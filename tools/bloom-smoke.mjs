@@ -339,12 +339,18 @@ export const SMOKE_BLOCKS = [
        its hub clamp, the annulus flag), buildStamenInto's tube and pill,
        spineLaw() at tilt 0 with a curl, the root on the CAP's normal, and
        the hidden-and-inert path under SPHERE; the families that need a
-       witness are JS1-JS4 in both directions. Cheapest row per path. */
+       witness are JS1-JS5 in both directions. Cheapest row per path.
+
+       WHAT THIS BLOCK IS BLIND TO AFTER SESSION 24, stated rather than
+       assumed: the two rows above carry JS5's DISC and RING arms, but NOT
+       its NO-ROOM corner — the disc inside its own inner limit, which is the
+       live matrix's `STAMENS: 1 stamen on the DISC` row and is not in the
+       subset. A mutation that only breaks the no-room clamp passes here. */
     rows: [
       { label: 'STAMENS: 6 on a RING (the six-stamen candidate)',
-        path: 'the RING layout at the six-stamen candidate — JS1 (flat normal), JS2 (containment, the radial law), JS3 (the root cylinder), JS4 (six free ends at the fixed count)' },
+        path: 'the RING layout at the six-stamen candidate — JS1 (flat normal), JS2 (containment, the radial law), JS3 (the root cylinder), JS4 (six free ends at the fixed count), JS5\'s RING arm (innerUsed and noRoom NULL, the stamens still at R)' },
       { label: 'STAMENS: 120 DISC x Head rise 0.5 (the tips fan out with the normals)',
-        path: 'the DISC layout at the count ceiling, CLAMPED at the hub, 86 roots in the petal-root annulus, on a CAP — JS1 on the cap\'s normal, JS2\'s equal-area clause, the two distance flags' },
+        path: 'the DISC layout at the count ceiling, CLAMPED at the hub, 86 roots in the petal-root annulus, on a CAP — JS1 on the cap\'s normal, JS5\'s annulus law and equal-area clause, the two distance flags' },
       { label: 'STAMENS: 6 x curl max (180) — bent in over the centre',
         path: 'spineLaw() at tilt 0 with a curl engaged — the filament off its normal beyond the outer face while the root stays on it' },
       { label: 'STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)',
@@ -365,7 +371,7 @@ export const SMOKE_BLOCKS = [
       { label: 'GYNOECIUM: a style on the bare apex (the four states — style only)',
         path: 'the style alone — JG1 (the root exactly on the axis, the normal exactly +z, through the full slab), JG2, JG3 (the root cylinder), JG4 (960 triangles, the trifid law on the emitted lobes)' },
       { label: 'GYNOECIUM: style x 6 stamens on a RING (the four states — both present)',
-        path: 'both parts present — the two descriptors from one owner on one row, JS1-JS4 and JG1-JG4 together, the centre accumulator counting both in R1' },
+        path: 'both parts present — the two descriptors from one owner on one row, JS1-JS5 and JG1-JG4 together, the centre accumulator counting both in R1' },
       { label: 'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on',
         path: 'spineLaw() with a curl on the filaments while the style stands on the axis they cross — the interaction the sheet is for; the rod helper on both parts' },
       { label: 'GYNOECIUM: GATED — the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert; bit-identical to the bare sphere)',

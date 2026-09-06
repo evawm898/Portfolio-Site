@@ -2652,17 +2652,33 @@ export async function zygoAssertions(page, row) {
 }
 
 /* ===================================================================
-   THE ANDROECIUM ASSERTIONS (session 21) — JS1-JS4, read from footRing()'s
-   own descriptor and the builder's EMITTED records, never the STL. Both STL
-   gates are blind to every one of them by construction: a filament rooted
-   off the normal, a stamen standing outside the hub, a root that touches the
-   slab in a hairline, or a stamen declared and never built, all export
-   watertight (each tube and pill is its own closed solid) and read as one
-   piece wherever the tube crosses the slab at all. Asserted in BOTH
-   directions on every row: present iff the state says so, absent otherwise.
+   THE ANDROECIUM ASSERTIONS (session 21; JS5 added session 24) — JS1-JS5,
+   read from footRing()'s own descriptor and the builder's EMITTED records,
+   never the STL. Both STL gates are blind to every one of them by
+   construction: a filament rooted off the normal, a stamen standing outside
+   the hub, a root that touches the slab in a hairline, a stamen declared and
+   never built, or a disc that starts on the axis, all export watertight (each
+   tube and pill is its own closed solid) and read as one piece wherever the
+   tube crosses the slab at all. Asserted in BOTH directions on every row:
+   present iff the state says so, absent otherwise.
+
+   JS5 (session 24) — THE DISC'S INNER LIMIT and the layout law. The limit is
+   REBUILT FROM THE SLAB rather than read from the descriptor (C1's
+   discipline), the annulus law is compared against the emitted radii, equal
+   area is asserted as its own property of those radii, and the DISC/RING
+   biconditional is asserted in both directions: `innerUsed` and `noRoom` are
+   numbers on a disc and NULL on a ring, and a ring's stamens stay at R even
+   when R is inside the limit.
+
+   WHAT JS5 DOES NOT COVER, stated here rather than assumed: it says nothing
+   about whether the limit is the RIGHT distance for a printed part. `rFil +
+   rSty` is where two tubes stop intersecting, which is geometry; whether a
+   filament that close to a style survives SLS is UNMEASURED — no coupon has
+   been printed. It is also silent on stamen-on-stamen crowding, which stays
+   the ROOTS FUSE flag's job and is not a gate.
    =================================================================== */
 export const STAMEN_SCOPE =
-  "androecium claims read footRing()'s own descriptor and the builder's emitted root axes, root rings and apexes, NOT the STL; a filament rooted off the normal (JS1), a stamen outside the hub (JS2), a hairline root (JS3) and a stamen declared and not built or built without its pill (JS4) all export watertight and as one piece — measured on mutants before these existed";
+  "androecium claims read footRing()'s own descriptor and the builder's emitted root axes, root rings and apexes, NOT the STL; a filament rooted off the normal (JS1), a stamen outside the hub (JS2), a hairline root (JS3), a stamen declared and not built or built without its pill (JS4) and a Vogel disc that starts on the axis (JS5) all export watertight and as one piece — measured on mutants before these existed";
 
 export async function stamenAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -2759,22 +2775,54 @@ export async function stamenAssertions(page, row) {
     }
     if (bad.length > 40) { bad.push('… (truncated)'); break; }
   }
-  /* THE LAYOUT LAW, as a PROPERTY of the emitted azimuths and the owner's
-     radii, never a restatement: RING is one radius and even azimuths; DISC
-     is equal-area (r_i^2 steps by a constant) at the golden angle. */
+  /* JS5 — THE INNER LIMIT AND THE LAYOUT LAW (session 24), as a PROPERTY of
+     the emitted azimuths and radii, never a restatement of the owner's.
+
+     THE LAW IS REBUILT HERE FROM OTHER OWNERS — C1's discipline. `innerLimit`
+     is rebuilt from the SLAB (`m.hubThickness`), never from the descriptor's
+     own `rFil` or `innerLimit`, so a limit derived from the wrong quantity
+     fails; `radius` is JS2's, already pinned against asked / limit / clamped.
+     Then every emitted radius is compared against the annulus law built from
+     those two and the count.
+
+     BOTH DIRECTIONS, because a limit that silently stopped applying and a
+     limit that applied where it must not are different defects: `innerUsed`
+     and `noRoom` must be numbers on DISC and NULL on RING, and RING's stamens
+     must sit at R even when R is inside the limit — the ring cannot start
+     inside the style, so the limit is not its to honour. */
   if (S.length === count && count >= 1) {
     const az = S.map((s) => s.azimuth), wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+    /* The limit from the SLAB: one filament radius plus one style radius,
+       both being one sheet thick. Not read from A.innerLimit. */
+    const wantLimit = t / 2 + t / 2;
+    if (A.innerLimit !== wantLimit) bad.push(`JS5: the inner limit the owner declares, ${A.innerLimit}, is not a filament radius plus a style radius on a ${t} mm slab = ${wantLimit}`);
+    const Gy = m.gynoecium;
+    if (Gy && A.innerLimit !== A.rFil + Gy.rSty) bad.push(`JS5: the inner limit ${A.innerLimit} is not the filament radius ${A.rFil} plus the style radius ${Gy.rSty} — the law of the disc and the flag must be ONE quantity`);
+    if (m.filamentStyle && m.filamentStyle.threshold !== A.innerLimit) bad.push(`JS5: the filament-against-style flag reports a threshold of ${m.filamentStyle.threshold} while the inner limit is ${A.innerLimit} — the flag must READ the limit, never re-derive it`);
     if (A.layout === 'RING') {
+      if (A.innerUsed !== null || A.noRoom !== null) bad.push(`JS5: RING reports innerUsed ${A.innerUsed} / noRoom ${A.noRoom} — the inner limit belongs to the DISC, and a claim nothing can make must read as absent`);
       for (let i = 0; i < count; i++) {
-        if (A.stamens[i].radius !== A.radius) { bad.push(`JS2: RING stamen ${i} at radius ${A.stamens[i].radius}, the ring is ${A.radius}`); break; }
+        if (A.stamens[i].radius !== A.radius) { bad.push(`JS2: RING stamen ${i} at radius ${A.stamens[i].radius}, the ring is ${A.radius}${A.radius < A.innerLimit ? ' — the inner limit must NOT apply to a ring' : ''}`); break; }
         if (Math.abs(wrap(az[i] - (i * 2 * Math.PI) / count)) > 1e-9) { bad.push(`JS2: RING stamen ${i} at azimuth ${az[i]}, the radial law puts it at ${(i * 2 * Math.PI) / count}`); break; }
       }
     } else {
-      const step = (A.radius * A.radius) / count;
+      const wantUsed = Math.min(wantLimit, A.radius), wantNoRoom = A.radius <= wantLimit;
+      if (A.innerUsed !== wantUsed) bad.push(`JS5: DISC reports innerUsed ${A.innerUsed}; the limit ${wantLimit} against a disc of ${A.radius} gives ${wantUsed}`);
+      if (A.noRoom !== wantNoRoom) bad.push(`JS5: DISC reports noRoom ${A.noRoom} at radius ${A.radius} against the ${wantLimit} mm limit, which says ${wantNoRoom}`);
+      const step = (A.radius * A.radius - wantUsed * wantUsed) / count;
       for (let i = 0; i < count; i++) {
-        const r2 = A.stamens[i].radius * A.stamens[i].radius, want = (i + 0.5) * step;
-        if (Math.abs(r2 - want) > 1e-9 * Math.max(1, want)) { bad.push(`JS2: DISC stamen ${i} at r^2 ${r2}, the equal-area law wants ${want} (step ${step})`); break; }
+        const r2 = A.stamens[i].radius * A.stamens[i].radius, want = wantUsed * wantUsed + (i + 0.5) * step;
+        if (Math.abs(r2 - want) > 1e-9 * Math.max(1, want)) { bad.push(`JS5: DISC stamen ${i} at r^2 ${r2}, the annulus law from ${wantUsed} to ${A.radius} wants ${want} (step ${step})`); break; }
+        if (A.stamens[i].radius < wantUsed - 1e-9) { bad.push(`JS5: DISC stamen ${i} stands at ${A.stamens[i].radius}, inside the ${wantUsed} mm inner limit`); break; }
         if (Math.abs(wrap(az[i] - i * GOLDEN_ANGLE)) > 1e-9) { bad.push(`JS2: DISC stamen ${i} at azimuth ${az[i]}, the golden angle puts it at ${wrap(i * GOLDEN_ANGLE)}`); break; }
+      }
+      /* EQUAL AREA is what the re-basing had to preserve, so it is asserted
+         as its own property of the EMITTED radii rather than inferred from
+         the law above matching: every annulus the same area. */
+      if (count > 2) {
+        const gaps = A.stamens.slice(1).map((s, i) => s.radius * s.radius - A.stamens[i].radius * A.stamens[i].radius);
+        const lo = Math.min(...gaps), hi = Math.max(...gaps);
+        if (hi - lo > 1e-9 * Math.max(1, hi)) bad.push(`JS5: the annuli of the DISC are not equal-area — r^2 steps range ${lo} to ${hi} across ${count} stamens`);
       }
     }
   }
