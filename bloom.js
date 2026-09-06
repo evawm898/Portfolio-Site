@@ -434,6 +434,10 @@ let lastPetalsBuilt = 0;
    that silently built a full ring would have passed all of them at an
    identical triangle count and STL byte length. */
 let lastSlotAzimuths = [];
+/* THE ANDROECIUM (session 21): footRing()'s descriptor, the builder's own
+   per-stamen emission records, its free-end tally and the two distance
+   flags — the inputs of JS1-JS4 and of the read-out's STAMENS line. */
+let lastAndroecium = null, lastStamens = [], lastFreeEnds = 0, lastStamenNearest = null;
 /* THE PLACEMENT THE BUILD WAS MADE FROM — the registry control's value, kept
    beside footRing()'s own `fan` record so J7 can cross-check the two. They
    are genuinely two owners of one boundary (the registry owns the option
@@ -475,6 +479,7 @@ function buildGeometry({ exportMode, record = false }) {
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
+    lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -824,7 +829,29 @@ function fanLine(fr) {
        + `\n`;
 }
 
-function summarise(ui, acc, mode, rings, fr, petals) {
+/* THE STAMENS LINE (session 21) — the androecium told in the numbers a
+   visitor cannot set, all of them footRing()'s own or the builder's own,
+   never re-derived here: the layout, the disc radius beside the reference it
+   multiplies (and "(CLAMPED at the hub radius)" when the range ran out —
+   the roll floor's discipline), the filament and the pill, the petal-root
+   annulus FLAG with the clear disc beside it, the two distance flags, and the
+   spine floor told (never clamped). Then the SLENDERNESS line (Q7), verbatim
+   tagged: telemetry, never a gate, until a coupon is printed. Absent when the
+   androecium is absent, so the lines simply are not there. */
+function stamenLine(fr, stamens, near, mode) {
+  const A = fr.androecium;
+  if (!A) return '';
+  const under = stamens.filter((s) => s.law.underFloor).length;
+  return `STAMENS ${A.count} on ${A.layout === 'DISC' ? 'a Vogel disc' : 'one ring'} · radius ${A.radius.toFixed(2)} mm (${mode}) = ${A.spread.toFixed(2)}x the reference ${A.derivedRadius.toFixed(2)} mm (the filaments' own area rule)`
+       + (A.onAxis ? ` (ON THE AXIS: the hub, ${A.hubRadius.toFixed(2)} mm, is narrower than a filament radius — ${A.asked.toFixed(2)} mm asked)` : A.clamped ? ` (CLAMPED at the hub radius ${A.hubRadius.toFixed(2)} mm less a filament radius — ${A.asked.toFixed(2)} mm asked)` : '')
+       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther PILL ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
+       + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
+       + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}` : '')
+       + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
+       + `\nSLENDERNESS L/d ${A.slenderness.toFixed(1)} (${mode}) — UNMEASURED — no coupon has been printed\n`;
+}
+
+function summarise(ui, acc, mode, rings, fr, petals, built = null) {
   const tris = acc.triangleCount.toLocaleString('en-US');
   const dim = acc.maxDimensionMm.toFixed(1);
   const layers = Number(ui.layerCount);
@@ -874,6 +901,7 @@ function summarise(ui, acc, mode, rings, fr, petals) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -946,7 +974,7 @@ function regenerate() {
   } else if (!userMoved) {
     fitCamera(lastFitRadius);
   }
-  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals) + `\n${materialLines(ui, mode)}`;
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
   readout.textContent = shownSummary;
 }
 
@@ -1112,7 +1140,7 @@ document.getElementById('exportStl').addEventListener('click', () => {
      an index into a variable-length list is a bug waiting for the first
      multi-layer export — it would have printed the ring radii under the word
      "exported". The tris/max-dim line is always last, so ask for that. */
-  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.petals).split('\n');
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.petals, built).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
 });
@@ -1405,6 +1433,16 @@ window.__bloomMetrics = () => ({
      the hub, so no flood fill splits. */
   petalThickness: lastPetal ? lastPetal.thickness : null,
   petalThicknessGuardResidual: lastPetal ? lastPetal.thicknessGuardResidual : null,
+  /* THE ANDROECIUM (session 21) — footRing()'s descriptor (null when absent
+     or under SPHERE), every stamen the builder EMITTED (root axis, surface
+     point, the two root rings, the apex — JS1-JS4's inputs, read from the
+     emission and never from the descriptor alone), the builder's free-end
+     tally and the two distance flags. The descriptor's `dome` is the same
+     object as `hubDome` and is dropped here to keep the hook one owner. */
+  androecium: lastAndroecium ? { ...lastAndroecium, dome: undefined, stamens: lastAndroecium.stamens.map((s) => ({ ...s })) } : null,
+  stamens: lastStamens.map((s) => ({ ...s })),
+  freeEnds: lastFreeEnds,
+  stamenNearest: lastStamenNearest,
 });
 window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) => { userMoved = true; fitCamera(radius, lift, at, dir, up); };
 

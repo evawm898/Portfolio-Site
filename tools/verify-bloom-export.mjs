@@ -48,7 +48,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE } from './bloom-harness.mjs';
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
+         stamenAssertions, STAMEN_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -149,6 +150,14 @@ for (const row of rows) {
      identity, an exact equality computed in footRing) are what observe it. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
+  /* THE ANDROECIUM (JS1-JS4, session 21), on EVERY row in both directions —
+     absent where the state says absent (count 0, or SPHERE where it is
+     hidden and inert), and where present: the root axis on the owner's
+     normal through the full slab, containment, the overlap a solid read from
+     the emitted root rings, the free-end census. This gate sees none of it:
+     each tube and pill is its own closed solid. */
+  const stm = await stamenAssertions(page, row);
+  if (stm.length) { validity.push(`${row.label}: ${stm.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -280,6 +289,7 @@ console.log(`${results.length - countMoved.length}/${results.length} configs hav
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
+console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag

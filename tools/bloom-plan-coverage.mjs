@@ -147,6 +147,17 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     const accHC = new mod.MeshBuilder({ exportMode: true });
     const frHC = mod.footRing(ui, accHC);
     mod.buildHubInto(accHC, ui, frHC.hub);
+    /* THE ANDROECIUM (session 21) — a THIRD accumulator, counted in R1 and
+       never rasterised: the anthers are not the petal canopy this raster is
+       about, and a stamen over the disc must not read as crown closure. The
+       orchestration is buildBloomInto's own, copied like the petal loop
+       below; R1 is what checks the copy against the owner. */
+    const accST = new mod.MeshBuilder({ exportMode: true });
+    if (frHC.androecium) {
+      const A = frHC.androecium;
+      mod.buildWhorlInto({ count: A.count, radius: (i) => A.stamens[i].radius, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
+        placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL', blade: (slot) => { mod.buildStamenInto(accST, A, A.stamens[slot.index], slot); } });
+    }
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
@@ -247,8 +258,8 @@ export async function measure(page, { capability = null, wantMask = false } = {}
 
     /* R1 */
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub/centre-only (${accHC.triangleCount}) tris = ${petalTris + accHC.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + stamens-only (${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {

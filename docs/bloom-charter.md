@@ -4385,3 +4385,94 @@ matters should be measured this way.
       B2 the androecium, B3 the gynoecium and the shipping default; B2 is split and SAID if
       it grows past its estimate, on session 19's 2.7x miss. The CORONA stays reserved as a
       name (the session-20 ruling above); nothing here builds it.
+
+- ~~Phase 2, B2 — the androecium~~ **BUILT Sep 6 (session 21): filaments one sheet thick
+  rooted THROUGH the hub slab on the owner's surface normal, curved by `spineLaw()` at a curl
+  of 0 as the identity, tipped with the PILL (A1, FIXED); `fr.androecium` as `footRing()`'s
+  second descriptor kind, sharing the dome object and a surface law extracted into one helper
+  both maps call (the petal rings byte-identical on the newest baseline by construction and
+  by diff); two layouts — RING (the shipped RADIAL law) and the VOGEL DISC (the equal-area
+  seed-head law the charter parked for petals, which shrink; stamens are constant-size, so
+  the objection does not apply); JS1–JS4 in both STL gates and fired on mutants; the
+  two-statement SPHERE guard with GATED rows; the slenderness line tagged verbatim; the
+  sheet with the pill at both count extremes and the six-filament curl range. SHIPS ABSENT
+  (`stamenCount` 0), 0 moved. Numbers, the mutant table, the rise measurement and the
+  recommendation in `docs/bloom-session-21-outcome.md`. Merge waits on Eva's ruling on the
+  sheet.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, Phase A, carried).** A1 PILL fixed — one shape, no
+      enum, no sub-controls; **A2 BILOBED is retired from the candidate set permanently**;
+      A3 T-BAR is a later value addition once six curved filaments have been seen (this sheet
+      shows them); A4 CLUB dropped. The radius is a RANGE: the filaments' OWN area rule
+      (R² = Σ r_filament² — the disc their cross-sections would tile) times an exposed
+      multiplier, out to the hub radius, where it is CLAMPED and told; stamen roots inside the
+      petal-root annulus are FLAGGED, never refused. Stamen roots do NOT enter the petal
+      ring's area rule (Q5 amended): `spread` scales the petal ring and nothing else.
+
+    - **"OUT TO THE HUB RADIUS" MEANS THE FOOTPRINT REACHES THE RIM — measured, not
+      assumed.** The first smoke run clamped the disc's CENTRE at the hub radius and JS2
+      fired: 16 of 120 roots stood half over the slab's edge on the defaults. The limit is
+      the hub radius LESS ONE FILAMENT RADIUS. Its one reachable corner — a hub narrower than
+      a filament radius (ALL MIN × spread min × sheet 2.40, the apex floor's own corner) —
+      collapses the androecium onto the axis: told (`onAxis`, the read-out's ON THE AXIS
+      clause), never refused, on the crosses-axis precedent, with a matrix row.
+
+    - **THE FILAMENT IS ONE SHEET THICK.** Its diameter is `sheetThickness`, floored at export
+      exactly as the sheet is — Part thickness owns the material dimension, and nothing here
+      has been printed. The pill is 1.6 filaments across and 2.5 of its own diameters long:
+      two constants (`ANTHER_DIAMETER_FACTOR`, `ANTHER_LENGTH_FACTOR`) for Eva's eye on the
+      sheet, never controls. Tilt is 0 with the axes mapped (dR along the normal, dZ inward),
+      not π/2 on the petal's axes, because cos(π/2) is 6e-17 and not 0 — at curl 0 the rod is
+      EXACTLY the normal, the law's own zero-curvature branch (Q3).
+
+    - **HEAD RISE DOES NOT RELIEVE THE ROOT PACKING AND DOES UNFUSE THE ANTHERS — by
+      splaying the filaments, not by adding surface.** Measured from the built owner on the
+      120-stamen disc at the shipping spread: the nearest roots' surface chord moves 1.164 →
+      1.168 mm from flat to hemisphere (0.3%), the same finding the dome made for the petal
+      feet; the nearest ANTHERS go 1.16 → 3.74 mm at rise 0.50 → 4.39 mm at a hemisphere,
+      because a filament leaves along the surface normal and the cap's normals fan out.
+      **Said plainly: on a bloom with an androecium, Head rise is the stamen splay** — that is
+      what the control means now, and the sheet's third row is that picture.
+
+    - **THE RECOMMENDATION ON THE RADIUS CONTROL: A MULTIPLIER, not millimetres** — it is
+      scale-free across count and filament diameter (the count is the control a visitor
+      actually turns); the range's far end is the hub radius, itself derived and moving under
+      nine controls, so a millimetre slider would clamp anyway and a clamp on the thing the
+      slider NAMES is worse than one on a ratio the read-out already tells in millimetres;
+      and the panel already teaches the reading. Its cost, told: on the shipping hub with 120
+      stamens the multiplier saturates at 1.37, so 4.6 of 6.0 sits above the clamp. Default
+      2.00 on the spread precedent (the Vogel disc's nearest pair is 1.547·m·(d/2): the
+      filaments clear at 1.29, the anthers at 2.07). Eva's ruling.
+
+    - **THE STOPPING RULE FIRED AT THE LINE AND THE SPLIT IS SAID.** 666 insertions on the
+      eight code files when JS1–JS4 were written and not yet green (~40% comment); nothing was
+      added past that point that a green run did not need. **B2b:** the crowding RASTER
+      extensions (stamen feet in `D_max`, the exact stamen-on-foot rectangle test — the
+      read-out's petal-root ANNULUS count is the radial stand-in) and the anther-against-BLADE
+      instrument (the anther-against-anther half ships as the nearest-apex flag). The curved
+      filaments were built before the check fired and are kept: one code path, and the sheet
+      Eva asked for shows the range.
+
+    - **THE INSTRUMENTS.** `stamenAssertions()` — JS0 (the two statements per row, present iff
+      eligible and count ≥ 1, nothing emitted when absent), JS1 (the root axis inner→outer is
+      exactly t along the cap's normal at the owner's surface point; flat: [0,0,1] and z = 0
+      exactly), JS2 (the limit, the clamp, every footprint inside the hub disc, the layout law
+      as a PROPERTY — one radius and even azimuths, or equal-area steps at the golden angle),
+      JS3 (both root rings as EMITTED: every point exactly one filament radius from its centre
+      in the face plane — a cylinder of diameter d through the full t, never a hairline), JS4
+      (emitted = tallied = declared; every stamen at the fixed 560 triangles from the
+      accumulator's own delta, so a dropped pill or a doubled tube moves it; apexes distinct).
+      **Both STL gates are blind to all of it** — each tube and pill is its own closed solid.
+      Six mutants, each fired first on the assertion that names it (the table in the outcome
+      doc); the sphere mutant dies at HARNESS LOAD. A JS4 clause that required the apex beyond
+      the outer face was WRONG and is gone: at curl 180 the anther comes back below the hub
+      plane on purpose — "free" is the census's word for the un-rooted end, never a position.
+      The plan and solid-angle coverage instruments count the stamens in R1 and never
+      rasterise them: an anther over the disc is not crown closure.
+
+    - **THE SHEET: `node tools/shot-bloom-androecium.mjs <dir>`** — six on a ring and a
+      hundred and twenty on the disc (the pill at both count extremes), the six-filament curl
+      range, the 120-disc flat / rise 0.50 / hemisphere on one camera, the multiplier at its
+      ends, one stamen, six on the disc, the absent default, and the byte claim on the sheet
+      (the androecium at maximum under SPHERE exporting the bare sphere's own sha — required
+      equal, or no sheet). Merge is released by Eva's ruling on it.

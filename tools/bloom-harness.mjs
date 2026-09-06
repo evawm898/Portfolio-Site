@@ -64,7 +64,8 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
-         MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+         MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
+         MAX_STAMENS, STAMEN_SIDES, STAMEN_TRIS, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -256,6 +257,43 @@ for (const o of ROLE_OVERRIDES) {
   }
   if (bad.length) {
     throw new Error(`the two statements of the sphere gating disagree — a slider the registry HIDES that the geometry still reads, or the reverse:\n  ${bad.join('\n  ')}`);
+  }
+}
+
+/* THE SAME TWO-STATEMENT CHECK FOR THE ANDROECIUM (session 21): the
+   registry's `androeciumEligible` HIDES the whole Androecium section under
+   SPHERE and `androeciumPresent` hides the sub-controls at count 0;
+   bloom-geometry.js's `androeciumEligible()` makes the section INERT (a null
+   descriptor) under SPHERE. Swept over every placement x both hub shapes x
+   four counts; per row against the real page in stamenAssertions. The
+   registry's slider ceiling must be the builder's MAX_STAMENS (the
+   layerCount / MAX_LAYERS argument, verbatim). */
+{
+  const bad = [];
+  const countCtl = CONTROLS.find((c) => c.id === 'stamenCount');
+  if (!countCtl) throw new Error('the registry declares no `stamenCount` control — the androecium block and stamenAssertions both read it');
+  if (countCtl.max !== MAX_STAMENS) throw new Error(`registry stamenCount.max ${countCtl.max} !== MAX_STAMENS ${MAX_STAMENS} — the slider and the builder's own bound have drifted`);
+  if (countCtl.min !== 0 || countCtl.default !== 0) throw new Error(`registry stamenCount min ${countCtl.min} / default ${countCtl.default} — the androecium ships ABSENT (0 is the byte-identical default)`);
+  const subs = CONTROLS.filter((c) => c.section === 'androecium' && c.id !== 'stamenCount');
+  if (subs.length < 1) throw new Error('the Androecium section declares no sub-controls');
+  for (const placement of ['RADIAL', 'SPIRAL', 'CONTINUOUS', 'FAN']) {
+    for (const hubShape of ['CAP', 'SPHERE']) {
+      for (const stamenCount of [0, 1, 6, MAX_STAMENS]) {
+        const st = { ...DEFAULTS, placement, hubShape, stamenCount };
+        const geo = androeciumEligible(st);
+        const reg = evalPredicate({ ref: 'androeciumEligible' }, st);
+        if (geo !== reg) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens: geometry says ${geo}, registry says ${reg}`);
+        const countShown = evalPredicate(countCtl.visibleWhen, st);
+        if (countShown !== geo) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens: stamenCount is ${countShown ? 'shown' : 'hidden'} while the geometry ${geo ? 'can build an androecium' : 'builds none (SPHERE)'}`);
+        for (const c of subs) {
+          const shown = evalPredicate(c.visibleWhen, st);
+          if (shown !== (geo && stamenCount >= 1)) bad.push(`${placement} x ${hubShape} x ${stamenCount} stamens: ${c.id} is ${shown ? 'shown' : 'hidden'} while the androecium is ${geo && stamenCount >= 1 ? 'present' : 'absent'}`);
+        }
+      }
+    }
+  }
+  if (bad.length) {
+    throw new Error(`the two statements of the androecium gating disagree — a control the registry HIDES that the geometry still reads, or the reverse:\n  ${bad.join('\n  ')}`);
   }
 }
 
@@ -2575,6 +2613,136 @@ export async function zygoAssertions(page, row) {
   return bad;
 }
 
+/* ===================================================================
+   THE ANDROECIUM ASSERTIONS (session 21) — JS1-JS4, read from footRing()'s
+   own descriptor and the builder's EMITTED records, never the STL. Both STL
+   gates are blind to every one of them by construction: a filament rooted
+   off the normal, a stamen standing outside the hub, a root that touches the
+   slab in a hairline, or a stamen declared and never built, all export
+   watertight (each tube and pill is its own closed solid) and read as one
+   piece wherever the tube crosses the slab at all. Asserted in BOTH
+   directions on every row: present iff the state says so, absent otherwise.
+   =================================================================== */
+export const STAMEN_SCOPE =
+  "androecium claims read footRing()'s own descriptor and the builder's emitted root axes, root rings and apexes, NOT the STL; a filament rooted off the normal (JS1), a stamen outside the hub (JS2), a hairline root (JS3) and a stamen declared and not built or built without its pill (JS4) all export watertight and as one piece — measured on mutants before these existed";
+
+export async function stamenAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+  const bad = [];
+  const count = Math.round(Number(ui.stamenCount));
+  const regElig = evalPredicate({ ref: 'androeciumEligible' }, ui);
+  const geoElig = androeciumEligible(ui);
+  const want = regElig && count >= 1;
+  const A = m.androecium;
+  /* THE TWO STATEMENTS, per row, on the real state. */
+  if (regElig !== geoElig) bad.push(`JS0: the registry's androeciumEligible says ${regElig} and the geometry's says ${geoElig} on this state`);
+  if ((A !== null) !== want) bad.push(`JS0: the owner ${A ? 'declares an androecium' : 'declares none'} while the state ${want ? `asks for ${count} stamens on a ${regElig ? 'cap' : 'sphere'}` : (count === 0 ? 'asks for none' : 'is a SPHERE (hidden and inert)')}`);
+  if (!want) {
+    if (m.stamens.length !== 0 || m.freeEnds !== 0) bad.push(`JS4: ${m.stamens.length} stamens emitted and ${m.freeEnds} free ends tallied on a state with no androecium`);
+    if (m.stamenNearest !== null) bad.push('JS0: distance flags reported with no androecium — a claim nothing can make must read as absent');
+    return bad;
+  }
+  if (!A) return bad;
+  const dome = m.hubDome || null;
+  const t = m.hubThickness;
+  if (A.count !== count) bad.push(`JS0: the owner declares ${A.count} stamens, the control says ${count}`);
+  if (A.thickness !== t || A.diameter !== t || A.rFil !== t / 2) bad.push(`JS3: the filament is ${A.diameter} across on a ${t} mm slab — it is meant to be one sheet thick, floored with it`);
+  if (A.hubRadius !== m.hubRadius) bad.push(`JS2: the owner's androecium reads a hub radius of ${A.hubRadius}, the hub is ${m.hubRadius}`);
+  if (Math.abs(A.derivedRadius - (t / 2) * Math.sqrt(count)) > 1e-12) bad.push(`JS2: the reference radius ${A.derivedRadius} is not the area rule's (d/2) sqrt(N) = ${(t / 2) * Math.sqrt(count)}`);
+  if (A.limit !== Math.max(0, A.hubRadius - A.rFil)) bad.push(`JS2: the range's limit ${A.limit} is not the hub radius ${A.hubRadius} less a filament radius ${A.rFil}`);
+  if (A.clamped !== (A.asked > A.limit)) bad.push(`JS2: clamped reads ${A.clamped} while asked ${A.asked} against the limit ${A.limit} says ${A.asked > A.limit}`);
+  if (A.radius !== (A.clamped ? A.limit : A.asked)) bad.push(`JS2: the disc radius ${A.radius} is neither the asked ${A.asked} nor the limit ${A.limit} it should clamp to`);
+  if (A.onAxis !== (A.limit === 0)) bad.push(`JS2: onAxis reads ${A.onAxis} at a limit of ${A.limit}`);
+  if (Math.abs(A.anther.diameter - ANTHER_DIAMETER_FACTOR * t) > 1e-12 || Math.abs(A.anther.length - ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * t) > 1e-12) bad.push(`JS4: the pill is ${A.anther.diameter} x ${A.anther.length} on a ${t} mm filament — not the fixed proportion`);
+  /* JS4 — THE FREE-END CENSUS: one stamen emitted per stamen declared, the
+     builder's tally agreeing, every one at the FIXED per-stamen triangle
+     count (the accumulator's own delta, so a dropped pill or a doubled tube
+     moves it), every apex distinct and outside the slab. */
+  if (m.stamens.length !== count) bad.push(`JS4: ${m.stamens.length} stamens emitted for ${count} declared`);
+  if (m.freeEnds !== count) bad.push(`JS4: the builder tallied ${m.freeEnds} free ends for ${count} stamens declared`);
+  if (m.stamenNearest === null && count > 1) bad.push('JS4: no distance flags on an androecium of more than one stamen');
+  const S = m.stamens;
+  for (let i = 0; i < S.length; i++) {
+    const s = S[i], d = A.stamens[i];
+    if (!d) { bad.push(`JS4: emitted stamen ${i} has no descriptor`); continue; }
+    if (s.tris !== STAMEN_TRIS) bad.push(`JS4: stamen ${i} emitted ${s.tris} triangles, the fixed count is ${STAMEN_TRIS} — a pill dropped or a tube doubled`);
+    const N = s.N, len = Math.hypot(s.outer[0] - s.inner[0], s.outer[1] - s.inner[1], s.outer[2] - s.inner[2]);
+    /* JS1 — THE ROOT AXIS ON THE OWNER'S NORMAL THROUGH THE FULL SLAB: inner
+       to outer is exactly one slab thickness along the cap's normal at the
+       surface point, and the surface point is the owner's. */
+    if (Math.abs(len - t) > 1e-9) bad.push(`JS1: stamen ${i}'s root runs ${len} mm through a ${t} mm slab`);
+    for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / t - N[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s root axis is not along its normal ${JSON.stringify(N)}`);
+    for (let k = 0; k < 3; k++) if (Math.abs((s.inner[k] + s.outer[k]) / 2 - s.root[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s root axis is not centred on its surface point`);
+    const plan = Math.hypot(s.root[0], s.root[1]);
+    if (Math.abs(plan - d.radius) > 1e-9) bad.push(`JS1: stamen ${i} stands at plan radius ${plan}, the owner says ${d.radius}`);
+    if (dome) {
+      const dx = s.root[0], dy = s.root[1], dz = s.root[2] - dome.centreZ, dist = Math.hypot(dx, dy, dz);
+      if (Math.abs(dist - dome.Rd) > 1e-9) bad.push(`JS1: stamen ${i}'s root is ${dist} from the cap's centre, the cap's radius is ${dome.Rd} — not ON the surface the owner declares`);
+      const wantN = [dx / dome.Rd, dy / dome.Rd, dz / dome.Rd];
+      for (let k = 0; k < 3; k++) if (Math.abs(N[k] - wantN[k]) > 1e-9) bad.push(`JS1: stamen ${i}'s normal ${JSON.stringify(N)} is not the cap's there ${JSON.stringify(wantN)}`);
+      if (Math.abs(s.root[2] - d.z) > 1e-9) bad.push(`JS1: stamen ${i}'s root z ${s.root[2]} is not the owner's ${d.z}`);
+    } else {
+      if (!(N[0] === 0 && N[1] === 0 && N[2] === 1)) bad.push(`JS1: stamen ${i}'s normal ${JSON.stringify(N)} is not exactly the hub plane's [0,0,1]`);
+      if (s.root[2] !== 0) bad.push(`JS1: stamen ${i}'s root z = ${s.root[2]}, not exactly 0 — it left the hub plane`);
+    }
+    /* JS2 — CONTAINMENT: the whole root footprint inside the hub disc. The
+       one labelled exception is the on-axis corner (a hub narrower than a
+       filament radius), where the footprint cannot fit and the owner says
+       so; there the root must stand exactly on the axis. */
+    if (A.onAxis) { if (d.radius !== 0) bad.push(`JS2: the owner declares the androecium on the axis and stamen ${i} stands at radius ${d.radius}`); }
+    else if (!(d.radius + A.rFil <= A.hubRadius + 1e-9)) bad.push(`JS2: stamen ${i} at radius ${d.radius} with a ${A.rFil} mm filament radius stands outside the hub disc of ${A.hubRadius}`);
+    if (!(d.radius <= A.radius + 1e-12)) bad.push(`JS2: stamen ${i} at radius ${d.radius} is outside the androecium's own radius ${A.radius}`);
+    /* JS3 — THE OVERLAP IS A SOLID, read from the two root rings AS EMITTED:
+       STAMEN_SIDES points each, every one exactly one filament radius from
+       its ring's centre and in the plane perpendicular to the axis, one ring
+       on each face of the slab — a cylinder of diameter d through the full
+       thickness t, never a hairline. */
+    const rings = s.rootRings;
+    if (!Array.isArray(rings) || rings.length !== 2) { bad.push(`JS3: stamen ${i} reports ${rings && rings.length} root rings, expected 2`); continue; }
+    rings.forEach((ring, which) => {
+      const C = which === 0 ? s.inner : s.outer;
+      if (!Array.isArray(ring) || ring.length !== STAMEN_SIDES) { bad.push(`JS3: stamen ${i}'s ${which === 0 ? 'inner' : 'outer'} root ring has ${ring && ring.length} points, expected ${STAMEN_SIDES}`); return; }
+      for (const p of ring) {
+        const v = [p[0] - C[0], p[1] - C[1], p[2] - C[2]];
+        const r = Math.hypot(v[0], v[1], v[2]);
+        if (Math.abs(r - A.rFil) > 1e-9) bad.push(`JS3: stamen ${i}'s ${which === 0 ? 'inner' : 'outer'} root ring has a point ${r} from its centre, the filament radius is ${A.rFil} — the overlap with the slab is not the solid cylinder the invariant is built on`);
+        if (Math.abs(v[0] * N[0] + v[1] * N[1] + v[2] * N[2]) > 1e-9) bad.push(`JS3: stamen ${i}'s ${which === 0 ? 'inner' : 'outer'} root ring leaves the face plane`);
+      }
+    });
+    /* JS4 — the apex is its own. "Free" is the census's word for the
+       un-rooted end, never a position claim: a filament at curl 180 brings
+       its anther back below the hub plane on purpose (measured on the first
+       smoke run, where a "beyond the outer face" clause fired on a shipped
+       row), and where an anther lands is the sheet's question. */
+    for (let j = 0; j < i && !A.onAxis; j++) {
+      const o = S[j];
+      if (Math.hypot(s.apex[0] - o.apex[0], s.apex[1] - o.apex[1], s.apex[2] - o.apex[2]) < 1e-9) bad.push(`JS4: stamens ${j} and ${i} share an apex — DUPLICATE GEOMETRY, this family's known cause of non-manifold edges`);
+    }
+    if (bad.length > 40) { bad.push('… (truncated)'); break; }
+  }
+  /* THE LAYOUT LAW, as a PROPERTY of the emitted azimuths and the owner's
+     radii, never a restatement: RING is one radius and even azimuths; DISC
+     is equal-area (r_i^2 steps by a constant) at the golden angle. */
+  if (S.length === count && count >= 1) {
+    const az = S.map((s) => s.azimuth), wrap = (x) => Math.atan2(Math.sin(x), Math.cos(x));
+    if (A.layout === 'RING') {
+      for (let i = 0; i < count; i++) {
+        if (A.stamens[i].radius !== A.radius) { bad.push(`JS2: RING stamen ${i} at radius ${A.stamens[i].radius}, the ring is ${A.radius}`); break; }
+        if (Math.abs(wrap(az[i] - (i * 2 * Math.PI) / count)) > 1e-9) { bad.push(`JS2: RING stamen ${i} at azimuth ${az[i]}, the radial law puts it at ${(i * 2 * Math.PI) / count}`); break; }
+      }
+    } else {
+      const step = (A.radius * A.radius) / count;
+      for (let i = 0; i < count; i++) {
+        const r2 = A.stamens[i].radius * A.stamens[i].radius, want = (i + 0.5) * step;
+        if (Math.abs(r2 - want) > 1e-9 * Math.max(1, want)) { bad.push(`JS2: DISC stamen ${i} at r^2 ${r2}, the equal-area law wants ${want} (step ${step})`); break; }
+        if (Math.abs(wrap(az[i] - i * GOLDEN_ANGLE)) > 1e-9) { bad.push(`JS2: DISC stamen ${i} at azimuth ${az[i]}, the golden angle puts it at ${wrap(i * GOLDEN_ANGLE)}`); break; }
+      }
+    }
+  }
+  return bad;
+}
+
 /* THE EXPORT FLOOR, asserted through the REAL export path. The live build
    never floors — floorThickness() is a no-op outside export mode — so no
    live metric can answer "did the print stay above the minimum feature". The
@@ -2695,6 +2863,16 @@ const PLACEMENT_SUB_IDS = () => new Set(PLACEMENT_SUBS().map((c) => c.id));
    -0.8 — bias and start are at their identities there and move nothing). */
 const CURL_SUBS = () => SLIDERS().filter((c) => ['petalSpineCurl', 'petalRoll'].some((d) => predicateDrivers(c.visibleWhen).has(d)) && !evalPredicate(c.visibleWhen, DEFAULTS));
 const CURL_SUB_IDS = () => new Set(CURL_SUBS().map((c) => c.id));
+/* THE ANDROECIUM'S SUB-CONTROLS (session 21) — hidden at the shipping
+   defaults because the androecium ships ABSENT (stamenCount 0). Derived from
+   the predicate: a control whose drivers name `stamenCount` and which
+   evalPredicate() hides at DEFAULTS. They ALSO satisfy PLACEMENT_SUBS above
+   (their predicate reaches `placement` through sphereMode), so SWEEPABLE
+   already leaves them alone — PREDECLARED: ALL MAX carries stamenCount 120 (a
+   visible slider, swept) with spread / length / curl at their defaults, and
+   ALL MIN carries no androecium. Named here so block 1's skip says why. */
+const STAMEN_SUBS = () => CONTROLS.filter((c) => c.visibleWhen && predicateDrivers(c.visibleWhen).has('stamenCount') && !evalPredicate(c.visibleWhen, DEFAULTS));
+const STAMEN_SUB_IDS = () => new Set(STAMEN_SUBS().map((c) => c.id));
 /* Every non-centre, non-layer-gated, non-placement-gated slider — the set the
    blanket sweep and the ALL MIN / ALL MAX corners are entitled to move. */
 const SWEEPABLE = () => SLIDERS().filter((c) => !LAYER_SUB_IDS().has(c.id) && !PLACEMENT_SUB_IDS().has(c.id));
@@ -2709,6 +2887,7 @@ export function buildMatrix() {
   for (const c of SLIDERS()) {
     if (c.id === 'petalCount') continue;                 // swept exhaustively above
     if (LAYER_SUB_IDS().has(c.id)) continue;             // needs layerCount >= 2; see block 7
+    if (STAMEN_SUB_IDS().has(c.id)) continue;            // needs stamenCount >= 1; see block 23
     if (PLACEMENT_SUB_IDS().has(c.id)) continue;         // needs a placement it is gated on; see block 13
     if (SLOT_SUB_IDS().has(c.id)) continue;              // slot roles; see block 12
     if (CURL_SUB_IDS().has(c.id)) continue;              // hidden at the defaults (curl bias, curl start, roll taper); see block 21
@@ -3803,6 +3982,58 @@ export function buildMatrix() {
   /* Every pin must have found its row — a pin on a label that drifted is a
      pin on nothing. */
   for (const k of Object.keys(SOLID_PINS)) if (!rows.some((r) => r.label.startsWith(k))) throw new Error(`SOLID_PINS names a row that does not exist: ${k}`);
+
+  /* 23. THE ANDROECIUM (session 21, phase 2 B2) — stamens rooted through the
+         slab on the owner's normal, curved by spineLaw() at curl 0 as the
+         identity, tipped with the fixed PILL. Ships ABSENT (stamenCount 0),
+         so every earlier row is bit-identical by construction and this block
+         is the whole of the new part's coverage; `stamenCount` min / max are
+         block 1's (0 is the default; 120 on the default RING is a fused ring,
+         flagged) and ALL MAX carries 120 on a ring.
+
+         THE ROWS, named: the two count extremes on both layouts (the
+         six-stamen candidate on a RING, the 120-stamen cushion on the DISC,
+         one stamen alone); spread at both ends (0.6 fuses the roots; 6.0 runs
+         out to the hub and CLAMPS, told); length and curl at both ends on six
+         (the curl range the sheet shows); the DISC at 120 x Head rise 0.5 and
+         1 (the tip fan the measurement found); the apex corner (the mum's
+         4.69 mm printed hub with 120 stamens clamped into it) and the
+         thinnest slab; deeper petal roots (three whorls, the continuous
+         spiral, the fan); the fat filament (sheet 2.40); and the GATED rows
+         that police the inertness in BOTH directions — the androecium at
+         MAXIMUM under SPHERE (must be bit-identical to the bare sphere, on
+         the incurve sphere too) and every sub-control at maximum with count 0
+         (bit-identical to the default). JS1-JS4 and the two-statement guard
+         are what these rows are. */
+  const STAMEN_MAX = { stamenCount: MAX_STAMENS, stamenLayout: 'DISC', stamenSpread: 6, stamenLength: 40, stamenCurl: 180 };
+  for (const [name, sets] of [
+    ['STAMENS: 6 on a RING (the six-stamen candidate)', { stamenCount: 6 }],
+    ['STAMENS: 6 on the DISC', { stamenCount: 6, stamenLayout: 'DISC' }],
+    ['STAMENS: 120 on the DISC (the cushion; the disc CLAMPED at the hub, 86 in the petal-root annulus)', { stamenCount: 120, stamenLayout: 'DISC' }],
+    ['STAMENS: 1 stamen (RING)', { stamenCount: 1 }],
+    ['STAMENS: 1 stamen on the DISC', { stamenCount: 1, stamenLayout: 'DISC' }],
+    ['STAMENS: 6 x spread min (0.6) — the roots fuse, flagged', { stamenCount: 6, stamenSpread: 0.6 }],
+    ['STAMENS: 6 x spread max (6) — CLAMPED at the hub radius, told', { stamenCount: 6, stamenSpread: 6 }],
+    ['STAMENS: 6 x length min (5)', { stamenCount: 6, stamenLength: 5 }],
+    ['STAMENS: 6 x length max (40) — L/d 33', { stamenCount: 6, stamenLength: 40 }],
+    ['STAMENS: 6 x curl min (-180) — reflexed outward', { stamenCount: 6, stamenCurl: -180 }],
+    ['STAMENS: 6 x curl max (180) — bent in over the centre', { stamenCount: 6, stamenCurl: 180 }],
+    ['STAMENS: 6 x curl 90 x length max (40)', { stamenCount: 6, stamenCurl: 90, stamenLength: 40 }],
+    ['STAMENS: 120 DISC x Head rise 0.5 (the tips fan out with the normals)', { stamenCount: 120, stamenLayout: 'DISC', headRise: 0.5 }],
+    ['STAMENS: 120 DISC x Head rise 1 (a hemisphere)', { stamenCount: 120, stamenLayout: 'DISC', headRise: 1 }],
+    ['STAMENS: 120 DISC x the mum (the apex corner: 120 stamens clamped into a 4.69 mm printed hub)', { ...MUM, stamenCount: 120, stamenLayout: 'DISC' }],
+    ['STAMENS: 6 x ALL THIN x spread min (the thinnest slab)', { ...ALL_THIN, spread: 0.6, stamenCount: 6 }],
+    ['STAMENS: 6 x 3 layers (deeper petal roots)', { stamenCount: 6, layerCount: 3 }],
+    ['STAMENS: 120 DISC x CONTINUOUS x 3 turns', { placement: 'CONTINUOUS', layerCount: 3, stamenCount: 120, stamenLayout: 'DISC' }],
+    ['STAMENS: 6 x FAN (the fan\'s full-disc hub)', { placement: 'FAN', stamenCount: 6 }],
+    ['STAMENS: 120 DISC x sheet 2.40 (the fat filament)', { stamenCount: 120, stamenLayout: 'DISC', sheetThickness: 2.4 }],
+    ['STAMENS: 6 x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than a filament radius: the stamens stand ON THE AXIS, told)', { petalCount: 3, petalWidth: 8, sheetThickness: 2.4, footDelicacy: 0.25, spread: 0.6, stamenCount: 6 }],
+    ['STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)', { ...SPH, ...STAMEN_MAX }],
+    ['STAMENS: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)', { ...INCURVE, ...SPH, ...STAMEN_MAX }],
+    ['STAMENS: GATED — every sub-control at MAXIMUM with count 0 (hidden and inert; bit-identical to the default)', { ...STAMEN_MAX, stamenCount: 0 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
   return rows;
 }
 
