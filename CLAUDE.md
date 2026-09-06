@@ -1009,6 +1009,10 @@ nothing. `partBox()` deliberately does NOT use `Box3.setFromObject` — the line
 parents its `LineSegments2` onto the source mesh with a placeholder bounding
 volume, and `setFromObject` reported a leaf stretching to the origin.
 
+**A hatch angle is now a choice of WHERE THE DIRECTION COMES FROM** — see
+"Shape-derived direction" below; `angleDeg` is still the default and still the
+only thing hatch, flow and tone read in `global`.
+
 **The sheet is `node tools/shot-print-tone.mjs <dir>`** — solid fill and
 reserved-vein fill on the separate leaf, the vein and gradient and nib sweeps, the
 CONTRAST PAIR both ways round (one of them alone is a picture; the pair is the
@@ -1017,6 +1021,121 @@ The reference drawings are not in the repo, so the sheet says so and asks to be
 held beside them. **A hatch/flow-versus-tone row is NOT shot, for a measured
 reason:** at the zoom the leaf cells need, line-flow seeds its whole bounding box
 over the 301k-triangle bloom behind the leaf and ran over ten minutes on one cell.
+
+### Shape-derived direction (`direction: 'axis'`) — one axis per part, and the bloom cannot pass this test
+
+The third thing the infill can be told: where a stroke's direction COMES FROM.
+`global` is one angle for the whole model and **stays the default** — it is the
+right answer for a shape with no meaningful long axis. `axis` derives a
+direction PER PART from that part's own projected filled region.
+
+**THE AXIS IS A STRAIGHT PRINCIPAL AXIS, NOT A MEDIAL AXIS, AND THAT IS SAID
+RATHER THAN HIDDEN.** `partAxis()` is `principalAxis()` (the closed-form
+eigenvector the veins already used — one owner, not two) plus an ORIENTATION.
+On a part whose length curves, a straight axis is a CHORD: measured, on a leaf
+bowed 46 px, it misses the shape's own centre line by **28.6 px**. The
+mitigation is a SHEAR, not a medial axis — `makeWarp()` / `warpFrame()` push
+the silhouette into `(station, offset-from-the-centre-line)` coordinates, the
+SAME scanline runs there, and the spans are sheared back on emit, so a stroke
+follows the bend while "inside" is still decided by exactly one rule (#157's
+whole point). Measured: a sheared row sits **2.8 px** off the centre line where
+the straight axis sits 23.2 px off. **It is INERT on a straight part** (`K = 1`
+piece, identical to the unwarped stroke). It is WRONG on a forked or strongly
+re-entrant part — one centre line, two arms — and it is applied to CROSS-HATCH
+and not to the solid fill: a fill has no legible stroke direction to curve, and
+paying K times the segments at a 0.80 x nib row pitch would run straight into
+the per-part cap.
+
+**WHICH END IS THE BASE CANNOT COME FROM THE OUTLINE.** `attachmentLocal()`
+reads vertex POSITIONS — never normals, never facing — ONCE per bundle, to find
+the point of each part nearest to any other part. The bundle declares a `pivot`
+junction and NOTHING about where the leaf joins the stem, so a declared
+attachment would cover one part of three. With no other part at all, the base
+is the WIDER end, measured from the shape's own cross-spans. **On the stem this
+reads as the BLOOM JUNCTION at the top, not the cut end at the bottom** — a
+defensible reading of "where this part meets the rest of the plant", not the
+botanical one, photographed on the sheet rather than tuned.
+
+**THE AXIAL RAMP IS THE SECOND COMPONENT OF THE COVERAGE THE ANCHOR ALREADY
+SUPPLIES, not a second mechanism.** `coverage = darkness x min(radial tone,
+1 - bias x station)`. `min` and not a product, deliberately: a product of two
+fields is not a single interval along a row, and every clip in this file is a
+closed-form interval. At bias 0 the factor is 1 everywhere, the clip is
+vacuous, and the fill is **span for span** what shipped in #160.
+
+**A WRONG OCCLUDER INDEX LEAVES NO MARK, and this is how one shipped for an
+afternoon.** `_tonePart`'s scan-index cache was keyed on the part index alone —
+correct while every part scanned at one global angle, wrong the moment each
+part has its own. A bloom index cached at the LEAF's angle was handed to the
+stem, and every span it subtracted was wrong. **Found by the cost table, not by
+a check**: a bad occluder subtraction takes ink AWAY, so nothing lands outside
+any outline and every membership assertion in both gates stays green. The key
+is now `part @ angle`.
+
+**THE COST WAS ALL IN ONE PLACE AND IT WAS NOT THE AXIS.** `medialOffsets()`
+built its cross-axis `ScanIndex` at a 1 px bucket with no viewport clamp; at
+the leaf's close-up camera the bloom projects across millions of pixels, and
+bucketing its 45,000 edges one row at a time to answer twenty-one questions was
+**4.5x the whole stage**. Clamped to the stations it actually asks about, with
+buckets one sample apart — neither of which moves an answer, and the emitted
+segment counts are identical before and after. Measured on the shipped
+three-part bundle, headless Chromium, 1100x800, software GL, same run so the
+two columns are comparable:
+
+| | global | axis |
+|---|---|---|
+| default framing, tonal fill | 14 ms | 30 ms |
+| default framing, cross-hatch | 7 ms | 10 ms |
+| close on the leaf, tonal fill | 195 ms | 84 ms |
+| close on the leaf, cross-hatch | 219 ms | 235 ms |
+
+So the worst case is **not** materially past where #160 left it: cross-hatch
+close-up pays +7%, and the tonal fill is CHEAPER in axis mode (its rows run
+along the leaf rather than across the clamped viewport, so it lays fewer of
+them). The +16 ms at default framing is the axis derivation for three parts.
+The AET sweep is still the real fix for the stage as a whole and is still
+deferred.
+
+**THE BLOOM CANNOT PASS THIS TEST AND MUST NOT BE TUNED AROUND.** It is ONE
+FUSED SOLID: no interior petal boundaries exist in the data, so the derived
+axis is a single axis for the entire flower and its "centre line" is a fiction
+over a radial blob — the strokes come back a long way off the axis they were
+nominally run along, and the sheet photographs exactly that. Per-petal
+direction is blocked on multi-part export.
+
+**Verify with `node tools/verify-print-axis.mjs`** (44 checks;
+`--negative-control` runs six mutants and is required before quoting a pass
+from a changed harness; `--skip-leaf` drops the leaf half). Part one drives
+the shipped `partAxis` / `medialOffsets` / `makeWarp` / `axialFactor` /
+`axialStationAt` / `axialClip` / `toneRowSpans` over outlines whose answer can
+be written down — a tapered leaf, a bent leaf, and rotated copies — because on
+the real leaf's silhouette a WRONG axis still draws a plausible picture at a
+plausible angle. Part two measures emitted pixel coordinates in a browser.
+**The direction-dependent membership hazard is load-bearing here, not
+background**: three parts now scan at three different angles in one frame, so
+the gate takes each part's own `scanAngleDeg` out of the stats and judges that
+part's ink there. The unsheared family (tonal fill) must come back EXACTLY 0
+outside; the shear gets its own bounded, named measurement
+(`shear/excursion-is-bounded-and-named`, 1 point of 10,308 at 2.74 px) because
+it is the one approximation in the file.
+
+Four things the negative control taught, each measured rather than predicted:
+a no-op shear still ROUND-TRIPS exactly, so `warp/round-trips-on-a-bent-part`
+cannot see it and `warp/rows-follow-the-centre-line` plus a chain-sagitta check
+on the real leaf are the only witnesses; a ramp run tip-to-base still thins the
+ink monotonically, so only the field against its own inverse catches it;
+`global/is-unchanged-by-the-new-mode` compares global BEFORE against global
+AFTER and is therefore blind to a mutation that breaks both equally (the
+witness is the angle slider actually turning the hatch); and a wrong axis makes
+the SHEAR fly, 430 px past the margin against the shipped 2.7.
+
+The sheet is `node tools/shot-print-axis.mjs <dir>` — the leaf with derived
+strokes at two densities beside the same leaf in global-angle mode, the axis
+drawn from the page's own reported base and tip, the shear on and off, the
+axial ramp as a sweep, the stem's honest "base", and the fused bloom
+unretouched. Cells are cropped from the leaf's own measured silhouette bbox,
+looking down its thinnest dimension — from the side it is a sliver and no
+direction is legible on it.
 
 ## Artist Tracker (`artist-tracker.html`)
 

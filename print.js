@@ -36,7 +36,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { StemRig, CONTROL_S } from './print-stem.js';
 import { LineArt, detailToAngleDeg, CURATION, INTERIOR_WEIGHT_RATIO } from './print-lines.js';
-import { Infill, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
+import { Infill, INFILL_DIRECTIONS, LAYER_THRESHOLDS, HATCH_OFFSETS_DEG, INFILL_LIMITS,
          TONE_LEVELS, TONE_ORDER,
          toneAt, toneRadius, toneCoverage, levelThreshold } from './print-infill.js';
 
@@ -64,6 +64,8 @@ const infillState = document.getElementById('print-infillstate');
 const infillModeIn = document.getElementById('infillMode');
 const infillSpacingIn = document.getElementById('infillSpacing');
 const infillAngleIn = document.getElementById('infillAngle');
+const infillDirectionIn = document.getElementById('infillDirection');
+const infillAxialIn = document.getElementById('infillAxial');
 const infillLayersIn = document.getElementById('infillLayers');
 const infillCurvatureIn = document.getElementById('infillCurvature');
 const infillReachIn = document.getElementById('infillReach');
@@ -76,6 +78,8 @@ const infillFillWeightIn = document.getElementById('infillFillWeight');
 const infillModeOut = document.getElementById('infillModeOut');
 const infillSpacingOut = document.getElementById('infillSpacingOut');
 const infillAngleOut = document.getElementById('infillAngleOut');
+const infillDirectionOut = document.getElementById('infillDirectionOut');
+const infillAxialOut = document.getElementById('infillAxialOut');
 const infillLayersOut = document.getElementById('infillLayersOut');
 const infillCurvatureOut = document.getElementById('infillCurvatureOut');
 const infillReachOut = document.getElementById('infillReachOut');
@@ -89,6 +93,8 @@ const showAnchorsBox = document.getElementById('showAnchors');
 const resetAnchorsBtn = document.getElementById('resetAnchors');
 const rowSpacing = infillSpacingIn.closest('.pose-row');
 const rowLayers = document.getElementById('row-infillLayers');
+const rowAngle = document.getElementById('row-infillAngle');
+const rowAxial = document.getElementById('row-infillAxial');
 const rowCurvature = document.getElementById('row-infillCurvature');
 const rowGradient = document.getElementById('row-infillGradient');
 const rowVeins = document.getElementById('row-infillVeins');
@@ -547,6 +553,8 @@ function readInfill() {
     mode,
     spacing: parseFloat(infillSpacingIn.value),
     angleDeg: parseFloat(infillAngleIn.value),
+    direction: infillDirectionIn.value,
+    axialBias: parseFloat(infillAxialIn.value),
     layers: parseInt(infillLayersIn.value, 10),
     curvature: parseFloat(infillCurvatureIn.value),
     reach: parseFloat(infillReachIn.value),
@@ -570,15 +578,22 @@ function readInfill() {
   rowVeinWidth.hidden = mode !== 'tone';
   rowFillWeight.hidden = mode !== 'tone';
   rowSpacing.hidden = mode === 'tone';
+  // The global angle and the axial ramp are the two halves of the direction
+  // choice, and each lies in the other's mode: an angle slider that no stroke
+  // obeys, or a base-to-tip ramp with no axis to run along.
+  const axisMode = infillDirectionIn.value === 'axis';
+  rowAngle.hidden = axisMode;
+  rowAxial.hidden = !axisMode || mode === 'flow';
   // Per-part darkness is a tonal-fill idea too, and the block carries its own
   // caption, so it hides as a block rather than row by row.
   infillPartsEl.hidden = mode !== 'tone' || !darknessRows.length;
   renderInfill();
 }
-[infillSpacingIn, infillAngleIn, infillLayersIn, infillCurvatureIn,
+[infillSpacingIn, infillAngleIn, infillAxialIn, infillLayersIn, infillCurvatureIn,
  infillReachIn, infillFalloffIn, infillJitterIn,
  infillGradientIn, infillVeinsIn, infillVeinWidthIn, infillFillWeightIn].forEach(el => el.addEventListener('input', readInfill));
 infillModeIn.addEventListener('change', readInfill);
+infillDirectionIn.addEventListener('change', readInfill);
 showAnchorsBox.addEventListener('change', () => { renderInfill(); });
 resetAnchorsBtn.addEventListener('click', () => {
   infill.anchors.forEach((_, i) => infill.resetAnchor(i));
@@ -590,6 +605,8 @@ function renderInfill() {
   infillModeOut.textContent = '';
   infillSpacingOut.textContent = `${infill.spacing.toFixed(1)} px`;
   infillAngleOut.textContent = `${infill.angleDeg.toFixed(0)}°`;
+  infillDirectionOut.textContent = '';
+  infillAxialOut.textContent = `${infill.axialBias.toFixed(0)}%`;
   infillLayersOut.textContent = `${infill.layers}`;
   infillCurvatureOut.textContent = `${infill.curvature.toFixed(0)}`;
   infillReachOut.textContent = `${infill.reach.toFixed(0)}%`;
@@ -632,19 +649,45 @@ function renderInfill() {
         : 'OFF'}`);
       rows.push(`                  a vein is UNFILLED PAPER, never a stroke:`);
       rows.push(`                  its capsule is subtracted from each row.`);
-      rows.push(`rows run at       ${infill.angleDeg.toFixed(0)}°`);
+      rows.push(`rows run at       ${infill.direction === 'axis'
+        ? 'each part’s OWN axis (no shear — see below)' : `${infill.angleDeg.toFixed(0)}°`}`);
     } else if (infill.mode === 'hatch') {
       const angs = HATCH_OFFSETS_DEG.slice(0, infill.layers)
-        .map(o => `${(infill.angleDeg + o + 360) % 180 | 0}°`).join(' / ');
+        .map(o => infill.direction === 'axis' ? `axis${o ? (o > 0 ? `+${o}` : `${o}`) : ''}°`
+          : `${(infill.angleDeg + o + 360) % 180 | 0}°`).join(' / ');
       rows.push(`angles            ${angs}   (${infill.layers} layer${infill.layers > 1 ? 's' : ''})`);
       rows.push(`layer thresholds  ${LAYER_THRESHOLDS.slice(0, infill.layers).map(t => t.toFixed(2)).join(' / ')} tone`);
     } else {
       const c = infill.curvature;
       rows.push(`field             ${c > 15 ? 'CONCENTRIC about the anchor'
         : c < -15 ? 'RADIAL from the anchor' : 'straight grain'}  (${c.toFixed(0)})`);
-      rows.push(`grain angle       ${infill.angleDeg.toFixed(0)}°`);
+      rows.push(`grain angle       ${infill.direction === 'axis'
+        ? 'each part’s OWN axis' : `${infill.angleDeg.toFixed(0)}°`}`);
     }
     if (infill.mode !== 'tone') rows.push(`spacing           ${infill.spacing.toFixed(1)} px`);
+    rows.push('');
+    if (infill.direction === 'axis') {
+      rows.push('DIRECTION         SHAPE AXIS — derived per part from its own');
+      rows.push('                  filled region. The axis is the STRAIGHT');
+      rows.push('                  principal axis, so on a part whose length');
+      rows.push('                  curves it is a chord: right in the middle,');
+      rows.push('                  drifting off the margin at both ends.');
+      if (infill.mode === 'hatch') {
+        rows.push('                  Cross-hatch shears the frame by the shape’s');
+        rows.push('                  own centre line so a stroke follows the');
+        rows.push('                  bend; the fill does NOT (a solid fill has');
+        rows.push('                  no legible stroke direction to curve).');
+      }
+      rows.push(`axial ramp        ${infill.axialBias > 0
+        ? `${infill.axialBias.toFixed(0)}% — coverage x (1 - ${(infill.axialBias / 100).toFixed(2)} x station)`
+        : 'OFF (0%) — inert, identical to no ramp'}`);
+      rows.push('                  base -> tip, min’d with the anchor’s field.');
+    } else {
+      rows.push(`DIRECTION         GLOBAL ${infill.angleDeg.toFixed(0)}° — one angle for the whole`);
+      rows.push('                  model. The right answer for a shape with no');
+      rows.push('                  meaningful long axis, which is what the');
+      rows.push('                  FUSED bloom is: see “shape axis”.');
+    }
     rows.push('');
     if (infill.mode === 'tone' && infill.gradient <= 0) {
       rows.push(`WHERE IS DARK     the per-part DARKNESS below. The anchor and`);
@@ -658,6 +701,14 @@ function renderInfill() {
     if (st) {
       for (const p of st.parts) {
         if (!p.ok) { rows.push(`  ${(p.name || '?').padEnd(14)} no silhouette this frame`); continue; }
+        if (p.axis) {
+          rows.push(`  ${(p.name || '?').padEnd(14)} axis ${p.axis.angleDeg.toFixed(0)}°`
+            + `  ${p.axis.lengthPx.toFixed(0)} px long  base at `
+            + `${p.axis.base.map(v => v.toFixed(0)).join(',')}  (${p.axis.basis})`
+            + `  bend ${p.axis.warpDeviationPx.toFixed(1)} px / ${p.axis.warpPieces} piece${p.axis.warpPieces === 1 ? '' : 's'}`);
+        } else if (infill.direction === 'axis') {
+          rows.push(`  ${(p.name || '?').padEnd(14)} NO AXIS — silhouette has no extent`);
+        }
         if (infill.mode === 'tone') {
           rows.push(`  ${(p.name || '?').padEnd(14)} darkness ${String(p.darkness.toFixed(0)).padStart(3)}%`
             + `  ${p.rows} rows  ${p.reservedRows} cut by a vein  ${p.segments} segs`
@@ -771,12 +822,33 @@ const INFILL_HOOK = {
   options: () => ({ spacing: infill.spacing, angleDeg: infill.angleDeg, layers: infill.layers,
     curvature: infill.curvature, reach: infill.reach, falloff: infill.falloff, jitter: infill.jitter,
     gradient: infill.gradient, veins: infill.veins, veinWidth: infill.veinWidth,
-    fillWeight: infill.fillWeight }),
+    fillWeight: infill.fillWeight, direction: infill.direction, axialBias: infill.axialBias }),
+
+  // --- the derived direction ---------------------------------------------
+  // Driven through the REAL select, so what the gate drives is what a hand
+  // drives; read back off the module, which is what lets the two be compared.
+  setDirection: (v) => { infillDirectionIn.value = v; infillDirectionIn.dispatchEvent(new Event('change')); },
+  direction: () => infill.direction,
+  directions: () => INFILL_DIRECTIONS.slice(),
+  // The axis the strokes were actually run along this frame, per part, in
+  // pixels — handed back rather than re-derived, for the same reason the vein
+  // paths are.
+  axis: (i) => {
+    const a = infill.axes[i];
+    if (!a) return null;
+    return { angleDeg: a.angleDeg, basis: a.basis, base: a.base.slice(), tip: a.tip.slice(),
+      lengthPx: a.t1 - a.t0, cx: a.cx, cy: a.cy, ex: a.ex, ey: a.ey,
+      warpPieces: infill.warps[i] ? infill.warps[i].K : 1,
+      warpDeviationPx: infill.warps[i] ? infill.warps[i].deviationPx : 0 };
+  },
+  attachmentLocal: (i) => (infill.attachments[i] ? infill.attachments[i].toArray() : null),
+  attachmentPx: (i) => (infill.frames[i].hasAttach ? [infill.frames[i].atx, infill.frames[i].aty] : null),
   setWidget: (id, v) => {
     const el = { spacing: infillSpacingIn, angle: infillAngleIn, layers: infillLayersIn,
       curvature: infillCurvatureIn, reach: infillReachIn, falloff: infillFalloffIn,
       jitter: infillJitterIn, gradient: infillGradientIn, veins: infillVeinsIn,
-      veinWidth: infillVeinWidthIn, fillWeight: infillFillWeightIn }[id];
+      veinWidth: infillVeinWidthIn, fillWeight: infillFillWeightIn,
+      axial: infillAxialIn }[id];
     el.value = String(v); el.dispatchEvent(new Event('input'));
   },
 
@@ -805,7 +877,8 @@ const INFILL_HOOK = {
   thresholds: () => LAYER_THRESHOLDS.slice(),
   offsets: () => HATCH_OFFSETS_DEG.slice(),
   infillText: () => infillState.textContent,
-  rowVisibility: () => ({ layers: !rowLayers.hidden, curvature: !rowCurvature.hidden }),
+  rowVisibility: () => ({ layers: !rowLayers.hidden, curvature: !rowCurvature.hidden,
+    angle: !rowAngle.hidden, axial: !rowAxial.hidden }),
 
   // The emitted geometry, in PIXELS, exactly as it is drawn. Everything the
   // gate asserts about clipping is measured off this rather than off a
