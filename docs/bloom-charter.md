@@ -4835,3 +4835,109 @@ matters should be measured this way.
       merged `main`: **375 of 375 held** (`sha1sum -c` on a worktree of `00dc4b2`); the nine files `main` moved since fd291b4 are exactly this session's nine predeclared movers, and no print file landed from another PR — `main` had not moved between fd291b4 and this merge. The ruling and this close recorded in the
       docs-only PR, opened from a fresh branch off `main` and merged by the session before
       reporting DONE.
+
+- **Session 24 (Sep 6): THE VOGEL DISC'S INNER LIMIT — the equal-area law re-based on the
+  annulus `[rFil + rSty, R]`, applied ALWAYS; `partRadius` as the one owner of the parts'
+  radius; JS5 in both STL gates. 11 live and 8 phase17 rows moved, none added, NO new frozen
+  phase. Numbers in `docs/bloom-session-24-outcome.md`.**
+
+    - **WHAT DECIDED IT (Eva, Sep 6, from the sheet — and it is a better reason than the one
+      in her own brief, which is why it is written here rather than paraphrased).** `R = rFil
+      sqrt(N) spread` and `r_0 = R sqrt(0.5/N)`, so **the N cancels: `r_0 = rFil * spread /
+      sqrt(2)`, 0.8485 mm on every unclamped disc at EVERY count since the disc was built.**
+      Not a dense-head problem and not a tuning for the 120 case: **the disc has started 0.85
+      mm from the axis at every count it has ever had, so this is a CORRECTION.** The brief
+      framed it from the clamped 120 (0.5322 mm); that framing is superseded.
+
+    - **THE LAW.** `innerLimit = partRadius + partRadius` — a filament radius plus a style
+      radius, where a filament's tube clears a style's, and EXACTLY the filament-against-style
+      flag's own threshold, which now READS it instead of re-deriving it. `r_i = sqrt(inner^2
+      + (i + 0.5)(R^2 - inner^2)/N)`: "start the spiral's index past zero" with the integer
+      rounded away, so every annulus keeps exactly the same area (measured spread 3.6e-14 mm^2
+      across 120) and, unlike an integer offset, it is CONTINUOUS in R and the spread slider
+      never jumps. **Flooring each radius was measured and REJECTED**: it takes the 120-disc's
+      closest pair of roots from 1.164 mm to 0.991 mm, deeper into the ROOTS FUSE flag it was
+      meant to relieve, where the annulus law takes it to 1.233 mm and CLEARS it. ALWAYS, not
+      only with a style: a limit that existed only with a style would make turning the style on
+      move every stamen, the coupling session 22 ruled against. NO ROOM is told, never refused;
+      `innerUsed` and `noRoom` are NULL under RING, and JS5 asserts that in both directions.
+
+    - **THE EIGHT RULINGS FOR THE PARAMETRIC TIP (Eva, Sep 6, from the discovery sheet), the
+      brief for sessions 2, 3 and 4. Recorded here so they are inherited, not re-derived.**
+
+        - **Q1 — THE ONE-EXPONENT OUTLINE LAW.** `h(u) = (|cos(nu/4)|^s + |sin(nu/4)|^s)^(-1/s)`,
+          blended by roundedness. One number sweeps star -> polygon -> circle -> rounded n-gon
+          and reaches all five named targets; the simpler lobe law reaches four and makes a
+          TREFOIL where a triangle was asked for. Roundedness is the ONLY producer of the
+          circle and sharpness is inert there — the curl-bias precedent, hidden AND inert.
+        - **Q2 — RODRIGUES, AND NO GUARD.** The anther migrates byte-identically under it (0 of
+          1,800 floats) and the trifid does not (17 live rows, 0 frozen — phase17 contains no
+          style at all). **Eva's reason, on the record because it cuts against this project's
+          habits: 17 moving rows is better than a guard that gives 0 moved and buys a
+          discontinuity the moment roundedness leaves 1. A slider that jumps is a defect a user
+          meets; a predeclared partition is an accounting entry.**
+        - **Q3 — THE ANNULUS FORM, ALWAYS.** Session 24, above.
+        - **Q4 — NO NEW FROZEN PHASE FOR A BYTE MOVE, AND THE RULE WRITTEN DOWN.** A frozen tag
+          pins ROW DEFINITIONS, not bytes; the session that moves frozen bytes names the tag.
+          Ruled and applied in session 24 — see "A FROZEN TAG PINS ROW DEFINITIONS" above.
+        - **Q5 — FLOOR THE ELONGATION.** A floor keeps the pill byte-identical; the ellipsoid
+          is more correct, moves the pill, and the difference between a 0.01 mm band and none
+          is invisible. No second partition for something nobody can see.
+        - **Q6 — NO SELF-INTERSECTION INSTRUMENT.** The gate is blind to it and always will be
+          (measured: an outline turned inside out through its own axis exports boundary 0,
+          non-manifold 0, one shell — a clean pass), and that goes in the instrument's own
+          header as a stated blind spot. **What is wanted instead is cheaper: BOUND THE
+          PARAMETER RANGES SO THE OUTLINE CANNOT INVERT. A law that cannot turn inside out
+          needs no check that it hasn't.** If the ranges cannot be bounded without losing
+          shapes Eva wants, say so and take it back to her.
+        - **Q7 — LIFT THE NESTING BOUND, AND GENERATE THE ROWS FROM ONE TABLE — both, not
+          either.** The panel was reorganised one session earlier to get that grouping and is
+          not to be flattened. Seven descriptors authored ONCE and instanced TWICE, the
+          `ROLE_OVERRIDES` pattern, so the two tips cannot drift.
+        - **Q8 — `size` BECOMES A REAL SLIDER,** superseding `ANTHER_DIAMETER_FACTOR`: the
+          point-radius floor (0.50 mm, UNMEASURED) makes points unreachable on a 1.92 mm
+          anther, so without a size control the sharp end of the range is decorative.
+
+    - **SIZING, APPROVED (Eva, Sep 6):** four sessions — session 24 (this one), then the
+      primitive and the migration ALONE (zero new controls, 17 movers in their own commit),
+      then the anther's seven controls, then the stigma's. **Session 2 is not to be
+      compressed: a ruled byte event gets its own commit.**
+
+    - **THE PANEL GATE'S RETIRED-ID SCANNER: FIX IT, IN ITS OWN SESSION, AND BEFORE SESSION 2**
+      (Eva, Sep 6). **Not left recorded — it has now cost two sessions.** Session 22 hit it and
+      reworded thirteen assertion messages; session 24 hit the identical symptom
+      (`bloom-harness.mjs:599 centerSize`, repeated, at a line number computed in the STRIPPED
+      text, naming a file the session did not touch) and reworded nine. **The workaround relies
+      on everyone remembering never to type an apostrophe, and a gate that reports 48 false
+      hits against the wrong file is how a real hit gets waved through later.** Session 2 writes
+      more new assertion messages than anything so far, so fixing it after would be a session
+      too late.
+      **THE SESSION IS SMALL AND SELF-CONTAINED: the regex in route (n)(iv)'s scanner, nothing
+      else.** Its positive control is already written for it — apostrophes inside template
+      literals scan clean, AND a genuinely retired id is still caught. **It restores the nine
+      messages session 24 reworded and session 22's thirteen as part of the same change.**
+      Measured on both trees at session 24's close: the base at `b847f81` scans 0 hits over 34
+      files; nine possessives took the head to 48, every one of them a frozen-matrix label
+      about 2,000 lines from the reported location; removing them took it back to 0. The em
+      dash in the same literals is harmless — the apostrophes alone are the trigger.
+
+    - **THE READ-OUT'S STAMENS LINE IS GETTING CROWDED, and it is noted rather than acted on**
+      (Eva, Sep 6). The inner-limit clause is long, and the line has gained a clause most
+      sessions for a while (the annulus flag, the two distance flags, the spine floor, the cap,
+      the filament-against-style flag, now this). **Look at it when it is next touched for
+      another reason; it is not worth its own work now.**
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `9e2784e`
+      (bloom-export-watertight and bloom-connectedness on the full 528-row matrix,
+      bloom-panel, bloom-frozen-matrices; the two flower gates ran too, `tools/**` filter, and
+      are not bloom evidence). **The export gate took 88 minutes and was checked against its
+      own history before it was waited on rather than assumed hung: its last five runs on the
+      528-row matrix took 83 / 90 / 87 / 88 / 85 minutes.** #171 undrafted and merged by the
+      session (squash) as **`a8c479d`**, the head sha read from the remote with
+      `git ls-remote` and passed as `expectedHeadSha`. **No frozen tag is owed and none was
+      published** — rows moved, none were added; phase17 stays the newest baseline and the
+      outcome doc names it as the tag whose bytes no longer reproduce. The predeclared
+      manifest re-verified against `main` after the merge: **376 of 376 held**; `main` had not
+      moved between `b847f81` and this merge, so the ten files it moved are exactly this
+      session's ten predeclared movers and no other PR's. This entry and the rulings above
+      are the docs-only PR that follows the merge, on the session-22/23 rhythm.
