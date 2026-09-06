@@ -1316,6 +1316,79 @@ in every caption, each lever as a pair, the stem's honest "base", the fused
 bloom with and without the field, the panel, and with a base-tree a real render
 of the old code from a git worktree.
 
+**THE SHIPPED DEFAULTS, as merged (#166) and NOT tuned by Eva** — the fan was
+merged additive-and-off so the branch would not diverge, before anyone had
+turned a slider on the preview. Treat every number here as a starting point
+somebody still has to rule on, not as a decision:
+
+| control | default | what it is |
+|---|---|---|
+| shading | `off` | the fan is opt-in; `global` is still the direction default |
+| spacing | 9 px | the TARGET gap between neighbouring rays |
+| converge | 55% | 0 = constant spacing / uniform density · 100 = a fixed pencil |
+| origin | 3 px | half-width of the origin bar — a FLOOR, see below |
+| inset | 92% | of the measured half-width a margin ray sits at |
+| tip reach | 88% | of the length a ray travels |
+| tip ragged | 35% | per-ray jitter on the tip cutoff |
+| show the field | off | the debug overlay |
+| darkness | 100% | per part; in this family it IS the target spacing |
+
+**WHAT THE NEXT ITERATION SHOULD KNOW, and would otherwise rediscover.** Five
+of these are about the spacing law and four about the direction hazard; all are
+measured on `bloom-stem-leaf-bundle.glb`'s leaf at its face-on framing.
+
+*The spacing law:*
+
+1. **DYADIC INSERTION IS A FACTOR-OF-TWO GRANULARITY, AND IT IS COARSE against
+   how a blade's width actually varies.** On this leaf the width goes 3 -> 30 px
+   over the first ~10% of the length and then 26 -> 28 px over all the rest, so
+   every insertion happens in the base zone and `converge` has nothing to do
+   anywhere else. That is why converge 0 and converge 100 are near-identical
+   PICTURES here and differ only as a number (base/tip density 1.95x vs 2.97x).
+   A finer ratio — inserting one ray between every OTHER pair, so a level is
+   sqrt(2) rather than 2 — is the obvious next move and was not built.
+2. **RAYS NEVER DIE AT THE BASE**: levels 0 and 1 run the full length by
+   construction. That is what guarantees ink at the base at any setting, and it
+   is also the cap on how uniform converge 0 can be — three rays still crowd
+   into the origin bar. Deliberate, but it means "constant spacing everywhere"
+   is not actually reachable.
+3. **THE ORIGIN IS A FLOOR AND IS CORRECTLY INERT ON A BLUNT BASE** — on this
+   leaf at its own framing it binds at 0 of the part's drawable stations and
+   moves nothing. The read-out says which of the two it is doing. Do not "fix"
+   it into something that always acts.
+4. **TIP RE-CONVERGENCE IS HIDDEN, NOT SOLVED.** A pointed leaf narrows again,
+   so the rays re-converge at the tip; `tipReach` 88% is what keeps that out of
+   the picture. At 100% you see it, and the exactness claim goes with it (1
+   point of 24,948 outside, at the degenerate tip).
+5. **INK LENGTH PER BAND IS THE WRONG INSTRUMENT** — divide by the band's
+   DRAWABLE area (this part's spans minus every nearer part's) or an occlusion
+   reads as a light base. Measured: 5,020 px² of leaf holding 79 px of ink.
+
+*The per-ray direction hazard:*
+
+6. **THE WHOLE APPROACH RESTS ON ONE PROPERTY: a ray crosses each
+   constant-station row AT MOST ONCE**, which holds because its offset is a
+   function of the station alone. That is what collapses "every ray its own
+   heading" down to ONE scan direction per part. Any future field where a ray
+   doubles back in station — a spiral, a hook, a ray that curls over — breaks
+   the clipper AND the gate's single `scanAngleDeg` at the same time, and #160's
+   direction-dependent membership hazard comes back at full strength with no
+   angle left to judge the ink at. Preserve it or rethink the clipper.
+7. **THE AET SWEEP IS NOT A DROP-IN HERE** (it is still deferred, and still the
+   right fix for the stage as a whole). Sweeping along RAYS would clip each ray
+   in its own direction, which is exactly what (6) says not to do.
+8. A scan index must be keyed on the WARP OWNER, and the witness is a part's own
+   ink escaping its outline — the occluder-facing check stayed green under that
+   mutation (see above).
+9. The gate must take `scanAngleDeg` out of the stats. Substituting the axis
+   angle where the cross-axis basis `(qx, qy)` belongs is not a near miss: it
+   read 94 of 95 points outside.
+
+*And one thing nobody has seen:* the fan has never been drawn on a part with a
+genuinely BROAD base, because neither shipped bundle has one. Everything above
+about `converge` being a base-zone lever is a fact about this leaf's proportions,
+not about the law.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for
