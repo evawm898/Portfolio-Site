@@ -124,10 +124,10 @@ EVERY row in both directions.
 | | claim | the mutant that fired it FIRST (`--only` on one row, real export gate, in a copy of the tree) |
 |---|---|---|
 | JG0 | the two statements agree per row; present iff eligible and STYLE; nothing emitted when absent | — (covered by every absent row) |
-| JG1 | inner→outer is exactly t along the cap's normal at the apex; the root EXACTLY on the axis; the normal EXACTLY [0,0,1] flat and cap alike; on a cap ON the owner's sphere at the owner's z; flat: z = 0 exactly | **M-JG1** the root axis laid along Rs: "the style's root axis is not along its normal [0,0,1]". **M-JG1b** the builder stands the style one radius off the axis, the owner unchanged: "the style stands at plan (0.6, 0), not exactly on the axis" |
+| JG1 | inner→outer is exactly t along the cap's normal at the apex; the root EXACTLY on the axis; the normal EXACTLY [0,0,1] flat and cap alike; on a cap ON the owner's sphere at the owner's z; flat: z = 0 exactly | **M-JG1** the root axis laid along Rs: "the root axis of the style is not along its normal [0,0,1]". **M-JG1b** the builder stands the style one radius off the axis, the owner unchanged: "the style stands at plan (0.6, 0), not exactly on the axis" |
 | JG2 | one style; the footprint inside the hub disc, or the owner says WIDER THAN THE HUB | **M-JG2** the flag never raised, on the apex corner: "widerThanHub reads false while the style radius 1.2 against the hub 1.149 says true" |
-| JG3 | one sheet thick; both root rings STAMEN_SIDES points each exactly rSty from the centre in the face plane | **M-JG3** root rings at a tenth of the radius: "a point 0.06 from its centre, the style radius is 0.6" |
-| JG4 | emitted = declared = 1; the fixed 960 (the accumulator's delta); the TRIFID as a PROPERTY — three unit axes each exactly 40° off the tip direction, 120° apart around it, every apex one lobe length along its axis, apexes distinct; the lobe the anther's proportion | **M-JG4a** a lobe dropped: "760 triangles, the fixed count is 960; 2 lobes emitted, the trifid is 3". **M-JG4b** the lobes at twice the spread — the SAME triangle count: "lobe 0 leaves the tip 80 degrees off the style, the trifid's spread is 40" |
+| JG3 | one sheet thick; both root rings STAMEN_SIDES points each exactly rSty from the centre in the face plane | **M-JG3** root rings at a tenth of the radius: "the inner root ring of the style has a point 0.06 from its centre, the style radius is 0.6" |
+| JG4 | emitted = declared = 1; the fixed 960 (the accumulator's delta); the TRIFID as a PROPERTY — three unit axes each exactly 40° off the tip direction, 120° apart around it, every apex one lobe length along its axis, apexes distinct; the lobe the anther's proportion | **M-JG4a** a lobe dropped: "760 triangles, the fixed count is 960; 2 lobes emitted, the trifid is 3". **M-JG4b** the lobes at twice the spread — the SAME triangle count: "lobe 0 leaves the tip 80 degrees off the style, the spread of the trifid is 40" |
 | the two-statement guard | `gynoeciumEligible()` (geometry) === the registry predicate over 16 states | **M-SPH** the geometry ignores the sphere: dies at HARNESS LOAD, before any row |
 | R1 (doctrine 2, measured again) | the centre's accumulator emits the style through the same builder; R1 fails on the ORCHESTRATION | **M-R1** the style emitted TWICE, recorded once, on the both-present row: JG1–JG4 silent, boundary 0, **`coverage R1: petals-only (9888) + hub-only (192) + centre-only (stamens and style: 4320) tris = 14400, but a normal whole-bloom build has 15360` — RED** |
 
@@ -136,7 +136,26 @@ their own closed solids, so a style off the axis, a hairline root, a missing lob
 off the law all export watertight and read as one piece — which is why the family exists and
 why the smoke subset ran with `--conn` until it had fired. Every mutant ran in a COPY of the
 tree (never the working tree), and every one is "first-fired", per the skill's rule on
-attributions.
+attributions. Three messages (JG1, JG3, JG4b) were REWORDED after the first table was
+measured and those three mutants re-run through the same route — see the panel-gate finding
+below; the assertions' logic did not change.
+
+**A finding in the panel gate's retirement scanner, recorded rather than fixed.** Route (n)
+strips comments and strings with regexes before scanning executable bloom source for a
+retired id used as an identifier. Its template-literal regex pairs backticks, and an
+apostrophe INSIDE a template literal (`the style's root`) can leave the pairing shifted for
+the rest of the file: this session's first `gynoeciumAssertions()` carried thirteen such
+messages — an odd count — and the scanner then read phase2's `DOME × centerSize` labels
+(string data, deep-equal to their base commit, exempt by design) as bare identifiers,
+failing the gate with `tools/bloom-harness.mjs:599 centerSize` on a line number computed in
+the stripped text. Bisected to the function, then to the lines, by removing one at a time:
+removing ANY one of the thirteen cleared it, which is what named it a parity effect. The
+thirteen messages were reworded without apostrophes and the scanner reads 0 across the 34
+files it covers. **The scanner is a latent fragility: a session whose new template literals
+carry an odd number of apostrophes will hit it again, and the failure names a file and a
+line that are not where the cause is.** Fixing the regex is a change to a shipped gate with
+its own negative control and is not done here; the panel gate's header does not yet say
+this, and should.
 
 ## THE SLENDERNESS LINE — what it actually reads now
 
@@ -183,7 +202,29 @@ bloom-frozen-tags workflow (red by design on the phase5 refusal), verified with
 
 ## The retention close — the newest baseline plus the live partition
 
-TBD_RETENTION
+The newest frozen baseline plus the live partition (session 11's retention ruling), both
+captured by `tools/diff-bloom-bytes.mjs` on the real Get STL bytes and compared row by row by
+label with the tool's own `--compare`:
+
+- **phase16 (481 rows at `a65d16d`) on a worktree of `6335ac4` (the head of `main`) and on
+  this tree: 481 compared, 481 HELD, 0 MOVED** — `byte diff: PASS — 0 of 481 configs moved`.
+  The claim this makes: nothing that shipped before this session moved, by construction (the
+  gynoecium ships absent and no phase16 row names a style control) and by measurement.
+- **The live partition — block 23, the 24 androecium rows, on both trees: 24 compared, 24
+  HELD, 0 MOVED.** This is the load-bearing one for the refactor: `rodInto()` and `pillInto()`
+  were extracted from `buildStamenInto` and every stamen in every block-23 row (the six-stamen
+  candidate, the 120-disc, curl ±180, the cap, the mum, the fat filament, the on-axis corner)
+  exports the bytes it exported at `6335ac4`. The extraction was "verbatim" as a construction;
+  the 24 rows are what MEASURE it, and they held to the byte.
+- The predicted movers in the live matrix: none. `gynoecium` is a choice, so block 1 sweeps
+  nothing of it and ALL MAX carries no style; the 21 block-24 rows are NEW, not moved. The two
+  captures were fingerprinted as different trees (`6335ac4` / `f78bf3f`), both "+dirty" for
+  reasons that touch no byte — the base worktree carries a `node_modules` symlink, the head
+  carried this document and the reworded assertion messages, neither read by the geometry.
+- Not run: the full historical suite (4,984 rows over 16 baselines) — a milestone instrument,
+  and this session touched neither the area rule nor the export path (the ruling's two
+  triggers). CI's `--verify-frozen` proves every baseline deep-equal on this push, phase17
+  included.
 
 ## The evidence
 
@@ -197,7 +238,15 @@ TBD_RETENTION
   was the quoted one; no defect was found by it.
 - **JG1–JG4 on the real rows: green; on the mutants: each fired first** — the table above,
   eight mutants, every run through the real export gate with `--only` on one row.
-- **Panel gate:** TBD_PANEL
+- **Panel gate PASS** on this tree (after the scanner rewording above), route (p)'s ten steps
+  green: the section shown with its choice at NONE and the sub-controls hidden; a style on the
+  bare apex; style × six with the stigma ABOVE the anthers; length 5 with the stigma BELOW;
+  the apex corner WIDER THAN THE HUB; the section hidden whole under SPHERE; a style asked for
+  under SPHERE with the build unmoved from the bare sphere's count; the WHOLE centre at
+  maximum under SPHERE unmoved; back to CAP; every sub-control at maximum with NONE at the
+  default's own count. Route (o)'s slenderness clause reads the line's `filament` part.
+  **`--negative-control` PASS — ALL FOURTEEN ROUTES fired**, the gynoecium route on its
+  frozen-read-out clause (the STYLE line ABSENT while the owner declares a gynoecium).
 - **Numbers.** The default bloom is unchanged at **10,080 triangles** live and export alike.
   A style is **960 triangles**, fixed: the rod's 360 plus three lobes at 200. The style alone
   is 11,040; the style among six stamens 14,400; the style through the 120-stamen cushion
@@ -205,10 +254,19 @@ TBD_RETENTION
   and 1.60 × 4.00 at the export floor.
 - **The live matrix is 528 rows** (507 + block 24's 21); the smoke subset 39 over 20 blocks,
   its drift guard green.
-- **The untouched manifest:** TBD_MANIFEST
+- **The untouched manifest:** 102 of 102 predeclared files byte-identical by `sha1sum -c` on
+  the FINAL tree (doctrine 1: run last, not at the first commit), and the set of files that
+  moved is exactly the predeclared MOVER set — no miss to name.
 - **The full matrix on both STL gates runs in CI on the PR head** — the merge criterion, not
   run locally (session 17's ruling).
-- **The sheet:** TBD_SHEET
+- **The sheet:** `node tools/shot-bloom-gynoecium.mjs <dir>` — 20 cells, 42 frames, every
+  frame decoded and required to carry content, every cell JS1–JS4, JG1–JG4 and the junction
+  assertions before the shutter, every export watertight with 0 degenerate triangles. **The
+  four byte claims on the sheet held:** every gynoecium control at maximum under SPHERE
+  exported the bare sphere's own sha (`db348671ad99`, 16,608 triangles), the WHOLE centre at
+  maximum under SPHERE the same `db348671ad99`, under the incurve sphere the incurve sphere's
+  (`7e5b7522e248`, 155,040), and every sub-control at maximum with NONE the default's
+  (`b648eea4905e`, 10,080).
 
 ## THE PROPOSAL — moving the shipping default to a present centre (NOT done; her ruling)
 
@@ -236,8 +294,55 @@ centre control, not what value they pin.
 
 ## What this session predeclared it would not touch
 
-TBD_MANIFEST_PARA
+A sha1 manifest of 102 files taken from the working tree at `6335ac4` before any edit: every
+`flower*` file and gate, cards, the tracker, print, every workflow, `bloom.html`, `bloom.css`,
+`bloom-view-presets.js`, `tools/bloom-crowding.mjs` (B2b's, parked), every shot tool including
+`shot-bloom-androecium.mjs`, `tools/compare-bloom-captures.mjs`, `tools/chromium-harness.mjs`,
+the frozen-tag script. **And, on B2's lesson, a predeclared MOVER list beside it** — the files
+this session said it WOULD touch, so a mover is a plan and not a discovery: the three bloom
+source files, the harness, BOTH STL gates (the assertion family wires into both — B2's first
+miss), the panel gate, BOTH coverage instruments (R1 counts the centre — B2's second miss),
+the smoke tool, `tools/diff-bloom-bytes.mjs` (the phase17 wiring — B2's fourth miss, the one
+its close-out commit found late), CLAUDE.md, the charter, this document, and the new sheet
+tool. **Doctrine 1, applied: verified on the FINAL tree, after the close-out commit, not at
+the first commit.** 102 of 102 held; the movers are exactly the fifteen predeclared; nothing
+moved that was not declared and nothing declared held.
 
 ## The sheet — `node tools/shot-bloom-gynoecium.mjs <dir>`
 
-TBD_SHEET_PARA
+Every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, JS1–JS4, JG1–JG4 and the
+junction assertions before every shutter, the STL sha of that cell: (1) THE FOUR CENTRE
+STATES on one camera — the bare apex (10,080), six stamens alone (13,440), the style alone
+(11,040), both (14,400); (2) THE PILL AND THE TRIFID TOGETHER at six and at a hundred and
+twenty — from 40° off the axis, from the side, straight down; (3) THE FILAMENT CURL AT ±180
+AGAIN, alone (B2's cells) and beside the style; (4) the style's own range — length 5 / 25 /
+40 among six, curl ±180, Head rise 1, the 2.40 sheet; (5) the byte claims above.
+
+**What the cells say, in the read-out's own numbers.** The style among six: the stigma's top
+stands at 28.54 mm, **4.10 mm ABOVE the highest anther** (the 20 mm filaments' pills top out
+at 24.44) — the trifid clears the six pills and reads against them. Through the cushion the
+same 4.10 mm: the disc is a packing, not a height, and the trifid stands proud of 120 pills
+at the same margin. Length 5 puts the stigma **15.90 mm BELOW** the anthers (the STYLE line
+says BELOW and route (p) asserts the word against the builder's own apexes); length 40 puts it
+19.10 mm above at L/d 33.3. On a hemisphere (rise 1) the root sits on the pole and the
+stigma at 37.39 mm, 5.99 above the anthers, which fan with the cap's normals. The 2.40 sheet
+makes a 2.40 mm style with 3.84 × 9.60 mm lobes, 3.20 mm above the anthers.
+
+**The filament curl at ±180, for the ruling this time.** Alone, as B2 photographed: at −180
+the six reflex outward and hang between the petals below the disc; at +180 they arch over
+the centre, cross at the axis, and their anthers come out below the hub plane on the far
+side. **Beside the style, +180 is a different picture:** the six half-turn arcs pass THROUGH
+the axis the style now occupies — a 6.4 mm bend radius lands each anther one bend diameter
+across from its root, straight across the hub's centre, and the style's rod stands in that
+crossing. The export is watertight and one piece (every rod is its own closed solid and the
+slicer unions the crossing), so no gate sees it and no gate should; whether ±180 is a range
+worth keeping once a style can stand on the axis is hers from these cells, and the STYLE line
+on them reads `31.78 mm ABOVE the highest anther` because those anthers are under the hub. A
+narrowing to ±120 is one number in the registry plus two row labels and two sheet cells and
+moves no byte (the default is 0).
+
+**The style's own curl at ±180** bends the 25 mm style over the apex on a 6.4 mm radius and
+lands the stigma **2.34 mm BELOW the hub plane** (the STYLE line's `stigma top −2.34 mm`),
+its lobes pointing down under the hub where the profile camera cannot see them — the same
+half-turn the filaments make, on the axis. Whether that is a range or an accident is also
+hers; the row is in the matrix either way.

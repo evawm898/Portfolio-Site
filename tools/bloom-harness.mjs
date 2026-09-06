@@ -2829,26 +2829,26 @@ export async function gynoeciumAssertions(page, row) {
   if (G.count !== 1) bad.push(`JG2: the owner declares ${G.count} styles; the gynoecium is one style on the axis`);
   if (G.radius !== 0) bad.push(`JG2: the owner puts the style at radius ${G.radius}, not 0 — it is not on the axis`);
   if (G.thickness !== t || G.diameter !== t || G.rSty !== t / 2) bad.push(`JG3: the style is ${G.diameter} across on a ${t} mm slab — it is meant to be one sheet thick, floored with it`);
-  if (G.hubRadius !== m.hubRadius) bad.push(`JG2: the owner's gynoecium reads a hub radius of ${G.hubRadius}, the hub is ${m.hubRadius}`);
+  if (G.hubRadius !== m.hubRadius) bad.push(`JG2: the gynoecium descriptor reads a hub radius of ${G.hubRadius}, the hub is ${m.hubRadius}`);
   if (G.widerThanHub !== (G.rSty > G.hubRadius)) bad.push(`JG2: widerThanHub reads ${G.widerThanHub} while the style radius ${G.rSty} against the hub ${G.hubRadius} says ${G.rSty > G.hubRadius}`);
   if (G.lobe.count !== STIGMA_LOBES) bad.push(`JG4: the owner declares ${G.lobe.count} lobes, the trifid is ${STIGMA_LOBES}`);
-  if (Math.abs(G.lobe.spreadRad - (STIGMA_LOBE_SPREAD_DEG * Math.PI) / 180) > 1e-12) bad.push(`JG4: the owner's lobe spread ${G.lobe.spreadRad} rad is not the fixed ${STIGMA_LOBE_SPREAD_DEG} degrees`);
-  if (Math.abs(G.lobe.diameter - ANTHER_DIAMETER_FACTOR * t) > 1e-12 || Math.abs(G.lobe.length - ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * t) > 1e-12) bad.push(`JG4: a lobe is ${G.lobe.diameter} x ${G.lobe.length} on a ${t} mm style — not the anther's fixed proportion`);
+  if (Math.abs(G.lobe.spreadRad - (STIGMA_LOBE_SPREAD_DEG * Math.PI) / 180) > 1e-12) bad.push(`JG4: the declared lobe spread ${G.lobe.spreadRad} rad is not the fixed ${STIGMA_LOBE_SPREAD_DEG} degrees`);
+  if (Math.abs(G.lobe.diameter - ANTHER_DIAMETER_FACTOR * t) > 1e-12 || Math.abs(G.lobe.length - ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * t) > 1e-12) bad.push(`JG4: a lobe is ${G.lobe.diameter} x ${G.lobe.length} on a ${t} mm style — not the fixed proportion of the anther`);
   if (m.styles.length !== 1) { bad.push(`JG4: ${m.styles.length} styles emitted for one declared`); return bad; }
   const s = m.styles[0], N = s.N;
   if (s.tris !== STYLE_TRIS) bad.push(`JG4: the style emitted ${s.tris} triangles, the fixed count is ${STYLE_TRIS} — a lobe dropped or a tube doubled`);
   /* JG1 */
   const len = Math.hypot(s.outer[0] - s.inner[0], s.outer[1] - s.inner[1], s.outer[2] - s.inner[2]);
-  if (Math.abs(len - t) > 1e-9) bad.push(`JG1: the style's root runs ${len} mm through a ${t} mm slab`);
-  for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / t - N[k]) > 1e-9) bad.push(`JG1: the style's root axis is not along its normal ${JSON.stringify(N)}`);
+  if (Math.abs(len - t) > 1e-9) bad.push(`JG1: the root of the style runs ${len} mm through a ${t} mm slab`);
+  for (let k = 0; k < 3; k++) if (Math.abs((s.outer[k] - s.inner[k]) / t - N[k]) > 1e-9) bad.push(`JG1: the root axis of the style is not along its normal ${JSON.stringify(N)}`);
   for (let k = 0; k < 3; k++) if (Math.abs((s.inner[k] + s.outer[k]) / 2 - s.root[k]) > 1e-9) bad.push('JG1: the style\'s root axis is not centred on its surface point');
   if (!(s.root[0] === 0 && s.root[1] === 0)) bad.push(`JG1: the style stands at plan (${s.root[0]}, ${s.root[1]}), not exactly on the axis`);
   if (!(N[0] === 0 && N[1] === 0 && N[2] === 1)) bad.push(`JG1: the style's normal ${JSON.stringify(N)} is not exactly the apex's [0,0,1]`);
   if (dome) {
     const dz = s.root[2] - dome.centreZ;
-    if (Math.abs(dz - dome.Rd) > 1e-9) bad.push(`JG1: the style's root is ${dz} above the cap's centre, the cap's radius is ${dome.Rd} — not ON the apex the owner declares`);
+    if (Math.abs(dz - dome.Rd) > 1e-9) bad.push(`JG1: the root of the style is ${dz} above the centre of the cap, whose radius is ${dome.Rd} — not ON the apex the owner declares`);
     if (Math.abs(s.root[2] - G.z) > 1e-9) bad.push(`JG1: the style's root z ${s.root[2]} is not the owner's ${G.z}`);
-  } else if (s.root[2] !== 0) bad.push(`JG1: the style's root z = ${s.root[2]}, not exactly 0 — it left the hub plane`);
+  } else if (s.root[2] !== 0) bad.push(`JG1: the root z of the style = ${s.root[2]}, not exactly 0 — it left the hub plane`);
   /* JG2 */
   if (!G.widerThanHub && !(G.rSty <= G.hubRadius + 1e-9)) bad.push(`JG2: a ${G.rSty} mm style radius on a ${G.hubRadius} mm hub, and the owner did not say so`);
   /* JG3 */
@@ -2856,12 +2856,12 @@ export async function gynoeciumAssertions(page, row) {
   if (!Array.isArray(rings) || rings.length !== 2) bad.push(`JG3: the style reports ${rings && rings.length} root rings, expected 2`);
   else rings.forEach((ring, which) => {
     const C = which === 0 ? s.inner : s.outer;
-    if (!Array.isArray(ring) || ring.length !== STAMEN_SIDES) { bad.push(`JG3: the style's ${which === 0 ? 'inner' : 'outer'} root ring has ${ring && ring.length} points, expected ${STAMEN_SIDES}`); return; }
+    if (!Array.isArray(ring) || ring.length !== STAMEN_SIDES) { bad.push(`JG3: the ${which === 0 ? 'inner' : 'outer'} root ring of the style has ${ring && ring.length} points, expected ${STAMEN_SIDES}`); return; }
     for (const p of ring) {
       const v = [p[0] - C[0], p[1] - C[1], p[2] - C[2]];
       const r = Math.hypot(v[0], v[1], v[2]);
-      if (Math.abs(r - G.rSty) > 1e-9) { bad.push(`JG3: the style's ${which === 0 ? 'inner' : 'outer'} root ring has a point ${r} from its centre, the style radius is ${G.rSty} — the overlap with the slab is not the solid cylinder the invariant is built on`); break; }
-      if (Math.abs(v[0] * N[0] + v[1] * N[1] + v[2] * N[2]) > 1e-9) { bad.push(`JG3: the style's ${which === 0 ? 'inner' : 'outer'} root ring leaves the face plane`); break; }
+      if (Math.abs(r - G.rSty) > 1e-9) { bad.push(`JG3: the ${which === 0 ? 'inner' : 'outer'} root ring of the style has a point ${r} from its centre, the style radius is ${G.rSty} — the overlap with the slab is not the solid cylinder the invariant is built on`); break; }
+      if (Math.abs(v[0] * N[0] + v[1] * N[1] + v[2] * N[2]) > 1e-9) { bad.push(`JG3: the ${which === 0 ? 'inner' : 'outer'} root ring of the style leaves the face plane`); break; }
     }
   });
   /* JG4 — THE TRIFID AS A PROPERTY of the emitted lobes. */
@@ -2872,10 +2872,10 @@ export async function gynoeciumAssertions(page, row) {
   const proj = L.map((l) => { const d = dot(l.dir, D); return [l.dir[0] - D[0] * d, l.dir[1] - D[1] * d, l.dir[2] - D[2] * d]; });
   for (let k = 0; k < L.length; k++) {
     const l = L[k];
-    if (Math.abs(Math.hypot(...l.dir) - 1) > 1e-12) bad.push(`JG4: lobe ${k}'s axis is not unit (${Math.hypot(...l.dir)})`);
+    if (Math.abs(Math.hypot(...l.dir) - 1) > 1e-12) bad.push(`JG4: the axis of lobe ${k} is not unit (${Math.hypot(...l.dir)})`);
     const off = Math.acos(Math.max(-1, Math.min(1, dot(l.dir, D))));
-    if (Math.abs(off - G.lobe.spreadRad) > 1e-9) bad.push(`JG4: lobe ${k} leaves the tip ${(off * 180) / Math.PI} degrees off the style, the trifid's spread is ${STIGMA_LOBE_SPREAD_DEG}`);
-    for (let c = 0; c < 3; c++) if (Math.abs(s.tip[c] + l.dir[c] * reach - l.apex[c]) > 1e-9) { bad.push(`JG4: lobe ${k}'s apex is not one lobe length along its axis from the tip`); break; }
+    if (Math.abs(off - G.lobe.spreadRad) > 1e-9) bad.push(`JG4: lobe ${k} leaves the tip ${(off * 180) / Math.PI} degrees off the style, the spread of the trifid is ${STIGMA_LOBE_SPREAD_DEG}`);
+    for (let c = 0; c < 3; c++) if (Math.abs(s.tip[c] + l.dir[c] * reach - l.apex[c]) > 1e-9) { bad.push(`JG4: the apex of lobe ${k} is not one lobe length along its axis from the tip`); break; }
     const n = L[(k + 1) % L.length], pa = proj[k], pb = proj[(k + 1) % L.length];
     const ang = Math.acos(Math.max(-1, Math.min(1, dot(pa, pb) / (Math.hypot(...pa) * Math.hypot(...pb)))));
     if (Math.abs(ang - (2 * Math.PI) / STIGMA_LOBES) > 1e-9) bad.push(`JG4: lobes ${k} and ${(k + 1) % L.length} are ${(ang * 180) / Math.PI} degrees apart around the style, the trifid puts them ${360 / STIGMA_LOBES} apart`);
