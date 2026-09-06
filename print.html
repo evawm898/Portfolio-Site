@@ -166,6 +166,11 @@
     margin: 0.55rem 0 0.5rem; color: #96a2a1; cursor: pointer; user-select: none;
   }
   #infill-anchor-toggle input { accent-color: #6fb7ae; margin: 0; }
+  #infill-fan-debug {
+    display: flex; align-items: center; gap: 0.4rem; margin-top: 0.5rem;
+    color: #2f8f9d; font-size: 0.72rem; cursor: pointer;
+  }
+  #infill-fan-debug input { accent-color: #2f8f9d; margin: 0; }
   #resetAnchors {
     background: none; border: 1px solid #2b3333; color: #96a2a1;
     font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
@@ -283,6 +288,7 @@
       <option value="hatch">cross-hatch</option>
       <option value="flow">line-flow</option>
       <option value="tone">tonal fill</option>
+      <option value="fan">fan</option>
     </select>
     <output id="infillModeOut"></output>
   </div>
@@ -346,6 +352,46 @@
     <output id="infillVeinWidthOut">2.5 px</output>
   </div>
 
+  <!-- THE FAN. Its own controls, and they are the review gate: the field is
+       tuned on the deploy preview rather than judged from a contact sheet.
+       `field` draws the field itself — the axis, the centre line, the origin
+       bar, the termination boundary and each inserted ray's birth — in its own
+       colour, so what is being tuned is visible and not only its ink. -->
+  <div class="pose-row" id="row-infillFanSpacing">
+    <label for="infillFanSpacing">spacing</label>
+    <input type="range" id="infillFanSpacing" min="2" max="40" step="0.5" value="9">
+    <output id="infillFanSpacingOut">9.0 px</output>
+  </div>
+  <div class="pose-row" id="row-infillFanConverge">
+    <label for="infillFanConverge">converge</label>
+    <input type="range" id="infillFanConverge" min="0" max="100" step="1" value="55">
+    <output id="infillFanConvergeOut">55%</output>
+  </div>
+  <div class="pose-row" id="row-infillFanOrigin">
+    <label for="infillFanOrigin">origin</label>
+    <input type="range" id="infillFanOrigin" min="0" max="30" step="0.5" value="3">
+    <output id="infillFanOriginOut">3.0 px</output>
+  </div>
+  <div class="pose-row" id="row-infillFanInset">
+    <label for="infillFanInset">inset</label>
+    <input type="range" id="infillFanInset" min="40" max="100" step="1" value="92">
+    <output id="infillFanInsetOut">92%</output>
+  </div>
+  <div class="pose-row" id="row-infillFanTipReach">
+    <label for="infillFanTipReach">tip reach</label>
+    <input type="range" id="infillFanTipReach" min="20" max="100" step="1" value="88">
+    <output id="infillFanTipReachOut">88%</output>
+  </div>
+  <div class="pose-row" id="row-infillFanTipJitter">
+    <label for="infillFanTipJitter">tip ragged</label>
+    <input type="range" id="infillFanTipJitter" min="0" max="100" step="1" value="35">
+    <output id="infillFanTipJitterOut">35%</output>
+  </div>
+  <label id="infill-fan-debug" hidden>
+    <input type="checkbox" id="infillFanDebug"> show the field
+  </label>
+
+  <div id="infillAnchorBlock">
   <div class="pose-hint">where the dark goes — drag the ring on each part</div>
   <div class="pose-row">
     <label for="infillReach">reach</label>
@@ -361,6 +407,7 @@
     <label for="infillJitter">jitter</label>
     <input type="range" id="infillJitter" min="0" max="100" step="1" value="35">
     <output id="infillJitterOut">35%</output>
+  </div>
   </div>
   <!-- PER-PART DARKNESS. Built per bundle, because the parts are the
        bundle's — the reference's depth is one shape reading dark against its

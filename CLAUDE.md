@@ -462,8 +462,10 @@ crease edges, three sliders, then chained/curated/smoothed into drawn contours
 in two weights), a **runtime bundle loader** (#156 — a `.glb` can be
 swapped in at any time, not only baked into the page at build time), the
 **authored infill** (#157 — cross-hatch and line-flow inside the silhouette),
-and the **tonal fill** (the silhouette inked solid or graded, veins reserved
-out of the fill, a darkness per part).
+the **tonal fill** (the silhouette inked solid or graded, veins reserved out of
+the fill, a darkness per part), **shape-derived direction** (#163 — one axis per
+part), and the **fan** (rays that converge at a part's base and spread toward
+its tip — the first family here whose strokes are not parallel to each other).
 
 **TWO BUNDLES SHIP, and the second one is why `/print` can now be judged on a
 LEAF.** `flower-test-bundle.glb` (5.7 MB, 78k triangles) is the default and is
@@ -762,7 +764,8 @@ once there is an actual multi-part export to test against.
 ### Authored infill (`print-infill.js`) — 2D, and it never reads the surface
 
 Interior shading generated INSIDE a solid's already-extracted 2D silhouette:
-cross-hatch and line-flow. It is authored illustration, not a render. The
+cross-hatch, line-flow, tonal fill and the fan. It is authored illustration,
+not a render. The
 module reads exactly one thing off the geometry — the projected silhouette the
 line-art extractor already computed for the frame — and everything after that
 is two-dimensional. No creases, no dihedral angles, no normals, no light, and
@@ -1011,7 +1014,9 @@ volume, and `setFromObject` reported a leaf stretching to the origin.
 
 **A hatch angle is now a choice of WHERE THE DIRECTION COMES FROM** — see
 "Shape-derived direction" below; `angleDeg` is still the default and still the
-only thing hatch, flow and tone read in `global`.
+only thing hatch, flow and tone read in `global`. **A fourth family, the FAN,
+reads neither** — see "The fan" below; it always derives its own per-part axis,
+and the direction select is hidden rather than left saying something inert.
 
 **The sheet is `node tools/shot-print-tone.mjs <dir>`** — solid fill and
 reserved-vein fill on the separate leaf, the vein and gradient and nib sweeps, the
@@ -1136,6 +1141,180 @@ axial ramp as a sweep, the stem's honest "base", and the fused bloom
 unretouched. Cells are cropped from the leaf's own measured silhouette bbox,
 looking down its thinnest dimension — from the side it is a sliver and no
 direction is legible on it.
+
+### The fan (`mode: 'fan'`) — strokes that converge at the base, and the review gate is the page
+
+The fourth family, and the answer to why #163's three cells were rejected:
+hatch, flow and tone are all PARALLEL LINE FAMILIES — rotated to an axis or
+sheared along a centre line, but every stroke running the same direction as
+every other. The reference does not. Its strokes emanate from where a part
+joins the plant and spread toward its point, curving with the shape as they go.
+
+**IT WAS CHECKED AGAINST LINE-FLOW FIRST, AND IT IS NOT A SETTING ON IT.**
+Flow at `curvature -100` is already RADIAL from the anchor, and rays from a
+point are the orthogonal family of the rings it draws at +100 — so on paper
+this is flow's own field with the origin moved. Two things make that the wrong
+place to build it, and both are measured rather than argued: a radial field
+knows NOTHING about the shape, so its straight rays exit through the side of a
+bowed or tapering leaf (the failure #163 built the shear for, and the shear
+cannot be bolted onto a per-step integrator); and flow SEEDS ON A BBOX GRID, so
+two seeds on one ray draw it twice and the spacing between rays is a property
+of the grid — and the spacing law is this family's whole design problem. Flow
+at -100 is photographed on the sheet as the nearest thing that already shipped.
+
+**THE FIELD IS ONE LINE: `offset(t) = u × halfWidth(t)`, in the part's WARPED
+(station, offset) frame.** A ray is a curve of constant normalised offset; the
+half-width is MEASURED off the shape's own cross-spans at that station. Two
+things fall out and neither is a special case: the rays converge at the base
+and spread toward the tip because THE SHAPE does (a leaf is narrow where it
+joins the stem), and a ray cannot exit sideways at any taper or bend, so the
+straight-ray failure is unreachable rather than mitigated. #163's shear is what
+makes it follow a bowed part, and is the identity on a straight one — the
+division of labour is asserted: the shear carries the bend (a 52 px bow leaves
+a **0.1 px** interior residual against 32.6 px unsheared) and the profile's
+measured centre carries what the shear's 21 samples CLAMP OFF THE TWO ENDS
+(32.6 px there). That clamp is not a detail: anchoring the fan at 0 instead of
+at the measured span centre put a whole station's rays outside the shape, and
+the base band read 5,020 px² of leaf holding 79 px of ink. **The profile is
+symmetric about its own centre by construction** — the centre IS the span's
+midpoint — so the two-sided API is a convenience and not a lopsided fan.
+
+**THE SPACING LAW IS THE SESSION'S ONE REAL DESIGN QUESTION, AND IT SHIPS AS A
+TRADE RATHER THAN AN ANSWER.** A pure pencil touches at the origin and splays
+at the tip; the reference does neither. But the two fixes pull opposite ways:
+hold the spacing constant along the length and the density is uniform, so
+convergence stops being a gradient at all; let a fixed pencil converge and the
+base is dark for free but the tip is a handful of strokes far apart. So it is
+ONE control, `converge`, interpolating the TARGET:
+`S(t) = spacing × ((1-k) + k × halfWidth(t)/halfWidthMax)`. Rays are inserted
+DYADICALLY — level 0 the two margins, level 1 the centre, level L the midpoints
+of level L-1 — and a level is BORN at the first station where its parent grid
+opens past `S(t)`, running from there to its tip cutoff. That is what puts
+short strokes tucked between long ones, with no bookkeeping beyond one station
+scan per level. Measured on the real leaf: ink density base/tip is **1.95x at
+converge 0 and 2.97x at converge 100**.
+
+**SO #163'S AXIAL RAMP IS NOT OFFERED HERE, AND THAT IS A FINDING, NOT AN
+OMISSION.** Convergence IS the gradient in this family, so a second base-to-tip
+ramp compounds with it. The read-out prints the MEASURED ink profile — length
+per station band over the band's own DRAWABLE area — so the claim is a number
+on the page rather than a sentence in a header. Drawable, not projected: on
+this bundle the bloom sits in front of exactly where the leaf meets the stem,
+and dividing ink by an area the part is not allowed to mark reports a light
+base that is only an occlusion.
+
+**AN ORIGIN REGION, NOT A POINT** (`origin`, a floor on the half-width, in
+pixels because it is a property of the MARK), and **strokes stop short of the
+tip** (`tipReach`, ragged per ray by `tipJitter` — the same argument
+`jitter` makes for the tonal layers' thresholds). The origin is a FLOOR, so on
+a part whose base is blunt it is correctly inert: the read-out says at how many
+of the part's drawable stations it is BINDING rather than offering an
+apparently dead slider, and the gate asserts that biconditional coordinate by
+coordinate (a checksum cannot see it — the floor widens the fan symmetrically,
+so a plain coordinate sum cancels exactly and read ±0 while the picture
+changed). **`darkness` is the target spacing** in this family: tone here IS
+line density, so "how dark is this part" is how far apart its strokes are, and
+0 is also the cost lever for a bloom filling the viewport.
+
+**THE DIRECTION-DEPENDENT MEMBERSHIP HAZARD IS ANSWERED BY CLIPPING PER
+STATION.** A fan gives every ray its own heading, so there is no "the ray's own
+angle" to judge its ink at — which would have made #160's hazard far worse than
+#163's three per-part axes. What the implementation does instead is ask
+membership on the row of CONSTANT STATION, and those rows all run along the
+part's cross axis: the fan therefore has exactly ONE scan direction,
+`scanAngleDeg` is the axis + 90, and a ray that leaves is bisected IN STATION
+so every probe stays on that one direction. The shear does not disturb it — a
+constant-station row maps to a straight pixel line whose offsets all shift by
+the same amount, so point and spans move together — and that identity is
+asserted (`fan/the-shear-preserves-membership-on-a-row`) because it is what
+lets the gate measure in pixels. **Measured: 0 of 16,512 emitted points outside
+the leaf's outline at its own framing.** At extreme zoom 65 of 27,854 read
+outside, ALL OF IT the leaf — the part with 16 of its 114 edges carrying a
+third face the topology drops, so its projected silhouette is the open one.
+That is bounded and named (`open-outline/the-disagreement-is-bounded-and-named`,
+0.23%), never absorbed into a tolerance.
+
+**AND #163'S CACHE BUG IS CARRIED FORWARD — BUT ITS WITNESS HERE IS A DIFFERENT
+ONE, AND THAT CORRECTION CAME FROM THE NEGATIVE CONTROL.** Every part has its
+own warp, so an index built for the bloom in the LEAF's warped frame is
+meaningless to the stem; the key is `part @ warp owner`. The check written for
+it, `fan/no-ink-under-a-nearer-part`, reasoned from #163: a wrong occluder
+subtraction takes ink AWAY, so the mark to look for is ink that should have
+been removed and was not. **It stayed green under the mutation — 0 of 10,851.**
+The damage is not to the occluders, it is to the part's OWN index: whoever asks
+for `j` first fixes the frame it is built in, so a part that occluded something
+earlier in the frame gets its own index back in someone else's warped
+coordinates and is clipped against a garbage outline. The witness is therefore
+the part's ink escaping itself (`leaf/strokes-terminate-at-the-silhouette`,
+158 of 714 leaf endpoints outside), and `no-ink-under-a-nearer-part` is kept as
+a true property this mutation does not happen to violate.
+
+**THE COST IS BELOW BOTH FAMILIES IT SITS BESIDE.** Measured in the same run,
+same camera, three-part bundle, headless Chromium 1100x800, software GL:
+
+| | fan | tonal fill | cross-hatch |
+|---|---|---|---|
+| leaf face-on (the review camera) | 7 ms | 3 ms | 1 ms |
+| #163's close-up | **60 ms** | 98 ms | 137 ms |
+
+(#163 recorded 84 ms tonal / 235 ms hatch at that close-up; this run reproduces
+the shape of it.) The fan is per-RAY work rather than per-row, and a ray is
+~120 membership probes: on the leaf that is a few thousand queries against the
+tonal fill's thousands of rows. `medialOffsets()`'s trap — bucketing per pixel
+across the whole viewport — is avoided the same way #163 avoided it: the
+station range is clamped to the VIEWPORT (the shear leaves the station alone,
+so the clamp is exact) and the index is bucketed at the ray step.
+
+**THE BLOOM CANNOT PASS THIS TEST AND MUST NOT BE TUNED AROUND** — the same
+sentence as #163 and #160, for the same reason. It is one fused solid, so the
+fan gets ONE origin and one centre line for the entire flower and runs its rays
+across a radial blob. Per-petal fans are blocked on multi-part export. The
+sheet photographs it with the field drawn, which is the clearest statement of
+the limit there is.
+
+**THE REVIEW GATE IS NOT A CONTACT SHEET THIS TIME.** Three sessions in a row
+built a shading field from a verbal description, produced a sheet, and missed —
+a process problem as much as a design one. So the six parameters are LIVE
+CONTROLS, the read-out says what the field is doing (the spacing law spelled
+out, the measured gaps between neighbouring rays at three stations, the measured
+ink density band by band, where each level was inserted, where the origin floor
+binds), and **`show the field`** draws the field itself in its own colour — the
+axis, the measured centre line, the origin bar, the ragged termination boundary
+and a tick at each inserted ray's birth. It is its OWN primitive in the overlay
+scene, never mixed into a part's ink buffer, so drawing it cannot change the
+picture it describes (asserted bit for bit). Review it on the deploy preview.
+
+**Verify with `node tools/verify-print-fan.mjs`** (46 checks; `--negative-control`
+runs seven mutants and is required before quoting a pass from a changed harness;
+`--skip-leaf` drops the leaf half). Part one drives the shipped `widthProfile` /
+`profileMidAt` / `profileHalfAt` / `fanTargetSpacing` / `fanRays` over outlines
+whose answer can be written down, because on the real leaf a WRONG fan still
+draws a plausible converging picture. Part two measures emitted pixel
+coordinates in a browser.
+
+Five things the checks and the negative control taught, each measured:
+**a field with two statements is a field one of whose statements is untested** —
+the ray offset lived inside `_fanPart` and the gate restated it, so the
+`rays-are-parallel` mutation sailed through every part-one check and only the
+browser half caught it; `fanOffsetAt()` is now the one owner and both call it;
+**a station is not a sentinel** — `t` is negative over the base half of every
+part, so a `-1` "not found" marker read as a real birth AT THE BASE and every
+level was born at once (a plausible fan, with the spacing law silently switched
+off; it is now a mutant); **comparing two gap lists by index is meaningless**
+the moment insertion has changed how many gaps there are, so divergence is
+asserted over the rays alive at BOTH stations, pair by pair; **substituting the
+axis angle into the scan formulas is not a near miss** — it read 94 of 95 points
+outside, and is how the shear-membership check was first written; and **a
+segment COUNT cannot see the origin floor at all** (it changes no ray's
+existence), nor can a coordinate checksum (it cancels), so that one is compared
+coordinate by coordinate.
+
+The sheet is `node tools/shot-print-fan.mjs <dir> [base-tree]` — the fan beside
+#163's cross-hatch and #157's radial flow on the same leaf at the same camera,
+the field drawn, the converge sweep as the argument with the measured density
+in every caption, each lever as a pair, the stem's honest "base", the fused
+bloom with and without the field, the panel, and with a base-tree a real render
+of the old code from a git worktree.
 
 ## Artist Tracker (`artist-tracker.html`)
 
