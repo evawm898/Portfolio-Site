@@ -184,6 +184,16 @@ const WITNESS = {
      are route (m)'s, on one page, in both directions. */
   head: { id: 'headRise', value: '0.5',
           read: (m) => `${m.hubBuilt ? m.hubBuilt.tris : 'no hub'}/${m.hubDome ? m.hubDome.Rd.toFixed(6) : 'flat'}`, what: "the hub builder's triangle count / the cap's radius" },
+  /* ANDROECIUM (session 21) — collapsed at first load; witnessed by the count
+     through the BUILDER's own free-end tally and the OWNER's disc radius,
+     which reach past the slider into what was emitted: 0 / 0 / none at the
+     shipping default, 6 / 6 / the area rule's radius at six. The section's
+     own transitions (hidden whole under SPHERE, the sub-controls at count 0,
+     the read-out's lines and flags, the two inertness clauses) are route
+     (o)'s, on one page, in both directions. */
+  androecium: { id: 'stamenCount', value: '6',
+                read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
+                what: "the builder's free-end tally / stamens emitted / the owner's disc radius" },
   /* NO `center` ENTRY (session 20): the CENTER section and its five controls
      are retired. The witness that stood here (`centerStyle` -> RING, read as
      centerStyle/centerTris) is REPLACED, not deleted silently, by route (n)
@@ -1564,6 +1574,82 @@ for (const [label, sets, wantDome, wantClamp] of [
   else ok.push(`${tag}: ${retired.length} retired ids (${retired.join(', ')}) absent from the DOM, the read-out's summary line, the metrics, and as identifiers in ${files.length} bloom source files`);
 }
 
+/* ===================================================================
+   ROUTE (o) — THE ANDROECIUM (session 21), on ONE page, in BOTH directions.
+   The section is hidden whole under SPHERE and the four sub-controls hide at
+   count 0; the read-out's STAMENS line, its (CLAMPED at the hub radius)
+   clause, its PETAL-ROOT ANNULUS flag, its ROOTS FUSE flag and the
+   SLENDERNESS line's verbatim UNMEASURED tag are asserted against the
+   OWNER'S own record (routes (k)-(m)'s discipline). The inertness clauses
+   are BEHAVIOURAL: six stamens are asked for while the head is a SPHERE and
+   the build's triangle count must not move from the bare sphere's; every
+   sub-control is driven to its maximum at count 0 and the count must not
+   move from the default's (the byte identity itself is the matrix's GATED
+   rows; this is the same claim on the DOM path). The negative control
+   freezes the read-out so the STAMENS line cannot appear where the geometry
+   builds one. */
+{
+  const tag = '[stamens]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const SUBS = CONTROLS.filter((c) => c.section === 'androecium' && c.id !== 'stamenCount').map((c) => c.id);
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate((subs) => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+      const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
+      const sec = document.getElementById('sec-androecium');
+      return { count: Math.round(Number(ui.stamenCount)), sphere: m.sphereMode === true,
+               sectionHidden: sec ? sec.hidden : null, countHidden: hid('stamenCount'), subsHidden: subs.map((id) => hid(id)),
+               has: m.androecium !== null, emitted: m.stamens.length, freeEnds: m.freeEnds, shownTris: m.shownTris,
+               clamped: !!(m.androecium && m.androecium.clamped), annulus: m.androecium ? m.androecium.inPetalRootAnnulus : 0,
+               saturation: m.androecium ? m.androecium.saturation : null, saturationSaid: (txt.match(/([\d.]+)x is as far as this hub goes, the slider above it is dead here/) || [])[1],
+               fuse: !!(m.stamenNearest && m.androecium && m.stamenNearest.root.mm < m.androecium.diameter),
+               lineSaid: (txt.match(/^STAMENS (\d+) on /m) || [])[1], clampSaid: /\(CLAMPED at the hub radius/.test(txt),
+               annulusSaid: /STAND INSIDE THE PETAL-ROOT ANNULUS/.test(txt), fuseSaid: /\(ROOTS FUSE\)/.test(txt),
+               slenderSaid: /^SLENDERNESS L\/d [\d.]+ \((live|export)\) — UNMEASURED — no coupon has been printed$/m.test(txt) };
+    }, SUBS);
+    const p = [];
+    const wantPresent = !res.sphere && res.count >= 1;
+    if (res.sectionHidden === null) p.push('there is no #sec-androecium section in the panel');
+    else if (res.sectionHidden !== res.sphere) p.push(`the Androecium section is ${res.sectionHidden ? 'hidden' : 'shown'} while the head ${res.sphere ? 'is a SPHERE (hidden and inert)' : 'is a cap'}`);
+    if (res.countHidden !== res.sphere) p.push(`stamenCount is ${res.countHidden ? 'hidden' : 'shown'} under a ${res.sphere ? 'sphere' : 'cap'}`);
+    res.subsHidden.forEach((h, i) => { if (h !== !wantPresent) p.push(`${SUBS[i]} is ${h ? 'hidden' : 'shown'} while the androecium is ${wantPresent ? 'present' : 'absent'}`); });
+    if (res.has !== wantPresent) p.push(`the owner ${res.has ? 'declares an androecium' : 'declares none'} while the state says ${wantPresent ? 'present' : 'absent'}`);
+    if (res.emitted !== (wantPresent ? res.count : 0) || res.freeEnds !== (wantPresent ? res.count : 0)) p.push(`${res.emitted} stamens emitted / ${res.freeEnds} free ends for ${wantPresent ? res.count : 0} expected`);
+    if ((res.lineSaid !== undefined) !== wantPresent) p.push(`the STAMENS line is ${res.lineSaid !== undefined ? 'SHOWN' : 'ABSENT'} while the owner ${wantPresent ? 'declares an androecium' : 'declares none'}`);
+    else if (wantPresent && Number(res.lineSaid) !== res.count) p.push(`the STAMENS line says ${res.lineSaid}, the control says ${res.count}`);
+    if (res.slenderSaid !== wantPresent) p.push(`the SLENDERNESS line with its verbatim UNMEASURED tag is ${res.slenderSaid ? 'shown' : 'absent'} while the androecium is ${wantPresent ? 'present' : 'absent'}`);
+    if (res.clampSaid !== res.clamped) p.push(`the (CLAMPED at the hub radius) clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports clamped ${res.clamped}`);
+    /* THE DEAD TRAVEL IS TOLD, AND THE NUMBER IS THE OWNER'S (Eva, Sep 6): where
+       the multiplier runs out on this bloom is printed in the clamp clause and
+       must equal the owner's `saturation` — a static range cannot be narrowed to
+       remove dead travel that is a function of the count and the hub. */
+    if (res.clamped) {
+      if (res.saturationSaid === undefined) p.push('the clamp clause does not say where the multiplier runs out on this bloom');
+      else if (Math.abs(Number(res.saturationSaid) - res.saturation) > 0.005) p.push(`the read-out says the multiplier runs out at ${res.saturationSaid}x, the owner says ${res.saturation}`);
+    } else if (res.saturationSaid !== undefined) p.push('the read-out names a saturation point while the owner reports no clamp');
+    if (res.annulusSaid !== (res.annulus > 0)) p.push(`the PETAL-ROOT ANNULUS flag is ${res.annulusSaid ? 'shown' : 'absent'} while the owner counts ${res.annulus} stamens in it`);
+    if (res.fuseSaid !== res.fuse) p.push(`the ROOTS FUSE flag is ${res.fuseSaid ? 'shown' : 'absent'} while the owner's nearest roots ${res.fuse ? 'are' : 'are not'} closer than a filament`);
+    for (const k of ['clamped', 'annulusFlag', 'fuse']) if (want[k] !== undefined && (k === 'annulusFlag' ? res.annulus > 0 : res[k]) !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${k === 'annulusFlag' ? res.annulus > 0 : res[k]}`);
+    if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden androecium control reached the geometry`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: section ${res.sectionHidden ? 'hidden' : 'shown'}, ${res.emitted} stamens emitted, ${res.lineSaid !== undefined ? 'STAMENS line shown' : 'no STAMENS line'}${res.clamped ? ', CLAMPED' : ''}${res.annulus ? `, ${res.annulus} in the petal-root annulus` : ''}${res.fuse ? ', ROOTS FUSE' : ''}`);
+    return res;
+  };
+  const dflt = await step('defaults (the section shows its count, the sub-controls hide, no androecium)', []);
+  await step('6 stamens on a RING (the sub-controls appear; the six-stamen candidate)', [{ id: 'stamenCount', value: '6' }], { clamped: false, annulusFlag: false, fuse: false });
+  await step('120 on the DISC (CLAMPED at the hub; the petal-root annulus flag)', [{ id: 'stamenLayout', value: 'DISC' }, { id: 'stamenCount', value: '120' }], { clamped: true, annulusFlag: true });
+  await step('6 on a RING x spread 0.60 (the roots fuse — a flag)', [{ id: 'stamenLayout', value: 'RING' }, { id: 'stamenCount', value: '6' }, { id: 'stamenSpread', value: '0.6' }], { clamped: false, fuse: true });
+  const bare = await step('CONTINUOUS x SPHERE x count 0 (the section hides whole)', [{ id: 'stamenSpread', value: '2' }, { id: 'stamenCount', value: '0' }, { id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }]);
+  if (bare) await step('6 stamens asked for under SPHERE (hidden AND inert: the build must not move)', [{ id: 'stamenCount', value: '6' }], { tris: bare.shownTris });
+  await step('back to CAP (the section and the six stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
+  if (dflt) await step('RADIAL x count 0 x every sub-control at MAXIMUM (hidden and inert: the default\'s own count)', [{ id: 'placement', value: 'RADIAL' }, { id: 'stamenCount', value: '0' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '6' }, { id: 'stamenLength', value: '40' }, { id: 'stamenCurl', value: '180' }], { tris: dflt.shownTris });
+}
+
 await browser.close();
 server.close();
 
@@ -1590,11 +1676,12 @@ if (NEGATIVE_CONTROL) {
     const sawCurl = fail.some((f) => /^\[curl\] .*SPINE CURL line is ABSENT while the owner reports a curl/.test(f));
     const sawSphere = fail.some((f) => /^\[sphere\] .*HEAD: FULL SPHERE line is ABSENT while the geometry builds a sphere/.test(f));
     const sawRetired = fail.some((f) => /^\[retired\]: retired id\(s\) still render in the panel: centerStyle; a #sec-center section is in the panel/.test(f) && /names a centre/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired) { console.log('\nALL TWELVE ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}. All twelve must.`);
+    const sawStamens = fail.some((f) => /^\[stamens\] .*STAMENS line is ABSENT while the owner declares an androecium/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens) { console.log('\nALL THIRTEEN ROUTES OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}. All thirteen must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line and a resurrected CENTER section. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a resurrected CENTER section and a frozen STAMENS line. It is not measuring anything.');
   process.exit(1);
 }
 

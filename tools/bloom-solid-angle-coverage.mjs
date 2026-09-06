@@ -341,6 +341,17 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     const accHC = new mod.MeshBuilder({ exportMode: true });
     const frHC = mod.footRing(ui, accHC);
     mod.buildHubInto(accHC, ui, frHC.hub);
+    /* THE ANDROECIUM (session 21) — a third accumulator, counted in R1 and
+       never rasterised (plan-coverage's own construction, verbatim): the
+       measure is the petal canopy's solid angle, and a stamen is not a petal.
+       Under SPHERE, the only head this instrument asserts on, there are no
+       stamens at all (hidden and inert). */
+    const accST = new mod.MeshBuilder({ exportMode: true });
+    if (frHC.androecium) {
+      const A = frHC.androecium;
+      mod.buildWhorlInto({ count: A.count, radius: (i) => A.stamens[i].radius, height: 0, sizeRamp: () => 1, angleRamp: () => 0, phase: 0,
+        placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL', blade: (slot) => { mod.buildStamenInto(accST, A, A.stamens[slot.index], slot); } });
+    }
     const fr = mod.footRing(ui, accFull);
 
     /* A FLAT hub is skipped — but AFTER the capture and R5 below, so the
@@ -413,7 +424,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
       }
     }
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
-    if (petalTris + accHC.triangleCount !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub/centre-only (${accHC.triangleCount}) tris = ${petalTris + accHC.triangleCount}, but a whole-bloom build has ${accFull.triangleCount}`);
+    if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) bad.push(`solid R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + stamens-only (${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a whole-bloom build has ${accFull.triangleCount}`);
     if (petalsBuilt !== builtFull.petalsBuilt) bad.push(`solid R2: captured ${petalsBuilt} petals but builtFull.petalsBuilt is ${builtFull.petalsBuilt}`);
     if (bad.length) return { bad };
 

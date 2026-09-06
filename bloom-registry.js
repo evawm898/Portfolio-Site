@@ -189,6 +189,19 @@ export const PREDICATES = {
   perPetalEligible: { id: 'placement', oneOf: ['FAN'] },
 
   /* ===================================================================
+     WHERE THE ANDROECIUM APPLIES (session 21, phase 2 B2) — everywhere but
+     the FULL SPHERE (Eva, Sep 5: a full-sphere bloom is a flower head and
+     its reproductive parts belong to its florets). The registry HIDES the
+     whole Androecium section on this; bloom-geometry.js's
+     `androeciumEligible()` makes it INERT (the descriptor is null there);
+     the harness asserts the two agree at module load, both gates per row,
+     and the GATED matrix rows prove a maximal androecium under SPHERE
+     byte-identical to the bare sphere. `androeciumPresent` is the
+     sub-controls' own gate: nothing to spread, lengthen or curl at count 0. */
+  androeciumEligible: { not: { ref: 'sphereMode' } },
+  androeciumPresent: { all: [{ ref: 'androeciumEligible' }, { id: 'stamenCount', min: 1 }] },
+
+  /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
      it is a predicate rather than a special case (Eva, Sep 2).
 
@@ -601,6 +614,16 @@ export const SECTIONS = [
        avoid. */
     parent: 'roles',
   })),
+  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
+     reproductive parts the retired CENTER section was standing in for
+     (session 20). Correct botanical naming (Eva): the androecium is the
+     filaments and anthers; the gynoecium (style and stigma) is B3 and will be
+     its own section. Hidden whole under SPHERE by every control's predicate.
+     LAST in this list on purpose: the generator renders a parent's nested
+     drop-downs directly after it, and the panel gate's census compares the
+     DOM order against this array — a top-level section declared between
+     "roles" and its children reads as out of order there (measured). */
+  { id: 'androecium', label: 'Androecium', open: false },
 ];
 
 /* WHAT A SECTION'S SUMMARY SAYS, at a given state — THE ONE OWNER, used by
@@ -1936,8 +1959,46 @@ export const CONTROLS = [
   /* THE CENTER ROWS WERE HERE (the A/B rig: centerStyle and its four
      sub-sliders) and are RETIRED — see RETIRED_IDS at the top of this file
      and the charter's session-20 entry. The `role: 'center'` vocabulary is
-     kept for the androecium and gynoecium that replace them (phase 2, B2);
-     no control carries it today. */
+     carried by the androecium below (session 21) and by the gynoecium when
+     it lands (B3).
+
+     ===================================================================
+     THE ANDROECIUM (session 21, phase 2 B2 — Eva's Phase A rulings). Ships
+     ABSENT: `stamenCount` 0 is the shipping default, so every pre-existing
+     export is bit-identical by construction and the four sub-controls are
+     hidden AND inert there (`androeciumPresent`). The anther is ONE shape,
+     the PILL (A1, FIXED) — no enum, no sub-controls; its proportions are two
+     constants in bloom-geometry.js. The filament's diameter is the sheet
+     thickness (Part thickness owns the material dimension); its curve is
+     spineLaw() at a curl of 0 as the identity.
+
+     `stamenSpread` IS A MULTIPLIER ON A DERIVED RADIUS, the petal `spread`
+     precedent (Eva's Q1: the radius is a range — a reference rule plus a
+     control; whether multiplier or millimetres is B2's recommendation and
+     her ruling). The reference is the androecium's OWN area rule, the disc
+     the filament cross-sections would tile; the range runs out to the hub
+     radius, where footRing() CLAMPS it and the read-out says so. A stamen
+     standing inside the petal-root annulus is FLAGGED, never refused. */
+  { id: 'stamenCount', section: 'androecium', kind: 'slider', min: 0, max: 120, step: 1, default: 0,
+    label: 'Stamens', fmt: (v) => (Number(v) === 0 ? 'none — the apex is bare' : `${v} stamen${Number(v) === 1 ? '' : 's'}, pill anthers`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumEligible' } },
+  { id: 'stamenLayout', section: 'androecium', kind: 'choice', default: 'RING',
+    options: [
+      { value: 'RING', label: 'One ring (a whorl)' },
+      { value: 'DISC', label: 'Disc (a Vogel spiral)' },
+    ],
+    label: 'Layout',
+    fmt: (v) => (v === 'DISC' ? 'every stamen at its own radius, r ∝ √i at the golden angle' : 'evenly around one ring'),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'stamenSpread', section: 'androecium', kind: 'slider', min: 0.6, max: 6, step: 0.05, default: 2,
+    label: 'Stamen spread', fmt: (v) => `${Number(v).toFixed(2)}x the reference — out to the hub radius`,
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'stamenLength', section: 'androecium', kind: 'slider', min: 5, max: 40, step: 1, default: 20,
+    label: 'Filament length', fmt: (v) => `${v} mm free, above the hub`,
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'stamenCurl', section: 'androecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
+    label: 'Filament curl', fmt: (v) => (Number(v) === 0 ? 'straight, along the surface normal' : `${v}° — ${Number(v) > 0 ? 'bends in over the centre' : 'reflexes outward'}`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));

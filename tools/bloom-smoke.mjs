@@ -2,7 +2,7 @@
    bloom-smoke.mjs — THE NAMED SMOKE SUBSET. FOR ITERATION, NEVER FOR MERGE.
 
    WHAT THIS IS. A written-down, derived, auditable subset of
-   buildMatrix() — a fixed subset (31 of 481 rows as of session 20) — run through the REAL export gate with
+   buildMatrix() — a fixed subset (35 of 507 rows as of session 21) — run through the REAL export gate with
    its own `--only` flag. It exists so a session can find out in ~2 minutes
    whether it has broken something, instead of in ~44. It is ADDITIVE: it
    changes nothing about what certifies the work.
@@ -329,6 +329,26 @@ export const SMOKE_BLOCKS = [
         path: 'S4 — headRise hidden AND inert under SPHERE (the bit-identity itself is the byte diff\'s; this row proves the guard and the DOME clause on the state)' },
       { label: 'SPHERE: GATED — SPHERE stored under RADIAL (hidden and inert; bit-identical to the default)',
         path: 'the other direction — a stored SPHERE under a ringed placement builds the cap; sphereMode false in both statements, no closed hub, no reserved-pole telemetry' },
+    ],
+  },
+  {
+    n: 23,
+    anchor: 'STAMENS: 6 on a RING (the six-stamen candidate)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 21): the branches the part
+       adds are footRing()'s androecium map (RING / DISC, the area rule and
+       its hub clamp, the annulus flag), buildStamenInto's tube and pill,
+       spineLaw() at tilt 0 with a curl, the root on the CAP's normal, and
+       the hidden-and-inert path under SPHERE; the families that need a
+       witness are JS1-JS4 in both directions. Cheapest row per path. */
+    rows: [
+      { label: 'STAMENS: 6 on a RING (the six-stamen candidate)',
+        path: 'the RING layout at the six-stamen candidate — JS1 (flat normal), JS2 (containment, the radial law), JS3 (the root cylinder), JS4 (six free ends at the fixed count)' },
+      { label: 'STAMENS: 120 DISC x Head rise 0.5 (the tips fan out with the normals)',
+        path: 'the DISC layout at the count ceiling, CLAMPED at the hub, 86 roots in the petal-root annulus, on a CAP — JS1 on the cap\'s normal, JS2\'s equal-area clause, the two distance flags' },
+      { label: 'STAMENS: 6 x curl max (180) — bent in over the centre',
+        path: 'spineLaw() at tilt 0 with a curl engaged — the filament off its normal beyond the outer face while the root stays on it' },
+      { label: 'STAMENS: GATED — every control at MAXIMUM under SPHERE (hidden and inert; bit-identical to the bare sphere)',
+        path: 'the other direction — hidden AND inert under SPHERE: no descriptor, no stamen emitted, no free end tallied, the two-statement guard on the state' },
     ],
   },
 ];

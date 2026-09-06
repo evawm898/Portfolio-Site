@@ -185,6 +185,49 @@ export function sphereMode(state) { return state.placement === 'CONTINUOUS' && s
    takes exactly the doubles it took before SPHERE existed. */
 export function domeIsFlat(state) { return !sphereMode(state) && state.headRise === 0; }
 
+/* ===================================================================
+   THE ANDROECIUM (session 21, phase 2 B2 — Eva's Phase A rulings, carried,
+   not re-derived). The stamens: a filament rooted THROUGH the hub slab on the
+   surface normal, curved by spineLaw() at a curl of 0 as the identity, tipped
+   with ONE anther shape — the PILL (A1, FIXED: not an enum, not a control).
+   A2 BILOBED is RETIRED from the candidate set permanently; A3 T-BAR is a
+   later value addition once six curved filaments have been seen in the real
+   generator; A4 CLUB is a tapered pill and is dropped. The descriptor is
+   footRing()'s SECOND KIND (`fr.androecium`), sharing the dome object and the
+   surface law with the petal rings; the builders read it and compute nothing.
+
+   THE FILAMENT IS ONE SHEET THICK: its diameter is `sheetThickness`, floored
+   at export exactly as the sheet is — one owner of the part's material
+   dimension, and nothing in this family has been printed. The pill is a fixed
+   PROPORTION of it (ANTHER_DIAMETER_FACTOR across, ANTHER_LENGTH_FACTOR of
+   its own diameter long) — two constants for Eva's eye on the sheet, never
+   controls. Ships ABSENT: `stamenCount` defaults to 0, so 0 moved is by
+   construction.
+
+   HIDDEN AND INERT UNDER SPHERE (Eva, Sep 5: a full-sphere bloom is a flower
+   head and its reproductive parts belong to its florets). This function is the
+   geometry's statement; `PREDICATES.androeciumEligible` in the registry is the
+   twin that HIDES; the harness asserts the two agree at module load, the gates
+   per row, and the GATED matrix rows prove the androecium at maximum under
+   SPHERE byte-identical to the bare sphere. */
+export const MAX_STAMENS = 120;
+export const ANTHER_DIAMETER_FACTOR = 1.6;
+export const ANTHER_LENGTH_FACTOR = 2.5;
+/* Mesh resolution — FIXED, so topology depends on no slider and the export
+   gate's live-equals-export count holds: STAMEN_SIDES around every tube and
+   pill ring, STAMEN_ROWS stations along the free filament, ANTHER_CAP_RINGS per
+   hemisphere of the pill. 560 triangles per stamen, 67,200 at 120. */
+export const STAMEN_SIDES = 10;
+export const STAMEN_ROWS = 16;
+export const ANTHER_CAP_RINGS = 5;
+/* Triangles per stamen, from the constants — the tube (STAMEN_ROWS + 1
+   bands, two fan caps) plus the pill (2 x ANTHER_CAP_RINGS - 1 bands, two
+   apex fans). JS4's census compares every stamen's EMITTED count (the
+   accumulator's own delta) against this: a dropped pill or a doubled tube
+   moves it. */
+export const STAMEN_TRIS = ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + ((2 * ANTHER_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
+export function androeciumEligible(state) { return !sphereMode(state); }
+
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
    definition instead of a rounding of it.
@@ -1684,6 +1727,23 @@ export function footRing(state, acc) {
     if (Rd < floor) { clamped = true; Rd = floor; H = floor - Math.sqrt(floor * floor - R0 * R0); }
     return { rise, riseBuilt: H / R0, H, Rd, centreZ: H - Rd, clamped, floorRadius: floor, surfaceToPlan: null };
   })();
+  /* THE SURFACE LAW, ONE HELPER FOR BOTH DESCRIPTOR KINDS (session 21): where
+     a plan radius (or, on the sphere, a polar angle) lands on the head the
+     owner declares — height, slope (the polar angle from the apex, which is
+     also the tangent plane's tilt), arc distance from the apex, and the local
+     relief 1 / cos(slope) (on the sphere against the equatorial plane,
+     symmetric about the equator; vertical AT the equator). Flat: 0 / 0 / the
+     plan radius / 1. The ring map below and the androecium map read it; the
+     expressions are the ring map's own, moved here VERBATIM, so every petal
+     ring takes the same doubles it took before the androecium existed — the
+     byte diff on the newest frozen baseline is what measures that. */
+  const surfaceAt = (radius, polar) => {
+    const slope = sphere ? polar : dome ? Math.asin(Math.min(1, radius / dome.Rd)) : 0;
+    const z = sphere ? dome.Rd * Math.cos(polar) + dome.centreZ : dome ? Math.sqrt(dome.Rd * dome.Rd - radius * radius) + dome.centreZ : 0;
+    const arc = dome ? dome.Rd * slope : radius;
+    const relief = sphere ? (Math.abs(Math.cos(slope)) < 1e-9 ? Infinity : 1 / Math.abs(Math.cos(slope))) : dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1;
+    return { slope, z, arc, relief };
+  };
   const rings = raw.map((p, L) => {
     /* ON THE SPHERE THE KEY IS THE POLAR ANGLE (session 18): under the
        continuous arm `L` IS the slot index k, so `phiAt(L)` places this
@@ -1692,13 +1752,9 @@ export function footRing(state, acc) {
        be continued there and this arm exists. Cap and flat: verbatim. */
     const polar = sphere ? phiAt(L) : null;
     const radius = sphere ? dome.Rd * Math.sin(polar) : R0 * p.scale;
-    /* WHERE ON THE DOME THIS RING LANDS — height, slope (the polar angle from
-       the apex, which is also the tangent plane's tilt) and arc distance from
-       the apex, all from the one sphere above. Flat: 0 / 0 / the plan radius.
+    /* WHERE ON THE DOME THIS RING LANDS — from the one surface law above.
        Containment (J2) is what makes radius <= Rd: Rd >= R0 by AM-GM. */
-    const slope = sphere ? polar : dome ? Math.asin(Math.min(1, radius / dome.Rd)) : 0;
-    const z = sphere ? dome.Rd * Math.cos(polar) + dome.centreZ : dome ? Math.sqrt(dome.Rd * dome.Rd - radius * radius) + dome.centreZ : 0;
-    const arc = dome ? dome.Rd * slope : radius;
+    const { slope, z, arc, relief } = surfaceAt(radius, polar);
     /* How far inside the ring each foot continues, so foot–hub overlap is a
        solid annulus, not a hairline touch. A FRACTION of this layer's own
        radius with an absolute floor, so the guarantee is scale-free per
@@ -1881,11 +1937,7 @@ export function footRing(state, acc) {
          z / slope / arc place the foot; `relief` is the local surface-to-
          plan factor 1 / cos(slope), the number the read-out prints at the
          rim and at the innermost ring so the relief finding is legible. */
-      z, slope, arc,
-      /* On the sphere the factor is against the EQUATORIAL plane's plan and
-         is symmetric about the equator (|cos|), vertical AT the equator. The
-         cap expression is kept verbatim on its own arm. */
-      relief: sphere ? (Math.abs(Math.cos(slope)) < 1e-9 ? Infinity : 1 / Math.abs(Math.cos(slope))) : dome ? (slope >= Math.PI / 2 - 1e-9 ? Infinity : 1 / Math.cos(slope)) : 1,
+      z, slope, arc, relief,
       dome,
     };
   });
@@ -1931,6 +1983,86 @@ export function footRing(state, acc) {
      every ring's plan radius is under by construction (Rd sin phi <= Rd).
      Cap and flat: R0, verbatim. */
   const hub = { radius: sphere ? dome.Rd : R0, thickness, derivedRadius, dome };
+
+  /* ===================================================================
+     THE ANDROECIUM DESCRIPTOR (session 21) — this owner's second kind. Null
+     when ABSENT (count 0) and null under SPHERE (hidden and inert — the
+     geometry's half of the registry's predicate); a claim nothing can make
+     reads as absent.
+
+     ITS OWN COUNT, ITS OWN LAW, NO PAIRING WITH PETALS (Q1). The radial
+     extent is a RANGE: the reference is the androecium's OWN area rule,
+     R_A^2 = SUM r_filament^2 = count x (d/2)^2 — the disc the filament
+     cross-sections would exactly tile, the spread precedent's "reference,
+     not a cage" — and `stamenSpread` multiplies it, out to the HUB RADIUS,
+     where it is CLAMPED and told. Stamen roots do NOT enter the petal ring's
+     area rule (Q5, amended): `spread` scales the petal ring and nothing else,
+     and R0 above is untouched by this block — it reads `hub`, never writes.
+
+     TWO LAYOUTS. RING is the shipped RADIAL law — every stamen on one ring at
+     R_A, evenly (the six-stamen candidate). DISC is the VOGEL disc, r_i =
+     R_A sqrt((i + 1/2) / count) at the golden angle — the equal-area
+     seed-head law the charter parked for PETALS because they shrink with
+     layerSize; stamens are constant-size, so that objection does not apply.
+     Both place through buildWhorlInto's existing azimuth arms; the radii are
+     stamped here and the builder indexes them.
+
+     THE OVERLAP FLAG (Eva: a flag, never a refusal): a stamen whose root
+     footprint stands inside any ring's petal-root annulus [radius - overhang,
+     radius] is counted; the read-out says how many, beside the clear disc.
+     Telemetry, like every clamp flag here — nothing geometric reads it. */
+  const androecium = (() => {
+    if (!androeciumEligible(state)) return null;
+    const count = Math.round(state.stamenCount);
+    if (!(count >= 0 && count <= MAX_STAMENS)) throw new Error(`stamenCount ${JSON.stringify(state.stamenCount)} is outside 0..${MAX_STAMENS} — the registry and the builder have diverged`);
+    if (count === 0) return null;
+    if (state.stamenLayout !== 'RING' && state.stamenLayout !== 'DISC') throw new Error(`unknown stamenLayout ${JSON.stringify(state.stamenLayout)} — the registry and the builder have diverged`);
+    const disc = state.stamenLayout === 'DISC';
+    const diameter = thickness;                       // one sheet thick, floored with it
+    const rFil = diameter / 2;
+    const derivedRadius = rFil * Math.sqrt(count);    // the androecium's own area rule
+    const asked = derivedRadius * state.stamenSpread;
+    /* OUT TO THE HUB RADIUS means the outermost FOOTPRINT reaches the rim:
+       the disc radius is clamped at the hub radius less one filament radius,
+       so every root stands whole on the slab (JS2). MEASURED before this was
+       written: clamping the CENTRE at the rim put 16 of 120 roots half over
+       the edge on the defaults. ONE REACHABLE CORNER — a hub narrower than a
+       filament radius (ALL MIN x spread min x sheet 2.40, the apex floor's
+       own corner) — collapses the androecium onto the axis: told (`onAxis`),
+       never refused, on the crosses-axis precedent. */
+    const limit = Math.max(0, hub.radius - rFil);
+    const clamped = asked > limit;
+    const radius = clamped ? limit : asked;
+    const onAxis = limit === 0;
+    const anther = { diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter };
+    const clearRadius = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
+    const stamens = [];
+    for (let i = 0; i < count; i++) {
+      const r = disc ? radius * Math.sqrt((i + 0.5) / count) : radius;
+      const s = surfaceAt(r, null);
+      const inPetalRootAnnulus = rings.some((rg) => r + rFil > rg.radius - rg.overhang && r - rFil < rg.radius);
+      stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus });
+    }
+    return {
+      count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
+      derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, dome,
+      /* WHERE THE MULTIPLIER RUNS OUT ON THIS BLOOM — the limit over the
+         reference, (hub - r) / (r sqrt N): 1.25 at 120 stamens on the shipping
+         hub, 13.7 at one, 123 on the largest hub, 0.03 on the smallest.
+         Telemetry, so the read-out can say how much of the slider is dead
+         HERE and the panel gate can assert it (Eva, Sep 6): a static range
+         cannot be narrowed to remove it, because it is a function of the
+         count and the hub, and the ruled answer to dead travel in this
+         codebase is the curl's — full ranges, clamped, TOLD. */
+      saturation: derivedRadius > 0 ? limit / derivedRadius : 0,
+      stamens,
+      inPetalRootAnnulus: stamens.filter((s) => s.inPetalRootAnnulus).length,
+      /* SLENDERNESS — free length over the FLOORED diameter, telemetry only
+         (Q7). UNMEASURED — no coupon has been printed: the six-stamen
+         candidate at L/d 18.3 is past anything this family has printed. */
+      slenderness: state.stamenLength / diameter,
+    };
+  })();
 
   /* THE QUANTIZER IDENTITY, CROSS-VALIDATED IN THE OWNER — the continuous
      arm's answer to `guardResidual`, and it exists for the same reason: a
@@ -2057,6 +2189,9 @@ export function footRing(state, acc) {
     rings, hub, derivedRadius, guardResidual, layerCount,
     /* THE DOME, footRing()'s own — null under the guard. */
     dome,
+    /* THE ANDROECIUM, this owner's second kind — null when absent or under
+       SPHERE (session 21). */
+    androecium,
     /* WHETHER THE HEAD IS THE FULL SPHERE (session 18) — this file's own
        answer, cross-checked against the registry's `sphereMode` predicate by
        the harness on every row. */
@@ -3698,6 +3833,82 @@ export function buildHubInto(acc, state, ring) {
 }
 
 /* ===================================================================
+   THE ANDROECIUM BUILDERS (session 21) — one stamen: a closed filament tube
+   rooted through the slab, and a closed PILL anther on its tip. Two closed
+   solids that overlap (the tube's last ring sits inside the pill's lower
+   hemisphere; its first ring sits inside the hub slab) — the export contract
+   exactly as the feet satisfy it.
+
+   THE ROOT AXIS IS THE OWNER'S NORMAL THROUGH THE FULL SLAB (JS1): the
+   centreline starts on the shell's INNER face, runs along the cap's normal
+   `Up` to the OUTER face — a straight cylinder of diameter d and height t, so
+   the overlap with the slab is a solid and never a hairline (JS3) — and the
+   free filament leaves the outer face along spineLaw() at TILT 0 in the
+   (Up, -Rs) plane: at curl 0 every substep of the law is `cos(0) * ds` along
+   Up and `sin(0) * ds = 0` across, so the straight rod IS the law's own
+   zero-curvature branch (Q3), and positive curl bends the filament INWARD over
+   the centre — the petal spine's own sign. Tilt is 0 with the axes mapped,
+   not pi/2 on the petal's axes, for exactly that exactness: cos(pi/2) is
+   6e-17, not 0.
+
+   The tube's ring frame is (T, D x T) — T the azimuthal tangent, constant
+   along a planar curve, so the frame never twists and never degenerates. The
+   pill is a surface of revolution about the tip direction with EXPLICIT apex
+   fans at both poles (a ring shrunk to radius 0 emitted 48 degenerate
+   triangles per dome, measured Sep 1). Both go through one emitter.
+   =================================================================== */
+function revolveInto(acc, rings, south, north) {
+  const NS = STAMEN_SIDES;
+  const pts = rings.map(({ C, e1, e2, r }) => Array.from({ length: NS }, (_, j) => {
+    const a = (j * TAU) / NS, ca = Math.cos(a), sa = Math.sin(a);
+    return [C[0] + r * (e1[0] * ca + e2[0] * sa), C[1] + r * (e1[1] * ca + e2[1] * sa), C[2] + r * (e1[2] * ca + e2[2] * sa)];
+  }));
+  for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.tri(south, pts[0][j2], pts[0][j]); }
+  for (let k = 0; k < pts.length - 1; k++) for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.quad(pts[k][j], pts[k][j2], pts[k + 1][j2], pts[k + 1][j]); }
+  const last = pts[pts.length - 1];
+  for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.tri(north, last[j], last[j2]); }
+  return pts;
+}
+
+export function buildStamenInto(acc, andro, s, slot) {
+  const t = andro.thickness, rf = andro.rFil;
+  const cosA = Math.cos(slot.azimuth), sinA = Math.sin(slot.azimuth);
+  const R = [cosA, sinA, 0], T = [-sinA, cosA, 0];
+  /* The foot's own frame on the cap — buildPetalInto's (Rs, Up), verbatim. */
+  const Rs = [R[0] * Math.cos(s.slope), R[1] * Math.cos(s.slope), -Math.sin(s.slope)];
+  const Up = [R[0] * Math.sin(s.slope), R[1] * Math.sin(s.slope), Math.cos(s.slope)];
+  const P = [R[0] * s.radius, R[1] * s.radius, s.z];                       // the owner's surface point
+  const off = (h) => [P[0] + Up[0] * h, P[1] + Up[1] * h, P[2] + Up[2] * h];
+  const inner = off(-t / 2), outer = off(t / 2);
+  const law = spineLaw({ curlRad: andro.curlRad, bias: 0, start: 0, length: andro.length, tilt: 0, floorRadius: andro.diameter });
+  const at = (sArc) => {
+    const q = law.at(sArc), c = Math.cos(q.phi), sn = Math.sin(q.phi);
+    return { C: [outer[0] + Up[0] * q.dR - Rs[0] * q.dZ, outer[1] + Up[1] * q.dR - Rs[1] * q.dZ, outer[2] + Up[2] * q.dR - Rs[2] * q.dZ],
+             D: [Up[0] * c - Rs[0] * sn, Up[1] * c - Rs[1] * sn, Up[2] * c - Rs[2] * sn] };
+  };
+  const ring = (C, D, r) => ({ C, e1: T, e2: [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]], r });
+  const stations = [ring(inner, Up, rf), ring(outer, Up, rf)];
+  for (let k = 1; k <= STAMEN_ROWS; k++) { const q = at((k / STAMEN_ROWS) * andro.length); stations.push(ring(q.C, q.D, rf)); }
+  const before = acc.triangleCount;
+  const tubePts = revolveInto(acc, stations, inner, stations[stations.length - 1].C);
+  /* THE PILL: lower hemisphere centred ON the tip (the tube's last ring is
+     inside it), a cylinder, the upper hemisphere, apex fans at both poles. */
+  const tip = stations[stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
+  const D = at(andro.length).D;
+  const along = (h) => [tip.C[0] + D[0] * h, tip.C[1] + D[1] * h, tip.C[2] + D[2] * h];
+  const pill = [], K = ANTHER_CAP_RINGS;
+  for (let k = 1; k <= K; k++) { const al = (k / K) * (Math.PI / 2); pill.push(ring(along(-a * Math.cos(al)), D, a * Math.sin(al))); }
+  pill.push(ring(along(Lc), D, a));
+  for (let k = 1; k < K; k++) { const be = (k / K) * (Math.PI / 2); pill.push(ring(along(Lc + a * Math.sin(be)), D, a * Math.cos(be))); }
+  const apex = along(Lc + a);
+  revolveInto(acc, pill, along(-a), apex);
+  /* WHAT WAS EMITTED, for the gate: the root axis (JS1), the surface point
+     (JS2), the two root rings AS EMITTED (JS3), the apex (JS4). */
+  return { index: slot.index, azimuth: slot.azimuth, root: P, N: Up, inner, outer, rootRings: [tubePts[0], tubePts[1]], tip: tip.C, dir: D, apex, tris: acc.triangleCount - before,
+           law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: law.turnBuilt / D2R, peakRadiusMm: law.peakRadius, underFloor: law.underFloor, clamped: law.clamped, floorRadius: andro.diameter } };
+}
+
+/* ===================================================================
    THE DESIGNED CENTRE WAS HERE — buildCenterInto() with its DOME / DISC / RING
    arms (domeInto, discInto, torusInto: 1,728 / 1,056 / 2,304 triangles, seated
    an eighth of a slab below the hub's underside) — and it is RETIRED (session
@@ -3869,8 +4080,33 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   }
   const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
-  /* NO DESIGNED CENTRE IS BUILT HERE (session 20): the A/B rig that followed
-     the hub is retired, and the apex is bare until the androecium (phase 2,
-     B2) roots through footRing() beside the feet. */
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths };
+  /* THE ANDROECIUM (session 21) — read from the descriptor, placed through
+     the arrangement primitive's EXISTING azimuth arms (RING: the RADIAL law;
+     DISC: SPIRAL's golden angle over the Vogel radii the owner stamped), one
+     closed filament and one closed pill per stamen. Absent when the
+     descriptor is null — count 0, or SPHERE, where it is hidden and inert.
+     `freeEnds` is the builder's own tally, JS4's independent quantity. */
+  const stamens = [];
+  let freeEnds = 0;
+  if (fr.androecium) {
+    const A = fr.androecium;
+    buildWhorlInto({
+      count: A.count,
+      radius: (i) => A.stamens[i].radius,
+      height: 0,
+      sizeRamp: () => 1,
+      angleRamp: () => 0,
+      phase: 0,
+      placement: A.layout === 'DISC' ? 'SPIRAL' : 'RADIAL',
+      blade: (slot) => { stamens.push(buildStamenInto(acc, A, A.stamens[slot.index], slot)); freeEnds++; },
+    });
+  }
+  /* THE TWO DISTANCE FLAGS (Q8, flags never gates): the nearest pair of ROOTS
+     (surface points, a chord on the dome) against the filament diameter, and
+     the nearest pair of ANTHER APEXES against the pill's — stamen-on-stamen
+     and tip-to-tip in their simplest form. All pairs, no chosen neighbours:
+     the golden angle's tightest approaches sit at Fibonacci index gaps. */
+  const nearest = (pts) => { let mm = Infinity, pair = null; for (let i = 0; i < pts.length; i++) for (let j = i + 1; j < pts.length; j++) { const d = Math.hypot(pts[i][0] - pts[j][0], pts[i][1] - pts[j][1], pts[i][2] - pts[j][2]); if (d < mm) { mm = d; pair = [i, j]; } } return { mm, pair }; };
+  const stamenNearest = stamens.length > 1 ? { root: nearest(stamens.map((s) => s.root)), apex: nearest(stamens.map((s) => s.apex)) } : null;
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest };
 }
