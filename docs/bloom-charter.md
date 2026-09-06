@@ -107,6 +107,19 @@ What changes from the flower project:
   cite issues and fail loud when they start passing. Run the same tree twice before
   concluding a config moved. Envelope deltas are meaningless for interior-aesthetic work —
   use triangle deltas or fixed-camera pixel diffs, chrome hidden, no autoRotate.
+- **A TOOL THAT CANNOT DO ITS JOB REFUSES; IT NEVER SKIPS AND REPORTS SUCCESS ON WHAT
+  REMAINS** (Eva, Sep 6, session 20 — a verification convention, ruled from the close that
+  proved it). A read-back that cannot honour a row, a capture that cannot serve a tree, a
+  compare that cannot pair a label: each ABORTS the run and names the row, never drops it
+  and prints PASS over the survivors. The case: session 20's harness validated every
+  base-tree row against the HEAD's registry and REFUSED the 509 rows naming a retired
+  control, so the captures could not be made at all until `kindsOf(root)` existed — loud,
+  and the reason the bug was found the same hour. A skipping version would have compared
+  the 18 NONE rows of 527, reported 18/18 bit-identical, and the retirement's whole claim
+  would have rested on the rows the retirement did not touch. Corollary for anyone writing
+  a `--only`, a filter or a catch: what was NOT run is printed with the count, matrix-level
+  claims are not made on a filtered run (session 18's rule), and a vacuity guard
+  (session 20's V1–V5) is owed wherever a comparison can pass by comparing nothing.
 - **Registration rule:** every boundary has exactly one definition; one owner, everyone
   else reads it. Check producers as well as consumers, and filters as well as boundaries
   (the E3 defect was one producer, two consumers, different filters). Registry predicates
@@ -571,7 +584,12 @@ any of them.
 - ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at
   phase-2 entry: EXPOSED.** The phase-1 grounds for hiding it — that a spread-out ring
   would have nothing in its middle but plumbing — expired the moment the designed centre
-  existed to occupy that middle, exactly as parked. `spread` is a Standard slider,
+  existed to occupy that middle, exactly as parked. **AMENDED Sep 5 (Eva, Phase A Q5,
+  recorded session 20): the designed centre that occupied the middle is retired (session
+  20) and the androecium that will occupy it does NOT enter this ring's area rule — stamen
+  roots are placed by their own law inside the clear disc, at a radius derived by their own
+  reference rule with their own exposed control (B2). `spread` keeps scaling the PETAL ring
+  and nothing else.** `spread` is a Standard slider,
   0.60–6.00, **default 2.00 (Eva, Aug 31)**, applied inside `footRing()` and nowhere else:
   the area rule still *derives* the radius and spread only scales it. Eva's ruling on the
   lower bound: **the area rule is a reference, not a cage** — below 1.00 the ring is
@@ -3906,7 +3924,9 @@ matters should be measured this way.
       two MODES — printed (the export floor moves the hub from 9.69 to 12.51 mm
       and the button with it) and live; the read-out prints the seat line in
       whichever mode is on screen. No configuration reads 1.2 mm. The hover is
-      a centre-versus-shell number and no curl control moves it.
+      a centre-versus-shell number and no curl control moves it. **(Historical from session
+      20: the centre rig and its seat line are retired; the number describes a tree that no
+      longer ships. B2's stamens sit inside the clear disc by their own law — Q5 amended.)**
 
     - **FIELDS: nothing folded.** `domeLean` and `tiltExtra` are untouched;
       the four new controls are separate ids; `spineLaw()` is a separate owner
@@ -4222,7 +4242,10 @@ matters should be measured this way.
   values, its four sub-sliders, the CENTER section and the three centre builders retired; the
   shipping default is the bare hub apex; `RETIRED_IDS` first used; `phase15Matrix()` (527 rows
   at 8524318) frozen. Numbers, the comparison shape and the partition in
-  `docs/bloom-session-20-outcome.md`. HELD FOR EVA'S RULING on the retirement sheet.**
+  `docs/bloom-session-20-outcome.md`. **SHEET APPROVED (Eva, Sep 6): THE BARE APEX SHIPS
+  AS THE DEFAULT.** Merged by the session as `258c2ea` (#161); `frozen/phase15` published
+  from `main` at `8524318`; the rulings as this docs-only PR (its own squash sha is in session
+  20's final report).**
 
     - **THE RULINGS THIS IMPLEMENTS (Eva, Sep 5, from Phase A's report and sheet).** The centre
       is the REPRODUCTIVE PARTS and nothing else: an androecium (filaments and anthers) and a
@@ -4327,3 +4350,38 @@ matters should be measured this way.
       row-checkpointed now (`--resume`), because three background captures died to
       container restarts before the foreground ones ran. The full matrix on both STL gates
       is CI's on the merge commit.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** Sheet approved; the bare apex ships as the
+      default. **The MIDDLE pair — the shipping default at head rise 0.50, the sparse dome row
+      — is what she ruled on.** The incurve pair showing no visible difference is a FINDING,
+      not a gap in the sheet: **the DISC was invisible on the incurve target from every camera,
+      which is part of why it deserved retiring** — a designed centre the crown hides from
+      every camera was never a centre on that head, only 1,056 triangles. All four bloom
+      gates green on the PR head `963d8eb` (both STL gates on the full 481-row matrix, the
+      panel gate, the frozen gate); the two flower gates ran too (`tools/**` filter) and are
+      not bloom evidence. The
+      68-file predeclared manifest re-verified by sha1 against `main` after the merge.
+
+    - **THE PHASE A RULINGS THAT B2 AND B3 INHERIT (Eva, Sep 5), recorded here so no kickoff
+      prompt has to carry them.** **Q1** — the androecium gets its OWN placement law and its
+      own count, and its radial extent is a RANGE: a derived default from its own reference
+      area rule plus an exposed control, out to the hub radius; a stamen ring that overlaps
+      the petal roots is FLAGGED, never refused; whether the control is a multiplier or
+      millimetres, and whether `headRise` relieves the packing, are B2's questions to
+      answer with a picture. **Q2** — the anther and stigma looks are ruled from Phase A's
+      candidate sheet BEFORE B2 opens, never inside it. **Q3** — filaments are curved, and
+      the curve is `spineLaw()` (the one owner, bloom-geometry.js) at a curl of 0 as the
+      identity, so a straight rod is a value and not a second code path; B2. **Q5,
+      AMENDED** — stamen roots do NOT enter the petal ring's area rule: the androecium's
+      radius is derived from the clear disc inside the ring by its own reference rule with
+      its own exposed control (the Aug 31 spread entry carries the amendment). **Q7** — the
+      read-out gets a slenderness line, L/d per filament, tagged `UNMEASURED — no coupon has
+      been printed`, telemetry only: the six-stamen candidate reads L/d 18.3 against the
+      16 the flower's #97 already carries as an open thin-feature question, so the first
+      stamen is past anything this family has printed. **Q8** — the crowding instrument's
+      extensions (stamen feet on the base, filaments against petal roots) and a tip
+      instrument (anther against anther, anther against blade) are FLAGS on the pattern of
+      `D_max`, never gates. **Q10** — three sessions: B1 the retirement alone (this one),
+      B2 the androecium, B3 the gynoecium and the shipping default; B2 is split and SAID if
+      it grows past its estimate, on session 19's 2.7x miss. The CORONA stays reserved as a
+      name (the session-20 ruling above); nothing here builds it.

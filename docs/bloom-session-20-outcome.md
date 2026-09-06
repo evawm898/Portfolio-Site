@@ -246,7 +246,19 @@ twice on this very tool. Caught on its first run, moved below its readers.
 - **The full matrix on both STL gates runs in CI on the merge commit** — the merge
   criterion, not run locally (session 17's ruling).
 
-## The sheet — HELD FOR EVA'S RULING
+## The sheet — RULED (Eva, Sep 6): approved, the bare apex ships
+
+Sheet approved. The bare apex ships as the default. The MIDDLE pair (the shipping default
+at head rise 0.50) is what Eva ruled on. The incurve pair showing no visible difference
+is a FINDING, not a gap: the DISC was invisible on the incurve target from every camera,
+which is part of why it deserved retiring. Merged by the session as `258c2ea` (#161);
+`frozen/phase15` published from `main` at `8524318` by dispatching `bloom-frozen-tags`
+(red by design on the phase5 refusal, read from its log; the tag verified with
+`git ls-remote`). The convention this close produced — a tool that cannot do its job
+REFUSES, it never skips and reports success on what remains — is in the charter's
+carried-over verification conventions, with this session's harness refusal as the case.
+
+### As it stood before the ruling
 
 `node tools/shot-bloom-centre-retirement.mjs <dir> <worktree of 8524318>`: three
 BEFORE/AFTER pairs, print preview ON, chrome hidden, asserted — the shipping default flat
