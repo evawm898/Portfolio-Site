@@ -75,6 +75,13 @@ const infillGradientIn = document.getElementById('infillGradient');
 const infillVeinsIn = document.getElementById('infillVeins');
 const infillVeinWidthIn = document.getElementById('infillVeinWidth');
 const infillFillWeightIn = document.getElementById('infillFillWeight');
+const infillFanSpacingIn = document.getElementById('infillFanSpacing');
+const infillFanConvergeIn = document.getElementById('infillFanConverge');
+const infillFanOriginIn = document.getElementById('infillFanOrigin');
+const infillFanInsetIn = document.getElementById('infillFanInset');
+const infillFanTipReachIn = document.getElementById('infillFanTipReach');
+const infillFanTipJitterIn = document.getElementById('infillFanTipJitter');
+const infillFanDebugIn = document.getElementById('infillFanDebug');
 const infillModeOut = document.getElementById('infillModeOut');
 const infillSpacingOut = document.getElementById('infillSpacingOut');
 const infillAngleOut = document.getElementById('infillAngleOut');
@@ -89,6 +96,12 @@ const infillGradientOut = document.getElementById('infillGradientOut');
 const infillVeinsOut = document.getElementById('infillVeinsOut');
 const infillVeinWidthOut = document.getElementById('infillVeinWidthOut');
 const infillFillWeightOut = document.getElementById('infillFillWeightOut');
+const infillFanSpacingOut = document.getElementById('infillFanSpacingOut');
+const infillFanConvergeOut = document.getElementById('infillFanConvergeOut');
+const infillFanOriginOut = document.getElementById('infillFanOriginOut');
+const infillFanInsetOut = document.getElementById('infillFanInsetOut');
+const infillFanTipReachOut = document.getElementById('infillFanTipReachOut');
+const infillFanTipJitterOut = document.getElementById('infillFanTipJitterOut');
 const showAnchorsBox = document.getElementById('showAnchors');
 const resetAnchorsBtn = document.getElementById('resetAnchors');
 const rowSpacing = infillSpacingIn.closest('.pose-row');
@@ -100,6 +113,15 @@ const rowGradient = document.getElementById('row-infillGradient');
 const rowVeins = document.getElementById('row-infillVeins');
 const rowVeinWidth = document.getElementById('row-infillVeinWidth');
 const rowFillWeight = document.getElementById('row-infillFillWeight');
+const rowFanSpacing = document.getElementById('row-infillFanSpacing');
+const rowFanConverge = document.getElementById('row-infillFanConverge');
+const rowFanOrigin = document.getElementById('row-infillFanOrigin');
+const rowFanInset = document.getElementById('row-infillFanInset');
+const rowFanTipReach = document.getElementById('row-infillFanTipReach');
+const rowFanTipJitter = document.getElementById('row-infillFanTipJitter');
+const rowFanDebug = document.getElementById('infill-fan-debug');
+const rowDirection = document.getElementById('row-infillDirection');
+const anchorBlock = document.getElementById('infillAnchorBlock');
 const infillPartsEl = document.getElementById('infillParts');
 // The per-part darkness sliders, rebuilt per bundle. Kept as a list so a
 // rebuild can be asserted not to have stacked a second set.
@@ -197,7 +219,10 @@ let anchorMarkers = [];
 // running is just something else to click by accident.
 function syncAnchorMarkers() {
   if (!infill || !anchorMarkers.length) return;
-  const show = !!(showAnchorsBox.checked && infill.enabled && art && art.enabled);
+  // Hidden in the fan, where the anchor decides nothing: a handle that moves
+  // and changes no mark is worse than no handle.
+  const show = !!(showAnchorsBox.checked && infill.enabled && infill.mode !== 'fan'
+    && art && art.enabled);
   for (let i = 0; i < anchorMarkers.length; i++) {
     const m = anchorMarkers[i];
     m.visible = show;
@@ -564,6 +589,13 @@ function readInfill() {
     veins: parseInt(infillVeinsIn.value, 10),
     veinWidth: parseFloat(infillVeinWidthIn.value),
     fillWeight: parseFloat(infillFillWeightIn.value),
+    fanSpacing: parseFloat(infillFanSpacingIn.value),
+    fanConverge: parseFloat(infillFanConvergeIn.value),
+    fanOrigin: parseFloat(infillFanOriginIn.value),
+    fanInset: parseFloat(infillFanInsetIn.value),
+    fanTipReach: parseFloat(infillFanTipReachIn.value),
+    fanTipJitter: parseFloat(infillFanTipJitterIn.value),
+    fanDebug: infillFanDebugIn.checked,
   });
   // Only the controls that MEAN something in the chosen family are shown.
   // Layers is a cross-hatch idea, flow curvature is a line-flow one, and the
@@ -577,21 +609,41 @@ function readInfill() {
   rowVeins.hidden = mode !== 'tone';
   rowVeinWidth.hidden = mode !== 'tone';
   rowFillWeight.hidden = mode !== 'tone';
-  rowSpacing.hidden = mode === 'tone';
+  rowSpacing.hidden = mode === 'tone' || mode === 'fan';
+  // THE FAN'S OWN SIX, and the four things that are INERT in it. The fan
+  // derives its own per-part axis, so the direction select and the global
+  // angle have nothing to say; its rays are offsets from the shape's own
+  // centre line rather than a distance from a point, so the anchor, its reach
+  // and its falloff are inert too — and a slider that silently does nothing is
+  // the thing this panel is specified not to offer.
+  const fanMode = mode === 'fan';
+  for (const r of [rowFanSpacing, rowFanConverge, rowFanOrigin, rowFanInset,
+                   rowFanTipReach, rowFanTipJitter, rowFanDebug]) r.hidden = !fanMode;
+  rowDirection.hidden = fanMode;
+  anchorBlock.hidden = fanMode;
   // The global angle and the axial ramp are the two halves of the direction
   // choice, and each lies in the other's mode: an angle slider that no stroke
   // obeys, or a base-to-tip ramp with no axis to run along.
   const axisMode = infillDirectionIn.value === 'axis';
-  rowAngle.hidden = axisMode;
-  rowAxial.hidden = !axisMode || mode === 'flow';
+  rowAngle.hidden = axisMode || fanMode;
+  // The axial ramp is NOT offered in the fan, and that is a finding rather
+  // than an omission: convergence is already the gradient there (the read-out
+  // prints the measured ink profile), so a second base-to-tip ramp compounds
+  // with it. See THE FAN in print-infill.js.
+  rowAxial.hidden = !axisMode || mode === 'flow' || fanMode;
   // Per-part darkness is a tonal-fill idea too, and the block carries its own
   // caption, so it hides as a block rather than row by row.
-  infillPartsEl.hidden = mode !== 'tone' || !darknessRows.length;
+  // Per-part darkness is a tonal-fill idea AND a fan one: in a family whose
+  // tone is line density, "how dark is this part" is its target spacing.
+  infillPartsEl.hidden = (mode !== 'tone' && mode !== 'fan') || !darknessRows.length;
   renderInfill();
 }
 [infillSpacingIn, infillAngleIn, infillAxialIn, infillLayersIn, infillCurvatureIn,
  infillReachIn, infillFalloffIn, infillJitterIn,
- infillGradientIn, infillVeinsIn, infillVeinWidthIn, infillFillWeightIn].forEach(el => el.addEventListener('input', readInfill));
+ infillGradientIn, infillVeinsIn, infillVeinWidthIn, infillFillWeightIn,
+ infillFanSpacingIn, infillFanConvergeIn, infillFanOriginIn, infillFanInsetIn,
+ infillFanTipReachIn, infillFanTipJitterIn].forEach(el => el.addEventListener('input', readInfill));
+infillFanDebugIn.addEventListener('change', readInfill);
 infillModeIn.addEventListener('change', readInfill);
 infillDirectionIn.addEventListener('change', readInfill);
 showAnchorsBox.addEventListener('change', () => { renderInfill(); });
@@ -616,6 +668,12 @@ function renderInfill() {
   infillVeinsOut.textContent = `${infill.veins} pair${infill.veins === 1 ? '' : 's'}`;
   infillVeinWidthOut.textContent = infill.veinWidth > 0 ? `${infill.veinWidth.toFixed(1)} px` : 'off';
   infillFillWeightOut.textContent = `${infill.fillWeight.toFixed(1)} px`;
+  infillFanSpacingOut.textContent = `${infill.fanSpacing.toFixed(1)} px`;
+  infillFanConvergeOut.textContent = `${infill.fanConverge.toFixed(0)}%`;
+  infillFanOriginOut.textContent = `${infill.fanOrigin.toFixed(1)} px`;
+  infillFanInsetOut.textContent = `${infill.fanInset.toFixed(0)}%`;
+  infillFanTipReachOut.textContent = `${infill.fanTipReach.toFixed(0)}%`;
+  infillFanTipJitterOut.textContent = `${infill.fanTipJitter.toFixed(0)}%`;
   darknessRows.forEach((r) => {
     r.input.value = String(infill.darknessOf(r.index));
     r.out.textContent = `${infill.darknessOf(r.index).toFixed(0)}%`;
@@ -637,8 +695,44 @@ function renderInfill() {
     const st = infillStats;
     const gamma = infill.falloff / 100;
     rows.push(`family            ${infill.mode === 'hatch' ? 'CROSS-HATCH'
-      : infill.mode === 'tone' ? 'TONAL FILL' : 'LINE-FLOW'}`);
-    if (infill.mode === 'tone') {
+      : infill.mode === 'tone' ? 'TONAL FILL' : infill.mode === 'fan' ? 'FAN' : 'LINE-FLOW'}`);
+    if (infill.mode === 'fan') {
+      rows.push(`field             rays of CONSTANT NORMALISED OFFSET in each`);
+      rows.push(`                  part's own (station, offset) frame: offset =`);
+      rows.push(`                  u x the MEASURED half-width at that station,`);
+      rows.push(`                  so a ray converges at the base and spreads`);
+      rows.push(`                  toward the tip because the SHAPE does, and`);
+      rows.push(`                  cannot exit through the side at any taper.`);
+      rows.push(`                  The shear (from #163) is what makes it`);
+      rows.push(`                  follow a BOWED part; it is the identity on a`);
+      rows.push(`                  straight one.`);
+      rows.push(`spacing law       target ${infill.fanSpacing.toFixed(1)} px, converge ${infill.fanConverge.toFixed(0)}%`);
+      rows.push(`                  S(t) = ${infill.fanSpacing.toFixed(1)} x (${(1 - infill.fanConverge / 100).toFixed(2)} + ${(infill.fanConverge / 100).toFixed(2)} x width(t)/widthMax)`);
+      rows.push(`                  0% = constant spacing (uniform density, no`);
+      rows.push(`                  gradient).  100% = a fixed pencil (dark base,`);
+      rows.push(`                  wide tip).  Rays are inserted DYADICALLY at`);
+      rows.push(`                  the station their parents open past S(t).`);
+      rows.push(`origin            a BAR ${(infill.fanOrigin * 2).toFixed(1)} px across, not a point —`);
+      rows.push(`                  a FLOOR on the half-width, so on a part whose`);
+      rows.push(`                  base is blunt it does nothing at all. Where`);
+      rows.push(`                  it bites is reported per part below.`);
+      rows.push(`inset             ${infill.fanInset.toFixed(0)}% of the measured half-width`);
+      rows.push(`tip               strokes stop at ${infill.fanTipReach.toFixed(0)}% of the length,`);
+      rows.push(`                  ragged by ${infill.fanTipJitter.toFixed(0)}% per ray, so the tip is left`);
+      rows.push(`                  lighter and the ends do not line up.`);
+      rows.push(`per-part darkness the TARGET SPACING (below): a part at 50%`);
+      rows.push(`                  gets its strokes twice as far apart.`);
+      rows.push(`the anchor        INERT in this family — the fan's origin is`);
+      rows.push(`                  the ATTACHMENT, derived per part, not the`);
+      rows.push(`                  draggable ring. So are reach and falloff.`);
+      rows.push(`the axial ramp    NOT OFFERED here, and that is a finding:`);
+      rows.push(`                  convergence IS the gradient, so #163's ramp`);
+      rows.push(`                  would compound with it. The ink profile`);
+      rows.push(`                  below is the measurement, not a restatement.`);
+      rows.push(`the field         ${infill.fanDebug ? 'DRAWN — axis, centre line, origin bar,'
+        : 'hidden — tick “show the field” to draw it'}`);
+      if (infill.fanDebug) rows.push('                  termination boundary, and each ray’s birth.');
+    } else if (infill.mode === 'tone') {
       rows.push(`fill              ${infill.gradient <= 0 ? 'SOLID to the outline'
         : `graded — ${infill.gradient.toFixed(0)}% of the tone field`}`);
       rows.push(`nib / row pitch   ${infill.fillWeight.toFixed(1)} px nib, rows ${infill.tonePitch().toFixed(2)} px apart`
@@ -666,7 +760,13 @@ function renderInfill() {
     }
     if (infill.mode !== 'tone') rows.push(`spacing           ${infill.spacing.toFixed(1)} px`);
     rows.push('');
-    if (infill.direction === 'axis') {
+    if (infill.mode === 'fan') {
+      rows.push('DIRECTION         PER PART, ALWAYS — the fan has no global');
+      rows.push('                  reading, so the direction select is hidden');
+      rows.push('                  rather than left saying something inert.');
+      rows.push('                  Base -> tip is the ATTACHMENT (nearest point');
+      rows.push('                  to any other part), same as #163.');
+    } else if (infill.direction === 'axis') {
       rows.push('DIRECTION         SHAPE AXIS — derived per part from its own');
       rows.push('                  filled region. The axis is the STRAIGHT');
       rows.push('                  principal axis, so on a part whose length');
@@ -689,7 +789,12 @@ function renderInfill() {
       rows.push('                  FUSED bloom is: see “shape axis”.');
     }
     rows.push('');
-    if (infill.mode === 'tone' && infill.gradient <= 0) {
+    if (infill.mode === 'fan') {
+      rows.push('WHERE IS DARK     WHERE THE RAYS CROWD. Nothing is placed by');
+      rows.push('                  hand and nothing is ramped: the base is dark');
+      rows.push('                  because that is where the shape is narrow');
+      rows.push('                  and every ray has to pass through it.');
+    } else if (infill.mode === 'tone' && infill.gradient <= 0) {
       rows.push(`WHERE IS DARK     the per-part DARKNESS below. The anchor and`);
       rows.push(`                  its falloff are inert at gradient 0 — a`);
       rows.push(`                  solid fill has no ramp to place.`);
@@ -709,6 +814,34 @@ function renderInfill() {
         } else if (infill.direction === 'axis') {
           rows.push(`  ${(p.name || '?').padEnd(14)} NO AXIS — silhouette has no extent`);
         }
+        if (infill.mode === 'fan' && p.fan) {
+          // DENSITY, not length. Ink length per band is low at a tapering
+          // base however tightly the strokes are packed there, so the profile
+          // is ink length over the band's own measured area.
+          const den = p.fan.bins.map((b, k) => (p.fan.area[k] > 1 ? b / p.fan.area[k] : 0));
+          const dmax = Math.max(...den) || 1;
+          const bar = den.map(v => ' .:-=+*#@'[Math.min(8, Math.round(v / dmax * 8))]).join('');
+          const base = den.slice(0, 2).reduce((a, b) => a + b, 0);
+          const tip = den.slice(-3, -1).reduce((a, b) => a + b, 0);
+          rows.push(`  ${(p.name || '?').padEnd(14)} ${p.fan.rays} rays to level ${p.fan.levels}`
+            + `  ${p.fan.clipped} cut mid-flight, ${p.fan.shortened} shortened  ${p.segments} segs`
+            + `  darkness ${p.darkness.toFixed(0)}%`);
+          rows.push(`  ${''.padEnd(14)} origin floor  `
+            + (p.fan.originBinding > 0
+              ? `BINDING at ${p.fan.originBinding} of ${p.fan.profileStations} stations`
+              : `does nothing on this part — its base is never narrower than ${infill.fanOrigin.toFixed(1)} px`));
+          rows.push(`  ${''.padEnd(14)} inserted at   `
+            + (p.fan.births.length ? p.fan.births.map(b => `L${b.level}x${b.n}`).join(' ') : 'nothing past level 1'));
+          rows.push(`  ${''.padEnd(14)} density b->t  [${bar}]`
+            + `  base/tip ${tip > 0 ? (base / tip).toFixed(2) : '∞'}x`
+            + '   <- convergence IS the gradient');
+          rows.push(`  ${''.padEnd(14)} gaps          `
+            + p.fan.gaps.map(g => `${(g.frac * 100) | 0}%: ${g.n} rays, ${g.median.toFixed(1)} px`).join('   '));
+          rows.push(`  ${''.padEnd(14)} clipped at    ${p.scanAngleDeg.toFixed(0)}° — every ray is cut on a`);
+          rows.push(`  ${''.padEnd(14)}               row of CONSTANT STATION, so the`);
+          rows.push(`  ${''.padEnd(14)}               fan has ONE scan direction.`);
+          continue;
+        }
         if (infill.mode === 'tone') {
           rows.push(`  ${(p.name || '?').padEnd(14)} darkness ${String(p.darkness.toFixed(0)).padStart(3)}%`
             + `  ${p.rows} rows  ${p.reservedRows} cut by a vein  ${p.segments} segs`
@@ -721,7 +854,8 @@ function renderInfill() {
       rows.push('');
       rows.push(`silhouette        ${st.parts.reduce((a, p) => a + p.silhouette, 0)} oriented edges (nonzero winding)`);
       rows.push(`drawn             ${st.segments} segments from ${st.seeds} `
-        + `${infill.mode === 'hatch' ? 'hatch lines' : infill.mode === 'tone' ? 'fill rows' : 'seeds'}`
+        + `${infill.mode === 'hatch' ? 'hatch lines' : infill.mode === 'tone' ? 'fill rows'
+          : infill.mode === 'fan' ? 'rays' : 'seeds'}`
         + `${st.truncated ? '  (TRUNCATED)' : ''}`);
       rows.push(`infill pass       ${infillMs.toFixed(2)} ms  (line art ${lastFrameMs.toFixed(2)} ms of 16.7)`);
     }
@@ -822,7 +956,10 @@ const INFILL_HOOK = {
   options: () => ({ spacing: infill.spacing, angleDeg: infill.angleDeg, layers: infill.layers,
     curvature: infill.curvature, reach: infill.reach, falloff: infill.falloff, jitter: infill.jitter,
     gradient: infill.gradient, veins: infill.veins, veinWidth: infill.veinWidth,
-    fillWeight: infill.fillWeight, direction: infill.direction, axialBias: infill.axialBias }),
+    fillWeight: infill.fillWeight, direction: infill.direction, axialBias: infill.axialBias,
+    fanSpacing: infill.fanSpacing, fanConverge: infill.fanConverge, fanOrigin: infill.fanOrigin,
+    fanInset: infill.fanInset, fanTipReach: infill.fanTipReach,
+    fanTipJitter: infill.fanTipJitter, fanDebug: infill.fanDebug }),
 
   // --- the derived direction ---------------------------------------------
   // Driven through the REAL select, so what the gate drives is what a hand
@@ -848,9 +985,41 @@ const INFILL_HOOK = {
       curvature: infillCurvatureIn, reach: infillReachIn, falloff: infillFalloffIn,
       jitter: infillJitterIn, gradient: infillGradientIn, veins: infillVeinsIn,
       veinWidth: infillVeinWidthIn, fillWeight: infillFillWeightIn,
-      axial: infillAxialIn }[id];
+      axial: infillAxialIn,
+      fanSpacing: infillFanSpacingIn, fanConverge: infillFanConvergeIn,
+      fanOrigin: infillFanOriginIn, fanInset: infillFanInsetIn,
+      fanTipReach: infillFanTipReachIn, fanTipJitter: infillFanTipJitterIn }[id];
     el.value = String(v); el.dispatchEvent(new Event('input'));
   },
+
+  // --- the fan ------------------------------------------------------------
+  // Driven through the REAL checkbox, like every other control the gate
+  // touches, so what it drives is what a hand drives.
+  setFanDebug: (on) => { infillFanDebugIn.checked = !!on; infillFanDebugIn.dispatchEvent(new Event('change')); },
+  fanDebug: () => infill.fanDebug,
+  fanDebugSegments: () => {
+    const dd = infill.debugDraw;
+    const out = [];
+    for (let i = 0; i < dd.count; i++) {
+      const o = i * 6;
+      out.push([dd.buf.array[o], dd.buf.array[o + 1], dd.buf.array[o + 3], dd.buf.array[o + 4]]);
+    }
+    return out;
+  },
+  fanDebugVisible: () => !!(infill.debugDraw && infill.debugDraw.lines.visible),
+  // The ray set the fan actually drew this frame, per part, straight out of
+  // the module — handed back rather than re-derived, for the same reason the
+  // vein paths are: comparing the ink to a SECOND construction of the field
+  // would test the two constructions against each other.
+  fanStats: (i) => (infill.fanStats[i] ? JSON.parse(JSON.stringify(infill.fanStats[i])) : null),
+  fanRowVisibility: () => ({
+    spacing: !rowFanSpacing.hidden, converge: !rowFanConverge.hidden,
+    origin: !rowFanOrigin.hidden, inset: !rowFanInset.hidden,
+    tipReach: !rowFanTipReach.hidden, tipJitter: !rowFanTipJitter.hidden,
+    debug: !rowFanDebug.hidden, direction: !rowDirection.hidden,
+    anchors: !anchorBlock.hidden, axial: !rowAxial.hidden, angle: !rowAngle.hidden,
+    hatchSpacing: !rowSpacing.hidden,
+  }),
 
   // --- tonal fill --------------------------------------------------------
   // Darkness goes through the REAL slider, so what the gate drives is what a

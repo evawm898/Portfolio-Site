@@ -217,7 +217,7 @@ import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js
 import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 
-export const INFILL_MODES = ['off', 'hatch', 'flow', 'tone'];
+export const INFILL_MODES = ['off', 'hatch', 'flow', 'tone', 'fan'];
 
 // Where a stroke's direction comes from. 'global' is the shipped one angle for
 // the whole model; 'axis' is one direction PER PART, derived from that part's
@@ -258,7 +258,24 @@ export const INFILL_LIMITS = {
   tonePitchMinPx: 0.5,
   toneMaxRows: 4000,           // per part per frame; a guard, not a look
   toneBucketPx: 6,             // scan-index bucket size; work only, never an answer
+  // The fan. `fanStepPx` is how finely a ray is walked — it is both the
+  // membership probe pitch and the drawn chord length, so it is the one number
+  // that trades smoothness against cost. The caps are guards, not a look.
+  fanStepPx: 2.6,
+  fanMaxSamples: 400,          // per ray
+  fanProfileSamples: 41,       // stations the half-width is measured at
+  fanMaxLevels: 7,             // 2^7 + 1 rays at the deepest insertion
+  fanMaxRays: 400,
+  fanBucketPx: 6,
 };
+
+// How many station bands the ink profile is reported in. The instrument for
+// "convergence IS the gradient" — see the read-out.
+export const FAN_BINS = 8;
+
+// Segments the debug overlay can draw before it stops. It is a diagnostic, so
+// it is capped well below the ink's cap and truncating it is not a failure.
+export const FAN_DEBUG_CAP = 6000;
 
 // How many discrete steps the gradient's ordered dither has, and the order the
 // rows take them in. The order is a BIT REVERSAL of 0..7, so that when only
@@ -463,6 +480,18 @@ export class Infill {
     // shape fills to its outline. That is the default because it is the
     // reference — a leaf in these drawings is a solid black shape, and the
     // gradient is the departure from it, not the starting point.
+    // --- the fan ---------------------------------------------------------
+    // All six are live controls, because three sessions in a row have now
+    // built a shading field from a verbal description and missed. The defaults
+    // are a starting point for tuning on the page, not a ruling.
+    this.fanSpacing = 9;       // target px between neighbouring rays
+    this.fanConverge = 55;     // % — constant spacing (0) .. pure pencil (100)
+    this.fanOrigin = 3;        // px half-width of the origin region
+    this.fanInset = 92;        // % of the measured half-width a margin ray sits at
+    this.fanTipReach = 88;     // % of the length a ray travels
+    this.fanTipJitter = 35;    // % ragged-edging of the tip cutoff, per ray
+    this.fanDebug = false;     // draw the field itself, not only the ink
+
     this.gradient = 0;       // % of the tone field mixed into the coverage
     this.veins = 4;          // lateral vein PAIRS; the midrib is always there
     this.veinWidth = 2.5;    // px of fill withheld along each vein path
@@ -511,6 +540,26 @@ export class Infill {
       return { geo, buf, mat, lines, count: 0, truncated: false };
     });
 
+    // THE FIELD, DRAWN. Its own primitive in the same overlay scene, its own
+    // colour, and never mixed into a part's ink buffer — so "show me the
+    // field" cannot change the picture the field produces, and the gate can
+    // count the ink and the diagnostic separately.
+    {
+      const geo = new LineSegmentsGeometry();
+      const buf = new THREE.InstancedInterleavedBuffer(new Float32Array(FAN_DEBUG_CAP * 6), 6, 1);
+      geo.setAttribute('instanceStart', new THREE.InterleavedBufferAttribute(buf, 3, 0));
+      geo.setAttribute('instanceEnd', new THREE.InterleavedBufferAttribute(buf, 3, 3));
+      geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e7);
+      const mat = new LineMaterial({ color: 0x2f8f9d, linewidth: 1.0, transparent: true, opacity: 0.9 });
+      const lines = new LineSegments2(geo, mat);
+      lines.frustumCulled = false;
+      lines.name = 'infill_fan_field';
+      lines.visible = false;
+      this.scene.add(lines);
+      this.debugDraw = { geo, buf, mat, lines, count: 0 };
+    }
+    this._debug = [];
+
     // projection scratch, per unit, sized to the welded vertex count
     this.proj = art.units.map((u) => ({
       x: new Float32Array(u.ex.topo.vertexCount),
@@ -523,6 +572,12 @@ export class Infill {
     // Per-part tonal-fill bookkeeping, so the read-out and the gate can say
     // how many rows were laid down and how many of them a vein cut into.
     this.rowStats = art.units.map(() => ({ rows: 0, reservedRows: 0, veinPaths: 0, openRows: 0 }));
+    // Per-part fan bookkeeping. Every number here is MEASURED off the ray set
+    // and the emitted ink, never restated from a control, because the review
+    // gate for this family is someone reading it on the page.
+    this.fanStats = art.units.map(() => ({ rays: 0, levels: 0, clipped: 0,
+      bins: new Array(FAN_BINS).fill(0), area: new Array(FAN_BINS).fill(0),
+      gaps: [], births: [], shortened: 0, originBinding: 0, scanAngleDeg: 0 }));
 
     this.stats = null;
     this.setEnabled(false);
@@ -532,13 +587,17 @@ export class Infill {
 
   setEnabled(on) {
     for (const d of this.draws) d.lines.visible = !!on;
+    if (this.debugDraw) this.debugDraw.lines.visible = !!on && this.mode === 'fan' && this.fanDebug;
   }
 
   setOptions(o = {}) {
     for (const k of ['spacing', 'angleDeg', 'layers', 'curvature', 'reach', 'falloff',
-                     'jitter', 'weight', 'gradient', 'veins', 'veinWidth', 'fillWeight']) {
+                     'jitter', 'weight', 'gradient', 'veins', 'veinWidth', 'fillWeight',
+                     'fanSpacing', 'fanConverge', 'fanOrigin', 'fanInset',
+                     'fanTipReach', 'fanTipJitter']) {
       if (o[k] !== undefined) this[k] = o[k];
     }
+    if (o.fanDebug !== undefined) this.fanDebug = !!o.fanDebug;
     if (o.axialBias !== undefined) this.axialBias = Math.max(0, Math.min(100, +o.axialBias || 0));
     if (o.direction !== undefined && INFILL_DIRECTIONS.includes(o.direction)) this.direction = o.direction;
     if (o.mode !== undefined && INFILL_MODES.includes(o.mode)) this.mode = o.mode;
@@ -560,6 +619,11 @@ export class Infill {
       this.scene.remove(d.lines);
       d.geo.dispose(); d.mat.dispose();
     }
+    if (this.debugDraw) {
+      this.scene.remove(this.debugDraw.lines);
+      this.debugDraw.geo.dispose(); this.debugDraw.mat.dispose();
+      this.debugDraw = null;
+    }
     this.draws = [];
   }
 
@@ -576,9 +640,11 @@ export class Infill {
 
     if (!this.enabled) {
       for (const d of this.draws) { d.count = 0; d.geo.instanceCount = 0; }
+      if (this.debugDraw) { this.debugDraw.geo.instanceCount = 0; this.debugDraw.lines.visible = false; }
       this.stats = null;
       return null;
     }
+    this._debug = [];
 
     const stamp = ++this._stamp;
     const units = this.art.units;
@@ -592,7 +658,10 @@ export class Infill {
     // model and the axis follows, which is the whole claim.
     for (let i = 0; i < units.length; i++) {
       this.axes[i] = null; this.warps[i] = null;
-      if (this.direction !== 'axis' || !this.frames[i].ok) continue;
+      // THE FAN ALWAYS DERIVES ONE. Its rays are offsets from the shape's own
+      // centre line, so there is no global-angle reading of it — the direction
+      // control is inert in that family and the read-out says so.
+      if ((this.direction !== 'axis' && this.mode !== 'fan') || !this.frames[i].ok) continue;
       const f = this.frames[i];
       const ax = partAxis(f, f.hasAttach ? [f.atx, f.aty] : null);
       if (!ax) continue;
@@ -610,6 +679,7 @@ export class Infill {
       const occluders = order.slice(0, rank);
       const n = this.mode === 'hatch' ? this._hatchPart(i, occluders)
         : this.mode === 'tone' ? this._tonePart(i, occluders)
+        : this.mode === 'fan' ? this._fanPart(i, occluders)
         : this._flowPart(i, occluders);
       segs += n.segments; seeds += n.seeds; truncated = truncated || n.truncated;
     }
@@ -622,6 +692,22 @@ export class Infill {
       d.mat.linewidth = this.mode === 'tone' ? this.fillWeight : this.weight;
       d.mat.resolution.set(W, H);
     }
+    // The field overlay, flushed once for the whole model.
+    {
+      const dd = this.debugDraw;
+      const on = this.mode === 'fan' && this.fanDebug;
+      const n = on ? Math.min(FAN_DEBUG_CAP, this._debug.length >> 2) : 0;
+      for (let k = 0; k < n; k++) {
+        const o = k * 6, q = k * 4;
+        dd.buf.array[o] = this._debug[q]; dd.buf.array[o + 1] = this._debug[q + 1]; dd.buf.array[o + 2] = 0;
+        dd.buf.array[o + 3] = this._debug[q + 2]; dd.buf.array[o + 4] = this._debug[q + 3]; dd.buf.array[o + 5] = 0;
+      }
+      dd.count = n;
+      dd.geo.instanceCount = n;
+      dd.buf.needsUpdate = true;
+      dd.mat.resolution.set(W, H);
+      dd.lines.visible = on && n > 0;
+    }
 
     this.stats = {
       mode: this.mode, segments: segs, seeds, truncated,
@@ -631,6 +717,11 @@ export class Infill {
       layers: this.mode === 'hatch' ? this.layers : 0,
       curvature: this.mode === 'flow' ? this.curvature : 0,
       gradient: this.mode === 'tone' ? this.gradient : 0,
+      fan: this.mode === 'fan' ? {
+        spacing: this.fanSpacing, converge: this.fanConverge, origin: this.fanOrigin,
+        inset: this.fanInset, tipReach: this.fanTipReach, tipJitter: this.fanTipJitter,
+        debug: this.fanDebug, debugSegments: this.debugDraw ? this.debugDraw.count : 0,
+      } : null,
       fillWeight: this.mode === 'tone' ? this.fillWeight : 0,
       veins: this.mode === 'tone' ? this.veins : 0,
       veinWidth: this.mode === 'tone' ? this.veinWidth : 0,
@@ -654,7 +745,21 @@ export class Infill {
           warpPieces: this.warps[i] ? this.warps[i].K : 1,
         } : null,
         attachPx: f.hasAttach ? [f.atx, f.aty] : null,
-        scanAngleDeg: this.axes[i] ? this.axes[i].angleDeg : this.angleDeg,
+        // THE DIRECTION A SEGMENT OF THIS PART WAS CLIPPED AT, which is the
+        // only angle its ink can honestly be judged at (#160). For the fan
+        // that is the axis + 90: every ray is clipped on a row of constant
+        // station, and those rows all run along the cross axis, however many
+        // headings the rays themselves have.
+        scanAngleDeg: this.mode === 'fan' && this.axes[i] ? this.axes[i].angleDeg + 90
+          : this.axes[i] ? this.axes[i].angleDeg : this.angleDeg,
+        fan: this.mode === 'fan' ? {
+          rays: this.fanStats[i].rays, levels: this.fanStats[i].levels,
+          clipped: this.fanStats[i].clipped, shortened: this.fanStats[i].shortened,
+          originBinding: this.fanStats[i].originBinding, profileStations: INFILL_LIMITS.fanProfileSamples,
+          bins: this.fanStats[i].bins.slice(), area: this.fanStats[i].area.slice(),
+          gaps: this.fanStats[i].gaps.map(g => ({ ...g })),
+          births: this.fanStats[i].births.map(b => ({ ...b })),
+        } : null,
       })),
       frameMs: performance.now() - t0,
     };
@@ -1150,6 +1255,295 @@ export class Infill {
     }
     d.count = count; d.truncated = truncated;
     return { segments: count, seeds, truncated };
+  }
+
+  // ------------------------------------------------------------------------
+  // THE FAN. Rays of constant normalised offset, run in the part's warped
+  // frame from the base toward the tip and clipped to the silhouette by the
+  // same row-span rule everything else here uses. See THE FAN, below, for the
+  // field and for the spacing law; this is the machinery.
+  //
+  // ONE SCAN DIRECTION FOR THE WHOLE FAMILY, WHICH IS THE HAZARD THIS FAMILY
+  // WALKS INTO. "Inside" is direction-dependent on an open outline (#160
+  // measured it: the same ink read 0 outside at its own angle and 33 outside,
+  // up to 20 px deep, judged 35 degrees away). A fan gives every ray its own
+  // heading, so there is no "the ray's own angle" to judge it at. What saves
+  // it is that a ray is CLIPPED PER STATION: membership is asked on the row of
+  // constant station, and those rows all run in ONE direction — the part's
+  // cross axis. So the fan has exactly one scan direction, `scanAngleDeg` is
+  // the axis + 90 degrees, and the gate judges its ink there.
+  //
+  // And the shear does not disturb that. A constant-station row maps, under
+  // unwarpPoint, to a straight pixel line along the cross axis whose offsets
+  // are all shifted by the SAME warpOffsetAt(t) — so the point and the spans
+  // move together and membership is identical in either frame. That is
+  // asserted (`fan/the-shear-preserves-membership-on-a-row`) rather than
+  // assumed, because it is what lets the gate measure in pixels.
+  _fanPart(i, occluders) {
+    const f0 = this.frames[i];
+    const A = this.axes[i];
+    const w = this.warps[i];
+    const d = this.draws[i];
+    const fs = this.fanStats[i];
+    fs.rays = 0; fs.levels = 0; fs.bins = new Array(FAN_BINS).fill(0);
+    fs.area = new Array(FAN_BINS).fill(0);
+    fs.gaps = []; fs.births = []; fs.clipped = 0; fs.shortened = 0; fs.originBinding = 0;
+    const cap = INFILL_LIMITS.maxSegmentsPerPart;
+    let count = 0, truncated = false;
+
+    const dst = d.buf.array;
+    const emit = (x0, y0, x1, y1) => {
+      if (count >= cap) { truncated = true; return false; }
+      const o = count * 6;
+      dst[o] = x0; dst[o + 1] = y0; dst[o + 2] = 0;
+      dst[o + 3] = x1; dst[o + 4] = y1; dst[o + 5] = 0;
+      count++;
+      return true;
+    };
+
+    const D = Math.max(0, Math.min(1, this.darkness[i] / 100));
+    if (!A || !w || D <= 0) { d.count = 0; d.truncated = false; return { segments: 0, seeds: 0, truncated: false }; }
+
+    // The station range, CLAMPED TO THE VIEWPORT. The shear leaves the station
+    // alone (it only moves the offset), so a pixel's station is its warped
+    // station and this clamp is exact. It is the same lever the tonal fill's
+    // row clamp is, and for the same reason: at the leaf's close-up camera the
+    // bloom's axis runs for tens of thousands of pixels, almost none of them
+    // on the canvas.
+    const W = this._W || 0, H = this._H || 0;
+    let cLo = Infinity, cHi = -Infinity;
+    for (const [cx, cy] of [[0, 0], [W, 0], [0, H], [W, H]]) {
+      const t = (cx - A.cx) * A.ex + (cy - A.cy) * A.ey;
+      if (t < cLo) cLo = t;
+      if (t > cHi) cHi = t;
+    }
+    const tLo = Math.max(A.t0, cLo), tHi = Math.min(A.t1, cHi);
+    if (!(tHi - tLo > 1e-3)) { d.count = 0; d.truncated = false; return { segments: 0, seeds: 0, truncated: false }; }
+
+    // The warped frame, scanned in ROWS OF CONSTANT STATION: with (ca, sa) =
+    // (0, 1) the index's `v` is -t and its spans are offsets from the centre
+    // line, which sits at 0 in this frame (the shear removes the bend).
+    const step = Math.max(1, INFILL_LIMITS.fanStepPx);
+    const io = { vLo: -tHi - step, vHi: -tLo + step,
+      bucketPitch: Math.max(step, INFILL_LIMITS.fanBucketPx) };
+    // KEYED ON THE WARP'S OWNER, NOT JUST THE PART. Every part has its own
+    // warp, so an index built for the bloom in the LEAF's warped frame is
+    // meaningless to the stem — the same shape of bug #163 shipped for an
+    // afternoon with a cache keyed on the part index alone.
+    //
+    // WHAT IT COSTS HERE IS NOT WHAT IT COST THERE, and the negative control
+    // is what said so. #163's reasoning was that a wrong occluder subtraction
+    // takes ink AWAY and therefore leaves no mark; that is true of the
+    // occluders, and the check written for it stayed GREEN under the mutation
+    // (0 of 10,851). The damage is to the part's OWN index: whoever asks for
+    // `j` first fixes the frame it is built in, so a part that occluded
+    // something earlier in the frame gets its own index back in someone else's
+    // warped coordinates, is clipped against a garbage outline, and puts its
+    // ink outside itself — 158 of 714 leaf endpoints, measured.
+    const getIdx = (j) => {
+      const k = `${j}@fanw${i}`;
+      let ix = this._idxCache.get(k);
+      if (!ix) { ix = new ScanIndex(warpFrame(w, this.frames[j]), 0, 1, step, io); this._idxCache.set(k, ix); }
+      return ix;
+    };
+    const idx = getIdx(i);
+    const occIdx = occluders.map(o => getIdx(o));
+
+    const inside = (t, n) => {
+      const sp = idx.spansAt(-t);
+      let hit = false;
+      for (let q = 0; q + 1 < sp.length; q += 2) if (n >= sp[q] && n <= sp[q + 1]) { hit = true; break; }
+      if (!hit) return false;
+      for (const o of occIdx) {
+        const os = o.spansAt(-t);
+        for (let q = 0; q + 1 < os.length; q += 2) if (n >= os[q] && n <= os[q + 1]) return false;
+      }
+      return true;
+    };
+
+    const prof = widthProfile(idx, 0, tLo, tHi, INFILL_LIMITS.fanProfileSamples);
+    const inset = Math.max(0, Math.min(1, this.fanInset / 100));
+    const originHalf = Math.max(0, this.fanOrigin);
+    // DARKNESS IS THE TARGET SPACING, in a family whose tone IS line density —
+    // which is what the reference's per-part contrast is made of. A part at
+    // 50% gets its strokes twice as far apart; a part at 0 gets none, which is
+    // also the cost lever for a bloom filling the viewport.
+    const spacing = Math.max(0.5, this.fanSpacing) / D;
+    const rays = fanRays(prof, {
+      spacing, converge: this.fanConverge / 100, inset, originHalf,
+      tipReach: this.fanTipReach / 100, tipJitter: this.fanTipJitter / 100,
+      maxLevels: INFILL_LIMITS.fanMaxLevels, maxRays: INFILL_LIMITS.fanMaxRays, seed: i + 1,
+    });
+    fs.rays = rays.length;
+    fs.levels = rays.reduce((a, r) => Math.max(a, r.level), 0);
+    const L = tHi - tLo;
+
+    // Where each level was inserted, for the read-out and the debug view: the
+    // insertion is the answer to "why is the tip not four strokes wide", so it
+    // is reported rather than left to be inferred from the picture.
+    for (const r of rays) {
+      if (!fs.births[r.level]) fs.births[r.level] = { level: r.level, t: r.tStart, n: 0 };
+      fs.births[r.level].n++;
+    }
+    fs.births = fs.births.filter(Boolean);
+
+    // THE BAND AREAS, so the ink profile can be reported as DENSITY and not as
+    // length. Ink length per band answers the wrong question on a tapering
+    // part: the base band is narrow, so it holds little ink even when the
+    // strokes there are packed twice as tight as anywhere else. This is the
+    // instrument for "convergence IS the gradient", so it has to measure the
+    // thing the claim is about.
+    //
+    // And the area is the DRAWABLE area — this part's spans with every nearer
+    // part's subtracted, the same subtraction the ink itself goes through.
+    // Measured, and the reason the first version of this instrument read a
+    // base band of 5,020 px^2 holding 79 px of ink: on the leaf bundle the
+    // bloom sits in front of exactly the region where the leaf meets the stem,
+    // so most of the base band is not the fan's to draw in. Dividing ink by an
+    // area the part is not allowed to mark reports a light base that is only
+    // an occlusion.
+    const drawableAt = (t) => {
+      let sp = idx.spansAt(-t);
+      for (const o of occIdx) { if (!sp.length) break; sp = subtractSpans(sp, o.spansAt(-t)); }
+      let w2 = 0;
+      for (let q = 0; q + 1 < sp.length; q += 2) w2 += sp[q + 1] - sp[q];
+      return w2;
+    };
+    for (let k = 0; k + 1 < prof.ts.length; k++) {
+      const tm = (prof.ts[k] + prof.ts[k + 1]) / 2;
+      const b = Math.min(FAN_BINS - 1, Math.max(0, Math.floor((tm - tLo) / L * FAN_BINS)));
+      fs.area[b] += drawableAt(tm) * (prof.ts[k + 1] - prof.ts[k]);
+    }
+
+    // The ray's offset in the warped frame: the MEASURED centre of the span at
+    // this station, plus its share of the measured half-width on its own side.
+    // WHERE THE ORIGIN FLOOR ACTUALLY BINDS. It is a floor, so on a part whose
+    // base is blunt it changes nothing, and a control that is inert on the
+    // part in front of you is worth SAYING rather than leaving to be found.
+    // Counted only where the fan can DRAW: a station the shape reaches but a
+    // nearer part covers is not somewhere this control could have acted, and
+    // counting it there reports a binding the picture cannot show.
+    for (let k = 0; k < prof.ts.length; k++) {
+      if (Math.max(prof.hi[k], -prof.lo[k]) * inset < originHalf
+        && drawableAt(prof.ts[k]) > 1) fs.originBinding++;
+    }
+
+    // The ray's offset in the warped frame. Not restated here — see
+    // fanOffsetAt(), which is the one owner and is what the gate drives.
+    const offsetAt = (u, t) => fanOffsetAt(prof, u, t, inset, originHalf);
+
+    for (const r of rays) {
+      const nSteps = Math.max(2, Math.min(INFILL_LIMITS.fanMaxSamples,
+        Math.ceil((r.tEnd - r.tStart) / step)));
+      let px = 0, py = 0, have = false, cutHere = false;
+      // The stations this ray actually got ink at, against the ones it asked
+      // for. `clipped` counts a ray the outline cut MID-FLIGHT; `shortened`
+      // counts one that lost any of its length at all, which is the only
+      // witness for a ray that was occluded before it ever started drawing
+      // (there `have` is never true and there is nothing to cut).
+      let drawnLo = Infinity, drawnHi = -Infinity;
+      for (let k = 0; k <= nSteps; k++) {
+        const t = r.tStart + (r.tEnd - r.tStart) * (k / nSteps);
+        const n = offsetAt(r.u, t);
+        if (inside(t, n)) {
+          const [x, y] = unwarpPoint(w, t, n);
+          if (have) {
+            if (!emit(px, py, x, y)) break;
+            // The ink profile, by station band. This is the instrument for
+            // "is convergence the gradient" — it is a measurement of the
+            // drawn length per band, not a restatement of the field.
+            const b = Math.min(FAN_BINS - 1, Math.max(0, Math.floor((t - tLo) / L * FAN_BINS)));
+            fs.bins[b] += Math.hypot(x - px, y - py);
+          }
+          px = x; py = y; have = true;
+          if (t < drawnLo) drawnLo = t;
+          if (t > drawnHi) drawnHi = t;
+        } else {
+          // A ray that leaves the shape ends ON the outline, found by
+          // bisecting in STATION — which keeps every probe on a row of the
+          // one scan direction, so the endpoint is exact under the same rule
+          // that decided it was outside.
+          if (have) {
+            let lo = t - (r.tEnd - r.tStart) / nSteps, hi = t;
+            for (let b2 = 0; b2 < 8; b2++) {
+              const mid = (lo + hi) / 2;
+              if (inside(mid, offsetAt(r.u, mid))) lo = mid; else hi = mid;
+            }
+            const [x, y] = unwarpPoint(w, lo, offsetAt(r.u, lo));
+            if (Math.hypot(x - px, y - py) > 0.25) emit(px, py, x, y);
+            cutHere = true;
+          }
+          have = false;
+        }
+        if (truncated) break;
+      }
+      if (cutHere) fs.clipped++;
+      const asked = r.tEnd - r.tStart;
+      if (!(drawnHi - drawnLo > asked * 0.95)) fs.shortened++;
+      if (truncated) break;
+    }
+
+    // The measured spacing between neighbouring rays, at three stations. The
+    // read-out prints it because "roughly a stroke's width apart along most of
+    // its length" is a claim about pixels, and the whole point of this session
+    // is that it should be checkable on the page rather than in a sheet.
+    for (const frac of [0.15, 0.5, 0.80]) {
+      const t = tLo + L * frac;
+      const live = rays.filter(r => t >= r.tStart && t <= r.tEnd)
+        .map(r => offsetAt(r.u, t)).sort((a, b) => a - b);
+      const gaps = [];
+      for (let k = 1; k < live.length; k++) gaps.push(live[k] - live[k - 1]);
+      gaps.sort((a, b) => a - b);
+      fs.gaps.push({ frac, n: live.length,
+        median: gaps.length ? gaps[gaps.length >> 1] : 0,
+        min: gaps.length ? gaps[0] : 0 });
+    }
+
+    // --- the debug view: the field itself, not the finished ink ------------
+    if (this.fanDebug) {
+      const seg = (t0d, n0d, t1d, n1d) => {
+        const a = unwarpPoint(w, t0d, n0d), b = unwarpPoint(w, t1d, n1d);
+        this._debug.push(a[0], a[1], b[0], b[1]);
+      };
+      // the axis, base -> tip, straight, in pixels
+      this._debug.push(A.base[0], A.base[1], A.tip[0], A.tip[1]);
+      // the shape's own centre line — what the rays are offsets from, and the
+      // MEASURED one rather than the shear's, which is the distinction the
+      // base-band anomaly turned on
+      const CS = 40;
+      for (let k = 0; k < CS; k++) {
+        const ta = tLo + L * (k / CS), tb = tLo + L * ((k + 1) / CS);
+        seg(ta, profileMidAt(prof, ta), tb, profileMidAt(prof, tb));
+      }
+      // the origin region: the bar the rays leave from
+      {
+        const [hn, hp] = profileHalfAt(prof, tLo, inset, originHalf);
+        const m = profileMidAt(prof, tLo);
+        seg(tLo, m - hn, tLo, m + hp);
+      }
+      // the termination boundary, ray by ray, so the ragged tip is visible as
+      // a boundary rather than only as absent ink
+      // IN THE FAN'S OWN ORDER — by `u`, not by offset. Sorting the ends by
+      // where they landed makes the boundary polyline double back on itself
+      // wherever two rays cross, and it reads as noise rather than as an edge.
+      {
+        const ends = rays.slice().sort((a, b) => a.u - b.u)
+          .map(r => [r.tEnd, offsetAt(r.u, r.tEnd)]);
+        for (let k = 1; k < ends.length; k++) seg(ends[k - 1][0], ends[k - 1][1], ends[k][0], ends[k][1]);
+      }
+      // a tick at each ray's birth, across the fan, so insertion is visible
+      for (const r of rays) {
+        if (r.level < 2) continue;
+        const n = offsetAt(r.u, r.tStart);
+        const [hn, hp] = profileHalfAt(prof, r.tStart, inset, originHalf);
+        const tick = Math.max(1.5, (hn + hp) * 0.06);
+        seg(r.tStart - tick, n, r.tStart + tick, n);
+      }
+    }
+
+    fs.scanAngleDeg = A.angleDeg + 90;
+    d.count = count; d.truncated = truncated;
+    return { segments: count, seeds: rays.length, truncated };
   }
 }
 
@@ -1687,6 +2081,261 @@ export function axialClip(tMax, du, dv, c0, v) {
   const rest = tMax - v * dv - c0;
   if (Math.abs(du) < 1e-12) return rest >= 0 ? [-Infinity, Infinity] : null;
   return du > 0 ? [-Infinity, rest / du] : [rest / du, Infinity];
+}
+
+// ===========================================================================
+// THE FAN — strokes that converge at the part's base and spread toward its
+// tip, curving with the shape as they travel.
+//
+// WHY THIS IS ITS OWN FAMILY AND NOT A SETTING ON LINE-FLOW. It was checked
+// first, because it looks like it should be one: line-flow's field at
+// curvature -100 is already RADIAL from the anchor, and rays from a point are
+// the orthogonal family of the concentric rings flow draws at +100. Move the
+// origin from the centroid to the attachment and that is very nearly the
+// brief. Two things make it the wrong place to build this:
+//
+//   * A radial field knows nothing about the shape. Its rays are straight
+//     lines from a point, so on a bowed or a tapering leaf they exit through
+//     the SIDE — which is exactly the failure #163 built the shear for, and
+//     the shear cannot be bolted onto a per-step integrator without the field
+//     being re-derived at every step.
+//   * Flow SEEDS ON A BBOX GRID. Two seeds that happen to sit on one ray draw
+//     the same ray twice, and the spacing between rays is then a property of
+//     the grid rather than of the fan. The spacing law below is the whole
+//     design problem of this family, and there is nowhere in a grid seeder to
+//     put it.
+//
+// So the fan is built here, and it REUSES rather than re-implements: the
+// warp and the medial line from #163, the row-span membership rule from #157,
+// the scan index, the between-part occlusion, and the emit/cap discipline.
+//
+// ---------------------------------------------------------------------------
+// THE FIELD. A fan ray is a curve of CONSTANT NORMALISED OFFSET in the part's
+// warped (station, offset) frame:
+//
+//     offset(t) = u * halfWidth(t)          u in [-1, 1], the ray's identity
+//
+// where halfWidth is MEASURED off the shape's own cross-spans at station t,
+// per side, so a lopsided part gets a lopsided fan. Two things fall out of
+// that and neither is a special case:
+//
+//   * The rays converge at the base and spread toward the tip WITHOUT being
+//     told to, because that is what the shape does. A leaf is narrow where it
+//     joins the stem.
+//   * A ray cannot exit through the side, at any bend and any taper, because
+//     its offset is a fraction of the width that is there. The straight-ray
+//     failure the brief predicts is not mitigated here, it is unreachable.
+//
+// The warp is what makes the curve follow a BOWED part: `offset` is measured
+// from the shape's own centre line, not from a chord. It is inert (K = 1, and
+// the identity) on a straight part, exactly as it is for cross-hatch.
+//
+// ---------------------------------------------------------------------------
+// THE SPACING LAW, WHICH IS THE REAL DESIGN QUESTION. A pure pencil of rays
+// from one point touches at the origin and splays wide at the tip; the
+// reference does neither. But the two fixes pull opposite ways, and this is
+// the trade rather than a tuning:
+//
+//   * Hold the spacing CONSTANT along the length — insert rays where they
+//     spread, drop them where they crowd — and the density is uniform
+//     everywhere. Convergence stops being a gradient at all, and the base
+//     goes as light as the tip.
+//   * Let a fixed pencil converge and the base is dark for free, but the tip
+//     is a handful of strokes a long way apart.
+//
+// So it is ONE CONTROL, `converge`, and it interpolates the TARGET SPACING
+// between the two readings:
+//
+//     S(t) = spacing * ( (1 - k) + k * halfWidth(t) / halfWidthMax )
+//
+// At k = 0 the target is constant and the density is uniform. At k = 1 the
+// target is proportional to the width, the birth condition below stops
+// depending on the station, and what is left is the pure converging pencil.
+// The default is in between, and IT IS MEANT TO BE TUNED ON THE PAGE rather
+// than argued about here — which is what the live controls and the debug
+// view are for.
+//
+// Rays are inserted DYADICALLY. Level 0 is the two margin rays (u = -1, +1),
+// level 1 the centre ray, and level L adds the 2^(L-1) midpoints of the level
+// L-1 grid. A ray of level L is BORN at the first station where its parent
+// grid's spacing has opened past the target:
+//
+//     2^(2-L) * halfWidth(t) >= S(t)
+//
+// and runs from there to its tip cutoff. Levels 0 and 1 always run the whole
+// length. That is what puts short strokes tucked between long ones — which is
+// what the reference's hatching actually looks like — with no bookkeeping
+// beyond one station scan per level.
+//
+// AN ORIGIN REGION, NOT A POINT. `originHalf` floors the half-width, so the
+// rays arrive at the base spread over a small bar rather than meeting at a
+// singularity. It is in pixels because it is a property of the MARK (how
+// close two strokes can be before they are one stroke), not of the shape.
+//
+// STROKES STOP SHORT OF THE TIP. `tipReach` is the fraction of the length a
+// ray travels and `tipJitter` ragged-edges it per ray, so the tip is left
+// lighter and the ends do not line up into a machined arc. This is the same
+// argument `jitter` makes for the tonal layers' thresholds.
+
+// The half-width of the part at each of `samples` stations, per side,
+// measured off the shape's own cross-spans in the WARPED frame — where a row
+// of constant station is a row of the scan index, so this is the same
+// membership rule everything else here uses, asked a different question.
+//
+// `mid` is the CENTRE of the span the fan runs down, and `lo`/`hi` are the
+// two half-widths RELATIVE to it, so a lopsided part reports two different
+// numbers. `mid` is not a refinement — it is load-bearing, and it was found
+// from the debug view rather than reasoned out. The shear's centre line is
+// interpolated from WARP_SAMPLES stations and clamped outside them, so near
+// the two extremes it drifts off the shape; where it lands outside the
+// silhouette entirely, the span containing it does not exist, the fallback
+// takes the widest span on the row, and a fan anchored at 0 would then place
+// every ray of that station OUTSIDE the part. Measured on the real leaf: the
+// base band reported 5,020 px^2 of shape and 79 px of ink. Anchoring on the
+// measured centre re-seats the fan on the shape at every station.
+export function widthProfile(idx, u0, t0, t1, samples) {
+  const n = Math.max(2, samples | 0);
+  const ts = new Float64Array(n), lo = new Float64Array(n), hi = new Float64Array(n);
+  const mid = new Float64Array(n);
+  for (let k = 0; k < n; k++) {
+    const t = t0 + (t1 - t0) * (k / (n - 1));
+    ts[k] = t;
+    const sp = idx.spansAt(-t);
+    let best = null, widest = null;
+    for (let q = 0; q + 1 < sp.length; q += 2) {
+      if (u0 >= sp[q] && u0 <= sp[q + 1]) best = [sp[q], sp[q + 1]];
+      if (!widest || sp[q + 1] - sp[q] > widest[1] - widest[0]) widest = [sp[q], sp[q + 1]];
+    }
+    const s = best || widest;
+    if (!s) { mid[k] = u0; lo[k] = 0; hi[k] = 0; continue; }
+    mid[k] = (s[0] + s[1]) / 2;
+    lo[k] = s[0] - mid[k];
+    hi[k] = s[1] - mid[k];
+  }
+  return { ts, mid, lo, hi, t0, t1 };
+}
+
+// Where in the profile station `t` falls: the sample below it and the
+// fraction past it. One owner, because three readers want it.
+function profileAt(prof, t) {
+  const ts = prof.ts, n = ts.length;
+  if (t <= ts[0]) return [0, 0];
+  if (t >= ts[n - 1]) return [n - 2, 1];
+  const span = (ts[n - 1] - ts[0]) / (n - 1);
+  let a = Math.min(n - 2, Math.max(0, Math.floor((t - ts[0]) / span)));
+  while (a + 1 < n - 1 && ts[a + 1] < t) a++;
+  while (a > 0 && ts[a] > t) a--;
+  return [a, (t - ts[a]) / (ts[a + 1] - ts[a])];
+}
+
+// The centre of the span the fan runs down, at an arbitrary station.
+export function profileMidAt(prof, t) {
+  const [a, s] = profileAt(prof, t);
+  return prof.mid[a] + (prof.mid[a + 1] - prof.mid[a]) * s;
+}
+
+// The profile read at an arbitrary station, linearly between samples and
+// clamped outside. Returns the two half-widths, floored by the origin region
+// and pulled in by `inset` so a stroke does not sit exactly on the outline.
+export function profileHalfAt(prof, t, inset = 1, originHalf = 0) {
+  const [a, s] = profileAt(prof, t);
+  const h = prof.hi[a] + (prof.hi[a + 1] - prof.hi[a]) * s;
+  const l = prof.lo[a] + (prof.lo[a + 1] - prof.lo[a]) * s;
+  return [Math.max(-l * inset, originHalf), Math.max(h * inset, originHalf)];
+}
+
+// The target spacing at station t: `spacing` at converge 0, and proportional
+// to the local width at converge 1. The ONE statement of the trade described
+// above — the app, the read-out and the gate all read it here.
+export function fanTargetSpacing(spacing, converge, halfBar, halfBarMax) {
+  const k = Math.max(0, Math.min(1, converge));
+  const r = halfBarMax > 1e-9 ? Math.max(0, halfBar) / halfBarMax : 1;
+  return Math.max(0.25, spacing * ((1 - k) + k * r));
+}
+
+// A RAY'S OFFSET AT A STATION — the field, in one line, and the ONE OWNER of
+// it. Exported and called by `_fanPart` rather than restated there, because
+// the gate has to drive the SHIPPED law: the first version of this file kept
+// the arithmetic inside the class and the gate re-wrote it, and the negative
+// control's `rays-are-parallel` mutation then sailed through every part-one
+// check while only the browser half caught it. A field with two statements is
+// a field one of whose statements is untested.
+export function fanOffsetAt(prof, u, t, inset = 1, originHalf = 0) {
+  const [hn, hp] = profileHalfAt(prof, t, inset, originHalf);
+  return profileMidAt(prof, t) + (u >= 0 ? u * hp : u * hn);
+}
+
+// The dyadic ray set: which rays exist, and where each one starts and stops.
+//
+// Returned in DRAW ORDER by level, each with the `u` that identifies it, the
+// level that inserted it, and the station interval it covers. Pure, and
+// exported, because a ray set is a list of numbers whose right answer can be
+// written down — on the real leaf a WRONG fan still draws a plausible picture.
+export function fanRays(prof, opts = {}) {
+  const spacing = Math.max(0.5, opts.spacing !== undefined ? opts.spacing : 9);
+  const converge = Math.max(0, Math.min(1, opts.converge !== undefined ? opts.converge : 0.55));
+  const inset = Math.max(0, Math.min(1, opts.inset !== undefined ? opts.inset : 0.92));
+  const originHalf = Math.max(0, opts.originHalf !== undefined ? opts.originHalf : 3);
+  const tipReach = Math.max(0.05, Math.min(1, opts.tipReach !== undefined ? opts.tipReach : 0.88));
+  const tipJitter = Math.max(0, Math.min(1, opts.tipJitter !== undefined ? opts.tipJitter : 0.35));
+  const maxLevels = Math.max(1, Math.min(9, opts.maxLevels !== undefined ? opts.maxLevels : 7));
+  const maxRays = Math.max(2, opts.maxRays !== undefined ? opts.maxRays : 400);
+  const seed = opts.seed !== undefined ? opts.seed : 1;
+
+  const t0 = prof.t0, t1 = prof.t1, L = t1 - t0;
+  if (!(L > 1e-6)) return [];
+
+  // The station grid the birth scan runs on is the profile's own, so a birth
+  // station is always a station the width was actually measured at.
+  const ts = prof.ts, N = ts.length;
+  const halfBar = new Float64Array(N);
+  let halfBarMax = 0;
+  for (let k = 0; k < N; k++) {
+    const [a, b] = profileHalfAt(prof, ts[k], inset, originHalf);
+    halfBar[k] = (a + b) / 2;
+    if (halfBar[k] > halfBarMax) halfBarMax = halfBar[k];
+  }
+
+  const rays = [];
+  let id = seed * 7919;
+  const push = (u, level, tStart) => {
+    if (rays.length >= maxRays) return;
+    const h = hash01(++id * 2246822519);
+    const reach = tipReach * (1 - tipJitter * h);
+    const tEnd = Math.min(t1, t0 + L * reach);
+    if (tEnd - tStart < Math.max(1, L * 0.02)) return;   // shorter than a mark
+    rays.push({ u, level, tStart, tEnd });
+  };
+
+  // Levels 0 and 1 — the two margins and the centre — run the whole length.
+  // They are the pencil the rest is inserted into, and they are what carries
+  // the ink down into the origin region where everything else has been
+  // squeezed out.
+  push(-1, 0, t0); push(1, 0, t0);
+  if (maxLevels >= 1) push(0, 1, t0);
+
+  for (let lev = 2; lev <= maxLevels; lev++) {
+    // The parent grid's spacing at station k, against the target there.
+    const parentDu = Math.pow(2, 2 - lev);
+    // A STATION IS NOT A SENTINEL. `t` here is measured from the silhouette's
+    // centroid along the axis, so it is negative over the whole base half of
+    // every part — a -1 "not found" marker reads as a real birth at the base
+    // and every level is born at once. Measured, not hypothetical: it is what
+    // the first run of this did.
+    let birth = 0, found = false;
+    for (let k = 0; k < N && !found; k++) {
+      const S = fanTargetSpacing(spacing, converge, halfBar[k], halfBarMax);
+      if (parentDu * halfBar[k] >= S) { birth = ts[k]; found = true; }
+    }
+    if (!found) break;                          // and no deeper level can start
+    const du = Math.pow(2, 1 - lev);
+    for (let m = 0; m < Math.pow(2, lev - 1); m++) {
+      const u = -1 + du * (2 * m + 1);
+      push(u, lev, birth);
+    }
+    if (rays.length >= maxRays) break;
+  }
+  return rays;
 }
 
 // The vein paths for one projected silhouette, in PIXELS: a midrib that
