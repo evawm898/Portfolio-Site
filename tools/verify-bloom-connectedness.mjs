@@ -285,7 +285,7 @@ for (const row of rows) {
      bytes cannot show. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
-  /* THE ANDROECIUM (JS1-JS4, session 21) — see stamenAssertions()'s header.
+  /* THE ANDROECIUM (JS1-JS5, sessions 21 and 24) — see stamenAssertions()'s header.
      The flood fill is blind to a filament rooted off the normal or a hairline
      root exactly as it is to the wrong hub: the tube crosses the slab, so it
      reads as one piece either way. */

@@ -884,6 +884,14 @@ function fanLine(fr) {
    spine floor told (never clamped). Then the SLENDERNESS line (Q7), verbatim
    tagged: telemetry, never a gate, until a coupon is printed. Absent when the
    androecium is absent, so the lines simply are not there. */
+/* THE INNER-LIMIT CLAUSE (session 24) rides on the same line and is DISC-ONLY,
+   because the limit is only a thing the disc's law does — the ring puts every
+   stamen at R and cannot start inside the style, so a clause there would be a
+   claim nothing can make. Two arms, both footRing()'s own numbers: where the
+   annulus starts and what the limit is made of, or NO ROOM when the disc is
+   inside the limit and every stamen stands on the rim (told, never refused —
+   the crosses-axis precedent). JS5 asserts both arms against the owner, in
+   both directions. */
 /* THE FILAMENT-AGAINST-STYLE CLAUSE (session 23) rides on the same line, on
    the ROOTS FUSE pattern: present exactly when both parts are built, the
    builder's own nearest approach and the height it happens at, and the flag
@@ -896,6 +904,11 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
   const under = stamens.filter((s) => s.law.underFloor).length;
   return `STAMENS ${A.count} on ${A.layout === 'DISC' ? 'a Vogel disc' : 'one ring'} · radius ${A.radius.toFixed(2)} mm (${mode}) = ${A.spread.toFixed(2)}x the reference ${A.derivedRadius.toFixed(2)} mm (the filaments' own area rule)`
        + (A.onAxis ? ` (ON THE AXIS: the hub, ${A.hubRadius.toFixed(2)} mm, is narrower than a filament radius — ${A.asked.toFixed(2)} mm asked)` : A.clamped ? ` (CLAMPED at the hub radius ${A.hubRadius.toFixed(2)} mm less a filament radius — ${A.asked.toFixed(2)} mm asked; ${A.saturation.toFixed(2)}x is as far as this hub goes, the slider above it is dead here)` : '')
+       + (A.layout === 'DISC'
+         ? (A.noRoom
+           ? ` · NO ROOM FOR THE INNER LIMIT: the disc, ${A.radius.toFixed(2)} mm, is inside the ${A.innerLimit.toFixed(2)} mm limit, so every stamen stands on the rim (told, never refused)`
+           : ` · the disc runs from ${A.innerUsed.toFixed(2)} mm out — a filament radius plus a style radius, where a filament's tube clears a style's — in equal-area annuli`)
+         : '')
        + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther PILL ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
        + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}` : '')

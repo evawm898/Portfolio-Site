@@ -40,9 +40,17 @@ milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloo
 PR are FLOWER gates (`'tools/**'` filtered), so "six verify jobs green" overstates
 the bloom evidence — it is four.
 **Frozen baselines are frozen at commits on `main`, never at a branch head, and
-are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all fifteen
-(`frozen/phase2`..`frozen/phase16`) so a branch delete or a force-push cannot
+are tagged at freeze time** — `tools/publish-frozen-tags.sh` pins all sixteen
+(`frozen/phase2`..`frozen/phase17`) so a branch delete or a force-push cannot
 orphan one; phase10 is the case that produced the rule (charter, Sep 5).
+**A FROZEN TAG PINS ROW DEFINITIONS, NOT BYTES** (Eva, Sep 6, session 24):
+`--verify-frozen` imports the base tree's own `buildMatrix()` and deep-compares
+row order, labels and set lists — it has never compared a byte. Byte identity is
+proved per session by the RETENTION CLOSE against a worktree of the base commit,
+and by nothing else. So **a session that moves frozen bytes must name in its
+outcome doc which tag's bytes no longer reproduce**, with the row count, even
+though that tag's definitions still do; a new phase is NOT owed for a byte move
+alone. The first entry is session 24 — `frozen/phase17`, 8 of 507 rows.
 Control-panel changes have their own gate: `node tools/verify-bloom-panel.mjs`
 (every registry control renders exactly once in its declared section, a control
 inside a collapsed section still reads, writes and rebuilds, every
@@ -341,6 +349,36 @@ added, no byte moved, phase17 stays the newest baseline — the session 18/19 ca
 last three sessions'. `docs/bloom-session-23-outcome.md` has the numbers. B2b's other
 instruments (the crowding-raster extensions, anther-against-blade, the independent splay)
 stay parked.
+
+**THE VOGEL DISC STARTS AT `rFil + rSty`, ALWAYS, AND THAT IS THE FLAG'S OWN THRESHOLD**
+(Eva's ruling, Sep 6, session 24 — session 23's open placement question, closed). The disc had
+no inner limit, so its innermost stamen stood at `rFil * spread / sqrt(2)` — **0.85 mm on every
+UNCLAMPED disc at ANY count** (the N cancels: `R = rFil sqrt(N) spread` and `r_0 = R sqrt(0.5/N)`),
+0.53 mm on the clamped 120 — inside a style, so FILAMENT AGAINST STYLE fired at the ROOT on every
+disc setting. `partRadius` (`thickness / 2`) in footRing() is now the ONE OWNER of the parts'
+radius: the androecium's `rFil`, the gynoecium's `rSty` and the disc's `innerLimit` are all it,
+and `buildBloomInto`'s flag READS the limit instead of re-deriving it. The law is the equal-area
+law RE-BASED ON THE ANNULUS `[inner, R]` instead of the disc `[0, R]` — "start the index past
+zero" with the integer rounded away: every annulus keeps exactly the same area (measured spread
+3.6e-14 mm² across 120) and, unlike an integer offset, it is CONTINUOUS in R so the spread slider
+never jumps. **Flooring each radius was measured and REJECTED**: it takes the 120-disc's closest
+pair of roots from 1.164 mm to 0.991 mm — deeper into the ROOTS FUSE flag it was meant to relieve
+— where the annulus law takes it to 1.233 mm and CLEARS it. ALWAYS, not only with a style
+present: a limit that existed only with a style would make turning the style on move every
+stamen, the coupling session 22 ruled against. NO ROOM (the disc inside the limit) is told, never
+refused, and `innerUsed` / `noRoom` are NULL under RING because the limit is the DISC's law —
+**JS5 in both STL gates asserts that biconditional in both directions**, rebuilding the limit from
+the SLAB rather than from the descriptor (C1's discipline) and asserting equal area as its own
+property of the emitted radii. Both STL gates are BLIND to a disc that starts on the axis. The
+sheet is `node tools/shot-bloom-inner-limit.mjs <dir> [base-tree]` — the disc from ABOVE, with and
+without, at 6 / 30 / 120, the fuse row, the NO-ROOM corner and a RING control that must not move.
+**11 live rows and 8 phase17 rows moved; no row added, so no new frozen phase** —
+`docs/bloom-session-24-outcome.md` names phase17 as the tag whose bytes no longer reproduce.
+**THE PARAMETRIC TIP'S EIGHT RULINGS LIVE IN THAT SAME DOC** (Eva, Sep 6, from the discovery
+sheet) and are the brief for sessions 2, 3 and 4 — the one-exponent outline law, the Rodrigues
+frame with no guard, the elongation floor, no self-intersection instrument (bound the ranges
+instead), two-level panel nesting with the rows generated from one table, and `size` as a real
+slider superseding `ANTHER_DIAMETER_FACTOR`. Read them there rather than re-deriving them.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

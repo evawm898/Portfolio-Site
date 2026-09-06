@@ -150,7 +150,7 @@ for (const row of rows) {
      identity, an exact equality computed in footRing) are what observe it. */
   const jct = await junctionAssertions(page, row);
   if (jct.length) { validity.push(`${row.label}: ${jct.join('; ')}`); continue; }
-  /* THE ANDROECIUM (JS1-JS4, session 21), on EVERY row in both directions —
+  /* THE ANDROECIUM (JS1-JS5, sessions 21 and 24), on EVERY row in both directions —
      absent where the state says absent (count 0, or SPHERE where it is
      hidden and inert), and where present: the root axis on the owner's
      normal through the full slab, containment, the overlap a solid read from

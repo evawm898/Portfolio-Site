@@ -2025,6 +2025,23 @@ export function footRing(state, acc) {
      Cap and flat: R0, verbatim. */
   const hub = { radius: sphere ? dome.Rd : R0, thickness, derivedRadius, dome };
 
+  /* THE REPRODUCTIVE PARTS' OWN RADIUS — ONE OWNER (session 24). A filament
+     and a style are each ONE SHEET THICK (Part thickness owns the material
+     dimension), so their radius is ONE number rather than two that happen to
+     agree: the androecium's `rFil`, the gynoecium's `rSty` and the disc's
+     INNER LIMIT below are all this, and buildBloomInto's filament-against-
+     style flag READS the limit instead of re-deriving it from the two
+     descriptors. Both expressions it replaces were `thickness / 2` on the
+     same double, so nothing moves by introducing it — the block-23 and
+     block-24 rows on both trees are what MEASURE that, not this sentence.
+
+     IT EXISTS WHETHER OR NOT A STYLE IS BUILT, which is what lets the limit
+     apply ALWAYS (Eva, Sep 6): a limit that only existed with a style
+     present would make turning the style on move every stamen, which is
+     exactly the coupling session 22 ruled against when it made each part
+     independently present or absent. */
+  const partRadius = thickness / 2;
+
   /* ===================================================================
      THE ANDROECIUM DESCRIPTOR (session 21) — this owner's second kind. Null
      when ABSENT (count 0) and null under SPHERE (hidden and inert — the
@@ -2060,7 +2077,7 @@ export function footRing(state, acc) {
     if (state.stamenLayout !== 'RING' && state.stamenLayout !== 'DISC') throw new Error(`unknown stamenLayout ${JSON.stringify(state.stamenLayout)} — the registry and the builder have diverged`);
     const disc = state.stamenLayout === 'DISC';
     const diameter = thickness;                       // one sheet thick, floored with it
-    const rFil = diameter / 2;
+    const rFil = partRadius;                          // the ONE owner above; `thickness / 2`, the expression it replaces
     const derivedRadius = rFil * Math.sqrt(count);    // the androecium's own area rule
     const asked = derivedRadius * state.stamenSpread;
     /* OUT TO THE HUB RADIUS means the outermost FOOTPRINT reaches the rim:
@@ -2077,9 +2094,45 @@ export function footRing(state, acc) {
     const onAxis = limit === 0;
     const anther = { diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter };
     const clearRadius = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
+    /* THE DISC'S INNER LIMIT (session 24, Eva's ruling Sep 6). The Vogel law
+       had no inner limit, so its innermost stamen stood at
+       `rFil * spread / sqrt(2)` — 0.85 mm on every UNCLAMPED disc at ANY
+       count (the N cancels: R = rFil sqrt(N) spread and r_0 = R sqrt(0.5/N)),
+       and 0.53 mm on the clamped 120. With a style present that is INSIDE the
+       style's own tube, so the filament-against-style flag fired at the root
+       on every disc setting; the RING layout never does it, since every
+       stamen sits at R.
+
+       THE LIMIT IS `rFil + rSty` — where a filament's tube clears a style's —
+       and that is EXACTLY the flag's own threshold: one quantity, stamped
+       here from `partRadius` and READ by the flag, never a second derivation
+       that agrees. ALWAYS, not only with a style (Eva's ruling and its
+       reason are at partRadius above).
+
+       THE LAW IS THE EQUAL-AREA LAW RE-BASED ON THE ANNULUS [inner, R]
+       instead of the disc [0, R] — "start the spiral's index past zero" with
+       the integer rounded away. Every annulus keeps exactly the same area,
+       `pi (R^2 - inner^2) / N` (measured: the spread across all 120 is
+       3.6e-14 mm^2), and unlike an integer offset it is CONTINUOUS in R, so
+       the spread slider never jumps. Chosen over flooring each radius, which
+       was measured to take the 120-disc's closest pair of roots from 1.164 mm
+       to 0.991 mm — deeper into the ROOTS FUSE flag it was meant to relieve —
+       while this takes it to 1.233 mm and clears it.
+
+       NO ROOM is told, never refused, on the crosses-axis precedent: when the
+       disc radius is inside the limit the annulus has no width and every
+       stamen stands on the rim (`STAMENS: 1 stamen on the DISC` is that row,
+       at R = inner = 1.20 mm exactly). At the on-axis corner R is 0, `inner`
+       with it, and every stamen is on the axis as before — byte-identical
+       there by construction, and a gate row proves it. `innerUsed` and
+       `noRoom` are NULL under RING: a claim nothing can make reads as absent,
+       and JS5 asserts that biconditional in both directions. */
+    const innerLimit = partRadius + partRadius;       // a filament radius plus a style radius — the flag's own threshold
+    const innerUsed = disc ? Math.min(innerLimit, radius) : null;
+    const noRoom = disc ? radius <= innerLimit : null;
     const stamens = [];
     for (let i = 0; i < count; i++) {
-      const r = disc ? radius * Math.sqrt((i + 0.5) / count) : radius;
+      const r = disc ? Math.sqrt(innerUsed * innerUsed + ((i + 0.5) * (radius * radius - innerUsed * innerUsed)) / count) : radius;
       const s = surfaceAt(r, null);
       const inPetalRootAnnulus = rings.some((rg) => r + rFil > rg.radius - rg.overhang && r - rFil < rg.radius);
       stamens.push({ index: i, radius: r, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief, inPetalRootAnnulus });
@@ -2087,6 +2140,10 @@ export function footRing(state, acc) {
     return {
       count, layout: state.stamenLayout, diameter, rFil, length: state.stamenLength, curlDeg: state.stamenCurl, curlRad: state.stamenCurl * D2R,
       derivedRadius, spread: state.stamenSpread, asked, radius, clamped, limit, onAxis, hubRadius: hub.radius, clearRadius, anther, thickness, dome,
+      /* THE INNER LIMIT (session 24) — see the block above. `innerLimit` is a
+         property of the PARTS and is a number on both layouts; `innerUsed`
+         and `noRoom` describe the DISC and are null under RING. */
+      innerLimit, innerUsed, noRoom,
       /* WHERE THE MULTIPLIER RUNS OUT ON THIS BLOOM — the limit over the
          reference, (hub - r) / (r sqrt N): 1.25 at 120 stamens on the shipping
          hub, 13.7 at one, 123 on the largest hub, 0.03 on the smallest.
@@ -2119,7 +2176,7 @@ export function footRing(state, acc) {
     if (!gynoeciumEligible(state)) return null;
     if (state.gynoecium !== 'NONE' && state.gynoecium !== 'STYLE') throw new Error(`unknown gynoecium ${JSON.stringify(state.gynoecium)} — the registry and the builder have diverged`);
     if (state.gynoecium === 'NONE') return null;
-    const diameter = thickness, rSty = diameter / 2;      // one sheet thick, floored with it
+    const diameter = thickness, rSty = partRadius;        // one sheet thick, floored with it — the ONE owner above
     const s = surfaceAt(0, null);
     const lobe = { count: STIGMA_LOBES, diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, spreadRad: STIGMA_LOBE_SPREAD_DEG * D2R };
     return {
@@ -4276,7 +4333,13 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      reproduces from the emitted stations. */
   const filamentStyle = (() => {
     if (!stamens.length || !styles.length) return null;
-    const threshold = fr.androecium.rFil + fr.gynoecium.rSty;
+    /* THE THRESHOLD IS THE DISC'S INNER LIMIT (session 24) — one quantity,
+       READ from footRing()'s androecium descriptor rather than re-derived
+       here from the two parts' radii. It was `fr.androecium.rFil +
+       fr.gynoecium.rSty`, which is the same double on the same owner; making
+       the limit and the flag one number is what stops the disc's law and the
+       flag from ever disagreeing about where a filament clears a style. */
+    const threshold = fr.androecium.innerLimit;
     const axis = styles[0].stations.slice(1);
     const segDist = (p, a, b) => {
       const ab = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], ap = [p[0] - a[0], p[1] - a[1], p[2] - a[2]];

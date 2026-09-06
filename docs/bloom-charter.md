@@ -2115,6 +2115,42 @@ say so loudly; if that ever becomes the real state, the honest move is a labelle
 unverifiable tier and a correction to the claim that CI "proves every one deep-equal on
 every push", never a quiet green.
 
+**RULED Sep 6 (session 24). A FROZEN TAG PINS ROW DEFINITIONS, NOT BYTES — AND A SESSION
+THAT MOVES FROZEN BYTES MUST NAME THE TAG WHOSE BYTES NO LONGER REPRODUCE.**
+
+**THE GAP, AND HOW IT SURFACED.** Session 24's inner limit moves 8 of phase17's 507 rows.
+The freeze rule as sessions 20–23 applied it — a phase is owed when the ROW SET changes,
+and is not owed when nothing moved — has no arm for that: every prior byte event either
+ADDED rows (21, 22) or RETIRED a control (20), so a change that moves frozen bytes with the
+row set unchanged is a shape the rule had never met. Asking "does CI go red?" answers
+nothing, because it cannot: **`--verify-frozen` imports the base tree's own `buildMatrix()`
+and deep-compares row order, labels and set lists against the named frozen function. It has
+never compared a byte, and it was never meant to.** Its own header says so; the risk is that
+a reader takes "CI proves every baseline deep-equal on every push" as a byte claim, which is
+exactly the label-naming-a-computation-nobody-performed defect this project has cleaned up
+four times.
+
+**SO THE TWO PROOFS ARE SEPARATE, AND THEY ALWAYS WERE.** A `frozen/*` tag keeps its base
+commit's OBJECT alive so `--verify-frozen` can resolve it; the tag proves that *these rows
+are those rows*, forever. **Byte identity is proved per session by the retention close** —
+the newest baseline plus the live partition, captured on a worktree of the base commit and
+on the head, in one run on one box — and by nothing else. A tag is not a byte baseline and
+must never be read as one.
+
+**THE PROTECTION THAT MAKES THE CHAIN SAFE, and it is an obligation on the outcome doc
+rather than a gate: WHEN A SESSION MOVES FROZEN BYTES, ITS OUTCOME DOC MUST NAME WHICH TAG'S
+BYTES NO LONGER REPRODUCE, with the row count, even though that tag's definitions still do.**
+Without it a later session re-exports phase17 on a new tree, finds 8 rows different from a
+number written down two sessions ago, and cannot tell a regression from a ruled change. With
+it the chain is readable: the tag stays the definition baseline it always was, and the doc
+carries the byte history the tag cannot. **Session 24 is the first entry: `frozen/phase17`,
+8 of 507 rows, the Vogel disc's inner limit, ruled by Eva on Sep 6.**
+
+**NO NEW PHASE IS OWED FOR A BYTE MOVE ALONE** (Eva, Sep 6). Freezing a phase every time
+bytes move would freeze one per session and put the suite back on the quadratic path the
+retention ruling closed; the row set is what a baseline is FOR. A phase is still owed when
+the row set changes, and never for a move the outcome doc names.
+
 **BLOCKED, AND RECORDED AS AN ENVIRONMENT LIMIT RATHER THAN A REPO ONE:** this session
 created all twelve tags locally and could not publish them. The agent proxy returns
 **HTTP 403 on a tag ref push** — both as `git push --tags` and as a single explicit
