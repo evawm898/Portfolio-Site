@@ -331,7 +331,8 @@ nearest approach of any filament's free station to the style's centreline below 
 (the builder's own `stations`, computed AFTER every solid is emitted), against one filament
 plus one style radius; never a gate, and both STL gates stay blind to it by design. It also
 sees what session 22's law table did not ask: a Vogel disc's innermost stamen stands inside
-the style's tube at the root. The panel gate carries all of it (route (q)'s clauses in (o)
+the style's tube at the root — ruled an OPEN PLACEMENT QUESTION for the next session (index
+past zero, or a radius floor), not a defect (Eva, Sep 6). The panel gate carries all of it (route (q)'s clauses in (o)
 and (p), route (r) for the flag's own witness, the path route admitting a child's control as
 a control-less container's witness, route (n)(i) now "the container holds no control of its
 own"); the sheet is `node tools/shot-bloom-panel.mjs <dir> [base-tree]`, whose fifth sheet is

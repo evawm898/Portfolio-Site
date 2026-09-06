@@ -4747,7 +4747,11 @@ matters should be measured this way.
       120 on the disc 1.25x (marked, CLAMPED), one stamen 13.74x (past the range, no mark).
       **The brief's "1.77x on the shipping hub" was NOT reproduced** at any shipping-default
       state and is in no record — a premise, not a specification; the instrument prints the
-      owner's number on whatever hub is in front of it.
+      owner's number on whatever hub is in front of it. **THE CORRECTION (Eva, Sep 6, at the
+      close):** the 1.77x came from a read-out in a screenshot of ONE configuration and was
+      wrongly described as the shipping hub's; the real readings are the session's — 5.61x at
+      six on a ring, 1.25x at 120 on the disc, 13.74x at one stamen — recorded so nobody
+      inherits the wrong number.
 
     - **THE FLAG READS THE BUILDER'S STATIONS, AFTER EMISSION.** `buildStamenInto` and
       `buildStyleInto` return `stations` (the ring centres the rod was revolved through);
@@ -4760,7 +4764,10 @@ matters should be measured this way.
       with a style present the flag fires at the root, straight, a true intersection of two
       closed tubes. Told, not tuned around. FLAG, NEVER GATE: both STL gates stay blind to it
       by design, and the harness, both gates, both coverage instruments and the smoke tool are
-      on the untouched list.
+      on the untouched list. **RULED AN OPEN PLACEMENT QUESTION, NOT A DEFECT (Eva, Sep 6):**
+      the disc law has no inner limit, so its innermost stamen is inside the style whenever
+      one is present; the candidates are starting the spiral's index past zero or flooring
+      the radius, and that is the NEXT session's question, not this one's.
 
     - **NO NEW FROZEN PHASE**, stated explicitly as the brief asked: the row set is the same
       528 (no matrix row was added — the flag is asserted on one page in both directions, the
@@ -4777,3 +4784,18 @@ matters should be measured this way.
       on `claude/panel-centre-reorganisation-mk89d0` targets `main`. Merge is released by
       Eva's ruling on `panel-centre.png` and is the session's own final step; the merge sha
       and the ruling are recorded here by the close-out.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The sheet approved; #169 merged as built.
+      Two records are hers, written down at the close: the 1.77x correction (above) and the
+      disc's innermost stamen as an open placement question (above).
+
+    - **THE CLOSE (Sep 6).** The four bloom gates confirmed green on the PR head `73b4fea` by
+      the session before the merge (bloom-export-watertight and bloom-connectedness on the full
+      528-row matrix, bloom-panel, bloom-frozen-matrices; the two flower gates ran on the
+      `tools/**` filter and are not bloom evidence). #169 undrafted, then merged by the session
+      (squash) with the head sha read from the remote, as **`00dc4b2`**, read back
+      from `main`. **No frozen tag is owed and none was published** — no row added, no byte
+      moved; phase17 stays the newest baseline. The predeclared manifest re-verified against
+      merged `main`: **375 of 375 held** (`sha1sum -c` on a worktree of `00dc4b2`); the nine files `main` moved since fd291b4 are exactly this session's nine predeclared movers, and no print file landed from another PR — `main` had not moved between fd291b4 and this merge. The ruling and this close recorded in the
+      docs-only PR, opened from a fresh branch off `main` and merged by the session before
+      reporting DONE.
