@@ -458,6 +458,12 @@ files are on it too and none moved.
 **Both STL gates and the connectedness gate are UNTOUCHED**, which matters for reading the
 results below: the export gate that passed block 25 is the one that shipped at `cb798f6`.
 
+**AND THE CLAIM IS NARROWER AFTER THE MERGE THAN IT LOOKS — say it precisely.** The claim is
+that **THIS SESSION moved none of those 46 files**, and that stays true. `bloom.html` is on the
+list and the *other* session 28 changed it (a "Get grid" button), so **on the merged tree that
+file is not the one this session certified.** A bare "46 files, 0 moved" would imply more than
+it says after a merge.
+
 **One file outside the plan WAS edited, on Eva's instruction and named here rather than left to
 be noticed:** `docs/bloom-session-26-outcome.md`, to mark its whole-bloom pixel comparison
 RETRACTED. It carries no code and no rows; the edit strikes numbers through and states the

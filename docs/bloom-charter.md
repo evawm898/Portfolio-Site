@@ -1818,6 +1818,48 @@ reached a fresh, unrelated session instead, which opened on it as if it were a n
 Verify the branch name in the session's LAST report before pasting; if it does not match
 the session in front of you, it is not this session's amendment to answer.
 
+## Incident, Sep 7 — TWO PARALLEL SESSIONS AGAIN, AND THIS TIME BOTH SHIPPED
+
+**A RECURRENCE OF THE Sep 2 INCIDENT BELOW, with a different ending and a measured cost.** Two
+sessions were open against `cb798f6` at once and both numbered themselves 28: one built the
+per-petal mid-surface grid and its glTF export (merged as `2efea32`, closed by `e7d8992`), the
+other the anther's seven tip controls. Unlike Sep 2, neither was redundant — they built
+different things — so nothing was thrown away. What was paid instead:
+
+- **THE CODE MERGED CLEANLY.** Seven hunks each in `bloom-geometry.js`, disjoint regions; `bloom.js`,
+  `bloom-registry.js`, `bloom.css` and every tool merged with no conflict at all. That is luck,
+  not design: both sessions were adding to the same three files at the same time.
+- **TWO DOCUMENTATION CONFLICTS**, one hunk each: a `CLAUDE.md` pointer both sessions appended in
+  the same place (resolved as a union — no preference involved), and an ADD/ADD collision on
+  `docs/bloom-session-28-outcome.md`, because both sessions had written their outcome doc under
+  the same name.
+- **A RENUMBER.** Eva's ruling: the one that merged first keeps 28, because `main` already refers
+  to it that way; the unmerged one becomes 29, and the stigma's session becomes 30. Every
+  reference moved — `frozen/phase18`'s provenance, the charter entry, the outcome doc's filename
+  and the stigma's brief. The replacement was applied ONLY to lines the unmerged session had
+  added (computed from its own diff against `cb798f6`), so session 26's historical
+  "sessions 3 and 4" — the tip plan's internal numbering, not the global one — was left alone.
+  81 lines across 13 files.
+- **A FULL RE-VERIFICATION, because the merged tree had never been built.** All four bloom gates
+  had gone green on the unmerged head, and every one of those results was void the moment `main`
+  moved: `bloom-geometry.js` had gained 110 lines and `bloom.js` 67 underneath them. **~95
+  minutes**, and `main` had also gained a FIFTH bloom gate (`bloom-grid.yml`), so certifying on
+  the old set of four would have been certifying this tree with the gates of a different one.
+
+**THE RULE THIS PRODUCES: ONE REGISTRY PR IN FLIGHT AT A TIME.** Both sessions touched
+`bloom-registry.js` and `bloom-geometry.js`, which are the two files every gate, every frozen
+matrix and every byte claim is anchored to. A second session against them does not merely risk a
+conflict — it invalidates the first session's entire verification the instant it merges, and the
+cost is the full gate suite, not the diff. The Sep 2 incident's remedy was "check for an open PR
+on the same brief before starting"; this one widens it: **check for an open PR touching the
+registry or the geometry at all, whatever the brief.**
+
+**AND A SMALLER ONE, worth stating because it nearly went unnoticed:** the manifest claim after
+a merge is narrower than it looks. `bloom.html` was on session 29's predeclared untouched list
+and *the other session changed it*. The claim "this session moved none of those 46 files" stays
+true; "those 46 files are unchanged on the merged tree" would not be. Write the first sentence,
+never the second.
+
 ## Incident, Sep 2 — one feature, two parallel sessions
 
 **A DUPLICATED KICKOFF PRODUCED TWO SESSIONS BUILDING THE FAN AT THE SAME TIME.** Both

@@ -589,8 +589,26 @@ export const PETAL_ROLE_ORDER =
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
 export class MeshBuilder {
-  constructor({ exportMode = false } = {}) {
+  constructor({ exportMode = false, captureGrid = false } = {}) {
     this.exportMode = !!exportMode;
+    /* THE MID-SURFACE CAPTURE (session 28) — OFF by default, and off is what
+       every existing caller gets: `new MeshBuilder({ exportMode })` reads this
+       as false, so the live rebuild and both STL gates allocate nothing new.
+
+       WHY A FLAG AND NOT ALWAYS-ON. The grid is the points emitPanel already
+       evaluates, so capturing costs no arithmetic — but it costs MEMORY, and
+       the reachable extreme is 240 petals x 31 rows x 10 columns of vectors on
+       every slider drag. A capture nobody asked for that allocates tens of
+       megabytes per rebuild is a performance regression wearing a feature's
+       label.
+
+       IT IS NOT A GEOMETRY SWITCH, and that is the property that has to hold:
+       nothing downstream of this flag reads it to decide what to BUILD. It
+       gates one `if` in emitPanel that pushes already-computed vectors into an
+       array, and one field on buildPetalInto's return. The export bytes are
+       identical with it on and off — asserted by tools/verify-bloom-grid.mjs
+       clause 1 rather than argued here. */
+    this.captureGrid = !!captureGrid;
     this.positions = [];          // 9 floats per triangle
     this.minThickness = Infinity; // telemetry: thinnest floored sheet emitted
     /* Bounding box of everything emitted, accumulated as triangles arrive.
@@ -3792,7 +3810,18 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   }
 
   const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
-  for (const panel of panels) emitPanel(acc, rows, panel, tAt);
+  /* ONE CAPTURED GRID PER PANEL, in emission order and labelled with the
+     panel's own name. A cleft is three panels — a shared base and two lobes
+     that BOTH start PANEL_OVERLAP_ROWS below the split — so the petal's
+     surface is not one rectangular grid there and flattening the three into
+     one array would be a claim the geometry does not make. At the shipping
+     default `panels` is the single 'full' span and this is a one-element
+     list, which is the case the export path draws. */
+  const capturedPanels = acc.captureGrid ? [] : null;
+  for (const panel of panels) {
+    const g = emitPanel(acc, rows, panel, tAt);
+    if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
+  }
 
   /* THE THICKNESS GUARD'S OWN CHECK. On uniform (shipped-default) builds
      only, and for slot 0 only, the full profile law is evaluated at every
@@ -4027,6 +4056,53 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     rootRow: { C: rows[footS.length].C, N: rows[footS.length].N, flat: form === null, tiltRad: tilt, u: rows[footS.length].u, curlRad: form ? form.curlRad : 0, ringC: rows[footS.length - 1].C },
     domeGuardResidual,
     spine,
+    /* THE MID-SURFACE GRID (session 28) — null unless the accumulator was
+       asked to capture, so every existing caller reads absence rather than an
+       empty array that could be mistaken for an empty petal.
+
+       WHAT IT IS: one entry per PANEL, each carrying the rows emitPanel
+       actually emitted, each row carrying its `u`, its half-width, the
+       thickness it was emitted at, and the per-column `v` / mid-surface point
+       / unit normal. It is the mesh's own mid-surface, not a re-derivation:
+       emitPanel stores the vectors it offset the two skins from.
+
+       WHAT IT IS NOT: the FOOT is in it. Rows 0..footRows-1 are the three
+       flat foot rows and all three carry `u: 0` — they are at
+       -overhang / -overhang/2 / 0 along the radial, not at three parameters.
+       A consumer wanting a grid uniform in u drops the first two and keeps
+       the third, which is the s = 0 row; `footRows` above says how many there
+       are, and the export path does exactly that. See
+       docs/bloom-session-28-outcome.md for the measured step at that seam —
+       it is the TILT, not a change of cross-section law. */
+    grid: capturedPanels,
+    /* WHERE THIS PETAL MEETS THE HUB — the quantity a downstream consumer
+       cannot recover from the grid without knowing the foot's layout: the
+       grid's own first row is the INNERMOST foot row, the one that runs
+       furthest in under the hub (measured 5.31 mm from the axis at the
+       shipping default against the ring's 8.84), and the blade leaves from
+       the LAST of the three, on the ring itself.
+
+       `base` is the builder's own variable, the point every blade row is
+       measured from (`spineAt(0).C === base`, exactly — the s = 0 branch of
+       every spine arm returns it unmodified). It is reported rather than
+       recomputed from ring.radius and the azimuth for the reason `tangent`
+       is: on a dome the z comes from `ring.z` and not `slot.z`, and a
+       consumer rebuilding it from the controls would be a second owner of a
+       boundary footRing() already owns. */
+    attachment: {
+      point: base,
+      /* The frame the blade LEAVES the hub with — the same three vectors the
+         first blade row was built in, at s = 0. `dir` is the blade's length
+         direction there, `nrm` its sheet normal, `T` the width direction. */
+      dir, normal: nrm, tangent: T,
+      /* THE FOOT'S OWN PLANE, which `normal` above is NOT: at the shipping
+         petalTilt of 25 degrees these differ by 25 degrees, and that angle is
+         the seam a consumer of the grid will see at u = 0. Reported so it can
+         be read rather than measured off the points. */
+      footNormal: rows[footS.length - 1].N,
+      ringRadius: ring.radius, ringZ: rows[footS.length - 1].C[2],
+      tiltRad: tilt, azimuth: slot.azimuth,
+    },
     /* THICKNESS TELEMETRY — the properties neither STL gate can show. Both
        are structurally blind here for the same reason they are blind to the
        form layer: thickness is pure vertex offset on a fixed-topology grid,
@@ -4068,7 +4144,24 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
    instead of a sheet. For a flat row the closure returns the row's own
    constant normal and the same expression as before, so the shipped default
    is unmoved — which the byte report measures rather than assumes. */
+/* THE MID-SURFACE CAPTURE (session 28) rides in this function and nowhere
+   else, for the reason the header above already gives: `row.sect(v)` is
+   evaluated HERE, once per grid point, and the mid-surface `P` it returns is
+   the thing the two skins are offset from. A capture that re-evaluated the
+   cross-section somewhere else would be a second reader of the row's closure
+   and could disagree with the emitted mesh — the one defect this project
+   repeats most. What is stored is the SAME object the offsets were taken
+   from, so "the grid" and "what was emitted" are the same numbers by
+   construction rather than by comparison.
+
+   IT ADDS NO ARITHMETIC. `P` and `n` are already computed and already
+   consumed; the capture pushes references. Nothing is recomputed, nothing is
+   reordered, and no float is touched — so the emitted bytes cannot move,
+   which clause 1 of tools/verify-bloom-grid.mjs measures rather than assumes.
+
+   RETURNS null when the accumulator was not asked to capture. */
 function emitPanel(acc, rows, panel, tAt) {
+  const grid = acc.captureGrid ? [] : null;
   const top = [], bot = [];
   for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
     const row = rows[i];
@@ -4089,6 +4182,10 @@ function emitPanel(acc, rows, panel, tAt) {
     const span = panel.spanAt(i);
     const vLo = span[0], vHi = span[1];
     const ht = [], hb = [];
+    /* THE ROW'S CAPTURED COLUMNS. Built beside ht/hb and pushed with them, so
+       a row that reached the mesh reached the grid — there is no path that
+       emits one and not the other. */
+    const gm = grid ? { row: i, u: row.u, halfWidth: row.h, thickness: t, v: [], mid: [], normal: [] } : null;
     for (let j = 0; j < NV; j++) {
       /* The span-form column map. A trimmed panel evaluates the row's
          cross-section at ITS OWN v values, and the cross-section is a
@@ -4099,8 +4196,16 @@ function emitPanel(acc, rows, panel, tAt) {
       const { P, n } = row.sect(v);
       ht.push([P[0] + n[0] * t / 2, P[1] + n[1] * t / 2, P[2] + n[2] * t / 2]);
       hb.push([P[0] - n[0] * t / 2, P[1] - n[1] * t / 2, P[2] - n[2] * t / 2]);
+      /* THE GLOBAL v IS STORED, not the column index. On a trimmed panel the
+         columns run over [vLo, vHi] rather than [-1, 1], so a consumer that
+         reconstructed v from j would be right on the shipping default and
+         wrong on every cleft — and it is exactly the quantity a downstream
+         drawing needs, since v is uniform in PARAMETER and not in arc length
+         (see metricMin/metricMax on the form telemetry). */
+      gm && (gm.v.push(v), gm.mid.push(P), gm.normal.push(n));
     }
     top.push(ht); bot.push(hb);
+    if (gm) grid.push(gm);
   }
   const NR = top.length;
   /* Top face (outward = +N side) and bottom face (reversed winding). */
@@ -4121,6 +4226,7 @@ function emitPanel(acc, rows, panel, tAt) {
     acc.quad(top[0][j], bot[0][j], bot[0][j + 1], top[0][j + 1]);                         // inner end cap
     acc.quad(top[NR - 1][j], top[NR - 1][j + 1], bot[NR - 1][j + 1], bot[NR - 1][j]);     // tip cap
   }
+  return grid;
 }
 
 /* ===================================================================
