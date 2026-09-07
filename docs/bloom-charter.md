@@ -5180,3 +5180,75 @@ matters should be measured this way.
       from a sheet before session 26 has that floor underneath it; most were ruled BY EYE, so
       the exposure is small. The push-once amendment and the 600-line note are above, at the
       session-17 CI ruling.
+
+- **Session 27 (tip plan 3a, Sep 7): THE TWO-LEVEL NESTING BOUND IS LIFTED, THE SMOKE GATE'S
+  FAMILY LIST IS DERIVED, AND THE GENERATED DESCRIPTOR TABLE IS DEFERRED TO 3b.** Structure
+  only — zero controls, zero geometry, no sheet, 0 moved by construction.
+  `docs/bloom-session-27-outcome.md` has the numbers.
+
+    **Q7's first half is done and its second half is not, deliberately.** The nesting bound is
+    gone from `verifySections()`. The generated table is NOT built here, on three findings: the
+    mechanism ALREADY SHIPS and is exercised by 36 controls (the per-petal block — 4 descriptors
+    × 9 instances, one distinct spec per suffix, measured); "instanced TWICE" is not reachable
+    until **session 4**, because session 3 is the anther's seven controls and session 4 the
+    stigma's, so the property the ruling names is unobservable in 3b whoever builds it; and
+    there is no honest existing pair to migrate through it (`labellum*`/`hood*` are 5 against 3;
+    `all*`/`inner*` share only the bounds while label, `fmt` and `visibleWhen` are all
+    per-instance, so they exercise a WEAKER mechanism than the tip needs). What 3a shipped
+    instead is the guard that sentence needs and that today has an instance to run on:
+    **instanced descriptor families share one spec**, in the panel gate. 3b adds one row to it.
+
+    **THE REFUSAL'S STATED REASON WAS WRONG ABOUT THE CENSUS AND RIGHT ABOUT TWO OTHER
+    EXPRESSIONS** — re-read from source rather than inherited. `applyVisibility()`'s backwards
+    walk, its `childrenOf` map, the gate's `ancestorsOf` while loop, the census (document order,
+    a pre-order walk at any depth, against the SECTIONS array) and `wantSectionHidden()` (which
+    reads each child's OWN answer rather than re-deriving it) are all depth-general already.
+    The two that were not: the panel gate's **witness-through-a-child** test (`x.parent === s.id`
+    — a container whose only content is a container would have had its only honest witness
+    refused) and its **on-screen filter** (`!d.parentElement.closest('details')?.hidden` — ONE
+    ancestor, so at three levels a drop-down inside a shown parent inside a HIDDEN grandparent
+    read as on screen). Both are now depth-general and both are PINNED to the answers they
+    replace on this tree — 22 states, 0 disagreements.
+
+    **AND A CHECK WAS OWED, WHICH IS WHERE THE COST ESTIMATE MISSED.** `verifySections()` never
+    checked that a parent is DECLARED BEFORE its child, and every instrument above is correct
+    exactly when it is — the backwards walk settles children first only if children come later,
+    and `bloom.js` appends into `sectionEls[s.parent]`, which must already exist. `bloom.js`'s
+    own comment said *"so there is no ordering to get wrong here"* and cited the function that
+    never looked: a child declared before its parent PASSED `verifySections()` and threw at
+    panel build. The label-naming-a-computation-nobody-performed defect, in a comment, pointing
+    at the function meant to perform it. The precedence check replaces the depth refusal and is
+    strictly stronger — a parent cycle and a self-parent are now unreachable too. **Route (s)**
+    in the panel gate carries it on WRITTEN-DOWN section arrays (three levels accepted;
+    child-before-parent, a cycle, a self-parent and a missing parent each refused), four
+    must-fails that run on EVERY invocation rather than only under `--negative-control`, because
+    the live tree is two levels and a wrong answer about depth 3 is unobservable on it. A third
+    level is legal and has **no CSS**: `bl-sec--sub` is "nested at all", not "nested at depth k".
+    One duplicate fell out of the audit: the accordion route had built its own `parentOf` map
+    and its own ancestor while-loop beside route (s)'s — two computations of one relation, in
+    the file that asserts the registration rule. Declared once now.
+
+    **THE FAMILY LIST WAS SHORT BY FIVE, NOT TWO.** `bloom-smoke.mjs` reads its roster out of
+    the assertion SITES (`bad.push(\`J2: …\`)` plus `tipClauses('JG5', …)`, session 26's shared
+    clauses, which push under a tag their caller names) and CLAUSE C checks a BICONDITIONAL
+    against what the rows' `path` fields claim. It fired on **JS0, JG0, C3, J2 and Z2** — three
+    of which nobody had ever reported, and **Z2 because a path wrote `Z1-Z3`: a range names its
+    ends and hides its middle.** 39 families, all 39 now claimed; the negative control renames
+    JS5 to JS99 in a copy of the harness source and requires both directions to fire; it runs in
+    CI. **The `R` namespace is OUT by name, for correctness not scope** — three instruments each
+    own an R1 (`crowding R1:` / `coverage R1:` / `solid R1:`) and the paths cite a bare `R1`;
+    and `R0` in a path is usually the geometry's own ring-zero notation, not an assertion.
+    **Hole 5 is narrowed, not closed:** citation is a claim about the PATH a row engages, never
+    evidence the assertion can FIRE on it. Re-run the mutant table when a family is added.
+
+    **`tools/verify-bloom-presentation-only.mjs` — "0 moved" as a construction, re-runnable.**
+    Predeclared files by sha256 (`bloom-geometry.js` first), all 528 matrix rows deep-equal,
+    the registry's data deep-equal with **functions serialised to their source** (JSON.stringify
+    drops them silently, which would have made the strongest-looking clause the emptiest), and
+    every `fmt` EVALUATED over its whole range — 1,734 values — because a function closing over
+    a moved constant has identical source. Its positive control: run against `2fee2c2` it FAILS
+    naming `bloom-geometry.js` and the harness while passing clauses 2–4, which is the correct
+    reading of session 26. **It is not a byte diff and never replaces one** — a session that
+    moves bytes on purpose still owes `diff-bloom-bytes.mjs` and a predeclared partition.
+    **No frozen phase owed:** no row added, no row definition moved. `frozen/phase17` stays the
+    newest baseline and session 24 stays the only "these bytes no longer reproduce" entry.

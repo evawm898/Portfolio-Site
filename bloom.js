@@ -87,10 +87,23 @@ for (const s of SECTIONS) {
   det.append(sum);
   summaryEls[s.id] = sum;
   /* A NESTED SECTION GOES INSIDE ITS PARENT'S ELEMENT, which the registry
-     guarantees already exists: SECTIONS is authored parents-first and
-     verifySections() has thrown at module load if a parent is missing or is
-     itself nested, so there is no ordering to get wrong here and no
-     silent-drop path to guard against. */
+     guarantees already exists: verifySections() has thrown at module load if
+     a parent is missing, is the section itself, or is declared AFTER it. So
+     there is no ordering to get wrong here and no silent-drop path to guard
+     against — and that sentence is true for the first time as of session 3a.
+     It used to cite "SECTIONS is authored parents-first", which was a
+     convention nothing checked: a child declared before its parent passed
+     verifySections() and threw HERE, on `sectionEls[s.parent]` being
+     undefined. The precedence clause is now in the registry, where the
+     literals are, so this line states a checked fact rather than a habit.
+
+     ANY DEPTH. The two-level bound was lifted with that check (Eva's Q7);
+     this loop never knew about depth — it appends into whatever the parent's
+     element is. What a third level does NOT yet have is CSS of its own:
+     `bl-sec--sub` below is "nested at all", not "nested at depth k", so a
+     grandchild would render with a child's indent. That is one rule in
+     bloom.css and it belongs to whoever first declares one, rather than being
+     written now for a level nothing reaches. */
   /* THE CAPTION GOES WHERE THE FIRST DROP-DOWN THAT HIDES FOR THIS REASON
      WOULD BE — appended before that section's own element, once. It is text,
      never a control: applyVisibility() is still the only thing that decides
@@ -258,11 +271,18 @@ function applyCaps(shown) {
 function applyVisibility() {
   const ui = readUI();
   for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
-  /* CHILDREN FIRST, THEN PARENTS — one pass each, because a parent's answer
-     READS its children's. SECTIONS is authored parents-first, so this walks it
-     backwards for the child pass; a parent holding only child sections has no
-     controls of its own, and `every` over an empty set is true, so without the
-     second term it would hide itself while its children were on screen. */
+  /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
+     READS its children's, so every child must have settled before its parent
+     is reached. verifySections() refuses a section declared before its parent,
+     so SECTIONS is a topological order of the tree and walking it BACKWARDS
+     settles every descendant before every ancestor — one level or five, with
+     no recursion and no second pass. That precedence check is what carries
+     this claim (session 3a); before it existed the ordering was a convention
+     and this walk was correct by luck.
+
+     A parent holding only child sections has no controls of its own, and
+     `every` over an empty set is true, so without the second term it would
+     hide itself while its children were on screen. */
   const childrenOf = new Map();
   for (const s of SECTIONS) {
     if (!s.parent) continue;
@@ -277,8 +297,9 @@ function applyVisibility() {
     /* A CAPTION SHOWS EXACTLY WHEN ITS REASON HOLDS AND EVERY SECTION THAT
        NAMES IT IS HIDDEN — decided here, once, on the way up: this parent's
        children have already settled (they come later in SECTIONS, so earlier
-       in this walk), so the caption can read them, and a visible caption is
-       content that keeps its parent on screen. */
+       in this walk — the precedence check, at any depth), so the caption can
+       read them, and a visible caption is content that keeps its parent on
+       screen. */
     let noWhy = true;
     for (const [reason, w] of whyEls) {
       if (w.parent !== s.id) continue;

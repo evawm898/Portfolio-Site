@@ -67,8 +67,12 @@ jobs:
       # two definitions of one predicate is the registration-rule violation
       # this project keeps catching. Browser-free and seconds, like the rest
       # of this workflow.
-      - name: The smoke subset must still cover every matrix block
-        run: node tools/bloom-smoke.mjs --check
+      # --negative-control renames an assertion family in a COPY of the harness
+      # source and requires the family census to name it in both directions.
+      # A census nobody has seen fire is a census nobody should trust, and this
+      # one replaced a hand-written sentence that had been wrong twice.
+      - name: The smoke subset must still cover every matrix block and every assertion family
+        run: node tools/bloom-smoke.mjs --check --negative-control
       - name: Every frozen matrix must equal its base commit's buildMatrix()
         run: |
           set -euo pipefail

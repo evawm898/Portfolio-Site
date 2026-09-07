@@ -415,6 +415,63 @@ and STL byte length. The sheet is `node tools/shot-bloom-tip.mjs <dir> [base-tre
 carries its own mm per pixel and every pair a measured pixel difference, because "is 0.047 mm
 visible" is Eva's ruling to make and should be made in front of a number.
 
+**THE PANEL MAY NEST TO ANY DEPTH, AND WHAT REPLACED THE BOUND IS AN ORDERING CHECK NOBODY
+HAD** (session 27, tip plan 3a — Eva's Q7, first half). `verifySections()`'s "the panel is one
+level deep" refusal is gone. Its stated reason was WRONG about the census and right about two
+other expressions, re-read from source: `applyVisibility()`'s backwards walk, its `childrenOf`
+map, the gate's `ancestorsOf` while loop, the census (`querySelectorAll('details')` is document
+order — a pre-order walk at any depth — compared against the SECTIONS array) and
+`wantSectionHidden()` (which reads each child's OWN answer rather than re-deriving it) were all
+depth-general already; the panel gate's **witness-through-a-child** test and its **on-screen
+filter** were not, and both are now, PINNED to the answers they replace on this tree (22 states,
+0 disagreements). **The real cost was a check that was owed:** `verifySections()` never checked
+that a parent is DECLARED BEFORE its child, which every one of those instruments needs — and
+`bloom.js`'s comment claimed it did, so a child declared before its parent passed the registry
+and threw at panel build. The precedence check is strictly stronger than the depth refusal: a
+parent cycle and a self-parent are unreachable too. **Route (s)** in the panel gate carries it
+on WRITTEN-DOWN section arrays — three levels ACCEPTED; child-before-parent, a cycle, a
+self-parent and a missing parent each REFUSED — four must-fails that run on EVERY invocation
+rather than only under `--negative-control`, because the live tree is two levels and a wrong
+answer about depth 3 is unobservable on it. Route (a) also compares the tree AS BUILT (each
+section's real ancestor and its count of enclosing `<details>`) against the tree as declared.
+**A third level is legal and has NO CSS:** `bl-sec--sub` is "nested at all", not "nested at
+depth k" — one rule in `bloom.css`, owed by whoever declares one.
+**THE GENERATED DESCRIPTOR TABLE IS DEFERRED TO 3b, AND THE MECHANISM IS NOT NEW:** the
+per-petal block in `bloom-registry.js` already is it — 4 descriptors x 9 instances = 36
+controls and 9 sections, one distinct spec per suffix (measured). "Instanced TWICE" is not
+reachable until **session 4** (3 is the anther's seven controls, 4 the stigma's), and neither
+`labellum*`/`hood*` (5 against 3) nor `all*`/`inner*` (label, `fmt` and `visibleWhen` all
+per-instance) is an honest pair to migrate. What 3a shipped instead is the guard that ruling
+needs and that has an instance today: **instanced descriptor families share one spec** in the
+panel gate — fields that ARE shared (kind, bounds, step, default, label, tier, role), never
+`fmt` / `section` / `visibleWhen`, which are per-instance by design. 3b adds one row to it.
+**THE SMOKE GATE'S FAMILY LIST IS READ OUT OF THE ASSERTIONS, AND IT WAS SHORT BY FIVE**
+(session 27). `tools/bloom-smoke.mjs`'s blocks 22-24 used to name "the families that need a
+witness" as a hand-written sentence; CLAUSE C now scans the assertion SITES in
+`tools/bloom-harness.mjs` (`bad.push(\`J2: …\`)` plus `tipClauses('JG5', …)`, whose tag its
+CALLER names — JG5 is pushed nowhere else) and checks a BICONDITIONAL against what the rows'
+`path` fields claim. It fired on **JS0, JG0, C3, J2 and Z2**; three had never been reported,
+and **Z2 was hidden by a range — `Z1-Z3` names its ends and hides its middle, so never write
+one.** 39 families, all 39 claimed; `node tools/bloom-smoke.mjs --check --negative-control`
+renames JS5 to JS99 in a COPY of the harness source and requires both directions to fire, and
+it runs in CI. **The `R` namespace is OUT by name, for correctness rather than scope:** three
+instruments each own an R1 (`crowding R1:` / `coverage R1:` / `solid R1:`) and the paths cite a
+bare `R1`, and `R0` in a path is usually the geometry's own ring-zero notation. **Hole 5 is
+NARROWED, NOT CLOSED** — a citation is a claim about the PATH a row engages, never evidence the
+assertion can FIRE there; re-run the mutant table when a family is added.
+**"0 MOVED" IS A CONSTRUCTION AND HAS ITS OWN INSTRUMENT:**
+`node tools/verify-bloom-presentation-only.mjs --base <worktree> [--also a,b]` (session 27).
+Predeclared files by sha256 with `bloom-geometry.js` at the head, all 528 matrix rows
+deep-equal, the registry's data deep-equal with **functions serialised to their SOURCE**
+(`JSON.stringify` drops them silently, which would make the strongest-looking clause the
+emptiest), and every `fmt` EVALUATED across its whole range — because a function closing over a
+moved constant has identical source. Run against `2fee2c2` it FAILS on `bloom-geometry.js` and
+the harness while passing clauses 2-4, which is the correct reading of session 26. **It is not
+a byte diff and never replaces one** — a session that moves bytes on purpose still owes
+`tools/diff-bloom-bytes.mjs` and a predeclared partition. **It does not run in CI**, because it
+takes a worktree of the BASE COMMIT and which commit a session claims to have moved nothing
+since is the session's to name: run it at the close and quote its output.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

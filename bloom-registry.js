@@ -776,16 +776,49 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
       bad.push(`the panel is an accordion, so at most ONE section may declare open: true among siblings${k === null ? ' at the top level' : ` of "${k}"`} — found ${opens.length} (${opens.join(', ')})`);
     }
   }
-  /* A PARENT MUST EXIST, AND NESTING IS ONE LEVEL DEEP. The second clause is a
-     real bound rather than caution: `applyVisibility()` derives a section's
-     hidden state from its controls AND its child sections, and the panel gate
-     walks the tree to assert it — both are written for one level, so a
-     grandchild would be a structure the instruments do not describe. */
-  for (const s of sections) {
+  /* A PARENT MUST EXIST, AND IT MUST BE DECLARED BEFORE ITS CHILD. THE
+     TWO-LEVEL BOUND IS LIFTED (session 3a of the tip plan; Eva's Q7, Sep 6).
+
+     WHAT THE BOUND SAID, and why it is gone: it refused a grandchild because
+     `applyVisibility()` and the panel gate were "written for one level". That
+     was re-verified from source before it was lifted, and it is NOT what
+     either one turned out to say. applyVisibility() builds a `childrenOf` MAP
+     and walks SECTIONS BACKWARDS, so a section settles before anything that
+     reads it; the panel gate's `ancestorsOf` is a WHILE LOOP; its census
+     compares `querySelectorAll('details')` — document order, which is a
+     pre-order walk at any depth — against the SECTIONS array; and
+     `wantSectionHidden()` reads each child's OWN answer rather than
+     re-deriving it, so the rule composes upward one level at a time. All four
+     are depth-general already. (Two places in the gate genuinely were one
+     level deep and are fixed with this: the witness-through-a-child test and
+     the on-screen filter. Neither is in the census.)
+
+     WHAT THEY ALL ACTUALLY NEED IS AN ORDER, AND NOTHING CHECKED IT. Every
+     one of those instruments is correct exactly when a section is declared
+     AFTER its parent — the backwards walk settles children first only if
+     children come later, and bloom.js's generator appends into
+     `sectionEls[s.parent]`, which must already exist. That was a CONVENTION,
+     stated in three comments and enforced by none of them: bloom.js said "so
+     there is no ordering to get wrong here" and cited this function, which
+     never looked. A child declared before its parent passed here and crashed
+     the panel build. So the refusal is replaced by the check the code was
+     always leaning on, and it is strictly stronger than what it replaces —
+     it also makes a cycle and a self-parent unreachable, both of which the
+     old depth clause caught only by accident and only at two levels.
+
+     IT IS NOT THE FULL DECLARATION CONVENTION. "Immediately after its
+     parent" — a contiguous subtree — is what makes the DOM's document order
+     equal the array's order, and the panel gate's census is the one owner of
+     that: it compares the two strings and fails by name. This clause is the
+     weaker half the app itself cannot run without, checked where the literals
+     live; the census is the other half, checked where the DOM is. */
+  const declaredAt = new Map(sections.map((s, i) => [s.id, i]));
+  for (const [i, s] of sections.entries()) {
     if (s.parent === undefined || s.parent === null) continue;
-    const par = sections.find((x) => x.id === s.parent);
-    if (!par) bad.push(`section "${s.id}" names parent "${s.parent}", which is not in SECTIONS`);
-    else if (par.parent) bad.push(`section "${s.id}" nests under "${par.id}", which is itself nested — the panel is one level deep`);
+    if (s.parent === s.id) { bad.push(`section "${s.id}" declares itself as its own parent`); continue; }
+    const at = declaredAt.get(s.parent);
+    if (at === undefined) bad.push(`section "${s.id}" names parent "${s.parent}", which is not in SECTIONS`);
+    else if (at > i) bad.push(`section "${s.id}" is declared at index ${i}, before its parent "${s.parent}" at ${at} — a parent must come first: bloom.js appends a nested drop-down into its parent's element, and applyVisibility() walks SECTIONS backwards so a child settles before the parent that reads it`);
   }
   const used = new Set();
   for (const c of controls) {
