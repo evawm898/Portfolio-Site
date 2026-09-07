@@ -244,8 +244,20 @@ ids are the first entries in `RETIRED_IDS` (`bloom-registry.js`), each with a `r
 session and a `why`; `verifySections()` fails module load on a collision with a live id, an
 option value, a DEFAULTS key or a section id, and the panel gate's route (n) fails CI if a
 retired id renders, is named on the read-out's summary line, is a `__bloomMetrics()` key, or
-survives as an IDENTIFIER in executable bloom source (string literals exempt — the frozen
-matrices name them as row data). A ruled aesthetic retirement that moves the default is an
+survives as an IDENTIFIER in executable bloom source (LITERALS exempt — strings, template
+TEXT and regex bodies; the frozen matrices name them as row data — while a `${…}`
+interpolation IS code and is scanned).
+**THAT SCANNER IS A CHARACTER WALK, NOT A REGEX CHAIN** (session 25, `928e13e`): the five
+regexes that stood there could not see nesting, matched the GAPS between literals rather
+than the literals, hid 45% of the source they scanned and reported real hits thousands of
+lines from where they live — and an apostrophe inside a template literal then produced 48
+false hits (charter, session 25; sessions 22 and 24 each reworded assertion messages around
+it). Apostrophes in assertion messages are ordinary English again. The walk blanks literals
+IN PLACE keeping newlines, so `file:line` is exact and a hit quotes its own line; it asserts
+per file that it can vouch for what it read (same length, same line count, nothing left
+open) and FAILS the gate rather than scanning in an unknown state; and it is checked against
+twenty written-down cases which were themselves checked against seven mutations of the walk.
+Its coverage is still its printed FILE LIST. A ruled aesthetic retirement that moves the default is an
 EXACT PARTITION, predeclared: on `phase15Matrix()` (527 rows at 8524318) 509 move and 18
 hold, and the moved rows cannot be re-exported on the new tree, so the close is the
 THREE-CAPTURE construction in `tools/diff-bloom-bytes.mjs`'s retirement mode (old plain, old
