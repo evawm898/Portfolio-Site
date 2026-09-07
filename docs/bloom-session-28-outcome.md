@@ -334,6 +334,81 @@ ships** — which is Q8's argument for the size slider arriving as a measurement
 unreachable on a 1.92 mm anther.* The sheet labels every comparison at or below ten times its own
 control rather than letting a number imply otherwise.
 
+### Defect 3 — SHARPNESS 2.00 IS A SINGULAR POINT, AND IT WAS THE SHIPPING DEFAULT
+
+**Eva's question, before ruling the sheet: at roundedness 1.00 and sharpness 2.00, does moving
+roundedness off 1 produce any visible change? Measured, not reasoned — and the premise holds,
+more sharply than it was put.**
+
+`s = 2` is the circle's own exponent, so `h(u) = (cos² + sin²)^(−1/2)`, and at every sampled
+azimuth that computes to **exactly 1.0** in IEEE-754. The blend is then `ρ + (1 − ρ)·1`, which
+is exactly 1 for every ρ. Not a rounding residue — `max|f − 1| = 0.000e+0`, at every roundedness
+and at every point count in the range.
+
+| at sharpness 2.00, n = 4 | measured |
+|---|---|
+| `max\|f − 1\|`, ρ = 0.95 / 0.75 / 0.50 / 0.25 / 0.00 | **exactly 0**, all five |
+| render, ρ 0.50 → 0.00 (macro, lattice constant at 16 sides) | **0 px, worst 0** |
+| render, ρ 1.00 → 0.50 | 834,695 px — **entirely the lattice**, 10 sides → 16 |
+| render, ρ 1.00 → 0.00 | **834,695 px, identical to the above** |
+
+**So the slider does not merely appear to do nothing. It gives ONE discontinuous faceting jump
+at the top of its travel — 10 sides to 16, +720 triangles on a six-stamen bloom — and is then
+dead, pixel for pixel, over 100% of its remaining range.** That is worse than inert, because the
+jump reads as the control working. And Eva's second half is confirmed exactly: below ρ = 1 the
+point count and the sharpness *do* appear, and at s = 2 the point count then moves only the
+lattice (n = 3 → 12, n = 4 → 16, n = 5 → 10 sides) and never the form — inert for a reason the
+read-out does not give.
+
+**THE PROPOSAL: `antherSharpness` defaults to 1.00.** Measured against the alternatives at the
+shipping anther radius of 0.96 mm:
+
+| s | deviation at ρ 0.5 / ρ 0 | waist at ρ 0 vs the 0.50 mm floor | |
+|---|---|---|---|
+| 0.50 | 0.310 / 0.621 mm | 0.500 mm — **the floor BINDS**, clamped to 0.694 | a clamp is the first thing you meet |
+| 0.75 | 0.211 / 0.421 mm | 0.539 mm (8% headroom) | close to the floor |
+| **1.00** | **0.141 / 0.281 mm** | **0.679 mm (36% headroom)** | **never clamps, at any point count** |
+| 2.00 | 0.000 / 0.000 mm | 0.960 mm | **the dead value** |
+| 3.00 | 0.059 / 0.118 mm | 0.960 mm | opens, but bulges into a rounded square |
+
+`s = 1.00` is the largest deviation that never meets the floor anywhere on the roundedness
+slider (the waist factor `2^(1/2 − 1/s)` is independent of the point count, so this holds at
+every n); it is a named value rather than a tuned one — the exact `|cos| + |sin|` family; and at
+the default point count of 4 it pinches at the diagonals, which is **the tetrasporangiate
+anther: four pollen sacs with grooves between them.** Rendered, `ρ 0.50 → 0.00` at s = 1.00
+moves **804,441 px** with the lattice held constant — the form changes continuously across the
+travel, which at s = 2.00 it does not at all.
+
+**WHAT IT COSTS: nothing, measured twice and in two ways.**
+
+- **0 of 120,960 floats moved**, live *and* export, between s = 2.00 and s = 1.00 at ρ = 1
+  (`Object.is`, so a signed zero would count). 0 of 90,720 on the default bloom, where the
+  androecium is absent.
+- **0 px** across four independent cross-config render pairs, interleaved with same-config
+  controls that also read 0 px — eight pairs, all zero.
+- Triangle count unchanged at 13,440; lattice unchanged at 10 sides.
+
+This is the same construction the whole session rests on: at ρ = 1 the blend is exactly 1 and
+`tipSides` returns the rod's own lattice, so **sharpness is inert at the shipping default
+whatever its value is.** The default is therefore free to be chosen for what happens when
+someone reaches for the control, which is exactly Eva's reasoning.
+
+**ONE MEASUREMENT HAZARD, RECORDED RATHER THAN SMOOTHED.** The first pass of this measurement
+reported **38,057 px** between two states later proved bit-identical at 0 of 120,960 floats. It
+did not reproduce: five interleaved page loads gave eight pairs at 0 px, including the exact
+comparison that had read 38,057. So the *macro* view can throw a one-off event too, not only the
+whole-bloom view — which means **"the macro control read 0 px on every row of every run" is an
+observation, not a guarantee.** The sheet's macro-only bound is sound in the direction that
+matters (a real change is 800,000+ px, three orders above any observed event) and fragile in the
+direction that costs a run; that is now said in the tool's own header.
+
+**PARKED, NOT BUILT — one for session 4.** The lattice still jumps 10 → 16 whenever roundedness
+leaves 1, at *any* sharpness, and at s = 2 exactly that jump is pure cost: 60% more triangles
+per tip for a provably identical shape. A one-line fix exists — `tipSides()` could return
+`STAMEN_SIDES` whenever the emitted factors are all exactly 1, rather than only when roundedness
+is 1 — but that changes a ruled law, and it belongs beside the stigma's seven where the same
+question is asked twice. Proposed, costed, not taken.
+
 ### And a process finding that is now a charter convention
 
 **The sheet tool took FIVE full runs to debug, and the geometry passed all sixteen rows on every

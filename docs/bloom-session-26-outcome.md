@@ -391,6 +391,25 @@ bar because the control measures tens of pixels and a real move measures tens of
 > move.
 >
 > A retracted number left standing in a doc is how it gets cited as evidence two sessions on.
+>
+> **THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 28 — said here so the
+> retraction is not over-applied to claims it never touched). A bimodal control destroys any
+> statement of the form *"X px is below the floor"*, because there is no floor to be below. It
+> touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
+> comparison against a noise estimate — it is an identity, and no distribution of renderer
+> noise can manufacture one. So these stand, unhedged:
+>
+> - session 26's **120-stamen row**, where base-vs-head EQUALLED base-vs-base to the pixel and
+>   the worst channel step;
+> - session 28's **migration pair**, 0 px on all three views;
+> - session 28's **INERT row**, 0 px against the pill on all three views *while its own
+>   whole-view control read 10,492 px on the same run* — which is the retraction and the
+>   exact zero standing side by side in one measurement;
+> - session 28's **cross-config pairs**, eight of them at 0 px, over states proved
+>   bit-identical at 0 of 120,960 floats.
+>
+> The rule to carry: **a threshold needs a floor and therefore needs a distribution; an
+> identity needs neither.** Retract the first kind, keep the second.
 
 Every number is a pixel count over a 1600x1600 frame, beside **that same row's own renderer
 control** (the base tree, same camera, shot twice). Read the pair, never the left number alone.

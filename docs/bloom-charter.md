@@ -5225,6 +5225,16 @@ matters should be measured this way.
     whole-bloom view is not evidence unless its own control was taken in the same page session
     AND came back low.**
 
+    **AND THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 28). A bimodal
+    control destroys any claim of the form *"X px is below the floor"* — there is no floor to be
+    below. It touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
+    comparison against a noise estimate, it is an IDENTITY, and no distribution of renderer noise
+    manufactures one. So the 120-stamen row's exact equality here, and session 28's migration
+    pair (0 px on all three views), its INERT row (0 px against the pill on all three views while
+    its own whole-view control read 10,492 px ON THE SAME RUN) and its eight cross-config pairs
+    (0 px over states proved bit-identical at 0 of 120,960 floats) all STAND, unhedged. **A
+    threshold needs a floor and therefore a distribution; an identity needs neither.**
+
     - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
       floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
       is only a measurement with its own control`): same tree, same camera, twice, at the

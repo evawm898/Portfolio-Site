@@ -2170,7 +2170,13 @@ and REPORT the rest; **(b)** session 26's `4,800 px against a 6,868 px floor` fo
 **RETRACTED** on these grounds — see `docs/bloom-session-26-outcome.md`. Ruling Q2 stands, on
 the facet phase and the two-session expiry, which were always its stated grounds. **A pixel
 figure from a whole-bloom view is not evidence unless its own control was taken in the same page
-session AND came back low.**
+session AND came back low.** **BUT THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva,
+session 28): a bimodal control destroys `X px is below the floor` and touches nothing of the form
+`the difference is exactly 0`, which is an IDENTITY rather than a comparison against a noise
+estimate. Session 28's migration pair (0 px on three views), its INERT row (0 px while its own
+whole-view control read 10,492 px on the same run) and its eight cross-config pairs over
+bit-identical states all stand unhedged. **A threshold needs a floor and therefore a
+distribution; an identity needs neither.**
 
 **DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
 instrument*. Session 28 spent five fifty-minute sheet runs finding bugs in a sheet tool while
