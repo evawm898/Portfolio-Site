@@ -472,6 +472,42 @@ a byte diff and never replaces one** — a session that moves bytes on purpose s
 takes a worktree of the BASE COMMIT and which commit a session claims to have moved nothing
 since is the session's to name: run it at the close and quote its output.
 
+**THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
+THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
+every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —
+stores the mid-surface `P`/`n` it already offset the two skins from, and `buildPetalInto`
+returns `grid` (one entry per PANEL: a cleft is three, not one rectangle) and `attachment`.
+`bloom-grid-gltf.js` writes one node per petal, LINE_STRIPs along (u) and across (v), and a
+child node whose `translation` IS the attachment point. **The Get grid button FOLLOWS
+`shownMode()` and the STL deliberately does not** — the STL is the object, so the preview
+toggle must never reach it; the grid DESCRIBES what is on screen and labels which it was.
+Two things ride in the file because downstream cannot recover them: the `metric` /
+`polyline` telemetry (v is uniform in PARAMETER, not arc length — `metricMax` reaches 4.12
+under cup with a gradient, so evenly spaced v is not evenly spaced mm) and the MODE
+(`buildGridGltf` THROWS without one). **`metric` is NULL on a flat build, which is the
+shipping default**, and a 1.0 there would be a number standing in for a measurement nobody
+took. **THE SEAM AT u = 0 IS THE TILT, NOT A CHANGE OF LAW** (the question the foot drop was
+ruled on): `ramp(0)` is exactly 0, so `sectAt(u=0)` IS `flatSect` — measured 0.00e+0 with
+every form control at maximum — while the sheet NORMAL turns by exactly `petalTilt` (25.0000°
+at the default, 75.0000° at the top, 114.98° at a hemisphere), which is the junction's own
+geometry and is in the STL too; the drawn kink there is SMALLER than the next row's (29.69°
+against 31.89° at the default), because `rootBlend` collapses the width over six rows. The
+export keeps the s = 0 row as u = 0 and drops the two overhanging feet (all three carry
+`u: 0`; row 0 is the INNERMOST, 5.31 mm from the axis against the ring's 8.84).
+**NV = 10 IS EVEN, so no column lies on v = 0 and there is no midrib line in the grid** —
+the spine is exported separately for that reason. **The file says how many petals it is
+missing, in three places**: `buildBloomInto` keeps one petal per DESCRIPTOR, so RADIAL
+exports 1 of 8 and only CONTINUOUS exports all; closing that is its own change and is
+NOT done. Gate: `node tools/verify-bloom-grid.mjs` (528 checks, 19 rows) with
+`--negative-control` (six mutations) REQUIRED before quoting a pass — both STL gates are
+structurally blind here, since the capture emits no triangles, and its clause 2 re-offsets
+every captured point and requires it among the emitted vertices EXACTLY. Read
+`docs/bloom-session-28-outcome.md` before touching any of it, including the two gate defects
+the negative control found. **0 moved**, measured two trees x 528 live rows x both modes with
+`Object.is` (328,820,760 floats) plus phase17's 507, with a positive control proving the
+comparison detects a 1e-9 perturbation — stronger than the STL hash diff, which quantises to
+float32. No new frozen phase.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
