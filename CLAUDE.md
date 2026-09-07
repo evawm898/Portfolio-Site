@@ -2029,7 +2029,7 @@ bottleneck again, the next thing to skip is the head transform during a BEND
 drag: the head cannot move then, and re-transforming 16,268 points to prove it
 is the one piece of work that is knowably wasted.
 
-**Verify with `node tools/verify-plot.mjs`** (83 checks). Part one drives the
+**Verify with `node tools/verify-plot.mjs`** (84 checks). Part one drives the
 shipped `plot-grid.js`, `plot-stem.js` and `plot-warp.js` functions in Node over
 fixtures whose answer is written
 down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
@@ -2043,16 +2043,25 @@ controls to still work. Part two drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs SEVENTEEN mutants and is required before quoting
+way. **`--negative-control` runs EIGHTEEN mutants and is required before quoting
 a pass from a changed harness**; it re-serves broken copies of `plot.js`,
 `plot-grid.js`, `plot-stem.js` and `plot-warp.js` through the gate's own HTTP
 server (and imports the broken module for part one — written into the REPO ROOT,
 because `plot-stem.js` imports `./plot-warp.js` and a mutant anywhere else
 resolves that to nothing), and fails if a mutation does not apply, if a check
-the mutant NAMES stays green, or if a check it did not name goes red. The nine
+the mutant NAMES stays green, or if a check it did not name goes red. The ten
 new ones are the four traps, the two halves of the zoom fix, a stem drawn for
-lines that are not, a locked root, and a bend width that stops coming from the
-neighbours.
+lines that are not, a locked root, a bend width that stops coming from the
+neighbours, and a droop that reaches only the u family.
+
+**THE DROOP REACHING ONLY THE U FAMILY IS ITS OWN CHECK, because every other
+instrument here is looking at a u-line foot.** A v-line's row 0 sits on the same
+ring as the u-lines' feet, so a head transform that reached only the family the
+stem is made of would tear the grid at the junction while the seam, the count,
+the drag checks and the panel's own numbers all stayed green. It is measured
+with the u family SWITCHED OFF, at one camera — fit at droop 0, then only the
+droop changed, because re-framing would move the picture for a reason that has
+nothing to do with the head turning.
 `__plot.settle()` advances OrbitControls until it reports no motion, which is
 what makes a pixel measurement here repeatable at all — a fixed wait samples
 an arbitrary point on the damping curve.

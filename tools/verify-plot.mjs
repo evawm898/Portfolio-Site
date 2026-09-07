@@ -230,6 +230,15 @@ const MUTANTS = [
     // not a seam that measures zero, it is a seam with nothing on one side.
   },
   {
+    // The droop reaches only the u family. The v-lines' row 0 sits on the SAME
+    // ring as the u-lines' feet, so the grid tears at the junction — and every
+    // instrument that looks at a foot is looking at a u one.
+    id: 'the-droop-reaches-only-the-u-lines', file: 'plot.js',
+    from: '    const p = headTransform(t.points, t.count, centre, angle);',
+    to: "    const p = headTransform(t.points, t.count, centre, t.kind === 'u' ? angle : 0);",
+    breaks: ['stem/the-droop-reaches-every-family'],
+  },
+  {
     // A locked root. Every other handle still works, so nothing but a drag on
     // the last one can see it.
     id: 'the-root-is-anchored', file: 'plot.js',
@@ -1288,6 +1297,26 @@ async function run({ mutant = null } = {}) {
     headMoved > 1 && worstOf(flatLine, bentLine) > 5 && rootMoved === 0,
     `head foot moved ${headMoved.toFixed(2)} mm, the stem up to `
     + `${worstOf(flatLine, bentLine).toFixed(2)} mm, the root ${rootMoved} mm`);
+
+  /* THE DROOP REACHES EVERY FAMILY, NOT JUST THE ONE THE STEM IS MADE OF. A
+     v-line's row 0 sits on the same ring as the u-lines' feet, so a head
+     transform that reached only the u family would tear the grid apart at the
+     junction — and every other instrument here is looking at a u-line foot, so
+     none of them would see it. Measured with the u family SWITCHED OFF, at one
+     camera: the fit happens at droop 0 and only the droop is changed after it,
+     because re-framing would move the picture for a reason that has nothing to
+     do with the head turning. */
+  await stemOn({ families: 'v', stemDroop: 0 });
+  const vFlat = await px();
+  await set({ ...STEM_ON, families: 'v', stemDroop: 40 });
+  const vBent = await px();
+  await set({ ...STEM_ON, families: 'v', stemDroop: 0 });
+  const vBack = await px();
+  check('stem/the-droop-reaches-every-family',
+    vFlat.hash !== vBent.hash && vFlat.hash === vBack.hash
+    && vFlat.ink > 1000 && vBent.ink > 1000,
+    `with u switched off, the v family's framebuffer moves under the droop `
+    + `(${vFlat.ink} -> ${vBent.ink} ink px) and comes back to the bit at 0`);
 
   // =========================================================================
   // BEND POINTS — driven with a REAL pointer drag on a handle found through the
