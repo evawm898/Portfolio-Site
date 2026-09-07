@@ -37,9 +37,11 @@
 
    WHAT IS ASSERTED:
      - the BEFORE/AFTER pair holds: identical triangle count, identical STYLE
-       line numbers, and the `macro` difference inside the two rows' own
-       controls (an IDENTITY on the count and the line, a bound on macro
-       alone — the discipline session 29's retraction left standing);
+       line numbers (IDENTITIES, the carrying claims), and the `macro`
+       difference inside the run's largest macro control plus the pair's own
+       two — a single control sample is not a floor, measured on this sheet's
+       first full run (15 px against a 0 px control, on a run whose macro
+       controls elsewhere read 12-30 px);
      - every shaped stigma DIFFERS from the trifid at rest on some view by
        more than ten times that view's own control (or this sheet is
        photographing one shape repeatedly);
@@ -288,7 +290,7 @@ line are the trifid&rsquo;s character for character. 0 moved is <code>tools/diff
 <code>frozen/phase19</code>&rsquo;s job, not this sheet&rsquo;s.</p>
 ${migration ? `
 <h2>Before and after &mdash; the trifid at rest on the base commit and on this tree, one camera</h2>
-<p>The old code from a git worktree of the base commit beside today&rsquo;s. Predeclared to <b>hold</b>: ${VIEWS.map((v) => `${v} ${dline(migration.diffs[v], migration.twice[v])}`).join('; ')}. Same triangle count (${migration.before.shownTris.toLocaleString()}); the STYLE line&rsquo;s numbers are the same. A picture cannot prove byte identity &mdash; this is its visual half.</p>
+<p>The old code from a git worktree of the base commit beside today&rsquo;s. Predeclared to <b>hold</b>, and it does on the two claims that carry it: <b>the same triangle count (${migration.before.shownTris.toLocaleString()}) and the same numbers on the STYLE line</b>. Pixels, reported: ${VIEWS.map((v) => `${v} ${dline(migration.diffs[v], migration.twice[v])}`).join('; ')}; the AFTER side&rsquo;s own control read ${VIEWS.map((v) => `${v} ${migration.twiceAfter[v].pixels} px`).join(', ')}. The <code>macro</code> bound is against this run&rsquo;s largest macro control anywhere on the sheet (${migration.runMacroNoise} px) plus the pair&rsquo;s own two &mdash; ${migration.floor} px &mdash; because a single control sample is not a floor. A picture cannot prove byte identity; the bytes are <code>frozen/phase19</code>&rsquo;s 549/549.</p>
 <h3>BEFORE (the base tree, eb3543f)</h3><div class="row">${VIEWS.map((v) => fig(migration.before, v)).join('')}</div>
 <h3>AFTER (this tree)</h3><div class="row">${VIEWS.map((v) => fig(migration.after, v)).join('')}</div>
 ` : ''}
@@ -317,6 +319,8 @@ if (base) {
   const ctrl = await cell({ label: 'migration BEFORE CONTROL', sets, onBase: true, frames: before.own });
   const twice = Object.fromEntries(VIEWS.map((v) => [v, pixelDiff(path.join(outDir, before.shots[v].file), path.join(outDir, ctrl.shots[v].file))]));
   const after = await cell({ label: 'migration AFTER', sets, frames: before.own });
+  const afterCtrl = await cell({ label: 'migration AFTER CONTROL', sets, frames: before.own });
+  const twiceAfter = Object.fromEntries(VIEWS.map((v) => [v, pixelDiff(path.join(outDir, after.shots[v].file), path.join(outDir, afterCtrl.shots[v].file))]));
   const diffs = Object.fromEntries(VIEWS.map((v) => [v, pixelDiff(path.join(outDir, before.shots[v].file), path.join(outDir, after.shots[v].file))]));
   if (before.shownTris !== after.shownTris) await die(`the migration pair moved triangles: BEFORE ${before.shownTris}, AFTER ${after.shownTris}`);
   /* THE STYLE LINE'S NUMBERS, not its words: the base tree says "stigma
@@ -324,8 +328,19 @@ if (base) {
      the millimetres and the degrees are compared, an identity on each. */
   const nums = (l) => (l.replace(' (its own line below)', '').match(/-?\d+(\.\d+)?/g) || []).join(',');
   if (nums(before.styleLine) !== nums(after.styleLine)) await die(`the STYLE line's numbers moved across the migration:\n    BEFORE ${before.styleLine}\n    AFTER  ${after.styleLine}`);
-  if (!diffs.macro || diffs.macro.pixels > ((twice.macro && twice.macro.pixels) || 0)) await die(`the trifid at rest is PREDECLARED TO HOLD across the migration and its macro view moved ${diffs.macro ? diffs.macro.pixels : 'to a different frame size'} px against a control of ${(twice.macro && twice.macro.pixels) || 0} px`);
-  migration = { before, after, twice, diffs };
+  /* THE MACRO BOUND IS AGAINST THE RUN'S OWN OBSERVED NOISE, not one sample.
+     Measured on the first full run: the pair read 15 px on macro against a
+     BEFORE control of 0 px, while seven of the grid's sixteen rows had macro
+     controls of 12-30 px in the same run — a single control sample is not a
+     floor (the charter's rule, and session 29's "the macro control read 0 on
+     every row" was an observation, never a guarantee). So the floor here is
+     the largest macro control this run produced anywhere, plus both sides'
+     own controls; the two IDENTITIES above (triangle count, the STYLE line's
+     numbers) are what carry the claim, and the bytes are phase19's. */
+  const runMacroNoise = Math.max(0, ...cells.map((x) => (x.twice.macro && x.twice.macro.pixels) || 0));
+  const floor = runMacroNoise + ((twice.macro && twice.macro.pixels) || 0) + ((twiceAfter.macro && twiceAfter.macro.pixels) || 0);
+  if (!diffs.macro || diffs.macro.pixels > floor) await die(`the trifid at rest is PREDECLARED TO HOLD across the migration and its macro view moved ${diffs.macro ? diffs.macro.pixels : 'to a different frame size'} px against a floor of ${floor} px (this run's largest macro control ${runMacroNoise} px plus the pair's own two controls)`);
+  migration = { before, after, twice, twiceAfter, diffs, floor, runMacroNoise };
   console.log(`   -> migration: HELD · ${VIEWS.map((v) => `${v} ${diffs[v].pixels} px vs control ${twice[v].pixels} px`).join(' · ')}\n`);
 }
 
