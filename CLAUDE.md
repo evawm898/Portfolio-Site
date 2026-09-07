@@ -472,6 +472,37 @@ a byte diff and never replaces one** — a session that moves bytes on purpose s
 takes a worktree of the BASE COMMIT and which commit a session claims to have moved nothing
 since is the session's to name: run it at the close and quote its output.
 
+**THE ANTHER'S SEVEN SHIP, AND THE TIP'S LATTICE IS DERIVED FROM ITS OUTLINE** (session 29,
+tip plan 3b — read `docs/bloom-session-29-outcome.md` before touching any of it). `antherSize`,
+`antherElongation`, `antherRoundedness`, `antherPoints`, `antherSharpness`, `antherLumps` and
+`antherSpread`, in a **Tip** drop-down inside Androecium — the panel's first THIRD LEVEL, whose
+CSS is now paid as a descendant selector in `bloom.css`. **AUTHORED PLAINLY, NO GENERATOR:**
+Q7's one-table instancing is session 30, where a second instance makes "they cannot drift"
+observable. **0 moved is a CONSTRUCTION:** size and elongation default to
+`ANTHER_DIAMETER_FACTOR` / `ANTHER_LENGTH_FACTOR` themselves (imported by the registry, asserted
+at harness load) and the two products keep the constants' own ORDER, because `(e * s) * d` is not
+`e * (s * d)`; roundedness 1 makes the blend exactly 1; one lobe at spread 0 is the Rodrigues
+identity. **`tipSides(shape)` is the tip's one lattice owner and `revolveInto` reads it off the
+OUTLINE ARRAY'S LENGTH** — forced, not chosen: the law's extrema sit at 2n azimuths and ten
+samples hit all of them at n = 5 and NO other point count, so a fixed 10-gon would make
+`antherPoints` a control that tells the truth once in eleven values. The circle arm
+(`STAMEN_SIDES` at roundedness exactly 1) is what makes points and sharpness **INERT rather than
+merely hidden**, and JS7 measures that at the opposite corner of both. **Cost, from
+`tippedRodTris(lumps, sides)`: 560 triangles per stamen today, 3,240 at six lobes on 24 sides;
+the worst reachable androecium is 388,800 against 67,200 — reported, not clamped.** **The
+sharpness floor bounds the WAIST (`R_min = MIN_FEATURE_MM / 2 = 0.50 mm`, `UNMEASURED — no coupon
+has been printed` verbatim), NEVER the point's included angle** — full range, clamped, told,
+three corners none refused. **Q6 is discharged by the BOUND, never an instrument:** the registry
+IMPORTS `TIP_*_RANGE` and the harness fails at module load if that became a literal. Two corners
+are told rather than refused: two lobes at spread 0 are COINCIDENT (duplicate geometry), one lobe
+above 0 LEANS (so spread is NOT gated on the count). **JS7 is the new family** — JS4 and JS6 ask
+what was emitted, and a tip built perfectly from the WRONG SEVEN passes both. The sheet is
+`node tools/shot-bloom-anther.mjs <dir> [base-tree]` — the corners and the middle at six stamens
+and at 120, three scales, mm-per-pixel on every cell, **a same-tree renderer control on every
+row**, and the INERT row held by two EXACT claims (its triangle count and its whole ANTHER
+read-out line, character for character) plus a MACRO-only pixel bound at the two rows' own
+measured controls — pixel-identity was tried and is false, see the noise-floor section above. `frozen/phase18` is the 528 rows
+at `cb798f6` (a phase IS owed: block 25 takes the matrix to 549).
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
 every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —
@@ -2400,6 +2431,44 @@ consecutive frames are BYTE-IDENTICAL, never a fixed sleep) took the anther row 
 to 0. It did not take the 80,544-triangle row below 13 px. Where a residue remains, REPORT it
 beside the control and let the gate assert the property that can actually fail; do not invent
 a tolerance that happens to pass the data in hand.
+
+**AND THE WHOLE-BLOOM CONTROL IS BIMODAL, WHICH MEANS A SINGLE CONTROL SAMPLE IS NOT A FLOOR**
+(Eva, session 29). Measured on one sheet, same tree, same camera, sixteen rows: the whole-bloom
+control read **0, 51, 50, 10,486, 0, 52, 10,635 px** and reached **15,885 px** across runs, with
+the SAME row landing in either mode on different runs. Settling removes the DAMPING; it does not
+remove this. Two consequences, both load-bearing: **(a)** a bar set from one control draw fires
+on an unchanged picture in the low mode and passes a real 10,000-px change in the high mode —
+wrong in both directions, so **make pixel ASSERTIONS only on a framing whose control is low in
+every observation** (on the anther sheet that is the macro crop, 0 px on every row of every run)
+and REPORT the rest; **(b)** session 26's `4,800 px against a 6,868 px floor` for the trifid is
+**RETRACTED** on these grounds — see `docs/bloom-session-26-outcome.md`. Ruling Q2 stands, on
+the facet phase and the two-session expiry, which were always its stated grounds. **A pixel
+figure from a whole-bloom view is not evidence unless its own control was taken in the same page
+session AND came back low.** **BUT THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva,
+session 29): a bimodal control destroys `X px is below the floor` and touches nothing of the form
+`the difference is exactly 0`, which is an IDENTITY rather than a comparison against a noise
+estimate. Session 29's migration pair (0 px on three views), its INERT row (0 px while its own
+whole-view control read 10,492 px on the same run) and its eight cross-config pairs over
+bit-identical states all stand unhedged. **A threshold needs a floor and therefore a
+distribution; an identity needs neither.** **AND THE BIMODALITY IS NOT CONFINED TO THE
+WHOLE-BLOOM FRAMING:** the MACRO view threw a 38,057 px one-off between two states proved
+bit-identical to the float (0 of 120,960), and it did not reproduce over eight interleaved
+pairs — so `the macro control read 0 px on every row` is an OBSERVATION, never a guarantee.
+
+**WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 29). The
+push-once amendment covers INSTRUMENT ITERATION; a session waiting on a ruling is the other
+state with uncommitted work by construction, and it meets the stop hook every time. Committing
+locally gives the hook everything it exists for; pushing is what costs. Session 29 pushed a
+docs-only commit while holding for a ruling: all four bloom gates re-triggered (paths filters
+are evaluated against the WHOLE PR diff) and `cancel-in-progress` killed the two long runs
+mid-flight, losing 23 minutes. Full worked case, including the session's own retraction of a
+wrong first reading, in the charter's push-once entry.
+
+**DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
+instrument*. Session 29 spent five fifty-minute sheet runs finding bugs in a sheet tool while
+the geometry passed all sixteen rows every time; none of the five failures was about the bloom.
+Cut the row arrays to a reference cell and one other, prove the tool in four minutes, then run
+the grid once. The same reflex applies to the matrix gates: `--only` and `--smoke` exist for it.
 
 ## Maintainability & performance (working agreement)
 

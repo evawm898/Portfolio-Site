@@ -367,8 +367,61 @@ bar because the control measures tens of pixels and a real move measures tens of
 
 ### WHAT THE SHEET MEASURED — and it answers the question
 
+> ### ⛔ THE WHOLE-BLOOM COLUMN OF THIS TABLE IS **RETRACTED** (Eva, session 29)
+>
+> **The `whole bloom` renderer control is not a floor — it is one sample of a TWO-MODE
+> distribution.** Session 29 shot the same tree at the same camera across sixteen rows of one
+> sheet and the whole-bloom control came back **0, 51, 50, 10,486, 0, 52, 10,635 px** — and
+> across runs it reached **15,885 px**. Two of eight rows in the high mode; the same row lands
+> in either mode on different runs. Settling on byte-identical FRAMES removes the orbit
+> DAMPING, which is a different thing, and does not remove this.
+>
+> So **`4,800 px against a 6,868 px floor` is withdrawn as evidence.** A single control sample
+> of a bimodal quantity cannot establish that a difference is "below the noise": the 6,868 was
+> as likely to have read 50. The other whole-bloom rows here (10,496 / 10,495, 56,834 / 56,834,
+> 34,230 / 29,419, 11,625 / 8,682) are withdrawn on the same grounds.
+>
+> **WHAT IS NOT RETRACTED.** The *centre* and *stigma* framings stand: their controls read
+> 0-25 px in every observation across both sessions, and their differences are four to six
+> orders of magnitude above that. The 120-stamen row's whole-bloom EXACT equality
+> (56,834 = 56,834, to the pixel and the worst channel step) also stands — it is an identity,
+> not a comparison against a floor. **And the Q2 RULING STANDS**, on the grounds Eva gave at the
+> time and repeated at this retraction: the facet phase, and the two-session expiry. The pixels
+> were corroboration and were said so then; they are now withdrawn, and the ruling does not
+> move.
+>
+> A retracted number left standing in a doc is how it gets cited as evidence two sessions on.
+>
+> **THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 29 — said here so the
+> retraction is not over-applied to claims it never touched). A bimodal control destroys any
+> statement of the form *"X px is below the floor"*, because there is no floor to be below. It
+> touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
+> comparison against a noise estimate — it is an identity, and no distribution of renderer
+> noise can manufacture one. So these stand, unhedged:
+>
+> - session 26's **120-stamen row**, where base-vs-head EQUALLED base-vs-base to the pixel and
+>   the worst channel step;
+> - session 29's **migration pair**, 0 px on all three views;
+> - session 29's **INERT row**, 0 px against the pill on all three views *while its own
+>   whole-view control read 10,492 px on the same run* — which is the retraction and the
+>   exact zero standing side by side in one measurement;
+> - session 29's **cross-config pairs**, eight of them at 0 px, over states proved
+>   bit-identical at 0 of 120,960 floats.
+>
+> The rule to carry: **a threshold needs a floor and therefore needs a distribution; an
+> identity needs neither.** Retract the first kind, keep the second.>
+> **AND THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 29, recorded
+> here rather than buried in a sheet header). The MACRO view threw a **38,057 px** one-off
+> between two states later proved bit-identical **to the float** — 0 of 120,960, live and
+> export, `Object.is`. It did not reproduce: five interleaved page loads gave eight pairs at
+> 0 px, including the very comparison that had read 38,057. So **"the macro control read 0 px on
+> every row" is an observation and never a guarantee**, and a macro-framed bound is sound only
+> in the direction that matters — a real change on these sheets is 800,000+ px, three orders
+> above any observed event — and fragile in the direction that costs a run.
+
 Every number is a pixel count over a 1600x1600 frame, beside **that same row's own renderer
 control** (the base tree, same camera, shot twice). Read the pair, never the left number alone.
+**Read the retraction above first: every `whole bloom` row's control is withdrawn.**
 
 | row | framing | base vs head | renderer control | |
 |---|---|---|---|---|
@@ -377,24 +430,28 @@ control** (the base tree, same camera, shot twice). Read the pair, never the lef
 | | stigma, 5.2 mm across | 0 | **0** | identical |
 | **120 on the DISC x rise 0.5** (the anther, at the ceiling) | whole bloom | 56,834 | **56,834** | *exactly* equal |
 | | centre, 16 mm across | 25 | **25** | *exactly* equal |
-| **a style, 1.20 mm sheet** (the trifid) | whole bloom | **4,800** | **6,868** | **BELOW the noise** |
+| **a style, 1.20 mm sheet** (the trifid) | whole bloom | ~~4,800~~ | ~~6,868~~ | ~~BELOW the noise~~ **RETRACTED — the control is bimodal** |
 | | centre, 16 mm across | 159,729 | 6 | plainly visible |
 | | stigma, 5.2 mm across | 1,335,355 | 15 | dominant |
-| **a style x sheet 2.40** (the worst case) | whole bloom | 34,230 | 29,419 | barely above noise |
+| **a style x sheet 2.40** (the worst case) | whole bloom | ~~34,230~~ | ~~29,419~~ | ~~barely above noise~~ **RETRACTED** |
 | | stigma, 9 mm across | 1,467,254 | 12 | plainly visible |
-| **the bare bloom** (the control row) | whole bloom | 11,625 | 8,682 | indistinguishable |
+| **the bare bloom** (the control row) | whole bloom | ~~11,625~~ | ~~8,682~~ | ~~indistinguishable~~ **RETRACTED** |
 
 **THE ANTHER ROWS ARE STRONGER THAN "WITHIN TOLERANCE".** On the 120-stamen row the
 base-vs-head difference EQUALS the base-vs-base control exactly, to the pixel and to the worst
 channel step — which can only happen if the head render is byte-identical to one of the two
 base renders. The picture is not close to unchanged; it is the same picture.
 
-**AND THE TRIFID'S MOVE IS BELOW THE RENDERER'S OWN NOISE AT THE SIZE THE BLOOM SHIPS:** 4,800
-px against a 6,868 px floor measured at that same camera. Stated precisely, because the
-temptation is to overclaim: this does not prove a human eye cannot see it. It proves the change
-is **smaller than the harness's own frame-to-frame variation at whole-bloom framing**, while
-being 26,000x the noise one zoom step in. That is the evidence for Q2 — and it is Eva's ruling,
-not the sheet's.
+**~~AND THE TRIFID'S MOVE IS BELOW THE RENDERER'S OWN NOISE AT THE SIZE THE BLOOM SHIPS~~ —
+RETRACTED (Eva, session 29).** The claim was 4,800 px against a 6,868 px floor at that camera.
+There is no floor there: the whole-bloom control is bimodal (0-52 px or ~10,500-15,900 px), so
+6,868 was one draw from a two-mode distribution and 4,800 cannot be called "below" it. **What
+survives is the part that never depended on a floor:** the trifid's move is 159,729 px at
+16 mm across and 1,335,355 px at 5.2 mm, against controls of 6 and 15 px — four and five orders
+of magnitude, in framings whose control has read 0-25 px in every observation across two
+sessions. The move is plainly visible one zoom step in and that was never in doubt; what is
+withdrawn is the claim that it is invisible at whole-bloom scale. **Q2 stands on its stated
+grounds — the facet phase and the two-session expiry — which is what Eva said at the time.**
 
 ## THE RULING — Q2 STANDS (Eva, Sep 7, from the sheet)
 
@@ -410,7 +467,9 @@ sessions.
 **The pixel measurements corroborate; they do not decide.** They are recorded because a
 ruling should be made in front of numbers, not because 4,800-against-6,868 is the argument.
 Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
-the expiry.
+the expiry. **(Session 29: the whole-bloom pair is now RETRACTED outright — see the
+retraction above the table. Eva's insistence that the pixels were corroboration and not the
+argument is exactly why the ruling is unaffected by their withdrawal.)**
 
 **STOP AT THE SHEET.** This change is visual — 0.047 mm of surface on a part that ships absent
 by default — so **merge waits on Eva's ruling on `tools/shot-bloom-tip.mjs`**, not on green CI.
