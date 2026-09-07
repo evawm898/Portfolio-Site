@@ -392,6 +392,29 @@ frame with no guard, the elongation floor, no self-intersection instrument (boun
 instead), two-level panel nesting with the rows generated from one table, and `size` as a real
 slider superseding `ANTHER_DIAMETER_FACTOR`. Read them there rather than re-deriving them.
 
+**`tipInto` IS THE ONE OWNER OF A TIP'S GEOMETRY, AND `pillInto` IS RETIRED INTO IT** (session
+26 — sessions 3 and 4 of the tip plan are the sliders; this one shipped ZERO CONTROLS). An
+anther is ONE tip, the trifid stigma is THREE, and both go through one emitter. **The outline
+law is in with its parameters hard-wired at today's equivalents** (`TIP_SHAPE`: roundedness 1,
+sharpness 2, lobes 4 — the circle twice over), and roundedness 1 makes the blend `1 + 0 * h`,
+which is EXACTLY 1 in IEEE-754, so `r * f === r` and the pill's radius arithmetic is untouched.
+**The frame is RODRIGUES with no guard, parameterised by the ANGLES rather than by two
+vectors** — that is what makes the identity exact at spread 0 (`cos 0` is exactly 1, `1 − cos 0`
+exactly 0) where a `D × L` axis would normalise a zero vector and put `D · L` on the frame.
+**The anther is byte-identical: 0 of 3,183,552 floats over seven corners in live and export,
+compared with `Object.is` so `-0` is distinguished** — `node tools/verify-bloom-tip-bytes.mjs
+--base <worktree>` is the instrument, and it REFUSES a vacuous run (the trifid rows must move).
+The trifid moved **17 live rows, 0 frozen** — no frozen matrix names a gynoecium control, so
+**no tag's bytes stop reproducing** and session 24's phase17 note is still the only one. The
+move is **0.047 mm of SURFACE** (the emitted 10-gon's sagitta, `a(1 − cos 18°)`, scaling with
+the sheet) against **1.855 mm of VERTEX displacement** — two different claims, both measured.
+`STAMEN_TRIS` and `STYLE_TRIS` are retired into **`tippedRodTris(lumps)`**, called by JS4 with 1
+and by JG4 with the count the owner declares. **JS6 and JG5** are the only witnesses for any of
+it: a tip rolled on its own axis exports watertight, one piece, at an identical triangle count
+and STL byte length. The sheet is `node tools/shot-bloom-tip.mjs <dir> [base-tree]` — every cell
+carries its own mm per pixel and every pair a measured pixel difference, because "is 0.047 mm
+visible" is Eva's ruling to make and should be made in front of a number.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

@@ -215,17 +215,10 @@ export const ANTHER_DIAMETER_FACTOR = 1.6;
 export const ANTHER_LENGTH_FACTOR = 2.5;
 /* Mesh resolution — FIXED, so topology depends on no slider and the export
    gate's live-equals-export count holds: STAMEN_SIDES around every tube and
-   pill ring, STAMEN_ROWS stations along the free filament, ANTHER_CAP_RINGS per
-   hemisphere of the pill. 560 triangles per stamen, 67,200 at 120. */
+   tip ring, STAMEN_ROWS stations along the free filament, TIP_CAP_RINGS per
+   hemisphere of the tip. 560 triangles per stamen, 67,200 at 120. */
 export const STAMEN_SIDES = 10;
 export const STAMEN_ROWS = 16;
-export const ANTHER_CAP_RINGS = 5;
-/* Triangles per stamen, from the constants — the tube (STAMEN_ROWS + 1
-   bands, two fan caps) plus the pill (2 x ANTHER_CAP_RINGS - 1 bands, two
-   apex fans). JS4's census compares every stamen's EMITTED count (the
-   accumulator's own delta) against this: a dropped pill or a doubled tube
-   moves it. */
-export const STAMEN_TRIS = ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + ((2 * ANTHER_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
 export function androeciumEligible(state) { return !sphereMode(state); }
 
 /* ===================================================================
@@ -242,9 +235,9 @@ export function androeciumEligible(state) { return !sphereMode(state); }
    KIND (`fr.gynoecium`), sharing the dome object and surfaceAt() with the
    rings and the androecium; the builder reads it and computes nothing.
 
-   THE TRIFID IS THREE PILLS SHARING THE TIP. Each lobe is the anther's own
-   solid of revolution (pillInto — one emitter, one vocabulary) whose lower
-   hemisphere is centred ON the style's tip, so the rod's last ring is
+   THE TRIFID IS THREE TIPS SHARING THE TIP. Each lobe is the anther's own
+   solid (tipInto — one emitter, one vocabulary) whose lower cap is
+   centred ON the style's tip, so the rod's last ring is
    inside every lobe exactly as it is inside an anther, aimed
    STIGMA_LOBE_SPREAD_DEG off the tip direction toward three azimuths a
    third of a turn apart. A lobe's proportions are the anther's own two
@@ -263,11 +256,100 @@ export function androeciumEligible(state) { return !sphereMode(state); }
    byte-identical to the bare sphere. */
 export const STIGMA_LOBES = 3;
 export const STIGMA_LOBE_SPREAD_DEG = 40;
-/* Triangles per style, from the constants — the rod (a filament's tube)
-   plus STIGMA_LOBES pills (each an anther's). JG4's census compares every
-   emitted style against this. */
-export const STYLE_TRIS = ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + STIGMA_LOBES * ((2 * ANTHER_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
 export function gynoeciumEligible(state) { return !sphereMode(state); }
+
+/* ===================================================================
+   THE TIP (session 26 — Eva's rulings of Sep 6, carried, not re-derived).
+   THE ONE OWNER OF A TIP'S GEOMETRY. An anther is ONE tip; the trifid
+   stigma is THREE of them sharing a style's tip; `pillInto` is retired
+   into `tipInto` below and there is no second emitter. Nothing here is a
+   control yet — the seven sliders are sessions 3 and 4 — so every value
+   below is hard-wired at TODAY'S EQUIVALENT and the migration is a byte
+   event, not a feature.
+
+   THE OUTLINE LAW (Q1), one exponent, in the tip's CROSS-SECTION:
+
+       h(u) = (|cos(n u / 4)|^s + |sin(n u / 4)|^s)^(-1/s)
+       f(u) = roundedness + (1 - roundedness) * h(u)
+
+   `n` is the symmetry order (TIP_LOBES), `s` the sharpness. One number
+   sweeps star -> polygon -> circle -> rounded n-gon and reaches all five
+   named targets, where the lobe law reached four and made a trefoil where
+   a triangle was asked for. ROUNDEDNESS IS THE ONLY PRODUCER OF THE
+   CIRCLE and sharpness is inert there — the curl-bias precedent, hidden
+   and inert, and here it is inert IN THE ARITHMETIC: at roundedness 1 the
+   blend is `1 + 0 * h`, which is exactly 1 in IEEE-754 for any finite h,
+   so `r * f === r` and the pill's radius arithmetic is untouched. That is
+   the whole byte-identity argument for the anther, and it is a
+   construction rather than a hope; tools/verify-bloom-tip-bytes.mjs is
+   what measures it.
+
+   NO SELF-INTERSECTION INSTRUMENT, EVER (Q6) — the ranges are bounded so
+   the outline CANNOT invert, and a law that cannot turn inside out needs
+   no check that it hasn't. f(u) is a RADIAL GRAPH about the tip's axis, so
+   it is simple iff it is strictly positive. f is a convex combination of 1
+   and h, so f >= min(1, h); and h is bounded below by 2^(1/2 - 1/s) for
+   s <= 2 (the worst azimuth is 45 degrees) and by 1 above it, so with
+   sharpness bounded BELOW at TIP_SHARPNESS_RANGE[0] = 0.25 the floor is
+   2^(-3.5) = 0.0884 > 0 — which is the measured worst case over the shipped
+   side count, exactly. The BOUND is what makes the claim, and `tipOutline()`
+   clamps rather than trusting its caller.
+
+   TODAY'S EQUIVALENT IS THE CIRCLE TWICE OVER: roundedness 1 makes the
+   blend exactly 1 whatever h is, and n = 4 with s = 2 is the circle's own
+   exponent — so a mutation that dropped the blend would still land on a
+   circle to within rounding, which is why the gate asserts the emitted
+   FACTORS are exactly 1 rather than asserting the picture looks round. */
+export const TIP_CAP_RINGS = 5;
+export const TIP_LOBES = 4;
+export const TIP_SHARPNESS = 2;
+export const TIP_ROUNDEDNESS = 1;
+export const TIP_SHARPNESS_RANGE = Object.freeze([0.25, 8]);
+export const TIP_LOBES_RANGE = Object.freeze([2, 12]);
+/* THE ELONGATION FLOOR (Q5), not an ellipsoid. At an elongation of exactly
+   1 the tip is a true sphere: the cylinder band between the two
+   hemispheres has zero height and every triangle in it has zero area. An
+   ellipsoid is the more correct shape and MOVES THE PILL; a floor keeps it
+   byte-identical, and the difference between a hundredth-of-a-radius band
+   and none is invisible. No second partition for something nobody can see.
+   Expressed on the BAND because that is the degenerate quantity: the band
+   is at least TIP_BAND_FLOOR of the tip's own radius, which is an
+   elongation floor of 1.005. Inert today — the shipping anther's band is
+   3.00 radii — and Math.max returns its larger argument unchanged, so the
+   floor costs no byte. */
+export const TIP_BAND_FLOOR = 0.01;
+/* THE SHAPE, hard-wired, ONE object shared by both tips because today they
+   ARE the same tip. Sessions 3 and 4 instance this table twice (Q7) — the
+   ROLE_OVERRIDES pattern — so the anther's and the stigma's cannot drift;
+   until then a single frozen object makes "they cannot drift" literal. */
+export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPNESS, roundedness: TIP_ROUNDEDNESS });
+/* TRIANGLES PER TIPPED ROD — a rod (the tube: STAMEN_ROWS + 1 bands and two
+   fan caps) plus `lumps` tips (each 2 * TIP_CAP_RINGS - 1 bands and two apex
+   fans). A FUNCTION OF THE LUMP COUNT and no longer two constants: a stamen
+   is one lump, the trifid is three, and session 4 makes the stigma's count a
+   control — so a constant would be a number that stops being true without
+   anything failing. JS4 and JG4 both compare an EMITTED count (the
+   accumulator's own delta) against this ONE owner, each called with the
+   count its own owner declares. */
+export function tippedRodTris(lumps) {
+  return ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + lumps * ((2 * TIP_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
+}
+/* THE OUTLINE, evaluated ONCE per tip and indexed by SIDE — the same factor
+   applies at every ring, which is what makes the tip a scaled radial graph
+   rather than a per-ring shape. Clamped here, so no caller can hand the law
+   a parameter that inverts it. */
+export function tipOutline(shape, sides = STAMEN_SIDES) {
+  const rho = clamp(shape.roundedness, 0, 1);
+  const sh = clamp(shape.sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
+  const n = Math.round(clamp(shape.lobes, TIP_LOBES_RANGE[0], TIP_LOBES_RANGE[1]));
+  const out = new Array(sides);
+  for (let j = 0; j < sides; j++) {
+    const q = (n * ((j * TAU) / sides)) / 4;
+    const h = Math.pow(Math.pow(Math.abs(Math.cos(q)), sh) + Math.pow(Math.abs(Math.sin(q)), sh), -1 / sh);
+    out[j] = rho + (1 - rho) * h;
+  }
+  return out;
+}
 
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
    pi*(3 - sqrt(5)) rather than a decimal literal so the constant IS the
@@ -2092,7 +2174,7 @@ export function footRing(state, acc) {
     const clamped = asked > limit;
     const radius = clamped ? limit : asked;
     const onAxis = limit === 0;
-    const anther = { diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter };
+    const anther = { diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, shape: TIP_SHAPE };
     const clearRadius = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
     /* THE DISC'S INNER LIMIT (session 24, Eva's ruling Sep 6). The Vogel law
        had no inner limit, so its innermost stamen stood at
@@ -2178,7 +2260,7 @@ export function footRing(state, acc) {
     if (state.gynoecium === 'NONE') return null;
     const diameter = thickness, rSty = partRadius;        // one sheet thick, floored with it — the ONE owner above
     const s = surfaceAt(0, null);
-    const lobe = { count: STIGMA_LOBES, diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, spreadRad: STIGMA_LOBE_SPREAD_DEG * D2R };
+    const lobe = { count: STIGMA_LOBES, diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, spreadRad: STIGMA_LOBE_SPREAD_DEG * D2R, shape: TIP_SHAPE };
     return {
       count: 1, diameter, rSty, length: state.styleLength, curlDeg: state.styleCurl, curlRad: state.styleCurl * D2R,
       radius: 0, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief,
@@ -3989,11 +4071,17 @@ export function buildHubInto(acc, state, ring) {
    fans at both poles (a ring shrunk to radius 0 emitted 48 degenerate
    triangles per dome, measured Sep 1). Both go through one emitter.
    =================================================================== */
-function revolveInto(acc, rings, south, north) {
+function revolveInto(acc, rings, south, north, outline = null) {
   const NS = STAMEN_SIDES;
   const pts = rings.map(({ C, e1, e2, r }) => Array.from({ length: NS }, (_, j) => {
     const a = (j * TAU) / NS, ca = Math.cos(a), sa = Math.sin(a);
-    return [C[0] + r * (e1[0] * ca + e2[0] * sa), C[1] + r * (e1[1] * ca + e2[1] * sa), C[2] + r * (e1[2] * ca + e2[2] * sa)];
+    /* THE OUTLINE (session 26) scales the ring's radius PER SIDE, so one
+       cross-section shape applies at every ring and the solid stays a radial
+       graph about the axis. `null` is the ROD's arm — no arithmetic at all,
+       so the tube's bytes cannot move — and a tip at roundedness 1 hands in
+       a factor of exactly 1, where `r * 1 === r`. */
+    const rr = outline === null ? r : r * outline[j];
+    return [C[0] + rr * (e1[0] * ca + e2[0] * sa), C[1] + rr * (e1[1] * ca + e2[1] * sa), C[2] + rr * (e1[2] * ca + e2[2] * sa)];
   }));
   for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.tri(south, pts[0][j2], pts[0][j]); }
   for (let k = 0; k < pts.length - 1; k++) for (let j = 0; j < NS; j++) { const j2 = (j + 1) % NS; acc.quad(pts[k][j], pts[k][j2], pts[k + 1][j2], pts[k + 1][j]); }
@@ -4033,32 +4121,77 @@ function rodInto(acc, { t, r, curlRad, length, floorRadius }, s, azimuth) {
   return { P, Up, T, inner, outer, stations, tubePts, at, law, before };
 }
 
-/* THE PILL — an anther's, or ONE LOBE of the trifid stigma: a surface of
-   revolution about `D` with EXPLICIT apex fans at both poles, its lower
-   hemisphere centred ON `C` (a rod's tip), so the rod's last ring is inside
-   it. `e1` is any unit vector perpendicular to D — the rod's own T for an
-   anther, D x P for a lobe tilted toward P. Extracted VERBATIM from
-   buildStamenInto (session 22), byte-identical on the anther by the same
-   argument as rodInto. Returns the apex. */
-function pillInto(acc, C, D, e1, a, Lc) {
-  const ring = (Cc, r) => ({ C: Cc, e1, e2: [D[1] * e1[2] - D[2] * e1[1], D[2] * e1[0] - D[0] * e1[2], D[0] * e1[1] - D[1] * e1[0]], r });
-  const along = (h) => [C[0] + D[0] * h, C[1] + D[1] * h, C[2] + D[2] * h];
-  const pill = [], K = ANTHER_CAP_RINGS;
-  for (let k = 1; k <= K; k++) { const al = (k / K) * (Math.PI / 2); pill.push(ring(along(-a * Math.cos(al)), a * Math.sin(al))); }
-  pill.push(ring(along(Lc), a));
-  for (let k = 1; k < K; k++) { const be = (k / K) * (Math.PI / 2); pill.push(ring(along(Lc + a * Math.sin(be)), a * Math.cos(be))); }
-  const apex = along(Lc + a);
-  revolveInto(acc, pill, along(-a), apex);
-  return apex;
+/* THE TIP (session 26) — an anther, or ONE LOBE of the trifid stigma: ONE
+   OWNER, and `pillInto` is retired into it. The solid is a radial graph about
+   the tip's own axis with EXPLICIT apex fans at both poles, its lower cap
+   centred ON `C` (a rod's tip), so the rod's last ring is inside it.
+
+   THE AXIS AND THE FRAME COME FROM THE ROD, AND THE ROTATION IS RODRIGUES
+   (Q2, and NO GUARD). `rod` is the rod's own tip frame — `D` its direction,
+   `T` its ring vector, both unit and perpendicular; `aim` says where this tip
+   points relative to that frame: `spreadRad` off `D`, toward the azimuth
+   `psi` around it. The tip's axis is then `L = D cos + P sin` (the expression
+   session 22's trifid already used, verbatim) and its ring vector is the
+   MINIMAL ROTATION of `T` onto `L` — the rod's frame carried along, not an
+   arbitrary perpendicular.
+
+   WHY IT MATTERS AND WHY NO GUARD. A circle has no orientation, so the old
+   `e1` (the rod's `T` for an anther, `D x P` for a lobe) was free; an outline
+   with corners does have one, and a frame that is not a continuous function
+   of the axis makes the cross-section JUMP the moment roundedness leaves 1.
+   Eva ruled the discontinuity worse than the move: `a slider that jumps is a
+   defect a user meets; a predeclared partition is an accounting entry`. The
+   formula is parameterised by the ANGLES rather than by two vectors, which is
+   what lets the identity be exact without a special case: at `spreadRad` 0,
+   `cos` is exactly 1 and `1 - cs` is exactly 0, so the coefficient of `T` is
+   exactly 1 and the other two are zero — the anther's frame comes back as its
+   rod's `T`, term for term. Deriving the rotation from `D x L` instead would
+   normalise a zero vector at the identity and put `D . L` (which is 1 only to
+   rounding) on `T`'s coefficient; that is the version with a guard, and this
+   is the version without one.
+
+   THE LOBES MOVE AND THE ANTHER DOES NOT. On a lobe the old `e1` was `D x P`,
+   which is the ROTATION AXIS and is therefore left fixed by the rotation,
+   while the new one is `Rot(T)`; the two differ by a turn about `L` of
+   `acos(-sin psi)` — 90, 150 and 30 degrees on the trifid's three lobes. The
+   SOLID is the same solid rotated on its own axis, so its surface moves by at
+   most the emitted polygon's sagitta; individual VERTICES move much further,
+   and the two numbers are not the same claim. Both are measured on the tree
+   by tools/verify-bloom-tip-bytes.mjs rather than argued here.
+
+   Returns what was emitted, for the gate: the axis, the ring vector, the
+   outline factors and the apex. */
+function tipInto(acc, C, rod, aim, tip) {
+  const { D, T } = rod;
+  const B = [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]];
+  const cs = Math.cos(aim.spreadRad), sn = Math.sin(aim.spreadRad);
+  const cp = Math.cos(aim.psi), sp = Math.sin(aim.psi);
+  const P = [T[0] * cp + B[0] * sp, T[1] * cp + B[1] * sp, T[2] * cp + B[2] * sp];
+  const L = [D[0] * cs + P[0] * sn, D[1] * cs + P[1] * sn, D[2] * cs + P[2] * sn];
+  /* Rot(T) about (D x P) by `spreadRad`, in the rod's own (T, B, D) basis. */
+  const kT = 1 - cp * cp * (1 - cs), kB = -(cp * sp * (1 - cs)), kD = -(cp * sn);
+  const e1 = [T[0] * kT + B[0] * kB + D[0] * kD, T[1] * kT + B[1] * kB + D[1] * kD, T[2] * kT + B[2] * kB + D[2] * kD];
+  const ring = (Cc, r) => ({ C: Cc, e1, e2: [L[1] * e1[2] - L[2] * e1[1], L[2] * e1[0] - L[0] * e1[2], L[0] * e1[1] - L[1] * e1[0]], r });
+  const along = (h) => [C[0] + L[0] * h, C[1] + L[1] * h, C[2] + L[2] * h];
+  const a = tip.a, band = Math.max(tip.Lc, TIP_BAND_FLOOR * a);
+  const outline = tipOutline(tip.shape);
+  const rings = [], K = TIP_CAP_RINGS;
+  for (let k = 1; k <= K; k++) { const al = (k / K) * (Math.PI / 2); rings.push(ring(along(-a * Math.cos(al)), a * Math.sin(al))); }
+  rings.push(ring(along(band), a));
+  for (let k = 1; k < K; k++) { const be = (k / K) * (Math.PI / 2); rings.push(ring(along(band + a * Math.sin(be)), a * Math.cos(be))); }
+  const apex = along(band + a);
+  revolveInto(acc, rings, along(-a), apex, outline);
+  return { L, e1, apex, outline, band };
 }
 
 export function buildStamenInto(acc, andro, s, slot) {
   const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: andro.length, floorRadius: andro.diameter }, s, slot.azimuth);
-  /* THE PILL: lower hemisphere centred ON the tip (the tube's last ring is
-     inside it), a cylinder, the upper hemisphere, apex fans at both poles. */
+  /* THE TIP: one lump, on the rod's own direction — `spreadRad` 0 is the
+     Rodrigues identity, so its ring vector comes back as the rod's `T` and
+     the anther's bytes do not move (session 26). */
   const tip = rod.stations[rod.stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
   const D = rod.at(andro.length).D;
-  const apex = pillInto(acc, tip.C, D, rod.T, a, Lc);
+  const lump = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: 0, psi: 0 }, { a, Lc, shape: andro.anther.shape });
   /* WHAT WAS EMITTED, for the gate: the root axis (JS1), the surface point
      (JS2), the two root rings AS EMITTED (JS3), the apex (JS4). */
   /* `stations` (session 23): every ring CENTRE the rod was revolved through
@@ -4066,7 +4199,11 @@ export function buildStamenInto(acc, andro, s, slot) {
      the builder's own centreline, read by the filament-against-style flag
      in buildBloomInto (the ROOTS FUSE pattern: the builder's record, never a
      re-derivation). Telemetry; nothing geometric reads it. */
-  return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex, tris: acc.triangleCount - rod.before,
+  /* `lumps` (session 26): what the TIP primitive emitted, for JS6 — its axis,
+     its Rodrigues ring vector and the outline factors it scaled every ring
+     by. One entry, because an anther is one tip; the trifid reports three. */
+  return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex: lump.apex, tris: acc.triangleCount - rod.before,
+           lumps: [{ index: 0, axis: lump.L, e1: lump.e1, outline: lump.outline }],
            stations: rod.stations.map((st) => st.C),
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
 }
@@ -4082,16 +4219,17 @@ export function buildStamenInto(acc, andro, s, slot) {
 export function buildStyleInto(acc, G) {
   const rod = rodInto(acc, { t: G.thickness, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
   const tip = rod.stations[rod.stations.length - 1], a = G.lobe.diameter / 2, Lc = G.lobe.length - 2 * a;
-  const D = rod.at(G.length).D, T = rod.T;
-  const B = [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]];
-  const cs = Math.cos(G.lobe.spreadRad), sn = Math.sin(G.lobe.spreadRad);
+  const D = rod.at(G.length).D;
+  /* THE TRIFID: `lobe.count` tips sharing the rod's tip, each `spreadRad` off
+     its direction at azimuths a whole turn apart. The axis is the expression
+     session 22 used, now inside tipInto and computed once — the LOBE AXES are
+     byte-identical; what moved is the ring vector, which was `D x P` (the
+     rotation axis, left fixed) and is now the Rodrigues image of the rod's
+     `T`. Predeclared, ruled, and measured rather than described. */
   const lobes = [];
   for (let k = 0; k < G.lobe.count; k++) {
-    const psi = (k * TAU) / G.lobe.count, cp = Math.cos(psi), sp = Math.sin(psi);
-    const P = [T[0] * cp + B[0] * sp, T[1] * cp + B[1] * sp, T[2] * cp + B[2] * sp];
-    const L = [D[0] * cs + P[0] * sn, D[1] * cs + P[1] * sn, D[2] * cs + P[2] * sn];
-    const e1 = [D[1] * P[2] - D[2] * P[1], D[2] * P[0] - D[0] * P[2], D[0] * P[1] - D[1] * P[0]];
-    lobes.push({ index: k, dir: L, apex: pillInto(acc, tip.C, L, e1, a, Lc) });
+    const lump = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: G.lobe.spreadRad, psi: (k * TAU) / G.lobe.count }, { a, Lc, shape: G.lobe.shape });
+    lobes.push({ index: k, dir: lump.L, apex: lump.apex, e1: lump.e1, outline: lump.outline });
   }
   /* WHAT WAS EMITTED, for the gate: the root axis (JG1), the surface point
      (JG2), the two root rings AS EMITTED (JG3), the tip, its direction and
