@@ -239,7 +239,34 @@ frame computed from the tip at 1.3× the sum put the default trifid at a **10 mm
 than the 8 mm lens, so the two views coincided. Framed from the stigma's own extent, centred half
 a lobe above the tip, it is 5.4 mm. Neither was about the bloom.
 
-Sheet results: FILLME_SHEET.
+**Sheet results (the third full run; the first two each failed one pixel bound the rule above
+retired, and every geometry claim passed on all three):**
+
+| row | vs the trifid at rest — whole / lens / macro (px) | this row's own control — whole / lens / macro |
+|---|---|---|
+| trifid at rest, 6 stamens (reference) | — | 10,291 / 45 / 0 |
+| trifid at rest, 120 on the disc (reference) | — | 0 / 0 / 0 |
+| roundedness 0 at 1.00, 6 stamens | 14,965 / 149,049 / 328,289 | 7,884 / 44 / 22 |
+| roundedness 0 at 1.00, 120 on the disc | 4,804 / 149,006 / 328,265 | 17,365 / 17 / 30 |
+| the circle it replaces (sharpness 2.00 at roundedness 0) | 16,908 / 146,113 / 321,802 | 0 / 0 / 0 |
+| sharpness 0.50 — CLAMPED (asserted) | 20,456 / 149,046 / 328,287 | 5,619 / 13 / 22 |
+| sharpness 0.75 — clear (asserted) | 13,410 / 149,071 / 328,250 | 0 / 0 / 0 |
+| sharpness 1.00 — clear (asserted) | 20,443 / 149,007 / 328,280 | 0 / 0 / 0 |
+| sharpness 1.25 — clear (asserted) | 17,119 / 148,759 / 327,980 | 5,605 / 12 / 14 |
+| sharpness 1.50 — clear (asserted) | 10,482 / 145,742 / 320,415 | 8,221 / 0 / 0 |
+| thin sheet 0.60, sharpness 0.75 — CLAMPED (asserted) | 143,432 / 481,499 / 738,187 | 2,800 / 56 / 29 |
+| THE PAIR — the same seven on both tips | 28,402 / 428,902 / 663,396 | 7,892 / 52 / 0 |
+| one lobe on the style beside six pills | 17,752 / 163,185 / 361,997 | 0 / 6 / 21 |
+| six lobes at 90° | 17,909 / 303,922 / 686,665 | 0 / 0 / 0 |
+| trifid anthers | 31,345 / 486,743 / 610,819 | 9,047 / 9 / 0 |
+| INERT — 12 points at 0.25, roundedness 1 | 15,854 / **0** / **0** | 12,478 / 5 / 15 |
+| BEFORE / AFTER, the trifid at rest across the migration | 22,251 / 42 / **0** | 4,183 / 42 / 0 (before) |
+
+Read the pair, not the `whole` number: the whole-bloom control is bimodal on this run too (0 px
+on seven rows, 2,800–17,365 px on the other nine, same tree, same camera). On `macro` the
+shaped stigma differs from the trifid at rest by ~320,000 px against controls of 0–30 px, and
+the INERT row and the migration pair read exactly 0. The sheet's macro noise this run: largest
+control 30 px.
 
 ---
 
@@ -358,5 +385,6 @@ singular-point exemption in `tipClauses`.
 stigma (16 or 12 sides) **14,760**; THE FAMILY row **14,760**; the INERT row **11,040** (the
 trifid alone at rest); GATED with NONE **10,080** (the shipping default, unchanged).
 
-WAITING ON EVA: the sheet's ruling — does the pair read as one family, and does the stigma keep
-the family's 1.00 or take its own value?
+**Waiting on Eva's ruling of the sheet:** does the pair read as one family, and does the stigma
+keep the family's 1.00 or take its own per-instance value? The merge is the session's own final
+step, released by that ruling.
