@@ -4709,6 +4709,12 @@ matters should be measured this way.
       session did not touch), the bisect, and the workaround (no apostrophes in assertion
       messages until the regex is fixed; replicate the six `.replace` calls to confirm a
       suspect). The regex fix is its own change to a shipped gate with a negative control.
+      **CLOSED IN SESSION 25 (Sep 6-7, #173).** The regex chain is a character walk, the
+      thirteen messages are restored verbatim, and the trap-list entry no longer applies:
+      apostrophes in assertion messages are ordinary English again. What the session added to
+      the picture is that the scanner was also BLIND — the template pass hid 45% of the
+      executable source it scanned, missed a genuine `${centerSize}` outright, and reported the
+      one reference it did find 2,095 lines from where it lives.
 
     - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `173d1ae`
       (bloom-export-watertight and bloom-connectedness on the full 528-row matrix, bloom-panel,
@@ -4920,6 +4926,11 @@ matters should be measured this way.
       files; nine possessives took the head to 48, every one of them a frozen-matrix label
       about 2,000 lines from the reported location; removing them took it back to 0. The em
       dash in the same literals is harmless — the apostrophes alone are the trigger.
+      **DONE — session 25, `928e13e`, before session 2 as ruled.** One correction from doing
+      it: the nine session-24 possessives restored ALONE do not reproduce the 48, because they
+      come to fourteen apostrophes and parity is preserved. It took all twenty-two. The count
+      matters, not the location — which is the same parity finding session 22 reached from the
+      other end, and the reason no small fixture can replay the bug.
 
     - **THE READ-OUT'S STAMENS LINE IS GETTING CROWDED, and it is noted rather than acted on**
       (Eva, Sep 6). The inner-limit clause is long, and the line has gained a clause most
@@ -4941,3 +4952,76 @@ matters should be measured this way.
       moved between `b847f81` and this merge, so the ten files it moved are exactly this
       session's ten predeclared movers and no other PR's. This entry and the rulings above
       are the docs-only PR that follows the merge, on the session-22/23 rhythm.
+
+- **Session 25 (Sep 6-7): THE PANEL GATE'S RETIRED-ID SCANNER — a character walk in place of
+  five regexes; the twenty-two reworded assertion messages restored. Gate only: 0 rows added,
+  0 of 528 bytes moved, NO frozen phase. Numbers in
+  `docs/bloom-session-25-outcome.md`.**
+
+    - **WHY IT WAS ITS OWN SESSION, and it was the right call.** Eva ruled it on Sep 6, before
+      session 2 of the parametric tip, on the grounds that the workaround was "never type an
+      apostrophe" and that session 2 writes more new assertion messages than anything so far.
+      Doing it turned up a second reason nobody had measured: **the scanner was BLIND as well
+      as loud.** At `888a506` its template pass deleted 58,522 of the panel gate's own 98,906
+      post-comment characters and hid **45% of the executable source it was meant to scan**
+      (332,888 non-whitespace characters surviving, against 605,687 under the walk); on a
+      PRISTINE tree with two genuine references spliced in, it missed `${centerSize}` entirely
+      and reported `row.centerDish` **2,095 lines** from where it lives. A scanner that misses
+      real references and misreports the ones it finds is how a real hit gets waved through —
+      that, not the noise, is what made it worth a session.
+
+    - **THE MECHANISM, FOUND RATHER THAN GUESSED.** `\$\{[^}]*\}` stops at the FIRST `}`, so
+      an interpolation holding a nested template that itself interpolates ends the outer match
+      at the INNER literal's closing backtick and every backtick after it pairs off by one —
+      the pass then matches the GAPS BETWEEN literals rather than the literals. The first
+      out-of-phase match in `tools/bloom-harness.mjs` is at **line 571**, the SPINE read-out's
+      floored-start clause, where `[^}]*` stops at the `}` of `${sp.startFloored.toFixed(3)}`.
+      20 of the 35 scanned files left a stray backtick behind.
+
+    - **THE PARITY EFFECT IS A WHOLE-FILE PROPERTY, AND NO SMALL FIXTURE CAN REPLAY IT** —
+      measured, not assumed. Four hand-built candidates and the real `:571` construct all
+      re-align within a few lines and the old chain passes every one of them; session 22
+      reached the same conclusion from the other end when removing any ONE of its thirteen
+      messages cleared the failure. **Session 24's nine possessives restored alone also do not
+      reproduce it** (fourteen apostrophes — an even count). It took all twenty-two to reach
+      48. So the gate's new case table pins the PROPERTIES that make the bug impossible rather
+      than pretending to reproduce it, and its own comment says so.
+
+    - **A CASE TABLE EVERY IMPLEMENTATION PASSES IS DECORATION.** Route (n)(iv) now drives the
+      walk over twenty sources whose answer is written down — necessary because on 35 real
+      files a walk that blanked EVERYTHING would also report 0 hits, and the per-file validity
+      check only knows the text still lines up. The table was checked against **seven
+      mutations of the walk itself**, each turning at least one case red; **two of the twenty
+      cases exist because two mutants survived the first draft** (a string running past its
+      newline, and a regex spanning one). Write the mutants before trusting the table.
+
+    - **WHAT THE WALK IS AND IS NOT.** It blanks comments, strings, template TEXT and regex
+      bodies to spaces IN PLACE keeping every newline, so `file:line` names the real line and a
+      hit quotes its own source line; a `${…}` is left as CODE, because it is; a mis-read costs
+      one line, never the file. **It is a lexer, not a JavaScript parser, and does not claim to
+      be** — its per-file validity assertion (same length, same line count, nothing left open)
+      FAILS THE GATE rather than scanning in an unknown state. A regex literal's body is exempt
+      as literal text, which it had to be: this gate's own negative control names `centerStyle`
+      inside one.
+
+    - **THE CLOSE (Sep 6-7).** All four bloom gates green on the PR head `e94ffce`
+      (bloom-export-watertight 87.5 min and bloom-connectedness 57 min on the full 528-row
+      matrix, bloom-panel, bloom-frozen-matrices; the two flower gates ran on the `tools/**`
+      filter and are not bloom evidence). Both controls fired before the fix was trusted: the
+      old chain at **48 hits** with the possessives back, every one at
+      `tools/bloom-harness.mjs:599`, against **0** for the walk; and nine mutations at real
+      executable positions each caught at exactly the spliced file and line, with four exempt
+      positions silent. **0 of 528 configs moved** on the full live matrix, a plain capture per
+      tree — true by construction (assertion strings are not geometry, and every file the
+      export path reads was predeclared untouched and byte-identical) and asserted anyway,
+      since CI does no byte diffs. #173 undrafted and merged by the session (squash) as
+      **`928e13e`**, the head sha read from the remote with `git ls-remote` and passed as
+      `expectedHeadSha`. **No frozen tag is owed and none was published** — no row added, no
+      byte moved; `buildMatrix()` is deep-equal between base and head at 528 rows, phase17
+      stays the newest baseline, and session 24's note that phase17's BYTES no longer reproduce
+      is untouched. The predeclared manifest re-verified against merged `main`: **384 of 384
+      held**, `bloom-geometry.js`, `bloom-registry.js` and `bloom.js` among them on Eva's
+      instruction, so "gate only" is a construction rather than a claim; `main` had not moved
+      between `888a506` and this merge, so its two moved files are exactly this session's two
+      predeclared movers. **No sheet is owed — nothing visual changes.** This entry is the
+      docs-only PR that follows the merge, on the session-22/23/24 rhythm.
