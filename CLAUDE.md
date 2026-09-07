@@ -2045,6 +2045,32 @@ it. Any NEW render path inherits the same obligation.
   exact cdnjs URLs `cards.html` pins, and replays real Google Fonts responses
   fetched by Node, so it needs no browser egress and is offline after one run.
 
+## Contact sheets — A PIXEL NUMBER IS ONLY A MEASUREMENT WITH ITS OWN CONTROL
+
+**THE RENDERER IS NOT DETERMINISTIC BETWEEN PAGE SESSIONS, and every sheet in this repo was
+shot as though it were** (Eva's ruling, Sep 7, from session 26's tip sheet). Measured: the
+SAME TREE, the SAME camera, shot twice at the fixed ~260 ms wait every sheet tool here uses —
+**4,925 to 7,426 pixels differ**, at worst channel steps of 82-88, spread over the whole
+frame. All of it is orbit damping still easing; headless software GL runs at ~2 fps, so the
+camera flight and the damping have a half-life measured in seconds and a fixed wait samples an
+arbitrary point on the way in.
+
+**So every pixel figure quoted from a sheet before session 26 has that floor underneath it.**
+The exposure is small in practice — most sheets here were ruled BY EYE, and a picture judged
+by eye is not harmed by sub-perceptual noise — but any sheet that reported a pixel DELTA as
+evidence was reporting a number with an unstated floor of several thousand.
+
+**THE RULE:** a pixel number is a measurement only when it comes with its own SAME-TREE
+CONTROL — the same tree, the same camera, shot twice, on that same row. Not one global control
+for the sheet: session 26 measured 0 px of noise at 13,440 triangles and 13 px at 80,544 on
+the same run, so the floor is per-row.
+
+**AND WAITING FIXES HALF OF IT, NOT ALL.** Settling on the real signal (screenshot until two
+consecutive frames are BYTE-IDENTICAL, never a fixed sleep) took the anther row from 27,262 px
+to 0. It did not take the 80,544-triangle row below 13 px. Where a residue remains, REPORT it
+beside the control and let the gate assert the property that can actually fail; do not invent
+a tolerance that happens to pass the data in hand.
+
 ## Maintainability & performance (working agreement)
 
 As the project grows, keep it maintainable and performant. Flag these proactively —

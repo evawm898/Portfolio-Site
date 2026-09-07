@@ -2034,6 +2034,35 @@ do not make the gates run again for nothing, and this one says do not stop them 
 head you have. Batch the close-out into ONE commit; a series of small pushes leaves the final
 head unproven and every earlier one abandoned.
 
+**AMENDED Sep 7 (Eva, session 26): PUSH ONCE APPLIES WHEN VERIFICATION IS COMPLETE BEFORE THE
+FIRST PUSH.** The rule above and the stop hook that requires committing and pushing as work
+lands are in direct conflict, and it has now cancelled full-matrix runs twice — session 18's
+two, and session 26's five pushes, each superseding the previous run. Session 26 named the
+conflict rather than letting it pass, which is the right handling and is why this amendment
+exists.
+
+**The amendment:** a session that must ITERATE ON AN INSTRUMENT — a gate, a sheet, a rig whose
+own defects only appear by running it — **declares that up front and reserves its FINAL push as
+the one allowed to run to completion.** The earlier pushes are then expected and their
+cancellations are not evidence lost, because the head they abandoned was never the head being
+certified. What remains forbidden is the unplanned drip: a series of small pushes with no
+declared final one, which is how a PR ends up open for half an hour with no completed gate
+result at all.
+
+Session 26 is the worked case: five pushes, the last (`2c5fd95`) declared in the PR body as the
+head that should be allowed to finish, and it is the head all four bloom gates ran on.
+
+**THE 600-LINE STOPPING RULE STAYS AS WRITTEN, AND ITS TRIGGER IS NOT SIZE** (Eva, Sep 7,
+session 26). Session 26 ran to roughly 1,600 insertions and the rule never fired, correctly:
+its trigger is **"if the diff passes roughly 600 lines BEFORE THE ASSERTIONS ARE GREEN"** —
+unverified surface, not volume. The assertions went green early there and everything after was
+measurement, mutants and prose, which is exactly the work the rule is not aimed at.
+
+**Eva's note, on the record because it cuts the other way: the INTENT behind the number was
+wrong, the rule was not.** A future session must not tighten this into a size cap. A 1,600-line
+session whose assertions were green at line 400 is a well-run session; a 300-line session with
+nothing green is the one the rule is for.
+
 **"SHIPPED MEANS REACHABLE" FIRED ON A WORKFLOW, AND THE CASE IS WORTH THE NAME (session 17).**
 `bloom-frozen-tags.yml` was written as a `workflow_dispatch` job so the tags could be published
 despite the proxy's 403, reported as ready to click, and it could not be clicked: **a
@@ -5126,3 +5155,28 @@ matters should be measured this way.
       photographing one tree twice), and row (A) is additionally shot twice on the base tree as
       a RENDERER control, because `0 pixels differ` is worth nothing if the renderer is not
       deterministic to begin with.
+
+- **Session 26's ruling (Eva, Sep 7): Q2 STANDS — RODRIGUES, NO GUARD.**
+
+    **RODRIGUES, NO GUARD. The trifid's 0.047 mm is acceptable.**
+
+    **THE REASON, and it is not the pixel counts.** 0.047 mm is the sagitta of the TEN-SIDED
+    TESSELLATION — **a facet phase rather than a change of form.** The solid is the same solid;
+    what moved is where the ten-gon's corners fall around its own axis. And sessions 3 and 4 make
+    the segment count variable, **at which point every tip moves regardless** — so a guard would
+    buy a permanent discontinuity in a shipped slider to preserve a property that expires in two
+    sessions.
+
+    **The pixel measurements corroborate; they do not decide.** They are recorded because a
+    ruling should be made in front of numbers, not because 4,800-against-6,868 is the argument.
+    Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
+    the expiry.
+
+    - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
+      floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
+      is only a measurement with its own control`): same tree, same camera, twice, at the
+      fixed 260 ms wait every sheet tool here uses — **4,925 to 7,426 px**, all of it orbit
+      damping. Every sheet this project has shot used a fixed wait, so any pixel figure quoted
+      from a sheet before session 26 has that floor underneath it; most were ruled BY EYE, so
+      the exposure is small. The push-once amendment and the 600-line note are above, at the
+      session-17 CI ruling.
