@@ -313,6 +313,37 @@ guard — a trifid row must move by at least ten times its own control, which is
 bar because the control measures tens of pixels and a real move measures tens of thousands.
 *Is the anther unchanged* is settled float-exactly in the byte rig, where it belongs.
 
+### WHAT THE SHEET MEASURED — and it answers the question
+
+Every number is a pixel count over a 1600x1600 frame, beside **that same row's own renderer
+control** (the base tree, same camera, shot twice). Read the pair, never the left number alone.
+
+| row | framing | base vs head | renderer control | |
+|---|---|---|---|---|
+| **6 stamens on a RING** (the anther) | whole bloom | 10,496 | **10,495** | indistinguishable |
+| | centre, 16 mm across | 8 | **8** | indistinguishable |
+| | stigma, 5.2 mm across | 0 | **0** | identical |
+| **120 on the DISC x rise 0.5** (the anther, at the ceiling) | whole bloom | 56,834 | **56,834** | *exactly* equal |
+| | centre, 16 mm across | 25 | **25** | *exactly* equal |
+| **a style, 1.20 mm sheet** (the trifid) | whole bloom | **4,800** | **6,868** | **BELOW the noise** |
+| | centre, 16 mm across | 159,729 | 6 | plainly visible |
+| | stigma, 5.2 mm across | 1,335,355 | 15 | dominant |
+| **a style x sheet 2.40** (the worst case) | whole bloom | 34,230 | 29,419 | barely above noise |
+| | stigma, 9 mm across | 1,467,254 | 12 | plainly visible |
+| **the bare bloom** (the control row) | whole bloom | 11,625 | 8,682 | indistinguishable |
+
+**THE ANTHER ROWS ARE STRONGER THAN "WITHIN TOLERANCE".** On the 120-stamen row the
+base-vs-head difference EQUALS the base-vs-base control exactly, to the pixel and to the worst
+channel step — which can only happen if the head render is byte-identical to one of the two
+base renders. The picture is not close to unchanged; it is the same picture.
+
+**AND THE TRIFID'S MOVE IS BELOW THE RENDERER'S OWN NOISE AT THE SIZE THE BLOOM SHIPS:** 4,800
+px against a 6,868 px floor measured at that same camera. Stated precisely, because the
+temptation is to overclaim: this does not prove a human eye cannot see it. It proves the change
+is **smaller than the harness's own frame-to-frame variation at whole-bloom framing**, while
+being 26,000x the noise one zoom step in. That is the evidence for Q2 — and it is Eva's ruling,
+not the sheet's.
+
 **STOP AT THE SHEET.** This change is visual — 0.047 mm of surface on a part that ships absent
 by default — so **merge waits on Eva's ruling on `tools/shot-bloom-tip.mjs`**, not on green CI.
 The sheet is what the ruling is made from, and the ruling being asked for is narrow: *is the
