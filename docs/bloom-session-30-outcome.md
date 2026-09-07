@@ -151,7 +151,7 @@ Every default reproduces today's trifid and today's pill **by the expressions' o
 
 **Measured, not argued** — `frozen/phase19` (549 rows at `eb3543f`, the newest baseline, the
 first carrying the anther's seven as controls) exported on a worktree of the base commit and on
-the final tree: FILLME_PHASE19. And the sheet's before/after pair from the base worktree: same
+the final tree: **549/549 byte-identical, 0 moved** (`diff-bloom-bytes --compare`, the base worktree at `eb3543f` against this tree; the two exports ran in parallel on one machine, so both sides are in the same state). And the sheet's before/after pair from the base worktree: same
 triangle count (14,400), the STYLE line's numbers identical, `macro` 0 px against a 0 px
 control.
 
@@ -279,7 +279,7 @@ FILLME_UNTOUCHED
 
 | instrument | result |
 |---|---|
-| `diff-bloom-bytes --compare` (phase19, both trees) | FILLME_PHASE19_ROW |
+| `diff-bloom-bytes --compare` (phase19, both trees) | **549/549 byte-identical; 0 moved** — the base worktree at `eb3543f` against this tree |
 | `diff-bloom-bytes --verify-frozen --phase19` | **PASS** — deep-equal to `eb3543f`'s own `buildMatrix()`, 549 rows |
 | `verify-bloom-export.mjs --only "^STIGMA:…"` | **25/25 watertight**, identical live/export counts, 0 degenerate — all of block 26 plus four control rows |
 | `verify-bloom-panel.mjs` | **PASS** — 191 ok lines, including the tip family's one-spec clause and both tip witnesses |
