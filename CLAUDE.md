@@ -2487,6 +2487,12 @@ distribution; an identity needs neither.** **AND THE BIMODALITY IS NOT CONFINED 
 WHOLE-BLOOM FRAMING:** the MACRO view threw a 38,057 px one-off between two states proved
 bit-identical to the float (0 of 120,960), and it did not reproduce over eight interleaved
 pairs — so `the macro control read 0 px on every row` is an OBSERVATION, never a guarantee.
+**A SINGLE SAME-TREE CONTROL IS NEVER A FLOOR** (Eva, session 30, after sessions 26, 28 and 30
+each found it independently — the last as 15 px against a 0 px control while the same run's other
+macro controls read 12 to 30 px): **a pixel BOUND is set from the RUN'S OBSERVED CONTROL
+DISTRIBUTION and both sides' controls, never from one sample.** An identity still needs neither,
+which is why the exact-zero claims (a triangle count, a read-out line character for character)
+stand unhedged and are what carry a row.
 
 **WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 29). The
 push-once amendment covers INSTRUMENT ITERATION; a session waiting on a ruling is the other

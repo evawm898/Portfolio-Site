@@ -245,9 +245,8 @@ Sheet results: FILLME_SHEET.
 
 ## What this session is blind to, or did not do — stated
 
-- **The lattice jump** (10 → 16 sides the moment roundedness leaves 1, at any sharpness) is
-  session 31's, ruled so; it moves bytes and gets its own commit. The sheet photographs it in
-  group 2's third cell.
+- **The lattice jump** is one site of the singularity below, and session 31's; it moves bytes
+  and gets its own commit. The sheet photographs it in group 2's third cell.
 - **The `gynoecium` choice's read-out at NONE** lists the style's kept settings and not the
   stigma's seven. Adding them is one `fmt` edit; left, to keep this diff to the generator.
 - **`tools/verify-bloom-tip-bytes.mjs` is untouched and not run** — its rows predeclare that the
@@ -266,6 +265,55 @@ Sheet results: FILLME_SHEET.
   assertions are green* — did not fire: the census, the frozen check, the export gate on block
   26, the panel gate in both directions and the quick sheet were green before the docs were
   written. Said here because the number is over, whatever the reason.
+
+---
+
+## Two patterns, not incidents (Eva, on reading the run)
+
+### Sharpness 2.00 is a SINGULARITY, not three bugs
+
+It has been handled separately at three sites, and it is one finding:
+
+| site | session | what was done |
+|---|---|---|
+| the roundedness slider dead through its whole travel at s = 2 | 29 | the anther's default moved to 1.00 |
+| the lattice jumping 10 → 16 sides for no form change | 29 → parked to 31 | the one-line `tipSides()` fix, costed at +60% triangles per tip at that corner |
+| JG5 / JS6's "not all 1 below roundedness 1" firing on a legitimate, reachable row | 30 | the clause exempts `sharpness === 2`; block 26 pins the row |
+
+At `s = 2` the law is the circle for every roundedness — `h = (cos² + sin²)^(−1/2)` is exactly 1
+at every azimuth — so every instrument that assumes "roundedness below 1 shapes the outline" is
+wrong at exactly that point, and each session met a different instrument. **Session 31's brief
+carries the DESIGN question, costed, for Eva to decide rather than a fourth patch: should the
+control carry a value that maps to `s` with the singular point at an END of the travel or
+UNREACHABLE?** The shape of the options, for that brief and not decided here: (a) leave the
+domain and document the point — free, and the fourth site arrives on schedule; (b) exclude 2
+from the range — a `step` that never lands on it (0.05 does; a step of 0.03 from 0.25 does not,
+but reads as an arbitrary grid) or two sub-ranges; (c) re-parameterise the slider so the visitor
+moves a "pinch" that maps to `s` monotonically with `s = 2` at the pinch-free END — the cleanest
+picture, and a stored-value change for every saved `antherSharpness` / `stigmaSharpness`, so a
+migration and a byte event on every shaped tip; (d) keep `s` and make the circle reachable only
+through roundedness 1, by clamping `s` away from 2 by one step — moves the shaped rows at 2.00
+only. Each is a ruled-law change, which is why it is a question and not a patch.
+
+### A single same-tree control is NEVER a floor
+
+Sessions 26, 28 and 30 each found this independently: 26 at whole-bloom framing (the bimodal
+control), 28 with a 38,057 px one-off between bit-identical states, and this session twice —
+**15 px on the macro view against a 0 px control while the same run's other macro controls read
+12 to 30 px**, on the before/after pair (run 1) and on the INERT row (run 2). **The rule, now in
+the charter and `CLAUDE.md`: a pixel bound is set from the run's OBSERVED CONTROL DISTRIBUTION
+and both sides' own controls, never from one sample.** `shot-bloom-stigma.mjs` uses the run's
+largest macro control plus the two rows' own. An identity still needs neither — the triangle
+count, the STIGMA and STYLE lines character for character, phase19's 549/549 — which is why the
+exact-zero claims stand unhedged and are what carry those rows. The sheet's noise numbers are
+reported beside every comparison for the same reason.
+
+### And the brief's premise, in its author's words
+
+> I told you not to copy 1.00 because a trifid lobe is a different size, and it is not — it is
+> the anther's proportion exactly, so the floor binds at the same sharpness. The value is right
+> and now it has a derivation attached rather than an inheritance, which is the part worth
+> keeping.
 
 ---
 

@@ -5313,6 +5313,18 @@ matters should be measured this way.
     sheets is 800,000+ px, three orders above any observed event) and fragile in the direction
     that costs a run. This belongs beside the retraction, not in a sheet's own header.
 
+    **A SINGLE SAME-TREE CONTROL IS NEVER A FLOOR** (Eva, session 30 — the rule, after three
+    sessions found it independently). Session 26 at whole-bloom framing (the bimodal control);
+    session 28 with the 38,057 px one-off between bit-identical states; session 30 with 15 px
+    on the macro view against a 0 px control while the SAME RUN's other macro controls read 12
+    to 30 px — twice, on the before/after pair and on the INERT row. **A pixel BOUND is set from
+    the run's OBSERVED CONTROL DISTRIBUTION and both sides' own controls, never from one
+    sample**: take every same-tree control the run produced on that framing, use its largest
+    (or a stated quantile) plus the two rows' own, and say so in the caption. An IDENTITY still
+    needs neither — a triangle count, a read-out line character for character, `0 of N floats`
+    — which is why the exact-zero claims stand unhedged and are what carry a row. Write the
+    rule into a sheet tool's header, not the workaround.
+
     - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
       floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
       is only a measurement with its own control`): same tree, same camera, twice, at the
@@ -5621,6 +5633,21 @@ matters should be measured this way.
   "Anther" and "Stigma", each declared in RENDER ORDER after its parent (the gate's census
   compares document order to the array; declaring both after Gynoecium failed it, and took the
   accordion route down with it).
+
+  **SHARPNESS 2.00 IS A SINGULARITY, NOT THREE BUGS** (Eva, session 30). It has been handled
+  separately at three sites: the roundedness slider dead through its whole travel at s = 2
+  (session 29, moved the default to 1.00); the lattice jumping 10 → 16 for no form change
+  (parked to session 31); and JG5/JS6's "not all 1 below roundedness 1" firing on a
+  legitimate row (this session's exemption). One finding: at s = 2 the law is the circle for
+  every roundedness, so every instrument that assumes "roundedness below 1 shapes the outline"
+  is wrong at exactly that point. **Session 31's brief carries the design question, costed,
+  for Eva to decide — whether the control should carry a value that maps to s with the
+  singular point at an END of the travel or UNREACHABLE — rather than a fourth patch.**
+
+  **THE BRIEF'S PREMISE WAS WRONG, SAID BY ITS AUTHOR** (Eva, session 30): "I told you not to
+  copy 1.00 because a trifid lobe is a different size, and it is not — it is the anther's
+  proportion exactly, so the floor binds at the same sharpness. The value is right and now it
+  has a derivation attached rather than an inheritance, which is the part worth keeping."
 
   **THE DIFF PASSED THE STOPPING RULE'S LINE WITH THE ASSERTIONS GREEN**: ~900 changed lines
   outside phase19's 549 generated rows, a third of it comment prose moved with its code. The
