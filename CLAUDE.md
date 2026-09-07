@@ -2066,9 +2066,32 @@ nothing to do with the head turning.
 what makes a pixel measurement here repeatable at all — a fixed wait samples
 an arbitrary point on the damping curve.
 
-**SIX THINGS THE STEM CHECKS GOT WRONG BEFORE THE NEGATIVE CONTROL WAS CLEAN,
-each measured and each worth not re-learning.** The last two were found by the
-control itself, on its second and third passes, and both are the same mistake:
+**THE IDLE SKIP IS MEASURED ON DRIVEN FRAMES, NOT ON WALL-CLOCK, and the first
+version of that check passed the mutation it exists for.** Headless Chromium's
+rAF is driven by the compositor, which idles when nothing is dirty — so 1.5 s of
+doing nothing produced **2 frames under a page that renders EVERY tick**, the
+same number a page that correctly skips them produces, and the always-render
+mutant sailed straight through. Scheduling rAF from the page forces the frames
+to happen and the two answers separate completely: **0 against ~60**. The check
+also used to require the wheel to paint, which is the other check's job — so
+removing the wheel fix reddened both and the pair stopped being a biconditional
+over two independent properties.
+
+**SEVEN THINGS THE STEM CHECKS GOT WRONG BEFORE THE NEGATIVE CONTROL WAS CLEAN,
+each measured and each worth not re-learning.** Three passes of the control were
+needed; besides the idle-skip defect above and the two below, four more mutants
+had UNCLAIMED reds that were all true statements about the mutation and are now
+named on its list — a Z-up misread puts the stem into the screen so the root
+handle projects off the canvas and a drag on it reaches nothing; a decay of
+0.999 at the ring is BELOW the smoothstep's own first step so the decay stops
+being monotone; a stepped funnel is not flat where it lands; and how fine the
+station ladder has to be is a property of the WIDTH LAW, so changing it moves
+the bend case from 0.155 mm to 0.442. **A REFACTOR SILENTLY DISARMS A MUTANT:**
+`the-bend-is-not-gated-by-the-funnel` edited a line that the station-plan
+factoring moved, and the control reported "mutation did not apply" rather than a
+false pass — which is the one thing that makes that failure mode survivable.
+
+The next two are the same mistake as each other:
 a check anchored to a number that belongs to a DIFFERENT check, so it reported
 on the reader instead of on itself.
 * **THE RING'S CENSUS BELONGS WITH THE COUNT CHECK, not with the check about

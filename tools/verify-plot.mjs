@@ -136,7 +136,13 @@ const MUTANTS = [
   {
     id: 'the-source-is-read-as-y-up', file: 'plot.js',
     from: 'container.rotation.x = -Math.PI / 2;', to: 'container.rotation.x = 0;',
-    breaks: ['zup/the-attachment-ring-is-flat'],
+    // The stem descends in the grid's −Z, which the correction sends to world
+    // −Y. Without it the stem runs INTO the screen, the camera fit follows it
+    // there, and the root handle projects off the canvas — so a drag aimed at
+    // it reaches nothing and the root moves 0.00 mm. A true report that the
+    // page's orientation is broken, from a check about something else.
+    breaks: ['zup/the-attachment-ring-is-flat',
+             'bend/the-root-is-a-point-like-any-other'],
   },
   {
     id: 'a-mesh-gltf-is-accepted-silently', file: 'plot.js',
@@ -200,14 +206,21 @@ const MUTANTS = [
     from: '  if (t <= 0) return 1;\n  if (t >= 1) return 0;',
     to: '  if (t <= 0) return 0.999;\n  if (t >= 1) return 0;',
     breaks: ['stem/the-boundary-values-are-exact-not-approached',
+             // 0.999 at the ring is BELOW the smoothstep's own first step
+             // (0.9997), so the decay rises before it falls and stops being
+             // monotone — a second, true thing wrong with it.
+             'stem/the-decay-washes-the-droop-out-over-the-neck',
              'stem/the-head-and-the-stem-agree-at-the-ring',
              'stem/the-seam-is-zero-on-every-drawn-line'],
   },
   {
     // The bend reaches the head: drag a control point and the bloom comes too.
+    // The gate lives in the STATION PLAN, which is where the bend's
+    // displacement is multiplied by the funnel's progress once per station
+    // rather than once per point.
     id: 'the-bend-is-not-gated-by-the-funnel', file: 'plot-stem.js',
-    from: '  out[0] = foot[0] + g * (opts.bundle * ux - fx) + g * tmp[0];',
-    to: '  out[0] = foot[0] + g * (opts.bundle * ux - fx) + tmp[0];',
+    from: '           bx: g * d[0], by: g * d[1], bz: g * d[2] };',
+    to: '           bx: d[0], by: d[1], bz: d[2] };',
     breaks: ['stem/a-bend-cannot-reach-the-head',
              'stem/the-head-and-the-stem-agree-at-the-ring',
              'bend/dragging-a-handle-leaves-the-head-alone'],
@@ -218,7 +231,11 @@ const MUTANTS = [
     id: 'the-funnel-steps-instead-of-tapering', file: 'plot-stem.js',
     from: '  if (t >= 1) return 1;\n  return t * t * (3 - 2 * t);',
     to: '  if (t >= 1) return 1;\n  return 0;',
-    breaks: ['stem/the-funnel-closes-smoothly-over-the-join'],
+    // A step is not flat where it lands either: the last sample before the
+    // join is 0 and the one at it is 1, so the endpoint-slope clause goes with
+    // the smoothness one.
+    breaks: ['stem/the-funnel-opens-and-closes-flat',
+             'stem/the-funnel-closes-smoothly-over-the-join'],
   },
   {
     // A stem for lines that are not drawn. Plausible everywhere except in the
@@ -264,7 +281,12 @@ const MUTANTS = [
     id: 'the-bend-width-is-not-derived-from-the-neighbours', file: 'plot-warp.js',
     from: '    return Math.max(1e-6, SIGMA_SPREAD * mean);',
     to: '    return Math.max(1e-6, LONE_SIGMA_SPREAD * L);',
-    breaks: ['warp/the-width-comes-from-the-neighbours'],
+    // HOW FINE THE LADDER HAS TO BE IS A PROPERTY OF THE WIDTH LAW. Six
+    // control points at 0.6 x the axis instead of 0.6 x their neighbour gap
+    // overlap into a field the ladder was not sized for: the bend case measures
+    // 0.442 mm against the shipped law's 0.155.
+    breaks: ['warp/the-width-comes-from-the-neighbours',
+             'stem/the-station-ladder-is-fine-enough-to-draw-the-curve'],
   },
 ];
 
@@ -1431,8 +1453,20 @@ async function run({ mutant = null } = {}) {
   const CLIP = { x: 330, y: 60, width: 420, height: 700 };
   const hashOf = buf => { let h = 2166136261;
     for (let i = 0; i < buf.length; i++) h = (Math.imul(h ^ buf[i], 16777619)) >>> 0; return h; };
+  /* DRIVEN FRAMES, NOT WALL-CLOCK. Headless Chromium's rAF is driven by the
+     compositor, which idles when nothing is dirty — so 1.5 s of doing nothing
+     produced 2 frames under a page that renders EVERY tick, which is the same
+     number a page that skips them correctly produces, and the always-render
+     mutant sailed through. Scheduling rAF from the page forces the frames to
+     happen, and the two answers separate completely: 0 against ~60. */
+  const driveFrames = n => page.evaluate(n => new Promise(res => {
+    let i = 0;
+    const tick = () => (++i < n ? requestAnimationFrame(tick) : res(i));
+    requestAnimationFrame(tick);
+  }), n);
+  const DRIVEN = 60;
   const idleBefore = await q(() => window.__plot.renderCount());
-  await page.waitForTimeout(1500);
+  const driven = await driveFrames(DRIVEN);
   const idleAfter = await q(() => window.__plot.renderCount());
   const wheelFrames = [], wheelDist = [];
   for (let i = 0; i < 4; i++) {
@@ -1445,13 +1479,18 @@ async function run({ mutant = null } = {}) {
   const afterWheel = await q(() => window.__plot.renderCount());
   check('zoom/a-wheel-event-repaints',
     new Set(wheelFrames).size === wheelFrames.length
-    && wheelDist.every((d, i) => i === 0 || d < wheelDist[i - 1]),
+    && wheelDist.every((d, i) => i === 0 || d < wheelDist[i - 1])
+    && afterWheel - idleAfter >= 1,
     `${new Set(wheelFrames).size} distinct frames from ${wheelFrames.length} wheel events, `
-    + `camera ${wheelDist.map(d => d.toFixed(1)).join(' -> ')}`);
+    + `camera ${wheelDist.map(d => d.toFixed(1)).join(' -> ')}, `
+    + `${afterWheel - idleAfter} frames painted`);
+  /* THE IDLE HALF ALONE. It used to also require the wheel to paint, which is
+     the other check's job — so removing the wheel fix reddened both and the
+     pair stopped being a biconditional over two independent properties. */
   check('zoom/an-idle-frame-is-still-skipped',
-    idleAfter - idleBefore <= 2 && afterWheel - idleAfter >= 1,
-    `${idleAfter - idleBefore} frames painted over 1.5 s of nothing happening, `
-    + `${afterWheel - idleAfter} over four wheel events`);
+    idleAfter - idleBefore <= 2,
+    `${idleAfter - idleBefore} frames painted over ${driven} rAF ticks driven `
+    + 'from the page with nothing happening');
 
   // THE DRAW CONTROLS STILL WORK WITH THE STEM ON — the checks above them all
   // ran with it off, so without this the stem could be shipping a page whose
