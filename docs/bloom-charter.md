@@ -5252,3 +5252,12 @@ matters should be measured this way.
     moves bytes on purpose still owes `diff-bloom-bytes.mjs` and a predeclared partition.
     **No frozen phase owed:** no row added, no row definition moved. `frozen/phase17` stays the
     newest baseline and session 24 stays the only "these bytes no longer reproduce" entry.
+
+    **CLOSED — merged as `b021f1c` (PR #177), all six CI jobs green on `bacb232`.** Four of the
+    six are bloom (`bloom-export-watertight` 73 min on the full 528 rows, `bloom-connectedness`
+    48 min on the flood fill, `bloom-panel`, `bloom-frozen-matrices` — which carries the new
+    family census and its negative control alongside `--verify-frozen` on all sixteen
+    baselines); the two flower gates ran only on the `tools/**` filter and are not bloom
+    evidence, per the standing note. **One process finding worth carrying:** the GitHub
+    run-level `status` read STALE for twenty minutes after a job finished — read
+    `list_workflow_jobs`, not the run, and it is far leaner besides.
