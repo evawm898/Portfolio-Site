@@ -1615,6 +1615,186 @@ genuinely BROAD base, because neither shipped bundle has one. Everything above
 about `converge` being a base-zone lever is a fact about this leaf's proportions,
 not about the law.
 
+## `/plot` — the curve viewer for the bloom grid export
+
+`plot.html` / `plot.css` / `plot.js` / `plot-grid.js` draw the bloom
+generator's grid glTF (the `Get grid ↓` export) as white-on-black line art: the
+x-ray/architectural look, where the drawing is literally the petal's own
+construction curves. It is `noindex`, it exports nothing, and it changes
+nothing about the generator or the export format.
+
+**IT IS NOT `/print` AND SHARES NO CODE WITH IT.** `/print` is mesh →
+silhouette → fill and INFERS structure from triangles; `/plot` draws curves
+that are already in the file. None of the silhouette extraction, crease
+detection, infill families, winding rule or scan-direction machinery applies
+here and none of it is imported — the whole render is read the LINE_STRIPs,
+project them, stroke them. Keep it that way. `/print` was not touched.
+
+**ROUTING IS THE PATTERN `/bloom` AND `/print` ALREADY USE, WHICH IS NO
+PATTERN AT ALL:** there is no `_redirects`, no `netlify.toml` redirect and no
+route table. The site is published from the repo root and Netlify's pretty
+URLs serve `/plot` from `plot.html`. Adding the page IS the routing change.
+
+**WHAT THE EXPORT CONTAINS, verified against a real 606 KB file** and not
+taken on trust: one `petal_N` node per petal with a `petal_N_attachment`
+child (a POINTS primitive at the attachment); ~39 LINE_STRIP primitives per
+petal, `POSITION` only, no materials; `extras.kind` (`u` / `v`) plus `v` /
+`column` on a u-line and `u` / `row` on a v-line; `asset.extras` carrying
+`mode`, `units` and the petal retention counts. On the sample: **280 u-lines
+of 29 points and 812 v-lines of 10 points — 1092 strips, 7,840 + 7,308 =
+15,148 segments** across 28 petals. (The kickoff brief's "11,500 for u+v" is
+low; 15,148 is what the file holds and what the page draws.) **The census is
+recounted from the .glb's own JSON chunk by the gate** and the page has to
+agree strip for strip — "extras.kind separates the families" is not checked by
+asking the page whether it thinks it did.
+
+**THE FAMILY COMES FROM THE TAG, NEVER FROM THE SHAPE**, and a strip the
+format did not tag is not guessed at: it lands in an `other` bucket that is
+drawn under every family switch, with the read-out naming it. A tag-blind
+reader still draws a plausible picture, which is why the gate's fixture
+includes a u-shaped strip tagged `v`.
+
+**ADDITIVE BLENDING DECIDES A DEFAULT, AND IT IS THE ONE CONTROL BEYOND THE
+BRIEF'S FOUR.** Overlapping petals brighten where they cross because the
+fragments genuinely add. The consequence is that a line already drawn at full
+white has no headroom, so the single-line level IS the glow control:
+`brightness` ships at 30%. That also gives the additive check its calibration
+rather than a threshold picked to pass — tone mapping is off and the colour is
+set in linear space, so **the brightest pixel a single fully-covered line can
+produce is exactly sRGB(brightness)** (137/255 at 25%, 170 at 40%), coverage
+and the depth dim can only lower it, and anything above it is accumulation.
+Measured: the frame reaches 255 with tens of thousands of pixels above the
+single-line ceiling; under `NormalBlending` that count is the mutation's
+witness.
+
+**THE DEPTH DIM IS EXACT, NOT A FEEL.** Three's linear fog fades by
+`smoothstep(near, far, depth)`, so `dimToFog()` pins `near` at the nearest
+point of the model on the LIVE camera and SOLVES the far plane from the
+closed-form inverse (`t = ½ − sin(asin(1−2y)/3)`) so the farthest point lands
+at exactly the amount asked for. The read-out can then say what the number
+means — at 60% the farthest line draws at 40% — and the gate checks the
+arithmetic (delivered vs asked: 30.000 / 60.000 / 90.000%) instead of
+eyeballing a gradient. Black fog under additive blending is a multiply, so a
+far line simply adds less; `scene.fog` null/non-null flips `USE_FOG` in the
+program, so the material is told when the fog APPEARS or GOES, not when its
+numbers move. **The read-out states the SETTING and the gate proves the
+delivery** — the DRAW panel's dim line is derived from the control, never from
+`scene.fog`, because the fog is re-solved during the render and a read-out that
+consulted it printed the previous frame's answer (a dim just switched on still
+said "off"); what checks that the two agree is `dim/the-fog-is-solved-on-the-live-camera`,
+against `__plot.depthRange()`. The panel is written when a control moves or a
+grid loads, not per frame: nothing in it depends on the camera and rebuilding it
+costs a `selectStrips` sweep per family (that is what the dead-step marker
+asks). The frame time is the one live number and has its own line.
+
+**THE SOURCE IS Z-UP** and the correction is one rotation on the one container
+every grid is parented to. The witness is the attachment ring, which is flat
+in the export: 28 attachments, world-Y spread 1.7e-15 against 8.1 and 7.7 of x
+and z. A y-up misread exports nothing and throws nothing — only that check
+sees it.
+
+**BOTH MARGINS OF EVERY PETAL SURVIVE ANY STRIDE.** For the u family those two
+lines are the petal's own outline, and dropping one at an even stride makes
+every petal on screen read lopsided. `densityToEvery()` in plot-grid.js is the
+one owner of the slider→stride map (right = every line, the `/print` `detail`
+precedent) and `keepsIndex()` of the rule.
+
+**EACH DENSITY SLIDER HAS DEAD STEPS, AND THEY ARE TOLD RATHER THAN TRIMMED**
+— the `stamenSpread` ruling. A stride can only thin a family down to its two
+margins, and WHICH steps are wasted is a property of the FILE: on this grid the
+u slider has three dead steps (densities 2, 3 and 4 — strides 9 through 12 all
+land on {0, 9} of ten columns) and the v slider has NONE, because over 29 rows
+every stride to 12 keeps a different set.
+No fixed range is dead-free and an adaptive maximum would make one slider
+position mean different things on different files, so **the RANGE is named on
+the read-out and hatched on the track** — `.plot-track--dead` and `--plot-dead`,
+the convention `bloom.css`'s `.bl-ctrl--capped` established for `stamenSpread`,
+mirrored for a slider whose dead travel is at the LEFT end. The panel prints
+"density 1–4 all draw the same lines" at every position and adds "you are in
+it" when the slider is inside; the range itself is untouched and the whole
+travel stays reachable. **The mark compares the SELECTION, not its size** — over
+ten columns stride 3 keeps {0,3,6,9} and stride 4 keeps {0,4,8,9}, four lines
+each and a different picture, and a count comparison marked eight of the u
+slider's twelve positions dead where three steps are (measured).
+The gate asserts the per-step biconditional at all 12 positions of both
+sliders, that the named range is the run those steps imply, and that the hatch
+appears exactly when there is dead travel and to exactly its extent. A first
+attempt asserted a STRICT decrease in segments and went red, which is how the
+dead travel was found at all; a second hard-coded "v has none", which made the
+mutation that EMPTIES v look like a dead-travel defect — an empty family really
+is dead at every position, and the check is a biconditional now for that
+reason.
+
+**THE CAMERA FITS THE PROJECTED EXTENT, NOT A BOUNDING SPHERE**, and centres
+on the drawing rather than on its box. A bloom grid is a wide flat disc: a
+sphere fit leaves most of the frame empty, and a symmetric `max|offset|` bound
+around a lopsided drawing centres the BOX and leaves the picture riding high.
+
+**A FILE THAT IS NOT A GRID FAILS VISIBLY AND CHANGES NOTHING.** A mesh glTF
+is named for what it is ("no LINE_STRIP primitives — found 2 triangles in 1
+mesh. This looks like a mesh glTF, not a bloom grid export"), and the grid
+that was on screen stays on screen — an empty viewport is indistinguishable
+from a page that broke. `GLTFLoader.parse()` called directly does NOT catch
+its own exceptions (the same measured fact `/print` records), so both the
+throw and the error callback are handled.
+
+**COST IS TRIVIAL AND THAT IS THE REPORT, NOT AN OPTIMISATION.** 0.10 ms
+median CPU per settled frame at all 15,148 segments, headless software GL,
+1100x800 (worst 0.20). The 26 ms first frame is shader compilation. Two
+`LineSegments2` objects and one `LineMaterial`; the density sliders REBUILD
+the segment buffers rather than mask, because rebuilding 15k segments is
+cheaper than the bookkeeping to avoid it.
+
+**Verify with `node tools/verify-plot.mjs`** (45 checks). Part one drives the
+shipped `plot-grid.js` functions in Node over fixtures whose answer is written
+down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
+{0,4,8,9} where 9 survives ONLY as the margin), because on the real grid a
+wrong stride, a wrong family split or a merely plausible fog range all still
+draw a plausible picture. Part two drives the page in a real browser and
+measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
+`__plot.readPixels()` reads it back through `gl.readPixels` straight after a
+render, so no DOM panel can be counted as ink and no PNG decode sits in the
+way. **`--negative-control` runs eight mutants and is required before quoting
+a pass from a changed harness**; it re-serves broken copies of `plot.js` and
+`plot-grid.js` through the gate's own HTTP server (and imports the broken
+module for part one), and fails if a mutation does not apply, if a check the
+mutant NAMES stays green, or if a check it did not name goes red.
+`__plot.settle()` advances OrbitControls until it reports no motion, which is
+what makes a pixel measurement here repeatable at all — a fixed wait samples
+an arbitrary point on the damping curve.
+
+The sheet is `node tools/shot-plot.mjs <dir>` — the two families apart and
+together at a low camera angle, two density settings, each lever as a pair,
+the drag-and-drop swap actually swapping (a real `File` on a real
+`DataTransfer` through a real dispatched `DragEvent`), the panels, and the
+mesh glTF being refused. **It quotes no pixel delta anywhere**, because the
+renderer is not deterministic between page sessions and none of these cells
+needs one; every cell settles by screenshotting until two consecutive frames
+are byte-identical.
+
+**Nothing here runs in CI.** Every GitHub Actions gate in this repo is
+path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
+— run the gate and the sheet by hand. Note the corollary `/print` and `/cards`
+already hit: `flower-export-watertight.yml` and `flower-geometry-quality.yml`
+are path-filtered on `'tools/**'`, so ADDING `tools/verify-plot.mjs` makes both
+flower gates run on a plot PR. They still test flower geometry; two green
+`verify` jobs on a plot PR are not evidence that anything about `/plot` was
+checked.
+
+Dev-only deps, gitignored and not in `package.json` (same convention as the
+other gates): `npm i --no-save three@0.161.0 playwright-core`, in ONE line.
+Three is served from `node_modules` at the exact jsDelivr URLs `plot.html`
+pins, so the gate needs no CDN egress.
+
+**A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
+shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
+form. That is a bloom parameter. The sheet photographs it and the viewer does
+not compensate for it.
+
+**Out of scope on purpose:** multiple blooms, composition and arrangement;
+stems and buds; print or SVG export; any change to `/print`, the generator, or
+the grid export format.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid Plot — Eva Maskalenko</title>
+<meta name="description" content="Curve viewer for the parametric bloom's grid export: the petal's own construction curves drawn white on black.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Three.js via ES-module import map, pinned to the SAME version bloom.html
+     and print.html already pin (0.161.0), so all three pages share one cached
+     copy and a headless CDN intercept has one URL to fulfil. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<link rel="stylesheet" href="plot.css">
+</head>
+<body>
+
+<canvas id="plot-canvas"></canvas>
+<div id="plot-dropzone-hint" hidden>drop a grid .glb to load it</div>
+
+<div id="plot-left">
+
+<!-- LOAD GRID. The one control that changes WHICH drawing you are looking at,
+     so it is its own panel rather than a row above a wall of diagnostics. -->
+<details id="plot-bundle-load" class="panel" open>
+  <summary>LOAD GRID</summary>
+  <label for="gridFile">load grid
+    <input type="file" id="gridFile" accept=".glb,model/gltf-binary">
+  </label>
+  <span class="hint">or drop a grid .glb anywhere on the page</span>
+</details>
+
+<!-- GRID. What the file turned out to be. `mode` comes from the export's own
+     asset.extras and is surfaced because every other number in this project is
+     labelled live/export and this one should be too. -->
+<details id="plot-grid" class="panel" open>
+  <summary>GRID</summary>
+  <pre id="plot-log">loading…</pre>
+</details>
+
+</div>
+
+<div id="plot-side">
+
+<!-- DRAW. Every control is live — nothing here is a re-export. The two density
+     sliders run the same way round (right = every line) and thin the grid out
+     as they travel left; `densityToEvery()` in plot-grid.js is their one owner
+     and the read-out below prints the stride it lands on. -->
+<details id="plot-draw" class="panel" open>
+  <summary>DRAW</summary>
+
+  <div class="plot-row">
+    <label for="families">lines</label>
+    <select id="families">
+      <option value="both" selected>u + v</option>
+      <option value="u">u only</option>
+      <option value="v">v only</option>
+    </select>
+    <output id="familiesOut"></output>
+  </div>
+
+  <div class="plot-row">
+    <label for="uDensity">u density</label>
+    <span class="plot-track" id="uDensityTrack">
+      <input type="range" id="uDensity" min="1" max="12" step="1" value="12">
+    </span>
+    <output id="uDensityOut">every line</output>
+  </div>
+  <div class="plot-row">
+    <label for="vDensity">v density</label>
+    <span class="plot-track" id="vDensityTrack">
+      <input type="range" id="vDensity" min="1" max="12" step="1" value="12">
+    </span>
+    <output id="vDensityOut">every line</output>
+  </div>
+  <div class="plot-row">
+    <label for="weight">weight</label>
+    <input type="range" id="weight" min="0.3" max="5" step="0.1" value="1.1">
+    <output id="weightOut">1.1 px</output>
+  </div>
+  <!-- BRIGHTNESS is the glow control, and it is the one addition to the four
+       controls the brief lists. Under additive blending a line already drawn at
+       full white cannot brighten where a second line crosses it, so the
+       single-line level IS how much crossings can add. -->
+  <div class="plot-row">
+    <label for="brightness">brightness</label>
+    <input type="range" id="brightness" min="5" max="100" step="1" value="30">
+    <output id="brightnessOut">30%</output>
+  </div>
+  <div class="plot-row">
+    <label for="depthDim">depth dim</label>
+    <input type="range" id="depthDim" min="0" max="100" step="1" value="55">
+    <output id="depthDimOut">55%</output>
+  </div>
+
+  <div class="plot-hint">drag to orbit · scroll to zoom</div>
+  <button type="button" id="resetView">reset view</button>
+
+  <pre id="plot-drawstate"></pre>
+  <pre id="plot-framestate"></pre>
+</details>
+</div>
+
+<script type="module" src="plot.js"></script>
+</body>
+</html>

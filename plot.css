@@ -1,0 +1,98 @@
+/* plot.css — the curve viewer at /plot.
+   Panel grammar is /print's on purpose (native <details>, a three-column row,
+   teal summaries): the two pages are read side by side and there is no reason
+   for a slider to look different here. The GROUND is not /print's: the whole
+   point of this page is white ink accumulating on black, so the viewport is
+   pure #000 and the chrome sits just off it. */
+
+:root { --mono: "IBM Plex Mono", ui-monospace, monospace; color-scheme: dark; }
+html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
+#plot-canvas { display: block; width: 100vw; height: 100vh; }
+
+/* The two fixed columns. Each SCROLLS, so a long read-out never pushes a
+   control off the screen, and each panel folds on its own. */
+#plot-left, #plot-side {
+  position: fixed; top: 0.9rem;
+  max-height: calc(100vh - 1.8rem); overflow: auto;
+  display: flex; flex-direction: column; gap: 0.7rem;
+}
+#plot-left { left: 0.9rem; max-width: min(28rem, calc(100vw - 1.8rem)); }
+#plot-side { right: 0.9rem; width: min(23rem, calc(100vw - 1.8rem)); }
+
+.panel {
+  font-family: var(--mono); font-size: 0.72rem; line-height: 1.6;
+  background: rgba(6, 8, 8, 0.88); border: 1px solid #2b3333;
+  padding: 0.7rem 0.9rem; border-radius: 2px; color: #96a2a1;
+}
+
+/* PANELS ARE ALWAYS PRESENT AND EACH COLLAPSES ON ITS OWN — native <details>,
+   so no JS owns the open/closed state and a panel cannot be "missing" because
+   the page was in the wrong state when it was looked for. Nothing here is ever
+   conditionally hidden; a panel with nothing to report says so. */
+.panel > summary {
+  color: #6fb7ae; letter-spacing: 0.08em; cursor: pointer;
+  list-style: none; user-select: none; display: flex; align-items: center; gap: 0.4rem;
+}
+.panel > summary::-webkit-details-marker { display: none; }
+.panel > summary::before { content: '\25be'; font-size: 0.85em; width: 0.7em; }
+.panel:not([open]) > summary::before { content: '\25b8'; }
+.panel > summary:hover { color: #8fd3ca; }
+.panel[open] > summary { margin-bottom: 0.5rem; }
+
+.plot-row { display: grid; grid-template-columns: 4.2rem 1fr 5.4rem; align-items: center; gap: 0.5rem; }
+.plot-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; display: block; }
+
+/* THE DEAD TRAVEL IS MARKED ON THE TRACK, AND THE RANGE IS NOT NARROWED — the
+   convention bloom.css's `.bl-ctrl--capped` established for `stamenSpread`.
+   A density slider can only thin a family down to its two margins, and how
+   many of its leftmost positions land on the same lines is a property of the
+   FILE, so the span is hatched with a tick at its right edge and the read-out
+   names it. Pointer-events off: it is a mark, not a control, and the whole
+   travel stays reachable. Chromium's default range draws a 16 px thumb whose
+   centre travels from 8 px to width − 8 px, which is what the calc() maps the
+   fraction onto. */
+.plot-track { position: relative; display: block; }
+.plot-track--dead::after {
+  content: ""; position: absolute; pointer-events: none;
+  left: 0; width: calc(8px + var(--plot-dead, 0) * (100% - 16px));
+  top: 0; bottom: 0;
+  border-right: 2px solid #6fb7ae;
+  background: repeating-linear-gradient(135deg, rgba(111, 183, 174, 0.30) 0 2px,
+                                        transparent 2px 6px);
+}
+.plot-row output { text-align: right; color: #c8d2d1; font-size: 0.68rem; }
+.plot-row select {
+  background: #0a0e0e; color: #c8d2d1; border: 1px solid #2b3333;
+  font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; width: 100%;
+}
+.plot-hint { margin: 0.55rem 0 0.4rem; color: #6b7776; }
+
+#plot-log, #plot-drawstate, #plot-framestate {
+  margin: 0.2rem 0 0; white-space: pre-wrap; font: inherit; color: #96a2a1;
+}
+#plot-drawstate { margin-top: 0.65rem; padding-top: 0.6rem; border-top: 1px solid #222a2a; }
+#plot-framestate { color: #6b7776; }
+.panel b { color: #6fb7ae; font-weight: 500; }
+.panel .err { color: #e07a6a; }
+.panel .warn { color: #d6a15c; }
+
+#plot-bundle-load input[type=file] {
+  display: block; margin-top: 0.3rem; max-width: 100%; font: inherit; color: inherit;
+}
+#plot-bundle-load .hint { color: #6b7776; font-size: 0.68rem; display: block; margin-top: 0.3rem; }
+
+#resetView {
+  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
+}
+#resetView:hover { border-color: #6fb7ae; color: #c8d2d1; }
+
+#plot-dropzone-hint {
+  position: fixed; inset: 0.6rem; z-index: 10; pointer-events: none;
+  display: flex; align-items: center; justify-content: center;
+  border: 2px dashed #6fb7ae; border-radius: 4px;
+  background: rgba(0, 0, 0, 0.72);
+  font-family: var(--mono); font-size: 1.05rem; letter-spacing: 0.06em; color: #c8d2d1;
+}
+#plot-dropzone-hint[hidden] { display: none; }
+#plot-canvas.dragging { cursor: grabbing; }
