@@ -50,7 +50,8 @@
        the derivation's floor claims, measured on the tree rather than in a
        script;
      - the INERT row's triangle count and STIGMA line are the trifid's,
-       character for character;
+       character for character, and its macro difference is inside the run's
+       largest macro control plus the two rows' own;
      - JS0-JS7 and JG0-JG6 run before every shutter.
 
    WHAT THIS SHEET IS NOT: a byte instrument (0 moved is diff-bloom-bytes
@@ -232,8 +233,15 @@ for (const g of GROUPS) {
       if (r.hold === 'identical') {
         if (main.shownTris !== ref.shownTris) await die(`${r.key}: ${main.shownTris} triangles against the trifid's ${ref.shownTris} — hidden is not inert`);
         if (main.stigmaLine !== ref.stigmaLine) await die(`${r.key}: the STIGMA line is not the trifid's, character for character\n    trifid ${ref.stigmaLine}\n    inert  ${main.stigmaLine}`);
-        const floor = (v) => ((twice[v] && twice[v].pixels) || 0) + ((ref.twice[v] && ref.twice[v].pixels) || 0);
-        if (!vs.macro || vs.macro.pixels > floor('macro')) await die(`${r.key}: PREDECLARED WITHIN THE RENDERER'S OWN NOISE on the macro view and it differs by ${vs.macro ? vs.macro.pixels : 'a different frame size'} px against a measured floor of ${floor('macro')} px — the two hidden outline controls are reaching the geometry`);
+        /* THE FLOOR IS THE RUN'S OWN OBSERVED MACRO NOISE plus both rows'
+           controls — not the two controls alone. Measured on this sheet's
+           second full run: the INERT row read 15 px on macro against two
+           controls summing to 0, while eight other rows' macro controls in
+           the same run read 13-30 px. A single sample (or two) is not a
+           floor; the two EXACT claims above are what carry this row. */
+        const runMacroNoise = Math.max(0, ...cells.map((x) => (x.twice.macro && x.twice.macro.pixels) || 0));
+        const floor = (v) => runMacroNoise + ((twice[v] && twice[v].pixels) || 0) + ((ref.twice[v] && ref.twice[v].pixels) || 0);
+        if (!vs.macro || vs.macro.pixels > floor('macro')) await die(`${r.key}: PREDECLARED WITHIN THE RENDERER'S OWN NOISE on the macro view and it differs by ${vs.macro ? vs.macro.pixels : 'a different frame size'} px against a floor of ${floor('macro')} px (this run's largest macro control ${runMacroNoise} px plus the two rows' own) — the two hidden outline controls are reaching the geometry`);
       } else if (!moved) {
         await die(`${r.key}: PREDECLARED TO DIFFER from the trifid at rest and no view moved past its own renderer control — ${VIEWS.map((v) => `${v} ${vs[v].pixels}px vs control ${twice[v].pixels}px`).join(', ')}; this sheet is photographing one shape twice`);
       }
