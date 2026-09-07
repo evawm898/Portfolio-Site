@@ -1642,8 +1642,10 @@ petal, `POSITION` only, no materials; `extras.kind` (`u` / `v`) plus `v` /
 `column` on a u-line and `u` / `row` on a v-line; `asset.extras` carrying
 `mode`, `units` and the petal retention counts. On the sample: **280 u-lines
 of 29 points and 812 v-lines of 10 points — 1092 strips, 7,840 + 7,308 =
-15,148 segments** across 28 petals. (The kickoff brief's "11,500 for u+v" is
-low; 15,148 is what the file holds and what the page draws.) **The census is
+15,148 segments** across 28 petals. (The kickoff brief's two cost figures split:
+its "roughly 7,800 for u-only" is right — 7,840 — but **"11,500 for u+v" is
+wrong**; the file holds and the page draws **15,148**. Quote the measured
+numbers, not the brief's.) **The census is
 recounted from the .glb's own JSON chunk by the gate** and the page has to
 agree strip for strip — "extras.kind separates the families" is not checked by
 asking the page whether it thinks it did.
@@ -1653,6 +1655,21 @@ format did not tag is not guessed at: it lands in an `other` bucket that is
 drawn under every family switch, with the read-out naming it. A tag-blind
 reader still draws a plausible picture, which is why the gate's fixture
 includes a u-shaped strip tagged `v`.
+
+**THE SHIPPED DEFAULTS WERE REVIEWED ON THE DEPLOY PREVIEW AND APPROVED AS-IS**
+(Eva, Sep 7, on `deploy-preview-182`). Unlike `/print`'s fan — which merged
+additive-and-off before anyone had turned a slider, so every number in its
+table is a starting point — these are a ruling. **Do not re-litigate them
+without a reason from the picture:**
+
+| control | default | what it is |
+|---|---|---|
+| lines | `u + v` | the family switch |
+| u density | 12 | every u line (right = densest) |
+| v density | 12 | every v line |
+| weight | 1.1 px | screen-space stroke width |
+| brightness | 30% | the single-line level — see below, this is the glow control |
+| depth dim | 55% | the farthest line draws at 45% of its brightness |
 
 **ADDITIVE BLENDING DECIDES A DEFAULT, AND IT IS THE ONE CONTROL BEYOND THE
 BRIEF'S FOUR.** Overlapping petals brighten where they cross because the
@@ -1666,6 +1683,16 @@ and the depth dim can only lower it, and anything above it is accumulation.
 Measured: the frame reaches 255 with tens of thousands of pixels above the
 single-line ceiling; under `NormalBlending` that count is the mutation's
 witness.
+**DO NOT "SIMPLIFY" `brightness` AWAY — it is not a redundant opacity slider.**
+The reasoning is easy to lose because the control looks like one: white lines on
+black, so surely the colour should just be white? A material colour of pure
+white is exactly the state in which the glow STOPS WORKING — every single line
+is already at the ceiling, a crossing adds nothing, and the picture flattens to
+the same white mass at every density (photographed on the sheet at brightness
+70%). The single-line level and the amount a crossing can add are the same
+number, and there is nowhere else to put it. It is also what gives the additive
+check a calibration instead of a threshold, so deleting the control deletes the
+gate's basis for `blend/crossings-exceed-a-single-line` as well.
 
 **THE DEPTH DIM IS EXACT, NOT A FEEL.** Three's linear fog fades by
 `smoothstep(near, far, depth)`, so `dimToFog()` pins `near` at the nearest
@@ -1794,6 +1821,36 @@ not compensate for it.
 **Out of scope on purpose:** multiple blooms, composition and arrangement;
 stems and buds; print or SVG export; any change to `/print`, the generator, or
 the grid export format.
+
+**`/plot` EXISTS NOW, SO THE PARKED FLOWER-PETAL-PATH TRIGGER NAMES A REAL
+PAGE.** `docs/bloom-session-28-outcome.md` parked the FLOWER's petal-path
+investigation behind Eva's trigger, recorded verbatim: *"when /plot needs real
+stems or leaves."* That doc could not resolve what `/plot` meant — it noted the
+posing/line-art stage is `/print` and that "whether `/plot` names that or
+something not yet built is not resolved here". **It was something not yet
+built, and this is it.** The ambiguity is closed: the trigger points at this
+page. It has NOT fired — `/plot` draws a bloom grid and nothing else, and
+stems and leaves are out of scope above — but a session that adds them to this
+page owes that investigation first, and what session 28 already established
+(the flower's `stemCenterline()` / `stemRadiusFn()`, `buildTrunkInto` returning
+`{ depth, cl }`, the horizontal-disk cross-sections, the untraced Voronoi and
+strand modes) is in that doc so it is not re-derived.
+
+**NEXT, KNOWN AND NOT STARTED — two items, recorded so they are not
+rediscovered:**
+1. **A UI overhaul for `/plot`.** The panels are `/print`'s grammar applied
+   as-is, which was right for shipping a viewer and is not a considered design
+   for this page.
+2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
+   for the export itself, and it belongs to the GENERATOR, not to this viewer.
+   `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
+   petal of 8** and only CONTINUOUS returns one grid per petal. The shipped
+   sample here is CONTINUOUS, which is why it holds 28 whole petals; a grid
+   exported from any other placement is nearly empty, and `/plot` will draw
+   exactly what it is given. The change is `buildBloomInto`'s retention plus
+   reconciling the gates that read `petals` (the Z-assertions and the metrics
+   hook read one-per-descriptor today) —
+   `docs/bloom-session-28-outcome.md`'s "Standing gaps" has it.
 
 ## Artist Tracker (`artist-tracker.html`)
 
