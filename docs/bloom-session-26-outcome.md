@@ -86,6 +86,22 @@ carrying the same tree fingerprint. And it derives the ruled set from **each row
 state**, independently of the enumeration above — the two derivations agree at 17, so the PASS
 means something rather than confirming the arithmetic that predicted it.
 
+### The frozen baseline, measured too — 0 of 507
+
+`--phase17` on both trees, the newest frozen baseline, which the close-out convention requires
+beside the live partition:
+
+> `phase17: 507 rows · RULED TO MOVE 0 (gynoecium STYLE and eligible) · MOVED 0`
+> **`partition: PASS — 0 move, 507 are bit-identical.`**
+
+**A zero-versus-zero PASS is the weaker shape of this check and should be read as such:** with
+an empty ruled set the equality cannot be violated from the ruled side, so on its own it could
+be a silent no-op. Two things make it a measurement rather than one. The instrument refuses two
+captures with the same tree fingerprint, and these carry `bfe6ebcd6f57` and `c0884bb50dbe`
+— different trees. And **the same instrument, on the same pair of trees, returned 17 of 528 on
+the live matrix minutes earlier**, so it demonstrably can see movement here; 507 bit-identical
+is what it saw.
+
 ### Which frozen tag's bytes no longer reproduce: **NONE** (Q4 / the session-24 rule)
 
 The change is reachable only through `gynoecium: STYLE`. **No frozen matrix names a gynoecium
@@ -304,6 +320,7 @@ above was re-run rather than assumed, and why the two block comments now name JS
 | `node tools/verify-bloom-tip-bytes.mjs --base <2fee2c2>` | **PASS** — 0 anther floats moved, every trifid row moved |
 | the mutant table | **6 of 6 fired**, every one still watertight |
 | `--partition` on two `--full` captures | **PASS — 17 move, 511 bit-identical, the moved set equals the ruled set exactly** |
+| `--partition --phase17` on two captures | **PASS — 0 move, 507 bit-identical** |
 
 **THE MERGE CRITERION IS UNCHANGED and is not any of the above:** the full 528-row matrix on
 BOTH STL gates, in CI, on the merge commit. Note that a bloom PR runs **six** verify jobs and
@@ -311,11 +328,17 @@ only **four** of them are bloom evidence — `flower-export-watertight` and
 `flower-geometry-quality` are path-filtered on `'tools/**'`, so adding a tool here makes them
 run, and they still test flower geometry.
 
-**The live partition is closed** (above). The `--phase17` pair — the newest frozen baseline on
-both trees, which the close-out convention requires beside the live partition — is still
-capturing at the time of writing and is expected at **0 of 507 moved**, by the construction
-above. CI does no byte diffs, so this is the one close-out step that genuinely needs a local
-run.
+**Both partitions are closed by measurement** (above): 17 of 528 live, 0 of 507 frozen. Four
+captures, two per tree, ~2,070 real STL exports through the app's own Get STL button. CI does no
+byte diffs, so this is the one close-out step that genuinely needs a local run — and it is done.
+
+**`bloom-geometry.js` was frozen before the head captures ran and is byte-identical now**
+(`1489d8c`, recorded then and re-verified at the close). The first head capture was DISCARDED
+and re-run from scratch when its blob hash was found to have moved mid-run — a comment-only
+edit correcting the Q6 bound. A capture that spans an edit cannot back a `verified on the final
+tree` claim, and arguing that comments cannot reach the export path is the kind of construction
+this project accepts only when it costs nothing to avoid. It cost two hours; it was still the
+right call.
 
 ### What the sheet measured about ITSELF, and why it reports rather than asserts
 
