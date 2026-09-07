@@ -253,6 +253,27 @@ registry datum and no read-out).
   Both STL gates and the frozen-matrix job run the full matrix in CI, which is the merge
   criterion; they were not duplicated locally because the construction above proves their
   inputs unchanged.
+- **MERGED as `b021f1c` (PR #177), all six CI jobs green on `bacb232`** — and the count is
+  reported with the caveat `CLAUDE.md` asks for: **four of the six are bloom**
+  (`bloom-panel`, `bloom-export-watertight`, `bloom-connectedness`, `bloom-frozen-matrices`),
+  and `flower-export-watertight` / `flower-geometry-quality` ran only because this PR touches
+  `tools/**`. They test flower geometry; two green flower jobs are not evidence about the
+  bloom.
+
+| job | | |
+|---|---|---|
+| `bloom-export-watertight` | success | 73 min, the full 528-row matrix, boundary edges 0 |
+| `bloom-connectedness` | success | 48 min, the voxel flood fill on all 528 rows |
+| `bloom-panel` | success | 2 min — route (s) and the census's new nesting clauses among them |
+| `bloom-frozen-matrices` | success | 30 s — the smoke coverage guard, the family census AND its negative control, and `--verify-frozen` on all sixteen baselines |
+| `flower-export-watertight` | success | `tools/**` filter, not bloom evidence |
+| `flower-geometry-quality` | success | `tools/**` filter, not bloom evidence |
+
+  **A note on reading CI here, because it cost a wrong reading once in this session:**
+  `actions_list`'s run-level `status` was STALE — it reported `bloom-connectedness` still
+  in progress twenty minutes after that job had finished. `list_workflow_jobs` is both current
+  and an order of magnitude leaner (the run-level payloads inline the whole commit message).
+  Read the JOB, not the run.
 
 ## What the next session should know
 
