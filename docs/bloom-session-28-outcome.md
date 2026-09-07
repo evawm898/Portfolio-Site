@@ -306,10 +306,81 @@ columns. The point count is reported instead.
 
 ---
 
+## 8. The format is VALIDATED, not speculative (Eva, after the merge)
+
+**The `.glb` has been through a real renderer and the look was confirmed
+good.** That matters more than it sounds: everything in sections 1–7 is a
+measurement of *internal consistency* — that the grid is the surface the mesh
+was built from, that the rows are uniform in `u`, that the file is well-formed
+glTF. **None of it could tell you whether the chosen shape is USEFUL**, and a
+gate cannot: "one node per petal, LINE_STRIPs along and across, attachment as
+a node translation, spine carried separately" was a design judgement about
+what a downstream consumer needs.
+
+So the export shape is settled by having been consumed, not by argument. A
+later session changing the node layout, the two line families, the `extras`
+keys or the units is changing something a renderer already reads — treat it as
+a breaking change to a consumed format, not as a free refactor.
+
+Two things this does **not** license, because nobody has looked at them yet:
+the CLEFT path (three panels, unreachable today — `capability` is a test hook)
+and any petal past the first on a RADIAL bloom (section 5).
+
 ## Standing gaps this session did not touch
 
-- The `perDescriptor` dedupe and its gate reconciliation — scoped separately,
-  by ruling.
+- **THE `perDescriptor` DEDUPE IS THE NEXT KNOWN BLOCKER.** RADIAL still
+  exports **1 petal of 8** — `buildBloomInto` retains one petal per
+  *descriptor*, so only CONTINUOUS returns one grid per petal (section 5 has
+  the table). Everything else about the format is now validated by a real
+  renderer; this is the one thing standing between the export and a whole
+  bloom. It is a change to `buildBloomInto`'s retention plus reconciling the
+  gates that read `petals` (the Z-assertions and the metrics hook read
+  one-per-descriptor today), which is why it was scoped out of this session
+  rather than folded in.
 - The grid is mid-surface only. Thickness is carried per row
   (`panels[].thicknessMm`) so a consumer can re-offset, but no skin is exported.
 - Nothing here has been printed, and nothing here is printable.
+
+## Parked investigation — the FLOWER's petal path
+
+**Not traced, deliberately, and this is a record of the decision rather than a
+gap in the work.** Session 28's investigation covered the BLOOM's petal path
+end to end (`buildPetalInto` in `bloom-geometry.js`, one builder, no petal
+types). The flower's is a different and larger read and was explicitly parked
+by Eva: nothing downstream depends on it today.
+
+**THE TRIGGER TO REVISIT, in Eva's own words: "when /plot needs real stems or
+leaves."** (The posing / line-art stage in this repo is `/print`
+— `print.html`, `print.js`, `print-stem.js`, `print-lines.js`; whether `/plot`
+names that or something not yet built is not resolved here, and the trigger is
+recorded verbatim rather than corrected.)
+
+**What is already known, so the next session does not re-derive it:**
+
+- `flower.js`'s `buildPetalInto` (line ~1229) is a *different* builder from the
+  bloom's and has **several petal modes**. Only the SOLID-BLADE mode was
+  traced, and only shallowly: `flower-geometry.js`'s `buildBlade(P, {uSteps,
+  vSteps})` (line ~1493) returns `{ rows }` — literally a (u, v) grid, laid
+  "rows base->tip, cols margin->margin" per `flower.js:1354` — consumed by
+  `acc.addBladeSolid(grid, thick)` (`flower.js:738`). So a grid *exists* there
+  too, for that mode.
+- **The other modes were NOT traced**: the Voronoi sheet, the continuous-margin
+  strands, the vein ribbons. Whether they carry a comparable grid is UNKNOWN,
+  not assumed.
+- `flower-sdf.js` is the **receptacle only** — a marched implicit surface. It
+  never touches a petal, so the SDF is not in the petal path at all.
+- **The stem already has what the bloom's petals did not**:
+  `stemCenterline()` (`flower.js:1788`) returns an explicit 49-point polyline
+  plus its leaf nodes, `stemRadiusFn()` (line ~1818) returns `r(t)`, and
+  `buildTrunkInto` **returns `{ depth, cl }`** (line ~2512) — the centreline
+  escapes the builder and is already consumed by `buildLeafInto` and
+  `buildBudBranchInto`. Two caveats measured at the time: the cross-sections
+  are **horizontal circles, not perpendicular to the centreline** (`ring[j] =
+  { x: c.x + rad*cosH[j], y: c.y, z: c.z + rad*sinH[j] }`, line ~2466), so it
+  is a stack of disks whose centres follow the curve rather than a swept tube;
+  and the receptacle and stem rings share one `rings` array, so where the stem
+  begins is `startI` bookkeeping, not a labelled boundary in the mesh.
+- Corroborating that the centreline is not reaching downstream today:
+  `print-stem.js` **recovers** one by slab-fitting the loaded mesh
+  (`extractAxis` / `axisAt`, lines 92–130). Nobody writes that if the
+  generator's own polyline is in the bundle.
