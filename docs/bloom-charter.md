@@ -5532,3 +5532,51 @@ matters should be measured this way.
   10,492 px on the same run** — the clearest statement available that the control measures the
   renderer and not the geometry. **The migration pair HELD at 0 px on all three views against
   controls of 0 px:** the shipping pill on `cb798f6` and on this tree are the same picture.
+
+- **Session 29's CLOSE (Sep 7) — merged as `96f2d40` (PR #179), `frozen/phase18` published.**
+
+  **THE SHEET RULING (Eva, from `tools/shot-bloom-anther.mjs`): APPROVED WITH ONE CHANGE.** The
+  anther's seven ship as built except `antherSharpness`, which defaults to **1.00** rather than
+  the circle's 2.00. Her grounds, from the measurement she asked for before ruling: at `s = 2`
+  the exponent is the circle's own, so `h = (cos² + sin²)^(−1/2)` computes to EXACTLY 1.0 at
+  every sampled azimuth and the blend is exactly 1 for every roundedness — `max|f − 1| =
+  0.000e+0`, and `ρ 0.50 → 0.00` renders **0 px** with the lattice held constant. **The
+  roundedness slider's only motion was a one-off faceting jump at the top of its travel, which
+  is worse than an inert control because the jump reads as the control working.** 1.00 is the
+  largest deviation that never meets the waist floor at any point count (0.679 mm at ρ 0 against
+  0.50 mm), a named value rather than a tuned one, and at four points it pinches at the
+  diagonals — the tetrasporangiate anther. It cost nothing: **0 of 120,960 floats** moved live
+  and export, and 0 px across four cross-config render pairs.
+
+  **THE PARKED ITEM, ruled into session 30's brief:** the lattice still jumps 10 → 16 whenever
+  roundedness leaves 1 at ANY sharpness. At the new default that jump is swallowed by the form
+  change, so the only state where roundedness does nothing but re-facet is sharpness EXACTLY
+  2.00 — a reachable corner, not the default. The one-line fix (`tipSides()` keying on "the
+  emitted factors are all exactly 1" rather than on roundedness) and its cost at that corner
+  (60% more triangles per tip for a provably identical shape) go beside the stigma's seven,
+  because it changes a ruled law.
+
+  **VERIFIED ON THE MERGED HEAD `2cfd35b`, not on the pre-merge one.** All FIVE bloom gates —
+  `bloom-export-watertight`, `bloom-connectedness`, `bloom-panel`, `bloom-frozen-matrices` and
+  `bloom-grid` (which `main` gained mid-session) — green, each read from its own run's
+  conclusion. `bloom-export-watertight` 90 min, `bloom-connectedness` 78 min on 549 rows. The
+  two flower gates ran on the `tools/**` filter and are NOT bloom evidence. **And the byte proof
+  was re-run on the merged tree specifically: 528/528 byte-identical, 0 moved on
+  `frozen/phase18` against `cb798f6`** — because the merged tree is a THIRD tree, and two
+  separate proofs of two separate trees do not compose. CI does no byte diffs; that one is the
+  session's to run.
+
+  **`frozen/phase18` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `cb798f6`, matching what
+  `FROZEN_BASE_COMMITS` declares. The `bloom-frozen-tags` workflow went red as designed: of the
+  seventeen baselines it declares, sixteen are tagged and **`phase5` is the only refusal**,
+  which is the `GITHUB_TOKEN`-cannot-push-a-differing-workflow-tree limit recorded in that
+  script's own header. Confirmed twice: from the job log, and by differencing
+  `FROZEN_BASE_COMMITS` against `git ls-remote --tags`.
+
+  **THE MANIFEST, PHRASED FOR A MERGE.** The claim is that **THIS SESSION moved none of its 46
+  predeclared files**, and that stays true. `bloom.html` is on the list and the *other* session
+  changed it, so **on the merged tree that file is not the one this session certified.** A bare
+  "46 files, 0 moved" would imply more than it says after a merge — write the first sentence.
+
+  **THE COLLISION** with the parallel session 28 is its own entry above (*Incident, Sep 7*),
+  with the rule it produced: **one registry PR in flight at a time.**
