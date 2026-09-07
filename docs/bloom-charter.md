@@ -5025,3 +5025,104 @@ matters should be measured this way.
       between `888a506` and this merge, so its two moved files are exactly this session's two
       predeclared movers. **No sheet is owed — nothing visual changes.** This entry is the
       docs-only PR that follows the merge, on the session-22/23/24 rhythm.
+
+- **Session 26 (Sep 7): THE TIP PRIMITIVE AND THE MIGRATION — `tipInto` as the one owner, the
+  one-exponent outline law hard-wired at today's circle, the Rodrigues frame with no guard, the
+  elongation floor. ZERO NEW CONTROLS. 17 live rows moved, 0 frozen, NO new frozen phase, and
+  NO tag's bytes stop reproducing. Numbers in `docs/bloom-session-26-outcome.md`.**
+
+    - **THE PARTITION WAS RE-MEASURED, NOT INHERITED.** The discovery's 17 was measured on a
+      tree that no longer exists and before the annulus law landed, so it was re-derived from
+      the rule — a row moves iff its resolved state has `gynoecium: STYLE` AND the gynoecium is
+      eligible — and enumerated from `buildMatrix()` + `DEFAULTS` + `gynoeciumEligible()` before
+      any capture ran: **17 of 528 live, 0 of 507 phase17.** It comes back 17 again, and that is
+      a coincidence worth naming rather than a confirmation: session 24's annulus law moved DISC
+      radii, which cannot add or remove a style row, so the count could not have changed — an
+      argument made AFTER re-deriving it, never a reason to have skipped the derivation. **The
+      other direction is in the 511:** three rows name `gynoecium: STYLE` and must NOT move, the
+      GATED rows where the whole centre is at maximum under SPHERE, hidden AND inert. A tip
+      primitive that leaked past the eligibility guard would move exactly those three.
+
+    - **WHICH FROZEN TAG'S BYTES NO LONGER REPRODUCE: NONE** (the session-24 rule, applied). The
+      change is reachable only through `gynoecium: STYLE`, and **no frozen matrix names a
+      gynoecium control** — the gynoecium landed in session 22 and phase17 was frozen at
+      `6335ac4`, the head of `main` when session 22 opened. Every frozen baseline therefore
+      holds by construction and `--phase17` measures it. Session 24's note that phase17's bytes
+      no longer reproduce (8 of 507) is untouched and remains the only such entry.
+
+    - **THE ANTHER IS BYTE-IDENTICAL, AND IT WAS PROVED RATHER THAN ASSERTED: 0 of 3,183,552
+      floats** over seven corners in live and export, compared with `Object.is` so `+0` and
+      `-0` are different — they are different float32 bit patterns in the STL, and `===` would
+      have reported a clean sheet over a real move. The base side is the WHOLE SHIPPED MODULE
+      imported from a `git worktree` of `2fee2c2`, never a function re-typed into a harness.
+      `tools/verify-bloom-tip-bytes.mjs` REFUSES a vacuous run two ways: V0 fails if the base
+      tree carries the same `bloom-geometry.js`, and every trifid row is PREDECLARED TO MOVE, so
+      a migration that never reached the lobes fails rather than passing beautifully.
+
+    - **WHY IT HOLDS IS A CONSTRUCTION, AND BOTH HALVES ARE IN THE CODE.** At roundedness
+      exactly 1 the blend is `1 + 0 * h`, exactly `1` in IEEE-754 for any finite `h`, so
+      `r * f === r`. And **the Rodrigues rotation is parameterised by the ANGLES, not by two
+      vectors** — at spread 0, `cos 0` is exactly 1 and `1 − cos 0` exactly 0, so the rod frame
+      comes back term for term. A `k = D × L` formulation would normalise a zero vector at the
+      identity and put `D · L` — which is 1 only to rounding — on the frame's own coefficient.
+      That is the version that needs the guard Eva ruled against; this is the version that does
+      not.
+
+    - **THE -0 HAZARD IS REAL AND IS MEASURED ON BOTH HALVES.** No arrangement of `x + 0`
+      preserves a negative zero and the no-guard formula adds two zero terms, so the anther's
+      ring vector at azimuth 0 flips `[-0,1,0]` to `[+0,1,0]`, and at a filament curl of exactly
+      180 the tip AXIS flips a zero the same way. **It reaches no emitted position** — `-0 among
+      the compared floats: 0` on every row of both trees. A first draft of JS6 asserted
+      bit-identity of the axis and turned two smoke rows red; the clause was wrong, not the
+      code, and it now compares by VALUE with the reason in its own comment so a later session
+      does not "strengthen" it back.
+
+    - **HOW FAR THE TRIFID MOVED — two numbers, and they are not the same claim.** The old lobe
+      frame was `D × P`, which IS the rotation axis and is left fixed by the rotation; the new
+      one is `Rot(T)`, so the two differ by a turn about the lobe's own axis of `acos(−sin ψ)` —
+      **90°, 150° and 30°** on the three lobes. Measured in export mode: **600 triangles, 5,220
+      of 5,400 floats** (the 180 that hold are the pole vertices, which lie on the axis of the
+      rotation), **max VERTEX displacement 1.8546 mm, max SURFACE deviation 0.0470 mm.** The
+      closed form for a regular n-gon rotated on its own axis is the sagitta at the widest ring,
+      `a(1 − cos π/n)` = 0.046986 mm at the shipping 1.20 mm sheet; the measurement agrees and
+      the closed form was a prediction the run could have contradicted. **It scales with the
+      sheet** — 0.094 mm at `sheetThickness` 2.40.
+
+    - **`STAMEN_TRIS` AND `STYLE_TRIS` ARE RETIRED INTO `tippedRodTris(lumps)`.**
+      `tippedRodTris(1)` is 560 and `(3)` is 960, exactly the retired constants, so the census
+      did not change — what changed is that the number is derived from a count the OWNER
+      declares. Session 4 makes the stigma's lobe count a control; a constant would be a number
+      that quietly stops being true with nothing failing. JS4 calls it with 1 (an anther is one
+      tip, A1, fixed) and pins the emitted lump list at 1 beside it; JG4 calls it with
+      `G.lobe.count` and pins the emitted lobe list against the same number.
+
+    - **JS6 AND JG5 ARE THE ONLY WITNESSES FOR ANY OF IT, and that is measured.** A tip rolled
+      on its own axis exports watertight, one piece, at an identical triangle count and an
+      identical STL byte length — nothing in this project looks at a ring vector. The two
+      families share `tipClauses()` so the anther and a stigma lobe are held to one statement:
+      the ring vector is unit, perpendicular to its own axis, and the Rodrigues image rebuilt
+      from OTHER owners (C1's discipline); and the outline factors are the law on the shape the
+      owner declares AND exactly 1. **Those last two are two directions and only the second
+      does this session's work** — the first compares the shipped function against itself and is
+      vacuous under a mutation of the law, while "exactly 1" is how *session 26 ships zero tip
+      controls* becomes a measurement. Stated in the harness's own header: clause 3 RESTATES the
+      formula, so a law wrong the same way in both places passes; clauses 1 and 2 hold for no
+      restatement reason and are the guard against that.
+
+    - **Q6 IS DISCHARGED BY A BOUND, NOT AN INSTRUMENT.** `f(u)` is a radial graph about the
+      tip's axis, so it is simple iff it is strictly positive. `f` is a convex combination of
+      1 and `h`, and `h ≥ 2^(1/2 − 1/s)` for s ≤ 2 (the worst azimuth is 45°), `≥ 1` above it —
+      so at the range floor s = 0.25 the bound is `2^(−3.5) = 0.08838834764831843`, which is
+      the measured minimum over the WHOLE bounded space (every lobe count 2..12 crossed with
+      sharpness 0.25..8, at the shipped ten sides): `0.0883883476483184`, at n = 5. `tipOutline()` CLAMPS rather than trusting
+      its caller, so no session-3 registry range can reach an inverted outline. **Nothing was
+      lost to the bound** — no shape on the discovery's list needs sharpness below 0.25.
+
+    - **THE SHEET IS `node tools/shot-bloom-tip.mjs <dir> [base-tree]`** and it exists because
+      "is 0.047 mm visible" is Eva's ruling and should be made in front of a number. Every cell
+      carries its own **mm per pixel** and every pair a measured **pixel difference**; the
+      anther and bare-bloom pairs are asserted PIXEL-IDENTICAL, the trifid pairs asserted NOT
+      (the vacuity guard — a sheet whose before and after agree everywhere is a sheet
+      photographing one tree twice), and row (A) is additionally shot twice on the base tree as
+      a RENDERER control, because `0 pixels differ` is worth nothing if the renderer is not
+      deterministic to begin with.

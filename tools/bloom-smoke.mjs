@@ -336,10 +336,12 @@ export const SMOKE_BLOCKS = [
     anchor: 'STAMENS: 6 on a RING (the six-stamen candidate)',
     /* DERIVED BY THE HEADER'S OWN METHOD (session 21): the branches the part
        adds are footRing()'s androecium map (RING / DISC, the area rule and
-       its hub clamp, the annulus flag), buildStamenInto's tube and pill,
+       its hub clamp, the annulus flag), buildStamenInto's rod and tip,
        spineLaw() at tilt 0 with a curl, the root on the CAP's normal, and
        the hidden-and-inert path under SPHERE; the families that need a
-       witness are JS1-JS5 in both directions. Cheapest row per path.
+       witness are JS1-JS6 in both directions (JS6 added session 26 with the
+       tip primitive — every row here carries it, and the mutant table was
+       re-run rather than assumed, per hole 5 above). Cheapest row per path.
 
        WHAT THIS BLOCK IS BLIND TO AFTER SESSION 24, stated rather than
        assumed: the two rows above carry JS5's DISC and RING arms, but NOT
@@ -348,7 +350,7 @@ export const SMOKE_BLOCKS = [
        subset. A mutation that only breaks the no-room clamp passes here. */
     rows: [
       { label: 'STAMENS: 6 on a RING (the six-stamen candidate)',
-        path: 'the RING layout at the six-stamen candidate — JS1 (flat normal), JS2 (containment, the radial law), JS3 (the root cylinder), JS4 (six free ends at the fixed count), JS5\'s RING arm (innerUsed and noRoom NULL, the stamens still at R)' },
+        path: 'the RING layout at the six-stamen candidate — JS1 (flat normal), JS2 (containment, the radial law), JS3 (the root cylinder), JS4 (six free ends at the fixed count, and the apex one radius past the floored band), JS5\'s RING arm (innerUsed and noRoom NULL, the stamens still at R), JS6 (the tip frame is the Rodrigues identity; the outline is exactly 1)' },
       { label: 'STAMENS: 120 DISC x Head rise 0.5 (the tips fan out with the normals)',
         path: 'the DISC layout at the count ceiling, CLAMPED at the hub, 86 roots in the petal-root annulus, on a CAP — JS1 on the cap\'s normal, JS5\'s annulus law and equal-area clause, the two distance flags' },
       { label: 'STAMENS: 6 x curl max (180) — bent in over the centre',
@@ -365,13 +367,16 @@ export const SMOKE_BLOCKS = [
        the-hub corner, the annulus flag), rodInto on the axis, the trifid's
        three pills, spineLaw() at tilt 0 with a curl on the style, and the
        hidden-and-inert path under SPHERE for the WHOLE centre; the families
-       that need a witness are JG1-JG4 in both directions. Cheapest row per
-       path; the four-state matrix's "both present" row is the second. */
+       that need a witness are JG1-JG5 in both directions (JG5 added session
+       26 with the tip primitive — the trifid is where the tip frame is not
+       the identity, so these rows are its only witness in the subset).
+       Cheapest row per path; the four-state matrix's "both present" row is
+       the second. */
     rows: [
       { label: 'GYNOECIUM: a style on the bare apex (the four states — style only)',
-        path: 'the style alone — JG1 (the root exactly on the axis, the normal exactly +z, through the full slab), JG2, JG3 (the root cylinder), JG4 (960 triangles, the trifid law on the emitted lobes)' },
+        path: 'the style alone — JG1 (the root exactly on the axis, the normal exactly +z, through the full slab), JG2, JG3 (the root cylinder), JG4 (960 triangles, the trifid law on the emitted lobes), JG5 (the tip frame is the Rodrigues image; the outline is the law and exactly 1)' },
       { label: 'GYNOECIUM: style x 6 stamens on a RING (the four states — both present)',
-        path: 'both parts present — the two descriptors from one owner on one row, JS1-JS5 and JG1-JG4 together, the centre accumulator counting both in R1' },
+        path: 'both parts present — the two descriptors from one owner on one row, JS1-JS6 and JG1-JG5 together, the centre accumulator counting both in R1' },
       { label: 'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on',
         path: 'spineLaw() with a curl on the filaments while the style stands on the axis they cross — the interaction the sheet is for; the rod helper on both parts' },
       { label: 'GYNOECIUM: GATED — the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert; bit-identical to the bare sphere)',

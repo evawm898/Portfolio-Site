@@ -65,8 +65,67 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
-         MAX_STAMENS, STAMEN_SIDES, STAMEN_TRIS, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
-         STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, STYLE_TRIS, gynoeciumEligible } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+         MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
+         STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
+         TIP_SHAPE, TIP_BAND_FLOOR, tipOutline } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+
+/* THE RODRIGUES RING VECTOR, REBUILT FROM OTHER OWNERS — C1's discipline, and
+   the only shape of check that can see this law (session 26). A tip built with
+   the frame WIRED IN and the rotation never applied is bit-identical to the
+   one that applies it at a spread of zero, so there is no byte to diff on the
+   anther and nothing in either STL gate looks at a ring vector at all: a tip
+   rolled on its own axis exports watertight, one piece, at an identical
+   triangle count and an identical STL byte length. So the gate rebuilds the
+   law and compares it against what was EMITTED.
+
+   Its inputs are deliberately not the builder's: `D` is the emitted rod
+   direction, `azimuth` the slot's (the style is 0, exact), `spreadRad` and
+   `psi` the owner's descriptor. `T` is rebuilt from the azimuth rather than
+   read back, so a builder that took its frame from somewhere else fails here.
+
+   WHAT IT CANNOT SEE, said rather than left implied: it RESTATES the formula,
+   so a law wrong in the same way in both places passes. That is why the two
+   PROPERTY checks beside it — unit, and perpendicular to the tip axis — are
+   asserted separately; they hold for no restatement reason. */
+function rodriguesRing(D, azimuth, spreadRad, psi) {
+  const T = [-Math.sin(azimuth), Math.cos(azimuth), 0];
+  const B = [D[1] * T[2] - D[2] * T[1], D[2] * T[0] - D[0] * T[2], D[0] * T[1] - D[1] * T[0]];
+  const cs = Math.cos(spreadRad), sn = Math.sin(spreadRad), cp = Math.cos(psi), sp = Math.sin(psi);
+  const kT = 1 - cp * cp * (1 - cs), kB = -(cp * sp * (1 - cs)), kD = -(cp * sn);
+  return [T[0] * kT + B[0] * kB + D[0] * kD, T[1] * kT + B[1] * kB + D[1] * kD, T[2] * kT + B[2] * kB + D[2] * kD];
+}
+
+/* THE TIP AS EMITTED — the clauses JS6 and JG5 share, so the anther and a
+   stigma lobe are held to ONE statement. `lump` is what tipInto returned,
+   `shape` what the owner declared, and (`D`, `azimuth`, `spreadRad`, `psi`)
+   the OTHER owners the law is rebuilt from. Returns failure strings, each
+   already tagged with the caller's family. */
+function tipClauses(tag, who, lump, shape, D, azimuth, spreadRad, psi) {
+  const bad = [];
+  if (!lump) { bad.push(`${tag}: ${who} emitted no tip record — nothing to check the frame or the outline against`); return bad; }
+  const L = lump.axis, e1 = lump.e1, f = lump.outline;
+  if (!Array.isArray(L) || !Array.isArray(e1)) { bad.push(`${tag}: ${who} reports no axis or ring vector`); return bad; }
+  if (!shape) { bad.push(`${tag}: ${who} declares no tip shape — the builder would be computing one`); return bad; }
+  /* Two PROPERTIES, which no restatement can give away. */
+  if (Math.abs(Math.hypot(...e1) - 1) > 1e-12) bad.push(`${tag}: ${who} has a ring vector of length ${Math.hypot(...e1)} — the tip frame is not unit`);
+  if (Math.abs(e1[0] * L[0] + e1[1] * L[1] + e1[2] * L[2]) > 1e-12) bad.push(`${tag}: ${who} has a ring vector that is not perpendicular to its own axis`);
+  /* And the law, rebuilt. */
+  const want = rodriguesRing(D, azimuth, spreadRad, psi);
+  for (let k = 0; k < 3; k++) if (Math.abs(e1[k] - want[k]) > 1e-9) { bad.push(`${tag}: ${who} has ring vector ${JSON.stringify(e1)}; the minimal rotation of the rod frame onto its axis is ${JSON.stringify(want)} — the tip frame is not the Rodrigues image`); break; }
+  /* THE OUTLINE, both directions: the emitted factors are the law applied to
+     the shape the owner declares, AND that shape is the hard-wired one whose
+     factors are EXACTLY 1. Session 26 ships zero controls, so `the tip is a
+     circle` is a measurement here rather than a sentence in a header, and
+     when roundedness becomes a slider only the second clause moves. */
+  if (!Array.isArray(f) || f.length !== STAMEN_SIDES) { bad.push(`${tag}: ${who} reports ${f && f.length} outline factors, expected ${STAMEN_SIDES}`); return bad; }
+  const wantF = tipOutline(shape);
+  for (let j = 0; j < f.length; j++) {
+    if (Math.abs(f[j] - wantF[j]) > 1e-12) { bad.push(`${tag}: ${who} scaled side ${j} by ${f[j]}, the outline law on the declared shape says ${wantF[j]}`); break; }
+    if (!Object.is(f[j], 1)) { bad.push(`${tag}: ${who} scaled side ${j} by ${f[j]} — with no tip control shipped the outline must be EXACTLY 1, or the anther is not byte-identical`); break; }
+  }
+  if (shape.roundedness !== TIP_SHAPE.roundedness || shape.sharpness !== TIP_SHAPE.sharpness || shape.lobes !== TIP_SHAPE.lobes) bad.push(`${tag}: ${who} declares a tip shape ${JSON.stringify(shape)}, and session 26 ships the hard-wired ${JSON.stringify(TIP_SHAPE)}`);
+  return bad;
+}
 
 /* THE TWO CONSTANTS THAT MUST BE ONE. SHEET_THICKNESS_MM is the geometry's
    name for the default sheet thickness and the registry carries a literal
@@ -2652,15 +2711,29 @@ export async function zygoAssertions(page, row) {
 }
 
 /* ===================================================================
-   THE ANDROECIUM ASSERTIONS (session 21; JS5 added session 24) — JS1-JS5,
-   read from footRing()'s own descriptor and the builder's EMITTED records,
-   never the STL. Both STL gates are blind to every one of them by
-   construction: a filament rooted off the normal, a stamen standing outside
-   the hub, a root that touches the slab in a hairline, a stamen declared and
-   never built, or a disc that starts on the axis, all export watertight (each
-   tube and pill is its own closed solid) and read as one piece wherever the
+   THE ANDROECIUM ASSERTIONS (session 21; JS5 added session 24, JS6 session
+   26) — JS1-JS6, read from footRing()'s own descriptor and the builder's
+   EMITTED records, never the STL. Both STL gates are blind to every one of
+   them by construction: a filament rooted off the normal, a stamen standing
+   outside the hub, a root that touches the slab in a hairline, a stamen
+   declared and never built, a disc that starts on the axis, or an anther
+   whose cross-section is rolled on its own axis, all export watertight (each
+   tube and tip is its own closed solid) and read as one piece wherever the
    tube crosses the slab at all. Asserted in BOTH directions on every row:
    present iff the state says so, absent otherwise.
+
+   JS6 (session 26) — THE TIP AS EMITTED. The anther is ONE tip aimed at NO
+   spread, so its axis must be the rod direction (by VALUE — see the clause's
+   own comment on why the no-guard formula cannot preserve a signed zero and
+   why that is measured elsewhere) and its ring vector the Rodrigues
+   identity — the rod frame, unrotated. That
+   identity is the whole byte-identity argument for the anther, and it is the
+   one thing here a byte diff CANNOT check, since a builder that never
+   rotates is bit-identical to one that rotates by nothing. The outline
+   clause is two-sided: the emitted factors are the law on the shape the
+   owner declares, and that shape is the hard-wired circle whose factors are
+   exactly 1 — which is how `session 26 ships zero tip controls` is a
+   measurement rather than a sentence.
 
    JS5 (session 24) — THE DISC'S INNER LIMIT and the layout law. The limit is
    REBUILT FROM THE SLAB rather than read from the descriptor (C1's
@@ -2678,7 +2751,7 @@ export async function zygoAssertions(page, row) {
    the ROOTS FUSE flag's job and is not a gate.
    =================================================================== */
 export const STAMEN_SCOPE =
-  "androecium claims read footRing()'s own descriptor and the builder's emitted root axes, root rings and apexes, NOT the STL; a filament rooted off the normal (JS1), a stamen outside the hub (JS2), a hairline root (JS3), a stamen declared and not built or built without its pill (JS4) and a Vogel disc that starts on the axis (JS5) all export watertight and as one piece — measured on mutants before these existed";
+  "androecium claims read footRing()'s own descriptor and the builder's emitted root axes, root rings and apexes, NOT the STL; a filament rooted off the normal (JS1), a stamen outside the hub (JS2), a hairline root (JS3), a stamen declared and not built or built without its tip (JS4), a Vogel disc that starts on the axis (JS5) and an anther whose cross-section is rolled on its own axis or is not the outline the owner declares (JS6) all export watertight and as one piece — measured on mutants before these existed";
 
 export async function stamenAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -2720,7 +2793,34 @@ export async function stamenAssertions(page, row) {
   for (let i = 0; i < S.length; i++) {
     const s = S[i], d = A.stamens[i];
     if (!d) { bad.push(`JS4: emitted stamen ${i} has no descriptor`); continue; }
-    if (s.tris !== STAMEN_TRIS) bad.push(`JS4: stamen ${i} emitted ${s.tris} triangles, the fixed count is ${STAMEN_TRIS} — a pill dropped or a tube doubled`);
+    /* JS4 — THE CENSUS, against tippedRodTris() rather than a constant
+       (session 26). An anther is ONE tip by session 21's A1 ruling, so the
+       function is called with 1 and the emitted lump list is pinned at 1
+       beside it: the count and the triangles are two claims, and a tip that
+       vanished from both at once would satisfy either alone. */
+    if (s.tris !== tippedRodTris(1)) bad.push(`JS4: stamen ${i} emitted ${s.tris} triangles, a rod tipped with one lump is ${tippedRodTris(1)} — a tip dropped or a tube doubled`);
+    if (!Array.isArray(s.lumps) || s.lumps.length !== 1) bad.push(`JS4: stamen ${i} emitted ${s.lumps && s.lumps.length} tips; the anther is ONE (A1, fixed)`);
+    /* JS6 — THE TIP AS EMITTED (session 26): its axis is the rod direction
+       (spread 0 — by value, for the signed-zero reason below), its ring
+       vector is the Rodrigues image of the rod frame, and its outline is the
+       law on the declared shape, exactly 1. */
+    else {
+      const lump = s.lumps[0];
+      /* The anther is aimed at NO spread, so its axis IS the rod direction.
+         VALUE equality, not Object.is, and the reason is measured rather
+         than assumed: the no-guard Rodrigues expression forms the axis as
+         `D * cos(0) + P * sin(0)`, and `x + 0` is `+0` when x is `-0`, so at
+         a filament curl of exactly 180 the rod direction's own -0 component
+         comes back `+0` — a difference of exactly 0. No arrangement of
+         `x + 0` preserves a negative zero, so a stricter clause here would
+         be asserting something the ruled formula cannot do. The claim that
+         matters is that it reaches no EMITTED POSITION, and that one is
+         float-exact and -0 aware in tools/verify-bloom-tip-bytes.mjs.
+         Anything but a signed zero fails here: for finite non-zero doubles
+         `===` is bit equality. */
+      for (let k = 0; k < 3; k++) if (lump.axis[k] !== s.dir[k]) { bad.push(`JS6: stamen ${i}'s tip points along ${JSON.stringify(lump.axis)}, the rod ends along ${JSON.stringify(s.dir)} — an anther is aimed at NO spread and the two must be the same direction`); break; }
+      bad.push(...tipClauses('JS6', `stamen ${i}`, lump, A.anther.shape, s.dir, s.azimuth, 0, 0));
+    }
     const N = s.N, len = Math.hypot(s.outer[0] - s.inner[0], s.outer[1] - s.inner[1], s.outer[2] - s.inner[2]);
     /* JS1 — THE ROOT AXIS ON THE OWNER'S NORMAL THROUGH THE FULL SLAB: inner
        to outer is exactly one slab thickness along the cap's normal at the
@@ -2764,6 +2864,15 @@ export async function stamenAssertions(page, row) {
         if (Math.abs(v[0] * N[0] + v[1] * N[1] + v[2] * N[2]) > 1e-9) bad.push(`JS3: stamen ${i}'s ${which === 0 ? 'inner' : 'outer'} root ring leaves the face plane`);
       }
     });
+    /* JS4 — THE APEX IS ONE RADIUS PAST THE FLOORED BAND along the tip's own
+       axis (session 26). Without this the elongation floor had NO witness on
+       the anther at all: a mutation turning the floor into a ceiling was
+       caught by JG4's lobe clause and by nothing on the stamen side, which
+       is exactly the half session 3 makes a control. Measured, then closed. */
+    {
+      const aA = A.anther.diameter / 2, reachA = Math.max(A.anther.length - 2 * aA, TIP_BAND_FLOOR * aA) + aA;
+      for (let c = 0; c < 3; c++) if (Math.abs(s.tip[c] + s.dir[c] * reachA - s.apex[c]) > 1e-9) { bad.push(`JS4: stamen ${i}'s apex is not one radius past the floored band (${reachA} mm) along its axis from the tip`); break; }
+    }
     /* JS4 — the apex is its own. "Free" is the census's word for the
        un-rooted end, never a position claim: a filament at curl 180 brings
        its anther back below the hub plane on purpose (measured on the first
@@ -2847,15 +2956,29 @@ export async function stamenAssertions(page, row) {
           says WIDER THAN THE HUB (the apex corner, told).
      JG3  the style is one sheet thick; both root rings have STAMEN_SIDES
           points each exactly rSty from the centre in the face plane.
-     JG4  emitted = declared = 1; the fixed STYLE_TRIS (the accumulator's
-          delta: a dropped lobe moves it); the TRIFID as a PROPERTY of the
+     JG4  emitted = declared = 1; tippedRodTris(the count THIS OWNER
+          declares) against the accumulator's own delta (a dropped lobe moves
+          it, and session 26 made it a function so a stigma count control
+          cannot leave a constant lying); the TRIFID as a PROPERTY of the
           emitted lobes — STIGMA_LOBES unit axes each exactly `spread` off
           the tip direction, a third of a turn apart around it, every apex
-          one lobe length along its axis from the tip, apexes distinct; the
-          lobe the anther's fixed proportion of the style.
+          one radius past the FLOORED band along its axis from the tip,
+          apexes distinct; the lobe the anther's fixed proportion of the
+          style.
+     JG5  (session 26) THE LOBE AS EMITTED: its ring vector is unit,
+          perpendicular to its own axis, and the RODRIGUES image of the rod
+          frame rebuilt from other owners; its outline factors are the law
+          on the shape the owner declares, and EXACTLY 1, because this
+          session ships no tip control. The lobe axes are JG4's and did not
+          move; the ring vector did, from the rotation axis (which the
+          rotation leaves fixed) to the rotated frame — a turn of
+          acos(-sin psi) about the lobe axis, 90/150/30 degrees on the
+          three. NOTHING ELSE HERE CAN SEE IT: a lobe rolled on its own axis
+          exports watertight, one piece, at an identical triangle count and
+          an identical STL byte length.
    =================================================================== */
 export const GYNOECIUM_SCOPE =
-  "gynoecium claims read footRing()'s own descriptor and the builder's emitted root axis, root rings, tip and lobes, NOT the STL; a style rooted off the axis or off the normal (JG1), wider than the hub unsaid (JG2), a hairline root (JG3) and a stigma with a lobe dropped or a lobe off the trifid's own law (JG4) all export watertight and as one piece — measured on mutants before these existed";
+  "gynoecium claims read footRing()'s own descriptor and the builder's emitted root axis, root rings, tip and lobes, NOT the STL; a style rooted off the axis or off the normal (JG1), wider than the hub unsaid (JG2), a hairline root (JG3), a stigma with a lobe dropped or a lobe off the trifid's own law (JG4) and a lobe whose cross-section is rolled on its own axis or is not the outline the owner declares (JG5) all export watertight and as one piece — measured on mutants before these existed";
 
 export async function gynoeciumAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -2884,7 +3007,12 @@ export async function gynoeciumAssertions(page, row) {
   if (Math.abs(G.lobe.diameter - ANTHER_DIAMETER_FACTOR * t) > 1e-12 || Math.abs(G.lobe.length - ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * t) > 1e-12) bad.push(`JG4: a lobe is ${G.lobe.diameter} x ${G.lobe.length} on a ${t} mm style — not the anther's fixed proportion`);
   if (m.styles.length !== 1) { bad.push(`JG4: ${m.styles.length} styles emitted for one declared`); return bad; }
   const s = m.styles[0], N = s.N;
-  if (s.tris !== STYLE_TRIS) bad.push(`JG4: the style emitted ${s.tris} triangles, the fixed count is ${STYLE_TRIS} — a lobe dropped or a tube doubled`);
+  /* JG4 — THE CENSUS, against tippedRodTris() called with the count THIS
+     owner declares (session 26), not a constant: the trifid is three lumps
+     today and session 4 makes the stigma a control, so a constant would be a
+     number that quietly stops being true. The emitted lobe list is pinned
+     against the same declared count below. */
+  if (s.tris !== tippedRodTris(G.lobe.count)) bad.push(`JG4: the style emitted ${s.tris} triangles, a rod tipped with the ${G.lobe.count} lumps this owner declares is ${tippedRodTris(G.lobe.count)} — a lobe dropped or a tube doubled`);
   /* JG1 */
   const len = Math.hypot(s.outer[0] - s.inner[0], s.outer[1] - s.inner[1], s.outer[2] - s.inner[2]);
   if (Math.abs(len - t) > 1e-9) bad.push(`JG1: the style's root runs ${len} mm through a ${t} mm slab`);
@@ -2915,7 +3043,11 @@ export async function gynoeciumAssertions(page, row) {
   /* JG4 — THE TRIFID AS A PROPERTY of the emitted lobes. */
   const D = s.dir, L = s.lobes;
   if (!Array.isArray(L) || L.length !== STIGMA_LOBES) { bad.push(`JG4: ${L && L.length} lobes emitted, the trifid is ${STIGMA_LOBES}`); return bad; }
-  const a = G.lobe.diameter / 2, reach = G.lobe.length - a;
+  /* The apex sits one radius past the cylinder band, and the band is FLOORED
+     (Q5) — inert at every reachable elongation today, and stated here so the
+     day elongation becomes a control this reads the shape that was built
+     rather than the one that was asked for. */
+  const a = G.lobe.diameter / 2, reach = Math.max(G.lobe.length - 2 * a, TIP_BAND_FLOOR * a) + a;
   const dot = (u, v) => u[0] * v[0] + u[1] * v[1] + u[2] * v[2];
   const proj = L.map((l) => { const d = dot(l.dir, D); return [l.dir[0] - D[0] * d, l.dir[1] - D[1] * d, l.dir[2] - D[2] * d]; });
   for (let k = 0; k < L.length; k++) {
@@ -2923,11 +3055,18 @@ export async function gynoeciumAssertions(page, row) {
     if (Math.abs(Math.hypot(...l.dir) - 1) > 1e-12) bad.push(`JG4: lobe ${k}'s axis is not unit (${Math.hypot(...l.dir)})`);
     const off = Math.acos(Math.max(-1, Math.min(1, dot(l.dir, D))));
     if (Math.abs(off - G.lobe.spreadRad) > 1e-9) bad.push(`JG4: lobe ${k} leaves the tip ${(off * 180) / Math.PI} degrees off the style, the trifid's spread is ${STIGMA_LOBE_SPREAD_DEG}`);
-    for (let c = 0; c < 3; c++) if (Math.abs(s.tip[c] + l.dir[c] * reach - l.apex[c]) > 1e-9) { bad.push(`JG4: lobe ${k}'s apex is not one lobe length along its axis from the tip`); break; }
+    for (let c = 0; c < 3; c++) if (Math.abs(s.tip[c] + l.dir[c] * reach - l.apex[c]) > 1e-9) { bad.push(`JG4: lobe ${k}'s apex is not one radius past the floored band (${reach} mm) along its axis from the tip`); break; }
     const n = L[(k + 1) % L.length], pa = proj[k], pb = proj[(k + 1) % L.length];
     const ang = Math.acos(Math.max(-1, Math.min(1, dot(pa, pb) / (Math.hypot(...pa) * Math.hypot(...pb)))));
     if (Math.abs(ang - (2 * Math.PI) / STIGMA_LOBES) > 1e-9) bad.push(`JG4: lobes ${k} and ${(k + 1) % L.length} are ${(ang * 180) / Math.PI} degrees apart around the style, the trifid puts them ${360 / STIGMA_LOBES} apart`);
     if (Math.hypot(l.apex[0] - n.apex[0], l.apex[1] - n.apex[1], l.apex[2] - n.apex[2]) < 1e-9) bad.push(`JG4: lobes ${k} and ${(k + 1) % L.length} share an apex — DUPLICATE GEOMETRY`);
+    /* JG5 — THE LOBE AS EMITTED (session 26). The lobe axes are unchanged by
+       the tip primitive and JG4 above still owns them; what is new is the
+       RING VECTOR, which was the rotation axis (left fixed, so it took no
+       part in the turn) and is now the Rodrigues image of the rod frame.
+       Nothing else in this project can see it: a lobe rolled on its own axis
+       exports watertight, one piece, at an identical triangle count. */
+    bad.push(...tipClauses('JG5', `stigma lobe ${k}`, { axis: l.dir, e1: l.e1, outline: l.outline }, G.lobe.shape, D, 0, G.lobe.spreadRad, (k * 2 * Math.PI) / G.lobe.count));
   }
   return bad;
 }
