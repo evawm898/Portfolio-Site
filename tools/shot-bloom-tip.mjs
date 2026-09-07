@@ -37,19 +37,31 @@
                                         of only movers cannot show that
                                         something held.
 
-   AND A RENDERER CONTROL, because `0 pixels differ` is worth nothing if the
-   renderer is not deterministic to begin with: row (A) is additionally shot
-   TWICE ON THE BASE TREE, and that pair's pixel difference is reported
-   beside the real one. Run the same tree twice before concluding anything
-   about two trees.
+   EVERY ROW IS ALSO SHOT TWICE ON THE BASE TREE — a RENDERER CONTROL, per
+   row, because `N pixels differ` is worth nothing without knowing what the
+   same tree twice gives on that same row. Run the same tree twice before
+   concluding anything about two trees.
 
-   WHAT THE SHEET ASSERTS from the two trees' own numbers rather than from a
-   caption: identical triangle counts on every pair (the tip primitive moves
-   no triangle and adds none); an identical STYLE read-out line on the trifid
-   rows (the stigma stands where it stood); the anther and control pairs
-   pixel-identical; and the trifid pairs NOT pixel-identical, which is the
-   vacuity guard — a sheet whose before and after agree everywhere is a sheet
-   photographing one tree twice.
+   AND THE CONTROL IS WHY THE PIXEL DIFFERENCE IS REPORTED, NOT ASSERTED.
+   Measured here, on rows whose geometry is byte-identical to 724,896 floats:
+   at 13,440 triangles the renderer is exactly deterministic (0 px on all
+   three views, twice), and at 80,544 it is not — 13 px of 2,560,000, at
+   channel steps of 1 (eleven of them), 4 and 17, scattered across a bounding
+   box spanning nearly the whole frame. That is edge rasterisation on a dense
+   scene, not geometry, and no threshold that passed it would be a
+   measurement — it would be a bar tuned to this data. So the division of
+   labour is the project's own: THE GATE ASSERTS THE PROPERTY THAT CAN
+   ACTUALLY FAIL and the sheet shows the picture. `Is the anther unchanged`
+   is settled float-exactly in tools/verify-bloom-tip-bytes.mjs; here it is
+   two numbers side by side, and a reader can see they are the same size.
+
+   WHAT THE SHEET DOES ASSERT, from the two trees' own numbers rather than
+   from a caption: identical triangle counts on every pair (the tip primitive
+   moves no triangle and adds none); identical STAMENS and STYLE read-out
+   lines (the parts stand where they stood); and THE TRIFID PAIRS MOVED, by
+   at least an order of magnitude more than that row's own renderer control —
+   the vacuity guard, because a sheet whose before and after agree everywhere
+   is a sheet photographing one tree twice.
 
    The deviation numbers in the captions come from tools/verify-bloom-tip-
    bytes.mjs, imported rather than restated, so the sheet and the rig quote
@@ -180,7 +192,7 @@ async function cell({ label, sets, onBase, frames, views }) {
 
 console.log('THE TIP SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted.\n');
 const ROWS = [
-  { key: 'anther-ring', name: '6 stamens on a RING — THE ANTHER, which must not move', sets: set({ stamenCount: 6 }), views: ['whole', 'lens', 'macro'], hold: true, control: true },
+  { key: 'anther-ring', name: '6 stamens on a RING — THE ANTHER, which must not move', sets: set({ stamenCount: 6 }), views: ['whole', 'lens', 'macro'], hold: true },
   { key: 'anther-disc', name: '120 on the DISC x Head rise 0.5 — the anther on a cap, at the count ceiling', sets: set({ stamenCount: 120, stamenLayout: 'DISC', headRise: 0.5 }), views: ['whole', 'lens'], hold: true },
   { key: 'trifid', name: 'a style on the bare apex — THE TRIFID at the shipping 1.20 mm sheet', sets: set({ gynoecium: 'STYLE' }), views: ['whole', 'lens', 'macro'], hold: false },
   { key: 'trifid-fat', name: 'a style x sheet 2.40 — THE WORST CASE: the sagitta scales with the tip radius', sets: set({ gynoecium: 'STYLE', sheetThickness: 2.4 }), views: ['whole', 'tip', 'macro'], hold: false },
@@ -190,24 +202,31 @@ const ROWS = [
 const pairs = [];
 for (const row of ROWS) {
   const before = await cell({ label: `BEFORE — ${row.name}`, sets: row.sets, onBase: true, views: row.views });
-  let twice = null;
-  if (row.control) {
-    const again = await cell({ label: `CONTROL — ${row.name} (the base tree, shot twice)`, sets: row.sets, onBase: true, frames: before.own, views: row.views });
-    twice = Object.fromEntries(row.views.map((v) => [v, pixelDiff(path.join(outDir, before.shots[v].file), path.join(outDir, again.shots[v].file))]));
-  }
+  /* THE RENDERER CONTROL, on every row: the same tree, the same camera,
+     twice. It is what makes the pixel numbers beside it readable. */
+  const again = await cell({ label: `CONTROL — ${row.name} (the base tree, shot twice)`, sets: row.sets, onBase: true, frames: before.own, views: row.views });
+  const twice = Object.fromEntries(row.views.map((v) => [v, pixelDiff(path.join(outDir, before.shots[v].file), path.join(outDir, again.shots[v].file))]));
   const after = await cell({ label: `AFTER — ${row.name}`, sets: row.sets, onBase: false, frames: before.own, views: row.views });
   if (before.shownTris !== after.shownTris) await die(`${row.name}: BEFORE ${before.shownTris} tris, AFTER ${after.shownTris} — the tip primitive moves no triangle and adds none`);
   if (before.styleLine !== after.styleLine) await die(`${row.name}: the STYLE read-out moved\n    BEFORE ${before.styleLine}\n    AFTER  ${after.styleLine}`);
   if (before.stamenLine !== after.stamenLine) await die(`${row.name}: the STAMENS read-out moved\n    BEFORE ${before.stamenLine}\n    AFTER  ${after.stamenLine}`);
   const diffs = Object.fromEntries(row.views.map((v) => [v, pixelDiff(path.join(outDir, before.shots[v].file), path.join(outDir, after.shots[v].file))]));
-  const anyMoved = Object.values(diffs).some((d) => d && d.pixels > 0);
-  if (row.hold && anyMoved) await die(`${row.name}: PREDECLARED TO HOLD and the render moved — ${Object.entries(diffs).map(([v, d]) => `${v} ${d.pixels}px`).join(', ')}`);
-  if (!row.hold && !anyMoved) await die(`${row.name}: PREDECLARED TO MOVE and every view is pixel-identical — this sheet is photographing one tree twice`);
+  /* THE VACUITY GUARD, and it is the only pixel ASSERTION here. A trifid row
+     must move by at least ten times its own renderer control on some view —
+     ten because the control measures tens of pixels at worst and a real move
+     measures tens of thousands, so the two are never within an order of each
+     other and the bar never has to be tuned. Held rows are REPORTED against
+     their control, never asserted: see this file's header for the numbers
+     that decided that, and the byte rig for the claim itself. */
+  const bar = (v) => Math.max(10 * ((twice[v] && twice[v].pixels) || 0), 100);
+  const reallyMoved = row.views.some((v) => diffs[v] && diffs[v].pixels > bar(v));
+  if (!row.hold && !reallyMoved) await die(`${row.name}: PREDECLARED TO MOVE and no view moved past its own renderer control — ${row.views.map((v) => `${v} ${diffs[v].pixels}px vs control ${twice[v].pixels}px`).join(', ')}; this sheet is photographing one tree twice`);
+  if (row.hold && reallyMoved) await die(`${row.name}: PREDECLARED TO HOLD and a view moved an order of magnitude past its own renderer control — ${row.views.map((v) => `${v} ${diffs[v].pixels}px vs control ${twice[v].pixels}px`).join(', ')}`);
   /* The measured surface deviation, from the rig, for this row's own state. */
   const st = { ...DEFAULTS, ...Object.fromEntries(row.sets.map((kv) => [kv.id, isNaN(Number(kv.value)) ? kv.value : Number(kv.value)])) };
   const dev = deviation(build(OLDG, st, true), build(NEWG, st, true));
   pairs.push({ row, before, after, diffs, twice, dev });
-  console.log(`   -> ${row.hold ? 'HELD' : 'MOVED'}: ${Object.entries(diffs).map(([v, d]) => `${v} ${d.pixels} px (worst level ${d.worst})`).join(' · ')}${dev ? ` · surface deviation ${dev.surfaceMax.toFixed(4)} mm` : ''}\n`);
+  console.log(`   -> ${row.hold ? 'HELD' : 'MOVED'}: ${row.views.map((v) => `${v} ${diffs[v].pixels} px (worst ${diffs[v].worst}) vs control ${twice[v].pixels} px (worst ${twice[v].worst})`).join(' · ')}${dev ? ` · surface deviation ${dev.surfaceMax.toFixed(4)} mm` : ''}\n`);
 }
 
 const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -218,7 +237,7 @@ const fig = (c, view, dev) => {
   return `<figure class="${c.onBase ? 'base' : 'head'}"><img src="${s.file}"><figcaption><b>${esc(c.onBase ? 'BEFORE — 2fee2c2, the pill' : 'AFTER — the tip primitive')}</b> <i>(${VIEWNAME[view]})</i><br><small>${s.mmPerPx.toFixed(5)} mm per pixel${px !== null ? ` — <b>0.047 mm is ${px.toFixed(1)} px here</b>` : ''}</small><br><small>${esc(c.tag)} · ${Number(c.shownTris).toLocaleString('en-US')} tris (print preview)</small></figcaption></figure>`;
 };
 const diffLine = (d, twice) => d === null ? 'frames differ in size — not comparable' :
-  `<b>${d.pixels.toLocaleString('en-US')} pixels differ</b> (${(d.frac * 100).toFixed(3)}% of the frame), worst channel step <b>${d.worst}</b> of 255${twice ? ` · <span class="ctl">renderer control, the same tree shot twice: ${twice.pixels} px</span>` : ''}`;
+  `<b>${d.pixels.toLocaleString('en-US')} pixels differ</b> (${(d.frac * 100).toFixed(3)}% of the frame), worst channel step <b>${d.worst}</b> of 255 · <span class="ctl">the RENDERER CONTROL on this same row — the base tree, same camera, shot twice — differs by ${twice ? `${twice.pixels.toLocaleString('en-US')} px (worst ${twice.worst})` : 'n/a'}. Read the two together: that is what makes this number mean something.</span>`;
 const html = `<title>The tip primitive — the anther unchanged, the trifid moved</title>
 <style>body{background:#0c0f0e;color:#dfe9e3;font:14px/1.55 system-ui,sans-serif;margin:24px}
 h1{font-size:22px;margin:0 0 6px}h2{font-size:17px;margin:30px 0 4px}h3{font-size:14px;margin:16px 0 2px;color:#9fb3a9;font-weight:600}

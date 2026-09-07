@@ -288,6 +288,31 @@ measurement rather than by the enumeration above. The numbers go in the table at
 this section when they land. CI does no byte diffs, so this is the one close-out step that
 genuinely needs a local run.
 
+### What the sheet measured about ITSELF, and why it reports rather than asserts
+
+The first sheet run asserted the anther pairs PIXEL-IDENTICAL and turned red at
+10,028 / 27,156 / 27,262 px. **The same-tree renderer control is what said that was not a
+finding:** shooting the base tree twice at the same camera differed by 4,925–7,426 px, spread
+over the whole frame. The cause is the flower project's own recorded lesson arriving again —
+the camera flight and the orbit damping are still easing at the ~2 fps software GL gives
+headless, so a fixed 260 ms wait samples an arbitrary point on the way in. `shoot()` now waits
+until **two consecutive screenshots are byte-identical**, and the anther row came back **0 px,
+worst channel step 0, on all three views.**
+
+**That did not make pixel-identity assertable, and the control is again what said so.** On the
+120-stamen row — 80,544 triangles, and a state the byte rig proves identical to 724,896 floats
+— the settled pair still differs by **13 px of 2,560,000**, at channel steps of 1 (eleven of
+them), 4 and 17, scattered across a bounding box spanning nearly the whole frame. That is edge
+rasterisation on a dense scene, and **no threshold that passed it would be a measurement** — it
+would be a bar tuned to this data.
+
+So the division of labour is the project's own: **the gate asserts the property that can
+actually fail and the sheet shows the picture.** Every row is now shot twice on the base tree,
+the two differences are printed side by side, and the only pixel ASSERTION left is the vacuity
+guard — a trifid row must move by at least ten times its own control, which is never a tuned
+bar because the control measures tens of pixels and a real move measures tens of thousands.
+*Is the anther unchanged* is settled float-exactly in the byte rig, where it belongs.
+
 **STOP AT THE SHEET.** This change is visual — 0.047 mm of surface on a part that ships absent
 by default — so **merge waits on Eva's ruling on `tools/shot-bloom-tip.mjs`**, not on green CI.
 The sheet is what the ruling is made from, and the ruling being asked for is narrow: *is the
