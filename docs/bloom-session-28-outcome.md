@@ -19,7 +19,7 @@ All under `Androecium ▸ Tip` — the panel's first **third level**, which sess
 | `antherElongation` | 1.00 – 6.00 | **2.50** (`ANTHER_LENGTH_FACTOR`) | its length, × its own diameter |
 | `antherRoundedness` | 0.00 – 1.00 | **1.00** | the blend toward a circle — the ONLY producer of one |
 | `antherPoints` | 2 – 12 | **4** | the outline's symmetry order *n* |
-| `antherSharpness` | 0.25 – 8.00 | **2.00** | the one exponent *s* — star ▸ polygon ▸ circle ▸ rounded *n*-gon |
+| `antherSharpness` | 0.25 – 8.00 | **1.00** | the one exponent *s* — star ▸ polygon ▸ circle ▸ rounded *n*-gon |
 | `antherLumps` ("Lobes") | 1 – 6 | **1** | tips sharing the filament's end |
 | `antherSpread` ("Lobe spread") | 0 – 90° | **0** | how far each leaves the filament's own direction |
 
@@ -64,6 +64,13 @@ Predeclared before a line was edited; measured afterwards.
 528/528 byte-identical; 0 moved
 byte diff: PASS — 0 of 528 configs moved. Defaults are bit-identical.
 ```
+
+**Re-proved after the sharpness ruling**, on the tree that ships (`antherSharpness` 1.00), against
+the same base capture: **528/528 byte-identical, 0 moved** again. Two independent captures of the
+new tree, twenty-two minutes apart with a default change between them, both bit-identical to
+`cb798f6` — which is the construction working, not a coincidence: at the shipping roundedness of
+1 the blend is exactly 1 and `tipSides` returns the rod's own lattice, so the sharpness value
+cannot reach the geometry.
 
 Because `phase18Matrix()` **is** `cb798f6`'s own `buildMatrix()`, that one pair is both halves
 of the charter's close-out at once: the newest frozen baseline, and the live-matrix partition
@@ -360,8 +367,10 @@ point count and the sharpness *do* appear, and at s = 2 the point count then mov
 lattice (n = 3 → 12, n = 4 → 16, n = 5 → 10 sides) and never the form — inert for a reason the
 read-out does not give.
 
-**THE PROPOSAL: `antherSharpness` defaults to 1.00.** Measured against the alternatives at the
-shipping anther radius of 0.96 mm:
+**RULED: `antherSharpness` defaults to 1.00** (Eva, session 28 — *"a roundedness slider whose
+only motion is one faceting jump at the top of its travel is worse than an inert one, because
+the jump reads as the control working"*). Measured against the alternatives at the shipping
+anther radius of 0.96 mm:
 
 | s | deviation at ρ 0.5 / ρ 0 | waist at ρ 0 vs the 0.50 mm floor | |
 |---|---|---|---|
@@ -393,6 +402,11 @@ This is the same construction the whole session rests on: at ρ = 1 the blend is
 whatever its value is.** The default is therefore free to be chosen for what happens when
 someone reaches for the control, which is exactly Eva's reasoning.
 
+`ANTHER_SHARPNESS_DEFAULT` is its own owner in `bloom-geometry.js`, deliberately **not**
+`TIP_SHARPNESS`: the stigma's hard-wired `TIP_SHAPE` stays at the circle's 2.00 until session 4
+gives it its own seven. Two owners because there are two tips, and the harness's module-load
+pairing now names the right one — which is what stops them being confused again.
+
 **ONE MEASUREMENT HAZARD, RECORDED RATHER THAN SMOOTHED.** The first pass of this measurement
 reported **38,057 px** between two states later proved bit-identical at 0 of 120,960 floats. It
 did not reproduce: five interleaved page loads gave eight pairs at 0 px, including the exact
@@ -402,12 +416,15 @@ observation, not a guarantee.** The sheet's macro-only bound is sound in the dir
 matters (a real change is 800,000+ px, three orders above any observed event) and fragile in the
 direction that costs a run; that is now said in the tool's own header.
 
-**PARKED, NOT BUILT — one for session 4.** The lattice still jumps 10 → 16 whenever roundedness
-leaves 1, at *any* sharpness, and at s = 2 exactly that jump is pure cost: 60% more triangles
-per tip for a provably identical shape. A one-line fix exists — `tipSides()` could return
-`STAMEN_SIDES` whenever the emitted factors are all exactly 1, rather than only when roundedness
-is 1 — but that changes a ruled law, and it belongs beside the stigma's seven where the same
-question is asked twice. Proposed, costed, not taken.
+**PARKED, NOT BUILT — ruled into session 4's brief.** The lattice still jumps 10 → 16 whenever
+roundedness leaves 1, at *any* sharpness. With the default at 1.00 that jump is **swallowed by
+the form change**, so the only state where roundedness does nothing but re-facet is sharpness
+**exactly** 2.00 — a reachable corner, not the default (Eva: *"it changes a ruled law; it goes
+beside the stigma's seven in session 4, with your one-line fix and its cost carried into that
+brief"*). The fix: `tipSides()` returns `STAMEN_SIDES` whenever the emitted factors are all
+exactly 1, rather than only when roundedness is 1. Its cost at that corner today is **60% more
+triangles per tip for a provably identical shape** — 200 → 320 on a four-point outline, +720 on
+a six-stamen bloom. Proposed, costed, carried.
 
 ### And a process finding that is now a charter convention
 
@@ -461,9 +478,9 @@ was to a harness, a tool or a document, none of which the browser loads.
 
 | instrument | result |
 |---|---|
-| `diff-bloom-bytes --compare` (phase18, both trees) | **528/528 byte-identical; 0 moved** |
+| `diff-bloom-bytes --compare` (phase18, both trees) | **528/528 byte-identical; 0 moved** — twice, before and after the sharpness ruling |
 | `diff-bloom-bytes --verify-frozen --phase18` | **PASS** — deep-equal to `cb798f6`'s own `buildMatrix()`, row for row |
-| `bloom-smoke.mjs` (44 rows) | **44/44 watertight, identical live/export counts, 0 degenerate** (290 s) |
+| `bloom-smoke.mjs` (44 rows) | **44/44 watertight, identical live/export counts, 0 degenerate** — re-run on the final tree after the sharpness ruling |
 | `bloom-smoke.mjs --conn` | **43/43 one connected piece** *(run before the fifth smoke row was added; that row, `elongation min`, is separately green on the export gate)* |
 | `verify-bloom-export.mjs --only "^ANTHER:"` | **21/21 watertight** — the whole of block 25 |
 | `verify-bloom-panel.mjs` | **PASS**, including route (t) and the new witness |

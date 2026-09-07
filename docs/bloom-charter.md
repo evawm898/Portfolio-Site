@@ -2089,6 +2089,33 @@ result at all.
 Session 26 is the worked case: five pushes, the last (`2c5fd95`) declared in the PR body as the
 head that should be allowed to finish, and it is the head all four bloom gates ran on.
 
+**AMENDED AGAIN Sep 7 (Eva, session 28): WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO
+NOT PUSH.** The session-26 amendment was written for INSTRUMENT ITERATION and does not cover the
+other state that has uncommitted work by construction — **a session waiting on a ruling.** Such
+a session will meet the stop hook every time: the tree is dirty because the answer has not
+arrived, and no declaration of a "final push" can be made, because whether there is more code to
+write depends on the ruling. Committing locally satisfies everything the hook exists for (the
+work is durable, nothing is lost to an ephemeral container) and costs nothing; pushing is what
+costs. Earlier sessions did exactly this and said so.
+
+**Session 28 is the worked case, and it is a case of getting it wrong.** Holding for Eva's
+ruling on the sheet, it pushed a docs-only commit (`bef415f`) to satisfy the hook. All four
+bloom gates re-triggered on the new head despite the commit touching no `bloom*` path — GitHub
+evaluates `paths` filters against the whole PR diff, which is the "no docs-only commits on a
+gated PR head" rule firing exactly as documented — and `cancel-in-progress` then killed the two
+long runs mid-flight, **losing 23 minutes of `bloom-export-watertight` and `bloom-connectedness`
+and restarting both from zero.**
+
+**THE PART WORTH KEEPING IS THE RETRACTION, NOT THE MISTAKE** (Eva's emphasis). The session
+first reported those runs as *still running and duplicating roughly two hours of runner time* —
+read from a run listing fetched seconds before the cancellation landed — and then, on checking
+the runs directly, found `conclusion: "cancelled"` timestamped at the push moment and corrected
+it in the next message, unprompted, naming which half of the claim had been wrong and which
+conclusion survived. **A status read from a listing is a snapshot that can be stale by seconds;
+a run's own conclusion is the primary source.** That is the same lesson as session 27's
+twenty-minute stale run-level `status`, arriving from a different direction, and it is why the
+correction is recorded here beside the error.
+
 **THE 600-LINE STOPPING RULE STAYS AS WRITTEN, AND ITS TRIGGER IS NOT SIZE** (Eva, Sep 7,
 session 26). Session 26 ran to roughly 1,600 insertions and the rule never fired, correctly:
 its trigger is **"if the diff passes roughly 600 lines BEFORE THE ASSERTIONS ARE GREEN"** —
@@ -5234,6 +5261,15 @@ matters should be measured this way.
     its own whole-view control read 10,492 px ON THE SAME RUN) and its eight cross-config pairs
     (0 px over states proved bit-identical at 0 of 120,960 floats) all STAND, unhedged. **A
     threshold needs a floor and therefore a distribution; an identity needs neither.**
+
+    **THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 28). The MACRO
+    view threw a **38,057 px** one-off between two states later proved bit-identical TO THE FLOAT
+    (0 of 120,960, live and export, `Object.is`), and it did not reproduce — five interleaved
+    page loads, eight pairs, all 0 px, including the comparison that had read 38,057. So
+    **"the macro control read 0 px on every row" is an OBSERVATION and never a guarantee.** A
+    macro-framed pixel bound is sound in the direction that matters (a real change on these
+    sheets is 800,000+ px, three orders above any observed event) and fragile in the direction
+    that costs a run. This belongs beside the retraction, not in a sheet's own header.
 
     - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
       floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number

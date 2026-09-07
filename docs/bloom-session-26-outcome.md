@@ -409,7 +409,15 @@ bar because the control measures tens of pixels and a real move measures tens of
 >   bit-identical at 0 of 120,960 floats.
 >
 > The rule to carry: **a threshold needs a floor and therefore needs a distribution; an
-> identity needs neither.** Retract the first kind, keep the second.
+> identity needs neither.** Retract the first kind, keep the second.>
+> **AND THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 28, recorded
+> here rather than buried in a sheet header). The MACRO view threw a **38,057 px** one-off
+> between two states later proved bit-identical **to the float** — 0 of 120,960, live and
+> export, `Object.is`. It did not reproduce: five interleaved page loads gave eight pairs at
+> 0 px, including the very comparison that had read 38,057. So **"the macro control read 0 px on
+> every row" is an observation and never a guarantee**, and a macro-framed bound is sound only
+> in the direction that matters — a real change on these sheets is 800,000+ px, three orders
+> above any observed event — and fragile in the direction that costs a run.
 
 Every number is a pixel count over a 1600x1600 frame, beside **that same row's own renderer
 control** (the base tree, same camera, shot twice). Read the pair, never the left number alone.

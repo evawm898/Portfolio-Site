@@ -38,7 +38,7 @@
    in either direction.
    =================================================================== */
 import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
-         ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_SHARPNESS, TIP_ROUNDEDNESS,
+         ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, ANTHER_SHARPNESS_DEFAULT, TIP_ROUNDEDNESS,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_SHARPNESS_RANGE, TIP_ROUNDEDNESS_RANGE,
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM } from './bloom-geometry.js';
 
@@ -2246,7 +2246,14 @@ export const CONTROLS = [
       return `${v}-fold${A ? ` — revolved through ${A.anther.sides} sides` : ''}`;
     },
     tier: 'standard', role: 'center', visibleWhen: { ref: 'antherOutlineLive' } },
-  { id: 'antherSharpness', section: 'tip', kind: 'slider', min: TIP_SHARPNESS_RANGE[0], max: TIP_SHARPNESS_RANGE[1], step: 0.05, default: TIP_SHARPNESS,
+  /* THE DEFAULT IS 1.00 AND NOT THE CIRCLE'S OWN 2.00 (Eva's ruling, session
+     28, from the measurement — the reasoning is at ANTHER_SHARPNESS_DEFAULT
+     in bloom-geometry.js). At s = 2 the law degenerates to exactly 1 at every
+     roundedness, so the roundedness slider above changed nothing but the
+     lattice; at 1.00 the space opens the moment anyone reaches for it, and it
+     costs no byte because sharpness is inert at the shipping roundedness of 1
+     whatever its value. */
+  { id: 'antherSharpness', section: 'tip', kind: 'slider', min: TIP_SHARPNESS_RANGE[0], max: TIP_SHARPNESS_RANGE[1], step: 0.05, default: ANTHER_SHARPNESS_DEFAULT,
     label: 'Sharpness',
     /* FULL RANGE, CLAMPED, TOLD — the spine curl's discipline. The floor is
        on the WAIST (the narrowest radius on the outline) at

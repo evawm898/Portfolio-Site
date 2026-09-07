@@ -2176,7 +2176,19 @@ session 28): a bimodal control destroys `X px is below the floor` and touches no
 estimate. Session 28's migration pair (0 px on three views), its INERT row (0 px while its own
 whole-view control read 10,492 px on the same run) and its eight cross-config pairs over
 bit-identical states all stand unhedged. **A threshold needs a floor and therefore a
-distribution; an identity needs neither.**
+distribution; an identity needs neither.** **AND THE BIMODALITY IS NOT CONFINED TO THE
+WHOLE-BLOOM FRAMING:** the MACRO view threw a 38,057 px one-off between two states proved
+bit-identical to the float (0 of 120,960), and it did not reproduce over eight interleaved
+pairs — so `the macro control read 0 px on every row` is an OBSERVATION, never a guarantee.
+
+**WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 28). The
+push-once amendment covers INSTRUMENT ITERATION; a session waiting on a ruling is the other
+state with uncommitted work by construction, and it meets the stop hook every time. Committing
+locally gives the hook everything it exists for; pushing is what costs. Session 28 pushed a
+docs-only commit while holding for a ruling: all four bloom gates re-triggered (paths filters
+are evaluated against the WHOLE PR diff) and `cancel-in-progress` killed the two long runs
+mid-flight, losing 23 minutes. Full worked case, including the session's own retraction of a
+wrong first reading, in the charter's push-once entry.
 
 **DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
 instrument*. Session 28 spent five fifty-minute sheet runs finding bugs in a sheet tool while

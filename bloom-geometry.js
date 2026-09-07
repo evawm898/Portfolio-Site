@@ -338,6 +338,43 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    the two agree at module load, the MAX_LAYERS move. A range restated in the
    registry is a range that drifts, and here the bound is what discharges Q6
    (no self-intersection instrument, ever). */
+/* THE ANTHER'S SHIPPING SHARPNESS — 1.00, and it is NOT TIP_SHARPNESS (Eva's
+   ruling, session 28, from the measurement).
+
+   `s = 2` IS A SINGULAR POINT OF THE LAW, and it was the default until this
+   ruling. At s = 2 the exponent is the circle's own, so
+   `h = (cos^2 + sin^2)^(-1/2)` computes to EXACTLY 1.0 at every sampled
+   azimuth and the blend `rho + (1 - rho) * 1` is exactly 1 for EVERY
+   roundedness — `max|f - 1| = 0.000e+0`, measured, not a rounding residue.
+   The roundedness slider therefore did nothing to the FORM at any setting;
+   its only motion was a one-off lattice jump (10 sides to 16) the instant it
+   left 1, which is worse than an inert control because the jump reads as the
+   control working. Rendered: rho 1.00 -> 0.50 and rho 1.00 -> 0.00 are the
+   SAME 834,695 px, and rho 0.50 -> 0.00 is 0 px.
+
+   WHY 1.00 AND NOT ANOTHER VALUE OFF 2. It is the largest deviation that
+   never meets the waist floor anywhere on the roundedness slider (0.679 mm
+   at rho 0 against the 0.50 mm floor, 36% headroom — and the waist factor
+   `2^(1/2 - 1/s)` is independent of the point count, so that holds at every
+   n; at 0.75 the headroom is 8%, and at 0.50 the floor BINDS at rho 0, so a
+   clamp would be the first thing a visitor met). It is a NAMED value rather
+   than a tuned one — the exact `|cos| + |sin|` family. And at the default
+   point count of four it pinches at the diagonals, which is the
+   tetrasporangiate anther: four pollen sacs with grooves between them.
+
+   IT MOVES NO BYTE, and that is why the default was free to choose: at the
+   shipping roundedness of 1 the blend is exactly 1 and tipSides() returns the
+   rod's own lattice, so sharpness is INERT there whatever its value.
+   Measured both ways rather than argued — 0 of 120,960 floats moved (live
+   and export, `Object.is`, so a signed zero would count), 0 of 90,720 on the
+   default bloom where the androecium is absent, and 0 px across four
+   cross-config render pairs interleaved with same-config controls also at 0.
+
+   SEPARATE FROM TIP_SHARPNESS, which stays 2 because TIP_SHAPE is the
+   STIGMA's hard-wired shape until session 4 gives it its own seven. Two
+   owners because there are two tips; the harness asserts the registry's
+   default against THIS one at module load. */
+export const ANTHER_SHARPNESS_DEFAULT = 1;
 export const TIP_SIZE_RANGE = Object.freeze([0.6, 6]);
 export const TIP_ELONGATION_RANGE = Object.freeze([1, 6]);
 export const TIP_ROUNDEDNESS_RANGE = Object.freeze([0, 1]);

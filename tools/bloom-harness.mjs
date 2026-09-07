@@ -72,7 +72,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
             floor derived from the wrong quantity fails instead of agreeing
             with itself (JS5's discipline). An unused import here would read
             as though the gate called it. */
-         TIP_SHAPE, TIP_BAND_FLOOR, tipOutline, tipSides,
+         TIP_SHAPE, TIP_BAND_FLOOR, tipOutline, tipSides, ANTHER_SHARPNESS_DEFAULT,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_SHARPNESS_RANGE, TIP_ROUNDEDNESS_RANGE,
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM } = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 
@@ -212,7 +212,11 @@ for (const [id, range, dflt] of [
   ['antherSize', TIP_SIZE_RANGE, ANTHER_DIAMETER_FACTOR],
   ['antherElongation', TIP_ELONGATION_RANGE, ANTHER_LENGTH_FACTOR],
   ['antherPoints', TIP_LOBES_RANGE, TIP_SHAPE.lobes],
-  ['antherSharpness', TIP_SHARPNESS_RANGE, TIP_SHAPE.sharpness],
+  /* AGAINST ANTHER_SHARPNESS_DEFAULT, not TIP_SHAPE.sharpness (session 28):
+     the anther's shipping sharpness is 1.00 and the stigma's hard-wired
+     TIP_SHAPE stays at the circle's 2.00 until session 4. Two owners because
+     there are two tips, and this is what stops them being confused again. */
+  ['antherSharpness', TIP_SHARPNESS_RANGE, ANTHER_SHARPNESS_DEFAULT],
   ['antherRoundedness', TIP_ROUNDEDNESS_RANGE, TIP_SHAPE.roundedness],
   ['antherLumps', TIP_LUMPS_RANGE, 1],
   ['antherSpread', TIP_SPREAD_DEG_RANGE, 0],
