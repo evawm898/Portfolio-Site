@@ -1748,12 +1748,12 @@ any of them.
 
 ## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
 
-**Eva's ruling, session 28, and it is a convention rather than a note because it has cost time
+**Eva's ruling, session 29, and it is a convention rather than a note because it has cost time
 in every sheet session, not just that one.**
 
 A contact sheet is two things at once: a TOOL and an ARTEFACT. Debugging the tool by running
 the artefact is the expensive way round, and it is the way this project keeps reaching for.
-Session 28 spent **five full-sheet runs** — roughly fifty minutes each — finding bugs in
+Session 29 spent **five full-sheet runs** — roughly fifty minutes each — finding bugs in
 `shot-bloom-anther.mjs`, and the geometry passed all sixteen rows on every one of them. The
 failures were: an assertion stated against zero where the renderer is noisy; the same assertion
 restated against a bimodal control; a Playwright screenshot timeout on the heaviest cell; a
@@ -1779,7 +1779,7 @@ tail, then run the grid once.
    it in the tool, and expect the largest cell to be the one that fails.
 
 The same shape applies to any instrument with a long input: **the matrix gates have `--only`
-and `--smoke` for exactly this reason**, and session 28's own JS4 defect was found by
+and `--smoke` for exactly this reason**, and session 29's own JS4 defect was found by
 `node tools/verify-bloom-export.mjs --only "^ANTHER:"` in two minutes rather than by a full
 matrix run. Reach for the narrow run first, every time.
 
@@ -2089,7 +2089,7 @@ result at all.
 Session 26 is the worked case: five pushes, the last (`2c5fd95`) declared in the PR body as the
 head that should be allowed to finish, and it is the head all four bloom gates ran on.
 
-**AMENDED AGAIN Sep 7 (Eva, session 28): WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO
+**AMENDED AGAIN Sep 7 (Eva, session 29): WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO
 NOT PUSH.** The session-26 amendment was written for INSTRUMENT ITERATION and does not cover the
 other state that has uncommitted work by construction — **a session waiting on a ruling.** Such
 a session will meet the stop hook every time: the tree is dirty because the answer has not
@@ -2098,7 +2098,7 @@ write depends on the ruling. Committing locally satisfies everything the hook ex
 work is durable, nothing is lost to an ephemeral container) and costs nothing; pushing is what
 costs. Earlier sessions did exactly this and said so.
 
-**Session 28 is the worked case, and it is a case of getting it wrong.** Holding for Eva's
+**Session 29 is the worked case, and it is a case of getting it wrong.** Holding for Eva's
 ruling on the sheet, it pushed a docs-only commit (`bef415f`) to satisfy the hook. All four
 bloom gates re-triggered on the new head despite the commit touching no `bloom*` path — GitHub
 evaluates `paths` filters against the whole PR diff, which is the "no docs-only commits on a
@@ -5236,9 +5236,9 @@ matters should be measured this way.
     Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
     the expiry.
 
-    **⛔ THE WHOLE-BLOOM PIXEL PAIR IS RETRACTED (Eva, session 28), AND THE RULING STANDS.**
+    **⛔ THE WHOLE-BLOOM PIXEL PAIR IS RETRACTED (Eva, session 29), AND THE RULING STANDS.**
     `4,800 px against a 6,868 px floor` was a single control sample of a TWO-MODE distribution,
-    not a floor: session 28 measured the same-tree whole-bloom control at **0, 51, 50, 10,486,
+    not a floor: session 29 measured the same-tree whole-bloom control at **0, 51, 50, 10,486,
     0, 52, 10,635 px** across sixteen rows of one sheet, reaching **15,885 px** across runs, with
     the same row landing in either mode on different runs. Settling on byte-identical FRAMES
     removes the orbit DAMPING and does not remove this. So "below the noise at whole-bloom
@@ -5252,17 +5252,17 @@ matters should be measured this way.
     whole-bloom view is not evidence unless its own control was taken in the same page session
     AND came back low.**
 
-    **AND THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 28). A bimodal
+    **AND THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 29). A bimodal
     control destroys any claim of the form *"X px is below the floor"* — there is no floor to be
     below. It touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
     comparison against a noise estimate, it is an IDENTITY, and no distribution of renderer noise
-    manufactures one. So the 120-stamen row's exact equality here, and session 28's migration
+    manufactures one. So the 120-stamen row's exact equality here, and session 29's migration
     pair (0 px on all three views), its INERT row (0 px against the pill on all three views while
     its own whole-view control read 10,492 px ON THE SAME RUN) and its eight cross-config pairs
     (0 px over states proved bit-identical at 0 of 120,960 floats) all STAND, unhedged. **A
     threshold needs a floor and therefore a distribution; an identity needs neither.**
 
-    **THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 28). The MACRO
+    **THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 29). The MACRO
     view threw a **38,057 px** one-off between two states later proved bit-identical TO THE FLOAT
     (0 of 120,960, live and export, `Object.is`), and it did not reproduce — five interleaved
     page loads, eight pairs, all 0 px, including the comparison that had read 38,057. So
@@ -5361,11 +5361,11 @@ matters should be measured this way.
     run-level `status` read STALE for twenty minutes after a job finished — read
     `list_workflow_jobs`, not the run, and it is far leaner besides.
 
-- **Session 28 (tip plan 3b, Sep 7): THE ANTHER'S SEVEN CONTROLS SHIP, THE TIP'S LATTICE STOPS
+- **Session 29 (tip plan 3b, Sep 7): THE ANTHER'S SEVEN CONTROLS SHIP, THE TIP'S LATTICE STOPS
   BEING A CONSTANT, AND 0 MOVED IS A CONSTRUCTION.** Full account:
-  `docs/bloom-session-28-outcome.md`. Seven sliders under `Androecium ▸ Tip` — size,
+  `docs/bloom-session-29-outcome.md`. Seven sliders under `Androecium ▸ Tip` — size,
   elongation, roundedness, points, sharpness, lobes, lobe spread — **authored plainly, no
-  generator**: Q7's one-table instancing waits for session 4, where a second instance makes
+  generator**: Q7's one-table instancing waits for session 30, where a second instance makes
   "they cannot drift" observable, and carrying it here would be debt this session could not
   verify.
 

@@ -116,7 +116,7 @@ function tipClauses(tag, who, lump, shape, D, azimuth, spreadRad, psi) {
   /* Two PROPERTIES, which no restatement can give away. */
   if (Math.abs(Math.hypot(...e1) - 1) > 1e-12) bad.push(`${tag}: ${who} has a ring vector of length ${Math.hypot(...e1)} — the tip frame is not unit`);
   if (Math.abs(e1[0] * L[0] + e1[1] * L[1] + e1[2] * L[2]) > 1e-12) bad.push(`${tag}: ${who} has a ring vector that is not perpendicular to its own axis`);
-  /* THE AXIS, rebuilt from the same other owners (session 28). It was the
+  /* THE AXIS, rebuilt from the same other owners (session 29). It was the
      CALLER's clause while an anther could only be aimed at no spread and a
      lobe only at the trifid's; with the anther's lobe count and spread
      controls both owners state it the same way, so it belongs here beside
@@ -139,7 +139,7 @@ function tipClauses(tag, who, lump, shape, D, azimuth, spreadRad, psi) {
      circle` is a measurement here rather than a sentence in a header, and
      when roundedness becomes a slider only the second clause moves. */
   /* THE OUTLINE, and it is STILL TWO-SIDED once roundedness is a slider
-     (session 28). The first clause is the law rebuilt on the declared shape;
+     (session 29). The first clause is the law rebuilt on the declared shape;
      the second is the ROUNDEDNESS BICONDITIONAL that replaced session 26's
      `must be exactly 1` — at a roundedness of exactly 1 every factor is
      `Object.is` 1 (which is the byte-identity argument for the shipping
@@ -194,7 +194,7 @@ if (LAYER_COUNT_CONTROL.min !== 1) {
   throw new Error(`registry layerCount.min ${LAYER_COUNT_CONTROL.min} !== 1 — one whorl is the byte-identical default and the guard's only case`);
 }
 
-/* THE SAME MOVE FOR THE ANTHER'S SEVEN (session 28), and here the bound is
+/* THE SAME MOVE FOR THE ANTHER'S SEVEN (session 29), and here the bound is
    LOAD-BEARING FOR A RULING: Q6 says there will never be a self-intersection
    instrument because the RANGES are what keep the outline from inverting
    (f >= 2^(1/2 - 1/s) > 0 at the sharpness floor of 0.25). A registry that
@@ -212,9 +212,9 @@ for (const [id, range, dflt] of [
   ['antherSize', TIP_SIZE_RANGE, ANTHER_DIAMETER_FACTOR],
   ['antherElongation', TIP_ELONGATION_RANGE, ANTHER_LENGTH_FACTOR],
   ['antherPoints', TIP_LOBES_RANGE, TIP_SHAPE.lobes],
-  /* AGAINST ANTHER_SHARPNESS_DEFAULT, not TIP_SHAPE.sharpness (session 28):
+  /* AGAINST ANTHER_SHARPNESS_DEFAULT, not TIP_SHAPE.sharpness (session 29):
      the anther's shipping sharpness is 1.00 and the stigma's hard-wired
-     TIP_SHAPE stays at the circle's 2.00 until session 4. Two owners because
+     TIP_SHAPE stays at the circle's 2.00 until session 30. Two owners because
      there are two tips, and this is what stops them being confused again. */
   ['antherSharpness', TIP_SHARPNESS_RANGE, ANTHER_SHARPNESS_DEFAULT],
   ['antherRoundedness', TIP_ROUNDEDNESS_RANGE, TIP_SHAPE.roundedness],
@@ -2853,7 +2853,7 @@ export async function stamenAssertions(page, row) {
   if (A.radius !== (A.clamped ? A.limit : A.asked)) bad.push(`JS2: the disc radius ${A.radius} is neither the asked ${A.asked} nor the limit ${A.limit} it should clamp to`);
   if (A.onAxis !== (A.limit === 0)) bad.push(`JS2: onAxis reads ${A.onAxis} at a limit of ${A.limit}`);
   /* THE PILL'S PROPORTION WAS PINNED TO THE TWO CONSTANTS HERE (session 21)
-     and that clause is RETIRED INTO JS7 (session 28), which rebuilds both
+     and that clause is RETIRED INTO JS7 (session 29), which rebuilds both
      from the SLAB and the two CONTROLS — strictly stronger, because it fails
      on a size that is not the control's as well as on a proportion that is
      not derived. Leaving it would have made every non-default size or
@@ -2896,7 +2896,7 @@ export async function stamenAssertions(page, row) {
          float-exact and -0 aware in tools/verify-bloom-tip-bytes.mjs.
          Anything but a signed zero fails here: for finite non-zero doubles
          `===` is bit equality. */
-      /* EVERY LOBE, at its own azimuth (session 28) — the count and the
+      /* EVERY LOBE, at its own azimuth (session 29) — the count and the
          spread are controls now, so this is the trifid's own shape. */
       for (let k = 0; k < s.lumps.length; k++) {
         const lk = s.lumps[k];
@@ -3027,7 +3027,7 @@ export async function stamenAssertions(page, row) {
 }
 
 /* ===================================================================
-   JS7 — THE ANTHER'S SEVEN (session 28). The tip controls' own family, split
+   JS7 — THE ANTHER'S SEVEN (session 29). The tip controls' own family, split
    out of JS4/JS6 because those two ask about what was EMITTED and this one
    asks whether the DESCRIPTOR is the seven controls: a tip built perfectly
    from the wrong numbers passes both of them.
@@ -3253,12 +3253,12 @@ export async function gynoeciumAssertions(page, row) {
        Nothing else in this project can see it: a lobe rolled on its own axis
        exports watertight, one piece, at an identical triangle count. */
     bad.push(...tipClauses('JG5', `stigma lobe ${k}`, { axis: l.dir, e1: l.e1, outline: l.outline }, G.lobe.shape, D, 0, G.lobe.spreadRad, (k * 2 * Math.PI) / G.lobe.count));
-    /* THE STIGMA IS STILL HARD-WIRED (session 28): the anther's seven landed
-       and the stigma's are session 4, so the lobe must still declare the
+    /* THE STIGMA IS STILL HARD-WIRED (session 29): the anther's seven landed
+       and the stigma's are session 30, so the lobe must still declare the
        frozen TIP_SHAPE. This clause was in the SHARED statement while both
-       tips were hard-wired; it is the gynoecium's alone now, and session 4
+       tips were hard-wired; it is the gynoecium's alone now, and session 30
        is what retires it. */
-    if (G.lobe.shape.roundedness !== TIP_SHAPE.roundedness || G.lobe.shape.sharpness !== TIP_SHAPE.sharpness || G.lobe.shape.lobes !== TIP_SHAPE.lobes) bad.push(`JG5: stigma lobe ${k} declares a tip shape ${JSON.stringify(G.lobe.shape)}, and the stigma's own controls are session 4 — until then it is the hard-wired ${JSON.stringify(TIP_SHAPE)}`);
+    if (G.lobe.shape.roundedness !== TIP_SHAPE.roundedness || G.lobe.shape.sharpness !== TIP_SHAPE.sharpness || G.lobe.shape.lobes !== TIP_SHAPE.lobes) bad.push(`JG5: stigma lobe ${k} declares a tip shape ${JSON.stringify(G.lobe.shape)}, and the stigma's own controls are session 30 — until then it is the hard-wired ${JSON.stringify(TIP_SHAPE)}`);
   }
   return bad;
 }
@@ -4614,7 +4614,7 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
-  /* 25. THE ANTHER'S TIP (session 28) — the anther's own seven. Ships at
+  /* 25. THE ANTHER'S TIP (session 29) — the anther's own seven. Ships at
          TODAY'S PILL: every default reproduces the constants, so every
          earlier row is bit-identical by construction and this block is the
          whole of the new controls' coverage. Block 1 sweeps none of them
@@ -9589,12 +9589,12 @@ export function phase17Matrix() {
 /* ===================================================================
    phase18Matrix() — THE 528 ROWS AS THEY STOOD AT cb798f6, frozen.
 
-   The like-for-like baseline for THE ANTHER'S SEVEN (session 28, tip plan
+   The like-for-like baseline for THE ANTHER'S SEVEN (session 29, tip plan
    3b), standing to it exactly as phase17Matrix() stands to the gynoecium and
    phase16Matrix() to the androecium. A NEW frozen matrix beside the
    seventeen older ones, never an edit to any of them — FROZEN MEANS FROZEN.
 
-   FROZEN AGAINST: cb798f6, the head of `main` when session 28 opened
+   FROZEN AGAINST: cb798f6, the head of `main` when session 29 opened
    (session 27's docs-only PR, #178), immediately before the anther's tip
    controls — the seven `anther*` rows, the Tip section and matrix block 25 —
    landed. A commit ON `main`, tagged at freeze time (session 17's rule;

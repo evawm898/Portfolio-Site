@@ -183,7 +183,7 @@
          one that rewrites only the flag away and keeps every other
          character, so exactly that assertion fires.
 
-     (t) THE ANTHER'S SEVEN (session 28), and the panel's FIRST THIRD LEVEL.
+     (t) THE ANTHER'S SEVEN (session 29), and the panel's FIRST THIRD LEVEL.
          Tip is declared inside Androecium inside Center, so every step counts
          the section's enclosing <details> and requires two — route (a)'s
          census would read a Tip re-parented to the top as identical. The two
@@ -275,7 +275,7 @@ const WITNESS = {
   center: { id: 'stamenCount', value: '6',
             read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
             what: "the builder's free-end tally / stamens emitted / the owner's disc radius, driven through the shut container" },
-  /* TIP (session 28) — the anther's seven, and the FIRST THIRD LEVEL in this
+  /* TIP (session 29) — the anther's seven, and the FIRST THIRD LEVEL in this
      panel: Tip sits inside Androecium, which sits inside Center, so driving
      this witness exercises a control two containers deep. Its precondition is
      the androecium being present at all (all seven are gated on
@@ -2318,7 +2318,7 @@ for (const [label, sets, wantDome, wantClamp] of [
 }
 
 /* ===================================================================
-   ROUTE (t) — THE ANTHER'S SEVEN (session 28), on ONE page, in BOTH
+   ROUTE (t) — THE ANTHER'S SEVEN (session 29), on ONE page, in BOTH
    directions, route (o)'s discipline one level further in.
 
    WHY IT IS OWED even though route (d) already drives every predicate's

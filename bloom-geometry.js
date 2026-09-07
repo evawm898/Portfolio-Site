@@ -211,14 +211,14 @@ export function domeIsFlat(state) { return !sphereMode(state) && state.headRise 
    per row, and the GATED matrix rows prove the androecium at maximum under
    SPHERE byte-identical to the bare sphere. */
 export const MAX_STAMENS = 120;
-/* THE ANTHER'S TWO PROPORTIONS — constants until session 28, and now the
+/* THE ANTHER'S TWO PROPORTIONS — constants until session 29, and now the
    DEFAULTS of `antherSize` and `antherElongation` (Q8: `size` becomes a real
    slider, superseding ANTHER_DIAMETER_FACTOR, because points are unreachable
    on a 1.92 mm anther and without it the sharp end of the range is
    decorative). They stay HERE, exported, and the registry reads them for its
    defaults: one owner for the shipping proportion, so the control cannot
    drift from the number every earlier export was built at. The gynoecium's
-   lobe still reads them directly — the stigma's own seven are session 4. */
+   lobe still reads them directly — the stigma's own seven are session 30. */
 export const ANTHER_DIAMETER_FACTOR = 1.6;
 export const ANTHER_LENGTH_FACTOR = 2.5;
 /* Mesh resolution — FIXED, so topology depends on no slider and the export
@@ -331,7 +331,7 @@ export const TIP_BAND_FLOOR = 0.01;
    ROLE_OVERRIDES pattern — so the anther's and the stigma's cannot drift;
    until then a single frozen object makes "they cannot drift" literal. */
 export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPNESS, roundedness: TIP_ROUNDEDNESS });
-/* THE REMAINING FIVE RANGES (session 28) — the two proportions, the two that
+/* THE REMAINING FIVE RANGES (session 29) — the two proportions, the two that
    aim the lumps, and roundedness. Beside TIP_SHARPNESS_RANGE and
    TIP_LOBES_RANGE above, these are the ONE OWNER of every tip control's
    bounds; the registry reads them for its `min`/`max` and the harness asserts
@@ -339,7 +339,7 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    registry is a range that drifts, and here the bound is what discharges Q6
    (no self-intersection instrument, ever). */
 /* THE ANTHER'S SHIPPING SHARPNESS — 1.00, and it is NOT TIP_SHARPNESS (Eva's
-   ruling, session 28, from the measurement).
+   ruling, session 29, from the measurement).
 
    `s = 2` IS A SINGULAR POINT OF THE LAW, and it was the default until this
    ruling. At s = 2 the exponent is the circle's own, so
@@ -371,7 +371,7 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    cross-config render pairs interleaved with same-config controls also at 0.
 
    SEPARATE FROM TIP_SHARPNESS, which stays 2 because TIP_SHAPE is the
-   STIGMA's hard-wired shape until session 4 gives it its own seven. Two
+   STIGMA's hard-wired shape until session 30 gives it its own seven. Two
    owners because there are two tips; the harness asserts the registry's
    default against THIS one at module load. */
 export const ANTHER_SHARPNESS_DEFAULT = 1;
@@ -429,7 +429,7 @@ export function tipWaistFactor(sharpness) {
   const sh = clamp(sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
   return sh < 2 ? Math.pow(2, 0.5 - 1 / sh) : 1;
 }
-/* THE TIP'S OWN LATTICE (session 28) — how many sides the tip is revolved
+/* THE TIP'S OWN LATTICE (session 29) — how many sides the tip is revolved
    through, and the OUTLINE is its one owner: `revolveInto` reads the array's
    length rather than a constant, so a shape and its tessellation cannot
    disagree.
@@ -2308,8 +2308,8 @@ export function footRing(state, acc) {
     const clamped = asked > limit;
     const radius = clamped ? limit : asked;
     const onAxis = limit === 0;
-    /* THE ANTHER'S SEVEN (session 28, Eva's ruling — the tip's own controls,
-       authored plainly here and instanced from ONE table in session 4, when
+    /* THE ANTHER'S SEVEN (session 29, Eva's ruling — the tip's own controls,
+       authored plainly here and instanced from ONE table in session 30, when
        the stigma's seven make "they cannot drift" observable).
 
        THE EXPRESSIONS ARE THE CONSTANTS' OWN, TERM FOR TERM. `size *
@@ -4248,7 +4248,7 @@ export function buildHubInto(acc, state, ring) {
    triangles per dome, measured Sep 1). Both go through one emitter.
    =================================================================== */
 function revolveInto(acc, rings, south, north, outline = null) {
-  /* THE OUTLINE OWNS THE LATTICE (session 28). `null` is the ROD's arm — the
+  /* THE OUTLINE OWNS THE LATTICE (session 29). `null` is the ROD's arm — the
      tube keeps STAMEN_SIDES and no arithmetic here moved — and a tip hands in
      an array whose LENGTH is tipSides(shape), so a shape and its tessellation
      cannot disagree. At roundedness 1 that length is STAMEN_SIDES. */
@@ -4368,7 +4368,7 @@ export function buildStamenInto(acc, andro, s, slot) {
   const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: andro.length, floorRadius: andro.diameter }, s, slot.azimuth);
   /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
      direction at azimuths a whole turn apart — the TRIFID's own law, one
-     statement for both owners (session 28). At the shipping default the count
+     statement for both owners (session 29). At the shipping default the count
      is 1 and the spread is 0, so the loop runs once at psi = 0 * TAU / 1 = 0
      and `spreadRad` 0 is the Rodrigues identity: the ring vector comes back
      as the rod's `T` and the anther's bytes do not move (session 26).

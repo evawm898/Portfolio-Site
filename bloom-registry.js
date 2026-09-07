@@ -224,7 +224,7 @@ export const PREDICATES = {
      (Eva, Sep 5 — four states including none), so each has its own
      presence predicate and the eligibility is stated once per part. */
   /* ===================================================================
-     WHERE THE ANTHER'S OUTLINE CONTROLS APPLY (session 28) — the point count
+     WHERE THE ANTHER'S OUTLINE CONTROLS APPLY (session 29) — the point count
      and the sharpness are HIDDEN AND INERT at a roundedness of 1, the
      curl-bias precedent, and here the inertness is IN THE ARITHMETIC rather
      than in a branch anyone has to remember: the blend is `1 + 0 * h`, which
@@ -542,7 +542,7 @@ export const SECTIONS = [
      second reproductive part and the last piece of the centre. Its own
      drop-down, on the session-21 note above: each part independently present
      or absent. Hidden whole under SPHERE by every control's predicate. */
-  /* TIP (session 28) — the anther's own seven, a drop-down INSIDE Androecium
+  /* TIP (session 29) — the anther's own seven, a drop-down INSIDE Androecium
      and therefore the panel's first third level, which session 27 made legal
      by lifting the nesting bound and replacing it with the precedence check
      this declaration relies on (a parent is declared before its child, and
@@ -554,7 +554,7 @@ export const SECTIONS = [
      that were there describe WHERE the stamens are and how long they are;
      these seven describe the shape of one small solid at the end of each.
      They are the "Petal roles" shape one level further in — a group of
-     controls about one part of the part. Session 4 declares the stigma's
+     controls about one part of the part. Session 30 declares the stigma's
      beside it and generates both from one table (Q7). */
   { id: 'tip', label: 'Tip', open: false, parent: 'androecium' },
   { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
@@ -2180,8 +2180,8 @@ export const CONTROLS = [
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
 
   /* ===================================================================
-     THE ANTHER'S SEVEN (session 28, Eva's ruling — the anther's tip controls
-     and nothing else; the stigma's seven are session 4, which instances both
+     THE ANTHER'S SEVEN (session 29, Eva's ruling — the anther's tip controls
+     and nothing else; the stigma's seven are session 30, which instances both
      from ONE table and is the first moment "they cannot drift" is
      observable). AUTHORED PLAINLY: seven rows, written out, no generator —
      carrying the generator here would be debt this session cannot verify.

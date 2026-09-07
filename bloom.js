@@ -100,7 +100,7 @@ for (const s of SECTIONS) {
      ANY DEPTH. The two-level bound was lifted with that check (Eva's Q7);
      this loop never knew about depth — it appends into whatever the parent's
      element is. `bl-sec--sub` below is still "nested at all", not "nested at
-     depth k": session 28 declared the first third level (Tip, inside
+     depth k": session 29 declared the first third level (Tip, inside
      Androecium) and paid the rule session 27 said was owed, as a DESCENDANT
      selector in bloom.css, so this line stays one class and a fourth level
      would cost nothing here either. */
@@ -938,7 +938,7 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
        + `\n`;
 }
 
-/* THE ANTHER LINE (session 28) — the tip's seven told in the owner's own
+/* THE ANTHER LINE (session 29) — the tip's seven told in the owner's own
    numbers, none of them re-derived here: the two proportions with the
    millimetres they resolve to, the OUTLINE (and, at a roundedness of exactly
    1, that the two controls below it are inert rather than merely hidden),
@@ -974,7 +974,7 @@ function styleLine(fr, styles, stamens, mode) {
   if (!G || !styles.length) return '';
   const s = styles[0];
   const stigmaTop = Math.max(...s.lobes.map((l) => l.apex[2]));
-  /* EVERY LOBE, not the first (session 28): with the anther's lobe count a
+  /* EVERY LOBE, not the first (session 29): with the anther's lobe count a
      control, `the highest anther` has to mean the highest tip actually
      emitted or the line names a computation nobody performed. */
   const antherTop = stamens.length ? Math.max(...stamens.map((a) => Math.max(...a.lumps.map((l) => l.apex[2])))) : null;

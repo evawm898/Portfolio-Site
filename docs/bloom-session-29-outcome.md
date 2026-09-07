@@ -1,9 +1,9 @@
-# The anther's seven, session 28 (tip plan 3b) — the tip's controls, 0 moved, `frozen/phase18`
+# The anther's seven, session 29 (tip plan 3b) — the tip's controls, 0 moved, `frozen/phase18`
 
 Session 24 ruled the parametric tip in eight parts and sized it at four sessions. Session 26
 was session 2 — the primitive and the migration, zero controls. Session 27 was 3a — the
 nesting bound lifted and the smoke gate's family census derived. **This is 3b: the anther's
-seven controls, and nothing else.** The stigma's seven are session 4, which instances both
+seven controls, and nothing else.** The stigma's seven are session 30, which instances both
 from one table; the generator is deliberately NOT carried here, because a session that cannot
 observe drift cannot verify the mechanism that prevents it.
 
@@ -186,7 +186,7 @@ only be aimed at no spread — and its `must be exactly 1` clause became the **r
 biconditional**: exactly 1 at roundedness 1, and *not* all 1 below it, because the first clause
 compares a mutated law against itself (session 26's M2a, where the unblended law differed from 1
 by 1.1e-16). JG5 keeps the hard-wired-`TIP_SHAPE` clause the shared statement gave up; the
-stigma is session 4's.
+stigma is session 30's.
 
 **The census caught the omission before a human did.** `node tools/bloom-smoke.mjs --check` on
 the first run reported *matrix block 25 has no smoke row* and *assertion family JS7 is asserted
@@ -249,7 +249,7 @@ the reason phase10 went unfetchable.
   run.** Its rows predeclare that the *trifid moves*, which was true of that migration and is
   false of this one; running it here would fail its own vacuity guard for the right reason. It
   is on the untouched list.
-- **The stigma still reads the hard-wired `TIP_SHAPE`.** That is session 4, and JG5 asserts it
+- **The stigma still reads the hard-wired `TIP_SHAPE`.** That is session 30, and JG5 asserts it
   rather than leaving it to habit.
 
 ---
@@ -367,7 +367,7 @@ point count and the sharpness *do* appear, and at s = 2 the point count then mov
 lattice (n = 3 → 12, n = 4 → 16, n = 5 → 10 sides) and never the form — inert for a reason the
 read-out does not give.
 
-**RULED: `antherSharpness` defaults to 1.00** (Eva, session 28 — *"a roundedness slider whose
+**RULED: `antherSharpness` defaults to 1.00** (Eva, session 29 — *"a roundedness slider whose
 only motion is one faceting jump at the top of its travel is worse than an inert one, because
 the jump reads as the control working"*). Measured against the alternatives at the shipping
 anther radius of 0.96 mm:
@@ -403,7 +403,7 @@ whatever its value is.** The default is therefore free to be chosen for what hap
 someone reaches for the control, which is exactly Eva's reasoning.
 
 `ANTHER_SHARPNESS_DEFAULT` is its own owner in `bloom-geometry.js`, deliberately **not**
-`TIP_SHARPNESS`: the stigma's hard-wired `TIP_SHAPE` stays at the circle's 2.00 until session 4
+`TIP_SHARPNESS`: the stigma's hard-wired `TIP_SHAPE` stays at the circle's 2.00 until session 30
 gives it its own seven. Two owners because there are two tips, and the harness's module-load
 pairing now names the right one — which is what stops them being confused again.
 
@@ -416,11 +416,11 @@ observation, not a guarantee.** The sheet's macro-only bound is sound in the dir
 matters (a real change is 800,000+ px, three orders above any observed event) and fragile in the
 direction that costs a run; that is now said in the tool's own header.
 
-**PARKED, NOT BUILT — ruled into session 4's brief.** The lattice still jumps 10 → 16 whenever
+**PARKED, NOT BUILT — ruled into session 30's brief.** The lattice still jumps 10 → 16 whenever
 roundedness leaves 1, at *any* sharpness. With the default at 1.00 that jump is **swallowed by
 the form change**, so the only state where roundedness does nothing but re-facet is sharpness
 **exactly** 2.00 — a reachable corner, not the default (Eva: *"it changes a ruled law; it goes
-beside the stigma's seven in session 4, with your one-line fix and its cost carried into that
+beside the stigma's seven in session 30, with your one-line fix and its cost carried into that
 brief"*). The fix: `tipSides()` returns `STAMEN_SIDES` whenever the emitted factors are all
 exactly 1, rather than only when roundedness is 1. Its cost at that corner today is **60% more
 triangles per tip for a provably identical shape** — 200 → 320 on a four-point outline, +720 on

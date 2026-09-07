@@ -417,7 +417,7 @@ export const SMOKE_BLOCKS = [
   {
     n: 25,
     anchor: 'ANTHER: 6 stamens at the shipped pill (the tip block\'s own control row)',
-    /* DERIVED BY THE HEADER'S OWN METHOD (session 28): the branches the
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 29): the branches the
        anther's seven add are the two proportions read from controls rather
        than constants, tipSharpnessFloor's three arms (no clamp / clamped /
        the whole tip under the floor), tipSides' two arms (a circle on the
@@ -440,7 +440,7 @@ export const SMOKE_BLOCKS = [
        THE ELONGATION ROW IS HERE BECAUSE THE SUBSET WAS MEASURED BLIND, not
        because it looked owed: block 25's first four rows all sit at the two
        shipping proportions, and session 21's `not the fixed proportion`
-       clause in JS4 — which session 28 retires into JS7 — failed four
+       clause in JS4 — which session 29 retires into JS7 — failed four
        live-matrix rows while every smoke row stayed green. Found by running
        the block through the export gate. */
     rows: [

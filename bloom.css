@@ -108,7 +108,7 @@ body {
 /* The parent's own last child keeps the same breathing room a control gets. */
 .bl-sec > .bl-sec--sub:last-child { margin-bottom: 10px; }
 
-/* THE THIRD LEVEL (session 28) — `bl-sec--sub` says "nested at all", so a
+/* THE THIRD LEVEL (session 29) — `bl-sec--sub` says "nested at all", so a
    grandchild would otherwise render with a child's indent and a child's rule
    and the two depths would read alike. This is the rule session 27 said was
    owed by whoever first declared one, and Tip (inside Androecium, inside

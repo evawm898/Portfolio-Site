@@ -367,10 +367,10 @@ bar because the control measures tens of pixels and a real move measures tens of
 
 ### WHAT THE SHEET MEASURED — and it answers the question
 
-> ### ⛔ THE WHOLE-BLOOM COLUMN OF THIS TABLE IS **RETRACTED** (Eva, session 28)
+> ### ⛔ THE WHOLE-BLOOM COLUMN OF THIS TABLE IS **RETRACTED** (Eva, session 29)
 >
 > **The `whole bloom` renderer control is not a floor — it is one sample of a TWO-MODE
-> distribution.** Session 28 shot the same tree at the same camera across sixteen rows of one
+> distribution.** Session 29 shot the same tree at the same camera across sixteen rows of one
 > sheet and the whole-bloom control came back **0, 51, 50, 10,486, 0, 52, 10,635 px** — and
 > across runs it reached **15,885 px**. Two of eight rows in the high mode; the same row lands
 > in either mode on different runs. Settling on byte-identical FRAMES removes the orbit
@@ -392,7 +392,7 @@ bar because the control measures tens of pixels and a real move measures tens of
 >
 > A retracted number left standing in a doc is how it gets cited as evidence two sessions on.
 >
-> **THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 28 — said here so the
+> **THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 29 — said here so the
 > retraction is not over-applied to claims it never touched). A bimodal control destroys any
 > statement of the form *"X px is below the floor"*, because there is no floor to be below. It
 > touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
@@ -401,16 +401,16 @@ bar because the control measures tens of pixels and a real move measures tens of
 >
 > - session 26's **120-stamen row**, where base-vs-head EQUALLED base-vs-base to the pixel and
 >   the worst channel step;
-> - session 28's **migration pair**, 0 px on all three views;
-> - session 28's **INERT row**, 0 px against the pill on all three views *while its own
+> - session 29's **migration pair**, 0 px on all three views;
+> - session 29's **INERT row**, 0 px against the pill on all three views *while its own
 >   whole-view control read 10,492 px on the same run* — which is the retraction and the
 >   exact zero standing side by side in one measurement;
-> - session 28's **cross-config pairs**, eight of them at 0 px, over states proved
+> - session 29's **cross-config pairs**, eight of them at 0 px, over states proved
 >   bit-identical at 0 of 120,960 floats.
 >
 > The rule to carry: **a threshold needs a floor and therefore needs a distribution; an
 > identity needs neither.** Retract the first kind, keep the second.>
-> **AND THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 28, recorded
+> **AND THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 29, recorded
 > here rather than buried in a sheet header). The MACRO view threw a **38,057 px** one-off
 > between two states later proved bit-identical **to the float** — 0 of 120,960, live and
 > export, `Object.is`. It did not reproduce: five interleaved page loads gave eight pairs at
@@ -443,7 +443,7 @@ channel step — which can only happen if the head render is byte-identical to o
 base renders. The picture is not close to unchanged; it is the same picture.
 
 **~~AND THE TRIFID'S MOVE IS BELOW THE RENDERER'S OWN NOISE AT THE SIZE THE BLOOM SHIPS~~ —
-RETRACTED (Eva, session 28).** The claim was 4,800 px against a 6,868 px floor at that camera.
+RETRACTED (Eva, session 29).** The claim was 4,800 px against a 6,868 px floor at that camera.
 There is no floor there: the whole-bloom control is bimodal (0-52 px or ~10,500-15,900 px), so
 6,868 was one draw from a two-mode distribution and 4,800 cannot be called "below" it. **What
 survives is the part that never depended on a floor:** the trifid's move is 159,729 px at
@@ -467,7 +467,7 @@ sessions.
 **The pixel measurements corroborate; they do not decide.** They are recorded because a
 ruling should be made in front of numbers, not because 4,800-against-6,868 is the argument.
 Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
-the expiry. **(Session 28: the whole-bloom pair is now RETRACTED outright — see the
+the expiry. **(Session 29: the whole-bloom pair is now RETRACTED outright — see the
 retraction above the table. Eva's insistence that the pixels were corroboration and not the
 argument is exactly why the ruling is unaffected by their withdrawal.)**
 

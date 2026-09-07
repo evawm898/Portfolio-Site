@@ -1,5 +1,5 @@
 /* ===================================================================
-   shot-bloom-anther.mjs — THE ANTHER'S SEVEN (session 28)
+   shot-bloom-anther.mjs — THE ANTHER'S SEVEN (session 29)
 
    THE SHEET IS THE POINT OF THIS SESSION and it is the first time the tip's
    parameter space is seen in the real generator rather than in a discovery
@@ -274,7 +274,7 @@ const html = `<title>The anther's seven — the tip's space in the real generato
  .num{font-size:12px;color:#c8b98a}
 </style>
 <h1>The anther&rsquo;s seven &mdash; the tip&rsquo;s space in the real generator</h1>
-<p>Session 28, tip plan 3b. Seven controls under <code>Androecium &rsaquo; Tip</code>: size, elongation,
+<p>Session 29, tip plan 3b. Seven controls under <code>Androecium &rsaquo; Tip</code>: size, elongation,
 points, sharpness, roundedness, lobes, lobe spread. <b>The defaults reproduce today&rsquo;s pill exactly</b>,
 by construction &mdash; size and elongation default to the two constants themselves, roundedness 1 makes the
 blend exactly 1 and the lattice the rod&rsquo;s own ten, and one lobe at a spread of 0 is the Rodrigues

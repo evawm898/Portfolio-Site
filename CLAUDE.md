@@ -472,12 +472,12 @@ a byte diff and never replaces one** — a session that moves bytes on purpose s
 takes a worktree of the BASE COMMIT and which commit a session claims to have moved nothing
 since is the session's to name: run it at the close and quote its output.
 
-**THE ANTHER'S SEVEN SHIP, AND THE TIP'S LATTICE IS DERIVED FROM ITS OUTLINE** (session 28,
-tip plan 3b — read `docs/bloom-session-28-outcome.md` before touching any of it). `antherSize`,
+**THE ANTHER'S SEVEN SHIP, AND THE TIP'S LATTICE IS DERIVED FROM ITS OUTLINE** (session 29,
+tip plan 3b — read `docs/bloom-session-29-outcome.md` before touching any of it). `antherSize`,
 `antherElongation`, `antherRoundedness`, `antherPoints`, `antherSharpness`, `antherLumps` and
 `antherSpread`, in a **Tip** drop-down inside Androecium — the panel's first THIRD LEVEL, whose
 CSS is now paid as a descendant selector in `bloom.css`. **AUTHORED PLAINLY, NO GENERATOR:**
-Q7's one-table instancing is session 4, where a second instance makes "they cannot drift"
+Q7's one-table instancing is session 30, where a second instance makes "they cannot drift"
 observable. **0 moved is a CONSTRUCTION:** size and elongation default to
 `ANTHER_DIAMETER_FACTOR` / `ANTHER_LENGTH_FACTOR` themselves (imported by the registry, asserted
 at harness load) and the two products keep the constants' own ORDER, because `(e * s) * d` is not
@@ -2159,7 +2159,7 @@ beside the control and let the gate assert the property that can actually fail; 
 a tolerance that happens to pass the data in hand.
 
 **AND THE WHOLE-BLOOM CONTROL IS BIMODAL, WHICH MEANS A SINGLE CONTROL SAMPLE IS NOT A FLOOR**
-(Eva, session 28). Measured on one sheet, same tree, same camera, sixteen rows: the whole-bloom
+(Eva, session 29). Measured on one sheet, same tree, same camera, sixteen rows: the whole-bloom
 control read **0, 51, 50, 10,486, 0, 52, 10,635 px** and reached **15,885 px** across runs, with
 the SAME row landing in either mode on different runs. Settling removes the DAMPING; it does not
 remove this. Two consequences, both load-bearing: **(a)** a bar set from one control draw fires
@@ -2171,9 +2171,9 @@ and REPORT the rest; **(b)** session 26's `4,800 px against a 6,868 px floor` fo
 the facet phase and the two-session expiry, which were always its stated grounds. **A pixel
 figure from a whole-bloom view is not evidence unless its own control was taken in the same page
 session AND came back low.** **BUT THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva,
-session 28): a bimodal control destroys `X px is below the floor` and touches nothing of the form
+session 29): a bimodal control destroys `X px is below the floor` and touches nothing of the form
 `the difference is exactly 0`, which is an IDENTITY rather than a comparison against a noise
-estimate. Session 28's migration pair (0 px on three views), its INERT row (0 px while its own
+estimate. Session 29's migration pair (0 px on three views), its INERT row (0 px while its own
 whole-view control read 10,492 px on the same run) and its eight cross-config pairs over
 bit-identical states all stand unhedged. **A threshold needs a floor and therefore a
 distribution; an identity needs neither.** **AND THE BIMODALITY IS NOT CONFINED TO THE
@@ -2181,17 +2181,17 @@ WHOLE-BLOOM FRAMING:** the MACRO view threw a 38,057 px one-off between two stat
 bit-identical to the float (0 of 120,960), and it did not reproduce over eight interleaved
 pairs — so `the macro control read 0 px on every row` is an OBSERVATION, never a guarantee.
 
-**WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 28). The
+**WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 29). The
 push-once amendment covers INSTRUMENT ITERATION; a session waiting on a ruling is the other
 state with uncommitted work by construction, and it meets the stop hook every time. Committing
-locally gives the hook everything it exists for; pushing is what costs. Session 28 pushed a
+locally gives the hook everything it exists for; pushing is what costs. Session 29 pushed a
 docs-only commit while holding for a ruling: all four bloom gates re-triggered (paths filters
 are evaluated against the WHOLE PR diff) and `cancel-in-progress` killed the two long runs
 mid-flight, losing 23 minutes. Full worked case, including the session's own retraction of a
 wrong first reading, in the charter's push-once entry.
 
 **DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
-instrument*. Session 28 spent five fifty-minute sheet runs finding bugs in a sheet tool while
+instrument*. Session 29 spent five fifty-minute sheet runs finding bugs in a sheet tool while
 the geometry passed all sixteen rows every time; none of the five failures was about the bloom.
 Cut the row arrays to a reference cell and one other, prove the tool in four minutes, then run
 the grid once. The same reflex applies to the matrix gates: `--only` and `--smoke` exist for it.

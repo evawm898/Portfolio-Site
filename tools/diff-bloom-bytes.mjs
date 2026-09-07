@@ -53,7 +53,7 @@
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
      --phase18  `phase18Matrix()` — the 528 rows frozen at cb798f6, the head
-                of main when session 28 opened. THE NEWEST baseline, and so
+                of main when session 29 opened. THE NEWEST baseline, and so
                 the one a close-out re-exports on both trees under the
                 charter's retention ruling; the like-for-like baseline for
                 the anther's seven, and the first to carry the tip primitive
