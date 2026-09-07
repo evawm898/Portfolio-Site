@@ -2081,8 +2081,13 @@ cells: what ships with the handles hidden and as the page opens it, the bundle
 tight and loose and then CLOSE (at this framing 1.60 mm reads as a tube with
 bright edges, and the strands are only legible zoomed in), droop at 35° and 80°
 seen square on, the SAME 60° head into a 15 mm and a 130 mm neck (the argument
-that the neck is its own control), the join as a pair, length as a pair, four
-bend cells, the v-only coupling, the thinned stem and the panel. Every bend cell
+that the neck is its own control), the join as a pair, length as a pair, the
+panel, four bend cells, and the v-only coupling with the thinned stem. The panel
+cell is captured BEFORE the bend cells on purpose: `reset()` rests every bend
+point's offset but does not restore the COUNT, because the page's reset button
+is specified to rest the points it has — restoring the default three would be
+the sheet's convenience deciding what a control does, and taken after the
+six-point cell the panel showed six. Every bend cell
 is a REAL pointer drag on a handle the page itself projected to the screen, and
 every caption carries the measured seam and chord. **The droop is only legible
 from along world X** — it tips the head from grid +Z toward grid +Y, and the

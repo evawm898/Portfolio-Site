@@ -214,55 +214,61 @@ await cell('13-length-60.png', 'LENGTH 60 mm. The camera fit follows the drawing
 await reset({ stemLength: 380 });
 await cell('14-length-380.png', 'LENGTH 380 mm — the proportion the reference drawings sit at.');
 
+// --- the panel ------------------------------------------------------------
+/* CAPTURED HERE, BEFORE THE BEND CELLS, and not because it reads better in the
+   middle: `reset()` rests every bend point's offset but does not restore the
+   COUNT, because the page's reset button is specified to rest the points it
+   has — restoring the default three would be the sheet's convenience deciding
+   what a control does. Taken after the six-point cell it showed six. */
+await reset({ stemDroop: 40, stemHandles: true });
+await chrome(true);
+await cell('15-panel.png',
+  'THE PANEL. Six controls, the bend count, and a read-out that states the law with numbers — '
+  + 'including the two the page measures on itself: the SEAM between the head and the stem at the '
+  + 'ring, and the CHORD the eased station ladder cuts.');
+await chrome(false);
+
 // --- bend points ----------------------------------------------------------
 await reset();
 await dragHandle(1, 150, -20);
 await dragHandle(0, -95, 10);
 await set({ stemHandles: false });
-await cell('15-bend-s-curve.png',
+await cell('16-bend-s-curve.png',
   'A CURVED STEM, from two real drags on the top two handles — the drawing with the handles hidden '
   + 'afterwards. Each control point has a gaussian influence whose width comes from how far its '
   + 'neighbours are, so two of them BLEND into one curve instead of meeting at a kink. The head has '
   + 'not moved: the bend is multiplied by the funnel\'s own convergence curve, which is zero at the '
   + 'ring.');
 await set({ stemHandles: true });
-await cell('16-bend-s-curve-handles.png',
+await cell('17-bend-s-curve-handles.png',
   'THE SAME BEND WITH ITS HANDLES. A handle sits on the stem\'s own centre line, through the same law '
   + 'the lines went through, so a handle that cannot move the drawing does not move either.');
 await reset();
 await dragHandle(2, -170, 30);
 await set({ stemHandles: true });
-await cell('17-root-moved.png',
+await cell('18-root-moved.png',
   'THE ROOT, DRAGGED. It is a control point like any other — a locked root only makes sense for a '
   + 'plant in the ground, and this is a picture.');
 await reset();
 await click('bendAdd'); await click('bendAdd'); await click('bendAdd');
 await dragHandle(1, 90, 0); await dragHandle(3, -80, 0); await dragHandle(5, 70, 0);
 await set({ stemHandles: false });
-await cell('18-six-points.png',
+await cell('19-six-points.png',
   'SIX CONTROL POINTS, three of them pulled. "Add" subdivides the widest stretch and every point\'s '
   + 'width comes from its neighbours, so adding one makes the ones around it a LOCAL adjustment — '
   + 'which is what adding a control point should do, and why there is no width slider to get wrong.');
 
 // --- the coupling ---------------------------------------------------------
 await reset({ families: 'v' });
-await cell('19-no-u-no-stem.png',
+await cell('20-no-u-no-stem.png',
   'V ONLY — AND NO STEM. The stem IS the u-lines continued, so lines that are not drawn have nothing '
   + 'to continue. The panel says so rather than quietly drawing a stem for lines that are not on '
   + 'screen.');
 await reset({ uDensity: 5 });
-await cell('20-thinned.png',
+await cell('21-thinned.png',
   'U DENSITY 5. The stem thins in step with the family it is made of, and dims with it under the '
   + 'additive blending — one drawing, thinned consistently, rather than a grid that thins beside a '
   + 'stem that does not.');
-
-// --- the panel ------------------------------------------------------------
-await reset({ stemDroop: 40, stemHandles: true });
-await chrome(true);
-await cell('21-panel.png',
-  'THE PANEL. Six controls, the bend count, and a read-out that states the law with numbers — '
-  + 'including the two the page measures on itself: the SEAM between the head and the stem at the '
-  + 'ring, and the CHORD the eased station ladder cuts.');
 
 const readout = await q(() => window.__plot.stemText());
 writeFileSync(path.join(OUT, 'cells.json'), JSON.stringify(
@@ -275,9 +281,9 @@ const SECTIONS = [
   ['droop, and the neck it washes out over', 6, 10],
   ['the join — the gather IS the taper', 10, 12],
   ['length', 12, 14],
-  ['bend points, every one of them a real drag', 14, 18],
-  ['the stem is the u-lines, and says so', 18, 20],
-  ['the panel', 20, 21],
+  ['the panel', 14, 15],
+  ['bend points, every one of them a real drag', 15, 19],
+  ['the stem is the u-lines, and says so', 19, 21],
 ];
 const html = `<!doctype html><meta charset="utf-8"><title>/plot — the inferred stem</title>
 <style>body{margin:0;background:#080a0a;color:#d8dedd;font:13px/1.6 ui-monospace,monospace;padding:2rem;max-width:1180px}
