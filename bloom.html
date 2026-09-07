@@ -83,6 +83,13 @@
     <button id="resetBtn" class="bl-btn" type="button">Reset</button>
     <button id="exportStl" class="bl-btn bl-btn--primary" type="button"
             title="Download a 3D-printable STL (millimetres)">Get STL &darr;</button>
+    <!-- NOT A SECOND WAY TO GET THE OBJECT. This downloads the per-petal
+         mid-surface as line strips — the surface structure the solid was
+         built from, with no thickness and nothing printable in it. It is
+         beside Get STL rather than in a section because it is an export,
+         not a control; it is deliberately the non-primary button. -->
+    <button id="exportGrid" class="bl-btn" type="button"
+            title="Download the per-petal surface grid as glTF (.glb, millimetres) — line strips along and across each petal, plus each petal's attachment point. Not printable geometry.">Get grid &darr;</button>
   </div>
   <div id="readout" class="bl-readout" aria-live="polite"></div>
 </aside>

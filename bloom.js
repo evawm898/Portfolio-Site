@@ -13,6 +13,7 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
 import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
+import { buildGridGltf } from './bloom-grid-gltf.js';
 
 /* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
    has genuine cliffs no input-space guard can see). Measured against the
@@ -534,8 +535,14 @@ let capability = null;
    viewport shows — the mislabelled-telemetry mutant (T2) the crowding
    instrument's R2 catches on every floor-binding row — so the caller says
    which build it is making, and only regenerate() says `record: true`. */
-function buildGeometry({ exportMode, record = false }) {
-  const acc = new MeshBuilder({ exportMode });
+/* `captureGrid` (session 28) is OFF for every existing caller and is read by
+   nothing that decides geometry — see MeshBuilder's own note. It is threaded
+   through here rather than given its own build function so that the grid
+   export and the STL export are the same build, made the same way, from the
+   same readUI() snapshot; a second builder would be a second owner of "what
+   the app is showing". */
+function buildGeometry({ exportMode, record = false, captureGrid = false }) {
+  const acc = new MeshBuilder({ exportMode, captureGrid });
   const uiForBuild = readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
@@ -555,8 +562,13 @@ function buildGeometry({ exportMode, record = false }) {
   /* `built` is returned as well as cached, so the export path can summarise
      the geometry IT built rather than reading the live cache — the two are
      different geometry whenever a floor binds, and a summary that mixes them
-     is the unlabelled-mode defect this file's every other number avoids. */
-  return { geo, acc, built };
+     is the unlabelled-mode defect this file's every other number avoids.
+
+     `ui` for the same reason one step further out: the grid export records
+     the state its geometry came from, and re-reading readUI() to get it
+     would be a second snapshot that a slider moved between the two calls
+     could make disagree with the geometry in the file. */
+  return { geo, acc, built, ui: uiForBuild };
 }
 
 /* The readout's one-line summary. Every number carries its MODE, because live
@@ -1269,6 +1281,53 @@ document.getElementById('exportStl').addEventListener('click', () => {
   const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.petals, built).split('\n');
   readout.textContent = `${shownSummary}\n`
     + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
+});
+
+/* THE GRID EXPORT (session 28) — the per-petal mid-surface, not the object.
+
+   IT FOLLOWS shownMode(), AND THE STL DELIBERATELY DOES NOT. That is not an
+   inconsistency: the STL is the thing being made, so it is always the export
+   geometry and the toggle must not be able to change a printed part. The
+   grid is a DESCRIPTION of what is on screen, so the honest thing is to
+   describe what is on screen and label which it was — the mode label rides
+   in `asset.extras.mode`, in the filename and in the read-out, so the two
+   can never be confused for each other.
+
+   NO TRIANGLE BUDGET CHECK, because there are no triangles: the budget
+   refuses an STL nobody could slice, and a line-strip file's size is bounded
+   by petals x rows x columns, which is bounded by MAX_LAYERS and the petal
+   count. The largest reachable file is on the order of a megabyte. The
+   POINT count is reported instead, in the read-out and in the file. */
+document.getElementById('exportGrid').addEventListener('click', () => {
+  const mode = shownMode();
+  const { geo, built, ui: builtUi } = buildGeometry({ exportMode: mode === 'export', captureGrid: true });
+  geo.dispose();   // the grid export never renders; the BufferGeometry is buildGeometry's, not ours
+  let glb;
+  try {
+    glb = buildGridGltf(built, { mode, state: builtUi, generator: 'Parametric Bloom — bloom-grid-gltf' });
+  } catch (err) {
+    readout.innerHTML = `<span class="bl-err">grid export failed: ${err.message}</span>`;
+    return;
+  }
+  const blob = new Blob([glb], { type: 'model/gltf-binary' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bloom-grid-${mode}.glb`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+  /* THE RETENTION GAP IS SAID AT THE BUTTON, not only inside the file. A
+     RADIAL bloom of eight petals exports ONE, because buildBloomInto keeps
+     one petal per descriptor; a reader who does not open the extras would
+     otherwise have no way to know the file is not the whole bloom. */
+  const emitted = built.petals.filter((p) => p && p.grid).length;
+  const gap = emitted < built.petalsBuilt
+    ? ` · ${emitted} of ${built.petalsBuilt} petals (one per descriptor — CONTINUOUS returns all)`
+    : ` · all ${emitted} petals`;
+  readout.textContent = `${shownSummary}\n`
+    + `exported bloom-grid-${mode}.glb · ${mode} geometry${gap} · ${(glb.byteLength / 1024).toFixed(0)} KB`;
 });
 
 /* Contact-sheet hooks (see the note beside __bloomUIState). __bloomFrame sets

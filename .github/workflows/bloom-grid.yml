@@ -1,0 +1,66 @@
+# The per-petal mid-surface capture and its .glb export.
+#
+# WHY THIS IS ITS OWN GATE AND NOT A CLAUSE IN AN EXISTING ONE: both STL gates
+# are structurally BLIND to everything it measures. The capture emits no
+# triangles, so no edge census can move and no flood fill can split, and the
+# .glb is not on the export path at all. A grid describing a DIFFERENT surface
+# from the one the mesh was built out of would pass bloom-export-watertight,
+# pass bloom-connectedness, produce an identical triangle count and an
+# identical STL byte length, and be wrong in the only way that matters.
+#
+# No browser — this imports three module graphs and compares arrays of floats,
+# so it is seconds rather than minutes. It needs no three.js and no Chromium;
+# bloom-grid-gltf.js is deliberately free of both so that it can be driven
+# here as pure functions rather than through a page.
+#
+# THE NEGATIVE CONTROL IS NOT OPTIONAL AND IS THE REASON THIS GATE IS WORTH
+# ANYTHING. On its first run it found two defects in the gate itself: a clause
+# that asserted a property of the CAPTURE while claiming to assert it of the
+# EXPORT (so a mutation changing the .glb left it green), and a reader so
+# brittle that one malformed chunk cascaded three clauses red. Both are fixed;
+# see docs/bloom-session-28-outcome.md. A check nobody has seen fail is a hope.
+name: bloom-grid
+
+on:
+  pull_request:
+    paths:
+      - bloom-geometry.js
+      - bloom-registry.js
+      - bloom-grid-gltf.js
+      - tools/verify-bloom-grid.mjs
+      - .github/workflows/bloom-grid.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom-geometry.js
+      - bloom-registry.js
+      - bloom-grid-gltf.js
+      - tools/verify-bloom-grid.mjs
+  workflow_dispatch: {}
+
+# A run on a superseded commit is not evidence about the head. Keyed to the
+# workflow AND the ref, so it can never cancel across PRs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The capture moves no byte, the grid IS the emitted mid-surface, the
+      # rows are uniform in u, the seam's law is continuous, the .glb is well
+      # formed, the mode cannot be omitted, the retention gap is reported, and
+      # the metric telemetry travels.
+      - name: The grid is the mesh's own mid-surface and the capture moves no byte
+        run: node tools/verify-bloom-grid.mjs
+      # Six mutations, each naming the clause it must break. Fails if a
+      # mutation does not apply, if the clause it names stays green, or if a
+      # clause it did NOT name goes red — which is how a mutation that just
+      # breaks the build gets caught pretending to be a negative control.
+      - name: The gate must fail when the capture or the export is broken on purpose
+        run: node tools/verify-bloom-grid.mjs --negative-control
