@@ -396,6 +396,22 @@ is **smaller than the harness's own frame-to-frame variation at whole-bloom fram
 being 26,000x the noise one zoom step in. That is the evidence for Q2 — and it is Eva's ruling,
 not the sheet's.
 
+## THE RULING — Q2 STANDS (Eva, Sep 7, from the sheet)
+
+**RODRIGUES, NO GUARD. The trifid's 0.047 mm is acceptable.**
+
+**THE REASON, and it is not the pixel counts.** 0.047 mm is the sagitta of the TEN-SIDED
+TESSELLATION — **a facet phase rather than a change of form.** The solid is the same solid;
+what moved is where the ten-gon's corners fall around its own axis. And sessions 3 and 4 make
+the segment count variable, **at which point every tip moves regardless** — so a guard would
+buy a permanent discontinuity in a shipped slider to preserve a property that expires in two
+sessions.
+
+**The pixel measurements corroborate; they do not decide.** They are recorded because a
+ruling should be made in front of numbers, not because 4,800-against-6,868 is the argument.
+Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
+the expiry.
+
 **STOP AT THE SHEET.** This change is visual — 0.047 mm of surface on a part that ships absent
 by default — so **merge waits on Eva's ruling on `tools/shot-bloom-tip.mjs`**, not on green CI.
 The sheet is what the ruling is made from, and the ruling being asked for is narrow: *is the
