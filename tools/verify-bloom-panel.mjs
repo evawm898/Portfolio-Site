@@ -19,6 +19,33 @@
          with its own predicate evaluated against the same state. Counting is
          the point: "exactly once" catches the duplicate-span defect as well as
          the missing-control one, and only one of those is visible by eye.
+         It also compares the tree AS BUILT — each section's actual ancestor
+         element and the number of <details> above it — against the tree as
+         DECLARED, which the order comparison alone cannot see, and asserts
+         that INSTANCED DESCRIPTOR FAMILIES SHARE ONE SPEC: a set authored
+         once and instanced N times (the per-petal groups today, the two tips
+         from session 3b) cannot drift while it stays generated, and this is
+         what says so if one instance is ever hand-written beside the rest.
+
+     (s) THE NESTING RELATION, AT ANY DEPTH (session 3a). verifySections()
+         used to REFUSE a grandchild, on the stated grounds that
+         applyVisibility() and this gate were "written for one level". That was
+         re-verified from source and was not what either said — see the check's
+         own header in bloom-registry.js. The bound is lifted; what replaces it
+         is the ORDERING every one of those instruments was silently leaning
+         on. This route hands verifySections() section arrays whose answer is
+         written down: three levels must be ACCEPTED, and a child-before-parent
+         array, a parent cycle, a self-parent and a missing parent must each be
+         REFUSED. Four must-fails that run on every invocation, so the route
+         carries its own positive control and needs no --negative-control
+         mutation — which matters here because the live tree is two levels and
+         a wrong answer about depth 3 is unobservable on it. Route (a) also
+         compares the tree AS BUILT (each section's actual ancestor and its
+         count of enclosing <details>) against the tree as declared, which the
+         order comparison cannot see; and the two expressions in this file that
+         really were one level deep — the witness-through-a-descendant test and
+         the on-screen walk — are pinned to the answers they replace on this
+         tree, in every state route (d) drives.
 
      (c) THE ACCORDION ROUTE — the panel holds at most one open section: the
          declared one at first load, exactly the clicked one after a real
@@ -363,6 +390,148 @@ const ok = [];
 verifySections();
 ok.push(`registry: ${SECTIONS.length} sections, ${CONTROLS.length} controls, ${RETIRED_IDS.length} retired ids — relation verified`);
 
+/* ---------------- INSTANCED DESCRIPTOR FAMILIES SHARE ONE SPEC ----------
+
+   A control set that is AUTHORED ONCE AND INSTANCED N TIMES cannot drift
+   while it stays generated — but nothing said so, and nothing would notice if
+   a tenth row were hand-written beside nine generated ones with a range that
+   was nearly the same. The per-petal groups are that shape today (four
+   descriptors, nine instances, 36 controls); the parametric tip's two tips
+   are that shape next (Eva's Q7, session 24 — seven descriptors, instanced
+   twice with an antherTip / stigmaTip prefix, "so the two tips cannot
+   drift"). This clause is the guard THAT sentence needs, and it is added in
+   session 3a rather than in 3b for one reason: today it has an instance to
+   run on, and a check with no instance is the same untested code a generator
+   with no instance would be.
+
+   WHAT IT MEASURES: for each declared family, every instance of a given
+   suffix must agree on the fields that ARE shared — kind, bounds, step,
+   default, label, tier, role. What is deliberately NOT compared is `fmt`,
+   `section` and `visibleWhen`: those are per-instance by design (the
+   per-petal read-outs name their own group; a tip's would name its own tip),
+   and demanding they match would be asserting the opposite of the design.
+
+   ADDING A FAMILY IS ONE ROW HERE. Not finding one is a FAILURE, not a skip:
+   a pattern list that silently matches nothing is this project's
+   label-naming-a-computation-nobody-performed defect. */
+const INSTANCED_FAMILIES = [
+  { what: 'the per-petal groups (session 11, generated from MAX_FAN_GROUPS)',
+    id: /^petal(\d+)(Size|Tilt|Cup|Curl)$/ },
+];
+for (const fam of INSTANCED_FAMILIES) {
+  const rows = CONTROLS.map((c) => ({ c, m: fam.id.exec(c.id) })).filter((x) => x.m);
+  if (!rows.length) { note(`no control matches the instanced family ${fam.id} (${fam.what}) — a pattern that matches nothing is a check that measures nothing`); continue; }
+  const bySuffix = new Map();
+  for (const { c, m } of rows) {
+    const suffix = m[m.length - 1];
+    if (!bySuffix.has(suffix)) bySuffix.set(suffix, []);
+    bySuffix.get(suffix).push(c);
+  }
+  const spec = (c) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, c.default, c.label, c.tier, c.role,
+    (c.options || []).map((o) => [o.value, o.label])]);
+  const drifted = [];
+  for (const [suffix, cs] of bySuffix) {
+    const distinct = new Map();
+    for (const c of cs) { const k = spec(c); if (!distinct.has(k)) distinct.set(k, []); distinct.get(k).push(c.id); }
+    if (distinct.size > 1) drifted.push(`"${suffix}" has ${distinct.size} distinct specs across its ${cs.length} instances — ${[...distinct.values()].map((ids) => ids.join('/')).join(' vs ')}`);
+  }
+  if (drifted.length) note(`instanced descriptors have DRIFTED in ${fam.what}: ${drifted.join('; ')}`);
+  else ok.push(`instanced descriptors agree: ${fam.what} — ${bySuffix.size} descriptors x ${[...bySuffix.values()][0].length} instances = ${rows.length} controls, one spec each (bounds, step, default, label, tier, role; fmt / section / visibleWhen are per-instance by design and are not compared)`);
+}
+
+/* ---------------- (s) THE NESTING RELATION, AT ANY DEPTH ----------------
+
+   Session 3a lifted the two-level bound in verifySections(). Everything that
+   walks the section tree is depth-general or was made so with it, and this
+   route is what says so rather than a comment claiming it.
+
+   IT NEEDS NO --negative-control MUTATION, AND THAT IS THE POINT. Four of its
+   six cases are MUST-FAILs: they hand verifySections() a section array whose
+   answer is written down and require it to throw. They run on EVERY
+   invocation, not only under the flag, so this route carries its own positive
+   control the way the flower project's clipper checks do — a written-down
+   shape beats a mutation of the live tree, because on the live tree a wrong
+   answer about depth 3 is unobservable (nothing here is three deep yet).
+
+   THE LIVE TREE IS SHALLOW AND THAT IS DECLARED, NOT HIDDEN. Today's panel is
+   two levels; the depth-3 claims below are made on synthetic arrays, and the
+   two depth-general expressions that reach the real DOM (the descendant test
+   and the on-screen walk) are pinned to the one-level expressions they replace
+   ON THIS TREE, so the generalisation is measured to change no answer that
+   exists. What it does at depth 3 is the synthetic half's business. */
+const parentOfSec = new Map(SECTIONS.map((s) => [s.id, s.parent ?? null]));
+/* Depth-general ancestry over the registry — the one owner for both this
+   route and the witness-through-a-descendant test below. */
+const ancestry = (id) => { const out = []; let p = parentOfSec.get(id); while (p) { out.push(p); p = parentOfSec.get(p); } return out; };
+const descends = (id, ofId) => ancestry(id).includes(ofId);
+const declaredDepth = (id) => ancestry(id).length;
+let screenAgreed = 0;
+{
+  const sec = (id, parent) => ({ id, label: id, open: false, ...(parent ? { parent } : {}) });
+  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal' });
+  const threw = (what, controls, sections) => {
+    try { verifySections(controls, sections); return null; } catch (e) { return String(e.message); }
+  };
+  /* MUST PASS — three levels, each declared immediately after its parent, the
+     leaf holding the only control. This is the structure the old bound
+     refused by name, and the whole reason this route exists. */
+  {
+    const secs = [sec('a'), sec('b', 'a'), sec('c', 'b')];
+    const m = threw('three levels', [ctl('x', 'c')], secs);
+    if (m) note(`[nesting] a three-level section tree is REFUSED: ${m}`);
+    else ok.push('[nesting] three levels declared parent-first, the leaf holding the only control, is accepted — the two-level bound is gone');
+  }
+  /* MUST PASS — a mid-level container holding only another container. This is
+     what the witness-through-a-DESCENDANT fix below is for: at depth 3 the
+     middle section has no control of its own and no direct child with one. */
+  {
+    const secs = [sec('a'), sec('b', 'a'), sec('c', 'b')];
+    const m = threw('empty middles', [ctl('x', 'c')], secs);
+    if (!m) ok.push('[nesting] a container whose only content is another container satisfies the "holds something" rule at depth 3');
+  }
+  /* MUST FAIL — a child declared BEFORE its parent. The convention nothing
+     checked until session 3a: it passed the old verifySections() and threw in
+     bloom.js on `sectionEls[s.parent]` being undefined. */
+  {
+    const secs = [sec('b', 'a'), sec('a')];
+    const m = threw('child first', [ctl('x', 'b'), ctl('y', 'a')], secs);
+    if (!m) note('[nesting] a section declared BEFORE its parent is ACCEPTED — the backwards walk in applyVisibility() and the DOM append both need the parent first');
+    else if (!/before its parent/.test(m)) note(`[nesting] a child-before-parent array failed for the wrong reason: ${m}`);
+    else ok.push('[nesting] a section declared before its parent is refused by name — the ordering the app was leaning on is now checked');
+  }
+  /* MUST FAIL — a two-section cycle. Unreachable under the old depth clause
+     only because both members were "nested under something nested"; the
+     precedence check refuses it outright, at any length. */
+  {
+    const secs = [sec('a', 'b'), sec('b', 'a')];
+    const m = threw('cycle', [ctl('x', 'a'), ctl('y', 'b')], secs);
+    if (!m) note('[nesting] a parent cycle is ACCEPTED — the panel build would recurse or drop a section');
+    else ok.push('[nesting] a two-section parent cycle is refused');
+  }
+  /* MUST FAIL — a section parented to itself. */
+  {
+    const secs = [sec('a', 'a')];
+    const m = threw('self', [ctl('x', 'a')], secs);
+    if (!m) note('[nesting] a section naming ITSELF as its parent is ACCEPTED');
+    else if (!/its own parent/.test(m)) note(`[nesting] a self-parented section failed for the wrong reason: ${m}`);
+    else ok.push('[nesting] a section naming itself as its parent is refused by name');
+  }
+  /* MUST FAIL — a parent that is not in SECTIONS at all (the clause that
+     survived the lift unchanged; asserted so the rewrite cannot have dropped
+     it while the new clauses were being written). */
+  {
+    const secs = [sec('a'), sec('b', 'nosuch')];
+    const m = threw('missing', [ctl('x', 'a'), ctl('y', 'b')], secs);
+    if (!m) note('[nesting] a section naming a parent that is not in SECTIONS is ACCEPTED');
+    else ok.push('[nesting] a section naming a parent that is not in SECTIONS is refused');
+  }
+  /* THE LIVE TREE, described rather than assumed: how deep it actually is, so
+     a reader knows which of the claims above are exercised by the shipped
+     registry and which are synthetic. */
+  const depths = SECTIONS.map((s) => declaredDepth(s.id));
+  ok.push(`[nesting] the shipped panel is ${Math.max(...depths) + 1} levels deep — ${SECTIONS.filter((s) => !s.parent).length} top-level sections, ${SECTIONS.filter((s) => s.parent).length} nested; every depth-3 claim above is on a written-down array, never on this one`);
+}
+
 const { server, port } = await serveRepo();
 const { browser, page } = await launchPage();
 await openBloom(page, port);
@@ -379,7 +548,15 @@ const census = await page.evaluate(({ controls, sections, retired, breakIt }) =>
   const root = document.getElementById('panelControls');
   const out = { sections: [], controls: [], strayInputs: [], straySpans: [] };
   for (const el of root.querySelectorAll('details')) {
-    out.sections.push({ id: el.dataset.section, open: el.open, hidden: el.hidden,
+    /* HOW DEEP THE DOM ACTUALLY PUT IT — counted, never inferred from the
+       `--sub` class or from `dataset.parent`, both of which the generator
+       writes from the same field the registry declares and so cannot
+       disagree with it. The ancestor chain is the independent quantity: it
+       is where the element was APPENDED. */
+    let depth = 0;
+    for (let a = el.parentElement; a && root.contains(a); a = a.parentElement) if (a.tagName === 'DETAILS') depth++;
+    out.sections.push({ id: el.dataset.section, open: el.open, hidden: el.hidden, depth,
+                        parent: el.parentElement.closest('details')?.dataset.section ?? null,
                         summary: el.querySelector('summary')?.textContent ?? null });
   }
   for (const c of controls) {
@@ -419,6 +596,29 @@ const census = await page.evaluate(({ controls, sections, retired, breakIt }) =>
 if (census.sectionOrder !== census.declaredOrder) {
   note(`section order in the DOM is "${census.sectionOrder}", registry declares "${census.declaredOrder}"`);
 } else ok.push(`sections render once each, in registry order: ${census.declaredOrder}`);
+/* THE NESTING, AS BUILT, AGAINST THE NESTING AS DECLARED (session 3a, with
+   the two-level bound lifted). The order comparison above is what makes the
+   DOM's document order equal the array's — it is a pre-order walk at any
+   depth, which is the whole reason the census needed no change to survive the
+   lift. What it CANNOT see is a nested drop-down appended into the wrong
+   ancestor: `querySelectorAll('details')` would still return it in the same
+   place if it were appended one level too high or too low next to its sibling.
+   So the tree itself is compared, element by element: the ancestor a section
+   was actually appended into, and how many `<details>` stand above it. */
+{
+  const wrong = [];
+  for (const s of SECTIONS) {
+    const r = census.sections.find((x) => x.id === s.id);
+    if (!r) continue;
+    const wantParent = s.parent ?? null;
+    const wantDepth = declaredDepth(s.id);
+    if (r.parent !== wantParent || r.depth !== wantDepth) {
+      wrong.push(`"${s.id}" sits ${r.depth} deep inside ${r.parent ?? 'the panel root'}, the registry declares ${wantDepth} deep inside ${wantParent ?? 'the panel root'}`);
+    }
+  }
+  if (wrong.length) note(`the panel's nesting does not match the registry's: ${wrong.join('; ')}`);
+  else ok.push(`every section is appended into the ancestor the registry declares, at the declared depth (max ${Math.max(...census.sections.map((r) => r.depth))} — ${census.sections.filter((r) => r.depth > 0).length} nested)`);
+}
 for (const s of SECTIONS) {
   const rendered = census.sections.filter((r) => r.id === s.id);
   if (rendered.length !== 1) { note(`section "${s.id}" renders ${rendered.length} times, expected exactly 1`); continue; }
@@ -596,8 +796,12 @@ if (JSON.stringify(accordion.firstLoad) !== JSON.stringify(accordion.declared)) 
    shape as ROLES_COMBOS. What is asserted now is stronger, not looser: every
    sibling group is checked, so a nested set that failed to be exclusive would
    fire here even though the old clause had nothing to say about it. */
-const parentOf = new Map(SECTIONS.map((sec) => [sec.id, sec.parent ?? null]));
-const ancestorsOf = (id) => { const out = []; let p = parentOf.get(id); while (p) { out.push(p); p = parentOf.get(p); } return out; };
+/* ONE OWNER FOR THE ANCESTOR WALK (session 3a). This route used to build its
+   own `parentOf` map and its own while loop beside route (s)'s — two
+   computations of one relation, which is the registration failure this project
+   has cleaned up three times, in a file that asserts the rule. `ancestry` is
+   declared once at route (s) and read here. */
+const ancestorsOf = ancestry;
 /* EFFECTIVELY OPEN — open, AND every ancestor open too. The distinction is not
    pedantry and the gate found it: closing "Petal roles" does not reset the
    petal drop-down open inside it (that is what `<details>` does, and it is
@@ -735,14 +939,23 @@ for (const s of closed) {
      an id that moved section, or a value a later range change put out of
      bounds, would otherwise make this assertion quietly measure nothing. */
   if (!c) { note(`WITNESS for "${s.id}" names control "${w.id}", which is not in the registry`); continue; }
-  /* A CONTAINER IS WITNESSED THROUGH A CHILD (session 23). "Center" holds no
+  /* A CONTAINER IS WITNESSED THROUGH A DESCENDANT (session 23; made
+     depth-general in session 3a with the nesting bound). "Center" holds no
      control of its own — only its two parts as drop-downs — so its witness is
-     a child's control, driven while the container and the child are BOTH
-     shut; the child's own row in this loop witnesses the child. A section
+     a control inside one of them, driven while the container and the child are
+     BOTH shut; the child's own row in this loop witnesses the child. A section
      WITH controls of its own must still be witnessed by one of them, so a
-     witness that quietly moved into a child cannot pass here. */
+     witness that quietly moved into a child cannot pass here.
+
+     WAS `x.parent === s.id` — a DIRECT child, which is one of the two places
+     in this gate that really were written for one level (the census, which the
+     bound's stated reason named, was not: see verifySections()). A container
+     whose only content is another container has no direct child holding a
+     control, and this would have refused its only honest witness. `descends`
+     reduces to the old expression at depth <= 2, and the reduction is asserted
+     rather than argued — see route (s). */
   const ownControls = CONTROLS.some((x) => x.section === s.id);
-  const inChild = SECTIONS.some((x) => x.id === c.section && x.parent === s.id);
+  const inChild = descends(c.section, s.id);
   if (c.section !== s.id && !(!ownControls && inChild)) { note(`WITNESS for "${s.id}" names "${w.id}", which now declares section "${c.section}"${ownControls ? '' : ' (a section without controls of its own is witnessed through a child section, and this is not one)'}`); continue; }
   if (c.kind === 'slider' && (Number(w.value) < c.min || Number(w.value) > c.max)) {
     note(`WITNESS for "${s.id}" drives ${w.id} to ${w.value}, outside its range ${c.min}..${c.max}`); continue;
@@ -876,11 +1089,28 @@ for (const [driverId, dependents] of drivers) {
         if (input) seen[input.id] = w.hidden;
       }
       /* The summaries a visitor can currently SEE — a section hidden by its
-         own derivation, or inside a hidden parent, is not on screen. */
-      const visibleLabels = [...document.querySelectorAll('#panelControls details')]
-        .filter((d) => !d.hidden && !d.parentElement.closest('details')?.hidden)
+         own derivation, or inside a hidden ANCESTOR, is not on screen.
+
+         WAS `!d.hidden && !d.parentElement.closest('details')?.hidden` — one
+         ancestor, the second of this gate's two genuinely one-level tests
+         (session 3a). At three levels a drop-down inside a shown parent inside
+         a HIDDEN grandparent read as on screen, because `hidden` is set per
+         element and a descendant of a hidden section is not itself hidden.
+         `closest` on the element ITSELF walks up through every ancestor and
+         includes `d`, so this is both clauses at once, at any depth; the
+         attribute form is what `el.hidden = true` reflects. Identical to the
+         old expression on today's tree, asserted below rather than argued. */
+      const onScreen = (d) => !d.closest('details[hidden]');
+      const all = [...document.querySelectorAll('#panelControls details')];
+      const visibleLabels = all.filter(onScreen)
         .map((d) => ({ id: d.dataset.section, label: d.querySelector(':scope > summary').textContent }));
-      return { state: window.__bloomUIState(), seen, visibleLabels };
+      /* THE SAME-TREE CONTROL for that generalisation: at depth <= 2 the old
+         one-ancestor expression and the new walk must agree on every section,
+         in every state this route drives. A disagreement here is the fix
+         changing an answer it was supposed to preserve. */
+      const oldOnScreen = (d) => !d.hidden && !d.parentElement.closest('details')?.hidden;
+      const screenDisagree = all.filter((d) => onScreen(d) !== oldOnScreen(d)).map((d) => d.dataset.section);
+      return { state: window.__bloomUIState(), seen, visibleLabels, screenDisagree };
     }, { id: driverId, value, breakIt: NEGATIVE_CONTROL });
 
 
@@ -902,6 +1132,8 @@ for (const [driverId, dependents] of drivers) {
       const dup = [...byLabel].filter(([, ids]) => ids.length > 1);
       if (dup.length) note(`${tag}: two visible sections share a name — ${dup.map(([l, ids]) => `"${l}" on ${ids.join(' and ')}`).join('; ')}`);
       else ok.push(`${tag}: ${res.visibleLabels.length} sections on screen, no two sharing a name`);
+      if (res.screenDisagree.length) note(`${tag}: the depth-general on-screen walk and the one-ancestor expression it replaced DISAGREE on ${res.screenDisagree.join(', ')} — at this tree's depth they must be the same answer`);
+      else screenAgreed++;
     }
     let wrong = 0;
     for (const c of CONTROLS) {
@@ -2082,6 +2314,8 @@ for (const [label, sets, wantDome, wantClamp] of [
     else ok.push(`${tag}: six at curl 90 beside the style — the builder reports ${res.fs.mm.toFixed(3)} mm against ${res.fs.threshold.toFixed(2)}, the clause is on the line and the flag is on it`);
   }
 }
+
+if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees with the one-ancestor expression it replaced on every section, in all ${screenAgreed} states route (d) drives — the generalisation changes no answer this tree can produce`);
 
 await browser.close();
 server.close();
