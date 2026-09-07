@@ -108,6 +108,20 @@ body {
 /* The parent's own last child keeps the same breathing room a control gets. */
 .bl-sec > .bl-sec--sub:last-child { margin-bottom: 10px; }
 
+/* THE THIRD LEVEL (session 29) — `bl-sec--sub` says "nested at all", so a
+   grandchild would otherwise render with a child's indent and a child's rule
+   and the two depths would read alike. This is the rule session 27 said was
+   owed by whoever first declared one, and Tip (inside Androecium, inside
+   Center) is it. Written as a DESCENDANT selector rather than a `--sub2`
+   class, so bloom.js keeps one class for "nested at all" and every further
+   level costs nothing: the indent steps down and the containment rule fades,
+   which is how depth is said here. */
+.bl-sec--sub .bl-sec--sub {
+  padding-left: 8px;
+  border-left-color: color-mix(in srgb, var(--bl-accent) 13%, transparent);
+}
+.bl-sec--sub .bl-sec--sub > summary { font-size: 9px; letter-spacing: .1em; }
+
 /* WHY A DROP-DOWN IS MISSING — the registry's `hiddenReason` caption (Eva,
    Sep 3), rendered where the hidden drop-downs would be. It is a sentence, not
    a control, so it takes the dim ink and the sub-section's indent and rule and

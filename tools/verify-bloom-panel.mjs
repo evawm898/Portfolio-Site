@@ -183,6 +183,25 @@
          one that rewrites only the flag away and keeps every other
          character, so exactly that assertion fires.
 
+     (t) THE ANTHER'S SEVEN (session 29), and the panel's FIRST THIRD LEVEL.
+         Tip is declared inside Androecium inside Center, so every step counts
+         the section's enclosing <details> and requires two — route (a)'s
+         census would read a Tip re-parented to the top as identical. The two
+         OUTLINE controls must be shown exactly when the androecium is present
+         AND the roundedness is below 1: route (d) cannot make that claim,
+         because it drives from the defaults where the androecium is absent
+         and both ends of the roundedness slider hide them, so its pass there
+         is vacuous. The INERTNESS is behavioural and is the point — the two
+         hidden controls are driven to their extremes at a roundedness of
+         exactly 1 and the triangle count must not move from the shipped
+         pill's, which is a stronger claim than `hidden` for a control whose
+         whole job is the tessellation. Then the read-out's ANTHER line
+         against the owner's own record: the lattice, the waist, the verbatim
+         UNMEASURED tag, and the four flags (sharpness clamped, the whole tip
+         under the floor, the sphere's floored band, coincident lobes) each in
+         both directions. The negative control freezes the read-out and every
+         wrapper's `hidden`, and eleven assertions fire.
+
      (j) THE INNER-RING LINE, BOTH DIRECTIONS (Sep 3). Where a derived depth
          clamp was proposed and rejected, the read-out SAYS which rings are
          narrower than one foot. Present iff footRing()'s own
@@ -256,6 +275,26 @@ const WITNESS = {
   center: { id: 'stamenCount', value: '6',
             read: (m) => `${m.freeEnds}/${m.stamens.length}/${m.androecium ? m.androecium.radius.toFixed(6) : 'none'}`,
             what: "the builder's free-end tally / stamens emitted / the owner's disc radius, driven through the shut container" },
+  /* TIP (session 29) — the anther's seven, and the FIRST THIRD LEVEL in this
+     panel: Tip sits inside Androecium, which sits inside Center, so driving
+     this witness exercises a control two containers deep. Its precondition is
+     the androecium being present at all (all seven are gated on
+     `androeciumPresent`, so with no stamens the witness would be invisible
+     and route (d) would refuse to drive it — the vacuity the `pre` mechanism
+     exists for).
+
+     THE WITNESS REACHES PAST THE CONTROL'S OWN VALUE. `antherPoints` at 12 is
+     read as the emitted TRIANGLE COUNT beside the owner's own lattice: the
+     point count's whole job is to change the tessellation, so a build that
+     stored the number and revolved through ten sides anyway is exactly what
+     this must catch. It is driven at roundedness 0 in the precondition,
+     BECAUSE at the shipping roundedness of 1 the control is hidden and inert
+     — driving it there would be a witness that must not move, which is route
+     (k)'s job and not this one's. */
+  tip: { id: 'antherPoints', value: '12',
+         pre: [{ id: 'stamenCount', value: '6' }, { id: 'antherRoundedness', value: '0' }],
+         read: (m) => `${m.liveTris}/${m.androecium ? m.androecium.anther.sides : 'none'}`,
+         what: "the emitted triangle count / the owner's own tip lattice, driven through two shut containers" },
   /* THE GYNOECIUM (session 22) — the builder's style record and the owner's
      descriptor; route (p)'s, on one page, in both directions. */
   gynoecium: { id: 'gynoecium', value: 'STYLE',
@@ -2276,6 +2315,106 @@ for (const [label, sets, wantDome, wantClamp] of [
   if (bare) await step('the WHOLE centre at MAXIMUM under SPHERE (both parts hidden and inert: the build must not move)', [{ id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }, { id: 'stamenCount', value: '120' }, { id: 'stamenLayout', value: 'DISC' }, { id: 'stamenSpread', value: '6' }, { id: 'stamenLength', value: '40' }, { id: 'stamenCurl', value: '180' }], { tris: bare.shownTris });
   await step('back to CAP (the section, the style and the stamens return)', [{ id: 'hubShape', value: 'CAP' }]);
   if (dflt) await step('RADIAL x NONE x every sub-control at MAXIMUM (hidden and inert: the default\'s own count)', [{ id: 'placement', value: 'RADIAL' }, { id: 'stamenCount', value: '0' }, { id: 'stamenLayout', value: 'RING' }, { id: 'stamenSpread', value: '2' }, { id: 'stamenLength', value: '20' }, { id: 'stamenCurl', value: '0' }, { id: 'gynoecium', value: 'NONE' }, { id: 'styleLength', value: '40' }, { id: 'styleCurl', value: '180' }], { tris: dflt.shownTris });
+}
+
+/* ===================================================================
+   ROUTE (t) — THE ANTHER'S SEVEN (session 29), on ONE page, in BOTH
+   directions, route (o)'s discipline one level further in.
+
+   WHY IT IS OWED even though route (d) already drives every predicate's
+   driver: route (d) starts from the DEFAULTS, where the androecium is absent
+   — so `antherPoints` is hidden at BOTH ends of the roundedness slider, its
+   predicate agrees at both, and the transition this session actually added is
+   never exercised. That is the vacuity the WITNESS map's `pre` mechanism
+   exists for one level up, and this route is it for the roundedness
+   transition: with six stamens present, roundedness 1 must HIDE the two
+   outline controls and roundedness below 1 must SHOW them.
+
+   THE INERTNESS CLAUSE IS BEHAVIOURAL AND IT IS THE POINT. The two hidden
+   controls are driven to their extremes at a roundedness of exactly 1 and the
+   build's TRIANGLE COUNT must not move from the shipped pill's — which is a
+   stronger statement than `hidden`, because the point count's whole job is to
+   change the tessellation. A shipped, hidden, NOT-inert slider is what this
+   catches, and neither route (a) nor route (d) can see it.
+
+   AND THE READ-OUT'S ANTHER LINE against the OWNER'S own record: the lattice,
+   the waist, the two floor clauses in both directions, the SPHERE band, the
+   COINCIDENT corner and the lobe count. The negative control freezes the
+   read-out, so the ANTHER line cannot follow a geometry that moved. */
+{
+  const tag = '[anther]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => {
+      const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} });
+      for (const w of document.querySelectorAll('.bl-ctrl')) Object.defineProperty(w, 'hidden', { get: () => false, set: () => {}, configurable: true });
+    });
+  }
+  const OUTLINE_SUBS = ['antherPoints', 'antherSharpness'];
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate((subs) => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
+      const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
+      const sec = document.getElementById('sec-tip');
+      const line = (txt.match(/^ANTHER .*$/m) || [])[0] || null;
+      return { has: m.androecium !== null, anther: m.androecium ? m.androecium.anther : null,
+               shownTris: m.shownTris, sectionHidden: sec ? sec.hidden : null,
+               depth: sec ? (() => { let d = 0, e = sec.parentElement; while (e) { if (e.tagName === 'DETAILS') d++; e = e.parentElement; } return d; })() : null,
+               subsHidden: subs.map((id) => hid(id)), rho: Number(ui.antherRoundedness),
+               line, sidesSaid: (line && (line.match(/revolved through (\d+) sides/) || [])[1]) ?? null,
+               waistSaid: (line && (line.match(/waist ([\d.]+) mm against the ([\d.]+) mm floor/) || []).slice(1)) || [],
+               circleSaid: !!line && /outline a CIRCLE \(roundedness 1 — the points and the sharpness are INERT here/.test(line),
+               clampSaid: !!line && /SHARPNESS CLAMPED to/.test(line), underSaid: !!line && /THE WHOLE TIP IS UNDER IT/.test(line),
+               bandSaid: !!line && /\(A SPHERE — the band FLOORED/.test(line), coinSaid: !!line && /COINCIDENT: duplicate geometry/.test(line),
+               unmeasuredSaid: !!line && line.includes('(UNMEASURED — no coupon has been printed)'),
+               lobesSaid: (line && (line.match(/· (one lobe|\d+ lobes) at (\d+)° off the filament/) || []).slice(1)) || [] };
+    }, OUTLINE_SUBS);
+    const p = [];
+    /* THE SECTION IS THE PANEL'S FIRST THIRD LEVEL — asserted as a number of
+       enclosing <details>, so a Tip that quietly re-parented to the top would
+       fail here rather than looking identical to route (a)'s census. */
+    if (res.sectionHidden === null) p.push('there is no #sec-tip section in the panel');
+    else if (res.depth !== 2) p.push(`the Tip section sits inside ${res.depth} drop-downs; it is declared inside Androecium inside Center, which is two`);
+    if (res.has !== !!want.present) p.push(`the owner ${res.has ? 'declares an androecium' : 'declares none'} while this step expects ${want.present ? 'one' : 'none'}`);
+    res.subsHidden.forEach((h, i) => {
+      const shouldShow = res.has && res.rho !== 1;
+      if (h === shouldShow) p.push(`${OUTLINE_SUBS[i]} is ${h ? 'hidden' : 'shown'} with the androecium ${res.has ? 'present' : 'absent'} at roundedness ${res.rho} — it must show exactly when the outline is not a circle`);
+    });
+    if ((res.line !== null) !== res.has) p.push(`the ANTHER line is ${res.line ? 'SHOWN' : 'ABSENT'} while the owner ${res.has ? 'declares an androecium' : 'declares none'}`);
+    if (res.has && res.line) {
+      const a = res.anther;
+      if (Number(res.sidesSaid) !== a.sides) p.push(`the ANTHER line says ${res.sidesSaid} sides, the owner's lattice is ${a.sides}`);
+      if (Math.abs(Number(res.waistSaid[0]) - a.waistMm) > 0.005) p.push(`the ANTHER line says a waist of ${res.waistSaid[0]} mm, the owner says ${a.waistMm.toFixed(3)}`);
+      if (Math.abs(Number(res.waistSaid[1]) - a.minRadiusMm) > 0.005) p.push(`the ANTHER line names a floor of ${res.waistSaid[1]} mm, the geometry's is ${a.minRadiusMm}`);
+      if (!res.unmeasuredSaid) p.push('the ANTHER line does not carry the verbatim UNMEASURED tag beside a floor nothing has printed a coupon for');
+      if (res.circleSaid !== (a.shape.roundedness === 1)) p.push(`the CIRCLE-and-inert clause is ${res.circleSaid ? 'shown' : 'absent'} at a roundedness of ${a.shape.roundedness}`);
+      if (res.clampSaid !== a.sharpnessFloored) p.push(`the SHARPNESS CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports floored ${a.sharpnessFloored}`);
+      if (res.underSaid !== a.underFloor) p.push(`the WHOLE TIP UNDER IT clause is ${res.underSaid ? 'shown' : 'absent'} while the owner reports underFloor ${a.underFloor}`);
+      if (res.bandSaid !== a.bandFloored) p.push(`the SPHERE band clause is ${res.bandSaid ? 'shown' : 'absent'} while the owner reports bandFloored ${a.bandFloored}`);
+      if (res.coinSaid !== a.lumpsCoincident) p.push(`the COINCIDENT clause is ${res.coinSaid ? 'shown' : 'absent'} while the owner reports lumpsCoincident ${a.lumpsCoincident}`);
+      const saidCount = res.lobesSaid[0] === 'one lobe' ? 1 : Number((res.lobesSaid[0] || '').split(' ')[0]);
+      if (saidCount !== a.lumps || Number(res.lobesSaid[1]) !== a.spreadDeg) p.push(`the ANTHER line says ${res.lobesSaid.join(' at ')}°, the owner declares ${a.lumps} at ${a.spreadDeg}°`);
+      for (const k of ['sharpnessFloored', 'underFloor', 'bandFloored', 'lumpsCoincident']) if (want[k] !== undefined && a[k] !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${a[k]}`);
+      if (want.sides !== undefined && a.sides !== want.sides) p.push(`this step expects a ${want.sides}-side lattice, the owner built ${a.sides}`);
+    }
+    if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden tip control reached the geometry`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: Tip at depth ${res.depth}, outline controls ${res.subsHidden[0] ? 'hidden' : 'shown'}, ${res.has ? `${res.anther.sides} sides, waist ${res.anther.waistMm.toFixed(2)} mm` : 'no androecium'}${res.clampSaid ? ', SHARPNESS CLAMPED' : ''}${res.underSaid ? ', UNDER THE FLOOR' : ''}${res.bandSaid ? ', A SPHERE' : ''}${res.coinSaid ? ', COINCIDENT' : ''}`);
+    return res;
+  };
+  await step('defaults (no androecium: the seven hide with the rest of the part, no ANTHER line)', [], { present: false });
+  const pill = await step('6 stamens at the shipped pill (the outline controls stay hidden — roundedness 1)', [{ id: 'stamenCount', value: '6' }], { present: true, sides: 10, sharpnessFloored: false, underFloor: false, bandFloored: false, lumpsCoincident: false });
+  await step('roundedness 0.50 (the two outline controls APPEAR; the lattice leaves the rod\'s ten)', [{ id: 'antherRoundedness', value: '0.5' }], { present: true, sides: 16 });
+  await step('a TRIANGLE — 3 points at sharpness 8, roundedness 0 (12 sides, the waist clear of the floor)', [{ id: 'antherRoundedness', value: '0' }, { id: 'antherPoints', value: '3' }, { id: 'antherSharpness', value: '8' }], { present: true, sides: 12, sharpnessFloored: false });
+  await step('sharpness min 0.25 at roundedness 0 (the WAIST FLOOR binds — CLAMPED, told)', [{ id: 'antherPoints', value: '4' }, { id: 'antherSharpness', value: '0.25' }], { present: true, sharpnessFloored: true, underFloor: false });
+  await step('size min 0.60 (the WHOLE TIP under the 0.50 mm floor — told, never refused)', [{ id: 'antherSize', value: '0.6' }], { present: true, underFloor: true, sharpnessFloored: false });
+  await step('elongation min 1.00 (A SPHERE: the band floored so no triangle has zero area)', [{ id: 'antherSize', value: '1.6' }, { id: 'antherSharpness', value: '2' }, { id: 'antherRoundedness', value: '1' }, { id: 'antherElongation', value: '1' }], { present: true, bandFloored: true, sides: 10 });
+  await step('3 lobes at 40° — the trifid\'s own law on an anther', [{ id: 'antherElongation', value: '2.5' }, { id: 'antherLumps', value: '3' }, { id: 'antherSpread', value: '40' }], { present: true, lumpsCoincident: false });
+  await step('2 lobes at a spread of 0 (COINCIDENT — duplicate geometry, told, never refused)', [{ id: 'antherLumps', value: '2' }, { id: 'antherSpread', value: '0' }], { present: true, lumpsCoincident: true });
+  if (pill) await step('back to the pill with the two OUTLINE controls at their extremes (hidden AND INERT: the build must not move)', [{ id: 'antherLumps', value: '1' }, { id: 'antherPoints', value: '12' }, { id: 'antherSharpness', value: '0.25' }], { present: true, tris: pill.shownTris, sides: 10 });
+  await step('count 0 with every tip control at MAXIMUM (the section hides whole; no ANTHER line)', [{ id: 'stamenCount', value: '0' }, { id: 'antherSize', value: '6' }, { id: 'antherElongation', value: '6' }, { id: 'antherRoundedness', value: '0' }, { id: 'antherLumps', value: '6' }, { id: 'antherSpread', value: '90' }], { present: false });
 }
 
 /* ===================================================================

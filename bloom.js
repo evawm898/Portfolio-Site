@@ -100,11 +100,11 @@ for (const s of SECTIONS) {
 
      ANY DEPTH. The two-level bound was lifted with that check (Eva's Q7);
      this loop never knew about depth — it appends into whatever the parent's
-     element is. What a third level does NOT yet have is CSS of its own:
-     `bl-sec--sub` below is "nested at all", not "nested at depth k", so a
-     grandchild would render with a child's indent. That is one rule in
-     bloom.css and it belongs to whoever first declares one, rather than being
-     written now for a level nothing reaches. */
+     element is. `bl-sec--sub` below is still "nested at all", not "nested at
+     depth k": session 29 declared the first third level (Tip, inside
+     Androecium) and paid the rule session 27 said was owed, as a DESCENDANT
+     selector in bloom.css, so this line stays one class and a fourth level
+     would cost nothing here either. */
   /* THE CAPTION GOES WHERE THE FIRST DROP-DOWN THAT HIDES FOR THIS REASON
      WOULD BE — appended before that section's own element, once. It is text,
      never a control: applyVisibility() is still the only thing that decides
@@ -942,11 +942,36 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
            ? ` · NO ROOM FOR THE INNER LIMIT: the disc, ${A.radius.toFixed(2)} mm, is inside the ${A.innerLimit.toFixed(2)} mm limit, so every stamen stands on the rim (told, never refused)`
            : ` · the disc runs from ${A.innerUsed.toFixed(2)} mm out — a filament radius plus a style radius, where a filament's tube clears a style's — in equal-area annuli`)
          : '')
-       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther PILL ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
+       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
        + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
-       + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}` : '')
+       + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}${A.anther.lumps > 1 ? ', on each anther\'s first lobe' : ''}` : '')
        + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
        + (fs ? ` · nearest filament to the style ${fs.mm.toFixed(2)} mm at ${fs.z.toFixed(1)} mm up${fs.crossing ? ` (FILAMENT AGAINST STYLE: under ${fs.threshold.toFixed(2)} mm, the two tubes cross — a flag, never a refusal)` : ` (clear of it by more than ${fs.threshold.toFixed(2)} mm)`}` : '')
+       + `\n`;
+}
+
+/* THE ANTHER LINE (session 29) — the tip's seven told in the owner's own
+   numbers, none of them re-derived here: the two proportions with the
+   millimetres they resolve to, the OUTLINE (and, at a roundedness of exactly
+   1, that the two controls below it are inert rather than merely hidden),
+   the LATTICE the point count derived, the WAIST against the print floor
+   with `UNMEASURED — no coupon has been printed` verbatim, and the two flags
+   this family can raise — the band floored at a sphere, and coincident lobes
+   at a spread of 0. Absent when the androecium is absent, so the line simply
+   is not there. Every number is footRing()'s own record. */
+function antherLine(fr, mode) {
+  const A = fr && fr.androecium;
+  if (!A) return '';
+  const a = A.anther, sh = a.shape;
+  const circle = sh.roundedness === 1;
+  return `ANTHER ${a.sizeFactor.toFixed(2)}x the filament = ${a.diameter.toFixed(2)} mm across (${mode}) · ${a.elongation.toFixed(2)}x its own diameter = ${a.length.toFixed(2)} mm long${a.bandFloored ? ' (A SPHERE — the band FLOORED so no triangle has zero area)' : ''}`
+       + ` · outline ${circle ? 'a CIRCLE (roundedness 1 — the points and the sharpness are INERT here, exactly, not merely hidden)' : `roundedness ${sh.roundedness.toFixed(2)}, ${sh.lobes}-fold, sharpness ${sh.sharpness.toFixed(2)}`}`
+       + ` · revolved through ${a.sides} sides`
+       + ` · waist ${a.waistMm.toFixed(2)} mm against the ${a.minRadiusMm.toFixed(2)} mm floor`
+       + (a.underFloor ? ' — THE WHOLE TIP IS UNDER IT (told, never refused)'
+         : a.sharpnessFloored ? ` — SHARPNESS CLAMPED to ${sh.sharpness.toFixed(2)} from ${a.sharpnessAsked.toFixed(2)}` : '')
+       + ' (UNMEASURED — no coupon has been printed)'
+       + ` · ${a.lumps === 1 ? 'one lobe' : `${a.lumps} lobes`} at ${a.spreadDeg}° off the filament${a.lumpsCoincident ? ' — COINCIDENT: duplicate geometry, told, never refused' : ''}`
        + `\n`;
 }
 
@@ -961,7 +986,10 @@ function styleLine(fr, styles, stamens, mode) {
   if (!G || !styles.length) return '';
   const s = styles[0];
   const stigmaTop = Math.max(...s.lobes.map((l) => l.apex[2]));
-  const antherTop = stamens.length ? Math.max(...stamens.map((a) => a.apex[2])) : null;
+  /* EVERY LOBE, not the first (session 29): with the anther's lobe count a
+     control, `the highest anther` has to mean the highest tip actually
+     emitted or the line names a computation nobody performed. */
+  const antherTop = stamens.length ? Math.max(...stamens.map((a) => Math.max(...a.lumps.map((l) => l.apex[2])))) : null;
   return `STYLE on the axis · ${G.diameter.toFixed(2)} × ${G.length} mm${G.curlDeg !== 0 ? `, curl ${G.curlDeg}°` : ', straight'} · stigma TRIFID: ${G.lobe.count} lobes ${G.lobe.diameter.toFixed(2)} × ${G.lobe.length.toFixed(2)} mm at ${((G.lobe.spreadRad * 180) / Math.PI).toFixed(0)}°`
        + ` · stigma top ${stigmaTop.toFixed(2)} mm (${mode})`
        + (antherTop !== null ? `, ${Math.abs(stigmaTop - antherTop).toFixed(2)} mm ${stigmaTop >= antherTop ? 'ABOVE' : 'BELOW'} the highest anther` : '')
@@ -1031,7 +1059,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)
-       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;

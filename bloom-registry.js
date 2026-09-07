@@ -37,7 +37,10 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN } from './bloom-geometry.js';
+import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
+         ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, ANTHER_SHARPNESS_DEFAULT, TIP_ROUNDEDNESS,
+         TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_SHARPNESS_RANGE, TIP_ROUNDEDNESS_RANGE,
+         TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM } from './bloom-geometry.js';
 
 /* RETIRED_IDS — names that may never be used again.
 
@@ -220,6 +223,18 @@ export const PREDICATES = {
      androecium on purpose: each part is INDEPENDENTLY present or absent
      (Eva, Sep 5 — four states including none), so each has its own
      presence predicate and the eligibility is stated once per part. */
+  /* ===================================================================
+     WHERE THE ANTHER'S OUTLINE CONTROLS APPLY (session 29) — the point count
+     and the sharpness are HIDDEN AND INERT at a roundedness of 1, the
+     curl-bias precedent, and here the inertness is IN THE ARITHMETIC rather
+     than in a branch anyone has to remember: the blend is `1 + 0 * h`, which
+     is exactly 1 in IEEE-754 for any finite h, and tipSides() returns the
+     rod's own lattice for a circle whatever the point count says. So the two
+     controls change nothing AT ALL there — not a small amount, none — and a
+     visible slider that builds nothing is the mirror of the defect the panel
+     gate exists to catch. JS7 asserts the inertness as a property of the
+     emitted tip; this predicate is the half that hides. */
+  antherOutlineLive: { all: [{ ref: 'androeciumPresent' }, { not: { id: 'antherRoundedness', min: 1 } }] },
   gynoeciumEligible: { not: { ref: 'sphereMode' } },
   gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
 
@@ -527,6 +542,21 @@ export const SECTIONS = [
      second reproductive part and the last piece of the centre. Its own
      drop-down, on the session-21 note above: each part independently present
      or absent. Hidden whole under SPHERE by every control's predicate. */
+  /* TIP (session 29) — the anther's own seven, a drop-down INSIDE Androecium
+     and therefore the panel's first third level, which session 27 made legal
+     by lifting the nesting bound and replacing it with the precedence check
+     this declaration relies on (a parent is declared before its child, and
+     `androecium` is two lines above). The three-level CSS is owed by whoever
+     declares one: `bl-sec--sub` is "nested at all" rather than "nested at
+     depth k", so one rule in bloom.css carries this.
+
+     WHY A SECTION RATHER THAN SEVEN MORE ROWS UNDER ANDROECIUM: the four
+     that were there describe WHERE the stamens are and how long they are;
+     these seven describe the shape of one small solid at the end of each.
+     They are the "Petal roles" shape one level further in — a group of
+     controls about one part of the part. Session 30 declares the stigma's
+     beside it and generates both from one table (Q7). */
+  { id: 'tip', label: 'Tip', open: false, parent: 'androecium' },
   { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
   { id: 'shape', label: 'Petal shape', open: false },
   { id: 'form', label: 'Petal form', open: false },
@@ -2147,6 +2177,118 @@ export const CONTROLS = [
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
   { id: 'stamenCurl', section: 'androecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Filament curl', fmt: (v) => (Number(v) === 0 ? 'straight, along the surface normal' : `${v}° — ${Number(v) > 0 ? 'bends in over the centre' : 'reflexes outward'}`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+
+  /* ===================================================================
+     THE ANTHER'S SEVEN (session 29, Eva's ruling — the anther's tip controls
+     and nothing else; the stigma's seven are session 30, which instances both
+     from ONE table and is the first moment "they cannot drift" is
+     observable). AUTHORED PLAINLY: seven rows, written out, no generator —
+     carrying the generator here would be debt this session cannot verify.
+
+     THE DEFAULTS REPRODUCE TODAY'S PILL EXACTLY, and that is a CONSTRUCTION
+     rather than a claim: size and elongation default to the two constants
+     themselves (imported, one owner), the outline defaults to the circle
+     twice over (roundedness 1, where the blend is exactly 1 and the lattice
+     is the rod's own), and the count and spread default to one lump on the
+     rod's own axis, where the Rodrigues frame is the identity. Every
+     pre-existing export is bit-identical by the same argument the androecium
+     shipping absent made, and the byte instruments measure it anyway.
+
+     ALL SEVEN ARE GATED ON `androeciumPresent`, the four beside them in
+     Androecium: with no stamens there is no anther to shape. Two are gated
+     FURTHER, on `antherOutlineLive` — see that predicate. */
+  { id: 'antherSize', section: 'tip', kind: 'slider', min: TIP_SIZE_RANGE[0], max: TIP_SIZE_RANGE[1], step: 0.05, default: ANTHER_DIAMETER_FACTOR,
+    label: 'Anther size',
+    /* Q8's own reason, on the control: points are unreachable on a 1.92 mm
+       anther, so without a real size slider the sharp end of every other
+       control here is decorative. The number in millimetres comes from the
+       SHOWN build (the third argument), never re-derived. */
+    fmt: (v, ui, shown) => {
+      const A = shown && shown.androecium;
+      return `${Number(v).toFixed(2)}x the filament${A ? ` — ${A.anther.diameter.toFixed(2)} mm across (${shown.mode})` : ''}`;
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'antherElongation', section: 'tip', kind: 'slider', min: TIP_ELONGATION_RANGE[0], max: TIP_ELONGATION_RANGE[1], step: 0.05, default: ANTHER_LENGTH_FACTOR,
+    label: 'Elongation',
+    /* THE FLOOR IS ON THE BAND, NOT AN ELLIPSOID (Q5, session 26): at an
+       elongation of exactly 1 the cylinder between the two hemispheres has
+       zero height and every triangle in it has zero area, so the band is
+       held at TIP_BAND_FLOOR of the tip's own radius — an elongation floor of
+       1.005. Said here at the bottom of the slider rather than left as a
+       sentence in a header, now that the bottom is reachable. */
+    fmt: (v, ui, shown) => {
+      const A = shown && shown.androecium;
+      const n = Number(v);
+      return `${n.toFixed(2)}x its own diameter${A ? ` — ${A.anther.length.toFixed(2)} mm long (${shown.mode})` : ''}`
+        + (A && A.anther.bandFloored ? ' · A SPHERE, and the band is FLOORED at a hundredth of a radius so no triangle has zero area' : '');
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'antherRoundedness', section: 'tip', kind: 'slider', min: TIP_ROUNDEDNESS_RANGE[0], max: TIP_ROUNDEDNESS_RANGE[1], step: 0.05, default: TIP_ROUNDEDNESS,
+    label: 'Roundedness',
+    /* ROUNDEDNESS IS THE ONLY PRODUCER OF THE CIRCLE (Q1), and at 1 it makes
+       the two below it hidden AND inert — so this read-out says so, with
+       their kept values, on the stamen count's own precedent (Eva, Sep 6:
+       turning a part off keeps its settings, said). */
+    fmt: (v, ui) => (Number(v) === 1
+      ? `a circle — the points (${ui.antherPoints}) and the sharpness (${Number(ui.antherSharpness).toFixed(2)}) are hidden and INERT here, kept, and return below 1`
+      : `${Number(v).toFixed(2)} — the outline blended toward a circle`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'antherPoints', section: 'tip', kind: 'slider', min: TIP_LOBES_RANGE[0], max: TIP_LOBES_RANGE[1], step: 1, default: TIP_LOBES,
+    label: 'Points',
+    /* The lattice is DERIVED from this (tipSides), never exposed: ten sides
+       sample all 2n extrema at n = 5 and at no other point count, so a fixed
+       10-gon would make this control tell the truth at one of its eleven
+       values. The number the build actually used is printed from the SHOWN
+       record rather than restated. */
+    fmt: (v, ui, shown) => {
+      const A = shown && shown.androecium;
+      return `${v}-fold${A ? ` — revolved through ${A.anther.sides} sides` : ''}`;
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'antherOutlineLive' } },
+  /* THE DEFAULT IS 1.00 AND NOT THE CIRCLE'S OWN 2.00 (Eva's ruling, session
+     28, from the measurement — the reasoning is at ANTHER_SHARPNESS_DEFAULT
+     in bloom-geometry.js). At s = 2 the law degenerates to exactly 1 at every
+     roundedness, so the roundedness slider above changed nothing but the
+     lattice; at 1.00 the space opens the moment anyone reaches for it, and it
+     costs no byte because sharpness is inert at the shipping roundedness of 1
+     whatever its value. */
+  { id: 'antherSharpness', section: 'tip', kind: 'slider', min: TIP_SHARPNESS_RANGE[0], max: TIP_SHARPNESS_RANGE[1], step: 0.05, default: ANTHER_SHARPNESS_DEFAULT,
+    label: 'Sharpness',
+    /* FULL RANGE, CLAMPED, TOLD — the spine curl's discipline. The floor is
+       on the WAIST (the narrowest radius on the outline) at
+       R_min = MIN_FEATURE_MM / 2, and it carries UNMEASURED verbatim because
+       nothing in this project has been printed. Both numbers come from the
+       shown build: what was asked, and what was built. */
+    fmt: (v, ui, shown) => {
+      const A = shown && shown.androecium;
+      const n = Number(v);
+      const head = n < 2 ? `${n.toFixed(2)} — pinched inward: a star` : n === 2 ? '2.00 — the circle\'s own exponent' : `${n.toFixed(2)} — bulged outward: a rounded polygon`;
+      if (!A) return head;
+      const a = A.anther;
+      return `${head} · waist ${a.waistMm.toFixed(2)} mm (${shown.mode})`
+        + (a.underFloor ? ` — THE WHOLE TIP is under the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor, told, never refused (UNMEASURED — no coupon has been printed)`
+          : a.sharpnessFloored ? ` — CLAMPED to ${a.shape.sharpness.toFixed(2)} from ${a.sharpnessAsked.toFixed(2)}, the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor (UNMEASURED — no coupon has been printed)`
+          : ` — clear of the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor (UNMEASURED — no coupon has been printed)`);
+    },
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'antherOutlineLive' } },
+  { id: 'antherLumps', section: 'tip', kind: 'slider', min: TIP_LUMPS_RANGE[0], max: TIP_LUMPS_RANGE[1], step: 1, default: 1,
+    label: 'Lobes',
+    /* One lump is the shipped PILL (A1). Above one the tips share the
+       filament's end on the TRIFID's own law — one statement for both
+       owners — and at a spread of 0 they are COINCIDENT: duplicate geometry,
+       told rather than refused, because a spread with a non-zero minimum
+       would put the shipping default out of reach. */
+    fmt: (v, ui) => (Number(v) === 1 ? 'one — the pill' : `${v} sharing the filament's end${Number(ui.antherSpread) === 0 ? ', COINCIDENT at a spread of 0 (duplicate geometry — told, never refused)' : ''}`),
+    tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
+  { id: 'antherSpread', section: 'tip', kind: 'slider', min: TIP_SPREAD_DEG_RANGE[0], max: TIP_SPREAD_DEG_RANGE[1], step: 5, default: 0,
+    label: 'Lobe spread',
+    /* NOT gated on the lobe count. At one lobe a spread above 0 LEANS the
+       anther off the filament, which is a shape and not a dead slider — the
+       DEAD-is-not-INVISIBLE rule, measured rather than assumed. */
+    fmt: (v, ui) => (Number(v) === 0
+      ? (Number(ui.antherLumps) === 1 ? 'on the filament\'s own axis' : 'all on the filament\'s own axis — COINCIDENT (duplicate geometry, told)')
+      : `${v}° off the filament${Number(ui.antherLumps) === 1 ? ' — one lobe, leaning' : ''}`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'androeciumPresent' } },
 
   /* ===================================================================
