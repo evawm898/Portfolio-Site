@@ -211,6 +211,14 @@ export function domeIsFlat(state) { return !sphereMode(state) && state.headRise 
    per row, and the GATED matrix rows prove the androecium at maximum under
    SPHERE byte-identical to the bare sphere. */
 export const MAX_STAMENS = 120;
+/* THE ANTHER'S TWO PROPORTIONS — constants until session 28, and now the
+   DEFAULTS of `antherSize` and `antherElongation` (Q8: `size` becomes a real
+   slider, superseding ANTHER_DIAMETER_FACTOR, because points are unreachable
+   on a 1.92 mm anther and without it the sharp end of the range is
+   decorative). They stay HERE, exported, and the registry reads them for its
+   defaults: one owner for the shipping proportion, so the control cannot
+   drift from the number every earlier export was built at. The gynoecium's
+   lobe still reads them directly — the stigma's own seven are session 4. */
 export const ANTHER_DIAMETER_FACTOR = 1.6;
 export const ANTHER_LENGTH_FACTOR = 2.5;
 /* Mesh resolution — FIXED, so topology depends on no slider and the export
@@ -323,6 +331,95 @@ export const TIP_BAND_FLOOR = 0.01;
    ROLE_OVERRIDES pattern — so the anther's and the stigma's cannot drift;
    until then a single frozen object makes "they cannot drift" literal. */
 export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPNESS, roundedness: TIP_ROUNDEDNESS });
+/* THE REMAINING FIVE RANGES (session 28) — the two proportions, the two that
+   aim the lumps, and roundedness. Beside TIP_SHARPNESS_RANGE and
+   TIP_LOBES_RANGE above, these are the ONE OWNER of every tip control's
+   bounds; the registry reads them for its `min`/`max` and the harness asserts
+   the two agree at module load, the MAX_LAYERS move. A range restated in the
+   registry is a range that drifts, and here the bound is what discharges Q6
+   (no self-intersection instrument, ever). */
+export const TIP_SIZE_RANGE = Object.freeze([0.6, 6]);
+export const TIP_ELONGATION_RANGE = Object.freeze([1, 6]);
+export const TIP_ROUNDEDNESS_RANGE = Object.freeze([0, 1]);
+export const TIP_LUMPS_RANGE = Object.freeze([1, 6]);
+export const TIP_SPREAD_DEG_RANGE = Object.freeze([0, 90]);
+/* THE SHARPNESS FLOOR (Eva's ruling, Sep 6) — R_min = MIN_FEATURE_MM / 2 =
+   0.50 mm, and it carries `UNMEASURED — no coupon has been printed` verbatim
+   wherever it is printed, because 0.50 mm is an assumption about SLS and
+   NOTHING IN THIS PROJECT HAS BEEN PRINTED. It is the sheet's own floor and
+   the spine's own discipline: full range, CLAMPED, TOLD.
+
+   WHAT IT BOUNDS, said rather than implied: the WAIST — the narrowest radius
+   anywhere on the emitted outline, `a * min_j f_j`. Below a sharpness of 2
+   the law pinches inward at the diagonals (h dips to 2^(1/2 - 1/s) < 1) and
+   that waist is what a star's points hang off; at 0.25 on the shipping anther
+   it is 0.085 mm, a hairline. It does NOT bound the included ANGLE of a
+   point, which is the other thing a printer would care about and which no
+   number here is derived from. Two claims, one measured, one absent.
+
+   CLOSED FORM, and it is a floor on SHARPNESS because sharpness is the only
+   control that makes the waist: f_min = rho + (1 - rho) h_min(s), so with
+   `need = R_min / a` the requirement h_min >= m = (need - rho)/(1 - rho)
+   becomes s >= 1 / (1/2 - log2 m). Three corners, all told and none refused:
+   rho >= need needs no clamp at all (the blend's own floor already clears
+   it — the DEFAULT's arm, where rho is exactly 1 and no arithmetic runs);
+   need > 1 means the whole tip is thinner than the floor and no sharpness
+   saves it (`underFloor` on the descriptor, the crosses-axis precedent); and
+   everything between clamps upward to `sNeed`, which is <= 2 by construction,
+   so the clamp can never push a shape past the circle.
+
+   THE SAMPLED MINIMUM IS THE CONTINUOUS ONE, not an approximation of it:
+   tipSides() makes the lattice n*k with k EVEN, so a sample lands on u = 0
+   and on u = pi/n — the law's two extrema — and `a * min_j f_j` over the
+   EMITTED factors equals `a * (rho + (1-rho) h_min)` exactly. JS7 asserts
+   that equality against the emitted outline rather than trusting it. */
+export const TIP_MIN_RADIUS_MM = MIN_FEATURE_MM / 2;
+export function tipSharpnessFloor(a, roundedness, sharpness) {
+  const rho = clamp(roundedness, TIP_ROUNDEDNESS_RANGE[0], TIP_ROUNDEDNESS_RANGE[1]);
+  const asked = clamp(sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
+  const need = TIP_MIN_RADIUS_MM / a;
+  if (!(need > rho)) return { sharpness: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: false };
+  if (need > 1) return { sharpness: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: true };
+  const m = (need - rho) / (1 - rho);
+  const sNeed = 1 / (0.5 - Math.log2(m));
+  const built = asked < sNeed ? sNeed : asked;
+  return { sharpness: built, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(built)), floored: built !== asked, underFloor: false };
+}
+/* h's own minimum over the azimuth — 2^(1/2 - 1/s) at the 45-degree worst
+   case below 2, and exactly 1 at or above it, where the law bulges outward
+   instead of pinching. ONE owner, read by the floor and by the read-out. */
+export function tipWaistFactor(sharpness) {
+  const sh = clamp(sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
+  return sh < 2 ? Math.pow(2, 0.5 - 1 / sh) : 1;
+}
+/* THE TIP'S OWN LATTICE (session 28) — how many sides the tip is revolved
+   through, and the OUTLINE is its one owner: `revolveInto` reads the array's
+   length rather than a constant, so a shape and its tessellation cannot
+   disagree.
+
+   WHY IT IS NOT STAMEN_SIDES ANY MORE, measured rather than argued. The tip
+   ships on a 10-gon, and the outline law's extrema sit at 2n azimuths (n
+   points and n valleys). Ten samples land on all of them for n = 5 and for
+   NO OTHER point count in the range — a triangle sampled at 36 degrees is an
+   irregular blob, and `number of points` would be a control that only tells
+   the truth at one of its eleven values. So the lattice is n * k with k EVEN
+   and at least 2 (a sample at every point AND every valley) and the whole at
+   least STAMEN_SIDES: 10 sides at n = 5, 12 at n = 2, 3 and 6, up to 24 at
+   n = 12.
+
+   A CIRCLE HAS NO LOBES, so at roundedness exactly 1 the lattice is the rod's
+   own STAMEN_SIDES whatever the point count says. That is not a special case
+   bolted on for the bytes — it is the same statement as the outline's, where
+   `1 + 0 * h` is exactly 1 — and it is what makes the point count and the
+   sharpness INERT at roundedness 1 rather than merely invisible: with the
+   factors exactly 1 AND the lattice fixed, the emitted tip is independent of
+   both, which JS7 asserts as a property. It is also the whole byte-identity
+   argument for the shipping anther, whose roundedness default is 1. */
+export function tipSides(shape) {
+  if (clamp(shape.roundedness, TIP_ROUNDEDNESS_RANGE[0], TIP_ROUNDEDNESS_RANGE[1]) === 1) return STAMEN_SIDES;
+  const n = Math.round(clamp(shape.lobes, TIP_LOBES_RANGE[0], TIP_LOBES_RANGE[1]));
+  return n * 2 * Math.ceil(STAMEN_SIDES / (2 * n));
+}
 /* TRIANGLES PER TIPPED ROD — a rod (the tube: STAMEN_ROWS + 1 bands and two
    fan caps) plus `lumps` tips (each 2 * TIP_CAP_RINGS - 1 bands and two apex
    fans). A FUNCTION OF THE LUMP COUNT and no longer two constants: a stamen
@@ -331,14 +428,14 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    anything failing. JS4 and JG4 both compare an EMITTED count (the
    accumulator's own delta) against this ONE owner, each called with the
    count its own owner declares. */
-export function tippedRodTris(lumps) {
-  return ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + lumps * ((2 * TIP_CAP_RINGS - 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES);
+export function tippedRodTris(lumps, sides = STAMEN_SIDES) {
+  return ((STAMEN_ROWS + 1) * STAMEN_SIDES * 2 + 2 * STAMEN_SIDES) + lumps * ((2 * TIP_CAP_RINGS - 1) * sides * 2 + 2 * sides);
 }
 /* THE OUTLINE, evaluated ONCE per tip and indexed by SIDE — the same factor
    applies at every ring, which is what makes the tip a scaled radial graph
    rather than a per-ring shape. Clamped here, so no caller can hand the law
    a parameter that inverts it. */
-export function tipOutline(shape, sides = STAMEN_SIDES) {
+export function tipOutline(shape, sides = tipSides(shape)) {
   const rho = clamp(shape.roundedness, 0, 1);
   const sh = clamp(shape.sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
   const n = Math.round(clamp(shape.lobes, TIP_LOBES_RANGE[0], TIP_LOBES_RANGE[1]));
@@ -2174,7 +2271,49 @@ export function footRing(state, acc) {
     const clamped = asked > limit;
     const radius = clamped ? limit : asked;
     const onAxis = limit === 0;
-    const anther = { diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, shape: TIP_SHAPE };
+    /* THE ANTHER'S SEVEN (session 28, Eva's ruling — the tip's own controls,
+       authored plainly here and instanced from ONE table in session 4, when
+       the stigma's seven make "they cannot drift" observable).
+
+       THE EXPRESSIONS ARE THE CONSTANTS' OWN, TERM FOR TERM. `size *
+       diameter` is where `ANTHER_DIAMETER_FACTOR * diameter` stood and
+       `elongation * size * diameter` is where `ANTHER_LENGTH_FACTOR *
+       ANTHER_DIAMETER_FACTOR * diameter` stood — the same two products in the
+       same order on the same doubles, because algebraically identical is not
+       bit-identical and `(e * s) * d` is not `e * (s * d)`. With the two
+       defaults reading exactly 1.6 and 2.5 the anther is byte-identical BY
+       CONSTRUCTION rather than by measurement, and the measurement is taken
+       anyway (tools/verify-bloom-tip-bytes.mjs, and the live partition).
+
+       THE FLOOR IS ON THE WAIST AND IT IS TOLD, NEVER REFUSED — the spine
+       curl's discipline. `tipSharpnessFloor` is its one owner; what it does
+       not bound is in its own header. At the shipping defaults roundedness is
+       exactly 1, so the `rho >= need` arm returns with no arithmetic done and
+       `sharpness` comes back the asked 2 unchanged.
+
+       LUMPS AND SPREAD AIM THE TIPS, and they are ONE law with the trifid's:
+       `count` tips sharing the rod's end, each `spreadRad` off its direction
+       at azimuths a whole turn apart. At one lump and a spread of 0 that is
+       today's single pill on the rod's own axis; at one lump and a spread
+       above it the anther LEANS, which is a shape and not a dead slider, so
+       spread is not gated on the count. */
+    const antherDia = state.antherSize * diameter;
+    const antherA = antherDia / 2;
+    const floor = tipSharpnessFloor(antherA, state.antherRoundedness, state.antherSharpness);
+    const shape = { lobes: Math.round(state.antherPoints), sharpness: floor.sharpness, roundedness: state.antherRoundedness };
+    const anther = { diameter: antherDia, length: state.antherElongation * state.antherSize * diameter, shape,
+                     lumps: Math.round(state.antherLumps), spreadDeg: state.antherSpread, spreadRad: state.antherSpread * D2R,
+                     sides: tipSides(shape), sizeFactor: state.antherSize, elongation: state.antherElongation,
+                     sharpnessAsked: floor.asked, sharpnessFloored: floor.floored, waistMm: floor.waist,
+                     minRadiusMm: TIP_MIN_RADIUS_MM, underFloor: floor.underFloor,
+                     /* THE ELONGATION FLOOR (Q5, session 26) told rather than
+                        silent, now that elongation is reachable: the band is
+                        at least TIP_BAND_FLOOR of the tip's own radius, which
+                        is an elongation floor of 1.005. Inert at the shipping
+                        2.5 (Math.max returns its larger argument unchanged),
+                        binding only at the very bottom of the slider. */
+                     bandFloored: (state.antherElongation * state.antherSize * diameter - 2 * antherA) < TIP_BAND_FLOOR * antherA,
+                     lumpsCoincident: Math.round(state.antherLumps) > 1 && state.antherSpread === 0 };
     const clearRadius = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
     /* THE DISC'S INNER LIMIT (session 24, Eva's ruling Sep 6). The Vogel law
        had no inner limit, so its innermost stamen stood at
@@ -4072,7 +4211,11 @@ export function buildHubInto(acc, state, ring) {
    triangles per dome, measured Sep 1). Both go through one emitter.
    =================================================================== */
 function revolveInto(acc, rings, south, north, outline = null) {
-  const NS = STAMEN_SIDES;
+  /* THE OUTLINE OWNS THE LATTICE (session 28). `null` is the ROD's arm — the
+     tube keeps STAMEN_SIDES and no arithmetic here moved — and a tip hands in
+     an array whose LENGTH is tipSides(shape), so a shape and its tessellation
+     cannot disagree. At roundedness 1 that length is STAMEN_SIDES. */
+  const NS = outline === null ? STAMEN_SIDES : outline.length;
   const pts = rings.map(({ C, e1, e2, r }) => Array.from({ length: NS }, (_, j) => {
     const a = (j * TAU) / NS, ca = Math.cos(a), sa = Math.sin(a);
     /* THE OUTLINE (session 26) scales the ring's radius PER SIDE, so one
@@ -4186,12 +4329,27 @@ function tipInto(acc, C, rod, aim, tip) {
 
 export function buildStamenInto(acc, andro, s, slot) {
   const rod = rodInto(acc, { t: andro.thickness, r: andro.rFil, curlRad: andro.curlRad, length: andro.length, floorRadius: andro.diameter }, s, slot.azimuth);
-  /* THE TIP: one lump, on the rod's own direction — `spreadRad` 0 is the
-     Rodrigues identity, so its ring vector comes back as the rod's `T` and
-     the anther's bytes do not move (session 26). */
+  /* THE TIP: `lumps` of them sharing the rod's end, each `spreadRad` off its
+     direction at azimuths a whole turn apart — the TRIFID's own law, one
+     statement for both owners (session 28). At the shipping default the count
+     is 1 and the spread is 0, so the loop runs once at psi = 0 * TAU / 1 = 0
+     and `spreadRad` 0 is the Rodrigues identity: the ring vector comes back
+     as the rod's `T` and the anther's bytes do not move (session 26).
+
+     TWO LUMPS AT A SPREAD OF ZERO ARE COINCIDENT, and that is TOLD rather
+     than refused (`lumpsCoincident` on the read-out): the tips are emitted
+     one on top of another, which is duplicate geometry — the family's known
+     cause of non-manifold edges — and still exports watertight and as one
+     piece. Refusing it would mean a spread with a non-zero minimum, and 0 at
+     one lump is the shipping default. */
   const tip = rod.stations[rod.stations.length - 1], a = andro.anther.diameter / 2, Lc = andro.anther.length - 2 * a;
   const D = rod.at(andro.length).D;
-  const lump = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: 0, psi: 0 }, { a, Lc, shape: andro.anther.shape });
+  const lumpRecs = [];
+  for (let k = 0; k < andro.anther.lumps; k++) {
+    const l = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: andro.anther.spreadRad, psi: (k * TAU) / andro.anther.lumps }, { a, Lc, shape: andro.anther.shape });
+    lumpRecs.push({ index: k, axis: l.L, e1: l.e1, outline: l.outline, apex: l.apex });
+  }
+  const lump = lumpRecs[0];
   /* WHAT WAS EMITTED, for the gate: the root axis (JS1), the surface point
      (JS2), the two root rings AS EMITTED (JS3), the apex (JS4). */
   /* `stations` (session 23): every ring CENTRE the rod was revolved through
@@ -4202,8 +4360,13 @@ export function buildStamenInto(acc, andro, s, slot) {
   /* `lumps` (session 26): what the TIP primitive emitted, for JS6 — its axis,
      its Rodrigues ring vector and the outline factors it scaled every ring
      by. One entry, because an anther is one tip; the trifid reports three. */
+  /* `apex` is the FIRST lump's, which is the anther's whole reach at the
+     default count of one; `lumps[k].apex` carries every one of them, and the
+     read-out's `highest anther` reads those while the pairwise ANTHERS TOUCH
+     flag stays on the first (said on the line itself when the count is
+     above one, rather than left for a reader to assume). */
   return { index: slot.index, azimuth: slot.azimuth, root: rod.P, N: rod.Up, inner: rod.inner, outer: rod.outer, rootRings: [rod.tubePts[0], rod.tubePts[1]], tip: tip.C, dir: D, apex: lump.apex, tris: acc.triangleCount - rod.before,
-           lumps: [{ index: 0, axis: lump.L, e1: lump.e1, outline: lump.outline }],
+           lumps: lumpRecs,
            stations: rod.stations.map((st) => st.C),
            law: { turnAskedDeg: andro.curlDeg, turnBuiltDeg: rod.law.turnBuilt / D2R, peakRadiusMm: rod.law.peakRadius, underFloor: rod.law.underFloor, clamped: rod.law.clamped, floorRadius: andro.diameter } };
 }

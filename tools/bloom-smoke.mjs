@@ -414,6 +414,48 @@ export const SMOKE_BLOCKS = [
         path: 'the other direction for BOTH parts — hidden AND inert under SPHERE: no descriptor of either kind, nothing emitted, and JS0 and JG0 together in their ABSENT arms (both two-statement guards on one state)' },
     ],
   },
+  {
+    n: 25,
+    anchor: 'ANTHER: 6 stamens at the shipped pill (the tip block\'s own control row)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 28): the branches the
+       anther's seven add are the two proportions read from controls rather
+       than constants, tipSharpnessFloor's three arms (no clamp / clamped /
+       the whole tip under the floor), tipSides' two arms (a circle on the
+       rod's lattice, a shaped outline on its own), the blend at a
+       roundedness below 1, and buildStamenInto's lump loop above one. Every
+       `JS` family is claimed by a row's `path` and CLAUSE C checks the
+       biconditional; JS7 is this block's own and every row here carries it.
+
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: the
+       COINCIDENT corner (two lobes at a spread of 0) and the LEANING corner
+       (one lobe at a spread above 0) are live-matrix rows and are not in the
+       subset, so a mutation that only breaks `lumpsCoincident` or that
+       silences the spread at a count of one passes here. So does anything
+       that only shows at 120 stamens — the cost corner is a full-matrix row.
+       And SIZE is not swept here at all: the elongation row below carries the
+       two-proportion rebuild, and a defect reachable only through `size` (the
+       under-the-floor corner is its own live row) would pass. Cheapest row
+       per path.
+
+       THE ELONGATION ROW IS HERE BECAUSE THE SUBSET WAS MEASURED BLIND, not
+       because it looked owed: block 25's first four rows all sit at the two
+       shipping proportions, and session 21's `not the fixed proportion`
+       clause in JS4 — which session 28 retires into JS7 — failed four
+       live-matrix rows while every smoke row stayed green. Found by running
+       the block through the export gate. */
+    rows: [
+      { label: 'ANTHER: a TRIANGLE (3 points, sharpness 8, roundedness 0)',
+        path: 'the outline OFF the circle at the shape Eva named — JS7 (the descriptor is the seven controls, the two proportions rebuilt from the slab, the lattice law and its multiple-of-2n property at 12 sides for 3 points, the waist clear of the floor) and JS6 on a tip whose factors are NOT all 1, with JS4\'s census on the tip\'s own lattice' },
+      { label: 'ANTHER: the WAIST FLOOR binding (sharpness min 0.25 at roundedness 0 — CLAMPED, told)',
+        path: 'tipSharpnessFloor\'s CLAMPED arm — JS7\'s restated closed form against the owner\'s, the built sharpness above the asked, sharpnessFloored true and underFloor false, and the emitted waist at the 0.50 mm floor' },
+      { label: 'ANTHER: elongation min (1.00) — A SPHERE, the band floored',
+        path: 'the two PROPORTIONS off their constants — JS7 rebuilding diameter and length from the SLAB and the two controls (the clause session 21 pinned to ANTHER_DIAMETER_FACTOR, retired into it), and JS4\'s per-lobe apex reach on a band the elongation floor is holding open' },
+      { label: 'ANTHER: 3 lobes at 40° — the trifid\'s own law on an anther',
+        path: 'buildStamenInto\'s lump loop above one — three tips at a whole turn apart on the anther, JS6 per lobe at its own azimuth (the frame is the Rodrigues image, NOT the identity), JS4\'s per-lobe apex reach along each lobe\'s own axis and the census at three lumps' },
+      { label: 'ANTHER: INERT — the points and the sharpness at their extremes with roundedness 1 (bit-identical to the shipped pill)',
+        path: 'the other direction — hidden AND INERT at a roundedness of exactly 1: JS7 evaluates both laws at the opposite corner of both controls and requires an identical answer (the lattice is the rod\'s own and every factor is Object.is 1), which is the shipping anther\'s whole byte-identity argument' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

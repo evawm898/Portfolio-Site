@@ -472,6 +472,36 @@ a byte diff and never replaces one** — a session that moves bytes on purpose s
 takes a worktree of the BASE COMMIT and which commit a session claims to have moved nothing
 since is the session's to name: run it at the close and quote its output.
 
+**THE ANTHER'S SEVEN SHIP, AND THE TIP'S LATTICE IS DERIVED FROM ITS OUTLINE** (session 28,
+tip plan 3b — read `docs/bloom-session-28-outcome.md` before touching any of it). `antherSize`,
+`antherElongation`, `antherRoundedness`, `antherPoints`, `antherSharpness`, `antherLumps` and
+`antherSpread`, in a **Tip** drop-down inside Androecium — the panel's first THIRD LEVEL, whose
+CSS is now paid as a descendant selector in `bloom.css`. **AUTHORED PLAINLY, NO GENERATOR:**
+Q7's one-table instancing is session 4, where a second instance makes "they cannot drift"
+observable. **0 moved is a CONSTRUCTION:** size and elongation default to
+`ANTHER_DIAMETER_FACTOR` / `ANTHER_LENGTH_FACTOR` themselves (imported by the registry, asserted
+at harness load) and the two products keep the constants' own ORDER, because `(e * s) * d` is not
+`e * (s * d)`; roundedness 1 makes the blend exactly 1; one lobe at spread 0 is the Rodrigues
+identity. **`tipSides(shape)` is the tip's one lattice owner and `revolveInto` reads it off the
+OUTLINE ARRAY'S LENGTH** — forced, not chosen: the law's extrema sit at 2n azimuths and ten
+samples hit all of them at n = 5 and NO other point count, so a fixed 10-gon would make
+`antherPoints` a control that tells the truth once in eleven values. The circle arm
+(`STAMEN_SIDES` at roundedness exactly 1) is what makes points and sharpness **INERT rather than
+merely hidden**, and JS7 measures that at the opposite corner of both. **Cost, from
+`tippedRodTris(lumps, sides)`: 560 triangles per stamen today, 3,240 at six lobes on 24 sides;
+the worst reachable androecium is 388,800 against 67,200 — reported, not clamped.** **The
+sharpness floor bounds the WAIST (`R_min = MIN_FEATURE_MM / 2 = 0.50 mm`, `UNMEASURED — no coupon
+has been printed` verbatim), NEVER the point's included angle** — full range, clamped, told,
+three corners none refused. **Q6 is discharged by the BOUND, never an instrument:** the registry
+IMPORTS `TIP_*_RANGE` and the harness fails at module load if that became a literal. Two corners
+are told rather than refused: two lobes at spread 0 are COINCIDENT (duplicate geometry), one lobe
+above 0 LEANS (so spread is NOT gated on the count). **JS7 is the new family** — JS4 and JS6 ask
+what was emitted, and a tip built perfectly from the WRONG SEVEN passes both. The sheet is
+`node tools/shot-bloom-anther.mjs <dir> [base-tree]` — the corners and the middle at six stamens
+and at 120, three scales, mm-per-pixel on every cell, **a same-tree renderer control on every
+row**, and the INERT row asserted PIXEL-IDENTICAL to the pill. `frozen/phase18` is the 528 rows
+at `cb798f6` (a phase IS owed: block 25 takes the matrix to 549).
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
@@ -2127,6 +2157,26 @@ consecutive frames are BYTE-IDENTICAL, never a fixed sleep) took the anther row 
 to 0. It did not take the 80,544-triangle row below 13 px. Where a residue remains, REPORT it
 beside the control and let the gate assert the property that can actually fail; do not invent
 a tolerance that happens to pass the data in hand.
+
+**AND THE WHOLE-BLOOM CONTROL IS BIMODAL, WHICH MEANS A SINGLE CONTROL SAMPLE IS NOT A FLOOR**
+(Eva, session 28). Measured on one sheet, same tree, same camera, sixteen rows: the whole-bloom
+control read **0, 51, 50, 10,486, 0, 52, 10,635 px** and reached **15,885 px** across runs, with
+the SAME row landing in either mode on different runs. Settling removes the DAMPING; it does not
+remove this. Two consequences, both load-bearing: **(a)** a bar set from one control draw fires
+on an unchanged picture in the low mode and passes a real 10,000-px change in the high mode —
+wrong in both directions, so **make pixel ASSERTIONS only on a framing whose control is low in
+every observation** (on the anther sheet that is the macro crop, 0 px on every row of every run)
+and REPORT the rest; **(b)** session 26's `4,800 px against a 6,868 px floor` for the trifid is
+**RETRACTED** on these grounds — see `docs/bloom-session-26-outcome.md`. Ruling Q2 stands, on
+the facet phase and the two-session expiry, which were always its stated grounds. **A pixel
+figure from a whole-bloom view is not evidence unless its own control was taken in the same page
+session AND came back low.**
+
+**DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
+instrument*. Session 28 spent five fifty-minute sheet runs finding bugs in a sheet tool while
+the geometry passed all sixteen rows every time; none of the five failures was about the bloom.
+Cut the row arrays to a reference cell and one other, prove the tool in four minutes, then run
+the grid once. The same reflex applies to the matrix gates: `--only` and `--smoke` exist for it.
 
 ## Maintainability & performance (working agreement)
 

@@ -52,12 +52,21 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase18  `phase18Matrix()` — the 528 rows frozen at cb798f6, the head
+                of main when session 28 opened. THE NEWEST baseline, and so
+                the one a close-out re-exports on both trees under the
+                charter's retention ruling; the like-for-like baseline for
+                the anther's seven, and the first to carry the tip primitive
+                (session 26) with blocks 23 and 24 both present. A plain
+                capture per tree and --compare close it.
      --phase17  `phase17Matrix()` — the 507 rows frozen at 6335ac4, the head
-                of main when session 22 opened. THE NEWEST baseline; the
-                like-for-like baseline for the gynoecium, and the first to
-                carry the androecium's own block-23 rows — the witness for
-                the rod/pill helpers' verbatim extraction. A plain capture
-                per tree and --compare close it.
+                of main when session 22 opened. The like-for-like baseline
+                for the gynoecium, and the first to carry the androecium's
+                own block-23 rows — the witness for the rod/pill helpers'
+                verbatim extraction. NOTE (session 24): eight of its rows no
+                longer reproduce their bytes — the Vogel disc's inner limit
+                moved them, by ruling; its row DEFINITIONS are unchanged and
+                --verify-frozen still proves them.
      --phase16  `phase16Matrix()` — the 481 rows frozen at a65d16d, the head
                 of main when session 21 opened. The like-for-like baseline
                 for the androecium, and the first post-retirement one —
@@ -248,7 +257,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase17] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase18] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -263,7 +272,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, phase18Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -382,7 +391,7 @@ const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
   phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix, phase15: phase15Matrix,
-  phase16: phase16Matrix, phase17: phase17Matrix,
+  phase16: phase16Matrix, phase17: phase17Matrix, phase18: phase18Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 

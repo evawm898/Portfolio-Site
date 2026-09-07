@@ -1746,6 +1746,43 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
+## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
+
+**Eva's ruling, session 28, and it is a convention rather than a note because it has cost time
+in every sheet session, not just that one.**
+
+A contact sheet is two things at once: a TOOL and an ARTEFACT. Debugging the tool by running
+the artefact is the expensive way round, and it is the way this project keeps reaching for.
+Session 28 spent **five full-sheet runs** — roughly fifty minutes each — finding bugs in
+`shot-bloom-anther.mjs`, and the geometry passed all sixteen rows on every one of them. The
+failures were: an assertion stated against zero where the renderer is noisy; the same assertion
+restated against a bimodal control; a Playwright screenshot timeout on the heaviest cell; a
+drift check run against the wrong tree's control set; and two temporal-dead-zone slips in the
+page writer. **Not one of them was about the bloom.** The method that worked arrived at attempt
+five: cut the shape and count arrays down to two cells, run that in four minutes, confirm the
+tail, then run the grid once.
+
+**SO THE RULE.** When a sheet tool is new or has been edited:
+
+1. **PROVE THE TOOL ON TWO ROWS.** Copy it, cut its row arrays to a reference cell and one
+   other, and run that. It exercises every code path the full grid does — the cell loop, the
+   controls, the comparisons, every assertion branch, the page writer and the optional
+   before/after pair — in a few minutes rather than an hour. Delete the copy afterwards; it is
+   scaffolding, not an instrument.
+2. **THEN RUN THE FULL GRID ONCE**, to produce the sheet.
+3. **WRITE THE PAGE BEFORE THE OPTIONAL TAIL.** A sheet that spends fifty minutes gathering
+   evidence should not end with no page because a nice-to-have cell at the end threw. The
+   assertions still `die()`; what changes is that the evidence already gathered survives them.
+4. **THE HEAVIEST CELL IS WHERE THE HARNESS BREAKS, not the geometry.** Playwright's 30-second
+   screenshot default is not enough for a fill-rate-bound frame on software GL — measured: 120
+   stamens at size 6.00, macro-framed, killed a run at cell 44 of 49 on 77,280 triangles. Raise
+   it in the tool, and expect the largest cell to be the one that fails.
+
+The same shape applies to any instrument with a long input: **the matrix gates have `--only`
+and `--smoke` for exactly this reason**, and session 28's own JS4 defect was found by
+`node tools/verify-bloom-export.mjs --only "^ANTHER:"` in two minutes rather than by a full
+matrix run. Reach for the narrow run first, every time.
+
 ## The working loop — who holds the ball
 
 **RULED Sep 2 (Eva). EVERY SESSION REPORT, AT EVERY STOP, ENDS WITH EXACTLY ONE
@@ -5172,6 +5209,22 @@ matters should be measured this way.
     Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
     the expiry.
 
+    **⛔ THE WHOLE-BLOOM PIXEL PAIR IS RETRACTED (Eva, session 28), AND THE RULING STANDS.**
+    `4,800 px against a 6,868 px floor` was a single control sample of a TWO-MODE distribution,
+    not a floor: session 28 measured the same-tree whole-bloom control at **0, 51, 50, 10,486,
+    0, 52, 10,635 px** across sixteen rows of one sheet, reaching **15,885 px** across runs, with
+    the same row landing in either mode on different runs. Settling on byte-identical FRAMES
+    removes the orbit DAMPING and does not remove this. So "below the noise at whole-bloom
+    scale" cannot be said, and every whole-bloom control in that table is withdrawn — marked
+    RETRACTED in `docs/bloom-session-26-outcome.md` rather than left to be re-cited. **What is
+    NOT retracted:** the centre and stigma framings (controls 0-25 px in every observation
+    across two sessions, differences four to six orders above), the 120-stamen row's EXACT
+    whole-bloom equality (an identity, not a comparison against a floor), and **Q2 itself** —
+    whose grounds were always the facet phase and the two-session expiry, which is exactly why
+    withdrawing the corroboration does not move it. **A pixel figure from a bloom sheet's
+    whole-bloom view is not evidence unless its own control was taken in the same page session
+    AND came back low.**
+
     - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
       floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
       is only a measurement with its own control`): same tree, same camera, twice, at the
@@ -5261,3 +5314,133 @@ matters should be measured this way.
     evidence, per the standing note. **One process finding worth carrying:** the GitHub
     run-level `status` read STALE for twenty minutes after a job finished — read
     `list_workflow_jobs`, not the run, and it is far leaner besides.
+
+- **Session 28 (tip plan 3b, Sep 7): THE ANTHER'S SEVEN CONTROLS SHIP, THE TIP'S LATTICE STOPS
+  BEING A CONSTANT, AND 0 MOVED IS A CONSTRUCTION.** Full account:
+  `docs/bloom-session-28-outcome.md`. Seven sliders under `Androecium ▸ Tip` — size,
+  elongation, roundedness, points, sharpness, lobes, lobe spread — **authored plainly, no
+  generator**: Q7's one-table instancing waits for session 4, where a second instance makes
+  "they cannot drift" observable, and carrying it here would be debt this session could not
+  verify.
+
+  **THE DEFAULTS REPRODUCE TODAY'S PILL EXACTLY AND THAT IS A CONSTRUCTION, NOT A CLAIM.** Size
+  and elongation default to `ANTHER_DIAMETER_FACTOR` and `ANTHER_LENGTH_FACTOR` themselves —
+  imported by the registry, asserted equal at harness load — and the two products are written in
+  the constants' own ORDER, because `(e * s) * d` is not `e * (s * d)`. Roundedness 1 makes the
+  blend exactly 1 and the lattice the rod's own; one lobe at a spread of 0 is the Rodrigues
+  identity. Every earlier export is bit-identical by the same argument the androecium shipping
+  absent made.
+
+  **THE TIP'S SEGMENT COUNT IS NOW DERIVED FROM THE OUTLINE, AND THAT WAS FORCED, NOT CHOSEN.**
+  The law's extrema sit at 2n azimuths and ten samples hit all of them **for n = 5 and no other
+  point count in the range** — so `antherPoints` on a fixed 10-gon would be a control that tells
+  the truth at one of its eleven values. `tipSides(shape)` is `n * 2 * ceil(STAMEN_SIDES / 2n)`,
+  and `STAMEN_SIDES` for a circle; `revolveInto` reads the lattice off the outline ARRAY'S OWN
+  LENGTH (the rod's arm still passes `null` and does no arithmetic). The circle arm is not a
+  bytes hack — it is what makes the two hidden controls **inert rather than merely invisible**,
+  and JS7 measures that at the opposite corner of both rather than arguing it. **Cost, from
+  `tippedRodTris()`: 560 triangles per stamen today, 3,240 at six lobes on a 24-side lattice;
+  the worst reachable androecium is 388,800 against today's 67,200. Reported, not clamped.**
+
+  **THE SHARPNESS FLOOR BOUNDS THE WAIST AND NOT THE POINT'S ANGLE**, said rather than implied.
+  `R_min = MIN_FEATURE_MM / 2 = 0.50 mm`, carried with `UNMEASURED — no coupon has been printed`
+  VERBATIM; closed form (`s ≥ 1 / (1/2 − log₂ m)`), full range, clamped, told; three corners,
+  none refused — `rho ≥ need` (the default's arm, no arithmetic runs), `need > 1` (the whole tip
+  under the floor), and the clamp between, whose result is `≤ 2` by construction so it can never
+  push a shape past the circle. **Q6 is discharged by the BOUND, never by an instrument:** the
+  registry IMPORTS `TIP_SHARPNESS_RANGE` and the rest, and the harness fails at module load if
+  that import became a literal — a wider slider than the law was proved on would make the ruling
+  false with nothing failing, because both STL gates are blind to a self-intersection by design.
+
+  **TWO CORNERS ARE TOLD RATHER THAN REFUSED**, on the crosses-axis precedent: two lobes at a
+  spread of 0 are COINCIDENT (duplicate geometry, the family's known cause of non-manifold
+  edges), and one lobe at a spread above 0 LEANS — a shape, not a dead slider, so the spread is
+  NOT gated on the count.
+
+  **JS7 IS THE NEW FAMILY AND THE CENSUS CAUGHT ITS ABSENCE BEFORE A HUMAN DID.** JS4 and JS6
+  ask what was emitted; **a tip built perfectly from the wrong seven passes both.** JS7 rebuilds
+  the two proportions from the SLAB, restates the floor in closed form (never calling the
+  shipped function), asserts the lattice as a PROPERTY (a multiple of 2n, at least
+  `STAMEN_SIDES`) beside the law, measures the inertness, and carries `floored` / `underFloor` /
+  `bandFloored` / `lumpsCoincident` in both directions. The shared `tipClauses` gained the axis
+  rebuild and traded `must be exactly 1` for the **roundedness biconditional** (exactly 1 at
+  roundedness 1, *not* all 1 below — because the first clause compares a mutated law against
+  itself: session 26's M2a). JG5 keeps the hard-wired-`TIP_SHAPE` clause; the stigma is session
+  4's. `node tools/bloom-smoke.mjs --check` reported *block 25 has no smoke row* and *JS7 is
+  claimed by NO smoke row* on the first run — session 27's biconditional firing in both
+  directions the first time it was needed.
+
+  **PANEL ROUTE (t), AND WHY ROUTE (d) COULD NOT DO IT.** Route (d) drives from the DEFAULTS,
+  where the androecium is absent, so `antherPoints` is hidden at both ends of the roundedness
+  slider and its pass there is VACUOUS. Route (t) drives the transition with six stamens
+  present, asserts the third level as a NUMBER of enclosing `<details>` (2), drives the two
+  hidden controls to their extremes at roundedness 1 and requires the triangle count not to
+  move, and holds the read-out's ANTHER line to the owner's own record with four flags in both
+  directions. Eleven assertions fire under `--negative-control`. **The third level's CSS is
+  paid** — a descendant selector in `bloom.css`, so `bloom.js` keeps one class and a fourth
+  level costs nothing there.
+
+  **`frozen/phase18` — 528 rows at `cb798f6`, and a phase IS owed.** Q4's rule: a tag pins ROW
+  DEFINITIONS, not bytes. Block 25 takes the live matrix 528 → 549, and no byte moves — the
+  phase16/phase17 case, and the exact mirror of session 24 (eight bytes moved, no row added, no
+  phase owed). It must be published from `main` after the merge, per session 17's rule.
+
+  **AND THE SHEET TOOL COST FIVE FULL RUNS TO DEBUG, WHICH IS NOW ITS OWN CONVENTION** — see
+  *Debugging an instrument — two rows to prove the tool, the full grid once to produce the
+  sheet*, above. The geometry passed all sixteen rows on every one of those runs; none of the
+  five failures was about the bloom.
+
+  **THE SHEET IS `node tools/shot-bloom-anther.mjs <dir> [base-tree]`** and it is what the merge
+  waits on. The corners and the middle — a sphere, the shipping pill, a triangle, a rounded star
+  — plus the waist floor binding, a trifid anther, Q8's 7.20 mm size and the INERT corner, each
+  at six stamens AND at 120, at three scales with mm-per-pixel on every cell. **Every row carries
+  its own same-tree renderer control** (Eva, Sep 7) and every frame settles until two consecutive
+  screenshots are byte-identical. Two pixel assertions with vacuity guards: every shape differs
+  from the pill by more than ten times its own control, and the INERT row is **pixel-identical**
+  to the pill on all three views.
+
+  **TWO THINGS FOUND BY RUNNING RATHER THAN BY READING, both worth carrying.** *(1)* Session
+  21's `not the fixed proportion` clause in JS4 pinned the anther to `ANTHER_DIAMETER_FACTOR * t`
+  and made **every non-default size or elongation a HARNESS-INVALID row** — four of them —
+  while every smoke row stayed green, because block 25's first four smoke rows all sat at the
+  two shipping proportions. It is retired into JS7 (which rebuilds both from the slab and the
+  controls, and is strictly stronger) and a fifth smoke row was added for that path. **Found by
+  `node tools/verify-bloom-export.mjs --only "^ANTHER:"`, not by reading the diff.** *(2)*
+  **THE WHOLE-BLOOM VIEW'S SAME-TREE CONTROL IS BIMODAL, and it took two failed sheet runs to
+  establish it.** `PIXEL-IDENTICAL` was tried first for the INERT row and came back 51 px on
+  `whole` / 45 px on `lens` against controls of 50 px / 8 px on the very rows being compared. The
+  claim was weakened to *within the two rows' own measured controls* and failed AGAIN, at 10,491
+  px against a floor of 51. The `whole` control across seven rows of one run reads **0, 51, 50,
+  10,486, 0, 52, 10,635 px** — two of eight in the high mode. That is an INTERMITTENT RENDERER
+  STATE catching some page sessions and not others, and **settling on byte-identical FRAMES does
+  not remove it** (settling removes the DAMPING, which is a different thing — the Sep 7 entry
+  above records 0 px at 13,440 triangles and 13 px at 80,544 after settling; this is ~10,500 px on
+  a 13,440-triangle bloom). **So a pixel figure from a bloom sheet's whole-bloom view is not
+  evidence unless its own control was taken in the same page session and came back low.** The
+  sheet now asserts on `macro` alone (control 0 px on every row of both runs) and reports `whole`
+  and `lens` beside their controls with no claim attached; the INERT row's weight is carried by
+  two EXACT, noise-free claims — its triangle count and its whole ANTHER read-out line, character
+  for character. And the floor is itself a finding about the anther: a shape difference of that
+  order at whole-bloom scale is NOT visible, which is Q8's argument for the size slider arriving
+  as a measurement.
+
+  **THE CLOSE.** `diff-bloom-bytes --compare` on `phase18` across both trees: **528/528
+  byte-identical, 0 moved**; `--verify-frozen --phase18` deep-equal to `cb798f6`'s own
+  `buildMatrix()`. Smoke 44/44 watertight with identical live/export counts and no degenerates;
+  `--conn` 43/43 one piece; the whole of block 25 through the export gate **21/21 watertight**;
+  the panel gate PASS with **1,806 assertions firing under `--negative-control`**, eleven of
+  them route (t)'s. Triangle counts (live = export): default **10,080**, six stamens at the pill
+  **13,440**, a triangle **13,680**, a 24-side star **15,120**, three lobes **15,840**, six lobes
+  at 90° **19,440**, the 120-stamen cost corner **110,880**, the mum with a shaped tip
+  **152,112**. Two rows carry an expected, unrated nonManifold count — **1,800** on COINCIDENT
+  (the duplicate geometry the flag tells) and **60** on six lobes at 90° — with boundary edges 0
+  on both, which is the only pass criterion. **Predeclared untouched: 46 files, 0 moved**,
+  including both STL gates, the connectedness gate and every pre-existing bloom sheet.
+
+  **THE SHEET, on its final run: 49 cells, 148 frames, every assertion passed.** Every shape is
+  850,000-2,560,000 px from the shipping pill on the macro view, at both stamen counts; the
+  macro control was **0 px on every row**, which is why the assertion lives there. **The INERT
+  row measured 0 px against the pill on all three views while its own whole-view control read
+  10,492 px on the same run** — the clearest statement available that the control measures the
+  renderer and not the geometry. **The migration pair HELD at 0 px on all three views against
+  controls of 0 px:** the shipping pill on `cb798f6` and on this tree are the same picture.
