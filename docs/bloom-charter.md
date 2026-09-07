@@ -5608,8 +5608,8 @@ matters should be measured this way.
   **0 MOVED ON BOTH TIPS IS A CONSTRUCTION** (the constants' own expressions term for term; the
   blend exactly 1 at roundedness 1, so the stigma's sharpness going 2.00 → 1.00 reaches
   nothing) and is measured on `frozen/phase19` — the 549 rows at `eb3543f`, the first baseline
-  carrying the anther's seven as controls — on both trees. Block 26 (21 rows, including THE
-  FAMILY row: the same seven on both tips at once) takes the live matrix to 570, so a phase IS
+  carrying the anther's seven as controls — on both trees. Block 26 (22 rows, including THE
+  FAMILY row: the same seven on both tips at once) takes the live matrix to 571, so a phase IS
   owed. JG4 reads the descriptor rather than constants; its shared-apex clause is a
   biconditional with `lumpsCoincident`, because three lobes at a spread of 0 share an apex by
   the law.

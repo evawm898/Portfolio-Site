@@ -159,7 +159,16 @@ function tipClauses(tag, who, lump, shape, D, azimuth, spreadRad, psi) {
     if (sides !== STAMEN_SIDES) bad.push(`${tag}: ${who} is a circle (roundedness 1) revolved through ${sides} sides — a circle has no lobes, so its lattice is the rod's own ${STAMEN_SIDES} and the point count must reach nothing`);
     for (let j = 0; j < f.length; j++) if (!Object.is(f[j], 1)) { bad.push(`${tag}: ${who} scaled side ${j} by ${f[j]} at a roundedness of exactly 1 — the blend must be EXACTLY 1 there, or the tip is neither byte-identical nor inert in the two controls above it`); break; }
   } else if (f.every((x) => Object.is(x, 1))) {
-    bad.push(`${tag}: ${who} scaled every side by exactly 1 at a roundedness of ${rho} — the outline is a circle where the shape says it is not, so the blend is not being applied`);
+    /* EXCEPT AT SHARPNESS EXACTLY 2 (session 30, found by the stigma sheet's
+       "circle it replaces" cell): the exponent is the circle's own there and
+       `h = (cos^2 + sin^2)^(-1/2)` computes to EXACTLY 1 at every azimuth —
+       Eva's session-29 measurement, `max|f - 1| = 0.000e+0` — so every factor
+       IS 1 below roundedness 1 with the blend fully applied. The clause was
+       written when the shipping sharpness was 2 and roundedness had no
+       slider, so the corner was unreachable; it is a reachable slider
+       position now. The exemption is the singular point and nothing wider:
+       a dropped blend at any OTHER sharpness still fails here. */
+    if (shape.sharpness !== 2) bad.push(`${tag}: ${who} scaled every side by exactly 1 at a roundedness of ${rho} — the outline is a circle where the shape says it is not, so the blend is not being applied`);
   }
   return bad;
 }
@@ -4721,6 +4730,7 @@ export function buildMatrix() {
     ['STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)', { ...SSHAPED, stigmaPoints: 12, stigmaSharpness: 0.6, stamenCount: 120, stamenLayout: 'DISC' }],
     ['STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)', { ...MUM, ...SSHAPED, stigmaPoints: 3, stigmaSharpness: 8 }],
     ['STIGMA: a shaped stigma x sheet 2.40 (the fat style)', { ...SSHAPED, stigmaPoints: 3, stigmaSharpness: 8, sheetThickness: 2.4 }],
+    ['STIGMA: the CIRCLE\'S OWN EXPONENT — sharpness exactly 2.00 at roundedness 0 (the singular point: every factor exactly 1 on a 16-side lattice; the lattice jump, session 31)', { ...SSHAPED, stigmaSharpness: 2 }],
     ['STIGMA: THE FAMILY — the same seven on both tips (3-point stars at sharpness 1, roundedness 0, on six anthers and the trifid)', { ...SSHAPED, stigmaPoints: 3, stigmaSharpness: 1, stamenCount: 6, antherRoundedness: 0, antherPoints: 3, antherSharpness: 1 }],
     ['STIGMA: INERT — the points and the sharpness at their extremes with roundedness 1 (bit-identical to the shipped trifid)', { ...STYLE, stigmaPoints: 12, stigmaSharpness: 0.25 }],
     ['STIGMA: GATED — every tip control at MAXIMUM with NONE (hidden and inert; bit-identical to the default)', { ...STIGMA_MAX, gynoecium: 'NONE' }],
@@ -10241,7 +10251,7 @@ export function phase18Matrix() {
 
    WHY IT IS OWED (Q4, session 24): a frozen tag pins ROW DEFINITIONS, not
    bytes, so a session owes a new phase when the ROW SET changes. This
-   session adds block 26 (549 -> 570, twenty-one rows) and moves no byte —
+   session adds block 26 (549 -> 571, twenty-two rows) and moves no byte —
    the phase18 case exactly.
 
    IT IS THE FIRST BASELINE CARRYING THE ANTHER'S SEVEN AS CONTROLS (block

@@ -528,7 +528,7 @@ thinnest printable sheet. It is ONE constant, `TIP_SHARPNESS_DEFAULT` (was
 `ANTHER_SHARPNESS_DEFAULT`); a different stigma value is one per-instance default the day it is
 ruled. **0 moved on both tips is a construction** (the constants' own expressions term for term,
 the blend exactly 1 at roundedness 1) measured on `frozen/phase19` — the 549 rows at `eb3543f`,
-the newest baseline — on both trees; a phase IS owed because block 26 takes the matrix to 570.
+the newest baseline — on both trees; a phase IS owed because block 26 takes the matrix to 571.
 The ids are `anther*` / `stigma*`, NOT the brief's `antherTip*` / `stigmaTip*`: renaming the
 anther's seven would retire seven ids and move phase18's row definitions. The sheet is
 `node tools/shot-bloom-stigma.mjs <dir> [base-tree] [--quick]` — the trifid at rest, the new

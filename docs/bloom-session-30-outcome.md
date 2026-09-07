@@ -179,13 +179,13 @@ control.
 
 ## Matrix block 26 and `frozen/phase19`
 
-Block 26 (21 rows) is block 25 on the other tip plus what only the stigma has: **one** lobe (a
+Block 26 (22 rows) is block 25 on the other tip plus what only the stigma has: the circle's own exponent (sharpness exactly 2.00 at roundedness 0 — the singular point, pinned because the sheet found JS6/JG5 firing on it), **one** lobe (a
 pill on the style — the anther's own default shape), six at 90°, the trifid's own COINCIDENT
 corner (three at a spread of 0), the four outline shapes and the floor, the lattice extremes,
 the 120-anther cushion around a shaped stigma, the mum, the fat style, the INERT row, both GATED
 directions — and **THE FAMILY row**, the same seven on both tips at once (3-point stars at
 sharpness 1, roundedness 0, six anthers around the trifid), which is the pair the sheet puts in
-front of Eva. Live matrix 549 → **570**.
+front of Eva. Live matrix 549 → **571**.
 
 `phase19Matrix()` is `eb3543f`'s own `buildMatrix()` (549 rows), generated from a worktree and
 proved deep-equal by `--verify-frozen --phase19` (PASS, locally and in CI). `FROZEN_BASE_COMMITS`
@@ -284,7 +284,7 @@ FILLME_UNTOUCHED
 | `verify-bloom-export.mjs --only "^STIGMA:…"` | **25/25 watertight**, identical live/export counts, 0 degenerate — all of block 26 plus four control rows |
 | `verify-bloom-panel.mjs` | **PASS** — 191 ok lines, including the tip family's one-spec clause and both tip witnesses |
 | `verify-bloom-panel.mjs --negative-control` | **all fifteen routes observed their failure**, and the tip family's clause fired on the drifted `stigmaSize` |
-| `bloom-smoke.mjs --check --negative-control` | 50 rows over 22 blocks of 570; **41 families, both directions**; census negative control PASS |
+| `bloom-smoke.mjs --check --negative-control` | 50 rows over 22 blocks of 571; **41 families, both directions**; census negative control PASS |
 | `bloom-smoke.mjs` | FILLME_SMOKE |
 | `shot-bloom-stigma.mjs --quick` | PASS — pair HELD (macro 0 px vs 0), both clamped cells CLAMPED |
 
