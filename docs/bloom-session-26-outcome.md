@@ -58,6 +58,34 @@ must NOT move — the GATED rows where the whole centre is at maximum under SPHE
 inert. They are in the 511. A tip primitive that leaked past the eligibility guard would move
 exactly those three, and nothing else would notice.
 
+### CLOSED BY MEASUREMENT — the moved set EQUALS the ruled set, exactly
+
+Two full-matrix captures, one per tree, through `tools/diff-bloom-bytes.mjs`, compared by
+`verify-bloom-tip-bytes.mjs --partition`:
+
+> `full: 528 rows · RULED TO MOVE 17 (gynoecium STYLE and eligible) · MOVED 17`
+> **`partition: PASS — the moved set EQUALS the ruled set exactly: 17 move, 511 are bit-identical.`**
+
+All seventeen are block 24's `GYNOECIUM:` rows — the style alone, both parts present, the curl
+and length extremes, the 120-disc and the mum and the fan and the apex corner. **And the three
+rows that name a STYLE and must NOT move all held:**
+
+```
+held   GYNOECIUM: GATED — every control at MAXIMUM under SPHERE
+held   GYNOECIUM: GATED — the WHOLE centre at MAXIMUM under SPHERE
+held   GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere
+```
+
+That is the sharper half. A tip primitive that leaked past `gynoeciumEligible()` would move
+exactly those three and nothing else would notice.
+
+**THE INSTRUMENT IS VERIFIED FALSIFIABLE**, on three synthetic captures built from the real base
+capture: exactly the 17 ruled rows altered → PASS; the 17 plus one unruled row → FAIL, naming
+the leak; 16 of the 17 → FAIL, naming the ruled row that held. It also refuses two captures
+carrying the same tree fingerprint. And it derives the ruled set from **each row's own captured
+state**, independently of the enumeration above — the two derivations agree at 17, so the PASS
+means something rather than confirming the arithmetic that predicted it.
+
 ### Which frozen tag's bytes no longer reproduce: **NONE** (Q4 / the session-24 rule)
 
 The change is reachable only through `gynoecium: STYLE`. **No frozen matrix names a gynoecium
@@ -275,6 +303,7 @@ above was re-run rather than assumed, and why the two block comments now name JS
 | `node tools/diff-bloom-bytes.mjs --verify-frozen --phase17 --base <6335ac4>` | **PASS** — 507 rows deep-equal to the base commit's own `buildMatrix()` |
 | `node tools/verify-bloom-tip-bytes.mjs --base <2fee2c2>` | **PASS** — 0 anther floats moved, every trifid row moved |
 | the mutant table | **6 of 6 fired**, every one still watertight |
+| `--partition` on two `--full` captures | **PASS — 17 move, 511 bit-identical, the moved set equals the ruled set exactly** |
 
 **THE MERGE CRITERION IS UNCHANGED and is not any of the above:** the full 528-row matrix on
 BOTH STL gates, in CI, on the merge commit. Note that a bloom PR runs **six** verify jobs and
@@ -282,11 +311,11 @@ only **four** of them are bloom evidence — `flower-export-watertight` and
 `flower-geometry-quality` are path-filtered on `'tools/**'`, so adding a tool here makes them
 run, and they still test flower geometry.
 
-**Still measuring at the time of this commit, and it is the reason there will be a second one:**
-the four byte captures (`--full` and `--phase17`, each tree) that close the partition by
-measurement rather than by the enumeration above. The numbers go in the table at the top of
-this section when they land. CI does no byte diffs, so this is the one close-out step that
-genuinely needs a local run.
+**The live partition is closed** (above). The `--phase17` pair — the newest frozen baseline on
+both trees, which the close-out convention requires beside the live partition — is still
+capturing at the time of writing and is expected at **0 of 507 moved**, by the construction
+above. CI does no byte diffs, so this is the one close-out step that genuinely needs a local
+run.
 
 ### What the sheet measured about ITSELF, and why it reports rather than asserts
 
