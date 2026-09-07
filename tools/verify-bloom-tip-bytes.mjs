@@ -52,6 +52,7 @@ import { pathToFileURL } from 'node:url';
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const argAt = (n) => { const i = process.argv.indexOf(n); return i > 0 ? process.argv[i + 1] : null; };
 const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname);
+const load = async (root) => import(pathToFileURL(path.join(root, 'bloom-geometry.js')).href);
 
 
 /* THE ROWS. `holds` is the PREDECLARATION: true means this row must come
@@ -154,10 +155,66 @@ export const build = (M, state, exportMode) => {
   return acc.positions;
 };
 
+/* THE PARTITION, AS A TWO-SIDED SET EQUALITY — `--partition <before.json>
+   <after.json>`, over two captures from tools/diff-bloom-bytes.mjs.
+
+   WHY IT IS HERE AND NOT A FLAG ON THAT TOOL. `--partition-value gynoecium
+   STYLE` splits on the RESOLVED value of one control, and this session's
+   ruled set is not that: three matrix rows resolve `gynoecium` to STYLE and
+   must NOT move, because they are the GATED rows where the whole centre is
+   hidden AND INERT under SPHERE. Splitting on the value alone would report
+   those three as `in the ruled set and did not move` and exit red on a
+   correct tree. The ruled set is `STYLE AND eligible`, which is two
+   conditions, so the predicate lives here — beside the rest of the
+   session's claims — and diff-bloom-bytes.mjs stays untouched.
+
+   THE PREDICATE IS THE SHIPPED `gynoeciumEligible()`, called on each row's
+   own resolved state, so the gate and the geometry cannot disagree about
+   which rows were supposed to move. Both directions are failures: a ruled
+   row that held means the primitive is not reaching that geometry; an
+   unruled row that moved means it leaked past the eligibility guard. */
+if (process.argv.includes('--partition')) {
+  const i = process.argv.indexOf('--partition');
+  const before = JSON.parse(fs.readFileSync(process.argv[i + 1], 'utf8'));
+  const after = JSON.parse(fs.readFileSync(process.argv[i + 2], 'utf8'));
+  const G = await load(ROOT);
+  const { DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
+  const H = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-harness.mjs')).href);
+  const which = process.argv.includes('--phase17') ? 'phase17' : 'full';
+  const rows = which === 'phase17' ? H.phase17Matrix() : H.buildMatrix();
+  const problems = [];
+  if (!before.complete || !after.complete) problems.push('one of the captures is not complete');
+  if (before.treeSha === after.treeSha) problems.push(`both captures carry tree fingerprint ${before.treeSha} — this is one tree compared with itself`);
+  if (before.rows.length !== after.rows.length || before.rows.length !== rows.length) problems.push(`row counts disagree: matrix ${rows.length}, before ${before.rows.length}, after ${after.rows.length}`);
+  if (problems.length) { console.error('partition: INVALID —\n  ' + problems.join('\n  ')); process.exit(1); }
+  const ruled = new Set(), byLabel = new Map(rows.map((r) => {
+    const st = { ...DEFAULTS }; for (const kv of r.set) st[kv.id] = kv.value;
+    if (st.gynoecium === 'STYLE' && G.gynoeciumEligible(st)) ruled.add(r.label);
+    return [r.label, st];
+  }));
+  const moved = new Set();
+  for (let k = 0; k < before.rows.length; k++) {
+    const b = before.rows[k], a = after.rows[k];
+    if (b.label !== a.label) { console.error(`partition: INVALID — row ${k} is "${b.label}" in one capture and "${a.label}" in the other`); process.exit(1); }
+    if (b.sha256 !== a.sha256 || b.bytes !== a.bytes) moved.add(b.label);
+  }
+  const heldButRuled = [...ruled].filter((l) => !moved.has(l));
+  const movedButNotRuled = [...moved].filter((l) => !ruled.has(l));
+  const styleNotEligible = rows.filter((r) => byLabel.get(r.label).gynoecium === 'STYLE' && !ruled.has(r.label)).map((r) => r.label);
+  console.log(`${which}: ${rows.length} rows · RULED TO MOVE ${ruled.size} (gynoecium STYLE and eligible) · MOVED ${moved.size}`);
+  console.log(`the other direction: ${styleNotEligible.length} row(s) name STYLE and are NOT ruled (hidden and inert under SPHERE) — every one must hold:`);
+  for (const l of styleNotEligible) console.log(`  ${moved.has(l) ? 'MOVED!' : 'held  '} ${l}`);
+  for (const l of [...ruled].sort()) console.log(`  ${moved.has(l) ? 'moved ' : 'HELD! '} ${l}`);
+  if (heldButRuled.length) console.error(`\npartition: FAIL — ${heldButRuled.length} ruled row(s) did not move; the tip primitive is not reaching that geometry:\n  ${heldButRuled.join('\n  ')}`);
+  if (movedButNotRuled.length) console.error(`\npartition: FAIL — ${movedButNotRuled.length} row(s) moved outside the ruled set; the change leaked past the eligibility guard:\n  ${movedButNotRuled.join('\n  ')}`);
+  if (heldButRuled.length || movedButNotRuled.length) process.exit(1);
+  console.log(`\npartition: PASS — the moved set EQUALS the ruled set exactly: ${ruled.size} move, ${rows.length - ruled.size} are bit-identical.`);
+  process.exit(0);
+}
+
 if (!IS_MAIN) { /* imported for its measurements — tools/shot-bloom-tip.mjs uses deviation() so the sheet's captions and this run quote ONE computation */ } else {
 const BASE = argAt('--base');
-if (!BASE) { console.error('usage: node tools/verify-bloom-tip-bytes.mjs --base <git worktree of the base commit>'); process.exit(2); }
-const load = async (root) => import(pathToFileURL(path.join(root, 'bloom-geometry.js')).href);
+if (!BASE) { console.error('usage: node tools/verify-bloom-tip-bytes.mjs --base <git worktree of the base commit>\n       node tools/verify-bloom-tip-bytes.mjs --partition <before.json> <after.json> [--phase17]'); process.exit(2); }
 const NEW = await load(ROOT);
 const OLD = await load(path.resolve(BASE));
 const { DEFAULTS } = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
