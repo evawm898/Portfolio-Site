@@ -113,6 +113,78 @@
   <pre id="plot-drawstate"></pre>
   <pre id="plot-framestate"></pre>
 </details>
+
+<!-- STEM. The bloom has no stem geometry — `below` throws in the generator, and
+     that is phase-2 work there. This one is INFERRED: every u-line already
+     starts on the attachment ring at z = 0, so the stem is those same lines
+     continued downward and pulled in toward a bundle. It is therefore made of
+     the u-lines that are actually drawn, and thins with the u density slider
+     and disappears under "v only" — the read-out says so rather than quietly
+     drawing a stem for lines that are not on screen. -->
+<details id="plot-stem" class="panel" open>
+  <summary>STEM</summary>
+
+  <div class="plot-row">
+    <label for="stem">stem</label>
+    <select id="stem">
+      <option value="on" selected>inferred</option>
+      <option value="off">off</option>
+    </select>
+    <output id="stemOut"></output>
+  </div>
+
+  <!-- BUNDLE and JOIN are the funnel. `join` does two jobs with one number on
+       purpose: how gradually the lines gather IS the head-to-stem taper, so a
+       separate taper control would be a second owner of one shape. -->
+  <div class="plot-row">
+    <label for="stemBundle">bundle</label>
+    <input type="range" id="stemBundle" min="0" max="5" step="0.05" value="0.35">
+    <output id="stemBundleOut">0.35 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemJoin">join</label>
+    <input type="range" id="stemJoin" min="0.5" max="80" step="0.5" value="12">
+    <output id="stemJoinOut">12 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemLength">length</label>
+    <input type="range" id="stemLength" min="10" max="500" step="1" value="170">
+    <output id="stemLengthOut">170 mm</output>
+  </div>
+  <!-- NECK is not derivable from DROOP: it is how far down the tilt washes
+       out, which is the difference between a stiff stalk and a heavy nodding
+       bloom. The head takes the full angle; the stem takes it decayed. -->
+  <div class="plot-row">
+    <label for="stemDroop">droop</label>
+    <input type="range" id="stemDroop" min="-120" max="120" step="1" value="0">
+    <output id="stemDroopOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemNeck">neck</label>
+    <input type="range" id="stemNeck" min="1" max="300" step="1" value="45">
+    <output id="stemNeckOut">45 mm</output>
+  </div>
+
+  <!-- BEND POINTS. Control points along the stem with a gaussian influence, so
+       neighbours blend rather than kink. The ROOT is one of them: a locked root
+       only makes sense for a plant in the ground, and this is a picture. -->
+  <div class="plot-row">
+    <label for="bendAdd">bends</label>
+    <span class="plot-bends">
+      <button type="button" id="bendRemove" title="remove a bend point">&minus;</button>
+      <span id="bendCount">3</span>
+      <button type="button" id="bendAdd" title="add a bend point">+</button>
+      <button type="button" id="bendReset" title="return every bend point to rest">reset</button>
+    </span>
+    <output id="bendOut"></output>
+  </div>
+  <label class="plot-check" for="stemHandles">
+    <input type="checkbox" id="stemHandles" checked> show bend handles
+  </label>
+  <div class="plot-hint">drag a handle to bend the stem</div>
+
+  <pre id="plot-stemstate"></pre>
+</details>
 </div>
 
 <script type="module" src="plot.js"></script>

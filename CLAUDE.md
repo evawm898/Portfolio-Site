@@ -1808,25 +1808,259 @@ median CPU per settled frame at all 15,148 segments, headless software GL,
 the segment buffers rather than mask, because rebuilding 15k segments is
 cheaper than the bookkeeping to avoid it.
 
-**Verify with `node tools/verify-plot.mjs`** (45 checks). Part one drives the
-shipped `plot-grid.js` functions in Node over fixtures whose answer is written
+**SCROLL-ZOOM REPAINTED NOTHING, AND ORBIT DAMPING WAS NEVER THE REASON.**
+The kickoff's hypothesis — "damping is on in `/bloom` and off here" — is wrong
+in both halves, checked against the source rather than assumed: damping is ON
+here (`dampingFactor` 0.09) and on `/bloom` (three's default 0.05), and
+three@0.161.0's `OrbitControls.update()` eases only `sphericalDelta` and
+`panOffset`. **The dolly `scale` is applied at full magnitude in one call and
+reset to 1**, so `enableDamping` does not smooth zoom on EITHER page and turning
+it up would not have helped; after this fix `/plot`'s zoom STEP is identical to
+`/bloom`'s, and an eased dolly is a separate feel change nobody has asked for.
+What was actually broken is the idle skip. `onMouseWheel` calls `scope.update()`
+SYNCHRONOUSLY inside the wheel handler; that call moves the camera, updates
+`lastPosition`/`lastQuaternion` and returns true to nobody. The animation loop's
+own `controls.update()` on the next frame then recomputes the same pose, compares
+it against the position the internal call already recorded, and returns FALSE —
+so the frame was never redrawn. **Measured headlessly on a settled page before
+the fix: five wheel events took the camera 95.68 -> 70.33 units while the
+framebuffer hash stayed identical across all five.** The zoom only appeared when
+something else dirtied a frame (a residual orbit tick, a slider), which is what
+reads as choppy. The fix is one listener — `controls.addEventListener('change',
+() => { dirty = true; })` — taking the signal from the source that has it,
+before it can be consumed. **The idle skip is KEPT and is asserted in both
+directions**: `zoom/a-wheel-event-repaints` (four wheel events, four distinct
+screenshots) and `zoom/an-idle-frame-is-still-skipped` (0 frames painted over
+1.5 s of nothing), each with its own mutant. Note the corollary for any future
+check here: `readPixels()` forces a render, so it CANNOT see this defect — the
+zoom cells sample the framebuffer with a screenshot.
+
+**THE STEM IS INFERRED FROM THE PETAL LINES, NOT LOADED** (session of Sep 7;
+`plot-stem.js`, `plot-warp.js`). The bloom generator has no stem geometry —
+`below` throws, phase-2 work there — but the grid export already contains what
+a stem is made of: **every u-line starts at z = 0 on the attachment ring**
+(measured on the shipped grid: 280 u-lines, first-point z exactly 0.0000,
+first-point radius 2.2766–5.3400 mm around a 4.275 mm hub). They are already
+gathered. So the stem is those same lines CONTINUED DOWNWARD and pulled in
+toward a bundle — no new object, no second curve stroked beside them, and
+because ~280 lines stack in nearly the same place below the join it reads bright
+under the existing additive blending with nothing told to brighten it. Read
+`plot-stem.js`'s header before touching any of it.
+
+**THE STEM IS THE U-LINES THAT ARE ACTUALLY DRAWN, and that coupling is TOLD
+rather than worked around.** It thins with the u density slider and disappears
+under "v only", where the panel says `no stem drawn — the stem IS the u lines
+continued, and no u line is on screen`. A stem drawn from lines that are not on
+screen would be a second, invisible line set with its own density.
+
+**THE KICKOFF'S THREE TRAPS, AND WHAT ANSWERS EACH** (a funnel that steps
+instead of tapering is a fourth the gate carries alongside them). They are the
+reason this is a module with written-down answers rather than a picture someone
+looked at: a stem that tears at the ring, a droop applied as a rigid rotation, a
+bend that drags the bloom head with it and a stepped funnel ALL still draw a
+plausible flower on a black field.
+
+1. **DROOP IS NOT A RIGID ROTATION.** In `/print` the bloom and the stem are
+   separate meshes on a pivot, so droop turns one rigid object. Here the lines
+   are CONTINUOUS — the head cannot rotate without the stem following — so droop
+   is a rotation whose ANGLE DECAYS along the stem, full at the ring and zero by
+   the end of the neck, and that decay IS the curve that reads as a nodding
+   flower. `neck` is therefore not derivable from `droop`: measured, the same
+   40° head over a 20 mm and a 90 mm neck differ by 16.17 mm at 40 mm down.
+2. **THE HEAD TAKES THE FULL ROTATION AND THE STEM THE WEIGHTED ONE, AND THEY
+   AGREE AT THE RING EXACTLY.** `droopDecay(0, neck)` returns EXACTLY 1 and
+   `convergence(0, join)` EXACTLY 0 — not "to within a tolerance" — so the stem's
+   own s = 0 station evaluates to `rotateAboutRing(foot, centre, droop * 1)`, the
+   same call on the same input as the head transform. The station is written as
+   `foot + delta(s)` and NEVER as `centre + radius * direction`, because the
+   second form does not reproduce the foot bit-for-bit at s = 0 even where it is
+   analytically equal. **Measured: 216 of 216 corners identical to the bit in the
+   gate, and a seam of 0 mm over all 280 drawn lines on the page**, which the
+   panel prints. The head transform reaches EVERY family, not just u: a v-line's
+   row 0 sits on the same ring, so a transform that reached only the u lines
+   would tear the grid at the junction.
+3. **THE BEND IS GATED BY THE CONVERGENCE CURVE AND DROOP IS APPLIED AFTER IT.**
+   `convergence` is 0 at the ring, so a control point cannot drag the head
+   however hard it pulls (measured: a 100 mm pull leaves the ring point identical
+   to the bit while moving the stem 87.4 mm); and because the bend is added
+   BEFORE the rotation, a handle means "displace the stem" rather than fighting
+   the droop it is being rotated by.
+
+**THE BEND MECHANISM IS `plot-warp.js` AND IT IS DELIBERATELY RE-POINTABLE.**
+Everything in it is a function of ONE SCALAR — a station along whatever axis the
+caller owns — so the next thing that wants it (a petal warped along its own `u`)
+needs no rewrite; nothing in it knows what a stem is. A gaussian and not a hat
+or a spline: the sum has to be C-infinity so two handles BLEND rather than kink,
+and a control point is a PULL, not a point the curve must pass through.
+**The width is DERIVED, not a seventh slider** — `sigma = 0.6 x` the mean
+distance to a point's neighbours, so adding a point makes the ones near it a
+local adjustment, which is what adding a control point should do.
+**THE ADD TIE-BREAK IS EXPLICIT, AND THE COMMON CASE IS A TIE.** Three evenly
+spaced points on a 170 mm stem give gaps of 56.666666666666664 and
+56.66666666666667 — equal by construction, one ulp apart as computed — so a bare
+`>` handed the win to the second gap and "add another" subdivided the middle of
+the stem instead of the stretch nearest the head. Measured on the page's own
+defaults; ties now go to the gap nearest the ring.
+
+**THE ROOT IS A MOVABLE POINT LIKE ANY OTHER** — a locked root only makes sense
+for a plant in the ground, and this is a picture. `removeIndex` drops the MIDDLE
+of the list so the two extremes survive; a remove that ate the root would make
+that untrue after one click.
+
+**A HANDLE LANDS UNDER THE POINTER, WHICH TAKES A SOLVE AND NOT A COPY.** The
+drag undoes that station's own share of the droop, subtracts the station's
+resting position, divides by the funnel gate, and subtracts what every OTHER
+control point already contributes there — without that last term the handle
+lands under the pointer plus its neighbours' pull, which reads as a handle
+refusing to follow the mouse. **The gate floors the divisor at 0.1 rather than
+dividing it back out exactly**: the offset still reaches every other station
+through the gaussian tail, where the gate is 1, so an exact inverse would send
+the whole stem flying as a handle approached the ring. A handle inside the funnel
+therefore LAGS the pointer, and the read-out prints its gate.
+
+**THE STATION LADDER IS UNIFORM WITH THE TOP ZONE PACKED, AND THE FIRST ONE
+WAS GRADED AND WRONG.** Two things curve near the ring — the funnel closes over
+the join, the droop washes out over the neck — and one thing curves anywhere: a
+bend point. A single graded ladder (`s = L (j/N)^1.7`, 64 rows) served only the
+first: it put a third of its rows in the top tenth and left the lower stem at
+4.5 mm chords, where six bend points measured **1.15 mm** of corner-cutting —
+about seven pixels at any framing that fits the drawing, and visible on the
+contact sheet's own bend cell. So the BODY is uniform (`BODY_ROWS` 120, the only
+spacing that makes a bend's resolution the same wherever the artist puts it) and
+the TOP ZONE gets `TOP_ROWS` 24 of its own on top, MERGED rather than
+partitioned so neither count depends on the other — which is what keeps a 0.5 mm
+funnel a taper instead of a step. `topZoneOf(length, join, neck)` is the one
+owner of how far down "the top" reaches, and it is the longer of the two.
+144 stations on the shipped defaults, 40,040 stem segments.
+`maxChordSagitta()` measures the corner-cutting and the page PRINTS it:
+**0.000 mm at the defaults, 0.020 mm at a 40° droop, 0.025 mm at 90° into a
+20 mm neck, 0.155 mm at six bend points with three 90 mm pulls**, and 0.576 mm
+at an eight-point 120 mm zigzag — the one setting that can still be seen, and it
+is on the panel rather than hidden.
+
+**THE CAMERA FIT AND THE DEPTH DIM NOW SHARE ONE WALKER.** `eachDrawnPoint()`
+walks every strip in the file at the current droop plus the stem strips that are
+drawn, and both `fitCamera` and the fog's own sphere read it — otherwise a stem
+hanging 170 mm below the head is either off the bottom of the frame or clamped
+past the fog's far plane and drawn black. `viewBounds` is `localBounds` verbatim
+when neither the droop nor the stem has moved anything, so the shipped no-stem
+drawing fades exactly as it did. **A CONTROL STILL NEVER MOVES THE CAMERA** —
+which is why the gate re-frames after turning the stem on, and why its first run
+dragged nothing at all and reported it as a bend that does not move the stem
+(the handle projected to y = 1327 on an 800 px page).
+
+**THE SHIPPED STEM DEFAULTS ARE A STARTING POINT, NOT A RULING.** Unlike the
+DRAW defaults above — which Eva approved on `deploy-preview-182` — nobody has
+turned one of these on a preview yet. Treat them the way `/print`'s fan table
+asks to be treated.
+
+| control | default | what it is |
+|---|---|---|
+| stem | `inferred` | on; `off` draws the grid as the file wrote it |
+| bundle | 0.35 mm | how tightly the lines gather (0–5 mm) |
+| join | 12 mm | how gradually — and therefore the head-to-stem taper |
+| length | 170 mm | total stem length (10–500 mm) |
+| droop | 0° | tips the head about the grid X axis, toward +Y (−120..120°) |
+| neck | 45 mm | how far down the droop washes out (1–300 mm) |
+| bends | 3, at rest | at a third, two thirds and the ROOT; up to 8 |
+| show bend handles | on | you cannot drag what you cannot see |
+
+Two things about that table are open questions rather than decisions: the droop
+direction is a FIXED axis (there is no droop azimuth control, and the six
+controls the brief named do not include one — orbit to see it from another
+side), and at this framing `bundle` 1.60 reads as a tube with bright edges
+rather than as separate strands, which the sheet photographs close up rather
+than tunes around.
+
+**COST: THE FRAME IS TRIVIAL AND THE REBUILD IS WHAT THE STEM ACTUALLY COSTS.**
+0.10 ms median per settled frame with 40,040 stem segments on top of the grid's
+15,148 (worst 0.20), headless software GL, 1100x800 — the same order as the grid
+alone, as the kickoff predicted. The REBUILD, which a slider drag pays on every
+input event, is the number that matters and it was not trivial when first
+measured: **13.5 ms median**, attributed by instrumenting the phases rather than
+guessed — head transform 0.8, stem build 4.4, packing 2.8, and **`computeViewBounds`
+6.6 ms**, more than building the stem. Two fixes, both structural rather than
+tuning:
+* **The bounds walk collected 135,000 numbers into a JS array** to measure the
+  radius in a second pass. Walking twice and allocating nothing costs a third of
+  that.
+* **A STATION'S PLAN IS THE SAME FOR ALL 280 LINES.** The funnel's progress, the
+  droop's decayed angle (with its cosine and sine) and the bend's gated
+  displacement are properties of the STATION, not of the line passing through
+  it — so `stationPlans()` computes them 144 times instead of 40,000, and
+  `stemPointFromPlan` is the one owner of the point arithmetic with
+  `stemPointAt` as the single-station front door onto it. Not a second
+  expression of the law: the front door IS `stemPointFromPlan` on this station's
+  own plan. Stem build 4.4 -> 1.6 ms.
+Rebuild is **9.9 ms median** now, at 144 stations — where 80 body rows would be
+8.5 ms and 160 would be past 12. If a future change makes the rebuild the
+bottleneck again, the next thing to skip is the head transform during a BEND
+drag: the head cannot move then, and re-transforming 16,268 points to prove it
+is the one piece of work that is knowably wasted.
+
+**Verify with `node tools/verify-plot.mjs`** (83 checks). Part one drives the
+shipped `plot-grid.js`, `plot-stem.js` and `plot-warp.js` functions in Node over
+fixtures whose answer is written
 down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
 {0,4,8,9} where 9 survives ONLY as the margin), because on the real grid a
 wrong stride, a wrong family split or a merely plausible fog range all still
-draw a plausible picture. Part two drives the page in a real browser and
+draw a plausible picture — and so do all four of the stem's silent failures.
+**EVERY DRAW CHECK RUNS WITH THE STEM OFF**, which the gate's own `DEFAULTS`
+say, so the ink and segment counts there are the ones /plot shipped and the
+stem cannot hide inside them; two later checks turn it on and require the draw
+controls to still work. Part two drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs eight mutants and is required before quoting
-a pass from a changed harness**; it re-serves broken copies of `plot.js` and
-`plot-grid.js` through the gate's own HTTP server (and imports the broken
-module for part one), and fails if a mutation does not apply, if a check the
-mutant NAMES stays green, or if a check it did not name goes red.
+way. **`--negative-control` runs SEVENTEEN mutants and is required before quoting
+a pass from a changed harness**; it re-serves broken copies of `plot.js`,
+`plot-grid.js`, `plot-stem.js` and `plot-warp.js` through the gate's own HTTP
+server (and imports the broken module for part one — written into the REPO ROOT,
+because `plot-stem.js` imports `./plot-warp.js` and a mutant anywhere else
+resolves that to nothing), and fails if a mutation does not apply, if a check
+the mutant NAMES stays green, or if a check it did not name goes red. The nine
+new ones are the four traps, the two halves of the zoom fix, a stem drawn for
+lines that are not, a locked root, and a bend width that stops coming from the
+neighbours.
 `__plot.settle()` advances OrbitControls until it reports no motion, which is
 what makes a pixel measurement here repeatable at all — a fixed wait samples
 an arbitrary point on the damping curve.
 
-The sheet is `node tools/shot-plot.mjs <dir>` — the two families apart and
+**FOUR THINGS THE STEM CHECKS GOT WRONG ON THEIR FIRST SWEEP, each measured and
+each worth not re-learning:**
+* **A CONTROL NEVER MOVES THE CAMERA, so a check that turns the stem on has to
+  re-frame.** The first run left the camera fitted to the head alone, projected
+  handle 1 to y = 1327 on an 800 px page, dragged nothing at all, and reported
+  it as a bend that does not move the stem.
+* **COMPARING INK ACROSS TWO FRAMINGS MEASURES THE ZOOM.** "The stem adds ink"
+  read 95,314 px without it against 11,569 px with it, because the frame that
+  has to hold a 170 mm stem shrinks the head. The fit happens once, with the
+  stem on, and only the stem is switched.
+* **THE SEAM HAS TO BE COMPARED THROUGH THE SHIPPED BUFFERS.** Both builders
+  write Float32; handing the stem an f64 foot and the head an f32 one compares
+  two roundings of two different inputs and failed 54 of 216 corners on a stem
+  that is exact.
+* **"THE CAMERA DID NOT MOVE" IS STILL NOT OBSERVABLE HERE** — /print's own
+  measured lesson. Damping never reaches exactly zero, so the handle-drag check
+  is a bar only a real orbit can clear: 5.7e-7 of a 343-unit standoff when the
+  drag does not orbit, tens of units when it does.
+
+**The stem has its own sheet: `node tools/shot-plot-stem.mjs <dir>`** — 21
+cells: what ships with the handles hidden and as the page opens it, the bundle
+tight and loose and then CLOSE (at this framing 1.60 mm reads as a tube with
+bright edges, and the strands are only legible zoomed in), droop at 35° and 80°
+seen square on, the SAME 60° head into a 15 mm and a 130 mm neck (the argument
+that the neck is its own control), the join as a pair, length as a pair, four
+bend cells, the v-only coupling, the thinned stem and the panel. Every bend cell
+is a REAL pointer drag on a handle the page itself projected to the screen, and
+every caption carries the measured seam and chord. **The droop is only legible
+from along world X** — it tips the head from grid +Z toward grid +Y, and the
+Z-up correction sends grid +Y to world −Z, so the whole droop lives in the world
+Y–Z plane; the sheet's first run used a mostly-+Z direction and photographed an
+80° droop as a face-on rosette. `tools/shot-plot.mjs` sets `stem: 'off'`, because
+it is the sheet about the grid.
+
+The grid's own sheet is `node tools/shot-plot.mjs <dir>` — the two families apart and
 together at a low camera angle, two density settings, each lever as a pair,
 the drag-and-drop swap actually swapping (a real `File` on a real
 `DataTransfer` through a real dispatched `DragEvent`), the panels, and the
@@ -1855,8 +2089,13 @@ form. That is a bloom parameter. The sheet photographs it and the viewer does
 not compensate for it.
 
 **Out of scope on purpose:** multiple blooms, composition and arrangement;
-stems and buds; print or SVG export; any change to `/print`, the generator, or
-the grid export format.
+LEAVES and buds; print or SVG export; any change to `/print`, the generator, or
+the grid export format. (The STEM is no longer out of scope — see the inferred
+stem above — but it is inferred from the u-lines, not loaded, and nothing about
+leaves follows from it.) Also out of scope this session and named so it is not
+mistaken for an omission: petal selection and per-petal warp, the FRAME panel,
+lock, save, shapes, cut-and-pull and export, and any persistence at all — stem
+settings evaporate on reload, and save lands with the FRAME panel.
 
 **`/plot` EXISTS NOW, SO THE PARKED FLOWER-PETAL-PATH TRIGGER NAMES A REAL
 PAGE.** `docs/bloom-session-28-outcome.md` parked the FLOWER's petal-path
@@ -1865,18 +2104,30 @@ stems or leaves."* That doc could not resolve what `/plot` meant — it noted th
 posing/line-art stage is `/print` and that "whether `/plot` names that or
 something not yet built is not resolved here". **It was something not yet
 built, and this is it.** The ambiguity is closed: the trigger points at this
-page. It has NOT fired — `/plot` draws a bloom grid and nothing else, and
-stems and leaves are out of scope above — but a session that adds them to this
-page owes that investigation first, and what session 28 already established
+page. **IT HAS STILL NOT FIRED, AND THE INFERRED STEM DOES NOT FIRE IT** — the
+trigger is "when /plot needs REAL stems or leaves", and this stem is not one: no
+geometry was loaded, nothing was traced, and the flower's `stemCenterline()` /
+`stemRadiusFn()` were not read. It is the grid's own u-lines continued. A
+session that makes `/plot` load or trace a real stem or a leaf owes that
+investigation first, and what session 28 already established
 (the flower's `stemCenterline()` / `stemRadiusFn()`, `buildTrunkInto` returning
 `{ depth, cl }`, the horizontal-disk cross-sections, the untraced Voronoi and
 strand modes) is in that doc so it is not re-derived.
 
-**NEXT, KNOWN AND NOT STARTED — two items, recorded so they are not
-rediscovered:**
+**NEXT, KNOWN AND NOT STARTED — recorded so they are not rediscovered:**
+0. **THE PETAL WARP, AND `plot-warp.js` IS ALREADY POINTED AT IT.** The bend
+   mechanism was built re-pointable on purpose: it is a function of one station
+   along whatever axis the caller owns, so warping an individual petal along its
+   own `u` needs the axis and the line set, not a rewrite. Three things that
+   session will have to decide and this one deliberately did not: which petal is
+   selected and how, whether a petal's stations are `u` (0..1, as the export
+   tags them) or arc length (they are not the same — the export's own telemetry
+   records `metricMax` reaching 4.12 under cup, so evenly spaced `u` is not
+   evenly spaced mm), and what a bend point's SIGMA means on an axis of length 1.
 1. **A UI overhaul for `/plot`.** The panels are `/print`'s grammar applied
    as-is, which was right for shipping a viewer and is not a considered design
-   for this page.
+   for this page. The STEM panel makes this more pressing, not less: there are
+   now eleven controls in the right-hand column.
 2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
    for the export itself, and it belongs to the GENERATOR, not to this viewer.
    `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
