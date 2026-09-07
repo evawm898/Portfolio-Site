@@ -2066,6 +2066,24 @@ nothing to do with the head turning.
 what makes a pixel measurement here repeatable at all — a fixed wait samples
 an arbitrary point on the damping curve.
 
+**SIX THINGS THE STEM CHECKS GOT WRONG BEFORE THE NEGATIVE CONTROL WAS CLEAN,
+each measured and each worth not re-learning.** The last two were found by the
+control itself, on its second and third passes, and both are the same mistake:
+a check anchored to a number that belongs to a DIFFERENT check, so it reported
+on the reader instead of on itself.
+* **THE RING'S CENSUS BELONGS WITH THE COUNT CHECK, not with the check about
+  the continuation's shape.** `ring.count === the file's u count` sitting in
+  `the-continuation-runs-from-the-foot-to-the-root` made a broken READER look
+  like a broken continuation. It is with the count now — and asserted at THREE
+  densities, which is the claim it was actually there to make: the ring is read
+  off every u-line foot in the file, so thinning the grid does not move where
+  the flower hangs from.
+* **A CHECK MEASURED ON THE V FAMILY HAS NOTHING TO MEASURE WHEN A MUTATION
+  EMPTIES IT.** `the-droop-reaches-every-family` reads the v-only framebuffer,
+  so the reader mutation that calls every strip a u-line legitimately reds it —
+  named on that mutant's list, the same way the two other v-family checks
+  already were.
+
 **FOUR THINGS THE STEM CHECKS GOT WRONG ON THEIR FIRST SWEEP, each measured and
 each worth not re-learning:**
 * **A CONTROL NEVER MOVES THE CAMERA, so a check that turns the stem on has to

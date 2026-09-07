@@ -101,7 +101,11 @@ const MUTANTS = [
              'density/the-v-slider-thins-v-and-leaves-u-alone',
              // The stem is the u-lines continued, so a reader that calls every
              // strip a u-line continues 1092 of them where the file has 280.
-             'stem/every-drawn-u-line-is-continued-and-no-other'],
+             'stem/every-drawn-u-line-is-continued-and-no-other',
+             // And this mutation EMPTIES the v family, so a check measured on
+             // the v family has nothing left to measure — the same reason the
+             // two v-family checks above are on this list.
+             'stem/the-droop-reaches-every-family'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -1206,13 +1210,21 @@ async function run({ mutant = null } = {}) {
     const si = await q(() => window.__plot.stemInfo());
     const dr = await q(() => window.__plot.drawn());
     stemLadder.push({ d, lines: si.lines, uLines: dr.uLines, seg: si.segments,
-                      rows: si.rows });   // rows = STATIONS, so n-1 segments
+                      rows: si.rows,      // rows = STATIONS, so n-1 segments
+                      ringFeet: si.ring ? si.ring.count : -1 });
   }
+  // AND THE RING IS READ OFF EVERY U-LINE FOOT IN THE FILE, not off the ones a
+  // density happens to keep: a stem that moved sideways when the slider thinned
+  // the feet it averages would make the density control decide where the flower
+  // hangs from. That is the same claim as the count, so it lives with it —
+  // anchored to the FILE, one aisle away from the checks that are about shape.
   check('stem/every-drawn-u-line-is-continued-and-no-other',
     stemLadder.every(r => r.lines === r.uLines && r.seg === r.lines * (r.rows - 1))
     && stemLadder[0].lines === fileCensus.census.u
+    && stemLadder.every(r => r.ringFeet === fileCensus.census.u)
     && new Set(stemLadder.map(r => r.lines)).size === 3,
-    stemLadder.map(r => `density ${r.d}: ${r.lines} lines = ${r.uLines} u-lines`).join(' · '));
+    stemLadder.map(r => `density ${r.d}: ${r.lines} lines = ${r.uLines} u-lines`).join(' · ')
+    + ` · the ring holds all ${stemLadder[0].ringFeet} feet at every density`);
 
   await stemOn({ families: 'v' });
   const vStem = await q(() => window.__plot.stemInfo());
@@ -1246,7 +1258,6 @@ async function run({ mutant = null } = {}) {
   await stemOn({ stemDroop: 0, stemLength: 170 });
   await restBends();
   const line0 = await q(() => window.__plot.stemLine(0));
-  const ring0 = (await q(() => window.__plot.stemInfo())).ring;
   const foot0 = (await q(() => window.__plot.headFeet()))[0];
   const nPts = line0.length / 3;
   let descends = true;
@@ -1256,8 +1267,7 @@ async function run({ mutant = null } = {}) {
   // one z — which is true of this grid and is not a property of the law.
   check('stem/the-continuation-runs-from-the-foot-to-the-root',
     line0[0] === foot0[0] && line0[1] === foot0[1] && line0[2] === foot0[2] && descends
-    && Math.abs(line0[(nPts - 1) * 3 + 2] - (foot0[2] - 170)) < 1e-3
-    && ring0.count === fileCensus.census.u,
+    && Math.abs(line0[(nPts - 1) * 3 + 2] - (foot0[2] - 170)) < 1e-3,
     `starts on the foot, ${nPts} stations strictly descending, root at z `
     + `${line0[(nPts - 1) * 3 + 2].toFixed(3)} against its foot's ${foot0[2].toFixed(3)} − 170`);
 
