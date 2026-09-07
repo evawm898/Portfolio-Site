@@ -271,7 +271,25 @@ Sheet results: FILLME_SHEET.
 
 ## Predeclared untouched, verified on the final tree
 
-FILLME_UNTOUCHED
+Named before the first edit and re-verified by `git status --porcelain` at the close: the session
+touched exactly **seven code files** — `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`,
+`tools/bloom-harness.mjs`, `tools/bloom-smoke.mjs`, `tools/diff-bloom-bytes.mjs`,
+`tools/verify-bloom-panel.mjs` — added `tools/shot-bloom-stigma.mjs` and this doc, and edited
+`CLAUDE.md` and `docs/bloom-charter.md`. **Everything else is untouched: 220 tracked files under
+the bloom, flower, print, plot, cards, tracker, `tools/` and `.github/workflows/` trees**, among
+them `bloom.html`, `bloom.css` (the third-level rule already covers a second third-level
+section), `bloom-view-presets.js`, `bloom-grid-gltf.js`, `tools/bloom-crowding.mjs`,
+`tools/bloom-plan-coverage.mjs`, `tools/bloom-solid-angle-coverage.mjs`,
+`tools/verify-bloom-export.mjs`, `tools/verify-bloom-connectedness.mjs`,
+`tools/verify-bloom-grid.mjs`, `tools/verify-bloom-tip-bytes.mjs`,
+`tools/verify-bloom-presentation-only.mjs`, `tools/publish-frozen-tags.sh`, all twenty-two
+`tools/shot-bloom-*.mjs` that existed before this session, and all six
+`.github/workflows/bloom-*.yml`.
+
+**Both STL gates and the connectedness gate are UNTOUCHED**, so the export gate that passed block
+26 is the one that shipped at `eb3543f`; what changed in the harness they import is the tip
+module-load table, `tipSevenClauses`, JG4/JG5/JG6, block 26, `phase19Matrix()` and the
+singular-point exemption in `tipClauses`.
 
 ---
 
@@ -285,7 +303,7 @@ FILLME_UNTOUCHED
 | `verify-bloom-panel.mjs` | **PASS** — 191 ok lines, including the tip family's one-spec clause and both tip witnesses |
 | `verify-bloom-panel.mjs --negative-control` | **all fifteen routes observed their failure**, and the tip family's clause fired on the drifted `stigmaSize` |
 | `bloom-smoke.mjs --check --negative-control` | 50 rows over 22 blocks of 571; **41 families, both directions**; census negative control PASS |
-| `bloom-smoke.mjs` | FILLME_SMOKE |
+| `bloom-smoke.mjs` (50 rows) | **50/50 watertight, identical live/export counts, 0 degenerate** — on the final tree, 270 s; 4 rows CROWDED-flagged (the mum rows, expected) |
 | `shot-bloom-stigma.mjs --quick` | PASS — pair HELD (macro 0 px vs 0), both clamped cells CLAMPED |
 
 **Triangle counts, live = export:** a style at rest with six stamens **14,400**; a shaped
