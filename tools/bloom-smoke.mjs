@@ -456,6 +456,41 @@ export const SMOKE_BLOCKS = [
         path: 'the other direction — hidden AND INERT at a roundedness of exactly 1: JS7 evaluates both laws at the opposite corner of both controls and requires an identical answer (the lattice is the rod\'s own and every factor is Object.is 1), which is the shipping anther\'s whole byte-identity argument' },
     ],
   },
+
+  {
+    n: 26,
+    anchor: 'STIGMA: a style at the shipped trifid x 6 stamens (the tip block\'s own control row)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 30): the branches the
+       stigma's seven add are tipDescriptor()'s SECOND call (the same owner on
+       the style's diameter — a prefix crossed, a field read from the wrong
+       instance), buildStyleInto's lump loop at a count that is not three and
+       at a spread of 0 (the trifid's own coincident corner), and JG4's
+       count-and-aim clauses now read from the descriptor rather than from
+       constants. JG6 is this block's own and every row here carries it.
+
+       WHAT THIS BLOCK IS BLIND TO, stated: the two proportions off their
+       constants (size / elongation are live-matrix rows here — block 25's
+       elongation row carries the two-proportion rebuild on the OTHER tip
+       through the same function, which is the generator's argument and not
+       a substitute for a stigma row), the lattice extremes, the LEANING
+       corner, the 120-anther cushion and the fat style. Cheapest row per
+       path; the FAMILY row is here because it is the one state where both
+       instances are shaped at once. */
+    rows: [
+      { label: 'STIGMA: a TRIANGLE (3 points, sharpness 8, roundedness 0)',
+        path: 'the outline OFF the circle on the STIGMA — JG6 (the descriptor is the seven stigma controls, the two proportions rebuilt from the slab, the lattice law at 12 sides for 3 points, the waist clear of the floor) and JG5 on lobes whose factors are NOT all 1, with JG4\'s census on the lobes\' own lattice' },
+      { label: 'STIGMA: the WAIST FLOOR binding (sharpness min 0.25 at roundedness 0 — CLAMPED, told)',
+        path: 'tipSharpnessFloor\'s CLAMPED arm on the stigma\'s lobe — JG6\'s restated closed form against the owner\'s, the built sharpness above the asked, sharpnessFloored true and underFloor false' },
+      { label: 'STIGMA: ONE lobe at 0° — a pill on the style (the anther\'s own default shape)',
+        path: 'buildStyleInto\'s lump loop at a count of ONE — JG4 with no azimuth step to ask about and the apex clause on a single lobe, JG5 at the Rodrigues identity (spread 0), JG6 holding the count and the aim to the controls' },
+      { label: 'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)',
+        path: 'the trifid\'s own coincident corner — JG4\'s shared-apex biconditional in its COINCIDENT direction, JG6\'s lumpsCoincident flag both ways' },
+      { label: 'STIGMA: THE FAMILY — the same seven on both tips (3-point stars at sharpness 1, roundedness 0, on six anthers and the trifid)',
+        path: 'both instances shaped at once — tipDescriptor() called twice on one state, JS7 and JG6 together in their OFF-THE-CIRCLE arms, JS6 and JG5 on factors that are not all 1, the two lattices each 12 sides; the pair the sheet puts in front of Eva' },
+      { label: 'STIGMA: INERT — the points and the sharpness at their extremes with roundedness 1 (bit-identical to the shipped trifid)',
+        path: 'the other direction — hidden AND INERT at a roundedness of exactly 1 on the stigma: JG6 evaluates both laws at the opposite corner of both controls and requires an identical answer, the trifid\'s whole byte-identity argument for the sharpness default moving from 2.00 to 1.00' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
@@ -482,11 +517,13 @@ export const SMOKE_BLOCKS = [
    prose and is not a family; a code named in a `path` field below is a CLAIM
    about a row, checked AGAINST this roster rather than joining it.
 
-   THE ONE INDIRECTION IT MUST KNOW ABOUT is `tipClauses(tag, ...)` — session
-   26's shared tip clauses, which push under a tag their CALLER names. JG5 is
-   pushed nowhere else, so a scan that saw only `bad.push` would report JG5 as
-   a family the smoke file invents. Any future helper of that shape is one
-   more pattern here.
+   THE INDIRECTIONS IT MUST KNOW ABOUT are `tipClauses(tag, ...)` — session
+   26's shared tip clauses — and `tipSevenClauses(tag, ...)` (session 30, the
+   descriptor-against-controls statement JS7 and JG6 share); both push under
+   a tag their CALLER names. JG5, JS7 and JG6 are pushed nowhere else, so a
+   scan that saw only `bad.push` would report them as families the smoke file
+   invents. Any future helper of that shape is one more alternative in the
+   pattern.
 
    ===================================================================
    WHAT THIS CENSUS DOES NOT COVER, in its own header, because two of the
@@ -515,7 +552,9 @@ export const SMOKE_BLOCKS = [
       claims, and a claim naming a family that does not exist.
    =================================================================== */
 const FAMILY_SITE = /bad\.push\(\s*[`'"]([A-Z]{1,3}\d+[a-z]?)\s*:/g;
-const FAMILY_TAGGED = /tipClauses\(\s*[`'"]([A-Z]{1,3}\d+[a-z]?)[`'"]/g;
+/* Two helpers of that shape now (session 30 added `tipSevenClauses`, JS7's
+   statement shared with JG6): each pushes under the tag its CALLER names. */
+const FAMILY_TAGGED = /tip(?:Seven)?Clauses\(\s*[`'"]([A-Z]{1,3}\d+[a-z]?)[`'"]/g;
 
 /* THROWS if the harness cannot be read, or if the scan comes back empty — a
    roster short a whole file, or an assertion shape that moved, must never
