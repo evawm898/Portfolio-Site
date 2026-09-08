@@ -1125,9 +1125,10 @@ export const SLOT_ROLE_ORDER = [SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL];
    value is clamped into the BASE control's own range so it is always a value
    the base control could itself hold — which keeps every downstream
    invariant, and every gate row's reasoning, inside the proven envelope.
-   `petalTipBreadth` matters most: the tip cap partitions on `=== 0` EXACTLY,
-   so a negative composed breadth would silently leave the pointed family and
-   re-square the tip Eva ruled to a point.
+   `petalTipEnd` matters most: it is the cap's TERMINAL half-width, and a
+   negative composed value would ask the apex to end narrower than the mode
+   floor — which the floor would silently absorb, so the clamp is what keeps a
+   role's tip inside the range its base control could itself hold.
 
    TWO LAWS NOW, AND THE KEY WAS RENAMED WITH THEM. Session A's rows carried
    the control id under a key called `delta`, which was honest while every row
@@ -1179,16 +1180,16 @@ export const ROLE_OVERRIDES = [
      bounds as the INNER trio below; only the role differs. */
   { role: ROLE_ALL, base: 'petalSpineCurl',  control: 'allCurl',       law: 'delta', min: -180, max: 360 },
   { role: ROLE_ALL, base: 'petalCup',        control: 'allCup',        law: 'delta', min: -0.8, max: 1.2 },
-  { role: ROLE_ALL, base: 'petalTipBreadth', control: 'allTipBreadth', law: 'delta', min: 0,    max: 0.6 },
+  { role: ROLE_ALL, base: 'petalTipEnd', control: 'allTipEnd', law: 'delta', min: 0,    max: 0.6 },
   /* LAYER ROLES — session A's three, unchanged in law, range and effect. */
   { role: ROLE_INNER, base: 'petalSpineCurl',  control: 'innerCurl',       law: 'delta', min: -180, max: 360 },
   { role: ROLE_INNER, base: 'petalCup',        control: 'innerCup',        law: 'delta', min: -0.8, max: 1.2 },
-  { role: ROLE_INNER, base: 'petalTipBreadth', control: 'innerTipBreadth', law: 'delta', min: 0,    max: 0.6 },
+  { role: ROLE_INNER, base: 'petalTipEnd', control: 'innerTipEnd', law: 'delta', min: 0,    max: 0.6 },
 
   /* SLOT ROLES — the orchid. Labellum 5, hood 3 (Eva, Sep 2). */
   { role: SLOT_LABELLUM, base: 'petalLength',     control: 'labellumSize',       law: 'mul',   min: 20,   max: 60 },
   { role: SLOT_LABELLUM, base: 'petalWidth',      control: 'labellumSize',       law: 'mul',   min: 8,    max: 30 },
-  { role: SLOT_LABELLUM, base: 'petalTipBreadth', control: 'labellumTipBreadth', law: 'delta', min: 0,    max: 0.6 },
+  { role: SLOT_LABELLUM, base: 'petalTipEnd', control: 'labellumTipEnd', law: 'delta', min: 0,    max: 0.6 },
   { role: SLOT_LABELLUM, base: 'petalTilt',       control: 'labellumTilt',       law: 'delta', min: 0,    max: 75 },
   { role: SLOT_LABELLUM, base: 'petalCup',        control: 'labellumCup',        law: 'delta', min: -0.8, max: 1.2 },
   { role: SLOT_LABELLUM, base: 'petalSpineCurl',  control: 'labellumCurl',       law: 'delta', min: -180, max: 360 },
@@ -1221,13 +1222,15 @@ export const ROLE_OVERRIDES = [
      and it is the one control that can". That is the defining fan gesture and
      the one the outer groups need.
 
-     TIP BREADTH IS DELIBERATELY ABSENT PER-PETAL, recorded so it reads as a
+     THE TIP IS DELIBERATELY ABSENT PER-PETAL, recorded so it reads as a
      decision rather than an oversight: it is ONE ROW IN THIS TABLE AND ONE IN
      THE REGISTRY the day Eva wants it. It is also the control whose absence
-     the supersession ruling costs the fan outright — `labellumTipBreadth` no
-     longer applies under FAN, so until that row exists a fan cannot vary tip
-     breadth per position at all. Stated at both ends, here and at
-     slotRolesEligible.
+     the supersession ruling costs the fan outright — `labellumTipEnd` no
+     longer applies under FAN, so until that row exists a fan cannot vary the
+     tip per position at all. Stated at both ends, here and at
+     slotRolesEligible. (`petalTipShape` has no role twin at all yet, for the
+     same reason the set is trimmed everywhere: it grows on evidence from real
+     use, and one row here plus one in the registry is always the cost.)
 
      SIZE IS TWO ROWS PER GROUP, exactly as `labellumSize` is: one control
      scaling petalLength AND petalWidth, because "size" is both, with the
@@ -1526,7 +1529,7 @@ export function slotRolesEligible(state) {
      WHAT IT COSTS, RULED AND ACCEPTED RATHER THAN OVERLOOKED. The fan loses
      labellum TIP BREADTH entirely, because the per-petal set ships without a
      tip-breadth row (Eva's ruling 2 — spine curl earned that slot instead) and
-     `labellumTipBreadth` no longer applies there. Nothing else is lost: size,
+     `labellumTipEnd` no longer applies there. Nothing else is lost: size,
      tilt, cup and curl all exist per group. It is one row in this table and
      one in the registry the day she wants it back.
 
@@ -1657,10 +1660,11 @@ export function resolveRoleOverrides(state, roles, clampedOut = null) {
   if (out === null) return null;
   /* THE CLAMP, ONCE, AFTER COMPOSITION. Every composed value must be one the
      BASE control could itself hold, so every downstream invariant and every
-     gate row's reasoning stays inside the proven envelope. `petalTipBreadth`
-     matters most: the tip cap partitions on `=== 0` EXACTLY, so a negative
-     composed breadth would silently leave the pointed family and re-square
-     the tip Eva ruled to a point. */
+     gate row's reasoning stays inside the proven envelope. `petalTipEnd`
+     matters most: it is the cap's TERMINAL half-width, and a negative composed
+     value would ask the apex to end narrower than the mode floor — which the
+     floor would silently absorb, so this clamp is what keeps a role's tip
+     inside the range its base control could itself hold. */
   for (const base of Object.keys(out)) {
     const b = OVERRIDE_BOUNDS.get(base);
     const composed = out[base];
@@ -2952,8 +2956,14 @@ export const TIP_CAP_HALF_MM = 0.15;
 export const TIP_CAP_FRACTION = 0.20;
 export const CAP_ENTRY_FACTOR = 2;
 /* Where the foot's width stops floor-ing the blade. Frozen at the
-   placeholder's value — moving it moves every export. */
-const ROOT_BLEND_END = 0.30;
+   placeholder's value — moving it moves every export. EXPORTED since session
+   32 because the apex assertion A5 must not scan below it: the root blend
+   legitimately FALLS to meet the rising core, so a profile whose foot is wider
+   than its blade peak (reachable at foot width 10 mm against petalWidth 8 —
+   4.405 mm against 4.000) shows a rise-after-a-fall at the BASE that is the
+   foot's continuity floor doing its job, not an apex that widens. The gate
+   reads this number rather than restating 0.30. */
+export const ROOT_BLEND_END = 0.30;
 const NU = 28;   // blade rows
 const NV = 10;   // columns across one span
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
@@ -2999,12 +3009,24 @@ const PANEL_OVERLAP_ROWS = 1;
      CORE          the power curve u^a (1-u)^b, a = petalBaseTaper,
                    b = petalTipTaper. Every member of this family is pinched
                    to a point at BOTH ends (w(0) = w(1) = 0 for all a,b > 0),
-                   which is exactly why TIP_PLATEAU has to exist.
-     TIP_PLATEAU   rises from 0 at the widest point to petalTipBreadth of
-                   the max half-width at the tip. The only shipped term that
-                   reaches outside the exponent family — truncate and
-                   rounded tips (rose, poppy) are unreachable without it.
-                   EXACTLY ZERO at its default, so it cannot move a byte.
+                   and it is UNIMODAL — its widest point is a/(a+b), which
+                   reaches 0.833 at the shipped ranges, so obovate and
+                   spatulate silhouettes are the two tapers' own to make.
+
+   THE APEX IS THE CAP, AND IT IS THE ONLY THING BELOW THAT TOUCHES THE TIP.
+   `petalTipEnd` says how broad the blade ends and `petalTipShape` says how it
+   gets there; both live in the cap, which is unconditional.
+
+   RETIRED HERE (session 32, Eva's `blunt` ruling): TIP_PLATEAU, a linear ramp
+   from the widest point to `petalTipBreadth` of the max half-width, combined
+   by `max` with the core. It was the only term that reached outside the
+   exponent family, and the way it did so was a defect rather than a shape:
+   `max`-ing a RISING ramp against a FALLING core puts a waist in the blade and
+   then widens it back out to the tip. Measured across the full shipped taper
+   ranges: 0 of 3,795 (a, b) pairs show a rise-after-a-fall above the peak at
+   breadth 0, and 3,795 of 3,795 do at every breadth above 0 — so the waist was
+   not an edge case, it was the term's signature. The cap below produces 0 of
+   14,364 swept states with one.
 
    CAPABILITY TERM — non-shipping, reachable only through the harness hook
      STALK         a narrow constant below `until`, which also restricts
@@ -3034,11 +3056,18 @@ export function widthProfile(state, ring, halfW, cap, acc) {
      This is the ONE mode-dependent quantity in the silhouette layer, and it
      changes the cap's SHAPE, never its topology — see the cap's own note. */
   const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
+  /* THE APEX'S TWO QUANTITIES (session 32, Eva's `blunt` ruling). `hEnd` is
+     how WIDE the blade ends, floored at the mode floor exactly as the pointed
+     cap's terminal always was; `m` is HOW it gets there. At petalTipEnd 0 the
+     first expression is `Math.max(0, tipFloor)`, which IS tipFloor, and at
+     petalTipShape 1 the interpolant below is the straight lerp character for
+     character — which is what makes the shipping default byte-identical by
+     construction rather than by a tolerance. */
+  const hEnd = Math.max(state.petalTipEnd * halfW, tipFloor);
+  const m = state.petalTipShape;
 
   const terms = [
     { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * core(u) },
-    { name: 'TIP_PLATEAU', from: 0, to: 1,
-      at: (u) => state.petalTipBreadth * halfW * clamp((u - uPk) / (1 - uPk), 0, 1) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -3059,12 +3088,13 @@ export function widthProfile(state, ring, halfW, cap, acc) {
   /* ===================================================================
      THE CONVERGING TIP CAP — Eva's ruling, Sep 1, from the tip sheet.
 
-     THE POINTED FAMILY ONLY. `petalTipBreadth === 0` is the exponent family,
-     which is pinched to zero at the tip by construction; above zero the flat
-     end is an AUTHORED TRUNCATE (rose, poppy) and stays exactly as it was,
-     byte for byte. That split is not a convenience — it is what makes this
-     change's partition sharp: every row at breadth 0 moves, every row above
-     it is bit-identical, asserted both ways.
+     EVERY PETAL, SINCE SESSION 32. The cap was the pointed family's alone
+     while `petalTipBreadth === 0` was an EXACT branch and a positive breadth
+     built a different apex entirely. Eva's `blunt` ruling collapsed that into
+     one construction: the cap is unconditional, it owns the terminal width,
+     and the two families are gone along with the discontinuity between them
+     (the live terminal used to jump 0.150 -> 0.800 mm on the first step off
+     zero) and the C0 corner where the two terms crossed (up to 16.4 deg).
 
      WHAT REPLACES THE STUB. Below the cap the profile is floored at the
      TERMINAL floor rather than the print floor, so it is free to taper; from
@@ -3102,34 +3132,47 @@ export function widthProfile(state, ring, halfW, cap, acc) {
      sits near u = 0.3 and a cleft's two lobes each end at the tip row, so both
      exercise the cap rather than sidestepping it — and the cleft is the
      stronger test, since it caps two panels that must stay on one arc. */
-  const pointed = state.petalTipBreadth === 0;
-  let uCap = 1, hEntry = 0;
-  if (pointed) {
-    /* The crossing of CAP_ENTRY_FACTOR x the print floor, by bisection on
-       (uPk, 1) where the pointed profile is monotone decreasing from halfW to
-       0. Deterministic, so the bytes are reproducible. */
-    const target = CAP_ENTRY_FACTOR * TIP_HALF_MM;
-    let lo = uPk, hi = 1;
-    for (let i = 0; i < 60; i++) {
-      const mid = (lo + hi) / 2;
-      if (shapeAt(mid) > target) lo = mid; else hi = mid;
-    }
-    uCap = Math.min(1 - TIP_CAP_FRACTION, lo);
-    hEntry = Math.max(shapeAt(uCap), rootBlend(uCap), tipFloor);
+  /* THE CAP IS UNCONDITIONAL. There is no longer a pointed family and a
+     truncate family with two different apex constructions and an EXACT branch
+     between them: every petal's apex is this cap, and `hEnd` says how broad
+     its end is. The crossing target scales with the terminal, so a BROAD end
+     starts its cap higher up the blade where the core is still wide enough to
+     reach it — which is what lets one monotone construction span a fine point
+     and a poppy's truncate alike. Bisection on (uPk, 1), deterministic, so
+     the bytes are reproducible. */
+  const target = CAP_ENTRY_FACTOR * Math.max(hEnd, TIP_HALF_MM);
+  let lo = uPk, hi = 1;
+  for (let i = 0; i < 60; i++) {
+    const mid = (lo + hi) / 2;
+    if (shapeAt(mid) > target) lo = mid; else hi = mid;
   }
+  const uCap = Math.min(1 - TIP_CAP_FRACTION, lo);
+  /* Floored at the TERMINAL so the cap can never widen into its own end; the
+     entry is the wider of what the blade actually is there and what the end
+     asks for. */
+  const hEntry = Math.max(shapeAt(uCap), rootBlend(uCap), hEnd);
 
   return {
-    uPk, terms, footHalf, pointed, uCap, tipFloor,
+    uPk, terms, footHalf, uCap, tipFloor,
     /* The cap's entry and terminal half-widths, reported for the gates and
        the contact sheet rather than re-derived by either. */
-    capEntryHalf: hEntry, capTerminalHalf: pointed ? tipFloor : TIP_HALF_MM,
+    capEntryHalf: hEntry, capTerminalHalf: hEnd, capShape: m,
     halfWidthAt(u) {
       const shape = shapeAt(u);
-      if (!pointed) return Math.max(shape, rootBlend(u), TIP_HALF_MM);
       if (u >= uCap) {
         const s = (u - uCap) / (1 - uCap);
-        return hEntry + (tipFloor - hEntry) * s;
+        /* THE APEX CURVE. m = 1 is the straight cone and `g` is EXACTLY `s`
+           — not `1 - (1-s)^1`, which is not s in IEEE-754 for every s. m < 1
+           holds the width into the apex and turns it over late (rounded);
+           m > 1 leaves the entry fast and draws the point out (acuminate). */
+        const g = m === 1 ? s : 1 - Math.pow(1 - s, m);
+        return hEntry + (hEnd - hEntry) * g;
       }
+      /* BELOW THE CAP THE FLOOR IS THE MODE FLOOR, never the terminal. This
+         is measured, not stylistic: flooring the whole blade at `hEnd` forces
+         a broad-tipped petal to have a broad BASE (base/tip 1.00 at a 3 /
+         b 0.6 / end 0.60), which destroys the narrow-base half of spatulate —
+         the silhouette this law was ruled in to preserve. */
       return Math.max(shape, rootBlend(u), tipFloor);
     },
   };
@@ -4067,7 +4110,11 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        would also have silently shadowed the position, since a later key wins
        in an object literal. */
     tipCap: {
-      pointed: profile.pointed,
+      /* NO `pointed` KEY. The cap is unconditional since session 32, so a
+         boolean naming a family that no longer exists would be a label for a
+         computation nobody performs — and both gates read this object. What
+         replaced it is `shape`, the exponent actually used. */
+      shape: profile.capShape,
       uCap: profile.uCap,
       entryHalf: profile.capEntryHalf,
       terminalHalf: profile.capTerminalHalf,

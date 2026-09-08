@@ -210,7 +210,7 @@ const asSet = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String
    the second place it has now been found. */
 const FAN = { placement: 'FAN' };
 /* THE PER-PETAL SET THE TWO DIFFERENTIATED CELLS DRIVE. It is the old LAB set
-   with `labellumTipBreadth` DROPPED, because the per-petal control set ships
+   with `labellumTipEnd` DROPPED, because the per-petal control set ships
    without a tip-breadth row (Eva's ruling 2) — the one capability the
    supersession costs the fan, stated here as an absence a reader can see. */
 const P1 = { petal1Size: '1.6', petal1Tilt: '-25', petal1Cup: '0.5', petal1Curl: '-60' };

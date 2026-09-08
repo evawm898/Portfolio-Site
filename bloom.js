@@ -861,7 +861,7 @@ function allPetalsLine(rings, fr) {
   const said = [];
   if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
   if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
-  if ('petalTipBreadth' in r.overrides) said.push(`tip breadth ${r.overrides.petalTipBreadth.toFixed(2)}`);
+  if ('petalTipEnd' in r.overrides) said.push(`tip end ${r.overrides.petalTipEnd.toFixed(2)}`);
   return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
 }
 

@@ -61,6 +61,10 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
+         /* THE APEX'S TWO MODE FLOORS, imported rather than restated: A4
+            rebuilds the cap's terminal from the state and must floor it at
+            the number the builder actually floors at, in the mode it built. */
+         TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
@@ -1236,32 +1240,87 @@ export async function thicknessAssertions(page, row) {
      reader could find. */
   if (!(th.minEmitted > 1e-3)) bad.push(`minimum emitted sheet ${th.minEmitted} mm is at or below the 1e-3 mm degeneracy bound`);
 
-  /* THE CONVERGING TIP CAP (Eva's ruling, Sep 1). Both directions, like the
-     thickness guard: a pointed row must report a cap that actually converges,
-     and a truncate row must report no cap at all — the second is what makes
-     the byte partition a claim rather than a hope, since every breadth > 0 row
-     must be bit-identical to the pre-ruling tree. */
+  /* ===================================================================
+     THE APEX — A1..A6. Eva's `blunt` ruling (session 32) made the converging
+     cap UNCONDITIONAL and gave it two controls of its own, so the old
+     pointed/truncate biconditional describes nothing any more and is gone
+     with the families it named.
+
+     WHAT REPLACED IT IS STRICTLY STRONGER, and the reason is the retired
+     term's own failure mode: `petalTipBreadth` produced a blade that WAISTED
+     and then widened back out to the tip, on every one of 3,795 taper pairs
+     at every value above zero, and BOTH STL GATES WERE BLIND TO IT — a
+     waisted blade is watertight, one piece, and has an identical triangle
+     count. A5 is the only witness for that class, and it is asserted on every
+     row rather than on the apex rows alone, because the property it defends
+     ("the apex narrows, monotonically, to its end") is what the whole
+     construction is for.
+
+     A4 REBUILDS THE TERMINAL FROM THE STATE rather than reading the
+     descriptor back — C1's discipline. A cap that computed its own terminal
+     wrongly would satisfy every other clause here, because every other clause
+     reads the number the cap itself reported.
+     =================================================================== */
   const tc = m.petalTipCap;
-  if (!tc) bad.push('no tip-cap telemetry reported');
+  if (!tc) bad.push('A1: no tip-cap telemetry reported');
   else {
-    /* THROUGH THE EFFECTIVE STATE TOO, and here it MATTERS rather than being
-       future-proofing: `petalTipBreadth` IS overridable, the tip cap
-       partitions on `=== 0` EXACTLY, and a labellum tip-breadth delta makes
-       descriptor 0's petal leave the pointed family while the row's own value
-       stays 0. Reading the row here would have checked the converging cap
-       against a petal that is an authored truncate. */
-    const wantsPointed = effectiveFor(m, row, 'petalTipBreadth') === 0;
-    if (wantsPointed !== tc.pointed) bad.push(`tip cap: row ${wantsPointed ? 'is' : 'is not'} the pointed family but the builder reports pointed=${tc.pointed}`);
-    if (tc.pointed) {
-      /* CONVERGING, not squared: the entry must be strictly wider than the
-         terminus. The cap-entry rule guarantees at least CAP_ENTRY_FACTOR x
-         the print floor at entry, so in export this is at least 2:1. */
-      if (!(tc.entryHalf > tc.terminalHalf)) bad.push(`tip cap does not converge: entry ${tc.entryHalf} <= terminal ${tc.terminalHalf} — the stub is back`);
-      /* The last emitted row IS the terminus, and it is never zero: a true
-         apex collapses NV columns onto one edge, which is the DOME's bug. */
-      if (Math.abs(tc.lastRowHalf - tc.terminalHalf) > 1e-9) bad.push(`tip cap: last row half-width ${tc.lastRowHalf} is not the terminal ${tc.terminalHalf}`);
-      if (!(tc.lastRowHalf > 0)) bad.push(`tip cap: terminal half-width is ${tc.lastRowHalf} — a true apex, which collapses NV columns onto one edge (the DOME's defect)`);
+    /* THROUGH THE EFFECTIVE STATE, not the row's own value: `petalTipEnd` IS
+       overridable, so a labellum tip delta gives descriptor 0's petal a
+       different terminal from the one the row asked for. Reading the row here
+       would check the cap against a petal that was never built. */
+    const endAsked = effectiveFor(m, row, 'petalTipEnd');
+    const shapeAsked = effectiveFor(m, row, 'petalTipShape');
+
+    /* A1 — THE CAP IS UNCONDITIONAL AND NEVER WIDENS. Entry >= terminal, with
+       equality only where the blade at the cap entry is already no wider than
+       the end asked for (the parallel-stub corner, reachable at a broad end on
+       a narrow petal). A cap that widened would be the retired plateau back. */
+    if (!(tc.entryHalf >= tc.terminalHalf)) bad.push(`A1: the cap widens — entry ${tc.entryHalf} < terminal ${tc.terminalHalf}`);
+    /* A2 — THE LAST EMITTED ROW IS THE TERMINUS. Not approximately: the row
+       the builder emitted must BE the terminal the profile declared. */
+    if (Math.abs(tc.lastRowHalf - tc.terminalHalf) > 1e-9) bad.push(`A2: last row half-width ${tc.lastRowHalf} is not the terminal ${tc.terminalHalf}`);
+    /* A3 — NEVER A TRUE APEX. Collapsing NV columns onto one edge is the
+       retired centre dome's own bug: 48 degenerate triangles from
+       `cos(PI/2) !== 0`, passing the gated criterion while being wrong. */
+    if (!(tc.lastRowHalf > 0)) bad.push(`A3: terminal half-width is ${tc.lastRowHalf} — a true apex, which collapses NV columns onto one edge (the retired DOME's defect)`);
+    /* A4 — THE TERMINAL IS THE ONE THE STATE ASKS FOR, rebuilt here from the
+       petal's own width and the mode floor rather than read off the cap. */
+    const halfW = effectiveFor(m, row, 'petalWidth') / 2;
+    const floor = tc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
+    const wantTerminal = Math.max(endAsked * halfW, floor);
+    if (Math.abs(tc.terminalHalf - wantTerminal) > 1e-9)
+      bad.push(`A4: terminal ${tc.terminalHalf} mm is not max(petalTipEnd ${endAsked} x halfW ${halfW}, floor ${floor}) = ${wantTerminal}`);
+    /* A5 — THE APEX NARROWS MONOTONICALLY. The retired plateau's signature was
+       a rise after a fall above the widest point; nothing in the new law can
+       produce one, and this is what says so on every row rather than in a
+       header. Foot rows are excluded: the root blend legitimately falls to
+       meet the rising core at the BASE, which is not an apex feature. */
+    const prof = m.petalProfile;
+    if (Array.isArray(prof) && prof.length > 4) {
+      /* THE SCAN STARTS ABOVE THE ROOT BLEND, and that is measured rather than
+         cautious. `prof` includes the foot rows, where the foot-continuity
+         floor FALLS to meet the rising core — so on a petal whose foot is
+         wider than its blade peak (reachable: foot width 10 mm against
+         petalWidth 8 puts 4.405 mm at row 0 against a 4.000 mm blade) the
+         global maximum lands on the foot and the ordinary rising core above it
+         reads as a widening. That is the base doing its job, not an apex. The
+         start is `max(uCap, ROOT_BLEND_END)`: uCap alone is not enough, since
+         it falls as low as 0.0698 on the parallel-stub corner. */
+      const uOf = (i) => (i + 1) / prof.length;
+      const from = Math.max(tc.uCap, ROOT_BLEND_END);
+      let peak = -1;
+      for (let i = 0; i < prof.length; i++) if (uOf(i) >= from && (peak < 0 || prof[i] > prof[peak])) peak = i;
+      let fell = false, rose = -1;
+      for (let i = peak + 1; i >= 1 && i < prof.length; i++) {
+        if (prof[i] < prof[i - 1] - 1e-9) fell = true;
+        else if (prof[i] > prof[i - 1] + 1e-9 && fell) { rose = i; break; }
+      }
+      if (rose >= 0) bad.push(`A5: the blade WIDENS at row ${rose} (u ${uOf(rose).toFixed(3)}: ${prof[rose - 1].toFixed(4)} -> ${prof[rose].toFixed(4)} mm) after narrowing past its widest row above u ${from.toFixed(3)} — the retired TIP_PLATEAU's waist is back`);
     }
+    /* A6 — THE SHAPE EXPONENT IS THE ONE THE STATE ASKS FOR. The cap reports
+       the exponent it used; a build that silently held it at 1 would pass
+       A1-A5 on every row and make the whole control inert. */
+    if (!Object.is(tc.shape, shapeAsked)) bad.push(`A6: the cap built at exponent ${tc.shape}, the effective state asks ${shapeAsked}`);
   }
 
   /* THE FOOT IS THE PROFILE WHERE THE PROFILE IS THE IDENTITY. u = 0 gives
@@ -2219,7 +2278,7 @@ export async function zygoAssertions(page, row) {
         bad.push(`Z2: descriptor ${i} (${rolesOf(r).join('+')}) was built with ${base} = ${got}, but ${r.overrides && base in r.overrides ? `its own record says ${wantV}` : `the base state says ${wantV} and it carries no override for it`} — a record that never reaches the blade exports watertight, in one piece, at an identical triangle count, and passes every other check here`);
       }
       /* (iv) THE CLAMP ACTUALLY CLAMPED. A composed value must be one the
-         base control could itself hold; `petalTipBreadth` matters most,
+         base control could itself hold; `petalTipEnd` matters most,
          because the tip cap partitions on `=== 0` EXACTLY and a negative
          composed breadth would silently re-square the tip Eva ruled to a
          point. A size MULTIPLIER makes this reachable in ordinary use rather
@@ -3462,8 +3521,8 @@ export function buildMatrix() {
         has no preset machinery yet, and inventing one here would be a
         second source of truth for authored values. */
   for (const [name, sets] of [
-    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
-    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipEnd: 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipEnd: 0.5 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
@@ -3567,7 +3626,7 @@ export function buildMatrix() {
   }
 
   /* 5c. THE CONVERGING TIP CAP's named rows (Eva's ruling, Sep 1). The four
-        FORM corners already sit at petalTipBreadth 0, so they exercise the cap
+        FORM corners already sit at petalTipEnd 0, so they exercise the cap
         for free — but "for free" is exactly the coverage that disappears the
         moment a default moves, which is the lesson the centre rig cost. These
         are explicit, and each is one question:
@@ -3584,11 +3643,26 @@ export function buildMatrix() {
           x ALL THIN               the new cap on the thinnest sheet, where the
                                    terminal face is smallest in both modes. */
   for (const [name, sets] of [
-    ['TIP: pointed × roll max', { petalRoll: 330 }],
-    ['TIP: pointed × twist max', { petalTwist: 180 }],
-    ['TIP: pointed × taper max (floor dominates)', { petalTipTaper: 4 }],
-    ['TIP: truncate (breadth max) — must NOT converge', { petalTipBreadth: 0.6 }],
-    ['TIP: pointed × ALL THIN', { ...ALL_THIN }],
+    ['APEX: fine end × roll max', { petalRoll: 330 }],
+    ['APEX: fine end × twist max', { petalTwist: 180 }],
+    ['APEX: fine end × taper max (the floor dominates)', { petalTipTaper: 4 }],
+    ['APEX: broad end (max) — the cap now converges to it, it does not square off', { petalTipEnd: 0.6 }],
+    /* THE APEX'S OWN BLOCK (session 32). The cap is unconditional, so what
+       needs rows is the SPACE the two controls open, not a partition between
+       two constructions. Every one of these was unreachable before the ruling. */
+    ['APEX: rounded (shape min) at the fine end', { petalTipShape: 0.35 }],
+    ['APEX: drawn out (shape max) at the fine end', { petalTipShape: 3.5 }],
+    ['APEX: a ROUNDED TRUNCATE — the poppy, and the state no shipped control could reach', { petalTipEnd: 0.3, petalTipShape: 0.5 }],
+    ['APEX: broad end × rounded, both at maximum', { petalTipEnd: 0.6, petalTipShape: 0.35 }],
+    ['APEX: broad end × drawn out (the cap runs long into a wide terminal)', { petalTipEnd: 0.6, petalTipShape: 3.5 }],
+    /* SPATULATE — the silhouette the retired term produced by WAISTING the
+       blade, now made by its proper owners (the two tapers put the widest
+       point at a/(a+b) = 0.833) with a broad end on top. A5 asserts this row
+       narrows monotonically, which the retired construction never did. */
+    ['APEX: SPATULATE — narrow base (taper 3/0.6, widest at 0.83) × broad end', { petalBaseTaper: 3, petalTipTaper: 0.6, petalTipEnd: 0.6 }],
+    ['APEX: the parallel-stub corner — broad end on the narrowest petal (entry == terminal)', { petalWidth: 8, petalTipEnd: 0.6, petalTipTaper: 4 }],
+    ['APEX: both apex controls × ALL THIN (the mode floor and the terminal interact)', { ...ALL_THIN, petalTipEnd: 0.6, petalTipShape: 0.35 }],
+    ['APEX: fine end × ALL THIN', { ...ALL_THIN }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
@@ -3794,7 +3868,7 @@ export function buildMatrix() {
          positive delta, base cup likewise. Saturating is the intended
          behaviour and the row says the export survives it.
 
-         THE TIP PARTITION CORNER IS THE SUBTLE ONE. `petalTipBreadth === 0`
+         THE TIP PARTITION CORNER IS THE SUBTLE ONE. `petalTipEnd === 0`
          is an EXACT branch — the pointed tip cap Eva ruled on — so a bloom
          with breadth 0 at the outer whorl and a positive delta at the inner
          one carries BOTH tip constructions at once, a state no single-whorl
@@ -3805,7 +3879,7 @@ export function buildMatrix() {
          has been reachable since session 5 and unreported; a zygomorphic
          bloom is simply the fastest way to notice it. */
   const IRIS = { layerCount: 2, petalSpineCurl: -90, innerCurl: 180, innerCup: 0.4, layerTilt: 30, petalTilt: 40 };
-  const ALL_INNER_MAX = { innerCurl: 360, innerCup: 1.2, innerTipBreadth: 0.6 };
+  const ALL_INNER_MAX = { innerCurl: 360, innerCup: 1.2, innerTipEnd: 0.6 };
   const zygoCorners = [
     ['ZYGO: THE IRIS (falls curl down, standards rise)', { ...IRIS }],
     ['ZYGO: 2 layers x ALL INNER MAX', { layerCount: 2, ...ALL_INNER_MAX }],
@@ -3818,8 +3892,8 @@ export function buildMatrix() {
     ['ZYGO: curl clamp binds (base 360 + delta 360 -> 360)', { layerCount: 2, petalSpineCurl: 360, innerCurl: 360 }],
     ['ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)', { layerCount: 2, petalCup: 1.2, innerCup: 1.2 }],
     ['ZYGO: curl clamp binds downward (base -180 + delta -180 -> -180)', { layerCount: 2, petalSpineCurl: -180, innerCurl: -180 }],
-    ['ZYGO: the tip partition, both ways in one bloom (outer pointed, inner truncate)', { layerCount: 2, petalTipBreadth: 0, innerTipBreadth: 0.6 }],
-    ['ZYGO: the tip partition inverted (outer truncate, inner more so)', { layerCount: 2, petalTipBreadth: 0.6, innerTipBreadth: 0.6 }],
+    ['ZYGO: two different apex terminals in one bloom (outer fine, inner broad)', { layerCount: 2, petalTipEnd: 0, innerTipEnd: 0.6 }],
+    ['ZYGO: both whorls broad, the inner clamped at the base range max', { layerCount: 2, petalTipEnd: 0.6, innerTipEnd: 0.6 }],
     ['ZYGO: the iris x SPIRAL (roles exist, azimuth differs)', { ...IRIS, placement: 'SPIRAL' }],
     ['ZYGO: GATED — CONTINUOUS x 3 turns x ALL INNER MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', layerCount: 3, ...ALL_INNER_MAX }],
     ['ZYGO: GATED — CONTINUOUS x 1 turn x ALL INNER MAX (hidden, and must be inert)', { placement: 'CONTINUOUS', ...ALL_INNER_MAX }],
@@ -3858,8 +3932,8 @@ export function buildMatrix() {
 
   /* THE ORCHID ITSELF — the headline, and the form the session was opened on:
      a big low labellum, a raised hood, the laterals left alone. */
-  const ORCHID = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60, labellumTipBreadth: 0.25, hoodSize: 1.15, hoodTilt: 40, hoodCup: -0.3 };
-  const ALL_SLOT_MAX = { labellumSize: 2, labellumTipBreadth: 0.6, labellumTilt: 75, labellumCup: 1.2, labellumCurl: 360, hoodSize: 2, hoodTilt: 75, hoodCup: 1.2 };
+  const ORCHID = { labellumSize: 1.6, labellumTilt: -25, labellumCup: 0.5, labellumCurl: -60, labellumTipEnd: 0.25, hoodSize: 1.15, hoodTilt: 40, hoodCup: -0.3 };
+  const ALL_SLOT_MAX = { labellumSize: 2, labellumTipEnd: 0.6, labellumTilt: 75, labellumCup: 1.2, labellumCurl: 360, hoodSize: 2, hoodTilt: 75, hoodCup: 1.2 };
   const ALL_SLOT_MIN = { labellumSize: 0.5, labellumTilt: -75, labellumCup: -0.8, labellumCurl: -180, hoodSize: 0.5, hoodTilt: -75, hoodCup: -0.8 };
   /* EVERY ROW BELOW THAT DOES NOT NAME ITS OWN DEPTH IS AT TWO WHORLS IN STEP
      (`IN_STEP` first, so a row that names a depth or a phase keeps its own).
@@ -3900,8 +3974,8 @@ export function buildMatrix() {
     /* THE TIP PARTITION, BOTH WAYS IN ONE BLOOM — the labellum leaves the
        pointed family while its neighbours converge, so one export carries two
        different tip constructions. */
-    [inStep('SLOT: the tip partition both ways (labellum truncate, laterals pointed)'), { ...IN_STEP, labellumTipBreadth: 0.6 }],
-    [inStep('SLOT: the tip partition inverted (base truncate, labellum more so)'), { ...IN_STEP, petalTipBreadth: 0.6, labellumTipBreadth: 0.6 }],
+    [inStep('SLOT: two different apex terminals in one whorl (labellum broad, laterals fine)'), { ...IN_STEP, labellumTipEnd: 0.6 }],
+    [inStep('SLOT: both broad, the labellum clamped at the base range max'), { ...IN_STEP, petalTipEnd: 0.6, labellumTipEnd: 0.6 }],
     /* THE CURL CLAMP, which is what the labellum curl delta reaches. */
     [inStep('SLOT: curl clamp binds downward (base -180 + delta -180 -> -180)'), { ...IN_STEP, petalSpineCurl: -180, labellumCurl: -180 }],
     /* THE ONE-WHORL ORCHID, RETIRED (Eva, Sep 3) — GATED rows. Slot roles
@@ -4216,7 +4290,7 @@ export function buildMatrix() {
          with a per-petal group on the fan ("the group, then the petal"), the
          other one-whorl placements, and the GATED rows above one whorl where
          the group is the INNER whorl's and these must be inert. */
-  const ALL_MAX = { allCurl: 360, allCup: 1.2, allTipBreadth: 0.6 };
+  const ALL_MAX = { allCurl: 360, allCup: 1.2, allTipEnd: 0.6 };
   const ALL_MIN = { allCurl: -180, allCup: -0.8 };
   for (const [name, sets] of [
     ['ALL PETALS: max (curl +360, cup +1.20, tip +0.60)', { ...ALL_MAX }],
@@ -4224,14 +4298,14 @@ export function buildMatrix() {
     ['ALL PETALS: max x petalCount 3 x ALL THIN x spread min', { ...ALL_MAX, petalCount: 3, ...ALL_THIN, spread: 0.6 }],
     ['ALL PETALS: max x petalCount 40 x ALL THIN x spread min', { ...ALL_MAX, petalCount: 40, ...ALL_THIN, spread: 0.6 }],
     ['ALL PETALS: min x petalCount 3 x ALL THIN x spread min (every petal folds under)', { ...ALL_MIN, petalCount: 3, ...ALL_THIN, spread: 0.6 }],
-    ['ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2, tip 0.6+0.6 — every clamp binds)', { ...ALL_MAX, petalSpineCurl: 360, petalCup: 1.2, petalTipBreadth: 0.6 }],
+    ['ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2, tip 0.6+0.6 — every clamp binds)', { ...ALL_MAX, petalSpineCurl: 360, petalCup: 1.2, petalTipEnd: 0.6 }],
     ['ALL PETALS: min x base curl and cup at min (-180 + -180 -> -180)', { ...ALL_MIN, petalSpineCurl: -180, petalCup: -0.8 }],
     ['ALL PETALS: max x FAN 3/side toggle ON x petal 1 max (the group, then the petal)', { ...FAN_ON, ...ALL_MAX, ...PETAL1_MAX }],
     ['ALL PETALS: max x CONTINUOUS 1 turn (one sequence is one whorl)', { placement: 'CONTINUOUS', ...ALL_MAX }],
     ['ALL PETALS: max x SPIRAL', { placement: 'SPIRAL', ...ALL_MAX }],
     ['ALL PETALS: GATED — max x 2 layers (hidden above one whorl, and must be inert; Inner is the group there)', { ...ALL_MAX, layerCount: 2 }],
     ['ALL PETALS: GATED — max x 3 layers x phase 0 x ORCHID (inert beside a live orchid)', { ...ALL_MAX, layerCount: 3, layerPhase: 0, ...ORCHID }],
-    ['ALL PETALS: GATED — max x Inner max x 2 layers (only the Inner trio applies)', { ...ALL_MAX, layerCount: 2, innerCurl: 360, innerCup: 1.2, innerTipBreadth: 0.6 }],
+    ['ALL PETALS: GATED — max x Inner max x 2 layers (only the Inner trio applies)', { ...ALL_MAX, layerCount: 2, innerCurl: 360, innerCup: 1.2, innerTipEnd: 0.6 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
@@ -6481,7 +6555,7 @@ export function phase3Matrix() {
   /* Frozen ranges — the values these controls carried at 6626961. */
   const RANGE = {
     petalCount: [3, 40], petalLength: [20, 60], petalWidth: [8, 30], petalTilt: [0, 75],
-    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], petalTipBreadth: [0, 0.6], spread: [0.6, 6],
+    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], 'petalTipBreadth': [0, 0.6], spread: [0.6, 6],
   };
   const SPREAD_DEFAULT = 2;
   const CENTER = {
@@ -6499,8 +6573,8 @@ export function phase3Matrix() {
     rows.push({ label: `${id} max (${RANGE[id][1]})`, set: [{ id, value: String(RANGE[id][1]) }] });
   }
   for (const [name, sets] of [
-    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
-    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, 'petalTipBreadth': 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, 'petalTipBreadth': 0.5 }],
   ]) rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
 
   for (const style of STYLES_F) {
@@ -11497,7 +11571,7 @@ export function phase4Matrix() {
   /* Frozen ranges — the values these controls carried at 3c542fb. */
   const RANGE = {
     petalCount: [3, 40], petalLength: [20, 60], petalWidth: [8, 30], petalTilt: [0, 75],
-    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], petalTipBreadth: [0, 0.6],
+    petalBaseTaper: [0.3, 3], petalTipTaper: [0.6, 4], 'petalTipBreadth': [0, 0.6],
     petalCup: [-0.8, 1.2], petalSpineCurl: [-180, 360], petalRoll: [-330, 330], petalTwist: [-180, 180],
     spread: [0.6, 6],
   };
@@ -11519,8 +11593,8 @@ export function phase4Matrix() {
     rows.push({ label: `${id} max (${RANGE[id][1]})`, set: [{ id, value: String(RANGE[id][1]) }] });
   }
   for (const [name, sets] of [
-    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }],
-    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }],
+    ['ROSE-ish (obovate, broad tip)', { petalBaseTaper: 2, petalTipTaper: 1.1, 'petalTipBreadth': 0.3 }],
+    ['POPPY-ish (orbicular, truncate)', { petalBaseTaper: 0.6, petalTipTaper: 0.7, 'petalTipBreadth': 0.5 }],
   ]) rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
 
   for (const style of CENTRE_STATES_F) {

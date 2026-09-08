@@ -120,7 +120,7 @@ const numbers = (m) => {
     ? `<br>tip end: the FLOORED STUB — TIP_HALF_MM clamps every row in both modes, so the last rows run parallel at ${(2 * 0.8).toFixed(2)} mm and are capped square`
     : tc.pointed
       ? `<br>tip end: CONVERGING from ${(2 * tc.entryHalf).toFixed(2)} mm at u=${tc.uCap.toFixed(2)} to a ${(2 * tc.terminalHalf).toFixed(2)} mm face (live) · ${(2 * 0.8).toFixed(2)} mm printed`
-      : `<br>tip end: AUTHORED TRUNCATE (tip breadth > 0) — flat by choice, not by floor; bit-identical to the pre-ruling tree`;
+      : `<br>tip end: a BROAD TERMINAL (petalTipEnd > 0) — the cap converges to it; since session 32 this is the same construction as the fine tip, at a wider end`;
   return `${sheet} · ${tip}`
     + `<br>foot ${m.ringWidth.toFixed(2)} × ${m.ringThickness.toFixed(2)} mm`
     + `${m.ringWidthClamped ? ` (width CLAMPED at the assumed ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm floor)` : ''}`
@@ -265,7 +265,7 @@ const tipRuling = [];
       note: 'The cap enters where the profile falls to twice the print floor (or the final fifth, whichever is later) and converges linearly to the terminal face. Live reaches 0.30 mm; export floors it at 1.60 mm and still converges at least 2:1. The apex is an explicitly truncated mini-face, NOT a true apex vertex: a true apex collapses NV columns onto one edge, which is the DOME cos(PI/2) defect, and it would also make live and export different meshes — a property the export gate now rates.',
     }));
     tipRuling.push(await cell({
-      label: 'HELD — the authored truncate (breadth 0.60)', set: set({ petalTipBreadth: 0.6 }), views: ['tip', 'tipface', 'whorl'],
+      label: 'A BROAD TERMINAL (tip end 0.60)', set: set({ petalTipEnd: 0.6 }), views: ['tip', 'tipface', 'whorl'],
       note: 'The other side of the partition. Above breadth 0 the flat end is a CHOSEN shape (rose, poppy), not a floor artifact, so it is untouched and bit-identical to the pre-ruling tree. Every row here must hold while every pointed row moves — asserted both ways.',
     }));
   }

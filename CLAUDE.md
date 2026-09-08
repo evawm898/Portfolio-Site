@@ -564,53 +564,61 @@ whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheet
 `tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
 positions of the travel on two-row scaffolding).
 
-**THE PETAL APEX IS A STRAIGHT CONE OR A FLAT TRUNCATE, ROUND IS UNREACHABLE, AND PETAL TIP
-SHAPE IS PARKED ON A RULING** (session 32, PHASE A ONLY — read
-`docs/bloom-session-32-outcome.md` before touching the apex). **No shipped source moved**; the
-session added one discovery sheet and stopped, because it was told to build only if exactly ONE
-mechanism survived costing and two did. The findings are facts about `main` whatever Eva rules.
-`uCap = min(1 - TIP_CAP_FRACTION, crossing)` and TIP_CAP_FRACTION is 0.20, so **`uCap <= 0.80`
-ALWAYS** — the converging cap owns at least the last 20% of every pointed petal (6 of 28 blade
-rows, 7.00 mm of a 35 mm petal) and inside it the half-width is a straight LERP (measured:
-constant −0.1422 mm differences at tip taper 4). **The two tapers set how WIDE the cone starts
-and nothing sets its curve**; above `petalTipBreadth === 0` there is no cap at all.
-**`petalTipBreadth` IS A TERMINAL-WIDTH CONTROL WITH UNTOLD DEAD TRAVEL** — the plateau is
-floored by `TIP_HALF_MM`, so 0.01–0.10 is one bit-identical tip at petal width 16 (10 of 60
-steps; 20 of 60 at width 8), width-dependent so no static range is dead-free, and told NOWHERE
-(the `stamenSpread` situation, unfixed). Above the floor it does not truncate, it makes the
-blade WIDEN toward the tip by 28–61% — spatulate, with the 16.4° corner the silhouette sheet
-already photographed as THE KINK. **ONE EXPONENT CANNOT SERVE BOTH CONSTRUCTIONS**: `1-(1-s)^m`
-rounds the cap at m<1 and DEEPENS the truncate's waist at the same value (1.753 → 1.126 mm,
-kink 6.7° → 10.3°) — a control running backwards from its label over half its domain, session
-31's own retired defect. The two survivors are `cap` (the exponent, additive, gated on breadth
-0, **0 rows move**) and `blunt` (the cap made unconditional owning its own terminal, superseding
-tip breadth: **71 of 572 live rows name a tip-breadth id and 66 set one non-zero, identically in
-`frozen/phase20`**, four ids retired, a phase owed). Both are byte-identical at their identity
-(16,704 and 2,088 half-widths, 0 differ, `Object.is`), so **0 moved is available to phase B as a
-construction either way**. The sheet is `node tools/shot-bloom-apex.mjs <dir> [--rows a,b]
-[--quick]`, which patches the candidate laws into `bloom-geometry.js` IN FLIGHT through
-`page.route()` (six substitutions, each asserted to match exactly once) rather than shipping
-them — the winner becomes a real control with gate rows at the ruling, the loser is deleted with
-that tool's candidate table. **ITS WHOLE-BLADE FRAMING IS BIMODAL AND CARRIES NO PIXEL BOUND,
-and this is the sharpest demonstration of that in the project**: the IDENTITY comparison —
-between two builds proved bit-identical to the float in Node before any browser opened — read
-**0 px on one run of this sheet and 7,036 px on the next**, same tool, same tree, same camera.
-The face-on control over 14 rows was [0 ×10, 7255, 15507, 15795, 16033]; an earlier pass read
-7,034/7,122 under a two-frame settle and 6,461/22,311 under a three-frame one, so settling made
-it WORSE, and a probe proved the framing inputs bit-identical across three page sessions, so it
-is not the camera. **The tip crop read 0 px on all 14 observations and both identity cells
-differ from today by EXACTLY 0 px there** — an identity, not a threshold, so it stands unhedged.
-**AND THE PICTURES SAID SOMETHING THE NUMBERS DID NOT:** `cap` at its roundest (m 0.35, a 0.150
-mm terminal) reads as a FACETED GABLE, not a curve — six rows in the cap and nowhere to draw one
-— while `blunt` at end 0.30 / m 0.50 reads as a genuine poppy. **A shoulder turning through 2.4
-mm of half-width can be drawn and one turning through 0.15 mm cannot, so at this row count the
-broad end is what makes roundness legible at all** — an argument for `blunt` that neither the
-costing nor the sweep produced. If a true round apex at a NARROW terminal is ever wanted, the
-lever is `NU` in the cap, not the exponent, and every frozen matrix depends on `NU`. **The upstream contract
-for the lobe session is in §5 of that doc**: `widthProfile()` stays the one owner of the apex,
-`[uCap, 1]` is the whole-petal apex region and is READ from the profile rather than re-spliced,
-no second round-to-pointed axis on the whole-petal apex, and the `u = 1` mini-face is never
-collapsed. Say PETAL TIP SHAPE or LOBE TIP SHAPE, never "tip shape".
+**THE APEX IS ONE UNCONDITIONAL CAP WITH TWO CONTROLS, AND `petalTipBreadth` IS RETIRED**
+(Eva's `blunt` ruling, session 32 — read `docs/bloom-session-32-outcome.md` before touching any
+of it). Phase A costed seven mechanisms, two survived, and it stopped at a sheet; **the ruling
+turned on the pictures, not the row count** — `cap`, the cheaper survivor, could not deliver a
+round apex at all, because six rows in the cap is a shoulder turning through 0.15 mm and the
+sheet reads it as a FACETED GABLE. A control that appears to do a thing and does not is the dead
+sharpness slider again, and **zero rows moved for a control that lies is the more expensive
+option**. `petalTipEnd` (0–0.6, default 0) is how BROAD the blade ends; `petalTipShape`
+(0.35–3.5, default 1.00) is HOW it gets there — 1.00 straight, below rounded, above drawn out.
+**TWO controls, not one dial**, because a rounded shoulder is only legible at a broad end, so
+round and broad must be reachable together AND apart; one control coupling them is session 31's
+own retired defect. `TIP_PLATEAU` is gone with the four retired ids (`petalTipBreadth` +
+`allTipBreadth` / `innerTipBreadth` / `labellumTipBreadth`, replaced by `*TipEnd`).
+**WHAT THE RETIRED TERM ACTUALLY DID, measured**: `max`-ing a RISING ramp against a FALLING core
+put a WAIST in the blade and widened it back out — 0 of 3,795 taper pairs show a rise-after-a-fall
+above the peak at breadth 0, **3,795 of 3,795** at every breadth above it, and **0 of 3,795**
+under the new law. **SPATULATE IS NOT LOST, it moved to its proper owner**: `uPk = a/(a+b)`
+reaches 0.833, giving a widest/base ratio of 4.94x at a 3.00 / b 0.60 / end 0.60 — Eva made the
+build conditional on confirming that, and **the confirm found a defect in the session's own
+draft**: flooring the whole blade at the terminal forces a broad tip to have a broad BASE
+(base/tip 1.00), so below the cap the floor stays the MODE floor and the comment at that line
+says why. **0 moved is a CONSTRUCTION** (`Math.max(0 × halfW, tipFloor)` IS the floor; the
+interpolant's `m === 1` arm returns `s` itself, not `1 - (1-s)^1`, which is not `s` in
+IEEE-754): 12,180 half-widths + every cap field, 0 differ under `Object.is`, plus 522 on the
+claw rows — and photographed at **0 px on both framings** against a 7,036 px same-tree control.
+**A1–A6 is the new family** (`bad.push('A…')` in both STL gates), and it exists because **both
+STL gates were blind to the waist for that control's whole life** — a waisted blade is
+watertight, one piece, at an identical triangle count. A5 (the apex narrows monotonically) is
+its only witness and runs on EVERY row; A4 rebuilds the terminal from the STATE, A6 catches a
+shape silently held at 1. **THE DEAD-CONTROL SWEEP**: `petalTipShape` has NO dead steps at any
+width in either mode and its default makes nothing inert; `petalTipEnd` has **1 dead step of 61
+in live** at the default width (against the retired control's 10) and 10 in EXPORT, where the
+floor is the PRINT floor doing its job — TOLD in the read-out keyed to the shown build, and a
+low-end track tick is costed (`/plot`'s `.plot-track--dead` is the pattern) but not built.
+**THE PARTITION IS 45 movers / 26 inert / 500 holders on `frozen/phase20`**, predeclared by
+evaluating each replacement control's own registry predicate per row — **a correction to phase
+A's "66", which counted NAMING: 21 of those 66 set a non-zero value on a control GATED OFF in
+that row**. `frozen/phase20` joins phase17 and phase19 as a tag whose definitions reproduce and
+whose bytes do not; **`frozen/phase21` is owed** (the live matrix goes 572 → 582). The frozen
+matrices' bare `petalTipBreadth:` object keys are QUOTED now — the retired-id scanner reads bare
+keys as identifiers and quoted ones as literals, and quoting changes no emitted row (all 19
+matrices verified deep-equal to b323268). The sheet is
+`node tools/shot-bloom-apex.mjs <dir> [base-tree]`, which no longer patches anything — phase A's
+in-flight `page.route()` candidate laws went with the loser. **ITS WHOLE-BLADE FRAMING IS
+BIMODAL AND CARRIES NO PIXEL BOUND**: in phase A the identity comparison, between builds proved
+bit-identical to the float, read **0 px on one run and 7,036 px on the next**; the tip crop read
+0 px on all 14 observations. A bound comes from the run's control distribution, never one
+sample. **AND NO BLOOM GATE TRIGGERED ON THE DISCOVERY PR** — the six bloom workflows are
+path-filtered on bloom SOURCE and their own gate tools by name, so a tools-only PR runs the two
+FLOWER gates and nothing else; green CI there meant almost nothing, and `bloom-smoke` was run as
+the positive control instead. **The upstream contract for the lobe session is §5 of that doc**
+and is UNCHANGED by the ruling: `widthProfile()` stays the one owner of the apex, `[uCap, 1]` is
+read from the profile rather than re-spliced, no second round-to-pointed axis on the whole-petal
+apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP SHAPE or LOBE TIP SHAPE, never
+"tip shape".
 
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
