@@ -5685,3 +5685,110 @@ matters should be measured this way.
   seven code files, the new sheet tool, the outcome doc, `CLAUDE.md` and this charter — and
   nothing else; 220 tracked files under the bloom, flower, print, plot, cards, tracker,
   `tools/` and workflow trees untouched.
+
+- **Session 31 (margin buckling, part 1 of two — Sep 8): THE FIELD AND ITS NORMAL SHIP WITH NO
+  CONTROLS.** Full detail in `docs/bloom-session-31-outcome.md`; read it before touching
+  `buckleIsFlat`, `buckleLaw`, `trueNormalRows` in `buildPetalInto`, or
+  `tools/bloom-wall-thickness.mjs`.
+
+  **THE DISCOVERY PREMISE HELD ON THE HALF THAT WAS LOAD-BEARING AND WAS INCOMPLETE ON ONE
+  OTHER.** Margin buckling IS a displacement field of the same family as cup and cross-section
+  roll — it adds a term to `aN`, `widthProfile` is untouched, `h(u)` is unchanged and the plan
+  outline is byte for byte what it was — so it never competes with the tip work for ownership
+  of the outline and the two lines can be sequenced in either order. **What it is NOT like is
+  the NORMAL.** Cup and roll are functions of `v` alone at a row, so the cross-section's own
+  normal (`dP/dv` rotated a quarter turn in the row's plane) is the surface normal to the
+  accuracy a SLOW along-`u` variation allows — and every deformation before this one is slow
+  along `u`. A buckle is fast by definition: measured **29 degrees off at a moderate setting
+  and 71 at the corner**, which offsets the two skins into a WEDGE rather than a sheet. The
+  buckled branch takes `normalise(dP/du × dP/dv)`, ORIENTED ONTO the cross-section normal
+  because `emitPanel` winds its quads off `n` and a sign flip there is a boundary-edge failure,
+  not a shading one. Blade rows only; the foot is a different surface and differencing across
+  the seam is a derivative of nothing.
+
+  **THE GUARD HAD TO JOIN `petalFormIsFlat`, AND THE RIG FOUND THAT BY FAILING.** That
+  predicate decides whether `petalForm()` is CONSTRUCTED AT ALL, and at the shipping default it
+  is true — so a field wired only inside `sectAt` builds nothing, reports an identical triangle
+  count and an identical byte, and is a DEAD SLIDER. Session 16's `cupGradient` move,
+  re-learned by measurement rather than by reading.
+
+  **EVA'S SIX RULINGS, each recorded with its reason in the outcome doc so none becomes
+  precedent by accident.** Two are worth carrying here. **Amplitude is a FRACTION OF THE LOCAL
+  HALF-WIDTH, not mm** — absolute mm is applied unchanged where the blade has tapered to its
+  tip floor, so the tip crumples. And **`NU = 56` fixed rather than derived from the buckle
+  frequency is a RULED EXCEPTION to "derive, don't expose", with its reason attached**:
+  `CURL_START_MIN = 1 / NU` and the registry IMPORTS it as a curl control's bound, so a derived
+  row count would be one control reaching into an unrelated control's declared range.
+  Likewise **Q6's "bound the ranges so the shape cannot invert" DOES NOT APPLY** to this
+  feature and the outcome doc says why: the cap `A·f² ≤ L²/(4π²t)` moves by a factor of 22
+  across the reachable `L × t` box, so no static rectangle is dead-free. Q6's tip bound holds
+  because one number covers the whole space; this one has no such number.
+
+  **0 MOVED, AND IT IS A CONSTRUCTION.** 0 of **203,212,800** floats over the live matrix's 571
+  rows plus `phase19`'s 549, both modes, against a worktree of `7011e88`, compared with
+  `Object.is`, with a 1e-9 positive control proving the comparison can fail. No row added, no
+  byte moved: **`frozen/phase19` stays the newest baseline and NO phase is owed** — the session
+  18/19 and 23 case. Zero triangles added; the field is pure vertex displacement. Honest
+  footnote in the doc: this run met 0 signed zeros in `positions`, so `Object.is` is present and
+  is not what carries the result.
+
+  **THE FIRST INSTRUMENT HERE EVER TO MEASURE THE EMITTED WALL** —
+  `node tools/bloom-wall-thickness.mjs`, built BEFORE the controls because it is the INPUT to
+  session 32's ranges rather than a completeness exercise (Eva's own distinction, and the reason
+  she took an instrument-first split she has argued against). The roll floor was a CURVATURE
+  argument never checked against the mesh, and `thicknessProfile` reports the thickness a row
+  was BUILT AT — the number handed to the offset, not the distance between the two skins that
+  were offset. V1 calibration / V2 reachability / V3 guard / V4 normal all ABORT the run;
+  five mutants in `--negative-control`, all behaving. It rides in `bloom-export-watertight.yml`
+  ahead of the browser install, so the bloom gate count stays at FIVE.
+
+  **WALL AND SELF ARE TWO NUMBERS, and conflating them reports a fold as a thinning** (the
+  discovery pass did, for an afternoon). **A deficit at one grid is not a thinning: refine and
+  see — recovery is the MESH, divergence is GEOMETRY.** That test is what separated the
+  session's three cases and it is the method to reuse.
+
+  **TWO PRE-EXISTING DEFECTS FOUND IN PASSING, SCHEDULED RATHER THAN LEFT AS FOLKLORE** (the
+  character-walk scanner sat unscheduled for three sessions because it lived only in an outcome
+  doc): **`petalRoll` 330 emits a 0.587 mm wall against a declared 1.200** at the shipped
+  28 × 10 grid, recovering to 1.177 at 168 × 60 — so the roll floor works and the deficit is the
+  mesh, but the FACETED mesh is what a slicer receives and no gate measures it; and **all-form
+  at maximum DIVERGES** under refinement, 0.282 → 0.014 mm, a genuine near-self-contact on a
+  reachable shipped state. Neither is this feature's; each gets its own session.
+
+  **THE COMPOSITION FINDING IS SESSION 32'S REAL PROBLEM, and it ships as an XFAIL with a
+  number.** The buckle over cup 1.2 + curl 180 diverges under refinement — its own contribution
+  0.438 mm at 28 × 10 to **0.635 mm at 84 × 30** — while `f = 7`, the other suspicious row,
+  RECOVERS (0.903 → 1.114, own contribution 0.086) and is therefore `report`ed with its numbers
+  rather than asserted. So **discovery's closed-form `A·f² ≤ L²/(4π²t)` is NECESSARY AND NOT
+  SUFFICIENT**: the buckle composes with the curvature cup and curl have already spent, and the
+  composition reaches inversion where neither does alone. The xfail **fails hard when it starts
+  passing**, which is the clamp landing.
+
+  **A REFACTOR SILENTLY DISARMS A MUTANT — AND IT DID, IN THIS SESSION.** Naming the block
+  `trueNormalRows` (so the header, the outcome doc and this entry could point at something
+  greppable) moved `cross-section-normal`'s anchor, and the sweep reported *"the mutation did
+  not apply"* rather than a false pass. `/plot` recorded that lesson in session 28; this is the
+  first time it fired here, and the apply-check is what made it survivable.
+
+  **THE NEGATIVE CONTROL FOUND TWO FURTHER DEFECTS IN ITSELF, both general.** **Node's ESM loader caches
+  by resolved URL**, so writing every mutant to one path and importing them in turn serves the
+  FIRST mutant's module to all of them — three mutants reported identical numbers and two
+  "passed" on mutant one's behaviour. Each mutant now gets its own directory. A mutation that
+  did not APPLY is survivable and is checked for; one that silently did not RUN is not. And
+  **two mutants named the wrong assertion**: dropping the buckle clause from `petalFormIsFlat`
+  makes the field a dead slider (V2's witness), it does not move the default's bytes — V3's real
+  witness is a guard that tests whether the keys EXIST rather than whether they are zero, and it
+  was written only after the sweep said so.
+
+  **SESSION 32** is the four controls, the clamp, `NU = 56` and the sheet, argued in front of
+  this instrument, and it STOPS for Eva's ruling. **Her amendment, from the reference
+  photographs**: the falloff exponent `p` is promoted from a constant to the fourth exposed
+  control (floor **2** — `p = 1` is C⁰ at the midrib and creases the blade, so it is out of
+  range rather than discouraged — ceiling 6, default 3), reading as *how far the ruffle reaches
+  in from the edge*, because **an iris ruffles at high amplitude AND wide while a rose undulates
+  at low amplitude AND narrow, and one fixed exponent cannot draw both**. Two things that
+  session must MEASURE AND REPORT rather than decide: whether the clamp's cap has to be a
+  function of `p` (this instrument already reads 0.048 mm at p=2 and p=3 against **0.108 mm at
+  p=6** on identical amplitude and frequency, so an independent cap is already doubtful), and
+  the dead-control sweep over `p`'s whole range. The sheet must vary `p` as its own axis and
+  carry an IRIS row and a ROSE row against the references that motivated the control.
