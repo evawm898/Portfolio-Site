@@ -200,6 +200,11 @@ tree's stripped export, on all 16 + 8 movers).
 merge — the prediction, stated before the dispatch: the workflow goes red with `phase5` the only
 refusal (its script's known `GITHUB_TOKEN` limit), and `git ls-remote --tags` reads twenty
 declared baselines with nineteen published, `frozen/phase20` at `8b4c671` among them.
+**CONFIRMED AFTER THE MERGE, with one count corrected:** run 34189380854 red as designed, the
+refusal the script's `GITHUB_TOKEN`-cannot-push-a-differing-workflow-tree case; differencing
+`FROZEN_BASE_COMMITS` against `git ls-remote --tags origin` reads **nineteen** declared (phase2
+through phase20 — the prediction said twenty, a miscount), **eighteen** published at their
+declared shas, `phase5` the only one absent, and **`frozen/phase20` at `8b4c671`**.
 
 **The gates, each from its own run on this tree:**
 
