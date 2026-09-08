@@ -541,7 +541,11 @@ const MUTANTS = [
     id: 'the-highlight-material-misses-the-resolution', file: 'plot.js',
     from: '  for (const m of materials) m.resolution.copy(size);',
     to: '  material.resolution.copy(size);',
-    breaks: ['select/the-highlight-material-carries-the-resolution-and-the-fog'],
+    // AND THE FRAME'S MATERIAL GOES WITH IT — `materials` is the list, and the
+    // boundary's own LineMaterial is the third entry in it. Named rather than
+    // tuned around, because it is true of the mutation.
+    breaks: ['select/the-highlight-material-carries-the-resolution-and-the-fog',
+             'frame/the-overlay-material-carries-the-viewport-resolution'],
   },
   {
     // The click takes the nearest line on screen rather than the front-most
@@ -568,6 +572,190 @@ const MUTANTS = [
     from: '  const peak = Math.max(selMaterial.color.r, selMaterial.color.g, selMaterial.color.b) || 1;',
     to: '  const peak = 1;',
     breaks: ['select/the-highlight-is-a-hue-and-not-a-brightness'],
+  },
+
+  /* ---- the frame ---------------------------------------------------------
+     A boundary that is merely plausible draws a perfectly convincing rectangle
+     on a black field, so each of these leaves a picture nobody would question. */
+  {
+    // The margin slider stops insetting, so the boundary always touches the
+    // viewport edge on its limiting axis and the whole control is inert.
+    id: 'the-frame-margin-is-ignored', file: 'plot-frame.js',
+    from: '  const inset = pct / 100 * Math.min(W, H);',
+    to: '  const inset = 0;',
+    breaks: ['frame/the-box-is-the-largest-ratio-box-inside-the-margin',
+             'frame/the-margin-insets-from-the-shorter-side',
+             'frame/the-ellipse-is-inscribed-in-the-very-same-box',
+             'frame/the-overlay-is-drawn-at-written-down-pixels',
+             'frame/the-shape-switch-changes-the-outline-and-not-the-box',
+             'frame/the-ratio-and-the-margin-each-move-the-boundary',
+             // The 2:3 box then reaches the full 800 px height, so a drawing
+             // fitted to the whole viewport no longer hangs past it.
+             'frame/a-frame-control-never-moves-the-camera'],
+  },
+  {
+    // The ratio control stops reaching the box: every frame is the viewport's
+    // own shape, and both the boundary and the fit it drives are wrong.
+    id: 'the-frame-ratio-is-ignored', file: 'plot-frame.js',
+    from: '  const A = ratio > 0 ? ratio : W / H;',
+    to: '  const A = W / H;',
+    breaks: ['frame/the-box-is-the-largest-ratio-box-inside-the-margin',
+             'frame/a-square-is-a-rectangle-at-one-to-one-and-a-circle-an-ellipse',
+             'frame/the-ellipse-is-inscribed-in-the-very-same-box',
+             'frame/the-overlay-is-drawn-at-written-down-pixels',
+             'frame/the-shape-switch-changes-the-outline-and-not-the-box',
+             'frame/the-ratio-and-the-margin-each-move-the-boundary',
+             'frame/a-frame-control-never-moves-the-camera',
+             'frame/reset-fits-the-drawing-inside-the-boundary'],
+  },
+  {
+    // The ellipse is drawn as a rectangle. The box, the ratio, the margin, the
+    // fit and the read-out are all still right, and the control still switches
+    // something — it just switches it to the same shape.
+    id: 'the-ellipse-is-drawn-as-a-rectangle', file: 'plot-frame.js',
+    from: "  if (shape === 'ellipse') {",
+    to: '  if (false) {',
+    breaks: ['frame/a-square-is-a-rectangle-at-one-to-one-and-a-circle-an-ellipse',
+             'frame/the-ellipse-is-inscribed-in-the-very-same-box',
+             'frame/the-outline-is-a-closed-loop-in-both-shapes',
+             'frame/the-shape-switch-changes-the-outline-and-not-the-box'],
+  },
+  {
+    // Reset fits the viewport rather than the boundary, so every drawing
+    // overflows its frame and there is no way to bring it back inside.
+    id: 'the-fit-ignores-the-frame', file: 'plot.js',
+    from: '    ? fitTangents(tan0, box, canvasSize().h)',
+    to: '    ? { tanY: tan0, tanX: tan0 * Math.max(camera.aspect, 1e-3) }',
+    breaks: ['frame/reset-fits-the-drawing-inside-the-boundary'],
+  },
+  {
+    // A frame control re-frames the drawing, which is the rule this page keeps
+    // everywhere else: a control never moves the camera.
+    id: 'a-frame-control-moves-the-camera', file: 'plot.js',
+    from: '    buildFrameOverlay();\n    writeFrameOutputs();',
+    to: '    buildFrameOverlay();\n    resetView();\n    writeFrameOutputs();',
+    breaks: ['frame/a-frame-control-never-moves-the-camera'],
+  },
+
+  /* ---- the composition file ----------------------------------------------
+     Every one of these leaves a page that looks entirely restored. */
+  {
+    // The writer drops a draw field. The reader NAMES it — which is the whole
+    // design — so a round trip is no longer clean and the field does not come
+    // back.
+    id: 'the-saved-document-drops-a-draw-field', file: 'plot-file.js',
+    from: '  for (const f of fields) o[f.key] = s[f.key];',
+    to: "  for (const f of fields) { if (f.key === 'brightness') continue; o[f.key] = s[f.key]; }",
+    breaks: ['file/every-field-round-trips-through-the-writer-and-the-reader',
+             'file/a-field-the-writer-dropped-is-reported-and-not-filled-in',
+             'save/the-document-describes-the-page-as-it-stands',
+             'restore/every-field-comes-back',
+             'restore/a-clean-round-trip-reports-nothing-missing',
+             'restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named'],
+  },
+  {
+    // A ROW OF THE TABLE VANISHES, which is the one way a field can be lost
+    // with the writer and the reader still agreeing perfectly: neither is
+    // looking for it, so nothing is reported and the round trip is clean.
+    // The written-down census is the only thing that can see it.
+    id: 'the-frame-field-table-loses-a-row', file: 'plot-file.js',
+    from: "  { key: 'margin', control: 'frameMargin', kind: 'number' },",
+    to: '',
+    breaks: ['file/the-document-carries-exactly-these-fields',
+             'file/every-field-round-trips-through-the-writer-and-the-reader',
+             'restore/every-field-comes-back',
+             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
+  },
+  {
+    // The reader skips a stem field on the way back in. The file still holds
+    // it, so nothing is missing and nothing is reported.
+    id: 'the-restore-skips-a-stem-field', file: 'plot.js',
+    from: '    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;',
+    to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;",
+    breaks: ['restore/every-field-comes-back'],
+  },
+  {
+    // A missing field stops being reported. The page then looks restored while
+    // one field is whatever it happened to be — the exact failure the notes
+    // exist for.
+    id: 'a-missing-field-is-not-reported', file: 'plot-file.js',
+    from: "      notes.push(note('missing', `${path}.${f.key} is missing — the page keeps the value it has`));\n      continue;",
+    to: '      continue;',
+    breaks: ['file/a-field-the-writer-dropped-is-reported-and-not-filled-in',
+             'restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named'],
+  },
+  {
+    /* THE GLOBAL MODEL, REINTRODUCED IN THE FILE. Every petal is written with
+       the first entry's values, so a composition of several differently shaped
+       petals saves as several identically shaped ones. The page is right, the
+       drawing at save time is right, and the file is a lie. */
+    id: 'the-petal-warps-are-written-globally', file: 'plot.js',
+    from: '      petals: [...petalWarps.entries()].map(([index, st]) => ({\n        index, along: st.along, across: st.across, bends: bendsOut(st.bends),\n      })),',
+    to: '      petals: (g => [...petalWarps.entries()].map(([index]) => ({\n        index, along: g.along, across: g.across, bends: bendsOut(g.bends),\n      })))([...petalWarps.values()][0] || { along: 1, across: 1, bends: [] }),',
+    breaks: ['save/the-document-describes-the-page-as-it-stands',
+             'restore/every-field-comes-back',
+             'restore/two-petals-come-back-with-their-own-warps',
+             // Every entry then carries the first petal's bend offsets, so the
+             // one bend the drag put on petal 7 is on every petal in the file.
+             'save/a-real-drag-put-an-offset-on-both-bend-sets'],
+  },
+  {
+    /* AND THE SAME FAILURE ON THE WAY BACK IN, which the brief names as the
+       worst thing this format could do: the warp lands on the NEXT petal. The
+       drawing is deformed, the counts are right, the panel is clean, and it is
+       the wrong petal. */
+    id: 'a-restored-warp-lands-on-the-next-petal', file: 'plot.js',
+    from: '    petalWarps.set(p.index, {',
+    to: '    petalWarps.set(p.index + 1, {',
+    breaks: ['restore/every-field-comes-back',
+             'restore/two-petals-come-back-with-their-own-warps'],
+  },
+  {
+    // A composition restored against a different bundle stops saying so. Warps
+    // are applied by petal INDEX, and a silently wrong petal is
+    // indistinguishable from a right one in the picture.
+    id: 'the-grid-mismatch-is-not-reported', file: 'plot.js',
+    from: '  const cmp = compareIdentity(inst.grid, currentIdentity());',
+    to: '  const cmp = { match: true, differences: [] };',
+    breaks: ['restore/a-composition-from-a-different-grid-is-named-field-by-field'],
+  },
+  {
+    // A file from a newer version is read anyway, which means quietly ignoring
+    // whatever that version added — the silent partial restore in another coat.
+    id: 'a-newer-version-is-read-anyway', file: 'plot-file.js',
+    from: '  if (v > VERSION)',
+    to: '  if (false)',
+    breaks: ['file/a-newer-version-is-refused-rather-than-partly-read',
+             'restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves'],
+  },
+  {
+    // The camera's position is not restored — silently, with no note, because
+    // the document did carry one.
+    id: 'the-camera-is-not-restored', file: 'plot.js',
+    from: '  camera.position.set(c.position[0], c.position[1], c.position[2]);',
+    to: '  void c.position;',
+    breaks: ['restore/every-field-comes-back',
+             'restore/the-camera-and-the-selection-come-back'],
+  },
+  {
+    // The selection is not restored: a composition comes back with the right
+    // shapes and no petal picked, so the panel's two scales read an em dash
+    // over a drawing that is exactly right.
+    id: 'the-selection-is-not-restored', file: 'plot.js',
+    from: '  pui.petalPick.value = String(canSelect ? want : -1);',
+    to: '  pui.petalPick.value = String(-1);',
+    breaks: ['restore/every-field-comes-back',
+             'restore/the-camera-and-the-selection-come-back'],
+  },
+  {
+    /* A WARP FOR A PETAL THIS GRID DOES NOT HAVE IS FOLDED ONTO PETAL 0 rather
+       than dropped. Nothing is lost, nothing is reported, and one petal is
+       wearing another's shape. */
+    id: 'a-dropped-petal-warp-is-moved-onto-another', file: 'plot-file.js',
+    from: '  for (const p of list || []) (hasPetal(p.index) ? applied : dropped).push(p);',
+    to: '  for (const p of list || []) applied.push(hasPetal(p.index) ? p : { ...p, index: 0 });',
+    breaks: ['file/a-warp-for-a-petal-the-grid-does-not-have-is-dropped-not-moved',
+             'restore/a-warp-for-a-petal-this-grid-does-not-have-is-dropped-and-counted'],
   },
 ];
 
@@ -695,6 +883,8 @@ async function run({ mutant = null } = {}) {
   const S = await loadModule('plot-stem.js', mutant);
   const W = await loadModule('plot-warp.js', mutant);
   const PT = await loadModule('plot-petal.js', mutant);
+  const FR = await loadModule('plot-frame.js', mutant);
+  const FL = await loadModule('plot-file.js', mutant);
   const {
     densityToEvery, everyLabel, keepsIndex, readGridScene, selectStrips,
     stripsToSegments, boundsOf, dimToFog, fogFactor, MIN_DENSITY, MAX_DENSITY,
@@ -1363,6 +1553,325 @@ async function run({ mutant = null } = {}) {
     + 'shared and stays shared');
 
   // =========================================================================
+  // THE FRAME, as arithmetic. A boundary that is merely plausible draws a
+  // perfectly convincing rectangle on a black field, so every number below is
+  // written down here rather than read back off a picture.
+  log('\n--- part one: plot-frame.js, on boxes whose answer is written down ---');
+
+  // Written down: on a 1000 x 800 canvas at margin 0, a 1:1 box is the height,
+  // 800 x 800 at x = 100; a 2:3 box is height-limited too (1000/800 = 1.25 is
+  // wider than 2/3), so 533.333 x 800 at x = 233.333. At margin 10% the inset
+  // is 10% of the SHORTER side = 80 px a side, leaving 840 x 640, and the 2:3
+  // box in it is 426.667 x 640 at (286.667, 80).
+  const fnear = (a, b, eps = 1e-9) => Math.abs(a - b) < eps;
+  const frBoxEq = (r, x, y, w, h) => fnear(r.x, x, 1e-6) && fnear(r.y, y, 1e-6)
+                                && fnear(r.width, w, 1e-6) && fnear(r.height, h, 1e-6);
+  const bSquare = FR.frameRect(1000, 800, 1, 0);
+  const b23 = FR.frameRect(1000, 800, 2 / 3, 0);
+  const b23m = FR.frameRect(1000, 800, 2 / 3, 10);
+  check('frame/the-box-is-the-largest-ratio-box-inside-the-margin',
+    frBoxEq(bSquare, 100, 0, 800, 800) && frBoxEq(b23, 233.3333333333, 0, 533.3333333333, 800)
+    && frBoxEq(b23m, 286.6666666666, 80, 426.6666666666, 640),
+    `1000x800: 1:1 -> ${bSquare.width}x${bSquare.height} at x ${bSquare.x.toFixed(3)}; `
+    + `2:3 -> ${b23.width.toFixed(3)}x${b23.height}; 2:3 at 10% -> `
+    + `${b23m.width.toFixed(3)}x${b23m.height} at (${b23m.x.toFixed(3)}, ${b23m.y})`);
+
+  // The same percentage on a frWide canvas and a frTall one has to be the same
+  // visual gap, which is what "of the shorter side" buys.
+  const frWide = FR.frameRect(1000, 800, 1, 10), frTall = FR.frameRect(800, 1000, 1, 10);
+  check('frame/the-margin-insets-from-the-shorter-side',
+    fnear(frWide.inset, 80) && fnear(frTall.inset, 80)
+    && fnear(FR.frameRect(1000, 800, 1, 0).inset, 0),
+    `10% is ${frWide.inset} px on 1000x800 and ${frTall.inset} px on 800x1000 — the same gap`);
+
+  // TWO TYPES, NOT FOUR: the ratio is its own axis, so 1:1 gives a square and a
+  // circle exactly rather than by a fourth named shape agreeing with it.
+  const frCircle = FR.frameOutline('ellipse', bSquare);
+  const frRadii = [];
+  for (let i = 0; i < frCircle.count; i++) {
+    frRadii.push(Math.hypot(frCircle.points[i * 3] - bSquare.cx, frCircle.points[i * 3 + 1] - bSquare.cy));
+  }
+  check('frame/a-square-is-a-rectangle-at-one-to-one-and-a-circle-an-ellipse',
+    FR.parseRatio('1:1') === 1 && fnear(bSquare.width, bSquare.height)
+    && frRadii.every(r => fnear(r, 400, 1e-4)),
+    `1:1 -> ${bSquare.width}x${bSquare.height}; every one of ${frCircle.count} ellipse points `
+    + `is ${Math.min(...frRadii).toFixed(4)}..${Math.max(...frRadii).toFixed(4)} from the centre`);
+
+  // THE ELLIPSE IS INSCRIBED IN THE VERY SAME BOX, so switching shape moves no
+  // edge — the box is a function of the ratio and the margin and of nothing else.
+  /* TOLERANCES SIZED FOR FLOAT32, WHICH IS WHAT THE OUTLINE IS. `frameOutline`
+     returns a Float32Array because that is what the geometry buffer takes, so a
+     coordinate near 700 px carries about 8e-5 of quantisation and the ellipse's
+     own residual lands near 3e-7. Asking for 1e-6 here failed on the dust and
+     not on the geometry — the first run of this check did exactly that. */
+  const F32 = 1e-3;
+  const frEll = FR.frameOutline('ellipse', b23m);
+  let frOnCurve = 0, frWorst = 0;
+  const ea = b23m.width / 2, eb = b23m.height / 2;
+  let ex0 = Infinity, ey0 = Infinity, ex1 = -Infinity, ey1 = -Infinity;
+  for (let i = 0; i < frEll.count; i++) {
+    const x = frEll.points[i * 3], y = frEll.points[i * 3 + 1];
+    const f = ((x - b23m.cx) / ea) ** 2 + ((y - b23m.cy) / eb) ** 2;
+    frWorst = Math.max(frWorst, Math.abs(f - 1));
+    if (fnear(f, 1, 1e-5)) frOnCurve++;
+    ex0 = Math.min(ex0, x); ex1 = Math.max(ex1, x);
+    ey0 = Math.min(ey0, y); ey1 = Math.max(ey1, y);
+  }
+  check('frame/the-ellipse-is-inscribed-in-the-very-same-box',
+    frOnCurve === frEll.count && fnear(ex0, b23m.x, F32) && fnear(ey0, b23m.y, F32)
+    && fnear(ex1, b23m.x + b23m.width, F32) && fnear(ey1, b23m.y + b23m.height, F32),
+    `${frOnCurve} of ${frEll.count} points satisfy the ellipse to ${frWorst.toExponential(1)}, `
+    + `and its extremes touch the box at ${ex0.toFixed(3)}..${ex1.toFixed(3)} x `
+    + `${ey0.toFixed(3)}..${ey1.toFixed(3)}`);
+
+  const rectLoop = FR.frameOutline('rect', b23m);
+  const loopCloses = o => o.points[0] === o.points[(o.count - 1) * 3]
+                   && o.points[1] === o.points[(o.count - 1) * 3 + 1];
+  check('frame/the-outline-is-a-closed-loop-in-both-shapes',
+    loopCloses(rectLoop) && loopCloses(frEll) && rectLoop.segments === 4
+    && frEll.segments === FR.ELLIPSE_SEGMENTS,
+    `rect ${rectLoop.segments} segments · ellipse ${frEll.segments} — both return to their `
+    + 'first point exactly, so the join needs no special case');
+
+  /* THE UNFRAMED FIT IS THE EXPRESSION /plot SHIPPED, term for term. This is
+     the identity the page's `fitCamera` rests on: hand `fitTangents` the
+     canvas's own box and it returns `tanY` and `tanY * W / H`, and
+     `camera.aspect` IS W / H. Asserted with === rather than a tolerance,
+     because it is an identity and not an approximation. */
+  const frTan0 = Math.tan((38 * Math.PI / 180) / 2);
+  const wholeTan = FR.fitTangents(frTan0, { width: 1100, height: 800 }, 800);
+  check('frame/the-unframed-fit-is-the-expression-the-page-shipped',
+    wholeTan.tanY === frTan0 && wholeTan.tanX === frTan0 * (1100 / 800),
+    `tanY ${wholeTan.tanY} === ${frTan0} and tanX ${wholeTan.tanX} === tanY * 1100/800 — exactly`);
+
+  check('frame/a-ratio-the-page-cannot-show-is-not-guessed-at',
+    FR.parseRatio('7:5') === 1.4 && FR.isListedRatio('7:5') === false
+    && FR.parseRatio('rubbish') === null && FR.parseRatio('0:3') === null
+    && FR.isListedRatio('2:3') === true,
+    '7:5 parses and is not offered; "rubbish" and "0:3" are not ratios at all');
+
+  // =========================================================================
+  // THE COMPOSITION FILE. Every claim here is about the ROUND TRIP, because a
+  // restore that silently drops a field looks exactly like one that did not.
+  log('\n--- part one: plot-file.js, round-tripped over a state written down ---');
+
+  // The bounds a control would supply. Written down rather than read off the
+  // markup, so a check about clamping is about the clamp.
+  const FILE_BOUNDS = {
+    frameMargin: { min: 0, max: 40, step: 1 },
+    uDensity: { min: 1, max: 12, step: 1 }, vDensity: { min: 1, max: 12, step: 1 },
+    weight: { min: 0.3, max: 5, step: 0.1 },
+    brightness: { min: 5, max: 100, step: 1 }, depthDim: { min: 0, max: 100, step: 1 },
+    stemBundle: { min: 0, max: 5, step: 0.05 }, stemJoin: { min: 0.5, max: 80, step: 0.5 },
+    stemLength: { min: 10, max: 500, step: 1 }, stemDroop: { min: -120, max: 120, step: 1 },
+    stemNeck: { min: 1, max: 300, step: 1 },
+    petalAlong: { min: 0.25, max: 2.5, step: 0.05 },
+    petalAcross: { min: 0.25, max: 2.5, step: 0.05 },
+  };
+  const FILE_OPTS = { boundsOf: id => FILE_BOUNDS[id] || null,
+                 limits: { stemBends: 8, petalBends: 6 } };
+  const FILE_STATE = {
+    frame: { on: 'on', shape: 'ellipse', ratio: '4:5', margin: 18 },
+    draw: { families: 'u', uDensity: 5, vDensity: 8, weight: 2.4, brightness: 62, depthDim: 20 },
+    view: { stemHandles: false, petalHandles: true },
+    camera: { position: [11, 22, 33], target: [1, 2, 3], fov: 38 },
+    selection: { instance: 0, petal: 7 },
+    instances: [{
+      id: 'bloom-0',
+      grid: { name: 'g.glb', mode: 'live', petals: 28, u: 280, v: 812, other: 0,
+              strips: 1092, segments: 15148 },
+      transform: FL.IDENTITY_TRANSFORM,
+      stem: { on: 'on', bundle: 1.6, join: 30, length: 240, droopDeg: 35, neck: 90,
+              bends: [{ t: 0.25, offset: [1, 2, 3] }, { t: 0.75, offset: [-4, 5, -6] }] },
+      // TWO PETALS AT DIFFERENT SHAPES — the state a single global warp could
+      // not express, and the reason the file holds a LIST.
+      petals: [{ index: 7, along: 1.9, across: 0.7, bends: [{ t: 0.5, offset: [3, 0, 1] }] },
+               { index: 2, along: 0.6, across: 2.2, bends: [] }],
+    }],
+  };
+  const roundTrip = st => FL.readDoc(JSON.parse(FL.toText(FL.composeDoc(st))), FILE_OPTS);
+
+  /* THE TABLES ARE THE ONE OWNER OF WHAT IS IN THE FILE — and a table ROW that
+     vanished would round-trip perfectly while silently losing its field, since
+     the writer and the reader walk the same table. So the census is written
+     down here: adding a field to the format means editing this line on purpose. */
+  const fieldKeysOf = t => t.map(f => f.key).join(',');
+  check('file/the-document-carries-exactly-these-fields',
+    fieldKeysOf(FL.FRAME_FIELDS) === 'on,shape,ratio,margin'
+    && fieldKeysOf(FL.DRAW_FIELDS) === 'families,uDensity,vDensity,weight,brightness,depthDim'
+    && fieldKeysOf(FL.VIEW_FIELDS) === 'stemHandles,petalHandles'
+    && fieldKeysOf(FL.STEM_FIELDS) === 'on,bundle,join,length,droopDeg,neck'
+    && fieldKeysOf(FL.PETAL_FIELDS) === 'along,across',
+    `frame(${fieldKeysOf(FL.FRAME_FIELDS)}) draw(${fieldKeysOf(FL.DRAW_FIELDS)}) `
+    + `view(${fieldKeysOf(FL.VIEW_FIELDS)}) stem(${fieldKeysOf(FL.STEM_FIELDS)}) `
+    + `petal(${fieldKeysOf(FL.PETAL_FIELDS)})`);
+
+  const rt = roundTrip(FILE_STATE);
+  const rtDiff = [];
+  if (rt.ok) {
+    for (const [group, fields] of [['frame', FL.FRAME_FIELDS], ['draw', FL.DRAW_FIELDS],
+                                   ['view', FL.VIEW_FIELDS]]) {
+      for (const f of fields) {
+        if (rt.doc[group][f.key] !== FILE_STATE[group][f.key]) rtDiff.push(`${group}.${f.key}`);
+      }
+    }
+    const si = FILE_STATE.instances[0], di = rt.doc.instances[0];
+    for (const f of FL.STEM_FIELDS) if (di.stem[f.key] !== si.stem[f.key]) rtDiff.push(`stem.${f.key}`);
+    if (JSON.stringify(di.stem.bends) !== JSON.stringify(si.stem.bends)) rtDiff.push('stem.bends');
+    for (const p of si.petals) {
+      const got = di.petals.find(x => x.index === p.index);
+      if (!got) { rtDiff.push(`petal ${p.index} missing`); continue; }
+      for (const f of FL.PETAL_FIELDS) if (got[f.key] !== p[f.key]) rtDiff.push(`petal ${p.index}.${f.key}`);
+      if (JSON.stringify(got.bends) !== JSON.stringify(p.bends)) rtDiff.push(`petal ${p.index}.bends`);
+    }
+    if (JSON.stringify(rt.doc.camera) !== JSON.stringify(FILE_STATE.camera)) rtDiff.push('camera');
+    if (JSON.stringify(rt.doc.selection) !== JSON.stringify(FILE_STATE.selection)) rtDiff.push('selection');
+  } else rtDiff.push(`refused: ${rt.error}`);
+  check('file/every-field-round-trips-through-the-writer-and-the-reader',
+    rt.ok && rtDiff.length === 0 && rt.notes.length === 0,
+    rtDiff.length ? `differed: ${rtDiff.join(', ')}`
+      : `every field of five groups, two bend lists and two petals came back; `
+        + `${rt.notes.length} notes`);
+
+  /* A WARP IS PER PETAL IN THE FILE AS ON THE PAGE. Two things, and the second
+     is the one the global model would fail: the entries are separable, AND
+     nowhere in the document is there a warp that is not inside a petal entry. */
+  const flatText = FL.toText(FL.composeDoc(FILE_STATE));
+  const globalWarp = /"along"\s*:/g;
+  const alongCount = (flatText.match(globalWarp) || []).length;
+  check('file/a-warp-belongs-to-its-petal-and-not-to-the-drawing',
+    rt.ok && rt.doc.instances[0].petals.length === 2
+    && rt.doc.instances[0].petals.find(p => p.index === 7).along === 1.9
+    && rt.doc.instances[0].petals.find(p => p.index === 2).along === 0.6
+    && alongCount === 2 && !('along' in rt.doc.draw) && !('along' in rt.doc.instances[0].stem),
+    `two petals hold 1.9x and 0.6x separately; the word "along" appears ${alongCount} times `
+    + 'in the file and both are inside a petal entry');
+
+  check('file/the-root-is-a-list-of-instances-even-with-one-bloom',
+    Array.isArray(rt.doc.instances) && rt.doc.instances.length === 1
+    && ['grid', 'transform', 'stem', 'petals'].every(k => k in rt.doc.instances[0])
+    && !('stem' in rt.doc) && !('petals' in rt.doc)
+    && 'frame' in rt.doc && 'camera' in rt.doc && 'draw' in rt.doc,
+    'the bloom-shaped state is inside instances[0] and the composition-shaped state is at '
+    + 'the root — adding a second bloom is an entry, not a migration');
+
+  // A file the WRITER dropped a field from: the reader has to name it, and must
+  // not fill it in — a defaulted field is a page that looks restored.
+  const docMissing = JSON.parse(flatText);
+  delete docMissing.draw.brightness;
+  delete docMissing.instances[0].stem.neck;
+  const rMissing = FL.readDoc(docMissing, FILE_OPTS);
+  const missNotes = rMissing.notes.filter(n => n.kind === 'missing');
+  check('file/a-field-the-writer-dropped-is-reported-and-not-filled-in',
+    rMissing.ok && !('brightness' in rMissing.doc.draw)
+    && !('neck' in rMissing.doc.instances[0].stem)
+    && missNotes.some(n => n.text.includes('draw.brightness'))
+    && missNotes.some(n => n.text.includes('stem.neck')),
+    `${missNotes.length} missing notes; neither key is in the result, so the applier has `
+    + 'nothing to write and the page keeps what it has');
+
+  const docStrange = JSON.parse(flatText);
+  docStrange.draw.glitter = 3;
+  docStrange.mood = 'wistful';
+  const rStrange = FL.readDoc(docStrange, FILE_OPTS);
+  check('file/a-field-this-page-does-not-know-is-reported-rather-than-ignored',
+    rStrange.ok && rStrange.notes.filter(n => n.kind === 'unknown').length === 2,
+    rStrange.notes.filter(n => n.kind === 'unknown').map(n => n.text).join(' · '));
+
+  const docRough = JSON.parse(flatText);
+  docRough.draw.brightness = 400;          // past the control's top
+  docRough.draw.weight = 1.137;            // off its 0.1 step
+  docRough.instances[0].stem.length = -20; // under its floor
+  const rRough = FL.readDoc(docRough, FILE_OPTS);
+  check('file/a-value-the-control-cannot-hold-is-clamped-or-snapped-and-told',
+    rRough.ok && rRough.doc.draw.brightness === 100 && fnear(rRough.doc.draw.weight, 1.1, 1e-9)
+    && rRough.doc.instances[0].stem.length === 10
+    && rRough.notes.filter(n => n.kind === 'clamped').length === 3,
+    `brightness 400 -> ${rRough.doc.draw.brightness}, weight 1.137 -> ${rRough.doc.draw.weight}, `
+    + `length -20 -> ${rRough.doc.instances[0].stem.length}, all three told`);
+
+  const docRefusals = [
+    ['not an object', FL.readDoc('nope', FILE_OPTS)],
+    ['wrong format', FL.readDoc({ format: 'something-else', version: 1 }, FILE_OPTS)],
+    ['no version', FL.readDoc({ format: FL.FORMAT }, FILE_OPTS)],
+    ['no instances', FL.readDoc({ format: FL.FORMAT, version: 1, instances: [] }, FILE_OPTS)],
+  ];
+  check('file/it-refuses-what-is-not-a-composition',
+    docRefusals.every(([, r2]) => r2.ok === false && typeof r2.error === 'string' && r2.error.length > 10),
+    docRefusals.map(([n, r2]) => `${n}: ${r2.error.slice(0, 44)}…`).join(' · '));
+
+  const docFuture = JSON.parse(flatText); docFuture.version = FL.VERSION + 1;
+  docFuture.draw.somethingNew = 12;
+  const rFuture = FL.readDoc(docFuture, FILE_OPTS);
+  check('file/a-newer-version-is-refused-rather-than-partly-read',
+    rFuture.ok === false && rFuture.error.includes(String(FL.VERSION + 1)),
+    'reading a v' + (FL.VERSION + 1) + ' file with a v' + FL.VERSION + ' reader would mean '
+    + 'ignoring whatever it added, which is the silent partial restore in another coat');
+
+  const docPlaced = JSON.parse(flatText);
+  docPlaced.instances[0].transform.position = [40, 0, 0];
+  const rPlaced = FL.readDoc(docPlaced, FILE_OPTS);
+  check('file/a-transform-this-page-cannot-honour-is-reported-as-not-applied',
+    rPlaced.ok && rPlaced.notes.some(n => n.kind === 'not-applied' && n.text.includes('transform'))
+    && FL.isIdentityTransform(FL.IDENTITY_TRANSFORM) === true
+    && FL.isIdentityTransform({ position: [0, 0, 0], rotationDeg: [0, 0, 0], scale: [1, 1, 1] }) === true
+    && FL.isIdentityTransform(rPlaced.doc.instances[0].transform) === false,
+    'placing an instance is multi-bloom work and is not built — a file that carries one is '
+    + 'told, not drawn as though it did not');
+
+  const twoBlooms = JSON.parse(flatText);
+  twoBlooms.instances.push(JSON.parse(JSON.stringify(twoBlooms.instances[0])));
+  const rTwo = FL.readDoc(twoBlooms, FILE_OPTS);
+  check('file/a-file-with-more-blooms-than-this-page-draws-is-read-and-told',
+    rTwo.ok && rTwo.doc.instances.length === 2
+    && rTwo.notes.some(n => n.kind === 'not-applied' && n.text.includes('only the first')),
+    'both instances are READ — the format is not the limit — and the page says it drew one');
+
+  /* A WARP FOR A PETAL THE GRID DOES NOT HAVE IS DROPPED, NEVER FOLDED ONTO A
+     NEIGHBOUR. The one outcome worse than a warp not landing is a warp landing
+     on the wrong petal, and neither the picture nor any count would show it. */
+  const resolved = FL.resolvePetals([{ index: 2 }, { index: 999 }, { index: 7 }], i => i < 28);
+  check('file/a-warp-for-a-petal-the-grid-does-not-have-is-dropped-not-moved',
+    resolved.applied.length === 2 && resolved.dropped.length === 1
+    && resolved.applied.map(p => p.index).join(',') === '2,7' && resolved.dropped[0].index === 999,
+    `petals 2 and 7 applied, 999 dropped — and dropped means dropped, not index 999 mod 28`);
+
+  const docMessy = JSON.parse(flatText);
+  docMessy.instances[0].stem.bends = [{ t: 0.9, offset: [0, 0, 0] }, { t: 0.2, offset: [0, 0, 0] },
+                                   { t: 4, offset: [1, 1, 1] }];
+  // BY INDEX, NOT BY POSITION: `composeInstance` sorts the petal list so a file
+  // is stable and diffable, so `petals[0]` is petal 2 and not the petal this
+  // check then goes looking for.
+  docMessy.instances[0].petals.find(p2 => p2.index === 7).bends =
+    new Array(9).fill(0).map((_, i) => ({ t: i / 9, offset: [0, 0, 0] }));
+  const rMessy = FL.readDoc(docMessy, FILE_OPTS);
+  const mb = rMessy.doc.instances[0].stem.bends;
+  check('file/bends-are-sorted-clamped-and-capped-and-each-is-told',
+    rMessy.ok && mb.map(b => b.t).join(',') === '0.2,0.9,1'
+    && rMessy.doc.instances[0].petals.find(p => p.index === 7).bends.length === 6
+    && rMessy.notes.some(n => n.kind === 'reordered')
+    && rMessy.notes.some(n => n.kind === 'clamped' && n.text.includes('outside 0..1'))
+    && rMessy.notes.some(n => n.kind === 'dropped' && n.text.includes('at most 6')),
+    `stem bends came back ${mb.map(b => b.t).join(',')} and the petal's nine were capped at six, `
+    + 'each with its own note');
+
+  // --- the grid's identity -------------------------------------------------
+  const idA = FL.gridIdentity({ name: 'a.glb', mode: 'live', petals: 28,
+    census: { u: 280, v: 812, other: 0, strips: 1092, segments: 15148 } });
+  const idB = FL.gridIdentity({ name: 'b.glb', mode: 'export', petals: 40,
+    census: { u: 400, v: 812, other: 0, strips: 1092, segments: 15148 } });
+  const idCmp = FL.compareIdentity(idA, idB);
+  check('identity/a-different-grid-is-named-field-by-field',
+    idCmp.match === false && idCmp.differences.map(d => d.field).join(',') === 'name,mode,petals,u'
+    && idCmp.differences[2].saved === 28 && idCmp.differences[2].current === 40,
+    `"28 petals saved, 40 here" is something an artist can act on where a changed hash is `
+    + `not: ${idCmp.differences.map(d => `${d.field} ${d.saved}->${d.current}`).join(', ')}`);
+  check('identity/the-same-grid-matches',
+    FL.compareIdentity(idA, FL.gridIdentity({ name: 'a.glb', mode: 'live', petals: 28,
+      census: { u: 280, v: 812, other: 0, strips: 1092, segments: 15148 } })).match === true,
+    'the census the page recounted from the file, plus its name and the export mode');
+
+  // =========================================================================
   // PART TWO — the page.
   log('\n--- part two: the page, measured on the rendered framebuffer ---');
 
@@ -1416,7 +1925,13 @@ async function run({ mutant = null } = {}) {
      the one /plot shipped, and neither the highlight's own object nor a
      deformed petal can be hiding inside one of them. The petal section further
      down picks one. */
-  const DEFAULTS = { families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
+  /* AND WITH THE FRAME OFF, for the third time and the same reason. The page
+     ships a boundary ON, and it draws a teal loop into the very framebuffer
+     `readPixels` reads — so every ink figure above the frame section would
+     carry the boundary's own pixels inside it. Off here; the frame section
+     turns it on. */
+  const DEFAULTS = { frame: 'off', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
+                     families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
                      brightness: 30, depthDim: 55, stem: 'off',
                      stemBundle: 0.35, stemJoin: 12, stemLength: 170,
                      stemDroop: 0, stemNeck: 45, stemHandles: true,
@@ -1672,6 +2187,31 @@ async function run({ mutant = null } = {}) {
     return { x: (l.right + r.left) / 2, y: window.innerHeight * 0.72,
              left: l.right, right: r.left };
   });
+  /* A POINT ON BARE CANVAS, ASKED OF THE PAGE RATHER THAN GUESSED. /print's own
+     measured lesson — a wheel or a pointerdown that lands on a control column
+     never reaches the canvas, and the check then reports on the panel it hit —
+     arriving here the moment a panel grew. The zoom check's fixed "30% of the
+     width, half the height" point sat on bare canvas for two sessions and then
+     sat on the GRID read-out, because the COMPOSITION panel made the left
+     column 180 px taller: four wheel events moved the camera 0.0 units and
+     scrolled a paragraph instead. A fraction of the viewport is not a place. */
+  const barePoint = async (fx, fy) => {
+    const p2 = await page.evaluate(([ax, ay]) => {
+      const c = document.getElementById('plot-canvas').getBoundingClientRect();
+      for (const gx of [ax, 0.5, 0.55, 0.45, 0.6, 0.42]) {
+        for (const gy of [ay, 0.75, 0.5, 0.85, 0.25]) {
+          const x = c.x + c.width * gx, y = c.y + c.height * gy;
+          const el = document.elementFromPoint(x, y);
+          if (el && el.id === 'plot-canvas') return { x, y, fx: gx, fy: gy };
+        }
+      }
+      return null;
+    }, [fx, fy]);
+    if (!p2) throw new Error('no point on this page is bare canvas — every candidate '
+      + 'is under a control column, so nothing here can be driven by a pointer');
+    return p2;
+  };
+
   const camBefore = await q(() => window.__plot.cameraInfo());
   const pixBefore = await px();
   await page.mouse.move(gap.x, gap.y);
@@ -2029,10 +2569,7 @@ async function run({ mutant = null } = {}) {
   // thing the defect hid behind.
   await stemOn();
   await page.waitForTimeout(1200);
-  const canvasBox = await page.evaluate(() => {
-    const r = document.getElementById('plot-canvas').getBoundingClientRect();
-    return { x: r.x + r.width * 0.30, y: r.y + r.height * 0.5 };
-  });
+  const canvasBox = await barePoint(0.30, 0.5);
   const CLIP = { x: 330, y: 60, width: 420, height: 700 };
   const hashOf = buf => { let h = 2166136261;
     for (let i = 0; i < buf.length; i++) h = (Math.imul(h ^ buf[i], 16777619)) >>> 0; return h; };
@@ -2068,7 +2605,8 @@ async function run({ mutant = null } = {}) {
     new Set(wheelFrames).size === wheelFrames.length
     && wheelDist.every((d, i) => i === 0 || d < wheelDist[i - 1])
     && afterWheel - idleAfter >= 1,
-    `${new Set(wheelFrames).size} distinct frames from ${wheelFrames.length} wheel events, `
+    `${new Set(wheelFrames).size} distinct frames from ${wheelFrames.length} wheel events at `
+    + `(${canvasBox.x.toFixed(0)}, ${canvasBox.y.toFixed(0)}) — bare canvas, asked of the page — `
     + `camera ${wheelDist.map(d => d.toFixed(1)).join(' -> ')}, `
     + `${afterWheel - idleAfter} frames painted`);
   /* THE IDLE HALF ALONE. It used to also require the wheel to paint, which is
@@ -2304,22 +2842,39 @@ async function run({ mutant = null } = {}) {
      pixel the PAGE says is on a named petal's ink, so the aim is the page's and
      what is under test is the plumbing: the slop that separates a click from an
      orbit, the route through the dropdown, and the miss. */
-  const aim = await page.evaluate(() => window.__plot.petalScreenPoint(7, 0.5));
-  const aimPick = await page.evaluate(a => window.__plot.pickAt(a.x, a.y), aim);
+  /* AND THE AIM IS SEARCHED FOR, not named. `petalScreenPoint` answers where a
+     petal's ink is; whether that pixel is under a control column is a different
+     question, and its answer moved when a panel grew — petal 7's own line came
+     back at (366, 507), which is inside the GRID read-out. The sheets already
+     search for a HANDLE in the clear for the same reason. */
+  const aim = await page.evaluate(() => {
+    for (let petal = 0; petal < 28; petal++) {
+      for (const frac of [0.5, 0.35, 0.65, 0.2, 0.8]) {
+        const a2 = window.__plot.petalScreenPoint(petal, frac);
+        if (!a2) continue;
+        const el = document.elementFromPoint(a2.x, a2.y);
+        if (el && el.id === 'plot-canvas') return { ...a2, petal, frac };
+      }
+    }
+    return null;
+  });
+  const aimPick = aim ? await page.evaluate(a => window.__plot.pickAt(a.x, a.y), aim) : -1;
   await page.mouse.move(aim.x, aim.y);
   await page.mouse.down();
   await page.mouse.up();
   const afterClick = await q(() => window.__plot.petalInfo());
   const optionAfter = await q(() => document.getElementById('petalPick').value);
-  await page.mouse.move(gap.x, 120);
+  const miss = await barePoint(0.5, 0.15);
+  await page.mouse.move(miss.x, miss.y);
   await page.mouse.down();
   await page.mouse.up();
   const afterMiss = await q(() => window.__plot.petalInfo());
   check('select/a-click-picks-and-a-click-on-the-black-clears',
-    aimPick >= 0 && afterClick.selected === aimPick && optionAfter === String(aimPick)
-    && afterMiss.selected === -1,
-    `a click on petal_7's own ink selected petal_${aimPick} and moved the dropdown to `
-    + `${optionAfter}; a click on empty canvas cleared it`);
+    !!aim && aimPick >= 0 && afterClick.selected === aimPick
+    && optionAfter === String(aimPick) && afterMiss.selected === -1,
+    `a click on petal_${aim && aim.petal}'s own ink, at a pixel in the clear, selected `
+    + `petal_${aimPick} and moved the dropdown to ${optionAfter}; a click on empty canvas `
+    + 'cleared it');
 
   await petalOn({ petalPick: 9 });
   const beforeOrbit = await q(() => window.__plot.petalInfo());
@@ -2852,12 +3407,500 @@ async function run({ mutant = null } = {}) {
 
   await set({ ...DEFAULTS });
 
+  // =========================================================================
+  // THE FRAME, ON THE PAGE. Every draw check above ran with it OFF — the gate's
+  // DEFAULTS say so — so those ink figures are the ones /plot shipped and the
+  // boundary's own teal pixels cannot be inside any of them.
+  log('\n--- the frame ---');
+
+  await reset();
+  // Written down for THIS viewport, so a box that is merely self-consistent
+  // cannot pass: 1100 x 800 at 2:3 and margin 6% is an inset of 0.06 * 800 = 48
+  // px a side, leaving 1004 x 704; 1004/704 is wider than 2/3, so the box is
+  // height-limited at 704 tall and 469.333 wide, centred at x = 315.333.
+  await set({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6 });
+  const fBox = await q(() => window.__plot.frameBox());
+  const fSegs = await q(() => window.__plot.frameSegments());
+  const corners = new Set(fSegs.map(g => `${g[0].toFixed(3)},${g[1].toFixed(3)}`));
+  check('frame/the-overlay-is-drawn-at-written-down-pixels',
+    fnear(fBox.x, 315.3333333, 1e-4) && fnear(fBox.y, 48, 1e-6)
+    && fnear(fBox.width, 469.3333333, 1e-4) && fnear(fBox.height, 704, 1e-6)
+    && fSegs.length === 4
+    && ['315.333,48.000', '784.667,48.000', '784.667,752.000', '315.333,752.000']
+       .every(c => corners.has(c)),
+    `${fBox.width.toFixed(3)} x ${fBox.height} at (${fBox.x.toFixed(3)}, ${fBox.y}); the four `
+    + `segments the overlay actually holds start at ${[...corners].join(' ')}`);
+
+  await set({ frameShape: 'ellipse' });
+  const eSegs = await q(() => window.__plot.frameSegments());
+  const eBox = await q(() => window.__plot.frameBox());
+  const ex = eSegs.flatMap(g => [g[0], g[3]]), ey = eSegs.flatMap(g => [g[1], g[4]]);
+  check('frame/the-shape-switch-changes-the-outline-and-not-the-box',
+    eSegs.length > 4 && JSON.stringify(eBox) === JSON.stringify(fBox)
+    && fnear(Math.min(...ex), fBox.x, 1e-3) && fnear(Math.max(...ex), fBox.x + fBox.width, 1e-3)
+    && fnear(Math.min(...ey), fBox.y, 1e-3) && fnear(Math.max(...ey), fBox.y + fBox.height, 1e-3),
+    `rect 4 segments · ellipse ${eSegs.length}, inscribed in the identical box — two shapes, `
+    + 'one boundary, and the ratio is the separate axis');
+
+  await set({ frameShape: 'rect', frameRatio: '16:9', frameMargin: 0 });
+  const wideBox = await q(() => window.__plot.frameBox());
+  await set({ frameRatio: '2:3', frameMargin: 24 });
+  const tightBox = await q(() => window.__plot.frameBox());
+  check('frame/the-ratio-and-the-margin-each-move-the-boundary',
+    fnear(wideBox.width, 1100, 1e-6) && fnear(wideBox.height, 618.75, 1e-4)
+    && fnear(wideBox.y, 90.625, 1e-4)
+    && fnear(tightBox.inset, 192, 1e-6) && fnear(tightBox.height, 416, 1e-6)
+    && tightBox.width < fBox.width,
+    `16:9 at margin 0 is ${wideBox.width} x ${wideBox.height.toFixed(3)} (width-limited); `
+    + `2:3 at 24% insets ${tightBox.inset} px and comes back `
+    + `${tightBox.width.toFixed(3)} x ${tightBox.height}`);
+
+  check('frame/the-ratio-options-are-the-ones-the-file-will-accept',
+    JSON.stringify(await q(() => window.__plot.frameOptions()))
+      === JSON.stringify(await q(() => window.__plot.frameRatios()))
+    && (await q(() => window.__plot.frameRatios())).every(v => FR.isListedRatio(v)),
+    'the select is written from FRAME_RATIOS and the reader checks a saved ratio against the '
+    + 'same array — two lists of ratios would be one of them wrong');
+
+  /* THE BOUNDARY IS CHROME, NOT INK. Two structural claims rather than a pixel
+     one: the drawn segment counts do not move when the frame appears (it is its
+     own primitive in its own scene), and it composites with NORMAL blending
+     where the drawing is additive — a teal line that ADDED to the ink beneath it
+     would brighten exactly the crossings the additive look is about. */
+  await reset();
+  const drawnNoFrame = await q(() => window.__plot.drawn());
+  await set({ frame: 'on' });
+  const drawnFramed = await q(() => window.__plot.drawn());
+  const fMat = await q(() => window.__plot.frameMaterialInfo());
+  const dMat = await q(() => window.__plot.materialInfo());
+  check('frame/the-boundary-is-chrome-and-not-ink',
+    JSON.stringify(drawnNoFrame) === JSON.stringify(drawnFramed)
+    && fMat.normalBlending === true && dMat.additive === true
+    && fMat.depthTest === false && fMat.fog === false,
+    `${drawnFramed.total} segments drawn either way; the boundary composites NORMAL where the `
+    + 'drawing is additive, so it cannot brighten a crossing');
+
+  /* THE RECORDED LESSON, PAID FORWARD. A second LineMaterial on this page once
+     shipped without the viewport's resolution and every one of its segments
+     rasterised as a screen-filling quad — a stalled renderer, not a wrong
+     picture. This is the third one. */
+  check('frame/the-overlay-material-carries-the-viewport-resolution',
+    JSON.stringify(fMat.resolution) === JSON.stringify(dMat.resolution)
+    && fMat.resolution[0] > 0 && fMat.resolution[1] > 0,
+    `the boundary's material holds ${fMat.resolution.join(' x ')}, the same the drawing's does`);
+
+  /* A CONTROL NEVER MOVES THE CAMERA, and RESET FITS THE FRAME — the pair. The
+     first is this page's own rule; the second is what makes the first
+     survivable, because a boundary you just changed has to be reachable. */
+  await reset();
+  await view(VIEW);
+  await q(() => window.__plot.settle());
+  const camLoose = await q(() => window.__plot.cameraInfo());
+  const drawnLoose = await q(() => window.__plot.drawnScreenBox());
+  await set({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6 });
+  const camAfterFrame = await q(() => window.__plot.cameraInfo());
+  const camMoved = Math.max(...[0, 1, 2].map(i =>
+    Math.abs(camLoose.position[i] - camAfterFrame.position[i])));
+  /* THE OVERFLOW IS ON WHICHEVER SIDE IT IS ON, not the one this check first
+     assumed. With the stem off — which the gate's DEFAULTS say — the drawing is
+     a wide flat disc, so the unframed fit is WIDTH-limited and a portrait
+     boundary is overrun at the sides rather than at the foot. Measuring only
+     the bottom read −107 px, which is the drawing sitting comfortably inside
+     the very edge it was overrunning. */
+  const overflowOf = (d, f) => Math.max(f.x - d.x, f.y - d.y,
+    (d.x + d.width) - (f.x + f.width), (d.y + d.height) - (f.y + f.height));
+  const overflow = overflowOf(drawnLoose, fBox);
+  check('frame/a-frame-control-never-moves-the-camera',
+    camMoved < 1e-4 * camLoose.distance && overflow > 20,
+    `turning a 2:3 boundary on moved the camera ${camMoved.toExponential(2)} of a `
+    + `${camLoose.distance.toFixed(1)} standoff — and the drawing fitted to the whole viewport `
+    + `(${drawnLoose.width.toFixed(0)} x ${drawnLoose.height.toFixed(0)} px) now overruns the `
+    + `${fBox.width.toFixed(0)} x ${fBox.height} boundary by ${overflow.toFixed(1)} px, which is `
+    + 'what reset is for');
+
+  const inside = (d, f, slack = 1) => d.x >= f.x - slack && d.y >= f.y - slack
+    && d.x + d.width <= f.x + f.width + slack && d.y + d.height <= f.y + f.height + slack;
+  await view(VIEW);
+  const drawnFitted = await q(() => window.__plot.drawnScreenBox());
+  await set({ frameRatio: '1:1', frameMargin: 0 });
+  const squareBox = await q(() => window.__plot.frameBox());
+  await view(VIEW);
+  const drawnSquare = await q(() => window.__plot.drawnScreenBox());
+  check('frame/reset-fits-the-drawing-inside-the-boundary',
+    inside(drawnFitted, fBox) && inside(drawnSquare, squareBox)
+    && fnear(squareBox.width, 800, 1e-6) && fnear(squareBox.x, 150, 1e-6),
+    `at 2:3 the drawing lands in ${drawnFitted.width.toFixed(0)} x ${drawnFitted.height.toFixed(0)} `
+    + `inside ${fBox.width.toFixed(0)} x ${fBox.height}; at 1:1 it lands in `
+    + `${drawnSquare.width.toFixed(0)} x ${drawnSquare.height.toFixed(0)} inside `
+    + `${squareBox.width} x ${squareBox.height}`);
+
+  check('frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped',
+    (await q(() => window.__plot.frameInfoText())).includes('800 x 800')
+    && (await q(() => window.__plot.frameInfoText())).includes('ink outside the boundary is still drawn')
+    && (await (async () => { await set({ frame: 'off' });
+         return q(() => window.__plot.frameInfoText()); })()).includes('no frame'),
+    'the panel gives the box in pixels and says the boundary marks the crop rather than '
+    + 'applying it — clipping is the export session’s');
+
+  /* THE IDENTITY, IN THE BROWSER. At an 800 x 800 viewport a 1:1 boundary at
+     margin 0 IS the viewport, so `fitTangents` returns `tan0 * 1` on both axes
+     and the framed fit has to be the very fit the unframed page performs. Part
+     one asserts that arithmetic with `===`; here it is asserted on the camera
+     the page actually lands on, to 1e-9 of the standoff, because damping never
+     reaches exactly zero on this harness and no check here asks for the bit. */
+  await page.setViewportSize({ width: 800, height: 800 });
+  await reset();
+  await view(VIEW);
+  await q(() => window.__plot.settle());
+  const camUnframed = await q(() => window.__plot.cameraInfo());
+  await set({ frame: 'on', frameShape: 'rect', frameRatio: '1:1', frameMargin: 0 });
+  const sqBox = await q(() => window.__plot.frameBox());
+  await view(VIEW);
+  await q(() => window.__plot.settle());
+  const camFramed = await q(() => window.__plot.cameraInfo());
+  const camDelta = Math.max(...[0, 1, 2].map(i =>
+    Math.max(Math.abs(camUnframed.position[i] - camFramed.position[i]),
+             Math.abs(camUnframed.target[i] - camFramed.target[i]))));
+  check('frame/a-boundary-that-is-the-viewport-is-the-fit-the-page-shipped',
+    fnear(sqBox.width, 800, 1e-9) && fnear(sqBox.height, 800, 1e-9)
+    && fnear(sqBox.x, 0, 1e-9) && fnear(sqBox.y, 0, 1e-9)
+    && camDelta < 1e-9 * camUnframed.distance,
+    `on an 800 x 800 viewport a 1:1 boundary at margin 0 is the viewport exactly, and the `
+    + `framed fit lands ${camDelta.toExponential(2)} from the unframed one on a `
+    + `${camUnframed.distance.toFixed(1)} standoff`);
+  await page.setViewportSize({ width: 1100, height: 800 });
+  await reset();
+
+  // =========================================================================
+  // THE COMPOSITION FILE, ON THE PAGE. Every claim here is about the ROUND
+  // TRIP, field by field, because a restore that quietly drops one looks
+  // exactly like a restore that did not — the page is plausible either way.
+  log('\n--- the composition file ---');
+
+  /* WHAT THE PAGE HOLDS, read from the page's own accessors and never from the
+     document — so "it came back" is the page agreeing with itself before and
+     after, rather than the file agreeing with the file. */
+  const compSnapshot = () => q(() => ({
+    frame: window.__plot.frame(),
+    draw: window.__plot.state(),
+    stem: window.__plot.stem(),
+    bends: window.__plot.bends().map(b => ({ t: b.t, offset: b.offset })),
+    /* SORTED BY INDEX, because the store is a Map and its ITERATION ORDER is
+       not state. The page inserts an entry the first time a petal is selected,
+       so a session that picked 7 then 2 iterates 7, 2; a restore inserts them
+       in the file's own sorted order. Comparing unsorted made "did it come
+       back" a claim about which petal was clicked first. */
+    petals: window.__plot.petalWarpStore()
+      .map(e => ({ index: e.index, along: e.along, across: e.across, bends: e.bends }))
+      .sort((a2, b2) => a2.index - b2.index),
+    selected: window.__plot.petalInfo().selected,
+    camera: window.__plot.cameraInfo(),
+    petalHandles: document.getElementById('petalHandles').checked,
+  }));
+  const diffState = (a2, b2) => {
+    const out = [];
+    for (const k of ['on', 'shape', 'ratio', 'margin']) if (a2.frame[k] !== b2.frame[k]) out.push(`frame.${k}`);
+    for (const k of Object.keys(a2.draw)) if (a2.draw[k] !== b2.draw[k]) out.push(`draw.${k}`);
+    for (const k of ['on', 'bundle', 'join', 'length', 'droopDeg', 'neck', 'showHandles']) {
+      if (a2.stem[k] !== b2.stem[k]) out.push(`stem.${k}`);
+    }
+    if (JSON.stringify(a2.bends) !== JSON.stringify(b2.bends)) out.push('stem.bends');
+    if (JSON.stringify(a2.petals) !== JSON.stringify(b2.petals)) out.push('petals');
+    if (a2.selected !== b2.selected) out.push('selection');
+    if (a2.petalHandles !== b2.petalHandles) out.push('view.petalHandles');
+    for (const i of [0, 1, 2]) {
+      if (Math.abs(a2.camera.position[i] - b2.camera.position[i]) > 1e-6) out.push(`camera.position[${i}]`);
+      if (Math.abs(a2.camera.target[i] - b2.camera.target[i]) > 1e-6) out.push(`camera.target[${i}]`);
+    }
+    return out;
+  };
+
+  /* STATE A: every control off its default, TWO petals warped differently, and
+     a real bend on each of the two handle sets — a bend offset is not a control
+     value, so the only honest way to have one is to drag for it. */
+  const RT_PETAL_A = 7, RT_PETAL_B = 2;
+  await petalOn({ petalPick: RT_PETAL_A, petalAlong: 1.9, petalAcross: 0.7 });
+  await pick(RT_PETAL_B);
+  await set({ petalAlong: 0.6, petalAcross: 2.2 });
+  await pick(RT_PETAL_A);
+  await set({ frame: 'on', frameShape: 'ellipse', frameRatio: '4:5', frameMargin: 18,
+              families: 'both', uDensity: 5, vDensity: 8, weight: 2.4, brightness: 62,
+              depthDim: 20, stem: 'on', stemBundle: 1.6, stemJoin: 30, stemLength: 240,
+              stemDroop: 35, stemNeck: 90, stemHandles: true, petalHandles: false });
+  await view(VIEW);
+  await q(() => document.getElementById('bendAdd').click());     // four stem bends, not three
+  const stemGrab = await q(() => window.__plot.handleScreenPos(1));
+  if (stemGrab) {
+    await page.mouse.move(stemGrab.x, stemGrab.y);
+    await page.mouse.down();
+    await page.mouse.move(stemGrab.x + 70, stemGrab.y - 20, { steps: 6 });
+    await page.mouse.up();
+  }
+  await set({ petalHandles: true });
+  const petalGrab = await q(() => window.__plot.petalHandleScreenPos(0));
+  if (petalGrab) {
+    await page.mouse.move(petalGrab.x, petalGrab.y);
+    await page.mouse.down();
+    await page.mouse.move(petalGrab.x + 40, petalGrab.y - 35, { steps: 6 });
+    await page.mouse.up();
+  }
+  await set({ petalHandles: false });
+  await q(() => window.__plot.settle());
+
+  const stateA = await compSnapshot();
+  const savedText = await q(() => window.__plot.compositionText());
+  const savedDoc = JSON.parse(savedText);
+  const aBendOffsets = stateA.bends.filter(b => b.offset.some(n => n !== 0)).length;
+  const aPetalOffsets = stateA.petals.reduce((n, p2) =>
+    n + p2.bends.filter(b => b.offset.some(m => m !== 0)).length, 0);
+
+  /* THE DOCUMENT DESCRIBES THE PAGE AS IT STANDS — gathered from the right
+     place. A writer that read the wrong control would round-trip perfectly and
+     still be wrong, so this compares the file against the page's own readers
+     before anything is restored. */
+  const gathered = [];
+  for (const f of FL.DRAW_FIELDS) {
+    const want = f.key === 'brightness' || f.key === 'depthDim'
+      ? stateA.draw[f.key] * 100 : stateA.draw[f.key];
+    if (savedDoc.draw[f.key] !== want) gathered.push(`draw.${f.key}`);
+  }
+  for (const [k, v] of [['on', stateA.stem.on ? 'on' : 'off'], ['bundle', stateA.stem.bundle],
+                        ['join', stateA.stem.join], ['length', stateA.stem.length],
+                        ['droopDeg', stateA.stem.droopDeg], ['neck', stateA.stem.neck]]) {
+    if (savedDoc.instances[0].stem[k] !== v) gathered.push(`stem.${k}`);
+  }
+  if (savedDoc.frame.on !== 'on' || savedDoc.frame.shape !== 'ellipse'
+      || savedDoc.frame.ratio !== '4:5' || savedDoc.frame.margin !== 18) gathered.push('frame');
+  if (savedDoc.selection.petal !== stateA.selected) gathered.push('selection.petal');
+  if (JSON.stringify(savedDoc.camera.position) !== JSON.stringify(stateA.camera.position)) gathered.push('camera.position');
+  if (savedDoc.view.petalHandles !== stateA.petalHandles) gathered.push('view.petalHandles');
+  if (savedDoc.instances[0].petals.length !== stateA.petals.length) gathered.push('petals.length');
+  check('save/the-document-describes-the-page-as-it-stands',
+    gathered.length === 0 && savedDoc.format === FL.FORMAT && savedDoc.version === FL.VERSION
+    && savedDoc.instances.length === 1
+    && savedDoc.instances[0].grid.petals === fileCensus.petals,
+    gathered.length ? `differed: ${gathered.join(', ')}`
+      : `${(savedText.length / 1024).toFixed(1)} KB · ${savedDoc.instances[0].petals.length} petal `
+        + `entries · ${savedDoc.instances[0].stem.bends.length} stem bends · grid identity names `
+        + `${savedDoc.instances[0].grid.petals} petals and ${savedDoc.instances[0].grid.segments} segments`);
+
+  check('save/a-real-drag-put-an-offset-on-both-bend-sets',
+    aBendOffsets > 0 && aPetalOffsets > 0
+    && savedDoc.instances[0].stem.bends.some(b => b.offset.some(n => n !== 0))
+    && savedDoc.instances[0].petals.some(p2 => p2.bends.some(b => b.offset.some(n => n !== 0))),
+    `${aBendOffsets} stem bend${aBendOffsets === 1 ? '' : 's'} and ${aPetalOffsets} petal bend`
+    + `${aPetalOffsets === 1 ? '' : 's'} carry a displacement — a bend offset is not a control `
+    + 'value, so the only honest way to have one is to drag for it');
+
+  /* STATE B: every field moved somewhere ELSE, so a restore that leaves a field
+     alone is a restore that failed. Both petals rested and a third selected,
+     the bend counts changed, the camera moved. */
+  await petalOn({ petalPick: 13, petalAlong: 1.3, petalAcross: 1.7 });
+  await set({ frame: 'off', frameShape: 'rect', frameRatio: '16:9', frameMargin: 3,
+              families: 'v', uDensity: 12, vDensity: 3, weight: 0.6, brightness: 15,
+              depthDim: 90, stem: 'off', stemBundle: 0.1, stemJoin: 60, stemLength: 90,
+              stemDroop: -60, stemNeck: 15, stemHandles: false, petalHandles: true });
+  await q(() => { document.getElementById('bendRemove').click();
+                  document.getElementById('bendReset').click(); });
+  await view([1, 0.1, 0.2]);
+  await q(() => window.__plot.settle());
+  const stateB = await compSnapshot();
+  const movedEverywhere = diffState(stateA, stateB);
+
+  const restored = await page.evaluate(t => window.__plot.loadComposition(t, 'round-trip.json'), savedText);
+  await q(() => window.__plot.settle());
+  const stateC = await compSnapshot();
+  const backDiff = diffState(stateA, stateC);
+  check('restore/every-field-comes-back',
+    restored === true && backDiff.length === 0 && movedEverywhere.length >= 12,
+    backDiff.length ? `did not come back: ${backDiff.join(', ')}`
+      : `${movedEverywhere.length} fields were moved away and every one came back — `
+        + `${stateA.petals.length} petal entries, ${stateA.bends.length} stem bends, the frame, `
+        + 'the draw settings, the stem, the selection and the camera');
+
+  const compState = await q(() => window.__plot.compositionState());
+  check('restore/a-clean-round-trip-reports-nothing-missing',
+    compState.action === 'restored' && compState.notes.length === 0
+    && compState.mismatch === null && compState.dropped === 0
+    && (await q(() => window.__plot.compositionReadOut())).includes('every field in the file was read'),
+    'a departure from a clean read — missing, unknown, clamped, re-ordered, dropped — is a note, '
+    + 'so "nothing to report" is a measurement and not a hope');
+
+  check('restore/two-petals-come-back-with-their-own-warps',
+    stateC.petals.length === stateA.petals.length
+    && JSON.stringify(stateC.petals.find(p2 => p2.index === RT_PETAL_A))
+       === JSON.stringify(stateA.petals.find(p2 => p2.index === RT_PETAL_A))
+    && JSON.stringify(stateC.petals.find(p2 => p2.index === RT_PETAL_B))
+       === JSON.stringify(stateA.petals.find(p2 => p2.index === RT_PETAL_B))
+    && stateA.petals.find(p2 => p2.index === RT_PETAL_A).along
+       !== stateA.petals.find(p2 => p2.index === RT_PETAL_B).along
+    && !stateC.petals.some(p2 => p2.index === 13),
+    `petal ${RT_PETAL_A} came back at ${stateC.petals.find(p2 => p2.index === RT_PETAL_A).along}x along `
+    + `and petal ${RT_PETAL_B} at ${stateC.petals.find(p2 => p2.index === RT_PETAL_B).along}x, each with `
+    + 'its own bends — and petal 13, which state B had touched, is gone rather than kept');
+
+  check('restore/the-camera-and-the-selection-come-back',
+    stateC.selected === RT_PETAL_A && stateB.selected !== RT_PETAL_A
+    && Math.abs(stateC.camera.distance - stateA.camera.distance) < 1e-6
+    && [0, 1, 2].every(i => Math.abs(stateC.camera.target[i] - stateA.camera.target[i]) < 1e-6),
+    `selection ${stateA.selected} -> ${stateB.selected} -> ${stateC.selected}; the standoff came `
+    + `back to ${stateC.camera.distance.toFixed(4)} from ${stateB.camera.distance.toFixed(4)}`);
+
+  /* A FIELD THE FILE DOES NOT CARRY LEAVES THE PAGE ALONE AND IS NAMED. The
+     alternative — defaulting it — is a page that LOOKS restored, which is the
+     whole failure this format is built against. */
+  const holed = JSON.parse(savedText);
+  delete holed.draw.weight;
+  delete holed.instances[0].stem.join;
+  const beforeHole = await compSnapshot();
+  await page.evaluate(t => window.__plot.loadComposition(t, 'holed.json'), JSON.stringify(holed));
+  const afterHole = await compSnapshot();
+  const holeNotes = (await q(() => window.__plot.compositionState())).notes;
+  check('restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named',
+    afterHole.draw.weight === beforeHole.draw.weight
+    && afterHole.stem.join === beforeHole.stem.join
+    && holeNotes.filter(n => n.kind === 'missing').length === 2
+    && (await q(() => window.__plot.compositionReadOut())).includes('missing'),
+    `weight stayed at ${afterHole.draw.weight} and join at ${afterHole.stem.join}, and the panel `
+    + `names both: ${holeNotes.map(n => n.text.split(' — ')[0]).join(' · ')}`);
+
+  /* THE WORST FAILURE THIS FORMAT COULD HAVE. A composition restored against a
+     different bundle must SAY so, field by field, because warps are applied by
+     petal INDEX and a silently wrong petal is indistinguishable from a right
+     one in the picture. */
+  await page.evaluate(t => window.__plot.loadComposition(t, 'ok.json'), savedText);
+  const foreign = JSON.parse(savedText);
+  foreign.instances[0].grid.name = 'some-other-bloom.glb';
+  foreign.instances[0].grid.petals = 40;
+  foreign.instances[0].grid.segments = 99999;
+  await page.evaluate(t => window.__plot.loadComposition(t, 'foreign.json'), JSON.stringify(foreign));
+  const foreignState = await q(() => window.__plot.compositionState());
+  const foreignOut = await q(() => window.__plot.compositionReadOut());
+  check('restore/a-composition-from-a-different-grid-is-named-field-by-field',
+    foreignState.mismatch !== null
+    && foreignState.mismatch.map(d => d.field).sort().join(',') === 'name,petals,segments'
+    && foreignState.mismatch.find(d => d.field === 'petals').saved === 40
+    && foreignOut.includes('DIFFERENT grid') && foreignOut.includes('some-other-bloom.glb')
+    && foreignState.petals === stateA.petals.length,
+    `three fields differ and all three are named on the panel (${foreignState.mismatch
+      .map(d => `${d.field} ${JSON.stringify(d.saved)}->${JSON.stringify(d.current)}`).join(', ')}); `
+    + 'the warps were still applied, by index, and the panel says to check them');
+
+  const orphan = JSON.parse(savedText);
+  orphan.instances[0].petals[0] = { ...orphan.instances[0].petals[0], index: 999 };
+  await page.evaluate(t => window.__plot.loadComposition(t, 'orphan.json'), JSON.stringify(orphan));
+  const orphanState = await q(() => window.__plot.compositionState());
+  const orphanStore = await q(() => window.__plot.petalWarpStore());
+  check('restore/a-warp-for-a-petal-this-grid-does-not-have-is-dropped-and-counted',
+    orphanState.dropped === 1 && orphanState.petals === stateA.petals.length - 1
+    && !orphanStore.some(e => e.index === 999)
+    && orphanStore.length === stateA.petals.length - 1
+    && orphanState.notes.some(n => n.kind === 'dropped' && n.text.includes('999')),
+    `petal 999 was dropped and counted, not folded onto another petal — ${orphanStore.length} `
+    + `entries where the file named ${stateA.petals.length}`);
+
+  // Back to a clean restore before the button and the drop are exercised.
+  await page.evaluate(t => window.__plot.loadComposition(t, 'ok.json'), savedText);
+
+  /* THE BUTTON AND THE SERIALISER ARE ONE OWNER. The download is captured for
+     real, so this is not "a function returned a string" — it is the bytes a
+     visitor's browser receives. */
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 20000 }),
+    page.click('#saveComposition'),
+  ]);
+  const dlPath = await download.path();
+  const dlText = dlPath ? readFileSync(dlPath, 'utf8') : '';
+  const dlName = download.suggestedFilename();
+  const savedHook = await q(() => window.__plot.compositionSaved());
+  const nowText = await q(() => window.__plot.compositionText());
+  const stripStamp = t => t.replace(/"savedAt": "[^"]*"/, '"savedAt": "-"');
+  check('save/the-button-writes-what-the-page-serialises',
+    dlText.length > 0 && stripStamp(dlText) === stripStamp(nowText)
+    && savedHook && savedHook.text === dlText
+    && /^plot-composition-\d{8}-\d{4}\.json$/.test(dlName),
+    `the browser received ${(dlText.length / 1024).toFixed(1)} KB as ${dlName}, byte for byte `
+    + 'what the page serialises (its timestamp aside)');
+
+  /* A COMPOSITION DROPPED ON THE PAGE LOADS, through a real File on a real
+     DataTransfer and a real dispatched DragEvent — the same path the .glb drop
+     already takes, and the reason the drop handler now has to tell the two
+     kinds of file apart. */
+  await set({ ...DEFAULTS });
+  await view([1, 0.1, 0.2]);
+  const beforeDrop = await compSnapshot();
+  await page.evaluate(async t => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([t], 'dropped.json', { type: 'application/json' }));
+    window.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
+    await new Promise(r => setTimeout(r, 400));
+  }, savedText);
+  await q(() => window.__plot.settle());
+  const afterDrop = await compSnapshot();
+  const dropState = await q(() => window.__plot.compositionState());
+  const dropDiff = diffState(stateA, afterDrop);
+  const dropMoved = diffState(stateA, beforeDrop);
+  check('restore/a-composition-dropped-on-the-page-is-loaded',
+    dropState && dropState.action === 'restored' && dropState.name === 'dropped.json'
+    && dropDiff.length === 0 && dropMoved.length > 0
+    && (await q(() => window.__plot.source())) === GRID.split('/').pop(),
+    `${dropState ? dropState.action : 'nothing'} ${dropState ? dropState.name : ''}: `
+    + `${dropMoved.length} fields were away and ${dropDiff.length} did not come back`
+    + `${dropDiff.length ? ` (${dropDiff.join(', ')})` : ''} — a .json goes to the composition `
+    + `reader and a .glb to the grid reader, and the grid on screen is still `
+    + `${await q(() => window.__plot.source())}`);
+
+  /* AND A FILE THAT IS NOT A COMPOSITION CHANGES NOTHING AT ALL. Same contract
+     the grid loader already keeps: a refusal is reported and what is on screen
+     is left exactly as it was. */
+  const beforeJunk = await compSnapshot();
+  const junkPix = await px();
+  for (const [label, body] of [['not JSON', 'this is not json at all'],
+                               ['a JSON object that is not a composition', '{"hello":"world"}'],
+                               ['a newer version', JSON.stringify({ ...savedDoc, version: 99 })]]) {
+    await page.evaluate(t => window.__plot.loadComposition(t, 'junk.json'), body);
+    const st2 = await q(() => window.__plot.compositionState());
+    if (st2.action !== 'refused') { check(`restore/${label}-is-refused`, false, st2.action); }
+  }
+  const afterJunk = await compSnapshot();
+  const junkState = await q(() => window.__plot.compositionState());
+  const junkPix2 = await px();
+  check('restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves',
+    junkState.action === 'refused' && typeof junkState.error === 'string'
+    && diffState(beforeJunk, afterJunk).length === 0
+    && junkPix.ink === junkPix2.ink
+    && (await q(() => window.__plot.compositionReadOut())).includes('left exactly as it was'),
+    `three refusals in a row — the last says "${junkState.error.slice(0, 60)}…" — and the page `
+    + `held ${junkPix2.ink} ink pixels throughout`);
+
+  /* EVERY CONTROL THE PANELS HOLD IS EITHER A FIELD OF THE FILE OR A NAMED
+     EXCEPTION. This is the one form of silent partial restore no round-trip
+     check can see: a control added later that nobody ever saved round-trips
+     perfectly, because it is not in the file to be compared. */
+  const EXEMPT = {
+    gridFile: 'a file input — the grid is identified in the file, never embedded in it',
+    compositionFile: 'a file input — it is how a composition gets here',
+    petalPick: 'the selection, which the file carries at the top level as one cursor',
+  };
+  const pageControls = await q(() => window.__plot.pageControls());
+  const covered = new Set([...FL.FRAME_FIELDS, ...FL.DRAW_FIELDS, ...FL.VIEW_FIELDS,
+                           ...FL.STEM_FIELDS, ...FL.PETAL_FIELDS].map(f => f.control));
+  const uncovered = pageControls.filter(c => !covered.has(c.id) && !(c.id in EXEMPT));
+  check('save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception',
+    uncovered.length === 0 && pageControls.length === covered.size + Object.keys(EXEMPT).length,
+    uncovered.length ? `not saved anywhere: ${uncovered.map(c => c.id).join(', ')}`
+      : `${pageControls.length} controls: ${covered.size} are fields of the file and `
+        + `${Object.keys(EXEMPT).length} are named exceptions (${Object.keys(EXEMPT).join(', ')})`);
+
+  await set({ ...DEFAULTS });
+
   // --- the panels ----------------------------------------------------------
   const panels = await q(() => [...document.querySelectorAll('details.panel')]
     .map(d => ({ id: d.id, summary: d.querySelector('summary').textContent.trim(), open: d.open })));
   check('panels/every-panel-is-present-and-is-a-details',
-    panels.length === 5 && panels.every(p => p.open)
-    && panels.map(p => p.summary).join('|') === 'LOAD GRID|GRID|DRAW|PETAL|STEM',
+    panels.length === 7 && panels.every(p => p.open)
+    && panels.map(p => p.summary).join('|')
+       === 'LOAD GRID|COMPOSITION|GRID|FRAME|DRAW|PETAL|STEM',
     panels.map(p => `${p.summary}(${p.id})`).join(' · '));
 
   // Driven through `brightness`, which no mutation in this file touches, so

@@ -2165,15 +2165,17 @@ bottleneck again, the next thing to skip is the head transform during a BEND
 drag: the head cannot move then, and re-transforming 16,268 points to prove it
 is the one piece of work that is knowably wasted.
 
-**Verify with `node tools/verify-plot.mjs`** (120 checks). Part one drives the
-shipped `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
+**Verify with `node tools/verify-plot.mjs`** (165 checks). Part one drives the
+shipped `plot-grid.js`, `plot-stem.js`, `plot-warp.js`, `plot-petal.js`,
+`plot-frame.js` and `plot-file.js`
 functions in Node over fixtures whose answer is written
 down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
 {0,4,8,9} where 9 survives ONLY as the margin; a flat 21-row petal is 40 mm
-long, 4 mm wide and holds its base over exactly 6 mm), because on the real grid
-a wrong stride, a wrong family split, a merely plausible fog range, all four of
-the stem's silent failures and every one of the petal warp's still
-draw a plausible picture.
+long, 4 mm wide and holds its base over exactly 6 mm; a 2:3 box on a 1000 x 800
+canvas at a 10% margin is 426.667 x 640 at (286.667, 80)), because on the real
+grid a wrong stride, a wrong family split, a merely plausible fog range, all
+four of the stem's silent failures, every one of the petal warp's and every one
+of the composition file's still draw a plausible picture.
 **EVERY DRAW CHECK RUNS WITH THE STEM OFF AND NO PETAL PICKED**, which the
 gate's own `DEFAULTS` say, so the ink and segment counts there are the ones
 /plot shipped and neither the stem nor a highlight can hide inside them; later
@@ -2182,9 +2184,10 @@ drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs THIRTY-FIVE mutants and is required before
+way. **`--negative-control` runs FIFTY-ONE mutants and is required before
 quoting a pass from a changed harness**; it re-serves broken copies of
-`plot.js`, `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
+`plot.js`, `plot-grid.js`, `plot-stem.js`, `plot-warp.js`, `plot-petal.js`,
+`plot-frame.js` and `plot-file.js`
 through the gate's own HTTP
 server (and imports the broken module for part one — written into the REPO ROOT,
 because `plot-stem.js` imports `./plot-warp.js` and a mutant anywhere else
@@ -2207,6 +2210,17 @@ live with nothing picked, and a fifth for the defect the sheet found while
 photographing them: the seam and the count of base points beside it naming
 DIFFERENT populations. Note that four of those five are invisible without a
 second warped petal on screen at the same time.
+**THE FRAME'S FIVE** are a margin that never insets, a ratio that never reaches
+the box, an ellipse drawn as a rectangle, a fit that ignores the boundary, and a
+frame control that re-frames the drawing; **THE COMPOSITION FILE'S ELEVEN** are a
+writer that drops a draw field, **a TABLE ROW that vanishes** (the one way a
+field is lost with the writer and the reader still agreeing perfectly — neither
+is looking for it, nothing is reported, and only the written-down census sees
+it), a reader that skips a stem field, a missing field that stops being
+reported, **the global warp model reintroduced in the file**, **a restored warp
+that lands on the NEXT petal**, a grid mismatch that is not reported, a newer
+version read anyway, a camera that is not restored, a selection that is not
+restored, and a dropped warp folded onto petal 0 instead.
 
 **THE SEAM'S COUNT HAS TO NAME THE SEAM'S OWN POPULATION.** The seam ranges over
 every warped petal (so one base drifting cannot hide behind another's holding)
@@ -2218,14 +2232,14 @@ panel prints — which is its job (does the panel say what the page holds?) and 
 structurally blind to the page holding the wrong thing. What sees it is a second
 warped petal: `warp/two-petals-hold-different-warps-at-once` now asserts the
 count is positive with nothing picked and GROWS when a second petal is warped.
-**35 of 35 clean**, and the sweep costs roughly three hours — about
-five minutes a mutant, because each is a full 120-check browser run.
+The sweep costs well over four hours now — about
+six minutes a mutant, because each is a full 165-check browser run.
 `--mutant=a,b,c` takes a comma list and is how to re-verify one
-without paying for the rest. **THE THREE-HOUR RUN IS NOT SURVIVABLE IN A
-CONTAINER THAT RESTARTS**: two attempts at the whole sweep were killed
+without paying for the rest. **THE WHOLE-SWEEP RUN IS NOT SURVIVABLE IN A
+CONTAINER THAT RESTARTS**: two attempts at it were killed
 mid-flight (one at 26 of 35, one immediately after its base pass), so
-the 35 were closed out in CHUNKS of four or five — each chunk pays its
-own five-minute base pass, which is cheap against losing an hour. The
+mutants are closed out in CHUNKS of four or five — each chunk pays its
+own base pass, which is cheap against losing an hour. The
 one to run alone is `the-highlight-material-misses-the-resolution`: it
 re-creates the pathological rendering it exists to catch and is the
 slowest mutant in the file by construction.
@@ -2611,11 +2625,10 @@ to say whose.
 part-way through, leaving stale panel outputs beside a live drawing.** A rest object is a
 value of the same TYPE, not a smaller one.
 
-**PERSISTENCE IS STILL OUT OF SCOPE AND WARPS STILL EVAPORATE ON RELOAD — but the shape of
-what will have to be saved is now settled, and the FRAME/save session inherits it: the
-composition file stores a warp PER PETAL** (index → `{ along, across, bends }`), not one warp
-for the drawing. A file with a single global warp cannot express the state this page can
-already reach.
+**PERSISTENCE IS BUILT — see the composition file below.** The shape this section predicted is
+what shipped: **the file stores a warp PER PETAL** (index → `{ along, across, bends }`), not
+one warp for the drawing, because a file with a single global warp could not express the
+state this page can already reach.
 
 **A HANDLE THAT PROJECTS UNDER A CONTROL COLUMN CANNOT BE GRABBED** — /print's measured
 lesson, arriving here as a real limit of the tool rather than of the harness: the gate and
@@ -2666,6 +2679,167 @@ the slider to 1.00 really does rest that petal — and it silently resets the ve
 check is about. `pick()` writes only the selection; scales are applied after it, never with
 it.
 
+**THE FRAME IS A CROP REGION IN THE VIEWPORT'S OWN PIXEL SPACE, AND `frameRect` IS ITS ONE
+OWNER** (session of Sep 8; `plot-frame.js` — read its header). An aspect ratio is a property
+of an output image, and a boundary defined in grid millimetres would change shape every time
+the camera turned, so the boundary is a function of the canvas size in CSS pixels, the ratio
+and the margin, and of nothing else. The overlay's own vertices, the camera fit, the
+read-out's pixel figures and the saved file all read that one function.
+
+**TWO SHAPES AND A SEPARATE RATIO, NOT FOUR TYPES.** A square is the rectangle at 1:1 and a
+circle is the ellipse at 1:1 — reachable exactly rather than as named types that could
+disagree with the ratio control — and the ellipse is INSCRIBED IN THE VERY SAME BOX, so
+switching the shape moves no edge. The ratio select is written from `FRAME_RATIOS` and the
+file reader checks a saved ratio against that same array: two lists of ratios is one of them
+being wrong. **THE MARGIN INSETS FROM THE SHORTER SIDE**, so one number is the same visual
+gap on a wide window and a tall one, and margin 0 puts the boundary on the viewport edge at
+every ratio.
+
+**THE BOUNDARY IS A DRAWN LINE AND THE EXTERIOR IS NOT VEILED, and that is a decision with a
+reason rather than the cheap option.** On a black ground under additive white ink, dimming
+the exterior dims only the INK (the ground is already black either way) and a letterbox is
+indistinguishable from the ground entirely — so wherever the drawing does not reach the edge,
+which is most of the boundary's length, neither treatment states where the frame is at all.
+A line does, everywhere. It is drawn in the panel's teal so it reads as chrome, as its OWN
+primitive in its OWN scene through an orthographic camera in CSS pixels, in a second pass
+with `autoClear` off (/print's overlay discipline), and with **NORMAL blending where the
+drawing is additive** — a teal line that added to the ink beneath it would brighten exactly
+the crossings the additive look is about. The DRAW panel's segment counts are identical with
+the boundary on and off.
+
+**RESET FITS THE FRAME; A FRAME CONTROL NEVER MOVES THE CAMERA.** `fitTangents` is the one
+expression both arms go through, and **the unframed arm is the expression /plot shipped, term
+for term** — hand it the canvas's own box and it returns `tanY` and `tanY * W / H`, and
+`camera.aspect` IS W/H. The gate asserts that with `===` on the arithmetic, and separately on
+an 800x800 viewport where a 1:1 boundary at margin 0 IS the viewport, so the framed fit has
+to land on the same camera as the unframed one. The consequence is deliberate and is the
+reason the frame ships ON: changing the ratio leaves the drawing overrunning the new boundary
+until you reset, and a frame that shipped off would guarantee that overflow the first time
+anyone switched it on.
+
+**INK OUTSIDE THE BOUNDARY IS STILL DRAWN — this marks the crop, it does not apply it**, and
+the panel says so in those words. What a non-rectangular frame costs downstream is recorded
+in `plot-frame.js`'s header rather than left to be rediscovered: RASTER export needs alpha
+outside the ellipse or a fill in the ground colour (cropping to the bounding box keeps the
+four corners), SVG needs a real `<clipPath>` applied to every stroked path, and BACKGROUND
+SHAPES will have to clip AT this boundary rather than at the viewport — which is the point at
+which the boundary stops being an overlay and becomes a clip region other things read.
+
+**THE FOUR FRAME DEFAULTS ARE NOT A RULING** — they are new controls, so they are not a
+re-tuning of the approved DRAW and STEM tables, but Eva has not seen them either. **The frame
+shipping ON is the one change to what the page looks like when it opens**, and it is one word
+to turn off.
+
+| control | default | range | what it is |
+|---|---|---|---|
+| frame | `on` | on / off | whether there is a boundary at all |
+| shape | rectangle | rectangle / ellipse | two types; the ratio is the other axis |
+| ratio | 2:3 | nine `w:h` values | 1:1 gives the square and the circle |
+| margin | 6% | 0–40% | of the SHORTER side, inset on all four |
+
+**A COMPOSITION SAVES AND LOADS BACK, AND THE FILE'S SHAPE IS THE PART THAT WILL NOT BE CHEAP
+TO CHANGE** (`plot-file.js` — read its header before changing anything about what is
+written). `plot-composition` v1, JSON, and **the root is a LIST OF INSTANCES holding exactly
+one**. A composition will eventually carry several blooms at different scales — the reference
+this direction is aimed at is five — and that is a change to the root's CARDINALITY, not to
+its fields: `{stem, petals, camera}` at the root would have to be migrated in every file
+already saved, where `{instances: [...]}` only ever gains entries. Each instance carries its
+own grid identity, stem parameters, per-petal warps and a TRANSFORM (identity today, and
+REPORTED as not applied if a file carries another); the frame, the camera, the draw settings
+and the selection stay at the top level, because they are properties of the composition and
+not of any one bloom. **Multi-instance loading, selection and transforms are NOT built, and
+nothing about them is foreclosed.** The selection is ONE cursor (`{instance, petal}`) at the
+top level rather than a remembered petal on each instance, because you can only be editing
+one petal of one bloom at a time.
+
+**THE WARP IS PER PETAL IN THE FILE AS ON THE PAGE** — `instances[i].petals` is a LIST of
+`{index, along, across, bends}`, one entry per petal that has ever been selected, and not one
+warp the bloom shares. A file with a single global warp could not express the state the page
+can already reach (four petals at four shapes), which is why the previous session's ownership
+correction is a property of the FORMAT and not only of the page. Entries at REST are saved
+too: an entry exists because that petal was selected, which is real state, and saving only the
+deformed ones would make the round trip inexact for a reason nobody could see.
+
+**FOUR THINGS CLOSE THE TRAP, AND NONE OF THEM IS A COMMENT.** A restore that silently does
+not restore something is invisible — every field can be dropped in the write, dropped in the
+read, or read into the wrong place, and the page is plausible either way.
+1. **ONE FIELD TABLE PER GROUP, WALKED BY BOTH DIRECTIONS.** `composeDoc` builds each group by
+   iterating its table and `readDoc` reads it by iterating the same table, so a field cannot
+   be written and not read. What the TABLES say is checked against a written-down census in
+   the gate, because a table ROW that vanished would round-trip perfectly while losing its
+   field — that is a mutant (`the-frame-field-table-loses-a-row`).
+2. **EVERY SCALAR IN THE FILE IS A CONTROL'S OWN VALUE, VERBATIM.** Nothing is converted,
+   rescaled or renamed on the way in or out, so "read into the wrong place" needs a wrong
+   `control` in the table rather than a wrong conversion nobody can see. The bounds come from
+   the control's own `min`/`max`/`step` at read time, so the markup cannot drift from the
+   format.
+3. **A MISSING FIELD IS REPORTED AND THE PAGE IS LEFT ALONE, NEVER DEFAULTED.** Defaulting a
+   field the writer forgot produces a page that LOOKS restored, which is the exact failure.
+   Every departure from a clean read — missing, unknown, clamped, snapped, re-ordered,
+   dropped, not-applied — comes back as a note, so **"a clean round trip reports nothing" is
+   a check rather than a hope**.
+4. **A NEWER VERSION IS REFUSED, NOT PARTLY READ.** Ignoring fields a future version added is
+   the same silent partial restore in another coat.
+
+**THE GRID IS NOT IN THE FILE, AND A MISMATCH IS SAID FIELD BY FIELD.** It is ~1.9 MB and
+already on disk, so what is stored is its name, the export's `mode` and the census the page
+recounted from it. A composition restored against a different bundle is **restored, and told**
+— not refused, because a re-export of the same bloom is a mismatch too — with the mismatch as
+the loudest line in the panel naming what differs (`petals 28 → 40`), because "the hash
+changed" is not something an artist can act on and a SILENT wrong petal is the worst thing
+this format could do. **A warp for a petal the grid does not have is DROPPED and counted,
+never folded onto a neighbour** (`resolvePetals`), and both halves are mutants.
+
+**AND ONE CHECK COVERS THE FORM OF SILENT PARTIAL RESTORE NO ROUND TRIP CAN SEE:** a control
+added later that nobody saved round-trips perfectly, because it is not in the file to be
+compared. `save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception`
+enumerates the panels' own inputs and requires each to be a field of a table or one of three
+named exceptions (the two file inputs, and `petalPick`, which the file carries as the
+selection). Adding a control to `/plot` now fails the gate until it is saved or exempted.
+
+**THE FRAME AND THE FILE HAVE THEIR OWN SHEET: `node tools/shot-plot-frame.mjs <dir>`** —
+16 cells in four sections. The boundary at both shapes, at 1:1 / 2:3 / 16:9, at margin 0 and
+30%, with the frame-off pair; the "a control never moves the camera / reset fits the
+boundary" pair; and **a real save, a real page RELOAD and a real restore**, with the measured
+per-field difference printed in the caption, because a picture of a round trip is worth
+nothing without the number beside it. The saved file is written out beside the sheet. The
+last cell is a restore against a DIFFERENT grid, which is the failure that matters most.
+
+**SIX THINGS THIS SESSION'S CHECKS GOT WRONG BEFORE THE SWEEP WAS CLEAN, each measured:**
+* **THE STALE-NAME GUARD CAUGHT A RENAME NOBODY MADE ON PURPOSE.** Two new checks had
+  identifiers colliding with names already live in `run()`, so they were renamed with a
+  word-boundary regex over the new block — and `\bcircle\b` matched inside the check NAME
+  `frame/a-square-is-a-rectangle-at-one-to-one-and-a-circle-an-ellipse`, because `\b` matches
+  at a hyphen. The check registered under a name no mutant claimed and two mutants claimed a
+  name the gate did not run. The guard the last session added for a DELIBERATE rename is what
+  reported it, on the first negative-control invocation, before a single mutant ran.
+  **Rename identifiers by hand in a file whose check names are prose.**
+* **A FRACTION OF THE VIEWPORT IS NOT A PLACE** — /print's lesson, arriving here for the
+  second time and from a new direction. The zoom check wheeled at "30% of the width, half the
+  height" and the click check aimed at `petalScreenPoint(7, 0.5)`; both sat on bare canvas for
+  two sessions and then sat on the GRID read-out, because the COMPOSITION panel made the left
+  column **180 px taller**. Four wheel events moved the camera **0.0 units** and scrolled a
+  paragraph instead, and the click check reported on a panel. `barePoint(fx, fy)` now ASKS the
+  page (`document.elementFromPoint`) and throws if nothing is in the clear, and the aim is
+  SEARCHED for over petals and fractions the way the sheets already search for a handle.
+  **Any panel added to this page can do this again.**
+* **THE OUTLINE IS A `Float32Array`**, because that is what the geometry buffer takes — so a
+  coordinate near 700 px carries ~8e-5 of quantisation and the ellipse's own residual lands
+  near 3e-7. The first version of the inscription check asked for 1e-6 and failed on the dust
+  rather than on the geometry.
+* **A `Map`'S ITERATION ORDER IS NOT STATE.** `petalWarps` inserts an entry the first time a
+  petal is picked, so a session that picked 7 then 2 iterates 7, 2 — while a restore inserts
+  them in the file's own sorted order. Comparing the store unsorted made "did it come back" a
+  claim about which petal was clicked first. (The FILE sorts by index on purpose, so two saves
+  of one page produce the same bytes.)
+* **AND THAT SORT MEANS A FIXTURE CANNOT EDIT `petals[0]` AND THEN LOOK FOR THE PETAL IT
+  NAMED** — `composeInstance` sorts, so `petals[0]` was petal 2 while the check went looking
+  at petal 7 for the nine bends it had just written.
+* **AN OVERFLOW IS ON WHICHEVER SIDE IT IS ON.** "The drawing overruns the new boundary" was
+  measured at the FOOT, and with the stem off — which the gate's DEFAULTS say — the drawing is
+  a wide flat disc whose unframed fit is WIDTH-limited, so it reads −107 px: the drawing
+  sitting comfortably inside the very edge it was overrunning.
+
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
 — run the gate and the sheet by hand. Note the corollary `/print` and `/cards`
@@ -2690,12 +2864,17 @@ LEAVES and buds; print or SVG export; any change to `/print`, the generator, or
 the grid export format. (The STEM is no longer out of scope — see the inferred
 stem above — but it is inferred from the u-lines, not loaded, and nothing about
 leaves follows from it.) Also out of scope this session and named so it is not
-mistaken for an omission: the FRAME panel, lock, save, shapes, cut-and-pull and
-export, and any persistence at all — stem settings and petal warps evaporate on
-reload, and save lands with the FRAME panel. TWIST was named in the petal
+mistaken for an omission: **LOCK VIEW, background SHAPES, cut-and-pull and
+EXPORT**. TWIST was named in the petal
 session's brief as the thing to drop if the session grew, and it was: bend and
 stretch shipped, twist did not. (PETAL SELECTION AND PER-PETAL WARP are no
-longer out of scope — see the petal section above.)
+longer out of scope — see the petal section above; nor are THE FRAME and SAVE —
+see the frame section. **LOCK was deliberately dropped from the frame/save
+session rather than deferred by accident**: it gates nothing today, because
+shapes are not built, so its only effect would be disabling orbit. It ships
+alongside the shapes it exists to enable, and the safety pairing still holds in
+the other direction — save landed first, so when the one-way lock arrives the
+guard is already there.)
 
 **`/plot` EXISTS NOW, SO THE PARKED FLOWER-PETAL-PATH TRIGGER NAMES A REAL
 PAGE.** `docs/bloom-session-28-outcome.md` parked the FLOWER's petal-path
@@ -2726,17 +2905,18 @@ strand modes) is in that doc so it is not re-derived.
    each row about the centre line's own tangent; the frame already has the rows
    and the stations, so what it needs is the tangent and one more term in
    `petalDeltaAt`, gated by the same `rootHold`.
-1. **A UI overhaul for `/plot`.** The panels are `/print`'s grammar applied
-   as-is, which was right for shipping a viewer and is not a considered design
-   for this page. The STEM and PETAL panels make this more pressing, not less:
-   there are now seventeen controls in the right-hand column, and one of them —
-   the petal picker — changes what four of the others MEAN.
-1b. **THE COMPOSITION FILE STORES A WARP PER PETAL.** Whenever save and the FRAME
-   panel land, this is inherited rather than decided: `petalWarps` is index →
-   `{ along, across, bends }` and a file holding one global warp cannot express a
-   state this page can already reach (four petals at four shapes — the sheet's
-   cell 16). Eva's Sep 8 correction is the reason it is a Map and not a record on
-   the page; see the ownership section above.
+1. **A UI overhaul for `/plot`, and it is now the most pressing thing on this
+   list.** The panels are `/print`'s grammar applied as-is, which was right for
+   shipping a viewer and is not a considered design for this page. There are
+   **twenty-three controls across seven panels** now, one of them — the petal
+   picker — changes what four of the others MEAN, and the left column has grown
+   tall enough that it covers canvas a hand wants to drag on (it ate the gate's
+   two hardcoded pointer coordinates the day COMPOSITION landed).
+1b. **THE COMPOSITION FILE IS BUILT** — `plot-composition` v1, a warp per petal,
+   and a root that is a LIST of instances holding one. What is inherited by the
+   NEXT sessions rather than decided by them: **lock state, background shapes and
+   cut-and-pull state are added as FIELDS**, and a second bloom is an ENTRY —
+   neither needs a migration. Anything that changes the root's cardinality does.
 2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
    for the export itself, and it belongs to the GENERATOR, not to this viewer.
    `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
