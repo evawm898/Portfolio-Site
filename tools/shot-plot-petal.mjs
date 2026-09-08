@@ -8,13 +8,19 @@
 // pictures — in particular the three the page measures on itself and that no
 // picture can show:
 //
-//   SEAM      the largest movement of any point the file placed at u = 0. Zero
-//             is the claim; the petal's base is shared with the attachment ring
-//             the inferred stem hangs from, and a base that drifted would tear
-//             the petal off the bundle.
-//   MOVED     how far this petal actually travelled, in millimetres.
-//   OFF IT    how many strips on the other 27 petals came back as the very
-//             arrays the file wrote. An identity, not a tolerance.
+//   SEAM      the largest movement of any point the file placed at u = 0, over
+//             EVERY warped petal. Zero is the claim; the petals' bases are
+//             shared with the attachment ring the inferred stem hangs from, and
+//             a base that drifted would tear the flower off the bundle.
+//   WARPED    which petals carry a warp and what each one is set to, read off
+//             the page's own store. A WARP BELONGS TO ITS PETAL: selection
+//             loads that petal's values into the panel and never applies the
+//             panel's values to the petal, so what the sliders read and what a
+//             petal holds are two different facts and the sheet prints both.
+//   MOVED     how far the selected petal actually travelled, in millimetres.
+//   DRAWN FROM THE FILE'S OWN ARRAYS
+//             how many strips came back as the very arrays the file wrote. An
+//             identity, not a tolerance.
 //
 // EVERY BEND CELL IS PRODUCED BY A REAL POINTER DRAG on a handle the page
 // itself projected to the screen. A picture of a bend the hand cannot reach is
@@ -147,9 +153,64 @@ const DEFAULTS = { families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
                    stemJoin: 12, stemLength: 170, stemDroop: 0, stemNeck: 45,
                    stemHandles: false,
                    petalPick: -1, petalAlong: 1, petalAcross: 1, petalHandles: false };
+
+/* PICKING AND WARPING ARE TWO SEPARATE WRITES, because a warp belongs to its
+   petal: selecting LOADS that petal's values into the two sliders, so a sweep
+   that writes every control at once puts 1.00x straight back over what it just
+   loaded. Legitimate page behaviour — a hand dragging the slider to 1.00 really
+   does reset that petal — and fatal to a sheet trying to photograph a loaded
+   value. */
+const pick = index => page.evaluate(i => {
+  const el = document.getElementById('petalPick');
+  el.value = String(i);
+  el.dispatchEvent(new Event('input', { bubbles: true }));
+}, index);
+
+/* AND CLEARING TAKES THE PAGE'S OWN CONTROLS. A warp outlives the selection
+   that made it and there is no page-wide reset, so each cell starts by picking
+   every warped petal in turn and putting it back: two sliders and a button,
+   nothing written from outside. */
+const restAll = async () => {
+  for (const e of await q(() => window.__plot.petalWarpStore())) {
+    if (!e.warped) continue;
+    await pick(e.index);
+    await set({ petalAlong: 1, petalAcross: 1 });
+    await click('petalBendReset');
+  }
+  await pick(-1);
+};
+
+/* ONE PETAL'S OWN WARP, WRITTEN THE WAY A HAND WRITES IT: pick, then set. Never
+   in one sweep — `set` writes every key it is given and the picker is one of
+   them, so a sweep that carries both puts the freshly-loaded 1.00x straight
+   back over the value it just loaded. That is legitimate page behaviour (a hand
+   dragging the slider to 1.00 really does rest that petal) and it is exactly
+   what makes several petals at once impossible to photograph by writing state. */
+const warpPetal = async (index, o = {}) => {
+  await pick(index);
+  const w = {};
+  if (o.along !== undefined) w.petalAlong = o.along;
+  if (o.across !== undefined) w.petalAcross = o.across;
+  if (Object.keys(w).length) await set(w);
+  if (o.drag) {
+    await dragPetalHandle(o.drag[0], o.drag[1], o.drag[2]);
+    await set({ petalHandles: false });
+  }
+};
+
+// `o` may carry petalPick / petalAlong / petalAcross; they are applied in that
+// order and after everything else, for the reason above.
 const reset = async (o = {}, dir = HOME, margin = 1.06) => {
-  await click('petalBendReset');
-  await set({ ...DEFAULTS, ...o });
+  await restAll();
+  const { petalPick, petalAlong, petalAcross, ...rest } = o;
+  await set({ ...DEFAULTS, ...rest, petalPick: -1, petalAlong: 1, petalAcross: 1 });
+  if (petalPick !== undefined && petalPick >= 0) await pick(petalPick);
+  if (petalAlong !== undefined || petalAcross !== undefined) {
+    const w = {};
+    if (petalAlong !== undefined) w.petalAlong = petalAlong;
+    if (petalAcross !== undefined) w.petalAcross = petalAcross;
+    await set(w);
+  }
   await view(dir, margin);
 };
 
@@ -162,16 +223,19 @@ async function cell(file, caption, clip) {
     petal: await q(() => window.__plot.petal()),
     frame: await q(() => window.__plot.petalFrame()),
     bends: await q(() => window.__plot.petalBends()),
+    // EVERY PETAL'S OWN WARP, so a caption can say what each one is set to
+    // rather than only what the panel happens to be showing.
+    store: (await q(() => window.__plot.petalWarpStore())).filter(e => e.warped),
+    controls: await q(() => window.__plot.petalControls()),
     drawn: await q(() => window.__plot.drawn()),
     ui: await q(() => window.__plot.state()),
     frameMs: +(await q(() => window.__plot.frameMs())).toFixed(2),
     settleFrames: frames, unsettled: !!unsettled });
-  console.log(`  ${file.padEnd(34)} petal ${String(info.selected).padStart(3)}  `
-    + (info.rest ? `at rest, all ${info.untouched} strips as written        `
-                 : `seam ${info.seamMm.toExponential(1)} mm  moved `
-                   + `${info.movedMm.toFixed(2).padStart(5)} mm  off it `
-                   + `${info.untouched}/${info.offPetal}`)
-    + `  ${cells[cells.length - 1].frameMs} ms  `
+  console.log(`  ${file.padEnd(36)} petal ${String(info.selected).padStart(3)}  `
+    + `${String(info.warpedPetals).padStart(2)} warped  seam `
+    + `${info.seamMm.toExponential(1)} mm  moved ${info.allMovedMm.toFixed(2).padStart(6)} mm  `
+    + `untouched ${String(info.untouched).padStart(4)}  `
+    + `${cells[cells.length - 1].frameMs} ms  `
     + `settled in ${frames}${unsettled ? ' (NOT SETTLED)' : ''}`);
 }
 
@@ -264,39 +328,78 @@ await cell('14-one-of-twenty-eight.png',
   'ONE OF TWENTY-EIGHT, at along 1.90x. The argument this whole session is about is in the other '
   + '27: read the caption\'s "off it" number rather than the picture, because a leak into a '
   + 'neighbour that shares the ring is exactly the failure a line drawing cannot show.');
-await reset({ petalPick: 14, petalAlong: 1.9 }, PLAN);
-await cell('15-the-warp-follows-the-selection.png',
-  'THE SAME SETTINGS ON PETAL_14. The two scales carry when you pick another petal; the BEND '
-  + 'offsets do not, and rest instead — a scale means the same thing on any petal, while a bend '
-  + 'offset is a world displacement in millimetres and would point the opposite way relative to a '
-  + 'petal facing the other way. Petal_0 is back on the file\'s own points.');
+/* A WARP BELONGS TO ITS PETAL, and the next three cells are that model. The
+   first version of this page held ONE warp and pointed it at whatever was
+   selected — two defects wearing one cause: picking a petal stamped the
+   sliders' current values onto it, and stepping off it took its shape away
+   again. Neither is visible in a single cell; both are obvious in a pair. */
+await pick(14);
+await cell('15-picking-another-loads-its-own.png',
+  'PETAL_14 PICKED, WITH PETAL_0 STILL AT 1.90x. Selection LOADS; it never applies. The panel now '
+  + 'reads petal_14\'s own 1.00x / 1.00x — that petal\'s values, not the ones that were on screen '
+  + 'a moment earlier — and the drawing did not move by a bit: the "warped" line below still names '
+  + 'petal_0 and only petal_0. What changed between this cell and the one above it is the '
+  + 'highlight, and nothing else. Stamping the panel onto the petal you just picked is what '
+  + 'shipped first, and it made picking a petal a destructive act.');
+
+/* SEVERAL PETALS, EACH DIFFERENT. This is the picture the global model could
+   not produce at all, and it is what the correction is for — the reference
+   compositions have petals at varied shapes. */
+await reset({}, PLAN);
+await warpPetal(0,  { along: 1.9, across: 0.7 });
+await warpPetal(7,  { along: 0.5, across: 1.9 });
+await warpPetal(14, { drag: [0, 150, -110] });
+await warpPetal(21, { along: 1.5, across: 1.5 });
+await cell('16-four-petals-four-shapes.png',
+  'FOUR PETALS, FOUR SHAPES, ALL AT ONCE — long and narrow, short and broad, bent by a real handle '
+  + 'drag, and enlarged. Each was picked in turn, given its own values and left; each holds them. '
+  + 'The other 24 are still drawn from the arrays the file wrote. The seam below ranges over EVERY '
+  + 'warped petal rather than over the selected one, so one base drifting cannot hide behind '
+  + 'another\'s holding.');
+
+await pick(-1);
+await cell('17-nothing-picked-and-the-warps-stay.png',
+  'THE SAME FOUR SHAPES WITH NOTHING PICKED. Deselecting writes nothing at all, so a warp outlives '
+  + 'the selection that made it — the first version dropped it, which meant a petal could only hold '
+  + 'a shape while it was the one being looked at. The two scales now read an EM DASH and are '
+  + 'switched off, because a number beside a control that applies to nothing is the global model\'s '
+  + 'own advertisement; the read-out says how many petals carry a warp whether or not one is picked.');
 
 // --- under load, with the stem --------------------------------------------
 await reset({ petalPick: SUBJECT, petalAlong: 1.8, petalAcross: 1.6,
               stem: 'on', stemDroop: 45 }, SIDE);
-await cell('16-with-the-stem-and-a-droop.png',
+await cell('18-with-the-stem-and-a-droop.png',
   'A STRETCHED PETAL ON A DROOPING STEM. The stem is built from the u-lines\' feet, and the petal '
   + 'law is exactly the identity at the base — so the stem does not notice a warp at all, and its '
   + 'own seam is still zero with the head turned 45°. Two seams, both measured, both zero, at the '
   + 'same ring.');
 await reset({ petalPick: SUBJECT, stem: 'on', stemDroop: 45, petalHandles: true }, SIDE);
 await dragPetalHandle(1, 120, 80);
-await cell('17-bent-on-a-drooping-stem.png',
+await cell('19-bent-on-a-drooping-stem.png',
   'AND THE TIP HANDLE DRAGGED WITH THE HEAD ALREADY DROOPED 45°. The handle is placed through the '
   + 'droop as well as through the warp, so it stands on the blade it belongs to rather than where '
   + 'that blade used to be, and the drag is solved back through both.');
 
 // --- the panel ------------------------------------------------------------
+/* THE PANEL WITH A SECOND PETAL WARPED BEHIND IT, so the read-out's own count
+   is showing more than one — the line that only means anything under the
+   ownership, and the one a reader should check against the store printed below
+   the cell. */
 await reset({ petalPick: SUBJECT, petalAlong: 1.7, petalAcross: 0.6 }, PLAN);
 await dragPetalHandle(0, 90, -70);
+await warpPetal(9, { along: 0.6, across: 1.7 });
+await pick(SUBJECT);
 await chrome(true);
-await cell('18-the-panel.png',
-  'THE PANEL. The picker is a dropdown flanked by two steppers because click-picking on a bloom '
-  + 'this dense is ambiguous more often than not — the numbers are in the index below. The read-out '
+await cell('20-the-panel.png',
+  'THE PANEL, with petal_0 picked and stretched and bent and petal_9 warped the other way behind '
+  + 'it. The picker is a dropdown flanked by two steppers because click-picking on a bloom this '
+  + 'dense is ambiguous more often than not — the numbers are in the index below. The read-out '
   + 'says what the law is doing with numbers rather than with adjectives: the axis measured along '
-  + 'this petal\'s own centre line, how far down the base is held, the gaussian widths the bend '
-  + 'points derived from their neighbours, the seam, and how many strips off this petal came back '
-  + 'as the file\'s own arrays.');
+  + 'THIS petal\'s own centre line, how far down the base is held, the gaussian widths the bend '
+  + 'points derived from their neighbours, the seam over EVERY warped petal, how many of the file\'s '
+  + '28 carry a warp, and how many strips came back as the arrays it wrote. The last line is the '
+  + 'ownership stated on the page: a warp belongs to its petal, so picking another one loads that '
+  + 'petal\'s values and leaves this shape where it is.');
 await chrome(false);
 
 /* --- HOW CLICK PICKING ACTUALLY BEHAVES, at two cameras --------------------
@@ -339,6 +442,16 @@ const probeAt = async (dir, label) => {
 const probe = await probeAt(HOME, 'the home framing');
 const probeLow = await probeAt(LOW, 'a low angle, where the whorls overlap most');
 
+/* WHICH PETALS CARRY A WARP AND WHAT EACH ONE IS SET TO — read off the page's
+   own store rather than restated from what this file wrote, because "the panel
+   shows 1.90x" and "petal_0 holds 1.90x" are exactly the two things the global
+   model conflated. */
+const storeLine = c => (c.store.length
+  ? `warped: ${c.store.length} of ${petalCount} — ` + c.store.map(e =>
+      `#${e.index} ${e.along.toFixed(2)}x/${e.across.toFixed(2)}x`
+      + (e.bends.some(b => b.offset.some(v => v !== 0)) ? ' bent' : '')).join(', ')
+  : 'warped: none');
+
 const petalCount = (await q(() => window.__plot.petalList())).length;
 const html = `<!doctype html><meta charset="utf-8"><title>/plot — petal selection and warp</title>
 <style>body{background:#000;color:#c8d2d1;font:14px/1.65 "IBM Plex Mono",ui-monospace,monospace;
@@ -354,13 +467,20 @@ measured on-screen box, never to a fixed rectangle. No pixel delta is quoted any
 renderer is not deterministic between page sessions, so a pixel figure would need its own
 same-tree control and none of these cells needs one — each settles instead until two consecutive
 frames are byte-identical.</p>
-<p><b class="n">The three numbers under every cell are the argument.</b>
-<b class="n">seam</b> is the largest movement of any point the file placed at u&nbsp;=&nbsp;0 — the
-petal's base is shared with the attachment ring the inferred stem hangs from, so zero there is what
-keeps the drawing one plant. <b class="n">moved</b> is how far this petal actually travelled.
-<b class="n">off&nbsp;it</b> is how many strips on the other ${petalCount - 1} petals came back as
-the very arrays the file wrote — an array identity, so a strip that shifted by a millionth of a
-millimetre would fail it where a tolerance would not.</p>
+<p><b class="n">The numbers under every cell are the argument.</b>
+<b class="n">seam</b> is the largest movement of any point the file placed at u&nbsp;=&nbsp;0, taken
+over every warped petal rather than over the selected one — the petals' bases are shared with the
+attachment ring the inferred stem hangs from, so zero there is what keeps the drawing one plant,
+and ranging over all of them is what stops one base drifting behind another's holding.
+<b class="n">warped</b> is the page's own store: which of the ${petalCount} petals carry a warp and
+what each one is set to. <b class="n">strips&nbsp;drawn&nbsp;from&nbsp;the&nbsp;arrays&nbsp;the&nbsp;file&nbsp;wrote</b>
+is an array identity, so a strip that shifted by a millionth of a millimetre would fail it where a
+tolerance would not.</p>
+<p><b class="n">A warp belongs to its petal.</b> Picking a petal LOADS that petal's own values into
+the two sliders; it never applies the sliders' values to the petal. So <b class="n">picked</b> and
+<b class="n">warped</b> below are two different facts, and the cells that matter most are the ones
+where they disagree: a petal holding a shape nobody is looking at, and a panel switched off beside
+a bloom that is deformed.</p>
 <p><b class="n">Why the picker is a list first and a click second, measured on this bloom with
 the shipped ${probe.tol}&nbsp;px tolerance:</b></p>
 <table style="border-collapse:collapse;margin:0 0 1rem"><tr style="color:#6fb7ae">
@@ -387,14 +507,21 @@ range of a few points across a factor of three and a half in radius.</p>
 </div>
 ${cells.map(c => `<figure><img src="${c.file}" alt="${c.file}">
 <figcaption><b class="n">${c.file}</b><br>${c.caption}
-<br><span class="m">petal ${c.info.selected < 0 ? 'none' : c.info.selected}
+<br><span class="m">picked ${c.info.selected < 0 ? 'none' : c.info.selected}
 ${c.info.selected >= 0 && c.frame ? `· axis ${c.frame.length.toFixed(2)} mm · hold ${c.frame.hold.toFixed(2)} mm (${c.frame.holdRows} rows)` : ''}
-· along ${c.petal.along.toFixed(2)}x · across ${c.petal.across.toFixed(2)}x
-· bends ${c.bends.length}${c.info.bendsRest ? ' at rest' : ' displaced'}
-<br>${c.info.rest
-  ? `at rest — all ${c.info.untouched} of the file's strips are the arrays it wrote`
-  : `seam ${c.info.seamMm.toExponential(1)} mm · moved ${c.info.movedMm.toFixed(2)} mm`
-    + ` · off it ${c.info.untouched} of the ${c.info.offPetal} strips on the other petals untouched`}
+· panel ${c.controls.alongDisabled && c.controls.acrossDisabled
+  ? 'switched off, reading ' + c.controls.alongOut + ' / ' + c.controls.acrossOut
+  : c.controls.along.toFixed(2) + 'x / ' + c.controls.across.toFixed(2) + 'x'}
+· bends ${c.bends.length}${c.info.selected < 0 ? '' : (c.info.bendsRest ? ' at rest' : ' displaced')}
+<br>${storeLine(c)}
+<br>${c.info.warpedPetals
+  ? `seam ${c.info.seamMm.toExponential(1)} mm over ${c.info.basePoints} base points`
+    + ` · ${c.info.movedStrips} strips moved, ${c.info.untouched} of `
+    + `${c.info.untouched + c.info.movedStrips}`
+    + ' drawn from the arrays the file wrote'
+    + (c.info.selected >= 0 && !c.info.rest
+        ? ` · this petal moved ${c.info.movedMm.toFixed(2)} mm` : '')
+  : `nothing is deformed — all ${c.info.untouched} strips are the arrays the file wrote`}
 · lines ${c.ui.families} · ${c.drawn.total} segments drawn
 · ${c.frameMs} ms/frame · settled in ${c.settleFrames} frames${c.unsettled ? ' (NOT SETTLED)' : ''}</span>
 </figcaption></figure>`).join('\n')}

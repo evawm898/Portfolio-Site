@@ -148,7 +148,14 @@
     <output id="petalPickOut">none</output>
   </div>
 
-  <!-- ALONG scales the petal's own centre line about its base; ACROSS scales
+  <!-- THE WARP BELONGS TO THE PETAL, AND THESE TWO ARE ITS EDITOR. Picking a
+       petal LOADS that petal's own values here; it never applies these values
+       to the petal. So selecting deforms nothing, a warp outlives the selection
+       that made it, and any number of petals can carry different warps at once.
+       With nothing picked they are disabled, because there is no page-wide
+       shape for them to hold.
+
+       ALONG scales the petal's own centre line about its base; ACROSS scales
        each point's offset from that centre line. They are independent because
        they act on different halves of one decomposition, so both at k is a
        similarity and either alone is not. ACROSS is held at the foot: 28 petals
@@ -182,7 +189,8 @@
   <label class="plot-check" for="petalHandles">
     <input type="checkbox" id="petalHandles" checked> show bend handles
   </label>
-  <div class="plot-hint">click a line to pick its petal &middot; drag a handle to bend it</div>
+  <div class="plot-hint">click a line to pick its petal &middot; drag a handle to bend it<br>
+    warps stay on their petal &mdash; picking another leaves this one as it is</div>
 
   <pre id="plot-petalstate"></pre>
 </details>

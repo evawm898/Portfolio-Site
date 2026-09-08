@@ -2087,7 +2087,7 @@ bottleneck again, the next thing to skip is the head transform during a BEND
 drag: the head cannot move then, and re-transforming 16,268 points to prove it
 is the one piece of work that is knowably wasted.
 
-**Verify with `node tools/verify-plot.mjs`** (116 checks). Part one drives the
+**Verify with `node tools/verify-plot.mjs`** (120 checks). Part one drives the
 shipped `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
 functions in Node over fixtures whose answer is written
 down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
@@ -2104,7 +2104,7 @@ drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs THIRTY mutants and is required before
+way. **`--negative-control` runs THIRTY-FIVE mutants and is required before
 quoting a pass from a changed harness**; it re-serves broken copies of
 `plot.js`, `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
 through the gate's own HTTP
@@ -2121,9 +2121,27 @@ file never placed, a warp that reaches every petal, a warp that reaches only the
 u lines, an along scale that also widens, a highlight material that never gets
 the viewport's resolution, a pick that takes the nearest line rather than the
 front-most, a drag that also selects, and a highlight that is a brightness as
-well as a hue.
-**30 of 30 clean**, and the sweep costs roughly two and a half hours — about
-five minutes a mutant, because each is a full 116-check browser run.
+well as a hue; and the OWNERSHIP's four each restore one half of the model Eva
+corrected — selection stamping the panel onto the petal it just picked,
+deselection dropping that petal's warp, only the SELECTED petal being drawn
+warped (every other one's warp held but not applied), and the two scales staying
+live with nothing picked, and a fifth for the defect the sheet found while
+photographing them: the seam and the count of base points beside it naming
+DIFFERENT populations. Note that four of those five are invisible without a
+second warped petal on screen at the same time.
+
+**THE SEAM'S COUNT HAS TO NAME THE SEAM'S OWN POPULATION.** The seam ranges over
+every warped petal (so one base drifting cannot hide behind another's holding)
+and the count printed beside it was the SELECTED petal's share — so picking an
+unwarped petal next to a warped one printed "every warped petal's base row is
+unmoved to 0.0e+0 mm, over 0 points". Found by reading a contact-sheet caption,
+not by a check, because the check compared the panel against the same field the
+panel prints — which is its job (does the panel say what the page holds?) and is
+structurally blind to the page holding the wrong thing. What sees it is a second
+warped petal: `warp/two-petals-hold-different-warps-at-once` now asserts the
+count is positive with nothing picked and GROWS when a second petal is warped.
+**35 of 35 clean**, and the sweep costs roughly three hours — about
+five minutes a mutant, because each is a full 120-check browser run.
 `--mutant=a,b,c` takes a comma list and is how to re-verify one
 without paying for the rest.
 
@@ -2433,12 +2451,72 @@ follows at droop 0), so a strip that shifted by a millionth of a millimetre woul
 array and would be counted. The panel prints the count; the gate asserts it is exactly the
 off-petal set.
 
-**A PETAL SWITCH RESTS THE BEND OFFSETS AND CARRIES THE TWO SCALES**, and the split is not
-a compromise: `along` and `across` are numbers that mean the same thing on any petal, while
-a bend offset is a WORLD displacement in millimetres — carried to a petal on the other side
-of the bloom it would point the same way in space and therefore the opposite way relative
-to that petal. There is no persistence yet, so nothing is stored per petal and the read-out
-says what carries.
+**A WARP BELONGS TO ITS PETAL, AND SELECTION LOADS RATHER THAN APPLIES** (Eva's correction,
+Sep 8, from the deploy preview — this SUPERSEDES the "a switch rests the bends and carries
+the scales" model that shipped first). `petalWarps` is a `Map` from petal index to that
+petal's own `{ along, across, bends }`; the two sliders and the handle set are a VIEW ONTO
+the selected entry, never a page-wide shape that the selection points at. Picking a petal
+calls `loadPetalControls()` and writes the panel FROM the store; nothing writes the panel's
+values INTO a petal except a hand moving a control (`commitPetalScales()`, on the control's
+own `input`). Deselecting writes nothing at all.
+
+**The first model was wrong in BOTH directions and each half looked like its own bug.**
+Picking a petal stamped whatever the sliders happened to read onto it, so selecting a petal
+DEFORMED it — a destructive act, on a page whose whole point is choosing which petal to look
+at; and moving off a petal took its shape away again, so an adjustment could only exist while
+its petal was the one selected. One cause: **the warp was global.** The consequence that made
+it worth a correction rather than a tweak is that many petals warped differently at once —
+the shape every reference composition has — was not merely awkward under the old model, it
+was UNREACHABLE.
+
+**AND THE GATE COULD NOT HAVE SEEN IT, WHICH IS THE MORE USEFUL HALF.** Every phase-2 check
+picked a petal and then wrote a value, in that order, so "stamped on selection" and "loaded
+on selection" produce the SAME drawing on every one of them; and no check ever looked at a
+petal after stepping off it, so "the warp is kept" and "the warp is dropped" were equally
+consistent with all 116. The four checks that separate them are the ones Eva named —
+`select/picking-a-petal-deforms-nothing` (every petal identical to the BIT across a pick,
+with a warped petal already on screen), `warp/a-warp-survives-deselection`,
+`warp/two-petals-hold-different-warps-at-once`, and
+`select/selecting-a-warped-petal-loads-its-own-values` — plus four mutants that each restore
+one half of the old model. **A check that writes the state it then measures cannot see who
+owns that state**; the witness has to be a read taken across a selection change.
+
+**`petalWarpStore()` IS WHAT A CHECK ASKS, NOT THE PANEL.** "The panel shows 1.90x" and
+"petal_0 holds 1.90x" are exactly the two facts the global model conflated, so the page
+exposes both — the store (every entry, with `rest` and `warped` per petal) and
+`petalControls()` (what the two sliders read and whether they are disabled). A count of moved
+strips cannot stand in for either.
+
+**THE BEND OFFSETS STAY ON THEIR PETAL TOO, and the argument that they should rest on a
+switch was an argument for the wrong thing.** A bend offset IS a world displacement in
+millimetres, so it would point the opposite way relative to a petal on the far side of the
+bloom — but that is a reason not to CARRY it to another petal, and under per-petal ownership
+nothing carries anywhere. Each petal keeps its own control points and its own offsets, and
+picking another one shows that petal's.
+
+**WITH NOTHING PICKED THE TWO SCALES ARE DISABLED AND READ AN EM DASH**, not `1.00x`: a
+number beside a control that applies to nothing is the global model's own advertisement. The
+read-out then says how many petals carry a warp — first, and whether or not one is picked,
+because a warp outlives its selection and "none picked" must not read as "nothing is
+deformed".
+
+**THE SEAM RANGES OVER EVERY WARPED PETAL, NOT OVER THE SELECTED ONE.** With several
+deformed at once, one base drifting could otherwise hide behind another's holding. Its
+companion count of base points is the same population — the count the seam sentence is ABOUT
+— while the selected petal's own `movedMm` is kept separately, because "moved up to N mm" has
+to say whose.
+
+**A FROZEN REST OBJECT NEEDS EVERY FIELD ITS READERS TOUCH.** `REST_PETAL` — what
+`readPetal()` returns with nothing picked — first shipped as `{ along: 1, across: 1 }`, and
+`warpFor` maps over `st.bends` unconditionally: **38 `pageerror`s, and `rebuild()` aborted
+part-way through, leaving stale panel outputs beside a live drawing.** A rest object is a
+value of the same TYPE, not a smaller one.
+
+**PERSISTENCE IS STILL OUT OF SCOPE AND WARPS STILL EVAPORATE ON RELOAD — but the shape of
+what will have to be saved is now settled, and the FRAME/save session inherits it: the
+composition file stores a warp PER PETAL** (index → `{ along, across, bends }`), not one warp
+for the drawing. A file with a single global warp cannot express the state this page can
+already reach.
 
 **A HANDLE THAT PROJECTS UNDER A CONTROL COLUMN CANNOT BE GRABBED** — /print's measured
 lesson, arriving here as a real limit of the tool rather than of the harness: the gate and
@@ -2446,8 +2524,10 @@ the sheet both search for a handle in the clear, and the answer for a hand is to
 Petal handles are AMBER where the stem's are teal, because with a drooped head the two runs
 can cross.
 
-**THE SIX PETAL CONTROLS ARE NOT A RULING** — unlike the DRAW and STEM defaults above, no
-one has turned them on the preview yet. Treat every number as a starting point:
+**THE SIX PETAL CONTROLS ARE NOT A RULING** — unlike the DRAW and STEM defaults above.
+Eva HAS now turned them on the preview, and what came back was the ownership correction
+above rather than a ruling on the numbers: "I said the defaults stand, I take that back."
+So the defaults are still a starting point:
 
 | control | default | range | what it is |
 |---|---|---|---|
@@ -2458,19 +2538,34 @@ one has turned them on the preview yet. Treat every number as a starting point:
 | show bend handles | on | — | you cannot drag what you cannot see |
 | (click tolerance) | 8 px | — | not a control; `PICK_TOLERANCE_PX`, and not the lever |
 
-**The petal has its own sheet: `node tools/shot-plot-petal.mjs <dir>`** — 18
+**The petal has its own sheet: `node tools/shot-plot-petal.mjs <dir>`** — 20
 cells: what ships with nothing picked, a petal picked at rest (the highlight
 alone), the handles, one petal BENT by a real drag with the other 27 untouched,
 that bend cropped to the petal's own measured box with both families on and then
 each family alone (the internal-tearing cells), along long and short, across wide
 and narrow, the narrow petal close enough to read its held foot, long-and-narrow
-together, the same settings moved to another petal, a stretched petal on a
+together, **the OWNERSHIP TRIO** — another petal picked while the first stays
+stretched (the panel loading 1.00x / 1.00x beside a bloom that is still
+deformed), FOUR petals at four different shapes at once, and those same four with
+NOTHING picked and the two scales switched off — then a stretched petal on a
 drooping stem, a tip handle dragged with the head already drooped, and the panel.
-Every caption carries the SEAM, how far the petal moved, and how many strips off
-it came back as the arrays the file wrote; the index carries the click-picking
+**Every caption prints PICKED and WARPED as two separate facts**, read off the
+page's own store rather than restated from what the tool wrote, because those are
+precisely the two the global model conflated; beside them the SEAM (over every
+warped petal), how far the selected petal moved, and how many strips came back as
+the arrays the file wrote. The index carries the click-picking
 measurement at TWO cameras and the tolerance sweep beside it. No pixel delta is quoted anywhere and every cell settles until two
 consecutive frames are byte-identical, the same discipline the stem sheet
 follows.
+
+**PICK AND SET ARE TWO SEPARATE WRITES IN THE HARNESS AND THE SHEET, and one blanket
+`set()` is what makes several petals at once impossible to photograph.** Both tools drive
+the page by writing every control in one sweep, and the picker is one of those controls: a
+sweep carrying both `petalPick` and `petalAlong: 1` picks the petal, LOADS its values, and
+then puts 1.00x straight back over them. That is legitimate page behaviour — a hand dragging
+the slider to 1.00 really does rest that petal — and it silently resets the very state the
+check is about. `pick()` writes only the selection; scales are applied after it, never with
+it.
 
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
@@ -2535,7 +2630,14 @@ strand modes) is in that doc so it is not re-derived.
 1. **A UI overhaul for `/plot`.** The panels are `/print`'s grammar applied
    as-is, which was right for shipping a viewer and is not a considered design
    for this page. The STEM and PETAL panels make this more pressing, not less:
-   there are now seventeen controls in the right-hand column.
+   there are now seventeen controls in the right-hand column, and one of them —
+   the petal picker — changes what four of the others MEAN.
+1b. **THE COMPOSITION FILE STORES A WARP PER PETAL.** Whenever save and the FRAME
+   panel land, this is inherited rather than decided: `petalWarps` is index →
+   `{ along, across, bends }` and a file holding one global warp cannot express a
+   state this page can already reach (four petals at four shapes — the sheet's
+   cell 16). Eva's Sep 8 correction is the reason it is a Map and not a record on
+   the page; see the ownership section above.
 2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
    for the export itself, and it belongs to the GENERATOR, not to this viewer.
    `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1

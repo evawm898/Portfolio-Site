@@ -116,7 +116,7 @@ const MUTANTS = [
                 noting too — the base row still holds and the stem is still
                 untouched, because with no warpable petal nothing moves at all. */
              'select/the-picker-lists-the-file-own-petals',
-             'warp/only-the-selected-petal-moves',
+             'warp/editing-moves-only-the-selected-petal',
              'warp/both-line-families-move-together',
              'stretch/along-changes-the-length-and-not-the-width',
              'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
@@ -124,7 +124,7 @@ const MUTANTS = [
              'bend/the-petal-handle-lands-under-the-pointer',
              'bend/a-petal-handle-drag-does-not-orbit-the-camera',
              'bend/add-and-remove-change-the-set-and-reset-rests-it',
-             'select/switching-petal-rests-the-bends-and-carries-the-scales',
+             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
              'readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
@@ -401,9 +401,10 @@ const MUTANTS = [
   {
     // The warp reaches every petal, not the one that is picked.
     id: 'the-warp-reaches-every-petal', file: 'plot.js',
-    from: '    if (!set.has(t) || !t.stations) return t;',
-    to: '    if (!t.stations) return t;',
-    breaks: ['warp/only-the-selected-petal-moves',
+    from: '  for (const a of active) for (const t of a.strips) owner.set(t, a);',
+    to: '  for (const a of active) for (const t of strips) owner.set(t, a);',
+    breaks: ['warp/editing-moves-only-the-selected-petal',
+             'warp/two-petals-hold-different-warps-at-once',
              'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
   },
   {
@@ -411,8 +412,8 @@ const MUTANTS = [
     // stay where the file put them and the petal tears along its own lattice —
     // and every other instrument here is looking at a u-line.
     id: 'the-warp-reaches-only-the-u-lines', file: 'plot.js',
-    from: "    if (!set.has(t) || !t.stations) return t;\n    const pts = petalPoints(",
-    to: "    if (!set.has(t) || !t.stations || t.kind !== 'u') return t;\n    const pts = petalPoints(",
+    from: "    if (!a || !t.stations) return t;\n    const pts = petalPoints(",
+    to: "    if (!a || !t.stations || t.kind !== 'u') return t;\n    const pts = petalPoints(",
     /* THE THREE EXTRAS ARE TRUE STATEMENTS ABOUT THIS MUTATION, NAMED RATHER
        THAN TUNED AROUND — the discipline the stem's own control settled on.
        The bend check asserts that ALL of the petal's strips moved and only ten
@@ -420,10 +421,63 @@ const MUTANTS = [
        every strip against a centre line the u-lines moved and the v-lines did
        not, so the width they read is neither the old one nor the new one. */
     breaks: ['warp/both-line-families-move-together',
-             'warp/only-the-selected-petal-moves',
+             'warp/editing-moves-only-the-selected-petal',
              'stretch/along-changes-the-length-and-not-the-width',
              'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
              'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
+  },
+
+  // ---- the warp belongs to the petal ------------------------------------
+  {
+    /* THE WARP GOES BACK TO BEING PAGE-WIDE: selection STAMPS whatever the
+       sliders currently read onto the petal just picked, instead of loading
+       that petal's own values. This is the defect the page shipped with, and
+       every check in this file was green under it — which is why the four
+       ownership checks exist. Picking a petal deforms it. */
+    id: 'selection-stamps-the-panel-onto-the-petal', file: 'plot.js',
+    from: '  frame = frameFor(index);\n  loadPetalControls();',
+    to: '  frame = frameFor(index);\n  commitPetalScales();',
+    breaks: ['select/picking-a-petal-deforms-nothing',
+             'select/selecting-a-warped-petal-loads-its-own-values',
+             'warp/two-petals-hold-different-warps-at-once'],
+  },
+  {
+    /* THE OTHER HALF OF THE SAME DEFECT: deselecting throws the warp away, so
+       an adjustment lives only as long as the selection that made it. */
+    id: 'deselecting-drops-the-warp', file: 'plot.js',
+    from: '  if (index >= 0) petalStateOf(index, true);',
+    to: '  if (index >= 0) petalStateOf(index, true); else petalWarps = new Map();',
+    breaks: ['warp/a-warp-survives-deselection'],
+  },
+  {
+    /* THE STATE IS PER PETAL BUT THE DRAWING IS NOT: only the selected petal is
+       drawn warped, so warping a second petal makes the first spring back while
+       its entry quietly survives. */
+    id: 'only-the-selected-petal-is-drawn-warped', file: 'plot.js',
+    from: '    if (!f || !mine) continue;',
+    to: '    if (!f || !mine || index !== selected) continue;',
+    breaks: ['warp/two-petals-hold-different-warps-at-once',
+             'warp/a-warp-survives-deselection'],
+  },
+  {
+    /* THE SEAM AND ITS COUNT STOP NAMING THE SAME POPULATION: the seam still
+       ranges over every warped petal and the count beside it drops back to the
+       SELECTED petal's share. This is what shipped, and the read-out's own
+       sentence is the only place it shows — a petal picked beside a warped one
+       reads "unmoved to 0.0e+0 mm over 0 points". Nothing about the drawing
+       moves, so only a check that warps two petals can see it. */
+    id: 'the-seam-counts-only-the-selected-petal-base-points', file: 'plot.js',
+    from: '    seamMm: pw.seam, basePoints: pw.basePoints,',
+    to: '    seamMm: pw.seam, basePoints: pw.mine.basePoints,',
+    breaks: ['warp/two-petals-hold-different-warps-at-once'],
+  },
+  {
+    /* A CONTROL THAT APPLIES TO NOTHING STAYS LIVE — the panel state that
+       advertised the page-wide model in the first place. */
+    id: 'the-scales-stay-live-with-nothing-picked', file: 'plot.js',
+    from: '  pui.petalAlong.disabled = !st;\n  pui.petalAcross.disabled = !st;',
+    to: '  pui.petalAlong.disabled = false;\n  pui.petalAcross.disabled = false;',
+    breaks: ['warp/a-warp-survives-deselection'],
   },
   {
     // The two stretches stop being independent: `along` widens the petal too,
@@ -2047,9 +2101,46 @@ async function run({ mutant = null } = {}) {
      aisles down then measured a petal that was bent AS WELL AS stretched and
      read 60.31 mm where 2.2x of 27.04 is 59.49. The stem sheet's own `reset`
      clicks its bend reset for the same reason. */
+  /* AND IT PICKS BEFORE IT WRITES THE SCALES, which the ownership makes
+     load-bearing rather than tidy. Selecting a petal LOADS that petal's values
+     into the two sliders; writing every control in one sweep then puts 1.00x
+     back over whatever was loaded, which is legitimate page behaviour (a hand
+     dragging the slider to 1.00 really does reset that petal) and makes the
+     load impossible to observe. So the selection goes in on its own first, and
+     the scales are written afterwards and only when the caller asked for them.
+     `pick` is the same event a click or an arrow raises — one path in. */
+  const pick = index => page.evaluate(i => {
+    const el = document.getElementById('petalPick');
+    el.value = String(i);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  }, index);
+  /* CLEARING A WARP TAKES THE PAGE'S OWN CONTROLS, because a warp now outlives
+     the selection that made it and there is no page-wide reset — which is the
+     ownership, not an omission. So this picks each warped petal in turn, puts
+     its two scales back to 1.00x and clicks its bend reset: three real controls,
+     no state written from outside. Without it every check would inherit the
+     previous one's petals, and "exactly this petal's strips moved" would be
+     measuring the section above it. */
+  const restAllPetals = async () => {
+    for (const e of await q(() => window.__plot.petalWarpStore())) {
+      if (!e.warped) continue;
+      await pick(e.index);
+      await set({ petalAlong: 1, petalAcross: 1 });
+      await page.evaluate(() => document.getElementById('petalBendReset').click());
+    }
+    await pick(-1);
+  };
   const petalOn = async (o = {}) => {
-    await page.evaluate(() => document.getElementById('petalBendReset').click());
-    await set({ ...PETAL_ON, ...o });
+    await restAllPetals();
+    const { petalAlong, petalAcross, petalPick, ...rest } = o;
+    await set({ ...PETAL_ON, ...rest, petalAlong: 1, petalAcross: 1, petalPick: -1 });
+    if (petalPick !== undefined && petalPick >= 0) await pick(petalPick);
+    if (petalAlong !== undefined || petalAcross !== undefined) {
+      const w = {};
+      if (petalAlong !== undefined) w.petalAlong = petalAlong;
+      if (petalAcross !== undefined) w.petalAcross = petalAcross;
+      await set(w);
+    }
     await view(VIEW);
   };
   const pList = await q(() => window.__plot.petalList());
@@ -2234,6 +2325,121 @@ async function run({ mutant = null } = {}) {
      did not move, so a strip that shifted by a millionth of a millimetre would
      be a new array and would be counted here, where a tolerance would swallow
      it. */
+  /* ---- THE WARP IS A PROPERTY OF THE PETAL ---------------------------------
+     Four checks, and they exist because the page shipped the other model and
+     every check here stayed green under it. `warp/editing-moves-only-the-
+     selected-petal` is TRUE of a single page-wide warp applied to whichever
+     petal is selected — it just never said whose the warp WAS. That is the same
+     class as the two checks this file already records as passing for the wrong
+     reason: a true statement that does not test the thing that matters.
+
+     THE INSTRUMENT IS GEOMETRY, NOT INK, and that is a deliberate strengthening
+     of what was asked for. Selecting a petal necessarily changes the ink — the
+     highlight is a hue by design, so a different petal draws teal — and it also
+     legitimately leaves an already-warped petal in frame. Neither is the defect.
+     Comparing every petal's emitted points BIT FOR BIT across the selection
+     isolates exactly the thing: did picking a petal move anything at all. */
+  const petalGeom = () => page.evaluate(() => window.__plot.allPetalPoints(true));
+  const sameGeom = (a, b) => {
+    if (a.length !== b.length) return false;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i].index !== b[i].index || a[i].points.length !== b[i].points.length) return false;
+      for (let k = 0; k < a[i].points.length; k++) {
+        const x = a[i].points[k], y = b[i].points[k];
+        if (x.length !== y.length) return false;
+        for (let j = 0; j < x.length; j++) if (!Object.is(x[j], y[j])) return false;
+      }
+    }
+    return true;
+  };
+  const petalMoved = (a, b, index) => {
+    const A = a.find(e => e.index === index), B = b.find(e => e.index === index);
+    if (!A || !B) return -1;
+    let m = 0;
+    for (let k = 0; k < A.points.length; k++) {
+      for (let j = 0; j < A.points[k].length; j += 3) {
+        m = Math.max(m, Math.hypot(A.points[k][j] - B.points[k][j],
+          A.points[k][j + 1] - B.points[k][j + 1], A.points[k][j + 2] - B.points[k][j + 2]));
+      }
+    }
+    return m;
+  };
+
+  const A_PETAL = 3, B_PETAL = 7;
+  await petalOn({ petalPick: A_PETAL, petalAlong: 0.30, petalAcross: 2.50 });
+  const withA = await petalGeom();
+  const storeA = await q(() => window.__plot.petalWarpStore());
+  await pick(B_PETAL);
+  const afterPick = await petalGeom();
+  const panelAtB = await q(() => window.__plot.petalControls());
+  check('select/picking-a-petal-deforms-nothing',
+    sameGeom(withA, afterPick)
+    && storeA.filter(e => e.warped).map(e => e.index).join(',') === String(A_PETAL)
+    && panelAtB.along === 1 && panelAtB.across === 1,
+    `petal_${A_PETAL} warped to 0.30x / 2.50x, then petal_${B_PETAL} picked: all `
+    + `${afterPick.length} petals identical to the bit, and the panel loaded `
+    + `${panelAtB.along.toFixed(2)}x / ${panelAtB.across.toFixed(2)}x — petal_${B_PETAL}'s `
+    + 'own values, not the ones on screen a moment earlier');
+
+  await pick(-1);
+  const afterDeselect = await petalGeom();
+  const storeOff = await q(() => window.__plot.petalWarpStore());
+  const offInfo = await q(() => window.__plot.petalInfo());
+  const offControls = await q(() => window.__plot.petalControls());
+  check('warp/a-warp-survives-deselection',
+    sameGeom(withA, afterDeselect)
+    && storeOff.filter(e => e.warped).map(e => e.index).join(',') === String(A_PETAL)
+    && offInfo.warpedPetals === 1 && offInfo.selected === -1
+    && offControls.alongDisabled === true && offControls.acrossDisabled === true
+    && offControls.alongOut === '\u2014' && offControls.acrossOut === '\u2014',
+    `with nothing picked, petal_${A_PETAL} is still warped to the bit and the page still `
+    + `counts ${offInfo.warpedPetals}; the two scales are switched off and read an em `
+    + 'dash, because a control that applies to nothing should say so');
+
+  await pick(B_PETAL);
+  await set({ petalAlong: 2.20, petalAcross: 0.40 });
+  const bothStore = await q(() => window.__plot.petalWarpStore());
+  const bothInfo = await q(() => window.__plot.petalInfo());
+  const withBoth = await petalGeom();
+  const aHeld = petalMoved(withA, withBoth, A_PETAL);
+  const bMoved = petalMoved(withA, withBoth, B_PETAL);
+  const aEntry = bothStore.find(e => e.index === A_PETAL);
+  const bEntry = bothStore.find(e => e.index === B_PETAL);
+  /* AND THE SEAM'S OWN POPULATION GROWS WITH THE WARPED SET. The seam ranges
+     over every warped petal, so the count of base points beside it has to be
+     the SAME population — this is the one place two petals are warped at once
+     and therefore the only place the two can be told apart. They shipped
+     crossed: the count was the selected petal's share, so `offInfo` above (one
+     petal warped, nothing picked) read "unmoved to 0.0e+0 mm over 0 points"
+     under a claim about all of them. `> 0` is what catches that one and
+     `bothInfo > offInfo` is what catches counting only the selected petal. */
+  check('warp/two-petals-hold-different-warps-at-once',
+    aEntry && bEntry && aEntry.along === 0.30 && aEntry.across === 2.50
+    && bEntry.along === 2.20 && bEntry.across === 0.40
+    && aHeld === 0 && bMoved > 1
+    && bothInfo.warpedPetals === 2 && bothInfo.seamMm === 0
+    && offInfo.basePoints > 0 && bothInfo.basePoints > offInfo.basePoints,
+    `petal_${A_PETAL} at ${aEntry && aEntry.along}x / ${aEntry && aEntry.across}x and `
+    + `petal_${B_PETAL} at ${bEntry && bEntry.along}x / ${bEntry && bEntry.across}x together: `
+    + `warping the second moved petal_${A_PETAL} by ${aHeld} mm and petal_${B_PETAL} by `
+    + `${bMoved.toFixed(2)} mm, ${bothInfo.warpedPetals} carry a warp, and every warped `
+    + `base row is still unmoved at ${bothInfo.seamMm} mm over ${bothInfo.basePoints} base `
+    + `points — the seam's own population, which was ${offInfo.basePoints} with one of them `
+    + 'warped and nothing picked');
+
+  await pick(A_PETAL);
+  const backAtA = await q(() => window.__plot.petalControls());
+  const backGeom = await petalGeom();
+  const aStill = petalMoved(withBoth, backGeom, A_PETAL);
+  const bStill = petalMoved(withBoth, backGeom, B_PETAL);
+  check('select/selecting-a-warped-petal-loads-its-own-values',
+    backAtA.along === 0.30 && backAtA.across === 2.50
+    && backAtA.alongOut === '0.30\u00d7' && backAtA.acrossOut === '2.50\u00d7'
+    && aStill === 0 && bStill === 0,
+    `picking petal_${A_PETAL} back put ${backAtA.along.toFixed(2)}x / `
+    + `${backAtA.across.toFixed(2)}x into the panel — its own values, loaded — and moved `
+    + `nothing: petal_${A_PETAL} ${aStill} mm, petal_${B_PETAL} ${bStill} mm`);
+
   const SEL = 11;
   await petalOn({ petalPick: SEL, petalAlong: 2.2, petalAcross: 1.8 });
   const untouched = await q(() => window.__plot.petalUntouched());
@@ -2241,14 +2447,21 @@ async function run({ mutant = null } = {}) {
   const mineIdx = await page.evaluate(sel => window.__plot.petalPoints(sel, false).length, SEL);
   const movedCount = untouched.filter(v => !v).length;
   const warpInfo = await q(() => window.__plot.petalInfo());
-  check('warp/only-the-selected-petal-moves',
+  /* AND THIS ONE IS TRUE OF A PAGE-WIDE WARP TOO, which is why it is not on its
+     own the guarantee: with exactly one petal carrying a warp, "exactly that
+     petal's strips moved" holds under either model. It is kept because it is
+     the right claim about EDITING — a slider reaches the petal it belongs to
+     and no other — and the four checks above carry the ownership. */
+  check('warp/editing-moves-only-the-selected-petal',
     movedCount === mineIdx && untouched.length === allStrips.strips
     && warpInfo.untouched === untouched.length - movedCount
     && warpInfo.offPetal === untouched.length - movedCount
+    && warpInfo.warpedPetals === 1
     && warpInfo.movedMm > 5,
     `${movedCount} strips moved, exactly petal_${SEL}'s ${mineIdx}; the other `
-    + `${untouched.length - movedCount} came back as the arrays the file wrote, and this `
-    + `petal moved up to ${warpInfo.movedMm.toFixed(2)} mm`);
+    + `${untouched.length - movedCount} came back as the arrays the file wrote, `
+    + `${warpInfo.warpedPetals} petal carries a warp, and it moved up to `
+    + `${warpInfo.movedMm.toFixed(2)} mm`);
 
   /* THE BASE ROW HOLDS UNDER EVERY WARP — trap one. Compared to the BIT against
      the file's own points, at the corners of both scales and with a bend, and
@@ -2521,10 +2734,16 @@ async function run({ mutant = null } = {}) {
     + 'gap) -> 2 with the tip kept; reset puts the petal back on the file\u2019s own '
     + 'points, to the bit');
 
-  /* A PETAL SWITCH RESTS THE BEND OFFSETS AND CARRIES THE TWO SCALES — stated on
-     the panel, so it is asserted rather than left as a habit. A bend offset is a
-     world displacement in millimetres and does not mean the same thing on a
-     petal facing the other way; a scale does. */
+  /* A BEND IS WARP STATE TOO, AND IT SURVIVES THE SWITCH — the claim that
+     replaces this file's earlier one. Under the model the page shipped with, a
+     petal switch RESTED the bend offsets and carried the two scales forward,
+     and that was asserted here as though it were a property rather than the
+     defect it was: the scales belonged to the page, so they had to go
+     somewhere, and the offsets had nowhere to live. Both halves are gone. A
+     bend now stays on the petal it was dragged onto, and stepping to the next
+     petal shows THAT petal's own bends — at rest, because nobody has touched
+     them. Driven by a real handle drag, because a bend offset cannot be set
+     from a slider. */
   await petalOn({ petalPick: dragPetal, petalAlong: 1.6, petalAcross: 0.7 });
   const h2 = dragPetal >= 0 ? await q(() => window.__plot.petalHandleScreenPos(0)) : null;
   if (h2) {
@@ -2534,15 +2753,25 @@ async function run({ mutant = null } = {}) {
     await page.mouse.up();
   }
   const bentThere = await q(() => window.__plot.petalInfo());
+  const bentGeom = await petalGeom();
   await page.evaluate(() => document.getElementById('petalNext').click());
   const afterSwitch = await q(() => window.__plot.petalInfo());
-  const scalesAfter = await q(() => window.__plot.petal());
-  check('select/switching-petal-rests-the-bends-and-carries-the-scales',
-    bentThere.bendsRest === false && afterSwitch.bendsRest === true
-    && scalesAfter.along === 1.6 && scalesAfter.across === 0.7
-    && afterSwitch.selected !== dragPetal,
-    `petal_${dragPetal} bent, then stepped on: the bends rest and the scales stay at `
-    + `${scalesAfter.along}x / ${scalesAfter.across}x on petal_${afterSwitch.selected}`);
+  const afterSwitchGeom = await petalGeom();
+  const switchStore = await q(() => window.__plot.petalWarpStore());
+  const bentEntry = switchStore.find(e => e.index === dragPetal);
+  const nextEntry = switchStore.find(e => e.index === afterSwitch.selected);
+  const bentOffset = bentEntry
+    ? Math.max(...bentEntry.bends.map(b => Math.hypot(...b.offset))) : -1;
+  check('warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
+    bentThere.bendsRest === false && !!h2
+    && sameGeom(bentGeom, afterSwitchGeom)
+    && bentEntry && bentEntry.along === 1.6 && bentEntry.across === 0.7 && bentOffset > 1
+    && nextEntry && nextEntry.along === 1 && nextEntry.across === 1
+    && afterSwitch.bendsRest === true && afterSwitch.selected !== dragPetal,
+    `petal_${dragPetal} bent by ${bentOffset.toFixed(1)} mm at 1.6x / 0.7x, then stepped `
+    + `on: every petal identical to the bit, petal_${dragPetal}'s entry still holds its `
+    + `bend and its scales, and petal_${afterSwitch.selected} shows its own 1.00x / 1.00x `
+    + 'with its bends at rest');
 
   // The panel's self-reports have to be the numbers the page holds, not a
   // sentence claiming a property.
@@ -2552,18 +2781,21 @@ async function run({ mutant = null } = {}) {
   });
   const pInfo = await q(() => window.__plot.petalInfo());
   const pFrame = await q(() => window.__plot.petalFrame());
-  check('readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours',
+  check('readout/the-petal-panel-reports-the-axis-the-seam-and-the-warped-count',
     !!pFrame
     && petalPanel.includes(`${pFrame.length.toFixed(2)} mm along its own centre line`)
     && petalPanel.includes(`unmoved to ${pInfo.seamMm.toExponential(1)} mm`)
     && petalPanel.includes(`over ${pInfo.basePoints} points the file placed at u = 0`)
-    && petalPanel.includes(`${pInfo.untouched} of the ${pInfo.offPetal} strips`)
     && petalPanel.includes(`up to ${pInfo.movedMm.toFixed(2)} mm`)
-    && petalPanel.includes(`held over the first ${pFrame.holdRows} rows`),
+    && petalPanel.includes(`held over the first ${pFrame.holdRows} rows`)
+    // AND THE COUNT THAT IS ONLY MEANINGFUL UNDER THE OWNERSHIP: how many
+    // petals carry a warp, and how many strips are still the file's own.
+    && petalPanel.includes(`${pInfo.warpedPetals} of ${pList.length} petals carry a warp`)
+    && petalPanel.includes(`${pInfo.movedStrips} strips moved, ${pInfo.untouched} drawn`),
     pFrame
       ? `axis ${pFrame.length.toFixed(2)} mm · seam ${pInfo.seamMm.toExponential(1)} mm over `
-        + `${pInfo.basePoints} base points · ${pInfo.untouched} of ${pInfo.offPetal} strips `
-        + 'off it untouched'
+        + `${pInfo.basePoints} base points · ${pInfo.warpedPetals} of ${pList.length} petals `
+        + `warped, ${pInfo.movedStrips} strips moved, ${pInfo.untouched} untouched`
       : 'this petal has no measurable axis');
 
   // COST. The warp touches one petal's ~580 points per rebuild, which is

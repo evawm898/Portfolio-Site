@@ -219,12 +219,64 @@ let warpAll = [];               // every strip with the selected petal deformed
    TIP and is an ordinary member of the list. */
 const DEFAULT_PETAL_BEND_T = [0.5, 1];
 const MAX_PETAL_BENDS = 6;
-let petalBends = DEFAULT_PETAL_BEND_T.map(t => ({ t, offset: [0, 0, 0] }));
+
+/* THE WARP BELONGS TO THE PETAL, NOT TO THE PAGE — and this file shipped it the
+   other way round once, so the reasoning is worth keeping. A single global
+   `along` / `across` / bend set, applied to whichever petal happened to be
+   selected, is wrong in two directions at once and both were visible on the
+   preview: picking a petal STAMPED the ambient slider values onto it, so
+   selecting deformed; and deselecting left the warp with nowhere to live, so
+   adjustments vanished. The panel showed the shape of the error plainly — the
+   sliders reading 0.30x / 2.50x while the petal read `none`, values belonging
+   to nothing.
+
+   So: one entry per petal, and THE CONTROLS ARE A VIEW OF THE SELECTED ENTRY.
+   Selection LOADS a petal's values into the panel; it never applies the panel's
+   values to a petal. Editing writes into that petal's own entry. Deselecting
+   writes nothing, so every warp stays exactly where it was, and any number of
+   petals can carry different warps at once — which is the point, because the
+   reference compositions have petals at varied shapes.
+
+   An entry is created the first time a petal is selected, so a petal nobody has
+   picked has no state at all; "warped" is an entry that is not at rest, which
+   is what `warpedPetals` counts. Nothing here is persisted across a reload —
+   that lands with the FRAME panel, and it will have to store one warp PER
+   PETAL rather than the single warp the global model would have had. */
+let petalWarps = new Map();     // petal index -> { along, across, bends }
+const newPetalState = () => ({
+  along: 1, across: 1,
+  bends: DEFAULT_PETAL_BEND_T.map(t => ({ t, offset: [0, 0, 0] })),
+});
+function petalStateOf(index, create = false) {
+  if (index < 0) return null;
+  let st = petalWarps.get(index);
+  if (!st && create) petalWarps.set(index, st = newPetalState());
+  return st || null;
+}
+
+/* THE FRAME IS A PROPERTY OF THE FILE AND IS CACHED FOR THE WHOLE GRID. It is
+   measured from the petal's own UNWARPED points — which never change — so
+   re-measuring it per rebuild would be re-deriving a constant, and with up to
+   28 petals warped at once that is 28 measurements a slider drag does not owe.
+   Cleared with the grid, never with the selection. */
+let petalFrames = new Map();    // petal index -> frame (or null: not warpable)
+function frameFor(index) {
+  if (index < 0) return null;
+  if (petalFrames.has(index)) return petalFrames.get(index);
+  const mine = petalIndex.get(index);
+  const info = petalInfoOf(index);
+  const f = (mine && info && info.warpable) ? petalFrame(mine) : null;
+  // The petal's own half-width is measured the same way and from the same
+  // points, so it is cached with the frame rather than beside it.
+  if (f) f.halfWidthMm = petalHalfWidth(mine, f);
+  petalFrames.set(index, f);
+  return f;
+}
 let petalHandleObjs = [];
-let petalHalfWidthMm = 0;       // measured once per selection, not per rebuild
 let petalStats = { on: false, warpable: false, why: '', strips: 0, points: 0,
                    lengthMm: 0, holdMm: 0, halfWidthMm: 0, movedMm: 0, seamMm: 0,
-                   basePoints: 0, untouched: 0, offPetal: 0, drawnStrips: 0,
+                   basePoints: 0, myBasePoints: 0, untouched: 0, offPetal: 0,
+                   drawnStrips: 0,
                    rest: true, bendsRest: true };
 
 const ui = {
@@ -301,15 +353,28 @@ const petalBendRemoveBtn = document.getElementById('petalBendRemove');
 const petalPrevBtn = document.getElementById('petalPrev');
 const petalNextBtn = document.getElementById('petalNext');
 
-const readPetal = () => ({
-  petal: +pui.petalPick.value,
-  along: +pui.petalAlong.value,
-  across: +pui.petalAcross.value,
-  showHandles: pui.petalHandles.checked,
-});
-const petalStationsOf = () => petalBends.map(b => b.t * (frame ? frame.length : 0));
-const petalWarpOf = () => makeWarp(petalStationsOf(), petalBends.map(b => b.offset),
-                                   frame ? frame.length : 1);
+/* THE SELECTED PETAL'S OWN STATE, never the controls. The controls are the
+   editor for it — `commitPetalScales` writes them in and `loadPetalControls`
+   reads them out — so everything downstream asks the PETAL what its shape is.
+   A rest state when nothing is selected, so callers need no branch. */
+/* THE REST STATE CARRIES AN EMPTY BEND LIST, not no bend list. `warpFor` maps
+   over `bends` unconditionally, so a rest state without one throws on every
+   rebuild with nothing selected — measured: 38 page errors and a `rebuild` that
+   aborted half way, leaving the panel showing the previous petal's numbers.
+   Frozen, because nothing may write to a state that belongs to no petal. */
+const REST_PETAL = Object.freeze({ along: 1, across: 1, bends: Object.freeze([]) });
+const readPetal = () => petalStateOf(selected) || REST_PETAL;
+const selectedBends = () => { const st = petalStateOf(selected); return st ? st.bends : []; };
+const showPetalHandles = () => pui.petalHandles.checked;
+
+// A petal's bend stations and gaussian warp, from ITS state and ITS frame — so
+// the same two lines serve the selected petal and each of the others being
+// drawn warped beside it.
+const stationsFor = (st, f) => st.bends.map(b => b.t * (f ? f.length : 0));
+const warpFor = (st, f) => makeWarp(stationsFor(st, f), st.bends.map(b => b.offset),
+                                    f ? f.length : 1);
+const petalStationsOf = () => stationsFor(readPetal(), frame);
+const petalWarpOf = () => warpFor(readPetal(), frame);
 
 const readStem = () => {
   const deg = +sui.stemDroop.value;
@@ -373,11 +438,14 @@ function clearCurrentGrid() {
   clearObjects();
   strips = []; warpAll = []; drawnStrips = []; gridInfo = null; assetExtras = null;
   localBounds = null; viewBounds = null;
-  selected = -1; frame = null; petalIndex = new Map(); petalHalfWidthMm = 0;
-  for (const b of petalBends) b.offset = [0, 0, 0];
+  selected = -1; frame = null; petalIndex = new Map();
+  // The warps and the measured frames both belong to the GRID that is going
+  // away, so both go with it — a petal index means nothing in the next file.
+  petalWarps = new Map(); petalFrames = new Map();
   petalStats = { on: false, warpable: false, why: '', strips: 0, points: 0,
                  lengthMm: 0, holdMm: 0, holdRows: 0, rows: 0, halfWidthMm: 0,
-                 movedMm: 0, seamMm: 0, basePoints: 0, untouched: 0, offPetal: 0,
+                 movedMm: 0, seamMm: 0, basePoints: 0, myBasePoints: 0,
+                 untouched: 0, offPetal: 0,
                  drawnStrips: 0, rest: true, bendsRest: true };
   stemRing = null; stemIsDrawn = false; stemStrips = [];
   stemStats = { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true };
@@ -462,67 +530,118 @@ function petalInfoOf(index) {
    measured `frame` and the control can never be out of step with each other
    however a petal came to be chosen.
 
-   A PETAL SWITCH RESTS THE BEND OFFSETS AND KEEPS THE TWO SCALES, and the split
-   is not a compromise: `along` and `across` are numbers that mean the same
-   thing on any petal, while a bend offset is a WORLD displacement in millimetres
-   — carried to a petal on the other side of the bloom it would point the same
-   way in space and therefore the opposite way relative to that petal, which
-   reads as the handles having gone wrong. There is no persistence on this page
-   yet, so nothing is stored per petal; the read-out says what carries. */
+   SELECTION LOADS, IT NEVER APPLIES. Picking a petal reads that petal's own
+   `along` / `across` / bends into the panel and changes nothing about the
+   drawing; picking an untouched one shows 1.00x / 1.00x and leaves it exactly
+   as the file drew it. The reverse — stamping whatever the sliders happen to
+   read onto the petal you just picked — is what shipped first and is the defect
+   this ownership fixes. Deselecting writes nothing at all, so a warp outlives
+   the selection that made it. */
 function syncSelection() {
   const want = +pui.petalPick.value;
   const index = petalIndex.has(want) ? want : -1;
   if (index === selected) return false;
   selected = index;
-  for (const b of petalBends) b.offset = [0, 0, 0];
-  const mine = petalIndex.get(index);
-  const info = petalInfoOf(index);
-  frame = (mine && info && info.warpable) ? petalFrame(mine) : null;
-  petalHalfWidthMm = frame ? petalHalfWidth(mine, frame) : 0;
+  // Created on first selection, so a petal nobody has picked carries no state
+  // and cannot be counted as warped.
+  if (index >= 0) petalStateOf(index, true);
+  frame = frameFor(index);
+  loadPetalControls();
   return true;
 }
 
-/* THE ONE PLACE A PETAL'S POINTS MOVE. Every strip in the file goes through
-   here — not just the ones the density sliders kept — so the camera fit and the
-   depth dim's own sphere see a stretched petal, and so there is exactly one
-   answer to "where is this point". A strip off the selected petal, and every
-   strip at all when nothing is selected or the warp is at rest, comes back as
-   the SAME RECORD carrying the SAME ARRAY the file wrote: that is what makes
-   "the other 27 petals were not touched" an identity rather than a measurement,
-   and it is what `petalStats.untouched` counts. */
+/* THE PANEL, WRITTEN FROM THE PETAL. Setting `.value` in script does not fire
+   an `input` event, so this cannot loop back through the handler that calls it.
+   With nothing selected the two scales are DISABLED and read 1.00x: a control
+   that applies to nothing should say so rather than show the last petal's
+   numbers, which is exactly how the global model advertised itself. */
+function loadPetalControls() {
+  const st = petalStateOf(selected);
+  pui.petalAlong.value = String(st ? st.along : 1);
+  pui.petalAcross.value = String(st ? st.across : 1);
+  pui.petalAlong.disabled = !st;
+  pui.petalAcross.disabled = !st;
+}
+
+/* THE PANEL, READ INTO THE PETAL — the only path by which a slider reaches the
+   drawing. No selection means nowhere to write, and the value is discarded
+   rather than becoming ambient state looking for a petal to land on. */
+function commitPetalScales() {
+  const st = petalStateOf(selected);
+  if (!st) return false;
+  st.along = +pui.petalAlong.value;
+  st.across = +pui.petalAcross.value;
+  return true;
+}
+
+/* THE ONE PLACE A PETAL'S POINTS MOVE, AND IT MOVES EVERY WARPED PETAL — not
+   only the selected one. That is the whole of the ownership correction on the
+   drawing side: a warp is a property of its petal, so it is drawn whether or
+   not that petal is currently picked, and any number of petals can carry
+   different ones at once.
+
+   Every strip in the file goes through here — not just the ones the density
+   sliders kept — so the camera fit and the depth dim's own sphere see a
+   stretched petal, and so there is exactly one answer to "where is this point".
+   A strip belonging to no warped petal comes back as the SAME RECORD carrying
+   the SAME ARRAY the file wrote: that is what makes "the petals you have not
+   warped were not touched" an identity rather than a measurement, and it is
+   what `petalStats.untouched` counts.
+
+   `selected` is used only to split the measurements — what THIS petal did
+   against what the drawing as a whole did — never to decide what moves. */
 function applyPetalWarp() {
-  const p = readPetal();
-  // `selected` and not `p.petal`: `syncSelection` is the one owner, and it is
-  // what refuses an index the loaded grid does not have. Reading the raw control
-  // here would let a stale index from a previous file reach the warp.
-  const mine = petalIndex.get(selected);
-  const warp = petalWarpOf();
-  if (!frame || !mine || petalIsRest(p, warp)) {
-    warpAll = strips;
-    return { warp, moved: 0, seam: 0, basePoints: 0, points: 0 };
+  // Which petals actually carry a deformation. A petal with an entry at rest is
+  // not one: it has been selected, nothing more.
+  const active = [];
+  for (const [index, st] of petalWarps) {
+    const f = frameFor(index);
+    const mine = petalIndex.get(index);
+    if (!f || !mine) continue;
+    const warp = warpFor(st, f);
+    if (petalIsRest(st, warp)) continue;
+    active.push({ index, st, f, warp, strips: mine });
   }
-  const set = new Set(mine);
-  let moved = 0, seam = 0, basePoints = 0, points = 0;
+  const blank = { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0,
+                  points: 0, basePoints: 0, mine: { moved: 0, points: 0, basePoints: 0 } };
+  if (!active.length) { warpAll = strips; return blank; }
+
+  // strip -> the petal that owns it, so the map below is one lookup per strip
+  // rather than a scan over the active set.
+  const owner = new Map();
+  for (const a of active) for (const t of a.strips) owner.set(t, a);
+
+  let movedStrips = 0, seam = 0, moved = 0, points = 0, basePoints = 0;
+  const mine = { moved: 0, points: 0, basePoints: 0 };
   warpAll = strips.map(t => {
-    if (!set.has(t) || !t.stations) return t;
-    const pts = petalPoints(t.points, t.count, t.stations, frame, warp, p);
+    const a = owner.get(t);
+    if (!a || !t.stations) return t;
+    const pts = petalPoints(t.points, t.count, t.stations, a.f, a.warp, a.st);
     if (pts === t.points) return t;
+    movedStrips++;
+    const isMine = a.index === selected;
     for (let i = 0; i < t.count; i++) {
       const d = Math.hypot(pts[i * 3] - t.points[i * 3],
                            pts[i * 3 + 1] - t.points[i * 3 + 1],
                            pts[i * 3 + 2] - t.points[i * 3 + 2]);
       points++;
       if (d > moved) moved = d;
+      if (isMine) { mine.points++; if (d > mine.moved) mine.moved = d; }
       // THE SEAM, MEASURED AND NOT ARGUED. The law is exactly the identity at
       // station 0 — see plot-petal.js note 3 — so this is structurally zero;
       // the stem's own seam is structurally zero too and is measured on every
       // rebuild for the same reason. A number that is asserted is a number that
-      // can go wrong in front of you.
-      if (t.stations[i] === 0) { basePoints++; if (d > seam) seam = d; }
+      // can go wrong in front of you. Measured over EVERY warped petal now, so
+      // one petal's base drifting cannot hide behind another's holding.
+      if (t.stations[i] === 0) {
+        basePoints++;
+        if (d > seam) seam = d;
+        if (isMine) mine.basePoints++;
+      }
     }
     return { ...t, points: pts };
   });
-  return { warp, moved, seam, basePoints, points };
+  return { warpedPetals: active.length, movedStrips, seam, moved, points, basePoints, mine };
 }
 
 /* Rebuild the drawn segment buffers from the current control values. Cheap by
@@ -591,21 +710,35 @@ function rebuild() {
     stem: stemStats.segments, stemLines: stemStats.lines,
   };
   const info = petalInfoOf(selected);
+  const myWarp = petalWarpOf();
   petalStats = {
     on: selected >= 0,
     warpable: !!(info && info.warpable && frame),
     why: info && !info.warpable ? info.why : (selected >= 0 && !frame
       ? 'its u-lines give no axis to measure' : ''),
     strips: info ? info.strips : 0,
-    points: pw.points,
     lengthMm: frame ? frame.length : 0,
     holdMm: frame ? frame.hold : 0,
     holdRows: frame ? frame.holdRows : 0,
     rows: frame ? frame.rows.length : 0,
-    halfWidthMm: petalHalfWidthMm,
-    movedMm: pw.moved, seamMm: pw.seam, basePoints: pw.basePoints,
-    // THE NEIGHBOURS, AS AN IDENTITY. `applyPetalWarp` hands back the file's
-    // own array for every strip it did not move, so this counts array identity
+    halfWidthMm: frame ? frame.halfWidthMm : 0,
+    // THIS PETAL'S OWN NUMBERS, kept apart from the drawing's: with several
+    // petals warped at once, "moved up to N mm" has to say whose.
+    movedMm: pw.mine.moved, points: pw.mine.points, myBasePoints: pw.mine.basePoints,
+    // AND THE DRAWING'S. `seamMm` ranges over EVERY warped petal, so one
+    // petal's base drifting cannot hide behind another's holding — and
+    // `basePoints` IS THAT SAME POPULATION, not the selected petal's share of
+    // it. The two were crossed when this shipped: the read-out said "unmoved to
+    // 0.0e+0 mm over N points" with the seam taken over every warped petal and
+    // N counted on the selected one, so picking an UNWARPED petal beside a
+    // warped one printed "over 0 points" under a claim about all of them. A
+    // count that does not name the population the number was taken over is
+    // worse than no count.
+    seamMm: pw.seam, basePoints: pw.basePoints,
+    warpedPetals: pw.warpedPetals, movedStrips: pw.movedStrips,
+    allMovedMm: pw.moved, allPoints: pw.points,
+    // UNTOUCHED, AS AN IDENTITY. `applyPetalWarp` hands back the file's own
+    // array for every strip it did not move, so this counts array identity
     // rather than distance — a strip that moved by 1e-12 mm would be a new
     // array and would be counted here, where a tolerance would swallow it.
     untouched: warpAll.reduce((a, t, i) => a + (t === strips[i] ? 1 : 0), 0),
@@ -614,8 +747,8 @@ function rebuild() {
     // TWO DIFFERENT "AT REST"s, and conflating them made the bend line say
     // "displaced" because a stretch slider had moved. `rest` is the petal's —
     // nothing is asked of it at all — and `bendsRest` is the control points'.
-    rest: petalIsRest(pt, pw.warp),
-    bendsRest: warpIsRest(pw.warp),
+    rest: petalIsRest(pt, myWarp),
+    bendsRest: warpIsRest(myWarp),
   };
   computeViewBounds();
   syncHandles();
@@ -729,12 +862,17 @@ function syncHandles() {
    belongs to instead of standing where the blade used to be. */
 function syncPetalHandles() {
   const p = readPetal(), st = readStem();
-  syncHandlePool(petalHandleObjs, frame ? petalBends.length : 0, PETAL_HANDLE_MAT);
-  petalBendCountEl.textContent = String(petalBends.length);
-  petalBendRemoveBtn.disabled = petalBends.length === 0 || !frame;
-  petalBendAddBtn.disabled = petalBends.length >= MAX_PETAL_BENDS || !frame;
+  // THE SELECTED PETAL'S OWN BEND LIST — handles are the editor for one petal,
+  // so an unselected petal's bends are held in its state and drawn in its
+  // lines, with no handles on them.
+  const bendsHere = selectedBends();
+  syncHandlePool(petalHandleObjs, frame ? bendsHere.length : 0, PETAL_HANDLE_MAT);
+  petalBendCountEl.textContent = selected < 0 ? '\u2014' : String(bendsHere.length);
+  petalBendRemoveBtn.disabled = bendsHere.length === 0 || !frame;
+  petalBendAddBtn.disabled = bendsHere.length >= MAX_PETAL_BENDS || !frame;
+  document.getElementById('petalBendReset').disabled = !frame;
   if (!frame) return;
-  const show = p.showHandles && selected >= 0;
+  const show = showPetalHandles() && selected >= 0;
   const r = petalHandleRadiusFor(frame.length);
   const warp = petalWarpOf();
   const angle = (st.on && stemRing) ? st.droopRad : 0;
@@ -745,7 +883,7 @@ function syncPetalHandles() {
     h.userData.set = 'petal';
     h.userData.bendIndex = k;
     h.scale.setScalar(r);
-    petalCentreAt(frame, warp, p, petalBends[k].t * frame.length, q, t);
+    petalCentreAt(frame, warp, p, bendsHere[k].t * frame.length, q, t);
     rotateAboutRing(q, c, angle, w);
     h.position.set(w[0], w[1], w[2]);
   });
@@ -812,9 +950,10 @@ function setBendFromWorld(k, world) {
 const PETAL_BEND_GATE_FLOOR = 0.1;
 
 function setPetalBendFromWorld(k, world) {
-  if (!frame || !petalBends[k]) return;
+  const bends = selectedBends();
+  if (!frame || !bends[k]) return;
   const p = readPetal(), st = readStem();
-  const sAt = petalBends[k].t * frame.length;
+  const sAt = bends[k].t * frame.length;
   container.updateMatrixWorld(true);
   const local = world.clone().applyMatrix4(
     new THREE.Matrix4().copy(container.matrixWorld).invert());
@@ -828,15 +967,15 @@ function setPetalBendFromWorld(k, world) {
   const gate = Math.max(rootHold(sAt, frame.hold), PETAL_BEND_GATE_FLOOR);
   const warp = petalWarpOf(), stations = petalStationsOf();
   const others = [0, 0, 0];
-  for (let j = 0; j < petalBends.length; j++) {
+  for (let j = 0; j < bends.length; j++) {
     if (j === k) continue;
     const w = gaussianWeight(sAt, stations[j], warp.points[j].sigma);
-    others[0] += petalBends[j].offset[0] * w;
-    others[1] += petalBends[j].offset[1] * w;
-    others[2] += petalBends[j].offset[2] * w;
+    others[0] += bends[j].offset[0] * w;
+    others[1] += bends[j].offset[1] * w;
+    others[2] += bends[j].offset[2] * w;
   }
   const cap = 4 * frame.length;
-  petalBends[k].offset = [0, 1, 2].map(a =>
+  bends[k].offset = [0, 1, 2].map(a =>
     Math.max(-cap, Math.min(cap, (un[a] - base[a]) / gate - others[a])));
   rebuild();
   writePetalState();
@@ -1055,22 +1194,26 @@ function afterBendChange() { rebuild(); writeStemOutputs(); writeStemState(); wr
    `removeIndex` drops the middle so the two ends survive, and reset rests the
    points it has rather than restoring a count the artist chose. */
 function addPetalBend() {
-  if (!frame || petalBends.length >= MAX_PETAL_BENDS) return false;
+  const bends = selectedBends();
+  if (!frame || bends.length >= MAX_PETAL_BENDS) return false;
   const at = nextStation(petalStationsOf(), frame.length);
-  petalBends.push({ t: frame.length > 0 ? at / frame.length : 1, offset: [0, 0, 0] });
-  petalBends.sort((a, b) => a.t - b.t);
+  bends.push({ t: frame.length > 0 ? at / frame.length : 1, offset: [0, 0, 0] });
+  bends.sort((a, b) => a.t - b.t);
   afterPetalChange();
   return true;
 }
 function removePetalBend() {
-  const i = removeIndex(petalBends.length);
+  const bends = selectedBends();
+  const i = removeIndex(bends.length);
   if (i < 0) return false;
-  petalBends.splice(i, 1);
+  bends.splice(i, 1);
   afterPetalChange();
   return true;
 }
+// Rests THIS petal's points. Another petal's bends are its own and are not
+// reachable from here — which is the ownership, not an omission.
 function restPetalBends() {
-  for (const b of petalBends) b.offset = [0, 0, 0];
+  for (const b of selectedBends()) b.offset = [0, 0, 0];
   afterPetalChange();
 }
 function afterPetalChange() { rebuild(); writePetalOutputs(); writePetalState(); writeDrawState(); }
@@ -1467,11 +1610,21 @@ function petalText() {
   const lines = [];
   const n = gridInfo ? gridInfo.petalList.length : 0;
   if (!gridInfo) return 'no grid loaded';
+  // HOW MANY PETALS CARRY A WARP, said first and said whether or not one is
+  // picked: a warp outlives its selection, so "none picked" must not read as
+  // "nothing is deformed".
+  const warped = petalStats.warpedPetals
+    ? `${petalStats.warpedPetals} of ${n} petal${n === 1 ? '' : 's'} carry a warp`
+      + ` · ${petalStats.movedStrips} strips moved, ${petalStats.untouched} drawn from`
+      + ' the arrays the file wrote'
+    : `none of the ${n} petals is deformed — every strip is the file's own`;
   if (selected < 0) {
-    lines.push(`none picked — ${n} petal${n === 1 ? '' : 's'} in this file`);
-    lines.push('pick one from the list, step with the arrows, or click a line.');
-    lines.push('a click takes the FRONT-MOST line within 8 px; on a bloom this dense');
-    lines.push('that is a convenience and the list is the control to rely on.');
+    lines.push(`none picked. ${warped}.`);
+    lines.push('the two scales apply to nothing and are switched off until a petal is');
+    lines.push('picked — a warp belongs to its petal, so there is no page-wide shape.');
+    lines.push('pick one from the list, step with the arrows, or click a line;');
+    lines.push('a click takes the FRONT-MOST line within 8 px, which on a bloom this');
+    lines.push('dense is a convenience and the list is the control to rely on.');
     return lines.join('\n');
   }
   const info = petalInfoOf(selected);
@@ -1496,14 +1649,15 @@ function petalText() {
     + ' not taper');
   lines.push(`stretch along ${p.along.toFixed(2)}× · across ${p.across.toFixed(2)}×`
     + (p.along === 1 && p.across === 1 ? '  (both at rest)' : ''));
-  if (!petalBends.length) {
+  const bendsHere = selectedBends();
+  if (!bendsHere.length) {
     lines.push('bends   none — the petal runs as the file drew it, less the stretch');
   } else {
     const stations = petalStationsOf();
     const warp = petalWarpOf();
     const at = stations.map(v => v.toFixed(1)).join(' / ');
     const sig = warp.points.map(q => q.sigma.toFixed(1)).join(' / ');
-    lines.push(`bends   ${petalBends.length} at ${at} mm · gaussian sigma ${sig} mm`
+    lines.push(`bends   ${bendsHere.length} at ${at} mm · gaussian sigma ${sig} mm`
       + ` (${petalStats.bendsRest ? 'all at rest' : 'displaced'})`);
     const gates = stations.map(v => rootHold(v, petalStats.holdMm));
     if (gates.some(g => g < 0.999)) {
@@ -1512,19 +1666,22 @@ function petalText() {
     }
   }
   if (petalStats.rest) {
-    lines.push(`at rest — every one of the file\u2019s ${strips.length} strips is being drawn`
-      + ' from the array it wrote');
+    lines.push('at rest — this petal is drawn from the arrays the file wrote');
   } else {
-    lines.push(`seam    the base row is unmoved to ${petalStats.seamMm.toExponential(1)} mm,`
-      + ` over ${petalStats.basePoints} point${petalStats.basePoints === 1 ? '' : 's'}`
-      + ' the file placed at u = 0');
     lines.push(`moved   this petal moved up to ${mm(petalStats.movedMm)}`
       + ` over its ${petalStats.points} points`);
-    lines.push(`off it  ${petalStats.untouched} of the ${petalStats.offPetal} strips on the`
-      + ` other petals came back as the arrays the file wrote`);
   }
-  lines.push('        the warp follows the SELECTION: the two scales carry to the next');
-  lines.push('        petal, the bend offsets rest, because an offset is a world vector');
+  // THE SEAM RANGES OVER EVERY WARPED PETAL, not just this one — with several
+  // deformed at once, one base drifting must not be able to hide behind
+  // another's holding.
+  if (petalStats.warpedPetals) {
+    lines.push(`seam    every warped petal's base row is unmoved to`
+      + ` ${petalStats.seamMm.toExponential(1)} mm, over ${petalStats.basePoints} points`
+      + ' the file placed at u = 0');
+  }
+  lines.push(`this file  ${warped}`);
+  lines.push('        a warp belongs to its petal: picking another one loads that');
+  lines.push('        petal\u2019s own values and leaves this shape exactly where it is');
   return lines.join('\n');
 }
 
@@ -1533,12 +1690,15 @@ function writePetalState() { petalEl.innerHTML = petalText(); }
 function writePetalOutputs() {
   const p = readPetal();
   const info = petalInfoOf(selected);
-  pout.petalPick.textContent = selected < 0 ? 'none'
+  pout.petalPick.textContent = selected < 0
+    ? (petalStats.warpedPetals ? `${petalStats.warpedPetals} warped` : 'none')
     : `${info ? info.uLines : 0}u · ${info ? info.vLines : 0}v`;
-  pout.petalAlong.textContent = `${p.along.toFixed(2)}\u00d7`;
-  pout.petalAcross.textContent = `${p.across.toFixed(2)}\u00d7`;
+  // AN EM DASH, NOT 1.00x, WHEN NOTHING IS PICKED. A number beside a control
+  // that applies to nothing is the global model's own advertisement.
+  pout.petalAlong.textContent = selected < 0 ? '\u2014' : `${p.along.toFixed(2)}\u00d7`;
+  pout.petalAcross.textContent = selected < 0 ? '\u2014' : `${p.across.toFixed(2)}\u00d7`;
   pout.bend.textContent = !frame ? '\u2014'
-    : !petalBends.length ? 'none'
+    : !selectedBends().length ? 'none'
     : petalStats.bendsRest ? 'at rest' : 'bent';
   const list = gridInfo ? gridInfo.petalList : [];
   const at = list.findIndex(q => q.index === selected);
@@ -1651,6 +1811,8 @@ function adopt(gltf, name) {
     a.push(t);
   }
   warpAll = strips;
+  petalWarps = new Map();
+  petalFrames = new Map();
   lastError = '';
   deadRange = { u: deadUpTo('u'), v: deadUpTo('v') };
   applyDeadTravel();
@@ -1749,6 +1911,12 @@ document.getElementById('bendReset').addEventListener('click', restBends);
    selected petal's segments are reported there as a share of the drawing. */
 for (const el of Object.values(pui)) {
   el.addEventListener('input', () => {
+    /* THE SCALES ARE COMMITTED INTO THE SELECTED PETAL FIRST, and the ORDER is
+       the whole correction: a slider writes into the petal that owns it, and
+       `rebuild` then reads every petal's own state. `petalPick` is the one
+       control that does NOT commit — it changes which petal the panel is
+       editing, and `syncSelection` loads that petal's values over the top. */
+    if (el === pui.petalAlong || el === pui.petalAcross) commitPetalScales();
     rebuild();
     writePetalOutputs();
     writePetalState();
@@ -1893,9 +2061,45 @@ window.__plot = {
     holdRows: frame.holdRows, rows: frame.rows.length,
     base: frame.base.slice(), u: frame.rows.map(r => r.u),
     s: frame.rows.map(r => r.s) } : null),
-  petalBends: () => petalBends.map((b, i) => ({ t: b.t, offset: b.offset.slice(),
+  petalBends: () => selectedBends().map((b, i) => ({ t: b.t, offset: b.offset.slice(),
     station: b.t * (frame ? frame.length : 0),
     sigma: petalWarpOf().points[i].sigma })),
+
+  /* ---- the warp store, which is the thing the ownership is about ----------
+     `petalWarpStore` is every entry the page holds, so a check can say which
+     petals carry a warp and what each one's values ARE — the property the
+     global model could not have had, and which no count of moved strips can
+     stand in for. `petalControls` is what the panel is showing, so a check can
+     say that selection LOADED a petal's values rather than the panel's values
+     having been stamped onto the petal. */
+  petalWarpStore: () => [...petalWarps.entries()].map(([index, st]) => {
+    const f = frameFor(index);
+    return { index, along: st.along, across: st.across,
+             bends: st.bends.map(b => ({ t: b.t, offset: b.offset.slice() })),
+             rest: petalIsRest(st, warpFor(st, f)),
+             warped: !!f && !petalIsRest(st, warpFor(st, f)) };
+  }),
+  petalControls: () => ({
+    along: +pui.petalAlong.value, across: +pui.petalAcross.value,
+    alongDisabled: pui.petalAlong.disabled, acrossDisabled: pui.petalAcross.disabled,
+    alongOut: pout.petalAlong.textContent, acrossOut: pout.petalAcross.textContent,
+    bendCount: petalBendCountEl.textContent,
+    addDisabled: petalBendAddBtn.disabled, removeDisabled: petalBendRemoveBtn.disabled,
+  }),
+  // Every petal's points at once, in grid space, warped or as the file wrote
+  // them — what "two petals hold different warps" and "a warp survives
+  // deselection" are measured on.
+  allPetalPoints: (warped = true) => {
+    const src = warped ? warpAll : strips;
+    const out = new Map();
+    for (let i = 0; i < src.length; i++) {
+      const petal = strips[i].petal;
+      if (petal < 0) continue;
+      if (!out.has(petal)) out.set(petal, []);
+      out.get(petal).push(Array.from(src[i].points));
+    }
+    return [...out.entries()].map(([index, points]) => ({ index, points }));
+  },
   petalHandleCount: () => petalHandleObjs.length,
   petalHandleVisible: k => !!(petalHandleObjs[k] && petalHandleObjs[k].visible),
   petalHandleScreenPos: k => screenPosOf(petalHandleObjs[k]),
@@ -2065,6 +2269,7 @@ window.__plot = {
 resize();
 writeOutputs();
 writeStemOutputs();
+loadPetalControls();
 writePetalOutputs();
 writeGridState();
 writeDrawState();

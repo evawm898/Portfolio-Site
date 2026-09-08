@@ -41,6 +41,11 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 
 .plot-row { display: grid; grid-template-columns: 4.2rem 1fr 5.4rem; align-items: center; gap: 0.5rem; }
 .plot-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; display: block; }
+/* A CONTROL THAT APPLIES TO NOTHING SAYS SO. A warp belongs to its petal, so
+   with none picked the two scales have nowhere to write — they are disabled
+   rather than left showing the last petal's numbers, which is exactly how the
+   page-wide model advertised itself before the ownership was fixed. */
+.plot-row input:disabled, .plot-bends button:disabled { opacity: 0.35; cursor: default; }
 
 /* THE DEAD TRAVEL IS MARKED ON THE TRACK, AND THE RANGE IS NOT NARROWED — the
    convention bloom.css's `.bl-ctrl--capped` established for `stamenSpread`.
