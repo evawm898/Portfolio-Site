@@ -350,6 +350,12 @@ await warpPetal(0,  { along: 1.9, across: 0.7 });
 await warpPetal(7,  { along: 0.5, across: 1.9 });
 await warpPetal(14, { drag: [0, 150, -110] });
 await warpPetal(21, { along: 1.5, across: 1.5 });
+/* AND RE-FIT, BECAUSE A CONTROL NEVER MOVES THE CAMERA — the stem sheet's own
+   measured lesson, arriving here as four stretched petals leaving the frame the
+   unwarped bloom was fitted to. `reset` fits LAST, after the scales, so every
+   single-petal cell above is already framed on what it is showing; these two
+   build their warps after it and have to ask again. */
+await view(PLAN);
 await cell('16-four-petals-four-shapes.png',
   'FOUR PETALS, FOUR SHAPES, ALL AT ONCE — long and narrow, short and broad, bent by a real handle '
   + 'drag, and enlarged. Each was picked in turn, given its own values and left; each holds them. '
@@ -389,6 +395,15 @@ await reset({ petalPick: SUBJECT, petalAlong: 1.7, petalAcross: 0.6 }, PLAN);
 await dragPetalHandle(0, 90, -70);
 await warpPetal(9, { along: 0.6, across: 1.7 });
 await pick(SUBJECT);
+/* A TALLER VIEWPORT FOR THIS ONE CELL, because the read-out is the subject of it
+   and it now runs past 1000 px — the seam line and the two lines that state the
+   ownership were below the fold. The camera is re-fitted after the resize because
+   the aspect changed under it, and the viewport is put BACK before the probe
+   sweep below — the pick measurement is a property of a framing, and running it
+   at a taller one silently moved every number in the index (measured: 15.8% of
+   pixels with a line in reach at 1000x1000 against 18.0% at 1000x1500). */
+await page.setViewportSize({ width: 1000, height: 1500 });
+await view(PLAN);
 await chrome(true);
 await cell('20-the-panel.png',
   'THE PANEL, with petal_0 picked and stretched and bent and petal_9 warped the other way behind '
@@ -401,6 +416,7 @@ await cell('20-the-panel.png',
   + 'ownership stated on the page: a warp belongs to its petal, so picking another one loads that '
   + 'petal\'s values and leaves this shape where it is.');
 await chrome(false);
+await page.setViewportSize({ width: 1000, height: 1000 });
 
 /* --- HOW CLICK PICKING ACTUALLY BEHAVES, at two cameras --------------------
    The measurement the picker's design rests on, taken here so that every number
