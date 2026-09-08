@@ -950,33 +950,36 @@ function stamenLine(fr, stamens, near, mode, fs = null) {
        + `\n`;
 }
 
-/* THE ANTHER LINE (session 29) — the tip's seven told in the owner's own
-   numbers, none of them re-derived here: the two proportions with the
-   millimetres they resolve to, the OUTLINE (and, at a roundedness of exactly
-   1, that the two controls below it are inert rather than merely hidden),
-   the LATTICE the point count derived, the WAIST against the print floor
-   with `UNMEASURED — no coupon has been printed` verbatim, and the two flags
-   this family can raise — the band floored at a sphere, and coincident lobes
-   at a spread of 0. Absent when the androecium is absent, so the line simply
-   is not there. Every number is footRing()'s own record. */
-function antherLine(fr, mode) {
-  const A = fr && fr.androecium;
-  if (!A) return '';
-  const a = A.anther, sh = a.shape;
-  const circle = sh.roundedness === 1;
-  return `ANTHER ${a.sizeFactor.toFixed(2)}x the filament = ${a.diameter.toFixed(2)} mm across (${mode}) · ${a.elongation.toFixed(2)}x its own diameter = ${a.length.toFixed(2)} mm long${a.bandFloored ? ' (A SPHERE — the band FLOORED so no triangle has zero area)' : ''}`
+/* THE TIP LINE (session 29's ANTHER line, ONE function for both tips since
+   session 30) — the seven told in the owner's own numbers, none re-derived
+   here: the two proportions with the millimetres they resolve to, the
+   OUTLINE (and, at a roundedness of exactly 1, that the two controls below
+   it are inert rather than merely hidden), the LATTICE the point count
+   derived, the WAIST against the print floor with `UNMEASURED — no coupon
+   has been printed` verbatim, and the two flags — the band floored at a
+   sphere, coincident lobes at a spread of 0. `name` is ANTHER or STIGMA and
+   `rod` the filament or the style; the ANTHER line's text is character for
+   character what session 29 shipped (the panel gate's route (t) reads it).
+   Absent when the part is absent. Every number is footRing()'s own record. */
+function tipLine(name, rod, a) {
+  if (!a) return '';
+  const sh = a.shape, circle = sh.roundedness === 1;
+  return `${name} ${a.sizeFactor.toFixed(2)}x ${rod} = ${a.diameter.toFixed(2)} mm across (${a.mode}) · ${a.elongation.toFixed(2)}x its own diameter = ${a.length.toFixed(2)} mm long${a.bandFloored ? ' (A SPHERE — the band FLOORED so no triangle has zero area)' : ''}`
        + ` · outline ${circle ? 'a CIRCLE (roundedness 1 — the points and the sharpness are INERT here, exactly, not merely hidden)' : `roundedness ${sh.roundedness.toFixed(2)}, ${sh.lobes}-fold, sharpness ${sh.sharpness.toFixed(2)}`}`
        + ` · revolved through ${a.sides} sides`
        + ` · waist ${a.waistMm.toFixed(2)} mm against the ${a.minRadiusMm.toFixed(2)} mm floor`
        + (a.underFloor ? ' — THE WHOLE TIP IS UNDER IT (told, never refused)'
          : a.sharpnessFloored ? ` — SHARPNESS CLAMPED to ${sh.sharpness.toFixed(2)} from ${a.sharpnessAsked.toFixed(2)}` : '')
        + ' (UNMEASURED — no coupon has been printed)'
-       + ` · ${a.lumps === 1 ? 'one lobe' : `${a.lumps} lobes`} at ${a.spreadDeg}° off the filament${a.lumpsCoincident ? ' — COINCIDENT: duplicate geometry, told, never refused' : ''}`
+       + ` · ${a.lumps === 1 ? 'one lobe' : `${a.lumps} lobes`} at ${a.spreadDeg}° off ${rod}${a.lumpsCoincident ? ' — COINCIDENT: duplicate geometry, told, never refused' : ''}`
        + `\n`;
 }
+function antherLine(fr, mode) { return fr && fr.androecium ? tipLine('ANTHER', 'the filament', { ...fr.androecium.anther, mode }) : ''; }
+function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 'the style', { ...fr.gynoecium.lobe, mode }) : ''; }
 
 /* THE STYLE LINE (session 22) — the gynoecium told in the owner's and the
-   builder's own numbers: the rod, the trifid's fixed proportions, where the
+   builder's own numbers: the rod, the stigma's count and aim (its seven have
+   their own STIGMA line below, session 30), where the
    stigma's top stands (and, with an androecium, how far ABOVE or BELOW the
    highest anther — the pair on the sheet, said in millimetres), the
    wider-than-the-hub corner and the petal-root annulus as FLAGS, the spine
@@ -990,7 +993,7 @@ function styleLine(fr, styles, stamens, mode) {
      control, `the highest anther` has to mean the highest tip actually
      emitted or the line names a computation nobody performed. */
   const antherTop = stamens.length ? Math.max(...stamens.map((a) => Math.max(...a.lumps.map((l) => l.apex[2])))) : null;
-  return `STYLE on the axis · ${G.diameter.toFixed(2)} × ${G.length} mm${G.curlDeg !== 0 ? `, curl ${G.curlDeg}°` : ', straight'} · stigma TRIFID: ${G.lobe.count} lobes ${G.lobe.diameter.toFixed(2)} × ${G.lobe.length.toFixed(2)} mm at ${((G.lobe.spreadRad * 180) / Math.PI).toFixed(0)}°`
+  return `STYLE on the axis · ${G.diameter.toFixed(2)} × ${G.length} mm${G.curlDeg !== 0 ? `, curl ${G.curlDeg}°` : ', straight'} · stigma ${G.lobe.lumps === 3 && G.lobe.spreadDeg === 40 ? 'TRIFID' : G.lobe.lumps === 1 ? 'ONE LOBE' : `${G.lobe.lumps} LOBES`}: ${G.lobe.lumps} lobe${G.lobe.lumps === 1 ? '' : 's'} ${G.lobe.diameter.toFixed(2)} × ${G.lobe.length.toFixed(2)} mm at ${G.lobe.spreadDeg}° (its own line below)`
        + ` · stigma top ${stigmaTop.toFixed(2)} mm (${mode})`
        + (antherTop !== null ? `, ${Math.abs(stigmaTop - antherTop).toFixed(2)} mm ${stigmaTop >= antherTop ? 'ABOVE' : 'BELOW'} the highest anther` : '')
        + (G.widerThanHub ? ` · WIDER THAN THE HUB (${G.hubRadius.toFixed(2)} mm — a flag, never a refusal)` : G.inPetalRootAnnulus ? ` · the root STANDS INSIDE THE PETAL-ROOT ANNULUS (clear disc ${G.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · inside the clear disc (${G.clearRadius.toFixed(2)} mm)`)
@@ -1059,7 +1062,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)
-       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + slendernessLine(fr, mode) : '')
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;

@@ -503,6 +503,39 @@ row**, and the INERT row held by two EXACT claims (its triangle count and its wh
 read-out line, character for character) plus a MACRO-only pixel bound at the two rows' own
 measured controls — pixel-identity was tried and is false, see the noise-floor section above. `frozen/phase18` is the 528 rows
 at `cb798f6` (a phase IS owed: block 25 takes the matrix to 549).
+**THE STIGMA'S SEVEN SHIP FROM ONE TABLE, AND THE TWO TIPS CANNOT DRIFT BECAUSE THEY ARE NOT
+WRITTEN TWICE** (session 30, tip plan 4 — read `docs/bloom-session-30-outcome.md` before touching
+any of it). `TIP_DESCRIPTORS` (seven specs, authored once) × `TIP_INSTANCES` (what varies: prefix,
+section, presence predicate, words, and the two per-instance defaults `Lumps` / `Spread`) →
+`tipControls(instance)` → fourteen rows: `anther*` in `antherTip` ("Anther", inside Androecium —
+session 29's `tip` renamed) and `stigma*` in `stigmaTip` ("Stigma", inside Gynoecium), each
+section declared IN RENDER ORDER after its parent. **`tipDescriptor(state, prefix, diameter)` in
+bloom-geometry.js is the ONE owner of the seven becoming a tip**, called twice by `footRing()`;
+`TIP_SHAPE` / `TIP_SHARPNESS` are retired and `STIGMA_LOBES` / `STIGMA_LOBE_SPREAD_DEG` are the
+stigma's count and spread DEFAULTS. **`tipSevenClauses(tag, …)` is the one witness, called as JS7
+on the anther and JG6 on the stigma's lobe** (JG6 is the new family — 41 in the census); JG4 reads
+the descriptor rather than constants and its shared-apex clause is a biconditional with
+`lumpsCoincident`. **THE ANTI-DRIFT WITNESS IS THE PANEL GATE'S ONE-SPEC CLAUSE ON THE TIP FAMILY,
+with `default` per-instance ONLY on Lumps and Spread, stated in the gate rather than read from the
+table, and its `--negative-control` drifts `stigmaSize.max` in a copy of the rows and requires it
+to fire** (measured: it does). **THE STIGMA'S SHARPNESS DEFAULT IS 1.00 BY RE-DERIVATION, NOT BY
+COPY, and the brief's premise that a lobe is a different size was CHECKED AND IS FALSE**: a lobe
+is `ANTHER_DIAMETER_FACTOR × one sheet` exactly as the anther is, 0.96 mm of radius on the
+default sheet in both modes, so the 0.50 mm waist floor binds below the same 0.694 on both tips at
+roundedness 0 (0.75 keeps 8%, 1.00 keeps 36%); on any sheet the export floors to 1.00 mm the bound
+is 0.849, where 0.75 CLAMPS and 1.00 keeps 13% — the reason 1.00 over 0.75 that survives the
+thinnest printable sheet. It is ONE constant, `TIP_SHARPNESS_DEFAULT` (was
+`ANTHER_SHARPNESS_DEFAULT`); a different stigma value is one per-instance default the day it is
+ruled. **0 moved on both tips is a construction** (the constants' own expressions term for term,
+the blend exactly 1 at roundedness 1) measured on `frozen/phase19` — the 549 rows at `eb3543f`,
+the newest baseline — on both trees; a phase IS owed because block 26 takes the matrix to 571.
+The ids are `anther*` / `stigma*`, NOT the brief's `antherTip*` / `stigmaTip*`: renaming the
+anther's seven would retire seven ids and move phase18's row definitions. The sheet is
+`node tools/shot-bloom-stigma.mjs <dir> [base-tree] [--quick]` — the trifid at rest, the new
+sharpness opened at both stamen counts against the circle it replaces, the space either side
+(0.50 clamped … 1.50, plus the thin-sheet 0.75), the pair, INERT — every row with its own
+same-tree control, no pixel claim on `whole` or `lens`. **The lattice jump (10 → 16 sides the
+moment roundedness leaves 1) is session 31's and moves bytes.**
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
 every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —
@@ -2454,6 +2487,12 @@ distribution; an identity needs neither.** **AND THE BIMODALITY IS NOT CONFINED 
 WHOLE-BLOOM FRAMING:** the MACRO view threw a 38,057 px one-off between two states proved
 bit-identical to the float (0 of 120,960), and it did not reproduce over eight interleaved
 pairs — so `the macro control read 0 px on every row` is an OBSERVATION, never a guarantee.
+**A SINGLE SAME-TREE CONTROL IS NEVER A FLOOR** (Eva, session 30, after sessions 26, 28 and 30
+each found it independently — the last as 15 px against a 0 px control while the same run's other
+macro controls read 12 to 30 px): **a pixel BOUND is set from the RUN'S OBSERVED CONTROL
+DISTRIBUTION and both sides' controls, never from one sample.** An identity still needs neither,
+which is why the exact-zero claims (a triangle count, a read-out line character for character)
+stand unhedged and are what carry a row.
 
 **WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO NOT PUSH** (Eva, session 29). The
 push-once amendment covers INSTRUMENT ITERATION; a session waiting on a ruling is the other

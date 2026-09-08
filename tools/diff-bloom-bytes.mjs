@@ -52,8 +52,12 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase19  `phase19Matrix()` — the 549 rows frozen at eb3543f, the head
+                of main when session 30 opened. THE NEWEST baseline, and so
+                the one a close-out re-exports on both trees; the like-for-like
+                baseline for the stigma's seven (block 26).
      --phase18  `phase18Matrix()` — the 528 rows frozen at cb798f6, the head
-                of main when session 29 opened. THE NEWEST baseline, and so
+                of main when session 29 opened. The baseline before it, and so
                 the one a close-out re-exports on both trees under the
                 charter's retention ruling; the like-for-like baseline for
                 the anther's seven, and the first to carry the tip primitive
@@ -257,7 +261,7 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase18] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase19] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
@@ -272,7 +276,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, phase18Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, phase18Matrix, phase19Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -391,7 +395,7 @@ const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
   phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix, phase15: phase15Matrix,
-  phase16: phase16Matrix, phase17: phase17Matrix, phase18: phase18Matrix,
+  phase16: phase16Matrix, phase17: phase17Matrix, phase18: phase18Matrix, phase19: phase19Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 

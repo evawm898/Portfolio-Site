@@ -5313,6 +5313,18 @@ matters should be measured this way.
     sheets is 800,000+ px, three orders above any observed event) and fragile in the direction
     that costs a run. This belongs beside the retraction, not in a sheet's own header.
 
+    **A SINGLE SAME-TREE CONTROL IS NEVER A FLOOR** (Eva, session 30 — the rule, after three
+    sessions found it independently). Session 26 at whole-bloom framing (the bimodal control);
+    session 28 with the 38,057 px one-off between bit-identical states; session 30 with 15 px
+    on the macro view against a 0 px control while the SAME RUN's other macro controls read 12
+    to 30 px — twice, on the before/after pair and on the INERT row. **A pixel BOUND is set from
+    the run's OBSERVED CONTROL DISTRIBUTION and both sides' own controls, never from one
+    sample**: take every same-tree control the run produced on that framing, use its largest
+    (or a stated quantile) plus the two rows' own, and say so in the caption. An IDENTITY still
+    needs neither — a triangle count, a read-out line character for character, `0 of N floats`
+    — which is why the exact-zero claims stand unhedged and are what carry a row. Write the
+    rule into a sheet tool's header, not the workaround.
+
     - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
       floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
       is only a measurement with its own control`): same tree, same camera, twice, at the
@@ -5580,3 +5592,64 @@ matters should be measured this way.
 
   **THE COLLISION** with the parallel session 28 is its own entry above (*Incident, Sep 7*),
   with the rule it produced: **one registry PR in flight at a time.**
+
+- **Session 30 (tip plan 4, Sep 7): THE STIGMA'S SEVEN SHIP FROM ONE TABLE, THE GENERATOR IS
+  THE POINT, AND THE ANTI-DRIFT WITNESS CAN FIRE.** Full account:
+  `docs/bloom-session-30-outcome.md`. Seven descriptors authored once (`TIP_DESCRIPTORS`),
+  instanced twice (`TIP_INSTANCES`: `anther*` in `Androecium ▸ Anther`, `stigma*` in
+  `Gynoecium ▸ Stigma`), with `Lumps` and `Spread` the ONLY per-instance defaults (1 / 0 on the
+  anther, `STIGMA_LOBES` 3 / `STIGMA_LOBE_SPREAD_DEG` 40 on the stigma). Three owners, one per
+  layer: `tipDescriptor()` in the geometry (called twice by `footRing()`; `TIP_SHAPE` and
+  `TIP_SHARPNESS` retired), the table in the registry, `tipSevenClauses()` in the harness
+  (JS7 on the anther, **JG6** — the new family, 41 in the census — on the stigma's lobe). The
+  witness Eva asked for is the panel gate's one-spec clause on the tip family, partition stated
+  in the gate, whose negative control drifts `stigmaSize.max` in a copy and requires it to fire
+  — it does.
+
+  **THE SHARPNESS DEFAULT WAS RE-DERIVED AND THE BRIEF'S PREMISE FAILED THE CHECK.** A stigma
+  lobe is NOT a different size from the anther: both are `ANTHER_DIAMETER_FACTOR × one sheet`
+  (`partRadius` owns both rods), 0.96 mm of radius on the default sheet in both modes, so the
+  waist floor binds below 0.694 at roundedness 0 on either tip. 1.00 stands for both — one
+  constant, `TIP_SHARPNESS_DEFAULT` — with a reason the session-29 ruling did not print: on any
+  sheet the export floors to 1.00 mm the bound is 0.849, where 0.75 clamps and 1.00 keeps 13%.
+  The sheet (`tools/shot-bloom-stigma.mjs`) shows 0.50 (clamped), 0.75, 1.00, 1.25, 1.50 and
+  the thin-sheet 0.75 at roundedness 0 for the ruling. **A first draft of that derivation applied
+  the export floor to the default 1.20 mm sheet and said 0.75 clamps in export; the sheet's quick
+  run refused it (waist 0.54 mm, clear).** Scope corrected, conclusion unchanged, recorded.
+
+  **0 MOVED ON BOTH TIPS IS A CONSTRUCTION** (the constants' own expressions term for term; the
+  blend exactly 1 at roundedness 1, so the stigma's sharpness going 2.00 → 1.00 reaches
+  nothing) and is measured on `frozen/phase19` — the 549 rows at `eb3543f`, the first baseline
+  carrying the anther's seven as controls — on both trees. Block 26 (22 rows, including THE
+  FAMILY row: the same seven on both tips at once) takes the live matrix to 571, so a phase IS
+  owed. JG4 reads the descriptor rather than constants; its shared-apex clause is a
+  biconditional with `lumpsCoincident`, because three lobes at a spread of 0 share an apex by
+  the law.
+
+  **THE IDS ARE `anther*` / `stigma*`, NOT `antherTip*` / `stigmaTip*`** as the brief wrote:
+  renaming the anther's seven a session after they shipped would retire seven ids and move
+  phase18's 21 anther-row definitions. The SECTIONS carry the Tip word. **Two sections cannot
+  both be labelled "Tip"** — the panel gate refuses a shared on-screen name — so they are
+  "Anther" and "Stigma", each declared in RENDER ORDER after its parent (the gate's census
+  compares document order to the array; declaring both after Gynoecium failed it, and took the
+  accordion route down with it).
+
+  **SHARPNESS 2.00 IS A SINGULARITY, NOT THREE BUGS** (Eva, session 30). It has been handled
+  separately at three sites: the roundedness slider dead through its whole travel at s = 2
+  (session 29, moved the default to 1.00); the lattice jumping 10 → 16 for no form change
+  (parked to session 31); and JG5/JS6's "not all 1 below roundedness 1" firing on a
+  legitimate row (this session's exemption). One finding: at s = 2 the law is the circle for
+  every roundedness, so every instrument that assumes "roundedness below 1 shapes the outline"
+  is wrong at exactly that point. **Session 31's brief carries the design question, costed,
+  for Eva to decide — whether the control should carry a value that maps to s with the
+  singular point at an END of the travel or UNREACHABLE — rather than a fourth patch.**
+
+  **THE BRIEF'S PREMISE WAS WRONG, SAID BY ITS AUTHOR** (Eva, session 30): "I told you not to
+  copy 1.00 because a trifid lobe is a different size, and it is not — it is the anther's
+  proportion exactly, so the floor binds at the same sharpness. The value is right and now it
+  has a derivation attached rather than an inheritance, which is the part worth keeping."
+
+  **THE DIFF PASSED THE STOPPING RULE'S LINE WITH THE ASSERTIONS GREEN**: ~900 changed lines
+  outside phase19's 549 generated rows, a third of it comment prose moved with its code. The
+  rule's trigger (over ~600 before the assertions are green) did not fire; the number is
+  recorded because it is over. The lattice-jump fix stays session 31's.

@@ -262,6 +262,10 @@ export function androeciumEligible(state) { return !sphereMode(state); }
    the harness asserts the two agree at module load, the gates per row, and
    the GATED matrix rows prove the style at maximum under SPHERE
    byte-identical to the bare sphere. */
+/* THE TRIFID'S TWO NUMBERS — the DEFAULTS of `stigmaLumps` and `stigmaSpread`
+   since session 30 (they were constants read by footRing() from session 22 to
+   29), imported by the registry so the default and the constant cannot drift,
+   and asserted paired at harness load. */
 export const STIGMA_LOBES = 3;
 export const STIGMA_LOBE_SPREAD_DEG = 40;
 export function gynoeciumEligible(state) { return !sphereMode(state); }
@@ -310,7 +314,6 @@ export function gynoeciumEligible(state) { return !sphereMode(state); }
    FACTORS are exactly 1 rather than asserting the picture looks round. */
 export const TIP_CAP_RINGS = 5;
 export const TIP_LOBES = 4;
-export const TIP_SHARPNESS = 2;
 export const TIP_ROUNDEDNESS = 1;
 export const TIP_SHARPNESS_RANGE = Object.freeze([0.25, 8]);
 export const TIP_LOBES_RANGE = Object.freeze([2, 12]);
@@ -326,11 +329,13 @@ export const TIP_LOBES_RANGE = Object.freeze([2, 12]);
    3.00 radii — and Math.max returns its larger argument unchanged, so the
    floor costs no byte. */
 export const TIP_BAND_FLOOR = 0.01;
-/* THE SHAPE, hard-wired, ONE object shared by both tips because today they
-   ARE the same tip. Sessions 3 and 4 instance this table twice (Q7) — the
-   ROLE_OVERRIDES pattern — so the anther's and the stigma's cannot drift;
-   until then a single frozen object makes "they cannot drift" literal. */
-export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPNESS, roundedness: TIP_ROUNDEDNESS });
+/* THE SHAPE WAS A FROZEN OBJECT HERE (`TIP_SHAPE`, sessions 26-29) — the
+   stigma's hard-wired outline while the anther's was a control. RETIRED in
+   session 30: both tips now read their seven from the state through ONE
+   function, `tipDescriptor()` below, so "they cannot drift" is a property of
+   the code path rather than of a shared literal, and TIP_SHARPNESS (the
+   circle's own 2.00, the singular point the session-29 ruling moved the
+   anther off) has no reader left. Nothing may import either name. */
 /* THE REMAINING FIVE RANGES (session 29) — the two proportions, the two that
    aim the lumps, and roundedness. Beside TIP_SHARPNESS_RANGE and
    TIP_LOBES_RANGE above, these are the ONE OWNER of every tip control's
@@ -338,8 +343,9 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    the two agree at module load, the MAX_LAYERS move. A range restated in the
    registry is a range that drifts, and here the bound is what discharges Q6
    (no self-intersection instrument, ever). */
-/* THE ANTHER'S SHIPPING SHARPNESS — 1.00, and it is NOT TIP_SHARPNESS (Eva's
-   ruling, session 29, from the measurement).
+/* THE TIP FAMILY'S SHIPPING SHARPNESS — 1.00, for BOTH tips (the anther's by
+   Eva's ruling, session 29, from the measurement; the stigma's re-derived at
+   its own dimensions in session 30 — see the second half of this note).
 
    `s = 2` IS A SINGULAR POINT OF THE LAW, and it was the default until this
    ruling. At s = 2 the exponent is the circle's own, so
@@ -370,11 +376,39 @@ export const TIP_SHAPE = Object.freeze({ lobes: TIP_LOBES, sharpness: TIP_SHARPN
    default bloom where the androecium is absent, and 0 px across four
    cross-config render pairs interleaved with same-config controls also at 0.
 
-   SEPARATE FROM TIP_SHARPNESS, which stays 2 because TIP_SHAPE is the
-   STIGMA's hard-wired shape until session 30 gives it its own seven. Two
-   owners because there are two tips; the harness asserts the registry's
-   default against THIS one at module load. */
-export const ANTHER_SHARPNESS_DEFAULT = 1;
+   THE STIGMA'S DEFAULT WAS RE-DERIVED, NOT COPIED (session 30, Eva's
+   instruction: "a trifid lobe is a different size, so the floor binds at a
+   different sharpness"). The premise was CHECKED and does not hold on this
+   tree: a stigma lobe is `stigmaSize * thickness` with the size defaulting to
+   ANTHER_DIAMETER_FACTOR, and the style is one sheet thick exactly as the
+   filament is (partRadius is the ONE owner of both), so the lobe radius IS
+   the anther's — 0.96 mm on the default 1.20 mm sheet, in BOTH modes, since
+   the export floor only raises a sheet under MIN_FEATURE_MM — at every sheet
+   thickness. The floor `s >= 1 / (1/2 - log2((need - rho) / (1 - rho)))` is
+   a function of that radius and roundedness alone, so it binds at the SAME
+   sharpness on both tips: below 0.694 at rho 0 on the default sheet. The
+   space either side there, waist against the 0.50 mm floor at rho 0: 0.50 ->
+   0.339 mm (CLAMPED), 0.75 -> 0.539 (8% headroom), 1.00 -> 0.679 (36%),
+   1.25 -> 0.780, 1.50 -> 0.855, 2.00 -> 0.960 (the circle, where roundedness
+   does nothing). ON THE THINNEST SHEETS the export floor raises the rod to
+   1.00 mm and the lobe radius to 0.80 mm, where the floor binds below 0.849:
+   0.75 CLAMPS there (0.449 mm) and 1.00 keeps 13% (0.566 mm) — a corner the
+   session-29 ruling did not print, and the reason 1.00 rather than 0.75 is
+   the largest named value that never meets the floor on ANY sheet a visitor
+   can print. It is ONE constant because it is one derivation on one radius
+   — a second constant with the same value would be the drift this session
+   exists to make impossible. The sheet (tools/shot-bloom-stigma.mjs) puts
+   0.50, 0.75, 1.00, 1.25 and 1.50 in front of Eva at rho 0; a different
+   stigma value is one per-instance default in the registry's tip table the
+   day she rules it.
+
+   IT MOVES NO BYTE ON EITHER TIP, for the anther's own reason: at the
+   shipping roundedness of 1 the blend is exactly 1 and tipSides() returns the
+   rod's own lattice, so the stigma's sharpness going from the frozen 2.00 to
+   1.00 changes nothing emitted. Measured at the close (phase19 on both
+   trees), not argued. The harness asserts BOTH registries' defaults against
+   this one constant at module load. */
+export const TIP_SHARPNESS_DEFAULT = 1;
 export const TIP_SIZE_RANGE = Object.freeze([0.6, 6]);
 export const TIP_ELONGATION_RANGE = Object.freeze([1, 6]);
 export const TIP_ROUNDEDNESS_RANGE = Object.freeze([0, 1]);
@@ -483,6 +517,70 @@ export function tipOutline(shape, sides = tipSides(shape)) {
     out[j] = rho + (1 - rho) * h;
   }
   return out;
+}
+
+/* THE TIP DESCRIPTOR — THE ONE OWNER OF "THE SEVEN CONTROLS BECOME A TIP"
+   (session 30, Eva's Q7: seven descriptors authored once, instanced twice).
+   footRing() calls this ONCE for the anther (`prefix` 'anther', on the
+   filament's diameter) and ONCE for the stigma's lobe (`prefix` 'stigma', on
+   the style's), and NOTHING else computes a tip's size, length, shape,
+   floor, lattice, count or spread. The registry's tip table generates the
+   fourteen controls from one spec with the same two prefixes; the harness's
+   `tipSevenClauses` asserts this record against those controls under one
+   statement per tip (JS7, JG6). One table, one owner, one witness: an
+   instance that drifted from the other has nowhere to drift IN.
+
+   THE EXPRESSIONS ARE THE CONSTANTS' OWN, TERM FOR TERM, on both tips.
+   `size * diameter` is where `ANTHER_DIAMETER_FACTOR * diameter` stood and
+   `elongation * size * diameter` where `ANTHER_LENGTH_FACTOR *
+   ANTHER_DIAMETER_FACTOR * diameter` stood — the same two products in the
+   same order on the same doubles, because algebraically identical is not
+   bit-identical and `(e * s) * d` is not `e * (s * d)`. `spread * D2R` is
+   where `STIGMA_LOBE_SPREAD_DEG * D2R` stood. With the defaults reading
+   exactly 1.6, 2.5, 3 and 40 the trifid is byte-identical BY CONSTRUCTION
+   (session 29's argument for the anther, verbatim), and phase19 on both
+   trees measures it anyway.
+
+   THE FLOOR IS ON THE WAIST AND IT IS TOLD, NEVER REFUSED — the spine curl's
+   discipline; `tipSharpnessFloor` is its one owner and what it does not
+   bound is in its own header. At the shipping roundedness of exactly 1 the
+   `rho >= need` arm returns with no arithmetic done, so the sharpness comes
+   back the asked value unchanged — and is INERT, because the blend is
+   exactly 1 there and the lattice is the rod's own (tipSides).
+
+   LUMPS AND SPREAD AIM THE TIPS on ONE law: `lumps` tips sharing the rod's
+   end, each `spreadRad` off its direction at azimuths a whole turn apart.
+   One lump at spread 0 is the pill on the rod's own axis (the anther's
+   default); three at 40 degrees is the trifid (the stigma's); one lump at a
+   spread above 0 LEANS, which is a shape and not a dead slider, so spread is
+   not gated on the count; two or more at a spread of 0 are COINCIDENT —
+   duplicate geometry, told rather than refused, because a spread with a
+   non-zero minimum would put the anther's own default out of reach. */
+export const TIP_PREFIXES = Object.freeze(['anther', 'stigma']);
+export function tipDescriptor(state, prefix, diameter) {
+  if (!TIP_PREFIXES.includes(prefix)) throw new Error(`tipDescriptor: unknown tip "${prefix}" — the registry and the geometry name two tips, ${TIP_PREFIXES.join(' and ')}`);
+  const g = (k) => state[`${prefix}${k}`];
+  const size = g('Size'), elongation = g('Elongation'), roundedness = g('Roundedness'), spreadDeg = g('Spread');
+  for (const [k, v] of [['Size', size], ['Elongation', elongation], ['Roundedness', roundedness], ['Points', g('Points')], ['Sharpness', g('Sharpness')], ['Lumps', g('Lumps')], ['Spread', spreadDeg]]) {
+    if (!Number.isFinite(Number(v))) throw new Error(`tipDescriptor: ${prefix}${k} is ${JSON.stringify(v)} — the state carries no such control; the registry's tip table and the geometry have diverged`);
+  }
+  const dia = size * diameter;
+  const a = dia / 2;
+  const floor = tipSharpnessFloor(a, roundedness, g('Sharpness'));
+  const shape = { lobes: Math.round(g('Points')), sharpness: floor.sharpness, roundedness };
+  const lumps = Math.round(g('Lumps'));
+  return { prefix, diameter: dia, length: elongation * size * diameter, shape,
+           lumps, spreadDeg, spreadRad: spreadDeg * D2R,
+           sides: tipSides(shape), sizeFactor: size, elongation,
+           sharpnessAsked: floor.asked, sharpnessFloored: floor.floored, waistMm: floor.waist,
+           minRadiusMm: TIP_MIN_RADIUS_MM, underFloor: floor.underFloor,
+           /* THE ELONGATION FLOOR (Q5, session 26) told rather than silent:
+              the band is at least TIP_BAND_FLOOR of the tip's own radius, an
+              elongation floor of 1.005. Inert at the shipping 2.5 (Math.max
+              returns its larger argument unchanged), binding only at the very
+              bottom of the slider. */
+           bandFloored: (elongation * size * diameter - 2 * a) < TIP_BAND_FLOOR * a,
+           lumpsCoincident: lumps > 1 && spreadDeg === 0 };
 }
 
 /* THE GOLDEN ANGLE — SPIRAL placement's azimuth step, 137.50776 degrees.
@@ -2326,49 +2424,11 @@ export function footRing(state, acc) {
     const clamped = asked > limit;
     const radius = clamped ? limit : asked;
     const onAxis = limit === 0;
-    /* THE ANTHER'S SEVEN (session 29, Eva's ruling — the tip's own controls,
-       authored plainly here and instanced from ONE table in session 30, when
-       the stigma's seven make "they cannot drift" observable).
-
-       THE EXPRESSIONS ARE THE CONSTANTS' OWN, TERM FOR TERM. `size *
-       diameter` is where `ANTHER_DIAMETER_FACTOR * diameter` stood and
-       `elongation * size * diameter` is where `ANTHER_LENGTH_FACTOR *
-       ANTHER_DIAMETER_FACTOR * diameter` stood — the same two products in the
-       same order on the same doubles, because algebraically identical is not
-       bit-identical and `(e * s) * d` is not `e * (s * d)`. With the two
-       defaults reading exactly 1.6 and 2.5 the anther is byte-identical BY
-       CONSTRUCTION rather than by measurement, and the measurement is taken
-       anyway (tools/verify-bloom-tip-bytes.mjs, and the live partition).
-
-       THE FLOOR IS ON THE WAIST AND IT IS TOLD, NEVER REFUSED — the spine
-       curl's discipline. `tipSharpnessFloor` is its one owner; what it does
-       not bound is in its own header. At the shipping defaults roundedness is
-       exactly 1, so the `rho >= need` arm returns with no arithmetic done and
-       `sharpness` comes back the asked 2 unchanged.
-
-       LUMPS AND SPREAD AIM THE TIPS, and they are ONE law with the trifid's:
-       `count` tips sharing the rod's end, each `spreadRad` off its direction
-       at azimuths a whole turn apart. At one lump and a spread of 0 that is
-       today's single pill on the rod's own axis; at one lump and a spread
-       above it the anther LEANS, which is a shape and not a dead slider, so
-       spread is not gated on the count. */
-    const antherDia = state.antherSize * diameter;
-    const antherA = antherDia / 2;
-    const floor = tipSharpnessFloor(antherA, state.antherRoundedness, state.antherSharpness);
-    const shape = { lobes: Math.round(state.antherPoints), sharpness: floor.sharpness, roundedness: state.antherRoundedness };
-    const anther = { diameter: antherDia, length: state.antherElongation * state.antherSize * diameter, shape,
-                     lumps: Math.round(state.antherLumps), spreadDeg: state.antherSpread, spreadRad: state.antherSpread * D2R,
-                     sides: tipSides(shape), sizeFactor: state.antherSize, elongation: state.antherElongation,
-                     sharpnessAsked: floor.asked, sharpnessFloored: floor.floored, waistMm: floor.waist,
-                     minRadiusMm: TIP_MIN_RADIUS_MM, underFloor: floor.underFloor,
-                     /* THE ELONGATION FLOOR (Q5, session 26) told rather than
-                        silent, now that elongation is reachable: the band is
-                        at least TIP_BAND_FLOOR of the tip's own radius, which
-                        is an elongation floor of 1.005. Inert at the shipping
-                        2.5 (Math.max returns its larger argument unchanged),
-                        binding only at the very bottom of the slider. */
-                     bandFloored: (state.antherElongation * state.antherSize * diameter - 2 * antherA) < TIP_BAND_FLOOR * antherA,
-                     lumpsCoincident: Math.round(state.antherLumps) > 1 && state.antherSpread === 0 };
+    /* THE ANTHER'S SEVEN (session 29) come through tipDescriptor(), the ONE
+       owner shared with the stigma's lobe (session 30) — see its header for
+       the term-for-term byte argument and the floor. `anther` is read by
+       buildStamenInto and by JS4/JS6/JS7; nothing here re-derives a field. */
+    const anther = tipDescriptor(state, 'anther', diameter);
     const clearRadius = Math.max(0, Math.min(...rings.map((r) => r.radius - r.overhang)));
     /* THE DISC'S INNER LIMIT (session 24, Eva's ruling Sep 6). The Vogel law
        had no inner limit, so its innermost stamen stood at
@@ -2454,7 +2514,12 @@ export function footRing(state, acc) {
     if (state.gynoecium === 'NONE') return null;
     const diameter = thickness, rSty = partRadius;        // one sheet thick, floored with it — the ONE owner above
     const s = surfaceAt(0, null);
-    const lobe = { count: STIGMA_LOBES, diameter: ANTHER_DIAMETER_FACTOR * diameter, length: ANTHER_LENGTH_FACTOR * ANTHER_DIAMETER_FACTOR * diameter, spreadRad: STIGMA_LOBE_SPREAD_DEG * D2R, shape: TIP_SHAPE };
+    /* THE STIGMA'S SEVEN (session 30) — the same owner as the anther's,
+       instanced on the style's diameter. STIGMA_LOBES and
+       STIGMA_LOBE_SPREAD_DEG are the two controls' DEFAULTS now (the
+       registry imports them, the harness asserts the pairing), so the trifid
+       is what the state says at rest and what the visitor says otherwise. */
+    const lobe = tipDescriptor(state, 'stigma', diameter);
     return {
       count: 1, diameter, rSty, length: state.styleLength, curlDeg: state.styleCurl, curlRad: state.styleCurl * D2R,
       radius: 0, slope: s.slope, z: s.z, arc: s.arc, relief: s.relief,
@@ -4526,15 +4591,15 @@ export function buildStyleInto(acc, G) {
   const rod = rodInto(acc, { t: G.thickness, r: G.rSty, curlRad: G.curlRad, length: G.length, floorRadius: G.diameter }, G, 0);
   const tip = rod.stations[rod.stations.length - 1], a = G.lobe.diameter / 2, Lc = G.lobe.length - 2 * a;
   const D = rod.at(G.length).D;
-  /* THE TRIFID: `lobe.count` tips sharing the rod's tip, each `spreadRad` off
+  /* THE TRIFID: `lobe.lumps` tips sharing the rod's tip (a control since session 30), each `spreadRad` off
      its direction at azimuths a whole turn apart. The axis is the expression
      session 22 used, now inside tipInto and computed once — the LOBE AXES are
      byte-identical; what moved is the ring vector, which was `D x P` (the
      rotation axis, left fixed) and is now the Rodrigues image of the rod's
      `T`. Predeclared, ruled, and measured rather than described. */
   const lobes = [];
-  for (let k = 0; k < G.lobe.count; k++) {
-    const lump = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: G.lobe.spreadRad, psi: (k * TAU) / G.lobe.count }, { a, Lc, shape: G.lobe.shape });
+  for (let k = 0; k < G.lobe.lumps; k++) {
+    const lump = tipInto(acc, tip.C, { D, T: rod.T }, { spreadRad: G.lobe.spreadRad, psi: (k * TAU) / G.lobe.lumps }, { a, Lc, shape: G.lobe.shape });
     lobes.push({ index: k, dir: lump.L, apex: lump.apex, e1: lump.e1, outline: lump.outline });
   }
   /* WHAT WAS EMITTED, for the gate: the root axis (JG1), the surface point

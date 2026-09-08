@@ -291,10 +291,17 @@ const WITNESS = {
      BECAUSE at the shipping roundedness of 1 the control is hidden and inert
      — driving it there would be a witness that must not move, which is route
      (k)'s job and not this one's. */
-  tip: { id: 'antherPoints', value: '12',
+  antherTip: { id: 'antherPoints', value: '12',
          pre: [{ id: 'stamenCount', value: '6' }, { id: 'antherRoundedness', value: '0' }],
          read: (m) => `${m.liveTris}/${m.androecium ? m.androecium.anther.sides : 'none'}`,
          what: "the emitted triangle count / the owner's own tip lattice, driven through two shut containers" },
+  /* THE STIGMA'S TIP (session 30) — the same witness on the other instance:
+     the point count at 12 read as the triangle count beside the LOBE's own
+     lattice, driven at roundedness 0 with a style present. */
+  stigmaTip: { id: 'stigmaPoints', value: '12',
+         pre: [{ id: 'gynoecium', value: 'STYLE' }, { id: 'stigmaRoundedness', value: '0' }],
+         read: (m) => `${m.liveTris}/${m.gynoecium ? m.gynoecium.lobe.sides : 'none'}`,
+         what: "the emitted triangle count / the owner's own stigma lattice, driven through two shut containers" },
   /* THE GYNOECIUM (session 22) — the builder's style record and the owner's
      descriptor; route (p)'s, on one page, in both directions. */
   gynoecium: { id: 'gynoecium', value: 'STYLE',
@@ -455,10 +462,27 @@ ok.push(`registry: ${SECTIONS.length} sections, ${CONTROLS.length} controls, ${R
    label-naming-a-computation-nobody-performed defect. */
 const INSTANCED_FAMILIES = [
   { what: 'the per-petal groups (session 11, generated from MAX_FAN_GROUPS)',
-    id: /^petal(\d+)(Size|Tilt|Cup|Curl)$/ },
+    id: /^petal(\d+)(Size|Tilt|Cup|Curl)$/, instances: MAX_FAN_GROUPS, perInstanceDefault: new Set() },
+  /* THE TIP'S SEVEN, INSTANCED TWICE (session 30 — Eva's Q7 landed). The
+     partition is STATED HERE, not read from the registry's own table: the
+     shared fields are every field but `default` on Lumps and Spread (a count
+     and an aim — what makes a trifid a trifid), and the instance count is
+     two. A check that read TIP_PER_INSTANCE_DEFAULTS out of the registry
+     would be checking the generator against itself. */
+  { what: 'the two tips (session 30, anther* and stigma* from one descriptor table)',
+    id: /^(anther|stigma)(Size|Elongation|Roundedness|Points|Sharpness|Lumps|Spread)$/, instances: 2, perInstanceDefault: new Set(['Lumps', 'Spread']) },
 ];
+/* NEGATIVE CONTROL for the tip family: drift ONE instance on a shared field
+   (the stigma's size range) in a COPY of the rows and require the clause to
+   fire. The live registry is never touched. A guard whose firing nobody has
+   seen is a guard nobody should quote. */
+const familyRows = (fam) => {
+  const rows = CONTROLS.map((c) => ({ c: { ...c }, m: fam.id.exec(c.id) })).filter((x) => x.m);
+  if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) { const r = rows.find((x) => x.c.id === 'stigmaSize'); if (r) r.c.max = r.c.max + 1; }
+  return rows;
+};
 for (const fam of INSTANCED_FAMILIES) {
-  const rows = CONTROLS.map((c) => ({ c, m: fam.id.exec(c.id) })).filter((x) => x.m);
+  const rows = familyRows(fam);
   if (!rows.length) { note(`no control matches the instanced family ${fam.id} (${fam.what}) — a pattern that matches nothing is a check that measures nothing`); continue; }
   const bySuffix = new Map();
   for (const { c, m } of rows) {
@@ -466,16 +490,20 @@ for (const fam of INSTANCED_FAMILIES) {
     if (!bySuffix.has(suffix)) bySuffix.set(suffix, []);
     bySuffix.get(suffix).push(c);
   }
-  const spec = (c) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, c.default, c.label, c.tier, c.role,
+  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, c.label, c.tier, c.role,
     (c.options || []).map((o) => [o.value, o.label])]);
   const drifted = [];
   for (const [suffix, cs] of bySuffix) {
+    if (cs.length !== fam.instances) drifted.push(`"${suffix}" has ${cs.length} instances, the family declares ${fam.instances}`);
+    /* A per-instance default is still BOUNDED by the shared range. */
+    for (const c of cs) if (fam.perInstanceDefault.has(suffix) && (c.default < c.min || c.default > c.max)) drifted.push(`${c.id} defaults to ${c.default}, outside its own ${c.min}..${c.max}`);
     const distinct = new Map();
-    for (const c of cs) { const k = spec(c); if (!distinct.has(k)) distinct.set(k, []); distinct.get(k).push(c.id); }
+    for (const c of cs) { const k = spec(c, suffix); if (!distinct.has(k)) distinct.set(k, []); distinct.get(k).push(c.id); }
     if (distinct.size > 1) drifted.push(`"${suffix}" has ${distinct.size} distinct specs across its ${cs.length} instances — ${[...distinct.values()].map((ids) => ids.join('/')).join(' vs ')}`);
   }
-  if (drifted.length) note(`instanced descriptors have DRIFTED in ${fam.what}: ${drifted.join('; ')}`);
-  else ok.push(`instanced descriptors agree: ${fam.what} — ${bySuffix.size} descriptors x ${[...bySuffix.values()][0].length} instances = ${rows.length} controls, one spec each (bounds, step, default, label, tier, role; fmt / section / visibleWhen are per-instance by design and are not compared)`);
+  if (drifted.length) { if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) ok.push(`NEGATIVE CONTROL: the instanced-family clause fired on a drifted stigmaSize range — ${drifted.join('; ')}`); else note(`instanced descriptors have DRIFTED in ${fam.what}: ${drifted.join('; ')}`); }
+  else if (NEGATIVE_CONTROL && /stigma/.test(String(fam.id))) note(`NEGATIVE CONTROL: stigmaSize's range was drifted in a copy of the rows and the instanced-family clause did NOT fire — the anti-drift witness measures nothing`);
+  else ok.push(`instanced descriptors agree: ${fam.what} — ${bySuffix.size} descriptors x ${[...bySuffix.values()][0].length} instances = ${rows.length} controls, one spec each (bounds, step, default${fam.perInstanceDefault.size ? ` except ${[...fam.perInstanceDefault].join('/')}, per-instance by declaration` : ''}, label, tier, role; fmt / section / visibleWhen are per-instance by design and are not compared)`);
 }
 
 /* ---------------- (s) THE NESTING RELATION, AT ANY DEPTH ----------------
@@ -2357,7 +2385,7 @@ for (const [label, sets, wantDome, wantClamp] of [
     const res = await page.evaluate((subs) => {
       const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent; const ui = window.__bloomUIState();
       const hid = (id) => document.getElementById(id).closest('.bl-ctrl').hidden;
-      const sec = document.getElementById('sec-tip');
+      const sec = document.getElementById('sec-antherTip');
       const line = (txt.match(/^ANTHER .*$/m) || [])[0] || null;
       return { has: m.androecium !== null, anther: m.androecium ? m.androecium.anther : null,
                shownTris: m.shownTris, sectionHidden: sec ? sec.hidden : null,
@@ -2375,8 +2403,8 @@ for (const [label, sets, wantDome, wantClamp] of [
     /* THE SECTION IS THE PANEL'S FIRST THIRD LEVEL — asserted as a number of
        enclosing <details>, so a Tip that quietly re-parented to the top would
        fail here rather than looking identical to route (a)'s census. */
-    if (res.sectionHidden === null) p.push('there is no #sec-tip section in the panel');
-    else if (res.depth !== 2) p.push(`the Tip section sits inside ${res.depth} drop-downs; it is declared inside Androecium inside Center, which is two`);
+    if (res.sectionHidden === null) p.push('there is no #sec-antherTip section in the panel');
+    else if (res.depth !== 2) p.push(`the Anther section sits inside ${res.depth} drop-downs; it is declared inside Androecium inside Center, which is two`);
     if (res.has !== !!want.present) p.push(`the owner ${res.has ? 'declares an androecium' : 'declares none'} while this step expects ${want.present ? 'one' : 'none'}`);
     res.subsHidden.forEach((h, i) => {
       const shouldShow = res.has && res.rho !== 1;
