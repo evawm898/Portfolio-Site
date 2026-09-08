@@ -353,7 +353,10 @@ row that widens anywhere inside the window says so and reports no share.
 
 ## 6b. Gates — what was run, and what it is evidence of
 
-**The predeclared untouched list, verified by `git diff` against `b323268` on the final tree**
+**PHASE A's predeclared untouched list — a statement about the DISCOVERY PR only, kept as the
+record of what that tree was.** It is *not* a claim about what this session ships: PR ONE
+changes `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and the harness by design, and its
+own list is §9c. Verified by `git diff` against `b323268` on the phase-A tree**
 (the head of `main` after session 31): `bloom.html`, `bloom.css`, `bloom.js`,
 `bloom-geometry.js`, `bloom-registry.js`, `bloom-grid-gltf.js`, `bloom-view-presets.js`,
 `tools/bloom-harness.mjs`, `tools/chromium-harness.mjs`, the four bloom verify gates,
@@ -459,6 +462,33 @@ was real:
    none at any amplitude to 0.9. **A5's coverage against "the retired term returns"
    is therefore narrower than it was**, and its stronger witness is `inverted-lerp`,
    which fires it on every row.
+
+---
+
+### 9c. PR ONE's OWN untouched list, verified on the final tree
+
+Against `origin/main` (`33c1195`, i.e. after #191), on the tree that is being merged — 18 files
+changed, +2,423 / −203.
+
+**Changed, all of it in scope:** `bloom-geometry.js` (the apex construction), `bloom-registry.js`
+(four ids retired, four rows gone), `bloom.js` (the read-out clause and `petalProfileU`),
+`tools/bloom-harness.mjs` (A2–A6, the stripped live matrix, `phase21Matrix()`,
+`FROZEN_MATRICES`), `tools/bloom-smoke.mjs`, `tools/diff-bloom-bytes.mjs`,
+`tools/verify-bloom-panel.mjs`, six `shot-bloom-*` sheets (retired-id references removed),
+`tools/verify-bloom-apex-mutants.mjs` and `tools/shot-bloom-apex.mjs` (new), plus this doc, the
+charter and `CLAUDE.md`.
+
+**Untouched, verified by `git diff` on the final tree:** `bloom.html`, `bloom.css`,
+`bloom-grid-gltf.js`, `bloom-view-presets.js`, `tools/chromium-harness.mjs`,
+`tools/verify-bloom-export.mjs`, `tools/verify-bloom-connectedness.mjs`,
+`tools/verify-bloom-grid.mjs`, `tools/bloom-crowding.mjs`, `tools/bloom-plan-coverage.mjs`,
+`tools/bloom-solid-angle-coverage.mjs`, `tools/publish-frozen-tags.sh` and #191's
+`tools/bloom-wall-thickness.mjs` — **and zero files** under `flower*`, `print*`, `plot*`,
+`cards*`, `artist-tracker*` or `.github/`.
+
+**Note the contrast with phase A on CI.** Phase A added a tool and nothing else, so no bloom
+workflow triggered. PR ONE changes bloom source, so **all six do** — which is why this one is
+merged on CI rather than on inherited byte-identity.
 
 ---
 
