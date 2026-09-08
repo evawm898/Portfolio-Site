@@ -564,80 +564,72 @@ whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheet
 `tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
 positions of the travel on two-row scaffolding).
 
-**THE APEX IS ONE UNCONDITIONAL CAP WITH TWO CONTROLS, AND `petalTipBreadth` IS RETIRED**
-(Eva's `blunt` ruling, session 32 — read `docs/bloom-session-32-outcome.md` before touching any
-of it). Phase A costed seven mechanisms, two survived, and it stopped at a sheet; **the ruling
-turned on the pictures, not the row count** — `cap`, the cheaper survivor, could not deliver a
-round apex at all, because six rows in the cap is a shoulder turning through 0.15 mm and the
-sheet reads it as a FACETED GABLE. A control that appears to do a thing and does not is the dead
-sharpness slider again, and **zero rows moved for a control that lies is the more expensive
-option**. `petalTipEnd` (0–0.6, default 0) is how BROAD the blade ends; `petalTipShape`
-(0.35–3.5, default 1.00) is HOW it gets there — 1.00 straight, below rounded, above drawn out.
-**TWO controls, not one dial**, because a rounded shoulder is only legible at a broad end, so
-round and broad must be reachable together AND apart; one control coupling them is session 31's
-own retired defect. `TIP_PLATEAU` is gone with the four retired ids (`petalTipBreadth` +
-`allTipBreadth` / `innerTipBreadth` / `labellumTipBreadth`, replaced by `*TipEnd`).
-**WHAT THE RETIRED TERM ACTUALLY DID, measured**: `max`-ing a RISING ramp against a FALLING core
-put a WAIST in the blade and widened it back out — 0 of 3,795 taper pairs show a rise-after-a-fall
-above the peak at breadth 0, **3,795 of 3,795** at every breadth above it, and **0 of 3,795**
-under the new law. **SPATULATE IS NOT LOST, it moved to its proper owner**: `uPk = a/(a+b)`
-reaches 0.833, giving a widest/base ratio of 4.94x at a 3.00 / b 0.60 / end 0.60 — Eva made the
-build conditional on confirming that, and **the confirm found a defect in the session's own
-draft**: flooring the whole blade at the terminal forces a broad tip to have a broad BASE
-(base/tip 1.00), so below the cap the floor stays the MODE floor and the comment at that line
-says why. **0 moved is a CONSTRUCTION** (`Math.max(0 × halfW, tipFloor)` IS the floor; the
-interpolant's `m === 1` arm returns `s` itself, not `1 - (1-s)^1`, which is not `s` in
-IEEE-754): 12,180 half-widths + every cap field, 0 differ under `Object.is`, plus 522 on the
-claw rows — and photographed at **0 px on both framings** against a 7,036 px same-tree control.
-**A2–A6 is the new family** (`bad.push('A…')` in both STL gates), and it exists because **both
-STL gates were blind to the waist for that control's whole life** — a waisted blade is
-watertight, one piece, at an identical triangle count. A5 (the apex narrows monotonically) is
-its only witness and runs on EVERY row; A4 rebuilds the terminal from the STATE, A6 catches a
-shape silently held at 1. **THERE IS NO A1 AND THE MUTANT TABLE IS WHY** — it read "entry >=
-terminal" off the descriptor and is VACUOUS, because `shapeAt(uCap)` dominates `hEnd` whether
-the crossing exists (it IS twice hEnd there) or not (uCap sits at uPk, where shapeAt is the full
-half-width); the mutation removing the very floor it guards fires nothing on four rows. The
-proof sits where A1 used to be. **`node tools/verify-bloom-apex-mutants.mjs` is the committed
-positive control** and it also caught **A5's first blind spot**: scanning from
-`max(uCap, ROOT_BLEND_END)` missed a re-added plateau entirely, because a term in `terms` only
-reaches the profile BELOW uCap — it scans from the root blend now, measured safe over 147,744
-shipped states. It must not scan lower: a foot wider than the blade peak is reachable (4.405 mm
-against 4.000 at foot width 10 x petalWidth 8) and the root blend legitimately falls to meet the
-rising core. **THE DEAD-CONTROL SWEEP**: `petalTipShape` has NO dead steps at any
-width in either mode and its default makes nothing inert; `petalTipEnd` has **1 dead step of 61
-in live** at the default width (against the retired control's 10) and 10 in EXPORT, where the
-floor is the PRINT floor doing its job — TOLD in the read-out keyed to the shown build, and a
-low-end track tick is costed (`/plot`'s `.plot-track--dead` is the pattern) but not built.
-**THE PARTITION CLOSED AT 45 movers / 21 inert / 462 holders on `frozen/phase18`**, with
-`twin === new on 528 of 528 rows` and V1–V5 held; movers were predeclared EXACTLY (the
-load-bearing class), the five-row gap being definitional — a row naming the id at its IDENTITY
-is a HOLDER, not INERT. **A correction to phase A's "66", which counted NAMING: 21 of those 66
-set a non-zero value on a control GATED OFF in that row, and measured they are exactly the INERT
-class. 45, not 66.** **THE CLOSE IS ON phase18, NOT THE NEWEST BASELINE, AND THAT IS ITS OWN
-FINDING: `frozen/phase20` and `frozen/phase19` can no longer be byte-re-exported from `main` at
-all** — they were frozen before session 31 retired `antherSharpness`/`stigmaSharpness`, so every
-row naming those is refused (`not in the DOM`). Session 31 could close on phase20 because it WAS
-that retirement; nobody after it can. phase18 (528 rows at `cb798f6`) is the newest replayable
-baseline, and the partition agrees across both (45/21 either side, only holders differ). The
-general remedy — freeze a phase at every retirement so a replayable baseline always exists newer
-than the last retired id — is recorded, not built. **`frozen/phase21` is owed** (the live matrix
-goes 572 → 582). The frozen
-matrices' bare `petalTipBreadth:` object keys are QUOTED now — the retired-id scanner reads bare
-keys as identifiers and quoted ones as literals, and quoting changes no emitted row (all 19
-matrices verified deep-equal to b323268). The sheet is
-`node tools/shot-bloom-apex.mjs <dir> [base-tree]`, which no longer patches anything — phase A's
-in-flight `page.route()` candidate laws went with the loser. **ITS WHOLE-BLADE FRAMING IS
-BIMODAL AND CARRIES NO PIXEL BOUND**: in phase A the identity comparison, between builds proved
-bit-identical to the float, read **0 px on one run and 7,036 px on the next**; the tip crop read
-0 px on all 14 observations. A bound comes from the run's control distribution, never one
-sample. **AND NO BLOOM GATE TRIGGERED ON THE DISCOVERY PR** — the six bloom workflows are
-path-filtered on bloom SOURCE and their own gate tools by name, so a tools-only PR runs the two
-FLOWER gates and nothing else; green CI there meant almost nothing, and `bloom-smoke` was run as
-the positive control instead. **The upstream contract for the lobe session is §5 of that doc**
-and is UNCHANGED by the ruling: `widthProfile()` stays the one owner of the apex, `[uCap, 1]` is
-read from the profile rather than re-spliced, no second round-to-pointed axis on the whole-petal
-apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP SHAPE or LOBE TIP SHAPE, never
-"tip shape".
+**THE APEX IS ONE UNCONDITIONAL CAP WITH NO CONTROL AT ALL, AND THE LAW IS A
+SUPERELLIPSE THAT HAS NOT LANDED YET** (Eva, session 32 — read
+`docs/bloom-session-32-outcome.md` before touching any of it). Phase A costed seven
+mechanisms and stopped at a sheet; the `blunt` ruling that followed was BUILT IN FULL and
+then WITHDRAWN, on the grounds that it answered the wrong question. **What Eva ruled
+instead: the petal tip law is the SUPERELLIPSE over `[widest point, 1]`, exposed as its
+exponent `n` directly (0.60–2.00, default 1.00), and it is a REPARAMETERISATION of the
+existing tip taper rather than a control beside it** — the core already IS that family
+over that region (RMS 0.005 at the round end) and two controls over one region violates
+the registration rule. **A terminal-width control is DROPPED and terminal width is
+DEFERRED as a separate shape family**, recorded so it is schedulable. **THE FACETING AT
+THE ROUND END IS A MESH PROBLEM, NOT A LAW PROBLEM**, and the law cannot be judged by eye
+until it is fixed: rows sit evenly in `u` while the curvature concentrates near the tip.
+**DO NOT FIX IT BY RAISING `NU` — `CURL_START_MIN = 1 / NU` is imported by the registry as
+a control bound, so changing `NU` silently moves an unrelated curl slider's floor.** The
+row COUNT stays fixed; the row POSITIONS move. It lands as THREE PRs in order: the
+structural prerequisite (this one), a SAGITTA INSTRUMENT (zero bytes), then the law plus
+redistribution.
+**WHAT SHIPPED HERE IS THE PREREQUISITE AND IT HAS NO CONTROL.** `TIP_PLATEAU` is gone,
+the converging cap is unconditional and runs to the mode floor along a straight lerp, and
+four ids are retired (`petalTipBreadth` + `allTipBreadth` / `innerTipBreadth` /
+`labellumTipBreadth`) with NOTHING replacing them — `petalTipShape` and `petalTipEnd` were
+stripped entirely so the superellipse arrives with no incumbent. Live matrix 572 → 562,
+registry 101 → 97. **WHAT THE RETIRED TERM DID, measured**: `max`-ing a RISING ramp
+against a FALLING core put a WAIST in the blade — 0 of 3,795 taper pairs show a
+rise-after-a-fall above the peak at breadth 0, **3,795 of 3,795** at every breadth above
+it, 0 under the new law. **SPATULATE IS NOT LOST**: `uPk = a/(a+b)` reaches 0.833.
+**A2–A6 IS THE FAMILY** and there is no A1 — it read "entry >= terminal" off the descriptor
+and the mutant table proved it VACUOUS. **`node tools/verify-bloom-apex-mutants.mjs` is the
+committed positive control**, six mutations, every family firing on one that names it. It
+took three passes and found two real defects: **A5 and A6 both reconstructed a row's
+station from its ARRAY INDEX**, which is off by however many FOOT rows precede the blade —
+A5 went silent on the mutation it exists for and A6 fired on the clean tree; the builder
+now emits `profileU` (its own per-row `u`) and both READ it, refusing to run rather than
+guess. And **the plateau mutation had to be raised to the retired control's own maximum
+(0.6) to fire at all**, which is a finding: with the cap unconditional and its terminal
+pinned to the mode floor a re-introduced plateau is MOSTLY MASKED (no waist anywhere at
+0.30 or 0.45; at 0.60 one on the default taper only; none at any amplitude on taper 0.6 or
+the narrowest petal), so **A5's coverage against that defect is narrower than it was** and
+its stronger witness is `inverted-lerp`.
+**THE THREE MEASUREMENTS EVA ASKED FOR, reported not decided.**
+**(1) THE CAP MUST BE DEMOTED OR THE LAW CANNOT BE JUDGED**: only TWO places depend on
+`TIP_CAP_FRACTION` (its definition and one `min`), and with the cap as a SHAPE the ceiling
+is unreachable — asked `n` 2.00 reads as **1.740** (rms 0.432) and 1.725 reads 1.590
+(reproducing Eva's own 1.585); demoted to a print-floor clamp it reads the asked `n`
+EXACTLY. A clamp binds on 1 of 28 rows live and 2 of 28 export at `n` 1.0.
+**(2) THE WIDEST POINT IS FIXED BY CONSTRUCTION** — at `s = 0` the superellipse is exactly
+1 for every `n` — and the DRAWN maximum holds on five of six taper pairs; it moves ONE ROW
+on `uPk = 0.2000`, which sits exactly between two stations. That is the sampling, not the
+law, and the redistribution must be measured against it.
+**(3) THE SHOULDER APPEARS AT `n` < 1.4 AND IS A RIGHT ANGLE BY 0.70** (turn angle at the
+widest point: 0.0° at `n` 2.00, 0.2–1.2° at 1.40, **19.6–53.9° at the DEFAULT 1.00**,
+50–76° at 0.90, 88.8–89.5° at 0.60). **The default is NOT corner-free** — the two limbs meet
+with different slopes for `n` <= 1 by construction, so only `n` >= ~1.4 is C1. That is a
+property of the approved law, not of an implementation, and Eva may want to revisit it
+before PR THREE.
+**`frozen/phase21` IS THE 572 ROWS AT `b323268`** — main's head before this retirement, owed
+because the matrix shrank, and **the newest baseline that is fully replayable** (see the
+charter's scheduled fix: phase19 and phase20 can no longer be byte-re-exported from main at
+all, because session 31's retirement postdates both). The sheet is
+`node tools/shot-bloom-apex.mjs <dir> [base-tree]`, now a RETIREMENT sheet — the phase-C
+scratch rig went with the withdrawn ruling. **The upstream contract for the lobe session is
+§5 of that doc** and is unchanged: `widthProfile()` stays the one owner of the apex,
+`[uCap, 1]` is read from the profile rather than re-spliced, no second round-to-pointed
+axis on the whole-petal apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP
+SHAPE or LOBE TIP SHAPE, never "tip shape".
 
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so

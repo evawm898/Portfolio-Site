@@ -218,6 +218,28 @@ any of them.
 
 ## Rulings to park for phase boundaries
 
+- **SCHEDULED FIX — `frozen/phase19` AND `frozen/phase20` CAN NO LONGER BE
+  BYTE-RE-EXPORTED FROM `main` AT ALL** (found session 32, Eva ruled it recorded rather
+  than acted on). Both were frozen BEFORE session 31 retired `antherSharpness` /
+  `stigmaSharpness`, so every row of theirs that names one is refused by design
+  (`config did not take: antherSharpness: not in the DOM`) and a plain capture from any
+  later tree collects nothing for it. Session 31 could close on phase20 because it WAS
+  that retirement and could pin the ids with `--override`; **nobody after it can**.
+  `--verify-frozen` is unaffected — it deep-compares row DEFINITIONS and still proves
+  every matrix on every push; what is gone is the byte half.
+  **THE FIX, when it is scheduled:** add a VALUE MAP for the retired ids to those two
+  matrices, using session 31's own rename-with-value-map construction (`--override`
+  taking a list, the INERT class predeclared, V3 requiring exactly the retired ids the
+  matrix names, V5 one frozen matrix for all three captures) — the ids resolve to their
+  replacements' images rather than being refused. Until then the replayable baseline is
+  the newest matrix that names no retired id, and a session that needs one **must check
+  that before choosing a baseline** rather than reaching for the newest.
+  **THE GENERAL REMEDY, recorded and not built:** freeze a phase at every retirement, so
+  a replayable baseline newer than the last retired id always exists.
+  **Session 32 hit this and worked around it** by freezing `frozen/phase21` (the 572 rows
+  at `b323268`) as its baseline — which it owed anyway, and which is fully replayable on
+  the tree it was frozen from. That is the pattern, not a one-off.
+
 - **THE A/B CENTRE RIG BELOW IS RETIRED (session 20, Sep 5) — see the session-20 entry at the
   end of this document. Both archetype entries are kept as written, because the reversal has
   to be legible: DISC was ruled the default on Aug 31 against real petals, and on Sep 5 Eva

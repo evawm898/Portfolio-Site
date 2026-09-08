@@ -52,7 +52,7 @@ import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-silhouette';
-const SIL = ['petalBaseTaper', 'petalTipTaper', 'petalTipEnd'];
+const SIL = ['petalBaseTaper', 'petalTipTaper'];
 const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
 
 const { server, port } = await serveRepo();
@@ -126,8 +126,8 @@ console.log('candidate defaults:');
 const candidates = [];
 for (const [label, s, note] of [
   ['TODAY — the pointed ovate (shipping default)', {}, 'The placeholder silhouette, reproduced BIT-IDENTICALLY by the new engine. Widest at 0.36; the tip is not a shape at all — it is the 0.8 mm blunt-tip floor governing the last 4 of 28 blade rows.'],
-  ['ROSE-ish — obovate, broad tip', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipEnd: 0.3 }, 'Widest at 0.65 — above the middle, which is what obovate means. CANDIDATE DEFAULT.'],
-  ['POPPY-ish — orbicular, truncate', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipEnd: 0.5 }, 'Blunt on both sides, tip held at half the max width. CANDIDATE DEFAULT.'],
+  ['ROSE-ish — obovate, broad tip', { petalBaseTaper: 2, petalTipTaper: 1.1 }, 'Widest at 0.65 — above the middle, which is what obovate means. CANDIDATE DEFAULT.'],
+  ['POPPY-ish — orbicular, truncate', { petalBaseTaper: 0.6, petalTipTaper: 0.7 }, 'Blunt on both sides, tip held at half the max width. CANDIDATE DEFAULT.'],
 ]) candidates.push(await cell({ label, set: set(s), views: ['whorl', 'petal'], note }));
 
 /* ---- 2. the family swept across its two exponents ---- */
@@ -138,12 +138,13 @@ for (const b of TIPT) for (const a of BASE) {
   family.push(await cell({ label: `base ${a} × tip ${b}`, set: set({ petalBaseTaper: a, petalTipTaper: b }) }));
 }
 
-/* ---- 3. the terminal: how broad the apex ends ---- */
-console.log('tip end sweep:');
+/* ---- 3. RETIRED SECTION. The terminal sweep swept `petalTipBreadth`, then
+       its `petalTipEnd` replacement, and session 32 retired both: the apex is
+       one unconditional cap with NO control, so there is nothing here to
+       sweep. The cells are not re-pointed at something else — a sweep whose
+       subject is gone is deleted, not repurposed. It returns when the
+       superellipse law gives the apex a control again. ---- */
 const breadth = [];
-for (const w of [0, 0.15, 0.3, 0.45, 0.6]) {
-  breadth.push(await cell({ label: `tip end ${w}`, set: set({ petalTipEnd: w }) }));
-}
 
 /* ---- 4. WHERE THE KINK WAS. The Aug 31 ruling ("it reads fine, plain
        Math.max stays") was about a C0 corner where the TIP_PLATEAU term
@@ -156,9 +157,9 @@ for (const w of [0, 0.15, 0.3, 0.45, 0.6]) {
 console.log('where the kink was (the same corner, one construction later):');
 const kink = [];
 for (const [label, s, note] of [
-  ['the fine end — tip end 0', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipEnd: 0 }, 'The steepest falling core at the mesh floor. The control case, unchanged from the Aug 31 sheet.'],
-  ['tip end 0.60 × steepest core', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipEnd: 0.6 }, 'THE CELL THAT USED TO BE THE KINK. Maximum terminal against the steepest falling core: under the retired TIP_PLATEAU the two terms crossed mid-blade and plain max left a C0 corner up to 16.4 deg there. There is no second term now — the cap starts higher up the blade and runs monotonically to its terminal, so there is nothing to cross.'],
-  ['tip end 0.30 × steepest core', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipEnd: 0.3 }, 'The gentler terminal, for scale.'],
+  ['the steepest core — tip taper 4', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4 }, 'The steepest falling core at the mesh floor. The control case, unchanged from the Aug 31 sheet.'],
+  ['tip taper 2', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 2 }, 'THE CELL THAT USED TO BE THE KINK. Maximum terminal against the steepest falling core: under the retired TIP_PLATEAU the two terms crossed mid-blade and plain max left a C0 corner up to 16.4 deg there. There is no second term now — the cap starts higher up the blade and runs monotonically to its terminal, so there is nothing to cross.'],
+  ['tip taper 1', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 1 }, 'The gentler terminal, for scale.'],
 ]) kink.push(await cell({ label, set: set(s), views: ['petal', 'tip'], note }));
 
 /* ---- 5. capability — what the architecture buys later ---- */

@@ -204,7 +204,7 @@ async function cell({ label, set = [], tag = '', onBase = false }) {
   const mm = `apex: terminal half-width ${tipHalf.toFixed(3)} mm · last six rows ${nearTip.slice(1).map((h) => h.toFixed(2)).join(' → ')} mm · ${gapTxt}`;
   const shown = ['petalBaseTaper', 'petalTipTaper'].map((id) => `${id === 'petalBaseTaper' ? 'base taper' : 'tip taper'} ${Number(want[id])}`)
     .concat(onBase ? [`tip breadth ${Number(want['petalTipBreadth'] ?? 0)}  (RETIRED)`]
-                   : [`tip end ${Number(want.petalTipEnd)}`, `tip shape ${Number(want.petalTipShape)}`]).join(' · ');
+                   : ['the apex has no control']).join(' · ');
   console.log(`  ${label.padEnd(52)} tip ${tipHalf.toFixed(3)} mm · ${narrows ? `last-gap ${(dropLast * 100).toFixed(0)}%` : `WIDENS ${Math.max(rises, -span).toFixed(2)} mm`} · tris(live) ${m.liveTris}`);
   return { label, tag, shots, mm, prof,
     caption: `${shown}${onBase ? ' · <b>THE BASE TREE (b323268)</b>' : ''}<br>${mm}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · ${modeTag(m)}` };
@@ -217,45 +217,29 @@ const set = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String(v
    whole control distribution decides what a pixel number here is worth.
    =================================================================== */
 const ROWS = [
-  { key: 'today', label: 'THE SHIPPING DEFAULT (tip end 0, tip shape 1.00)', set: {},
-    note: 'Byte-identical to the tree before this session, by construction rather than by tolerance: <code>Math.max(0 &times; halfW, tipFloor)</code> IS the floor, and the interpolant\'s <code>m === 1</code> arm returns <code>s</code> itself rather than <code>1 - (1-s)^1</code>, which is not <code>s</code> in IEEE-754. Measured in Node against a worktree of b323268: 12,180 half-widths and every cap field, 0 differ under <code>Object.is</code>; 522 more on the claw capability rows.' },
-
-  { key: 'shape-035', label: 'TIP SHAPE 0.35 — the roundest, at the fine end', set: { petalTipShape: 0.35 },
-    note: 'The blade holds its width into the apex and turns over late. At a 0.15 mm terminal this is the state Eva ruled reads as a faceted gable rather than a curve &mdash; the sheet keeps it because that reading is the reason the ruling went the way it did.' },
-  { key: 'shape-05', label: 'TIP SHAPE 0.50 — rounded (obtuse)', set: { petalTipShape: 0.5 }, note: 'The half-power: the apex approaches the axis with the profile of a circular quadrant.' },
-  { key: 'shape-2', label: 'TIP SHAPE 2.00 — drawn out', set: { petalTipShape: 2 }, note: 'Past the identity the apex leaves the cap entry fast and creeps to the terminal.' },
-  { key: 'shape-35', label: 'TIP SHAPE 3.50 — the most drawn out (acuminate)', set: { petalTipShape: 3.5 }, note: 'The other corner of the shape axis. Note where the narrowing sits: 0% of it in the final row gap, against 49% at 0.35 &mdash; the pointed half is the well-resolved half.' },
-
-  { key: 'end-15', label: 'TIP END 0.15 — a narrow truncate', set: { petalTipEnd: 0.15 }, note: 'The first end that clears the export floor at every shipped petal width.' },
-  { key: 'end-30', label: 'TIP END 0.30 — a broad truncate', set: { petalTipEnd: 0.3 },
-    note: 'Read this against the retired control at the same 0.30 below: the same terminal width, reached by a blade that NARROWS to it monotonically instead of waisting and flaring back out. No crossing, so no corner.' },
-  { key: 'end-60', label: 'TIP END 0.60 — the maximum', set: { petalTipEnd: 0.6 }, note: 'The broad extreme. The cap starts higher up the blade, where the core is still wide enough to reach this terminal.' },
-
-  { key: 'poppy', label: 'THE POPPY — end 0.30 &times; shape 0.50, a ROUNDED TRUNCATE', set: { petalTipEnd: 0.3, petalTipShape: 0.5 },
-    note: '<b>THE STATE NO SHIPPED CONTROL COULD REACH.</b> A broad end approached by a rounded shoulder. Before this session roundness and a broad end were mutually exclusive, because the cap that could round an apex existed only at tip breadth exactly 0. This is the cell the ruling turns on: a shoulder turning through 2.4 mm of half-width can be drawn at this row count, one turning through 0.15 mm cannot.' },
-  { key: 'corner-round', label: 'CORNER — end 0.60 &times; shape 0.35', set: { petalTipEnd: 0.6, petalTipShape: 0.35 }, note: 'Both axes at their round/broad extremes at once.' },
-  { key: 'corner-drawn', label: 'CORNER — end 0.60 &times; shape 3.50', set: { petalTipEnd: 0.6, petalTipShape: 3.5 }, note: 'Broad end, drawn-out approach: the cap runs long into a wide terminal.' },
-  { key: 'spatulate', label: 'SPATULATE — base taper 3.00 / tip taper 0.60 &times; end 0.60', set: { petalBaseTaper: 3, petalTipTaper: 0.6, petalTipEnd: 0.6 },
-    note: '<b>THE SILHOUETTE THE RETIRED TERM PRODUCED BY WAISTING THE BLADE, made here by its proper owners.</b> The widest point is a/(a+b) = 0.833, so the blade is broad in its upper fifth and narrow at the base &mdash; measured widest/base 4.94x, against 1.00x if the terminal had been allowed to floor the whole blade (a defect this session found and fixed while confirming the ruling\'s premise). It narrows monotonically, which the retired construction never did.' },
+  { key: 'today', label: 'THE SHIPPING DEFAULT — the unconditional cap', set: {},
+    note: 'Unchanged from the tree before this session: the shipping petal was already the pointed family, and the pointed family\'s cap is what became unconditional. Measured against a worktree of b323268 — every drawn row, both modes, 0 differ under <code>Object.is</code>.' },
+  { key: 'taper-06', label: 'TIP TAPER 0.60 — the cap entry at the 0.80 clamp', set: { petalTipTaper: 0.6 },
+    note: 'The widest cap this matrix reaches. <code>uCap = min(1 - TIP_CAP_FRACTION, crossing)</code>, and here the FRACTION rule picks it, so the cap owns exactly the last fifth.' },
+  { key: 'taper-4', label: 'TIP TAPER 4.00 — the cap entry from the crossing', set: { petalTipTaper: 4 },
+    note: 'The other entry rule: the crossing at twice the print floor picks u 0.59, so the cap owns the last 41%. The two rules are why the apex cannot be judged from one row.' },
+  { key: 'narrow', label: 'THE NARROWEST PETAL — width 8, taper 4', set: { petalWidth: 8, petalTipTaper: 4 },
+    note: 'Where the mode floor is the largest fraction of the blade, so live and export diverge most at the tip.' },
 ];
 
-/* THE BASE-TREE CELLS — what the retirement actually removed, rendered from a
-   git worktree of b323268 by the same browser and camera rather than
-   remembered. The identity pair is first: the same default on both trees.
-
-   THE RETIRED ID IS QUOTED IN THESE ROWS, deliberately. It names a control
-   that exists on the OLD tree and nowhere else, so it is row DATA rather than
-   a reference to anything live — and the panel gate's retired-id scanner
-   exempts literals for exactly that reason, which is also how the frozen
-   matrices keep naming the ids their rows were defined with. */
+/* THE BASE-TREE CELLS — what the retirement removed, rendered from a git
+   worktree of b323268 by the same browser and the same camera rather than
+   remembered. The retired id is QUOTED in these rows: it names a control that
+   exists on the OLD tree and nowhere else, so it is row DATA, which is what
+   the panel gate's retired-id scanner exempts. */
 const BASE_ROWS = [
   { key: 'base-today', label: 'BASE TREE — the shipping default', set: {}, onBase: true,
-    note: 'The identity pair with the first cell above. Any difference on the TIP CROP is a difference in the geometry, because that framing\'s same-tree control read 0 px on every observation of the phase-A run.' },
-  { key: 'base-breadth-01', label: 'BASE TREE — the retired control at 0.01', set: { 'petalTipBreadth': 0.01 }, onBase: true,
-    note: 'The first step off zero on the retired control. The live terminal jumped 0.150 &rarr; 0.800 mm here &mdash; a 5.3x discontinuity on the first step, and then ten of sixty steps drew this same tip.' },
-  { key: 'base-breadth-30', label: 'BASE TREE — the retired control at 0.30', set: { 'petalTipBreadth': 0.3 }, onBase: true,
-    note: 'Against TIP END 0.30 above. Waist 1.753 mm at u = 0.83 flaring 37% to a 2.400 mm tip, with a 6.7&deg; corner at the crossing. This is what "widens toward the tip" actually looked like.' },
-  { key: 'base-breadth-60', label: 'BASE TREE — the retired control at 0.60 (maximum)', set: { 'petalTipBreadth': 0.6 }, onBase: true,
+    note: 'The identity pair with the first cell. Any difference on the TIP CROP is a difference in the geometry, because that framing\'s same-tree control read 0 px on every observation of this rig.' },
+  { key: 'base-01', label: 'BASE TREE — the retired control at 0.01', set: { 'petalTipBreadth': 0.01 }, onBase: true,
+    note: 'The first step off zero on the retired control: the live terminal jumped 0.150 &rarr; 0.800 mm, a 5.3x discontinuity, and then ten of sixty steps drew this same tip.' },
+  { key: 'base-30', label: 'BASE TREE — the retired control at 0.30', set: { 'petalTipBreadth': 0.3 }, onBase: true,
+    note: 'Waist 1.753 mm at u = 0.83 flaring 37% to a 2.400 mm tip, with a 6.7&deg; corner at the crossing. This is the shape A5 exists to catch, and both STL gates are blind to it.' },
+  { key: 'base-60', label: 'BASE TREE — the retired control at 0.60 (maximum)', set: { 'petalTipBreadth': 0.6 }, onBase: true,
     note: 'The extreme: waist 2.974 mm at u = 0.76 flaring 61% to 4.800 mm, worst outline corner 16.4&deg;. The state the silhouette sheet photographed as THE KINK.' },
 ];
 
@@ -303,40 +287,16 @@ if (!baseToday) console.log('  IDENTITY  (no base tree given — pass one as the
    move the shape across its WHOLE declared range, and does its default sit
    anywhere the OTHER control goes inert.
    =================================================================== */
-const sweep = [];
-{
-  const geo = await import('../bloom-geometry.js');
-  const byIdR = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
-  const ring = { width: 6.4 };
-  const rowsOf = (st, halfW, em) => { const p = geo.widthProfile(st, ring, halfW, null, { exportMode: em });
-    return Array.from({ length: 28 }, (_, i) => p.halfWidthAt((i + 1) / 28)); };
-  const maxAbs = (A, B) => Math.max(...A.map((x, i) => Math.abs(x - B[i])));
-  const stAt = (o) => ({ petalBaseTaper: 1, petalTipTaper: 1.8, petalTipEnd: 0, petalTipShape: 1, ...o });
-  const stepsOf = (id) => { const c = byIdR[id], o = []; for (let v = c.min; v <= c.max + 1e-9; v += c.step) o.push(+v.toFixed(4)); return o; };
-  for (const [id, other] of [['petalTipEnd', 'petalTipShape'], ['petalTipShape', 'petalTipEnd']]) {
-    const c = byIdR[id], vals = stepsOf(id);
-    sweep.push(`  ${id}  (${c.min}..${c.max} step ${c.step}, ${vals.length} steps, default ${DEFAULTS[id]}):`);
-    for (const [pw, em] of [[16, false], [16, true], [8, false], [8, true], [30, false]]) {
-      const halfW = pw / 2; let dead = [], run = [], minStep = Infinity;
-      for (let k = 1; k < vals.length; k++) {
-        const d = maxAbs(rowsOf(stAt({ [id]: vals[k] }), halfW, em), rowsOf(stAt({ [id]: vals[k - 1] }), halfW, em));
-        if (d < 1e-9) run.push(vals[k]);
-        else { if (run.length) { dead.push([run[0], run[run.length - 1]]); run = []; } if (d < minStep) minStep = d; }
-      }
-      if (run.length) dead.push([run[0], run[run.length - 1]]);
-      const nDead = dead.reduce((n, [x, y]) => n + Math.round((y - x) / c.step) + 1, 0);
-      sweep.push(`    width ${String(pw).padStart(2)} ${em ? 'export' : 'live  '}: ${nDead === 0 ? 'NO DEAD STEPS' : `${nDead} DEAD ${dead.map(([x, y]) => `${x}..${y}`).join(', ')}`}`
-        + ` · smallest live step ${minStep === Infinity ? 'n/a' : minStep.toFixed(4) + ' mm'}`);
-    }
-    const oc = byIdR[other], inertAt = [];
-    for (const [pw, em] of [[16, false], [8, false], [8, true], [30, false]]) {
-      const halfW = pw / 2, inert = [];
-      for (const v of vals) if (maxAbs(rowsOf(stAt({ [id]: v, [other]: oc.min }), halfW, em), rowsOf(stAt({ [id]: v, [other]: oc.max }), halfW, em)) < 1e-9) inert.push(v);
-      inertAt.push(`    width ${String(pw).padStart(2)} ${em ? 'export' : 'live  '}: ${inert.length ? `${other} INERT at ${id} = ${inert[0]}..${inert[inert.length - 1]} (${inert.length} of ${vals.length})${inert.includes(Number(DEFAULTS[id])) ? '  <-- INCLUDES THE DEFAULT' : ''}` : `${other} is never inert on this travel`}`);
-    }
-    sweep.push(`    --- does ${other} go inert anywhere on ${id}'s travel? ---`, ...inertAt);
-  }
-}
+/* THE DEAD-CONTROL SWEEP IS EMPTY, AND SAYING SO IS THE POINT. The apex has
+   no control on this tree, so there is no travel to sweep — the sweep block
+   is kept rather than deleted because a later session adding the superellipse
+   inherits the place it goes, and Eva's standing instruction is that every
+   control added or changed gets one. */
+const sweep = ['  the apex has NO CONTROL on this tree, so there is no travel to sweep.',
+  '  The two that were built for it (a terminal width and a shape exponent) were',
+  '  DROPPED on Eva\'s ruling; the superellipse that replaces them is a',
+  '  reparameterisation of the tip taper and lands with the row redistribution',
+  '  its round end needs. This block is where its sweep goes.'];
 console.log('\nDEAD-CONTROL SWEEP:');
 for (const l of sweep) console.log(l);
 
@@ -389,18 +349,12 @@ framing.</p>
 <pre>${VIEWS.map((v) => `${v.padEnd(6)} n=${dist[v].n}  min ${dist[v].min}  median ${dist[v].median}  max ${dist[v].max}   [${dist[v].all.join(', ')}]`).join('\n')}
 
 ${idLines.join('\n')}</pre>
-${group('1 &middot; The shipping default, and the space the two controls open',
-  'At the size petals actually ship (35 &times; 16 mm). The first cell is unchanged from before this session; everything after it was unreachable.',
-  ['today', 'shape-035', 'shape-05', 'shape-2', 'shape-35'])}
-${group('2 &middot; The terminal — how broad the blade ends',
-  'The <code>Tip end</code> axis at the straight-cone shape. Every one of these narrows monotonically to its terminal, which is what A5 asserts on every gate row.',
-  ['end-15', 'end-30', 'end-60'])}
-${group('3 &middot; The corners, and the state no shipped control could reach',
-  'Both axes together. The poppy is the cell the ruling turns on.',
-  ['poppy', 'corner-round', 'corner-drawn', 'spatulate'])}
-${group('4 &middot; The base tree — what the retirement removed',
+${group('1 &middot; The unconditional cap, on this tree',
+  'The shipping default and the two cap-entry rules. The apex has no control, so what varies here is what actually reaches it: the tip taper (which decides where the cap enters and how wide it starts) and the petal width (which decides how much of the tip the mode floor is).',
+  ['today', 'taper-06', 'taper-4', 'narrow'])}
+${group('2 &middot; The base tree — what the retirement removed',
   'Rendered from a git worktree of b323268 by the same browser and the same camera, so this is a real render of the old code rather than a remembered one. The first cell is the identity pair with section 1; the rest are the retired control\'s own states.',
-  ['base-today', 'base-breadth-01', 'base-breadth-30', 'base-breadth-60'])}
+  ['base-today', 'base-01', 'base-30', 'base-60'])}
 <h2>Dead-control sweep</h2>
 <p>Every step of both shipped ranges, at five petal-width &times; mode combinations, measured on the
 <b>drawn rows</b> rather than on the continuous law &mdash; a curve the 28-row sampling cannot resolve is a

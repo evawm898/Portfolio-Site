@@ -383,261 +383,168 @@ for the first time because this one adds a tool and nothing else.
 
 ---
 
-## 8. THE CONFIRM QUESTION — asked before the build, and it changed the design
+## 8. THE `blunt` RULING WAS WITHDRAWN, AND WHAT REPLACED IT
 
-Eva made the build conditional: *"after `blunt`, is a blade that widens toward the tip still
-reachable from widthProfile? … If widening is genuinely gone rather than relocated, say so and
-stop."* Her reading was that the widening was a `widthProfile` property smuggled into a
-terminal-width control. **That is right, and checking it found a defect in this session's own
-phase-A draft.**
+`blunt` was built in full and is recorded in this repository's history; Eva then
+withdrew the ruling, on the grounds that it answered the wrong question. What she
+ruled instead, from phase C's four-state sheet:
 
-**Two different shapes hide under "widens toward the tip", and only one of them goes.**
+* **The law is the SUPERELLIPSE over `[widest point, 1]`**, exposed as its exponent
+  `n` directly, range **0.60 – 2.00**, default **1.00**. It is a
+  **REPARAMETERISATION of the existing tip taper, not a control beside it** — the
+  existing core already IS that family over that region (RMS 0.005 at the round
+  end), and two controls over one region violates the registration rule. `n = 2.00`
+  is the ceiling because the ellipse is the roundest state wanted.
+* **A terminal-width control is DROPPED.** It was built as `petalTipEnd`, measured,
+  and dropped on this ruling. **Terminal width is DEFERRED as a separate shape
+  family** — recorded here so it is schedulable rather than forgotten. What it would
+  buy, from the phase-B measurements: truncate and rounded-truncate apices (rose,
+  poppy), which no other control reaches; what it costs is a second owner over the
+  same region as the superellipse unless it is scoped to the terminal alone.
+* **The faceting at the round end is a MESH problem, not a law problem**, and the
+  law cannot be judged by eye until it is fixed. Rows sit evenly in `u` while the
+  outline's curvature concentrates near the tip, so the sampling is sparsest exactly
+  where the curve is tightest. **The row COUNT stays fixed and the row POSITIONS
+  move** — `NU` must not rise, because `CURL_START_MIN = 1 / NU` is imported by the
+  registry as a control bound and changing `NU` silently moves an unrelated curl
+  slider's floor.
 
-* **Obovate / spatulate** — the widest point above the middle. Owned by the two taper
-  exponents alone: `uPk = a/(a+b)`, which reaches **0.833** at the shipped ranges. `blunt`
-  does not touch it. Under the new law, at `a` 3.00 / `b` 0.60 / end 0.60 the widest point
-  sits at **80% of the length** with a **widest/base ratio of 4.94×** and a 4.80 mm terminal.
-  Reachable, and better than before, because it no longer has to travel through a waist.
-* **Pandurate / fiddle** — a waist, then a genuine re-widening to the tip. **This is what
-  `petalTipBreadth` uniquely made, and it goes.** Measured across the full shipped taper
-  ranges: **0 of 3,795** (a, b) pairs show a rise-after-a-fall above the peak at breadth 0,
-  **3,795 of 3,795** do at every breadth above it, and **0 of 3,795** do under `blunt`. It was
-  not an edge case; it was the term's signature on every value it had.
+It lands as three PRs in order: **this one** (the structural prerequisite), a
+**sagitta instrument** (zero bytes), and the **law plus redistribution**.
 
-**THE DEFECT THE QUESTION FOUND.** Phase A's `blunt` draft floored the whole blade at the
-terminal (`Math.max(shape, rootBlend(u), hEnd)` below the cap). That forces a broad-tipped
-petal to have a broad **base** — measured **base/tip 1.00** at a 3.00 / b 0.60 / end 0.60,
-i.e. the narrow-base half of spatulate destroyed, which would have made Eva's premise false.
-The shipped law floors below the cap at the **mode floor**, exactly as it always did, and the
-comment at that line says why so it cannot be "simplified" back. Swept afterwards over
-**14,364 states** (three petal widths × both modes × six terminals × the taper grid): **0 put
-a rise after a fall above the peak**, so the step-up risk that motivated the wrong floor does
-not occur anywhere reachable.
+## 9. WHAT THIS PR SHIPS — the structural prerequisite
 
-## 9. What shipped
+One apex construction and **no control at all**. `TIP_PLATEAU` is gone; the
+converging cap is unconditional and runs to the mode floor along a straight lerp on
+every petal. Four ids are retired — `petalTipBreadth` and its three role twins — and
+**nothing replaces them**: `petalTipShape` and `petalTipEnd` were stripped entirely,
+so the superellipse arrives with no incumbent to fight for ownership of the region.
 
-### 9a. Two controls, because the ruling rests on the combination
+The live matrix goes **572 → 562 rows**; the registry goes **101 → 97 controls**.
 
-| id | range | default | what it is |
-|---|---|---|---|
-| `petalTipEnd` | 0 – 0.6, step 0.01 | **0** | how BROAD the blade ends, as a fraction of the max half-width |
-| `petalTipShape` | 0.35 – 3.5, step 0.05 | **1.00** | HOW it gets there: 1.00 straight, below rounded, above drawn out |
-
-Separate rows rather than one dial moving both, and the reason is Eva's own: a rounded
-shoulder is only legible at a broad end, so "round" and "broad" have to be reachable *together
-and apart*. One control coupling them would also be the two-things-in-one-control defect
-session 31 retired `antherSharpness` for.
-
-`petalTipEnd` keeps the three role twins its predecessor had — `allTipEnd`, `innerTipEnd`,
-`labellumTipEnd`, same roles, same laws, same ranges. `petalTipShape` ships with none, for the
-reason the `ROLE_OVERRIDES` header already gives: the set is trimmed and grows on evidence, and
-one row there plus one in the registry is always the cost.
-
-### 9b. Four ids retired
-
-`petalTipBreadth`, `allTipBreadth`, `innerTipBreadth`, `labellumTipBreadth` — into
-`RETIRED_IDS` with `retiredAt: 32`, `schema: null` (nothing persists a bloom design yet) and a
-`why` that carries the measurements above. The name may never come back: a stored 0.30 under
-the old name is a waisted spatulate blade and under the new one is a clean truncate.
-
-### 9c. The identity is a construction, and it is measured
-
-`Math.max(0 * halfW, tipFloor)` **is** `tipFloor`; the crossing target
-`CAP_ENTRY_FACTOR * Math.max(tipFloor, TIP_HALF_MM)` is `CAP_ENTRY_FACTOR * TIP_HALF_MM` in
-both modes; and the interpolant's `m === 1` arm returns `s` itself rather than `1 - (1-s)^1`,
-which is **not** `s` in IEEE-754. Measured against a `git worktree` of `b323268`:
-
-```
-  12,180 half-widths + every cap field (uCap, capEntryHalf), 0 differ   (Object.is)
-     522 half-widths on the CLAW capability rows,             0 differ
-```
-
-and photographed: the shipping default rendered on both trees differs by **0 px on both
-framings**, against a same-tree control that read 7,036 px on each row of that run.
-
-### 9d. The apex assertion family, A2–A6
-
-The old tip-cap check was a biconditional between the pointed and truncate families; both are
-gone, so it is gone. What replaced it is stronger, and the reason is the retired term's own
-failure mode: **a waisted blade is watertight, one piece, and has an identical triangle count**,
-so both STL gates were blind to it for the whole life of that control.
+### 9a. The apex family, A2–A6, re-established on the stripped tree
 
 | | asserts |
 |---|---|
 | A2 | the last emitted row **is** the terminus |
 | A3 | never a true apex (the retired centre dome's 48-degenerate-triangle bug) |
-| A4 | the terminal is `max(effective petalTipEnd × halfW, mode floor)`, **rebuilt from the state** rather than read off the descriptor — C1's discipline |
-| A5 | the apex narrows monotonically: no rise after a fall above the widest row. **The only witness for the retired waist**, and asserted on every row |
-| A6 | the cap built at the exponent the **effective** state asks for — the only witness for a shape silently held at 1, which would pass A1–A5 on every row |
+| A4 | the terminal is the **mode floor and nothing else**, rebuilt from the mode the builder reported |
+| A5 | the apex narrows monotonically — the retired waist's only witness, on every row |
+| A6 | the capped rows are **collinear**: the cap is a straight lerp |
 
-A4 and A6 read the **effective** state, not the row's own: `petalTipEnd` is overridable, so a
-labellum delta gives descriptor 0's petal a different terminal from the one the row asked for.
+**There is no A1, and the mutant table is why** — it read "entry ≥ terminal" off the
+descriptor and is vacuous; the proof sits where it used to be in `bloom-harness.mjs`.
 
-**THERE IS NO A1, AND THE MUTANT TABLE IS WHY.** It was written as "the cap never widens: entry
-≥ terminal", read off the descriptor — and it is **vacuous**. `hEntry = max(shapeAt(uCap),
-rootBlend(uCap), hEnd)`, and even with the `hEnd` term removed the first already dominates:
-where the cap-entry crossing exists `shapeAt(uCap)` IS `CAP_ENTRY_FACTOR × max(hEnd,
-TIP_HALF_MM)`, at least twice hEnd; where it does not, the bisection leaves `uCap` at `uPk` and
-`shapeAt(uPk)` is the full half-width, which every reachable terminal is a fraction of. Measured
-as well as derived: the mutation removing the very floor it guards fires **nothing**, on four
-rows including the parallel-stub corner. It was deleted rather than kept as a number under a
-header claiming it checks something, and the proof sits where it used to be so a later session
-does not add it back. What actually witnesses "the cap never widens" is **A5, on the emitted
-rows** — confirmed by the inverted-interpolation mutant, where A1 was silent and A2 and A5 both
-fired.
+**A6 is written to fire when the law changes, deliberately.** The superellipse owns
+`[widest point, 1]`, which contains the cap's last fifth, so either the cap is
+demoted or it stops being straight — and both should be loud rather than absorbed.
 
-**AND THE SMOKE GATE'S CENSUS CAUGHT THE LEFTOVER, IN CI, ON THE FIRST PUSH.** Deleting A1
-left one `path` claiming it — not by name, but inside the RANGE `A1-A5`. That is session 27's
-own recorded hazard arriving on a new family (*"Z2 was hidden by a range — `Z1-Z3` names its
-ends and hides its middle, so never write one"*), and it is why the census reads a biconditional
-rather than a checklist. Two lessons for the next session that adds or removes a family:
-**re-run `node tools/bloom-smoke.mjs --check` after touching one** — the local run that passed
-was taken before A1 was deleted — and **never write a range in a `path`**.
+### 9b. What the mutant table found on the stripped tree, re-run rather than inherited
 
-**`node tools/verify-bloom-apex-mutants.mjs` is the positive control**, committed rather than
-scratch, because the smoke gate's own header says a `path` citation "is a claim about the PATH a
-row engages, never evidence the assertion can FIRE there". It found three things on two passes:
-A1's vacuity; **A5's first blind spot** — the scan started at `max(uCap, ROOT_BLEND_END)`, and a
-plateau term added to `terms` only reaches the profile BELOW `uCap`, so the retired defect sat
-outside the scanned region and fired nothing anywhere in the gate (the scan starts at the root
-blend now, strictly stronger, measured safe over 147,744 shipped states); and two expectations
-that were wrong about which family a mutation breaks — corrected in the table, not in the gate.
-Result: every one of A2–A6 fires on a mutation that names it and all are silent on the clean
-tree.
+`node tools/verify-bloom-apex-mutants.mjs` — **six mutations, every family fires on
+one that names it, silent on the clean tree.** It took three passes, and each failure
+was real:
 
-## 10. The dead-control sweep, reported rather than concluded
+1. **A5 and A6 both reconstructed a row's station from its array index**, which is
+   off by however many FOOT rows precede the blade. A5 scanned the wrong region and
+   went silent on the mutation it exists for; A6 fired on the clean tree. Fixed by
+   emitting `profileU` — the builder's own per-row `u` — and reading it. **The gate
+   now refuses to run rather than guess** if it is absent.
+2. **The plateau mutation had to be raised to the retired control's OWN maximum
+   (0.6) to fire at all**, and that is a finding rather than a tuning: with the cap
+   unconditional and its terminal pinned to the mode floor, a re-introduced
+   `TIP_PLATEAU` is **mostly masked**. Measured over the four mutant rows — at
+   amplitude 0.30 and 0.45 it produces **no waist anywhere**; at 0.60 it produces one
+   **on the default taper only**; on taper 0.6 and on the narrowest petal it produces
+   none at any amplitude to 0.9. **A5's coverage against "the retired term returns"
+   is therefore narrower than it was**, and its stronger witness is `inverted-lerp`,
+   which fires it on every row.
 
-Every step of both shipped ranges, five petal-width × mode combinations, measured on the
-**drawn rows**:
+---
 
-```
-  petalTipEnd   (0..0.6 step 0.01, 61 steps, default 0)
-    width 16 live  :  1 DEAD 0.01..0.01        · smallest live step 0.0100 mm
-    width 16 export: 10 DEAD 0.01..0.10        · smallest live step 0.0800 mm
-    width  8 live  :  3 DEAD 0.01..0.03        · smallest live step 0.0100 mm
-    width  8 export: 20 DEAD 0.01..0.20        · smallest live step 0.0400 mm
-    width 30 live  :  1 DEAD 0.01..0.01        · smallest live step 0.1500 mm
+## 10. THE THREE MEASUREMENTS — reported, not decided
 
-  petalTipShape (0.35..3.5 step 0.05, 64 steps, default 1.00)
-    width 16 live  : NO DEAD STEPS · smallest live step 0.0107 mm
-    width 16 export: NO DEAD STEPS · smallest live step 0.0073 mm
-    width  8 live  : NO DEAD STEPS · smallest live step 0.0074 mm
-    width  8 export: NO DEAD STEPS · smallest live step 0.0041 mm
-    width 30 live  : NO DEAD STEPS · smallest live step 0.0207 mm
+### 10a. THE CAP: it must be demoted, or the law cannot be judged
 
-  neither control goes inert anywhere on the other's travel, at any width, in either mode.
-```
+**What depends on `TIP_CAP_FRACTION` today: two places.** Its own definition
+(`bloom-geometry.js:2950`) and one use — `uCap = Math.min(1 - TIP_CAP_FRACTION, lo)`
+— plus one sheet caption. The blast radius is as small as it could be.
 
-**`petalTipShape` is clean across its whole declared range and its default 1.00 makes nothing
-inert** — which is the check the anther's sharpness failed in session 29, where the default sat
-exactly on the value that made roundedness inert for its entire travel.
+**With the cap as a SHAPE, the ceiling Eva set is unreachable.** Least-squares fit of
+the superellipse to the 28 drawn rows, default petal, live:
 
-**`petalTipEnd` has dead travel and it is TOLD, in the read-out, keyed to the shown build.**
-Below `floor / halfW` the mode floor IS the terminal. Note what the numbers say: the retired
-control had **10 dead steps of 60 in LIVE** at the default width; the replacement has **one**,
-because the live floor is 0.15 mm rather than 0.8 mm. The ten remaining dead steps are in
-EXPORT, where the floor is the **print floor** doing exactly its job — the same floor that
-governs sheet thickness and every other printable feature. The read-out reads the SHOWN build
-so it can never print an export number under a live label:
+| asked `n` | cap as a SHAPE (today) | cap DEMOTED to a floor | no floor at all |
+|---|---|---|---|
+| 0.600 | reads **0.610** (rms 0.239) | reads 0.600 (rms 0.048) | reads 0.600 (rms 0.000) |
+| 1.000 | reads **1.005** (rms 0.054) | reads 1.000 (rms 0.035) | reads 1.000 (rms 0.000) |
+| 1.400 | reads **1.360** (rms 0.166) | reads 1.400 (rms 0.035) | reads 1.400 (rms 0.000) |
+| 1.725 | reads **1.590** (rms 0.324) | reads 1.725 (rms 0.035) | reads 1.725 (rms 0.000) |
+| 2.000 | reads **1.740** (rms 0.432) | reads 2.000 (rms 0.035) | reads 2.000 (rms 0.000) |
+
+Eva's own reading of phase C — n 1.725 falling to 1.585 — reproduces here at 1.590.
+**The round half of the range is where the cap does the damage**: it costs 0.005 at
+`n` 1.0 and 0.260 at `n` 2.0. Demoted to a print-floor clamp the drawn outline reads
+the asked `n` **exactly**, and the residual rms 0.035 is the floor itself pinning the
+last row.
+
+**A clamp would bind on very few rows** — it acts only where the law falls below the
+printable minimum:
 
 ```
-  0     ->  a point — the 0.15 mm floor is the whole terminal (live)
-  0.01  ->  1% asked — FLOORED at 0.30 mm across (live); every step to 0.02 draws this same tip
-  0.05  ->  5% asked — FLOORED at 1.60 mm across (export); every step to 0.10 draws this same tip
-  0.30  ->  30% of width — 4.80 mm across (live)
+  live  : n 0.6: 3 of 28 rows below the 0.15 mm floor · n 1.0: 1 · n 2.0: 1
+  export: n 0.6: 7 of 28 rows below the 0.80 mm floor · n 1.0: 2 · n 2.0: 1
 ```
 
-**NOT drawn on the track, and costed rather than skipped.** The registry's `cap` mechanism
-hatches travel *above* a mark (`stamenSpread`'s saturation); this dead zone is at the *bottom*.
-A low-end tick is a new registry field, a change to `applyCaps()`, a new CSS rule and a new
-panel-gate route — `/plot`'s density sliders already do exactly this with
-`.plot-track--dead`, so the pattern exists and could be ported in a small session. It is not
-built here because the read-out already carries the number and the live default has one dead
-step.
+**The invariants under the demotion are measured in §10d** — this section is the
+shape reading only. **The reading is that the cap cannot stay a shape if the
+superellipse owns that region; the boundary is not changed here.**
 
-## 11. The partition
+### 10b. THE WIDEST POINT: fixed by construction, with one sampling caveat
 
-**Predeclared before the captures, derived by evaluating each replacement control's own
-registry predicate on each row's state** — not by counting which rows name an id. **Measured:**
+**The law holds it exactly.** At `s = 0` the superellipse is `(1 - 0)^(1/n) = 1` for
+every `n`, so `h(uPk) = halfW` exactly and `n` never appears in `uPk = a/(a+b)`.
 
-```
-  PREDECLARED  frozen/phase18 (528 rows):   45 movers / 26 inert / 457 holders
-  MEASURED                                  45 movers / 21 inert / 462 holders     PASS
-```
+**The DRAWN maximum is fixed on five of six taper pairs and moves by one row on the
+sixth** — measured across `n` = 0.60, 0.80, 1.00, 1.40, 2.00:
 
-**The movers — the load-bearing class — were predicted exactly, and `twin === new on 528 of
-528 rows`.** The five-row gap is definitional and the tool's definition is the better one: a row
-that names a retired id **at its identity** (`petalTipBreadth min (0)`, `ALL MIN`, and three
-`*TipBreadth min (0)` rows) already holds the twin's value, so it is a HOLDER. INERT is reserved
-for a row that set a NON-identity value which could not reach the geometry — the twenty-one
-GATED rows, where the control is hidden and inert by construction. Both numbers are recorded
-because the predeclaration is only evidence if the correction to it is visible.
+| taper | `uPk` | drawn widest across the sweep |
+|---|---|---|
+| 1 / 1.8 | 0.3571 | 0.3571 throughout — **fixed** |
+| 1 / 0.6 | 0.6250 | 0.6071 throughout — **fixed** |
+| 3 / 0.6 | 0.8333 | 0.8214 throughout — **fixed** |
+| 0.3 / 4 | 0.0698 | 0.0714 throughout — **fixed** |
+| 2 / 1.1 | 0.6452 | 0.6429 throughout — **fixed** |
+| **1 / 4** | **0.2000** | 0.1786, 0.1786, 0.1786, **0.2143, 0.2143** — moves one row |
 
-V1–V5 held: every one of the 45 movers is bit-identical to its twin on the old tree, every one
-of the 462 holders is bit-identical outright, the twin moved exactly the movers, and the three
-rows whose set became empty once the retired ids were stripped are named
-(`petalTipBreadth min (0)`, `petalTipBreadth max (0.6)`, `TIP: truncate (breadth max)`).
+The mover is `uPk = 0.2000` sitting exactly BETWEEN two stations (5/28 = 0.1786 and
+6/28 = 0.2143); which neighbour is taller depends on the curvature either side, and
+`n` changes one of them. **That is the sampling, not the law** — the same defect as
+the faceting, and the row redistribution should be measured against it too.
 
-**A CORRECTION TO THE PHASE-A NUMBER, which Eva's ruling quotes.** Phase A reported "66 rows
-move", counted by *naming* — rows that set a tip-breadth id to a non-zero value. That
-overstates it: **21 of those 66 set a non-zero value on a control that is GATED OFF in that
-row** (a labellum delta under FAN, an all-petals delta above one whorl, an inner delta under
-CONTINUOUS), so they cannot move; measured, they are exactly the INERT class. The naming count
-was the right thing to predeclare *before* the mechanism was chosen, and the wrong thing to keep
-once the rows could be evaluated. **45, not 66.** The ruling does not turn on it.
+### 10c. THE SHOULDER: it appears at `n` < 1.4 and is a right angle by 0.70
 
-Closed by the session-20 three-capture construction, generalised in session 31 for a
-rename-with-map: old tree plain, old tree with the four retired ids pinned to **0** (the new
-default's image on the old tree), new tree with the four **stripped**.
+The core reaches its peak with slope 0; the superellipse leaves the peak with slope 0
+for `n` > 1, −1 at `n` = 1, and **−∞ for `n` < 1**. So the reparameterisation
+introduces a corner at the widest point that the current core does not have. Turn
+angle of the outline there, in the petal's own millimetres:
 
-### THE BYTE CLOSE IS ON `frozen/phase18`, NOT ON THE NEWEST BASELINE — and that is a finding
+| taper (`uPk`) | n 0.60 | 0.70 | 0.80 | 0.90 | 1.00 | 1.40 | 2.00 |
+|---|---|---|---|---|---|---|---|
+| 1 / 1.8 (0.357) | 88.8° | 85.9° | 76.2° | 50.1° | **19.6°** | 0.2° | 0.0° |
+| 2 / 1.1 (0.645) | 89.2° | 87.3° | 81.3° | 63.9° | **32.8°** | 0.4° | 0.0° |
+| 3 / 0.6 (0.833) | 89.5° | 88.4° | 85.2° | 76.1° | **53.9°** | 1.2° | 0.0° |
 
-**`frozen/phase20` and `frozen/phase19` can no longer be byte-re-exported from `main`.** They
-were frozen at `8b4c671` and `eb3543f`, both of which predate session 31's retirement of
-`antherSharpness` / `stigmaSharpness` — so their rows name controls that the current tree does
-not declare, and a plain capture from `b323268` refuses **every one of those rows by design**
-(`config did not take: antherSharpness: not in the DOM`). Session 31 could close on phase20
-because it *was* that retirement and could pin the ids with `--override`; from any later
-session, a plain re-export of phase19 or phase20 is impossible without stripping another
-session's retired ids, which makes the capture something other than plain.
+**The shoulder becomes the dominant feature between `n` 0.90 and 0.80** — 50–76° at
+0.90, 76–85° at 0.80 — and is within half a degree of a right angle by 0.60. On that
+reading **0.60 is well past where the shoulder takes over**, and a floor around 0.85–0.90
+is where it stops competing with the tip for attention.
 
-**`frozen/phase18` (528 rows at `cb798f6`) is the newest baseline this tree can still replay**
-— it names `petalTipBreadth` and neither of session 31's ids — so the byte close runs there.
-The partition is **identical in its two interesting classes**: `45 movers / 26 inert / 457
-holders` on phase18 against `45 / 26 / 500` on phase20, because every tip-breadth row in
-phase20 was already in phase18 and only the holder count grew. That agreement is itself a check
-on the predeclaration.
-
-**What this costs, stated rather than absorbed:** `--verify-frozen` still proves every frozen
-matrix's row DEFINITIONS deep-equal on every push, and that is unaffected. What is no longer
-available from `main` is a plain BYTE re-export of the two newest baselines. The charter's
-retention section should say so, and the general remedy — freeze a new phase at every
-retirement, so there is always a replayable baseline newer than the last retired id — is
-recorded here rather than built.
-
-## 12. A frozen phase IS owed: `frozen/phase21`
-
-The live matrix goes **572 → 582** rows (block 5b gains nine apex rows; the registry's own
-min/max sweep gains two for `petalTipShape` and keeps two for `petalTipEnd`), so `phase20` no
-longer describes the live matrix and a new baseline is owed at the merge commit.
-
-**`frozen/phase20` also joins `frozen/phase17` and `frozen/phase19` as a tag whose row
-definitions still reproduce and whose bytes no longer do** — 45 of its 571 rows. Its
-definitions are untouched: all 19 frozen matrices were verified deep-equal to `b323268` after
-the change (the retired ids appear in `phase3Matrix` and `phase4Matrix` as bare object keys,
-which the panel gate's retired-id scanner correctly reads as identifiers; they are **quoted**
-now, which the scanner exempts as literals and which changes no emitted row).
-
-## 13. Gates
-
-Unlike the discovery PR, this one touches bloom source, so **all six bloom workflows trigger**
-and the two flower gates run as well (the `tools/**` filter). Run locally before the push:
-
-* `node tools/bloom-smoke.mjs` — **clean**, 53 rows through the real export gate, 219s, with
-  A1–A6 live. Its CLAUSE C family census caught both things it exists for on the first run: a
-  renamed row, and six assertion families claimed by no smoke row.
-* `node tools/verify-bloom-panel.mjs` — see §14.
-* the full matrices run in CI on both STL gates, which is the merge criterion.
+**AND THE DEFAULT IS NOT CORNER-FREE**, which is the part of this measurement that was
+not asked for and matters most: at `n` = 1.00 the shoulder is already **19.6° at the
+default taper and 53.9° at taper 3 / 0.6**, because the two limbs meet with different
+slopes there by construction. Only `n` ≥ ~1.4 is C1. That is a property of the law Eva
+approved, not of any implementation of it, and it is a ruling she may want to revisit
+before PR THREE builds it.
 
 ---
 

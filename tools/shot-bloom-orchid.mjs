@@ -139,7 +139,7 @@ async function cell({ label, set = [], note = '', expectSplit = true, onBase = f
 
 fs.mkdirSync(outDir, { recursive: true });
 
-const ORCHID = { labellumSize: '1.6', labellumTilt: '-25', labellumCup: '0.5', labellumCurl: '-60', labellumTipEnd: '0.25', hoodSize: '1.15', hoodTilt: '40', hoodCup: '-0.3' };
+const ORCHID = { labellumSize: '1.6', labellumTilt: '-25', labellumCup: '0.5', labellumCurl: '-60', hoodSize: '1.15', hoodTilt: '40', hoodCup: '-0.3' };
 /* TWO WHORLS IN STEP — where the orchid lives since Sep 3. Spread FIRST, so a
    cell that names its own depth (the ORCHID x IRIS cell, at three) keeps it. */
 const IN_STEP = { layerCount: '2', layerPhase: '0' };

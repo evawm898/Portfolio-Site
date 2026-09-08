@@ -1328,9 +1328,9 @@ for (const [driverId, dependents] of drivers) {
       want: { all: true, inner: false, slot: false, caption: false } },
   ];
   const groups = {
-    all: ['allCurl', 'allCup', 'allTipEnd'],
-    inner: ['innerCurl', 'innerCup', 'innerTipEnd'],
-    slot: ['labellumSize', 'labellumTipEnd', 'labellumTilt', 'labellumCup', 'labellumCurl', 'hoodSize', 'hoodTilt', 'hoodCup'],
+    all: ['allCurl', 'allCup'],
+    inner: ['innerCurl', 'innerCup'],
+    slot: ['labellumSize', 'labellumTilt', 'labellumCup', 'labellumCurl', 'hoodSize', 'hoodTilt', 'hoodCup'],
   };
   const captions = captionsOf('roles');
   if (captions.length !== 1) note(`[depth] expected exactly one hiddenReason caption under "roles", the registry declares ${captions.length}`);
