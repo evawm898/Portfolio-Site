@@ -687,6 +687,50 @@ scratch rig went with the withdrawn ruling. **The upstream contract for the lobe
 axis on the whole-petal apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP
 SHAPE or LOBE TIP SHAPE, never "tip shape".
 
+**THE PETAL TIP LAW IS RULED IN FULL: `n` 0.60–3.00, DEFAULT 2.50, AND THE SIX STATES HAVE
+NAMES** (Eva, session 32, from the rendered sheet — the artifact *Petal Apex Law*). Ceiling moved
+from 2.00 to 3.00; floor stays 0.60; **default 2.50, chosen BY EYE** because it holds the blade's
+width past the widest point and then turns — the hand-drawn reference's shape, which **nothing on
+the shipped control could reach**. **THE NAMES ARE THE RULING, and the panel, the sheet and the
+docs must all use them**: 0.60 acute · 1.00 straight point · ≈1.20 today's pointed petal · 2.00 the
+true ellipse · **2.50 the default** · 3.00 the held-width round tip. The pointed look at ≈1.20 must
+stay reachable, ruled explicitly. **THE RESHAPE-FROM-TODAY ARGUMENT IS FORMALLY DEAD** — the
+default moves the shape deliberately and substantially, that is the point, and nothing here is
+published or printed; do not re-raise it (it cost this session a floor at 1.40 that measured 2.09 mm
+of reshape to avoid a 0.91 mm one).
+**THE SHEET IS WHY ANY OF THIS IS RULED.** Every prior ruling was made on a shape nobody had
+rendered, and the cell shown as `n` 2.00 **was drawn through the cap and was actually 1.740**. The
+scratch rig demoted the cap and measured, reading the exponent BACK off the emitted 28-row
+polyline: **drawn `n` equals asked `n` to four decimals** at every value on both tapers, and the
+widest point holds at `u` 0.538. **CAP DEMOTION IS THEREFORE REQUIRED, not preferred: the chosen
+default is not reachable through the cap at all.** It stays conditional on ONE thing — the
+connectedness and watertight invariants surviving a REAL EXPORT RUN, which PR THREE must prove
+rather than argue.
+**TURNING-RATE REDISTRIBUTION IS A DELIVERABLE OF PR THREE, NOT AN OPTIMISATION**: the chosen
+default sits where the apex turn is LARGEST (29.6° at 2.50, 34.1° at 3.00, uniform in `u`, 28
+rows), and turning-rate weighting collapses that **75–83% at the same row count with the drawn `n`
+unchanged**. **KEEP THE CLAUSE THAT COUNTS TURNING ONLY WHERE THE LAW IS THE ACTIVE BRANCH, AND
+KEEP THE NOTE SAYING WHY** — a kink's turning is a DELTA FUNCTION, so integrating through the
+root-blend and tip-floor joins made the cumulative measure STEP and stacked **5 rows on `u` 0.058
+and 8 duplicates on `u` 1.000**, reporting an 84° "apex turn" that was a zero-length segment and
+reading as *"redistribution makes it 256% worse"*. **Third instance of this bug class here; the
+note is what stops a fourth.** Arc length is the WRONG weighting for that test and is why this
+session first concluded the opposite — an ellipse's apex is exactly where the outline turns
+fastest, so arc length puts EVENLY SPACED rows through it.
+**NEVER REPORT A PER-ROW TURN ANGLE WITHOUT NAMING THE ROW COUNT AND THE WEIGHTING** (Eva, session
+32): two of that session's three corrections came from a drawn quantity being reported as an
+analytic one. The same session's `"only n >= 1.4 is C1"` was WRONG — `uPk` is the core's MAXIMUM so
+its slope is exactly 0, and the superellipse's tends to 0 for EVERY `n` > 1; what had been measured
+was the DRAWN turn at 28 uniform rows. C1 was never the property wanted; **bounded curvature** is.
+**THE ROOT BLEND IS ITS OWN SCHEDULED SESSION AND MUST NOT BE FOLDED INTO PR THREE** (Eva, session
+32). The rig found the largest drawn corner on a REAL petal is the root blend at `u` ≈ 0.07 —
+**31.9° on the default taper, 27.2° on Eva's** — exceeding the apex until `n` reaches 2.5, and the
+worst chord error too (0.6325 mm at `u` 0.049, 88.2% of 1,124 measured profiles worst at the base,
+NONE at the apex). **One owner per boundary, and that boundary belongs to `footRing()`.** The
+verification claim SPLITS across two commits with two separate proofs — the law (surface changes;
+drawn `n` matches asked across the range) and the redistribution (surface unchanged; dense sampling
+agreeing on both trees) — never one proof spanning both.
+
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
 registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen

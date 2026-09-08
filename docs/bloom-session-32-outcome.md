@@ -974,6 +974,84 @@ real run.
 
 ---
 
+## 16. EVA'S RULING ON THE SHEET — the final range, the default, and what PR THREE owes
+
+Ruled from the rendered cells, which is the point of §15 having been built at all.
+
+### 16a. THE RANGE IS 0.60 – 3.00, AND THE DEFAULT IS n = 2.50
+
+The ceiling moves from 2.00 to **3.00**; the floor stays **0.60**; the default is **2.50**,
+chosen **by eye** because it holds the blade's width past the widest point and then turns — the
+shape in the hand-drawn reference, and one **nothing on the shipped control could reach**.
+
+**THE SIX STATES, IN EVA'S OWN WORDS.** These names are the ruling, not a gloss: the panel's
+read-out, the contact sheet's captions and this doc must all use them, so the control and the
+person operating it speak one language.
+
+| n | what it is |
+|---|---|
+| **0.60** | acute |
+| **1.00** | straight point |
+| **≈ 1.20** | today's pointed petal |
+| **2.00** | the true ellipse |
+| **2.50** | **the default** — holds width past the widest point, then turns |
+| **3.00** | the held-width round tip (the ceiling) |
+
+The pointed look at `n` ≈ 1.20 **must stay reachable** — ruled explicitly — and the acute end
+below 1.00 stays in range as originally ruled.
+
+**THE RESHAPE-FROM-TODAY ARGUMENT IS FORMALLY DEAD.** §14c measured the floor at 1.40 costing
+2.09 mm against today's core and treated that as a cost; it is not one. The default moves the
+shape deliberately and substantially — *that is the point* — and nothing here is published or
+printed, with no library of saved configurations, so proximity to today's petal buys nothing. Do
+not re-raise it.
+
+### 16b. TURNING-RATE REDISTRIBUTION IS A DELIVERABLE, NOT AN OPTIMISATION
+
+The chosen default sits **where the apex turn is largest**: 29.6° at `n` 2.50 and 34.1° at 3.00,
+uniform-in-`u`, 28 rows. §15 measured turning-rate weighting collapsing that **75–83% at the same
+row count with the drawn `n` unchanged**. **PR THREE ships it.**
+
+Two things carry forward verbatim: the clause that **counts turning only where the law is the
+active branch**, and **the note saying why** — a kink's turning is a delta function, and
+integrating through it stacked 5 rows on `u` = 0.058 and 8 duplicates on `u` = 1.000. It is the
+**third instance of this bug class** in the project and the note is what stops a fourth.
+
+### 16c. CAP DEMOTION IS CONFIRMED REQUIRED — and the reason is now the default itself
+
+Not a preference: **the chosen default is not reachable through the cap at all.** With the cap in
+place an asked 2.50 does not draw 2.50. It stays conditional on exactly one thing — the
+**connectedness and watertight invariants surviving a real export run**, which **PR THREE must
+prove rather than argue**. If they do not survive, stop and report.
+
+### 16d. THE ROOT BLEND IS ITS OWN SESSION — do not fold it into PR THREE
+
+§15 found the largest drawn corner on a real petal is **the root blend at `u` ≈ 0.07 — 31.9° on
+the default taper, 27.2° on Eva's** — exceeding the apex until `n` reaches 2.5. **Scheduled as its
+own session, with that measurement attached.** It is not PR THREE's: **one owner per boundary, and
+that boundary belongs to `footRing()`.** Folding a root-blend fix into an apex PR would put two
+owners on one profile, which is the registration rule this project keeps re-learning.
+
+### 16e. WHAT THE FINAL CONTACT SHEET MUST SHOW
+
+The full range **0.60 through 3.00**, at **Eva's settings and at the shipped default taper**,
+**with turning-rate weighting in place**. Every cell prints: asked `n`, drawn `n`, the widest
+point, the **apex turn with its row count and weighting named**, and the **last six half-widths**.
+**Each of the named states above appears as its own labelled cell.**
+
+### 16f. STANDING, UNCHANGED
+
+* The verification claim **splits across two commits with two separate proofs** — the law (surface
+  changes; drawn `n` matches asked `n` across the range) and the redistribution (surface unchanged;
+  dense sampling of the law agreeing on both trees). Never one proof spanning both.
+* The **shoulder is approved as a property of the law**, with its turn angle printed per cell.
+* The **sagitta instrument's header states that 0.6325 mm is base-driven** root-blend chord error
+  and is **not** the bound the redistribution aims at; the apex bound is set after the law lands,
+  from the post-law distribution.
+* **PR TWO is tools/-only and proceeds under the registry lock. PR THREE waits for the lock.**
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
