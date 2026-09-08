@@ -822,6 +822,114 @@ what PR THREE has to prove. Raised here rather than resolved.
 
 ---
 
+## 14. THE DEFAULT RULING, MEASURED — and it does not hold together as stated
+
+Eva ruled: *"Measure the n that best reproduces the shipped default taper's core and report it
+with its residual. The default is that value, floored at 1.40. The floor is because the two
+limbs meet with different slopes for n at or below 1, so only n at or above roughly 1.4 is C1."*
+
+Both halves were measured. **The measurement contradicts the floor's stated reason, and the
+floor's own cost is larger than the reshape it was meant to prevent.** Reported, not acted on.
+
+### 14a. A CORRECTION TO MY OWN EARLIER REPORT: the join is C1 for EVERY n > 1
+
+§10c said *"only `n` ≥ ~1.4 is C1"*. **That is wrong, and it is what the floor was built on.**
+
+`uPk` is the core's MAXIMUM, so the core's slope there is exactly 0. The superellipse's slope
+is `dy/ds = −s^(n−1)(1−s^n)^(1/n−1)`, whose limit at `s = 0` is **0 for every `n` > 1**, −1 at
+`n` = 1, and −∞ below it. So the two limbs meet with the SAME slope — analytically C1 — at any
+`n` above 1, not only above 1.4.
+
+What §10c actually measured was the **drawn** turn angle at 28 uniform rows, which is a
+different quantity. The approach to that zero slope is what matters, and it is slow (half-width
+8 mm, length 40 mm, default taper, slope measured 1e-7 in `u` past the join):
+
+| n | slope just past the join | drawn turn, 28 uniform | drawn turn, 28 by arc length |
+|---|---|---|---|
+| 0.60 | −10966 | 59.7° at u=0.36 | 37.9° |
+| 1.00 | −12.44 | 19.8° at u=0.36 | 16.2° |
+| 1.05 | −5.41 | 17.0° at u=0.36 | 14.3° |
+| 1.20 | −0.451 | **10.9° at u=0.36** | **9.8°** |
+| 1.40 | −0.0168 | 12.5° **at u=0.96** | 13.2° |
+| 1.70 | −0.0001 | 20.3° at u=0.96 | 21.3° |
+| 2.00 | −0.0000 | 25.5° at u=0.96 | 24.5° |
+
+So the curve is C1 at `n` = 1.05 and still reads as a corner, because it turns through its whole
+bend in an infinitesimal neighbourhood of the join. **C1 is not the property that was wanted;
+bounded curvature is.**
+
+### 14b. THE DRAWN CORNER IS NON-MONOTONIC IN n, AND THE FLOOR LANDS PAST ITS MINIMUM
+
+The worst drawn turn does not fall as `n` rises. It **moves to the other end of the blade and
+grows again**: below `n` ≈ 1.3 the corner is the shoulder at `u` = 0.36; above it the corner is
+the TIP at `u` = 0.96, where the ellipse's tangent goes vertical. The minimum is around
+**`n` = 1.20 (10.9°)**, and the approved ceiling `n` = 2.00 is the **worst** corner in the table
+at 25.5° — worse than `n` = 1.00's shoulder.
+
+**Redistribution does not rescue either end.** Arc-length sampling takes `n` = 1.05 from 17.0°
+to 14.3° and `n` = 2.00 from 25.5° to 24.5°. Real improvements, not fixes — so the shoulder and
+the tip corner are geometry, not sampling artefacts. That is a useful result for PR THREE: the
+redistribution's job is the sagitta, and it should not be expected to remove these.
+
+### 14c. THE BEST FIT, AND WHAT THE FLOOR COSTS
+
+Best-fit `n` for the shipped default taper (`a` 1.0, `b` 1.8), least-squares over `[uPk, 1]`,
+both curves pinned to 1 at `s` = 0 and 0 at `s` = 1 so there is no scale freedom:
+
+**best-fit `n` = 1.0519, RMS residual 0.0641** (of a half-width normalised to 1).
+
+Deviation from **today's** core, in mm, on the default 8 mm half-width:
+
+| n | RMS | MAX | where |
+|---|---|---|---|
+| 1.0000 | 0.5602 mm | 0.9114 mm | u=0.518 |
+| **1.0519** (best fit) | **0.5124 mm** | **0.7330 mm** | u=0.880 |
+| **1.4000** (the floor) | **1.2964 mm** | **2.0860 mm** | u=0.843 |
+| 2.0000 | 2.4498 mm | 3.7496 mm | u=0.851 |
+
+**The floor moves every shipped petal's outline by up to 2.09 mm — 26% of the blade's
+half-width, and 2.3× the reshape at `n` = 1.00 that the ruling rejected *for being a
+reshape*.** The floor was adopted to avoid silently reshaping every petal and to avoid a corner;
+measured, it reshapes them more than the option it replaced, and it does not remove the corner —
+it relocates it to the tip at 12.5°.
+
+### 14d. WHAT THE MEASUREMENT ACTUALLY SAYS
+
+**No `n` is both close to today's petal and corner-free.** Today's petal is smooth at `uPk`
+because it is one unimodal core across the whole blade; the law splices a different function
+onto `[uPk, 1]`, and every choice trades:
+
+* `n` ≈ 1.05 — closest to today (0.73 mm max), 17.0° shoulder.
+* `n` = 1.20 — the smallest drawn corner anywhere (10.9°), ~1 mm reshape.
+* `n` = 1.40 — the ruling's floor: 2.09 mm reshape AND a 12.5° tip corner.
+
+And the best fit is **not stable across tapers** (0.656 at `a` 0.3/`b` 4.0 up to 1.988 at
+`a` 3.0/`b` 0.6): the core is a two-parameter family and the law is one-parameter, so
+"reparameterisation" holds only in the best-fit sense at each taper, with the residual as the
+honest statement of how well.
+
+**This is Eva's to rule, not the session's to resolve.** The build is held at PR TWO, which is
+unaffected.
+
+### 14e. THE REGISTRY LOCK AND PR TWO — compatible, checked rather than assumed
+
+The lock forbids touching `bloom-geometry.js` and `bloom-registry.js` until margin buckling
+part 2 lands. The PR TWO design recorded before the lock required factoring `buildPetalInto`'s
+blade loop into a named `rowAt(u)` closure — **a geometry change, which the lock forbids.**
+
+Checked: it is not needed. Eva's spec says *"the true continuous **outline**"*, and the outline
+is the width profile, whose owners — `widthProfile()`, `footRing()`, `MeshBuilder`,
+`TIP_HALF_MM`, `TIP_CAP_HALF_MM`, `TIP_CAP_FRACTION`, `ROOT_BLEND_END`, `CAP_ENTRY_FACTOR` — are
+**all already exported**. A tools/-only instrument calls them at arbitrary `u` and computes the
+chord-to-curve distance exactly. **PR TWO ships entirely under the lock.**
+
+What that version is BLIND to, and its header will say so: the 3D margin — the drawn edge in
+space, carrying spine curl, cup, roll and tilt. That needs the row closure and waits for the
+lock to lift. The outline is the quantity the redistribution acts on, so it is the right one
+first; it is not the whole picture.
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
