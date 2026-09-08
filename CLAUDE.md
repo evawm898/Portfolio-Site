@@ -33,14 +33,23 @@ both run in CI and both must pass before any bloom geometry change is done.
 the real export gate; `--conn` adds the
 flood fill and is REQUIRED while a new geometry mode's junction assertions are
 still being established.
-**A FULL GATE IN CI IS ~90 MINUTES, NOT ~44** (measured, session 32, from four
-completed `bloom-export-watertight` runs rather than from memory: 91.5 / 90.9 /
-88.5 / 92.1 min, on runs 133, 134, 137 and 138). The long-standing "~44" here was
-written when the matrix was roughly half its current size and is withdrawn; it
-had a session sizing a CI wait at half the real figure and reporting "nearly
-done" four times over. **Size a CI waiter off `actions_list` on the workflow's own
-recent completed runs, never off a number in this file** — the matrix grows every
-session, so any figure written down here is stale by construction. The smoke
+**A FULL GATE IN CI WAS ~90 MINUTES AT `NU` 28, NOT ~44, AND SESSION 34 ROUGHLY
+DOUBLED IT** (measured, session 32, from completed `bloom-export-watertight` runs
+rather than from memory: over the nine successful NU-28 runs the spread is
+**68.8 to 92.1 min, median 88.5** — session 32 quoted four of them at 91.5 / 90.9
+/ 88.5 / 92.1, and the wider set is worth knowing because runner variance alone
+is ±20 min). The long-standing "~44" was written when the matrix was roughly half
+its size and is withdrawn; it had a session sizing a CI wait at half the real
+figure and reporting "nearly done" four times over. **That "~44" was also a
+LOCAL figure being compared against a CI one** — the smoke tool's speedup ratio
+is measured on the dev machine, the gate runs on a GitHub runner after checkout,
+npm install and a browser install, and the two are not the same measurement.
+Never quote one at the other. Session 34 took `NU` 28 -> 56, so the petal
+triangle count roughly doubles and so does this figure; no replacement constant
+is written here on purpose. **Size a CI waiter off `actions_list` on the
+workflow's own recent completed runs, never off a number in this file** — the
+matrix grows every session, so any figure written down here is stale by
+construction. The smoke
 subset is still the iteration instrument and is still minutes, not hours; what
 changed is the thing it is being compared against. It is for iteration, never for merge: the full matrix
 on both gates, in CI, is the merge criterion, and what the subset is BLIND to is

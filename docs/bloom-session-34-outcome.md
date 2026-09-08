@@ -383,9 +383,27 @@ is why `BUCKLE_FREQ_RANGE[1] × BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` is ass
 module load rather than left as a coincidence.
 
 **What it costs, so future sessions budget for it in wall clock:** the doubling roughly
-doubles full-matrix gate runtime — the two long STL gates ran 78 and 92 minutes at `NU` 28
-and carry about double the petal triangles now — and takes the default model from 492 KiB to
-**930 KiB**.
+doubles full-matrix gate runtime, and takes the default model from 492 KiB to **930 KiB**.
+
+The `NU` 28 baseline, stated as a distribution rather than as the one pair this doc first
+quoted (78 and 92 min, from session 33's own PR): over the **nine** successful
+`bloom-export-watertight` runs at `NU` 28, CI wall clock ran **68.8 to 92.1 minutes, median
+88.5** — so runner variance alone is ±20 min and a single observation is not a budget. This
+project's own contact-sheet doctrine applies unchanged to runtimes: one sample is never a
+floor.
+
+**These are CI wall-clock figures, and that qualifier is load-bearing.** The `~44` that stood
+in CLAUDE.md until session 32 withdrew it was a LOCAL number — the smoke tool's speedup is
+measured on the dev machine, while the gate additionally pays checkout, npm install and a
+browser install on a GitHub runner. Quoting one at the other is what produced a figure half
+the real one, and a session sizing its waits off it reported "nearly done" four times with
+forty minutes left. Say which machine a runtime came from, every time.
+
+**No replacement constant for `NU` 56 is written down**, here or in CLAUDE.md, and that is
+deliberate: session 32's durable fix is to size a CI waiter off `actions_list` on the
+workflow's own recent completed runs, because the matrix grows every session and any figure
+committed to a file is stale by construction. This session doubling `NU` is precisely that
+mechanism firing.
 
 ---
 
