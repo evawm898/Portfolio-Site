@@ -613,6 +613,86 @@ for. Recorded here so whichever session rebases second does not resolve it by pr
 
 ---
 
+## 12. TWO FROZEN-BASELINE DEFECTS THIS PR INTRODUCED — one CI caught, one nothing could
+
+Both are recorded because the second is the interesting one: it had **no row that could go
+red**, and it was found only by going looking after the first.
+
+### 12a. TEN FROZEN MATRIX LABELS HAD BEEN EDITED AS PROSE
+
+Retiring `allTipBreadth` turns the live matrix's *"only the Inner trio applies"* into
+*"only the Inner pair applies"* — correct, because above one whorl the Inner group really is
+now `innerCurl` + `innerCup`. The same sentence also sits inside `phase11Matrix()` through
+`phase20Matrix()`, where it is **not prose but DATA**: a verbatim snapshot of that base
+commit's own `buildMatrix()`, in which the trio had three members. Editing it there is the
+same class of error as editing a checked-in fixture to match new behaviour.
+
+`--verify-frozen phase11` went red on **row 400**, naming both strings. That is the check
+working exactly as its header says — *a frozen tag pins ROW DEFINITIONS* — and it is worth
+noting the failure was **24 seconds into CI**, not at the end of a 44-minute matrix.
+
+Reverted in the JSON-literal form only (`{"label":"…"`), which cannot reach the live matrix
+because that one uses the array form (`['ALL PETALS: …', { … }]`). All twenty baselines then
+re-verified against real worktrees of their own base commits: **20 of 20 PASS**.
+
+### 12b. `phase21Matrix()` WAS REGISTERED IN NO CENSUS, AND NOTHING WENT RED
+
+The new baseline this PR owes was written, verified by hand, and **left out of
+`FROZEN_BASE_COMMITS` entirely.** It was present in `diff-bloom-bytes.mjs`'s own `FROZEN`
+table, so `--verify-frozen --phase21` worked when invoked by hand — which is exactly what made
+it look done.
+
+**Both consumers iterate the other map.** CI's frozen-matrices job builds its phase list from
+`FROZEN_BASE_COMMITS`; so does `publish-frozen-tags.sh`. An unregistered matrix therefore
+means the loop runs one fewer iteration:
+
+* the new baseline is **verified against nothing** — the one property a frozen phase exists to
+  have, and
+* its base commit is **pinned by no tag**, leaving it one force-push from the orphaning that
+  cost `phase10` (session 17).
+
+Neither failure is observable. There is no row to fail, no count that looks wrong, and CI
+stays green. This is the registration rule this project keeps re-learning, arriving through a
+new door: not two definitions of one predicate, but **one definition with two lists of what it
+applies to.**
+
+**The fix is a single owner plus a biconditional, not a line.** The name → matrix map moved out
+of `diff-bloom-bytes.mjs` into the harness as `FROZEN_MATRICES` — imported by its consumer
+rather than restated — and the harness asserts **at module load** that its keys and
+`FROZEN_BASE_COMMITS`' keys agree in both directions: *a matrix with no base commit is
+unverifiable; a base commit with no matrix is a phase nobody wrote.* It throws in the harness
+so every tool that imports it pays for it, and no gate can be run that skips the census.
+
+**Negative control:** deleting `phase21`'s base entry fires it, naming `phase21` and the
+reason; the clean tree loads silently. Measured, not assumed.
+
+`b323268` is on `main` (it is #188's merge), so `phase21` is frozen at a commit on main rather
+than at a branch head, as the charter requires.
+
+### 12c. `frozen/phase21` COULD NOT BE PUBLISHED FROM THIS SESSION — session 17's limit, unchanged
+
+`tools/publish-frozen-tags.sh` runs and refuses to publish a partial set. The rejection is the
+one already diagnosed in its own header: **a GitHub App token cannot push a tag whose
+`.github/workflows` content differs from the default branch's**, and `GITHUB_TOKEN` cannot be
+granted `workflow` scope at all. `#191` added 11 lines to
+`.github/workflows/bloom-export-watertight.yml` after `b323268`, so `frozen/phase21` is exactly
+such a tag.
+
+Measured state of the remote: **18 `frozen/*` tags published**, phases 2–4 and 6–20.
+`frozen/phase5` was already absent before this session and is named in the script's own error.
+`frozen/phase21` is **not published** and cannot be from here.
+
+Per the script's own asymmetry argument this one is **belt-and-braces, not load-bearing**:
+`b323268` is a commit in `main`'s history, so only a force-push to `main` could orphan it, and
+the standing remedy Eva ruled for that is **branch protection on `main`**, not a stored
+credential. `phase10` — the base that was never on main and whose tag is the only thing keeping
+it alive — is published and unaffected.
+
+**What is owed:** one `git push origin refs/tags/frozen/phase21` from a clone whose credentials
+are a user's. Nothing in the tree needs changing for it.
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
