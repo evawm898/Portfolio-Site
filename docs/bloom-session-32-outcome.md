@@ -548,6 +548,29 @@ before PR THREE builds it.
 
 ---
 
+## 11. THE #191 MERGE, VERIFIED RATHER THAN ASSUMED
+
+Eva's instruction was that PR #191 (session 33, margin buckling) merges first and that its
+clean auto-merge should be checked rather than taken on trust. Tested by merging its head
+into this PR's commit in a throwaway `git worktree` — never in the live tree, because
+`git checkout <sha> -- <files>` stages the revert and a stray commit then pushes it:
+
+```
+  Auto-merging CLAUDE.md
+  CONFLICT (content): Merge conflict in CLAUDE.md
+  Auto-merging bloom-geometry.js          <- clean
+  Auto-merging docs/bloom-charter.md      <- clean
+```
+
+**`bloom-geometry.js` and the charter auto-merge clean, and `CLAUDE.md` does NOT.** #191's own
+PR body predicted the first half and not the second. The conflict is one 117-line hunk and it
+is **pure adjacency**: both sessions appended a new pointer entry at the same place in the
+bloom section. **Neither side is a superset of the other**, so the resolution is BOTH entries
+in session order — not a choice between them, which is the trap the squash-merge rule exists
+for. Recorded here so whichever session rebases second does not resolve it by preference.
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
