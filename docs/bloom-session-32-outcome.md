@@ -930,6 +930,50 @@ first; it is not the whole picture.
 
 ---
 
+## 15. THE SCRATCH RIG — the law rendered, and §14b RETRACTED for the tip
+
+Eva's order: one picture before PR TWO, because every ruling so far had been made on a shape
+nobody had rendered. Built as a scratch rig touching no shipped source, with the cap **demoted**
+(a print-floor clamp only) — the point of the exercise, since through the cap the asked `n` is not
+what is drawn. Artifact: **Petal Apex Law**.
+
+**Three readings.**
+
+1. **The cap was the whole problem.** With it demoted, the **drawn `n` equals the asked `n` to four
+   decimals at every value on both tapers** — `2.0000`, not the 1.740 the earlier cell showed. Read
+   back by least-squares off the emitted 28-row polyline, not asserted.
+2. **The widest point holds** — `u` = 0.538 on Eva's settings across the whole range, with the drawn
+   maximum on the nearest row at 0.536. Sampling, not law, exactly as §10b said.
+3. **§14b IS RETRACTED FOR THE TIP.** Turning-rate weighting at the **same 28 rows** collapses the
+   apex turn **75–83%**: default `n` 2.00 23.6° → 6.0°, `n` 3.00 34.1° → 6.6°; Eva's `n` 3.00
+   **34.9° → 6.1°**. Drawn `n` is unchanged at 2.0000 / 2.5000 / 3.0000. **The tip corner is
+   sampling, not geometry.** Eva's correction was right and my test was wrong: arc length puts
+   *evenly spaced* rows through the one place the outline turns fastest. The shoulder reading at
+   low `n` stands — it is a slope discontinuity, which no ladder can resolve.
+
+**THE FIRST TURNING LADDER WAS BROKEN AND SAID THE OPPOSITE**, which is worth recording because the
+failure looks like a result. Cumulative turning **STEPS at a kink** — the root-blend join and the
+tip-floor join are corners, whose turning is a delta function — so equal increments stacked **5 rows
+on `u` = 0.058 and 8 duplicates on `u` = 1.000**, starving the middle, and reported an apex turn of
+**84.0°** that was a zero-length segment between two identical stations. It read as "redistribution
+makes it 256% worse". The fix is one clause: **count turning only where the law is the active
+branch**, plus a strictly-increasing assertion on the ladder. A kink cannot be resolved by row
+placement, so spending rows on it is the one thing the weighting must not do.
+
+**AND THE LARGEST DRAWN CORNER ON A REAL PETAL IS NOT AT THE APEX AT ALL.** With the real
+`footRing()` ring in play, the whole-blade maximum is **31.9° at `u` = 0.07 on the default taper and
+27.2° at `u` = 0.07 on Eva's** — the root blend collapsing width over six rows — and it dominates
+until `n` ≥ 2.5. Every apex figure in §15 is therefore measured **restricted to `u` ≥ u_pk**, and is
+labelled with its row count and weighting. That restriction is not a detail: §14b's unrestricted
+table was computed without a root blend and is not comparable to it.
+
+**What the rig is not:** it draws the blade's own outline — the half-width profile, which is what
+the row positions act on and what a face-on petal's silhouette is. No spine curl, cup, roll or tilt,
+and **no export**: watertight and connectedness under a demoted cap remain PR THREE's to prove on a
+real run.
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
