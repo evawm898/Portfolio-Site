@@ -199,12 +199,12 @@ async function cell({ label, sets, onBase, frames }) {
 const SHAPES = [
   { key: 'pill', name: 'THE SHIPPING PILL — the defaults, and every other cell’s reference', sets: {}, hold: 'reference' },
   { key: 'sphere', name: 'A SPHERE — elongation 1.00, the band floored so no triangle has zero area', sets: { antherElongation: 1 } },
-  { key: 'triangle', name: 'A TRIANGLE — 3 points, sharpness 8, roundedness 0 (12 sides)', sets: { antherPoints: 3, antherSharpness: 8, antherRoundedness: 0 } },
-  { key: 'star', name: 'A ROUNDED STAR — 6 points, sharpness 1, roundedness 0.35 (12 sides)', sets: { antherPoints: 6, antherSharpness: 1, antherRoundedness: 0.35 } },
-  { key: 'floor', name: 'THE WAIST FLOOR BINDING — sharpness 0.25 asked, CLAMPED at the 0.50 mm waist', sets: { antherPoints: 4, antherSharpness: 0.25, antherRoundedness: 0 } },
+  { key: 'triangle', name: 'A TRIANGLE — 3 points, pinch 1.00 (the polygon), roundedness 0 (12 sides)', sets: { antherPoints: 3, antherPinch: 1, antherRoundedness: 0 } },
+  { key: 'star', name: 'A ROUNDED STAR — 6 points, pinch 1.00, roundedness 0.35 (12 sides)', sets: { antherPoints: 6, antherPinch: 1, antherRoundedness: 0.35 } },
+  { key: 'floor', name: 'THE WAIST FLOOR BINDING — pinch 7.00 asked, CLAMPED at the 0.50 mm waist', sets: { antherPoints: 4, antherPinch: 7, antherRoundedness: 0 } },
   { key: 'trifid', name: 'A TRIFID ANTHER — 3 lobes at 40°, the stigma’s own law on a filament', sets: { antherLumps: 3, antherSpread: 40 } },
-  { key: 'big', name: 'SIZE 6.00x — Q8’s argument: a 7.20 mm anther, where a point is reachable', sets: { antherSize: 6, antherPoints: 5, antherSharpness: 0.6, antherRoundedness: 0 } },
-  { key: 'inert', name: 'INERT — 12 points at sharpness 0.25 with roundedness 1: must be PIXEL-IDENTICAL to the pill', sets: { antherPoints: 12, antherSharpness: 0.25 }, hold: 'identical' },
+  { key: 'big', name: 'SIZE 6.00x — Q8’s argument: a 7.20 mm anther, where a point is reachable', sets: { antherSize: 6, antherPoints: 5, antherPinch: 2.35, antherRoundedness: 0 } },
+  { key: 'inert', name: 'INERT — 12 points at pinch 7.00 with roundedness 1: must be PIXEL-IDENTICAL to the pill', sets: { antherPoints: 12, antherPinch: 7 }, hold: 'identical' },
 ];
 const COUNTS = [
   { key: 'ring6', name: '6 on a RING', sets: { stamenCount: 6 } },
@@ -275,7 +275,7 @@ const html = `<title>The anther's seven — the tip's space in the real generato
 </style>
 <h1>The anther&rsquo;s seven &mdash; the tip&rsquo;s space in the real generator</h1>
 <p>Session 29, tip plan 3b. Seven controls under <code>Androecium &rsaquo; Tip</code>: size, elongation,
-points, sharpness, roundedness, lobes, lobe spread. <b>The defaults reproduce today&rsquo;s pill exactly</b>,
+points, pinch (session 31: the exponent&rsquo;s slider, retired), roundedness, lobes, lobe spread. <b>The defaults reproduce today&rsquo;s pill exactly</b>,
 by construction &mdash; size and elongation default to the two constants themselves, roundedness 1 makes the
 blend exactly 1 and the lattice the rod&rsquo;s own ten, and one lobe at a spread of 0 is the Rodrigues
 identity. Every cell is print preview ON, chrome hidden, auto-rotate off.</p>

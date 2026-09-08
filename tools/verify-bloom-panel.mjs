@@ -197,7 +197,7 @@
          pill's, which is a stronger claim than `hidden` for a control whose
          whole job is the tessellation. Then the read-out's ANTHER line
          against the owner's own record: the lattice, the waist, the verbatim
-         UNMEASURED tag, and the four flags (sharpness clamped, the whole tip
+         UNMEASURED tag, and the four flags (pinch clamped, the whole tip
          under the floor, the sphere's floored band, coincident lobes) each in
          both directions. The negative control freezes the read-out and every
          wrapper's `hidden`, and eleven assertions fire.
@@ -470,7 +470,7 @@ const INSTANCED_FAMILIES = [
      two. A check that read TIP_PER_INSTANCE_DEFAULTS out of the registry
      would be checking the generator against itself. */
   { what: 'the two tips (session 30, anther* and stigma* from one descriptor table)',
-    id: /^(anther|stigma)(Size|Elongation|Roundedness|Points|Sharpness|Lumps|Spread)$/, instances: 2, perInstanceDefault: new Set(['Lumps', 'Spread']) },
+    id: /^(anther|stigma)(Size|Elongation|Roundedness|Points|Pinch|Lumps|Spread)$/, instances: 2, perInstanceDefault: new Set(['Lumps', 'Spread']) },
 ];
 /* NEGATIVE CONTROL for the tip family: drift ONE instance on a shared field
    (the stigma's size range) in a COPY of the rows and require the clause to
@@ -2378,7 +2378,7 @@ for (const [label, sets, wantDome, wantClamp] of [
       for (const w of document.querySelectorAll('.bl-ctrl')) Object.defineProperty(w, 'hidden', { get: () => false, set: () => {}, configurable: true });
     });
   }
-  const OUTLINE_SUBS = ['antherPoints', 'antherSharpness'];
+  const OUTLINE_SUBS = ['antherPoints', 'antherPinch'];
   const step = async (label, sets, want = {}) => {
     const bad = sets.length ? await applyConfig(page, sets) : [];
     if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
@@ -2393,8 +2393,8 @@ for (const [label, sets, wantDome, wantClamp] of [
                subsHidden: subs.map((id) => hid(id)), rho: Number(ui.antherRoundedness),
                line, sidesSaid: (line && (line.match(/revolved through (\d+) sides/) || [])[1]) ?? null,
                waistSaid: (line && (line.match(/waist ([\d.]+) mm against the ([\d.]+) mm floor/) || []).slice(1)) || [],
-               circleSaid: !!line && /outline a CIRCLE \(roundedness 1 — the points and the sharpness are INERT here/.test(line),
-               clampSaid: !!line && /SHARPNESS CLAMPED to/.test(line), underSaid: !!line && /THE WHOLE TIP IS UNDER IT/.test(line),
+               circleSaid: !!line && /outline a CIRCLE \(roundedness 1 — the points and the pinch are INERT here/.test(line),
+               clampSaid: !!line && /PINCH CLAMPED to/.test(line), underSaid: !!line && /THE WHOLE TIP IS UNDER IT/.test(line),
                bandSaid: !!line && /\(A SPHERE — the band FLOORED/.test(line), coinSaid: !!line && /COINCIDENT: duplicate geometry/.test(line),
                unmeasuredSaid: !!line && line.includes('(UNMEASURED — no coupon has been printed)'),
                lobesSaid: (line && (line.match(/· (one lobe|\d+ lobes) at (\d+)° off the filament/) || []).slice(1)) || [] };
@@ -2418,30 +2418,31 @@ for (const [label, sets, wantDome, wantClamp] of [
       if (Math.abs(Number(res.waistSaid[1]) - a.minRadiusMm) > 0.005) p.push(`the ANTHER line names a floor of ${res.waistSaid[1]} mm, the geometry's is ${a.minRadiusMm}`);
       if (!res.unmeasuredSaid) p.push('the ANTHER line does not carry the verbatim UNMEASURED tag beside a floor nothing has printed a coupon for');
       if (res.circleSaid !== (a.shape.roundedness === 1)) p.push(`the CIRCLE-and-inert clause is ${res.circleSaid ? 'shown' : 'absent'} at a roundedness of ${a.shape.roundedness}`);
-      if (res.clampSaid !== a.sharpnessFloored) p.push(`the SHARPNESS CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports floored ${a.sharpnessFloored}`);
+      if (res.clampSaid !== a.pinchFloored) p.push(`the PINCH CLAMPED clause is ${res.clampSaid ? 'shown' : 'absent'} while the owner reports floored ${a.pinchFloored}`);
       if (res.underSaid !== a.underFloor) p.push(`the WHOLE TIP UNDER IT clause is ${res.underSaid ? 'shown' : 'absent'} while the owner reports underFloor ${a.underFloor}`);
       if (res.bandSaid !== a.bandFloored) p.push(`the SPHERE band clause is ${res.bandSaid ? 'shown' : 'absent'} while the owner reports bandFloored ${a.bandFloored}`);
       if (res.coinSaid !== a.lumpsCoincident) p.push(`the COINCIDENT clause is ${res.coinSaid ? 'shown' : 'absent'} while the owner reports lumpsCoincident ${a.lumpsCoincident}`);
       const saidCount = res.lobesSaid[0] === 'one lobe' ? 1 : Number((res.lobesSaid[0] || '').split(' ')[0]);
       if (saidCount !== a.lumps || Number(res.lobesSaid[1]) !== a.spreadDeg) p.push(`the ANTHER line says ${res.lobesSaid.join(' at ')}°, the owner declares ${a.lumps} at ${a.spreadDeg}°`);
-      for (const k of ['sharpnessFloored', 'underFloor', 'bandFloored', 'lumpsCoincident']) if (want[k] !== undefined && a[k] !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${a[k]}`);
+      for (const k of ['pinchFloored', 'underFloor', 'bandFloored', 'lumpsCoincident']) if (want[k] !== undefined && a[k] !== want[k]) p.push(`this step expects ${k} ${want[k]}, the owner reports ${a[k]}`);
       if (want.sides !== undefined && a.sides !== want.sides) p.push(`this step expects a ${want.sides}-side lattice, the owner built ${a.sides}`);
     }
     if (want.tris !== undefined && res.shownTris !== want.tris) p.push(`the build has ${res.shownTris} triangles where the reference step had ${want.tris} — a hidden tip control reached the geometry`);
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
-    else ok.push(`${tag} ${label}: Tip at depth ${res.depth}, outline controls ${res.subsHidden[0] ? 'hidden' : 'shown'}, ${res.has ? `${res.anther.sides} sides, waist ${res.anther.waistMm.toFixed(2)} mm` : 'no androecium'}${res.clampSaid ? ', SHARPNESS CLAMPED' : ''}${res.underSaid ? ', UNDER THE FLOOR' : ''}${res.bandSaid ? ', A SPHERE' : ''}${res.coinSaid ? ', COINCIDENT' : ''}`);
+    else ok.push(`${tag} ${label}: Tip at depth ${res.depth}, outline controls ${res.subsHidden[0] ? 'hidden' : 'shown'}, ${res.has ? `${res.anther.sides} sides, waist ${res.anther.waistMm.toFixed(2)} mm` : 'no androecium'}${res.clampSaid ? ', PINCH CLAMPED' : ''}${res.underSaid ? ', UNDER THE FLOOR' : ''}${res.bandSaid ? ', A SPHERE' : ''}${res.coinSaid ? ', COINCIDENT' : ''}`);
     return res;
   };
   await step('defaults (no androecium: the seven hide with the rest of the part, no ANTHER line)', [], { present: false });
-  const pill = await step('6 stamens at the shipped pill (the outline controls stay hidden — roundedness 1)', [{ id: 'stamenCount', value: '6' }], { present: true, sides: 10, sharpnessFloored: false, underFloor: false, bandFloored: false, lumpsCoincident: false });
+  const pill = await step('6 stamens at the shipped pill (the outline controls stay hidden — roundedness 1)', [{ id: 'stamenCount', value: '6' }], { present: true, sides: 10, pinchFloored: false, underFloor: false, bandFloored: false, lumpsCoincident: false });
   await step('roundedness 0.50 (the two outline controls APPEAR; the lattice leaves the rod\'s ten)', [{ id: 'antherRoundedness', value: '0.5' }], { present: true, sides: 16 });
-  await step('a TRIANGLE — 3 points at sharpness 8, roundedness 0 (12 sides, the waist clear of the floor)', [{ id: 'antherRoundedness', value: '0' }, { id: 'antherPoints', value: '3' }, { id: 'antherSharpness', value: '8' }], { present: true, sides: 12, sharpnessFloored: false });
-  await step('sharpness min 0.25 at roundedness 0 (the WAIST FLOOR binds — CLAMPED, told)', [{ id: 'antherPoints', value: '4' }, { id: 'antherSharpness', value: '0.25' }], { present: true, sharpnessFloored: true, underFloor: false });
-  await step('size min 0.60 (the WHOLE TIP under the 0.50 mm floor — told, never refused)', [{ id: 'antherSize', value: '0.6' }], { present: true, underFloor: true, sharpnessFloored: false });
-  await step('elongation min 1.00 (A SPHERE: the band floored so no triangle has zero area)', [{ id: 'antherSize', value: '1.6' }, { id: 'antherSharpness', value: '2' }, { id: 'antherRoundedness', value: '1' }, { id: 'antherElongation', value: '1' }], { present: true, bandFloored: true, sides: 10 });
+  await step('a TRIANGLE — 3 points at pinch 1.00 (the polygon), roundedness 0 (12 sides, the waist clear of the floor)', [{ id: 'antherRoundedness', value: '0' }, { id: 'antherPoints', value: '3' }, { id: 'antherPinch', value: '1' }], { present: true, sides: 12, pinchFloored: false });
+  await step('pinch max 7.00 at roundedness 0 (the WAIST FLOOR binds — CLAMPED, told)', [{ id: 'antherPoints', value: '4' }, { id: 'antherPinch', value: '7' }], { present: true, pinchFloored: true, underFloor: false });
+  await step('pinch min 0.05 at roundedness 0 (the nearest reachable to the circle — NOT a circle: the CIRCLE clause must be absent)', [{ id: 'antherPinch', value: '0.05' }], { present: true, pinchFloored: false, sides: 16 });
+  await step('size min 0.60 (the WHOLE TIP under the 0.50 mm floor — told, never refused)', [{ id: 'antherSize', value: '0.6' }], { present: true, underFloor: true, pinchFloored: false });
+  await step('elongation min 1.00 (A SPHERE: the band floored so no triangle has zero area)', [{ id: 'antherSize', value: '1.6' }, { id: 'antherPinch', value: '1' }, { id: 'antherRoundedness', value: '1' }, { id: 'antherElongation', value: '1' }], { present: true, bandFloored: true, sides: 10 });
   await step('3 lobes at 40° — the trifid\'s own law on an anther', [{ id: 'antherElongation', value: '2.5' }, { id: 'antherLumps', value: '3' }, { id: 'antherSpread', value: '40' }], { present: true, lumpsCoincident: false });
   await step('2 lobes at a spread of 0 (COINCIDENT — duplicate geometry, told, never refused)', [{ id: 'antherLumps', value: '2' }, { id: 'antherSpread', value: '0' }], { present: true, lumpsCoincident: true });
-  if (pill) await step('back to the pill with the two OUTLINE controls at their extremes (hidden AND INERT: the build must not move)', [{ id: 'antherLumps', value: '1' }, { id: 'antherPoints', value: '12' }, { id: 'antherSharpness', value: '0.25' }], { present: true, tris: pill.shownTris, sides: 10 });
+  if (pill) await step('back to the pill with the two OUTLINE controls at their extremes (hidden AND INERT: the build must not move)', [{ id: 'antherLumps', value: '1' }, { id: 'antherPoints', value: '12' }, { id: 'antherPinch', value: '7' }], { present: true, tris: pill.shownTris, sides: 10 });
   await step('count 0 with every tip control at MAXIMUM (the section hides whole; no ANTHER line)', [{ id: 'stamenCount', value: '0' }, { id: 'antherSize', value: '6' }, { id: 'antherElongation', value: '6' }, { id: 'antherRoundedness', value: '0' }, { id: 'antherLumps', value: '6' }, { id: 'antherSpread', value: '90' }], { present: false });
 }
 

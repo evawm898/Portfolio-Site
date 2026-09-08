@@ -1,5 +1,9 @@
 /* ===================================================================
-   shot-bloom-stigma.mjs — THE STIGMA'S SEVEN, AND THE PAIR (session 30)
+   shot-bloom-stigma.mjs — THE STIGMA'S SEVEN, AND THE PAIR (session 30;
+   re-based on the PINCH in session 31 — `stigmaSharpness` is retired, the
+   slider carries k with the exponent s = 2 / (1 + k), and the circle's own
+   exponent is no longer on the travel, so the "circle it replaces" cell is
+   now the NEAREST REACHABLE cell, pinch 0.05)
 
    THE SHEET IS THE POINT OF THIS SESSION, and Eva's brief names what it must
    show: the trifid at the NEW SHARPNESS against today's, at both count
@@ -9,17 +13,18 @@
    WHAT "TODAY'S TRIFID" IS, said before the pictures. The stigma's seven
    default to today's trifid EXACTLY (0 moved is a construction — roundedness
    1, where the blend is exactly 1 and the lattice is the rod's own), and at
-   roundedness 1 the sharpness is INERT. So the new default of 1.00 against
-   the frozen 2.00 is INVISIBLE at rest, by design, and the first row proves
-   it as a before/after pair from a git worktree of the base commit. The
-   sharpness only shows once roundedness leaves 1, and THAT is where the
-   ruling lives: the second row is the trifid at roundedness 0 on the new
-   default beside the circle it replaces, and the third row is THE SPACE
-   EITHER SIDE — 0.50, 0.75, 1.00, 1.25, 1.50 at roundedness 0, on the print
-   preview, where 0.50 is UNDER the 0.50 mm waist floor and the read-out says
-   CLAMPED, plus the THIN-SHEET corner where the export floor raises the rod
-   to 1.00 mm and 0.75 clamps too. The derivation is at TIP_SHARPNESS_DEFAULT
-   in bloom-geometry.js; the sheet is where its numbers are seen.
+   roundedness 1 the pinch is INERT. So the default of 1.00 is INVISIBLE at
+   rest, by design, and the first row proves it as a before/after pair from
+   a git worktree of the base commit. The pinch only shows once roundedness
+   leaves 1, and THAT is where the ruling lives: the second row is the trifid
+   at roundedness 0 on the default beside the nearest reachable to the
+   circle (pinch 0.05, one step above the singular exponent), and the third
+   row is THE SPACE EITHER SIDE — pinch 3.00, 1.65, 1.00, 0.60, 0.35 at
+   roundedness 0, on the print preview, where 3.00 is UNDER the 0.50 mm
+   waist floor and the read-out says CLAMPED, plus the THIN-SHEET corner
+   where the export floor raises the rod to 1.00 mm and 1.65 clamps too. The
+   derivation is at TIP_PINCH_DEFAULT in bloom-geometry.js; the sheet is
+   where its numbers are seen.
 
    THREE SCALES, mm per pixel on every cell, the anther sheet's shape:
      - `whole`  the bloom at its own fit radius — the stigma at its ACTUAL size.
@@ -45,8 +50,8 @@
      - every shaped stigma DIFFERS from the trifid at rest on some view by
        more than ten times that view's own control (or this sheet is
        photographing one shape repeatedly);
-     - the 0.50 cell and the thin-sheet 0.75 cell report SHARPNESS CLAMPED
-       and the 0.75 / 1.00 / 1.25 / 1.50 cells on the default sheet do not —
+     - the 3.00 cell and the thin-sheet 1.65 cell report PINCH CLAMPED
+       and the 1.65 / 1.00 / 0.60 / 0.35 cells on the default sheet do not —
        the derivation's floor claims, measured on the tree rather than in a
        script;
      - the INERT row's triangle count and STIGMA line are the trifid's,
@@ -183,31 +188,31 @@ async function cell({ label, sets, onBase, frames }) {
    otherwise; `hold` names the exact claim a row carries. */
 const STYLE6 = { gynoecium: 'STYLE', stamenCount: 6 };
 const GROUPS = [
-  { key: 'today', name: 'THE TRIFID AT REST — today’s stigma, and the new sharpness default is INERT here (roundedness 1)', rows: [
+  { key: 'today', name: 'THE TRIFID AT REST — today’s stigma, and the pinch default is INERT here (roundedness 1)', rows: [
     { key: 'rest6', name: 'the trifid at rest, six stamens — the REFERENCE for every row below', sets: STYLE6, hold: 'reference' },
     { key: 'rest120', name: 'the trifid at rest, 120 on the disc', sets: { gynoecium: 'STYLE', stamenCount: 120, stamenLayout: 'DISC' }, hold: 'reference120' },
   ] },
-  { key: 'opened', name: 'THE NEW SHARPNESS OPENED — roundedness 0 at the default 1.00, against the circle it replaces, at both count extremes', rows: [
-    { key: 'open6', name: 'roundedness 0, sharpness 1.00 (the default), 4 points — six stamens', sets: { ...STYLE6, stigmaRoundedness: 0 } },
-    { key: 'open120', name: 'roundedness 0, sharpness 1.00, 4 points — 120 on the disc', sets: { gynoecium: 'STYLE', stamenCount: 120, stamenLayout: 'DISC', stigmaRoundedness: 0 }, ref: 'rest120' },
-    { key: 'circle6', name: 'the CIRCLE the default replaces — roundedness 0 at sharpness 2.00 (the frozen TIP_SHAPE’s own exponent; the lattice jumps, the form does not)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 2 } },
+  { key: 'opened', name: 'THE PINCH OPENED — roundedness 0 at the default 1.00, against the nearest reachable to the circle, at both count extremes', rows: [
+    { key: 'open6', name: 'roundedness 0, pinch 1.00 (the default — the polygon), 4 points — six stamens', sets: { ...STYLE6, stigmaRoundedness: 0 } },
+    { key: 'open120', name: 'roundedness 0, pinch 1.00, 4 points — 120 on the disc', sets: { gynoecium: 'STYLE', stamenCount: 120, stamenLayout: 'DISC', stigmaRoundedness: 0 }, ref: 'rest120' },
+    { key: 'near6', name: 'the NEAREST REACHABLE TO THE CIRCLE — roundedness 0 at pinch 0.05 (every factor 0.983 on 16 sides; the singular exponent is one step below and off the travel)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 0.05 } },
   ] },
-  { key: 'either', name: 'THE SPACE EITHER SIDE OF 1.00 — roundedness 0, print preview, the 0.50 mm waist floor', rows: [
-    { key: 's050', name: 'sharpness 0.50 — UNDER the 0.50 mm waist floor (0.339 mm asked): CLAMPED to 0.694, told', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 0.5 }, hold: 'clamped' },
-    { key: 's075', name: 'sharpness 0.75 — 8% headroom on this sheet (and CLAMPED on a sheet the export floors to 1.00 mm)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 0.75 }, hold: 'clear' },
-    { key: 's100', name: 'sharpness 1.00 — the proposed default (36% headroom; 13% on the thinnest printable sheet)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 1 }, hold: 'clear' },
-    { key: 's125', name: 'sharpness 1.25 (56% headroom)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 1.25 }, hold: 'clear' },
-    { key: 's150', name: 'sharpness 1.50 (71% headroom)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 1.5 }, hold: 'clear' },
-    { key: 'thin075', name: 'the THIN-SHEET corner — sheet 0.60, which the export floors to 1.00 mm: sharpness 0.75 CLAMPS here (0.449 mm asked)', sets: { ...STYLE6, sheetThickness: 0.6, stigmaRoundedness: 0, stigmaSharpness: 0.75 }, hold: 'clamped' },
+  { key: 'either', name: 'THE SPACE EITHER SIDE OF 1.00 — roundedness 0, print preview, the 0.50 mm waist floor (a CAP on the pinch)', rows: [
+    { key: 'k300', name: 'pinch 3.00 — UNDER the 0.50 mm waist floor (0.339 mm asked): CLAMPED to 1.88, told', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 3 }, hold: 'clamped' },
+    { key: 'k165', name: 'pinch 1.65 — 8% headroom on this sheet (and CLAMPED on a sheet the export floors to 1.00 mm)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 1.65 }, hold: 'clear' },
+    { key: 'k100', name: 'pinch 1.00 — the default (36% headroom; 13% on the thinnest printable sheet)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 1 }, hold: 'clear' },
+    { key: 'k060', name: 'pinch 0.60 (56% headroom) — a rounded polygon', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 0.6 }, hold: 'clear' },
+    { key: 'k035', name: 'pinch 0.35 (70% headroom)', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 0.35 }, hold: 'clear' },
+    { key: 'thin165', name: 'the THIN-SHEET corner — sheet 0.60, which the export floors to 1.00 mm: pinch 1.65 CLAMPS here (0.452 mm asked)', sets: { ...STYLE6, sheetThickness: 0.6, stigmaRoundedness: 0, stigmaPinch: 1.65 }, hold: 'clamped' },
   ] },
   { key: 'pair', name: 'THE PAIR — anther and stigma from one table, side by side in the lens view', rows: [
-    { key: 'pairstars', name: 'the SAME seven on both tips: 3-point stars at sharpness 1, roundedness 0 — six anthers around the trifid', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPoints: 3, stigmaSharpness: 1, antherRoundedness: 0, antherPoints: 3, antherSharpness: 1 } },
+    { key: 'pairstars', name: 'the SAME seven on both tips: 3-point polygons at pinch 1, roundedness 0 — six anthers around the trifid', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPoints: 3, stigmaPinch: 1, antherRoundedness: 0, antherPoints: 3, antherPinch: 1 } },
     { key: 'pairpill', name: 'ONE lobe at 0° on the style — a pill, the anther’s own default shape, beside six pills', sets: { ...STYLE6, stigmaLumps: 1, stigmaSpread: 0 } },
     { key: 'pairsix', name: 'SIX lobes at 90° on the style — the widest fan, beside six pills', sets: { ...STYLE6, stigmaLumps: 6, stigmaSpread: 90 } },
     { key: 'pairtrifid', name: 'TRIFID ANTHERS — 3 lobes at 40° on every filament, the stigma’s own law on the other tip', sets: { ...STYLE6, antherLumps: 3, antherSpread: 40 } },
   ] },
   { key: 'inert', name: 'THE INERT ROW', rows: [
-    { key: 'inert', name: 'INERT — 12 points at sharpness 0.25 with roundedness 1: the trifid’s triangle count and STIGMA line, character for character', sets: { ...STYLE6, stigmaPoints: 12, stigmaSharpness: 0.25 }, hold: 'identical' },
+    { key: 'inert', name: 'INERT — 12 points at pinch 7.00 with roundedness 1: the trifid’s triangle count and STIGMA line, character for character', sets: { ...STYLE6, stigmaPoints: 12, stigmaPinch: 7 }, hold: 'identical' },
   ] },
 ];
 /* --ruling (session 31): the four positions of the proposed pinch travel —
@@ -218,14 +223,13 @@ const GROUPS = [
    driven at and the pinch it would map to; a ruling row is shot with its own
    control and is NOT compared against the trifid at rest. */
 const RULING = process.argv.includes('--ruling');
-if (RULING) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'ruling', name: 'SESSION 31 RULING CELLS — where star, polygon, rounded polygon and the circle land on the proposed pinch travel (size 3.00, roundedness 0, 4 points; old exponent s beside the pinch k = 2/s - 1)', rows: [
-  { key: 'star', name: 'STAR — pinch 3.00 (s 0.50): waist 35% of the point radius', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 0.5 }, hold: 'ruling' },
-  { key: 'polygon', name: 'POLYGON — pinch 1.00 (s 1.00), the proposed default: waist 71%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1 }, hold: 'ruling' },
-  { key: 'rounded', name: 'ROUNDED POLYGON — pinch 0.60 (s 1.25): waist 81%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1.25 }, hold: 'ruling' },
-  { key: 'nearcircle', name: 'THE NEAREST REACHABLE TO THE CIRCLE — pinch 0.05 (s 1.905; shot at s 1.90 on today’s grid, pinch 0.053): waist 98%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1.9 }, hold: 'ruling' },
-  { key: 'singular', name: 'THE SINGULAR POINT, for the record — s 2.00 at roundedness 0: every factor exactly 1, the circle on a 16-side lattice (UNREACHABLE on the proposed travel)', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 2 }, hold: 'ruling' },
+if (RULING) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'ruling', name: 'SESSION 31 RULING CELLS — where star, polygon, rounded polygon and the circle land on the pinch travel (size 3.00, roundedness 0, 4 points; the exponent s = 2 / (1 + k) beside each pinch)', rows: [
+  { key: 'star', name: 'STAR — pinch 3.00 (s 0.50): waist 35% of the point radius', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaPinch: 3 }, hold: 'ruling' },
+  { key: 'polygon', name: 'POLYGON — pinch 1.00 (s 1.00), the default: waist 71%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaPinch: 1 }, hold: 'ruling' },
+  { key: 'rounded', name: 'ROUNDED POLYGON — pinch 0.60 (s 1.25): waist 81%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaPinch: 0.6 }, hold: 'ruling' },
+  { key: 'nearcircle', name: 'THE NEAREST REACHABLE TO THE CIRCLE — pinch 0.05 (s 1.905): waist 98%. The singular exponent (s 2.00, every factor exactly 1) sits one step below and is UNREACHABLE — the ruling’s fifth cell was shot on the base tree and cannot be shot here', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaPinch: 0.05 }, hold: 'ruling' },
 ] }); }
-if (QUICK) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'either', name: 'QUICK — the two clamped cells', rows: [{ key: 's050', name: 'sharpness 0.50', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 0.5 }, hold: 'clamped' }, { key: 'thin075', name: 'thin sheet, 0.75', sets: { ...STYLE6, sheetThickness: 0.6, stigmaRoundedness: 0, stigmaSharpness: 0.75 }, hold: 'clamped' }] }); }
+if (QUICK) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'either', name: 'QUICK — the two clamped cells', rows: [{ key: 'k300', name: 'pinch 3.00', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaPinch: 3 }, hold: 'clamped' }, { key: 'thin165', name: 'thin sheet, 1.65', sets: { ...STYLE6, sheetThickness: 0.6, stigmaRoundedness: 0, stigmaPinch: 1.65 }, hold: 'clamped' }] }); }
 
 console.log(`THE STIGMA SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, JS0-JS7 and JG0-JG6 before every shutter.${QUICK ? ' (--quick)' : ''}\n`);
 const cells = [];
@@ -261,7 +265,7 @@ for (const g of GROUPS) {
       } else if (!moved) {
         await die(`${r.key}: PREDECLARED TO DIFFER from the trifid at rest and no view moved past its own renderer control — ${VIEWS.map((v) => `${v} ${vs[v].pixels}px vs control ${twice[v].pixels}px`).join(', ')}; this sheet is photographing one shape twice`);
       }
-      if (r.hold === 'clamped' && !/SHARPNESS CLAMPED to/.test(main.stigmaLine)) await die(`${r.key}: predeclared to be CLAMPED at the waist floor in export mode and the STIGMA line does not say so: ${main.stigmaLine}`);
+      if (r.hold === 'clamped' && !/PINCH CLAMPED to/.test(main.stigmaLine)) await die(`${r.key}: predeclared to be CLAMPED at the waist floor in export mode and the STIGMA line does not say so: ${main.stigmaLine}`);
       if (r.hold === 'clear' && /CLAMPED|UNDER IT/.test(main.stigmaLine)) await die(`${r.key}: predeclared CLEAR of the waist floor in export mode and the STIGMA line says otherwise: ${main.stigmaLine}`);
     }
     cells.push({ group: g, row: r, main, twice, vs });
@@ -278,7 +282,7 @@ const dline = (d, t) => d === null ? 'frames differ in size — not comparable'
 
 let migration = null;
 function writeSheet() {
-const html = `<title>The stigma's seven — the trifid at the new sharpness, and the pair</title>
+const html = `<title>The stigma's seven — the trifid on the pinch, and the pair</title>
 <style>
  body{background:#0c0f0e;color:#dfe7e4;font:14px/1.55 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;margin:0;padding:28px 34px;}
  h1{font-size:19px;letter-spacing:.02em;margin:0 0 4px} h2{font-size:14px;letter-spacing:.16em;text-transform:uppercase;color:#6fd6b4;margin:34px 0 4px;border-top:1px solid #21302b;padding-top:14px}
@@ -290,32 +294,36 @@ const html = `<title>The stigma's seven — the trifid at the new sharpness, and
  .said{font-size:11px;color:#7f8f8a;font-family:ui-monospace,Menlo,monospace;white-space:pre-wrap;word-break:break-word;margin:2px 0 0}
  .num{font-size:12px;color:#c8b98a}
 </style>
-<h1>The stigma&rsquo;s seven &mdash; the trifid at the new sharpness, and the pair</h1>
-<p>Session 30. Seven controls under <code>Gynoecium &rsaquo; Stigma</code>, INSTANCED from the anther&rsquo;s seven through
+<h1>The stigma&rsquo;s seven &mdash; the trifid on the pinch, and the pair</h1>
+<p>Session 30, re-based on the PINCH in session 31. Seven controls under <code>Gynoecium &rsaquo; Stigma</code>, INSTANCED from the anther&rsquo;s seven through
 one descriptor table &mdash; the generator Eva&rsquo;s Q7 asked for. <b>The defaults reproduce today&rsquo;s trifid exactly</b>,
 by construction: size and elongation are the two constants, the count and the aim are the trifid&rsquo;s own 3 at 40&deg;,
-roundedness 1 makes the blend exactly 1 and the lattice the rod&rsquo;s own ten &mdash; so the sharpness default moving from the
-frozen 2.00 to 1.00 is <b>inert at rest</b>, and the first group shows a stigma that has not moved. Every cell is print
+roundedness 1 makes the blend exactly 1 and the lattice the rod&rsquo;s own ten &mdash; so the pinch default of 1.00 is
+<b>inert at rest</b>, and the first group shows a stigma that has not moved. Every cell is print
 preview ON, chrome hidden, auto-rotate off; JS0&ndash;JS7 and JG0&ndash;JG6 ran before every shutter.</p>
-<p><b>The sharpness default was re-derived at the stigma&rsquo;s own dimensions and they are the anther&rsquo;s:</b> a lobe is
-<code>stigmaSize &times; one sheet</code> exactly as the anther is <code>antherSize &times; one sheet</code> &mdash; 0.96 mm of radius on the
-default 1.20 mm sheet in both modes &mdash; so the 0.50 mm waist floor binds at the same sharpness on both tips: below <b>0.694</b> at
-roundedness 0. 0.50 clamps; 0.75 clears by 8%; 1.00 by 36%. On the thinnest sheets the export floor raises the rod to 1.00 mm
-(a lobe radius of 0.80 mm) and the floor moves to <b>0.849</b>, where 0.75 clamps and 1.00 still clears by 13% &mdash; which is why 1.00
-and not 0.75 is the largest named value that never meets the floor on any printable sheet. The third group is that space, on the
-print preview.</p>
+<p><b>The slider carries the PINCH <code>k</code> and the geometry forms the exponent <code>s = 2 / (1 + k)</code> in one place</b> (session 31, Eva&rsquo;s ruling;
+<code>stigmaSharpness</code> is retired). 1.00 is the polygon, below 1 a rounded polygon, above 1 a star, and the waist is
+<code>2<sup>&minus;k/2</sup></code> of the point radius. The circle&rsquo;s own exponent (k = 0, where every factor is exactly 1 for every
+roundedness) sits one step BELOW the minimum and is unreachable: roundedness 1 is the only producer of the circle. The second group
+puts the default beside the nearest reachable cell, pinch 0.05.</p>
+<p><b>The floor binds at the same pinch on both tips because a lobe is the anther&rsquo;s size:</b> <code>stigmaSize &times; one sheet</code>
+exactly as <code>antherSize &times; one sheet</code> &mdash; 0.96 mm of radius on the default 1.20 mm sheet in both modes &mdash; so the 0.50 mm waist
+floor CAPS the pinch at <b>1.88</b> at roundedness 0. 3.00 clamps; 1.65 clears by 8%; 1.00 by 36%. On the thinnest sheets the export floor
+raises the rod to 1.00 mm (a lobe radius of 0.80 mm) and the cap moves to <b>1.36</b>, where 1.65 clamps and 1.00 still clears by 13%
+&mdash; which is why 1.00 is the largest named value that never meets the floor on any printable sheet. The third group is that space,
+on the print preview.</p>
 <p><b>Every row carries its own same-tree renderer control</b> &mdash; the same tree, the same camera, shot twice &mdash; and every
 frame is settled until two consecutive screenshots are byte-identical. <b>No pixel claim is made on <code>whole</code> or
 <code>lens</code>:</b> the control there is bimodal (0&ndash;52 px, or ~10,500 px), so those figures are reported beside their
 controls and the pair is what to read. What is asserted: the before/after pair holds on triangle count, on the STYLE
 line and on <code>macro</code> inside its controls; every shaped stigma differs from the trifid at rest past ten times its
-own control on some view; 0.50 and the thin-sheet 0.75 say CLAMPED and 0.75 / 1.00 / 1.25 / 1.50 on the default sheet do not; the INERT row&rsquo;s count and STIGMA
-line are the trifid&rsquo;s character for character. 0 moved is <code>tools/diff-bloom-bytes.mjs</code> against
-<code>frozen/phase19</code>&rsquo;s job, not this sheet&rsquo;s.</p>
+own control on some view; 3.00 and the thin-sheet 1.65 say CLAMPED and 1.65 / 1.00 / 0.60 / 0.35 on the default sheet do not; the INERT row&rsquo;s count and STIGMA
+line are the trifid&rsquo;s character for character. The partition is <code>tools/diff-bloom-bytes.mjs</code> against
+<code>frozen/phase20</code>&rsquo;s job, not this sheet&rsquo;s.</p>
 ${migration ? `
 <h2>Before and after &mdash; the trifid at rest on the base commit and on this tree, one camera</h2>
-<p>The old code from a git worktree of the base commit beside today&rsquo;s. Predeclared to <b>hold</b>, and it does on the two claims that carry it: <b>the same triangle count (${migration.before.shownTris.toLocaleString()}) and the same numbers on the STYLE line</b>. Pixels, reported: ${VIEWS.map((v) => `${v} ${dline(migration.diffs[v], migration.twice[v])}`).join('; ')}; the AFTER side&rsquo;s own control read ${VIEWS.map((v) => `${v} ${migration.twiceAfter[v].pixels} px`).join(', ')}. The <code>macro</code> bound is against this run&rsquo;s largest macro control anywhere on the sheet (${migration.runMacroNoise} px) plus the pair&rsquo;s own two &mdash; ${migration.floor} px &mdash; because a single control sample is not a floor. A picture cannot prove byte identity; the bytes are <code>frozen/phase19</code>&rsquo;s 549/549.</p>
-<h3>BEFORE (the base tree, eb3543f)</h3><div class="row">${VIEWS.map((v) => fig(migration.before, v)).join('')}</div>
+<p>The old code from a git worktree of the base commit beside today&rsquo;s. Predeclared to <b>hold</b>, and it does on the two claims that carry it: <b>the same triangle count (${migration.before.shownTris.toLocaleString()}) and the same numbers on the STYLE line</b>. Pixels, reported: ${VIEWS.map((v) => `${v} ${dline(migration.diffs[v], migration.twice[v])}`).join('; ')}; the AFTER side&rsquo;s own control read ${VIEWS.map((v) => `${v} ${migration.twiceAfter[v].pixels} px`).join(', ')}. The <code>macro</code> bound is against this run&rsquo;s largest macro control anywhere on the sheet (${migration.runMacroNoise} px) plus the pair&rsquo;s own two &mdash; ${migration.floor} px &mdash; because a single control sample is not a floor. A picture cannot prove byte identity; the bytes are the phase20 partition&rsquo;s.</p>
+<h3>BEFORE (the base tree)</h3><div class="row">${VIEWS.map((v) => fig(migration.before, v)).join('')}</div>
 <h3>AFTER (this tree)</h3><div class="row">${VIEWS.map((v) => fig(migration.after, v)).join('')}</div>
 ` : ''}
 ${GROUPS.map((g) => `

@@ -419,7 +419,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'ANTHER: 6 stamens at the shipped pill (the tip block\'s own control row)',
     /* DERIVED BY THE HEADER'S OWN METHOD (session 29): the branches the
        anther's seven add are the two proportions read from controls rather
-       than constants, tipSharpnessFloor's three arms (no clamp / clamped /
+       than constants, tipPinchFloor's three arms (no clamp / clamped /
        the whole tip under the floor), tipSides' two arms (a circle on the
        rod's lattice, a shaped outline on its own), the blend at a
        roundedness below 1, and buildStamenInto's lump loop above one. Every
@@ -444,15 +444,15 @@ export const SMOKE_BLOCKS = [
        live-matrix rows while every smoke row stayed green. Found by running
        the block through the export gate. */
     rows: [
-      { label: 'ANTHER: a TRIANGLE (3 points, sharpness 8, roundedness 0)',
+      { label: 'ANTHER: a TRIANGLE (3 points, pinch 1.00 — the polygon, roundedness 0)',
         path: 'the outline OFF the circle at the shape Eva named — JS7 (the descriptor is the seven controls, the two proportions rebuilt from the slab, the lattice law and its multiple-of-2n property at 12 sides for 3 points, the waist clear of the floor) and JS6 on a tip whose factors are NOT all 1, with JS4\'s census on the tip\'s own lattice' },
-      { label: 'ANTHER: the WAIST FLOOR binding (sharpness min 0.25 at roundedness 0 — CLAMPED, told)',
-        path: 'tipSharpnessFloor\'s CLAMPED arm — JS7\'s restated closed form against the owner\'s, the built sharpness above the asked, sharpnessFloored true and underFloor false, and the emitted waist at the 0.50 mm floor' },
+      { label: 'ANTHER: the WAIST FLOOR binding (pinch max 7.00 at roundedness 0 — CLAMPED, told)',
+        path: 'tipPinchFloor\'s CLAMPED arm — JS7\'s restated closed form against the owner\'s, the built pinch BELOW the asked (a cap), pinchFloored true and underFloor false, and the emitted waist at the 0.50 mm floor' },
       { label: 'ANTHER: elongation min (1.00) — A SPHERE, the band floored',
         path: 'the two PROPORTIONS off their constants — JS7 rebuilding diameter and length from the SLAB and the two controls (the clause session 21 pinned to ANTHER_DIAMETER_FACTOR, retired into it), and JS4\'s per-lobe apex reach on a band the elongation floor is holding open' },
       { label: 'ANTHER: 3 lobes at 40° — the trifid\'s own law on an anther',
         path: 'buildStamenInto\'s lump loop above one — three tips at a whole turn apart on the anther, JS6 per lobe at its own azimuth (the frame is the Rodrigues image, NOT the identity), JS4\'s per-lobe apex reach along each lobe\'s own axis and the census at three lumps' },
-      { label: 'ANTHER: INERT — the points and the sharpness at their extremes with roundedness 1 (bit-identical to the shipped pill)',
+      { label: 'ANTHER: INERT — the points and the pinch at their extremes with roundedness 1 (bit-identical to the shipped pill)',
         path: 'the other direction — hidden AND INERT at a roundedness of exactly 1: JS7 evaluates both laws at the opposite corner of both controls and requires an identical answer (the lattice is the rod\'s own and every factor is Object.is 1), which is the shipping anther\'s whole byte-identity argument' },
     ],
   },
@@ -477,18 +477,20 @@ export const SMOKE_BLOCKS = [
        path; the FAMILY row is here because it is the one state where both
        instances are shaped at once. */
     rows: [
-      { label: 'STIGMA: a TRIANGLE (3 points, sharpness 8, roundedness 0)',
+      { label: 'STIGMA: a TRIANGLE (3 points, pinch 1.00 — the polygon, roundedness 0)',
         path: 'the outline OFF the circle on the STIGMA — JG6 (the descriptor is the seven stigma controls, the two proportions rebuilt from the slab, the lattice law at 12 sides for 3 points, the waist clear of the floor) and JG5 on lobes whose factors are NOT all 1, with JG4\'s census on the lobes\' own lattice' },
-      { label: 'STIGMA: the WAIST FLOOR binding (sharpness min 0.25 at roundedness 0 — CLAMPED, told)',
-        path: 'tipSharpnessFloor\'s CLAMPED arm on the stigma\'s lobe — JG6\'s restated closed form against the owner\'s, the built sharpness above the asked, sharpnessFloored true and underFloor false' },
+      { label: 'STIGMA: the WAIST FLOOR binding (pinch max 7.00 at roundedness 0 — CLAMPED, told)',
+        path: 'tipPinchFloor\'s CLAMPED arm on the stigma\'s lobe — JG6\'s restated closed form against the owner\'s, the built pinch BELOW the asked (a cap), pinchFloored true and underFloor false' },
       { label: 'STIGMA: ONE lobe at 0° — a pill on the style (the anther\'s own default shape)',
         path: 'buildStyleInto\'s lump loop at a count of ONE — JG4 with no azimuth step to ask about and the apex clause on a single lobe, JG5 at the Rodrigues identity (spread 0), JG6 holding the count and the aim to the controls' },
       { label: 'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)',
         path: 'the trifid\'s own coincident corner — JG4\'s shared-apex biconditional in its COINCIDENT direction, JG6\'s lumpsCoincident flag both ways' },
-      { label: 'STIGMA: THE FAMILY — the same seven on both tips (3-point stars at sharpness 1, roundedness 0, on six anthers and the trifid)',
+      { label: 'STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)',
+        path: 'the pinch\'s MINIMUM, one step above the singular exponent — JG5\'s every-factor-1 clause with NO exemption (session 31) on factors that are 0.983 at the diagonals, JG6 on the descriptor at the bottom of the range' },
+      { label: 'STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)',
         path: 'both instances shaped at once — tipDescriptor() called twice on one state, JS7 and JG6 together in their OFF-THE-CIRCLE arms, JS6 and JG5 on factors that are not all 1, the two lattices each 12 sides; the pair the sheet puts in front of Eva' },
-      { label: 'STIGMA: INERT — the points and the sharpness at their extremes with roundedness 1 (bit-identical to the shipped trifid)',
-        path: 'the other direction — hidden AND INERT at a roundedness of exactly 1 on the stigma: JG6 evaluates both laws at the opposite corner of both controls and requires an identical answer, the trifid\'s whole byte-identity argument for the sharpness default moving from 2.00 to 1.00' },
+      { label: 'STIGMA: INERT — the points and the pinch at their extremes with roundedness 1 (bit-identical to the shipped trifid)',
+        path: 'the other direction — hidden AND INERT at a roundedness of exactly 1 on the stigma: JG6 evaluates both laws at the opposite corner of both controls and requires an identical answer, the trifid\'s whole byte-identity argument for the pinch default (session 31: the same exponent as the old 1.00, exactly)' },
     ],
   },
 ];
