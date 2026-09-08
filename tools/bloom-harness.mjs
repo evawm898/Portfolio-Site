@@ -1241,7 +1241,7 @@ export async function thicknessAssertions(page, row) {
   if (!(th.minEmitted > 1e-3)) bad.push(`minimum emitted sheet ${th.minEmitted} mm is at or below the 1e-3 mm degeneracy bound`);
 
   /* ===================================================================
-     THE APEX — A1..A6. Eva's `blunt` ruling (session 32) made the converging
+     THE APEX — A2..A6 (there is no A1; see below). Eva's `blunt` ruling (session 32) made the converging
      cap UNCONDITIONAL and gave it two controls of its own, so the old
      pointed/truncate biconditional describes nothing any more and is gone
      with the families it named.
@@ -1262,7 +1262,7 @@ export async function thicknessAssertions(page, row) {
      reads the number the cap itself reported.
      =================================================================== */
   const tc = m.petalTipCap;
-  if (!tc) bad.push('A1: no tip-cap telemetry reported');
+  if (!tc) bad.push('A2: no tip-cap telemetry reported');
   else {
     /* THROUGH THE EFFECTIVE STATE, not the row's own value: `petalTipEnd` IS
        overridable, so a labellum tip delta gives descriptor 0's petal a
@@ -1271,11 +1271,23 @@ export async function thicknessAssertions(page, row) {
     const endAsked = effectiveFor(m, row, 'petalTipEnd');
     const shapeAsked = effectiveFor(m, row, 'petalTipShape');
 
-    /* A1 — THE CAP IS UNCONDITIONAL AND NEVER WIDENS. Entry >= terminal, with
-       equality only where the blade at the cap entry is already no wider than
-       the end asked for (the parallel-stub corner, reachable at a broad end on
-       a narrow petal). A cap that widened would be the retired plateau back. */
-    if (!(tc.entryHalf >= tc.terminalHalf)) bad.push(`A1: the cap widens — entry ${tc.entryHalf} < terminal ${tc.terminalHalf}`);
+    /* THERE IS NO A1, AND ITS ABSENCE IS THE POINT. It was written as
+       "the cap never widens: entry >= terminal", and the mutant table proved
+       it VACUOUS — it cannot fire on any reachable state, so it was deleted
+       rather than kept as a number under a header claiming it checks
+       something. The proof, because a later session will be tempted to add it
+       back: `hEntry = max(shapeAt(uCap), rootBlend(uCap), hEnd)`, and even
+       with the `hEnd` term removed the first term already dominates. Where the
+       cap-entry crossing exists, `shapeAt(uCap)` IS `CAP_ENTRY_FACTOR x
+       max(hEnd, TIP_HALF_MM)`, i.e. at least twice hEnd; where it does not
+       (a terminal so broad the core never reaches twice it), the bisection
+       leaves `uCap` at `uPk` and `shapeAt(uPk)` is the full half-width, which
+       every reachable terminal is a fraction of. Measured as well as derived:
+       the mutation that removes the floor fires NOTHING, on the default, on
+       both extreme corners and on the parallel-stub row.
+       WHAT ACTUALLY WITNESSES "the cap never widens" is A5, on the emitted
+       rows — and the inverted-interpolation mutant confirms it (A1 silent,
+       A2 and A5 both fired). */
     /* A2 — THE LAST EMITTED ROW IS THE TERMINUS. Not approximately: the row
        the builder emitted must BE the terminal the profile declared. */
     if (Math.abs(tc.lastRowHalf - tc.terminalHalf) > 1e-9) bad.push(`A2: last row half-width ${tc.lastRowHalf} is not the terminal ${tc.terminalHalf}`);
@@ -1307,7 +1319,16 @@ export async function thicknessAssertions(page, row) {
          start is `max(uCap, ROOT_BLEND_END)`: uCap alone is not enough, since
          it falls as low as 0.0698 on the parallel-stub corner. */
       const uOf = (i) => (i + 1) / prof.length;
-      const from = Math.max(tc.uCap, ROOT_BLEND_END);
+      /* THE SCAN STARTS AT THE ROOT BLEND, NOT AT THE CAP ENTRY. Starting at
+         `max(uCap, ROOT_BLEND_END)` was the first version and it had a blind
+         spot the mutant table found: a re-introduced TIP_PLATEAU term feeds
+         `shapeAt`, which only reaches the profile BELOW `uCap`, so its waist
+         sat entirely outside the scanned region and the mutation fired
+         NOTHING anywhere in this gate. The wider scan is strictly stronger and
+         measured safe: over 147,744 shipped states (foot width x petal width x
+         mode x terminal x exponent x the taper grid) it reports 0 rises after
+         a fall. Below ROOT_BLEND_END it still must not look — see above. */
+      const from = ROOT_BLEND_END;
       let peak = -1;
       for (let i = 0; i < prof.length; i++) if (uOf(i) >= from && (peak < 0 || prof[i] > prof[peak])) peak = i;
       let fell = false, rose = -1;

@@ -589,20 +589,39 @@ says why. **0 moved is a CONSTRUCTION** (`Math.max(0 × halfW, tipFloor)` IS the
 interpolant's `m === 1` arm returns `s` itself, not `1 - (1-s)^1`, which is not `s` in
 IEEE-754): 12,180 half-widths + every cap field, 0 differ under `Object.is`, plus 522 on the
 claw rows — and photographed at **0 px on both framings** against a 7,036 px same-tree control.
-**A1–A6 is the new family** (`bad.push('A…')` in both STL gates), and it exists because **both
+**A2–A6 is the new family** (`bad.push('A…')` in both STL gates), and it exists because **both
 STL gates were blind to the waist for that control's whole life** — a waisted blade is
 watertight, one piece, at an identical triangle count. A5 (the apex narrows monotonically) is
 its only witness and runs on EVERY row; A4 rebuilds the terminal from the STATE, A6 catches a
-shape silently held at 1. **THE DEAD-CONTROL SWEEP**: `petalTipShape` has NO dead steps at any
+shape silently held at 1. **THERE IS NO A1 AND THE MUTANT TABLE IS WHY** — it read "entry >=
+terminal" off the descriptor and is VACUOUS, because `shapeAt(uCap)` dominates `hEnd` whether
+the crossing exists (it IS twice hEnd there) or not (uCap sits at uPk, where shapeAt is the full
+half-width); the mutation removing the very floor it guards fires nothing on four rows. The
+proof sits where A1 used to be. **`node tools/verify-bloom-apex-mutants.mjs` is the committed
+positive control** and it also caught **A5's first blind spot**: scanning from
+`max(uCap, ROOT_BLEND_END)` missed a re-added plateau entirely, because a term in `terms` only
+reaches the profile BELOW uCap — it scans from the root blend now, measured safe over 147,744
+shipped states. It must not scan lower: a foot wider than the blade peak is reachable (4.405 mm
+against 4.000 at foot width 10 x petalWidth 8) and the root blend legitimately falls to meet the
+rising core. **THE DEAD-CONTROL SWEEP**: `petalTipShape` has NO dead steps at any
 width in either mode and its default makes nothing inert; `petalTipEnd` has **1 dead step of 61
 in live** at the default width (against the retired control's 10) and 10 in EXPORT, where the
 floor is the PRINT floor doing its job — TOLD in the read-out keyed to the shown build, and a
 low-end track tick is costed (`/plot`'s `.plot-track--dead` is the pattern) but not built.
-**THE PARTITION IS 45 movers / 26 inert / 500 holders on `frozen/phase20`**, predeclared by
-evaluating each replacement control's own registry predicate per row — **a correction to phase
-A's "66", which counted NAMING: 21 of those 66 set a non-zero value on a control GATED OFF in
-that row**. `frozen/phase20` joins phase17 and phase19 as a tag whose definitions reproduce and
-whose bytes do not; **`frozen/phase21` is owed** (the live matrix goes 572 → 582). The frozen
+**THE PARTITION CLOSED AT 45 movers / 21 inert / 462 holders on `frozen/phase18`**, with
+`twin === new on 528 of 528 rows` and V1–V5 held; movers were predeclared EXACTLY (the
+load-bearing class), the five-row gap being definitional — a row naming the id at its IDENTITY
+is a HOLDER, not INERT. **A correction to phase A's "66", which counted NAMING: 21 of those 66
+set a non-zero value on a control GATED OFF in that row, and measured they are exactly the INERT
+class. 45, not 66.** **THE CLOSE IS ON phase18, NOT THE NEWEST BASELINE, AND THAT IS ITS OWN
+FINDING: `frozen/phase20` and `frozen/phase19` can no longer be byte-re-exported from `main` at
+all** — they were frozen before session 31 retired `antherSharpness`/`stigmaSharpness`, so every
+row naming those is refused (`not in the DOM`). Session 31 could close on phase20 because it WAS
+that retirement; nobody after it can. phase18 (528 rows at `cb798f6`) is the newest replayable
+baseline, and the partition agrees across both (45/21 either side, only holders differ). The
+general remedy — freeze a phase at every retirement so a replayable baseline always exists newer
+than the last retired id — is recorded, not built. **`frozen/phase21` is owed** (the live matrix
+goes 572 → 582). The frozen
 matrices' bare `petalTipBreadth:` object keys are QUOTED now — the retired-id scanner reads bare
 keys as identifiers and quoted ones as literals, and quoting changes no emitted row (all 19
 matrices verified deep-equal to b323268). The sheet is

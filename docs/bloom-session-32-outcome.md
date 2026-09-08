@@ -455,7 +455,7 @@ which is **not** `s` in IEEE-754. Measured against a `git worktree` of `b323268`
 and photographed: the shipping default rendered on both trees differs by **0 px on both
 framings**, against a same-tree control that read 7,036 px on each row of that run.
 
-### 9d. The apex assertion family, A1–A6
+### 9d. The apex assertion family, A2–A6
 
 The old tip-cap check was a biconditional between the pointed and truncate families; both are
 gone, so it is gone. What replaced it is stronger, and the reason is the retired term's own
@@ -464,16 +464,38 @@ so both STL gates were blind to it for the whole life of that control.
 
 | | asserts |
 |---|---|
-| A1 | the cap never widens — entry ≥ terminal |
 | A2 | the last emitted row **is** the terminus |
 | A3 | never a true apex (the retired centre dome's 48-degenerate-triangle bug) |
 | A4 | the terminal is `max(effective petalTipEnd × halfW, mode floor)`, **rebuilt from the state** rather than read off the descriptor — C1's discipline |
 | A5 | the apex narrows monotonically: no rise after a fall above the widest row. **The only witness for the retired waist**, and asserted on every row |
 | A6 | the cap built at the exponent the **effective** state asks for — the only witness for a shape silently held at 1, which would pass A1–A5 on every row |
 
-A1, A2, A4 and A6 read the **effective** state, not the row's own: `petalTipEnd` is
-overridable, so a labellum delta gives descriptor 0's petal a different terminal from the one
-the row asked for.
+A4 and A6 read the **effective** state, not the row's own: `petalTipEnd` is overridable, so a
+labellum delta gives descriptor 0's petal a different terminal from the one the row asked for.
+
+**THERE IS NO A1, AND THE MUTANT TABLE IS WHY.** It was written as "the cap never widens: entry
+≥ terminal", read off the descriptor — and it is **vacuous**. `hEntry = max(shapeAt(uCap),
+rootBlend(uCap), hEnd)`, and even with the `hEnd` term removed the first already dominates:
+where the cap-entry crossing exists `shapeAt(uCap)` IS `CAP_ENTRY_FACTOR × max(hEnd,
+TIP_HALF_MM)`, at least twice hEnd; where it does not, the bisection leaves `uCap` at `uPk` and
+`shapeAt(uPk)` is the full half-width, which every reachable terminal is a fraction of. Measured
+as well as derived: the mutation removing the very floor it guards fires **nothing**, on four
+rows including the parallel-stub corner. It was deleted rather than kept as a number under a
+header claiming it checks something, and the proof sits where it used to be so a later session
+does not add it back. What actually witnesses "the cap never widens" is **A5, on the emitted
+rows** — confirmed by the inverted-interpolation mutant, where A1 was silent and A2 and A5 both
+fired.
+
+**`node tools/verify-bloom-apex-mutants.mjs` is the positive control**, committed rather than
+scratch, because the smoke gate's own header says a `path` citation "is a claim about the PATH a
+row engages, never evidence the assertion can FIRE there". It found three things on two passes:
+A1's vacuity; **A5's first blind spot** — the scan started at `max(uCap, ROOT_BLEND_END)`, and a
+plateau term added to `terms` only reaches the profile BELOW `uCap`, so the retired defect sat
+outside the scanned region and fired nothing anywhere in the gate (the scan starts at the root
+blend now, strictly stronger, measured safe over 147,744 shipped states); and two expectations
+that were wrong about which family a mutation breaks — corrected in the table, not in the gate.
+Result: every one of A2–A6 fires on a mutation that names it and all are silent on the clean
+tree.
 
 ## 10. The dead-control sweep, reported rather than concluded
 
@@ -528,19 +550,33 @@ step.
 ## 11. The partition
 
 **Predeclared before the captures, derived by evaluating each replacement control's own
-registry predicate on each row's state** — not by counting which rows name an id:
+registry predicate on each row's state** — not by counting which rows name an id. **Measured:**
 
 ```
-  frozen/phase20 (571 rows):   45 movers  /  26 inert  /  500 holders
+  PREDECLARED  frozen/phase18 (528 rows):   45 movers / 26 inert / 457 holders
+  MEASURED                                  45 movers / 21 inert / 462 holders     PASS
 ```
+
+**The movers — the load-bearing class — were predicted exactly, and `twin === new on 528 of
+528 rows`.** The five-row gap is definitional and the tool's definition is the better one: a row
+that names a retired id **at its identity** (`petalTipBreadth min (0)`, `ALL MIN`, and three
+`*TipBreadth min (0)` rows) already holds the twin's value, so it is a HOLDER. INERT is reserved
+for a row that set a NON-identity value which could not reach the geometry — the twenty-one
+GATED rows, where the control is hidden and inert by construction. Both numbers are recorded
+because the predeclaration is only evidence if the correction to it is visible.
+
+V1–V5 held: every one of the 45 movers is bit-identical to its twin on the old tree, every one
+of the 462 holders is bit-identical outright, the twin moved exactly the movers, and the three
+rows whose set became empty once the retired ids were stripped are named
+(`petalTipBreadth min (0)`, `petalTipBreadth max (0.6)`, `TIP: truncate (breadth max)`).
 
 **A CORRECTION TO THE PHASE-A NUMBER, which Eva's ruling quotes.** Phase A reported "66 rows
 move", counted by *naming* — rows that set a tip-breadth id to a non-zero value. That
 overstates it: **21 of those 66 set a non-zero value on a control that is GATED OFF in that
 row** (a labellum delta under FAN, an all-petals delta above one whorl, an inner delta under
-CONTINUOUS), so they cannot move and land in the INERT class instead. The naming count was the
-right thing to predeclare *before* the mechanism was chosen, and the wrong thing to keep once
-the rows could be evaluated. The ruling does not turn on it.
+CONTINUOUS), so they cannot move; measured, they are exactly the INERT class. The naming count
+was the right thing to predeclare *before* the mechanism was chosen, and the wrong thing to keep
+once the rows could be evaluated. **45, not 66.** The ruling does not turn on it.
 
 Closed by the session-20 three-capture construction, generalised in session 31 for a
 rename-with-map: old tree plain, old tree with the four retired ids pinned to **0** (the new

@@ -141,12 +141,32 @@ async function cell({ label, set = [], tag = '', onBase = false }) {
      behaving perfectly. The drop is CHECKED: exactly the ids the base tree does
      not declare may be dropped, and nothing else, so a real drift on a control
      both trees share still fails the run. */
-  const drift0 = await fullStateDrift(page, set);
+  /* THE DRIFT SET IS FILTERED TO IDS THIS TREE DECLARES, and only for a BASE
+     row. `fullStateDrift` validates the set against the CURRENT registry and
+     THROWS on an unknown id — correct for a live row, and wrong for a base row,
+     which deliberately sets `petalTipBreadth`, a control that exists on the old
+     tree and nowhere else. Those ids are not going unchecked: `applyConfig`
+     above ran against the base tree's own control set and READ THEM BACK, which
+     is the assertion that the value took. What is dropped here is only the
+     "state is DEFAULTS + set" comparison, which this tree's DEFAULTS cannot
+     express for a control it does not have. */
+  const byIdHere = Object.fromEntries(CONTROLS.map((c) => [c.id, true]));
+  const driftSet = onBase ? set.filter((x) => byIdHere[x.id]) : set;
+  const baseOnly = set.filter((x) => !byIdHere[x.id]).map((x) => x.id);
+  if (!onBase && baseOnly.length) await die(`${label}: a LIVE row sets ${baseOnly.join(', ')}, which this tree does not declare`);
+  const drift0 = await fullStateDrift(page, driftSet);
   const drift = onBase ? drift0.filter((d) => baseKinds[d.split(':')[0]] !== undefined) : drift0;
   if (onBase) {
     const dropped = drift0.filter((d) => baseKinds[d.split(':')[0]] === undefined).map((d) => d.split(':')[0]).sort();
     const want = CONTROLS.filter((c) => baseKinds[c.id] === undefined).map((c) => c.id).sort();
     if (dropped.join(',') !== want.join(',')) await die(`${label}: the base tree's missing-control set is ${want.join(', ') || '(none)'} and the drift report dropped ${dropped.join(', ') || '(none)'}`);
+    /* AND THE OTHER DIRECTION, which this session is the first to need: the ids
+       the BASE tree has and this one does not are exactly the four retired in
+       session 32, and a base row may set them. Asserted rather than assumed, so
+       a typo in a base row's id fails the run instead of being filtered away. */
+    const onlyThere = Object.keys(baseKinds).filter((id) => !byIdHere[id]).sort();
+    const stray = baseOnly.filter((id) => !onlyThere.includes(id));
+    if (stray.length) await die(`${label}: sets ${stray.join(', ')}, which neither tree declares`);
   }
   if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
   await page.waitForTimeout(400);
