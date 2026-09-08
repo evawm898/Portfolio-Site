@@ -141,7 +141,12 @@ const MUTANTS = [
     // there, and the root handle projects off the canvas — so a drag aimed at
     // it reaches nothing and the root moves 0.00 mm. A true report that the
     // page's orientation is broken, from a check about something else.
+    // And it changes the VIEWING GEOMETRY, so how much of the picture a droop
+    // moves changes with it: the v family's ink shifts by 798 px instead of
+    // 14,482 and falls under that check's bar. A third true report, from a
+    // third check about something else.
     breaks: ['zup/the-attachment-ring-is-flat',
+             'stem/the-droop-reaches-every-family',
              'bend/the-root-is-a-point-like-any-other'],
   },
   {

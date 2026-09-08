@@ -1917,6 +1917,13 @@ plausible flower on a black field.
    BEFORE the rotation, a handle means "displace the stem" rather than fighting
    the droop it is being rotated by.
 
+**THE BEND MECHANISM IS `plot-warp.js`, IT IS DELIBERATELY RE-POINTABLE, AND THE
+NEXT SESSION POINTS IT AT A PETAL'S OWN `u` AXIS — DO NOT REBUILD IT.** What it
+is, in one line: control points along an axis, each with a gaussian falloff,
+summed into a displacement applied to a BUNDLE OF LINES. The stem is one caller.
+A petal warped along its own `u` is the next, and it needs the axis and the line
+set — not a rewrite, not a second copy of the falloff law.
+
 **THE BEND MECHANISM IS `plot-warp.js` AND IT IS DELIBERATELY RE-POINTABLE.**
 Everything in it is a function of ONE SCALAR — a station along whatever axis the
 caller owns — so the next thing that wants it (a petal warped along its own `u`)
@@ -1969,6 +1976,18 @@ owner of how far down "the top" reaches, and it is the longer of the two.
 at an eight-point 120 mm zigzag — the one setting that can still be seen, and it
 is on the panel rather than hidden.
 
+**THE SEAM READS 0.0e+0 mm ON EVERY CELL OF THE SHEET, AND THAT IS THE ONE
+NUMBER TO LOOK AT FIRST.** It is the largest distance between the head's own
+answer for a foot and the stem's, over every drawn line, measured live and
+printed on the panel. It matters because the head takes the FULL droop rotation
+and the stem takes it DECAYED, from two different expressions: if those two
+disagree at the ring by any amount at all, the 280 lines tear apart at the
+junction — and a tear of a hundredth of a millimetre is invisible on a black
+field while being exactly the defect that makes the drawing not a drawing of one
+plant. It reads zero rather than "small" because both boundary values are exact
+rather than approached (see note 2 above), and the sheet carries it on all 21
+cells so a future change that breaks it cannot be photographed as fine.
+
 **THE CAMERA FIT AND THE DEPTH DIM NOW SHARE ONE WALKER.** `eachDrawnPoint()`
 walks every strip in the file at the current droop plus the stem strips that are
 drawn, and both `fitCamera` and the fog's own sphere read it — otherwise a stem
@@ -1980,28 +1999,34 @@ which is why the gate re-frames after turning the stem on, and why its first run
 dragged nothing at all and reported it as a bend that does not move the stem
 (the handle projected to y = 1327 on an 800 px page).
 
-**THE SHIPPED STEM DEFAULTS ARE A STARTING POINT, NOT A RULING.** Unlike the
-DRAW defaults above — which Eva approved on `deploy-preview-182` — nobody has
-turned one of these on a preview yet. Treat them the way `/print`'s fan table
-asks to be treated.
+**THE SIX STEM CONTROLS AND THEIR DEFAULTS ARE APPROVED** (Eva, Sep 8, from the
+contact sheet — "the stem and its six defaults stand"). They are a RULING, like
+the DRAW defaults above, not a starting point the way `/print`'s fan table is.
+Do not re-litigate them without a reason from the picture.
 
-| control | default | what it is |
-|---|---|---|
-| stem | `inferred` | on; `off` draws the grid as the file wrote it |
-| bundle | 0.35 mm | how tightly the lines gather (0–5 mm) |
-| join | 12 mm | how gradually — and therefore the head-to-stem taper |
-| length | 170 mm | total stem length (10–500 mm) |
-| droop | 0° | tips the head about the grid X axis, toward +Y (−120..120°) |
-| neck | 45 mm | how far down the droop washes out (1–300 mm) |
-| bends | 3, at rest | at a third, two thirds and the ROOT; up to 8 |
-| show bend handles | on | you cannot drag what you cannot see |
+| control | default | range | what it is |
+|---|---|---|---|
+| stem | `inferred` | on / off | `off` draws the grid as the file wrote it |
+| bundle | 0.35 mm | 0–5 mm | how tightly the lines gather |
+| join | 12 mm | 0.5–80 mm | how gradually — and therefore the head-to-stem taper |
+| length | 170 mm | 10–500 mm | total stem length |
+| droop | 0° | −120..120° | tips the head about the grid X axis, toward +Y |
+| neck | 45 mm | 1–300 mm | how far down the droop washes out |
+| bends | 3, at rest | 0–8 | at a third, two thirds and the ROOT |
+| show bend handles | on | — | you cannot drag what you cannot see |
 
-Two things about that table are open questions rather than decisions: the droop
-direction is a FIXED axis (there is no droop azimuth control, and the six
-controls the brief named do not include one — orbit to see it from another
-side), and at this framing `bundle` 1.60 reads as a tube with bright edges
-rather than as separate strands, which the sheet photographs close up rather
-than tunes around.
+**`bundle` 1.60 mm READS AS A TUBE WITH BRIGHT EDGES AT NORMAL FRAMING, AND THE
+ANSWER IS A BIGGER BUNDLE, NOT A DIFFERENT LAW.** 3.2 mm across a 170 mm stem is
+about a dozen pixels at any framing that fits the drawing, so 280 strands smear
+into a band with a cosine-bright silhouette. The strands ARE there and each keeps
+its own azimuth all the way down — cell 06 of the sheet is the same drawing with
+the camera pushed in, and they are plainly separate. If separate strands are
+wanted at reading distance, that is a larger `bundle`; do not reach for a
+different gather law.
+
+One thing that is an open question rather than a decision: the droop direction is
+a FIXED axis. There is no droop azimuth control — the six controls the brief
+named do not include one — so orbit to see it from another side.
 
 **COST: THE FRAME IS TRIVIAL AND THE REBUILD IS WHAT THE STEM ACTUALLY COSTS.**
 0.10 ms median per settled frame with 40,040 stem segments on top of the grid's
@@ -2113,12 +2138,16 @@ family turns and exactly 0 when it does not.
 each measured and each worth not re-learning.** Three passes of the control were
 needed; besides the idle-skip defect above and the two below, four more mutants
 had UNCLAIMED reds that were all true statements about the mutation and are now
-named on its list — a Z-up misread puts the stem into the screen so the root
-handle projects off the canvas and a drag on it reaches nothing; a decay of
-0.999 at the ring is BELOW the smoothstep's own first step so the decay stops
-being monotone; a stepped funnel is not flat where it lands; and how fine the
-station ladder has to be is a property of the WIDTH LAW, so changing it moves
-the bend case from 0.155 mm to 0.442. **A REFACTOR SILENTLY DISARMS A MUTANT:**
+named on its list — a Z-up misread puts the stem into the screen, so the root
+handle projects off the canvas and a drag on it reaches nothing AND the droop's
+own on-screen effect shrinks from 14,482 px of ink to 798, under the bar of the
+check that measures it; a decay of 0.999 at the ring is BELOW the smoothstep's
+own first step so the decay stops being monotone; a stepped funnel is not flat
+where it lands; and how fine the station ladder has to be is a property of the
+WIDTH LAW, so changing it moves the bend case from 0.155 mm to 0.442.
+**THE COMMON SHAPE OF ALL OF THESE:** a mutation that breaks the page globally
+reds checks that are about something else, and the honest remedy is to NAME them
+on that mutant's list, not to loosen the check until the red goes away. **A REFACTOR SILENTLY DISARMS A MUTANT:**
 `the-bend-is-not-gated-by-the-funnel` edited a line that the station-plan
 factoring moved, and the control reported "mutation did not apply" rather than a
 false pass — which is the one thing that makes that failure mode survivable.
