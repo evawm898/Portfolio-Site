@@ -564,6 +564,56 @@ whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheet
 `tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
 positions of the travel on two-row scaffolding).
 
+**MARGIN BUCKLING SHIPS AS A FIELD WITH NO CONTROLS, AND THE ONE THING THAT IS NOT LIKE CUP
+AND ROLL IS THE NORMAL** (session 33, part 1 of two — read `docs/bloom-session-33-outcome.md`
+before touching any of it). `w(u,v) = A * h(u) * |v|^p * cos(2 pi f u + phase)` added to `aN`
+in `petalForm`'s `sectAt`, on the same `ramp(u)` the other curves use so the FOOT is untouched
+by construction. **It is a displacement field, not a boundary change** — `widthProfile` is
+untouched and `h(u)` is unchanged, so it never competes with the tip work for the outline.
+**`buckleIsFlat` JOINS `petalFormIsFlat`**, because that predicate decides whether
+`petalForm()` is constructed at all and at the default it is true: a buckle wired only inside
+`sectAt` is a DEAD SLIDER (session 16's `cupGradient` move, re-learned by measurement).
+**AMPLITUDE IS A FRACTION OF THE LOCAL HALF-WIDTH, NOT mm** (Eva, ruling 1): absolute mm is
+applied unchanged where the blade has tapered to its tip floor, so the tip crumples.
+**THE NORMAL IS THE SESSION.** Cup and roll are functions of `v` alone, so the shipped
+cross-section normal (`dP/dv` rotated a quarter turn in the row's own plane) is the surface
+normal to the accuracy a SLOW along-`u` variation allows — and every deformation before this
+one is slow along `u`. A buckle is not: measured 29 degrees off at a moderate setting and 71
+at the corner, which offsets the two skins into a WEDGE. The buckled branch takes
+`normalise(dP/du x dP/dv)` instead, ORIENTED ONTO the cross-section normal so the winding
+cannot flip (`emitPanel`'s quads are wound off `n`; a flip there is a boundary-edge failure).
+Blade rows only — the foot is a different surface and differencing across the seam is a
+derivative of nothing. **The field's `v`-derivative is `d/da` at `a = h*v`**, the shipped
+convention; differentiating in `v` overstates the slope by a factor of `h` (~8 mm) and is now
+a mutant. **0 of 207,385,920 floats moved** (572 live rows + phase20's 571, both modes, against a
+worktree of `b323268`, `Object.is`, with a 1e-9 positive control); no row added, so
+`frozen/phase20` stays the newest baseline and NO phase is owed. Zero triangles added.
+**THE INSTRUMENT IS `node tools/bloom-wall-thickness.mjs`** — the first thing here ever to
+measure the EMITTED wall, and it is the INPUT to part 2's ranges rather than a completeness
+exercise (Eva's own distinction, which is why this session is instrument-first). V1
+calibration / V2 reachability / V3 guard / V4 normal all ABORT; `--negative-control` runs five
+mutants that all behave. It rides in `bloom-export-watertight.yml` before the browser install,
+so the bloom gate count stays at FIVE. **It measures WALL and SELF separately** — the wall under
+a point versus the sheet approaching another part of itself; conflating them reports a fold as a
+thinning. **A deficit at one grid is not a thinning: refine and see.** Recovery = the mesh,
+divergence = geometry. Two things it found on SHIPPED states, neither this feature's and both
+scheduled in the outcome doc rather than left as folklore: **`petalRoll` 330 emits a 0.587 mm
+wall against a declared 1.200** at 28x10 (recovering to 1.177 at 168x60, so the roll floor works
+and the FACETED mesh is what a slicer receives), and **all-form-max DIVERGES** 0.282 -> 0.014,
+a real near-self-contact, pre-existing. **THE COMPOSITION ROW IS AN XFAIL WITH A NUMBER**: the
+buckle over cup 1.2 + curl 180 diverges (own contribution 0.438 -> 0.635 mm under refinement),
+so **discovery's closed-form `A*f^2 <= L^2/(4 pi^2 t)` is NECESSARY AND NOT SUFFICIENT** — the
+buckle composes with curvature cup and curl already spent. That is part 2's clamp problem,
+and the xfail FAILS HARD when it starts passing. **Part 2** is the four controls (amplitude,
+frequency in CYCLES capped at 7, phase from the slot index, and `p` — Eva's amendment, floor 2,
+ceiling 6, default 3, "how far the ruffle reaches in from the edge", because an iris ruffles
+wide and a rose narrow and one exponent cannot draw both), the clamp, `NU = 56` and the sheet.
+**`NU = 56` IS A RULED EXCEPTION TO "DERIVE, DON'T EXPOSE", WITH ITS REASON**: a row count
+derived from buckle frequency would move `CURL_START_MIN = 1 / NU`, which the registry IMPORTS
+as a CURL control's bound — a control reaching into an unrelated control's range. Raising `NU`
+moves bytes and owes a frozen phase; session 33 does not.
+
+
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
 every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —

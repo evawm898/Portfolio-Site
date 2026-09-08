@@ -3343,6 +3343,84 @@ if (HEAD_RISE_MIN_RADIUS_FACTOR !== ROLL_MIN_RADIUS_FACTOR) throw new Error(`HEA
 
 const D2R = Math.PI / 180;
 
+/* ===================================================================
+   MARGIN BUCKLING — the lettuce edge (session 33, the FIELD and its NORMAL;
+   the controls, their ranges and the clamp are part 2).
+
+   WHAT IT IS, and what it is NOT. This is a DISPLACEMENT FIELD of the
+   mid-surface, the same family as cup and cross-section roll — it adds a
+   term to `aN` in sectAt — the slot cup already occupies. It does NOT touch
+   `widthProfile`: `h(u)` is unchanged, `v` still runs -1..1, and the petal's
+   plan outline is byte for byte what it was. So it does not compete with the
+   tip-shape work for ownership of the outline, and the two can be sequenced
+   in either order. A wavy OUTLINE would be a different change with a
+   different owner; this is not that.
+
+     w(u, v) = A * h(u) * |v|^p * cos(2 pi f u + phase)
+
+   AMPLITUDE IS A FRACTION OF THE LOCAL HALF-WIDTH, NOT MILLIMETRES (Eva,
+   session 33, ruling 1). Scale-free is the principle. An absolute mm
+   amplitude fails in one specific way: it is applied UNCHANGED where the
+   blade has already tapered to its tip floor, so the tip crumples while the
+   body of the blade ripples gently — measured and photographed on the
+   discovery sheet's row E. Multiplying by the row's own `h` makes the wave
+   taper with the blade, which is what a leaf does.
+
+   `|v|^p` IS WHAT MAKES IT A MARGIN BUCKLE. At p = 0 the whole sheet ripples
+   (a different plant); as p rises the wave is confined to the edge. p = 1 is
+   C0 AT THE MIDRIB — |v| is not differentiable at 0 — and creases the blade
+   down its centre, so part 2's floor is 2 and 1 is out of range rather
+   than merely discouraged.
+
+   THE RAMP. The field rides `ramp(u)`, the same onset the other curves use,
+   so it is exactly 0 at u = 0 and the FOOT and root blend are untouched by
+   construction rather than by a special case.
+
+   THE ONE PLACE IT IS NOT LIKE CUP AND ROLL, and the reason this session
+   exists. Cup and roll are functions of `v` alone at a given row, so the
+   row's cross-section is a PLANE CURVE and the shipped normal — `dP/dv`
+   rotated a quarter turn in the row's own (T, N) plane — is the surface
+   normal to the accuracy the along-length variation allows. Every existing
+   deformation varies SLOWLY along u (a taper, an onset ramp), which is what
+   makes that approximation good. A buckle varies FAST along u; that is what
+   a buckle IS. Measured on the discovery rig: the cross-section normal sits
+   up to 71 degrees off the true surface normal at the top corner, and 29
+   degrees at a moderate setting. Offsetting the two skins along it makes a
+   WEDGE, not a sheet. So the buckled branch takes its normal from
+   `cross(dP/du, dP/dv)` instead — see `trueNormalRows` in buildPetalInto,
+   which is the ONE place that happens.
+   =================================================================== */
+/* Part 2's control default, named here so the instrument and the control
+   read one owner rather than two — TIP_SHARPNESS_DEFAULT's move. */
+export const BUCKLE_ENV_DEFAULT = 3;
+/* THE GUARD. Either factor absent means no field, and the whole buckle layer
+   is then skipped by a BRANCH — not by an argument that multiplying by zero
+   is exact. Written as `!x` rather than `x === 0` because with no registry
+   row for these keys yet, every shipped build reads them as `undefined`;
+   part 2's controls make them real numbers whose defaults are 0, and the
+   predicate is true in both worlds. */
+export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }
+export function buckleLaw(state) {
+  const A = state.buckleAmp, f = state.buckleFreq;
+  const p = state.buckleEnv === undefined ? BUCKLE_ENV_DEFAULT : state.buckleEnv;
+  const ph = (state.bucklePhase || 0) * (Math.PI / 180);
+  /* `w` takes the row half-width rather than closing over one: the amplitude
+     is a fraction of the LOCAL half-width, so h is a per-row input and a law
+     that captured a single h would be the absolute-mm parameterisation
+     wearing this one's name. */
+  return {
+    A, f, p, phaseRad: ph,
+    w: (u, v, h) => A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),
+    /* d/da at a = h*v, which is the convention dT/dN already use (roll's
+       cos(k*a); cup's `2*c*v`, which is d(c*a^2/h)/da). Differentiating in v
+       instead overstates the cross-width slope by a factor of h — about 8 mm
+       on the shipping petal — and the discovery rig read a thinning that was
+       the instrument's before this was written down. */
+    dwda: (u, v, h) => (v === 0 && p > 1 ? 0
+      : A * p * Math.pow(Math.abs(v), p - 1) * (v < 0 ? -1 : 1) * Math.cos(2 * Math.PI * f * u + ph)),
+  };
+}
+
 /* THE GUARD's predicate, exported so the app, the builder and the gates all
    ask the same question. Exact zero comparisons: every one of the four
    defaults IS exactly 0, and a range input at its default yields it. */
@@ -3353,7 +3431,14 @@ export function petalFormIsFlat(state) {
          is a deformation of its own: bias and start multiply the curl, roll
          taper multiplies the roll, and all three are inert by construction
          where their base is 0, so only this one joins the guard. */
-      && state.petalCupGradient === 0;
+      && state.petalCupGradient === 0
+      /* MARGIN BUCKLING (session 33) joins the guard for the same reason
+         cupGradient did: this predicate is what decides whether petalForm()
+         is CONSTRUCTED AT ALL, and at the shipping default it is true. A
+         buckle wired only inside sectAt would be a dead slider — measured on
+         the discovery rig, which built the field, saw an identical triangle
+         count and an identical byte, and was right to. */
+      && buckleIsFlat(state);
 }
 
 /* ===================================================================
@@ -3521,6 +3606,8 @@ export function petalForm(state, halfW, t) {
      gradient 0, never `x * 1` or `x + 0` argued exact. */
   const bias = state.curlBias, start = state.curlStart;
   const rollTaper = state.petalRollTaper, cupGrad = state.petalCupGradient;
+  /* MARGIN BUCKLING (session 33). Null unless engaged; see buckleLaw above. */
+  const buckle = buckleIsFlat(state) ? null : buckleLaw(state);
   const curlUniform = curlIsUniform(state);
   const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
   const rollEnv = (u) => 1 - Math.abs(rollTaper) * smoother(rollTaper > 0 ? u : 1 - u);
@@ -3574,23 +3661,34 @@ export function petalForm(state, halfW, t) {
     const r = ramp(u);
     const k = kAt(u, r);
     const c = cAt(u, r);
+    /* THE BUCKLE'S TWO TERMS FOR THIS ROW, or null. `buckle === null` makes
+       every expression below the pre-session-31 one character for character,
+       which is what the byte report is a construction rather than a hope. */
+    const bw = buckle === null ? null : (v) => r * buckle.w(u, v, h);
+    const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);
     return (v) => {
       const a = h * v;
       const aT = k === 0 ? a : Math.sin(k * a) / k;
-      const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * h * v * v;
+      const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * h * v * v + (bw === null ? 0 : bw(v));
       const dT = k === 0 ? 1 : Math.cos(k * a);
-      const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v;
+      const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v + (bd === null ? 0 : bd(v));
       const L = Math.hypot(dT, dN);
       const nT = -dN / L, nN = dT / L;
       return {
         P: [C[0] + T1[0] * aT + N1[0] * aN, C[1] + T1[1] * aT + N1[1] * aN, C[2] + T1[2] * aT + N1[2] * aN],
         n: [T1[0] * nT + N1[0] * nN, T1[1] * nT + N1[1] * nN, T1[2] * nT + N1[2] * nN],
+        /* dP/dv lifted into 3D. Only the buckled branch reads it — it is what
+           `trueNormalRows` crosses against dP/du — and it is emitted here
+           rather than recomputed there because these are the SAME two
+           components the 2D normal was just built from. Two expressions of
+           one tangent is how this project's most repeated defect starts. */
+        dv: buckle === null ? null : [T1[0] * dT + N1[0] * dN, T1[1] * dT + N1[1] * dN, T1[2] * dT + N1[2] * dN],
       };
     };
   };
 
   return {
-    curlRad, twistRad, kappa, frameAt, sectAt, curlUniform,
+    curlRad, twistRad, kappa, frameAt, sectAt, curlUniform, buckle,
     /* WHAT THE EXPORT CANNOT SHOW. Watertightness and connectedness are
        measured on the STL; these are the properties a pure-displacement
        change can break while leaving both of those green, so they are read
@@ -3897,6 +3995,62 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     const f = form.frameAt(Rs, T, phi, u, dome === null ? null : Up);
     rows.push({ C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) });
   }
+
+  /* ===================================================================
+     THE TRUE SURFACE NORMAL — the ONE place the offset direction stops being
+     the cross-section's own normal, and the reason session 33 exists.
+
+     WHY IT IS NEEDED. emitPanel offsets the two skins by +/- t/2 along the
+     normal `sect(v)` hands it. That normal is `dP/dv` rotated a quarter turn
+     in the row's own (T, N) plane — the CROSS-SECTION's normal. It equals the
+     SURFACE normal only while the surface varies slowly along u, which every
+     deformation before this one does (a taper, an onset ramp, a constant-
+     curvature spine). A buckle varies fast along u by definition. Measured on
+     the discovery rig: 29 degrees off at a moderate setting and 71 at the top
+     corner, which offsets the skins into a wedge whose perpendicular
+     thickness is t*cos(that angle).
+
+     WHAT REPLACES IT. n = normalise(dP/du x dP/dv), oriented onto the
+     cross-section normal so the WINDING cannot flip (emitPanel's quads are
+     wound off `n`, and a sign flip there is a boundary-edge failure, not a
+     shading one). dP/dv is analytic and comes back on the row's own section
+     (`dv`); dP/du is a difference over the NEIGHBOURING ROWS' OWN sections at
+     the same v — legitimate because a section is a function of the GLOBAL v,
+     which is what already lets a cleft's two lobes stay on one arc.
+
+     THE FOOT IS NOT TOUCHED. Only blade rows are wrapped. The foot's three
+     rows are a different surface with a different width law, so differencing
+     across the seam would be a derivative of nothing; and the buckle's ramp
+     is exactly 0 there anyway. The first blade row therefore takes a ONE-
+     SIDED difference forward, the last one backward, the rest central.
+
+     COST: a buckled build evaluates three sections per emitted column instead
+     of one. It adds NO triangles. Unbuckled builds do not enter here at all.
+     =================================================================== */
+  const trueNormalRows = (rowList, from) => {
+    const raw = rowList.map((r) => r.sect);
+    for (let i = from; i < rowList.length; i++) {
+      const ia = i === from ? i : i - 1;
+      const ib = i === rowList.length - 1 ? i : i + 1;
+      const own = raw[i], before = raw[ia], after = raw[ib];
+      rowList[i].sect = (v) => {
+        const q = own(v);
+        const Pa = before(v).P, Pb = after(v).P;
+        const du = [Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]];
+        const cx = du[1] * q.dv[2] - du[2] * q.dv[1];
+        const cy = du[2] * q.dv[0] - du[0] * q.dv[2];
+        const cz = du[0] * q.dv[1] - du[1] * q.dv[0];
+        const L = Math.hypot(cx, cy, cz);
+        /* A degenerate cross means the two tangents are parallel and there is
+           no surface normal to be had; the cross-section's own normal is the
+           honest answer there, not a zero vector. */
+        if (!(L > 1e-12)) return q;
+        const sgn = (cx * q.n[0] + cy * q.n[1] + cz * q.n[2]) < 0 ? -1 / L : 1 / L;
+        return { P: q.P, n: [cx * sgn, cy * sgn, cz * sgn], dv: q.dv };
+      };
+    }
+  };
+  if (form && form.buckle !== null) trueNormalRows(rows, footS.length);
 
   const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
   /* ONE CAPTURED GRID PER PANEL, in emission order and labelled with the
