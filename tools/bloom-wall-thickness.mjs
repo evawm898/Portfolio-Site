@@ -42,8 +42,9 @@
      - It reads ONE petal — the one grid `buildBloomInto` retains per
        descriptor — so it says nothing about petal-to-petal clearance.
 
-   THE FOUR VALIDITY ASSERTIONS ABORT THE RUN. A self-check that reports
-   instead of failing is not a self-check:
+   THE FIVE ASSERTIONS ABORT THE RUN. A self-check that reports instead of
+   failing is not a self-check — and a MEASUREMENT that reports instead of
+   failing becomes folklore within two sessions, which is why V5 exists:
      V1 CALIBRATION — a flat build must read the declared thickness to within
         `CALIBRATION_EPS`. Zero curvature means zero faceting error, so a
         deviation above the arithmetic's own noise means the instrument is
@@ -63,7 +64,12 @@
         per cycle are reported, not asserted — a deficit there is the row
         count, and this session ships no control that can reach one.
 
-   RUN:  node tools/bloom-wall-thickness.mjs [--grid NUxNV] [--json]
+     V5 SELF-APPROACH — no state may bring the sheet within `MIN_FEATURE_MM`
+        of another part of itself, except the pre-existing failures declared
+        individually in `SELF_XFAIL` and measured on `main` at 2a97e96. Those
+        MUST fail; one that starts passing is a loud failure, not a bonus.
+
+   RUN:  node tools/bloom-wall-thickness.mjs [--controls]
          node tools/bloom-wall-thickness.mjs --negative-control
    =================================================================== */
 
@@ -259,6 +265,36 @@ export function measureCurvature(grid, { footRows = 3, half = 2, uMin = 0.15, uM
   }
   return { kMax, radiusMm: kMax > 0 ? 1 / kMax : Infinity, at };
 }
+
+/* V5's BAR AND ITS PRE-EXISTING FAILURES (session 34, Eva's ruling).
+
+   THE BAR IS `MIN_FEATURE_MM`, THE MINIMUM PRINTABLE GAP. SELF is a distance
+   between two parts of one sheet; below the minimum feature the slicer fuses
+   them or the gap never forms. It is the project's own constant applied to a
+   GAP rather than to a wall, and it is imported, never restated.
+
+   WHAT THE INSTRUMENT CANNOT RESOLVE, said here rather than discovered later:
+   a FLAT build reads SELF ~1.25 mm, because the nearest bottom triangle
+   outside the +/-2-cell neighbourhood is already about a thickness away. So
+   the bar sits 0.25 mm under the flat floor and the measurement is coarse in
+   between. `cup-max` passes at 1.031 — 3% of headroom, and worth watching.
+
+   THE xfail LIST IS MEASURED ON `main` AT 2a97e96, NOT ON THIS BRANCH (Eva's
+   ruling), so it is provably pre-existing rather than accidentally inclusive
+   of something this session introduced. Named INDIVIDUALLY — never a range,
+   never a wildcard — so a new self-approach reddens immediately while these
+   do not, and so a later fix TRIPS the gate rather than passing silently.
+   Measured 2026-09-08, `main` first then this branch:
+       roll-max          0.564 -> 0.659
+       form-max          0.037 -> 0.010
+       buckle-on-form    0.583 -> 0.299
+   No state that passes on `main` fails here, which is the claim that makes
+   this list honest rather than convenient. */
+export const SELF_XFAIL = Object.freeze({
+  'roll-max': 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 here. Pre-existing, recorded as found-in-passing by session 33, its own session.',
+  'form-max': 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 here, DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.',
+  'buckle-on-form': 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 here. This is the row that established self-approach as the hazard; it fails on main WITHOUT this session\'s controls, so it is pre-existing too.',
+});
 
 /* ------------------------------------------------------------------ states */
 
@@ -457,6 +493,36 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
     const worst = judged.reduce((a, b) => (b.ownDeficit > a.ownDeficit ? b : a));
     say(`  V4 normal: ${judged.length} asserted states, worst own contribution ${worst.ownDeficit.toFixed(3)} mm ("${worst.label}") against a ${WALL_TOLERANCE} mm bar.`);
   }
+  /* V5 THE SHEET MUST NOT APPROACH ITSELF (session 34, Eva's ruling: gate it,
+     with the known failures declared). SELF was a reported flag; a reported
+     number becomes folklore within two sessions, so it is an assertion now.
+     The three pre-existing failures are declared in SELF_XFAIL above and MUST
+     fail; anything else falling under the bar is this session's or a later
+     one's, and reddens immediately. */
+  {
+    const bar = G.MIN_FEATURE_MM;
+    if (typeof bar !== 'number') fails.push('V5 self-approach: the geometry does not export MIN_FEATURE_MM — this gate will not invent a bar');
+    for (const r of rows) {
+      const known = Object.prototype.hasOwnProperty.call(SELF_XFAIL, r.id);
+      const under = r.self < bar;
+      if (under && !known) {
+        fails.push(`V5 self-approach: "${r.label}" brings the sheet within ${r.self.toFixed(3)} mm of itself, under the ${bar.toFixed(2)} mm minimum printable gap — a NEW self-approach, not one of the ${Object.keys(SELF_XFAIL).length} declared pre-existing ones`);
+      } else if (!under && known) {
+        fails.push(`V5 xfail: "${r.label}" now clears the bar at ${r.self.toFixed(3)} mm and PASSES — the pre-existing self-approach is FIXED. Remove its SELF_XFAIL entry in the same commit. (was: ${SELF_XFAIL[r.id]})`);
+      }
+    }
+    const stray = Object.keys(SELF_XFAIL).filter((id) => !rows.some((r) => r.id === id));
+    if (stray.length) fails.push(`V5 xfail: SELF_XFAIL names ${stray.join(', ')}, which no longer exists in STATES — a declaration nothing measures is worse than an absence`);
+    if (!fails.some((f) => f.startsWith('V5'))) {
+      const worst = rows.filter((r) => !SELF_XFAIL[r.id]).reduce((a, b) => (b.self < a.self ? b : a));
+      say(`  V5 self-approach: every state clears the ${bar.toFixed(2)} mm minimum printable gap except the ${Object.keys(SELF_XFAIL).length} declared pre-existing ones; closest passing is "${worst.label}" at ${worst.self.toFixed(3)} mm.`);
+      for (const id of Object.keys(SELF_XFAIL)) {
+        const r = rows.find((x) => x.id === id);
+        say(`  V5 xfail (pre-existing, still failing as expected): "${r.label}" at ${r.self.toFixed(3)} mm — ${SELF_XFAIL[id]}`);
+      }
+    }
+  }
+
   /* AN XFAIL THAT STARTS PASSING IS THE FIX LANDING, and it is a LOUD failure
      rather than a quiet bonus — the marker has to come off in the same commit
      or the gate stops meaning anything for that row. */
@@ -472,7 +538,7 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
   }
 
   if (fails.length) { say(''); for (const f of fails) { if (!quiet) console.error('  FAIL  ' + f); } }
-  else say('\n  V1 calibration · V2 reachability · V3 guard · V4 normal — all clean.');
+  else say('\n  V1 calibration · V2 reachability · V3 guard · V4 normal · V5 self-approach — all clean.');
   return { fails, rows };
 }
 
@@ -602,6 +668,20 @@ const MUTANTS = [
   { id: 'unguarded-form', names: ['V2'],
     why: 'petalFormIsFlat stops naming the buckle, so petalForm() is never constructed and the field is a dead slider — session 16\'s failure, repeated',
     apply: (s) => s.replace('      && buckleIsFlat(state);\n}', '      && true;\n}') },
+  /* THE CLAMP'S MUTANT NAMES V4, NOT V5, AND THAT IS A RESULT RATHER THAN A
+     correction of convenience. It was written naming V5 on the assumption that
+     an unclamped wave folds the sheet onto itself; measured, removing the
+     clamp reddens the WALL and leaves SELF clear on every state here. That is
+     independent evidence for session 34's measurement 1 — the clamp bounds
+     offset inversion and does NOT bound self-approach, which is exactly why it
+     is necessary and not sufficient. */
+  { id: 'no-amplitude-clamp', names: ['V4'],
+    why: 'the amplitude clamp is removed, so a high frequency builds the amplitude it was asked for and the skins wedge — measured to redden the WALL and NOT self-approach, which is the clamp telling you what it does and does not bound',
+    apply: (s) => s.replace('  const A = Math.min(asked, cap);', '  const A = asked;') },
+  { id: 'field-four-times-too-big', names: ['V5'],
+    why: 'the field is emitted at four times the law\'s amplitude — a wrong constant in `w`, the defect class that folds a margin onto the blade behind it',
+    apply: (s) => s.replace('    w: (u, v, h) => A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),',
+                            '    w: (u, v, h) => 4 * A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),') },
   { id: 'guard-needs-both-zero', names: ['V3'],
     why: 'the guard asks for BOTH factors to be zero rather than either, so a frequency alone engages the field at amplitude 0 and the gated state stops being inert',
     apply: (s) => s.replace('export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',

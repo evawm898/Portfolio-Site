@@ -125,18 +125,48 @@ parts of a folded sheet. The sufficient condition is a **measured minimum separa
 between non-adjacent parts of the emitted mid-surface** — which is exactly the `SELF`
 column that already exists — floored at one sheet thickness.
 
-That is a measurement, not a formula, which is consistent with the project's own doctrine
-(*cap the OUTPUT, never an input proxy*) and inconsistent with shipping it as a clamp: a
-clamp has to answer before the geometry is built. **Three options, costed, none taken
-without a ruling:**
+That is a measurement, not a formula — consistent with the project's own doctrine (*cap
+the OUTPUT, never an input proxy*).
 
-1. **Leave the clamp as it is and keep `SELF` as a flag** — the shipped state. The
-   necessary condition is enforced; the sufficient one is measured and told.
-2. **Make `SELF` a gate.** It would fire on `all form at maximum` too, which is a
-   *pre-existing* shipped state (wall 0.004 at 56 rows), so this reddens `main` on
-   geometry this session did not touch.
-3. **Clamp iteratively** — build, measure `SELF`, reduce amplitude, rebuild. Costs a
-   build per step and makes the control's value depend on a search.
+### Eva's ruling: GATE IT, with the known failures declared
+
+**`SELF` is `V5` now, a real assertion in the wall instrument, not a reported flag.** Her
+reasoning, recorded because it generalises: *a reported-but-unenforced measurement becomes
+folklore within two sessions*. Iterative clamping was **rejected** — it silently overrides
+the amplitude a visitor set, and its correctness cannot be established.
+
+**The bar is `MIN_FEATURE_MM` (1.00 mm), the minimum printable gap** — the project's own
+constant applied to a *gap* rather than to a wall, imported and never restated. Below it a
+slicer fuses the two parts or the gap never forms.
+
+**The xfail list was measured on `main` at `2a97e96`, not on this branch** (her instruction),
+so it is provably pre-existing rather than accidentally inclusive of something this session
+introduced. Named **individually** — never a range, never a wildcard:
+
+| state | on `main` | here | why it is pre-existing |
+|---|---|---|---|
+| `roll-max` | 0.564 | 0.659 | `petalRoll` 330 folds the blade into a near-closed quill. Session 33 found it. |
+| `form-max` | 0.037 | 0.010 | every form control at maximum, **diverging** under refinement. Session 33 found it. |
+| `buckle-on-form` | 0.583 | 0.299 | the composition — and it fails on `main` **without this session's controls**, because session 33 shipped the field. |
+
+**No state that passes on `main` fails here**, which is the claim that makes the list honest
+rather than convenient. A new self-approach reddens immediately; one of these starting to
+pass is a **loud failure**, not a bonus, so a later fix trips the gate instead of passing
+silently.
+
+**What the instrument cannot resolve, stated rather than left to be discovered**: a flat
+build reads `SELF` ≈ 1.25 mm, because the nearest bottom triangle outside the ±2-cell
+neighbourhood is already about a thickness away. The bar therefore sits 0.25 mm under the
+flat floor and the measurement is coarse in between. **`cup-max` passes at 1.031 — 3% of
+headroom**, and is worth watching.
+
+### The clamp does not bound self-approach, and the negative control proved it
+
+`no-amplitude-clamp` was written naming **V5**, on the assumption that an unclamped wave
+folds the sheet onto itself. Measured, it reddens **V4 and leaves V5 clear on every state**.
+That is independent evidence for the finding above: the clamp bounds *offset inversion* and
+does not bound *self-approach*, which is exactly why it is necessary and not sufficient. The
+mutant now names V4, and V5 got its own (`field-four-times-too-big`).
 
 ---
 
@@ -172,9 +202,20 @@ instrument reads curvature *high* where it is biased, the true radius is larger 
 the conclusion holds under its own known bias.
 
 **Reading: the cap does not need to be a function of `p` for safety. It is
-over-conservative at low `p`** — at p 2 the geometry would carry about **2.4× the
-amplitude** the cap allows. Making it p-dependent is a **capability** change, not a safety
-fix. Not adjusted; Eva's to rule.
+over-conservative at low `p`** — at p 2 the geometry would carry about **2.4× the amplitude**
+the cap allows. Making it p-dependent is a **capability** change, not a safety fix.
+
+### Eva's ruling: LEAVE IT A CONSTANT
+
+Not made a function of `p`. It is safe at every p, and **the 2.4× conservatism at p = 2 is a
+capability limit, not a defect.**
+
+**She is ruling the rest of it by eye**, from this session's contact sheet — the iris row
+(row 1, cell 1: A 0.45, f 2, p 2) against her reference photograph. If that row reads
+*shallow* beside the photo, the cap becomes p-dependent in its own session; if it reads deep
+enough, the constant stands. **Neither outcome is pre-built here.** The 2.4× figure and the
+`A·p(p−1)/h` cross-curvature law are recorded above so that session starts from this
+measurement rather than re-deriving it.
 
 ---
 
@@ -290,6 +331,70 @@ of its clauses were fired on mutated registries before being trusted.**
 - smoke, grid gate, census — see the close
 
 Live matrix **562 → 596** (block 27's 28 rows plus 2 sweep rows for each new slider).
+
+---
+
+## Part 1's premise is superseded — stated plainly so no later session re-derives it
+
+Part 1 recorded the composition as a **curvature** problem the clamp could not see, and
+concluded that a sufficient condition would be a bound the clamp was missing. **That is
+wrong, and Eva's ruling that rested on it is superseded with it.**
+
+The measurement that establishes it: **the composed surface is LESS curved than its base —
+1.0625 against 1.1149 /mm — while its wall collapses from 0.912 to 0.310 mm**, with
+`SELF ≈ WALL`. Curvature went *down*. The hazard is self-approach.
+
+**A sufficient condition cannot be a closed form in `(A, f, p, L, t)`.** Self-approach is a
+distance between two parts of a folded sheet; the parameters describe a field, and no
+function of them can express where that sheet ends up relative to itself. Do not re-derive
+`A·f² ≤ L²/(4π²t)` and try to extend it — it is the necessary condition, it ships as one,
+and the sufficient one is `V5`, which is a measurement.
+
+---
+
+## For the petal tip shape session: NU IS 56 NOW
+
+Written here because that session will read this doc, and because two of its things change.
+
+`NU` went **28 → 56** in session 34 (Eva's ruling, and the reason is below). Two consequences
+for the apex work:
+
+- **PR THREE redistributes rows at a fixed count.** The count is no longer 28. Whatever it
+  redistributes, it redistributes 56 of them, and any row-index arithmetic tuned against 28
+  needs re-deriving.
+- **The sagitta instrument was measured on 28 rows.** Chord sagitta falls roughly as the
+  square of the row spacing, so every sagitta number that session recorded is measured on a
+  grid that no longer exists. Re-measure before quoting.
+
+There is precedent for the shape of this: the grid gate carried `NU_EXPECTED = 28` as a
+literal under a comment claiming it was read back, and went red on 76 of 528 checks the
+moment `NU` moved. It imports `BLADE_ROWS` from the geometry now. **Any instrument that
+knows the row count should import it rather than hold it.**
+
+---
+
+## Why NU is 56, and what it costs
+
+Eva's ruling said *"fixed at 56"* believing that was the current value; it was 28, so the
+ruling **changed** it rather than holding it. It is correct anyway, and the reason is worth
+writing down: **a frequency cap of 7 at 28 rows is four samples per cycle, which resolves as
+noise rather than as a ruffle.** The cap and the row count are one decision, not two — which
+is why `BUCKLE_FREQ_RANGE[1] × BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` is asserted at
+module load rather than left as a coincidence.
+
+**What it costs, so future sessions budget for it in wall clock:** the doubling roughly
+doubles full-matrix gate runtime — the two long STL gates ran 78 and 92 minutes at `NU` 28
+and carry about double the petal triangles now — and takes the default model from 492 KiB to
+**930 KiB**.
+
+---
+
+## The control count: three, not four, and that is correct
+
+Part 1's brief said four. **Three are exposed.** The fourth in that list was the phase, and
+ruling 5 made it *derived* from the slot index — so it is not a control. Eva has confirmed
+this reading: the flag was right and needs no fix. **Recorded here so the discrepancy does
+not read as an omission to a later session** counting controls against the brief.
 
 ---
 

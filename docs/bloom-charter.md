@@ -5953,6 +5953,46 @@ matters should be measured this way.
   p = 2 the geometry would carry 2.4x the amplitude the cap allows, so making the cap
   p-dependent is a CAPABILITY change and not a safety fix — reported, not decided.
 
+  **PART 1'S PREMISE IS SUPERSEDED AND SO IS THE RULING THAT RESTED ON IT** (Eva, session
+  34). Part 1 recorded the composition as a CURVATURE problem the clamp could not see. The
+  measurement says otherwise: **the composed surface is LESS curved than its base — 1.0625
+  against 1.1149 — while its wall collapses 0.912 to 0.310**, with SELF ~ WALL. **A
+  SUFFICIENT CONDITION CANNOT BE A CLOSED FORM IN (A, f, p, L, t)**: self-approach is a
+  distance between two parts of a folded sheet, and no function of a field's parameters can
+  express where that sheet ends up relative to itself. Do not re-derive the closed form and
+  try to extend it.
+
+  **SO `SELF` IS GATED, WITH THE KNOWN FAILURES DECLARED** (Eva's ruling one). V5 in the wall
+  instrument, barred at `MIN_FEATURE_MM` — the minimum printable GAP, the project's own
+  constant applied to a gap rather than a wall. Iterative clamping was REJECTED (it silently
+  overrides the amplitude a visitor set and its correctness cannot be established), and a
+  reported-but-unenforced measurement was rejected because **an unenforced number becomes
+  folklore within two sessions.** The xfail list is measured on `main` AT 2a97e96, NOT on the
+  branch, so it is provably pre-existing, and it names its three states INDIVIDUALLY — never
+  a range, never a wildcard — so a new self-approach reddens at once while these do not, and
+  one that starts passing TRIPS the gate. No state that passes on main fails on the branch,
+  which is what makes the list honest rather than convenient.
+
+  **AND THE CLAMP'S OWN MUTANT PROVED THE POINT.** `no-amplitude-clamp` was written naming
+  V5, on the assumption that an unclamped wave folds the sheet onto itself. Measured, it
+  reddens the WALL and leaves self-approach clear on every state — independent evidence that
+  the clamp bounds offset inversion and does NOT bound self-approach. It names V4 now and V5
+  got its own mutant.
+
+  **THE CAP STAYS A CONSTANT** (Eva's ruling two): safe at every p, and the 2.4x conservatism
+  at p = 2 is a CAPABILITY limit rather than a defect. The rest is being ruled BY EYE from
+  the sheet's iris row against the reference photograph — shallow beside it and the cap
+  becomes p-dependent in its own session; deep enough and the constant stands. Neither
+  outcome pre-built; the 2.4x figure and the `A*p*(p-1)/h` law are recorded so that session
+  starts from the measurement.
+
+  **AND NU BEING 56 IS A DECISION WITH THE CAP, NOT BESIDE IT.** Eva's ruling said "fixed at
+  56" believing that was the current value; it was 28, so the ruling changed it. It is right
+  anyway: **a frequency cap of 7 at 28 rows is four samples per cycle, which resolves as
+  noise rather than a ruffle**, so the cap and the row count are ONE decision — asserted at
+  module load rather than left a coincidence. It roughly doubles full-matrix gate runtime
+  (the long STL gates ran 78 and 92 minutes at 28) and takes the default model to 930 KiB.
+
   **A SHEET'S SETTLE CRITERION CAN FIRE SPURIOUSLY, AND "TWO IDENTICAL FRAMES" DOES.**
   Measured here: on a page just loaded and configured, the settle declared itself done
   after 27 iterations and its frame sat **27,982 px** from where the same cell rests, while

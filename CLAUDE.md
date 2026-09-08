@@ -593,6 +593,29 @@ row-modes, ALL BY ARRAY LENGTH** — a length change and a value change must not
 word, and quoting "floats differ" over the second is a number that means nothing.
 `frozen/phase22` (562 rows at `2a97e96`) is owed and shipped, verified deep-equal.
 Default cost 19,040 tris and 930 KiB; worst reachable 565,632 = 37.7% of budget.
+**SELF-APPROACH IS GATED — V5, barred at `MIN_FEATURE_MM` (the minimum printable GAP), with
+three PRE-EXISTING failures named INDIVIDUALLY in `SELF_XFAIL`** (Eva's ruling, session 34):
+`roll-max`, `form-max` and `buckle-on-form`, **measured on `main` at 2a97e96 rather than on
+the branch** so the list is provably pre-existing, and no state that passes on main fails on
+the branch. A new self-approach reddens at once; one of the three starting to pass TRIPS the
+gate rather than passing silently. Iterative clamping was REJECTED, and so was leaving it a
+reported flag — **an unenforced number becomes folklore within two sessions.** The
+instrument's own floor is ~1.25 mm on a flat build, so the bar sits 0.25 mm under it and
+`cup-max` passes with 3% of headroom. **PART 1'S PREMISE AND THE RULING THAT RESTED ON IT ARE
+SUPERSEDED: a sufficient condition CANNOT be a closed form in (A, f, p, L, t)** — do not
+re-derive `A*f^2 <= L^2/(4 pi^2 t)` and try to extend it. **THE CLAMP'S OWN MUTANT PROVED
+IT**: `no-amplitude-clamp` was written naming V5 and measured to redden the WALL only, so it
+names V4 now. **THE CAP STAYS A CONSTANT** — safe at every p, the 2.4x conservatism at p = 2
+a capability limit; the rest is being ruled BY EYE from the sheet's iris row against the
+reference photograph, and neither outcome is pre-built. **NU 56 IS ONE DECISION WITH THE
+FREQUENCY CAP**: 7 cycles at 28 rows is four samples per cycle, which resolves as noise, so
+`BUCKLE_FREQ_RANGE[1] * BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` is asserted at module load.
+It roughly DOUBLES full-matrix gate runtime (78 and 92 min at 28) and takes the default model
+to 930 KiB. **AND THE PETAL TIP SHAPE SESSION IS NOTIFIED IN
+`docs/bloom-session-34-outcome.md`**: its PR THREE redistributes rows at a count that is no
+longer 28, and its sagitta instrument was measured on a grid that no longer exists. Any
+instrument holding the row count should IMPORT `BLADE_ROWS`, which is what the grid gate
+does now after carrying `NU_EXPECTED = 28` as a literal under a comment claiming otherwise.
 **THE CLAMP IS NECESSARY AND NOT SUFFICIENT, AND THE REASON IS NOT CURVATURE.** It bounds
 `A*h*(2 pi f/L)^2`. Measured with a validated principal-curvature instrument
 (`measureCurvature`, checked against closed-form cup and roll first, and biased to read
