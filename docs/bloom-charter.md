@@ -5653,3 +5653,35 @@ matters should be measured this way.
   outside phase19's 549 generated rows, a third of it comment prose moved with its code. The
   rule's trigger (over ~600 before the assertions are green) did not fire; the number is
   recorded because it is over. The lattice-jump fix stays session 31's.
+
+- **Session 30's CLOSE (Sep 8) — merged as `f8f621d` (PR #185), `frozen/phase19` published.**
+
+  **THE SHEET RULING (Eva, from `tools/shot-bloom-stigma.mjs`): APPROVED AS BUILT.** The stigma
+  keeps the family's 1.00 — her grounds are the session's own measurement: a lobe is exactly the
+  anther's size, so the floor binds at the same sharpness, and making the two instances differ
+  for no measured reason would be the first thing to undo the generator's own point. A
+  per-instance value stays one table entry for the day a picture asks for it. All three
+  deviations stand as recorded; the id naming (`anther*` / `stigma*`, the sections carrying the
+  Tip word) she called a better call than her brief.
+
+  **VERIFIED ON THE HEAD `e559943` BEFORE THE MERGE, each gate from its own run's conclusion:**
+  all FIVE bloom gates green — `bloom-grid`, `bloom-frozen-matrices`, `bloom-panel`,
+  `bloom-connectedness` (85 min on 571 rows), `bloom-export-watertight` (86 min). The two
+  flower gates ran on the `tools/**` filter and are NOT bloom evidence. Mergeable state clean;
+  merged by the session with the head sha read from the remote, squash, as the session's own
+  final step. **The merged tree is byte-identical to `e559943`'s** (`main` had not moved since
+  `eb3543f`), so the byte proof on the branch head IS the proof of the merged tree this time —
+  unlike session 29, where a parallel merge made a third tree.
+
+  **`frozen/phase19` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `eb3543f`, matching
+  `FROZEN_BASE_COMMITS`. Predicted before the dispatch and confirmed twice: the
+  `bloom-frozen-tags` workflow went red as designed, `phase5` the only refusal (the
+  `GITHUB_TOKEN`-cannot-push-a-differing-workflow-tree limit in that script's header), and
+  differencing the nineteen declared baselines against `git ls-remote --tags` reads eighteen
+  published at their declared shas and `phase5` absent. Without this, phase19's base would
+  depend on branch reachability.
+
+  **THE MANIFEST, RE-VERIFIED ON MERGED `main`:** eleven files changed since `eb3543f` — the
+  seven code files, the new sheet tool, the outcome doc, `CLAUDE.md` and this charter — and
+  nothing else; 220 tracked files under the bloom, flower, print, plot, cards, tracker,
+  `tools/` and workflow trees untouched.
