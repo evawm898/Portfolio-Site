@@ -583,15 +583,17 @@ const MUTANTS = [
     id: 'the-frame-margin-is-ignored', file: 'plot-frame.js',
     from: '  const inset = pct / 100 * Math.min(W, H);',
     to: '  const inset = 0;',
+    /* AND THREE IT DOES NOT, all claimed on the first sweep and all wrong in
+       the honest direction. The ellipse and shape-switch checks compare the
+       outline against WHATEVER BOX `frameRect` returns, so a margin that never
+       insets moves both sides together and neither can see it — they are checks
+       about the SHAPE, which `the-ellipse-is-drawn-as-a-rectangle` reddens.
+       And the drawing still overruns the boundary, by 149 px rather than 43,
+       because the box grew on the axis it was already overrunning. */
     breaks: ['frame/the-box-is-the-largest-ratio-box-inside-the-margin',
              'frame/the-margin-insets-from-the-shorter-side',
-             'frame/the-ellipse-is-inscribed-in-the-very-same-box',
              'frame/the-overlay-is-drawn-at-written-down-pixels',
-             'frame/the-shape-switch-changes-the-outline-and-not-the-box',
-             'frame/the-ratio-and-the-margin-each-move-the-boundary',
-             // The 2:3 box then reaches the full 800 px height, so a drawing
-             // fitted to the whole viewport no longer hangs past it.
-             'frame/a-frame-control-never-moves-the-camera'],
+             'frame/the-ratio-and-the-margin-each-move-the-boundary'],
   },
   {
     // The ratio control stops reaching the box: every frame is the viewport's
@@ -599,14 +601,16 @@ const MUTANTS = [
     id: 'the-frame-ratio-is-ignored', file: 'plot-frame.js',
     from: '  const A = ratio > 0 ? ratio : W / H;',
     to: '  const A = W / H;',
+    /* The two SHAPE checks are not on this list for the reason above. The
+       READ-OUT is: a 1:1 box at margin 0 comes back 1100 x 800 rather than
+       800 x 800, so the panel no longer prints the square it is asked for. */
     breaks: ['frame/the-box-is-the-largest-ratio-box-inside-the-margin',
              'frame/a-square-is-a-rectangle-at-one-to-one-and-a-circle-an-ellipse',
-             'frame/the-ellipse-is-inscribed-in-the-very-same-box',
              'frame/the-overlay-is-drawn-at-written-down-pixels',
-             'frame/the-shape-switch-changes-the-outline-and-not-the-box',
              'frame/the-ratio-and-the-margin-each-move-the-boundary',
              'frame/a-frame-control-never-moves-the-camera',
-             'frame/reset-fits-the-drawing-inside-the-boundary'],
+             'frame/reset-fits-the-drawing-inside-the-boundary',
+             'frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped'],
   },
   {
     // The ellipse is drawn as a rectangle. The box, the ratio, the margin, the
@@ -634,7 +638,15 @@ const MUTANTS = [
     id: 'a-frame-control-moves-the-camera', file: 'plot.js',
     from: '    buildFrameOverlay();\n    writeFrameOutputs();',
     to: '    buildFrameOverlay();\n    resetView();\n    writeFrameOutputs();',
-    breaks: ['frame/a-frame-control-never-moves-the-camera'],
+    /* AND IT TAKES A STEM CHECK WITH IT, which is the most useful thing this
+       mutation says: a control that moves the camera makes every "the same
+       camera twice" comparison on this page unreliable, because `set()` writes
+       the WHOLE control set on every sweep and the frame's four are in it. The
+       droop check captures the v-only framebuffer at droop 0, at 40 and back at
+       0, and the return came back at 65,456 ink px against 58,295 — a
+       re-framing, not a droop. Named rather than tuned around. */
+    breaks: ['frame/a-frame-control-never-moves-the-camera',
+             'stem/the-droop-reaches-every-family'],
   },
 
   /* ---- the composition file ----------------------------------------------
