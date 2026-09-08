@@ -486,6 +486,14 @@ does not add it back. What actually witnesses "the cap never widens" is **A5, on
 rows** — confirmed by the inverted-interpolation mutant, where A1 was silent and A2 and A5 both
 fired.
 
+**AND THE SMOKE GATE'S CENSUS CAUGHT THE LEFTOVER, IN CI, ON THE FIRST PUSH.** Deleting A1
+left one `path` claiming it — not by name, but inside the RANGE `A1-A5`. That is session 27's
+own recorded hazard arriving on a new family (*"Z2 was hidden by a range — `Z1-Z3` names its
+ends and hides its middle, so never write one"*), and it is why the census reads a biconditional
+rather than a checklist. Two lessons for the next session that adds or removes a family:
+**re-run `node tools/bloom-smoke.mjs --check` after touching one** — the local run that passed
+was taken before A1 was deleted — and **never write a range in a `path`**.
+
 **`node tools/verify-bloom-apex-mutants.mjs` is the positive control**, committed rather than
 scratch, because the smoke gate's own header says a `path` citation "is a claim about the PATH a
 row engages, never evidence the assertion can FIRE there". It found three things on two passes:
