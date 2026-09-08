@@ -585,9 +585,9 @@ cannot flip (`emitPanel`'s quads are wound off `n`; a flip there is a boundary-e
 Blade rows only — the foot is a different surface and differencing across the seam is a
 derivative of nothing. **The field's `v`-derivative is `d/da` at `a = h*v`**, the shipped
 convention; differentiating in `v` overstates the slope by a factor of `h` (~8 mm) and is now
-a mutant. **0 of 203,212,800 floats moved** (571 live rows + phase19's 549, both modes, against
-a worktree of 7011e88, `Object.is`, with a 1e-9 positive control); no row added, so
-`frozen/phase19` stays the newest baseline and NO phase is owed. Zero triangles added.
+a mutant. **0 of 207,385,920 floats moved** (572 live rows + phase20's 571, both modes, against a
+worktree of `b323268`, `Object.is`, with a 1e-9 positive control); no row added, so
+`frozen/phase20` stays the newest baseline and NO phase is owed. Zero triangles added.
 **THE INSTRUMENT IS `node tools/bloom-wall-thickness.mjs`** — the first thing here ever to
 measure the EMITTED wall, and it is the INPUT to part 2's ranges rather than a completeness
 exercise (Eva's own distinction, which is why this session is instrument-first). V1

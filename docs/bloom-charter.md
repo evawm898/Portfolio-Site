@@ -5801,10 +5801,10 @@ matters should be measured this way.
   across the reachable `L × t` box, so no static rectangle is dead-free. Q6's tip bound holds
   because one number covers the whole space; this one has no such number.
 
-  **0 MOVED, AND IT IS A CONSTRUCTION.** 0 of **203,212,800** floats over the live matrix's 571
-  rows plus `phase19`'s 549, both modes, against a worktree of `7011e88`, compared with
-  `Object.is`, with a 1e-9 positive control proving the comparison can fail. No row added, no
-  byte moved: **`frozen/phase19` stays the newest baseline and NO phase is owed** — the session
+  **0 MOVED, AND IT IS A CONSTRUCTION.** 0 of **207,385,920** floats over the live matrix's 572
+  rows plus `phase20`'s 571, both modes, against a worktree of `b323268` (current `main`),
+  compared with `Object.is`, with a 1e-9 positive control proving the comparison can fail. No
+  row added, no byte moved: **`frozen/phase20` stays the newest baseline and NO phase is owed** — the session
   18/19 and 23 case. Zero triangles added; the field is pure vertex displacement. Honest
   footnote in the doc: this run met 0 signed zeros in `positions`, so `Object.is` is present and
   is not what carries the result.
@@ -5856,6 +5856,28 @@ matters should be measured this way.
   makes the field a dead slider (V2's witness), it does not move the default's bytes — V3's real
   witness is a guard that tests whether the keys EXIST rather than whether they are zero, and it
   was written only after the sweep said so.
+
+  **THE SESSION NUMBER WAS WRONG AND IT COST THE WHOLE CI SIGNAL.** The brief called this
+  session 31; `main` already carried a different session 31 (the pinch, #187) and a session 32
+  was in flight (#190). The outcome doc's FILENAME collided with one already on `main`, the PR
+  came back `mergeable_state: dirty`, and **a conflicted PR has no merge ref — so not one of
+  the five bloom gates ran on it. Zero workflow runs, no red, no signal at all.** A session
+  number is an identifier in four places and one of them is a path: **check `main` for it
+  before writing it down, and read a silent CI as an unmergeable head rather than as
+  patience.** Renumbered to 33; forward references to this feature's second half carry no
+  number, because the next free one cannot be known while another session is in flight.
+
+  **AND THE TREE WAS NOT FREE, THOUGH THE BRIEF SAID IT WAS** — the Sep 2 and Sep 7 incidents
+  arriving a third time. The instruction was *"the tip-shape session is stopped and
+  re-scoping, and it writes nothing while it does … do not open a second writer beside it."*
+  Measured against the remote: #190 pushed at 16:11, 16:23 and **17:27** UTC with a gate run
+  in progress at 17:27:53Z, **four minutes before this PR was created at 17:31:14Z.** So this
+  branch is the second writer the brief forbade, opened on a premise that was already false —
+  which is the premises-are-hypotheses rule pointed at a claim about the WORKING STATE rather
+  than about the code. The diffs do not overlap textually and `bloom-geometry.js` auto-merged
+  clean, but "they did not conflict today" is not the property the one-PR-at-a-time rule
+  protects. Left to Eva as the session's ball-holder question rather than resolved by the
+  session.
 
   **PART 2** is the four controls, the clamp, `NU = 56` and the sheet, argued in front of
   this instrument, and it STOPS for Eva's ruling. **Her amendment, from the reference

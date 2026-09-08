@@ -126,12 +126,22 @@ was the instrument's before this was written down; `derivative-in-v` is now a mu
 
 | set | rows × modes | floats compared | differ |
 |---|---|---|---|
-| live `buildMatrix()` | 571 × 2 | 103,602,240 | **0** |
-| frozen `phase19Matrix()` (newest) | 549 × 2 | 99,610,560 | **0** |
-| | | **203,212,800** | **0** |
+| live `buildMatrix()` | 572 × 2 | 103,783,680 | **0** |
+| frozen `phase20Matrix()` (newest) | 571 × 2 | 103,602,240 | **0** |
+| | | **207,385,920** | **0** |
 
-Head against a `git worktree` of `7011e88`, float-level, `Object.is` (so `-0` is a
-difference). **Positive control: a single 1e-9 perturbation reads as exactly 1 differing
+Head against a `git worktree` of **`b323268`** — current `main`, after the pinch session
+(#187) — float-level, `Object.is` (so `-0` is a difference). An earlier run of the same
+close against `7011e88` read 0 of 203,212,800 over the live matrix's then-571 rows and
+phase19's 549; it was correct about that base and is superseded, because `main` moved while
+this branch was open.
+
+**On phase20 and the retired ids.** The pinch session retired `antherSharpness` /
+`stigmaSharpness`, and phase20 was frozen before that, so its rows naming them resolve to
+defaults. That happens **identically on both trees** here — both are post-retirement — so
+the comparison stays like-for-like; it simply no longer exercises what those rows were
+frozen to exercise. **The live matrix is the load-bearing set for that reason**, and it is
+fully post-retirement. **Positive control: a single 1e-9 perturbation reads as exactly 1 differing
 float**, so the comparison can fail. Stronger than an STL hash diff, which quantises to
 float32 and can only ever merge two doubles, never split one — session 28's precedent.
 
@@ -145,7 +155,7 @@ character. No registry row declares these keys, so every shipped build reads the
 `undefined` and the guard is true. **V3 in the instrument is the standing version of this
 claim** and runs in CI on every push; the table above is the one-time close.
 
-**No frozen phase is owed**: no row was added, no byte moved, `frozen/phase19` stays the
+**No frozen phase is owed**: no row was added, no byte moved, `frozen/phase20` stays the
 newest baseline. The session 18/19 and 23 case, not the last three sessions'.
 
 **Triangle counts (live · export) and STL size are unchanged**, base tree against head:
@@ -331,6 +341,43 @@ amplitude, high `p`), so the ruling is made against the same two references that
 the control.
 
 ---
+
+## Two process findings, and one of them is Eva's to rule
+
+Neither is about the geometry. Both are recorded here rather than left in a commit message.
+
+**1. THIS SESSION WAS NUMBERED 31 AND 31 WAS ALREADY TAKEN — TWICE OVER.** The brief called
+it session 31; by the time it pushed, `main` carried a *different* session 31 (the pinch,
+#187, which published `frozen/phase20`) and a session 32 was in flight (petal tip shape,
+#190). The collision was not cosmetic: this branch's outcome doc was named
+`docs/bloom-session-31-outcome.md`, **a file that already exists on `main`**, so the PR came
+back `mergeable_state: dirty` — and **a conflicted PR has no merge ref, which is why not one
+of the five bloom gates ran on it.** Zero workflow runs, no red, no signal at all. Renamed
+to 33, and forward references to this feature's second half are now **"part 2" with no
+number**, because the next free number cannot be known while another session is in flight.
+
+*The general lesson:* a session number is an identifier in four places (the doc filename,
+the source comments, `CLAUDE.md`, this charter) and one of them is a path. **Check `main`
+for the number before writing it down**, and read a silent CI as a signal rather than as
+patience — zero runs is not "still queued", it is usually an unmergeable head.
+
+**2. THE TREE WAS NOT FREE, AND THE BRIEF SAID IT WAS.** The instruction was explicit —
+*"the tip-shape session is stopped and re-scoping, and it writes nothing while it does.
+Session 1 can start immediately. Do not open a second writer beside it."* Measured against
+the remote: PR #190 pushed commits at 16:11, 16:23 and **17:27** UTC and had a
+`bloom-export-watertight` run in progress at 17:27:53Z — **four minutes before this PR was
+created at 17:31:14Z.** It is not stopped, and it is writing to `bloom-geometry.js`,
+`bloom-registry.js` and the harness.
+
+So this branch is now the second writer the brief said not to open, created on the strength
+of a premise that was false at the time it was acted on. That is the charter's own recorded
+incident, twice (Sep 2 and Sep 7), and its rule — **one registry PR in flight at a time** —
+is the thing at stake. **This is Eva's call, not the session's**, and it is the ball-holder
+question at the end of this work rather than something resolved here. The two diffs do not
+overlap textually (this one is in `petalForm` / `buildPetalInto`; #190 is in `widthProfile`
+and the tip cap, and it retires `petalTipBreadth`), and `main` merged into this branch with
+`bloom-geometry.js` auto-merging clean — but "they did not conflict today" is not the
+property the rule protects.
 
 ## What is NOT done
 
