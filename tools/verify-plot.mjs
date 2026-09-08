@@ -3705,7 +3705,21 @@ async function run({ mutant = null } = {}) {
   if (savedDoc.selection.petal !== stateA.selected) gathered.push('selection.petal');
   if (JSON.stringify(savedDoc.camera.position) !== JSON.stringify(stateA.camera.position)) gathered.push('camera.position');
   if (savedDoc.view.petalHandles !== stateA.petalHandles) gathered.push('view.petalHandles');
-  if (savedDoc.instances[0].petals.length !== stateA.petals.length) gathered.push('petals.length');
+  /* THE PETAL ENTRIES BY VALUE, NOT BY COUNT — and this check shipped as a
+     count. `the-petal-warps-are-written-globally` leaves the count untouched:
+     every entry is still written, each carrying the FIRST entry's numbers, so
+     the file describes a bloom the page is not drawing and a length comparison
+     sails straight past it (measured — it did). Strengthened rather than
+     unclaimed, because "the document describes the page as it stands" is
+     exactly the claim a wrong per-petal value breaks. */
+  const savedPetals = savedDoc.instances[0].petals;
+  if (savedPetals.length !== stateA.petals.length) gathered.push('petals.length');
+  for (const want of stateA.petals) {
+    const got = savedPetals.find(p2 => p2.index === want.index);
+    if (!got) { gathered.push(`petal ${want.index} is not in the file`); continue; }
+    if (got.along !== want.along || got.across !== want.across) gathered.push(`petal ${want.index} scales`);
+    if (JSON.stringify(got.bends) !== JSON.stringify(want.bends)) gathered.push(`petal ${want.index} bends`);
+  }
   check('save/the-document-describes-the-page-as-it-stands',
     gathered.length === 0 && savedDoc.format === FL.FORMAT && savedDoc.version === FL.VERSION
     && savedDoc.instances.length === 1
@@ -3766,9 +3780,13 @@ async function run({ mutant = null } = {}) {
     && stateA.petals.find(p2 => p2.index === RT_PETAL_A).along
        !== stateA.petals.find(p2 => p2.index === RT_PETAL_B).along
     && !stateC.petals.some(p2 => p2.index === 13),
-    `petal ${RT_PETAL_A} came back at ${stateC.petals.find(p2 => p2.index === RT_PETAL_A).along}x along `
-    + `and petal ${RT_PETAL_B} at ${stateC.petals.find(p2 => p2.index === RT_PETAL_B).along}x, each with `
-    + 'its own bends — and petal 13, which state B had touched, is gone rather than kept');
+    // Same reason: a mutation that shifts or drops an entry is exactly what this
+    // check is for, so the detail may not assume the entry is there.
+    `petal ${RT_PETAL_A} came back at ${(stateC.petals.find(p2 => p2.index === RT_PETAL_A)
+      || { along: 'nothing' }).along}x along and petal ${RT_PETAL_B} at `
+    + `${(stateC.petals.find(p2 => p2.index === RT_PETAL_B) || { along: 'nothing' }).along}x, each `
+    + `with its own bends — the store holds ${stateC.petals.map(p2 => p2.index).join(',')} `
+    + 'and petal 13, which state B had touched, is gone rather than kept');
 
   check('restore/the-camera-and-the-selection-come-back',
     stateC.selected === RT_PETAL_A && stateB.selected !== RT_PETAL_A
@@ -3807,15 +3825,21 @@ async function run({ mutant = null } = {}) {
   await page.evaluate(t => window.__plot.loadComposition(t, 'foreign.json'), JSON.stringify(foreign));
   const foreignState = await q(() => window.__plot.compositionState());
   const foreignOut = await q(() => window.__plot.compositionReadOut());
+  // NULL-SAFE, because the mutation this check exists for is precisely the one
+  // that makes `mismatch` null — and a detail string that assumes its own
+  // premise takes the sweep down instead of going red.
+  const fm = foreignState.mismatch || [];
   check('restore/a-composition-from-a-different-grid-is-named-field-by-field',
     foreignState.mismatch !== null
-    && foreignState.mismatch.map(d => d.field).sort().join(',') === 'name,petals,segments'
-    && foreignState.mismatch.find(d => d.field === 'petals').saved === 40
+    && fm.map(d => d.field).sort().join(',') === 'name,petals,segments'
+    && (fm.find(d => d.field === 'petals') || {}).saved === 40
     && foreignOut.includes('DIFFERENT grid') && foreignOut.includes('some-other-bloom.glb')
     && foreignState.petals === stateA.petals.length,
-    `three fields differ and all three are named on the panel (${foreignState.mismatch
-      .map(d => `${d.field} ${JSON.stringify(d.saved)}->${JSON.stringify(d.current)}`).join(', ')}); `
-    + 'the warps were still applied, by index, and the panel says to check them');
+    (foreignState.mismatch === null
+      ? 'the panel reported NO mismatch at all'
+      : `${fm.length} fields differ and all are named on the panel (${fm
+          .map(d => `${d.field} ${JSON.stringify(d.saved)}->${JSON.stringify(d.current)}`).join(', ')})`)
+    + '; the warps were still applied, by index, and the panel says to check them');
 
   const orphan = JSON.parse(savedText);
   orphan.instances[0].petals[0] = { ...orphan.instances[0].petals[0], index: 999 };
