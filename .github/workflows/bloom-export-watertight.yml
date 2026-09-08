@@ -15,6 +15,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-export-watertight.yml
@@ -28,6 +29,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
