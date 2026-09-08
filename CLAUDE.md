@@ -687,6 +687,38 @@ scratch rig went with the withdrawn ruling. **The upstream contract for the lobe
 axis on the whole-petal apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP
 SHAPE or LOBE TIP SHAPE, never "tip shape".
 
+**A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
+(session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
+registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen
+--phase21` worked by hand, while BOTH consumers (CI's frozen job and
+`publish-frozen-tags.sh`) build their phase list from `FROZEN_BASE_COMMITS`, which had no
+entry. The loop just runs one fewer iteration: **the new baseline is verified by nothing and
+its base commit pinned by no tag**, and there is no row that can go red. The name → matrix map
+is now `FROZEN_MATRICES` **in the harness** (one owner, imported by `diff-bloom-bytes.mjs`
+rather than restated) and the harness **throws at MODULE LOAD** if its keys and
+`FROZEN_BASE_COMMITS`' keys disagree in either direction — a matrix with no base commit is
+unverifiable, a base commit with no matrix is a phase nobody wrote. It lives in the harness so
+no gate can be run that skips it; the negative control is in the session-32 doc.
+**AND NEVER EDIT A LABEL INSIDE A FROZEN MATRIX.** Retiring `allTipBreadth` correctly turned
+the live matrix's "Inner trio" into "Inner pair" — and the same sentence in phases 11–20 is a
+VERBATIM SNAPSHOT of that base commit's `buildMatrix()`, where the trio had three members.
+`--verify-frozen phase11` went red on row 400 in 24 seconds, which is that check doing its
+job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses the array form
+(`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
+**`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS OWED AND IS NOT PUBLISHED** —
+session 17's limit, unchanged: a GitHub App token cannot push a tag whose `.github/workflows`
+differs from the default branch's, and #191 changed a workflow after `b323268`. 18 `frozen/*`
+tags are on the remote (phase5 was already absent). One `git push origin
+refs/tags/frozen/phase21` from a clone with a user's credentials is what it needs; by the
+script's own asymmetry argument it is belt-and-braces, since `b323268` is in `main`'s history.
+**THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
+session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
+error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
+with 88.2% of 1,124 measured profiles worst there and NONE at the apex. So the visible faceting
+is not chord error along `u`; it is the apex BEING a straight cone plus the slope break at
+`uCap`. **And the cap makes `n` INERT on 26 of 3,795 reachable taper states** (`uPk ≥ 0.80 ⟺
+a ≥ 4b`), 163 with two row intervals or fewer — a second, independent argument for demoting it.
+
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
 every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —
