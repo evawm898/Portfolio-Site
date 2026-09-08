@@ -172,6 +172,72 @@ instruments, every other `tools/shot-bloom-*.mjs`, all six `.github/workflows/bl
 the flower, print, plot, cards and tracker trees. Verified at the close by `git diff --stat` against
 `8b4c671` — see below.
 
-## The close
+## The close — every number from its own run, on this machine, this tree
 
-_(filled at the close — every number from its own run)_
+**The partition, MEASURED** (`tools/diff-bloom-bytes.mjs`, the three-capture construction; the
+base is a git worktree of `8b4c671`, the new tree is `c0d1ca0` — the code, before the docs):
+
+| matrix | captures | result |
+|---|---|---|
+| phase20 (571 rows at 8b4c671) | plain (base) · twin (base, `antherSharpness=1,stigmaSharpness=1`) · new (`--strip antherSharpness,stigmaSharpness`) · `--expect 16/6/549` | **PASS — 16 movers / 6 inert / 549 holders, exactly as predeclared; twin === new on 571 of 571; V1 0, V2 0, V3–V5 held** |
+| phase19 (549 rows at eb3543f) | plain (base) · twin (base, `antherSharpness=1`) · new (`--strip antherSharpness`) · `--expect 8/3/538` | **PASS — 8 / 3 / 538, exactly as predeclared; twin === new on 549 of 549; V1 0, V2 0** |
+| same tree twice (control) | base `--full` (before the harness changed) against base `--phase20` | **571/571 byte-identical, 0 moved** |
+
+The sixteen movers are exactly the sixteen named above — the two triangles, the two waist-floor
+rows, the four lattice rows, the cost corner and the cushion, the two mums, the two fat tips,
+the tip beside a style, and the singular row — and **every one moved at an identical triangle
+count and STL byte length**: vertices moved, no lattice did. The six inert rows are the two
+INERT rows and the four GATED rows. No row's set became empty under the strip.
+
+So the two claims the brief asked for hold on the bytes: **the default is byte-identical by
+construction** (every row that did not name the retired control, and every row that set the old
+value 1, is bit-identical outright — 549 + 538 rows), and **the new default maps to the same
+output as exponent 1 on every shaped row** (the twin at exponent 1 on the old tree IS the new
+tree's stripped export, on all 16 + 8 movers).
+
+**`frozen/phase20`**: `phase20Matrix()` deep-equal to `8b4c671`'s own `buildMatrix()`, 571 = 571
+(`--verify-frozen --phase20`, PASS). To be published from `main` by `bloom-frozen-tags` after the
+merge — the prediction, stated before the dispatch: the workflow goes red with `phase5` the only
+refusal (its script's known `GITHUB_TOKEN` limit), and `git ls-remote --tags` reads twenty
+declared baselines with nineteen published, `frozen/phase20` at `8b4c671` among them.
+
+**The gates, each from its own run on this tree:**
+
+| gate | result |
+|---|---|
+| `bloom-smoke.mjs --check` | coverage OK — 51 rows over 22 blocks of 572; **41 families asserted, 41 claimed, both directions** |
+| `bloom-smoke.mjs --check --negative-control` | PASS (JS5 → JS99 fires both ways) |
+| `bloom-smoke.mjs --conn` | **clean** — 51 rows through the export gate and the flood fill, JS6/JG5 with no exemption, the two NEAREST REACHABLE rows included; 4 rows CROWDED (a flag) |
+| `verify-bloom-panel.mjs` | **PASS** — 23 sections, 101 controls, **7 retired ids absent from the DOM, the summary line, the metrics and as identifiers in 41 bloom source files**; the anther route's new step at pinch 0.05 (16 sides, no CIRCLE clause) green |
+| `verify-bloom-panel.mjs --negative-control` | **all fifteen routes and session 23's four clauses observed their failure** |
+| `diff-bloom-bytes --verify-frozen --phase20` | PASS, 571 = 571 |
+| both STL gates on the full 572-row matrix, `bloom-grid`, `bloom-frozen-matrices` | CI, on the PR head — recorded in the PR and the charter's close entry |
+
+**The sheets** (both proved on two rows with `--quick` before the grid; both then run with the
+base worktree for their before/after pair):
+
+- `tools/shot-bloom-stigma.mjs`: 17 rows, all holding — the migration pair **HELD** (14,400
+  triangles on both trees, macro 0 px against a 0 px control); pinch 3.00 and the thin-sheet
+  1.65 say **PINCH CLAMPED**; 1.65 / 1.00 / 0.60 / 0.35 clear; every shaped cell past ten times
+  its control on `macro` (319,490–738,199 px against controls of 0–29 px); the INERT row 15 px on
+  macro against a 15 px control, count and STIGMA line character for character. The NEAREST
+  REACHABLE cell (pinch 0.05) differs from the trifid at rest by 319,490 px on macro — the
+  lattice (16 sides) and the 1.7% form together.
+- `tools/shot-bloom-anther.mjs`: 16 cells at six on the ring and 120 on the disc, all holding;
+  the migration pair **HELD** (13,440 triangles on both trees, macro 0 px against 20 px); the
+  INERT row 12 px / 0 px on macro against its own 12 px / 0 px controls.
+- The ruling cells (`--ruling`, shot on the base tree before the build) are what Eva ruled from.
+
+**Cost, from the descriptor:** no lattice moved at any reachable value, so `tippedRodTris` is
+unchanged — 560 triangles per stamen on the shipping pill, the same 3,240 ceiling at six lobes on
+24 sides. The 572-row matrix is one row longer than the 571 at the base.
+
+**Predeclared untouched, verified**: `git diff --stat 8b4c671` on the final tree lists exactly the
+twelve files named above — the nine code files, this doc, `CLAUDE.md`, the charter — and **216 of
+the 228 tracked files under the bloom, flower, print, plot, cards, tracker, `tools/` and workflow
+trees are untouched**, among them both STL gates, the grid gate, the tip-bytes and
+presentation-only instruments, all other `shot-bloom-*.mjs`, and all six bloom workflows.
+
+**Frozen phase owed: YES** — phase20 at `8b4c671` (the row set changes: 571 → 572). **Tags whose
+bytes no longer fully reproduce**: `frozen/phase17` (8 of 507, session 24) and now
+`frozen/phase19` (8 of 549, this session); both sets of definitions still reproduce.
