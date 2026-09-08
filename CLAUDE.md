@@ -573,6 +573,55 @@ whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheet
 `tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
 positions of the travel on two-row scaffolding).
 
+**MARGIN BUCKLING'S THREE CONTROLS, THE CLAMP, AND NU 56** (session 34 — read
+`docs/bloom-session-34-outcome.md` before touching any of it). `buckleAmp` (0–0.60 x the
+LOCAL half-width, default 0), `buckleFreq` (1–7 cycles, default 3) and `buckleEnv` (p 2–6,
+default 3, "how far the ruffle reaches in from the edge") in PETAL FORM — not a section of
+their own, because the buckle IS a form deformation and a new top-level section would say
+otherwise. The three ranges are `export const` in the geometry and IMPORTED by the registry
+(Q6). Frequency and reach are hidden AND INERT at amplitude 0, the curl family's own gating.
+**PHASE IS DERIVED, `slotIndex * GOLDEN_ANGLE`, never a control** — so "the four controls"
+in part 1's brief is THREE exposed plus a derived phase, flagged rather than shipped as a
+fourth thing nobody asked for.
+**NU IS 56 NOW, FIXED AND NOT DERIVED**, and it is the only thing that moved bytes.
+`CURL_START_MIN = 1/NU` is a registry-imported bound on a CURL slider, so a row count
+derived from the buckle frequency would be one control reaching into another's range. The
+frequency ceiling is `NU / 8` exactly. **THE BYTE STORY IS A THREE-CAPTURE ATTRIBUTION**
+because two changes landed together: main / this head with NU back at 28 / this head as it
+ships. **The controls alone: 0 of 101,969,280 floats. The row count alone: 1124 of 1124
+row-modes, ALL BY ARRAY LENGTH** — a length change and a value change must not share one
+word, and quoting "floats differ" over the second is a number that means nothing.
+`frozen/phase22` (562 rows at `2a97e96`) is owed and shipped, verified deep-equal.
+Default cost 19,040 tris and 930 KiB; worst reachable 565,632 = 37.7% of budget.
+**THE CLAMP IS NECESSARY AND NOT SUFFICIENT, AND THE REASON IS NOT CURVATURE.** It bounds
+`A*h*(2 pi f/L)^2`. Measured with a validated principal-curvature instrument
+(`measureCurvature`, checked against closed-form cup and roll first, and biased to read
+curvature HIGH where a stencil spans past ~50 deg of arc — the conservative direction):
+**the composition's curvature FALLS while its wall collapses** (1.0625 against the base's
+1.1149; wall 0.912 -> 0.310) and `SELF ~ WALL`. **The hazard is SELF-APPROACH, a GLOBAL
+property no curvature bound can see**, and neither cup nor curl alone does it. A sufficient
+condition is therefore a MEASURED minimum separation, not a closed form — three options
+costed in the outcome doc, none taken without a ruling.
+**THE CAP IS p-DEPENDENT BUT CONSERVATIVE, NOT UNSAFE**: the clamp radius is 1.437 mm at
+every p while the real one moves 3.449 -> 1.456 (the cross curvature is `A*p*(p-1)/h`, so
+2/6/30 at p 2/3/6) — yet EVERY clamped build clears the floor at every p, the tightest at
+f 3 p 6 reading 1.227 against 1.200. At p 2 the geometry would carry 2.4x the amplitude the
+cap allows, so making it p-dependent is a CAPABILITY change, not a safety fix.
+**AMPLITUDE'S DEAD TRAVEL IS A FUNCTION OF FREQUENCY** — 0% at f 1–2, 40% at f 3, **88% at
+f 7** — told in the read-out and marked on the track, range not narrowed, max not adaptive
+(`stamenSpread`'s ruling). Frequency and reach have no dead steps and are measured inert
+where hidden.
+**THE SHEET'S SETTLE CRITERION WAS WRONG AND IT MATTERED**: "two consecutive identical
+frames" fires SPURIOUSLY on the first capture after a page load — measured, the first
+settle declared itself done and sat **27,982 px** from the same cell at rest, while every
+later capture is 1 px. A warm-up settle plus THREE identical frames takes the same-tree
+controls from 28,893/64,621 px to **0**. And **the identity claim moved off pixels onto the
+geometry**: an exact-zero PIXEL identity is not available on this renderer, so asserting it
+would assert the instrument's own noise — it is `Object.is` over the emitted positions (0
+of 171,360) and the pixel number is reported, never a bar.
+`node tools/shot-bloom-buckle.mjs <dir> [--quick]` is the sheet;
+`node tools/bloom-wall-thickness.mjs --controls` is the dead-control sweep.
+
 **MARGIN BUCKLING SHIPS AS A FIELD WITH NO CONTROLS, AND THE ONE THING THAT IS NOT LIKE CUP
 AND ROLL IS THE NORMAL** (session 33, part 1 of two — read `docs/bloom-session-33-outcome.md`
 before touching any of it). `w(u,v) = A * h(u) * |v|^p * cos(2 pi f u + phase)` added to `aN`

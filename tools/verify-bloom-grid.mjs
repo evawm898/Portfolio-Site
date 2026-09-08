@@ -196,11 +196,19 @@ function validateGltf(json, bin) {
 
 /* ------------------------------------------------------------------ */
 async function run(geomUrl, gltfUrl, registryUrl) {
-  const { MeshBuilder, buildBloomInto, petalForm } = await import(geomUrl);
+  const { MeshBuilder, buildBloomInto, petalForm, BLADE_ROWS } = await import(geomUrl);
   const { buildGridGltf } = await import(gltfUrl);
   const { DEFAULTS } = await import(registryUrl);
 
-  const NU_EXPECTED = 28;   // read back from the emitted rows below, never assumed
+  /* THE ROW COUNT IS THE GEOMETRY'S, IMPORTED. It was a literal 28 under a
+     comment claiming it was "read back from the emitted rows, never assumed"
+     — a label naming a computation nobody performed, which is this project's
+     most repeated defect, and it went red the moment NU moved to 56 (session
+     34). One owner: `BLADE_ROWS`. The check is unchanged; only where the
+     number comes from is. Fails loudly rather than defaulting if the geometry
+     ever stops exporting it. */
+  if (typeof BLADE_ROWS !== 'number') throw new Error('the geometry does not export BLADE_ROWS — this gate cannot check the row count against a number it invented');
+  const NU_EXPECTED = BLADE_ROWS;
 
   for (const row of ROWS) {
     const mode = row.mode || 'live';

@@ -5914,3 +5914,80 @@ matters should be measured this way.
   the dead-control sweep over `p`'s whole range. The sheet must vary `p` as its own axis and
   carry an IRIS row and a ROSE row against the references that motivated the control.
 
+- **Session 34 (margin buckling, part 2 of two — Sep 8): THE THREE CONTROLS, THE CLAMP, AND
+  NU 56.** `docs/bloom-session-34-outcome.md` has the numbers; this is what carries forward.
+
+  **THE BYTE STORY IS A THREE-CAPTURE ATTRIBUTION, and it had to be.** Two changes landed
+  together — three controls and NU 28 -> 56 — and one "everything moved" number cannot say
+  which did it. Main / this head with NU reverted / this head as it ships: **the controls
+  alone moved 0 of 101,969,280 floats; the row count alone moved 1124 of 1124 row-modes.**
+  Predeclared before measuring, both held. **A LENGTH CHANGE AND A VALUE CHANGE MUST NOT
+  SHARE ONE WORD** — the first draft printed "0 floats differ" for the row-count move,
+  which was true and meaningless, because the arrays cannot line up. `frozen/phase22` (562
+  rows at `2a97e96`) is owed and shipped, verified deep-equal to that commit's own
+  `buildMatrix()`.
+
+  **NU IS FIXED AT 56, NOT DERIVED, AND THE REASON IS A REGISTRY IMPORT.**
+  `CURL_START_MIN = 1/NU` is a bound the registry imports for a CURL slider, so a row count
+  derived from the buckle's frequency would be one control silently moving another's
+  declared range. The frequency ceiling is `NU / 8` exactly instead. Cost: default 19,040
+  triangles, worst reachable 565,632 = 37.7% of budget, as part 1 costed it.
+
+  **THE CLAMP IS NECESSARY AND NOT SUFFICIENT, AND THE REASON IS NOT CURVATURE — which is
+  the session's real finding and it overturned its own expectation.** Part 1 recorded the
+  composition as a curvature problem the clamp could not see. Measured with a
+  principal-curvature instrument validated against closed-form cup and roll BEFORE use (and
+  biased to read curvature HIGH past ~50 degrees of stencil arc — the conservative
+  direction, which is what lets its conclusions stand): **the composed surface is LESS
+  curved than its base** (1.0625 against 1.1149) while its wall collapses from 0.912 to
+  0.310, and `SELF ~ WALL`. **The hazard is SELF-APPROACH — a GLOBAL property of a folded
+  sheet that no local curvature bound can express** — and neither cup nor curl alone
+  produces it. So a sufficient condition cannot be a closed form in the field's own
+  parameters; it is a MEASURED minimum separation. Three options costed, none taken without
+  a ruling.
+
+  **THE CAP IS p-DEPENDENT BUT CONSERVATIVE RATHER THAN UNSAFE.** `|v|^p` is exactly 1 at
+  the margin, so p is invisible to the along-margin bound by construction: the clamp radius
+  reads 1.437 mm at every p while the true one moves 3.449 -> 1.456. Yet EVERY clamped
+  build clears the floor at every p, the tightest corner reading 1.227 against 1.200. At
+  p = 2 the geometry would carry 2.4x the amplitude the cap allows, so making the cap
+  p-dependent is a CAPABILITY change and not a safety fix — reported, not decided.
+
+  **A SHEET'S SETTLE CRITERION CAN FIRE SPURIOUSLY, AND "TWO IDENTICAL FRAMES" DOES.**
+  Measured here: on a page just loaded and configured, the settle declared itself done
+  after 27 iterations and its frame sat **27,982 px** from where the same cell rests, while
+  every capture after that is 1 px. A WARM-UP settle before the first capture, plus THREE
+  consecutive identical frames, took the same-tree controls from 28,893 and 64,621 px to
+  **0**. This is /plot's own recorded lesson — a hash equality across two captures is not
+  proof the view stopped — arriving in the bloom's sheets, and every sheet tool here still
+  settles on two.
+
+  **AND THE IDENTITY CLAIM BELONGS ON THE GEOMETRY, NOT THE PIXELS.** An exact-zero PIXEL
+  identity is not available on this renderer — two draws of one cell at one camera settle
+  1 px apart — so a sheet asserting `0 px` would be asserting its own noise. The GATED
+  state's identity is `Object.is` over the emitted positions (0 of 171,360) and the pixel
+  figure is reported beside the row's control. The distinction the contact-sheet section
+  already draws (an identity needs no floor, a threshold does) has a second half: **an
+  identity is only exact in the quantity that can be exact, and pixels are not it.**
+
+  **A CHECK CAN GO VACUOUS WHEN THE THING IT GUARDS SHIPS, AND ONLY THE NEGATIVE CONTROL
+  NOTICES.** V3 asked whether the buckle's keys "present at zero" matched "absent" — a real
+  distinction while the keys were undeclared, and a state compared with itself the moment
+  they became registry rows. Re-pointing it at the gated claim was still not enough: a guard
+  that engages at amplitude 0 moves the default AND the gated state equally, so a same-tree
+  comparison is blind to it (/print's `global/is-unchanged-by-the-new-mode` lesson). **The
+  fix is to assert the PREDICATE as a biconditional, not only its geometric consequence.**
+
+  **AND TWO MORE LABELS NAMING COMPUTATIONS NOBODY PERFORMED, both found here.** The grid
+  gate carried `NU_EXPECTED = 28` under the comment "read back from the emitted rows below,
+  never assumed" — it was a literal, and it went red on 76 of 528 checks the moment NU
+  moved; fixed by importing `BLADE_ROWS`, not by editing the number, because editing it
+  would have left the false comment. And three comments in this session's own new code
+  claimed a module-load check on the registry's imported ranges that did not exist until it
+  was written and its four clauses fired on mutated registries.
+
+  **THE FALLOFF EXPONENT SHIPS BECAUSE ONE CONSTANT CANNOT DRAW BOTH REFERENCES** (Eva's
+  amendment, from the photographs): an iris ruffles at high amplitude AND wide, a rose at
+  low amplitude AND narrow. p = 1 is out of range rather than discouraged — |v| is not
+  differentiable at 0, so it creases the midrib to C0. Amplitude's dead travel runs 0% at
+  f 1-2 to **88% at f 7**, told and marked, range not narrowed (`stamenSpread`'s ruling).
