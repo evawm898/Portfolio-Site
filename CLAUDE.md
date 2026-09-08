@@ -2143,7 +2143,14 @@ count is positive with nothing picked and GROWS when a second petal is warped.
 **35 of 35 clean**, and the sweep costs roughly three hours — about
 five minutes a mutant, because each is a full 120-check browser run.
 `--mutant=a,b,c` takes a comma list and is how to re-verify one
-without paying for the rest.
+without paying for the rest. **THE THREE-HOUR RUN IS NOT SURVIVABLE IN A
+CONTAINER THAT RESTARTS**: two attempts at the whole sweep were killed
+mid-flight (one at 26 of 35, one immediately after its base pass), so
+the 35 were closed out in CHUNKS of four or five — each chunk pays its
+own five-minute base pass, which is cheap against losing an hour. The
+one to run alone is `the-highlight-material-misses-the-resolution`: it
+re-creates the pathological rendering it exists to catch and is the
+slowest mutant in the file by construction.
 
 **A MUTANT'S CLAIMED LIST IS NOT A GUESS TO BE LOOSENED — but a check that
 LEAKS STATE will make it look like one.** Two things this session found by
@@ -2156,6 +2163,20 @@ together left that bend in place and the stretch checks two aisles down then
 measured a petal that was bent as well as stretched — 60.31 mm where 2.2x of
 27.04 mm is 59.49. A slider cannot clear a bend offset, because a bend offset is
 not a control value.
+
+**A CLAIMED CHECK THAT NAMES NOTHING THE GATE RUNS CAN NEVER FIRE, AND THE CONTROL
+REPORTS IT AS `MISSED (stayed green)` — which is indistinguishable from a mutation the
+gate is genuinely blind to.** This session renamed
+`readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours` to
+`...-and-the-warped-count` and left the old name on
+`every-strip-reads-as-a-u-line`'s list. The mutant then failed the control for a reason
+that had nothing to do with the mutation, and it cost a twenty-minute chunk to find.
+The sweep now REFUSES any `breaks` entry naming a check the gate does not run, asserted
+right after the base pass — the first moment every check name is known — and for EVERY
+mutant rather than only the ones a `--mutant=` invocation is about to run, because a
+stale name inside a skipped mutant is precisely the one nobody sees. Measured: one stale
+entry on this tree before, zero after. **Renaming a check is therefore two edits, not
+one**, and the guard is what makes forgetting the second one loud.
 
 **AND TWO CLAIMED LISTS WERE WRONG IN THE HONEST DIRECTION, WHICH IS WHAT THE
 CONTROL IS FOR.** `the-station-is-guessed-from-the-shape` was claimed to break
