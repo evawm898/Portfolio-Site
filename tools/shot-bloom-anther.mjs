@@ -75,7 +75,7 @@
    0.50 mm waist floor it photographs is MIN_FEATURE_MM / 2 and
    MIN_FEATURE_MM is an assumption; UNMEASURED, no coupon has been printed.
 
-   RUN:  node tools/shot-bloom-anther.mjs <out-dir> [base-tree]
+   RUN:  node tools/shot-bloom-anther.mjs <out-dir> [base-tree] [--quick]
          The optional base tree adds ONE before/after pair on the shipping
          pill — the visual half of "0 moved", predeclared to hold.
    =================================================================== */
@@ -84,8 +84,8 @@ import path from 'node:path';
 import { decodePNG } from './pngdec.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, kindsOf, fullStateDrift, stillFrame, settleBuild, modeTag, shownModeOf, CONTROLS } from './bloom-harness.mjs';
 
-const outDir = process.argv[2] || '/tmp/bloom-anther';
-const BASE_ROOT = process.argv[3] || null;
+const outDir = (process.argv.slice(2).filter((a) => !a.startsWith('--'))[0]) || '/tmp/bloom-anther';
+const BASE_ROOT = (process.argv.slice(3).filter((a) => !a.startsWith('--'))[0]) || null;
 fs.mkdirSync(outDir, { recursive: true });
 const { server, port } = await serveRepo();
 const base = BASE_ROOT && fs.existsSync(path.join(BASE_ROOT, 'bloom.html')) ? await serveRepo(BASE_ROOT) : null;
@@ -211,7 +211,11 @@ const COUNTS = [
   { key: 'disc120', name: '120 on the DISC', sets: { stamenCount: 120, stamenLayout: 'DISC' } },
 ];
 
-console.log('THE ANTHER SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted.\n');
+/* --quick (session 31): the pill, the floor cell and the INERT row on six
+   stamens only — the charter's "two rows to prove the tool, the grid once". */
+const QUICK = process.argv.includes('--quick');
+if (QUICK) { COUNTS.splice(1); SHAPES.splice(0, SHAPES.length, ...SHAPES.filter((x) => ['pill', 'floor', 'inert'].includes(x.key))); }
+console.log(`THE ANTHER SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted.${QUICK ? ' (--quick)' : ''}\n`);
 const cells = [];
 for (const c of COUNTS) {
   let ref = null;
