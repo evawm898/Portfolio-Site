@@ -31,6 +31,27 @@
          a head and differ in their override record, run 3 has another head.
    Full construction and what makes it vacuous: docs/bloom-session-20-outcome.md.
 
+   GENERALISED IN SESSION 31 for a retirement that is a RENAME WITH A VALUE
+   MAP rather than a removal (`antherSharpness` / `stigmaSharpness` ->
+   `antherPinch` / `stigmaPinch`, the exponent re-based on the pinch):
+     - `--override` takes a LIST, `a=1,b=1`, because two ids retired at once
+       and the twin must pin both to the new default's IMAGE on the old tree
+       (exponent 1.00 is pinch 1.00, the same double);
+     - a row that NAMES a retired id and does not move — the two INERT rows
+       and the four GATED ones, where the control is hidden AND inert by
+       construction — is a third class, INERT, and it is PREDECLARED:
+       `--expect <movers>/<inert>/<holders>`; with two numbers the inert
+       count must be 0, which is session 20's construction unchanged;
+     - V1 asks that the twin DIFFERS from the plain export on every mover;
+       the "fewer triangles" half of session 20's V1 is kept for the ids in
+       TWIN_REMOVES_GEOMETRY (the centre rig removed a solid; a re-based
+       exponent moves vertices), never dropped;
+     - V3 asks that the strip is EXACTLY the retired ids the matrix NAMES
+       (session 20's phase15 named all five, so that run is unchanged) and
+       that every twin override is one of them; and V5 asks that all three
+       captures were taken on the SAME FROZEN matrix — never `--full`, whose
+       rows change between the two trees.
+
    WHAT IT COMPARES. Either matrix, run against two trees, hashing the exact
    bytes the real Get STL button produced.
      default    `legacyMatrix()` — the 47 rows the scaffold's matrix held at
@@ -52,10 +73,19 @@
                 change: the 76 are then the rows whose bytes are unmoved
                 across two consecutive feature layers, which neither matrix
                 claims on its own.
+     --phase20  `phase20Matrix()` — the 571 rows frozen at 8b4c671, the head
+                of main when session 31 opened. THE NEWEST baseline, and so
+                the one a close-out re-exports on both trees; the last to
+                name `antherSharpness` / `stigmaSharpness` (25 rows), so on
+                any later tree it is captured with `--strip` and compared in
+                the retirement mode (16 movers / 6 inert / 549 holders,
+                docs/bloom-session-31-outcome.md).
      --phase19  `phase19Matrix()` — the 549 rows frozen at eb3543f, the head
-                of main when session 30 opened. THE NEWEST baseline, and so
-                the one a close-out re-exports on both trees; the like-for-like
-                baseline for the stigma's seven (block 26).
+                of main when session 30 opened. The like-for-like baseline for
+                the stigma's seven (block 26). NOTE (session 31): eight of its
+                rows no longer reproduce their bytes — the shaped anther rows
+                whose exponent has no image on the pinch — while its row
+                DEFINITIONS are unchanged and --verify-frozen still proves them.
      --phase18  `phase18Matrix()` — the 528 rows frozen at cb798f6, the head
                 of main when session 29 opened. The baseline before it, and so
                 the one a close-out re-exports on both trees under the
@@ -261,12 +291,12 @@
      - Bytes only. It says nothing about whether the geometry is right; the
        export and connectedness gates own that.
 
-   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase19] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>] [--strip <id,id,...>]
+   RUN:  node tools/diff-bloom-bytes.mjs [--full|--phase2..--phase20] --root <dir> --out <file.json> [--only <regex>] [--override <id>=<value>[,<id>=<value>…]] [--strip <id,id,...>]
          ... twice, then:
          node tools/diff-bloom-bytes.mjs --compare <before.json> <after.json>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --partition <controlId>
          node tools/diff-bloom-bytes.mjs --compare <b.json> <a.json> --region foot
-         node tools/diff-bloom-bytes.mjs --compare <twin.json> <new.json> --retirement <plain.json> --expect <movers>/<holders>
+         node tools/diff-bloom-bytes.mjs --compare <twin.json> <new.json> --retirement <plain.json> --expect <movers>/[<inert>/]<holders>
    =================================================================== */
 import crypto from 'node:crypto';
 import fs from 'node:fs';
@@ -276,7 +306,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, phase18Matrix, phase19Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, phase2Matrix, phase3Matrix, phase4Matrix, phase5Matrix, phase6Matrix, phase7Matrix, phase8Matrix, phase9Matrix, phase10Matrix, phase11Matrix, phase12Matrix, phase13Matrix, phase14Matrix, phase15Matrix, phase16Matrix, phase17Matrix, phase18Matrix, phase19Matrix, phase20Matrix, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -395,7 +425,7 @@ const FROZEN = {
   phase2: phase2Matrix, phase3: phase3Matrix, phase4: phase4Matrix, phase5: phase5Matrix,
   phase6: phase6Matrix, phase7: phase7Matrix, phase8: phase8Matrix, phase9: phase9Matrix, phase10: phase10Matrix,
   phase11: phase11Matrix, phase12: phase12Matrix, phase13: phase13Matrix, phase14: phase14Matrix, phase15: phase15Matrix,
-  phase16: phase16Matrix, phase17: phase17Matrix, phase18: phase18Matrix, phase19: phase19Matrix,
+  phase16: phase16Matrix, phase17: phase17Matrix, phase18: phase18Matrix, phase19: phase19Matrix, phase20: phase20Matrix,
 };
 const PHASE_NAMES = Object.keys(FROZEN);
 
@@ -484,35 +514,57 @@ if (process.argv.includes('--compare')) {
     if (fpFresh === fpPlain) invalid.push(`the new-tree capture fingerprints the SAME tree as the old one (${fpFresh}) — one tree compared with itself`);
     console.log(`  trees: old ${fpPlain} (${plain.head}), new ${fpFresh} (${fresh.head})`);
     if (plain.rows.length !== labels.length || plain.rows.some((r) => !r.state)) invalid.push('the plain capture is missing rows or per-row state');
-    /* V3 — the strip is exactly the reservation. */
+    /* V5 (continued) — ONE FROZEN MATRIX for all three. `--full` is the LIVE
+       buildMatrix() of whichever tree ran the capture, so two `full`
+       captures on two trees are two different row lists that happen to
+       share labels wherever a row was not re-authored; a retirement compare
+       on them would be a comparison nobody characterised. */
+    for (const [name, cap] of [['plain', plain], ['twin', twin], ['new-tree', fresh]]) {
+      if (!(cap.matrix in FROZEN)) invalid.push(`the ${name} capture was taken on matrix "${cap.matrix}", which is not a frozen phase — a retirement compare needs one frozen row list on both trees`);
+    }
+    if (plain.matrix !== twin.matrix || twin.matrix !== fresh.matrix) invalid.push(`the three captures name three matrices (${plain.matrix} / ${twin.matrix} / ${fresh.matrix})`);
+    /* V3 — the strip is exactly the reservation THE MATRIX NAMES, and every
+       twin override is one of the stripped ids. */
     const retired = RETIRED_IDS.map((r) => r.id);
     const stripSet = new Set(fresh.strip || []);
-    for (const id of retired) if (!stripSet.has(id)) invalid.push(`retired id ${id} was not stripped on the new tree`);
-    for (const id of stripSet) { if (!retired.includes(id)) invalid.push(`stripped id ${id} is not in RETIRED_IDS`); if (CONTROLS.some((c) => c.id === id)) invalid.push(`stripped id ${id} is a LIVE control on this tree — stripping it hides a real control`); }
+    const named = new Set();
+    if (fresh.matrix in FROZEN) for (const row of FROZEN[fresh.matrix]()) for (const st of row.set) if (retired.includes(st.id)) named.add(st.id);
+    for (const id of named) if (!stripSet.has(id)) invalid.push(`retired id ${id} is named by ${fresh.matrix} and was not stripped on the new tree`);
+    for (const id of stripSet) { if (!retired.includes(id)) invalid.push(`stripped id ${id} is not in RETIRED_IDS`); if (!named.has(id)) invalid.push(`stripped id ${id} is retired but no row of ${fresh.matrix} names it — stripping it is a no-op that reads as coverage`); if (CONTROLS.some((c) => c.id === id)) invalid.push(`stripped id ${id} is a LIVE control on this tree — stripping it hides a real control`); }
+    const overrides = Array.isArray(twin.override) ? twin.override : [twin.override];
+    for (const o of overrides) if (!stripSet.has(o.id)) invalid.push(`the twin overrides ${o.id}, which is not a stripped retired id — the twin must pin the RETIRED control to the new default's image and nothing else`);
     if (invalid.length) { console.error('byte diff: INVALID — the retirement comparison cannot be made:'); for (const v of invalid) console.error(`  - ${v}`); process.exit(1); }
-    const oid = twin.override.id, oval = twin.override.value;
-    const movers = [], holders = [], bad = [], emptied = [];
+    /* THE TWIN VALUE'S ROLE, by id: session 20's centre-off twin REMOVED a
+       solid (fewer triangles is asserted); a re-based control's twin MOVES
+       vertices at an identical count. Stated per id rather than dropped. */
+    const TWIN_REMOVES_GEOMETRY = new Set(['centerStyle']);
+    const ovText = overrides.map((o) => `${o.id}=${o.value}`).join(',');
+    const movers = [], inert = [], holders = [], bad = [], emptied = [];
     for (let k = 0; k < labels.length; k++) {
       const p = plain.rows[k], t = twin.rows[k], n = fresh.rows[k];
-      const resolved = String(p.state[oid]);
-      const mover = resolved !== String(oval);
-      (mover ? movers : holders).push(labels[k]);
+      const resolved = overrides.map((o) => `${o.id}=${String(p.state[o.id])}`).join(',');
+      const byValue = overrides.some((o) => String(p.state[o.id]) !== String(o.value));
+      const byBytes = p.sha256 !== t.sha256;
+      if (byValue && byBytes) movers.push(labels[k]); else if (byValue) inert.push(labels[k]); else holders.push(labels[k]);
       if (n.setEmptied) emptied.push(labels[k]);
       /* THE CLAIM: twin === new, on every row. */
-      if (t.sha256 !== n.sha256) bad.push(`CLAIM ${labels[k]} [${oid}=${resolved}]: twin ${t.bytes}B/${t.tris}t ${t.sha256.slice(0, 12)} != new ${n.bytes}B/${n.tris}t ${n.sha256.slice(0, 12)}`);
-      /* V1 / V2 — the twin removed a centre exactly where there was one. */
-      if (mover && (p.sha256 === t.sha256 || !(p.tris > t.tris))) bad.push(`V1 ${labels[k]} [${oid}=${resolved}]: the twin did not remove the centre (plain ${p.tris}t ${p.sha256.slice(0, 12)}, twin ${t.tris}t ${t.sha256.slice(0, 12)}) — old versus old`);
-      if (!mover && p.sha256 !== t.sha256) bad.push(`V2 ${labels[k]} [${oid}=${resolved}]: the override changed a row that already resolved to ${oval}`);
+      if (t.sha256 !== n.sha256) bad.push(`CLAIM ${labels[k]} [${resolved}]: twin ${t.bytes}B/${t.tris}t ${t.sha256.slice(0, 12)} != new ${n.bytes}B/${n.tris}t ${n.sha256.slice(0, 12)}`);
+      /* V1 / V2 — the twin changed a row exactly where the plain run resolved
+         a value other than the twin's, EXCEPT the predeclared inert class. */
+      if (byValue && byBytes && overrides.some((o) => TWIN_REMOVES_GEOMETRY.has(o.id)) && !(p.tris > t.tris)) bad.push(`V1 ${labels[k]} [${resolved}]: the twin did not REMOVE geometry (plain ${p.tris}t, twin ${t.tris}t) for an override that retires a solid`);
+      if (!byValue && byBytes) bad.push(`V2 ${labels[k]} [${resolved}]: the override changed a row that already resolved to the twin's value`);
     }
-    console.log(`retirement of ${oid} (twin value ${oval}) on ${labels.length} rows: ${movers.length} MOVERS (resolved a centre on the old tree), ${holders.length} HOLDERS (already ${oval})`);
+    console.log(`retirement of ${overrides.map((o) => o.id).join(' + ')} (twin ${ovText}) on ${labels.length} rows: ${movers.length} MOVERS (resolved another value on the old tree and moved), ${inert.length} INERT (resolved another value and did NOT move — must be predeclared), ${holders.length} HOLDERS (already the twin's value)`);
+    if (inert.length) console.log(`  inert: ${inert.join('; ')}`);
     console.log(`  rows whose set became EMPTY once the retired ids were stripped (they build the new default): ${emptied.length}${emptied.length ? ' — ' + emptied.slice(0, 6).join('; ') + (emptied.length > 6 ? ' …' : '') : ''}`);
     console.log(`  twin === new on ${labels.length - bad.filter((b) => b.startsWith('CLAIM')).length} of ${labels.length} rows; V1 fired ${bad.filter((b) => b.startsWith('V1')).length}, V2 fired ${bad.filter((b) => b.startsWith('V2')).length}`);
     for (const b of bad.slice(0, 40)) console.error(`  ${b}`);
     if (bad.length > 40) console.error(`  … and ${bad.length - 40} more`);
-    if (!expect) { console.error('\nbyte diff: REFUSED — the retirement mode needs the PREDECLARED partition on the command line: --expect <movers>/<holders> (the doc names it before the run; this tool does not invent it).'); process.exit(1); }
-    if (movers.length !== expect[0] || holders.length !== expect[1]) { console.error(`\nbyte diff: FAIL — V4: measured ${movers.length}/${holders.length} against the predeclared ${expect[0]}/${expect[1]}`); process.exit(1); }
+    if (!expect) { console.error('\nbyte diff: REFUSED — the retirement mode needs the PREDECLARED partition on the command line: --expect <movers>/[<inert>/]<holders> (the doc names it before the run; this tool does not invent it).'); process.exit(1); }
+    const want = expect.length === 3 ? expect : [expect[0], 0, expect[1]];
+    if (movers.length !== want[0] || inert.length !== want[1] || holders.length !== want[2]) { console.error(`\nbyte diff: FAIL — V4: measured ${movers.length}/${inert.length}/${holders.length} against the predeclared ${want.join('/')}`); process.exit(1); }
     if (bad.length) { console.error('\nbyte diff: FAIL — the retirement claim does not hold on every row (see above).'); process.exit(1); }
-    console.log(`\nbyte diff: PASS — every one of the ${movers.length} movers is BIT-IDENTICAL to its centre-off twin on the old tree, every one of the ${holders.length} holders is bit-identical outright, and the twin removed a centre on exactly the movers (V1–V5 held).`);
+    console.log(`\nbyte diff: PASS — every one of the ${movers.length} movers is BIT-IDENTICAL to its twin on the old tree, every one of the ${holders.length} holders is bit-identical outright, the ${inert.length} predeclared inert rows named the control and did not move, and the twin moved exactly the movers (V1–V5 held).`);
     process.exit(0);
   }
 
@@ -713,7 +765,10 @@ const MATRIX_FN = { full: buildMatrix, ...FROZEN, legacy: legacyMatrix };
    can refuse a capture that is not what it is being used as. */
 const onlyRe = arg('--only') ? new RegExp(arg('--only')) : null;
 const overrideArg = arg('--override');
-const override = overrideArg ? { id: overrideArg.split('=')[0], value: overrideArg.split('=').slice(1).join('=') } : null;
+/* One `id=value` records the session-20 shape ({id, value}); a comma list
+   records an ARRAY, and --compare accepts either. */
+const overrideList = overrideArg ? overrideArg.split(',').filter(Boolean).map((o) => ({ id: o.split('=')[0], value: o.split('=').slice(1).join('=') })) : [];
+const override = overrideList.length === 0 ? null : overrideList.length === 1 ? overrideList[0] : overrideList;
 const strip = arg('--strip') ? arg('--strip').split(',').filter(Boolean) : [];
 if (strip.length) {
   const live = strip.filter((id) => CONTROLS.some((c) => c.id === id));
@@ -752,7 +807,7 @@ for (const row of MATRIX_FN[MATRIX]()) {
   if (done.has(row.label)) continue;
   let set = row.set;
   if (strip.length) set = set.filter((s) => !strip.includes(s.id));
-  if (override) set = [...set.filter((s) => s.id !== override.id), { id: override.id, value: override.value }];
+  if (overrideList.length) set = [...set.filter((s) => !overrideList.some((o) => o.id === s.id)), ...overrideList.map((o) => ({ id: o.id, value: o.value }))];
   const setEmptied = row.set.length > 0 && set.length === 0;
   await openBloom(page, port);
   const bad = await applyConfig(page, set, treeKinds);

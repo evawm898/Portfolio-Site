@@ -38,9 +38,9 @@
    in either direction.
    =================================================================== */
 import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
-         ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_SHARPNESS_DEFAULT, TIP_ROUNDEDNESS,
+         ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_PINCH_DEFAULT, TIP_ROUNDEDNESS,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
-         TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_SHARPNESS_RANGE, TIP_ROUNDEDNESS_RANGE,
+         TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM } from './bloom-geometry.js';
 
 /* ===================================================================
@@ -107,6 +107,8 @@ export const RETIRED_IDS = [
   { id: 'centerRise', retiredAt: 20, schema: null, why: 'DOME\'s rise. Retired with the DOME style. NOT to be confused with headRise (the HEAD section\'s cap), which is live and is the surface the retired ornament was standing in for.' },
   { id: 'centerDish', retiredAt: 20, schema: null, why: 'DISC\'s paraboloid depression. Retired with the DISC style, which was the shipping default — 509 of 527 matrix rows moved (the predeclared partition in docs/bloom-session-20-outcome.md).' },
   { id: 'centerBore', retiredAt: 20, schema: null, why: 'RING\'s bore fraction. Retired with the RING style; a real corona (held, not retired — charter session 20) gets its own group and ids.' },
+  { id: 'antherSharpness', retiredAt: 31, schema: null, why: 'The anther outline law\'s EXPONENT carried directly (0.25..8, default 1.00). Retired on Eva\'s ruling (session 31): 2.00 was a singular point of the law — the circle for every roundedness, so roundedness and the point count were inert there, and three sessions met it in three instruments — and the control ran backwards from its label (8 was the bulge, 0.25 the star). Replaced by antherPinch, which carries k with s = 2 / (1 + k); the singular value sits one step below its minimum. A stored 8 or 0.25 under this name means a different shape under the new one, so the name may never come back.' },
+  { id: 'stigmaSharpness', retiredAt: 31, schema: null, why: 'The stigma lobe\'s exponent, instanced from the same descriptor as antherSharpness and retired with it for the same reason (session 31). Replaced by stigmaPinch.' },
 ];
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
@@ -256,7 +258,7 @@ export const PREDICATES = {
      WHERE A TIP'S OUTLINE CONTROLS APPLY (session 29; both tips from one
      statement since session 30, `antherOutlineLive` / `stigmaOutlineLive`
      generated from TIP_INSTANCES) — the point count
-     and the sharpness are HIDDEN AND INERT at a roundedness of 1, the
+     and the pinch are HIDDEN AND INERT at a roundedness of 1, the
      curl-bias precedent, and here the inertness is IN THE ARITHMETIC rather
      than in a branch anyone has to remember: the blend is `1 + 0 * h`, which
      is exactly 1 in IEEE-754 for any finite h, and tipSides() returns the
@@ -1060,28 +1062,32 @@ export const TIP_DESCRIPTORS = Object.freeze([
        the two below it hidden AND inert — so this read-out says so, with
        their kept values (Eva, Sep 6: turning a part off keeps its settings). */
     fmt: (v, ui, shown, t) => (Number(v) === 1
-      ? `a circle — the points (${ui[`${t.prefix}Points`]}) and the sharpness (${Number(ui[`${t.prefix}Sharpness`]).toFixed(2)}) are hidden and INERT here, kept, and return below 1`
+      ? `a circle — the points (${ui[`${t.prefix}Points`]}) and the pinch (${Number(ui[`${t.prefix}Pinch`]).toFixed(2)}) are hidden and INERT here, kept, and return below 1`
       : `${Number(v).toFixed(2)} — the outline blended toward a circle`) },
   { suffix: 'Points', kind: 'slider', min: TIP_LOBES_RANGE[0], max: TIP_LOBES_RANGE[1], step: 1, default: TIP_LOBES, label: 'Points', outline: true,
     /* The lattice is DERIVED from this (tipSides), never exposed; the number
        the build used is printed from the SHOWN record rather than restated. */
     fmt: (v, ui, shown, t) => { const a = tipRec(shown, t); return `${v}-fold${a ? ` — revolved through ${a.sides} sides` : ''}`; } },
-  /* THE DEFAULT IS 1.00 AND NOT THE CIRCLE'S OWN 2.00 (Eva's ruling, session
-     29, re-derived for the stigma in session 30 — the reasoning and the
-     export-mode numbers are at TIP_SHARPNESS_DEFAULT in bloom-geometry.js).
-     At s = 2 the law degenerates to exactly 1 at every roundedness, so the
-     roundedness slider would change nothing but the lattice. */
-  { suffix: 'Sharpness', kind: 'slider', min: TIP_SHARPNESS_RANGE[0], max: TIP_SHARPNESS_RANGE[1], step: 0.05, default: TIP_SHARPNESS_DEFAULT, label: 'Sharpness', outline: true,
+  /* THE PINCH (session 31, Eva's ruling — the old `sharpness` retired). The
+     slider carries k and the geometry forms the exponent s = 2 / (1 + k)
+     in ONE place (tipExponent): 1.00 is the polygon (the default, derived
+     for its waist headroom — the reasoning and the export-mode numbers are
+     at TIP_PINCH_DEFAULT in bloom-geometry.js), below 1 a rounded polygon,
+     above 1 a star, and the circle (k = 0, the law's singular point) sits one
+     step BELOW the minimum — roundedness 1 is the only producer of it, so no
+     read-out branch here names "the circle's own exponent" any more. */
+  { suffix: 'Pinch', kind: 'slider', min: TIP_PINCH_RANGE[0], max: TIP_PINCH_RANGE[1], step: 0.05, default: TIP_PINCH_DEFAULT, label: 'Pinch', outline: true,
     /* FULL RANGE, CLAMPED, TOLD — the spine curl's discipline. The floor is on
        the WAIST at R_min = MIN_FEATURE_MM / 2 and carries UNMEASURED verbatim
-       because nothing in this project has been printed. */
+       because nothing in this project has been printed; on the pinch it is a
+       CAP, so the clamp reads "to a smaller pinch from a larger one". */
     fmt: (v, ui, shown, t) => {
       const a = tipRec(shown, t), n = Number(v);
-      const head = n < 2 ? `${n.toFixed(2)} — pinched inward: a star` : n === 2 ? '2.00 — the circle\'s own exponent' : `${n.toFixed(2)} — bulged outward: a rounded polygon`;
+      const head = n < 1 ? `${n.toFixed(2)} — a rounded polygon` : n === 1 ? '1.00 — the polygon' : `${n.toFixed(2)} — pinched inward: a star`;
       if (!a) return head;
       return `${head} · waist ${a.waistMm.toFixed(2)} mm (${shown.mode})`
         + (a.underFloor ? ` — THE WHOLE TIP is under the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor, told, never refused (UNMEASURED — no coupon has been printed)`
-          : a.sharpnessFloored ? ` — CLAMPED to ${a.shape.sharpness.toFixed(2)} from ${a.sharpnessAsked.toFixed(2)}, the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor (UNMEASURED — no coupon has been printed)`
+          : a.pinchFloored ? ` — CLAMPED to ${a.shape.pinch.toFixed(2)} from ${a.pinchAsked.toFixed(2)}, the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor (UNMEASURED — no coupon has been printed)`
           : ` — clear of the ${TIP_MIN_RADIUS_MM.toFixed(2)} mm floor (UNMEASURED — no coupon has been printed)`);
     } },
   { suffix: 'Lumps', kind: 'slider', min: TIP_LUMPS_RANGE[0], max: TIP_LUMPS_RANGE[1], step: 1, default: 1, label: 'Lobes',
@@ -2319,9 +2325,9 @@ export const CONTROLS = [
      is a CONSTRUCTION: size and elongation default to the two constants every
      earlier export was built at (imported, one owner), the outline to the
      circle (roundedness 1, where the blend is exactly 1 and the lattice is
-     the rod's own — so the sharpness default, 1.00 for BOTH tips, moves no
+     the rod's own — so the pinch default, 1.00 for BOTH tips, moves no
      byte on either; the stigma's was re-derived at its own dimensions, which
-     ARE the anther's, see TIP_SHARPNESS_DEFAULT), the anther's count and
+     ARE the anther's, see TIP_PINCH_DEFAULT), the anther's count and
      spread to one lump on the rod's axis (the Rodrigues identity), the
      stigma's to STIGMA_LOBES at STIGMA_LOBE_SPREAD_DEG (the constants
      footRing() used to read). Both byte instruments measure it anyway.
