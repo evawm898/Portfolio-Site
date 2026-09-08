@@ -2093,11 +2093,21 @@ say so.**
   through the gaussian's tail: tiny, and not zero. Both are compared foot by
   foot now, at exactly zero.
 
-**AND ONE CHECK FLAKED ON THE CAMERA, ONCE.** `stemOn()` re-fits, and a fit
-applies whatever damping residue the previous section left, so a first frame can
-be caught mid-drift while a third, taken later, is at rest — and a round-trip
-clause then fails on the camera rather than on the thing under test. Settle at
-the moment the window opens, not inside each capture.
+**AND ONE CHECK FLAKED ON THE CAMERA, TWICE, FOR TWO DIFFERENT REASONS — WHICH
+IS WHY NO CHECK HERE ASKS FOR A FRAMEBUFFER TO COME BACK TO THE BIT.**
+`stemOn()` re-fits, and a fit applies whatever damping residue the previous
+section left, so a first frame can be caught mid-drift while a third, taken
+later, is at rest: settle at the moment the window opens, not inside each
+capture. That was not enough. **Damping never reaches exactly zero:**
+`settle()` stops when `update()` reports the movement is below EPS, and every
+LATER `settle()` still applies one more sub-EPS step — so three captures at the
+"same" camera creep, and the third came back at 58,294 ink px against 58,295
+with a different hash. That is /print's own measured lesson ("the camera did not
+move" is not observable in this harness) arriving in a different disguise. A
+hash INEQUALITY is safe, because a one-pixel drift can only help it; a hash
+EQUALITY across two captures separated by anything at all is not. What carries
+the claim instead is the SIZE of the change: 14,482 px of ink move when the v
+family turns and exactly 0 when it does not.
 
 **SEVEN THINGS THE STEM CHECKS GOT WRONG BEFORE THE NEGATIVE CONTROL WAS CLEAN,
 each measured and each worth not re-learning.** Three passes of the control were

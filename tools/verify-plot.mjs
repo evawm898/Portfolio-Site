@@ -1355,12 +1355,22 @@ async function run({ mutant = null } = {}) {
   const vBent = await px();
   await set({ ...STEM_ON, families: 'v', stemDroop: 0, depthDim: 0 });
   const vBack = await px();
+  /* THE RETURN IS COMPARED BY INK AND NOT BY HASH, and asking for the bit was
+     wrong twice over. Damping never reaches exactly zero: `settle()` stops when
+     `update()` reports the movement is below EPS, and every later `settle()`
+     still applies one more sub-EPS step — so three captures at the "same"
+     camera creep, and the third came back at 58,294 px against 58,295 with a
+     different hash. That is /print's own measured lesson ("the camera did not
+     move" is not observable here) arriving in a different disguise. The
+     INEQUALITY is safe — a one-pixel drift can only help it — and what carries
+     the claim is the SIZE of the change: 14,000 px of ink move when the v
+     family turns, and exactly 0 when it does not. */
   check('stem/the-droop-reaches-every-family',
-    vFlat.hash !== vBent.hash && vFlat.hash === vBack.hash
-    && vFlat.ink > 1000 && vBent.ink > 1000,
+    vFlat.hash !== vBent.hash && Math.abs(vFlat.ink - vBent.ink) > 1000
+    && Math.abs(vBack.ink - vFlat.ink) <= 8 && vFlat.ink > 1000,
     `with u switched off, the v family's framebuffer moves under the droop `
-    + `(${vFlat.ink} -> ${vBent.ink} ink px) and comes back to the BIT at 0 `
-    + `(${vBack.ink} px, hash ${vBack.hash})`);
+    + `(${vFlat.ink} -> ${vBent.ink} ink px, a change of `
+    + `${Math.abs(vFlat.ink - vBent.ink)}) and comes back to ${vBack.ink}`);
 
   // =========================================================================
   // BEND POINTS — driven with a REAL pointer drag on a handle found through the
