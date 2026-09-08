@@ -658,12 +658,17 @@ const MUTANTS = [
     id: 'the-saved-document-drops-a-draw-field', file: 'plot-file.js',
     from: '  for (const f of fields) o[f.key] = s[f.key];',
     to: "  for (const f of fields) { if (f.key === 'brightness') continue; o[f.key] = s[f.key]; }",
+    /* NOT `file/a-field-the-writer-dropped-is-reported-and-not-filled-in`,
+       which was claimed and is wrong: that check builds its OWN holed document
+       by deleting two keys, so under this mutation the delete is a no-op and
+       the reader still reports both fields missing. It is a check about the
+       READER; this mutation is in the WRITER. */
     breaks: ['file/every-field-round-trips-through-the-writer-and-the-reader',
-             'file/a-field-the-writer-dropped-is-reported-and-not-filled-in',
              'save/the-document-describes-the-page-as-it-stands',
              'restore/every-field-comes-back',
              'restore/a-clean-round-trip-reports-nothing-missing',
-             'restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named'],
+             'restore/a-field-the-file-does-not-carry-leaves-the-page-alone-and-is-named',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     // A ROW OF THE TABLE VANISHES, which is the one way a field can be lost
@@ -673,9 +678,15 @@ const MUTANTS = [
     id: 'the-frame-field-table-loses-a-row', file: 'plot-file.js',
     from: "  { key: 'margin', control: 'frameMargin', kind: 'number' },",
     to: '',
+    /* AND THE ROUND-TRIP CHECK MISSES IT, exactly as the design predicted —
+       measured, not argued. That check iterates the tables, so a table without
+       `margin` never compares `margin`, and the writer and the reader agree
+       perfectly about a field that is simply gone. The written-down census is
+       the only thing that sees it, which is why it is written down. */
     breaks: ['file/the-document-carries-exactly-these-fields',
-             'file/every-field-round-trips-through-the-writer-and-the-reader',
+             'save/the-document-describes-the-page-as-it-stands',
              'restore/every-field-comes-back',
+             'restore/a-composition-dropped-on-the-page-is-loaded',
              'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
   },
   {
@@ -684,7 +695,8 @@ const MUTANTS = [
     id: 'the-restore-skips-a-stem-field', file: 'plot.js',
     from: '    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;',
     to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;",
-    breaks: ['restore/every-field-comes-back'],
+    breaks: ['restore/every-field-comes-back',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     // A missing field stops being reported. The page then looks restored while
@@ -707,6 +719,7 @@ const MUTANTS = [
     breaks: ['save/the-document-describes-the-page-as-it-stands',
              'restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
+             'restore/a-composition-dropped-on-the-page-is-loaded',
              // Every entry then carries the first petal's bend offsets, so the
              // one bend the drag put on petal 7 is on every petal in the file.
              'save/a-real-drag-put-an-offset-on-both-bend-sets'],
@@ -720,7 +733,8 @@ const MUTANTS = [
     from: '    petalWarps.set(p.index, {',
     to: '    petalWarps.set(p.index + 1, {',
     breaks: ['restore/every-field-comes-back',
-             'restore/two-petals-come-back-with-their-own-warps'],
+             'restore/two-petals-come-back-with-their-own-warps',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     // A composition restored against a different bundle stops saying so. Warps
@@ -747,7 +761,8 @@ const MUTANTS = [
     from: '  camera.position.set(c.position[0], c.position[1], c.position[2]);',
     to: '  void c.position;',
     breaks: ['restore/every-field-comes-back',
-             'restore/the-camera-and-the-selection-come-back'],
+             'restore/the-camera-and-the-selection-come-back',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     // The selection is not restored: a composition comes back with the right
@@ -757,7 +772,8 @@ const MUTANTS = [
     from: '  pui.petalPick.value = String(canSelect ? want : -1);',
     to: '  pui.petalPick.value = String(-1);',
     breaks: ['restore/every-field-comes-back',
-             'restore/the-camera-and-the-selection-come-back'],
+             'restore/the-camera-and-the-selection-come-back',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     /* A WARP FOR A PETAL THIS GRID DOES NOT HAVE IS FOLDED ONTO PETAL 0 rather
