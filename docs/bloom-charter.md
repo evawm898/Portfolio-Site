@@ -5643,6 +5643,9 @@ matters should be measured this way.
   is wrong at exactly that point. **Session 31's brief carries the design question, costed,
   for Eva to decide — whether the control should carry a value that maps to s with the
   singular point at an END of the travel or UNREACHABLE — rather than a fourth patch.**
+  _(Corrected in session 31, by Eva: TWO sites, not three. The lattice arm in `tipSides()` is
+  keyed on roundedness 1, not on s = 2 — the circle's own lattice law, which only looked broken
+  in the singular state. See session 31 below.)_
 
   **THE BRIEF'S PREMISE WAS WRONG, SAID BY ITS AUTHOR** (Eva, session 30): "I told you not to
   copy 1.00 because a trifid lobe is a different size, and it is not — it is the anther's
@@ -5685,3 +5688,45 @@ matters should be measured this way.
   seven code files, the new sheet tool, the outcome doc, `CLAUDE.md` and this charter — and
   nothing else; 220 tracked files under the bloom, flower, print, plot, cards, tracker,
   `tools/` and workflow trees untouched.
+
+- **Session 31 (Sep 8): THE PINCH REPLACES THE SHARPNESS, THE SINGULAR EXPONENT IS OFF THE
+  TRAVEL, AND THE TWO PATCHES COME OUT.** Full account: `docs/bloom-session-31-outcome.md`. One
+  stop, before the build, for the mapping; Eva's ruling, in full: `s = 2 / (1 + k)`, the slider
+  carries k (0.05–7.00, step 0.05, default 1.00), UNREACHABLE rather than at an end (at an end
+  the exemption and its pinned row survive and the class is not solved); the linear alternative
+  rejected because a default at 0.7071 sits on no grid the slider returns to.
+
+  **HER THREE-SITE COUNT WAS WRONG, AND SHE SAID SO.** `tipSides()`'s roundedness-1 arm is keyed
+  on roundedness, not on the exponent; it is the circle's own lattice law that only looked broken
+  in the singular state, and with the singular exponent off the travel every departure from
+  roundedness 1 earns its sides. Deleting it was costed (79 live rows and 59 of phase19 moved,
+  +60% triangles per tip) and refused. **Two sites, then: the default (session 29) and the
+  JS6/JG5 exemption (session 30).** Both patches are DELETED — the exemption in `tipClauses`,
+  the registry's "circle's own exponent" read-out branch, and the pinned block-26 row that
+  existed to hold the exemption — and the gates are green without them. Nothing else in the
+  tip's path special-cases a value.
+
+  **`s > 2` IS GIVEN UP, WITH THE SHAPE NAMED.** It pinched at the OTHER azimuth — at three or
+  four points a half-step ROTATION of the polygon, a visibly different shape, not only a second
+  path to the rounded polygon. A rotation living inside a sharpness dial is two things in one
+  control, the muddle this project has unpicked twice; if wanted later it returns as its own
+  PHASE control, never as the far half of this one.
+
+  **THE RENAME EARNS ITS LINE.** `sharpness` ran backwards from its label (8 was the bulge, 0.25
+  the star); `pinch` reads the way it behaves — the same defect class as a comment naming a check
+  nobody performs. `antherSharpness` / `stigmaSharpness` are in `RETIRED_IDS`; `antherPinch` /
+  `stigmaPinch` come from one row of `TIP_DESCRIPTORS`; `tipExponent()` is the one owner of the
+  exponent; the floor is a CAP, `k ≤ −2 log2 m`, bit-identical to the old closed form on a
+  1,528-point sweep.
+
+  **THE PARTITION IS PREDECLARED AND MEASURED WITH THE SESSION-20 CONSTRUCTION, GENERALISED.**
+  Defaults hold by construction (pinch 1.00 is exponent 1.00, the same double); the movers are
+  the shaped rows whose old exponent has no exact image on the grid. `frozen/phase20` is the 571
+  rows at `8b4c671` (a phase IS owed: block 26 loses the singular row and both blocks gain a
+  NEAREST REACHABLE row, 571 → 572). `diff-bloom-bytes` gains `--phase20`, a list-valued
+  `--override`, a predeclared INERT class (`--expect m/i/h`) for rows that name the control and
+  cannot reach the geometry, a V3 that requires exactly the retired ids the matrix NAMES, and a V5
+  that refuses `--full` on any of the three captures. **`frozen/phase19` joins `frozen/phase17`
+  on the list of tags whose definitions reproduce and whose bytes do not fully** (8 of 549), per
+  the session-24 ruling. Numbers, each from its own run, in the outcome doc's close.
+

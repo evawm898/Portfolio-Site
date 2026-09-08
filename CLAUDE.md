@@ -536,6 +536,34 @@ sharpness opened at both stamen counts against the circle it replaces, the space
 (0.50 clamped … 1.50, plus the thin-sheet 0.75), the pair, INERT — every row with its own
 same-tree control, no pixel claim on `whole` or `lens`. **The lattice jump (10 → 16 sides the
 moment roundedness leaves 1) is session 31's and moves bytes.**
+**THE PINCH REPLACES THE SHARPNESS, AND THE CIRCLE'S OWN EXPONENT IS OFF THE TRAVEL** (Eva's
+ruling, session 31 — read `docs/bloom-session-31-outcome.md` before touching any of it).
+`antherSharpness` / `stigmaSharpness` are RETIRED (`RETIRED_IDS`, session 31); `antherPinch` /
+`stigmaPinch` (0.05–7.00, step 0.05, default 1.00, one row of `TIP_DESCRIPTORS`) carry `k`, and
+`tipExponent()` in bloom-geometry.js is the ONE place `s = 2 / (1 + k)` is formed. **`s = 2` was
+a SINGULAR POINT of the outline law** — the circle for every roundedness, so roundedness and the
+point count were inert there — and it had been patched at TWO sites (the anther's default moved
+off it, session 29; JS6/JG5 exempted it, session 30). It is now UNREACHABLE: k = 0 sits one step
+below the minimum, roundedness 1 is the only producer of the circle, and both patches are
+DELETED with the gates green without them. **The roundedness-1 arm of `tipSides()` is NOT a third
+site** (Eva corrected her own count): it is the circle's own lattice law, keyed on roundedness,
+load-bearing for every tip row's bytes and for JS7/JG6's inertness clause, and it stays. The old
+control ran BACKWARDS from its label (8 the bulge, 0.25 the star); the pinch reads the way it
+behaves: 1.00 the polygon, below 1 a rounded polygon, above 1 a star, the waist `2^(−k/2)` of the
+point radius, the 0.50 mm floor a CAP `k ≤ −2 log2 m` (bit-identical to the old closed form,
+measured). **The `s > 2` half is GIVEN UP with its shape named**: it pinched at the other azimuth
+— at three or four points a half-step ROTATION — and a rotation inside a sharpness dial is two
+things in one control; if wanted it returns as its own phase control. Defaults are byte-identical
+BY CONSTRUCTION (pinch 1.00 is exponent 1.00, the same double); the partition is the shaped rows
+with no exact image on the grid — **16 movers / 6 inert / 549 holders on `frozen/phase20`** (the
+571 rows at `8b4c671`, the newest baseline) and 8 / 3 / 538 on phase19, measured with the
+session-20 three-capture construction generalised for a rename-with-map (`--override` takes a
+list, the INERT class is predeclared, V3 requires exactly the retired ids the matrix names, V5
+one frozen matrix for all three captures). **`frozen/phase19` joins `frozen/phase17` as a tag
+whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheets are
+`tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
+positions of the travel on two-row scaffolding).
+
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so
 every existing caller is unchanged; `emitPanel` — the ONE place `row.sect(v)` is evaluated —

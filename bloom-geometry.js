@@ -284,38 +284,66 @@ export function gynoeciumEligible(state) { return !sphereMode(state); }
        h(u) = (|cos(n u / 4)|^s + |sin(n u / 4)|^s)^(-1/s)
        f(u) = roundedness + (1 - roundedness) * h(u)
 
-   `n` is the symmetry order (TIP_LOBES), `s` the sharpness. One number
-   sweeps star -> polygon -> circle -> rounded n-gon and reaches all five
-   named targets, where the lobe law reached four and made a trefoil where
-   a triangle was asked for. ROUNDEDNESS IS THE ONLY PRODUCER OF THE
-   CIRCLE and sharpness is inert there — the curl-bias precedent, hidden
-   and inert, and here it is inert IN THE ARITHMETIC: at roundedness 1 the
-   blend is `1 + 0 * h`, which is exactly 1 in IEEE-754 for any finite h,
-   so `r * f === r` and the pill's radius arithmetic is untouched. That is
-   the whole byte-identity argument for the anther, and it is a
-   construction rather than a hope; tools/verify-bloom-tip-bytes.mjs is
-   what measures it.
+   `n` is the symmetry order (TIP_LOBES) and `s` the exponent. THE EXPONENT
+   IS DERIVED FROM THE PINCH, NEVER CARRIED BY A CONTROL (session 31, Eva's
+   ruling): `s = 2 / (1 + k)`, `tipExponent()` below the one owner, where
+   `k` is the pinch the slider carries. One number sweeps rounded polygon
+   (k below 1) -> polygon (k = 1, the exact |cos| + |sin| family) -> star
+   (k above 1), and the waist — the narrowest radius as a fraction of the
+   point's — is `2^(-k/2)`: every 2.00 of pinch halves it. The circle is
+   NOT on the travel: `s = 2` is a SINGULAR POINT of the law (h is exactly 1
+   at every azimuth, so roundedness and the point count are inert there —
+   sessions 29 and 30 each met it in a different instrument), and it sits at
+   k = 0, one step BELOW TIP_PINCH_RANGE[0]. ROUNDEDNESS IS THE ONLY
+   PRODUCER OF THE CIRCLE and the pinch is inert there — the curl-bias
+   precedent, hidden and inert, and here it is inert IN THE ARITHMETIC: at
+   roundedness 1 the blend is `1 + 0 * h`, which is exactly 1 in IEEE-754
+   for any finite h, so `r * f === r` and the pill's radius arithmetic is
+   untouched. That is the whole byte-identity argument for the anther, and
+   it is a construction rather than a hope; tools/verify-bloom-tip-bytes.mjs
+   is what measures it.
+
+   WHAT WAS GIVEN UP WITH THE OLD `sharpness` (Eva, session 31, a deliberate
+   loss with the shape named): the exponent's far half, `s > 2`, which
+   pinched at the OTHER azimuth — at three or four points it is a half-step
+   ROTATION of the polygon and a visibly different shape, not only a second
+   path to the rounded polygon. A rotation living inside a sharpness dial is
+   two things in one control; if it is wanted later it returns as its own
+   PHASE control, never as the far half of this one. The old control also
+   ran backwards from its label (8 was the bulge, 0.25 the star); the pinch
+   reads the way it behaves. `antherSharpness` / `stigmaSharpness` are in
+   RETIRED_IDS.
 
    NO SELF-INTERSECTION INSTRUMENT, EVER (Q6) — the ranges are bounded so
    the outline CANNOT invert, and a law that cannot turn inside out needs
    no check that it hasn't. f(u) is a RADIAL GRAPH about the tip's axis, so
    it is simple iff it is strictly positive. f is a convex combination of 1
-   and h, so f >= min(1, h); and h is bounded below by 2^(1/2 - 1/s) for
-   s <= 2 (the worst azimuth is 45 degrees) and by 1 above it, so with
-   sharpness bounded BELOW at TIP_SHARPNESS_RANGE[0] = 0.25 the floor is
-   2^(-3.5) = 0.0884 > 0 — which is the measured worst case over the shipped
-   side count, exactly. The BOUND is what makes the claim, and `tipOutline()`
-   clamps rather than trusting its caller.
+   and h, so f >= min(1, h); and h is bounded below by 2^(-k/2) (the worst
+   azimuth is 45 degrees), so with the pinch bounded ABOVE at
+   TIP_PINCH_RANGE[1] = 7 the floor is 2^(-3.5) = 0.0884 > 0 — which is the
+   measured worst case over the shipped side count, exactly, and the same
+   bound the old range's floor of 0.25 gave (0.25 is 2 / (1 + 7)). The BOUND
+   is what makes the claim, and `tipOutline()` clamps rather than trusting
+   its caller.
 
-   TODAY'S EQUIVALENT IS THE CIRCLE TWICE OVER: roundedness 1 makes the
-   blend exactly 1 whatever h is, and n = 4 with s = 2 is the circle's own
-   exponent — so a mutation that dropped the blend would still land on a
-   circle to within rounding, which is why the gate asserts the emitted
-   FACTORS are exactly 1 rather than asserting the picture looks round. */
+   TODAY'S EQUIVALENT IS THE CIRCLE BY ROUNDEDNESS ALONE: roundedness 1
+   makes the blend exactly 1 whatever h is, so a mutation that dropped the
+   blend would still land on a circle to within rounding, which is why the
+   gate asserts the emitted FACTORS are exactly 1 rather than asserting the
+   picture looks round. */
 export const TIP_CAP_RINGS = 5;
 export const TIP_LOBES = 4;
 export const TIP_ROUNDEDNESS = 1;
-export const TIP_SHARPNESS_RANGE = Object.freeze([0.25, 8]);
+/* THE PINCH RANGE (session 31). The MINIMUM is one step above the singular
+   point on purpose — 0 is the circle, and the circle is roundedness 1's —
+   so no reachable pinch makes every factor 1 below roundedness 1, and the
+   two instruments that once needed a special case there (the JS6/JG5
+   exemption, the read-out's "circle's own exponent" branch) are gone rather
+   than papered over. At the minimum the outline differs from a circle by
+   1.7% of radius, which every gate sees at 1e-12. The MAXIMUM is the old
+   floor of 0.25 exactly (k = 2 / 0.25 - 1 = 7), so the star end is where it
+   was. */
+export const TIP_PINCH_RANGE = Object.freeze([0.05, 7]);
 export const TIP_LOBES_RANGE = Object.freeze([2, 12]);
 /* THE ELONGATION FLOOR (Q5), not an ellipsoid. At an elongation of exactly
    1 the tip is a true sphere: the cylinder band between the two
@@ -334,47 +362,33 @@ export const TIP_BAND_FLOOR = 0.01;
    session 30: both tips now read their seven from the state through ONE
    function, `tipDescriptor()` below, so "they cannot drift" is a property of
    the code path rather than of a shared literal, and TIP_SHARPNESS (the
-   circle's own 2.00, the singular point the session-29 ruling moved the
-   anther off) has no reader left. Nothing may import either name. */
+   circle's own exponent 2.00 — the singular point, off the travel entirely
+   since session 31) has no reader left. Nothing may import either name. */
 /* THE REMAINING FIVE RANGES (session 29) — the two proportions, the two that
-   aim the lumps, and roundedness. Beside TIP_SHARPNESS_RANGE and
+   aim the lumps, and roundedness. Beside TIP_PINCH_RANGE and
    TIP_LOBES_RANGE above, these are the ONE OWNER of every tip control's
    bounds; the registry reads them for its `min`/`max` and the harness asserts
    the two agree at module load, the MAX_LAYERS move. A range restated in the
    registry is a range that drifts, and here the bound is what discharges Q6
    (no self-intersection instrument, ever). */
-/* THE TIP FAMILY'S SHIPPING SHARPNESS — 1.00, for BOTH tips (the anther's by
-   Eva's ruling, session 29, from the measurement; the stigma's re-derived at
-   its own dimensions in session 30 — see the second half of this note).
+/* THE TIP FAMILY'S SHIPPING PINCH — 1.00, THE POLYGON, for BOTH tips. The
+   value is the one derived in sessions 29 and 30 for the old `sharpness`
+   (where it was also 1.00: s = 2 / (1 + 1) = 1, the SAME exponent, exactly,
+   so the default matrix holds by construction), and the derivation is
+   unchanged because it was always about the WAIST: at pinch 1 the waist is
+   2^(-1/2) = 0.707 of the point radius — 0.679 mm at roundedness 0 on the
+   default 0.96 mm tip, 36% clear of the 0.50 mm floor, and 13% clear on the
+   thinnest sheet the export floors to 1.00 mm (a 0.80 mm tip: 0.566 mm),
+   which is why 1.00 and not 1.65 (the old 0.75: 8%, and CLAMPED on that
+   sheet). A NAMED value rather than a tuned one — the exact |cos| + |sin|
+   family, straight-sided in the 4-fold base — and at the default point
+   count of four it pinches at the diagonals, which is the tetrasporangiate
+   anther: four pollen sacs with grooves between them.
 
-   `s = 2` IS A SINGULAR POINT OF THE LAW, and it was the default until this
-   ruling. At s = 2 the exponent is the circle's own, so
-   `h = (cos^2 + sin^2)^(-1/2)` computes to EXACTLY 1.0 at every sampled
-   azimuth and the blend `rho + (1 - rho) * 1` is exactly 1 for EVERY
-   roundedness — `max|f - 1| = 0.000e+0`, measured, not a rounding residue.
-   The roundedness slider therefore did nothing to the FORM at any setting;
-   its only motion was a one-off lattice jump (10 sides to 16) the instant it
-   left 1, which is worse than an inert control because the jump reads as the
-   control working. Rendered: rho 1.00 -> 0.50 and rho 1.00 -> 0.00 are the
-   SAME 834,695 px, and rho 0.50 -> 0.00 is 0 px.
-
-   WHY 1.00 AND NOT ANOTHER VALUE OFF 2. It is the largest deviation that
-   never meets the waist floor anywhere on the roundedness slider (0.679 mm
-   at rho 0 against the 0.50 mm floor, 36% headroom — and the waist factor
-   `2^(1/2 - 1/s)` is independent of the point count, so that holds at every
-   n; at 0.75 the headroom is 8%, and at 0.50 the floor BINDS at rho 0, so a
-   clamp would be the first thing a visitor met). It is a NAMED value rather
-   than a tuned one — the exact `|cos| + |sin|` family. And at the default
-   point count of four it pinches at the diagonals, which is the
-   tetrasporangiate anther: four pollen sacs with grooves between them.
-
-   IT MOVES NO BYTE, and that is why the default was free to choose: at the
-   shipping roundedness of 1 the blend is exactly 1 and tipSides() returns the
-   rod's own lattice, so sharpness is INERT there whatever its value.
-   Measured both ways rather than argued — 0 of 120,960 floats moved (live
-   and export, `Object.is`, so a signed zero would count), 0 of 90,720 on the
-   default bloom where the androecium is absent, and 0 px across four
-   cross-config render pairs interleaved with same-config controls also at 0.
+   WHAT IT IS NO LONGER: "1.00 and not the circle's own 2.00" (session 29's
+   framing). The circle is not on this travel at all, so the default is not
+   chosen AWAY from anything — it is chosen for its waist headroom, which is
+   the part of the session-29 ruling that was always load-bearing.
 
    THE STIGMA'S DEFAULT WAS RE-DERIVED, NOT COPIED (session 30, Eva's
    instruction: "a trifid lobe is a different size, so the floor binds at a
@@ -384,60 +398,53 @@ export const TIP_BAND_FLOOR = 0.01;
    filament is (partRadius is the ONE owner of both), so the lobe radius IS
    the anther's — 0.96 mm on the default 1.20 mm sheet, in BOTH modes, since
    the export floor only raises a sheet under MIN_FEATURE_MM — at every sheet
-   thickness. The floor `s >= 1 / (1/2 - log2((need - rho) / (1 - rho)))` is
-   a function of that radius and roundedness alone, so it binds at the SAME
-   sharpness on both tips: below 0.694 at rho 0 on the default sheet. The
-   space either side there, waist against the 0.50 mm floor at rho 0: 0.50 ->
-   0.339 mm (CLAMPED), 0.75 -> 0.539 (8% headroom), 1.00 -> 0.679 (36%),
-   1.25 -> 0.780, 1.50 -> 0.855, 2.00 -> 0.960 (the circle, where roundedness
-   does nothing). ON THE THINNEST SHEETS the export floor raises the rod to
-   1.00 mm and the lobe radius to 0.80 mm, where the floor binds below 0.849:
-   0.75 CLAMPS there (0.449 mm) and 1.00 keeps 13% (0.566 mm) — a corner the
-   session-29 ruling did not print, and the reason 1.00 rather than 0.75 is
-   the largest named value that never meets the floor on ANY sheet a visitor
-   can print. It is ONE constant because it is one derivation on one radius
-   — a second constant with the same value would be the drift this session
-   exists to make impossible. The sheet (tools/shot-bloom-stigma.mjs) puts
-   0.50, 0.75, 1.00, 1.25 and 1.50 in front of Eva at rho 0; a different
-   stigma value is one per-instance default in the registry's tip table the
-   day she rules it.
+   thickness. The floor `k <= -2 log2((need - rho) / (1 - rho))` is a
+   function of that radius and roundedness alone, so it binds at the SAME
+   pinch on both tips: above 1.88 at rho 0 on the default sheet. It is ONE
+   constant because it is one derivation on one radius — a second constant
+   with the same value would be the drift session 30 exists to make
+   impossible. A different stigma value is one per-instance default in the
+   registry's tip table the day Eva rules it.
 
-   IT MOVES NO BYTE ON EITHER TIP, for the anther's own reason: at the
-   shipping roundedness of 1 the blend is exactly 1 and tipSides() returns the
-   rod's own lattice, so the stigma's sharpness going from the frozen 2.00 to
-   1.00 changes nothing emitted. Measured at the close (phase19 on both
-   trees), not argued. The harness asserts BOTH registries' defaults against
-   this one constant at module load. */
-export const TIP_SHARPNESS_DEFAULT = 1;
+   IT MOVES NO BYTE ON EITHER TIP at the shipping roundedness of 1 (the
+   blend is exactly 1 and tipSides() returns the rod's own lattice), and
+   NONE below it either where the old value was 1.00: the exponent is the
+   same double. The harness asserts BOTH registries' defaults against this
+   one constant at module load. */
+export const TIP_PINCH_DEFAULT = 1;
 export const TIP_SIZE_RANGE = Object.freeze([0.6, 6]);
 export const TIP_ELONGATION_RANGE = Object.freeze([1, 6]);
 export const TIP_ROUNDEDNESS_RANGE = Object.freeze([0, 1]);
 export const TIP_LUMPS_RANGE = Object.freeze([1, 6]);
 export const TIP_SPREAD_DEG_RANGE = Object.freeze([0, 90]);
-/* THE SHARPNESS FLOOR (Eva's ruling, Sep 6) — R_min = MIN_FEATURE_MM / 2 =
-   0.50 mm, and it carries `UNMEASURED — no coupon has been printed` verbatim
-   wherever it is printed, because 0.50 mm is an assumption about SLS and
-   NOTHING IN THIS PROJECT HAS BEEN PRINTED. It is the sheet's own floor and
-   the spine's own discipline: full range, CLAMPED, TOLD.
+/* THE WAIST FLOOR, ON THE PINCH (Eva's ruling, Sep 6; re-based on the
+   pinch in session 31) — R_min = MIN_FEATURE_MM / 2 = 0.50 mm, and it
+   carries `UNMEASURED — no coupon has been printed` verbatim wherever it is
+   printed, because 0.50 mm is an assumption about SLS and NOTHING IN THIS
+   PROJECT HAS BEEN PRINTED. It is the sheet's own floor and the spine's own
+   discipline: full range, CLAMPED, TOLD.
 
    WHAT IT BOUNDS, said rather than implied: the WAIST — the narrowest radius
-   anywhere on the emitted outline, `a * min_j f_j`. Below a sharpness of 2
-   the law pinches inward at the diagonals (h dips to 2^(1/2 - 1/s) < 1) and
-   that waist is what a star's points hang off; at 0.25 on the shipping anther
-   it is 0.085 mm, a hairline. It does NOT bound the included ANGLE of a
-   point, which is the other thing a printer would care about and which no
-   number here is derived from. Two claims, one measured, one absent.
+   anywhere on the emitted outline, `a * min_j f_j`. The law pinches inward
+   at the diagonals (h dips to 2^(-k/2) < 1) and that waist is what a star's
+   points hang off; at pinch 7 on the shipping anther it is 0.085 mm, a
+   hairline. It does NOT bound the included ANGLE of a point, which is the
+   other thing a printer would care about and which no number here is
+   derived from. Two claims, one measured, one absent.
 
-   CLOSED FORM, and it is a floor on SHARPNESS because sharpness is the only
-   control that makes the waist: f_min = rho + (1 - rho) h_min(s), so with
+   CLOSED FORM, and it is a CAP on the PINCH because the pinch is the only
+   control that makes the waist: f_min = rho + (1 - rho) h_min(k), so with
    `need = R_min / a` the requirement h_min >= m = (need - rho)/(1 - rho)
-   becomes s >= 1 / (1/2 - log2 m). Three corners, all told and none refused:
+   becomes k <= -2 log2 m. (The old floor on the exponent, s >= 1 / (1/2 -
+   log2 m), is this line through s = 2 / (1 + k) — bit-identical on a
+   1,528-point sweep of radius and roundedness, measured, since scaling by 2
+   commutes with rounding.) Three corners, all told and none refused:
    rho >= need needs no clamp at all (the blend's own floor already clears
    it — the DEFAULT's arm, where rho is exactly 1 and no arithmetic runs);
-   need > 1 means the whole tip is thinner than the floor and no sharpness
-   saves it (`underFloor` on the descriptor, the crosses-axis precedent); and
-   everything between clamps upward to `sNeed`, which is <= 2 by construction,
-   so the clamp can never push a shape past the circle.
+   need > 1 means the whole tip is thinner than the floor and no pinch saves
+   it (`underFloor` on the descriptor, the crosses-axis precedent); and
+   everything between clamps DOWNWARD to `kMax`, which is >= 0 by
+   construction, so the clamp can never push a shape past the circle.
 
    THE SAMPLED MINIMUM IS THE CONTINUOUS ONE, not an approximation of it:
    tipSides() makes the lattice n*k with k EVEN, so a sample lands on u = 0
@@ -445,23 +452,30 @@ export const TIP_SPREAD_DEG_RANGE = Object.freeze([0, 90]);
    EMITTED factors equals `a * (rho + (1-rho) h_min)` exactly. JS7 asserts
    that equality against the emitted outline rather than trusting it. */
 export const TIP_MIN_RADIUS_MM = MIN_FEATURE_MM / 2;
-export function tipSharpnessFloor(a, roundedness, sharpness) {
+export function tipPinchFloor(a, roundedness, pinch) {
   const rho = clamp(roundedness, TIP_ROUNDEDNESS_RANGE[0], TIP_ROUNDEDNESS_RANGE[1]);
-  const asked = clamp(sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
+  const asked = clamp(pinch, TIP_PINCH_RANGE[0], TIP_PINCH_RANGE[1]);
   const need = TIP_MIN_RADIUS_MM / a;
-  if (!(need > rho)) return { sharpness: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: false };
-  if (need > 1) return { sharpness: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: true };
+  if (!(need > rho)) return { pinch: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: false };
+  if (need > 1) return { pinch: asked, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(asked)), floored: false, underFloor: true };
   const m = (need - rho) / (1 - rho);
-  const sNeed = 1 / (0.5 - Math.log2(m));
-  const built = asked < sNeed ? sNeed : asked;
-  return { sharpness: built, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(built)), floored: built !== asked, underFloor: false };
+  const kMax = -2 * Math.log2(m);
+  const built = asked > kMax ? kMax : asked;
+  return { pinch: built, asked, waist: a * (rho + (1 - rho) * tipWaistFactor(built)), floored: built !== asked, underFloor: false };
 }
-/* h's own minimum over the azimuth — 2^(1/2 - 1/s) at the 45-degree worst
-   case below 2, and exactly 1 at or above it, where the law bulges outward
-   instead of pinching. ONE owner, read by the floor and by the read-out. */
-export function tipWaistFactor(sharpness) {
-  const sh = clamp(sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
-  return sh < 2 ? Math.pow(2, 0.5 - 1 / sh) : 1;
+/* h's own minimum over the azimuth — 2^(-k/2) at the 45-degree worst case,
+   which is where the law pinches. ONE owner, read by the floor and by the
+   read-out. */
+export function tipWaistFactor(pinch) {
+  const k = clamp(pinch, TIP_PINCH_RANGE[0], TIP_PINCH_RANGE[1]);
+  return Math.pow(2, -k / 2);
+}
+/* THE EXPONENT FROM THE PINCH — the one place `s = 2 / (1 + k)` is formed.
+   Exact where it matters: pinch 1 is exponent 1, pinch 3 is 0.5, pinch 7 is
+   0.25 (the old range's floor), so every shape the old control reached at
+   those values is reached at the same double. */
+export function tipExponent(pinch) {
+  return 2 / (1 + clamp(pinch, TIP_PINCH_RANGE[0], TIP_PINCH_RANGE[1]));
 }
 /* THE TIP'S OWN LATTICE (session 29) — how many sides the tip is revolved
    through, and the OUTLINE is its one owner: `revolveInto` reads the array's
@@ -482,10 +496,20 @@ export function tipWaistFactor(sharpness) {
    own STAMEN_SIDES whatever the point count says. That is not a special case
    bolted on for the bytes — it is the same statement as the outline's, where
    `1 + 0 * h` is exactly 1 — and it is what makes the point count and the
-   sharpness INERT at roundedness 1 rather than merely invisible: with the
+   pinch INERT at roundedness 1 rather than merely invisible: with the
    factors exactly 1 AND the lattice fixed, the emitted tip is independent of
    both, which JS7 asserts as a property. It is also the whole byte-identity
-   argument for the shipping anther, whose roundedness default is 1. */
+   argument for the shipping anther, whose roundedness default is 1.
+
+   THIS ARM IS THE CIRCLE'S OWN LATTICE LAW AND NOT A SINGULARITY PATCH
+   (Eva, session 31, correcting her own count of the singularity's sites
+   from three to two). It is keyed on ROUNDEDNESS 1, not on the exponent; it
+   only LOOKED like a patch while the singular exponent was reachable,
+   because there leaving roundedness 1 jumped the lattice 10 -> 16 with no
+   form change. With that exponent off the travel, leaving roundedness 1
+   always changes the form, so the sides are always earned. Deleting the arm
+   was costed and refused: every row with a tip at roundedness 1 moves (79
+   live, 59 of phase19) for 60% more triangles per tip. */
 export function tipSides(shape) {
   if (clamp(shape.roundedness, TIP_ROUNDEDNESS_RANGE[0], TIP_ROUNDEDNESS_RANGE[1]) === 1) return STAMEN_SIDES;
   const n = Math.round(clamp(shape.lobes, TIP_LOBES_RANGE[0], TIP_LOBES_RANGE[1]));
@@ -508,7 +532,7 @@ export function tippedRodTris(lumps, sides = STAMEN_SIDES) {
    a parameter that inverts it. */
 export function tipOutline(shape, sides = tipSides(shape)) {
   const rho = clamp(shape.roundedness, 0, 1);
-  const sh = clamp(shape.sharpness, TIP_SHARPNESS_RANGE[0], TIP_SHARPNESS_RANGE[1]);
+  const sh = tipExponent(shape.pinch);
   const n = Math.round(clamp(shape.lobes, TIP_LOBES_RANGE[0], TIP_LOBES_RANGE[1]));
   const out = new Array(sides);
   for (let j = 0; j < sides; j++) {
@@ -542,9 +566,9 @@ export function tipOutline(shape, sides = tipSides(shape)) {
    trees measures it anyway.
 
    THE FLOOR IS ON THE WAIST AND IT IS TOLD, NEVER REFUSED — the spine curl's
-   discipline; `tipSharpnessFloor` is its one owner and what it does not
+   discipline; `tipPinchFloor` is its one owner and what it does not
    bound is in its own header. At the shipping roundedness of exactly 1 the
-   `rho >= need` arm returns with no arithmetic done, so the sharpness comes
+   `rho >= need` arm returns with no arithmetic done, so the pinch comes
    back the asked value unchanged — and is INERT, because the blend is
    exactly 1 there and the lattice is the rod's own (tipSides).
 
@@ -561,18 +585,18 @@ export function tipDescriptor(state, prefix, diameter) {
   if (!TIP_PREFIXES.includes(prefix)) throw new Error(`tipDescriptor: unknown tip "${prefix}" — the registry and the geometry name two tips, ${TIP_PREFIXES.join(' and ')}`);
   const g = (k) => state[`${prefix}${k}`];
   const size = g('Size'), elongation = g('Elongation'), roundedness = g('Roundedness'), spreadDeg = g('Spread');
-  for (const [k, v] of [['Size', size], ['Elongation', elongation], ['Roundedness', roundedness], ['Points', g('Points')], ['Sharpness', g('Sharpness')], ['Lumps', g('Lumps')], ['Spread', spreadDeg]]) {
+  for (const [k, v] of [['Size', size], ['Elongation', elongation], ['Roundedness', roundedness], ['Points', g('Points')], ['Pinch', g('Pinch')], ['Lumps', g('Lumps')], ['Spread', spreadDeg]]) {
     if (!Number.isFinite(Number(v))) throw new Error(`tipDescriptor: ${prefix}${k} is ${JSON.stringify(v)} — the state carries no such control; the registry's tip table and the geometry have diverged`);
   }
   const dia = size * diameter;
   const a = dia / 2;
-  const floor = tipSharpnessFloor(a, roundedness, g('Sharpness'));
-  const shape = { lobes: Math.round(g('Points')), sharpness: floor.sharpness, roundedness };
+  const floor = tipPinchFloor(a, roundedness, g('Pinch'));
+  const shape = { lobes: Math.round(g('Points')), pinch: floor.pinch, roundedness };
   const lumps = Math.round(g('Lumps'));
   return { prefix, diameter: dia, length: elongation * size * diameter, shape,
            lumps, spreadDeg, spreadRad: spreadDeg * D2R,
            sides: tipSides(shape), sizeFactor: size, elongation,
-           sharpnessAsked: floor.asked, sharpnessFloored: floor.floored, waistMm: floor.waist,
+           pinchAsked: floor.asked, pinchFloored: floor.floored, waistMm: floor.waist,
            minRadiusMm: TIP_MIN_RADIUS_MM, underFloor: floor.underFloor,
            /* THE ELONGATION FLOOR (Q5, session 26) told rather than silent:
               the band is at least TIP_BAND_FLOOR of the tip's own radius, an

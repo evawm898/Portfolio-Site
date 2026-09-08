@@ -965,11 +965,11 @@ function tipLine(name, rod, a) {
   if (!a) return '';
   const sh = a.shape, circle = sh.roundedness === 1;
   return `${name} ${a.sizeFactor.toFixed(2)}x ${rod} = ${a.diameter.toFixed(2)} mm across (${a.mode}) · ${a.elongation.toFixed(2)}x its own diameter = ${a.length.toFixed(2)} mm long${a.bandFloored ? ' (A SPHERE — the band FLOORED so no triangle has zero area)' : ''}`
-       + ` · outline ${circle ? 'a CIRCLE (roundedness 1 — the points and the sharpness are INERT here, exactly, not merely hidden)' : `roundedness ${sh.roundedness.toFixed(2)}, ${sh.lobes}-fold, sharpness ${sh.sharpness.toFixed(2)}`}`
+       + ` · outline ${circle ? 'a CIRCLE (roundedness 1 — the points and the pinch are INERT here, exactly, not merely hidden)' : `roundedness ${sh.roundedness.toFixed(2)}, ${sh.lobes}-fold, pinch ${sh.pinch.toFixed(2)}`}`
        + ` · revolved through ${a.sides} sides`
        + ` · waist ${a.waistMm.toFixed(2)} mm against the ${a.minRadiusMm.toFixed(2)} mm floor`
        + (a.underFloor ? ' — THE WHOLE TIP IS UNDER IT (told, never refused)'
-         : a.sharpnessFloored ? ` — SHARPNESS CLAMPED to ${sh.sharpness.toFixed(2)} from ${a.sharpnessAsked.toFixed(2)}` : '')
+         : a.pinchFloored ? ` — PINCH CLAMPED to ${sh.pinch.toFixed(2)} from ${a.pinchAsked.toFixed(2)}` : '')
        + ' (UNMEASURED — no coupon has been printed)'
        + ` · ${a.lumps === 1 ? 'one lobe' : `${a.lumps} lobes`} at ${a.spreadDeg}° off ${rod}${a.lumpsCoincident ? ' — COINCIDENT: duplicate geometry, told, never refused' : ''}`
        + `\n`;
