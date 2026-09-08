@@ -693,6 +693,105 @@ are a user's. Nothing in the tree needs changing for it.
 
 ---
 
+## 13. THE SAGITTA, MEASURED ON THIS TREE BEFORE THE INSTRUMENT IS BUILT
+
+Taken while PR ONE's matrix gates were in flight, on **this** tree — which is
+post-PR-ONE `main`, the tree PR TWO builds on. It is the "report the distribution
+before proposing a bound" Eva asked for, arriving early.
+
+**What it measures and what it does not.** This is the **width-profile** sagitta: the outline
+in the blade's own `(s, h)` plane, where `s = u × petalLength` is exactly what the row loop
+uses. It calls the **real `footRing()` and the real `widthProfile()`** — no approximation of
+either, which the earlier phase-A probe could not say. It is **not** the 3D margin sagitta the
+shipped instrument will measure (that needs `buildPetalInto`'s own row closures and is PR TWO's
+structural change). Over **all 562 live matrix rows × both modes = 1,124 measured profiles, 0
+skipped.**
+
+### 13a. THE WORST CHORD ERROR IS AT THE BASE, AND THE APEX IS EXACTLY ZERO
+
+| region | n (intervals) | p50 | p90 | max |
+|---|---|---|---|---|
+| base, `u ≤ 0.30` | 8,992 | 0.0186 | 0.4025 | **0.6325 mm** |
+| middle | 16,860 | 0.0085 | 0.0174 | 0.1580 mm |
+| apex, `u ≥ 0.80` | 5,620 | 0.0000 | 0.0000 | **0.0000 mm** |
+
+Whole-profile worst: **0.6325 mm at u = 0.049**, on *SLOT: size ×2.00 saturating (petalLength
+60, petalWidth 30) × 2 whorls in step*. **Live and export are identical at the top** (0.6325
+both). Of the 1,124 rows, **991 (88.2%) have their worst interval at the base** and 133 in the
+middle; **none at the apex.** As a fraction of the local half-width the worst is **45.7%**
+(0.3462 mm on 0.758 mm, at u = 0.016, `footDelicacy min`).
+
+**THE APEX ZERO IS NOT GOOD NEWS AND MUST NOT BE READ AS ONE.** It is zero **by construction**:
+above `uCap` the profile is a straight lerp to the terminal, and a straight line has no chord
+error against its own chords. The instrument's headline number at the apex is therefore
+**vacuous today** and becomes meaningful the moment PR THREE curves that region. Anyone reading
+a green apex sagitta on `main` as evidence the mesh is fine there has read a tautology.
+
+**Which also says what the visible faceting is.** The "faceted gable" is not chord error along
+`u` — there is none. It is the apex **being a straight cone**, plus the slope discontinuity at
+`uCap`. That is a *shape* fact, which is why the cap question and the law question are the same
+question.
+
+**And the base number is a pre-existing defect with nothing to do with the apex.** 0.6325 mm of
+chord error at `u = 0.049` is the root blend collapsing the width over six rows
+(`ROOT_BLEND_END = 0.30`) on the widest reachable petal. A bound set from "the observed
+distribution" would bind **there**, on geometry this session never touched.
+
+### 13b. WHAT PR THREE'S LAW WILL COST AT UNIFORM ROWS — the prediction that justifies redistribution
+
+Worst interval above `uPk`, EXPORT mode, mm:
+
+| state | n = 0.60 | n = 1.00 | n = 2.00 |
+|---|---|---|---|
+| DEFAULT `a=1.0 b=1.8 W=16 L=40` | 0.2424 | 0.0333 | 0.1041 |
+| WIDEST `W=30` | 0.2728 | 0.0304 | 0.1775 |
+| LONGEST `L=60` | 0.3109 | 0.0338 | 0.1102 |
+| TAPER MIN `b=0.6` | **0.5881** | 0.1885 | 0.1536 |
+| TAPER MAX `b=4.0` | 0.5695 | 0.1097 | 0.0893 |
+| LATE PEAK `a=3.0 b=0.6` | 0.0000 | 0.0000 | 0.0000 |
+
+Two readings, neither of them the expected one:
+
+* **The acute end is the expensive one, not the round end.** `n = 0.60` costs 2–6× what
+  `n = 2.00` does. The shoulder is a corner, and a corner is what uniform rows follow worst.
+* **At `n = 2.00` the worst interval sits at `u ≈ 0.99`** — the last one, where the ellipse
+  quadrant's tangent goes vertical. Redistribution has to put rows *there*, which is the
+  opposite end from where the eye complains.
+
+### 13c. THE CAP MAKES `n` INERT ON 26 REACHABLE STATES — a dead-control finding, before the control exists
+
+`uCap = min(1 − TIP_CAP_FRACTION, crossing) ≤ 0.80` **always**. The law lives on `[uPk, 1]`. So
+wherever `uPk ≥ 0.80` the law's entire domain is inside the straight cap and **`n` does
+nothing at all** — not hidden, not clamped, *inert*, with no read-out saying so.
+
+`uPk ≥ 0.80 ⟺ a ≥ 4b`, and over the reachable grid (55 × 69 = **3,795** taper states):
+
+* **26 states (0.69%) make `n` fully inert** — `a ≥ 2.45` against `b ≤ 0.75`.
+* **137 more (3.61%) leave the law fewer than two of the 28 row intervals.**
+* **Together 163 of 3,795 (4.30%)** give `n` two intervals or fewer.
+
+The LATE PEAK row above is that fact in the table: `0.0000` at every `n` **with** the cap, and
+`0.4480 / 0.3590 / 0.2565` with it demoted. **Demoting the cap removes the dead region
+outright**, because the law then owns `[uPk, 1]` at every taper. That is a second, independent
+argument for the demotion §10a already asked for on the roundness reading — and it is a
+measurement, not a preference.
+
+### 13d. ONE THING TO SETTLE BEFORE PR THREE, flagged not decided
+
+The ruling says `n` **default 1.00** and calls the law a *reparameterisation* of the existing
+taper. But today's outline above `uPk` is the **core** `u^a(1−u)^b`, and phase A's own finding
+was that the core matches this family *at the round end* (RMS 0.005), not at `n = 1`. So
+`n = 1.00` is a straight chord from the widest point to the terminal, which is **not** today's
+shape — the default would move every shipped petal rather than reproduce it.
+
+That may well be intended: the ruling does say every shipped shape's bytes move under PR THREE
+and a frozen phase is owed. But "the continuous surface must be unchanged — prove by sampling
+the underlying law densely on both trees" cannot hold for the law change and the redistribution
+at once. **Which of the two the identity claim attaches to is Eva's to say**, and it changes
+what PR THREE has to prove. Raised here rather than resolved.
+
+---
+
 ## 7. Standing gaps this session did not touch
 
 * The dead travel on the shipped `petalTipBreadth` (§1b) is a defect **today**, on `main`,
