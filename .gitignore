@@ -21,3 +21,7 @@ audit-out/
 # tools/verify-cards-fonts.mjs replays real Google Fonts responses from here so
 # a second run needs no network. Regenerable, so not committed.
 tools/.cache/
+
+# tools/.scratch — throwaway harnesses and gate logs from a working session.
+# Regenerate, never commit.
+tools/.scratch/

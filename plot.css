@@ -41,6 +41,11 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 
 .plot-row { display: grid; grid-template-columns: 4.2rem 1fr 5.4rem; align-items: center; gap: 0.5rem; }
 .plot-row input[type=range] { width: 100%; accent-color: #6fb7ae; margin: 0; display: block; }
+/* A CONTROL THAT APPLIES TO NOTHING SAYS SO. A warp belongs to its petal, so
+   with none picked the two scales have nowhere to write — they are disabled
+   rather than left showing the last petal's numbers, which is exactly how the
+   page-wide model advertised itself before the ownership was fixed. */
+.plot-row input:disabled, .plot-bends button:disabled { opacity: 0.35; cursor: default; }
 
 /* THE DEAD TRAVEL IS MARKED ON THE TRACK, AND THE RANGE IS NOT NARROWED — the
    convention bloom.css's `.bl-ctrl--capped` established for `stamenSpread`.
@@ -95,10 +100,34 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 .plot-check { display: block; margin: 0.5rem 0 0; cursor: pointer; user-select: none; }
 .plot-check input { accent-color: #6fb7ae; margin: 0 0.35rem 0 0; vertical-align: -0.1em; }
 
-#plot-stemstate {
+/* THE PETAL PICKER. A dropdown flanked by two steppers, in the middle column of
+   the same three-column row every slider uses. Both, and in that order, because
+   click-picking on a 28-petal bloom is ambiguous more often than not (the
+   numbers are in plot.html's own comment): the list is what you can rely on,
+   the arrows are how you sweep it, and the click is a convenience on top of
+   both. The select takes the free space so a petal's name is never clipped. */
+.plot-pick { display: flex; align-items: center; gap: 0.3rem; }
+.plot-pick select {
+  background: #0a0e0e; color: #c8d2d1; border: 1px solid #2b3333;
+  font: inherit; padding: 0.15rem 0.3rem; border-radius: 2px; flex: 1 1 auto; min-width: 0;
+}
+.plot-pick button {
+  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  font: inherit; line-height: 1; padding: 0.15rem 0.35rem; cursor: pointer;
+  border-radius: 2px; flex: 0 0 auto;
+}
+.plot-pick button:hover:not(:disabled) { border-color: #6fb7ae; color: #c8d2d1; }
+.plot-pick button:disabled { opacity: 0.35; cursor: default; }
+
+#plot-stemstate, #plot-petalstate {
   margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
   white-space: pre-wrap; font: inherit; color: #96a2a1;
 }
+/* The selected petal is drawn in the panel's own teal on the canvas, so the
+   name of it in the read-out is too — one colour means "this one" in both
+   places. `.panel b` is already teal, and a second name for the same colour is
+   a second thing to keep in step. */
+#plot-petalstate .sel { color: #6fb7ae; }
 
 #resetView {
   background: none; border: 1px solid #2b3333; color: #96a2a1;

@@ -17,6 +17,51 @@
 // file we do not fully understand is never silently half-invisible.
 export const KINDS = ['u', 'v'];
 
+/* THE STATION COMES FROM THE FILE, NEVER FROM THE POINT'S INDEX — the same
+   discipline `kindOf` follows one aisle down, for the same reason. The export
+   declares where every point sits along the petal in two places: a v-line
+   carries its own `extras.u`, and a u-line's point i sits at row i of its
+   panel's declared `u` ladder (`extras.panels[].u` on the petal node). Those
+   two declarations are what make a u-line and a v-line agree at the lattice
+   crossing they share, and `i / (count - 1)` only happens to equal them when
+   the ladder is uniform — which is a property of the grid in front of you and
+   not of the format. The bloom's own telemetry records `metricMax` reaching
+   4.12 under cup, so evenly spaced `u` is not evenly spaced anything.
+
+   A strip the file does not place gets NO station rather than a guessed one,
+   and a petal holding such a strip is not warpable — see `petalList` below.
+   Deforming part of a petal and leaving the rest where it was is the one
+   outcome worse than refusing. */
+export function stationsForStrip(kind, ud, count, panels) {
+  if (!(count > 0)) return null;
+  if (kind === 'u') {
+    const p = panelFor(panels, ud && ud.panel);
+    const ladder = p && p.u;
+    if (!Array.isArray(ladder) || ladder.length !== count) return null;
+    const out = new Float64Array(count);
+    for (let i = 0; i < count; i++) {
+      if (!Number.isFinite(ladder[i])) return null;
+      out[i] = ladder[i];
+    }
+    return out;
+  }
+  if (kind === 'v') {
+    if (!ud || !Number.isFinite(ud.u)) return null;
+    return new Float64Array(count).fill(ud.u);
+  }
+  return null;
+}
+
+/* Which panel a strip belongs to. A cleft petal is three panels, each with its
+   own `u` ladder and its own label, and every strip names its own — so the
+   match is by label. A file with exactly one panel and a strip that does not
+   name it is the single unambiguous case, and is allowed. */
+export function panelFor(panels, label) {
+  if (!Array.isArray(panels) || !panels.length) return null;
+  if (label == null) return panels.length === 1 ? panels[0] : null;
+  return panels.find(p => p && p.label === label) || null;
+}
+
 // Density slider bounds. 1 is the sparsest, MAX_DENSITY draws every line.
 export const MIN_DENSITY = 1;
 export const MAX_DENSITY = 12;
@@ -75,12 +120,15 @@ function indexOf(o, kind) {
   return Number.isFinite(n) ? n : -1;
 }
 
-function petalIndexOf(ancestors) {
+// The node the exporter hung this strip's petal off — the one carrying
+// `petalIndex`. Its extras hold the panel ladders the station comes from and
+// the azimuth / role the read-out names the petal by, so it is found once and
+// read for both rather than walked twice.
+function petalNodeOf(ancestors) {
   for (const a of ancestors) {
-    const n = a.userData && a.userData.petalIndex;
-    if (Number.isFinite(n)) return n;
+    if (a.userData && Number.isFinite(a.userData.petalIndex)) return a;
   }
-  return -1;
+  return null;
 }
 
 // Apply a 4x4 column-major matrix (three's `.elements` order) to (x,y,z).
@@ -100,6 +148,7 @@ const IDENTITY = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
 export function readGridScene(root) {
   const strips = [];
   const petals = new Set();
+  const nodes = new Map();     // petal index -> the node carrying its extras
   const attachments = [];
   let triangles = 0, meshes = 0, lineSegments = 0, lineLoops = 0, points = 0;
 
@@ -131,12 +180,20 @@ export function readGridScene(root) {
           applyMat4(e, pos.getX(i), pos.getY(i), pos.getZ(i), p);
           pts[i * 3] = p[0]; pts[i * 3 + 1] = p[1]; pts[i * 3 + 2] = p[2];
         }
-        const petal = petalIndexOf(ancestors);
+        const node = petalNodeOf(ancestors);
+        const nd = (node && node.userData) || {};
+        const petal = Number.isFinite(nd.petalIndex) ? nd.petalIndex : -1;
+        if (petal >= 0 && !nodes.has(petal)) nodes.set(petal, node);
         if (petal >= 0) petals.add(petal);
+        const ud = (g.userData) || {};
         strips.push({
           kind, petal, index: indexOf(o, kind), points: pts,
           count: pos.count, segments: pos.count - 1,
-          panel: (g.userData && g.userData.panel) || null,
+          panel: ud.panel || null,
+          // WHERE EVERY POINT SITS ALONG THE PETAL, from the file's own
+          // declarations and never from the index — see `stationsForStrip`.
+          // null when the file did not place it.
+          stations: stationsForStrip(kind, ud, pos.count, nd.panels),
         });
       }
     }
@@ -155,7 +212,48 @@ export function readGridScene(root) {
   for (const s of strips) s.last = lastByGroup.get(`${s.petal}/${s.kind}`) ?? -1;
 
   return { strips, attachments, census: census(strips), petals: petals.size,
+           petalList: petalList(strips, nodes),
            found: { triangles, meshes, lineSegments, lineLoops, points } };
+}
+
+/* THE PETALS, AS THINGS THAT CAN BE PICKED — one entry per petal node the file
+   declares, in the file's own order, carrying what the read-out names it by and
+   whether the whole of it can be placed along its own axis.
+
+   `warpable` is a property of the FILE, not of the app: a petal is warpable
+   when every strip under it has a station and it has u-lines to measure an axis
+   from. A petal holding one unplaced strip is refused whole — deforming the
+   rest of it and leaving that strip behind would tear the grid internally,
+   which is the failure the drawing is least able to show. */
+export function petalList(strips, nodes) {
+  const by = new Map();
+  for (const s of strips) {
+    if (s.petal < 0) continue;
+    let e = by.get(s.petal);
+    if (!e) by.set(s.petal, e = { index: s.petal, strips: 0, u: 0, v: 0, placed: 0 });
+    e.strips++;
+    if (s.kind === 'u') e.u++;
+    if (s.kind === 'v') e.v++;
+    if (s.stations) e.placed++;
+  }
+  return [...by.values()].sort((a, b) => a.index - b.index).map(e => {
+    const node = nodes && nodes.get(e.index);
+    const ud = (node && node.userData) || {};
+    const unplaced = e.strips - e.placed;
+    return {
+      index: e.index,
+      name: (node && node.name) || `petal_${e.index}`,
+      azimuthDeg: Number.isFinite(ud.azimuthDeg) ? ud.azimuthDeg : null,
+      role: ud.role || null,
+      slotIndex: Number.isFinite(ud.slotIndex) ? ud.slotIndex : null,
+      panels: Array.isArray(ud.panels) ? ud.panels.length : 0,
+      strips: e.strips, uLines: e.u, vLines: e.v, unplaced,
+      warpable: unplaced === 0 && e.u > 0,
+      why: unplaced > 0
+        ? `${unplaced} of its ${e.strips} strips carry no declared u`
+        : e.u === 0 ? 'it has no u-lines to measure an axis from' : '',
+    };
+  });
 }
 
 export function census(strips) {
