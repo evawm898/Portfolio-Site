@@ -114,6 +114,79 @@
   <pre id="plot-framestate"></pre>
 </details>
 
+<!-- PETAL. One petal out of the file's own set, picked and deformed while the
+     rest of the bloom stays where it is. The station a bend rides on is ARC
+     LENGTH along that petal's own measured centre line, not `u` — see
+     plot-petal.js's header — and the whole law is gated to be exactly the
+     identity at the base, because every u-line starts on the attachment ring
+     and the inferred stem continues from precisely those points.
+
+     PICKING IS A CYCLE FIRST AND A CLICK SECOND, and that order is MEASURED
+     rather than assumed — `tools/shot-plot-petal.mjs` sweeps the canvas and
+     prints it, so the numbers below come out of a tool rather than out of a
+     comment. On this bloom with the shipped 8 px tolerance: at the home framing
+     only 15.8% of pixels have any line within reach of a click at all, 62.5% of
+     the clicks that DO hit have two or more petals within tolerance, and 39.5%
+     of them are ones where the nearest line on screen and the nearest line to
+     the camera belong to DIFFERENT petals; at a low angle, where the whorls
+     overlap most, it is 10.6% / 75.6% / 49.6%. Widening the tolerance is not
+     the lever — the hit rate runs 14.3% at 4 px to 18.0% at 14 px — because
+     what is scarce is INK, not reach. So the dropdown is the control you can
+     rely on and the click is the convenience; the click takes the front-most
+     line within tolerance, because with depth testing off everything is drawn
+     and the front petal is the one the eye means. -->
+<details id="plot-petal" class="panel" open>
+  <summary>PETAL</summary>
+
+  <div class="plot-row">
+    <label for="petalPick">petal</label>
+    <span class="plot-pick">
+      <button type="button" id="petalPrev" title="the petal before this one">&#9664;</button>
+      <select id="petalPick"><option value="-1">none</option></select>
+      <button type="button" id="petalNext" title="the petal after this one">&#9654;</button>
+    </span>
+    <output id="petalPickOut">none</output>
+  </div>
+
+  <!-- ALONG scales the petal's own centre line about its base; ACROSS scales
+       each point's offset from that centre line. They are independent because
+       they act on different halves of one decomposition, so both at k is a
+       similarity and either alone is not. ACROSS is held at the foot: 28 petals
+       share one ring, and a petal whose own attachment widened would overrun
+       its neighbours' and move the feet the stem is built from. -->
+  <div class="plot-row">
+    <label for="petalAlong">along</label>
+    <input type="range" id="petalAlong" min="0.25" max="2.5" step="0.05" value="1">
+    <output id="petalAlongOut">1.00&times;</output>
+  </div>
+  <div class="plot-row">
+    <label for="petalAcross">across</label>
+    <input type="range" id="petalAcross" min="0.25" max="2.5" step="0.05" value="1">
+    <output id="petalAcrossOut">1.00&times;</output>
+  </div>
+
+  <!-- The same control points, the same gaussian, the same width law the stem
+       bends by — plot-warp.js, pointed at a different axis. Its handles are
+       AMBER here and teal on the stem, so which set is which is legible when
+       both are on screen. -->
+  <div class="plot-row">
+    <label for="petalBendAdd">bends</label>
+    <span class="plot-bends">
+      <button type="button" id="petalBendRemove" title="remove a bend point">&minus;</button>
+      <span id="petalBendCount">2</span>
+      <button type="button" id="petalBendAdd" title="add a bend point">+</button>
+      <button type="button" id="petalBendReset" title="return every bend point to rest">reset</button>
+    </span>
+    <output id="petalBendOut"></output>
+  </div>
+  <label class="plot-check" for="petalHandles">
+    <input type="checkbox" id="petalHandles" checked> show bend handles
+  </label>
+  <div class="plot-hint">click a line to pick its petal &middot; drag a handle to bend it</div>
+
+  <pre id="plot-petalstate"></pre>
+</details>
+
 <!-- STEM. The bloom has no stem geometry — `below` throws in the generator, and
      that is phase-2 work there. This one is INFERRED: every u-line already
      starts on the attachment ring at z = 0, so the stem is those same lines

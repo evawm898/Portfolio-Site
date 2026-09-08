@@ -105,7 +105,27 @@ const MUTANTS = [
              // And this mutation EMPTIES the v family, so a check measured on
              // the v family has nothing left to measure — the same reason the
              // two v-family checks above are on this list.
-             'stem/the-droop-reaches-every-family'],
+             'stem/the-droop-reaches-every-family',
+             /* AND IT TAKES THE WHOLE PETAL FEATURE WITH IT, which is a true and
+                useful thing to say about a reader that guesses the family: with
+                every strip read as a u-line, two thirds of each petal's strips
+                have the wrong point count for their panel's declared ladder, so
+                nothing is placeable, no petal is warpable, there is no axis to
+                measure, and there are no handles to drag. Eleven checks, named
+                rather than tuned around. The ones that stay GREEN are worth
+                noting too — the base row still holds and the stem is still
+                untouched, because with no warpable petal nothing moves at all. */
+             'select/the-picker-lists-the-file-own-petals',
+             'warp/only-the-selected-petal-moves',
+             'warp/both-line-families-move-together',
+             'stretch/along-changes-the-length-and-not-the-width',
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours',
+             'bend/the-petal-handle-lands-under-the-pointer',
+             'bend/a-petal-handle-drag-does-not-orbit-the-camera',
+             'bend/add-and-remove-change-the-set-and-reset-rests-it',
+             'select/switching-petal-rests-the-bends-and-carries-the-scales',
+             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -145,9 +165,15 @@ const MUTANTS = [
     // moves changes with it: the v family's ink shifts by 798 px instead of
     // 14,482 and falls under that check's bar. A third true report, from a
     // third check about something else.
+    // And a fourth: with the drawing pushed into the screen, the pixel the page
+    // itself reports as being on petal_7's ink, and the pixel this file picks as
+    // empty canvas, are no longer either of those things — so the click check
+    // reports, truthfully, that picking does not work on a page whose
+    // orientation is broken.
     breaks: ['zup/the-attachment-ring-is-flat',
              'stem/the-droop-reaches-every-family',
-             'bend/the-root-is-a-point-like-any-other'],
+             'bend/the-root-is-a-point-like-any-other',
+             'select/a-click-picks-and-a-click-on-the-black-clears'],
   },
   {
     id: 'a-mesh-gltf-is-accepted-silently', file: 'plot.js',
@@ -250,7 +276,15 @@ const MUTANTS = [
     to: "    if (t.kind === 'zzz') continue;\n    // The UNTRANSFORMED foot",
     breaks: ['stem/every-drawn-u-line-is-continued-and-no-other',
              'stem/no-u-lines-means-no-stem',
-             'stem/the-seam-is-zero-on-every-drawn-line'],
+             'stem/the-seam-is-zero-on-every-drawn-line',
+             /* AND THE PETAL WARP STOPS BEING INVISIBLE TO THE STEM, which is a
+                true and useful thing to say about it: that property holds
+                because the stem hangs off the u-lines' feet and the petal law
+                is exactly the identity at u = 0. Continue a V-line instead and
+                its first point is not on the base row at all — so a warp moves
+                the foot the stem was built from, and the check that says the
+                stem does not notice one correctly stops holding. */
+             'warp/a-deformed-petal-leaves-the-stem-alone'],
     // The seam is on this list because the seam check asserts the PAIRING as
     // well as the distance: a stem strip whose head strip does not exist is
     // not a seam that measures zero, it is a seam with nothing on one side.
@@ -284,9 +318,14 @@ const MUTANTS = [
     // paints 0 because the drag never orbits at all. Named rather than tuned
     // around: loosening the idle bar to swallow this would blunt it against
     // the always-render mutant, which is the check's whole reason to exist.
+    // AND THE PETAL'S TWO, because the pointerdown handler is SHARED: one
+    // raycast over both handle sets, one drag plane, one place the orbit is
+    // switched off. A mutation there reaches whichever handle is grabbed.
     breaks: ['bend/a-handle-drag-does-not-orbit-the-camera',
              'bend/the-handle-lands-under-the-pointer',
-             'zoom/an-idle-frame-is-still-skipped'],
+             'zoom/an-idle-frame-is-still-skipped',
+             'bend/the-petal-handle-lands-under-the-pointer',
+             'bend/a-petal-handle-drag-does-not-orbit-the-camera'],
   },
   {
     // The gaussian width stops coming from the neighbours, so adding a control
@@ -300,6 +339,141 @@ const MUTANTS = [
     // 0.442 mm against the shipped law's 0.155.
     breaks: ['warp/the-width-comes-from-the-neighbours',
              'stem/the-station-ladder-is-fine-enough-to-draw-the-curve'],
+  },
+
+  // ---- one petal, picked and deformed -----------------------------------
+  {
+    // The base hold is 0.001 at the ring instead of exactly 0. Invisible on
+    // screen and exactly what tears a petal off the attachment the stem is
+    // built from — the petal's version of the tear the stem's own decay
+    // mutation makes, coming the other way.
+    id: 'the-petal-warp-is-not-gated-at-the-base', file: 'plot-petal.js',
+    from: '  if (t <= 0) return 0;\n  if (t >= 1) return 1;',
+    to: '  if (t <= 0) return 0.001;\n  if (t >= 1) return 1;',
+    breaks: ['petal/the-base-hold-is-exactly-zero-and-opens-flat',
+             'petal/the-delta-is-exactly-zero-at-the-base',
+             'petal/a-bend-cannot-reach-the-base',
+             'petal/across-scales-the-width-past-the-hold-and-holds-the-foot',
+             'warp/the-base-row-holds-to-the-bit-under-every-warp',
+             'warp/a-deformed-petal-leaves-the-stem-alone',
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
+  },
+  {
+    // The across scale stops being gated: the petal's own foot widens, which
+    // overruns the arc its neighbours occupy on a ring 28 petals share and
+    // moves the feet the stem continues from.
+    id: 'the-across-scale-is-not-gated-at-the-foot', file: 'plot-petal.js',
+    from: '  const kc = g * (st.across - 1);', to: '  const kc = (st.across - 1);',
+    breaks: ['petal/the-delta-is-exactly-zero-at-the-base',
+             'petal/across-scales-the-width-past-the-hold-and-holds-the-foot',
+             'warp/the-base-row-holds-to-the-bit-under-every-warp',
+             'warp/a-deformed-petal-leaves-the-stem-alone',
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot'],
+  },
+  {
+    // The station is guessed from the point's index instead of read off the
+    // file. Right on a uniform ladder — which the shipped grid is — and wrong
+    // about a v-line, whose ten points all sit at ONE u and would be spread
+    // from 0 to 1 across the petal's width.
+    id: 'the-station-is-guessed-from-the-shape', file: 'plot-grid.js',
+    from: '    return new Float64Array(count).fill(ud.u);',
+    to: '    return Float64Array.from({ length: count }, (_, i) => i / (count - 1));',
+    // NOT `station/what-the-file-did-not-place-gets-no-station`: that check
+    // stayed green under this mutation and was right to — the edit lands AFTER
+    // the guard that refuses a v-line with no `u`, so a strip the file did not
+    // place still gets nothing. Named here rather than loosened, and the guard
+    // gets a mutant of its own below.
+    breaks: ['station/a-u-line-takes-its-own-panel-ladder-and-a-v-line-its-own-u',
+             'warp/both-line-families-move-together'],
+  },
+  {
+    // The guard the mutation above leaves alone: a v-line with no declared `u`
+    // gets an array of NaN instead of nothing, so a petal the file did not
+    // place is deformed against a station that is not a number. Nothing on the
+    // shipped grid is missing a `u`, so the page is unmoved and only the
+    // written-down case can see it.
+    id: 'a-strip-the-file-did-not-place-gets-a-station-anyway', file: 'plot-grid.js',
+    from: '    if (!ud || !Number.isFinite(ud.u)) return null;',
+    to: '    if (!ud) return null;',
+    breaks: ['station/what-the-file-did-not-place-gets-no-station'],
+  },
+  {
+    // The warp reaches every petal, not the one that is picked.
+    id: 'the-warp-reaches-every-petal', file: 'plot.js',
+    from: '    if (!set.has(t) || !t.stations) return t;',
+    to: '    if (!t.stations) return t;',
+    breaks: ['warp/only-the-selected-petal-moves',
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
+  },
+  {
+    // The warp reaches only the family the axis was measured from. The v-lines
+    // stay where the file put them and the petal tears along its own lattice —
+    // and every other instrument here is looking at a u-line.
+    id: 'the-warp-reaches-only-the-u-lines', file: 'plot.js',
+    from: "    if (!set.has(t) || !t.stations) return t;\n    const pts = petalPoints(",
+    to: "    if (!set.has(t) || !t.stations || t.kind !== 'u') return t;\n    const pts = petalPoints(",
+    /* THE THREE EXTRAS ARE TRUE STATEMENTS ABOUT THIS MUTATION, NAMED RATHER
+       THAN TUNED AROUND — the discipline the stem's own control settled on.
+       The bend check asserts that ALL of the petal's strips moved and only ten
+       of thirty-nine do; and both stretch checks measure the half-width of
+       every strip against a centre line the u-lines moved and the v-lines did
+       not, so the width they read is neither the old one nor the new one. */
+    breaks: ['warp/both-line-families-move-together',
+             'warp/only-the-selected-petal-moves',
+             'stretch/along-changes-the-length-and-not-the-width',
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
+  },
+  {
+    // The two stretches stop being independent: `along` widens the petal too,
+    // so there is no setting that makes it longer without making it fatter.
+    id: 'the-along-scale-also-widens-the-petal', file: 'plot-petal.js',
+    from: '  const kc = g * (st.across - 1);',
+    to: '  const kc = g * (st.across * st.along - 1);',
+    breaks: ['petal/along-scales-the-length-and-leaves-the-width',
+             'stretch/along-changes-the-length-and-not-the-width'],
+  },
+  {
+    // The highlight's own material never gets the viewport's size, so a fat
+    // line's width is computed by dividing by the clone's default resolution
+    // and every highlighted segment rasterises as a screen-filling quad. The
+    // segment count, the colour and the line set are all still right.
+    // THIS IS THE SLOWEST MUTANT IN THE FILE, BY CONSTRUCTION AND NOT BY
+    // ACCIDENT: it re-creates the pathological rendering it exists to catch, so
+    // every control write in the run pays for a few hundred screen-filling
+    // quads under software GL. Measured on the shipped page before the fix, one
+    // `set()` went from 0.2 s to 7.9 s. Budget for it rather than tuning it.
+    id: 'the-highlight-material-misses-the-resolution', file: 'plot.js',
+    from: '  for (const m of materials) m.resolution.copy(size);',
+    to: '  material.resolution.copy(size);',
+    breaks: ['select/the-highlight-material-carries-the-resolution-and-the-fog'],
+  },
+  {
+    // The click takes the nearest line on screen rather than the front-most
+    // within tolerance. On this bloom the two disagree on better than a third
+    // of the pixels that hit anything at all, and both answers are a petal.
+    id: 'the-pick-takes-the-nearest-line-rather-than-the-front', file: 'plot.js',
+    from: '    if (d <= tol && z < bestZ) { bestZ = z; best = petal; }',
+    to: '    if (d <= tol && d < bestZ) { bestZ = d; best = petal; }',
+    breaks: ['select/the-pick-is-the-front-most-line-within-tolerance'],
+  },
+  {
+    // A drag selects as well as orbits, so reading the model from another angle
+    // costs you the petal you were working on.
+    id: 'a-drag-that-travelled-still-selects', file: 'plot.js',
+    from: '    if (moved <= CLICK_SLOP_PX) selectFromClick(ev.clientX, ev.clientY);',
+    to: '    if (moved <= 1e9) selectFromClick(ev.clientX, ev.clientY);',
+    breaks: ['select/a-drag-orbits-and-leaves-the-selection-alone'],
+  },
+  {
+    // The highlight stops being normalised to its own peak channel, so the
+    // selected petal draws a third dimmer than the rest of the drawing — which
+    // under a depth dim is the cue for "further away".
+    id: 'the-highlight-is-a-brightness-as-well-as-a-hue', file: 'plot.js',
+    from: '  const peak = Math.max(selMaterial.color.r, selMaterial.color.g, selMaterial.color.b) || 1;',
+    to: '  const peak = 1;',
+    breaks: ['select/the-highlight-is-a-hue-and-not-a-brightness'],
   },
 ];
 
@@ -426,9 +600,11 @@ async function run({ mutant = null } = {}) {
   const G = await loadModule('plot-grid.js', mutant);
   const S = await loadModule('plot-stem.js', mutant);
   const W = await loadModule('plot-warp.js', mutant);
+  const PT = await loadModule('plot-petal.js', mutant);
   const {
     densityToEvery, everyLabel, keepsIndex, readGridScene, selectStrips,
     stripsToSegments, boundsOf, dimToFog, fogFactor, MIN_DENSITY, MAX_DENSITY,
+    stationsForStrip, panelFor,
   } = G;
 
   const checks = new Map(), details = new Map();
@@ -550,6 +726,62 @@ async function run({ mutant = null } = {}) {
   check('select/an-untagged-strip-is-drawn-under-every-switch',
     ['both', 'u', 'v'].every(f => sel(f).includes('other')),
     'a strip the format did not tag is never made unreachable');
+
+  /* --- WHERE A POINT SITS ALONG ITS PETAL ---------------------------------
+     Written down, because a station guessed from the point's index is right on
+     a uniform ladder and wrong on any other — and the shipped grid IS uniform,
+     so the real file cannot tell the two apart. A v-line takes its own declared
+     u for all of its points; a u-line takes its panel's declared ladder, one
+     value per point; anything the file did not place gets null rather than a
+     number, and the petal holding it is refused whole. */
+  const LADDER = [0, 0.1, 0.4, 1];
+  const PANELS = [{ label: 'full', u: LADDER, v: [-1, 0, 1] },
+                  { label: 'left', u: [0, 0.5, 0.9, 1], v: [-1, 1] }];
+  const uSt = stationsForStrip('u', { kind: 'u', column: 0, panel: 'full' }, 4, PANELS);
+  const uLeft = stationsForStrip('u', { kind: 'u', column: 0, panel: 'left' }, 4, PANELS);
+  const vSt = stationsForStrip('v', { kind: 'v', row: 2, u: 0.4, panel: 'full' }, 3, PANELS);
+  check('station/a-u-line-takes-its-own-panel-ladder-and-a-v-line-its-own-u',
+    uSt && [...uSt].join(',') === '0,0.1,0.4,1'
+    && uLeft && [...uLeft].join(',') === '0,0.5,0.9,1'
+    && vSt && [...vSt].join(',') === '0.4,0.4,0.4'
+    && panelFor(PANELS, 'left').u[1] === 0.5,
+    `u/full {${uSt}} · u/left {${uLeft}} · v at u 0.4 {${vSt}} — a cleft petal's three `
+    + 'panels each carry their own ladder, and the strip names which');
+  // A station is never derived from the shape or the count: the wrong panel,
+  // a ladder of the wrong length, a v-line with no `u`, and a strip the format
+  // did not tag all come back with nothing rather than with something.
+  check('station/what-the-file-did-not-place-gets-no-station',
+    stationsForStrip('u', { panel: 'nope' }, 4, PANELS) === null
+    && stationsForStrip('u', { panel: 'full' }, 5, PANELS) === null
+    && stationsForStrip('u', { panel: 'full' }, 4, null) === null
+    && stationsForStrip('u', {}, 4, PANELS) === null
+    && stationsForStrip('v', { kind: 'v', row: 0 }, 3, PANELS) === null
+    && stationsForStrip('other', { u: 0.5 }, 3, PANELS) === null
+    && panelFor(PANELS, null) === null && panelFor([PANELS[0]], null) === PANELS[0],
+    'a missing panel, a ladder of the wrong length, no panels at all, an unnamed '
+    + 'panel among two, a v-line with no u, and an untagged strip: six nulls');
+
+  /* AND A PETAL HOLDING ONE UNPLACED STRIP IS REFUSED WHOLE, which is the only
+     safe answer: deforming the rest of it and leaving that strip behind would
+     tear the grid internally, and a line drawing is the worst possible place to
+     notice it. */
+  const placed = (kind, ud, n) => ({ kind, index: 0, count: n, segments: n - 1,
+    petal: 0, points: new Float32Array(n * 3),
+    stations: stationsForStrip(kind, ud, n, PANELS) });
+  const okPetal = G.petalList([
+    placed('u', { panel: 'full' }, 4), placed('v', { u: 0.4, panel: 'full' }, 3),
+  ], new Map([[0, { name: 'petal_0', userData: { petalIndex: 0, azimuthDeg: 12, role: 'OUTER',
+                                                panels: PANELS } }]]));
+  const badPetal = G.petalList([
+    placed('u', { panel: 'full' }, 4), placed('other', {}, 3),
+  ], new Map());
+  const noAxis = G.petalList([placed('v', { u: 0.4, panel: 'full' }, 3)], new Map());
+  check('station/a-petal-with-an-unplaced-strip-is-not-warpable',
+    okPetal[0].warpable === true && okPetal[0].name === 'petal_0'
+    && okPetal[0].azimuthDeg === 12 && okPetal[0].role === 'OUTER'
+    && badPetal[0].warpable === false && /1 of its 2 strips/.test(badPetal[0].why)
+    && noAxis[0].warpable === false && /no u-lines/.test(noAxis[0].why),
+    `placed: warpable · unplaced: "${badPetal[0].why}" · v-only: "${noAxis[0].why}"`);
 
   // --- the depth dim -------------------------------------------------------
   let worst = 0;
@@ -835,6 +1067,208 @@ async function run({ mutant = null } = {}) {
     sagRows.map(([l, v]) => `${l} ${v.toFixed(3)} mm`).join(' · ') + ' on a 170 mm stem');
 
   // =========================================================================
+  // THE PETAL'S LAW. Every failure here draws a plausible bloom, which is the
+  // reason these are functions over a petal whose answer is written down: on a
+  // 28-petal drawing a warp that leaks into a neighbour, a warp that reaches
+  // one line family and not the other, and a base that quietly drifts off the
+  // attachment ring are all invisible.
+  log('\n--- part one: plot-petal.js, on a petal whose answer is written down ---');
+
+  /* A FLAT STRAIGHT PETAL, SO EVERY ANSWER CAN BE STATED. 21 rows at u = r/20
+     spaced 2 mm apart along +x, 3 columns at y = -4, 0, +4. So the centre line
+     is the x axis, its length is exactly 40 mm, the half-width is exactly 4,
+     the base is the origin and the hold — ROOT_HOLD_ROWS rows in — is exactly
+     6 mm. The lattice is shared exactly the way the real file's is: the u-line
+     in column c and the v-line in row r hand back the SAME point. */
+  const FIX_ROWS = 21, FIX_COLS = 3, FIX_STEP = 2, FIX_HALF = 4;
+  const fixtureStrips = () => {
+    const out = [];
+    const at = (r, c) => [r * FIX_STEP, (c - 1) * FIX_HALF, 0];
+    for (let c = 0; c < FIX_COLS; c++) {
+      const pts = new Float32Array(FIX_ROWS * 3), st = new Float64Array(FIX_ROWS);
+      for (let r = 0; r < FIX_ROWS; r++) {
+        const q2 = at(r, c);
+        pts[r * 3] = q2[0]; pts[r * 3 + 1] = q2[1]; pts[r * 3 + 2] = q2[2];
+        st[r] = r / (FIX_ROWS - 1);
+      }
+      out.push({ kind: 'u', index: c, last: FIX_COLS - 1, count: FIX_ROWS,
+                 segments: FIX_ROWS - 1, points: pts, stations: st, petal: 0 });
+    }
+    for (let r = 0; r < FIX_ROWS; r++) {
+      const pts = new Float32Array(FIX_COLS * 3);
+      for (let c = 0; c < FIX_COLS; c++) {
+        const q2 = at(r, c);
+        pts[c * 3] = q2[0]; pts[c * 3 + 1] = q2[1]; pts[c * 3 + 2] = q2[2];
+      }
+      out.push({ kind: 'v', index: r, last: FIX_ROWS - 1, count: FIX_COLS,
+                 segments: FIX_COLS - 1, points: pts, petal: 0,
+                 stations: new Float64Array(FIX_COLS).fill(r / (FIX_ROWS - 1)) });
+    }
+    return out;
+  };
+  const FIX = fixtureStrips();
+  const fixFrame = PT.petalFrame(FIX);
+  const FIX_L = (FIX_ROWS - 1) * FIX_STEP;
+
+  check('petal/the-frame-is-measured-from-the-file-own-points',
+    fixFrame && fixFrame.rows.length === FIX_ROWS
+    && fixFrame.length === FIX_L && fixFrame.holdRows === PT.ROOT_HOLD_ROWS
+    && fixFrame.hold === PT.ROOT_HOLD_ROWS * FIX_STEP
+    && fixFrame.base.every(v => v === 0) && fixFrame.rows[0].s === 0
+    && PT.stationOfU(fixFrame, 0.5) === FIX_L / 2
+    && PT.petalHalfWidth(FIX, fixFrame) === FIX_HALF,
+    `${fixFrame.rows.length} rows · ${fixFrame.length} mm along the centre line · hold `
+    + `${fixFrame.hold} mm (${fixFrame.holdRows} rows) · half-width `
+    + `${PT.petalHalfWidth(FIX, fixFrame)} mm — all exact`);
+
+  /* THE HOLD IS EXACTLY ZERO AT THE BASE, and `Object.is` is the comparison for
+     the same reason the stem's boundary check uses it: the whole seam rests on
+     `0 * anything` dropping out of the sum, and a hold of 0.001 at the base is
+     invisible on screen while tearing the petal off the ring the stem hangs
+     from. Flat at both ends so the petal leaves the ring tangentially. */
+  const holds = [];
+  for (let i = 0; i <= 100; i++) holds.push(PT.rootHold(6 * i / 100, 6));
+  check('petal/the-base-hold-is-exactly-zero-and-opens-flat',
+    [0.5, 6, 40, 0].every(h => Object.is(PT.rootHold(0, h), 0))
+    && PT.rootHold(6, 6) === 1 && PT.rootHold(60, 6) === 1
+    && holds.every((v, i) => i === 0 || v >= holds[i - 1] - 1e-15)
+    && Math.abs(holds[1] - holds[0]) < 1e-3 && Math.abs(holds[100] - holds[99]) < 1e-3,
+    'rootHold(0, h) is exactly 0 at every hold; 0 -> 1 over the hold, monotone, '
+    + 'flat at both ends');
+
+  /* AND THE DELTA IS EXACTLY ZERO THERE, at every setting there is — which is
+     the property the seam is, rather than a consequence of it. Swept over both
+     scales and a bend big enough to throw the petal across the frame. */
+  const fixWarp = W.makeWarp([FIX_L * 0.5, FIX_L], [[60, -40, 25], [-50, 30, 45]], FIX_L);
+  let deltaRows = 0, deltaZero = 0;
+  for (const along of [0.25, 1, 2.5]) {
+    for (const across of [0.25, 1, 2.5]) {
+      for (const wp of [null, fixWarp]) {
+        const d = PT.petalDeltaAt(fixFrame, wp, { along, across }, 0,
+          fixFrame.base, [0, -FIX_HALF, 0], [0, 0, 0], [0, 0, 0]);
+        deltaRows++;
+        if (d[0] === 0 && d[1] === 0 && d[2] === 0) deltaZero++;
+      }
+    }
+  }
+  check('petal/the-delta-is-exactly-zero-at-the-base',
+    deltaZero === deltaRows && deltaRows === 18,
+    `${deltaZero} of ${deltaRows} corners of (along x across x bend) put the base row `
+    + 'exactly nowhere — the seam is this, not a consequence of it');
+
+  check('petal/at-rest-the-points-come-straight-back',
+    PT.petalIsRest({ along: 1, across: 1 }, null)
+    && !PT.petalIsRest({ along: 1.5, across: 1 }, null)
+    && !PT.petalIsRest({ along: 1, across: 0.5 }, null)
+    && !PT.petalIsRest({ along: 1, across: 1 }, fixWarp)
+    && PT.petalPoints(FIX[0].points, FIX[0].count, FIX[0].stations, fixFrame, null,
+                      { along: 1, across: 1 }) === FIX[0].points,
+    'petalPoints returns the SAME array when nothing is asked of the petal, so an '
+    + 'untouched petal draws the vertices the file wrote');
+
+  /* THE TWO STRETCHES ARE INDEPENDENT, and each is asserted on what it must
+     LEAVE ALONE as well as on what it changes — a single control wired to "make
+     it look different" satisfies the first half of either on its own. Measured
+     by re-deriving the frame from the DEFORMED points, so the length and the
+     width come from the drawing rather than from the number that was typed. */
+  const warped = (along, across, wp = null) => FIX.map(t => ({ ...t,
+    points: PT.petalPoints(t.points, t.count, t.stations, fixFrame, wp, { along, across }) }));
+  const sizeOf = set => { const f2 = PT.petalFrame(set);
+                          return { L: f2.length, half: PT.petalHalfWidth(set, f2) }; };
+  /* THE WIDTH IS MEASURED ROW BY ROW, NOT AS A MAXIMUM, and that is a finding
+     rather than a nicety. The across scale rides `rootHold`, so the rows inside
+     the hold keep the width the junction gave the foot — narrow the blade
+     enough and the petal's WIDEST point moves into the hold, where it is
+     correctly not narrowing, and a maximum then reads unchanged. Measured on
+     this fixture: the max half-width comes back 4.00 mm at across 0.5 and at
+     0.25 alike, and the first version of this check failed on it. So the claim
+     is stated where it belongs — the blade past the hold scales exactly, and
+     the base row does not move at all. */
+  const halfAtRow = (set, f2, u) => {
+    let w = 0;
+    const c = PT.centreOfU(f2, u, [0, 0, 0]);
+    for (const t of set) {
+      if (!t.stations) continue;
+      for (let i = 0; i < t.count; i++) {
+        if (t.stations[i] !== u) continue;
+        w = Math.max(w, Math.hypot(t.points[i * 3] - c[0], t.points[i * 3 + 1] - c[1],
+                                   t.points[i * 3 + 2] - c[2]));
+      }
+    }
+    return w;
+  };
+  const TIP_U = 1, BASE_U = 0;
+  const sizeAt = set => { const f2 = PT.petalFrame(set);
+    return { L: f2.length, blade: halfAtRow(set, f2, TIP_U),
+             foot: halfAtRow(set, f2, BASE_U), max: PT.petalHalfWidth(set, f2) }; };
+  const alongRows = [0.25, 0.5, 1, 1.6, 2.5].map(k => [k, sizeAt(warped(k, 1))]);
+  const acrossRows = [0.25, 0.5, 1, 1.6, 2.5].map(k => [k, sizeAt(warped(1, k))]);
+  check('petal/along-scales-the-length-and-leaves-the-width',
+    alongRows.every(([k, r2]) => Math.abs(r2.L - k * FIX_L) < 1e-4
+                                 && Math.abs(r2.blade - FIX_HALF) < 1e-4
+                                 && Math.abs(r2.foot - FIX_HALF) < 1e-4),
+    alongRows.map(([k, r2]) => `${k}x -> ${r2.L.toFixed(2)} mm long, `
+      + `${r2.blade.toFixed(2)} wide`).join(' · '));
+  check('petal/across-scales-the-width-past-the-hold-and-holds-the-foot',
+    acrossRows.every(([k, r2]) => Math.abs(r2.blade - k * FIX_HALF) < 1e-4
+                                  && Math.abs(r2.foot - FIX_HALF) < 1e-9
+                                  && Math.abs(r2.L - FIX_L) < 1e-4),
+    acrossRows.map(([k, r2]) => `${k}x -> blade ${r2.blade.toFixed(2)} mm, foot `
+      + `${r2.foot.toFixed(2)}, length ${r2.L.toFixed(2)}`).join(' · ')
+    + ` — and the whole-petal MAXIMUM reads ${acrossRows.map(([, r2]) =>
+        r2.max.toFixed(2)).join('/')}, which is why it is not what is asserted`);
+
+  // A BEND CANNOT REACH THE BASE — the petal's own version of the claim the
+  // stem's funnel gate carries, and the reason the base row is compared to the
+  // BIT rather than to a tolerance.
+  const bentFix = warped(1, 1, fixWarp);
+  let baseBit = 0, baseN = 0, midMove = 0;
+  for (let k = 0; k < FIX.length; k++) {
+    for (let i = 0; i < FIX[k].count; i++) {
+      const d = Math.hypot(bentFix[k].points[i * 3] - FIX[k].points[i * 3],
+        bentFix[k].points[i * 3 + 1] - FIX[k].points[i * 3 + 1],
+        bentFix[k].points[i * 3 + 2] - FIX[k].points[i * 3 + 2]);
+      if (FIX[k].stations[i] === 0) {
+        baseN++;
+        if ([0, 1, 2].every(a2 => Object.is(bentFix[k].points[i * 3 + a2],
+                                            FIX[k].points[i * 3 + a2]))) baseBit++;
+      } else if (d > midMove) midMove = d;
+    }
+  }
+  check('petal/a-bend-cannot-reach-the-base',
+    baseN > 0 && baseBit === baseN && midMove > 20,
+    `a 60 mm pull on a 40 mm petal leaves all ${baseN} base points identical to the bit `
+    + `while moving the rest up to ${midMove.toFixed(1)} mm`);
+
+  /* THE TWO LINE FAMILIES TAKE THE SAME DISPLACEMENT, as an identity. The
+     u-line in column c and the v-line in row r share the point (r, c); every
+     term of the law depends on the point and on its station and on nothing
+     else, so the two copies cannot part company. A warp that reached one family
+     and not the other would tear the grid internally — conspicuous once it
+     happens and easy to miss while developing with `u only` on. */
+  const crossings = (set) => {
+    const U = set.filter(t => t.kind === 'u').sort((a, b) => a.index - b.index);
+    const V = set.filter(t => t.kind === 'v').sort((a, b) => a.index - b.index);
+    let bad = 0, n = 0;
+    for (let c = 0; c < U.length; c++) {
+      for (let r2 = 0; r2 < V.length; r2++) {
+        for (let a2 = 0; a2 < 3; a2++) {
+          n++;
+          if (!Object.is(U[c].points[r2 * 3 + a2], V[r2].points[c * 3 + a2])) bad++;
+        }
+      }
+    }
+    return { bad, n };
+  };
+  const crossRows = [[1, 1, fixWarp], [2.5, 1, null], [1, 2.5, null], [0.4, 0.6, fixWarp]]
+    .map(([a2, b2, wp]) => crossings(warped(a2, b2, wp)));
+  check('petal/the-two-line-families-take-the-same-displacement',
+    crossings(FIX).bad === 0 && crossRows.every(r2 => r2.bad === 0),
+    `${crossRows.reduce((a2, r2) => a2 + r2.n, 0)} shared coordinates over four settings, `
+    + `${crossRows.reduce((a2, r2) => a2 + r2.bad, 0)} of them different — the lattice is `
+    + 'shared and stays shared');
+
+  // =========================================================================
   // PART TWO — the page.
   log('\n--- part two: the page, measured on the rendered framebuffer ---');
 
@@ -883,10 +1317,16 @@ async function run({ mutant = null } = {}) {
      on every reset, so the ink and the segment counts below are the ones /plot
      shipped and the stem cannot be hiding inside any of them; the page's own
      default is stem ON, and the stem section further down turns it back on. */
+  /* AND WITH NO PETAL PICKED AND NO WARP, for the reason the stem is off here:
+     every ink figure and every segment count above the petal section is then
+     the one /plot shipped, and neither the highlight's own object nor a
+     deformed petal can be hiding inside one of them. The petal section further
+     down picks one. */
   const DEFAULTS = { families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
                      brightness: 30, depthDim: 55, stem: 'off',
                      stemBundle: 0.35, stemJoin: 12, stemLength: 170,
-                     stemDroop: 0, stemNeck: 45, stemHandles: true };
+                     stemDroop: 0, stemNeck: 45, stemHandles: true,
+                     petalPick: -1, petalAlong: 1, petalAcross: 1, petalHandles: true };
   const reset = async (o = {}) => { await set({ ...DEFAULTS, ...o }); await view(VIEW); };
 
   await reset();
@@ -1590,14 +2030,562 @@ async function run({ mutant = null } = {}) {
     && stemPanel.includes(`${si40.lines} of ${pageU} u-lines continued`),
     `seam ${si40.seamMm.toExponential(1)} mm · chord ${si40.sagittaMm.toFixed(3)} mm`);
 
+  // =========================================================================
+  // ONE PETAL, PICKED AND DEFORMED. Every check above ran with NOTHING picked
+  // and both scales at 1, so those numbers are /plot's own and nothing here can
+  // be hiding inside them. These pick one.
+  //
+  // The camera is re-framed after each state change for the reason the stem
+  // section records: a control never moves the camera, so a petal stretched to
+  // two and a half times its length hangs out of a frame fitted to the file.
+  const PETAL_ON = { ...DEFAULTS, stem: 'off' };
+  /* AND IT RESTS THE BEND POINTS, which the sliders cannot do. A bend offset is
+     not a control value — it is set by dragging a handle — so `set()` cannot
+     clear one, and a check that dragged one leaves it for whatever runs next.
+     Measured: without this, the check that drags a handle to prove both line
+     families move together left that bend in place, and the stretch checks two
+     aisles down then measured a petal that was bent AS WELL AS stretched and
+     read 60.31 mm where 2.2x of 27.04 is 59.49. The stem sheet's own `reset`
+     clicks its bend reset for the same reason. */
+  const petalOn = async (o = {}) => {
+    await page.evaluate(() => document.getElementById('petalBendReset').click());
+    await set({ ...PETAL_ON, ...o });
+    await view(VIEW);
+  };
+  const pList = await q(() => window.__plot.petalList());
+  const OPTS = await q(() => window.__plot.petalOptions());
+
+  check('select/the-picker-lists-the-file-own-petals',
+    pList.length === fileCensus.petals && OPTS.length === pList.length + 1
+    && OPTS[0] === '-1' && OPTS.slice(1).join(',') === pList.map(p => String(p.index)).join(',')
+    && pList.every(p => p.warpable) && pList[0].name === 'petal_0'
+    && pList.every(p => p.uLines > 0 && p.vLines > 0),
+    `${pList.length} petals, all deformable, ${pList[0].uLines} u-lines x `
+    + `${pList[0].vLines} v-lines each; the list is "none" plus the file's own order`);
+
+  /* EXACTLY ONE PETAL IS SELECTED, AND THE DRAWING DOES NOT MOVE WHEN IT IS.
+     Both halves matter: the highlight has to be exactly that petal's strips and
+     no others, and the DRAW panel is about the FILE — so the per-family segment
+     and line counts have to be identical to the number they read with nothing
+     picked. A highlight that quietly dropped or duplicated a strip would show
+     up in the second half even where the first cannot see it. */
+  await petalOn();
+  const noneDrawn = await q(() => window.__plot.drawn());
+  await petalOn({ petalPick: 11 });
+  const oneDrawn = await q(() => window.__plot.drawn());
+  const oneInfo = await q(() => window.__plot.petalInfo());
+  const p11 = pList.find(p => p.index === 11);
+  const p11Segments = (await q(() => window.__plot.petalPoints(11, false)))
+    .reduce((a, t) => a + (t.count - 1), 0);
+  check('select/exactly-one-petal-is-highlighted-and-the-counts-do-not-move',
+    oneInfo.selected === 11 && oneDrawn.selectedLines === p11.strips
+    && oneDrawn.selected === p11Segments && noneDrawn.selectedLines === 0
+    && ['u', 'v', 'other', 'uLines', 'vLines', 'total'].every(k => oneDrawn[k] === noneDrawn[k]),
+    `petal_11 highlighted: ${oneDrawn.selectedLines} of the file's ${p11.strips} strips, `
+    + `${oneDrawn.selected} segments; the DRAW counts held at u ${noneDrawn.u} · `
+    + `v ${noneDrawn.v} · ${noneDrawn.total} total`);
+
+  /* THE HIGHLIGHT IS A HUE AND NOT A BRIGHTNESS, which is the one signal this
+     page cannot spend: overlapping petals already brighten where they cross, so
+     a selected petal drawn brighter or dimmer reads as nearer or further. The
+     accent is normalised to its own largest linear channel, so its ceiling is
+     exactly the white line's — same exposure, same weight, different hue. */
+  const selMat = await q(() => window.__plot.selectionColor());
+  const mainMat = await q(() => window.__plot.materialInfo());
+  const peak = Math.max(...selMat.colorLinear);
+  check('select/the-highlight-is-a-hue-and-not-a-brightness',
+    selMat.drawn === true && Math.abs(peak - mainMat.colorLinear) < 1e-6
+    && selMat.linewidth === mainMat.linewidth
+    && Math.min(...selMat.colorLinear) < peak * 0.9,
+    `the highlight tops out at ${peak.toFixed(4)} against the drawing's `
+    + `${mainMat.colorLinear}, at the same ${selMat.linewidth} px, with channels `
+    + `(${selMat.colorLinear.map(v => v.toFixed(3)).join(', ')}) — a hue, not a level`);
+
+  /* AND THE HIGHLIGHT'S MATERIAL CARRIES THE STATE A CLONE SILENTLY MISSES.
+     A `LineMaterial` divides by `resolution` to work out a fat line's width, so
+     a clone that never gets the viewport's size draws every one of its segments
+     as a screen-filling quad — and the symptom is NOT a wrong picture, it is a
+     stalled renderer: measured here before the fix, a selected petal's 541
+     segments took a headless software-GL frame from milliseconds to SECONDS and
+     pinned the GPU process at 350% CPU, which read as this gate hanging. The
+     fog FLAG is the same shape of mistake, because three compiles `USE_FOG`
+     into the program and a clone that is never told keeps the program it was
+     first compiled with while the drawing beside it fades. Neither is visible
+     in a segment count and neither has a colour. */
+  await petalOn({ petalPick: 11, depthDim: 0 });
+  const selNoFog = await q(() => window.__plot.selectionColor());
+  await petalOn({ petalPick: 11, depthDim: 55 });
+  const selFog = await q(() => window.__plot.selectionColor());
+  const mainFog = await q(() => window.__plot.materialInfo());
+  check('select/the-highlight-material-carries-the-resolution-and-the-fog',
+    selFog.resolution.length === 2 && selFog.resolution[0] > 1 && selFog.resolution[1] > 1
+    && selFog.resolution.every((v, i) => v === mainFog.resolution[i])
+    && selFog.fog === true && selNoFog.fog === true
+    && selFog.blending === mainFog.blending,
+    `resolution ${selFog.resolution.join('x')} on both materials, fog flag on, blending `
+    + `${selFog.blending} — the two pieces of LineMaterial state that are not properties `
+    + 'of the drawing and are invisible in a segment count');
+
+  /* THE PICK TAKES THE FRONT-MOST LINE WITHIN TOLERANCE, re-derived in the gate
+     from a DIFFERENT primitive than the shipped rule uses. `pickAt` scans every
+     drawn segment at once and returns one petal; `petalDistancesAt` reports, per
+     petal, that petal's own nearest segment and its depth — so the gate can
+     work out which petal SHOULD win and compare, rather than restate the scan.
+     The detail line carries the measurement the whole design rests on. */
+  await petalOn({ petalPick: -1 });
+  const probes = await page.evaluate(() => {
+    const out = [];
+    for (let y = 40; y < 780; y += 30) {
+      for (let x = 40; x < 1060; x += 30) {
+        const near = window.__plot.petalDistancesAt(x, y);
+        out.push({ x, y, pick: window.__plot.pickAt(x, y), near });
+      }
+    }
+    return { out, tol: window.__plot.pickTolerance() };
+  });
+  let hits = 0, agree = 0, ambiguous = 0, disagree = 0, offInk = 0;
+  for (const pr of probes.out) {
+    const within = pr.near.filter(n => n.d <= probes.tol);
+    if (!within.length) { if (pr.pick >= 0) offInk++; continue; }
+    hits++;
+    const front = within.reduce((a, b) => (b.z < a.z ? b : a));
+    const closest = within.reduce((a, b) => (b.d < a.d ? b : a));
+    if (pr.pick === front.petal) agree++;
+    if (within.length > 1) ambiguous++;
+    if (front.petal !== closest.petal) disagree++;
+  }
+  /* AND IT IS NOT ALLOWED TO PASS VACUOUSLY. `disagree > 0` is the clause that
+     makes this check falsifiable at all: on a drawing where no two petals ever
+     overlap, front-most and nearest-on-screen agree everywhere and the mutation
+     this check exists for would sail through. On this bloom they disagree on a
+     third of the hits, and requiring that says so. */
+  check('select/the-pick-is-the-front-most-line-within-tolerance',
+    hits > 100 && agree === hits && offInk === 0 && ambiguous > 0 && disagree > 0,
+    `${agree} of ${hits} probes with ink within ${probes.tol} px picked the FRONT-most `
+    + `petal, and ${offInk} picked a petal where there was no ink. Of those hits `
+    + `${(100 * ambiguous / hits).toFixed(1)}% had two or more petals in reach and `
+    + `${(100 * disagree / hits).toFixed(1)}% would have picked a different petal on `
+    + `nearest-on-screen — which is why the list is the primary control and this is `
+    + `the convenience (${(100 * hits / probes.out.length).toFixed(1)}% of the canvas `
+    + 'has any line within reach at all)');
+
+  /* A CLICK PICKS, A DRAG ORBITS, AND A CLICK ON THE BLACK CLEARS. Aimed at a
+     pixel the PAGE says is on a named petal's ink, so the aim is the page's and
+     what is under test is the plumbing: the slop that separates a click from an
+     orbit, the route through the dropdown, and the miss. */
+  const aim = await page.evaluate(() => window.__plot.petalScreenPoint(7, 0.5));
+  const aimPick = await page.evaluate(a => window.__plot.pickAt(a.x, a.y), aim);
+  await page.mouse.move(aim.x, aim.y);
+  await page.mouse.down();
+  await page.mouse.up();
+  const afterClick = await q(() => window.__plot.petalInfo());
+  const optionAfter = await q(() => document.getElementById('petalPick').value);
+  await page.mouse.move(gap.x, 120);
+  await page.mouse.down();
+  await page.mouse.up();
+  const afterMiss = await q(() => window.__plot.petalInfo());
+  check('select/a-click-picks-and-a-click-on-the-black-clears',
+    aimPick >= 0 && afterClick.selected === aimPick && optionAfter === String(aimPick)
+    && afterMiss.selected === -1,
+    `a click on petal_7's own ink selected petal_${aimPick} and moved the dropdown to `
+    + `${optionAfter}; a click on empty canvas cleared it`);
+
+  await petalOn({ petalPick: 9 });
+  const beforeOrbit = await q(() => window.__plot.petalInfo());
+  const camPre = await q(() => window.__plot.cameraInfo());
+  await page.mouse.move(gap.x, gap.y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(gap.x - i * 9, gap.y - i * 4);
+  await page.mouse.up();
+  const afterOrbit = await q(() => { window.__plot.settle(); return window.__plot.petalInfo(); });
+  const camPost = await q(() => window.__plot.cameraInfo());
+  const orbited = Math.hypot(...camPost.position.map((v, i) => v - camPre.position[i]));
+  check('select/a-drag-orbits-and-leaves-the-selection-alone',
+    beforeOrbit.selected === 9 && afterOrbit.selected === 9
+    && orbited > camPre.distance * 0.05,
+    `the camera moved ${orbited.toFixed(1)} of a ${camPre.distance.toFixed(1)} standoff `
+    + 'and petal_9 stayed picked — reading the model from every angle costs nothing');
+
+  // THE ARROWS STEP THE FILE'S OWN ORDER and stop at its ends rather than
+  // wrapping, so holding one does not spin through the bloom forever.
+  await petalOn({ petalPick: 0 });
+  const stepped = [];
+  for (let i = 0; i < 3; i++) {
+    await page.evaluate(() => document.getElementById('petalNext').click());
+    stepped.push((await q(() => window.__plot.petalInfo())).selected);
+  }
+  await page.evaluate(() => document.getElementById('petalPrev').click());
+  stepped.push((await q(() => window.__plot.petalInfo())).selected);
+  await petalOn({ petalPick: 0 });
+  const atFirst = await q(() => ({ prev: document.getElementById('petalPrev').disabled,
+                                   next: document.getElementById('petalNext').disabled }));
+  await petalOn({ petalPick: pList[pList.length - 1].index });
+  const atLast = await q(() => ({ prev: document.getElementById('petalPrev').disabled,
+                                  next: document.getElementById('petalNext').disabled }));
+  check('select/the-arrows-step-the-file-own-order-and-stop-at-its-ends',
+    stepped.join(',') === '1,2,3,2' && atFirst.prev === true && atFirst.next === false
+    && atLast.prev === false && atLast.next === true,
+    `0 -> ${stepped.join(' -> ')} · the arrows are disabled at the two ends`);
+
+  /* THE WARP MOVES THE SELECTED PETAL AND NOTHING ELSE — trap three, and the
+     one that goes wrong quietly, because neighbouring petals share the ring and
+     sit close in space. Asserted as an ARRAY IDENTITY over the whole file:
+     `applyPetalWarp` hands back the very array the file wrote for every strip it
+     did not move, so a strip that shifted by a millionth of a millimetre would
+     be a new array and would be counted here, where a tolerance would swallow
+     it. */
+  const SEL = 11;
+  await petalOn({ petalPick: SEL, petalAlong: 2.2, petalAcross: 1.8 });
+  const untouched = await q(() => window.__plot.petalUntouched());
+  const allStrips = await q(() => window.__plot.census());
+  const mineIdx = await page.evaluate(sel => window.__plot.petalPoints(sel, false).length, SEL);
+  const movedCount = untouched.filter(v => !v).length;
+  const warpInfo = await q(() => window.__plot.petalInfo());
+  check('warp/only-the-selected-petal-moves',
+    movedCount === mineIdx && untouched.length === allStrips.strips
+    && warpInfo.untouched === untouched.length - movedCount
+    && warpInfo.offPetal === untouched.length - movedCount
+    && warpInfo.movedMm > 5,
+    `${movedCount} strips moved, exactly petal_${SEL}'s ${mineIdx}; the other `
+    + `${untouched.length - movedCount} came back as the arrays the file wrote, and this `
+    + `petal moved up to ${warpInfo.movedMm.toFixed(2)} mm`);
+
+  /* THE BASE ROW HOLDS UNDER EVERY WARP — trap one. Compared to the BIT against
+     the file's own points, at the corners of both scales and with a bend, and
+     with the stem ON at a droop so the ring the stem hangs from is under load
+     from both ends at once. */
+  const baseRows = [];
+  for (const [al, ac, stem, droop] of [[1, 1, 'off', 0], [2.5, 1, 'off', 0],
+                                       [0.25, 2.5, 'off', 0], [2.5, 2.5, 'on', 40],
+                                       [0.25, 0.25, 'on', -35]]) {
+    await petalOn({ petalPick: SEL, petalAlong: al, petalAcross: ac,
+                    stem, stemDroop: droop });
+    const before = await page.evaluate(sel => window.__plot.petalPoints(sel, false), SEL);
+    const after = await page.evaluate(sel => window.__plot.petalPoints(sel, true), SEL);
+    let base = 0, bit = 0;
+    for (let k = 0; k < before.length; k++) {
+      // A STRIP WITH NO STATIONS IS SKIPPED, NOT DEREFERENCED. The negative
+      // control runs this file against deliberately broken code, and one of the
+      // mutations leaves two thirds of a petal's strips unplaced — a check that
+      // reached into `stations` there THREW and took the whole sweep with it,
+      // where what it owes is a red line and a number.
+      if (!before[k].stations) continue;
+      for (let i = 0; i < before[k].count; i++) {
+        if (before[k].stations[i] !== 0) continue;
+        base++;
+        if ([0, 1, 2].every(a2 => Object.is(after[k].points[i * 3 + a2],
+                                            before[k].points[i * 3 + a2]))) bit++;
+      }
+    }
+    baseRows.push({ al, ac, stem, droop, base, bit,
+                    seam: (await q(() => window.__plot.petalInfo())).seamMm });
+  }
+  check('warp/the-base-row-holds-to-the-bit-under-every-warp',
+    baseRows.every(r2 => r2.base > 0 && r2.bit === r2.base && r2.seam === 0),
+    baseRows.map(r2 => `along ${r2.al} across ${r2.ac} stem ${r2.stem} droop ${r2.droop}: `
+      + `${r2.bit}/${r2.base} base points identical`).join(' · '));
+
+  /* AND THE STEM DOES NOT NOTICE. The stem is built from the u-lines' feet, and
+     the petal law is exactly the identity there — so this is structural rather
+     than an ordering, and it is measured with the stem drawn and drooped so a
+     failure would have somewhere to show. */
+  await petalOn({ petalPick: SEL, stem: 'on', stemDroop: 40, petalAlong: 1, petalAcross: 1 });
+  const stemFlat = await q(() => window.__plot.stemLine(0));
+  const feetFlat = await q(() => window.__plot.stemFeet());
+  await set({ ...PETAL_ON, petalPick: SEL, stem: 'on', stemDroop: 40,
+              petalAlong: 2.5, petalAcross: 2.5 });
+  const stemWarped = await q(() => window.__plot.stemLine(0));
+  const feetWarped = await q(() => window.__plot.stemFeet());
+  const sameStem = stemFlat.length === stemWarped.length
+    && stemFlat.every((v, i) => Object.is(v, stemWarped[i]));
+  const sameFeet = feetFlat.length === feetWarped.length
+    && feetFlat.every((f, i) => [0, 1, 2].every(a2 => Object.is(f[a2], feetWarped[i][a2])));
+  /* THE STEM'S OWN SEAM IS THE STEM'S CHECK, ONE AISLE UP, and folding it in
+     here made this report on the stem rather than on the petal — the mistake
+     this file already records twice. What this check owes is a comparison: the
+     stem WITH a petal deformed against the stem without, under identical stem
+     settings. */
+  check('warp/a-deformed-petal-leaves-the-stem-alone',
+    sameStem && sameFeet && feetFlat.length > 0,
+    `${feetFlat.length} stem feet and all ${stemFlat.length / 3} stations of stem line 0 `
+    + 'identical to the bit with the petal at 2.5x in both directions, at a 40° droop');
+
+  /* BOTH LINE FAMILIES MOVE TOGETHER — trap two, measured on the page over every
+     shared lattice point of the selected petal, with BOTH families drawn. The
+     u-line in column c and the v-line in row r hold the same point; they are
+     equal to the bit in the file and must stay equal to the bit after the warp,
+     because the station is a function of u alone. */
+  const latticeRows = [];
+  for (const [al, ac, bend] of [[1, 1, false], [2.5, 1, false], [1, 2.5, false],
+                                [0.5, 1.7, false], [1, 1, true]]) {
+    await petalOn({ petalPick: SEL, petalAlong: al, petalAcross: ac, families: 'both' });
+    if (bend) {
+      // Through a REAL drag on a real handle, so this covers the bend arriving
+      // from the pointer and not only from a slider.
+      const h = await page.evaluate(() => window.__plot.petalHandleScreenPos(0));
+      if (h && h.x > gap.left + 30 && h.x < gap.right - 30 && h.y > 40 && h.y < 760) {
+        await page.mouse.move(h.x, h.y);
+        await page.mouse.down();
+        await page.mouse.move(h.x + 70, h.y - 40, { steps: 4 });
+        await page.mouse.up();
+      }
+    }
+    const set2 = await page.evaluate(sel => window.__plot.petalPoints(sel, true), SEL);
+    const U = set2.filter(t => t.kind === 'u').sort((a, b) => a.index - b.index);
+    const V = set2.filter(t => t.kind === 'v').sort((a, b) => a.index - b.index);
+    let bad = 0, n = 0;
+    for (let c = 0; c < U.length; c++) {
+      for (let r2 = 0; r2 < V.length; r2++) {
+        for (let a2 = 0; a2 < 3; a2++) {
+          n++;
+          if (!Object.is(U[c].points[r2 * 3 + a2], V[r2].points[c * 3 + a2])) bad++;
+        }
+      }
+    }
+    latticeRows.push({ al, ac, bend, bad, n, u: U.length, v: V.length });
+  }
+  check('warp/both-line-families-move-together',
+    latticeRows.every(r2 => r2.n > 0 && r2.bad === 0)
+    && latticeRows.every(r2 => r2.u > 1 && r2.v > 1),
+    `${latticeRows[0].u} u-lines x ${latticeRows[0].v} v-lines share `
+    + `${latticeRows[0].n / 3} points; over five settings including a real handle drag, `
+    + `${latticeRows.reduce((a2, r2) => a2 + r2.bad, 0)} of `
+    + `${latticeRows.reduce((a2, r2) => a2 + r2.n, 0)} shared coordinates differ`);
+
+  /* THE TWO STRETCHES, ON THE PAGE, each asserted on what it LEAVES ALONE too.
+     Measured off the emitted points — the centre line's own arc length and the
+     largest distance from it — never off the number that was typed. */
+  const measure = async (al, ac) => {
+    await petalOn({ petalPick: SEL, petalAlong: al, petalAcross: ac });
+    const set2 = await page.evaluate(sel => window.__plot.petalPoints(sel, true), SEL);
+    const rows = new Map();
+    for (const t of set2) {
+      if (t.kind !== 'u' || !t.stations) continue;
+      for (let i = 0; i < t.count; i++) {
+        const u = t.stations[i];
+        let r2 = rows.get(u);
+        if (!r2) rows.set(u, r2 = { u, n: 0, x: 0, y: 0, z: 0 });
+        r2.n++; r2.x += t.points[i * 3]; r2.y += t.points[i * 3 + 1]; r2.z += t.points[i * 3 + 2];
+      }
+    }
+    const ord = [...rows.values()].sort((a2, b2) => a2.u - b2.u)
+      .map(r2 => [r2.x / r2.n, r2.y / r2.n, r2.z / r2.n]);
+    if (!ord.length) return { L: 0, half: new Map() };
+    let L = 0;
+    for (let i = 1; i < ord.length; i++) {
+      L += Math.hypot(ord[i][0] - ord[i - 1][0], ord[i][1] - ord[i - 1][1],
+                      ord[i][2] - ord[i - 1][2]);
+    }
+    const byU = new Map();
+    [...rows.values()].sort((a2, b2) => a2.u - b2.u)
+      .forEach((r2, i) => byU.set(r2.u, ord[i]));
+    /* PER ROW, NOT AS A MAXIMUM — the finding part one records. The across
+       scale is gated at the base, so on this grid the blade at across 0.4
+       lands on exactly the base row's own 3.2 mm and a whole-petal maximum
+       would have read "narrowed correctly" for no reason at all. */
+    const half = new Map();
+    for (const t of set2) {
+      if (!t.stations) continue;
+      for (let i = 0; i < t.count; i++) {
+        const u = t.stations[i], c = byU.get(u);
+        if (!c) continue;
+        const d = Math.hypot(t.points[i * 3] - c[0], t.points[i * 3 + 1] - c[1],
+                             t.points[i * 3 + 2] - c[2]);
+        if (d > (half.get(u) ?? 0)) half.set(u, d);
+      }
+    }
+    return { L, half };
+  };
+  const rest = await measure(1, 1);
+  // The widest row at rest, and the base row: one is where the blade scale has
+  // to show, the other is where it must not. Both are `null` on a petal the
+  // file did not place, which a mutation can produce — the two checks below
+  // then read undefined and go red, which is what they owe.
+  const BLADE_U = rest.half.size
+    ? [...rest.half.entries()].reduce((a2, b2) => (b2[1] > a2[1] ? b2 : a2))[0] : null;
+  const FOOT_U = rest.half.size ? Math.min(...rest.half.keys()) : null;
+  const longer = await measure(2.2, 1);
+  const shorter = await measure(0.4, 1);
+  const wider = await measure(1, 2.2);
+  const narrower = await measure(1, 0.4);
+  const near = (a2, b2) => Number.isFinite(a2) && Number.isFinite(b2)
+    && Math.abs(a2 - b2) < 2e-3 * Math.max(1, Math.abs(b2));
+  const blade = r2 => r2.half.get(BLADE_U) ?? NaN, foot = r2 => r2.half.get(FOOT_U) ?? NaN;
+  const show = v => (Number.isFinite(v) ? v.toFixed(2) : 'nothing');
+  check('stretch/along-changes-the-length-and-not-the-width',
+    near(longer.L, 2.2 * rest.L) && near(shorter.L, 0.4 * rest.L)
+    && near(blade(longer), blade(rest)) && near(blade(shorter), blade(rest))
+    && near(foot(longer), foot(rest)) && near(foot(shorter), foot(rest)),
+    `${rest.L.toFixed(2)} mm at rest -> ${longer.L.toFixed(2)} at 2.2x and `
+    + `${shorter.L.toFixed(2)} at 0.4x, with the widest row held at `
+    + `${show(blade(rest))} mm and the foot at ${show(foot(rest))} mm`);
+  check('stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+    near(blade(wider), 2.2 * blade(rest)) && near(blade(narrower), 0.4 * blade(rest))
+    && foot(wider) === foot(rest) && foot(narrower) === foot(rest)
+    && near(wider.L, rest.L) && near(narrower.L, rest.L),
+    `the widest row goes ${show(blade(rest))} -> ${show(blade(wider))} mm at 2.2x `
+    + `and ${show(blade(narrower))} at 0.4x, while the foot stays at exactly `
+    + `${show(foot(rest))} mm and the length at ${rest.L.toFixed(2)} mm`);
+
+  /* A REAL DRAG ON A REAL HANDLE, at a handle the page itself projected into the
+     gap between the two panels — a pointerdown that lands on a control column
+     never reaches the canvas, which is /print's own measured lesson and would
+     read here as a bend that does not move anything. */
+  await petalOn({ petalPick: -1 });
+  let dragPetal = -1, grabAt = null;
+  for (const cand of pList.map(p => p.index)) {
+    await petalOn({ petalPick: cand });
+    const h = await q(() => window.__plot.petalHandleScreenPos(0));
+    if (h && h.x > gap.left + 40 && h.x < gap.right - 40 && h.y > 60 && h.y < 740) {
+      dragPetal = cand; grabAt = h; break;
+    }
+  }
+  /* NO HANDLE IN THE CLEAR IS A RED LINE, NOT A CRASH. A mutation can leave a
+     petal with no axis and therefore no handles at all, and the first version
+     of this section reached into a null screen position and threw — which took
+     down the whole negative-control sweep on its second mutant, where what it
+     owed was one failing check with a reason. */
+  let visible0 = false, landedAt = null, dragWorst = 0, dragMoved = -1;
+  let preDrag = [], camBeforeBend = null, camDuringBend = null, dragInfo = null;
+  if (dragPetal >= 0 && grabAt) {
+    await petalOn({ petalPick: dragPetal });
+    await q(() => window.__plot.settle());
+    grabAt = await q(() => window.__plot.petalHandleScreenPos(0));
+    visible0 = await q(() => window.__plot.petalHandleVisible(0));
+    preDrag = await page.evaluate(sel => window.__plot.petalPoints(sel, true), dragPetal);
+    camBeforeBend = await q(() => window.__plot.cameraInfo());
+    await page.mouse.move(grabAt.x, grabAt.y);
+    await page.mouse.down();
+    await page.mouse.move(grabAt.x + 100, grabAt.y - 45, { steps: 6 });
+    landedAt = await q(() => window.__plot.petalHandleScreenPos(0));
+    camDuringBend = await q(() => window.__plot.cameraInfo());
+    await page.mouse.up();
+    const postDrag = await page.evaluate(sel => window.__plot.petalPoints(sel, true), dragPetal);
+    const dragUntouched = await q(() => window.__plot.petalUntouched());
+    dragInfo = await q(() => window.__plot.petalInfo());
+    for (let k = 0; k < preDrag.length; k++) {
+      for (let i = 0; i < preDrag[k].count; i++) {
+        dragWorst = Math.max(dragWorst, Math.hypot(
+          postDrag[k].points[i * 3] - preDrag[k].points[i * 3],
+          postDrag[k].points[i * 3 + 1] - preDrag[k].points[i * 3 + 1],
+          postDrag[k].points[i * 3 + 2] - preDrag[k].points[i * 3 + 2]));
+      }
+    }
+    dragMoved = dragUntouched.filter(v => !v).length;
+  }
+  check('bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours',
+    visible0 === true && dragWorst > 3 && dragMoved === preDrag.length
+    && dragInfo && dragInfo.seamMm === 0 && dragInfo.bendsRest === false,
+    dragPetal < 0 || !grabAt
+      ? 'no petal offered a bend handle in the clear between the two panels'
+      : `handle 0 of petal_${dragPetal} dragged 100 px: that petal moved up to `
+        + `${dragWorst.toFixed(2)} mm, ${dragMoved} strips changed (all ${preDrag.length} of `
+        + `them its own), and the base row is still unmoved at ${dragInfo.seamMm} mm`);
+  check('bend/the-petal-handle-lands-under-the-pointer',
+    !!landedAt && Math.abs(landedAt.x - (grabAt.x + 100)) < 3
+    && Math.abs(landedAt.y - (grabAt.y - 45)) < 3,
+    landedAt
+      ? `asked (${(grabAt.x + 100).toFixed(1)}, ${(grabAt.y - 45).toFixed(1)}), landed `
+        + `(${landedAt.x.toFixed(1)}, ${landedAt.y.toFixed(1)})`
+      : 'no handle to drag');
+  // NOT AN EQUALITY — damping never reaches exactly zero here, the measured fact
+  // the stem's own drag check records. The bar is one only a real orbit clears.
+  const bendDrift = camDuringBend ? Math.hypot(...camDuringBend.position
+    .map((v, i) => v - camBeforeBend.position[i])) : NaN;
+  check('bend/a-petal-handle-drag-does-not-orbit-the-camera',
+    bendDrift < 0.5,
+    camDuringBend
+      ? `the camera moved ${bendDrift.toExponential(2)} of a `
+        + `${camBeforeBend.distance.toFixed(1)} standoff while a handle was held`
+      : 'no handle to drag');
+
+  // ADD, REMOVE AND REST, against the law plot-warp.js states — the same three
+  // buttons the stem has, over the petal's own axis.
+  const pbBefore = await q(() => window.__plot.petalBends());
+  await page.evaluate(() => document.getElementById('petalBendAdd').click());
+  const pbAdded = await q(() => window.__plot.petalBends());
+  await page.evaluate(() => document.getElementById('petalBendRemove').click());
+  const pbBack = await q(() => window.__plot.petalBends());
+  await page.evaluate(() => document.getElementById('petalBendReset').click());
+  const pbRested = await q(() => window.__plot.petalBends());
+  const restedPts = await page.evaluate(sel => window.__plot.petalPoints(sel, true), dragPetal);
+  const filePts = await page.evaluate(sel => window.__plot.petalPoints(sel, false), dragPetal);
+  const backToFile = restedPts.every((t, k) => t.points.every((v, i) =>
+    Object.is(v, filePts[k].points[i])));
+  check('bend/add-and-remove-change-the-set-and-reset-rests-it',
+    pbBefore.length === 2 && pbAdded.length === 3 && pbBack.length === 2
+    && Math.abs((pbAdded[0] || {}).t - 0.25) < 1e-9
+    && pbBack[pbBack.length - 1].t === 1
+    && pbRested.every(b => b.offset.every(v => v === 0)) && backToFile,
+    `2 -> 3 (new point at t = ${(pbAdded[0] ? pbAdded[0].t : NaN).toFixed(4)}, the midpoint of the widest `
+    + 'gap) -> 2 with the tip kept; reset puts the petal back on the file\u2019s own '
+    + 'points, to the bit');
+
+  /* A PETAL SWITCH RESTS THE BEND OFFSETS AND CARRIES THE TWO SCALES — stated on
+     the panel, so it is asserted rather than left as a habit. A bend offset is a
+     world displacement in millimetres and does not mean the same thing on a
+     petal facing the other way; a scale does. */
+  await petalOn({ petalPick: dragPetal, petalAlong: 1.6, petalAcross: 0.7 });
+  const h2 = dragPetal >= 0 ? await q(() => window.__plot.petalHandleScreenPos(0)) : null;
+  if (h2) {
+    await page.mouse.move(h2.x, h2.y);
+    await page.mouse.down();
+    await page.mouse.move(h2.x + 80, h2.y - 30, { steps: 4 });
+    await page.mouse.up();
+  }
+  const bentThere = await q(() => window.__plot.petalInfo());
+  await page.evaluate(() => document.getElementById('petalNext').click());
+  const afterSwitch = await q(() => window.__plot.petalInfo());
+  const scalesAfter = await q(() => window.__plot.petal());
+  check('select/switching-petal-rests-the-bends-and-carries-the-scales',
+    bentThere.bendsRest === false && afterSwitch.bendsRest === true
+    && scalesAfter.along === 1.6 && scalesAfter.across === 0.7
+    && afterSwitch.selected !== dragPetal,
+    `petal_${dragPetal} bent, then stepped on: the bends rest and the scales stay at `
+    + `${scalesAfter.along}x / ${scalesAfter.across}x on petal_${afterSwitch.selected}`);
+
+  // The panel's self-reports have to be the numbers the page holds, not a
+  // sentence claiming a property.
+  await petalOn({ petalPick: SEL, petalAlong: 1.7, petalAcross: 0.6 });
+  const petalPanel = await page.evaluate(() => {
+    window.__plot.renderNow(); return window.__plot.petalText();
+  });
+  const pInfo = await q(() => window.__plot.petalInfo());
+  const pFrame = await q(() => window.__plot.petalFrame());
+  check('readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours',
+    !!pFrame
+    && petalPanel.includes(`${pFrame.length.toFixed(2)} mm along its own centre line`)
+    && petalPanel.includes(`unmoved to ${pInfo.seamMm.toExponential(1)} mm`)
+    && petalPanel.includes(`over ${pInfo.basePoints} points the file placed at u = 0`)
+    && petalPanel.includes(`${pInfo.untouched} of the ${pInfo.offPetal} strips`)
+    && petalPanel.includes(`up to ${pInfo.movedMm.toFixed(2)} mm`)
+    && petalPanel.includes(`held over the first ${pFrame.holdRows} rows`),
+    pFrame
+      ? `axis ${pFrame.length.toFixed(2)} mm · seam ${pInfo.seamMm.toExponential(1)} mm over `
+        + `${pInfo.basePoints} base points · ${pInfo.untouched} of ${pInfo.offPetal} strips `
+        + 'off it untouched'
+      : 'this petal has no measurable axis');
+
+  // COST. The warp touches one petal's ~580 points per rebuild, which is
+  // nothing beside the 16,268 the camera bounds already walk — but a warp that
+  // quietly ran over every petal would show here as well as in the identity
+  // check above.
+  await petalOn({ petalPick: SEL, petalAlong: 1.8, petalAcross: 1.4 });
+  const petalFrames = await q(() => { window.__plot.settle();
+    const a = []; for (let i = 0; i < 15; i++) a.push(window.__plot.renderNow()); return a; });
+  const petalMedian = petalFrames.slice().sort((a, b) => a - b)[Math.floor(petalFrames.length / 2)];
+  check('cost/the-petal-warp-is-trivial', petalMedian < 5,
+    `${petalMedian.toFixed(2)} ms median over 15 settled frames with a petal at 1.8x / `
+    + `1.4x (worst ${Math.max(...petalFrames).toFixed(2)} ms)`);
+
   await set({ ...DEFAULTS });
 
   // --- the panels ----------------------------------------------------------
   const panels = await q(() => [...document.querySelectorAll('details.panel')]
     .map(d => ({ id: d.id, summary: d.querySelector('summary').textContent.trim(), open: d.open })));
   check('panels/every-panel-is-present-and-is-a-details',
-    panels.length === 4 && panels.every(p => p.open)
-    && panels.map(p => p.summary).join('|') === 'LOAD GRID|GRID|DRAW|STEM',
+    panels.length === 5 && panels.every(p => p.open)
+    && panels.map(p => p.summary).join('|') === 'LOAD GRID|GRID|DRAW|PETAL|STEM',
     panels.map(p => `${p.summary}(${p.id})`).join(' · '));
 
   // Driven through `brightness`, which no mutation in this file touches, so
@@ -1666,7 +2654,24 @@ if (NEG) {
       mutantsOK = false; continue;
     }
     OVERRIDE = { file: m.file, text: src.replace(m.from, m.to) };
-    const r = await run({ mutant: m.id });
+    /* A MUTANT THAT CRASHES THE GATE IS THAT MUTANT'S FAILURE, NOT THE SWEEP'S.
+       Measured: one mutation leaves two thirds of a petal's strips unplaced, a
+       check reached into their missing stations, and the THROW took the whole
+       run down on its second mutant — thirty minutes to find out nothing. A
+       check that cannot answer owes a red line and a reason; a harness that
+       cannot survive one owes the same. The checks were fixed; this is the net
+       under them. */
+    let r;
+    try {
+      r = await run({ mutant: m.id });
+    } catch (e) {
+      console.log(`  [FAIL] ${m.id.padEnd(46)} THREW: ${(e && e.message) || e}`);
+      console.log('         a check reached into state this mutation removed — fix the '
+        + 'check to report rather than throw');
+      OVERRIDE = null;
+      mutantsOK = false;
+      continue;
+    }
     OVERRIDE = null;
     const red = [...r.checks].filter(([, v]) => !v).map(([k]) => k);
     const missed = m.breaks.filter(k => !red.includes(k));

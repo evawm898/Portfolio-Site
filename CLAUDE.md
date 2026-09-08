@@ -2087,34 +2087,68 @@ bottleneck again, the next thing to skip is the head transform during a BEND
 drag: the head cannot move then, and re-transforming 16,268 points to prove it
 is the one piece of work that is knowably wasted.
 
-**Verify with `node tools/verify-plot.mjs`** (84 checks). Part one drives the
-shipped `plot-grid.js`, `plot-stem.js` and `plot-warp.js` functions in Node over
-fixtures whose answer is written
+**Verify with `node tools/verify-plot.mjs`** (116 checks). Part one drives the
+shipped `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
+functions in Node over fixtures whose answer is written
 down (a stride of 3 over columns 0..9 keeps {0,3,6,9}; a stride of 4 keeps
-{0,4,8,9} where 9 survives ONLY as the margin), because on the real grid a
-wrong stride, a wrong family split or a merely plausible fog range all still
-draw a plausible picture — and so do all four of the stem's silent failures.
-**EVERY DRAW CHECK RUNS WITH THE STEM OFF**, which the gate's own `DEFAULTS`
-say, so the ink and segment counts there are the ones /plot shipped and the
-stem cannot hide inside them; two later checks turn it on and require the draw
-controls to still work. Part two drives the page in a real browser and
+{0,4,8,9} where 9 survives ONLY as the margin; a flat 21-row petal is 40 mm
+long, 4 mm wide and holds its base over exactly 6 mm), because on the real grid
+a wrong stride, a wrong family split, a merely plausible fog range, all four of
+the stem's silent failures and every one of the petal warp's still
+draw a plausible picture.
+**EVERY DRAW CHECK RUNS WITH THE STEM OFF AND NO PETAL PICKED**, which the
+gate's own `DEFAULTS` say, so the ink and segment counts there are the ones
+/plot shipped and neither the stem nor a highlight can hide inside them; later
+sections turn each on and require the draw controls to still work. Part two
+drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs NINETEEN mutants and is required before quoting
-a pass from a changed harness**; it re-serves broken copies of `plot.js`,
-`plot-grid.js`, `plot-stem.js` and `plot-warp.js` through the gate's own HTTP
+way. **`--negative-control` runs THIRTY mutants and is required before
+quoting a pass from a changed harness**; it re-serves broken copies of
+`plot.js`, `plot-grid.js`, `plot-stem.js`, `plot-warp.js` and `plot-petal.js`
+through the gate's own HTTP
 server (and imports the broken module for part one — written into the REPO ROOT,
 because `plot-stem.js` imports `./plot-warp.js` and a mutant anywhere else
 resolves that to nothing), and fails if a mutation does not apply, if a check
-the mutant NAMES stays green, or if a check it did not name goes red. The eleven
-new ones are the four traps, the two halves of the zoom fix, a stem drawn for
+the mutant NAMES stays green, or if a check it did not name goes red. The stem's
+eleven are the four traps, the two halves of the zoom fix, a stem drawn for
 lines that are not, a locked root, a drag that also orbits, a bend width that
-stops coming from the neighbours, and a droop that reaches only the u family.
-**19 of 19 clean at `cac4475` + the bookkeeping fix**, and the sweep costs
-roughly 95 minutes — five minutes a mutant, because each is a full 84-check
-browser run. `--mutant=a,b,c` takes a comma list and is how to re-verify one
+stops coming from the neighbours, and a droop that reaches only the u family;
+the petal's eleven are a base hold of 0.001 instead of 0, an ungated across
+scale, a station guessed from the point's index, a station handed to a strip the
+file never placed, a warp that reaches every petal, a warp that reaches only the
+u lines, an along scale that also widens, a highlight material that never gets
+the viewport's resolution, a pick that takes the nearest line rather than the
+front-most, a drag that also selects, and a highlight that is a brightness as
+well as a hue.
+**30 of 30 clean**, and the sweep costs roughly two and a half hours — about
+five minutes a mutant, because each is a full 116-check browser run.
+`--mutant=a,b,c` takes a comma list and is how to re-verify one
 without paying for the rest.
+
+**A MUTANT'S CLAIMED LIST IS NOT A GUESS TO BE LOOSENED — but a check that
+LEAKS STATE will make it look like one.** Two things this session found by
+running the control rather than by reasoning about it: the pick check would have
+passed vacuously on any drawing whose petals never overlap (front-most and
+nearest-on-screen agree everywhere there), so it now REQUIRES that they disagree
+somewhere and says by how much; and `petalOn` had to be made rest the bend
+points, because the check that drags a handle to prove both line families move
+together left that bend in place and the stretch checks two aisles down then
+measured a petal that was bent as well as stretched — 60.31 mm where 2.2x of
+27.04 mm is 59.49. A slider cannot clear a bend offset, because a bend offset is
+not a control value.
+
+**AND TWO CLAIMED LISTS WERE WRONG IN THE HONEST DIRECTION, WHICH IS WHAT THE
+CONTROL IS FOR.** `the-station-is-guessed-from-the-shape` was claimed to break
+the check that a strip the file did not place gets no station — it does not, and
+was right not to: the edit lands AFTER the guard that refuses a v-line with no
+`u`. The claim came off the list and that guard got a mutant of its own.
+`the-warp-reaches-only-the-u-lines` reddened three checks it had not claimed,
+and all three are TRUE about it: the bend check asserts that ALL of a petal's
+strips moved where ten of thirty-nine do, and both stretch checks measure a
+half-width against a centre line the u-lines moved and the v-lines did not. They
+were added to its list, not tuned out of the checks.
 
 **THE DROOP REACHING ONLY THE U FAMILY IS ITS OWN CHECK, because every other
 instrument here is looking at a u-line foot.** A v-line's row 0 sits on the same
@@ -2253,6 +2287,191 @@ renderer is not deterministic between page sessions and none of these cells
 needs one; every cell settles by screenshotting until two consecutive frames
 are byte-identical.
 
+**ONE PETAL CAN BE PICKED AND DEFORMED, AND `plot-warp.js` WAS NOT REBUILT TO DO IT**
+(session of Sep 8; `plot-petal.js`). The bend mechanism was written re-pointable on
+purpose — a function of ONE SCALAR station along whatever axis the caller owns — and
+this is its second caller. What the new file supplies is the AXIS: where a petal's
+stations are, how long it is, and what a displacement at a station does to its points.
+Read `plot-petal.js`'s header before touching any of it.
+
+**THE STATION IS ARC LENGTH IN MILLIMETRES ALONG THE PETAL'S OWN MEASURED CENTRE LINE,
+NOT `u`** — the open question this file's own NEXT list recorded, closed with a reason. The file
+parameterises a petal by u in [0,1] and that is what PLACES each point; but u is a
+parameter, and the export's own telemetry records `metricMax` reaching 4.12 under cup,
+so evenly spaced u is not evenly spaced millimetres. `sigmasFor` derives a bend's width
+from the gaps between stations, so the units it is handed decide what a handle MEANS: a
+gaussian of constant width in u is a bend whose physical size changes along the petal.
+So u orders the rows and the centre line measured through them supplies the millimetres,
+and a sigma reads in mm exactly as the stem's does. **On the shipped grid the two agree
+to 2e-5 mm** — which is what a flat build looks like and is not a reason to assume it.
+That also answers the third parked question: a bend point's sigma is never "on an axis of
+length 1", because the axis is the petal's own length (18.6 to 35.0 mm across this file's
+28 petals, so bends are stored as FRACTIONS `t` — the stem's convention, for the stem's
+reason).
+
+**THE STATION COMES FROM THE FILE, NEVER FROM THE POINT'S INDEX**, the discipline
+`kindOf` already followed. A v-line carries its own `extras.u`; a u-line's point i sits at
+row i of its panel's declared `u` ladder (`extras.panels[].u` on the petal node), matched
+BY LABEL so a cleft petal's three panels each keep their own. `i / (count - 1)` happens to
+equal them on a uniform ladder — which the shipped grid is, so the real file cannot tell
+the two apart, which is why `stationsForStrip` is driven in the gate over ladders written
+down. **A strip the file did not place gets NO station and the petal holding it is
+refused WHOLE** (`petalList().warpable`, with a `why` the panel prints): deforming the
+rest of a petal and leaving one strip behind tears the grid internally, and a line drawing
+is the worst possible place to notice it.
+
+**THE TWO LINE FAMILIES CANNOT PART COMPANY, STRUCTURALLY.** A petal is 10 u-lines of 29
+points and 29 v-lines of 10 points over ONE lattice — the u-line in column c and the
+v-line in row r hold the same point, **bit for bit, 0 mismatches over all 28 petals**
+(measured). Every term of the law depends on a point and on its station and on nothing
+else — never on which strip the point arrived in — so the two copies take the same
+displacement and the grid cannot tear internally. Asserted as an IDENTITY on the fixture
+and on the page, at five settings including a real handle drag.
+
+**THE BASE IS HELD BY THE DELTA BEING EXACTLY ZERO, NOT BY A COMPARISON.** Every u-line
+starts on the attachment ring at z = 0 and the inferred stem continues from precisely
+those points, so a petal that moved at its base would tear off the bundle — the failure
+the stem's join gate exists to prevent, coming the other way. The law is written
+`point + delta`; `rootHold` returns EXACTLY 0 at station 0 and the centre-line term is a
+difference of a value with itself there, so all three components are exactly zero and the
+point is handed straight back. **`=== 0` and NOT `Object.is`**, because a zero's sign here
+follows the sign of `along - 1` and `-0 === 0` is true while `(-0) + 0` is `+0` — a point
+whose own coordinate is a negative zero would otherwise stop being the file's point.
+The hold is **`ROOT_HOLD_ROWS = 3` of the file's OWN ROWS**, not a fraction and not a
+length: a gate shorter than the lattice spacing cannot be drawn — it would step between
+row 0 and row 1 rather than taper, the failure the stem's funnel already has a check for.
+
+**ALONG AND ACROSS ARE INDEPENDENT BECAUSE THEY ACT ON DIFFERENT HALVES OF ONE
+DECOMPOSITION.** Every point is its row's centroid plus an offset from it: `along` scales
+the CENTRE LINE about the base (longer petal, same cross-sections), `across` scales the
+OFFSET (wider petal, same length). Both at k is a similarity; either alone is not.
+**The across scale is GATED and the along scale is not**, and that asymmetry is
+load-bearing: along is anchored by construction (it multiplies `centre − base`, zero at
+the base), while widening a petal's own foot would overrun the arc its neighbours occupy
+on a ring 28 petals share AND move the feet the stem is built from. So the petal flares
+out of a foot whose width the junction owns.
+
+**A MAXIMUM HALF-WIDTH IS BLIND TO A GATED NARROWING, and the first version of the check
+failed on it.** Because `across` rides `rootHold`, the rows inside the hold keep the width
+the junction gave them; narrow the blade enough and the petal's WIDEST point moves INTO
+the hold, where it is by design not narrowing. Measured: on the written-down fixture (every
+row 4 mm) the maximum reads **4.00 mm at across 0.5 and at across 0.25 alike**, and on the
+shipped grid **across 0.4 lands the scaled blade on exactly the base row's own 3.2 mm** —
+a check watching the maximum would have passed that one for no reason at all. So the claim
+is asserted ROW BY ROW: the blade past the hold scales exactly, the base row does not move
+at all.
+
+**PICKING IS A LIST FIRST AND A CLICK SECOND, AND THAT ORDER IS MEASURED — the sheet sweeps
+the canvas at two cameras and prints it, so every number here comes out of a committed
+tool.** On this bloom with the shipped 8 px tolerance, at the home framing: **only 15.8%
+of pixels have any line within reach of a click at all; of the clicks that DO hit, 62.5%
+have two or more petals within tolerance and 39.5% are ones where the nearest line on
+screen and the nearest line to the camera belong to DIFFERENT petals.** At a LOW angle,
+where the whorls overlap most, it is **10.6% / 75.6% / 49.6%** — quoting only the
+flattering camera would be quoting half a measurement. **Widening the tolerance is not the
+lever**: the hit rate runs 14.3% at 4 px to 18.0% at 14 px, because what is scarce is INK
+and not reach. (The gate reads 19.3 / 59.8 / 36.6 at its own 1100x800 framing against the
+sheet's square one, and asserts the RULE on every probe rather than the numbers.) So the
+dropdown
+(flanked by two steppers) is the control to rely on and the click is a convenience, and the
+click takes the **FRONT-MOST** line within tolerance: depth testing is off and every line
+is drawn, so the front petal is the one the eye means, and among two crossing lines the
+front one does not change as the pointer moves a pixel where the nearest-on-screen one
+does. A click that travelled more than `CLICK_SLOP_PX` is an orbit and leaves the
+selection alone.
+
+**THE PICK IS A CPU PASS OVER THE DRAWN STRIPS, NOT A RAYCAST, and that is a design choice
+rather than a shortcut.** The page draws all 28 petals into four buffers, so a raycast
+could say WHERE it hit and never WHICH PETAL; splitting the draw into 56 objects to make
+picking work would be paying for picking on every frame instead of on every click.
+~16k points, once per click. `scanSegments` is the one projection and `pickPetalAt` and
+`petalDistancesAt` are its two consumers — the RULE lives in exactly one of them, which
+is what lets the gate re-derive the answer from a different primitive than the shipped
+rule uses.
+
+**THE HIGHLIGHT IS A HUE, NEVER A BRIGHTNESS — and getting that right is a colour-space
+trap.** Overlapping petals already brighten where they cross, so "this one is brighter" is
+the one signal this page cannot spend. The selected petal draws through a CLONE of the one
+material (so weight and brightness reach it from their single owner) in the panel's own
+teal. But `setScalar(b)` writes b as a LINEAR value while `setHex` converts an sRGB hex
+INTO linear, so teal-at-hex times brightness came out at **0.142 linear where white sat at
+0.300** — a selected petal a third dimmer than the drawing, which under a depth dim is
+exactly the cue for "further away". Dividing by the accent's own largest linear channel
+first puts the highlight's ceiling at exactly `brightness`, so the calibration the additive
+check rests on holds for both. **The DRAW counts do not move when the selection does**: the
+per-family segment and line counts are taken from the whole drawn set, not from the object
+each strip landed in.
+
+**A SECOND `LineMaterial` NEEDS THE RESOLUTION AND THE FOG FLAG, AND THE SYMPTOM OF
+FORGETTING IS NOT A WRONG PICTURE — IT IS A STALLED RENDERER.** A fat line's width is
+computed in the shader by dividing by `resolution`, and `resize()` set it on the one
+material there used to be. The cloned highlight kept the clone's default, so every one
+of a selected petal's 541 segments rasterised as a screen-filling quad: **one control
+write went from 0.2 s to 7.9 s and the headless GPU process sat at 350% CPU**, which read
+as the gate hanging rather than as anything to do with a highlight. The fog FLAG is the
+same shape of mistake — three compiles `USE_FOG` into the program, so a material has to be
+told when the fog APPEARS or GOES and a clone that is never told keeps the program it was
+first compiled with while the drawing beside it fades. `materials` is now the list both
+`resize()` and `updateFog()` walk, and
+`select/the-highlight-material-carries-the-resolution-and-the-fog` is the witness —
+neither property is visible in a segment count, in a colour, or in a line set, which is
+why nothing else here could see it.
+
+**THE WARP RUNS FIRST, ON EVERY STRIP IN THE FILE, AND EVERYTHING ELSE READS ITS OUTPUT.**
+`applyPetalWarp` produces `warpAll`; the density selection, the droop, the stem, the camera
+fit and the depth dim's own sphere all walk that — so there is one answer to "where is this
+point", and a petal stretched to 2.5x is in frame and inside the fog rather than half out
+of it. **The stem does not notice a warp at all**, structurally rather than by ordering:
+the law is exactly the identity at the base, so the feet `buildStem` continues from are the
+file's own points. Measured with the stem drawn at a 40° droop and the petal at 2.5x in
+both directions: every foot and every station of a stem line identical to the bit.
+
+**"ONLY THE SELECTED PETAL MOVED" IS AN ARRAY IDENTITY, NOT A TOLERANCE.**
+`applyPetalWarp` hands back the very array the file wrote for every strip it did not move
+(and `petalPoints` returns the SAME array at rest, the discipline `headTransform` already
+follows at droop 0), so a strip that shifted by a millionth of a millimetre would be a new
+array and would be counted. The panel prints the count; the gate asserts it is exactly the
+off-petal set.
+
+**A PETAL SWITCH RESTS THE BEND OFFSETS AND CARRIES THE TWO SCALES**, and the split is not
+a compromise: `along` and `across` are numbers that mean the same thing on any petal, while
+a bend offset is a WORLD displacement in millimetres — carried to a petal on the other side
+of the bloom it would point the same way in space and therefore the opposite way relative
+to that petal. There is no persistence yet, so nothing is stored per petal and the read-out
+says what carries.
+
+**A HANDLE THAT PROJECTS UNDER A CONTROL COLUMN CANNOT BE GRABBED** — /print's measured
+lesson, arriving here as a real limit of the tool rather than of the harness: the gate and
+the sheet both search for a handle in the clear, and the answer for a hand is to orbit.
+Petal handles are AMBER where the stem's are teal, because with a drooped head the two runs
+can cross.
+
+**THE SIX PETAL CONTROLS ARE NOT A RULING** — unlike the DRAW and STEM defaults above, no
+one has turned them on the preview yet. Treat every number as a starting point:
+
+| control | default | range | what it is |
+|---|---|---|---|
+| petal | `none` | none + the file's own order | a fresh grid picks nothing |
+| along | 1.00x | 0.25–2.50 | the centre line, scaled about the base |
+| across | 1.00x | 0.25–2.50 | each point's offset from it, held at the foot |
+| bends | 2, at rest | 0–6 | at the middle and the TIP; add subdivides the widest gap |
+| show bend handles | on | — | you cannot drag what you cannot see |
+| (click tolerance) | 8 px | — | not a control; `PICK_TOLERANCE_PX`, and not the lever |
+
+**The petal has its own sheet: `node tools/shot-plot-petal.mjs <dir>`** — 18
+cells: what ships with nothing picked, a petal picked at rest (the highlight
+alone), the handles, one petal BENT by a real drag with the other 27 untouched,
+that bend cropped to the petal's own measured box with both families on and then
+each family alone (the internal-tearing cells), along long and short, across wide
+and narrow, the narrow petal close enough to read its held foot, long-and-narrow
+together, the same settings moved to another petal, a stretched petal on a
+drooping stem, a tip handle dragged with the head already drooped, and the panel.
+Every caption carries the SEAM, how far the petal moved, and how many strips off
+it came back as the arrays the file wrote; the index carries the click-picking
+measurement at TWO cameras and the tolerance sweep beside it. No pixel delta is quoted anywhere and every cell settles until two
+consecutive frames are byte-identical, the same discipline the stem sheet
+follows.
+
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
 — run the gate and the sheet by hand. Note the corollary `/print` and `/cards`
@@ -2277,9 +2496,12 @@ LEAVES and buds; print or SVG export; any change to `/print`, the generator, or
 the grid export format. (The STEM is no longer out of scope — see the inferred
 stem above — but it is inferred from the u-lines, not loaded, and nothing about
 leaves follows from it.) Also out of scope this session and named so it is not
-mistaken for an omission: petal selection and per-petal warp, the FRAME panel,
-lock, save, shapes, cut-and-pull and export, and any persistence at all — stem
-settings evaporate on reload, and save lands with the FRAME panel.
+mistaken for an omission: the FRAME panel, lock, save, shapes, cut-and-pull and
+export, and any persistence at all — stem settings and petal warps evaporate on
+reload, and save lands with the FRAME panel. TWIST was named in the petal
+session's brief as the thing to drop if the session grew, and it was: bend and
+stretch shipped, twist did not. (PETAL SELECTION AND PER-PETAL WARP are no
+longer out of scope — see the petal section above.)
 
 **`/plot` EXISTS NOW, SO THE PARKED FLOWER-PETAL-PATH TRIGGER NAMES A REAL
 PAGE.** `docs/bloom-session-28-outcome.md` parked the FLOWER's petal-path
@@ -2299,19 +2521,21 @@ investigation first, and what session 28 already established
 strand modes) is in that doc so it is not re-derived.
 
 **NEXT, KNOWN AND NOT STARTED — recorded so they are not rediscovered:**
-0. **THE PETAL WARP, AND `plot-warp.js` IS ALREADY POINTED AT IT.** The bend
-   mechanism was built re-pointable on purpose: it is a function of one station
-   along whatever axis the caller owns, so warping an individual petal along its
-   own `u` needs the axis and the line set, not a rewrite. Three things that
-   session will have to decide and this one deliberately did not: which petal is
-   selected and how, whether a petal's stations are `u` (0..1, as the export
-   tags them) or arc length (they are not the same — the export's own telemetry
-   records `metricMax` reaching 4.12 under cup, so evenly spaced `u` is not
-   evenly spaced mm), and what a bend point's SIGMA means on an axis of length 1.
+0. **THE PETAL WARP IS BUILT — see the petal section above.** All three
+   questions this list parked are answered there with reasons: the picker is a
+   list first and a click second (measured), the stations are ARC LENGTH in mm
+   along the petal's own measured centre line rather than `u` (`metricMax` 4.12
+   is exactly why), and a bend's sigma is therefore in millimetres on the
+   petal's own length rather than on an axis of length 1. **TWIST is what that
+   session did not build** — the brief named it as the thing to drop if the
+   session grew, and bend and stretch are what shipped. A twist would rotate
+   each row about the centre line's own tangent; the frame already has the rows
+   and the stations, so what it needs is the tangent and one more term in
+   `petalDeltaAt`, gated by the same `rootHold`.
 1. **A UI overhaul for `/plot`.** The panels are `/print`'s grammar applied
    as-is, which was right for shipping a viewer and is not a considered design
-   for this page. The STEM panel makes this more pressing, not less: there are
-   now eleven controls in the right-hand column.
+   for this page. The STEM and PETAL panels make this more pressing, not less:
+   there are now seventeen controls in the right-hand column.
 2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
    for the export itself, and it belongs to the GENERATOR, not to this viewer.
    `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
