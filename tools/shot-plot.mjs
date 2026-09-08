@@ -66,7 +66,8 @@ const q = fn => page.evaluate(fn);
 const set = o => page.evaluate(o => {
   for (const [k, v] of Object.entries(o)) {
     const el = document.getElementById(k);
-    el.value = String(v); el.dispatchEvent(new Event('input', { bubbles: true }));
+    if (el.type === 'checkbox') el.checked = !!v; else el.value = String(v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
   }
 }, o);
 const view = (dir, margin = 1.06) => page.evaluate(([d, m]) => window.__plot.setView(d, m), [dir, margin]);
@@ -87,8 +88,11 @@ async function settled() {
   return { bytes: prev, frames: 40, unsettled: true };
 }
 
+/* THE STEM IS OFF ON THIS SHEET. It ships ON, and it is the whole subject of
+   `tools/shot-plot-stem.mjs`; here it would put a 170 mm stalk in every frame
+   and shrink the grid these cells are about. */
 const DEFAULTS = { families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
-                   brightness: 30, depthDim: 55 };
+                   brightness: 30, depthDim: 55, stem: 'off' };
 const cells = [];
 async function cell(file, caption) {
   const { bytes, unsettled, frames } = await settled();

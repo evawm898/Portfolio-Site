@@ -81,6 +81,25 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 }
 #plot-bundle-load .hint { color: #6b7776; font-size: 0.68rem; display: block; margin-top: 0.3rem; }
 
+/* THE BEND ROW. Two nudge buttons and a reset, sitting in the middle column of
+   the same three-column row every slider uses, so the bend-point count reads as
+   one more control rather than as a widget bolted under the panel. */
+.plot-bends { display: flex; align-items: center; gap: 0.3rem; }
+.plot-bends button {
+  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  font: inherit; line-height: 1; padding: 0.15rem 0.4rem; cursor: pointer; border-radius: 2px;
+}
+.plot-bends button:hover:not(:disabled) { border-color: #6fb7ae; color: #c8d2d1; }
+.plot-bends button:disabled { opacity: 0.35; cursor: default; }
+.plot-bends #bendCount { color: #c8d2d1; min-width: 1.2em; text-align: center; }
+.plot-check { display: block; margin: 0.5rem 0 0; cursor: pointer; user-select: none; }
+.plot-check input { accent-color: #6fb7ae; margin: 0 0.35rem 0 0; vertical-align: -0.1em; }
+
+#plot-stemstate {
+  margin: 0.65rem 0 0; padding-top: 0.6rem; border-top: 1px solid #222a2a;
+  white-space: pre-wrap; font: inherit; color: #96a2a1;
+}
+
 #resetView {
   background: none; border: 1px solid #2b3333; color: #96a2a1;
   font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
