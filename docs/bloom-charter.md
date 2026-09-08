@@ -5730,3 +5730,36 @@ matters should be measured this way.
   on the list of tags whose definitions reproduce and whose bytes do not fully** (8 of 549), per
   the session-24 ruling. Numbers, each from its own run, in the outcome doc's close.
 
+- **Session 31's CLOSE (Sep 8) — merged as `552bbcc` (PR #187), `frozen/phase20` published.**
+
+  **VERIFIED ON THE HEAD `0c990ed` BEFORE THE MERGE, each gate from its own run's conclusion:**
+  all FIVE bloom gates green — `bloom-grid`, `bloom-frozen-matrices` (phase20 deep-equal in CI,
+  the smoke census 41/41), `bloom-panel`, `bloom-connectedness` (64 min on 572 rows),
+  `bloom-export-watertight` (91 min) — with JS6/JG5 running on every row WITHOUT the singular
+  exemption. The two flower gates ran on the `tools/**` filter and are NOT bloom evidence.
+  Mergeable state clean; undrafted and merged by the session with the head sha read from the
+  remote, squash, as the session's own final step.
+
+  **`main` HAD MOVED BY ONE COMMIT** — `7011e88`, the `/plot` stem PR (#184): plot files, its two
+  tools and `CLAUDE.md`, no bloom source. So the merged tree is a third tree, as in session 29,
+  and the manifest was re-verified ON IT: `git diff --name-only 8b4c671..552bbcc` is exactly this
+  session's twelve files plus #184's nine with `CLAUDE.md` shared (twenty), and **no bloom-tree
+  file differs between the certified head `0c990ed` and merged `main`** — the byte proof on the
+  head IS the proof of the merged tree's bloom. CI ran on the head merged into that base, which
+  is what merged.
+
+  **`frozen/phase20` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `8b4c671`, matching
+  `FROZEN_BASE_COMMITS`. Predicted before the dispatch and confirmed from the log and from
+  `git ls-remote --tags`: the `bloom-frozen-tags` workflow went red as designed (run
+  34189380854, the `GITHUB_TOKEN` refusal its script's header describes), `phase5` the only
+  baseline absent, eighteen published at their declared shas. **One count in the prediction
+  was wrong and is corrected here:** nineteen baselines are declared (phase2 through phase20),
+  not twenty, so eighteen published rather than nineteen. The outcome doc carries the same
+  correction beside its prediction.
+
+  **THE PARTITION, MEASURED** (the outcome doc's close has the tables): phase20 16 movers / 6
+  inert / 549 holders and phase19 8 / 3 / 538, both EXACTLY as predeclared, twin === new on every
+  row of both; the base captured twice 571/571. Every mover moved at an identical triangle count
+  and byte length. `frozen/phase19`'s bytes no longer fully reproduce (8 of 549); its definitions
+  do. Both sheets proved on two rows, then the grid; both before/after pairs HELD.
+
