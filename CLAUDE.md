@@ -29,11 +29,20 @@ deliberately not repeated here. Its invariant is one connected watertight
 solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
-**Iterate on `node tools/bloom-smoke.mjs`** — 28 of the 499 matrix rows through
-the real export gate, ~2 min against ~44 for one full gate (about 20x — the
-first-reported 31x mixed machine states and is withdrawn; see the charter); `--conn` adds the
+**Iterate on `node tools/bloom-smoke.mjs`** — a subset of the matrix rows through
+the real export gate; `--conn` adds the
 flood fill and is REQUIRED while a new geometry mode's junction assertions are
-still being established. It is for iteration, never for merge: the full matrix
+still being established.
+**A FULL GATE IN CI IS ~90 MINUTES, NOT ~44** (measured, session 32, from four
+completed `bloom-export-watertight` runs rather than from memory: 91.5 / 90.9 /
+88.5 / 92.1 min, on runs 133, 134, 137 and 138). The long-standing "~44" here was
+written when the matrix was roughly half its current size and is withdrawn; it
+had a session sizing a CI wait at half the real figure and reporting "nearly
+done" four times over. **Size a CI waiter off `actions_list` on the workflow's own
+recent completed runs, never off a number in this file** — the matrix grows every
+session, so any figure written down here is stale by construction. The smoke
+subset is still the iteration instrument and is still minutes, not hours; what
+changed is the thing it is being compared against. It is for iteration, never for merge: the full matrix
 on both gates, in CI, is the merge criterion, and what the subset is BLIND to is
 in that tool's own header. Do not also run the full matrix locally except at a
 milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloom
