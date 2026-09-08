@@ -740,9 +740,12 @@ const MUTANTS = [
     // A composition restored against a different bundle stops saying so. Warps
     // are applied by petal INDEX, and a silently wrong petal is
     // indistinguishable from a right one in the picture.
+    /* RE-POINTED after a refactor moved the line it edits (the null-grid guard).
+       The sweep reported "mutation did not apply" rather than a false pass,
+       which is the one thing that makes that failure mode survivable. */
     id: 'the-grid-mismatch-is-not-reported', file: 'plot.js',
-    from: '  const cmp = compareIdentity(inst.grid, currentIdentity());',
-    to: '  const cmp = { match: true, differences: [] };',
+    from: '  const cmp = inst.grid ? compareIdentity(inst.grid, currentIdentity())',
+    to: '  const cmp = false ? compareIdentity(inst.grid, currentIdentity())',
     breaks: ['restore/a-composition-from-a-different-grid-is-named-field-by-field'],
   },
   {
@@ -3881,25 +3884,35 @@ async function run({ mutant = null } = {}) {
   /* AND A FILE THAT IS NOT A COMPOSITION CHANGES NOTHING AT ALL. Same contract
      the grid loader already keeps: a refusal is reported and what is on screen
      is left exactly as it was. */
+  /* A CHECK THAT CANNOT ANSWER OWES A RED LINE AND A REASON, NOT A THROW — the
+     harness has a net under it, and this check fell into it. The first version
+     registered a check name PER FAILING FILE (so a name existed only under a
+     mutant, which the stale-name guard cannot see either way) and then quoted
+     `junkState.error.slice(...)` in its detail. Under
+     `a-newer-version-is-read-anyway` the v99 file is ACCEPTED, so `error` is
+     null, and the detail string threw and took the whole sweep down on its
+     second mutant. Every outcome is collected first and the detail is
+     null-safe; the claim is over all three files rather than the last one. */
   const beforeJunk = await compSnapshot();
   const junkPix = await px();
+  const junkTried = [];
   for (const [label, body] of [['not JSON', 'this is not json at all'],
                                ['a JSON object that is not a composition', '{"hello":"world"}'],
                                ['a newer version', JSON.stringify({ ...savedDoc, version: 99 })]]) {
     await page.evaluate(t => window.__plot.loadComposition(t, 'junk.json'), body);
     const st2 = await q(() => window.__plot.compositionState());
-    if (st2.action !== 'refused') { check(`restore/${label}-is-refused`, false, st2.action); }
+    junkTried.push({ label, action: st2 ? st2.action : 'nothing', error: st2 ? st2.error : null });
   }
   const afterJunk = await compSnapshot();
-  const junkState = await q(() => window.__plot.compositionState());
   const junkPix2 = await px();
+  const junkReadOut = await q(() => window.__plot.compositionReadOut());
+  const refusedAll = junkTried.every(j => j.action === 'refused' && typeof j.error === 'string');
   check('restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves',
-    junkState.action === 'refused' && typeof junkState.error === 'string'
-    && diffState(beforeJunk, afterJunk).length === 0
-    && junkPix.ink === junkPix2.ink
-    && (await q(() => window.__plot.compositionReadOut())).includes('left exactly as it was'),
-    `three refusals in a row — the last says "${junkState.error.slice(0, 60)}…" — and the page `
-    + `held ${junkPix2.ink} ink pixels throughout`);
+    refusedAll && diffState(beforeJunk, afterJunk).length === 0
+    && junkPix.ink === junkPix2.ink && junkReadOut.includes('left exactly as it was'),
+    junkTried.map(j => `${j.label} -> ${j.action}`).join(' · ')
+    + (refusedAll ? ` — the last says "${String(junkTried[2].error).slice(0, 50)}…"` : '')
+    + ` — and the page held ${junkPix2.ink} ink pixels throughout`);
 
   /* EVERY CONTROL THE PANELS HOLD IS EITHER A FIELD OF THE FILE OR A NAMED
      EXCEPTION. This is the one form of silent partial restore no round-trip
