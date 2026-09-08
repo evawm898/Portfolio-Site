@@ -125,7 +125,17 @@ const MUTANTS = [
              'bend/a-petal-handle-drag-does-not-orbit-the-camera',
              'bend/add-and-remove-change-the-set-and-reset-rests-it',
              'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
-             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours'],
+             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours',
+             /* AND THE PETAL CHECKS, ALL TRUE OF THIS MUTATION rather than
+                tuned out of the checks: with every strip called a u-line, a
+                v-line's ten points are matched against a 29-row panel ladder,
+                get no stations, and the petal holding them is refused WHOLE —
+                so there is no warp for the ownership checks to observe and no
+                axis for the read-out to report. */
+             'select/picking-a-petal-deforms-nothing',
+             'warp/a-warp-survives-deselection',
+             'warp/two-petals-hold-different-warps-at-once',
+             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-warped-count'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -357,7 +367,11 @@ const MUTANTS = [
              'warp/the-base-row-holds-to-the-bit-under-every-warp',
              'warp/a-deformed-petal-leaves-the-stem-alone',
              'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
-             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours'],
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours',
+             /* TRUE OF THIS MUTATION: the two-petal check asserts every warped
+                base row is still unmoved, and an ungated base moves it. Named
+                rather than dropped from the check — the seam IS the claim. */
+             'warp/two-petals-hold-different-warps-at-once'],
   },
   {
     // The across scale stops being gated: the petal's own foot widens, which
@@ -369,7 +383,11 @@ const MUTANTS = [
              'petal/across-scales-the-width-past-the-hold-and-holds-the-foot',
              'warp/the-base-row-holds-to-the-bit-under-every-warp',
              'warp/a-deformed-petal-leaves-the-stem-alone',
-             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot'],
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+             /* TRUE OF THIS MUTATION: the two-petal check asserts every warped
+                base row is still unmoved, and an ungated base moves it. Named
+                rather than dropped from the check — the seam IS the claim. */
+             'warp/two-petals-hold-different-warps-at-once'],
   },
   {
     // The station is guessed from the point's index instead of read off the
@@ -439,7 +457,14 @@ const MUTANTS = [
     to: '  frame = frameFor(index);\n  commitPetalScales();',
     breaks: ['select/picking-a-petal-deforms-nothing',
              'select/selecting-a-warped-petal-loads-its-own-values',
-             'warp/two-petals-hold-different-warps-at-once'],
+             'warp/two-petals-hold-different-warps-at-once',
+             /* TWO MORE THE MUTATION REALLY DOES BREAK. Stamping on pick makes
+                a SECOND warped petal, so the deselection check counts two where
+                it expects one; and stepping onto the next petal writes the
+                previous one's 1.6x / 0.7x into it, so it does not show its own
+                1.00x / 1.00x with its bends at rest. */
+             'warp/a-warp-survives-deselection',
+             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch'],
   },
   {
     /* THE OTHER HALF OF THE SAME DEFECT: deselecting throws the warp away, so
@@ -447,7 +472,14 @@ const MUTANTS = [
     id: 'deselecting-drops-the-warp', file: 'plot.js',
     from: '  if (index >= 0) petalStateOf(index, true);',
     to: '  if (index >= 0) petalStateOf(index, true); else petalWarps = new Map();',
-    breaks: ['warp/a-warp-survives-deselection'],
+    breaks: ['warp/a-warp-survives-deselection',
+             /* THE CHECKS DOWNSTREAM OF THE DESELECT IN THE SAME SEQUENCE. The
+                first petal is warped, then deselected, then the second is
+                warped — so under this mutation the first petal's entry is gone
+                by the time either of these reads it, and both report it at no
+                values rather than at its own. */
+             'warp/two-petals-hold-different-warps-at-once',
+             'select/selecting-a-warped-petal-loads-its-own-values'],
   },
   {
     /* THE STATE IS PER PETAL BUT THE DRAWING IS NOT: only the selected petal is
@@ -457,7 +489,16 @@ const MUTANTS = [
     from: '    if (!f || !mine) continue;',
     to: '    if (!f || !mine || index !== selected) continue;',
     breaks: ['warp/two-petals-hold-different-warps-at-once',
-             'warp/a-warp-survives-deselection'],
+             'warp/a-warp-survives-deselection',
+             /* AND EVERY CHECK THAT READS A PETAL ACROSS A SELECTION CHANGE,
+                all true of this mutation: if only the selected petal is DRAWN
+                warped, then picking another makes the first spring back to the
+                file's own points while its entry quietly survives — so "every
+                petal identical to the bit across a pick" is false, and picking
+                the first one back moves two petals rather than none. */
+             'select/picking-a-petal-deforms-nothing',
+             'select/selecting-a-warped-petal-loads-its-own-values',
+             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch'],
   },
   {
     /* THE SEAM AND ITS COUNT STOP NAMING THE SAME POPULATION: the seam still
