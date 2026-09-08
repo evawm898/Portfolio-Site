@@ -1,5 +1,5 @@
 /* ===================================================================
-   bloom-wall-thickness.mjs — HOW THICK IS THE SHEET, ACTUALLY? (session 31)
+   bloom-wall-thickness.mjs — HOW THICK IS THE SHEET, ACTUALLY? (session 33)
 
    THE GAP THIS FILLS. Nothing in this project has ever measured the emitted
    wall. The roll curvature floor (`ROLL_MIN_RADIUS_FACTOR`) is a CURVATURE
@@ -10,7 +10,7 @@
    were offset. Those are the same only while the mid-surface is gentle.
 
    Margin buckling is the first deformation whose whole point is that the
-   mid-surface is NOT gentle along u, and session 32 has to set its ranges
+   mid-surface is NOT gentle along u, and part 2 has to set its ranges
    against something. This is that something. It is the INPUT to a ruling,
    which is why it is built before the controls rather than after them.
 
@@ -93,7 +93,7 @@ export const CALIBRATION_EPS = 1e-12;
    The value is set from the run's own separation rather than from taste: with
    the surface normal the strongest resolvable state contributes 0.048 mm, and
    `--negative-control`'s `cross-section-normal` mutant is what proves the bar
-   sits below where that line lands when session 31 is undone. */
+   sits below where that line lands when session 33 is undone. */
 export const WALL_TOLERANCE = 0.12;
 
 /* V4 applies only where the grid can REPRESENT the wave. Below this many rows
@@ -200,12 +200,12 @@ export const STATES = [
   { id: 'buckle-strong',   label: 'buckle A=0.30 x half-width · f=3', set: { buckleAmp: 0.30, buckleFreq: 3 }, buckled: true },
   { id: 'buckle-env2',     label: 'buckle A=0.30 · f=3 · p=2',        set: { buckleAmp: 0.30, buckleFreq: 3, buckleEnv: 2 }, buckled: true },
   { id: 'buckle-env6',     label: 'buckle A=0.30 · f=3 · p=6',        set: { buckleAmp: 0.30, buckleFreq: 3, buckleEnv: 6 }, buckled: true },
-  { id: 'buckle-f7',       label: 'buckle A=0.20 · f=7 (session 32 cap)', set: { buckleAmp: 0.20, buckleFreq: 7 }, buckled: true,
+  { id: 'buckle-f7',       label: 'buckle A=0.20 · f=7 (part 2 cap)', set: { buckleAmp: 0.20, buckleFreq: 7 }, buckled: true,
     /* REPORTED, NOT ASSERTED, and the reason is measured rather than assumed:
        4.0 rows per cycle at the shipped grid, and the wall RECOVERS under
        refinement — 0.903 at 28x10, 0.991 at 42x15, 1.050 at 56x20, 1.114 at
        84x30, where the buckle's own contribution is 0.086 mm and inside V4's
-       bar. So the deficit here is the row count, and session 31 ships no
+       bar. So the deficit here is the row count, and session 33 ships no
        control that can reach it. */
     report: 'resolution: 4.0 rows/cycle; recovers to 1.114 mm at 84x30, own contribution 0.086 mm' },
   { id: 'buckle-on-form',  label: 'buckle A=0.20 f=3 over cup 1.2 + curl 180',
@@ -217,14 +217,14 @@ export const STATES = [
        shipped all-form-max already shows: 0.282 -> 0.014 in discovery).
        WHAT IT MEANS: the buckle COMPOSES with the curvature cup and curl have
        already spent, and the composition reaches inversion where neither does
-       alone. Session 32's clamp cannot be a function of A, f, L and t only —
+       alone. Part 2's clamp cannot be a function of A, f, L and t only —
        the closed-form `A*f^2 <= L^2/(4*pi^2*t)` bound derived in discovery is
        necessary and NOT sufficient. That is this row's job: to be the number
        that argument gets made in front of.
        IT IS AN XFAIL, NOT A WIDER BAR. The run FAILS HARD if it starts
        passing — that is the clamp landing, and the marker must come off in
        the same commit. */
-    xfail: 'composition: diverges under refinement (own contribution 0.438 mm at 28x10 -> 0.635 mm at 84x30); session 32 clamp' },
+    xfail: 'composition: diverges under refinement (own contribution 0.438 mm at 28x10 -> 0.635 mm at 84x30); part 2 clamp' },
 ];
 
 /* ------------------------------------------------------------------- driver */
@@ -329,7 +329,7 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
     if (floatDiff(a.positions, probe).differ !== 1) fails.push('V3 guard: the float comparison did not detect a deliberate 1e-9 perturbation — it cannot fail, so its clean sheet means nothing');
   }
 
-  /* V4 THE NORMAL — session 31's claim, on the buckle's OWN contribution.
+  /* V4 THE NORMAL — session 33's claim, on the buckle's OWN contribution.
      Three dispositions, each declared on the state rather than decided here:
      asserted, `report` (a stated reason it is not V4's to judge) and `xfail`
      (a tracked defect that FAILS HARD when it starts passing). */
@@ -371,7 +371,7 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
    merely breaks the build gets caught pretending to be a negative control. */
 const MUTANTS = [
   { id: 'cross-section-normal', names: ['V4'],
-    why: 'revert the buckled branch to the cross-section normal — session 31 undone',
+    why: 'revert the buckled branch to the cross-section normal — session 33 undone',
     apply: (s) => s.replace('if (form && form.buckle !== null) trueNormalRows(rows, footS.length);',
                             'if (false && form.buckle !== null) trueNormalRows(rows, footS.length);') },
   { id: 'derivative-in-v', names: ['V4'],

@@ -537,7 +537,7 @@ sharpness opened at both stamen counts against the circle it replaces, the space
 same-tree control, no pixel claim on `whole` or `lens`. **The lattice jump (10 → 16 sides the
 moment roundedness leaves 1) is session 31's and moves bytes.**
 **MARGIN BUCKLING SHIPS AS A FIELD WITH NO CONTROLS, AND THE ONE THING THAT IS NOT LIKE CUP
-AND ROLL IS THE NORMAL** (session 31, part 1 of two — read `docs/bloom-session-31-outcome.md`
+AND ROLL IS THE NORMAL** (session 33, part 1 of two — read `docs/bloom-session-33-outcome.md`
 before touching any of it). `w(u,v) = A * h(u) * |v|^p * cos(2 pi f u + phase)` added to `aN`
 in `petalForm`'s `sectAt`, on the same `ramp(u)` the other curves use so the FOOT is untouched
 by construction. **It is a displacement field, not a boundary change** — `widthProfile` is
@@ -561,7 +561,7 @@ a mutant. **0 of 203,212,800 floats moved** (571 live rows + phase19's 549, both
 a worktree of 7011e88, `Object.is`, with a 1e-9 positive control); no row added, so
 `frozen/phase19` stays the newest baseline and NO phase is owed. Zero triangles added.
 **THE INSTRUMENT IS `node tools/bloom-wall-thickness.mjs`** — the first thing here ever to
-measure the EMITTED wall, and it is the INPUT to session 32's ranges rather than a completeness
+measure the EMITTED wall, and it is the INPUT to part 2's ranges rather than a completeness
 exercise (Eva's own distinction, which is why this session is instrument-first). V1
 calibration / V2 reachability / V3 guard / V4 normal all ABORT; `--negative-control` runs five
 mutants that all behave. It rides in `bloom-export-watertight.yml` before the browser install,
@@ -575,15 +575,15 @@ and the FACETED mesh is what a slicer receives), and **all-form-max DIVERGES** 0
 a real near-self-contact, pre-existing. **THE COMPOSITION ROW IS AN XFAIL WITH A NUMBER**: the
 buckle over cup 1.2 + curl 180 diverges (own contribution 0.438 -> 0.635 mm under refinement),
 so **discovery's closed-form `A*f^2 <= L^2/(4 pi^2 t)` is NECESSARY AND NOT SUFFICIENT** — the
-buckle composes with curvature cup and curl already spent. That is session 32's clamp problem,
-and the xfail FAILS HARD when it starts passing. **Session 32** is the four controls (amplitude,
+buckle composes with curvature cup and curl already spent. That is part 2's clamp problem,
+and the xfail FAILS HARD when it starts passing. **Part 2** is the four controls (amplitude,
 frequency in CYCLES capped at 7, phase from the slot index, and `p` — Eva's amendment, floor 2,
 ceiling 6, default 3, "how far the ruffle reaches in from the edge", because an iris ruffles
 wide and a rose narrow and one exponent cannot draw both), the clamp, `NU = 56` and the sheet.
 **`NU = 56` IS A RULED EXCEPTION TO "DERIVE, DON'T EXPOSE", WITH ITS REASON**: a row count
 derived from buckle frequency would move `CURL_START_MIN = 1 / NU`, which the registry IMPORTS
 as a CURL control's bound — a control reaching into an unrelated control's range. Raising `NU`
-moves bytes and owes a frozen phase; session 31 does not.
+moves bytes and owes a frozen phase; session 33 does not.
 
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so

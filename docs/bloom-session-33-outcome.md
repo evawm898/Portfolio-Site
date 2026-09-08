@@ -1,9 +1,9 @@
-# Session 31 — margin buckling, part 1: the normal and the instrument
+# Session 33 — margin buckling, part 1: the normal and the instrument
 
 Read this before touching `buckleIsFlat`, `buckleLaw`, `trueNormalRows` in `buildPetalInto` or `tools/bloom-wall-thickness.mjs`.
 
 **Nothing visual changed and no control shipped.** This session lands the displacement
-field, the surface normal it needs, and the instrument session 32's ranges have to be
+field, the surface normal it needs, and the instrument part 2's ranges have to be
 argued in front of. The four controls, their ranges, the clamp and the sheet are session
 32; the brief for it is at the bottom of this file, including Eva's amendment.
 
@@ -72,7 +72,7 @@ Recorded here because a ruling whose reason is not attached becomes precedent by
 
 5. **Phase derived from the slot index.** One phase for the whorl reads machined.
    *Not shipped this session* — the field takes `bucklePhase` as a plain input; the
-   slot-index derivation is session 32's, with the controls.
+   slot-index derivation is part 2's, with the controls.
 
 6. **The two found-in-passing defects get their own sessions** — recorded below rather than
    bundled here.
@@ -232,7 +232,7 @@ red there costs nothing. The bloom gate count stays at five.
 
 ---
 
-## The composition finding — session 32's real problem
+## The composition finding — part 2's real problem
 
 **One state is an `xfail` with a measured reason.** `buckle A=0.20 f=3 over cup 1.2 + curl
 180` costs 0.438 mm of wall against its own control at 28 × 10 — and **it does not recover
@@ -249,10 +249,10 @@ Divergence under refinement is the signature of **real geometry**, not faceting.
 0.086 mm at 84 × 30 and inside V4's bar — so that one is the row count and is `report`ed
 with its numbers rather than asserted.
 
-**What it means for session 32.** The buckle **composes** with the curvature cup and curl
+**What it means for part 2.** The buckle **composes** with the curvature cup and curl
 have already spent, and the composition reaches inversion where neither does alone.
 **The closed-form bound derived in discovery — `A·f² ≤ L²/(4π²t)` — is necessary and NOT
-sufficient**, because it knows nothing about the curvature already present. Session 32's
+sufficient**, because it knows nothing about the curvature already present. Part 2's
 clamp has to be argued in front of this row. It is an `xfail`, not a wider bar: the run
 **fails hard if it starts passing**, and that marker comes off in the same commit as the
 clamp.
@@ -279,7 +279,7 @@ because it lived only in an outcome doc.)
 
 ---
 
-## Session 32's brief
+## Part 2's brief
 
 Everything in the sizing split stands: the four controls, the clamp with its read-out
 clause, and the sheet, argued in front of this instrument. That session **stops for Eva's
@@ -336,8 +336,8 @@ the control.
 
 - No control, no registry row, no range, no clamp, no read-out. The keys are reachable only
   from a tool.
-- No contact sheet. Nothing visual changed, so none is owed; session 32's is.
-- `NU` is still 28. Raising it to 56 is session 32's, and it moves bytes.
+- No contact sheet. Nothing visual changed, so none is owed; part 2's is.
+- `NU` is still 28. Raising it to 56 is part 2's, and it moves bytes.
 - No self-intersection instrument, and there will not be one (Q6). The composition row above
   is the closest thing: it measures a *wall*, and a wall going to zero is what an inversion
   looks like from the outside.

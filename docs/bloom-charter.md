@@ -5686,8 +5686,8 @@ matters should be measured this way.
   nothing else; 220 tracked files under the bloom, flower, print, plot, cards, tracker,
   `tools/` and workflow trees untouched.
 
-- **Session 31 (margin buckling, part 1 of two — Sep 8): THE FIELD AND ITS NORMAL SHIP WITH NO
-  CONTROLS.** Full detail in `docs/bloom-session-31-outcome.md`; read it before touching
+- **Session 33 (margin buckling, part 1 of two — Sep 8): THE FIELD AND ITS NORMAL SHIP WITH NO
+  CONTROLS.** Full detail in `docs/bloom-session-33-outcome.md`; read it before touching
   `buckleIsFlat`, `buckleLaw`, `trueNormalRows` in `buildPetalInto`, or
   `tools/bloom-wall-thickness.mjs`.
 
@@ -5734,7 +5734,7 @@ matters should be measured this way.
 
   **THE FIRST INSTRUMENT HERE EVER TO MEASURE THE EMITTED WALL** —
   `node tools/bloom-wall-thickness.mjs`, built BEFORE the controls because it is the INPUT to
-  session 32's ranges rather than a completeness exercise (Eva's own distinction, and the reason
+  part 2's ranges rather than a completeness exercise (Eva's own distinction, and the reason
   she took an instrument-first split she has argued against). The roll floor was a CURVATURE
   argument never checked against the mesh, and `thicknessProfile` reports the thickness a row
   was BUILT AT — the number handed to the offset, not the distance between the two skins that
@@ -5755,7 +5755,7 @@ matters should be measured this way.
   at maximum DIVERGES** under refinement, 0.282 → 0.014 mm, a genuine near-self-contact on a
   reachable shipped state. Neither is this feature's; each gets its own session.
 
-  **THE COMPOSITION FINDING IS SESSION 32'S REAL PROBLEM, and it ships as an XFAIL with a
+  **THE COMPOSITION FINDING IS PART 2'S REAL PROBLEM, and it ships as an XFAIL with a
   number.** The buckle over cup 1.2 + curl 180 diverges under refinement — its own contribution
   0.438 mm at 28 × 10 to **0.635 mm at 84 × 30** — while `f = 7`, the other suspicious row,
   RECOVERS (0.903 → 1.114, own contribution 0.086) and is therefore `report`ed with its numbers
@@ -5780,7 +5780,7 @@ matters should be measured this way.
   witness is a guard that tests whether the keys EXIST rather than whether they are zero, and it
   was written only after the sweep said so.
 
-  **SESSION 32** is the four controls, the clamp, `NU = 56` and the sheet, argued in front of
+  **PART 2** is the four controls, the clamp, `NU = 56` and the sheet, argued in front of
   this instrument, and it STOPS for Eva's ruling. **Her amendment, from the reference
   photographs**: the falloff exponent `p` is promoted from a constant to the fourth exposed
   control (floor **2** — `p = 1` is C⁰ at the midrib and creases the blade, so it is out of
