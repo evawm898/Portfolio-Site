@@ -52,7 +52,7 @@ import { chromium } from 'playwright-core';
 import { findChromium } from './chromium-harness.mjs';
 
 const outDir = process.argv[2] || '/tmp/bloom-silhouette';
-const SIL = ['petalBaseTaper', 'petalTipTaper', 'petalTipBreadth'];
+const SIL = ['petalBaseTaper', 'petalTipTaper'];
 const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
 
 const { server, port } = await serveRepo();
@@ -126,8 +126,8 @@ console.log('candidate defaults:');
 const candidates = [];
 for (const [label, s, note] of [
   ['TODAY — the pointed ovate (shipping default)', {}, 'The placeholder silhouette, reproduced BIT-IDENTICALLY by the new engine. Widest at 0.36; the tip is not a shape at all — it is the 0.8 mm blunt-tip floor governing the last 4 of 28 blade rows.'],
-  ['ROSE-ish — obovate, broad tip', { petalBaseTaper: 2, petalTipTaper: 1.1, petalTipBreadth: 0.3 }, 'Widest at 0.65 — above the middle, which is what obovate means. CANDIDATE DEFAULT.'],
-  ['POPPY-ish — orbicular, truncate', { petalBaseTaper: 0.6, petalTipTaper: 0.7, petalTipBreadth: 0.5 }, 'Blunt on both sides, tip held at half the max width. CANDIDATE DEFAULT.'],
+  ['ROSE-ish — obovate, broad tip', { petalBaseTaper: 2, petalTipTaper: 1.1 }, 'Widest at 0.65 — above the middle, which is what obovate means. CANDIDATE DEFAULT.'],
+  ['POPPY-ish — orbicular, truncate', { petalBaseTaper: 0.6, petalTipTaper: 0.7 }, 'Blunt on both sides, tip held at half the max width. CANDIDATE DEFAULT.'],
 ]) candidates.push(await cell({ label, set: set(s), views: ['whorl', 'petal'], note }));
 
 /* ---- 2. the family swept across its two exponents ---- */
@@ -138,20 +138,28 @@ for (const b of TIPT) for (const a of BASE) {
   family.push(await cell({ label: `base ${a} × tip ${b}`, set: set({ petalBaseTaper: a, petalTipTaper: b }) }));
 }
 
-/* ---- 3. tip breadth: the one term that reaches outside the exponent family ---- */
-console.log('tip breadth sweep:');
+/* ---- 3. RETIRED SECTION. The terminal sweep swept `petalTipBreadth`, then
+       its `petalTipEnd` replacement, and session 32 retired both: the apex is
+       one unconditional cap with NO control, so there is nothing here to
+       sweep. The cells are not re-pointed at something else — a sweep whose
+       subject is gone is deleted, not repurposed. It returns when the
+       superellipse law gives the apex a control again. ---- */
 const breadth = [];
-for (const w of [0, 0.15, 0.3, 0.45, 0.6]) {
-  breadth.push(await cell({ label: `tip breadth ${w}`, set: set({ petalTipBreadth: w }) }));
-}
 
-/* ---- 4. THE KINK — worst reachable crossover, cropped tight to the tip ---- */
-console.log('the kink (worst reachable crossover):');
+/* ---- 4. WHERE THE KINK WAS. The Aug 31 ruling ("it reads fine, plain
+       Math.max stays") was about a C0 corner where the TIP_PLATEAU term
+       crossed the falling core. That term is RETIRED (Eva's `blunt` ruling,
+       session 32) and the crossing with it: the apex is one monotone cap, so
+       the corner is unreachable rather than tolerated. These three cells keep
+       the same camera and the same extreme exponents and now photograph what
+       stands in its place — which is the honest successor to a ruling whose
+       subject no longer exists. ---- */
+console.log('where the kink was (the same corner, one construction later):');
 const kink = [];
 for (const [label, s, note] of [
-  ['no crossover — tip breadth 0', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipBreadth: 0 }, 'One term active. No crossover, no kink — the control case.'],
-  ['THE KINK — breadth 0.60 × steepest core', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipBreadth: 0.6 }, 'Maximum tip breadth against the steepest falling core: the two terms cross mid-blade and plain max leaves a C0 corner there. This is the worst case the shipped ranges can reach.'],
-  ['mid crossover — breadth 0.30', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4, petalTipBreadth: 0.3 }, 'A gentler crossover, for scale.'],
+  ['the steepest core — tip taper 4', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 4 }, 'The steepest falling core at the mesh floor. The control case, unchanged from the Aug 31 sheet.'],
+  ['tip taper 2', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 2 }, 'THE CELL THAT USED TO BE THE KINK. Maximum terminal against the steepest falling core: under the retired TIP_PLATEAU the two terms crossed mid-blade and plain max left a C0 corner up to 16.4 deg there. There is no second term now — the cap starts higher up the blade and runs monotonically to its terminal, so there is nothing to cross.'],
+  ['tip taper 1', { petalLength: 60, petalBaseTaper: 0.3, petalTipTaper: 1 }, 'The gentler terminal, for scale.'],
 ]) kink.push(await cell({ label, set: set(s), views: ['petal', 'tip'], note }));
 
 /* ---- 5. capability — what the architecture buys later ---- */
@@ -197,11 +205,11 @@ for (const [name, title, note, cells, which, perRow] of [
   ['silhouette-family', 'Petal silhouette — the rounded family swept',
    'Base taper (a) across, tip taper (b) down, tip breadth 0 throughout. These two exponents are the whole CORE term, u^a (1-u)^b — and every member of that family is pinched to a point at BOTH ends, which is the measured reason the tip-breadth control has to exist. Single-petal crops: the subject is the outline, so the frame is the petal.',
    family, 'petal', BASE.length],
-  ['silhouette-tip-breadth', 'Petal silhouette — tip breadth',
-   'The only shipped term that reaches outside the exponent family: truncate and rounded tips (rose, poppy) are unreachable without it. 0 is the shipping default and contributes EXACTLY zero, which is what makes the whole engine byte-identical.',
+  ['silhouette-tip-breadth', 'Petal silhouette — the apex terminal',
+   'How BROAD the blade ends, as a fraction of the max half-width. 0 is the shipping default and contributes EXACTLY zero, which is what makes the whole engine byte-identical.',
    breadth, 'petal', 5],
-  ['silhouette-kink', 'Petal silhouette — the max-combinator kink',
-   'Plain Math.max puts a C0 corner wherever two profile terms cross. This is the worst case the shipped ranges reach: maximum tip breadth against the steepest falling core, at 60 mm petals. Top row is the whole blade, bottom row is the tip cropped tight — a whole-flower frame cannot carry this ruling. If the corner reads badly, a smooth p-norm blend is a later, separately-evidenced change; if it reads fine, the complexity was never needed.',
+  ['silhouette-kink', 'Petal silhouette — where the max-combinator kink was',
+   'RETIRED SUBJECT, KEPT CAMERA. Plain Math.max put a C0 corner wherever two profile terms crossed, and Eva ruled on Aug 31 that it read fine. Session 32 retired the second term, so the crossing is unreachable rather than tolerated; these cells hold the same extreme exponents at the same camera so the succession can be seen. Original text: maximum tip breadth against the steepest falling core, at 60 mm petals. Top row is the whole blade, bottom row is the tip cropped tight — a whole-flower frame cannot carry this ruling. If the corner reads badly, a smooth p-norm blend is a later, separately-evidenced change; if it reads fine, the complexity was never needed.',
    pairs(kink, 'petal', 'tip'), 'shot', 3],
   ['silhouette-capability', 'Petal silhouette — capability, not claims',
    'NEITHER OF THESE SHIPS. No control reaches them; they are set only through the harness hook, and they exist so "architected for claw and cleft from day one" is something the gates build and measure rather than a sentence in a header. Both export watertight and as one connected piece — measured on the STL by the two gates. The structural claims (non-monotone width, two-span domain) are read from the app\'s own profile and trim evaluation, not from the STL.',

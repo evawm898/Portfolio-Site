@@ -29,11 +29,20 @@ deliberately not repeated here. Its invariant is one connected watertight
 solid, gated by `node tools/verify-bloom-export.mjs` (boundary edges = 0) and
 `node tools/verify-bloom-connectedness.mjs` (voxel flood-fill, one region) —
 both run in CI and both must pass before any bloom geometry change is done.
-**Iterate on `node tools/bloom-smoke.mjs`** — 28 of the 499 matrix rows through
-the real export gate, ~2 min against ~44 for one full gate (about 20x — the
-first-reported 31x mixed machine states and is withdrawn; see the charter); `--conn` adds the
+**Iterate on `node tools/bloom-smoke.mjs`** — a subset of the matrix rows through
+the real export gate; `--conn` adds the
 flood fill and is REQUIRED while a new geometry mode's junction assertions are
-still being established. It is for iteration, never for merge: the full matrix
+still being established.
+**A FULL GATE IN CI IS ~90 MINUTES, NOT ~44** (measured, session 32, from four
+completed `bloom-export-watertight` runs rather than from memory: 91.5 / 90.9 /
+88.5 / 92.1 min, on runs 133, 134, 137 and 138). The long-standing "~44" here was
+written when the matrix was roughly half its current size and is withdrawn; it
+had a session sizing a CI wait at half the real figure and reporting "nearly
+done" four times over. **Size a CI waiter off `actions_list` on the workflow's own
+recent completed runs, never off a number in this file** — the matrix grows every
+session, so any figure written down here is stale by construction. The smoke
+subset is still the iteration instrument and is still minutes, not hours; what
+changed is the thing it is being compared against. It is for iteration, never for merge: the full matrix
 on both gates, in CI, is the merge criterion, and what the subset is BLIND to is
 in that tool's own header. Do not also run the full matrix locally except at a
 milestone (charter, "the iteration loop"). Note two of the six CI jobs on a bloom
@@ -613,6 +622,155 @@ derived from buckle frequency would move `CURL_START_MIN = 1 / NU`, which the re
 as a CURL control's bound — a control reaching into an unrelated control's range. Raising `NU`
 moves bytes and owes a frozen phase; session 33 does not.
 
+**THE APEX IS ONE UNCONDITIONAL CAP WITH NO CONTROL AT ALL, AND THE LAW IS A
+SUPERELLIPSE THAT HAS NOT LANDED YET** (Eva, session 32 — read
+`docs/bloom-session-32-outcome.md` before touching any of it). Phase A costed seven
+mechanisms and stopped at a sheet; the `blunt` ruling that followed was BUILT IN FULL and
+then WITHDRAWN, on the grounds that it answered the wrong question. **What Eva ruled
+instead: the petal tip law is the SUPERELLIPSE over `[widest point, 1]`, exposed as its
+exponent `n` directly (0.60–2.00, default 1.00), and it is a REPARAMETERISATION of the
+existing tip taper rather than a control beside it** — the core already IS that family
+over that region (RMS 0.005 at the round end) and two controls over one region violates
+the registration rule. **A terminal-width control is DROPPED and terminal width is
+DEFERRED as a separate shape family**, recorded so it is schedulable. **THE FACETING AT
+THE ROUND END IS A MESH PROBLEM, NOT A LAW PROBLEM**, and the law cannot be judged by eye
+until it is fixed: rows sit evenly in `u` while the curvature concentrates near the tip.
+**DO NOT FIX IT BY RAISING `NU` — `CURL_START_MIN = 1 / NU` is imported by the registry as
+a control bound, so changing `NU` silently moves an unrelated curl slider's floor.** The
+row COUNT stays fixed; the row POSITIONS move. It lands as THREE PRs in order: the
+structural prerequisite (this one), a SAGITTA INSTRUMENT (zero bytes), then the law plus
+redistribution.
+**WHAT SHIPPED HERE IS THE PREREQUISITE AND IT HAS NO CONTROL.** `TIP_PLATEAU` is gone,
+the converging cap is unconditional and runs to the mode floor along a straight lerp, and
+four ids are retired (`petalTipBreadth` + `allTipBreadth` / `innerTipBreadth` /
+`labellumTipBreadth`) with NOTHING replacing them — `petalTipShape` and `petalTipEnd` were
+stripped entirely so the superellipse arrives with no incumbent. Live matrix 572 → 562,
+registry 101 → 97. **WHAT THE RETIRED TERM DID, measured**: `max`-ing a RISING ramp
+against a FALLING core put a WAIST in the blade — 0 of 3,795 taper pairs show a
+rise-after-a-fall above the peak at breadth 0, **3,795 of 3,795** at every breadth above
+it, 0 under the new law. **SPATULATE IS NOT LOST**: `uPk = a/(a+b)` reaches 0.833.
+**A2–A6 IS THE FAMILY** and there is no A1 — it read "entry >= terminal" off the descriptor
+and the mutant table proved it VACUOUS. **`node tools/verify-bloom-apex-mutants.mjs` is the
+committed positive control**, six mutations, every family firing on one that names it. It
+took three passes and found two real defects: **A5 and A6 both reconstructed a row's
+station from its ARRAY INDEX**, which is off by however many FOOT rows precede the blade —
+A5 went silent on the mutation it exists for and A6 fired on the clean tree; the builder
+now emits `profileU` (its own per-row `u`) and both READ it, refusing to run rather than
+guess. And **the plateau mutation had to be raised to the retired control's own maximum
+(0.6) to fire at all**, which is a finding: with the cap unconditional and its terminal
+pinned to the mode floor a re-introduced plateau is MOSTLY MASKED (no waist anywhere at
+0.30 or 0.45; at 0.60 one on the default taper only; none at any amplitude on taper 0.6 or
+the narrowest petal), so **A5's coverage against that defect is narrower than it was** and
+its stronger witness is `inverted-lerp`.
+**THE THREE MEASUREMENTS EVA ASKED FOR, reported not decided.**
+**(1) THE CAP MUST BE DEMOTED OR THE LAW CANNOT BE JUDGED**: only TWO places depend on
+`TIP_CAP_FRACTION` (its definition and one `min`), and with the cap as a SHAPE the ceiling
+is unreachable — asked `n` 2.00 reads as **1.740** (rms 0.432) and 1.725 reads 1.590
+(reproducing Eva's own 1.585); demoted to a print-floor clamp it reads the asked `n`
+EXACTLY. A clamp binds on 1 of 28 rows live and 2 of 28 export at `n` 1.0.
+**(2) THE WIDEST POINT IS FIXED BY CONSTRUCTION** — at `s = 0` the superellipse is exactly
+1 for every `n` — and the DRAWN maximum holds on five of six taper pairs; it moves ONE ROW
+on `uPk = 0.2000`, which sits exactly between two stations. That is the sampling, not the
+law, and the redistribution must be measured against it.
+**(3) THE SHOULDER APPEARS AT `n` < 1.4 AND IS A RIGHT ANGLE BY 0.70** (turn angle at the
+widest point: 0.0° at `n` 2.00, 0.2–1.2° at 1.40, **19.6–53.9° at the DEFAULT 1.00**,
+50–76° at 0.90, 88.8–89.5° at 0.60). **The default is NOT corner-free** — the two limbs meet
+with different slopes for `n` <= 1 by construction, so only `n` >= ~1.4 is C1. That is a
+property of the approved law, not of an implementation, and Eva may want to revisit it
+before PR THREE.
+**THE PARTITION CLOSED AT 45 movers / 21 inert / 506 holders on `frozen/phase21`, EXACTLY as
+predeclared in all three classes**, with `twin === new on 572 of 572 rows` and V1-V5 held; the
+inert class is the GATED rows plus `6 layers x allTipBreadth max`. phase21 joins phase17 and
+phase19 as a tag whose definitions reproduce and whose bytes do not (45 of 572). **The byte
+tool caught the session's own shell bug rather than answering plausibly** — an unexported
+variable left `--strip` empty, and it recorded `strip: []`, refused 71 rows BY NAME and wrote
+`complete: false` instead of closing a partition over the 501 rows that happened to apply.
+**`frozen/phase21` IS THE 572 ROWS AT `b323268`** — main's head before this retirement, owed
+because the matrix shrank, and **the newest baseline that is fully replayable** (see the
+charter's scheduled fix: phase19 and phase20 can no longer be byte-re-exported from main at
+all, because session 31's retirement postdates both). The sheet is
+`node tools/shot-bloom-apex.mjs <dir> [base-tree]`, now a RETIREMENT sheet — the phase-C
+scratch rig went with the withdrawn ruling. **The upstream contract for the lobe session is
+§5 of that doc** and is unchanged: `widthProfile()` stays the one owner of the apex,
+`[uCap, 1]` is read from the profile rather than re-spliced, no second round-to-pointed
+axis on the whole-petal apex, and the `u = 1` mini-face is never collapsed. Say PETAL TIP
+SHAPE or LOBE TIP SHAPE, never "tip shape".
+
+**THE PETAL TIP LAW IS RULED IN FULL: `n` 0.60–3.00, DEFAULT 2.50, AND THE SIX STATES HAVE
+NAMES** (Eva, session 32, from the rendered sheet — the artifact *Petal Apex Law*). Ceiling moved
+from 2.00 to 3.00; floor stays 0.60; **default 2.50, chosen BY EYE** because it holds the blade's
+width past the widest point and then turns — the hand-drawn reference's shape, which **nothing on
+the shipped control could reach**. **THE NAMES ARE THE RULING, and the panel, the sheet and the
+docs must all use them**: 0.60 acute · 1.00 straight point · ≈1.20 today's pointed petal · 2.00 the
+true ellipse · **2.50 the default** · 3.00 the held-width round tip. The pointed look at ≈1.20 must
+stay reachable, ruled explicitly. **THE RESHAPE-FROM-TODAY ARGUMENT IS FORMALLY DEAD** — the
+default moves the shape deliberately and substantially, that is the point, and nothing here is
+published or printed; do not re-raise it (it cost this session a floor at 1.40 that measured 2.09 mm
+of reshape to avoid a 0.91 mm one).
+**THE SHEET IS WHY ANY OF THIS IS RULED.** Every prior ruling was made on a shape nobody had
+rendered, and the cell shown as `n` 2.00 **was drawn through the cap and was actually 1.740**. The
+scratch rig demoted the cap and measured, reading the exponent BACK off the emitted 28-row
+polyline: **drawn `n` equals asked `n` to four decimals** at every value on both tapers, and the
+widest point holds at `u` 0.538. **CAP DEMOTION IS THEREFORE REQUIRED, not preferred: the chosen
+default is not reachable through the cap at all.** It stays conditional on ONE thing — the
+connectedness and watertight invariants surviving a REAL EXPORT RUN, which PR THREE must prove
+rather than argue.
+**TURNING-RATE REDISTRIBUTION IS A DELIVERABLE OF PR THREE, NOT AN OPTIMISATION**: the chosen
+default sits where the apex turn is LARGEST (29.6° at 2.50, 34.1° at 3.00, uniform in `u`, 28
+rows), and turning-rate weighting collapses that **75–83% at the same row count with the drawn `n`
+unchanged**. **KEEP THE CLAUSE THAT COUNTS TURNING ONLY WHERE THE LAW IS THE ACTIVE BRANCH, AND
+KEEP THE NOTE SAYING WHY** — a kink's turning is a DELTA FUNCTION, so integrating through the
+root-blend and tip-floor joins made the cumulative measure STEP and stacked **5 rows on `u` 0.058
+and 8 duplicates on `u` 1.000**, reporting an 84° "apex turn" that was a zero-length segment and
+reading as *"redistribution makes it 256% worse"*. **Third instance of this bug class here; the
+note is what stops a fourth.** Arc length is the WRONG weighting for that test and is why this
+session first concluded the opposite — an ellipse's apex is exactly where the outline turns
+fastest, so arc length puts EVENLY SPACED rows through it.
+**NEVER REPORT A PER-ROW TURN ANGLE WITHOUT NAMING THE ROW COUNT AND THE WEIGHTING** (Eva, session
+32): two of that session's three corrections came from a drawn quantity being reported as an
+analytic one. The same session's `"only n >= 1.4 is C1"` was WRONG — `uPk` is the core's MAXIMUM so
+its slope is exactly 0, and the superellipse's tends to 0 for EVERY `n` > 1; what had been measured
+was the DRAWN turn at 28 uniform rows. C1 was never the property wanted; **bounded curvature** is.
+**THE ROOT BLEND IS ITS OWN SCHEDULED SESSION AND MUST NOT BE FOLDED INTO PR THREE** (Eva, session
+32). The rig found the largest drawn corner on a REAL petal is the root blend at `u` ≈ 0.07 —
+**31.9° on the default taper, 27.2° on Eva's** — exceeding the apex until `n` reaches 2.5, and the
+worst chord error too (0.6325 mm at `u` 0.049, 88.2% of 1,124 measured profiles worst at the base,
+NONE at the apex). **One owner per boundary, and that boundary belongs to `footRing()`.** The
+verification claim SPLITS across two commits with two separate proofs — the law (surface changes;
+drawn `n` matches asked across the range) and the redistribution (surface unchanged; dense sampling
+agreeing on both trees) — never one proof spanning both.
+
+**A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
+(session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
+registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen
+--phase21` worked by hand, while BOTH consumers (CI's frozen job and
+`publish-frozen-tags.sh`) build their phase list from `FROZEN_BASE_COMMITS`, which had no
+entry. The loop just runs one fewer iteration: **the new baseline is verified by nothing and
+its base commit pinned by no tag**, and there is no row that can go red. The name → matrix map
+is now `FROZEN_MATRICES` **in the harness** (one owner, imported by `diff-bloom-bytes.mjs`
+rather than restated) and the harness **throws at MODULE LOAD** if its keys and
+`FROZEN_BASE_COMMITS`' keys disagree in either direction — a matrix with no base commit is
+unverifiable, a base commit with no matrix is a phase nobody wrote. It lives in the harness so
+no gate can be run that skips it; the negative control is in the session-32 doc.
+**AND NEVER EDIT A LABEL INSIDE A FROZEN MATRIX.** Retiring `allTipBreadth` correctly turned
+the live matrix's "Inner trio" into "Inner pair" — and the same sentence in phases 11–20 is a
+VERBATIM SNAPSHOT of that base commit's `buildMatrix()`, where the trio had three members.
+`--verify-frozen phase11` went red on row 400 in 24 seconds, which is that check doing its
+job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses the array form
+(`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
+**`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS OWED AND IS NOT PUBLISHED** —
+session 17's limit, unchanged: a GitHub App token cannot push a tag whose `.github/workflows`
+differs from the default branch's, and #191 changed a workflow after `b323268`. 18 `frozen/*`
+tags are on the remote (phase5 was already absent). One `git push origin
+refs/tags/frozen/phase21` from a clone with a user's credentials is what it needs; by the
+script's own asymmetry argument it is belt-and-braces, since `b323268` is in `main`'s history.
+**THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
+session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
+error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
+with 88.2% of 1,124 measured profiles worst there and NONE at the apex. So the visible faceting
+is not chord error along `u`; it is the apex BEING a straight cone plus the slope break at
+`uCap`. **And the cap makes `n` INERT on 26 of 3,795 reachable taper states** (`uPk ≥ 0.80 ⟺
+a ≥ 4b`), 163 with two row intervals or fewer — a second, independent argument for demoting it.
 
 **THE PER-PETAL MID-SURFACE IS CAPTURABLE AND EXPORTS AS A .glb, AND THE CAPTURE IS A FLAG
 THAT DECIDES NO GEOMETRY** (session 28). `MeshBuilder({ captureGrid })` defaults FALSE, so

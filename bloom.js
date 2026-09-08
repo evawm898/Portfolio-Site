@@ -861,7 +861,6 @@ function allPetalsLine(rings, fr) {
   const said = [];
   if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
   if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
-  if ('petalTipBreadth' in r.overrides) said.push(`tip breadth ${r.overrides.petalTipBreadth.toFixed(2)}`);
   return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
 }
 
@@ -1399,6 +1398,11 @@ window.__bloomMetrics = () => ({
      connectedness are measured on the export; the structural claims are
      measured here. */
   petalProfile: lastPetal ? lastPetal.profile : null,
+  /* EACH ROW'S OWN STATION, beside its half-width. A5 and A6 both need to know
+     WHERE a row is, and both were wrong reconstructing it from the array index
+     — `profile` leads with the foot rows, so the offset is however many of
+     those there are. The builder already knows; this passes it through. */
+  petalProfileU: lastPetal ? lastPetal.profileU : null,
   petalFootRows: lastPetal ? lastPetal.footRows : null,
   petalPanels: lastPetal ? lastPetal.panels : null,
   petalTipSpans: lastPetal ? lastPetal.tipSpans : null,

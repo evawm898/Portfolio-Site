@@ -109,6 +109,10 @@ export const RETIRED_IDS = [
   { id: 'centerBore', retiredAt: 20, schema: null, why: 'RING\'s bore fraction. Retired with the RING style; a real corona (held, not retired — charter session 20) gets its own group and ids.' },
   { id: 'antherSharpness', retiredAt: 31, schema: null, why: 'The anther outline law\'s EXPONENT carried directly (0.25..8, default 1.00). Retired on Eva\'s ruling (session 31): 2.00 was a singular point of the law — the circle for every roundedness, so roundedness and the point count were inert there, and three sessions met it in three instruments — and the control ran backwards from its label (8 was the bulge, 0.25 the star). Replaced by antherPinch, which carries k with s = 2 / (1 + k); the singular value sits one step below its minimum. A stored 8 or 0.25 under this name means a different shape under the new one, so the name may never come back.' },
   { id: 'stigmaSharpness', retiredAt: 31, schema: null, why: 'The stigma lobe\'s exponent, instanced from the same descriptor as antherSharpness and retired with it for the same reason (session 31). Replaced by stigmaPinch.' },
+  { id: 'petalTipBreadth', retiredAt: 32, schema: null, why: 'The TIP_PLATEAU term\'s amplitude (0..0.6, default 0) — a linear ramp from the widest point to this fraction of the max half-width, combined by `max` with the core. Retired on Eva\'s `blunt` ruling (session 32) because the way it reached outside the exponent family was a defect rather than a shape: `max`-ing a RISING ramp against a FALLING core puts a waist in the blade and widens it back out to the tip (measured: 0 of 3,795 taper pairs show a rise-after-a-fall above the peak at breadth 0, 3,795 of 3,795 at every breadth above it), left a C0 corner up to 16.4 deg at the crossing, jumped the live terminal 0.150 -> 0.800 mm on its first step off zero, and had 10 of 60 steps of untold dead travel at the default petal width (20 of 60 at width 8) because the plateau sat under TIP_HALF_MM. Replaced by petalTipEnd, which is the CAP\'s terminal half-width: same quantity, a monotone law, no waist, no corner, no dead zone. A stored 0.30 under this name is a waisted spatulate blade and under the new one is a clean truncate, so the name may never come back.' },
+  { id: 'allTipBreadth', retiredAt: 32, schema: null, why: 'The whole-whorl delta on petalTipBreadth, retired with its base (session 32). Not replaced — no role can differentiate an apex that has no control.' },
+  { id: 'innerTipBreadth', retiredAt: 32, schema: null, why: 'The inner-whorl delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
+  { id: 'labellumTipBreadth', retiredAt: 32, schema: null, why: 'The labellum\'s delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
 ];
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
@@ -1157,13 +1161,17 @@ export const CONTROLS = [
      would be two owners of one quantity, so the shoulder is DERIVED and
      printed in Tip taper's read-out instead. Derive, don't expose.
 
-     WHAT THE EXPONENT FAMILY CANNOT DO, and why the third control exists:
-     w(0) = w(1) = 0 for every a, b > 0, so every member of the family is
-     pinched to a point at both ends. The placeholder's tip is not a shape at
-     all — it is the TIP_HALF_MM constant, governing the last 4 of 28 blade
-     rows. Rose, ranunculus and poppy petals are broad or truncate at the
-     tip. `petalTipBreadth` is the only shipped term that reaches outside the
-     family, and it is EXACTLY 0 by default so it cannot move a byte.
+     WHAT THE EXPONENT FAMILY CANNOT DO, and why the apex has controls of its
+     own: w(0) = w(1) = 0 for every a, b > 0, so every member of the family is
+     pinched to a point at both ends, and rose, ranunculus and poppy petals
+     are broad or truncate there. What it CAN do is the shoulder — the widest
+     point a/(a+b) reaches 0.833 at these ranges — so obovate and spatulate
+     silhouettes belong to these two exponents and are NOT the apex's to make.
+     That division is load-bearing: session 32's retired `petalTipBreadth`
+     confused the two, producing a blade that waisted and then widened back
+     out, and the apex controls below deliberately cannot do it (measured:
+     0 of 14,364 swept states put a rise after a fall above the peak, against
+     3,795 of 3,795 taper pairs under the retired term).
 
      DELIBERATELY NOT SHIPPED, with grounds rather than silence:
        - shoulder position — derived from the two tapers (above);
@@ -1193,10 +1201,16 @@ export const CONTROLS = [
     },
     visibleWhen: { all: [] } },
 
-  { id: 'petalTipBreadth', section: 'shape', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'Tip breadth', tier: 'standard', role: 'petal',
-    fmt: (v) => (Number(v) === 0 ? 'pointed' : `${(Number(v) * 100).toFixed(0)}% of width`),
-    visibleWhen: { all: [] } },
+  /* THE APEX HAS NO CONTROL, AND THAT IS A STATED INTERIM (Eva, session 32).
+     `petalTipBreadth` is retired and nothing replaced it: the converging cap
+     is unconditional and runs to the mode floor on every petal. Eva ruled the
+     petal tip law is a SUPERELLIPSE over [widest point, 1] — a
+     REPARAMETERISATION of the tip taper above, not a control beside it,
+     because the existing core already IS that family over that region (RMS
+     0.005 at the round end) and two controls over one region violates the
+     registration rule. It lands with the blade-row redistribution its round
+     end needs; until then the apex is deliberately bare rather than carrying
+     a control the law would have to fight. */
 
   /* THE PETAL'S 3D FORM — four curves, four controls, and they are NOT
      interchangeable (bloom-geometry.js's petalForm header carries the full
@@ -2040,10 +2054,6 @@ export const CONTROLS = [
     label: 'All cup', fmt: (v) => (Number(v) === 0 ? 'as Petal form sets it' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} on Cup`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
 
-  { id: 'allTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'All tip', fmt: (v) => (Number(v) === 0 ? 'as Petal shape sets it' : `+${Number(v).toFixed(2)} on Tip breadth`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'allPetalsEligible' } },
-
   { id: 'innerCurl', section: 'roles', kind: 'slider', min: -180, max: 360, step: 5, default: 0,
     label: 'Inner curl', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${v}° spine curl`),
     tier: 'standard', role: 'petal',
@@ -2051,11 +2061,6 @@ export const CONTROLS = [
 
   { id: 'innerCup', section: 'roles', kind: 'slider', min: -0.8, max: 1.2, step: 0.01, default: 0,
     label: 'Inner cup', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `${v > 0 ? '+' : ''}${Number(v).toFixed(2)} cup`),
-    tier: 'standard', role: 'petal',
-    visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
-
-  { id: 'innerTipBreadth', section: 'roles', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'Inner tip', fmt: (v) => (Number(v) === 0 ? 'same as outer' : `+${Number(v).toFixed(2)} breadth`),
     tier: 'standard', role: 'petal',
     visibleWhen: { all: [{ id: 'layerCount', min: 2 }, { not: { id: 'placement', oneOf: ['CONTINUOUS'] } }] } },
 
@@ -2115,10 +2120,6 @@ export const CONTROLS = [
        millimetres and the app's read-out prints what was actually built. */
     fmt: (v, ui) => (Number(v) === 1 ? `same as the rest — ${saidLabellum(ui)}`
       : `x${Number(v).toFixed(2)} — ${saidLabellum(ui)}, asks ${(Number(ui.petalLength) * Number(v)).toFixed(0)} x ${(Number(ui.petalWidth) * Number(v)).toFixed(0)} mm`),
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
-
-  { id: 'labellumTipBreadth', section: 'labellumGroup', kind: 'slider', min: 0, max: 0.6, step: 0.01, default: 0,
-    label: 'Tip', fmt: (v, ui) => (Number(v) === 0 ? `same as the rest — ${saidLabellum(ui)}` : `+${Number(v).toFixed(2)} breadth — ${saidLabellum(ui)}`),
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'slotRolesEligible' } },
 
   { id: 'labellumTilt', section: 'labellumGroup', kind: 'slider', min: -75, max: 75, step: 1, default: 0,

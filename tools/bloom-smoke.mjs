@@ -187,8 +187,12 @@ export const SMOKE_BLOCKS = [
         path: 'cross-section roll and the roll curvature floor, saturating and told' },
       { label: 'THIN: ALL THIN × spread min',
         path: 'the thickness layer, the export feature-size floor diverging from live, and the foot-hub overlap box at its worst reachable corner' },
-      { label: 'TIP: truncate (breadth max) — must NOT converge',
-        path: 'the tip-cap partition on petalTipBreadth === 0 — the authored-truncate arm, which must NOT converge' },
+      { label: 'APEX: the cap entry at the 0.80 clamp (taper 0.60 — the widest entry)',
+        path: 'the unconditional cap entered by the FRACTION rule rather than the crossing: A2 (the last emitted row IS the terminus), A3 (never a true apex), A4 (the terminal is the mode floor and nothing else) and A6 (the capped rows are collinear) all read the widest cap this matrix reaches' },
+      { label: 'APEX: the cap entry from the crossing (taper 4 — the earliest entry)',
+        path: 'the other cap-entry rule — the crossing at twice the print floor, which is what picks uCap on a steep falling limb; the same four clauses on a cap that starts at u 0.59 rather than 0.80, so a cap that only works at one entry rule cannot pass both rows' },
+      { label: 'APEX: the narrowest petal (the terminal is the whole tip)',
+        path: 'A5 (the apex narrows monotonically — the retired TIP_PLATEAU\'s waist, which BOTH STL gates are blind to) on the petal where the mode floor is the largest fraction of the blade, and A4 where live and export floors differ most' },
     ],
   },
   {
@@ -259,7 +263,7 @@ export const SMOKE_BLOCKS = [
     n: 16,
     anchor: 'ALL PETALS: max (curl +360, cup +1.20, tip +0.60)',
     rows: [
-      { label: 'ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2, tip 0.6+0.6 — every clamp binds)',
+      { label: 'ALL PETALS: max x every base at max (curl 360+360, cup 1.2+1.2 — every clamp binds)',
         path: 'the one-whorl all-petals group (ROLE_ALL) with every composition clamp binding at once' },
     ],
   },
