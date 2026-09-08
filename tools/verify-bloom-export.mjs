@@ -51,6 +51,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
+import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
 import { spineLine, curlCoverage } from './bloom-harness.mjs';
@@ -188,6 +189,16 @@ for (const row of rows) {
      not. See bloom-crowding.mjs for what it is blind to. */
   const crowd = await footCrowding(page, row, stl);
   if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
+  /* THE OUTLINE SAGITTA (session 32) — a REPORT on every row, never a gate:
+     no bound has been ruled, and the one number this could be bounded against
+     today is the ROOT BLEND's, which is footRing()'s boundary and its own
+     scheduled session. It is here rather than in a sixth workflow because it
+     costs nothing extra: the page is already built and the profile is already
+     the builder's own. Its `skipped` is LOUD and labelled — a row whose
+     rebuilt profile is not the builder's is measuring a different flower, and
+     must say so rather than print a plausible number. See bloom-sagitta.mjs
+     for the three defects its own draft had and what it is blind to. */
+  const sag = await sagitta(page, row);
   /* PLAN COVERAGE (session 16, Eva Sep 4) — printed on EVERY row, ASSERTED
      only on rows that declare `coverage` (the pinned incurve rows): crown
      closure there is emergent, curl 150 x tilt x domeLean landing tips
@@ -264,6 +275,7 @@ for (const row of rows) {
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
     crowding: crowd.r,
+    sagitta: sag,
     coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage, sphere: isSphere,
     solid: sol.r, solidSkipped: sol.skipped || null, solidAsserted: !!row.solidCoverage, solidHead, solidR5: sol.r ? sol.r.r5 : (sol.r5 || null),
     spine: fm.petalRingSpine, selfContact: (fm.petalRingSpine || []).some((s) => s && s.clearance.selfContact), underFloor: (fm.petalRingSpine || []).some((s) => s && s.underFloor),
@@ -286,6 +298,7 @@ for (const r of results) {
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
+  console.log(`       ^ ${sagittaLine(r.sagitta)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
@@ -299,6 +312,19 @@ console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
+/* THE SAGITTA SUMMARY — a REPORT, and the worst is named with WHERE it sits,
+   because base and apex are different problems with different owners. */
+{
+  const sg = results.map((r) => r.sagitta).filter((x) => x && !x.skipped);
+  const sk = results.filter((r) => r.sagitta && r.sagitta.skipped).length;
+  if (sg.length) {
+    let w = { d: -1 };
+    for (const x of sg) if (x.worst.d > w.d) w = x.worst;
+    const mx = (z) => sg.reduce((a, x) => Math.max(a, x.zone[z]), -1);
+    console.log(`${sg.length}/${results.length} rows sagitta-measured (${sk} skipped, labelled) · worst ${w.d.toFixed(4)} mm at u=${w.u.toFixed(3)} (${w.zone}) · by zone: base ${mx('base').toFixed(4)} middle ${mx('middle').toFixed(4)} apex ${mx('apex').toFixed(4)} mm`);
+    console.log(`  ${SAGITTA_SCOPE}`);
+  }
+}
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag
    never raises has never shown the flag works, and one on which it always
    raises has a stuck flag. Validity, not a row result. */
