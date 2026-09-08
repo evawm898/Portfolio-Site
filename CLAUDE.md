@@ -2077,6 +2077,28 @@ also used to require the wheel to paint, which is the other check's job — so
 removing the wheel fix reddened both and the pair stopped being a biconditional
 over two independent properties.
 
+**TWO CHECKS PASSED FOR THE WRONG REASON, and only the negative control could
+say so.**
+* **`stem/the-droop-reaches-every-family` was reading the FOG.** The fog is
+  solved against what the drawing OCCUPIES, and that walker rotates every strip
+  by the droop whatever the head transform did with it — so under the
+  only-the-u-lines mutation the v-only frame changed because the FADE moved, at
+  an identical ink count of 58,295 px, and the check went green. It runs with
+  the depth dim OFF now, where nothing but the geometry can move the frame.
+* **`bend/dragging-a-handle-leaves-the-head-alone` was measuring something a
+  bend cannot reach.** `headTransform` does not take the warp at all, so the
+  head's own vertices could not move however broken the gate was — measured, the
+  ungated mutation left it green at 0 mm. What the gate protects is the JOIN,
+  which is the stem's own s = 0 station, and there the ungated bend arrives
+  through the gaussian's tail: tiny, and not zero. Both are compared foot by
+  foot now, at exactly zero.
+
+**AND ONE CHECK FLAKED ON THE CAMERA, ONCE.** `stemOn()` re-fits, and a fit
+applies whatever damping residue the previous section left, so a first frame can
+be caught mid-drift while a third, taken later, is at rest — and a round-trip
+clause then fails on the camera rather than on the thing under test. Settle at
+the moment the window opens, not inside each capture.
+
 **SEVEN THINGS THE STEM CHECKS GOT WRONG BEFORE THE NEGATIVE CONTROL WAS CLEAN,
 each measured and each worth not re-learning.** Three passes of the control were
 needed; besides the idle-skip defect above and the two below, four more mutants

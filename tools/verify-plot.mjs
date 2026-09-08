@@ -1338,17 +1338,29 @@ async function run({ mutant = null } = {}) {
      camera: the fit happens at droop 0 and only the droop is changed after it,
      because re-framing would move the picture for a reason that has nothing to
      do with the head turning. */
-  await stemOn({ families: 'v', stemDroop: 0 });
+  /* AND WITH THE DEPTH DIM OFF. The fog is solved against what the drawing
+     OCCUPIES, and that walker rotates every strip by the droop whatever the
+     head transform did with it — so under the mutation the v-only frame changed
+     because the FADE moved, not because the lines turned, and this check passed
+     for the wrong reason at an identical ink count of 58,295 px. */
+  await stemOn({ families: 'v', stemDroop: 0, depthDim: 0 });
+  // SETTLED BEFORE THE FIRST CAPTURE, not just inside each one. `stemOn`
+  // re-fits the camera, and a fit applies whatever damping residue the previous
+  // section left — so the first frame can be caught mid-drift while the third,
+  // taken later, is at rest, and the round trip fails on the camera rather than
+  // on the droop. Measured: exactly that, once.
+  await q(() => window.__plot.settle());
   const vFlat = await px();
-  await set({ ...STEM_ON, families: 'v', stemDroop: 40 });
+  await set({ ...STEM_ON, families: 'v', stemDroop: 40, depthDim: 0 });
   const vBent = await px();
-  await set({ ...STEM_ON, families: 'v', stemDroop: 0 });
+  await set({ ...STEM_ON, families: 'v', stemDroop: 0, depthDim: 0 });
   const vBack = await px();
   check('stem/the-droop-reaches-every-family',
     vFlat.hash !== vBent.hash && vFlat.hash === vBack.hash
     && vFlat.ink > 1000 && vBent.ink > 1000,
     `with u switched off, the v family's framebuffer moves under the droop `
-    + `(${vFlat.ink} -> ${vBent.ink} ink px) and comes back to the bit at 0`);
+    + `(${vFlat.ink} -> ${vBent.ink} ink px) and comes back to the BIT at 0 `
+    + `(${vBack.ink} px, hash ${vBack.hash})`);
 
   // =========================================================================
   // BEND POINTS — driven with a REAL pointer drag on a handle found through the
@@ -1358,6 +1370,7 @@ async function run({ mutant = null } = {}) {
   await q(() => window.__plot.settle());
   const preLine = await q(() => window.__plot.stemLine(0));
   const preFeet = await q(() => window.__plot.headFeet());
+  const preJoin = await q(() => window.__plot.stemFeet());
   const preCam = await q(() => window.__plot.cameraInfo());
   const grab = await q(() => window.__plot.handleScreenPos(1));
   const visible1 = await q(() => window.__plot.handleVisible(1));
@@ -1369,20 +1382,34 @@ async function run({ mutant = null } = {}) {
   await page.mouse.up();
   const postLine = await q(() => window.__plot.stemLine(0));
   const postFeet = await q(() => window.__plot.headFeet());
+  const postJoin = await q(() => window.__plot.stemFeet());
   check('bend/dragging-a-handle-moves-the-stem',
     visible1 === true && worstOf(preLine, postLine) > 10,
     `handle 1 dragged 120 px; the stem moved up to ${worstOf(preLine, postLine).toFixed(2)} mm`);
-  // A CHECKSUM WOULD NOT DO: the head is a rosette about the axis, so a pull
-  // that dragged it sideways would leave a coordinate sum almost unchanged.
-  // This is compared foot by foot, to the bit.
-  let headWorst = 0;
-  for (let i = 0; i < preFeet.length; i++) {
-    headWorst = Math.max(headWorst, Math.hypot(preFeet[i][0] - postFeet[i][0],
-      preFeet[i][1] - postFeet[i][1], preFeet[i][2] - postFeet[i][2]));
-  }
+  /* MEASURED AT THE JOIN, NOT ON THE HEAD'S OWN VERTICES. `headTransform` does
+     not take the warp at all, so the head's points could not move under a bend
+     however broken the gate was — measured: the ungated mutation left this
+     check green at 0 mm. What the gate actually protects is the point where the
+     head hangs, which is the STEM's own s = 0 station, and there the ungated
+     bend arrives through the gaussian's tail: tiny (the handle is three sigma
+     up the stem) and not zero, which is why the bar is exactly zero and not a
+     tolerance. Both are compared foot by foot: a checksum would not do, because
+     the ring is a rosette about the axis and a pull that dragged it sideways
+     would leave a coordinate sum almost unchanged. */
+  const worstFoot = (a, b) => {
+    let w = 0;
+    for (let i = 0; i < Math.min(a.length, b.length); i++) {
+      w = Math.max(w, Math.hypot(a[i][0] - b[i][0], a[i][1] - b[i][1], a[i][2] - b[i][2]));
+    }
+    return w;
+  };
+  const headWorst = worstFoot(preFeet, postFeet);
+  const joinWorst = worstFoot(preJoin, postJoin);
   check('bend/dragging-a-handle-leaves-the-head-alone',
-    preFeet.length === postFeet.length && headWorst === 0,
-    `${preFeet.length} feet, worst movement ${headWorst} mm — the funnel gate holds`);
+    preFeet.length === postFeet.length && preJoin.length === postJoin.length
+    && preJoin.length > 0 && headWorst === 0 && joinWorst === 0,
+    `${preJoin.length} joins and ${preFeet.length} feet, worst movement `
+    + `${joinWorst} mm at the join and ${headWorst} mm on the head — the funnel gate holds`);
   check('bend/the-handle-lands-under-the-pointer',
     Math.abs(landed.x - (grab.x + 120)) < 3 && Math.abs(landed.y - (grab.y - 30)) < 3,
     `asked (${(grab.x + 120).toFixed(1)}, ${(grab.y - 30).toFixed(1)}), landed `
@@ -1444,7 +1471,6 @@ async function run({ mutant = null } = {}) {
   // readPixels(), because readPixels forces a render — which is exactly the
   // thing the defect hid behind.
   await stemOn();
-  await q(() => window.__plot.settle());
   await page.waitForTimeout(1200);
   const canvasBox = await page.evaluate(() => {
     const r = document.getElementById('plot-canvas').getBoundingClientRect();
@@ -1465,6 +1491,10 @@ async function run({ mutant = null } = {}) {
     requestAnimationFrame(tick);
   }), n);
   const DRIVEN = 60;
+  // SETTLED AT THE MOMENT THE WINDOW OPENS, not a second and a bit before it:
+  // the orbit mutation leaves the camera easing, and a settle that happened
+  // earlier let 7 of 60 driven frames land on residue that was real motion.
+  await q(() => window.__plot.settle());
   const idleBefore = await q(() => window.__plot.renderCount());
   const driven = await driveFrames(DRIVEN);
   const idleAfter = await q(() => window.__plot.renderCount());
