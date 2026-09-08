@@ -2068,16 +2068,20 @@ controls to still work. Part two drives the page in a real browser and
 measures every pixel claim against the ACTUAL RENDERED FRAMEBUFFER —
 `__plot.readPixels()` reads it back through `gl.readPixels` straight after a
 render, so no DOM panel can be counted as ink and no PNG decode sits in the
-way. **`--negative-control` runs EIGHTEEN mutants and is required before quoting
+way. **`--negative-control` runs NINETEEN mutants and is required before quoting
 a pass from a changed harness**; it re-serves broken copies of `plot.js`,
 `plot-grid.js`, `plot-stem.js` and `plot-warp.js` through the gate's own HTTP
 server (and imports the broken module for part one — written into the REPO ROOT,
 because `plot-stem.js` imports `./plot-warp.js` and a mutant anywhere else
 resolves that to nothing), and fails if a mutation does not apply, if a check
-the mutant NAMES stays green, or if a check it did not name goes red. The ten
+the mutant NAMES stays green, or if a check it did not name goes red. The eleven
 new ones are the four traps, the two halves of the zoom fix, a stem drawn for
-lines that are not, a locked root, a bend width that stops coming from the
-neighbours, and a droop that reaches only the u family.
+lines that are not, a locked root, a drag that also orbits, a bend width that
+stops coming from the neighbours, and a droop that reaches only the u family.
+**19 of 19 clean at `cac4475` + the bookkeeping fix**, and the sweep costs
+roughly 95 minutes — five minutes a mutant, because each is a full 84-check
+browser run. `--mutant=a,b,c` takes a comma list and is how to re-verify one
+without paying for the rest.
 
 **THE DROOP REACHING ONLY THE U FAMILY IS ITS OWN CHECK, because every other
 instrument here is looking at a u-line foot.** A v-line's row 0 sits on the same

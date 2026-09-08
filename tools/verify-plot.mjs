@@ -277,8 +277,16 @@ const MUTANTS = [
     id: 'a-handle-drag-also-orbits', file: 'plot.js',
     from: '  controls.enabled = false;\n  canvas.setPointerCapture(ev.pointerId);',
     to: '  canvas.setPointerCapture(ev.pointerId);',
+    // AND IT LEAVES THE CAMERA EASING, which is a true thing to say about a
+    // drag that orbits: `settle()` stops the moment `update()` reports the
+    // movement is below EPS, and the residue an orbit leaves then accumulates
+    // back over EPS a few times — 7 of 60 driven frames. The shipped code
+    // paints 0 because the drag never orbits at all. Named rather than tuned
+    // around: loosening the idle bar to swallow this would blunt it against
+    // the always-render mutant, which is the check's whole reason to exist.
     breaks: ['bend/a-handle-drag-does-not-orbit-the-camera',
-             'bend/the-handle-lands-under-the-pointer'],
+             'bend/the-handle-lands-under-the-pointer',
+             'zoom/an-idle-frame-is-still-skipped'],
   },
   {
     // The gaussian width stops coming from the neighbours, so adding a control
