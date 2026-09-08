@@ -548,6 +548,48 @@ before PR THREE builds it.
 
 ---
 
+## 10e. THE PARTITION, CLOSED — 45 / 21 / 506 on `frozen/phase21`, exactly as predeclared
+
+Predeclared BEFORE the captures, by evaluating each retired control's own registry predicate
+on each row's state against the BASE tree's registry — not by counting which rows name an id:
+
+```
+  frozen/phase21 (572 rows @ b323268):  --expect 45/21/506
+```
+
+Closed by the session-20 three-capture construction (old plain / old with the four ids pinned
+to 0 / new with the four stripped), `--compare … --retirement … --expect 45/21/506`:
+
+```
+  byte diff: 572 configs compared
+    before: /tmp/bloom-base @ b323268   after: this tree
+  45 MOVERS · 21 INERT · 506 HOLDERS
+  twin === new on 572 of 572 rows; V1 fired 0, V2 fired 0
+  byte diff: PASS — every one of the 45 movers is BIT-IDENTICAL to its twin on the old
+  tree, every one of the 506 holders is bit-identical outright, the 21 predeclared inert
+  rows named the control and did not move, and the twin moved exactly the movers (V1-V5 held).
+```
+
+**The predeclaration was exact in all three classes.** The 21 inert rows are the GATED ones —
+a labellum delta under FAN, an all-petals delta above one whorl, an inner delta under
+CONTINUOUS — plus `6 layers x allTipBreadth max`, where the control is hidden and inert by
+construction. Three rows had their set become EMPTY once the ids were stripped and build the
+new default: `petalTipBreadth min (0)`, `petalTipBreadth max (0.6)` and the old
+`TIP: truncate (breadth max)` row.
+
+**`frozen/phase21` therefore joins `frozen/phase17` and `frozen/phase19` as a tag whose row
+definitions reproduce and whose bytes no longer do — 45 of 572.**
+
+**One instrument note, because the tool caught the session's own bug rather than producing a
+plausible answer.** The first run of the third capture was launched with an unexported shell
+variable, so `--strip` received an empty list. It did not quietly close a partition over the
+rows that happened to apply: it recorded `strip: []`, refused 71 rows BY NAME
+(`petalTipBreadth: not in the DOM`), wrote `complete: false`, and the chain stopped. That is
+"a harness that sets a config must read it back" applied to the harness's own arguments, and
+it is the difference between a re-run and a wrong number in this document.
+
+---
+
 ## 11. THE #191 MERGE, VERIFIED RATHER THAN ASSUMED
 
 Eva's instruction was that PR #191 (session 33, margin buckling) merges first and that its

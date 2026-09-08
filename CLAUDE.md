@@ -620,6 +620,13 @@ widest point: 0.0° at `n` 2.00, 0.2–1.2° at 1.40, **19.6–53.9° at the DEF
 with different slopes for `n` <= 1 by construction, so only `n` >= ~1.4 is C1. That is a
 property of the approved law, not of an implementation, and Eva may want to revisit it
 before PR THREE.
+**THE PARTITION CLOSED AT 45 movers / 21 inert / 506 holders on `frozen/phase21`, EXACTLY as
+predeclared in all three classes**, with `twin === new on 572 of 572 rows` and V1-V5 held; the
+inert class is the GATED rows plus `6 layers x allTipBreadth max`. phase21 joins phase17 and
+phase19 as a tag whose definitions reproduce and whose bytes do not (45 of 572). **The byte
+tool caught the session's own shell bug rather than answering plausibly** — an unexported
+variable left `--strip` empty, and it recorded `strip: []`, refused 71 rows BY NAME and wrote
+`complete: false` instead of closing a partition over the 501 rows that happened to apply.
 **`frozen/phase21` IS THE 572 ROWS AT `b323268`** — main's head before this retirement, owed
 because the matrix shrank, and **the newest baseline that is fully replayable** (see the
 charter's scheduled fix: phase19 and phase20 can no longer be byte-re-exported from main at
