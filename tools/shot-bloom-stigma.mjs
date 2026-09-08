@@ -58,7 +58,7 @@
    against frozen/phase19), or a print instrument (the 0.50 mm floor is
    MIN_FEATURE_MM / 2, UNMEASURED — no coupon has been printed).
 
-   RUN:  node tools/shot-bloom-stigma.mjs <out-dir> [base-tree] [--quick]
+   RUN:  node tools/shot-bloom-stigma.mjs <out-dir> [base-tree] [--quick|--ruling]
          --quick runs two cells and the pair, for debugging the instrument
          (the charter's "two rows, not the grid").
    =================================================================== */
@@ -210,6 +210,21 @@ const GROUPS = [
     { key: 'inert', name: 'INERT — 12 points at sharpness 0.25 with roundedness 1: the trifid’s triangle count and STIGMA line, character for character', sets: { ...STYLE6, stigmaPoints: 12, stigmaSharpness: 0.25 }, hold: 'identical' },
   ] },
 ];
+/* --ruling (session 31): the four positions of the proposed pinch travel —
+   star, polygon, rounded polygon, the nearest reachable to the circle — plus
+   the singular point itself, at size 3.00 (a 1.80 mm lobe radius, so the
+   star at pinch 3.00 clears the 0.50 mm waist floor rather than clamping to
+   it). Shot on TODAY'S control, so each cell carries the old exponent it was
+   driven at and the pinch it would map to; a ruling row is shot with its own
+   control and is NOT compared against the trifid at rest. */
+const RULING = process.argv.includes('--ruling');
+if (RULING) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'ruling', name: 'SESSION 31 RULING CELLS — where star, polygon, rounded polygon and the circle land on the proposed pinch travel (size 3.00, roundedness 0, 4 points; old exponent s beside the pinch k = 2/s - 1)', rows: [
+  { key: 'star', name: 'STAR — pinch 3.00 (s 0.50): waist 35% of the point radius', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 0.5 }, hold: 'ruling' },
+  { key: 'polygon', name: 'POLYGON — pinch 1.00 (s 1.00), the proposed default: waist 71%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1 }, hold: 'ruling' },
+  { key: 'rounded', name: 'ROUNDED POLYGON — pinch 0.60 (s 1.25): waist 81%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1.25 }, hold: 'ruling' },
+  { key: 'nearcircle', name: 'THE NEAREST REACHABLE TO THE CIRCLE — pinch 0.05 (s 1.905; shot at s 1.90 on today’s grid, pinch 0.053): waist 98%', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 1.9 }, hold: 'ruling' },
+  { key: 'singular', name: 'THE SINGULAR POINT, for the record — s 2.00 at roundedness 0: every factor exactly 1, the circle on a 16-side lattice (UNREACHABLE on the proposed travel)', sets: { ...STYLE6, stigmaSize: 3, stigmaRoundedness: 0, stigmaSharpness: 2 }, hold: 'ruling' },
+] }); }
 if (QUICK) { GROUPS.splice(1); GROUPS[0].rows.splice(1); GROUPS.push({ key: 'either', name: 'QUICK — the two clamped cells', rows: [{ key: 's050', name: 'sharpness 0.50', sets: { ...STYLE6, stigmaRoundedness: 0, stigmaSharpness: 0.5 }, hold: 'clamped' }, { key: 'thin075', name: 'thin sheet, 0.75', sets: { ...STYLE6, sheetThickness: 0.6, stigmaRoundedness: 0, stigmaSharpness: 0.75 }, hold: 'clamped' }] }); }
 
 console.log(`THE STIGMA SHEET — every cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, JS0-JS7 and JG0-JG6 before every shutter.${QUICK ? ' (--quick)' : ''}\n`);
@@ -223,6 +238,7 @@ for (const g of GROUPS) {
     const twice = Object.fromEntries(VIEWS.map((v) => [v, pixelDiff(path.join(outDir, main.shots[v].file), path.join(outDir, again.shots[v].file))]));
     let vs = null;
     if (r.hold === 'reference' || r.hold === 'reference120') { refs[r.key] = main; main.twice = twice; }
+    else if (r.hold === 'ruling') { /* its own control only — see --ruling */ }
     else {
       const ref = refs[r.ref || 'rest6'];
       if (!ref) await die(`${r.key}: its reference ${r.ref || 'rest6'} has not been shot — the trifid at rest is what every other cell is measured against`);
