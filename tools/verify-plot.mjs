@@ -125,7 +125,6 @@ const MUTANTS = [
              'bend/a-petal-handle-drag-does-not-orbit-the-camera',
              'bend/add-and-remove-change-the-set-and-reset-rests-it',
              'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
-             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-neighbours',
              /* AND THE PETAL CHECKS, ALL TRUE OF THIS MUTATION rather than
                 tuned out of the checks: with every strip called a u-line, a
                 v-line's ten points are matched against a 29-row panel ladder,
@@ -2919,6 +2918,23 @@ let mutantsOK = true;
 if (NEG) {
   console.log('\n=== negative control ===');
   const wanted = ONLY ? ONLY.split(',') : null;
+  /* A CLAIM THAT NAMES NO CHECK CAN NEVER FIRE, AND READS AS "stayed green" —
+     which is indistinguishable from a mutation the gate is blind to. This
+     session renamed `readout/…-and-the-neighbours` to `…-and-the-warped-count`
+     and left the old name on a mutant's list, where it cost a twenty-minute
+     sweep to find. The base run has just named every check there is, so this is
+     the first moment the claim can be checked at all — and it is checked for
+     EVERY mutant, not only the ones this invocation is about to run, because a
+     stale name in a mutant `--mutant=` skips is exactly the one nobody sees. */
+  const known = new Set(main.checks.keys());
+  const stale = MUTANTS.flatMap(m =>
+    m.breaks.filter(c => !known.has(c)).map(c => `${m.id} claims ${c}`));
+  if (stale.length) {
+    console.log(`  [FAIL] ${stale.length} claimed check${stale.length === 1 ? '' : 's'} `
+      + `name${stale.length === 1 ? 's' : ''} nothing the gate runs:`);
+    for (const line of stale) console.log(`         ${line}`);
+    mutantsOK = false;
+  }
   for (const m of MUTANTS) {
     if (wanted && !wanted.includes(m.id)) continue;
     const src = readFileSync(path.join(ROOT, m.file), 'utf8');
