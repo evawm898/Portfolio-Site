@@ -3153,6 +3153,163 @@ correction below names what a mutation really does; none loosens a check.
   a file whose per-petal values do not describe the page is precisely what that
   check is named for.
 
+**POLARITY IS A RENDER-PATH CHANGE, NOT A COLOUR SWAP, AND `plot-polarity.js` IS THE
+LAW** (session of Sep 9; read its header before touching any of it). The screen is white
+ink on black under ADDITIVE blending, so crossings brighten toward white; inverting the
+colours alone gives a WHITE RECTANGLE, because additive ink on a white ground saturates on
+the first line. The symmetric operation is MULTIPLY.
+
+**MULTIPLY AND NOT SUBTRACTIVE, and the two are the same operation reparameterised** —
+`dst * src` against `dst * (1 - src)` — so nothing is given up either way and the only
+question is which quantity the material colour carries. Under multiply it carries the ink's
+TRANSMITTANCE, which is what a single line LOOKS LIKE on white paper: the additive
+calibration mirrors term for term, and the accent's own hex still draws TEAL, where under
+subtractive a teal INK prints as teal's complement (a dull red) and the colour in the panel
+would stop matching the colour on the canvas. Either choice needs exactly one inversion;
+multiply puts it on a SCALAR where subtractive would put it on every hue on the page.
+
+**EVERYTHING BLENDS IN sRGB-ENCODED VALUES HERE, MEASURED FROM three's OWN SOURCES, and
+that is why the two regimes are not symmetric on their own.** `LineMaterial`'s fragment
+shader orders its chunks `tonemapping -> colorspace -> fog -> premultiplied_alpha`
+(LineMaterial.js:411-414), so the colour is converted to the output space BEFORE the
+blender and before the fog; `refreshFogUniforms` hands `fog.color` over in
+`renderer.outputColorSpace` (three.module.js:27779); and `premultipliedAlpha` defaults TRUE
+on WebGLRenderer, so the premultiplied branch of the blend switch is the one that runs
+(RGB behaviour is identical in both branches, and this page's opacity is 1). Measured
+consequence:
+
+| level 0.30 | n=1 | n=2 | n=3 | n=4 | n=6 | n=10 | saturates |
+|---|---|---|---|---|---|---|---|
+| screen ink | 149 | 255 | 255 | 255 | 255 | 255 | at n=2 |
+| print ink (raw value) | 37 | 69 | 96 | 119 | 156 | 202 | never |
+
+**SO THE ANSWER IS A TRANSFER, NOT A SECOND SET OF DEFAULTS** — the question the session
+was asked, answered with numbers. Print's material colour is the transmittance whose sRGB
+encoding is `1 - sRGB(level)`. Then: **one line lands at exactly the same ink either way
+(`screen px + print px === 255` at every position of the control — 63/192, 108/147,
+149/106, 196/59, 231/24, 255/0)**, an identity rather than a tolerance; **the depth dim is
+the same law in both, algebraically** (fading a transmittance toward 1 gives ink
+`255(1-f)(1-t)` exactly as fading a level toward 0 gives `255 s (1-f)`, so a far line is
+`(1-f)` times a near one's ink in both regimes) and only the fog's COLOUR flips; and **what
+is left asymmetric is the CROSSINGS, which is irreducible and in the good direction** —
+print holds six distinguishable levels (149 211 237 248 252 254) where the screen holds two
+(149, then white). The panel PRINTS that ladder rather than describing it. The slider keeps
+one meaning, "a single line's ink", and its LABEL follows the polarity (brightness /
+darkness) while its ID does not, because `brightness` is what every saved composition names.
+A shared RAW value would have been four times off, which is what makes this worth a transfer.
+**A BLACK FOG UNDER MULTIPLY DRIVES FAR LINES TOWARD `dst*0` = BLACK** — the depth dim would
+make the most DISTANT lines the heaviest thing on the page — and nothing in a blend-mode
+check can see it, so it has its own check and its own mutant. The ground and the fog are ONE
+field per polarity for exactly that reason.
+
+**TWO ARTEFACTS COME OUT OF THE TOOL, BOTH CROPPED TO `frameRect()`, AND THEY LIVE IN THE
+FRAME PANEL** because the frame defines the output bounds — export is not a global action.
+`plot-export.js` owns the parts that are not the page's; read its header.
+* **THE RASTER IS THE FRAMEBUFFER ITSELF at 4x**, through the page's own renderer and
+  materials, so the additive or multiply result survives BY CONSTRUCTION rather than by an
+  argument about colour spaces — a render target would blend in a different space and the
+  picture would quietly stop being the one on screen. **The line widths are scaled by the
+  same factor and the resolution is told the truth**: leaving `resolution` at the screen's
+  would keep the strokes right and would also be a lie to a material about how big its
+  viewport is, which is the exact state that once rasterised every segment here as a
+  screen-filling quad. The crop goes through `frameRect` AT THE BUFFER'S OWN SIZE — the same
+  owner, asked the same question about a bigger canvas — and the achieved scale is reported,
+  never the asked-for one (the GL cap here is 8192, so 4x fits at 1100x800; it would not on
+  a larger viewport). **Outside an ELLIPSE is TRANSPARENT, not filled**: alpha is strictly
+  more information, since a viewer or a layout that wants the ground composites it in one
+  step where a ground-filled PNG cannot have its corners taken back off. A rectangle is
+  fully opaque, so this only ever touches the ellipse.
+* **THE SVG IS AN HONESTLY DIFFERENT ARTEFACT AND THE UI SAYS SO.** SVG has no additive and
+  no multiply, so the crossings cannot survive as vector; that is not engineered around with
+  per-path opacity, because a plotter draws UNIFORM strokes and takes its depth from line
+  DENSITY, which is exactly what this geometry produces. Strokes are flat and full strength,
+  and the ink level and depth dim do NOT reach the file. **ONE PATH PER LINE STRIP, NEVER ONE
+  PER SEGMENT** — measured on the shipped grid: **1,372 paths and 1,372 pen-downs against
+  55,188 draws**, where per-segment emission is fifty-five thousand pen lifts and the
+  difference between a plot that finishes and one that does not. A strip is split only where
+  the projection has nothing to say (a point outside the depth range), splits are counted,
+  and **a run of ONE point is not a path** — `M x y` with nothing after it is a pen-down and
+  no stroke, which some plotter software puts down as a dot. **REAL MILLIMETRES**, from the
+  grid's own `asset.extras.units` and the camera in closed form
+  (`2 tan(fov/2) · distance / viewportHeight`), with the SVG's user unit equal to one
+  millimetre so a stroke width is a real width: the shipped grid at the home framing comes
+  out **154.24 x 231.36 mm with a 0.361 mm stroke** — a real fineliner width, converted from
+  1.1 px rather than relabelled. **That scale is exact AT THE TARGET PLANE and is said so**:
+  this is a perspective projection, so nearer parts are magnified and farther reduced. If the
+  grid's units are not millimetres, the file says what they actually are. **The boundary is a
+  real `clipPath` IN BOTH SHAPES** — the rectangle too, rather than leaning on the SVG
+  viewport's own overflow, so "every stroked path is inside a clip that IS the boundary" is
+  one statement with no special case — and the boundary itself is NOT drawn, because it is
+  chrome.
+* **THE SVG'S GROUND RECT MUST BE INSIDE THE CLIP, and it shipped outside it for an hour.**
+  Outside, a screen-polarity ellipse comes out as a full black RECTANGLE with an ellipse of
+  white lines floating in it — neither the boundary the page drew nor what the raster's own
+  elliptical alpha produces. **Found by RENDERING one and reading the corners, not by reading
+  the text**, and it is now a mutant.
+
+**AN EXPORT DRAWS THE INK AND NONE OF THE CHROME, AND THE WITNESS IS THAT IT IS GREY.** One
+rule with three consequences rather than three decisions: the frame's own boundary is an
+indication of the crop (baking a crop indicator into the cropped image would be an odd thing
+to plot), the bend handles are an editor, and the SELECTED PETAL'S TEAL exists to answer
+"which one am I about to grab" — an exported print with one teal petal in it is a bug report.
+All three are suppressed for the render and restored in a `finally`. **Both polarities' ink
+and ground are neutral, so every pixel of a correct export has `r === g === b` EXACTLY**,
+where the accent (0x6fb7ae) and the petal handles' amber (0xd6a15c) are neutral in no
+channel. That is an identity, not a threshold, and one statement catches a leaked boundary,
+a leaked handle and a leaked highlight at once — measured 0 non-neutral pixels of 330,176
+with all three on screen.
+
+**POLARITY IS A `draw` FIELD AND `VERSION` IS 2.** It rides with the draw settings because
+it IS one — it decides how the fragments blend and it changes what the two controls beside
+it MEAN — and its values are imported from `plot-polarity.js` rather than restated, the way
+the ratios come from `plot-frame.js`. **The bump is the point of having a version**: nothing
+breaks without it (a v1 file has no polarity key, the reader reports it missing and the page
+keeps what it has, which is rule 3 working) but leaving it at 1 would mean "version 1" no
+longer names one shape. Old files still load and say what they are missing.
+**A RESTORED POLARITY IS A BLEND MODE AND NOT A SELECT VALUE** — restoring the control while
+the renderer stayed where it was is a silent partial restore that passes every
+field-by-field comparison, so the blend constant and the clear colour are read back from the
+renderer itself on both sides of the trip.
+
+**THE GATE IS 192 CHECKS AND 63 MUTANTS**, and three things it taught this session:
+* **A CHECK THAT READS THE PAGE'S REPORT IS NOT A CHECK ON THE FILE.** The millimetre check
+  first asked `exportSvg()` for its own `widthMm`; a document dimensioned in screen pixels
+  beside a report that still says millimetres would have sailed through it. It parses the
+  emitted `width` / `height` / `viewBox` / `stroke-width` out of the text now, and the
+  mutation is anchored on the DOCUMENT rather than on the report so the silent half is the
+  one under test.
+* **THE TWO REGIMES AGREE EXACTLY ON WHERE THERE IS INK AND CANNOT AGREE ON HOW MUCH**, and
+  asserting both is what the complement check did on its first run. "Is there ink here" is
+  the same question either way (the two values sum to 255 and no accumulation moves a pixel
+  back toward its own ground) — an identity, measured at `screen ink 102,843 === print dark
+  102,843`. "Is this pixel saturated" is precisely where they part, because additive clips
+  where multiply does not: an 11,136 px gap, REPORTED beside the identity and asserted as an
+  asymmetry, never as an equality that happens to be nearly true.
+* **A REFACTOR DISARMS A MUTANT, AND THE SWEEP IS WHAT SAYS SO.**
+  `the-highlight-is-a-brightness-as-well-as-a-hue` edited the peak normalisation inside
+  `applyStyle`; the polarity transfer moved that into `hueRGB`'s SCREEN arm and the anchor
+  check reported it MISSING. Re-anchored, with the polarity check it also reddens named on
+  its list. Note the trap it would have been the other way round: leaving the constructor's
+  `blending:` literal in place while `applyStyle` overwrote it every call would have made
+  `blending-is-not-additive` pass SILENTLY, so that mutant is re-anchored onto the one map
+  from a polarity's blend name to three's constant, which both the constructor and
+  `applyStyle` read.
+Also: `readPixels` gained `min` and `dark` rather than having `ink` made polarity-aware —
+`ink` counts pixels above a BLACK ground, which is the right question on screen and a
+meaningless one on white paper, and a great many checks are written against that number.
+
+**The sheet is `node tools/shot-plot-export.mjs <dir>`, and it PRODUCES THE ARTEFACTS rather
+than pictures of them** — a PNG and an SVG at each polarity and each shape, written to disk,
+with the SVG rendered back through the browser's own engine (magenta showing through
+wherever the file put nothing, which is how a clip is legible on a white artefact) and
+embedded directly, so opening the sheet IS opening the files. The PNGs sit on a checkerboard
+so the ellipse's alpha is visible instead of reading as a white fill.
+
+**OUT OF SCOPE HERE ON PURPOSE, and none of it foreclosed:** background shapes, cut-and-pull,
+lock view, and MULTIPLE BLOOM INSTANCES. The export path walks `drawnLineSets()` — a LIST of
+line sets, today `grid` and `stem` — rather than naming two, so a second instance is another
+entry there and not a change to how an export is built.
+
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
 — run the gate and the sheet by hand. Note the corollary `/print` and `/cards`
@@ -3173,12 +3330,13 @@ form. That is a bloom parameter. The sheet photographs it and the viewer does
 not compensate for it.
 
 **Out of scope on purpose:** multiple blooms, composition and arrangement;
-LEAVES and buds; print or SVG export; any change to `/print`, the generator, or
+LEAVES and buds; any change to `/print`, the generator, or
 the grid export format. (The STEM is no longer out of scope — see the inferred
 stem above — but it is inferred from the u-lines, not loaded, and nothing about
-leaves follows from it.) Also out of scope this session and named so it is not
-mistaken for an omission: **LOCK VIEW, background SHAPES, cut-and-pull and
-EXPORT**. TWIST was named in the petal
+leaves follows from it. RASTER AND SVG EXPORT are no longer out of scope
+either — see the polarity and export section above.) Also out of scope and named
+so it is not mistaken for an omission: **LOCK VIEW, background SHAPES and
+cut-and-pull**. TWIST was named in the petal
 session's brief as the thing to drop if the session grew, and it was: bend and
 stretch shipped, twist did not. (PETAL SELECTION AND PER-PETAL WARP are no
 longer out of scope — see the petal section above; nor are THE FRAME and SAVE —
@@ -3221,11 +3379,14 @@ strand modes) is in that doc so it is not re-derived.
 1. **A UI overhaul for `/plot`, and it is now the most pressing thing on this
    list.** The panels are `/print`'s grammar applied as-is, which was right for
    shipping a viewer and is not a considered design for this page. There are
-   **twenty-three controls across seven panels** now, one of them — the petal
-   picker — changes what four of the others MEAN, and the left column has grown
-   tall enough that it covers canvas a hand wants to drag on (it ate the gate's
-   two hardcoded pointer coordinates the day COMPOSITION landed).
-1b. **THE COMPOSITION FILE IS BUILT** — `plot-composition` v1, a warp per petal,
+   **twenty-four controls and twelve buttons across seven panels** now, one of
+   them — the petal picker — changes what four of the others MEAN and another —
+   the POLARITY — changes what two more mean and relabels one of them, and the
+   left column has grown tall enough that it covers canvas a hand wants to drag
+   on (it ate the gate's two hardcoded pointer coordinates the day COMPOSITION
+   landed).
+1b. **THE COMPOSITION FILE IS BUILT** — `plot-composition` v2 (v1 plus
+   `draw.polarity`), a warp per petal,
    and a root that is a LIST of instances holding one. What is inherited by the
    NEXT sessions rather than decided by them: **lock state, background shapes and
    cut-and-pull state are added as FIELDS**, and a second bloom is an ENTRY —
