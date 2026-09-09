@@ -87,7 +87,13 @@ const MUTANTS = [
   {
     id: 'blending-is-not-additive', file: 'plot.js',
     from: '  blending: THREE.AdditiveBlending,', to: '  blending: THREE.NormalBlending,',
-    breaks: ['blend/the-material-is-additive', 'blend/crossings-exceed-a-single-line'],
+    /* AND THE FRAME'S OWN CHECK, because that check's claim is a CONTRAST — the
+       boundary composites NORMAL where the DRAWING is additive — and this
+       mutation removes the second half of it. True, and the claim is worth
+       keeping whole: "the boundary is chrome and not ink" is a statement about
+       the two blend modes together, not about the frame's alone. */
+    breaks: ['blend/the-material-is-additive', 'blend/crossings-exceed-a-single-line',
+             'frame/the-boundary-is-chrome-and-not-ink'],
   },
   {
     id: 'every-strip-reads-as-a-u-line', file: 'plot-grid.js',
