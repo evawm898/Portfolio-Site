@@ -3271,7 +3271,7 @@ the renderer stayed where it was is a silent partial restore that passes every
 field-by-field comparison, so the blend constant and the clear colour are read back from the
 renderer itself on both sides of the trip.
 
-**THE GATE IS 192 CHECKS AND 63 MUTANTS**, and three things it taught this session:
+**THE GATE IS 194 CHECKS AND 65 MUTANTS**, and five things it taught this session:
 * **A CHECK THAT READS THE PAGE'S REPORT IS NOT A CHECK ON THE FILE.** The millimetre check
   first asked `exportSvg()` for its own `widthMm`; a document dimensioned in screen pixels
   beside a report that still says millimetres would have sailed through it. It parses the
@@ -3294,9 +3294,35 @@ renderer itself on both sides of the trip.
   `blending-is-not-additive` pass SILENTLY, so that mutant is re-anchored onto the one map
   from a polarity's blend name to three's constant, which both the constructor and
   `applyStyle` read.
+* **TWO HOLES CAME OUT OF RE-READING THE DIFF ADVERSARIALLY, not out of a failure**, and
+  both are the shape that passes everything already written. A raster whose line widths did
+  not scale with the buffer is the SAME PICTURE in hairlines — right aspect, right crop,
+  non-zero ink, still grey — so `export/the-strokes-scale-with-the-image` measures an ink
+  FRACTION across two scales (2.79% at 1x against 2.66% at 2x, a ratio of 0.956 where
+  unscaled widths would halve it). And a projection that flipped y or lost the boundary's
+  origin emits exactly the right number of paths, at exactly the right physical size, inside
+  exactly the right clip, and draws the bloom upside down — so
+  `export/the-svg-lands-where-the-drawing-lands-on-screen` maps the emitted coordinates back
+  into the page's own pixel space and compares them against `drawnScreenBox()`, which walks
+  the SAME population through the same camera: 1.31e-3 px apart.
+* **A MUTANT CAN CLAIM A CHECK THAT CANNOT SEE IT, AND MSAA IS WHY.**
+  `the-print-transfer-is-a-plain-inversion` was listed as breaking
+  `the-two-regimes-agree-exactly-on-where-there-is-ink`; the control reported MISSED, and the
+  CLAIM was what was wrong. That check is named for WHERE the ink is and a plain inversion
+  puts ink in exactly the same places — because MSAA quantises coverage to a handful of
+  steps, so both of its thresholds sit in EMPTY regions of the histogram. Measured: this
+  drawing has exactly ONE populated screen bin between 1 and 39 (bin 38, 9,452 px) and
+  print's mirror at 218 holds the same 9,452. Any monotone transfer inks the same pixels. The
+  claim came off the list and the check now SAYS what it cannot see, so it is not re-added;
+  the level is a law, it is asserted in part one, and part one reddens.
 Also: `readPixels` gained `min` and `dark` rather than having `ink` made polarity-aware —
 `ink` counts pixels above a BLACK ground, which is the right question on screen and a
 meaningless one on white paper, and a great many checks are written against that number.
+**AND THE SVG EMITS PATHS WHOLE, LEANING ON THE CLIP TO REMOVE THE OVERFLOW** — measured on
+an ellipse at a zoomed-in camera, 26,430 of 56,560 emitted points lie outside the viewBox, so
+plotter software that ignores `clip-path` draws every one of them. Pre-clipping instead would
+mean splitting strips at the boundary, which is the one thing the file is built not to do (a
+split is a pen lift), so the clip is the right trade and the caveat is real.
 
 **The sheet is `node tools/shot-plot-export.mjs <dir>`, and it PRODUCES THE ARTEFACTS rather
 than pictures of them** — a PNG and an SVG at each polarity and each shape, written to disk,
