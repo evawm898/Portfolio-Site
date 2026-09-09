@@ -522,7 +522,20 @@ const FORM_IDS = ['petalCup', 'petalSpineCurl', 'petalRoll', 'petalTwist',
      taper do NOT: they multiply a base curve and are inert by construction
      where it is 0, so a row setting only them is a FLAT row and must build
      one. curlAssertions() is what covers them. */
-  'petalCupGradient'];
+  'petalCupGradient',
+  /* MARGIN BUCKLING (session 34) joins the guard, and ONLY its amplitude.
+     `petalFormIsFlat` in the geometry was extended with `buckleIsFlat` when
+     the field landed; THIS list is a second, independent statement of the
+     same question and it was not, so every buckle row read as a FLAT row
+     that was inexplicably reporting form telemetry — 23 validity failures,
+     "no result above is trustworthy", on a run where all 573 rows passed.
+     Only `buckleAmp` belongs: `buckleIsFlat` is `!buckleAmp || !buckleFreq`
+     and buckleFreq's range is 1..7, so it is never 0 and flatness is
+     decided by the amplitude alone. `buckleFreq` and `buckleEnv` must stay
+     OUT for exactly the reason curl bias and roll taper are out — they are
+     inert at amplitude 0, so the GATED rows that set them at their extremes
+     with no amplitude are FLAT rows and must build one. */
+  'buckleAmp'];
 
 /* Serves the repo root by default. `root` exists for ONE reason: a
    before/after contact sheet needs the OLD tree rendered by the same browser,
@@ -4884,8 +4897,7 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
-  /* ===================================================================
-     BLOCK 27 — MARGIN BUCKLING'S THREE (session 34). The field and its true
+  /* 27. MARGIN BUCKLING'S THREE (session 34). The field and its true
      surface normal shipped in session 33 with no controls; these are the
      controls, the clamp and the per-slot phase.
 
@@ -4898,7 +4910,13 @@ export function buildMatrix() {
      thickness assertion; and the GATED rows, where frequency and falloff sit
      at their extremes with amplitude 0 and must be bit-identical to the
      default — hidden AND inert, never a mute.
-     =================================================================== */
+     THE MARKER ON THE FIRST LINE IS LOAD-BEARING: bloom-smoke.mjs parses
+     buildMatrix() for /^ {2}\/\* (\d+)\. (.*)$/ to build its block census,
+     and this block first shipped with a decorative "BLOCK 27 ---" banner
+     that the regex could not match. The block was therefore invisible to
+     CLAUSE A, no smoke row was ever demanded for it, and the local smoke
+     run came back clean having never built a buckled petal — which is why
+     the FORM_IDS defect above reached CI. Keep the "N. TITLE" form. */
   for (const [name, sets] of [
     ['BUCKLE: the first live step (0.01 x the half-width)', { buckleAmp: 0.01 }],
     ['BUCKLE: a gentle undulation (0.10 x, f 2)', { buckleAmp: 0.1, buckleFreq: 2 }],
