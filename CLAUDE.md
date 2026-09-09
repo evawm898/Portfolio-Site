@@ -21,6 +21,24 @@ Guidance for Claude Code sessions working in this repository.
 
 ## Bloom generator — pointer only
 
+**NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH** (Eva, session
+32 — the durable rule, and the first thing to read before touching ROW PLACEMENT
+or quoting any measured figure). *Every reported measurement names its MODE
+(live or export) and its SAMPLING (the row count and the weighting), and any
+constant standing for a PHYSICAL LENGTH is derived from that length rather than
+from a ROW COUNT.* A row count is only a length under UNIFORM spacing, and this
+project's spacing stopped being uniform when the turning ladder shipped. Five
+defects in one session came from this single root, and they are not cosmetic —
+two reached CI, one reached shipped source, and one changed TOPOLOGY rather than
+geometry: the buckle's rows-per-cycle ceiling (a count standing for a spacing),
+C1's `(i + 1) / n` station (an index standing for the builder's own `u`), the
+self-contact flag's skip (a count standing for three sheet thicknesses), the
+mode-dependent ladder (reading the LIVE floor, so the export split panels at a
+different row), and `LADDER_ARC_SHARE`'s justification (live figures from a
+scratch tree quoted as the shipped tree's). `bladeStations()`'s own header
+carries this too, which is where four of the five lived. §18h of
+`docs/bloom-session-32-outcome.md` has the table.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom
@@ -901,15 +919,29 @@ truncates exactly the curved stretch the extra rows would have resolved. The lad
 export and 4 states' whole-blade worst chord REGRESSES, by at most 0.0361 mm, all on spatulate
 tapers (widest point at u 0.67–0.83) at low exponents that neither the shipped default taper
 nor Eva's reference reaches.
+**EVA RULED IT SHIPS AS MEASURED, ON THE GROUND THAT IT IS A RENDER-QUALITY CHANGE** (§18g):
+every figure in that comparison is BELOW PRINT RESOLUTION — 0.2147 against 0.3952 mm at the
+worst, and 0.0361 mm is about a third of a layer height — so none of it is resolvable on a
+printed object. What it changes is the FACETED LOOK ON SCREEN, which is the mode the defect
+was reported in and where the ladder is worth ~2.2x. **The export figures stay on the record
+beside it as the honest statement of what the print gets, never dropped for being the weaker
+half.** And **dropping the ladder is NOT the neutral option**: without it this PR moves the
+exported apex 3–7% and nothing else — the law shipped with the visual defect that motivated
+the work still present, at twice the row count.
 **AND `LADDER_ARC_SHARE` = 0.70 IS A TRADE, NOT AN OPTIMUM** (§18d). Its shipped justification
 welded two LIVE-mode sweeps into one sentence and did not reproduce once the ladder was made
 mode-independent. Re-derived: 0.70 is a local minimum in live and is NOT one in export; the
 grid optimum near 0.90–0.95 improves the worst state (1.84x → 2.04x) and the regressions
 (4/72 → 1/72) while COSTING the shipping default (1.61x → 1.29x) and Eva's taper (1.44x →
-1.22x). Kept at 0.70 because it serves what ships. Pure arc length (1.00) collapses to 1.31x
-with 30 of 72 whole-blade regressions, so the turning term is load-bearing — measured, not
-argued. **Do not tune it to three digits: the worst-of-72 objective HOPS** (0.75 spikes to
-0.2732 mm in both modes).
+1.22x). **Eva ruled it STAYS at 0.70**: optimising the tail at the cost of the default is the
+wrong trade, and the tail regressions bought are precisely the sub-resolution ones — 0.90's
+numbers stay beside it so the value reads as a TRADE rather than a tuned constant. Pure arc
+length (1.00) collapses to 1.31x with 30 of 72 whole-blade regressions, so the turning term is
+load-bearing — measured, not argued. **Do not tune it to three digits: the worst-of-72
+objective HOPS** (0.75 spikes to 0.2732 mm in both modes). **And the PER-STATE GATE is
+WITHDRAWN, not deferred** — chord error is a property of the DISCRETISATION, so feeding it back
+into row placement makes the sagitta instrument measure its own fixed point: the `headRise`
+ruling applied correctly.
 **THE APEX TURN ANGLE IS NOT THE CRITERION AND CANNOT BE** — it is discontinuous in row
 placement (65.7° or 10.6° on one outline), and at n 1.20 it RISES while the sagitta falls,
 which is the tip-floor join resolving rather than smearing. The sagitta decides.

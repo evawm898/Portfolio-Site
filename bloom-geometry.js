@@ -2996,6 +2996,18 @@ export const BLADE_ROWS = NU;
    this changes only the sampling and is proved by DENSE SAMPLING agreeing on
    both trees.
 
+   *** NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH. ***
+   The project rule (Eva, session 32; CLAUDE.md's bloom pointer carries it, §18h
+   of the session-32 outcome doc has the table) and it lives here because FOUR
+   of the five defects that produced it were in this file or in what reads it:
+   the buckle's rows-per-cycle ceiling, C1's `(i + 1) / n` station, the
+   self-contact flag's row-count skip, and this ladder reading the LIVE floor so
+   the export split a cleft's panels at a different row. A ROW COUNT IS ONLY A
+   LENGTH UNDER UNIFORM SPACING, and below this line the spacing is not uniform.
+   Anything added here that means a distance must be written as a distance
+   (`ladderHalfAt` is why this ladder is mode-free), and any figure reported off
+   it must say which mode and which row count it was measured at.
+
    WHY. Rows evenly spaced in u put the same number through the apex whatever
    the outline is doing there, and the apex turn grows with the exponent
    across the whole upper half of a range Eva ruled reachable — so the

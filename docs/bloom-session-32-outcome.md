@@ -1626,3 +1626,75 @@ three rows are not the cleft one, so no smoke run ever built it. And
 instrument, before the browser install. **Two gates were red on that head for
 two unrelated reasons, and the second was masked by the first exiting early.**
 Fixed, the row exports as one piece, 0 boundary edges, 29,216 export triangles.
+
+## 18g. THE RULING — the redistribution ships as measured, ARC stays 0.70 (Eva, session 32)
+
+§18c put three options; §18d withdrew one and turned another into a named trade.
+Eva ruled on the remaining choice, and the reasoning belongs here rather than in
+a message.
+
+**SHIP THE REDISTRIBUTION AS MEASURED.**
+
+**IT IS A RENDER-QUALITY CHANGE AND IT IS CORRECTLY JUDGED ON THE RENDER.** Every
+figure in §18c's comparison is BELOW PRINT RESOLUTION: the worst apex chord is
+0.2147 mm with the ladder against 0.3952 without, and the four whole-blade
+regressions are at most **0.0361 mm — about a third of a layer height.** None of
+it is resolvable on a printed object. What the redistribution actually changes is
+the FACETED LOOK ON SCREEN, which is what motivated it in the first place — Eva
+rejected the tip from a live preview — and in LIVE mode the ladder is worth about
+**2.2x**. So the case for it rests on the live figures, and that is not a
+convenient reading of the mode split: it is the mode the defect was reported in.
+
+**THE EXPORT FIGURES STAY ON THE RECORD BESIDE IT**, as the honest statement of
+what the print gets, rather than being dropped now that they are the weaker half:
+1.61x / 1.44x at the two shipped settings, 1.84x at the worst state, 21 of 72
+states worse at the apex and 4 worse on the whole blade.
+
+**DROPPING IT IS NOT THE NEUTRAL OPTION.** Without the ladder this PR moves the
+exported apex 3-7% (§18e) and nothing else — which is shipping the law with the
+visual defect that motivated the work still present, at twice the row count.
+"Do less" is not the same as "change less" here.
+
+**`LADDER_ARC_SHARE` STAYS 0.70, AND 0.90'S NUMBERS STAY BESIDE IT.** The 0.90
+variant is better in the tail (worst state 1.84x -> 2.04x, whole-blade
+regressions 4/72 -> 1/72) and worse at BOTH settings that ship (1.61x -> 1.29x
+and 1.44x -> 1.22x). Optimising the tail at the cost of the default is the wrong
+trade — and the tail regressions being bought are precisely the sub-resolution
+ones. The sweep in §18d stays in the doc and in the geometry's own comment so the
+value reads as a TRADE rather than as a tuned constant.
+
+**THE PER-STATE GATE'S WITHDRAWAL IS UPHELD AND IS NOT DEFERRED.** Chord error is
+a property of the DISCRETISATION, so feeding it back into row placement would
+make the sagitta instrument measure its own fixed point. That is the `headRise`
+ruling applied correctly — *a metric consumed as a geometric input becomes a
+target* — and it is closed, not parked.
+
+**AND THE COMMENT CORRECTION IS THE IMPORTANT HALF OF §18d.** A constant
+justified by numbers that do not reproduce is WORSE than an unjustified one,
+because it stops the next person re-deriving it.
+
+## 18h. THE DURABLE RULE — name the mode and the sampling; derive a length from a length
+
+Five defects in this session share one root: **a quantity measured in one MODE or
+under one SAMPLING, then quoted or consumed as if it were free of both.**
+
+| # | the defect | the conflation |
+|---|---|---|
+| 1 | the buckle's rows-per-cycle ceiling | a row COUNT standing for row SPACING — true only of a uniform ladder |
+| 2 | C1's station reconstruction | `(i + 1) / n` standing for the builder's own `u` |
+| 3 | the self-contact flag's skip | a row COUNT standing for three sheet thicknesses of DISTANCE |
+| 4 | the mode-dependent ladder | the ladder reading the LIVE floor, so the export split panels at a different row |
+| 5 | the arc-share justification | LIVE figures on a scratch tree quoted as the shipped tree's |
+
+Two of the five reached CI, one reached shipped source, and one (4) changed
+TOPOLOGY rather than geometry — the class is not cosmetic. The rule is written
+into `CLAUDE.md` so a session starting on row placement reads it before touching
+anything, and is cross-referenced from `bladeStations()`'s own header, which is
+where four of the five live:
+
+> **Every reported measurement names its MODE and its SAMPLING, and any constant
+> standing for a physical length is derived from that length rather than from a
+> row count.**
+
+The second clause is the constructive half. A row count is only a length under
+uniform spacing, and this project's spacing is no longer uniform.
