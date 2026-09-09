@@ -3234,7 +3234,17 @@ FRAME PANEL** because the frame defines the output bounds — export is not a gl
   (`2 tan(fov/2) · distance / viewportHeight`), with the SVG's user unit equal to one
   millimetre so a stroke width is a real width: the shipped grid at the home framing comes
   out **154.24 x 231.36 mm with a 0.361 mm stroke** — a real fineliner width, converted from
-  1.1 px rather than relabelled. **That scale is exact AT THE TARGET PLANE and is said so**:
+  1.1 px rather than relabelled. **THAT STROKE FIGURE IS AT DPR 1, AND THE DIMENSIONS ARE THE
+  ONLY HALF THAT IS DPR-INDEPENDENT.** `frameRect()` and the mm/px scale are both in CSS
+  pixels, so the width and height are the same on any display; but `resize()` sets each
+  material's `resolution` to the DRAWING BUFFER's size — it does so on `main`, where three's
+  own Line2 example uses the CSS size — so `linewidth` is a width in DEVICE pixels and a
+  retina display draws every line HALF as wide as the slider says. The export divides by the
+  pixel ratio so the file matches the screen, which is why the same drawing exports 0.361 mm
+  at DPR 1 and **0.129 mm at the contact sheet's DPR 2** (with its closer camera). The
+  conversion is faithful; what moves is /plot's own line width, and it is pre-existing rather
+  than the export's. **Do not quote one of those numbers as "the" pen width.**
+  **That scale is exact AT THE TARGET PLANE and is said so**:
   this is a perspective projection, so nearer parts are magnified and farther reduced. If the
   grid's units are not millimetres, the file says what they actually are. **The boundary is a
   real `clipPath` IN BOTH SHAPES** — the rectangle too, rather than leaning on the SVG

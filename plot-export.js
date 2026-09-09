@@ -35,8 +35,18 @@
 // world units ARE millimetres; the picture plane's scale is then a closed form
 // in the camera — `2 tan(fov/2) · distance / viewportHeight` millimetres per
 // pixel, at the plane through the orbit target. The SVG's user unit is one
-// millimetre, so `width`/`height` in mm and the coordinates agree by
 // construction and a stroke width is a real width.
+//   THE DIMENSIONS ARE DPR-INDEPENDENT AND THE STROKE IS NOT, and that is a
+//   property of /plot rather than of this conversion. `frameRect()` and the
+//   mm/px scale are both in CSS pixels, so `width`/`height` are the same on any
+//   display; but `resize()` sets each material's `resolution` to the DRAWING
+//   BUFFER's size (it does on `main`, and three's own Line2 example uses the
+//   CSS size instead), so `linewidth` is a width in DEVICE pixels and a
+//   device-pixel-ratio of 2 draws every line half as wide as the slider says.
+//   The export DIVIDES BY THE PIXEL RATIO so the file matches what is on
+//   screen, which is why the same drawing exports a 0.361 mm stroke at DPR 1
+//   and 0.129 mm at DPR 2 with the sheet's closer camera. Faithful, and worth
+//   knowing before anyone reads one of those numbers as "the" pen width.
 //   WHAT THAT SCALE IS TRUE OF, said rather than hidden: it is exact AT THE
 //   TARGET PLANE. This is a perspective projection, so nearer parts of the
 //   drawing are magnified and farther parts reduced — inherent to the picture,
