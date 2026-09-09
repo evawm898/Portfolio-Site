@@ -232,9 +232,17 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-conn-'));
 
 const results = [];
 const validity = [];
+/* EVERY ROW ATTEMPTED, so a row that never reaches `results` is named rather
+   than merely missing from a ratio. A validity failure `continue`s out of the
+   loop, so `results.length` is the SURVIVORS and every headline below divides
+   by it: session 32 shipped a row naming a control that does not exist, and
+   this gate printed `621/621 rows are ONE connected piece` over a 622-row
+   matrix and exited 1 with the dropped row invisible except in the count. */
+const attempted = [];
 const t0 = Date.now();
 for (const row of rows) {
   if (ONLY && !ONLY.test(row.label)) continue;
+  attempted.push(row.label);
   await openBloom(page, port);   // fresh page per row
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -404,6 +412,12 @@ const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+
+/* THE DENOMINATOR ITSELF, asserted. */
+if (results.length !== attempted.length) {
+  const got = new Set(results.map((r) => r.label));
+  validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
+}
 
 let bad = false;
 if (validity.length) {

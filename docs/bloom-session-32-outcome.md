@@ -1577,3 +1577,52 @@ for itself here.
 This is reported, not argued into a recommendation: the cost side is §18c's
 21/72 apex regressions and 4/72 whole-blade regressions at up to 0.0361 mm, and
 weighing a 1.44–1.61x typical gain against those is the ruling.
+
+## 18f. THE CI RED THAT WAS NOT A GEOMETRY FAILURE — a row naming a control that does not exist
+
+`bloom-connectedness` went red on `6dcb524` and the log's own headline read
+**`621/621 rows are ONE connected piece`**, every row `ok`, exit code 1. That
+shape — all rows green, gate red — is session 34's `FORM_IDS` failure, so it
+was read that way first. It is not.
+
+**THE CAUSE.** Block 28's cleft row was written
+`['TIP SHAPE: 3.00 x a cleft margin', { petalTipShape: 3, petalCleft: 0.5 }]`
+and **there is no `petalCleft` control and never has been.** A cleft is a
+`capability` (`CAPABILITY_CLEFT`, a two-span domain handed to the builder), not
+a slider — every other cleft row in the matrix carries it that way with
+`set: []`. `applyConfig` REFUSED the unknown id (`petalCleft: not in the DOM`)
+rather than ignoring it, which is correct and is the whole reason this was
+recoverable.
+
+**WHY IT WAS HARD TO SEE, AND WHAT WAS FIXED BESIDES THE ROW.** A validity
+failure `continue`s out of the row loop, so the row never reaches `results` —
+and **every headline in both STL gates divides by `results.length`**, the
+SURVIVORS. The matrix is 622 rows; 621 survived; the gate printed `621/621`.
+The ratio can never show a dropped row, because the drop removes it from both
+sides of the fraction. The `HARNESS INVALID` block did fire (that is why the
+exit code was 1) and it names the row — but on a 621-row run it goes to stderr
+under six screens of scope text, and the number a reader anchors on says
+everything passed.
+
+So both gates now carry a **row census**: every attempted label is recorded,
+and a mismatch against `results` is its own validity failure that NAMES the
+dropped rows. Falsified rather than assumed — reintroducing `petalCleft` in a
+copy produces:
+
+```
+connectedness: HARNESS INVALID — 2 validity assertion(s) failed.
+  - TIP SHAPE: 3.00 x a cleft margin: config did not take: petalCleft: not in the DOM
+  - row census: 1 rows attempted but 0 reached the results — dropped: TIP SHAPE: 3.00 x a cleft margin
+```
+
+**READ THE ROW COUNT AGAINST `buildMatrix().length`, NEVER THE RATIO.** That is
+how this was diagnosed at all: 622 in the matrix, 621 in the log, and the one
+block-28 row absent from the log's `ok` lines was the cleft.
+
+**WHAT NEITHER SUBSET CAUGHT, AND WHY.** The smoke subset carries block 28 (the
+census sees it — the banner mistake session 34 recorded was avoided) but its
+three rows are not the cleft one, so no smoke run ever built it. And
+`bloom-export-watertight` never reached the matrix at all: it exits at the wall
+instrument, before the browser install. **Two gates were red on that head for
+two unrelated reasons, and the second was masked by the first exiting early.**
+Fixed, the row exports as one piece, 0 boundary edges, 29,216 export triangles.

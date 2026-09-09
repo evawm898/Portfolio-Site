@@ -5086,7 +5086,6 @@ export function buildMatrix() {
     ['TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)', { petalTipShape: 0.6, sheetThickness: 2.4 }],
     ['TIP SHAPE: 0.60 x the shortest petal (20 mm — the floor is a larger share)', { petalTipShape: 0.6, petalLength: 20 }],
     ['TIP SHAPE: 3.00 x the longest, widest petal (60 x 30)', { petalTipShape: 3, petalLength: 60, petalWidth: 30 }],
-    ['TIP SHAPE: 3.00 x a cleft margin', { petalTipShape: 3, petalCleft: 0.5 }],
     ['TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once)', { petalTipShape: 3, petalCup: 1.2, petalSpineCurl: 360, petalRoll: 330, petalTwist: 180 }],
     ['TIP SHAPE: x CONTINUOUS x 3 turns', { petalTipShape: 3, placement: 'CONTINUOUS', layerCount: 3 }],
     ['TIP SHAPE: x SPHERE', { petalTipShape: 0.6, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 24 }],
@@ -5100,6 +5099,22 @@ export function buildMatrix() {
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
+  /* THE CLEFT ROW IS A CAPABILITY, NOT A CONTROL, which is why it sits outside
+     the table above. A cleft petal is THREE panels, so the ladder's stations
+     are consumed by `trimPanels` at a split index — the one place a
+     mode-dependent ladder would change TOPOLOGY rather than geometry. It is
+     pushed here because there is no `petalCleft` slider and never was: the
+     first draft of this row invented one, and because a non-existent id is
+     REFUSED rather than ignored, the row `continue`d out of `results` and the
+     connectedness gate reported `621/621 rows are ONE connected piece` and
+     exited 1 — every surviving row green, the dropped one invisible except in
+     the count. That is what "No result above is trustworthy" is for; read the
+     row count against buildMatrix().length, never the ratio. */
+  rows.push({
+    label: 'TIP SHAPE: 3.00 x a cleft margin',
+    capability: CAPABILITY_CLEFT,
+    set: [{ id: 'petalTipShape', value: '3' }],
+  });
 
   return rows;
 }
