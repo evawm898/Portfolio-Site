@@ -871,11 +871,16 @@ const MUTANTS = [
        from where the screen puts it. */
     id: 'the-print-transfer-is-a-plain-inversion', file: 'plot-polarity.js',
     from: '    const t = srgbDecode(1 - srgbEncode(L));', to: '    const t = 1 - L;',
+    /* AND `the-two-regimes-agree-exactly-on-where-there-is-ink` IS NOT ON THIS
+       LIST, because the control proved the claim false and the claim was the
+       thing that was wrong. That check is named for WHERE the ink is, and a
+       plain inversion still puts ink in exactly the same places — see the
+       check's own note on what MSAA leaves it blind to. The LEVEL is asserted
+       in part one, where this project puts a law, and part one reddens. */
     breaks: ['polarity/one-line-lands-at-the-same-ink-in-both-polarities',
              'polarity/the-transfer-is-not-a-plain-inversion-of-the-level',
              'polarity/the-crossings-are-the-part-that-does-not-carry-across',
-             'polarity/the-highlight-is-a-hue-and-not-a-level-in-both',
-             'polarity/the-two-regimes-agree-exactly-on-where-there-is-ink'],
+             'polarity/the-highlight-is-a-hue-and-not-a-level-in-both'],
   },
   {
     // The highlight's ink is not normalised against the drawing's, so a selected
@@ -945,6 +950,23 @@ const MUTANTS = [
     from: '    ? frameRect(raw.bw, raw.bh, parseRatio(f.ratio) ?? (raw.bw / raw.bh), f.margin)',
     to: '    ? frameRect(raw.bw, raw.bh, raw.bw / raw.bh, 0)',
     breaks: ['export/the-raster-is-not-empty-and-matches-the-frame-aspect'],
+  },
+  {
+    /* THE STROKES DO NOT SCALE WITH THE IMAGE. The same picture in hairlines —
+       right aspect, right crop, non-zero ink, still grey, and every other export
+       check green. */
+    id: 'the-export-strokes-do-not-scale', file: 'plot.js',
+    from: '      m.linewidth *= S / prevRatio;', to: '      m.linewidth *= 1;',
+    breaks: ['export/the-strokes-scale-with-the-image'],
+  },
+  {
+    /* THE PROJECTION IS FLIPPED IN Y. Exactly the right number of paths, at
+       exactly the right physical size, inside exactly the right clip — and the
+       bloom is upside down. */
+    id: 'the-svg-projection-is-flipped', file: 'plot.js',
+    from: '        xy[i * 2 + 1] = (-v.y * 0.5 + 0.5) * h;',
+    to: '        xy[i * 2 + 1] = (v.y * 0.5 + 0.5) * h;',
+    breaks: ['export/the-svg-lands-where-the-drawing-lands-on-screen'],
   },
   {
     // Outside the ellipse is filled rather than cleared, which is the way round
@@ -4003,7 +4025,17 @@ async function run({ mutant = null } = {}) {
      regimes differ — additive clips flat against white where multiply
      approaches black without arriving — so it is REPORTED here and asserted by
      `additive-clips-where-multiply-does-not` below, as an asymmetry rather than
-     as an equality that happens to be nearly true. */
+     as an equality that happens to be nearly true.
+
+     WHAT THIS CHECK IS BLIND TO, MEASURED RATHER THAN GUESSED: the ink LEVEL.
+     MSAA quantises coverage to a handful of steps, so both thresholds sit in
+     empty regions of the histogram — on this drawing the screen has exactly ONE
+     populated bin between 1 and 39 (bin 38, 9,452 px) and print's mirror at 218
+     holds the same 9,452. Any monotone transfer therefore inks the same
+     PIXELS, and `the-print-transfer-is-a-plain-inversion` stays green here; the
+     negative control is what said so, after that mutant claimed this check. The
+     level is a law, it is asserted in part one, and part one reddens. Do not
+     re-add the claim without first making this check able to see it. */
   check('polarity/the-two-regimes-agree-exactly-on-where-there-is-ink',
     pxScreen.ink === pxPrint.dark && pxScreen.ink > 10000,
     `screen ink ${pxScreen.ink} === print dark ${pxPrint.dark} exactly — the same lines, `
@@ -4090,6 +4122,21 @@ async function run({ mutant = null } = {}) {
     + `${rasterChrome.stats.notGrey} of ${rasterChrome.stats.pixels} exported pixels are `
     + `non-neutral on screen and ${rasterChromePrint.stats.notGrey} in print — the accent `
     + `is 0x6fb7ae and the petal handles 0xd6a15c, neither of them grey`);
+
+  /* THE STROKES SCALE WITH THE IMAGE, and nothing above can see it if they do
+     not. `linewidth` is divided by `resolution.y` in the shader, so an export
+     that enlarges the buffer without enlarging the widths is the same picture
+     drawn in hairlines — right aspect, right crop, non-zero ink, still grey.
+     Measured as an ink FRACTION so the two scales are comparable at all: with
+     the widths scaled it holds; without, the 2x image carries about half. */
+  const rs1 = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  const rs2 = await q(() => window.__plot.exportRaster({ scale: 2 }));
+  const frac1 = rs1.stats.ink / rs1.stats.pixels, frac2 = rs2.stats.ink / rs2.stats.pixels;
+  check('export/the-strokes-scale-with-the-image',
+    frac1 > 0.01 && Math.abs(frac2 / frac1 - 1) < 0.15
+    && rs2.width === 2 * rs1.width - (2 * rs1.width - rs2.width),
+    `ink fraction ${(frac1 * 100).toFixed(2)}% at 1x and ${(frac2 * 100).toFixed(2)}% at 2x, `
+    + `a ratio of ${(frac2 / frac1).toFixed(3)} — unscaled widths would halve it`);
 
   /* THE ELLIPSE'S CORNERS ARE TRANSPARENT AND THE RECTANGLE'S ARE NOT. Alpha
      rather than a ground fill, because alpha is the recoverable way round. */
@@ -4197,6 +4244,45 @@ async function run({ mutant = null } = {}) {
     `rendered at ${renEllipse.w}px: the ellipse leaves all ${renEllipse.cornerPix} corner `
     + `pixels empty and the rectangle none of them, and ${(100 * renEllipse.empty / 160000).toFixed(1)}% `
     + `of the ellipse image is outside the boundary against 1 - pi/4 = 21.5%`);
+
+  /* AND IT LANDS WHERE THE DRAWING DOES. A projection that flipped y or lost
+     the boundary's origin emits exactly the right number of paths, at exactly
+     the right physical size, inside exactly the right clip — and draws the
+     bloom upside down or off the page. So the emitted coordinates are mapped
+     back into the page's own CSS-pixel space and compared against
+     `drawnScreenBox()`, which walks the SAME population (the drawn grid strips
+     and the stem's continuations) through the same camera. */
+  await reset({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
+                stem: 'on', polarity: 'print' });
+  await view(VIEW);
+  const svgBox = await q(() => {
+    const r = window.__plot.exportSvg();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const re = /[ML](-?[\d.]+) (-?[\d.]+)/g;
+    let m;
+    while ((m = re.exec(r.text))) {
+      const x = +m[1], y = +m[2];
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    return { x0, y0, x1, y1, mmPerPx: r.mmPerPx };
+  });
+  const svgCropBox = await q(() => window.__plot.exportBox());
+  const onScreen = await q(() => window.__plot.drawnScreenBox());
+  const backX0 = svgBox.x0 / svgBox.mmPerPx + svgCropBox.x;
+  const backY0 = svgBox.y0 / svgBox.mmPerPx + svgCropBox.y;
+  const backX1 = svgBox.x1 / svgBox.mmPerPx + svgCropBox.x;
+  const backY1 = svgBox.y1 / svgBox.mmPerPx + svgCropBox.y;
+  const off = Math.max(Math.abs(backX0 - onScreen.x), Math.abs(backY0 - onScreen.y),
+                       Math.abs(backX1 - (onScreen.x + onScreen.width)),
+                       Math.abs(backY1 - (onScreen.y + onScreen.height)));
+  check('export/the-svg-lands-where-the-drawing-lands-on-screen',
+    off < 0.05 && onScreen.width > 100,
+    `the emitted paths map back to (${backX0.toFixed(2)}, ${backY0.toFixed(2)})..`
+    + `(${backX1.toFixed(2)}, ${backY1.toFixed(2)}) against the drawing's own screen box `
+    + `(${onScreen.x.toFixed(2)}, ${onScreen.y.toFixed(2)})..`
+    + `(${(onScreen.x + onScreen.width).toFixed(2)}, ${(onScreen.y + onScreen.height).toFixed(2)}) `
+    + `— ${off.toExponential(2)} px apart, which a flipped y or a lost origin could not be`);
 
   check('export/the-panel-says-what-the-two-artefacts-are',
     (await q(() => window.__plot.exportInfoText())).includes('flat strokes, no glow')
