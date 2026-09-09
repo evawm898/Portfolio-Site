@@ -382,8 +382,22 @@ noise rather than as a ruffle.** The cap and the row count are one decision, not
 is why `BUCKLE_FREQ_RANGE[1] × BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` is asserted at
 module load rather than left as a coincidence.
 
-**What it costs, so future sessions budget for it in wall clock:** the doubling roughly
-doubles full-matrix gate runtime, and takes the default model from 492 KiB to **930 KiB**.
+**What it costs, so future sessions budget for it in wall clock — MEASURED, and the
+estimate was wrong:** the model does double (492 KiB -> **930 KiB**), but the gates did
+not. On the merged head `2ff8d89`, all seven jobs green:
+
+| gate | NU 28 | NU 56 |
+|---|---|---|
+| `bloom-export-watertight` | 68.8-92.1 min, median 88.5 (n=9) | **111.1 min** |
+| `bloom-connectedness` | 77.7-88.5 min | **57.7 min** |
+| `bloom-panel` / `bloom-grid` / `bloom-frozen-matrices` | — | 2.4 / 0.5 / 0.6 min |
+
+So roughly doubling the petal triangle count moved the export gate about **25% above its
+NU-28 median** and left connectedness **below** its NU-28 self. "It roughly doubles" was
+the safe read and it is withdrawn: per-row browser startup, page load and harness
+overhead dominate, not triangle count, so a matrix that grows in ROWS costs far more than
+one that grows in triangles per row. Runner variance at NU 28 was already +/-20 min, which
+is most of the difference between these two columns.
 
 The `NU` 28 baseline, stated as a distribution rather than as the one pair this doc first
 quoted (78 and 92 min, from session 33's own PR): over the **nine** successful
@@ -425,3 +439,78 @@ not read as an omission to a later session** counting controls against the brief
   all-form-max diverging) are untouched, per instruction. All-form-max now reads **0.004
   mm** at 56 rows, diverging further, consistent with its being real geometry.
 - Nothing is merged.
+
+---
+
+## Reachability: is the reference look in the box at all? (measured after the rulings)
+
+Eva asked, after ruling, for one cheap scratch measurement — no shipped source, no CI — to
+decide whether a later session on the clamp is worth opening. Scripts are scratch only;
+nothing here changed the clamp.
+
+**Ten cycles is UNREACHABLE, and the clamp is not what blocks it.** The frequency ceiling
+is 7 and it is STRUCTURAL: `BUCKLE_FREQ_RANGE[1] * BUCKLE_ROWS_PER_CYCLE_MIN ===
+BLADE_ROWS` (7 x 8 = 56) is asserted at module load. No amplitude, no petal, no mode
+reaches ten. The reference photograph carries roughly ten along one fall, so the shipped
+box cannot draw it at any setting.
+
+Maximum amplitude asked (0.60) at f 7, EXPORT mode, peak-to-trough at the widest point:
+
+| configuration | built | wavelength | depth p-p |
+|---|---|---|---|
+| default (len 35, sheet 1.20) | 0.066 clamped | 5.34 mm | 1.06 mm |
+| longest (len 60) | 0.194 clamped | 8.69 mm | 3.10 mm |
+| thinnest (sheet 0.60) | 0.079 clamped | 5.34 mm | 1.27 mm |
+| thickest (sheet 2.40) | 0.033 clamped | 5.34 mm | 0.53 mm |
+| **best (len 60 + sheet 0.60)** | **0.388 clamped** | **8.69 mm** | **3.72 mm** (6.20 live) |
+
+**The short thick default petal is what makes f 7 look shallow, not the exponent** — the
+same request reads 1.06 mm on the default and 3.72 mm on a long thin one. The densest
+reachable cell was rendered and does read as a lettuce edge.
+
+**Petal LENGTH is the strongest lever** and it works in both modes. **A thinner sheet is
+bounded by the print floor**: `MIN_FEATURE_MM` is 1.0, so `sheetThickness` 0.60 floors to
+1.00 in EXPORT and buys much less there (1.27 mm) than it does live (2.11 mm).
+
+**What would have to change for ten cycles:** `BLADE_ROWS >= 80` (10 x 8), i.e. another
+`NU` raise, with another gate-time increase and another frozen phase. Relaxing
+`BUCKLE_ROWS_PER_CYCLE_MIN` below 8 is the alternative and is the thing Eva's own NU-56
+reasoning rejects — four samples per cycle resolves as noise rather than a ruffle. **The
+clamp is not on that path**, which is the finding: a session opened to relax the clamp
+would be working the wrong control.
+
+---
+
+## Two defects the CI failure exposed, recorded so they are not rediscovered
+
+**A GUARD PREDICATE WITH TWO OWNERS WILL DRIFT, AND THE SECOND OWNER IS THE ONE NOBODY
+UPDATES.** Session 33 correctly joined `buckleIsFlat` to `petalFormIsFlat` in the
+geometry. `FORM_IDS` in `tools/bloom-harness.mjs` answers the SAME question -- is this row
+flat? -- from its own hand-written list, and was not extended. Every buckle row therefore
+read as a flat row that was inexplicably reporting form telemetry, and `formAssertions`'
+both-directions read-back fired on 23 of them: **"HARNESS INVALID -- 23 validity assertion(s)
+failed. No result above is trustworthy", on a run where all 573 rows individually passed.**
+Both STL gates share it. Only the amplitude joins the list: `buckleIsFlat` is `!buckleAmp
+|| !buckleFreq` and `buckleFreq`'s range is 1..7, so it is never 0 and flatness is decided
+by the amplitude alone; `buckleFreq` and `buckleEnv` must stay OUT for exactly the reason
+curl bias and roll taper are out, and the smoke block asserts both directions.
+
+**A BLOCK COMMENT'S FORMATTING HID IT FROM THE COVERAGE CENSUS.** `bloom-smoke.mjs`'s
+CLAUSE A parses `buildMatrix()` for `/^ {2}\/\* (\d+)\. (.*)$/` to build its block census
+and DRIFT-fails when a matrix block has no smoke row. Block 27 shipped with a decorative
+`BLOCK 27 ---` banner instead of the `27. TITLE` form, so the census **could not see the
+block at all**, never demanded a row for it, and the smoke subset silently **never built a
+buckled petal**. That is why "smoke clean (53 rows)" was reported by a session whose entire
+feature the subset did not touch, and why the `FORM_IDS` defect reached CI. Restoring the
+marker made the check fire on its own. The comment now says the marker is load-bearing.
+
+**NEGATIVE CONTROL, run rather than reasoned:** with `buckleAmp` removed from `FORM_IDS`
+again, the new anchor row ALONE reproduces the CI failure -- `HARNESS INVALID -- 1 validity
+assertion(s) failed ... flat row reports form telemetry`, exit 1 -- in about two minutes
+rather than the ~90 the gate took to say it.
+
+**THE GENERAL LESSON, which is the third instance here of its class:** a check that
+enumerates what it covers is only as good as its ability to SEE what exists. CLAUSE A was
+written precisely to stop the subset narrowing silently, and it was defeated by a comment
+style. When adding a matrix block, run `node tools/bloom-smoke.mjs --check` and confirm the
+block COUNT rises -- a green census that does not mention your block is not a pass.
