@@ -112,6 +112,38 @@ const MUTANTS = [
   { id: 'law-past-the-floor', why: 'the tip floor is raised so it owns a large share of the apex',
     find: '  const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;',
     into: '  const tipFloor = (acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM) * 3;', names: ['A4'] },
+  /* A7 — the ladder resamples the root blend. The held rows stop being the
+     uniform ones, which moves a boundary footRing() owns. Watertight, one
+     piece, identical triangle count; nothing else here can see it. */
+  { id: 'ladder-eats-the-base', why: 'the ladder redistributes every row, including the ones the root blend owns',
+    find: '  const held = Math.floor(ROOT_BLEND_END * NU);',
+    /* A7 ONLY, and the claim was corrected by the control rather than the
+       check by the claim: with the held count at 0 the ladder still respects
+       its gap bound, so A8 is RIGHT not to fire here. */
+    into: '  const held = 0;', names: ['A7'] },
+  /* A7 — two rows land on one station. The de-duplication pass is removed, so
+     a ladder that saturates emits a zero-length panel.
+     IT NEEDS THE BUCKLED ROW, and that is a finding rather than a detail:
+     measured over 288 unbuckled states the pass never once fires, so on the
+     taper rows alone this mutation is a no-op and reported SILENT.
+
+     AND THE ROW HAS TO SATURATE IN *LIVE* MODE, which is the second half of
+     the same finding. `__bloomMetrics()` reports the LIVE build, so a state
+     that only saturates under the export floor is invisible to this harness:
+     the first row tried here (amplitude 0.6, f 1, exponent 1.5) produced one
+     non-increasing pair in export and NONE in live, and the mutation was
+     reported silent while being perfectly real. Amplitude 0.30 at f 1 and
+     exponent 1.00 saturates in live, which is what this row is. */
+  { id: 'stations-not-increasing', why: 'the strictly-increasing pass is removed',
+    find: '  for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);',
+    into: '  for (let i = 1; i < NU; i++) if (false) out[i] = Math.min(1, out[i - 1] + 1e-5);', names: ['A7'] },
+  /* A8 — the buckle's bar stops being read. The ladder takes rows the wave
+     needs, which DOUBLES the buckle's along-margin chord error at the
+     frequency ceiling (measured: 0.2808 -> 0.5626 mm) while every other gate
+     here stays green. */
+  { id: 'ladder-ignores-the-buckle', why: 'the gap bound stops deriving from the buckle frequency',
+    find: '  if (!buckleFreq) return LADDER_MAX_GAP_FACTOR;',
+    into: '  if (true) return LADDER_MAX_GAP_FACTOR;', names: ['A8'] },
 ];
 
 /* Rows chosen so every mutation has something to bite on. */
@@ -125,6 +157,14 @@ const ROWS = [
   { label: 'taper 0.60 — the cap entry at the 0.80 clamp', set: [{ id: 'petalTipTaper', value: '0.6' }] },
   { label: 'taper 4 — the cap entry from the crossing', set: [{ id: 'petalTipTaper', value: '4' }] },
   { label: 'the narrowest petal (width 8, taper 4)', set: [{ id: 'petalWidth', value: '8' }, { id: 'petalTipTaper', value: '4' }] },
+  /* THE TWO LADDER ROWS (session 32). The taper rows above drive the OUTLINE;
+     neither of the ladder's two arms is reachable from them. `A0.6 f1 n1.5`
+     is the one state measured to saturate the station measure, so it is what
+     `stations-not-increasing` bites on; `A0.2 f7` is the frequency ceiling,
+     the only place the buckle-derived gap bound is not simply the constant,
+     so it is what `ladder-ignores-the-buckle` bites on. */
+  { label: 'the ladder saturated in LIVE mode (buckle 0.30 at f 1, exponent 1.00)', set: [{ id: 'buckleAmp', value: '0.3' }, { id: 'buckleFreq', value: '1' }, { id: 'petalTipShape', value: '1' }] },
+  { label: 'the buckle at its frequency ceiling (0.20 at f 7 — the bound is exactly uniform)', set: [{ id: 'buckleAmp', value: '0.2' }, { id: 'buckleFreq', value: '7' }] },
 ];
 
 const { server, port } = await serveRepo();

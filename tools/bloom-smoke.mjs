@@ -536,8 +536,9 @@ export const SMOKE_BLOCKS = [
        superellipse arm of `tipLaw` (u > uPk), the DEMOTED cap — which is now
        just the print floor inside widthProfile's `max`, so it needs a row
        where that floor actually binds over a large share of the apex — and
-       nothing else: the blade rows are still evenly spaced in u until the
-       commit after this one.
+       `bladeStations`, whose two identities are the held rows and the gap
+       bound. The bound has two arms, unbounded and buckle-derived, and the
+       second only exists at a non-zero amplitude.
 
        WHY THE ANCHOR IS THE THICKEST SHEET rather than a bare exponent
        sweep: at the default sheet the floor owns one row of twenty-five, so a
@@ -550,10 +551,16 @@ export const SMOKE_BLOCKS = [
        WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: five of Eva's
        six named states are live-matrix rows only; so are the far-out widest
        point (where the OLD cap made the exponent inert), SPHERE, and the
-       cleft margin. Cheapest row per path. */
+       cleft margin. The redistribution's own before/after — the apex chord
+       error against a uniform ladder — is not reachable from a single tree at
+       all and belongs to the byte diff and the sheet. Cheapest row per path. */
     rows: [
       { label: 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)',
         path: 'the DEMOTED cap doing its one job — the print floor is the only thing setting the terminal, and it binds over a large share of the apex, so A4 reads the floor and A6 must still recover the asked exponent by fitting on the ACTIVE BRANCH only. A6 fitted through the floor instead reads 0.6080 for an asked 0.60, which is the defect this row exists to catch' },
+      { label: 'LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform',
+        path: 'the ladder\'s buckle-derived arm at the one frequency with no slack: A8 requires the stations to be exactly uniform there, since 56 rows over 7 cycles is the bar exactly, and A7 requires the held rows below ROOT_BLEND_END to be the uniform ones whatever the bound did' },
+      { label: 'TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once)',
+        path: 'the ladder\'s UNBOUNDED arm redistributing hardest, under every form deformation at once — A7 for the held rows and the strictly-increasing stations (two rows at one station is a zero-length panel), A6 for the exponent surviving cup, curl, roll and twist' },
     ],
   },
 ];

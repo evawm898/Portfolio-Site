@@ -851,6 +851,53 @@ verification claim SPLITS across two commits with two separate proofs — the la
 drawn `n` matches asked across the range) and the redistribution (surface unchanged; dense sampling
 agreeing on both trees) — never one proof spanning both.
 
+**THE PETAL TIP LAW SHIPS, THE CAP IS A PRINT-FLOOR CLAMP, AND THE BLADE ROWS ARE PLACED BY
+TURNING RATE** (session 32, PR THREE — read §17 of `docs/bloom-session-32-outcome.md` before
+touching any of it). `petalTipShape` (PETAL SHAPE, 0.60–3.00, step 0.05, default 2.50) is the
+superellipse exponent over `[widest point, 1]`, a REPARAMETERISATION of the tip taper rather
+than a control beside it. **The six named states are Eva's ruling and the panel's read-out
+speaks them**: 0.60 acute · 1.00 a straight point · ≈1.20 today's pointed petal · 2.00 the
+true ellipse · 2.50 the default · 3.00 the held-width round tip.
+**CAP DEMOTION WAS REQUIRED, NOT PREFERRED**: through the cap the drawn exponent SATURATES at
+1.900 / 2.318 on the two reference tapers whatever is asked, rms 0.62 — the ruled default is
+unreachable. Demoted, drawn n equals asked n at **8.88e-16** over 32 states, fitted ON THE
+ACTIVE BRANCH ONLY. **Fitting through the print floor biases an asked 0.60 to 0.6080** — the
+same bug class as integrating turning through a kink, FOURTH instance here.
+**THE REDISTRIBUTION EARNED ITS PLACE AT NU 56 AND THE GAP DID NOT COLLAPSE**: doubling rows
+halved the apex chord error (0.3525 → 0.1752 mm at the default), and the weighting takes
+another **3.74x / 3.05x** on top; worst over 9 tapers × 8 exponents, **0.2423 → 0.1025 mm**.
+**THE APEX TURN ANGLE IS NOT THE CRITERION AND CANNOT BE** — it is discontinuous in row
+placement (65.7° or 10.6° on one outline), and at n 1.20 it RISES while the sagitta falls,
+which is the tip-floor join resolving rather than smearing. The sagitta decides.
+**THE LADDER AND MARGIN BUCKLING COMPETE FOR THE SAME 56 ROWS, and the resolution is derived
+from the buckle's own constants.** `NU / BUCKLE_ROWS_PER_CYCLE_MIN` is a claim about row
+SPACING expressed as row COUNT — true of a uniform ladder, false of any other; measured, an
+unbounded ladder DOUBLES the buckle's along-margin chord error at the ceiling (0.2808 →
+0.5626 mm). **Uniform uniquely maximises the minimum local rows-per-cycle, so no bound can
+restore the bar.** What ships is BOTH halves: the margin wave's own turning is in the measure
+(so the buckle buys its own rows) AND `ladderGapFactor(f)` is `NU / (BAR * f)`, **exactly 1 at
+f 7**, i.e. uniform. Measured clean at every frequency — the buckle never regresses, improves
+at every f ≤ 5, and at the ceiling the apex keeps today's faceting, which is the honest trade
+and is a matrix row rather than an argument. **At the shipping default the buckle is flat, so
+the bound does not bind.**
+**THE ROOT BLEND'S ROWS DO NOT MOVE, BY CONSTRUCTION** — every station below `ROOT_BLEND_END`
+keeps its uniform value exactly (A7, a bit identity), so the base chord error is unchanged at
+every exponent, and `CURL_START_MIN = 1 / NU` still means what it says because the first blade
+row is one of the held ones. **After this, the worst chord on the blade IS the root blend's,
+at every exponent** — §13's finding as the new ceiling, and the scheduled session's to fix.
+**A6 IS REPLACED, NOT RELAXED** (it asserted the cap was a straight lerp and its own comment
+said it would fire when the law changed; it did), **A7 and A8 are new**, and the three
+lerp mutations are retired as UNREACHABLE. **`tipCap.peakHalf` is DECLARED because the ladder
+does not guarantee a row near `uPk`**: reading the largest emitted row instead gives 7.9936
+against a true 8.0000 and reads an asked 1.50 as 1.5014 — the sampling read as the geometry,
+which is what made A6 fire on a clean tree. The mutant table
+(`node tools/verify-bloom-apex-mutants.mjs`) found FOUR defects on its first run, all the
+session's own, including `plateau-returns` reporting MUTATION DID NOT APPLY because the law
+moved its find-string, and a mutation invisible because its row saturated only in EXPORT while
+`__bloomMetrics()` reports the LIVE build. **`frozen/phase23` is the 596 rows at `7544796`; it
+is 23 and not 22 because phase22 is margin buckling's, and the FROZEN_MATRICES census caught
+the collision at module load, by name.**
+
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
 registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen

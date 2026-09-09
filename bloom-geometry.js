@@ -2985,6 +2985,162 @@ const NU = 56;   // blade rows
    56. `NU` stays the internal name every expression here already uses. */
 export const BLADE_ROWS = NU;
 
+/* ===================================================================
+   WHERE THE BLADE ROWS SIT — the turning-rate ladder (Eva, session 32).
+
+   THE ROW COUNT IS UNCHANGED; ONLY THE POSITIONS MOVE. NU rows, as before;
+   `bladeStations()` is the ONE owner of which u each one takes, and it is a
+   pure function of the profile, so the SURFACE is untouched. That split is
+   the reason the law and the redistribution are two commits with two proofs:
+   the law changes the surface and is proved by reading the exponent back;
+   this changes only the sampling and is proved by DENSE SAMPLING agreeing on
+   both trees.
+
+   WHY. Rows evenly spaced in u put the same number through the apex whatever
+   the outline is doing there, and the ruled default (n 2.50) is exactly where
+   the apex turns most. Measured over 9 tapers x 8 exponents at NU 56, the
+   worst apex chord error falls 0.2423 -> 0.1025 mm, 2.36x.
+
+   THE MEASURE counts TURNING, blended with arc length so no stretch is ever
+   starved: `d(theta) + beta * ds/S`, with beta set so arc length carries
+   LADDER_ARC_SHARE of the total. 0.70 is an interior minimum of the worst
+   apex error over that sweep (0.55 reads 0.1052, 0.80 reads 0.1049) and is
+   picked by that measurement, not by taste. It keeps a real turning term:
+   pure arc length is the WRONG weighting here, because an ellipse's apex is
+   precisely where the outline turns fastest, so arc length spaces rows
+   EVENLY through it.
+
+   TURNING IS COUNTED ONLY WHERE THE LAW IS THE ACTIVE BRANCH, AND THIS NOTE
+   IS THE POINT OF THE CLAUSE. A kink's turning is a delta function, so
+   integrating through the root-blend and tip-floor joins makes the cumulative
+   measure STEP, and equal increments of a stepping function stack rows onto
+   the step: measured, 5 rows on u 0.058 and 8 duplicates on u 1.000, which
+   then reported an 84 degree "apex turn" that was a zero-length segment.
+   That is the fourth instance of this bug class in this project (the third
+   was this same ladder's first draft; the fourth was reading the exponent
+   back THROUGH the print floor, which biased an asked 0.60 to 0.6080). If a
+   later change adds a branch to widthProfile(), it belongs in `lawActive`.
+
+   THE ROOT BLEND'S OWN ROWS DO NOT MOVE, BY CONSTRUCTION. Every station
+   below ROOT_BLEND_END keeps its uniform value exactly, so the base's chord
+   error is IDENTICAL to the un-redistributed build at every exponent and
+   every taper (measured: 0.1023 mm and 0.1293 mm on the two reference
+   tapers, unchanged across 16 states). That boundary belongs to footRing()
+   and is scheduled as its own session; a tip control must not resample it.
+   It also keeps `CURL_START_MIN = 1 / NU` meaning exactly what it says — the
+   first blade row is still at 1/NU, because it is one of the held ones.
+
+   THE WIDEST GAP IS BOUNDED at LADDER_MAX_GAP_FACTOR / NU. This is NOT a
+   quality lever — measured, it costs the apex nothing at all (0.1025 mm with
+   the bound and without) — it exists because the buckle's frequency ceiling
+   is NU / BUCKLE_ROWS_PER_CYCLE_MIN, which is a statement about row SPACING
+   derived from row COUNT, and those stop being the same thing the moment the
+   ladder is not uniform. THE BOUND DOES NOT MAKE THAT CEILING TRUE AGAIN:
+   uniform uniquely maximises the minimum local rows-per-cycle, so ANY
+   redistribution lowers it. At the frequency cap the minimum falls 8.00 ->
+   5.71 with this bound (4.73 without). Reported, not resolved: whoever lands
+   second owns reconciling the two. */
+export const LADDER_ARC_SHARE = 0.70;
+export const LADDER_MAX_GAP_FACTOR = 1.4;
+const LADDER_SAMPLES = 8000;
+
+/* THE BOUND THE BUCKLE IMPOSES, read from ITS OWN constants rather than
+   restated. `BUCKLE_ROWS_PER_CYCLE_MIN` is the bar below which the emitted
+   polyline stops being the wave's curve, and the frequency ceiling is
+   `NU / that` — a statement about row SPACING derived from row COUNT, which
+   is exactly what stops being the same thing once the ladder is not uniform.
+   Measured at the ceiling: an unbounded ladder DOUBLES the buckle's
+   along-margin chord error (0.2808 -> 0.5626 mm at maximum amplitude).
+
+   AT f = 7 THIS RETURNS EXACTLY 1, WHICH IS UNIFORM. 56 rows over 7 cycles is
+   8 per cycle with no slack at all, so there is nothing to redistribute and
+   the apex keeps today's faceting there — the honest trade, not a bug. Below
+   the ceiling the bound opens up and both features are served: measured, the
+   buckle's chord error IMPROVES at every f <= 5 rather than merely holding. */
+export function ladderGapFactor(buckleFreq) {
+  if (!buckleFreq) return LADDER_MAX_GAP_FACTOR;
+  return Math.min(LADDER_MAX_GAP_FACTOR, NU / (BUCKLE_ROWS_PER_CYCLE_MIN * buckleFreq));
+}
+
+export function bladeStations(profile, length, buckle = null) {
+  const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
+  /* The rows the root blend can reach keep their uniform stations, exactly. */
+  const held = Math.floor(ROOT_BLEND_END * NU);
+  const u0 = held / NU;
+  if (held >= NU) return uniform;
+
+  const at = (u) => profile.halfWidthAt(u);
+  /* ASKED, never re-derived — widthProfile() is the one owner of which term
+     wins, and this is the one caller. */
+  const active = (u) => profile.lawIsActiveAt(u);
+  const tangent = (f, u) => {
+    const h = 1e-6, lo = Math.max(u0, u - h), hi = Math.min(1, u + h);
+    return Math.atan2(f(hi) - f(lo), (hi - lo) * length);
+  };
+  /* THE MARGIN WAVE IS PART OF WHAT IS EMITTED, so its turning buys its own
+     rows. Weighting by the outline alone would place rows for the apex and
+     leave the buckle to be sampled by whatever fell out — which is how an
+     unbounded ladder made the wave worse. Along the margin the field is
+     `A * h(u) * ramp(u) * cos(2 pi f u + phase)`; the envelope is exactly 1
+     at v = +/-1 whatever the reach exponent is, which is why this does not
+     read `p` at all — the same reason buckleAmpCap does not. */
+  const wave = buckle && buckle.A
+    ? (u) => buckle.A * at(u) * Math.min(1, u / FORM_ONSET_END)
+        * Math.cos(2 * Math.PI * buckle.f * u + (buckle.phaseRad || 0))
+    : null;
+
+  const dT = [], dA = [];
+  let turn = 0, arc = 0, pT = tangent(at, u0 + 1e-9), pX = u0 * length, pY = at(u0);
+  let pW = wave ? tangent(wave, u0 + 1e-9) : 0;
+  for (let i = 1; i <= LADDER_SAMPLES; i++) {
+    const u = u0 + (1 - u0) * i / LADDER_SAMPLES;
+    const t = tangent(at, u), x = u * length, y = at(u);
+    let d = Math.abs(t - pT);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    if (!(active(u) && active(u0 + (1 - u0) * (i - 1) / LADDER_SAMPLES))) d = 0;
+    if (wave) {
+      const tw = tangent(wave, u);
+      let dw = Math.abs(tw - pW);
+      if (dw > Math.PI) dw = 2 * Math.PI - dw;
+      d += dw; pW = tw;
+    }
+    const s = Math.hypot(x - pX, y - pY);
+    dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
+  }
+  if (!(arc > 0)) return uniform;
+
+  const beta = (LADDER_ARC_SHARE / (1 - LADDER_ARC_SHARE)) * turn;
+  const cum = [0];
+  for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
+  const total = cum[LADDER_SAMPLES];
+  if (!(total > 0)) return uniform;
+
+  const out = uniform.slice(0, held), want = NU - held;
+  for (let j = 1; j <= want; j++) {
+    const target = total * j / want;
+    let lo = 0, hi = LADDER_SAMPLES;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
+    out.push(u0 + (1 - u0) * hi / LADDER_SAMPLES);
+  }
+  out[NU - 1] = 1;
+  /* Strictly increasing, always: two rows at one station is a zero-length
+     panel, and the assertion families read `profileU` expecting an order. */
+  for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);
+
+  /* Bound the widest gap by blending back toward uniform in u. Monotone in
+     the blend, so a bisection finds the largest admissible ladder. */
+  const widest = (r) => { let m = r[0]; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
+  const cap = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU;
+  if (widest(out) <= cap) return out;
+  /* The blend touches ONLY the redistributed rows. Running it over the held
+     ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
+     floating point) and the base's identity claim is a BIT identity, not a
+     four-decimal agreement — measured: 23 of the held stations moved. */
+  const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * uniform[i]));
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
+  return mix(lo);
+}
 const NV = 10;   // columns across one span
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
@@ -3720,7 +3876,31 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
   return {
     /* Position and angle at arc length s, in the foot's own (Rs, Up) plane:
        dR along the rotated radial, dZ along the rotated up. */
-    at(s) { const i = Math.round(s / ds); return { dR: dR[i], dZ: dZ[i], phi: phi[i] }; },
+    /* EXACT AT ANY STATION, not only at a substep. This used to be
+       `Math.round(s / ds)` — a SNAP to the nearest tabulated substep, which
+       is exact when and only when every station is substep-aligned. Uniform
+       blade rows always were (`(i/NU)*length` is substep `i*SPINE_SUBSTEPS`
+       exactly), so the assumption was invisible; session 32's turning ladder
+       moved the rows off the grid and it became a real error of up to ds/2 —
+       measured, 8.8e-3 mm, which is what C1 reported while blaming the spine.
+
+       It matters to the GEOMETRY and not only to the gate: `generalSpine`
+       (any curl bias or start) is the one arm of the builder that evaluates
+       this rather than the closed-form arc, so a snapped `at()` would have
+       quantised those rows' own centreline to the substep grid.
+
+       The remaining fraction of a substep is advanced along the SAME arc
+       construction the table itself is built with, so at f = 0 this returns
+       the tabulated value bit-for-bit and nothing substep-aligned moves. */
+    at(s) {
+      const x = s / ds, i = Math.min(N, Math.max(0, Math.floor(x))), f = x - i;
+      if (!(f > 0) || i >= N) return { dR: dR[i], dZ: dZ[i], phi: phi[i] };
+      const k = (phi[i + 1] - phi[i]) / ds;
+      const p0 = phi[i], p1 = p0 + k * f * ds;
+      if (k === 0) return { dR: dR[i] + Math.cos(p0) * f * ds, dZ: dZ[i] + Math.sin(p0) * f * ds, phi: p1 };
+      const pm = (p0 + p1) / 2, sc = f * ds * sinc((p1 - p0) / 2);
+      return { dR: dR[i] + Math.cos(pm) * sc, dZ: dZ[i] + Math.sin(pm) * sc, phi: p1 };
+    },
     peakRadius: peakK === 0 ? Infinity : 1 / peakK,
     clamped,
     /* A UNIFORM curl whose arc sits under one sheet thickness — told, never
@@ -4167,8 +4347,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       return { C: [base[0] + Rs[0] * dR + Up[0] * dZ, base[1] + Rs[1] * dR + Up[1] * dZ, base[2] + Rs[2] * dR + Up[2] * dZ], phi };
     };
 
+  /* THE ONE READ of the ladder. The row COUNT is NU exactly as before; only
+     where each row sits has moved, and it moved as a function of the profile
+     alone, so this samples the same surface differently. */
+  const stations = bladeStations(profile, length, form && form.buckle);
   for (let i = 1; i <= NU; i++) {
-    const u = i / NU;
+    const u = stations[i - 1];
     const s = u * length;
     const h = profile.halfWidthAt(u);
     const { C, phi } = spineAt(s);
@@ -4317,6 +4501,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      one sheet thickness. Row pitch is not contact: the shrink-0.35 blade
      is 0.88 mm long and every row is within a sheet of its neighbours. */
   const spineRows = rows.slice(footS.length).map((r) => r.C);
+  /* THE STATIONS THOSE CENTRES SIT AT, emitted rather than left to be
+     re-derived. C1 rebuilds the curl law and compares it against these
+     centres, and it used to locate each one as `(i + 1) / n` — the uniform
+     ladder, restated. That is a SECOND, INDEPENDENT statement of where the
+     blade rows are, and the turning ladder made it false: C1 fired on every
+     continuous row at 5.8e-1 mm, reporting "the controls were read but the
+     spine did not follow them" about a spine that was correct. Session 32's
+     A5/A6 fix is the precedent — the builder emits `profileU` and the gate
+     reads it — and this is the same repair on the same class of defect. */
+  const spineRowU = rows.slice(footS.length).map((r) => r.u);
   let integrationResidual = null;
   if (law !== null && form.curlUniform && slot.index === 0) {
     integrationResidual = 0;
@@ -4346,6 +4540,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   })();
   const spine = {
     rows: spineRows,
+    rowU: spineRowU,
     tiltRad: tilt, length, curlRad: form ? form.curlRad : 0,
     bias: ps.curlBias, start: ps.curlStart, floorRadius,
     uniform: form ? form.curlUniform : true,
@@ -4440,6 +4635,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
          the sampling as if it were the geometry — this project's own most
          repeated defect. */
       peakHalf: profile.halfWidthAt(profile.uPk),
+    },
+    /* THE LADDER, reported so its two identities can be asserted on the
+       EMITTED stations rather than on the expression that made them: the
+       rows below ROOT_BLEND_END are the uniform ones, and the widest gap
+       respects whatever bound was in force. */
+    bladeLadder: {
+      held: Math.floor(ROOT_BLEND_END * NU),
+      rows: NU,
+      gapFactor: ladderGapFactor(form && form.buckle && form.buckle.A ? form.buckle.f : 0),
+      buckleFreq: form && form.buckle && form.buckle.A ? form.buckle.f : 0,
     },
     /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
        ACTUALLY USED, which is the whole point of reporting it here rather

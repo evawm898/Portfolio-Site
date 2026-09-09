@@ -1060,3 +1060,208 @@ point, the **apex turn with its row count and weighting named**, and the **last 
   If she rules `blunt`, it goes with the control.
 * The `perDescriptor` dedupe in `buildBloomInto` (RADIAL exports 1 petal of 8) is unchanged and
   still the next known blocker for the grid export — `docs/bloom-session-28-outcome.md`.
+
+
+---
+
+## 17. PR THREE — the law, the cap demotion and the turning ladder (shipped)
+
+Rebased onto `7544796` (main's head with margin buckling merged as `5ab3458`
+and its outcome doc on top). The CLAUDE.md conflict Eva expected did not
+arise: PR ONE and PR TWO were already merged, so this branch carried nothing
+main lacked, and both sessions' pointer entries were verified present on main
+before starting rather than assumed.
+
+### 17a. The redistribution earns its place at 56 — measured, not assumed
+
+Eva's instruction was to check before building, and to say plainly if the gap
+had collapsed. It has not.
+
+**Apex turn, past the widest point. Row count and weighting named on every
+figure**, per the standing rule:
+
+| | n 1.20 | n 2.00 | n 2.50 | n 3.00 |
+|---|---|---|---|---|
+| Eva's, 28 rows uniform-in-u | 4.8° | 23.7° | 30.0° | 34.9° |
+| Eva's, 56 rows uniform-in-u | 5.0° | 19.0° | 22.6° | 25.3° |
+| Eva's, 56 rows turning-rate | 14.6° | 5.5° | 11.8° | 14.2° |
+| default, 28 rows uniform-in-u | 12.4° | 23.6° | **29.6°** | 34.1° |
+| default, 56 rows uniform-in-u | 9.7° | 19.6° | 23.0° | 25.4° |
+| default, 56 rows turning-rate | 15.4° | 7.6° | 13.6° | 15.2° |
+
+The 28-row default column reproduces Eva's own recorded 29.6° at 2.50 and
+34.1° at 3.00, which is the check that the rig is measuring the same thing
+she was.
+
+**Apex chord error (main's own `sagittaOf`), which is the criterion**:
+
+| | 28 uniform | 56 uniform | 56 turning | ratio |
+|---|---|---|---|---|
+| Eva's, n 2.50 | 0.3525 | 0.1752 | 0.0469 | 3.74x |
+| Eva's, n 3.00 | 0.4325 | 0.2156 | 0.0777 | 2.77x |
+| default, n 2.50 | 0.3682 | 0.1844 | 0.0604 | 3.05x |
+| default, n 3.00 | 0.4539 | 0.2276 | 0.0891 | 2.56x |
+
+Doubling the row count halved the error; the weighting takes another 3-4x on
+top of that, at the ruled default. Over 9 tapers x 8 exponents the worst apex
+chord error falls **0.2423 -> 0.1025 mm, 2.36x**.
+
+**THE APEX TURN ANGLE IS NOT THE CRITERION AND CANNOT BE.** It is
+discontinuous in row placement — the same outline reads 65.7° or 10.6°
+depending on where a row happens to land — so it bounds nothing. The sagitta
+is continuous, which is why Eva's ruling that acceptance is the sagitta
+instrument's is the right one. At n 1.20 the ladder's turn goes *up* (5.0° ->
+14.6°) while its sagitta goes *down* (0.0696 -> 0.0532): that is the tip-floor
+join being resolved rather than smeared across two long chords.
+
+### 17b. The ladder competes with margin buckling for the same 56 rows
+
+Not theoretical, and not something the previous session could have known: it
+was measured against the merged tree.
+
+Margin buckling's frequency ceiling is `NU / BUCKLE_ROWS_PER_CYCLE_MIN`,
+asserted at harness module load. **That is a claim about row SPACING expressed
+as row COUNT** — true of a uniform ladder and false of any other. Measured, an
+unbounded ladder at maximum amplitude:
+
+| f | buckle chord error, 56 uniform | 56 turning, unbounded |
+|---|---|---|
+| 3 | 0.1843 mm | 0.0971 mm (better) |
+| 5 | 0.2179 mm | 0.2492 mm (**worse**) |
+| 7 | 0.2808 mm | 0.5626 mm (**double**) |
+
+**AND UNIFORM UNIQUELY MAXIMISES THE MINIMUM LOCAL ROWS-PER-CYCLE**, so no
+bound can restore the bar: any redistribution lowers it. Two candidate fixes
+were measured, and neither is clean alone — a gap bound derived from the
+buckle's own constants fails at f 5, and folding the wave into the turning
+measure fails at f 7, where 56 rows over 7 cycles leaves no slack at all.
+
+**WHAT SHIPS IS BOTH**, and it is clean at every frequency: the measure counts
+the margin wave's own turning (so the buckle buys its own rows), and the gap
+bound is `NU / (BUCKLE_ROWS_PER_CYCLE_MIN * f)`, which is **exactly 1 — i.e.
+uniform — at the ceiling**. Measured: the buckle never regresses at any
+frequency, improves at every f <= 5, and at f 7 the ladder is bit-identical to
+uniform, so the apex keeps today's faceting there. That is the honest trade at
+the one corner where the two features cannot both be served, and it is a
+matrix row rather than an argument.
+
+At the shipping default the buckle is flat, so the bound does not bind and the
+full apex gain lands: 3.74x on Eva's settings, 3.05x on the default taper.
+
+### 17c. The root blend is not touched, by construction
+
+Every station below `ROOT_BLEND_END` keeps its uniform value **exactly**, so
+the base's chord error is identical at every exponent and every taper (0.1023
+mm and 0.1293 mm on the two reference tapers, unchanged across 16 states).
+A7 asserts it as a bit identity. That boundary belongs to `footRing()` and is
+scheduled as its own session; a tip control must not resample it.
+
+It also keeps `CURL_START_MIN = 1 / NU` meaning what it says: the first blade
+row is still at `1/NU`, because it is one of the held ones.
+
+**After the redistribution the worst chord error on the blade is the root
+blend's, at every exponent.** That is §13's finding arriving as the new
+ceiling, and it is the scheduled session's to fix.
+
+### 17d. Three cautions, each discharged by measurement
+
+**Second independent copies of a predicate.** The ladder needs to know where
+the law is the active branch, and the first version answered that with its own
+copy of `widthProfile()`'s `max` — exactly the `FORM_IDS` shape. It is now
+`profile.lawIsActiveAt()`, declared beside the `max` it is about, with the
+ladder as its one caller. Separately: `petalTipShape` correctly does NOT join
+`FORM_IDS` (it is a width-profile control, not a form one), and that was
+verified by building rather than reasoned — `petalFormIsFlat` stays true with
+the exponent at its extreme.
+
+**The house block format.** Block 28 was written in the parsed form and the
+census was then *run*: it fired by name — `DRIFT: matrix block 28 ... has NO
+smoke row` — which is the guard doing its job and the evidence that the block
+is visible.
+
+**Prove a new smoke row can fail.** The mutant table found **four real
+problems** on its first run, all of them the session's own:
+
+1. `plateau-returns` reported **MUTATION DID NOT APPLY** — the law moved its
+   find-string. Session 34's lesson arriving verbatim, and the one failure
+   mode that makes a disarmed mutant survivable.
+2. `ladder-eats-the-base` over-claimed A8. With the held count at 0 the gap
+   bound is still respected, so A8 is *right* not to fire. The claim was
+   corrected, not the check.
+3. `stations-not-increasing` was silent because the de-duplication pass never
+   fires on an unbuckled row — measured over 288 states, zero. It fires at
+   amplitude 0.6, f 1; but the row first chosen saturated only in EXPORT mode,
+   and `__bloomMetrics()` reports the LIVE build, so the mutation stayed
+   invisible. Amplitude 0.30 at f 1 and exponent 1.00 saturates in live.
+4. `ladder-ignores-the-buckle` was silent because no mutant row carried a
+   buckle at all.
+
+And then a fifth, which the corrected table exposed: **A6 fired on the clean
+tree.** It read the peak as the largest *emitted* row, and the ladder does not
+guarantee a row near `uPk` — 7.9936 mm against a true 8.0000, enough to read
+an asked 1.50 as 1.5014. The peak is now declared by the builder
+(`tipCap.peakHalf`). Reading the sampling as if it were the geometry, again.
+
+The table now passes: every family fires on a mutation that names it and is
+silent on the clean tree.
+
+### 17e. The two proofs, kept separate as ruled
+
+**The law** (surface deliberately changes): drawn n equals asked n, read off
+the emitted polyline, worst **8.88e-16** over 32 states. Fitted on the ACTIVE
+BRANCH ONLY — fitting through the print floor biases an asked 0.60 to 0.6080,
+the fourth instance of this bug class here.
+
+**The redistribution** (surface unchanged): with the ladder forced uniform,
+**0 of 4,112,640 floats moved** against commit one, with a positive control
+detecting 134,280 at a 1e-9 perturbation; and 4,800,024 dense samples of the
+continuous law agreeing at exactly **0.00e+0 mm**. Same surface, different
+sampling.
+
+`frozen/phase23` is the 596 rows at `7544796`. It is 23 and not 22 because
+phase22 is margin buckling's own baseline — the `FROZEN_MATRICES` census added
+in PR ONE caught the collision at module load, by name.
+
+
+### 17f. Three gates were asserting the OLD sampling, and the smoke run found them
+
+The ladder does not only have to be right; every instrument that had quietly
+assumed evenly-spaced rows has to be found. Running `bloom-smoke --conn`
+before pushing is what surfaced them, and all three are the same defect —
+a SECOND, INDEPENDENT statement of where the blade rows sit.
+
+**C1 reconstructed the station as `(i + 1) / n`.** It fired on every
+continuous row at 5.8e-1 mm, reporting *"the controls were read but the spine
+did not follow them"* about a spine that was perfectly correct. The builder
+now emits `spine.rowU` and C1 reads it, refusing to run rather than guessing
+— session 32's own A5/A6 repair, on the same class of defect.
+
+**`verify-bloom-grid.mjs`'s clause 3 asserted the rows were uniform in u**, in
+two places. That is not a property of the export any more; what replaced it is
+stronger, because it pins the file to the builder rather than to a formula —
+the count, the first row at exactly 0, strictly increasing stations ending at
+1, and the declared list agreeing with the emitted v-lines. `/plot` reads a
+point's station off that list rather than from its index, so a list that
+disagreed would silently misplace every bend on a warped petal.
+
+**And `spineLaw().at()` was `Math.round(s / ds)` — a SNAP to the nearest
+tabulated substep.** That is exact when and only when every station is
+substep-aligned, which uniform blade rows always were (`(i/NU)*length` is
+substep `i*SPINE_SUBSTEPS` exactly — verified, 0 of 56 stations land off-grid).
+The ladder moved rows off that grid and the snap became a real error of up to
+`ds/2`, measured at 8.8e-3 mm.
+
+**That last one is a GEOMETRY defect and not a gate defect**, which is why it
+matters most: `generalSpine` — any curl bias or start — is the one arm of the
+builder that evaluates `at()` rather than the closed-form arc, so a snapped
+lookup would have quantised those rows' own centreline to the substep grid.
+`at()` now advances the remaining fraction of a substep along the same arc
+construction the table is built with: it agrees with the closed-form arc to
+**1.78e-14 mm** at off-grid stations, and returns the tabulated value
+bit-for-bit at `f = 0`, so nothing substep-aligned moves. Commit two's proof
+was re-run with bias/start rows included and still reads **0 of 8,225,280
+floats moved**.
+
+The buckle ceiling's own rationale in the harness now says that counting is
+not sufficient on its own — that it is a claim about row SPACING written as
+row COUNT, and that `ladderGapFactor()` plus A8 are what keep it honest.

@@ -255,7 +255,16 @@ async function run(geomUrl, gltfUrl, registryUrl) {
     check('2', missing === 0, `${row.label}: ${missing} of ${probed} reconstructed skin points are not among the emitted vertices (first: ${firstMiss})`);
     check('2', probed > 0, `${row.label}: nothing was probed — the capture produced no grid`);
 
-    /* ---- clause 3: rows uniform in u after the foot drop ---- */
+    /* ---- clause 3: the rows are the BUILDER's stations after the foot drop ----
+       THIS USED TO ASSERT THE ROWS WERE UNIFORM IN u, and that stopped being
+       true when the turning ladder landed (session 32, PR THREE): the row
+       COUNT is fixed and the row POSITIONS are a function of the profile. A
+       gate asserting `i / NU` was asserting the old sampling, not a property
+       of the export — the same second-independent-statement defect the C1
+       clause carried. What is asserted instead is stronger, because it pins
+       the file to the builder rather than to a formula: the count, the first
+       row at exactly 0, strictly increasing stations ending at 1, and the
+       file's declared list agreeing with the emitted v-lines. */
     for (const p of built.petals) {
       if (!p || !p.grid) continue;
       const base = p.grid.find((g) => g.label === 'full' || g.label === 'base');
@@ -263,11 +272,12 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       const kept = base.rows.filter((r) => r.row >= p.footRows - 1);
       check('3', kept.length === NU_EXPECTED + 1, `${row.label}: ${kept.length} rows after the foot drop, expected ${NU_EXPECTED + 1}`);
       let bad = null;
-      for (let i = 0; i < kept.length; i++) {
-        const want = i / NU_EXPECTED;
-        if (Math.abs(kept[i].u - want) > 1e-12) { bad = `row ${i} u=${kept[i].u} want ${want}`; break; }
+      if (kept.length && kept[0].u !== 0) bad = `the first kept row is u=${kept[0].u}, not the s = 0 foot row`;
+      for (let i = 1; !bad && i < kept.length; i++) {
+        if (!(kept[i].u > kept[i - 1].u)) bad = `row ${i} u=${kept[i].u} does not exceed row ${i - 1} u=${kept[i - 1].u}`;
       }
-      check('3', bad === null, `${row.label}: rows are not uniform in u — ${bad}`);
+      if (!bad && kept.length && kept[kept.length - 1].u !== 1) bad = `the last kept row is u=${kept[kept.length - 1].u}, not 1`;
+      check('3', bad === null, `${row.label}: the row stations are not a valid ladder — ${bad}`);
       /* The three foot rows must ALL carry u = 0, which is what makes the
          drop a drop of positions rather than of parameters. */
       const feet = base.rows.filter((r) => r.row < p.footRows);
@@ -331,11 +341,17 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       if (fp) {
         check('3', fp.rows === NU_EXPECTED + 1, `${row.label}: the file declares ${fp.rows} rows, expected ${NU_EXPECTED + 1}`);
         check('3', p0.extras.footRowsDropped === 2, `${row.label}: the file says it dropped ${p0.extras.footRowsDropped} foot rows, expected 2`);
+        /* The file's own list must be a valid ladder — strictly increasing
+           from 0 to 1. /plot reads a point's station off this list rather
+           than from its index (`plot-petal.js`'s own rule), so a list that
+           disagreed with the emitted rows would silently misplace every
+           bend on a warped petal. */
         let badU = null;
-        for (let i = 0; i < fp.u.length; i++) {
-          if (Math.abs(fp.u[i] - i / NU_EXPECTED) > 1e-6) { badU = `index ${i} u=${fp.u[i]} want ${i / NU_EXPECTED}`; break; }
+        for (let i = 1; i < fp.u.length; i++) {
+          if (!(fp.u[i] > fp.u[i - 1])) { badU = `index ${i} u=${fp.u[i]} does not exceed ${fp.u[i - 1]}`; break; }
         }
-        check('3', badU === null, `${row.label}: the file's u list is not uniform — ${badU}`);
+        if (!badU && fp.u.length && fp.u[fp.u.length - 1] !== 1) badU = `the last declared station is ${fp.u[fp.u.length - 1]}, not 1`;
+        check('3', badU === null, `${row.label}: the file's u list is not a valid ladder — ${badU}`);
         check('3', fp.u[0] === 0, `${row.label}: the file's first row is u=${fp.u[0]}, not the s = 0 foot row`);
         const vLineUs = gm0.primitives.filter((q) => q.extras && q.extras.kind === 'v' && q.extras.panel === fp.label).map((q) => q.extras.u);
         check('3', vLineUs.length === fp.u.length && vLineUs.every((u, i) => Math.abs(u - fp.u[i]) < 1e-9),

@@ -238,6 +238,15 @@ if (LAYER_COUNT_CONTROL.min !== 1) {
      - the frequency CEILING is NU / BUCKLE_ROWS_PER_CYCLE_MIN exactly, so a
        reachable f above it is a wave the emitted polyline cannot draw. That
        relation is checked here too, against NU as the geometry reports it.
+       BUT COUNTING IS NOT SUFFICIENT ON ITS OWN, and that is worth stating
+       where the check lives: this is a claim about row SPACING written as row
+       COUNT, and the two are the same thing only while the blade's rows are
+       evenly spaced. Since session 32's turning ladder they are not. What
+       keeps the ceiling honest is `ladderGapFactor()` in the geometry, which
+       bounds the widest gap by this same bar and returns exactly 1 — uniform
+       — at the ceiling; A8 asserts it per row, in both directions. Measured:
+       an unbounded ladder DOUBLES the buckle's along-margin chord error at
+       f 7 (0.2808 -> 0.5626 mm) while this arithmetic stays true.
      - amplitude's DEFAULT of 0 is what makes the whole layer byte-identical
        to the pre-buckle tree by a BRANCH; a non-zero default would silently
        move every export.
@@ -1151,9 +1160,19 @@ export async function curlAssertions(page, row) {
     /* THE LAW, evaluated HERE, against the EMITTED rows. */
     const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius });
     const n = sp.rows.length;
+    /* THE STATION IS THE BUILDER'S OWN, never `(i + 1) / n`. That expression
+       was the uniform ladder restated inside this gate — a second, independent
+       statement of where the blade rows sit — and the turning ladder made it
+       false: C1 fired at 5.8e-1 mm on every continuous row, blaming the spine
+       for the gate's own assumption. Refuse to run rather than guess, which is
+       what A5 and A6 already do with `profileU`. */
+    if (!Array.isArray(sp.rowU) || sp.rowU.length !== n) {
+      bad.push(`C1: ring ${L}: the builder reported no per-row station (${JSON.stringify(sp.rowU && sp.rowU.length)} for ${n} rows), so the law cannot be evaluated where the rows actually are`);
+      return;
+    }
     let worst = 0, worstRow = -1;
     for (let i = 0; i < n; i++) {
-      const w = law.at(((i + 1) / n) * inp.length);
+      const w = law.at(sp.rowU[i] * inp.length);
       const want = [inp.base[0] + inp.Rs[0] * w.dR + inp.Up[0] * w.dZ, inp.base[1] + inp.Rs[1] * w.dR + inp.Up[1] * w.dZ, inp.base[2] + inp.Rs[2] * w.dR + inp.Up[2] * w.dZ];
       const C = sp.rows[i];
       const d = Math.max(Math.abs(C[0] - want[0]), Math.abs(C[1] - want[1]), Math.abs(C[2] - want[2]));
@@ -1450,6 +1469,59 @@ export async function thicknessAssertions(page, row) {
       }
     }
 
+    /* A7 — THE ROOT BLEND'S ROWS DO NOT MOVE. The turning ladder redistributes
+       the blade's rows, and every station below ROOT_BLEND_END must still be
+       the uniform one, EXACTLY. Not a quality bound: that boundary belongs to
+       footRing(), it is scheduled as its own session, and a tip control that
+       resampled it would be one owner reaching into another's. Asserted as a
+       bit identity because the builder holds those stations rather than
+       recomputing them. */
+    const ld = m.petalBladeLadder;
+    if (ld && Array.isArray(m.petalProfileU)) {
+      const blade = m.petalProfileU.filter((u) => u > 0);
+      for (let i = 0; i < Math.min(ld.held, blade.length); i++) {
+        const want = (i + 1) / ld.rows;
+        if (blade[i] !== want) {
+          bad.push(`A7: held row ${i} sits at u ${blade[i]} where the uniform station is ${want} — the ladder moved a row the root blend owns`);
+          break;
+        }
+      }
+      if (blade.length && blade[blade.length - 1] !== 1) {
+        bad.push(`A7: the last blade station is ${blade[blade.length - 1]}, not 1 — the tip row is not at the tip`);
+      }
+      for (let i = 1; i < blade.length; i++) {
+        if (!(blade[i] > blade[i - 1])) {
+          bad.push(`A7: stations are not strictly increasing at row ${i} (${blade[i - 1]} -> ${blade[i]}) — two rows at one station is a zero-length panel`);
+          break;
+        }
+      }
+    }
+
+    /* A8 — THE BUCKLE'S BAR IS RESPECTED. The margin buckling ceiling is
+       `NU / BUCKLE_ROWS_PER_CYCLE_MIN`, which is a claim about row SPACING
+       expressed as row COUNT — true of a uniform ladder and false of any
+       other. So the ladder's widest gap is bounded by the buckle's own
+       frequency, and at the ceiling the bound is exactly 1, i.e. uniform.
+       Read from the builder's declared gapFactor rather than recomputed, and
+       checked against BUCKLE_ROWS_PER_CYCLE_MIN imported from the geometry. */
+    if (ld && Array.isArray(m.petalProfileU)) {
+      const blade = m.petalProfileU.filter((u) => u > 0);
+      let widest = blade.length ? blade[0] : 0;
+      for (let i = 1; i < blade.length; i++) widest = Math.max(widest, blade[i] - blade[i - 1]);
+      if (widest > ld.gapFactor / ld.rows + 1e-9) {
+        bad.push(`A8: the widest row gap is ${(widest * ld.rows).toFixed(4)} x uniform, past the declared bound of ${ld.gapFactor.toFixed(4)}`);
+      }
+      if (ld.buckleFreq) {
+        const perCycle = (1 / ld.buckleFreq) / widest;
+        const want = BUCKLE_ROWS_PER_CYCLE_MIN;
+        if (ld.buckleFreq === BUCKLE_FREQ_RANGE[1] && widest > 1 / ld.rows + 1e-9) {
+          bad.push(`A8: at the frequency ceiling the ladder must be uniform (56 rows over 7 cycles is ${want} per cycle with no slack), and the widest gap is ${(widest * ld.rows).toFixed(4)} x uniform`);
+        }
+        if (perCycle < want - 1e-6) {
+          bad.push(`A8: the buckle gets ${perCycle.toFixed(2)} rows per cycle at its widest gap, below the bar of ${want} — the ladder has taken rows the wave needs`);
+        }
+      }
+    }
   }
 
   /* THE FOOT IS THE PROFILE WHERE THE PROFILE IS THE IDENTITY. u = 0 gives
@@ -4981,9 +5053,10 @@ export function buildMatrix() {
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
-  /* 28. THE PETAL TIP LAW (session 32). The apex over [widest point, 1] is
-     the SUPERELLIPSE with its exponent exposed directly, and the cap is
-     demoted to a print-floor clamp.
+  /* 28. THE PETAL TIP LAW AND THE TURNING LADDER (session 32). The apex
+     over [widest point, 1] is the SUPERELLIPSE with its exponent exposed,
+     the cap is demoted to a print-floor clamp, and the blade rows are placed
+     by turning rate instead of evenly in u.
 
      WHAT THE ROWS ARE FOR, beyond sweeping the slider: Eva's SIX NAMED
      STATES, which the panel and the sheet must also speak (0.60 acute, 1.00
@@ -4992,9 +5065,10 @@ export function buildMatrix() {
      widest point sits far out, which is where the OLD cap made the exponent
      inert on 26 reachable states; the print floor binding hard at a thin
      sheet and a short petal, since the demoted cap IS that floor; and the
-     rows that will carry the LADDER when it lands in the commit after this
-     one, which is why the exponent is swept across tapers here rather than
-     only at the default.
+     LADDER against the BUCKLE, whose frequency ceiling is the one place the
+     two features compete for the same 56 rows — f 7 leaves no slack at all,
+     so the ladder's gap bound collapses it to uniform there, and that corner
+     must be a row rather than an argument.
      THE MARKER ON THE FIRST LINE IS LOAD-BEARING: bloom-smoke.mjs parses
      buildMatrix() for /^ {2}\/\* (\d+)\. (.*)$/ to build its block census.
      Keep the "N. TITLE" form — see block 27 for what a banner cost. */
@@ -5018,6 +5092,10 @@ export function buildMatrix() {
     ['TIP SHAPE: x SPHERE', { petalTipShape: 0.6, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 24 }],
     ['TIP SHAPE: x the whole centre (stamens and a style under a round tip)', { petalTipShape: 3, stamenCount: 60, gynoecium: 'STYLE' }],
     ['TIP SHAPE: x ZYGO 2 whorls x ALL INNER MAX', { petalTipShape: 0.6, layerCount: 2, innerCurl: 360, innerCup: 1.2 }],
+    ['LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform', { petalTipShape: 3, buckleAmp: 0.2, buckleFreq: 7 }],
+    ['LADDER x BUCKLE: f 5 — the ladder is bounded but still redistributes', { petalTipShape: 3, buckleAmp: 0.3, buckleFreq: 5 }],
+    ['LADDER x BUCKLE: f 1 — one cycle, the ladder is unbounded by the buckle', { petalTipShape: 3, buckleAmp: 0.6, buckleFreq: 1 }],
+    ['LADDER x BUCKLE: the clamp binding under a round tip', { petalTipShape: 2.5, buckleAmp: 0.6, buckleFreq: 7 }],
     ['TIP SHAPE: x petalCount 40 (forty apexes on one hub)', { petalTipShape: 3, petalCount: 40 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
