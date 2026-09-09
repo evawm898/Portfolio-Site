@@ -2725,10 +2725,13 @@ four corners), SVG needs a real `<clipPath>` applied to every stroked path, and 
 SHAPES will have to clip AT this boundary rather than at the viewport — which is the point at
 which the boundary stops being an overlay and becomes a clip region other things read.
 
-**THE FOUR FRAME DEFAULTS ARE NOT A RULING** — they are new controls, so they are not a
-re-tuning of the approved DRAW and STEM tables, but Eva has not seen them either. **The frame
+**THE FOUR FRAME DEFAULTS ARE APPROVED** (Eva, Sep 9, from the deploy preview: *"Frame ships ON
+at rectangle / 2:3 / 6%"*). They are a RULING, like the DRAW and STEM tables above, and the two
+reasons are hers: **the fit being frame-aware is the deciding argument** for shipping ON — a
+boundary that shipped off would guarantee the drawing overflowed it the first time anyone
+switched it on — and **2:3 portrait matches the references she is working from**. **The frame
 shipping ON is the one change to what the page looks like when it opens**, and it is one word
-to turn off.
+to turn off. Do not re-litigate them without a reason from the picture.
 
 | control | default | range | what it is |
 |---|---|---|---|
@@ -2840,8 +2843,18 @@ last cell is a restore against a DIFFERENT grid, which is the failure that matte
   a wide flat disc whose unframed fit is WIDTH-limited, so it reads −107 px: the drawing
   sitting comfortably inside the very edge it was overrunning.
 
-**AND FIVE MORE THE SWEEP ITSELF TAUGHT, once the base pass was clean.** Every
+**AND SIX MORE THE SWEEP ITSELF TAUGHT, once the base pass was clean.** Every
 correction below names what a mutation really does; none loosens a check.
+* **A WRITER AND A READER THAT BOTH WALK THE SAME TABLE AGREE PERFECTLY ABOUT A
+  FIELD THAT IS GONE — measured, and the reason the census is WRITTEN DOWN rather
+  than derived.** `the-frame-field-table-loses-a-row` MISSES the round-trip check
+  entirely: `composeDoc` never writes `margin`, `readDoc` never looks for it, the
+  comparison never compares it, and both halves report a clean read. The
+  round-trip check is the strongest-looking instrument here and it is structurally
+  blind to this one failure, so a census derived FROM the tables would be blind
+  with it. Predicted by the format's own design, then confirmed by the control —
+  which is the order to keep: any future field group needs its row in the census
+  the same day it needs its row in the table.
 * **A CHECK WHOSE *DETAIL STRING* ASSUMES ITS OWN PREMISE TAKES THE SWEEP DOWN
   INSTEAD OF GOING RED.** Two did. `restore/a-file-that-is-not-a-composition-…`
   quoted `junkState.error.slice(…)`, and the mutation it exists for is the one
