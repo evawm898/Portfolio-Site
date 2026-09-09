@@ -201,8 +201,15 @@ const snapshot = () => q(() => ({
   draw: window.__plot.state(),
   stem: window.__plot.stem(),
   bends: window.__plot.bends().map(b => ({ t: b.t, offset: b.offset })),
-  petals: window.__plot.petalWarpStore().map(e => ({ index: e.index, along: e.along,
-    across: e.across, bends: e.bends })),
+  /* SORTED BY INDEX — the store is a `Map` and its ITERATION ORDER is not
+     state. This sheet picks petal 7 then petal 2, so the page iterates 7, 2;
+     a restore inserts them in the file's own sorted order. Unsorted, the
+     round-trip caption read "1 field differs: petals" about nothing at all.
+     The gate has its own copy of this helper and learned the same thing —
+     the two are separate tools and each owns its own snapshot. */
+  petals: window.__plot.petalWarpStore()
+    .map(e => ({ index: e.index, along: e.along, across: e.across, bends: e.bends }))
+    .sort((a, b) => a.index - b.index),
   selected: window.__plot.petalInfo().selected,
   camera: window.__plot.cameraInfo(),
 }));

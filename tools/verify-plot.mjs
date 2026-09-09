@@ -174,15 +174,21 @@ const MUTANTS = [
     // moves changes with it: the v family's ink shifts by 798 px instead of
     // 14,482 and falls under that check's bar. A third true report, from a
     // third check about something else.
-    // And a fourth: with the drawing pushed into the screen, the pixel the page
-    // itself reports as being on petal_7's ink, and the pixel this file picks as
-    // empty canvas, are no longer either of those things — so the click check
-    // reports, truthfully, that picking does not work on a page whose
-    // orientation is broken.
+    /* AND `select/a-click-picks-and-a-click-on-the-black-clears` HAS COME OFF
+       THIS LIST — the one correction this session made in that direction, and
+       it is worth reading. It used to red here for a reason that was never
+       about picking: the check aimed at `petalScreenPoint(7, 0.5)`, ONE
+       hardcoded pixel, and a Z-up misread happened to put that pixel somewhere
+       unusable. The aim is SEARCHED for in the clear now (a panel grew and ate
+       it), so the check tests what it claims — a click on a petal's own ink
+       picks that petal — and under this mutation that claim is TRUE: the
+       picking machinery is fine, the ORIENTATION is wrong, and seeing that is
+       `zup/the-attachment-ring-is-flat`'s job and no other check's. Losing an
+       incidental red is the correct consequence of an aim that stopped being
+       brittle, and the dedicated witness is untouched. */
     breaks: ['zup/the-attachment-ring-is-flat',
              'stem/the-droop-reaches-every-family',
-             'bend/the-root-is-a-point-like-any-other',
-             'select/a-click-picks-and-a-click-on-the-black-clears'],
+             'bend/the-root-is-a-point-like-any-other'],
   },
   {
     id: 'a-mesh-gltf-is-accepted-silently', file: 'plot.js',
