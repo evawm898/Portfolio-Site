@@ -4404,10 +4404,32 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       const ia = i === from ? i : i - 1;
       const ib = i === rowList.length - 1 ? i : i + 1;
       const own = raw[i], before = raw[ia], after = raw[ib];
+      /* THE STATION SPACING EITHER SIDE, because since session 32's turning
+         ladder the rows are NOT evenly spaced and a raw central difference
+         stops being a tangent. `Pb - Pa` is the secant from row i-1 to row
+         i+1; it points along dP/du only when the two half-intervals are
+         EQUAL, and with unequal ones it skews toward the longer side. The
+         cross product then tilts and the two skins are offset along a
+         direction that is not the surface normal — which is precisely what
+         the wall instrument reported (V4, three buckled states at 0.166 to
+         0.259 mm against their own buckle-free controls, past a 0.12 mm bar).
+
+         The unequal case takes the second-order non-uniform difference,
+         `(h1/h2)(Pb - P) + (h2/h1)(P - Pa)`. The EQUAL case is kept as its
+         own branch and left as the plain secant: the two agree analytically,
+         but not bit-for-bit in floating point, and every row of every
+         un-redistributed build is the equal case — so this branch is what
+         keeps those bytes identical rather than merely equivalent. */
+      const h1 = rowList[i].u - rowList[ia].u, h2 = rowList[ib].u - rowList[i].u;
+      const skew = ia !== i && ib !== i && h1 !== h2 && h1 > 0 && h2 > 0;
       rowList[i].sect = (v) => {
         const q = own(v);
         const Pa = before(v).P, Pb = after(v).P;
-        const du = [Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]];
+        const du = skew
+          ? [(h1 / h2) * (Pb[0] - q.P[0]) + (h2 / h1) * (q.P[0] - Pa[0]),
+             (h1 / h2) * (Pb[1] - q.P[1]) + (h2 / h1) * (q.P[1] - Pa[1]),
+             (h1 / h2) * (Pb[2] - q.P[2]) + (h2 / h1) * (q.P[2] - Pa[2])]
+          : [Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]];
         const cx = du[1] * q.dv[2] - du[2] * q.dv[1];
         const cy = du[2] * q.dv[0] - du[0] * q.dv[2];
         const cz = du[0] * q.dv[1] - du[1] * q.dv[0];

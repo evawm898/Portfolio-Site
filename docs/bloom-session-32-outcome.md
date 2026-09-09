@@ -1265,3 +1265,59 @@ floats moved**.
 The buckle ceiling's own rationale in the harness now says that counting is
 not sufficient on its own — that it is a claim about row SPACING written as
 row COUNT, and that `ladderGapFactor()` plus A8 are what keep it honest.
+
+
+### 17g. THE WALL INSTRUMENT GOES RED AT EVA'S DEFAULT, AND IT IS THIS PR'S
+
+CI failed on `tools/bloom-wall-thickness.mjs` (session 34's instrument), five
+assertions across V4 (normal) and V5 (self-approach). **Main is completely
+clean** — all five validity checks pass there, `p=6` reads 0.090 mm against a
+0.12 mm bar and cup 1.2 reads 1.031 mm against the 1.00 mm printable gap — so
+this is not pre-existing, not a flake, and not the base branch's.
+
+**It is not the ladder, and it is not the surface normal.** Both were checked
+before concluding:
+
+- A raw central difference `Pb - Pa` is not a tangent on a non-uniform grid —
+  it is the secant, which skews toward the longer half-interval. That is a
+  real defect and is fixed (the second-order non-uniform difference, with the
+  equal-spacing case kept as its own branch so every un-redistributed build
+  stays byte-identical — measured, 0 of 1,370,880 floats). But it moved the
+  number by 0.002 mm. **It was not the cause.**
+- With the ladder forced uniform in a worktree, two of the three V4 failures
+  and the cup-1.2 V5 failure disappear — but `p=6` still fails at 0.228 mm.
+  So the ladder is not the cause either.
+
+**IT IS THE LAW'S DEFAULT, and the relationship is monotone in the exponent:**
+
+| `n` | cup 1.2 SELF | `p=6` wall | failing assertions |
+|---|---|---|---|
+| 1.20 | 1.031 | 1.128 | 1 |
+| 1.70 | 1.031 | 1.104 | **0** |
+| 2.00 | 1.019 | 1.055 | 1 |
+| **2.50 (ruled default)** | **0.977** | **0.918** | **5** |
+| 3.00 | 0.832 | 0.855 | 10 |
+
+The mechanism is the shape itself, and it is exactly what the default was
+chosen for: n 2.50 **holds the blade's width past the widest point**, so a
+cupped or buckled sheet carries more material near the tip and comes closer to
+itself. The clearance the old pointed tip had was a by-product of being narrow
+there.
+
+**This is a print-safety finding and it is Eva's to rule on, not the session's
+to tune around.** The three options, with their numbers:
+
+1. **Accept it.** The 1.00 mm gap is itself an unprinted guess — every floor
+   in this project is (the charter says so in its own Printing section, and
+   the parked cantilever coupon is what would settle it). 0.977 mm is 2.3%
+   under a bar nobody has measured against a printer.
+2. **Move the default down.** 1.70 is entirely clean on this instrument; 2.00
+   fails one assertion. Both give up the shape Eva picked by eye, and the
+   reshape-from-today argument is formally dead, so this is a real loss.
+3. **Track it as an xfail with a number**, the treatment session 33 gave its
+   own composition row — which is already a declared pre-existing self-approach
+   in this same instrument.
+
+Nothing was weakened to clear the red, and no assertion was touched. The
+normal fix ships because it is correct on its own terms; the red stands until
+the ruling.
