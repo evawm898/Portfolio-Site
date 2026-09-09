@@ -2232,7 +2232,7 @@ panel prints — which is its job (does the panel say what the page holds?) and 
 structurally blind to the page holding the wrong thing. What sees it is a second
 warped petal: `warp/two-petals-hold-different-warps-at-once` now asserts the
 count is positive with nothing picked and GROWS when a second petal is warped.
-The sweep costs well over four hours now — about
+**51 of 51 clean.** The sweep costs well over four hours now — about
 six minutes a mutant, because each is a full 165-check browser run.
 `--mutant=a,b,c` takes a comma list and is how to re-verify one
 without paying for the rest. **THE WHOLE-SWEEP RUN IS NOT SURVIVABLE IN A
@@ -2839,6 +2839,37 @@ last cell is a restore against a DIFFERENT grid, which is the failure that matte
   measured at the FOOT, and with the stem off — which the gate's DEFAULTS say — the drawing is
   a wide flat disc whose unframed fit is WIDTH-limited, so it reads −107 px: the drawing
   sitting comfortably inside the very edge it was overrunning.
+
+**AND FIVE MORE THE SWEEP ITSELF TAUGHT, once the base pass was clean.** Every
+correction below names what a mutation really does; none loosens a check.
+* **A CHECK WHOSE *DETAIL STRING* ASSUMES ITS OWN PREMISE TAKES THE SWEEP DOWN
+  INSTEAD OF GOING RED.** Two did. `restore/a-file-that-is-not-a-composition-…`
+  quoted `junkState.error.slice(…)`, and the mutation it exists for is the one
+  that ACCEPTS the file — so `error` was null and the run died on its second
+  mutant; `restore/a-composition-from-a-different-grid-…` did the same on
+  `mismatch.map`. Collect every outcome first, then build the detail.
+* **A REFACTOR DISARMS A MUTANT, AND THAT IS THE SURVIVABLE FAILURE.** This
+  session's own null-grid guard split the line `the-grid-mismatch-is-not-reported`
+  edits, and the sweep said "mutation did not apply" rather than passing falsely.
+* **VERIFY AN EDIT LANDED; DO NOT TRUST THE ASSERT.** A python script that
+  asserts on several anchors and writes at the END throws before writing, so a
+  correction to an EARLIER anchor is lost with it. Two list widenings vanished
+  that way and only a re-run found them — chunk 6 reported the identical
+  unclaimed reds chunk 5 had.
+* **A MUTATION THAT KEEPS THE CAMERA MOVING REDDENS EVERYTHING THAT READS THE
+  CAMERA TWICE.** `a-handle-drag-also-orbits` takes SIX composition and frame
+  checks with it, because the composition section performs two real handle drags
+  and the camera is still easing when the snapshot and the serialisation are
+  taken a moment apart; `a-frame-control-moves-the-camera` takes a STEM check,
+  because `set()` writes the whole control set on every sweep. "The same camera
+  twice" is a premise on this page, and both mutations break it wholesale.
+* **AND A CHECK CAN CLAIM VALUES WHILE COMPARING COUNTS.**
+  `save/the-document-describes-the-page-as-it-stands` shipped comparing the
+  petal COUNT, which is exactly what `the-petal-warps-are-written-globally`
+  leaves untouched — every entry still written, each carrying the first entry's
+  numbers. Strengthened to compare each entry's scales and bends, not unclaimed:
+  a file whose per-petal values do not describe the page is precisely what that
+  check is named for.
 
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*` files, so `plot*` is covered by nothing
