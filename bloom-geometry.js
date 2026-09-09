@@ -2958,7 +2958,32 @@ export const CAP_ENTRY_FACTOR = 2;
    foot's continuity floor doing its job, not an apex that widens. The gate
    reads this number rather than restating 0.30. */
 export const ROOT_BLEND_END = 0.30;
-const NU = 28;   // blade rows
+/* BLADE ROWS. 56 SINCE SESSION 34, FIXED AND NOT DERIVED (Eva's ruling).
+   Margin buckling needs about eight rows per cycle before the emitted
+   polyline is the law's curve rather than a sawtooth — measured in part 1's
+   discovery, where the same state read a 1.381 mm along-margin radius at 28
+   rows and 0.314 mm at 224, i.e. at 28 the mesh could not BUILD the curvature
+   the law asked for and the export gate's green was an artefact of that.
+
+   WHY FIXED AND NOT DERIVED FROM THE FREQUENCY, which is what "derive, don't
+   expose" would ordinarily want: `CURL_START_MIN = 1 / NU` below, and the
+   registry IMPORTS it as curlStart's floor. A row count that moved with the
+   buckle frequency would silently move an unrelated CURL slider's declared
+   bound — one control reaching into another's range, the registration
+   violation this project has unpicked five times. So the buckle's frequency
+   is CAPPED at NU / BUCKLE_ROWS_PER_CYCLE_MIN instead, and the cap is a
+   constant because NU is.
+
+   IT MOVES BYTES, and that is predeclared rather than discovered: every blade
+   has more rows, so EVERY row of the live matrix moves. The partition and the
+   attribution (the controls move nothing; NU moves everything) are in
+   docs/bloom-session-34-outcome.md. `curlStart`'s floor halves with it,
+   0.0357 -> 0.0179, which is part of the same move. */
+const NU = 56;   // blade rows
+/* The blade's row count, EXPORTED under a name that says what it is, so the
+   harness can check the frequency ceiling against it rather than restating
+   56. `NU` stays the internal name every expression here already uses. */
+export const BLADE_ROWS = NU;
 const NV = 10;   // columns across one span
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
@@ -3415,9 +3440,45 @@ const D2R = Math.PI / 180;
    `cross(dP/du, dP/dv)` instead — see `trueNormalRows` in buildPetalInto,
    which is the ONE place that happens.
    =================================================================== */
-/* Part 2's control default, named here so the instrument and the control
-   read one owner rather than two — TIP_SHARPNESS_DEFAULT's move. */
+/* THE THREE RANGES ARE THE GEOMETRY'S, AND THE REGISTRY IMPORTS THEM. Q6's
+   discipline: a slider wider than the law was reasoned on would make a bound
+   false with nothing failing, so the ONE owner is here and the harness fails
+   at module load if the registry's import quietly became a literal.
+
+   AMPLITUDE is a FRACTION OF THE LOCAL HALF-WIDTH (Eva, ruling 1) — never
+   millimetres, because an absolute amplitude is applied unchanged where the
+   blade has tapered to its tip floor and crumples the point.
+
+   FREQUENCY is in CYCLES along the blade and is CAPPED AT 7 (ruling 4). It
+   starts at 1, not 0: a zero would be a second way to say "no buckle" beside
+   amplitude 0, and a control whose bottom step means what another control's
+   bottom step already means is a dead step by construction. Seven is where
+   NU = 56 still gives 8 rows per cycle, the bar below which the emitted
+   polyline stops being the law's curve.
+
+   THE FALLOFF EXPONENT p (Eva's amendment, from the reference photographs) —
+   "how far the ruffle reaches in from the edge", higher = more confined. TWO
+   is a FLOOR and not a taste: |v| is not differentiable at 0, so p = 1 is C0
+   at the midrib and creases the blade down its centre. p is what separates
+   the two references — a bearded iris ruffles at high amplitude AND wide, a
+   rose at low amplitude AND narrow — and one fixed exponent draws one or the
+   other, never both. */
+export const BUCKLE_AMP_RANGE = Object.freeze([0, 0.6]);
+export const BUCKLE_FREQ_RANGE = Object.freeze([1, 7]);
+export const BUCKLE_ENV_RANGE = Object.freeze([2, 6]);
 export const BUCKLE_ENV_DEFAULT = 3;
+export const BUCKLE_FREQ_DEFAULT = 3;
+/* Rows per cycle below which the emitted polyline is not the law's curve.
+   NU is 56, so the frequency ceiling above is exactly NU / this. */
+export const BUCKLE_ROWS_PER_CYCLE_MIN = 8;
+
+/* THE PER-SLOT PHASE (Eva, ruling 5) — DERIVED, never a control. One phase
+   for the whole whorl makes every petal identical, which reads machined; the
+   slot index at the golden angle spreads them so no two petals in a reachable
+   count share one, and it is deterministic, so the same design rebuilds the
+   same bloom. GOLDEN_ANGLE is the arrangement's own constant, read rather
+   than restated. */
+export function bucklePhaseForSlot(slotIndex) { return slotIndex * GOLDEN_ANGLE; }
 /* THE GUARD. Either factor absent means no field, and the whole buckle layer
    is then skipped by a BRANCH — not by an argument that multiplying by zero
    is exact. Written as `!x` rather than `x === 0` because with no registry
@@ -3425,16 +3486,69 @@ export const BUCKLE_ENV_DEFAULT = 3;
    part 2's controls make them real numbers whose defaults are 0, and the
    predicate is true in both worlds. */
 export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }
-export function buckleLaw(state) {
-  const A = state.buckleAmp, f = state.buckleFreq;
+/* THE CLAMP — CAP THE OUTPUT, NEVER AN INPUT PROXY, spineLaw's own treatment:
+   full ranges exposed, the built curvature clamped, and the read-out told
+   what was asked beside what was built.
+
+   WHAT IS BOUNDED. Along the margin the field is `A*h*cos(2 pi f s / L)`, so
+   its curvature there is `A*h*(2 pi f / L)^2` — the |v|^p envelope is exactly
+   1 at v = +/-1 whatever p is, which is why THIS bound does not see p at all.
+   Floored at the roll floor's own radius, one sheet thickness, the largest
+   amplitude that clears it is
+
+       A_max = L^2 / (h * (2 pi f)^2 * ROLL_MIN_RADIUS_FACTOR * t)
+
+   and `h` is the NOMINAL half-width rather than a row's own, so the bound
+   protects the widest row instead of only the row it was evaluated at — the
+   roll floor's discipline, which expresses itself against the THICKEST row.
+
+   WHAT IT DOES NOT BOUND, said here rather than discovered later. This is a
+   bound on ONE principal direction of ONE term. It does not see the ACROSS-
+   WIDTH curvature, which is where p acts (`A*p*(p-1)/h` at the margin, so 2,
+   6 and 30 at p = 2, 3 and 6), and it does not see curvature the cup, the
+   roll or the spine have already spent — measured in part 1: a buckle over
+   cup 1.2 and curl 180 DIVERGES under refinement where this bound says it is
+   clear. It is NECESSARY AND NOT SUFFICIENT, it ships as ruled, and what a
+   sufficient condition would look like is measured and reported in
+   docs/bloom-session-34-outcome.md rather than decided here. */
+export function buckleAmpCap({ halfW, length, floorRadius, freq }) {
+  if (!freq || !halfW || !length) return Infinity;
+  const k = (2 * Math.PI * freq) / length;
+  return 1 / (halfW * k * k * floorRadius);
+}
+
+export function buckleLaw(state, ctx = null) {
+  const asked = state.buckleAmp, f = state.buckleFreq;
   const p = state.buckleEnv === undefined ? BUCKLE_ENV_DEFAULT : state.buckleEnv;
-  const ph = (state.bucklePhase || 0) * (Math.PI / 180);
+  /* The phase is the SLOT's, derived; `bucklePhase` survives only as the
+     instruments' own way in and is degrees, as it was in part 1. */
+  const ph = ctx && ctx.slotIndex !== undefined
+    ? bucklePhaseForSlot(ctx.slotIndex)
+    : (state.bucklePhase || 0) * (Math.PI / 180);
+  const cap = ctx ? buckleAmpCap({ ...ctx, freq: f }) : Infinity;
+  const A = Math.min(asked, cap);
+  const clamped = asked > cap;
   /* `w` takes the row half-width rather than closing over one: the amplitude
      is a fraction of the LOCAL half-width, so h is a per-row input and a law
      that captured a single h would be the absolute-mm parameterisation
      wearing this one's name. */
+  /* The tightest ALONG-MARGIN radius this build actually has, and the one it
+     was asked for — the read-out prints both, spineLaw's `turnBuilt` beside
+     `turnAsked`. Infinity where there is no curvature to report. */
+  const radiusAt = (amp) => {
+    if (!ctx || !amp) return Infinity;
+    const k = (2 * Math.PI * f) / ctx.length;
+    return 1 / (amp * ctx.halfW * k * k);
+  };
   return {
     A, f, p, phaseRad: ph,
+    ampAsked: asked, ampBuilt: A, ampCap: cap, clamped,
+    radiusMm: radiusAt(A), radiusAskedMm: radiusAt(asked),
+    floorRadiusMm: ctx ? ctx.floorRadius : null,
+    /* THE ACROSS-WIDTH CURVATURE AT THE MARGIN, which the cap above does not
+       bound. Reported so the read-out and the instruments read one owner
+       rather than three re-derivations of `p*(p-1)`. */
+    crossCurvatureAtMargin: ctx ? (A * p * (p - 1)) / ctx.halfW : null,
     w: (u, v, h) => A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),
     /* d/da at a = h*v, which is the convention dT/dN already use (roll's
        cos(k*a); cup's `2*c*v`, which is d(c*a^2/h)/da). Differentiating in v
@@ -3597,7 +3711,7 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
    `halfW` and `t` are passed rather than recomputed: the roll clamp must be
    expressed against the thickness the solids are ACTUALLY built at, or the
    floor would protect a wall nothing has. */
-export function petalForm(state, halfW, t) {
+export function petalForm(state, halfW, t, buckleCtx = null) {
   const cup = state.petalCup;
   const curlRad = state.petalSpineCurl * D2R;
   const twistRad = state.petalTwist * D2R;
@@ -3631,8 +3745,12 @@ export function petalForm(state, halfW, t) {
      gradient 0, never `x * 1` or `x + 0` argued exact. */
   const bias = state.curlBias, start = state.curlStart;
   const rollTaper = state.petalRollTaper, cupGrad = state.petalCupGradient;
-  /* MARGIN BUCKLING (session 33). Null unless engaged; see buckleLaw above. */
-  const buckle = buckleIsFlat(state) ? null : buckleLaw(state);
+  /* MARGIN BUCKLING (session 33; the controls and the clamp are session 34).
+     Null unless engaged; see buckleLaw above. `ctx` carries what the CLAMP and
+     the per-slot phase need and the cross-section does not: the slot index,
+     the blade length and the floor. Absent it (the zero-form guard's own call)
+     there is no buckle to clamp anyway. */
+  const buckle = buckleIsFlat(state) ? null : buckleLaw(state, buckleCtx);
   const curlUniform = curlIsUniform(state);
   const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
   const rollEnv = (u) => 1 - Math.abs(rollTaper) * smoother(rollTaper > 0 ? u : 1 - u);
@@ -3770,6 +3888,19 @@ export function petalForm(state, halfW, t) {
         polylineMin: pMin, polylineMax: pMax,
         rollRadiusMm: kappa === 0 ? Infinity : 1 / Math.abs(kappa),
         rollClamped: clamped,
+        /* MARGIN BUCKLING's numbers travel with the form telemetry for the
+           same reason the curl family's do — one owner, read by the read-out,
+           both STL gates and the sheet. `null` where there is no buckle: a
+           claim nothing can make reads as absent, never as a passing 0. */
+        buckle: buckle === null ? null : {
+          ampAsked: buckle.ampAsked, ampBuilt: buckle.ampBuilt, ampCap: buckle.ampCap,
+          clamped: buckle.clamped, freq: buckle.f, env: buckle.p,
+          phaseRad: buckle.phaseRad,
+          radiusMm: buckle.radiusMm, radiusAskedMm: buckle.radiusAskedMm,
+          floorRadiusMm: buckle.floorRadiusMm,
+          crossCurvatureAtMargin: buckle.crossCurvatureAtMargin,
+          rowsPerCycle: NU / buckle.f,
+        },
         /* THE CURL FAMILY's own numbers travel with the form telemetry; the
            spine's (floor, clamp, built turn, clearance) are the builder's,
            under `spine`, because they need tilt and length. */
@@ -3855,7 +3986,9 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      stays null and every row below takes the pre-form expression verbatim.
      That — not an IEEE-754 argument — is what makes the shipped default
      byte-identical. */
-  const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t);
+  const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t, {
+    slotIndex: slot.index, halfW, length, floorRadius: ROLL_MIN_RADIUS_FACTOR * t,
+  });
 
   /* THE THICKNESS GUARD, same doctrine as the form guard above. When the
      profile is uniform, `tAt` is the pre-change scalar verbatim, so every

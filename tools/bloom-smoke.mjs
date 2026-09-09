@@ -497,6 +497,38 @@ export const SMOKE_BLOCKS = [
         path: 'the other direction — hidden AND INERT at a roundedness of exactly 1 on the stigma: JG6 evaluates both laws at the opposite corner of both controls and requires an identical answer, the trifid\'s whole byte-identity argument for the pinch default (session 31: the same exponent as the old 1.00, exactly)' },
     ],
   },
+  {
+    n: 27,
+    anchor: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 34): the branches margin
+       buckling adds are `buckleIsFlat` joining `petalFormIsFlat` (so the
+       field is CONSTRUCTED at all), `buckleLaw`'s amplitude clamp, and the
+       true-surface-normal branch in buildPetalInto that replaces the
+       cross-section normal on blade rows. Every one of those needs a row
+       with a NON-ZERO amplitude; a row that only sets frequency or reach is
+       inert by construction and exercises none of them.
+
+       WHY THIS BLOCK EXISTS AT ALL, recorded because it is the finding:
+       block 27 originally shipped with a decorative "BLOCK 27 ---" banner
+       instead of the "27. TITLE" marker CLAUSE A parses, so the block was
+       INVISIBLE to the census, no row was demanded, and the smoke subset
+       silently never built a buckled petal. A FORM_IDS defect that made
+       every buckle row read as a flat row then reached CI and failed 23
+       validity assertions on the connectedness gate. The clamped row is the
+       anchor because the clamp is the one branch a gentle amplitude misses.
+
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: the two
+       reference looks (iris at low p, rose at high p) and the reach axis are
+       live-matrix rows only, the per-slot phase has no witness here at a
+       single petal count, and the COMPOSITION xfail is the wall
+       instrument's rather than this subset's. Cheapest row per path. */
+    rows: [
+      { label: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)',
+        path: 'the field CONSTRUCTED and CLAMPED at once — buckleIsFlat joins petalFormIsFlat so petalForm() is built, buckleLaw clamps 0.30 against its own f-dependent cap, and the blade rows take the true surface normal rather than the cross-section one. It is also the row that makes FORM_IDS honest: a harness that does not count buckleAmp as a form control reads this as a FLAT row reporting form telemetry' },
+      { label: 'BUCKLE: GATED — frequency and reach at MAXIMUM with amplitude 0 (hidden and inert; bit-identical to the default)',
+        path: 'the OTHER direction, and the one that fails if buckleFreq or buckleEnv are ever added to FORM_IDS: both at their extremes with no amplitude is a FLAT row and must build one, so the guard must short-circuit and the telemetry must be absent' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

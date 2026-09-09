@@ -37,7 +37,8 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
+import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
+         GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
          ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_PINCH_DEFAULT, TIP_ROUNDEDNESS,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
@@ -1302,6 +1303,81 @@ export const CONTROLS = [
      reading and a later session should find the ruling rather than re-open it
      from the code. `role` is UNCHANGED at 'petal' either way — see the ROLE
      note above; a section is not a role. */
+  /* ===================================================================
+     MARGIN BUCKLING — the lettuce edge (session 34; the field and its normal
+     shipped in session 33 with no controls).
+
+     IN PETAL FORM, not a section of its own, because that is what it IS: a
+     displacement field of the mid-surface, the same family as cup and
+     cross-section roll. `widthProfile` is untouched and `h(u)` is unchanged,
+     so it never competes with the apex work for ownership of the outline —
+     and a new top-level section would say the opposite.
+
+     THE RANGES ARE IMPORTED, never restated. Q6's discipline: the geometry is
+     the one owner and the harness fails at module load if these became
+     literals, because a slider wider than the law was reasoned on makes a
+     bound false with nothing failing.
+
+     FREQUENCY AND FALLOFF ARE GATED ON AMPLITUDE, the curl family's own
+     shape: both are inert at amplitude 0 (the field is `A * ...`), so ungated
+     they would ship as dead sliders — exactly what `curlBias` and `curlStart`
+     are gated on spine curl for, and `petalRollTaper` on roll.
+     =================================================================== */
+  { id: 'buckleAmp', section: 'form', kind: 'slider',
+    min: BUCKLE_AMP_RANGE[0], max: BUCKLE_AMP_RANGE[1], step: 0.01, default: 0,
+    label: 'Margin buckle', tier: 'standard', role: 'petal',
+    /* Prints the DERIVED out-of-plane displacement in mm at the widest row —
+       the physical quantity — because the control is a FRACTION of the local
+       half-width and a bare 0.30 says nothing about how deep the wave is.
+       The CLAMP is told here and marked on the track: full range exposed,
+       output clamped, `(CLAMPED)` and the built radius named, spineLaw's
+       treatment. The cap is the SHOWN build's, never re-derived. */
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      if (a === 0) return 'flat — no buckle';
+      const hw = (ui ? Number(ui.petalWidth) : 16) / 2;
+      const mm = (a * hw).toFixed(1);
+      const b = shown && shown.buckle;
+      if (!b) return `${a.toFixed(2)}x the half-width — ${mm} mm deep at the widest row`;
+      const R = b.radiusMm;
+      if (b.clamped) {
+        return `${a.toFixed(2)}x asked — CLAMPED at ${b.ampCap.toFixed(2)}x (${(b.ampCap * hw).toFixed(1)} mm), `
+             + `the tightest fold this sheet holds at ${R.toFixed(2)} mm; the travel above the mark is dead`;
+      }
+      return `${a.toFixed(2)}x the half-width — ${mm} mm deep · tightest fold ${R.toFixed(2)} mm`
+           + (b.ampCap < BUCKLE_AMP_RANGE[1] ? ` · clamps at ${b.ampCap.toFixed(2)}x, the mark on the slider` : '');
+    },
+    cap: (shown) => (shown && shown.buckle ? shown.buckle.ampCap : null),
+    visibleWhen: { all: [] } },
+  { id: 'buckleFreq', section: 'form', kind: 'slider',
+    min: BUCKLE_FREQ_RANGE[0], max: BUCKLE_FREQ_RANGE[1], step: 1, default: BUCKLE_FREQ_DEFAULT,
+    label: 'Buckle frequency', tier: 'standard', role: 'petal',
+    /* Cycles along the blade, and the read-out prints the ROWS PER CYCLE it
+       buys, because that is the number that decides whether the mesh can draw
+       the wave at all. The ceiling is NU / 8 exactly, so the bottom of that
+       range is the bar rather than a cliff past it. */
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const rpc = shown && shown.buckle ? shown.buckle.rowsPerCycle : null;
+      return `${f} cycle${f === 1 ? '' : 's'} along the blade`
+           + (rpc ? ` · ${rpc.toFixed(1)} rows per cycle` : '');
+    },
+    visibleWhen: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
+  { id: 'buckleEnv', section: 'form', kind: 'slider',
+    min: BUCKLE_ENV_RANGE[0], max: BUCKLE_ENV_RANGE[1], step: 0.1, default: BUCKLE_ENV_DEFAULT,
+    label: 'Buckle reach', tier: 'standard', role: 'petal',
+    /* HOW FAR THE RUFFLE REACHES IN FROM THE EDGE — higher = more confined.
+       The number a visitor can act on is not the exponent, it is where the
+       wave has faded to a tenth of its margin value: |v| = 0.1^(1/p), which
+       is 32% of the half-width in from the edge at p = 2 and 68% at p = 6.
+       Printed as the fraction of the half-width the wave occupies. */
+    fmt: (v) => {
+      const p = Number(v);
+      const reach = 1 - Math.pow(0.1, 1 / p);
+      return `p ${p.toFixed(1)} — the wave occupies the outer ${(reach * 100).toFixed(0)}% of the half-width`;
+    },
+    visibleWhen: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
+
   { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },

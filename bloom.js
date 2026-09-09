@@ -1109,7 +1109,12 @@ function regenerate() {
      owner's number), so both read the record THIS build produced; the span
      is still written only from here, which is what the panel gate's path
      route relies on (a changed span is proof a rebuild happened). */
-  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium };
+  /* MARGIN BUCKLING's clamp joins the record for the same reason the
+     androecium's saturation did: `buckleAmp`'s read-out and its slider MARK
+     must print the OWNER's cap rather than re-derive it from the sliders.
+     The petal's own form telemetry is where it lives; null on a flat build. */
+  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium,
+                  buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null };
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }

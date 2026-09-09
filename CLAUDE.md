@@ -33,14 +33,23 @@ both run in CI and both must pass before any bloom geometry change is done.
 the real export gate; `--conn` adds the
 flood fill and is REQUIRED while a new geometry mode's junction assertions are
 still being established.
-**A FULL GATE IN CI IS ~90 MINUTES, NOT ~44** (measured, session 32, from four
-completed `bloom-export-watertight` runs rather than from memory: 91.5 / 90.9 /
-88.5 / 92.1 min, on runs 133, 134, 137 and 138). The long-standing "~44" here was
-written when the matrix was roughly half its current size and is withdrawn; it
-had a session sizing a CI wait at half the real figure and reporting "nearly
-done" four times over. **Size a CI waiter off `actions_list` on the workflow's own
-recent completed runs, never off a number in this file** — the matrix grows every
-session, so any figure written down here is stale by construction. The smoke
+**A FULL GATE IN CI WAS ~90 MINUTES AT `NU` 28, NOT ~44, AND SESSION 34 ROUGHLY
+DOUBLED IT** (measured, session 32, from completed `bloom-export-watertight` runs
+rather than from memory: over the nine successful NU-28 runs the spread is
+**68.8 to 92.1 min, median 88.5** — session 32 quoted four of them at 91.5 / 90.9
+/ 88.5 / 92.1, and the wider set is worth knowing because runner variance alone
+is ±20 min). The long-standing "~44" was written when the matrix was roughly half
+its size and is withdrawn; it had a session sizing a CI wait at half the real
+figure and reporting "nearly done" four times over. **That "~44" was also a
+LOCAL figure being compared against a CI one** — the smoke tool's speedup ratio
+is measured on the dev machine, the gate runs on a GitHub runner after checkout,
+npm install and a browser install, and the two are not the same measurement.
+Never quote one at the other. Session 34 took `NU` 28 -> 56, so the petal
+triangle count roughly doubles and so does this figure; no replacement constant
+is written here on purpose. **Size a CI waiter off `actions_list` on the
+workflow's own recent completed runs, never off a number in this file** — the
+matrix grows every session, so any figure written down here is stale by
+construction. The smoke
 subset is still the iteration instrument and is still minutes, not hours; what
 changed is the thing it is being compared against. It is for iteration, never for merge: the full matrix
 on both gates, in CI, is the merge criterion, and what the subset is BLIND to is
@@ -572,6 +581,78 @@ one frozen matrix for all three captures). **`frozen/phase19` joins `frozen/phas
 whose definitions reproduce and whose bytes do not fully (8 of 549).** The sheets are
 `tools/shot-bloom-anther.mjs` and `tools/shot-bloom-stigma.mjs` (`--ruling` shoots the four
 positions of the travel on two-row scaffolding).
+
+**MARGIN BUCKLING'S THREE CONTROLS, THE CLAMP, AND NU 56** (session 34 — read
+`docs/bloom-session-34-outcome.md` before touching any of it). `buckleAmp` (0–0.60 x the
+LOCAL half-width, default 0), `buckleFreq` (1–7 cycles, default 3) and `buckleEnv` (p 2–6,
+default 3, "how far the ruffle reaches in from the edge") in PETAL FORM — not a section of
+their own, because the buckle IS a form deformation and a new top-level section would say
+otherwise. The three ranges are `export const` in the geometry and IMPORTED by the registry
+(Q6). Frequency and reach are hidden AND INERT at amplitude 0, the curl family's own gating.
+**PHASE IS DERIVED, `slotIndex * GOLDEN_ANGLE`, never a control** — so "the four controls"
+in part 1's brief is THREE exposed plus a derived phase, flagged rather than shipped as a
+fourth thing nobody asked for.
+**NU IS 56 NOW, FIXED AND NOT DERIVED**, and it is the only thing that moved bytes.
+`CURL_START_MIN = 1/NU` is a registry-imported bound on a CURL slider, so a row count
+derived from the buckle frequency would be one control reaching into another's range. The
+frequency ceiling is `NU / 8` exactly. **THE BYTE STORY IS A THREE-CAPTURE ATTRIBUTION**
+because two changes landed together: main / this head with NU back at 28 / this head as it
+ships. **The controls alone: 0 of 101,969,280 floats. The row count alone: 1124 of 1124
+row-modes, ALL BY ARRAY LENGTH** — a length change and a value change must not share one
+word, and quoting "floats differ" over the second is a number that means nothing.
+`frozen/phase22` (562 rows at `2a97e96`) is owed and shipped, verified deep-equal.
+Default cost 19,040 tris and 930 KiB; worst reachable 565,632 = 37.7% of budget.
+**SELF-APPROACH IS GATED — V5, barred at `MIN_FEATURE_MM` (the minimum printable GAP), with
+three PRE-EXISTING failures named INDIVIDUALLY in `SELF_XFAIL`** (Eva's ruling, session 34):
+`roll-max`, `form-max` and `buckle-on-form`, **measured on `main` at 2a97e96 rather than on
+the branch** so the list is provably pre-existing, and no state that passes on main fails on
+the branch. A new self-approach reddens at once; one of the three starting to pass TRIPS the
+gate rather than passing silently. Iterative clamping was REJECTED, and so was leaving it a
+reported flag — **an unenforced number becomes folklore within two sessions.** The
+instrument's own floor is ~1.25 mm on a flat build, so the bar sits 0.25 mm under it and
+`cup-max` passes with 3% of headroom. **PART 1'S PREMISE AND THE RULING THAT RESTED ON IT ARE
+SUPERSEDED: a sufficient condition CANNOT be a closed form in (A, f, p, L, t)** — do not
+re-derive `A*f^2 <= L^2/(4 pi^2 t)` and try to extend it. **THE CLAMP'S OWN MUTANT PROVED
+IT**: `no-amplitude-clamp` was written naming V5 and measured to redden the WALL only, so it
+names V4 now. **THE CAP STAYS A CONSTANT** — safe at every p, the 2.4x conservatism at p = 2
+a capability limit; the rest is being ruled BY EYE from the sheet's iris row against the
+reference photograph, and neither outcome is pre-built. **NU 56 IS ONE DECISION WITH THE
+FREQUENCY CAP**: 7 cycles at 28 rows is four samples per cycle, which resolves as noise, so
+`BUCKLE_FREQ_RANGE[1] * BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` is asserted at module load.
+It roughly DOUBLES full-matrix gate runtime (78 and 92 min at 28) and takes the default model
+to 930 KiB. **AND THE PETAL TIP SHAPE SESSION IS NOTIFIED IN
+`docs/bloom-session-34-outcome.md`**: its PR THREE redistributes rows at a count that is no
+longer 28, and its sagitta instrument was measured on a grid that no longer exists. Any
+instrument holding the row count should IMPORT `BLADE_ROWS`, which is what the grid gate
+does now after carrying `NU_EXPECTED = 28` as a literal under a comment claiming otherwise.
+**THE CLAMP IS NECESSARY AND NOT SUFFICIENT, AND THE REASON IS NOT CURVATURE.** It bounds
+`A*h*(2 pi f/L)^2`. Measured with a validated principal-curvature instrument
+(`measureCurvature`, checked against closed-form cup and roll first, and biased to read
+curvature HIGH where a stencil spans past ~50 deg of arc — the conservative direction):
+**the composition's curvature FALLS while its wall collapses** (1.0625 against the base's
+1.1149; wall 0.912 -> 0.310) and `SELF ~ WALL`. **The hazard is SELF-APPROACH, a GLOBAL
+property no curvature bound can see**, and neither cup nor curl alone does it. A sufficient
+condition is therefore a MEASURED minimum separation, not a closed form — three options
+costed in the outcome doc, none taken without a ruling.
+**THE CAP IS p-DEPENDENT BUT CONSERVATIVE, NOT UNSAFE**: the clamp radius is 1.437 mm at
+every p while the real one moves 3.449 -> 1.456 (the cross curvature is `A*p*(p-1)/h`, so
+2/6/30 at p 2/3/6) — yet EVERY clamped build clears the floor at every p, the tightest at
+f 3 p 6 reading 1.227 against 1.200. At p 2 the geometry would carry 2.4x the amplitude the
+cap allows, so making it p-dependent is a CAPABILITY change, not a safety fix.
+**AMPLITUDE'S DEAD TRAVEL IS A FUNCTION OF FREQUENCY** — 0% at f 1–2, 40% at f 3, **88% at
+f 7** — told in the read-out and marked on the track, range not narrowed, max not adaptive
+(`stamenSpread`'s ruling). Frequency and reach have no dead steps and are measured inert
+where hidden.
+**THE SHEET'S SETTLE CRITERION WAS WRONG AND IT MATTERED**: "two consecutive identical
+frames" fires SPURIOUSLY on the first capture after a page load — measured, the first
+settle declared itself done and sat **27,982 px** from the same cell at rest, while every
+later capture is 1 px. A warm-up settle plus THREE identical frames takes the same-tree
+controls from 28,893/64,621 px to **0**. And **the identity claim moved off pixels onto the
+geometry**: an exact-zero PIXEL identity is not available on this renderer, so asserting it
+would assert the instrument's own noise — it is `Object.is` over the emitted positions (0
+of 171,360) and the pixel number is reported, never a bar.
+`node tools/shot-bloom-buckle.mjs <dir> [--quick]` is the sheet;
+`node tools/bloom-wall-thickness.mjs --controls` is the dead-control sweep.
 
 **MARGIN BUCKLING SHIPS AS A FIELD WITH NO CONTROLS, AND THE ONE THING THAT IS NOT LIKE CUP
 AND ROLL IS THE NORMAL** (session 33, part 1 of two — read `docs/bloom-session-33-outcome.md`
