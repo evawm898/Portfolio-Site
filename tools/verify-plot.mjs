@@ -689,7 +689,16 @@ const MUTANTS = [
              'frame/the-ratio-and-the-margin-each-move-the-boundary',
              'frame/a-frame-control-never-moves-the-camera',
              'frame/reset-fits-the-drawing-inside-the-boundary',
-             'frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped'],
+             'frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped',
+             /* AND BOTH ARTEFACTS, because the export crops to `frameRect()` and
+                nothing else -- which is the coupling this session was asked to
+                build. Measured under the mutation: the raster comes back
+                1936 x 1408 at aspect 1.375 against the boundary's 0.667, and the
+                SVG is dimensioned 318.115 x 231.357 mm instead of 154.8 x 232.2.
+                True of the mutation, so the list is widened rather than the
+                checks loosened. */
+             'export/the-raster-is-not-empty-and-matches-the-frame-aspect',
+             'export/the-svg-carries-real-millimetres-from-the-grid-own-units'],
   },
   {
     // The ellipse is drawn as a rectangle. The box, the ratio, the margin, the
