@@ -53,6 +53,15 @@
 // one statement with no special case. The boundary itself is NOT drawn: it is
 // chrome on the page (an indication of the crop, not the crop), and a crop
 // indicator baked into the cropped image would be an odd thing to plot.
+//   WHAT A CLIP IS AND IS NOT, said because it matters at a plotter: the paths
+//   are emitted WHOLE and the clip is what removes what is outside. Measured on
+//   an ellipse at a zoomed-in camera, 26,430 of 56,560 emitted points lie
+//   outside the viewBox — so software that ignores `clip-path` draws every one
+//   of them. Pre-clipping the geometry instead would mean splitting strips at
+//   the boundary, which is the one thing this file is built not to do (a split
+//   is a pen lift), so the clip is the right trade and the caveat is real. If a
+//   plotter turns out to ignore it, the fix is a clipped COPY of the file, not
+//   a different path structure.
 
 export const RASTER_SCALE = 4;          // asked for; the GL limits may lower it
 export const SVG_PRECISION = 3;         // 1 µm, well past any plotter

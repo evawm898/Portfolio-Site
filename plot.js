@@ -2201,7 +2201,7 @@ function cropRaster({ buf, bw, bh, scale }, box, shape) {
 // really came out empty.
 function rasterStats(rgba, w, h, ground) {
   const g = ground ? 255 : 0;
-  let ink = 0, notGrey = 0, opaque = 0, min = 255, max = 0;
+  let ink = 0, notGrey = 0, opaque = 0, min = 255, max = 0, mass = 0;
   for (let i = 0; i < rgba.length; i += 4) {
     const r = rgba[i], gr = rgba[i + 1], b = rgba[i + 2];
     if (rgba[i + 3] === 255) opaque++; else continue;
@@ -2210,10 +2210,17 @@ function rasterStats(rgba, w, h, ground) {
     if (m < min) min = m;
     if (m > max) max = m;
     if (Math.abs(m - g) > 8) ink++;
+    /* MASS, BESIDE THE COUNT, AND THEY ANSWER DIFFERENT QUESTIONS. `ink` is
+       "how many pixels carry any ink at all", which is a COVERAGE-PRESENCE
+       measure and is nearly blind to how WIDE a stroke is — a hairline still
+       marks almost the same pixels, just lighter. `mass` is the total distance
+       from the ground, which scales with the width, and it is the only one of
+       the two that can see a stroke that did not scale with its buffer. */
+    mass += Math.abs(m - g);
   }
   const cornerAlpha = [rgba[3], rgba[(w - 1) * 4 + 3],
                        rgba[((h - 1) * w) * 4 + 3], rgba[((h - 1) * w + w - 1) * 4 + 3]];
-  return { pixels: w * h, opaque, ink, notGrey, min, max, cornerAlpha };
+  return { pixels: w * h, opaque, ink, notGrey, min, max, mass, cornerAlpha };
 }
 
 function rasterExport({ scale = RASTER_SCALE, withData = false } = {}) {

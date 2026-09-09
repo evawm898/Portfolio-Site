@@ -982,8 +982,15 @@ const MUTANTS = [
     id: 'the-polarity-is-not-in-the-file', file: 'plot-file.js',
     from: "  { key: 'polarity',   control: 'polarity',   kind: 'enum', values: POLARITIES },\n",
     to: '',
+    /* AND THE ROUND-TRIP CHECK IS NOT ON THIS LIST, because a writer and a
+       reader that both walk the same table agree PERFECTLY about a field that
+       is gone — `composeDoc` never writes it, `readDoc` never looks for it, the
+       comparison never compares it, and both halves report a clean read. That
+       is the exact failure the WRITTEN-DOWN census exists for, it is already
+       recorded here for `the-frame-field-table-loses-a-row`, and the census
+       check is what reddens. Measured: this mutant left the round trip green at
+       "0 notes". */
     breaks: ['file/the-document-carries-exactly-these-fields',
-             'file/every-field-round-trips-through-the-writer-and-the-reader',
              'restore/every-field-comes-back',
              'restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value',
              'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
@@ -4131,12 +4138,21 @@ async function run({ mutant = null } = {}) {
      the widths scaled it holds; without, the 2x image carries about half. */
   const rs1 = await q(() => window.__plot.exportRaster({ scale: 1 }));
   const rs2 = await q(() => window.__plot.exportRaster({ scale: 2 }));
+  /* MASS PER PIXEL, NOT THE INK COUNT, and the first version of this check used
+     the count and MISSED its own mutant — measured, ratio 0.871 against a clean
+     0.956 where a halved stroke should read 0.5. A pixel count asks "does any
+     ink reach here", which a hairline satisfies almost as well as a full
+     stroke: it marks nearly the same pixels, just lighter. Total distance from
+     the ground is what scales with the width. Same shape of error as the MSAA
+     one in `the-two-regimes-agree-exactly-on-where-there-is-ink` — a threshold
+     over coverage cannot see an AMOUNT. */
+  const mass1 = rs1.stats.mass / rs1.stats.pixels, mass2 = rs2.stats.mass / rs2.stats.pixels;
   const frac1 = rs1.stats.ink / rs1.stats.pixels, frac2 = rs2.stats.ink / rs2.stats.pixels;
   check('export/the-strokes-scale-with-the-image',
-    frac1 > 0.01 && Math.abs(frac2 / frac1 - 1) < 0.15
-    && rs2.width === 2 * rs1.width - (2 * rs1.width - rs2.width),
-    `ink fraction ${(frac1 * 100).toFixed(2)}% at 1x and ${(frac2 * 100).toFixed(2)}% at 2x, `
-    + `a ratio of ${(frac2 / frac1).toFixed(3)} — unscaled widths would halve it`);
+    mass1 > 1 && Math.abs(mass2 / mass1 - 1) < 0.15,
+    `ink mass per pixel ${mass1.toFixed(2)} at 1x and ${mass2.toFixed(2)} at 2x, a ratio of `
+    + `${(mass2 / mass1).toFixed(3)} — unscaled widths halve it. (The pixel COUNT, which `
+    + `cannot see this, moves only ${(frac1 * 100).toFixed(2)}% -> ${(frac2 * 100).toFixed(2)}%.)`);
 
   /* THE ELLIPSE'S CORNERS ARE TRANSPARENT AND THE RECTANGLE'S ARE NOT. Alpha
      rather than a ground fill, because alpha is the recoverable way round. */
