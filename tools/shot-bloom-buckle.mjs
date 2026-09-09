@@ -124,7 +124,28 @@ async function cell({ id, label, sets, radius }) {
      come to rest BEFORE the frame that will be captured, rather than trusting
      the capture's own settle to notice. */
   if (await settleOnly() < 0) await die(`${label}: the view never came to rest before the first capture`);
-  const b = m.petal && m.petal.form && m.petal.form.buckle;
+  /* THE ACCESS PATH IS FLAT: __bloomMetrics() exposes `petalForm`, never a
+     nested `petal.form`. Reading `m.petal.form.buckle` is undefined on EVERY
+     cell, and the caption below then falls through to its no-buckle branch —
+     so a fully buckled row captions itself "flat — no buckle" while the
+     picture beside it is visibly ruffled. That shipped, and it is the fourth
+     label-naming-a-computation-nobody-performed defect this session found.
+     The guard under it is the real fix: a cell that ASKED for a buckle and
+     got no record now DIES rather than describing itself as flat. */
+  const b = m.petalForm && m.petalForm.buckle;
+  /* `sets` is the RAW config object; set() turns it into the [{id,value}]
+     the UI driver wants, so set(sets).buckleAmp is undefined and a guard
+     written against it would never fire — vacuous, the A1 defect. */
+  const asked = Number(sets.buckleAmp || 0);
+  if (asked > 0 && !b) {
+    await die(`${label}: buckleAmp ${asked} was applied and read back, but the build reports NO buckle record `
+      + `(__bloomMetrics().petalForm.buckle is ${b === undefined ? 'undefined — wrong access path' : 'null'}). `
+      + `Refusing to caption a buckled cell as flat.`);
+  }
+  if (asked === 0 && b) {
+    await die(`${label}: no buckle was asked for, but the build reports one (amp built ${b.ampBuilt}). `
+      + `Refusing to caption a buckled cell as flat.`);
+  }
   const buf = await shoot(path.join(outDir, `${id}.png`), radius || m.fitRadius);
   const cap = b
     ? `${b.ampAsked.toFixed(2)}x asked → ${b.ampBuilt.toFixed(3)}x built${b.clamped ? ' (CLAMPED)' : ''}`
