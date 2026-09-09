@@ -3281,7 +3281,39 @@ the renderer stayed where it was is a silent partial restore that passes every
 field-by-field comparison, so the blend constant and the clear colour are read back from the
 renderer itself on both sides of the trip.
 
-**THE GATE IS 194 CHECKS AND 65 MUTANTS**, and five things it taught this session:
+**THE GATE IS 194 CHECKS AND 65 MUTANTS, AND THE SWEEP WAS STOPPED AT 41 OF THEM ON EVA'S
+INSTRUCTION, WITH 24 OUTSTANDING** (Sep 9, a usage-limit call, not a judgement about the
+code). What DID run is clean: the base pass is 194 checks / 0 failed, and 41 mutants closed
+green — this session's own 15 plus the re-anchored `the-highlight-is-a-brightness-as-well-as-a-hue`,
+plus 25 older ones in five chunks. **Quote it as "41 of 65", never as a sweep.**
+**THE 24 OUTSTANDING, so a later session can finish them:** the petal-warp group
+(`the-petal-warp-is-not-gated-at-the-base`, `the-across-scale-is-not-gated-at-the-foot`,
+`the-station-is-guessed-from-the-shape`, `a-strip-the-file-did-not-place-gets-a-station-anyway`,
+`the-along-scale-also-widens-the-petal`, `the-warp-reaches-every-petal`,
+`the-warp-reaches-only-the-u-lines`); the OWNERSHIP group
+(`selection-stamps-the-panel-onto-the-petal`, `deselecting-drops-the-warp`,
+`only-the-selected-petal-is-drawn-warped`, `the-seam-counts-only-the-selected-petal-base-points`,
+`the-scales-stay-live-with-nothing-picked`); the COMPOSITION-FILE group
+(`the-saved-document-drops-a-draw-field`, `the-frame-field-table-loses-a-row`,
+`the-restore-skips-a-stem-field`, `a-missing-field-is-not-reported`,
+`the-petal-warps-are-written-globally`, `a-restored-warp-lands-on-the-next-petal`,
+`the-grid-mismatch-is-not-reported`, `a-newer-version-is-read-anyway`,
+`the-camera-is-not-restored`, `the-selection-is-not-restored`,
+`a-dropped-petal-warp-is-moved-onto-another`); and
+`the-highlight-material-misses-the-resolution`, which runs ALONE.
+**DO NOT RECORD THESE AS "CODE THIS SESSION DID NOT TOUCH" — 19 OF THE 24 TARGET `plot.js` OR
+`plot-file.js`, BOTH OF WHICH IT CHANGED**; only the five in `plot-grid.js` / `plot-petal.js`
+are genuinely untouched. Three sit ON this session's own edits and are the ones to run first:
+`the-saved-document-drops-a-draw-field` (`DRAW_FIELDS` is exactly where `polarity` was added),
+`a-newer-version-is-read-anyway` (`VERSION` went 1 -> 2), and
+`the-highlight-material-misses-the-resolution` (the highlight material now carries the polarity
+hue transfer).
+**AND THE STOPPED SWEEP HAD ALREADY EARNED ITS KEEP TWICE IN THE 41**, which is the argument
+for finishing it: `the-depth-dim-is-never-applied` found a NEW check whose detail string
+dereferenced state the mutation removes (it THREW and failed the chunk instead of reporting —
+the frame/save session's lesson, in a new check), and `the-frame-ratio-is-ignored` reddened two
+new export checks it did not claim, both true, because the export crops to `frameRect()` and
+nothing else. Five things it taught this session:
 * **A CHECK THAT READS THE PAGE'S REPORT IS NOT A CHECK ON THE FILE.** The millimetre check
   first asked `exportSvg()` for its own `widthMm`; a document dimensioned in screen pixels
   beside a report that still says millimetres would have sailed through it. It parses the
