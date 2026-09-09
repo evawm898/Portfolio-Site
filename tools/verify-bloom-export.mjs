@@ -88,8 +88,13 @@ const t0 = Date.now();
   console.log(`SOLID-ANGLE CALIBRATION (R6)\n    ${calibrationLine(cal)}`);
   if (cb.length) validity.push(`solid-angle calibration: ${cb.join('; ')}`);
 }
+/* EVERY ROW ATTEMPTED — see the connectedness gate's own note. A validity
+   failure `continue`s out of this loop, so every ratio below divides by the
+   SURVIVORS and a dropped row is invisible in all of them. */
+const attempted = [];
 for (const row of rows) {
   if (ONLY && !ONLY.test(row.label)) continue;
+  attempted.push(row.label);
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -302,6 +307,11 @@ for (const r of results) {
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
+}
+/* THE DENOMINATOR ITSELF, asserted. */
+if (results.length !== attempted.length) {
+  const got = new Set(results.map((r) => r.label));
+  validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
 }
 console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);

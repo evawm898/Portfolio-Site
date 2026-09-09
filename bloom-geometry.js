@@ -2984,6 +2984,199 @@ const NU = 56;   // blade rows
    harness can check the frequency ceiling against it rather than restating
    56. `NU` stays the internal name every expression here already uses. */
 export const BLADE_ROWS = NU;
+
+/* ===================================================================
+   WHERE THE BLADE ROWS SIT — the turning-rate ladder (Eva, session 32).
+
+   THE ROW COUNT IS UNCHANGED; ONLY THE POSITIONS MOVE. NU rows, as before;
+   `bladeStations()` is the ONE owner of which u each one takes, and it is a
+   pure function of the profile, so the SURFACE is untouched. That split is
+   the reason the law and the redistribution are two commits with two proofs:
+   the law changes the surface and is proved by reading the exponent back;
+   this changes only the sampling and is proved by DENSE SAMPLING agreeing on
+   both trees.
+
+   *** NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH. ***
+   The project rule (Eva, session 32; CLAUDE.md's bloom pointer carries it, §18h
+   of the session-32 outcome doc has the table) and it lives here because FOUR
+   of the five defects that produced it were in this file or in what reads it:
+   the buckle's rows-per-cycle ceiling, C1's `(i + 1) / n` station, the
+   self-contact flag's row-count skip, and this ladder reading the LIVE floor so
+   the export split a cleft's panels at a different row. A ROW COUNT IS ONLY A
+   LENGTH UNDER UNIFORM SPACING, and below this line the spacing is not uniform.
+   Anything added here that means a distance must be written as a distance
+   (`ladderHalfAt` is why this ladder is mode-free), and any figure reported off
+   it must say which mode and which row count it was measured at.
+
+   WHY. Rows evenly spaced in u put the same number through the apex whatever
+   the outline is doing there, and the apex turn grows with the exponent
+   across the whole upper half of a range Eva ruled reachable — so the
+   sampling has to serve n 3.00, not only the shipped 1.70. Measured on THIS
+   tree over 9 tapers x 8 exponents at NU 56, worst apex chord error:
+   0.3952 -> 0.2147 mm in EXPORT (1.84x) and 0.3952 -> 0.1319 in LIVE (3.00x).
+
+   NAME THE MODE. An earlier draft of this comment quoted `0.2423 -> 0.1025 mm,
+   2.36x` and attributed it to this sweep. That figure was LIVE mode, measured
+   on a scratch re-implementation, with the ladder reading the LIVE floor —
+   and it does not reproduce here, because making the ladder mode-independent
+   (`ladderHalfAt`, the export floor in both modes, which topology requires)
+   moved every live station. Two different measurements had been welded into
+   one sentence. Fifth instance of this project's mode-conflation class.
+
+   THE MEASURE counts TURNING, blended with arc length so no stretch is ever
+   starved: `d(theta) + beta * ds/S`, with beta set so arc length carries
+   LADDER_ARC_SHARE of the total. It keeps a real turning term, and that is
+   MEASURED rather than argued: pure arc length (ARC 1.00, where beta
+   diverges) collapses to 1.31x with 30 of 72 states' whole-blade chord WORSE
+   than uniform, because an ellipse's apex is precisely where the outline
+   turns fastest, so arc length spaces rows EVENLY through it.
+
+   0.70 IS A TRADE, NOT AN OPTIMUM, and re-deriving it is how that was found.
+   On this tree it is a local minimum in LIVE and is NOT one in EXPORT (0.80
+   reads 0.1992 against its 0.2147). The grid optimum sits near 0.90-0.95 in
+   both modes — and moving there is TAIL AGAINST TYPICAL, not a free win: at
+   0.90 the worst state improves 1.84x -> 2.04x and whole-blade regressions
+   fall 4/72 -> 1/72, while the SHIPPING DEFAULT's own apex gain drops
+   1.61x -> 1.29x and Eva's reference taper's 1.44x -> 1.22x (EXPORT, n 1.70).
+   0.70 is kept because it serves the settings that actually ship. Do not tune
+   this to three digits: the objective is the worst of 72 states and it HOPS
+   (0.75 spikes to 0.2732 in both modes while 0.70 and 0.80 sit near 0.14 and
+   0.20), so a decimal place here is sampling, not signal. §18d of
+   docs/bloom-session-32-outcome.md has the full sweep; the value is Eva's.
+
+   TURNING IS COUNTED ONLY WHERE THE LAW IS THE ACTIVE BRANCH, AND THIS NOTE
+   IS THE POINT OF THE CLAUSE. A kink's turning is a delta function, so
+   integrating through the root-blend and tip-floor joins makes the cumulative
+   measure STEP, and equal increments of a stepping function stack rows onto
+   the step: measured, 5 rows on u 0.058 and 8 duplicates on u 1.000, which
+   then reported an 84 degree "apex turn" that was a zero-length segment.
+   That is the fourth instance of this bug class in this project (the third
+   was this same ladder's first draft; the fourth was reading the exponent
+   back THROUGH the print floor, which biased an asked 0.60 to 0.6080). If a
+   later change adds a branch to widthProfile(), it belongs in `lawActive`.
+
+   THE ROOT BLEND'S OWN ROWS DO NOT MOVE, BY CONSTRUCTION. Every station
+   below ROOT_BLEND_END keeps its uniform value exactly, so the base's chord
+   error is IDENTICAL to the un-redistributed build at every exponent and
+   every taper (measured: 0.1023 mm and 0.1293 mm on the two reference
+   tapers, unchanged across 16 states). That boundary belongs to footRing()
+   and is scheduled as its own session; a tip control must not resample it.
+   It also keeps `CURL_START_MIN = 1 / NU` meaning exactly what it says — the
+   first blade row is still at 1/NU, because it is one of the held ones.
+
+   THE WIDEST GAP IS BOUNDED at LADDER_MAX_GAP_FACTOR / NU. This is NOT a
+   quality lever — measured, it costs the apex nothing at all (0.1025 mm with
+   the bound and without) — it exists because the buckle's frequency ceiling
+   is NU / BUCKLE_ROWS_PER_CYCLE_MIN, which is a statement about row SPACING
+   derived from row COUNT, and those stop being the same thing the moment the
+   ladder is not uniform. THE BOUND DOES NOT MAKE THAT CEILING TRUE AGAIN:
+   uniform uniquely maximises the minimum local rows-per-cycle, so ANY
+   redistribution lowers it. At the frequency cap the minimum falls 8.00 ->
+   5.71 with this bound (4.73 without). Reported, not resolved: whoever lands
+   second owns reconciling the two. */
+export const LADDER_ARC_SHARE = 0.70;
+export const LADDER_MAX_GAP_FACTOR = 1.4;
+const LADDER_SAMPLES = 8000;
+
+/* THE BOUND THE BUCKLE IMPOSES, read from ITS OWN constants rather than
+   restated. `BUCKLE_ROWS_PER_CYCLE_MIN` is the bar below which the emitted
+   polyline stops being the wave's curve, and the frequency ceiling is
+   `NU / that` — a statement about row SPACING derived from row COUNT, which
+   is exactly what stops being the same thing once the ladder is not uniform.
+   Measured at the ceiling: an unbounded ladder DOUBLES the buckle's
+   along-margin chord error (0.2808 -> 0.5626 mm at maximum amplitude).
+
+   AT f = 7 THIS RETURNS EXACTLY 1, WHICH IS UNIFORM. 56 rows over 7 cycles is
+   8 per cycle with no slack at all, so there is nothing to redistribute and
+   the apex keeps today's faceting there — the honest trade, not a bug. Below
+   the ceiling the bound opens up and both features are served: measured, the
+   buckle's chord error IMPROVES at every f <= 5 rather than merely holding. */
+export function ladderGapFactor(buckleFreq) {
+  if (!buckleFreq) return LADDER_MAX_GAP_FACTOR;
+  return Math.min(LADDER_MAX_GAP_FACTOR, NU / (BUCKLE_ROWS_PER_CYCLE_MIN * buckleFreq));
+}
+
+export function bladeStations(profile, length, buckle = null) {
+  const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
+  /* The rows the root blend can reach keep their uniform stations, exactly. */
+  const held = Math.floor(ROOT_BLEND_END * NU);
+  const u0 = held / NU;
+  if (held >= NU) return uniform;
+
+  /* THE LADDER'S OWN VIEW, which is the export floor in BOTH modes — see
+     `ladderHalfAt` in widthProfile(). Row positions are topology; the export
+     floor may not move them. ASKED, never re-derived: widthProfile() is the
+     one owner of which term wins, and this is its one caller. */
+  const at = (u) => profile.ladderHalfAt(u);
+  const active = (u) => profile.ladderLawActiveAt(u);
+  const tangent = (f, u) => {
+    const h = 1e-6, lo = Math.max(u0, u - h), hi = Math.min(1, u + h);
+    return Math.atan2(f(hi) - f(lo), (hi - lo) * length);
+  };
+  /* THE MARGIN WAVE IS PART OF WHAT IS EMITTED, so its turning buys its own
+     rows. Weighting by the outline alone would place rows for the apex and
+     leave the buckle to be sampled by whatever fell out — which is how an
+     unbounded ladder made the wave worse. Along the margin the field is
+     `A * h(u) * ramp(u) * cos(2 pi f u + phase)`; the envelope is exactly 1
+     at v = +/-1 whatever the reach exponent is, which is why this does not
+     read `p` at all — the same reason buckleAmpCap does not. */
+  const wave = buckle && buckle.A
+    ? (u) => buckle.A * at(u) * Math.min(1, u / FORM_ONSET_END)
+        * Math.cos(2 * Math.PI * buckle.f * u + (buckle.phaseRad || 0))
+    : null;
+
+  const dT = [], dA = [];
+  let turn = 0, arc = 0, pT = tangent(at, u0 + 1e-9), pX = u0 * length, pY = at(u0);
+  let pW = wave ? tangent(wave, u0 + 1e-9) : 0;
+  for (let i = 1; i <= LADDER_SAMPLES; i++) {
+    const u = u0 + (1 - u0) * i / LADDER_SAMPLES;
+    const t = tangent(at, u), x = u * length, y = at(u);
+    let d = Math.abs(t - pT);
+    if (d > Math.PI) d = 2 * Math.PI - d;
+    if (!(active(u) && active(u0 + (1 - u0) * (i - 1) / LADDER_SAMPLES))) d = 0;
+    if (wave) {
+      const tw = tangent(wave, u);
+      let dw = Math.abs(tw - pW);
+      if (dw > Math.PI) dw = 2 * Math.PI - dw;
+      d += dw; pW = tw;
+    }
+    const s = Math.hypot(x - pX, y - pY);
+    dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
+  }
+  if (!(arc > 0)) return uniform;
+
+  const beta = (LADDER_ARC_SHARE / (1 - LADDER_ARC_SHARE)) * turn;
+  const cum = [0];
+  for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
+  const total = cum[LADDER_SAMPLES];
+  if (!(total > 0)) return uniform;
+
+  const out = uniform.slice(0, held), want = NU - held;
+  for (let j = 1; j <= want; j++) {
+    const target = total * j / want;
+    let lo = 0, hi = LADDER_SAMPLES;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
+    out.push(u0 + (1 - u0) * hi / LADDER_SAMPLES);
+  }
+  out[NU - 1] = 1;
+  /* Strictly increasing, always: two rows at one station is a zero-length
+     panel, and the assertion families read `profileU` expecting an order. */
+  for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);
+
+  /* Bound the widest gap by blending back toward uniform in u. Monotone in
+     the blend, so a bisection finds the largest admissible ladder. */
+  const widest = (r) => { let m = r[0]; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
+  const cap = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU;
+  if (widest(out) <= cap) return out;
+  /* The blend touches ONLY the redistributed rows. Running it over the held
+     ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
+     floating point) and the base's identity claim is a BIT identity, not a
+     four-decimal agreement — measured: 23 of the held stations moved. */
+  const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * uniform[i]));
+  let lo = 0, hi = 1;
+  for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
+  return mix(lo);
+}
 const NV = 10;   // columns across one span
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
@@ -3082,8 +3275,27 @@ export function widthProfile(state, ring, halfW, cap, acc) {
      changes the cap's SHAPE, never its topology — see the cap's own note. */
   const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
 
+  /* THE PETAL TIP LAW (Eva, session 32). Over [uPk, 1] the outline is the
+     SUPERELLIPSE `(1 - s^n)^(1/n)`, s = (u - uPk)/(1 - uPk), exposed as its
+     exponent directly: 0.60 acute, 1.00 a straight point, ~1.20 today's
+     pointed petal, 2.00 the true ellipse, 2.50 the default, 3.00 the
+     held-width round tip. It REPARAMETERISES the tip taper rather than
+     standing beside it — the core already is this family over this region —
+     so there is exactly one producer of the half-width above the peak and
+     `widthProfile()` remains its one owner.
+
+     BELOW uPk THE CORE IS UNTOUCHED. The two limbs meet at the peak, where
+     the core's slope is exactly 0 (uPk is its maximum) and the superellipse's
+     tends to 0 for every n > 1. */
+  const n = state.petalTipShape;
+  const tipLaw = (u) => {
+    if (u <= uPk) return core(u);
+    const s = (u - uPk) / (1 - uPk);
+    return Math.pow(Math.max(0, 1 - Math.pow(s, n)), 1 / n);
+  };
+
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * core(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -3166,20 +3378,53 @@ export function widthProfile(state, ring, halfW, cap, acc) {
     /* The cap's entry and terminal half-widths, reported for the gates and
        the contact sheet rather than re-derived by either. */
     capEntryHalf: hEntry, capTerminalHalf: tipFloor,
+    /* WHICH TERM WON, from the ONE expression that decides it. The turning
+       ladder needs to know where the LAW is the active branch — a kink's
+       turning is a delta function, so it must not integrate through the
+       root-blend or tip-floor joins. Answering that with its own copy of the
+       `max` below would be a second, independent statement of the same fact,
+       which is precisely how this project's most repeated defect starts (the
+       harness predicate that did not know `buckleAmp` existed, session 34).
+       So it is answered HERE, beside the max it is about, and a term added to
+       the max is a term this reads by construction. */
+    lawIsActiveAt(u) {
+      const shape = shapeAt(u), blend = rootBlend(u);
+      return shape >= blend && shape >= tipFloor;
+    },
+    /* THE LADDER'S OWN VIEW OF THE PROFILE, AT THE EXPORT FLOOR IN BOTH MODES.
+       Row POSITIONS are topology and the export floor may not touch topology —
+       it "is meant to change geometry and never topology", which is the export
+       gate's own sentence. But `tipFloor` above is mode-dependent by design, so
+       a ladder reading `halfWidthAt` places its rows differently in live and in
+       export; `trimPanels` then splits a cleft at the first row index past
+       `cleft.from`, that index moves, and the two modes emit different numbers
+       of triangles. Measured: 39 of 56 stations differed, and the cleft row
+       came back 28,896 live against 28,576 export.
+
+       THE EXPORT FLOOR IS THE REFERENCE, not the live one, for two reasons:
+       the export is the object, so the printable minimum is a real property of
+       the shape being made rather than a preview convenience; and it is the
+       conservative direction — the larger floor truncates the region where the
+       superellipse is steepest, so the ladder does not crowd rows into a sliver
+       that export flattens anyway. EXPORT-mode stations are therefore
+       unchanged by this and only the live preview's sampling moves, to agree
+       with the object. */
+    ladderHalfAt(u) { return Math.max(shapeAt(u), rootBlend(u), TIP_HALF_MM); },
+    ladderLawActiveAt(u) {
+      const shape = shapeAt(u), blend = rootBlend(u);
+      return shape >= blend && shape >= TIP_HALF_MM;
+    },
     halfWidthAt(u) {
       const shape = shapeAt(u);
-      if (u >= uCap) {
-        const s = (u - uCap) / (1 - uCap);
-        /* A STRAIGHT LERP, AND THAT IS THE OPEN QUESTION RATHER THAN A CHOICE.
-           Eva ruled (session 32) that the petal tip law is a SUPERELLIPSE over
-           [widest point, 1], which this last fifth would then be inside — so
-           the cap cannot also own the shape there. Whether it can be demoted
-           from a shape to a print-floor clamp acting only where the outline
-           would fall below the printable minimum is MEASURED and reported in
-           docs/bloom-session-32-outcome.md, not decided here. Until that
-           ruling lands the lerp is what shipped, unchanged. */
-        return hEntry + (tipFloor - hEntry) * s;
-      }
+      /* THE CAP IS DEMOTED (Eva, session 32, from the rendered sheet). It is a
+         PRINT-FLOOR CLAMP and nothing else: the `max` below is the whole of
+         it. It was a SHAPE — a straight lerp owning the last fifth — and that
+         made the upper range unreachable: with 2.50 ruled the default at
+         the time, an asked n of 2.50 drew as 1.740,
+         because the lerp overwrote exactly the region the law is about.
+         Measured with it demoted, drawn n equals asked n to four decimals at
+         every value on both tapers. `uCap` and the entry half-width are kept
+         as TELEMETRY for the gates and the sheet; nothing reads them to build. */
       return Math.max(shape, rootBlend(u), tipFloor);
     },
   };
@@ -3691,7 +3936,31 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
   return {
     /* Position and angle at arc length s, in the foot's own (Rs, Up) plane:
        dR along the rotated radial, dZ along the rotated up. */
-    at(s) { const i = Math.round(s / ds); return { dR: dR[i], dZ: dZ[i], phi: phi[i] }; },
+    /* EXACT AT ANY STATION, not only at a substep. This used to be
+       `Math.round(s / ds)` — a SNAP to the nearest tabulated substep, which
+       is exact when and only when every station is substep-aligned. Uniform
+       blade rows always were (`(i/NU)*length` is substep `i*SPINE_SUBSTEPS`
+       exactly), so the assumption was invisible; session 32's turning ladder
+       moved the rows off the grid and it became a real error of up to ds/2 —
+       measured, 8.8e-3 mm, which is what C1 reported while blaming the spine.
+
+       It matters to the GEOMETRY and not only to the gate: `generalSpine`
+       (any curl bias or start) is the one arm of the builder that evaluates
+       this rather than the closed-form arc, so a snapped `at()` would have
+       quantised those rows' own centreline to the substep grid.
+
+       The remaining fraction of a substep is advanced along the SAME arc
+       construction the table itself is built with, so at f = 0 this returns
+       the tabulated value bit-for-bit and nothing substep-aligned moves. */
+    at(s) {
+      const x = s / ds, i = Math.min(N, Math.max(0, Math.floor(x))), f = x - i;
+      if (!(f > 0) || i >= N) return { dR: dR[i], dZ: dZ[i], phi: phi[i] };
+      const k = (phi[i + 1] - phi[i]) / ds;
+      const p0 = phi[i], p1 = p0 + k * f * ds;
+      if (k === 0) return { dR: dR[i] + Math.cos(p0) * f * ds, dZ: dZ[i] + Math.sin(p0) * f * ds, phi: p1 };
+      const pm = (p0 + p1) / 2, sc = f * ds * sinc((p1 - p0) / 2);
+      return { dR: dR[i] + Math.cos(pm) * sc, dZ: dZ[i] + Math.sin(pm) * sc, phi: p1 };
+    },
     peakRadius: peakK === 0 ? Infinity : 1 / peakK,
     clamped,
     /* A UNIFORM curl whose arc sits under one sheet thickness — told, never
@@ -4138,8 +4407,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       return { C: [base[0] + Rs[0] * dR + Up[0] * dZ, base[1] + Rs[1] * dR + Up[1] * dZ, base[2] + Rs[2] * dR + Up[2] * dZ], phi };
     };
 
+  /* THE ONE READ of the ladder. The row COUNT is NU exactly as before; only
+     where each row sits has moved, and it moved as a function of the profile
+     alone, so this samples the same surface differently. */
+  const stations = bladeStations(profile, length, form && form.buckle);
   for (let i = 1; i <= NU; i++) {
-    const u = i / NU;
+    const u = stations[i - 1];
     const s = u * length;
     const h = profile.halfWidthAt(u);
     const { C, phi } = spineAt(s);
@@ -4191,10 +4464,32 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       const ia = i === from ? i : i - 1;
       const ib = i === rowList.length - 1 ? i : i + 1;
       const own = raw[i], before = raw[ia], after = raw[ib];
+      /* THE STATION SPACING EITHER SIDE, because since session 32's turning
+         ladder the rows are NOT evenly spaced and a raw central difference
+         stops being a tangent. `Pb - Pa` is the secant from row i-1 to row
+         i+1; it points along dP/du only when the two half-intervals are
+         EQUAL, and with unequal ones it skews toward the longer side. The
+         cross product then tilts and the two skins are offset along a
+         direction that is not the surface normal — which is precisely what
+         the wall instrument reported (V4, three buckled states at 0.166 to
+         0.259 mm against their own buckle-free controls, past a 0.12 mm bar).
+
+         The unequal case takes the second-order non-uniform difference,
+         `(h1/h2)(Pb - P) + (h2/h1)(P - Pa)`. The EQUAL case is kept as its
+         own branch and left as the plain secant: the two agree analytically,
+         but not bit-for-bit in floating point, and every row of every
+         un-redistributed build is the equal case — so this branch is what
+         keeps those bytes identical rather than merely equivalent. */
+      const h1 = rowList[i].u - rowList[ia].u, h2 = rowList[ib].u - rowList[i].u;
+      const skew = ia !== i && ib !== i && h1 !== h2 && h1 > 0 && h2 > 0;
       rowList[i].sect = (v) => {
         const q = own(v);
         const Pa = before(v).P, Pb = after(v).P;
-        const du = [Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]];
+        const du = skew
+          ? [(h1 / h2) * (Pb[0] - q.P[0]) + (h2 / h1) * (q.P[0] - Pa[0]),
+             (h1 / h2) * (Pb[1] - q.P[1]) + (h2 / h1) * (q.P[1] - Pa[1]),
+             (h1 / h2) * (Pb[2] - q.P[2]) + (h2 / h1) * (q.P[2] - Pa[2])]
+          : [Pb[0] - Pa[0], Pb[1] - Pa[1], Pb[2] - Pa[2]];
         const cx = du[1] * q.dv[2] - du[2] * q.dv[1];
         const cy = du[2] * q.dv[0] - du[0] * q.dv[2];
         const cz = du[0] * q.dv[1] - du[1] * q.dv[0];
@@ -4288,6 +4583,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      one sheet thickness. Row pitch is not contact: the shrink-0.35 blade
      is 0.88 mm long and every row is within a sheet of its neighbours. */
   const spineRows = rows.slice(footS.length).map((r) => r.C);
+  /* THE STATIONS THOSE CENTRES SIT AT, emitted rather than left to be
+     re-derived. C1 rebuilds the curl law and compares it against these
+     centres, and it used to locate each one as `(i + 1) / n` — the uniform
+     ladder, restated. That is a SECOND, INDEPENDENT statement of where the
+     blade rows are, and the turning ladder made it false: C1 fired on every
+     continuous row at 5.8e-1 mm, reporting "the controls were read but the
+     spine did not follow them" about a spine that was correct. Session 32's
+     A5/A6 fix is the precedent — the builder emits `profileU` and the gate
+     reads it — and this is the same repair on the same class of defect. */
+  const spineRowU = rows.slice(footS.length).map((r) => r.u);
   let integrationResidual = null;
   if (law !== null && form.curlUniform && slot.index === 0) {
     integrationResidual = 0;
@@ -4298,25 +4603,52 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     }
   }
   const clearance = (() => {
-    const f0 = footS.length, ds = length / NU;
-    const minSep = Math.max(1, Math.ceil((3 * t) / ds));
+    /* THE SEPARATION IS A DISTANCE ALONG THE SPINE, NEVER A COUNT OF ROWS.
+       The flag asks whether the blade comes within one sheet thickness of
+       ITSELF, and it must not answer yes for two rows that are simply
+       neighbours — so it skips rows nearer than three sheet thicknesses along
+       the length. That skip used to be `ceil(3t / (length / NU))`, a ROW COUNT
+       computed from the UNIFORM row pitch, which is the same thing as a
+       distance only while the rows are evenly spaced. Session 32's turning
+       ladder made them not, and the count became wrong exactly where the
+       ladder packs rows: measured on a FLAT, STRAIGHT, UNCURLED blade at the
+       shipping default, rows 50 and 56 sat 0.84 mm apart along the spine and
+       the flag fired on a petal that touches nothing at all.
+
+       Third instance of this bug class in one change — the buckle's
+       rows-per-cycle and C1's station reconstruction are the other two — and
+       the shape is always the same: a count standing in for a length, true
+       only under a uniformity that no longer holds.
+
+       IT REDUCES EXACTLY TO THE OLD TEST ON A UNIFORM LADDER: there
+       `u_j - u_i` is `(j - i) / NU`, so `(u_j - u_i) * length >= 3t` is
+       `j - i >= 3t / ds`, which for integer `j - i` is the old `ceil`. The
+       foot arm asks the same question against the foot's own station, u = 0.
+       Telemetry only — this decides no geometry and moves no bytes. */
+    const f0 = footS.length, sep = 3 * t;
+    const far = (a, b) => Math.abs(rows[b].u - rows[a].u) * length >= sep;
     let minMm = Infinity, rowsAt = [-1, -1];
-    for (let i = f0; i < rows.length; i++) for (let j = i + minSep; j < rows.length; j++) {
+    for (let i = f0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+      if (!far(i, j)) continue;
       const a = rows[i].C, b = rows[j].C;
       const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       if (d < minMm) { minMm = d; rowsAt = [i - f0 + 1, j - f0 + 1]; }
     }
     let minToFootMm = Infinity, footRowAt = -1;
-    for (let i = f0 + minSep; i < rows.length; i++) for (let j = 0; j < f0; j++) {
-      const a = rows[i].C, b = rows[j].C;
-      const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-      if (d < minToFootMm) { minToFootMm = d; footRowAt = i - f0 + 1; }
+    for (let i = f0; i < rows.length; i++) {
+      if (!(rows[i].u * length >= sep)) continue;
+      for (let j = 0; j < f0; j++) {
+        const a = rows[i].C, b = rows[j].C;
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        if (d < minToFootMm) { minToFootMm = d; footRowAt = i - f0 + 1; }
+      }
     }
     const nearest = Math.min(minMm, minToFootMm);
-    return { minMm, rows: rowsAt, minToFootMm, footRow: footRowAt, sheetT: t, minSepRows: minSep, selfContact: nearest < t };
+    return { minMm, rows: rowsAt, minToFootMm, footRow: footRowAt, sheetT: t, minSepMm: sep, selfContact: nearest < t };
   })();
   const spine = {
     rows: spineRows,
+    rowU: spineRowU,
     tiltRad: tilt, length, curlRad: form ? form.curlRad : 0,
     bias: ps.curlBias, start: ps.curlStart, floorRadius,
     uniform: form ? form.curlUniform : true,
@@ -4398,6 +4730,29 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
          intended one, for the same reason row.tUsed exists. */
       lastRowHalf: rows[rows.length - 1].h,
       exportMode: acc.exportMode,
+      /* THE LAW'S OWN TWO NUMBERS, so a gate can read the exponent back off
+         the emitted rows instead of re-deriving where the apex starts. */
+      uPk: profile.uPk,
+      shapeN: state.petalTipShape,
+      /* THE PEAK THE LAW IS NORMALISED AGAINST, declared rather than left to
+         be estimated as the largest emitted row. Those are different numbers
+         the moment the ladder stops putting a row near uPk: measured on the
+         saturated ladder the largest emitted row is 7.9936 mm against a true
+         8.0000, and a fit that takes the emitted maximum as the peak absorbs
+         that into the exponent and reads 1.5014 for an asked 1.50. Reading
+         the sampling as if it were the geometry — this project's own most
+         repeated defect. */
+      peakHalf: profile.halfWidthAt(profile.uPk),
+    },
+    /* THE LADDER, reported so its two identities can be asserted on the
+       EMITTED stations rather than on the expression that made them: the
+       rows below ROOT_BLEND_END are the uniform ones, and the widest gap
+       respects whatever bound was in force. */
+    bladeLadder: {
+      held: Math.floor(ROOT_BLEND_END * NU),
+      rows: NU,
+      gapFactor: ladderGapFactor(form && form.buckle && form.buckle.A ? form.buckle.f : 0),
+      buckleFreq: form && form.buckle && form.buckle.A ? form.buckle.f : 0,
     },
     /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
        ACTUALLY USED, which is the whole point of reporting it here rather

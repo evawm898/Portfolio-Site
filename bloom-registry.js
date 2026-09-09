@@ -1190,6 +1190,43 @@ export const CONTROLS = [
     fmt: (v) => `${Number(v).toFixed(2)}${Number(v) < 0.7 ? ' (broad base)' : Number(v) > 1.6 ? ' (narrow base)' : ''}`,
     visibleWhen: { all: [] } },
 
+  /* THE PETAL TIP LAW'S ONE CONTROL (Eva, session 32, ruled from the rendered
+     sheet). It REPARAMETERISES the tip taper over [widest point, 1] rather
+     than standing beside it, so nothing owns the half-width twice.
+
+     THE SIX STATES HAVE NAMES AND THE READ-OUT USES THEM, because the panel,
+     the contact sheet and the docs must say the same words Eva does. The
+     default is 2.50 — chosen by eye, for holding the blade's width past the
+     widest point and then turning, a shape nothing on the shipped control
+     could reach. Proximity to the pre-law petal is NOT a consideration: the
+     default moves the shape deliberately and substantially. */
+  { id: 'petalTipShape', section: 'shape', kind: 'slider', min: 0.6, max: 3, step: 0.05, default: 1.7,
+    label: 'Tip shape', tier: 'standard', role: 'petal',
+    /* THE DEFAULT IS 1.70 AND THE RANGE IS UNCHANGED (Eva, session 32, ruled
+       from the rendered sheet after the wall instrument went red at 2.50).
+       2.50 stays fully reachable and is still her preferred LOOK; what moved
+       is only which value ships. Why it moved is in §17g/§17h of
+       docs/bloom-session-32-outcome.md and is not a property of the law: a
+       rounder tip holds the blade's width further out, so a CUPPED blade
+       carries more material near the tip and approaches itself more closely.
+
+       THE SIX NAMED STATES ARE THE RULING, so the read-out speaks them — and
+       1.70 IS NOT ONE OF THEM. It sits between the pointed petal and the true
+       ellipse, and the read-out says exactly that rather than rounding it to
+       the nearer anchor: calling 1.70 "the true ellipse" would be the panel
+       claiming a shape the geometry is not drawing. */
+    fmt: (v) => {
+      const n = Number(v);
+      const name = n <= 0.70 ? 'acute'
+        : n < 1.05 ? 'a straight point'
+        : n < 1.45 ? "today's pointed petal"
+        : n < 1.90 ? 'between the pointed petal and the true ellipse'
+        : n < 2.25 ? 'the true ellipse'
+        : n < 2.80 ? 'width held, then turning'
+        : 'the held-width round tip';
+      return `${n.toFixed(2)} · ${name}`;
+    },
+    visibleWhen: { all: [] } },
   { id: 'petalTipTaper', section: 'shape', kind: 'slider', min: 0.6, max: 4, step: 0.05, default: 1.8,
     label: 'Tip taper', tier: 'standard', role: 'petal',
     /* Prints the DERIVED widest point. One owner: the geometry computes

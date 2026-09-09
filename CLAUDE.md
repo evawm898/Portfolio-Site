@@ -21,6 +21,24 @@ Guidance for Claude Code sessions working in this repository.
 
 ## Bloom generator — pointer only
 
+**NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH** (Eva, session
+32 — the durable rule, and the first thing to read before touching ROW PLACEMENT
+or quoting any measured figure). *Every reported measurement names its MODE
+(live or export) and its SAMPLING (the row count and the weighting), and any
+constant standing for a PHYSICAL LENGTH is derived from that length rather than
+from a ROW COUNT.* A row count is only a length under UNIFORM spacing, and this
+project's spacing stopped being uniform when the turning ladder shipped. Five
+defects in one session came from this single root, and they are not cosmetic —
+two reached CI, one reached shipped source, and one changed TOPOLOGY rather than
+geometry: the buckle's rows-per-cycle ceiling (a count standing for a spacing),
+C1's `(i + 1) / n` station (an index standing for the builder's own `u`), the
+self-contact flag's skip (a count standing for three sheet thicknesses), the
+mode-dependent ladder (reading the LIVE floor, so the export split panels at a
+different row), and `LADDER_ARC_SHARE`'s justification (live figures from a
+scratch tree quoted as the shipped tree's). `bladeStations()`'s own header
+carries this too, which is where four of the five lived. §18h of
+`docs/bloom-session-32-outcome.md` has the table.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom
@@ -850,6 +868,111 @@ NONE at the apex). **One owner per boundary, and that boundary belongs to `footR
 verification claim SPLITS across two commits with two separate proofs — the law (surface changes;
 drawn `n` matches asked across the range) and the redistribution (surface unchanged; dense sampling
 agreeing on both trees) — never one proof spanning both.
+
+**THE PETAL TIP LAW SHIPS, THE CAP IS A PRINT-FLOOR CLAMP, AND THE BLADE ROWS ARE PLACED BY
+TURNING RATE** (session 32, PR THREE — read §17 and §18 of `docs/bloom-session-32-outcome.md`
+before touching any of it). `petalTipShape` (PETAL SHAPE, 0.60–3.00, step 0.05, **default
+1.70**) is the superellipse exponent over `[widest point, 1]`, a REPARAMETERISATION of the tip
+taper rather than a control beside it. **The six named states are Eva's ruling and the panel's
+read-out speaks them**: 0.60 acute · 1.00 a straight point · ≈1.20 today's pointed petal · 2.00
+the true ellipse · 2.50 width held then turning · 3.00 the held-width round tip.
+**THE DEFAULT IS 1.70 AND 1.70 IS NOT ONE OF THE SIX** (Eva, ruled from the sheet after the
+wall instrument went red at 2.50). The RANGE IS UNCHANGED, so **2.50 stays reachable and is
+still Eva's preferred LOOK** — only the shipped value moved. The read-out says "between the
+pointed petal and the true ellipse" rather than rounding 1.70 to the nearer anchor, because
+naming it "the true ellipse" would claim a shape the geometry is not drawing. **The
+redistribution's ratios were REPORTED WITHOUT NAMING THE MODE AND WERE LIVE** — this
+project's own rule, broken here. Corrected, apex chord error at n 1.70 over 56 rows,
+uniform-in-u → turning-rate ladder: **EXPORT (the object) 0.1609 → 0.1118 mm on Eva's taper
+(1.44x) and 0.1693 → 0.1054 (1.61x) on the default**; LIVE 0.0732 → 0.0330 (2.22x) and
+0.0732 → 0.0352 (2.08x). The withdrawn figures were 5.84x / 5.04x. The contact sheet was NOT re-rendered — the cells are per-exponent
+and the law did not move; the cell labelled default is now 1.70.
+**AT HIGH `n` COMBINED WITH HIGH CUP A PETAL SELF-APPROACHES BELOW THE 1.00 mm PRINTABLE GAP,
+AND THAT COMBINATION IS NOT GATED** (§18a). Measured on `SHIPPED cup 1.2`, monotone in `n`:
+1.031 mm at 1.20, **1.031 at the shipped 1.70**, 1.019 at 2.00, **0.977 at 2.50**, 0.832 at
+3.00. Same class as session 34's composition finding — self-approach from two shape controls
+both pushed, no closed form in the individual parameters, neither control alone doing it.
+**The matrix varies ONE CONTROL AT A TIME, so this is invisible to it by construction**, and
+the wall instrument's rows have the same shape. **No range limit, clamp or warning was added**
+— narrowing the range would remove states Eva ruled reachable, on the strength of a threshold
+that is itself a guess. A COMBINATION GATE (a predeclared set of two-control products through
+the wall instrument) is the schedulable item; it is recorded, not pre-empted.
+**AND THE 1.00 mm PRINTABLE GAP IS ITSELF AN UNVALIDATED CONSTANT** (§18b, recorded once):
+NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED, so `MIN_FEATURE_MM`, the printable gap, the
+sheet floor, the foot width and every curvature floor are DECLARED GUESSES rather than
+measurements. **That is not a reason to weaken any of them** — an unenforced number becomes
+folklore within two sessions, and this session's refusal to loosen V5 is why the gate meant
+anything when it went red. It IS the reason the parked cantilever coupon matters: every
+figure above is a comparison against a line we drew ourselves.
+**CAP DEMOTION WAS REQUIRED, NOT PREFERRED**: through the cap the drawn exponent SATURATES at
+1.900 / 2.318 on the two reference tapers whatever is asked, rms 0.62 — the ruled default is
+unreachable. Demoted, drawn n equals asked n at **8.88e-16** over 32 states, fitted ON THE
+ACTIVE BRANCH ONLY. **Fitting through the print floor biases an asked 0.60 to 0.6080** — the
+same bug class as integrating turning through a kink, FOURTH instance here.
+**THE REDISTRIBUTION EARNED ITS PLACE AT NU 56, AND ON THE OBJECT IT IS DOING ALL OF THE
+APEX WORK.** Doubling the rows halves the apex chord error in LIVE (0.1608 → 0.0732 mm at the
+default, n 1.70) and buys almost NOTHING in EXPORT (0.1812 → 0.1693, 1.07x) — the print floor
+truncates exactly the curved stretch the extra rows would have resolved. The ladder then takes
+**1.61x / 1.44x in EXPORT** and 2.08x / 2.22x in LIVE. Worst over 9 tapers × 8 exponents:
+**EXPORT 0.3952 → 0.2147 mm (1.84x)**, LIVE 0.3952 → 0.1319 (3.00x).
+**IT IS NOT UNIFORMLY BETTER, AND THAT IS §18c**: 21 of 72 states are worse at the apex in
+export and 4 states' whole-blade worst chord REGRESSES, by at most 0.0361 mm, all on spatulate
+tapers (widest point at u 0.67–0.83) at low exponents that neither the shipped default taper
+nor Eva's reference reaches.
+**EVA RULED IT SHIPS AS MEASURED, ON THE GROUND THAT IT IS A RENDER-QUALITY CHANGE** (§18g):
+every figure in that comparison is BELOW PRINT RESOLUTION — 0.2147 against 0.3952 mm at the
+worst, and 0.0361 mm is about a third of a layer height — so none of it is resolvable on a
+printed object. What it changes is the FACETED LOOK ON SCREEN, which is the mode the defect
+was reported in and where the ladder is worth ~2.2x. **The export figures stay on the record
+beside it as the honest statement of what the print gets, never dropped for being the weaker
+half.** And **dropping the ladder is NOT the neutral option**: without it this PR moves the
+exported apex 3–7% and nothing else — the law shipped with the visual defect that motivated
+the work still present, at twice the row count.
+**AND `LADDER_ARC_SHARE` = 0.70 IS A TRADE, NOT AN OPTIMUM** (§18d). Its shipped justification
+welded two LIVE-mode sweeps into one sentence and did not reproduce once the ladder was made
+mode-independent. Re-derived: 0.70 is a local minimum in live and is NOT one in export; the
+grid optimum near 0.90–0.95 improves the worst state (1.84x → 2.04x) and the regressions
+(4/72 → 1/72) while COSTING the shipping default (1.61x → 1.29x) and Eva's taper (1.44x →
+1.22x). **Eva ruled it STAYS at 0.70**: optimising the tail at the cost of the default is the
+wrong trade, and the tail regressions bought are precisely the sub-resolution ones — 0.90's
+numbers stay beside it so the value reads as a TRADE rather than a tuned constant. Pure arc
+length (1.00) collapses to 1.31x with 30 of 72 whole-blade regressions, so the turning term is
+load-bearing — measured, not argued. **Do not tune it to three digits: the worst-of-72
+objective HOPS** (0.75 spikes to 0.2732 mm in both modes). **And the PER-STATE GATE is
+WITHDRAWN, not deferred** — chord error is a property of the DISCRETISATION, so feeding it back
+into row placement makes the sagitta instrument measure its own fixed point: the `headRise`
+ruling applied correctly.
+**THE APEX TURN ANGLE IS NOT THE CRITERION AND CANNOT BE** — it is discontinuous in row
+placement (65.7° or 10.6° on one outline), and at n 1.20 it RISES while the sagitta falls,
+which is the tip-floor join resolving rather than smearing. The sagitta decides.
+**THE LADDER AND MARGIN BUCKLING COMPETE FOR THE SAME 56 ROWS, and the resolution is derived
+from the buckle's own constants.** `NU / BUCKLE_ROWS_PER_CYCLE_MIN` is a claim about row
+SPACING expressed as row COUNT — true of a uniform ladder, false of any other; measured, an
+unbounded ladder DOUBLES the buckle's along-margin chord error at the ceiling (0.2808 →
+0.5626 mm). **Uniform uniquely maximises the minimum local rows-per-cycle, so no bound can
+restore the bar.** What ships is BOTH halves: the margin wave's own turning is in the measure
+(so the buckle buys its own rows) AND `ladderGapFactor(f)` is `NU / (BAR * f)`, **exactly 1 at
+f 7**, i.e. uniform. Measured clean at every frequency — the buckle never regresses, improves
+at every f ≤ 5, and at the ceiling the apex keeps today's faceting, which is the honest trade
+and is a matrix row rather than an argument. **At the shipping default the buckle is flat, so
+the bound does not bind.**
+**THE ROOT BLEND'S ROWS DO NOT MOVE, BY CONSTRUCTION** — every station below `ROOT_BLEND_END`
+keeps its uniform value exactly (A7, a bit identity), so the base chord error is unchanged at
+every exponent, and `CURL_START_MIN = 1 / NU` still means what it says because the first blade
+row is one of the held ones. **After this, the worst chord on the blade IS the root blend's,
+at every exponent** — §13's finding as the new ceiling, and the scheduled session's to fix.
+**A6 IS REPLACED, NOT RELAXED** (it asserted the cap was a straight lerp and its own comment
+said it would fire when the law changed; it did), **A7 and A8 are new**, and the three
+lerp mutations are retired as UNREACHABLE. **`tipCap.peakHalf` is DECLARED because the ladder
+does not guarantee a row near `uPk`**: reading the largest emitted row instead gives 7.9936
+against a true 8.0000 and reads an asked 1.50 as 1.5014 — the sampling read as the geometry,
+which is what made A6 fire on a clean tree. The mutant table
+(`node tools/verify-bloom-apex-mutants.mjs`) found FOUR defects on its first run, all the
+session's own, including `plateau-returns` reporting MUTATION DID NOT APPLY because the law
+moved its find-string, and a mutation invisible because its row saturated only in EXPORT while
+`__bloomMetrics()` reports the LIVE build. **`frozen/phase23` is the 596 rows at `7544796`; it
+is 23 and not 22 because phase22 is margin buckling's, and the FROZEN_MATRICES census caught
+the collision at module load, by name.**
 
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
