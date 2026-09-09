@@ -54,9 +54,17 @@
 
 import { MIN_DENSITY, MAX_DENSITY } from './plot-grid.js';
 import { FRAME_RATIOS, FRAME_SHAPES, isListedRatio } from './plot-frame.js';
+import { POLARITIES } from './plot-polarity.js';
 
 export const FORMAT = 'plot-composition';
-export const VERSION = 1;
+/* VERSION 2 ADDS `draw.polarity`, AND THE BUMP IS THE POINT OF HAVING A VERSION.
+   Nothing breaks without it — a v1 file has no polarity key, the reader reports
+   it missing and the page keeps the polarity it has, which is exactly rule 3 —
+   but leaving it at 1 would mean "version 1" no longer names one shape: a file
+   written before this session and a file written after it would carry the same
+   number and different fields, and a later reader would have no way to tell
+   which it was holding. Old files still load; they say what they are missing. */
+export const VERSION = 2;
 
 /* ---- the field tables --------------------------------------------------- */
 /* `key` is the name in the file, `control` the id of the element that owns the
@@ -71,11 +79,20 @@ export const FRAME_FIELDS = [
   { key: 'margin', control: 'frameMargin', kind: 'number' },
 ];
 
+/* POLARITY RIDES WITH THE DRAW SETTINGS AND NOT IN A GROUP OF ITS OWN, because
+   it is one: it decides how the fragments blend, and it changes what the two
+   controls beside it MEAN — `brightness` is an amount of light on black and an
+   amount of ink on white. Splitting it out would put a draw setting somewhere
+   the draw group is not.
+   The values come from plot-polarity.js rather than being restated, the way the
+   ratios come from plot-frame.js: two lists of polarities is one of them being
+   wrong. */
 export const DRAW_FIELDS = [
   { key: 'families',   control: 'families',   kind: 'enum', values: ['both', 'u', 'v'] },
   { key: 'uDensity',   control: 'uDensity',   kind: 'int' },
   { key: 'vDensity',   control: 'vDensity',   kind: 'int' },
   { key: 'weight',     control: 'weight',     kind: 'number' },
+  { key: 'polarity',   control: 'polarity',   kind: 'enum', values: POLARITIES },
   { key: 'brightness', control: 'brightness', kind: 'int' },
   { key: 'depthDim',   control: 'depthDim',   kind: 'int' },
 ];

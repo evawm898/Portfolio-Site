@@ -93,6 +93,13 @@ import {
   FRAME_RATIOS, DEFAULT_RATIO, parseRatio, frameRect, frameOutline, fitTangents,
 } from './plot-frame.js';
 import {
+  POLARITY, POLARITIES, DEFAULT_POLARITY, polarityOf, inkRGB, hueRGB,
+  singleLinePixel, crossingInk,
+} from './plot-polarity.js';
+import {
+  RASTER_SCALE, mmPerPixel, stripToPaths, svgDocument, punchEllipse, exportName,
+} from './plot-export.js';
+import {
   FORMAT, VERSION, FRAME_FIELDS, DRAW_FIELDS, VIEW_FIELDS, STEM_FIELDS,
   composeDoc, readDoc, toText, gridIdentity, compareIdentity, resolvePetals,
   IDENTITY_TRANSFORM,
@@ -151,14 +158,23 @@ const container = new THREE.Group();
 container.rotation.x = -Math.PI / 2;
 scene.add(container);
 
-// One material for both families: weight, brightness and the fog are
+/* THE ONE MAP FROM A POLARITY'S BLEND NAME TO THREE'S OWN CONSTANT, and the
+   only place in this project that names either. plot-polarity.js carries the
+   NAME rather than the constant so that it imports in Node and the gate can
+   drive the transfer without a browser; this is where the name lands. */
+const BLEND = {
+  additive: THREE.AdditiveBlending,
+  multiply: THREE.MultiplyBlending,
+};
+
+// One material for both families: weight, the ink level and the fog are
 // properties of the drawing, not of a family.
 const material = new LineMaterial({
   color: 0xffffff,
   linewidth: 1.2,
   worldUnits: false,
   transparent: true,
-  blending: THREE.AdditiveBlending,
+  blending: BLEND[POLARITY[DEFAULT_POLARITY].blend],
   depthTest: false,
   depthWrite: false,
 });
@@ -339,6 +355,7 @@ const ui = {
   uDensity: document.getElementById('uDensity'),
   vDensity: document.getElementById('vDensity'),
   weight: document.getElementById('weight'),
+  polarity: document.getElementById('polarity'),
   brightness: document.getElementById('brightness'),
   depthDim: document.getElementById('depthDim'),
 };
@@ -347,9 +364,15 @@ const out = {
   uDensity: document.getElementById('uDensityOut'),
   vDensity: document.getElementById('vDensityOut'),
   weight: document.getElementById('weightOut'),
+  polarity: document.getElementById('polarityOut'),
   brightness: document.getElementById('brightnessOut'),
   depthDim: document.getElementById('depthDimOut'),
 };
+/* THE INK CONTROL'S OWN LABEL, because the same number is an amount of LIGHT on
+   black and an amount of INK on white. The control's ID stays `brightness`: it
+   is what the composition file names and what every saved file already carries,
+   and renaming it would break every one of them to change a word on screen. */
+const brightnessLabel = document.querySelector('label[for="brightness"]');
 
 const tracks = {
   u: document.getElementById('uDensityTrack'),
@@ -508,6 +531,7 @@ const readUI = () => ({
   uDensity: +ui.uDensity.value,
   vDensity: +ui.vDensity.value,
   weight: +ui.weight.value,
+  polarity: ui.polarity.value,
   brightness: +ui.brightness.value / 100,
   depthDim: +ui.depthDim.value / 100,
 });
@@ -898,33 +922,60 @@ function rebuild() {
   dirty = true;
 }
 
+/* THE POLARITY, APPLIED. Three things and only three: which way the fragments
+   blend, what is behind them, and what a line fades INTO — and the third is the
+   same field as the second by construction, so there is no second place to get
+   the fog's ground wrong. Everything else about the polarity is the colour
+   transfer in plot-polarity.js.
+
+   `blending` is renderer STATE and not a program define, so it wants no
+   `needsUpdate`; the fog appearing or going away is the one thing here that
+   recompiles, and updateFog() owns that. */
+function applyPolarity(id) {
+  const pol = polarityOf(id);
+  const blend = BLEND[pol.blend];
+  material.blending = blend;
+  selMaterial.blending = blend;
+  renderer.setClearColor(pol.ground, 1);
+  return pol;
+}
+
+// Scratch, module-level: `setHex` is the only way to get the accent into linear
+// space and there is no reason to allocate a Color per slider event to do it.
+const tealLinear = new THREE.Color();
+
 function applyStyle() {
   const s = readUI();
-  // Both are UNIFORM accessors on LineMaterial (`linewidth`, and `color` over
-  // `uniforms.diffuse`), so neither wants `needsUpdate`: that bumps the
-  // material version and sends the renderer back through program acquisition on
-  // every input event of a slider drag. The one thing that genuinely changes
-  // the PROGRAM here is fog appearing or going away, and updateFog() owns it.
+  const pol = applyPolarity(s.polarity);
+  // `linewidth` and `color` are both UNIFORM accessors on LineMaterial, so
+  // neither wants `needsUpdate`: that bumps the material version and sends the
+  // renderer back through program acquisition on every input event of a slider
+  // drag.
   material.linewidth = s.weight;
-  material.color.setScalar(s.brightness);
+  /* THE INK, THROUGH THE ONE TRANSFER. On SCREEN this is `setScalar(brightness)`
+     term for term — `inkRGB` returns [b,b,b] there — so the picture /plot ships
+     does not move. In PRINT it is the transmittance whose sRGB encoding is
+     1 - sRGB(brightness), which is what makes ONE LINE land at the same ink in
+     both regimes: the two framebuffer values sum to 255 at every position of
+     the control. See plot-polarity.js for why a shared RAW value would have
+     been four times off instead. */
+  material.color.setRGB(...inkRGB(pol.id, s.brightness));
   // THE HIGHLIGHT TRACKS THE DRAWING, differing in hue and in nothing else:
-  // same weight, and the same brightness applied to the accent rather than to
-  // white, so selecting a petal cannot make it read nearer or further than it
-  // is. `setHex` then `multiplyScalar` and not a stored constant, because
-  // `brightness` is linear and the accent has to be scaled in the same space.
+  // same weight, same exposure, so selecting a petal cannot make it read nearer
+  // or further than it is.
   selMaterial.linewidth = s.weight;
-  /* NORMALISED TO ITS BRIGHTEST CHANNEL, WHICH IS THE WHOLE POINT AND IS EASY
-     TO GET WRONG. `setScalar(b)` writes b as a LINEAR value; `setHex` converts
-     an sRGB hex INTO linear, so teal at hex times b came out at 0.142 linear
-     where white sat at 0.300 — a selected petal that read a third dimmer than
-     the drawing, which under a depth dim is exactly the cue for "further away".
-     Dividing by the accent's own largest linear channel first puts the
-     highlight's brightest channel at exactly `brightness`, the same ceiling a
-     white line has, so the calibration the additive check rests on holds for
-     both and the highlight is a hue and nothing else. */
-  selMaterial.color.setHex(SELECT_COLOR);
-  const peak = Math.max(selMaterial.color.r, selMaterial.color.g, selMaterial.color.b) || 1;
-  selMaterial.color.multiplyScalar(s.brightness / peak);
+  /* NORMALISED AGAINST THE DRAWING'S OWN INK, WHICH IS THE WHOLE POINT AND IS
+     EASY TO GET WRONG. On screen `setScalar(b)` writes b as a LINEAR value
+     while `setHex` converts an sRGB hex INTO linear, so teal at hex times b
+     came out at 0.142 linear where white sat at 0.300 — a selected petal a
+     third dimmer than the drawing, which under a depth dim is exactly the cue
+     for "further away". `hueRGB` divides by the accent's own peak first, in the
+     space each polarity's invariant is stated in: the brightest CHANNEL on
+     screen, the strongest ABSORPTION in print. The accent arrives linear
+     because that is what a hex is once three has read it. */
+  tealLinear.setHex(SELECT_COLOR);
+  selMaterial.color.setRGB(...hueRGB(pol.id, [tealLinear.r, tealLinear.g, tealLinear.b],
+                                     s.brightness));
   dirty = true;
 }
 
@@ -1512,15 +1563,24 @@ function resetView() { fitCamera(HOME_VIEW); }
 function updateFog() {
   const s = readUI();
   const sph = worldSphere();
+  const ground = polarityOf(s.polarity).ground;
   let fog = null;
   if (sph && s.depthDim > 0) {
     const dCenter = camera.position.distanceTo(sph.center);
     fog = dimToFog(s.depthDim, dCenter - sph.radius, dCenter + sph.radius);
   }
   if (fog) {
-    if (!scene.fog) scene.fog = new THREE.Fog(0x000000, fog.near, fog.far);
+    if (!scene.fog) scene.fog = new THREE.Fog(ground, fog.near, fog.far);
     else { scene.fog.near = fog.near; scene.fog.far = fog.far; }
-    scene.fog.color.setHex(0x000000);
+    /* THE FOG IS THE GROUND, AND ON WHITE PAPER THAT IS WHITE. Under additive
+       the fragment carries LIGHT, so fading toward black adds less; under
+       multiply it carries TRANSMITTANCE, so fading toward WHITE lets more
+       through. A black fog under multiply would drive far lines toward dst*0 —
+       the depth dim would make the most distant lines the heaviest thing on the
+       page — and nothing in a blend-mode check can see it.
+       The LAW is the same either way and that is algebraic, not arranged: a far
+       line's ink is (1 - f) times a near line's in both regimes. */
+    scene.fog.color.setHex(ground);
   } else {
     scene.fog = null;
   }
@@ -1685,14 +1745,27 @@ function drawText() {
   // Read from the CONTROL, not from scene.fog: the fog is re-solved during the
   // render, so a read-out that consulted it printed the PREVIOUS frame's answer
   // and a dim just switched on still said "off".
+  const pol = polarityOf(s.polarity);
   if (s.depthDim > 0 && drawn.total > 0) {
     lines.push(`depth dim ${(s.depthDim * 100).toFixed(0)}% — the farthest line in`
-      + ` the grid draws at ${((1 - s.depthDim) * 100).toFixed(0)}% of its brightness`);
+      + ` the grid draws at ${((1 - s.depthDim) * 100).toFixed(0)}% of its ink`
+      + `, fading into the ${pol.groundWord}`);
   } else {
-    lines.push('depth dim off — every line at full brightness');
+    lines.push('depth dim off — every line at full ink');
   }
-  lines.push(`additive: a single line sits at ${(s.brightness * 100).toFixed(0)}%,`
-    + ` so crossings add toward white`);
+  /* THE POLARITY LINE PRINTS THE ASYMMETRY RATHER THAN DESCRIBING IT. One line
+     lands at the same ink either way — that is the transfer's whole job — and
+     what does NOT carry across is the crossings, because additive CLIPS and
+     multiply does not. So the read-out shows the ladder: on screen it runs out
+     after two, in print it keeps going. Both numbers come from the same
+     arithmetic the shader runs, at the level the control is actually on. */
+  const single = Math.round(singleLinePixel(pol.id, s.brightness) * 255);
+  const ladder = [1, 2, 3, 4, 6].map(n => crossingInk(pol.id, s.brightness, n));
+  const flat = ladder.findIndex((v, i) => i > 0 && v === ladder[i - 1]);
+  lines.push(`${pol.blend} · ${pol.label} — a single line is ${pol.levelWord}`
+    + ` ${(s.brightness * 100).toFixed(0)}% (pixel ${single} of 255)`);
+  lines.push(`  crossings reach ${ladder.join(' → ')} of 255 ink at 1,2,3,4,6 lines`
+    + (flat >= 0 ? ` — flat from ${[1, 2, 3, 4, 6][flat]}` : ' — still climbing'));
   return lines.join('\n');
 }
 
@@ -1933,7 +2006,13 @@ function writeOutputs() {
   out.uDensity.textContent = everyLabel(densityToEvery(s.uDensity));
   out.vDensity.textContent = everyLabel(densityToEvery(s.vDensity));
   out.weight.textContent = `${s.weight.toFixed(1)} px`;
+  const pol = polarityOf(s.polarity);
+  out.polarity.textContent = pol.label;
   out.brightness.textContent = `${(s.brightness * 100).toFixed(0)}%`;
+  // THE LABEL FOLLOWS THE POLARITY AND THE ID DOES NOT. The same number is an
+  // amount of light on black and an amount of ink on white, so the word has to
+  // move; the control's id is what every saved composition names, so it cannot.
+  if (brightnessLabel) brightnessLabel.textContent = pol.levelWord;
   out.depthDim.textContent = s.depthDim > 0 ? `${(s.depthDim * 100).toFixed(0)}%` : 'off';
 }
 
@@ -1962,13 +2041,362 @@ function frameText() {
   lines.push(`${Math.round(box.width)} x ${Math.round(box.height)} px, centred in `
     + `${Math.round(w)} x ${Math.round(h)}`);
   lines.push(`margin ${f.margin}% of the shorter side = ${Math.round(box.inset)} px inset`);
-  // SAID RATHER THAN IMPLIED. The boundary is an indication of the crop and not
-  // the crop: ink outside it is still drawn at full brightness, and an export
-  // that actually clips is the next session's.
-  lines.push('<span class="warn">ink outside the boundary is still drawn</span> — this marks the crop, it does not apply it');
+  // SAID RATHER THAN IMPLIED. On screen the boundary is an indication of the
+  // crop and not the crop — ink outside it is still drawn — and it is the
+  // EXPORTS below that apply it. Both statements are true at once and the
+  // panel makes both, because "the frame marks the crop" on its own now reads
+  // as though nothing ever honours it.
+  lines.push('<span class="warn">ink outside the boundary is still drawn on screen</span> — the exports below are what apply the crop');
   return lines.join('\n');
 }
-function writeFrameInfo() { frameInfoEl.innerHTML = frameText(); }
+function writeFrameInfo() {
+  frameInfoEl.innerHTML = `${frameText()}\n\n${exportText()}`;
+}
+
+
+/* ---- export ------------------------------------------------------------- */
+/* THE FRAME DEFINES THE OUTPUT BOUNDS, WHICH IS WHY THE BUTTONS ARE IN THIS
+   PANEL and not in an export section of their own. Two artefacts, and they are
+   deliberately not the same picture — see plot-export.js's header.
+
+   AN EXPORT DRAWS THE INK AND NONE OF THE CHROME, and that is one rule with
+   three consequences rather than three decisions. The frame's own boundary is
+   an indication of the crop, so baking it into the cropped image would be an
+   odd thing to plot; the bend handles are an editor; and the SELECTED PETAL'S
+   TEAL exists to answer "which one am I about to grab", so an exported print
+   with one teal petal in it is a bug report. All three are suppressed for the
+   duration of the render and restored after it.
+   THE WITNESS IS THAT THE RESULT IS GREY. Both polarities' ink and ground are
+   neutral, so every pixel of a correct export has r === g === b exactly — where
+   the accent (0x6fb7ae) and the petal handles' amber (0xd6a15c) are not neutral
+   in any channel. That is an identity rather than a threshold, and it catches a
+   leaked boundary, a leaked handle and a leaked highlight with one statement. */
+
+// The boundary the export is cropped to. With the frame OFF that is the whole
+// viewport — through `frameRect` all the same, so there is still exactly one
+// owner of where an output's edges are.
+function exportBox() {
+  const box = frameBox();
+  if (box) return box;
+  const { w, h } = canvasSize();
+  return frameRect(w, h, w / h, 0);
+}
+
+/* HOW FAR THE RASTER CAN ACTUALLY BE PUSHED. `RASTER_SCALE` is what is asked
+   for; the GL implementation's own limits are what is available, and a renderer
+   silently handed a buffer it cannot make returns a blank one. So the scale is
+   clamped here and the ACHIEVED scale is what the panel and the file name
+   report — never the asked-for one. */
+let glCap = 0;
+function rasterScaleFor(scale) {
+  const want = Math.max(1, scale || RASTER_SCALE);
+  const { w, h } = canvasSize();
+  if (!glCap) {
+    // Asked once: the limits cannot change, and the read-out below runs this on
+    // every input event of a slider.
+    const gl = renderer.getContext();
+    const dims = gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [4096, 4096];
+    glCap = Math.min(gl.getParameter(gl.MAX_RENDERBUFFER_SIZE) || 4096,
+                     dims[0] || 4096, dims[1] || 4096);
+  }
+  const fit = Math.min(glCap / Math.max(1, w), glCap / Math.max(1, h));
+  // Whole steps only: a fractional device-pixel ratio puts the boundary between
+  // pixels, and the crop is meant to land on exact rows and columns.
+  return Math.max(1, Math.min(want, Math.floor(fit)));
+}
+
+/* THE INK, WITHOUT THE CHROME. Restores in a `finally` because a throw halfway
+   through would otherwise leave the page with its handles hidden and the
+   selected petal drawn in the wrong material — a broken editor, from a failed
+   export. */
+function withInkOnly(fn) {
+  const hidden = [];
+  for (const h of handles) if (h.visible) { h.visible = false; hidden.push(h); }
+  for (const h of petalHandleObjs) if (h.visible) { h.visible = false; hidden.push(h); }
+  const sel = objects.sel;
+  const selMat = sel ? sel.material : null;
+  if (sel) sel.material = material;
+  try { return fn(); }
+  finally {
+    for (const h of hidden) h.visible = true;
+    if (sel) sel.material = selMat;
+    dirty = true;
+  }
+}
+
+/* RENDER AT A MULTIPLE OF THE DISPLAY RESOLUTION AND READ THE BUFFER BACK.
+   Through the page's own renderer and the page's own materials, so the additive
+   or multiply result survives EXACTLY as seen rather than by an argument about
+   colour spaces — a render target would blend in a different space and the
+   picture would quietly stop being the one on screen.
+
+   THE LINE WIDTHS ARE SCALED AND THE RESOLUTION IS TOLD THE TRUTH. `linewidth`
+   is divided by `resolution.y` in the shader, so leaving the resolution at the
+   screen's would keep the strokes the right size — and would also be a lie to a
+   material about how big its viewport is, which is the exact state that once
+   rasterised every segment as a screen-filling quad here. So the resolution
+   follows the real buffer and the widths are multiplied by the same factor: at
+   scale S every line is S times as many pixels wide because the image is S
+   times as large, which is the property that makes this the screen picture and
+   not a thinner one. */
+function renderRaster(scale) {
+  const S = rasterScaleFor(scale);
+  const { w, h } = canvasSize();
+  const prevRatio = renderer.getPixelRatio();
+  const widths = materials.map(m => m.linewidth);
+  const size = new THREE.Vector2();
+  try {
+    renderer.setPixelRatio(S);
+    renderer.setSize(w, h, false);
+    renderer.getDrawingBufferSize(size);
+    for (const m of materials) {
+      m.resolution.copy(size);
+      m.linewidth *= S / prevRatio;
+    }
+    return withInkOnly(() => {
+      updateFog();
+      renderer.render(scene, camera);
+      const gl = renderer.getContext();
+      const bw = gl.drawingBufferWidth, bh = gl.drawingBufferHeight;
+      const buf = new Uint8Array(bw * bh * 4);
+      gl.readPixels(0, 0, bw, bh, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+      return { buf, bw, bh, scale: S };
+    });
+  } finally {
+    renderer.setPixelRatio(prevRatio);
+    renderer.setSize(w, h, false);
+    renderer.getDrawingBufferSize(size);
+    materials.forEach((m, i) => { m.resolution.copy(size); m.linewidth = widths[i]; });
+    dirty = true;
+    render();
+  }
+}
+
+/* THE CROP, plus the ellipse's alpha. `readPixels` hands back rows from the
+   BOTTOM, so the flip happens here, once, while the rows are being copied into
+   the output — rather than as a second pass over the same megabytes. */
+function cropRaster({ buf, bw, bh, scale }, box, shape) {
+  const cw = Math.max(1, Math.round(box.width)), ch = Math.max(1, Math.round(box.height));
+  const x0 = Math.round(box.x), y0 = Math.round(box.y);
+  const out = new Uint8ClampedArray(cw * ch * 4);
+  for (let r = 0; r < ch; r++) {
+    const srcRow = bh - 1 - (y0 + r);
+    if (srcRow < 0 || srcRow >= bh) continue;
+    for (let c = 0; c < cw; c++) {
+      const sx = x0 + c;
+      if (sx < 0 || sx >= bw) continue;
+      const si = (srcRow * bw + sx) * 4, di = (r * cw + c) * 4;
+      out[di] = buf[si]; out[di + 1] = buf[si + 1]; out[di + 2] = buf[si + 2];
+      // The context is created without alpha, so what comes back is 255 and the
+      // only thing that can make a pixel transparent is the ellipse below.
+      out[di + 3] = 255;
+    }
+  }
+  const cleared = shape === 'ellipse' ? punchEllipse(out, cw, ch) : 0;
+  return { rgba: out, width: cw, height: ch, scale, cleared };
+}
+
+// What the cropped image IS, measured rather than asserted — the greyscale
+// identity above, how much ink it carries, and whether the ellipse's corners
+// really came out empty.
+function rasterStats(rgba, w, h, ground) {
+  const g = ground ? 255 : 0;
+  let ink = 0, notGrey = 0, opaque = 0, min = 255, max = 0;
+  for (let i = 0; i < rgba.length; i += 4) {
+    const r = rgba[i], gr = rgba[i + 1], b = rgba[i + 2];
+    if (rgba[i + 3] === 255) opaque++; else continue;
+    if (r !== gr || gr !== b) notGrey++;
+    const m = Math.max(r, gr, b);
+    if (m < min) min = m;
+    if (m > max) max = m;
+    if (Math.abs(m - g) > 8) ink++;
+  }
+  const cornerAlpha = [rgba[3], rgba[(w - 1) * 4 + 3],
+                       rgba[((h - 1) * w) * 4 + 3], rgba[((h - 1) * w + w - 1) * 4 + 3]];
+  return { pixels: w * h, opaque, ink, notGrey, min, max, cornerAlpha };
+}
+
+function rasterExport({ scale = RASTER_SCALE, withData = false } = {}) {
+  const f = readFrame();
+  const s = readUI();
+  const pol = polarityOf(s.polarity);
+  const shape = f.on ? f.shape : 'rect';
+  const raw = renderRaster(scale);
+  // THE CROP GOES THROUGH `frameRect` AT THE BUFFER'S OWN SIZE, not through the
+  // screen box multiplied by something. It is the same owner, asked the same
+  // question about a bigger canvas.
+  const box = f.on
+    ? frameRect(raw.bw, raw.bh, parseRatio(f.ratio) ?? (raw.bw / raw.bh), f.margin)
+    : frameRect(raw.bw, raw.bh, raw.bw / raw.bh, 0);
+  const cropped = cropRaster(raw, box, shape);
+  const stats = rasterStats(cropped.rgba, cropped.width, cropped.height, pol.groundIsWhite);
+  const cv = document.createElement('canvas');
+  cv.width = cropped.width; cv.height = cropped.height;
+  cv.getContext('2d').putImageData(
+    new ImageData(cropped.rgba, cropped.width, cropped.height), 0, 0);
+  return {
+    width: cropped.width, height: cropped.height,
+    scale: cropped.scale, requestedScale: scale,
+    aspect: cropped.width / cropped.height,
+    shape, polarity: pol.id, cleared: cropped.cleared, stats,
+    name: exportName(sourceName, pol.id, shape, 'png'),
+    canvas: cv,
+    dataUrl: withData ? cv.toDataURL('image/png') : null,
+  };
+}
+
+/* THE DRAWING, PROJECTED. Every strip that is on screen — the grid's, and the
+   stem's continuations — through the page's own camera into its own CSS-pixel
+   space, which is the space `frameRect` works in.
+
+   IT WALKS A LIST OF LINE SETS RATHER THAN NAMING TWO, so a second bloom
+   instance is another entry here and not a change to the export path. */
+const drawnLineSets = () => [
+  { id: 'grid', strips: drawnStrips },
+  { id: 'stem', strips: stemStrips },
+];
+
+function projectStrips(box, mmPerPx) {
+  container.updateMatrixWorld(true);
+  const M = container.matrixWorld;
+  const { w, h } = canvasSize();
+  const v = new THREE.Vector3();
+  const paths = [];
+  let strips = 0, points = 0, dropped = 0;
+  for (const set of drawnLineSets()) {
+    for (const t of set.strips) {
+      strips++;
+      const xy = new Float64Array(t.count * 2);
+      const ok = new Uint8Array(t.count);
+      for (let i = 0; i < t.count; i++) {
+        v.set(t.points[i * 3], t.points[i * 3 + 1], t.points[i * 3 + 2])
+          .applyMatrix4(M).project(camera);
+        // The page's own visibility convention, so the export draws what the
+        // viewport draws rather than a second opinion about it.
+        if (!(v.z > -1 && v.z < 1)) { dropped++; continue; }
+        ok[i] = 1; points++;
+        xy[i * 2] = (v.x * 0.5 + 0.5) * w;
+        xy[i * 2 + 1] = (-v.y * 0.5 + 0.5) * h;
+      }
+      for (const path of stripToPaths(xy, ok, box, mmPerPx)) paths.push(path);
+    }
+  }
+  return { paths, strips, points, dropped };
+}
+
+/* THE PICTURE PLANE'S SCALE, AND WHAT IT IS TRUE OF. `units` comes from the
+   export's own asset.extras and is not relabelled: if a grid says something
+   other than millimetres, that is what the SVG is dimensioned in. */
+function exportUnits() {
+  const u = assetExtras && assetExtras.units ? String(assetExtras.units) : '';
+  return u || 'mm';
+}
+const exportMmPerPx = () => mmPerPixel(camera.fov,
+  camera.position.distanceTo(controls.target), canvasSize().h);
+
+function svgExport() {
+  const f = readFrame();
+  const s = readUI();
+  const pol = polarityOf(s.polarity);
+  const shape = f.on ? f.shape : 'rect';
+  const box = exportBox();
+  const mmPerPx = exportMmPerPx();
+  // Destructured under another name on purpose: `strips` at module scope is
+  // every strip in the LOADED FILE, and the two counts are not the same number.
+  const { paths, strips: stripCount, points, dropped } = projectStrips(box, mmPerPx);
+  /* THE STROKE CONVERTS, AND ITS HONEST WIDTH IS REPORTED RATHER THAN ROUNDED
+     UP TO A PEN. `weight` is a width in DEVICE pixels (the material's
+     resolution is the drawing buffer's size), so it becomes CSS pixels first
+     and millimetres second. A plotter takes its width from the PEN and ignores
+     this entirely; it is here so the file renders like the screen when someone
+     opens it, and the panel says which of those two is which. */
+  const strokeMm = s.weight / renderer.getPixelRatio() * mmPerPx;
+  const unit = exportUnits();
+  const text = svgDocument({
+    paths,
+    widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,
+    shape, strokeMm,
+    // FULL STRENGTH, NOT THE INK LEVEL. There is no blending to accumulate, so
+    // a stroke drawn at the screen's single-line level would simply be a
+    // washed-out picture; a pen has one density and the depth comes from how
+    // many lines cross. The panel says so.
+    ink: pol.groundIsWhite ? 0x000000 : 0xffffff,
+    ground: pol.ground, drawGround: !pol.groundIsWhite,
+    unitLabel: unit,
+    title: `${sourceName || 'grid'} — ${pol.label}, ${shape} `
+      + `${f.on ? f.ratio : 'viewport'}`,
+  });
+  return { text, paths: paths.length, strips: stripCount, points, dropped, shape,
+           polarity: pol.id, unit,
+           widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,
+           strokeMm, mmPerPx,
+           name: exportName(sourceName, pol.id, shape, 'svg') };
+}
+
+function download(blob, name) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+let lastExport = null;
+function exportPNG() {
+  if (!strips.length) return null;
+  const r = rasterExport({});
+  r.canvas.toBlob(b => { if (b) download(b, r.name); }, 'image/png');
+  lastExport = { kind: 'PNG', name: r.name,
+                 detail: `${r.width} x ${r.height} px at ${r.scale}x`
+                   + (r.scale < RASTER_SCALE ? ` (${RASTER_SCALE}x asked; the GL limits capped it)` : '')
+                   + (r.cleared ? ` · ${r.cleared} px cleared outside the ellipse` : '') };
+  writeFrameInfo();
+  return r;
+}
+
+function exportSVG() {
+  if (!strips.length) return null;
+  const r = svgExport();
+  download(new Blob([r.text], { type: 'image/svg+xml' }), r.name);
+  lastExport = { kind: 'SVG', name: r.name,
+                 detail: `${r.paths} paths · ${r.widthMm.toFixed(1)} x ${r.heightMm.toFixed(1)} ${r.unit}`
+                   + (r.dropped ? ` · ${r.dropped} points off screen` : '') };
+  writeFrameInfo();
+  return r;
+}
+
+/* WHAT THE TWO BUTTONS WOULD PRODUCE, without producing it. The path count is
+   the STRIP count and is labelled as such: the real number can only be higher,
+   and only where a strip leaves the depth range and is split rather than drawn
+   through a coordinate the projection could not give it. */
+function exportText() {
+  const f = readFrame();
+  const s = readUI();
+  const pol = polarityOf(s.polarity);
+  const box = exportBox();
+  const lines = [];
+  if (!strips.length) return '<span class="warn">no grid loaded</span> — nothing to export';
+  const S = rasterScaleFor(RASTER_SCALE);
+  lines.push(`<b>PNG</b> ${Math.round(box.width * S)} x ${Math.round(box.height * S)} px`
+    + ` — the picture at ${S}x, ${pol.blend}, exactly as rendered`
+    + (S < RASTER_SCALE ? `  <span class="warn">(${RASTER_SCALE}x asked; capped by the GL limits)</span>` : ''));
+  if (f.on && f.shape === 'ellipse') {
+    lines.push('  outside the ellipse is TRANSPARENT, not filled — alpha is the recoverable way round');
+  }
+  const mmPerPx = exportMmPerPx();
+  const unit = exportUnits();
+  const nStrips = drawnLineSets().reduce((a, set) => a + set.strips.length, 0);
+  lines.push(`<b>SVG</b> ${(box.width * mmPerPx).toFixed(1)} x ${(box.height * mmPerPx).toFixed(1)} ${unit}`
+    + ` at the target plane · ${nStrips} strips → one path each`);
+  lines.push(`  stroke ${(s.weight / renderer.getPixelRatio() * mmPerPx).toFixed(3)} ${unit}`
+    + ' — a plotter takes its width from the pen');
+  lines.push('  <span class="warn">flat strokes, no glow</span> — SVG has no additive or multiply,'
+    + ' so the crossings do not survive; depth comes from line density');
+  if (lastExport) lines.push(`saved ${lastExport.kind}: ${esc(lastExport.name)} — ${esc(lastExport.detail)}`);
+  return lines.join('\n');
+}
 
 /* ---- the composition file ------------------------------------------------
    plot-file.js owns the FORMAT; everything here is the page's two halves of it,
@@ -2353,10 +2781,17 @@ function loadDefault() {
 for (const [id, el] of Object.entries(ui)) {
   el.addEventListener('input', () => {
     writeOutputs();
-    if (id === 'weight' || id === 'brightness') applyStyle();
+    // POLARITY IS A CHEAP ARM: it changes how the fragments blend and what is
+    // behind them, and it moves no line, so the segment buffers are untouched
+    // and `applyStyle` is the whole of it.
+    if (id === 'weight' || id === 'brightness' || id === 'polarity') applyStyle();
     else if (id === 'depthDim') dirty = true;
     else rebuild();
     writeDrawState();
+    // The FRAME panel reports what the two exports would produce, and both the
+    // polarity and the weight reach that — so it is refreshed here rather than
+    // left describing the settings before last.
+    writeFrameInfo();
     // The stem is the u lines continued, so `families` and `u density` change
     // it as surely as any stem control does — including to nothing.
     writeStemState();
@@ -2394,6 +2829,9 @@ for (const el of Object.values(sui)) {
     writeDrawState();
   });
 }
+document.getElementById('exportPng').addEventListener('click', exportPNG);
+document.getElementById('exportSvg').addEventListener('click', exportSVG);
+
 bendAddBtn.addEventListener('click', addBend);
 bendRemoveBtn.addEventListener('click', removeBend);
 document.getElementById('bendReset').addEventListener('click', restBends);
@@ -2704,12 +3142,54 @@ window.__plot = {
     resolution: material.resolution.toArray(),
     blending: material.blending,
     additive: material.blending === THREE.AdditiveBlending,
+    multiply: material.blending === THREE.MultiplyBlending,
     linewidth: material.linewidth,
     color: material.color.getHex(),
     colorLinear: material.color.r,
     depthTest: material.depthTest,
     fogEnabled: material.fog,
   }),
+  /* THE POLARITY, AS THE PAGE ACTUALLY HOLDS IT — the blend constant, the clear
+     colour the renderer is set to, and the material colour the transfer
+     produced. Three separate reads on purpose: "the colours changed" and "the
+     blend mode changed" are exactly the two halves a colour-swap would satisfy
+     one of, so a check has to be able to ask them apart. */
+  polarityInfo: () => {
+    const cc = new THREE.Color();
+    renderer.getClearColor(cc);
+    return {
+      id: readUI().polarity,
+      blending: material.blending,
+      blendName: material.blending === THREE.AdditiveBlending ? 'additive'
+        : material.blending === THREE.MultiplyBlending ? 'multiply' : 'other',
+      clearColor: cc.getHex(),
+      ink: [material.color.r, material.color.g, material.color.b],
+      // What a single fully-covered line should put in the framebuffer, from the
+      // module's own arithmetic — the calibration both regimes' checks rest on.
+      singleLinePixel: singleLinePixel(readUI().polarity, readUI().brightness),
+      levelWord: polarityOf(readUI().polarity).levelWord,
+      brightnessLabel: brightnessLabel ? brightnessLabel.textContent : null,
+    };
+  },
+  selectionInk: () => [selMaterial.color.r, selMaterial.color.g, selMaterial.color.b],
+
+  /* ---- the exports -------------------------------------------------------
+     Both through the very functions the two buttons call, so a check measures
+     the shipped path rather than a copy of it. The raster takes a `scale` so a
+     check can run at 1x or 2x without paying for a 4x buffer on every one, and
+     the ACHIEVED scale comes back beside the asked-for one. */
+  exportRaster: opts => {
+    const r = rasterExport(opts || {});
+    // The canvas element itself cannot cross into the harness; everything a
+    // check needs was measured in here.
+    const { canvas: _c, ...rest } = r;
+    return rest;
+  },
+  exportSvg: () => svgExport(),
+  exportInfoText: () => exportText(),
+  exportBox: () => ({ ...exportBox() }),
+  mmPerPixel: () => exportMmPerPx(),
+  drawnLineSetCounts: () => drawnLineSets().map(s2 => ({ id: s2.id, strips: s2.strips.length })),
   fogInfo: () => (scene.fog ? { near: scene.fog.near, far: scene.fog.far,
                                 color: scene.fog.color.getHex() } : null),
   // Every attachment marker's world position AFTER the Z-up correction. The
@@ -2835,14 +3315,23 @@ window.__plot = {
     gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, buf);
     const hist = new Array(256).fill(0);
     let ink = 0, max = 0, sum = 0, hash = 2166136261;
+    /* MIN AND `dark` ARE THE PRINT-SIDE HALF, ADDED RATHER THAN SUBSTITUTED.
+       `ink` counts pixels ABOVE the black ground, which is the right question on
+       screen and a meaningless one on white paper — where every pixel is bright
+       and the drawing is what is DARK. Every figure beside them keeps the exact
+       meaning it had, because a great many checks are written against those
+       numbers and a polarity-aware `ink` would quietly move all of them. */
+    let min = 255, dark = 0;
     for (let i = 0; i < buf.length; i += 4) {
       const m = Math.max(buf[i], buf[i + 1], buf[i + 2]);
       hist[m]++; sum += m;
       if (m > 8) ink++;
+      if (m < 247) dark++;
       if (m > max) max = m;
+      if (m < min) min = m;
       hash = (Math.imul(hash ^ m, 16777619)) >>> 0;
     }
-    return { w, h, ink, max, sum, hist, hash };
+    return { w, h, ink, dark, max, min, sum, hist, hash };
   },
   // The view depths the depth dim is solved between, from the app's own sphere
   // and the live camera — so the gate can check the shipped fog against the
