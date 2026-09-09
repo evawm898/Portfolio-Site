@@ -59,6 +59,17 @@ jobs:
       # bloom-frozen-matrices.yml.
       - name: Install render deps (pinned three + playwright)
         run: npm i --no-save three@0.161.0 playwright@1.62.1
+      # GOOGLE'S CHROME APT INDEX IS DROPPED BEFORE THE BROWSER INSTALL, because
+      # `--with-deps` runs `apt-get update` and that index broke on Sep 9: the
+      # repo served a Packages.gz whose SHA256 did not match its own Release
+      # file (Release regenerated 17:16:59 UTC, Packages last modified 09:41:12),
+      # and every run after that timestamp died at "Failed to install browsers,
+      # exit code 100" — 20 seconds in, before any test body ran. Nothing here
+      # installs the google-chrome PACKAGE; Playwright downloads its own
+      # chromium and the system deps `--with-deps` wants come from Ubuntu's
+      # archives. So the source buys nothing and can only break the run.
+      - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
+        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Export STL watertightness (smoke subset on PR/push, full matrix on dispatch/schedule)
