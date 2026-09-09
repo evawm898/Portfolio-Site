@@ -101,8 +101,23 @@ const MUTANTS = [
        mutation removes the second half of it. True, and the claim is worth
        keeping whole: "the boundary is chrome and not ink" is a statement about
        the two blend modes together, not about the frame's alone. */
+    /* AND THE THREE POLARITY CHECKS IT ALSO REDDENS ARE NAMED HERE RATHER THAN
+       TUNED OUT OF, which is what the control is for. All three are TRUE
+       statements about a screen polarity that does not blend additively:
+         * `print-changes-the-blend-mode-…` asserts the screen arm IS additive,
+           and under this mutation it reads `other` (blending 1, not 2);
+         * `additive-clips-where-multiply-does-not` measures the clipping that
+           only accumulation produces — with NORMAL blending nothing
+           accumulates, so 0 pixels clip flat white against print's 469;
+         * `the-polarity-comes-back-as-a-blend-mode-…` reads the blend constant
+           back off the renderer after a restore, and gets `other` too.
+       The mutation breaks the screen polarity wholesale, so everything that
+       asks the screen polarity a question legitimately goes red. */
     breaks: ['blend/the-material-is-additive', 'blend/crossings-exceed-a-single-line',
-             'frame/the-boundary-is-chrome-and-not-ink'],
+             'frame/the-boundary-is-chrome-and-not-ink',
+             'polarity/print-changes-the-blend-mode-and-not-only-the-colours',
+             'polarity/additive-clips-where-multiply-does-not',
+             'restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value'],
   },
   {
     id: 'every-strip-reads-as-a-u-line', file: 'plot-grid.js',
