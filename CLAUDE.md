@@ -992,12 +992,27 @@ VERBATIM SNAPSHOT of that base commit's `buildMatrix()`, where the trio had thre
 `--verify-frozen phase11` went red on row 400 in 24 seconds, which is that check doing its
 job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses the array form
 (`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
-**`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS OWED AND IS NOT PUBLISHED** —
+**`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
+THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
+**(1) THE PUSH FAILS FROM A SESSION** whenever the baseline predates a workflow change —
 session 17's limit, unchanged: a GitHub App token cannot push a tag whose `.github/workflows`
-differs from the default branch's, and #191 changed a workflow after `b323268`. 18 `frozen/*`
-tags are on the remote (phase5 was already absent). One `git push origin
-refs/tags/frozen/phase21` from a clone with a user's credentials is what it needs; by the
-script's own asymmetry argument it is belt-and-braces, since `b323268` is in `main`'s history.
+differs from the default branch's, and #191 changed a workflow after `b323268`. This recurs by
+construction, so expect it again.
+**(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
+TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
+tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
+surface exposes only tag READERS (`get_tag`, `list_tags`, `get_release_by_tag`, `list_releases`,
+`get_latest_release`); the one ref-creating tool, `create_branch`, takes a branch NAME and
+constructs `refs/heads/…`, so it cannot address `refs/tags/…`; and every writing tool
+(`create_or_update_file`, `push_files`) creates a TREE, which is the thing the hypothesis avoids.
+A session with a different tool surface should still attempt the POST — it is an open question,
+not a closed one.
+**(3) IT IS BELT-AND-BRACES, NOT LOAD-BEARING, so do not re-litigate it.** `b323268` is in
+`main`'s history (a squash-merge, #188 — one parent, NOT a merge commit) and `main` is never
+force-pushed here, so the commit cannot be orphaned and the definitions stay replayable without
+the tag. 18 `frozen/*` tags are on the remote (phase5 was already absent) and they remain the
+pattern: **a future baseline should still be tagged whenever it can be** — via the web UI
+(Releases → Tags), or one `git push origin refs/tags/…` from a clone with a user's credentials.
 **THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
 session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
 error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
