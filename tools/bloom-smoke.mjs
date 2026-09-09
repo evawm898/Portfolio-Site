@@ -529,6 +529,33 @@ export const SMOKE_BLOCKS = [
         path: 'the OTHER direction, and the one that fails if buckleFreq or buckleEnv are ever added to FORM_IDS: both at their extremes with no amplitude is a FLAT row and must build one, so the guard must short-circuit and the telemetry must be absent' },
     ],
   },
+  {
+    n: 28,
+    anchor: 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this block adds are the
+       superellipse arm of `tipLaw` (u > uPk), the DEMOTED cap — which is now
+       just the print floor inside widthProfile's `max`, so it needs a row
+       where that floor actually binds over a large share of the apex — and
+       nothing else: the blade rows are still evenly spaced in u until the
+       commit after this one.
+
+       WHY THE ANCHOR IS THE THICKEST SHEET rather than a bare exponent
+       sweep: at the default sheet the floor owns one row of twenty-five, so a
+       row that merely moves the exponent exercises the law and leaves the
+       clamp arm effectively untested. At 2.40 mm the floor doubles and takes
+       a real share of the apex, which is the state that separates "the cap is
+       a print floor" from "the cap is a shape" — the distinction the whole
+       demotion rests on.
+
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: five of Eva's
+       six named states are live-matrix rows only; so are the far-out widest
+       point (where the OLD cap made the exponent inert), SPHERE, and the
+       cleft margin. Cheapest row per path. */
+    rows: [
+      { label: 'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)',
+        path: 'the DEMOTED cap doing its one job — the print floor is the only thing setting the terminal, and it binds over a large share of the apex, so A4 reads the floor and A6 must still recover the asked exponent by fitting on the ACTIVE BRANCH only. A6 fitted through the floor instead reads 0.6080 for an asked 0.60, which is the defect this row exists to catch' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

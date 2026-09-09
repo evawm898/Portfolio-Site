@@ -2984,6 +2984,7 @@ const NU = 56;   // blade rows
    harness can check the frequency ceiling against it rather than restating
    56. `NU` stays the internal name every expression here already uses. */
 export const BLADE_ROWS = NU;
+
 const NV = 10;   // columns across one span
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
@@ -3082,8 +3083,27 @@ export function widthProfile(state, ring, halfW, cap, acc) {
      changes the cap's SHAPE, never its topology — see the cap's own note. */
   const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
 
+  /* THE PETAL TIP LAW (Eva, session 32). Over [uPk, 1] the outline is the
+     SUPERELLIPSE `(1 - s^n)^(1/n)`, s = (u - uPk)/(1 - uPk), exposed as its
+     exponent directly: 0.60 acute, 1.00 a straight point, ~1.20 today's
+     pointed petal, 2.00 the true ellipse, 2.50 the default, 3.00 the
+     held-width round tip. It REPARAMETERISES the tip taper rather than
+     standing beside it — the core already is this family over this region —
+     so there is exactly one producer of the half-width above the peak and
+     `widthProfile()` remains its one owner.
+
+     BELOW uPk THE CORE IS UNTOUCHED. The two limbs meet at the peak, where
+     the core's slope is exactly 0 (uPk is its maximum) and the superellipse's
+     tends to 0 for every n > 1. */
+  const n = state.petalTipShape;
+  const tipLaw = (u) => {
+    if (u <= uPk) return core(u);
+    const s = (u - uPk) / (1 - uPk);
+    return Math.pow(Math.max(0, 1 - Math.pow(s, n)), 1 / n);
+  };
+
   const terms = [
-    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * core(u) },
+    { name: 'CORE', from: stalk ? stalk.until : 0, to: 1, at: (u) => halfW * tipLaw(u) },
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
@@ -3166,20 +3186,29 @@ export function widthProfile(state, ring, halfW, cap, acc) {
     /* The cap's entry and terminal half-widths, reported for the gates and
        the contact sheet rather than re-derived by either. */
     capEntryHalf: hEntry, capTerminalHalf: tipFloor,
+    /* WHICH TERM WON, from the ONE expression that decides it. The turning
+       ladder needs to know where the LAW is the active branch — a kink's
+       turning is a delta function, so it must not integrate through the
+       root-blend or tip-floor joins. Answering that with its own copy of the
+       `max` below would be a second, independent statement of the same fact,
+       which is precisely how this project's most repeated defect starts (the
+       harness predicate that did not know `buckleAmp` existed, session 34).
+       So it is answered HERE, beside the max it is about, and a term added to
+       the max is a term this reads by construction. */
+    lawIsActiveAt(u) {
+      const shape = shapeAt(u), blend = rootBlend(u);
+      return shape >= blend && shape >= tipFloor;
+    },
     halfWidthAt(u) {
       const shape = shapeAt(u);
-      if (u >= uCap) {
-        const s = (u - uCap) / (1 - uCap);
-        /* A STRAIGHT LERP, AND THAT IS THE OPEN QUESTION RATHER THAN A CHOICE.
-           Eva ruled (session 32) that the petal tip law is a SUPERELLIPSE over
-           [widest point, 1], which this last fifth would then be inside — so
-           the cap cannot also own the shape there. Whether it can be demoted
-           from a shape to a print-floor clamp acting only where the outline
-           would fall below the printable minimum is MEASURED and reported in
-           docs/bloom-session-32-outcome.md, not decided here. Until that
-           ruling lands the lerp is what shipped, unchanged. */
-        return hEntry + (tipFloor - hEntry) * s;
-      }
+      /* THE CAP IS DEMOTED (Eva, session 32, from the rendered sheet). It is a
+         PRINT-FLOOR CLAMP and nothing else: the `max` below is the whole of
+         it. It was a SHAPE — a straight lerp owning the last fifth — and that
+         made the ruled default unreachable: an asked n of 2.50 drew as 1.740,
+         because the lerp overwrote exactly the region the law is about.
+         Measured with it demoted, drawn n equals asked n to four decimals at
+         every value on both tapers. `uCap` and the entry half-width are kept
+         as TELEMETRY for the gates and the sheet; nothing reads them to build. */
       return Math.max(shape, rootBlend(u), tipFloor);
     },
   };
@@ -4398,6 +4427,19 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
          intended one, for the same reason row.tUsed exists. */
       lastRowHalf: rows[rows.length - 1].h,
       exportMode: acc.exportMode,
+      /* THE LAW'S OWN TWO NUMBERS, so a gate can read the exponent back off
+         the emitted rows instead of re-deriving where the apex starts. */
+      uPk: profile.uPk,
+      shapeN: state.petalTipShape,
+      /* THE PEAK THE LAW IS NORMALISED AGAINST, declared rather than left to
+         be estimated as the largest emitted row. Those are different numbers
+         the moment the ladder stops putting a row near uPk: measured on the
+         saturated ladder the largest emitted row is 7.9936 mm against a true
+         8.0000, and a fit that takes the emitted maximum as the peak absorbs
+         that into the exponent and reads 1.5014 for an asked 1.50. Reading
+         the sampling as if it were the geometry — this project's own most
+         repeated defect. */
+      peakHalf: profile.halfWidthAt(profile.uPk),
     },
     /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
        ACTUALLY USED, which is the whole point of reporting it here rather
