@@ -44,6 +44,25 @@
   <span class="hint">or drop a grid .glb anywhere on the page</span>
 </details>
 
+<!-- COMPOSITION. Save the whole page as a project file and load one back.
+     The grid .glb is NOT in it — it is ~1.9 MB and it is already on disk — so
+     what is stored is enough identity to notice a mismatch and say what
+     differs, field by field. plot-file.js owns the format; read its header
+     before changing anything about what is written. It sits here rather than
+     in the right-hand column because this column is the one that reads and
+     writes files. -->
+<details id="plot-composition" class="panel" open>
+  <summary>COMPOSITION</summary>
+  <div class="plot-file-row">
+    <button type="button" id="saveComposition">save composition</button>
+    <label class="plot-file-load" for="compositionFile">load composition
+      <input type="file" id="compositionFile" accept=".json,application/json">
+    </label>
+  </div>
+  <span class="hint">or drop a .json composition anywhere on the page</span>
+  <pre id="plot-compstate"></pre>
+</details>
+
 <!-- GRID. What the file turned out to be. `mode` comes from the export's own
      asset.extras and is surfaced because every other number in this project is
      labelled live/export and this one should be too. -->
@@ -55,6 +74,68 @@
 </div>
 
 <div id="plot-side">
+
+<!-- FRAME. Where the picture ends: a crop region in the VIEWPORT's own pixel
+     space, because an aspect ratio is a property of an output image and a
+     boundary defined in grid millimetres would change shape every time the
+     camera turned. plot-frame.js is its one geometry owner — the overlay's
+     vertices, the camera fit, the numbers below and the saved file all read it.
+
+     TWO SHAPES AND A SEPARATE RATIO, so a square is a rectangle at 1:1 and a
+     circle is an ellipse at 1:1 — reachable exactly, rather than as two more
+     named types that could disagree with the ratio control about what they mean.
+
+     THE BOUNDARY IS A DRAWN LINE AND THE EXTERIOR IS NOT VEILED. On a black
+     ground under additive white ink, a dimmed exterior dims only the INK (the
+     ground is already black either way) and a letterbox is indistinguishable
+     from the ground entirely — so wherever the drawing does not reach the edge,
+     which is most of it, neither treatment states where the frame is at all.
+     A line does, everywhere, and it is drawn in the panel's teal so it reads as
+     chrome rather than as ink. Ink outside it is still drawn: this is an
+     indication of the crop, not the crop.
+
+     Note `#plot-framestate` in the DRAW panel below is an unrelated sense of the
+     word — it is the frame TIME. -->
+<details id="plot-frame" class="panel" open>
+  <summary>FRAME</summary>
+
+  <div class="plot-row">
+    <label for="frame">frame</label>
+    <select id="frame">
+      <option value="on" selected>on</option>
+      <option value="off">off</option>
+    </select>
+    <output id="frameOut"></output>
+  </div>
+  <div class="plot-row">
+    <label for="frameShape">shape</label>
+    <select id="frameShape">
+      <option value="rect" selected>rectangle</option>
+      <option value="ellipse">ellipse</option>
+    </select>
+    <output id="frameShapeOut"></output>
+  </div>
+  <!-- The options are written from FRAME_RATIOS at load, not listed here: the
+       ratio a saved file may carry is checked against that same array, and two
+       lists of ratios is one of them being wrong. -->
+  <div class="plot-row">
+    <label for="frameRatio">ratio</label>
+    <select id="frameRatio"></select>
+    <output id="frameRatioOut"></output>
+  </div>
+  <!-- MARGIN INSETS FROM THE SHORTER SIDE, so one number means the same visual
+       gap on a wide window and a tall one, and 0 puts the boundary on the
+       viewport edge at every ratio. -->
+  <div class="plot-row">
+    <label for="frameMargin">margin</label>
+    <input type="range" id="frameMargin" min="0" max="40" step="1" value="6">
+    <output id="frameMarginOut">6%</output>
+  </div>
+
+  <div class="plot-hint">reset view fits the frame &middot; a frame control never moves the camera</div>
+
+  <pre id="plot-frameinfo"></pre>
+</details>
 
 <!-- DRAW. Every control is live — nothing here is a re-export. The two density
      sliders run the same way round (right = every line) and thin the grid out

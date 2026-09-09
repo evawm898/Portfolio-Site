@@ -81,6 +81,24 @@ html, body { margin: 0; height: 100%; background: #000; color: #d8dedd; }
 .panel .err { color: #e07a6a; }
 .panel .warn { color: #d6a15c; }
 
+/* THE COMPOSITION PANEL. A save button and a load control on one row, in the
+   column that already reads and writes files. The file input is styled like
+   LOAD GRID's for the same reason it exists there — this is the second thing
+   on the page you hand a file to. */
+.plot-file-row { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.3rem; }
+.plot-file-row button {
+  background: none; border: 1px solid #2b3333; color: #96a2a1;
+  font: inherit; padding: 0.25rem 0.65rem; cursor: pointer; border-radius: 2px;
+}
+.plot-file-row button:hover { border-color: #6fb7ae; color: #c8d2d1; }
+.plot-file-load { color: #6b7776; font-size: 0.68rem; }
+.plot-file-load input[type=file] { display: block; margin-top: 0.3rem; max-width: 100%; font: inherit; color: inherit; }
+#plot-compstate, #plot-frameinfo {
+  margin: 0.55rem 0 0; padding-top: 0.5rem; border-top: 1px solid #222a2a;
+  white-space: pre-wrap; font: inherit; color: #96a2a1;
+}
+#plot-compstate .ok { color: #6fb7ae; }
+
 #plot-bundle-load input[type=file] {
   display: block; margin-top: 0.3rem; max-width: 100%; font: inherit; color: inherit;
 }
