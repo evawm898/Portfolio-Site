@@ -134,7 +134,13 @@ const MUTANTS = [
              'select/picking-a-petal-deforms-nothing',
              'warp/a-warp-survives-deselection',
              'warp/two-petals-hold-different-warps-at-once',
-             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-warped-count'],
+             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-warped-count',
+             /* AND THE COMPOSITION FILE'S TWO PETAL CHECKS, for the same reason
+                as the eleven above: with no warpable petal there is no handle
+                to drag for a bend offset, and no per-petal warp to save or
+                restore. */
+             'save/a-real-drag-put-an-offset-on-both-bend-sets',
+             'restore/two-petals-come-back-with-their-own-warps'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -469,7 +475,14 @@ const MUTANTS = [
                 previous one's 1.6x / 0.7x into it, so it does not show its own
                 1.00x / 1.00x with its bends at rest. */
              'warp/a-warp-survives-deselection',
-             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch'],
+             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
+             /* AND THE ROUND TRIP, because the gate builds its saved state by
+                PICKING a petal and then writing its scales: under the stamping
+                model the pick itself deforms, so the state that was saved is
+                not the state that comes back. */
+             'restore/every-field-comes-back',
+             'restore/two-petals-come-back-with-their-own-warps',
+             'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
   {
     /* THE OTHER HALF OF THE SAME DEFECT: deselecting throws the warp away, so
