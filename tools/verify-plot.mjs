@@ -237,8 +237,13 @@ const MUTANTS = [
     from: '  if (sph && s.depthDim > 0) {', to: '  if (sph && s.depthDim > 1e9) {',
     // The last of these is on the list only because it became a biconditional:
     // "0 is off" is satisfied by a dim that is never applied at any setting.
+    // And the polarity check joins the list because it is TRUE of this mutation:
+    // with the dim never applied there is no fog at all, so there is no ground
+    // for it to fade into on either polarity. Widened rather than the check
+    // loosened -- the fog being absent is exactly what it should refuse.
     breaks: ['dim/the-far-side-fades', 'dim/the-fog-is-solved-on-the-live-camera',
-             'dim/zero-is-off-and-the-read-out-says-so'],
+             'dim/zero-is-off-and-the-read-out-says-so',
+             'polarity/the-depth-dim-fades-into-the-ground-it-is-on'],
   },
   {
     id: 'the-weight-slider-does-nothing', file: 'plot.js',
@@ -4088,8 +4093,13 @@ async function run({ mutant = null } = {}) {
     fogScreen && fogPrint && fogScreen.color === 0x000000 && fogPrint.color === 0xffffff
     && dimTextScreen.includes('fading into the black')
     && dimTextPrint.includes('fading into the white'),
-    `fog 0x${fogScreen.color.toString(16)} on black and 0x${fogPrint.color.toString(16)} `
-    + `on white, and the read-out names the ground in both`);
+    // THE DETAIL MUST NOT ASSUME ITS OWN PREMISE. `the-depth-dim-is-never-applied`
+    // removes the fog outright, so both of these are NULL under exactly the
+    // mutation this check exists to be red for -- and a `.color` read here threw
+    // and took the whole sweep down instead. Report the absence.
+    `fog ${fogScreen ? '0x' + fogScreen.color.toString(16) : 'ABSENT'} on black and `
+    + `${fogPrint ? '0x' + fogPrint.color.toString(16) : 'ABSENT'} on white, and the `
+    + `read-out names the ground in both`);
 
   check('polarity/the-level-control-is-renamed-and-not-re-identified',
     polScreen.levelWord === 'brightness' && polPrint.levelWord === 'darkness'
