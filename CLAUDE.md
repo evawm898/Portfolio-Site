@@ -44,9 +44,14 @@ figure and reporting "nearly done" four times over. **That "~44" was also a
 LOCAL figure being compared against a CI one** — the smoke tool's speedup ratio
 is measured on the dev machine, the gate runs on a GitHub runner after checkout,
 npm install and a browser install, and the two are not the same measurement.
-Never quote one at the other. Session 34 took `NU` 28 -> 56, so the petal
-triangle count roughly doubles and so does this figure; no replacement constant
-is written here on purpose. **Size a CI waiter off `actions_list` on the
+Never quote one at the other. **SESSION 34 TOOK `NU` 28 -> 56 AND THE GATE DID
+NOT DOUBLE** — measured on the merged head `2ff8d89`, all seven jobs green:
+`bloom-export-watertight` **111.1 min** and `bloom-connectedness` **57.7 min**.
+So roughly doubling the petal triangles moved the export gate about 25% above
+its NU-28 median and left connectedness BELOW its NU-28 self. The "it will
+double" estimate this file carried was the safe read and it was wrong; per-row
+browser and harness overhead, not triangle count, is what dominates. That is
+still not a constant to plan against. **Size a CI waiter off `actions_list` on the
 workflow's own recent completed runs, never off a number in this file** — the
 matrix grows every session, so any figure written down here is stale by
 construction. The smoke
@@ -653,6 +658,31 @@ would assert the instrument's own noise — it is `Object.is` over the emitted p
 of 171,360) and the pixel number is reported, never a bar.
 `node tools/shot-bloom-buckle.mjs <dir> [--quick]` is the sheet;
 `node tools/bloom-wall-thickness.mjs --controls` is the dead-control sweep.
+**TEN CYCLES IS UNREACHABLE AND THE CLAMP IS NOT WHAT BLOCKS IT** (measured after the
+rulings, session 34): the frequency ceiling of 7 is STRUCTURAL —
+`BUCKLE_FREQ_RANGE[1] * BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` — so no amplitude, petal
+or mode reaches the reference photograph's ~10 along one fall. Densest reachable is f 7 on
+`petalLength` 60 + `sheetThickness` 0.60: 0.60x asked -> **0.388x built, clamped**, 8.69 mm
+wavelength, **3.72 mm peak-to-trough in EXPORT** (6.20 live), and it does read as a lettuce
+edge. The same f 7 on the DEFAULT petal is 0.066x / 1.06 mm — **the short thick petal is
+what makes f 7 look shallow, not the exponent.** Petal LENGTH is the strongest lever; a
+thinner sheet is bounded by `MIN_FEATURE_MM` (0.60 floors to 1.00 in export). Ten cycles
+needs `BLADE_ROWS >= 80`. **A session opened to relax the CLAMP would be working the wrong
+control** — see the session-34 outcome doc.
+**A GUARD PREDICATE WITH TWO OWNERS WILL DRIFT, AND `FORM_IDS` IS THE SECOND OWNER.**
+`petalFormIsFlat` in the geometry and `FORM_IDS` in `tools/bloom-harness.mjs` answer the
+same question — is this row flat? — and session 34 extended only the first. Every buckle
+row then read as a flat row reporting form telemetry: **"HARNESS INVALID — 23 validity
+assertion(s) failed. No result above is trustworthy", on a run where all 573 rows
+individually passed.** Both STL gates share it. Adding a form-family control means adding
+it to BOTH, and only the member that decides flatness (the amplitude, never its frequency
+or reach — those are inert at amplitude 0, the curl-family rule).
+**AND A BLOCK COMMENT'S FORMATTING HID BLOCK 27 FROM THE SMOKE CENSUS.** CLAUSE A parses
+`buildMatrix()` for `/^ {2}\/\* (\d+)\. /`; block 27 shipped with a decorative banner, so
+the census could not see it, demanded no smoke row, and **the subset never built a buckled
+petal** — which is why a clean local smoke run could not have caught the above. When you
+add a matrix block, run `node tools/bloom-smoke.mjs --check` and confirm the BLOCK COUNT
+rises: a green census that does not mention your block is not a pass.
 
 **MARGIN BUCKLING SHIPS AS A FIELD WITH NO CONTROLS, AND THE ONE THING THAT IS NOT LIKE CUP
 AND ROLL IS THE NORMAL** (session 33, part 1 of two — read `docs/bloom-session-33-outcome.md`
