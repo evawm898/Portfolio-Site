@@ -69,7 +69,17 @@ jobs:
       # chromium and the system deps `--with-deps` wants come from Ubuntu's
       # archives. So the source buys nothing and can only break the run.
       - name: Drop Google's Chrome apt source (it is not used, and it broke CI)
-        run: sudo rm -f /etc/apt/sources.list.d/google-chrome.list
+        # A GLOB, AND THE DIRECTORY IS LISTED EITHER SIDE OF IT. The first
+        # attempt removed `google-chrome.list` by name and changed nothing:
+        # Ubuntu 24.04 carries the source in deb822 form as
+        # `google-chrome.sources`, so the rm matched no file while the run kept
+        # failing identically. The `ls` lines make the log say what was actually
+        # there and what actually went, so a next failure here is diagnosable
+        # from the log alone instead of by guessing a filename again.
+        run: |
+          echo '--- before ---'; ls -la /etc/apt/sources.list.d/ || true
+          sudo rm -fv /etc/apt/sources.list.d/google-chrome* || true
+          echo '--- after ---'; ls -la /etc/apt/sources.list.d/ || true
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Export STL watertightness (smoke subset on PR/push, full matrix on dispatch/schedule)
