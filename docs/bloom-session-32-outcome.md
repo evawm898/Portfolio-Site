@@ -1339,17 +1339,26 @@ passing, only the three declared pre-existing xfails still failing as expected.
 and `buckle p=6` reads **0.108 mm** against the 0.12 mm bar. Nothing in that
 instrument was touched to get there.
 
-**The redistribution is worth MORE at 1.70 than it was at 2.50.** Apex chord
-error, row count and weighting named on every figure:
+**The redistribution's value, corrected — and the correction is the finding.**
+Every ratio this session reported before now (3.74x / 3.05x at 2.50, then
+5.84x / 5.04x at 1.70) was measured in **LIVE** mode and quoted without naming
+the mode. The exported object's numbers are smaller. Mode named on every
+figure from here, which is this project's own rule and was broken:
 
-| | 28 uniform-in-u | 56 uniform-in-u | 56 turning-rate | ratio |
-|---|---|---|---|---|
-| Eva's reference | 0.1612 | 0.0732 | **0.0125 mm** | 5.84x |
-| default taper | 0.1608 | 0.0732 | **0.0145 mm** | 5.04x |
+| taper | mode | 28 uniform-in-u | 56 uniform-in-u | 56 turning-rate | ratio |
+|---|---|---|---|---|---|
+| Eva's reference | live | 0.1612 | 0.0732 | 0.0330 mm | 2.22x |
+| Eva's reference | **export** | 0.1655 | 0.1609 | **0.1118 mm** | **1.44x** |
+| default taper | live | 0.1608 | 0.0732 | 0.0352 mm | 2.08x |
+| default taper | **export** | 0.1812 | 0.1693 | **0.1054 mm** | **1.61x** |
 
-(3.74x and 3.05x at n 2.50.) The apex turn falls 15.4° → 5.8° on Eva's taper
-and 15.6° → 5.8° on the default. The base chord error is **identical** —
-0.1023 and 0.1293 mm, unchanged by the ladder, as A7 asserts.
+The base chord error is **identical** — 0.1023 and 0.1293 mm, unchanged by the
+ladder, as A7 asserts.
+
+**In EXPORT the row count alone did almost nothing** (0.1655 → 0.1609 on Eva's
+taper): the export floor truncates the tip, so doubling rows buys the apex
+little there and the ladder is the only lever that moves it. That is the
+opposite of the live-mode reading, where 28 → 56 halved the error.
 
 Re-established at the new default: commit one's proof (drawn n equals asked n,
 worst **8.88e-16** over 32 states); commit two's proof (**0 of 8,225,280**
@@ -1425,3 +1434,40 @@ comparison against an unmeasured constant, so the honest reading of §18a is
 fail on a printer". One printed coupon converts the whole family of floors from
 guesses into measurements, and would let §18a's table be read as a real
 buildability limit rather than a self-imposed one.
+
+
+### 18c. THE LADDER IS NOT UNIFORMLY BETTER, AND THAT WAS NOT REPORTED BEFORE
+
+Measured over 9 tapers x 9 exponents, mode named:
+
+| | apex better | apex WORSE | worst apex over all states | whole-blade worst REGRESSES |
+|---|---|---|---|---|
+| **export** (the object) | 52 of 81 | **23 of 81** | 0.3952 → 0.2147 mm (1.84x) | **4 states**, by up to 0.0361 mm |
+| live (the preview) | 56 of 81 | 25 of 81 | 0.3952 → 0.1319 mm (3.00x) | 1 state, by 0.0110 mm |
+
+Most of the 23 do not matter — they are states where the apex error was already
+far below the base kink, so the blade's worst chord is unchanged. **The four
+that do are these**, all EXPORT:
+
+| taper | uPk | `n` | uniform | ladder |
+|---|---|---|---|---|
+| 3 / 0.6 | 0.833 | 1.00 | 0.1786 | **0.2147 mm** |
+| 3 / 0.6 | 0.833 | 1.70 | 0.0658 | 0.0661 mm |
+| 2 / 1 | 0.667 | 1.00 | 0.0877 | **0.1149 mm** |
+| 2 / 1 | 0.667 | 1.20 | 0.0862 | **0.1197 mm** |
+
+All four are **spatulate** tapers — the widest point far out at u 0.67–0.83 —
+at a low exponent. Neither the shipped default taper (1/1.8) nor Eva's
+reference (0.7/0.6) is among them.
+
+**So the honest summary is: the ladder improves the worst case on the object by
+1.84x and makes 23 of 81 states worse at the apex, four of them enough to move
+the blade's worst chord.** That is a materially different trade from the one
+reported when the ruling to ship it was made, and the difference is entirely
+this session's error — a live-mode ratio quoted as if it were the object's.
+
+**It is NOT resolved here.** Two options, neither taken without a ruling:
+ship as measured (a better worst case, some states worse); or gate the ladder
+per state so it can never be worse than uniform — blend toward uniform until
+the emitted chord error is no larger, which is new design work rather than a
+tuning constant, and would need its own witness.

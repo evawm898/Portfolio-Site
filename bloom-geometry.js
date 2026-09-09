@@ -3069,10 +3069,12 @@ export function bladeStations(profile, length, buckle = null) {
   const u0 = held / NU;
   if (held >= NU) return uniform;
 
-  const at = (u) => profile.halfWidthAt(u);
-  /* ASKED, never re-derived — widthProfile() is the one owner of which term
-     wins, and this is the one caller. */
-  const active = (u) => profile.lawIsActiveAt(u);
+  /* THE LADDER'S OWN VIEW, which is the export floor in BOTH modes — see
+     `ladderHalfAt` in widthProfile(). Row positions are topology; the export
+     floor may not move them. ASKED, never re-derived: widthProfile() is the
+     one owner of which term wins, and this is its one caller. */
+  const at = (u) => profile.ladderHalfAt(u);
+  const active = (u) => profile.ladderLawActiveAt(u);
   const tangent = (f, u) => {
     const h = 1e-6, lo = Math.max(u0, u - h), hi = Math.min(1, u + h);
     return Math.atan2(f(hi) - f(lo), (hi - lo) * length);
@@ -3354,6 +3356,29 @@ export function widthProfile(state, ring, halfW, cap, acc) {
     lawIsActiveAt(u) {
       const shape = shapeAt(u), blend = rootBlend(u);
       return shape >= blend && shape >= tipFloor;
+    },
+    /* THE LADDER'S OWN VIEW OF THE PROFILE, AT THE EXPORT FLOOR IN BOTH MODES.
+       Row POSITIONS are topology and the export floor may not touch topology —
+       it "is meant to change geometry and never topology", which is the export
+       gate's own sentence. But `tipFloor` above is mode-dependent by design, so
+       a ladder reading `halfWidthAt` places its rows differently in live and in
+       export; `trimPanels` then splits a cleft at the first row index past
+       `cleft.from`, that index moves, and the two modes emit different numbers
+       of triangles. Measured: 39 of 56 stations differed, and the cleft row
+       came back 28,896 live against 28,576 export.
+
+       THE EXPORT FLOOR IS THE REFERENCE, not the live one, for two reasons:
+       the export is the object, so the printable minimum is a real property of
+       the shape being made rather than a preview convenience; and it is the
+       conservative direction — the larger floor truncates the region where the
+       superellipse is steepest, so the ladder does not crowd rows into a sliver
+       that export flattens anyway. EXPORT-mode stations are therefore
+       unchanged by this and only the live preview's sampling moves, to agree
+       with the object. */
+    ladderHalfAt(u) { return Math.max(shapeAt(u), rootBlend(u), TIP_HALF_MM); },
+    ladderLawActiveAt(u) {
+      const shape = shapeAt(u), blend = rootBlend(u);
+      return shape >= blend && shape >= TIP_HALF_MM;
     },
     halfWidthAt(u) {
       const shape = shapeAt(u);
