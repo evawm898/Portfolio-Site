@@ -1471,3 +1471,77 @@ ship as measured (a better worst case, some states worse); or gate the ladder
 per state so it can never be worse than uniform — blend toward uniform until
 the emitted chord error is no larger, which is new design work rather than a
 tuning constant, and would need its own witness.
+## 18d. THE LADDER'S BLEND CONSTANT WAS TUNED ON THE WRONG MODE, AND RE-DERIVING IT ANSWERS §18c
+
+§18c left two options. Re-deriving `LADDER_ARC_SHARE` on the shipped tree —
+which is what "re-establish the numbers that depend on it" asked for — rules
+one of them out and turns the other into a named trade.
+
+**THE PER-STATE GATE IS NOT AVAILABLE, and the reason is a standing rule
+rather than a cost.** "Blend toward uniform until the emitted chord error is
+no larger" makes the sagitta an INPUT to row placement. This project already
+ruled on that shape of thing when `headRise` was built: *a metric consumed as
+a geometric input becomes a target; the crowding instrument observes the
+geometry and is never an input to it.* The turning measure is not the same
+thing — turning rate is a property of the CONTINUOUS profile, computed in
+closed form from the law, whereas chord error is a property of the EMITTED
+discretisation, which is what an instrument reads. Feeding the second back in
+would give the sagitta gate a build tuned to it, and the gate would then be
+measuring its own fixed point. So §18c's second option is withdrawn, not
+deferred.
+
+**WHAT IS AVAILABLE IS THE BLEND CONSTANT, AND ITS SHIPPED JUSTIFICATION DID
+NOT REPRODUCE.** `bloom-geometry.js` claimed `0.2423 -> 0.1025 mm, 2.36x` over
+9 tapers x 8 exponents and that `0.70 is an interior minimum ... picked by that
+measurement, not by taste`. Traced back: those are two different measurements
+welded into one sentence, and both were **LIVE mode on a scratch
+re-implementation** — the 2.36x from a 9x8 sweep, the 0.55/0.80 readings from a
+different sweep over two configs and six exponents. Neither reproduces here,
+because making the ladder mode-independent (`ladderHalfAt`, §18's topology fix)
+moved every live station. **Fifth instance of the mode-conflation class in this
+session**, and the first one inside shipped source. The comment is corrected.
+
+**RE-MEASURED ON THIS TREE** — 9 tapers x 8 exponents (n 0.60/0.80/1.00/1.20/
+1.70/2.00/2.50/3.00), NU 56, uniform-in-u worst apex 0.3952 mm in both modes.
+`apexWorse` and `wholeWorse` count states worse than uniform; `worstReg` is the
+largest whole-blade regression.
+
+| ARC | EXPORT worst apex | gain | apexWorse | wholeWorse | worstReg | default taper @1.70 | Eva's taper @1.70 |
+|---|---|---|---|---|---|---|---|
+| **0.70 (ships)** | 0.2147 | 1.84x | 21/72 | 4/72 | 0.0361 | **1.61x** | **1.44x** |
+| 0.80 | 0.1992 | 1.98x | 15/72 | 3/72 | 0.0266 | 1.46x | 1.33x |
+| 0.85 | 0.1957 | 2.02x | 15/72 | 2/72 | 0.0308 | 1.37x | 1.27x |
+| 0.90 | 0.1937 | **2.04x** | **14/72** | **1/72** | 0.0284 | 1.29x | 1.22x |
+| 0.95 | 0.1924 | 2.05x | 18/72 | 1/72 | **0.0198** | 1.20x | 1.16x |
+| 1.00 | 0.3017 | 1.31x | 42/72 | **30/72** | 0.1170 | — | — |
+
+**THREE READINGS, none of which is a free win.**
+
+1. **The turning term is load-bearing, now measured rather than argued.** Pure
+   arc length (ARC 1.00, where `beta` diverges) collapses: 1.31x, and 30 of 72
+   states' whole-blade chord WORSE than uniform. The shipped comment's
+   reasoning was right in kind; it just had no number behind it.
+2. **0.70 is not the optimum on this tree.** It is a local minimum in LIVE and
+   is not one in EXPORT (0.80 beats it). The grid optimum is near 0.90–0.95 in
+   both modes.
+3. **But moving there is TAIL AGAINST TYPICAL.** At 0.90 the worst state
+   improves 1.84x -> 2.04x and the whole-blade regressions §18c reported fall
+   from 4/72 to 1/72 — while the SHIPPING DEFAULT's own apex gain drops
+   1.61x -> 1.29x and Eva's reference taper's 1.44x -> 1.22x. The states that
+   get better are spatulate tapers at low exponents that neither the default
+   nor Eva's reference reaches; the states that get worse are the two that do.
+
+**AND THE OBJECTIVE IS NOISY, so it must not be tuned to three digits.** The
+statistic is the worst of 72 states, and it HOPS as the constant moves: 0.75
+spikes to 0.2732 mm in both modes while 0.70 and 0.80 sit near 0.21 and 0.20.
+Each state's sagitta is continuous in ARC; the max over states is not, because
+which interval straddles the apex changes. A decimal place here is sampling,
+not signal — the same discontinuity already recorded for the apex turn angle,
+arriving in the grid maximum.
+
+**RECOMMENDATION, for Eva rather than taken:** keep 0.70. It serves the two
+settings that actually ship, the regressions it costs are 0.0361 mm and under
+on tapers neither the default nor Eva's reference reaches, and the alternative
+buys a tail this project has no evidence anyone visits. The constant is now
+documented as a trade with its sweep, so a later session revisiting it starts
+from numbers rather than from a sentence that did not reproduce.

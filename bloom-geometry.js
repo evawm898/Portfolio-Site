@@ -2997,18 +2997,40 @@ export const BLADE_ROWS = NU;
    both trees.
 
    WHY. Rows evenly spaced in u put the same number through the apex whatever
-   the outline is doing there, and the ruled default (n 2.50) is exactly where
-   the apex turns most. Measured over 9 tapers x 8 exponents at NU 56, the
-   worst apex chord error falls 0.2423 -> 0.1025 mm, 2.36x.
+   the outline is doing there, and the apex turn grows with the exponent
+   across the whole upper half of a range Eva ruled reachable — so the
+   sampling has to serve n 3.00, not only the shipped 1.70. Measured on THIS
+   tree over 9 tapers x 8 exponents at NU 56, worst apex chord error:
+   0.3952 -> 0.2147 mm in EXPORT (1.84x) and 0.3952 -> 0.1319 in LIVE (3.00x).
+
+   NAME THE MODE. An earlier draft of this comment quoted `0.2423 -> 0.1025 mm,
+   2.36x` and attributed it to this sweep. That figure was LIVE mode, measured
+   on a scratch re-implementation, with the ladder reading the LIVE floor —
+   and it does not reproduce here, because making the ladder mode-independent
+   (`ladderHalfAt`, the export floor in both modes, which topology requires)
+   moved every live station. Two different measurements had been welded into
+   one sentence. Fifth instance of this project's mode-conflation class.
 
    THE MEASURE counts TURNING, blended with arc length so no stretch is ever
    starved: `d(theta) + beta * ds/S`, with beta set so arc length carries
-   LADDER_ARC_SHARE of the total. 0.70 is an interior minimum of the worst
-   apex error over that sweep (0.55 reads 0.1052, 0.80 reads 0.1049) and is
-   picked by that measurement, not by taste. It keeps a real turning term:
-   pure arc length is the WRONG weighting here, because an ellipse's apex is
-   precisely where the outline turns fastest, so arc length spaces rows
-   EVENLY through it.
+   LADDER_ARC_SHARE of the total. It keeps a real turning term, and that is
+   MEASURED rather than argued: pure arc length (ARC 1.00, where beta
+   diverges) collapses to 1.31x with 30 of 72 states' whole-blade chord WORSE
+   than uniform, because an ellipse's apex is precisely where the outline
+   turns fastest, so arc length spaces rows EVENLY through it.
+
+   0.70 IS A TRADE, NOT AN OPTIMUM, and re-deriving it is how that was found.
+   On this tree it is a local minimum in LIVE and is NOT one in EXPORT (0.80
+   reads 0.1992 against its 0.2147). The grid optimum sits near 0.90-0.95 in
+   both modes — and moving there is TAIL AGAINST TYPICAL, not a free win: at
+   0.90 the worst state improves 1.84x -> 2.04x and whole-blade regressions
+   fall 4/72 -> 1/72, while the SHIPPING DEFAULT's own apex gain drops
+   1.61x -> 1.29x and Eva's reference taper's 1.44x -> 1.22x (EXPORT, n 1.70).
+   0.70 is kept because it serves the settings that actually ship. Do not tune
+   this to three digits: the objective is the worst of 72 states and it HOPS
+   (0.75 spikes to 0.2732 in both modes while 0.70 and 0.80 sit near 0.14 and
+   0.20), so a decimal place here is sampling, not signal. §18d of
+   docs/bloom-session-32-outcome.md has the full sweep; the value is Eva's.
 
    TURNING IS COUNTED ONLY WHERE THE LAW IS THE ACTIVE BRANCH, AND THIS NOTE
    IS THE POINT OF THE CLAUSE. A kink's turning is a delta function, so
@@ -3385,7 +3407,8 @@ export function widthProfile(state, ring, halfW, cap, acc) {
       /* THE CAP IS DEMOTED (Eva, session 32, from the rendered sheet). It is a
          PRINT-FLOOR CLAMP and nothing else: the `max` below is the whole of
          it. It was a SHAPE — a straight lerp owning the last fifth — and that
-         made the ruled default unreachable: an asked n of 2.50 drew as 1.740,
+         made the upper range unreachable: with 2.50 ruled the default at
+         the time, an asked n of 2.50 drew as 1.740,
          because the lerp overwrote exactly the region the law is about.
          Measured with it demoted, drawn n equals asked n to four decimals at
          every value on both tapers. `uCap` and the entry half-width are kept
