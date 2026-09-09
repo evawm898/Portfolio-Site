@@ -852,12 +852,38 @@ drawn `n` matches asked across the range) and the redistribution (surface unchan
 agreeing on both trees) — never one proof spanning both.
 
 **THE PETAL TIP LAW SHIPS, THE CAP IS A PRINT-FLOOR CLAMP, AND THE BLADE ROWS ARE PLACED BY
-TURNING RATE** (session 32, PR THREE — read §17 of `docs/bloom-session-32-outcome.md` before
-touching any of it). `petalTipShape` (PETAL SHAPE, 0.60–3.00, step 0.05, default 2.50) is the
-superellipse exponent over `[widest point, 1]`, a REPARAMETERISATION of the tip taper rather
-than a control beside it. **The six named states are Eva's ruling and the panel's read-out
-speaks them**: 0.60 acute · 1.00 a straight point · ≈1.20 today's pointed petal · 2.00 the
-true ellipse · 2.50 the default · 3.00 the held-width round tip.
+TURNING RATE** (session 32, PR THREE — read §17 and §18 of `docs/bloom-session-32-outcome.md`
+before touching any of it). `petalTipShape` (PETAL SHAPE, 0.60–3.00, step 0.05, **default
+1.70**) is the superellipse exponent over `[widest point, 1]`, a REPARAMETERISATION of the tip
+taper rather than a control beside it. **The six named states are Eva's ruling and the panel's
+read-out speaks them**: 0.60 acute · 1.00 a straight point · ≈1.20 today's pointed petal · 2.00
+the true ellipse · 2.50 width held then turning · 3.00 the held-width round tip.
+**THE DEFAULT IS 1.70 AND 1.70 IS NOT ONE OF THE SIX** (Eva, ruled from the sheet after the
+wall instrument went red at 2.50). The RANGE IS UNCHANGED, so **2.50 stays reachable and is
+still Eva's preferred LOOK** — only the shipped value moved. The read-out says "between the
+pointed petal and the true ellipse" rather than rounding 1.70 to the nearer anchor, because
+naming it "the true ellipse" would claim a shape the geometry is not drawing. **The
+redistribution is worth MORE at 1.70**: apex chord error 0.0732 → 0.0125 mm on Eva's taper
+(**5.84x**, against 3.74x at 2.50) and 0.0732 → 0.0145 (5.04x) on the default; apex turn
+15.4° → 5.8° at 56 rows. The contact sheet was NOT re-rendered — the cells are per-exponent
+and the law did not move; the cell labelled default is now 1.70.
+**AT HIGH `n` COMBINED WITH HIGH CUP A PETAL SELF-APPROACHES BELOW THE 1.00 mm PRINTABLE GAP,
+AND THAT COMBINATION IS NOT GATED** (§18a). Measured on `SHIPPED cup 1.2`, monotone in `n`:
+1.031 mm at 1.20, **1.031 at the shipped 1.70**, 1.019 at 2.00, **0.977 at 2.50**, 0.832 at
+3.00. Same class as session 34's composition finding — self-approach from two shape controls
+both pushed, no closed form in the individual parameters, neither control alone doing it.
+**The matrix varies ONE CONTROL AT A TIME, so this is invisible to it by construction**, and
+the wall instrument's rows have the same shape. **No range limit, clamp or warning was added**
+— narrowing the range would remove states Eva ruled reachable, on the strength of a threshold
+that is itself a guess. A COMBINATION GATE (a predeclared set of two-control products through
+the wall instrument) is the schedulable item; it is recorded, not pre-empted.
+**AND THE 1.00 mm PRINTABLE GAP IS ITSELF AN UNVALIDATED CONSTANT** (§18b, recorded once):
+NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED, so `MIN_FEATURE_MM`, the printable gap, the
+sheet floor, the foot width and every curvature floor are DECLARED GUESSES rather than
+measurements. **That is not a reason to weaken any of them** — an unenforced number becomes
+folklore within two sessions, and this session's refusal to loosen V5 is why the gate meant
+anything when it went red. It IS the reason the parked cantilever coupon matters: every
+figure above is a comparison against a line we drew ourselves.
 **CAP DEMOTION WAS REQUIRED, NOT PREFERRED**: through the cap the drawn exponent SATURATES at
 1.900 / 2.318 on the two reference tapers whatever is asked, rms 0.62 — the ruled default is
 unreachable. Demoted, drawn n equals asked n at **8.88e-16** over 32 states, fitted ON THE

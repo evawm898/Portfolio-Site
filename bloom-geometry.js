@@ -4543,22 +4543,48 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     }
   }
   const clearance = (() => {
-    const f0 = footS.length, ds = length / NU;
-    const minSep = Math.max(1, Math.ceil((3 * t) / ds));
+    /* THE SEPARATION IS A DISTANCE ALONG THE SPINE, NEVER A COUNT OF ROWS.
+       The flag asks whether the blade comes within one sheet thickness of
+       ITSELF, and it must not answer yes for two rows that are simply
+       neighbours — so it skips rows nearer than three sheet thicknesses along
+       the length. That skip used to be `ceil(3t / (length / NU))`, a ROW COUNT
+       computed from the UNIFORM row pitch, which is the same thing as a
+       distance only while the rows are evenly spaced. Session 32's turning
+       ladder made them not, and the count became wrong exactly where the
+       ladder packs rows: measured on a FLAT, STRAIGHT, UNCURLED blade at the
+       shipping default, rows 50 and 56 sat 0.84 mm apart along the spine and
+       the flag fired on a petal that touches nothing at all.
+
+       Third instance of this bug class in one change — the buckle's
+       rows-per-cycle and C1's station reconstruction are the other two — and
+       the shape is always the same: a count standing in for a length, true
+       only under a uniformity that no longer holds.
+
+       IT REDUCES EXACTLY TO THE OLD TEST ON A UNIFORM LADDER: there
+       `u_j - u_i` is `(j - i) / NU`, so `(u_j - u_i) * length >= 3t` is
+       `j - i >= 3t / ds`, which for integer `j - i` is the old `ceil`. The
+       foot arm asks the same question against the foot's own station, u = 0.
+       Telemetry only — this decides no geometry and moves no bytes. */
+    const f0 = footS.length, sep = 3 * t;
+    const far = (a, b) => Math.abs(rows[b].u - rows[a].u) * length >= sep;
     let minMm = Infinity, rowsAt = [-1, -1];
-    for (let i = f0; i < rows.length; i++) for (let j = i + minSep; j < rows.length; j++) {
+    for (let i = f0; i < rows.length; i++) for (let j = i + 1; j < rows.length; j++) {
+      if (!far(i, j)) continue;
       const a = rows[i].C, b = rows[j].C;
       const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
       if (d < minMm) { minMm = d; rowsAt = [i - f0 + 1, j - f0 + 1]; }
     }
     let minToFootMm = Infinity, footRowAt = -1;
-    for (let i = f0 + minSep; i < rows.length; i++) for (let j = 0; j < f0; j++) {
-      const a = rows[i].C, b = rows[j].C;
-      const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
-      if (d < minToFootMm) { minToFootMm = d; footRowAt = i - f0 + 1; }
+    for (let i = f0; i < rows.length; i++) {
+      if (!(rows[i].u * length >= sep)) continue;
+      for (let j = 0; j < f0; j++) {
+        const a = rows[i].C, b = rows[j].C;
+        const d = Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+        if (d < minToFootMm) { minToFootMm = d; footRowAt = i - f0 + 1; }
+      }
     }
     const nearest = Math.min(minMm, minToFootMm);
-    return { minMm, rows: rowsAt, minToFootMm, footRow: footRowAt, sheetT: t, minSepRows: minSep, selfContact: nearest < t };
+    return { minMm, rows: rowsAt, minToFootMm, footRow: footRowAt, sheetT: t, minSepMm: sep, selfContact: nearest < t };
   })();
   const spine = {
     rows: spineRows,

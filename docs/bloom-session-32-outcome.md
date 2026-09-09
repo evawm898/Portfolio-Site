@@ -1321,3 +1321,107 @@ to tune around.** The three options, with their numbers:
 Nothing was weakened to clear the red, and no assertion was touched. The
 normal fix ships because it is correct on its own terms; the red stands until
 the ruling.
+
+
+---
+
+## 18. THE DEFAULT IS 1.70 (Eva's ruling from the sheet)
+
+The range does **not** change — it stays 0.60 to 3.00, so 2.50 remains fully
+reachable and is still Eva's preferred *look*. What moved is only which value
+ships. The law, the ladder, the cap demotion and both commits' proofs all
+stand; every number below was re-established at the new default rather than
+carried forward.
+
+**The wall instrument is clean at 1.70** — exit 0, all five validity checks
+passing, only the three declared pre-existing xfails still failing as expected.
+`SHIPPED cup 1.2` reads **1.031 mm** against the 1.00 mm gap (3% of headroom)
+and `buckle p=6` reads **0.108 mm** against the 0.12 mm bar. Nothing in that
+instrument was touched to get there.
+
+**The redistribution is worth MORE at 1.70 than it was at 2.50.** Apex chord
+error, row count and weighting named on every figure:
+
+| | 28 uniform-in-u | 56 uniform-in-u | 56 turning-rate | ratio |
+|---|---|---|---|---|
+| Eva's reference | 0.1612 | 0.0732 | **0.0125 mm** | 5.84x |
+| default taper | 0.1608 | 0.0732 | **0.0145 mm** | 5.04x |
+
+(3.74x and 3.05x at n 2.50.) The apex turn falls 15.4° → 5.8° on Eva's taper
+and 15.6° → 5.8° on the default. The base chord error is **identical** —
+0.1023 and 0.1293 mm, unchanged by the ladder, as A7 asserts.
+
+Re-established at the new default: commit one's proof (drawn n equals asked n,
+worst **8.88e-16** over 32 states); commit two's proof (**0 of 8,225,280**
+floats moved with the ladder forced uniform, positive control detecting
+134,280 at 1e-9; **9,600,048** dense samples agreeing at exactly 0.00e+0 mm);
+the mutant table (every family fires on a mutation naming it, silent on the
+clean tree). Triangles unchanged: 19,040 live and export, 929.8 KB.
+
+**The read-out does not call 1.70 a named state, because it is not one.** The
+six names are the ruling and the panel speaks them, but 1.70 sits between the
+pointed petal and the true ellipse and the read-out says exactly that. Rounding
+it to the nearer anchor would be the panel claiming a shape the geometry is not
+drawing.
+
+**The contact sheet was not re-rendered** (it does not need to be — the cells
+are per-exponent and the law did not move). The cell labelled as the default is
+now **n = 1.70**, and **2.50 remains in range as Eva's preferred look rather
+than the shipped default**. The artifact carries that annotation.
+
+### 18a. A REACHABLE COMBINATION THE GATE DOES NOT COVER
+
+**At high `n` combined with high cup, a petal self-approaches below the 1.00 mm
+printable gap.** Measured, `SHIPPED cup 1.2`:
+
+| `n` | cup 1.2 self-approach | `p=6` wall | failing assertions |
+|---|---|---|---|
+| 1.20 | 1.031 mm | 1.128 | 1 |
+| **1.70 (shipped)** | **1.031 mm** | **1.104** | **0** |
+| 2.00 | 1.019 mm | 1.055 | 1 |
+| 2.50 | 0.977 mm | 0.918 | 5 |
+| 3.00 | 0.832 mm | 0.855 | 10 |
+
+Monotone in `n`. **This is the same class as session 34's composition
+finding**: self-approach arising from two shape controls both pushed, with no
+closed form in the individual parameters. Neither control alone does it — the
+shipped default at cup 1.2 clears the gap, and `n` 2.50 on an uncupped blade
+clears it too.
+
+**IT IS A COMBINATION A USER CAN SELECT AND THE GATE DOES NOT COVER**, and that
+is stated here plainly rather than mitigated. The reason is structural: the
+matrix varies **one control at a time**, so a hazard that only exists in a
+product of two settings is invisible to it by construction. The wall
+instrument's rows are the same shape — one axis each, plus the handful of
+compositions session 34 wrote down by hand.
+
+**No range limit, no clamp and no warning dialog was added.** Narrowing the
+range would remove states Eva ruled reachable, on the strength of a threshold
+that is itself a guess (below). This is recorded so a later session can decide
+whether a COMBINATION GATE — a small predeclared set of two-control products
+run through the wall instrument — is worth building. That is the schedulable
+item; nothing here pre-empts it.
+
+### 18b. THE 1.00 mm PRINTABLE GAP IS AN UNVALIDATED CONSTANT
+
+Recorded once, where it can be seen rather than assumed: **nothing in this
+project has ever been printed.** `MIN_FEATURE_MM`, the 1.00 mm minimum
+printable gap, the 1.20 mm sheet floor, the 1.60 mm foot width, the roll and
+spine curvature floors and the 0.50 mm tip waist are all **declared guesses**,
+carried forward from SLS PA12 datasheet figures and from reasoning, never from
+a coupon that came out of a machine.
+
+**That is not a reason to weaken any of them.** A guessed threshold enforced
+consistently is what turns a class of defect into something a gate can catch;
+an unenforced one becomes folklore within two sessions (session 34's own
+ruling). The wall instrument's V5 was correctly refused a loosening in this
+session for exactly that reason, and the refusal is why the gate meant
+anything when it went red.
+
+**It is a reason the parked cantilever coupon matters.** Every number above —
+including the 2.3% by which `n` 2.50 at cup 1.2 misses the bar — is a
+comparison against an unmeasured constant, so the honest reading of §18a is
+"this combination crosses a line we drew ourselves", not "this combination will
+fail on a printer". One printed coupon converts the whole family of floors from
+guesses into measurements, and would let §18a's table be read as a real
+buildability limit rather than a self-imposed one.
