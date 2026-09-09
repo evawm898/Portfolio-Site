@@ -1545,3 +1545,35 @@ on tapers neither the default nor Eva's reference reaches, and the alternative
 buys a tail this project has no evidence anyone visits. The constant is now
 documented as a trade with its sweep, so a later session revisiting it starts
 from numbers rather than from a sentence that did not reproduce.
+
+## 18e. ON THE OBJECT, `NU` 56 BOUGHT THE APEX ALMOST NOTHING — THE LADDER IS DOING ALL OF IT
+
+This bears directly on §18c's remaining choice and was not measured until the
+mode-independence fix made it askable. Apex chord error at n 1.70, uniform-in-u
+at 28 rows -> uniform at 56 -> the ladder at 56:
+
+| taper | mode | 28 uniform | 56 uniform | 56 ladder | 28→56 | 56→ladder |
+|---|---|---|---|---|---|---|
+| default (1/1.8) | LIVE | 0.1608 | 0.0732 | 0.0352 | **2.20x** | 2.08x |
+| Eva's (0.7/0.6) | LIVE | 0.1612 | 0.0732 | 0.0330 | **2.20x** | 2.22x |
+| default (1/1.8) | **EXPORT** | 0.1812 | 0.1693 | 0.1054 | **1.07x** | **1.61x** |
+| Eva's (0.7/0.6) | **EXPORT** | 0.1655 | 0.1609 | 0.1118 | **1.03x** | **1.44x** |
+
+**Doubling the row count halves the apex chord error in LIVE and buys 3–7% on
+the OBJECT.** The reason is the print floor: in export the blade is floored at
+`TIP_HALF_MM` over the last stretch, so a large part of the apex zone is a
+STRAIGHT run, and a straight run has no chord error to resolve however many
+rows are laid through it. The curved region that remains is short, and evenly
+spaced rows put the same few through it at 28 and at 56.
+
+**So the consequence for the decision is sharp: if the ladder is dropped, this
+PR improves the exported apex by 3–7% and nothing else.** The law would still
+ship — that is a shape change and is the point of the PR — but the faceting
+that motivated redistribution in the first place would be essentially where it
+was, on the object, at twice the rows. Margin buckling's `NU` 56 paid for
+itself elsewhere (that is its session's claim, not this one's); it did not pay
+for itself here.
+
+This is reported, not argued into a recommendation: the cost side is §18c's
+21/72 apex regressions and 4/72 whole-blade regressions at up to 0.0361 mm, and
+weighing a 1.44–1.61x typical gain against those is the ruling.

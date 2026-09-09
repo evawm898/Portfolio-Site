@@ -863,9 +863,11 @@ wall instrument went red at 2.50). The RANGE IS UNCHANGED, so **2.50 stays reach
 still Eva's preferred LOOK** — only the shipped value moved. The read-out says "between the
 pointed petal and the true ellipse" rather than rounding 1.70 to the nearer anchor, because
 naming it "the true ellipse" would claim a shape the geometry is not drawing. **The
-redistribution is worth MORE at 1.70**: apex chord error 0.0732 → 0.0125 mm on Eva's taper
-(**5.84x**, against 3.74x at 2.50) and 0.0732 → 0.0145 (5.04x) on the default; apex turn
-15.4° → 5.8° at 56 rows. The contact sheet was NOT re-rendered — the cells are per-exponent
+redistribution's ratios were REPORTED WITHOUT NAMING THE MODE AND WERE LIVE** — this
+project's own rule, broken here. Corrected, apex chord error at n 1.70 over 56 rows,
+uniform-in-u → turning-rate ladder: **EXPORT (the object) 0.1609 → 0.1118 mm on Eva's taper
+(1.44x) and 0.1693 → 0.1054 (1.61x) on the default**; LIVE 0.0732 → 0.0330 (2.22x) and
+0.0732 → 0.0352 (2.08x). The withdrawn figures were 5.84x / 5.04x. The contact sheet was NOT re-rendered — the cells are per-exponent
 and the law did not move; the cell labelled default is now 1.70.
 **AT HIGH `n` COMBINED WITH HIGH CUP A PETAL SELF-APPROACHES BELOW THE 1.00 mm PRINTABLE GAP,
 AND THAT COMBINATION IS NOT GATED** (§18a). Measured on `SHIPPED cup 1.2`, monotone in `n`:
@@ -889,9 +891,25 @@ figure above is a comparison against a line we drew ourselves.
 unreachable. Demoted, drawn n equals asked n at **8.88e-16** over 32 states, fitted ON THE
 ACTIVE BRANCH ONLY. **Fitting through the print floor biases an asked 0.60 to 0.6080** — the
 same bug class as integrating turning through a kink, FOURTH instance here.
-**THE REDISTRIBUTION EARNED ITS PLACE AT NU 56 AND THE GAP DID NOT COLLAPSE**: doubling rows
-halved the apex chord error (0.3525 → 0.1752 mm at the default), and the weighting takes
-another **3.74x / 3.05x** on top; worst over 9 tapers × 8 exponents, **0.2423 → 0.1025 mm**.
+**THE REDISTRIBUTION EARNED ITS PLACE AT NU 56, AND ON THE OBJECT IT IS DOING ALL OF THE
+APEX WORK.** Doubling the rows halves the apex chord error in LIVE (0.1608 → 0.0732 mm at the
+default, n 1.70) and buys almost NOTHING in EXPORT (0.1812 → 0.1693, 1.07x) — the print floor
+truncates exactly the curved stretch the extra rows would have resolved. The ladder then takes
+**1.61x / 1.44x in EXPORT** and 2.08x / 2.22x in LIVE. Worst over 9 tapers × 8 exponents:
+**EXPORT 0.3952 → 0.2147 mm (1.84x)**, LIVE 0.3952 → 0.1319 (3.00x).
+**IT IS NOT UNIFORMLY BETTER, AND THAT IS §18c**: 21 of 72 states are worse at the apex in
+export and 4 states' whole-blade worst chord REGRESSES, by at most 0.0361 mm, all on spatulate
+tapers (widest point at u 0.67–0.83) at low exponents that neither the shipped default taper
+nor Eva's reference reaches.
+**AND `LADDER_ARC_SHARE` = 0.70 IS A TRADE, NOT AN OPTIMUM** (§18d). Its shipped justification
+welded two LIVE-mode sweeps into one sentence and did not reproduce once the ladder was made
+mode-independent. Re-derived: 0.70 is a local minimum in live and is NOT one in export; the
+grid optimum near 0.90–0.95 improves the worst state (1.84x → 2.04x) and the regressions
+(4/72 → 1/72) while COSTING the shipping default (1.61x → 1.29x) and Eva's taper (1.44x →
+1.22x). Kept at 0.70 because it serves what ships. Pure arc length (1.00) collapses to 1.31x
+with 30 of 72 whole-blade regressions, so the turning term is load-bearing — measured, not
+argued. **Do not tune it to three digits: the worst-of-72 objective HOPS** (0.75 spikes to
+0.2732 mm in both modes).
 **THE APEX TURN ANGLE IS NOT THE CRITERION AND CANNOT BE** — it is discontinuous in row
 placement (65.7° or 10.6° on one outline), and at n 1.20 it RISES while the sagitta falls,
 which is the tip-floor join resolving rather than smearing. The sagitta decides.
