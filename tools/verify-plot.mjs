@@ -342,11 +342,29 @@ const MUTANTS = [
     // AND THE PETAL'S TWO, because the pointerdown handler is SHARED: one
     // raycast over both handle sets, one drag plane, one place the orbit is
     // switched off. A mutation there reaches whichever handle is grabbed.
+    /* AND SIX MORE, which say the most useful thing this mutation has to say:
+       A PAGE WHERE EVERY DRAG ALSO ORBITS NEVER SETTLES, so nothing that reads
+       the camera twice can agree with itself. The composition section performs
+       two REAL handle drags to put an offset on the two bend sets, and the
+       camera is still easing when the snapshot and the serialisation are taken
+       a moment apart — so the document does not describe the page, the round
+       trip does not come back, the button's bytes differ from the page's, and
+       the "nothing moves" check watches the ink move. The frame's own identity
+       check goes with them for the same reason at a finer tolerance: it asks
+       two fits to land within 1e-9 of each other. All six named rather than
+       tuned around — the same shape as `a-frame-control-moves-the-camera`
+       reddening a stem check. */
     breaks: ['bend/a-handle-drag-does-not-orbit-the-camera',
              'bend/the-handle-lands-under-the-pointer',
              'zoom/an-idle-frame-is-still-skipped',
              'bend/the-petal-handle-lands-under-the-pointer',
-             'bend/a-petal-handle-drag-does-not-orbit-the-camera'],
+             'bend/a-petal-handle-drag-does-not-orbit-the-camera',
+             'frame/a-boundary-that-is-the-viewport-is-the-fit-the-page-shipped',
+             'save/the-document-describes-the-page-as-it-stands',
+             'save/the-button-writes-what-the-page-serialises',
+             'restore/every-field-comes-back',
+             'restore/a-composition-dropped-on-the-page-is-loaded',
+             'restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves'],
   },
   {
     // The gaussian width stops coming from the neighbours, so adding a control
