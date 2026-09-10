@@ -234,18 +234,32 @@ await cell('05-placed-and-turned.png',
   + 'the droop and the stem, so every millimetre each bloom reports about itself stays in the space '
   + 'its own law is written in.');
 
-// --- two stems ------------------------------------------------------------
-await eachBloom(async (k) => {
-  await set({ stem: 'on', stemDroop: [0, 55, -30][k] ?? 0, stemLength: [170, 120, 230][k] ?? 170 });
+/* --- a stem per bloom ---------------------------------------------------
+   RE-PLACED ALONG GRID Y FOR THIS CELL, AND THAT IS NOT TIDINESS. The droop
+   tips the head from grid +Z toward grid +Y and the Z-up correction sends grid
+   +Y to world −Z, so the whole droop lives in the world Y–Z plane and is only
+   legible from along world X — the stem sheet's own hard-won note. But the
+   shipped PLACEMENT runs along grid X, which is exactly the direction that
+   camera looks down, so the three blooms would stack on top of each other.
+   Moving the row onto grid Y puts it across the screen at the one camera the
+   droop can be read from. Compromising the camera instead would repeat the
+   mistake the stem sheet records. */
+await eachBloom(async (k, n) => {
+  await set({ bloomX: 0, bloomY: (k - (n - 1) / 2) * 130,
+              stem: 'on', stemDroop: [0, 55, -30][k] ?? 0,
+              stemLength: [170, 120, 230][k] ?? 170 });
 });
 await view([1, 0.18, 0.10], 1.02);
 await cell('06-three-stems.png',
   'THREE BLOOMS, THREE STEMS, seen square on to the droop. Each bloom infers its own stem from its '
   + 'own u-lines and carries its own six values — 0° / 55° / −30° over 170 / 120 / 230 mm. '
   + 'This is the state a page-wide stem could not express, and it is why the six controls are a VIEW '
-  + 'of the selected bloom rather than a setting on the page.');
+  + 'of the selected bloom rather than a setting on the page. The row is placed along grid Y here '
+  + 'rather than grid X: the droop is only legible from along world X, and that is the direction the '
+  + 'shipped placement runs in.');
 
 // --- the selection --------------------------------------------------------
+await eachBloom(async (k, n) => { await set({ bloomY: 0, bloomX: k * 92, stem: 'on', stemDroop: 0 }); });
 await selectBloom(1);
 await set({ petalPick: 5 });
 await view(WIDE);
