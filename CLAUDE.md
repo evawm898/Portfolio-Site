@@ -1139,6 +1139,42 @@ the negative control found. **0 moved**, measured two trees x 528 live rows x bo
 comparison detects a 1e-9 perturbation — stronger than the STL hash diff, which quantises to
 float32. No new frozen phase.
 
+**THE GRID EXPORT WRITES EVERY PETAL, AND `petalsAll` IS A SECOND ARRAY RATHER
+THAN A CHANGED ONE** (session of Sep 10, overnight). `buildBloomInto` used to
+retain one petal per DESCRIPTOR, so **RADIAL exported 1 petal of 8** and only
+CONTINUOUS exported all of them — a grid exported from any other placement was
+nearly empty, and it was the last generator-side blocker on `/plot`'s
+composition work. **`built.petals` IS UNTOUCHED AND STILL MEANS ONE ENTRY PER
+RING**, because four of the metrics hook's arrays are INDEX-MATCHED to
+`fr.rings` through it — `petalRingSpine`, `petalRingRootRows`,
+`petalRingFootFrames`, `petalRingApplied`, which are J1's, Z2's and Z6's own
+inputs — and re-keying it per slot would move every one of those
+correspondences for no gain to the export. `built.petalsAll` is every petal the
+builder emitted, in slot order, and `bloom-grid-gltf.js` is its only consumer.
+Two questions, two arrays. **IT COSTS NOTHING TO BUILD:** the capture is a
+property of the ACCUMULATOR, not of retention, so every petal was already
+building its grid and all but one per ring were being thrown away.
+**ZERO BYTES MOVED, MEASURED:** `node tools/verify-bloom-petalsall-bytes.mjs
+--base <worktree>` compares every float of `acc.positions` against a build of
+the base commit's own source, both modes, the full live matrix, with
+`Object.is`; `--control` perturbs one coordinate by 1e-9 and requires the
+comparison to fail, and the run REFUSES to pass vacuously if no row hands the
+exporter more petals than before. **WHAT IT COSTS IN A FILE** (live mode,
+measured): RADIAL 8 x 1 goes 1 -> 8 petals and 38 -> **301 KB**; RADIAL 40 x 3
+goes 3 -> 120 petals at **4,528 KB**; FAN 1 -> 7 at 264 KB; CONTINUOUS is
+unchanged at 302 KB. **The 40 x 3 figure is not clamped** and is the honest
+ceiling — about four times the sample grid's segments, which matters now that
+`/plot` draws several blooms at once. **CLAUSE 9 IN `verify-bloom-grid` IS THE
+WITNESS AND IT IS ANCHORED TO `petalsBuilt`** — the BUILDER's own tally, which
+reaches the module by a different route from either petal array — and it counts
+`petal_N` nodes in the FILE rather than reading the extras a mutation would be
+lying in. Its mutant reverts the exporter to the per-ring array and produces a
+perfectly valid .glb of a perfectly valid petal whose census agrees with itself;
+nothing else in that gate notices. 585 checks over 19 rows, seven mutations.
+**A MUTANT IN THAT GATE MAY NOW CLAIM SEVERAL CLAUSES** — the retention mutant
+genuinely reddens 9 and 7 and both are true about it — and what is still refused
+is a clause nobody claimed. A widening, not a loosening.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
@@ -3846,16 +3882,13 @@ strand modes) is in that doc so it is not re-derived.
    drag costs ~31 ms at three blooms against 8.3 at one. A density slider
    genuinely changes all of them and would still pay the full cost. Measured, not
    built — see the multi-bloom section's cost table.
-2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
-   for the export itself, and it belongs to the GENERATOR, not to this viewer.
-   `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
-   petal of 8** and only CONTINUOUS returns one grid per petal. The shipped
-   sample here is CONTINUOUS, which is why it holds 28 whole petals; a grid
-   exported from any other placement is nearly empty, and `/plot` will draw
-   exactly what it is given. The change is `buildBloomInto`'s retention plus
-   reconciling the gates that read `petals` (the Z-assertions and the metrics
-   hook read one-per-descriptor today) —
-   `docs/bloom-session-28-outcome.md`'s "Standing gaps" has it.
+2. **The `perDescriptor` retention is CLOSED** — see the generator section
+   below. A grid exported from any placement now holds every petal the builder
+   emitted; the shipped CONTINUOUS sample is unchanged, and a RADIAL export goes
+   from 1 petal of 8 to all 8. What `/plot` should know is the SIZE: a RADIAL
+   40 x 3 grid is 120 petals and **4.5 MB**, about four times the sample's
+   segment count, and three of THOSE in one composition is a real number rather
+   than a hypothetical one.
 
 ## Artist Tracker (`artist-tracker.html`)
 

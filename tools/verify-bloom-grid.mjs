@@ -237,7 +237,11 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       emitted.add(key3(accOn.positions[i], accOn.positions[i + 1], accOn.positions[i + 2]));
     }
     let missing = 0, probed = 0, firstMiss = null;
-    for (const p of built.petals) {
+    /* EVERY PETAL, not one per ring — the file holds them all now, so this
+       reconstructs the skin of all of them and the clause covers the whole
+       bloom rather than one blade of each whorl. Strictly more coverage from
+       the same expression. */
+    for (const p of built.petalsAll) {
       if (!p || !p.grid) continue;
       for (const panel of p.grid) {
         for (const r of panel.rows) {
@@ -265,7 +269,7 @@ async function run(geomUrl, gltfUrl, registryUrl) {
        the file to the builder rather than to a formula: the count, the first
        row at exactly 0, strictly increasing stations ending at 1, and the
        file's declared list agreeing with the emitted v-lines. */
-    for (const p of built.petals) {
+    for (const p of built.petalsAll) {
       if (!p || !p.grid) continue;
       const base = p.grid.find((g) => g.label === 'full' || g.label === 'base');
       if (!base) continue;
@@ -296,17 +300,43 @@ async function run(geomUrl, gltfUrl, registryUrl) {
     check('6', json && json.asset.extras.mode === mode, `${row.label}: file says mode ${json && json.asset.extras.mode}, built as ${mode}`);
     check('6', json && json.asset.extras.units === 'mm', `${row.label}: units label missing`);
 
-    const emittedPetals = built.petals.filter((p) => p && p.grid).length;
+    const emittedPetals = built.petalsAll.filter((p) => p && p.grid).length;
     check('7', json && json.asset.extras.petalsEmitted === emittedPetals, `${row.label}: petalsEmitted disagrees with the build`);
     check('7', json && json.asset.extras.petalsBuilt === built.petalsBuilt, `${row.label}: petalsBuilt disagrees with the build`);
     check('7', json && typeof json.asset.extras.retentionNote === 'string' && json.asset.extras.retentionNote.length > 0,
       `${row.label}: no retention note`);
 
+    /* ---- clause 9: EVERY petal the builder emitted is in the file ----
+       This is the claim the retention change makes, and it is the one that
+       would regress silently: `built.petals` is ONE ENTRY PER RING, so a
+       reader that went back to it would write a RADIAL bloom of eight petals
+       as ONE — a perfectly valid .glb of a perfectly valid petal, with a
+       plausible census and a retention note explaining itself. Nothing else in
+       this gate would notice: clause 2 would reconstruct the one petal it was
+       given, clause 3 would find its ladder, clause 5 would validate the file,
+       and the count clauses above compare the file against a build measured
+       the same way.
+         So the number is anchored to `petalsBuilt` — the BUILDER's own tally,
+       computed in the whorl loop and reaching this module by a different route
+       from either petal array. `petal_N` nodes are counted in the file rather
+       than taken from the extras, because the extras are what the mutation
+       would be lying in. */
+    const petalNodes = json ? json.nodes.filter((n) => /^petal_\d+$/.test(n.name || '')).length : 0;
+    check('9', built.petalsAll.length === built.petalsBuilt,
+      `${row.label}: buildBloomInto emitted ${built.petalsBuilt} petals and handed the exporter `
+      + `${built.petalsAll.length}`);
+    check('9', petalNodes === built.petalsBuilt,
+      `${row.label}: the file holds ${petalNodes} petal nodes against the ${built.petalsBuilt} the `
+      + `builder emitted (the per-RING array would give ${built.petals.length})`);
+    check('9', json && json.asset.extras.petalsRetained === built.petalsBuilt,
+      `${row.label}: petalsRetained says ${json && json.asset.extras.petalsRetained}, `
+      + `the builder emitted ${built.petalsBuilt}`);
+
     const p0 = json && json.nodes.find((n) => n.name === 'petal_0');
     check('7', !!p0, `${row.label}: no petal_0 node`);
     if (p0) {
-      const anyForm = built.petals.find((p) => p && p.grid && p.form);
-      const hasForm = !!(built.petals[0] && built.petals[0].form);
+      const anyForm = built.petalsAll.find((p) => p && p.grid && p.form);
+      const hasForm = !!(built.petalsAll[0] && built.petalsAll[0].form);
       /* NULL WHEN FLAT, A NUMBER WHEN NOT — both directions, because a
          constant 1.0 would satisfy the first half of this on every row that
          happens to be flat. */
@@ -315,8 +345,8 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       check('8', hasForm ? (p0.extras.polyline && typeof p0.extras.polyline.min === 'number') : p0.extras.polyline === null,
         `${row.label}: polyline is ${JSON.stringify(p0.extras.polyline)} on a ${hasForm ? 'formed' : 'flat'} build`);
       if (hasForm) {
-        check('8', Math.abs(p0.extras.metric.min - built.petals[0].form.metricMin) < 1e-5
-          && Math.abs(p0.extras.metric.max - built.petals[0].form.metricMax) < 1e-5,
+        check('8', Math.abs(p0.extras.metric.min - built.petalsAll[0].form.metricMin) < 1e-5
+          && Math.abs(p0.extras.metric.max - built.petalsAll[0].form.metricMax) < 1e-5,
           `${row.label}: metric in the file disagrees with the builder's own telemetry`);
       }
       if (anyForm) notes.push(`${row.label}: metric ${anyForm.form.metricMin.toFixed(4)}..${anyForm.form.metricMax.toFixed(4)}`);
@@ -324,7 +354,7 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       /* The attachment node's translation IS the builder's attachment point,
          at float32. */
       const an = json.nodes[p0.children[0]];
-      const ap = built.petals[0].attachment.point;
+      const ap = built.petalsAll[0].attachment.point;
       check('7', an && an.translation.every((v, k) => Math.abs(v - ap[k]) < 1e-4),
         `${row.label}: attachment translation ${JSON.stringify(an && an.translation)} != builder's ${JSON.stringify(ap)}`);
 
@@ -359,7 +389,7 @@ async function run(geomUrl, gltfUrl, registryUrl) {
         /* The v-line at u = 0 must carry the FOOT's half-width, which is the
            whole content of "keep the s = 0 row": a file that kept a blade row
            instead would be uniform in u and wrong about the junction. */
-        check('3', Math.abs(fp.halfWidthMm[0] - built.petals[0].profile[built.petals[0].footRows - 1]) < 1e-6,
+        check('3', Math.abs(fp.halfWidthMm[0] - built.petalsAll[0].profile[built.petalsAll[0].footRows - 1]) < 1e-6,
           `${row.label}: the u = 0 row's half-width is not the foot's`);
       }
 
@@ -407,7 +437,7 @@ async function run(geomUrl, gltfUrl, registryUrl) {
     for (const tilt of [0, 25, 75]) {
       const acc = new MeshBuilder({ exportMode: false, captureGrid: true });
       const b = buildBloomInto(acc, { ...DEFAULTS, petalTilt: tilt });
-      const g = b.petals[0].grid[0].rows, nF = b.petals[0].footRows;
+      const g = b.petalsAll[0].grid[0].rows, nF = b.petalsAll[0].footRows;
       const a = g[nF - 1].normal[4], c = g[nF].normal[4];
       const deg = (Math.acos(Math.max(-1, Math.min(1, dot(a, c) / (nrm(a) * nrm(c))))) * 180) / Math.PI;
       check('4b', Math.abs(deg - tilt) < 1e-6, `frame step across the seam is ${deg.toFixed(4)} deg at petalTilt ${tilt} — expected exactly the tilt`);
@@ -430,7 +460,7 @@ async function run(geomUrl, gltfUrl, registryUrl) {
   {
     const acc = new MeshBuilder({ exportMode: false });
     const b = buildBloomInto(acc, { ...DEFAULTS });
-    check('1b', b.petals.every((p) => !p || p.grid === null), 'a petal carried a grid from an accumulator that was not asked to capture');
+    check('1b', b.petalsAll.every((p) => !p || p.grid === null), 'a petal carried a grid from an accumulator that was not asked to capture');
     let threw = false;
     try { buildGridGltf(b, { mode: 'live', state: {} }); } catch { threw = true; }
     check('1b', threw, 'buildGridGltf produced a file from a build with no captured grid');
@@ -470,6 +500,16 @@ const MUTANTS = [
     to: 'metric: p.form ? { min: round(p.form.metricMin), max: round(p.form.metricMax) } : { min: 1, max: 1 },',
   },
   {
+    /* BACK TO ONE PETAL PER RING — what this module read before the retention
+       change, and what made a RADIAL bloom of eight petals export as one. The
+       file is valid, the petal in it is correct, the census agrees with itself
+       and the retention note explains the gap in prose. Only a count anchored
+       to the BUILDER's own tally can tell. */
+    id: 'the-exporter-keeps-one-petal-per-ring', clause: ['9', '7'], file: 'bloom-grid-gltf.js',
+    from: '  const allPetals = built.petalsAll || built.petals;',
+    to: '  const allPetals = built.petals;',
+  },
+  {
     id: 'mode-defaults-to-live', clause: '6', file: 'bloom-grid-gltf.js',
     from: "  if (mode !== 'live' && mode !== 'export') {",
     to: "  if (mode === undefined) mode = 'live';\n  if (false) {",
@@ -503,15 +543,20 @@ async function negativeControl() {
       } catch (e) {
         fails.push(`threw: ${e.message}`);
       }
+      /* `clause` MAY NAME SEVERAL, and that is a widening rather than a
+         loosening. A mutation that genuinely breaks two clauses has to say
+         both — the retention mutant below reddens clause 9 (the count against
+         the builder's own tally) AND clause 7 (the file's own census against
+         the same build), and both are true statements about it. What is not
+         allowed is a mutation reddening a clause nobody claimed, which is a
+         broken build wearing a negative control's coat. */
+      const claimed = Array.isArray(m.clause) ? m.clause : [m.clause];
       const firedClauses = new Set(fails.map((f) => f.split(':')[0]));
-      const named = firedClauses.has(m.clause);
-      const others = [...firedClauses].filter((c) => c !== m.clause && c !== m.clause + 'b');
-      if (!named) problems.push(`${m.id}: clause ${m.clause} stayed GREEN under its own mutation`);
-      /* A mutation that reddens clauses it did not name is not a negative
-         control, it is a broken build wearing one. `threw` is allowed only
-         for the mode mutant, whose whole point is that nothing throws. */
+      const missed = claimed.filter((c) => !firedClauses.has(c));
+      const others = [...firedClauses].filter((c) => !claimed.includes(c) && !claimed.includes(c.replace(/b$/, '')));
+      for (const c of missed) problems.push(`${m.id}: clause ${c} stayed GREEN under its own mutation`);
       if (others.length) problems.push(`${m.id}: also reddened unnamed clause(s) ${others.join(', ')} — the mutation is not surgical`);
-      console.log(`  ${named && !others.length ? 'OK  ' : 'BAD '} ${m.id.padEnd(30)} clause ${m.clause}  fired: [${[...firedClauses].sort().join(' ')}]  (${fails.length} failures of ${checks} checks)`);
+      console.log(`  ${!missed.length && !others.length ? 'OK  ' : 'BAD '} ${m.id.padEnd(38)} clause ${claimed.join('+')}  fired: [${[...firedClauses].sort().join(' ')}]  (${fails.length} failures of ${checks} checks)`);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -521,7 +566,7 @@ async function negativeControl() {
 
 /* ------------------------------------------------------------------ */
 if (NEG) {
-  console.log('verify-bloom-grid --negative-control: six mutations, each naming the clause it must break\n');
+  console.log('verify-bloom-grid --negative-control: seven mutations, each naming the clause(s) it must break\n');
   const problems = await negativeControl();
   console.log('');
   if (problems.length) {

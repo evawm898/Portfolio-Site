@@ -29,14 +29,17 @@
    the reader cannot identify. `asset.extras.mode` is the label, taken from
    the accumulator that built the geometry, never from a caller's intent.
 
-   THE PETAL COUNT IS REPORTED HONESTLY AND IT IS USUALLY NOT EVERY PETAL.
-   buildBloomInto retains ONE petal per DESCRIPTOR under the layered arm, so
-   a RADIAL bloom of eight petals hands this module one grid, not eight; only
-   CONTINUOUS returns one per petal. `asset.extras.petalsRetained` and
-   `petalsBuilt` are both written and they DIFFER on most designs — a reader
-   comparing them can see the gap rather than counting nodes and concluding
-   the bloom has one petal. Closing that gap is its own change to
-   buildBloomInto and is deliberately not made here.
+   EVERY PETAL IS IN THE FILE, AND THAT WAS NOT ALWAYS TRUE. This module used
+   to read `built.petals`, which is ONE ENTRY PER RING — so a RADIAL bloom of
+   eight petals handed it one grid, not eight, and a grid exported from any
+   placement but CONTINUOUS was nearly empty. It reads `built.petalsAll` now:
+   the same build, every petal the builder emitted, in slot order.
+   `built.petals` is untouched and still means what it meant, because four of
+   the metrics hook's arrays are INDEX-MATCHED to `fr.rings` through it and
+   J1, Z2 and Z6 read them there. Two questions, two arrays.
+   `asset.extras.petalsRetained` and `petalsBuilt` are both still written and
+   now agree on every placement unless a petal's own grid was not capturable —
+   which is a property of that petal, and is what the retention note says.
    =================================================================== */
 
 /* glTF primitive modes, from the spec's own table. Named rather than
@@ -170,8 +173,16 @@ export function buildGridGltf(built, { mode, state, generator = 'bloom-grid-gltf
   let emittedPetals = 0;
   let totalPoints = 0;
 
-  for (let pi = 0; pi < built.petals.length; pi++) {
-    const p = built.petals[pi];
+  /* EVERY PETAL THE BUILDER EMITTED, not one per ring. `built.petals` answers
+     "one representative per RING" and four of the metrics hook's arrays are
+     index-matched to `fr.rings` through it; this file wants the other question,
+     and `petalsAll` is where it is answered. Before this, a RADIAL bloom of
+     eight petals reached here as ONE and the file was nearly empty — a known
+     gap, closed, and the retention note below no longer has anything to
+     apologise for on any placement. */
+  const allPetals = built.petalsAll || built.petals;
+  for (let pi = 0; pi < allPetals.length; pi++) {
+    const p = allPetals[pi];
     if (!p || !p.grid) { skipped++; continue; }
 
     const primitives = [];
@@ -321,12 +332,17 @@ export function buildGridGltf(built, { mode, state, generator = 'bloom-grid-gltf
            buildBloomInto retains one petal per DESCRIPTOR, so a RADIAL bloom
            of eight petals reaches this module as one. A reader must be able
            to see that from the file rather than infer a one-petal bloom. */
-        petalsRetained: built.petals.length,
+        petalsRetained: allPetals.length,
         petalsBuilt: built.petalsBuilt,
         petalsEmitted: emittedPetals,
         petalsSkipped: skipped,
+        /* THE NOTE IS STILL WRITTEN, AND IT NOW SAYS WHAT IS ACTUALLY MISSING
+           RATHER THAN A STANDING CAVEAT. `buildBloomInto` retains every petal;
+           the only way a petal is absent from the file now is that its own grid
+           was not capturable (a panel with fewer than two rows after the foot
+           drop), which is a property of that petal and is worth naming. */
         retentionNote: emittedPetals < built.petalsBuilt
-          ? `${emittedPetals} of ${built.petalsBuilt} petals are in this file. buildBloomInto keeps one petal per descriptor under the layered arm; only CONTINUOUS returns one per petal. This is a known gap, not a property of the bloom.`
+          ? `${emittedPetals} of ${built.petalsBuilt} petals are in this file. The ${built.petalsBuilt - emittedPetals} that are not carried no capturable grid — see petalsSkipped.`
           : 'every petal the builder emitted is in this file',
         footRowsDropped: FOOT_ROWS_DROPPED,
         footDropNote: 'buildPetalInto emits three foot rows, all at u = 0. The two that overhang inward are dropped; the s = 0 row on the ring is kept as u = 0, leaving the rows uniform in u. The cross-section law is continuous across that seam (measured 0.00e+0); the sheet NORMAL turns by petalTilt there, which is the junction geometry and is in the STL too.',
