@@ -64,6 +64,35 @@ read stations **7.11e-2 mm** away from the builder's, a second producer of the p
 inside the instrument written to catch second producers — so every witness reads
 `buildBloomInto`'s own report.
 
+**A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
+FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
+rule, beside mode-and-sampling and the stale-harness-row one). Session 35 read the apex
+sweep's printable ceiling off two curvature instruments that both exclude `u > 0.92`,
+while the sweep acts at `u` 0.84–0.98. It stated that exclusion out loud and then drew
+the conclusion anyway — *"the sweep never binds"* — which was wrong in the direction
+that matters: `measureWall`, which reads emitted points rather than fitting a stencil,
+shows the sweep taking self-approach from a passing 1.031 mm to a failing 0.733 on
+`petalCup` 1.2 × `petalTipShape` 1.80. **Calibration is not coverage.** Before quoting
+an instrument at a feature, check that its own window contains the region the feature
+changes, and say so beside the number.
+
+**AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
+ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
+triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
+are the export contract's own "overlapping closed shells are fine" and are counted
+separately — 4,720 of them on the flat default). Its adjacency exclusion is per
+intersection POINT rather than per pair, so a pair that shares a vertex AND crosses
+elsewhere is still reported; `--prove-exclusion` demonstrates that on a written-down
+pair. **Calibration: the flat default reads exactly 0, a roll-330 fold reads 18,776.**
+Getting there cost two epsilon defects, both the same class — an ABSOLUTE tolerance on
+a determinant whose scale is a volume (flat read 27,356), then an ill-conditioned
+barycentric solve that no epsilon can rescue and that had to be replaced by VERIFYING
+the point (flat read 1,220). **THE FINDING: V4 and V5 pass at every cup value while the
+solid self-intersects from cup 0.60 up** — 750 pairs at the shipped `petalTipShape`
+1.70 with cup 1.20, at the apex, verified identical on a worktree of `main`. V5 is not
+an over-strict proxy; it is blind to this. Sheet thickness and petal scale do not fix
+it. Cost is 387 ms at 19,040 triangles, so the exact census needs no bound.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom

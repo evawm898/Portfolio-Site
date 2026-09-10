@@ -595,3 +595,187 @@ for the buckle. Neither is built, and neither should be without a ruling.
 ruling.** It is a different question from the reach — it is about how the rim's own
 samples are spaced, not about how far a deformation carries — and it belongs to the
 lobe / serration session. Nothing here forecloses it.
+
+---
+
+## 7. THE SELF-INTERSECTION CENSUS — and V5 was not over-reporting, it was blind
+
+**Eva's ruling: the evidence the sweep was judged on did not hold together.** Three
+readings disagreed and only one of them redded. Watertight means no open boundary
+edges; connected means one region; **neither catches a solid that passes through
+itself**, which is the condition that actually breaks a slicer. There was no such
+test anywhere in the gates and V5 had been standing in for one.
+
+`tools/bloom-self-intersection.mjs` is that test.
+
+### 7.1 What it measures, and the scoping decision that is the whole design
+
+The export contract is *"every primitive is an individually closed solid"* and
+**"overlapping closed shells are fine — the slicer unions them."** The bloom relies
+on that: the cleft's lobe panels reach `PANEL_OVERLAP_ROWS` down into the base panel,
+every stamen and style is rooted THROUGH the hub slab, every petal foot sits inside
+the hub. **A census over the whole mesh would report thousands of intersecting pairs
+BY DESIGN and mean nothing** — 4,720 of them on the flat shipping default.
+
+So the census runs WITHIN each closed shell and reports cross-shell hits separately
+as by-design. That is the question the export contract poses, and it is the same
+question a folded petal poses: does THIS sheet pass through ITSELF?
+
+### 7.2 The adjacency exclusion is per intersection POINT, not per pair
+
+Two triangles sharing a vertex meet there; two sharing an edge meet along it. A
+blanket "skip pairs that share a vertex" would also skip a pair that shares a vertex
+**and crosses somewhere else** — a real fold, silently dropped. So every intersection
+point is computed, and a point is discarded only if it IS the shared feature: equal
+to a shared vertex, or lying on the segment between two shared vertices. The
+discarded set is exactly the topology and nothing more.
+
+`--prove-exclusion` demonstrates it on a written-down pair sharing exactly one
+vertex: **arranged to cross elsewhere it reports 1; touching only at the shared
+vertex it reports 0.**
+
+### 7.3 CALIBRATION — and it took two goes, both the same error class
+
+| | |
+|---|---|
+| flat shipping default | **0 within-shell pairs** — exactly zero, PASS |
+| roll 330 (a known fold) | **18,776 pairs**, worst span 1.3837 mm — detected, PASS |
+
+**Two defects in the instrument, both an epsilon that should have been a
+measurement**, and neither would have announced itself:
+
+1. **The parallel test was ABSOLUTE where the quantity is a volume.** `det` is a
+   triple product, so on a millimetre mesh its natural scale is `|e1|·|p|`; an
+   exactly-parallel edge computes to ~1e-17 rather than 0, and a guard of `< 1e-18`
+   let it through with `1/det ≈ 1e17`, manufacturing barycentric coordinates that
+   land in [0,1] by accident. **The flat default read 27,356 within-shell
+   intersections**, every one an edge parallel to the other triangle's plane
+   reporting a hit at its own start vertex. Relative guard: 1,220.
+2. **The barycentric solve is ill-conditioned near parallel and cannot be fixed by
+   any epsilon.** A surviving pair reported `u=1, v=0, t=0` — placing the hit at the
+   edge's start AND at the triangle's second corner, **0.63 mm apart**, on an edge
+   whose direction cosine against the normal was 8.5e-6. No threshold separates that
+   from a real shallow crossing. The fix is to **verify the point** (is it on the
+   segment? is it in the triangle?) rather than trust the solve. Flat then reads 0.
+
+### 7.4 THE VERDICT, per state — EXPORT, 56 × 10
+
+| state | V4 wall | V5 self | census pairs | worst span | sound? |
+|---|---|---|---|---|---|
+| flat — the shipping default | ok | ok | **0** | — | **SOUND** |
+| cup 1.20 × tip **1.70** (the SHIPPING tip) | ok 1.0710 | ok 1.0310 | 750 | 0.1268 mm | **no** |
+| cup 1.20 × tip 1.80 | RED 1.0485 | ok 1.0310 | 748 | 0.1164 mm | **no** |
+| cup 1.20 × tip 2.45 | RED 0.8528 | RED 0.9941 | 771 | 0.1213 mm | **no** |
+| cup 1.20 × tip 3.00 | RED 0.7160 | RED 0.8320 | 785 | 0.1164 mm | **no** |
+| cup 1.2 × tip 1.80 × **sweep 1.00** | RED | RED 0.733 | 668 | 0.4343 mm | **no** |
+| cup 1.2 × tip 2.45 × **sweep 1.00** | RED | RED 0.482 | 579 | 1.6379 mm | **no** |
+| cup 1.2 × tip 3.00 × **sweep 1.00** | RED | RED | 537 | 2.0437 mm | **no** |
+| buckle at the clamp (A 0.60, f 3) | ok | ok | 8 | 0.0179 mm | **no** |
+| buckle at the frequency ceiling (f 7) | ok | ok | **0** | — | **SOUND** |
+| twist 180 | ok | ok | **0** | — | **SOUND** |
+| curl 360 | — | — | 1,008 | 0.5233 mm | no |
+| roll 330 | RED (xfail) | RED (xfail) | 18,776 | 1.3837 mm | no |
+| all form at maximum | RED (xfail) | RED (xfail) | 11,056 | 1.7810 mm | no |
+
+### 7.5 **V5 WAS NOT OVER-REPORTING. IT IS BLIND TO THIS FAILURE.**
+
+Eva offered two branches — the census contradicts V5, or it confirms it. **Neither is
+what happened.** The onset table is the finding:
+
+| cup | V4 wall | V5 self | census |
+|---|---|---|---|
+| 0.00 – 0.50 | ok | ok | 0 — SOUND |
+| **0.60** | ok 1.1085 | ok 1.1785 | **12 pairs** |
+| 0.80 | ok 1.0890 | ok 1.1494 | **375**, 0.2104 mm |
+| 1.00 | ok 1.0776 | ok 1.1020 | **679**, 0.2022 mm |
+| 1.20 | ok 1.0710 | ok 1.0310 | **750**, 0.1268 mm |
+
+**V4 and V5 pass at EVERY cup value, including 1.20 where the solid genuinely
+self-intersects in 750 triangle pairs.** So V5 is not a conservative proxy that
+over-reports — it misses the failure entirely, and only starts complaining much later
+when the TIP SHAPE is also pushed. The ruling's second branch is the closer one:
+**the shapes really are unsound, and they are unsound earlier and more widely than
+V5 ever said.**
+
+**WHERE, and the mechanism, read off a pair by hand rather than inferred.** Every
+worst case sits at radius 39.7–40.2 mm of a 40 mm petal — the apex. The worst pair on
+the shipping tip is `T1[1] = (28.0338, −28.0419)` against `T2[0] = (28.0419,
+−28.0338)`: **mirror images across the petal's own midrib**, normals 64.7° apart,
+centroids 0.0764 mm apart. At the terminal row the blade is 1.6 mm wide and 1.2 mm
+thick and cup lifts each margin 0.96 mm — **a sheet that thick bent into a V that
+narrow must invert its inner offset.** It is geometrically necessary, not a bug in a
+blend.
+
+**IT IS PRE-EXISTING, verified on a real worktree of `main` at `a827b6d`** rather than
+inferred from the byte-identity claim: flat 0, cup 1.20 × tip 1.70 → 750 / 0.1268 mm,
+tip 2.45 → 771 / 0.1213, tip 3.00 → 785 / 0.1164 — **identical to this branch**, which
+independently corroborates that the apex sweep moves nothing at its default.
+
+**AND SHEET THICKNESS AND PETAL SCALE DO NOT FIX IT** — the ruling's proposed next
+question, answered while the instrument was open. At cup 1.20:
+
+| variation | pairs | worst span |
+|---|---|---|
+| as shipped (sheet 1.20, length 40) | 750 | 0.1268 mm |
+| sheet 0.60 (the thinnest reachable) | 481 | **0.2240 mm** |
+| sheet 2.00 | 1,408 | 0.4354 mm |
+| petalLength 60 | 799 | 0.2340 mm |
+| petalWidth 24 | 798 | 0.1259 mm |
+| petalWidth 8 | 840 | 0.4039 mm |
+| tipThinning 1 | 470 | 0.2240 mm |
+
+None clears it, and a thinner sheet makes the worst crossing DEEPER while making it
+rarer. The lever is the apex's own terminal width against the sheet thickness, which
+is `TIP_HALF_MM` and `MIN_FEATURE_MM` — not a blend shape and not a scale.
+
+### 7.6 Cost — no bound needed
+
+| mesh | triangles | census |
+|---|---|---|
+| shipping default | 19,040 | 387 ms |
+| cup 1.20 | 19,040 | 627 ms |
+| roll 330 (18,776 hits) | 19,040 | 590 ms |
+| CONTINUOUS 40 petals | 94,432 | 6.0 s |
+| CONTINUOUS 40 + cup 1.2 | 94,432 | 8.8 s |
+
+Exact, via a uniform grid over triangle AABBs — a pair is tested only if their boxes
+share a cell, which cannot miss an intersecting pair because intersecting triangles
+have overlapping boxes. **Sub-second on a typical row against a gate that already
+runs 74–118 minutes, so the exact census needs no bound.**
+
+### 7.7 What V5 should become — proposed, not done
+
+**Do not delete it and do not weaken its bar.** Three separate properties are in play
+and they were being carried by two instruments:
+
+1. **Self-intersection** — does the shell pass through itself? **The census owns
+   this, and it is the printability verdict.** Nothing else measures it.
+2. **Offset inversion** — is the emitted wall as thick as declared? **V4 owns this**
+   and it stays exactly as it is; it is a real and distinct property.
+3. **The printable air gap** — are two parts of the sheet that are far apart *along
+   the surface* too close in space for a slicer to keep them separate? That is what
+   V5 was reaching for, it is a genuine printability question, and it is **not**
+   self-intersection.
+
+So the proposal is to **re-scope V5 to (3) under its own name** — a MINIMUM GAP
+assertion — and fix its exclusion at the same time, because as implemented it is
+wrong for that purpose too: its ±2-ROW index window is 1.4 mm of blade at NU 56, so
+it reads the chord under an arc rather than a gap (a flat build reports 0.6219 mm).
+The convention calibrated in §6.5d is the fix — the **undeformed sheet's own in-plane
+distance**, at which a flat build reads its own 3.600 mm bar by construction.
+
+**AND THE CENSUS CANNOT BE WIRED AS A HARD GATE TODAY**, because it reds on shipped
+geometry from cup 0.60 up. Landing it means a declared xfail list measured on `main`
+— exactly the pattern session 34 used for `SELF_XFAIL`, and for the same reason: an
+unenforced number becomes folklore within two sessions, but a gate that reds the
+whole matrix on day one gets disabled. That is a ruling, and it is not made here.
+
+### 7.8 The free cross-check is out
+
+The exact STL for `petalCup` 1.20 × `petalTipShape` 2.45 — EXPORT, 56 × 10, every
+other control at its default, 19,040 triangles, 930 KiB, boundary edges 0 — was
+emitted to the conversation. The census on those exact bytes: **771 within-shell
+intersecting pairs, worst span 0.1213 mm, at the apex.** If the slicer accepts that
+file cleanly, the census is over-strict and this whole section needs revisiting; if
+it refuses or produces garbage at the petal tips, the census is right and so is
+§7.5. **That reading outranks every instrument here.**
