@@ -1375,14 +1375,14 @@ const PETAL_HANDLE_MAT = handleMaterial(0xd6a15c);
 const BLOOM_HANDLE_GEOM = new THREE.OctahedronGeometry(1, 0);
 const BLOOM_HANDLE_MAT = handleMaterial(0xd66f9a);
 const BLOOM_HANDLE_MAT_MUTED = handleMaterial(0xd66f9a);
-BLOOM_HANDLE_MAT_MUTED.opacity = 0.45;
+BLOOM_HANDLE_MAT_MUTED.opacity = 0.6;
 let bloomHandleObjs = [];
 /* In grid mm, from the bloom's own width so it is the same size against its
    bloom whatever the grid was exported at, then through the bloom's scale. */
 const bloomHandleRadiusFor = inst => {
   const b = inst.localBounds;
   const width = b ? Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1]) : 60;
-  return Math.max(1.2, width * 0.035) * meanScale(inst.transform);
+  return Math.max(1.5, width * 0.05) * meanScale(inst.transform);
 };
 // In grid mm, from the axis's own length, so a handle is the same size on
 // screen whatever the axis is set to rather than a dot on a long stalk. The

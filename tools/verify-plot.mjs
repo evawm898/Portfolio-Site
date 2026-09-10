@@ -1417,18 +1417,30 @@ const MUTANTS = [
     id: 'grabbing-an-anchor-does-not-select-its-bloom', file: 'plot.js',
     from: "    setSelectedInstance(dragging.userData.instance);\n    dragging = bloomHandleObjs[dragging.userData.instance] || dragging;",
     to: "    void 0;",
+    /* AND TWO MORE THE CONTROL FOUND UNCLAIMED, both true about it: `landed` reads
+       the SELECTED bloom's anchor, which under this mutation is bloom 1's and
+       did not move (asked 610.7, stood at 360.2); and the one-field check turns
+       a slider on the selected bloom, which is not the dragged one, so its
+       `turn z` lands elsewhere. Named, not tuned out. */
     breaks: ['anchor/grabbing-an-anchor-selects-its-bloom',
-             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag'],
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag',
+             'anchor/the-anchor-lands-under-the-pointer',
+             'anchor/a-transform-slider-writes-only-its-own-field'],
   },
   {
-    /* THE SLIDERS WITHOUT THE BLOOM: the panel is loaded from the store but the
-       store is never written — the anchor and the lines stay where they were. */
+    /* THE STORE IS NEVER WRITTEN: the drag selects, rebuilds and loads the panel
+       from a store it did not move, so the anchor and the lines stay where they
+       were. It was first claimed to break the sliders-and-geometry agreement
+       check and the control said MISSED, which is the honest direction: with
+       nothing moved the sliders, the read-out and the geometry agree TRIVIALLY,
+       and that check is about agreement, not motion — motion is the first
+       check's claim. The one-field check reddens because the position stays at
+       whole millimetres, which is a true statement about it. */
     id: 'a-bloom-drag-updates-the-sliders-and-not-the-bloom', file: 'plot.js',
     from: "  inst.transform = { position: [v.x, v.y, v.z],\n                     rotationDeg: inst.transform.rotationDeg.slice(),\n                     scale: inst.transform.scale.slice() };",
     to: "  inst.transform = { position: inst.transform.position.slice(),\n                     rotationDeg: inst.transform.rotationDeg.slice(),\n                     scale: inst.transform.scale.slice() };",
     breaks: ['anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
              'anchor/the-anchor-lands-under-the-pointer',
-             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag',
              'anchor/a-transform-slider-writes-only-its-own-field'],
   },
   {
