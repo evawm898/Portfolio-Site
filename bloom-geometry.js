@@ -4370,23 +4370,63 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
 }
 
 /* ===================================================================
-   buildPetalInto — one petal: thin SOLID sheet panels, closed by
-   construction.
+   petalSurface — THE PETAL'S MID-SURFACE, EVALUABLE AT ANY (u, v).
 
-   Layout along the local length coordinate s, unchanged from the
-   placeholder because the FOOT IS SETTLED AND OWNED:
-     s in [-overhang, 0]   the FOOT — flat in the hub plane (z = ring
-                           plane), constant half-width ring.width / 2. Three
-                           rows. The silhouette layer never writes these.
-     s in (0, length]      the BLADE — tilted by petalTilt about the ring
-                           tangent, half-width from widthProfile(), domain
-                           from trimPanels(), and 3D FORM from petalForm().
-                           28 rows.
+   WHY IT EXISTS. Until session 37 the surface law lived inside
+   buildPetalInto's row loop, so the only points on a petal anyone could ask
+   for were the NU stations the mesh happens to sample. Everything that wants
+   the surface between them was blocked on that, and two consumers had already
+   written the blockage down: `tools/bloom-sagitta.mjs`'s header ("reaching
+   [the 3D margin] needs the row construction callable at arbitrary `u` — a
+   closure inside `buildPetalInto`"), and the flower's Voronoi/veins port,
+   whose cell vertices land wherever the diagram puts them and never on a row.
 
-   Returns the petal's own measurements for the metrics hook, so the gates
-   and the contact sheet ASK THE BUILDER rather than recomputing anything.
+   WHAT IT IS. A factory over one petal's constants returning:
+     rowAt(u)  the ROW PLAN at u — spine centre, frame, half-width, and the
+               row's own `sect(v)`. It IS the object the row loop pushes.
+     at(u, v)  the front door: `rowAt(u).sect(v)`, giving the mid-surface
+               point and its unit normal.
+   `at` is NOT a second statement of the law — it is `rowAt` applied. This is
+   the same shape /plot's `stemPointFromPlan` / `stemPointAt` pair already has,
+   and for the same reason: the per-station work (a spine evaluation, a frame,
+   a half-width) is a property of the STATION, not of the column, so a caller
+   walking one row pays it once while a caller asking for one point still goes
+   through the one owner.
+
+   WHAT IT DOES NOT OWN, stated here rather than discovered later:
+
+   - THE LADDER. `bladeStations()` decides WHICH u the mesh samples; this
+     decides what the surface IS there. Two different questions, and folding
+     the ladder in would make the evaluator a function of the mesh it is
+     supposed to be independent of.
+
+   - THE BUCKLED NORMAL. `sect(v).n` here is the CROSS-SECTION's normal, which
+     is the emitted normal on every build with no buckle — which is every
+     shipping state (`buckleIsFlat` holds unless BOTH buckleAmp and buckleFreq
+     are non-zero). On a buckled build buildPetalInto then wraps each blade
+     row through `trueNormalRows`, which crosses dP/dv against a difference
+     over the NEIGHBOURING ROWS. That is a LATTICE quantity by construction —
+     it is a function of where the ladder put the rows — so it cannot live in
+     a continuous evaluator, and a continuous dP/du here would NOT reproduce
+     the emitted normal at the stations. The honest split is: this owns the
+     surface, `trueNormalRows` owns the offset direction the mesh is built on.
+     Off-station on a buckled build, `n` is the cross-section normal and the
+     measured gap to the emitted one is in docs/bloom-session-37-outcome.md.
+
+   - THE FOOT'S SURFACE. `footRowsAt()` is here because it is built from the
+     same constants, but the three foot rows all carry u = 0 and are a
+     different surface with a different width law. They are not reachable
+     through `at`, and differencing across that seam is a derivative of
+     nothing.
+
+   `acc` IS REQUIRED, NOT DEFAULTED. widthProfile() reads `acc.exportMode` to
+   choose the tip's terminal floor and thicknessProfile's `tAt` reads
+   `acc.floorThickness`, so a null accumulator would silently build the LIVE
+   surface whatever mode the caller meant — a mode decision by omission. Pass
+   the accumulator you will emit into, or one in the mode you want to ask
+   about.
    =================================================================== */
-export function buildPetalInto(acc, state, ring, slot, cap = null) {
+export function petalSurface(state, ring, slot, cap, acc) {
   /* READ from footRing(), never a second floorThickness() of the same
      constant. Identical value, one producer. */
   const t = ring.thickness;
@@ -4467,7 +4507,6 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     n: N,
   });
 
-  const rows = [];
   /* THE FOOT — three flat rows in the hub plane. NOTHING in the form layer
      reaches them: they are emitted here, from footRing()'s quantities only,
      before any curve exists. That is the whole junction argument, and
@@ -4515,14 +4554,22 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     }
     return out;
   };
-  if (dome === null) {
-    for (const s of footS) {
-      const C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z];
-      rows.push({ C, N: Z, T, h: footHalf, u: 0, sect: flatSect(C, Z, footHalf) });
+  /* THE FOOT ROWS, built on demand rather than into a shared array: an
+     evaluator handing every caller the same three mutable objects would let
+     one caller's `tUsed` and one caller's `trueNormalRows` wrap reach
+     another's. Same three expressions, same order, fresh objects. */
+  const footRowsAt = () => {
+    const out = [];
+    if (dome === null) {
+      for (const s of footS) {
+        const C = [R[0] * (ring.radius + s), R[1] * (ring.radius + s), slot.z];
+        out.push({ C, N: Z, T, h: footHalf, u: 0, sect: flatSect(C, Z, footHalf) });
+      }
+    } else {
+      for (const row of domeRows(1 / dome.Rd)) out.push(row);
     }
-  } else {
-    for (const row of domeRows(1 / dome.Rd)) rows.push(row);
-  }
+    return out;
+  };
 
   /* THE BLADE FRAME ROTATES RIGIDLY WITH THE FOOT: on the dome the tilt is
      measured from the tangent plane's outward direction (which points DOWN
@@ -4582,26 +4629,85 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       return { C: [base[0] + Rs[0] * dR + Up[0] * dZ, base[1] + Rs[1] * dR + Up[1] * dZ, base[2] + Rs[2] * dR + Up[2] * dZ], phi };
     };
 
-  /* THE ONE READ of the ladder. The row COUNT is NU exactly as before; only
-     where each row sits has moved, and it moved as a function of the profile
-     alone, so this samples the same surface differently. */
-  const stations = bladeStations(profile, length, form && form.buckle);
-  for (let i = 1; i <= NU; i++) {
-    const u = stations[i - 1];
+  /* ===================================================================
+     THE ROW PLAN AT ANY u — the ONE owner, and one return.
+
+     Every expression below is the row loop's own, character for character;
+     what changed is only that it is reachable at a u the mesh does not
+     sample. The flat arm is written as a ternary on a frame that is `null`
+     when there is no form, rather than as an early return, so there is a
+     single return path AND `form.frameAt` is still never called on a flat
+     build — the guard doctrine the whole builder rests on.
+     =================================================================== */
+  const rowAt = (u) => {
     const s = u * length;
     const h = profile.halfWidthAt(u);
     const { C, phi } = spineAt(s);
-    if (!form) { rows.push({ C, N: nrm, T, h, u, sect: flatSect(C, nrm, h) }); continue; }
     /* The row's own frame, READ from petalForm's frameAt rather than
        recomputed here — the contact sheet's framing reads the same
        function, and two copies of a frame is how this project's most
        repeated defect starts. Twist follows the spine because frameAt
        rotates about the CURRENT length direction; see the ordering
        argument in petalForm's header. */
-    const f = form.frameAt(Rs, T, phi, u, dome === null ? null : Up);
-    rows.push({ C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) });
-  }
+    const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
+    return f === null
+      ? { C, N: nrm, T, h, u, sect: flatSect(C, nrm, h) }
+      : { C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) };
+  };
 
+  return {
+    /* THE FRONT DOOR. `rowAt` applied — never a second law. */
+    at: (u, v) => rowAt(u).sect(v),
+    rowAt, footRowsAt,
+    /* The petal's constants, so a consumer reads them from the one place
+       that derived them instead of re-deriving any of them. */
+    t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
+    profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
+    floorRadius, uniformThickness, profileT, tAt,
+  };
+}
+
+/* ===================================================================
+   buildPetalInto — one petal: thin SOLID sheet panels, closed by
+   construction.
+
+   Layout along the local length coordinate s, unchanged from the
+   placeholder because the FOOT IS SETTLED AND OWNED:
+     s in [-overhang, 0]   the FOOT — flat in the hub plane (z = ring
+                           plane), constant half-width ring.width / 2. Three
+                           rows. The silhouette layer never writes these.
+     s in (0, length]      the BLADE — tilted by petalTilt about the ring
+                           tangent, half-width from widthProfile(), domain
+                           from trimPanels(), and 3D FORM from petalForm().
+                           NU rows, at the stations bladeStations() picks.
+                           (This said "28 rows" from the placeholder until
+                           session 37; NU has been 56 since session 32.)
+
+   THE SURFACE LAW IS NOT HERE — it is petalSurface() above, and this reads
+   it. What stayed: the ladder (which u to sample), the true-surface-normal
+   wrap (a lattice quantity), the panels, and every measurement the gates and
+   the contact sheet ask the builder for.
+
+   Returns the petal's own measurements for the metrics hook, so the gates
+   and the contact sheet ASK THE BUILDER rather than recomputing anything.
+   =================================================================== */
+export function buildPetalInto(acc, state, ring, slot, cap = null) {
+  /* ONE construction of the surface, and every constant below is READ off
+     it. A builder that re-derived any of them beside the evaluator would be
+     the two-producers defect this project repeats most. */
+  const surface = petalSurface(state, ring, slot, cap, acc);
+  const {
+    t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
+    profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
+    uniformThickness, profileT, tAt,
+  } = surface;
+
+  const rows = surface.footRowsAt();
+  /* THE ONE READ of the ladder. The row COUNT is NU exactly as before; only
+     where each row sits has moved, and it moved as a function of the profile
+     alone, so this samples the same surface differently. */
+  const stations = bladeStations(profile, length, form && form.buckle);
+  for (let i = 1; i <= NU; i++) rows.push(surface.rowAt(stations[i - 1]));
   /* ===================================================================
      THE TRUE SURFACE NORMAL — the ONE place the offset direction stops being
      the cross-section's own normal, and the reason session 33 exists.
