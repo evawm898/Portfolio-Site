@@ -127,6 +127,8 @@ const MUTANTS = [
        a bend offset cannot be dragged for. All true, all worth keeping whole,
        and the breadth is the finding: a cache that trusts its routing has no
        small failure mode. */
+    /* AND THE ANCHOR DRAG, five checks, found by the control and all true: a
+       dragged bloom served from its own cache is a bloom that does not move. */
     breaks: ['stem/every-drawn-u-line-is-continued-and-no-other',
              'stem/the-continuation-runs-from-the-foot-to-the-root',
              'stem/the-seam-is-zero-on-every-drawn-line',
@@ -150,7 +152,12 @@ const MUTANTS = [
              'partial/a-per-instance-change-rebuilds-one-bloom',
              'partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
              'partial/every-control-draws-what-a-full-rebuild-would-draw',
-             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms',
+             'anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+             'anchor/a-drag-rebuilds-one-bloom-and-pays-the-drag-tail',
+             'anchor/the-patched-pack-is-the-full-pack',
+             'anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag'],
   },
   {
     /* AND THE CACHE STOPS CHECKING WHAT IT WAS BUILT UNDER. Under correct
@@ -1106,6 +1113,9 @@ const MUTANTS = [
     id: 'the-import-replaces-instead-of-adding', file: 'plot.js',
     from: '  resetCompositionState();\n  instances.push(inst);',
     to: '  resetCompositionState();\n  instances.length = 0;\n  instances.push(inst);',
+    /* AND EVERY ANCHOR CHECK, for the reason the counter checks already went:
+       the section is written at three blooms and this leaves the page with one,
+       so there is no unselected anchor to grab and nothing downstream runs. */
     breaks: ['add/a-dropped-grid-is-added-beside-the-one-already-there',
              'add/the-new-bloom-lands-clear-of-the-old-one',
              'add/the-file-input-adds-a-grid-too',
@@ -1131,7 +1141,17 @@ const MUTANTS = [
              'partial/a-global-change-rebuilds-every-bloom',
              'partial/a-view-only-change-rebuilds-no-bloom-and-still-moves-the-handles',
              'partial/a-change-misrouted-as-per-instance-is-not-served-from-cache',
-             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms',
+             'anchor/every-bloom-carries-an-anchor-at-its-placed-origin',
+             'anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+             'anchor/grabbing-an-anchor-selects-its-bloom',
+             'anchor/the-anchor-lands-under-the-pointer',
+             'anchor/a-drag-rebuilds-one-bloom-and-pays-the-drag-tail',
+             'anchor/the-patched-pack-is-the-full-pack',
+             'anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag',
+             'anchor/an-anchor-drag-does-not-orbit-the-camera',
+             'anchor/a-transform-slider-writes-only-its-own-field'],
   },
   {
     /* A NEW BLOOM LANDS AT THE ORIGIN. Under additive ink on black, a second
@@ -1170,11 +1190,17 @@ const MUTANTS = [
        wrong by construction: the drawing after a stem slider disagrees with a
        forced full rebuild on all six stem writes and both `stem` toggles. That
        is the digest sweep doing the one job no counter can do. */
+    /* AND TWO ANCHOR CHECKS, true about it: the section turns the stem on for
+       the selected bloom, which under this mutation turns it on for all three,
+       so the "no other bloom moved" digests move and the first drawn point is
+       a different point. */
     breaks: ['blooms/two-blooms-carry-two-different-stems-at-once',
              'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
              'blooms/a-transform-places-its-own-bloom-and-no-other',
              'partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
-             'partial/every-control-draws-what-a-full-rebuild-would-draw'],
+             'partial/every-control-draws-what-a-full-rebuild-would-draw',
+             'anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag'],
   },
   {
     /* SELECTING A BLOOM STAMPS THE PANEL ONTO IT. The destructive half of the
