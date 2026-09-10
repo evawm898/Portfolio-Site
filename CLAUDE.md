@@ -2501,8 +2501,9 @@ panel prints — which is its job (does the panel say what the page holds?) and 
 structurally blind to the page holding the wrong thing. What sees it is a second
 warped petal: `warp/two-petals-hold-different-warps-at-once` now asserts the
 count is positive with nothing picked and GROWS when a second petal is warped.
-**51 of 51 clean.** The sweep costs well over four hours now — about
-six minutes a mutant, because each is a full 165-check browser run.
+**51 of 51 clean at that time; the gate is 194 checks / 65 mutants now and the current
+figure is 65 of 65 — see the polarity and export section below.** The sweep costs well over
+four hours — about six minutes a mutant, because each is a full browser run of every check.
 `--mutant=a,b,c` takes a comma list and is how to re-verify one
 without paying for the rest. **THE WHOLE-SWEEP RUN IS NOT SURVIVABLE IN A
 CONTAINER THAT RESTARTS**: two attempts at it were killed
@@ -3281,39 +3282,31 @@ the renderer stayed where it was is a silent partial restore that passes every
 field-by-field comparison, so the blend constant and the clear colour are read back from the
 renderer itself on both sides of the trip.
 
-**THE GATE IS 194 CHECKS AND 65 MUTANTS, AND THE SWEEP WAS STOPPED AT 41 OF THEM ON EVA'S
-INSTRUCTION, WITH 24 OUTSTANDING** (Sep 9, a usage-limit call, not a judgement about the
-code). What DID run is clean: the base pass is 194 checks / 0 failed, and 41 mutants closed
-green — this session's own 15 plus the re-anchored `the-highlight-is-a-brightness-as-well-as-a-hue`,
-plus 25 older ones in five chunks. **Quote it as "41 of 65", never as a sweep.**
-**THE 24 OUTSTANDING, so a later session can finish them:** the petal-warp group
-(`the-petal-warp-is-not-gated-at-the-base`, `the-across-scale-is-not-gated-at-the-foot`,
-`the-station-is-guessed-from-the-shape`, `a-strip-the-file-did-not-place-gets-a-station-anyway`,
-`the-along-scale-also-widens-the-petal`, `the-warp-reaches-every-petal`,
-`the-warp-reaches-only-the-u-lines`); the OWNERSHIP group
-(`selection-stamps-the-panel-onto-the-petal`, `deselecting-drops-the-warp`,
-`only-the-selected-petal-is-drawn-warped`, `the-seam-counts-only-the-selected-petal-base-points`,
-`the-scales-stay-live-with-nothing-picked`); the COMPOSITION-FILE group
-(`the-saved-document-drops-a-draw-field`, `the-frame-field-table-loses-a-row`,
-`the-restore-skips-a-stem-field`, `a-missing-field-is-not-reported`,
-`the-petal-warps-are-written-globally`, `a-restored-warp-lands-on-the-next-petal`,
-`the-grid-mismatch-is-not-reported`, `a-newer-version-is-read-anyway`,
-`the-camera-is-not-restored`, `the-selection-is-not-restored`,
-`a-dropped-petal-warp-is-moved-onto-another`); and
-`the-highlight-material-misses-the-resolution`, which runs ALONE.
-**DO NOT RECORD THESE AS "CODE THIS SESSION DID NOT TOUCH" — 19 OF THE 24 TARGET `plot.js` OR
-`plot-file.js`, BOTH OF WHICH IT CHANGED**; only the five in `plot-grid.js` / `plot-petal.js`
-are genuinely untouched. Three sit ON this session's own edits and are the ones to run first:
+**THE GATE IS 194 CHECKS AND 65 MUTANTS, AND THE SWEEP IS COMPLETE — 65 of 65 CLEAN**
+(Sep 9-10, run in chunks over two sittings). The base pass is 194 checks / 0 failed and every
+mutant reddens exactly the checks it claims. **THE SWEEP WAS STOPPED AT 41 PART-WAY THROUGH,
+ON EVA'S INSTRUCTION** (a usage-limit call, never a judgement about the code) and then RESUMED
+on her word — the record is kept because the stop was real and the honest partial was posted
+at the time, but the standing number is 65 of 65.
+**THE STOP TAUGHT SOMETHING THAT OUTLIVES IT: DO NOT DESCRIBE AN OUTSTANDING SET AS "CODE
+THIS SESSION DID NOT TOUCH" WITHOUT CHECKING.** Of the 24 then outstanding, **19 targeted
+`plot.js` or `plot-file.js`, both of which this session changed**; only five were in
+`plot-grid.js` / `plot-petal.js`. Three sat ON this session's own edits and were run FIRST
+when the sweep resumed, which is the right ordering for a sweep that may be interrupted again:
 `the-saved-document-drops-a-draw-field` (`DRAW_FIELDS` is exactly where `polarity` was added),
 `a-newer-version-is-read-anyway` (`VERSION` went 1 -> 2), and
 `the-highlight-material-misses-the-resolution` (the highlight material now carries the polarity
-hue transfer).
-**AND THE STOPPED SWEEP HAD ALREADY EARNED ITS KEEP TWICE IN THE 41**, which is the argument
-for finishing it: `the-depth-dim-is-never-applied` found a NEW check whose detail string
-dereferenced state the mutation removes (it THREW and failed the chunk instead of reporting —
-the frame/save session's lesson, in a new check), and `the-frame-ratio-is-ignored` reddened two
-new export checks it did not claim, both true, because the export crops to `frameRect()` and
-nothing else. Five things it taught this session:
+hue transfer). All three came back clean.
+**THE RESUMED 24 NEEDED NO CORRECTIONS AT ALL** — every chunk green on its first run, no
+`breaks` list widened, no check changed. That is worth recording beside the two corrections
+the first 41 DID force, because it is the distribution: the checks that needed work were the
+NEW ones, and the older mutants covering older code were already sound.
+**THE FIRST 41 EARNED THE SWEEP'S KEEP TWICE**, which is why finishing it was worth the time:
+`the-depth-dim-is-never-applied` found a NEW check whose detail string dereferenced state the
+mutation removes (it THREW and failed the chunk instead of reporting — the frame/save session's
+lesson, arriving in a new check), and `the-frame-ratio-is-ignored` reddened two new export
+checks it did not claim, both true, because the export crops to `frameRect()` and nothing
+else. Five things it taught this session:
 * **A CHECK THAT READS THE PAGE'S REPORT IS NOT A CHECK ON THE FILE.** The millimetre check
   first asked `exportSvg()` for its own `widthMm`; a document dimensioned in screen pixels
   beside a report that still says millimetres would have sailed through it. It parses the
