@@ -503,6 +503,78 @@ sits. **A default for the sweep is therefore not proposed here**: it is a taste
 decision about how far the bowl should carry on the tip shapes where it CAN carry, and
 it belongs in front of the sheet.
 
+### 6.5d THE CEILING, CORRECTED — AND THE FEATURE DOES NOT CLEAR IT
+
+**Section 6.5's conclusion that "the sweep never binds" IS WITHDRAWN. It was wrong,
+and the error is one this session had already named out loud and then walked into.**
+
+Both curvature instruments exclude `u > 0.92` — the shipped `measureCurvature` by
+its own `uMax`, and the normal-free one because a 5x5 stencil across the tip cap's
+corner has no curvature to fit. The apex sweep acts at `u` 0.84–0.98. §6.5 states
+that limitation and then reads a ceiling off those instruments anyway. **A reading
+taken outside the region a feature acts in is not evidence about that feature**, and
+this is the fifth instance in this project of a label naming a computation nobody
+performed.
+
+`measureWall` is not blind there: it reads EMITTED POINTS rather than fitting a
+stencil. Re-run on swept states (EXPORT, 56 x 10, the shipped conventions):
+
+| state | WALL mm | SELF mm | V4 | V5 |
+|---|---|---|---|---|
+| flat — the shipping default | 1.2000 | 1.2460 | ok | ok |
+| SHIPPED cup 1.2 | 1.0710 | 1.0310 | ok | ok |
+| cup 1.2 tip 1.80 **sweep 0** | 1.0485 | 1.0310 | RED | ok |
+| cup 1.2 tip 1.80 **sweep 1.00** | 0.7514 | **0.7333** | RED | **RED** |
+| cup 1.2 tip 2.45 sweep 0 | 0.8528 | 0.9941 | RED | RED |
+| cup 1.2 tip 2.45 **sweep 1.00** | 0.3374 | **0.4821** | RED | RED |
+| cup 1.2 tip 3.00 **sweep 1.00** | 0.2104 | 0.5500 | RED | RED |
+| tip 1.20 sweep 1.00 (INERT) | 1.0740 | 1.0310 | ok | ok |
+
+**At tip 1.80 the sweep takes a PASSING state to a FAILING one** — SELF 1.0310 to
+0.7333 — which is precisely what Eva's stopping rule exists to catch.
+
+**THE CEILING, from V4 and V5, per (cup, tip shape):**
+
+| cup | tip n | baseline V4 / V5 | largest sweep holding both | apex share there |
+|---|---|---|---|---|
+| 0.40 | 1.20 | ok / ok | 1.00 (INERT) | 10.0% |
+| 0.40 | 1.70 | ok / ok | 0.75 | 15.1% |
+| 0.40 | 1.80 | ok / ok | **0.30** | 13.4% |
+| 0.40 | 2.45 | RED / ok | none — red at sweep 0 | — |
+| 0.40 | 3.00 | RED / RED | none — red at sweep 0 | — |
+| 0.80 | 1.70 | ok / ok | 0.40 | 12.7% |
+| 0.80 | 1.80 | ok / ok | **0.00** | 10.0% |
+| 1.20 | 1.70 | ok / ok | **0.05** | 10.3% |
+| 1.20 | 1.80 | RED / ok | none — red at sweep 0 | — |
+| 1.20 | 2.45 / 3.00 | RED / RED | none — red at sweep 0 | — |
+
+**THE FEATURE AS BUILT DOES NOT DELIVER A PRINTABLE BOWL ANYWHERE, and the reason is
+structural rather than a tuning miss.** The two halves of the range fail for opposite
+reasons:
+
+* where V5 holds, the tip is POINTED, so the inscribed radius is small and the sweep
+  buys between 0 and 5 percentage points of apex share over the 10.0% already there;
+* where a real bowl is available (2.45 at 67.1%, 3.00 at 83.2%), the geometry is
+  **already below the printable bar at sweep 0** — the pre-existing section-18a
+  family — so there is nothing safe to sweep from.
+
+**So the proposed default is 0**, which is what ships, and the earlier proposal of
+1.00 in this session's report is withdrawn. The three readings' disagreement is
+itself the substantive result: the mid-surface does NOT approach itself (reading 2
+stays saturated at its bar on every swept state), and the principal radius on the
+measurable window barely moves — but the OFFSET SKINS invert, in the tip-cap region
+neither curvature instrument can see. **A skin-to-skin collapse under a curved sheet
+is a curvature symptom, and the curvature that causes it is exactly where this grid
+cannot resolve it.**
+
+**WHAT WOULD HAVE TO CHANGE**, recorded rather than attempted: the sweep raises the
+cross-width metric at the apex to 16.137 (§6.5b) because it scales the derivative on
+a row that is 0.80 mm half-wide. The wall collapses for the same reason. Any version
+of this that clears V4 and V5 has to either put more columns where the metric is
+large, or bound the sweep by the wall the row can actually carry — and the second is
+a clamp derived from a measurement, which is the shape session 34 ruled acceptable
+for the buckle. Neither is built, and neither should be without a ruling.
+
 ### 6.6 What is not done
 
 * **The 1.80 threshold control is WITHDRAWN**, per Eva: *"A number that moves when the
