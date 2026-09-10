@@ -1391,6 +1391,96 @@ const MUTANTS = [
              'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
   },
 
+  /* ---- dragging a bloom by its anchor -------------------------------------
+     Eight, over the code the anchor session added. The three plausible wrong
+     drags the brief named (the wrong bloom, sliders without the bloom, the bloom
+     without the sliders), the two halves of the narrowed tail, the tail
+     outliving the drag, the anchors leaking into an export, and the one-field
+     commit. */
+  {
+    /* THE WRONG BLOOM — every bloom. A drag writes the pointer's position into
+       every instance; the dragged one still lands under the pointer and the
+       sliders still agree with it, so only the other blooms' own coordinates
+       can say. The others are served from cache under the drag route, so their
+       STORE moved and their lines did not — which is also the stale-geometry
+       trap, and the full-rebuild digests see it. */
+    id: 'a-bloom-drag-moves-every-bloom', file: 'plot.js',
+    from: "  inst.transform = { position: [v.x, v.y, v.z],\n                     rotationDeg: inst.transform.rotationDeg.slice(),",
+    to: "  for (const o of instances) o.transform = { ...o.transform, position: [v.x, v.y, v.z] };\n  inst.transform = { position: [v.x, v.y, v.z],\n                     rotationDeg: inst.transform.rotationDeg.slice(),",
+    breaks: ['anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+             'anchor/the-patched-pack-is-the-full-pack',
+             'anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact'],
+  },
+  {
+    /* THE BLOOM WITHOUT THE SLIDERS: the grab no longer selects, so the moved
+       bloom is not the one the panel describes. */
+    id: 'grabbing-an-anchor-does-not-select-its-bloom', file: 'plot.js',
+    from: "    setSelectedInstance(dragging.userData.instance);\n    dragging = bloomHandleObjs[dragging.userData.instance] || dragging;",
+    to: "    void 0;",
+    breaks: ['anchor/grabbing-an-anchor-selects-its-bloom',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag'],
+  },
+  {
+    /* THE SLIDERS WITHOUT THE BLOOM: the panel is loaded from the store but the
+       store is never written — the anchor and the lines stay where they were. */
+    id: 'a-bloom-drag-updates-the-sliders-and-not-the-bloom', file: 'plot.js',
+    from: "  inst.transform = { position: [v.x, v.y, v.z],\n                     rotationDeg: inst.transform.rotationDeg.slice(),\n                     scale: inst.transform.scale.slice() };",
+    to: "  inst.transform = { position: inst.transform.position.slice(),\n                     rotationDeg: inst.transform.rotationDeg.slice(),\n                     scale: inst.transform.scale.slice() };",
+    breaks: ['anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+             'anchor/the-anchor-lands-under-the-pointer',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag',
+             'anchor/a-transform-slider-writes-only-its-own-field'],
+  },
+  {
+    /* OVER-EAGER, THE DRAG'S OWN: every step is a whole-composition rebuild.
+       The picture is identical; the routing and the tail words are not. */
+    id: 'a-bloom-drag-rebuilds-every-bloom', file: 'plot.js',
+    from: '  rebuild(k, REBUILD_DRAG);\n  loadTransformControls();',
+    to: '  rebuild(REBUILD_ALL);\n  loadTransformControls();',
+    breaks: ['anchor/a-drag-rebuilds-one-bloom-and-pays-the-drag-tail'],
+  },
+  {
+    /* THE RUN WRITTEN AT THE WRONG OFFSET. Every strip record is right and the
+       drawn digest agrees with a full rebuild's; the GPU buffers hold the
+       dragged bloom's segments over the first bloom's. Only the buffer digest
+       sees it, which is why that digest exists. */
+    id: 'the-patched-pack-writes-the-wrong-run', file: 'plot.js',
+    from: '    data.array.set(positions, before * 6);',
+    to: '    data.array.set(positions, 0);',
+    breaks: ['anchor/the-patched-pack-is-the-full-pack'],
+  },
+  {
+    /* THE MOVED BLOOM'S EXTENT GOES STALE: the memo key stops naming what it
+       depends on, so the composed box is the box from before the drag. */
+    id: 'the-drag-extent-forgets-the-moved-bloom', file: 'plot.js',
+    from: '  const key = `${inst.builds}|${JSON.stringify(inst.transform)}`;',
+    to: "  const key = 'x';",
+    breaks: ['anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact'],
+  },
+  {
+    /* THE DRAG TAIL OUTLIVES THE DRAG: no exact rebuild on release, so the page
+       at rest holds a patched pack and a bounded radius. */
+    id: 'the-drag-tail-outlives-the-drag', file: 'plot.js',
+    from: "    if (dragging.userData.set === 'bloom') {\n      rebuild(dragging.userData.instance);",
+    to: "    if (false) {\n      rebuild(dragging.userData.instance);",
+    breaks: ['anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact'],
+  },
+  {
+    /* THE ANCHORS IN THE EXPORT. Rose is neutral in no channel, so the grey
+       identity in the export check is the witness, with nothing added for it. */
+    id: 'the-anchors-leak-into-the-export', file: 'plot.js',
+    from: '  for (const h of bloomHandleObjs) if (h.visible) { h.visible = false; hidden.push(h); }',
+    to: '  void bloomHandleObjs;',
+    breaks: ['export/the-raster-carries-the-ink-and-none-of-the-chrome'],
+  },
+  {
+    /* EVERY SLIDER READ BACK ON EVERY INPUT: the floating position a drag left
+       is snapped to the whole millimetre by a control that was not moved. */
+    id: 'a-transform-slider-writes-every-field', file: 'plot.js',
+    from: '    if (el && document.getElementById(f.control) !== el) continue;',
+    to: '    if (false) continue;',
+    breaks: ['anchor/a-transform-slider-writes-only-its-own-field'],
+  },
 ];
 
 // ===========================================================================
@@ -5460,12 +5550,252 @@ async function run({ mutant = null } = {}) {
                                       return window.__plot.instanceText(); });
   const bl_dragInfo = await q(() => window.__plot.rebuildInfo());
   const dragLine = bl_dragText.split('\n').find(l => l.startsWith('drag')) || '';
+  /* THE LINE IS ASSERTED ON WHAT IT SAYS AND NOT ON WHICH PHASE WAS LONGER.
+     This check shipped requiring `buildMs < packMs + boundsMs`, and on a slow
+     runner a single-bloom build read 26.3 ms against a 16.4 ms tail (measured on
+     `main`, one run of many) — a timing INEQUALITY on a two-frames-a-second box
+     is a bar set on noise, the class of check this gate refuses everywhere else.
+     What the panel owes is the three figures the page measured, each printed,
+     and which word each carries; the split itself is reported in the detail. */
   check('partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms',
     /1 built, 2 reused/.test(dragLine) && /blooms/.test(dragLine)
-    && /packing/.test(dragLine) && /extent/.test(dragLine)
+    && /packing \((full|patched)\)/.test(dragLine) && /extent \((walk|file|composed)\)/.test(dragLine)
     && dragLine.includes(bl_dragInfo.ms.toFixed(1))
-    && bl_dragInfo.buildMs < bl_dragInfo.packMs + bl_dragInfo.boundsMs,
-    dragLine || '(no drag line)');
+    && dragLine.includes(bl_dragInfo.buildMs.toFixed(1))
+    && dragLine.includes(bl_dragInfo.packMs.toFixed(1))
+    && dragLine.includes(bl_dragInfo.boundsMs.toFixed(1)),
+    `${dragLine || '(no drag line)'} — build ${bl_dragInfo.buildMs.toFixed(1)} against a tail of `
+    + `${(bl_dragInfo.packMs + bl_dragInfo.boundsMs).toFixed(1)} ms, reported not compared`);
+
+  /* =========================================================================
+     DRAGGING A BLOOM. Three blooms are on screen and the transform sliders are a
+     view of the selected one. The anchor is a REAL pointer drag on a handle the
+     page projected, and the trap is the last session's in a new place: a drag
+     that moves the wrong bloom, updates the sliders without moving the bloom,
+     or moves the bloom without updating the sliders — all three plausible for a
+     frame. So the bloom that moved is named by its own drawn coordinates, every
+     other bloom is required to be identical to the bit, and the sliders, the
+     read-out and the geometry are compared after the pointer is up. And the
+     drag pays a NARROWED tail (one bloom's run of each buffer written in place,
+     the extent composed from per-bloom boxes), so the buffers themselves and
+     the extent are compared against a forced full rebuild — the strip-record
+     digest is blind to a buffer written in the wrong place. */
+  log('\n--- dragging a bloom ---');
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  await set({ stem: 'on', stemDroop: 0, depthDim: 55 });
+  await view(VIEW);
+  await q(() => window.__plot.settle());
+  const an_world = (a2, i, k) => (a2 && a2[i] ? a2[i][k] : undefined);
+  const an_before = await q(() => ({
+    n: window.__plot.bloomHandleCount(),
+    list: window.__plot.instances(),
+    world: window.__plot.instances().map((_, k) => window.__plot.bloomHandleWorld(k)),
+    visible: window.__plot.instances().map((_, k) => window.__plot.bloomHandleVisible(k)),
+    muted: window.__plot.instances().map((_, k) => window.__plot.bloomHandleMuted(k)),
+    digests: window.__plot.instances().map((_, k) => window.__plot.bloomDigest(k)),
+    first: window.__plot.instances().map((_, k) => window.__plot.bloomFirstPoint(k)),
+  }));
+  /* THE ANCHOR IS THE PLACED ORIGIN, through the container's one Z-up rotation:
+     grid (x, y, z) is world (x, z, -y). Asserted against the transform the page
+     itself holds, so an anchor drawn a bloom's width off — plausible, since
+     every bloom here is a copy of one grid — is caught by arithmetic. */
+  const an_atOrigin = an_before.list.every((inst, k) => {
+    const w = an_before.world[k], p = inst.transform.position;
+    return w && Math.abs(w[0] - p[0]) < 1e-6 && Math.abs(w[1] - p[2]) < 1e-6
+      && Math.abs(w[2] + p[1]) < 1e-6;
+  });
+  check('anchor/every-bloom-carries-an-anchor-at-its-placed-origin',
+    an_before.n === 3 && an_before.list.length === 3 && an_atOrigin
+    && an_before.visible.every(v => v === true)
+    && JSON.stringify(an_before.muted) === JSON.stringify([false, true, true]),
+    `${an_before.n} anchors for ${an_before.list.length} blooms, each at its bloom's `
+    + `position through the Z-up correction; visible ${an_before.visible.join('/')}, muted `
+    + `${an_before.muted.join('/')} with bloom 1 selected`);
+
+  /* A HANDLE UNDER A CONTROL COLUMN CANNOT BE GRABBED — the page's own lesson —
+     so the grab is SEARCHED for, highest bloom first: an unselected bloom, so
+     the grab has a selection to change, and the last one where possible, so a
+     run written at offset 0 instead of its own lands somewhere it can be seen. */
+  const an_pick = await q(() => {
+    for (let k = window.__plot.instanceCount() - 1; k >= 1; k--) {
+      const s2 = window.__plot.bloomHandleScreenPos(k);
+      const el = s2 && document.elementFromPoint(s2.x, s2.y);
+      if (el && el.id === 'plot-canvas') return { k, ...s2 };
+    }
+    return null;
+  });
+  const AN_DX = 110, AN_DY = -40;
+  let an_mid = null, an_after = null, an_full = null, an_midFull = null, an_camPre = null;
+  if (an_pick) {
+    an_camPre = await q(() => window.__plot.cameraInfo());
+    await page.mouse.move(an_pick.x, an_pick.y);
+    await page.mouse.down();
+    await page.mouse.move(an_pick.x + AN_DX, an_pick.y + AN_DY, { steps: 5 });
+    an_mid = await q(() => ({
+      dragging: window.__plot.dragging(),
+      sel: window.__plot.selectedInstance(),
+      ctl: window.__plot.instanceControls().transform,
+      info: window.__plot.rebuildInfo(),
+      landed: window.__plot.bloomHandleScreenPos(window.__plot.selectedInstance()),
+      cam: window.__plot.cameraInfo(),
+      packed: window.__plot.packedDigest(),
+      digest: window.__plot.drawnDigest(),
+      vb: window.__plot.viewBounds(),
+      list: window.__plot.instances(),
+    }));
+    /* THE PATCHED BUFFERS AGAINST A FULL PACK, MID-DRAG — the forced rebuild
+       runs the exact tail, so what it holds is what a full pack and a walked
+       extent produce from the same store. */
+    an_midFull = await q(() => { window.__plot.forceRebuild();
+      return { packed: window.__plot.packedDigest(), digest: window.__plot.drawnDigest(),
+               vb: window.__plot.viewBounds() }; });
+    // One more step so the drag's own tail is what the pointer-up finds.
+    await page.mouse.move(an_pick.x + AN_DX + 6, an_pick.y + AN_DY, { steps: 2 });
+    const an_step = await q(() => window.__plot.rebuildInfo());
+    await page.mouse.up();
+    an_after = await q(() => ({
+      dragging: window.__plot.dragging(),
+      sel: window.__plot.selectedInstance(),
+      ctl: window.__plot.instanceControls().transform,
+      info: window.__plot.rebuildInfo(),
+      list: window.__plot.instances(),
+      digests: window.__plot.instances().map((_, k) => window.__plot.bloomDigest(k)),
+      first: window.__plot.instances().map((_, k) => window.__plot.bloomFirstPoint(k)),
+      text: window.__plot.instanceText(),
+      packed: window.__plot.packedDigest(),
+      vb: window.__plot.viewBounds(),
+      step: null,
+    }));
+    an_after.step = an_step;
+    an_full = await q(() => { window.__plot.forceRebuild();
+      return { packed: window.__plot.packedDigest(), vb: window.__plot.viewBounds(),
+               digests: window.__plot.instances().map((_, k) => window.__plot.bloomDigest(k)) }; });
+  }
+  const an_k = an_pick ? an_pick.k : -1;
+  const an_same = (a2, b2) => JSON.stringify(a2) === JSON.stringify(b2);
+  const an_movedList = an_after
+    ? an_after.digests.map((d, k) => !an_same(d, an_before.digests[k])) : [];
+  const an_othersHeld = an_after && an_after.list.every((inst, k) => k === an_k
+    || an_same(inst.transform, an_before.list[k].transform));
+  check('anchor/dragging-an-anchor-moves-that-bloom-and-no-other',
+    !!an_pick && an_after && an_movedList[an_k] === true
+    && an_movedList.every((m, k) => (k === an_k) === m)
+    && an_othersHeld
+    && !an_same(an_world(an_after.list, an_k, 'transform').position,
+                an_world(an_before.list, an_k, 'transform').position),
+    an_pick
+      ? `grabbed bloom ${an_k + 1}'s anchor and dragged ${AN_DX} x ${AN_DY} px: moved `
+        + `[${an_movedList.map(m => (m ? 'yes' : 'no')).join(', ')}] by bloom, the other two `
+        + `transforms ${an_othersHeld ? 'identical' : 'CHANGED'}`
+      : 'no unselected bloom has its anchor in the clear at this framing');
+
+  check('anchor/grabbing-an-anchor-selects-its-bloom',
+    !!an_mid && an_mid.dragging && an_mid.dragging.set === 'bloom'
+    && an_mid.dragging.instance === an_k && an_mid.sel === an_k
+    && an_after && an_after.sel === an_k && an_after.dragging === null,
+    an_mid ? `pointer down on bloom ${an_k + 1}: selected ${an_mid.sel + 1}, dragging `
+      + `${JSON.stringify(an_mid.dragging)}; after release selected ${an_after.sel + 1}`
+      : '(no drag)');
+
+  check('anchor/the-anchor-lands-under-the-pointer',
+    !!an_mid && an_mid.landed
+    && Math.abs(an_mid.landed.x - (an_pick.x + AN_DX)) < 3
+    && Math.abs(an_mid.landed.y - (an_pick.y + AN_DY)) < 3,
+    an_mid && an_mid.landed
+      ? `asked (${(an_pick.x + AN_DX).toFixed(1)}, ${(an_pick.y + AN_DY).toFixed(1)}), the anchor `
+        + `stands at (${an_mid.landed.x.toFixed(1)}, ${an_mid.landed.y.toFixed(1)})`
+      : '(no drag)');
+
+  /* THE ROUTING AND THE TAIL, READ WHILE THE POINTER IS DOWN. One bloom built,
+     two reused, and the two global phases narrowed — `patched` and `composed`
+     are the words the page prints for them. */
+  check('anchor/a-drag-rebuilds-one-bloom-and-pays-the-drag-tail',
+    !!an_mid && an_mid.info.only === String(an_k) && an_mid.info.built === 1
+    && an_mid.info.reused === 2 && an_mid.info.pack === 'patched'
+    && an_mid.info.bounds === 'composed'
+    && an_after && an_after.step.pack === 'patched' && an_after.step.bounds === 'composed',
+    an_mid ? `mid-drag: routed ‘${an_mid.info.only}’, ${an_mid.info.built} built / `
+      + `${an_mid.info.reused} reused, packing ${an_mid.info.pack}, extent ${an_mid.info.bounds} `
+      + `— ${an_mid.info.ms.toFixed(1)} ms (${an_mid.info.buildMs.toFixed(1)} build, `
+      + `${an_mid.info.packMs.toFixed(1)} pack, ${an_mid.info.boundsMs.toFixed(1)} extent)`
+      : '(no drag)');
+
+  /* THE PATCHED BUFFERS ARE THE FULL PACK'S, float for float, in every family —
+     and the strip records agree too. The buffer digest is the witness that
+     matters: a run written at the wrong offset leaves every record right. */
+  const an_famsEqual = an_mid && an_midFull
+    && Object.keys(an_midFull.packed).every(f => an_same(an_mid.packed[f], an_midFull.packed[f]));
+  const an_famsNonEmpty = an_mid ? Object.values(an_mid.packed).filter(Boolean).length : 0;
+  check('anchor/the-patched-pack-is-the-full-pack',
+    !!an_mid && an_famsEqual && an_famsNonEmpty >= 3
+    && an_same(an_mid.digest, an_midFull.digest),
+    an_mid ? `${an_famsNonEmpty} non-empty buffers, each ${an_famsEqual ? 'identical' : 'DIFFERENT'} `
+      + `to a full pack's (u ${an_mid.packed.u ? an_mid.packed.u.floats : 0} floats, stem `
+      + `${an_mid.packed.stem ? an_mid.packed.stem.floats : 0}); records `
+      + `${an_same(an_mid.digest, an_midFull.digest) ? 'agree' : 'DISAGREE'}`
+      : '(no drag)');
+
+  /* THE COMPOSED EXTENT: an exact BOX and a radius that may only be LARGER —
+     and once the pointer is up, the exact walk, equal to a forced rebuild's to
+     the bit. */
+  const an_boxEq = an_mid && an_midFull && an_mid.vb && an_midFull.vb
+    && an_same(an_mid.vb.min, an_midFull.vb.min) && an_same(an_mid.vb.max, an_midFull.vb.max);
+  check('anchor/the-drag-extent-contains-the-drawing-and-rest-is-exact',
+    !!an_mid && an_boxEq && an_mid.vb.radius >= an_midFull.vb.radius - 1e-9
+    && an_after && an_after.info.pack === 'full' && an_after.info.bounds === 'walk'
+    && an_same(an_after.vb, an_full.vb) && an_same(an_after.packed, an_full.packed),
+    an_mid && an_mid.vb ? `mid-drag box ${an_boxEq ? 'exact' : 'WRONG'}, radius `
+      + `${an_mid.vb.radius.toFixed(2)} against the walk's ${an_midFull.vb.radius.toFixed(2)} `
+      + `(a bound); released: ${an_after ? `${an_after.info.pack} / ${an_after.info.bounds}` : '—'}, `
+      + `extent ${an_after && an_same(an_after.vb, an_full.vb) ? 'identical' : 'DIFFERENT'} to a full rebuild's`
+      : '(no drag)');
+
+  /* THE SLIDERS, THE READ-OUT AND THE GEOMETRY, AFTER. The sliders hold a
+     1 mm step, so they agree to half a step; the read-out prints the whole
+     millimetres; and the geometry is the bloom's own first drawn point, which
+     must have moved by EXACTLY the position delta — the store is what the lines
+     are built from, and this reads the lines. */
+  let an_agree = false, an_detail = '(no drag)';
+  if (an_after) {
+    const t = an_world(an_after.list, an_k, 'transform'), t0 = an_world(an_before.list, an_k, 'transform');
+    const c = an_after.ctl;
+    const sl = c && t && Math.abs(c.bloomX - t.position[0]) <= 0.5
+      && Math.abs(c.bloomY - t.position[1]) <= 0.5 && Math.abs(c.bloomZ - t.position[2]) <= 0.5;
+    const said = t && an_after.text.includes(`(${t.position.map(v2 => v2.toFixed(0)).join(', ')}) mm`);
+    const f0 = an_before.first[an_k], f1 = an_after.first[an_k];
+    const geom = t && f0 && f1 && [0, 1, 2].every(a2 =>
+      Math.abs((f1[a2] - f0[a2]) - (t.position[a2] - t0.position[a2])) < 1e-3);
+    an_agree = !!(sl && said && geom);
+    an_detail = `bloom ${an_k + 1} at (${t ? t.position.map(v2 => v2.toFixed(2)).join(', ') : '—'}) mm; `
+      + `sliders (${c ? [c.bloomX, c.bloomY, c.bloomZ].join(', ') : '—'}) ${sl ? 'within a step' : 'OFF'}, `
+      + `read-out ${said ? 'says so' : 'DOES NOT'}, first drawn point moved by the same delta: ${geom}`;
+  }
+  check('anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag', an_agree, an_detail);
+
+  const an_drift = an_mid && an_camPre
+    ? Math.hypot(...an_mid.cam.position.map((v2, i) => v2 - an_camPre.position[i])) : Infinity;
+  check('anchor/an-anchor-drag-does-not-orbit-the-camera',
+    an_drift < 0.5,
+    an_mid ? `the camera moved ${an_drift.toExponential(2)} of a ${an_camPre.distance.toFixed(1)} `
+      + 'standoff while an anchor was held' : '(no drag)');
+
+  /* A SLIDER WRITES ITS OWN FIELD AND NOTHING ELSE. The drag left a floating
+     position; turning an unrelated slider must not snap it to the whole
+     millimetre the position sliders display. */
+  let an_snap = null;
+  if (an_after) {
+    const p0 = an_world(an_after.list, an_k, 'transform').position;
+    await set({ bloomRotZ: 10 });
+    const p1 = await page.evaluate(k => window.__plot.instances()[k].transform, an_k);
+    await set({ bloomRotZ: 0 });
+    an_snap = { p0, p1: p1.position, rot: p1.rotationDeg[2] };
+  }
+  check('anchor/a-transform-slider-writes-only-its-own-field',
+    !!an_snap && an_same(an_snap.p0, an_snap.p1) && an_snap.rot === 10
+    && an_snap.p0.some(v2 => v2 !== Math.round(v2)),
+    an_snap ? `turn z to 10° left the position at (${an_snap.p1.map(v2 => v2.toFixed(3)).join(', ')}) `
+      + `— ${an_same(an_snap.p0, an_snap.p1) ? 'unsnapped' : 'SNAPPED'} from `
+      + `(${an_snap.p0.map(v2 => v2.toFixed(3)).join(', ')})` : '(no drag)');
 
   await page.evaluate(() => window.__plot.selectInstance(0));
 
