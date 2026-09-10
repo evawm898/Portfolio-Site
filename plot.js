@@ -297,7 +297,14 @@ function newInstance() {
     // derived on every rebuild
     warpAll: [], stemStrips: [], stemLocal: [], stemIsDrawn: false,
     stemStats: { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true },
-    warpInfo: { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0, points: 0, basePoints: 0 },
+    /* A REST OBJECT IS A VALUE OF THE SAME TYPE, NOT A SMALLER ONE — the
+       lesson `REST_PETAL` already carries. `rebuild` reads `warpInfo.mine.moved`
+       unconditionally, so a rest `warpInfo` without a `mine` throws on every
+       rebuild that reaches it and leaves the panels showing the outgoing
+       bloom's numbers beside a live drawing. Measured: a mutation that let the
+       last bloom be removed took the page down here rather than going red. */
+    warpInfo: { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0, points: 0, basePoints: 0,
+                mine: { moved: 0, points: 0, basePoints: 0 } },
   };
 }
 const EMPTY_INSTANCE = Object.freeze({

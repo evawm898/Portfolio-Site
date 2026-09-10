@@ -624,8 +624,11 @@ const MUTANTS = [
     // within tolerance. On this bloom the two disagree on better than a third
     // of the pixels that hit anything at all, and both answers are a petal.
     id: 'the-pick-takes-the-nearest-line-rather-than-the-front', file: 'plot.js',
-    from: '    if (d <= tol && z < bestZ) { bestZ = z; best = petal; }',
-    to: '    if (d <= tol && d < bestZ) { bestZ = d; best = petal; }',
+    /* RE-ANCHORED (multi-bloom session): the pick returns the whole cursor
+       now, so the line this edits carries the instance too. The mutation is
+       unchanged — nearest on screen instead of nearest to the camera. */
+    from: '    if (d <= tol && z < bestZ) { bestZ = z; best = petal; bestInst = inst; }',
+    to: '    if (d <= tol && d < bestZ) { bestZ = d; best = petal; bestInst = inst; }',
     breaks: ['select/the-pick-is-the-front-most-line-within-tolerance'],
   },
   {
@@ -780,9 +783,14 @@ const MUTANTS = [
   {
     // The reader skips a stem field on the way back in. The file still holds
     // it, so nothing is missing and nothing is reported.
+    /* RE-ANCHORED (multi-bloom session): the stem is no longer written by
+       `applyFields` — it goes into the bloom that owns it through
+       `applyStemFields`, so the anchor moved there. Two matches of the old
+       string would have made this mutation ambiguous rather than absent, which
+       is the quieter half of the same failure. */
     id: 'the-restore-skips-a-stem-field', file: 'plot.js',
-    from: '    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;',
-    to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;",
+    from: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;\n    inst.stemVals[f.key] = vals[f.key];",
+    to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;\n    inst.stemVals[f.key] = vals[f.key];",
     breaks: ['restore/every-field-comes-back',
              'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
@@ -802,8 +810,11 @@ const MUTANTS = [
        petals saves as several identically shaped ones. The page is right, the
        drawing at save time is right, and the file is a lie. */
     id: 'the-petal-warps-are-written-globally', file: 'plot.js',
-    from: '      petals: [...petalWarps.entries()].map(([index, st]) => ({\n        index, along: st.along, across: st.across, bends: bendsOut(st.bends),\n      })),',
-    to: '      petals: (g => [...petalWarps.entries()].map(([index]) => ({\n        index, along: g.along, across: g.across, bends: bendsOut(g.bends),\n      })))([...petalWarps.values()][0] || { along: 1, across: 1, bends: [] }),',
+    /* RE-ANCHORED (multi-bloom session): the warps are gathered off the
+       INSTANCE now, so the anchor carries `inst.petalWarps`. The mutation is
+       unchanged — every entry written from the first one's values. */
+    from: '      petals: [...inst.petalWarps.entries()].map(([index, st]) => ({\n        index, along: st.along, across: st.across, bends: bendsOut(st.bends),\n      })),',
+    to: '      petals: (g => [...inst.petalWarps.entries()].map(([index]) => ({\n        index, along: g.along, across: g.across, bends: bendsOut(g.bends),\n      })))([...inst.petalWarps.values()][0] || { along: 1, across: 1, bends: [] }),',
     breaks: ['save/the-document-describes-the-page-as-it-stands',
              'restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
@@ -818,8 +829,10 @@ const MUTANTS = [
        drawing is deformed, the counts are right, the panel is clean, and it is
        the wrong petal. */
     id: 'a-restored-warp-lands-on-the-next-petal', file: 'plot.js',
-    from: '    petalWarps.set(p.index, {',
-    to: '    petalWarps.set(p.index + 1, {',
+    // RE-ANCHORED (multi-bloom session): the restore writes into the target
+    // bloom's own store.
+    from: '      target.petalWarps.set(p.index, {',
+    to: '      target.petalWarps.set(p.index + 1, {',
     breaks: ['restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
              'restore/a-composition-dropped-on-the-page-is-loaded'],
@@ -832,8 +845,9 @@ const MUTANTS = [
        The sweep reported "mutation did not apply" rather than a false pass,
        which is the one thing that makes that failure mode survivable. */
     id: 'the-grid-mismatch-is-not-reported', file: 'plot.js',
-    from: '  const cmp = inst.grid ? compareIdentity(inst.grid, currentIdentity())',
-    to: '  const cmp = false ? compareIdentity(inst.grid, currentIdentity())',
+    // RE-ANCHORED (multi-bloom session): the comparison is per bloom now.
+    from: '    const cmp = src.grid ? compareIdentity(src.grid, identityOf(target))',
+    to: '    const cmp = false ? compareIdentity(src.grid, identityOf(target))',
     breaks: ['restore/a-composition-from-a-different-grid-is-named-field-by-field'],
   },
   {
@@ -3141,6 +3155,25 @@ async function run({ mutant = null } = {}) {
   };
   const beforeSolo = await q(() => window.__plot.instanceCount());
   await soloGrid();
+  /* AND THE REFUSAL IS ASKED FOR, not merely observed on a disabled button. The
+     button's `disabled` is set by `rebuildInstanceOptions` and a mutation to
+     the guard inside `removeInstance` leaves it exactly as it was — measured:
+     the first version of this check watched only the button and stayed GREEN
+     under the mutation that lets the last bloom go. So the removal is
+     ATTEMPTED, and what is asserted is that it refuses and the bloom is still
+     there. */
+  const lastOne = await q(() => ({ refused: window.__plot.removeInstance(0) === false,
+                                   n: window.__plot.instanceCount() }));
+  /* AND THE PAGE IS PUT BACK IF IT WENT. Under the mutation that lets the last
+     bloom go, the composition is EMPTY from here on and every section below
+     reports on an empty page rather than on itself — which is how a mutation
+     that breaks the page pretends to be a negative control. The outcome above
+     is already recorded; this only restores something to measure. */
+  if (lastOne.n === 0) {
+    await page.evaluate(() => window.__plot.addGrid('bloom-grid-live.glb'));
+    await page.waitForFunction(() => window.__plot.instanceCount() > 0, null, { timeout: 15000 })
+      .catch(() => {});
+  }
   const afterSolo = await q(() => ({ n: window.__plot.instanceCount(),
                                      s: window.__plot.source(),
                                      p: window.__plot.petals(),
@@ -3150,8 +3183,10 @@ async function run({ mutant = null } = {}) {
     beforeSolo === 3 && afterSolo.n === 1 && afterSolo.s === 'bloom-grid-live.glb'
     && afterSolo.p === 28 && afterSolo.ctl.removeDisabled === true
     && afterSolo.ctl.options.length === 1
-    && afterSolo.ident.length === 1 && afterSolo.ident[0].identity === true,
-    `${beforeSolo} blooms -> ${afterSolo.n}; remove is then disabled, because an empty `
+    && afterSolo.ident.length === 1 && afterSolo.ident[0].identity === true
+    && lastOne.refused === true && lastOne.n === 1,
+    `${beforeSolo} blooms -> ${afterSolo.n}; asking to remove the last one is refused `
+    + `(${lastOne.n} bloom still drawn) and the button is disabled, because an empty `
     + 'viewport is indistinguishable from a page that broke');
   await reset();
 
@@ -5544,6 +5579,36 @@ if (NEG) {
     console.log(`  [FAIL] ${stale.length} claimed check${stale.length === 1 ? '' : 's'} `
       + `name${stale.length === 1 ? 's' : ''} nothing the gate runs:`);
     for (const line of stale) console.log(`         ${line}`);
+    mutantsOK = false;
+  }
+
+  /* AND EVERY MUTANT'S ANCHOR IS CHECKED BEFORE ANY OF THEM RUNS — for EVERY
+     mutant, not only the ones this invocation is about to run, and for the same
+     reason the stale-name guard is: a mutation whose source has moved is
+     reported as "mutation did not apply", which is the SURVIVABLE half of a
+     refactor disarming it — but only if somebody runs it. A mutant in a chunk
+     nobody gets to is silently dead, and a sweep that never completes is the
+     normal case here.
+
+     It also catches the quieter half. A `from` that now matches TWICE mutates
+     the first occurrence and says nothing, so the mutation lands somewhere
+     other than where it is described. Measured: the multi-bloom session's
+     refactor moved four anchors outright and made a fifth ambiguous, and this
+     found all five in under a second where the sweep would have cost half an
+     hour a piece. */
+  const anchors = [];
+  for (const m of MUTANTS) {
+    const text = readFileSync(path.join(ROOT, m.file), 'utf8');
+    const n = text.split(m.from).length - 1;
+    if (n !== 1) {
+      anchors.push(`${m.id} (${m.file}): its anchor appears ${n} times, not once`
+        + `${n === 0 ? ' — the source it edits has moved' : ' — it would mutate the first one silently'}`);
+    }
+  }
+  if (anchors.length) {
+    console.log(`  [FAIL] ${anchors.length} mutant${anchors.length === 1 ? '' : 's'} `
+      + `cannot apply as written:`);
+    for (const line of anchors) console.log(`         ${line}`);
     mutantsOK = false;
   }
   for (const m of MUTANTS) {
