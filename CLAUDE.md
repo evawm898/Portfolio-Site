@@ -1211,6 +1211,54 @@ nothing else in that gate notices. 585 checks over 19 rows, seven mutations.
 genuinely reddens 9 and 7 and both are true about it — and what is still refused
 is a clause nobody claimed. A widening, not a loosening.
 
+**THE PETAL'S MID-SURFACE IS EVALUABLE AT ANY (u, v), AND THE ROW LOOP READS IT**
+(session 37, Eva's ruling on the discovery). `petalSurface(state, ring, slot, cap, acc)`
+in `bloom-geometry.js` owns the surface law: `rowAt(u)` is the row plan (spine centre,
+frame, half-width, the row's own `sect(v)`) and `at(u, v)` is `rowAt(u).sect(v)` — the
+front door, never a second law, the `/plot` `stemPointFromPlan` / `stemPointAt` shape.
+`buildPetalInto`'s loop is `rows.push(surface.rowAt(stations[i - 1]))`; the ladder,
+`trueNormalRows`, the panels and every telemetry field are untouched. **WHAT IT DOES
+NOT OWN, by design:** the ladder (`bladeStations` decides WHICH u the mesh samples), the
+BUCKLED normal (`trueNormalRows`' cross against the NEIGHBOURING ROWS is a lattice
+quantity — measured **54.74°** off the cross-section normal at amp 0.5 / freq 3, so a
+continuous dP/du would NOT reproduce the emitted normal at the stations), and the foot
+(`footRowsAt()`, not `at`). **0 FLOATS MOVED, POSITIONALLY:** `node
+tools/verify-bloom-surface-bytes.mjs --base <worktree>` — every export float AND every
+captured-grid value, `Object.is`, full matrix, both modes, CAPABILITY rows passed (the
+winding tool drops them; they are the only multi-panel rows); `--control` perturbs BOTH
+clauses by 1e-9 and requires two findings, so neither clause is a log line. It follows
+`verify-bloom-petalsall-bytes.mjs`'s shape and is positional where session 36's winding
+tool is multiset, because a refactor may not reorder. **OFF-STATION IS THE POINT AND HAS
+ITS OWN INSTRUMENT:** `node tools/verify-bloom-surface-offstation.mjs` (`--control`
+required) — at every station `at(u, v)` reproduces the captured point exactly AND its two
+skin vertices are found exactly in the emitted stream (3,360 stations, 5,600 vertices);
+between stations |dP| shrinks 10× per decade on every arm (Lipschitz, no jumps).
+**THE OUTLINE IS C0 AND THE EVALUATOR INHERITS IT, AT TWO SEAMS, NEITHER RULED:**
+`halfWidthAt` is a `Math.max`, and the surface's tangent breaks by **44.54° at
+u = 0.057939** (root blend meets core) and **73.73° at u = 0.999562** (the cap's terminal
+ramp meets the last flat segment — new, and the sharper of the two). **u = 0.800 is NOT a
+seam on this tree** — the discovery session measured it on the pre-session-32 cap law;
+premises from a stale tree are hypotheses, and this one moved. The bracket detector also
+fires on the tip's steep SMOOTH taper (26 of 28 candidates, 0.002–0.012° apart); only the
+one-sided tangents classify a seam, and the tool reports only genuine ones. **THE FIELDS
+ARE NOT BUILT** (Eva's Q2/Q3): on a plain petal `buildVoronoi` reads neither `d` nor `T`
+(`flowField` is null unless `cleftCfg && aniso > 1`), strands and bones read only
+`petalHalfWidth` / `ribInnerEdge`, and `d`'s one reader is a 1e-3 cleft-wall epsilon in
+space colonisation — the briefs, with the proxy's 30% overstatement near the base and the
+flat/metric/geodesic divergence to 2.236 under max cup, are §5 of
+`docs/bloom-session-37-outcome.md`. **THE VORONOI COST IS MEASURED FROM THE FLOWER'S OWN
+EMITTER, AND IT CAPS THE FEATURE:** `node tools/bloom-voronoi-cost.mjs` drives the real
+page with `flower.js` served plus a hook (the quality gate's mechanism) and regresses the
+per-petal live delta on the added petal's OWN ring points across densities 3..12 —
+**20.016 triangles per ring point, R² 0.99984**, intercept 3,191 (rim + strands, which do
+not port). The discovery's estimate assumed 30 ring points per cell; real cells carry
+**43** (44 cells, 1,890 points at density 7), so a ported petal is **37,830 triangles —
+16.1× today's 2,356 — and the 1,500,000 budget holds at most 39 petals with Voronoi on
+every one** (27 at density 12, 59 at density 3). Above the shipped 8, under one whorl of
+40, 6× short of the 240-foot head. A fact about the feature for Eva to rule on before the
+port is scheduled. Two consumers were already waiting in writing: the port, and
+`bloom-sagitta.mjs`'s 3D margin. No frozen phase owed; nothing moved.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
