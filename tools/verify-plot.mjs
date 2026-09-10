@@ -1119,7 +1119,19 @@ const MUTANTS = [
              'blooms/the-petal-cursor-is-reset-when-the-bloom-changes',
              'blooms/a-click-picks-the-bloom-as-well-as-the-petal',
              'blooms/several-blooms-save-and-restore-as-themselves',
-             'blooms/the-panel-reports-what-the-composition-costs'],
+             'blooms/the-panel-reports-what-the-composition-costs',
+             /* AND THE FIVE PER-INSTANCE REBUILD CHECKS, all true and all for
+                one reason: an import that REPLACES leaves the page with a
+                single bloom, and every one of these is written at three —
+                `builds` compared as a three-element list, `1 built, 2 reused`
+                on the panel. The two DIGEST checks are NOT here and were not
+                red, which is the reassuring half: with one bloom the partial
+                rebuild still draws exactly what a full one draws. */
+             'partial/a-per-instance-change-rebuilds-one-bloom',
+             'partial/a-global-change-rebuilds-every-bloom',
+             'partial/a-view-only-change-rebuilds-no-bloom-and-still-moves-the-handles',
+             'partial/a-change-misrouted-as-per-instance-is-not-served-from-cache',
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
   },
   {
     /* A NEW BLOOM LANDS AT THE ORIGIN. Under additive ink on black, a second

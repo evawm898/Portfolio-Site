@@ -3963,6 +3963,30 @@ build the detail" rule, one step earlier.
 **NO DIGEST ASKS A FRAMEBUFFER FOR ANYTHING** — it is arithmetic over floats the
 page already holds, which is the only way an EQUALITY is available on this renderer.
 
+**SIXTEEN MUTANTS WERE RUN AND SIXTY-EIGHT WERE NOT — the standing sweep is NOT
+complete.** The three new ones plus thirteen pre-existing ones over the code this
+session touched (the stem build, `applyPetalWarp`, the instance list, the stem and
+bloom panels, the restore). Four lists needed widening and **not one check was
+wrong**, which is the same distribution the multi-bloom session found:
+* `a-per-instance-change-rebuilds-every-bloom` also reddens the panel's drag line
+  (`3 built, 0 reused` where the check asserts `1 built, 2 reused`) — which IS the
+  claim, so the list widened.
+* **`the-bloom-that-changed-is-served-from-its-own-cache` reddens TWENTY-FOUR**,
+  and the breadth is the finding rather than a nuisance: a cache that trusts its
+  routing has no small failure mode. Every per-instance control stops taking, on
+  one bloom as much as on eight — no stem turns on, no warp lands, no bend can be
+  dragged for.
+* `the-stem-controls-are-page-wide` gains three, and what it says is the useful
+  part: it does not damage the cache, it changes the PARTITION, so the key cannot
+  notice and only the digest sweep sees it.
+* `the-import-replaces-instead-of-adding` gains five, all because it leaves the
+  page with ONE bloom and every counter check is written at three. **The two
+  DIGEST checks were NOT among them**, which is the reassuring half.
+**AND A CHECK THREW BEFORE ANY OF THEM COULD REPORT.**
+`stem/the-continuation-runs-from-the-foot-to-the-root` dereferenced `stemLine(0)`,
+which is NULL under any mutation that stops the stem turning on — fourth instance
+of that bug class here. It reports now.
+
 **A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
 shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
 form. That is a bloom parameter. The sheet photographs it and the viewer does
