@@ -228,11 +228,21 @@ const out = [];
 for (const row of ROWS) {
   const shots = [];
   for (const c of row.cells) shots.push(await cell(c));
-  /* THE ROW'S OWN SAME-TREE CONTROL: the first cell shot again, same page
-     session, same camera. Never one global control for the sheet — session 26
-     measured 0 px at 13,440 triangles and 13 px at 80,544 on one run. */
-  const ctrlBuf = await shoot(path.join(outDir, `${row.cells[0].id}-control.png`), shots[0].metrics, shots[0].len, shots[0].view);
-  const ctrl = pixelDiff(shots[0].buf, ctrlBuf);
+  /* THE ROW'S OWN SAME-TREE CONTROL: the first cell BUILT AGAIN and shot
+     again, at the same camera. Never one global control for the sheet —
+     session 26 measured 0 px at 13,440 triangles and 13 px at 80,544 px on one
+     run, so the floor is per-row.
+
+     IT HAS TO RE-APPLY THE CONFIG, and the first version of this did not.
+     Every cell opens a FRESH PAGE, so by the time the row is finished the page
+     is showing the LAST cell's build; re-framing that with the FIRST cell's
+     camera and calling the difference a control measures the sweep itself.
+     Measured on this sheet's own first run: rows whose cells share one build
+     read 0 px (correctly), and the rows that actually vary read 126,831 /
+     89,050 / 42,682 px — three numbers that would have been reported as this
+     renderer's noise floor and are nothing of the kind. */
+  const ctrlCell = await cell({ ...row.cells[0], id: `${row.cells[0].id}-control` });
+  const ctrl = pixelDiff(shots[0].buf, ctrlCell.buf);
   out.push({ ...row, shots, ctrl });
   console.log(`  ${row.title}  —  ${shots.length} cells, same-tree control ${ctrl} px`);
 }

@@ -4275,11 +4275,17 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
         const row = rows[i];
         const rr = ramp(row.u);
         const k = kAt(row.u, rr), c = cAt(row.u, rr);
+        /* THE APEX SCALE REACHES HERE TOO. This loop is a SECOND COPY of
+           `sectAt`'s cross-section derivative, and it already omitted the
+           buckle before session 35 — so a scale wired only into `sectAt`
+           would leave the metric telemetry reporting the UNSWEPT stretch on
+           every swept row, which is the same defect one layer down. */
+        const kS = apex === null ? null : apex.kAt(row.u, row.h);
         for (let j = 0; j < NV; j++) {
           const v = -1 + (2 * j) / (NV - 1);
           const a = row.h * v;
           const dT = k === 0 ? 1 : Math.cos(k * a);
-          const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v;
+          const dN = (k === 0 ? 0 : Math.sin(k * a)) + (kS === null ? 2 * c * v : 2 * c * v * kS);
           const g = Math.hypot(dT, dN);              // |dP/dv| / h — the RATIO
           if (g < mMin) mMin = g;
           if (g > mMax) mMax = g;
@@ -4299,10 +4305,13 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
         const row = rows[i];
         const rr = ramp(row.u);
         const k = kAt(row.u, rr), c = cAt(row.u, rr);
+        /* And a THIRD copy, of the cross-section POINT. Same reason. */
+        const kS = apex === null ? null : apex.kAt(row.u, row.h);
         const pt = (v) => {
           const a = row.h * v;
           return [k === 0 ? a : Math.sin(k * a) / k,
-                  (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * row.h * v * v];
+                  (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)
+                    + (kS === null ? c * row.h * v * v : c * row.h * v * v * kS)];
         };
         let chord = 0, prev = pt(-1);
         for (let j = 1; j < NV; j++) {

@@ -434,6 +434,42 @@ a time. `petalCup 0.80 x petalTipShape 1.20` is **NOT** confirmed — the two in
 disagree on both location and verdict, so it is recorded as unconfirmed rather than as
 a finding.
 
+### 6.5b The cost, and the one number that is not free
+
+**Triangles: zero added, at every setting.** 19,040 live and export on the default
+petal at every sweep; 94,432 on a 40-petal continuous bloom. Export STL 930 KiB
+default, 4,611 KiB at 40 petals — identical to the shipped figures, because the scale
+changes where points sit and not how many there are.
+
+**Watertightness holds.** A direct edge census on the builder's own export-mode output
+over nine swept states — including the maximum reach, a reflex cup, the iris buckle,
+the f 7 buckle ceiling, the inert pointed tip, and a 40-petal CONTINUOUS bloom — gives
+**boundary = 0, degenerate = 0, non-manifold = 0** on all nine. That is a direct census
+and NOT the browser gate; the full matrix on `verify-bloom-export.mjs` and
+`verify-bloom-connectedness.mjs` is still what merge requires.
+
+**AND THE CROSS-WIDTH METRIC IS THE COST.** `v` is uniform in PARAMETER, not in arc
+length, and the scale multiplies the cross-width derivative — so at `petalCup 1.20 x
+petalTipShape 2.45`, sweep 0 to 1 takes `metricMax` from **2.600 to 16.137** and
+`polylineMax` from 1.631 to 8.129. CLAUDE.md records 4.12 as the previous worst
+reachable metric, so this is four times it.
+
+It is not a defect, it is what "the rim carries around at constant height" means for a
+narrowing blade: at `u0` the row is 5.37 mm half-wide and its margin lifts 6.44 mm; at
+the apex the row is 0.80 mm half-wide and its margin lifts the same 6.44 mm, so the
+surface between midrib and rim is necessarily steeper there. But it means **the apex
+row's ten emitted columns are very unevenly spaced in millimetres**, which is a
+sampling question the sheet's profile rows are the place to judge, and it is the
+strongest argument for a smaller default than 1.00.
+
+**The second-copies audit, re-derived against this scale.** `telemetry()` holds two
+more copies of the cross-section — the metric loop at `bloom-geometry.js:4282` and the
+polyline loop below it — and both already omitted the buckle before this session. A
+scale wired only into `sectAt` would have left them reporting the UNSWEPT stretch on
+every swept row: the same defect one layer down, and the reason the numbers above
+exist at all. Both read the scale now; the flat default still reports `null`, which is
+the guard doing its job.
+
 ### 6.6 What is not done
 
 * **The 1.80 threshold control is WITHDRAWN**, per Eva: *"A number that moves when the
