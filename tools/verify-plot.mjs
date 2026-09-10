@@ -982,8 +982,16 @@ const MUTANTS = [
     to: 'const stemOf = (inst = cur()) => {\n  const v = { on: sui.stem.value, bundle: +sui.stemBundle.value,'
         + ' join: +sui.stemJoin.value, length: +sui.stemLength.value,'
         + ' droopDeg: +sui.stemDroop.value, neck: +sui.stemNeck.value };',
+    /* THE SAVE/RESTORE CHECK CANNOT SEE THIS, measured rather than assumed, and
+       it is worth saying why: `commitStem` still writes the SELECTED bloom's
+       values into its own record, so the STORE is right and only the DRAWING is
+       wrong — and a round trip compares stores. What does see it is the pair
+       below, one of which was not claimed on the first sweep and is a true
+       statement about the mutation: with the stem read off the panel, selecting
+       a bloom changes what the OTHER bloom draws, so a bloom stops being drawn
+       from its own arrays. */
     breaks: ['blooms/two-blooms-carry-two-different-stems-at-once',
-             'blooms/several-blooms-save-and-restore-as-themselves'],
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing'],
   },
   {
     /* SELECTING A BLOOM STAMPS THE PANEL ONTO IT. The destructive half of the
@@ -993,9 +1001,12 @@ const MUTANTS = [
     id: 'selecting-a-bloom-stamps-the-panel-onto-it', file: 'plot.js',
     from: '  selInstance = want;\n  bui.bloomPick.value = String(selInstance);\n  loadStemControls();',
     to: '  selInstance = want;\n  bui.bloomPick.value = String(selInstance);\n  commitStem();',
+    /* AND THE SAVE/RESTORE CHECK CANNOT SEE THIS ONE EITHER, for the same
+       measured reason: every bloom's record is still written by hand and read
+       back by hand, and what the stamp damages is the record of the bloom you
+       moved AWAY from — which this check restores over. */
     breaks: ['blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
-             'blooms/two-blooms-carry-two-different-stems-at-once',
-             'blooms/several-blooms-save-and-restore-as-themselves'],
+             'blooms/two-blooms-carry-two-different-stems-at-once'],
   },
   {
     /* THE IDENTITY TRANSFORM ALLOCATES. The picture is IDENTICAL — every
@@ -1013,7 +1024,10 @@ const MUTANTS = [
     id: 'the-rotation-is-transposed', file: 'plot-instance.js',
     from: '  m[1] = af + be * d;  m[5] = ae - bf * d;  m[9] = -b * c;',
     to: '  m[4] = af + be * d;  m[5] = ae - bf * d;  m[6] = -b * c;',
-    breaks: ['instance/the-matrix-is-threes-own-scale-rotate-translate'],
+    // It turns the 45° box the other way too, which is a true statement about
+    // it and was not on the first sweep's list.
+    breaks: ['instance/the-matrix-is-threes-own-scale-rotate-translate',
+             'instance/a-turned-box-is-measured-at-its-corners'],
   },
   {
     /* TRANSLATE THEN SCALE, so a bloom's position is scaled too and a bloom
@@ -1030,7 +1044,11 @@ const MUTANTS = [
     id: 'a-turned-box-is-measured-at-its-mapped-corners-only', file: 'plot-instance.js',
     from: '  for (let c = 0; c < 8; c++) {',
     to: '  for (let c = 0; c < 8; c += 7) {',
-    breaks: ['instance/a-turned-box-is-measured-at-its-corners'],
+    /* AND THE SCALE CHECK READS `placedExtents`, so a bloom turned 30° measures
+       13.50 mm across instead of 44.9 — true about the mutation, unclaimed on
+       the first sweep, and named here rather than tuned out of the check. */
+    breaks: ['instance/a-turned-box-is-measured-at-its-corners',
+             'blooms/the-scale-control-is-uniform-and-the-bloom-really-shrinks'],
   },
   {
     /* THE PICK FORGETS WHICH BLOOM. Every click then selects the right petal
@@ -3072,15 +3090,22 @@ async function run({ mutant = null } = {}) {
      the two boxes rather than being a constant, so what is asserted is the
      property — the new bloom's placed x extent starts past the old one's end —
      and not a number this file would have to keep in step with the module. */
+  /* THE DETAIL IS BUILT FROM WHAT IS THERE, NEVER FROM WHAT THE CHECK EXPECTS.
+     Under the mutation that makes an import REPLACE, there is one extent and no
+     `extents[1]` — and a message that reached into it took the whole negative
+     control down with a TypeError instead of reporting a red. Third instance of
+     that bug class on this page; collect the outcomes first, then say them. */
   const extents = await q(() => window.__plot.placedExtents());
+  const span = e => (e ? `${e.min[0].toFixed(1)}..${e.max[0].toFixed(1)}` : '(no bloom)');
   check('add/the-new-bloom-lands-clear-of-the-old-one',
-    extents.length === 2 && extents[0].min[0] === extents[0].min[0]
+    extents.length === 2 && !!extents[0] && !!extents[1]
     && extents[1].min[0] > extents[0].max[0]
+    && added.list.length === 2
     && added.list[0].transform.position.every(v => v === 0)
     && added.list[1].transform.position[0] > 0,
-    `bloom 1 spans x ${extents[0].min[0].toFixed(1)}..${extents[0].max[0].toFixed(1)} mm and `
-    + `bloom 2 ${extents[1].min[0].toFixed(1)}..${extents[1].max[0].toFixed(1)} — the first `
-    + 'keeps the identity transform, so one bloom is drawn exactly where its file put it');
+    `${extents.length} placed bloom${extents.length === 1 ? '' : 's'}: bloom 1 spans x `
+    + `${span(extents[0])} mm and bloom 2 ${span(extents[1])} — the first keeps the identity `
+    + 'transform, so one bloom is drawn exactly where its file put it');
 
   const tmpFile = path.join(os.tmpdir(), 'bloom-grid-live.glb');
   writeFileSync(tmpFile, readFileSync(path.join(ROOT, GRID)));
@@ -4797,6 +4822,15 @@ async function run({ mutant = null } = {}) {
      same correction — so what is asked here is the STORE and the CONTROLS
      separately, and a read taken ACROSS a selection change. */
   log('\n--- several blooms ---');
+  /* EVERY READ IN THIS SECTION GOES THROUGH `at`, and that is not fussiness.
+     Half the mutations below leave the page with ONE bloom — an import that
+     replaces is the headline one — so a clause or a DETAIL STRING that reaches
+     into `list[1]` throws a TypeError and takes the whole negative control down
+     with it, reporting nothing about the mutation at all. Third instance of
+     that bug class on this page; the rule is collect the outcomes first, then
+     build the sentence. */
+  const blAt = (a, i, k) => (a && a[i] ? a[i][k] : undefined);
+  const blNum = v => (typeof v === 'number' ? v.toFixed(2) : '—');
   await reset();
   const oneBloom = await q(() => ({ n: window.__plot.instanceCount(),
                                     d: window.__plot.drawn(),
@@ -4849,8 +4883,10 @@ async function run({ mutant = null } = {}) {
                                      sel: window.__plot.selectedInstance() }));
   const inkAfterPick = (await px()).ink;
   const pickWhy = [];
-  if (droopedOn2[1].stem.droopDeg !== 40) pickWhy.push(`bloom 2 holds ${droopedOn2[1].stem.droopDeg}°`);
-  if (droopedOn2[0].stem.droopDeg !== 0) pickWhy.push(`bloom 1 holds ${droopedOn2[0].stem.droopDeg}°`);
+  if (droopedOn2.length !== 2) pickWhy.push(`${droopedOn2.length} blooms, not 2`);
+  const droop = i => { const s = blAt(droopedOn2, i, 'stem'); return s ? s.droopDeg : '(none)'; };
+  if (droop(1) !== 40) pickWhy.push(`bloom 2 holds ${droop(1)}°`);
+  if (droop(0) !== 0) pickWhy.push(`bloom 1 holds ${droop(0)}°`);
   if (bl_afterPick.sel !== 0) pickWhy.push(`selection is ${bl_afterPick.sel}`);
   if (+bl_afterPick.ctl.stem.droopDeg !== 0) pickWhy.push(`the panel reads ${bl_afterPick.ctl.stem.droopDeg}°`);
   if (stateOf(bl_afterPick.list) !== stateOf(droopedOn2)) pickWhy.push('a record moved');
@@ -4893,13 +4929,16 @@ async function run({ mutant = null } = {}) {
      length, part company along their run, and that the drooping one swings
      further off its own ring axis than the straight one. */
   check('blooms/two-blooms-carry-two-different-stems-at-once',
-    stemsNow.rows.length === 2 && stemsNow.rows[0].lines === stemsNow.rows[1].lines
-    && stemsNow.rows[0].lines > 0 && stemsNow.worst > 5
-    && stemsNow.rows[1].lateralMm > stemsNow.rows[0].lateralMm + 1,
-    `the two stems part company by up to ${stemsNow.worst.toFixed(2)} mm over `
-    + `${stemsNow.rows[0].lines} lines each, and the drooping one swings `
-    + `${stemsNow.rows[1].lateralMm.toFixed(2)} mm off its own ring axis against the straight `
-    + `one's ${stemsNow.rows[0].lateralMm.toFixed(2)} — bloom 1 hangs straight, bloom 2 droops 40°`);
+    stemsNow.rows.length === 2
+    && blAt(stemsNow.rows, 0, 'lines') === blAt(stemsNow.rows, 1, 'lines')
+    && blAt(stemsNow.rows, 0, 'lines') > 0 && stemsNow.worst > 5
+    && blAt(stemsNow.rows, 1, 'lateralMm') > blAt(stemsNow.rows, 0, 'lateralMm') + 1,
+    `${stemsNow.rows.length} bloom${stemsNow.rows.length === 1 ? '' : 's'}: the two stems part `
+    + `company by up to ${stemsNow.worst.toFixed(2)} mm over `
+    + `${blAt(stemsNow.rows, 0, 'lines')} / ${blAt(stemsNow.rows, 1, 'lines')} lines, and the drooping `
+    + `one swings ${blNum(blAt(stemsNow.rows, 1, 'lateralMm'))} mm off its own ring axis against the `
+    + `straight one's ${blNum(blAt(stemsNow.rows, 0, 'lateralMm'))} — bloom 1 hangs straight, bloom 2 `
+    + 'droops 40°');
 
   /* THE TRANSFORM PLACES ONE BLOOM AND LEAVES THE OTHER ALONE, AS AN ARRAY
      IDENTITY. `placeStrips` hands back the very records it was given at the
@@ -4919,13 +4958,15 @@ async function run({ mutant = null } = {}) {
                                   ext: window.__plot.placedExtents(),
                                   ctl: window.__plot.instanceControls() }));
   const placeWhy = [];
-  if (bl_placed.list[1].transform.position[0] !== 150) placeWhy.push(`x ${bl_placed.list[1].transform.position[0]}`);
-  if (bl_placed.list[1].transform.rotationDeg[2] !== 30) placeWhy.push(`rotZ ${bl_placed.list[1].transform.rotationDeg[2]}`);
-  if (JSON.stringify(bl_placed.list[1].transform.scale) !== '[0.5,0.5,0.5]') placeWhy.push(`scale ${bl_placed.list[1].transform.scale}`);
-  if (JSON.stringify(bl_placed.list[0].transform.position) !== '[0,0,0]') placeWhy.push(`bloom 1 moved to ${bl_placed.list[0].transform.position}`);
-  if (!bl_placed.ident[0].identity) placeWhy.push('bloom 1 is not at the identity');
-  if (!bl_placed.ident[0].sameArrays) placeWhy.push("bloom 1's drawn strips are not its file's arrays");
-  if (bl_placed.ident[1].identity) placeWhy.push('bloom 2 reads as the identity');
+  const t0 = blAt(bl_placed.list, 0, 'transform'), t1 = blAt(bl_placed.list, 1, 'transform');
+  if (bl_placed.list.length !== 2) placeWhy.push(`${bl_placed.list.length} blooms, not 2`);
+  if (!t1 || t1.position[0] !== 150) placeWhy.push(`x ${t1 ? t1.position[0] : '(no bloom 2)'}`);
+  if (!t1 || t1.rotationDeg[2] !== 30) placeWhy.push(`rotZ ${t1 ? t1.rotationDeg[2] : '(no bloom 2)'}`);
+  if (!t1 || JSON.stringify(t1.scale) !== '[0.5,0.5,0.5]') placeWhy.push(`scale ${t1 ? t1.scale : '(no bloom 2)'}`);
+  if (!t0 || JSON.stringify(t0.position) !== '[0,0,0]') placeWhy.push(`bloom 1 at ${t0 ? t0.position : '(none)'}`);
+  if (!blAt(bl_placed.ident, 0, 'identity')) placeWhy.push('bloom 1 is not at the identity');
+  if (!blAt(bl_placed.ident, 0, 'sameArrays')) placeWhy.push("bloom 1's drawn strips are not its file's arrays");
+  if (blAt(bl_placed.ident, 1, 'identity') !== false) placeWhy.push('bloom 2 does not read as placed');
   check('blooms/a-transform-places-its-own-bloom-and-no-other',
     placeWhy.length === 0,
     placeWhy.length ? placeWhy.join(' · ')
@@ -4935,12 +4976,12 @@ async function run({ mutant = null } = {}) {
   /* THE SCALE CONTROL IS UNIFORM AND WRITES ALL THREE, and the bl_placed extent
      really is half the size — the control could write one axis and the picture
      would still look plausible from most angles. */
-  const halfW = bl_placed.ext[1].max[0] - bl_placed.ext[1].min[0];
-  const fullW = bl_placed.ext[0].max[0] - bl_placed.ext[0].min[0];
+  const widthOf = i => (bl_placed.ext[i] ? bl_placed.ext[i].max[0] - bl_placed.ext[i].min[0] : NaN);
+  const halfW = widthOf(1), fullW = widthOf(0);
   check('blooms/the-scale-control-is-uniform-and-the-bloom-really-shrinks',
     Math.abs(bl_placed.ctl.transform.bloomScale - 0.5) < 1e-9
     && halfW < fullW * 0.8 && halfW > fullW * 0.35,
-    `bloom 2 spans ${halfW.toFixed(1)} mm against bloom 1's ${fullW.toFixed(1)} at 0.5x — `
+    `bloom 2 spans ${blNum(halfW)} mm against bloom 1's ${blNum(fullW)} at 0.5x — `
     + 'turned 30°, so it is not exactly half and the corners are what is measured');
 
   /* A PETAL WARP BELONGS TO ITS BLOOM. Petal 3 exists in both, so a store keyed
@@ -4951,11 +4992,13 @@ async function run({ mutant = null } = {}) {
   await set({ petalAlong: 1.8 });
   const warpsPerBloom = await q(() => window.__plot.instances().map(i => ({
     k: i.k, warped: i.warpedPetals.slice() })));
+  const warpedOf = i => (warpsPerBloom[i] ? warpsPerBloom[i].warped : null);
   check('blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number',
-    warpsPerBloom[1].warped.length === 1 && warpsPerBloom[1].warped[0] === 3
-    && warpsPerBloom[0].warped.length === 0,
+    warpsPerBloom.length === 2
+    && (warpedOf(1) || []).length === 1 && (warpedOf(1) || [])[0] === 3
+    && (warpedOf(0) || ['x']).length === 0,
     `petal 3 of bloom 2 carries a warp and petal 3 of bloom 1 does not — `
-    + `[${warpsPerBloom[0].warped}] against [${warpsPerBloom[1].warped}]`);
+    + `[${warpedOf(0) || '(no bloom 1)'}] against [${warpedOf(1) || '(no bloom 2)'}]`);
 
   /* AND THE CURSOR IS RESET, NOT CARRIED, WHEN THE BLOOM CHANGES. Petal 3 of
      this bloom is a different blade from petal 3 of that one, so carrying the
