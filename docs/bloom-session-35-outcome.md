@@ -470,6 +470,39 @@ every swept row: the same defect one layer down, and the reason the numbers abov
 exist at all. Both read the scale now; the flat default still reports `null`, which is
 the guard doing its job.
 
+### 6.5c EVA'S OWN QUESTION, ANSWERED — and the answer is not a sweep value
+
+Eva asked which sweep makes `petalTipShape` 1.80 read as a bowl rather than a point,
+and to propose it as the default. **No value does, and the reason is the outline
+rather than the control.** The sweep cannot carry the apex past the tip's own
+inscribed radius, so the CEILING on apex participation is set by the shape:
+
+| tip n | inscribed R | ceiling on apex share at sweep 1.00 |
+|---|---|---|
+| 1.20 | 0.8000 | 10.0% (inert — R IS the terminal half-width) |
+| 1.40 | 0.8190 | 10.2% |
+| 1.60 | 1.0791 | 13.5% |
+| 1.70 | 1.3393 | 16.7% |
+| **1.80** | **1.7089** | **21.4%** |
+| 2.00 | 2.8937 | 36.2% |
+| 2.15 | 3.9794 | 49.7% |
+| 2.45 | 5.3687 | 67.1% |
+| 3.00 | 6.6531 | 83.2% |
+
+(peakHalf 8.00 mm on the shipping petal, EXPORT, 56 x 10.)
+
+At 1.80 the apex can reach **at most a fifth** of the rim's peak however hard the
+control is pushed. **The bowl only becomes available above 2.00**, and it is
+unmistakable at 2.45 and 3.00.
+
+**This bears on the original ruling.** The 1.80 boundary was chosen against the
+rim-keyed construction, which is retired; measured against the outline itself the
+physical crossover is higher. That is reported, not acted on — the threshold control
+is withdrawn either way, so nothing in the shipped code depends on where the crossover
+sits. **A default for the sweep is therefore not proposed here**: it is a taste
+decision about how far the bowl should carry on the tip shapes where it CAN carry, and
+it belongs in front of the sheet.
+
 ### 6.6 What is not done
 
 * **The 1.80 threshold control is WITHDRAWN**, per Eva: *"A number that moves when the
