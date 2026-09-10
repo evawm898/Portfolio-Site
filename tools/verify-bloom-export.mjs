@@ -51,6 +51,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -185,6 +186,14 @@ for (const row of rows) {
   const flr = await exportFloorAssertion(page);
   if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
   const stl = analyzeStl(buf);
+  /* ORIENTATION (O1-O2) AND THE SELF-INTERSECTION CENSUS (X1-X2), session
+     36 — see their header in bloom-harness.mjs. Read from THIS row's STL
+     bytes. Both are things this gate is structurally blind to: an inside-out
+     petal and a petal folded through itself are watertight and one piece. */
+  const ori = orientationAssertions(stlPositions(buf), row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
+  const sx = await selfIntersectionAssertions(page, buf, row);
+  if (sx.bad.length) { validity.push(`${row.label}: ${sx.bad.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the one thing
      here that can see OVER-connection: 120 feet fused into one mass at the
      base add no boundary edge and split no flood fill, so every other
@@ -280,6 +289,7 @@ for (const row of rows) {
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
     crowding: crowd.r,
+    solidCensus: sx.r, orientation: ori.r,
     sagitta: sag,
     coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage, sphere: isSphere,
     solid: sol.r, solidSkipped: sol.skipped || null, solidAsserted: !!row.solidCoverage, solidHead, solidR5: sol.r ? sol.r.r5 : (sol.r5 || null),
@@ -303,6 +313,8 @@ for (const r of results) {
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
+  console.log(`       ^ ${orientationLine(r.orientation)}`);
+  console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ' · XFAIL (declared on main at ead8624, still failing as expected)' : ''}`);
   console.log(`       ^ ${sagittaLine(r.sagitta)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
@@ -317,6 +329,12 @@ console.log(`\n${results.length - failures.length}/${results.length} configs wat
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
+console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
+console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
+{
+  const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === (r.sphere ? 1 : 0)).length}/${results.length} configs meeting the orientation baseline (every shell outward; under SPHERE exactly one inward, the hub's inner face)`);
+}
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
@@ -341,6 +359,7 @@ console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a 
 /* MATRIX-LEVEL claims (a flag raised somewhere, an asserted row somewhere)
    are claims about the MATRIX, so a filtered `--only` run does not make them. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label)));
 /* THE SELF-CONTACT FLAG, both directions at matrix level (session 16). */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
 {

@@ -18,6 +18,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-connectedness.mjs
       - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-connectedness.yml
   push:
@@ -30,6 +31,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-connectedness.mjs
       - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 

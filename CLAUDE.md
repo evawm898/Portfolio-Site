@@ -64,6 +64,42 @@ read stations **7.11e-2 mm** away from the builder's, a second producer of the p
 inside the instrument written to catch second producers — so every witness reads
 `buildBloomInto`'s own report.
 
+**EVERY PETAL SHELL IS WOUND OUTWARD NOW, THE ORIENTATION IS A GATE WITH ONE DECLARED
+BASELINE, AND THE CENSUS IS A GATE WITH A 318-ROW XFAIL LIST MEASURED ON `main`** (session
+36, Eva's ruling on session 35's two findings — read `docs/bloom-session-36-outcome.md`
+before touching `emitPanel`, `tools/bloom-self-intersection.mjs` or the O/X families).
+`emitPanel` emits each quad as `(a, d, c, b)` where it was `(a, b, c, d)`: the same
+triangles as vertex SETS, each winding reversed. **"0 floats moved" is FALSE and must not
+be claimed** — the vertex order within every petal facet and its exporter-derived normal
+changed on every row with a petal; what is invariant is measured by `node
+tools/verify-bloom-winding-bytes.mjs --base <worktree>` (72,666,576 triangles matched as
+unordered sets, 653,999,184 coordinates `Object.is`-equal, 29,492 petal shells reversed,
+9,234 other shells identical in order, per-triangle divergence terms exactly negated, shell
+|volume| to 2.4e-14 relative — SUMMATION ORDER, not the bit). No frozen phase is owed
+(frozen matrices pin definitions, never bytes) but EVERY frozen tag's STL bytes now differ
+on every petal row. **O1/O2 ride in both STL gates**: every shell outward — the one
+exception is the SPHERE head's inner sphere, inward BY DESIGN as the hollow's inner face,
+declared and bounded — and volume sign agreeing with ray parity, the latter asserted only
+where the row is not a declared self-intersector, because parity is undefined on a shell
+that passes through itself (495 disagreeing shells on this tree, all on such rows, none on
+a clean one). **X0/X1/X2 ride in the EXPORT gate only, on cost** (41.6 min over the matrix,
+808 s on the deepest continuous corner). **The census reads the BUILDER'S DOUBLES and X0
+proves they are the file's own** (`fround` of every double equals the STL's float): the
+float32 bytes manufacture 196 span-0 touches on the flat default. **Two defects in the
+census surfaced the first time it ran over the whole matrix**: its pair `Set` overflowed on
+ALL MAX (canonical-cell rule now), and its COUNT DEPENDED ON THE WINDING (corners are read
+in coordinate order now; identical on both trees). **THE ROOT BLEND IS NOT FIXED — its
+brief with all measurements is §5 of that doc**, and its 138 rows are in the xfail list
+by name; the fix is `footRing()`'s, never a blade-side correction. (The list holds three by-design overlaps the vertex-welded shell definition
+cannot tell from a fold — every STYLE row at exactly 272, the lobed tips, and every CLEFT row —
+named as such in the doc; and a sweep that applies control sets but not a row's `capability`
+hook measures the cleft rows without their cleft, which the smoke gate caught.) **RECORDED FOR EVA, as
+MEASURED rather than as the ruling phrased it**: one or two layers export free of
+self-intersection at any petal count AT THE DEFAULT FORM (the petalCount sweep reads 0 on
+every row); cup beyond about −0.2..0.3, buckle from 0.3×, roll from 270° and curl 360° fold
+a single petal at ANY depth — the read-out's `ROOT BLEND AT N LAYERS` line says exactly
+that, at three layers and up, and the panel gate's route (v) asserts it both ways.
+
 **EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
 corroborated independently against an exported STL). Per-shell signed volume: the hub
 is POSITIVE and every petal is NEGATIVE — −3,827 mm³ on the shipping default, −20,480

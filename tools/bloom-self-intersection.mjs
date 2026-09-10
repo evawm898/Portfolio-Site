@@ -49,8 +49,30 @@
    if their boxes share a cell, which cannot miss an intersecting pair because
    intersecting triangles have overlapping boxes. Exact, not approximate.
 
+   TWO DEFECTS THE FIRST FULL-MATRIX RUN FOUND (session 36), both in this
+   file and neither in the geometry:
+     - the pair-dedup Set OVERFLOWED (2^24 entries) on the ALL MAX row's
+       636,096 triangles before returning anything — replaced by the
+       canonical-cell rule, which keeps no record at all (see census());
+     - the count depended on the WINDING: the segment-triangle test is not
+       symmetric at the epsilon, so reversing every petal moved 40 of 624
+       rows by a few pairs and flipped one verdict (4 -> 0). The corners are
+       now read in coordinate order, so a surface reads the same whatever
+       its winding — verified identical on both trees over 113 rows.
+   The calibration did not move under either: flat 0, roll-330 18,776, curl
+   360 1,008, all-form 11,056; the cup rows moved by single digits (cup 1.20
+   x tip 1.70 750 -> 752, x tip 2.45 771 -> 777) and those are the figures
+   the X family's xfail list carries.
+
+   IT IS WIRED (session 36): O1/O2 (orientation) in both STL gates, X0-X2
+   (this census, on the builder's doubles that X0 proves are the STL's own)
+   in the export gate, with SELF_INTERSECTION_XFAIL in bloom-harness.mjs
+   measured on main at ead8624. The float32 STL itself is NOT a valid input
+   here: its ~2e-6 mm quantisation manufactures span-0 touches (196 on the
+   flat default, all single points, none within 0.5 mm of a real site).
+
    RUN:  node tools/bloom-self-intersection.mjs [--states] [--negative-control]
-         [--prove-exclusion] [--stl <file> --set k=v,...]
+         [--prove-exclusion] [--orientation] [--stl <file> --set k=v,...]
    =================================================================== */
 import fs from 'node:fs';
 import * as G from '../bloom-geometry.js';
@@ -227,26 +249,48 @@ export function census(positions, { verbose = false, collect = false } = {}) {
           let L = grid.get(k); if (!L) { L = []; grid.set(k, L); } L.push(t);
         }
   }
-  const tri = (t) => [[positions[t*9],positions[t*9+1],positions[t*9+2]],
-                      [positions[t*9+3],positions[t*9+4],positions[t*9+5]],
-                      [positions[t*9+6],positions[t*9+7],positions[t*9+8]]];
-  const seen = new Set();
+  /* THE TRIANGLE IS READ AS A VERTEX SET, IN A CANONICAL ORDER (session 36).
+     The segment-triangle test is not symmetric at the epsilon: an edge run
+     P -> Q and the same edge run Q -> P can disagree on a grazing hit, so a
+     census that read the emitted corner order depended on the WINDING —
+     measured when the petal winding was reversed: 40 of 624 matrix rows
+     moved by a few pairs and one row's verdict flipped (4 -> 0). A surface
+     does not change when its winding does, so the corners are ordered by
+     welded vertex index before any test, and the count is winding-invariant
+     by construction. The recalibrated figures are in the CLI's own banner. */
+  const tri = (t) => {
+    /* by COORDINATE, lexicographically — not by welded index, which is a
+       first-occurrence number and therefore itself a function of stream
+       order (measured: sorting by index left 29 of 113 rows differing
+       between the two windings). */
+    const cs = [0, 1, 2].map((k) => [positions[t*9+k*3], positions[t*9+k*3+1], positions[t*9+k*3+2]]);
+    return cs.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+  };
   let within = 0, cross = 0, worst = 0, worstAt = null, worstPair = null, tested = 0;
   const sites = [];
-  for (const L of grid.values()) {
+  /* A PAIR IS TESTED IN EXACTLY ONE CELL — the cell holding the minimum
+     corner of the two boxes' OVERLAP — so no record of tested pairs is kept.
+     The first version kept a Set of pair keys and it OVERFLOWED (a JS Set
+     holds at most 2^24 entries) on the matrix's ALL MAX row, 636,096
+     triangles, before any answer came back; session 36 found it the first
+     time the census was run over the whole matrix. The overlap's min corner
+     lies in a cell both boxes cover, so every overlapping pair is still
+     tested once, and a pair whose boxes do not overlap is skipped here as
+     before. */
+  for (const [ck, L] of grid) {
+    const [cx, cy, cz] = ck.split(',').map(Number);
     for (let a = 0; a < L.length; a++) for (let b = a + 1; b < L.length; b++) {
       const i = L[a], j = L[b];
-      const pk = i < j ? i * nTri + j : j * nTri + i;
-      if (seen.has(pk)) continue; seen.add(pk);
-      /* boxes must actually overlap */
+      /* boxes must actually overlap, and this must be the overlap's own cell */
       let sep = false;
       for (let x = 0; x < 3; x++) if (hi[i*3+x] < lo[j*3+x] || hi[j*3+x] < lo[i*3+x]) { sep = true; break; }
       if (sep) continue;
+      if (gi(Math.max(lo[i*3], lo[j*3]), 0) !== cx || gi(Math.max(lo[i*3+1], lo[j*3+1]), 1) !== cy || gi(Math.max(lo[i*3+2], lo[j*3+2]), 2) !== cz) continue;
       tested++;
       const T1 = tri(i), T2 = tri(j);
       const shared = [];
       for (let c = 0; c < 3; c++) for (let d = 0; d < 3; d++)
-        if (vidx[i*3+c] === vidx[j*3+d]) shared.push(T1[c]);
+        if (vidx[i*3+c] === vidx[j*3+d]) shared.push([positions[i*9+c*3], positions[i*9+c*3+1], positions[i*9+c*3+2]]);
       const pts = [];
       for (let c = 0; c < 3; c++) {
         const P = segTri(T1[c], sub(T1[(c+1)%3], T1[c]), T2[0], T2[1], T2[2]);

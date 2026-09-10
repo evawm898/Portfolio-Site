@@ -124,6 +124,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
+import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -322,6 +323,12 @@ for (const row of rows) {
   const flr = await exportFloorAssertion(page);
   if (flr.length) { validity.push(`${row.label}: ${flr.join('; ')}`); continue; }
   const e = analyzeStl(buf);
+  /* ORIENTATION (O1-O2), session 36 — see its header in bloom-harness.mjs.
+     Read from THIS row's STL bytes; an inside-out petal is one piece here.
+     The self-intersection census (X0-X2) rides in the EXPORT gate only, on
+     cost — its header says why. */
+  const ori = orientationAssertions(stlPositions(buf), row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the ONE thing in
      this file that can see OVER-connection. This gate's whole criterion is
      "one region": 120 feet fused into a single mass at the base are the most
@@ -333,7 +340,7 @@ for (const row of rows) {
   if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
   const v = voxelComponents(buf, CELL_MM);
   const fm = await page.evaluate(() => window.__bloomMetrics());
-  const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius, crowding: crowd.r };
+  const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius, crowding: crowd.r, orientation: ori.r };
   if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, ...probe, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
   else results.push({ label: row.label, capability: !!row.capability, ok: v.comps === 1, ...e, ...v, ...probe });
 }
@@ -399,6 +406,7 @@ for (const r of results) {
   console.log(`  ${verdict} ${r.label.padEnd(46)} ${detail}`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
+  console.log(`       ^ ${orientationLine(r.orientation)}`);
 }
 console.log(`\n${results.length - failures.length - skipped.length}/${results.length} rows are ONE connected piece`
   + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')
@@ -408,6 +416,7 @@ console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under la
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
+console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
