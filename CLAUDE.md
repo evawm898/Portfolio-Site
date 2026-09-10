@@ -3566,17 +3566,141 @@ other gates): `npm i --no-save three@0.161.0 playwright-core`, in ONE line.
 Three is served from `node_modules` at the exact jsDelivr URLs `plot.html`
 pins, so the gate needs no CDN egress.
 
+**A COMPOSITION HOLDS SEVERAL BLOOMS, AND THE FILE NEEDED NO MIGRATION BECAUSE ITS
+ROOT WAS ALWAYS A LIST** (session of Sep 10, overnight — read `plot-instance.js`'s
+header before touching any of it). Build order step 5, and the last thing standing
+between `/plot` and the reference composition of five blooms at different scales.
+`instances` in plot.js is one record per bloom and `cur()` is the one window the
+panels edit through. **THE VERSION DID NOT MOVE AND MUST NOT BE MOVED FOR THIS:**
+nothing about the format changed — only how many entries the page puts in the list
+it always had — so a file written before this session is one entry long and reads
+back unchanged, and `plot-composition` v2 still names one shape.
+
+**WHAT A BLOOM OWNS AND WHAT THE COMPOSITION OWNS** is exactly the split the file
+already carried: a bloom owns its grid and everything measured from it, its inferred
+stem and that stem's six values, its own per-petal warps and a TRANSFORM saying where
+it stands; the frame, the camera, the draw settings, the polarity and the ONE
+selection cursor are the composition's. The cursor is `(instance, petal)` and it is
+one cursor, because you can only be editing one petal of one bloom at a time.
+
+**IMPORT ADDS, AND A NEW BLOOM IS PLACED CLEAR OF WHAT IS ALREADY THERE.** A second
+grid at the ORIGIN sits exactly on top of the first, which under additive ink on
+black is indistinguishable from the import having REPLACED the drawing — the very
+thing this change exists to stop doing. `placementFor` offsets it along +x by the
+incoming bloom's own width plus `PLACE_GAP_FRACTION` (0.15) of it, DERIVED from the
+two boxes rather than a constant, so it is the right size at any export scale. **The
+FIRST bloom takes the identity transform**, which is what keeps a one-bloom page
+drawn from the very arrays its file wrote.
+
+**THE STEM'S SIX CONTROLS AND THE SEVEN PLACEMENT CONTROLS ARE A VIEW OF THE SELECTED
+BLOOM** — `commitStem` / `loadStemControls` and `commitTransform` /
+`loadTransformControls`, the same shape `commitPetalScales` / `loadPetalControls`
+already had one level down. **SELECTION LOADS; IT NEVER APPLIES.** Picking a bloom to
+look at it must not deform it, and deselecting must not take its stem away — the two
+halves of the ownership error the petal warps had once, and the reason two blooms at
+two different droops is reachable at all. `stemHandles` / `petalHandles` are the
+exception and stay COMPOSITION-level: they are VIEW fields in the file and decide
+whether an editor is drawn, not what any bloom's geometry is.
+
+**THE ORDER IS WARP, DROOP, STEM, THEN PLACE, and the last step is the only new one.**
+Everything before it runs in the bloom's OWN grid space — the space its ring, its
+millimetres, its seam and its chord are written in — and `placeStrips` is applied to
+the finished lines. Placing first would put every reported length in a space that
+moves when a position slider does. **`placeStrips` HANDS BACK THE VERY RECORDS IT WAS
+GIVEN AT THE IDENTITY**, so `warpAll[i] === strips[i]` still answers what it answered
+before instances existed and every "nothing moved" claim on the page stays an array
+identity rather than becoming a tolerance.
+
+**`stemLine` / `stemFeet` REPORT IN THE BLOOM'S OWN SPACE, NOT WHERE IT STANDS** —
+`inst.stemLocal` beside `inst.stemStrips`, the same array at the identity. Comparing a
+PLACED stem against an unplaced head read a bloom that had merely been MOVED as one
+whose stem had come off its ring: measured, a 155 mm seam on a stem that is exact.
+
+**TWO BLOOMS' STEM FEET DO NOT COINCIDE, AND THAT IS THE LAW WORKING** — the stem's
+own s = 0 station takes the FULL droop (decay 1 at the ring, which is what makes the
+seam zero), so a drooping bloom's stem starts where a straight one's does not. A check
+written on the premise that they agree costs a run.
+
+**A FRAMEBUFFER EQUALITY EITHER SIDE OF A SELECTION CHANGE IS NOT AVAILABLE HERE** —
+/print's and /plot's own measured lesson, arriving again: damping never reaches exactly
+zero, so two `settle()`d captures separated by anything creep. "Selecting a bloom
+deforms nothing" is asserted on the GEOMETRY (every record, and which arrays each bloom
+is drawn from) and the ink is REPORTED beside it.
+
+**COST: THE FRAME IS STILL TRIVIAL AND THE REBUILD IS WHAT SCALES.** Measured,
+headless software GL, 1100x800, stems on, u/v density 12:
+
+| | grid segments | stem segments | rebuild (median of 9 real slider events) | frame |
+|---|---|---|---|---|
+| 1 bloom | 15,148 | 40,040 | 8.3 ms | 0.40 ms |
+| 2 blooms | 30,296 | 80,080 | 23.8 ms | 0.40 ms |
+| 3 blooms | 45,444 | 120,120 | 31.4 ms | 0.40 ms |
+
+**At three blooms with stems a slider drag pays ~31 ms per input event, which is past
+the 16.7 ms frame budget** — a drag will read as steppy there. Reported rather than
+optimised around. **The obvious fix is not built and is the next thing to do here: a
+stem or transform slider changes ONE bloom, so `rebuild()` could rebuild that instance
+and re-pack the buffers instead of rebuilding all of them.** A density slider genuinely
+changes all of them and would still pay the full cost. The BLOOM panel prints the live
+figures, because a number nobody prints is a number nobody watches.
+
+**THE PANEL IS 8 CONTROLS HEAVIER AND THE UI OVERHAUL IS NOW OVERDUE.** BLOOM sits
+between DRAW and PETAL so the two-level selection reads top-down. That takes `/plot`
+to eight panels and thirty-two controls, two of which (the bloom picker and the petal
+picker) change what a dozen others MEAN. The overhaul was already the most pressing
+backlog item; it is more so.
+
+**DECISIONS MADE WITHOUT A RULING** (overnight session, Sep 10 — Eva was asleep and the
+brief authorised reversible implementation choices). Each names what was rejected and
+how hard it is to undo:
+
+1. **A new bloom is placed clear of the composition rather than at the origin.**
+   *Rejected:* the origin — indistinguishable from a replace under additive ink.
+   *Undo:* `PLACE_GAP_FRACTION` and `placementFor` in `plot-instance.js`.
+2. **Scale is ONE uniform control; a non-uniform scale in a file is applied exactly as
+   written and REPORTED as something the control cannot show.** *Rejected:* three scale
+   sliders (this page is already over-full), and quietly making a saved non-uniform
+   scale uniform — applying something other than what the file says, however reported,
+   is the failure this format is built against. *Undo:* two rows in `TRANSFORM_FIELDS`.
+3. **The last bloom cannot be removed.** *Rejected:* removing down to zero — an empty
+   viewport is indistinguishable from a page that broke, a reading this project already
+   refused once for a failed grid load. *Undo:* one comparison in `removeInstance`.
+4. **`MAX_INSTANCES` is 8**, so the placement ladder (~92 mm a bloom on this grid) stays
+   inside the position sliders' ±800 mm. The reference is five. *Undo:* one constant.
+5. **The petal cursor RESETS when the bloom changes** rather than carrying the number
+   across — petal 3 of one bloom is a different blade from petal 3 of another.
+   *Undo:* one call in `setSelectedInstance`.
+6. **Position sliders are ±800 mm at 1 mm steps** — about 9 mm per pixel of track, which
+   is coarse. A number input would be precise and would break the panel's visual
+   language; that is a look question and was left for Eva. *Undo:* the markup.
+7. **The GRID, STEM and PETAL panels describe the SELECTED bloom and say so** when there
+   is more than one; the DRAW panel's counts are the whole composition, summed, so its
+   "drawn N of M" stays a ratio. *Undo:* the read-out functions.
+
+**THE GATE IS 216 CHECKS AND 81 MUTANTS.** Two check names changed because the
+behaviour did: `swap/a-dropped-grid-replaces-the-one-on-screen` is now
+`add/a-dropped-grid-is-added-beside-the-one-already-there`, and
+`swap/the-file-input-loads-a-grid-too` is `add/the-file-input-adds-a-grid-too`. Two
+file checks were claims about a CAPABILITY rather than about the file and the
+capability changed (a transform is applied now, and so is a second instance); both are
+re-stated as what the reader really does. **The gate's own grid loads now ACCUMULATE**,
+so its add/remove section removes back to one bloom before every later section — and it
+removes **from the END**, because the survivor has to be the bloom the page booted with,
+the one at the identity transform: removing from the front leaves an ADDED bloom
+standing 155 mm to one side, which is a perfectly good composition and not the drawing
+`/plot` ships.
+
 **A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
 shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
 form. That is a bloom parameter. The sheet photographs it and the viewer does
 not compensate for it.
 
-**Out of scope on purpose:** multiple blooms, composition and arrangement;
-LEAVES and buds; any change to `/print`, the generator, or
+**Out of scope on purpose:** LEAVES and buds; any change to `/print`, the generator, or
 the grid export format. (The STEM is no longer out of scope — see the inferred
 stem above — but it is inferred from the u-lines, not loaded, and nothing about
 leaves follows from it. RASTER AND SVG EXPORT are no longer out of scope
-either — see the polarity and export section above.) Also out of scope and named
+either — see the polarity and export section above; nor are MULTIPLE BLOOM
+INSTANCES, composition and arrangement — see the multi-bloom section above.) Also out of scope and named
 so it is not mistaken for an omission: **LOCK VIEW, background SHAPES and
 cut-and-pull**. TWIST was named in the petal
 session's brief as the thing to drop if the session grew, and it was: bend and
@@ -3628,11 +3752,18 @@ strand modes) is in that doc so it is not re-derived.
    on (it ate the gate's two hardcoded pointer coordinates the day COMPOSITION
    landed).
 1b. **THE COMPOSITION FILE IS BUILT** — `plot-composition` v2 (v1 plus
-   `draw.polarity`), a warp per petal,
-   and a root that is a LIST of instances holding one. What is inherited by the
-   NEXT sessions rather than decided by them: **lock state, background shapes and
-   cut-and-pull state are added as FIELDS**, and a second bloom is an ENTRY —
-   neither needs a migration. Anything that changes the root's cardinality does.
+   `draw.polarity`), a warp per petal, and a root that is a LIST of instances.
+   **The list now holds as many blooms as are loaded** (see the multi-bloom
+   section above): that needed no migration and no version bump, which is what
+   the shape was for. What is inherited by the NEXT sessions rather than decided
+   by them: **lock state, background shapes and cut-and-pull state are added as
+   FIELDS** — neither needs a migration. Anything that changes the root's
+   cardinality does.
+1c. **REBUILDING ONLY THE BLOOM THAT CHANGED.** A stem or transform slider
+   changes ONE instance; `rebuild()` rebuilds all of them, which is why a slider
+   drag costs ~31 ms at three blooms against 8.3 at one. A density slider
+   genuinely changes all of them and would still pay the full cost. Measured, not
+   built — see the multi-bloom section's cost table.
 2. **The `perDescriptor` dedupe in `buildBloomInto`** — the next known blocker
    for the export itself, and it belongs to the GENERATOR, not to this viewer.
    `buildBloomInto` retains one petal per *descriptor*, so **RADIAL exports 1
