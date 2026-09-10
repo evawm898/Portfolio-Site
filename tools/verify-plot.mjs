@@ -539,10 +539,27 @@ const MUTANTS = [
   },
   {
     /* THE OTHER HALF OF THE SAME DEFECT: deselecting throws the warp away, so
-       an adjustment lives only as long as the selection that made it. */
+       an adjustment lives only as long as the selection that made it.
+
+       RE-WRITTEN (multi-bloom session), AND THIS IS A FAILURE THE ANCHOR GUARD
+       CANNOT SEE. The anchor applied perfectly; what broke was the REPLACEMENT.
+       `petalWarps` stopped being a module variable and became a field of the
+       selected bloom, so the mutation's own line was an assignment to an
+       UNDECLARED identifier — valid syntax, and in a module it throws rather
+       than clearing anything. The mutant then reddened `page/no-errors` and
+       MISSED two of the three checks it exists for: it was not the defect it
+       names, it was a broken page wearing that defect's coat. A static check
+       catches a `from` that has moved; it cannot catch a `to` that is valid
+       syntax and invalid at runtime, and only running the mutant found this.
+
+       IT ALSO HAS TO GUARD ON `instances.length`, and that guard is a property
+       of the page rather than a softening of the mutation: `EMPTY_INSTANCE` is
+       FROZEN, so a write into the record that belongs to no bloom THROWS rather
+       than being quietly lost — and `syncSelection` runs once before any grid
+       has loaded. */
     id: 'deselecting-drops-the-warp', file: 'plot.js',
     from: '  if (index >= 0) petalStateOf(index, true);',
-    to: '  if (index >= 0) petalStateOf(index, true); else petalWarps = new Map();',
+    to: '  if (index >= 0) petalStateOf(index, true); else if (instances.length) cur().petalWarps = new Map();',
     breaks: ['warp/a-warp-survives-deselection',
              /* THE CHECKS DOWNSTREAM OF THE DESELECT IN THE SAME SEQUENCE. The
                 first petal is warped, then deselected, then the second is
@@ -589,7 +606,12 @@ const MUTANTS = [
     id: 'the-scales-stay-live-with-nothing-picked', file: 'plot.js',
     from: '  pui.petalAlong.disabled = !st;\n  pui.petalAcross.disabled = !st;',
     to: '  pui.petalAlong.disabled = false;\n  pui.petalAcross.disabled = false;',
-    breaks: ['warp/a-warp-survives-deselection'],
+    breaks: ['warp/a-warp-survives-deselection',
+             /* AND THE BLOOM CURSOR CHECK, which asks the two scales to be
+                switched off after moving to a bloom where nothing is picked —
+                exactly the state this mutation leaves live. True about it, and
+                unclaimed on the sweep that added that check. */
+             'blooms/the-petal-cursor-is-reset-when-the-bloom-changes'],
   },
   {
     // The two stretches stop being independent: `along` widens the petal too,
@@ -821,7 +843,12 @@ const MUTANTS = [
              'restore/a-composition-dropped-on-the-page-is-loaded',
              // Every entry then carries the first petal's bend offsets, so the
              // one bend the drag put on petal 7 is on every petal in the file.
-             'save/a-real-drag-put-an-offset-on-both-bend-sets'],
+             'save/a-real-drag-put-an-offset-on-both-bend-sets',
+             /* AND THE MULTI-BLOOM SECTION SEES IT TOO — unclaimed on the sweep
+                that added that section, true about the mutation, so named here
+                rather than tuned out of the check. */
+             'blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number',
+             'blooms/several-blooms-save-and-restore-as-themselves'],
   },
   {
     /* AND THE SAME FAILURE ON THE WAY BACK IN, which the brief names as the
@@ -835,7 +862,12 @@ const MUTANTS = [
     to: '      target.petalWarps.set(p.index + 1, {',
     breaks: ['restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
-             'restore/a-composition-dropped-on-the-page-is-loaded'],
+             'restore/a-composition-dropped-on-the-page-is-loaded',
+             /* AND THE MULTI-BLOOM SECTION SEES IT TOO — unclaimed on the sweep
+                that added that section, true about the mutation, so named here
+                rather than tuned out of the check. */
+             'blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number',
+             'blooms/several-blooms-save-and-restore-as-themselves'],
   },
   {
     // A composition restored against a different bundle stops saying so. Warps
