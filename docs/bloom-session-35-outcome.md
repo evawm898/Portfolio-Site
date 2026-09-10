@@ -779,3 +779,141 @@ intersecting pairs, worst span 0.1213 mm, at the apex.** If the slicer accepts t
 file cleanly, the census is over-strict and this whole section needs revisiting; if
 it refuses or produces garbage at the petal tips, the census is right and so is
 §7.5. **That reading outranks every instrument here.**
+
+---
+
+## 8. TWO DEFECTS THE CENSUS DID NOT COVER, AND THE ONE IT DID — RELOCATED
+
+Independent corroboration arrived from an instrument written separately against
+the exported STL. **Both findings are established here from the builder rather
+than taken on report**, and one of them changes what this session was about.
+
+### 8.0 First, the file identity — the analysis was NOT of the file that was sent
+
+The emitted STL was **19,040 triangles / 9 shells** (8 petals × 1 layer). The
+analysed file was **66,160 / 29 shells**. Same generator — the same 2,356
+triangles per petal and the same 192-triangle hub — but a different
+configuration: `petalCount 7, layerCount 4`, reproduced here exactly. Every
+comparison below is therefore run on BOTH, because a like-for-like comparison
+was not otherwise available and the difference turns out to be the whole story.
+
+### 8.1 FINDING ONE — every petal shell is inside-out
+
+Established by two independent methods that **agree on all 29 shells**: the
+divergence-theorem signed volume, and a ray-parity test fired from just outside
+each shell's largest facet along that facet's own normal.
+
+| configuration | shells | outward | INWARD | total signed volume |
+|---|---|---|---|---|
+| shipping default (8 × 1) | 9 | 1 (hub, +294.07 mm³) | **8 petals**, −515.19 each | **−3,827.4 mm³** |
+| 7 petals × 4 layers | 29 | 1 (hub, +672.01) | **28 petals**, ≈ −529 each | **−6,465.4 mm³** |
+| cup 1.20 × tip 2.45 | 9 | 1 | 8 | −6,497.9 mm³ |
+| 40 petals CONTINUOUS | 41 | 1 | **40** | **−20,480.5 mm³** |
+
+**WHERE IT COMES FROM, located in the builder and confirmed empirically rather
+than reasoned.** `emitPanel` (`bloom-geometry.js:5152–5157`) emits the top skin
+offset along `+n` and winds it:
+
+```js
+/* Top face (outward = +N side) and bottom face (reversed winding). */
+acc.quad(top[i][j], top[i][j + 1], top[i + 1][j + 1], top[i + 1][j]);
+acc.quad(bot[i][j], bot[i + 1][j], bot[i + 1][j + 1], bot[i][j + 1]);
+```
+
+Measured at a top-skin point, against the mid-surface normal the builder itself
+recorded for that row: **all 6 emitted triangles touching it are wound AGAINST
++n.** The top skin is offset along `+n`, so a face wound against `+n` points
+INTO the solid. **The comment's claim that the top face is the outward side has
+never been checked and is false** — the sixth label-naming-a-computation-nobody-
+performed defect this session. `buildHubInto` uses the opposite convention,
+which is why the hub alone is positive.
+
+**Why nothing here could ever have caught it:** watertight, connected, manifold,
+winding-consistency, degeneracy and Euler characteristic all pass unchanged on an
+inside-out solid. It matters because the export contract relies on a slicer
+UNIONING overlapping closed shells, and a union handed a negative-volume shell
+can treat it as a SUBTRACTION — petals carving into the hub instead of joining it.
+
+**The check is built**: `node tools/bloom-self-intersection.mjs --orientation`.
+Calibrated on a unit cube whose answer is written down (wound outward **+1.0000**,
+reversed **−1.0000**, both methods agreeing on both), with a positive control that
+reverses every triangle of a real bloom export and requires the verdict to move
+(it does: 8 of 9 inward → 1 of 9, −3,827.4 → +3,827.4 mm³). **Not fixed** — the
+ruling is that orientation and the intersections are separate defects with
+separate causes and must not be fixed in one change.
+
+### 8.2 FINDING TWO — the root/tip split, and why the two censuses disagreed
+
+**Neither instrument is wrong. The root cluster is configuration-dependent, and
+it is absent from the configuration this session measured.**
+
+| state | pairs | root (z ≤ 3 mm) | tip (z > 3 mm) |
+|---|---|---|---|
+| 8 × 1 at the DEFAULTS | **0** | 0 | 0 |
+| 8 × 1 at cup 1.20 × tip 2.45 *(the STL that was sent)* | 771 | **0 (0%)** | 771 (100%) |
+| **7 × 4 at the DEFAULTS** | **364** | **364 (100%)** | 0 |
+| 7 × 4 at cup 1.20 × tip 2.45 | 2,997 | 364 (12%) | 2,633 (88%) |
+
+So the census reported the apex because the file it was given has only an apex
+problem. **The root cluster needed a fourth layer to exist at all.**
+
+**THE TRIGGER IS `layerCount ≥ 3`, and nothing else** — measured at the defaults
+with no cup, no buckle and no sweep:
+
+| petals × layers | pairs | root | tip |
+|---|---|---|---|
+| 8 × 1, 7 × 1, **40 × 1** | 0 | 0 | 0 |
+| 8 × 2, 7 × 2 | 0 | 0 | 0 |
+| 8 × 3 | 72 | 72 | 0 |
+| 3 × 4 / 7 × 4 / 8 × 4 / 12 × 4 | 162 / 364 / 416 / 624 | all | 0 |
+
+**AND IT IS THE SHORT PETALS.** Grouping the 7 × 4 sites by shell and sizing
+each shell by the radius its own faces reach:
+
+| petal reach | affected | pairs each |
+|---|---|---|
+| 11.9 mm (innermost layer) | **7 of 7** | 43 |
+| 19.3 mm | **7 of 7** | 9 |
+| 30.1 mm | 0 of 7 | — |
+| 45.4 mm (outermost) | 0 of 7 | — |
+
+These are **within-shell** pairs, so this is a petal crossing ITSELF at its own
+root — not petal-against-petal crowding, which `tools/bloom-crowding.mjs`
+already flags and which is a different quantity. The mechanism follows from the
+sizes: `layerSize` shrinks the blade but the FOOT is set by the hub ring, so a
+short petal must collapse a full-width foot into a short blade across
+`ROOT_BLEND_END` — and past some shrinkage the blend folds through itself.
+Consistent with the controls: `layerSize` 0.90 takes it 364 → **49**,
+`petalTilt` 0 takes it to **63**, `footDelicacy` 0.25 takes it to **595**.
+
+**THAT IS THE ROOT BLEND, `footRing()`'s own boundary, deferred three times** —
+and it is now measured as a real self-intersection in a shipped configuration at
+the shipping defaults, not as a chord-error statistic.
+
+### 8.3 What this does to the ruling — accepted
+
+**The apex sweep is not what stands between Eva and a printable bowl.** A
+multi-layer bloom self-intersects at its roots at the DEFAULTS, before cup is
+touched and before the sweep exists. Judging a swept apex printable or not was
+being done on top of an object already unprintable for an unrelated reason.
+
+So the sweep ships at default 0 as ruled, and it stops being the open question.
+
+### 8.4 What is NOT done, and why
+
+**Neither defect is fixed** — the ruling is explicit that they are separate and
+that the order is Eva's to set.
+
+**The two checks are built and calibrated but NOT wired into the gates.** Wiring
+them means editing the shared harness and both STL workflows, and the xfail
+lists must be measured on `main` across the full 624-row matrix. Every push
+restarts the long gates, and PR #199 has to merge first. So the construction is
+scoped here and lands on a fresh branch off the merged `main`:
+
+* the **orientation** xfail is not a list at all — it is *every petal shell in
+  every configuration*, so the honest form is a single declared baseline (`hub
+  outward, all petal shells inward`) that FAILS the moment any shell changes
+  sign, which is what makes the fix trip it;
+* the **self-intersection** xfail is a per-row list measured on `main`, exactly
+  the `SELF_XFAIL` construction session 34 used, with a run that starts passing
+  failing HARD so a fix cannot land silently.

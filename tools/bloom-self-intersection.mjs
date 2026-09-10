@@ -177,7 +177,7 @@ function coplanarOverlap(T1, T2) {
 }
 
 /* ------------------------------------------------------------------ census */
-export function census(positions, { verbose = false } = {}) {
+export function census(positions, { verbose = false, collect = false } = {}) {
   const nTri = positions.length / 9;
   /* WELD BY EXACT POSITION. The builder emits shared corners from the same
      computation, so exact equality is the right key — a distance-based weld
@@ -232,6 +232,7 @@ export function census(positions, { verbose = false } = {}) {
                       [positions[t*9+6],positions[t*9+7],positions[t*9+8]]];
   const seen = new Set();
   let within = 0, cross = 0, worst = 0, worstAt = null, worstPair = null, tested = 0;
+  const sites = [];
   for (const L of grid.values()) {
     for (let a = 0; a < L.length; a++) for (let b = a + 1; b < L.length; b++) {
       const i = L[a], j = L[b];
@@ -267,11 +268,86 @@ export function census(positions, { verbose = false } = {}) {
           if (d > span) { span = d; at = real[m]; }
         }
         if (span >= worst) { worst = span; worstAt = at; worstPair = [i, j]; }
+        if (collect) sites.push({ at, span, pair: [i, j], shell: shell[i] });
       } else cross++;
     }
   }
   return { nTri, shells: shells.size, within, cross, worstSpanMm: worst, worstAt, worstPair,
-           pairsTested: tested, cellMm: cell };
+           pairsTested: tested, cellMm: cell, sites };
+}
+
+/* ===================================================================
+   ORIENTATION — is each closed shell wound OUTWARD?
+
+   WHY IT MATTERS BEYOND TIDINESS. The export contract leans on a slicer
+   UNIONING overlapping closed shells. A union handed a NEGATIVE-volume shell
+   can treat it as a SUBTRACTION, so the petals would carve into the hub rather
+   than joining it. And nothing else here can see it: watertight, connected,
+   manifold, winding-consistent and degenerate-free ALL pass on an inside-out
+   solid. Euler characteristic passes too.
+
+   TWO INDEPENDENT METHODS, because one of them alone is a convention:
+     - the DIVERGENCE THEOREM signed volume, (1/6) sum v0 . (v1 x v2), which is
+       positive for an outward-wound closed shell;
+     - a RAY-PARITY test fired from just outside each shell's largest facet
+       along that facet's own normal: if the normal is outward the launch point
+       is outside the shell and the ray crosses an EVEN number of faces.
+   They are reported together and a disagreement is itself a failure — that is
+   what stops the check from being a restatement of one convention.
+   =================================================================== */
+export function orientation(positions) {
+  const nTri = positions.length / 9;
+  const key = new Map(), vidx = new Int32Array(nTri * 3);
+  for (let t = 0; t < nTri; t++) for (let c = 0; c < 3; c++) {
+    const o = t * 9 + c * 3;
+    const k = `${positions[o]},${positions[o + 1]},${positions[o + 2]}`;
+    let id = key.get(k); if (id === undefined) { id = key.size; key.set(k, id); }
+    vidx[t * 3 + c] = id;
+  }
+  const par = new Int32Array(nTri).map((_, i) => i);
+  const find = (x) => { while (par[x] !== x) { par[x] = par[par[x]]; x = par[x]; } return x; };
+  const uni = (a, b) => { a = find(a); b = find(b); if (a !== b) par[b] = a; };
+  const bv = new Map();
+  for (let t = 0; t < nTri; t++) for (let c = 0; c < 3; c++) {
+    const v = vidx[t * 3 + c];
+    if (bv.has(v)) uni(bv.get(v), t); else bv.set(v, t);
+  }
+  const groups = new Map();
+  for (let t = 0; t < nTri; t++) { const r = find(t); if (!groups.has(r)) groups.set(r, []); groups.get(r).push(t); }
+  const tri = (t) => [[positions[t*9],positions[t*9+1],positions[t*9+2]],
+                      [positions[t*9+3],positions[t*9+4],positions[t*9+5]],
+                      [positions[t*9+6],positions[t*9+7],positions[t*9+8]]];
+  const out = [];
+  for (const ids of groups.values()) {
+    let V = 0;
+    for (const t of ids) { const [a, b, c] = tri(t);
+      V += (a[0]*(b[1]*c[2]-b[2]*c[1]) + a[1]*(b[2]*c[0]-b[0]*c[2]) + a[2]*(b[0]*c[1]-b[1]*c[0])) / 6; }
+    /* the ray-parity second opinion, from the largest facet */
+    let best = ids[0], bA = -1;
+    for (const t of ids) { const [a,b,c] = tri(t);
+      const u = sub(b,a), v = sub(c,a); const A = len(cross(u,v)) / 2;
+      if (A > bA) { bA = A; best = t; } }
+    const [a,b,c] = tri(best);
+    let N = cross(sub(b,a), sub(c,a)); const L = len(N); N = [N[0]/L, N[1]/L, N[2]/L];
+    const ctr = [0,1,2].map((i) => (a[i]+b[i]+c[i])/3);
+    const O = [0,1,2].map((i) => ctr[i] + N[i] * 1e-4);
+    let hits = 0;
+    for (const t of ids) { if (t === best) continue;
+      const [A2,B2,C2] = tri(t);
+      const e1 = sub(B2,A2), e2 = sub(C2,A2), p = cross(N, e2), det = dot(e1, p);
+      if (Math.abs(det) <= 1e-12 * len(e1) * len(p)) continue;
+      const inv = 1/det, tv = sub(O, A2);
+      const uu = dot(tv,p)*inv; if (uu < 0 || uu > 1) continue;
+      const q = cross(tv, e1); const vv = dot(N,q)*inv; if (vv < 0 || uu+vv > 1) continue;
+      if (dot(e2,q)*inv > 1e-7) hits++;
+    }
+    out.push({ tris: ids.length, volumeMm3: V, rayCrossings: hits,
+               outwardByVolume: V > 0, outwardByRay: hits % 2 === 0 });
+  }
+  out.sort((x, y) => y.tris - x.tris);
+  return { shells: out.length, inward: out.filter((s) => !s.outwardByVolume).length,
+           disagreements: out.filter((s) => s.outwardByVolume !== s.outwardByRay).length,
+           totalVolumeMm3: out.reduce((a, s) => a + s.volumeMm3, 0), perShell: out };
 }
 
 /* --------------------------------------------------------------- the build */
@@ -306,6 +382,62 @@ if (import.meta.url === `file://${process.argv[1]}`) {
     console.log(pass ? '  PASS — the shared vertex is discarded and a real crossing is not.'
                      : '  FAIL');
     process.exit(pass ? 0 : 1);
+  }
+
+  if (argv.includes('--orientation')) {
+    /* CALIBRATION FIRST, on a shell whose answer is written down: a unit CUBE
+       wound outward must read POSITIVE, and the SAME cube with every triangle
+       reversed must read NEGATIVE. A check that cannot tell those apart is not
+       measuring orientation. */
+    const cube = (flip) => {
+      const v = [[0,0,0],[1,0,0],[1,1,0],[0,1,0],[0,0,1],[1,0,1],[1,1,1],[0,1,1]];
+      const f = [[0,3,2],[0,2,1],[4,5,6],[4,6,7],[0,1,5],[0,5,4],
+                 [1,2,6],[1,6,5],[2,3,7],[2,7,6],[3,0,4],[3,4,7]];
+      const P = [];
+      for (const t of f) { const o = flip ? [t[0],t[2],t[1]] : t;
+        for (const i of o) P.push(...v[i]); }
+      return new Float64Array(P);
+    };
+    const good = orientation(cube(false)), bad = orientation(cube(true));
+    const okCal = good.perShell[0].volumeMm3 > 0 && bad.perShell[0].volumeMm3 < 0
+      && good.disagreements === 0 && bad.disagreements === 0;
+    console.log('CALIBRATION — a unit cube whose answer is written down:');
+    console.log(`  wound outward : volume ${good.perShell[0].volumeMm3.toFixed(4)} (must be +1)  ray ${good.perShell[0].rayCrossings} (even)  -> ${good.perShell[0].outwardByVolume ? 'OUTWARD' : 'inward'}`);
+    console.log(`  wound reversed: volume ${bad.perShell[0].volumeMm3.toFixed(4)} (must be -1)  ray ${bad.perShell[0].rayCrossings} (odd)   -> ${bad.perShell[0].outwardByVolume ? 'outward' : 'INWARD'}`);
+    console.log(`  the two methods disagree on ${good.disagreements + bad.disagreements} shells (must be 0)`);
+    console.log(`  ${okCal ? 'PASS' : 'FAIL'} — the check can tell an outward shell from a reversed one.\n`);
+    if (!okCal) process.exit(1);
+
+    console.log('THE BLOOM — per-shell orientation of the emitted EXPORT mesh:');
+    console.log('  configuration                          shells   INWARD   disagree   total volume');
+    let anyInward = false;
+    for (const [label, set] of [
+      ['the shipping default (8 petals x 1)', {}],
+      ['7 petals x 4 layers', { petalCount: 7, layerCount: 4 }],
+      ['cup 1.20 x tip 2.45', { petalCup: 1.2, petalTipShape: 2.45 }],
+      ['40 petals CONTINUOUS', { petalArrangement: 'continuous', petalCount: 40 }],
+    ]) {
+      const r = orientation(meshFor(set));
+      if (r.inward) anyInward = true;
+      console.log(`  ${label.padEnd(38)} ${String(r.shells).padStart(6)}   ${String(r.inward).padStart(6)}   ${String(r.disagreements).padStart(8)}   ${r.totalVolumeMm3.toFixed(1).padStart(10)} mm^3`);
+    }
+    /* THE POSITIVE CONTROL THAT MUST FAIL: reverse every triangle of a real
+       bloom export and require the verdict to move. */
+    const P0 = meshFor({});
+    const flipped = new Float64Array(P0.length);
+    for (let t = 0; t < P0.length / 9; t++) {
+      for (let k = 0; k < 3; k++) flipped[t*9+k] = P0[t*9+k];
+      for (let k = 0; k < 3; k++) flipped[t*9+3+k] = P0[t*9+6+k];
+      for (let k = 0; k < 3; k++) flipped[t*9+6+k] = P0[t*9+3+k];
+    }
+    const a = orientation(P0), b = orientation(flipped);
+    console.log(`\n  POSITIVE CONTROL — every triangle of the shipping default reversed:`);
+    console.log(`    as built  ${a.inward} of ${a.shells} shells inward, total ${a.totalVolumeMm3.toFixed(1)} mm^3`);
+    console.log(`    reversed  ${b.inward} of ${b.shells} shells inward, total ${b.totalVolumeMm3.toFixed(1)} mm^3`);
+    const moved = a.inward !== b.inward && Math.sign(a.totalVolumeMm3) !== Math.sign(b.totalVolumeMm3);
+    console.log(`    ${moved ? 'PASS — the verdict moves, so the check is live.' : 'FAIL — reversing the mesh changed nothing.'}`);
+    console.log(`\n  ${anyInward ? 'INWARD SHELLS PRESENT — see docs/bloom-session-35-outcome.md section 8.' : 'all shells outward.'}`);
+    process.exit(moved ? 0 : 1);
   }
 
   const STATES = [

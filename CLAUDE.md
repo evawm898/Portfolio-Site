@@ -64,6 +64,34 @@ read stations **7.11e-2 mm** away from the builder's, a second producer of the p
 inside the instrument written to catch second producers — so every witness reads
 `buildBloomInto`'s own report.
 
+**EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
+corroborated independently against an exported STL). Per-shell signed volume: the hub
+is POSITIVE and every petal is NEGATIVE — −3,827 mm³ on the shipping default, −20,480
+at 40 continuous petals — confirmed by two methods that agree on all 29 shells (the
+divergence theorem and a ray-parity test from each shell's largest facet). **The site
+is `emitPanel`'s top-face winding** (`bloom-geometry.js:5152–5157`): the top skin is
+offset along `+n` and all six triangles touching a top-skin point are wound AGAINST
+`+n`, so the comment claiming "outward = +N side" is false and had never been checked.
+It matters because the export contract relies on a slicer UNIONING overlapping closed
+shells, and a union given a negative-volume shell can SUBTRACT it. Watertight,
+connected, manifold, winding-consistent, degenerate-free and Euler characteristic ALL
+pass unchanged on an inside-out solid. `node tools/bloom-self-intersection.mjs
+--orientation` is the check, calibrated on a unit cube (+1 outward, −1 reversed) with a
+positive control that reverses a real export and requires the verdict to move.
+
+**AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS** (session
+35). No cup, no buckle, no sweep: 0 pairs at 1 or 2 layers even with 40 petals, 72 at 3
+layers, 416 at 4. It is a petal crossing ITSELF (within-shell), not foot crowding, and
+it is **the short petals** — at 7×4 the innermost layer (reach 11.9 mm) has 43 pairs
+per petal and the next (19.3 mm) has 9, while the two outer layers are clean.
+`layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
+collapses a full-width foot across `ROOT_BLEND_END` and folds. `layerSize` 0.90 takes
+364 → 49; `petalTilt` 0 → 63; `footDelicacy` 0.25 → 595. **This is `footRing()`'s
+boundary, deferred three times, now measured as a real self-intersection rather than a
+chord statistic — and it means a multi-layer bloom is unprintable before any
+deformation control is touched.** Do not judge a deformation feature's printability on
+a multi-layer build until this is fixed.
+
 **A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
 FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
 rule, beside mode-and-sampling and the stale-harness-row one). Session 35 read the apex
