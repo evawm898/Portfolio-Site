@@ -1354,8 +1354,9 @@ acts above `u0 = 0.2857` where the 0.55 onset sits; what is new is that somethin
 One declared entry with its numbers, failing hard if another row's count moves OR if this one
 stops moving. **Do not write "the row count is fixed so the topology cannot move" about a
 cleft.** **No frozen phase is owed**
-(no row added or removed); **`frozen/phase23`'s bytes stop reproducing on its share of the
-movers** while its definitions still deep-compare.
+(no row added or removed); **`frozen/phase23`'s bytes stop reproducing on 156 of its 596
+rows** (measured) while its definitions still deep-compare — it joins phase17, phase19 and
+phase21 in that class.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a

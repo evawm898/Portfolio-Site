@@ -1,6 +1,6 @@
 # Bloom session 38 — the foot-to-blade seam clearance
 
-**Status: waiting on Eva's ruling. Nothing is merged.**
+**Status: pushed, CI running, waiting on Eva's ruling. Nothing is merged.**
 
 ---
 
@@ -373,9 +373,13 @@ MODE-DEPENDENT clause to fire exactly once. A clause with only the first
 control would leave the second exactly what this project calls a log line.
 
 **No frozen phase is owed**: no row was added or removed, and the matrix is
-still 624. **`frozen/phase23`'s bytes stop reproducing on its share of the
-movers** — its definitions still deep-compare, as `--verify-frozen` proves, and
-that is the distinction session 24 established.
+still 624. **`frozen/phase23`'s bytes stop reproducing on 156 of its 596 rows**
+— measured, `--matrix phase23 --control`, 640,601,424 floats, same one declared
+triangle-count exception, foot identical across 5,443,956 captured values. Its
+DEFINITIONS still deep-compare, which is what `--verify-frozen` proves on every
+push, and that is the distinction session 24 established: **a frozen tag pins
+row definitions, not bytes.** phase23 joins phase17, phase19 and phase21 as a
+tag whose definitions reproduce and whose bytes do not fully.
 
 ---
 
