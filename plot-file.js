@@ -111,6 +111,29 @@ export const STEM_FIELDS = [
   { key: 'neck',     control: 'stemNeck',   kind: 'number' },
 ];
 
+/* THE TRANSFORM'S CONTROLS. The FILE's shape does not change — `transform` is
+   still three vec3s, exactly as it was written before any of them existed — so
+   this table is not a second definition of the format; it is what maps a
+   control to its place inside those vectors, so the page can walk one table in
+   both directions and the gate's control census has a row for each.
+
+   `axis: -1` MEANS UNIFORM: one control, all three components. "Size this bloom
+   against that one" is the operation an artist repeats, and three scale sliders
+   would make the common case three drags and the useful case (a squashed bloom)
+   no more reachable than a hand-written file already makes it. A file carrying a
+   non-uniform scale IS applied exactly as written and the reader says so — see
+   `readInstance` — because applying something different from the file, however
+   reported, is worse than applying the file. */
+export const TRANSFORM_FIELDS = [
+  { key: 'position',    axis: 0,  control: 'bloomX' },
+  { key: 'position',    axis: 1,  control: 'bloomY' },
+  { key: 'position',    axis: 2,  control: 'bloomZ' },
+  { key: 'rotationDeg', axis: 0,  control: 'bloomRotX' },
+  { key: 'rotationDeg', axis: 1,  control: 'bloomRotY' },
+  { key: 'rotationDeg', axis: 2,  control: 'bloomRotZ' },
+  { key: 'scale',       axis: -1, control: 'bloomScale' },
+];
+
 export const PETAL_FIELDS = [
   { key: 'along',  control: 'petalAlong',  kind: 'number' },
   { key: 'across', control: 'petalAcross', kind: 'number' },
@@ -344,12 +367,18 @@ function readInstance(raw, path, notes, opts) {
     notes.push(note('missing', `${path}.transform is missing — read as the identity`));
     inst.transform = { position: [0, 0, 0], rotationDeg: [0, 0, 0], scale: [1, 1, 1] };
   }
-  /* A TRANSFORM THIS PAGE CANNOT HONOUR IS SAID SO, NOT SWALLOWED. Placing an
-     instance is multi-bloom work and is not built; a file that carries one and
-     is drawn as though it did not is the silent partial restore this format is
-     designed against. */
-  if (!isIdentityTransform(inst.transform))
-    notes.push(note('not-applied', `${path}.transform is not the identity, and this page draws one bloom at the origin — it was NOT applied`));
+  /* THE TRANSFORM IS APPLIED EXACTLY AS WRITTEN, INCLUDING A SCALE THE PANEL
+     CANNOT SHOW. The scale control is uniform, so a hand-written non-uniform
+     scale has no position on it — the bloom is still drawn with the scale the
+     file asked for, and what is reported is that the CONTROL shows only the x
+     component and that moving it makes all three equal. Reporting a departure
+     the page really does honour is rule 3 the right way round; applying x to
+     all three and calling it restored would be the failure. */
+  const sc = inst.transform.scale;
+  if (!(sc[0] === sc[1] && sc[1] === sc[2]))
+    notes.push(note('clamped', `${path}.transform.scale is not uniform `
+      + `(${sc.join(', ')}) — it is applied as saved, and the scale control shows `
+      + `${sc[0]}; moving that control makes all three equal`));
 
   // `bends` rides inside `stem` in the file as it does on the page, and it is a
   // LIST rather than a control — so it is named to the group reader as a key it
@@ -438,10 +467,13 @@ export function readDoc(obj, opts = {}) {
 
   if (!Array.isArray(obj.instances) || obj.instances.length === 0)
     return { ok: false, error: 'this file carries no instances — a composition holds at least one bloom' };
+  /* HOW MANY OF THESE THE PAGE CAN ACTUALLY HONOUR IS THE PAGE'S BUSINESS, NOT
+     THIS READER'S. It used to be said here — "this page draws one" — which was
+     true when it was written and is a claim about a capability rather than
+     about the file. The applier compares the file's instance count against the
+     grids that are loaded and reports the difference; this function reads them
+     all. */
   doc.instances = obj.instances.map((raw, i) => readInstance(raw, `instances[${i}]`, notes, opts));
-  if (doc.instances.length > 1)
-    notes.push(note('not-applied', `this file holds ${doc.instances.length} bloom instances and this `
-      + 'page draws one — only the first was applied'));
 
   for (const k of Object.keys(obj)) {
     if (!TOP_LEVEL_KEYS.includes(k)) notes.push(note('unknown', `${k} is not a field this page knows`));
