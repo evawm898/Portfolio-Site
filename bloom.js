@@ -1353,13 +1353,14 @@ document.getElementById('exportGrid').addEventListener('click', () => {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(a.href), 5000);
 
-  /* THE RETENTION GAP IS SAID AT THE BUTTON, not only inside the file. A
-     RADIAL bloom of eight petals exports ONE, because buildBloomInto keeps
-     one petal per descriptor; a reader who does not open the extras would
-     otherwise have no way to know the file is not the whole bloom. */
-  const emitted = built.petals.filter((p) => p && p.grid).length;
+  /* WHAT WENT INTO THE FILE IS SAID AT THE BUTTON, not only inside the
+     extras. It used to have a standing gap to report — a RADIAL bloom of
+     eight petals exported ONE — and does not any more; the line stays,
+     because a petal whose own grid was not capturable would still be absent
+     and a reader who does not open the extras would have no way to know. */
+  const emitted = (built.petalsAll || built.petals).filter((p) => p && p.grid).length;
   const gap = emitted < built.petalsBuilt
-    ? ` · ${emitted} of ${built.petalsBuilt} petals (one per descriptor — CONTINUOUS returns all)`
+    ? ` · ${emitted} of ${built.petalsBuilt} petals (the rest carry no capturable grid)`
     : ` · all ${emitted} petals`;
   readout.textContent = `${shownSummary}\n`
     + `exported bloom-grid-${mode}.glb · ${mode} geometry${gap} · ${(glb.byteLength / 1024).toFixed(0)} KB`;

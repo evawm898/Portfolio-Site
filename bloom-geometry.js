@@ -5564,6 +5564,30 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      forbids, and it is the same rule that made the layered arm read
      `ring.scale` instead of raising layerSize to a power out here. */
   const petals = [];
+  /* AND EVERY PETAL THE BUILDER EMITTED, IN SLOT ORDER — a SECOND array beside
+     the per-ring one, not a replacement for it, and the distinction is the
+     whole of this change.
+
+     `petals` answers "one representative per RING", and four of the metrics
+     hook's arrays are INDEX-MATCHED to `fr.rings` through it — `petalRingSpine`,
+     `petalRingRootRows`, `petalRingFootFrames`, `petalRingApplied`, which are
+     J1's, Z2's and Z6's own inputs. Re-keying it per slot would move every one
+     of those correspondences for no gain to the thing that actually needed
+     fixing.
+
+     What needed fixing is the GRID EXPORT, which wants a different question
+     answered: not "one per ring" but "every petal there is". Under the layered
+     arm the two differ by the whole bloom — a RADIAL bloom of eight petals
+     reached the exporter as ONE — so a grid exported from any placement but
+     CONTINUOUS was nearly empty. Two questions, two arrays, and no consumer of
+     either has to change its mind about what it is holding.
+
+     IT COSTS NOTHING TO BUILD. Every petal already captures its grid when the
+     accumulator was asked to — the capture is a property of the accumulator,
+     not of retention — so what was happening before was that the grids of all
+     but one petal per ring were built and then thrown away. This keeps the
+     references. */
+  const petalsAll = [];
   /* ===================================================================
      EVERY SLOT'S AZIMUTH, one array per whorl, indexed by slot — J7's and
      Z4b's only input, and NEW IN THIS SESSION because nothing here had ever
@@ -5608,7 +5632,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          a thing. */
       phase: fr.rings[0].phase,
       placement: state.placement,
-      blade: (slot) => { petalsBuilt++; azOf[slot.index] = slot.azimuth; petals.push(buildPetalInto(acc, state, fr.rings[slot.index], slot, capability)); },
+      blade: (slot) => { petalsBuilt++; azOf[slot.index] = slot.azimuth; const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability); petals.push(p); petalsAll.push(p); },
     });
     slotAzimuths.push(azOf);
   } else {
@@ -5648,6 +5672,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
         azOf[slot.index] = slot.azimuth;
         const d = slotsFor[slot.index];
         const p = buildPetalInto(acc, state, d, slot, capability);
+        petalsAll.push(p);
         /* ONE REPORTED PETAL PER DESCRIPTOR — its first slot's. Under the
            collapsed arm that is slot 0 of the whorl, which is what every
            pre-session-B consumer read; under a split whorl it becomes one
@@ -5745,5 +5770,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     }
     return { ...best, threshold, crossing: best.mm < threshold };
   })();
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle };
 }
