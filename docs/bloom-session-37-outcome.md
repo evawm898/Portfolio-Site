@@ -156,6 +156,22 @@ is at u = 0.9996, at the tip, and is the sharper of the two (73.7° against 44.5
 are properties of the shipped outline law, present before the evaluator existed; what
 would be a defect is nobody knowing. Recorded, not ruled (Eva's Q4).
 
+**A candidate connection to session 32's visual report — a candidate, not a finding,
+because nobody has connected them by measurement.** `docs/bloom-session-32-outcome.md`
+§18g records what motivated the turning-rate ladder: *"the FACETED LOOK ON SCREEN, which
+is what motivated it in the first place — Eva rejected the tip from a live preview."*
+That diagnosis was about row DENSITY near the apex (a discretisation question — how far
+apart the rows sampling a curving outline sit) and the ladder was ruled to ship on
+exactly that basis; nothing there measured a tangent break, because there was no
+evaluator to ask the surface for its derivative off-station. **u = 0.999562, 73.73°, is
+the sharper of the two seams found here, and it sits exactly where that diagnosis was
+aimed — the apex, where the outline meets the print-floor plateau.** A tangent break of
+that size is, on its own, large enough to read as a visible facet independent of row
+density. Whether it is a contributor to what Eva saw in session 32, a second defect the
+ladder's fix happened to mask, or unconnected to it entirely, is unmeasured. Recording it
+here is what stops a later session re-discovering the seam and wondering whether the
+faceted-tip ruling already accounted for it.
+
 **Clause D — the buckled normal, reported not asserted.** At `buckleAmp 0.5, buckleFreq 3`,
 the cross-section normal `at(u, v).n` against the EMITTED (lattice) normal: **max 54.74°**.
 That is the size of the quantity `trueNormalRows` exists to supply, and it is why the
