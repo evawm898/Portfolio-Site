@@ -3711,6 +3711,11 @@ const D2R = Math.PI / 180;
 export const BUCKLE_AMP_RANGE = Object.freeze([0, 0.6]);
 export const BUCKLE_FREQ_RANGE = Object.freeze([1, 7]);
 export const BUCKLE_ENV_RANGE = Object.freeze([2, 6]);
+
+/* THE APEX SWEEP's range (session 35), exported for the registry to IMPORT
+   rather than restate — Q6, and the harness fails at module load if this
+   became a literal there. 0 is the shipped build, bit for bit. */
+export const APEX_SWEEP_RANGE = Object.freeze([0, 1]);
 export const BUCKLE_ENV_DEFAULT = 3;
 export const BUCKLE_FREQ_DEFAULT = 3;
 /* Rows per cycle below which the emitted polyline is not the law's curve.
@@ -3973,6 +3978,145 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
   };
 }
 
+/* ===================================================================
+   apexScale — THE ONE OWNER of how far the cup and the buckle reach around
+   the APEX (session 35).
+
+   THE DEFECT. Cup and margin buckling are both scaled by `h(u)`, the row's
+   own half-width: cup `c*h*v^2`, buckle `A*h*|v|^p*cos(...)`. At the apex `h`
+   IS the print floor, so the apex is deformed at exactly `amplitude x
+   terminalHalf` and its share of the rim's peak is PINNED at
+   `terminalHalf / peakHalf` — 10.00% in export, 1.88% live — whatever the
+   sliders say. Measured to 9e-16 mm, independent of tip shape, taper, length
+   and width. That is why the sides bowl and the apex keeps a point: not
+   "undeformed by construction", but deformed at the print floor's share.
+
+   It is a ONE-DIMENSIONAL fact about how the amplitude is scaled, so the fix
+   is one dimensional. `S(u)` replaces the `h` in the AMPLITUDE while `v` stays
+   the profile coordinate; the OUTLINE is untouched, so this never competes
+   with widthProfile() for ownership of the boundary.
+
+   A PER-POINT DISTANCE FIELD WAS BUILT FIRST AND IS RETIRED. Keying the reach
+   on the plan distance to the rim creased the blade — principal radius
+   0.369 mm against the 1.200 mm floor, mid-blade at u 0.349, nowhere near the
+   apex — and its derivative cannot converge, because `R` is looked up at a
+   foot point and a foot point on a polyline is not continuous (the field
+   itself jumps 7.13e-3 mm across a 1.25e-3 mm step). See
+   docs/bloom-session-35-outcome.md.
+
+   THE LAW.  S(u) = h(u)                                    for u <= u0
+             S(u) = h(u) + beta * (R - h(u)) * smootherstep((u-u0)/(1-u0))
+
+   R is the TIP'S INSCRIBED RADIUS — the largest disc that fits inside the plan
+   outline and touches the apex — and u0 is where h falls to R. Both are
+   DERIVED from the profile alone; neither is a threshold and neither is a
+   chosen constant. Where the tip is pointed the inscribed radius IS the
+   terminal half-width, u0 runs to 1, the blend region is empty and S is h
+   identically — so a point stays a point with no threshold anywhere.
+
+   FOUR PROPERTIES, declared before the blend shape was picked, all measured in
+   docs/bloom-session-35-outcome.md:
+     - S is h EXACTLY below u0 (0.00e+0 at every exponent), so the margin
+       buckling Eva approved is preserved unchanged along the sides;
+     - C1 at the join AND at the apex, as an IDENTITY: the smootherstep's
+       w(0), w'(0) and w'(1) are all EXACT doubles 0, so the blend contributes
+       exactly nothing to S or S' at the join and the scale arrives at the apex
+       with zero slope;
+     - S >= h everywhere (0 of 20,001 stations below, every exponent);
+     - S(1) = R, which is what makes the apex participate at `R / peakHalf`.
+
+   AND ONE DECLARED PROPERTY THAT IS WITHDRAWN AS UNACHIEVABLE. "S introduces
+   no interior local minimum" cannot hold: S leaves u0 with h's own FALLING
+   slope and must return to R at the apex, so the mean value theorem gives it a
+   minimum whatever the blend shape. What is true, and is the property that
+   matters, is that the resulting scallop is SHALLOWER than the one the shipped
+   build already has at the same place — 0.6286 mm against today's 4.5687 mm at
+   tip shape 2.45, 1.4x to 10.0x shallower across the range.
+
+   THE CONSUMER SIDE IS A RATIO, NOT A SUBSTITUTION, and that is what makes the
+   shipped build BIT-IDENTICAL. Putting S where `h` stands gives a derivative
+   `(2*c*S*v)/h`, which at S === h is ONE ULP off the shipped double `2*c*v` —
+   on every blade point of every row, so `0 moved` would be false. Instead the
+   scale enters as `k = S/h`, appended as the LAST factor: `h/h` is exactly 1.0
+   and `x * 1.0` is exactly `x`, so each expression is the shipped one with a
+   factor that is the exact double 1. Same doctrine as `roundedness 1 makes the
+   blend exactly 1` in the tip law. `kAt` returns null when the scale is inert
+   so `sectAt` can take the shipped expression by a BRANCH as well.
+   =================================================================== */
+export function apexScale(profile, length, sweep) {
+  const halfWidthAt = (u) => profile.halfWidthAt(u);
+  const terminal = halfWidthAt(1);
+  const R = tipInscribedRadius(halfWidthAt, length);
+  const u0 = R > terminal ? blendStart(halfWidthAt, R) : 1;
+  if (!(sweep > 0) || !(u0 < 1)) return null;
+  const span = 1 - u0;
+  const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
+  /* `at` is a named local so `kAt` calls the SAME function, rather than a
+     second expression of the blend. */
+  const at = (u) => {
+    if (u <= u0) return halfWidthAt(u);
+    return halfWidthAt(u) + sweep * (R - halfWidthAt(u)) * smoother((u - u0) / span);
+  };
+  return {
+    R, u0, sweep, span, at, terminal,
+    /* THE RATIO. Null below u0 — where the blend weight is exactly 0 — so the
+       caller takes the shipped expression rather than multiplying by a 1. `h`
+       is the row's own half-width, passed in rather than recomputed, so this
+       and the builder cannot disagree about which row they are on. */
+    kAt(u, h) { return u <= u0 || h === 0 ? null : at(u) / h; },
+  };
+}
+
+/* THE TIP'S INSCRIBED RADIUS, from the profile alone — no rim polyline and no
+   nearest-point search, which is what the retired field needed and could not
+   make continuous. The largest disc that touches the apex face is centred on
+   the midrib at `L - R`, so the condition is that every margin point clears
+   it, and the answer is a bisection on that condition.
+
+   A COARSE SCAN UNDER-RESOLVES IT AND THE ERROR IS ONE-SIDED. Near a pointed
+   tip the outline runs parallel to the axis at the print floor, so the binding
+   station sits in a narrow well of half-width sqrt(2*h*eps): at 2048 steps on
+   a 40 mm petal the well is missed until eps reaches ~6e-5 mm, and the scan
+   reports a disc LARGER than fits, every time. Measured: R read 1.0910 /
+   1.0835 / 1.0793 mm at 1303 / 2048 / 65536 steps on one profile, monotone
+   downward — a number that had not converged, reported to four decimals. So
+   the coarse scan only LOCATES the well and a local ternary pass resolves it,
+   which is `refineDepth()`'s own discipline in the crowding raster for exactly
+   the same reason. With it, R is identical to 6 decimals from 512 steps to
+   65536 (spread 3.8e-14). */
+export function tipInscribedRadius(halfWidthAt, length, steps = 2048) {
+  const clearance = (R) => {
+    const cx = length - R;
+    const dist = (u) => Math.hypot(u * length - cx, halfWidthAt(u));
+    let best = Infinity, bi = 0;
+    for (let i = 0; i <= steps; i++) { const d = dist(i / steps); if (d < best) { best = d; bi = i; } }
+    let lo = Math.max(0, (bi - 1) / steps), hi = Math.min(1, (bi + 1) / steps);
+    for (let i = 0; i < 200 && hi - lo > 1e-15; i++) {
+      const m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3;
+      if (dist(m1) < dist(m2)) hi = m2; else lo = m1;
+    }
+    return Math.min(best, dist((lo + hi) / 2)) - R;
+  };
+  let lo = halfWidthAt(1), hi = length;
+  if (clearance(lo) < 0) return lo;
+  for (let i = 0; i < 200 && hi - lo > 1e-14; i++) {
+    const m = (lo + hi) / 2; if (clearance(m) >= 0) lo = m; else hi = m;
+  }
+  return lo;
+}
+
+/* WHERE THE BLEND STARTS: the last station at which h still exceeds R.
+   Bisected on the falling limb, so it is derived rather than chosen. */
+function blendStart(halfWidthAt, R, steps = 2048) {
+  let lo = null;
+  for (let i = steps; i >= 0; i--) { const u = i / steps; if (halfWidthAt(u) >= R) { lo = u; break; } }
+  if (lo === null) return 0;
+  if (lo >= 1) return 1;
+  let a = lo, b = lo + 1 / steps;
+  for (let i = 0; i < 60; i++) { const m = (a + b) / 2; if (halfWidthAt(m) >= R) a = m; else b = m; }
+  return a;
+}
+
 /* THE ONE OWNER of the four curves. Always returns the law (it is the
    CALLER that decides whether to use it — see petalFormIsFlat), so the
    zero-form law is constructible for the guard's residual check.
@@ -4020,6 +4164,14 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      the blade length and the floor. Absent it (the zero-form guard's own call)
      there is no buckle to clamp anyway. */
   const buckle = buckleIsFlat(state) ? null : buckleLaw(state, buckleCtx);
+  /* THE APEX SWEEP (session 35). Null unless engaged, and null without a ctx —
+     the zero-form guard's own call has no profile to derive R from and no
+     deformation to scale anyway. It is NOT a member of petalFormIsFlat: at cup
+     0 with no buckle there is nothing for it to multiply, so it cannot decide
+     flatness. The curl family's own rule (frequency and reach are inert at
+     amplitude 0), and the reason it is absent from FORM_IDS too. */
+  const apex = buckleCtx && buckleCtx.profile
+    ? apexScale(buckleCtx.profile, buckleCtx.length, state.petalApexSweep) : null;
   const curlUniform = curlIsUniform(state);
   const smoother = (x) => x * x * x * (x * (x * 6 - 15) + 10);
   const rollEnv = (u) => 1 - Math.abs(rollTaper) * smoother(rollTaper > 0 ? u : 1 - u);
@@ -4078,12 +4230,23 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
        which is what the byte report is a construction rather than a hope. */
     const bw = buckle === null ? null : (v) => r * buckle.w(u, v, h);
     const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);
+    /* THE APEX SCALE'S RATIO for this row, or null where the blend is inactive
+       — `apex === null` and `kS === null` both make every expression below the
+       pre-session-35 one CHARACTER FOR CHARACTER, which is what makes the byte
+       report a construction rather than a hope. Even where it is non-null the
+       ratio is the LAST factor, so at S === h it would be a multiplication by
+       the exact double 1; the branch is belt and braces on top of that. */
+    const kS = apex === null ? null : apex.kAt(u, h);
     return (v) => {
       const a = h * v;
       const aT = k === 0 ? a : Math.sin(k * a) / k;
-      const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k) + c * h * v * v + (bw === null ? 0 : bw(v));
+      const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)
+        + (kS === null ? c * h * v * v : c * h * v * v * kS)
+        + (bw === null ? 0 : (kS === null ? bw(v) : bw(v) * kS));
       const dT = k === 0 ? 1 : Math.cos(k * a);
-      const dN = (k === 0 ? 0 : Math.sin(k * a)) + 2 * c * v + (bd === null ? 0 : bd(v));
+      const dN = (k === 0 ? 0 : Math.sin(k * a))
+        + (kS === null ? 2 * c * v : 2 * c * v * kS)
+        + (bd === null ? 0 : (kS === null ? bd(v) : bd(v) * kS));
       const L = Math.hypot(dT, dN);
       const nT = -dN / L, nN = dT / L;
       return {
@@ -4257,6 +4420,9 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      byte-identical. */
   const form = petalFormIsFlat(ps) ? null : petalForm(ps, halfW, t, {
     slotIndex: slot.index, halfW, length, floorRadius: ROLL_MIN_RADIUS_FACTOR * t,
+    /* The profile, so apexScale() derives R and u0 from widthProfile()`s own
+       answer rather than from a second statement of the outline. */
+    profile,
   });
 
   /* THE THICKNESS GUARD, same doctrine as the form guard above. When the
