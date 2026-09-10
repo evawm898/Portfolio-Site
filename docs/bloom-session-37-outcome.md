@@ -255,6 +255,11 @@ accept it — a ruling for the day `T` has a reader. On a plain petal `T` has no
   PASSED, every mutation reddened the clause it named and nothing else. This is the gate
   whose clause 2 re-offsets every captured point and requires it EXACTLY among the emitted
   vertices — the path `rowAt` now feeds.
+- `node tools/bloom-smoke.mjs` — SMOKE: clean. 58 of 58 configs watertight (boundary = 0),
+  export gate PASS, 921 s on this tree beside the byte run and the grid gate. 4 of 58 rows
+  FLAGGED CROWDED (the pre-existing flag, never a gate) and 6 of 58 are SPHERE heads, each a
+  labelled plan-coverage skip read by the solid-angle instrument. In the tool's own words:
+  *this is NOT a matrix pass — the full 624 rows on both gates, in CI, is the merge criterion.*
 
 No frozen phase is owed: no row was added and no byte moved. Adding three tools under
 `tools/` makes both FLOWER gates run on this PR; they test flower geometry, not this.
