@@ -294,6 +294,18 @@ function newInstance() {
     stemRing: null,
     // its own stem, and where it stands
     stemVals: { ...STEM_REST }, bends: newBends(), transform: newTransform(),
+    /* WHAT THE LAST BUILD PRODUCED, AND UNDER WHAT. `built` is this bloom's
+       finished lines — head and stems, placed and stamped — and `builtKey` is
+       every input to that build which does NOT live on this record: the density
+       and family switches, whether this bloom was the selected one, its own
+       ordinal, and which petal the cursor was on. A partial rebuild reuses
+       `built` only when the key it would build under is the key it was built
+       under, so a change misrouted as per-instance costs a rebuild rather than
+       leaving stale geometry on screen — the cache validates itself instead of
+       trusting the routing. `builds` is a monotonic counter, because "bloom B
+       was not rebuilt" is not visible in any drawing and the gate has to be
+       able to ask it. */
+    built: null, builtKey: '', builds: 0,
     // derived on every rebuild
     warpAll: [], stemStrips: [], stemLocal: [], stemIsDrawn: false,
     stemStats: { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true },
@@ -595,16 +607,23 @@ const petalWarpOf = () => warpFor(readPetal(), frame);
    one's. `showHandles` is the exception and is composition-level on purpose: it
    is a VIEW field in the saved file, it decides whether an editor is drawn
    rather than what any bloom's geometry is, and one bloom's handles hidden
-   while another's show would be a preference with two answers. */
+   while another's show would be a preference with two answers — which is why it
+   is NOT in this bag. It used to be, unread, and a bag handed to a builder is
+   exactly where a composition-level field should not sit. */
 const stemOf = (inst = cur()) => {
   const v = inst.stemVals;
   return {
     on: v.on === 'on',
     bundle: v.bundle, join: v.join, length: v.length,
     droopDeg: v.droopDeg, droopRad: v.droopDeg * Math.PI / 180, neck: v.neck,
-    showHandles: sui.stemHandles.checked,
   };
 };
+/* AND THE ONE THING THAT IS NOT A BLOOM'S. `stemHandles` used to ride inside
+   `stemOf`'s bag, which is the bag the BUILDER is handed — so a
+   composition-level view preference sat, unread, among a bloom's geometry
+   inputs. It is read here, by the one thing that uses it, so "this changes no
+   line in any bloom" is a property of the code rather than of a grep. */
+const showStemHandles = () => sui.stemHandles.checked;
 const readStem = () => stemOf(cur());
 
 /* THE PANEL, WRITTEN INTO THE BLOOM IT BELONGS TO. One direction only: a hand
@@ -949,8 +968,7 @@ function applyPetalWarp(inst, isSel) {
    GIVEN, so a single bloom at the origin is drawn from the arrays the file
    wrote and every "nothing moved" identity on this page still answers what it
    answered before instances existed. */
-function buildInstance(inst, ord, isSel) {
-  const s = readUI();
+function buildInstance(inst, ord, isSel, s = buildInputs()) {
   const st = stemOf(inst);
   const pw = applyPetalWarp(inst, isSel);
   const chosen = selectStrips(inst.warpAll, s);
@@ -991,20 +1009,92 @@ function buildInstance(inst, ord, isSel) {
   return { head: placedHead, stems: inst.stemStrips };
 }
 
+/* EVERY COMPOSITION-LEVEL INPUT A BLOOM'S BUILD DEPENDS ON, IN ONE PLACE.
+   `buildInstance` is HANDED this and reads no other global — that is what makes
+   the key below unable to drift from what the builder consumes, which is the
+   one way a self-validating cache stops validating anything. Three fields, all
+   of them the density and family switches reaching `selectStrips`; everything
+   else the DRAW panel holds (weight, polarity, level, depth dim) moves no line
+   and never calls `rebuild` at all.
+
+   The key is a STRING because what it is for is EQUALITY, not inspection: a
+   partial rebuild reuses a bloom's lines only when the key it would build under
+   is the key it was built under. */
+function buildInputs() {
+  const s = readUI();
+  return { families: s.families, uDensity: s.uDensity, vDensity: s.vDensity };
+}
+const globalBuildKey = s => `${s.families}|${s.uDensity}|${s.vDensity}`;
+/* AND THE THREE THAT ARE PER BLOOM RATHER THAN GLOBAL. `ord` is stamped onto
+   every drawn record, so a bloom whose position in the list changed has to be
+   rebuilt even though nothing about it did; `isSel` and `selected` decide the
+   `mine` half of `warpInfo` — the numbers the PETAL panel prints under the name
+   of one petal of one bloom. `selected` cannot reach an unselected bloom
+   (`isMine` is `isSel && …`), so it is in the key only on the arm where it can
+   — which is what lets the petal cursor be a one-bloom rebuild rather than a
+   whole-composition one. */
+const instanceBuildKey = (g, ord, isSel) => `${g}#${ord}#${isSel ? `1:${selected}` : '0'}`;
+
 /* Rebuild the drawn segment buffers from the current control values. Cheap by
    construction — one bloom's sample grid is ~15k segments and its stem another
-   ~40k — so the density sliders rebuild rather than mask. With several blooms
-   loaded that cost is paid once per bloom and the numbers are on the DRAW
-   panel, where they can be watched rather than guessed at. */
-function rebuild() {
+   ~40k — so the density sliders rebuild rather than mask.
+
+   A CHANGE THAT AFFECTS ONE BLOOM REBUILDS ONE BLOOM. `only` names it: an
+   instance index for a per-instance change (a stem slider, a bend, a transform,
+   a petal warp — all of which edit the SELECTED bloom and nothing else), `ALL`
+   for a genuinely global one (the density and family switches, a selection
+   change, a load, a restore) and `VIEW` for a change that moves no line at all.
+   Getting that routing wrong is a PERFORMANCE bug and not a correctness one:
+   every bloom's cached lines carry the key they were built under, and a key
+   that no longer matches is rebuilt whatever `only` says. The trap this is
+   built against — one bloom quietly not updating while the others do, which
+   reads as "the slider didn't take" — is therefore unreachable through a
+   misroute, and what remains is an over-eager rebuild, which is only slow.
+
+   THE TAIL IS GLOBAL AND STAYS GLOBAL. One set of segment buffers holds every
+   bloom, so the packing, the family counts, the view bounds and the style are
+   properties of the composition and are redone whatever was rebuilt. Splitting
+   the buffers per bloom is the next thing to do here and is deliberately not
+   done — see the note in CLAUDE.md. */
+const REBUILD_ALL = 'all';
+const REBUILD_VIEW = 'view';
+/* AND WHAT THE TIME WENT ON. Three phases, because they answer different
+   questions and only one of them is what this partition can move: `buildMs` is
+   the blooms that were built, `packMs` is the segment buffers — ONE set for the
+   whole composition, so it is paid in full whatever was rebuilt — and
+   `boundsMs` is the walk over every drawn point that the camera fit and the
+   depth dim share. A number nobody prints is a number nobody watches, and the
+   next thing to do here is decided by which of the three is largest. */
+let lastRebuild = { only: REBUILD_ALL, built: 0, reused: 0, ms: 0,
+                    buildMs: 0, packMs: 0, boundsMs: 0 };
+const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
+function rebuild(only = REBUILD_ALL) {
+  const t0 = now();
   syncSelection();
+  const inputs = buildInputs();
+  const g = globalBuildKey(inputs);
   const heads = [], stems = [];
+  let built = 0, reused = 0;
   for (let k = 0; k < instances.length; k++) {
-    const r = buildInstance(instances[k], k, k === selInstance);
-    for (const t of r.head) heads.push(t);
-    for (const t of r.stems) stems.push(t);
+    const inst = instances[k];
+    const isSel = k === selInstance;
+    const key = instanceBuildKey(g, k, isSel);
+    /* THE ONE PLACE THE CACHE IS TRUSTED, AND IT ASKS TWO THINGS: was this
+       bloom left alone by the caller, and was what it holds built under the
+       conditions that hold now. Both, or it is rebuilt. */
+    const canReuse = only !== REBUILD_ALL && only !== k
+                     && inst.built !== null && inst.builtKey === key;
+    if (canReuse) { reused++; } else {
+      inst.built = buildInstance(inst, k, isSel, inputs);
+      inst.builtKey = key;
+      inst.builds++;
+      built++;
+    }
+    for (const t of inst.built.head) heads.push(t);
+    for (const t of inst.built.stems) stems.push(t);
   }
   stemStrips = stems;
+  const tBuilt = now();
 
   /* THE SELECTED PETAL IS DRAWN IN ITS OWN OBJECT, AND THE COUNTS ARE NOT.
      Splitting the buffers is what lets one petal take a different hue without a
@@ -1023,6 +1113,7 @@ function rebuild() {
   const other = buildFamily('other', rest.filter(t => t.kind === 'other'));
   buildFamily('sel', selStrips, selMaterial);
   buildFamily('stem', stems);
+  const tPacked = now();
   drawnStrips = heads;
   const segOf = k => heads.reduce((a, t) => a + (t.kind === k ? t.segments : 0), 0);
   const lineOf = k => heads.reduce((a, t) => a + (t.kind === k ? 1 : 0), 0);
@@ -1084,10 +1175,15 @@ function rebuild() {
     rest: petalIsRest(pt, myWarp),
     bendsRest: warpIsRest(myWarp),
   };
+  const tBounds0 = now();
   computeViewBounds();
+  const tBounds = now();
   syncHandles();
   applyStyle();
   dirty = true;
+  lastRebuild = { only: String(only), built, reused, ms: now() - t0,
+                  buildMs: tBuilt - t0, packMs: tPacked - tBuilt,
+                  boundsMs: tBounds - tBounds0 };
 }
 
 /* THE POLARITY, APPLIED. Three things and only three: which way the fragments
@@ -1234,7 +1330,7 @@ function syncHandles() {
   const { bends, stemRing, stemIsDrawn } = cur();
   const st = readStem();
   syncHandlePool(handles, bends.length, HANDLE_MAT);
-  const show = st.on && st.showHandles && stemIsDrawn && !!stemRing;
+  const show = st.on && showStemHandles() && stemIsDrawn && !!stemRing;
   // THE HANDLE IS A SIZE IN THE DRAWING, so it takes the bloom's own scale: a
   // half-size bloom with full-size handles reads as a bloom made of handles.
   const r = handleRadiusFor(st) * meanScale(cur().transform);
@@ -1337,7 +1433,8 @@ function setBendFromWorld(k, world) {
   const cap = 4 * st.length;
   bends[k].offset = [0, 1, 2].map(a =>
     Math.max(-cap, Math.min(cap, (un[a] - base[a]) / gate - others[a])));
-  rebuild();
+  // ONE BLOOM'S BEND POINT. The drag wrote into `cur().bends` and nothing else.
+  rebuild(selInstance);
   writeStemState();
   writeStemOutputs();
 }
@@ -1388,7 +1485,9 @@ function setPetalBendFromWorld(k, world) {
   const cap = 4 * frame.length;
   bends[k].offset = [0, 1, 2].map(a =>
     Math.max(-cap, Math.min(cap, (un[a] - base[a]) / gate - others[a])));
-  rebuild();
+  // ONE PETAL OF ONE BLOOM — the warp is a property of its petal, and its petal
+  // belongs to the selected bloom.
+  rebuild(selInstance);
   writePetalState();
   writePetalOutputs();
 }
@@ -1693,7 +1792,10 @@ function restBends() {
   for (const b of cur().bends) b.offset = [0, 0, 0];
   afterBendChange();
 }
-function afterBendChange() { rebuild(); writeStemOutputs(); writeStemState(); writeDrawState(); }
+/* THE STEM'S BEND POINTS AND THE PETAL'S ARE BOTH THE SELECTED BLOOM'S — add,
+   remove and rest all reach `cur()` and nothing else, so both of these are a
+   one-bloom rebuild. */
+function afterBendChange() { rebuild(selInstance); writeStemOutputs(); writeStemState(); writeDrawState(); }
 
 /* The petal's own three, over the same law from plot-warp.js: `nextStation`
    subdivides the coarsest stretch (counting base-to-first-point as a stretch),
@@ -1722,7 +1824,7 @@ function restPetalBends() {
   for (const b of selectedBends()) b.offset = [0, 0, 0];
   afterPetalChange();
 }
-function afterPetalChange() { rebuild(); writePetalOutputs(); writePetalState(); writeDrawState(); }
+function afterPetalChange() { rebuild(selInstance); writePetalOutputs(); writePetalState(); writeDrawState(); }
 
 /* ---- the view ----------------------------------------------------------- */
 function worldSphere() {
@@ -2340,6 +2442,24 @@ function bloomText() {
     + ` + ${drawn.stem.toLocaleString('en-US')} stem`
     + ` = ${(drawn.total + drawn.stem).toLocaleString('en-US')} drawn`
     + `   ·   ${lastFrameMs.toFixed(2)} ms/frame`);
+  /* AND WHAT A SLIDER DRAG COSTS, SPLIT THREE WAYS — because the frame is
+     trivial here and the REBUILD is what an artist actually feels, and because
+     which of the three phases is largest is what says where the next
+     improvement is. `blooms` is the phase this page's per-instance routing
+     moves: a stem, transform or petal control rebuilds the ONE bloom it edits,
+     so that number is flat in the bloom count while the other two are not.
+     The packing and the walk are the composition's — one set of segment buffers
+     and one measurement of what the whole drawing occupies — and they are paid
+     in full whatever was rebuilt. */
+  const r = lastRebuild;
+  lines.push(`drag    ${r.ms.toFixed(1)} ms/rebuild`
+    + `   ·   ${r.buildMs.toFixed(1)} blooms (${r.built} built, ${r.reused} reused)`
+    + `   ·   ${r.packMs.toFixed(1)} packing   ·   ${r.boundsMs.toFixed(1)} extent`);
+  if (r.ms > 16.7) {
+    lines.push('<span class="warn">        past a 16.7 ms frame — a slider drag will'
+      + ' read as steppy at this many blooms; the packing and the extent walk are'
+      + ' the composition’s, not any one bloom’s</span>');
+  }
   if (instances.length >= MAX_INSTANCES) {
     lines.push(`<span class="warn">${MAX_INSTANCES} blooms is as many as this page`
       + ' draws — remove one before adding another</span>');
@@ -3436,7 +3556,14 @@ for (const el of Object.values(sui)) {
        one bloom, so `commitStem` does not read it and `stemOf` takes it from
        the checkbox. */
     if (el !== sui.stemHandles) commitStem();
-    rebuild();
+    /* ONE BLOOM, EXCEPT FOR THE ONE CONTROL THAT IS NOT A STEM CONTROL.
+       `stemHandles` is composition-level — it is read by `syncHandles` and by
+       nothing else, it is a VIEW field in the saved file, and since it left
+       `stemOf`'s bag it is not even in front of a builder — so it moves no line
+       in any bloom and rebuilds none of them; the handles themselves are
+       `syncHandles`, in the global tail. Every other one of the six was just
+       committed into the selected bloom. */
+    rebuild(el === sui.stemHandles ? REBUILD_VIEW : selInstance);
     writeStemOutputs();
     writeStemState();
     writeDrawState();
@@ -3453,7 +3580,8 @@ for (const [id, el] of Object.entries(bui)) {
   if (id === 'bloomPick') continue;
   el.addEventListener('input', () => {
     commitTransform();
-    rebuild();
+    // WHERE ONE BLOOM STANDS. Every field of the transform is that bloom's own.
+    rebuild(selInstance);
     writeInstanceOutputs();
     writeDrawState();
     writeFrameInfo();
@@ -3488,7 +3616,13 @@ for (const el of Object.values(pui)) {
        control that does NOT commit — it changes which petal the panel is
        editing, and `syncSelection` loads that petal's values over the top. */
     if (el === pui.petalAlong || el === pui.petalAcross) commitPetalScales();
-    rebuild();
+    /* ONE BLOOM — INCLUDING `petalPick`, which is the case that is not cleanly
+       one or the other and resolves to per-instance. Moving the cursor changes
+       which petal is highlighted and which petal's `mine` numbers the panel
+       prints, and both are properties of the SELECTED bloom: `isMine` is
+       `isSel && …`, so no other bloom's build can read `selected` at all. The
+       highlight split itself is in the global tail, where it always was. */
+    rebuild(selInstance);
     writePetalOutputs();
     writePetalState();
     writeDrawState();
@@ -3588,8 +3722,54 @@ window.__plot = {
     petalEntries: [...inst.petalWarps.keys()].sort((a, b) => a - b),
     strips: inst.strips.length,
     stemSegments: inst.stemStats.segments,
+    /* HOW MANY TIMES THIS BLOOM'S LINES HAVE BEEN BUILT. "Bloom B was not
+       rebuilt" is invisible in every drawing — that is the whole trap — so it
+       is counted rather than inferred, and a check reads the counter across a
+       control change instead of trying to see a rebuild that produced the same
+       picture. Monotonic for the life of the record. */
+    builds: inst.builds,
   })),
   instanceCount: () => instances.length,
+  /* WHAT THE LAST REBUILD ACTUALLY DID — which routing it was given, how many
+     blooms it built and how many it reused from cache. The routing and the
+     count are two facts: a per-instance route whose cache all missed builds
+     everything, which is correct and slow, and a check that only read the route
+     would call that a saving. */
+  rebuildInfo: () => ({ ...lastRebuild }),
+  /* A FULL REBUILD ON DEMAND, AND THE DIGEST TO COMPARE IT AGAINST. Together
+     they are the one instrument that can see stale geometry directly: write a
+     control, digest, force everything rebuilt, digest again, and require the
+     two to be EQUAL. A change misrouted as per-instance shows up as a
+     difference in the drawing itself rather than as a counter nobody looked at.
+     The digest is over the emitted POINTS of every drawn head and stem strip
+     across every bloom, in order, so it sees a line that moved, a line that
+     did not, and a line that is missing. It is arithmetic on floats the page
+     already holds — never a framebuffer, which on this renderer cannot be asked
+     to come back to the bit. */
+  forceRebuild: () => { rebuild(REBUILD_ALL); },
+  /* AND A REBUILD ROUTED THE WAY A CALLER WOULD ROUTE IT. This is how the
+     MISROUTE — the failure the whole design is built against — is exercised
+     from outside: change something composition-level without letting its own
+     handler run, then ask for a per-instance rebuild, and require the answer to
+     be the full rebuild's answer anyway. There is no control that can do that,
+     because every control routes itself correctly; the hook is test chrome in
+     the same spirit as `setView`. */
+  rebuildAs: only => { rebuild(only === 'all' || only === 'view' ? only : +only); },
+  drawnDigest: () => {
+    let n = 0, h = 0;
+    const add = arr => {
+      for (const t of arr) {
+        for (let i = 0; i < t.count * 3; i++) {
+          // A cheap order-sensitive mix; the claim it carries is EQUALITY, and
+          // any bit of any coordinate moving changes it.
+          h = (Math.imul(h, 16777619) ^ (Math.fround(t.points[i]) * 1e6 | 0)) | 0;
+          n++;
+        }
+      }
+    };
+    add(drawnStrips); add(stemStrips);
+    return { points: n, hash: h, strips: drawnStrips.length, stems: stemStrips.length };
+  },
   /* WHERE EACH BLOOM ACTUALLY STANDS, as a box in grid space through its own
      matrix — the same function the placement of a NEW bloom is derived from, so
      a check can assert "clear of what was there" as a property rather than

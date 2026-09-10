@@ -3838,7 +3838,11 @@ how hard it is to undo:
    is more than one; the DRAW panel's counts are the whole composition, summed, so its
    "drawn N of M" stays a ratio. *Undo:* the read-out functions.
 
-**THE GATE IS 216 CHECKS AND 81 MUTANTS.** Two check names changed because the
+**THE GATE IS 223 CHECKS AND 84 MUTANTS** — the per-instance rebuild session
+added seven and three. The paragraph below is the multi-bloom session's, at 216
+/ 81, and its check-name corrections still stand.
+
+**AT 216 CHECKS AND 81 MUTANTS,** two check names changed because the
 behaviour did: `swap/a-dropped-grid-replaces-the-one-on-screen` is now
 `add/a-dropped-grid-is-added-beside-the-one-already-there`, and
 `swap/the-file-input-loads-a-grid-too` is `add/the-file-input-adds-a-grid-too`. Two
@@ -3850,6 +3854,138 @@ removes **from the END**, because the survivor has to be the bloom the page boot
 the one at the identity transform: removing from the front leaves an ADDED bloom
 standing 155 mm to one side, which is a perfectly good composition and not the drawing
 `/plot` ships.
+
+**A CHANGE THAT AFFECTS ONE BLOOM REBUILDS ONE BLOOM, AND THE CACHE VALIDATES ITSELF
+RATHER THAN TRUSTING THE ROUTING** (session of Sep 10). `rebuild(only)` takes an
+instance index for a per-instance change, `REBUILD_ALL` for a global one and
+`REBUILD_VIEW` for one that moves no line. Each bloom keeps `built` (its finished
+head and stem lines, placed and stamped) beside `builtKey` — every input to that
+build which does NOT live on the record — and a cached answer is served only when
+the key it would be built under IS the key it was built under. **So a misroute
+costs a rebuild, never a wrong picture.** The trap this is built against is the
+one the brief named: one bloom quietly not updating while the others do reads as
+"the slider didn't take", is not a crash, and every check written before this
+session passes on it.
+
+**THE PARTITION, VERIFIED AGAINST THE CODE AND NOT RECITED.** PER-INSTANCE: the
+six stem values, the stem's bend points, the instance transform (all seven
+controls), the per-petal warps, and the petal cursor. GLOBAL: the two densities
+and the family switch (they reach `selectStrips`), a bloom selection change, a
+grid load, an instance removal, and a composition restore. NEITHER, and both are
+cases the brief asked about: **`stemHandles`** is composition-level and moves no
+line — it decided nothing about geometry, but it USED to ride inside `stemOf`'s
+bag, which is the bag the BUILDER is handed, so a view preference sat unread among
+a bloom's geometry inputs; it is now read by `syncHandles` through
+`showStemHandles()` and by nothing else, which makes `REBUILD_VIEW` honest rather
+than merely safe. **`petalPick`** reads as global (it changes which petal is
+highlighted, and the highlight split is in the global tail) but resolves to
+PER-INSTANCE: `isMine` is `isSel && …`, so no unselected bloom's build can read the
+cursor at all — which is why the key carries `selected` only on the `isSel` arm.
+Everything else the DRAW panel holds — weight, polarity, level, depth dim — never
+called `rebuild` in the first place.
+
+**`buildInputs()` IS THE ONE OWNER OF WHAT A BUILD DEPENDS ON GLOBALLY, and that is
+what stops the key drifting.** `buildInstance` is HANDED it and reads no other
+global; `globalBuildKey` serialises the same object. A key assembled beside the
+builder rather than from it is a self-validating cache that has quietly stopped
+validating anything — and there is no check that can see it, because under correct
+routing the key is never load-bearing.
+
+**THE BUILD PHASE IS NOW FLAT IN THE BLOOM COUNT AND THE COMPOSITION IS STILL OVER
+BUDGET — say both.** Measured, headless software GL, 1100x800, stems on for EVERY
+bloom (the stem is per-instance, so setting the control once reaches only the
+selected one and the rows are not comparable), median of a 13-event slider drag,
+same run so the columns compare:
+
+| | stem slider | position slider | density slider |
+|---|---|---|---|
+| 1 bloom, main | 9.2 ms | 14.2 ms | 8.0 ms |
+| 1 bloom, after | **7.2** | **10.9** | **5.5** |
+| 3 blooms, main | 29.8 | 48.2 | 22.7 |
+| 3 blooms, after | **20.1** | **21.2** | 16.1 |
+| 8 blooms, main | 80.4 | 87.7 | 44.6 |
+| 8 blooms, after | **51.2** | **53.5** | 51.5 |
+
+**EIGHT BLOOMS IS STILL THREE TIMES THE 16.7 ms FRAME BUDGET, AND SO IS THREE.**
+The improvement is ~1.5-1.6x on the per-instance controls and the goal is met
+exactly — but it is not enough, and the phase split says why. The BLOOM panel's
+`drag` line prints all three:
+
+| phase | 1 bloom | 3 blooms | 8 blooms |
+|---|---|---|---|
+| **blooms** (what this change moves) | 2.2 ms | **1.5** | **1.6** |
+| packing | 4.6 | 7.8 | 24.6 |
+| extent walk | 4.1 | 8.9 | 22.6 |
+
+**The build phase is FLAT — one bloom is built whatever the composition holds.**
+Everything left is the global tail, and it is 47 of the 51 ms at eight blooms. The
+density row barely moves for the same reason (it is global by nature and always
+was); its 44.6 -> 51.5 is run-to-run variance on a 2 fps box, not a regression.
+
+**THE TWO THINGS THAT WOULD ACTUALLY CLOSE THE GAP, WRITTEN DOWN AND DELIBERATELY
+NOT BUILT** (both are the render-path restructure this session was told not to
+pull in):
+* **ONE SET OF SEGMENT BUFFERS HOLDS EVERY BLOOM**, so `stripsToSegments` re-packs
+  the whole composition however little changed. Per-bloom buffers would make the
+  packing per-instance too — and would multiply the draw calls and complicate the
+  highlight object, which is why it is its own session.
+* **`computeViewBounds` WALKS EVERY POINT OF EVERY BLOOM TWICE** — `warpAll`, so
+  every strip in every file rather than the drawn subset, plus the stems. The
+  first walk (the box) composes EXACTLY from per-instance boxes and could be
+  cached the same way `built` is. **The second cannot**: it is the radius about
+  the composition's own centre, and a radius about a global centre does not
+  compose from per-instance radii about per-instance centres. A conservative
+  radius is available and would change the depth dim's fade, which is a visible
+  behaviour change and not a free optimisation.
+
+**WHAT THE GATE ASKS, AND THE TWO INSTRUMENTS IT NEEDS.** A build COUNTER
+(`instances()[k].builds`), because "bloom B was not rebuilt" is invisible in every
+drawing — that is the whole trap — and a DIGEST of every drawn coordinate against
+a FORCED FULL REBUILD (`drawnDigest()` / `forceRebuild()`), because a counter
+cannot say whether what was skipped should have been. Seven checks: one bloom
+built on a per-instance change and three on a global one; the partial drawing
+identical to the full one; **a twenty-write sweep over every control that rebuilds,
+each compared point for point against a full rebuild**; a view-only change
+building nothing while the handles still move; the panel's own drag line; and
+`partial/a-change-misrouted-as-per-instance-is-not-served-from-cache`, which
+performs the misroute on purpose — it writes a density into the control WITHOUT
+dispatching its event, so nothing routes it, then asks for a per-instance rebuild
+through `rebuildAs` (test chrome, like `setView`; no control can reach that state).
+**That last check is the only witness for the key at all**, because under correct
+routing the key never binds — which is why its mutant
+(`the-cache-is-served-without-checking-what-it-was-built-under`) breaks exactly one
+check and that is not a weakness in it.
+**AND IT FAILED ON ITS OWN PREMISE FIRST**: it read the build counters AFTER the
+forced full rebuild, so every bloom counted twice (2 / 2 / 2) and the check went red
+on a page that was right. Collect the counters before the control you are comparing
+against runs — the same shape as this gate's "collect every outcome first, then
+build the detail" rule, one step earlier.
+**NO DIGEST ASKS A FRAMEBUFFER FOR ANYTHING** — it is arithmetic over floats the
+page already holds, which is the only way an EQUALITY is available on this renderer.
+
+**SIXTEEN MUTANTS WERE RUN AND SIXTY-EIGHT WERE NOT — the standing sweep is NOT
+complete.** The three new ones plus thirteen pre-existing ones over the code this
+session touched (the stem build, `applyPetalWarp`, the instance list, the stem and
+bloom panels, the restore). Four lists needed widening and **not one check was
+wrong**, which is the same distribution the multi-bloom session found:
+* `a-per-instance-change-rebuilds-every-bloom` also reddens the panel's drag line
+  (`3 built, 0 reused` where the check asserts `1 built, 2 reused`) — which IS the
+  claim, so the list widened.
+* **`the-bloom-that-changed-is-served-from-its-own-cache` reddens TWENTY-FOUR**,
+  and the breadth is the finding rather than a nuisance: a cache that trusts its
+  routing has no small failure mode. Every per-instance control stops taking, on
+  one bloom as much as on eight — no stem turns on, no warp lands, no bend can be
+  dragged for.
+* `the-stem-controls-are-page-wide` gains three, and what it says is the useful
+  part: it does not damage the cache, it changes the PARTITION, so the key cannot
+  notice and only the digest sweep sees it.
+* `the-import-replaces-instead-of-adding` gains five, all because it leaves the
+  page with ONE bloom and every counter check is written at three. **The two
+  DIGEST checks were NOT among them**, which is the reassuring half.
+**AND A CHECK THREW BEFORE ANY OF THEM COULD REPORT.**
+`stem/the-continuation-runs-from-the-foot-to-the-root` dereferenced `stemLine(0)`,
+which is NULL under any mutation that stops the stem turning on — fourth instance
+of that bug class here. It reports now.
 
 **A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
 shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
@@ -3920,11 +4056,9 @@ strand modes) is in that doc so it is not re-derived.
    by them: **lock state, background shapes and cut-and-pull state are added as
    FIELDS** — neither needs a migration. Anything that changes the root's
    cardinality does.
-1c. **REBUILDING ONLY THE BLOOM THAT CHANGED.** A stem or transform slider
-   changes ONE instance; `rebuild()` rebuilds all of them, which is why a slider
-   drag costs ~31 ms at three blooms against 8.3 at one. A density slider
-   genuinely changes all of them and would still pay the full cost. Measured, not
-   built — see the multi-bloom section's cost table.
+1c. **REBUILDING ONLY THE BLOOM THAT CHANGED IS DONE** — see the per-instance
+   rebuild section above. What is NOT done, and is now the whole of the
+   remaining cost, is the GLOBAL TAIL: the packing and the extent walk.
 2. **The `perDescriptor` retention is CLOSED** — see the generator section
    below. A grid exported from any placement now holds every petal the builder
    emitted; the shipped CONTINUOUS sample is unchanged, and a RADIAL export goes

@@ -84,6 +84,87 @@ const LOW_VIEW = [0.92, 0.14, 1];      // a low angle, where the whorls overlap 
 // MUTANTS. `file` is the module the edit lands in; part one imports the broken
 // copy and part two is served it.
 const MUTANTS = [
+  /* ---- rebuilding only the bloom that changed ----------------------------
+     Three, and what they are between them is the two directions plus the thing
+     that makes the routing safe. An OVER-eager rebuild is only slow, so its
+     mutant is caught by a counter; an UNDER-eager one is the stale-geometry
+     trap, so its mutant is caught by the drawing itself. */
+  {
+    /* OVER-EAGER: every per-instance route becomes a whole-composition one.
+       The picture is IDENTICAL — that is the point, and it is why nothing that
+       shipped before this session can see it. Only the build counter can. */
+    id: 'a-per-instance-change-rebuilds-every-bloom', file: 'plot.js',
+    from: '    rebuild(el === sui.stemHandles ? REBUILD_VIEW : selInstance);',
+    to: '    rebuild(REBUILD_ALL);',
+    /* AND THE VIEW-ONLY CHECK GOES WITH IT, named rather than tuned out of: the
+       mutation routes `stemHandles` as a full rebuild too, which is a true
+       thing to say about it and is exactly what that check asserts against. */
+    /* AND THE PANEL'S OWN DRAG LINE, which the control found unclaimed and which
+       is a true statement about the mutation: it reads `3 built, 0 reused`
+       where the check asserts `1 built, 2 reused`. That IS the claim — the
+       panel says which part of a drag is one bloom's — so the list is widened
+       and the check is left alone. */
+    breaks: ['partial/a-per-instance-change-rebuilds-one-bloom',
+             'partial/a-view-only-change-rebuilds-no-bloom-and-still-moves-the-handles',
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
+  },
+  {
+    /* UNDER-EAGER, AND THIS IS THE TRAP ITSELF: the bloom the change was FOR is
+       served from its own cache. Its stem values changed, its key did not — the
+       key is composition-level and a stem lives on the instance — so the slider
+       moves nothing and every other bloom is drawn correctly beside it. No
+       crash, no broken frame, and the counter for the target bloom is the one
+       thing that does not move. */
+    id: 'the-bloom-that-changed-is-served-from-its-own-cache', file: 'plot.js',
+    from: '    const canReuse = only !== REBUILD_ALL && only !== k',
+    to: '    const canReuse = only !== REBUILD_ALL',
+    /* IT REDDENS TWENTY-FOUR, AND EVERY ONE OF THEM IS NAMED RATHER THAN TUNED
+       OUT OF — the honest remedy when a mutation breaks the page wholesale.
+       This one stops EVERY per-instance control taking, on one bloom as much as
+       on eight: the stem never turns on (so there is no stem line, no seam, no
+       droop and no bend to drag), no petal warp ever lands (so every stretch,
+       every petal bend and every ownership claim measures a petal at rest), and
+       a bend offset cannot be dragged for. All true, all worth keeping whole,
+       and the breadth is the finding: a cache that trusts its routing has no
+       small failure mode. */
+    breaks: ['stem/every-drawn-u-line-is-continued-and-no-other',
+             'stem/the-continuation-runs-from-the-foot-to-the-root',
+             'stem/the-seam-is-zero-on-every-drawn-line',
+             'stem/the-droop-bends-the-stem-rather-than-turning-it',
+             'bend/dragging-a-handle-moves-the-stem',
+             'bend/the-root-is-a-point-like-any-other',
+             'draw/the-existing-controls-still-work-with-the-stem-on',
+             'select/picking-a-petal-deforms-nothing',
+             'warp/a-warp-survives-deselection',
+             'warp/two-petals-hold-different-warps-at-once',
+             'select/selecting-a-warped-petal-loads-its-own-values',
+             'warp/editing-moves-only-the-selected-petal',
+             'stretch/along-changes-the-length-and-not-the-width',
+             'stretch/across-changes-the-width-past-the-hold-and-holds-the-foot',
+             'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours',
+             'warp/a-bend-and-its-scales-stay-on-the-petal-across-a-switch',
+             'readout/the-petal-panel-reports-the-axis-the-seam-and-the-warped-count',
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+             'blooms/a-click-picks-the-bloom-as-well-as-the-petal',
+             'save/a-real-drag-put-an-offset-on-both-bend-sets',
+             'partial/a-per-instance-change-rebuilds-one-bloom',
+             'partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
+             'partial/every-control-draws-what-a-full-rebuild-would-draw',
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
+  },
+  {
+    /* AND THE CACHE STOPS CHECKING WHAT IT WAS BUILT UNDER. Under correct
+       routing this changes nothing at all — every route that moves a global
+       input is already a full rebuild — so it is invisible to the whole gate
+       except to the one check that misroutes on purpose. That is the check's
+       whole reason for existing: the safety here is that a misroute costs a
+       rebuild rather than a wrong picture, and a safety net nobody drops
+       anything into is not measured by watching the trapeze. */
+    id: 'the-cache-is-served-without-checking-what-it-was-built-under', file: 'plot.js',
+    from: '                     && inst.built !== null && inst.builtKey === key;',
+    to: '                     && inst.built !== null;',
+    breaks: ['partial/a-change-misrouted-as-per-instance-is-not-served-from-cache'],
+  },
   {
     /* RE-ANCHORED, DELIBERATELY. The blend used to be a literal in the material's
        own constructor; it is now the SCREEN polarity's entry in the one map from
@@ -170,7 +251,17 @@ const MUTANTS = [
                 to drag for a bend offset, and no per-petal warp to save or
                 restore. */
              'save/a-real-drag-put-an-offset-on-both-bend-sets',
-             'restore/two-petals-come-back-with-their-own-warps'],
+             'restore/two-petals-come-back-with-their-own-warps',
+             /* AND THE TWO MULTI-BLOOM CHECKS THIS LIST NEVER REACHED. They
+                arrived with the several-blooms session, which ran 34 of its 81
+                mutants and named the rest unrun; this one was among the rest.
+                Both are true about a page where every strip reads as a u-line:
+                the two stems part company by 10.59 mm where the check wants
+                them equal line for line, and the per-bloom petal census counts
+                a petal that is not there. Short in the honest direction, and
+                widened rather than the checks being loosened. */
+             'blooms/two-blooms-carry-two-different-stems-at-once',
+             'blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -1028,7 +1119,19 @@ const MUTANTS = [
              'blooms/the-petal-cursor-is-reset-when-the-bloom-changes',
              'blooms/a-click-picks-the-bloom-as-well-as-the-petal',
              'blooms/several-blooms-save-and-restore-as-themselves',
-             'blooms/the-panel-reports-what-the-composition-costs'],
+             'blooms/the-panel-reports-what-the-composition-costs',
+             /* AND THE FIVE PER-INSTANCE REBUILD CHECKS, all true and all for
+                one reason: an import that REPLACES leaves the page with a
+                single bloom, and every one of these is written at three —
+                `builds` compared as a three-element list, `1 built, 2 reused`
+                on the panel. The two DIGEST checks are NOT here and were not
+                red, which is the reassuring half: with one bloom the partial
+                rebuild still draws exactly what a full one draws. */
+             'partial/a-per-instance-change-rebuilds-one-bloom',
+             'partial/a-global-change-rebuilds-every-bloom',
+             'partial/a-view-only-change-rebuilds-no-bloom-and-still-moves-the-handles',
+             'partial/a-change-misrouted-as-per-instance-is-not-served-from-cache',
+             'partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms'],
   },
   {
     /* A NEW BLOOM LANDS AT THE ORIGIN. Under additive ink on black, a second
@@ -1059,8 +1162,19 @@ const MUTANTS = [
        statement about the mutation: with the stem read off the panel, selecting
        a bloom changes what the OTHER bloom draws, so a bloom stops being drawn
        from its own arrays. */
+    /* AND THE PER-INSTANCE REBUILD SEES IT FROM THE OTHER SIDE, which is the
+       most useful thing this mutant now says. It does not damage the cache —
+       it changes the PARTITION, making a control that is per-instance in the
+       shipped code page-wide. The key cannot notice (the stem lives on the
+       record, so nothing composition-level moved), and the routing is now
+       wrong by construction: the drawing after a stem slider disagrees with a
+       forced full rebuild on all six stem writes and both `stem` toggles. That
+       is the digest sweep doing the one job no counter can do. */
     breaks: ['blooms/two-blooms-carry-two-different-stems-at-once',
-             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing'],
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+             'blooms/a-transform-places-its-own-bloom-and-no-other',
+             'partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
+             'partial/every-control-draws-what-a-full-rebuild-would-draw'],
   },
   {
     /* SELECTING A BLOOM STAMPS THE PANEL ONTO IT. The destructive half of the
@@ -3318,19 +3432,27 @@ async function run({ mutant = null } = {}) {
   // descends to the root, one station at a time.
   await stemOn({ stemDroop: 0, stemLength: 170 });
   await restBends();
+  /* NULL IS AN OUTCOME, NOT A CRASH. A mutation that stops a per-instance
+     control taking leaves the stem never turned on at all, so there is no line
+     to measure — and a check that dereferenced it THREW and took the whole
+     sweep down instead of going red with a sentence. Fourth instance of that
+     bug class on this page; collect the outcome first, then build the detail. */
   const line0 = await q(() => window.__plot.stemLine(0));
   const foot0 = (await q(() => window.__plot.headFeet()))[0];
-  const nPts = line0.length / 3;
-  let descends = true;
+  const nPts = line0 ? line0.length / 3 : 0;
+  let descends = nPts > 1;
   for (let i = 1; i < nPts; i++) if (!(line0[i * 3 + 2] < line0[(i - 1) * 3 + 2])) descends = false;
   // AGAINST THE LINE'S OWN FOOT, not the ring's centroid z. The law is
   // `foot[2] - s` per line, and the two coincide only when every foot shares
   // one z — which is true of this grid and is not a property of the law.
   check('stem/the-continuation-runs-from-the-foot-to-the-root',
-    line0[0] === foot0[0] && line0[1] === foot0[1] && line0[2] === foot0[2] && descends
+    !!line0 && !!foot0 && line0[0] === foot0[0] && line0[1] === foot0[1]
+    && line0[2] === foot0[2] && descends
     && Math.abs(line0[(nPts - 1) * 3 + 2] - (foot0[2] - 170)) < 1e-3,
-    `starts on the foot, ${nPts} stations strictly descending, root at z `
-    + `${line0[(nPts - 1) * 3 + 2].toFixed(3)} against its foot's ${foot0[2].toFixed(3)} − 170`);
+    !line0 ? 'no stem line at all — the stem never turned on'
+      : `starts on the foot, ${nPts} stations strictly descending, root at z `
+        + `${line0[(nPts - 1) * 3 + 2].toFixed(3)} against its foot's `
+        + `${foot0 ? foot0[2].toFixed(3) : '—'} − 170`);
 
   // THE SEAM, MEASURED ON THE PAGE, at a droop and with the bends at rest: the
   // stem's own top point against the head's own answer for the same foot, line
@@ -5164,6 +5286,189 @@ async function run({ mutant = null } = {}) {
     && /ms\/frame/.test(bl_costText),
     bl_costText.split('\n').find(l => l.startsWith('cost')) || '(no cost line)');
 
+  /* ---- rebuilding only the bloom that changed ---------------------------
+     THE TRAP IS STALE GEOMETRY THAT LOOKS RIGHT. One bloom quietly not
+     updating while the others do reads as "the slider didn't take"; it is not a
+     crash, it is not a broken frame, and every check written before this one
+     passes on it. So both directions are asserted, and they are asserted
+     against two different instruments: a BUILD COUNTER, because "bloom B was
+     not rebuilt" is invisible in any drawing, and the DRAWING ITSELF against a
+     forced full rebuild, because a counter cannot say whether what was skipped
+     should have been.
+
+     A THIRD BLOOM FIRST — two cannot separate "the selected one" from "the one
+     that changed" from "all of them", because with two blooms every one of
+     those is a different pair of counters only by luck. */
+  await addBloom();
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ stem: 'on', stemDroop: 10 });
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  await reset();
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  const bl_buildsBefore = await q(() => window.__plot.instances().map(i => i.builds));
+  await set({ stemDroop: 33 });
+  const bl_afterStem = await q(() => ({ builds: window.__plot.instances().map(i => i.builds),
+                                        info: window.__plot.rebuildInfo(),
+                                        digest: window.__plot.drawnDigest() }));
+  const bl_stemFull = await q(() => { window.__plot.forceRebuild();
+                                      return window.__plot.drawnDigest(); });
+  const bl_delta = (a, b) => b.map((v, i) => v - a[i]);
+  const stemDelta = bl_delta(bl_buildsBefore, bl_afterStem.builds);
+  check('partial/a-per-instance-change-rebuilds-one-bloom',
+    bl_buildsBefore.length === 3
+    && JSON.stringify(stemDelta) === JSON.stringify([0, 1, 0])
+    && bl_afterStem.info.built === 1 && bl_afterStem.info.reused === 2
+    && bl_afterStem.info.only === '1',
+    `a stem slider on bloom 2 of 3: builds ${stemDelta.join(' / ')} `
+    + `(${bl_afterStem.info.built} built, ${bl_afterStem.info.reused} reused, `
+    + `routed ‘${bl_afterStem.info.only}’)`);
+
+  /* AND THE PICTURE IS THE ONE A FULL REBUILD WOULD HAVE DRAWN. Point for
+     point, across every bloom's head lines and every bloom's stem — the only
+     instrument that can say a bloom which was NOT rebuilt should not have been.
+     An EQUALITY over floats the page holds, never a framebuffer: this renderer
+     cannot be asked to come back to the bit. */
+  check('partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
+    bl_afterStem.digest.points > 0
+    && bl_afterStem.digest.hash === bl_stemFull.hash
+    && bl_afterStem.digest.points === bl_stemFull.points
+    && bl_afterStem.digest.strips === bl_stemFull.strips
+    && bl_afterStem.digest.stems === bl_stemFull.stems,
+    `${bl_afterStem.digest.points.toLocaleString('en-US')} coordinates over `
+    + `${bl_afterStem.digest.strips} grid strips and ${bl_afterStem.digest.stems} stem lines, `
+    + `identical either side of a forced full rebuild (hash ${bl_afterStem.digest.hash} / `
+    + `${bl_stemFull.hash})`);
+
+  /* THE OTHER DIRECTION: A DENSITY SLIDER IS EVERY BLOOM'S. An under-eager
+     rebuild here is the correctness bug and an over-eager one is only slow, so
+     this one is asserted at exactly three. */
+  const bl_beforeDens = await q(() => window.__plot.instances().map(i => i.builds));
+  await set({ uDensity: 8 });
+  const bl_afterDens = await q(() => ({ builds: window.__plot.instances().map(i => i.builds),
+                                        info: window.__plot.rebuildInfo(),
+                                        digest: window.__plot.drawnDigest() }));
+  const bl_densFull = await q(() => { window.__plot.forceRebuild();
+                                      return window.__plot.drawnDigest(); });
+  const densDelta = bl_delta(bl_beforeDens, bl_afterDens.builds);
+  check('partial/a-global-change-rebuilds-every-bloom',
+    JSON.stringify(densDelta) === JSON.stringify([1, 1, 1])
+    && bl_afterDens.info.built === 3 && bl_afterDens.info.reused === 0
+    && bl_afterDens.info.only === 'all'
+    && bl_afterDens.digest.hash === bl_densFull.hash
+    && bl_afterDens.digest.points === bl_densFull.points
+    && bl_afterDens.digest.points !== bl_afterStem.digest.points,
+    `the u density slider: builds ${densDelta.join(' / ')}, routed `
+    + `‘${bl_afterDens.info.only}’, and the drawing drops from `
+    + `${bl_afterStem.digest.points.toLocaleString('en-US')} to `
+    + `${bl_afterDens.digest.points.toLocaleString('en-US')} coordinates`);
+  await set({ uDensity: 12 });
+
+  /* EVERY CONTROL THAT REBUILDS, AGAINST A FULL REBUILD, ONE AT A TIME. The
+     routing above is one claim per control and this is the sweep: whatever a
+     control is routed as, the drawing after it has to be the drawing a full
+     rebuild would have produced. This is what makes a misroute a performance
+     bug rather than a correctness one — and it is measured rather than argued,
+     because the cache validating itself is a property of two expressions
+     (`only !== k` and the key) and a claim that rests on two expressions is a
+     claim one of them can quietly stop supporting. */
+  const SWEEP = [['stemDroop', 47], ['stemLength', 120], ['stemBundle', 2.2],
+                 ['stemJoin', 30], ['stemNeck', 80], ['stemHandles', false],
+                 ['bloomX', 60], ['bloomScale', 1.4], ['bloomRotZ', 25],
+                 ['petalPick', 7], ['petalAlong', 1.6], ['petalAcross', 0.7],
+                 ['families', 'u'], ['families', 'both'], ['vDensity', 6],
+                 ['uDensity', 5], ['uDensity', 12], ['vDensity', 12],
+                 ['stem', 'off'], ['stem', 'on']];
+  const sweepBad = [];
+  for (const [id, v] of SWEEP) {
+    await set({ [id]: v });
+    const a = await q(() => window.__plot.drawnDigest());
+    const b = await q(() => { window.__plot.forceRebuild(); return window.__plot.drawnDigest(); });
+    if (a.hash !== b.hash || a.points !== b.points || a.strips !== b.strips
+        || a.stems !== b.stems) sweepBad.push(`${id}=${v}`);
+  }
+  check('partial/every-control-draws-what-a-full-rebuild-would-draw',
+    sweepBad.length === 0 && SWEEP.length === 20,
+    sweepBad.length ? `stale after: ${sweepBad.join(', ')}`
+      : `${SWEEP.length} control writes over 3 blooms, each compared point for `
+        + 'point against a forced full rebuild — no stale line anywhere');
+
+  /* A CHANGE THAT MOVES NO LINE REBUILDS NO BLOOM. `stemHandles` is the one
+     control in the STEM panel that is not a stem control: it is a VIEW field of
+     the composition, read by `syncHandles` and by nothing else. It still runs
+     the global tail — the handles are IN that tail — so this is a claim about
+     the blooms, not about the page doing nothing. */
+  const bl_beforeView = await q(() => window.__plot.instances().map(i => i.builds));
+  await set({ stemHandles: false });
+  const bl_afterView = await q(() => ({ builds: window.__plot.instances().map(i => i.builds),
+                                        info: window.__plot.rebuildInfo(),
+                                        handles: window.__plot.instances().length
+                                          ? window.__plot.handleVisible(0) : null }));
+  await set({ stemHandles: true });
+  const bl_handlesBack = await q(() => window.__plot.handleVisible(0));
+  const viewDelta = bl_delta(bl_beforeView, bl_afterView.builds);
+  check('partial/a-view-only-change-rebuilds-no-bloom-and-still-moves-the-handles',
+    JSON.stringify(viewDelta) === JSON.stringify([0, 0, 0])
+    && bl_afterView.info.only === 'view' && bl_afterView.info.built === 0
+    && bl_afterView.info.reused === 3
+    && bl_afterView.handles === false && bl_handlesBack === true,
+    `hiding the stem handles: builds ${viewDelta.join(' / ')}, routed `
+    + `‘${bl_afterView.info.only}’, and the bend handles still go `
+    + `hidden (${bl_afterView.handles}) and back (${bl_handlesBack})`);
+
+  /* AND THE CACHE REFUSES TO SERVE AN ANSWER BUILT UNDER OTHER CONDITIONS.
+     This is the misroute itself, performed on purpose: the density is written
+     into the control WITHOUT dispatching its own event — so no handler runs and
+     nothing routes it — and then a PER-INSTANCE rebuild is asked for. A cache
+     that trusted the routing would hand back every other bloom at the old
+     density and draw two blooms at one density beside one at another, which is
+     precisely the picture nobody would question. The key is what makes it
+     rebuild all three instead, and the digest is what says the drawing is
+     right. There is no control that can reach this state; `rebuildAs` is test
+     chrome, like `setView`. */
+  const bl_beforeMis = await q(() => window.__plot.instances().map(i => i.builds));
+  const bl_mis = await q(() => {
+    document.getElementById('uDensity').value = '6';   // no `input` event: nothing routes it
+    window.__plot.rebuildAs(window.__plot.selectedInstance());
+    const a = window.__plot.drawnDigest();
+    const info = window.__plot.rebuildInfo();
+    /* THE COUNTERS ARE READ HERE, BEFORE THE FORCED REBUILD — the forced one
+       builds all three too, so reading them after it would count every bloom
+       twice and say nothing about which of them the MISROUTED rebuild reached.
+       (It did, on this check's first run: 2 / 2 / 2.) */
+    const builds = window.__plot.instances().map(i => i.builds);
+    window.__plot.forceRebuild();
+    return { a, info, b: window.__plot.drawnDigest(), builds };
+  });
+  await set({ uDensity: 12 });
+  const misDelta = bl_delta(bl_beforeMis, bl_mis.builds);
+  check('partial/a-change-misrouted-as-per-instance-is-not-served-from-cache',
+    JSON.stringify(misDelta) === JSON.stringify([1, 1, 1])
+    && bl_mis.info.built === 3 && bl_mis.info.reused === 0
+    && bl_mis.info.only !== 'all'
+    && bl_mis.a.hash === bl_mis.b.hash && bl_mis.a.points === bl_mis.b.points,
+    `a density change routed as bloom ${bl_mis.info.only}: builds `
+    + `${misDelta.join(' / ')} — the key busted every cached answer, and the `
+    + `${bl_mis.a.points.toLocaleString('en-US')} coordinates drawn are a full rebuild's`);
+
+  /* AND THE PANEL SAYS WHICH PART OF A DRAG IS ONE BLOOM'S. The split is the
+     whole point of the routing: `blooms` is the phase this change moves and it
+     is flat in the bloom count, while the packing and the extent walk are the
+     composition's and are not. A number nobody prints is a number nobody
+     watches — and this one is over budget at three blooms, so it says so. */
+  await set({ stemDroop: 21 });
+  const bl_dragText = await q(() => { window.__plot.renderNow();
+                                      return window.__plot.instanceText(); });
+  const bl_dragInfo = await q(() => window.__plot.rebuildInfo());
+  const dragLine = bl_dragText.split('\n').find(l => l.startsWith('drag')) || '';
+  check('partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms',
+    /1 built, 2 reused/.test(dragLine) && /blooms/.test(dragLine)
+    && /packing/.test(dragLine) && /extent/.test(dragLine)
+    && dragLine.includes(bl_dragInfo.ms.toFixed(1))
+    && bl_dragInfo.buildMs < bl_dragInfo.packMs + bl_dragInfo.boundsMs,
+    dragLine || '(no drag line)');
+
+  await page.evaluate(() => window.__plot.selectInstance(0));
+
   /* BACK TO ONE BLOOM. Every section below is written about a single grid — the
      composition-file section compares `instances[0]` against the page, and the
      export section counts strips — so this leaves the page the way it found it.
@@ -5687,6 +5992,9 @@ if (NEG) {
       r = await run({ mutant: m.id });
     } catch (e) {
       console.log(`  [FAIL] ${m.id.padEnd(46)} THREW: ${(e && e.message) || e}`);
+      // WHERE it threw, not only that it did — a message with no frame in it
+      // sends the next session grepping the whole file for `.length`.
+      if (e && e.stack) console.log(e.stack.split('\n').slice(1, 5).join('\n'));
       console.log('         a check reached into state this mutation removed — fix the '
         + 'check to report rather than throw');
       OVERRIDE = null;
