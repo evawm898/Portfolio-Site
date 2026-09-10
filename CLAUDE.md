@@ -2115,7 +2115,7 @@ without a reason from the picture:**
 | u density | 12 | every u line (right = densest) |
 | v density | 12 | every v line |
 | weight | 1.1 px | screen-space stroke width |
-| brightness | 30% | the single-line level — see below, this is the glow control |
+| brightness | 30% (screen) · **16% (print)** | the single-line level — see below, this is the glow control, and the two polarities' defaults DIFFER by ruling |
 | depth dim | 55% | the farthest line draws at 45% of its brightness |
 
 **ADDITIVE BLENDING DECIDES A DEFAULT, AND IT IS THE ONE CONTROL BEYOND THE
@@ -3270,6 +3270,49 @@ channel. That is an identity, not a threshold, and one statement catches a leake
 a leaked handle and a leaked highlight at once — measured 0 non-neutral pixels of 330,176
 with all three on screen.
 
+**THE TWO POLARITIES HAVE DIFFERENT LEVEL DEFAULTS, AND THE ASYMMETRY IS THE POINT**
+(Eva's ruling, Sep 10, from the print artefact). **Screen keeps `brightness` 30%** — "the
+blowout at the center is the glow, and it was in what I approved. That's the look."
+**Print's default is 16%, tuned on the PRINT artefact and never matched to the screen
+number.** `levelDefault` per polarity in `plot-polarity.js` is the one owner of both, and
+`levelDefaultFor()` the one reader. **WHY THEY DIFFER, so a later session does not "fix" it:
+ADDITIVE SATURATES AT WHITE** — past a couple of crossings every deeper one lands on the
+same pixel and the tonal range is spent, which IS the approved glow — while **MULTIPLY
+APPROACHES BLACK ASYMPTOTICALLY** and never saturates, so crossings keep separating and a
+screen-tuned level throws that away. Measured on the shipped grid at the sheets' framing:
+
+| | ink crushed to the far end | greys carrying the ink |
+|---|---|---|
+| screen 30% (approved) | 36.3% | 7 |
+| print 30% (inherited — the state ruled against) | 24.8% | 16 |
+| **print 16% (tuned, shipped)** | **17.3%** | **20** |
+| print 8% | 8.4% | 23 — but the line is 175/255, too pale |
+
+**The pick is print-native: the DARKEST level still on the ladder plateau** (occupancy holds
+to 16% and falls from 18%), so it is the most legible single line — 144 of 255 — that has not
+begun trading away crossing separation. **A FULLY UNCRUSHED PRINT IS NOT REACHABLE ON THIS
+DRAWING** and the tuning is HOW MUCH rather than WHETHER: the ink reaches black after 10
+crossings at 16% and after 13 even at 8%, where a 28-petal bloom stacks far more than that at
+its centre. Do not read the residual black core as a defect to tune out.
+**SWITCHING POLARITY TAKES THE NEW DEFAULT, and that costs a hand-tuned level** — said rather
+than hidden. It fires ONLY on a real change (`applyPolarity` is the one owner of
+`shownPolarity`, so a re-selection of the polarity already showing leaves the level alone, and
+a whole-control-set write lands the same way whatever order it walks). **AND ONLY FROM THE
+EVENT: `applyFields` — the composition restore — writes `.value` and dispatches nothing**, so
+a restored polarity never moves the restored level. That separation is load-bearing and is
+asserted (`restore/a-restored-level-is-not-replaced-by-the-polarity-default`): if the restore
+ever started firing the handler, every saved print composition would come back at the default
+instead of at the level it was saved with, **and the round-trip check would still pass**,
+because it compares the page against the file it just wrote. Remembering one level PER
+POLARITY would keep a hand-tuned number across a switch; it is a change to the FORMAT (two
+levels where there is one field) and is deliberately not done.
+**THE GATE'S OWN "VERBATIM" RULE CAUGHT THE FIRST VERSION OF THAT CHECK**: `brightness` is an
+`int` field carrying the control's own 0–100 value, so writing `0.41` into a document meant
+0.41%, and the check went red on its own premise rather than on the page. Two mutants carry
+the ruling — `the-print-polarity-inherits-the-screen-level` and
+`the-two-level-defaults-are-made-the-same`, the second being exactly the "fix" this section
+exists to prevent.
+
 **POLARITY IS A `draw` FIELD AND `VERSION` IS 2.** It rides with the draw settings because
 it IS one — it decides how the fragments blend and it changes what the two controls beside
 it MEAN — and its values are imported from `plot-polarity.js` rather than restated, the way
@@ -3282,7 +3325,7 @@ the renderer stayed where it was is a silent partial restore that passes every
 field-by-field comparison, so the blend constant and the clear colour are read back from the
 renderer itself on both sides of the trip.
 
-**THE GATE IS 194 CHECKS AND 65 MUTANTS, AND THE SWEEP IS COMPLETE — 65 of 65 CLEAN**
+**THE GATE IS 197 CHECKS AND 67 MUTANTS; THE SWEEP WAS COMPLETE AT 65 of 65 AND THE TWO ADDED FOR THE LEVEL-DEFAULT RULING ARE VERIFIED**
 (Sep 9-10, run in chunks over two sittings). The base pass is 194 checks / 0 failed and every
 mutant reddens exactly the checks it claims. **THE SWEEP WAS STOPPED AT 41 PART-WAY THROUGH,
 ON EVA'S INSTRUCTION** (a usage-limit call, never a judgement about the code) and then RESUMED

@@ -24,6 +24,35 @@
 // Either choice needs exactly one inversion; multiply puts it on a SCALAR (the
 // ink level) where subtractive would put it on every HUE on the page.
 //
+// THE TWO DEFAULTS DIFFER ON PURPOSE, AND THE REASON IS THE BLEND, NOT TASTE.
+// `levelDefault` is 30% on screen and 16% in print. That is a RULING (Eva,
+// Sep 10) and the asymmetry is structural: ADDITIVE SATURATES AT WHITE, so past
+// a couple of crossings every deeper crossing lands on the same pixel and the
+// tonal range is spent — which is exactly the glow the screen default was
+// approved for. MULTIPLY APPROACHES BLACK ASYMPTOTICALLY and never saturates,
+// so crossings keep separating and a level tuned for the screen throws that
+// away. Measured on the shipped grid, at the framing the sheets use:
+//
+//   polarity       ink crushed to the far end     greys carrying the ink
+//   screen 30%     36.3%  (the approved glow)     7      <- the look, ruled
+//   print  30%     24.8%                          16     <- inherited, wrong
+//   print  16%     17.3%                          20     <- tuned, shipped
+//   print   8%      8.4%                          23     <- line too pale, 175/255
+//
+// The pick is print-native: 16% is the DARKEST level still on the ladder
+// plateau (occupancy holds to 16% and falls from 18%), so it is the most
+// legible single line — 144 of 255 — that has not begun trading away crossing
+// separation. Below 14% the line goes pale (158 at 12%, 175 at 8%) and buys no
+// more ladder.
+//   AND A FULLY UNCRUSHED PRINT IS NOT REACHABLE ON THIS DRAWING, which is why
+// the tuning is HOW MUCH rather than WHETHER: the ink reaches black after 10
+// crossings at 16% and after 13 even at 8%, and a 28-petal bloom stacks far
+// more than that at its centre. Do not read the residual black core as a defect
+// to tune out.
+//   DO NOT "FIX" THE TWO NUMBERS INTO ONE. Matching them is the thing that was
+// ruled against, in both directions: the screen number in print flattens a
+// quarter of the ink, and the print number on screen would put the glow out.
+//
 // EVERYTHING HERE HAPPENS IN sRGB-ENCODED VALUES, AND THAT IS MEASURED, NOT
 // ASSUMED. LineMaterial's own fragment shader orders its chunks
 // tonemapping -> colorspace -> fog -> premultiplied_alpha, so the colour is
@@ -93,13 +122,23 @@ export const POLARITY = Object.freeze({
     id: 'screen', blend: 'additive', ground: 0x000000, groundIsWhite: false,
     ink: Object.freeze([1, 1, 1]), label: 'white on black',
     levelWord: 'brightness', groundWord: 'black',
+    // 30% — Eva, Sep 7 on deploy-preview-182, and REAFFIRMED Sep 10 against the
+    // print artefact: "the blowout at the center is the glow, and it was in what
+    // I approved. That's the look." See THE TWO DEFAULTS DIFFER above.
+    levelDefault: 0.30,
   }),
   print: Object.freeze({
     id: 'print', blend: 'multiply', ground: 0xffffff, groundIsWhite: true,
     ink: Object.freeze([0, 0, 0]), label: 'black on white',
     levelWord: 'darkness', groundWord: 'white',
+    // 16% — tuned on the PRINT artefact (Sep 10), never matched to the screen
+    // number. See THE TWO DEFAULTS DIFFER above for the measurement.
+    levelDefault: 0.16,
   }),
 });
+
+/* THE DEFAULT LEVEL FOR A POLARITY, and the one place either number lives. */
+export const levelDefaultFor = polarity => polarityOf(polarity).levelDefault;
 
 export const isPolarity = p => Object.prototype.hasOwnProperty.call(POLARITY, p);
 export const polarityOf = p => (isPolarity(p) ? POLARITY[p] : POLARITY[DEFAULT_POLARITY]);

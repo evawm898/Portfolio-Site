@@ -94,7 +94,7 @@ import {
 } from './plot-frame.js';
 import {
   POLARITY, POLARITIES, DEFAULT_POLARITY, polarityOf, inkRGB, hueRGB,
-  singleLinePixel, crossingInk,
+  singleLinePixel, crossingInk, levelDefaultFor,
 } from './plot-polarity.js';
 import {
   RASTER_SCALE, mmPerPixel, stripToPaths, svgDocument, punchEllipse, exportName,
@@ -931,12 +931,18 @@ function rebuild() {
    `blending` is renderer STATE and not a program define, so it wants no
    `needsUpdate`; the fog appearing or going away is the one thing here that
    recompiles, and updateFog() owns that. */
+let shownPolarity = DEFAULT_POLARITY;
 function applyPolarity(id) {
   const pol = polarityOf(id);
   const blend = BLEND[pol.blend];
   material.blending = blend;
   selMaterial.blending = blend;
   renderer.setClearColor(pol.ground, 1);
+  /* THE ONE OWNER OF WHICH POLARITY IS ON SCREEN. The level-follows-polarity
+     rule below compares against this rather than against a variable of its own,
+     so a polarity arriving through a RESTORE — which writes `.value` and
+     dispatches nothing — leaves it correct instead of stale. */
+  shownPolarity = pol.id;
   return pol;
 }
 
@@ -2784,9 +2790,31 @@ function loadDefault() {
   });
 }
 
+/* THE LEVEL FOLLOWS THE POLARITY, BECAUSE THE TWO NUMBERS ARE NOT COMPARABLE.
+   `plot-polarity.js` carries a `levelDefault` per polarity (30% screen, 16%
+   print) and the reason they differ is in that file's header: additive
+   saturates at white, multiply approaches black asymptotically, so a level
+   tuned for one regime is measurably wrong in the other. Switching polarity
+   therefore TAKES the new polarity's default rather than carrying the old
+   number across.
+     ONLY ON A REAL CHANGE. An `input` event that re-selects the polarity
+   already showing must not stomp a hand-tuned level, so the previous value is
+   remembered and compared. That also makes a whole-control-set write (the gate
+   and the sheets both do one) land the same way whatever order it walks.
+     AND ONLY FROM THE EVENT. `applyFields` — the composition restore — writes
+   `.value` and dispatches nothing, so a restored polarity never moves the
+   restored level. That separation is what keeps the file's field-by-field
+   comparison honest, and it is asserted rather than assumed.
+     WHAT THIS COSTS, said rather than hidden: a level tuned by hand is replaced
+   when you switch polarity. Remembering one level PER POLARITY would keep it,
+   and is a change to the composition FORMAT (two levels where there is now one
+   field), so it is not done here. */
 /* ---- one-time wiring ---------------------------------------------------- */
 for (const [id, el] of Object.entries(ui)) {
   el.addEventListener('input', () => {
+    if (id === 'polarity' && el.value !== shownPolarity) {
+      ui.brightness.value = String(Math.round(levelDefaultFor(el.value) * 100));
+    }
     writeOutputs();
     // POLARITY IS A CHEAP ARM: it changes how the fragments blend and what is
     // behind them, and it moves no line, so the segment buffers are untouched
@@ -3174,6 +3202,12 @@ window.__plot = {
       // What a single fully-covered line should put in the framebuffer, from the
       // module's own arithmetic — the calibration both regimes' checks rest on.
       singleLinePixel: singleLinePixel(readUI().polarity, readUI().brightness),
+      // The level the CURRENT polarity defaults to, and the level actually
+      // showing — two facts, because "the control reads 16%" and "print's
+      // default is 16%" are what a shared default would conflate.
+      levelDefault: levelDefaultFor(readUI().polarity),
+      level: readUI().brightness,
+      shown: shownPolarity,
       levelWord: polarityOf(readUI().polarity).levelWord,
       brightnessLabel: brightnessLabel ? brightnessLabel.textContent : null,
     };

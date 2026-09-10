@@ -895,6 +895,24 @@ const MUTANTS = [
     breaks: ['polarity/the-depth-dim-fades-into-the-ground-it-is-on'],
   },
   {
+    /* THE LEVEL DOES NOT FOLLOW THE POLARITY — so print INHERITS the screen's
+       30%, which is the state Eva ruled against on Sep 10. Still a plausible
+       black-on-white flower: nothing is out of place, a quarter of the ink is
+       just flattened to black where the tuned default keeps it separable. */
+    id: 'the-print-polarity-inherits-the-screen-level', file: 'plot.js',
+    from: "    if (id === 'polarity' && el.value !== shownPolarity) {",
+    to:   "    if (false && id === 'polarity' && el.value !== shownPolarity) {",
+    breaks: ['polarity/each-polarity-carries-its-own-level-default'],
+  },
+  {
+    /* THE TWO DEFAULTS ARE MADE EQUAL — a later session "fixing" the asymmetry
+       this file exists to record. The page still works and still switches
+       polarity; it just quietly stops being tuned. */
+    id: 'the-two-level-defaults-are-made-the-same', file: 'plot-polarity.js',
+    from: '    levelDefault: 0.16,', to: '    levelDefault: 0.30,',
+    breaks: ['polarity/each-polarity-carries-its-own-level-default'],
+  },
+  {
     /* THE TRANSFER IS A PLAIN INVERSION OF THE LEVEL. Still a black-on-white
        flower nobody would question — and a single line lands 112 of 255 away
        from where the screen puts it. */
@@ -4117,6 +4135,61 @@ async function run({ mutant = null } = {}) {
     'the word on the label follows the polarity because the same number is light on '
     + 'black and ink on white; the control ID does not, because that is what every '
     + 'saved composition names');
+
+  /* THE TWO DEFAULTS DIFFER, AND THE LEVEL FOLLOWS THE POLARITY. Ruled Sep 10:
+     screen keeps 30% (the glow Eva approved) and print is tuned on its own
+     artefact at 16%. Asserted as a DIFFERENCE rather than as two literals the
+     gate restates — a check that hard-codes both numbers goes red on a retune
+     that is Eva's to make, where the property that must not be lost is that
+     they are independent and that a switch takes the new one. */
+  await reset({ polarity: 'screen' });
+  const dfScreen = await q(() => window.__plot.polarityInfo());
+  await set({ polarity: 'print' });
+  const dfPrint = await q(() => window.__plot.polarityInfo());
+  check('polarity/each-polarity-carries-its-own-level-default',
+    dfScreen.levelDefault !== dfPrint.levelDefault
+    && Math.abs(dfScreen.level - dfScreen.levelDefault) < 1e-9
+    && Math.abs(dfPrint.level - dfPrint.levelDefault) < 1e-9,
+    `screen defaults to ${(dfScreen.levelDefault * 100).toFixed(0)}% and print to `
+    + `${(dfPrint.levelDefault * 100).toFixed(0)}%, and switching polarity takes the `
+    + 'new one rather than carrying the old number across — additive saturates at '
+    + 'white where multiply approaches black asymptotically, so the two are not '
+    + 'the same quantity');
+
+  /* AND A RE-SELECTION OF THE POLARITY ALREADY SHOWING MUST NOT STOMP A
+     HAND-TUNED LEVEL — the difference between "the polarity changed" and "an
+     input event fired", which a whole-control-set write makes reachable. */
+  await set({ brightness: 44 });
+  await set({ polarity: 'print' });
+  const held = await q(() => window.__plot.polarityInfo());
+  check('polarity/re-selecting-the-polarity-already-shown-leaves-the-level-alone',
+    Math.abs(held.level - 0.44) < 1e-9,
+    `a hand-tuned 44% survives an input event that re-selects the polarity already `
+    + `on screen (read back ${(held.level * 100).toFixed(0)}%)`);
+
+  /* AND A RESTORE NEVER MOVES THE RESTORED LEVEL. `applyFields` writes `.value`
+     and dispatches nothing, which is what keeps the composition's field-by-field
+     comparison honest — if the polarity write ever started firing the handler,
+     every saved print composition would come back at the default instead of at
+     the level it was saved with, and the round-trip check would still pass
+     because it compares the page against the file it just wrote. */
+  await reset({ polarity: 'screen', brightness: 30 });
+  const polRestored = await q(() => {
+    const doc = JSON.parse(window.__plot.compositionText());
+    doc.draw.polarity = 'print';
+    // The file stores a control's own value VERBATIM, and this slider is an int
+    // in percent — 0.41 here would be 0.41%, which is the format's own rule
+    // catching a check that ignored it.
+    doc.draw.brightness = 41;
+    window.__plot.loadComposition(JSON.stringify(doc), 'level-follows.json');
+    return window.__plot.polarityInfo();
+  });
+  check('restore/a-restored-level-is-not-replaced-by-the-polarity-default',
+    polRestored.id === 'print' && Math.abs(polRestored.level - 0.41) < 1e-9
+    && polRestored.shown === 'print',
+    `a composition saved in print at 41% comes back at 41%, not at print's own `
+    + `default of ${(dfPrint.levelDefault * 100).toFixed(0)}% (read back `
+    + `${(polRestored.level * 100).toFixed(0)}%, renderer showing ${polRestored.shown})`);
 
   // =========================================================================
   /* THE EXPORTS. Both through the very functions the two buttons call. */
