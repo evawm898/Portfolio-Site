@@ -295,7 +295,7 @@ function newInstance() {
     // its own stem, and where it stands
     stemVals: { ...STEM_REST }, bends: newBends(), transform: newTransform(),
     // derived on every rebuild
-    warpAll: [], stemStrips: [], stemIsDrawn: false,
+    warpAll: [], stemStrips: [], stemLocal: [], stemIsDrawn: false,
     stemStats: { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true },
     warpInfo: { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0, points: 0, basePoints: 0 },
   };
@@ -973,6 +973,12 @@ function buildInstance(inst, ord, isSel) {
      the on-screen box all read one flat list across every bloom, and `petal` on
      its own does not identify a petal there — petal 3 exists in all of them. */
   const stamp = t => (t.inst === ord ? t : { ...t, inst: ord });
+  /* THE UNPLACED STEMS ARE KEPT BESIDE THE PLACED ONES, because the seam, the
+     chord and every millimetre this bloom reports are measured in ITS OWN grid
+     space — the space its ring, its law and its file are written in. At the
+     identity `placeStrips` hands back the very records it was given, so the two
+     are the same array and a single bloom at rest costs nothing for it. */
+  inst.stemLocal = stems;
   const placedHead = placeStrips(head, inst.transform).map(stamp);
   inst.stemStrips = placeStrips(stems, inst.transform).map(stamp);
   return { head: placedHead, stems: inst.stemStrips };
@@ -3620,16 +3626,27 @@ window.__plot = {
      a claim about the LINES, not about the store, and the store cannot answer
      it. Measured in the bloom's own grid space, before its placement, so a
      bloom that has merely been moved does not read as one that has drooped. */
+  /* ONE NAMED BLOOM'S STEM LINE, in that bloom's own grid space — what "two
+     blooms carry two different stems" is measured on. The store saying 40° and
+     the lines being drooped are two facts, and only the second is the drawing. */
+  stemLineOf: (k, i) => (instances[k] && instances[k].stemLocal[i]
+    ? Array.from(instances[k].stemLocal[i].points) : null),
   drawnStemsByBloom: () => instances.map((inst, k) => {
-    let lo = 0;
-    for (const s of inst.stemStrips) {
+    const c = inst.stemRing ? inst.stemRing.center : [0, 0, 0];
+    let lo = 0, lateral = 0;
+    for (const s of inst.stemLocal) {
       for (let i = 0; i < s.count; i++) {
         const z = s.points[i * 3 + 2];
         if (z < lo) lo = z;
+        // HOW FAR THE STEM SWINGS OFF ITS OWN RING AXIS. The drop to the root is
+        // the LENGTH and is nearly the same at any droop — a stem hanging 170 mm
+        // straight down and one drooping 40° both end 170 mm below — so the drop
+        // cannot tell two droops apart and this is what can.
+        const d = Math.hypot(s.points[i * 3] - c[0], s.points[i * 3 + 1] - c[1]);
+        if (d > lateral) lateral = d;
       }
     }
-    const ring = inst.stemRing ? inst.stemRing.center[2] : 0;
-    return { k, lines: inst.stemStrips.length, tipDropMm: ring - lo };
+    return { k, lines: inst.stemLocal.length, tipDropMm: c[2] - lo, lateralMm: lateral };
   }),
   /* A PIXEL ON A NAMED BLOOM'S NAMED PETAL — `petalScreenPoint`'s two-level
      twin, because with two blooms on screen a petal number does not identify a
@@ -3685,12 +3702,17 @@ window.__plot = {
   }; },
   // One stem line's points, in grid space — what a decay or a bend is measured
   // on. Index is into the stem strips in the order they were built.
-  stemLine: i => (stemStrips[i] ? Array.from(stemStrips[i].points) : null),
-  stemLineCount: () => stemStrips.length,
+  /* IN THE BLOOM'S OWN GRID SPACE, NOT WHERE IT STANDS. The seam and the chord
+     are properties of the stem's own law, measured against a head transform
+     written in the same space; comparing a placed stem against an unplaced head
+     would report a bloom that has merely been MOVED as one whose stem had come
+     off its ring. */
+  stemLine: i => (cur().stemLocal[i] ? Array.from(cur().stemLocal[i].points) : null),
+  stemLineCount: () => cur().stemLocal.length,
   // The corresponding head strip's FOOT, through the head's own transform: the
   // other half of the seam, so a check can measure the join itself rather than
   // trust the page's own number for it.
-  stemFeet: () => stemStrips.map(t => [t.points[0], t.points[1], t.points[2]]),
+  stemFeet: () => cur().stemLocal.map(t => [t.points[0], t.points[1], t.points[2]]),
   headFeet: () => {
     const { stemRing, strips } = cur();
     const st = readStem();
