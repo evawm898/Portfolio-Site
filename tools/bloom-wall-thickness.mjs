@@ -652,22 +652,54 @@ export async function sweepControls({ root = ROOT, quiet = false } = {}) {
 /* Each mutation names the assertions it MUST redden. A mutation that reddens
    something it did not name is reported too — that is how a mutation which
    merely breaks the build gets caught pretending to be a negative control. */
+/* EVERY MUTANT DECLARES THREE THINGS, and the third is what makes this a
+   BEHAVIOUR check rather than a text one (Eva's ruling, session 35).
+
+     find / into   the edit, as an EXACT source string. The anchor is kept
+                   exact on purpose: a moved anchor must fail LOUDLY, which is
+                   the survivable failure this project already prizes. What
+                   changed is that the match is now COUNTED — `String.replace`
+                   takes the FIRST occurrence, so an anchor that becomes
+                   ambiguous silently lands the mutation somewhere else while
+                   "something changed" still passes. `verify-bloom-apex-
+                   mutants.mjs` has counted since session 32; this file did not.
+     names         the assertion tags it MUST redden.
+     witness       a direct call on the MUTATED module proving the intended
+                   behaviour actually moved. This is the clause that keys the
+                   mutant on behaviour: an edit can land on the right line and
+                   still change nothing observable (a dead branch, a state the
+                   sweep never reaches), and then a green `names` line is
+                   evidence of nothing. It returns null when the behaviour
+                   moved, or a STRING saying what it found when it did not.
+
+   The witness is deliberately NOT the assertion the mutant names. Asking the
+   gate whether the gate fired is the circularity the whole table exists to
+   avoid; the witness asks the GEOMETRY whether it changed, from the other
+   side. */
 const MUTANTS = [
   { id: 'cross-section-normal', names: ['V4'],
     why: 'revert the buckled branch to the cross-section normal — session 33 undone',
-    apply: (s) => s.replace('if (form && form.buckle !== null) trueNormalRows(rows, footS.length);',
-                            'if (false && form.buckle !== null) trueNormalRows(rows, footS.length);') },
+    find: 'if (form && form.buckle !== null) trueNormalRows(rows, footS.length);',
+    into: 'if (false && form.buckle !== null) trueNormalRows(rows, footS.length);',
+    witness: normalsMustMove },
   { id: 'derivative-in-v', names: ['V4'],
     why: "differentiate the field in v rather than in a = h*v — the discovery pass's own first bug",
-    apply: (s) => s.replace('const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);',
-                            'const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h) * h;') },
+    find: 'const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);',
+    into: 'const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h) * h;',
+    witness: normalsMustMove },
   { id: 'dead-branch', names: ['V2'],
     why: 'the guard always holds, so the buckle is never built',
-    apply: (s) => s.replace('export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',
-                            'export function buckleIsFlat(state) { return true; }') },
+    find: 'export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',
+    into: 'export function buckleIsFlat(state) { return true; }',
+    witness: (M) => (M.buckleIsFlat({ buckleAmp: 0.3, buckleFreq: 3 }) === true ? null
+      : 'buckleIsFlat still reports a buckled state as buckled') },
   { id: 'unguarded-form', names: ['V2'],
     why: 'petalFormIsFlat stops naming the buckle, so petalForm() is never constructed and the field is a dead slider — session 16\'s failure, repeated',
-    apply: (s) => s.replace('      && buckleIsFlat(state);\n}', '      && true;\n}') },
+    find: '      && buckleIsFlat(state);\n}',
+    into: '      && true;\n}',
+    witness: (M) => (M.petalFormIsFlat({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0,
+                                         petalCupGradient: 0, buckleAmp: 0.3, buckleFreq: 3 }) === true ? null
+      : 'petalFormIsFlat still reports a buckled row as non-flat') },
   /* THE CLAMP'S MUTANT NAMES V4, NOT V5, AND THAT IS A RESULT RATHER THAN A
      correction of convenience. It was written naming V5 on the assumption that
      an unclamped wave folds the sheet onto itself; measured, removing the
@@ -677,16 +709,51 @@ const MUTANTS = [
      is necessary and not sufficient. */
   { id: 'no-amplitude-clamp', names: ['V4'],
     why: 'the amplitude clamp is removed, so a high frequency builds the amplitude it was asked for and the skins wedge — measured to redden the WALL and NOT self-approach, which is the clamp telling you what it does and does not bound',
-    apply: (s) => s.replace('  const A = Math.min(asked, cap);', '  const A = asked;') },
+    find: '  const A = Math.min(asked, cap);',
+    into: '  const A = asked;',
+    witness: (M) => {
+      const ctx = { halfW: 8, length: 35, floorRadius: 1.2, slotIndex: 0 };
+      const b = M.buckleLaw({ buckleAmp: 0.6, buckleFreq: 7, buckleEnv: 3 }, ctx);
+      return b.ampBuilt === 0.6 ? null : `ampBuilt is ${b.ampBuilt}, still clamped below the asked 0.6`;
+    } },
   { id: 'field-four-times-too-big', names: ['V5'],
     why: 'the field is emitted at four times the law\'s amplitude — a wrong constant in `w`, the defect class that folds a margin onto the blade behind it',
-    apply: (s) => s.replace('    w: (u, v, h) => A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),',
-                            '    w: (u, v, h) => 4 * A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),') },
+    find: '    w: (u, v, h) => A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),',
+    into: '    w: (u, v, h) => 4 * A * h * Math.pow(Math.abs(v), p) * Math.cos(2 * Math.PI * f * u + ph),',
+    witness: (M, C) => {
+      const ctx = { halfW: 8, length: 35, floorRadius: 1.2, slotIndex: 0 };
+      const st = { buckleAmp: 0.2, buckleFreq: 3, buckleEnv: 3 };
+      const got = M.buckleLaw(st, ctx).w(0.5, 1, 8), want = C.buckleLaw(st, ctx).w(0.5, 1, 8) * 4;
+      return Math.abs(got - want) < 1e-12 ? null : `w at the margin is ${got}, not 4x the clean ${want / 4}`;
+    } },
   { id: 'guard-needs-both-zero', names: ['V3'],
     why: 'the guard asks for BOTH factors to be zero rather than either, so a frequency alone engages the field at amplitude 0 and the gated state stops being inert',
-    apply: (s) => s.replace('export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',
-                            'export function buckleIsFlat(state) { return !state.buckleAmp && !state.buckleFreq; }') },
+    find: 'export function buckleIsFlat(state) { return !state.buckleAmp || !state.buckleFreq; }',
+    into: 'export function buckleIsFlat(state) { return !state.buckleAmp && !state.buckleFreq; }',
+    witness: (M) => (M.buckleIsFlat({ buckleAmp: 0, buckleFreq: 3 }) === false ? null
+      : 'buckleIsFlat still reports amplitude 0 with a frequency as flat') },
 ];
+
+/* The witness shared by the two normal mutants: both change WHICH normal the
+   skins are offset along, which is not visible in any pure function — it is
+   visible in the normals the builder EMITS. Compared against the clean
+   module's on the same buckled state, at the same grid. */
+function normalsMustMove(M, C) {
+  const set = { buckleAmp: 0.3, buckleFreq: 3, buckleEnv: 3 };
+  const grid = (mod) => {
+    const acc = new mod.MeshBuilder({ exportMode: true, captureGrid: true });
+    return mod.buildBloomInto(acc, { ...DEFAULTS_FOR_WITNESS, ...set }).petal.grid[0].rows;
+  };
+  const a = grid(M), b = grid(C);
+  let worst = 0;
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    for (let j = 0; j < a[i].normal.length; j++) {
+      for (let k = 0; k < 3; k++) worst = Math.max(worst, Math.abs(a[i].normal[j][k] - b[i].normal[j][k]));
+    }
+  }
+  return worst > 1e-9 ? null : `the emitted normals are identical to the clean tree (worst ${worst.toExponential(2)})`;
+}
+let DEFAULTS_FOR_WITNESS = null;
 
 /* EACH MUTANT GETS ITS OWN DIRECTORY, and that is not tidiness. Node's ESM
    loader caches by resolved URL: writing every mutant to one path and
@@ -694,10 +761,12 @@ const MUTANTS = [
    first sweep did exactly that — three mutants reported identical numbers and
    two "passed" on mutant one's behaviour. A mutation that did not apply is
    survivable; a mutation that silently did not RUN is not. */
-async function negativeControl() {
+async function negativeControl({ disarm = null, neuter = null } = {}) {
   const src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
   const reg = fs.readFileSync(path.join(ROOT, 'bloom-registry.js'), 'utf8');
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-wall-nc-'));
+  const clean = await loadGeometry(ROOT);
+  DEFAULTS_FOR_WITNESS = (await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href)).DEFAULTS;
   let bad = 0;
   console.log('negative control — each mutation must redden the assertions it NAMES.');
   console.log('Anything else it reddens is reported, which is how a mutation that merely breaks');
@@ -713,7 +782,22 @@ async function negativeControl() {
   }
   console.log('  baseline: the shipped tree is green, so every red below is the mutation\'s.\n');
   for (const mut of MUTANTS) {
-    const mutated = mut.apply(src);
+    /* THE ANCHOR IS COUNTED, not merely applied. `String.replace` takes the
+       FIRST occurrence, so an anchor that has become ambiguous lands the
+       mutation on a line nobody chose while `mutated !== src` still passes.
+       Exactly one, or the mutant is disarmed and says so. */
+    const find = disarm === mut.id ? mut.find + ' /* --disarm */' : mut.find;
+    const n = src.split(find).length - 1;
+    if (n !== 1) {
+      console.error(`  FAIL ${mut.id.padEnd(22)} its anchor matches ${n} time(s), not once — this mutant is disarmed and proves nothing`);
+      bad++; continue;
+    }
+    /* `--neuter` makes the edit APPLY while changing nothing — the source
+       differs, so every text-based guard is satisfied, and only the witness
+       can see that the behaviour did not move. It is the positive control on
+       the witness clause itself. */
+    const into = neuter === mut.id ? find + ' /* neutered */' : mut.into;
+    const mutated = src.replace(find, into);
     if (mutated === src) {
       console.error(`  FAIL ${mut.id.padEnd(22)} the mutation did not apply — its anchor has moved and this mutant is silently disarmed`);
       bad++; continue;
@@ -722,6 +806,23 @@ async function negativeControl() {
     fs.mkdirSync(mdir, { recursive: true });
     fs.writeFileSync(path.join(mdir, 'bloom-geometry.js'), mutated);
     fs.writeFileSync(path.join(mdir, 'bloom-registry.js'), reg);
+    /* THE WITNESS, before the assertions are consulted at all. An edit that
+       landed on the right line and changed no behaviour makes a green `names`
+       line evidence of nothing, and that is the failure this clause exists
+       for — not a moved anchor, which the count above already catches. */
+    let mutMod = null;
+    try { mutMod = await loadGeometry(mdir); }
+    catch (e) {
+      console.error(`  FAIL ${mut.id.padEnd(22)} the mutated module does not load: ${e.message}`);
+      bad++; continue;
+    }
+    let verdict = 'the mutant declares no witness';
+    try { verdict = await mut.witness(mutMod, clean); }
+    catch (e) { verdict = `the witness threw: ${e.message}`; }
+    if (verdict !== null) {
+      console.error(`  FAIL ${mut.id.padEnd(22)} the edit applied but the BEHAVIOUR did not move — ${verdict}`);
+      bad++; continue;
+    }
     let fails = [];
     try { ({ fails } = await verify({ root: mdir, quiet: true })); }
     catch (e) { fails = [`XX threw: ${e.message}`]; }
@@ -741,7 +842,18 @@ if (IS_MAIN) {
     const { fails } = await sweepControls({});
     process.exit(fails.length ? 1 : 0);
   } else if (process.argv.includes('--negative-control')) {
-    const bad = await negativeControl();
+    /* `--disarm=<id>` breaks ONE mutant's anchor on purpose and requires the
+       run to report it. A positive control on the positive control: without
+       it, "all mutants behaved" is a sentence nobody has ever seen fail. */
+    const d = (process.argv.find((a) => a.startsWith('--disarm=')) || '').split('=')[1] || null;
+    const nu = (process.argv.find((a) => a.startsWith('--neuter=')) || '').split('=')[1] || null;
+    const bad = await negativeControl({ disarm: d, neuter: nu });
+    if (d || nu) {
+      const what = d ? `disarmed ("${d}", stale anchor)` : `neutered ("${nu}", edit applies but changes nothing)`;
+      console.log(bad ? `\nguard check: the sweep REPORTED the ${what} mutant — the guard fires.`
+                      : `\nguard check: FAIL — the ${what} mutant was not reported and the sweep stayed green.`);
+      process.exit(bad ? 0 : 1);
+    }
     console.log(bad ? `\nnegative control: FAIL — ${bad} mutant(s) did not behave` : '\nnegative control: all mutants behaved.');
     process.exit(bad ? 1 : 0);
   } else {
