@@ -1308,8 +1308,12 @@ const MUTANTS = [
     id: 'the-transform-field-table-loses-a-row', file: 'plot-file.js',
     from: "  { key: 'position',    axis: 2,  control: 'bloomZ' },\n",
     to: '',
+    /* AND THE ANCHOR'S AGREEMENT CHECK, true about it: `loadTransformControls`
+       walks the same table, so a slider whose row is gone is never loaded and
+       disagrees with the store after a drag. */
     breaks: ['file/the-document-carries-exactly-these-fields',
-             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
+             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception',
+             'anchor/the-sliders-the-read-out-and-the-geometry-agree-after-the-drag'],
   },
 
   // ---- EXPORT -------------------------------------------------------------
