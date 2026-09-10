@@ -251,7 +251,17 @@ const MUTANTS = [
                 to drag for a bend offset, and no per-petal warp to save or
                 restore. */
              'save/a-real-drag-put-an-offset-on-both-bend-sets',
-             'restore/two-petals-come-back-with-their-own-warps'],
+             'restore/two-petals-come-back-with-their-own-warps',
+             /* AND THE TWO MULTI-BLOOM CHECKS THIS LIST NEVER REACHED. They
+                arrived with the several-blooms session, which ran 34 of its 81
+                mutants and named the rest unrun; this one was among the rest.
+                Both are true about a page where every strip reads as a u-line:
+                the two stems part company by 10.59 mm where the check wants
+                them equal line for line, and the per-bloom petal census counts
+                a petal that is not there. Short in the honest direction, and
+                widened rather than the checks being loosened. */
+             'blooms/two-blooms-carry-two-different-stems-at-once',
+             'blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number'],
     // The partition check is on this list only because it was ANCHORED to the
     // file's own counts. In its first form — u + v = both — this mutation left
     // it green at 15148 + 0 = 15148.
@@ -1140,8 +1150,19 @@ const MUTANTS = [
        statement about the mutation: with the stem read off the panel, selecting
        a bloom changes what the OTHER bloom draws, so a bloom stops being drawn
        from its own arrays. */
+    /* AND THE PER-INSTANCE REBUILD SEES IT FROM THE OTHER SIDE, which is the
+       most useful thing this mutant now says. It does not damage the cache —
+       it changes the PARTITION, making a control that is per-instance in the
+       shipped code page-wide. The key cannot notice (the stem lives on the
+       record, so nothing composition-level moved), and the routing is now
+       wrong by construction: the drawing after a stem slider disagrees with a
+       forced full rebuild on all six stem writes and both `stem` toggles. That
+       is the digest sweep doing the one job no counter can do. */
     breaks: ['blooms/two-blooms-carry-two-different-stems-at-once',
-             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing'],
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+             'blooms/a-transform-places-its-own-bloom-and-no-other',
+             'partial/the-partial-rebuild-draws-what-a-full-rebuild-draws',
+             'partial/every-control-draws-what-a-full-rebuild-would-draw'],
   },
   {
     /* SELECTING A BLOOM STAMPS THE PANEL ONTO IT. The destructive half of the
