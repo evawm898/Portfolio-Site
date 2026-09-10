@@ -39,6 +39,88 @@ scratch tree quoted as the shipped tree's). `bladeStations()`'s own header
 carries this too, which is where four of the five lived. §18h of
 `docs/bloom-session-32-outcome.md` has the table.
 
+**A HARNESS ROW THAT EXERCISES A BRANCH MUST STATE WHICH BRANCH IT EXERCISES AND
+ASSERT THAT IT STILL DOES** (Eva, session 35 — the second durable rule, beside the
+mode/sampling one above, and it arrives from the same root). *A row chosen against a
+row COUNT goes stale when the count changes, silently, because nothing in the harness
+can tell that its chosen state has stopped reaching the code it was picked for.*
+`verify-bloom-apex-mutants.mjs`'s `stations-not-increasing` row was pinned to
+`petalTipShape 1` when it was chosen at **NU 28**; session 34 took NU to 56, and at 56
+that is precisely the exponent where the turning ladder stops saturating — so the
+de-duplication pass had nothing to do on that row, the mutation moved the ladder by
+9.302e-6 mm at a station ABOVE `ROOT_BLEND_END` (outside what A7 asserts), the stations
+stayed strictly increasing, and **the mutant was RED ON `main` naming a family that
+fired nothing.** Swept at NU 56 over 9,072 buckled states: 2,232 move the ladder at all,
+159 give a non-increasing pair, and the row nearest the shipped defaults is the
+harness's own with the exponent simply left alone. **THE REMEDY IS THE WITNESS CLAUSE**
+— every mutant declares a `witness`, a direct call on the MUTATED MODULE proving the
+intended behaviour moved, run BEFORE the assertions are consulted and deliberately not
+the assertion the mutant names (asking the gate whether the gate fired is the
+circularity the table exists to avoid). Both sweeps carry it now, and both are proven
+by controls that must fail: `--disarm=<id>` gives one mutant a stale anchor,
+`--neuter=<id>` makes its edit apply while changing nothing. The witness immediately
+found a defect in itself — its first version rebuilt the profile from a stub ring and
+read stations **7.11e-2 mm** away from the builder's, a second producer of the profile
+inside the instrument written to catch second producers — so every witness reads
+`buildBloomInto`'s own report.
+
+**EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
+corroborated independently against an exported STL). Per-shell signed volume: the hub
+is POSITIVE and every petal is NEGATIVE — −3,827 mm³ on the shipping default, −20,480
+at 40 continuous petals — confirmed by two methods that agree on all 29 shells (the
+divergence theorem and a ray-parity test from each shell's largest facet). **The site
+is `emitPanel`'s top-face winding** (`bloom-geometry.js:5152–5157`): the top skin is
+offset along `+n` and all six triangles touching a top-skin point are wound AGAINST
+`+n`, so the comment claiming "outward = +N side" is false and had never been checked.
+It matters because the export contract relies on a slicer UNIONING overlapping closed
+shells, and a union given a negative-volume shell can SUBTRACT it. Watertight,
+connected, manifold, winding-consistent, degenerate-free and Euler characteristic ALL
+pass unchanged on an inside-out solid. `node tools/bloom-self-intersection.mjs
+--orientation` is the check, calibrated on a unit cube (+1 outward, −1 reversed) with a
+positive control that reverses a real export and requires the verdict to move.
+
+**AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS** (session
+35). No cup, no buckle, no sweep: 0 pairs at 1 or 2 layers even with 40 petals, 72 at 3
+layers, 416 at 4. It is a petal crossing ITSELF (within-shell), not foot crowding, and
+it is **the short petals** — at 7×4 the innermost layer (reach 11.9 mm) has 43 pairs
+per petal and the next (19.3 mm) has 9, while the two outer layers are clean.
+`layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
+collapses a full-width foot across `ROOT_BLEND_END` and folds. `layerSize` 0.90 takes
+364 → 49; `petalTilt` 0 → 63; `footDelicacy` 0.25 → 595. **This is `footRing()`'s
+boundary, deferred three times, now measured as a real self-intersection rather than a
+chord statistic — and it means a multi-layer bloom is unprintable before any
+deformation control is touched.** Do not judge a deformation feature's printability on
+a multi-layer build until this is fixed.
+
+**A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
+FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
+rule, beside mode-and-sampling and the stale-harness-row one). Session 35 read the apex
+sweep's printable ceiling off two curvature instruments that both exclude `u > 0.92`,
+while the sweep acts at `u` 0.84–0.98. It stated that exclusion out loud and then drew
+the conclusion anyway — *"the sweep never binds"* — which was wrong in the direction
+that matters: `measureWall`, which reads emitted points rather than fitting a stencil,
+shows the sweep taking self-approach from a passing 1.031 mm to a failing 0.733 on
+`petalCup` 1.2 × `petalTipShape` 1.80. **Calibration is not coverage.** Before quoting
+an instrument at a feature, check that its own window contains the region the feature
+changes, and say so beside the number.
+
+**AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
+ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
+triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
+are the export contract's own "overlapping closed shells are fine" and are counted
+separately — 4,720 of them on the flat default). Its adjacency exclusion is per
+intersection POINT rather than per pair, so a pair that shares a vertex AND crosses
+elsewhere is still reported; `--prove-exclusion` demonstrates that on a written-down
+pair. **Calibration: the flat default reads exactly 0, a roll-330 fold reads 18,776.**
+Getting there cost two epsilon defects, both the same class — an ABSOLUTE tolerance on
+a determinant whose scale is a volume (flat read 27,356), then an ill-conditioned
+barycentric solve that no epsilon can rescue and that had to be replaced by VERIFYING
+the point (flat read 1,220). **THE FINDING: V4 and V5 pass at every cup value while the
+solid self-intersects from cup 0.60 up** — 750 pairs at the shipped `petalTipShape`
+1.70 with cup 1.20, at the apex, verified identical on a worktree of `main`. V5 is not
+an over-strict proxy; it is blind to this. Sheet thickness and petal scale do not fix
+it. Cost is 387 ms at 19,040 triangles, so the exact census needs no bound.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom

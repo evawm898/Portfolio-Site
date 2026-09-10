@@ -38,6 +38,7 @@
    in either direction.
    =================================================================== */
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
+         APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
          ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_PINCH_DEFAULT, TIP_ROUNDEDNESS,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
@@ -1414,6 +1415,22 @@ export const CONTROLS = [
       return `p ${p.toFixed(1)} — the wave occupies the outer ${(reach * 100).toFixed(0)}% of the half-width`;
     },
     visibleWhen: { id: 'buckleAmp', awayFrom: 0, by: 0.005 } },
+
+  { id: 'petalApexSweep', section: 'form', kind: 'slider',
+    min: APEX_SWEEP_RANGE[0], max: APEX_SWEEP_RANGE[1], step: 0.05, default: 0,
+    label: 'Apex sweep', tier: 'standard', role: 'petal',
+    /* HOW FAR THE BOWL CARRIES AROUND THE TIP. It reads in the direction it
+       moves: 0 is the shipped build (the apex keeps its point), 1 is the full
+       reach. It is a STRENGTH, not a place — there is no threshold anywhere in
+       it, and at a pointed tip it is inert because the outline says so rather
+       than because a number was crossed.
+
+       WHAT IT MULTIPLIES, and why it is here rather than in a section of its
+       own: the apex sweep is a change to the AMPLITUDE that cup and margin
+       buckling are scaled by, so it belongs beside them in PETAL FORM. It has
+       nothing to say about the outline, which widthProfile() owns. */
+    fmt: () => 'the bowl carries around the tip',
+    visibleWhen: { all: [] } },
 
   { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
