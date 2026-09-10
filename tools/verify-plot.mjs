@@ -624,8 +624,11 @@ const MUTANTS = [
     // within tolerance. On this bloom the two disagree on better than a third
     // of the pixels that hit anything at all, and both answers are a petal.
     id: 'the-pick-takes-the-nearest-line-rather-than-the-front', file: 'plot.js',
-    from: '    if (d <= tol && z < bestZ) { bestZ = z; best = petal; }',
-    to: '    if (d <= tol && d < bestZ) { bestZ = d; best = petal; }',
+    /* RE-ANCHORED (multi-bloom session): the pick returns the whole cursor
+       now, so the line this edits carries the instance too. The mutation is
+       unchanged — nearest on screen instead of nearest to the camera. */
+    from: '    if (d <= tol && z < bestZ) { bestZ = z; best = petal; bestInst = inst; }',
+    to: '    if (d <= tol && d < bestZ) { bestZ = d; best = petal; bestInst = inst; }',
     breaks: ['select/the-pick-is-the-front-most-line-within-tolerance'],
   },
   {
@@ -780,9 +783,14 @@ const MUTANTS = [
   {
     // The reader skips a stem field on the way back in. The file still holds
     // it, so nothing is missing and nothing is reported.
+    /* RE-ANCHORED (multi-bloom session): the stem is no longer written by
+       `applyFields` — it goes into the bloom that owns it through
+       `applyStemFields`, so the anchor moved there. Two matches of the old
+       string would have made this mutation ambiguous rather than absent, which
+       is the quieter half of the same failure. */
     id: 'the-restore-skips-a-stem-field', file: 'plot.js',
-    from: '    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;',
-    to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;",
+    from: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;\n    inst.stemVals[f.key] = vals[f.key];",
+    to: "    if (!Object.prototype.hasOwnProperty.call(vals, f.key) || f.key === 'neck') continue;\n    inst.stemVals[f.key] = vals[f.key];",
     breaks: ['restore/every-field-comes-back',
              'restore/a-composition-dropped-on-the-page-is-loaded'],
   },
@@ -802,8 +810,11 @@ const MUTANTS = [
        petals saves as several identically shaped ones. The page is right, the
        drawing at save time is right, and the file is a lie. */
     id: 'the-petal-warps-are-written-globally', file: 'plot.js',
-    from: '      petals: [...petalWarps.entries()].map(([index, st]) => ({\n        index, along: st.along, across: st.across, bends: bendsOut(st.bends),\n      })),',
-    to: '      petals: (g => [...petalWarps.entries()].map(([index]) => ({\n        index, along: g.along, across: g.across, bends: bendsOut(g.bends),\n      })))([...petalWarps.values()][0] || { along: 1, across: 1, bends: [] }),',
+    /* RE-ANCHORED (multi-bloom session): the warps are gathered off the
+       INSTANCE now, so the anchor carries `inst.petalWarps`. The mutation is
+       unchanged — every entry written from the first one's values. */
+    from: '      petals: [...inst.petalWarps.entries()].map(([index, st]) => ({\n        index, along: st.along, across: st.across, bends: bendsOut(st.bends),\n      })),',
+    to: '      petals: (g => [...inst.petalWarps.entries()].map(([index]) => ({\n        index, along: g.along, across: g.across, bends: bendsOut(g.bends),\n      })))([...inst.petalWarps.values()][0] || { along: 1, across: 1, bends: [] }),',
     breaks: ['save/the-document-describes-the-page-as-it-stands',
              'restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
@@ -818,8 +829,10 @@ const MUTANTS = [
        drawing is deformed, the counts are right, the panel is clean, and it is
        the wrong petal. */
     id: 'a-restored-warp-lands-on-the-next-petal', file: 'plot.js',
-    from: '    petalWarps.set(p.index, {',
-    to: '    petalWarps.set(p.index + 1, {',
+    // RE-ANCHORED (multi-bloom session): the restore writes into the target
+    // bloom's own store.
+    from: '      target.petalWarps.set(p.index, {',
+    to: '      target.petalWarps.set(p.index + 1, {',
     breaks: ['restore/every-field-comes-back',
              'restore/two-petals-come-back-with-their-own-warps',
              'restore/a-composition-dropped-on-the-page-is-loaded'],
@@ -832,8 +845,9 @@ const MUTANTS = [
        The sweep reported "mutation did not apply" rather than a false pass,
        which is the one thing that makes that failure mode survivable. */
     id: 'the-grid-mismatch-is-not-reported', file: 'plot.js',
-    from: '  const cmp = inst.grid ? compareIdentity(inst.grid, currentIdentity())',
-    to: '  const cmp = false ? compareIdentity(inst.grid, currentIdentity())',
+    // RE-ANCHORED (multi-bloom session): the comparison is per bloom now.
+    from: '    const cmp = src.grid ? compareIdentity(src.grid, identityOf(target))',
+    to: '    const cmp = false ? compareIdentity(src.grid, identityOf(target))',
     breaks: ['restore/a-composition-from-a-different-grid-is-named-field-by-field'],
   },
   {
@@ -936,6 +950,171 @@ const MUTANTS = [
     from: '  return absorb.map(a => srgbDecode(clamp01(1 - a / peak * want)));',
     to: '  return absorb.map(a => srgbDecode(clamp01(1 - a * want)));',
     breaks: ['polarity/the-highlight-is-a-hue-and-not-a-level-in-both'],
+  },
+
+  // ---- SEVERAL BLOOMS -----------------------------------------------------
+  {
+    /* THE IMPORT REPLACES INSTEAD OF ADDING — the behaviour that shipped before
+       this session, and the whole of what a composition of several blooms
+       needs undone. It draws a perfectly good picture of one bloom. */
+    id: 'the-import-replaces-instead-of-adding', file: 'plot.js',
+    from: '  resetCompositionState();\n  instances.push(inst);',
+    to: '  resetCompositionState();\n  instances.length = 0;\n  instances.push(inst);',
+    breaks: ['add/a-dropped-grid-is-added-beside-the-one-already-there',
+             'add/the-new-bloom-lands-clear-of-the-old-one',
+             'add/the-file-input-adds-a-grid-too',
+             'remove/a-bloom-can-be-removed-and-the-last-one-cannot',
+             'blooms/a-second-bloom-doubles-the-drawing-and-is-its-own-record',
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+             'blooms/two-blooms-carry-two-different-stems-at-once',
+             'blooms/a-transform-places-its-own-bloom-and-no-other',
+             'blooms/the-scale-control-is-uniform-and-the-bloom-really-shrinks',
+             'blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number',
+             'blooms/the-petal-cursor-is-reset-when-the-bloom-changes',
+             'blooms/a-click-picks-the-bloom-as-well-as-the-petal',
+             'blooms/several-blooms-save-and-restore-as-themselves',
+             'blooms/the-panel-reports-what-the-composition-costs'],
+  },
+  {
+    /* A NEW BLOOM LANDS AT THE ORIGIN. Under additive ink on black, a second
+       bloom exactly on top of the first is indistinguishable from an import
+       that replaced the drawing — the segment count doubles and the picture
+       does not move, so every count-based check stays green. */
+    id: 'a-new-bloom-lands-at-the-origin', file: 'plot-instance.js',
+    from: '  if (!have || !bounds) return newTransform();',
+    to: '  if (have || !have || !bounds) return newTransform();',
+    breaks: ['instance/a-new-bloom-is-placed-clear-of-the-composition',
+             'add/the-new-bloom-lands-clear-of-the-old-one'],
+  },
+  {
+    /* THE STEM'S SIX ARE PAGE-WIDE AGAIN — read off the DOM rather than off the
+       bloom that owns them. Every bloom then draws whatever the panel happens
+       to say, which is the ownership error the petal warps already had once,
+       one level up. */
+    id: 'the-stem-controls-are-page-wide', file: 'plot.js',
+    from: 'const stemOf = (inst = cur()) => {\n  const v = inst.stemVals;',
+    to: 'const stemOf = (inst = cur()) => {\n  const v = { on: sui.stem.value, bundle: +sui.stemBundle.value,'
+        + ' join: +sui.stemJoin.value, length: +sui.stemLength.value,'
+        + ' droopDeg: +sui.stemDroop.value, neck: +sui.stemNeck.value };',
+    /* THE SAVE/RESTORE CHECK CANNOT SEE THIS, measured rather than assumed, and
+       it is worth saying why: `commitStem` still writes the SELECTED bloom's
+       values into its own record, so the STORE is right and only the DRAWING is
+       wrong — and a round trip compares stores. What does see it is the pair
+       below, one of which was not claimed on the first sweep and is a true
+       statement about the mutation: with the stem read off the panel, selecting
+       a bloom changes what the OTHER bloom draws, so a bloom stops being drawn
+       from its own arrays. */
+    breaks: ['blooms/two-blooms-carry-two-different-stems-at-once',
+             'blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing'],
+  },
+  {
+    /* SELECTING A BLOOM STAMPS THE PANEL ONTO IT. The destructive half of the
+       ownership error: picking a bloom to look at it DEFORMS it. No count of
+       drawn segments can see this — the drawing is entirely plausible either
+       way, and only a read taken ACROSS a selection change separates them. */
+    id: 'selecting-a-bloom-stamps-the-panel-onto-it', file: 'plot.js',
+    from: '  selInstance = want;\n  bui.bloomPick.value = String(selInstance);\n  loadStemControls();',
+    to: '  selInstance = want;\n  bui.bloomPick.value = String(selInstance);\n  commitStem();',
+    /* AND THE SAVE/RESTORE CHECK CANNOT SEE THIS ONE EITHER, for the same
+       measured reason: every bloom's record is still written by hand and read
+       back by hand, and what the stamp damages is the record of the bloom you
+       moved AWAY from — which this check restores over. */
+    breaks: ['blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+             'blooms/two-blooms-carry-two-different-stems-at-once'],
+  },
+  {
+    /* THE IDENTITY TRANSFORM ALLOCATES. The picture is IDENTICAL — every
+       coordinate is the same double — and what is lost is the array identity
+       every "nothing moved" claim on this page is written against. */
+    id: 'the-identity-transform-copies-the-arrays', file: 'plot-instance.js',
+    from: '  if (isIdentityTransform(t)) return points;\n  const m = transformMatrix(t);',
+    to: '  const m = transformMatrix(t);',
+    breaks: ['instance/the-identity-transform-hands-back-the-callers-own-arrays'],
+  },
+  {
+    /* THE ROTATION IS TRANSPOSED. A transposed rotation is still a rotation, so
+       every bloom is still placed somewhere plausible and every extent is still
+       a box — it is simply turned the wrong way. */
+    id: 'the-rotation-is-transposed', file: 'plot-instance.js',
+    from: '  m[1] = af + be * d;  m[5] = ae - bf * d;  m[9] = -b * c;',
+    to: '  m[4] = af + be * d;  m[5] = ae - bf * d;  m[6] = -b * c;',
+    // It turns the 45° box the other way too, which is a true statement about
+    // it and was not on the first sweep's list.
+    breaks: ['instance/the-matrix-is-threes-own-scale-rotate-translate',
+             'instance/a-turned-box-is-measured-at-its-corners'],
+  },
+  {
+    /* TRANSLATE THEN SCALE, so a bloom's position is scaled too and a bloom
+       moved 100 mm aside JUMPS when its scale slider moves. */
+    id: 'the-transform-scales-the-position-too', file: 'plot-instance.js',
+    from: '  m[12] = px; m[13] = py; m[14] = pz; m[15] = 1;',
+    to: '  m[12] = px * sx; m[13] = py * sy; m[14] = pz * sz; m[15] = 1;',
+    breaks: ['instance/the-matrix-is-threes-own-scale-rotate-translate'],
+  },
+  {
+    /* A TURNED BOX MEASURED BY ITS MAPPED MIN AND MAX. Correct for an unrotated
+       box and wrong for every other one — so placements overlap exactly when a
+       bloom has been turned, and nowhere else. */
+    id: 'a-turned-box-is-measured-at-its-mapped-corners-only', file: 'plot-instance.js',
+    from: '  for (let c = 0; c < 8; c++) {',
+    to: '  for (let c = 0; c < 8; c += 7) {',
+    /* AND THE SCALE CHECK READS `placedExtents`, so a bloom turned 30° measures
+       13.50 mm across instead of 44.9 — true about the mutation, unclaimed on
+       the first sweep, and named here rather than tuned out of the check. */
+    breaks: ['instance/a-turned-box-is-measured-at-its-corners',
+             'blooms/the-scale-control-is-uniform-and-the-bloom-really-shrinks'],
+  },
+  {
+    /* THE PICK FORGETS WHICH BLOOM. Every click then selects the right petal
+       NUMBER on the first bloom, which is a petal, and looks like a pick. */
+    id: 'the-pick-forgets-which-bloom', file: 'plot.js',
+    from: 'ax[2] + t * (bx[2] - ax[2]), s.inst | 0);',
+    to: 'ax[2] + t * (bx[2] - ax[2]), 0);',
+    breaks: ['blooms/a-click-picks-the-bloom-as-well-as-the-petal'],
+  },
+  {
+    /* ONLY THE FIRST BLOOM IS SAVED. The file is valid, the round trip is
+       clean, and a five-bloom composition comes back as one. */
+    id: 'only-the-first-bloom-is-saved', file: 'plot.js',
+    from: '    instances: instances.map(inst => ({',
+    to: '    instances: instances.slice(0, 1).map(inst => ({',
+    breaks: ['blooms/several-blooms-save-and-restore-as-themselves'],
+  },
+  {
+    /* THE RESTORE WRITES EVERY BLOOM FROM THE FIRST ENTRY — the multi-instance
+       twin of "a dropped warp folded onto petal 0". Everything is restored, all
+       of it onto the wrong blooms. */
+    id: 'the-restore-writes-every-bloom-from-the-first-entry', file: 'plot.js',
+    from: '    const src = doc.instances[k];',
+    to: '    const src = doc.instances[0];',
+    breaks: ['blooms/several-blooms-save-and-restore-as-themselves'],
+  },
+  {
+    /* THE LAST BLOOM CAN BE REMOVED, leaving an empty viewport — which is
+       indistinguishable from a page that broke, the reading this project
+       already refused once for a failed grid load. */
+    id: 'the-last-bloom-can-be-removed', file: 'plot.js',
+    from: '  if (instances.length <= 1 || k < 0 || k >= instances.length) return false;',
+    to: '  if (instances.length < 1 || k < 0 || k >= instances.length) return false;',
+    breaks: ['remove/a-bloom-can-be-removed-and-the-last-one-cannot'],
+  },
+  {
+    /* A NON-UNIFORM SCALE IS QUIETLY MADE UNIFORM. The bloom is drawn at a
+       scale the file did not ask for, and nothing says so. */
+    id: 'a-non-uniform-scale-is-made-uniform', file: 'plot-file.js',
+    from: '      scale: readVec3(t.scale, `${path}.transform.scale`, notes, [1, 1, 1]),',
+    to: '      scale: (v => [v[0], v[0], v[0]])(readVec3(t.scale, `${path}.transform.scale`, notes, [1, 1, 1])),',
+    breaks: ['file/a-non-uniform-scale-is-applied-as-written-and-said-so'],
+  },
+  {
+    /* A ROW OF THE TRANSFORM TABLE VANISHES. The z position stops being a
+       control anything walks — it saves and restores through the vec3 exactly
+       as before, and the SLIDER stops writing into it. */
+    id: 'the-transform-field-table-loses-a-row', file: 'plot-file.js',
+    from: "  { key: 'position',    axis: 2,  control: 'bloomZ' },\n",
+    to: '',
+    breaks: ['file/the-document-carries-exactly-these-fields',
+             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
   },
 
   // ---- EXPORT -------------------------------------------------------------
@@ -1173,6 +1352,7 @@ async function run({ mutant = null } = {}) {
   const FL = await loadModule('plot-file.js', mutant);
   const PL = await loadModule('plot-polarity.js', mutant);
   const EX = await loadModule('plot-export.js', mutant);
+  const IN = await loadModule('plot-instance.js', mutant);
   const {
     densityToEvery, everyLabel, keepsIndex, readGridScene, selectStrips,
     stripsToSegments, boundsOf, dimToFog, fogFactor, MIN_DENSITY, MAX_DENSITY,
@@ -1980,20 +2160,103 @@ async function run({ mutant = null } = {}) {
   };
   const roundTrip = st => FL.readDoc(JSON.parse(FL.toText(FL.composeDoc(st))), FILE_OPTS);
 
+  /* --- the instance transform, on answers that can be written down ---------
+     A WRONG ROTATION ORDER, A TRANSPOSED MATRIX OR A TRANSLATE-THEN-SCALE ALL
+     DRAW A PLAUSIBLE BOUQUET, which is exactly why the arithmetic is checked
+     away from the picture. The rotation is asserted against three's OWN
+     `Matrix4.compose` with an 'XYZ' Euler — the convention plot-instance.js
+     says it follows — rather than against a second copy of the same formula. */
+  {
+    const THREEJS = await import('three');
+    const cases = [
+      { position: [1, 2, 3], rotationDeg: [0, 0, 0], scale: [1, 1, 1] },
+      { position: [-4, 5, 6], rotationDeg: [13, -27, 88], scale: [2, 0.5, 1.7] },
+      { position: [0, 0, 0], rotationDeg: [90, 45, -30], scale: [1, 1, 1] },
+      { position: [12, -3, 0.5], rotationDeg: [-170, 6, 179], scale: [0.25, 0.25, 0.25] },
+    ];
+    let worst = 0;
+    for (const t of cases) {
+      const mine = IN.transformMatrix(t);
+      const m4 = new THREEJS.Matrix4().compose(
+        new THREEJS.Vector3(...t.position),
+        new THREEJS.Quaternion().setFromEuler(
+          new THREEJS.Euler(...t.rotationDeg.map(d => d * Math.PI / 180), 'XYZ')),
+        new THREEJS.Vector3(...t.scale));
+      for (let i = 0; i < 16; i++) worst = Math.max(worst, Math.abs(mine[i] - m4.elements[i]));
+    }
+    check('instance/the-matrix-is-threes-own-scale-rotate-translate',
+      worst < 1e-12,
+      `worst element difference over ${cases.length} transforms: ${worst.toExponential(2)} — `
+      + 'scale, then XYZ rotation, then translate, term for term');
+
+    /* THE IDENTITY IS AN ARRAY IDENTITY, NOT A TOLERANCE. This is what makes a
+       one-bloom composition drawn from the very arrays the file wrote, and it is
+       what every "nothing moved" claim on the page rests on one level up. */
+    const pts = new Float32Array([1, 2, 3, 4, 5, 6]);
+    const strip = { kind: 'u', count: 2, segments: 1, points: pts, petal: 0 };
+    const same = IN.applyTransformToPoints(pts, 2, IN.newTransform());
+    const movedT = { position: [10, 0, 0], rotationDeg: [0, 0, 0], scale: [1, 1, 1] };
+    const moved = IN.applyTransformToPoints(pts, 2, movedT);
+    const listSame = IN.placeStrips([strip], IN.newTransform());
+    const listMoved = IN.placeStrips([strip], movedT);
+    check('instance/the-identity-transform-hands-back-the-callers-own-arrays',
+      same === pts && moved !== pts && moved[0] === 11 && moved[3] === 14
+      && Array.isArray(listSame) && listSame.length === 1
+      && listSame[0] === strip && listMoved[0] !== strip,
+      'at the identity both the points and the strip records come back by reference; '
+      + `at +10 mm the first point reads ${moved[0]} and the record is a new one`);
+
+    /* A NEW BLOOM LANDS CLEAR OF WHAT IS THERE, and the FIRST one takes the
+       identity — the property, not the gap, because the gap is derived from the
+       incoming bloom's own width and a number here would be a second owner. */
+    const boxA = { min: [-10, -10, 0], max: [10, 10, 5] };
+    const first = IN.placementFor(null, boxA);
+    const have = IN.placedExtent(boxA, first);
+    const second = IN.placementFor(have, boxA);
+    const secondExtent = IN.placedExtent(boxA, second);
+    check('instance/a-new-bloom-is-placed-clear-of-the-composition',
+      IN.isIdentityTransform(first) && secondExtent.min[0] > have.max[0]
+      && second.position[1] === 0 && second.position[2] === 0,
+      `the first bloom takes the identity; the second starts at x `
+      + `${secondExtent.min[0].toFixed(2)} where the first ends at ${have.max[0].toFixed(2)}`);
+
+    /* AND A ROTATED BOX'S EXTENT IS ITS CORNERS, NOT ITS MAPPED MIN AND MAX —
+       the two differ the moment a bloom is turned, and a placement built on the
+       second would overlap exactly then. */
+    const turned = { position: [0, 0, 0], rotationDeg: [0, 0, 45], scale: [1, 1, 1] };
+    const tExt = IN.placedExtent({ min: [-10, -2, 0], max: [10, 2, 0] }, turned);
+    check('instance/a-turned-box-is-measured-at-its-corners',
+      Math.abs(tExt.max[0] - (12 * Math.SQRT1_2)) < 1e-9
+      && Math.abs(tExt.max[1] - (12 * Math.SQRT1_2)) < 1e-9,
+      `a 20 x 4 box turned 45° spans ±${tExt.max[0].toFixed(4)} in x, against the `
+      + `${(12 * Math.SQRT1_2).toFixed(4)} its corners give — its mapped min and max would say `
+      + `${(10 * Math.SQRT1_2).toFixed(4)}`);
+  }
+
   /* THE TABLES ARE THE ONE OWNER OF WHAT IS IN THE FILE — and a table ROW that
      vanished would round-trip perfectly while silently losing its field, since
      the writer and the reader walk the same table. So the census is written
      down here: adding a field to the format means editing this line on purpose. */
   const fieldKeysOf = t => t.map(f => f.key).join(',');
+  /* THE TRANSFORM'S TABLE IS KEYED BY CONTROL, not by a file key, because seven
+     controls address three vectors — so its census is the control list and the
+     vector each one writes into. The FILE's own shape is unchanged by it, which
+     is why the version did not move. */
+  const transformCensus = FL.TRANSFORM_FIELDS
+    .map(f => `${f.control}->${f.key}[${f.axis}]`).join(',');
   check('file/the-document-carries-exactly-these-fields',
     fieldKeysOf(FL.FRAME_FIELDS) === 'on,shape,ratio,margin'
     && fieldKeysOf(FL.DRAW_FIELDS) === 'families,uDensity,vDensity,weight,polarity,brightness,depthDim'
     && fieldKeysOf(FL.VIEW_FIELDS) === 'stemHandles,petalHandles'
     && fieldKeysOf(FL.STEM_FIELDS) === 'on,bundle,join,length,droopDeg,neck'
-    && fieldKeysOf(FL.PETAL_FIELDS) === 'along,across',
+    && fieldKeysOf(FL.PETAL_FIELDS) === 'along,across'
+    && transformCensus === 'bloomX->position[0],bloomY->position[1],bloomZ->position[2],'
+       + 'bloomRotX->rotationDeg[0],bloomRotY->rotationDeg[1],bloomRotZ->rotationDeg[2],'
+       + 'bloomScale->scale[-1]'
+    && FL.VERSION === 2,
     `frame(${fieldKeysOf(FL.FRAME_FIELDS)}) draw(${fieldKeysOf(FL.DRAW_FIELDS)}) `
     + `view(${fieldKeysOf(FL.VIEW_FIELDS)}) stem(${fieldKeysOf(FL.STEM_FIELDS)}) `
-    + `petal(${fieldKeysOf(FL.PETAL_FIELDS)})`);
+    + `petal(${fieldKeysOf(FL.PETAL_FIELDS)}) transform(${transformCensus}) at v${FL.VERSION}`);
 
   const rt = roundTrip(FILE_STATE);
   const rtDiff = [];
@@ -2043,6 +2306,54 @@ async function run({ mutant = null } = {}) {
     && 'frame' in rt.doc && 'camera' in rt.doc && 'draw' in rt.doc,
     'the bloom-shaped state is inside instances[0] and the composition-shaped state is at '
     + 'the root — adding a second bloom is an entry, not a migration');
+
+  /* AND THE LIST HOLDS SEVERAL, WITH NO MIGRATION AND NO VERSION BUMP. This is
+     the claim the format was written for, driven rather than argued: three
+     instances at three transforms, three stems and their own petal entries, all
+     the way through the writer and the reader with nothing reported. A file
+     written before tonight is one entry long and reads back the same way — the
+     shape did not move, only how many of them the page puts in it. */
+  const THREE_STATE = { ...FILE_STATE, selection: { instance: 2, petal: 3 },
+    instances: [
+      FILE_STATE.instances[0],
+      { ...FILE_STATE.instances[0], id: 'bloom-1',
+        transform: { position: [120, 0, 0], rotationDeg: [0, 0, 45], scale: [0.5, 0.5, 0.5] },
+        stem: { ...FILE_STATE.instances[0].stem, droopDeg: 40, length: 220, bends: [] },
+        petals: [{ index: 3, along: 1.4, across: 1, bends: [] }] },
+      { ...FILE_STATE.instances[0], id: 'bloom-2',
+        transform: { position: [-90, 30, 12], rotationDeg: [10, -20, 0], scale: [2, 2, 2] },
+        stem: { ...FILE_STATE.instances[0].stem, on: 'off', bends: [] }, petals: [] },
+    ] };
+  const rt3 = roundTrip(THREE_STATE);
+  const three = rt3.ok ? rt3.doc.instances : [];
+  check('file/the-list-carries-several-blooms-with-no-migration',
+    rt3.ok && rt3.notes.length === 0 && three.length === 3
+    && three[1].transform.position[0] === 120 && three[1].transform.rotationDeg[2] === 45
+    && three[1].transform.scale[0] === 0.5
+    && three[2].transform.position[1] === 30 && three[2].stem.on === 'off'
+    && three[1].stem.droopDeg === 40 && three[0].stem.droopDeg === THREE_STATE.instances[0].stem.droopDeg
+    && three[1].petals.length === 1 && three[2].petals.length === 0
+    && rt3.doc.selection.instance === 2 && rt3.doc.version === 2,
+    rt3.ok ? `three instances round-trip at v${rt3.doc.version} with ${rt3.notes.length} notes — `
+      + `own transforms (${three.map(i => i.transform.position[0]).join(' / ')} mm), own stems `
+      + `(droop ${three.map(i => i.stem.droopDeg).join(' / ')}°) and own petal entries `
+      + `(${three.map(i => i.petals.length).join(' / ')})`
+      : `refused: ${rt3.error}`);
+
+  /* A NON-UNIFORM SCALE IS APPLIED AS WRITTEN AND REPORTED, never quietly made
+     uniform. The control is one slider; the FILE is three numbers; applying
+     something other than what the file says — however reported — would be the
+     failure this format is built against, so what is reported is that the
+     CONTROL cannot show it. */
+  const skewed = { ...FILE_STATE, instances: [{ ...FILE_STATE.instances[0],
+    transform: { position: [0, 0, 0], rotationDeg: [0, 0, 0], scale: [1, 2, 1] } }] };
+  const rtSkew = roundTrip(skewed);
+  const skewNote = rtSkew.ok && rtSkew.notes.find(n => /not uniform/.test(n.text));
+  check('file/a-non-uniform-scale-is-applied-as-written-and-said-so',
+    rtSkew.ok && JSON.stringify(rtSkew.doc.instances[0].transform.scale) === '[1,2,1]'
+    && !!skewNote,
+    rtSkew.ok ? `scale comes back [${rtSkew.doc.instances[0].transform.scale}] and the reader says: `
+      + `"${skewNote ? skewNote.text.slice(0, 90) : '(nothing)'}"` : `refused: ${rtSkew.error}`);
 
   // A file the WRITER dropped a field from: the reader has to name it, and must
   // not fill it in — a defaulted field is a page that looks restored.
@@ -2097,24 +2408,42 @@ async function run({ mutant = null } = {}) {
     'reading a v' + (FL.VERSION + 1) + ' file with a v' + FL.VERSION + ' reader would mean '
     + 'ignoring whatever it added, which is the silent partial restore in another coat');
 
+  /* A TRANSFORM IS READ VERBATIM AND REPORTED AS NOTHING — it is APPLIED now,
+     so a note about it would be a note about a departure that did not happen,
+     and "a clean round trip reports nothing" is the check next door. What is
+     still asserted is that the reader can tell the identity from a placement:
+     `isIdentityTransform` is what the page's own "hand back the caller's own
+     arrays" rests on, one module over. */
   const docPlaced = JSON.parse(flatText);
   docPlaced.instances[0].transform.position = [40, 0, 0];
+  docPlaced.instances[0].transform.rotationDeg = [0, 0, 15];
   const rPlaced = FL.readDoc(docPlaced, FILE_OPTS);
-  check('file/a-transform-this-page-cannot-honour-is-reported-as-not-applied',
-    rPlaced.ok && rPlaced.notes.some(n => n.kind === 'not-applied' && n.text.includes('transform'))
+  check('file/a-placement-is-read-verbatim-and-is-not-a-departure',
+    rPlaced.ok && rPlaced.notes.length === 0
+    && JSON.stringify(rPlaced.doc.instances[0].transform.position) === '[40,0,0]'
+    && rPlaced.doc.instances[0].transform.rotationDeg[2] === 15
     && FL.isIdentityTransform(FL.IDENTITY_TRANSFORM) === true
     && FL.isIdentityTransform({ position: [0, 0, 0], rotationDeg: [0, 0, 0], scale: [1, 1, 1] }) === true
     && FL.isIdentityTransform(rPlaced.doc.instances[0].transform) === false,
-    'placing an instance is multi-bloom work and is not built — a file that carries one is '
-    + 'told, not drawn as though it did not');
+    `a bloom at 40 mm turned 15° comes back at 40 mm turned 15° with `
+    + `${rPlaced.notes.length} notes — it is drawn there, so there is nothing to report`);
 
+  /* A SECOND BLOOM IS AN ENTRY AND NOT A DEPARTURE EITHER. This note used to
+     say "this page draws one — only the first was applied", which was a claim
+     about a CAPABILITY rather than about the file, and the capability changed.
+     How many of them the page can honour against the grids it has loaded is the
+     APPLIER's business and is reported there; the reader reads them all. */
   const twoBlooms = JSON.parse(flatText);
   twoBlooms.instances.push(JSON.parse(JSON.stringify(twoBlooms.instances[0])));
+  twoBlooms.instances[1].id = 'bloom-1';
+  twoBlooms.instances[1].transform.position = [95, 0, 0];
   const rTwo = FL.readDoc(twoBlooms, FILE_OPTS);
-  check('file/a-file-with-more-blooms-than-this-page-draws-is-read-and-told',
-    rTwo.ok && rTwo.doc.instances.length === 2
-    && rTwo.notes.some(n => n.kind === 'not-applied' && n.text.includes('only the first')),
-    'both instances are READ — the format is not the limit — and the page says it drew one');
+  check('file/a-second-bloom-is-an-entry-and-not-a-departure',
+    rTwo.ok && rTwo.doc.instances.length === 2 && rTwo.notes.length === 0
+    && rTwo.doc.instances[1].id === 'bloom-1'
+    && rTwo.doc.instances[1].transform.position[0] === 95,
+    `both instances are read with ${rTwo.notes.length} notes — the list was always the format's `
+    + 'shape, and populating it is not a migration');
 
   /* A WARP FOR A PETAL THE GRID DOES NOT HAVE IS DROPPED, NEVER FOLDED ONTO A
      NEIGHBOUR. The one outcome worse than a warp not landing is a warp landing
@@ -2741,30 +3070,125 @@ async function run({ mutant = null } = {}) {
     && errs.length === 0,
     (await q(() => window.__plot.error())).slice(0, 90));
 
-  // --- swapping in a real second grid ---------------------------------------
+  /* --- ADDING A REAL SECOND GRID -------------------------------------------
+     A DROPPED GRID IS ADDED, NOT SWAPPED IN, and that is the change this
+     session made to this path: a composition holds several blooms, so an import
+     that replaced the drawing could never build one. What has to hold is that
+     the first bloom is still there, untouched, with its own census — and that
+     the second lands somewhere it can be SEEN, because a bloom dropped at the
+     origin sits exactly on top of the first and is indistinguishable from a
+     replace under additive ink. */
+  const beforeAdd = await q(() => ({ n: window.__plot.instanceCount(),
+                                     d: window.__plot.drawn() }));
   const trimmed = trimmedGridGlb(raw.json, raw.bin, 4);
   await drop(trimmed, 'bloom-grid-4petals.glb');
-  const swapped = await q(() => ({ c: window.__plot.census(), s: window.__plot.source(),
-                                   p: window.__plot.petals(), e: window.__plot.error() }));
+  const added = await q(() => ({ c: window.__plot.census(), s: window.__plot.source(),
+                                 p: window.__plot.petals(), e: window.__plot.error(),
+                                 n: window.__plot.instanceCount(),
+                                 sel: window.__plot.selectedInstance(),
+                                 list: window.__plot.instances(),
+                                 d: window.__plot.drawn() }));
   const trimmedCensus = censusFromFile(readGlb(trimmed).json);
-  check('swap/a-dropped-grid-replaces-the-one-on-screen',
-    swapped.s === 'bloom-grid-4petals.glb' && swapped.p === 4 && swapped.e === ''
-    && swapped.c.segments === trimmedCensus.census.segments
-    && swapped.c.segments < fileCensus.census.segments,
-    `${swapped.p} petals, ${swapped.c.segments} segments (the file says `
-    + `${trimmedCensus.census.segments}); was ${fileCensus.census.segments}`);
+  check('add/a-dropped-grid-is-added-beside-the-one-already-there',
+    added.n === beforeAdd.n + 1 && added.sel === added.n - 1
+    && added.s === 'bloom-grid-4petals.glb' && added.p === 4 && added.e === ''
+    && added.c.segments === trimmedCensus.census.segments
+    && added.list[0].source === 'bloom-grid-live.glb'
+    && added.list[0].identity.petals === fileCensus.petals
+    && added.d.total === beforeAdd.d.total + trimmedCensus.census.segments,
+    `${beforeAdd.n} bloom -> ${added.n}; the new one is ${added.p} petals / `
+    + `${added.c.segments} segments and the first still reads `
+    + `${added.list[0].identity.petals} petals; drawn ${beforeAdd.d.total} -> ${added.d.total}`);
+
+  /* AND IT LANDS CLEAR OF WHAT IS ALREADY THERE. The placement is derived from
+     the two boxes rather than being a constant, so what is asserted is the
+     property — the new bloom's placed x extent starts past the old one's end —
+     and not a number this file would have to keep in step with the module. */
+  /* THE DETAIL IS BUILT FROM WHAT IS THERE, NEVER FROM WHAT THE CHECK EXPECTS.
+     Under the mutation that makes an import REPLACE, there is one extent and no
+     `extents[1]` — and a message that reached into it took the whole negative
+     control down with a TypeError instead of reporting a red. Third instance of
+     that bug class on this page; collect the outcomes first, then say them. */
+  const extents = await q(() => window.__plot.placedExtents());
+  const span = e => (e ? `${e.min[0].toFixed(1)}..${e.max[0].toFixed(1)}` : '(no bloom)');
+  check('add/the-new-bloom-lands-clear-of-the-old-one',
+    extents.length === 2 && !!extents[0] && !!extents[1]
+    && extents[1].min[0] > extents[0].max[0]
+    && added.list.length === 2
+    && added.list[0].transform.position.every(v => v === 0)
+    && added.list[1].transform.position[0] > 0,
+    `${extents.length} placed bloom${extents.length === 1 ? '' : 's'}: bloom 1 spans x `
+    + `${span(extents[0])} mm and bloom 2 ${span(extents[1])} — the first keeps the identity `
+    + 'transform, so one bloom is drawn exactly where its file put it');
 
   const tmpFile = path.join(os.tmpdir(), 'bloom-grid-live.glb');
   writeFileSync(tmpFile, readFileSync(path.join(ROOT, GRID)));
   await page.setInputFiles('#gridFile', tmpFile);
-  await page.waitForFunction(() => window.__plot.petals() === 28, null, { timeout: 15000 })
+  await page.waitForFunction(() => window.__plot.instanceCount() === 3, null, { timeout: 15000 })
     .catch(() => {});
   rmSync(tmpFile, { force: true });
-  check('swap/the-file-input-loads-a-grid-too',
-    (await q(() => window.__plot.petals())) === 28
+  check('add/the-file-input-adds-a-grid-too',
+    (await q(() => window.__plot.instanceCount())) === 3
+    && (await q(() => window.__plot.petals())) === 28
     && (await q(() => window.__plot.census())).segments === fileCensus.census.segments
     && (await q(() => window.__plot.source())) === 'bloom-grid-live.glb',
-    `back to ${await q(() => window.__plot.petals())} petals via the file input`);
+    `three blooms now, the newest ${await q(() => window.__plot.petals())} petals via the file input`);
+
+  /* REMOVING BLOOMS BACK TO ONE, through the page's own button — every section
+     below this one is about a single bloom (its DEFAULTS say so), and a section
+     that inherited three would be measuring a composition rather than a grid.
+     It is also the check that removal works: the count falls, and the record
+     that is left is the one that was selected. */
+  const soloGrid = async () => {
+    await page.evaluate(async () => {
+      /* REMOVE FROM THE END so the survivor is the bloom this page BOOTED with:
+         the one at the identity transform, drawn from the very arrays its file
+         wrote. Removing from the front leaves whichever bloom was ADDED last,
+         and an added bloom is placed clear of the others — so every section
+         below would then be measuring a grid standing 155 mm to one side, which
+         is a perfectly good composition and not the drawing /plot ships. */
+      while (window.__plot.instanceCount() > 1) {
+        window.__plot.removeInstance(window.__plot.instanceCount() - 1);
+      }
+      await new Promise(r => setTimeout(r, 50));
+    });
+  };
+  const beforeSolo = await q(() => window.__plot.instanceCount());
+  await soloGrid();
+  /* AND THE REFUSAL IS ASKED FOR, not merely observed on a disabled button. The
+     button's `disabled` is set by `rebuildInstanceOptions` and a mutation to
+     the guard inside `removeInstance` leaves it exactly as it was — measured:
+     the first version of this check watched only the button and stayed GREEN
+     under the mutation that lets the last bloom go. So the removal is
+     ATTEMPTED, and what is asserted is that it refuses and the bloom is still
+     there. */
+  const lastOne = await q(() => ({ refused: window.__plot.removeInstance(0) === false,
+                                   n: window.__plot.instanceCount() }));
+  /* AND THE PAGE IS PUT BACK IF IT WENT. Under the mutation that lets the last
+     bloom go, the composition is EMPTY from here on and every section below
+     reports on an empty page rather than on itself — which is how a mutation
+     that breaks the page pretends to be a negative control. The outcome above
+     is already recorded; this only restores something to measure. */
+  if (lastOne.n === 0) {
+    await page.evaluate(() => window.__plot.addGrid('bloom-grid-live.glb'));
+    await page.waitForFunction(() => window.__plot.instanceCount() > 0, null, { timeout: 15000 })
+      .catch(() => {});
+  }
+  const afterSolo = await q(() => ({ n: window.__plot.instanceCount(),
+                                     s: window.__plot.source(),
+                                     p: window.__plot.petals(),
+                                     ident: window.__plot.placedIdentity(),
+                                     ctl: window.__plot.instanceControls() }));
+  check('remove/a-bloom-can-be-removed-and-the-last-one-cannot',
+    beforeSolo === 3 && afterSolo.n === 1 && afterSolo.s === 'bloom-grid-live.glb'
+    && afterSolo.p === 28 && afterSolo.ctl.removeDisabled === true
+    && afterSolo.ctl.options.length === 1
+    && afterSolo.ident.length === 1 && afterSolo.ident[0].identity === true
+    && lastOne.refused === true && lastOne.n === 1,
+    `${beforeSolo} blooms -> ${afterSolo.n}; asking to remove the last one is refused `
+    + `(${lastOne.n} bloom still drawn) and the button is disabled, because an empty `
+    + 'viewport is indistinguishable from a page that broke');
+  await reset();
 
   // =========================================================================
   // THE STEM, ON THE PAGE. Every draw check above ran with the stem OFF — the
@@ -4420,6 +4844,286 @@ async function run({ mutant = null } = {}) {
   // THE COMPOSITION FILE, ON THE PAGE. Every claim here is about the ROUND
   // TRIP, field by field, because a restore that quietly drops one looks
   // exactly like a restore that did not — the page is plausible either way.
+  /* =========================================================================
+     SEVERAL BLOOMS. Everything above this line ran on ONE — the gate's DEFAULTS
+     say so, and the counts there are the ones /plot shipped. This section
+     builds a composition and asserts the two properties a second bloom is
+     entirely about: each one OWNS its state, and selecting one changes nothing
+     about the drawing.
+
+     THE OWNERSHIP IS THE WHOLE POINT AND NO COUNT CAN SEE IT. "The panel reads
+     40°" and "bloom 2 holds 40°" are exactly the two facts a page-wide stem
+     would conflate — the same error the petal warps had one level down and the
+     same correction — so what is asked here is the STORE and the CONTROLS
+     separately, and a read taken ACROSS a selection change. */
+  log('\n--- several blooms ---');
+  /* EVERY READ IN THIS SECTION GOES THROUGH `at`, and that is not fussiness.
+     Half the mutations below leave the page with ONE bloom — an import that
+     replaces is the headline one — so a clause or a DETAIL STRING that reaches
+     into `list[1]` throws a TypeError and takes the whole negative control down
+     with it, reporting nothing about the mutation at all. Third instance of
+     that bug class on this page; the rule is collect the outcomes first, then
+     build the sentence. */
+  const blAt = (a, i, k) => (a && a[i] ? a[i][k] : undefined);
+  const blNum = v => (typeof v === 'number' ? v.toFixed(2) : '—');
+  await reset();
+  const oneBloom = await q(() => ({ n: window.__plot.instanceCount(),
+                                    d: window.__plot.drawn(),
+                                    list: window.__plot.instances() }));
+  const addBloom = () => page.evaluate(() => window.__plot.addGrid('bloom-grid-live.glb'));
+  const addRes = await addBloom();
+  await view(VIEW);
+  const twoBloom = await q(() => ({ n: window.__plot.instanceCount(),
+                                    d: window.__plot.drawn(),
+                                    sel: window.__plot.selectedInstance(),
+                                    list: window.__plot.instances(),
+                                    ctl: window.__plot.instanceControls() }));
+  check('blooms/a-second-bloom-doubles-the-drawing-and-is-its-own-record',
+    addRes.ok && oneBloom.n === 1 && twoBloom.n === 2 && twoBloom.sel === 1
+    && twoBloom.d.total === oneBloom.d.total * 2
+    && twoBloom.list[0].id !== twoBloom.list[1].id
+    && twoBloom.ctl.options.length === 2 && twoBloom.ctl.removeDisabled === false,
+    `${oneBloom.d.total} -> ${twoBloom.d.total} grid segments over ${twoBloom.n} blooms `
+    + `(${twoBloom.list.map(i => i.id).join(', ')}), and remove is live`);
+
+  /* SELECTING A BLOOM DEFORMS NOTHING — the instance-level twin of
+     `select/picking-a-petal-deforms-nothing`, and it is asserted with a bloom
+     already bl_placed and drooped, so there is something for a stamp to damage.
+     The drawing is compared BEFORE and AFTER a selection change, by the
+     framebuffer's own ink and by every instance's transform. */
+  // THE STEM IS TURNED ON FOR BOTH — it is a per-bloom control, so setting it
+  // with bloom 2 selected leaves bloom 1 with no stem at all and there would be
+  // nothing to compare. Only the DROOP differs.
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  await set({ stem: 'on', stemDroop: 0 });
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ stem: 'on', stemDroop: 40 });
+  const droopedOn2 = await q(() => window.__plot.instances());
+  /* THE DRAWING IS COMPARED AS GEOMETRY, NOT AS A FRAMEBUFFER. "The same camera
+     twice" is a premise this page rests on and it is not one a pixel count can
+     carry — damping never reaches exactly zero here, so two captures either
+     side of anything creep by a pixel or two. What is asserted is what each
+     bloom OWNS and what is drawn from whose arrays; the ink is reported beside
+     it because it is worth seeing and is not a bar. */
+  const stateOf = list => JSON.stringify(list.map(i =>
+    [i.transform, i.stem, i.bends, i.warpedPetals, i.stemSegments]));
+  const inkBeforePick = (await px()).ink;
+  const identBefore = await q(() => window.__plot.placedIdentity());
+  const drawnBefore = await q(() => window.__plot.drawn());
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  const bl_afterPick = await q(() => ({ list: window.__plot.instances(),
+                                     ctl: window.__plot.instanceControls(),
+                                     ident: window.__plot.placedIdentity(),
+                                     drawn: window.__plot.drawn(),
+                                     sel: window.__plot.selectedInstance() }));
+  const inkAfterPick = (await px()).ink;
+  const pickWhy = [];
+  if (droopedOn2.length !== 2) pickWhy.push(`${droopedOn2.length} blooms, not 2`);
+  const droop = i => { const s = blAt(droopedOn2, i, 'stem'); return s ? s.droopDeg : '(none)'; };
+  if (droop(1) !== 40) pickWhy.push(`bloom 2 holds ${droop(1)}°`);
+  if (droop(0) !== 0) pickWhy.push(`bloom 1 holds ${droop(0)}°`);
+  if (bl_afterPick.sel !== 0) pickWhy.push(`selection is ${bl_afterPick.sel}`);
+  if (+bl_afterPick.ctl.stem.droopDeg !== 0) pickWhy.push(`the panel reads ${bl_afterPick.ctl.stem.droopDeg}°`);
+  if (stateOf(bl_afterPick.list) !== stateOf(droopedOn2)) pickWhy.push('a record moved');
+  if (JSON.stringify(bl_afterPick.ident) !== JSON.stringify(identBefore)) pickWhy.push('a bloom stopped being drawn from its own arrays');
+  if (bl_afterPick.drawn.total !== drawnBefore.total) pickWhy.push(`drawn ${drawnBefore.total} -> ${bl_afterPick.drawn.total}`);
+  check('blooms/selecting-a-bloom-loads-its-values-and-deforms-nothing',
+    pickWhy.length === 0,
+    pickWhy.length ? pickWhy.join(' · ')
+      : `bloom 2 holds 40° and bloom 1 holds 0°; picking bloom 1 puts 0° in the panel, leaves `
+        + `both records exactly where they were and draws the same ${bl_afterPick.drawn.total} `
+        + `segments (ink ${inkBeforePick} -> ${inkAfterPick} px, reported not asserted)`);
+
+  /* TWO BLOOMS AT TWO STEMS AT ONCE — the state a page-wide stem could not
+     express, which is what makes the per-instance store worth having. Measured
+     on the emitted stem lines rather than on the store, because "the record
+     says 40°" and "the lines are drooped" are two facts and only the second is
+     the drawing. */
+  const stemsNow = await q(() => {
+    const rows = window.__plot.drawnStemsByBloom();
+    const a = window.__plot.stemLineOf(0, 0), b = window.__plot.stemLineOf(1, 0);
+    let worst = 0;
+    if (a && b && a.length === b.length) {
+      for (let i = 0; i * 3 < a.length; i++) {
+        worst = Math.max(worst, Math.hypot(a[i * 3] - b[i * 3], a[i * 3 + 1] - b[i * 3 + 1],
+                                           a[i * 3 + 2] - b[i * 3 + 2]));
+      }
+    }
+    return { rows, worst, foot: a && b ? [a[0] === b[0], a[1] === b[1], a[2] === b[2]] : null };
+  });
+  /* MEASURED ON THE LINES, NOT ON THE STORE, and station by station on the SAME
+     grid — both blooms are the same file, so their two stems start on the same
+     foot to the bit and part company only because one of them is drooping. The
+     lateral swing alone is a poor discriminator (a 40° droop washes out over the
+     neck, so the stem's own maximum excursion barely moves) and the drop to the
+     root is the LENGTH, which is the same at any droop. */
+  /* THEIR FEET DO NOT COINCIDE, AND THAT IS THE POINT RATHER THAN A PROBLEM:
+     the stem's own s = 0 station takes the FULL droop (decay 1 at the ring — it
+     is what makes the seam zero), so a drooping bloom's stem starts somewhere a
+     straight one's does not. What is asserted is that the two lines are the same
+     length, part company along their run, and that the drooping one swings
+     further off its own ring axis than the straight one. */
+  check('blooms/two-blooms-carry-two-different-stems-at-once',
+    stemsNow.rows.length === 2
+    && blAt(stemsNow.rows, 0, 'lines') === blAt(stemsNow.rows, 1, 'lines')
+    && blAt(stemsNow.rows, 0, 'lines') > 0 && stemsNow.worst > 5
+    && blAt(stemsNow.rows, 1, 'lateralMm') > blAt(stemsNow.rows, 0, 'lateralMm') + 1,
+    `${stemsNow.rows.length} bloom${stemsNow.rows.length === 1 ? '' : 's'}: the two stems part `
+    + `company by up to ${stemsNow.worst.toFixed(2)} mm over `
+    + `${blAt(stemsNow.rows, 0, 'lines')} / ${blAt(stemsNow.rows, 1, 'lines')} lines, and the drooping `
+    + `one swings ${blNum(blAt(stemsNow.rows, 1, 'lateralMm'))} mm off its own ring axis against the `
+    + `straight one's ${blNum(blAt(stemsNow.rows, 0, 'lateralMm'))} — bloom 1 hangs straight, bloom 2 `
+    + 'droops 40°');
+
+  /* THE TRANSFORM PLACES ONE BLOOM AND LEAVES THE OTHER ALONE, AS AN ARRAY
+     IDENTITY. `placeStrips` hands back the very records it was given at the
+     identity, so the bloom that was not moved is drawn from the arrays its file
+     wrote — a tolerance here would swallow exactly the leak that matters. */
+  /* BOTH STEMS OFF BEFORE THE PLACEMENT CHECKS. The stem is per bloom, so
+     switching it with one selected leaves the other drooping — and a bloom
+     whose head has been ROTATED is drawn from new arrays, which is exactly what
+     the identity clause below is looking at. Clearing both is what keeps this
+     check about the transform. */
+  await set({ stem: 'off', stemDroop: 0 });
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ stem: 'off', stemDroop: 0 });
+  await set({ bloomX: 150, bloomRotZ: 30, bloomScale: 0.5 });
+  const bl_placed = await q(() => ({ list: window.__plot.instances(),
+                                  ident: window.__plot.placedIdentity(),
+                                  ext: window.__plot.placedExtents(),
+                                  ctl: window.__plot.instanceControls() }));
+  const placeWhy = [];
+  const t0 = blAt(bl_placed.list, 0, 'transform'), t1 = blAt(bl_placed.list, 1, 'transform');
+  if (bl_placed.list.length !== 2) placeWhy.push(`${bl_placed.list.length} blooms, not 2`);
+  if (!t1 || t1.position[0] !== 150) placeWhy.push(`x ${t1 ? t1.position[0] : '(no bloom 2)'}`);
+  if (!t1 || t1.rotationDeg[2] !== 30) placeWhy.push(`rotZ ${t1 ? t1.rotationDeg[2] : '(no bloom 2)'}`);
+  if (!t1 || JSON.stringify(t1.scale) !== '[0.5,0.5,0.5]') placeWhy.push(`scale ${t1 ? t1.scale : '(no bloom 2)'}`);
+  if (!t0 || JSON.stringify(t0.position) !== '[0,0,0]') placeWhy.push(`bloom 1 at ${t0 ? t0.position : '(none)'}`);
+  if (!blAt(bl_placed.ident, 0, 'identity')) placeWhy.push('bloom 1 is not at the identity');
+  if (!blAt(bl_placed.ident, 0, 'sameArrays')) placeWhy.push("bloom 1's drawn strips are not its file's arrays");
+  if (blAt(bl_placed.ident, 1, 'identity') !== false) placeWhy.push('bloom 2 does not read as placed');
+  check('blooms/a-transform-places-its-own-bloom-and-no-other',
+    placeWhy.length === 0,
+    placeWhy.length ? placeWhy.join(' · ')
+      : 'bloom 2 stands at 150 mm, turned 30°, at 0.5x; bloom 1 keeps the identity transform and '
+        + 'every one of its drawn strips is still the array its file wrote');
+
+  /* THE SCALE CONTROL IS UNIFORM AND WRITES ALL THREE, and the bl_placed extent
+     really is half the size — the control could write one axis and the picture
+     would still look plausible from most angles. */
+  const widthOf = i => (bl_placed.ext[i] ? bl_placed.ext[i].max[0] - bl_placed.ext[i].min[0] : NaN);
+  const halfW = widthOf(1), fullW = widthOf(0);
+  check('blooms/the-scale-control-is-uniform-and-the-bloom-really-shrinks',
+    Math.abs(bl_placed.ctl.transform.bloomScale - 0.5) < 1e-9
+    && halfW < fullW * 0.8 && halfW > fullW * 0.35,
+    `bloom 2 spans ${blNum(halfW)} mm against bloom 1's ${blNum(fullW)} at 0.5x — `
+    + 'turned 30°, so it is not exactly half and the corners are what is measured');
+
+  /* A PETAL WARP BELONGS TO ITS BLOOM. Petal 3 exists in both, so a store keyed
+     on the petal alone would put one warp in two places — invisible in a
+     segment count and plain in the two stores. */
+  await set({ bloomX: 0, bloomRotZ: 0, bloomScale: 1 });
+  await pick(3);
+  await set({ petalAlong: 1.8 });
+  const warpsPerBloom = await q(() => window.__plot.instances().map(i => ({
+    k: i.k, warped: i.warpedPetals.slice() })));
+  const warpedOf = i => (warpsPerBloom[i] ? warpsPerBloom[i].warped : null);
+  check('blooms/a-petal-warp-belongs-to-its-bloom-and-not-to-the-number',
+    warpsPerBloom.length === 2
+    && (warpedOf(1) || []).length === 1 && (warpedOf(1) || [])[0] === 3
+    && (warpedOf(0) || ['x']).length === 0,
+    `petal 3 of bloom 2 carries a warp and petal 3 of bloom 1 does not — `
+    + `[${warpedOf(0) || '(no bloom 1)'}] against [${warpedOf(1) || '(no bloom 2)'}]`);
+
+  /* AND THE CURSOR IS RESET, NOT CARRIED, WHEN THE BLOOM CHANGES. Petal 3 of
+     this bloom is a different blade from petal 3 of that one, so carrying the
+     number across would silently select something else. */
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  const cursorAfter = await q(() => ({ petal: window.__plot.petalInfo().selected,
+                                       ctl: window.__plot.petalControls() }));
+  check('blooms/the-petal-cursor-is-reset-when-the-bloom-changes',
+    cursorAfter.petal === -1 && cursorAfter.ctl.alongDisabled === true,
+    'moving to another bloom picks nothing there, and the two scales switch off — '
+    + 'petal 3 of one bloom is not petal 3 of another');
+
+  /* A CLICK PICKS BOTH HALVES OF THE CURSOR. With two blooms on screen `petal`
+     alone does not name a petal, and a pick rule that returned it alone would
+     select the right number on the wrong bloom. */
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ bloomX: 150 });
+  await view(VIEW);
+  const bl_aim = await q(() => window.__plot.petalScreenPointOf(1, 5, 0.5));
+  const bl_pair = bl_aim ? await page.evaluate(p => window.__plot.pickPairAt(p.x, p.y), bl_aim) : null;
+  check('blooms/a-click-picks-the-bloom-as-well-as-the-petal',
+    !!bl_aim && !!bl_pair && bl_pair.instance === 1 && bl_pair.petal >= 0,
+    bl_aim ? `a pixel on bloom 2's petal 5 picks (bloom ${bl_pair.instance + 1}, petal ${bl_pair.petal})`
+        : 'no ink found to bl_aim at');
+
+  /* SEVERAL BLOOMS SAVE AND RESTORE — through the very button and the very
+     reader the one-bloom round trip uses, so what is measured is the shipped
+     path. What has to survive is the thing a single-instance file could not
+     hold: two transforms, two stems and each bloom's own petal entries. */
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  await set({ stem: 'on', stemDroop: -25, stemLength: 210 });
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ stem: 'on', stemDroop: 55, stemLength: 130, bloomX: 90, bloomScale: 0.7 });
+  // Through the BUTTON, which is the only way to say the button and the
+  // serialiser are the same owner — the same discipline the one-bloom round
+  // trip below follows.
+  await page.evaluate(() => document.getElementById('saveComposition').click());
+  const savedTwo = await q(() => window.__plot.compositionSaved());
+  const beforeRestore = await q(() => window.__plot.instances());
+  // Knock every one of them off their values, then restore.
+  await page.evaluate(() => window.__plot.selectInstance(0));
+  await set({ stem: 'off', stemDroop: 0, stemLength: 170 });
+  await page.evaluate(() => window.__plot.selectInstance(1));
+  await set({ stem: 'off', stemDroop: 0, stemLength: 170, bloomX: 0, bloomScale: 1 });
+  const bl_restored = await page.evaluate(t => {
+    window.__plot.loadComposition(t, 'two-blooms.json');
+    return { list: window.__plot.instances(), state: window.__plot.compositionState(),
+             sel: window.__plot.selectedInstance() };
+  }, savedTwo.text);
+  const sameInst = (a, b) => JSON.stringify([a.transform, a.stem, a.warpedPetals])
+                          === JSON.stringify([b.transform, b.stem, b.warpedPetals]);
+  check('blooms/several-blooms-save-and-restore-as-themselves',
+    JSON.parse(savedTwo.text).instances.length === 2
+    && bl_restored.list.length === 2
+    && sameInst(bl_restored.list[0], beforeRestore[0])
+    && sameInst(bl_restored.list[1], beforeRestore[1])
+    && bl_restored.list[0].stem.droopDeg === -25 && bl_restored.list[1].stem.droopDeg === 55
+    && bl_restored.list[1].transform.position[0] === 90
+    && bl_restored.sel === 1,
+    `two instances in the file; both come back with their own stems `
+    + `(${bl_restored.list.map(i => i.stem.droopDeg).join(' / ')}°), their own placement `
+    + `(${bl_restored.list.map(i => i.transform.position[0]).join(' / ')} mm) and their own warps`);
+
+  /* AND THE PANEL SAYS WHAT IT COST. A second bloom doubles the segment count
+     and every slider drag pays for all of them — a number nobody prints is a
+     number nobody watches, which is why this is asserted rather than measured
+     and forgotten. */
+  const bl_costText = await q(() => { window.__plot.renderNow(); return window.__plot.instanceText(); });
+  const costDrawn = await q(() => window.__plot.drawn());
+  check('blooms/the-panel-reports-what-the-composition-costs',
+    /bloom 2 of 2/.test(bl_costText) && /grid segments/.test(bl_costText)
+    && bl_costText.includes(costDrawn.total.toLocaleString('en-US'))
+    && /ms\/frame/.test(bl_costText),
+    bl_costText.split('\n').find(l => l.startsWith('cost')) || '(no cost line)');
+
+  /* BACK TO ONE BLOOM. Every section below is written about a single grid — the
+     composition-file section compares `instances[0]` against the page, and the
+     export section counts strips — so this leaves the page the way it found it.
+     Through the page's own remove button, which is also the last word on it. */
+  await page.evaluate(async () => {
+    while (window.__plot.instanceCount() > 1) window.__plot.removeInstance(1);
+    await new Promise(r => setTimeout(r, 30));
+  });
+  await reset();
+  const backToOne = await q(() => ({ n: window.__plot.instanceCount(),
+                                     d: window.__plot.drawn() }));
+  check('blooms/removing-the-others-leaves-the-drawing-the-page-shipped',
+    backToOne.n === 1 && backToOne.d.total === oneBloom.d.total,
+    `${backToOne.n} bloom, ${backToOne.d.total} segments — the count this gate opened with`);
+
   log('\n--- the composition file ---');
 
   /* WHAT THE PAGE HOLDS, read from the page's own accessors and never from the
@@ -4775,12 +5479,15 @@ async function run({ mutant = null } = {}) {
      perfectly, because it is not in the file to be compared. */
   const EXEMPT = {
     gridFile: 'a file input — the grid is identified in the file, never embedded in it',
+    gridAdd: 'the second file input, on the BLOOM panel — same reason',
     compositionFile: 'a file input — it is how a composition gets here',
     petalPick: 'the selection, which the file carries at the top level as one cursor',
+    bloomPick: 'the other half of that cursor — selection.instance in the file',
   };
   const pageControls = await q(() => window.__plot.pageControls());
   const covered = new Set([...FL.FRAME_FIELDS, ...FL.DRAW_FIELDS, ...FL.VIEW_FIELDS,
-                           ...FL.STEM_FIELDS, ...FL.PETAL_FIELDS].map(f => f.control));
+                           ...FL.STEM_FIELDS, ...FL.PETAL_FIELDS,
+                           ...FL.TRANSFORM_FIELDS].map(f => f.control));
   const uncovered = pageControls.filter(c => !covered.has(c.id) && !(c.id in EXEMPT));
   check('save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception',
     uncovered.length === 0 && pageControls.length === covered.size + Object.keys(EXEMPT).length,
@@ -4794,9 +5501,9 @@ async function run({ mutant = null } = {}) {
   const panels = await q(() => [...document.querySelectorAll('details.panel')]
     .map(d => ({ id: d.id, summary: d.querySelector('summary').textContent.trim(), open: d.open })));
   check('panels/every-panel-is-present-and-is-a-details',
-    panels.length === 7 && panels.every(p => p.open)
+    panels.length === 8 && panels.every(p => p.open)
     && panels.map(p => p.summary).join('|')
-       === 'LOAD GRID|COMPOSITION|GRID|FRAME|DRAW|PETAL|STEM',
+       === 'ADD GRID|COMPOSITION|GRID|FRAME|DRAW|BLOOM|PETAL|STEM',
     panels.map(p => `${p.summary}(${p.id})`).join(' · '));
 
   // Driven through `brightness`, which no mutation in this file touches, so
@@ -4872,6 +5579,36 @@ if (NEG) {
     console.log(`  [FAIL] ${stale.length} claimed check${stale.length === 1 ? '' : 's'} `
       + `name${stale.length === 1 ? 's' : ''} nothing the gate runs:`);
     for (const line of stale) console.log(`         ${line}`);
+    mutantsOK = false;
+  }
+
+  /* AND EVERY MUTANT'S ANCHOR IS CHECKED BEFORE ANY OF THEM RUNS — for EVERY
+     mutant, not only the ones this invocation is about to run, and for the same
+     reason the stale-name guard is: a mutation whose source has moved is
+     reported as "mutation did not apply", which is the SURVIVABLE half of a
+     refactor disarming it — but only if somebody runs it. A mutant in a chunk
+     nobody gets to is silently dead, and a sweep that never completes is the
+     normal case here.
+
+     It also catches the quieter half. A `from` that now matches TWICE mutates
+     the first occurrence and says nothing, so the mutation lands somewhere
+     other than where it is described. Measured: the multi-bloom session's
+     refactor moved four anchors outright and made a fifth ambiguous, and this
+     found all five in under a second where the sweep would have cost half an
+     hour a piece. */
+  const anchors = [];
+  for (const m of MUTANTS) {
+    const text = readFileSync(path.join(ROOT, m.file), 'utf8');
+    const n = text.split(m.from).length - 1;
+    if (n !== 1) {
+      anchors.push(`${m.id} (${m.file}): its anchor appears ${n} times, not once`
+        + `${n === 0 ? ' — the source it edits has moved' : ' — it would mutate the first one silently'}`);
+    }
+  }
+  if (anchors.length) {
+    console.log(`  [FAIL] ${anchors.length} mutant${anchors.length === 1 ? '' : 's'} `
+      + `cannot apply as written:`);
+    for (const line of anchors) console.log(`         ${line}`);
     mutantsOK = false;
   }
   for (const m of MUTANTS) {

@@ -30,18 +30,20 @@
 <body>
 
 <canvas id="plot-canvas"></canvas>
-<div id="plot-dropzone-hint" hidden>drop a grid .glb to load it</div>
+<div id="plot-dropzone-hint" hidden>drop a grid .glb to add it</div>
 
 <div id="plot-left">
 
-<!-- LOAD GRID. The one control that changes WHICH drawing you are looking at,
-     so it is its own panel rather than a row above a wall of diagnostics. -->
+<!-- ADD A GRID. Loading a grid ADDS a bloom to the composition rather than
+     replacing the one on screen, so this is how a composition of several blooms
+     is built up; the BLOOM panel is where one is selected, placed and removed.
+     Its own panel rather than a row above a wall of diagnostics. -->
 <details id="plot-bundle-load" class="panel" open>
-  <summary>LOAD GRID</summary>
-  <label for="gridFile">load grid
+  <summary>ADD GRID</summary>
+  <label for="gridFile">add grid
     <input type="file" id="gridFile" accept=".glb,model/gltf-binary">
   </label>
-  <span class="hint">or drop a grid .glb anywhere on the page</span>
+  <span class="hint">or drop a grid .glb anywhere on the page — it is ADDED, beside what is already there</span>
 </details>
 
 <!-- COMPOSITION. Save the whole page as a project file and load one back.
@@ -238,6 +240,85 @@
 
   <pre id="plot-drawstate"></pre>
   <pre id="plot-framestate"></pre>
+</details>
+
+<!-- BLOOM. A composition holds several blooms at different scales, so the
+     selection is TWO levels — which bloom, then which petal within it — and this
+     panel is the first of them. It sits above PETAL and STEM because both of
+     those are about the bloom this one names: a 28-entry petal list is one
+     bloom's, and would be 84 for three if the two levels were collapsed into
+     one.
+
+     LOADING A GRID ADDS A BLOOM. `remove` is its own button because "look at a
+     different grid" and "throw this bloom away" are two intentions, and the last
+     bloom cannot be removed — an empty viewport is indistinguishable from a page
+     that broke.
+
+     THE TRANSFORM IS IN THE GRID'S OWN Z-UP MILLIMETRES, before the page's one
+     Z-up correction, so a saved position means the same thing whatever the
+     viewer does with the container. Scale is ONE control and writes all three
+     axes: "size this bloom against that one" is the operation, and a file
+     carrying a non-uniform scale is still applied exactly as written and said
+     so on the panel. -->
+<details id="plot-bloom" class="panel" open>
+  <summary>BLOOM</summary>
+
+  <div class="plot-row">
+    <label for="bloomPick">bloom</label>
+    <span class="plot-pick">
+      <button type="button" id="bloomPrev" title="the bloom before this one">&#9664;</button>
+      <select id="bloomPick"></select>
+      <button type="button" id="bloomNext" title="the bloom after this one">&#9654;</button>
+    </span>
+    <output id="bloomPickOut">1 of 1</output>
+  </div>
+
+  <div class="plot-file-row">
+    <label class="plot-file-load" for="gridAdd">add a bloom
+      <input type="file" id="gridAdd" accept=".glb,model/gltf-binary">
+    </label>
+    <button type="button" id="bloomRemove" title="remove this bloom from the composition">remove</button>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomX">x</label>
+    <input type="range" id="bloomX" min="-800" max="800" step="1" value="0">
+    <output id="bloomXOut">0 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomY">y</label>
+    <input type="range" id="bloomY" min="-800" max="800" step="1" value="0">
+    <output id="bloomYOut">0 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomZ">z</label>
+    <input type="range" id="bloomZ" min="-800" max="800" step="1" value="0">
+    <output id="bloomZOut">0 mm</output>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomRotX">turn x</label>
+    <input type="range" id="bloomRotX" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotXOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomRotY">turn y</label>
+    <input type="range" id="bloomRotY" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotYOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomRotZ">turn z</label>
+    <input type="range" id="bloomRotZ" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotZOut">0&deg;</output>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomScale">scale</label>
+    <input type="range" id="bloomScale" min="0.1" max="4" step="0.05" value="1">
+    <output id="bloomScaleOut">1.00&times;</output>
+  </div>
+
+  <pre id="plot-bloomstate"></pre>
 </details>
 
 <!-- PETAL. One petal out of the file's own set, picked and deformed while the

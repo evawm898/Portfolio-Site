@@ -101,9 +101,15 @@ import {
 } from './plot-export.js';
 import {
   FORMAT, VERSION, FRAME_FIELDS, DRAW_FIELDS, VIEW_FIELDS, STEM_FIELDS,
+  TRANSFORM_FIELDS,
   composeDoc, readDoc, toText, gridIdentity, compareIdentity, resolvePetals,
   IDENTITY_TRANSFORM,
 } from './plot-file.js';
+import {
+  newTransform, cloneTransform, transformMatrix, applyMatrixToPoint, placeStrips,
+  meanScale, scaleIsUniform, placementFor, placedExtent, unionExtent,
+  isIdentityTransform,
+} from './plot-instance.js';
 
 const DEFAULT_GRID = 'assets/plot-test/bloom-grid-live.glb';
 
@@ -233,56 +239,114 @@ let frameObj = null;
 
 const materials = [material, selMaterial, frameMaterial];
 
-/* ---- mutable module state — one grid at a time -------------------------- */
-let strips = [];            // every LINE_STRIP in the loaded file
-let gridInfo = null;        // readGridScene()'s report
-let assetExtras = null;     // the export's own asset.extras (mode, units, …)
-let sourceName = '';
-let localBounds = null;     // bounds of every strip, in grid space
+/* ---- the composition's own state — everything that is not one bloom ------ */
 let objects = { u: null, v: null, other: null, stem: null, sel: null };
 let lastError = '';
 let fogOn = false;
 let lastFrameMs = 0;
 let dirty = true;
 let drawn = { u: 0, v: 0, other: 0, total: 0, uLines: 0, vLines: 0 };
-let drawnStrips = [];       // what is on screen, head-transformed — what a click picks from
+/* WHAT IS ON SCREEN, ACROSS EVERY BLOOM — head-transformed and PLACED, so a
+   click, an export and the on-screen box all read one list and none of them
+   has to know how many instances there are. Each record carries the `inst`
+   ordinal it came from beside its own `petal`, because petal 3 exists in every
+   bloom and a pick has to name both. */
+let drawnStrips = [];
+let stemStrips = [];        // every bloom's stem continuation, placed
+
+/* ---- the instances ------------------------------------------------------
+   ONE RECORD PER BLOOM, AND `cur()` IS THE ONE WINDOW THE PANELS EDIT THROUGH.
+   A composition holds several blooms at different scales; what each of them
+   owns is its grid and everything measured from it, its inferred stem and that
+   stem's parameters, its own per-petal warps, and where it stands. What stays
+   at the COMPOSITION level is the frame, the camera, the draw settings, the
+   polarity and the one selection cursor — those are properties of the picture
+   and not of any one bloom, which is exactly the split the composition file was
+   written to (see plot-file.js: the root has always been a LIST of instances).
+
+   THE STEM'S SIX CONTROLS ARE A VIEW OF THE SELECTED INSTANCE, exactly as the
+   two petal scales are a view of the selected petal — `commitStem` writes the
+   panel into the bloom that owns it and `loadStemControls` reads that bloom's
+   values back out. Selecting a bloom LOADS; it never applies. That is the
+   ownership correction the petal warps already went through, applied one level
+   up, and it is what makes two blooms at two different droops reachable.
+
+   AN EMPTY INSTANCE IS FROZEN AND CARRIES EVERY FIELD, the `REST_PETAL`
+   discipline: callers need no branch for "nothing loaded", and nothing can
+   write into a record that belongs to no bloom. */
+const STEM_REST = Object.freeze({ on: 'off', bundle: 0.35, join: 12, length: 170,
+                                  droopDeg: 0, neck: 45 });
+const DEFAULT_BEND_T = [1 / 3, 2 / 3, 1];
+const MAX_BENDS = 8;
+const newBends = () => DEFAULT_BEND_T.map(t => ({ t, offset: [0, 0, 0] }));
+
+let instanceSeq = 0;
+function newInstance() {
+  return {
+    id: `bloom-${instanceSeq++}`,
+    // the file, and everything measured from it
+    strips: [], gridInfo: null, assetExtras: null, sourceName: '', localBounds: null,
+    petalIndex: new Map(), petalWarps: new Map(), petalFrames: new Map(),
+    /* THE RING IS READ OFF EVERY U-LINE FOOT IN THIS BLOOM'S OWN FILE, not off
+       the ones the density sliders kept: it is a property of the grid, and a
+       stem that moved sideways when the slider thinned the feet it averages
+       would make the density control decide where the flower hangs from. */
+    stemRing: null,
+    // its own stem, and where it stands
+    stemVals: { ...STEM_REST }, bends: newBends(), transform: newTransform(),
+    // derived on every rebuild
+    warpAll: [], stemStrips: [], stemLocal: [], stemIsDrawn: false,
+    stemStats: { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true },
+    /* A REST OBJECT IS A VALUE OF THE SAME TYPE, NOT A SMALLER ONE — the
+       lesson `REST_PETAL` already carries. `rebuild` reads `warpInfo.mine.moved`
+       unconditionally, so a rest `warpInfo` without a `mine` throws on every
+       rebuild that reaches it and leaves the panels showing the outgoing
+       bloom's numbers beside a live drawing. Measured: a mutation that let the
+       last bloom be removed took the page down here rather than going red. */
+    warpInfo: { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0, points: 0, basePoints: 0,
+                mine: { moved: 0, points: 0, basePoints: 0 } },
+  };
+}
+const EMPTY_INSTANCE = Object.freeze({
+  ...newInstance(), id: '(none)', petalIndex: new Map(), petalWarps: new Map(),
+  petalFrames: new Map(), stemVals: Object.freeze({ ...STEM_REST }),
+  bends: Object.freeze([]), transform: Object.freeze(newTransform()),
+});
+instanceSeq = 0;
+
+const instances = [];
+let selInstance = 0;
+/* THE SELECTED BLOOM. Never null: an empty record when nothing is loaded, so
+   every read-out, hook and handler below is written once rather than twice. */
+const cur = () => instances[selInstance] || EMPTY_INSTANCE;
+const instanceCount = () => instances.length;
+const MAX_INSTANCES = 12;
 
 /* ---- the stem's own state ------------------------------------------------
-   `stemRing` is read off EVERY u-line's foot in the loaded file, not off the
-   ones currently drawn: the ring is a property of the grid, and a stem that
-   moved sideways when the density slider thinned the feet it was averaging
-   would be a density slider that changes where the flower hangs from. */
-let stemRing = null;
-/* A bend point is a STATION AS A FRACTION of the stem length plus a world
+   A bend point is a STATION AS A FRACTION of the stem length plus a world
    offset in grid mm. The fraction and not an absolute station, so dragging
    `length` slides the bends along with the stem instead of stranding them at
    the top of a long stalk. Ascending in `t`. THE LAST ONE IS THE ROOT and is
    an ordinary member of this list — see `removeIndex` in plot-warp.js. */
-const DEFAULT_BEND_T = [1 / 3, 2 / 3, 1];
-const MAX_BENDS = 8;
-let bends = DEFAULT_BEND_T.map(t => ({ t, offset: [0, 0, 0] }));
 let handles = [];           // one THREE.Mesh per bend, parented to `container`
-let stemStrips = [];        // the built continuations, one per drawn u-line
-let stemIsDrawn = false;    // the stem is the u lines continued, so no u = no stem
-let viewBounds = null;      // what the drawing occupies — the grid at the current
-                            // droop plus the stem; `localBounds` when neither moved
-let stemStats = { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true };
+let viewBounds = null;      // what the whole drawing occupies — every bloom at
+                            // its current droop, warp and placement
 
 /* ---- the selected petal's own state --------------------------------------
-   `selected` is the FILE's own petal index, not a position in a list, so it
-   survives a density that hides a petal and means the same thing as the name
-   the read-out prints. -1 is "none", which is the state a freshly loaded grid
-   is in: a page that picked one for you would be deciding which petal the
-   drawing is about. */
+   `selected` is the FILE's own petal index within the SELECTED bloom, not a
+   position in a list, so it survives a density that hides a petal and means the
+   same thing as the name the read-out prints. -1 is "none", which is the state
+   a freshly loaded grid is in: a page that picked one for you would be deciding
+   which petal the drawing is about. The cursor is `(selInstance, selected)` and
+   it is one cursor, because you can only be editing one petal of one bloom at
+   a time — which is the shape the composition file already stores. */
 let selected = -1;
-let petalIndex = new Map();     // file petal index -> its strips, in file order
 /* `frame` HERE IS THE PETAL'S OWN AXIS, and it predates the FRAME panel by a
    session. The composition's boundary is never this identifier: it is reached
    through `fui.frame` (the on/off select) and `frameBox()`, and the two senses
    of the word never meet. Worth knowing before writing `frame.` and meaning the
    other one — `#plot-framestate` is a third sense again, the frame TIME. */
 let frame = null;               // the selected petal's own axis (plot-petal.js)
-let warpAll = [];               // every strip with the selected petal deformed
 /* A bend point is a STATION AS A FRACTION of the petal's own length plus a
    world offset in grid mm — the stem's convention, for the stem's reason:
    petals in this file run 18.6 to 35.0 mm, so a bend stored in mm would mean a
@@ -301,27 +365,20 @@ const MAX_PETAL_BENDS = 6;
    sliders reading 0.30x / 2.50x while the petal read `none`, values belonging
    to nothing.
 
-   So: one entry per petal, and THE CONTROLS ARE A VIEW OF THE SELECTED ENTRY.
-   Selection LOADS a petal's values into the panel; it never applies the panel's
-   values to a petal. Editing writes into that petal's own entry. Deselecting
-   writes nothing, so every warp stays exactly where it was, and any number of
-   petals can carry different warps at once — which is the point, because the
-   reference compositions have petals at varied shapes.
-
-   An entry is created the first time a petal is selected, so a petal nobody has
-   picked has no state at all; "warped" is an entry that is not at rest, which
-   is what `warpedPetals` counts. Nothing here is persisted across a reload —
-   that lands with the FRAME panel, and it will have to store one warp PER
-   PETAL rather than the single warp the global model would have had. */
-let petalWarps = new Map();     // petal index -> { along, across, bends }
+   So: one entry per petal, PER BLOOM, and THE CONTROLS ARE A VIEW OF THE
+   SELECTED ENTRY. Selection LOADS a petal's values into the panel; it never
+   applies the panel's values to a petal. Editing writes into that petal's own
+   entry. Deselecting writes nothing, so every warp stays exactly where it was,
+   and any number of petals can carry different warps at once — which is the
+   point, because the reference compositions have petals at varied shapes. */
 const newPetalState = () => ({
   along: 1, across: 1,
   bends: DEFAULT_PETAL_BEND_T.map(t => ({ t, offset: [0, 0, 0] })),
 });
-function petalStateOf(index, create = false) {
-  if (index < 0) return null;
-  let st = petalWarps.get(index);
-  if (!st && create) petalWarps.set(index, st = newPetalState());
+function petalStateOf(index, create = false, inst = cur()) {
+  if (index < 0 || inst === EMPTY_INSTANCE) return null;
+  let st = inst.petalWarps.get(index);
+  if (!st && create) inst.petalWarps.set(index, st = newPetalState());
   return st || null;
 }
 
@@ -330,17 +387,16 @@ function petalStateOf(index, create = false) {
    re-measuring it per rebuild would be re-deriving a constant, and with up to
    28 petals warped at once that is 28 measurements a slider drag does not owe.
    Cleared with the grid, never with the selection. */
-let petalFrames = new Map();    // petal index -> frame (or null: not warpable)
-function frameFor(index) {
-  if (index < 0) return null;
-  if (petalFrames.has(index)) return petalFrames.get(index);
-  const mine = petalIndex.get(index);
-  const info = petalInfoOf(index);
+function frameFor(index, inst = cur()) {
+  if (index < 0 || inst === EMPTY_INSTANCE) return null;
+  if (inst.petalFrames.has(index)) return inst.petalFrames.get(index);
+  const mine = inst.petalIndex.get(index);
+  const info = petalInfoOf(index, inst);
   const f = (mine && info && info.warpable) ? petalFrame(mine) : null;
   // The petal's own half-width is measured the same way and from the same
   // points, so it is cached with the frame rather than beside it.
   if (f) f.halfWidthMm = petalHalfWidth(mine, f);
-  petalFrames.set(index, f);
+  inst.petalFrames.set(index, f);
   return f;
 }
 let petalHandleObjs = [];
@@ -472,6 +528,36 @@ const pout = {
   petalAcross: document.getElementById('petalAcrossOut'),
   bend: document.getElementById('petalBendOut'),
 };
+/* THE BLOOM'S CONTROLS — the outer half of the two-level selection, and the
+   placement of the bloom it names. Dispatched separately again: `bloomPick`
+   changes which bloom every panel below is about (and therefore LOADS that
+   bloom's stem and placement into the controls), while the seven transform
+   sliders change where one bloom stands and nothing else. */
+const bui = {
+  bloomPick: document.getElementById('bloomPick'),
+  bloomX: document.getElementById('bloomX'),
+  bloomY: document.getElementById('bloomY'),
+  bloomZ: document.getElementById('bloomZ'),
+  bloomRotX: document.getElementById('bloomRotX'),
+  bloomRotY: document.getElementById('bloomRotY'),
+  bloomRotZ: document.getElementById('bloomRotZ'),
+  bloomScale: document.getElementById('bloomScale'),
+};
+const bout = {
+  bloomPick: document.getElementById('bloomPickOut'),
+  bloomX: document.getElementById('bloomXOut'),
+  bloomY: document.getElementById('bloomYOut'),
+  bloomZ: document.getElementById('bloomZOut'),
+  bloomRotX: document.getElementById('bloomRotXOut'),
+  bloomRotY: document.getElementById('bloomRotYOut'),
+  bloomRotZ: document.getElementById('bloomRotZOut'),
+  bloomScale: document.getElementById('bloomScaleOut'),
+};
+const bloomEl = document.getElementById('plot-bloomstate');
+const bloomPrevBtn = document.getElementById('bloomPrev');
+const bloomNextBtn = document.getElementById('bloomNext');
+const bloomRemoveBtn = document.getElementById('bloomRemove');
+
 const petalEl = document.getElementById('plot-petalstate');
 const petalBendCountEl = document.getElementById('petalBendCount');
 const petalBendAddBtn = document.getElementById('petalBendAdd');
@@ -502,29 +588,59 @@ const warpFor = (st, f) => makeWarp(stationsFor(st, f), st.bends.map(b => b.offs
 const petalStationsOf = () => stationsFor(readPetal(), frame);
 const petalWarpOf = () => warpFor(readPetal(), frame);
 
-const readStem = () => {
-  const deg = +sui.stemDroop.value;
+/* THE STEM'S SIX VALUES, FROM THE BLOOM THAT OWNS THEM — never from the DOM.
+   The panel is the EDITOR for the selected bloom's stem, the way the two petal
+   scales are the editor for the selected petal's shape, so every consumer below
+   asks the instance and a second bloom keeps its own droop while you drag this
+   one's. `showHandles` is the exception and is composition-level on purpose: it
+   is a VIEW field in the saved file, it decides whether an editor is drawn
+   rather than what any bloom's geometry is, and one bloom's handles hidden
+   while another's show would be a preference with two answers. */
+const stemOf = (inst = cur()) => {
+  const v = inst.stemVals;
   return {
-    on: sui.stem.value === 'on',
-    bundle: +sui.stemBundle.value,
-    join: +sui.stemJoin.value,
-    length: +sui.stemLength.value,
-    droopDeg: deg,
-    droopRad: deg * Math.PI / 180,
-    neck: +sui.stemNeck.value,
+    on: v.on === 'on',
+    bundle: v.bundle, join: v.join, length: v.length,
+    droopDeg: v.droopDeg, droopRad: v.droopDeg * Math.PI / 180, neck: v.neck,
     showHandles: sui.stemHandles.checked,
   };
 };
+const readStem = () => stemOf(cur());
+
+/* THE PANEL, WRITTEN INTO THE BLOOM IT BELONGS TO. One direction only: a hand
+   moving a stem control writes here, and nothing else does. */
+function commitStem() {
+  const inst = cur();
+  if (inst === EMPTY_INSTANCE) return;
+  inst.stemVals = {
+    on: sui.stem.value,
+    bundle: +sui.stemBundle.value, join: +sui.stemJoin.value,
+    length: +sui.stemLength.value, droopDeg: +sui.stemDroop.value,
+    neck: +sui.stemNeck.value,
+  };
+}
+/* AND THE OTHER DIRECTION, ON A SELECTION CHANGE ONLY. Selecting a bloom LOADS
+   its stem into the panel; it never applies the panel's stem to a bloom. */
+function loadStemControls() {
+  const v = cur().stemVals;
+  sui.stem.value = v.on;
+  sui.stemBundle.value = String(v.bundle);
+  sui.stemJoin.value = String(v.join);
+  sui.stemLength.value = String(v.length);
+  sui.stemDroop.value = String(v.droopDeg);
+  sui.stemNeck.value = String(v.neck);
+}
 // The `opts` bag plot-stem.js reads. One place builds it, so a control can
 // never reach one of the two builders (the lines, the centre line) and not the
 // other.
 const stemOpts = st => ({ bundle: st.bundle, join: st.join, length: st.length,
                           droopRad: st.droopRad, neck: st.neck });
-const stationsOf = st => bends.map(b => b.t * st.length);
+const stationsOf = (st, inst = cur()) => inst.bends.map(b => b.t * st.length);
 // The ONE place the ladder's top zone is decided, so the lines, the camera fit
 // and the chord the panel prints are all sampled the same way.
 const ladderFor = st => stationLadder(st.length, topZoneOf(st.length, st.join, st.neck));
-const currentWarp = st => makeWarp(stationsOf(st), bends.map(b => b.offset), st.length);
+const currentWarp = (st, inst = cur()) =>
+  makeWarp(stationsOf(st, inst), inst.bends.map(b => b.offset), st.length);
 
 const readUI = () => ({
   families: ui.families.value,
@@ -568,25 +684,27 @@ function clearObjects() {
   }
 }
 
-function clearCurrentGrid() {
+/* EVERYTHING THE COMPOSITION HOLDS, GONE. A bloom's own state goes with its
+   record — removing an instance drops the whole record, so there is no field to
+   forget — and what this resets is the composition-level state that outlives no
+   grid at all: the drawn buffers, the selection cursor, the measured dead
+   travel and the last composition's report.
+
+   THE LAST COMPOSITION GOES WITH IT for the same reason it always did: loading
+   or removing a grid changes which warps exist, so a panel still reading
+   "restored my-composition.json" would be describing state this has thrown
+   away. */
+function resetCompositionState() {
   clearObjects();
-  strips = []; warpAll = []; drawnStrips = []; gridInfo = null; assetExtras = null;
-  localBounds = null; viewBounds = null;
-  selected = -1; frame = null; petalIndex = new Map();
-  // The warps and the measured frames both belong to the GRID that is going
-  // away, so both go with it — a petal index means nothing in the next file.
-  petalWarps = new Map(); petalFrames = new Map();
+  drawnStrips = []; stemStrips = [];
+  selected = -1; frame = null;
+  viewBounds = null;
   petalStats = { on: false, warpable: false, why: '', strips: 0, points: 0,
                  lengthMm: 0, holdMm: 0, holdRows: 0, rows: 0, halfWidthMm: 0,
                  movedMm: 0, seamMm: 0, basePoints: 0, myBasePoints: 0,
                  untouched: 0, offPetal: 0,
                  drawnStrips: 0, rest: true, bendsRest: true };
-  /* AND THE LAST COMPOSITION GOES WITH IT. A grid load clears the warps and the
-     selection, so a panel still reading "restored my-composition.json" would be
-     describing state this function has just thrown away. */
   lastComposition = null;
-  stemRing = null; stemIsDrawn = false; stemStrips = [];
-  stemStats = { lines: 0, segments: 0, stations: 0, seamMm: 0, sagittaMm: 0, rest: true };
   deadRange = { u: MIN_DENSITY, v: MIN_DENSITY };
   drawn = { u: 0, v: 0, other: 0, total: 0, uLines: 0, vLines: 0 };
 }
@@ -652,7 +770,8 @@ function buildFrameOverlay() {
    the stem's law with the decay at 0. The two are different code paths on
    purpose — that is the only way a wrong decay or a wrong gate at the ring can
    show up as a number rather than as a picture nobody compares. */
-function buildStem(chosen, head, st, warp) {
+function buildStem(inst, chosen, head, st, warp) {
+  const { stemRing } = inst;
   if (!st.on || !stemRing) return { stems: [], seam: 0, sagitta: 0 };
   const ladder = ladderFor(st);
   const opts = stemOpts(st);
@@ -677,7 +796,7 @@ function buildStem(chosen, head, st, warp) {
     // expressions, compared, on every drawn line, every rebuild.
     const h = head[i].points;
     seam = Math.max(seam, Math.hypot(points[0] - h[0], points[1] - h[1], points[2] - h[2]));
-    stems.push({ kind: 'stem', petal: t.petal, index: -1, last: -1,
+    stems.push({ kind: 'stem', petal: t.petal, inst: t.inst, index: -1, last: -1,
                  points, count: ladder.length, segments: ladder.length - 1 });
   }
   return { stems, seam, sagitta: maxChordSagitta(stemRing, opts, warp, ladder) };
@@ -685,9 +804,9 @@ function buildStem(chosen, head, st, warp) {
 
 /* ---- the selected petal ------------------------------------------------- */
 
-function petalInfoOf(index) {
-  if (!gridInfo || index < 0) return null;
-  return gridInfo.petalList.find(p => p.index === index) || null;
+function petalInfoOf(index, inst = cur()) {
+  if (!inst.gridInfo || index < 0) return null;
+  return inst.gridInfo.petalList.find(p => p.index === index) || null;
 }
 
 /* THE ONE OWNER OF WHAT IS SELECTED. `petalPick` holds the value — the arrows
@@ -705,7 +824,7 @@ function petalInfoOf(index) {
    the selection that made it. */
 function syncSelection() {
   const want = +pui.petalPick.value;
-  const index = petalIndex.has(want) ? want : -1;
+  const index = cur().petalIndex.has(want) ? want : -1;
   if (index === selected) return false;
   selected = index;
   // Created on first selection, so a petal nobody has picked carries no state
@@ -756,12 +875,13 @@ function commitPetalScales() {
 
    `selected` is used only to split the measurements — what THIS petal did
    against what the drawing as a whole did — never to decide what moves. */
-function applyPetalWarp() {
+function applyPetalWarp(inst, isSel) {
+  const { strips, petalWarps, petalIndex } = inst;
   // Which petals actually carry a deformation. A petal with an entry at rest is
   // not one: it has been selected, nothing more.
   const active = [];
   for (const [index, st] of petalWarps) {
-    const f = frameFor(index);
+    const f = frameFor(index, inst);
     const mine = petalIndex.get(index);
     if (!f || !mine) continue;
     const warp = warpFor(st, f);
@@ -770,7 +890,7 @@ function applyPetalWarp() {
   }
   const blank = { warpedPetals: 0, movedStrips: 0, seam: 0, moved: 0,
                   points: 0, basePoints: 0, mine: { moved: 0, points: 0, basePoints: 0 } };
-  if (!active.length) { warpAll = strips; return blank; }
+  if (!active.length) { inst.warpAll = strips; return blank; }
 
   // strip -> the petal that owns it, so the map below is one lookup per strip
   // rather than a scan over the active set.
@@ -779,13 +899,16 @@ function applyPetalWarp() {
 
   let movedStrips = 0, seam = 0, moved = 0, points = 0, basePoints = 0;
   const mine = { moved: 0, points: 0, basePoints: 0 };
-  warpAll = strips.map(t => {
+  inst.warpAll = strips.map(t => {
     const a = owner.get(t);
     if (!a || !t.stations) return t;
     const pts = petalPoints(t.points, t.count, t.stations, a.f, a.warp, a.st);
     if (pts === t.points) return t;
     movedStrips++;
-    const isMine = a.index === selected;
+    // "MINE" IS THE SELECTED PETAL OF THE SELECTED BLOOM, both halves — petal 3
+    // exists in every instance, so a bloom nobody has picked must not contribute
+    // to the number the panel prints under the name of the one that is.
+    const isMine = isSel && a.index === selected;
     for (let i = 0; i < t.count; i++) {
       const d = Math.hypot(pts[i * 3] - t.points[i * 3],
                            pts[i * 3 + 1] - t.points[i * 3 + 1],
@@ -810,24 +933,34 @@ function applyPetalWarp() {
   return { warpedPetals: active.length, movedStrips, seam, moved, points, basePoints, mine };
 }
 
-/* Rebuild the drawn segment buffers from the current control values. Cheap by
-   construction — the sample grid is ~15k segments and its stem another ~18k —
-   so the density sliders rebuild rather than mask. */
-function rebuild() {
-  syncSelection();
-  const s = readUI(), st = readStem(), pt = readPetal();
-  // THE PETAL WARP RUNS FIRST, on everything, and every later stage reads its
-  // output. Selecting from the warped set rather than warping the selection is
-  // what keeps the density sliders out of the deformation.
-  const pw = applyPetalWarp();
-  const chosen = selectStrips(warpAll, s);
+/* ONE BLOOM'S LINES, FROM ITS OWN STATE AND NOTHING ELSE. Everything here is a
+   function of the instance handed in, so the second bloom is built by the same
+   code as the first and there is no arm that only the selected one takes.
+
+   THE ORDER IS WARP, DROOP, STEM, THEN PLACE, and the last step is the only new
+   one. The warp, the droop and the stem all run in the bloom's OWN grid space —
+   the space its millimetres, its ring and its seam are measured in — and the
+   instance transform is applied to the finished lines afterwards. Placing first
+   would mean the stem's ring, the droop's axis and every reported length were
+   in a space that moves when a position slider does, so the seam and the chord
+   the panel prints would change with where the bloom stands.
+
+   AT THE IDENTITY TRANSFORM `placeStrips` HANDS BACK THE VERY RECORDS IT WAS
+   GIVEN, so a single bloom at the origin is drawn from the arrays the file
+   wrote and every "nothing moved" identity on this page still answers what it
+   answered before instances existed. */
+function buildInstance(inst, ord, isSel) {
+  const s = readUI();
+  const st = stemOf(inst);
+  const pw = applyPetalWarp(inst, isSel);
+  const chosen = selectStrips(inst.warpAll, s);
   // THE HEAD TAKES THE FULL DROOP, every family of it: the v-lines' row 0 sits
   // on the same ring as the u-lines' feet, so a head transform that reached
   // only the u family would tear the grid apart at the junction. At angle 0
   // headTransform hands the SAME array back, so the shipped default draws the
   // file's own vertices and costs nothing.
-  const angle = (st.on && stemRing) ? st.droopRad : 0;
-  const centre = stemRing ? stemRing.center : [0, 0, 0];
+  const angle = (st.on && inst.stemRing) ? st.droopRad : 0;
+  const centre = inst.stemRing ? inst.stemRing.center : [0, 0, 0];
   const head = chosen.map(t => {
     const p = headTransform(t.points, t.count, centre, angle);
     return p === t.points ? t : { ...t, points: p };
@@ -835,37 +968,68 @@ function rebuild() {
   // ONE WARP PER REBUILD, built here and handed down: the lines, the handles
   // and the "at rest" the panel prints all have to be the same set of control
   // points, and rebuilding it three times is three chances for them not to be.
-  const warp = currentWarp(st);
-  const { stems, seam, sagitta } = buildStem(chosen, head, st, warp);
+  const warp = currentWarp(st, inst);
+  const { stems, seam, sagitta } = buildStem(inst, chosen, head, st, warp);
+  inst.stemIsDrawn = stems.length > 0;
+  inst.stemStats = { lines: stems.length,
+                     segments: stems.reduce((a, b) => a + b.segments, 0),
+                     stations: stems.length ? stems[0].count : 0,
+                     seamMm: seam, sagittaMm: sagitta, rest: warpIsRest(warp) };
+  inst.warpInfo = pw;
+  /* THE INSTANCE ORDINAL RIDES ON EVERY DRAWN RECORD. A click, an export and
+     the on-screen box all read one flat list across every bloom, and `petal` on
+     its own does not identify a petal there — petal 3 exists in all of them. */
+  const stamp = t => (t.inst === ord ? t : { ...t, inst: ord });
+  /* THE UNPLACED STEMS ARE KEPT BESIDE THE PLACED ONES, because the seam, the
+     chord and every millimetre this bloom reports are measured in ITS OWN grid
+     space — the space its ring, its law and its file are written in. At the
+     identity `placeStrips` hands back the very records it was given, so the two
+     are the same array and a single bloom at rest costs nothing for it. */
+  inst.stemLocal = stems;
+  const placedHead = placeStrips(head, inst.transform).map(stamp);
+  inst.stemStrips = placeStrips(stems, inst.transform).map(stamp);
+  return { head: placedHead, stems: inst.stemStrips };
+}
+
+/* Rebuild the drawn segment buffers from the current control values. Cheap by
+   construction — one bloom's sample grid is ~15k segments and its stem another
+   ~40k — so the density sliders rebuild rather than mask. With several blooms
+   loaded that cost is paid once per bloom and the numbers are on the DRAW
+   panel, where they can be watched rather than guessed at. */
+function rebuild() {
+  syncSelection();
+  const heads = [], stems = [];
+  for (let k = 0; k < instances.length; k++) {
+    const r = buildInstance(instances[k], k, k === selInstance);
+    for (const t of r.head) heads.push(t);
+    for (const t of r.stems) stems.push(t);
+  }
   stemStrips = stems;
-  stemIsDrawn = stems.length > 0;
-  stemStats = { lines: stems.length,
-                segments: stems.reduce((a, b) => a + b.segments, 0),
-                stations: stems.length ? stems[0].count : 0,
-                seamMm: seam, sagittaMm: sagitta, rest: warpIsRest(warp) };
 
   /* THE SELECTED PETAL IS DRAWN IN ITS OWN OBJECT, AND THE COUNTS ARE NOT.
      Splitting the buffers is what lets one petal take a different hue without a
      per-vertex colour, but the DRAW panel is about the file and not about what
-     is picked — so the per-family segment and line counts are taken from
-     `head`, which is the whole drawn set, and are identical whether a petal is
-     selected or not. One object rather than one per family for the highlight:
-     `selectStrips` has already applied the family switch, so what is left is
-     "this petal, as far as it is on screen". */
-  const isSel = t => selected >= 0 && t.petal === selected;
-  const selStrips = head.filter(isSel);
-  const rest = head.filter(t => !isSel(t));
+     is picked — so the per-family segment and line counts are taken from the
+     whole drawn set, and are identical whether a petal is selected or not. One
+     object rather than one per family for the highlight: `selectStrips` has
+     already applied the family switch, so what is left is "this petal, as far
+     as it is on screen". IT IS ONE PETAL OF ONE BLOOM, both halves: without the
+     instance test the same petal number would light up in every bloom at once. */
+  const isSel = t => selected >= 0 && t.petal === selected && t.inst === selInstance;
+  const selStrips = heads.filter(isSel);
+  const rest = heads.filter(t => !isSel(t));
   const u = buildFamily('u', rest.filter(t => t.kind === 'u'));
   const v = buildFamily('v', rest.filter(t => t.kind === 'v'));
   const other = buildFamily('other', rest.filter(t => t.kind === 'other'));
   buildFamily('sel', selStrips, selMaterial);
   buildFamily('stem', stems);
-  drawnStrips = head;
-  const segOf = k => head.reduce((a, t) => a + (t.kind === k ? t.segments : 0), 0);
-  const lineOf = k => head.reduce((a, t) => a + (t.kind === k ? 1 : 0), 0);
+  drawnStrips = heads;
+  const segOf = k => heads.reduce((a, t) => a + (t.kind === k ? t.segments : 0), 0);
+  const lineOf = k => heads.reduce((a, t) => a + (t.kind === k ? 1 : 0), 0);
   // GRID SEGMENTS ONLY. The stem is counted on its own line, because "drawn N
   // of the file's M segments" stops meaning anything the moment it includes
   // segments the file does not contain.
+  const stemSegments = stems.reduce((a, t) => a + t.segments, 0);
   drawn = {
     u: segOf('u'), v: segOf('v'), other: segOf('other'),
     total: u.segments + v.segments + other.segments
@@ -873,10 +1037,14 @@ function rebuild() {
     uLines: lineOf('u'), vLines: lineOf('v'), otherLines: lineOf('other'),
     selected: selStrips.reduce((a, t) => a + t.segments, 0),
     selectedLines: selStrips.length,
-    stem: stemStats.segments, stemLines: stemStats.lines,
+    stem: stemSegments, stemLines: stems.length,
+    blooms: instances.length,
   };
+  const inst = cur();
+  const pw = inst.warpInfo;
   const info = petalInfoOf(selected);
   const myWarp = petalWarpOf();
+  const pt = readPetal();
   petalStats = {
     on: selected >= 0,
     warpable: !!(info && info.warpable && frame),
@@ -907,8 +1075,8 @@ function rebuild() {
     // array for every strip it did not move, so this counts array identity
     // rather than distance — a strip that moved by 1e-12 mm would be a new
     // array and would be counted here, where a tolerance would swallow it.
-    untouched: warpAll.reduce((a, t, i) => a + (t === strips[i] ? 1 : 0), 0),
-    offPetal: strips.reduce((a, t) => a + (selected >= 0 && t.petal === selected ? 0 : 1), 0),
+    untouched: inst.warpAll.reduce((a, t, i) => a + (t === inst.strips[i] ? 1 : 0), 0),
+    offPetal: inst.strips.reduce((a, t) => a + (selected >= 0 && t.petal === selected ? 0 : 1), 0),
     drawnStrips: selStrips.length,
     // TWO DIFFERENT "AT REST"s, and conflating them made the bend line say
     // "displaced" because a stretch slider had moved. `rest` is the petal's —
@@ -1017,6 +1185,35 @@ const petalHandleRadiusFor = L => Math.max(0.5, L * 0.028);
    below raycasts both and dispatches on what it hit — rather than two drag
    implementations that have to be kept saying the same thing about capture,
    about the drag plane and about switching the orbit off. */
+/* A POINT OF THE SELECTED BLOOM, PLACED — and the same point taken back out of
+   its placement. The handles stand on geometry the bloom's own laws produced in
+   the bloom's own grid space, so they are placed on the way out and unplaced on
+   the way in; the solves below then do their arithmetic in exactly the space
+   the law is written in, whatever the bloom's transform is doing.
+
+   THE IDENTITY IS AN IDENTITY. At the identity transform both are a copy and
+   nothing is computed, so a single bloom at rest goes through the very
+   arithmetic that shipped. */
+function placePoint(p, out) {
+  const t = cur().transform;
+  if (isIdentityTransform(t)) { out[0] = p[0]; out[1] = p[1]; out[2] = p[2]; return out; }
+  return applyMatrixToPoint(transformMatrix(t), p[0], p[1], p[2], out);
+}
+/* THE INVERSE, VIA three's own `Matrix4.invert` — the transform can carry a
+   rotation and a scale, so an inverse written by hand here would be a second
+   expression of the same matrix and the two would drift. */
+const invScratch = new THREE.Matrix4();
+function unplaceWorld(world, out) {
+  const t = cur().transform;
+  invScratch.copy(container.matrixWorld);
+  if (!isIdentityTransform(t)) {
+    invScratch.multiply(new THREE.Matrix4().fromArray(transformMatrix(t)));
+  }
+  const v = world.clone().applyMatrix4(invScratch.invert());
+  out[0] = v.x; out[1] = v.y; out[2] = v.z;
+  return out;
+}
+
 function syncHandlePool(pool, want, mat) {
   while (pool.length > want) container.remove(pool.pop());
   while (pool.length < want) {
@@ -1030,10 +1227,17 @@ function syncHandlePool(pool, want, mat) {
 }
 
 function syncHandles() {
+  // THE HANDLES ARE THE SELECTED BLOOM'S, AND ONLY ITS. Every instance carries
+  // its own bend list; drawing all of them at once would put three sets of
+  // draggable spheres on a picture where a drag has one meaning, and the
+  // selection is what says which stem the panel is editing.
+  const { bends, stemRing, stemIsDrawn } = cur();
   const st = readStem();
   syncHandlePool(handles, bends.length, HANDLE_MAT);
   const show = st.on && st.showHandles && stemIsDrawn && !!stemRing;
-  const r = handleRadiusFor(st);
+  // THE HANDLE IS A SIZE IN THE DRAWING, so it takes the bloom's own scale: a
+  // half-size bloom with full-size handles reads as a bloom made of handles.
+  const r = handleRadiusFor(st) * meanScale(cur().transform);
   const warp = currentWarp(st), opts = stemOpts(st), q = [0, 0, 0], t = [0, 0, 0];
   handles.forEach((h, k) => {
     h.visible = show;
@@ -1045,6 +1249,10 @@ function syncHandles() {
     // cannot move the stem visibly does not move either.
     if (stemRing) {
       centrelineAt(stemRing, opts, warp, bends[k].t * st.length, q, t);
+      // THROUGH THE BLOOM'S OWN PLACEMENT. The stem's law runs in the bloom's
+      // own grid space — that is where its ring and its millimetres are — so
+      // the handle is placed the same way the lines it stands on were.
+      placePoint(q, q);
       h.position.set(q[0], q[1], q[2]);
     }
   });
@@ -1060,6 +1268,7 @@ function syncHandles() {
    petal's points — so a handle on a nodding bloom stays on the blade it
    belongs to instead of standing where the blade used to be. */
 function syncPetalHandles() {
+  const { stemRing } = cur();
   const p = readPetal(), st = readStem();
   // THE SELECTED PETAL'S OWN BEND LIST — handles are the editor for one petal,
   // so an unselected petal's bends are held in its state and drawn in its
@@ -1072,7 +1281,7 @@ function syncPetalHandles() {
   document.getElementById('petalBendReset').disabled = !frame;
   if (!frame) return;
   const show = showPetalHandles() && selected >= 0;
-  const r = petalHandleRadiusFor(frame.length);
+  const r = petalHandleRadiusFor(frame.length) * meanScale(cur().transform);
   const warp = petalWarpOf();
   const angle = (st.on && stemRing) ? st.droopRad : 0;
   const c = stemRing ? stemRing.center : [0, 0, 0];
@@ -1084,6 +1293,7 @@ function syncPetalHandles() {
     h.scale.setScalar(r);
     petalCentreAt(frame, warp, p, bendsHere[k].t * frame.length, q, t);
     rotateAboutRing(q, c, angle, w);
+    placePoint(w, w);
     h.position.set(w[0], w[1], w[2]);
   });
 }
@@ -1103,14 +1313,15 @@ const BEND_GATE_FLOOR = 0.1;
    without that last term a handle would land under the pointer plus its
    neighbours' pull, which reads as the handle refusing to follow the mouse. */
 function setBendFromWorld(k, world) {
+  const { stemRing, bends } = cur();
   if (!stemRing || !bends[k]) return;
   const st = readStem();
   const sAt = bends[k].t * st.length;
   container.updateMatrixWorld(true);
-  const local = world.clone().applyMatrix4(
-    new THREE.Matrix4().copy(container.matrixWorld).invert());
+  const local = [0, 0, 0];
+  unplaceWorld(world, local);
   const un = [0, 0, 0];
-  rotateAboutRing([local.x, local.y, local.z], stemRing.center,
+  rotateAboutRing(local, stemRing.center,
                   -st.droopRad * droopDecay(sAt, st.neck), un);
   const base = [stemRing.center[0], stemRing.center[1], stemRing.center[2] - sAt];
   const gate = Math.max(convergence(sAt, st.join), BEND_GATE_FLOOR);
@@ -1149,17 +1360,18 @@ function setBendFromWorld(k, world) {
 const PETAL_BEND_GATE_FLOOR = 0.1;
 
 function setPetalBendFromWorld(k, world) {
+  const { stemRing } = cur();
   const bends = selectedBends();
   if (!frame || !bends[k]) return;
   const p = readPetal(), st = readStem();
   const sAt = bends[k].t * frame.length;
   container.updateMatrixWorld(true);
-  const local = world.clone().applyMatrix4(
-    new THREE.Matrix4().copy(container.matrixWorld).invert());
+  const local = [0, 0, 0];
+  unplaceWorld(world, local);
   const angle = (st.on && stemRing) ? st.droopRad : 0;
   const c = stemRing ? stemRing.center : [0, 0, 0];
   const un = [0, 0, 0];
-  rotateAboutRing([local.x, local.y, local.z], c, -angle, un);
+  rotateAboutRing(local, c, -angle, un);
   // The station's RESTING place: the centre line at rest, carried by the along
   // scale. `petalCentreAt` with a null warp is that, through the one law.
   const base = petalCentreAt(frame, null, p, sAt, [0, 0, 0], [0, 0, 0]);
@@ -1318,32 +1530,40 @@ function scanSegments(clientX, clientY, fn) {
         let t = L2 > 0 ? ((px - ax[0]) * dx + (py - ax[1]) * dy) / L2 : 0;
         t = t < 0 ? 0 : t > 1 ? 1 : t;
         const qx = ax[0] + t * dx - px, qy = ax[1] + t * dy - py;
-        fn(s.petal, Math.sqrt(qx * qx + qy * qy), ax[2] + t * (bx[2] - ax[2]));
+        fn(s.petal, Math.sqrt(qx * qx + qy * qy), ax[2] + t * (bx[2] - ax[2]), s.inst | 0);
       }
       ax[0] = bx[0]; ax[1] = bx[1]; ax[2] = bx[2]; okA = okB;
     }
   }
 }
 
+/* THE PICK NAMES BOTH HALVES OF THE CURSOR, because `petal` on its own does
+   not identify a petal once there is more than one bloom: petal 3 exists in
+   every one of them. The RULE is unchanged — of the segments within tolerance,
+   take the one nearest the camera — and what it returns is the pair. */
 function pickPetalAt(clientX, clientY) {
   const tol = PICK_TOLERANCE_PX;
-  let best = -1, bestZ = Infinity;
-  scanSegments(clientX, clientY, (petal, d, z) => {
-    if (d <= tol && z < bestZ) { bestZ = z; best = petal; }
+  let best = -1, bestInst = -1, bestZ = Infinity;
+  scanSegments(clientX, clientY, (petal, d, z, inst) => {
+    if (d <= tol && z < bestZ) { bestZ = z; best = petal; bestInst = inst; }
   });
-  return best;
+  return { petal: best, instance: bestInst };
 }
 
-/* A click on ink picks its petal; a click on the black picks none. Both go
-   through the dropdown, which is the one holder of the selection — so a click
-   and an arrow and a keyboard choice are the same event downstream. */
+/* A click on ink picks its bloom AND its petal; a click on the black picks
+   none. Both go through the two dropdowns, which are the one holder of each
+   half of the selection — so a click, an arrow and a keyboard choice are the
+   same event downstream. THE BLOOM GOES FIRST: `setSelectedPetal` reads the
+   index against the SELECTED bloom's own petal list, so choosing the petal
+   before its bloom would check it against the outgoing one. */
 function selectFromClick(clientX, clientY) {
   const hit = pickPetalAt(clientX, clientY);
-  setSelectedPetal(hit);
+  if (hit.instance >= 0 && hit.instance !== selInstance) setSelectedInstance(hit.instance);
+  setSelectedPetal(hit.petal);
 }
 
 function setSelectedPetal(index) {
-  const want = petalIndex.has(index) ? index : -1;
+  const want = cur().petalIndex.has(index) ? index : -1;
   if (+pui.petalPick.value === want) return false;
   pui.petalPick.value = String(want);
   pui.petalPick.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1354,7 +1574,7 @@ function setSelectedPetal(index) {
    than wrapping, so holding one does not spin through the bloom forever; from
    "none" the first step lands on the first petal. */
 function stepSelection(delta) {
-  const list = gridInfo ? gridInfo.petalList : [];
+  const list = cur().gridInfo ? cur().gridInfo.petalList : [];
   if (!list.length) return false;
   const at = list.findIndex(p => p.index === selected);
   const next = at < 0 ? (delta > 0 ? 0 : list.length - 1)
@@ -1362,8 +1582,94 @@ function stepSelection(delta) {
   return setSelectedPetal(list[next].index);
 }
 
+/* ---- the selected bloom -------------------------------------------------
+   THE OUTER HALF OF THE CURSOR. Everything here is the instance-level twin of
+   what `syncSelection` / `loadPetalControls` / `commitPetalScales` already do
+   for petals: the dropdown is the one canonical holder, selecting LOADS that
+   bloom's stem and placement into the panels, and a slider writes into the
+   bloom that owns it. Selecting a bloom therefore changes nothing about the
+   drawing — the same property `select/picking-a-petal-deforms-nothing` pins one
+   level down, and for the same reason. */
+function rebuildInstanceOptions() {
+  const el = bui.bloomPick;
+  el.innerHTML = '';
+  if (!instances.length) {
+    const o = document.createElement('option');
+    o.value = '0'; o.textContent = 'none';
+    el.appendChild(o);
+  }
+  instances.forEach((inst, k) => {
+    const o = document.createElement('option');
+    o.value = String(k);
+    o.textContent = `${k + 1} · ${inst.sourceName || inst.id}`;
+    el.appendChild(o);
+  });
+  el.value = String(selInstance);
+  bloomPrevBtn.disabled = instances.length < 2;
+  bloomNextBtn.disabled = instances.length < 2;
+  bloomRemoveBtn.disabled = instances.length < 2;
+}
+
+/* THE PANEL, WRITTEN FROM THE BLOOM. Setting `.value` in script fires no
+   `input`, so this cannot loop back through the handler that calls it. */
+function loadTransformControls() {
+  const t = cur().transform;
+  for (const f of TRANSFORM_FIELDS) {
+    const el = document.getElementById(f.control);
+    el.value = String(f.axis < 0 ? t[f.key][0] : t[f.key][f.axis]);
+    el.disabled = !instances.length;
+  }
+}
+
+/* AND THE PANEL, READ INTO THE BLOOM — the only path by which one of these
+   sliders reaches the drawing. The uniform scale writes all three components;
+   see TRANSFORM_FIELDS on why it is one control. */
+function commitTransform() {
+  const inst = cur();
+  if (inst === EMPTY_INSTANCE) return false;
+  const t = { position: inst.transform.position.slice(),
+              rotationDeg: inst.transform.rotationDeg.slice(),
+              scale: inst.transform.scale.slice() };
+  for (const f of TRANSFORM_FIELDS) {
+    const v = +document.getElementById(f.control).value;
+    if (f.axis < 0) t[f.key] = [v, v, v];
+    else t[f.key][f.axis] = v;
+  }
+  inst.transform = t;
+  return true;
+}
+
+/* THE ONE OWNER OF WHICH BLOOM IS SELECTED, the twin of `syncSelection`. The
+   petal cursor is RESET rather than carried: petal 3 of this bloom is a
+   different petal from petal 3 of that one, and carrying the number across
+   would silently select a different blade. */
+function setSelectedInstance(k) {
+  const want = (k >= 0 && k < instances.length) ? k : selInstance;
+  if (want === selInstance) { bui.bloomPick.value = String(selInstance); return false; }
+  selInstance = want;
+  bui.bloomPick.value = String(selInstance);
+  loadStemControls();
+  loadTransformControls();
+  // A FRESH BLOOM PICKS NOTHING, through the one path — `rebuildPetalOptions`
+  // writes -1 into the control and `syncSelection` reads it on the next rebuild.
+  rebuildPetalOptions();
+  rebuild();
+  writeGridState(); writeDrawState();
+  writeStemState(); writeStemOutputs();
+  writePetalState(); writePetalOutputs();
+  writeInstanceOutputs();
+  writeFrameInfo();
+  return true;
+}
+function stepInstance(delta) {
+  if (instances.length < 2) return false;
+  const n = instances.length;
+  return setSelectedInstance(Math.min(n - 1, Math.max(0, selInstance + delta)));
+}
+
 /* ---- adding, removing and resting bend points --------------------------- */
 function addBend() {
+  const { bends } = cur();
   if (bends.length >= MAX_BENDS) return false;
   const st = readStem();
   const at = nextStation(stationsOf(st), st.length);
@@ -1373,6 +1679,7 @@ function addBend() {
   return true;
 }
 function removeBend() {
+  const { bends } = cur();
   const i = removeIndex(bends.length);
   if (i < 0) return false;
   bends.splice(i, 1);
@@ -1383,7 +1690,7 @@ function removeBend() {
 // because the count is a choice the artist made and the offsets are the thing
 // that goes wrong.
 function restBends() {
-  for (const b of bends) b.offset = [0, 0, 0];
+  for (const b of cur().bends) b.offset = [0, 0, 0];
   afterBendChange();
 }
 function afterBendChange() { rebuild(); writeStemOutputs(); writeStemState(); writeDrawState(); }
@@ -1438,21 +1745,32 @@ function worldSphere() {
    droop) rather than the ones the density sliders kept, so thinning the grid
    does not re-frame it, and then the stem strips that are actually drawn. */
 function eachDrawnPoint(fn) {
-  const st = readStem();
-  const angle = (st.on && stemRing) ? st.droopRad : 0;
-  const c = stemRing ? stemRing.center : [0, 0, 0];
-  const p = [0, 0, 0], q = [0, 0, 0];
-  // `warpAll` and not `strips`: a stretched petal has to be in frame and inside
-  // the fog's own sphere, or it hangs out of the picture or fades to black at
-  // the very moment it is the thing being looked at. It is the file's own array
-  // when nothing is warped, so the shipped drawing is unchanged.
-  for (const s of warpAll) {
-    for (let i = 0; i < s.count; i++) {
-      p[0] = s.points[i * 3]; p[1] = s.points[i * 3 + 1]; p[2] = s.points[i * 3 + 2];
-      rotateAboutRing(p, c, angle, q);
-      fn(q[0], q[1], q[2]);
+  const p = [0, 0, 0], q = [0, 0, 0], w = [0, 0, 0];
+  // EVERY BLOOM, EACH IN TURN AND EACH THROUGH ITS OWN DROOP AND ITS OWN
+  // PLACEMENT. The droop is a property of the instance's stem and the placement
+  // of the instance, so the two are composed here per point rather than a
+  // second placed copy of every strip being kept for the camera to read.
+  for (const inst of instances) {
+    const st = stemOf(inst);
+    const angle = (st.on && inst.stemRing) ? st.droopRad : 0;
+    const c = inst.stemRing ? inst.stemRing.center : [0, 0, 0];
+    const ident = isIdentityTransform(inst.transform);
+    const m = ident ? null : transformMatrix(inst.transform);
+    // `warpAll` and not `strips`: a stretched petal has to be in frame and inside
+    // the fog's own sphere, or it hangs out of the picture or fades to black at
+    // the very moment it is the thing being looked at. It is the file's own array
+    // when nothing is warped, so the shipped drawing is unchanged.
+    for (const s of inst.warpAll) {
+      for (let i = 0; i < s.count; i++) {
+        p[0] = s.points[i * 3]; p[1] = s.points[i * 3 + 1]; p[2] = s.points[i * 3 + 2];
+        rotateAboutRing(p, c, angle, q);
+        if (m) { applyMatrixToPoint(m, q[0], q[1], q[2], w); fn(w[0], w[1], w[2]); }
+        else fn(q[0], q[1], q[2]);
+      }
     }
   }
+  // The stems are already placed — they are what is drawn — so they are walked
+  // flat, across every bloom, exactly as they were when there was one.
   for (const s of stemStrips) {
     for (let i = 0; i < s.count; i++) fn(s.points[i * 3], s.points[i * 3 + 1], s.points[i * 3 + 2]);
   }
@@ -1466,10 +1784,20 @@ function eachDrawnPoint(fn) {
    per frame — the fog itself is re-solved per frame against the live camera,
    but what it is solved around is a property of the drawing. */
 function computeViewBounds() {
-  const st = readStem();
-  const moved = stemIsDrawn || (st.on && stemRing && st.droopRad !== 0)
-                || warpAll !== strips;
-  if (!moved) { viewBounds = localBounds; return; }
+  /* THE SHORTCUT SURVIVES, AND IT NOW HAS ONE MORE CONDITION. With a single
+     bloom standing at the origin with nothing warped, drooped or continued, the
+     drawing IS the file and this is `localBounds` verbatim — the fade is
+     exactly the one /plot shipped. A second bloom, or a placed one, is a
+     different picture and is measured. */
+  const one = instances.length === 1 ? instances[0] : null;
+  if (one) {
+    const st = stemOf(one);
+    const moved = one.stemIsDrawn || (st.on && one.stemRing && st.droopRad !== 0)
+                  || one.warpAll !== one.strips
+                  || !isIdentityTransform(one.transform);
+    if (!moved) { viewBounds = one.localBounds; return; }
+  }
+  if (!instances.length) { viewBounds = null; return; }
   // TWO WALKS AND NO ARRAY. Collecting the points to measure the radius in a
   // second pass meant a 135,000-element JS array per rebuild, and cost 6.6 ms
   // of a 13.5 ms rebuild — more than building the stem. Walking twice is
@@ -1482,7 +1810,7 @@ function computeViewBounds() {
     if (y < min[1]) min[1] = y; if (y > max[1]) max[1] = y;
     if (z < min[2]) min[2] = z; if (z > max[2]) max[2] = z;
   });
-  if (!n) { viewBounds = localBounds; return; }
+  if (!n) { viewBounds = one ? one.localBounds : null; return; }
   const center = [0, 1, 2].map(a => (min[a] + max[a]) / 2);
   let r = 0;
   eachDrawnPoint((x, y, z) => {
@@ -1503,7 +1831,7 @@ function setClipping(dist) {
 }
 
 function fitCamera(dirArr, margin = 1.06) {
-  if (!viewBounds || !strips.length) return false;
+  if (!viewBounds || !instances.length) return false;
   container.updateMatrixWorld(true);
   const M = container.matrixWorld;
   const center = new THREE.Vector3(...viewBounds.center).applyMatrix4(M);
@@ -1628,11 +1956,18 @@ renderer.setAnimationLoop(() => {
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
 
 function gridText() {
+  const { gridInfo, assetExtras, sourceName } = cur();
   const lines = [];
   if (lastError) lines.push(`<span class="err">${esc(lastError)}</span>`);
   if (!gridInfo) { lines.push('no grid loaded'); return lines.join('\n'); }
   const c = gridInfo.census;
   const x = assetExtras || {};
+  /* THE GRID PANEL DESCRIBES THE SELECTED BLOOM, and says so the moment there
+     is more than one — a census that silently named one of several files would
+     be the wrong number under the right heading. */
+  if (instances.length > 1) {
+    lines.push(`bloom ${selInstance + 1} of ${instances.length}`);
+  }
   lines.push(`<b>${esc(sourceName)}</b>`);
   lines.push(`mode ${esc(x.mode ?? '—')}   units ${esc(x.units ?? '—')}`);
   if (x.petalsRetained != null) {
@@ -1674,15 +2009,23 @@ function gridText() {
    Measured: on the shipped grid the count test called eight of the u slider's
    twelve positions dead, where only the genuinely repeated ones are. */
 function selectionKey(kind, density) {
-  if (!strips.length) return 0;
+  if (!instances.length) return 0;
   const s = readUI();
   const opts = { families: 'both', uDensity: s.uDensity, vDensity: s.vDensity };
   opts[kind === 'u' ? 'uDensity' : 'vDensity'] = density;
   let h = 2166136261;
-  for (const t of selectStrips(strips, opts)) {
-    if (t.kind !== kind) continue;
-    h = Math.imul(h ^ t.petal, 16777619) >>> 0;
-    h = Math.imul(h ^ (t.index + 2), 16777619) >>> 0;
+  /* ACROSS EVERY BLOOM, because the slider is one control over all of them: a
+     position is dead travel only when NO loaded grid draws anything different
+     there, and a key taken on the selected bloom alone would hatch the track
+     according to whichever one happened to be picked. The instance ordinal is
+     folded in so two grids whose kept sets coincide still read as two. */
+  for (let k = 0; k < instances.length; k++) {
+    for (const t of selectStrips(instances[k].strips, opts)) {
+      if (t.kind !== kind) continue;
+      h = Math.imul(h ^ k, 16777619) >>> 0;
+      h = Math.imul(h ^ t.petal, 16777619) >>> 0;
+      h = Math.imul(h ^ (t.index + 2), 16777619) >>> 0;
+    }
   }
   return h;
 }
@@ -1723,11 +2066,33 @@ function applyDeadTravel() {
   }
 }
 
+/* THE CENSUS OF EVERY LOADED GRID, SUMMED. The DRAW panel's counts are what is
+   on screen across the whole composition — "drawn N of M segments" would stop
+   being a ratio the moment a second bloom's segments were in N and not in M —
+   so its denominator is summed the same way its numerator is. With one bloom it
+   is that bloom's own census, verbatim. */
+function totalCensus() {
+  const t = { u: 0, v: 0, other: 0, strips: 0, uSegments: 0, vSegments: 0,
+              otherSegments: 0, segments: 0 };
+  for (const inst of instances) {
+    if (!inst.gridInfo) continue;
+    for (const k of Object.keys(t)) t[k] += inst.gridInfo.census[k] || 0;
+  }
+  return t;
+}
+
 function drawText() {
   const s = readUI();
-  const c = gridInfo ? gridInfo.census : { u: 0, v: 0, uSegments: 0, vSegments: 0, segments: 0 };
+  const c = totalCensus();
   const uEvery = densityToEvery(s.uDensity), vEvery = densityToEvery(s.vDensity);
   const lines = [];
+  /* HOW MANY BLOOMS, FIRST, AND ONLY WHEN THERE IS MORE THAN ONE. Every count
+     below is across all of them, so a reader who does not know how many are
+     loaded cannot read the panel; a reader looking at one bloom is told nothing
+     new and the line is not there. */
+  if (instances.length !== 1) {
+    lines.push(`${instances.length} bloom${instances.length === 1 ? '' : 's'}`);
+  }
   // Names the RANGE, not just this position: which slider settings are the
   // same picture is what the visitor needs before dragging into them.
   const bottom = k => {
@@ -1783,10 +2148,17 @@ function drawText() {
    the eased station ladder cuts the corner. Neither is a sentence claiming a
    property; both are the property, measured, on the settings in front of you. */
 function stemText() {
+  /* THE SELECTED BLOOM'S STEM. Every bloom infers its own from its own u-lines
+     and carries its own six values, so this panel — like the GRID and PETAL
+     panels beside it — is about the one the cursor is on, and says so when
+     there is more than one to be about. */
+  const { stemRing, stemIsDrawn, stemStats, bends, gridInfo } = cur();
   const st = readStem();
   const lines = [];
-  if (!st.on) return 'stem off — the grid is drawn as the file wrote it';
-  if (!stemRing) return 'no stem — this file has no u-lines to hang one from';
+  const head = instances.length > 1 ? `bloom ${selInstance + 1} of ${instances.length}\n` : '';
+  if (!st.on) return head + 'stem off — the grid is drawn as the file wrote it';
+  if (!stemRing) return head + 'no stem — this file has no u-lines to hang one from';
+  if (head) lines.push(head.trim());
 
   const nf = n => n.toLocaleString('en-US');
   const mm = n => `${n.toFixed(2)} mm`;
@@ -1795,7 +2167,7 @@ function stemText() {
       + ' continued, and no u line is on screen</span>');
   }
   lines.push(`${stemStats.lines} of ${gridInfo ? gridInfo.census.u : 0} u-lines continued`
-    + ` · ${nf(stemStats.segments)} stem segments beside the grid's ${nf(drawn.total)}`);
+    + ` · ${nf(stemStats.segments)} stem segments beside the drawing's ${nf(drawn.total)}`);
   lines.push(`ring   centre (${stemRing.center.map(v => v.toFixed(2)).join(', ')})`
     + ` · ${stemRing.count} feet, ${mm(stemRing.rMin)}–${mm(stemRing.rMax)} out`);
   lines.push(`funnel  ${mm(stemRing.rMin)}–${mm(stemRing.rMax)} gathers to`
@@ -1858,8 +2230,8 @@ function stemText() {
 function petalText() {
   const p = readPetal();
   const lines = [];
-  const n = gridInfo ? gridInfo.petalList.length : 0;
-  if (!gridInfo) return 'no grid loaded';
+  const n = cur().gridInfo ? cur().gridInfo.petalList.length : 0;
+  if (!cur().gridInfo) return 'no grid loaded';
   // HOW MANY PETALS CARRY A WARP, said first and said whether or not one is
   // picked: a warp outlives its selection, so "none picked" must not read as
   // "nothing is deformed".
@@ -1935,6 +2307,64 @@ function petalText() {
   return lines.join('\n');
 }
 
+/* THE BLOOM'S READ-OUT. Three things the panel cannot otherwise say: how many
+   blooms the composition holds and which one these controls are editing, what
+   this bloom's placement actually IS (including a scale the uniform control
+   cannot show), and what the whole composition costs — because a second bloom
+   doubles the segment count and a slider drag pays for all of them, and a
+   number nobody prints is a number nobody watches. */
+function bloomText() {
+  const inst = cur();
+  const lines = [];
+  if (!instances.length) return 'no bloom loaded — add a grid .glb';
+  const t = inst.transform;
+  lines.push(`bloom ${selInstance + 1} of ${instances.length}`
+    + `   <b>${esc(inst.sourceName || inst.id)}</b>`);
+  if (isIdentityTransform(t)) {
+    lines.push('at rest — this bloom stands where its file put it, at full size');
+  } else {
+    lines.push(`at      (${t.position.map(v => v.toFixed(0)).join(', ')}) mm`
+      + `   turn (${t.rotationDeg.map(v => v.toFixed(0)).join(', ')})°`
+      + `   scale ${t.scale[0].toFixed(2)}x`);
+    if (!scaleIsUniform(t)) {
+      lines.push(`<span class="warn">        the saved scale is not uniform`
+        + ` (${t.scale.map(v => v.toFixed(2)).join(', ')}) — it is drawn as saved,`
+        + ' and moving the scale control makes all three equal</span>');
+    }
+  }
+  lines.push('        x, y and z are the GRID\'s own axes, before the Z-up correction:'
+    + ' +z is the way the bloom faces');
+  // WHAT THE WHOLE COMPOSITION COSTS. Grid segments and stem segments apart,
+  // because they come from two places and only one of them is in any file.
+  lines.push(`cost    ${drawn.total.toLocaleString('en-US')} grid segments`
+    + ` + ${drawn.stem.toLocaleString('en-US')} stem`
+    + ` = ${(drawn.total + drawn.stem).toLocaleString('en-US')} drawn`
+    + `   ·   ${lastFrameMs.toFixed(2)} ms/frame`);
+  if (instances.length >= MAX_INSTANCES) {
+    lines.push(`<span class="warn">${MAX_INSTANCES} blooms is as many as this page`
+      + ' draws — remove one before adding another</span>');
+  }
+  if (instances.length === 1) {
+    lines.push('remove is off: the last bloom cannot be removed, because an empty'
+      + ' viewport says nothing');
+  }
+  return lines.join('\n');
+}
+function writeInstanceState() { bloomEl.innerHTML = bloomText(); }
+function writeInstanceOutputs() {
+  const t = cur().transform;
+  bout.bloomPick.textContent = instances.length
+    ? `${selInstance + 1} of ${instances.length}` : 'none';
+  bout.bloomX.textContent = `${t.position[0].toFixed(0)} mm`;
+  bout.bloomY.textContent = `${t.position[1].toFixed(0)} mm`;
+  bout.bloomZ.textContent = `${t.position[2].toFixed(0)} mm`;
+  bout.bloomRotX.textContent = `${t.rotationDeg[0].toFixed(0)}\u00b0`;
+  bout.bloomRotY.textContent = `${t.rotationDeg[1].toFixed(0)}\u00b0`;
+  bout.bloomRotZ.textContent = `${t.rotationDeg[2].toFixed(0)}\u00b0`;
+  bout.bloomScale.textContent = `${t.scale[0].toFixed(2)}\u00d7`;
+  writeInstanceState();
+}
+
 function writePetalState() { petalEl.innerHTML = petalText(); }
 
 function writePetalOutputs() {
@@ -1950,7 +2380,7 @@ function writePetalOutputs() {
   pout.bend.textContent = !frame ? '\u2014'
     : !selectedBends().length ? 'none'
     : petalStats.bendsRest ? 'at rest' : 'bent';
-  const list = gridInfo ? gridInfo.petalList : [];
+  const list = cur().gridInfo ? cur().gridInfo.petalList : [];
   const at = list.findIndex(q => q.index === selected);
   petalPrevBtn.disabled = !list.length || at === 0;
   petalNextBtn.disabled = !list.length || at === list.length - 1;
@@ -1961,7 +2391,7 @@ function writePetalOutputs() {
    should be able to see which one it is — and the read-out then says why it
    cannot be deformed instead of the control quietly missing an entry. */
 function rebuildPetalOptions() {
-  const list = gridInfo ? gridInfo.petalList : [];
+  const list = cur().gridInfo ? cur().gridInfo.petalList : [];
   const opts = ['<option value="-1">none</option>'];
   for (const q of list) {
     opts.push(`<option value="${q.index}">${esc(q.name)}`
@@ -1974,6 +2404,7 @@ function rebuildPetalOptions() {
 function writeStemState() { stemEl.innerHTML = stemText(); }
 
 function writeStemOutputs() {
+  const { stemIsDrawn, stemStats, bends } = cur();
   const st = readStem();
   sout.stem.textContent = st.on
     ? (stemIsDrawn ? `${stemStats.segments.toLocaleString('en-US')} seg` : 'no u lines')
@@ -2252,7 +2683,7 @@ function rasterExport({ scale = RASTER_SCALE, withData = false } = {}) {
     scale: cropped.scale, requestedScale: scale,
     aspect: cropped.width / cropped.height,
     shape, polarity: pol.id, cleared: cropped.cleared, stats,
-    name: exportName(sourceName, pol.id, shape, 'png'),
+    name: exportName(cur().sourceName, pol.id, shape, 'png'),
     canvas: cv,
     dataUrl: withData ? cv.toDataURL('image/png') : null,
   };
@@ -2301,7 +2732,7 @@ function projectStrips(box, mmPerPx) {
    export's own asset.extras and is not relabelled: if a grid says something
    other than millimetres, that is what the SVG is dimensioned in. */
 function exportUnits() {
-  const u = assetExtras && assetExtras.units ? String(assetExtras.units) : '';
+  const u = cur().assetExtras && cur().assetExtras.units ? String(cur().assetExtras.units) : '';
   return u || 'mm';
 }
 const exportMmPerPx = () => mmPerPixel(camera.fov,
@@ -2336,14 +2767,14 @@ function svgExport() {
     ink: pol.groundIsWhite ? 0x000000 : 0xffffff,
     ground: pol.ground, drawGround: !pol.groundIsWhite,
     unitLabel: unit,
-    title: `${sourceName || 'grid'} — ${pol.label}, ${shape} `
+    title: `${cur().sourceName || 'grid'} — ${pol.label}, ${shape} `
       + `${f.on ? f.ratio : 'viewport'}`,
   });
   return { text, paths: paths.length, strips: stripCount, points, dropped, shape,
            polarity: pol.id, unit,
            widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,
            strokeMm, mmPerPx,
-           name: exportName(sourceName, pol.id, shape, 'svg') };
+           name: exportName(cur().sourceName, pol.id, shape, 'svg') };
 }
 
 function download(blob, name) {
@@ -2358,7 +2789,7 @@ function download(blob, name) {
 
 let lastExport = null;
 function exportPNG() {
-  if (!strips.length) return null;
+  if (!instances.length) return null;
   const r = rasterExport({});
   r.canvas.toBlob(b => { if (b) download(b, r.name); }, 'image/png');
   lastExport = { kind: 'PNG', name: r.name,
@@ -2370,7 +2801,7 @@ function exportPNG() {
 }
 
 function exportSVG() {
-  if (!strips.length) return null;
+  if (!instances.length) return null;
   const r = svgExport();
   download(new Blob([r.text], { type: 'image/svg+xml' }), r.name);
   lastExport = { kind: 'SVG', name: r.name,
@@ -2390,7 +2821,7 @@ function exportText() {
   const pol = polarityOf(s.polarity);
   const box = exportBox();
   const lines = [];
-  if (!strips.length) return '<span class="warn">no grid loaded</span> — nothing to export';
+  if (!instances.length) return '<span class="warn">no grid loaded</span> — nothing to export';
   const S = rasterScaleFor(RASTER_SCALE);
   lines.push(`<b>PNG</b> ${Math.round(box.width * S)} x ${Math.round(box.height * S)} px`
     + ` — the picture at ${S}x, ${pol.blend}, exactly as rendered`
@@ -2459,18 +2890,43 @@ const applyFields = (fields, vals) => {
   return wrote;
 };
 
-const currentIdentity = () => gridIdentity({
-  name: sourceName,
-  mode: assetExtras ? (assetExtras.mode ?? null) : null,
-  census: gridInfo ? gridInfo.census : null,
-  petals: gridInfo ? gridInfo.petals : 0,
+const identityOf = inst => gridIdentity({
+  name: inst.sourceName,
+  mode: inst.assetExtras ? (inst.assetExtras.mode ?? null) : null,
+  census: inst.gridInfo ? inst.gridInfo.census : null,
+  petals: inst.gridInfo ? inst.gridInfo.petals : 0,
 });
+const currentIdentity = () => identityOf(cur());
 
 const bendsOut = list => list.map(b => ({ t: b.t, offset: b.offset.slice() }));
 
-/* THE DOCUMENT, FROM THE PAGE AS IT STANDS. One instance today, in a list,
-   carrying its own grid identity and its own transform — see plot-file.js on
-   why the root's cardinality is the thing that must not need migrating.
+/* ONE BLOOM'S STEM, THROUGH THE FIELD TABLE RATHER THAN OFF THE INSTANCE. The
+   panel's six controls are a view of the SELECTED bloom, so a `gather` over the
+   DOM would write the selected bloom's stem into every instance — which is
+   precisely the ownership error the petal warps already had once. Walking
+   STEM_FIELDS keeps the file's rule 1 (one table, both directions) while the
+   values come from the bloom that owns them. */
+const gatherStem = inst => {
+  const o = {};
+  for (const f of STEM_FIELDS) o[f.key] = inst.stemVals[f.key];
+  return o;
+};
+const applyStemFields = (inst, vals) => {
+  const wrote = [];
+  for (const f of STEM_FIELDS) {
+    if (!Object.prototype.hasOwnProperty.call(vals, f.key)) continue;
+    inst.stemVals[f.key] = vals[f.key];
+    wrote.push(f.key);
+  }
+  return wrote;
+};
+
+/* THE DOCUMENT, FROM THE PAGE AS IT STANDS — every bloom in the list, each
+   carrying its own grid identity, its own transform, its own stem and its own
+   per-petal warps. The root has always been a LIST for exactly this; what
+   changed is that it now holds what it was shaped to hold, and NOTHING about
+   the format moved, so the version does not move either. A file written before
+   tonight is one entry long and reads back unchanged.
 
    EVERY PETAL ENTRY IS SAVED, INCLUDING THE ONES AT REST. An entry exists
    because that petal was selected at least once, and that is real state: saving
@@ -2484,16 +2940,18 @@ function compositionDoc() {
     view: gather(VIEW_FIELDS),
     camera: { position: camera.position.toArray(), target: controls.target.toArray(),
               fov: camera.fov },
-    selection: { instance: 0, petal: selected },
-    instances: [{
-      id: 'bloom-0',
-      grid: currentIdentity(),
-      transform: IDENTITY_TRANSFORM,
-      stem: { ...gather(STEM_FIELDS), bends: bendsOut(bends) },
-      petals: [...petalWarps.entries()].map(([index, st]) => ({
+    // ONE CURSOR, BOTH HALVES. `selection.instance` has been in the file since
+    // it was written and was always 0; it is the live value now.
+    selection: { instance: selInstance, petal: selected },
+    instances: instances.map(inst => ({
+      id: inst.id,
+      grid: identityOf(inst),
+      transform: cloneTransform(inst.transform),
+      stem: { ...gatherStem(inst), bends: bendsOut(inst.bends) },
+      petals: [...inst.petalWarps.entries()].map(([index, st]) => ({
         index, along: st.along, across: st.across, bends: bendsOut(st.bends),
       })),
-    }],
+    })),
   });
 }
 const compositionText = () => toText(compositionDoc());
@@ -2519,9 +2977,10 @@ function saveComposition() {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
   lastSaved = { name, text };
-  const warped = doc.instances[0].petals.length;
+  const warped = doc.instances.reduce((a, i) => a + i.petals.length, 0);
   lastComposition = { action: 'saved', name, notes: [], bytes: text.length,
-                      petals: warped, dropped: 0, mismatch: null };
+                      blooms: doc.instances.length, petals: warped, dropped: 0,
+                      mismatch: null, mismatches: [] };
   writeCompState();
   return text;
 }
@@ -2568,57 +3027,103 @@ function applyComposition(text, name) {
   }
   const doc = r.doc;
   const notes = r.notes.slice();
-  const inst = doc.instances[0];
 
-  /* THE GRID IS COMPARED AND NAMED, FIELD BY FIELD. Not refused: a re-export of
-     the same bloom is a mismatch too, and an artist who wants their warps on it
-     is not doing anything unreasonable. What must never happen is the mismatch
-     being SILENT, so it is the loudest line in the panel and it says what
-     differs rather than that something did. */
-  const cmp = inst.grid ? compareIdentity(inst.grid, currentIdentity())
-                        : { match: true, differences: [] };
+  /* THE FILE'S BLOOMS ARE MATCHED TO THE PAGE'S, IN ORDER, AND THE REMAINDER IS
+     SAID. The grids themselves are not in the file — they are megabytes and
+     they are already on disk — so a restore lands each saved instance's state
+     onto the loaded bloom at the same position. A file with more blooms than
+     the page has loaded cannot be honoured in full, and that is REPORTED
+     rather than silently truncated: it names how many grids to load and in
+     what order, which is something an artist can act on, where "restored" over
+     a picture missing two blooms is not. */
+  const n = Math.min(doc.instances.length, instances.length);
+  if (doc.instances.length > instances.length) {
+    notes.push({ kind: 'not-applied', text: `this composition holds `
+      + `${doc.instances.length} blooms and ${instances.length} `
+      + `${instances.length === 1 ? 'is' : 'are'} loaded — the first ${n} `
+      + `${n === 1 ? 'was' : 'were'} restored. Load the missing grids in the `
+      + 'order the file names them, then restore again' });
+  } else if (instances.length > doc.instances.length) {
+    notes.push({ kind: 'not-applied', text: `this composition holds `
+      + `${doc.instances.length} bloom${doc.instances.length === 1 ? '' : 's'} and `
+      + `${instances.length} are loaded — the extra `
+      + `${instances.length - doc.instances.length} `
+      + `${instances.length - doc.instances.length === 1 ? 'was' : 'were'} left `
+      + 'exactly as they stand' });
+  }
 
   applyFields(FRAME_FIELDS, doc.frame);
   applyFields(DRAW_FIELDS, doc.draw);
   applyFields(VIEW_FIELDS, doc.view);
-  applyFields(STEM_FIELDS, inst.stem);
-  if (inst.stem.bends) bends = bendsOut(inst.stem.bends);
 
-  /* A WARP FOR A PETAL THIS GRID DOES NOT HAVE IS DROPPED AND COUNTED, never
-     folded onto a neighbour — `resolvePetals` is the rule and it is driven in
-     the gate. A missing `along`/`across` inside an entry that IS applied reads
-     as rest: the petal has no page value to leave alone, and the reader has
-     already reported the field missing. */
-  const { applied, dropped } = resolvePetals(inst.petals, i => petalIndex.has(i));
-  petalWarps = new Map();
-  for (const p of applied) {
-    petalWarps.set(p.index, {
-      along: p.along === undefined ? 1 : p.along,
-      across: p.across === undefined ? 1 : p.across,
-      bends: bendsOut(p.bends || []),
-    });
-  }
-  if (dropped.length) {
-    notes.push({ kind: 'dropped', text: `${dropped.length} petal warp`
-      + `${dropped.length === 1 ? '' : 's'} (petal ${dropped.map(p => p.index).join(', ')}) `
-      + `${dropped.length === 1 ? 'names a petal' : 'name petals'} this grid does not have `
-      + `— dropped rather than moved onto another petal` });
+  /* THE GRID IS COMPARED AND NAMED, FIELD BY FIELD, PER BLOOM. Not refused: a
+     re-export of the same bloom is a mismatch too, and an artist who wants
+     their warps on it is not doing anything unreasonable. What must never
+     happen is the mismatch being SILENT, so it is the loudest line in the panel
+     and it says what differs rather than that something did. */
+  const mismatches = [];
+  let applied = 0, dropped = 0;
+  for (let k = 0; k < n; k++) {
+    const src = doc.instances[k];
+    const target = instances[k];
+    const cmp = src.grid ? compareIdentity(src.grid, identityOf(target))
+                         : { match: true, differences: [] };
+    if (!cmp.match) mismatches.push({ instance: k, differences: cmp.differences });
+
+    applyStemFields(target, src.stem);
+    if (src.stem.bends) target.bends = bendsOut(src.stem.bends);
+    if (src.transform) target.transform = cloneTransform(src.transform);
+
+    /* A WARP FOR A PETAL THIS GRID DOES NOT HAVE IS DROPPED AND COUNTED, never
+       folded onto a neighbour — `resolvePetals` is the rule and it is driven in
+       the gate. A missing `along`/`across` inside an entry that IS applied reads
+       as rest: the petal has no page value to leave alone, and the reader has
+       already reported the field missing. */
+    const res = resolvePetals(src.petals, i => target.petalIndex.has(i));
+    target.petalWarps = new Map();
+    for (const p of res.applied) {
+      target.petalWarps.set(p.index, {
+        along: p.along === undefined ? 1 : p.along,
+        across: p.across === undefined ? 1 : p.across,
+        bends: bendsOut(p.bends || []),
+      });
+    }
+    applied += res.applied.length;
+    dropped += res.dropped.length;
+    if (res.dropped.length) {
+      notes.push({ kind: 'dropped', text: `bloom ${k + 1}: ${res.dropped.length} petal warp`
+        + `${res.dropped.length === 1 ? '' : 's'} (petal ${res.dropped.map(p => p.index).join(', ')}) `
+        + `${res.dropped.length === 1 ? 'names a petal' : 'name petals'} this grid does not have `
+        + `— dropped rather than moved onto another petal` });
+    }
   }
 
+  /* THE CURSOR, BOTH HALVES, AND THE BLOOM FIRST — the petal index is read
+     against the bloom it belongs to, so restoring the petal before the bloom
+     would check it against the outgoing one. */
   if (doc.selection) {
+    const wantInst = doc.selection.instance;
+    if (wantInst >= 0 && wantInst < instances.length) selInstance = wantInst;
+    else if (instances.length) {
+      notes.push({ kind: 'dropped', text: `the saved selection names bloom `
+        + `${wantInst + 1}, which is not loaded — bloom ${selInstance + 1} stays selected` });
+    }
+    loadStemControls();
+    rebuildInstanceOptions();
+    rebuildPetalOptions();
     const want = doc.selection.petal;
-    const canSelect = want >= 0 && petalIndex.has(want);
+    const canSelect = want >= 0 && cur().petalIndex.has(want);
     pui.petalPick.value = String(canSelect ? want : -1);
     if (want >= 0 && !canSelect) {
       notes.push({ kind: 'dropped', text: `the saved selection was petal ${want}, `
         + 'which this grid does not have — nothing is selected' });
     }
-    if (doc.selection.instance !== 0) {
-      notes.push({ kind: 'not-applied', text: `the saved selection names instance `
-        + `${doc.selection.instance} and this page draws one bloom — petal selection `
-        + 'was applied to it' });
-    }
+  } else {
+    loadStemControls();
+    rebuildInstanceOptions();
+    rebuildPetalOptions();
   }
+  loadTransformControls();
 
   rebuild();
   loadPetalControls();
@@ -2630,8 +3135,9 @@ function applyComposition(text, name) {
   else notes.push({ kind: 'missing', text: 'no camera in the file — the view was left where it was' });
 
   lastComposition = { action: 'restored', name, notes, bytes: text.length,
-                      petals: applied.length, dropped: dropped.length,
-                      mismatch: cmp.match ? null : cmp.differences };
+                      blooms: n, petals: applied, dropped,
+                      mismatch: mismatches.length ? mismatches[0].differences : null,
+                      mismatches };
   writeCompState();
   dirty = true;
   return true;
@@ -2662,11 +3168,15 @@ function compText() {
     return lines.join('\n');
   }
   lines.push(`<span class="ok">${c.action}</span>  ${esc(c.name)}   ${KB(c.bytes)}`);
-  lines.push(`1 bloom · ${c.petals} petal entr${c.petals === 1 ? 'y' : 'ies'}`
+  const nb = c.blooms ?? 1;
+  lines.push(`${nb} bloom${nb === 1 ? '' : 's'} · ${c.petals} petal entr${c.petals === 1 ? 'y' : 'ies'}`
     + (c.dropped ? ` · ${c.dropped} dropped` : ''));
-  if (c.mismatch) {
-    lines.push('<span class="warn">this composition was saved from a DIFFERENT grid:</span>');
-    for (const d of c.mismatch) {
+  /* EVERY MISMATCHED BLOOM, NAMED. With several loaded, "saved from a different
+     grid" has to say WHICH — a single unlabelled list would send the reader to
+     check the wrong bloom's petals. */
+  for (const m of (c.mismatches || (c.mismatch ? [{ instance: 0, differences: c.mismatch }] : []))) {
+    lines.push(`<span class="warn">bloom ${m.instance + 1} was saved from a DIFFERENT grid:</span>`);
+    for (const d of m.differences) {
       lines.push(`  <span class="warn">${esc(d.field)}</span>  `
         + `${esc(JSON.stringify(d.saved))} → ${esc(JSON.stringify(d.current))}`);
     }
@@ -2687,6 +3197,16 @@ function writeCompState() { compEl.innerHTML = compText(); }
 /* ---- loading ------------------------------------------------------------ */
 const loader = new GLTFLoader();
 
+/* AN IMPORT ADDS A BLOOM; IT DOES NOT REPLACE THE DRAWING. That is the whole
+   change on this path, and it is what a composition of several blooms is made
+   of. Removing one is its own button, because "load a different grid" and
+   "throw this bloom away" are two different intentions and a loader that did
+   both silently would make the second one un-undoable.
+
+   NOTHING IS TOUCHED UNTIL THE LAST THROW. A file that cannot be read leaves
+   the composition exactly as it stands — the same contract the single-grid
+   loader had, and the reason the new record is built after the checks and not
+   before them. */
 function adopt(gltf, name) {
   const root = gltf.scene || (gltf.scenes && gltf.scenes[0]);
   if (!root) throw new Error('this glTF has no scene');
@@ -2703,34 +3223,44 @@ function adopt(gltf, name) {
       + `${found.length ? found.join(', ') : 'nothing drawable'}. `
       + 'This looks like a mesh glTF, not a bloom grid export.');
   }
-  // Only past the last throw is the displayed grid replaced. A file that
-  // cannot be read leaves what is on screen alone.
-  clearCurrentGrid();
-  strips = info.strips;
-  gridInfo = info;
-  assetExtras = (gltf.parser && gltf.parser.json && gltf.parser.json.asset
-                 && gltf.parser.json.asset.extras) || null;
-  sourceName = name;
-  localBounds = boundsOf(strips);
+  if (instances.length >= MAX_INSTANCES) {
+    throw new Error(`${name}: this composition already holds ${MAX_INSTANCES} blooms, `
+      + 'which is as many as this page draws. Remove one first.');
+  }
+  const inst = newInstance();
+  inst.strips = info.strips;
+  inst.gridInfo = info;
+  inst.assetExtras = (gltf.parser && gltf.parser.json && gltf.parser.json.asset
+                      && gltf.parser.json.asset.extras) || null;
+  inst.sourceName = name;
+  inst.localBounds = boundsOf(inst.strips);
   // THE RING IS READ OFF EVERY U-LINE FOOT IN THE FILE, not off the ones the
   // density sliders kept: it is a property of the grid, and a stem that moved
   // sideways when the slider thinned the feet it averages would make the
   // density control decide where the flower hangs from.
-  stemRing = ringOf(strips.filter(t => t.kind === 'u')
+  inst.stemRing = ringOf(inst.strips.filter(t => t.kind === 'u')
                           .map(t => [t.points[0], t.points[1], t.points[2]]));
   // The petal -> strips index, in the file's own order. Built once per grid:
   // it is what `applyPetalWarp` asks "is this strip mine" of, and rebuilding it
   // per frame would be a Set of 1092 records per input event.
-  petalIndex = new Map();
-  for (const t of strips) {
+  for (const t of inst.strips) {
     if (t.petal < 0) continue;
-    let a = petalIndex.get(t.petal);
-    if (!a) petalIndex.set(t.petal, a = []);
+    let a = inst.petalIndex.get(t.petal);
+    if (!a) inst.petalIndex.set(t.petal, a = []);
     a.push(t);
   }
-  warpAll = strips;
-  petalWarps = new Map();
-  petalFrames = new Map();
+  inst.warpAll = inst.strips;
+  /* WHERE IT LANDS, AND WHY NOT THE ORIGIN. A second grid at the origin sits
+     exactly on top of the first, which under additive ink on black is
+     indistinguishable from the import having replaced the drawing. So it is
+     placed clear of what is already there, by an amount derived from the two
+     boxes rather than by a constant — see `placementFor`. The FIRST bloom takes
+     the identity, so a one-bloom page is bit-identical to what shipped. */
+  inst.transform = placementFor(occupiedExtent(), inst.localBounds);
+
+  resetCompositionState();
+  instances.push(inst);
+  selInstance = instances.length - 1;
   lastError = '';
   deadRange = { u: deadUpTo('u'), v: deadUpTo('v') };
   applyDeadTravel();
@@ -2739,7 +3269,10 @@ function adopt(gltf, name) {
   // the measured frame and the dropdown all land in the same state through the
   // one path — rather than a stale petal index from the previous file being
   // carried into a bloom that may not have it.
+  rebuildInstanceOptions();
   rebuildPetalOptions();
+  loadStemControls();
+  loadTransformControls();
   rebuild();
   resetView();
   writeGridState();
@@ -2748,6 +3281,43 @@ function adopt(gltf, name) {
   writeStemOutputs();
   writePetalState();
   writePetalOutputs();
+  writeInstanceOutputs();
+  writeFrameInfo();
+}
+
+/* WHAT THE COMPOSITION ALREADY OCCUPIES, PLACED — null when nothing is loaded,
+   which is what makes the first bloom take the identity transform. Measured
+   from each bloom's own resting box through its own matrix: a placement that
+   read the DRAWN extent would move as the density sliders thinned the picture,
+   and where a bloom stands is not a property of how much of it is on screen. */
+function occupiedExtent() {
+  let have = null;
+  for (const inst of instances) have = unionExtent(have, placedExtent(inst.localBounds, inst.transform));
+  return have;
+}
+
+/* REMOVING A BLOOM DROPS ITS WHOLE RECORD, which is why there is no field to
+   forget: its grid, its stem, its bends, its warps and its placement all live
+   on the record and go with it. THE LAST ONE CANNOT BE REMOVED — an empty
+   viewport is indistinguishable from a page that broke, which is the reading
+   this project already refused once for a failed grid load, and "start again"
+   is a reload. The button says so rather than being silently inert. */
+function removeInstance(k = selInstance) {
+  if (instances.length <= 1 || k < 0 || k >= instances.length) return false;
+  instances.splice(k, 1);
+  selInstance = Math.min(selInstance, instances.length - 1);
+  resetCompositionState();
+  deadRange = { u: deadUpTo('u'), v: deadUpTo('v') };
+  applyDeadTravel();
+  rebuildInstanceOptions();
+  rebuildPetalOptions();
+  loadStemControls();
+  loadTransformControls();
+  rebuild();
+  writeGridState(); writeDrawState(); writeStemState(); writeStemOutputs();
+  writePetalState(); writePetalOutputs(); writeInstanceOutputs(); writeFrameInfo();
+  dirty = true;
+  return true;
 }
 
 /* GLTFLoader.parse() CALLED DIRECTLY DOES NOT CATCH ITS OWN EXCEPTIONS —
@@ -2858,12 +3428,47 @@ for (const el of Object.values(fui)) {
    arm here the way `weight` and `brightness` are cheap arms on the draw side. */
 for (const el of Object.values(sui)) {
   el.addEventListener('input', () => {
+    /* THE SIX ARE COMMITTED INTO THE SELECTED BLOOM FIRST, and the ORDER is the
+       same correction the petal scales already carry: a slider writes into the
+       bloom that owns it, and `rebuild` then asks every bloom for its own stem.
+       `stemHandles` is the exception and is deliberately NOT committed — it is
+       a VIEW field in the saved file and a property of the picture, not of any
+       one bloom, so `commitStem` does not read it and `stemOf` takes it from
+       the checkbox. */
+    if (el !== sui.stemHandles) commitStem();
     rebuild();
     writeStemOutputs();
     writeStemState();
     writeDrawState();
+    writeInstanceOutputs();
   });
 }
+
+/* THE BLOOM'S OWN DISPATCH. `bloomPick` does not commit — it changes which
+   bloom the panels are editing, and `setSelectedInstance` loads that bloom's
+   values over the top; the seven transform sliders commit and rebuild, because
+   where a bloom stands is what its lines ARE once they are placed. */
+bui.bloomPick.addEventListener('input', () => setSelectedInstance(+bui.bloomPick.value));
+for (const [id, el] of Object.entries(bui)) {
+  if (id === 'bloomPick') continue;
+  el.addEventListener('input', () => {
+    commitTransform();
+    rebuild();
+    writeInstanceOutputs();
+    writeDrawState();
+    writeFrameInfo();
+  });
+}
+bloomPrevBtn.addEventListener('click', () => stepInstance(-1));
+bloomNextBtn.addEventListener('click', () => stepInstance(1));
+bloomRemoveBtn.addEventListener('click', () => removeInstance());
+document.getElementById('gridAdd').addEventListener('change', ev => {
+  const f = ev.target.files && ev.target.files[0];
+  if (f) loadFile(f);
+  // Cleared so adding the SAME grid twice still fires a change event — two
+  // copies of one bloom at two scales is a composition, not a mistake.
+  ev.target.value = '';
+});
 document.getElementById('exportPng').addEventListener('click', exportPNG);
 document.getElementById('exportSvg').addEventListener('click', exportSVG);
 
@@ -2900,6 +3505,7 @@ document.getElementById('resetView').addEventListener('click', resetView);
 document.getElementById('gridFile').addEventListener('change', ev => {
   const f = ev.target.files && ev.target.files[0];
   if (f) loadFile(f);
+  ev.target.value = '';
 });
 
 saveBtn.addEventListener('click', () => { saveComposition(); });
@@ -2955,10 +3561,130 @@ function screenPosOf(h) {
 window.__plot = {
   ready,
   state: () => readUI(),
-  census: () => (gridInfo ? gridInfo.census : null),
-  found: () => (gridInfo ? gridInfo.found : null),
-  petals: () => (gridInfo ? gridInfo.petals : 0),
+  census: () => (cur().gridInfo ? cur().gridInfo.census : null),
+  found: () => (cur().gridInfo ? cur().gridInfo.found : null),
+  petals: () => (cur().gridInfo ? cur().gridInfo.petals : 0),
   drawn: () => ({ ...drawn }),
+
+  /* ---- the blooms --------------------------------------------------------
+     `instances` is every bloom the composition holds, with the state each one
+     OWNS — its grid identity, its placement, its stem and how many petals carry
+     a warp. `instanceControls` is what the panel is showing, so a check can say
+     that selecting a bloom LOADED its values rather than the panel's values
+     having been stamped onto it — the two facts the one-warp-for-the-page model
+     conflated a level down, and which no count of drawn segments can separate.
+     `addGrid` re-parses the default grid's own bytes so a check can build a
+     several-bloom composition without a file dialogue; it goes through the very
+     path the file input uses, so what it exercises is the shipped loader. */
+  instances: () => instances.map((inst, k) => ({
+    k, id: inst.id, source: inst.sourceName,
+    selected: k === selInstance,
+    transform: cloneTransform(inst.transform),
+    identity: identityOf(inst),
+    stem: { ...inst.stemVals },
+    bends: inst.bends.map(b => ({ t: b.t, offset: b.offset.slice() })),
+    warpedPetals: [...inst.petalWarps.entries()].filter(([i, st]) =>
+      !petalIsRest(st, warpFor(st, frameFor(i, inst)))).map(([i]) => i),
+    petalEntries: [...inst.petalWarps.keys()].sort((a, b) => a - b),
+    strips: inst.strips.length,
+    stemSegments: inst.stemStats.segments,
+  })),
+  instanceCount: () => instances.length,
+  /* WHERE EACH BLOOM ACTUALLY STANDS, as a box in grid space through its own
+     matrix — the same function the placement of a NEW bloom is derived from, so
+     a check can assert "clear of what was there" as a property rather than
+     against a number this file and the gate would both have to hold. */
+  placedExtents: () => instances.map(inst => {
+    const e = placedExtent(inst.localBounds, inst.transform);
+    return e ? { min: e.min.slice(), max: e.max.slice() } : null;
+  }),
+  selectedInstance: () => selInstance,
+  instanceControls: () => {
+    const o = { pick: +bui.bloomPick.value,
+                options: [...bui.bloomPick.options].map(x => x.value),
+                removeDisabled: bloomRemoveBtn.disabled,
+                prevDisabled: bloomPrevBtn.disabled,
+                nextDisabled: bloomNextBtn.disabled,
+                stem: {}, transform: {} };
+    for (const f of STEM_FIELDS) {
+      const el = document.getElementById(f.control);
+      o.stem[f.key] = el.type === 'checkbox' ? el.checked : el.value;
+    }
+    for (const f of TRANSFORM_FIELDS) {
+      o.transform[f.control] = +document.getElementById(f.control).value;
+      o.transform[f.control + 'Disabled'] = document.getElementById(f.control).disabled;
+    }
+    return o;
+  },
+  instanceText: () => bloomEl.textContent,
+  /* ADD ANOTHER BLOOM FROM THE DEFAULT GRID'S OWN BYTES, through `adopt` — the
+     one path a dropped file and the file input also take. Returns the error
+     text on a refusal rather than throwing, so a check can assert the cap. */
+  addGrid: async (name) => {
+    try {
+      const res = await fetch(DEFAULT_GRID);
+      await parseGridBytes(await res.arrayBuffer(), name || DEFAULT_GRID.split('/').pop());
+      return { ok: true, count: instances.length };
+    } catch (e) { return { ok: false, error: String((e && e.message) || e) }; }
+  },
+  removeInstance: k => removeInstance(k === undefined ? selInstance : k),
+  /* EACH BLOOM'S STEM AS IT IS ACTUALLY DRAWN — how many lines it has and how
+     far its lowest point falls below its own ring. Two blooms at two droops is
+     a claim about the LINES, not about the store, and the store cannot answer
+     it. Measured in the bloom's own grid space, before its placement, so a
+     bloom that has merely been moved does not read as one that has drooped. */
+  /* ONE NAMED BLOOM'S STEM LINE, in that bloom's own grid space — what "two
+     blooms carry two different stems" is measured on. The store saying 40° and
+     the lines being drooped are two facts, and only the second is the drawing. */
+  stemLineOf: (k, i) => (instances[k] && instances[k].stemLocal[i]
+    ? Array.from(instances[k].stemLocal[i].points) : null),
+  drawnStemsByBloom: () => instances.map((inst, k) => {
+    const c = inst.stemRing ? inst.stemRing.center : [0, 0, 0];
+    let lo = 0, lateral = 0;
+    for (const s of inst.stemLocal) {
+      for (let i = 0; i < s.count; i++) {
+        const z = s.points[i * 3 + 2];
+        if (z < lo) lo = z;
+        // HOW FAR THE STEM SWINGS OFF ITS OWN RING AXIS. The drop to the root is
+        // the LENGTH and is nearly the same at any droop — a stem hanging 170 mm
+        // straight down and one drooping 40° both end 170 mm below — so the drop
+        // cannot tell two droops apart and this is what can.
+        const d = Math.hypot(s.points[i * 3] - c[0], s.points[i * 3 + 1] - c[1]);
+        if (d > lateral) lateral = d;
+      }
+    }
+    return { k, lines: inst.stemLocal.length, tipDropMm: c[2] - lo, lateralMm: lateral };
+  }),
+  /* A PIXEL ON A NAMED BLOOM'S NAMED PETAL — `petalScreenPoint`'s two-level
+     twin, because with two blooms on screen a petal number does not identify a
+     line and a check aiming at one would be aiming at whichever bloom drew it
+     last. */
+  petalScreenPointOf: (instance, index, frac = 0.5) => {
+    const mine = drawnStrips.filter(t => t.inst === instance && t.petal === index && t.kind === 'u');
+    if (!mine.length) return null;
+    const t = mine[Math.min(mine.length - 1, Math.floor(frac * mine.length))];
+    const i = Math.min(t.count - 1, Math.max(0, Math.round(frac * (t.count - 1))));
+    container.updateMatrixWorld(true);
+    const v = new THREE.Vector3(t.points[i * 3], t.points[i * 3 + 1], t.points[i * 3 + 2])
+      .applyMatrix4(container.matrixWorld).project(camera);
+    const r = canvas.getBoundingClientRect();
+    return { x: r.left + (v.x * 0.5 + 0.5) * r.width,
+             y: r.top + (-v.y * 0.5 + 0.5) * r.height };
+  },
+  selectInstance: k => {
+    bui.bloomPick.value = String(k);
+    bui.bloomPick.dispatchEvent(new Event('input', { bubbles: true }));
+    return selInstance;
+  },
+  /* EVERY DRAWN POINT'S OWNER, so a check can say which bloom's ink moved. Not
+     a count: `placeStrips` hands back the very records it was given at the
+     identity, so this is where "one bloom at rest is drawn from the arrays the
+     file wrote" is read. */
+  placedIdentity: () => instances.map((inst, k) => ({
+    k, identity: isIdentityTransform(inst.transform),
+    sameArrays: drawnStrips.filter(t => t.inst === k)
+      .every(t => inst.warpAll.some(w => w.points === t.points)),
+  })),
 
   /* ---- the stem ---------------------------------------------------------
      Everything here is a READ of state the page already computed, except
@@ -2967,7 +3693,9 @@ window.__plot = {
      sets a bend directly — a check that wrote an offset in would be testing
      its own arithmetic rather than the page's. */
   stem: () => readStem(),
-  stemInfo: () => ({
+  stemInfo: () => {
+    const { stemIsDrawn, stemStats, stemRing } = cur();
+    return {
     drawn: stemIsDrawn,
     lines: stemStats.lines,
     segments: stemStats.segments,
@@ -2978,16 +3706,22 @@ window.__plot = {
     ring: stemRing ? { center: stemRing.center.slice(), rMin: stemRing.rMin,
                        rMax: stemRing.rMax, zMin: stemRing.zMin, zMax: stemRing.zMax,
                        count: stemRing.count } : null,
-  }),
+  }; },
   // One stem line's points, in grid space — what a decay or a bend is measured
   // on. Index is into the stem strips in the order they were built.
-  stemLine: i => (stemStrips[i] ? Array.from(stemStrips[i].points) : null),
-  stemLineCount: () => stemStrips.length,
+  /* IN THE BLOOM'S OWN GRID SPACE, NOT WHERE IT STANDS. The seam and the chord
+     are properties of the stem's own law, measured against a head transform
+     written in the same space; comparing a placed stem against an unplaced head
+     would report a bloom that has merely been MOVED as one whose stem had come
+     off its ring. */
+  stemLine: i => (cur().stemLocal[i] ? Array.from(cur().stemLocal[i].points) : null),
+  stemLineCount: () => cur().stemLocal.length,
   // The corresponding head strip's FOOT, through the head's own transform: the
   // other half of the seam, so a check can measure the join itself rather than
   // trust the page's own number for it.
-  stemFeet: () => stemStrips.map(t => [t.points[0], t.points[1], t.points[2]]),
+  stemFeet: () => cur().stemLocal.map(t => [t.points[0], t.points[1], t.points[2]]),
   headFeet: () => {
+    const { stemRing, strips } = cur();
     const st = readStem();
     const angle = (st.on && stemRing) ? st.droopRad : 0;
     const c = stemRing ? stemRing.center : [0, 0, 0];
@@ -2999,7 +3733,7 @@ window.__plot = {
     }
     return out;
   },
-  bends: () => bends.map((b, i) => ({ t: b.t, offset: b.offset.slice(),
+  bends: () => cur().bends.map((b, i) => ({ t: b.t, offset: b.offset.slice(),
     station: b.t * readStem().length,
     sigma: currentWarp(readStem()).points[i].sigma })),
   handleCount: () => handles.length,
@@ -3018,13 +3752,14 @@ window.__plot = {
      selection or an offset — a check that set one would be testing its own
      arithmetic instead of the page's. */
   petal: () => readPetal(),
-  petalList: () => (gridInfo ? gridInfo.petalList.map(q => ({ ...q })) : []),
+  petalList: () => (cur().gridInfo ? cur().gridInfo.petalList.map(q => ({ ...q })) : []),
   petalInfo: () => ({ ...petalStats, selected }),
   petalOptions: () => [...pui.petalPick.options].map(o => o.value),
   // Every point of one petal's strips, in grid space, as the page currently
   // holds them: `warpAll` is post-warp and pre-droop, `strips` is the file's
   // own. Both, because the claims are about the difference between them.
   petalPoints: (index, warped = true) => {
+    const { warpAll, strips } = cur();
     const src = warped ? warpAll : strips;
     const out = [];
     for (let i = 0; i < src.length; i++) {
@@ -3038,7 +3773,7 @@ window.__plot = {
   },
   // True when the strip at this position is the very array the file wrote —
   // the identity "nothing off the selected petal moved" rests on.
-  petalUntouched: () => warpAll.map((t, i) => t === strips[i]),
+  petalUntouched: () => cur().warpAll.map((t, i) => t === cur().strips[i]),
   petalFrame: () => (frame ? { length: frame.length, hold: frame.hold,
     holdRows: frame.holdRows, rows: frame.rows.length,
     base: frame.base.slice(), u: frame.rows.map(r => r.u),
@@ -3054,7 +3789,7 @@ window.__plot = {
      stand in for. `petalControls` is what the panel is showing, so a check can
      say that selection LOADED a petal's values rather than the panel's values
      having been stamped onto the petal. */
-  petalWarpStore: () => [...petalWarps.entries()].map(([index, st]) => {
+  petalWarpStore: () => [...cur().petalWarps.entries()].map(([index, st]) => {
     const f = frameFor(index);
     return { index, along: st.along, across: st.across,
              bends: st.bends.map(b => ({ t: b.t, offset: b.offset.slice() })),
@@ -3072,6 +3807,7 @@ window.__plot = {
   // them — what "two petals hold different warps" and "a warp survives
   // deselection" are measured on.
   allPetalPoints: (warped = true) => {
+    const { warpAll, strips } = cur();
     const src = warped ? warpAll : strips;
     const out = new Map();
     for (let i = 0; i < src.length; i++) {
@@ -3127,7 +3863,11 @@ window.__plot = {
   // What the shipped pick rule answers at a pixel, without moving anything —
   // so the tolerance and the front-most rule can be measured over the whole
   // canvas rather than one click at a time.
-  pickAt: (x, y) => pickPetalAt(x, y),
+  // THE PETAL ALONE, which is what this answered before there was more than
+  // one bloom and what every check written against it means. `pickPairAt` is
+  // the whole cursor.
+  pickAt: (x, y) => pickPetalAt(x, y).petal,
+  pickPairAt: (x, y) => pickPetalAt(x, y),
   pickTolerance: () => PICK_TOLERANCE_PX,
   /* PER PETAL, at a pixel: its own nearest segment's screen distance, and the
      depth of its FRONT-MOST segment within tolerance. Not the pick — the
@@ -3166,8 +3906,8 @@ window.__plot = {
     fraction: tracks[kind].style.getPropertyValue('--plot-dead') || null,
   }),
   error: () => lastError,
-  source: () => sourceName,
-  assetExtras: () => assetExtras,
+  source: () => cur().sourceName,
+  assetExtras: () => cur().assetExtras,
   frameMs: () => lastFrameMs,
   renderCount: () => renderCount,
   gridText: () => logEl.textContent,
@@ -3239,7 +3979,7 @@ window.__plot = {
   attachmentsWorld: () => {
     container.updateMatrixWorld(true);
     const v = new THREE.Vector3();
-    return gridInfo ? gridInfo.attachments.map(a => {
+    return cur().gridInfo ? cur().gridInfo.attachments.map(a => {
       v.set(a.world[0], a.world[1], a.world[2]).applyMatrix4(container.matrixWorld);
       return [v.x, v.y, v.z];
     }) : [];
@@ -3389,6 +4129,10 @@ window.__plot = {
 resize();
 writeOutputs();
 writeFrameOutputs();
+rebuildInstanceOptions();
+loadStemControls();
+loadTransformControls();
+writeInstanceOutputs();
 writeStemOutputs();
 loadPetalControls();
 writePetalOutputs();
