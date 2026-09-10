@@ -5150,23 +5150,41 @@ function emitPanel(acc, rows, panel, tAt) {
     if (gm) grid.push(gm);
   }
   const NR = top.length;
-  /* Top face (outward = +N side) and bottom face (reversed winding). */
+  /* THE WINDING IS OUTWARD, AND THAT IS MEASURED RATHER THAN ASSERTED
+     (session 36, fixing session 35's finding). The top skin is offset along
+     +n, so its triangles must be wound counter-clockwise SEEN FROM +n — the
+     convention MeshBuilder.quad documents and buildHubInto follows. From the
+     day this emitter was written until session 35 the comment here read
+     "Top face (outward = +N side)" while every quad below was wound the OTHER
+     way: all six triangles touching a top-skin point pointed INTO the sheet,
+     every petal shell had NEGATIVE signed volume (−515.19 mm³ each on the
+     shipping default against the hub's +294.07), and six gates passed on it,
+     because watertight, connected, manifold, winding-consistent,
+     degenerate-free and Euler all hold on an inside-out solid. It mattered
+     because the export contract leans on a slicer UNIONING overlapping closed
+     shells, and a union handed a negative-volume shell can SUBTRACT it.
+     Each quad is now emitted as (a, d, c, b) where it was (a, b, c, d): the
+     same two triangles as vertex SETS, each with its winding reversed. The
+     witness is the O family in both STL gates (per-shell signed volume by the
+     divergence theorem AND a ray-parity test, agreeing), calibrated on a unit
+     cube in `node tools/bloom-self-intersection.mjs --orientation`. */
   for (let i = 0; i < NR - 1; i++) {
     for (let j = 0; j < NV - 1; j++) {
-      acc.quad(top[i][j], top[i][j + 1], top[i + 1][j + 1], top[i + 1][j]);
-      acc.quad(bot[i][j], bot[i + 1][j], bot[i + 1][j + 1], bot[i][j + 1]);
+      acc.quad(top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]);   // top skin: normal +n
+      acc.quad(bot[i][j], bot[i][j + 1], bot[i + 1][j + 1], bot[i + 1][j]);   // bottom skin: normal -n
     }
   }
   /* Rim: both side edges along every row pair, plus the two end caps. Every
      perimeter edge of the grid gets exactly one rim quad, which is what makes
-     each edge of the closed solid shared by exactly two triangles. */
+     each edge of the closed solid shared by exactly two triangles. Wound to
+     match the skins above, so the shell is one consistent outward surface. */
   for (let i = 0; i < NR - 1; i++) {
-    acc.quad(top[i][0], top[i + 1][0], bot[i + 1][0], bot[i][0]);                         // v = -1 side
-    acc.quad(top[i][NV - 1], bot[i][NV - 1], bot[i + 1][NV - 1], top[i + 1][NV - 1]);     // v = +1 side
+    acc.quad(top[i][0], bot[i][0], bot[i + 1][0], top[i + 1][0]);                         // v = -1 side
+    acc.quad(top[i][NV - 1], top[i + 1][NV - 1], bot[i + 1][NV - 1], bot[i][NV - 1]);     // v = +1 side
   }
   for (let j = 0; j < NV - 1; j++) {
-    acc.quad(top[0][j], bot[0][j], bot[0][j + 1], top[0][j + 1]);                         // inner end cap
-    acc.quad(top[NR - 1][j], top[NR - 1][j + 1], bot[NR - 1][j + 1], bot[NR - 1][j]);     // tip cap
+    acc.quad(top[0][j], top[0][j + 1], bot[0][j + 1], bot[0][j]);                         // inner end cap
+    acc.quad(top[NR - 1][j], bot[NR - 1][j], bot[NR - 1][j + 1], top[NR - 1][j + 1]);     // tip cap
   }
   return grid;
 }

@@ -815,6 +815,33 @@ function spineLine(petals) {
        + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
 }
 
+/* THE ROOT-BLEND LINE (session 36, recorded for Eva so it is not
+   rediscovered). A MEASURED FACT about the shipped geometry, printed where a
+   visitor sets the layer count: at three or more layers the inner whorls'
+   petals cross THEMSELVES at the root — `layerSize` shrinks the blade while
+   the foot stays set by the hub ring, so a short petal collapses a full-width
+   foot across ROOT_BLEND_END and folds. Measured at the defaults with no cup,
+   no buckle and no sweep: 0 within-shell intersecting pairs at 1 or 2 layers
+   at ANY petal count, 72 at 3, 416 at 4; the innermost layer carries 43 pairs
+   per petal at 7 x 4. The X family in both STL gates carries the rows. The
+   fix is footRing()'s (it owns foot placement) and is its own scheduled
+   session — docs/bloom-session-36-outcome.md §5. This line is a FLAG: it
+   says what the census measured, and the panel gate asserts it appears iff
+   the layer count is three or more (route (v)). Absent otherwise, so a one-
+   or two-layer bloom's read-out says nothing — that is the workaround, and
+   it is stated on the line itself. THE WORKAROUND IS STATED AS MEASURED,
+   not as the ruling phrased it ("with cup and buckle anywhere in range"):
+   the full-matrix census on main at ead8624 reads 142 one-layer rows
+   self-intersecting, all of them FORM states — cup ±0.4 and beyond, buckle
+   amplitude 0.3x and up, roll 270° and up, curl 360° — and the petalCount
+   sweep 3..40 at the defaults reads 0 on every row. Depth is what the root
+   blend adds; the form's own apex folds are session 35 §7.4's and are
+   in the xfail list by row. */
+function rootBlendLine(layers, cont) {
+  if (!(layers >= 3)) return '';
+  return `ROOT BLEND AT ${layers} ${cont ? 'TURNS' : 'LAYERS'}: the inner ${cont ? 'turns' : 'layers'}' short petals fold through themselves at the root (a measured self-intersection at the defaults, session 35; a flag here, the X family in the export gate) — a bloom of ONE OR TWO ${cont ? 'turns' : 'layers'} exports free of self-intersection at any petal count at the default form; what still folds a single petal is its own form (cup beyond about -0.2..0.3, buckle from 0.3x, roll from 270°, curl 360°), not the depth\n`;
+}
+
 /* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
    envelope clamp bit. Two things a visitor cannot otherwise see: WHICH slots
    the labellum and hood came out as (the derivation is exact but it is not
@@ -1058,6 +1085,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + fanLine(fr)
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
+       + rootBlendLine(layers, cont)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
        + spineLine(petals)

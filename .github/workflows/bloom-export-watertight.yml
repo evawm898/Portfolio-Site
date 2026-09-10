@@ -17,6 +17,7 @@ on:
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
       - tools/chromium-harness.mjs
       - .github/workflows/bloom-export-watertight.yml
   push:
@@ -31,6 +32,7 @@ on:
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 

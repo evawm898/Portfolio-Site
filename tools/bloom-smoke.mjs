@@ -163,7 +163,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'DEFAULT (the shipping configuration)',
     rows: [
       { label: 'DEFAULT (the shipping configuration)',
-        path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, the bare apex (the centre rig is retired, session 20)' },
+        path: 'the shipping state; every guard OFF at once — petalFormIsFlat, domeIsFlat, thicknessIsUniform, curlIsUniform, one whorl, RADIAL, the bare apex (the centre rig is retired, session 20); O1 (every shell wound outward — the petal shells were inside-out until session 36) and O2 (volume sign and ray parity agree) on the nine-shell default, and X2 (exactly zero within-shell intersecting pairs) on the census\'s own calibration state' },
     ],
   },
   /* Blocks 2 and 3 — the centre rig's style x spread and sub-control sweeps —
@@ -184,7 +184,7 @@ export const SMOKE_BLOCKS = [
       { label: 'FORM: FIDDLEHEAD (spine curl alone)',
         path: 'uniform spine curl — the closed-form arc branch, C2\'s only witness (the integrator\'s own validity), and C3\'s UNIFORM arm: the shipped arc is never clamped and must never report the floor binding' },
       { label: 'FORM: ROLL CLAMP (roll max x narrowest petal)',
-        path: 'cross-section roll and the roll curvature floor, saturating and told' },
+        path: 'cross-section roll and the roll curvature floor, saturating and told; X1 — this row is declared self-intersecting on main at ead8624 (roll 330 folds the blade into a near-closed quill, the census\'s own positive control) and must STILL read pairs, so the fix landing trips the gate' },
       { label: 'THIN: ALL THIN × spread min',
         path: 'the thickness layer, the export feature-size floor diverging from live, and the foot-hub overlap box at its worst reachable corner' },
       { label: 'APEX: the cap entry at the 0.80 clamp (taper 0.60 — the widest entry)',
@@ -200,7 +200,7 @@ export const SMOKE_BLOCKS = [
     anchor: 'CAPABILITY: claw (non-monotone width)',
     rows: [
       { label: 'CAPABILITY: cleft (two-span domain)',
-        path: 'the trim domain with two spans per row — the panel-per-span construction, reached only through window.__bloomCapability' },
+        path: 'the trim domain with two spans per row — the panel-per-span construction, reached only through window.__bloomCapability; X0 — the census reads the builder\'s doubles rebuilt from the page\'s own state WITH this row\'s capability, and X0 requires their float32 rounding to equal the STL float for float, which a rebuild that forgot the capability would break' },
     ],
   },
   {
