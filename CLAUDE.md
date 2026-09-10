@@ -3832,7 +3832,8 @@ how hard it is to undo:
    across — petal 3 of one bloom is a different blade from petal 3 of another.
    *Undo:* one call in `setSelectedInstance`.
 6. **Position sliders are ±800 mm at 1 mm steps** — about 9 mm per pixel of track, which
-   is coarse. A number input would be precise and would break the panel's visual
+   is coarse. **Superseded as the placement gesture by the anchor drag (see below);
+   the sliders stay as the axis-precise control and the read-out.** A number input would be precise and would break the panel's visual
    language; that is a look question and was left for Eva. *Undo:* the markup.
 7. **The GRID, STEM and PETAL panels describe the SELECTED bloom and say so** when there
    is more than one; the DRAW panel's counts are the whole composition, summed, so its
@@ -3987,6 +3988,138 @@ wrong**, which is the same distribution the multi-bloom session found:
 which is NULL under any mutation that stops the stem turning on — fourth instance
 of that bug class here. It reports now.
 
+**A BLOOM IS DRAGGED BY ITS ANCHOR, IN THE PLANE FACING THE CAMERA, AND THE DRAG
+PAYS A NARROWED TAIL RATHER THAN A SKIPPED ONE** (session of Sep 10, the anchor
+session — the placement sliders were ±800 mm at 1 mm steps, about 9 mm per pixel
+of track, the wrong gesture for arranging a composition). One rose octahedron per
+bloom (`bloomHandleObjs`, 0xd66f9a, the selected bloom's at full strength and
+the rest muted) stands at the bloom's PLACED ORIGIN — `transform.position` through
+the container's one Z-up rotation, which is exactly the point the three position
+sliders move, so a drag on it writes those three numbers and nothing else
+(`setBloomFromWorld`, a copy: no gate, no neighbours' term, because the anchor IS
+the translation). It goes through the same pointerdown / pointermove / `endDrag`
+the stem and petal handles use, so the orbit is off while it is held.
+
+**THE TWO DECISIONS, MADE WITHOUT A RULING AND FOR EVA'S EYE** (each names what was
+rejected and how hard it is to undo):
+
+1. **THE PLANE IS THE ONE FACING THE CAMERA THROUGH THE ANCHOR** — the plane the
+   two bend-handle drags already use. Chosen because `/plot` is a PICTURE: the
+   frame, the export, the depth dim and the pick are all in camera terms, and the
+   gesture's guarantee is then "the bloom lands under the pointer, at the depth it
+   had", which holds from every camera and has no degenerate angle. *Rejected:* the
+   grid's own x/y plane — predictable in grid terms, but from the three-quarter home
+   view every drag is foreshortened, and near edge-on the ray and the plane are
+   nearly parallel and a small pointer move sends the bloom off to infinity; an
+   axis constraint on a modifier key — a third gesture vocabulary on a canvas that
+   already has orbit and click-to-pick, when the sliders are the axis-precise
+   control and stay in sync. *Cost of it:* from an oblique camera a screen drag
+   writes to all three grid axes at once, which the sliders show and the read-out
+   says. *Undo:* `dragPlane.setFromNormalAndCoplanarPoint` in the pointerdown
+   handler is the one line; the bloom arm would take a plane normal of grid +z
+   (world +y) instead of the camera's.
+2. **THE GRAB IS A DEDICATED ANCHOR PER BLOOM, AND GRABBING SELECTS.** *Rejected:*
+   grabbing the bloom body — a click on a line already picks a petal, and a drag
+   on a line already orbits, so there is no free gesture on the ink; a handle on
+   the selected bloom only — arranging means grabbing a bloom you have not yet
+   picked from the list, and a drag that moved an unselected bloom would move the
+   drawing while the sliders described another (the "bloom without the sliders"
+   trap). So every bloom carries one, the grab goes through `setSelectedInstance`
+   (which LOADS that bloom's values and applies nothing — the ownership rule, one
+   level up; on the bloom already selected it is a no-op), and the sliders are a
+   view of the bloom under the pointer. *Where it sits:* the origin is clear of the
+   stem's bends (a third of the length and below) and of the petal's (mid-blade and
+   tip). *No checkbox:* a view field is a field of the saved file, and the two
+   handle sets that have one are editors for state a bloom HOLDS, where this one is
+   the bloom itself; the anchors are hidden from the export by `withInkOnly` like
+   the others, and the grey identity in the export check is their witness.
+   *Undo:* `syncBloomHandles` decides visibility; the selection call is one line in
+   the pointerdown handler.
+
+**THE PERFORMANCE QUESTION, ANSWERED: BOTH GLOBAL PHASES ARE NARROWABLE MID-DRAG,
+CHEAPLY, AND NEITHER IS SKIPPED.** `rebuild(only, mode)` takes `REBUILD_DRAG` from
+the drag and `REBUILD_EXACT` from everything else, and `endDrag` pays one exact
+rebuild so nothing a drag showed outlives the pointer by a frame.
+* **THE PACK IS WRITTEN IN PLACE.** One set of buffers holds every bloom and the
+  strips are pushed bloom by bloom, so a bloom's segments are one contiguous RUN
+  of each buffer. `packLayout` records the last full pack's per-bloom, per-buffer
+  segment counts; `patchPack` writes the moved bloom's run into the
+  `InstancedInterleavedBuffer` at six times the segments before it and flags
+  `needsUpdate`, and does so ONLY when the whole layout — every bloom's count in
+  every buffer — equals the recorded one, count for count (an offset is the sum of
+  the counts before it). A drag changes no count, so a drag takes this path; any
+  change of count falls through to the full pack. The `drawnDigest` is BLIND to a
+  run written at the wrong offset (every strip record stays right), so
+  `packedDigest()` hashes the GPU-bound arrays themselves and is compared against a
+  forced full rebuild mid-drag.
+* **THE EXTENT IS COMPOSED FROM PER-BLOOM BOXES.** `extentOf(inst)` measures one
+  bloom over exactly the population `eachDrawnPoint` walks for it (every strip of
+  its file at its droop, placed, plus its drawn stems), memoised on
+  `builds|transform`, so during a drag the moved bloom is re-measured each step and
+  the others once. `composeViewBounds` unions the boxes — EXACT, a union of boxes
+  over the same points is the box over all of them — and takes the radius as
+  `max(|c_i − C| + r_i)`, which is a BOUND, not the measurement (a radius about a
+  global centre does not compose). Measured on three blooms: 191.03 against the
+  walk's 147.08. The depth dim's sphere is that much larger for as long as the
+  pointer is down and not a frame longer. The panel's `drag` line prints which
+  tail was paid: `packing (full|patched)` and `extent (walk|file|composed)`.
+* **THE NUMBERS**, headless software GL, 1100x800, stems on for every bloom, median
+  of a 12-step real pointer drag, and a 9-event position-slider drag in the SAME
+  run for the exact tail (this runner is slower than the last session's — its
+  8-bloom slider figure reads 82 ms where the last session's read 51 — so compare
+  within a row, never across sessions):
+
+  | | anchor drag (drag tail) | position slider (exact tail) |
+  |---|---|---|
+  | 1 bloom | 12.8 ms (4.7 build · 1.4 pack · 6.3 extent) | 14.4 ms (3.8 pack · 5.2 extent) |
+  | 3 blooms | 14.6–20.4 ms (6.1 · 1.7 · 6.0) | 40.1 ms (10.9 · 23.3) |
+  | 8 blooms | **14.6 ms** (6.0 · 2.4 · 5.4) | **82.0 ms** (28.5 · 41.8) |
+
+  **THE DRAG IS FLAT IN THE BLOOM COUNT AND INSIDE THE 16.7 ms BUDGET AT EIGHT.**
+  What is left in it is the moved bloom's own build (~6 ms) and its own extent walk
+  (~6 ms — two passes over ~55k points, the per-bloom cost the memo cannot remove);
+  the remainder is the head-list assembly, the counts and the handles. **THE
+  SLIDERS STILL PAY THE EXACT TAIL** — `set()` in the gate dispatches `input` and
+  never `change`, so routing a slider's `input` through the drag tail with the exact
+  rebuild on `change` would leave every gate write in the drag state (a bounded fog
+  radius under every depth-dim check); it is the obvious next step, is one branch in
+  the transform handler, and was left because it moves the whole gate's premise.
+
+**A TRANSFORM SLIDER COMMITS ONLY ITS OWN FIELD** (`commitTransform(el)`). A range
+input holds its value at its own step and a drag leaves a floating millimetre, so
+reading all seven back on every input snapped the two axes nobody touched to the
+whole millimetre — a move of up to 0.5 mm by a control that was not moved. The
+sliders therefore agree with the store to half a step, the read-out prints whole
+millimetres, and the gate compares the GEOMETRY (the bloom's first drawn point moved
+by exactly the store's delta) rather than the slider against itself. Not new in
+kind: `placementFor` has always written a non-integer position.
+
+**THE GATE IS 233 CHECKS AND 93 MUTANTS.** Ten `anchor/*` checks: the anchors at
+the placed origin (through the Z-up rotation, against the store), a REAL pointer
+drag on the highest unselected anchor in the clear (searched for — a handle under
+a control column cannot be grabbed, this page's own lesson; the highest so a run
+written at offset 0 lands somewhere visible), the moved bloom named by its own
+`bloomDigest` and every other bloom identical to the bit with its transform
+unchanged, the grab selecting, the anchor under the pointer within 3 px, the
+routing and both tail words read WHILE THE POINTER IS DOWN, the patched buffers
+float-for-float against a full pack, the composed box exact and its radius a bound
+with the released page identical to a forced rebuild, the sliders / read-out /
+geometry agreeing after, no orbit, and the one-field commit. **ONE PRE-EXISTING
+CHECK WAS CORRECTED, NOT LOOSENED:**
+`partial/the-panel-says-what-a-drag-costs-and-which-part-is-one-blooms` shipped
+requiring `buildMs < packMs + boundsMs`, and on this runner it went RED ON `main`'s
+code (26.3 ms build against a 16.4 ms tail, one run) — a timing INEQUALITY on a
+two-frames-a-second box is a bar set on noise, the class of check this gate refuses
+everywhere else. It now asserts every figure the page measured is the figure the
+panel prints, with each tail word, and REPORTS the split. Nine mutants over the
+anchor code: the three plausible wrong drags the brief named (every bloom moves; the
+grab does not select, so the sliders describe another bloom; the sliders load and
+the bloom stays), the drag rebuilding everything, the run written at offset 0, the
+moved bloom's extent going stale, the drag tail outliving the drag, the anchors in
+the export (the grey identity, with nothing added for it), and every field read
+back on every slider input. **WHICH MUTANTS WERE RUN IS IN THE SESSION'S REPORT AND
+NOT HERE**, because a count implies a sweep.
+
 **A known limitation that is NOT the viewer's to fix:** a splayed bloom (the
 shipped sample is spread 0.60, tilt 25°) reads flatter than a cupped reference
 form. That is a bloom parameter. The sheet photographs it and the viewer does
@@ -4056,6 +4189,10 @@ strand modes) is in that doc so it is not re-derived.
    by them: **lock state, background shapes and cut-and-pull state are added as
    FIELDS** — neither needs a migration. Anything that changes the root's
    cardinality does.
+1d. **THE ANCHOR DRAG IS DONE** — see the anchor section above. What it leaves: the
+   sliders' `input` stream still pays the exact tail (one branch, gated on the
+   gate's `set()` dispatching `change`), and the drag plane and the anchor's
+   placement are two feel decisions made for Eva's eye and not yet ruled on.
 1c. **REBUILDING ONLY THE BLOOM THAT CHANGED IS DONE** — see the per-instance
    rebuild section above. What is NOT done, and is now the whole of the
    remaining cost, is the GLOBAL TAIL: the packing and the extent walk.
