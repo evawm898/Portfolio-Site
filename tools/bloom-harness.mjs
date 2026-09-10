@@ -1567,8 +1567,26 @@ export async function thicknessAssertions(page, row) {
       if (typeof ld.seamClearMm === 'number' && Math.abs(ld.seamClearMm - wantClear) > 1e-12) {
         bad.push(`A7: ${at}the declared seam clearance is ${ld.seamClearMm} mm where half the export sheet (${wantHalf} mm) times sin(${ld.seamTurnDeg.toFixed(4)} degrees) is ${wantClear} — the foot-to-blade clearance law is not the one this gate derives`);
       }
-      if (blade.length && !(blade[0] > ld.seamClearU)) {
+      /* THE CLAMP IS A BICONDITIONAL, IN BOTH DIRECTIONS. A petal can be
+         SHORTER than the fold it has to clear — measured, five matrix rows,
+         the worst asking 1.0925 of its own length on a 0.18 mm blade at an
+         85 degree kink — and there is then no station inside the blade that
+         satisfies the derivation. Those rows are CLAMPED and TOLD and stay
+         declared self-intersectors; what must never happen is the clamp
+         firing where the blade DID have room, or the strict clause being
+         quietly skipped where it did not. So: clamped iff the unclamped step
+         would overrun the block's own limit, and the strict clearance is
+         asserted on every row that is not clamped. */
+      if (typeof ld.seamStepRaw === 'number') {
+        const wantClamp = ld.seamStepRaw > ld.seamMaxStep;
+        if (ld.seamClamped !== wantClamp) bad.push(`A7: ${at}the ladder reports seamClamped ${ld.seamClamped} while the unclamped step ${ld.seamStepRaw} against the limit ${ld.seamMaxStep} says ${wantClamp}`);
+        if (ld.seamStep !== Math.min(ld.seamStepRaw, ld.seamMaxStep)) bad.push(`A7: ${at}the seam step is ${ld.seamStep} where min(${ld.seamStepRaw}, ${ld.seamMaxStep}) is ${Math.min(ld.seamStepRaw, ld.seamMaxStep)}`);
+      }
+      if (blade.length && !ld.seamClamped && !(blade[0] > ld.seamClearU)) {
         bad.push(`A7: ${at}the first blade row sits at u ${blade[0]}, not strictly beyond the declared seam clearance ${ld.seamClearU} (${ld.seamClearMm.toFixed(4)} mm at a ${ld.seamTurnDeg.toFixed(2)} degree kink) — the foot-to-blade offset fold is not cleared`);
+      }
+      if (blade.length && ld.seamClamped && blade[0] !== ld.seamMaxStep / ld.rows) {
+        bad.push(`A7: ${at}the seam is CLAMPED (${ld.seamClearMm.toFixed(4)} mm of clearance wanted on a blade that is ${(ld.seamClearMm / ld.seamClearU).toFixed(4)} mm long) but the first blade row is at u ${blade[0]}, not at the limit ${ld.seamMaxStep / ld.rows} — a clamped row must start as far out as it can`);
       }
       if (blade.length && blade[blade.length - 1] !== 1) {
         bad.push(`A7: ${at}the last blade station is ${blade[blade.length - 1]}, not 1 — the tip row is not at the tip`);
@@ -3683,12 +3701,14 @@ export async function gynoeciumAssertions(page, row) {
        sits on a row the census reads pairs on, and NO clean row disagrees.
        On a declared row it is reported, never asserted.
    X1  A ROW NAMED IN SELF_INTERSECTION_XFAIL STILL SELF-INTERSECTS. The list
-       was MEASURED ON MAIN at ead8624 (session 35's own head) with that
-       tree's builder in export mode on its doubles, every capability row
-       with its capability applied, over the full 624-row matrix, and
-       every entry names its row INDIVIDUALLY with the count and worst span
-       it read. A listed row that starts passing FAILS HARD: that is a fix
-       landing, and its entry must come off in the same commit.
+       was RE-BASELINED ON THIS BRANCH IN SESSION 38 (it was main at ead8624
+       until then, and the note above the list says why it could not stay
+       there): the builder in export mode on its own doubles, every
+       capability row with its capability applied, over the full 624-row
+       matrix, and every entry names its row INDIVIDUALLY with the count and
+       worst span it read. A listed row that starts passing FAILS HARD: that
+       is a fix landing, and its entry must come off in the same commit —
+       which is exactly what happened to 84 of them in session 38.
    X0  THE DOUBLES THE CENSUS READS ARE THE FILE'S OWN — see the note above
        selfIntersectionAssertions.
    X2  EVERY OTHER ROW HAS EXACTLY ZERO WITHIN-SHELL INTERSECTING PAIRS.
@@ -3755,10 +3775,44 @@ export function orientationAssertions(positions, row, sphere) {
   return { bad, r: o };
 }
 
-/* MEASURED ON MAIN AT ead8624 — see the header. Filled from the full-matrix
-   sweep recorded in docs/bloom-session-36-outcome.md; every value is the
-   count of within-shell pairs and the worst span on that row, export mode,
-   float32, so a later session can tell a moved number from a moved verdict. */
+/* MEASURED ON THIS BRANCH — RE-BASELINED IN SESSION 38, and that is a change
+   of meaning this entry states rather than leaves to be noticed. The list used
+   to be "measured on main at ead8624": a set of PRE-EXISTING failures, which is
+   what session 34's SELF_XFAIL doctrine wants. It cannot be that here, because
+   this session's whole purpose is to FIX 84 of its rows — a list that stayed on
+   main's numbers would fail X1 on every one of them, correctly, and the entries
+   have to come off in the same commit as the fix.
+
+   THE SWEEP: the full 624-row matrix, export mode, on the builder's own
+   doubles, every capability row with its capability applied, driven in Node
+   through the same census the export gate calls. It is CALIBRATED rather than
+   trusted: run against a worktree of main the same sweep reproduced session
+   36's recorded count on 222 declared rows EXACTLY, with zero disagreements
+   and zero undeclared rows reading non-zero — so the state mapping is the
+   page's and main's own numbers still hold.
+
+   WHAT MOVED, 624 rows, main -> this branch:
+     84 rows FIXED to exactly zero, 58 improved, 467 unchanged, 15 WORSE,
+     and ZERO rows went from clean to self-intersecting.
+     Declared rows 318 -> 234; total within-shell pairs 1,617,263 -> 1,359,861.
+
+   THE 15 THAT GOT WORSE ARE REPORTED, NOT TUNED AROUND (Eva's stop condition,
+   session 38) — the numbers and the attribution are in
+   docs/bloom-session-38-outcome.md. All 15 are the seam floor's: re-measured
+   with the curl-start floor neutered, every one reads identically.
+
+   THE TAGS ARE THE ROW'S CLASS, and two of them are session 38's rulings:
+   EFFECTIVE TILT PAST 90 (47 rows) is a MID-SURFACE overlap no offset spacing
+   can fix, and SEAM CLAMPED (5 rows) is a blade shorter than the fold it must
+   clear. The old "(N layers — the root blend)" tag is GONE from every row: A7
+   now asserts the foot-to-blade clearance is met on every ring of every row
+   (measured, 0 violations over the matrix), so on every unclamped row that
+   class is provably no longer what the pairs are.
+
+   WHAT THIS LIST STILL DOES NOT GATE: the MAGNITUDE. X1 fails a declared row
+   that reads zero and X2 fails an undeclared row that does not; a declared row
+   whose count doubles passes silently. That is how the 15 above could regress
+   without a red. Recorded, not built — a magnitude gate is its own ruling. */
 export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnProperty.call(SELF_INTERSECTION_XFAIL, label);
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'petalCup min (-0.8)': '384 pairs, worst span 0.2104 mm',
@@ -3769,10 +3823,9 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'petalSpineCurl max (360)': '1008 pairs, worst span 0.5233 mm',
   'petalRoll min (-330)': '18776 pairs, worst span 1.3837 mm',
   'petalRoll max (330)': '18776 pairs, worst span 1.3837 mm',
-  'headRise max (1)': '216 pairs, worst span 0.4176 mm',
-  'layerCount max (6)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
+  'headRise max (1)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'ALL MIN': '537 pairs, worst span 0.4270 mm',
-  'ALL MAX': '72598 pairs, worst span 4.4894 mm (6 layers — the root blend)',
+  'ALL MAX': '77990 pairs, worst span 4.4166 mm (EFFECTIVE TILT PAST 90 — 165.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'FORM: QUILL (roll alone, toward a tube)': '18776 pairs, worst span 1.3837 mm',
   'FORM: FIDDLEHEAD (spine curl alone)': '1008 pairs, worst span 0.5233 mm',
   'FORM: REFLEXED (cup min x curl below the plane)': '360 pairs, worst span 0.1991 mm',
@@ -3785,107 +3838,56 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'CAPABILITY: claw x form max': '7656 pairs, worst span 2.4618 mm',
   'CAPABILITY: cleft x roll max': '35144 pairs, worst span 1.3837 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
   'CAPABILITY: cleft x all thin': '4643 pairs, worst span 0.7125 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
-  '6 layers x layerSize min (0.35)': '25944 pairs, worst span 0.8355 mm (6 layers — the root blend)',
-  '6 layers x layerSize max (0.9)': '680 pairs, worst span 0.5500 mm (6 layers — the root blend)',
-  '6 layers x layerPhase min (0)': '1953 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x layerPhase max (1)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x layerTilt min (0)': '840 pairs, worst span 0.1285 mm (6 layers — the root blend)',
-  '6 layers x layerTilt max (30)': '3384 pairs, worst span 0.8739 mm (6 layers — the root blend)',
-  '6 layers x allCurl min (-180)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x allCurl max (360)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x allCup min (-0.8)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x allCup max (1.2)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  '6 layers x innerCurl min (-180)': '1904 pairs, worst span 0.3353 mm (6 layers — the root blend)',
-  '6 layers x innerCurl max (360)': '9424 pairs, worst span 0.5646 mm (6 layers — the root blend)',
-  '6 layers x innerCup min (-0.8)': '4106 pairs, worst span 0.3246 mm (6 layers — the root blend)',
-  '6 layers x innerCup max (1.2)': '6582 pairs, worst span 0.3366 mm (6 layers — the root blend)',
-  '3 layers x RADIAL': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  '3 layers x SPIRAL': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'LAYERS: 3 x spread min': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL THIN': '80 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL THIN x spread min': '80 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL THIN x spread min x petalCount 40': '400 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL THIN x spread min x petalCount 3': '30 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'LAYERS: 3 x layerSize min x ALL THIN (deepest foot floored)': '1164 pairs, worst span 0.1238 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL FORM MAX': '29880 pairs, worst span 1.3655 mm (3 layers — the root blend)',
-  'LAYERS: 3 x SPIRAL x ALL THIN x spread min x petalCount 40': '400 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'LAYERS: 3 (the layered bloom at its defaults)': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'LAYERS: 3 x layerTilt max (135° effective at petalTilt max)': '848 pairs, worst span 0.5361 mm (3 layers — the root blend)',
-  'LAYERS: 3 x ALL MIN elsewhere': '27 pairs, worst span 0.0598 mm (3 layers — the root blend)',
-  'CAPABILITY: cleft x 3 layers': '14023 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell) (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 3 x 3 turns (9 in sequence)': '100 pairs, worst span 0.3302 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 5 x 3 turns (15 in sequence)': '169 pairs, worst span 0.3249 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 7 x 3 turns (21 in sequence)': '259 pairs, worst span 0.3340 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 8 x 3 turns (24 in sequence)': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 13 x 3 turns (39 in sequence)': '463 pairs, worst span 0.3323 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 21 x 3 turns (63 in sequence)': '766 pairs, worst span 0.3340 mm (3 layers — the root blend)',
-  'CONTINUOUS x petalCount 40 x 3 turns (120 in sequence)': '1438 pairs, worst span 0.3349 mm (3 layers — the root blend)',
-  'CONTINUOUS x 2 turns': '34 pairs, worst span 0.1091 mm',
-  'CONTINUOUS x 3 turns': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
-  'CONT: 3 turns x layerSize min x petalCount 40 (the deepest foot)': '14108 pairs, worst span 0.2154 mm (3 layers — the root blend)',
-  'CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)': '161 pairs, worst span 0.1372 mm (3 layers — the root blend)',
-  'CONT: 3 turns x ALL THIN x spread min x petalCount 40 (the overlap box at 120 rings)': '1602 pairs, worst span 0.2928 mm (3 layers — the root blend)',
-  'CONT: 3 turns x ALL THIN x spread min x petalCount 3 (the sparsest continuum)': '99 pairs, worst span 0.2715 mm (3 layers — the root blend)',
-  'CONT: 3 turns x layerSize min x ALL THIN x petalCount 40 (deepest foot, thinnest sheet)': '12364 pairs, worst span 0.1835 mm (3 layers — the root blend)',
-  'CONT: 3 turns x footDelicacy min (floored from ring 1)': '433 pairs, worst span 0.3282 mm (3 layers — the root blend)',
-  'CONT: 3 turns x spread max (the hub plate under a continuum)': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
-  'CONT: 3 turns x layerTilt max x petalTilt max (161.25° effective — past the layered 135°)': '1294 pairs, worst span 0.6151 mm (3 layers — the root blend)',
-  'CONT: 3 turns x ALL FORM MAX': '27299 pairs, worst span 1.3655 mm (3 layers — the root blend)',
-  'CONT: 3 turns x ALL MIN elsewhere': '118 pairs, worst span 0.1479 mm (3 layers — the root blend)',
-  'CAPABILITY: cleft x CONTINUOUS x 3 turns': '14224 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell) (3 layers — the root blend)',
-  'ZYGO: THE IRIS (falls curl down, standards rise)': '56 pairs, worst span 0.3786 mm',
+  '6 layers x layerSize min (0.35)': '20912 pairs, worst span 1.0649 mm (SEAM CLAMPED — the blade is SHORTER than the fold it must clear)',
+  '6 layers x layerTilt max (30)': '2944 pairs, worst span 0.8739 mm (EFFECTIVE TILT PAST 90 — 175.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  '6 layers x innerCurl max (360)': '8256 pairs, worst span 0.5646 mm',
+  '6 layers x innerCup min (-0.8)': '2578 pairs, worst span 0.1682 mm',
+  '6 layers x innerCup max (1.2)': '5222 pairs, worst span 0.2361 mm',
+  'LAYERS: 3 x ALL FORM MAX': '29672 pairs, worst span 1.2616 mm',
+  'LAYERS: 3 x layerTilt max (135° effective at petalTilt max)': '1056 pairs, worst span 0.3572 mm (EFFECTIVE TILT PAST 90 — 135.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CAPABILITY: cleft x 3 layers': '13976 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
+  'CONT: 3 turns x layerTilt max x petalTilt max (161.25° effective — past the layered 135°)': '1342 pairs, worst span 0.4459 mm (EFFECTIVE TILT PAST 90 — 161.3 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CONT: 3 turns x ALL FORM MAX': '26937 pairs, worst span 1.6044 mm',
+  'CAPABILITY: cleft x CONTINUOUS x 3 turns': '13985 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
   'ZYGO: 2 layers x ALL INNER MAX': '9312 pairs, worst span 0.6466 mm',
-  'ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)': '19040 pairs, worst span 0.6466 mm (3 layers — the root blend)',
-  'ZYGO: 3 layers x ALL INNER MAX x ALL THIN': '16320 pairs, worst span 0.5356 mm (3 layers — the root blend)',
-  'ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)': '17520 pairs, worst span 0.6466 mm (3 layers — the root blend)',
-  'ZYGO: 3 layers x ALL INNER MAX x petalCount 3': '6750 pairs, worst span 0.6466 mm (3 layers — the root blend)',
-  'ZYGO: 3 layers x ALL INNER MAX x petalCount 40': '100880 pairs, worst span 0.6466 mm (3 layers — the root blend)',
-  'ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)': '29880 pairs, worst span 1.3655 mm (3 layers — the root blend)',
+  'ZYGO: 3 layers x ALL INNER MAX (one role over two whorls)': '18792 pairs, worst span 0.6466 mm',
+  'ZYGO: 3 layers x ALL INNER MAX x ALL THIN': '16264 pairs, worst span 0.5356 mm',
+  'ZYGO: 3 layers x ALL INNER MAX x spread min (crowded feet)': '17352 pairs, worst span 0.6466 mm',
+  'ZYGO: 3 layers x ALL INNER MAX x petalCount 3': '6687 pairs, worst span 0.6466 mm',
+  'ZYGO: 3 layers x ALL INNER MAX x petalCount 40': '100040 pairs, worst span 0.6466 mm',
+  'ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)': '29672 pairs, worst span 1.2616 mm',
   'ZYGO: curl clamp binds (base 360 + delta 360 -> 360)': '2064 pairs, worst span 0.5549 mm',
   'ZYGO: cup clamp binds (base 1.2 + delta 1.2 -> 1.2)': '1528 pairs, worst span 0.2361 mm',
-  'ZYGO: the iris x SPIRAL (roles exist, azimuth differs)': '56 pairs, worst span 0.3786 mm',
-  'ZYGO: GATED — CONTINUOUS x 3 turns x ALL INNER MAX (hidden, and must be inert)': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
   'ZYGO: the foot UPPER clamp (petalWidth 30 — ring frozen at 11.06 mm)': '14768 pairs, worst span 1.0071 mm',
   'CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX': '21051 pairs, worst span 1.1369 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
-  'SLOT: labellumSize min (0.5) x 2 whorls in step': '9 pairs, worst span 0.1267 mm',
-  'SLOT: labellumTilt max (75) x 2 whorls in step': '43 pairs, worst span 0.3706 mm',
   'SLOT: labellumCup min (-0.8) x 2 whorls in step': '95 pairs, worst span 0.2104 mm',
   'SLOT: labellumCup max (1.2) x 2 whorls in step': '195 pairs, worst span 0.2361 mm',
   'SLOT: labellumCurl max (360) x 2 whorls in step': '258 pairs, worst span 0.5549 mm',
-  'SLOT: hoodSize min (0.5) x 2 whorls in step': '9 pairs, worst span 0.1267 mm',
-  'SLOT: hoodTilt max (75) x 2 whorls in step': '43 pairs, worst span 0.3706 mm',
   'SLOT: hoodCup min (-0.8) x 2 whorls in step': '99 pairs, worst span 0.2104 mm',
   'SLOT: hoodCup max (1.2) x 2 whorls in step': '195 pairs, worst span 0.2361 mm',
-  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step': '9 pairs, worst span 0.3000 mm',
-  'ORCHID x petalCount 3 (one of three is the labellum, no laterals) x 2 whorls in step': '19 pairs, worst span 0.3000 mm',
-  'ORCHID x petalCount 4 (smallest even — hood is one slot) x 2 whorls in step': '11 pairs, worst span 0.3000 mm',
-  'ORCHID x petalCount 39 (odd at scale — hood is a straddling pair) x 2 whorls in step': '15 pairs, worst span 0.3000 mm',
-  'ORCHID x petalCount 40 (even at scale) x 2 whorls in step': '7 pairs, worst span 0.3000 mm',
-  'ORCHID x 3 layers x phase 0 (slot roles x layer roles)': '107 pairs, worst span 0.5480 mm (3 layers — the root blend)',
-  'ORCHID x the IRIS (both role axes, one bloom)': '140 pairs, worst span 0.4162 mm',
+  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step': '2 pairs, worst span 0.0000 mm',
+  'ORCHID x petalCount 3 (one of three is the labellum, no laterals) x 2 whorls in step': '3 pairs, worst span 0.0000 mm',
+  'ORCHID x petalCount 4 (smallest even — hood is one slot) x 2 whorls in step': '3 pairs, worst span 0.0000 mm',
+  'ORCHID x petalCount 39 (odd at scale — hood is a straddling pair) x 2 whorls in step': '1 pairs, worst span 0.0000 mm',
+  'ORCHID x 3 layers x phase 0 (slot roles x layer roles)': '5 pairs, worst span 0.0000 mm',
+  'ORCHID x the IRIS (both role axes, one bloom)': '55 pairs, worst span 0.1413 mm (EFFECTIVE TILT PAST 90 — 105.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'ORCHID x ALL THIN x spread min (the junction at its thinnest) x 2 whorls in step': '4 pairs, worst span 0.0000 mm',
-  'ORCHID x the foot UPPER clamp (petalWidth 30) x 2 whorls in step': '50 pairs, worst span 0.3019 mm',
+  'ORCHID x the foot UPPER clamp (petalWidth 30) x 2 whorls in step': '39 pairs, worst span 0.0000 mm',
   'SLOT: ALL MAX x 2 whorls in step': '2619 pairs, worst span 1.4909 mm',
   'SLOT: ALL MIN x 2 whorls in step': '222 pairs, worst span 0.2538 mm',
-  'SLOT: ALL MAX x 3 layers x phase 0': '4007 pairs, worst span 1.4909 mm (3 layers — the root blend)',
+  'SLOT: ALL MAX x 3 layers x phase 0': '3912 pairs, worst span 1.4909 mm (EFFECTIVE TILT PAST 90 — 99.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'SLOT: ALL MAX x petalCount 3 x 2 whorls in step': '2793 pairs, worst span 1.4909 mm',
   'SLOT: ALL MAX x petalCount 40 x 2 whorls in step': '2599 pairs, worst span 1.4909 mm',
   'SLOT: ALL MAX x ALL FORM MAX (every clamp binds at once) x 2 whorls in step': '19790 pairs, worst span 2.4700 mm',
-  'SLOT: size x0.50 (a blade narrower than its own root) x 2 whorls in step': '18 pairs, worst span 0.1192 mm',
-  'SLOT: GATED — CONTINUOUS x 3 turns x ALL SLOT MAX (hidden, and must be inert)': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
-  'SLOT: GATED — 3 layers x phase 0.25 x ALL SLOT MAX (whorls out of phase)': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
   'FAN: ALL FORM MAX': '8631 pairs, worst span 1.2616 mm',
-  'FAN: 3 layers (nested fans)': '63 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'FAN: 3 layers x ALL THIN x spread min': '70 pairs, worst span 0.1078 mm (3 layers — the root blend)',
-  'FAN: 3 layers x toggle ON x layerTilt max': '728 pairs, worst span 0.5361 mm (3 layers — the root blend)',
-  'FAN: GATED — ALL SLOT MAX x 3 layers (hidden and inert at depth)': '63 pairs, worst span 0.1648 mm (3 layers — the root blend)',
+  'FAN: 3 layers x toggle ON x layerTilt max': '910 pairs, worst span 0.3572 mm (EFFECTIVE TILT PAST 90 — 135.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)': '2 pairs, worst span 0.0000 mm',
   'FAN x PER-PETAL: 1/side x 170deg x petal 1 MAX (largest petal, widest spacing, fewest petals)': '1247 pairs, worst span 1.4909 mm',
   'FAN x PER-PETAL: 1/side x 170deg x toggle OFF x petal 1 MAX (two petals, both are petal 1)': '2494 pairs, worst span 1.4909 mm',
   'FAN x PER-PETAL: ALL PER-PETAL MAX x 8/side x 60deg (nine groups on a capped arc)': '21233 pairs, worst span 1.4909 mm',
   'FAN x PER-PETAL: ALL PER-PETAL MAX x 1/side (one group is the whole bloom)': '3741 pairs, worst span 1.4909 mm',
-  'FAN x PER-PETAL: petal 1 x 3 layers x inner* (position and depth composing)': '223 pairs, worst span 0.2089 mm (3 layers — the root blend)',
-  'FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers': '25284 pairs, worst span 1.4909 mm (3 layers — the root blend)',
+  'FAN x PER-PETAL: petal 1 x 3 layers x inner* (position and depth composing)': '169 pairs, worst span 0.2089 mm',
+  'FAN x PER-PETAL: ALL PER-PETAL MAX x 3 layers': '25319 pairs, worst span 1.4909 mm (EFFECTIVE TILT PAST 90 — 99.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'FAN x PER-PETAL: ALL PER-PETAL MAX x ALL THIN x spread min': '8064 pairs, worst span 1.4801 mm',
   'FAN x PER-PETAL: ALL PER-PETAL MAX x ALL FORM MAX': '8330 pairs, worst span 2.4700 mm',
   'PER-PETAL: petal1Cup min (-0.8) at 1/side': '46 pairs, worst span 0.2104 mm',
@@ -3915,9 +3917,6 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'PER-PETAL: petal7Curl max (360) at 6/side': '268 pairs, worst span 0.5929 mm',
   'PER-PETAL: petal8Curl max (360) at 7/side': '388 pairs, worst span 0.7089 mm',
   'PER-PETAL: petal9Curl max (360) at 8/side': '392 pairs, worst span 0.6227 mm',
-  'PER-PETAL: GATED — CONTINUOUS x 3 x ALL PER-PETAL MAX (hidden, and must be inert)': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
-  'FAN: GATED — 3 layers x layerPhase max (hidden under FAN, and must be inert)': '63 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'FAN: GATED — 3 layers x layerPhase 0 (the same bloom, stated)': '63 pairs, worst span 0.1648 mm (3 layers — the root blend)',
   'CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX': '13699 pairs, worst span 2.8811 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
   'ALL PETALS: max (curl +360, cup +1.20, tip +0.60)': '8448 pairs, worst span 0.7972 mm',
   'ALL PETALS: min (curl -180, cup -0.80)': '360 pairs, worst span 0.1991 mm',
@@ -3928,70 +3927,47 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'ALL PETALS: max x FAN 3/side toggle ON x petal 1 max (the group, then the petal)': '7593 pairs, worst span 1.4909 mm',
   'ALL PETALS: max x CONTINUOUS 1 turn (one sequence is one whorl)': '8749 pairs, worst span 0.7884 mm',
   'ALL PETALS: max x SPIRAL': '8448 pairs, worst span 0.7972 mm',
-  'ALL PETALS: GATED — max x 3 layers x phase 0 x ORCHID (inert beside a live orchid)': '107 pairs, worst span 0.5480 mm (3 layers — the root blend)',
+  'ALL PETALS: GATED — max x 3 layers x phase 0 x ORCHID (inert beside a live orchid)': '5 pairs, worst span 0.0000 mm',
   'ALL PETALS: GATED — max x Inner max x 2 layers (only the Inner pair applies)': '9312 pairs, worst span 0.6466 mm',
-  'DEPTH: 4 layers x RADIAL x spread min (0.6)': '432 pairs, worst span 0.2359 mm (4 layers — the root blend)',
-  'DEPTH: 4 turns x CONTINUOUS x spread min (0.6)': '650 pairs, worst span 0.4110 mm (4 layers — the root blend)',
-  'DEPTH: 4 layers x RADIAL x spread default (2)': '416 pairs, worst span 0.2359 mm (4 layers — the root blend)',
-  'DEPTH: 4 turns x CONTINUOUS x spread default (2)': '630 pairs, worst span 0.4110 mm (4 layers — the root blend)',
-  'DEPTH: 4 layers x RADIAL x spread max (6)': '416 pairs, worst span 0.2359 mm (4 layers — the root blend)',
-  'DEPTH: 4 turns x CONTINUOUS x spread max (6)': '628 pairs, worst span 0.4110 mm (4 layers — the root blend)',
-  'DEPTH: 5 layers x RADIAL x spread min (0.6)': '856 pairs, worst span 0.2359 mm (5 layers — the root blend)',
-  'DEPTH: 5 turns x CONTINUOUS x spread min (0.6)': '1504 pairs, worst span 0.5355 mm (5 layers — the root blend)',
-  'DEPTH: 5 layers x RADIAL x spread default (2)': '840 pairs, worst span 0.2359 mm (5 layers — the root blend)',
-  'DEPTH: 5 turns x CONTINUOUS x spread default (2)': '1484 pairs, worst span 0.5355 mm (5 layers — the root blend)',
-  'DEPTH: 5 layers x RADIAL x spread max (6)': '824 pairs, worst span 0.2359 mm (5 layers — the root blend)',
-  'DEPTH: 5 turns x CONTINUOUS x spread max (6)': '1430 pairs, worst span 0.5355 mm (5 layers — the root blend)',
-  'DEPTH: 6 layers x RADIAL x spread min (0.6)': '1984 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  'DEPTH: 6 turns x CONTINUOUS x spread min (0.6)': '2856 pairs, worst span 0.6106 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x RADIAL x spread default (2)': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  'DEPTH: 6 turns x CONTINUOUS x spread default (2)': '2836 pairs, worst span 0.6106 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x RADIAL x spread max (6)': '1840 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  'DEPTH: 6 turns x CONTINUOUS x spread max (6)': '2634 pairs, worst span 0.6106 mm (6 layers — the root blend)',
-  'DEPTH: the mum at 6 turns (D_max 19 measured, CROWDED)': '4164 pairs, worst span 0.5064 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x ALL THIN x spread min (feet across the axis on every ring)': '2248 pairs, worst span 0.3700 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x layerSize min (a 0.18 mm blade on a 1.60 mm foot; crowding R5 needs its fine pass)': '25944 pairs, worst span 0.8355 mm (6 layers — the root blend)',
-  'DEPTH: 6 turns x layerSize min x petalCount 40 (the deepest continuous foot)': '152182 pairs, worst span 1.0691 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x petalCount 40 x spread min (D_max 15 measured)': '9920 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  'DEPTH: 6 turns x petalCount 40 x spread min (D_max 25 measured, CROWDED)': '14720 pairs, worst span 0.6106 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x ALL FORM MAX': '54880 pairs, worst span 1.3655 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x SPIRAL': '1968 pairs, worst span 0.5498 mm (6 layers — the root blend)',
-  'DEPTH: 6 layers x layerTilt max x petalTilt max (225° effective on the sixth whorl)': '4544 pairs, worst span 1.0161 mm (6 layers — the root blend)',
-  'DEPTH: ZYGO 6 layers x ALL INNER MAX (one role over five whorls)': '59880 pairs, worst span 0.6466 mm (6 layers — the root blend)',
-  'DEPTH: the depth cell taken to six (0.90 x tilt 12; D_max 4 measured)': '680 pairs, worst span 0.5500 mm (6 layers — the root blend)',
-  'CAPABILITY: cleft x 6 layers': '29931 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell) (6 layers — the root blend)',
-  'DOME: rise 1 x RADIAL x spread min (0.6)': '152 pairs, worst span 0.5414 mm',
-  'DOME: rise 1 x CONTINUOUS x spread min (0.6)': '23 pairs, worst span 0.5232 mm',
-  'DOME: rise 1 x RADIAL x spread default (2)': '216 pairs, worst span 0.4176 mm',
-  'DOME: rise 1 x CONTINUOUS x spread default (2)': '116 pairs, worst span 0.4292 mm',
-  'DOME: rise 1 x RADIAL x spread max (6)': '320 pairs, worst span 0.4997 mm',
-  'DOME: rise 1 x CONTINUOUS x spread max (6)': '169 pairs, worst span 0.5818 mm',
-  'DOME: the INCURVE TARGET, flat (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) · curl family pinned at identity, COVERAGE ASSERTED': '7806 pairs, worst span 0.5109 mm (3 layers — the root blend)',
-  'DOME: the INCURVE TARGET x rise 0.5 (the sheet\'s headline; pre-registered D_max 5) · curl family pinned at identity, COVERAGE ASSERTED': '7350 pairs, worst span 0.4957 mm (3 layers — the root blend)',
-  'DOME: rise 1 x 6 layers x spread min (the arc-based crossing flag)': '1784 pairs, worst span 0.4737 mm (6 layers — the root blend)',
-  'DOME: rise 1 x 6 turns x spread min x petalCount 40 (the arc-based crossing flag, continuous)': '9996 pairs, worst span 0.5909 mm (6 layers — the root blend)',
-  'DOME: the APEX CORNER — ALL MIN x sheet 2.40 x spread min x rise 1 (the floor binds, CLAMPED to 0.25)': '48 pairs, worst span 0.2346 mm',
-  'DOME: rise 1 x ALL FORM MAX (the four curves on the rotated frame)': '10016 pairs, worst span 1.2616 mm',
-  'DOME: rise 1 x petalTilt 75 x 3 layers x layerTilt 30 (135 deg effective on a hemisphere)': '3224 pairs, worst span 0.6435 mm (3 layers — the root blend)',
-  'DOME: rise 1 x FAN 3/side toggle ON': '189 pairs, worst span 0.3982 mm',
-  'DOME: rise 1 x SPIRAL': '216 pairs, worst span 0.4176 mm',
-  'DOME: rise 1 x ORCHID at two whorls in step': '433 pairs, worst span 0.6233 mm',
-  'DOME: rise 1 x FAN 3/side x petal 1 max': '1473 pairs, worst span 1.4909 mm',
-  'DOME: rise 1 x ALL THIN x spread min x 3 layers (feet across the apex)': '336 pairs, worst span 0.2728 mm (3 layers — the root blend)',
-  'DOME: rise 1 x 6 layers x layerSize min (the 0.18 mm blade on a hemisphere)': '7336 pairs, worst span 0.4946 mm (6 layers — the root blend)',
-  'DOME LEAN: EVA_CONFIG flat (the headRise-independent baseline the lean must not touch)': '14490 pairs, worst span 0.6106 mm (6 layers — the root blend)',
-  'DOME LEAN: EVA_CONFIG x rise 1 (GATED — bald-cap unmoved by domeLean; a shortfall the dome did not cause)': '10510 pairs, worst span 0.6537 mm (6 layers — the root blend)',
-  'DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18 (closes the gap via the EXISTING ramp, not domeLean)': '15481 pairs, worst span 0.6451 mm (6 layers — the root blend)',
-  'CURL: bias max x incurve target x rise 0.5 (documented: re-opens 16.0% of the crown, tips 5-11 mm out)': '6740 pairs, worst span 0.4519 mm (3 layers — the root blend)',
-  'CURL: bias 0.5 x incurve target x rise 0.5 (documented: re-opens 5.4%)': '6740 pairs, worst span 0.4519 mm (3 layers — the root blend)',
-  'CURL: start max x incurve target x rise 0.5 (the spine floor binds: 150 asked, 96 built; re-opens 23.1%)': '6740 pairs, worst span 0.4519 mm (3 layers — the root blend)',
-  'CURL: bias max x start max x incurve target x rise 0.5 (CLAMPED: 50 built)': '6740 pairs, worst span 0.4519 mm (3 layers — the root blend)',
-  'CURL: start floored at one blade row (0.02 -> 0.036) x incurve target x rise 0.5': '6794 pairs, worst span 0.4568 mm (3 layers — the root blend)',
-  'CURL: bias max x incurve target, flat': '7788 pairs, worst span 0.4989 mm (3 layers — the root blend)',
-  'CURL: start max x incurve target, flat': '7788 pairs, worst span 0.4989 mm (3 layers — the root blend)',
-  'CURL: bias 0.5 x start 0.5 x incurve target x rise 1': '10252 pairs, worst span 0.5759 mm (3 layers — the root blend)',
+  'DEPTH: 6 turns x CONTINUOUS x spread min (0.6)': '61 pairs, worst span 0.1490 mm (EFFECTIVE TILT PAST 90 — 95.5 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DEPTH: 6 turns x CONTINUOUS x spread default (2)': '61 pairs, worst span 0.1490 mm (EFFECTIVE TILT PAST 90 — 95.5 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DEPTH: 6 turns x CONTINUOUS x spread max (6)': '61 pairs, worst span 0.1490 mm (EFFECTIVE TILT PAST 90 — 95.5 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DEPTH: 6 layers x layerSize min (a 0.18 mm blade on a 1.60 mm foot; crowding R5 needs its fine pass)': '20912 pairs, worst span 1.0649 mm (SEAM CLAMPED — the blade is SHORTER than the fold it must clear)',
+  'DEPTH: 6 turns x layerSize min x petalCount 40 (the deepest continuous foot)': '109295 pairs, worst span 1.1587 mm (EFFECTIVE TILT PAST 90 — 96.7 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it) (SEAM CLAMPED — the blade is SHORTER than the fold it must clear)',
+  'DEPTH: 6 turns x petalCount 40 x spread min (D_max 25 measured, CROWDED)': '610 pairs, worst span 0.4215 mm (EFFECTIVE TILT PAST 90 — 96.7 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DEPTH: 6 layers x ALL FORM MAX': '53816 pairs, worst span 1.2616 mm',
+  'DEPTH: 6 layers x layerTilt max x petalTilt max (225° effective on the sixth whorl)': '4744 pairs, worst span 1.0161 mm (EFFECTIVE TILT PAST 90 — 225.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DEPTH: ZYGO 6 layers x ALL INNER MAX (one role over five whorls)': '62344 pairs, worst span 0.6466 mm',
+  'CAPABILITY: cleft x 6 layers': '28058 pairs, worst span 0.8550 mm (CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)',
+  'DOME: rise 1 x RADIAL x spread min (0.6)': '152 pairs, worst span 0.5414 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x CONTINUOUS x spread min (0.6)': '19 pairs, worst span 0.5232 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x RADIAL x spread default (2)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x CONTINUOUS x spread default (2)': '27 pairs, worst span 0.3974 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x RADIAL x spread max (6)': '320 pairs, worst span 0.4997 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x CONTINUOUS x spread max (6)': '40 pairs, worst span 0.4991 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: the INCURVE TARGET, flat (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) · curl family pinned at identity, COVERAGE ASSERTED': '510 pairs, worst span 0.2656 mm',
+  'DOME: the INCURVE TARGET x rise 0.5 (the sheet\'s headline; pre-registered D_max 5) · curl family pinned at identity, COVERAGE ASSERTED': '9944 pairs, worst span 0.3709 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x 6 layers x spread min (the arc-based crossing flag)': '320 pairs, worst span 0.4737 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x 6 turns x spread min x petalCount 40 (the arc-based crossing flag, continuous)': '1408 pairs, worst span 0.4607 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x ALL FORM MAX (the four curves on the rotated frame)': '10016 pairs, worst span 1.2616 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x petalTilt 75 x 3 layers x layerTilt 30 (135 deg effective on a hemisphere)': '3168 pairs, worst span 0.6435 mm (EFFECTIVE TILT PAST 90 — 166.2 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x FAN 3/side toggle ON': '189 pairs, worst span 0.3982 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x SPIRAL': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x ORCHID at two whorls in step': '351 pairs, worst span 0.6233 mm (EFFECTIVE TILT PAST 90 — 155.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x FAN 3/side x petal 1 max': '1473 pairs, worst span 1.4909 mm (EFFECTIVE TILT PAST 90 — 165.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x ALL THIN x spread min x 3 layers (feet across the apex)': '136 pairs, worst span 0.2728 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME: rise 1 x 6 layers x layerSize min (the 0.18 mm blade on a hemisphere)': '6528 pairs, worst span 0.4946 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it) (SEAM CLAMPED — the blade is SHORTER than the fold it must clear)',
+  'DOME LEAN: EVA_CONFIG flat (the headRise-independent baseline the lean must not touch)': '610 pairs, worst span 0.4215 mm (EFFECTIVE TILT PAST 90 — 96.7 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME LEAN: EVA_CONFIG x rise 1 (GATED — bald-cap unmoved by domeLean; a shortfall the dome did not cause)': '1678 pairs, worst span 0.5608 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18 (closes the gap via the EXISTING ramp, not domeLean)': '7866 pairs, worst span 0.5604 mm (EFFECTIVE TILT PAST 90 — 140.6 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: bias max x incurve target x rise 0.5 (documented: re-opens 16.0% of the crown, tips 5-11 mm out)': '7227 pairs, worst span 0.3152 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: bias 0.5 x incurve target x rise 0.5 (documented: re-opens 5.4%)': '7227 pairs, worst span 0.3153 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: start max x incurve target x rise 0.5 (the spine floor binds: 150 asked, 96 built; re-opens 23.1%)': '7227 pairs, worst span 0.3152 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: bias max x start max x incurve target x rise 0.5 (CLAMPED: 50 built)': '7227 pairs, worst span 0.3152 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: start floored at one blade row (0.02 -> 0.036) x incurve target x rise 0.5': '8070 pairs, worst span 0.3297 mm (EFFECTIVE TILT PAST 90 — 128.1 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'CURL: bias 0.5 x start 0.5 x incurve target x rise 1': '14763 pairs, worst span 0.5759 mm (EFFECTIVE TILT PAST 90 — 165.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'CURL: FIDDLEHEAD x start 0.5 (SELF-CONTACT: the tip lands on its own mid-blade)': '1104 pairs, worst span 0.5302 mm',
-  'CURL: crozier x rise 1 x 6 deep (curl max x bias max x start max)': '1936 pairs, worst span 0.5250 mm (6 layers — the root blend)',
+  'CURL: crozier x rise 1 x 6 deep (curl max x bias max x start max)': '608 pairs, worst span 0.4954 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'CURL: ALL FORM MAX x bias max x start 0.5': '6640 pairs, worst span 2.1026 mm',
   'TAPER: QUILL x taper max (roll clamp; opens toward the tip)': '768 pairs, worst span 0.8985 mm',
   'TAPER: roll min (-330) x taper min': '3744 pairs, worst span 1.2919 mm',
@@ -3999,21 +3975,16 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'GRADIENT: cup gradient min x cup min (reflexed, more so at the tip)': '768 pairs, worst span 0.2271 mm',
   'GRADIENT: cup gradient max x ALL THIN x spread min': '432 pairs, worst span 0.2130 mm',
   'GRADIENT: cup gradient max x QUILL (cup composes onto an isometric roll; no damping)': '5240 pairs, worst span 0.7145 mm',
-  'SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet\'s headline': '5009 pairs, worst span 0.5203 mm (3 layers — the root blend)',
-  'SPHERE: 40 per turn x 6 turns (240 feet — the densest reachable pole)': '7416 pairs, worst span 0.6258 mm (6 layers — the root blend)',
-  'SPHERE: the APEX CORNER — ALL MIN x sheet 2.40 x spread min (the sphere held at one sheet, CLAMPED)': '17 pairs, worst span 0.1290 mm',
-  'SPHERE: ALL THIN x spread min x 3 turns': '38 pairs, worst span 0.1420 mm (3 layers — the root blend)',
+  'SPHERE: the INCURVE sliders (40/turn x 3, spread 1.60, length 20, tilt 75, curl 150, ALL THIN feet) — the sheet\'s headline': '67 pairs, worst span 0.2109 mm',
+  'SPHERE: 40 per turn x 6 turns (240 feet — the densest reachable pole)': '199 pairs, worst span 0.2394 mm (EFFECTIVE TILT PAST 90 — 96.7 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'SPHERE: ALL FORM MAX (the four curves on the sphere\'s frame)': '10024 pairs, worst span 1.3646 mm',
-  'SPHERE: petalTilt 75 x layerTilt 30 x 3 turns (the tilt extreme, lean 0)': '1120 pairs, worst span 0.5565 mm (3 layers — the root blend)',
-  'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)': '7295 pairs, worst span 0.2024 mm (6 layers — the root blend)',
-  'SPHERE: curl bias max x start 0.5 x the incurve sliders': '4975 pairs, worst span 0.4992 mm (3 layers — the root blend)',
-  'SPHERE: FIDDLEHEAD (curl 360) x 3 turns': '4548 pairs, worst span 0.9263 mm (3 layers — the root blend)',
-  'SPHERE: GATED — Head rise 0.5 x the incurve sliders under SPHERE (bit-identical to the incurve sphere)': '5009 pairs, worst span 0.5203 mm (3 layers — the root blend)',
-  'STAMENS: 120 DISC x Head rise 1 (a hemisphere)': '216 pairs, worst span 0.4176 mm',
-  'STAMENS: 6 x 3 layers (deeper petal roots)': '72 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'STAMENS: 120 DISC x CONTINUOUS x 3 turns': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
+  'SPHERE: petalTilt 75 x layerTilt 30 x 3 turns (the tilt extreme, lean 0)': '1231 pairs, worst span 0.5565 mm (EFFECTIVE TILT PAST 90 — 161.3 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)': '5021 pairs, worst span 0.1681 mm (EFFECTIVE TILT PAST 90 — 95.5 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it) (SEAM CLAMPED — the blade is SHORTER than the fold it must clear)',
+  'SPHERE: FIDDLEHEAD (curl 360) x 3 turns': '4188 pairs, worst span 0.9263 mm',
+  'SPHERE: GATED — Head rise 0.5 x the incurve sliders under SPHERE (bit-identical to the incurve sphere)': '67 pairs, worst span 0.2109 mm',
+  'STAMENS: 120 DISC x Head rise 1 (a hemisphere)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
   'STAMENS: 6 x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than a filament radius: the stamens stand ON THE AXIS, told)': '45539 pairs, worst span 5.7600 mm',
-  'STAMENS: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': '5009 pairs, worst span 0.5203 mm (3 layers — the root blend)',
+  'STAMENS: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': '67 pairs, worst span 0.2109 mm',
   'GYNOECIUM: a style on the bare apex (the four states — style only)': '272 pairs, worst span 0.0796 mm',
   'GYNOECIUM: style x 6 stamens on a RING (the four states — both present)': '272 pairs, worst span 0.0796 mm',
   'GYNOECIUM: style x 120 on the DISC (the trifid against the cushion)': '272 pairs, worst span 0.0796 mm',
@@ -4022,15 +3993,15 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'GYNOECIUM: style curl min (-180) x 6 stamens': '272 pairs, worst span 0.0796 mm',
   'GYNOECIUM: style curl max (180) — bent over the apex': '272 pairs, worst span 0.0796 mm',
   'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on': '272 pairs, worst span 0.0796 mm',
-  'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': '286 pairs, worst span 0.4176 mm',
-  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': '272 pairs, worst span 0.0664 mm (3 layers — the root blend)',
+  'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': '286 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 deg at the deepest ring: the blade lies back over its own foot and no station spacing clears it)',
+  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': '272 pairs, worst span 0.0664 mm',
   'GYNOECIUM: style x sheet 2.40 (the fat style)': '272 pairs, worst span 0.1593 mm',
   'GYNOECIUM: style x ALL THIN x spread min (the thinnest slab)': '272 pairs, worst span 0.0664 mm',
   'GYNOECIUM: style x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than the style: WIDER THAN THE HUB, told)': '300 pairs, worst span 1.6149 mm',
-  'GYNOECIUM: style x 3 layers (deeper petal roots)': '344 pairs, worst span 0.1648 mm (3 layers — the root blend)',
-  'GYNOECIUM: style x CONTINUOUS x 3 turns x 120 DISC': '536 pairs, worst span 0.3324 mm (3 layers — the root blend)',
+  'GYNOECIUM: style x 3 layers (deeper petal roots)': '272 pairs, worst span 0.0796 mm',
+  'GYNOECIUM: style x CONTINUOUS x 3 turns x 120 DISC': '272 pairs, worst span 0.0796 mm',
   'GYNOECIUM: style x FAN (the fan\'s full-disc hub)': '272 pairs, worst span 0.0796 mm',
-  'GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': '5009 pairs, worst span 0.5203 mm (3 layers — the root blend)',
+  'GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': '67 pairs, worst span 0.2109 mm',
   'ANTHER: 6 lobes at 90° — the widest fan': '619 pairs, worst span 0.5933 mm',
   'ANTHER: a shaped tip x a style (the trifid beside a triangle, on one scale)': '272 pairs, worst span 0.0796 mm',
   'STIGMA: a style at the shipped trifid x 6 stamens (the tip block\'s own control row)': '272 pairs, worst span 0.0796 mm',
@@ -4048,7 +4019,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)': '272 pairs, worst span 0.0796 mm',
   'STIGMA: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)': '272 pairs, worst span 0.0796 mm',
   'STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)': '272 pairs, worst span 0.0796 mm',
-  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': '272 pairs, worst span 0.0664 mm (3 layers — the root blend)',
+  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': '272 pairs, worst span 0.0664 mm',
   'STIGMA: a shaped stigma x sheet 2.40 (the fat style)': '272 pairs, worst span 0.1593 mm',
   'STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)': '272 pairs, worst span 0.0796 mm',
   'STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)': '272 pairs, worst span 0.0796 mm',
@@ -4065,13 +4036,12 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'BUCKLE: x the longest, widest petal (60 x 30)': '20 pairs, worst span 0.2016 mm',
   'BUCKLE: x petalCount 3 (the per-slot phase over three petals)': '4 pairs, worst span 0.0104 mm',
   'BUCKLE: x petalCount 40 (forty phases at the golden angle)': '31 pairs, worst span 0.0104 mm',
-  'BUCKLE: x 3 whorls (the phase runs over the slot index, not the whorl)': '88 pairs, worst span 0.2238 mm (3 layers — the root blend)',
-  'BUCKLE: x CONTINUOUS x 3 turns': '299 pairs, worst span 0.3391 mm (3 layers — the root blend)',
+  'BUCKLE: x 3 whorls (the phase runs over the slot index, not the whorl)': '16 pairs, worst span 0.0104 mm',
+  'BUCKLE: x CONTINUOUS x 3 turns': '19 pairs, worst span 0.0368 mm',
   'BUCKLE: x SPHERE (a buckled margin on a full-sphere head)': '28 pairs, worst span 0.0102 mm',
   'BUCKLE: x the whole centre (stamens and a style under a buckled whorl)': '280 pairs, worst span 0.0796 mm',
   'BUCKLE: x ZYGO 2 whorls x ALL INNER MAX (the buckle is not role-differentiated)': '22657 pairs, worst span 2.1213 mm',
   'TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once)': '10760 pairs, worst span 1.0968 mm',
-  'TIP SHAPE: x CONTINUOUS x 3 turns': '264 pairs, worst span 0.3324 mm (3 layers — the root blend)',
   'TIP SHAPE: x the whole centre (stamens and a style under a round tip)': '272 pairs, worst span 0.0796 mm',
   'TIP SHAPE: x ZYGO 2 whorls x ALL INNER MAX': '4584 pairs, worst span 0.5275 mm',
   'LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform': '12 pairs, worst span 0.8685 mm',
@@ -4112,7 +4082,7 @@ export async function selfIntersectionAssertions(page, buf, row) {
   const r = selfIntersectionCensus(positions);
   const known = Object.prototype.hasOwnProperty.call(SELF_INTERSECTION_XFAIL, row.label);
   if (r.within > 0 && !known) {
-    bad.push(`X2: ${r.within} within-shell intersecting pair(s), worst span ${r.worstSpanMm.toFixed(4)} mm at (${(r.worstAt || []).map((x) => x.toFixed(2)).join(', ')}) — a NEW self-intersection, not one of the ${Object.keys(SELF_INTERSECTION_XFAIL).length} declared on main at ead8624`);
+    bad.push(`X2: ${r.within} within-shell intersecting pair(s), worst span ${r.worstSpanMm.toFixed(4)} mm at (${(r.worstAt || []).map((x) => x.toFixed(2)).join(', ')}) — a NEW self-intersection, not one of the ${Object.keys(SELF_INTERSECTION_XFAIL).length} declared`);
   } else if (r.within === 0 && known) {
     bad.push(`X1: this row is declared self-intersecting on main (${SELF_INTERSECTION_XFAIL[row.label]}) and now reads 0 pairs — the pre-existing self-intersection is FIXED. Remove its SELF_INTERSECTION_XFAIL entry in the same commit.`);
   }

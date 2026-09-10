@@ -1259,6 +1259,104 @@ every one** (27 at density 12, 59 at density 3). Above the shipped 8, under one 
 port is scheduled. Two consumers were already waiting in writing: the port, and
 `bloom-sagitta.mjs`'s 3D margin. No frozen phase owed; nothing moved.
 
+**THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
+SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-session-38-outcome.md` before
+touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
+root blend is an **offset-surface fold at the foot-to-blade kink**: every site on the top
+skin at the ring radius at `dz = t/2`, both triangles of every pair a seam quad, zero pairs
+at zero tilt, and a **SINGLE layer at tilt 75 / length 20 / sheet 2.4 folding 376 pairs with
+no layers involved at all**. Layer count was a proxy for shorter petals and stacked tilt.
+**All three candidates in the brief are disqualified and the doc records why in those
+terms** — the foot already scales with the petal (candidates 1 and 3 move the count by at
+most 8 pairs either way), and spreading a width change along the blend acts where the fold
+is not, measured worse at every value and moving the default's bytes through
+`ROOT_BLEND_END`. **The brief was written from an inferred mechanism; do not re-derive the
+dead branch.**
+**THE LAW IS `s1 > (t/2) * sin(theta)`, DERIVED, NOT DIALLED** — from where the seam panel's
+RIM crosses the foot's top plane (the algebra is in the geometry's own header). The naive
+offset-corner bound `a*tan(theta/2)` is **necessary and NOT sufficient**: at exactly that
+value the tilt-75 state goes **376 -> 632 pairs, every site at z = t/2 EXACTLY**, because
+the row lands coplanar with the foot's top skin. **The gap between the two bounds is exactly
+`1 + cos(theta)`** — 2 at a shallow kink, 1.906 at the shipping tilt, 1 at a right angle,
+which is the chord cost of the mesh drawing the seam as a flat chord where the bound assumes
+a mitred corner. Swept against the census, **every state flips to exactly zero between
+k = 1.0000 and k = 1.0005** across three turn angles, two sheet thicknesses and two layer
+counts; at exactly 1.0000 all four probe states read the SAME 64 pairs, which is the equality
+touching rather than geometry.
+**REDISTRIBUTE, NEVER PILE, AND STRICTNESS COSTS NO EPSILON.** The held block keeps the
+uniform ROW LATTICE and simply STARTS LATER — the held stations are `(m + i) / NU` for the
+integer `m` the builder declares, still one row apart, so nothing can stack against a floor.
+The first blade row is **the first lattice station strictly beyond the clearance**, so the
+margin is one row rather than a constant chosen because the count reached zero. `m` is 1
+wherever the floor does not bind and the code then takes the same `uniform.slice(0, held)`,
+so **the shipping default is bit-identical by branch**.
+**A7 IS RE-DERIVED ONTO THE LATTICE AND RUNS PER RING** (only inner whorls bind — three
+layers at the defaults turn 25/37/49 degrees and only the innermost does). Nothing relaxed:
+it now also pins the seam step, the STRICT clearance on the emitted station, the clearance
+LAW (restated in the gate — see below), the mode-free half-thickness, and the clamp as a
+biconditional. **A8 gave up its leading term and it was VACUOUS before**: that gap was always
+exactly `1/NU` and could never be the widest. **`CURL_START_MIN`'s CONTROL bound is
+untouched** (a bound moving with the tilt is one control reaching into another's range) while
+the floor the LAW applies becomes the first blade row — relaxing instead would have made
+J8's stronger clause SKIP those rows rather than fail them. Measured: the curl-start floor is
+**census-neutral on all 15 regressions**.
+**A7 COULD NOT SEE A CLEARANCE THAT WAS WRONG, AND ONLY THE MUTANT TABLE SAID SO**:
+`seam-floor-removed` (the law returns 0) fired NOTHING, because every clause checked the
+ladder against the DECLARED clearance and a zero clearance is declared zero too. The gate
+**restates the one-line law** and rebuilds the expected value from the two other owners;
+importing `seamClearanceMm` there would mutate with it and check nothing. Second finding:
+**`seam-reads-the-live-sheet` is a no-op on any sheet at or above 1.00 mm** — `MIN_FEATURE_MM`
+only raises a sheet UNDER it — so the table needed a 0.60 mm row. And `HELD_ROWS` is now the
+one owner of `Math.floor(ROOT_BLEND_END * NU)`, which stood in three places and made an
+anchored mutation match twice.
+**THE CENSUS, 624 ROWS, BOTH TREES: 84 rows FIXED to zero, 58 improved, 467 unchanged,
+15 WORSE, and ZERO rows went from clean to self-intersecting.** Declared rows **318 -> 234**;
+total pairs 1,617,263 -> 1,359,861. **The sweep is CALIBRATED** — against a worktree of main
+it reproduced session 36's recorded count on **222 declared rows exactly**, zero
+disagreements, zero undeclared rows non-zero. **The 15 regressions are REPORTED, NOT TUNED
+AROUND** (Eva's stop condition): the mum on a hemisphere is CLEARED (0 -> 0) but **the
+incurve target at rise 0.5 still regresses, 7,350 -> 9,944**, worse than the piling patch's
+8,641, while its FLAT sibling goes 7,806 -> 510.
+**THE XFAIL LIST IS RE-BASELINED ON THE BRANCH, AND THAT IS A CHANGE OF MEANING** — it cannot
+be a set of pre-existing failures when the session's purpose is to fix 84 of its rows. The
+old `(N layers — the root blend)` tag is GONE from every row (A7 asserts the clearance is met
+on every ring of every row, 0 violations over the matrix), replaced by the two real classes:
+**EFFECTIVE TILT PAST 90 (47 rows** — the blade's own MID-SURFACE lies back over its foot and
+no spacing can fix it; the algebra reverses past a right angle) and **SEAM CLAMPED (5 rows** —
+the blade is SHORTER than the fold it must clear, the worst asking 1.0925x its own length,
+told in the read-out and asserted as a biconditional). **Whether the tilt control should reach
+past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** — a
+declared row whose count doubles passes silently, which is how those 15 landed without a red;
+recorded, not built.
+**MODE INDEPENDENCE IS MEASURED, NOT ARGUED: 0 of 624 rows have a `seamStep` set that differs
+live from export.** `seamHalfThicknessMm()` is the ONE owner of `max(sheetThickness,
+MIN_FEATURE_MM) / 2` — both the clearance and the reported `seamHalfMm` call it, so the live
+gate's A7 clause and the clearance cannot drift apart. Row positions are topology and the
+export floor may not move them; this is session 32's mode-dependence defect refusing to ship
+a third time.
+**THE BYTE CLAIM: 157 rows move and 467 hold, PREDECLARED from the seam-step data before the
+comparison ran**, the default holds bit-identically, and **the FOOT is untouched on every
+row** — measured on
+the builder's captured grid, not argued, because J1-J4 and the crowding raster read those
+rows. NOT `diff-bloom-bytes --region foot`: that slab is a documented SUPERSET carrying the
+UNDERSIDE of the first blade rows, which this change does move. `node
+tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live --control --expect 157/467`
+is the instrument, with a SECOND control (`--control-mode`) for the mode clause, because a
+control that fires only the first leaves the second a log line.
+**"TRIANGLE COUNTS ARE UNCHANGED BECAUSE THE ROW COUNT IS FIXED" IS FALSE ON A CLEFT, AND THE
+TOOL FOUND IT RATHER THAN A READING OF THE CODE.** `trimPanels()` splits the blade at a ROW
+INDEX — the row nearest the cleft onset in `u` — and the two lobes SHARE that boundary row
+with the base panel, so moving the stations moves the split and the base loses a row while
+BOTH lobes gain one. Measured on `CAPABILITY: cleft x 6 layers`: the split lands at
+32/32/33/32/31/31 against main's 32 on every ring, **168,256 -> 170,816 triangles**. It is
+**pre-existing IN KIND** — any ladder change can move it, and session 32's own redistribution
+acts above `u0 = 0.2857` where the 0.55 onset sits; what is new is that something measures it.
+One declared entry with its numbers, failing hard if another row's count moves OR if this one
+stops moving. **Do not write "the row count is fixed so the topology cannot move" about a
+cleft.** **No frozen phase is owed**
+(no row added or removed); **`frozen/phase23`'s bytes stop reproducing on its share of the
+movers** while its definitions still deep-compare.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

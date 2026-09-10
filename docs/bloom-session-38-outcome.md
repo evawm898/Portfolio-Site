@@ -247,12 +247,185 @@ Eva.** It is independent, it blocks nothing, and it only scopes the claim.
 
 ---
 
-## 7. Cost, and the byte claim
+## 7. What it did to the census — the whole matrix, both trees
 
-*(filled from the measured sweeps — see §8)*
+Driven in Node through the same census the export gate calls, export mode, on
+the builder's own doubles, every capability row with its capability applied,
+**624 rows, no errors on either tree**.
+
+**The sweep is calibrated, which is what makes the rest of this section
+readable.** Run against a worktree of `main`, it reproduced session 36's
+recorded count on **222 declared rows exactly** — zero disagreements, and zero
+undeclared rows reading non-zero. So the Node state mapping is the page's, and
+main's own numbers still hold.
+
+| | |
+|---|---|
+| rows FIXED to exactly zero | **84** |
+| improved | 58 |
+| unchanged | 467 |
+| **worse** | **15** |
+| **went from clean to self-intersecting** | **0** |
+
+Declared rows **318 → 234**. Total within-shell pairs **1,617,263 → 1,359,861**.
+
+### The 15 that got worse — reported, not tuned around
+
+| main | now | row |
+|---|---|---|
+| 72,598 | 77,990 | ALL MAX |
+| 10,252 | 14,763 | CURL: bias 0.5 × start 0.5 × incurve target × rise 1 |
+| **7,350** | **9,944** | **DOME: the INCURVE TARGET × rise 0.5** |
+| 59,880 | 62,344 | DEPTH: ZYGO 6 layers × ALL INNER MAX |
+| 6,794 | 8,070 | CURL: start floored at one blade row × incurve target × rise 0.5 |
+| 6,740 | 7,227 | CURL: bias max × incurve target × rise 0.5 |
+| 6,740 | 7,227 | CURL: bias 0.5 × incurve target × rise 0.5 |
+| 6,740 | 7,227 | CURL: start max × incurve target × rise 0.5 |
+| 6,740 | 7,227 | CURL: bias max × start max × incurve target × rise 0.5 |
+| 4,544 | 4,744 | DEPTH: 6 layers × layerTilt max × petalTilt max (225° effective) |
+| 1,294 | 1,342 | CONT: 3 turns × layerTilt max × petalTilt max (161.25° effective) |
+| 1,120 | 1,231 | SPHERE: petalTilt 75 × layerTilt 30 × 3 turns |
+| 848 | 1,056 | LAYERS: 3 × layerTilt max (135° effective) |
+| 728 | 910 | FAN: 3 layers × toggle ON × layerTilt max |
+| 25,284 | 25,319 | FAN × PER-PETAL: ALL PER-PETAL MAX × 3 layers |
+
+### Eva's two named rows
+
+* **The mum on a hemisphere: 0 → 0.** The piling patch's 0 → 72 is **cleared**.
+* **The incurve target at rise 0.5: 7,350 → 9,944.** It **still regresses**,
+  and by more than the piling patch did (8,641). **That is the stop condition,
+  and it is reported rather than tuned around.** Its FLAT sibling goes
+  **7,806 → 510**, so it is specifically the domed variant.
+
+### The attribution is clean: all 15 are the seam floor's
+
+Re-measured on a tree with the curl-start floor neutered and the seam floor
+left in, all fifteen read **identically** to the shipped build. **The
+`CURL_START_MIN` re-derivation moves no census count on any of them.**
+
+### The clamp, told rather than hidden
+
+The seam floor binds on **157 of 624 rows**. Worst-ring step histogram:
+`{2: 80, 3: 26, 4: 6, 5: 28, 6: 1, 7: 9, 16: 1, 20: 1, 40: 5}`.
+
+**On five rows the clamp binds**, and the reason is not a tuning choice: those
+petals are **shorter than the fold they have to clear** — the 0.18 mm blade at
+six whorls of `layerSize` 0.35 asks **1.0925 × its own length** at an 85° kink.
+No station inside the blade satisfies the derivation there. Those rows start as
+far out as the lattice allows, stay declared, and the read-out says CLAMPED.
+All five still **improve** (25,944 → 20,912; 152,182 → 109,295; 7,336 → 6,528;
+7,295 → 5,021); none regresses. A7 asserts the clamp as a **biconditional** in
+both directions, so the clamp cannot fire where the blade did have room, and
+the strict clause cannot be skipped where it did not. Measured across the whole
+matrix: **0 A7 violations, 5 rows with a clamped ring.**
+
+### Mode independence, measured rather than argued
+
+**Zero of 624 rows have a `seamStep` set that differs between live and export.**
+The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` in both modes.
 
 ---
 
-## 8. What was run
+## 8. The byte claim
 
-*(filled)*
+*The row count is fixed at NU, and only the stations move.* So:
+
+* **Which rows move: the 157 on which the seam floor binds, and no others.**
+  That was **predicted from the seam-step data before the byte comparison was
+  run**, and it is the same 157 the census partition names (84 fixed + 58
+  improved + 15 worse = 157, with the other 467 rows' counts unchanged). The
+  first run reported 156/468 — the cleft row above was being skipped by the
+  triangle-count failure before it could be classified, which is the off-by-one
+  and not a disagreement about the geometry.
+* **The shipping default does not move**, bit-identically and by branch: its
+  seam step is 1 and `bladeStations` takes the same `uniform.slice(0, held)` it
+  always took.
+* **Triangle counts are unchanged on 623 of 624 rows, and the exception is
+  declared rather than tolerated.** I claimed they would be unchanged on *every*
+  row, on the grounds that the row count is fixed at NU and only the stations
+  move. **That was wrong, and the tool found it rather than my reading it.** On
+  `CAPABILITY: cleft x 6 layers` the count goes **168,256 → 170,816 (+2,560)**,
+  because `trimPanels()` splits the blade into three panels at a **row index**
+  — the row nearest the cleft onset in `u` — and the two lobes share that
+  boundary row with the base panel. Move the stations and a different row is
+  nearest: measured ring by ring, the split lands at **32 / 32 / 33 / 32 / 31 /
+  31** where main puts it at 32 on every ring, so the base panel loses a row and
+  **both** lobes gain one.
+
+  **This is pre-existing in kind.** Any ladder change can move that split, and
+  session 32's own redistribution acts above `u₀ = 0.2857` where the cleft onset
+  at 0.55 sits. What is new is that something finally measures it. The exception
+  is therefore ONE named entry carrying its numbers: the run fails hard if any
+  other row's count moves, and fails hard if this row's count stops moving or
+  moves to a different number. It is not a tolerance and it is not a skip.
+* **The foot is untouched on every row**, measured on the builder's captured
+  grid rather than argued from the code, because J1–J4, the crowding raster and
+  the whole junction argument read those rows.
+
+`node tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live
+--control --expect 157/467` is the instrument, and it **PASSES with the
+partition exactly as predeclared** — 624 rows, both modes, **654,173,712 floats
+compared positionally**, and **5,555,844 captured foot values identical**. It compares positionally under
+`Object.is`, passes capability rows, and has **two controls** — `--control`
+perturbs a held row by 1e-9 and requires it to be reported moved, and
+`--control-mode` reclassifies one row's live answer and requires the
+MODE-DEPENDENT clause to fire exactly once. A clause with only the first
+control would leave the second exactly what this project calls a log line.
+
+**No frozen phase is owed**: no row was added or removed, and the matrix is
+still 624. **`frozen/phase23`'s bytes stop reproducing on its share of the
+movers** — its definitions still deep-compare, as `--verify-frozen` proves, and
+that is the distinction session 24 established.
+
+---
+
+## 9. What was run, and what was not
+
+**Run and green:**
+
+* the full-matrix within-shell census on both trees (624 rows each, no errors),
+  calibrated against session 36's recorded numbers on 222 declared rows;
+* `node tools/verify-bloom-apex-mutants.mjs` — **13 mutants, every family fires
+  on a mutation that names it and is silent on the clean tree**, including four
+  new A7 seam mutants and two new rows;
+* `node tools/bloom-smoke.mjs --check` — coverage and the 53-family census, both
+  directions;
+* `node tools/verify-bloom-seam-bytes.mjs` with both controls.
+
+**Two things the mutant table found that no amount of reading would have:**
+
+1. **A7 could not see a clearance that was wrong.** `seam-floor-removed` (the
+   law returns 0) fired **NOTHING**: every clause was checking the ladder
+   against the *declared* clearance, and a zero clearance is declared zero too.
+   The gate now **restates the one-line law** and rebuilds the expected value
+   from the two other owners. Importing `seamClearanceMm` there would have
+   mutated with it and checked nothing.
+2. **`seam-reads-the-live-sheet` was a no-op on every row in the table.**
+   `MIN_FEATURE_MM` only raises a sheet *under* 1.00 mm, so on the 1.20 mm
+   default — and on the 2.40 mm binding row — `max(sheet, MIN_FEATURE_MM)` **is**
+   the sheet. It needed a 0.60 mm row, which the table now carries.
+
+Also: the `ladder-eats-the-base` mutant stopped applying (**matched 2×**) the
+moment the seam code restated `Math.floor(ROOT_BLEND_END * NU)`. `HELD_ROWS` is
+now the one owner of that count, which was standing in three places.
+
+**Found on the way, pre-existing:** the matrix row **`CURL: start floored at one
+blade row (0.02 → 0.036)`** has been stale since session 34 — `0.036` is `1/28`,
+and at `NU = 56` the floor is `0.01786`, so `0.02` was no longer floored and the
+row stopped testing what it names.
+
+**Not run here, and owed to CI:** the full export-watertight and connectedness
+gates. Boundary edges = 0 and non-manifold = 0 on every touched row is CI's to
+prove, not this session's laptop's.
+
+**Not built, recorded:**
+
+* **A magnitude gate on the xfail list.** X1 fails a declared row that reads
+  zero and X2 fails an undeclared row that does not; a declared row whose count
+  doubles passes silently, which is how the 15 regressions above could land
+  without a red. That is its own ruling.
+* **A panel-gate route for the SEAM CLEARANCE read-out line.** The line ships;
+  its route does not. A7 asserts every quantity in it per ring in **both** STL
+  gates, which is a stronger read-back than the panel could give.
+* **Whether the tilt control should reach past 90° at all** — Eva's, and
+  independent of everything above.

@@ -818,6 +818,9 @@ function seamLine(petals) {
   return `SEAM CLEARANCE binds on ${ls.length} of ${all.length} ring${all.length === 1 ? '' : 's'}`
        + ` · worst ${worst.seamClearMm.toFixed(3)} mm at a ${worst.seamTurnDeg.toFixed(1)}° foot-to-blade kink`
        + ` · that ring's first blade row starts ${worst.seamStep} row${worst.seamStep === 1 ? '' : 's'} out`
+       + (ls.some((l) => l.seamClamped)
+          ? ` · CLAMPED on ${ls.filter((l) => l.seamClamped).length} ring${ls.filter((l) => l.seamClamped).length === 1 ? '' : 's'} — the blade there is SHORTER than the fold it has to clear (${Math.max(...ls.filter((l) => l.seamClamped).map((l) => l.seamClearU)).toFixed(3)}x its own length asked), so the block starts as far out as it can and the sheet still passes through itself`
+          : '')
        + ` — nearer and the sheet's own top skin would fold back into the foot\n`;
 }
 

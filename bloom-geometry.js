@@ -3216,10 +3216,16 @@ export function seamClearanceMm(turnRad, sheetMm) {
    station STRICTLY beyond the clearance, never nearer than the first. Both
    `bladeStations` and the ladder telemetry A7 reads call this, so the
    assertion pins the block the builder built rather than a second law. */
-export function seamLatticeStep(seamMm, length) {
+/* THE FURTHEST OUT THE BLOCK CAN START and still leave the redistributed
+   ladder a domain at all: the last held row then lands at (SEAM_MAX_STEP +
+   HELD_ROWS - 1) / NU, one row short of the tip. */
+export const SEAM_MAX_STEP = Math.max(1, NU - HELD_ROWS);
+export function seamLatticeStepRaw(seamMm, length) {
   const uSeam = length > 0 ? seamMm / length : 0;
-  const m = Math.max(1, Math.floor(uSeam * NU) + 1);
-  return Math.min(m, Math.max(1, NU - HELD_ROWS));
+  return Math.max(1, Math.floor(uSeam * NU) + 1);
+}
+export function seamLatticeStep(seamMm, length) {
+  return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP);
 }
 
 export function bladeStations(profile, length, buckle = null, seamMm = 0) {
@@ -5266,6 +5272,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       /* The integer lattice offset the block starts at — 1 when the floor
          does not bind, and what A7 pins the held stations against. */
       seamStep,
+      /* CLAMPED AND TOLD, never silently passed. A petal can be SHORTER than
+         the fold it has to clear — measured, the 0.18 mm blade at six whorls
+         of layerSize 0.35 asks 1.0925 of its own length — and no station
+         inside the blade satisfies the derivation there. The block starts as
+         far out as it can and the row stays a declared self-intersector; the
+         read-out says so and A7 asserts the biconditional in both
+         directions. */
+      seamStepRaw: seamLatticeStepRaw(seamClearMm, length),
+      seamMaxStep: SEAM_MAX_STEP,
+      seamClamped: seamLatticeStepRaw(seamClearMm, length) > SEAM_MAX_STEP,
       seamClearU: length > 0 ? seamClearMm / length : 0,
       seamBaseU: stations[0],
       /* The owner's turn re-read off the two EMITTED frames, so the
