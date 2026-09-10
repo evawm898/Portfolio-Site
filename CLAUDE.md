@@ -39,6 +39,31 @@ scratch tree quoted as the shipped tree's). `bladeStations()`'s own header
 carries this too, which is where four of the five lived. §18h of
 `docs/bloom-session-32-outcome.md` has the table.
 
+**A HARNESS ROW THAT EXERCISES A BRANCH MUST STATE WHICH BRANCH IT EXERCISES AND
+ASSERT THAT IT STILL DOES** (Eva, session 35 — the second durable rule, beside the
+mode/sampling one above, and it arrives from the same root). *A row chosen against a
+row COUNT goes stale when the count changes, silently, because nothing in the harness
+can tell that its chosen state has stopped reaching the code it was picked for.*
+`verify-bloom-apex-mutants.mjs`'s `stations-not-increasing` row was pinned to
+`petalTipShape 1` when it was chosen at **NU 28**; session 34 took NU to 56, and at 56
+that is precisely the exponent where the turning ladder stops saturating — so the
+de-duplication pass had nothing to do on that row, the mutation moved the ladder by
+9.302e-6 mm at a station ABOVE `ROOT_BLEND_END` (outside what A7 asserts), the stations
+stayed strictly increasing, and **the mutant was RED ON `main` naming a family that
+fired nothing.** Swept at NU 56 over 9,072 buckled states: 2,232 move the ladder at all,
+159 give a non-increasing pair, and the row nearest the shipped defaults is the
+harness's own with the exponent simply left alone. **THE REMEDY IS THE WITNESS CLAUSE**
+— every mutant declares a `witness`, a direct call on the MUTATED MODULE proving the
+intended behaviour moved, run BEFORE the assertions are consulted and deliberately not
+the assertion the mutant names (asking the gate whether the gate fired is the
+circularity the table exists to avoid). Both sweeps carry it now, and both are proven
+by controls that must fail: `--disarm=<id>` gives one mutant a stale anchor,
+`--neuter=<id>` makes its edit apply while changing nothing. The witness immediately
+found a defect in itself — its first version rebuilt the profile from a stub ring and
+read stations **7.11e-2 mm** away from the builder's, a second producer of the profile
+inside the instrument written to catch second producers — so every witness reads
+`buildBloomInto`'s own report.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom
