@@ -1137,7 +1137,16 @@ function spineInputsFor(m, ui, row, L) {
   const Rs = [cA * Math.cos(sl), sA * Math.cos(sl), -Math.sin(sl)], Up = [cA * Math.sin(sl), sA * Math.sin(sl), Math.cos(sl)];
   const base = [r.radius * cA, r.radius * sA, dome ? r.z : 0];
   const curlRad = (curlDeg * Math.PI) / 180;
-  return { bias, start, curlDeg, curlRad, length, tilt, floorRadius, Rs, Up, base, uniform: curlIsUniform({ curlBias: bias, curlStart: start }) };
+  /* THE CURL START'S FLOOR, RECONSTRUCTED FROM THE OTHER OWNER (session 38).
+     The spine's own record says which floor it applied; the LADDER says where
+     the first blade row actually is, and since session 38 those must be the
+     same number. Taken from the ladder here so C1's comparison is against an
+     independent owner rather than against the field the defect would also be
+     missing from — the reworked-foot lesson. Falls back to the geometry's own
+     constant when a tree predates the per-ring ladder telemetry. */
+  const ldr = Array.isArray(m.petalRingBladeLadder) ? m.petalRingBladeLadder[L] : m.petalBladeLadder;
+  const startFloor = ldr && typeof ldr.seamBaseU === 'number' ? ldr.seamBaseU : CURL_START_MIN;
+  return { bias, start, curlDeg, curlRad, length, tilt, floorRadius, startFloor, Rs, Up, base, uniform: curlIsUniform({ curlBias: bias, curlStart: start }) };
 }
 
 export async function curlAssertions(page, row) {
@@ -1160,7 +1169,7 @@ export async function curlAssertions(page, row) {
     if (Math.abs(sp.length - inp.length) > 1e-9) bad.push(`C1: ring ${L}: the spine record reports length ${sp.length}; the applied petalLength x scale gives ${inp.length}`);
     if (sp.floorRadius !== inp.floorRadius) bad.push(`C1: ring ${L}: the spine record reports a floor of ${sp.floorRadius} mm; ${ROLL_MIN_RADIUS_FACTOR} x the ring's thickness ${r.thickness} is ${inp.floorRadius}`);
     /* THE LAW, evaluated HERE, against the EMITTED rows. */
-    const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius });
+    const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius, startFloor: inp.startFloor });
     const n = sp.rows.length;
     /* THE STATION IS THE BUILDER'S OWN, never `(i + 1) / n`. That expression
        was the uniform ladder restated inside this gate — a second, independent
@@ -1197,7 +1206,11 @@ export async function curlAssertions(page, row) {
       const short = Math.abs(sp.turnBuiltDeg) < Math.abs(sp.turnAskedDeg) - 1e-9;
       if (sp.clamped !== short) bad.push(`C3: ring ${L}: clamped reads ${sp.clamped} but the turn asked (${sp.turnAskedDeg}°) and built (${sp.turnBuiltDeg}°) ${short ? 'differ' : 'agree'} — the read-out's CLAMPED and the built turn disagree`);
       if (Math.abs(sp.turnBuiltDeg - (law.turnBuilt * 180) / Math.PI) > 1e-9) bad.push(`C3: ring ${L}: the built turn ${sp.turnBuiltDeg}° is not the law's ${(law.turnBuilt * 180) / Math.PI}°`);
-      if (sp.startFloored !== curlStartFloored(inp.start)) bad.push(`C3: ring ${L}: start floored to ${sp.startFloored}; the owner's floor gives ${curlStartFloored(inp.start)}`);
+      if (sp.startFloored !== curlStartFloored(inp.start, inp.startFloor)) bad.push(`C3: ring ${L}: start floored to ${sp.startFloored}; the owner's floor gives ${curlStartFloored(inp.start, inp.startFloor)}`);
+      /* THE FLOOR THE SPINE APPLIED IS THE FIRST BLADE ROW (session 38) —
+         `inp.startFloor` comes from the LADDER's telemetry, so this compares
+         two owners rather than one field against itself. */
+      if (sp.startFloor !== inp.startFloor) bad.push(`C3: ring ${L}: the spine floored curl start at ${sp.startFloor} while the ladder puts the first blade row at ${inp.startFloor} — the root chord is not straight where J8 assumes it is`);
     }
   });
   return bad;
@@ -1471,29 +1484,98 @@ export async function thicknessAssertions(page, row) {
       }
     }
 
-    /* A7 — THE ROOT BLEND'S ROWS DO NOT MOVE. The turning ladder redistributes
-       the blade's rows, and every station below ROOT_BLEND_END must still be
-       the uniform one, EXACTLY. Not a quality bound: that boundary belongs to
-       footRing(), it is scheduled as its own session, and a tip control that
-       resampled it would be one owner reaching into another's. Asserted as a
-       bit identity because the builder holds those stations rather than
-       recomputing them. */
-    const ld = m.petalBladeLadder;
-    if (ld && Array.isArray(m.petalProfileU)) {
-      const blade = m.petalProfileU.filter((u) => u > 0);
+    /* A7 — THE ROOT BLEND'S ROWS ARE THE ROW LATTICE, AND THE FIRST OF THEM
+       CLEARS THE SEAM. RE-DERIVED, NOT RELAXED (session 38).
+
+       It used to read "every station below ROOT_BLEND_END is the uniform one,
+       exactly", which was the same claim while the block always started at
+       row 1. Session 38's seam floor STARTS THE BLOCK LATER — at the first
+       lattice station standing strictly clear of the foot-to-blade kink — so
+       the identity is now stated on the lattice rather than on its first
+       member: the held stations are `(seamStep + i) / rows` for the integer
+       offset the BUILDER declares, still a bit identity, still `held`
+       consecutive rows one row apart, and still bit-identical to the old
+       expression wherever `seamStep` is 1 (which is every state where the
+       floor does not bind, the shipping default among them). Nothing is
+       relaxed: this pins `seamStep` as well, which the old form could not.
+
+       AND IT NOW CARRIES THE PRINT-SAFETY CLAIM ITSELF — the first blade row
+       must stand STRICTLY beyond the declared clearance. That is the property
+       the floor exists for, asserted on the EMITTED station rather than on
+       the expression that placed it.
+
+       PER RING, because the clearance is a function of the ring's own
+       effective tilt: on a layered bloom the outer whorl typically does not
+       bind while the inner ones do, so reading layer 0 alone would never
+       exercise the branch. Measured on 3 layers at the defaults: the three
+       rings turn 25, 37 and 49 degrees and only the innermost binds. */
+    const ladders = Array.isArray(m.petalRingBladeLadder) && Array.isArray(m.petalRingProfileU)
+      ? m.petalRingBladeLadder.map((l, k) => [l, m.petalRingProfileU[k], k])
+      : [[m.petalBladeLadder, m.petalProfileU, 0]];
+    for (const [ld, pu, ring] of ladders) {
+      if (!ld || !Array.isArray(pu)) continue;
+      const at = ladders.length > 1 ? `ring ${ring}: ` : '';
+      const blade = pu.filter((u) => u > 0);
       for (let i = 0; i < Math.min(ld.held, blade.length); i++) {
-        const want = (i + 1) / ld.rows;
+        const want = (ld.seamStep + i) / ld.rows;
         if (blade[i] !== want) {
-          bad.push(`A7: held row ${i} sits at u ${blade[i]} where the uniform station is ${want} — the ladder moved a row the root blend owns`);
+          bad.push(`A7: ${at}held row ${i} sits at u ${blade[i]} where the lattice station at the declared seam step ${ld.seamStep} is ${want} — the ladder moved a row the root blend owns`);
           break;
         }
       }
+      /* THE TURN THE CLEARANCE WAS COMPUTED FROM IS THE TURN THE BUILDER
+         EMITTED. petalSurface() derives it as |tilt| (the foot's own normal
+         rotated by the tilt is the blade's, in both hub branches); the
+         builder re-reads it off the two EMITTED frames and reports the
+         difference of the cosines. Asserted exactly 0 — measured 0.00e+0 on
+         the flat default, a hemisphere, a full SPHERE and six whorls at
+         maximum tilt — so the derivation is checked rather than trusted, and
+         a hub shape that broke it could not ship a clearance for the wrong
+         angle. */
+      /* THE CLEARANCE READS THE EXPORT THICKNESS IN BOTH MODES. Reconstructed
+         from the REGISTRY state rather than from the ladder's own fields, so
+         a clearance that had quietly started reading the accumulator's
+         mode-dependent `t` fails HERE, in the live gate, instead of only
+         showing up as a live/export byte split nobody ran. `ladderHalfAt`'s
+         rule: row positions are topology. */
+      const sheet = effectiveFor(m, row, 'sheetThickness', ring);
+      const wantHalf = Math.max(Number(sheet), MIN_FEATURE_MM) / 2;
+      if (typeof ld.seamHalfMm === 'number' && ld.seamHalfMm !== wantHalf) {
+        bad.push(`A7: ${at}the seam clearance was built on a half-thickness of ${ld.seamHalfMm} mm where max(sheetThickness ${sheet}, MIN_FEATURE_MM ${MIN_FEATURE_MM}) / 2 is ${wantHalf} — the ladder is reading a mode-dependent thickness and row positions are topology`);
+      }
+      if (typeof ld.seamFrameResidual === 'number' && ld.seamFrameResidual !== 0) {
+        bad.push(`A7: ${at}the seam turn the clearance used (${ld.seamTurnDeg.toFixed(4)} degrees) is ${ld.seamFrameResidual.toExponential(2)} off the angle between the two frames the builder emitted — the clearance was computed for an angle this build does not have`);
+      }
+      /* THE CLEARANCE IS THE LAW'S OWN VALUE, RESTATED HERE ON PURPOSE.
+         The clause below asks whether the first blade row clears the
+         DECLARED clearance — and a clearance that is wrong is declared wrong
+         too, so that clause passes on it. Measured: the `seam-floor-removed`
+         mutant (the law returns 0) fired NOTHING until this existed, because
+         every other clause here is self-consistent with a zero clearance.
+         So the expected value is rebuilt from the two OTHER owners — the
+         sheet thickness above, and the turn, which the frame residual clause
+         above pins to the angle the builder actually emitted. Restating a
+         one-line derivation in the gate is what makes a mutation of the
+         geometry's own function visible; importing `seamClearanceMm` here
+         would mutate with it and check nothing. C1's doctrine, applied.
+
+         A TOLERANCE AND NOT AN IDENTITY, with its reason: the turn crosses
+         the metrics hook as DEGREES, so this converts it back and the round
+         trip is not bit-exact. Everything else in this family is `!==` on
+         purpose. */
+      const wantClear = wantHalf * Math.sin(Math.max(0, Math.min(ld.seamTurnDeg * Math.PI / 180, Math.PI / 2)));
+      if (typeof ld.seamClearMm === 'number' && Math.abs(ld.seamClearMm - wantClear) > 1e-12) {
+        bad.push(`A7: ${at}the declared seam clearance is ${ld.seamClearMm} mm where half the export sheet (${wantHalf} mm) times sin(${ld.seamTurnDeg.toFixed(4)} degrees) is ${wantClear} — the foot-to-blade clearance law is not the one this gate derives`);
+      }
+      if (blade.length && !(blade[0] > ld.seamClearU)) {
+        bad.push(`A7: ${at}the first blade row sits at u ${blade[0]}, not strictly beyond the declared seam clearance ${ld.seamClearU} (${ld.seamClearMm.toFixed(4)} mm at a ${ld.seamTurnDeg.toFixed(2)} degree kink) — the foot-to-blade offset fold is not cleared`);
+      }
       if (blade.length && blade[blade.length - 1] !== 1) {
-        bad.push(`A7: the last blade station is ${blade[blade.length - 1]}, not 1 — the tip row is not at the tip`);
+        bad.push(`A7: ${at}the last blade station is ${blade[blade.length - 1]}, not 1 — the tip row is not at the tip`);
       }
       for (let i = 1; i < blade.length; i++) {
         if (!(blade[i] > blade[i - 1])) {
-          bad.push(`A7: stations are not strictly increasing at row ${i} (${blade[i - 1]} -> ${blade[i]}) — two rows at one station is a zero-length panel`);
+          bad.push(`A7: ${at}stations are not strictly increasing at row ${i} (${blade[i - 1]} -> ${blade[i]}) — two rows at one station is a zero-length panel`);
           break;
         }
       }
@@ -1506,9 +1588,20 @@ export async function thicknessAssertions(page, row) {
        frequency, and at the ceiling the bound is exactly 1, i.e. uniform.
        Read from the builder's declared gapFactor rather than recomputed, and
        checked against BUCKLE_ROWS_PER_CYCLE_MIN imported from the geometry. */
-    if (ld && Array.isArray(m.petalProfileU)) {
-      const blade = m.petalProfileU.filter((u) => u > 0);
-      let widest = blade.length ? blade[0] : 0;
+    for (const [ld, pu] of ladders) {
+      if (!ld || !Array.isArray(pu)) continue;
+      const blade = pu.filter((u) => u > 0);
+      /* THE GAPS BETWEEN STATIONS, and the leading one is A7's now. Before
+         session 38 this measure opened with `blade[0]`, which was ALWAYS
+         exactly 1 / NU and so could never be the widest gap — a vacuous term.
+         With the seam floor it is no longer vacuous, and it is no longer this
+         family's either: the offset from the seam to the first row is placed
+         by the clearance law and PINNED by A7 (`blade[0] === (seamStep + 0) /
+         rows`, plus the strict-clearance clause), where A8's question is
+         whether the ladder's own REDISTRIBUTION starved the wave. Counting a
+         structural offset as redistribution would fire this family on a gap
+         it does not govern. */
+      let widest = 0;
       for (let i = 1; i < blade.length; i++) widest = Math.max(widest, blade[i] - blade[i - 1]);
       if (widest > ld.gapFactor / ld.rows + 1e-9) {
         bad.push(`A8: the widest row gap is ${(widest * ld.rows).toFixed(4)} x uniform, past the declared bound of ${ld.gapFactor.toFixed(4)}`);
@@ -1914,7 +2007,7 @@ export async function junctionAssertions(page, row) {
          VERBATIM as a second clause, so the arc's exactness is still
          asserted where it holds. */
       const inp = spineInputsFor(m, ui0, row, L);
-      const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius });
+      const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius, startFloor: inp.startFloor });
       const w1 = law.at(q.u * inp.length);
       const wantAngle = inp.uniform ? t + (q.curlRad * q.u) / 2 : Math.atan2(w1.dZ, w1.dR);
       const gotAngle = Math.atan2(up, along);
@@ -1931,7 +2024,7 @@ export async function junctionAssertions(page, row) {
          the rigid tilt by the law's own construction. Roll and cup act on
          the cross-section, never on the row's frame normal, so they do not
          exclude a row; twist rotates the frame, so it does. */
-      const rootStraight = inp.start !== 0 && curlStartFloored(inp.start) >= q.u - 1e-12 && Number(ui0.petalTwist) === 0;
+      const rootStraight = inp.start !== 0 && curlStartFloored(inp.start, inp.startFloor) >= q.u - 1e-12 && Number(ui0.petalTwist) === 0;
       if (!q.flat && !rootStraight) return;
       const want = [-Rs[0] * Math.sin(t) + Up[0] * Math.cos(t), -Rs[1] * Math.sin(t) + Up[1] * Math.cos(t), -Rs[2] * Math.sin(t) + Up[2] * Math.cos(t)];
       const err = Math.max(Math.abs(q.N[0] - want[0]), Math.abs(q.N[1] - want[1]), Math.abs(q.N[2] - want[2]));
