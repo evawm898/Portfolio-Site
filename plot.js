@@ -1058,6 +1058,28 @@ const instanceBuildKey = (g, ord, isSel) => `${g}#${ord}#${isSel ? `1:${selected
    done — see the note in CLAUDE.md. */
 const REBUILD_ALL = 'all';
 const REBUILD_VIEW = 'view';
+/* AND HOW MUCH OF THE TAIL TO PAY. `REBUILD_EXACT` is every rebuild that
+   shipped before a bloom could be dragged: the segment buffers re-packed in
+   full and the extent walked over every point of every bloom. `REBUILD_DRAG`
+   is the pointer-down state and nothing else — a bloom is being moved, the
+   camera is not refitting, and a frame is owed every 16.7 ms — so the two
+   global phases are NARROWED rather than skipped: the moved bloom's own slice of
+   each segment buffer is written in place (the layout of the pack is the same
+   pack, so nothing about which floats are whose has changed), and the extent is
+   COMPOSED from per-bloom boxes with a radius that is conservative rather than
+   exact. `endDrag` then pays one exact rebuild, so nothing the drag showed is
+   what the page holds at rest: what it holds at rest is what it always held. */
+const REBUILD_EXACT = 'exact';
+const REBUILD_DRAG = 'drag';
+/* THE LAYOUT OF THE LAST FULL PACK: for each family, the segment count each
+   bloom contributed, in instance order. One set of buffers holds every bloom
+   and the strips are pushed bloom by bloom, so a bloom's segments are one
+   contiguous run of each buffer and this is where that run starts. A drag-mode
+   rebuild may write into a run in place only when the counts it would pack
+   are the counts that were packed — asserted count for count, never assumed
+   from the routing, the same discipline as `builtKey`. */
+let packLayout = null;
+const FAMILIES = ['u', 'v', 'other', 'sel', 'stem'];
 /* AND WHAT THE TIME WENT ON. Three phases, because they answer different
    questions and only one of them is what this partition can move: `buildMs` is
    the blooms that were built, `packMs` is the segment buffers — ONE set for the
@@ -1066,10 +1088,12 @@ const REBUILD_VIEW = 'view';
    depth dim share. A number nobody prints is a number nobody watches, and the
    next thing to do here is decided by which of the three is largest. */
 let lastRebuild = { only: REBUILD_ALL, built: 0, reused: 0, ms: 0,
-                    buildMs: 0, packMs: 0, boundsMs: 0 };
+                    buildMs: 0, packMs: 0, boundsMs: 0, pack: 'full', bounds: 'walk' };
 const now = () => (typeof performance !== 'undefined' ? performance.now() : 0);
-function rebuild(only = REBUILD_ALL) {
+function rebuild(only = REBUILD_ALL, mode = REBUILD_EXACT) {
   const t0 = now();
+  // A drag narrows the tail for ONE bloom; anything else is the exact rebuild.
+  const dragK = (mode === REBUILD_DRAG && typeof only === 'number') ? only : -1;
   syncSelection();
   const inputs = buildInputs();
   const g = globalBuildKey(inputs);
@@ -1108,11 +1132,26 @@ function rebuild(only = REBUILD_ALL) {
   const isSel = t => selected >= 0 && t.petal === selected && t.inst === selInstance;
   const selStrips = heads.filter(isSel);
   const rest = heads.filter(t => !isSel(t));
-  const u = buildFamily('u', rest.filter(t => t.kind === 'u'));
-  const v = buildFamily('v', rest.filter(t => t.kind === 'v'));
-  const other = buildFamily('other', rest.filter(t => t.kind === 'other'));
-  buildFamily('sel', selStrips, selMaterial);
-  buildFamily('stem', stems);
+  /* WHICH BUFFER EACH STRIP LANDS IN, AND HOW MANY SEGMENTS EACH BLOOM PUTS
+     THERE — counted now, whichever way the pack goes, because the patch below
+     compares this against the layout of the last full pack and the full pack
+     records it. */
+  const famOf = t => (isSel(t) ? 'sel' : t.kind);
+  const layout = packCounts(heads, stems, famOf);
+  let pack = 'full';
+  if (dragK >= 0 && patchPack(dragK, layout, heads, stems, famOf)) {
+    pack = 'patched';
+  } else {
+    buildFamily('u', rest.filter(t => t.kind === 'u'));
+    buildFamily('v', rest.filter(t => t.kind === 'v'));
+    buildFamily('other', rest.filter(t => t.kind === 'other'));
+    buildFamily('sel', selStrips, selMaterial);
+    buildFamily('stem', stems);
+    packLayout = layout;
+  }
+  const famTotal = f => layout[f].reduce((a, b) => a + b, 0);
+  const u = { segments: famTotal('u') }, v = { segments: famTotal('v') },
+        other = { segments: famTotal('other') };
   const tPacked = now();
   drawnStrips = heads;
   const segOf = k => heads.reduce((a, t) => a + (t.kind === k ? t.segments : 0), 0);
@@ -1176,14 +1215,66 @@ function rebuild(only = REBUILD_ALL) {
     bendsRest: warpIsRest(myWarp),
   };
   const tBounds0 = now();
-  computeViewBounds();
+  const bounds = dragK >= 0 ? composeViewBounds() : computeViewBounds();
   const tBounds = now();
   syncHandles();
   applyStyle();
   dirty = true;
   lastRebuild = { only: String(only), built, reused, ms: now() - t0,
                   buildMs: tBuilt - t0, packMs: tPacked - tBuilt,
-                  boundsMs: tBounds - tBounds0 };
+                  boundsMs: tBounds - tBounds0, pack, bounds };
+}
+
+/* ---- the pack, narrowed to one bloom -------------------------------------
+   THE SEGMENT COUNT EACH BLOOM CONTRIBUTES TO EACH BUFFER, in instance order.
+   `famOf` is the one owner of which buffer a head strip lands in (the selected
+   petal's strips go to `sel`, the rest to their family); the stems are their
+   own buffer. */
+function packCounts(heads, stems, famOf) {
+  const n = instances.length;
+  const counts = {};
+  for (const f of FAMILIES) counts[f] = new Array(n).fill(0);
+  for (const t of heads) counts[famOf(t)][t.inst] += t.segments;
+  for (const t of stems) counts.stem[t.inst] += t.segments;
+  return counts;
+}
+const sameLayout = (a, b) => !!a && !!b && FAMILIES.every(f =>
+  a[f].length === b[f].length && a[f].every((c, i) => c === b[f][i]));
+
+/* WRITE ONE BLOOM'S RUN OF EACH BUFFER IN PLACE. The condition is the WHOLE
+   layout matching the last full pack's — every bloom's count in every buffer —
+   and not only the moved bloom's, because an offset is the sum of the counts
+   before it and a change anywhere earlier moves where this bloom's run starts.
+   Returns false, having written nothing, when the pack has to be redone in
+   full; the caller then does that. A drag changes no count (it moves a bloom's
+   points and keeps its strips), so on a drag this is the path taken, and the
+   full pack is what runs when anything else has changed underneath.
+     `instanceStart.data` is the `InstancedInterleavedBuffer` that
+   `LineSegmentsGeometry.setPositions` built from `stripsToSegments`' own array,
+   six floats a segment, so the run for bloom k in buffer f begins at six times
+   the segments of the blooms before it — the same arithmetic the full pack does
+   by concatenation, written as an offset. */
+function patchPack(k, layout, heads, stems, famOf) {
+  if (!sameLayout(packLayout, layout)) return false;
+  for (const f of FAMILIES) {
+    const seg = layout[f][k];
+    if (!seg) continue;
+    const obj = objects[f];
+    if (!obj) return false;
+    const data = obj.geometry.attributes.instanceStart.data;
+    let before = 0;
+    for (let i = 0; i < k; i++) before += layout[f][i];
+    const total = layout[f].reduce((a, b) => a + b, 0);
+    if (data.array.length !== total * 6) return false;
+    const mine = f === 'stem'
+      ? stems.filter(t => t.inst === k)
+      : heads.filter(t => t.inst === k && famOf(t) === f);
+    const { positions, segments } = stripsToSegments(mine);
+    if (segments !== seg) return false;
+    data.array.set(positions, before * 6);
+    data.needsUpdate = true;
+  }
+  return true;
 }
 
 /* THE POLARITY, APPLIED. Three things and only three: which way the fragments
@@ -1269,6 +1360,30 @@ const handleMaterial = color => new THREE.MeshBasicMaterial({
    on its own. */
 const HANDLE_MAT = handleMaterial(0x6fb7ae);
 const PETAL_HANDLE_MAT = handleMaterial(0xd6a15c);
+/* A THIRD SET, A THIRD COLOUR AND A DIFFERENT SHAPE: the bloom's ANCHOR, one per
+   instance, at the point the position sliders move — the grid's own origin
+   through the bloom's placement. Rose, where the stem's handles are teal and
+   the petal's amber; an octahedron rather than a sphere, so among three sets
+   of handles on one canvas the one that moves a whole bloom does not read as a
+   bend. Every bloom carries one, selected or not, because arranging a
+   composition means grabbing a bloom you have not yet picked from the list —
+   and the grab is what picks it. The selected bloom's anchor is drawn at full
+   strength and the others muted, so the panel's bloom and the canvas's agree at
+   a glance. There is no checkbox for these: a view field is a field of the
+   saved file, and the two handle sets that have one are editors for state a
+   bloom holds, where this one is the bloom itself. */
+const BLOOM_HANDLE_GEOM = new THREE.OctahedronGeometry(1, 0);
+const BLOOM_HANDLE_MAT = handleMaterial(0xd66f9a);
+const BLOOM_HANDLE_MAT_MUTED = handleMaterial(0xd66f9a);
+BLOOM_HANDLE_MAT_MUTED.opacity = 0.6;
+let bloomHandleObjs = [];
+/* In grid mm, from the bloom's own width so it is the same size against its
+   bloom whatever the grid was exported at, then through the bloom's scale. */
+const bloomHandleRadiusFor = inst => {
+  const b = inst.localBounds;
+  const width = b ? Math.max(b.max[0] - b.min[0], b.max[1] - b.min[1]) : 60;
+  return Math.max(1.5, width * 0.05) * meanScale(inst.transform);
+};
 // In grid mm, from the axis's own length, so a handle is the same size on
 // screen whatever the axis is set to rather than a dot on a long stalk. The
 // petal's floor is smaller because a petal is: this file's shortest is 18.6 mm
@@ -1310,10 +1425,10 @@ function unplaceWorld(world, out) {
   return out;
 }
 
-function syncHandlePool(pool, want, mat) {
+function syncHandlePool(pool, want, mat, geom = HANDLE_GEOM) {
   while (pool.length > want) container.remove(pool.pop());
   while (pool.length < want) {
-    const h = new THREE.Mesh(HANDLE_GEOM, mat);
+    const h = new THREE.Mesh(geom, mat);
     h.renderOrder = 10;
     h.frustumCulled = false;
     container.add(h);
@@ -1356,6 +1471,50 @@ function syncHandles() {
   bendRemoveBtn.disabled = bends.length === 0;
   bendAddBtn.disabled = bends.length >= MAX_BENDS;
   syncPetalHandles();
+  syncBloomHandles();
+}
+
+/* ONE ANCHOR PER BLOOM, AT ITS PLACED ORIGIN. The origin through the transform
+   is the translation itself — `transformMatrix` puts `position` in the fourth
+   column — so the anchor stands exactly where the three position sliders say,
+   and a drag on it writes those three numbers and nothing else. */
+function syncBloomHandles() {
+  syncHandlePool(bloomHandleObjs, instances.length, BLOOM_HANDLE_MAT, BLOOM_HANDLE_GEOM);
+  bloomHandleObjs.forEach((h, k) => {
+    const inst = instances[k];
+    h.visible = true;
+    h.userData.set = 'bloom';
+    h.userData.instance = k;
+    h.material = k === selInstance ? BLOOM_HANDLE_MAT : BLOOM_HANDLE_MAT_MUTED;
+    h.scale.setScalar(bloomHandleRadiusFor(inst));
+    const p = inst.transform.position;
+    h.position.set(p[0], p[1], p[2]);
+  });
+}
+
+/* MOVE A BLOOM SO ITS ANCHOR LANDS UNDER THE POINTER. `world` is a point on the
+   drag plane in three's world; the transform's position is in the container's
+   grid space (Z-up, before the page's one correction), so the world point is
+   taken back through the CONTAINER's matrix only — never the instance's, since
+   what is being solved for IS the instance's translation. No gate and no
+   neighbours' term, unlike the two bend solves: the anchor is the translation
+   itself, so the solve is a copy. The three numbers are written as they come,
+   in floating millimetres; the sliders show them at their own 1 mm step. */
+function setBloomFromWorld(k, world) {
+  const inst = instances[k];
+  if (!inst) return;
+  container.updateMatrixWorld(true);
+  invScratch.copy(container.matrixWorld).invert();
+  const v = world.clone().applyMatrix4(invScratch);
+  inst.transform = { position: [v.x, v.y, v.z],
+                     rotationDeg: inst.transform.rotationDeg.slice(),
+                     scale: inst.transform.scale.slice() };
+  // ONE BLOOM MOVED, AND THE TAIL IS THE DRAG'S — `endDrag` pays the exact one.
+  rebuild(k, REBUILD_DRAG);
+  loadTransformControls();
+  writeInstanceOutputs();
+  writeDrawState();
+  writeFrameInfo();
 }
 
 /* THE PETAL'S HANDLES SIT ON ITS DEFORMED CENTRE LINE, THROUGH THE HEAD'S OWN
@@ -1517,13 +1676,23 @@ canvas.addEventListener('pointerdown', ev => {
   // which is how selection and orbiting share one canvas without a modifier
   // key. A drag of any length is an orbit and never a selection.
   downAt = { x: ev.clientX, y: ev.clientY };
-  const live = [...handles, ...petalHandleObjs].filter(h => h.visible);
+  const live = [...handles, ...petalHandleObjs, ...bloomHandleObjs].filter(h => h.visible);
   if (!live.length) return;
   toNDC(ev);
   ray.setFromCamera(ndc, camera);
   const picks = ray.intersectObjects(live, false);
   if (!picks.length) return;
   dragging = picks[0].object;
+  /* GRABBING A BLOOM SELECTS IT. The seven transform sliders are a view of the
+     SELECTED bloom, so a drag that moved an unselected one would move the
+     drawing while the panel described another bloom — the "sliders without the
+     bloom, bloom without the sliders" pair the gate exists to refuse. Through
+     the one owner of the selection, which loads that bloom's values and applies
+     nothing; on the bloom already selected it is a no-op. */
+  if (dragging.userData.set === 'bloom') {
+    setSelectedInstance(dragging.userData.instance);
+    dragging = bloomHandleObjs[dragging.userData.instance] || dragging;
+  }
   const wp = dragging.getWorldPosition(new THREE.Vector3());
   // Drag in the plane facing the camera through the handle, so the handle
   // tracks the pointer from whatever direction the model is being read.
@@ -1542,7 +1711,9 @@ canvas.addEventListener('pointermove', ev => {
   ray.setFromCamera(ndc, camera);
   if (!ray.ray.intersectPlane(dragPlane, hitPt)) return;
   const world = hitPt.clone().add(grabOffset);
-  if (dragging.userData.set === 'petal') setPetalBendFromWorld(dragging.userData.bendIndex, world);
+  const set = dragging.userData.set;
+  if (set === 'bloom') setBloomFromWorld(dragging.userData.instance, world);
+  else if (set === 'petal') setPetalBendFromWorld(dragging.userData.bendIndex, world);
   else setBendFromWorld(dragging.userData.bendIndex, world);
   ev.preventDefault();
 });
@@ -1550,6 +1721,14 @@ canvas.addEventListener('pointermove', ev => {
 function endDrag(ev) {
   const wasDragging = !!dragging;
   if (dragging) {
+    /* THE DRAG'S REBUILDS PAID A NARROWED TAIL; THE LAST ONE IS EXACT. So what
+       the page holds once the pointer is up — the full pack and the walked
+       extent — is what every other route to `rebuild` produces, and nothing a
+       drag showed outlives it by a frame. */
+    if (dragging.userData.set === 'bloom') {
+      rebuild(dragging.userData.instance);
+      writeInstanceOutputs(); writeDrawState(); writeFrameInfo();
+    }
     dragging = null;
     controls.enabled = true;
     if (ev && ev.pointerId !== undefined && canvas.hasPointerCapture(ev.pointerId)) {
@@ -1723,13 +1902,20 @@ function loadTransformControls() {
 /* AND THE PANEL, READ INTO THE BLOOM — the only path by which one of these
    sliders reaches the drawing. The uniform scale writes all three components;
    see TRANSFORM_FIELDS on why it is one control. */
-function commitTransform() {
+function commitTransform(el) {
   const inst = cur();
   if (inst === EMPTY_INSTANCE) return false;
   const t = { position: inst.transform.position.slice(),
               rotationDeg: inst.transform.rotationDeg.slice(),
               scale: inst.transform.scale.slice() };
+  /* THE ONE FIELD THAT MOVED, not all seven. A range input holds its value at
+     its own step, and a position written by a drag is a floating millimetre —
+     so reading every slider back on every input would quietly snap the two
+     axes nobody touched to the nearest whole millimetre, a move of up to half a
+     millimetre made by a control that was not moved. Given no element (there
+     is no such caller today) it reads them all, which is what shipped. */
   for (const f of TRANSFORM_FIELDS) {
+    if (el && document.getElementById(f.control) !== el) continue;
     const v = +document.getElementById(f.control).value;
     if (f.axis < 0) t[f.key] = [v, v, v];
     else t[f.key][f.axis] = v;
@@ -1897,9 +2083,9 @@ function computeViewBounds() {
     const moved = one.stemIsDrawn || (st.on && one.stemRing && st.droopRad !== 0)
                   || one.warpAll !== one.strips
                   || !isIdentityTransform(one.transform);
-    if (!moved) { viewBounds = one.localBounds; return; }
+    if (!moved) { viewBounds = one.localBounds; return 'file'; }
   }
-  if (!instances.length) { viewBounds = null; return; }
+  if (!instances.length) { viewBounds = null; return 'none'; }
   // TWO WALKS AND NO ARRAY. Collecting the points to measure the radius in a
   // second pass meant a 135,000-element JS array per rebuild, and cost 6.6 ms
   // of a 13.5 ms rebuild — more than building the stem. Walking twice is
@@ -1912,7 +2098,7 @@ function computeViewBounds() {
     if (y < min[1]) min[1] = y; if (y > max[1]) max[1] = y;
     if (z < min[2]) min[2] = z; if (z > max[2]) max[2] = z;
   });
-  if (!n) { viewBounds = one ? one.localBounds : null; return; }
+  if (!n) { viewBounds = one ? one.localBounds : null; return 'none'; }
   const center = [0, 1, 2].map(a => (min[a] + max[a]) / 2);
   let r = 0;
   eachDrawnPoint((x, y, z) => {
@@ -1920,6 +2106,81 @@ function computeViewBounds() {
     if (d > r) r = d;
   });
   viewBounds = { min, max, center, radius: r };
+  return 'walk';
+}
+
+/* ---- the extent, composed rather than walked ----------------------------
+   WHAT ONE BLOOM OCCUPIES, PLACED: its box and the radius about its own centre,
+   over exactly the population `eachDrawnPoint` walks for it — every strip of
+   its file at its droop, through its placement, plus its drawn stems. Memoised
+   on the bloom's build counter and its transform, so during a drag the moved
+   bloom is re-measured on every step and every other bloom is measured once,
+   at the first step, and then read. */
+function extentOf(inst) {
+  const key = `${inst.builds}|${JSON.stringify(inst.transform)}`;
+  if (inst.extent && inst.extent.key === key) return inst.extent;
+  const st = stemOf(inst);
+  const angle = (st.on && inst.stemRing) ? st.droopRad : 0;
+  const c = inst.stemRing ? inst.stemRing.center : [0, 0, 0];
+  const m = isIdentityTransform(inst.transform) ? null : transformMatrix(inst.transform);
+  const min = [Infinity, Infinity, Infinity], max = [-Infinity, -Infinity, -Infinity];
+  const p = [0, 0, 0], q = [0, 0, 0], w = [0, 0, 0];
+  const take = (x, y, z) => {
+    if (x < min[0]) min[0] = x; if (x > max[0]) max[0] = x;
+    if (y < min[1]) min[1] = y; if (y > max[1]) max[1] = y;
+    if (z < min[2]) min[2] = z; if (z > max[2]) max[2] = z;
+  };
+  const each = fn => {
+    for (const s of inst.warpAll) {
+      for (let i = 0; i < s.count; i++) {
+        p[0] = s.points[i * 3]; p[1] = s.points[i * 3 + 1]; p[2] = s.points[i * 3 + 2];
+        rotateAboutRing(p, c, angle, q);
+        if (m) { applyMatrixToPoint(m, q[0], q[1], q[2], w); fn(w[0], w[1], w[2]); }
+        else fn(q[0], q[1], q[2]);
+      }
+    }
+    for (const s of inst.stemStrips) {
+      for (let i = 0; i < s.count; i++) fn(s.points[i * 3], s.points[i * 3 + 1], s.points[i * 3 + 2]);
+    }
+  };
+  each(take);
+  if (min[0] === Infinity) { inst.extent = { key, empty: true }; return inst.extent; }
+  const center = [0, 1, 2].map(a => (min[a] + max[a]) / 2);
+  let r = 0;
+  each((x, y, z) => { const d = Math.hypot(x - center[0], y - center[1], z - center[2]); if (d > r) r = d; });
+  inst.extent = { key, min, max, center, radius: r };
+  return inst.extent;
+}
+
+/* THE COMPOSITION'S EXTENT FROM ITS BLOOMS' — the drag-mode arm of
+   `computeViewBounds`. THE BOX IS EXACT: a union of per-bloom boxes over the
+   same points is the box over all of them. THE RADIUS IS NOT, AND IS SAID SO:
+   the exact radius is about the COMPOSITION's centre, and a radius about a
+   global centre does not compose from radii about per-bloom centres — what does
+   compose is a bound, each bloom's centre-to-centre distance plus its own
+   radius, which contains every point and can exceed the exact figure. That
+   changes the depth dim's sphere by that excess for as long as the pointer is
+   down and not a frame longer: `endDrag` runs the exact walk. Returns which arm
+   answered, for the panel and the gate. */
+function composeViewBounds() {
+  if (!instances.length) { viewBounds = null; return 'none'; }
+  let box = null;
+  const parts = [];
+  for (const inst of instances) {
+    const e = extentOf(inst);
+    if (e.empty) continue;
+    parts.push(e);
+    box = unionExtent(box, e);
+  }
+  if (!box) { viewBounds = null; return 'none'; }
+  const center = [0, 1, 2].map(a => (box.min[a] + box.max[a]) / 2);
+  let r = 0;
+  for (const e of parts) {
+    const d = Math.hypot(e.center[0] - center[0], e.center[1] - center[1], e.center[2] - center[2]);
+    r = Math.max(r, d + e.radius);
+  }
+  viewBounds = { min: box.min, max: box.max, center, radius: r };
+  return 'composed';
 }
 
 /* THE NEAR AND FAR PLANES, FROM ONE DISTANCE — extracted so a camera RESTORED
@@ -2436,6 +2697,9 @@ function bloomText() {
   }
   lines.push('        x, y and z are the GRID\'s own axes, before the Z-up correction:'
     + ' +z is the way the bloom faces');
+  lines.push('anchor  the rose diamond on the canvas is this bloom\'s origin — drag it to move'
+    + ' the bloom in the plane facing the camera (its depth does not change); grabbing'
+    + ' another bloom\'s anchor selects that bloom');
   // WHAT THE WHOLE COMPOSITION COSTS. Grid segments and stem segments apart,
   // because they come from two places and only one of them is in any file.
   lines.push(`cost    ${drawn.total.toLocaleString('en-US')} grid segments`
@@ -2452,9 +2716,15 @@ function bloomText() {
      and one measurement of what the whole drawing occupies — and they are paid
      in full whatever was rebuilt. */
   const r = lastRebuild;
+  /* AND WHICH TAIL WAS PAID. `packing` is the whole composition's buffers redone
+     (`full`) or one bloom's run of each written in place (`patched`, the pointer-
+     down state); `extent` is the walk over every point (`walk`), the one-bloom
+     shortcut (`file`) or the drag's composition from per-bloom boxes
+     (`composed`, whose radius is a bound rather than the measurement). */
   lines.push(`drag    ${r.ms.toFixed(1)} ms/rebuild`
     + `   ·   ${r.buildMs.toFixed(1)} blooms (${r.built} built, ${r.reused} reused)`
-    + `   ·   ${r.packMs.toFixed(1)} packing   ·   ${r.boundsMs.toFixed(1)} extent`);
+    + `   ·   ${r.packMs.toFixed(1)} packing (${r.pack})`
+    + `   ·   ${r.boundsMs.toFixed(1)} extent (${r.bounds})`);
   if (r.ms > 16.7) {
     lines.push('<span class="warn">        past a 16.7 ms frame — a slider drag will'
       + ' read as steppy at this many blooms; the packing and the extent walk are'
@@ -2670,6 +2940,7 @@ function withInkOnly(fn) {
   const hidden = [];
   for (const h of handles) if (h.visible) { h.visible = false; hidden.push(h); }
   for (const h of petalHandleObjs) if (h.visible) { h.visible = false; hidden.push(h); }
+  for (const h of bloomHandleObjs) if (h.visible) { h.visible = false; hidden.push(h); }
   const sel = objects.sel;
   const selMat = sel ? sel.material : null;
   if (sel) sel.material = material;
@@ -3579,7 +3850,7 @@ bui.bloomPick.addEventListener('input', () => setSelectedInstance(+bui.bloomPick
 for (const [id, el] of Object.entries(bui)) {
   if (id === 'bloomPick') continue;
   el.addEventListener('input', () => {
-    commitTransform();
+    commitTransform(el);
     // WHERE ONE BLOOM STANDS. Every field of the transform is that bloom's own.
     rebuild(selInstance);
     writeInstanceOutputs();
@@ -3998,6 +4269,60 @@ window.__plot = {
     }
     return [...out.entries()].map(([index, points]) => ({ index, points }));
   },
+  /* ---- the bloom anchors ------------------------------------------------
+     One per instance, found on screen through the page's own projection, so a
+     gate drives a REAL pointer at one. `bloomDigest(k)` is one bloom's drawn
+     coordinates — the instrument for "no other bloom moved", which no count and
+     no framebuffer can say. `packedDigest()` is the GPU-bound arrays themselves,
+     family by family: `drawnDigest` hashes the strip RECORDS, and a drag-mode
+     pack that wrote the wrong run of a buffer leaves every record right and the
+     picture wrong, so the buffers have their own witness. `viewBounds()` is what
+     the camera fit and the depth dim read, for the drag's composed arm to be
+     compared against the exact walk. */
+  bloomHandleCount: () => bloomHandleObjs.length,
+  bloomHandleVisible: k => !!(bloomHandleObjs[k] && bloomHandleObjs[k].visible),
+  bloomHandleScreenPos: k => screenPosOf(bloomHandleObjs[k]),
+  bloomHandleWorld: k => (bloomHandleObjs[k]
+    ? bloomHandleObjs[k].getWorldPosition(new THREE.Vector3()).toArray() : null),
+  bloomHandleMuted: k => !!(bloomHandleObjs[k] && bloomHandleObjs[k].material === BLOOM_HANDLE_MAT_MUTED),
+  bloomFirstPoint: k => {
+    const inst = instances[k];
+    if (!inst || !inst.built || !inst.built.head.length) return null;
+    const p = inst.built.head[0].points;
+    return [p[0], p[1], p[2]];
+  },
+  bloomDigest: k => {
+    const inst = instances[k];
+    if (!inst || !inst.built) return null;
+    let n = 0, h = 0;
+    for (const arr of [inst.built.head, inst.built.stems]) {
+      for (const t of arr) {
+        for (let i = 0; i < t.count * 3; i++) {
+          h = (Math.imul(h, 16777619) ^ (Math.fround(t.points[i]) * 1e6 | 0)) | 0;
+          n++;
+        }
+      }
+    }
+    return { points: n, hash: h };
+  },
+  packedDigest: () => {
+    const out = {};
+    for (const f of FAMILIES) {
+      const o = objects[f];
+      if (!o) { out[f] = null; continue; }
+      const a = o.geometry.attributes.instanceStart.data.array;
+      let h = 0;
+      for (let i = 0; i < a.length; i++) h = (Math.imul(h, 16777619) ^ (a[i] * 1e6 | 0)) | 0;
+      out[f] = { floats: a.length, hash: h };
+    }
+    return out;
+  },
+  viewBounds: () => (viewBounds ? { min: viewBounds.min.slice(), max: viewBounds.max.slice(),
+                                    center: viewBounds.center.slice(), radius: viewBounds.radius }
+                                : null),
+  dragging: () => (dragging ? { set: dragging.userData.set,
+                                instance: dragging.userData.instance ?? null,
+                                bendIndex: dragging.userData.bendIndex ?? null } : null),
   petalHandleCount: () => petalHandleObjs.length,
   petalHandleVisible: k => !!(petalHandleObjs[k] && petalHandleObjs[k].visible),
   petalHandleScreenPos: k => screenPosOf(petalHandleObjs[k]),
