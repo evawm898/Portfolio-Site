@@ -2747,6 +2747,49 @@ that lands on the NEXT petal**, a grid mismatch that is not reported, a newer
 version read anyway, a camera that is not restored, a selection that is not
 restored, and a dropped warp folded onto petal 0 instead.
 
+**A REFACTOR DISARMS A MUTANT IN TWO WAYS, AND THE GATE NOW CATCHES ONE OF THEM
+IN A SECOND** (overnight session, Sep 10, from the multi-bloom refactor). The
+known half is a `from` that has MOVED — the sweep reports "mutation did not
+apply", which is survivable, but only if somebody runs that mutant, and a sweep
+that never completes is the normal case here. **`--negative-control` now checks
+every mutant's anchor BEFORE any mutant runs, for EVERY mutant rather than only
+the ones an invocation is about to run** — the same reasoning the stale-name
+guard carries, applied to the other half of a mutant's claim. It found five
+disarmed mutants in under a second where the sweep would have cost half an hour
+a piece, and it also catches the quieter case: **a `from` that now matches TWICE
+mutates the first occurrence and says nothing**, so the mutation lands somewhere
+other than where it is described.
+**THE OTHER HALF IS A `to` THAT IS VALID SYNTAX AND INVALID AT RUNTIME, AND NO
+STATIC CHECK CAN SEE IT.** `deselecting-drops-the-warp`'s anchor applied
+perfectly; its replacement assigned to `petalWarps`, which had stopped being a
+module variable and become a field of the selected bloom — an assignment to an
+undeclared identifier, which in a module THROWS. The mutant reddened
+`page/no-errors` and MISSED two of the three checks it exists for: **it was not
+the defect it names, it was a broken page wearing that defect's coat.** Only
+running it found this. Its guard on `instances.length` is a property of the page
+rather than a softening: `EMPTY_INSTANCE` is FROZEN, so a write into the record
+that belongs to no bloom throws rather than being quietly lost.
+**AND ONE MUTANT'S BLAST RADIUS IS NOT DETERMINISTIC, so a mutant may carry
+`mayAlso` beside `breaks`.** `a-handle-drag-also-orbits` named FOUR DIFFERENT
+SETS over four consecutive sweeps: a page where every drag also orbits NEVER
+SETTLES — `settle()` stops the moment `update()` reports the movement is below
+EPS and the residue accumulates back over it — so the HANDLE checks fire every
+run while everything downstream that reads the camera twice fires or does not
+depending on where the residue happens to be when it looks. The same check was
+UNCLAIMED on one run and MISSED on the next, and no single list can be right.
+**`breaks` is the claim and every one must still go red; `mayAlso` is collateral
+the mutation is ALLOWED but not required to cause; a check in NEITHER list going
+red is still a failure.** The run prints how much of the collateral fired. It is
+used by exactly one mutation, and the split says which half of its fallout is a
+property of the defect and which is a property of the damping.
+**RUN THE MUTANTS COVERING THE CODE A SESSION CHANGED FIRST.** A full sweep is
+81 mutants at roughly six minutes each. The overnight session ran 34 of them —
+its own 14, plus 20 pre-existing ones over the areas the refactor touched — and
+named the other 47 as unrun rather than implying a complete sweep. Of the 20
+pre-existing, SIX needed a correction, and none of the corrections was to a
+check: five were `breaks` lists that were short in the honest direction, and one
+was the broken `to` above.
+
 **THE SEAM'S COUNT HAS TO NAME THE SEAM'S OWN POPULATION.** The seam ranges over
 every warped petal (so one base drifting cannot hide behind another's holding)
 and the count printed beside it was the SELECTED petal's share — so picking an
