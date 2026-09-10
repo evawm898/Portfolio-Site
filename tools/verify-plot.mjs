@@ -85,15 +85,39 @@ const LOW_VIEW = [0.92, 0.14, 1];      // a low angle, where the whorls overlap 
 // copy and part two is served it.
 const MUTANTS = [
   {
+    /* RE-ANCHORED, DELIBERATELY. The blend used to be a literal in the material's
+       own constructor; it is now the SCREEN polarity's entry in the one map from
+       a polarity's blend name to three's constant, and both the constructor and
+       `applyStyle` read that map — so this is still exactly "the drawing does not
+       blend additively at the polarity /plot ships", edited where the decision
+       now lives. Leaving the old anchor would have reported `mutation did not
+       apply`, which is survivable; leaving the constructor's literal in place
+       while `applyStyle` overwrote it would NOT have been, because the mutation
+       would have been silently undone and the mutant would have passed. */
     id: 'blending-is-not-additive', file: 'plot.js',
-    from: '  blending: THREE.AdditiveBlending,', to: '  blending: THREE.NormalBlending,',
+    from: '  additive: THREE.AdditiveBlending,', to: '  additive: THREE.NormalBlending,',
     /* AND THE FRAME'S OWN CHECK, because that check's claim is a CONTRAST — the
        boundary composites NORMAL where the DRAWING is additive — and this
        mutation removes the second half of it. True, and the claim is worth
        keeping whole: "the boundary is chrome and not ink" is a statement about
        the two blend modes together, not about the frame's alone. */
+    /* AND THE THREE POLARITY CHECKS IT ALSO REDDENS ARE NAMED HERE RATHER THAN
+       TUNED OUT OF, which is what the control is for. All three are TRUE
+       statements about a screen polarity that does not blend additively:
+         * `print-changes-the-blend-mode-…` asserts the screen arm IS additive,
+           and under this mutation it reads `other` (blending 1, not 2);
+         * `additive-clips-where-multiply-does-not` measures the clipping that
+           only accumulation produces — with NORMAL blending nothing
+           accumulates, so 0 pixels clip flat white against print's 469;
+         * `the-polarity-comes-back-as-a-blend-mode-…` reads the blend constant
+           back off the renderer after a restore, and gets `other` too.
+       The mutation breaks the screen polarity wholesale, so everything that
+       asks the screen polarity a question legitimately goes red. */
     breaks: ['blend/the-material-is-additive', 'blend/crossings-exceed-a-single-line',
-             'frame/the-boundary-is-chrome-and-not-ink'],
+             'frame/the-boundary-is-chrome-and-not-ink',
+             'polarity/print-changes-the-blend-mode-and-not-only-the-colours',
+             'polarity/additive-clips-where-multiply-does-not',
+             'restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value'],
   },
   {
     id: 'every-strip-reads-as-a-u-line', file: 'plot-grid.js',
@@ -213,8 +237,13 @@ const MUTANTS = [
     from: '  if (sph && s.depthDim > 0) {', to: '  if (sph && s.depthDim > 1e9) {',
     // The last of these is on the list only because it became a biconditional:
     // "0 is off" is satisfied by a dim that is never applied at any setting.
+    // And the polarity check joins the list because it is TRUE of this mutation:
+    // with the dim never applied there is no fog at all, so there is no ground
+    // for it to fade into on either polarity. Widened rather than the check
+    // loosened -- the fog being absent is exactly what it should refuse.
     breaks: ['dim/the-far-side-fades', 'dim/the-fog-is-solved-on-the-live-camera',
-             'dim/zero-is-off-and-the-read-out-says-so'],
+             'dim/zero-is-off-and-the-read-out-says-so',
+             'polarity/the-depth-dim-fades-into-the-ground-it-is-on'],
   },
   {
     id: 'the-weight-slider-does-nothing', file: 'plot.js',
@@ -611,10 +640,17 @@ const MUTANTS = [
     // The highlight stops being normalised to its own peak channel, so the
     // selected petal draws a third dimmer than the rest of the drawing — which
     // under a depth dim is the cue for "further away".
-    id: 'the-highlight-is-a-brightness-as-well-as-a-hue', file: 'plot.js',
-    from: '  const peak = Math.max(selMaterial.color.r, selMaterial.color.g, selMaterial.color.b) || 1;',
-    to: '  const peak = 1;',
-    breaks: ['select/the-highlight-is-a-hue-and-not-a-brightness'],
+    /* RE-ANCHORED. The peak normalisation moved out of `applyStyle` and into
+       `hueRGB`'s SCREEN arm when the polarity transfer landed, and the sweep
+       reported `mutation did not apply` — which is the one thing that makes a
+       refactor disarming a mutant survivable. Same mutation, same meaning, at
+       the line that now owns it; and it reddens the polarity check that also
+       asserts the normalisation, which is named here rather than tuned out. */
+    id: 'the-highlight-is-a-brightness-as-well-as-a-hue', file: 'plot-polarity.js',
+    from: '    const peak = Math.max(hue[0], hue[1], hue[2]) || 1;',
+    to: '    const peak = 1;',
+    breaks: ['select/the-highlight-is-a-hue-and-not-a-brightness',
+             'polarity/the-highlight-is-a-hue-and-not-a-level-in-both'],
   },
 
   /* ---- the frame ---------------------------------------------------------
@@ -653,7 +689,16 @@ const MUTANTS = [
              'frame/the-ratio-and-the-margin-each-move-the-boundary',
              'frame/a-frame-control-never-moves-the-camera',
              'frame/reset-fits-the-drawing-inside-the-boundary',
-             'frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped'],
+             'frame/the-read-out-names-the-box-and-says-the-ink-is-not-cropped',
+             /* AND BOTH ARTEFACTS, because the export crops to `frameRect()` and
+                nothing else -- which is the coupling this session was asked to
+                build. Measured under the mutation: the raster comes back
+                1936 x 1408 at aspect 1.375 against the boundary's 0.667, and the
+                SVG is dimensioned 318.115 x 231.357 mm instead of 154.8 x 232.2.
+                True of the mutation, so the list is widened rather than the
+                checks loosened. */
+             'export/the-raster-is-not-empty-and-matches-the-frame-aspect',
+             'export/the-svg-carries-real-millimetres-from-the-grid-own-units'],
   },
   {
     // The ellipse is drawn as a rectangle. The box, the ratio, the margin, the
@@ -831,6 +876,173 @@ const MUTANTS = [
     breaks: ['file/a-warp-for-a-petal-the-grid-does-not-have-is-dropped-not-moved',
              'restore/a-warp-for-a-petal-this-grid-does-not-have-is-dropped-and-counted'],
   },
+  // ---- POLARITY -----------------------------------------------------------
+  {
+    /* THE ONE MUTATION A COLOUR SWAP WOULD SURVIVE. Print keeps its white ground
+       and its transfer and blends ADDITIVELY — which on white paper saturates on
+       the first line, i.e. the white rectangle this whole design exists to avoid. */
+    id: 'polarity-is-only-a-colour-swap', file: 'plot.js',
+    from: '  multiply: THREE.MultiplyBlending,', to: '  multiply: THREE.AdditiveBlending,',
+    breaks: ['polarity/print-changes-the-blend-mode-and-not-only-the-colours',
+             'polarity/the-two-regimes-agree-exactly-on-where-there-is-ink'],
+  },
+  {
+    /* THE FOG DOES NOT FOLLOW THE GROUND. Under multiply this drives far lines
+       toward dst*0 — the depth dim makes the MOST DISTANT lines the heaviest
+       thing on the page — and no blend-mode check can see it. */
+    id: 'the-fog-does-not-follow-the-ground', file: 'plot.js',
+    from: '    scene.fog.color.setHex(ground);', to: '    scene.fog.color.setHex(0x000000);',
+    breaks: ['polarity/the-depth-dim-fades-into-the-ground-it-is-on'],
+  },
+  {
+    /* THE LEVEL DOES NOT FOLLOW THE POLARITY — so print INHERITS the screen's
+       30%, which is the state Eva ruled against on Sep 10. Still a plausible
+       black-on-white flower: nothing is out of place, a quarter of the ink is
+       just flattened to black where the tuned default keeps it separable. */
+    id: 'the-print-polarity-inherits-the-screen-level', file: 'plot.js',
+    from: "    if (id === 'polarity' && el.value !== shownPolarity) {",
+    to:   "    if (false && id === 'polarity' && el.value !== shownPolarity) {",
+    breaks: ['polarity/each-polarity-carries-its-own-level-default'],
+  },
+  {
+    /* THE TWO DEFAULTS ARE MADE EQUAL — a later session "fixing" the asymmetry
+       this file exists to record. The page still works and still switches
+       polarity; it just quietly stops being tuned. */
+    id: 'the-two-level-defaults-are-made-the-same', file: 'plot-polarity.js',
+    from: '    levelDefault: 0.16,', to: '    levelDefault: 0.30,',
+    breaks: ['polarity/each-polarity-carries-its-own-level-default'],
+  },
+  {
+    /* THE TRANSFER IS A PLAIN INVERSION OF THE LEVEL. Still a black-on-white
+       flower nobody would question — and a single line lands 112 of 255 away
+       from where the screen puts it. */
+    id: 'the-print-transfer-is-a-plain-inversion', file: 'plot-polarity.js',
+    from: '    const t = srgbDecode(1 - srgbEncode(L));', to: '    const t = 1 - L;',
+    /* AND `the-two-regimes-agree-exactly-on-where-there-is-ink` IS NOT ON THIS
+       LIST, because the control proved the claim false and the claim was the
+       thing that was wrong. That check is named for WHERE the ink is, and a
+       plain inversion still puts ink in exactly the same places — see the
+       check's own note on what MSAA leaves it blind to. The LEVEL is asserted
+       in part one, where this project puts a law, and part one reddens. */
+    breaks: ['polarity/one-line-lands-at-the-same-ink-in-both-polarities',
+             'polarity/the-transfer-is-not-a-plain-inversion-of-the-level',
+             'polarity/the-crossings-are-the-part-that-does-not-carry-across',
+             'polarity/the-highlight-is-a-hue-and-not-a-level-in-both'],
+  },
+  {
+    // The highlight's ink is not normalised against the drawing's, so a selected
+    // petal reads heavier or lighter than the drawing it sits in.
+    id: 'the-print-highlight-is-not-normalised', file: 'plot-polarity.js',
+    from: '  return absorb.map(a => srgbDecode(clamp01(1 - a / peak * want)));',
+    to: '  return absorb.map(a => srgbDecode(clamp01(1 - a * want)));',
+    breaks: ['polarity/the-highlight-is-a-hue-and-not-a-level-in-both'],
+  },
+
+  // ---- EXPORT -------------------------------------------------------------
+  {
+    /* ONE PATH PER SEGMENT. The picture is IDENTICAL and the file is a plotter
+       lifting the pen fifty-five thousand times — invisible until someone has
+       waited three hours at one. */
+    id: 'the-svg-emits-one-path-per-segment', file: 'plot-export.js',
+    from: '    (run || (run = [])).push(x, y);',
+    to: '    (run || (run = [])).push(x, y); if (run.length >= 4) { out.push(run); run = [x, y]; }',
+    breaks: ['export/a-whole-strip-is-exactly-one-path',
+             'export/the-svg-emits-one-path-per-strip-and-not-one-per-segment'],
+  },
+  {
+    // The SVG is dimensioned in screen pixels wearing a millimetre label — the
+    // numbers are plausible (469 x 704) and the plot comes out three times life
+    // size.
+    /* ANCHORED ON THE DOCUMENT, NOT ON THE REPORT, and the two lines are nearly
+       identical — so the anchor carries the line above it. This is the SILENT
+       half deliberately: the panel goes on saying millimetres while the file
+       carries pixels, which is why the check parses the emitted text's own
+       width/height rather than trusting what the page reports about it. */
+    id: 'the-svg-is-dimensioned-in-pixels', file: 'plot.js',
+    from: '    paths,\n    widthMm: box.width * mmPerPx, heightMm: box.height * mmPerPx,',
+    to: '    paths,\n    widthMm: box.width, heightMm: box.height,',
+    breaks: ['export/the-svg-carries-real-millimetres-from-the-grid-own-units'],
+  },
+  {
+    // The ellipse clips to its own bounding box, which keeps the four corners —
+    // not the same picture, and exactly what plot-frame.js's header warned the
+    // export session not to do.
+    id: 'the-ellipse-clip-is-a-rectangle', file: 'plot-export.js',
+    from: "  const clip = shape === 'ellipse'", to: "  const clip = shape === 'never'",
+    breaks: ['export/the-boundary-is-a-real-clip-of-the-boundary-own-shape',
+             'export/the-ellipse-svg-renders-and-actually-clips'],
+  },
+  {
+    /* THE GROUND SITS OUTSIDE THE CLIP — the bug this session actually shipped
+       and then found by RENDERING one, not by reading the text. A screen-polarity
+       ellipse comes out as a full black rectangle with an ellipse of white lines
+       floating in it. */
+    id: 'the-svg-ground-is-outside-the-clip', file: 'plot-export.js',
+    from: '  <g clip-path="url(#plot-frame)">${groundRect}',
+    to: '  ${groundRect}\n  <g clip-path="url(#plot-frame)">',
+    breaks: ['export/the-ground-is-inside-the-clip-with-the-ink',
+             'export/the-ellipse-svg-renders-and-actually-clips'],
+  },
+  {
+    // The selection's teal survives into the export: a print with one teal petal
+    // in it, which is a bug report rather than an artefact.
+    id: 'the-export-keeps-the-selection-highlight', file: 'plot.js',
+    from: '  if (sel) sel.material = material;', to: '  if (sel) sel.material = selMat;',
+    breaks: ['export/the-raster-carries-the-ink-and-none-of-the-chrome'],
+  },
+  {
+    // The raster is not cropped to the boundary at all — it is the whole
+    // viewport, at the viewport's own aspect, whatever the FRAME panel says.
+    id: 'the-raster-is-not-cropped-to-the-frame', file: 'plot.js',
+    from: '    ? frameRect(raw.bw, raw.bh, parseRatio(f.ratio) ?? (raw.bw / raw.bh), f.margin)',
+    to: '    ? frameRect(raw.bw, raw.bh, raw.bw / raw.bh, 0)',
+    breaks: ['export/the-raster-is-not-empty-and-matches-the-frame-aspect'],
+  },
+  {
+    /* THE STROKES DO NOT SCALE WITH THE IMAGE. The same picture in hairlines —
+       right aspect, right crop, non-zero ink, still grey, and every other export
+       check green. */
+    id: 'the-export-strokes-do-not-scale', file: 'plot.js',
+    from: '      m.linewidth *= S / prevRatio;', to: '      m.linewidth *= 1;',
+    breaks: ['export/the-strokes-scale-with-the-image'],
+  },
+  {
+    /* THE PROJECTION IS FLIPPED IN Y. Exactly the right number of paths, at
+       exactly the right physical size, inside exactly the right clip — and the
+       bloom is upside down. */
+    id: 'the-svg-projection-is-flipped', file: 'plot.js',
+    from: '        xy[i * 2 + 1] = (-v.y * 0.5 + 0.5) * h;',
+    to: '        xy[i * 2 + 1] = (v.y * 0.5 + 0.5) * h;',
+    breaks: ['export/the-svg-lands-where-the-drawing-lands-on-screen'],
+  },
+  {
+    // Outside the ellipse is filled rather than cleared, which is the way round
+    // that cannot be undone downstream.
+    id: 'the-ellipse-raster-is-filled-not-cleared', file: 'plot-export.js',
+    from: '      rgba[(y * w + x) * 4 + 3] = 0;', to: '      rgba[(y * w + x) * 4 + 3] = 255;',
+    breaks: ['export/alpha-is-punched-outside-the-ellipse-and-nowhere-else',
+             'export/the-ellipse-raster-is-transparent-outside-the-boundary'],
+  },
+  {
+    // The polarity is not a field of the file, so a composition restores into
+    // whatever polarity the page happened to be in.
+    id: 'the-polarity-is-not-in-the-file', file: 'plot-file.js',
+    from: "  { key: 'polarity',   control: 'polarity',   kind: 'enum', values: POLARITIES },\n",
+    to: '',
+    /* AND THE ROUND-TRIP CHECK IS NOT ON THIS LIST, because a writer and a
+       reader that both walk the same table agree PERFECTLY about a field that
+       is gone — `composeDoc` never writes it, `readDoc` never looks for it, the
+       comparison never compares it, and both halves report a clean read. That
+       is the exact failure the WRITTEN-DOWN census exists for, it is already
+       recorded here for `the-frame-field-table-loses-a-row`, and the census
+       check is what reddens. Measured: this mutant left the round trip green at
+       "0 notes". */
+    breaks: ['file/the-document-carries-exactly-these-fields',
+             'restore/every-field-comes-back',
+             'restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value',
+             'save/every-control-on-the-page-is-a-field-of-the-file-or-a-named-exception'],
+  },
+
 ];
 
 // ===========================================================================
@@ -959,6 +1171,8 @@ async function run({ mutant = null } = {}) {
   const PT = await loadModule('plot-petal.js', mutant);
   const FR = await loadModule('plot-frame.js', mutant);
   const FL = await loadModule('plot-file.js', mutant);
+  const PL = await loadModule('plot-polarity.js', mutant);
+  const EX = await loadModule('plot-export.js', mutant);
   const {
     densityToEvery, everyLabel, keepsIndex, readGridScene, selectStrips,
     stripsToSegments, boundsOf, dimToFog, fogFactor, MIN_DENSITY, MAX_DENSITY,
@@ -1746,7 +1960,8 @@ async function run({ mutant = null } = {}) {
                  limits: { stemBends: 8, petalBends: 6 } };
   const FILE_STATE = {
     frame: { on: 'on', shape: 'ellipse', ratio: '4:5', margin: 18 },
-    draw: { families: 'u', uDensity: 5, vDensity: 8, weight: 2.4, brightness: 62, depthDim: 20 },
+    draw: { families: 'u', uDensity: 5, vDensity: 8, weight: 2.4, polarity: 'print',
+            brightness: 62, depthDim: 20 },
     view: { stemHandles: false, petalHandles: true },
     camera: { position: [11, 22, 33], target: [1, 2, 3], fov: 38 },
     selection: { instance: 0, petal: 7 },
@@ -1772,7 +1987,7 @@ async function run({ mutant = null } = {}) {
   const fieldKeysOf = t => t.map(f => f.key).join(',');
   check('file/the-document-carries-exactly-these-fields',
     fieldKeysOf(FL.FRAME_FIELDS) === 'on,shape,ratio,margin'
-    && fieldKeysOf(FL.DRAW_FIELDS) === 'families,uDensity,vDensity,weight,brightness,depthDim'
+    && fieldKeysOf(FL.DRAW_FIELDS) === 'families,uDensity,vDensity,weight,polarity,brightness,depthDim'
     && fieldKeysOf(FL.VIEW_FIELDS) === 'stemHandles,petalHandles'
     && fieldKeysOf(FL.STEM_FIELDS) === 'on,bundle,join,length,droopDeg,neck'
     && fieldKeysOf(FL.PETAL_FIELDS) === 'along,across',
@@ -1945,6 +2160,180 @@ async function run({ mutant = null } = {}) {
       census: { u: 280, v: 812, other: 0, strips: 1092, segments: 15148 } })).match === true,
     'the census the page recounted from the file, plus its name and the export mode');
 
+  // --- polarity, on values whose answer can be written down ----------------
+  /* ON THE REAL PAGE A WRONG TRANSFER STILL DRAWS AN ENTIRELY PLAUSIBLE
+     PICTURE — a plain inversion, a mis-normalised hue and a level applied in
+     the wrong space all produce a black-on-white flower nobody would question.
+     So the transfer is driven here, over the arithmetic itself. */
+  log('\n  polarity');
+
+  // THE SCREEN ARM IS THE SHIPPED EXPRESSION, UNCHANGED. `setScalar(brightness)`
+  // is what /plot draws with, so this is the claim that the picture already
+  // approved did not move — and it is an identity, at every position of the
+  // control, not a comparison against a remembered number.
+  let screenMoved = 0;
+  for (let v = 5; v <= 100; v++) {
+    const L = v / 100, rgb = PL.inkRGB('screen', L);
+    if (!(rgb[0] === L && rgb[1] === L && rgb[2] === L)) screenMoved++;
+  }
+  check('polarity/the-screen-arm-is-the-shipped-expression-unchanged',
+    screenMoved === 0,
+    `inkRGB('screen', L) === [L,L,L] exactly at all 96 positions of the control`);
+
+  /* ONE LINE LANDS AT THE SAME INK IN BOTH REGIMES. The whole reason this page
+     needs no second set of defaults: the two framebuffer values a single
+     fully-covered line produces sum to 255. An identity on the values this
+     module computes — the GPU's own encode uses pow(x, 0.41666) against 1/2.4
+     here, so the PIXEL figure is reported in part two and asserted nowhere. */
+  const sums = [], pairs = [];
+  for (let v = 5; v <= 100; v++) {
+    const L = v / 100;
+    const a = Math.round(PL.singleLinePixel('screen', L) * 255);
+    const b = Math.round(PL.singleLinePixel('print', L) * 255);
+    sums.push(a + b);
+    if ([5, 15, 30, 55, 80, 100].includes(v)) pairs.push(`${v}%:${a}/${b}`);
+  }
+  check('polarity/one-line-lands-at-the-same-ink-in-both-polarities',
+    sums.every(x => x === 255),
+    `screen px + print px === 255 at all 96 positions — ${pairs.join(' ')}`);
+
+  /* AND THAT IS NOT WHAT A PLAIN INVERSION GIVES, which is the mutation this
+     check exists to separate itself from: inverting the LEVEL rather than the
+     transmittance puts a single line 43 of 255 off at the shipped setting. */
+  const naive = Math.round(srgb(1 - 0.30) * 255);
+  const real = Math.round(PL.singleLinePixel('print', 0.30) * 255);
+  check('polarity/the-transfer-is-not-a-plain-inversion-of-the-level',
+    real === 106 && naive !== real && Math.abs(naive - real) > 20,
+    `the transmittance whose sRGB encoding is 1 - sRGB(level) is ${real}; `
+    + `inverting the level itself gives ${naive}, ${Math.abs(naive - real)} off`);
+
+  /* THE CROSSINGS ARE WHERE THE TWO REGIMES GENUINELY DIFFER, and the
+     difference is irreducible: additive CLIPS at the top of the byte and
+     multiply approaches the ground without reaching it. Reported by the panel
+     rather than tuned away, and asserted here so "they are equivalent" cannot
+     quietly become true. */
+  const scrLadder = [1, 2, 3, 4, 6].map(n => PL.crossingInk('screen', 0.30, n));
+  const prLadder = [1, 2, 3, 4, 6].map(n => PL.crossingInk('print', 0.30, n));
+  check('polarity/the-crossings-are-the-part-that-does-not-carry-across',
+    scrLadder[0] === prLadder[0]
+    && scrLadder[1] === 255 && scrLadder[2] === 255
+    && prLadder[1] < 255 && prLadder[2] < 255 && prLadder[2] > prLadder[1],
+    `at 1,2,3,4,6 lines screen reaches ${scrLadder.join(' ')} and print `
+    + `${prLadder.join(' ')} — the same single line, then additive clips at two `
+    + `where multiply still has range`);
+
+  /* THE HIGHLIGHT IS A HUE AND NEVER A LEVEL, in both regimes and in the space
+     each one's invariant is stated in: the brightest CHANNEL on screen, the
+     strongest ABSORPTION in print. Either way its peak is the drawing's own,
+     so selecting a petal cannot make it read nearer or further than it is. */
+  const teal = [0.1568, 0.4620, 0.4046];       // 0x6fb7ae, linear
+  const hs = PL.hueRGB('screen', teal, 0.30);
+  const hp = PL.hueRGB('print', teal, 0.30);
+  const peakScreen = Math.max(...hs);
+  const absorbPrint = Math.max(...hp.map(c => 1 - PL.srgbEncode(c)));
+  const inkAbsorb = 1 - PL.srgbEncode(PL.inkRGB('print', 0.30)[0]);
+  check('polarity/the-highlight-is-a-hue-and-not-a-level-in-both',
+    Math.abs(peakScreen - 0.30) < 1e-12
+    && Math.abs(absorbPrint - inkAbsorb) < 1e-12
+    // and it is still TEAL in print — green and blue let more through than red
+    && hp[1] > hp[0] && hp[2] > hp[0],
+    `screen peak channel ${peakScreen.toFixed(6)} = the level; print strongest `
+    + `absorption ${absorbPrint.toFixed(6)} = a black line's ${inkAbsorb.toFixed(6)}; `
+    + `print rgb ${hp.map(c => c.toFixed(3)).join(',')} still reads teal`);
+
+  check('polarity/the-ground-and-the-fog-are-one-field',
+    PL.POLARITY.screen.ground === 0x000000 && PL.POLARITY.print.ground === 0xffffff
+    && PL.POLARITY.screen.blend === 'additive' && PL.POLARITY.print.blend === 'multiply'
+    && PL.POLARITY.print.groundIsWhite === true,
+    'one `ground` per polarity, read by the clear colour and by the fog — there is '
+    + 'no second place to get "what a line fades into" wrong');
+
+  // --- the exports, on polylines whose answer can be written down ----------
+  log('\n  export');
+
+  /* ONE PATH PER STRIP IS THE WHOLE PLOT TIME, and it is the kind of thing that
+     is invisible until someone has waited three hours at a plotter: 55,188
+     segments emitted one path each is fifty-five thousand pen lifts. */
+  const rectMm = { x: 10, y: 20, width: 100, height: 150 };
+  const whole = EX.stripToPaths([10, 20, 60, 20, 110, 170], null, rectMm, 2);
+  check('export/a-whole-strip-is-exactly-one-path',
+    whole.length === 1 && whole[0].length === 6
+    && EX.pathData(whole[0]) === 'M0 0L100 0L200 300',
+    `three points -> ${whole.length} path with ${whole[0].length / 2} points: `
+    + `${EX.pathData(whole[0])}`);
+
+  /* A STRIP IS SPLIT ONLY WHERE THE PROJECTION HAD NOTHING TO SAY, and a run of
+     ONE point is not a path — `M x y` with nothing after it is a pen-down and no
+     stroke, which some plotter software puts down as a dot. */
+  const splitRun = EX.stripToPaths([0, 0, 10, 0, 20, 0, 30, 0, 40, 0],
+                                   [1, 1, 0, 1, 1], { x: 0, y: 0 }, 1);
+  const lone = EX.stripToPaths([0, 0, 10, 0, 20, 0], [1, 0, 1], { x: 0, y: 0 }, 1);
+  check('export/a-strip-splits-only-at-a-gap-and-a-lone-point-is-not-a-path',
+    splitRun.length === 2 && splitRun[0].length === 4 && splitRun[1].length === 4
+    && lone.length === 0,
+    `a five-point strip with one unplaceable point -> ${splitRun.length} paths of 2 points; `
+    + `a strip whose only runs are single points -> ${lone.length} paths`);
+
+  /* REAL MILLIMETRES. The picture plane's scale is a closed form in the camera,
+     so it is checked against one — not against a number this file remembers. */
+  const mmpp = EX.mmPerPixel(38, 343, 800);
+  const byHand = 2 * Math.tan(38 * Math.PI / 360) * 343 / 800;
+  check('export/millimetres-per-pixel-is-the-camera-in-closed-form',
+    Math.abs(mmpp - byHand) < 1e-15 && Math.abs(mmpp - 0.2952611) < 1e-6
+    // and it scales the way a projection does: twice the standoff, twice the mm
+    && Math.abs(EX.mmPerPixel(38, 686, 800) - 2 * mmpp) < 1e-12,
+    `2·tan(fov/2)·d/H = ${mmpp.toFixed(6)} mm/px at fov 38, d 343, H 800`);
+
+  const svgR = EX.svgDocument({ paths: [[0, 0, 10, 10]], widthMm: 100, heightMm: 150,
+    shape: 'rect', strokeMm: 0.36, ink: 0x000000, ground: 0xffffff, drawGround: false });
+  const svgE = EX.svgDocument({ paths: [[0, 0, 10, 10]], widthMm: 100, heightMm: 150,
+    shape: 'ellipse', strokeMm: 0.36, ink: 0xffffff, ground: 0x000000, drawGround: true });
+
+  check('export/the-svg-is-dimensioned-in-real-units-at-one-unit-per-mm',
+    svgR.includes('width="100mm"') && svgR.includes('height="150mm"')
+    && svgR.includes('viewBox="0 0 100 150"') && svgR.includes('stroke-width="0.36"'),
+    'width/height carry the unit and the viewBox carries the same numbers, so one '
+    + 'user unit is one millimetre and a stroke width is a real width');
+
+  check('export/the-boundary-is-a-real-clip-of-the-boundary-own-shape',
+    svgE.includes('<clipPath id="plot-frame"><ellipse cx="50" cy="75" rx="50" ry="75"/>')
+    && svgR.includes('<clipPath id="plot-frame"><rect x="0" y="0" width="100" height="150"/>')
+    && svgE.includes('clip-path="url(#plot-frame)"') && svgR.includes('clip-path="url(#plot-frame)"'),
+    'an ellipse frame clips to an ellipse inscribed in the very same box, and the '
+    + 'rectangle clips too rather than leaning on the viewport overflow');
+
+  /* AND THE GROUND IS INSIDE THAT CLIP. Outside it a screen-polarity ellipse
+     comes out as a full black RECTANGLE with an ellipse of white lines floating
+     in it — which is neither the boundary the page drew nor what the raster's
+     own elliptical alpha produces. Found by rendering one, not by reading it. */
+  const gi = svgE.indexOf('clip-path="url(#plot-frame)"');
+  const ri = svgE.indexOf('<rect x="0" y="0" width="100" height="150" fill="#000000"/>');
+  check('export/the-ground-is-inside-the-clip-with-the-ink',
+    gi > 0 && ri > gi && !svgR.includes('fill="#000000"') && !svgR.includes('fill="#ffffff"'),
+    'the screen ground is a rect INSIDE the clipped group; print draws no ground at '
+    + 'all, because on white paper the absence of ink is the ground');
+
+  /* ALPHA OUTSIDE THE ELLIPSE, AND ONLY THERE. Driven over a grid small enough
+     to write the answer down: on a 4x4, the four corner pixels fall outside an
+     inscribed ellipse and the twelve others do not. */
+  const rgba = new Uint8ClampedArray(4 * 4 * 4).fill(255);
+  const cleared = EX.punchEllipse(rgba, 4, 4);
+  const alphaGrid = [];
+  for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) alphaGrid.push(rgba[(y * 4 + x) * 4 + 3]);
+  check('export/alpha-is-punched-outside-the-ellipse-and-nowhere-else',
+    cleared === 4 && alphaGrid.filter(a => a === 0).length === 4
+    && alphaGrid[0] === 0 && alphaGrid[3] === 0 && alphaGrid[12] === 0 && alphaGrid[15] === 0
+    && EX.punchEllipse(new Uint8ClampedArray(16 * 4).fill(255), 4, 4) === 4,
+    `${cleared} of 16 pixels cleared on a 4x4, and they are the four corners — `
+    + 'alpha is the recoverable way round: a ground fill cannot be taken back off');
+
+  check('export/the-file-name-says-what-the-artefact-is',
+    EX.exportName('bloom-grid-live.glb', 'print', 'ellipse', 'svg')
+      === 'bloom-grid-live-print-ellipse.svg'
+    && EX.exportName('', 'screen', 'rect', 'png') === 'plot-screen-rect.png',
+    'two exports of one composition at two polarities are the pair anyone reviewing '
+    + 'this will be holding side by side, so the name carries both');
+
   // =========================================================================
   // PART TWO — the page.
   log('\n--- part two: the page, measured on the rendered framebuffer ---');
@@ -2004,9 +2393,14 @@ async function run({ mutant = null } = {}) {
      `readPixels` reads — so every ink figure above the frame section would
      carry the boundary's own pixels inside it. Off here; the frame section
      turns it on. */
+  /* AND AT THE SCREEN POLARITY, for the fourth time and the same reason. The
+     page ships white ink on black, every ink figure below was measured in that
+     regime, and `readPixels`'s own `ink` counts pixels ABOVE a black ground —
+     a number that means nothing on white paper. The polarity section turns it
+     over and checks the two against each other. */
   const DEFAULTS = { frame: 'off', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
                      families: 'both', uDensity: 12, vDensity: 12, weight: 1.1,
-                     brightness: 30, depthDim: 55, stem: 'off',
+                     polarity: 'screen', brightness: 30, depthDim: 55, stem: 'off',
                      stemBundle: 0.35, stemJoin: 12, stemLength: 170,
                      stemDroop: 0, stemNeck: 45, stemHandles: true,
                      petalPick: -1, petalAlong: 1, petalAcross: 1, petalHandles: true };
@@ -2218,8 +2612,13 @@ async function run({ mutant = null } = {}) {
   check('dim/zero-is-off-and-the-read-out-says-so',
     fogOff === null && textOff.includes('depth dim off')
     && fogOn !== null && textOn.includes('depth dim 55%')
-    && textOn.includes('45% of its brightness'),
-    'null and "off" at 0; a fog and "the farthest line draws at 45%" at 55');
+    // "ink" and not "brightness": the same fade is an amount of light on black
+    // and an amount of ink on white, and the line NAMES the ground it fades
+    // into — which the polarity section below checks turns over with it.
+    && textOn.includes('45% of its ink')
+    && textOn.includes('fading into the black'),
+    'null and "off" at 0; a fog and "the farthest line draws at 45% of its ink, '
+    + 'fading into the black" at 55');
 
   const dimRows = [];
   for (const d of [30, 60, 90]) {
@@ -3646,6 +4045,378 @@ async function run({ mutant = null } = {}) {
   await reset();
 
   // =========================================================================
+  /* POLARITY, ON THE PAGE. The one thing a colour swap would satisfy and this
+     must not is the BLEND: inverting the colours alone gives a white rectangle,
+     because additive ink on a white ground saturates on the first line. So the
+     blend constant and the ground are asked SEPARATELY, and the crossing
+     behaviour is measured on the framebuffer rather than inferred from either. */
+  log('\n--- polarity ---');
+
+  await reset({ depthDim: 0 });
+  await view(VIEW);
+  const polScreen = await q(() => window.__plot.polarityInfo());
+  const pxScreen = await px();
+  await set({ polarity: 'print' });
+  const polPrint = await q(() => window.__plot.polarityInfo());
+  const pxPrint = await px();
+
+  check('polarity/print-changes-the-blend-mode-and-not-only-the-colours',
+    polScreen.blendName === 'additive' && polPrint.blendName === 'multiply'
+    && polScreen.blending !== polPrint.blending
+    && polScreen.clearColor === 0x000000 && polPrint.clearColor === 0xffffff,
+    `blending ${polScreen.blending} -> ${polPrint.blending} (additive -> multiply) and the `
+    + `ground 0x000000 -> 0xffffff — a mutation that flips only the colours leaves the `
+    + `first pair equal`);
+
+  /* THE TWO REGIMES AGREE EXACTLY ON WHERE THERE IS INK, AND THEY CANNOT AGREE
+     ON HOW MUCH — and asserting both is what this check did on its first run.
+     "Is there ink at this pixel" is the same question either way, because the
+     two framebuffer values sum to 255 at every coverage and no amount of
+     accumulation moves a pixel back toward its own ground: an IDENTITY, over
+     two counts of the same drawing at one camera, so the renderer's own noise
+     cannot reach it.
+     "Is this pixel saturated" is the other half and is precisely where the
+     regimes differ — additive clips flat against white where multiply
+     approaches black without arriving — so it is REPORTED here and asserted by
+     `additive-clips-where-multiply-does-not` below, as an asymmetry rather than
+     as an equality that happens to be nearly true.
+
+     WHAT THIS CHECK IS BLIND TO, MEASURED RATHER THAN GUESSED: the ink LEVEL.
+     MSAA quantises coverage to a handful of steps, so both thresholds sit in
+     empty regions of the histogram — on this drawing the screen has exactly ONE
+     populated bin between 1 and 39 (bin 38, 9,452 px) and print's mirror at 218
+     holds the same 9,452. Any monotone transfer therefore inks the same
+     PIXELS, and `the-print-transfer-is-a-plain-inversion` stays green here; the
+     negative control is what said so, after that mutant claimed this check. The
+     level is a law, it is asserted in part one, and part one reddens. Do not
+     re-add the claim without first making this check able to see it. */
+  check('polarity/the-two-regimes-agree-exactly-on-where-there-is-ink',
+    pxScreen.ink === pxPrint.dark && pxScreen.ink > 10000,
+    `screen ink ${pxScreen.ink} === print dark ${pxPrint.dark} exactly — the same lines, `
+    + `the same coverage, read from opposite grounds. Where they part is saturation: `
+    + `${pxScreen.dark} unsaturated on screen against ${pxPrint.ink} in print, a `
+    + `${Math.abs(pxScreen.dark - pxPrint.ink)} px gap that is the clipping`);
+
+  /* AND WHERE THEY ARE NOT COMPLEMENTS IS THE CROSSINGS, measured: additive
+     CLIPS a great many pixels flat against white where multiply reaches the
+     ground on almost none. Reported with the numbers, because "the two look
+     equivalent" is exactly the claim this session was asked to test. */
+  check('polarity/additive-clips-where-multiply-does-not',
+    pxScreen.hist[255] > 20 * pxPrint.hist[0],
+    `${pxScreen.hist[255]} pixels are clipped flat white on screen against `
+    + `${pxPrint.hist[0]} driven to pure black in print — the same drawing, and the `
+    + `asymmetry the panel prints rather than tunes away`);
+
+  /* THE DEPTH DIM FADES INTO THE GROUND IT IS ON. A black fog under multiply
+     would drive far lines toward dst*0 — the most distant lines would be the
+     HEAVIEST thing on the page — and no blend-mode check can see that. */
+  await set({ ...DEFAULTS, polarity: 'screen', depthDim: 55 });
+  const fogScreen = await fogNow();
+  const dimTextScreen = await drawTextNow();
+  await set({ polarity: 'print' });
+  const fogPrint = await fogNow();
+  const dimTextPrint = await drawTextNow();
+  check('polarity/the-depth-dim-fades-into-the-ground-it-is-on',
+    fogScreen && fogPrint && fogScreen.color === 0x000000 && fogPrint.color === 0xffffff
+    && dimTextScreen.includes('fading into the black')
+    && dimTextPrint.includes('fading into the white'),
+    // THE DETAIL MUST NOT ASSUME ITS OWN PREMISE. `the-depth-dim-is-never-applied`
+    // removes the fog outright, so both of these are NULL under exactly the
+    // mutation this check exists to be red for -- and a `.color` read here threw
+    // and took the whole sweep down instead. Report the absence.
+    `fog ${fogScreen ? '0x' + fogScreen.color.toString(16) : 'ABSENT'} on black and `
+    + `${fogPrint ? '0x' + fogPrint.color.toString(16) : 'ABSENT'} on white, and the `
+    + `read-out names the ground in both`);
+
+  check('polarity/the-level-control-is-renamed-and-not-re-identified',
+    polScreen.levelWord === 'brightness' && polPrint.levelWord === 'darkness'
+    && polScreen.brightnessLabel === 'brightness' && polPrint.brightnessLabel === 'darkness'
+    && (await q(() => window.__plot.pageControls().some(c => c.id === 'brightness'))),
+    'the word on the label follows the polarity because the same number is light on '
+    + 'black and ink on white; the control ID does not, because that is what every '
+    + 'saved composition names');
+
+  /* THE TWO DEFAULTS DIFFER, AND THE LEVEL FOLLOWS THE POLARITY. Ruled Sep 10:
+     screen keeps 30% (the glow Eva approved) and print is tuned on its own
+     artefact at 16%. Asserted as a DIFFERENCE rather than as two literals the
+     gate restates — a check that hard-codes both numbers goes red on a retune
+     that is Eva's to make, where the property that must not be lost is that
+     they are independent and that a switch takes the new one. */
+  await reset({ polarity: 'screen' });
+  const dfScreen = await q(() => window.__plot.polarityInfo());
+  await set({ polarity: 'print' });
+  const dfPrint = await q(() => window.__plot.polarityInfo());
+  check('polarity/each-polarity-carries-its-own-level-default',
+    dfScreen.levelDefault !== dfPrint.levelDefault
+    && Math.abs(dfScreen.level - dfScreen.levelDefault) < 1e-9
+    && Math.abs(dfPrint.level - dfPrint.levelDefault) < 1e-9,
+    `screen defaults to ${(dfScreen.levelDefault * 100).toFixed(0)}% and print to `
+    + `${(dfPrint.levelDefault * 100).toFixed(0)}%, and switching polarity takes the `
+    + 'new one rather than carrying the old number across — additive saturates at '
+    + 'white where multiply approaches black asymptotically, so the two are not '
+    + 'the same quantity');
+
+  /* AND A RE-SELECTION OF THE POLARITY ALREADY SHOWING MUST NOT STOMP A
+     HAND-TUNED LEVEL — the difference between "the polarity changed" and "an
+     input event fired", which a whole-control-set write makes reachable. */
+  await set({ brightness: 44 });
+  await set({ polarity: 'print' });
+  const held = await q(() => window.__plot.polarityInfo());
+  check('polarity/re-selecting-the-polarity-already-shown-leaves-the-level-alone',
+    Math.abs(held.level - 0.44) < 1e-9,
+    `a hand-tuned 44% survives an input event that re-selects the polarity already `
+    + `on screen (read back ${(held.level * 100).toFixed(0)}%)`);
+
+  /* AND A RESTORE NEVER MOVES THE RESTORED LEVEL. `applyFields` writes `.value`
+     and dispatches nothing, which is what keeps the composition's field-by-field
+     comparison honest — if the polarity write ever started firing the handler,
+     every saved print composition would come back at the default instead of at
+     the level it was saved with, and the round-trip check would still pass
+     because it compares the page against the file it just wrote. */
+  await reset({ polarity: 'screen', brightness: 30 });
+  const polRestored = await q(() => {
+    const doc = JSON.parse(window.__plot.compositionText());
+    doc.draw.polarity = 'print';
+    // The file stores a control's own value VERBATIM, and this slider is an int
+    // in percent — 0.41 here would be 0.41%, which is the format's own rule
+    // catching a check that ignored it.
+    doc.draw.brightness = 41;
+    window.__plot.loadComposition(JSON.stringify(doc), 'level-follows.json');
+    return window.__plot.polarityInfo();
+  });
+  check('restore/a-restored-level-is-not-replaced-by-the-polarity-default',
+    polRestored.id === 'print' && Math.abs(polRestored.level - 0.41) < 1e-9
+    && polRestored.shown === 'print',
+    `a composition saved in print at 41% comes back at 41%, not at print's own `
+    + `default of ${(dfPrint.levelDefault * 100).toFixed(0)}% (read back `
+    + `${(polRestored.level * 100).toFixed(0)}%, renderer showing ${polRestored.shown})`);
+
+  // =========================================================================
+  /* THE EXPORTS. Both through the very functions the two buttons call. */
+  log('\n--- export ---');
+
+  await reset({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
+                stem: 'on', polarity: 'screen' });
+  await view(VIEW);
+  const rasterScreen = await q(() => window.__plot.exportRaster({ scale: 2 }));
+  const boxNow = await q(() => window.__plot.exportBox());
+
+  check('export/the-raster-is-not-empty-and-matches-the-frame-aspect',
+    rasterScreen.stats.ink > 5000
+    && Math.abs(rasterScreen.aspect - 2 / 3) < 0.002
+    && rasterScreen.width === Math.round(boxNow.width * rasterScreen.scale)
+    && rasterScreen.height === Math.round(boxNow.height * rasterScreen.scale),
+    `${rasterScreen.width} x ${rasterScreen.height} px at ${rasterScreen.scale}x, aspect `
+    + `${rasterScreen.aspect.toFixed(5)} against the boundary's 0.66667, carrying `
+    + `${rasterScreen.stats.ink} px of ink`);
+
+  /* AN EXPORT DRAWS THE INK AND NONE OF THE CHROME, and the witness is that it
+     is GREY. Both polarities' ink and ground are neutral, so every pixel of a
+     correct export has r === g === b exactly — where the frame's teal
+     (0x6fb7ae), the stem handles' teal and the petal handles' amber (0xd6a15c)
+     are neutral in no channel. One identity catches a leaked boundary, a leaked
+     handle and a leaked selection highlight, and it needs no tolerance.
+     RUN WITH ALL THREE ON SCREEN, or it is a test of an empty room. */
+  await reset({ frame: 'on', stem: 'on', stemHandles: true, petalHandles: true,
+                petalPick: 11, polarity: 'screen' });
+  await view(VIEW);
+  const chromeOn = await q(() => ({
+    frame: window.__plot.frameDrawn(),
+    sel: window.__plot.selectionColor().drawn,
+    handles: window.__plot.handleScreenPos ? 1 : 1,
+  }));
+  const rasterChrome = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  await set({ polarity: 'print' });
+  const rasterChromePrint = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  check('export/the-raster-carries-the-ink-and-none-of-the-chrome',
+    chromeOn.frame === true && chromeOn.sel === true
+    && rasterChrome.stats.notGrey === 0 && rasterChromePrint.stats.notGrey === 0
+    && rasterChrome.stats.ink > 1000,
+    `with the boundary drawn, a petal selected and both handle sets shown, `
+    + `${rasterChrome.stats.notGrey} of ${rasterChrome.stats.pixels} exported pixels are `
+    + `non-neutral on screen and ${rasterChromePrint.stats.notGrey} in print — the accent `
+    + `is 0x6fb7ae and the petal handles 0xd6a15c, neither of them grey`);
+
+  /* THE STROKES SCALE WITH THE IMAGE, and nothing above can see it if they do
+     not. `linewidth` is divided by `resolution.y` in the shader, so an export
+     that enlarges the buffer without enlarging the widths is the same picture
+     drawn in hairlines — right aspect, right crop, non-zero ink, still grey.
+     Measured as an ink FRACTION so the two scales are comparable at all: with
+     the widths scaled it holds; without, the 2x image carries about half. */
+  const rs1 = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  const rs2 = await q(() => window.__plot.exportRaster({ scale: 2 }));
+  /* MASS PER PIXEL, NOT THE INK COUNT, and the first version of this check used
+     the count and MISSED its own mutant — measured, ratio 0.871 against a clean
+     0.956 where a halved stroke should read 0.5. A pixel count asks "does any
+     ink reach here", which a hairline satisfies almost as well as a full
+     stroke: it marks nearly the same pixels, just lighter. Total distance from
+     the ground is what scales with the width. Same shape of error as the MSAA
+     one in `the-two-regimes-agree-exactly-on-where-there-is-ink` — a threshold
+     over coverage cannot see an AMOUNT. */
+  const mass1 = rs1.stats.mass / rs1.stats.pixels, mass2 = rs2.stats.mass / rs2.stats.pixels;
+  const frac1 = rs1.stats.ink / rs1.stats.pixels, frac2 = rs2.stats.ink / rs2.stats.pixels;
+  check('export/the-strokes-scale-with-the-image',
+    mass1 > 1 && Math.abs(mass2 / mass1 - 1) < 0.15,
+    `ink mass per pixel ${mass1.toFixed(2)} at 1x and ${mass2.toFixed(2)} at 2x, a ratio of `
+    + `${(mass2 / mass1).toFixed(3)} — unscaled widths halve it. (The pixel COUNT, which `
+    + `cannot see this, moves only ${(frac1 * 100).toFixed(2)}% -> ${(frac2 * 100).toFixed(2)}%.)`);
+
+  /* THE ELLIPSE'S CORNERS ARE TRANSPARENT AND THE RECTANGLE'S ARE NOT. Alpha
+     rather than a ground fill, because alpha is the recoverable way round. */
+  await set({ frameShape: 'ellipse' });
+  const rasterEllipse = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  await set({ frameShape: 'rect' });
+  const rasterRect = await q(() => window.__plot.exportRaster({ scale: 1 }));
+  const areaRatio = rasterEllipse.stats.opaque / rasterEllipse.stats.pixels;
+  check('export/the-ellipse-raster-is-transparent-outside-the-boundary',
+    rasterEllipse.stats.cornerAlpha.every(a => a === 0)
+    && rasterRect.stats.cornerAlpha.every(a => a === 255)
+    && rasterRect.cleared === 0
+    && Math.abs(areaRatio - Math.PI / 4) < 0.01,
+    `all four ellipse corners read alpha 0 and all four rectangle corners 255; `
+    + `${(areaRatio * 100).toFixed(1)}% of the ellipse image is opaque against `
+    + `pi/4 = ${(100 * Math.PI / 4).toFixed(1)}%`);
+
+  /* ONE PATH PER LINE STRIP. Fifty-five thousand segments emitted one path each
+     is fifty-five thousand pen lifts, which is the difference between a plot
+     that finishes and one that does not. Compared against the page's OWN count
+     of what is drawn, set by set, so a second bloom instance would be counted
+     rather than missed. */
+  await reset({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
+                stem: 'on', polarity: 'print' });
+  await view(VIEW);
+  const sets = await q(() => window.__plot.drawnLineSetCounts());
+  /* READ OFF THE EMITTED TEXT, NOT OFF WHAT THE PAGE SAYS ABOUT IT. A document
+     dimensioned in screen pixels beside a report that still says millimetres is
+     exactly the silent half of that mutation, and a check that asked the report
+     would pass it. */
+  const svg = await q(() => { const r = window.__plot.exportSvg();
+    const attr = n => { const m = new RegExp(`\\s${n}="([^"]+)"`).exec(r.text); return m ? m[1] : null; };
+    return { ...r, text: undefined, bytes: r.text.length,
+             docWidth: attr('width'), docHeight: attr('height'),
+             docViewBox: attr('viewBox'), docStroke: attr('stroke-width'),
+             pathTags: (r.text.match(/<path /g) || []).length,
+             moveTos: (r.text.match(/M-?[\d.]/g) || []).length,
+             lineTos: (r.text.match(/L-?[\d.]/g) || []).length }; });
+  const wantStrips = sets.reduce((a, x) => a + x.strips, 0);
+  check('export/the-svg-emits-one-path-per-strip-and-not-one-per-segment',
+    svg.paths === wantStrips && svg.pathTags === wantStrips && svg.dropped === 0
+    && svg.moveTos === wantStrips && svg.lineTos === svg.points - wantStrips
+    && svg.lineTos > 20 * wantStrips,
+    `${sets.map(x => `${x.id} ${x.strips}`).join(' + ')} = ${wantStrips} strips -> `
+    + `${svg.pathTags} <path> tags, ${svg.moveTos} pen-downs and ${svg.lineTos} draws over `
+    + `${svg.points} points — per segment it would be ${svg.lineTos} pen-downs`);
+
+  const docW = parseFloat(svg.docWidth), docH = parseFloat(svg.docHeight);
+  const wantW = boxNow.width * svg.mmPerPx, wantH = boxNow.height * svg.mmPerPx;
+  check('export/the-svg-carries-real-millimetres-from-the-grid-own-units',
+    svg.unit === 'mm'
+    // the DOCUMENT's own attributes, in the grid's own unit, agreeing with the
+    // viewBox so one user unit is one millimetre
+    && svg.docWidth.endsWith('mm') && svg.docHeight.endsWith('mm')
+    && Math.abs(docW - wantW) < 0.01 && Math.abs(docH - wantH) < 0.01
+    && svg.docViewBox === `0 0 ${docW} ${docH}`
+    && Math.abs(docH / docW - 3 / 2) < 0.002 && docW > 50 && docW < 500
+    // and the stroke is the weight CONVERTED, not the weight carried across
+    && Math.abs(parseFloat(svg.docStroke)
+                - 1.1 / (await q(() => window.devicePixelRatio || 1)) * svg.mmPerPx) < 1e-4,
+    `the file says width="${svg.docWidth}" height="${svg.docHeight}" viewBox="${svg.docViewBox}" `
+    + `stroke-width="${svg.docStroke}" — ${svg.mmPerPx.toFixed(5)} mm/px at the target plane, `
+    + `and a weight of 1.1 px converted rather than relabelled`);
+
+  /* AND THE CLIP ACTUALLY CLIPS, which is a claim about a RENDERED SVG and not
+     about its text. Measured with the camera pushed IN so ink genuinely reaches
+     the corners: at the home framing the drawing does not fill the box and an
+     ellipse and a rectangle render identically, which would be a clip test that
+     passes with no clip at all. */
+  await reset({ frame: 'on', frameShape: 'ellipse', frameRatio: '1:1', frameMargin: 0,
+                stem: 'on', polarity: 'screen' });
+  await view(VIEW, 0.42);
+  const svgEllipseText = await q(() => window.__plot.exportSvg().text);
+  await set({ frameShape: 'rect' });
+  const svgRectText = await q(() => window.__plot.exportSvg().text);
+  const renderSvg = text => page.evaluate(async t => {
+    const url = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(t)));
+    const img = new Image();
+    await new Promise((res, rej) => {
+      img.onload = res; img.onerror = () => rej(new Error('the SVG did not render')); img.src = url;
+    });
+    const cv = document.createElement('canvas');
+    cv.width = 400; cv.height = 400;
+    const g = cv.getContext('2d');
+    // Magenta shows through wherever the SVG put nothing at all.
+    g.fillStyle = '#ff00ff'; g.fillRect(0, 0, 400, 400);
+    g.drawImage(img, 0, 0, 400, 400);
+    const d = g.getImageData(0, 0, 400, 400).data;
+    let empty = 0, cornerPix = 0, cornerEmpty = 0;
+    for (let y = 0; y < 400; y++) for (let x = 0; x < 400; x++) {
+      const i = (y * 400 + x) * 4;
+      const mag = d[i] === 255 && d[i + 1] === 0 && d[i + 2] === 255;
+      if (mag) empty++;
+      if ((x < 40 || x > 359) && (y < 40 || y > 359)) { cornerPix++; if (mag) cornerEmpty++; }
+    }
+    return { empty, cornerPix, cornerEmpty, w: img.naturalWidth, h: img.naturalHeight };
+  }, text);
+  const renEllipse = await renderSvg(svgEllipseText);
+  const renRect = await renderSvg(svgRectText);
+  check('export/the-ellipse-svg-renders-and-actually-clips',
+    renEllipse.w > 0 && renRect.w > 0
+    && renEllipse.cornerEmpty === renEllipse.cornerPix
+    && renRect.cornerEmpty === 0
+    && Math.abs(renEllipse.empty / 160000 - (1 - Math.PI / 4)) < 0.01,
+    `rendered at ${renEllipse.w}px: the ellipse leaves all ${renEllipse.cornerPix} corner `
+    + `pixels empty and the rectangle none of them, and ${(100 * renEllipse.empty / 160000).toFixed(1)}% `
+    + `of the ellipse image is outside the boundary against 1 - pi/4 = 21.5%`);
+
+  /* AND IT LANDS WHERE THE DRAWING DOES. A projection that flipped y or lost
+     the boundary's origin emits exactly the right number of paths, at exactly
+     the right physical size, inside exactly the right clip — and draws the
+     bloom upside down or off the page. So the emitted coordinates are mapped
+     back into the page's own CSS-pixel space and compared against
+     `drawnScreenBox()`, which walks the SAME population (the drawn grid strips
+     and the stem's continuations) through the same camera. */
+  await reset({ frame: 'on', frameShape: 'rect', frameRatio: '2:3', frameMargin: 6,
+                stem: 'on', polarity: 'print' });
+  await view(VIEW);
+  const svgBox = await q(() => {
+    const r = window.__plot.exportSvg();
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    const re = /[ML](-?[\d.]+) (-?[\d.]+)/g;
+    let m;
+    while ((m = re.exec(r.text))) {
+      const x = +m[1], y = +m[2];
+      if (x < x0) x0 = x; if (x > x1) x1 = x;
+      if (y < y0) y0 = y; if (y > y1) y1 = y;
+    }
+    return { x0, y0, x1, y1, mmPerPx: r.mmPerPx };
+  });
+  const svgCropBox = await q(() => window.__plot.exportBox());
+  const onScreen = await q(() => window.__plot.drawnScreenBox());
+  const backX0 = svgBox.x0 / svgBox.mmPerPx + svgCropBox.x;
+  const backY0 = svgBox.y0 / svgBox.mmPerPx + svgCropBox.y;
+  const backX1 = svgBox.x1 / svgBox.mmPerPx + svgCropBox.x;
+  const backY1 = svgBox.y1 / svgBox.mmPerPx + svgCropBox.y;
+  const off = Math.max(Math.abs(backX0 - onScreen.x), Math.abs(backY0 - onScreen.y),
+                       Math.abs(backX1 - (onScreen.x + onScreen.width)),
+                       Math.abs(backY1 - (onScreen.y + onScreen.height)));
+  check('export/the-svg-lands-where-the-drawing-lands-on-screen',
+    off < 0.05 && onScreen.width > 100,
+    `the emitted paths map back to (${backX0.toFixed(2)}, ${backY0.toFixed(2)})..`
+    + `(${backX1.toFixed(2)}, ${backY1.toFixed(2)}) against the drawing's own screen box `
+    + `(${onScreen.x.toFixed(2)}, ${onScreen.y.toFixed(2)})..`
+    + `(${(onScreen.x + onScreen.width).toFixed(2)}, ${(onScreen.y + onScreen.height).toFixed(2)}) `
+    + `— ${off.toExponential(2)} px apart, which a flipped y or a lost origin could not be`);
+
+  check('export/the-panel-says-what-the-two-artefacts-are',
+    (await q(() => window.__plot.exportInfoText())).includes('flat strokes, no glow')
+    && (await q(() => window.__plot.exportInfoText())).includes('one path each')
+    && (await q(() => window.__plot.exportInfoText())).includes('mm'),
+    'the SVG is an honestly different artefact and the panel says so, rather than '
+    + 'letting anyone expect the screen image out of a plotter');
+
+  await reset();
+
+  // =========================================================================
   // THE COMPOSITION FILE, ON THE PAGE. Every claim here is about the ROUND
   // TRIP, field by field, because a restore that quietly drops one looks
   // exactly like a restore that did not — the page is plausible either way.
@@ -3785,7 +4556,8 @@ async function run({ mutant = null } = {}) {
      the bend counts changed, the camera moved. */
   await petalOn({ petalPick: 13, petalAlong: 1.3, petalAcross: 1.7 });
   await set({ frame: 'off', frameShape: 'rect', frameRatio: '16:9', frameMargin: 3,
-              families: 'v', uDensity: 12, vDensity: 3, weight: 0.6, brightness: 15,
+              families: 'v', uDensity: 12, vDensity: 3, weight: 0.6,
+              polarity: 'print', brightness: 15,
               depthDim: 90, stem: 'off', stemBundle: 0.1, stemJoin: 60, stemLength: 90,
               stemDroop: -60, stemNeck: 15, stemHandles: false, petalHandles: true });
   await q(() => { document.getElementById('bendRemove').click();
@@ -3813,6 +4585,22 @@ async function run({ mutant = null } = {}) {
     && (await q(() => window.__plot.compositionReadOut())).includes('every field in the file was read'),
     'a departure from a clean read — missing, unknown, clamped, re-ordered, dropped — is a note, '
     + 'so "nothing to report" is a measurement and not a hope');
+
+  /* AND THE POLARITY COMES BACK AS A RENDER, NOT AS A SELECT. Restoring the
+     control's value while the blend mode stayed where it was is a silent
+     partial restore of exactly the kind this format exists to prevent — and it
+     is invisible in every field-by-field comparison, because the field is
+     right. So the blend constant and the clear colour are read back from the
+     renderer itself, on both sides of the trip. */
+  const polAfterRestore = await q(() => window.__plot.polarityInfo());
+  check('restore/the-polarity-comes-back-as-a-blend-mode-and-not-only-as-a-value',
+    stateA.draw.polarity === 'screen' && stateB.draw.polarity === 'print'
+    && stateC.draw.polarity === 'screen'
+    && polAfterRestore.blendName === 'additive' && polAfterRestore.clearColor === 0x000000,
+    `the control went screen -> print -> screen, and the renderer came back to `
+    + `${polAfterRestore.blendName} on 0x${polAfterRestore.clearColor.toString(16).padStart(6, '0')} `
+    + `— a restore that wrote the select and not the render would pass every `
+    + `field-by-field comparison here`);
 
   check('restore/two-petals-come-back-with-their-own-warps',
     stateC.petals.length === stateA.petals.length
