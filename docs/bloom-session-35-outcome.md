@@ -1,8 +1,9 @@
 # Session 35 — the apex under cup, and why the rim-keyed field does not ship
 
 **Status: STOPPED AT STEP TWO, on Eva's own stopping rule.** No geometry changed.
-What shipped is the mutant-sweep strengthening step ONE asked for, and the two
-findings below.
+What shipped is the mutant-sweep strengthening step ONE asked for — including a
+fix for a mutant that was red on `main` — and the findings below. Both negative
+controls are green, and both guards are proven by controls that must fail.
 
 ---
 
@@ -161,21 +162,28 @@ defect in the table.**
   read stations **7.11e-2 away** from the ones the builder emits — a second
   producer of the profile, inside the instrument written to catch second
   producers. Every witness reads `buildBloomInto`'s own report now.
-* **`stations-not-increasing` is RED ON `main`, and was before this session.**
-  Verified by running the committed file from `git show HEAD:` — it names A7 and
-  fires nothing. The witness proves the mutation is live (the ladder moves
-  9.302e-6 mm at row 23, both modes) and A7 simply does not cover it: A7 asserts
-  the *held* root-blend stations are exactly uniform, and row 23 is above
-  `ROOT_BLEND_END`. The mutant's `names` claim is wrong, and the row it bites on
-  was chosen at **NU 28** (session 32); NU is 56 now.
+* **`stations-not-increasing` was RED ON `main` before this session** — verified
+  by running the committed file from `git show HEAD:`; it named A7 and fired
+  nothing. **Fixed here, and the cause is one value.** The row was pinned to
+  `petalTipShape 1` when it was chosen at **NU 28** (session 32). At NU 56 that
+  is precisely the exponent where the ladder stops saturating, so the
+  de-duplication pass had nothing to do on that row: the witness measured the
+  mutation moving the ladder by only 9.302e-6 mm at row 23 — above
+  `ROOT_BLEND_END`, so outside what A7 asserts — with the stations still
+  strictly increasing.
 
-  **This needs a ruling: correct the family it names, or retire it with its
-  measurement the way `inverted-lerp` was.** It is not fixed here.
+  Swept at NU 56 over **9,072 buckled states**: 2,232 move the ladder at all
+  when the repair is removed (worst 5.217e-5 in u) and **159 produce a
+  non-increasing pair**. The one nearest the shipped defaults is the harness's
+  own row with the exponent simply left alone — two controls off default rather
+  than three. With `petalTipShape` removed from the row, **A7 fires and the
+  whole table is green.**
 
-Also measured while establishing that: over 125 buckled states swept across
-amplitude, frequency and tip shape, **exactly 3 carry the de-duplication pass's
-own 1e-5 fingerprint** — the pass is rarely engaged at all, which is why the
-mutant needs one hand-picked row and is a no-op on the taper rows.
+  The general lesson is the durable rule arriving from a new direction: *a row
+  chosen against a row COUNT goes stale when the count changes.* NU went 28 to
+  56 in session 34 and this state went with it, silently, because the harness
+  had no way to tell that its chosen row had stopped exercising the branch. The
+  witness clause is that way.
 
 ---
 

@@ -217,26 +217,21 @@ const MUTANTS = [
        the comment above already records: over 288 unbuckled states the pass
        never fires, so on a plain profile this edit is a no-op and a witness
        that did not buckle would report a defect that is not there. */
-    /* THE WITNESS ASKS WHETHER THE LADDER MOVED, not whether a non-increasing
-       PAIR appeared, and the difference is a measurement rather than a
-       preference. Written the second way first, it reported the mutation inert
-       at the harness's own saturating row: the repair fires there (the clean
-       ladder sits 9.302e-6 above the mutant's at row 23, in both modes) and
-       yet the unrepaired ladder is still strictly increasing as counted. So
-       "a non-increasing pair appears" is a re-derivation of the pass's own
-       predicate, and the direct question — did removing the pass change what
-       the builder emits — is both simpler and true.
+    /* THE WITNESS ASSERTS BOTH DIRECTIONS: the CLEAN ladder is strictly
+       increasing (or the repair is not doing its job and nothing here can be
+       read) and the UNREPAIRED one is not. That is the pass's own contract,
+       and it is only assertable on a row where the pass actually engages.
 
-       AND THE PASS IS RARELY ENGAGED AT ALL: over 125 buckled states swept
-       across amplitude, frequency and tip shape, exactly 3 carry the repair's
-       own 1e-5 fingerprint. That is why this mutant needs the harness's one
-       saturating row and is a no-op on the taper rows. */
+       THE PASS IS RARELY ENGAGED: swept at NU 56 over 9,072 buckled states,
+       2,232 move the ladder at all when the repair is removed — worst 5.2e-5
+       in u — and only 159 produce a non-increasing pair. So this mutant is a
+       no-op on the taper rows by construction and needs the one row above. */
     witness: (M, C) => {
-      const st = { buckleAmp: 0.3, buckleFreq: 1, petalTipShape: 1 };
-      const a = builtOn(M, st, 'live').stations, b = builtOn(C, st, 'live').stations;
-      let worst = 0;
-      for (let i = 0; i < Math.min(a.length, b.length); i++) worst = Math.max(worst, Math.abs(a[i] - b[i]));
-      return worst > 0 ? null : 'the mutated ladder is identical to the clean one — the pass is inert on this state and the mutant proves nothing';
+      const st = { buckleAmp: 0.3, buckleFreq: 1 };
+      const nonIncr = (arr) => { let n = 0; for (let i = 1; i < arr.length; i++) if (arr[i] <= arr[i - 1]) n++; return n; };
+      const a = nonIncr(builtOn(M, st, 'live').stations), b = nonIncr(builtOn(C, st, 'live').stations);
+      if (b !== 0) return `the CLEAN ladder already has ${b} non-increasing pairs — the repair is not doing its job and this mutant cannot be read`;
+      return a > 0 ? null : 'the unrepaired ladder is still strictly increasing — the pass is inert on this state and the mutant proves nothing';
     } },
   /* A8 — the buckle's bar stops being read. The ladder takes rows the wave
      needs, which DOUBLES the buckle's along-margin chord error at the
@@ -266,7 +261,16 @@ const ROWS = [
      `stations-not-increasing` bites on; `A0.2 f7` is the frequency ceiling,
      the only place the buckle-derived gap bound is not simply the constant,
      so it is what `ladder-ignores-the-buckle` bites on. */
-  { label: 'the ladder saturated in LIVE mode (buckle 0.30 at f 1, exponent 1.00)', set: [{ id: 'buckleAmp', value: '0.3' }, { id: 'buckleFreq', value: '1' }, { id: 'petalTipShape', value: '1' }] },
+  /* THE EXPONENT CAME OFF THIS ROW AT NU 56 (session 35), and the one value is
+     the whole finding. The row was pinned to `petalTipShape 1` when it was
+     chosen at NU 28; at NU 56 that is precisely the value where the ladder
+     stops saturating, so the de-duplication pass had nothing to do here and
+     `stations-not-increasing` named A7 while firing nothing — red on `main`,
+     and red because a row count changed underneath a state that was chosen
+     against it. Swept at NU 56: 159 of 9,072 buckled states DO make the
+     unrepaired ladder non-increasing, and the one nearest the shipped defaults
+     is this row with the exponent simply left alone. */
+  { label: 'the ladder saturated in LIVE mode (buckle 0.30 at f 1, the default exponent)', set: [{ id: 'buckleAmp', value: '0.3' }, { id: 'buckleFreq', value: '1' }] },
   { label: 'the buckle at its frequency ceiling (0.20 at f 7 — the bound is exactly uniform)', set: [{ id: 'buckleAmp', value: '0.2' }, { id: 'buckleFreq', value: '7' }] },
 ];
 
