@@ -224,13 +224,30 @@ const MUTANTS = [
        brittle, and the dedicated witness is untouched. */
     breaks: ['zup/the-attachment-ring-is-flat',
              'stem/the-droop-reaches-every-family',
-             'bend/the-root-is-a-point-like-any-other'],
+             'bend/the-root-is-a-point-like-any-other',
+             /* AND THE DRAG THAT PUTS AN OFFSET ON BOTH BEND SETS. A Z-up
+                misread puts the stem into the screen, so a handle projects off
+                the canvas and the drag reaches nothing — the same consequence
+                this mutation already has for the two checks above it, arriving
+                at a third. Unclaimed on the sweep before this one. */
+             'save/a-real-drag-put-an-offset-on-both-bend-sets'],
   },
   {
     id: 'a-mesh-gltf-is-accepted-silently', file: 'plot.js',
     from: '  if (!info.strips.length) {', to: '  if (info.strips.length < 0) {',
     breaks: ['mesh/a-mesh-gltf-fails-visibly', 'mesh/the-message-names-what-it-found',
-             'mesh/the-grid-on-screen-survives'],
+             'mesh/the-grid-on-screen-survives',
+             /* AND THE ADD/REMOVE SECTION, which is new since this mutation was
+                written and which it reaches through the very change that made
+                it new: an import ADDS, so a bad file that is ACCEPTED is an
+                extra BLOOM rather than a replaced one. Every count in that
+                section is then off by one and the solo-back-to-one leaves the
+                wrong survivor. True about the mutation, and worth having said
+                — "a mesh glTF is accepted" is a different-shaped defect on a
+                page that composes than on one that replaces. */
+             'add/the-new-bloom-lands-clear-of-the-old-one',
+             'add/the-file-input-adds-a-grid-too',
+             'remove/a-bloom-can-be-removed-and-the-last-one-cannot'],
   },
   {
     id: 'the-depth-dim-is-never-applied', file: 'plot.js',
@@ -367,39 +384,45 @@ const MUTANTS = [
     id: 'a-handle-drag-also-orbits', file: 'plot.js',
     from: '  controls.enabled = false;\n  canvas.setPointerCapture(ev.pointerId);',
     to: '  canvas.setPointerCapture(ev.pointerId);',
-    // AND IT LEAVES THE CAMERA EASING, which is a true thing to say about a
-    // drag that orbits: `settle()` stops the moment `update()` reports the
-    // movement is below EPS, and the residue an orbit leaves then accumulates
-    // back over EPS a few times — 7 of 60 driven frames. The shipped code
-    // paints 0 because the drag never orbits at all. Named rather than tuned
-    // around: loosening the idle bar to swallow this would blunt it against
-    // the always-render mutant, which is the check's whole reason to exist.
-    // AND THE PETAL'S TWO, because the pointerdown handler is SHARED: one
-    // raycast over both handle sets, one drag plane, one place the orbit is
-    // switched off. A mutation there reaches whichever handle is grabbed.
-    /* AND SIX MORE, which say the most useful thing this mutation has to say:
-       A PAGE WHERE EVERY DRAG ALSO ORBITS NEVER SETTLES, so nothing that reads
-       the camera twice can agree with itself. The composition section performs
-       two REAL handle drags to put an offset on the two bend sets, and the
-       camera is still easing when the snapshot and the serialisation are taken
-       a moment apart — so the document does not describe the page, the round
-       trip does not come back, the button's bytes differ from the page's, and
-       the "nothing moves" check watches the ink move. The frame's own identity
-       check goes with them for the same reason at a finer tolerance: it asks
-       two fits to land within 1e-9 of each other. All six named rather than
-       tuned around — the same shape as `a-frame-control-moves-the-camera`
-       reddening a stem check. */
+    /* THE ONLY MUTANT HERE WITH A NON-DETERMINISTIC BLAST RADIUS, AND THAT IS A
+       PROPERTY OF THE MUTATION RATHER THAN OF THE CHECKS. A page where every
+       drag also orbits NEVER SETTLES: `settle()` stops the moment `update()`
+       reports the movement is below EPS, and the residue an orbit leaves
+       accumulates back over EPS a few times. So the handle checks below fire on
+       every run — the drag genuinely does not land where it was aimed — while
+       everything DOWNSTREAM that reads the camera twice fires or does not
+       depending on where the residue happens to be when it looks. Four
+       consecutive sweeps of this one mutant named four different sets.
+
+       So `breaks` is the part that is a claim, and `mayAlso` is the collateral
+       this mutation is ALLOWED but not required to cause. Splitting them is not
+       a loosening: every check in `breaks` is still required to go red, and a
+       check in NEITHER list going red is still a failure. What it stops is the
+       sweep reporting a red as unclaimed on one run and a MISS on the next for
+       the same check, which is the shape that has now cost this session two
+       runs. */
     breaks: ['bend/a-handle-drag-does-not-orbit-the-camera',
              'bend/the-handle-lands-under-the-pointer',
-             'zoom/an-idle-frame-is-still-skipped',
              'bend/the-petal-handle-lands-under-the-pointer',
              'bend/a-petal-handle-drag-does-not-orbit-the-camera',
-             'frame/a-boundary-that-is-the-viewport-is-the-fit-the-page-shipped',
-             'save/the-document-describes-the-page-as-it-stands',
-             'save/the-button-writes-what-the-page-serialises',
-             'restore/every-field-comes-back',
-             'restore/a-composition-dropped-on-the-page-is-loaded',
-             'restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves'],
+             'zoom/an-idle-frame-is-still-skipped'],
+    /* EVERY CHECK THAT READS THE CAMERA TWICE, observed across four sweeps. The
+       composition section performs two REAL handle drags to put an offset on
+       the two bend sets, and the camera is still easing when the snapshot and
+       the serialisation are taken a moment apart; the frame's identity check
+       asks two fits to land within 1e-9 of each other; the polarity identity
+       asks two captures to agree on the ink exactly; the petal-bend check asks
+       which petals a real drag moved. A future sweep naming another one should
+       ADD it here, never loosen the check it named. */
+    mayAlso: ['frame/a-boundary-that-is-the-viewport-is-the-fit-the-page-shipped',
+              'save/the-document-describes-the-page-as-it-stands',
+              'save/the-button-writes-what-the-page-serialises',
+              'save/a-real-drag-put-an-offset-on-both-bend-sets',
+              'restore/every-field-comes-back',
+              'restore/a-composition-dropped-on-the-page-is-loaded',
+              'restore/a-file-that-is-not-a-composition-is-refused-and-nothing-moves',
+              'bend/dragging-a-handle-bends-the-selected-petal-and-not-its-neighbours',
+              'polarity/the-two-regimes-agree-exactly-on-where-there-is-ink'],
   },
   {
     // The gaussian width stops coming from the neighbours, so adding a control
@@ -5606,7 +5629,8 @@ if (NEG) {
      stale name in a mutant `--mutant=` skips is exactly the one nobody sees. */
   const known = new Set(main.checks.keys());
   const stale = MUTANTS.flatMap(m =>
-    m.breaks.filter(c => !known.has(c)).map(c => `${m.id} claims ${c}`));
+    [...m.breaks, ...(m.mayAlso || [])].filter(c => !known.has(c))
+      .map(c => `${m.id} claims ${c}`));
   if (stale.length) {
     console.log(`  [FAIL] ${stale.length} claimed check${stale.length === 1 ? '' : 's'} `
       + `name${stale.length === 1 ? 's' : ''} nothing the gate runs:`);
@@ -5670,12 +5694,25 @@ if (NEG) {
       continue;
     }
     OVERRIDE = null;
+    /* `breaks` IS THE CLAIM AND `mayAlso` IS THE COLLATERAL. Every check in
+       `breaks` must go red; a check in NEITHER list going red is still a
+       failure, which is what keeps a broken build from wearing a negative
+       control's coat. `mayAlso` exists for exactly one mutation — the one that
+       makes the page never settle, so that whichever camera-twice check happens
+       to be reading when the residue is above its own bar goes red, differently
+       on every sweep. Without it that mutant reports a check as UNCLAIMED on one
+       run and MISSED on the next, and no list can ever be right. Splitting them
+       loosens nothing: it names which half of the fallout is a property of the
+       defect and which is a property of the damping. */
     const red = [...r.checks].filter(([, v]) => !v).map(([k]) => k);
+    const mayAlso = m.mayAlso || [];
     const missed = m.breaks.filter(k => !red.includes(k));
-    const extra = red.filter(k => !m.breaks.includes(k));
+    const extra = red.filter(k => !m.breaks.includes(k) && !mayAlso.includes(k));
+    const tolerated = red.filter(k => mayAlso.includes(k));
     const ok = missed.length === 0 && extra.length === 0;
     if (!ok) mutantsOK = false;
     console.log(`  [${ok ? 'ok  ' : 'FAIL'}] ${m.id.padEnd(46)} red: ${red.length ? red.join(', ') : '(none)'}`);
+    if (tolerated.length) console.log(`         (also red, allowed: ${tolerated.length} of ${mayAlso.length} named as collateral)`);
     if (missed.length) console.log(`         MISSED (stayed green): ${missed.join(', ')}`);
     if (extra.length) console.log(`         UNCLAIMED (also red): ${extra.join(', ')}`);
     if (!ok) for (const k of [...missed, ...extra]) console.log(`           ${k}: ${r.details.get(k) || '(no detail)'}`);
