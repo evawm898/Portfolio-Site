@@ -74,6 +74,20 @@ winding tool does not do; they are the only rows with a non-rectangular `trimPan
 domain and the only ones with more than one panel, which is where a row-loop refactor
 would bite.
 
+**Result, full matrix, 624 rows × 2 modes, this tree against a worktree of `403baf2` (whose `bloom-geometry.js` is byte-identical to merged `main` at `08651ad`):**
+
+```
+export stream : 657,202,320 floats over 73,022,480 triangles, 624 rows x 2 modes
+captured grid : 70,781,790 values over 8,055 panels (live)
+PASS — 0 floats moved, positionally, under Object.is.
+```
+
+Both counts sit above session 36's winding tool (653,999,184 coordinates over 72,666,576
+triangles) by exactly the CAPABILITY rows it drops and this passes. The tree the run
+compared predates one later edit — `petalSurface`'s `acc` parameter losing its `= null`
+default, a signature and comment change with `buildPetalInto` always passing `acc` — and
+the 6-row re-run after that edit, against a worktree of merged `main`, passed identically.
+
 **The positive control** (`--control`) perturbs BOTH clauses by 1e-9 — one export
 coordinate and one grid mid-surface coordinate — and requires exactly two findings.
 Measured on the 6-row subset (the perturbation is on row 0, so the subset is what
