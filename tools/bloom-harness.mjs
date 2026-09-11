@@ -62,6 +62,13 @@ export const { CONTROLS, SECTIONS, RETIRED_IDS, DEFAULTS, valuesEqual, evalPredi
    builder actually clamps to. A second copy here would let the gate endorse
    a wall the geometry does not build. */
 const GEOMETRY = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
+/* A7's ULP bound on `seamFrameResidual` — the gate's own number, declared here
+   as its ONE owner rather than inline at the clause. It bounds a difference of
+   COSINES (so it is absolute, and in ULP), and the clause states its whole
+   derivation and both measured endpoints: 1.5 ULP worst over the live matrix,
+   2.41e15 ULP on the mutant that names A7. */
+const SEAM_FRAME_RESIDUAL_ULP = 8;
+
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
          /* THE APEX'S TWO MODE FLOORS, imported rather than restated: A4
             rebuilds the cap's terminal from the state and must floor it at
@@ -1543,8 +1550,33 @@ export async function thicknessAssertions(page, row) {
       if (typeof ld.seamHalfMm === 'number' && ld.seamHalfMm !== wantHalf) {
         bad.push(`A7: ${at}the seam clearance was built on a half-thickness of ${ld.seamHalfMm} mm where max(sheetThickness ${sheet}, MIN_FEATURE_MM ${MIN_FEATURE_MM}) / 2 is ${wantHalf} — the ladder is reading a mode-dependent thickness and row positions are topology`);
       }
-      if (typeof ld.seamFrameResidual === 'number' && ld.seamFrameResidual !== 0) {
-        bad.push(`A7: ${at}the seam turn the clearance used (${ld.seamTurnDeg.toFixed(4)} degrees) is ${ld.seamFrameResidual.toExponential(2)} off the angle between the two frames the builder emitted — the clearance was computed for an angle this build does not have`);
+      /* THE RESIDUAL IS A DIFFERENCE OF COSINES, SO ITS BOUND IS IN ULP AND
+         IS NOT ZERO. This clause shipped asking for EXACTLY 0 and went RED in
+         CI on `DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18` — 120 rings, each
+         1e-16 to 1.5e-16 out. That is not a defect in the derivation: the two
+         sides reach the same angle by two routes (the owner's
+         `Math.cos(|tilt|)` against the dot of the two emitted unit normals),
+         and a dot of unit vectors built from a handful of multiply-adds
+         accumulates a few ULP. The smoke subset simply contained no row where
+         the two routes diverge, which is why an exact-zero bar survived
+         locally. Measured over the WHOLE live matrix, both modes, 15,938
+         rings: 4,419 (27.7%) are non-zero and the worst is 3.331e-16 —
+         **1.5 ULP** — on `CURL: bias 0.5 x start 0.5 x incurve target x rise 1`
+         at a 141.773 degree turn.
+         THE BOUND IS DERIVED FROM THE QUANTITY, NOT FITTED TO THAT DATA: the
+         residual is |cos a - cos b| with both cosines in [-1, 1], so an
+         ABSOLUTE bound in ULP is the dimensionally honest form, and 8 ULP
+         bounds the accumulation of that arithmetic with room. It is not a
+         tolerance chosen to pass what was in hand — the observed worst uses
+         19% of it, and the `seam-turn-is-not-the-kink` mutant (which halves
+         the turn the clearance is built on) reads **5.345e-1, or 2.41e15
+         ULP**, fifteen orders above the bar. Any bound in that gap separates
+         them; this one is at the end of the gap the arithmetic explains.
+         THE NUMBER IS REPORTED ON EVERY ROW so it stays watched rather than
+         becoming folklore under a bar nobody reads. */
+      if (typeof ld.seamFrameResidual === 'number'
+          && ld.seamFrameResidual > SEAM_FRAME_RESIDUAL_ULP * Number.EPSILON) {
+        bad.push(`A7: ${at}the seam turn the clearance used (${ld.seamTurnDeg.toFixed(4)} degrees) is ${ld.seamFrameResidual.toExponential(2)} off the angle between the two frames the builder emitted (${(ld.seamFrameResidual / Number.EPSILON).toFixed(1)} ULP against a bound of ${SEAM_FRAME_RESIDUAL_ULP}) — the clearance was computed for an angle this build does not have`);
       }
       /* THE CLEARANCE IS THE LAW'S OWN VALUE, RESTATED HERE ON PURPOSE.
          The clause below asks whether the first blade row clears the
