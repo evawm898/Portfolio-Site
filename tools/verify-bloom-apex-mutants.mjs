@@ -186,11 +186,14 @@ const MUTANTS = [
      uniform ones, which moves a boundary footRing() owns. Watertight, one
      piece, identical triangle count; nothing else here can see it. */
   { id: 'ladder-eats-the-base', why: 'the ladder redistributes every row, including the ones the root blend owns',
-    find: '  const held = Math.floor(ROOT_BLEND_END * NU);',
+    /* Anchored on the comment that precedes it: `ladderWindowCapacity` and
+       `ladderOutsideMinima` now derive the same count with the same line, and
+       the sweep's own guard reported the bare line matching 3x. */
+    find: '  /* The rows the root blend can reach keep their uniform stations, exactly. */\n  const held = Math.floor(ROOT_BLEND_END * NU);',
     /* A7 ONLY, and the claim was corrected by the control rather than the
        check by the claim: with the held count at 0 the ladder still respects
        its gap bound, so A8 is RIGHT not to fire here. */
-    into: '  const held = 0;', names: ['A7'],
+    into: '  /* The rows the root blend can reach keep their uniform stations, exactly. */\n  const held = 0;', names: ['A7'],
     witness: (M, C) => {
       const a = builtOn(M).stations, b = builtOn(C).stations;
       const held = Math.floor(0.30 * C.BLADE_ROWS);

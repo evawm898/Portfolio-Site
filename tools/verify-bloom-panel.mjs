@@ -244,6 +244,19 @@ const WITNESS = {
              the material across the width, and the metric ratio is what says
              so: 1.0000 flat, above 1 at any cup. */
           read: (m) => m.petalForm && m.petalForm.metricMax, what: 'petalForm.metricMax' },
+  /* LOBES (session 38, PR 2) — a drop-down inside Petal shape, collapsed at
+     first load; witnessed by the depth through the BUILDER's own lobe record,
+     which reaches past the slider into what the outline was cut to: null at
+     the shipping depth of 0 (the section's guard, `lobesEngaged`, is false
+     and no record exists), and at 0.5 the count the cut was built with, the
+     deepest sinus AS BUILT (the max with the floors applied — a number the
+     slider does not hold) and the stations the ladder placed inside the
+     window. The count, the coverage and the tip shape are gated on the depth
+     (hidden and inert at 0, the curl family's own rule) and are the L family's
+     in both STL gates, not this one's. */
+  lobes: { id: 'lobeDepth', value: '0.5',
+           read: (m) => (m.petalLobes ? `${m.petalLobes.countBuilt}/${m.petalLobes.sinusMinHalfMm.toFixed(6)}/${m.petalLobes.rowsInWindow}` : 'no lobe record'),
+           what: "the builder's lobe count / the deepest sinus as built / the stations inside the window" },
   /* PETAL CURL (session 16) — the spine's own section, collapsed at first
      load; witnessed by spine curl through the builder's own spine record. */
   curl: { id: 'petalSpineCurl', value: '150',

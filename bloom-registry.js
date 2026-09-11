@@ -43,7 +43,9 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, TIP_LOBES, TIP_PINCH_DEFAULT, TIP_ROUNDEDNESS,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
-         TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM } from './bloom-geometry.js';
+         TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
+         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_TIP_SHAPE_RANGE,
+         LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_TIP_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -234,6 +236,14 @@ export const PREDICATES = {
      the two agree on every matrix row (Z5), exactly as they already do for
      the slot-role twin. */
   perPetalEligible: { id: 'placement', oneOf: ['FAN'] },
+  /* LOBES ENGAGED (session 38, PR 2) — the registry's statement of the
+     geometry's `lobesEngaged()`: the count, the coverage and the lobe tip
+     shape are hidden AND inert at depth 0, the curl family's own rule (a
+     control that is visible and not building is the panel gate's defect).
+     The slider's step is 0.01, so every reachable non-zero depth is at
+     least 0.005 away from 0 and the two statements agree on every reachable
+     state; the harness checks that at load and on every row (L0). */
+  lobesEngaged: { id: 'lobeDepth', awayFrom: 0, by: 0.005 },
 
   /* ===================================================================
      WHERE THE ANDROECIUM APPLIES (session 21, phase 2 B2) — everywhere but
@@ -605,6 +615,13 @@ export const SECTIONS = [
   /* THE STIGMA'S TIP SECTION — the same statement, inside Gynoecium. */
   tipSection('stigma'),
   { id: 'shape', label: 'Petal shape', open: false },
+  /* LOBES (session 38, PR 2) — a drop-down INSIDE Petal shape, declared in
+     render order directly after its parent. A lobe is a cut in the OUTLINE
+     (widthProfile's), so it belongs under the section that owns the outline
+     and not beside the form curves; nested rather than four more rows in the
+     parent because three of the four are gated on the first, the "Petal
+     roles" shape. */
+  { id: 'lobes', label: 'Lobes', open: false, parent: 'shape' },
   { id: 'form', label: 'Petal form', open: false },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
      session-16 Phase A proposal): petal tilt, spine curl, curl bias, curl
@@ -1239,6 +1256,99 @@ export const CONTROLS = [
       return `${b.toFixed(2)} · widest at ${(a / (a + b)).toFixed(2)}`;
     },
     visibleWhen: { all: [] } },
+
+  /* ===================================================================
+     LOBES ON THE RIM (session 38, PR 2 — read bloom-geometry.js's LOBES block
+     and docs/bloom-session-38-outcome.md §B before touching these).
+
+     FOUR CONTROLS, ONE GATE. Depth is the switch: at 0 the outline is the
+     shipped one by a BRANCH (byte identity is a construction, never an
+     argument that multiplying by 1 is exact), and the other three are hidden
+     AND inert there. Ranges and defaults are the geometry's, IMPORTED (Q6);
+     the harness fails at load if any became a literal.
+
+     THE TWO CAPS ARE THE OWNER'S NUMBERS, drawn on the track: the count's
+     ceiling is the ruled 2–8 at the default coverage and 10 at maximum
+     (a row-resolution bound, derived and asserted at load), and below that
+     the physical pitch floor max(sheet, MIN_FEATURE_MM) when the window is
+     short; the depth's cap is where the deepest sinus reaches the print
+     floor's half-width. Full ranges exposed, output clamped, told —
+     stamenSpread's ruling, the buckle's treatment. `fmt`'s third argument is
+     the SHOWN build's record, so every number printed here is the builder's
+     and none is re-derived from the sliders.
+     =================================================================== */
+  { id: 'lobeDepth', section: 'lobes', kind: 'slider',
+    min: LOBE_DEPTH_RANGE[0], max: LOBE_DEPTH_RANGE[1], step: 0.01, default: 0,
+    label: 'Lobe depth', tier: 'standard', role: 'petal',
+    fmt: (v, ui, shown) => {
+      const d = Number(v);
+      if (d === 0) return 'plain — no lobes';
+      const L = shown && shown.lobes;
+      if (L && L.noRoom) return `${Number(v).toFixed(2)}x asked — NO ROOM (${L.noRoomWhy === 'region' ? 'no rim below the apex entry' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows here and a lobe needs ${L.samplesPerLobe}` : `${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}); nothing cut, told`;
+      if (!L) return `${d.toFixed(2)}x the local half-width cut in at each sinus`;
+      if (L.depthClamped) {
+        return `${d.toFixed(2)}x asked — CLAMPED at ${L.depthCap.toFixed(2)}x: the deepest sinus is on the print floor `
+             + `(${(2 * L.sinusMinHalfMm).toFixed(2)} mm across); the travel above the mark is dead`;
+      }
+      return `${d.toFixed(2)}x the local half-width — the deepest sinus leaves ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across`
+           + (L.depthCap < LOBE_DEPTH_RANGE[1] ? ` · reaches the print floor at ${L.depthCap.toFixed(2)}x, the mark on the slider` : '');
+    },
+    cap: (shown) => (shown && shown.lobes ? shown.lobes.depthCap : null),
+    visibleWhen: { all: [] } },
+  { id: 'lobeCount', section: 'lobes', kind: 'slider',
+    min: LOBE_COUNT_RANGE[0], max: LOBE_COUNT_RANGE[1], step: 1, default: LOBE_COUNT_DEFAULT,
+    label: 'Lobes', tier: 'standard', role: 'petal',
+    /* Prints the built PITCH beside its floor — the physical quantity — and
+       which cap clamped the count when one did: the rows the ladder has for
+       this window at the samples-per-lobe floor (rows) or the pitch floor (a
+       length). Both are the builder's own numbers. */
+    fmt: (v, ui, shown) => {
+      const n = Number(v);
+      const L = shown && shown.lobes;
+      if (!L) return `${n} lobes`;
+      if (L.noRoom) {
+        return L.noRoomWhy === 'region' ? `${n} asked — NO ROOM: the apex entry sits at or below the root blend, there is no rim to cut`
+          : L.noRoomWhy === 'rows' ? `${n} asked — NO ROOM: the ladder can place ${L.rowsCapacity} rows in this window and one lobe needs ${L.samplesPerLobe}; nothing cut, told`
+          : `${n} asked — NO ROOM: ${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor; nothing cut, told`;
+      }
+      const pitch = `pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm)`;
+      const rows = `${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} stations in the window, ${L.samplesPerLobe} demanded a lobe)`;
+      const caps = `the ladder holds ${L.countRowsCap} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} a lobe), the pitch floor ${L.countFloorCap}`;
+      if (L.countClamped) {
+        return `${n} asked — CLAMPED at ${L.countBuilt} by ${L.clampedBy === 'pitch' ? `the pitch floor (${L.windowMm.toFixed(1)} mm of rim holds ${L.countBuilt} at ${L.pitchFloorMm.toFixed(2)} mm)` : `the rows the ladder has (${L.rowsCapacity} free rows in this window at ${L.samplesPerLobe} stations a lobe)`}`
+             + ` · ${pitch} · ${rows}; the travel above the mark is dead`;
+      }
+      return `${n} lobes · ${pitch} · ${rows}`
+           + (L.countCap < LOBE_COUNT_RANGE[1] ? ` · clamps at ${L.countCap}, the mark on the slider — ${caps}` : '');
+    },
+    cap: (shown) => (shown && shown.lobes ? shown.lobes.countCap : null),
+    visibleWhen: { ref: 'lobesEngaged' } },
+  { id: 'lobeCoverage', section: 'lobes', kind: 'slider',
+    min: LOBE_COVERAGE_RANGE[0], max: LOBE_COVERAGE_RANGE[1], step: 0.05, default: LOBE_COVERAGE_DEFAULT,
+    label: 'Coverage', tier: 'standard', role: 'petal',
+    /* How much of the rim between the root blend's end and the apex entry
+       carries lobes, measured from the apex down; and the ceiling it buys,
+       from the law's own function rather than a restatement. */
+    fmt: (v, ui, shown) => {
+      const c = Number(v);
+      const L = shown && shown.lobes;
+      return `${(c * 100).toFixed(0)}% of the rim below the apex, from the apex down`
+           + (L ? ` — ${L.windowMm.toFixed(1)} mm of ${L.regionMm.toFixed(1)}` + (L.noRoom ? '' : ` · the ladder holds ${L.countRowsCap} lobe${L.countRowsCap === 1 ? '' : 's'} here (${L.rowsCapacity} free rows at ${LOBE_SAMPLES_PER_LOBE} stations a lobe)`) : '');
+    },
+    visibleWhen: { ref: 'lobesEngaged' } },
+  { id: 'lobeTipShape', section: 'lobes', kind: 'slider',
+    min: LOBE_TIP_SHAPE_RANGE[0], max: LOBE_TIP_SHAPE_RANGE[1], step: 0.05, default: LOBE_TIP_SHAPE_DEFAULT,
+    label: 'Lobe tip shape', tier: 'standard', role: 'petal',
+    /* THE LOBE'S OWN APEX, at the lobe's scale — never the petal's (PETAL
+       TIP SHAPE owns [uCap, 1]). The cut profile is a cosine bump raised to
+       this power: 0.5 a pointed crest (a V), 1.0 a round crest, 2.0 a flat-
+       topped crest with a narrower sinus. Every sinus stays parabolic. */
+    fmt: (v) => {
+      const q = Number(v);
+      const name = q < 0.75 ? 'pointed' : q <= 1.25 ? 'round' : 'flat-topped';
+      return `${q.toFixed(2)} · ${name}`;
+    },
+    visibleWhen: { ref: 'lobesEngaged' } },
 
   /* THE APEX HAS NO CONTROL, AND THAT IS A STATED INTERIM (Eva, session 32).
      `petalTipBreadth` is retired and nothing replaced it: the converging cap

@@ -180,7 +180,7 @@ export async function measure(page, row, opts = {}) {
   let ring, profile;
   try {
     ring = footRing(state, acc).rings[0];
-    profile = widthProfile(state, ring, state.petalWidth / 2, null, acc);
+    profile = widthProfile(state, ring, state.petalWidth / 2, null, acc, state.petalLength);
   } catch (e) {
     return { skipped: `the profile could not be rebuilt for this row (${e.message.slice(0, 60)})` };
   }
