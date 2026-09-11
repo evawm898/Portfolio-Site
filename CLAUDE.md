@@ -1259,6 +1259,37 @@ every one** (27 at density 12, 59 at density 3). Above the shipped 8, under one 
 port is scheduled. Two consumers were already waiting in writing: the port, and
 `bloom-sagitta.mjs`'s 3D margin. No frozen phase owed; nothing moved.
 
+**THE RIM HAS AN ARC LENGTH, THE SURFACE DECLARES ITS OWN TANGENT BREAKS, AND THE FORM
+ONSET IS ONE OF THEM** (session 38, PR 1 — read `docs/bloom-session-38-outcome.md` §A before
+touching `petalRim`, `slopeBreaks` or the onset ramp). `petalRim(surface)` in
+`bloom-geometry.js` answers, per margin (v = ±1), where the rim is in space and how far along
+it a point sits — `sAt(u)`, `uAt(s)`, `pointAt(u)`, `length()`, the terminal face's width —
+as the chord length of a dense polyline (`RIM_SAMPLES` 4096 cells) with every tangent break
+the surface declares inserted as a node and a self-similar graded patch around each break
+and the apex (the n ≠ 1 apex power laws have UNBOUNDED slope at their own points, and a
+uniform cell containing one is cut by a chord however fine the grid). `sAt` appends `u` as a
+node, so the arc between two `u` is NEVER less than the chord — an identity, not a tolerance.
+**THE PROOF IS CORRESPONDENCE, NOT INERTNESS** (nothing calls it yet, so "0 floats moved" is
+worth nothing): `node tools/verify-bloom-rim-arc.mjs` (+ `--control`) ties the query to the
+EXPORTED mesh's own rim — every rim-strip vertex found exactly in the emitted stream at every
+station, both margins, 64 states × 2 modes — and states the residual: the reported length
+exceeds the mesh's 56-station polyline by at most **0.90% LIVE / 0.75% EXPORT** (the mesh's
+chord deficit), and the query's own error is bounded at **4.0e-4 mm LIVE / 1.5e-4 mm EXPORT**
+on the worst state (all form max × buckle f 7 × n 3.00) from three measured doublings plus
+the tail the measured order implies. **THE CONVERGENCE ORDER IS NOT A WITNESS FOR THE SEAM
+NODES** — a kink cut by chords reads any order at the fine end (2.50 measured with no nodes
+at all); R5's independent detector on the rim CURVE is, and the control strips the declared
+breaks. **THREE FINDINGS, RECORDED NOT RULED:** the FORM ONSET at `FORM_ONSET_END` = 0.30 is a
+tangent break of the shipped sheet on every cupped, rolled or buckled petal — 24°/55° at the
+two margins of FORMED, 36° at cup 1.2, 35° at roll 330, in both modes — a third C0 seam
+beside session 37's two, and a smoothed ramp would be a partition event; the TIP SEAM MOVES
+WITH THE MODE (LIVE 0.999562 at the 0.15 mm mesh floor, EXPORT 0.992424 at the 0.8 mm print
+floor — the brief's figure was the live one); and under curl + twist THE TWO MARGINS DIFFER
+IN LENGTH by up to 8.09 mm, so a lobe layout must say which margin's `s` it reads. Cost is
+3–40 ms a petal at 4096 cells; PR 2 sizes `samples` from the tool's table. The slot payload
+for Node-side instruments is `tools/bloom-first-slot.mjs`, one copy, read by the off-station
+tool and this one.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
