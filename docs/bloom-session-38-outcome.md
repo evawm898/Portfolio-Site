@@ -247,6 +247,131 @@ Eva.** It is independent, it blocks nothing, and it only scopes the claim.
 
 ---
 
+## 6b. THE FLAT/DOMED ASYMMETRY — a named finding
+
+Two matrix rows differ by **`headRise` alone**. Same 120 petals, same tilt, same
+sheet, same everything else. The flat one went **7,806 → 510** pairs and the
+domed one went **7,350 → 9,944**. Eva called that the most interesting thing in
+the report and asked for the mechanism rather than a footnote. Here it is,
+measured.
+
+### The instrument, and the two ways its first version was wrong
+
+The scratch tool attributes **every** intersecting pair to the mesh rows its two
+triangles belong to, by **exact coordinate match** against the builder's own
+captured grid — `emitPanel` offsets each skin vertex to `mid ± n·t/2`, so an
+emitted vertex matches one of those points exactly and there is no
+nearest-neighbour guess. Unmatched triangles: **0 of every census**, both trees,
+every row below.
+
+**A first pass classified by NEAREST row and named a triangle by its LOWER row,
+and it was wrong twice.** It reported a four-thousand-pair jump in "foot on
+foot" on a tree whose foot rows are byte-identical to main's — because the
+**seam panel** (the quad spanning the last foot row and the first blade row) was
+being filed under FOOT, and because a blade row that has flopped onto the foot
+is *nearest* a foot row. A triangle is named by the rows it **spans** now, and
+SEAM has its own name. That correction is what turned a confusing tally into the
+finding, and it is the reason the first version's numbers are not quoted here.
+
+### What the rows actually say
+
+| | main | branch |
+|---|---|---|
+| **flat** — turn 75.0–89.9°, 0/120 past 90° | FOOT×blade1-2 **5788**, SEAM×blade1-2 978, FOOT×SEAM 600, FOOT×blade2-3 440 | FOOT×blade1-2 **440**, FOOT×SEAM 70 |
+| **domed** — turn 125.4–128.1°, **120/120 past 90°** | FOOT×blade3-4 3390, FOOT×blade2-3 1850, FOOT×blade1-2 1221, FOOT×SEAM 415, SEAM×blade1-2 360, FOOT×blade4-5 114 | FOOT×blade2-3 3390, **FOOT×SEAM 2428**, **SEAM×SEAM 2162**, FOOT×blade1-2 1850, FOOT×blade3-4 114 |
+
+**Every pair on all four cells involves the foot or the seam. There is no
+blade-against-blade collision anywhere on either tree.**
+
+And the blade terms line up exactly. `seamStep` is 2 on both rows, so the blade
+lattice starts one step later and **every blade term keeps its count and shifts
+down one index**: main's blade2-3 = 1850 becomes the branch's blade1-2 = 1850;
+main's blade3-4 = 3390 becomes blade2-3 = 3390; main's blade4-5 = 114 becomes
+blade3-4 = 114. **The collisions are a property of the STATION, not of the row
+number** — the same `u` stations lie over the foot on both trees, with the same
+counts. What the floor does is **delete the lowest-station panel**, and the
+benefit is exactly that panel's own pair count.
+
+### The accounting closes to the pair
+
+Splitting each census into terms that involve the seam panel and terms that do
+not, over a tilt sweep on the **domed** configuration. Only `petalTilt` is
+varied; `seamStep` is 2 at every point, so the displacement is identical
+throughout and the sweep isolates the turn angle:
+
+| effective turn | main | branch | blade benefit | seam change | net |
+|---|---|---|---|---|---|
+| 70–73° | 4763 | **0** | — | — | −4763 |
+| 85–88° | 5015 | **0** | — | — | −5015 |
+| 92–95° | 5073 | 318 | −4429 | −326 | **−4755** |
+| 100–103° | 5357 | 2337 | −2789 | −231 | **−3020** |
+| 110–113° | 6114 | 5391 | −606 | −117 | **−723** |
+| 115–118° | 6164 | 5442 | −615 | −107 | **−722** |
+| 120–123° | 6344 | 6447 | −686 | +789 | **+103** |
+| 125–128° | 7350 | 9944 | −1221 | **+3815** | **+2594** |
+
+Every net figure is the measured census difference exactly.
+
+### The mechanism
+
+Past a right angle the blade leaves the ring leaning **back over its own foot**.
+Measured in the **foot's own frame** — the cap's local outward axis, taken from
+the two captured foot rows themselves, because on a dome the global radius is
+the wrong coordinate and reads the first blade row as moving *outward* even at
+128° — the first blade row sits **behind** the ring row, and the branch roughly
+**doubles** how far back it reaches, because the seam panel is twice as long:
+
+| turn | main | branch | ratio |
+|---|---|---|---|
+| 95.1° | −0.0117 mm | −0.0401 mm | 3.4× |
+| 103.1° | −0.0613 | −0.1390 | 2.3× |
+| 113.1° | −0.1214 | −0.2585 | 2.1× |
+| 118.1° | −0.1503 | −0.3155 | 2.1× |
+| 123.1° | −0.1779 | −0.3701 | 2.1× |
+| 128.1° | −0.2042 | −0.4219 | 2.1× |
+
+So **two effects compete, and the clearance drives both**:
+
+* it **removes** the lowest-station blade panel from the foot — a benefit at
+  every angle, and the whole of the fix below 90°;
+* it **lengthens the seam panel**, which past 90° drags that panel further back
+  over the foot — a penalty that exists only past a right angle, because that is
+  where `cos θ` changes sign and the derivation's own inequality reverses.
+
+Below 90° the second term does not exist and the fix is total: **both states
+under the right angle in the sweep go to exactly 0 pairs.** Past it the penalty
+grows with the backward reach until it overtakes the benefit. `SEAM × SEAM`
+appears only in the worst cell (2,162 pairs at 125–128°) — that is the
+lengthened seam panel crossing **itself**.
+
+### What is NOT explained, said plainly
+
+**The crossover is measured between 115–118° and 120–123° of effective turn, and
+I did not determine its functional form.** The seam term is flat-to-improving
+(−326, −231, −117, −107) while the backward reach is shallow, and then it
+explodes (+789, +3815) once that reach passes roughly a third of a millimetre on
+this configuration. Whether that threshold is the half-thickness, the foot's own
+row spacing, or something else **is not measured here**, and no story is offered
+for it.
+
+What IS established: the decomposition into two terms, the sign and size of
+each, that they account for every census difference exactly, and that the net
+flips with the turn angle and with nothing else — `seamStep`, the sheet, the
+petal count and the displacement are all constant across the sweep.
+
+### Why this does not change the law
+
+The clearance already **saturates** at `half · sin(90°)` past a right angle, and
+those rows are already declared — `SEAM CLAMPED` and `EFFECTIVE TILT PAST 90`
+are the two retagged classes in §6. This finding says the saturation is not
+merely useless there but mildly **counterproductive** on the deepest rows, and
+that is the honest shape of the trade: 84 rows to exactly zero against a derived
+constant, at the cost of 15 rows that were already failing either way.
+
+**It also says where a future fix would have to act.** Not on the clearance
+constant — on the seam panel's LENGTH past a right angle, or on the tilt control
+reaching past 90° at all, which is a separate ruling.
+
 ## 7. What it did to the census — the whole matrix, both trees
 
 Driven in Node through the same census the export gate calls, export mode, on
@@ -433,3 +558,38 @@ prove, not this session's laptop's.
   gates, which is a stronger read-back than the panel could give.
 * **Whether the tilt control should reach past 90° at all** — Eva's, and
   independent of everything above.
+
+---
+
+## 10. BACKLOG — the xfail list does not gate MAGNITUDE
+
+**Named.** `SELF_INTERSECTION_XFAIL` maps a row label to a string. X1 asserts a
+declared row still reads **non-zero**, and fails hard if it reaches zero (a fix
+landing). It does **not** compare the count. So a declared row can go from 7,350
+pairs to 9,944 and the gate stays green — which is exactly how all fifteen of
+this session's regressions landed without a red, and why they had to be found by
+a hand-run full-matrix sweep rather than by CI.
+
+**Sized.** The entries already carry their numbers as prose
+(`'7350 pairs, worst span 0.4519 mm'`), so the data is present and only the
+comparison is missing.
+
+* Parse the count and worst span out of each entry, or restructure the value to
+  `{ pairs, worstMm, why }` — **234 entries**, mechanical.
+* Assert the measured count is within a declared band of the recorded one. The
+  band is the design question, not the code: these counts are **exact integers
+  from a deterministic census**, so the honest bar is equality, and equality
+  would make every future geometry change re-baseline 234 numbers by hand.
+* Cost per run: **zero**. The census already runs on every export-gate row; this
+  reads a number it already has.
+* Cost per session: a re-baseline whenever a change legitimately moves a
+  declared row, which is most geometry sessions.
+
+**Why it is not built here.** That last trade is a ruling, not an
+implementation: a magnitude gate at equality makes the list a ratchet that every
+session pays, and a magnitude gate at a tolerance invents exactly the kind of
+constant this session spent its effort avoiding. It also wants deciding
+alongside the two retagged classes — a `SEAM CLAMPED` row's count is expected to
+move when the clearance law moves, where a `CLEFT` row's is not.
+
+Left as recorded, not built.

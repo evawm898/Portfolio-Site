@@ -1328,6 +1328,36 @@ told in the read-out and asserted as a biconditional). **Whether the tilt contro
 past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** — a
 declared row whose count doubles passes silently, which is how those 15 landed without a red;
 recorded, not built.
+**THE FLAT/DOMED ASYMMETRY IS EXPLAINED, AND THE CROSSOVER IS MEASURED RATHER THAN MODELLED**
+(session 38, §6b of the outcome doc — Eva asked for the mechanism or the word "unexplained").
+The same configuration goes 7,806 -> 510 FLAT and 7,350 -> 9,944 at `headRise` 0.5, and
+`headRise` is the ONLY difference between the two matrix rows. The cause is the EFFECTIVE SEAM
+TURN: **125.4-128.1 deg on all 120 rings domed against 75.0-89.9 deg flat** (0 of 120 past a
+right angle). **EXACT REGION ATTRIBUTION on both trees** — by coordinate-matching every
+intersecting triangle against `mid +/- n*t/2` and naming it by the rows it SPANS, with SEAM its
+own name, 0 unmatched — shows **every pair involves FOOT or SEAM and there is no
+blade-against-blade anywhere**; blade terms keep their counts and shift down one index, because
+a collision is a property of the STATION and not of the index. So the floor buys one thing and
+pays for another: it DELETES the lowest-station panel (the benefit, which is all of the flat
+row's 15x) while LENGTHENING the seam panel, and past 90 deg a longer seam panel is dragged
+further back OVER its own foot (the penalty). **A CONTROLLED TILT SWEEP WITH `seamStep` HELD AT
+2** — so the displacement is fixed and only the turn varies — gives net **-4763, -5015, -4755,
+-3020, -723, -722, +103, +2594** as the turn rises, and every net figure equals the measured
+census difference EXACTLY. Backward reach in the FOOT'S OWN FRAME (never the global radius,
+which reads the first blade row moving OUTWARD at 128 deg on a dome) roughly doubles on the
+branch, 2.1x at every tilt. **The crossover is between 115-118 deg and 120-123 deg, MEASURED;
+the functional form is NOT determined and no story is offered for it.** Two earlier versions of
+the classifier were wrong and are recorded there: classifying by NEAREST row and naming a
+triangle by its LOWER row reported a four-thousand-pair jump in "foot on foot" on a tree whose
+foot rows are byte-identical to main's.
+**THE STOP-CONDITION ROW IS RENDERED** (`node tools/shot-bloom-seam-ruling.mjs <dir>`): the
+regressed row and its flat sibling, main against branch, ONE camera sized from the branch and
+written verbatim to BOTH trees, PRINT PREVIEW ON with a `shownMode` read-back, whole plus a rim
+close-up, settled to two byte-identical frames, **no pixel delta quoted** (two trees, two
+servers, two page sessions). It serves both trees over their OWN HTTP servers rather than
+swapping modules, because main's `bloom.js` has no seam telemetry. **Read on the renders: the
+branch shows NO new visible break on either row** — the blade roots meet the hub rim with the
+deep notches shallower on both — which is what released the merge.
 **MODE INDEPENDENCE IS MEASURED, NOT ARGUED: 0 of 624 rows have a `seamStep` set that differs
 live from export.** `seamHalfThicknessMm()` is the ONE owner of `max(sheetThickness,
 MIN_FEATURE_MM) / 2` — both the clearance and the reported `seamHalfMm` call it, so the live
