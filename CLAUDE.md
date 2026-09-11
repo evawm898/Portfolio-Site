@@ -1433,12 +1433,20 @@ are REPORTED, NOT TUNED AROUND** (Eva's stop condition) and they are **the same 
 rows at the same counts — the new ladder did not move them**: the mum on a hemisphere is
 CLEARED (0 -> 0) but **the incurve target at rise 0.5 still regresses, 7,350 -> 9,944**,
 worse than the piling patch's 8,641, while its FLAT sibling goes 7,806 -> 510.
-**THREE OF MAIN'S OWN LOBE ROWS ARE CLEARED TO EXACTLY ZERO, and they are the three whose
-entries named the ROOT BLEND as the cause** — `LOBES: x 3 whorls` (72 -> 0), `LOBES: x
-CONTINUOUS x 3 turns` (264 -> 0) and `LOBES: ONE lobe by both caps` (72 -> 0), each 0
-lobed AND plain, confirmed by `node tools/bloom-lobe-composition.mjs` on the merged tree.
-A second session's instrument, measuring a different feature, named this defect and its
-cause; this change removes it.
+**THE INDEPENDENT CORROBORATION IS THE BEST EVIDENCE IN THE REPORT AND HAS ITS OWN SECTION
+(§7b of the outcome doc): THREE OF MAIN'S OWN DECLARED LOBE ROWS ARE CLEARED TO EXACTLY
+ZERO, AND THEY ARE THE THREE WHOSE ENTRIES NAMED THE ROOT BLEND AS THE CAUSE** — `LOBES: x
+3 whorls` (72 -> 0), `LOBES: x CONTINUOUS x 3 turns` (264 -> 0) and `LOBES: ONE lobe by
+both caps` (72 -> 0), each 0 lobed AND plain, confirmed by `node
+tools/bloom-lobe-composition.mjs` on the merged tree. **The attribution was WRITTEN DOWN
+IN ADVANCE by the lobe session, from its own two-sided builds** (lobed and plain sites
+identical, so it concluded the pairs were not the lobe's and said whose they were) — a
+different session's instrument, measuring a different feature, on rows this session did
+not choose. That is worth more than the 87 rows of the partition, which are a closed loop:
+this session's sweep, of this session's defect, with this session's instrument. **And the
+third row is a SINGLE whorl**, so session 35's `layerCount >= 3` framing could not have
+cleared it while the clearance law predicts it exactly — a short petal under a thick sheet
+is a large `t/2 sin(theta)` against a short blade.
 **THE XFAIL LIST IS RE-BASELINED ON THE BRANCH, AND THAT IS A CHANGE OF MEANING** — it cannot
 be a set of pre-existing failures when the session's purpose is to fix 87 of its rows. The
 old `(N layers — the root blend)` tag is GONE from every row (A7 asserts the clearance is met
@@ -1519,6 +1527,36 @@ cleft.** **No frozen phase is owed**
 values and the same ONE declared cleft triangle-count exception. `frozen/phase23`'s bytes
 stop reproducing on 156 of its 596. Both definitions still deep-compare; they join phase17,
 phase19 and phase21 in that class.
+**TWO THINGS NEITHER SESSION'S GATES CAUGHT, RECORDED AS THEIR CLASS** (§9b of the outcome
+doc). **(i) A FEATURE PR SHIPPED A SECOND COPY OF A VALUE THAT ALREADY HAD AN OWNER, AND
+THE MERGE IS WHAT FOUND IT:** #212's `ladderWindowCapacity` and `ladderOutsideMinima` each
+re-derived `Math.floor(ROOT_BLEND_END * NU)` inline instead of reading `HELD_ROWS`. Nothing
+is wrong with the arithmetic and **both sessions' full suites pass on a tree with three
+copies** — what it damages is the MUTANT TABLE, because an anchored mutation on the bare
+expression matched THREE times and mutated only the first, so `ladder-eats-the-base` was
+testing a third of its consumers while reporting a clean fire. Invisible until two changes
+to one expression meet, which is what a merge is. A duplicate-expression gate is reachable
+with the retired-id scanner's character walk and is RECORDED, NOT BUILT.
+**(ii) AN EXACT-EQUALITY BAR ON A QUANTITY COMPUTED BY TWO ROUTES IS A CLAIM ABOUT FLOATING
+POINT, NOT ABOUT GEOMETRY — AND AN ITERATION SUBSET CANNOT REFUTE IT.** A7 shipped asserting
+`seamFrameResidual === 0`; it is a difference of two COSINES reached by two routes, and CI
+went red on `DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18`, 120 rings each ~1e-16 out.
+**It survived every local run because the smoke subset contains no row where the two routes
+diverge** — the subset is one row per block and the divergence needs a dome AND a lean AND a
+non-default layer tilt together. Measured over the whole live matrix, both modes, 15,938
+rings: 4,419 (27.7%) non-zero, worst **1.5 ULP**. The replacement is DERIVED FROM THE
+QUANTITY, not fitted: both cosines are in [-1, 1] so the error is ABSOLUTE and its unit is
+the ULP — `SEAM_FRAME_RESIDUAL_ULP = 8`, its own declared owner, the observed worst using
+19% of it and the `seam-turn-is-not-the-kink` mutant reading 2.41e15 ULP. Where two owners
+must agree, compare them through ONE expression (`seamHalfThicknessMm()`, which needs no
+tolerance at all) or bound the difference in the unit the quantity carries.
+**THIS BOX RAN ~1.8x THE WRITTEN PACE, AND FOUR CI WAITS SIZED OFF WRITTEN NUMBERS CAME UP
+SHORT** — measured: `bloom-connectedness` **103.8 and 110.4 min** against the 57.7 recorded
+above, `bloom-export-watertight` **189.7 min** against ~111. Same failure mode as the
+withdrawn "~44", arriving from RUNNER VARIANCE rather than matrix growth, which is why the
+rule is not "update the number" but **size a CI wait off `actions_list` on the workflow's
+own recent completed runs, read at the time — never off any figure in this file or any doc.**
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
