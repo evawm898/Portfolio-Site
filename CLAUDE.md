@@ -1419,31 +1419,46 @@ importing `seamClearanceMm` there would mutate with it and check nothing. Second
 only raises a sheet UNDER it — so the table needed a 0.60 mm row. And `HELD_ROWS` is now the
 one owner of `Math.floor(ROOT_BLEND_END * NU)`, which stood in three places and made an
 anchored mutation match twice.
-**THE CENSUS, 624 ROWS, BOTH TREES: 84 rows FIXED to zero, 58 improved, 467 unchanged,
-15 WORSE, and ZERO rows went from clean to self-intersecting.** Declared rows **318 -> 234**;
-total pairs 1,617,263 -> 1,359,861. **The sweep is CALIBRATED** — against a worktree of main
-it reproduced session 36's recorded count on **222 declared rows exactly**, zero
-disagreements, zero undeclared rows non-zero. **The 15 regressions are REPORTED, NOT TUNED
-AROUND** (Eva's stop condition): the mum on a hemisphere is CLEARED (0 -> 0) but **the
-incurve target at rise 0.5 still regresses, 7,350 -> 9,944**, worse than the piling patch's
-8,641, while its FLAT sibling goes 7,806 -> 510.
+**THE CENSUS, 666 ROWS, BOTH TREES, RE-MEASURED AFTER #211 AND #212 MERGED: 87 rows FIXED
+to zero, 58 improved, 506 unchanged, 15 WORSE, and ZERO rows went from clean to
+self-intersecting.** Declared rows **328 -> 241**; total pairs 1,644,959 -> 1,385,765.
+The lobe work moved the same held rows this change moves, so the first sweep's
+84/58/467/15 over 624 rows is SUPERSEDED, not carried forward — **a census partition
+cannot be re-used across a base it was not measured against.** **The sweep is
+CALIBRATED** — against a worktree of main at 1740a2e it reproduced main's OWN declared
+count and worst span on **327 of its 328 declared rows exactly**, zero undeclared rows
+non-zero; the one exception is `ALL MAX`, whose entry on main says in so many words that
+it was never re-measured after #212 gave that row `lobeDepth 1.00`. **The 15 regressions
+are REPORTED, NOT TUNED AROUND** (Eva's stop condition) and they are **the same fifteen
+rows at the same counts — the new ladder did not move them**: the mum on a hemisphere is
+CLEARED (0 -> 0) but **the incurve target at rise 0.5 still regresses, 7,350 -> 9,944**,
+worse than the piling patch's 8,641, while its FLAT sibling goes 7,806 -> 510.
+**THREE OF MAIN'S OWN LOBE ROWS ARE CLEARED TO EXACTLY ZERO, and they are the three whose
+entries named the ROOT BLEND as the cause** — `LOBES: x 3 whorls` (72 -> 0), `LOBES: x
+CONTINUOUS x 3 turns` (264 -> 0) and `LOBES: ONE lobe by both caps` (72 -> 0), each 0
+lobed AND plain, confirmed by `node tools/bloom-lobe-composition.mjs` on the merged tree.
+A second session's instrument, measuring a different feature, named this defect and its
+cause; this change removes it.
 **THE XFAIL LIST IS RE-BASELINED ON THE BRANCH, AND THAT IS A CHANGE OF MEANING** — it cannot
-be a set of pre-existing failures when the session's purpose is to fix 84 of its rows. The
+be a set of pre-existing failures when the session's purpose is to fix 87 of its rows. The
 old `(N layers — the root blend)` tag is GONE from every row (A7 asserts the clearance is met
 on every ring of every row, 0 violations over the matrix), replaced by the two real classes:
-**EFFECTIVE TILT PAST 90 (47 rows** — the blade's own MID-SURFACE lies back over its foot and
+**EFFECTIVE TILT PAST 90 (48 rows** — the blade's own MID-SURFACE lies back over its foot and
 no spacing can fix it; the algebra reverses past a right angle) and **SEAM CLAMPED (5 rows** —
 the blade is SHORTER than the fold it must clear, the worst asking 1.0925x its own length,
 told in the read-out and asserted as a biconditional). **Whether the tilt control should reach
 past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** — a
 declared row whose count doubles passes silently, which is how those 15 landed without a red;
-recorded, not built.
+recorded as issue #213, not built. Every tag is DERIVED per row from the builder's own ladder
+records rather than written by hand, and CLEFT (9 rows) is the third class.
 **THE FLAT/DOMED ASYMMETRY IS EXPLAINED, AND THE CROSSOVER IS MEASURED RATHER THAN MODELLED**
 (session 38, §6b of the outcome doc — Eva asked for the mechanism or the word "unexplained").
 The same configuration goes 7,806 -> 510 FLAT and 7,350 -> 9,944 at `headRise` 0.5, and
 `headRise` is the ONLY difference between the two matrix rows. The cause is the EFFECTIVE SEAM
 TURN: **125.4-128.1 deg on all 120 rings domed against 75.0-89.9 deg flat** (0 of 120 past a
-right angle). **EXACT REGION ATTRIBUTION on both trees** — by coordinate-matching every
+right angle) — **RE-MEASURED on the merged tree and identical**, with `seamStep` identically
+{2} on both, so the displacement the floor applies is HELD and the turn is the only thing that
+differs. **EXACT REGION ATTRIBUTION on both trees** — by coordinate-matching every
 intersecting triangle against `mid +/- n*t/2` and naming it by the rows it SPANS, with SEAM its
 own name, 0 unmatched — shows **every pair involves FOOT or SEAM and there is no
 blade-against-blade anywhere**; blade terms keep their counts and shift down one index, because
@@ -1466,7 +1481,8 @@ written verbatim to BOTH trees, PRINT PREVIEW ON with a `shownMode` read-back, w
 close-up, settled to two byte-identical frames, **no pixel delta quoted** (two trees, two
 servers, two page sessions). It serves both trees over their OWN HTTP servers rather than
 swapping modules, because main's `bloom.js` has no seam telemetry. **Read on the renders: the
-branch shows NO new visible break on either row** — the blade roots meet the hub rim with the
+branch shows NO new visible break on either row, RE-RENDERED on the merged tree against main
+at 1740a2e** — the blade roots meet the hub rim with the
 deep notches shallower on both — which is what released the merge.
 **MODE INDEPENDENCE IS MEASURED, NOT ARGUED: 0 of 624 rows have a `seamStep` set that differs
 live from export.** `seamHalfThicknessMm()` is the ONE owner of `max(sheetThickness,

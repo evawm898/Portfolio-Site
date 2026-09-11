@@ -299,6 +299,19 @@ domed one went **7,350 → 9,944**. Eva called that the most interesting thing i
 the report and asked for the mechanism rather than a footnote. Here it is,
 measured.
 
+**RE-MEASURED ON THE MERGED TREE, and it reproduces exactly.** Neither row
+carries a lobe control, so #211/#212 leave both alone: the two census counts
+above are unmoved, and so are the turns —
+
+| row | rings | effective seam turn | past 90° | `seamStep` |
+|---|---|---|---|---|
+| the incurve target × rise 0.5 | 120 | **125.4 – 128.1°** | **120 / 120** | {2} |
+| the same, flat | 120 | **75.0 – 89.9°** | **0 / 120** | {2} |
+
+`seamStep` is **identically 2 on both**, so the displacement the floor applies is
+held and the turn is the only thing that differs. That is the controlled
+comparison, not a claim about it.
+
 ### The instrument, and the two ways its first version was wrong
 
 The scratch tool attributes **every** intersecting pair to the mesh rows its two
@@ -420,33 +433,63 @@ reaching past 90° at all, which is a separate ruling.
 
 Driven in Node through the same census the export gate calls, export mode, on
 the builder's own doubles, every capability row with its capability applied,
-**624 rows, no errors on either tree**.
+**666 rows, no errors on either tree**.
+
+**RE-MEASURED AFTER #211 AND #212 MERGED.** The first sweep was taken against a
+`main` that no longer exists — the lobe feature and its resolution-demand ladder
+move the same held rows this change moves — so the whole partition was swept
+again on the merged tree rather than carried forward. Everything in this section
+is the second sweep. The first one's figures (84 / 58 / 467 / 15 over 624 rows,
+declared 318 → 234) are superseded and are recorded here only so a reader who
+saw them knows which is which.
 
 **The sweep is calibrated, which is what makes the rest of this section
-readable.** Run against a worktree of `main`, it reproduced session 36's
-recorded count on **222 declared rows exactly** — zero disagreements, and zero
-undeclared rows reading non-zero. So the Node state mapping is the page's, and
-main's own numbers still hold.
+readable.** Run against a worktree of `main` at `1740a2e`, it reproduced main's
+own declared count and worst span on **327 of its 328 declared rows exactly**,
+with **zero undeclared rows reading non-zero**. The single exception is
+`ALL MAX`, and it is not a disagreement about geometry: main's own entry for it
+says in so many words that the count was never re-measured after #212 gave that
+row `lobeDepth 1.00`. So the Node state mapping is the page's.
 
 | | |
 |---|---|
-| rows FIXED to exactly zero | **84** |
+| rows FIXED to exactly zero | **87** |
 | improved | 58 |
-| unchanged | 467 |
+| unchanged | 506 |
 | **worse** | **15** |
 | **went from clean to self-intersecting** | **0** |
 
-Declared rows **318 → 234**. Total within-shell pairs **1,617,263 → 1,359,861**.
+Declared rows **328 → 241**. Total within-shell pairs **1,644,959 → 1,385,765**.
+
+### Three of main's own lobe rows are cleared to exactly zero
+
+And they are the three whose entries on `main` named the **ROOT BLEND** as the
+cause, in so many words:
+
+| main | now | row | main's own note |
+|---|---|---|---|
+| 72 | **0** | `LOBES: x 3 whorls` | *"3 layers — the root blend"* |
+| 264 | **0** | `LOBES: x CONTINUOUS x 3 turns` | *"3 layers — the root blend"* |
+| 72 | **0** | `LOBES: ONE lobe by both caps` | *"the root blend of a short petal under a thick sheet, not the lobe"* |
+
+Each reads 0 **lobed and plain** on this tree, confirmed by `node
+tools/bloom-lobe-composition.mjs`. A different session's instrument, measuring a
+different feature, named this defect and its cause; this change removes it. That
+is the strongest corroboration in this document, and none of it was arranged.
 
 ### The 15 that got worse — reported, not tuned around
 
+**The same fifteen rows, at the same counts — the new ladder did not move them.**
+Only `ALL MAX` reads differently, and only because main's figure for it is now a
+measurement rather than the stale one its own entry disclaimed.
+
 | main | now | row |
 |---|---|---|
-| 72,598 | 77,990 | ALL MAX |
+| 67,521 | 72,348 | ALL MAX |
 | 10,252 | 14,763 | CURL: bias 0.5 × start 0.5 × incurve target × rise 1 |
 | **7,350** | **9,944** | **DOME: the INCURVE TARGET × rise 0.5** |
 | 59,880 | 62,344 | DEPTH: ZYGO 6 layers × ALL INNER MAX |
-| 6,794 | 8,070 | CURL: start floored at one blade row × incurve target × rise 0.5 |
+| 6,794 | 7,251 | CURL: start floored at one blade row × incurve target × rise 0.5 |
 | 6,740 | 7,227 | CURL: bias max × incurve target × rise 0.5 |
 | 6,740 | 7,227 | CURL: bias 0.5 × incurve target × rise 0.5 |
 | 6,740 | 7,227 | CURL: start max × incurve target × rise 0.5 |
@@ -490,7 +533,7 @@ matrix: **0 A7 violations, 5 rows with a clamped ring.**
 
 ### Mode independence, measured rather than argued
 
-**Zero of 624 rows have a `seamStep` set that differs between live and export.**
+**Zero of 666 rows have a `seamStep` set that differs between live and export.**
 The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` in both modes.
 
 ---
@@ -607,6 +650,10 @@ prove, not this session's laptop's.
 
 ## 10. BACKLOG — the xfail list does not gate MAGNITUDE
 
+**Filed as [#213](https://github.com/evawm898/Portfolio-Site/issues/213)**, on
+Eva's instruction: recorded as a backlog item, not built. The rest of this
+section is the sizing that issue carries.
+
 **Named.** `SELF_INTERSECTION_XFAIL` maps a row label to a string. X1 asserts a
 declared row still reads **non-zero**, and fails hard if it reaches zero (a fix
 landing). It does **not** compare the count. So a declared row can go from 7,350
@@ -619,11 +666,11 @@ a hand-run full-matrix sweep rather than by CI.
 comparison is missing.
 
 * Parse the count and worst span out of each entry, or restructure the value to
-  `{ pairs, worstMm, why }` — **234 entries**, mechanical.
+  `{ pairs, worstMm, why }` — **241 entries**, mechanical.
 * Assert the measured count is within a declared band of the recorded one. The
   band is the design question, not the code: these counts are **exact integers
   from a deterministic census**, so the honest bar is equality, and equality
-  would make every future geometry change re-baseline 234 numbers by hand.
+  would make every future geometry change re-baseline 241 numbers by hand.
 * Cost per run: **zero**. The census already runs on every export-gate row; this
   reads a number it already has.
 * Cost per session: a re-baseline whenever a change legitimately moves a
