@@ -356,7 +356,13 @@ fix of B10.7 is in every run below):
   station; worst mesh deficit 0.347 % LIVE / 0.520 % EXPORT; worst query bound 2.31e-5 mm LIVE /
   1.61e-5 mm EXPORT.
 - **Off-station surface gate** with `--control` PASS; **wall thickness** V1–V5 clean, the
-  composition xfail still failing as expected.
+  composition xfail still failing as expected — **and its `--negative-control` was NOT run
+  locally on the final tree, which CI's first run of #212 reported in 35 s**: the
+  `derivative-in-v` mutant's anchor matched 0 times, because the buckle's derivative line grew
+  a lobed arm (it reads the base width `hb` on a lobed row). Re-anchored on both arms; the
+  control's own guard is what caught it, exactly as it is written to. A changed GEOMETRY line
+  disarms a mutant as surely as a changed harness, and the rule to run every control before
+  quoting a pass applies to the tree, not to the file that was edited.
 - **Composition hand check**: 11 rows both sides, every plain row main declares reproducing
   main's count and worst span exactly (B4).
 - **`--verify-frozen --phase24 --base ../main`**: 624 rows deep-equal to `59c0657`'s own
