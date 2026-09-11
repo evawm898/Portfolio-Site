@@ -48,6 +48,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+         lobeAssertions, LOBE_SCOPE, lobeResultLine,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
@@ -123,6 +124,11 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* LOBES (L0-L6, session 38) — see lobeAssertions()'s header. Both gates are
+     blind to a cut in the wrong place or not made: it exports watertight and
+     one piece either way. Rebuilt in Node from the page's own state. */
+  const lob = await lobeAssertions(page, row);
+  if (lob.length) { validity.push(`${row.label}: ${lob.join('; ')}`); continue; }
   /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
      emitted spine rows against the law rebuilt from OTHER owners. Both STL
      gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
@@ -289,6 +295,7 @@ for (const row of rows) {
         + ` · |dP/dv|/h ${fm.petalForm.metricMin.toFixed(4)}..${fm.petalForm.metricMax.toFixed(4)}`
       : null,
     crowding: crowd.r,
+    lobes: fm.petalLobes || null,
     solidCensus: sx.r, orientation: ori.r,
     sagitta: sag,
     coverage: cov.r, coverageSkipped: cov.skipped || null, coverageAsserted: !!row.coverage, sphere: isSphere,
@@ -312,6 +319,7 @@ for (const r of results) {
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
   if (r.thickness) console.log(`       ^ THICKNESS: ${r.thickness} · SCOPE: ${THICKNESS_SCOPE}`);
+  if (r.lobes) console.log(`       ^ ${lobeResultLine(r.lobes)} · SCOPE: ${LOBE_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
   console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ' · XFAIL (declared on main at ead8624, still failing as expected)' : ''}`);

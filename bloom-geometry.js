@@ -3228,6 +3228,9 @@ export function seamLatticeStep(seamMm, length) {
   return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP);
 }
 
+/* The blend grid a demand's ladder is taken down to — see the note at the
+   end of bladeStations. */
+const LADDER_BLEND_GRID = 4096;
 export function bladeStations(profile, length, buckle = null, seamMm = 0) {
   const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
   /* The rows the root blend can reach keep their uniform stations, exactly. */
@@ -3245,7 +3248,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
      it took the mum on a hemisphere from 0 to 72 pairs and the incurve target
      at rise 0.5 from 7,350 to 8,641 (Eva's ruling, session 38 — those two
      figures are that patch's, not this one's; both rows are re-measured under
-     the shipped redistribution in docs/bloom-session-38-seam-clearance-outcome.md).
+     the shipped redistribution in docs/bloom-foot-to-blade-seam-outcome.md).
 
      WHY THE LATTICE AND NOT THE CLEARANCE ITSELF. Placing the first row AT
      the clearance realises the derivation's inequality as an EQUALITY, which
@@ -3307,21 +3310,90 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
     const s = Math.hypot(x - pX, y - pY);
     dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
   }
+  /* THE DEGENERATE PATHS MUST STILL CLEAR THE SEAM (session 38). If the
+     measure is empty there is nothing to redistribute, but returning the
+     UNIFORM ladder would put the first blade rows back under the clearance
+     and break A7. The even ladder over the held block's own domain is the
+     answer, and with no seam shift it is `uniform` verbatim. */
   const fallback = () => heldRows.concat(Array.from({ length: NU - held }, (_, j) => u0 + (1 - u0) * (j + 1) / (NU - held)));
   if (!(arc > 0)) return seamBinds ? fallback() : uniform;
 
   const beta = (LADDER_ARC_SHARE / (1 - LADDER_ARC_SHARE)) * turn;
+  const want = NU - held;
+  const sampleU = (i) => u0 + (1 - u0) * i / LADDER_SAMPLES;
+  /* THE RESOLUTION DEMAND (Eva's ruling amendment, session 38). The ladder
+     stays the ONE place rows are placed; it no longer places them from the
+     petal's curvature alone. A rim feature hands it a demand — a window and
+     the stations that window needs — and the ladder satisfies it INSIDE ITS
+     OWN MEASURE: three REGION COUNTS decided first (the window raised to the
+     demand and held at the ladder's capacity for it, the stretch below and
+     the tip above split by the base measure's own masses, each raised to the
+     gap bound's minimum), then each region placed at equal increments of the
+     SAME cumulative measure. (The first form — one multiplicative factor on
+     the window's increments solved by bisection — left the stretch two rows
+     and its gaps at 1.62 x uniform; A8 caught it, session 38.) No second
+     placer, no station inserted behind the ladder's back: with no demand
+     the whole blade is one region and every line below is today's, to the
+     bit. */
+  /* At the buckle's frequency cap the ladder is uniform (the gap factor is
+     exactly 1 and the blend below takes it there whatever the measure says),
+     so a demand is not placed — it is SERVED by uniform's own rows, which is
+     what ladderWindowCapacity counts there. */
+  const demand = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) === 1 ? null
+    : profile.ladderDemand ? profile.ladderDemand() : null;
   const cum = [0];
   for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
   const total = cum[LADDER_SAMPLES];
   if (!(total > 0)) return seamBinds ? fallback() : uniform;
-
-  const out = heldRows.slice(), want = NU - held;
-  for (let j = 1; j <= want; j++) {
-    const target = total * j / want;
-    let lo = 0, hi = LADDER_SAMPLES;
-    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
-    out.push(u0 + (1 - u0) * hi / LADDER_SAMPLES);
+  /* Stations at equal increments of the measure between two of its values —
+     the whole blade when there is no demand (today's placement, verbatim), one
+     region at a time when there is. */
+  const placeInto = (rows, cA, cB, count) => {
+    for (let j = 1; j <= count; j++) {
+      /* The region's LAST station is asked for at cB ITSELF, not at
+         `cA + (cB - cA)`, which is cB give or take an ulp: under a demand cB
+         is one of `cum`'s own samples, so that ulp decides whether the
+         search lands ON the sample or one past it — a whole ladder sample
+         (~4e-4 of u) riding on the last bit of a sum. The last bit is not
+         the same in every engine (measured: the page and the Node rebuild
+         of one state placed a station 5.5e-4 apart, and X0 refused the
+         export as not this state's build). With no demand cB is `total`
+         and the answer is the top sample either way. */
+      const target = j === count ? cB : cA + (cB - cA) * j / count;
+      let lo = 0, hi = LADDER_SAMPLES;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
+      rows.push(sampleU(hi));
+    }
+  };
+  const cumAt = (u) => { const i = Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES))); return cum[i]; };
+  const out = heldRows.slice();
+  let regions = null;
+  if (demand === null) {
+    placeInto(out, 0, total, want);
+  } else {
+    /* THE REGION COUNTS. The window gets what the base measure would give it,
+       raised to the demand and held at the capacity (or EXACTLY the demand
+       under a capability that asks for it — the floor demonstration's non-
+       shipping configuration); the rest is split between the stretch below
+       and the tip above by the base measure's own masses, each raised to the
+       minimum the gap bound needs of it. Feasible by construction: the
+       capacity is the free rows less those two minima. */
+    const { minStretch, minTip } = ladderOutsideMinima(demand.u0, demand.u1, buckle && buckle.A ? buckle.f : 0);
+    const capRows = Math.max(0, want - minStretch - minTip);
+    const cS = cumAt(demand.u0), cW = cumAt(demand.u1);
+    const mS = cS, mW = cW - cS, mT = total - cW;
+    const baseW = Math.round(want * mW / total);
+    const W = demand.exact ? Math.min(demand.stations, capRows) : Math.min(Math.max(baseW, demand.stations), capRows);
+    const R = want - W;
+    let S = mS + mT > 0 ? Math.round(R * mS / (mS + mT)) : 0;
+    S = Math.max(minStretch, S);
+    let T = R - S;
+    if (T < minTip) { T = minTip; S = R - T; }
+    if (S < 0) { S = 0; T = R; }
+    regions = { S, W, T };
+    placeInto(out, 0, cS, S);
+    placeInto(out, cS, cW, W);
+    placeInto(out, cW, total, T);
   }
   out[NU - 1] = 1;
   /* Strictly increasing, always: two rows at one station is a zero-length
@@ -3336,14 +3408,51 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
   /* The blend touches ONLY the redistributed rows. Running it over the held
      ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
      floating point) and the base's identity claim is a BIT identity, not a
-     four-decimal agreement — measured: 23 of the held stations moved. */
-  /* The blend's target is the EVEN ladder over the redistributed domain.
-     Kept as `uniform[i]` verbatim when the seam floor does not bind, so a
-     bounded ladder on an unshifted block is bit-identical to before. */
-  const even = seamBinds ? (i) => u0 + (1 - u0) * (i + 1 - held) / want : (i) => uniform[i];
-  const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * even(i)));
+     four-decimal agreement — measured: 23 of the held stations moved.
+
+     UNDER A DEMAND THE BLEND TARGET KEEPS THE DEMAND. Blending toward the
+     global uniform ladder would pull rows out of the window and quietly
+     break the count the demand was solved for; so the target is uniform
+     WITHIN EACH REGION — the stretch below the window, the window, the tip
+     above it — with the region counts `out` already has, so row i lies in
+     the same region in both lists and the mix cannot leave it. The window's
+     count is at most the capacity, which is what makes the target's outside
+     gaps admissible. With no demand the target is the uniform ladder, as
+     before. */
+  /* THE BLEND'S TARGET FOLLOWS THE SEAM SHIFT (session 38). The target is the
+     EVEN ladder over the domain the redistributed rows actually occupy, which
+     the seam floor moves: `u0` is the last HELD row, not `held / NU`, whenever
+     the floor binds. Kept as `uniform` / `held / NU` VERBATIM when it does not,
+     so a bounded ladder on an unshifted block stays bit-identical to main's. */
+  const target = demand === null
+    ? (seamBinds
+        ? out.map((u, i) => (i < held ? u : u0 + (1 - u0) * (i + 1 - held) / want))
+        : uniform)
+    : (() => {
+    const ref = heldRows.slice();
+    const bandBase = seamBinds ? u0 : held / NU;
+    const bands = [[bandBase, Math.max(bandBase, demand.u0)], [Math.max(bandBase, demand.u0), demand.u1], [demand.u1, 1]];
+    const counts = [regions.S, regions.W, regions.T];
+    for (let b = 0; b < 3; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
+    ref[NU - 1] = 1;
+    return ref;
+  })();
+  const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * target[i]));
   let lo = 0, hi = 1;
   for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
+  /* UNDER A DEMAND THE BLEND IS THE NORMAL CASE (the window's rows are
+     raised past what the base measure gave, so the gaps outside it widen to
+     the bound on most lobed petals), and a bisection run to 2^-60 hands back
+     the largest admissible blend TO THE LAST BIT — a value whose low bits
+     are a function of the low bits of every measure sample, which differ
+     between engines by an ulp through the transcendental functions (the page
+     and the Node rebuild of one state disagreed at one station by exactly one
+     ulp, and X0 refused the export). The blend is therefore taken DOWN to a
+     grid of 1/4096: still admissible (the widest gap is monotone in the
+     blend), and unmoved by an ulp unless the exact boundary sits within an
+     ulp of a grid line. Only under a demand: with none, every row keeps the
+     placement main ships, to the bit. */
+  if (demand !== null) lo = Math.floor(lo * LADDER_BLEND_GRID) / LADDER_BLEND_GRID;
   return mix(lo);
 }
 const NV = 10;   // columns across one span
@@ -3431,7 +3540,7 @@ const PANEL_OVERLAP_ROWS = 1;
                    shoulder and is deliberate.
      TIP_HALF_MM   the blunt-tip floor.
    =================================================================== */
-export function widthProfile(state, ring, halfW, cap, acc) {
+export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   const a = state.petalBaseTaper;
   const b = state.petalTipTaper;
   const uPk = a / (a + b);                                     // the derived widest point
@@ -3486,7 +3595,10 @@ export function widthProfile(state, ring, halfW, cap, acc) {
     }
     return { shape, name };
   };
-  const shapeAt = (u) => shapeWinner(u).shape;
+  /* THE BASE OUTLINE — the shape before any cut. The cap entry, the lobe
+     stationing and the lobes' own depth cap all read THIS; the lobed shape
+     (`shapeAt`, below the cap) is what the floors are max-ed against. */
+  const shapeBaseAt = (u) => shapeWinner(u).shape;
 
   /* ===================================================================
      THE CONVERGING TIP CAP — Eva's ruling, Sep 1, from the tip sheet.
@@ -3543,13 +3655,163 @@ export function widthProfile(state, ring, halfW, cap, acc) {
   let lo = uPk, hi = 1;
   for (let i = 0; i < 60; i++) {
     const mid = (lo + hi) / 2;
-    if (shapeAt(mid) > target) lo = mid; else hi = mid;
+    if (shapeBaseAt(mid) > target) lo = mid; else hi = mid;
   }
   const uCap = Math.min(1 - TIP_CAP_FRACTION, lo);
+
+  /* THE OUTLINE'S OWN SLOPE BREAKS, from a given winner — the lobes read the
+     BASE outline's (to lay their stations on it), the profile reports the
+     final outline's. */
+  const winnerOf = (shapeFn) => (u) => {
+    const { name } = shapeWinner(u), shape = shapeFn(u), blend = rootBlend(u);
+    const h = Math.max(shape, blend, tipFloor);
+    return { h, term: h === shape ? name : h === blend ? 'ROOT_BLEND' : 'TIP_FLOOR' };
+  };
+  const breaksOf = (winnerAt, grid = 4096) => {
+    const out = [];
+    let prev = winnerAt(0).term;
+    for (let i = 1; i <= grid; i++) {
+      const b = i / grid, cur = winnerAt(b).term;
+      if (cur === prev) continue;
+      let lo2 = (i - 1) / grid, hi2 = b;
+      const from = prev;
+      for (let k = 0; k < 60; k++) {
+        const m = (lo2 + hi2) / 2;
+        if (winnerAt(m).term === from) lo2 = m; else hi2 = m;
+      }
+      out.push({ u: hi2, kind: 'TERM_CHANGE', from, to: cur });
+      prev = cur;
+    }
+    out.push({ u: uPk, kind: 'TIP_LAW_JOIN', from: 'CORE', to: 'CORE' });
+    out.sort((a, b) => a.u - b.u);
+    return out;
+  };
+
+  /* ===================================================================
+     LOBES ON THE RIM (session 38, PR 2) — the cut, stationed on the lamina.
+
+     WHAT IT IS. Between the root blend's end (ROOT_BLEND_END — the foot's
+     boundary, footRing()'s, never touched) and the apex entry (uCap — the
+     region PETAL TIP SHAPE owns, never touched) the outline carries a window
+     of `coverage` of that stretch, measured from the apex down, in which the
+     CORE is multiplied by (1 - depth * c(u)): c is 0 at every crest and 1 at
+     every sinus, so the crests ARE the base outline and the sinuses are cut
+     toward the midrib. Material is only ever removed; the floors below are
+     max-ed against the cut shape exactly as they are against the plain one;
+     one span at every u by construction.
+
+     STATIONED ON ARC LENGTH, NOT ON u. The lobes are laid at even intervals
+     of the BASE outline's own 2D arc — (u * length, max(shape, rootBlend,
+     TIP_HALF_MM)), the ladder's mode-free view, so live and export station
+     the same lobes — through the same engine petalRim() uses on the surface
+     in space (rimArcTable). Even spacing in u bunches where the outline
+     curves and reads as damage; the lamina's arc is what a leaf's teeth are
+     even in. The rim IN SPACE (cup, buckle) is petalRim's to report and the
+     hand checks measure it; laying lobes on the deformed rim would make the
+     outline a function of the form that reads the outline (apexScale), which
+     is circular, and would move the lobes every time a form slider moved.
+
+     THE CUT PROFILE within one period, from crest to crest, is
+     ((1 - cos 2 pi x) / 2) ^ q — LOBE TIP SHAPE's q: 0.5 a pointed crest
+     (near x = 0 the bump is (pi x)^(2q), a V at q = 0.5, round above it),
+     1.0 the cosine, 2.0 a flat-topped crest with a narrower sinus. Every
+     sinus is parabolic at every q: a notch the printer can fill.
+
+     THE WINDOW ENDS ON CRESTS, so the outline meets the base exactly there
+     (a BRANCH: outside (u0, u1) the shape is the base's own closure, not a
+     multiplication by 1), and the cut is continuous at both ends.
+
+     THE TWO CAPS are derived here, told through the record, and drawn on
+     the sliders by bloom.js: the count is the least of what was asked, the
+     ladder's capacity for this window over the samples-per-lobe floor
+     (ladderWindowCapacity / LOBE_SAMPLES_PER_LOBE — the amendment's rows
+     cap) and what the pitch floor allows (floor(window / max(sheet,
+     MIN_FEATURE_MM))); under one of either it is NO ROOM, told, and nothing
+     is cut (the stamens' ruling: told, never refused, and here there is
+     nothing to build); the depth is the least of what was asked and the cap at
+     which the deepest sinus reaches the print floor's half-width (see the
+     LOBES block above for the derivation). A region that does not exist
+     (uCap at or below the root blend's end — the parallel-stub corner)
+     builds no cut and says `noRoom`.
+     =================================================================== */
+  const lobes = (() => {
+    if (!lobesEngaged(state)) return null;
+    if (!(length > 0)) throw new Error('widthProfile: a lobed outline needs the blade LENGTH in mm to station its lobes on the lamina — pass it');
+    const coverage = state.lobeCoverage === undefined ? LOBE_COVERAGE_DEFAULT : Number(state.lobeCoverage);
+    const q = state.lobeTipShape === undefined ? LOBE_TIP_SHAPE_DEFAULT : Number(state.lobeTipShape);
+    const countAsked = state.lobeCount === undefined ? LOBE_COUNT_DEFAULT : Number(state.lobeCount);
+    const depthAsked = Number(state.lobeDepth);
+    const pitchFloorMm = lobePitchFloor(ring.thickness);
+    /* THE FLOOR the demand is made at. A CAPABILITY may name another — a
+       non-shipping configuration, labelled, for the floor demonstration
+       (one step below the floor cannot be reached by any control). */
+    const samplesPerLobe = cap && cap.lobeSamplesPerLobe ? Number(cap.lobeSamplesPerLobe) : LOBE_SAMPLES_PER_LOBE;
+    const buckleFreq = buckleIsFlat(state) ? 0 : Number(state.buckleFreq);
+    const base = { coverage, tipShape: q, countAsked, depthAsked, pitchFloorMm, samplesPerLobe };
+    const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0,
+      countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
+      depthBuilt: 0, depthCap: 0, depthClamped: depthAsked > 0, pitchMm: 0, pitchBelowFloor: false, windowMm: 0, regionMm: 0,
+      windowU: [uCap, uCap], askedWindowU: [uCap, uCap], sinusU: [], crestU: [], cutAt: () => 0, u0: uCap, u1: uCap, demand: null, ...extra });
+    if (!(uCap > ROOT_BLEND_END)) return noRoom('region');
+    const laminaHalf = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
+    const table = rimArcTable((u) => [u * length, laminaHalf(u), 0], breaksOf(winnerOf(shapeBaseAt)), uPk, LOBE_ARC_SAMPLES);
+    const s0 = table.sAt(ROOT_BLEND_END), s1 = table.sAt(uCap);
+    const regionMm = s1 - s0;
+    const windowMm = coverage * regionMm;
+    const sStart = s1 - windowMm;
+    const u0 = coverage >= 1 ? ROOT_BLEND_END : table.uAt(sStart);
+    const u1 = uCap;
+    /* THE TWO CAPS, from the other direction each: the ladder's rows cannot
+       be too few for a lobe (capacity over the floor), and the teeth cannot
+       be too fine for the printer (the window over the pitch floor). The
+       count is the least of asked and both; under one it is NO ROOM, told,
+       and nothing is cut. */
+    const rowsCapacity = ladderWindowCapacity(u0, u1, buckleFreq);
+    const countRowsCap = Math.floor(rowsCapacity / samplesPerLobe + 1e-9);
+    const countFloorCap = Math.floor(windowMm / pitchFloorMm + 1e-9);
+    const countBuilt = Math.min(countAsked, countRowsCap, countFloorCap);
+    if (countBuilt < 1) return noRoom(countRowsCap < 1 ? 'rows' : 'pitch', { rowsCapacity, countRowsCap, countFloorCap, windowMm, regionMm, askedWindowU: [u0, u1] });
+    const countClamped = countAsked > countBuilt;
+    const clampedBy = !countClamped ? null : (countFloorCap < countRowsCap && countFloorCap < countAsked) ? 'pitch' : 'rows';
+    const pitchMm = windowMm / countBuilt;
+    /* False by construction now that the pitch cap clamps the count all the
+       way down; kept as telemetry the gate asserts false. */
+    const pitchBelowFloor = pitchMm < pitchFloorMm - 1e-9;
+    const crestU = [], sinusU = [];
+    for (let k = 0; k <= countBuilt; k++) crestU.push(k === 0 ? u0 : k === countBuilt ? u1 : table.uAt(sStart + k * pitchMm));
+    for (let k = 0; k < countBuilt; k++) sinusU.push(table.uAt(sStart + (k + 0.5) * pitchMm));
+    let hMin = Infinity;
+    for (const us of sinusU) hMin = Math.min(hMin, shapeBaseAt(us));
+    const depthCap = Math.max(0, 1 - TIP_HALF_MM / hMin);
+    const depthBuilt = Math.min(depthAsked, depthCap);
+    const depthClamped = depthAsked > depthCap;
+    const cutAt = (u) => {
+      const x = (table.sAt(u) - sStart) / pitchMm;
+      const f = x - Math.floor(x);
+      return depthBuilt * Math.pow((1 - Math.cos(2 * Math.PI * f)) / 2, q);
+    };
+    return { ...base, noRoom: false, noRoomWhy: null, countBuilt, rowsCapacity, countRowsCap, countFloorCap, countCap: Math.min(countRowsCap, countFloorCap),
+      countClamped, clampedBy, depthBuilt, depthCap, depthClamped, pitchMm, pitchBelowFloor, windowMm, regionMm,
+      windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutAt, u0, u1,
+      /* THE RESOLUTION DEMAND the ladder reads: rows it must place inside
+         the window. A count, because that is what a row placer places; the
+         floor it comes from is stations per PERIOD. */
+      demand: { u0, u1, stations: countBuilt * samplesPerLobe, exact: !!(cap && cap.lobeExactDemand) } };
+  })();
+  /* THE SHAPE THE FLOORS ARE MAX-ED AGAINST. With no lobes it IS the base
+     closure — the branch, not a multiplication by 1 — so the plain petal's
+     bytes are the plain petal's bytes. */
+  const shapeAt = (lobes === null || lobes.noRoom)
+    ? shapeBaseAt
+    : (u) => (u > lobes.u0 && u < lobes.u1 ? shapeBaseAt(u) * (1 - lobes.cutAt(u)) : shapeBaseAt(u));
   const hEntry = Math.max(shapeAt(uCap), rootBlend(uCap), tipFloor);
 
   return {
     uPk, terms, footHalf, uCap, tipFloor,
+    /* THE SHAPE TERM BEFORE THE FLOORS — on a lobed profile the cut one, on a
+       plain profile the base's own closure. The L family re-derives the depth
+       cap from a plain profile's `shapeAt` at the sinus stations. */
+    shapeAt,
     /* The cap's entry and terminal half-widths, reported for the gates and
        the contact sheet rather than re-derived by either. */
     capEntryHalf: hEntry, capTerminalHalf: tipFloor,
@@ -3566,6 +3828,12 @@ export function widthProfile(state, ring, halfW, cap, acc) {
       const shape = shapeAt(u), blend = rootBlend(u);
       return shape >= blend && shape >= tipFloor;
     },
+    /* THE RESOLUTION DEMAND (Eva's amendment, session 38): the rim feature
+       tells the one row placer how many stations its window needs, and the
+       placer satisfies it — the lobes never place a station themselves.
+       Null on a plain petal and under NO ROOM, so the ladder's path there is
+       today's to the bit. */
+    ladderDemand() { return lobes !== null && !lobes.noRoom ? lobes.demand : null; },
     /* THE LADDER'S OWN VIEW OF THE PROFILE, AT THE EXPORT FLOOR IN BOTH MODES.
        Row POSITIONS are topology and the export floor may not touch topology —
        it "is meant to change geometry and never topology", which is the export
@@ -3588,6 +3856,20 @@ export function widthProfile(state, ring, halfW, cap, acc) {
     ladderLawActiveAt(u) {
       const shape = shapeAt(u), blend = rootBlend(u);
       return shape >= blend && shape >= TIP_HALF_MM;
+    },
+    /* THE BASE OUTLINE'S HALF-WIDTH — the same three-way max over the shape
+       BEFORE any cut. On a plain profile this is halfWidthAt's own double
+       (shapeAt IS shapeBaseAt there). The form laws that scale with the
+       half-width (cup, cup gradient, the buckle, the apex sweep) read THIS,
+       because a lobe removes material from the outline and leaves the sheet's
+       surface alone: the cupped, ruffled surface is the same surface with a
+       different boundary, never a surface that dents at every sinus.
+       Measured before this existed: lobes over a 0.30 x buckle read 63
+       within-shell pairs (worst span 0.258 mm), every worst site at a sinus,
+       because the ruffle's amplitude stepped with the cut and the true-normal
+       offset turned each step into a wedge. */
+    halfWidthBaseAt(u) {
+      return Math.max(shapeBaseAt(u), rootBlend(u), tipFloor);
     },
     halfWidthAt(u) {
       const shape = shapeAt(u);
@@ -3612,11 +3894,7 @@ export function widthProfile(state, ring, halfW, cap, acc) {
        (petalRim) places integration nodes on the crossovers it finds, because
        the outline is C0 there and a chord laid across a kink loses first
        order rather than second. */
-    winnerAt(u) {
-      const { shape, name } = shapeWinner(u), blend = rootBlend(u);
-      const h = Math.max(shape, blend, tipFloor);
-      return { h, term: h === shape ? name : h === blend ? 'ROOT_BLEND' : 'TIP_FLOOR' };
-    },
+    winnerAt: winnerOf(shapeAt),
     /* THE OUTLINE'S SLOPE BREAKS, LOCATED: every u where the winning term
        changes (bisected to the crossover between two grid cells that name
        different winners), plus the CORE's own tip-law join at uPk. Below
@@ -3629,24 +3907,28 @@ export function widthProfile(state, ring, halfW, cap, acc) {
        and 73.7 degrees at u 0.057939 and 0.999562 on the default) and it
        rules nothing about them. */
     slopeBreaks(grid = 4096) {
-      const out = [];
-      let prev = this.winnerAt(0).term;
-      for (let i = 1; i <= grid; i++) {
-        const b = i / grid, cur = this.winnerAt(b).term;
-        if (cur === prev) continue;
-        let lo = (i - 1) / grid, hi = b;
-        const from = prev;
-        for (let k = 0; k < 60; k++) {
-          const m = (lo + hi) / 2;
-          if (this.winnerAt(m).term === from) lo = m; else hi = m;
-        }
-        out.push({ u: hi, kind: 'TERM_CHANGE', from, to: cur });
-        prev = cur;
+      const out = breaksOf(winnerOf(shapeAt), grid);
+      /* A POINTED LOBE CREST IS A TANGENT BREAK (the bump is (pi x)^(2q), a V
+         at q = 0.5), so the crests are declared below q = 0.75 — an integrator
+         laying a chord across one loses first order; declaring a round crest
+         costs a node and nothing else. The sinuses are parabolic at every q. */
+      if (lobes !== null && !lobes.noRoom && lobes.tipShape < 0.75) {
+        for (const u of lobes.crestU) if (u > 0 && u < 1) out.push({ u, kind: 'LOBE_CREST', from: 'CORE', to: 'CORE' });
+        out.sort((a, b) => a.u - b.u);
       }
-      out.push({ u: uPk, kind: 'TIP_LAW_JOIN', from: 'CORE', to: 'CORE' });
-      out.sort((a, b) => a.u - b.u);
       return out;
     },
+    /* THE LOBES' RECORD — what was asked, what was built, the two caps and
+       which bound, the pitch against its floor, the window and every
+       station; `sinusMinHalfMm` is the deepest sinus AS BUILT (the max with
+       the floors applied). Null on a plain petal. The builder adds the rows
+       the ladder gave each lobe. */
+    lobes: lobes === null ? null : (() => {
+      const { cutAt, u0, u1, ...rec } = lobes;
+      let sinusMin = Infinity;
+      for (const us of rec.sinusU) sinusMin = Math.min(sinusMin, Math.max(shapeAt(us), rootBlend(us), tipFloor));
+      return { ...rec, sinusMinHalfMm: rec.sinusU.length ? sinusMin : null };
+    })(),
   };
 }
 
@@ -3941,6 +4223,138 @@ export const BUCKLE_FREQ_DEFAULT = 3;
 /* Rows per cycle below which the emitted polyline is not the law's curve.
    NU is 56, so the frequency ceiling above is exactly NU / this. */
 export const BUCKLE_ROWS_PER_CYCLE_MIN = 8;
+
+/* ===================================================================
+   LOBES ON THE RIM (session 38, PR 2) — THE RANGES, THE TWO CAPS AND THE
+   ENGAGEMENT PREDICATE. The cut itself lives in widthProfile(), the
+   outline's one owner; nothing here builds geometry.
+
+   THE RULINGS THIS IMPLEMENTS (the brief, binding): lobes are CUT IN, never
+   built out — material is removed from the existing outline and nothing is
+   appended to the boundary (the appendage construction is what put 19 and
+   37 detached components into the flower at boundary === 0); the outline
+   stays SINGLE-VALUED, one span of material at every u; the count ceiling is
+   2–8 at the default coverage and 10 at maximum coverage; the turning-rate
+   ladder stays the ONE owner of row placement (lobes place no rows — they
+   are part of the outline the ladder reads, and buy their rows through its
+   turning term exactly as the buckle does); LOBE TIP SHAPE is its own
+   control at the lobe's scale and never touches the whole-petal apex, which
+   PETAL TIP SHAPE owns over [uCap, 1]; `coverage` keeps its name (the id is
+   namespaced `lobeCoverage`, the label is "Coverage").
+
+   THE COUNT CAP IS THE LADDER'S CAPACITY OVER THE SAMPLES-PER-LOBE FLOOR,
+   derived per build and never a ruled pair of numbers (the amendment): the
+   lobe feature DEMANDS LOBE_SAMPLES_PER_LOBE stations per lobe of the one
+   row placer, the ladder can put at most ladderWindowCapacity(u0, u1) of its
+   free rows inside the window without its own gap bound breaking outside
+   it, and the count is the least of what was asked, capacity / floor and
+   the pitch floor's own cap. The ruled 2-8 / 10-at-max was issued without
+   the floor under it and does not survive it — what survives is reported in
+   the read-out (`countRowsCap`, `rowsCapacity`) and in docs §B10, plainly.
+   NAME THE SAMPLING: the built rows-per-lobe is MEASURED on the emitted
+   stations and printed (L6), and L6 asserts the demand was met.
+
+   THE PITCH FLOOR IS A PHYSICAL LENGTH, derived from one: max(the emitted
+   sheet thickness, MIN_FEATURE_MM). A lobe pitch under it is two teeth the
+   printer cannot separate. The count is clamped to floor(window / floor),
+   told as CLAMPED, and the read-out prints the floor beside the pitch.
+
+   THE DEPTH CAP IS WHERE "ONE SPAN OF MATERIAL" STOPS BEING TRUE, derived
+   per build: the depth is a fraction of the LOCAL half-width (scale-free,
+   the buckle's own ruling, so a deep cut on a wide row and a shallow one on
+   the tip row are the same slider position), the sinus keeps
+   `(1 - depth) * h` of half-width, and at depth 1 the sinus reaches the
+   midrib and the petal is DIVIDED — which is a split petal, out of scope.
+   The cap is the depth at which the deepest sinus reaches the print floor's
+   half-width (TIP_HALF_MM, the same 1.60 mm span the apex face keeps):
+   depthCap = 1 - TIP_HALF_MM / min over the sinuses of the base half-width.
+   Below it every u carries a span wider than the print floor; above it the
+   floor holds the width and the travel is dead — told, and marked.
+   =================================================================== */
+export const LOBE_COUNT_RANGE = Object.freeze([2, 10]);
+export const LOBE_DEPTH_RANGE = Object.freeze([0, 1]);
+export const LOBE_COVERAGE_RANGE = Object.freeze([0.1, 1]);
+export const LOBE_TIP_SHAPE_RANGE = Object.freeze([0.5, 2]);
+export const LOBE_COUNT_DEFAULT = 6;
+export const LOBE_COVERAGE_DEFAULT = 0.8;
+export const LOBE_TIP_SHAPE_DEFAULT = 1;
+/* THE SAMPLES-PER-LOBE FLOOR — DERIVED, and the reason the count is what
+   it is (Eva's ruling amendment, session 38). The first lobe sheet stood on
+   a sampling floor: 3.0 rows per lobe at eight lobes and 4.2 at six drew
+   three tip shapes as three identical triangle waves, the control inert to
+   the eye — the buckle's own f 7 at NU 28, four samples per period cannot
+   carry a shape. `node tools/bloom-lobe-resolution.mjs` derives the floor:
+   one period of the law at the sheet's own depth and pitch, its polyline
+   through n stations placed as the LADDER places them (turning plus the arc
+   share, ends on crests), and two clauses — every tip shape's BROAD feature
+   (the round sinus of 0.50, the flat crest of 2.00, either of 1.00's) spans
+   at least two station gaps, so it is drawn as a bend and not a corner; and
+   every pair is drawn further apart than either drawing's own chord error
+   while keeping half the laws' true separation. The floor is 11 under the
+   ladder's placement and 10 under a uniform one: the ladder's rows land on
+   the SHOULDERS, where the outline turns, and leave the round bands' centres
+   the widest gaps, and the binding shape is the default 1.00, whose crest
+   and sinus bands (0.205 of the period each) are the narrowest broad
+   feature in the range. NAME THE SAMPLING: this is stations per lobe PERIOD,
+   scale-free by construction, and the demand it sets is a COUNT of rows in
+   the window that the ladder must place — see ladderWindowCapacity and
+   bladeStations. Ten happens to be the buckle's own bar plus two; eight is
+   what the three-lobe cell had, and it was not picked. */
+export const LOBE_SAMPLES_PER_LOBE = 11;
+/* The lamina arc table's density for stationing (rimArcTable cells). 1024
+   rather than petalRim's 4096 because it runs per petal on every rebuild:
+   the residual scales with the cell squared on the smooth stretches, and the
+   graded patches carry the outline's own singular points at any density
+   (PR 1's R3 table), so 1024 is within ~2e-4 mm of the limit on the default
+   — three orders under the pitch floor. */
+export const LOBE_ARC_SAMPLES = 1024;
+/* THE GUARD. `!x` rather than `=== 0` for the reason buckleIsFlat gives: a
+   state with no registry row reads the key as undefined and must read as
+   plain. The registry's twin is PREDICATES.lobesEngaged; the harness checks
+   the two agree at load and on every row (L0). */
+export function lobesEngaged(state) { return !!state.lobeDepth; }
+/* THE LADDER'S CAPACITY FOR A WINDOW — how many of its free rows it can
+   place inside [u0, u1] without the rows OUTSIDE breaking its own widest-gap
+   bound (LADDER_MAX_GAP_FACTOR / NU in u, or uniform at the buckle's
+   frequency cap). The rows below ROOT_BLEND_END are held and never counted;
+   the stretch between the last held row and u0 needs ceil(its length / the
+   gap) gaps, whose interior stations are outside the window; the tip above u1
+   needs ceil(its length / the gap) stations including u = 1. What is left of
+   NU - held is the window's. The lobes' count cap is this over the
+   samples-per-lobe floor — the ONE derivation of "how many lobes the rim can
+   carry", and it is the ladder's, not a ruled number: 8 and 10 were ruled
+   without this floor under them and do not survive it (docs, §B10). */
+export function ladderWindowCapacity(u0, u1, buckleFreq = 0) {
+  /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
+     places, which is what made an anchored mutation match three times. */
+  const held = HELD_ROWS;
+  const free = NU - held;
+  /* AT THE BUCKLE'S FREQUENCY CAP THE LADDER IS UNIFORM, BY THE BUCKLE'S OWN
+     RULE (56 rows over 7 cycles is 8 per cycle with no slack; A8 asserts it),
+     so the window's capacity there is what the uniform ladder puts in it —
+     counted, not bounded — and a demand is served by exactly those rows. */
+  if (ladderGapFactor(buckleFreq) === 1) {
+    let n = 0;
+    for (let k = held + 1; k <= NU; k++) { const u = k / NU; if (u > u0 && u <= u1) n++; }
+    return n;
+  }
+  const gap = ladderGapFactor(buckleFreq) / NU;
+  const stretch = Math.max(0, u0 - held / NU), tip = Math.max(0, 1 - u1);
+  const outside = Math.ceil(stretch / gap - 1e-9) + Math.ceil(tip / gap - 1e-9);
+  return Math.max(0, free - outside);
+}
+/* The two outside regions' minimum station counts under the bound, the same
+   arithmetic as the capacity's, exposed for the ladder's own use so the two
+   cannot drift: the stretch's rows run from the last held row up to u0 (its
+   last row AT u0), the tip's from u1 up to 1 (its last row AT 1). */
+export function ladderOutsideMinima(u0, u1, buckleFreq = 0) {
+  /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
+     places, which is what made an anchored mutation match three times. */
+  const held = HELD_ROWS;
+  const gap = ladderGapFactor(buckleFreq) / NU;
+  return { held, minStretch: Math.ceil(Math.max(0, u0 - held / NU) / gap - 1e-9), minTip: Math.ceil(Math.max(0, 1 - u1) / gap - 1e-9) };
+}
+export function lobePitchFloor(sheetThicknessMm) { return Math.max(sheetThicknessMm, MIN_FEATURE_MM); }
 
 /* THE PER-SLOT PHASE (Eva, ruling 5) — DERIVED, never a control. One phase
    for the whole whorl makes every petal identical, which reads machined; the
@@ -4448,31 +4862,46 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      constant per-row normal is a wedge of varying thickness, not a sheet;
      the unit normal here is dP/dv rotated a quarter turn in the same
      plane, which keeps the offset a true constant-thickness shell. */
-  const sectAt = (C, T1, N1, h, u) => {
+  const sectAt = (C, T1, N1, h, u, hb = h) => {
     const r = ramp(u);
     const k = kAt(u, r);
     const c = cAt(u, r);
+    /* THE CUT LEAVES THE SURFACE ALONE (session 38). `h` is where the boundary
+       is; `hb` is the BASE outline's half-width, the scale every law below
+       reads. Where the two are the same double (every plain petal — the
+       profile computes both from the same max over the same shape) the
+       shipped expressions run verbatim by a BRANCH on `hb === h`; on a lobed
+       row the laws are the same functions of `a` (millimetres from the midrib)
+       with the base width as their scale, so the cupped, ruffled surface at a
+       sinus is the surface the crest beside it lies on. */
+    const cut = hb !== h;
     /* THE BUCKLE'S TWO TERMS FOR THIS ROW, or null. `buckle === null` makes
        every expression below the pre-session-31 one character for character,
-       which is what the byte report is a construction rather than a hope. */
-    const bw = buckle === null ? null : (v) => r * buckle.w(u, v, h);
-    const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);
+       which is what the byte report is a construction rather than a hope. On
+       a lobed row the wave is evaluated at the base outline's own v for this
+       a — `v * h / hb` — and scaled by the base width. */
+    const bw = buckle === null ? null : cut ? (v) => r * buckle.w(u, v * h / hb, hb) : (v) => r * buckle.w(u, v, h);
+    const bd = buckle === null ? null : cut ? (v) => r * buckle.dwda(u, v * h / hb, hb) : (v) => r * buckle.dwda(u, v, h);
     /* THE APEX SCALE'S RATIO for this row, or null where the blend is inactive
        — `apex === null` and `kS === null` both make every expression below the
        pre-session-35 one CHARACTER FOR CHARACTER, which is what makes the byte
        report a construction rather than a hope. Even where it is non-null the
        ratio is the LAST factor, so at S === h it would be a multiplication by
        the exact double 1; the branch is belt and braces on top of that. */
-    const kS = apex === null ? null : apex.kAt(u, h);
+    const kS = apex === null ? null : apex.kAt(u, hb);
+    /* The cup's lift is c * a^2 / hb — the same parabola on every row of a
+       lobe — written on the plain branch as the shipped `c * h * v * v`. */
+    const cupLift = cut ? (v) => c * (h * v) * (h * v) / hb : (v) => c * h * v * v;
+    const cupSlope = cut ? (v) => 2 * c * (h * v) / hb : (v) => 2 * c * v;
     return (v) => {
       const a = h * v;
       const aT = k === 0 ? a : Math.sin(k * a) / k;
       const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)
-        + (kS === null ? c * h * v * v : c * h * v * v * kS)
+        + (kS === null ? cupLift(v) : cupLift(v) * kS)
         + (bw === null ? 0 : (kS === null ? bw(v) : bw(v) * kS));
       const dT = k === 0 ? 1 : Math.cos(k * a);
       const dN = (k === 0 ? 0 : Math.sin(k * a))
-        + (kS === null ? 2 * c * v : 2 * c * v * kS)
+        + (kS === null ? cupSlope(v) : cupSlope(v) * kS)
         + (bd === null ? 0 : (kS === null ? bd(v) : bd(v) * kS));
       const L = Math.hypot(dT, dN);
       const nT = -dN / L, nN = dT / L;
@@ -4713,7 +5142,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
   const T = [-sinA, cosA, 0];
   const Z = [0, 0, 1];
 
-  const profile = widthProfile(ps, ring, halfW, cap, acc);
+  const profile = widthProfile(ps, ring, halfW, cap, acc, length);
   /* THE GUARD. petalFormIsFlat() is the predicate; when it holds, `form`
      stays null and every row below takes the pre-form expression verbatim.
      That — not an IEEE-754 argument — is what makes the shipped default
@@ -4906,6 +5335,10 @@ export function petalSurface(state, ring, slot, cap, acc) {
   const rowAt = (u) => {
     const s = u * length;
     const h = profile.halfWidthAt(u);
+    /* THE SURFACE'S OWN WIDTH SCALE (session 38): the base outline's, so a
+       lobe cuts the boundary without denting the sheet. Identical to `h` on
+       every plain petal, and `sectAt` takes the shipped branch there. */
+    const hb = profile.halfWidthBaseAt(u);
     const { C, phi } = spineAt(s);
     /* The row's own frame, READ from petalForm's frameAt rather than
        recomputed here — the contact sheet's framing reads the same
@@ -4916,7 +5349,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
     return f === null
       ? { C, N: nrm, T, h, u, sect: flatSect(C, nrm, h) }
-      : { C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u) };
+      : { C, N: f.N, T: f.T, D: f.D, h, u, sect: form.sectAt(C, f.T, f.N, h, u, hb) };
   };
 
   return {
@@ -5007,39 +5440,19 @@ export const RIM_SIDES = Object.freeze([1, -1]);
 export const RIM_GRADE_CELLS = 4;
 export const RIM_GRADE_DEPTH = 32;
 
-export function petalRim(surface, samples = RIM_SAMPLES) {
-  if (!(Number.isInteger(samples) && samples >= 2)) throw new Error(`petalRim: samples must be an integer >= 2, got ${samples}`);
-  const breaks = surface.tangentBreaks();
-  /* The node ladder: uniform cells over [0, 1] with every tangent break the
-     surface declares inserted (the outline's crossovers and, on a formed
-     build, the onset ramp's corner), sorted, exact duplicates dropped (a
-     break that lands on a grid node is one node, not two). */
-  /* THE NODE LADDER: uniform cells over [0, 1], and around every declared
-     break AND the apex a GEOMETRICALLY GRADED patch replacing the uniform
-     nodes there. The grading is not optional: the outline's power laws have
-     UNBOUNDED slope at two of their own points — the superellipse leaves the
-     widest point vertically below n = 1 and arrives at the apex vertically
-     above it (h ~ (1 - s)^(1/n)) — and a uniform cell containing such a
-     point is cut by one chord however fine the grid. Measured before the
-     grading existed: the all-form-max x buckle f 7 x n 3.00 corner converged
-     at order 1.25 in LIVE mode (the 0.15 mm floor lets the profile run to
-     within 2e-6 of s = 1) with every seam node already in place.
-
-     THE PATCH SCALES WITH THE CELL — RIM_GRADE_CELLS cells either side,
-     halving RIM_GRADE_DEPTH times toward the point — so doubling `samples`
-     halves the whole patch and the ladder is SELF-SIMILAR under refinement.
-     A fixed-width patch was tried first and made the convergence ORDER
-     unreadable (uniform nodes interleaving a fixed geometric set differently
-     at every density, order 1.06 on n 0.60 at residuals of 4e-6 mm): the
-     residual was small and the instrument could no longer say so cleanly. A
-     power-law point y ~ x^alpha under a self-similar graded patch converges
-     at order 3 - 2 alpha (>= 1.8 across the shipped exponents), which the
-     correspondence tool's R3 reads back rather than assumes. */
+/* THE ARC-LENGTH ENGINE, one implementation for two callers (session 38,
+   PR 2): petalRim() runs it along each margin of the surface in space, and
+   widthProfile() runs it along the base outline's own 2D curve
+   (u * length, h(u)) to station the lobes on the lamina. The ladder, the
+   graded patches and `sAt`'s appended node are all here and nowhere else.
+   `P(u)` returns a point (any dimension the caller likes, three here);
+   `breaks` are the u of every tangent break to place nodes on; `uPk` sets the
+   graded patch's span scale. See petalRim's note for why the patch is
+   self-similar under refinement and why the endpoints are unconditional. */
+export function rimArcTable(P, breaks, uPk, samples) {
+  if (!(Number.isInteger(samples) && samples >= 2)) throw new Error(`rimArcTable: samples must be an integer >= 2, got ${samples}`);
   const span = RIM_GRADE_CELLS / samples;
   const singular = [...breaks.filter((b) => b.u > 0 && b.u < 1).map((b) => b.u), 1];
-  /* Both endpoints unconditionally: a break within `span` of the apex would
-     otherwise filter u = 1 out with the uniform nodes — measured, the last
-     node came back 1 - 2^-32 * span and sAt(1) overshot the length. */
   const nodes = [0, 1];
   for (let i = 1; i < samples; i++) {
     const u = i / samples;
@@ -5056,41 +5469,45 @@ export function petalRim(surface, samples = RIM_SAMPLES) {
   nodes.sort((a, b) => a - b);
   const U = [nodes[0]];
   for (let i = 1; i < nodes.length; i++) if (nodes[i] !== U[U.length - 1]) U.push(nodes[i]);
-
   const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const Pt = U.map((u) => P(u));
+  const S = [0];
+  for (let i = 1; i < U.length; i++) S.push(S[i - 1] + dist(Pt[i], Pt[i - 1]));
+  const cellOf = (u) => {
+    let lo = 0, hi = U.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (U[m] <= u) lo = m; else hi = m; }
+    return lo;
+  };
+  const sAt = (u) => {
+    if (!(u >= 0 && u <= 1)) throw new Error(`rimArcTable: u must be in [0, 1], got ${u}`);
+    const k = u >= 1 ? U.length - 1 : cellOf(u);
+    if (U[k] === u) return S[k];
+    return S[k] + dist(P(u), Pt[k]);
+  };
+  const length = S[S.length - 1];
+  const uAt = (s) => {
+    if (!(s >= 0 && s <= length)) throw new Error(`rimArcTable: s must be in [0, ${length}], got ${s}`);
+    let lo = 0, hi = S.length - 1;
+    while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= s) lo = m; else hi = m; }
+    if (S[lo] === s) return U[lo];
+    let a = U[lo], b = U[hi];
+    for (let k = 0; k < 50; k++) { const m = (a + b) / 2; if (sAt(m) < s) a = m; else b = m; }
+    return (a + b) / 2;
+  };
+  return { length, sAt, uAt, nodesU: U, nodesS: S, pointAt: P };
+}
+
+export function petalRim(surface, samples = RIM_SAMPLES) {
+  const breaks = surface.tangentBreaks();
+  const uPk = surface.profile.uPk;
   const sideOf = (side) => {
     if (side !== 1 && side !== -1) throw new Error(`petalRim: side must be +1 or -1, got ${side}`);
-    const P = U.map((u) => surface.at(u, side).P);
-    const S = [0];
-    for (let i = 1; i < U.length; i++) S.push(S[i - 1] + dist(P[i], P[i - 1]));
-    /* The last node at or before u — U is sorted and U[0] is 0. */
-    const cellOf = (u) => {
-      let lo = 0, hi = U.length - 1;
-      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (U[m] <= u) lo = m; else hi = m; }
-      return lo;
-    };
-    const sAt = (u) => {
-      if (!(u >= 0 && u <= 1)) throw new Error(`petalRim: u must be in [0, 1], got ${u}`);
-      const k = u >= 1 ? U.length - 1 : cellOf(u);
-      if (U[k] === u) return S[k];
-      return S[k] + dist(surface.at(u, side).P, P[k]);
-    };
-    const length = S[S.length - 1];
-    const uAt = (s) => {
-      if (!(s >= 0 && s <= length)) throw new Error(`petalRim: s must be in [0, ${length}], got ${s}`);
-      let lo = 0, hi = S.length - 1;
-      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= s) lo = m; else hi = m; }
-      if (S[lo] === s) return U[lo];
-      /* s is monotone in u within one cell (the chord from the cell's start
-         grows with u on any cell short enough to bend less than a quarter
-         turn, which every cell here is); bisect it. */
-      let a = U[lo], b = U[hi];
-      for (let k = 0; k < 50; k++) { const m = (a + b) / 2; if (sAt(m) < s) a = m; else b = m; }
-      return (a + b) / 2;
-    };
-    return { side, length, sAt, uAt, nodesU: U, nodesS: S, pointAt: (u) => surface.at(u, side).P };
+    const t = rimArcTable((u) => surface.at(u, side).P, breaks, uPk, samples);
+    return { side, ...t };
   };
   const sides = { [1]: sideOf(1), [-1]: sideOf(-1) };
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const U = sides[1].nodesU;
 
   /* THE TERMINAL MINI-FACE: the margins meet across the u = 1 row. Its
      length is measured the same way, as a dense polyline over v — and beside
@@ -5492,8 +5909,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
          that into the exponent and reads 1.5014 for an asked 1.50. Reading
          the sampling as if it were the geometry — this project's own most
          repeated defect. */
-      peakHalf: profile.halfWidthAt(profile.uPk),
+      peakHalf: profile.halfWidthBaseAt(profile.uPk),
     },
+    /* THE LOBES (session 38, PR 2): the profile's own record plus the rows
+       the ladder actually gave the window — a ROW COUNT, read off the emitted
+       stations, said as one. Null on a plain petal. */
+    lobes: profile.lobes === null ? null : (() => {
+      const [u0, u1] = profile.lobes.windowU;
+      const inWin = rows.filter((r) => r.u > 0 && r.u >= u0 && r.u <= u1).length;
+      return { ...profile.lobes, rowsInWindow: inWin, rowsPerLobe: profile.lobes.countBuilt ? inWin / profile.lobes.countBuilt : 0 };
+    })(),
     /* THE LADDER, reported so its two identities can be asserted on the
        EMITTED stations rather than on the expression that made them: the
        rows below ROOT_BLEND_END are the uniform ones, and the widest gap

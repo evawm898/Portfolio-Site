@@ -121,6 +121,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
+         lobeAssertions, LOBE_SCOPE, lobeResultLine,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
@@ -220,6 +221,30 @@ function voxelComponents(buf, cell) {
   return { dim, comps, biggest, total, strayFraction: total ? +(1 - biggest / total).toFixed(5) : 0 };
 }
 
+/* A REAL GAP DOES NOT CLOSE WHEN THE CELL SHRINKS (the flower gate's own
+   recorded rule, arriving here on a measured case, session 38): a row that
+   reads more than one component at the gate's cell is re-read at HALF the
+   cell before it is called detached. A rasterisation artefact — the quarter-
+   cell sampler landing one triangle's samples in a cell none of whose six
+   face-neighbours another triangle's samples reached — vanishes at the finer
+   cell; a genuine detachment survives it. Measured on `LOBES: x buckle 0.30
+   f 3` with the resolution demand in: ONE cell holding ONE 0.15 mm^2 tip
+   triangle that shares vertices with ten neighbours in a watertight mesh
+   read as a second component at 0.6 mm and as one piece at 0.55, 0.5, 0.45,
+   0.4 and 0.3. The refinement is reported on the row, never silent, and a
+   row that is still more than one piece at the finer cell FAILS as before.
+   It runs only on a multi-component read, so every other row's cost and
+   verdict are exactly what they were. */
+function componentsRefined(buf, cell) {
+  const r = voxelComponents(buf, cell);
+  if (r.skipped || r.comps <= 1) return { ...r, refined: null };
+  const fine = voxelComponents(buf, cell / 2);
+  if (fine.skipped) return { ...r, refined: { cell: cell / 2, skipped: true } };
+  return fine.comps <= 1
+    ? { ...fine, coarse: { cell, comps: r.comps, strayFraction: r.strayFraction }, refined: { cell: cell / 2, comps: fine.comps, artefact: true } }
+    : { ...r, refined: { cell: cell / 2, comps: fine.comps, strayFraction: fine.strayFraction, artefact: false } };
+}
+
 const rows = buildMatrix();
 if (NEGATIVE_CONTROL) {
   rows.length = 1;
@@ -267,6 +292,11 @@ for (const row of rows) {
      everywhere because the junction is everywhere. */
   const frm = await formAssertions(page, row);
   if (frm.length) { validity.push(`${row.label}: ${frm.join('; ')}`); continue; }
+  /* LOBES (L0-L6, session 38) — see lobeAssertions()'s header. Both gates are
+     blind to a cut in the wrong place or not made: it exports watertight and
+     one piece either way. Rebuilt in Node from the page's own state. */
+  const lob = await lobeAssertions(page, row);
+  if (lob.length) { validity.push(`${row.label}: ${lob.join('; ')}`); continue; }
   /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
      emitted spine rows against the law rebuilt from OTHER owners. Both STL
      gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
@@ -338,7 +368,7 @@ for (const row of rows) {
      validity assertions are hard; the CROWDED mark is not. */
   const crowd = await footCrowding(page, row, e);
   if (crowd.bad.length) { validity.push(`${row.label}: ${crowd.bad.join('; ')}`); continue; }
-  const v = voxelComponents(buf, CELL_MM);
+  const v = componentsRefined(buf, CELL_MM);
   const fm = await page.evaluate(() => window.__bloomMetrics());
   const probe = { ringWidth: fm.ringWidth, ringThickness: fm.ringThickness, ringRadius: fm.ringRadius, crowding: crowd.r, orientation: ori.r };
   if (v.skipped) results.push({ label: row.label, capability: !!row.capability, ok: null, ...e, ...probe, note: `SKIPPED — grid ${v.dim.join('x')} exceeds ${MAX_VOXELS.toLocaleString('en-US')} voxels` });
@@ -401,7 +431,7 @@ for (const r of results) {
   if (r.ok === null) skipped.push(r);
   else if (!r.ok) failures.push(r);
   const detail = r.comps !== undefined
-    ? `components=${r.comps} stray=${r.strayFraction} tris(export)=${r.tris} boundary=${r.boundary}`
+    ? `components=${r.comps} stray=${r.strayFraction} tris(export)=${r.tris} boundary=${r.boundary}${r.refined ? (r.refined.artefact ? ` [${r.coarse.comps} components at ${CELL_MM} mm read as ONE at ${r.refined.cell} mm — a rasterisation artefact of the sampler, not a gap]` : ` [still ${r.refined.comps} components at ${r.refined.cell} mm — a real gap]`) : ''}`
     : (r.note || '');
   console.log(`  ${verdict} ${r.label.padEnd(46)} ${detail}`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);

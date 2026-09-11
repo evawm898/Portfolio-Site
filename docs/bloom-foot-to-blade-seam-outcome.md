@@ -1,13 +1,40 @@
-# Bloom session 38 — the foot-to-blade seam clearance
+# The foot-to-blade seam clearance (the work scheduled as "the root blend")
 
-> **Two session-38 workstreams ran in parallel, so this doc is not
-> `bloom-session-38-outcome.md`.** That filename belongs to the LOBE work
-> (#211, "lobes on the petal rim"), whose own opening reserves it for that
-> feature's two PRs. This one is the foot-to-blade seam clearance. Neither
-> was folded into the other: they share a session number and nothing else.
+> **NAMED FOR THE WORK, NOT THE NUMBER** (Eva's instruction). Two parallel
+> workstreams both called themselves session 38, so `bloom-session-38-outcome.md`
+> is the LOBE work's (#211, #212) and this one is named for what it turned out to
+> be. Eva's instruction called it "the root blend work", which is the name the
+> scheduled session carried — and **superseding that diagnosis is this document's
+> headline finding**: the defect is an offset-surface fold at the FOOT-TO-BLADE
+> SEAM, not a foot collapsing across the root blend. The filename follows the
+> finding.
 
 
-**Status: all five bloom gates GREEN, waiting on Eva's ruling. Nothing is merged.**
+**Status: RE-MEASURED ON THE MERGED TREE. Nothing is merged.**
+
+**#211 AND #212 BOTH LANDED ON `main` WHILE THIS BRANCH WAS HELD, AND THEY MOVE THE
+SAME LADDER.** #212 rewrote `bladeStations` around a resolution DEMAND (regions,
+`placeInto`, a blend target per region) while this branch moves where that ladder's
+HELD BLOCK starts. `main` was merged in — merged, not rebased: this repo forbids
+history rewriting, and a merge keeps the branch's own history intact — and the
+overlap was resolved deliberately rather than textually:
+
+* `bladeStations` is #212's body with the seam edits re-applied to it — the
+  signature's `seamMm`, the lattice-shifted held block, `out` starting from those
+  held rows, the degenerate `fallback()` (returning `uniform` there would put the
+  first blade rows back under the clearance and break A7), and the blend target
+  following the shift in BOTH arms, including per-region under a demand.
+* **`HELD_ROWS` is the one owner again.** #212 re-derived `Math.floor(ROOT_BLEND_END * NU)`
+  in `ladderWindowCapacity` and `ladderOutsideMinima` — which is why their own
+  `ladder-eats-the-base` mutant had to be re-anchored after the sweep reported the
+  bare line matching 3x. Both now read `HELD_ROWS`, so the mutation moves every
+  consumer together and the anchor is unique again.
+* The mutant table is **their nine plus this branch's four**, none dropped.
+
+**EVERY FIGURE BELOW THAT WAS MEASURED AGAINST THE OLD `main` IS RE-MEASURED OR
+MARKED.** The census partition, the byte partition and the renders were all taken
+against a base that no longer exists, and the live matrix is **666 rows now, not
+624**, so those totals cannot be carried forward on assertion.
 
 **RE-VERIFIED AFTER MAIN MOVED.** #211 (the lobe work's PR 1) landed on `main` while
 this branch was held, touching `bloom-geometry.js`, `CLAUDE.md` and the doc filename.

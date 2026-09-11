@@ -1290,8 +1290,87 @@ IN LENGTH by up to 8.09 mm, so a lobe layout must say which margin's `s` it read
 for Node-side instruments is `tools/bloom-first-slot.mjs`, one copy, read by the off-station
 tool and this one.
 
+**LOBES ARE CUT INTO THE RIM, THE LADDER ACCEPTS A RESOLUTION DEMAND, AND THE RIM HOLDS TWO
+LOBES AT NU 56** (session 38, PR 2, under Eva's ruling amendment — read
+`docs/bloom-session-38-outcome.md` §B, and §B10 first, before touching `widthProfile`'s lobes
+block, `bladeStations`, the L family or block 29). `lobeDepth` (0–1 of the BASE half-width,
+default 0 — the guard, hidden and inert at 0), `lobeCount` (2–10), `lobeCoverage` (0.10–1.00 of the
+rim between the root blend and the tip cap, as ARC LENGTH on the lamina from the tip end) and
+`lobeTipShape` (0.50 pointed – 2.00 flat-topped, its own control, never `petalTipShape`) in a Lobes
+drop-down inside Petal shape. **CUT IN, NEVER BUILT OUT**: inside the window the half-width is
+`base · (1 − cut)`, outside it the base's own closure (a BRANCH — the GATED rows are bit-identical
+to the default); the stations are `rimArcTable()` on the base outline; the pitch is millimetres and
+its floor `max(sheet, MIN_FEATURE_MM)`; the depth cap `1 − TIP_HALF_MM / min base half-width over
+the sinuses` keeps the outline single-valued. **THE CUT LEAVES THE SURFACE ALONE**: cup, cup
+gradient, buckle and the apex sweep read the BASE width `hb` on a lobed row (the first cut let the
+buckle read the cut width: 63 pairs, one at every sinus).
+**THE FIRST SHEET STOOD ON A SAMPLING FLOOR AND EVA RULED IT A STAIRCASE**: 3.0 rows per lobe at
+eight lobes, 4.2 at six, three tip shapes as three identical triangle waves — the buckle's own f 7 at
+NU 28. **THE AMENDMENT: the turning-rate ladder remains the ONE place rows are placed, and it now
+ACCEPTS A RESOLUTION DEMAND from the rim feature and satisfies it** — no second placer, no station
+inserted behind its back. **THE FLOOR IS DERIVED, 11 STATIONS PER LOBE UNDER THE LADDER'S PLACEMENT
+(10 uniform)**: `node tools/bloom-lobe-resolution.mjs` — every tip shape's BROAD feature (the round
+sinus of 0.50, the flat crest of 2.00, either of 1.00's) must span two station gaps to draw as a bend,
+and every pair must separate past both drawings' chord error; the ladder's rows land on the shoulders
+and leave the round bands' centres the widest gaps, and the binding shape is the DEFAULT 1.00. A
+height comparison alone passed at 4 and the sheet had already refuted it — a polyline through four
+points differs in vertex heights without differing in shape. **THE CONSEQUENCE, STATED PLAINLY: TWO
+LOBES.** The demand is `count × 11` rows in the window; the ladder's capacity for a window is its 39
+free rows less what its own gap bound (1.40 × uniform; uniform at the buckle's f 7) needs outside it
+(`ladderWindowCapacity`): 27 at the default coverage, 31 at maximum, 22 under buckle f 7 — 2 lobes
+everywhere on the default petal, 1 where the window is short, NO ROOM by the pitch floor on a 20 mm
+petal at coverage 0.10. The ruled 2–8 / 10-at-max was issued without the floor under it and does not
+survive it; three lobes at maximum coverage are one constant away (the tip's 1.40 bound giving up two
+rows), not taken. **HOW THE LADDER SERVES IT**: region counts first (the window raised to the demand
+and held at the capacity; the stretch and the tip split by the base measure's masses, each raised to
+the bound's minimum), then each region placed at equal increments of the SAME measure; the gap
+bound's blend target is uniform within each region with those counts. The first implementation (a
+factor on the window's increments, the old global-uniform blend target) was caught by A8 at 1.62 ×
+uniform; the region form reads exactly 1.400 on every lobed row and the plain path is today's to
+the bit. **THE APEX IS `petalTipShape`'s, UNTOUCHED** (measured, both modes): the window ends at
+`uCap` on a crest where the cut is exactly 0; the join is tangent-continuous at tip shape 1.00 and
+2.00 and a corner at 0.50 (39.7° at two lobes, 81.4° on the six-lobe triptych) — the pointed law's
+own crest derivative, which is what reads as a tooth reaching the apex; options costed in §B10.3,
+none taken. **THE CENSUS IS THE VERDICT AND A PAIR COUNT IS A PROPERTY OF THE TESSELLATION**: nine
+block-29 rows over folds main declares are in `SELF_INTERSECTION_XFAIL` with BOTH counts (the ninth is
+the SHEET's, not the lobe's — a 20 mm petal at a 2.40 mm sheet folds at the root blend with no lobe at
+all, 72 pairs / 0.1755 mm on main's own geometry, which no row on main names because the matrix varies
+one control at a time; X2 found it on the pitch-floor row), and `node
+tools/bloom-lobe-composition.mjs` — the named lobes × cup / lobes × buckle hand check — builds each
+twice and reports the nearest-site distance (every lobed site within 0.70 mm of a plain one; 0.000
+where the pairs are the root blend's or the stigma's), REPORTED never bounded; cup 0.40's and buckle
+0.30 f 3's plain hairline contacts are sampling coincidences of the stations against a crease — the
+buckle row reads 0 lobed, the cup row 3 span-0 touches on other petals (declared, X1 says when a ladder
+change lands 0 there again).
+**THE CONNECTEDNESS GATE RE-READS A MULTI-COMPONENT ROW AT HALF THE CELL** before calling it detached
+(the flower gate's rule, arriving on a measured case: one cell, one 0.15 mm² tip triangle with ten
+vertex-sharing neighbours, one piece at every cell below 0.6). **`verify-bloom-surface-bytes.mjs`
+GAINED `--movers <regex>`**: a feature that adds rows cannot claim 0 moved over the whole matrix, so the
+movers are predeclared and must move, the holders must hold, and both counts print. **A ROW THAT SWEEPS
+EVERY CONTROL IS A MOVER OF ANY CONTROL A FEATURE ADDS** — `ALL MAX` takes `lobeDepth`'s maximum and is
+a lobed row on the branch; session 38's first predeclaration left it off and the tool failed the run on
+it rather than closing over 634 "holders" one of which moved 3.5 million floats. `frozen/phase24`
+is the 624 rows at `59c0657`. The demonstration is `node tools/shot-bloom-lobe-floor.mjs <dir>` —
+fifteen macro images with print preview ON, through the capability hook for the below-floor states
+(`lobeSamplesPerLobe`, `lobeExactDemand`; no control reaches under the floor, which is the point) —
+not a sheet.
+**A PLACEMENT DECIDED BY A STRICT COMPARISON OF TWO VALUES EQUAL BY CONSTRUCTION IS DECIDED BY THE
+LAST BIT, AND THE LAST BIT IS NOT THE SAME IN EVERY ENGINE** (session 38, §B10.7 — X0 caught it on
+three lobed rows: the page's STL and the Node rebuild of the page's own state differed by 0.002 mm at
+2,880 / 28,014 floats). The ladder's cumulative measure is transcendental at every term and reads
+8.1e-13 apart between V8 12.4 (Node) and V8 14.1 (the gate's Chromium) on every petal — harmless
+until a discrete decision sits on it: the region's last station was asked for at `cA + (cB - cA)`,
+which is `cB` give or take an ulp, against `cB` being one of the measure's own samples, so the search
+landed on the sample in one engine and one past it in the other (a whole ladder sample, 5.5e-4 in
+`u`, measured); and the gap-bound blend is a bisection to 2^-60. Under a demand the last station is
+asked for at `cB` itself and the blend is floored to 1/4096 (`LADDER_BLEND_GRID`); the plain path is
+untouched to the bit. **The plain blend carries the same exposure and it BINDS on 348 of 1,226
+row-modes of the live matrix** (measured), below `fround` so X0 has never seen it; flooring it would
+move those bytes and is not this PR's. Fourth instance of a discrete decision on a continuous
+quantity here; do not write a fifth.
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
-SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-session-38-seam-clearance-outcome.md` before
+SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
 root blend is an **offset-surface fold at the foot-to-blade kink**: every site on the top
 skin at the ring radius at `dz = t/2`, both triangles of every pair a seam quad, zero pairs
@@ -1418,7 +1497,6 @@ cleft.** **No frozen phase is owed**
 (no row added or removed); **`frozen/phase23`'s bytes stop reproducing on 156 of its 596
 rows** (measured) while its definitions still deep-compare — it joins phase17, phase19 and
 phase21 in that class.
-
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because

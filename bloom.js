@@ -864,6 +864,24 @@ function spineLine(petals) {
    sweep 3..40 at the defaults reads 0 on every row. Depth is what the root
    blend adds; the form's own apex folds are session 35 §7.4's and are
    in the xfail list by row. */
+/* THE LOBES LINE (session 38, PR 2) — read from ring 0's petal record, never
+   re-derived from the sliders: asked beside built for the count and the depth,
+   each cap and whether it bound, the pitch against its floor, and the rows the
+   ladder gave each lobe (a ROW COUNT, measured on the emitted stations, said
+   as such). Absent on a plain petal. */
+function lobeLine(petals) {
+  const L = petals && petals[0] && petals[0].lobes;
+  if (!L) return '';
+  if (L.noRoom) return `LOBES NO ROOM — ${L.noRoomWhy === 'region' ? 'the apex entry sits at or below the root blend' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows in this window and a lobe needs ${L.samplesPerLobe}` : `${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}; nothing cut, told\n`;
+  const count = L.countClamped
+    ? `${L.countAsked} asked → ${L.countBuilt} built (CLAMPED by ${L.clampedBy === 'pitch' ? 'the pitch floor' : `the rows the ladder has — ${L.rowsCapacity} free in this window at ${L.samplesPerLobe} a lobe`})`
+    : `${L.countBuilt} lobes`;
+  const depth = L.depthClamped
+    ? `depth ${L.depthAsked.toFixed(2)}x asked → ${L.depthBuilt.toFixed(2)}x built (CLAMPED at the print floor)`
+    : `depth ${L.depthBuilt.toFixed(2)}x (cap ${L.depthCap.toFixed(2)}x)`;
+  return `LOBES ${count} · ${depth} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% (${L.windowMm.toFixed(1)} of ${L.regionMm.toFixed(1)} mm, u ${L.windowU[0].toFixed(3)}–${L.windowU[1].toFixed(3)}) · tip shape ${L.tipShape.toFixed(2)} · ${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} emitted stations in the window) · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
+}
+
 function rootBlendLine(layers, cont) {
   if (!(layers >= 3)) return '';
   return `ROOT BLEND AT ${layers} ${cont ? 'TURNS' : 'LAYERS'}: the inner ${cont ? 'turns' : 'layers'}' short petals fold through themselves at the root (a measured self-intersection at the defaults, session 35; a flag here, the X family in the export gate) — a bloom of ONE OR TWO ${cont ? 'turns' : 'layers'} exports free of self-intersection at any petal count at the default form; what still folds a single petal is its own form (cup beyond about -0.2..0.3, buckle from 0.3x, roll from 270°, curl 360°), not the depth\n`;
@@ -1117,6 +1135,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
        + spineLine(petals)
+       + lobeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
@@ -1170,7 +1189,10 @@ function regenerate() {
      must print the OWNER's cap rather than re-derive it from the sliders.
      The petal's own form telemetry is where it lives; null on a flat build. */
   const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium,
-                  buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null };
+                  buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
+                  /* THE LOBES' two caps join the record for the same reason (session
+                     38): the count's and the depth's marks print the OWNER's numbers. */
+                  lobes: (built.petal && built.petal.lobes) || null };
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -1491,6 +1513,13 @@ window.__bloomMetrics = () => ({
      measured here, from the builder that made the geometry, and asserted by
      both gates on every row. */
   petalForm: lastPetal ? lastPetal.form : null,
+  /* LOBE TELEMETRY (session 38, PR 2) — the builder's own record of the cut:
+     what was asked, what was built, both caps and which one bound, the pitch
+     against its floor, the window in u and in mm, the sinus stations, and
+     the rows the ladder gave each lobe. Null on a plain petal. Both STL gates
+     are structurally blind to a wrong cut (a petal cut in the wrong place is
+     watertight and one piece), so the L family reads this. */
+  petalLobes: lastPetal ? (lastPetal.lobes ?? null) : null,
   petalFootFrames: lastPetal ? lastPetal.footFrames : null,
   petalGuardResidual: lastPetal ? lastPetal.guardResidual : null,
   /* THE FOOT RING'S OWN CROSS-SECTION, exposed so the reworked foot
