@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-surface-bytes.mjs — THE SURFACE EXTRACTION MOVED NOTHING.
 
-     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--rows N] [--control]
+     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--rows N] [--only <label regex>] [--control] [--movers <label regex>]
 
    Session 37 lifted the petal's mid-surface law out of `buildPetalInto`'s row
    loop into `petalSurface()`. The claim is the strongest one available and
@@ -62,8 +62,20 @@ const argOf = (n) => { const i = argv.indexOf(n); return i < 0 ? null : argv[i +
 const BASE = argOf('--base');
 const LIMIT = +(argOf('--rows') || 0) || Infinity;
 const CONTROL = argv.includes('--control');
+/* THE PARTITION (session 38, PR 2). A feature that ADDS rows to the matrix
+   cannot claim "0 floats moved" over the whole matrix: the base tree does not
+   know the new controls, so every row that engages them builds the default on
+   the base and the feature here, and differs BY DESIGN. `--movers <regex>`
+   names those rows by label, predeclared: every matching row MUST move (at
+   least one float, in at least one mode — a mover that holds is a feature that
+   did nothing, refused as vacuous), every other row must hold to the bit, and
+   the verdict prints both counts. Without it the tool is the session-37 shape:
+   every row holds. A generated `<id> min/max` row for a new control whose
+   guard is off (the count, coverage and tip shape at depth 0) is a HOLDER and
+   must not be named. */
+const MOVERS = argOf('--movers') ? new RegExp(argOf('--movers')) : null;
 if (!BASE || !existsSync(path.join(BASE, 'bloom-geometry.js'))) {
-  console.error('usage: node tools/verify-bloom-surface-bytes.mjs --base <worktree of the base commit> [--rows N] [--control]');
+  console.error('usage: node tools/verify-bloom-surface-bytes.mjs --base <worktree of the base commit> [--rows N] [--control] [--movers <label regex>]');
   process.exit(2);
 }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
@@ -84,9 +96,10 @@ function stateOf(row) {
   return s;
 }
 
-const rows = harness.buildMatrix().slice(0, LIMIT);
+const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
+const rows = harness.buildMatrix().filter((r) => !ONLY || ONLY.test(r.label)).slice(0, LIMIT);
 console.log(`${rows.length} rows x 2 modes — this tree against ${BASE}`);
-const fails = [];
+const allFails = [];
 let floats = 0, gridFloats = 0, tris = 0, rowsDone = 0, panels = 0;
 let controlFired = 0;
 
@@ -112,9 +125,14 @@ function gridFloatsOf(petals) {
   return out;
 }
 
+let moversSeen = 0, moversMoved = 0, holdersSeen = 0;
 for (const row of rows) {
   const st = stateOf(row);
   const opts = { below: null, capability: row.capability ?? null };
+  const mover = MOVERS ? MOVERS.test(row.label) : false;
+  if (mover) moversSeen++; else holdersSeen++;
+  const rowFails = [];
+  const fails = mover ? rowFails : allFails;
   for (const exportMode of [false, true]) {
     const tag = `${row.label} (${exportMode ? 'export' : 'live'})`;
 
@@ -155,9 +173,16 @@ for (const row of rows) {
     }
     if (!exportMode) panels += ga.filter((x) => typeof x === 'string' && x.includes('.label:')).length;
   }
+  if (mover) {
+    if (rowFails.length) moversMoved++;
+    else allFails.push(`${row.label}: named a MOVER by --movers and held to the bit in both modes — the feature did nothing on a row declared to engage it`);
+  }
   rowsDone++;
   if (rowsDone % 50 === 0) process.stderr.write(`  ${rowsDone}/${rows.length} rows\n`);
 }
+const fails = allFails;
+if (MOVERS && !moversSeen) fails.push(`VACUOUS: --movers ${MOVERS} matched no row of the matrix`);
+if (MOVERS && !holdersSeen) fails.push('VACUOUS: --movers matched EVERY row — nothing is being held');
 
 /* VACUITY. A comparison that compared nothing passes trivially. */
 if (!rows.length) fails.push('VACUOUS: the matrix returned no rows');
@@ -169,7 +194,8 @@ if (CONTROL && fails.filter((f) => !f.startsWith('VACUOUS')).length !== 2) {
   fails.push(`CONTROL DID NOT FIRE BOTH CLAUSES: ${fails.filter((f) => !f.startsWith('VACUOUS')).length} finding(s), expected exactly 2 — a clause that cannot produce a verdict is not a check`);
 }
 
-console.log(`\nexport stream : ${floats.toLocaleString()} floats over ${tris.toLocaleString()} triangles, ${rowsDone} rows x 2 modes`);
+if (MOVERS) console.log(`\npartition     : ${moversMoved} of ${moversSeen} rows named by --movers MOVED (every one must), ${holdersSeen} holders compared to the bit`);
+console.log(`${MOVERS ? '' : '\n'}export stream : ${floats.toLocaleString()} floats over ${tris.toLocaleString()} triangles, ${rowsDone} rows x 2 modes${MOVERS ? ' (movers counted in the floats only where their lengths agree)' : ''}`);
 console.log(`captured grid : ${gridFloats.toLocaleString()} values over ${panels.toLocaleString()} panels (live)`);
 if (CONTROL) console.log('positive control: one coordinate perturbed by 1e-9 — the run MUST fail below');
 
@@ -179,4 +205,4 @@ if (fails.length) {
   if (fails.length > 40) console.log(`  ... and ${fails.length - 40} more`);
   process.exit(1);
 }
-console.log('\nPASS — 0 floats moved, positionally, under Object.is.');
+console.log(MOVERS ? `\nPASS — 0 floats moved on the ${holdersSeen} holders, positionally, under Object.is; all ${moversSeen} predeclared movers moved.` : '\nPASS — 0 floats moved, positionally, under Object.is.');

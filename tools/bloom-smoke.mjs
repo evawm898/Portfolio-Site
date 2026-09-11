@@ -563,6 +563,31 @@ export const SMOKE_BLOCKS = [
         path: 'the ladder\'s UNBOUNDED arm redistributing hardest, under every form deformation at once — A7 for the held rows and the strictly-increasing stations (two rows at one station is a zero-length panel), A6 for the exponent surviving cup, curl, roll and twist' },
     ],
   },
+  {
+    n: 29,
+    anchor: 'LOBES: the first live step (depth 0.01)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 38): the branches lobes add
+       are `lobesEngaged` (the outline's cut is CONSTRUCTED at all), the
+       window and its stationing on the base outline's arc, the two caps
+       (the ruled count ceiling and the pitch floor; the depth cap at the
+       print floor) each in its binding and non-binding direction, and the
+       GATED plain petal. Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: the
+       compositions (cup, buckle, roll, curl, twist), every placement but
+       RADIAL, the centre, the apex law's ends and the tip-shape axis are
+       live-matrix rows only; the census verdict on the folds declared on
+       main is the export gate's X family on the full matrix. */
+    rows: [
+      { label: 'LOBES: 10 asked at the default coverage — CLAMPED to 2, told',
+        path: 'the cut CONSTRUCTED and the ROWS CAP binding at once (the ladder\'s capacity over the samples-per-lobe floor, L6 asserting the demand met) — L0 (the predicate and the guard agree), L1 (a lobed row reports the cut), L2 (cut in, never out: the outline at or below the base everywhere and identical outside the window), L3 (eight sinuses on the law, countBuilt the least of asked / ceiling / pitch cap, CLAMPED by the ceiling and told), L4 (the window and the region re-measured as the base outline\'s own arc, the pitch over the count against max(sheet, MIN_FEATURE_MM)), L5 (the depth cap derived and NOT binding at 0.30), L6 (the window inside [root blend, uCap], the crests at its ends, every sinus reached by an emitted station)' },
+      { label: 'LOBES: THE DEPTH CAP (1.00 asked — CLAMPED where the deepest sinus reaches the print floor)',
+        path: 'L5 in its BINDING direction — depth 1.00 asked, built at 1 - TIP_HALF_MM / the shallowest sinus, CLAMPED told, the deepest sinus keeping exactly the print floor\'s half-width in live mode too; L3 with the count unclamped' },
+      { label: 'LOBES: NO ROOM by the pitch floor (20 mm petal at coverage 0.10 — a 1.0 mm window under the 1.20 mm floor; nothing cut, told)',
+        path: 'the PITCH FLOOR as the cause of NO ROOM — L3\'s noRoom branch naming the pitch (the window under max(sheet, MIN_FEATURE_MM) holds no lobe while the rows cap would allow one), L2 the outline identical to the base everywhere, L1 the record present and telling; the one direction the count cap has that the rows cap does not exercise' },
+      { label: 'LOBES: GATED — count, coverage and tip shape at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)',
+        path: 'the OTHER direction — L0 and L1 on a plain petal: depth 0 with every sub-control at its extreme builds no cut and reports no record; the row the byte tool proves bit-identical to the default' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

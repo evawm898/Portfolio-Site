@@ -684,8 +684,12 @@ const MUTANTS = [
     witness: normalsMustMove },
   { id: 'derivative-in-v', names: ['V4'],
     why: "differentiate the field in v rather than in a = h*v — the discovery pass's own first bug",
-    find: 'const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h);',
-    into: 'const bd = buckle === null ? null : (v) => r * buckle.dwda(u, v, h) * h;',
+    /* Re-anchored in session 38: the line grew a lobed arm (the buckle reads the
+       BASE width `hb` on a lobed row), and CI's own run of this control reported
+       the old anchor matching 0 times — the guard doing its job. Both arms take
+       the wrong derivative; the wall gate's rows exercise the plain one. */
+    find: 'const bd = buckle === null ? null : cut ? (v) => r * buckle.dwda(u, v * h / hb, hb) : (v) => r * buckle.dwda(u, v, h);',
+    into: 'const bd = buckle === null ? null : cut ? (v) => r * buckle.dwda(u, v * h / hb, hb) * hb : (v) => r * buckle.dwda(u, v, h) * h;',
     witness: normalsMustMove },
   { id: 'dead-branch', names: ['V2'],
     why: 'the guard always holds, so the buckle is never built',
