@@ -62,6 +62,11 @@
    =================================================================== */
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
+/* ONE OWNER OF THE SLOT PAYLOAD — buildWhorlInto's own callback, never a
+   synthesised `{ index, azimuth, ... }`; the helper lives in
+   tools/bloom-first-slot.mjs so the rim-arc tool (session 38) reads the same
+   lines rather than a copy. */
+import { firstSlot } from './bloom-first-slot.mjs';
 
 const argv = process.argv.slice(2);
 const CONTROL = argv.includes('--control');
@@ -86,31 +91,6 @@ const CONFIGS = [
   { name: 'BUCKLED (trueNormalRows engaged)', set: { buckleAmp: 0.5, buckleFreq: 3 }, buckled: true },
   { name: 'THINNED (non-uniform thickness)', set: { tipThinning: 0.4 } },
 ];
-
-/* ONE OWNER OF THE SLOT PAYLOAD — buildWhorlInto's own callback, never a
-   synthesised `{ index, azimuth, ... }`. A tool that made up a slot would be a
-   second producer of exactly the payload it is checking a consumer against. */
-function firstSlot(state, acc) {
-  const fr = G.footRing(state, acc);
-  let got = null;
-  if (fr.continuousMode) {
-    G.buildWhorlInto({
-      count: fr.rings.length, radius: (i) => fr.rings[i].radius, height: 0,
-      sizeRamp: (i) => fr.rings[i].scale, angleRamp: (i) => fr.rings[i].tiltExtra,
-      phase: fr.rings[0].phase, placement: state.placement,
-      blade: (slot) => { if (!got) got = { ring: fr.rings[slot.index], slot }; },
-    });
-  } else {
-    const ring = fr.slotRings[0][0];
-    G.buildWhorlInto({
-      count: fr.slotCount, radius: ring.radius, height: 0,
-      sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra,
-      phase: ring.phase, placement: state.placement, fan: fr.fan,
-      blade: (slot) => { if (!got) got = { ring: fr.slotRings[0][slot.index], slot }; },
-    });
-  }
-  return got;
-}
 
 for (const cfg of CONFIGS) {
   const state = { ...DEFAULTS, ...cfg.set };

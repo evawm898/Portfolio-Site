@@ -3245,7 +3245,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
      it took the mum on a hemisphere from 0 to 72 pairs and the incurve target
      at rise 0.5 from 7,350 to 8,641 (Eva's ruling, session 38 — those two
      figures are that patch's, not this one's; both rows are re-measured under
-     the shipped redistribution in docs/bloom-session-38-outcome.md).
+     the shipped redistribution in docs/bloom-session-38-seam-clearance-outcome.md).
 
      WHY THE LATTICE AND NOT THE CLEARANCE ITSELF. Placing the first row AT
      the clearance realises the derivation's inequality as an EQUALITY, which
@@ -3472,15 +3472,21 @@ export function widthProfile(state, ring, halfW, cap, acc) {
      so the foot-continuity floor stands down for it — and ONLY for it. */
   const rootBlend = stalk ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
 
-  const shapeAt = (u) => {
-    let shape = 0;
+  /* ONE LOOP over the term list, returning the winning term's NAME beside
+     its value — so `winnerAt` below can say WHICH term the outline is on
+     without a second walk over the same list with the same comparison.
+     `shapeAt` is this loop's value, and its arithmetic is unchanged: the
+     same `>` on the same terms in the same order. */
+  const shapeWinner = (u) => {
+    let shape = 0, name = null;
     for (const t of terms) {
       if (u < t.from || u > t.to) continue;
       const v = t.at(u);
-      if (v > shape) shape = v;
+      if (v > shape) { shape = v; name = t.name; }
     }
-    return shape;
+    return { shape, name };
   };
+  const shapeAt = (u) => shapeWinner(u).shape;
 
   /* ===================================================================
      THE CONVERGING TIP CAP — Eva's ruling, Sep 1, from the tip sheet.
@@ -3595,6 +3601,51 @@ export function widthProfile(state, ring, halfW, cap, acc) {
          every value on both tapers. `uCap` and the entry half-width are kept
          as TELEMETRY for the gates and the sheet; nothing reads them to build. */
       return Math.max(shape, rootBlend(u), tipFloor);
+    },
+    /* WHICH OF THE THREE WON, BY NAME — the same `max` as halfWidthAt, asked
+       which of its arguments it returned. `Math.max` returns one of its
+       arguments exactly, so `h === shape` is a statement about that call and
+       never a tolerance; a tie is resolved shape, then blend, then floor, and
+       a tie IS a crossover, so either answer names the seam correctly. Reads
+       the same three values in the same order as halfWidthAt; a term added
+       to the max is a term this reports by construction. The rim query
+       (petalRim) places integration nodes on the crossovers it finds, because
+       the outline is C0 there and a chord laid across a kink loses first
+       order rather than second. */
+    winnerAt(u) {
+      const { shape, name } = shapeWinner(u), blend = rootBlend(u);
+      const h = Math.max(shape, blend, tipFloor);
+      return { h, term: h === shape ? name : h === blend ? 'ROOT_BLEND' : 'TIP_FLOOR' };
+    },
+    /* THE OUTLINE'S SLOPE BREAKS, LOCATED: every u where the winning term
+       changes (bisected to the crossover between two grid cells that name
+       different winners), plus the CORE's own tip-law join at uPk. Below
+       n = 1 the superellipse leaves uPk with an infinite slope, so that
+       join is a genuine break; above it the two limbs meet C1 and the node
+       is harmless. A term that wins only inside one grid cell (1/grid of u,
+       ~0.01 mm at 4096) is not seen — stated here, and the rim query's
+       Richardson check is what bounds what that could cost.
+       This reports the SHIPPED law's own seams (session 37 measured 44.5
+       and 73.7 degrees at u 0.057939 and 0.999562 on the default) and it
+       rules nothing about them. */
+    slopeBreaks(grid = 4096) {
+      const out = [];
+      let prev = this.winnerAt(0).term;
+      for (let i = 1; i <= grid; i++) {
+        const b = i / grid, cur = this.winnerAt(b).term;
+        if (cur === prev) continue;
+        let lo = (i - 1) / grid, hi = b;
+        const from = prev;
+        for (let k = 0; k < 60; k++) {
+          const m = (lo + hi) / 2;
+          if (this.winnerAt(m).term === from) lo = m; else hi = m;
+        }
+        out.push({ u: hi, kind: 'TERM_CHANGE', from, to: cur });
+        prev = cur;
+      }
+      out.push({ u: uPk, kind: 'TIP_LAW_JOIN', from: 'CORE', to: 'CORE' });
+      out.sort((a, b) => a.u - b.u);
+      return out;
     },
   };
 }
@@ -4872,12 +4923,198 @@ export function petalSurface(state, ring, slot, cap, acc) {
     /* THE FRONT DOOR. `rowAt` applied — never a second law. */
     at: (u, v) => rowAt(u).sect(v),
     rowAt, footRowsAt,
+    /* WHERE THE SURFACE'S TANGENT BREAKS ALONG u, DECLARED BY ITS OWNERS
+       (session 38). Two producers of C0 points reach a rim point P(u, v):
+       the OUTLINE (widthProfile's `max` — its own `slopeBreaks()`), and the
+       FORM's onset ramp, which is `u / FORM_ONSET_END` then 1, so cup, roll
+       and the buckle each arrive with a slope that stops dead at u =
+       FORM_ONSET_END. Measured before this existed: a rim polyline that cut
+       that point with a chord converged at FIRST order on every formed
+       state (order 0.8–1.0 on the buckle, non-monotone on cup + roll), and
+       at second order once the node was placed. Curl and twist are smooth
+       there (a curvature jump costs a chord nothing at second order), so
+       the node is declared only when a form exists — on a flat build the
+       list is the profile's alone, and the constant is the one FORM_ONSET_END
+       petalForm's own ramp reads. Consumers integrating along u (petalRim)
+       read this; nothing here re-derives a seam. */
+    tangentBreaks: () => {
+      const out = profile.slopeBreaks();
+      if (form !== null) out.push({ u: FORM_ONSET_END, kind: 'FORM_ONSET', from: 'ramp', to: 'full' });
+      out.sort((a, b) => a.u - b.u);
+      return out;
+    },
     /* The petal's constants, so a consumer reads them from the one place
        that derived them instead of re-deriving any of them. */
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     floorRadius, uniformThickness, profileT, tAt,
     seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
+  };
+}
+
+/* ===================================================================
+   petalRim — WHERE THE RIM IS IN SPACE, AND HOW FAR ALONG IT A POINT SITS.
+   (session 38, PR 1 — the structural prerequisite for lobes; no feature.)
+
+   WHAT IT ANSWERS. For one petal, on either margin (v = +1 or v = -1): the
+   rim point at any u, the ARC LENGTH s(u) along the rim from the ring row
+   (u = 0) to that point, its inverse u(s), the total length, and the width
+   of the terminal mini-face the two margins meet across at u = 1. Even
+   spacing of teeth and lobes depends on this: spacing evenly in u bunches
+   where the outline curves fastest (the apex, where h(u) falls through the
+   tip law) and reads as damage rather than as a treatment.
+
+   WHAT THE RIM IS. The mid-surface's margin, `surface.at(u, +/-1).P` — the
+   curve the exporter's rim quads are built about (emitPanel offsets the two
+   skins +/- t/2 from exactly these points at every station, and the rim
+   strip joins them). It is the rim IN SPACE, so cup, roll, curl, twist and
+   the buckle all lengthen or shorten it while leaving h(u) alone; the
+   correspondence proof in tools/verify-bloom-rim-arc.mjs samples those.
+   The FOOT's edges (s < 0, the three rows at u = 0) are footRing()'s and are
+   not part of this curve; a cleft's inner edges are not either — a
+   capability petal has more boundary than its two margins, and this query
+   describes the two margins only.
+
+   HOW s IS MEASURED, and why it is a construction rather than a quadrature.
+   There is no analytic dP/du (the spine law is a table on the curl family,
+   the buckle differentiates in v only), so s(u) is the chord length of a
+   DENSE POLYLINE through `at(u_k, side).P` over `samples` cells of u, with
+   every tangent break the surface declares (`surface.tangentBreaks()`: the
+   outline's crossovers from widthProfile, and the form onset ramp's corner
+   at FORM_ONSET_END when a form exists) inserted as nodes. The nodes matter:
+   a chord laid ACROSS a kink converges at first order where chords that land
+   on it converge at second, and the correspondence tool's R3 measures that
+   order rather than assuming it. `sAt(u)` for an arbitrary u appends u to the
+   polyline as one more node (s at the node before it, plus the chord to
+   u), so by the triangle inequality the reported arc between any two u is
+   never less than the straight chord between them — which is what lets the
+   correspondence tool assert `arc >= the exported chord` EXACTLY rather than
+   within a tolerance. `RIM_SAMPLES` is the default density; the residual it
+   leaves against a doubled and quadrupled density is measured, not assumed
+   (the tool's R3), and a consumer that needs it cheaper passes fewer.
+
+   NAME THE MODE. The surface this is built on already carries its
+   accumulator's mode (widthProfile reads acc.exportMode for the terminal
+   floor), so a rim built from an export-mode surface is the export's rim
+   and a live one the preview's; the two differ at the tip and every number
+   reported off either says which.
+   =================================================================== */
+export const RIM_SAMPLES = 4096;
+export const RIM_SIDES = Object.freeze([1, -1]);
+/* The graded patch around a singular point of the ladder: this many uniform
+   cells either side, halved this many times toward it. See the ladder note
+   inside petalRim. */
+export const RIM_GRADE_CELLS = 4;
+export const RIM_GRADE_DEPTH = 32;
+
+export function petalRim(surface, samples = RIM_SAMPLES) {
+  if (!(Number.isInteger(samples) && samples >= 2)) throw new Error(`petalRim: samples must be an integer >= 2, got ${samples}`);
+  const breaks = surface.tangentBreaks();
+  /* The node ladder: uniform cells over [0, 1] with every tangent break the
+     surface declares inserted (the outline's crossovers and, on a formed
+     build, the onset ramp's corner), sorted, exact duplicates dropped (a
+     break that lands on a grid node is one node, not two). */
+  /* THE NODE LADDER: uniform cells over [0, 1], and around every declared
+     break AND the apex a GEOMETRICALLY GRADED patch replacing the uniform
+     nodes there. The grading is not optional: the outline's power laws have
+     UNBOUNDED slope at two of their own points — the superellipse leaves the
+     widest point vertically below n = 1 and arrives at the apex vertically
+     above it (h ~ (1 - s)^(1/n)) — and a uniform cell containing such a
+     point is cut by one chord however fine the grid. Measured before the
+     grading existed: the all-form-max x buckle f 7 x n 3.00 corner converged
+     at order 1.25 in LIVE mode (the 0.15 mm floor lets the profile run to
+     within 2e-6 of s = 1) with every seam node already in place.
+
+     THE PATCH SCALES WITH THE CELL — RIM_GRADE_CELLS cells either side,
+     halving RIM_GRADE_DEPTH times toward the point — so doubling `samples`
+     halves the whole patch and the ladder is SELF-SIMILAR under refinement.
+     A fixed-width patch was tried first and made the convergence ORDER
+     unreadable (uniform nodes interleaving a fixed geometric set differently
+     at every density, order 1.06 on n 0.60 at residuals of 4e-6 mm): the
+     residual was small and the instrument could no longer say so cleanly. A
+     power-law point y ~ x^alpha under a self-similar graded patch converges
+     at order 3 - 2 alpha (>= 1.8 across the shipped exponents), which the
+     correspondence tool's R3 reads back rather than assumes. */
+  const span = RIM_GRADE_CELLS / samples;
+  const singular = [...breaks.filter((b) => b.u > 0 && b.u < 1).map((b) => b.u), 1];
+  /* Both endpoints unconditionally: a break within `span` of the apex would
+     otherwise filter u = 1 out with the uniform nodes — measured, the last
+     node came back 1 - 2^-32 * span and sAt(1) overshot the length. */
+  const nodes = [0, 1];
+  for (let i = 1; i < samples; i++) {
+    const u = i / samples;
+    if (!singular.some((x) => Math.abs(u - x) < span)) nodes.push(u);
+  }
+  for (const x of singular) {
+    if (x < 1) nodes.push(x);
+    for (let k = 0; k <= RIM_GRADE_DEPTH; k++) {
+      const d = span * Math.pow(2, -k);
+      if (x - d > 0) nodes.push(x - d);
+      if (x + d < 1) nodes.push(x + d);
+    }
+  }
+  nodes.sort((a, b) => a - b);
+  const U = [nodes[0]];
+  for (let i = 1; i < nodes.length; i++) if (nodes[i] !== U[U.length - 1]) U.push(nodes[i]);
+
+  const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+  const sideOf = (side) => {
+    if (side !== 1 && side !== -1) throw new Error(`petalRim: side must be +1 or -1, got ${side}`);
+    const P = U.map((u) => surface.at(u, side).P);
+    const S = [0];
+    for (let i = 1; i < U.length; i++) S.push(S[i - 1] + dist(P[i], P[i - 1]));
+    /* The last node at or before u — U is sorted and U[0] is 0. */
+    const cellOf = (u) => {
+      let lo = 0, hi = U.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (U[m] <= u) lo = m; else hi = m; }
+      return lo;
+    };
+    const sAt = (u) => {
+      if (!(u >= 0 && u <= 1)) throw new Error(`petalRim: u must be in [0, 1], got ${u}`);
+      const k = u >= 1 ? U.length - 1 : cellOf(u);
+      if (U[k] === u) return S[k];
+      return S[k] + dist(surface.at(u, side).P, P[k]);
+    };
+    const length = S[S.length - 1];
+    const uAt = (s) => {
+      if (!(s >= 0 && s <= length)) throw new Error(`petalRim: s must be in [0, ${length}], got ${s}`);
+      let lo = 0, hi = S.length - 1;
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (S[m] <= s) lo = m; else hi = m; }
+      if (S[lo] === s) return U[lo];
+      /* s is monotone in u within one cell (the chord from the cell's start
+         grows with u on any cell short enough to bend less than a quarter
+         turn, which every cell here is); bisect it. */
+      let a = U[lo], b = U[hi];
+      for (let k = 0; k < 50; k++) { const m = (a + b) / 2; if (sAt(m) < s) a = m; else b = m; }
+      return (a + b) / 2;
+    };
+    return { side, length, sAt, uAt, nodesU: U, nodesS: S, pointAt: (u) => surface.at(u, side).P };
+  };
+  const sides = { [1]: sideOf(1), [-1]: sideOf(-1) };
+
+  /* THE TERMINAL MINI-FACE: the margins meet across the u = 1 row. Its
+     length is measured the same way, as a dense polyline over v — and beside
+     it the length the MESH draws it at, NV - 1 chords, so a consumer knows
+     both the curve and what the exporter emits. */
+  const faceNodes = 256;
+  let faceLen = 0, faceMesh = 0, prevF = surface.at(1, -1).P;
+  for (let j = 1; j <= faceNodes; j++) { const q = surface.at(1, -1 + (2 * j) / faceNodes).P; faceLen += dist(q, prevF); prevF = q; }
+  prevF = surface.at(1, -1).P;
+  for (let j = 1; j < NV; j++) { const q = surface.at(1, -1 + (2 * j) / (NV - 1)).P; faceMesh += dist(q, prevF); prevF = q; }
+
+  return {
+    samples, breaks, nodesU: U,
+    /* Per-side queries, keyed by the v sign. */
+    side: (s) => sides[s],
+    sAt: (u, side = 1) => sides[side].sAt(u),
+    uAt: (s, side = 1) => sides[side].uAt(s),
+    pointAt: (u, side = 1) => sides[side].pointAt(u),
+    length: (side = 1) => sides[side].length,
+    tipFace: { length: faceLen, meshLength: faceMesh, columns: NV },
+    /* THE WHOLE BOUNDARY the blade presents outside the hub: up one margin,
+       across the terminal face, down the other. The foot's own edges are not
+       in it. */
+    loopLength: sides[1].length + faceLen + sides[-1].length,
   };
 }
 

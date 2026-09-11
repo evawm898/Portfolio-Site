@@ -1,595 +1,213 @@
-# Bloom session 38 — the foot-to-blade seam clearance
+# Bloom session 38 — lobes on the petal rim
 
-**Status: pushed, CI running, waiting on Eva's ruling. Nothing is merged.**
+Two PRs, in order. **PR 1** is the structural prerequisite: a query that says where a
+petal's rim is in space and how far along it a point sits, proved to CORRESPOND to the
+boundary the exported mesh actually has, across the control space. No feature, no
+visible change. **PR 2** is the lobe feature itself, cut into the outline, under the
+rulings the brief carries (§B below, once it ships).
 
----
-
-## 1. What the defect actually is
-
-The brief called it "the root blend" and expected a foot collapsing across the
-blend on short, multi-layer petals. **It is not that, and the diagnosis in the
-brief is superseded.** It is an **offset-surface fold at the foot-to-blade
-kink**, and the evidence is decisive rather than suggestive:
-
-* every site sits **on the top skin, at the ring radius, at dz = t/2**;
-* **both triangles of every pair are seam quads** — the foot's own top-skin
-  quad and the blade's first;
-* **zero pairs at zero tilt**, at any layer count;
-* and a **single layer** at `petalTilt` 75, `petalLength` 20, `sheetThickness`
-  2.4 folds **376 pairs with no layers involved at all**.
-
-Layer count was a proxy for two things that really do drive it — shorter petals
-(a smaller first-station spacing in mm) and stacked tilt (a sharper kink).
-
-Read off the builder's own captured grid at that state, the top skin's radius
-goes **12.5133 mm at the foot's ring row → 11.4464 mm at the first blade row**,
-a **−1.0667 mm** step backward, and then advances +0.092 mm per row. The blade's
-top skin has plunged back inside the foot's own slab.
-
-### The three candidates in the brief are disqualified, and here is why
-
-1. **and 3. Widen the foot with the petal.** The foot width already scales with
-   the petal by the shipped law (`footRing()` owns it), so both candidates
-   describe what exists. Moving them either way changes the census by **at most
-   8 pairs**.
-2. **Spread a width change along the blend.** The fold is not in the blend, it
-   is *at the kink*, so this spreads a correction across a region the defect
-   does not live in. It measured **worse at every value tried**, and it moves
-   the shipping default's bytes, because `ROOT_BLEND_END` sets the ladder's
-   held-row count.
-
-The brief was written from a mechanism that had been inferred rather than
-measured. Recorded here so the next reader does not re-derive the dead branch.
+The brief named `claude/lobes-serration-status.md` and `claude/edge-treatment-findings.md`
+as the rulings' record. **Neither file exists in this repository on any branch** (checked
+by `git ls-tree` over every remote ref and by a filesystem search). What is here and was
+read instead: the E2/E3 history in `docs/flower-rim-treatment-registration.md` (the
+appendage construction, 19 / 37 / 47 detached components at `boundary === 0`), the lobe
+session's upstream contract in §5 of `docs/bloom-session-32-outcome.md`, and session 37's
+`petalSurface` in `docs/bloom-session-37-outcome.md`. The brief's own ruling list is
+treated as binding as written.
 
 ---
 
-## 2. The derivation — `s₁ > (t/2)·sin θ`
+## A. PR 1 — the rim arc-length query, and the correspondence proof
 
-Nothing here is dialled.
+### A1. What shipped
 
-Work in the petal's own radial cross-section with the ring row at the origin,
-the foot running along `+r`, the blade leaving at the seam turn `θ`, and
-`a = t/2`. Write `c = cos θ`, `s = sin θ`. The first blade row's centre is
-`s₁·(c, s)`; its two skin points are
+`bloom-geometry.js`:
 
-```
-T = ( s₁c − a·s ,  s₁s + a·c )      (top)
-B = ( s₁c + a·s ,  s₁s − a·c )      (bottom)
-```
-
-while the foot's own skins sit at `(0, ±a)` and run inward. The seam panel's
-**rim** — the closing face at `v = ±1` — is the quad through the foot's two skin
-points and `T`, `B`, and it is what carries the panel across the foot's top
-plane `z = a`. That plane cuts the rim on the edge `T→B` at
-
-```
-λ = (z_T − a) / (z_T − z_B) = (s₁s + a·c − a) / (2a·c)
-```
-
-and the crossing lands at `r = r_T + λ(r_B − r_T)`. Requiring that crossing to
-fall **outside** the foot — `r ≥ 0`, i.e. at or beyond the ring — and clearing
-the denominator:
-
-```
-s₁c − a·s + 2a·s·(s₁s + a·c − a)/(2a·c)  ≥ 0
-s₁c² − a·s·c + s₁s² + a·s·c − a·s        ≥ 0
-s₁(c² + s²)                              ≥ a·s
-
-                s₁  >  (t/2)·sin θ
-```
-
-### The bare bound is necessary and not sufficient, and the gap is `1 + cos θ`
-
-The naive offset-corner bound — put the first row's own skin point above the
-foot's top plane — is `a·tan(θ/2)`. That is the bound the brief expected, and
-**at exactly that value the result is worse than main**: the tilt-75 state goes
-**376 → 632 pairs**, with **every site at z = t/2 exactly**, because the row
-lands *coplanar* with the foot's top skin rather than clear of it.
-
-The ratio between the two is
-
-```
-sin θ / tan(θ/2)  =  1 + cos θ
-```
-
-which is **2 at a shallow kink, 1.906 at the shipping tilt of 25°, and 1 at a
-right angle**. That is the answer to *"if the derivation lands near 2.0, say so
-and show the working"*: it lands at 2 in the limit, and it is a **function of
-the turn angle**, not a constant. It is the cost of the mesh drawing the seam as
-a flat **chord** from the foot's offset ring to the blade's offset first row
-where the bound assumes the corner is mitred.
-
-### Measured, which is what makes it a derivation and not a fit
-
-Sweeping a constant `k` in front of `a·sin θ` and reading the within-shell
-census:
-
-| k | tilt 45 | tilt 60 | tilt 75 | sheet 1.2 | 3 layers | 6 layers |
-|---|---|---|---|---|---|---|
-| 0.90  | 72 | 72 | 56 | 56 | 56 | 704 |
-| 0.99  | 56 | 56 | 56 | 56 | 56 | 248 |
-| **1.0000** | **64** | **64** | **64** | **64** | **64** | 272 |
-| **1.0005** | **0** | **0** | **0** | **0** | **0** | **0** |
-| 1.05  | 0 | 0 | 0 | 0 | 0 | 0 |
-
-Every state flips to **exactly zero between 1.0000 and 1.0005**, across three
-turn angles, two sheet thicknesses and two layer counts. At exactly 1.0000 all
-of them read the **same 64 pairs**, which is the signature of the equality
-*touching* rather than of geometry. The constant is 1 and it is derived.
-
-### Strictness costs no epsilon
-
-The inequality is strict, and a margin dialled until the count reached zero
-would have been precisely the invented-constant defect this project keeps
-finding — carrying a printability guarantee, no less. So the first blade row is
-not placed **at** the clearance: it is the **first station of the row lattice
-strictly beyond it**,
-
-```
-m = max(1, floor(uSeam·NU) + 1),      first blade row = m / NU
-```
-
-The margin is *one row* — a length this file already owns.
-
----
-
-## 3. Redistribute, never pile
-
-The held block keeps the uniform **row lattice** exactly and simply **starts
-later**: the held stations are `(m + i)/NU` for `i = 0 … held−1`, still `held`
-consecutive lattice steps, still one row apart. Nothing can stack against a
-floor, because nothing is being clamped to it.
-
-`m = 1` whenever the floor does not bind, and the code then takes the same
-`uniform.slice(0, held)` it always took — so the shipping default is
-bit-identical **by construction and by branch**, not by an IEEE-754 argument.
-
-The ladder above the block is untouched either way: it runs over `[u₀, 1]` from
-wherever the block ends.
-
----
-
-## 4. A7 and `CURL_START_MIN`, re-derived
-
-### A7
-
-It read *"every station below `ROOT_BLEND_END` is the uniform one, exactly"* —
-the same claim, while the block always started at row 1. It now states the
-identity on the **lattice** rather than on its first member: the held stations
-are `(seamStep + i)/rows` for the integer offset **the builder declares**. Still
-a bit identity; still bit-identical to the old expression wherever `seamStep` is
-1. **Nothing is relaxed — this pins `seamStep` as well, which the old form could
-not**, and A7 gained three clauses it did not have:
-
-* the first blade row stands **strictly beyond** the declared clearance (the
-  print-safety claim itself, asserted on the emitted station);
-* the declared clearance **is the law's own value**, rebuilt in the gate from
-  the two other owners;
-* the clearance's **half-thickness is `max(sheetThickness, MIN_FEATURE_MM)/2`**,
-  reconstructed from the registry state — the mode-independence claim, asserted
-  in the live gate.
-
-**A7 now runs per ring.** The clearance is a function of the ring's own
-effective tilt, and on a layered bloom the outer whorl typically does not bind
-while the inner ones do — measured, three layers at the defaults turn 25°, 37°
-and 49° and only the innermost binds; six layers turn 25 … 85° with steps
-1/1/2/3/4/5. Reading layer 0 alone would never have entered the branch.
-`petalRingBladeLadder` and `petalRingProfileU` are the new per-ring telemetry.
-
-**A8 gave up one term, and it was vacuous before.** Its gap measure opened with
-`blade[0]`, which was *always* exactly `1/NU` and so could never be the widest
-gap. It is no longer vacuous, and it is no longer A8's: the offset from the seam
-to the first row is placed by the clearance law and pinned by A7, where A8's
-question is whether the ladder's own **redistribution** starved the wave.
-
-### `CURL_START_MIN`
-
-The ladder's header could say *"the first blade row is still at 1/NU, because it
-is one of the held ones"*, and that is what made Eva's Sep 4 floor mean **"the
-root chord is straight wherever start is engaged"** — the premise J8's stronger
-normal clause rests on. The first blade row is now at `m/NU`.
-
-Re-derived, not relaxed: the **control's** declared bound is untouched (the
-registry still imports `1/NU`; a bound that moved with the tilt would be one
-control reaching into another's range — the violation `NU = 56` exists to
-avoid), while the floor the **law** applies becomes
-`max(start, CURL_START_MIN, the first blade row)`.
-
-**Relaxing instead would have made J8's clause SKIP those rows rather than fail
-them** — coverage lost silently. `spineInputsFor` now reconstructs the floor
-from the **ladder's** telemetry, so C3 compares two owners rather than one field
-against itself.
-
-*Found on the way:* the matrix row named **`CURL: start floored at one blade row
-(0.02 → 0.036)`** has been stale since session 34. `0.036` is `1/28`; at
-`NU = 56` the floor is `0.01786`, so `0.02` was no longer floored at all and the
-row stopped testing what it names. Under the seam floor it is floored again
-wherever the clearance binds.
-
----
-
-## 5. Mode independence
-
-The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` — the **export**
-thickness — in **both** modes, exactly as `ladderHalfAt` does. Row positions are
-topology and the export floor may not move them. This is session 32's
-mode-dependence defect refusing to ship a third time; the scratch patch that
-read the live thickness had ring 2's first station differing live from export on
-a 0.6 mm sheet.
-
-`seamHalfThicknessMm()` is the **one owner** of that half-thickness — both the
-clearance and the reported `seamHalfMm` call it — so the live gate's A7 clause
-and the clearance itself cannot drift apart, and a single-line mutation of it is
-visible to the gate.
-
-Two independent instruments carry the claim: A7's thickness clause (live gate,
-per ring) and `verify-bloom-seam-bytes.mjs`'s **MODE-DEPENDENT** class, which
-fails if any row's moved/held verdict differs between the modes.
-
----
-
-## 6. The two residual classes are not this defect
-
-Retagged in `SELF_INTERSECTION_XFAIL` to their real class rather than left filed
-under the root blend:
-
-* **EFFECTIVE TILT PAST 90°.** The algebra in §2 multiplies by `cos θ`, so past
-  a right angle the inequality **reverses** and no spacing satisfies it. That is
-  the geometry telling the truth: the blade's own **mid-surface** lies back over
-  its foot, which is a mid-surface overlap no offset spacing can fix. The
-  clearance is held at its right-angle value there rather than falling away with
-  `sin`, and those rows stay declared.
-* **THE DOME'S OUTER RING AT A HEMISPHERE RIM**, whose pairs sit on ring 0 and
-  are unchanged by the clearance.
-
-**Whether the tilt control should reach past 90° at all is a separate ruling for
-Eva.** It is independent, it blocks nothing, and it only scopes the claim.
-
----
-
-## 6b. THE FLAT/DOMED ASYMMETRY — a named finding
-
-Two matrix rows differ by **`headRise` alone**. Same 120 petals, same tilt, same
-sheet, same everything else. The flat one went **7,806 → 510** pairs and the
-domed one went **7,350 → 9,944**. Eva called that the most interesting thing in
-the report and asked for the mechanism rather than a footnote. Here it is,
-measured.
-
-### The instrument, and the two ways its first version was wrong
-
-The scratch tool attributes **every** intersecting pair to the mesh rows its two
-triangles belong to, by **exact coordinate match** against the builder's own
-captured grid — `emitPanel` offsets each skin vertex to `mid ± n·t/2`, so an
-emitted vertex matches one of those points exactly and there is no
-nearest-neighbour guess. Unmatched triangles: **0 of every census**, both trees,
-every row below.
-
-**A first pass classified by NEAREST row and named a triangle by its LOWER row,
-and it was wrong twice.** It reported a four-thousand-pair jump in "foot on
-foot" on a tree whose foot rows are byte-identical to main's — because the
-**seam panel** (the quad spanning the last foot row and the first blade row) was
-being filed under FOOT, and because a blade row that has flopped onto the foot
-is *nearest* a foot row. A triangle is named by the rows it **spans** now, and
-SEAM has its own name. That correction is what turned a confusing tally into the
-finding, and it is the reason the first version's numbers are not quoted here.
-
-### What the rows actually say
-
-| | main | branch |
-|---|---|---|
-| **flat** — turn 75.0–89.9°, 0/120 past 90° | FOOT×blade1-2 **5788**, SEAM×blade1-2 978, FOOT×SEAM 600, FOOT×blade2-3 440 | FOOT×blade1-2 **440**, FOOT×SEAM 70 |
-| **domed** — turn 125.4–128.1°, **120/120 past 90°** | FOOT×blade3-4 3390, FOOT×blade2-3 1850, FOOT×blade1-2 1221, FOOT×SEAM 415, SEAM×blade1-2 360, FOOT×blade4-5 114 | FOOT×blade2-3 3390, **FOOT×SEAM 2428**, **SEAM×SEAM 2162**, FOOT×blade1-2 1850, FOOT×blade3-4 114 |
-
-**Every pair on all four cells involves the foot or the seam. There is no
-blade-against-blade collision anywhere on either tree.**
-
-And the blade terms line up exactly. `seamStep` is 2 on both rows, so the blade
-lattice starts one step later and **every blade term keeps its count and shifts
-down one index**: main's blade2-3 = 1850 becomes the branch's blade1-2 = 1850;
-main's blade3-4 = 3390 becomes blade2-3 = 3390; main's blade4-5 = 114 becomes
-blade3-4 = 114. **The collisions are a property of the STATION, not of the row
-number** — the same `u` stations lie over the foot on both trees, with the same
-counts. What the floor does is **delete the lowest-station panel**, and the
-benefit is exactly that panel's own pair count.
-
-### The accounting closes to the pair
-
-Splitting each census into terms that involve the seam panel and terms that do
-not, over a tilt sweep on the **domed** configuration. Only `petalTilt` is
-varied; `seamStep` is 2 at every point, so the displacement is identical
-throughout and the sweep isolates the turn angle:
-
-| effective turn | main | branch | blade benefit | seam change | net |
-|---|---|---|---|---|---|
-| 70–73° | 4763 | **0** | — | — | −4763 |
-| 85–88° | 5015 | **0** | — | — | −5015 |
-| 92–95° | 5073 | 318 | −4429 | −326 | **−4755** |
-| 100–103° | 5357 | 2337 | −2789 | −231 | **−3020** |
-| 110–113° | 6114 | 5391 | −606 | −117 | **−723** |
-| 115–118° | 6164 | 5442 | −615 | −107 | **−722** |
-| 120–123° | 6344 | 6447 | −686 | +789 | **+103** |
-| 125–128° | 7350 | 9944 | −1221 | **+3815** | **+2594** |
-
-Every net figure is the measured census difference exactly.
-
-### The mechanism
-
-Past a right angle the blade leaves the ring leaning **back over its own foot**.
-Measured in the **foot's own frame** — the cap's local outward axis, taken from
-the two captured foot rows themselves, because on a dome the global radius is
-the wrong coordinate and reads the first blade row as moving *outward* even at
-128° — the first blade row sits **behind** the ring row, and the branch roughly
-**doubles** how far back it reaches, because the seam panel is twice as long:
-
-| turn | main | branch | ratio |
-|---|---|---|---|
-| 95.1° | −0.0117 mm | −0.0401 mm | 3.4× |
-| 103.1° | −0.0613 | −0.1390 | 2.3× |
-| 113.1° | −0.1214 | −0.2585 | 2.1× |
-| 118.1° | −0.1503 | −0.3155 | 2.1× |
-| 123.1° | −0.1779 | −0.3701 | 2.1× |
-| 128.1° | −0.2042 | −0.4219 | 2.1× |
-
-So **two effects compete, and the clearance drives both**:
-
-* it **removes** the lowest-station blade panel from the foot — a benefit at
-  every angle, and the whole of the fix below 90°;
-* it **lengthens the seam panel**, which past 90° drags that panel further back
-  over the foot — a penalty that exists only past a right angle, because that is
-  where `cos θ` changes sign and the derivation's own inequality reverses.
-
-Below 90° the second term does not exist and the fix is total: **both states
-under the right angle in the sweep go to exactly 0 pairs.** Past it the penalty
-grows with the backward reach until it overtakes the benefit. `SEAM × SEAM`
-appears only in the worst cell (2,162 pairs at 125–128°) — that is the
-lengthened seam panel crossing **itself**.
-
-### What is NOT explained, said plainly
-
-**The crossover is measured between 115–118° and 120–123° of effective turn, and
-I did not determine its functional form.** The seam term is flat-to-improving
-(−326, −231, −117, −107) while the backward reach is shallow, and then it
-explodes (+789, +3815) once that reach passes roughly a third of a millimetre on
-this configuration. Whether that threshold is the half-thickness, the foot's own
-row spacing, or something else **is not measured here**, and no story is offered
-for it.
-
-What IS established: the decomposition into two terms, the sign and size of
-each, that they account for every census difference exactly, and that the net
-flips with the turn angle and with nothing else — `seamStep`, the sheet, the
-petal count and the displacement are all constant across the sweep.
-
-### Why this does not change the law
-
-The clearance already **saturates** at `half · sin(90°)` past a right angle, and
-those rows are already declared — `SEAM CLAMPED` and `EFFECTIVE TILT PAST 90`
-are the two retagged classes in §6. This finding says the saturation is not
-merely useless there but mildly **counterproductive** on the deepest rows, and
-that is the honest shape of the trade: 84 rows to exactly zero against a derived
-constant, at the cost of 15 rows that were already failing either way.
-
-**It also says where a future fix would have to act.** Not on the clearance
-constant — on the seam panel's LENGTH past a right angle, or on the tilt control
-reaching past 90° at all, which is a separate ruling.
-
-## 7. What it did to the census — the whole matrix, both trees
-
-Driven in Node through the same census the export gate calls, export mode, on
-the builder's own doubles, every capability row with its capability applied,
-**624 rows, no errors on either tree**.
-
-**The sweep is calibrated, which is what makes the rest of this section
-readable.** Run against a worktree of `main`, it reproduced session 36's
-recorded count on **222 declared rows exactly** — zero disagreements, and zero
-undeclared rows reading non-zero. So the Node state mapping is the page's, and
-main's own numbers still hold.
-
-| | |
+| member | what it is |
 |---|---|
-| rows FIXED to exactly zero | **84** |
-| improved | 58 |
-| unchanged | 467 |
-| **worse** | **15** |
-| **went from clean to self-intersecting** | **0** |
+| `widthProfile().winnerAt(u)` | which of `shapeAt` / `rootBlend` / `tipFloor` the outline's `Math.max` returned at `u`, BY NAME, from the same three values in the same order. `Math.max` returns one of its arguments exactly, so the answer is an identity and never a tolerance. `shapeAt` now reads one loop (`shapeWinner`) that also carries the winning term's name; the same `>` on the same terms. |
+| `widthProfile().slopeBreaks()` | every `u` where the winner changes, bisected to the crossover between two grid cells that name different winners, plus the CORE's own tip-law join at `uPk`. Reports the shipped outline's seams; rules nothing. |
+| `petalSurface().tangentBreaks()` | the profile's breaks plus, when a form exists, the FORM ONSET at `FORM_ONSET_END` — the ramp `u / 0.30` then `1` is C0 by construction, and cup, roll and the buckle each ride it (§A4). The one place the surface declares where its own tangent breaks. |
+| `petalRim(surface, samples = RIM_SAMPLES)` | per margin (`side` ±1): `sAt(u)`, `uAt(s)`, `pointAt(u)`, `length()`; the terminal mini-face's width (`tipFace.length`, and `meshLength` at NV − 1 chords); `loopLength` (up one margin, across, down the other); `breaks` and `nodesU`. |
 
-Declared rows **318 → 234**. Total within-shell pairs **1,617,263 → 1,359,861**.
+`tools/bloom-first-slot.mjs` — the slot payload from `buildWhorlInto`'s own callback, extracted
+from the off-station tool so the two instruments read one copy (the off-station tool now
+imports it; its run and its control are unchanged).
 
-### The 15 that got worse — reported, not tuned around
+`tools/verify-bloom-rim-arc.mjs` — the correspondence proof (§A2), with `--control`,
+`--quick` (two states, to prove the rig) and `--json <file>` (the per-state table).
 
-| main | now | row |
+**How `s` is measured, and why it is a construction.** There is no analytic dP/du (the
+spine law is a table on the curl family; the buckle differentiates in `v` only), so `s(u)`
+is the chord length of a dense polyline through `at(u, side).P`: `RIM_SAMPLES` = 4096
+uniform cells of `u`, with every tangent break the surface declares inserted as a node
+and a GEOMETRICALLY GRADED PATCH (`RIM_GRADE_CELLS` = 4 cells either side, halved
+`RIM_GRADE_DEPTH` = 32 times) replacing the uniform nodes around every break and around
+the apex. `sAt(u)` appends `u` as one more node, so by the triangle inequality the reported
+arc between any two `u` is never less than the straight chord between them — the property
+R2 asserts exactly rather than within a tolerance.
+
+### A2. The correspondence proof — what it asserts, and the result
+
+Every figure names its MODE (live / export) and its SAMPLING (the query at 4096 cells plus
+the graded patches; the mesh at NU = 56 stations).
+
+| clause | what it measures | result, 64 states × 2 modes |
 |---|---|---|
-| 72,598 | 77,990 | ALL MAX |
-| 10,252 | 14,763 | CURL: bias 0.5 × start 0.5 × incurve target × rise 1 |
-| **7,350** | **9,944** | **DOME: the INCURVE TARGET × rise 0.5** |
-| 59,880 | 62,344 | DEPTH: ZYGO 6 layers × ALL INNER MAX |
-| 6,794 | 8,070 | CURL: start floored at one blade row × incurve target × rise 0.5 |
-| 6,740 | 7,227 | CURL: bias max × incurve target × rise 0.5 |
-| 6,740 | 7,227 | CURL: bias 0.5 × incurve target × rise 0.5 |
-| 6,740 | 7,227 | CURL: start max × incurve target × rise 0.5 |
-| 6,740 | 7,227 | CURL: bias max × start max × incurve target × rise 0.5 |
-| 4,544 | 4,744 | DEPTH: 6 layers × layerTilt max × petalTilt max (225° effective) |
-| 1,294 | 1,342 | CONT: 3 turns × layerTilt max × petalTilt max (161.25° effective) |
-| 1,120 | 1,231 | SPHERE: petalTilt 75 × layerTilt 30 × 3 turns |
-| 848 | 1,056 | LAYERS: 3 × layerTilt max (135° effective) |
-| 728 | 910 | FAN: 3 layers × toggle ON × layerTilt max |
-| 25,284 | 25,319 | FAN × PER-PETAL: ALL PER-PETAL MAX × 3 layers |
+| **R1** the rim IS the mesh's rim | at every blade station on both margins, `pointAt(u, side)` reproduces the captured rim point under `Object.is`, and the two rim-strip vertices offset from it with the EMITTED normal are present exactly in the position stream | **14,336 station × margin comparisons, 28,672 vertices tied to the emitted stream, 0 misses** |
+| **R2** the arc is never shorter than the chord | per consecutive station pair, `sAt(u₂) − sAt(u₁) ≥ |P₂ − P₁|` | min (arc − chord) over 14,080 pairs: **−2.6e-10 mm** (summation rounding; never a real shortfall) |
+| **R2** the mesh's deficit | the reported blade length minus the exported rim polyline's length — the mesh's own chord shortfall at 56 stations | LIVE median 0.247%, **max 0.897%** (0.850 mm of 65.5); EXPORT median 0.358%, **max 0.750%** — both worst on `ALL FORM MAX × buckle 0.6 f 7 × petalTipShape 3.00` |
+| **R3** the query's own error | lengths at 1×, 2×, 4×, 8× `RIM_SAMPLES`; the fine-end order `log₂(d₂/d₃)` must exceed 1.0; the bound is `d₁ + d₂ + d₃·2ᵖ/(2ᵖ − 1)` | fine-end orders LIVE 1.06–2.12 (median 2.02), EXPORT 1.40–2.09 (median 2.03); **bound max 4.0e-4 mm LIVE, 1.5e-4 mm EXPORT** (7.4e-6 relative), medians 9.7e-6 / 2.6e-6 mm |
+| **R4** the inverse | `uAt(sAt(u)) = u` within 1e-9 on 12 probes per side; `sAt` strictly increasing | 0 misses |
+| **R5** the nodes are the rim's own breaks | an INDEPENDENT detector on the rim CURVE `P(u, +1)` (bracket a jump in the central-difference tangent on a golden-offset grid, bisect, classify by one-sided tangents at 1e-6) over the six builder arms in both modes; every genuine break within 1e-5 of a query node | worst gap **6.0e-7** in `u`; every break found is declared (§A4) |
+| **R6** the terminal face | curve vs the mesh's NV − 1 chords | default: 0.3000 / 0.3000 mm LIVE, 1.6000 / 1.6000 EXPORT (= 2·h(1)) |
 
-### Eva's two named rows
+**THE RESIDUAL BOUND, stated.** Against the exported boundary, the reported rim length
+exceeds the mesh's own polyline by at most **0.90% (LIVE) / 0.75% (EXPORT)** of the rim,
+worst over the sample, and that excess is the mesh's chord deficit at 56 rows (the default
+petal's worst single chord is 0.078 mm at u = 0.071, the root blend — §13 of the session-32
+doc's finding again). The query's OWN error at `RIM_SAMPLES` is bounded at **4.0e-4 mm
+(LIVE) / 1.5e-4 mm (EXPORT)** on the worst state and below 1e-5 mm on the median, from three
+measured doublings plus the geometric tail the measured order implies. Not from one sample:
+64 states, both modes, listed in the tool's header — the six builder arms, every
+petal-reaching slider at both ends, the exponent at 0.60 / 1.00 / 2.50 / 3.00, the tapers
+that move the widest point, cup and cup gradient, roll and its taper, curl, twist, tilt, the
+buckle's three at their corners, the thinnest and thickest sheet, the shortest and longest
+petal, a domed hub, a sphere head, the innermost petal of six whorls at the smallest layer
+size, and the two-control products (exponent × cup, exponent × buckle, cup × buckle, roll ×
+buckle, all form max, all form max × buckle max × n 3.00).
 
-* **The mum on a hemisphere: 0 → 0.** The piling patch's 0 → 72 is **cleared**.
-* **The incurve target at rise 0.5: 7,350 → 9,944.** It **still regresses**,
-  and by more than the piling patch did (8,641). **That is the stop condition,
-  and it is reported rather than tuned around.** Its FLAT sibling goes
-  **7,806 → 510**, so it is specifically the domed variant.
+**The positive control** (`--control`): R1 evaluated at `u + 1e-9` fires on every state;
+R5 run on a query over the same surface DECLARING NO BREAKS fires on 12 of 12 arm × mode
+builds, and the residual that costs is printed beside the declared query's — **5.1e-3 mm
+without the nodes against 8.3e-6 mm with them** on the default (LIVE), 1.5e-3 against
+1.1e-6 (EXPORT). Nothing else fires.
 
-### The attribution is clean: all 15 are the seam floor's
+### A3. How the bound was got — three defects in the instrument, in order
 
-Re-measured on a tree with the curl-start floor neutered and the seam floor
-left in, all fifteen read **identically** to the shipped build. **The
-`CURL_START_MIN` re-derivation moves no census count on any of them.**
+1. **The ORDER test found a kink the profile did not own.** The first two-state run
+   converged at first order on FORMED and BUCKLED (0.81–1.03) with every profile seam
+   already a node. The rim has a tangent break at u = 0.30 from the FORM layer's onset ramp
+   (§A4). `petalSurface().tangentBreaks()` now declares it; the profile could not.
+2. **A fixed-width graded patch made the order unreadable.** The superellipse arrives at the
+   apex with a vertical tangent above n = 1 and leaves the widest point vertically below it,
+   and a uniform cell containing such a point is cut by one chord however fine the grid
+   (measured: order 1.25 on the all-form-max corner, LIVE, with the seams in place). A
+   geometric patch of fixed width cured the residual and broke the instrument: uniform nodes
+   interleaving a fixed geometric set differently at every density read order 1.06 on n 0.60
+   at residuals of 4e-6 mm. The patch now scales with the cell (4 cells either side), so
+   doubling `samples` halves the whole patch and the ladder is self-similar under refinement.
+   Wider patches (16, 64, 256 cells) were measured and are worse at every state.
+3. **The endpoints must be unconditional.** With the tip seam inside the apex's patch, u = 1
+   was filtered out with the uniform nodes; the last node came back 1 − 2⁻³²·span and
+   `sAt(1)` overshot the length by 8e-12, which `uAt` correctly refused.
 
-### The clamp, told rather than hidden
+And one correction to what the instrument may assert: **the convergence order is not a
+witness for the seam nodes.** A kink cut by chords produces erratic differences (its
+position inside a cell changes with every density), so at the fine end a seam-less ladder
+can read any order — measured 2.50 on the default export with no seam nodes at all. R3
+asserts only that the tail converges (fine-end order > 1.0, where a kink reads ≤ 1) and
+computes the bound; R5's independent detector carries the seam claim, and the control strips
+the declared breaks rather than the nodes.
 
-The seam floor binds on **157 of 624 rows**. Worst-ring step histogram:
-`{2: 80, 3: 26, 4: 6, 5: 28, 6: 1, 7: 9, 16: 1, 20: 1, 40: 5}`.
+**Orders below 2 are genuine and steady, not defects:** the n ≠ 1 apex power laws converge
+at 1.40 (n 0.60), 1.43 (n 0.60 × cup 1.2), 1.65–1.72 (n 3.00 × cup) under the graded patch,
+in both modes, unchanged out to 32k cells; the LIVE floor's steeper apex (0.15 mm against
+0.8) is pre-asymptotic at 4096 on every formed state and reaches 2.0 by 16k. The bound
+formula takes the measured order, so both are inside it.
 
-**On five rows the clamp binds**, and the reason is not a tuning choice: those
-petals are **shorter than the fold they have to clear** — the 0.18 mm blade at
-six whorls of `layerSize` 0.35 asks **1.0925 × its own length** at an 85° kink.
-No station inside the blade satisfies the derivation there. Those rows start as
-far out as the lattice allows, stay declared, and the read-out says CLAMPED.
-All five still **improve** (25,944 → 20,912; 152,182 → 109,295; 7,336 → 6,528;
-7,295 → 5,021); none regresses. A7 asserts the clamp as a **biconditional** in
-both directions, so the clamp cannot fire where the blade did have room, and
-the strict clause cannot be skipped where it did not. Measured across the whole
-matrix: **0 A7 violations, 5 rows with a clamped ring.**
+### A4. Findings recorded, not ruled
 
-### Mode independence, measured rather than argued
+**(a) THE FORM ONSET IS A TANGENT BREAK OF THE SHIPPED SHEET, AND NOBODY HAD NAMED IT.**
+Session 37 measured the outline's two C0 seams on `halfWidthAt` (u = 0.057939 and
+0.999562). The rim-curve detector finds a third, at `FORM_ONSET_END` = 0.30, on every cupped,
+rolled or buckled petal, at every v ≠ 0 — the ramp `u / 0.30` then `1` is C0, and the
+deformation it ramps arrives with a slope that stops dead. One-sided tangents at the margin
+(v = +1 / −1), e = 1e-6, identical in both modes because the ramp is mode-free:
 
-**Zero of 624 rows have a `seamStep` set that differs between live and export.**
-The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` in both modes.
+| state | angle at v = +1 | at v = −1 | \|dP/du\| ratio |
+|---|---|---|---|
+| FORMED (cup 0.6, curl 120, roll 90, twist 45) | **24.18°** | **54.98°** | 0.43 / 0.55 |
+| cup 1.2 | 35.91° | 35.91° | 0.69 |
+| roll 330 | 35.22° | 35.22° | 0.72 |
+| cup 0.3 | 12.28° | 12.28° | 0.97 |
+| buckle 0.5, f 3 | 5.93° | 5.93° | 0.90 |
+| buckle 0.6, f 7 | 2.01° | 2.01° | 1.01 |
 
----
+Curl and twist are smooth there (a curvature jump costs nothing), so a flat, curled or
+twisted petal has no break at 0.30. Whether this crease is visible on the preview or the
+print, and whether the ramp should become a smootherstep, is Eva's: a smoothed ramp moves
+every formed row's bytes — a partition event with a frozen phase, not a fix to fold into a
+lobe PR. Recorded here so the next session does not find it again.
 
-## 8. The byte claim
+**(b) THE TIP SEAM MOVES WITH THE MODE.** The brief's u = 0.999562 is the LIVE figure (the
+0.15 mm mesh floor). The OBJECT's seam — where the superellipse meets the 0.8 mm print floor
+— is at **u = 0.992424** on the default taper at n 1.70, and at 0.754092 for n 0.60, 0.999786
+for n 3.00 (export). A lobe treatment reading "where the apex begins" must ask the profile
+in the mode it is building for; `slopeBreaks()` answers per accumulator.
 
-*The row count is fixed at NU, and only the stations move.* So:
+**(c) SEAM ANGLES DEPEND ON WHERE ACROSS THE BLADE THEY ARE READ.** Session 37's 44.54° and
+73.73° were at v = 0.6. At the margin (v = +1) the same two seams read **65.50° and 80.13°**
+(LIVE), 65.50° and 60.50° (EXPORT). Both sets are correct; the half-width's slope jump
+enters dP/du multiplied by v.
 
-* **Which rows move: the 157 on which the seam floor binds, and no others.**
-  That was **predicted from the seam-step data before the byte comparison was
-  run**, and it is the same 157 the census partition names (84 fixed + 58
-  improved + 15 worse = 157, with the other 467 rows' counts unchanged). The
-  first run reported 156/468 — the cleft row above was being skipped by the
-  triangle-count failure before it could be classified, which is the off-by-one
-  and not a disagreement about the geometry.
-* **The shipping default does not move**, bit-identically and by branch: its
-  seam step is 1 and `bladeStations` takes the same `uniform.slice(0, held)` it
-  always took.
-* **Triangle counts are unchanged on 623 of 624 rows, and the exception is
-  declared rather than tolerated.** I claimed they would be unchanged on *every*
-  row, on the grounds that the row count is fixed at NU and only the stations
-  move. **That was wrong, and the tool found it rather than my reading it.** On
-  `CAPABILITY: cleft x 6 layers` the count goes **168,256 → 170,816 (+2,560)**,
-  because `trimPanels()` splits the blade into three panels at a **row index**
-  — the row nearest the cleft onset in `u` — and the two lobes share that
-  boundary row with the base panel. Move the stations and a different row is
-  nearest: measured ring by ring, the split lands at **32 / 32 / 33 / 32 / 31 /
-  31** where main puts it at 32 on every ring, so the base panel loses a row and
-  **both** lobes gain one.
+**(d) THE TWO MARGINS ARE NOT THE SAME LENGTH UNDER CURL + TWIST.** A twisted frame on a
+curled spine puts one margin on the outside of the bend for more of the length: FORMED reads
+33.01 / 37.59 mm (+1 / −1, LIVE) and all-form-max 66.35 / 58.39; the corner state 74.29 /
+66.20 — **8.09 mm apart**. The query keeps the sides separate for this reason; a lobe laid
+out at even `s` on one margin lands at a different `u` on the other, and PR 2 has to say
+which margin's `s` it uses or lay out each margin on its own.
 
-  **This is pre-existing in kind.** Any ladder change can move that split, and
-  session 32's own redistribution acts above `u₀ = 0.2857` where the cleft onset
-  at 0.55 sits. What is new is that something finally measures it. The exception
-  is therefore ONE named entry carrying its numbers: the run fails hard if any
-  other row's count moves, and fails hard if this row's count stops moving or
-  moves to a different number. It is not a tolerance and it is not a skip.
-* **The foot is untouched on every row**, measured on the builder's captured
-  grid rather than argued from the code, because J1–J4, the crowding raster and
-  the whole junction argument read those rows.
+**(e) ON A DOMED HUB THE BLADE'S RIM STARTS OFF THE FOOT'S EDGE.** `pointAt(0, side)` is the
+row plan at u = 0 (a chord across); the emitted ring row on a dome is an arc across
+(session 20's foot law). The margin points differ by **0.509 mm at headRise 0.6, 0.577 at
+1.0, 0.360 on the sphere head**, and by exactly 0 on every flat build. Reported, not ruled,
+and not this PR's — it is the dome/tilt junction's own geometry between the last foot row
+and the first blade row.
 
-`node tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live
---control --expect 157/467` is the instrument, and it **PASSES with the
-partition exactly as predeclared** — 624 rows, both modes, **654,173,712 floats
-compared positionally**, and **5,555,844 captured foot values identical**. It compares positionally under
-`Object.is`, passes capability rows, and has **two controls** — `--control`
-perturbs a held row by 1e-9 and requires it to be reported moved, and
-`--control-mode` reclassifies one row's live answer and requires the
-MODE-DEPENDENT clause to fire exactly once. A clause with only the first
-control would leave the second exactly what this project calls a log line.
+**(f) THE INNERMOST PETAL OF SIX WHORLS AT LAYER SIZE 0.4 HAS A 0.36 mm RIM IN EXPORT** (0.93
+live) — the query works there (bound at fp noise) and it is the same reachable state the
+depth ruling already records as under the floor.
 
-**No frozen phase is owed**: no row was added or removed, and the matrix is
-still 624. **`frozen/phase23`'s bytes stop reproducing on 156 of its 596 rows**
-— measured, `--matrix phase23 --control`, 640,601,424 floats, same one declared
-triangle-count exception, foot identical across 5,443,956 captured values. Its
-DEFINITIONS still deep-compare, which is what `--verify-frozen` proves on every
-push, and that is the distinction session 24 established: **a frozen tag pins
-row definitions, not bytes.** phase23 joins phase17, phase19 and phase21 as a
-tag whose definitions reproduce and whose bytes do not fully.
+**(g) COST.** 3–40 ms per petal at 4096 cells (the 40 is the first call's JIT), ~4,300
+`at()` evaluations per margin. PR 2 calls this per petal; at 240 feet that is seconds per
+rebuild, so PR 2 will size `samples` from R3's table rather than take the default.
 
----
+### A5. What the query is blind to
 
-## 9. What was run, and what was not
+The FOOT's edges (s < 0, the three rows at u = 0, footRing()'s); a cleft's inner edges (a
+capability petal has more boundary than two margins — the tool refuses multi-panel petals);
+any state the sample does not name. It describes the rim of the surface `petalSurface`
+evaluates; whether that rim is the right shape is a picture's question.
 
-**Run and green:**
+### A6. Gates run on this tree
 
-* the full-matrix within-shell census on both trees (624 rows each, no errors),
-  calibrated against session 36's recorded numbers on 222 declared rows;
-* `node tools/verify-bloom-apex-mutants.mjs` — **13 mutants, every family fires
-  on a mutation that names it and is silent on the clean tree**, including four
-  new A7 seam mutants and two new rows;
-* `node tools/bloom-smoke.mjs --check` — coverage and the 53-family census, both
-  directions;
-* `node tools/verify-bloom-seam-bytes.mjs` with both controls.
+- `node tools/verify-bloom-rim-arc.mjs` — PASS, §A2; `--control` — fires as stated; `--quick` proves the rig on two states.
+- `node tools/verify-bloom-surface-offstation.mjs` and `--control` — unchanged results (the import moved, the twenty lines did not).
+- `node tools/bloom-wall-thickness.mjs` and `--negative-control` — clean (V1–V5, two tracked xfails still failing as expected).
+- `node tools/bloom-smoke.mjs` — 58/58 configs watertight, 609 s, SMOKE: clean; `--check` — 58 rows over 24 blocks, 53 families both directions.
+- `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 59c0657>` — the full matrix, both modes, `Object.is`, positional: see the close below.
 
-**Two things the mutant table found that no amount of reading would have:**
+No frozen phase is owed: no row was added and no byte moved. Adding two tools under
+`tools/` makes both FLOWER gates run on this PR; they test flower geometry, not this.
 
-1. **A7 could not see a clearance that was wrong.** `seam-floor-removed` (the
-   law returns 0) fired **NOTHING**: every clause was checking the ladder
-   against the *declared* clearance, and a zero clearance is declared zero too.
-   The gate now **restates the one-line law** and rebuilds the expected value
-   from the two other owners. Importing `seamClearanceMm` there would have
-   mutated with it and checked nothing.
-2. **`seam-reads-the-live-sheet` was a no-op on every row in the table.**
-   `MIN_FEATURE_MM` only raises a sheet *under* 1.00 mm, so on the 1.20 mm
-   default — and on the 2.40 mm binding row — `max(sheet, MIN_FEATURE_MM)` **is**
-   the sheet. It needed a 0.60 mm row, which the table now carries.
+### A7. The close — bytes
 
-Also: the `ladder-eats-the-base` mutant stopped applying (**matched 2×**) the
-moment the seam code restated `Math.floor(ROOT_BLEND_END * NU)`. `HELD_ROWS` is
-now the one owner of that count, which was standing in three places.
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 59c0657>` (main's head, the
+base of this branch), the full matrix, both modes, `Object.is`, positional:
 
-**Found on the way, pre-existing:** the matrix row **`CURL: start floored at one
-blade row (0.02 → 0.036)`** has been stale since session 34 — `0.036` is `1/28`,
-and at `NU = 56` the floor is `0.01786`, so `0.02` was no longer floored and the
-row stopped testing what it names.
+```
+export stream : 657,202,320 floats over 73,022,480 triangles, 624 rows x 2 modes
+captured grid : 70,781,790 values over 8,055 panels (live)
+PASS — 0 floats moved, positionally, under Object.is.
+```
 
-**Not run here, and owed to CI:** the full export-watertight and connectedness
-gates. Boundary edges = 0 and non-manifold = 0 on every touched row is CI's to
-prove, not this session's laptop's.
+Stated honestly: that run's module was loaded before the last edits inside `petalRim`
+(the graded patch and its endpoints), which is not on the build path — `buildPetalInto`
+reads `petalSurface` and never the rim — and the six-row subset re-run on the final tree
+passes identically, with `--control` firing both clauses. `widthProfile`'s one change on
+the build path (`shapeAt` reading the winner loop) is the same `>` on the same terms in
+the same order, and the full run above is what says so.
 
-**Not built, recorded:**
-
-* **A magnitude gate on the xfail list.** X1 fails a declared row that reads
-  zero and X2 fails an undeclared row that does not; a declared row whose count
-  doubles passes silently, which is how the 15 regressions above could land
-  without a red. That is its own ruling.
-* **A panel-gate route for the SEAM CLEARANCE read-out line.** The line ships;
-  its route does not. A7 asserts every quantity in it per ring in **both** STL
-  gates, which is a stronger read-back than the panel could give.
-* **Whether the tilt control should reach past 90° at all** — Eva's, and
-  independent of everything above.
-
----
-
-## 10. BACKLOG — the xfail list does not gate MAGNITUDE
-
-**Named.** `SELF_INTERSECTION_XFAIL` maps a row label to a string. X1 asserts a
-declared row still reads **non-zero**, and fails hard if it reaches zero (a fix
-landing). It does **not** compare the count. So a declared row can go from 7,350
-pairs to 9,944 and the gate stays green — which is exactly how all fifteen of
-this session's regressions landed without a red, and why they had to be found by
-a hand-run full-matrix sweep rather than by CI.
-
-**Sized.** The entries already carry their numbers as prose
-(`'7350 pairs, worst span 0.4519 mm'`), so the data is present and only the
-comparison is missing.
-
-* Parse the count and worst span out of each entry, or restructure the value to
-  `{ pairs, worstMm, why }` — **234 entries**, mechanical.
-* Assert the measured count is within a declared band of the recorded one. The
-  band is the design question, not the code: these counts are **exact integers
-  from a deterministic census**, so the honest bar is equality, and equality
-  would make every future geometry change re-baseline 234 numbers by hand.
-* Cost per run: **zero**. The census already runs on every export-gate row; this
-  reads a number it already has.
-* Cost per session: a re-baseline whenever a change legitimately moves a
-  declared row, which is most geometry sessions.
-
-**Why it is not built here.** That last trade is a ruling, not an
-implementation: a magnitude gate at equality makes the list a ratchet that every
-session pays, and a magnitude gate at a tolerance invents exactly the kind of
-constant this session spent its effort avoiding. It also wants deciding
-alongside the two retagged classes — a `SEAM CLAMPED` row's count is expected to
-move when the clearance law moves, where a `CLEFT` row's is not.
-
-Left as recorded, not built.
+**No frozen phase owed** (no row added, no byte moved). PR 2 owes `frozen/phase24` at this
+PR's merge commit, because block 29 adds rows.

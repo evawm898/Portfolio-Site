@@ -3830,7 +3830,7 @@ export function orientationAssertions(positions, row, sphere) {
 
    THE 15 THAT GOT WORSE ARE REPORTED, NOT TUNED AROUND (Eva's stop condition,
    session 38) — the numbers and the attribution are in
-   docs/bloom-session-38-outcome.md. All 15 are the seam floor's: re-measured
+   docs/bloom-session-38-seam-clearance-outcome.md. All 15 are the seam floor's: re-measured
    with the curl-start floor neutered, every one reads identically.
 
    THE TAGS ARE THE ROW'S CLASS, and two of them are session 38's rulings:
