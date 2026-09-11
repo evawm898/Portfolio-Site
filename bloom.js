@@ -797,6 +797,33 @@ function domeLine(rings, fr, mode) {
    Absent when spine curl is 0, so the line simply is not there. The panel
    gate asserts both clauses in both directions against the builder's own
    flags (route l). */
+/* THE SEAM CLEARANCE (session 38) — TOLD, never silent. The floor moves the
+   blade's first row outward when the foot-to-blade kink would otherwise fold
+   the offset surface, and a geometry change nobody is told about is exactly
+   what this project's "full ranges, clamped, told" convention exists against.
+   It is NOT a control and never becomes one: the clearance is derived from
+   the turn and the sheet, and a slider for it would be a second owner of a
+   printability condition. Absent when it binds on no ring — the shipping
+   default among them — so the line simply is not there.
+
+   The number that matters is per RING, because the clearance is a function of
+   the ring's own effective tilt: on six whorls at the defaults the turns run
+   25 to 85 degrees and the steps 1 to 5. Both STL gates assert all of it per
+   ring (A7), which is a stronger read-back than the panel could give. */
+function seamLine(petals) {
+  const ls = (petals || []).map((p) => p && p.bladeLadder).filter((l) => l && l.seamStep > 1);
+  if (!ls.length) return '';
+  const all = (petals || []).map((p) => p && p.bladeLadder).filter(Boolean);
+  const worst = ls.reduce((a, l) => (l.seamStep > a.seamStep ? l : a), ls[0]);
+  return `SEAM CLEARANCE binds on ${ls.length} of ${all.length} ring${all.length === 1 ? '' : 's'}`
+       + ` · worst ${worst.seamClearMm.toFixed(3)} mm at a ${worst.seamTurnDeg.toFixed(1)}° foot-to-blade kink`
+       + ` · that ring's first blade row starts ${worst.seamStep} row${worst.seamStep === 1 ? '' : 's'} out`
+       + (ls.some((l) => l.seamClamped)
+          ? ` · CLAMPED on ${ls.filter((l) => l.seamClamped).length} ring${ls.filter((l) => l.seamClamped).length === 1 ? '' : 's'} — the blade there is SHORTER than the fold it has to clear (${Math.max(...ls.filter((l) => l.seamClamped).map((l) => l.seamClearU)).toFixed(3)}x its own length asked), so the block starts as far out as it can and the sheet still passes through itself`
+          : '')
+       + ` — nearer and the sheet's own top skin would fold back into the foot\n`;
+}
+
 function spineLine(petals) {
   const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && sp.curlRad !== 0);
   if (!sps.length) return '';
@@ -1106,6 +1133,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + rootBlendLine(layers, cont)
        + domeLine(rings, fr, mode)
        + sphereLine(rings, fr, mode)
+       + seamLine(petals)
        + spineLine(petals)
        + lobeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
@@ -1623,6 +1651,12 @@ window.__bloomMetrics = () => ({
      — 3 x petalCount x layerCount frames instead of 3 x layerCount — and J1
      gets that coverage from the same expression. */
   petalRingFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
+  /* THE LADDER PER RING, because the seam clearance is a function of the
+     ring's OWN effective tilt: on a layered bloom the outer whorl usually
+     does not bind while the inner ones do, so A7 reading layer 0 alone
+     would never see the case the floor exists for. */
+  petalRingBladeLadder: lastPetals.map((p) => (p ? p.bladeLadder : null)),
+  petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is
      what the legibility flag counts, and each descriptor's own `roleCount`

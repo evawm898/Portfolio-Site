@@ -186,14 +186,11 @@ const MUTANTS = [
      uniform ones, which moves a boundary footRing() owns. Watertight, one
      piece, identical triangle count; nothing else here can see it. */
   { id: 'ladder-eats-the-base', why: 'the ladder redistributes every row, including the ones the root blend owns',
-    /* Anchored on the comment that precedes it: `ladderWindowCapacity` and
-       `ladderOutsideMinima` now derive the same count with the same line, and
-       the sweep's own guard reported the bare line matching 3x. */
-    find: '  /* The rows the root blend can reach keep their uniform stations, exactly. */\n  const held = Math.floor(ROOT_BLEND_END * NU);',
+    find: 'export const HELD_ROWS = Math.floor(ROOT_BLEND_END * NU);',
     /* A7 ONLY, and the claim was corrected by the control rather than the
        check by the claim: with the held count at 0 the ladder still respects
        its gap bound, so A8 is RIGHT not to fire here. */
-    into: '  /* The rows the root blend can reach keep their uniform stations, exactly. */\n  const held = 0;', names: ['A7'],
+    into: 'export const HELD_ROWS = 0;', names: ['A7'],
     witness: (M, C) => {
       const a = builtOn(M).stations, b = builtOn(C).stations;
       const held = Math.floor(0.30 * C.BLADE_ROWS);
@@ -236,6 +233,85 @@ const MUTANTS = [
       if (b !== 0) return `the CLEAN ladder already has ${b} non-increasing pairs — the repair is not doing its job and this mutant cannot be read`;
       return a > 0 ? null : 'the unrepaired ladder is still strictly increasing — the pass is inert on this state and the mutant proves nothing';
     } },
+  /* ===================================================================
+     A7 — THE SEAM CLEARANCE (session 38). Four mutations, one per clause the
+     floor added, because a clause with no mutation that fires it is a
+     computation nobody has shown can produce a verdict.
+
+     EVERY ONE OF THEM NEEDS `THE SEAM FLOOR BINDING` IN `ROWS`, and that is
+     this table's own durable rule (session 35: a row chosen against a branch
+     must state which branch and assert that it still reaches it). The four
+     taper rows all sit at the shipping tilt of 25 degrees, where the
+     clearance is 0.2536 mm against a first station at 0.625 mm — the floor
+     does not bind, the new branch is never entered, and all four of these
+     would report SILENT on them. Each witness therefore drives the binding
+     state itself and asserts the mutated module's own behaviour moved.
+     =================================================================== */
+  /* A7 — the clearance is gone, so the first blade row goes back to row 1
+     and the foot-to-blade offset fold returns (measured on main: 376 pairs
+     on a SINGLE layer at tilt 75, length 20, sheet 2.4). */
+  { id: 'seam-floor-removed', why: 'the foot-to-blade clearance is zero, so the first blade row sits on the kink',
+    find: '  return seamHalfThicknessMm(sheetMm) * Math.sin(Math.max(0, Math.min(turnRad, Math.PI / 2)));',
+    into: '  return 0 * seamHalfThicknessMm(sheetMm) * Math.sin(Math.max(0, Math.min(turnRad, Math.PI / 2)));', names: ['A7'],
+    witness: (M, C) => {
+      const t = 75 * Math.PI / 180;
+      const a = M.seamClearanceMm(t, 2.4), b = C.seamClearanceMm(t, 2.4);
+      if (!(a === 0)) return `the mutated clearance is ${a} mm at a 75 degree kink, not 0`;
+      if (!(b > 0)) return `the CLEAN clearance is ${b} mm — this mutant cannot be read`;
+      return M.seamLatticeStep(a, 20) === 1 && C.seamLatticeStep(b, 20) > 1 ? null
+        : `the lattice step is ${M.seamLatticeStep(a, 20)} on the mutant and ${C.seamLatticeStep(b, 20)} on the clean tree — the floor did not stop binding`;
+    } },
+  /* A7 — THE FIRST DRAFT, kept as a mutation because Eva ruled against it by
+     name: floor each station instead of translating the lattice, and let the
+     strictly-increasing repair separate the survivors. It PILES — every row
+     the floor swallowed ends up 1e-5 apart against the floor — which trades
+     this defect for another and measured WORSE than main. */
+  { id: 'seam-piles-instead-of-redistributing', why: 'the held rows are floored individually rather than translated as a lattice',
+    find: '    ? Array.from({ length: held }, (_, i) => (mUsed + i) / NU)',
+    into: '    ? Array.from({ length: held }, (_, i) => Math.max((i + 1) / NU, mUsed / NU))', names: ['A7'],
+    witness: (M, C) => {
+      const set = { petalTilt: 75, petalLength: 20, sheetThickness: 2.4 };
+      const gap = (T) => { const st = builtOn(T, set).stations; let g = Infinity;
+        for (let i = 1; i < Math.floor(0.30 * T.BLADE_ROWS); i++) g = Math.min(g, st[i] - st[i - 1]); return g; };
+      const a = gap(M), b = gap(C);
+      if (!(b > 1e-3)) return `the CLEAN ladder's tightest held gap is already ${b} — this mutant cannot be read`;
+      return a < 1e-3 ? null : `the mutated ladder's tightest held gap is ${a}, not a pile against the floor`;
+    } },
+  /* A7 — the clearance starts reading the sheet as authored rather than as
+     the export floors it. Row positions are topology; a ladder that moves
+     with the mode splits a cleft's panels at a different row (session 32's
+     own defect, which is why `ladderHalfAt` reads the export floor in both
+     modes). ONE OWNER makes this a one-line mutation AND makes it visible in
+     the live gate at all. */
+  { id: 'seam-reads-the-live-sheet', why: 'the clearance is built on the authored sheet rather than the export floor',
+    find: 'export function seamHalfThicknessMm(sheetMm) { return Math.max(sheetMm, MIN_FEATURE_MM) / 2; }',
+    into: 'export function seamHalfThicknessMm(sheetMm) { return sheetMm / 2; }', names: ['A7'],
+    /* THE WITNESS NAMES THE ONLY SHEET THAT CAN SEE IT. On the default 1.20
+       and on the 2.40 row above, `max(sheet, MIN_FEATURE_MM)` IS the sheet
+       and this edit changes nothing at all — so the witness asks about 0.60,
+       and the row list carries a 0.60 state for the assertion to bite on. */
+    witness: (M, C) => {
+      if (M.seamHalfThicknessMm(1.2) !== C.seamHalfThicknessMm(1.2)) return 'the mutation moved the DEFAULT sheet, which it must not — the export floor does not bind there';
+      return M.seamHalfThicknessMm(0.6) === 0.3 && C.seamHalfThicknessMm(0.6) === 0.5 ? null
+        : `the half-thickness on a 0.6 mm sheet is ${M.seamHalfThicknessMm(0.6)} on the mutant and ${C.seamHalfThicknessMm(0.6)} on the clean tree — the export floor is still being read`;
+    } },
+  /* A7 — the clearance is computed for an angle this build does not have.
+     petalSurface() derives the seam turn as |tilt|; the builder re-reads it
+     off the two EMITTED frames and reports the difference of the cosines,
+     which is exactly 0 on every hub shape measured. Halving the owner's
+     angle leaves a perfectly plausible ladder and a clearance sized for a
+     kink that is not there. */
+  { id: 'seam-turn-is-not-the-kink', why: 'the clearance is built on half the turn the frames actually make',
+    find: '  const seamTurnRad = Math.abs(tilt);',
+    into: '  const seamTurnRad = Math.abs(tilt) / 2;', names: ['A7'],
+    witness: (M, C) => {
+      const set = { petalTilt: 75, petalLength: 20, sheetThickness: 2.4 };
+      const turn = (T) => { const acc = new T.MeshBuilder({ exportMode: true });
+        return T.buildBloomInto(acc, { ...REGISTRY_DEFAULTS, ...set }).petal.bladeLadder.seamTurnDeg; };
+      const a = turn(M), b = turn(C);
+      return Math.abs(a - b / 2) < 1e-9 && Math.abs(b - 75) < 1e-9 ? null
+        : `the seam turn is ${a} degrees on the mutant against ${b} on the clean tree — the owner's angle did not move`;
+    } },
   /* A8 — the buckle's bar stops being read. The ladder takes rows the wave
      needs, which DOUBLES the buckle's along-margin chord error at the
      frequency ceiling (measured: 0.2808 -> 0.5626 mm) while every other gate
@@ -255,6 +331,22 @@ const ROWS = [
      the tip the mode floor is). Both cap-entry rules are covered — the 0.80
      clamp at a broad falling limb, the crossing at a steep one. */
   { label: 'the shipping default', set: [] },
+  /* THE SEAM FLOOR BINDING, and it is a SINGLE LAYER on purpose: layer count
+     was the proxy the brief mistook for the cause, and this row is the
+     measured counter-example — tilt 75, length 20, sheet 2.4 folds 376 pairs
+     on main with no layers involved at all. At the shipping tilt the
+     clearance is 0.2536 mm against a first station at 0.625 mm, so without
+     this row all four seam mutations are no-ops. */
+  { label: 'the seam floor binding (tilt 75, length 20, sheet 2.4 — a SINGLE layer)',
+    set: [{ id: 'petalTilt', value: '75' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '2.4' }] },
+  /* THE EXPORT FLOOR BINDING TOO, and it is a second row rather than a wider
+     one because the two floors bind in opposite directions. `MIN_FEATURE_MM`
+     only raises a sheet UNDER 1.00 mm, so on the 1.20 mm default — and on the
+     2.40 mm row above — `max(sheet, MIN_FEATURE_MM)` IS the sheet and
+     `seam-reads-the-live-sheet` is a no-op. Measured: that mutant fired
+     NOTHING until this row existed. 0.60 is the control's own minimum. */
+  { label: 'the seam floor binding on a sheet UNDER the export floor (0.60, tilt 75, length 20)',
+    set: [{ id: 'petalTilt', value: '75' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '0.6' }] },
   { label: 'taper 0.60 — the cap entry at the 0.80 clamp', set: [{ id: 'petalTipTaper', value: '0.6' }] },
   { label: 'taper 4 — the cap entry from the crossing', set: [{ id: 'petalTipTaper', value: '4' }] },
   { label: 'the narrowest petal (width 8, taper 4)', set: [{ id: 'petalWidth', value: '8' }, { id: 'petalTipTaper', value: '4' }] },

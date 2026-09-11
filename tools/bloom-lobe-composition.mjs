@@ -35,11 +35,14 @@
    project's own rule). The gate's claim is X1's — every declared row still
    self-intersects — and the XFAIL entry carries both counts.
 
-   VALIDITY. Every plain row here that main declares by name must reproduce
-   main's own count and worst span EXACTLY (SELF_INTERSECTION_XFAIL, measured
-   on main at ead8624): the cup, the curl, the roll, the dome and the buckle
-   row. That is the anchor that the plain builds on this tree ARE main's
-   geometry, so the comparison is against main and not against a moved base;
+   VALIDITY. Every plain row here that the list declares by name must reproduce
+   that entry's count and worst span EXACTLY (SELF_INTERSECTION_XFAIL): the cup,
+   the curl, the roll, the dome and the buckle row. That is the anchor that the
+   plain builds on this tree ARE the geometry the list was measured on, so the
+   comparison is against a fixed base and not a moved one. NOTE that the list is
+   no longer main's: the foot-to-blade seam session re-baselined it on its own
+   merged tree, so this check is now "the plain rows agree with what THIS tree
+   declares" rather than "the plain rows are main's";
    a mismatch aborts the run. The two hairline rows are named for what they
    are: cup 0.40's touches are span-0 contacts at the FORM-ONSET CREASE (the
    u = 0.30 tangent break PR 1 recorded), and every one sits BELOW the window,
@@ -58,7 +61,7 @@ const JSON_OUT = process.argv.includes('--json');
 
 /* The rows, BY LABEL, read from the matrix itself so a relabelled or removed
    row is a loud failure here rather than a stale copy. Each names the plain
-   row main declares (or the class its plain build belongs to). */
+   row the list declares (or the class its plain build belongs to). */
 const ROWS = [
   { label: 'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', plainDeclared: null, note: 'span-0 touches at the form-onset crease on the cup alone; the lobed ladder lands three of its own, on other petals' },
   { label: 'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', plainDeclared: 'petalCup max (1.2)' },
@@ -115,8 +118,8 @@ for (const spec of ROWS) {
   if (plain.lobes) { invalid.push(`${spec.label}: the plain build reports a lobe record`); continue; }
   if (spec.plainDeclared) {
     const d = parseDeclared(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared] || '');
-    if (!d) invalid.push(`${spec.label}: main declares no row "${spec.plainDeclared}"`);
-    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > 5e-5) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where main declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT main's geometry, so nothing below compares against main`);
+    if (!d) invalid.push(`${spec.label}: this tree's SELF_INTERSECTION_XFAIL declares no row "${spec.plainDeclared}"`);
+    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > 5e-5) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where the list declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT what the list declares, so nothing below has a baseline to compare against`);
   }
   const [u0, u1] = lob.lobes.windowU;
   const inWin = (b) => b.sites.filter((p) => { const u = b.uOf(p); return u > u0 && u < u1; }).length;
@@ -127,7 +130,7 @@ for (const spec of ROWS) {
   out.push(rec);
   if (!JSON_OUT) {
     console.log(`\n${spec.label}`);
-    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — main declares "${spec.plainDeclared}" at ${H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]}` : spec.note ? ` — ${spec.note}` : ''}`);
+    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — the list declares "${spec.plainDeclared}" at ${H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]}` : spec.note ? ` — ${spec.note}` : ''}`);
     console.log(`  sites, lobed -> nearest plain: ${f(rec.lobedToPlain)}; plain -> nearest lobed: ${f(rec.plainToLobed)}`);
     console.log(`  inside the lobes' window (u ${u0.toFixed(3)}-${u1.toFixed(3)}): lobed ${rec.lobed.inWindow} of ${rec.lobed.sites}, plain ${rec.plain.inWindow} of ${rec.plain.sites}`);
   }
@@ -138,4 +141,4 @@ if (invalid.length) {
   for (const m of invalid) console.error('  ' + m);
   process.exit(2);
 }
-if (!JSON_OUT) console.log(`\n${out.length} composition rows measured on both sides; every plain row main declares by name reproduced main's count and worst span exactly.`);
+if (!JSON_OUT) console.log(`\n${out.length} composition rows measured on both sides; every plain row declared by name reproduced this tree's declared count and worst span exactly.`);

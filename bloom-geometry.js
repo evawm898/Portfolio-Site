@@ -3055,14 +3055,31 @@ export const BLADE_ROWS = NU;
    back THROUGH the print floor, which biased an asked 0.60 to 0.6080). If a
    later change adds a branch to widthProfile(), it belongs in `lawActive`.
 
-   THE ROOT BLEND'S OWN ROWS DO NOT MOVE, BY CONSTRUCTION. Every station
-   below ROOT_BLEND_END keeps its uniform value exactly, so the base's chord
-   error is IDENTICAL to the un-redistributed build at every exponent and
-   every taper (measured: 0.1023 mm and 0.1293 mm on the two reference
-   tapers, unchanged across 16 states). That boundary belongs to footRing()
-   and is scheduled as its own session; a tip control must not resample it.
-   It also keeps `CURL_START_MIN = 1 / NU` meaning exactly what it says — the
-   first blade row is still at 1/NU, because it is one of the held ones.
+   THE ROOT BLEND'S OWN ROWS ARE THE ROW LATTICE, AND SESSION 38 MOVED WHERE
+   THAT LATTICE STARTS. Until then the sentence here read "every station below
+   ROOT_BLEND_END keeps its uniform value exactly", and the redistribution
+   still does not touch them: what changed is that the block may now START AT
+   ROW m rather than at row 1, so that the first blade row clears the
+   foot-to-blade offset fold (see THE SEAM CLEARANCE above). The held rows are
+   `(m + i) / NU` — still `held` consecutive lattice steps, still one row
+   apart, still a BIT identity, and still bit-identical to the old expression
+   at every state where the floor does not bind, the shipping default among
+   them. The ladder above the block is untouched either way: it runs over
+   [u0, 1] from wherever the block ends. That boundary belongs to footRing()
+   and a tip control must not resample it; the seam floor is not a tip
+   control, it is that boundary's own print-safety condition.
+
+   `CURL_START_MIN = 1 / NU` IS RE-DERIVED, NOT RELAXED. It used to be able to
+   say "the first blade row is still at 1/NU, because it is one of the held
+   ones", and that is what made Eva's Sep 4 floor mean "the root chord is
+   straight wherever start is engaged" — the premise J8's stronger normal
+   clause rests on. The first blade row is now at m/NU, so the CONTROL's bound
+   is unchanged (the registry still imports 1/NU; a bound that moved with the
+   tilt would be one control reaching into another's range) while the floor
+   the LAW applies is `max(start, 1/NU, the first blade row)` — see
+   `startFloor` at spineLaw's call site. Relaxing instead would have made J8's
+   clause SKIP those rows rather than fail them, which is coverage lost
+   silently rather than loudly.
 
    THE WIDEST GAP IS BOUNDED at LADDER_MAX_GAP_FACTOR / NU. This is NOT a
    quality lever — measured, it costs the apex nothing at all (0.1025 mm with
@@ -3074,6 +3091,11 @@ export const BLADE_ROWS = NU;
    redistribution lowers it. At the frequency cap the minimum falls 8.00 ->
    5.71 with this bound (4.73 without). Reported, not resolved: whoever lands
    second owns reconciling the two. */
+/* HOW MANY BLADE ROWS THE ROOT BLEND OWNS — ONE OWNER (session 38). This
+   expression stood in three places (the ladder, the seam's lattice step and
+   the ladder telemetry) and two of them were textually identical, which is
+   enough to make an anchored mutation land twice and say nothing. */
+export const HELD_ROWS = Math.floor(ROOT_BLEND_END * NU);
 export const LADDER_ARC_SHARE = 0.70;
 export const LADDER_MAX_GAP_FACTOR = 1.4;
 const LADDER_SAMPLES = 8000;
@@ -3096,15 +3118,157 @@ export function ladderGapFactor(buckleFreq) {
   return Math.min(LADDER_MAX_GAP_FACTOR, NU / (BUCKLE_ROWS_PER_CYCLE_MIN * buckleFreq));
 }
 
+/* ===================================================================
+   THE SEAM CLEARANCE — how far the first blade row must stand off the foot
+   (session 38, Eva's ruling: DERIVE k, do not dial it).
+
+   THE DEFECT. At the foot-to-blade kink the two skins are offset along the
+   ROWS' own normals — the foot's (the hub plane's) at one end and the
+   blade's, turned by the tilt, at the other. That makes the seam panel a
+   WEDGE, and when the first blade row sits too close to the ring the wedge's
+   own top skin re-enters the foot's slab: measured, every site on the top
+   skin at the ring radius at dz = t/2, both triangles of every pair a seam
+   quad, zero pairs at zero tilt, and a SINGLE layer at tilt 75 with length
+   20 and sheet 2.4 folding 376 pairs with no layers involved at all. Layer
+   count was a proxy for shorter petals and stacked tilt, never the cause.
+
+   THE DERIVATION. Work in the petal's own radial cross-section, with the
+   ring row at the origin, the foot running along +r, the blade leaving at
+   the seam turn `th`, and a = t/2. Write c = cos th, s = sin th. The first
+   blade row's centre is s1*(c, s); its two skin points are
+
+     T = ( s1 c - a s ,  s1 s + a c )     (top)
+     B = ( s1 c + a s ,  s1 s - a c )     (bottom)
+
+   while the foot's own skins sit at (0, +/-a) and run inward. The seam
+   panel's RIM (the closing face at v = +/-1) is the quad through the foot's
+   two skin points and T, B; it is what carries the panel across the foot's
+   top plane z = a. That plane cuts the rim on the edge T->B at
+
+     lambda = (z_T - a) / (z_T - z_B) = (s1 s + a c - a) / (2 a c),
+
+   and the crossing lands at r = r_T + lambda (r_B - r_T). Requiring that
+   crossing to fall OUTSIDE the foot — r >= 0, i.e. at or beyond the ring —
+   and clearing the denominator:
+
+     s1 c - a s + 2 a s (s1 s + a c - a) / (2 a c)  >=  0
+     s1 c^2 - a s c + s1 s^2 + a s c - a s          >=  0
+     s1 (c^2 + s^2)                                 >=  a s
+
+                    ***  s1  >  (t/2) * sin(th)  ***
+
+   NOTHING IS TUNED. The naive offset-corner bound — put the first row's own
+   skin point above the foot's top plane — is a*tan(th/2), and that is the
+   "bare geometric bound" the brief expected: it is NECESSARY AND NOT
+   SUFFICIENT, and at exactly that value the result is WORSE than main (the
+   tilt-75 case goes 376 -> 632 pairs, every site at z = t/2 EXACTLY, because
+   the row lands coplanar with the foot's top skin rather than clear of it).
+   The gap between the two is the factor
+
+     sin(th) / tan(th/2) = 1 + cos(th),
+
+   which is 2 at a shallow kink, 1.906 at the shipping tilt of 25 degrees,
+   and 1 at a right angle — the answer to "if the derivation lands near 2.0".
+   It is the cost of the mesh drawing the seam as a flat CHORD from the
+   foot's offset ring to the blade's offset first row where the bound assumes
+   the corner is mitred.
+
+   MEASURED AGAINST THE CENSUS, which is what makes this a derivation rather
+   than a fit: sweeping the constant in front of a*sin(th), every state flips
+   from non-zero to EXACTLY ZERO between 1.0000 and 1.0005 — tilt 45, 60 and
+   75, sheet 1.2 and 2.4, three layers and six. At exactly 1.0000 all four
+   probe states read the SAME 64 pairs, which is the signature of the
+   equality touching rather than of geometry.
+
+   THE INEQUALITY IS STRICT, AND STRICTNESS COSTS NO EPSILON — see
+   bladeStations: the first blade row is not placed AT the clearance, it is
+   the first station of the row lattice STRICTLY BEYOND it. A margin dialled
+   until the count reached zero would have been the invented-constant defect
+   this project keeps finding, and it would have been carrying a printability
+   guarantee.
+
+   BOTH MODES, and this is the session-32 mode-dependence defect refusing to
+   ship a third time: the thickness read here is max(sheetThickness,
+   MIN_FEATURE_MM) — the EXPORT thickness — in live mode too, exactly as
+   `ladderHalfAt` reads the export floor in both modes. Row positions are
+   topology; the export floor may not move them. Measured on the scratch
+   patch that read the live thickness: on a 0.6 mm sheet ring 2's first
+   station differed live from export.
+
+   PAST A RIGHT ANGLE THE LAW SATURATES AND SAYS SO. The algebra above
+   multiplies by c = cos(th), so beyond a right angle the inequality REVERSES
+   and no spacing satisfies it — which is the geometry telling the truth: at
+   an effective tilt past 90 degrees the blade's own MID-SURFACE lies back
+   over its foot, and that is a mid-surface overlap no offset spacing can
+   fix. The clearance is held at its right-angle value (a) there rather than
+   falling away with sin, and those rows stay declared. Whether the tilt
+   control should reach past 90 at all is a separate ruling.
+   =================================================================== */
+/* THE ONE OWNER of the half-thickness the clearance is built on — the EXPORT
+   thickness in both modes. Both `seamClearanceMm` and petalSurface's reported
+   `seamHalfMm` call this rather than restating it, so the live gate's A7
+   clause and the clearance itself cannot drift apart. */
+export function seamHalfThicknessMm(sheetMm) { return Math.max(sheetMm, MIN_FEATURE_MM) / 2; }
+export function seamClearanceMm(turnRad, sheetMm) {
+  return seamHalfThicknessMm(sheetMm) * Math.sin(Math.max(0, Math.min(turnRad, Math.PI / 2)));
+}
+/* THE ONE OWNER of which lattice station the blade starts at — the first
+   station STRICTLY beyond the clearance, never nearer than the first. Both
+   `bladeStations` and the ladder telemetry A7 reads call this, so the
+   assertion pins the block the builder built rather than a second law. */
+/* THE FURTHEST OUT THE BLOCK CAN START and still leave the redistributed
+   ladder a domain at all: the last held row then lands at (SEAM_MAX_STEP +
+   HELD_ROWS - 1) / NU, one row short of the tip. */
+export const SEAM_MAX_STEP = Math.max(1, NU - HELD_ROWS);
+export function seamLatticeStepRaw(seamMm, length) {
+  const uSeam = length > 0 ? seamMm / length : 0;
+  return Math.max(1, Math.floor(uSeam * NU) + 1);
+}
+export function seamLatticeStep(seamMm, length) {
+  return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP);
+}
+
 /* The blend grid a demand's ladder is taken down to — see the note at the
    end of bladeStations. */
 const LADDER_BLEND_GRID = 4096;
-export function bladeStations(profile, length, buckle = null) {
+export function bladeStations(profile, length, buckle = null, seamMm = 0) {
   const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
   /* The rows the root blend can reach keep their uniform stations, exactly. */
-  const held = Math.floor(ROOT_BLEND_END * NU);
-  const u0 = held / NU;
-  if (held >= NU) return uniform;
+  const held = HELD_ROWS;
+  /* THE SEAM FLOOR — REDISTRIBUTE, NEVER PILE (Eva, session 38). The held
+     block keeps the uniform ROW LATTICE exactly and simply STARTS LATER: the
+     first blade row is the first station of that lattice standing strictly
+     clear of the seam, and the block is `held` consecutive lattice steps
+     from there. So the held rows are still (m + i) / NU for an integer m,
+     their spacing is still one row, and nothing can stack against a floor.
+
+     A first draft floored each station instead (`max(u_i, uMin)`) and let
+     the strictly-increasing repair separate the survivors by 1e-4. That
+     PILES, and it trades this defect for another: the scratch patch that did
+     it took the mum on a hemisphere from 0 to 72 pairs and the incurve target
+     at rise 0.5 from 7,350 to 8,641 (Eva's ruling, session 38 — those two
+     figures are that patch's, not this one's; both rows are re-measured under
+     the shipped redistribution in docs/bloom-foot-to-blade-seam-outcome.md).
+
+     WHY THE LATTICE AND NOT THE CLEARANCE ITSELF. Placing the first row AT
+     the clearance realises the derivation's inequality as an EQUALITY, which
+     is exactly the coplanar-touch case the derivation warns about. Taking
+     the next lattice station instead makes it strict with no epsilon: the
+     margin is one row, which is a length this file already owns, rather than
+     a number chosen because the count reached zero.
+
+     m IS 1 WHENEVER THE FLOOR DOES NOT BIND, and then `base` is `1 / NU`
+     from the same expression `uniform[0]` used, so the stations below are
+     BIT-IDENTICAL to the un-floored ladder and the shipping default cannot
+     move. */
+  const mUsed = seamLatticeStep(seamMm, length);
+  const seamBinds = mUsed > 1;
+  const heldRows = seamBinds
+    ? Array.from({ length: held }, (_, i) => (mUsed + i) / NU)
+    : uniform.slice(0, held);
+  const u0 = held > 0 ? heldRows[held - 1] : 0;
+  if (held >= NU) return heldRows;
+  if (!(u0 < 1)) return heldRows.concat(uniform.slice(held));
 
   /* THE LADDER'S OWN VIEW, which is the export floor in BOTH modes — see
      `ladderHalfAt` in widthProfile(). Row positions are topology; the export
@@ -3146,7 +3310,13 @@ export function bladeStations(profile, length, buckle = null) {
     const s = Math.hypot(x - pX, y - pY);
     dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
   }
-  if (!(arc > 0)) return uniform;
+  /* THE DEGENERATE PATHS MUST STILL CLEAR THE SEAM (session 38). If the
+     measure is empty there is nothing to redistribute, but returning the
+     UNIFORM ladder would put the first blade rows back under the clearance
+     and break A7. The even ladder over the held block's own domain is the
+     answer, and with no seam shift it is `uniform` verbatim. */
+  const fallback = () => heldRows.concat(Array.from({ length: NU - held }, (_, j) => u0 + (1 - u0) * (j + 1) / (NU - held)));
+  if (!(arc > 0)) return seamBinds ? fallback() : uniform;
 
   const beta = (LADDER_ARC_SHARE / (1 - LADDER_ARC_SHARE)) * turn;
   const want = NU - held;
@@ -3174,7 +3344,7 @@ export function bladeStations(profile, length, buckle = null) {
   const cum = [0];
   for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
   const total = cum[LADDER_SAMPLES];
-  if (!(total > 0)) return uniform;
+  if (!(total > 0)) return seamBinds ? fallback() : uniform;
   /* Stations at equal increments of the measure between two of its values —
      the whole blade when there is no demand (today's placement, verbatim), one
      region at a time when there is. */
@@ -3196,7 +3366,7 @@ export function bladeStations(profile, length, buckle = null) {
     }
   };
   const cumAt = (u) => { const i = Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES))); return cum[i]; };
-  const out = uniform.slice(0, held);
+  const out = heldRows.slice();
   let regions = null;
   if (demand === null) {
     placeInto(out, 0, total, want);
@@ -3249,9 +3419,19 @@ export function bladeStations(profile, length, buckle = null) {
      count is at most the capacity, which is what makes the target's outside
      gaps admissible. With no demand the target is the uniform ladder, as
      before. */
-  const target = demand === null ? uniform : (() => {
-    const ref = uniform.slice(0, held);
-    const bands = [[held / NU, Math.max(held / NU, demand.u0)], [Math.max(held / NU, demand.u0), demand.u1], [demand.u1, 1]];
+  /* THE BLEND'S TARGET FOLLOWS THE SEAM SHIFT (session 38). The target is the
+     EVEN ladder over the domain the redistributed rows actually occupy, which
+     the seam floor moves: `u0` is the last HELD row, not `held / NU`, whenever
+     the floor binds. Kept as `uniform` / `held / NU` VERBATIM when it does not,
+     so a bounded ladder on an unshifted block stays bit-identical to main's. */
+  const target = demand === null
+    ? (seamBinds
+        ? out.map((u, i) => (i < held ? u : u0 + (1 - u0) * (i + 1 - held) / want))
+        : uniform)
+    : (() => {
+    const ref = heldRows.slice();
+    const bandBase = seamBinds ? u0 : held / NU;
+    const bands = [[bandBase, Math.max(bandBase, demand.u0)], [Math.max(bandBase, demand.u0), demand.u1], [demand.u1, 1]];
     const counts = [regions.S, regions.W, regions.T];
     for (let b = 0; b < 3; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
     ref[NU - 1] = 1;
@@ -4145,7 +4325,9 @@ export function lobesEngaged(state) { return !!state.lobeDepth; }
    carry", and it is the ladder's, not a ruled number: 8 and 10 were ruled
    without this floor under them and do not survive it (docs, §B10). */
 export function ladderWindowCapacity(u0, u1, buckleFreq = 0) {
-  const held = Math.floor(ROOT_BLEND_END * NU);
+  /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
+     places, which is what made an anchored mutation match three times. */
+  const held = HELD_ROWS;
   const free = NU - held;
   /* AT THE BUCKLE'S FREQUENCY CAP THE LADDER IS UNIFORM, BY THE BUCKLE'S OWN
      RULE (56 rows over 7 cycles is 8 per cycle with no slack; A8 asserts it),
@@ -4166,7 +4348,9 @@ export function ladderWindowCapacity(u0, u1, buckleFreq = 0) {
    cannot drift: the stretch's rows run from the last held row up to u0 (its
    last row AT u0), the tip's from u1 up to 1 (its last row AT 1). */
 export function ladderOutsideMinima(u0, u1, buckleFreq = 0) {
-  const held = Math.floor(ROOT_BLEND_END * NU);
+  /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
+     places, which is what made an anchored mutation match three times. */
+  const held = HELD_ROWS;
   const gap = ladderGapFactor(buckleFreq) / NU;
   return { held, minStretch: Math.ceil(Math.max(0, u0 - held / NU) / gap - 1e-9), minTip: Math.ceil(Math.max(0, 1 - u1) / gap - 1e-9) };
 }
@@ -4322,6 +4506,12 @@ export function petalFormIsFlat(state) {
    the builder and the gate read. CURL START IS FLOORED AT ONE BLADE ROW
    (Eva, Sep 4): any non-zero start is at least 1/NU, so the root chord is
    straight wherever start is engaged and J8's normal clause applies there.
+   SESSION 38 RE-DERIVED WHICH ROW THAT IS. The seam clearance can start the
+   blade's row lattice at row m rather than row 1, and "one blade row" has to
+   go on meaning THE FIRST ONE or the property above quietly stops holding —
+   so `curlStartFloored` takes a `startFloor` (the first blade station) beside
+   `CURL_START_MIN`, and the two are maxed. At every state where the seam
+   floor does not bind the two are the same number and nothing moves.
    =================================================================== */
 export const SPINE_SUBSTEPS = 32;
 export const CURL_BIAS_POWER = 4;
@@ -4333,10 +4523,10 @@ export const CURL_BIAS_POWER = 4;
 const SPINE_WIRED = true;
 export const CURL_START_MIN = 1 / NU;
 export function curlIsUniform(state) { return state.curlBias === 0 && state.curlStart === 0; }
-export function curlStartFloored(start) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN); }
-export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
+export function curlStartFloored(start, startFloor = CURL_START_MIN) { return start === 0 ? 0 : Math.max(start, CURL_START_MIN, startFloor); }
+export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, startFloor = CURL_START_MIN }) {
   const p = CURL_BIAS_POWER * bias;
-  const s0 = curlStartFloored(start);
+  const s0 = curlStartFloored(start, startFloor);
   const remap = (u) => (s0 === 0 ? u : Math.max(0, (u - s0) / (1 - s0)));
   /* The CUMULATIVE turn at u — the law in closed form, before the floor.
      Each substep's curvature is the exact mean of the law over it, so the
@@ -4425,6 +4615,7 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius }) {
     turnBuilt: phi[N] - tilt,
     turnAsked: curlRad,
     startFloored: s0,
+    startFloor,
   };
 }
 
@@ -4921,6 +5112,30 @@ export function petalSurface(state, ring, slot, cap, acc) {
   const halfW = (ps.petalWidth * slot.scale) / 2;
   const footHalf = ring.width / 2;
 
+  /* THE SEAM (session 38) — the ONE owner of the foot-to-blade clearance and
+     of where the blade's first row therefore sits. It is computed HERE, above
+     the form, because the spine law needs it: see `startFloor` below.
+
+     THE TURN IS `tilt`, and that is a derivation rather than a shortcut. The
+     foot's own surface normal at the ring row is +Z on a flat hub and the
+     cap's `Up` on a dome; the blade's sheet normal `nrm` is, in BOTH of this
+     file's branches, that same up-vector rotated by `tilt` toward -Rs. So the
+     angle between them is exactly |tilt| whatever the hub is doing. It is not
+     ASSUMED: `seamFrameResidual` below re-reads it off the two emitted frames
+     and both STL gates assert that residual is zero, which is the project's
+     own "compute from one owner, check the other reading agrees" shape rather
+     than a second producer. */
+  const seamTurnRad = Math.abs(tilt);
+  /* THE THICKNESS THE CLEARANCE READS, reported so the LIVE gate can pin it:
+     it is `max(sheetThickness, MIN_FEATURE_MM) / 2` in BOTH modes, never the
+     accumulator's mode-dependent `t`. Row positions are topology and the
+     export floor may not move them — `ladderHalfAt`'s own rule, and session
+     32's mode-dependence defect refusing to ship a third time. */
+  const seamHalfMm = seamHalfThicknessMm(ps.sheetThickness);
+  const seamClearMm = seamClearanceMm(seamTurnRad, ps.sheetThickness);
+  const seamStep = seamLatticeStep(seamClearMm, length);
+  const seamBaseU = seamStep / NU;
+
   /* Local frame: R radial (out), T tangent, Z up. */
   const cosA = Math.cos(slot.azimuth), sinA = Math.sin(slot.azimuth);
   const R = [cosA, sinA, 0];
@@ -5069,7 +5284,20 @@ export function petalSurface(state, ring, slot, cap, acc) {
      and C2 compares the table against the closed form on uniform rows —
      the integrator's own validity, never assumed. */
   const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
-  const law = form && kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: ps.curlBias, start: ps.curlStart, length, tilt, floorRadius }) : null;
+  /* THE CURL START IS FLOORED AT THE FIRST BLADE ROW, RE-DERIVED (session 38).
+     Eva's Sep 4 ruling floored it at ONE BLADE ROW so that "the root chord is
+     straight wherever start is engaged", which is what lets J8 assert its
+     stronger normal clause there. `CURL_START_MIN = 1 / NU` said that exactly
+     while the first blade row was always row 1. Under the seam floor the
+     first row is row `seamStep`, so the SAME property now needs the same
+     floor stated against the same thing: the first blade row's own station.
+     The CONTROL's declared bound is untouched (the registry still imports
+     `CURL_START_MIN`, and a bound that moved with the tilt would be one
+     control reaching into another's range — the violation NU = 56 exists to
+     avoid); what moves is the floor the LAW applies, which the read-out
+     already prints. Relaxing instead would have made J8's clause SKIP those
+     rows rather than fail them, which is coverage lost silently. */
+  const law = form && kC !== 0 ? spineLaw({ curlRad: form.curlRad, bias: ps.curlBias, start: ps.curlStart, length, tilt, floorRadius, startFloor: seamBaseU }) : null;
   const generalSpine = SPINE_WIRED && law !== null && !form.curlUniform;
   const spineAt = generalSpine
     ? (s) => {
@@ -5153,6 +5381,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
     t, ps, length, tilt, halfW, footHalf, R, T, Z, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, flatSect, spineAt, law, kC,
     floorRadius, uniformThickness, profileT, tAt,
+    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
   };
 }
 
@@ -5339,13 +5568,30 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     t, ps, length, tilt, halfW, R, T, Rs, Up, dir, nrm, base,
     profile, form, dome, footS, domeRows, spineAt, law, floorRadius,
     uniformThickness, profileT, tAt,
+    seamTurnRad, seamClearMm, seamStep, seamBaseU, seamHalfMm,
   } = surface;
 
   const rows = surface.footRowsAt();
   /* THE ONE READ of the ladder. The row COUNT is NU exactly as before; only
      where each row sits has moved, and it moved as a function of the profile
      alone, so this samples the same surface differently. */
-  const stations = bladeStations(profile, length, form && form.buckle);
+  /* THE SEAM — ASKED, never re-derived. petalSurface() owns the clearance and
+     the turn it came from; this reads them. What is computed here is the
+     RESIDUAL: the same turn re-read off the two frames the builder actually
+     emitted (the last foot row's normal against the blade's sheet normal),
+     against the owner's own answer. Both STL gates assert it is zero, so the
+     "the turn is |tilt|" derivation in petalSurface() is checked rather than
+     trusted — without there being two producers of it. */
+  const footN = rows[rows.length - 1].N;
+  /* COMPARED AS COSINES, not as angles. Two unit normals can only report the
+     unsigned angle between them, in [0, pi]; an effective tilt past half a
+     turn (the sixth whorl at 225 degrees is reachable) reads back as its
+     complement, and comparing the angles would make this residual fire on
+     the wrap rather than on the derivation. J8's own clause takes the same
+     care for the same reason. */
+  const seamFrameResidual = Math.abs(
+    (footN[0] * nrm[0] + footN[1] * nrm[1] + footN[2] * nrm[2]) - Math.cos(seamTurnRad));
+  const stations = bladeStations(profile, length, form && form.buckle, seamClearMm);
   for (let i = 1; i <= NU; i++) rows.push(surface.rowAt(stations[i - 1]));
   /* ===================================================================
      THE TRUE SURFACE NORMAL — the ONE place the offset direction stops being
@@ -5578,6 +5824,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
     turnAskedDeg: ps.petalSpineCurl,
     turnBuiltDeg: law ? law.turnBuilt / D2R : 0,
     startFloored: law ? law.startFloored : 0,
+    startFloor: law ? law.startFloor : CURL_START_MIN,
     integrationResidual,
     clearance,
   };
@@ -5677,8 +5924,31 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
        rows below ROOT_BLEND_END are the uniform ones, and the widest gap
        respects whatever bound was in force. */
     bladeLadder: {
-      held: Math.floor(ROOT_BLEND_END * NU),
+      held: HELD_ROWS,
       rows: NU,
+      /* THE SEAM FLOOR, declared so A7 asserts the block the builder built
+         rather than restating the law. */
+      seamTurnDeg: seamTurnRad * 180 / Math.PI,
+      seamClearMm,
+      seamHalfMm,
+      /* The integer lattice offset the block starts at — 1 when the floor
+         does not bind, and what A7 pins the held stations against. */
+      seamStep,
+      /* CLAMPED AND TOLD, never silently passed. A petal can be SHORTER than
+         the fold it has to clear — measured, the 0.18 mm blade at six whorls
+         of layerSize 0.35 asks 1.0925 of its own length — and no station
+         inside the blade satisfies the derivation there. The block starts as
+         far out as it can and the row stays a declared self-intersector; the
+         read-out says so and A7 asserts the biconditional in both
+         directions. */
+      seamStepRaw: seamLatticeStepRaw(seamClearMm, length),
+      seamMaxStep: SEAM_MAX_STEP,
+      seamClamped: seamLatticeStepRaw(seamClearMm, length) > SEAM_MAX_STEP,
+      seamClearU: length > 0 ? seamClearMm / length : 0,
+      seamBaseU: stations[0],
+      /* The owner's turn re-read off the two EMITTED frames, so the
+         derivation that it is |tilt| is checked and not trusted. */
+      seamFrameResidual,
       gapFactor: ladderGapFactor(form && form.buckle && form.buckle.A ? form.buckle.f : 0),
       buckleFreq: form && form.buckle && form.buckle.A ? form.buckle.f : 0,
     },
