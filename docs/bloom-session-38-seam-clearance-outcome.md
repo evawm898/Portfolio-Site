@@ -7,7 +7,17 @@
 > was folded into the other: they share a session number and nothing else.
 
 
-**Status: pushed, CI running, waiting on Eva's ruling. Nothing is merged.**
+**Status: all five bloom gates GREEN, waiting on Eva's ruling. Nothing is merged.**
+
+**RE-VERIFIED AFTER MAIN MOVED.** #211 (the lobe work's PR 1) landed on `main` while
+this branch was held, touching `bloom-geometry.js`, `CLAUDE.md` and the doc filename.
+`main` was merged in and the byte claim was **re-measured against the NEW base**: the
+partition is still **EXACTLY 157 moved / 467 held**, 654,173,712 floats positionally
+under `Object.is`, the foot identical across 5,555,844 captured values, and the same
+ONE declared triangle-count exception. So #211 moved no bytes, and nothing here had to
+be restated. Their own new gate, `node tools/verify-bloom-rim-arc.mjs`, **passes on the
+merged tree** — which is the check that matters, since this change moves blade stations
+and their rim query integrates along the rim.
 
 ---
 
