@@ -47,10 +47,10 @@ fs.mkdirSync(outDir, { recursive: true });
 const ROWS = [
   { key: 'domed', prefix: 'DOME: the INCURVE TARGET x rise 0.5',
     title: 'THE STOP CONDITION — the incurve target at headRise 0.5',
-    census: 'census 7,350 -> 9,944 pairs (REGRESSED)' },
+    census: 'census 7,350 -> 9,944 pairs (REGRESSED) — RE-MEASURED on the merged tree against main at 1740a2e' },
   { key: 'flat', prefix: 'DOME: the INCURVE TARGET, flat',
     title: 'THE CONTROL — the same configuration, flat (headRise 0)',
-    census: 'census 7,806 -> 510 pairs (improved 15x)' },
+    census: 'census 7,806 -> 510 pairs (improved 15x) — RE-MEASURED on the merged tree against main at 1740a2e' },
 ];
 const matrix = buildMatrix();
 const rowOf = (p) => { const r = matrix.find((x) => x.label.startsWith(p)); if (!r) { console.error('no row ' + p); process.exit(2); } return r; };
