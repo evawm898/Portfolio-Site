@@ -22,7 +22,7 @@
      3  TRIANGLE COUNTS ARE UNCHANGED ON EVERY ROW BUT ONE, and the
         exception is DECLARED rather than tolerated. The row count is fixed at
         NU and only the stations move, so the topology should not move with
-        them — and on 623 of 624 rows it does not. It does on
+        them — and on 665 of 666 rows it does not. It does on
         `CAPABILITY: cleft x 6 layers`, and the reason is a property of the
         CLEFT rather than of this change: `trimPanels()` splits the blade into
         three panels at a ROW INDEX (the row nearest the cleft onset in u), and

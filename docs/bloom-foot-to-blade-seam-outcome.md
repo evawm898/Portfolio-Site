@@ -36,15 +36,26 @@ MARKED.** The census partition, the byte partition and the renders were all take
 against a base that no longer exists, and the live matrix is **666 rows now, not
 624**, so those totals cannot be carried forward on assertion.
 
-**RE-VERIFIED AFTER MAIN MOVED.** #211 (the lobe work's PR 1) landed on `main` while
-this branch was held, touching `bloom-geometry.js`, `CLAUDE.md` and the doc filename.
-`main` was merged in and the byte claim was **re-measured against the NEW base**: the
-partition is still **EXACTLY 157 moved / 467 held**, 654,173,712 floats positionally
-under `Object.is`, the foot identical across 5,555,844 captured values, and the same
-ONE declared triangle-count exception. So #211 moved no bytes, and nothing here had to
-be restated. Their own new gate, `node tools/verify-bloom-rim-arc.mjs`, **passes on the
-merged tree** — which is the check that matters, since this change moves blade stations
-and their rim query integrates along the rim.
+**RE-VERIFIED AFTER MAIN MOVED, TWICE.** #211 (the lobe work's PR 1) landed while this
+branch was held, and #212 (its PR 2 — the resolution-demand ladder) landed after that,
+touching the very function this change touches. Both were merged in and **everything
+measured against the old base was measured again**, not carried forward:
+
+| claim | against old `main` | against `main` at `1740a2e` |
+|---|---|---|
+| census partition, live matrix | 84 / 58 / 467 / 15 over 624 rows | **87 / 58 / 506 / 15 over 666** |
+| declared rows | 318 → 234 | **328 → 241** |
+| byte partition, live matrix | 157 moved / 467 held | **160 moved / 506 held**, predeclared and PASS |
+| floats compared | 654,173,712 | **673,055,784** |
+| foot values identical | 5,555,844 | **5,715,738** |
+| rows with a mode-dependent `seamStep` | 0 of 624 | **0 of 666** |
+| declared triangle-count exception | the one cleft row, 168,256 → 170,816 | **the same row, the same numbers** |
+
+Their own new gate, `node tools/verify-bloom-rim-arc.mjs`, **passes on the merged tree**
+— which is the check that matters, since this change moves blade stations and their rim
+query integrates along the rim. And `node tools/bloom-lobe-composition.mjs`, #212's
+instrument, passes too: all five plain rows it declares by name reproduce exactly
+against the re-baselined xfail list, and its site distances are unchanged.
 
 ---
 
@@ -517,12 +528,14 @@ left in, all fifteen read **identically** to the shipped build. **The
 
 ### The clamp, told rather than hidden
 
-The seam floor binds on **157 of 624 rows**. Worst-ring step histogram:
-`{2: 80, 3: 26, 4: 6, 5: 28, 6: 1, 7: 9, 16: 1, 20: 1, 40: 5}`.
+The seam floor binds on **160 of 666 rows** (re-measured on the merged tree).
+Worst-ring step histogram:
+`{2: 82, 3: 27, 4: 6, 5: 28, 6: 1, 7: 9, 16: 1, 20: 1, 40: 5}`.
 
 **On five rows the clamp binds**, and the reason is not a tuning choice: those
 petals are **shorter than the fold they have to clear** — the 0.18 mm blade at
-six whorls of `layerSize` 0.35 asks **1.0925 × its own length** at an 85° kink.
+six whorls of `layerSize` 0.35 asks **3.2515 × its own length**, and the deepest
+continuous foot asks **9.0840 ×**.
 No station inside the blade satisfies the derivation there. Those rows start as
 far out as the lattice allows, stay declared, and the read-out says CLAMPED.
 All five still **improve** (25,944 → 20,912; 152,182 → 109,295; 7,336 → 6,528;
@@ -542,17 +555,20 @@ The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` in both modes.
 
 *The row count is fixed at NU, and only the stations move.* So:
 
-* **Which rows move: the 157 on which the seam floor binds, and no others.**
-  That was **predicted from the seam-step data before the byte comparison was
-  run**, and it is the same 157 the census partition names (84 fixed + 58
-  improved + 15 worse = 157, with the other 467 rows' counts unchanged). The
-  first run reported 156/468 — the cleft row above was being skipped by the
-  triangle-count failure before it could be classified, which is the off-by-one
-  and not a disagreement about the geometry.
+* **Which rows move: the 160 on which the seam floor binds, and no others.**
+  **Re-derived on the merged tree**, and it is the same 160 the census partition
+  names (87 fixed + 58 improved + 15 worse = 160, with the other 506 rows'
+  counts unchanged). Two instruments that share no code reach that number
+  independently: the byte comparison classifies 160 rows MOVED, and a separate
+  sweep of the builder's own `seamStep` records finds the floor binding on 160.
+  (The pre-merge figure was 157 of 624; the first run of all reported 156/468,
+  the cleft row below being skipped by the triangle-count failure before it
+  could be classified — an off-by-one in the tool, not a disagreement about the
+  geometry.)
 * **The shipping default does not move**, bit-identically and by branch: its
   seam step is 1 and `bladeStations` takes the same `uniform.slice(0, held)` it
   always took.
-* **Triangle counts are unchanged on 623 of 624 rows, and the exception is
+* **Triangle counts are unchanged on 665 of 666 rows, and the exception is
   declared rather than tolerated.** I claimed they would be unchanged on *every*
   row, on the grounds that the row count is fixed at NU and only the stations
   move. **That was wrong, and the tool found it rather than my reading it.** On
@@ -575,17 +591,22 @@ The clearance reads `max(sheetThickness, MIN_FEATURE_MM)` in both modes.
   the whole junction argument read those rows.
 
 `node tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live
---control --expect 157/467` is the instrument, and it **PASSES with the
-partition exactly as predeclared** — 624 rows, both modes, **654,173,712 floats
-compared positionally**, and **5,555,844 captured foot values identical**. It compares positionally under
+--expect 160/506` is the instrument, and it **PASSES with the partition exactly
+as predeclared** — 666 rows, both modes, **673,055,784 floats compared
+positionally**, and **5,715,738 captured foot values identical**. The same
+invocation with `--control --control-mode` fires both controls and fails, once
+each, so neither clause is a log line. It compares positionally under
 `Object.is`, passes capability rows, and has **two controls** — `--control`
 perturbs a held row by 1e-9 and requires it to be reported moved, and
 `--control-mode` reclassifies one row's live answer and requires the
 MODE-DEPENDENT clause to fire exactly once. A clause with only the first
 control would leave the second exactly what this project calls a log line.
 
-**No frozen phase is owed**: no row was added or removed, and the matrix is
-still 624. **`frozen/phase23`'s bytes stop reproducing on 156 of its 596 rows**
+**No frozen phase is owed**: no row was added or removed by this change.
+**The newest frozen baseline is `frozen/phase24`** (the 624 rows at `59c0657`, added by
+the lobe work), and **its bytes stop reproducing on 157 of its 624 rows** — predeclared
+from a seam-step sweep of phase24's own rows and confirmed exactly by `--matrix phase24
+--expect 157/467`, PASS. **`frozen/phase23`'s bytes stop reproducing on 156 of its 596 rows**
 — measured, `--matrix phase23 --control`, 640,601,424 floats, same one declared
 triangle-count exception, foot identical across 5,443,956 captured values. Its
 DEFINITIONS still deep-compare, which is what `--verify-frozen` proves on every
@@ -599,8 +620,8 @@ tag whose definitions reproduce and whose bytes do not fully.
 
 **Run and green:**
 
-* the full-matrix within-shell census on both trees (624 rows each, no errors),
-  calibrated against session 36's recorded numbers on 222 declared rows;
+* the full-matrix within-shell census on both trees (666 rows each, no errors),
+  calibrated against `main`'s own declared numbers on 327 of its 328 declared rows;
 * `node tools/verify-bloom-apex-mutants.mjs` — **13 mutants, every family fires
   on a mutation that names it and is silent on the clean tree**, including four
   new A7 seam mutants and two new rows;

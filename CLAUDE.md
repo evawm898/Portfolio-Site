@@ -1445,7 +1445,7 @@ old `(N layers — the root blend)` tag is GONE from every row (A7 asserts the c
 on every ring of every row, 0 violations over the matrix), replaced by the two real classes:
 **EFFECTIVE TILT PAST 90 (48 rows** — the blade's own MID-SURFACE lies back over its foot and
 no spacing can fix it; the algebra reverses past a right angle) and **SEAM CLAMPED (5 rows** —
-the blade is SHORTER than the fold it must clear, the worst asking 1.0925x its own length,
+the blade is SHORTER than the fold it must clear, the worst asking 9.0840x its own length,
 told in the read-out and asserted as a biconditional). **Whether the tilt control should reach
 past 90 at all is a separate ruling for Eva.** **The list still does not gate MAGNITUDE** — a
 declared row whose count doubles passes silently, which is how those 15 landed without a red;
@@ -1484,19 +1484,21 @@ swapping modules, because main's `bloom.js` has no seam telemetry. **Read on the
 branch shows NO new visible break on either row, RE-RENDERED on the merged tree against main
 at 1740a2e** — the blade roots meet the hub rim with the
 deep notches shallower on both — which is what released the merge.
-**MODE INDEPENDENCE IS MEASURED, NOT ARGUED: 0 of 624 rows have a `seamStep` set that differs
+**MODE INDEPENDENCE IS MEASURED, NOT ARGUED: 0 of 666 rows have a `seamStep` set that differs
 live from export.** `seamHalfThicknessMm()` is the ONE owner of `max(sheetThickness,
 MIN_FEATURE_MM) / 2` — both the clearance and the reported `seamHalfMm` call it, so the live
 gate's A7 clause and the clearance cannot drift apart. Row positions are topology and the
 export floor may not move them; this is session 32's mode-dependence defect refusing to ship
 a third time.
-**THE BYTE CLAIM: 157 rows move and 467 hold, PREDECLARED from the seam-step data before the
-comparison ran**, the default holds bit-identically, and **the FOOT is untouched on every
+**THE BYTE CLAIM: 160 rows move and 506 hold on the merged tree, PREDECLARED from the
+seam-step data before the comparison ran** (157/467 over 624 rows against the old main, now
+superseded) — and TWO instruments that share no code reach 160 independently, the byte
+comparison's MOVED class and a separate sweep of the builder's own `seamStep` records; the default holds bit-identically, and **the FOOT is untouched on every
 row** — measured on
 the builder's captured grid, not argued, because J1-J4 and the crowding raster read those
 rows. NOT `diff-bloom-bytes --region foot`: that slab is a documented SUPERSET carrying the
 UNDERSIDE of the first blade rows, which this change does move. `node
-tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live --control --expect 157/467`
+tools/verify-bloom-seam-bytes.mjs --base <worktree> --matrix live --expect 160/506`
 is the instrument, with a SECOND control (`--control-mode`) for the mode clause, because a
 control that fires only the first leaves the second a log line.
 **"TRIANGLE COUNTS ARE UNCHANGED BECAUSE THE ROW COUNT IS FIXED" IS FALSE ON A CLEFT, AND THE
@@ -1510,9 +1512,13 @@ acts above `u0 = 0.2857` where the 0.55 onset sits; what is new is that somethin
 One declared entry with its numbers, failing hard if another row's count moves OR if this one
 stops moving. **Do not write "the row count is fixed so the topology cannot move" about a
 cleft.** **No frozen phase is owed**
-(no row added or removed); **`frozen/phase23`'s bytes stop reproducing on 156 of its 596
-rows** (measured) while its definitions still deep-compare — it joins phase17, phase19 and
-phase21 in that class.
+(no row added or removed). **The newest baseline is `frozen/phase24`** (the 624 rows at
+`59c0657`, added by the lobe work), and **its bytes stop reproducing on 157 of its 624 rows**
+— PREDECLARED from the seam-step sweep of phase24's own rows and confirmed exactly by
+`--matrix phase24 --expect 157/467`, PASS, with the foot identical across 5,555,844 captured
+values and the same ONE declared cleft triangle-count exception. `frozen/phase23`'s bytes
+stop reproducing on 156 of its 596. Both definitions still deep-compare; they join phase17,
+phase19 and phase21 in that class.
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
