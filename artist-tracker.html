@@ -493,6 +493,40 @@
     color:var(--paper);
   }
 
+  /* The import confirm card reuses .import-report's frame; these are the
+     controls it adds. It is the one card with actions in it. */
+  #ioReport{margin-top:18px;}
+  #ioReport:empty{margin-top:0;}
+  .io-choice{
+    display:flex;
+    flex-wrap:wrap;
+    align-items:center;
+    gap:10px;
+    margin-top:10px;
+  }
+  .io-choice select{
+    font-family:var(--font-mono);
+    font-size:11px;
+    background:var(--ink);
+    color:var(--paper);
+    border:1px solid var(--line-strong);
+    padding:5px 8px;
+  }
+  .io-choice button{
+    font-family:var(--font-mono);
+    font-size:11px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    background:none;
+    color:var(--dim);
+    border:1px solid var(--line-strong);
+    padding:5px 12px;
+    cursor:pointer;
+  }
+  .io-choice button:hover{color:var(--paper); border-color:var(--teal);}
+  .io-choice button[data-primary="true"]{color:var(--teal); border-color:var(--teal);}
+  .io-choice button[data-primary="true"]:hover{background:rgba(95,160,160,0.10);}
+
   .panel-actions{
     display:flex;
     gap:12px;
@@ -1192,6 +1226,10 @@ another.handle"></textarea>
         <button id="clearBtn">clear all</button>
       </div>
     </footer>
+    <!-- An import says what it is about to do BEFORE it does it. The old one
+         concatenated silently, so restoring a backup on top of live data
+         doubled every entry with nothing to undo it. -->
+    <div id="ioReport"></div>
     <input type="file" id="importFile" accept="application/json" style="display:none;">
   </div>
 
@@ -3024,7 +3062,104 @@ another.handle"></textarea>
   //   skip      — leave the existing entry completely untouched
   //   add       — add a second entry anyway
   const BULK_FIELD_COUNTS = [8, 9, 10];
-  const FILLABLE_FIELDS = ['category', 'location', 'pronouns', 'status', 'link', 'photo'];
+  // One row per field a merge has to reason about. Bulk paste and JSON import
+  // BOTH walk this table, so a field added later states its semantics once
+  // instead of growing a fourth and fifth hand-written exception beside the
+  // two this replaced (`gender`, because its unset value is a sentinel rather
+  // than a blank, and `tags`, because it unions). Two owners of one predicate
+  // drift; this is the one owner.
+  //
+  //   text    a plain value. A blank INCOMING value is "no opinion", never
+  //           "erase this" — so overwrite mode still cannot wipe a field.
+  //   unset   has a sentinel meaning "not set" (gender's 'unknown', a rating
+  //           of 0), so the sentinel counts as blank on both sides.
+  //   union   a set. Incoming members are added; existing ones are never
+  //           removed, because no import asked to take them away.
+  //   oldest  the EARLIER value wins in every mode, overwrite included,
+  //           because the field records when something first happened and a
+  //           later copy of it is not news.
+  //
+  // `bulk: false` keeps a field out of the pipe-delimited paste's reach. That
+  // paste is a research file about artists; it has no opinion on when you
+  // added someone or what you made of them, and a column it never carries
+  // must not be merged from it.
+  const MERGE_RULES = [
+    { field:'name',     rule:'text',   bulk:false },
+    { field:'category', rule:'text',   bulk:true  },
+    { field:'location', rule:'text',   bulk:true  },
+    { field:'pronouns', rule:'text',   bulk:true  },
+    { field:'status',   rule:'text',   bulk:true  },
+    { field:'link',     rule:'text',   bulk:true  },
+    { field:'photo',    rule:'text',   bulk:true  },
+    { field:'date',     rule:'text',   bulk:false },
+    { field:'notes',    rule:'text',   bulk:false },
+    { field:'gender',   rule:'unset',  bulk:true,  unset:'unknown', read:genderOf },
+    { field:'tags',     rule:'union',  bulk:true,  key:tagKey },
+  ];
+
+  // `handle` is deliberately absent: it is the key the two entries MATCHED on,
+  // so there is nothing to merge. `id` is absent for the same reason.
+
+  function unionInto(entry, field, incoming, keyFn){
+    if(!Array.isArray(incoming)) return false;
+    let changed = false;
+    entry[field] = Array.isArray(entry[field]) ? entry[field] : [];
+    incoming.forEach(v => {
+      if(!v && v !== 0) return;
+      const k = keyFn ? keyFn(v) : v;
+      if(entry[field].some(cur => (keyFn ? keyFn(cur) : cur) === k)) return;
+      entry[field].push(v);
+      changed = true;
+    });
+    return changed;
+  }
+
+  // scope: 'bulk' walks only the rows the paste can speak for; anything else
+  // walks the whole table (a JSON restore is a whole entry).
+  function mergeEntry(existing, incoming, mode, scope){
+    let changed = false;
+    MERGE_RULES.forEach(r => {
+      if(scope === 'bulk' && !r.bulk) return;
+      if(!Object.prototype.hasOwnProperty.call(incoming, r.field)) return;
+      const inc = incoming[r.field];
+
+      if(r.rule === 'union'){
+        if(unionInto(existing, r.field, inc, r.key)) changed = true;
+        return;
+      }
+
+      if(r.rule === 'oldest'){
+        if(!inc) return;
+        if(!existing[r.field] || String(inc) < String(existing[r.field])){
+          existing[r.field] = inc;
+          changed = true;
+        }
+        return;
+      }
+
+      // An incoming value equal to the rule's unset sentinel says nothing.
+      const blankIn = r.rule === 'unset'
+        ? (inc === undefined || inc === null || inc === r.unset)
+        : !inc;
+      if(blankIn) return;
+
+      const cur = r.read ? r.read(existing) : existing[r.field];
+      const blankCur = r.rule === 'unset'
+        ? (cur === undefined || cur === null || cur === r.unset)
+        : !cur;
+
+      const take = mode === 'overwrite' ? cur !== inc : blankCur;
+      if(take){ existing[r.field] = inc; changed = true; }
+    });
+    return changed;
+  }
+
+  // Kept as the one place a tag list is widened, now that `unionInto` is
+  // general: the bulk parser's per-line extra tag still goes through it.
+  function addTags(entry, incoming){
+    return unionInto(entry, 'tags', incoming, tagKey);
+  }
+
 
   function bulkParseLine(line, defaultCat){
     if(!line.includes('|')){
@@ -3070,19 +3205,6 @@ another.handle"></textarea>
 
   // Unions incoming tags into an entry without letting two spellings of the
   // same tag both land on it.
-  function addTags(entry, incoming){
-    let changed = false;
-    entry.tags = entry.tags || [];
-    incoming.forEach(t => {
-      if(!t) return;
-      const key = tagKey(t);
-      if(entry.tags.some(existing => tagKey(existing) === key)) return;
-      entry.tags.push(t);
-      changed = true;
-    });
-    return changed;
-  }
-
   document.getElementById('saveBulk').onclick = () => {
     const text = document.getElementById('bulkText').value;
     const defaultCat = document.getElementById('bulkDefaultCategory').value;
@@ -3107,28 +3229,11 @@ another.handle"></textarea>
     };
 
     function applyToExisting(existing, incoming, extraTag){
-      let changed = false;
-      if(dupeMode === 'overwrite'){
-        // A blank cell in the paste is "no opinion", not "erase this".
-        FILLABLE_FIELDS.forEach(f => {
-          if(incoming[f] && existing[f] !== incoming[f]){ existing[f] = incoming[f]; changed = true; }
-        });
-        if(incoming.gender !== 'unknown' && existing.gender !== incoming.gender){
-          existing.gender = incoming.gender;
-          changed = true;
-        }
-      }else{
-        FILLABLE_FIELDS.forEach(f => {
-          if(!existing[f] && incoming[f]){ existing[f] = incoming[f]; changed = true; }
-        });
-        if(genderOf(existing) === 'unknown' && incoming.gender !== 'unknown'){
-          existing.gender = incoming.gender;
-          changed = true;
-        }
-      }
-      // Tags union in either mode — a tag is additive by nature, and dropping
-      // ones already on the entry would lose work no paste asked to remove.
-      if(addTags(existing, incoming.tags)) changed = true;
+      // Scope 'bulk': only the rows MERGE_RULES marks the paste can speak for.
+      // Tags union in either mode there, which is the table's `union` rule —
+      // a tag is additive by nature, and dropping ones already on the entry
+      // would lose work no paste asked to remove.
+      let changed = mergeEntry(existing, incoming, dupeMode, 'bulk');
       if(extraTag && addTags(existing, [extraTag])) changed = true;
       if(changed) r.updated++; else r.unchanged++;
     }
@@ -3636,8 +3741,22 @@ another.handle"></textarea>
   });
 
   // --- export / import / clear ---
+  // The export carries a header so an import can say what it holds before it
+  // touches anything: how many entries, and when they were taken. The old
+  // export was a bare array, which is why `readBackup` still accepts one —
+  // see its comment. That acceptance is PERMANENT, not a migration window.
+  const BACKUP_FORMAT = 'artist-tracker';
+  const BACKUP_VERSION = 1;
+
   document.getElementById('exportBtn').onclick = () => {
-    const blob = new Blob([JSON.stringify(entries, null, 2)], { type:'application/json' });
+    const doc = {
+      format: BACKUP_FORMAT,
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      count: entries.length,
+      entries: entries,
+    };
+    const blob = new Blob([JSON.stringify(doc, null, 2)], { type:'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -3646,26 +3765,244 @@ another.handle"></textarea>
     URL.revokeObjectURL(url);
   };
 
+  // Both shapes, forever. Every backup taken before this existed is a bare
+  // array, and those files do not stop being backups because the writer moved
+  // on. A bare array simply has no header to report, which the card says.
+  function readBackup(text){
+    const parsed = JSON.parse(text);
+    if(Array.isArray(parsed)) return { entries: parsed, header: null };
+    if(parsed && typeof parsed === 'object' && Array.isArray(parsed.entries)){
+      if(typeof parsed.version === 'number' && parsed.version > BACKUP_VERSION){
+        // Reading a newer file by ignoring what we do not understand is a
+        // silent partial restore. Refuse it and say so.
+        const err = new Error('newer');
+        err.newerVersion = parsed.version;
+        throw err;
+      }
+      return { entries: parsed.entries, header: parsed };
+    }
+    throw new Error('shape');
+  }
+
   document.getElementById('importBtn').onclick = () => document.getElementById('importFile').click();
+
   document.getElementById('importFile').addEventListener('change', (ev) => {
     const file = ev.target.files[0];
     if(!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      try{
-        const imported = JSON.parse(reader.result);
-        if(!Array.isArray(imported)) throw new Error('not an array');
-        const withIds = imported.map(e => ({ ...e, id: e.id || uid(), category: normalizeCategory(e.category) }));
-        entries = entries.concat(withIds);
-        persist();
-        render();
-      }catch(e){
-        alert('Could not read that file — expecting a JSON export from this page.');
-      }
+      let read;
+      try{ read = readBackup(reader.result); }
+      catch(err){ showIoError(err); return; }
+      offerImport(read, file.name);
     };
     reader.readAsText(file);
     ev.target.value = '';
   });
+
+  function clearIoReport(){ document.getElementById('ioReport').innerHTML = ''; }
+
+  function ioActions(buttons, select){
+    const row = document.createElement('div');
+    row.className = 'io-choice';
+    if(select) row.appendChild(select);
+    buttons.forEach(b => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.textContent = b.label;
+      if(b.primary) btn.dataset.primary = 'true';
+      btn.onclick = b.fn;
+      row.appendChild(btn);
+    });
+    return row;
+  }
+
+  function showIoError(err){
+    const box = document.getElementById('ioReport');
+    box.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'import-report';
+    card.dataset.tone = 'warn';
+    const h = document.createElement('h4');
+    h.textContent = 'could not read that file';
+    card.appendChild(h);
+    const p = document.createElement('div');
+    if(err && err.newerVersion){
+      p.innerHTML = 'That backup is version <span class="warn-num">' + escapeHtml(String(err.newerVersion))
+        + '</span> and this page understands version <span class="num">' + BACKUP_VERSION
+        + '</span>. Reading it would mean ignoring fields it carries and quietly restoring '
+        + 'only part of your data, so nothing was changed.';
+    }else{
+      p.textContent = 'Expecting a JSON export from this page — either the newer '
+        + '{ format, version, entries } shape or a bare array of entries. Nothing was changed.';
+    }
+    card.appendChild(p);
+    card.appendChild(ioActions([{ label:'dismiss', fn: clearIoReport }]));
+    box.appendChild(card);
+    box.scrollIntoView({ block:'nearest' });
+  }
+
+  // What the file holds, what is already here, and what the chosen mode would
+  // do — stated first, applied only on a second click.
+  function offerImport(read, fileName){
+    const box = document.getElementById('ioReport');
+    box.innerHTML = '';
+
+    const incoming = read.entries;
+    const header = read.header;
+    const countMismatch = !!(header && typeof header.count === 'number'
+      && header.count !== incoming.length);
+
+    const haveKeys = new Set();
+    entries.forEach(e => {
+      const k = normalizeHandleKey(e.handle);
+      if(k) haveKeys.add(k);
+    });
+    let matching = 0, noHandle = 0;
+    incoming.forEach(e => {
+      const k = normalizeHandleKey(e && e.handle);
+      if(!k){ noHandle++; return; }
+      if(haveKeys.has(k)) matching++;
+    });
+
+    const card = document.createElement('div');
+    card.className = 'import-report';
+    card.dataset.tone = countMismatch ? 'warn' : 'ok';
+
+    const h = document.createElement('h4');
+    h.textContent = 'import ' + incoming.length + (incoming.length === 1 ? ' entry?' : ' entries?');
+    card.appendChild(h);
+
+    const sum = document.createElement('div');
+    sum.innerHTML = '<span class="num">' + incoming.length + '</span> in the file · '
+      + '<span class="num">' + entries.length + '</span> already here · '
+      + '<span class="num">' + matching + '</span> handle(s) in both.';
+    card.appendChild(sum);
+
+    const prov = document.createElement('div');
+    if(header){
+      const when = header.exportedAt ? new Date(header.exportedAt) : null;
+      prov.innerHTML = '<code>' + escapeHtml(fileName || 'backup') + '</code> — exported '
+        + (when && !isNaN(when.getTime()) ? escapeHtml(when.toLocaleString()) : 'at an unstated time')
+        + ', version <span class="num">' + escapeHtml(String(header.version)) + '</span>.';
+    }else{
+      prov.innerHTML = '<code>' + escapeHtml(fileName || 'backup') + '</code> — a bare array with no '
+        + 'header, so it was exported before this page stamped its backups. That is fine; it just '
+        + 'cannot state its own count.';
+    }
+    card.appendChild(prov);
+
+    if(countMismatch){
+      const w = document.createElement('div');
+      w.innerHTML = 'The header says <span class="warn-num">' + escapeHtml(String(header.count))
+        + '</span> entries but the file contains <span class="warn-num">' + incoming.length
+        + '</span>. It may have been edited or truncated — worth a look first.';
+      card.appendChild(w);
+    }
+    if(noHandle){
+      const nh = document.createElement('div');
+      nh.innerHTML = '<span class="num">' + noHandle + '</span> entr' + (noHandle === 1 ? 'y has' : 'ies have')
+        + ' no handle, so ' + (noHandle === 1 ? 'it' : 'they') + ' cannot be matched against what is '
+        + 'here and will be added.';
+      card.appendChild(nh);
+    }
+
+    const sel = document.createElement('select');
+    sel.id = 'ioDedupe';
+    [
+      ['merge', 'fill blanks only (safe)'],
+      ['overwrite', 'let the file win where it has a value'],
+      ['skip', 'leave existing entries alone'],
+      ['add', 'add everything, duplicates and all'],
+    ].forEach(([v, label]) => {
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = label;
+      sel.appendChild(o);
+    });
+    // MERGE, not overwrite and not add: a restore that can only ever fill in
+    // blanks is the one mode that cannot destroy work, and this control is
+    // reached most often when something has already gone wrong.
+    sel.value = 'merge';
+
+    const note = document.createElement('div');
+    note.style.marginTop = '8px';
+    note.innerHTML = matching === 0
+      ? 'No handle in the file is already here, so every mode adds all '
+        + incoming.length + ' — the choice only matters for overlaps.'
+      : 'That choice applies to the <span class="num">' + matching + '</span> overlapping handle(s). '
+        + 'The other <span class="num">' + (incoming.length - matching) + '</span> are added either way.';
+    card.appendChild(note);
+
+    card.appendChild(ioActions([
+      { label:'import', primary:true, fn: () => applyImport(incoming, sel.value) },
+      { label:'cancel', fn: clearIoReport },
+    ], sel));
+
+    box.appendChild(card);
+    box.scrollIntoView({ block:'nearest' });
+  }
+
+  function applyImport(incoming, mode){
+    const r = { added:0, updated:0, unchanged:0, skipped:0, malformed:0 };
+    const handleIndex = new Map();
+    entries.forEach(e => {
+      const k = normalizeHandleKey(e.handle);
+      if(k) handleIndex.set(k, e);
+    });
+
+    incoming.forEach(raw => {
+      if(!raw || typeof raw !== 'object' || Array.isArray(raw)){ r.malformed++; return; }
+      const inc = { ...raw, category: normalizeCategory(raw.category) };
+      const key = normalizeHandleKey(inc.handle);
+      const existing = key ? handleIndex.get(key) : null;
+
+      if(existing && mode !== 'add'){
+        if(mode === 'skip'){ r.skipped++; return; }
+        if(mergeEntry(existing, inc, mode, 'json')) r.updated++; else r.unchanged++;
+        return;
+      }
+
+      const created = { ...inc, id: inc.id || uid() };
+      entries.push(created);
+      if(key && !handleIndex.has(key)) handleIndex.set(key, created);
+      r.added++;
+    });
+
+    const touched = r.added > 0 || r.updated > 0;
+    const saved = touched ? persist() : true;
+    render();
+    showImportOutcome(r, incoming.length, saved);
+  }
+
+  function showImportOutcome(r, total, saved){
+    const box = document.getElementById('ioReport');
+    box.innerHTML = '';
+    const card = document.createElement('div');
+    card.className = 'import-report';
+    card.dataset.tone = (r.malformed || !saved) ? 'warn' : 'ok';
+    const h = document.createElement('h4');
+    h.textContent = saved ? 'import complete' : 'import not saved';
+    card.appendChild(h);
+
+    const bits = ['<span class="num">' + r.added + '</span> added'];
+    if(r.updated) bits.push('<span class="num">' + r.updated + '</span> updated');
+    if(r.unchanged) bits.push('<span class="num">' + r.unchanged + '</span> already complete');
+    if(r.skipped) bits.push('<span class="num">' + r.skipped + '</span> left alone');
+    const sum = document.createElement('div');
+    sum.innerHTML = bits.join(' · ') + ' — from ' + total + ' in the file.';
+    card.appendChild(sum);
+
+    if(r.malformed){
+      const w = document.createElement('div');
+      w.innerHTML = '<span class="warn-num">' + r.malformed + '</span> item(s) in the file were not '
+        + 'entry objects and were ignored.';
+      card.appendChild(w);
+    }
+    card.appendChild(ioActions([{ label:'dismiss', fn: clearIoReport }]));
+    box.appendChild(card);
+    box.scrollIntoView({ block:'nearest' });
+  }
 
   // --- one-time split of the old combined `status` into notes + status -----
   // This rewrites existing data, so it is NOT run on load. The user presses
