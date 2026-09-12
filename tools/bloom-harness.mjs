@@ -4518,12 +4518,23 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      either side — a printer sees nothing — but X2 admits only 0 or a declaration, and a
      declaration is the honest one: X1 will say when a ladder change lands 0 here again,
      and the entry comes off then. Both counts are unmoved by the seam clearance. */
-  'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)': '3 pairs, worst span 0.0000 mm',
-  'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)': '722 pairs, worst span 0.2891 mm (over "petalCup max (1.2)", which reads 752 pairs / 0.1268 mm on THIS tree)',
-  'LOBES: x roll 330 (over the quill, declared on main)': '18072 pairs, worst span 1.6072 mm (over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm on THIS tree)',
-  'LOBES: x curl 360 (over the fiddlehead, declared on main)': '816 pairs, worst span 0.6999 mm (over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm on THIS tree)',
+  'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)': '1 pair, worst span 0.0000 mm (was 3 before session 41 moved the demand from 11 to 9 stations a lobe on this shape; the PLAIN cup 0.40 build reads 2 span-0 touches, so they are the cup\'s)',
+  /* DECLARED BY SESSION 41, and the entry is the two-sided build rather than
+     a reading. This row asked for lobes over a buckle whose OWN contacts are
+     already declared — `BUCKLE: the default frequency at a strong amplitude
+     (0.30 x, f 3)` reads 8 pairs / 0.0104 mm — and on main the lobed build
+     read 0 because the ladder's stations happened to MISS them, which session
+     38 recorded in so many words as a sampling coincidence that any ladder
+     change would move. Session 41 changed the demand (9 stations a lobe at
+     the default shape, against the ruled 11), the stations moved, and they
+     now land on the buckle's own hairline contacts. The two-sided build is
+     the evidence: PLAIN 8 pairs / 0.0104 mm, LOBED 20 / 0.0965. */
+  'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip, declared; the lobed ladder\'s stations LAND on them — 20 pairs since session 41 moved the demand)': '20 pairs, worst span 0.0965 mm (over "BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)", which is declared at 8 pairs / 0.0104 mm and reads the same on THIS tree; the lobed ladder read 0 on main because its stations missed them, which is the sampling coincidence session 38 named)',
+  'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)': '724 pairs, worst span 0.4626 mm (was 722 / 0.2891 before session 41; over "petalCup max (1.2)", which reads 752 pairs / 0.1268 mm on THIS tree)',
+  'LOBES: x roll 330 (over the quill, declared on main)': '18712 pairs, worst span 1.6115 mm (was 18072 / 1.6072 before session 41; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm on THIS tree)',
+  'LOBES: x curl 360 (over the fiddlehead, declared on main)': '784 pairs, worst span 0.8971 mm (was 816 / 0.6999 before session 41; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm on THIS tree)',
   'LOBES: x the whole centre (stamens and a style under a lobed whorl)': '272 pairs, worst span 0.0796 mm',
-  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '12264 pairs, worst span 0.7032 mm',
+  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '11824 pairs, worst span 0.7468 mm (was 12264 / 0.7032 before session 41)',
   'LOBES: x the domed hub (head rise 1.00)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)',
 });
 
@@ -6188,7 +6199,7 @@ export function buildMatrix() {
     ['LOBES: a FLAT crest over a CUSPED notch (crest 3.00, notch 0.60 — the other corner; DENTATE)', { lobeDepth: 0.3, lobeCrestShape: 3, lobeNotchShape: 0.6 }],
     ['LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', { lobeDepth: 0.3, petalCup: 0.4 }],
     ['LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', { lobeDepth: 0.3, petalCup: 1.2 }],
-    ['LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; the lobed ladder\'s stations miss them — 0 pairs)', { lobeDepth: 0.3, buckleAmp: 0.3, buckleFreq: 3 }],
+    ['LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip, declared; the lobed ladder\'s stations LAND on them — 20 pairs since session 41 moved the demand)', { lobeDepth: 0.3, buckleAmp: 0.3, buckleFreq: 3 }],
     ['LOBES: x buckle 0.60 f 7 (the ladder forced uniform by the buckle — its 22 window rows hold 2 lobes)', { lobeDepth: 0.3, lobeCount: 2, buckleAmp: 0.6, buckleFreq: 7 }],
     ['LOBES: x roll 330 (over the quill, declared on main)', { lobeDepth: 0.3, petalRoll: 330 }],
     ['LOBES: x curl 360 (over the fiddlehead, declared on main)', { lobeDepth: 0.3, petalSpineCurl: 360 }],
