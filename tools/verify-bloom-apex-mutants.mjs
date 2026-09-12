@@ -168,6 +168,39 @@ function lobePowers(M) {
    because a mutation inside the guard would move the record and the outline
    together and a witness that read the record would be agreeing with the
    defect (session 39's fourth durable rule). */
+/* THE DEEPEST CUT ABOVE THE APEX ENTRY, off the MUTATED module's own
+   emitted outline — `shapeAt` against `shapeBaseAt` over [uCap, 1], which is
+   exactly the region session 40 proved MODEL A never touches. Built in LIVE
+   for `lobeRelief`'s reason: the export floor would mask a cut that the law
+   still made. Nothing here reads the lobe RECORD — a witness that asked the
+   record whether the record moved would be agreeing with the defect. */
+function lobeOutline(M, set) {
+  const state = { ...REGISTRY_DEFAULTS, ...set };
+  const acc = new M.MeshBuilder({ exportMode: false });
+  let got;
+  try {
+    const fr = M.footRing(state, acc);
+    const ring = fr.slotRings[0][0];
+    let slot = null;
+    M.buildWhorlInto({ count: fr.slotCount, radius: ring.radius, height: 0, sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra, phase: ring.phase, placement: state.placement, fan: fr.fan,
+      blade: (sl) => { if (!slot) slot = sl; } });
+    got = M.petalSurface(state, ring, slot, null, acc).profile;
+  } catch { return null; }
+  if (!got.lobes || got.lobes.noRoom) return null;
+  /* `halfWidthBaseAt` is the outline the treatment is SUBTRACTED FROM — the
+     same pair `lobeRelief` reads, on the same profile, so the mutated module
+     supplies both and neither is a record. */
+  const uCap = got.uCap;
+  let cutAbove = 0;
+  for (let i = 0; i <= 2000; i++) {
+    const u = uCap + (1 - uCap) * i / 2000;
+    const d = got.halfWidthBaseAt(u) - got.halfWidthAt(u);
+    if (d > cutAbove) cutAbove = d;
+  }
+  return { uCap, cutAbove };
+}
+
 function lobeRelief(M, set) {
   /* IN LIVE, AND THAT IS THE POINT. The EXPORT floor is TIP_HALF_MM — the very
      bound the guard exists to keep — so in export a broken guard is INVISIBLE
@@ -234,6 +267,36 @@ const MUTANTS = [
      of the project's life. What replaces it is a mutation on the OTHER owner
      L5's expected value is built from: the relief TARGET.
      =================================================================== */
+  /* ===================================================================
+     L8 — THE MODEL ITSELF, and the reason the clause it fires needed a
+     second half. MODEL A terminated the treatment at the apex entry `uCap`,
+     and session 40 established as an IDENTITY that the profile above it was
+     `Object.is`-equal to a petal with no lobes at all. This mutation puts
+     that back — the one change that makes this session's whole premise
+     false — and every other L clause is blind to it: the count, the caps,
+     the window's LOWER end, the pitch, the demand and the crests-at-the-ends
+     identity are all unchanged by where the treatment STOPS.
+
+     THE WITNESS READS THE MUTATED MODULE'S OWN OUTLINE, never the assertion
+     it names: the cut above `uCap`, which must go to exactly nothing.
+
+     AND IT IS WHY L8 GAINED A PAGE-SIDE CLAUSE. The table serves its
+     mutation to the PAGE; L8's first model clause compares two NODE
+     rebuilds, so this mutant would have left both halves of it unmutated
+     and passed — the reason the second clause is there. */
+  { id: 'the-treatment-terminates-at-the-apex-entry',
+    why: 'MODEL A restored — the cut stops at `uCap` and the apex is bit-identical to a petal with no lobes, which is exactly the objection this session exists to answer',
+    find: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));',
+    into: '    const cutMm = (u) => (u > uCap || dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['L8'],
+    witness: (M, C) => {
+      const set = { lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 0.9, lobeCrestShape: 1, lobeNotchShape: 1 };
+      const m = lobeOutline(M, set), c = lobeOutline(C, set);
+      if (!m || !c) return 'the lobed row built no cut';
+      if (!(c.cutAbove > 1e-6)) return `the clean module cuts only ${c.cutAbove.toExponential(2)} mm above uCap on this row — the mutation is unobservable here`;
+      return m.cutAbove < 1e-12
+        ? null
+        : `the mutant still cuts ${m.cutAbove.toFixed(4)} mm above uCap ${m.uCap.toFixed(4)} (the clean module cuts ${c.cutAbove.toFixed(4)}) — the treatment did not stop at the apex entry`;
+    } },
   { id: 'guard-reads-the-widest-period',
     why: 'every period takes the relief the WIDEST point could give instead of its own sinus\'s, so a tooth near the tip cuts past the print floor',
     find: '    const reliefMm = sinusD.map((dd) => Math.min(reliefAskedMm, headroomOf(dd)));',

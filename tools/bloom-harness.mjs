@@ -1755,6 +1755,31 @@ export async function lobeAssertions(page, row) {
       bad.push(`L8: the outline over [uCap ${base.profile.uCap.toFixed(4)}, 1] is identical to a plain petal at all 2001 samples — the apex is untreated and this is MODEL A, whatever the record says`);
     }
     if (L.depthBuilt > 0 && differ > 0 && worst === 0) bad.push(`L8: the outline above uCap differs only in the sign of a zero — the cut there is not material`);
+    /* AND THE SAME CLAIM ON THE PAGE'S OWN EMITTED ROWS, because the clause
+       above cannot see a page-only defect (session 41's own lesson, and this
+       is the family it was learned in). `h` and `hb` are both NODE rebuilds:
+       under CI, where the page and the rebuild run one source, that pairing
+       is the right one and catches a shipped regression — but the mutant
+       table serves its mutation to the PAGE alone, so a tree that reverted
+       to MODEL A there would leave both halves of it unmutated and silent.
+       This clause reads two arrays the BUILDER emitted — the half-width it
+       drew at each station, and the BASE half-width it drew it from — so a
+       cut that stops at the apex entry shows as the two agreeing on every
+       row above `uCap`. Its reference is `shapeBaseAt`, which the treatment
+       does not write; the quantity under test is `shapeAt`, which is the
+       one a MODEL A revert moves. */
+    const pu = m.petalProfileU, ph = m.petalProfile, pb = m.petalProfileBase;
+    if (L.depthBuilt > 0 && Array.isArray(pu) && Array.isArray(ph) && Array.isArray(pb)
+        && pu.length === ph.length && pu.length === pb.length) {
+      const above = [];
+      for (let i = 0; i < pu.length; i++) if (pu[i] > base.profile.uCap) above.push(i);
+      const cutThere = above.filter((i) => ph[i] < pb[i] - 1e-12);
+      if (!above.length) {
+        bad.push(`L8: no emitted row stands above uCap ${base.profile.uCap.toFixed(4)} — this clause cannot read the apex on this row and must not pass vacuously`);
+      } else if (!cutThere.length) {
+        bad.push(`L8: the BUILDER emitted ${above.length} row(s) above uCap ${base.profile.uCap.toFixed(4)} and NONE of them is cut below its own base half-width — on the page's own rows the apex is untreated, which is MODEL A`);
+      }
+    }
     /* THE ARC IS SYMMETRIC ABOUT THE APEX, which is what makes coverage a
        clock rather than a window: the treated half-arc is measured from the
        rim's MIDPOINT, so the margin carries exactly the treated half less the

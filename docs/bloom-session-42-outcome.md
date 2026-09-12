@@ -411,6 +411,40 @@ plain petal`; on this tree, unchanged, it reads `false`, `2.53e-4`, and **3075
 of 4001 differing**. Its verdict is now DERIVED from those rows rather than
 written as a literal, so it stays a witness when the answer moves again.
 
+### The load-bearing clause needed a SECOND half, and re-reading the diff is what found it
+
+The clause above builds `h` and `hb` as two NODE rebuilds of the state the
+page reports. **In CI that is the right pairing** — the page and the rebuild
+run one source, so a shipped regression moves both together and the clause
+catches it. **Under the mutant table it is worth nothing**, because the table
+serves its mutation to the PAGE alone (`page.route`) and imports a separate
+in-memory copy only for the witness: a tree that reverted to MODEL A on the
+page would leave both halves of the clause unmutated and green. That is
+session 41's own L7 finding — *a clause with no record to disagree with has
+both halves on the same unmutated module* — arriving in the very family it was
+learned in, one session later.
+
+So L8 gained a clause that reads TWO ARRAYS THE BUILDER EMITTED: the
+half-width drawn at each station (`petalProfile`) against the BASE half-width
+it was drawn from (`petalProfileBase`). A cut that stops at the apex entry
+shows there as the two agreeing on every row above `uCap`. The reference is
+`shapeBaseAt`, which the treatment does not write; the quantity under test is
+`shapeAt`, which is what a MODEL A revert moves — different owners, as
+session 39's rule requires. It refuses to pass vacuously if no emitted row
+stands above `uCap` at all.
+
+And **`the-treatment-terminates-at-the-apex-entry` is the mutant** — one
+clause added to `cutMm`, the single change that makes this session's whole
+premise false — with a witness that reads the MUTATED module's own outline
+(`halfWidthBaseAt` against `halfWidthAt` over `[uCap, 1]`, in LIVE so the
+export floor cannot mask it), never the assertion it names.
+
+**PENDING MEASUREMENT — the claim above is read off the code and not yet
+run.** The experiment that settles it is the mutant against the harness
+WITHOUT the page-side clause: if that pairing really is blind, it names L8 and
+L8 stays green. Until that run is in hand this paragraph is a prediction, and
+it is labelled one.
+
 ### What the other L clauses needed, and why
 
 * **L7's instrument INVERTED with the law's form.** Session 41 wrote that the
