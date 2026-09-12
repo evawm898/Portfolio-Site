@@ -1738,8 +1738,10 @@ class here): over crest exponents 0.60 to 3.00 at 2 and 8 lobes, **ZERO gaps at 
 against a uniform 1.786e-2. What contains it is the `LADDER_MAX_GAP_FACTOR` blend — a
 THIRD job for a constant session 39 already found doing two — so **if that arm is ever
 removed (session 39's ruling 2 proposes exactly that), RETAKE this measurement.**
-**THE PARTITION: 39 MOVED / 635 HELD of the 674-row live matrix**, predeclared from the
-BUILDER'S OWN RECORD (a row moves iff a ring actually builds a cut — present, not
+**THE PARTITION: 39 MOVED / 635 HELD of the 674-row live matrix, CONFIRMED PASS** —
+all 39 predeclared movers moved and 0 floats moved on the 635 holders, positionally
+under `Object.is`, over 678,898,152 export floats and 71,662,182 captured-grid values —
+predeclared from the BUILDER'S OWN RECORD (a row moves iff a ring actually builds a cut — present, not
 `noRoom`, count >= 1, depth > 0) rather than from the control set, regex exact in both
 directions. The three lobe-labelled HOLDERS are `NO ROOM by the pitch floor` (no cut
 built) and the two GATED rows; the two non-lobe MOVERS are `lobeDepth max (1)` and
@@ -1747,7 +1749,9 @@ built) and the two GATED rows; the two non-lobe MOVERS are `lobeDepth max (1)` a
 rows, plus two from the blanket slider sweep for the net new slider), so **`frozen/phase25`
 is owed at `3f238bd`**. No matrix BLOCK was added: the shape rows went into block 29 and
 the block count is unchanged at 25.
-The sheet is `node tools/shot-bloom-serration-range.mjs <dir>`, which now renders BOTH of
+The sheet is `node tools/shot-bloom-serration-range.mjs <dir>` -> **`docs/img/lobe-shape-law.png`**
+(NOT `serration-range.png`, which is session 40's image of the RETIRED law and stays put —
+its outcome doc points at it by name), which renders BOTH of
 Eva's images — the 3 x 3 shape square (at count 3, because the demand is a function of the
 shape and a higher count would CLAMP the blunt corner, leaving the grid varying the count
 as well) and the serration / midpoint / lobing row on the shipped sliders with no hook.

@@ -1,5 +1,15 @@
 /* ===================================================================
-   ONE IMAGE — ONE GENERATOR, FROM SERRATION TO LOBING (session 40, item 5).
+   TWO IMAGES — THE SHAPE SQUARE, AND SERRATION TO LOBING.
+
+   THE OUTPUT IS `lobe-shape-law.png`, NOT `serration-range.png`, and the
+   rename is deliberate: `docs/img/serration-range.png` is SESSION 40's
+   image and its outcome doc points at it by name. That image is the record
+   of the RETIRED one-exponent law — the row whose caption says the count
+   axis is inert and serration is not a slider position — and overwriting it
+   would leave session 40's document describing a picture that no longer
+   exists. It stays; this tool writes beside it.
+
+   ORIGINALLY: ONE IMAGE — ONE GENERATOR, FROM SERRATION TO LOBING (session 40, item 5).
 
      node tools/shot-bloom-serration-range.mjs <out-dir> [--only <id regex>]
 
@@ -239,11 +249,11 @@ await page.setViewportSize({ width: 1240, height: 1100 });
 await page.setContent(html);
 await page.waitForTimeout(400);
 const sheet = await page.screenshot({ fullPage: true });
-fs.writeFileSync(path.join(outDir, 'serration-range.png'), sheet);
+fs.writeFileSync(path.join(outDir, 'lobe-shape-law.png'), sheet);
 
 const lines = shots.map((s) => `${s.id}: ${s.title} · asked count ${s.asked.count} depth ${s.asked.depth} crest ${s.asked.crest} notch ${s.asked.notch} coverage ${s.asked.coverage} · built ${s.built} at ${s.samples} stations a lobe · ${modeTag(s.m)} · ${s.line}`);
 lines.push(`same-tree controls: ${Object.entries(controls).map(([k, v]) => `${k} ${v} px`).join(' · ')}`);
 fs.writeFileSync(path.join(outDir, 'captions.txt'), lines.join('\n') + '\n');
 console.log(lines.join('\n'));
-console.log(`\nwrote ${path.join(outDir, 'serration-range.png')}`);
+console.log(`\nwrote ${path.join(outDir, 'lobe-shape-law.png')}`);
 await browser.close(); server.close();

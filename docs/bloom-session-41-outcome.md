@@ -274,8 +274,42 @@ nine cells reach unclamped. Every caption carries all five control values, both 
 included angles and the chord they were read on, and the demand.
 
 **(b) SERRATION / THE MIDPOINT / LOBING**, the three cells session 40 rendered, on the
-new law at the counts now reachable — 8, 4 and 2, all built at their asked count
-through the shipped sliders.
+new law at the counts now reachable — **8, 4 and 2, every one built at its asked count
+through the shipped sliders**, at 3 / 4 / 9 stations a lobe respectively.
+
+**THE IMAGE IS `docs/img/lobe-shape-law.png`**, and the name is deliberate:
+`docs/img/serration-range.png` is SESSION 40's image and its outcome doc points at it
+by name. That one is the record of the RETIRED law — the row whose caption says the
+count axis is inert and serration is not a slider position — so it stays and this one
+sits beside it.
+
+### 5a. What the grid measured, from the rendered cells' own read-outs
+
+All nine at count 3, depth 0.45, coverage 1.00; the drawn included angles on each
+cell's own 0.74 mm chord (crest / notch, degrees):
+
+| | notch 1.00 | notch 2.00 | notch 3.00 |
+|---|---|---|---|
+| **crest 1.00** | 80.8 / 84.4 | 69.3 / 142.9 | 59.5 / 170.1 |
+| **crest 2.00** | 139.9 / 72.7 | 129.4 / 132.7 | 117.4 / 166.8 |
+| **crest 3.00** | 168.4 / 62.6 | 164.9 / 121.0 | 160.4 / 162.5 |
+
+**Down a column the crest angle moves 87.6°** (80.8 → 168.4 at notch 1.00) while the
+notch drifts 21.8°; **across a row the notch moves 85.7°** (84.4 → 170.1 at crest 1.00)
+while the crest drifts 21.3°. So each control owns its own feature by about **four to
+one** on this cell.
+
+**NAME THE SAMPLING — these are NOT §1a's figures and must not be quoted as them.**
+§1a measured 2 lobes at depth 0.30 on a 0.50 mm chord and put the cross-talk at ≤16.7°;
+this grid is 3 lobes at depth 0.45 on a 0.74 mm chord and puts it at ≤21.8°. Both are
+honest readings of the same law at different depths, pitches and chords, which is
+precisely why the shipped read-out prints the chord beside the angle.
+
+**All nine cells build 3 lobes** although the demand across them runs 3 to 9 stations a
+lobe — which is why the count had to be 3 and not 4.
+
+**Same-tree controls: `range-serration` 0 px and `grid-c100-n100` 0 px**, each cell shot
+twice on the same tree at the same camera, REPORTED and never used as a bar.
 
 ## 6. Verification
 
@@ -390,6 +424,24 @@ iff a ring of it actually BUILDS a cut — `lobes` present, not `noRoom`, `count
 and `depthBuilt > 0` — because the cut's SHAPE changed and nothing else did.
 **39 MOVERS / 635 HOLDERS**, and the predeclaring regex is exact against that partition
 (0 disagreements in either direction).
+
+**CONFIRMED, EXACTLY AS PREDECLARED.**
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 3f238bd> --movers <the
+predeclared set>` reports **PASS**: all **39 of 39** rows named by `--movers` moved
+(every one must — a mover that held is a feature that did nothing, refused as vacuous),
+and **0 floats moved on the 635 holders, positionally, under `Object.is`** — so a
+one-ULP move and a `-0` that became `+0` would both have failed. Over **678,898,152
+export floats across 75,433,128 triangles**, 674 rows × 2 modes, plus **71,662,182
+captured-grid values over 8,154 panels** — the second clause matters because the grid
+carries the mid-surface and the per-column normal, which the STL never sees, so a change
+that cancelled in the two skins would still show there.
+
+**`--control` was not re-run this session, and that is stated rather than glossed.** The
+tool is unchanged since #215, where its 1e-9 two-clause positive control was run. What
+this invocation does carry is its own anti-vacuity requirement in the direction that
+matters here: if the comparison had gone blind, the 39 predeclared movers would have
+reported as holding and the run would have failed. That is a weaker sensitivity claim
+than 1e-9 and is not offered as an equal one.
 
 Three lobe-labelled rows are HOLDERS and each for a stated reason: `NO ROOM by the pitch
 floor` builds no cut (the outline is the plain petal's by branch), and the two GATED rows
