@@ -1418,14 +1418,82 @@ INCURVE TARGET` flat and at rise 0.5 and the CURL / SPHERE / STAMENS / GYNOECIUM
 it, costing **0.0660 mm of EXPORT apex chord error against 0.0041 with the ladder (16x)**.
 The harness's A8 excludes that gap by name ("placed by the clearance law and PINNED by
 A7"); the geometry's `widest()` was never given the same clause — two owners of one
-predicate, in the same function as §9b(i)'s duplicate-expression finding. One line to fix,
-NOT fixed here (it moves bytes and owes a partition). **AND THE PARKED APEX JOIN GETS
+predicate, in the same function as §9b(i)'s duplicate-expression finding. **FIXED IN PR
+TWO OF THIS SESSION — see the block below.** **AND THE PARKED APEX JOIN GETS
 SHARPER WITH THE THIRD LOBE:** the corner at `lobeTipShape` 0.50 is the pointed law's own
 crest derivative, `pi * depth * h / pitch`, so a third lobe takes the pitch 7.14 -> 4.76 mm
 and the join **39.7 -> 55.9 degrees**; tangent-continuous at 1.00 and 2.00 at both counts.
 The image is `docs/img/lobe-count-trade.png` (floors 11 / 8 / 6 at 3 / 4 / 6 lobes, macro,
 print preview ON, same-tree control 0 px, rendered on a scratch tree with the arm
 removed).
+
+**AND IT IS FIXED — `widest()` NO LONGER COUNTS A7'S GAP, AND A8 NOW ASKS THE EMITTED ROWS
+RATHER THAN THE MEASURE** (session 39, PR 2, Eva's ruling 3 — read §11-§14 of
+`docs/bloom-session-39-outcome.md` before touching `bladeStations`' blend or A8). The
+geometry's gap measure opens at `i = 1`: that is A8's own exclusion-by-name given its
+matching clause in the geometry rather than a second rule, so the two owners of that
+predicate stop disagreeing. `bladeStations` takes an optional `report` and declares the
+BLEND it landed on; `buildPetalInto` puts it on `bladeLadder`.
+**THE FIRST VERSION OF A8'S NEW CLAUSE WAS CIRCULAR AND WENT GREEN ON THE MUTATION IT
+EXISTS FOR.** It read the BUILDER's own raw widest gap — and under the mutation that IS
+`r[0]`, which does exceed the cap, so the defect handed over the number that excused it.
+Session 38's `seam-floor-removed` lesson, one function later: **a clause that asks the
+defect whether it fired asks nothing.** The shipped clause reads the gap OFF THE EMITTED
+STATIONS, which A8 already computes for the buckle bar, and asserts the geometry's own
+contract — **a blend below 1 implies the emitted ladder sits AT the bound**, because the
+bisection returns the LARGEST admissible blend. ONE DIRECTION (the converse is false at
+the knife edge where the base measure lands exactly on the cap and the early return takes
+it unblended), and **the slack is DERIVED, not typed**: one step of `LADDER_BLEND_GRID`,
+now EXPORTED and imported by the harness rather than restated, because each gap is linear
+in the blend with a slope under 1 in `u`. **A BLEND OF 0 IS LEGITIMATE at the buckle's
+frequency ceiling**, where the bound IS uniform and the emitted ladder is at it — a clause
+written as "the blend must not be 0" fires on every `buckleFreq` 7 row and says nothing
+about the defect. Checked over the whole live matrix, both modes, every ring: A8 is silent
+on the fixed tree and the emitted widest never passes the bound. The mutant is
+`widest-counts-the-seam-offset` (22 in the apex table, all green) and its witness is the
+builder's declared blend on the seam row — 0 on the mutant, 1 on the clean tree — never
+the assertion it names.
+**THE PARTITION: 157 MOVED / 509 HELD over the 666-row live matrix**, predeclared from a
+per-(ring, slot) sweep of `petalSurface` + `bladeStations` that builds no mesh, confirmed
+by `node tools/verify-bloom-seam-bytes.mjs --base <worktree> --change widest --matrix live
+--expect 157/509 --control --control-mode`. **0 rows whose class differs between the
+modes**, the FOOT identical on every row, and the shipping default bit-identical by
+branch. A THIRD sweep counts the population the mechanism bounds it by: **160 rows carry a
+seam step of 2 or more — the seam session's own mover count, reached by an instrument
+sharing no code with it — the 157 are all inside it, and the three that are shifted and do
+NOT move are named** (`ALL MAX`, `LOBES: x 3 whorls`, `LOBES: x CONTINUOUS x 3 turns`: all
+lobed, so the demand floors the blend to `1 / LADDER_BLEND_GRID` and it is 0 on both trees).
+**`frozen/phase24` is 156 moved / 468 held of its 624**, predeclared the same way; it
+already joins the definitions-reproduce-bytes-do-not class from the seam change, so this is
+an overlapping set rather than a new kind of debt.
+**X1/X2 CANNOT FIRE, CHECKED BEFORE THE CI CYCLE RATHER THAN AFTER IT:** the census run in
+Node on both trees over all 157 moved rows reads **0 pairs on every one of the 85
+undeclared movers** and **non-zero on every one of the 72 declared** — 20 declared rows'
+counts move, in both directions, which the xfail list does not gate (#213). `node
+tools/bloom-smoke.mjs --conn` is clean, export and flood fill both.
+**THREE CLEFT ROWS' TRIANGLE COUNTS MOVE** (`x 3 layers` 85024 -> 85344, `x CONTINUOUS x 3
+turns` 84944 -> 85424, `x 6 layers` 170816 -> 171456) — `trimPanels()` splits at a ROW
+INDEX, so ANY ladder change can move it, which is why the declaration table in
+`verify-bloom-seam-bytes.mjs` is now PER CHANGE (`--change seam|widest`) rather than per
+tool: that file is named for its first caller and the tool is not. **No frozen phase is
+owed** (no row added or removed).
+**THE GAP-BOUND TOOL'S §5 IS NOW THE STANDING WITNESS RATHER THAN THE FINDING**, and §2's
+census is RE-MEASURED as §9a said it was owed: seam-shifted row-modes placing the blade
+exactly uniformly go **34 -> 0**, the ones keeping a real ladder **2 -> 34**, and the
+1.40 arm's own cost reading REVERSES — apex worse with the arm on **87** and better on
+**101**, where main read 103 / 87. **Nothing in §1 moves**: 1.40 is still typed, its
+stated reason is still not what it does, and it still caps the lobe count on its own, so
+ruling 2 stands unchanged. **That tool's §5 print was corrected in the same commit**: the
+"uniform at the frequency ceiling" and "uniform with the seam floor binding" classes
+OVERLAP by 2 row-modes, which did not matter on main and is all that is left on the fixed
+tree — the uncorrected line reports a surviving defect on a tree where the defect is gone.
+**THE WALL INSTRUMENT CANNOT BE REACHED BY THIS, AND IT IS MEASURED RATHER THAN ARGUED:**
+all twelve rows of `tools/bloom-wall-thickness.mjs` read `seamStep` 1 (they vary cup /
+roll / twist / curl / buckle, none of which reaches the turn, the sheet or the length), so
+V1-V5 and `SELF_XFAIL` are bit-identical. And the buckle's bar cannot be broken by
+arithmetic: the emitted widest is bounded by `ladderGapFactor(f) / NU`, so rows-per-cycle
+is at least `NU / (f * gapFactor)` — exactly 8 where the bound is the buckle's own arm,
+and `40 / f >= 8` where it is the 1.40 arm, which only binds at `f <= 5`.
 
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before

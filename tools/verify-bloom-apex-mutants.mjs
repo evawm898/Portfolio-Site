@@ -321,6 +321,30 @@ const MUTANTS = [
     into: '  if (true) return LADDER_MAX_GAP_FACTOR;', names: ['A8'],
     witness: (M, C) => (M.ladderGapFactor(7) === M.LADDER_MAX_GAP_FACTOR && C.ladderGapFactor(7) < C.LADDER_MAX_GAP_FACTOR ? null
       : `ladderGapFactor(7) is ${M.ladderGapFactor(7)} on the mutant and ${C.ladderGapFactor(7)} on the clean tree — the bound still reads the frequency`) },
+  /* A8 — THE LEADING GAP COMES BACK INTO THE LADDER'S OWN MEASURE, which is
+     `main`'s own defect restored (session 39). That gap is the seam-to-first-
+     row offset, placed by the clearance law and pinned by A7, and `mix()`
+     cannot move it — so counting it makes the cap unsatisfiable on every
+     seam-shifted row, the bisection lands on 0 and the turning-rate ladder is
+     thrown away. The blade is then EXACTLY uniform: watertight, one piece,
+     the right triangle count, inside every bound, and invisible to every
+     assertion here until A8 gained its blend clause. The SEAM FLOOR BINDING
+     row is what this bites on; at the shipping tilt the seam step is 1 and
+     the mutation is a no-op. */
+  { id: 'widest-counts-the-seam-offset', why: 'the ladder measures the structural seam offset as its own redistribution',
+    find: '  const widest = (r) => { let m = 0; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };',
+    into: '  const widest = (r) => { let m = r[0]; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };', names: ['A8'],
+    /* THE WITNESS IS THE BLEND THE BUILDER DECLARES, never the assertion A8
+       makes: the mutant must collapse it to 0 where the clean tree keeps a
+       real ladder. Read off buildBloomInto's own report on the seam row. */
+    witness: (M, C) => {
+      const set = { petalTilt: 75, petalLength: 20, sheetThickness: 2.4 };
+      const blend = (T) => { const acc = new T.MeshBuilder({ exportMode: true });
+        return T.buildBloomInto(acc, { ...REGISTRY_DEFAULTS, ...set }).petal.bladeLadder.blend; };
+      const a = blend(M), b = blend(C);
+      return a === 0 && b > 0 ? null
+        : `the blend is ${a} on the mutant against ${b} on the clean tree — the ladder was not discarded`;
+    } },
 ];
 
 /* Rows chosen so every mutation has something to bite on. */

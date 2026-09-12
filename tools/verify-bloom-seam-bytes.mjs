@@ -1,30 +1,46 @@
 /* ===================================================================
-   verify-bloom-seam-bytes.mjs — WHICH ROWS THE SEAM CLEARANCE MOVED
-   (session 38)
+   verify-bloom-seam-bytes.mjs — WHICH ROWS A LADDER CHANGE MOVED
+   (session 38, generalised session 39)
 
      node tools/verify-bloom-seam-bytes.mjs --base <worktree>
-          [--matrix live|phase23] [--expect <moved>/<held>] [--control]
+          [--change seam|widest] [--matrix live|phase23]
+          [--expect <moved>/<held>] [--control] [--control-mode]
+
+   THE FILE IS NAMED FOR ITS FIRST CALLER AND THE TOOL IS NOT. Every clause
+   below is a property of a LADDER-SIDE change — one that moves WHERE the
+   blade rows sit and nothing else — and the seam clearance was simply the
+   first of them. Session 39's `widest()` fix is the second, and it is the
+   same claim measured the same way, so it rides here rather than in a second
+   copy of this comparison; `--change` names whose declarations to use. Adding
+   a third means one entry in TRI_COUNT_XFAIL_BY_CHANGE, not a new file.
 
    THE CLAIM THIS EXISTS TO STATE PRECISELY. Session 38 puts a floor under the
-   FIRST BLADE STATION so the foot-to-blade offset fold cannot happen. That is
-   a ladder-side change: it moves WHERE rows sit, never how many there are and
-   never the surface they sample. So the byte claim splits in three and each
-   part is measured here rather than argued:
+   FIRST BLADE STATION so the foot-to-blade offset fold cannot happen. Session
+   39 stops the gap bound from MEASURING that floor as its own redistribution,
+   which had been discarding the whole turning-rate ladder wherever it binds.
+   Both are ladder-side: they move WHERE rows sit, never how many there are
+   and never the surface they sample. So the byte claim splits in three and
+   each part is measured here rather than argued:
 
      1  THE PARTITION. Every row is MOVED or HELD, per mode, and the counts
         are PREDECLARED with `--expect`. A partition that is merely reported
         is a number nobody can be wrong about.
      2  THE SHIPPING DEFAULT IS HELD, and held means `Object.is` on every
-        float in position — not "within a tolerance", not "equivalent". It is
-        held BY CONSTRUCTION: when the clearance does not reach the first
-        lattice station the seam step is 1 and `bladeStations` takes the same
-        `uniform.slice(0, held)` it always took.
-     3  TRIANGLE COUNTS ARE UNCHANGED ON EVERY ROW BUT ONE, and the
-        exception is DECLARED rather than tolerated. The row count is fixed at
-        NU and only the stations move, so the topology should not move with
-        them — and on 665 of 666 rows it does not. It does on
+        float in position — not "within a tolerance", not "equivalent". Both
+        changes hold it BY CONSTRUCTION and for different reasons, which is
+        why it is asserted rather than assumed: the clearance does not reach
+        the first lattice station there, so the seam step is 1 and
+        `bladeStations` takes the same `uniform.slice(0, held)` it always
+        took; and with a seam step of 1 the leading gap is 1/NU, under every
+        cap this function is handed, so whether the gap measure counts it or
+        not cannot change the answer.
+     3  TRIANGLE COUNTS ARE UNCHANGED EXCEPT WHERE THE CHANGE DECLARES
+        OTHERWISE, and each exception is DECLARED rather than tolerated. The
+        row count is fixed at NU and only the stations move, so the topology
+        should not move with them — and for the seam change, on 665 of 666
+        rows it does not. It does on
         `CAPABILITY: cleft x 6 layers`, and the reason is a property of the
-        CLEFT rather than of this change: `trimPanels()` splits the blade into
+        CLEFT rather than of that change: `trimPanels()` splits the blade into
         three panels at a ROW INDEX (the row nearest the cleft onset in u), and
         the two lobes then share that boundary row with the base panel. Move
         the stations and a different row is nearest the onset; the base panel
@@ -33,7 +49,8 @@
         32/31/31 where main puts it at 32 on every ring — 168,256 -> 170,816
         triangles, +2,560.
 
-        THIS IS PRE-EXISTING IN KIND: any ladder change can move that split,
+        THIS IS PRE-EXISTING IN KIND: ANY ladder change can move that split,
+        which is exactly why the table is per change rather than per tool —
         and session 32's own redistribution acts above u0 = 0.2857 where the
         cleft onset at 0.55 sits. What is new is that something finally
         MEASURES it. So the exception is one named entry with its numbers, it
@@ -42,11 +59,13 @@
         doctrine this project already applies to the connectedness gate and to
         SELF_INTERSECTION_XFAIL. It is not a tolerance and it is not a skip.
 
-   BOTH MODES, EVERY ROW. The clearance reads the EXPORT thickness in both
-   modes on purpose (row positions are topology), so a row that moved in
-   export must move identically in live — and a row whose CLASS differs
-   between the modes is reported as a failure in its own right. That is the
-   session-32 mode-dependence defect wired as a check rather than trusted.
+   BOTH MODES, EVERY ROW. Row positions are topology and the export floor may
+   not move them, so a row that moved in export must move identically in live
+   — and a row whose CLASS differs between the modes is reported as a failure
+   in its own right. That is the session-32 mode-dependence defect wired as a
+   check rather than trusted. (The seam change satisfies it by reading the
+   EXPORT thickness in both modes; session 39's fix satisfies it by touching
+   no mode-dependent quantity at all.)
 
    THE COMPARISON IS POSITIONAL (`pa[i]` against `pb[i]`, `Object.is`, so a
    one-ULP move and a `-0` that became `+0` both count as moved), following
@@ -69,6 +88,7 @@ const arg = (k, d = null) => { const i = argv.indexOf(k); return i >= 0 && argv[
 const baseDir = arg('--base');
 if (!baseDir) { console.error('usage: --base <worktree of the base commit>'); process.exit(2); }
 const which = arg('--matrix', 'live');
+const change = arg('--change', 'seam');
 const expect = arg('--expect');
 const control = argv.includes('--control');
 const controlMode = argv.includes('--control-mode');
@@ -120,8 +140,33 @@ if (rowsA.length !== rowsB.length) {
   process.exit(1);
 }
 
-/* THE ONE ROW WHOSE TRIANGLE COUNT MOVES, with its number — see clause 3. */
-const TRI_COUNT_XFAIL = { 'CAPABILITY: cleft x 6 layers': '168256 -> 170816' };
+/* THE ROWS WHOSE TRIANGLE COUNT MOVES, WITH THEIR NUMBERS — see clause 3.
+   ONE TABLE PER CHANGE, named on the command line, because the declaration is
+   a property of the CHANGE and not of this tool: `--change seam` is session
+   38's, `--change widest` is session 39's. Keeping them here rather than on
+   the command line is deliberate — a predeclaration a caller types is a
+   predeclaration a typo can weaken, and these are reviewed in the diff. A
+   change whose name is not in this table is REFUSED rather than run with an
+   empty one, so "no exceptions" has to be written down as `{}`. */
+const TRI_COUNT_XFAIL_BY_CHANGE = {
+  seam: { 'CAPABILITY: cleft x 6 layers': '168256 -> 170816' },
+  /* SESSION 39 restores the turning-rate ladder wherever the seam floor
+     binds, so the same `trimPanels()` mechanism moves the same split on the
+     same kind of row — and on THREE of them rather than one, because the
+     rows it reaches are the ones with an inner whorl turning far enough to
+     shift the seam. Every other cleft and claw row in the matrix is a single
+     whorl at the shipping tilt, seam step 1, and its count is unmoved. */
+  widest: {
+    'CAPABILITY: cleft x 3 layers': '85024 -> 85344',
+    'CAPABILITY: cleft x CONTINUOUS x 3 turns': '84944 -> 85424',
+    'CAPABILITY: cleft x 6 layers': '170816 -> 171456',
+  },
+};
+if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
+  console.error(`REFUSED: --change ${change} has no declared triangle-count table. Add one (even an empty {}) rather than running without a declaration.`);
+  process.exit(2);
+}
+const TRI_COUNT_XFAIL = TRI_COUNT_XFAIL_BY_CHANGE[change];
 const triXfailSeen = new Set();
 
 const bad = [];
@@ -182,6 +227,13 @@ for (const mode of ['export', 'live']) {
    clause leaves this one exactly what this project calls a log line: a
    computation nobody has shown can produce a verdict. `--control-mode`
    reclassifies one row's live answer and requires the run to report it. */
+/* THE DEFAULT'S VERDICT IS TAKEN BEFORE THE PLANT, because the plant lands ON
+   the default (it reclassifies the first row, and the first row is the
+   shipping configuration). Reading the corrupted record would make the
+   default clause report a second finding about a deliberate lie — two
+   findings for one planted change, against a budget of one, so the control
+   failed the run it exists to validate. Measured, session 39. */
+const defBefore = classes.has(rowsA[0].label) ? { ...classes.get(rowsA[0].label) } : null;
 if (controlMode) {
   const first = [...classes.keys()][0];
   const rec = classes.get(first);
@@ -193,15 +245,15 @@ let modeFindings = 0;
 for (const [label, rec] of classes) {
   if (rec.export && rec.live && rec.export !== rec.live) {
     modeFindings++;
-    bad.push(`MODE-DEPENDENT: "${label}" is ${rec.export} in export and ${rec.live} in live — the clearance must read the export thickness in BOTH modes`);
+    bad.push(`MODE-DEPENDENT: "${label}" is ${rec.export} in export and ${rec.live} in live — row POSITIONS are topology and a ladder change may not move them with the mode`);
   }
 }
 if (controlMode && modeFindings !== 1) bad.push(`CONTROL: the mode clause reported ${modeFindings} findings on a deliberately reclassified row, expected exactly 1 — the clause cannot produce a verdict`);
 if (controlMode && modeFindings === 1) { console.log('  the mode clause fired on the control, exactly once.'); }
 
-const def = classes.get(rowsA[0].label);
+const def = defBefore;
 if (which === 'live' && def && (def.export !== 'held' || def.live !== 'held')) {
-  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — the seam step is 1 there and the stations must be bit-identical`);
+  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — every ladder change here holds it by construction and the stations must be bit-identical`);
 }
 
 if (!rowsA.length || !floats) bad.push('VACUOUS: no rows or no floats were compared');
@@ -220,7 +272,7 @@ if (which === 'live') for (const l of Object.keys(TRI_COUNT_XFAIL)) {
 if (!movers.length && !control && !expect) bad.push('VACUOUS: no row moved, and neither --control nor --expect ran — nothing here has shown this tool could report movement at all');
 
 const movedRows = movers.length, heldRows = rowsA.length - movedRows;
-console.log(`\n${which} matrix: ${rowsA.length} rows, both modes, ${floats.toLocaleString()} floats compared positionally under Object.is`);
+console.log(`\n${which} matrix, change "${change}": ${rowsA.length} rows, both modes, ${floats.toLocaleString()} floats compared positionally under Object.is`);
 console.log(`  MOVED ${movedRows}   HELD ${heldRows}   (per row, export; live agrees on every row or this run has already failed)`);
 if (expect) {
   const [wm, wh] = expect.split('/').map(Number);
