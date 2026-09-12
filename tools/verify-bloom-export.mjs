@@ -328,14 +328,20 @@ for (const r of results) {
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
 }
-/* THE DENOMINATOR ITSELF, asserted. */
-if (results.length !== attempted.length) {
-  const got = new Set(results.map((r) => r.label));
-  validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
-}
-console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
-console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
+/* THE DENOMINATOR ITSELF, asserted — and the three real populations printed
+   beside it (#220). Every ratio in this summary divides by `results.length`,
+   which is the SURVIVORS of the validity assertions, so a dropped row shrinks
+   BOTH sides of seven ratios at once and each of them still reads as a clean
+   pass. The matrix count was never printed to compare them against. */
+const got = new Set(results.map((r) => r.label));
+const dropped = attempted.filter((l) => !got.has(l));
+if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
+console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length} watertight (boundary = 0)`
+  + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass` : '')
+  + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+if (dropped.length) console.log(`  ^ every ratio below divides by the ${results.length} row(s) that SURVIVED, not by the ${attempted.length} in the matrix.`);
+console.log(`${results.length - countMoved.length}/${results.length} measured configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
+console.log(`${results.length - degenerates.length}/${results.length} measured configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
@@ -393,6 +399,11 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) =>
 let bad = false;
 if (validity.length) {
   bad = true;
+  /* THE POINTER GOES TO STDOUT — stderr is unbuffered and stdout is block
+     buffered, so in a combined CI log this block flushes EARLIER than the
+     summary it follows. The detail stays here; that there IS detail belongs
+     in the stream carrying the summary. */
+  console.log(`\nexport gate: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the "HARNESS INVALID" block (stderr; it may appear ABOVE this line in a combined log).`);
   console.error(`\nexport gate: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
   for (const v of validity) console.error(`  - ${v}`);
 }
@@ -428,5 +439,9 @@ if (NEGATIVE_CONTROL) {
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   process.exit(1);
 }
-if (bad) process.exit(1);
-console.log('export gate: PASS — every config above exports watertight.');
+if (bad) {
+  /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
+  console.log(`\nexport gate: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} not watertight, ${degenerates.length} with degenerate triangles, ${countMoved.length} whose triangle count moved between modes. Nothing above is a pass.`);
+  process.exit(1);
+}
+console.log(`\nexport gate: PASS — all ${attempted.length} attempted configs reached the results and every one exports watertight.`);
