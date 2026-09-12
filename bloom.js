@@ -879,7 +879,7 @@ function lobeLine(petals) {
   const depth = L.depthClamped
     ? `depth ${L.depthAsked.toFixed(2)}x asked → ${L.depthBuilt.toFixed(2)}x built (CLAMPED at the print floor)`
     : `depth ${L.depthBuilt.toFixed(2)}x (cap ${L.depthCap.toFixed(2)}x)`;
-  return `LOBES ${count} · ${depth} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% (${L.windowMm.toFixed(1)} of ${L.regionMm.toFixed(1)} mm, u ${L.windowU[0].toFixed(3)}–${L.windowU[1].toFixed(3)}) · tip shape ${L.tipShape.toFixed(2)} · ${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} emitted stations in the window) · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
+  return `LOBES ${count} · ${depth} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% (${L.windowMm.toFixed(1)} of ${L.regionMm.toFixed(1)} mm, u ${L.windowU[0].toFixed(3)}–${L.windowU[1].toFixed(3)}) · crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)}${L.crestAngleDeg === null ? '' : ` (crest ${L.crestAngleDeg.toFixed(1)}\u00b0`}${L.notchAngleDeg === null ? (L.crestAngleDeg === null ? '' : ')') : `${L.crestAngleDeg === null ? ' (' : ', '}notch ${L.notchAngleDeg.toFixed(1)}\u00b0 included on a ${L.angleChordMm.toFixed(2)} mm chord)`} · ${L.samplesPerLobe} stations a lobe demanded by this shape · ${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} emitted stations in the window) · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
 }
 
 function rootBlendLine(layers, cont) {

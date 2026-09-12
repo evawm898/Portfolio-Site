@@ -44,8 +44,8 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, TIP_PREFIXES,
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
-         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_TIP_SHAPE_RANGE,
-         LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_TIP_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE } from './bloom-geometry.js';
+         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
+         LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -117,6 +117,7 @@ export const RETIRED_IDS = [
   { id: 'allTipBreadth', retiredAt: 32, schema: null, why: 'The whole-whorl delta on petalTipBreadth, retired with its base (session 32). Not replaced — no role can differentiate an apex that has no control.' },
   { id: 'innerTipBreadth', retiredAt: 32, schema: null, why: 'The inner-whorl delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
   { id: 'labellumTipBreadth', retiredAt: 32, schema: null, why: 'The labellum\'s delta on petalTipBreadth, retired with its base (session 32). Not replaced, with its base.' },
+  { id: 'lobeTipShape', retiredAt: 41, schema: null, why: 'The lobe cut profile\'s single exponent (0.50..2.00, default 1.00): the cut was ((1 - cos 2 pi f)/2)^q = sin(pi f)^{2q}, so q was the crest\'s local power halved and the NOTCH was parabolic at every value of it. Retired on Eva\'s ruling (session 41) because one control cannot carry the two quantities her model names separately: the expansion about the sinus is 1 - q pi^2 e^2 + O(e^4) for EVERY exponent, so the notch\'s included angle was 180 degrees across the whole range and beyond it — an identity of the law (session 40, §1), not a range that could be widened. What q did buy at the notch was a RADIUS, and it tightened at the same end of the control that flattened the crest, so the two features moved in opposition and "both acute" (a serrate margin) was unreachable anywhere in (0, infinity). Replaced by lobeCrestShape and lobeNotchShape, each the LOCAL POWER of the cut at its own feature, independent by construction. A stored 0.50 under this name is a pointed crest over a round sinus and under either new name is a cusp, so the name may never come back.' },
 ];
 
 /* VISIBILITY PREDICATES — the condition itself, never a name for one.
@@ -1336,17 +1337,59 @@ export const CONTROLS = [
            + (L ? ` — ${L.windowMm.toFixed(1)} mm of ${L.regionMm.toFixed(1)}` + (L.noRoom ? '' : ` · the ladder holds ${L.countRowsCap} lobe${L.countRowsCap === 1 ? '' : 's'} here (${L.rowsCapacity} free rows at ${LOBE_SAMPLES_PER_LOBE} stations a lobe)`) : '');
     },
     visibleWhen: { ref: 'lobesEngaged' } },
-  { id: 'lobeTipShape', section: 'lobes', kind: 'slider',
-    min: LOBE_TIP_SHAPE_RANGE[0], max: LOBE_TIP_SHAPE_RANGE[1], step: 0.05, default: LOBE_TIP_SHAPE_DEFAULT,
-    label: 'Lobe tip shape', tier: 'standard', role: 'petal',
-    /* THE LOBE'S OWN APEX, at the lobe's scale — never the petal's (PETAL
-       TIP SHAPE owns [uCap, 1]). The cut profile is a cosine bump raised to
-       this power: 0.5 a pointed crest (a V), 1.0 a round crest, 2.0 a flat-
-       topped crest with a narrower sinus. Every sinus stays parabolic. */
-    fmt: (v) => {
-      const q = Number(v);
-      const name = q < 0.75 ? 'pointed' : q <= 1.25 ? 'round' : 'flat-topped';
-      return `${q.toFixed(2)} · ${name}`;
+  /* THE TWO SHAPE EXPONENTS (session 41). Eva's model names the tooth's two
+     features separately — "notch angle, the included angle of the valley
+     between teeth" and "crest point, how pointed the tooth's own peak is" —
+     and they ARE separate quantities: the local power of the cut at the
+     crest and at the sinus, independent by construction of the law.
+
+     TWO CONTROLS IS NOT A REGISTRATION VIOLATION, and the brief says why:
+     the rule forbids two controls moving ONE quantity, not one control per
+     quantity. The retired `lobeTipShape` was the other error — ONE control
+     over TWO quantities, which is why it could only trade them.
+
+     THE NUMBER IS THE LOCAL POWER AND IT READS THE WAY IT BEHAVES, which is
+     session 31's ruling on `antherPinch` (the control it replaced ran
+     backwards from its label: 8 the bulge, 0.25 the star). Rising = blunter,
+     the same sense in BOTH controls, so a value means one thing wherever it
+     is read. The controls are NOT calibrated in degrees, deliberately: the
+     angle a given exponent draws depends on the depth, the pitch AND the
+     local half-width, so a slider labelled 90 degrees would draw something
+     else the moment any of the three moved. The DRAWN angle is measured on
+     the build's own outline and printed in the read-out, beside the chord it
+     was read through — which is where a degree figure can be true. */
+  { id: 'lobeCrestShape', section: 'lobes', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Crest', tier: 'standard', role: 'petal',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const name = a < 1 ? 'a needle — the peak is a cusp' : a < 1.15 ? 'a point' : a < 1.75 ? 'a blunt point'
+        : a < 2.25 ? 'round' : 'flat-topped';
+      const L = shown && shown.lobes;
+      const ang = L && !L.noRoom && L.crestAngleDeg !== null
+        ? ` · drawn ${L.crestAngleDeg.toFixed(1)}° included, on a ${L.angleChordMm.toFixed(2)} mm chord`
+        : L && !L.noRoom ? ' · one lobe, so the window carries no interior crest to measure' : '';
+      return `${a.toFixed(2)} · ${name}${ang}`;
+    },
+    visibleWhen: { ref: 'lobesEngaged' } },
+  { id: 'lobeNotchShape', section: 'lobes', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Notch', tier: 'standard', role: 'petal',
+    /* THE DEAD TRAVEL IS IN THE ANGLE AND IS TOLD, NOT TRIMMED (the
+       `stamenSpread` ruling): at 2.00 and above the valley is parabolic or
+       flatter, so its included angle is 180 degrees and stays there — what
+       the travel above 2.00 buys is the WIDTH of the flat bottom (a crenate
+       margin), not an angle. The range is not narrowed and the read-out says
+       which of the two the value is changing. */
+    fmt: (v, ui, shown) => {
+      const b = Number(v);
+      const name = b < 1 ? 'a slit — the valley is a cusp' : b < 1.15 ? 'a V' : b < 1.75 ? 'a soft V'
+        : b < 2.25 ? 'a round U' : 'flat-bottomed — the travel here widens the floor, not the angle';
+      const L = shown && shown.lobes;
+      const ang = L && !L.noRoom && L.notchAngleDeg !== null
+        ? ` · drawn ${L.notchAngleDeg.toFixed(1)}° included, on a ${L.angleChordMm.toFixed(2)} mm chord`
+        : '';
+      return `${b.toFixed(2)} · ${name}${ang}`;
     },
     visibleWhen: { ref: 'lobesEngaged' } },
 

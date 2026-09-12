@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -99,7 +99,89 @@ const outlineMoved = (M, C, set = {}, mode = 'export') => {
   return worst;
 };
 
+
+/* THE LOBE WITNESS. Drives the module under test to a lobed rim and reads the
+   LOCAL POWER of the removed material at a crest and at a sinus off the
+   EMITTED half-width — the same quantity L7 measures, but reached here
+   through the module directly rather than through the gate, so the witness
+   and the assertion have different owners. Returns null when the row builds
+   no measurable cut, which the witness clauses report rather than swallow. */
+function lobePowers(M) {
+  const state = { ...REGISTRY_DEFAULTS, lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 1, lobeCrestShape: 1, lobeNotchShape: 2.5 };
+  const acc = new M.MeshBuilder({ exportMode: true });
+  let got;
+  try {
+    const fr = M.footRing(state, acc);
+    const ring = fr.slotRings[0][0];
+    let slot = null;
+    M.buildWhorlInto({ count: fr.slotCount, radius: ring.radius, height: 0, sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra, phase: ring.phase, placement: state.placement, fan: fr.fan,
+      blade: (sl) => { if (!slot) slot = sl; } });
+    got = M.petalSurface(state, ring, slot, null, acc).profile;
+  } catch { return null; }
+  const L = got.lobes;
+  if (!L || L.noRoom || L.countBuilt < 2 || L.depthClamped) return null;
+  /* THE CUT FRACTION, not the removed material — see the harness's L7: the
+     difference carries the base outline's taper and its maximum is a
+     stationary point of a product, so a slope read there is 2 for every
+     exponent. The ratio is `depth * g(r)` and its powers are the exponents. */
+  const removed = (u) => 1 - got.halfWidthAt(u) / got.halfWidthBaseAt(u);
+  const span = (L.windowU[1] - L.windowU[0]) / L.countBuilt;
+  const ternary = (lo, hi, want) => {
+    for (let k = 0; k < 220; k++) {
+      const a1 = lo + (hi - lo) / 3, b1 = hi - (hi - lo) / 3;
+      const fa = removed(a1), fb = removed(b1);
+      if (want === 'min' ? fa <= fb : fa >= fb) hi = b1; else lo = a1;
+    }
+    return (lo + hi) / 2;
+  };
+  const powerAt = (uf, dir) => {
+    const at0 = removed(uf), d1 = span * 1e-3, d2 = span * 1e-2;
+    const r1 = Math.abs(removed(uf + dir * d1) - at0), r2 = Math.abs(removed(uf + dir * d2) - at0);
+    if (!(r1 > 0 && r2 > r1)) return NaN;
+    return Math.log(r2 / r1) / Math.log(10);
+  };
+  const us = ternary(L.sinusU[Math.floor(L.sinusU.length / 2)] - span * 0.35, L.sinusU[Math.floor(L.sinusU.length / 2)] + span * 0.35, 'max');
+  const uc = ternary(L.crestU[1] - span * 0.35, L.crestU[1] + span * 0.35, 'min');
+  const notch = powerAt(us, -1), crest = powerAt(uc, +1);
+  return Number.isFinite(notch) && Number.isFinite(crest) ? { crest, notch } : null;
+}
+
 const MUTANTS = [
+  /* ===================================================================
+     THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
+     the LOCAL POWER the mutated module actually emits — deliberately NOT
+     the assertion L7 makes, because asking the gate whether the gate fired
+     is the circularity the table exists to avoid (session 35).
+
+     WHY THESE TWO. The retired one-exponent family's error was ONE control
+     over TWO quantities; the two failure modes of the replacement are
+     exactly the ways that error could come back — the controls exchanged,
+     or both features served from one of them. Both leave L0-L6 completely
+     unchanged: the count, the two caps, the window, the pitch, the demand
+     and the crests-at-the-ends identity are all blind to WHICH SHAPE the
+     cut carries, so without L7 either mutation ships silently.
+     =================================================================== */
+  { id: 'shapes-swapped', why: 'the crest exponent is applied at the notch and the notch exponent at the crest — the two controls exchanged',
+    find: '  const P = Math.pow(r, crest), Q = Math.pow(1 - r, notch);',
+    into: '  const P = Math.pow(r, notch), Q = Math.pow(1 - r, crest);', names: ['L7'],
+    witness: (M, C) => {
+      const m = lobePowers(M), c = lobePowers(C);
+      if (!m || !c) return 'the lobed row built no measurable cut';
+      return (Math.abs(m.crest - c.notch) < 0.05 && Math.abs(m.notch - c.crest) < 0.05)
+        ? null
+        : `the emitted powers did not exchange: clean (crest ${c.crest.toFixed(3)}, notch ${c.notch.toFixed(3)}), mutant (crest ${m.crest.toFixed(3)}, notch ${m.notch.toFixed(3)})`;
+    } },
+  { id: 'shapes-coupled', why: 'both features read the CREST exponent, so one control moves two quantities — the retired family’s own error, returning',
+    find: '  const P = Math.pow(r, crest), Q = Math.pow(1 - r, notch);',
+    into: '  const P = Math.pow(r, crest), Q = Math.pow(1 - r, crest);', names: ['L7'],
+    witness: (M, C) => {
+      const m = lobePowers(M), c = lobePowers(C);
+      if (!m || !c) return 'the lobed row built no measurable cut';
+      return (Math.abs(m.notch - m.crest) < 0.05 && Math.abs(c.notch - c.crest) > 0.5)
+        ? null
+        : `the notch did not follow the crest: clean (crest ${c.crest.toFixed(3)}, notch ${c.notch.toFixed(3)}), mutant (crest ${m.crest.toFixed(3)}, notch ${m.notch.toFixed(3)})`;
+    } },
   /* THE THREE LERP MUTATIONS ARE GONE WITH THE LERP (session 32, PR THREE).
      `inverted-lerp`, `short-cap` and `curved-cap` all bit on
      `return hEntry + (tipFloor - hEntry) * s;`, which the cap demotion
@@ -355,6 +437,17 @@ const ROWS = [
      the tip the mode floor is). Both cap-entry rules are covered — the 0.80
      clamp at a broad falling limb, the crossing at a steep one. */
   { label: 'the shipping default', set: [] },
+  /* A LOBED ROW, so L7 has an outline to measure. Both of its measurements
+     must RUN on it, which needs an UNCLAMPED depth (a clamped one holds the
+     sinus on the print floor, where the removed material is the floor's and
+     not the law's) and an INTERIOR crest, which exists only from two lobes
+     up. The two exponents are set APART so a swap is observable: a mutation
+     that exchanged them on equal values would be undetectable by
+     construction. */
+  { label: 'a lobed rim, the two shape exponents apart (crest 1.00, notch 2.50, 3 lobes at 0.30x)',
+    set: [{ id: 'lobeDepth', value: '0.3' }, { id: 'lobeCount', value: '3' },
+          { id: 'lobeCoverage', value: '1' },
+          { id: 'lobeCrestShape', value: '1' }, { id: 'lobeNotchShape', value: '2.5' }] },
   /* THE SEAM FLOOR BINDING, and it is a SINGLE LAYER on purpose: layer count
      was the proxy the brief mistook for the cause, and this row is the
      measured counter-example — tilt 75, length 20, sheet 2.4 folds 376 pairs
@@ -406,8 +499,16 @@ async function famsOn(rows) {
     const bad = await applyConfig(page, row.set);
     if (bad.length) { console.log(`    (row "${row.label}" refused: ${bad[0]})`); continue; }
     await page.waitForTimeout(300);
+    /* BOTH FAMILIES. The apex table was A-only; session 41 added L7, whose
+       witness is the emitted outline's local powers, and "re-run the mutant
+       table when a family is added" is this project's own rule. A lobe
+       mutation that fired nothing would otherwise look exactly like a clean
+       tree. */
     for (const msg of await thicknessAssertions(page, row)) {
       const mm = /^(A\d)/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    for (const msg of await lobeAssertions(page, row)) {
+      const mm = /^(L\d)/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

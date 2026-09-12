@@ -143,7 +143,7 @@ if (want('0')) {
    (Np 2), two either side of twelve is count 2 (Np 3), three at eleven /
    twelve / one is count 3 (Np 4).
    ===================================================================== */
-function modelB({ p, length, coverage, teeth, q, depth, absoluteMm = null }) {
+function modelB({ p, length, coverage, teeth, crest, notch, depth, absoluteMm = null }) {
   /* THE STATIONING CURVE IS MODE-FREE, as the shipped one is: `max(shape,
      rootBlend, TIP_HALF_MM)`, never the accumulator's floor, so live and
      export station the SAME lobes. (`halfWidthBaseAt` is already
@@ -170,7 +170,10 @@ function modelB({ p, length, coverage, teeth, q, depth, absoluteMm = null }) {
     return (lo + hi) / 2;
   })();
   const phase = (u) => (Wh - d(u)) / pitch;               // 0 at the treated end, Np/2 at the apex
-  const wave = (x) => Math.pow((1 - Math.cos(2 * Math.PI * x)) / 2, q);
+  /* THE SHIPPED LAW, called — never restated. The prototype's whole point is
+     that it differs from Model A in WHERE the teeth sit and in nothing else,
+     so it must carry the same cut. */
+  const wave = (x) => G.lobeCutProfile(x, crest, notch);
   const cutFrac = (u) => (d(u) > Wh ? 0 : depth * wave(phase(u)));
   /* PROPORTIONAL (the shipped rule): a fraction of the LOCAL half-width.
      ABSOLUTE: the same millimetres everywhere, which is the other half of
@@ -204,15 +207,23 @@ if (want('0b')) {
   const EPS = 1e-4;                                   // named: the chord the turn is read through, in u
   for (const exportMode of [false, true]) {
     const plain = build({}, exportMode);
-    for (const q of [0.5, 1, 2]) {
-      /* MODEL A, the shipped build, at the same q. */
-      const a = build({ lobeDepth: 0.30, lobeTipShape: q }, exportMode);
+    /* RE-KEYED ON THE CREST EXPONENT (session 41). The apex JOIN is where
+       the window's last crest meets the base outline, so the axis that
+       decides whether it is a corner is the CREST's own local power: 1.00 a
+       corner, 2.00 parabolic, 3.00 flatter. The notch is held at its default
+       throughout, because it cannot reach the join. The retired control's
+       0.50 / 1.00 / 2.00 were crest powers 1 / 2 / 4, so the first two rows
+       are the same geometry at the join as session 40 measured and the third
+       is the new range's own ceiling rather than the retired law's. */
+    for (const q of [1, 2, 3]) {
+      /* MODEL A, the shipped build, at the same crest exponent. */
+      const a = build({ lobeDepth: 0.30, lobeCrestShape: q }, exportMode);
       const uCap = a.p.uCap, hA = a.p.halfWidthAt;
       const joinTurnA = turnDeg(hA, uCap, a.length, EPS);
       /* MODEL B, the prototype, teeth chosen so the apex is a CREST (odd) and
          then a NOTCH (even), at the same depth and the same coverage. */
       for (const teeth of [1, 2, 3]) {
-        const B = modelB({ p: plain.p, length: plain.length, coverage: 0.8, teeth, q, depth: 0.30 });
+        const B = modelB({ p: plain.p, length: plain.length, coverage: 0.8, teeth, crest: q, notch: G.LOBE_SHAPE_DEFAULT, depth: 0.30 });
         const hB = (u) => B.flooredHalf(u);
         const uAtD = (dd) => { let lo = G.ROOT_BLEND_END, hi = 1; for (let k = 0; k < 80; k++) { const m = (lo + hi) / 2; if (B.d(m) > dd) lo = m; else hi = m; } return (lo + hi) / 2; };
         /* The interior crests and sinuses that fall on the margin (d >= F/2). */
@@ -255,85 +266,94 @@ if (want('0b')) {
 }
 
 /* =====================================================================
-   §1 — WHAT lobeTipShape DOES TO THE CREST AND TO THE NOTCH.
+   §1 — THE REACHABLE (CREST ANGLE, NOTCH ANGLE) REGION, MEASURED.
 
-   The cut within a period is c(x) = ((1 - cos 2 pi x)/2)^q = sin(pi x)^(2q),
-   applied as h = hb * (1 - depth * c). Near the CREST (x -> 0),
-   c ~ (pi x)^(2q): a V at q = 0.5, a parabola at q = 1, flat above. Near the
-   SINUS (x -> 1/2), c ~ 1 - q pi^2 (x - 1/2)^2 for EVERY q: always a
-   parabola. So the two ends of the control are NOT two ends of one curve —
-   q moves the crest from a corner to a plateau and moves the sinus only from
-   one radius to another.
+   SESSION 41 REPLACED THE FAMILY. `lobeTipShape` is retired; the cut is
+   `lobeCutProfile(f, crest, notch) = r^a / (r^a + (1-r)^b)` on the triangle
+   phase `r = 1 - |2f - 1|`, whose two exponents are the LOCAL POWERS of the
+   cut at its own two features and are independent by construction.
 
-   The numbers below are given in the units each claim needs: the crest's
-   INCLUDED ANGLE in degrees (a corner has one; a bend does not), and the
-   sinus's RADIUS OF CURVATURE in millimetres (a bend has one; a corner does
-   not). A third column, the steepest FLANK, is what an eye actually reads as
-   "acute" on a margin, and it is a function of depth and pitch as much as q.
+   WHAT THIS SECTION USED TO SAY, and why it could not survive the change:
+   it measured what ONE exponent did to the crest and to the notch, and its
+   finding was that the notch's included angle is 180 degrees at every value
+   — `sin(pi x)^{2q}` is `1 - q pi^2 e^2 + O(e^4)` about its minimum for
+   EVERY q, an identity of the law rather than a reading. That finding is
+   what retired the family, and it is preserved in
+   `docs/bloom-session-40-outcome.md` §1 rather than re-measured here on a
+   law that no longer exists.
+
+   WHAT IT SAYS NOW is Eva's item 1: report the reachable pairs as a
+   MEASURED REGION and not a claim. The two angles are read off the emitted
+   outline of a real build, so they are the object's and not the law's
+   idealisation — and because an included angle at a curved feature is a
+   function of the chord it is read through, every figure names its chord.
+
+   NAME THE SAMPLING. Two chords a decade apart, exactly as the retired
+   section did, because they answer different questions: 0.05 mm is finer
+   than any print resolution and reads the LIMIT the exponent sets, while
+   0.50 mm is about a nozzle and reads what the printed edge will do. A
+   feature whose power is above 1 has a limiting angle of 180 degrees at
+   every exponent and only the coarse chord separates the shapes — which is
+   why a control calibrated in degrees would be a lie, and why the shipped
+   read-out prints the angle it DREW beside the chord it drew it on.
    ===================================================================== */
 if (want('1')) {
-  /* Measured on the SHIPPED build so the numbers are the object's: the
-     default petal, lobeDepth 0.30, coverage 0.80, 2 lobes, pitch 7.137 mm.
-     `lobeTipShape` outside [0.50, 2.00] is not reachable from the slider but
-     the geometry accepts it, so the trend either side of the range is shown
-     and marked unreachable.
-
-     A TURN ANGLE NAMES ITS SCALE. The crest at q slightly above 0.50 has an
-     included angle of exactly 180 degrees and a curvature that is INFINITE —
-     it is not a corner and it is not a bend, and only a measurement at a
-     stated scale separates it from either. So the turn is read through a
-     chord of a named AXIAL distance either side, at two scales: 0.05 mm
-     (finer than any print resolution) and 0.50 mm (about a nozzle). */
   const SCALES_MM = [0.05, 0.50];
-  const rows = [];
+  const AX = [0.6, 1.0, 1.5, 2.0, 2.5, 3.0];
   const exportMode = true;
-  for (const q of [0.5, 0.55, 0.6, 0.75, 1.0, 1.25, 1.5, 2.0, 3.0, 4.0]) {
-    const b = build({ lobeDepth: 0.30, lobeTipShape: q }, exportMode);
+  const rows = [];
+  for (const crest of AX) for (const notch of AX) {
+    const b = build({ lobeDepth: 0.30, lobeCount: 2, lobeCrestShape: crest, lobeNotchShape: notch }, exportMode);
     const L = b.p.lobes;
-    const pitch = L.pitchMm, depth = L.depthBuilt;
-    const uCrest = L.crestU[1], uSinus = L.sinusU[0];
-    const hbC = b.p.halfWidthBaseAt(uCrest), hbS = b.p.halfWidthBaseAt(uSinus);
+    if (!L || L.noRoom || L.countBuilt < 2) continue;
     const h = b.p.halfWidthAt;
-    const turns = (u) => SCALES_MM.map((mm) => turnDeg(h, u, b.length, mm / b.length));
-    /* THE SINUS IS PARABOLIC AT EVERY q — an identity of the law, not a
-       reading: c ~ 1 - q pi^2 e^2 about x = 1/2, so the included angle is
-       180 degrees and the only thing q moves there is the RADIUS. */
-    const sinusRadius = (pitch * pitch) / (2 * Math.PI * Math.PI * q * depth * hbS);
-    /* The crest's second derivative: c ~ (pi x)^(2q), so the radius is 0 for
-       q < 1 (a corner at q = 0.5, an unbounded curvature below 1), finite at
-       exactly 1, and infinite above it. Stated as the three cases it is. */
-    const crestRadius = q < 1 ? 0 : q === 1 ? (pitch * pitch) / (2 * Math.PI * Math.PI * depth * hbC) : Infinity;
-    let maxSlope = 0;
-    for (let i = 1; i < 20000; i++) {
-      const x = i / 20000, e = 1e-6;
-      const c1 = Math.pow((1 - Math.cos(2 * Math.PI * (x + e))) / 2, q), c0 = Math.pow((1 - Math.cos(2 * Math.PI * (x - e))) / 2, q);
-      maxSlope = Math.max(maxSlope, Math.abs(((c1 - c0) / (2 * e)) * depth * hbS / pitch));
+    const uCrest = L.crestU[1], uSinus = L.sinusU[0];
+    rows.push({ crest, notch, pitch: L.pitchMm,
+      crestDeg: SCALES_MM.map((mm) => 180 - Math.abs(turnDeg(h, uCrest, b.length, mm / b.length))),
+      notchDeg: SCALES_MM.map((mm) => 180 - Math.abs(turnDeg(h, uSinus, b.length, mm / b.length))),
+      demand: L.samplesPerLobe });
+  }
+  out.section1 = { scalesMm: SCALES_MM, rows };
+  say('\n=== §1 — THE REACHABLE (CREST, NOTCH) ANGLE REGION, MEASURED =============');
+  say(`  EXPORT, the shipping default petal, lobeDepth 0.30, 2 lobes, pitch ${f3(rows[0].pitch)} mm.`);
+  say('  Included angles in degrees, read on the EMITTED outline through a chord of the named');
+  say(`  axial distance either side: fine = ${SCALES_MM[0]} mm (the limit the exponent sets), coarse = ${SCALES_MM[1]} mm (about a nozzle).\n`);
+  say('  crest  notch |  crest incl. (fine / coarse) | notch incl. (fine / coarse) | demand');
+  for (const r of rows) say(`  ${r.crest.toFixed(2)}   ${r.notch.toFixed(2)} |   ${f3(r.crestDeg[0]).padStart(8)} / ${f3(r.crestDeg[1]).padStart(8)}  |  ${f3(r.notchDeg[0]).padStart(8)} / ${f3(r.notchDeg[1]).padStart(8)}  | ${String(r.demand).padStart(4)}`);
+  /* THE INDEPENDENCE CLAIM, as a number rather than a picture: down a column
+     the notch is fixed and only the crest angle should move; across a row the
+     crest is fixed and only the notch angle should move. The RANGE of the
+     quantity that is supposed to be fixed is the cross-talk. */
+  const coarse = (r, which) => (which === 'crest' ? r.crestDeg[1] : r.notchDeg[1]);
+  const spread = (sel, which) => { const v = rows.filter(sel).map((r) => coarse(r, which)); return v.length ? Math.max(...v) - Math.min(...v) : 0; };
+  let ownMax = 0, crossMax = 0;
+  for (const a of AX) { ownMax = Math.max(ownMax, spread((r) => r.crest === a, 'notch')); crossMax = Math.max(crossMax, spread((r) => r.crest === a, 'crest')); }
+  let ownMax2 = 0, crossMax2 = 0;
+  for (const b of AX) { ownMax2 = Math.max(ownMax2, spread((r) => r.notch === b, 'crest')); crossMax2 = Math.max(crossMax2, spread((r) => r.notch === b, 'notch')); }
+  say(`\n  INDEPENDENCE, on the coarse chord. Across a row (the crest held): the NOTCH angle spans up to`);
+  say(`  ${f3(ownMax)} deg — that is its own control working — while the CREST angle drifts at most ${f3(crossMax)} deg.`);
+  say(`  Down a column (the notch held): the CREST angle spans up to ${f3(ownMax2)} deg while the NOTCH`);
+  say(`  angle drifts at most ${f3(crossMax2)} deg. Each control owns its own feature; the drift is the`);
+  say(`  shared denominator of the law, and it is the measured size of the cross-talk rather than a claim.`);
+  /* THE COMPOSITION CHECK — the form, not a feature. The cut enters the
+     outline as a REDUCTION FACTOR, so a second level is one more factor in
+     the same product and cannot make the outline multi-valued however the
+     two levels are set. Verified rather than argued: over the shape square
+     at both levels, the composed factor stays in (0, 1] and never rises. */
+  let worst = 1, minFac = 1, bad = 0;
+  for (const a of AX) for (const b of AX) for (const a2 of AX) for (const b2 of AX) {
+    for (let i = 0; i <= 200; i++) {
+      const f = i / 200;
+      const c1 = 0.9 * G.lobeCutProfile(f, a, b), c2 = 0.9 * G.lobeCutProfile(f * 4, a2, b2);
+      const fac = (1 - c1) * (1 - c2);
+      if (!(fac > 0 && fac <= 1)) bad++;
+      minFac = Math.min(minFac, fac);
     }
-    rows.push({ q, reachable: q >= G.LOBE_TIP_SHAPE_RANGE[0] && q <= G.LOBE_TIP_SHAPE_RANGE[1],
-      pitchMm: pitch, depthBuilt: depth, hbAtCrest: hbC, hbAtSinus: hbS,
-      crestTurnDeg: turns(uCrest), sinusTurnDeg: turns(uSinus),
-      crestIncludedDeg: q === 0.5 ? 180 - 2 * (Math.atan((Math.PI * depth * hbC) / pitch) * 180) / Math.PI : 180,
-      crestRadiusMm: crestRadius, sinusIncludedDeg: 180, sinusRadiusMm: sinusRadius,
-      maxFlankDeg: (Math.atan(maxSlope) * 180) / Math.PI,
-      crestBand: 2 * Math.asin(Math.pow(0.1, 1 / (2 * q))) / Math.PI,
-      sinusBand: 1 - 2 * Math.asin(Math.pow(0.9, 1 / (2 * q))) / Math.PI });
   }
-  out.section1 = { scalesMm: SCALES_MM, mode: 'export', rows,
-    note: 'The shipping default petal at lobeDepth 0.30 / coverage 0.80, 2 lobes, pitch 7.137 mm; turns are DRAWN on the build own halfWidthAt through a chord of the named axial distance either side; radii and bands are the law own closed form at the build own pitch and local half-width.' };
-  say('\n=== \u00a71 — WHAT lobeTipShape DOES TO THE CREST AND TO THE NOTCH ============');
-  say('  EXPORT, the shipping default petal, lobeDepth 0.30, coverage 0.80, 2 lobes built, pitch 7.137 mm.');
-  say('  Turn angles are DRAWN on the build\u2019s own outline through a chord of +/- the named axial distance.');
-  say('  A NEGATIVE turn is material turning away (a crest); a POSITIVE turn is the outline opening (a sinus).\n');
-  say('    q   reach | crest turn @0.05mm  @0.50mm | sinus turn @0.05mm  @0.50mm | crest included | crest R (mm) | sinus included | sinus R (mm) | steepest flank');
-  for (const r of rows) {
-    say(`  ${String(r.q).padStart(4)}   ${(r.reachable ? 'yes' : 'NO ')} | ${f3(r.crestTurnDeg[0]).padStart(17)} ${f3(r.crestTurnDeg[1]).padStart(8)} | ${f3(r.sinusTurnDeg[0]).padStart(17)} ${f3(r.sinusTurnDeg[1]).padStart(8)} | ${(r.crestIncludedDeg === 180 ? '180 (none)' : f3(r.crestIncludedDeg)).padStart(14)} | ${(r.crestRadiusMm === 0 ? '0 (corner)' : r.crestRadiusMm === Infinity ? 'inf (flat)' : f3(r.crestRadiusMm)).padStart(12)} | ${'180 (never)'.padStart(14)} | ${f3(r.sinusRadiusMm).padStart(12)} | ${(f3(r.maxFlankDeg) + ' deg').padStart(14)}`);
-  }
-  say('\n  READ. THE SINUS INCLUDED ANGLE IS 180 DEGREES AT EVERY q, as an identity of the law: the wave');
-  say('  is parabolic at its minimum for every exponent. All q buys at the notch is a RADIUS, and the');
-  say('  radius TIGHTENS with q — the same end of the control that FLATTENS the crest. The two features');
-  say('  move in opposition, so one control cannot point both: at the acute end of `lobeTipShape` the');
-  say('  crest is a corner and the notch is at its ROUNDEST (2.26 mm), and at the flat end the notch is');
-  say('  at its tightest (0.57 mm) with no crest left to point.\n');
+  say(`\n  COMPOSITION (the form): two levels at 0.90 depth each, the second at 4x the frequency, over all`);
+  say(`  ${AX.length ** 4} exponent quadruples x 201 phases — the composed reduction factor (1-c1)(1-c2) leaves (0, 1]`);
+  say(`  on ${bad} of ${AX.length ** 4 * 201} samples, its smallest value ${f3(minFac)}. A second level is one more factor in`);
+  say(`  the same product; it cannot make the outline multi-valued, and it needs no change to the law.`);
 }
 
 /* =====================================================================
@@ -359,7 +379,7 @@ if (want('2')) {
     const reliefFloor = G.lobePitchFloor(plain.ring.thickness);
     for (const teeth of [3, 5]) {
       for (const depth of [0.30, 0.60, 0.90]) {
-        const B = modelB({ p: plain.p, length: plain.length, coverage: 1.0, teeth, q: 1, depth });
+        const B = modelB({ p: plain.p, length: plain.length, coverage: 1.0, teeth, crest: G.LOBE_SHAPE_DEFAULT, notch: G.LOBE_SHAPE_DEFAULT, depth });
         const uAtD = (dd) => { let lo = G.ROOT_BLEND_END, hi = 1; for (let k = 0; k < 80; k++) { const m = (lo + hi) / 2; if (B.d(m) > dd) lo = m; else hi = m; } return (lo + hi) / 2; };
         const sinus = B.sinusD.filter((x) => x > B.face / 2 + 1e-9).map((dd) => {
           const u = uAtD(dd), base = B.baseMode(u), raw = B.rawHalf(u), fl = B.flooredHalf(u);
@@ -376,7 +396,7 @@ if (want('2')) {
         const coverageStop = dFade === null ? null : 1 - dFade / B.halfRim;
         /* ABSOLUTE, matched to what the proportional rule cuts mid-blade. */
         const absMm = depth * plain.p.halfWidthBaseAt(0.5);
-        const Babs = modelB({ p: plain.p, length: plain.length, coverage: 1.0, teeth, q: 1, depth, absoluteMm: absMm });
+        const Babs = modelB({ p: plain.p, length: plain.length, coverage: 1.0, teeth, crest: G.LOBE_SHAPE_DEFAULT, notch: G.LOBE_SHAPE_DEFAULT, depth, absoluteMm: absMm });
         let severU = null;
         for (let i = 0; i <= 20000; i++) { const u = G.ROOT_BLEND_END + (1 - G.ROOT_BLEND_END) * i / 20000; if (Babs.rawHalf(u) <= 0) { severU = u; break; } }
         /* THE SHIPPED DEPTH CAP, applied to Model B's own sinus set:
@@ -393,7 +413,7 @@ if (want('2')) {
   }
   out.section2 = { rows };
   say('\n=== §2 — PROPORTIONAL OR ABSOLUTE DEPTH, at the apex ======================');
-  say('  Model B prototype, coverage 1.00 (the whole clock), q 1.00, so the treatment reaches u = 1.');
+  say('  Model B prototype, coverage 1.00 (the whole clock), the shape controls at their defaults, so the treatment reaches u = 1.');
   say('  PROPORTIONAL = a fraction of the LOCAL half-width (the shipped rule). ABSOLUTE = the same');
   say('  millimetres everywhere, matched to what the proportional rule removes at u = 0.50.');
   say('  RELIEF FLOOR = max(sheetThickness, MIN_FEATURE_MM), the same physical length the lobe PITCH');
@@ -450,7 +470,7 @@ if (want('4')) {
     const placedA = L.noRoom ? 0 : inWindow(stA, L.windowU[0], L.windowU[1]);
 
     /* ---- MODEL B: the prototype outline, through the same placer ------- */
-    const mk = (teeth) => modelB({ p: plainE.p, length: plainE.length, coverage, teeth, q: 1, depth: 0.30 });
+    const mk = (teeth) => modelB({ p: plainE.p, length: plainE.length, coverage, teeth, crest: G.LOBE_SHAPE_DEFAULT, notch: G.LOBE_SHAPE_DEFAULT, depth: 0.30 });
     const B0 = mk(1);
     const capB = G.ladderWindowCapacity(B0.u0, 1, 0);
     /* THE DEMAND, exactly: the margin carries the treated arc LESS the half

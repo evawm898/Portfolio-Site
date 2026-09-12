@@ -3775,20 +3775,22 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     if (!lobesEngaged(state)) return null;
     if (!(length > 0)) throw new Error('widthProfile: a lobed outline needs the blade LENGTH in mm to station its lobes on the lamina — pass it');
     const coverage = state.lobeCoverage === undefined ? LOBE_COVERAGE_DEFAULT : Number(state.lobeCoverage);
-    const q = state.lobeTipShape === undefined ? LOBE_TIP_SHAPE_DEFAULT : Number(state.lobeTipShape);
+    const crestShape = state.lobeCrestShape === undefined ? LOBE_SHAPE_DEFAULT : Number(state.lobeCrestShape);
+    const notchShape = state.lobeNotchShape === undefined ? LOBE_SHAPE_DEFAULT : Number(state.lobeNotchShape);
     const countAsked = state.lobeCount === undefined ? LOBE_COUNT_DEFAULT : Number(state.lobeCount);
     const depthAsked = Number(state.lobeDepth);
     const pitchFloorMm = lobePitchFloor(ring.thickness);
     /* THE FLOOR the demand is made at. A CAPABILITY may name another — a
        non-shipping configuration, labelled, for the floor demonstration
        (one step below the floor cannot be reached by any control). */
-    const samplesPerLobe = cap && cap.lobeSamplesPerLobe ? Number(cap.lobeSamplesPerLobe) : LOBE_SAMPLES_PER_LOBE;
+    const samplesPerLobe = cap && cap.lobeSamplesPerLobe ? Number(cap.lobeSamplesPerLobe) : lobeSamplesPerLobe(crestShape, notchShape);
     const buckleFreq = buckleIsFlat(state) ? 0 : Number(state.buckleFreq);
-    const base = { coverage, tipShape: q, countAsked, depthAsked, pitchFloorMm, samplesPerLobe };
+    const base = { coverage, crestShape, notchShape, countAsked, depthAsked, pitchFloorMm, samplesPerLobe };
     const noRoom = (why, extra = {}) => ({ ...base, noRoom: true, noRoomWhy: why, countBuilt: 0, rowsCapacity: 0, countRowsCap: 0, countFloorCap: 0, countCap: 0,
       countClamped: countAsked > 0, clampedBy: why === 'region' ? 'rows' : why,
       depthBuilt: 0, depthCap: 0, depthClamped: depthAsked > 0, pitchMm: 0, pitchBelowFloor: false, windowMm: 0, regionMm: 0,
-      windowU: [uCap, uCap], askedWindowU: [uCap, uCap], sinusU: [], crestU: [], cutAt: () => 0, u0: uCap, u1: uCap, demand: null, ...extra });
+      windowU: [uCap, uCap], askedWindowU: [uCap, uCap], sinusU: [], crestU: [], cutAt: () => 0, u0: uCap, u1: uCap, demand: null,
+      crestAngleDeg: null, notchAngleDeg: null, angleChordMm: 0, ...extra });
     if (!(uCap > ROOT_BLEND_END)) return noRoom('region');
     const laminaHalf = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
     const table = rimArcTable((u) => [u * length, laminaHalf(u), 0], breaksOf(winnerOf(shapeBaseAt)), uPk, LOBE_ARC_SAMPLES);
@@ -3822,14 +3824,53 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     const depthCap = Math.max(0, 1 - TIP_HALF_MM / hMin);
     const depthBuilt = Math.min(depthAsked, depthCap);
     const depthClamped = depthAsked > depthCap;
-    const cutAt = (u) => {
-      const x = (table.sAt(u) - sStart) / pitchMm;
-      const f = x - Math.floor(x);
-      return depthBuilt * Math.pow((1 - Math.cos(2 * Math.PI * f)) / 2, q);
+    const cutAt = (u) => depthBuilt * lobeCutProfile((table.sAt(u) - sStart) / pitchMm, crestShape, notchShape);
+    /* THE DRAWN INCLUDED ANGLES, so the read-out can answer Eva's control by
+       its own name ("notch angle") in degrees without the CONTROL carrying
+       degrees — which it must not, because the angle a given exponent draws
+       depends on the depth, the pitch and the local half-width, so a slider
+       calibrated in degrees would say 90 and draw something else the moment
+       any of the three moved.
+
+       NAME THE SAMPLING: this is the angle of the LAW on the build's own
+       outline, read through a chord of ONE EIGHTH OF THIS BUILD'S PITCH
+       either side of the feature — a length derived from the feature's own
+       length, so it scales with the tooth instead of standing for it. A
+       different chord reads a different angle on the same geometry wherever
+       the feature is curved (session 40 measured the retired family at two
+       chords a decade apart and got 94.2 degrees at one and 180 at the
+       other on ONE state), which is why the chord is reported beside the
+       angle and never dropped.
+
+       The crest angle needs an INTERIOR crest and so is null at one lobe:
+       the window's two ends are the branch boundary between the cut and the
+       base outline, and the turn there is the apex/base JOIN that session 38
+       measured (-39.7 and -44.7 degrees), a different quantity with a
+       different owner.
+
+       AND IT READS THE EMITTED OUTLINE, FLOORS AND ALL, not the cut law's
+       own product. Under the shipped depth cap the two agree inside the
+       window by construction — the cap is derived so the deepest sinus keeps
+       at least the print floor's half-width — but a read-out that reported
+       the LAW's angle would be reporting a shape the geometry does not draw
+       the moment a floor did bind, and the whole point of printing a degree
+       figure here is that it is the one the object carries. Same expression
+       the shape term goes through below. */
+    const hOf = (uu) => Math.max(shapeBaseAt(uu) * (1 - cutAt(uu)), rootBlend(uu), tipFloor);
+    const angleChordMm = pitchMm / 8;
+    const includedAt = (uf) => {
+      const sf = table.sAt(uf), d = angleChordMm;
+      if (!(sf - d > sStart && sf + d < s1)) return null;
+      const tL = Math.atan2(hOf(uf) - hOf(table.uAt(sf - d)), d);
+      const tR = Math.atan2(hOf(table.uAt(sf + d)) - hOf(uf), d);
+      return 180 - Math.abs((tR - tL) * 180 / Math.PI);
     };
     return { ...base, noRoom: false, noRoomWhy: null, countBuilt, rowsCapacity, countRowsCap, countFloorCap, countCap: Math.min(countRowsCap, countFloorCap),
       countClamped, clampedBy, depthBuilt, depthCap, depthClamped, pitchMm, pitchBelowFloor, windowMm, regionMm,
       windowU: [u0, u1], askedWindowU: [u0, u1], sinusU, crestU, cutAt, u0, u1,
+      angleChordMm,
+      notchAngleDeg: sinusU.length ? includedAt(sinusU[Math.floor(sinusU.length / 2)]) : null,
+      crestAngleDeg: countBuilt >= 2 ? includedAt(crestU[Math.round(crestU.length / 2) - 1]) : null,
       /* THE RESOLUTION DEMAND the ladder reads: rows it must place inside
          the window. A count, because that is what a row placer places; the
          floor it comes from is stations per PERIOD. */
@@ -3945,13 +3986,32 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        rules nothing about them. */
     slopeBreaks(grid = 4096) {
       const out = breaksOf(winnerOf(shapeAt), grid);
-      /* A POINTED LOBE CREST IS A TANGENT BREAK (the bump is (pi x)^(2q), a V
-         at q = 0.5), so the crests are declared below q = 0.75 — an integrator
-         laying a chord across one loses first order; declaring a round crest
-         costs a node and nothing else. The sinuses are parabolic at every q. */
-      if (lobes !== null && !lobes.noRoom && lobes.tipShape < 0.75) {
-        for (const u of lobes.crestU) if (u > 0 && u < 1) out.push({ u, kind: 'LOBE_CREST', from: 'CORE', to: 'CORE' });
-        out.sort((a, b) => a.u - b.u);
+      /* A FEATURE OF THE CUT IS A TANGENT BREAK WHEN ITS LOCAL POWER IS AT
+         OR BELOW 1 — a finite non-zero slope at exactly 1, an unbounded one
+         below it — and under the two-exponent law (session 41) EITHER
+         feature can be one, independently. The SINUS break is new: the
+         retired one-exponent family was parabolic at its minimum at every
+         value, so a notch could never be a break and none was ever
+         declared.
+
+         THE MARGIN IS THE SHIPPED ONE. The retired control declared a break
+         below crest power 1.5 (`tipShape < 0.75`, whose crest power is 2q),
+         and the same threshold is kept for both features here: a power a
+         little above 1 still has a slope of `p r^(p-1)`, which at p = 1.05
+         is 63% of the corner's value a ten-thousandth of a period out, so it
+         draws as a corner whatever the limit says. Over-declaring costs one
+         node in petalRim's arc table; under-declaring costs its accuracy.
+
+         THESE DO NOT REACH THE LOBE STATIONING and cannot: `table` above is
+         built on `shapeBaseAt`, the outline BEFORE the cut, so its nodes are
+         the base outline's own breaks. A cut that fed its own breaks back
+         into the arc it is stationed on would be the circularity the
+         stationing comment already refuses. */
+      if (lobes !== null && !lobes.noRoom) {
+        const before = out.length;
+        if (lobes.crestShape < LOBE_BREAK_POWER) for (const u of lobes.crestU) if (u > 0 && u < 1) out.push({ u, kind: 'LOBE_CREST', from: 'CORE', to: 'CORE' });
+        if (lobes.notchShape < LOBE_BREAK_POWER) for (const u of lobes.sinusU) if (u > 0 && u < 1) out.push({ u, kind: 'LOBE_SINUS', from: 'CORE', to: 'CORE' });
+        if (out.length !== before) out.sort((a, b) => a.u - b.u);
       }
       return out;
     },
@@ -4311,10 +4371,18 @@ export const BUCKLE_ROWS_PER_CYCLE_MIN = 8;
 export const LOBE_COUNT_RANGE = Object.freeze([2, 10]);
 export const LOBE_DEPTH_RANGE = Object.freeze([0, 1]);
 export const LOBE_COVERAGE_RANGE = Object.freeze([0.1, 1]);
-export const LOBE_TIP_SHAPE_RANGE = Object.freeze([0.5, 2]);
+/* THE TWO SHAPE EXPONENTS share one range and one default: they are the same
+   KIND of quantity — a local power at a feature — read at two different
+   features, so a value means the same thing in either control. The step is
+   petalTipShape's own, and the range is the range Eva's brief named. */
+export const LOBE_SHAPE_RANGE = Object.freeze([0.6, 3]);
+export const LOBE_SHAPE_STEP = 0.05;
+export const LOBE_SHAPE_DEFAULT = 2;
+/* The local power at or below which a feature of the cut is a TANGENT BREAK
+   and is declared as one. The retired control's own margin — see slopeBreaks. */
+export const LOBE_BREAK_POWER = 1.5;
 export const LOBE_COUNT_DEFAULT = 6;
 export const LOBE_COVERAGE_DEFAULT = 0.8;
-export const LOBE_TIP_SHAPE_DEFAULT = 1;
 /* THE SAMPLES-PER-LOBE FLOOR — DERIVED, and the reason the count is what
    it is (Eva's ruling amendment, session 38). The first lobe sheet stood on
    a sampling floor: 3.0 rows per lobe at eight lobes and 4.2 at six drew
@@ -4392,6 +4460,203 @@ export function ladderOutsideMinima(u0, u1, buckleFreq = 0) {
   return { held, minStretch: Math.ceil(Math.max(0, u0 - held / NU) / gap - 1e-9), minTip: Math.ceil(Math.max(0, 1 - u1) / gap - 1e-9) };
 }
 export function lobePitchFloor(sheetThicknessMm) { return Math.max(sheetThicknessMm, MIN_FEATURE_MM); }
+
+/* ===================================================================
+   THE CUT PROFILE — ONE PERIOD, TWO INDEPENDENT EXPONENTS (session 41).
+
+   THE FAMILY. In the crest-to-sinus coordinate `r` (0 at a crest, 1 at a
+   sinus), the cut is
+
+       g(r) = r^a / (r^a + (1 - r)^b)
+
+   and the period is the even extension of it through the triangle phase
+   `r = 1 - |2f - 1|`, so a crest sits at f = 0 and a sinus at f = 1/2.
+
+   WHAT a AND b ARE: the LOCAL POWER of the cut at its own feature, exactly.
+   Near r = 0 the denominator tends to 1, so g ~ r^a; near r = 1 it tends to
+   1 the other way, so 1 - g ~ (1 - r)^b. Measured by log-log slope, a and b
+   come back to six figures and NEITHER MOVES WITH THE OTHER — which is the
+   whole point, and is what the shipped family could not do.
+
+   WHAT THE SHIPPED FAMILY COULD NOT DO, and why no range fixed it (session
+   40 established this as an identity): `((1 - cos 2 pi f)/2)^q` is
+   `sin(pi f)^{2q}`, whose expansion about the sinus is `1 - q pi^2 e^2 +
+   O(e^4)` for EVERY exponent. So the notch was parabolic — 180 degrees
+   included — at every value of the one control, while the crest's power was
+   2q. One exponent, two features, coupled: `q` bought a pointed crest only
+   by rounding the notch and a tight notch only by flattening the crest.
+
+   WHY NOT THE SUPERELLIPSE, which the brief asked for by preference so the
+   generator would carry one law family. Three forms were tried and the
+   reasons are measurements, not taste:
+     - ONE exponent (`(1 - (1-r)^n)^{1/n}` and friends) gives crest power n
+       and notch power 1/n — COUPLED INVERSELY, which is the very trade
+       session 40 measured. It cannot reach "both acute" anywhere.
+     - TWO exponents as a Lame curve, `g = (1 - (1-r)^b)^a`, does decouple
+       them (crest a, notch b) but is NOT SYMMETRIC when a = b: at a = b = 2
+       it reads g(1/2) = 0.5625 rather than 0.5, so equal settings would draw
+       a lopsided wave and the two controls would not read as calibrated
+       against each other.
+     - The PIECEWISE POWER (`(2r)^a / 2` below the midpoint, mirrored above)
+       is symmetric and exact at the features, but its two halves meet with
+       slopes a and b, so it puts a THIRD tangent break mid-flank whenever
+       a != b — a crease down the side of every tooth.
+   The ratio above has all three properties the others each miss one of:
+   exact independent powers, g(1/2) = 1/2 whenever a = b, and C-infinity
+   strictly inside the period (a ratio of smooth functions over a positive
+   denominator), so the only tangent breaks it can carry are AT its two
+   features, which is where they belong.
+
+   THE SYMMETRY IS EXACT, not approximate: swapping a and b and reflecting
+   r -> 1 - r gives 1 - g(r) identically, so the crest control and the notch
+   control are the same control read at opposite ends of the tooth.
+
+   TWO EXACT VALUES, and both are load-bearing. g(0) = 0 and g(1) = 1 to the
+   bit (the numerator or the denominator's second term is exactly 0 there,
+   at every exponent, including the cusped ones where `Math.pow(0, 0.6)` is
+   0), so the crests still meet the base outline EXACTLY and L6's `Object.is`
+   clause holds unchanged. And at a = b = 1 the law is the TRIANGLE WAVE to
+   the bit — `r + (1 - r)` is exactly 1 in IEEE-754 over the whole unit
+   interval (measured: max |g(r) - r| = 0 over 100001 samples), so the
+   serrate margin is drawn by the identity rather than approached.
+
+   IT COMPOSES, and that is a property of the FORM rather than a feature.
+   The cut enters the outline as a REDUCTION FACTOR — `shapeBase * (1 - cut)`
+   — so a second, shorter-wavelength level is one more factor in the same
+   product, `shapeBase * (1 - cut1) * (1 - cut2)`, which stays in (0, 1] by
+   construction and therefore cannot make the outline multi-valued however
+   the two levels are set. The law is a function of a PHASE alone, so the
+   second level needs only its own phase, count and pair of exponents; it
+   needs no change here.
+   =================================================================== */
+export function lobeCutProfile(f, crest, notch) {
+  const ph = f - Math.floor(f);
+  const r = 1 - Math.abs(2 * ph - 1);
+  const P = Math.pow(r, crest), Q = Math.pow(1 - r, notch);
+  return P / (P + Q);
+}
+
+/* ===================================================================
+   THE RESOLUTION DEMAND, AS A FUNCTION OF THE SHAPE (session 41, Eva's
+   item 3). Session 38 derived ONE constant, 11 stations a lobe, from the
+   shipped family's three tip shapes; session 40 measured that the floor is
+   NOT constant across that family (10 / 11 / 8 at q 0.50 / 1.00 / 2.00) and
+   peaks in the middle. With two independent exponents the floor is a
+   surface, and it is what decides the count ceiling — so the count the user
+   can reach is now a function of the shape they asked for.
+
+   THE DERIVATION HAS ONE OWNER AND IT IS NOT THIS FILE.
+   `node tools/bloom-lobe-resolution.mjs` derives every cell from its own
+   clauses — one period of the law at the sheet's own depth and pitch, its
+   polyline through n stations placed as the LADDER places them, and the
+   clauses below — and PRINTS the table in exactly the form it is pasted
+   here. `--verify` re-derives it and compares cell for cell, which is the
+   table's only independent witness: the harness's L3 reads this table, so
+   L3 can prove the record carries the demand the shape asks for and can
+   never prove the table itself.
+
+   THE CLAUSES, and what changed from session 38's:
+     (i)  THE BINDING FEATURE IS THE WIDER BAND (session 38, unchanged), and
+          its band must span `2 x roundness` station gaps, where roundness
+          is `clamp(power - 1, 0, 1)`. Session 40 stated the premise in
+          prose — "a corner does not need resolving; a station either side of
+          it draws it exactly. What needs resolving is the ROUND band" — and
+          its formula did not implement it, because on the shipped family the
+          distinction never bit: the binding feature there is parabolic or
+          flatter on every reachable value, so the weight is 1 and the bar is
+          session 38's own "two station gaps", EXACTLY. The generalisation is
+          therefore proved to be one: it reproduces 10 / 11 / 8 and the
+          uniform 7 / 10 / 6 on all three shipped shapes.
+          A BINARY corner test was tried first and rejected by measurement:
+          it put a step from 2 to 20 stations between notch 1.00 and 1.25,
+          which is a cliff in the count ceiling under one slider step. The
+          weight is continuous, so no step of either control can collapse
+          the count.
+     (ii) THE PAIRWISE CLAUSE (session 38) is unchanged and is a statement
+          about a SET, so it sets the ceiling rather than a cell.
+     (iii) THE PHASE THE MODEL DOES NOT PIN — NEW, and it is why no cell
+          reads 2. The per-period model places the period's ends ON crests,
+          which is what the builder does at the WINDOW's two ends and at no
+          interior crest; so the model reads the FAVOURABLE phase. Measured
+          over 200 offsets, the drawn tooth at 2 stations a period ranges
+          from 100% of its true amplitude down to ZERO — at the worst phase
+          both stations land at mid-flank and the tooth vanishes entirely,
+          for every shape. The clause is that the drawn amplitude keeps at
+          least HALF at EVERY phase, which is clause (ii)'s own ruled
+          "keeps at least half" convention applied to the amplitude. It
+          binds only where clause (i) has gone quiet, and it is slack on the
+          whole shipped family (4 / 3 / 3 against clause (i)'s 10 / 11 / 8),
+          so session 38's ruled constant is untouched by it.
+
+   NO CELL EXCEEDS `LOBE_SAMPLES_PER_LOBE`, and that is asserted rather than
+   clamped: the ruled constant stays the CEILING of the surface, and this
+   session's contribution is the reduction below it where the shape is sharp.
+   =================================================================== */
+export const LOBE_DEMAND_ROWS = Object.freeze([
+/* DERIVED — do not edit by hand. Regenerate with:
+ *   node tools/bloom-lobe-resolution.mjs --table
+ * 49 x 49 cells over [0.6, 3] at a step of 0.05: row = the CREST
+ * exponent, column = the NOTCH exponent, the cell the demand in base 36.
+ * `--verify` re-derives every cell from the clauses and compares. */
+  '55553333333345555688888899aaaaaaaaaaaaaaaaaaaaaaa',   // crest 0.60
+  '555333333333455556788888999aaaaaaaaaaaaaaaaaaaa88',
+  '553333333333455556788888999aaaaaaaaaaaaaaaaaa8888',
+  '5333333333334555567888889999aaaaaaaaaaaaaaaa88888',
+  '3333333333334455556788888999aaaaaaaaaaaaaaa888888',
+  '3333333333334455556788888999aaaaaaaaaaaaa88888888',
+  '33333333333334555566788888999aaaaaaaaaa8888888888',
+  '333333333333345666667888888999999aaaa888888888888',
+  '3333333333333446666667888889999999888888888888888',
+  '3333333333333446666667888889999999888888888888888',
+  '333333333333344666666788888999999aa88888888888888',
+  '333333333333344666666778888999999aa88888888888888',
+  '44444444444444466666677888899999aaa88888888888888',
+  '5555444444444446666667788889999aaaaa8888888888888',
+  '555555554444444566666778888999aaaaaa8888888888888',
+  '666555555555555566666778888999aaaaaa8888888888888',
+  '66666655555555555666677888899aaaaaaaa888888888888',
+  '66666666555555555566677888899aaaaaaaa888888888888',
+  '77776666666666666666677888899aaaaaaaa888888888888',
+  '7777776666666666666667778889aaaaaaaaa888888888888',
+  '7777777766666666666667778889aaaaaaaaaa88888888888',
+  '8888777777777777777777778889aaaaaaaaaa88888888888',
+  '8888887777777777777777778889aaaaaaaaaa88888888888',
+  '8888888777777777777777778889aaaaaaaaaaa8888888888',
+  '9999888888888888888888888889aaaaaaaaaaa8888888888',
+  '9999998888888888888888888889aaaaaaaaaaa8888888888',
+  '9999999888888888888888888889aaaaaaaaaaaa888888888',
+  'aaaa999999999999999999999999aaaaaaaaaaaa888888888',
+  'aaaaaa99999999999999999999999aaaaaaaaaaa888888888',
+  'aaaaa9999999999999999999999999aaaaaaaaaa888888888',
+  'aaaaa99999999999999999999999999aaaaaaaaaa88888888',
+  'aaaa9999999999999999999999999999aaaaaaaaa88888888',
+  'aaa999999999999999999999999999999aaaaaaaa88888888',
+  'aa99999999999999999999999999999999aaaaaaa88888888',
+  '99999999899999999999999999999999999aaaaaaa8888888',
+  '999999998888999999999999999999999999aaaaaa8888888',
+  '9999999988888888999999999999999999999aaaaa8888888',
+  '99999998888888888888999999999999999999aaaaa888888',
+  '999999988888888888888889999999999999999aaaa888888',
+  '9999998888888888888888888899999999999999aaa888888',
+  '99999988888888888888888888888899999999999aa888888',
+  '999998888888888888888888888888888899999999aa88888',
+  '9999988888888888888888888888888888888999999a88888',
+  '9999888888888888888888888888888888888888899988888',
+  '9998888888888888888888888888888888888888888888888',
+  '9888888888888888888888888888888888888888888888888',
+  '8888888888888888888888888888888888888888888888888',
+  '8888888888888888888888888888888888888888888888888',
+  '8888888888888888888888888888888888888888888888888',   // crest 3.00
+]);
+
+/* The demand for one period at these two exponents. Base-36 so a cell is one
+   character; the index is the control's own step, so every reachable slider
+   position has its own cell and nothing is interpolated. */
+export function lobeSamplesPerLobe(crest, notch) {
+  const last = LOBE_DEMAND_ROWS.length - 1;
+  const ix = (v) => Math.min(last, Math.max(0, Math.round((Number(v) - LOBE_SHAPE_RANGE[0]) / LOBE_SHAPE_STEP)));
+  return parseInt(LOBE_DEMAND_ROWS[ix(crest)][ix(notch)], 36);
+}
 
 /* THE PER-SLOT PHASE (Eva, ruling 5) — DERIVED, never a control. One phase
    for the whole whorl makes every petal identical, which reads machined; the
