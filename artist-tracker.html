@@ -620,14 +620,17 @@
     display:flex;
     flex-direction:column;
     align-items:flex-end;
-    gap:4px;
+    gap:5px;
     flex-shrink:0;
     padding-top:2px;
+    /* A fixed width so the glyphs line up into a column the eye can run down
+       -- without it they sit at whatever x the row's content leaves them. */
+    width:52px;
   }
   .entry-stars{
     display:flex;
     gap:1px;
-    font-size:13px;
+    font-size:15px;
     line-height:1;
     /* Not a target on a touch device at all, so a scroll can never set a
        rating by accident. Re-enabled below only where there is a real
@@ -648,14 +651,16 @@
   .entry-markers{
     display:flex;
     gap:4px;
-    font-size:12px;
+    font-size:13px;
     line-height:1;
     color:var(--dim);
   }
   .map-panel-item .entry-marks{ padding-top:0; }
 
-  .filter-row--marks .chip{ letter-spacing:0.06em; text-transform:none; }
-  .filter-row--marks .chip[data-star]{ font-size:12px; }
+  /* A glyph needs more size than a word to read at the same weight. */
+  .filter-row--marks .chip{ letter-spacing:0.06em; text-transform:none; font-size:12px; }
+  .filter-row--marks .chip[data-star]{ font-size:13px; letter-spacing:0.02em; }
+  .filter-row--marks .chip[data-active="true"]{ color:var(--teal); }
 
   /* Drawer controls: the canonical, keyboard-reachable pair. */
   .tag-escape{ margin-top:10px; }
@@ -805,6 +810,13 @@
 
   @media (max-width:560px){
     .entry{flex-direction:column;}
+    /* The row stacks here, so a right-aligned 52px column becomes a whole
+       wasted LINE per entry with the glyphs floating in the middle of it.
+       Lay them along the row instead. And because the stars are not a target
+       on a touch device (see .entry-stars), an unrated row has nothing to
+       reserve space FOR -- it draws nothing at all. */
+    .entry-marks{ flex-direction:row; align-items:center; width:auto; gap:12px; margin-top:2px; }
+    .entry-stars[data-stars="0"]{ display:none; }
     .drawer{width:100%; border-left:none;}
     /* A 240px empty square pushes everything below the fold on a phone. */
     .detail-photo, .detail-photo-placeholder{max-width:160px;}
@@ -1741,9 +1753,12 @@ another.handle"></textarea>
   // backlog, and the same reasoning as the gender filter's "unknown".
   const STAR_FILTERS = [
     { id:'all',     label:'all',      test: () => true },
-    { id:'3',       label:'★★★',   test: e => starsOf(e) === 3 },
-    { id:'2',       label:'★★+',  test: e => starsOf(e) >= 2 },
-    { id:'1',       label:'★+',   test: e => starsOf(e) >= 1 },
+    // Number first, ONE star as the unit. Three stars at chip size render as
+    // punctuation -- the two-plus chip read as "**+" on the contact sheet and
+    // could not be counted at a glance. No assertion would have caught that.
+    { id:'3',       label:'3★',   test: e => starsOf(e) === 3 },
+    { id:'2',       label:'2+★',  test: e => starsOf(e) >= 2 },
+    { id:'1',       label:'1+★',  test: e => starsOf(e) >= 1 },
     { id:'unrated', label:'unrated',  test: e => starsOf(e) === 0 },
   ];
   function starFilterDef(id){
