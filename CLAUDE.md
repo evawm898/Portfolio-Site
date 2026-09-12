@@ -5080,6 +5080,29 @@ they and who is near who (region filter + map), and why did I save them
     showed a third of the world), and the map **fits to its pins once** per
     load rather than opening on a fixed `[20,0]` zoom-2 rectangle.
 
+28. **The style vocabulary is NINE controlled buckets** (`STARTER_TAGS`),
+    replacing the eighteen-tag starter set: `fine line`, `blackwork`,
+    `color`, `realism`, `illustrative`, `dark & gothic`,
+    `botanical & animal`, `anime & pop culture`, `ornamental & traditional`.
+    They are BROAD BUCKETS, not a top-nine cut — Eva consolidated upstream so
+    nothing is orphaned (`cute`/`fantasy` → illustrative, `animal` →
+    botanical & animal, `oriental/asian traditional` + `neo-traditional` →
+    ornamental & traditional). `cover-up` is deliberately absent: it is a
+    SERVICE, not a style, and those 5 artists carry "Does cover-ups" in
+    notes, still searchable.
+    A retired bucket that is still ON an entry keeps appearing in the
+    drawer's picker, marked `data-custom`, or there would be no way to
+    un-tag that entry. Only the unused ones disappear.
+    **A tag outside the nine is IMPORTED, never dropped, and reported** —
+    named with the line numbers it appeared on. The file is meant to contain
+    only the nine, so one showing up means the upstream consolidation
+    drifted; silently discarding it would lose real data and hide the drift.
+    A different SPELLING of a vocabulary tag is not drift — membership is
+    tested through `tagKey()`, so "Fine-Line" counts as `fine line`.
+    `vocabularyKeys` is built LAZILY on first use: `tagKey()` reaches
+    `CHAR_FOLD`, declared further down the IIFE, so computing it eagerly at
+    declaration hits the temporal dead zone and throws before first paint.
+
 **Facet counts are computed against every filter except themselves** — with
 the view defaulting to tattoo artists, a region count taken over the whole
 ledger would read "USA (40)" while showing 25. Each filter is its own
@@ -5090,7 +5113,7 @@ counts can exclude their own dimension.
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
 drawer, paste-to-add, shortlist and import work (items 11–24) ship with a
-behaviour gate, `node tools/verify-tracker-drawer.mjs` (269 checks;
+behaviour gate, `node tools/verify-tracker-drawer.mjs` (289 checks;
 `--shots <dir>` also writes a contact sheet). `staticGeocode()` is a pure
 function, so its ANSWERS are unit-checked against declarations SLICED OUT of
 `artist-tracker.html` itself (the app is inside an IIFE) rather than inferred
@@ -5113,8 +5136,16 @@ the cluster group for a plain layer group, neutering `foldText()`, making
 `tagKey()` the identity, widening `BULK_FIELD_COUNTS` to accept anything,
 lifting the tag cap, un-pinning a selected tag when the bar collapses,
 emptying `CITY_COORDS`, making a geocoding failure permanent again, removing
-the retry backoff, and dropping the legacy-tombstone sweep — each turns it
-red, on the checks that name that behaviour.
+the retry backoff, dropping the legacy-tombstone sweep, disabling
+off-vocabulary detection, and letting a TENTH tag into the vocabulary — each
+turns it red, on the checks that name that behaviour.
+
+**The gate reads no bulk-paste file.** Its only `readFileSync` calls are
+`artist-tracker.html` and the leaflet vendor bundles; every fixture is
+inline. So importing a new research file cannot turn the gate red — what
+turns it red is changing `STARTER_TAGS`, which is what the `verify` starter
+assertions are pinned to. `reseed([])` is supported: an empty fixture waits
+on `.add-row` rather than a list row that will never render.
 
 **A fixture whose handle contains the name it searches for proves nothing.**
 The search haystack includes `e.handle`, so a realistic `@sarahrose_tattoo`
@@ -5163,6 +5194,18 @@ testing, rather than testing against a stub.
   confirmed to parse cleanly and merge correctly — but has **not**
   actually been pasted into the user's real tracker yet, since that step
   can only happen in their own browser.
+- **`bulk-paste-v3.txt`** (240 artists — v2 minus `@kittytattoos` and
+  `@tinkercast.official`, which are not artists; tags consolidated to the
+  nine upstream). Dry-run end to end in OVERWRITE mode: 240 added / 0
+  malformed / 0 off-vocabulary, 97 with tags, 29 blank locations, 5 `woman`
+  + 1 `nonbinary`, 69.9 KB, no page errors; a re-paste reports "0 added ·
+  240 already complete". On the map: **211 plotted · 29 without, zero
+  Nominatim requests — 211 of 211 located entries, a 100% plot rate.** The
+  29 are exactly the 29 with a blank location field, so the geocoding gap is
+  fully accounted for and there is nothing left to fix there. Tag chips
+  collapse from 119 groups to 9 (89px, so the `+ N more` cap never fires on
+  this data). NOT yet pasted into the real tracker — that only happens in
+  Eva's browser.
 - **`bulk-paste-v2.txt`** (242 researched tattoo artists, 10-field format)
   was driven end-to-end through a real Chromium against the current page:
   242 added / 0 malformed, 98 with tags, 31 with no location, 5 `woman` +

@@ -1496,12 +1496,34 @@ another.handle"></textarea>
 
   // Click-to-apply style tags. Free typing still works — this is a floor,
   // not a fence.
+  // The controlled vocabulary: NINE broad buckets, not a top-nine cut of a
+  // longer list. Eva consolidated the research file into these — "cute" and
+  // "fantasy" fold into illustrative, "animal" into botanical & animal,
+  // "oriental/asian traditional" and "neo-traditional" into ornamental &
+  // traditional — so no artist loses all their tags to the narrowing.
+  // "cover-up" deliberately is NOT here: it is a service, not a style, and
+  // those artists carry "Does cover-ups" in their notes instead.
   const STARTER_TAGS = [
-    'fine line', 'bold line', 'color', 'black & grey', 'blackwork',
-    'illustrative', 'ornamental', 'botanical / floral', 'gothic', 'baroque',
-    'cute', 'anime', 'traditional', 'neo-traditional', 'realism',
-    'watercolor', 'lettering', 'micro / tiny',
+    'fine line', 'blackwork', 'color', 'realism', 'illustrative',
+    'dark & gothic', 'botanical & animal', 'anime & pop culture',
+    'ornamental & traditional',
   ];
+
+  // Membership test for the vocabulary, by the same normalized key the chips
+  // group on — so "Fine Line" and "fine-line" both count as in-vocabulary.
+  // A tag outside it is still imported, never silently dropped; it is
+  // REPORTED, because the file is supposed to contain only the nine and
+  // anything else means the upstream consolidation drifted.
+  //
+  // Built LAZILY on first use, not at declaration: tagKey() reaches CHAR_FOLD,
+  // which is declared further down this IIFE, so computing this eagerly here
+  // would hit the temporal dead zone and throw before the page ever rendered.
+  let vocabularyKeys = null;
+  function isOffVocabulary(tag){
+    if(!vocabularyKeys) vocabularyKeys = new Set(STARTER_TAGS.map(t => tagKey(t)));
+    const k = tagKey(tag);
+    return k !== '' && !vocabularyKeys.has(k);
+  }
 
   const UNPLACED = 'Other / unspecified';
 
@@ -3078,6 +3100,10 @@ another.handle"></textarea>
     const r = {
       added: 0, updated: 0, unchanged: 0, skipped: 0, noName: 0,
       oddFields: [], dupeNames: [], withinPaste: 0,
+      // tag -> [line numbers]. Tags outside the nine are still imported;
+      // they are surfaced because the file is meant to contain only the nine,
+      // so one appearing means the upstream consolidation drifted.
+      offVocab: new Map(),
     };
 
     function applyToExisting(existing, incoming, extraTag){
@@ -3116,6 +3142,11 @@ another.handle"></textarea>
       if(parsed.error === 'noName'){ r.noName++; return; }
 
       const { data, extraTag } = parsed;
+      (data.tags || []).forEach(t => {
+        if(!isOffVocabulary(t)) return;
+        if(!r.offVocab.has(t)) r.offVocab.set(t, []);
+        r.offVocab.get(t).push(i + 1);
+      });
       const key = normalizeHandleKey(data.handle);
       if(key && seenThisPaste.has(key)) r.withinPaste++;
       if(key) seenThisPaste.add(key);
@@ -3151,7 +3182,8 @@ another.handle"></textarea>
   // malformed line in a 242-line paste was invisible. This is that report.
   function showImportReport(r, totalLines, clearBox){
     const box = document.getElementById('bulkReport');
-    const problems = r.oddFields.length > 0 || r.noName > 0;
+    const problems = r.oddFields.length > 0 || r.noName > 0
+      || (r.offVocab && r.offVocab.size > 0);
     box.innerHTML = '';
 
     const card = document.createElement('div');
@@ -3187,6 +3219,16 @@ another.handle"></textarea>
     if(r.withinPaste){
       issues.push('<span class="warn-num">' + r.withinPaste + '</span> handle(s) appeared more than once '
         + 'inside this paste itself; the later line was applied to the same entry, not a new one.');
+    }
+    if(r.offVocab && r.offVocab.size){
+      const listed = [...r.offVocab.entries()].slice(0, 8).map(([tag, lines]) =>
+        escapeHtml(tag) + ' (line' + (lines.length > 1 ? 's' : '') + ' '
+        + lines.slice(0, 5).join(', ') + (lines.length > 5 ? '…' : '') + ')'
+      ).join('</li><li>');
+      const more = r.offVocab.size > 8 ? ' and ' + (r.offVocab.size - 8) + ' more' : '';
+      issues.push('<span class="warn-num">' + r.offVocab.size + '</span> tag(s) outside the nine-tag '
+        + 'vocabulary. They were IMPORTED, not dropped — but the file is meant to contain only the '
+        + 'nine, so this means the consolidation drifted:<ul><li>' + listed + '</li></ul>' + more);
     }
     if(issues.length){
       const ul = document.createElement('ul');
