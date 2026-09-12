@@ -481,7 +481,13 @@ raw gap reported alongside the blend. **It goes green on the very mutation it ex
 for**: under the mutation the builder's raw widest IS `r[0]`, which does exceed the cap,
 so the defect hands over the number that excuses it. That is session 38's
 `seam-floor-removed` lesson — *a clause that asks the defect whether it fired asks
-nothing* — arriving one function later. The shipped clause reads the gap **off the
+nothing* — arriving one function later. **Eva ruled it the third instance of one defect
+class and gave it a durable rule in `CLAUDE.md`**: *a gate clause names where its reference
+value comes from, and that source is independent of the quantity under test*, citing this
+clause, `seam-floor-removed`, and session 38's `seamFrameResidual === 0`. The three did not
+surface the same way — an adversarial read of the diff, the mutant table, and CI
+respectively — which is in the rule, because the mutant table is the instrument that finds
+this class and not a guarantee against it. The shipped clause reads the gap **off the
 emitted stations**, which A8 already computes for the buckle bar:
 
 > a blend below 1 implies the emitted ladder sits AT the bound.

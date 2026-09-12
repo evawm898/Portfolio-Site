@@ -140,6 +140,46 @@ shows the sweep taking self-approach from a passing 1.031 mm to a failing 0.733 
 an instrument at a feature, check that its own window contains the region the feature
 changes, and say so beside the number.
 
+**A GATE CLAUSE NAMES WHERE ITS REFERENCE VALUE COMES FROM, AND THAT SOURCE IS INDEPENDENT
+OF THE QUANTITY UNDER TEST** (Eva, session 39 — the fourth durable rule, beside
+mode-and-sampling, the stale-harness-row one and calibration-is-not-coverage). *A clause
+that reads its reference from the thing it is checking is entangled with it, and an
+entangled clause does not measure the tree: it measures its own consistency.* A defect
+inside the quantity moves BOTH sides together, so the clause holds while the geometry is
+wrong; and noise inside the quantity moves both sides apart, so the clause fires while the
+geometry is right. It breaks in both directions, which is why "the clause looked strict" is
+never evidence about it. **THE TEST IS MECHANICAL: name the owner of the expected value and
+the owner of the measured one, and if they are the same owner the clause is worth nothing.**
+Rebuild the reference from OTHER owners (C1's discipline, JS5's, the seam gate's restated
+one-line law), or read it off the EMITTED geometry, which no declaration can lie about.
+
+Three instances, cited so the rule is checkable rather than remembered — and they did NOT
+all surface the same way, which is itself the point:
+  * **A8's first blend clause** (session 39, this file's `widest()` block below). It asked
+    whether `blend < 1` implied the BUILDER's own raw widest gap exceeded the cap — and
+    under `widest-counts-the-seam-offset` that raw gap IS `r[0]`, which does exceed the cap,
+    so the defect handed over the number that excused it. Caught by re-reading the diff
+    against the mutant that had just been written, before the table ran; the shipped clause
+    reads the gap off the emitted stations instead.
+  * **`seam-floor-removed`** (session 38). Every A7 clause checked the ladder against the
+    DECLARED clearance, and a zero clearance is declared zero too, so the mutation that
+    returns 0 fired NOTHING. **The mutant table was the only thing that said so** — and the
+    remedy was the same one: the gate restates the one-line law and rebuilds the expected
+    value from the two other owners, because importing `seamClearanceMm` there would mutate
+    with it and check nothing.
+  * **A7's `seamFrameResidual === 0`** (session 38, §9b(ii)). A difference of two cosines
+    reached by two routes, asserted exactly equal — so the clause carried the two routes'
+    disagreement rather than the geometry's. **This one failed the other way and CI is what
+    found it**, red on `DOME LEAN: EVA_CONFIG x rise 1 x layerTilt 18` at ~1e-16 a ring,
+    where the smoke subset holds no row on which the two routes diverge at all. The
+    replacement is the same move a third time: compare two owners through ONE expression
+    (`seamHalfThicknessMm()`, which then needs no tolerance) or bound their difference in
+    the unit the quantity carries.
+
+So the mutant table is the instrument that finds this class, not a guarantee against it:
+it caught one of the three, CI caught one, and an adversarial read of the diff caught one.
+**Write the clause so its reference has a different owner in the first place.**
+
 **AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
 ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
 triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
