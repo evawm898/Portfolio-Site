@@ -4828,11 +4828,14 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: items 1–12 are MERGED to `main`** (PRs #121 and #125); items
-13–18 are in review on branch `claude/tracker-shortlist-filters-h46mti`.
+**Status: items 1–27 are MERGED to `main`** — PRs #121 and #125 (items
+1–12) and #132 (items 13–27, which carried #127's commits; #127 itself was
+closed as superseded rather than merged). Item 28 is in review on branch
+`claude/tracker-v3-nine-tags`.
 Review through the Netlify Deploy Preview — `localStorage` is per-origin, so
 preview data does not carry over to production and vice versa; move it with
-the app's own JSON export/import.
+the app's own JSON export/import. The production page is
+`https://eva-maskalenko.com/artist-tracker.html`.
 
 **What this tool is for.** It is primarily a TATTOO ARTIST SHORTLIST — the
 job is deciding who to get tattooed by and finding where they are. Friends,
