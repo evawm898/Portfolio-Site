@@ -1535,6 +1535,74 @@ arithmetic: the emitted widest is bounded by `ladderGapFactor(f) / NU`, so rows-
 is at least `NU / (f * gapFactor)` — exactly 8 where the bound is the buckle's own arm,
 and `40 / f >= 8` where it is the 1.40 arm, which only binds at `f <= 5`.
 
+**THE SHIPPED RIM MODEL IS `A` — THE TREATMENT TERMINATES AT THE APEX — AND MODEL B
+DISSOLVES THE JOIN WITHOUT DISSOLVING THE CORNER** (session 40, discovery; read
+`docs/bloom-session-40-outcome.md` before proposing any lobe re-architecture, and run
+`node tools/bloom-lobe-model-b.mjs` — it reproduces every figure in seconds with no
+browser). **MODEL A, established as an IDENTITY rather than read off the code**: the
+lobed profile is `Object.is`-equal to the PLAIN petal over `[uCap, 1]` on 4001 of 4001
+samples in BOTH modes, `windowU[1] === uCap` exactly, and the cut at `uCap` is exactly
+0. **MODEL B** — lobes at even arc intervals along the WHOLE rim (base, up one margin,
+across the terminal face, down the other), coverage measured from twelve outward —
+removes the apex boundary by construction: the rim's midpoint is the middle of the
+terminal mini-face, which is not a point of the margin, so there is no
+treated-against-untreated turn to measure. **BUT THE CORNER CLASS SURVIVES AND MOVES TO
+THE BASE**, and the shipped window has TWO of them, the unreported one being the
+LARGER: at `lobeTipShape` 0.50 the join at `uCap` reads **−39.748°** (reproducing
+§B10.3's −39.7° through a different instrument) and the window's LOWER end at `u0`
+reads **−44.743°**, because the crest's arm slope is `π·depth·h/pitch` and the base end
+is the wider. **A session opened to fix the 39.7° corner would be fixing the smaller of
+two, at the end Eva did not complain about.**
+**`lobeTipShape` CANNOT POINT THE NOTCH, AT ANY VALUE, AND THAT IS AN IDENTITY OF THE
+LAW**: the cut is `sin(πx)^{2q}`, which about the sinus is `1 − qπ²e² + O(e⁴)` for
+EVERY exponent — parabolic at its minimum whatever `q` is — so **the notch's included
+angle is 180° across the whole range and beyond it**. All `q` buys there is a RADIUS,
+`pitch²/(2π² q·depth·h)`, and it tightens from 2.26 mm to 0.57 mm at the same end of
+the control that flattens the crest from a 94.2° corner to nothing. The two features
+move in OPPOSITION, so one control cannot carry Eva's "acute" (which is acute at BOTH
+features — a serrate margin is triangular teeth with sharp sinuses). **Widening the
+range does not fix it; the FAMILY is what is wrong.** A triangle wave at the same depth
+and pitch gives 114.7° included at crest AND sinus. Two costed options in §1 of that
+doc, neither built: one control on a round↔triangle family (a partition event on every
+lobed row, retires `lobeTipShape`'s meaning), or two exponents (strictly more
+expressive, reaches crenate and dentate, and is a second control over one region —
+session 32's registration rule, so Eva's ruling and not a measurement).
+**DEPTH STAYS PROPORTIONAL, AND THE FLOOR THAT BINDS IS NOT THE ONE THE BRIEF NAMES.**
+A proportional cut essentially never reaches the OUTLINE floor at a notch (0 of every
+row at or under the shipped `depthCap`, both modes) because it shrinks with the width
+it cuts; ABSOLUTE millimetres SEVER the blade — zero half-width at `u` 0.999 at depth
+0.30 on five teeth, 0.665 at depth 0.90 — which is out of scope at any value. What
+fades toward the apex is the **RELIEF**, against `max(sheetThickness, MIN_FEATURE_MM)`
+(`lobePitchFloor`, one owner): 2.37 / 1.92 / **0.93** mm across three notches at depth
+0.30, so the apex-most is under the floor while the base-most is twice over it — and it
+fades SMOOTHLY, not at a cliff. **AND COVERAGE CANNOT MITIGATE IT**: Eva's coverage is
+measured from TWELVE outward and excludes SIX, so the apex is the one arc coverage
+never removes; a coverage stopping short of the fade point would have to be an ANNULUS
+excluding twelve. **At an even count the apex notch lands on the terminal face, which
+is at the print floor in BOTH modes (0.15 live / 0.80 export), so it is FLATTENED** —
+which makes the parity coupling a printability statement and not only a look: odd
+counts put a crest at twelve and work, even counts spend their apex notch on a floor.
+**THE SAMPLES-PER-LOBE FLOOR IS A FUNCTION OF THE SHAPE AND IT PEAKS IN THE MIDDLE**
+(`node tools/bloom-lobe-resolution.mjs --q=<list>`, whose clause (i) is now reported
+PER SHAPE): **10 / 11 / 8 stations a period at `q` 0.50 / 1.00 / 2.00** under the
+ladder, 7 / 10 / 6 uniform. The brief's hypothesis was right that it varies and wrong
+about the direction — **the acute end needs FEWER, not more**, because a corner does
+not need resolving and what does is the ROUND band, whose narrowest member sits where
+neither feature is pointed. So a demand carrying SHARPNESS is worth 2–3 teeth at the
+flat end. **THE COUNT CEILING, with the shipped `bladeStations` actually run on both
+models**: Model A 1 / 1 / 2 / 2 at coverage 0.10 / 0.40 / 0.80 / 1.00 — `widest()`'s
+correction did NOT move it, structurally, because `ladderWindowCapacity` reads only
+`HELD_ROWS` and `ladderGapFactor` and never calls `widest()` — against Model B's
+**2 / 3 / 5 / 6**, demand met at 11.4–11.9 rows a period. The RESOLUTION floor binds
+from below at every coverage on both; the print pitch floor never binds on the default
+petal in either. **SERRATION IS NOT A SLIDER POSITION ON THIS TREE and no petal length
+reaches it** — the cap is in ROWS, not millimetres, so a longer petal buys pitch and no
+rows; `docs/img/serration-range.png` (`node tools/shot-bloom-serration-range.mjs`)
+photographs that as its first row and puts Eva's counts beside it through the
+capability hook, labelled non-shipping with the stations per lobe on every caption.
+**ZERO BYTES OF GEOMETRY: `bloom-geometry.js`, `bloom-registry.js` and `bloom.js` are
+untouched by session 40.**
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
