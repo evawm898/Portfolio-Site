@@ -65,7 +65,14 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 const JSON_OUT = process.argv.includes('--json');
 
-const Q = [0.5, 1, 2];
+/* THE SHAPE SET. The shipped range's ends and its middle by default; `--q`
+   takes any comma list so the floor can be read AS A FUNCTION OF THE SHAPE
+   (session 40, item 3) rather than only as the set-wide number. Clause (i)
+   is per-shape and is reported per shape; clause (ii) is a statement about
+   the SET and needs at least two members. */
+const qArg = process.argv.find((a) => a.startsWith('--q='));
+const Q = qArg ? qArg.slice(4).split(',').map(Number) : [0.5, 1, 2];
+if (Q.some((q) => !(q > 0))) throw new Error(`--q: every exponent must be > 0, got ${Q.join(',')}`);
 const DEPTH = 0.30, HALF = 5.4, PITCH = 2.38;          // the sheet's default cell, in mm
 const law = (q) => (f) => HALF * (1 - DEPTH * Math.pow((1 - Math.cos(2 * Math.PI * f)) / 2, q));
 const DENSE = 4000;
@@ -126,7 +133,9 @@ const gapsPerBroad = (q, st) => {
   }
   return widest > 0 ? b.broadWidth / widest : 0;
 };
-const pairs = [[0.5, 1], [1, 2], [0.5, 2]];
+/* Every unordered pair of the set — was the three of the shipped triple. */
+const pairs = [];
+for (let i = 0; i < Q.length; i++) for (let j = i + 1; j < Q.length; j++) pairs.push([Q[i], Q[j]]);
 const trueSep = Object.fromEntries(pairs.map(([a, b]) => [`${a}-${b}`, maxOver((f) => law(a)(f) - law(b)(f))]));
 const table = [];
 let floorLadder = null, floorUniform = null;
@@ -147,16 +156,33 @@ for (let n = 3; n <= 14; n++) {
   }
   table.push(row);
 }
-const out = { model: { depth: DEPTH, halfMm: HALF, pitchMm: PITCH, arcShare: G.LADDER_ARC_SHARE }, bands, trueSepMm: trueSep, floor: { ladder: floorLadder, uniform: floorUniform }, table };
+/* THE PER-SHAPE FLOOR — clause (i) alone, which is the only per-shape clause
+   there is: the smallest n at which THIS shape's own broad band spans two
+   station gaps. The set-wide floor above is the largest of these AND clause
+   (ii); reported separately so "the floor is a function of sharpness" is a
+   number rather than an inference. */
+const floorPerQ = Object.fromEntries(Q.map((q) => {
+  const row = table.find((r) => r.ladder.inBroad[q] >= 2);
+  const rowU = table.find((r) => r.uniform.inBroad[q] >= 2);
+  return [q, { ladder: row ? row.n : null, uniform: rowU ? rowU.n : null }];
+}));
+const out = { model: { depth: DEPTH, halfMm: HALF, pitchMm: PITCH, arcShare: G.LADDER_ARC_SHARE }, bands, trueSepMm: trueSep, floor: { ladder: floorLadder, uniform: floorUniform }, floorPerQ, table };
 if (JSON_OUT) { console.log(JSON.stringify(out, null, 1)); }
 else {
   console.log(`one lobe period of cut(f) = ((1 - cos 2 pi f)/2)^q at depth ${DEPTH} on a ${HALF} mm half-width, pitch ${PITCH} mm; ladder = turning + ${G.LADDER_ARC_SHARE} arc share, ends on crests; dense phase ${DENSE}`);
   console.log(`true separation of the laws (mm): ${pairs.map(([a, b]) => `${a} vs ${b}: ${trueSep[`${a}-${b}`].toFixed(3)}`).join(' · ')}`);
   console.log(`bands (fraction of the period): ${Q.map((q) => `q ${q}: crest ${bands[q].crest.toFixed(3)}, sinus ${bands[q].sinus.toFixed(3)} -> broad ${bands[q].broad} ${bands[q].broadWidth.toFixed(3)}`).join(' · ')}`);
-  console.log('\n n | placement | broad feature / widest gap in it (0.5 / 1 / 2) | chord error E (0.5 / 1 / 2) | drawn separation D (0.5-1 / 1-2 / 0.5-2) | (i) drawn | (ii) separated');
+  /* THE COLUMN LABELS ARE DERIVED FROM THE SETS THEY LABEL. They were three
+     literals matching the shipped triple; once `--q` made Q settable the
+     literal would have named a different column from the one printed beside
+     it (the pair list is now every unordered pair of Q, in Q's own order). */
+  const qLab = Q.join(' / '), pLab = pairs.map(([a, b]) => `${a}-${b}`).join(' / ');
+  console.log(`\n n | placement | broad feature / widest gap in it (${qLab}) | chord error E (${qLab}) | drawn separation D (${pLab}) | (i) drawn | (ii) separated`);
   for (const r of table) for (const name of ['ladder', 'uniform']) {
     const x = r[name];
     console.log(`${String(r.n).padStart(2)} | ${name.padEnd(9)} | ${Q.map((q) => x.inBroad[q].toFixed(2).padStart(5)).join(' / ')} | ${Q.map((q) => x.E[q].toFixed(3)).join(' / ')} | ${pairs.map(([a, b]) => x.D[`${a}-${b}`].toFixed(3)).join(' / ')} | ${x.drawn ? 'yes' : 'no '} | ${x.separated ? 'yes' : 'no '}${x.pass ? '  PASS' : ''}`);
   }
+  console.log(`\nPER-SHAPE FLOOR, clause (i) only (the smallest n at which this shape's own broad band spans two station gaps):`);
+  for (const q of Q) console.log(`   q ${String(q).padEnd(5)} broad ${bands[q].broad.padEnd(5)} ${bands[q].broadWidth.toFixed(3)} of the period -> ladder ${String(floorPerQ[q].ladder).padStart(3)}, uniform ${String(floorPerQ[q].uniform).padStart(3)}`);
   console.log(`\nFLOOR: ${floorLadder} stations per lobe under the ladder's placement (uniform: ${floorUniform}) — the smallest n at which every tip shape's broad feature spans two station gaps AND every pair is drawn further apart than either drawing's chord error, keeping half its true separation.`);
 }
