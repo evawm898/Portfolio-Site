@@ -496,4 +496,8 @@ the stations apart.
   ORDERS exactly (the raised cosine is parabolic at both features), so the default lobed
   row moves as little as a family change allows — max 0.051 of depth, 0.083 mm at the
   model cell. Whether the shipped default should be a rounder or a sharper tooth is
-  Eva's to rule from image (a), and the range reaches both.
+  Eva's to rule from image (a), and the range reaches both. **RULED NON-BLOCKING** (Eva,
+  at the merge): a default is not a structure, the range reaches both tooth shapes and a
+  slider moves it, so this PR merged with the question left open rather than held for a
+  ruling. Moving it is one constant (`LOBE_SHAPE_DEFAULT`) plus the registry twin; it
+  would move the default lobed row's bytes and owes a predeclared partition.

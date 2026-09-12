@@ -1152,17 +1152,22 @@ job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses 
 (`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
 **`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
 THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
-**(1) THE PUSH FAILS FROM A SESSION** — and the STATED REASON IS NOT THE WHOLE STORY, measured
-session 41. What was written here was session 17's reading: a GitHub App token cannot push a tag
-whose `.github/workflows` differs from the default branch's, and #191 changed a workflow after
+**(1) THE PUSH FAILS FROM A SESSION, AND THE MECHANISM RECORDED HERE IS REFUTED — NOT REPLACED**
+(corrected session 41; the reading below is what this file used to assert, kept so the correction
+is checkable). What was written here was session 17's: a GitHub App token cannot push a tag whose
+`.github/workflows` differs from the default branch's, and #191 changed a workflow after
 `b323268`. **Session 41 tried it in the one case that reading exempts and it still failed.**
 `frozen/phase25` points at `3f238bd`, which WAS `origin/main`'s own head at the time, and the
 branch pushing it changed no workflow file at all (`git diff --stat <base>..HEAD -- .github/` is
 empty) — so no `.github/workflows` difference existed anywhere, and `git push origin
 refs/tags/frozen/phase25` still returned a flat **HTTP 403** ("RPC failed; send-pack: unexpected
-disconnect"). So the restriction is on TAG REFS from a session token generally, not on workflow
-divergence. Expect it always, not only after a workflow change, and do not spend time
-engineering around the workflow condition.
+disconnect"). **That is a counter-example to the workflow-divergence mechanism and nothing more:
+what actually refuses the push is NOT ESTABLISHED, and no replacement mechanism is offered here.**
+The server said 403 and named no reason; a session token, the tag ref namespace, a push rule and
+the proxy are all consistent with what was observed and none was isolated. So: expect the push to
+fail, do not engineer around the workflow condition — and do not engineer around a successor
+condition either, because there is no measured one to engineer around. What IS measured is one
+failure in the exempt case.
 **(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
 TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
 tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
@@ -1622,7 +1627,13 @@ establishing that, and `docs/bloom-lobe-model.md` exists so a fourth session doe
 `g(r) = r^a / (r^a + (1-r)^b)` on `r = 1 - |2f - 1|`, and `lobeCrestShape` / `lobeNotchShape`
 (0.60-3.00, step 0.05, default 2.00 each) are **the LOCAL POWERS of the cut at its own two
 features** — 1.00 a corner, 2.00 parabolic, 3.00 flat, below 1.00 a cusp — measured
-independent to six figures. **TWO CONTROLS IS NOT A REGISTRATION VIOLATION** (the brief):
+independent to six figures. **WHETHER 2.00 / 2.00 IS THE RIGHT SHIPPED TOOTH IS OPEN, AND EVA
+RULED IT DOES NOT BLOCK** (session 41): it is a DEFAULT, not a structure — the range reaches a
+rounder and a sharper tooth and a slider moves it — so it was left open rather than held for.
+2.00 / 2.00 was chosen because it reproduces the retired control's own local orders exactly
+(the raised cosine is parabolic at both features), which makes the default lobed row move as
+little as a family change allows; §5 of the outcome doc has the number. It is Eva's to rule
+from image (a) whenever she wants to, and moving it is one constant. **TWO CONTROLS IS NOT A REGISTRATION VIOLATION** (the brief):
 the rule forbids two controls moving ONE quantity, and the retired control was the other
 error, ONE control over TWO. **THE SUPERELLIPSE DOES NOT FIT AND THE REASONS ARE
 MEASUREMENTS, so do not re-propose it**: one exponent couples the powers INVERSELY (n at
@@ -1943,6 +1954,20 @@ above, `bloom-export-watertight` **189.7 min** against ~111. Same failure mode a
 withdrawn "~44", arriving from RUNNER VARIANCE rather than matrix growth, which is why the
 rule is not "update the number" but **size a CI wait off `actions_list` on the workflow's
 own recent completed runs, read at the time — never off any figure in this file or any doc.**
+**SESSION 41 SIZED ONE THAT WAY AND IT IS RECORDED AS A CORRECTION TO THE METHOD'S EVIDENCE,
+NOT AS A NEW CONSTANT.** Read off `actions_list` (`bloom-export-watertight.yml`, completed
+runs, `run_started_at` → `updated_at`, cross-checked against `get_workflow_run_usage`'s
+`run_duration_ms`): the five most recent SUCCESSFUL runs at the time of reading were
+**151.8 / 152.5 / 190.6 / 192.1 / 196.1 min**, and two more completed during that session at
+194.9 and **203.5**, so the observed spread over seven runs is **151.8 to 203.5 min, median
+192.1** — a factor of 1.34 between the fastest and the slowest of the SAME workflow, four of
+the seven on an unchanged matrix. Four of those figures are independently corroborated: 190.6
+and 196.1 are quoted in #215's and #210's own merge messages, and 151.8 in #212's. **DO NOT
+READ "151.8 to 203.5" AS THE REPLACEMENT FOR "~111".** The figure above is not superseded by a
+better one, because there is no stable one to have: the point of the measurement is the SPREAD,
+and it is wide enough that no single number — this paragraph's included — can size a wait. It is
+here as evidence that the rule above is load-bearing, and a session that quotes it instead of
+reading `actions_list` at the time has made exactly the mistake it documents.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
