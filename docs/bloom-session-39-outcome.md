@@ -22,7 +22,9 @@ the builder's own 56 stations.
 ## 1. `LADDER_MAX_GAP_FACTOR = 1.4` IS TYPED
 
 Not derived from a physical length, not derived from a row count standing for one. A
-bare ratio with no owner. Four independent lines, three of them checkable mechanically.
+bare ratio with no owner. Five lines, every one of them checkable from the tree —
+`tools/bloom-ladder-gap-bound.mjs` prints §1c, §1d and §1e; §1a is a `grep` and §1b is
+two paragraphs of one comment.
 
 ### 1a. There is no derivation anywhere, and its own commit does not mention it
 
@@ -52,9 +54,9 @@ describes the shipped function as
 > re-implementation … and it does not reproduce here.
 
 So the bound's one number is a live, scratch-tree figure, quoted with no mode named, in
-the paragraph 59 lines below the paragraph that retracts it. **Sixth instance of this
-project's mode-conflation class, and the first where the retraction and the surviving
-use are in the same comment.**
+the paragraph 59 lines below the paragraph that retracts it — the withdrawal and the
+surviving use are in **one comment block**. By the header's own count that makes this the
+sixth instance of the project's mode-conflation class.
 
 ### 1c. The paragraph describes a bound that did not ship — measured
 
