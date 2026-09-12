@@ -99,9 +99,17 @@ if (want('0')) {
       inWindowIdentical: identBelow, inWindowDiffer: diffBelow, crestU: L.crestU, sinusU: L.sinusU,
       demand: B.p.ladderDemand() });
   }
-  out.section0 = { model: 'A', rows };
+  /* THE VERDICT IS DERIVED FROM WHAT WAS MEASURED, NOT ASSERTED (session 42).
+     Session 40 wrote "MODEL A" as a literal because that is what the tree it
+     ran on was; session 42 shipped MODEL B and this tool — unchanged in every
+     measurement — now reads the identity NEGATED. A tool whose conclusion is
+     a constant is a tool that stops being a witness the day the answer moves,
+     so the conclusion is computed from the same rows the table prints. */
+  const isA = rows.every((r) => r.u1IsUCap && r.cutAtUCap === 0 && r.aboveDiffer === 0);
+  const isB = rows.every((r) => !r.u1IsUCap && r.aboveDiffer > 0);
+  out.section0 = { model: isA ? 'A' : isB ? 'B' : 'NEITHER', rows };
   say('=== §0 — WHICH MODEL IS SHIPPED ==========================================');
-  say('  state: the shipping defaults with lobeDepth 0.30 (count 6 asked, 2 built), against the plain default.');
+  say('  state: the shipping defaults with lobeDepth 0.30, against the plain default.');
   say('  sampling: 4001 u, Object.is on halfWidthAt, per mode.\n');
   for (const r of rows) {
     say(`  ${r.mode.toUpperCase().padEnd(6)} window u = [${f3(r.windowU[0])}, ${f3(r.windowU[1])}]   uCap = ${f3(r.uCap)}   windowU[1] === uCap : ${r.u1IsUCap}`);
@@ -111,10 +119,20 @@ if (want('0')) {
     say(`         inside the window: ${r.inWindowDiffer} of ${r.inWindowIdentical + r.inWindowDiffer} differ (the cut)`);
     say(`         ladder demand: ${JSON.stringify(r.demand)}`);
   }
-  say('\n  VERDICT: MODEL A. The treated region is an interval in u whose upper end IS the apex entry,');
-  say('  the apex above it is bit-identical to a petal with no lobes at all, and the apex is therefore a');
-  say('  BOUNDARY of the treatment, not a point on it. Mirrored across the spine by construction (the');
-  say('  outline is one half-width h(u) applied at v = +/-1).\n');
+  if (out.section0.model === 'A') {
+    say('\n  VERDICT: MODEL A. The treated region is an interval in u whose upper end IS the apex entry,');
+    say('  the apex above it is bit-identical to a petal with no lobes at all, and the apex is therefore a');
+    say('  BOUNDARY of the treatment, not a point on it. Mirrored across the spine by construction (the');
+    say('  outline is one half-width h(u) applied at v = +/-1).\n');
+  } else if (out.section0.model === 'B') {
+    say('\n  VERDICT: MODEL B. The treated arc\'s upper end is NOT the apex entry, the cut at `uCap` is not');
+    say('  zero, and the outline above it is NOT the plain petal\'s — so the apex is INTERIOR to the');
+    say('  treatment and there is no join there to make or to measure. This is session 40\'s own identity,');
+    say('  negated by the instrument that established it, on the same rows and the same sampling.\n');
+  } else {
+    say('\n  VERDICT: NEITHER MODEL, CONSISTENTLY. The rows above do not all agree on whether the apex is a');
+    say('  boundary of the treatment. That is a finding about the tree, not about the models.\n');
+  }
 }
 
 /* =====================================================================

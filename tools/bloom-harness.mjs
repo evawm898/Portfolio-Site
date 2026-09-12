@@ -103,7 +103,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
          BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT, BUCKLE_ROWS_PER_CYCLE_MIN, BLADE_ROWS,
-         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, lobeSamplesPerLobe, ladderWindowCapacity, LADDER_BLEND_GRID,
+         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, lobeSamplesPerLobe, ladderWindowCapacity, ladderGapFactor, LADDER_BLEND_GRID,
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
@@ -1207,12 +1207,13 @@ export async function formAssertions(page, row) {
        station, so no lobe is skipped by the mesh.
    =================================================================== */
 export const LOBE_SCOPE =
-  'L0-L7 read the builder\'s own lobe record against the outline law rebuilt in Node from the page\'s read-back state; both STL gates are structurally blind to a cut in the wrong place, at the wrong depth, with the wrong count, with the wrong SHAPE at either of its two features, or not made at all.';
+  'L0-L8 read the builder\'s own lobe record against the outline law rebuilt in Node from the page\'s read-back state; both STL gates are structurally blind to a cut in the wrong place, at the wrong depth, with the wrong count, with the wrong SHAPE at either of its two features, with the wrong RELIEF on any one tooth, with the apex left untreated, or not made at all.';
 
 export function lobeResultLine(L) {
   if (!L) return 'LOBES: none';
-  if (L.noRoom) return `LOBES: NO ROOM (${L.noRoomWhy}) — ${L.countAsked} asked, capacity ${L.rowsCapacity} rows at ${L.samplesPerLobe} a lobe (rows cap ${L.countRowsCap}), pitch cap ${L.countFloorCap} on ${L.windowMm.toFixed(2)} mm at a ${L.pitchFloorMm.toFixed(2)} mm floor; nothing cut`;
-  return `LOBES: crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)} (demand ${L.samplesPerLobe} a lobe) · ${L.countAsked} asked -> ${L.countBuilt} built${L.countClamped ? ` (CLAMPED by ${L.clampedBy}: capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})` : ` (capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})`} · depth ${L.depthAsked.toFixed(2)} -> ${L.depthBuilt.toFixed(2)}x${L.depthClamped ? ' (CLAMPED)' : ''} (cap ${L.depthCap.toFixed(3)}) · pitch ${L.pitchMm.toFixed(3)} mm (floor ${L.pitchFloorMm.toFixed(2)})${L.pitchBelowFloor ? ' BELOW THE FLOOR — told' : ''} · window u ${L.windowU[0].toFixed(4)}-${L.windowU[1].toFixed(4)} (${L.windowMm.toFixed(2)} of ${L.regionMm.toFixed(2)} mm) · ${L.rowsInWindow} stations, ${L.rowsPerLobe.toFixed(2)} rows per lobe · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(3)} mm across`;
+  if (L.noRoom) return `LOBES: NO ROOM (${L.noRoomWhy}) — ${L.countAsked} asked, capacity ${L.rowsCapacity} rows at ${L.samplesPerLobe} a period (rows cap ${L.countRowsCap}), pitch cap ${L.countFloorCap} on ${(2 * L.treatedHalfMm).toFixed(2)} mm at a ${L.pitchFloorMm.toFixed(2)} mm floor${L.noRoomWhy === 'relief' ? `, asked relief ${L.reliefAskedMm.toFixed(3)} mm against zero headroom at every period` : ''}; nothing cut`;
+  const margin = L.reliefMm.filter((r, i) => L.apexIsCrest || i !== (L.periods - 1) / 2);
+  return `LOBES: crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)} (demand ${L.samplesPerLobe} a period) · ${L.countAsked} asked -> ${L.countBuilt} built${L.countClamped ? ` (CLAMPED by ${L.clampedBy}: capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})` : ` (capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})`} · APEX ${L.apexIsCrest ? 'CREST' : `NOTCH (flat: ${L.apexReliefMm.toFixed(3)} mm, on the terminal face)`} · relief ${L.reliefAskedMm.toFixed(3)} mm asked -> ${Math.min(...margin).toFixed(3)}..${Math.max(...margin).toFixed(3)} on the margin${L.reliefLimited ? ` (${L.reliefLimited} limited)` : ''} (depth ${L.depthBuilt.toFixed(2)}x of ${L.peakHalfMm.toFixed(3)} mm, saturates at ${L.depthCap.toFixed(3)}x) · pitch ${L.pitchMm.toFixed(3)} mm (floor ${L.pitchFloorMm.toFixed(2)})${L.pitchBelowFloor ? ' BELOW THE FLOOR — told' : ''} · arc ${(2 * L.treatedHalfMm).toFixed(2)} of ${(2 * L.halfRimMm).toFixed(2)} mm from u ${L.windowU[0].toFixed(4)} over the apex · ${L.rowsInWindow} stations, ${L.rowsPerPeriod.join('/')} per period (min ${L.rowsPerPeriodMin}) · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(3)} mm across`;
 }
 
 /* The buckle frequency the ladder's gap bound reads on this row: 0 when the
@@ -1242,13 +1243,17 @@ export async function lobeAssertions(page, row) {
   const h = (u) => surf.profile.halfWidthAt(u), hb = (u) => base.profile.halfWidthAt(u);
   const [u0, u1] = L.windowU;
   if (L.noRoom) {
-    /* THE PARALLEL-STUB CORNER: no region between the root blend's end and
-       the apex entry, so no cut and no window. The record must say so and
-       the outline must be the base's everywhere. */
-    const regionless = base.profile.uCap <= ROOT_BLEND_END;
-    if (L.noRoomWhy === 'region' && !regionless) bad.push(`L3: the record says noRoom (region) but uCap ${base.profile.uCap.toFixed(6)} is above ROOT_BLEND_END ${ROOT_BLEND_END} — there is a region`);
-    if (L.noRoomWhy !== 'region' && regionless) bad.push(`L3: noRoom (${L.noRoomWhy}) on a row with no region at all (uCap ${base.profile.uCap.toFixed(6)})`);
-    if (!['region', 'rows', 'pitch'].includes(L.noRoomWhy)) bad.push(`L3: noRoom names no cause (${JSON.stringify(L.noRoomWhy)})`);
+    /* MODEL A's 'region' CAUSE IS UNREACHABLE UNDER MODEL B and the clause
+       says so rather than being deleted: the treated arc runs to u = 1 on a
+       margin that always exists, so `uCap` at or below the root blend — the
+       parallel-stub corner that used to leave no window — no longer stops a
+       cut. A record naming it is a defect, and this is where it is caught. */
+    if (L.noRoomWhy === 'region') bad.push(`L3: noRoom (region) — under MODEL B the margin runs from the root blend's end to u = 1 and always exists; only the caps can refuse a cut`);
+    if (!['region', 'rows', 'pitch', 'relief'].includes(L.noRoomWhy)) bad.push(`L3: noRoom names no cause (${JSON.stringify(L.noRoomWhy)})`);
+    /* THE RELIEF CAUSE, both directions: it means every period's headroom is
+       zero, which is a statement about the BASE outline and is rebuilt here
+       from it rather than read from the record. */
+    if (L.noRoomWhy === 'relief' && !(L.countRowsCap >= 1 && L.countFloorCap >= 1)) bad.push(`L3: noRoom (relief) on a row whose caps already refuse the cut (rows ${L.countRowsCap}, pitch ${L.countFloorCap}) — the cause must be the one that binds`);
     if (L.noRoomWhy === 'rows' && !(L.countRowsCap < 1)) bad.push(`L3: noRoom (rows) with a rows cap of ${L.countRowsCap}`);
     if (L.noRoomWhy === 'pitch' && !(L.countFloorCap < 1 && L.countRowsCap >= 1)) bad.push(`L3: noRoom (pitch) with a pitch cap of ${L.countFloorCap} and a rows cap of ${L.countRowsCap}`);
     if (L.noRoomWhy !== 'region') {
@@ -1262,7 +1267,11 @@ export async function lobeAssertions(page, row) {
     if (diff) bad.push(`L2: noRoom, yet the outline differs from the base at ${diff} of 4001 stations`);
     return bad;
   }
-  if (!(u0 >= ROOT_BLEND_END - 1e-12 && u1 <= base.profile.uCap + 1e-12 && u0 < u1)) bad.push(`L6: the window u ${u0}..${u1} is not inside [ROOT_BLEND_END ${ROOT_BLEND_END}, uCap ${base.profile.uCap.toFixed(6)}]`);
+  /* THE WINDOW'S UPPER END IS THE APEX ITSELF — exactly 1, not `uCap`, and
+     that is MODEL B's own signature rather than a bound that happens to
+     hold. L8 below measures the consequence on the emitted outline. */
+  if (!(u0 >= ROOT_BLEND_END - 1e-12 && u0 < u1)) bad.push(`L6: the window u ${u0}..${u1} does not start at or above ROOT_BLEND_END ${ROOT_BLEND_END}`);
+  if (u1 !== 1) bad.push(`L6: the window's upper end is ${u1}, not exactly 1 — under MODEL B the treated arc runs THROUGH the apex and the margin ends at u = 1`);
 
   /* L2 */
   let above = 0, notIdentical = 0, worstAbove = 0;
@@ -1279,9 +1288,17 @@ export async function lobeAssertions(page, row) {
      times the cut profile): a shallow cut on a sloping base makes no local
      minimum in the outline itself — measured, depth 0.01 read 1 minimum for
      6 lobes — while the ratio dips to its floor at every sinus at any depth. */
+  /* AND THE RATIO IS TAKEN ON THE MODE-FREE LAMINA (session 42). MODEL B's
+     arc runs THROUGH the tip floor, and the mode's own floor manufactures a
+     minimum there that belongs to neither the law nor the cut: below the
+     floor the base is held at `tipFloor` while the cut outline is held too,
+     so `h / hb` dips and recovers with nothing having been cut. Flooring
+     BOTH at TIP_HALF_MM — the lamina the teeth are stationed on — reads 1
+     over that whole stretch and the artefact is gone. Measured: it put a
+     THIRD dip on a 3-tooth row whose law has two sinuses on the margin. */
   const N = Math.max(400, 200 * L.countBuilt);
   const hs = [];
-  for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N; hs.push(h(u) / hb(u)); }
+  for (let i = 0; i <= N; i++) { const u = u0 + (u1 - u0) * i / N; hs.push(Math.max(h(u), TIP_HALF_MM) / Math.max(hb(u), TIP_HALF_MM)); }
   let minima = 0, dir = 0;
   for (let i = 1; i <= N; i++) {
     const d = hs[i] - hs[i - 1];
@@ -1304,18 +1321,53 @@ export async function lobeAssertions(page, row) {
   const samples = row.capability && row.capability.lobeSamplesPerLobe ? Number(row.capability.lobeSamplesPerLobe)
     : lobeSamplesPerLobe(Number(ui.lobeCrestShape), Number(ui.lobeNotchShape));
   if (!(row.capability && row.capability.lobeSamplesPerLobe) && !(samples >= 2 && samples <= LOBE_SAMPLES_PER_LOBE))
-    bad.push(`L3: the shape's demand is ${samples} stations a lobe, outside [2, the ruled ceiling ${LOBE_SAMPLES_PER_LOBE}] — no shape may ask more than session 38's derived resolution`);
-  if (L.samplesPerLobe !== samples) bad.push(`L3: the record was built at ${L.samplesPerLobe} stations a lobe, the floor is ${samples}`);
+    bad.push(`L3: the shape's demand is ${samples} stations a period, outside [2, the ruled ceiling ${LOBE_SAMPLES_PER_LOBE}] — no shape may ask more than session 38's derived resolution`);
+  if (L.samplesPerLobe !== samples) bad.push(`L3: the record was built at ${L.samplesPerLobe} stations a period, the floor is ${samples}`);
   const capacity = ladderWindowCapacity(u0, u1, buckleFreqOf(ui));
   if (L.rowsCapacity !== capacity) bad.push(`L3: the record's capacity ${L.rowsCapacity} is not the ladder's ${capacity} for the window ${u0.toFixed(4)}-${u1.toFixed(4)}`);
-  const rowsCap = Math.floor(capacity / samples + 1e-9);
-  const floorCap = Math.floor(L.windowMm / L.pitchFloorMm + 1e-9);
+  /* THE RIM, RE-MEASURED HERE, ON THE MODE-FREE LAMINA. `hb` is the base
+     outline in THIS mode; the lamina the teeth are stationed on floors at
+     TIP_HALF_MM in both, and under MODEL B the arc runs THROUGH that floor,
+     so the two differ near the tip in live. Integrated as chords over 65536
+     samples — a different engine from the geometry's graded `rimArcTable`,
+     which is what makes this a measurement of the tree rather than of its
+     own consistency. */
+  const length = surf.length;
+  const hL = (u) => Math.max(hb(u), TIP_HALF_MM);
+  const arc = (a, b, n) => { let acc2 = 0, px = a * length, py = hL(a); for (let i = 1; i <= n; i++) { const u = a + (b - a) * i / n, x = u * length, y = hL(u); acc2 += Math.hypot(x - px, y - py); px = x; py = y; } return acc2; };
+  const wantFace = 2 * hL(1);
+  const wantMargin = arc(ROOT_BLEND_END, 1, 65536);
+  const wantHalfRim = wantMargin + wantFace / 2;
+  const wantTreated = Number(ui.lobeCoverage) * wantHalfRim;
+  /* THE COUNT CAPS, re-derived on those arc figures: the ladder's capacity
+     against the PER-PERIOD demand (a full period asks the floor, the
+     tip-most partial one asks pro rata), and the treated arc over the pitch
+     floor. The demand is rebuilt here from the periods rather than read from
+     the record, so a record whose demand does not follow its own geometry is
+     caught rather than believed. */
+  const demandSum = (n) => {
+    const pitch = 2 * wantTreated / (n + 1);
+    let d = wantTreated, total2 = 0;
+    while (d - pitch >= wantFace / 2 - 1e-12) { total2 += samples; d -= pitch; }
+    const tail = d - wantFace / 2;
+    if (tail > 1e-12) total2 += Math.max(1, Math.ceil((tail / pitch) * samples - 1e-9));
+    return total2;
+  };
+  let rowsCap = 0;
+  for (let n = 1; n <= LOBE_COUNT_RANGE[1]; n++) { if (demandSum(n) <= capacity) rowsCap = n; else break; }
+  const floorCap = Math.max(0, Math.floor(2 * wantTreated / L.pitchFloorMm + 1e-9) - 1);
   const wantBuilt = Math.min(Number(ui.lobeCount), rowsCap, floorCap);
-  const wantMinima = L.depthBuilt > 0 ? L.countBuilt : 0;
-  if (minima !== wantMinima) bad.push(`L3: the law carries ${minima} sinuses in the window and the record says ${L.countBuilt} were built at depth ${L.depthBuilt}`);
+  /* THE SINUSES THE LAW PUTS ON THIS MARGIN — the mirror margin's are the
+     same teeth drawn by symmetry and have no `u`, so the outline carries
+     only the ones with |d| at or beyond half the terminal face. */
+  const wantPitch = 2 * wantTreated / (L.countBuilt + 1);
+  let wantMarginSinus = 0;
+  for (let k = 0; k < L.countBuilt + 1; k++) if (Math.abs(wantTreated - (k + 0.5) * wantPitch) >= wantFace / 2 - 1e-9 && wantTreated - (k + 0.5) * wantPitch > 0) wantMarginSinus++;
+  const wantMinima = L.depthBuilt > 0 ? wantMarginSinus : 0;
+  if (minima !== wantMinima) bad.push(`L3: the cut ratio dips ${minima} times over the margin and the law puts ${wantMarginSinus} sinuses there (${L.countBuilt} teeth = ${L.countBuilt + 1} periods over the whole rim) at depth ${L.depthBuilt}`);
   if (!(wantBuilt >= 1)) bad.push(`L3: a built record where the caps say NO ROOM (rows cap ${rowsCap}, pitch cap ${floorCap})`);
-  if (L.countBuilt !== wantBuilt) bad.push(`L3: countBuilt ${L.countBuilt} is not min(asked ${ui.lobeCount}, capacity ${capacity} / ${samples} = ${rowsCap}, pitch-floor cap ${floorCap}) = ${wantBuilt}`);
-  if (L.countRowsCap !== rowsCap) bad.push(`L3: the record's rows cap ${L.countRowsCap} is not ${capacity} / ${samples} = ${rowsCap}`);
+  if (L.countBuilt !== wantBuilt) bad.push(`L3: countBuilt ${L.countBuilt} is not min(asked ${ui.lobeCount}, the ladder's ${rowsCap} at ${samples} stations a period against a capacity of ${capacity}, pitch-floor cap ${floorCap}) = ${wantBuilt}`);
+  if (L.countRowsCap !== rowsCap) bad.push(`L3: the record's rows cap ${L.countRowsCap} is not the ${rowsCap} this window's capacity ${capacity} allows at ${samples} stations a period`);
   if (L.countFloorCap !== floorCap) bad.push(`L3: the record's pitch-floor cap ${L.countFloorCap} is not ${floorCap}`);
   if (L.countCap !== Math.min(rowsCap, floorCap)) bad.push(`L3: the slider's cap ${L.countCap} is not min(${rowsCap}, ${floorCap})`);
   if (L.countClamped !== (Number(ui.lobeCount) > L.countBuilt)) bad.push(`L3: countClamped ${L.countClamped} disagrees with asked ${ui.lobeCount} against built ${L.countBuilt}`);
@@ -1326,31 +1378,76 @@ export async function lobeAssertions(page, row) {
     if (byPitch !== (L.clampedBy === 'pitch')) bad.push(`L3: clampedBy says ${L.clampedBy} where the pitch-floor cap is ${floorCap} against the rows cap ${rowsCap}`);
   }
 
-  /* L4 — the region and the window as the base outline's own 2D arc */
-  const length = surf.length;
-  const arc = (a, b, n) => { let s = 0, px = a * length, py = hb(a); for (let i = 1; i <= n; i++) { const u = a + (b - a) * i / n, x = u * length, y = hb(u); s += Math.hypot(x - px, y - py); px = x; py = y; } return s; };
-  const region = arc(ROOT_BLEND_END, base.profile.uCap, 65536);
-  const window = arc(u0, u1, 65536);
-  if (Math.abs(region - L.regionMm) > 1e-2) bad.push(`L4: the lobed region re-measured as ${region.toFixed(4)} mm of outline against the record's ${L.regionMm.toFixed(4)}`);
-  if (Math.abs(window - L.windowMm) > 1e-2) bad.push(`L4: the window re-measured as ${window.toFixed(4)} mm against the record's ${L.windowMm.toFixed(4)}`);
-  if (Math.abs(L.windowMm - Number(ui.lobeCoverage) * L.regionMm) > 1e-9 * L.regionMm) bad.push(`L4: the window ${L.windowMm} is not coverage ${ui.lobeCoverage} x the region ${L.regionMm}`);
-  if (Math.abs(L.pitchMm - L.windowMm / L.countBuilt) > 1e-9 * L.pitchMm) bad.push(`L4: pitch ${L.pitchMm} is not the window ${L.windowMm} over the count ${L.countBuilt}`);
+  /* L4 — THE RIM AS ONE CURVE, re-measured on the mode-free lamina above,
+     and the arc arithmetic MODEL B rests on. The rim's half-length is the
+     margin's own arc plus HALF the terminal face (the face's midpoint is the
+     apex, which is the curve's midpoint); the treated arc is coverage of
+     that, and the pitch is the WHOLE treated arc over the periods, because
+     the periods run over both margins. */
+  if (Math.abs(wantFace - L.faceMm) > 1e-9) bad.push(`L4: the terminal face re-measured as ${wantFace.toFixed(6)} mm against the record's ${L.faceMm.toFixed(6)}`);
+  if (Math.abs(wantMargin - L.marginArcMm) > 1e-2) bad.push(`L4: the margin re-measured as ${wantMargin.toFixed(4)} mm of outline against the record's ${L.marginArcMm.toFixed(4)}`);
+  if (Math.abs(wantHalfRim - L.halfRimMm) > 1e-2) bad.push(`L4: the rim's half-length re-measured as ${wantHalfRim.toFixed(4)} mm (margin ${wantMargin.toFixed(4)} + half the face ${(wantFace / 2).toFixed(4)}) against the record's ${L.halfRimMm.toFixed(4)}`);
+  if (Math.abs(L.treatedHalfMm - Number(ui.lobeCoverage) * L.halfRimMm) > 1e-9 * L.halfRimMm) bad.push(`L4: the treated half-arc ${L.treatedHalfMm} is not coverage ${ui.lobeCoverage} x the rim's half-length ${L.halfRimMm}`);
+  if (L.periods !== L.countBuilt + 1) bad.push(`L4: the record carries ${L.periods} periods for ${L.countBuilt} teeth — a tooth is the gap between two sinuses, so there is always one more period than teeth`);
+  if (Math.abs(L.pitchMm - 2 * L.treatedHalfMm / L.periods) > 1e-9 * L.pitchMm) bad.push(`L4: pitch ${L.pitchMm} is not the treated arc ${2 * L.treatedHalfMm} over ${L.periods} periods`);
   const wantFloor = GEOMETRY.lobePitchFloor(ring.thickness);
   if (L.pitchFloorMm !== wantFloor) bad.push(`L4: the pitch floor ${L.pitchFloorMm} is not max(the ring's sheet ${ring.thickness}, MIN_FEATURE_MM ${MIN_FEATURE_MM}) = ${wantFloor}`);
   const below = L.pitchMm < L.pitchFloorMm - 1e-9;
   if (below !== !!L.pitchBelowFloor) bad.push(`L4: pitch ${L.pitchMm.toFixed(4)} against floor ${L.pitchFloorMm} — pitchBelowFloor says ${L.pitchBelowFloor}`);
   if (below) bad.push(`L4: the pitch ${L.pitchMm.toFixed(4)} mm is under the floor ${L.pitchFloorMm} with ${L.countBuilt} lobes built — the pitch cap clamps the count all the way down (to NO ROOM), so this cannot happen`);
 
-  /* L5 — the depth cap */
-  if (!Array.isArray(L.sinusU) || L.sinusU.length !== L.countBuilt) bad.push(`L5: the record carries ${Array.isArray(L.sinusU) ? L.sinusU.length : 'no'} sinus stations for ${L.countBuilt} lobes`);
+  /* L5 — THE RELIEF, PER PERIOD, AND THE PRINT FLOOR.
+
+     THE REFERENCE HAS A DIFFERENT OWNER FROM THE QUANTITY (Eva's fourth
+     durable rule): the asked relief is rebuilt from the PAGE's read-back
+     control state and the BASE profile's own lamina — neither of which the
+     lobes block writes — and compared against the record's. Reading the
+     peak half-width or the headroom out of the record instead would move
+     with any defect in them and could not fail.
+
+     AND THE PRINT-FLOOR CLAIM IS THE LOAD-BEARING ONE. Under MODEL A it was
+     a global depth clamp; here the guard is local, so the claim is per
+     period: the base LAMINA at each sinus, less the relief the record says
+     that period took, is still at or above TIP_HALF_MM. Asserting it on the
+     EMITTED half-width instead would be vacuous in export, where the floor
+     is TIP_HALF_MM and the `max` makes it true whatever the cut did. */
+  if (!Array.isArray(L.sinusU) || L.sinusU.length !== wantMarginSinus) bad.push(`L5: the record carries ${Array.isArray(L.sinusU) ? L.sinusU.length : 'no'} sinus stations for the ${wantMarginSinus} the law puts on this margin`);
+  if (!Array.isArray(L.reliefMm) || L.reliefMm.length !== L.periods) bad.push(`L5: the record carries ${Array.isArray(L.reliefMm) ? L.reliefMm.length : 'no'} reliefs for ${L.periods} periods`);
   else {
-    let shallowest = Infinity, sinusMin = Infinity;
-    for (const us of L.sinusU) { shallowest = Math.min(shallowest, base.profile.shapeAt(us)); sinusMin = Math.min(sinusMin, h(us)); }
-    const wantCap = 1 - TIP_HALF_MM / shallowest;
-    if (Math.abs(L.depthCap - wantCap) > 1e-9) bad.push(`L5: depthCap ${L.depthCap} is not 1 - TIP_HALF_MM / the shallowest base half-width over the sinuses (${shallowest.toFixed(6)} mm) = ${wantCap.toFixed(9)}`);
-    const wantDepth = Math.min(Number(ui.lobeDepth), L.depthCap);
-    if (Math.abs(L.depthBuilt - wantDepth) > 1e-12) bad.push(`L5: depthBuilt ${L.depthBuilt} is not min(asked ${ui.lobeDepth}, cap ${L.depthCap})`);
-    if (L.depthClamped !== (Number(ui.lobeDepth) > L.depthCap)) bad.push(`L5: depthClamped ${L.depthClamped} disagrees with asked ${ui.lobeDepth} against cap ${L.depthCap}`);
+    let sinusMin = Infinity;
+    for (const us of L.sinusU) sinusMin = Math.min(sinusMin, h(us));
+    const wantPeak = hL(base.profile.uPk);
+    if (Math.abs(L.peakHalfMm - wantPeak) > 1e-9) bad.push(`L5: the record's widest half-width ${L.peakHalfMm} is not the base lamina at the declared peak u ${base.profile.uPk} (${wantPeak})`);
+    const wantAsked = Number(ui.lobeDepth) * Math.max(0, wantPeak - TIP_HALF_MM);
+    if (Math.abs(L.reliefAskedMm - wantAsked) > 1e-9) bad.push(`L5: the asked relief ${L.reliefAskedMm} mm is not depth ${ui.lobeDepth} x (the widest half-width ${wantPeak.toFixed(6)} - the print floor ${TIP_HALF_MM}) = ${wantAsked.toFixed(9)}`);
+    /* EVERY PERIOD'S OWN RELIEF, rebuilt: the headroom is read at |d| — a
+       mirror period is the same tooth as its reflection, and reading it at
+       u = 1 would say it has no room while its reflection has plenty. */
+    const dOfSinus = (k) => Math.abs(wantTreated - (k + 0.5) * wantPitch);
+    const uAtD = (dd) => { let lo = ROOT_BLEND_END, hi = 1; for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; const dm = wantFace / 2 + arc(m, 1, 4096); if (dm > dd) lo = m; else hi = m; } return (lo + hi) / 2; };
+    let worstRelief = 0, worstK = -1;
+    for (let k = 0; k < L.periods; k++) {
+      const dd = dOfSinus(k);
+      const want = dd >= wantFace / 2 - 1e-9 ? Math.min(wantAsked, Math.max(0, hL(uAtD(dd)) - TIP_HALF_MM)) : 0;
+      const gap = Math.abs(L.reliefMm[k] - want);
+      if (gap > worstRelief) { worstRelief = gap; worstK = k; }
+    }
+    /* THE BAR IS A LENGTH DERIVED FROM A LENGTH: the two routes to a sinus
+       station differ by the arc engines' own residual (this clause's 4096
+       chords against the geometry's 1024 graded cells), and the relief is a
+       half-width read at that station, so the tolerance is that residual
+       times the outline's steepest slope. 1e-3 mm is three orders under the
+       pitch floor and two under any printable relief. */
+    if (worstRelief > 1e-3) bad.push(`L5: period ${worstK}'s relief is ${L.reliefMm[worstK]} mm where min(asked ${wantAsked.toFixed(6)}, its own sinus's headroom) is ${worstRelief.toExponential(3)} mm away — the per-period guard is not the law this gate derives`);
+    /* THE PRINT FLOOR, per period, on the MODE-FREE lamina. */
+    for (let k = 0; k < L.sinusU.length; k++) {
+      const keep = hL(L.sinusU[k]) - L.reliefMm[k];
+      if (!(keep >= TIP_HALF_MM - 1e-6)) bad.push(`L5: the sinus at u ${L.sinusU[k].toFixed(6)} takes ${L.reliefMm[k].toFixed(4)} mm out of a lamina of ${hL(L.sinusU[k]).toFixed(4)} mm and leaves ${keep.toFixed(4)}, under the print floor's ${TIP_HALF_MM} — the per-period guard did not hold`);
+    }
+    const wantCap = wantPeak > TIP_HALF_MM ? Math.min(...L.sinusU.map((us) => Math.max(0, hL(us) - TIP_HALF_MM))) / (wantPeak - TIP_HALF_MM) : 0;
+    if (Math.abs(L.depthCap - wantCap) > 1e-6) bad.push(`L5: depthCap ${L.depthCap} is not the shallowest MARGIN sinus's headroom over (the widest half-width - the print floor) = ${wantCap.toFixed(9)}`);
+    if (L.depthBuilt !== Number(ui.lobeDepth)) bad.push(`L5: depthBuilt ${L.depthBuilt} is not the asked ${ui.lobeDepth} — MODEL B does not clamp the depth globally; the guard is per period`);
+    if (L.depthClamped !== (Number(ui.lobeDepth) > L.depthCap + 1e-9)) bad.push(`L5: depthClamped ${L.depthClamped} disagrees with asked ${ui.lobeDepth} against the saturation depth ${L.depthCap}`);
     /* THE BAR IS DERIVED FROM THE QUANTITY — see LOBE_SINUS_STATION_ULPS.
        `nextUp` steps one double; the sensitivity is read off THIS build's own
        profile at the recorded stations, so a cusped notch opens the bar by
@@ -1362,33 +1459,96 @@ export async function lobeAssertions(page, row) {
     const sinusTol = Math.max(1e-9, LOBE_SINUS_STATION_ULPS * perUlp);
     const sinusGap = Math.abs(L.sinusMinHalfMm - sinusMin);
     if (sinusGap > sinusTol) bad.push(`L5: the record's deepest sinus ${L.sinusMinHalfMm} is not the law's ${sinusMin} at the recorded stations — ${sinusGap.toExponential(3)} mm apart against a bound of ${sinusTol.toExponential(3)} (${LOBE_SINUS_STATION_ULPS} station ulps at ${perUlp.toExponential(3)} mm each, floored at 1e-9), so this is the geometry and not the two engines' last bits`);
-    if (!(sinusMin >= TIP_HALF_MM - 1e-9)) bad.push(`L5: the deepest sinus keeps ${sinusMin.toFixed(4)} mm of half-width, under the print floor's ${TIP_HALF_MM} — the cap did not hold`);
-    for (const us of L.sinusU) if (!(us > u0 && us < u1)) bad.push(`L6: a sinus at u ${us} is not strictly inside the window ${u0}..${u1}`);
+    /* MODEL A's global "the deepest sinus keeps TIP_HALF_MM" clause is GONE
+       and is replaced by the per-period lamina clause above. It read the
+       EMITTED half-width, which under MODEL B is legitimately under
+       TIP_HALF_MM in LIVE — the live mesh floor is 0.15 mm and the teeth now
+       reach a region the old window never entered — so keeping it would have
+       gone red on every apex-treated row in live while saying nothing about
+       export, where the same expression is vacuous. */
+    for (const us of L.sinusU) if (!(us > u0 && us <= u1)) bad.push(`L6: a sinus at u ${us} is not inside the treated arc ${u0}..${u1}`);
   }
 
-  /* L6 — the crests at the ends, and the rows */
-  if (!Object.is(h(u0), hb(u0)) || !Object.is(h(u1), hb(u1))) bad.push(`L6: the outline does not meet the base at the window's ends (crests) — ${h(u0)} vs ${hb(u0)} at u0, ${h(u1)} vs ${hb(u1)} at u1`);
+  /* L6 — THE CREST AT THE TREATED ARC'S BASE END, AND THE ROWS.
+
+     ONE END, NOT TWO. MODEL A's window ended on a crest at BOTH ends and the
+     outline met the base exactly at each; MODEL B's upper end is the apex,
+     which is INTERIOR to the treatment, so there is nothing for the outline
+     to meet there and the cut at u = 1 is generally non-zero. What survives
+     unchanged is the base end, where `g` is exactly 0 and the cut is exactly
+     0 mm — `Object.is`, not a tolerance, because `x - 0 === x` in IEEE-754. */
+  if (!Object.is(h(u0), hb(u0))) bad.push(`L6: the outline does not meet the base at the treated arc's base end (a crest) — ${h(u0)} vs ${hb(u0)} at u0 ${u0}`);
+  /* AND THE TERMINAL FACE IS NEVER COLLAPSED, at any depth or count: the
+     u = 1 mini-face is the upstream contract's (session 32, §5) and the cut
+     now reaches it. */
+  if (!(h(1) >= surf.profile.tipFloor - 1e-12)) bad.push(`L6: the terminal half-width is ${h(1)}, under the mode's own floor ${surf.profile.tipFloor} — the cut collapsed the u = 1 mini-face`);
   const stations = (m.petalProfileU || []).filter((u) => u >= u0 && u <= u1);
   if (stations.length !== L.rowsInWindow) bad.push(`L6: ${stations.length} emitted stations lie in the window and the record says ${L.rowsInWindow}`);
-  if (Math.abs(L.rowsPerLobe - L.rowsInWindow / L.countBuilt) > 1e-12) bad.push(`L6: rowsPerLobe ${L.rowsPerLobe} is not ${L.rowsInWindow} / ${L.countBuilt}`);
+  if (Math.abs(L.rowsPerLobe - L.rowsInWindow / L.marginPeriods) > 1e-9) bad.push(`L6: rowsPerLobe ${L.rowsPerLobe} is not ${L.rowsInWindow} over the ${L.marginPeriods} periods on this margin`);
+  /* THE PER-PERIOD FLOOR, ON THE EMITTED STATIONS — the criterion session 38
+     derived and session 39 found a window TOTAL could not express. Every FULL
+     period on the margin must carry at least the floor; the tip-most one is
+     partial and asks pro rata, which is what the demand handed the ladder. */
+  if (Array.isArray(L.rowsPerPeriod) && Array.isArray(L.demand.counts)) {
+    if (L.rowsPerPeriod.length !== L.demand.counts.length) bad.push(`L6: the ladder reports ${L.rowsPerPeriod.length} periods on the margin and the demand named ${L.demand.counts.length}`);
+    /* THE DEMAND REACHED THE PLACER — an identity on what the ladder PLACED,
+       which is the claim the per-region demand actually makes. */
+    /* AT THE BUCKLE'S FREQUENCY CEILING THE LADDER IS UNIFORM BY THE BUCKLE'S
+       OWN RULE and does not take a demand at all — the window's rows are
+       uniform's own, which is exactly what `ladderWindowCapacity` counts
+       there. So the placement clause is SKIPPED on those rows rather than
+       failing, and the skip is keyed on the ladder's own gap factor rather
+       than on the absence of the report (which would swallow a real one). */
+    const uniformLadder = ladderGapFactor(buckleFreqOf(ui)) === 1;
+    const placed = m.petalBladeLadder && m.petalBladeLadder.placedSub;
+    if (!Array.isArray(placed)) {
+      /* AND THE ABSENCE IS ONLY FORGIVEN ON THE UNIFORM ROWS. A clause whose
+         `else` dereferences the thing its `if` just found missing takes the
+         sweep down instead of going red — this gate's own lesson, and it did
+         exactly that here before the branch was split. */
+      if (!uniformLadder) bad.push(`L6: the ladder reports no per-period placement for a demand that named ${L.demand.counts.length} regions`);
+    } else {
+      for (let i = 0; i < Math.min(placed.length, L.demand.counts.length); i++) {
+        if (placed[i] < L.demand.counts[i]) bad.push(`L6: the ladder placed ${placed[i]} stations in period ${i} (base to apex) against a demand of ${L.demand.counts[i]} — the per-region demand did not reach the placer`);
+      }
+    }
+    /* AND THE GAP-BOUND BLEND MAY MOVE A STATION ACROSS A BOUNDARY. It pulls
+       every station toward uniform AFTER the placement, so the emitted
+       distribution is not the placed one; what is bounded is how FAR it can
+       drift, and a drift of more than one station per boundary would mean the
+       bound has undone the resolution demand rather than nudged it. */
+    if (Array.isArray(placed) && placed.length === L.rowsPerPeriod.length) for (let i = 0; i < placed.length; i++) {
+      if (L.rowsPerPeriod[i] < placed[i] - 1) bad.push(`L6: period ${i} was placed with ${placed[i]} stations and carries ${L.rowsPerPeriod[i]} after the gap-bound blend (${L.demand.counts[i]} demanded) — the bound moved more than one station out of this period`);
+    }
+  }
   /* THE DEMAND WAS MET (Eva's amendment): the ladder placed at least the
      stations the lobes demanded inside the window, and no more than its own
      capacity for it — the one witness that the resolution demand reaches the
      one row placer, and that the count cap is the ladder's real capacity. */
-  if (!L.demand || L.demand.stations !== L.countBuilt * L.samplesPerLobe) bad.push(`L6: the record's demand is ${JSON.stringify(L.demand)}, not ${L.countBuilt} x ${L.samplesPerLobe} stations`);
+  if (!L.demand || L.demand.stations !== demandSum(L.countBuilt)) bad.push(`L6: the record's demand is ${L.demand ? L.demand.stations : 'absent'} stations, not the ${demandSum(L.countBuilt)} this margin's ${L.countBuilt + 1} periods ask at ${samples} each (the tip-most one pro rata)`);
+  if (L.demand && Array.isArray(L.demand.splits) && L.demand.splits.length !== Math.max(0, L.crestU.length - 1)) bad.push(`L6: the demand names ${L.demand.splits.length} splits for ${L.crestU.length} margin crests — one split per interior crest`);
   if (L.demand && L.rowsInWindow < L.demand.stations) bad.push(`L6: the ladder placed ${L.rowsInWindow} stations in the window against a demand of ${L.demand.stations} — the resolution demand was not met`);
   /* `rowsInWindow` counts stations with u0 <= u <= u1 inclusive, and the
      stretch's last station sits AT u0 (the region target puts it there, and
      the placement lands within a sample of it), so the inclusive count can
      read one above the ladder's own window count. One, never more. */
   if (L.rowsInWindow > capacity + 1) bad.push(`L6: the ladder placed ${L.rowsInWindow} stations in the window, above its own capacity ${capacity} for it (plus the boundary station at u0) — the rows outside cannot meet the gap bound`);
+  /* EVERY SINUS HAS A STATION WITHIN HALF ITS OWN PERIOD. Half a period is
+     NOT (u1 - u0) / count under MODEL B: the periods are even in ARC and the
+     arc runs through the converging tip, so the tip-most period spans a small
+     fraction of the `u` the base-most one does. The record's own crest
+     stations bound each period, so each sinus is judged against ITS period. */
   if (Array.isArray(L.sinusU) && L.depthBuilt > 0) {
-    const half = (u1 - u0) / L.countBuilt / 2;
     const all = m.petalProfileU || [];
-    for (const us of L.sinusU) {
+    const edges = [...L.crestU, u1];
+    for (let k = 0; k < L.sinusU.length; k++) {
+      const us = L.sinusU[k];
+      let i = 0;
+      while (i + 2 < edges.length && edges[i + 1] < us) i++;
+      const half = (edges[i + 1] - edges[i]) / 2;
       let near = Infinity;
       for (const u of all) near = Math.min(near, Math.abs(u - us));
-      if (near > half + 1e-12) bad.push(`L6: the sinus at u ${us.toFixed(4)} has no emitted station within half a period (${half.toFixed(4)}; nearest ${near.toFixed(4)}) — the mesh skips this lobe`);
+      if (near > half + 1e-12) bad.push(`L6: the sinus at u ${us.toFixed(4)} has no emitted station within half its own period (${half.toFixed(4)}; nearest ${near.toFixed(4)}) — the mesh skips this tooth`);
     }
   }
 
@@ -1396,15 +1556,27 @@ export async function lobeAssertions(page, row) {
 
      The two exponents ARE the local powers of the cut at its two features,
      by construction of the law; so they are readable off the emitted
-     half-width and need not be taken on trust. `removed(u) = 1 - h(u)/hb(u)`
-     is the CUT FRACTION the outline carries: exactly 0 at a crest, exactly
-     `depthBuilt` at a sinus, and `depth * g(r)` in between — so its log-log
-     slope against the offset from a feature IS that feature's exponent,
-     whatever the constant in front, which is why neither the depth nor the
-     local half-width has to be known here. THE RATIO AND NOT THE DIFFERENCE:
-     `hb - h` carries the base outline's own taper, so its maximum is a
-     stationary point of a product rather than the sinus, and a slope read
-     there is 2 for every exponent (measured 2.021 for an asked 2.50).
+     half-width and need not be taken on trust.
+
+     AND WHICH QUANTITY CARRIES THEM DEPENDS ON THE LAW'S FORM, WHICH MODEL B
+     CHANGED — session 41's own note is INVERTED here and is kept above the
+     new one so the inversion is checkable. Under MODEL A the cut was a
+     FRACTION of the local half-width, `h = hb * (1 - depth*g)`, so the RATIO
+     `1 - h/hb` was exactly `depth*g` with the half-width cancelled, while
+     the DIFFERENCE `hb - h = depth*hb*g` carried the base outline's own
+     taper as a product — its maximum was a stationary point of that product
+     rather than the sinus, and a slope read there came back 2 for every
+     exponent (measured 2.021 for an asked 2.50). Under MODEL B the cut is a
+     RELIEF IN MILLIMETRES, constant within a period, `h = hb - R_k*g`: now
+     the DIFFERENCE is exactly `R_k*g` with nothing else in it, and it is the
+     RATIO that carries the taper — `R_k*g/hb`, whose `1/hb` term is LINEAR
+     in the offset and swamps an `e^3` notch entirely. Measured on the branch
+     before this was changed: an asked notch power of 3.00 read 1.966.
+
+     So `removed(u) = hb(u) - h(u)`, in millimetres: exactly 0 at a crest,
+     exactly that period's own relief at its sinus, and `R_k * g(r)` in
+     between — so its log-log slope against the offset from a feature IS that
+     feature's exponent, whatever the constant in front.
 
      THE FEATURE IS PINNED ON THE CURVE, NOT READ FROM THE RECORD: a ternary
      search over `removed` finds the crest (its minimum) and the sinus (its
@@ -1425,13 +1597,13 @@ export async function lobeAssertions(page, row) {
      claims L7 is chosen to be one where BOTH measurements run. */
   if (Array.isArray(L.sinusU) && Array.isArray(L.crestU) && L.depthBuilt > 0) {
     /* MEASURED IN THE PAGE, on the page's own `/bloom-geometry.js`. The
-       profile is rebuilt there from the same read-back state, the cut
-       fraction `1 - h/hb` is formed on it, each feature is pinned by a
-       ternary search over that fraction, and the two local powers come back
+       profile is rebuilt there from the same read-back state, the removed
+       millimetres `hb - h` are formed on it, each feature is pinned by a
+       ternary search over that curve, and the two local powers come back
        as log-log slopes over offsets one decade apart — so the quotient of
        logs is the exponent with no constant to cancel and neither the depth
        nor the local half-width has to be known. */
-    const measured = await page.evaluate(async ({ state, sinus, crest, wlo, whi, count }) => {
+    const measured = await page.evaluate(async ({ state, sinus, crest, spanS, spanC, hasSinus }) => {
       const M = await import('/bloom-geometry.js');
       const acc = new M.MeshBuilder({ exportMode: false });
       const fr = M.footRing(state, acc);
@@ -1449,8 +1621,14 @@ export async function lobeAssertions(page, row) {
       }
       if (!slot) return { error: 'the whorl primitive emitted no slot in the page' };
       const p = M.petalSurface(state, ring, slot, null, acc).profile;
-      const frac = (u) => 1 - p.halfWidthAt(u) / p.halfWidthBaseAt(u);
-      const span = (whi - wlo) / count;
+      const frac = (u) => p.halfWidthBaseAt(u) - p.halfWidthAt(u);
+      /* THE SPAN IS THE FEATURE'S OWN PERIOD IN `u`, NOT A UNIFORM SLICE OF
+         THE WINDOW (session 42). MODEL B's periods are even in ARC and the
+         arc runs through the converging tip, so the tip-most period covers a
+         small fraction of the `u` the base-most one does — a bracket sized
+         from (u1 - u0) / count reaches several periods away at one end and a
+         third of one at the other. Each feature is handed its own neighbours'
+         stations and the bracket is a fraction of THAT. */
       const ternary = (lo, hi, want) => {
         for (let k = 0; k < 220; k++) {
           const a1 = lo + (hi - lo) / 3, b1 = hi - (hi - lo) / 3;
@@ -1459,34 +1637,131 @@ export async function lobeAssertions(page, row) {
         }
         return (lo + hi) / 2;
       };
-      const powerAt = (uf, dir) => {
+      const powerAt = (uf, dir, span) => {
         const at0 = frac(uf), d1 = span * 1e-3, d2 = span * 1e-2;
         const r1 = Math.abs(frac(uf + dir * d1) - at0), r2 = Math.abs(frac(uf + dir * d2) - at0);
         if (!(r1 > 0 && r2 > r1)) return null;
         return Math.log(r2 / r1) / Math.log(10);
       };
-      const us = ternary(sinus - span * 0.35, sinus + span * 0.35, 'max');
-      const uc = crest === null ? null : ternary(crest - span * 0.35, crest + span * 0.35, 'min');
-      return { us, uc, notch: powerAt(us, -1), crest: uc === null ? null : powerAt(uc, +1) };
-    }, { state: ui, sinus: L.sinusU[Math.floor(L.sinusU.length / 2)],
-         crest: L.countBuilt >= 2 ? L.crestU[Math.round(L.crestU.length / 2) - 1] : null,
-         wlo: u0, whi: u1, count: L.countBuilt });
+      const us = hasSinus ? ternary(sinus - spanS * 0.35, sinus + spanS * 0.35, 'max') : null;
+      const uc = crest === null ? null : ternary(crest - spanC * 0.35, crest + spanC * 0.35, 'min');
+      return { us, uc, notch: us === null ? null : powerAt(us, -1, spanS), crest: uc === null ? null : powerAt(uc, +1, spanC), hasSinus, hasCrest: crest !== null };
+    }, (() => {
+      /* THE FEATURES AND THEIR OWN NEIGHBOURHOODS, chosen here so the page is
+         handed numbers rather than a rule. Two conditions, both of which
+         MODEL B made necessary and neither of which MODEL A could violate:
+
+         THE CREST MUST BE AN INTERIOR MARGIN CREST. `crestU[0]` is the
+         treated arc's BASE END, where the cut is exactly 0 on the outside
+         and a search walks off into the untreated blade — measured, it
+         landed 0.06 below u0 and reported the crest as having no measurable
+         power.
+
+         AND BOTH ITS NEIGHBOURING PERIODS MUST ACTUALLY CUT. Under MODEL B a
+         period's relief can be exactly zero — the even-count apex notch sits
+         on the terminal face, where there is nothing to remove — so the
+         stretch above the crest below it carries no cut at all and its power
+         is not a property of the law. Measured: every 2-tooth row reported
+         "no measurable power" at u 0.852, correctly. A crest with a dead
+         neighbour is SKIPPED, and the same rule picks the sinus. */
+      const relief = Array.isArray(L.reliefMm) ? L.reliefMm : [];
+      const live = (k) => Number(relief[k]) > 0;
+      const sCand = [];
+      for (let j = 0; j < L.sinusU.length; j++) if (live(j)) sCand.push(j);
+      const si = sCand.length ? sCand[Math.floor(sCand.length / 2)] : Math.floor(L.sinusU.length / 2);
+      const sinusU = L.sinusU[si];
+      const sLo = L.crestU[si] !== undefined ? L.crestU[si] : u0;
+      const sHi = L.crestU[si + 1] !== undefined ? L.crestU[si + 1] : u1;
+      const cCand = [];
+      for (let i = 1; i < L.crestU.length; i++) if (live(i - 1) && live(i)) cCand.push(i);
+      const ci = cCand.length ? cCand[Math.floor(cCand.length / 2)] : null;
+      const cLo = ci === null ? 0 : L.crestU[ci - 1];
+      const cHi = ci === null ? 0 : (L.crestU[ci + 1] !== undefined ? L.crestU[ci + 1] : u1);
+      return { state: ui, sinus: sinusU, crest: ci === null ? null : L.crestU[ci],
+               hasSinus: sCand.length > 0,
+               spanS: Math.max(1e-6, sHi - sLo),
+               spanC: ci === null ? 1e-6 : Math.max(1e-6, 2 * Math.min(L.crestU[ci] - cLo, cHi - L.crestU[ci])) };
+    })());
     const TOL = 0.10;
     if (measured.error) bad.push(`L7: ${measured.error}`);
     else {
       const wantCrest = Number(ui.lobeCrestShape), wantNotch = Number(ui.lobeNotchShape);
-      /* THE NOTCH — skipped where the depth cap holds the sinus on the print
-         floor, because there the cut fraction is the floor's and not the law's. */
-      if (!L.depthClamped) {
-        if (measured.notch === null) bad.push(`L7: the cut fraction does not vary either side of the sinus at u ${measured.us.toFixed(5)} — the notch has no measurable power`);
-        else if (Math.abs(measured.notch - wantNotch) > TOL) bad.push(`L7: the emitted outline's NOTCH power is ${measured.notch.toFixed(3)} and the control asks ${wantNotch.toFixed(2)} (tolerance ${TOL}) — measured IN THE PAGE at u ${measured.us.toFixed(5)} on the cut fraction 1 - h/hb, expected read from the page's own lobeNotchShape`);
+      /* THE NOTCH. MODEL A skipped every CLAMPED row, because a global depth
+         clamp held the sinus ON the print floor and what `removed` carried
+         there was the floor's rather than the law's. MODEL B's guard is per
+         period and derived so the outline never REACHES the floor at a
+         sinus — a relief-limited period still removes `R_k * g` with the
+         notch's own power, only with a smaller R_k — so the skip is no
+         longer keyed on `depthClamped` at all. What IS skipped is a sinus
+         whose period removes nothing (the even-count apex notch), which the
+         feature picker above has already excluded. */
+      if (measured.hasSinus) {
+        if (measured.notch === null) bad.push(`L7: the removed millimetres do not vary either side of the sinus at u ${measured.us.toFixed(5)} — the notch has no measurable power`);
+        else if (Math.abs(measured.notch - wantNotch) > TOL) bad.push(`L7: the emitted outline's NOTCH power is ${measured.notch.toFixed(3)} and the control asks ${wantNotch.toFixed(2)} (tolerance ${TOL}) — measured IN THE PAGE at u ${measured.us.toFixed(5)} on the removed millimetres hb - h, expected read from the page's own lobeNotchShape`);
       }
       /* THE CREST — an INTERIOR crest, which exists only from two lobes up. */
-      if (L.countBuilt >= 2) {
-        if (measured.crest === null) bad.push(`L7: the cut fraction does not vary above the crest at u ${measured.uc.toFixed(5)} — the crest has no measurable power`);
-        else if (Math.abs(measured.crest - wantCrest) > TOL) bad.push(`L7: the emitted outline's CREST power is ${measured.crest.toFixed(3)} and the control asks ${wantCrest.toFixed(2)} (tolerance ${TOL}) — measured IN THE PAGE at u ${measured.uc.toFixed(5)} on the cut fraction 1 - h/hb, expected read from the page's own lobeCrestShape`);
+      if (measured.hasCrest) {
+        if (measured.crest === null) bad.push(`L7: the removed millimetres do not vary above the crest at u ${measured.uc.toFixed(5)} — the crest has no measurable power`);
+        else if (Math.abs(measured.crest - wantCrest) > TOL) bad.push(`L7: the emitted outline's CREST power is ${measured.crest.toFixed(3)} and the control asks ${wantCrest.toFixed(2)} (tolerance ${TOL}) — measured IN THE PAGE at u ${measured.uc.toFixed(5)} on the removed millimetres hb - h, expected read from the page's own lobeCrestShape`);
       }
     }
+  }
+
+  /* ===================================================================
+     L8 — THE APEX IS TREATED, AND THE PARITY IS WHAT THE LAW SAYS IT IS
+     (session 42, the new family and the ONLY witness for MODEL B itself).
+
+     WHY IT IS OWED. L0-L7 are every one of them blind to WHICH MODEL the
+     stationing follows: the count, the caps, the pitch, the relief, the
+     demand and the two shape powers are all statements about a treated arc
+     and say nothing about where that arc ENDS. A tree that reverted to
+     MODEL A — window ending at `uCap`, apex untouched — would pass all of
+     them with the same numbers on a shorter rim. Session 40 established
+     MODEL A as an IDENTITY (the profile above `uCap` `Object.is`-equal to a
+     plain petal, 4001 of 4001 samples, both modes); L8 is that identity
+     NEGATED and measured on the emitted outline, which no declaration can
+     lie about.
+
+     AND THE PARITY IS DERIVED, NOT DECLARED. `periods = count + 1` and the
+     rim's midpoint is a crest iff `periods` is even, so an odd count puts a
+     crest at twelve and an even one a notch. The even case's notch sits on
+     the terminal mini-face, where the base outline is already at the print
+     floor — so its relief is exactly zero, at every depth, and that is a
+     printability fact rather than a look. Both directions, because a record
+     that always said CREST would pass a one-directional clause.
+     =================================================================== */
+  {
+    const wantApexCrest = (L.countBuilt + 1) % 2 === 0;
+    if (L.apexIsCrest !== wantApexCrest) bad.push(`L8: the record says the apex is a ${L.apexIsCrest ? 'CREST' : 'NOTCH'} where ${L.countBuilt} teeth make ${L.countBuilt + 1} periods over the arc, whose midpoint is a ${wantApexCrest ? 'CREST' : 'SINUS'}`);
+    if (wantApexCrest && L.apexReliefMm !== null) bad.push(`L8: the apex is a crest and the record reports an apex relief of ${L.apexReliefMm} — there is no apex sinus to have one`);
+    if (!wantApexCrest) {
+      if (L.apexReliefMm !== 0) bad.push(`L8: the apex sinus sits on the terminal mini-face, where the base outline is already at the print floor, so its relief must be exactly 0 — the record says ${L.apexReliefMm}`);
+      /* AND IT HAS NO `u` OF ITS OWN: d = 0 is the middle of the face, which
+         is not a point of either margin, so it must not appear among the
+         stations the outline carries. */
+      const onFace = L.sinusU.filter((us) => us >= 1 - 1e-12).length;
+      if (onFace) bad.push(`L8: ${onFace} sinus station(s) sit at u = 1 — the apex sinus is on the terminal face and has no station on the margin`);
+    }
+    /* THE TREATED ARC REACHES THE APEX, measured on the EMITTED outline over
+       exactly the region session 40 proved MODEL A never touches. */
+    let differ = 0, worst = 0, worstU = 0;
+    for (let i = 0; i <= 2000; i++) {
+      const u = base.profile.uCap + (1 - base.profile.uCap) * i / 2000;
+      const d = Math.abs(h(u) - hb(u));
+      if (!Object.is(h(u), hb(u))) differ++;
+      if (d > worst) { worst = d; worstU = u; }
+    }
+    if (L.depthBuilt > 0 && differ === 0) {
+      bad.push(`L8: the outline over [uCap ${base.profile.uCap.toFixed(4)}, 1] is identical to a plain petal at all 2001 samples — the apex is untreated and this is MODEL A, whatever the record says`);
+    }
+    if (L.depthBuilt > 0 && differ > 0 && worst === 0) bad.push(`L8: the outline above uCap differs only in the sign of a zero — the cut there is not material`);
+    /* THE ARC IS SYMMETRIC ABOUT THE APEX, which is what makes coverage a
+       clock rather than a window: the treated half-arc is measured from the
+       rim's MIDPOINT, so the margin carries exactly the treated half less the
+       half-face it does not own. */
+    const wantMarginTreated = Math.max(0, L.treatedHalfMm - L.faceMm / 2);
+    const gotMarginTreated = arc(u0, 1, 65536);
+    if (Math.abs(wantMarginTreated - gotMarginTreated) > 1e-2) bad.push(`L8: the treated arc ON THIS MARGIN re-measures as ${gotMarginTreated.toFixed(4)} mm where the record's treated half-arc less half the face is ${wantMarginTreated.toFixed(4)} — the arc is not centred on the apex`);
   }
   return bad;
 }
@@ -4609,7 +4884,6 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      the default shape, against the ruled 11), the stations moved, and they
      now land on the buckle's own hairline contacts. The two-sided build is
      the evidence: PLAIN 8 pairs / 0.0104 mm, LOBED 20 / 0.0965. */
-  'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip, declared; the lobed ladder\'s stations LAND on them — 20 pairs since session 41 moved the demand)': '20 pairs, worst span 0.0965 mm (over "BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)", which is declared at 8 pairs / 0.0104 mm and reads the same on THIS tree; the lobed ladder read 0 on main because its stations missed them, which is the sampling coincidence session 38 named)',
   'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)': '724 pairs, worst span 0.4626 mm (was 722 / 0.2891 before session 41; over "petalCup max (1.2)", which reads 752 pairs / 0.1268 mm on THIS tree)',
   'LOBES: x roll 330 (over the quill, declared on main)': '18712 pairs, worst span 1.6115 mm (was 18072 / 1.6072 before session 41; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm on THIS tree)',
   'LOBES: x curl 360 (over the fiddlehead, declared on main)': '784 pairs, worst span 0.8971 mm (was 816 / 0.6999 before session 41; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm on THIS tree)',
@@ -6259,12 +6533,15 @@ export function buildMatrix() {
      Keep the "N. TITLE" form — see block 27 for what a banner cost. */
   for (const [name, sets] of [
     ['LOBES: the first live step (depth 0.01)', { lobeDepth: 0.01 }],
-    ['LOBES: 2 lobes at the default coverage — the whole reachable count on this petal (capacity 27 rows at 11 a lobe)', { lobeDepth: 0.3, lobeCount: 2 }],
-    ['LOBES: 8 asked at the default coverage — CLAMPED to 2 by the rows the ladder has (the ruled 8 does not survive the 11-station floor)', { lobeDepth: 0.3, lobeCount: 8 }],
-    ['LOBES: 10 asked at the default coverage — CLAMPED to 2, told', { lobeDepth: 0.3, lobeCount: 10 }],
-    ['LOBES: 10 asked at maximum coverage — CLAMPED to 2 (capacity 31 rows; the ruled 10 does not survive the floor)', { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 }],
-    ['LOBES: coverage min (0.10) — ONE lobe: the rows cap and the pitch cap both read 1 on a 1.8 mm window (CLAMPED by rows, told)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1 }],
-    ['LOBES: THE DEPTH CAP (1.00 asked — CLAMPED where the deepest sinus reaches the print floor)', { lobeDepth: 1, lobeCount: 2 }],
+    ['LOBES: 2 teeth at the default coverage — an EVEN count, so the apex carries the NOTCH and it is FLAT (the terminal face is already at the print floor)', { lobeDepth: 0.3, lobeCount: 2 }],
+    ['LOBES: 3 teeth at the default coverage — an ODD count (eleven, twelve, one), so a CREST sits at the apex and the apex carries a tooth', { lobeDepth: 0.3, lobeCount: 3 }],
+    ['LOBES: 8 asked at the default coverage — CLAMPED to 6 by the rows the ladder has (capacity 33 at 9 stations a period)', { lobeDepth: 0.3, lobeCount: 8 }],
+    ['LOBES: 10 asked at the default coverage — CLAMPED to 6, told', { lobeDepth: 0.3, lobeCount: 10 }],
+    ['LOBES: 10 asked at maximum coverage — CLAMPED to 7 (capacity 39 rows at 9 a period); TWO of the margin\'s teeth are relief-limited by the material at their own sinus', { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 }],
+    ['LOBES: TWELVE O\'CLOCK ALONE — coverage min (0.10), 1.2 hours of the clock: the whole treated arc lies in the converging tip, so both teeth are relief-limited to what the material there allows', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1 }],
+    ['LOBES: ONE tooth AT twelve — count 1 at coverage min, the apex-only state Eva\'s clock names (periods 2, a crest on the terminal face)', { lobeDepth: 0.3, lobeCount: 1, lobeCoverage: 0.1 }],
+    ['LOBES: DEPTH 1.00 — the relief target is the whole of the widest half-width above the print floor; the guard is PER PERIOD, so the depth is never clamped and only the teeth without room fall short', { lobeDepth: 1, lobeCount: 2 }],
+    ['LOBES: DEPTH 1.00 at maximum coverage over 5 teeth — SIX of the six periods relief-limited, the residual fade measured at its worst', { lobeDepth: 1, lobeCount: 5, lobeCoverage: 1 }],
     /* THE SHAPE AXIS (session 41). Two exponents, each the LOCAL POWER of
        the cut at its own feature: 1.00 a corner, 2.00 parabolic, 3.00 flat,
        under 1.00 a cusp. The corners of the square plus the two asymmetric
@@ -6272,24 +6549,27 @@ export function buildMatrix() {
     ['LOBES: a POINT over a round U (crest 1.00, notch 2.00 — the old pointed lobe, drawn by the new law)', { lobeDepth: 0.3, lobeCrestShape: 1, lobeNotchShape: 2 }],
     ['LOBES: a ROUND crest over a V (crest 2.00, notch 1.00 — CRENATE; unreachable on the shipped family at any exponent)', { lobeDepth: 0.3, lobeCrestShape: 2, lobeNotchShape: 1 }],
     ['LOBES: the TRIANGLE wave (crest 1.00, notch 1.00 — both acute, the serrate margin; g(r) = r to the bit)', { lobeDepth: 0.3, lobeCount: 8, lobeCrestShape: 1, lobeNotchShape: 1 }],
-    ['LOBES: SERRATION (8 asked at the triangle wave, low depth — the count the shape now buys: demand 3 a lobe, not 11)', { lobeDepth: 0.12, lobeCount: 8, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['LOBES: SERRATION (8 asked at the triangle wave, low depth — the count the shape buys: demand 3 a period, not 9)', { lobeDepth: 0.12, lobeCount: 8, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['LOBES: SERRATION AROUND THE WHOLE RIM (10 at the triangle wave, coverage 1 — the range\'s own maximum, uncapped by either cap)', { lobeDepth: 0.12, lobeCount: 10, lobeCoverage: 1, lobeCrestShape: 1, lobeNotchShape: 1 }],
     ['LOBES: both CUSPED (crest 0.60, notch 0.60 — a needle over a slit, both local powers under 1)', { lobeDepth: 0.3, lobeCount: 4, lobeCrestShape: 0.6, lobeNotchShape: 0.6 }],
     ['LOBES: both FLAT (crest 3.00, notch 3.00 — a square wave drawn as bends; the flattest reachable pair)', { lobeDepth: 0.3, lobeCrestShape: 3, lobeNotchShape: 3 }],
     ['LOBES: a CUSPED crest over a FLAT notch (crest 0.60, notch 3.00 — the most asymmetric pair the square holds)', { lobeDepth: 0.3, lobeCrestShape: 0.6, lobeNotchShape: 3 }],
     ['LOBES: a FLAT crest over a CUSPED notch (crest 3.00, notch 0.60 — the other corner; DENTATE)', { lobeDepth: 0.3, lobeCrestShape: 3, lobeNotchShape: 0.6 }],
     ['LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', { lobeDepth: 0.3, petalCup: 0.4 }],
     ['LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', { lobeDepth: 0.3, petalCup: 1.2 }],
-    ['LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip, declared; the lobed ladder\'s stations LAND on them — 20 pairs since session 41 moved the demand)', { lobeDepth: 0.3, buckleAmp: 0.3, buckleFreq: 3 }],
+    ['LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; MODEL B\'s stations no longer land on them — 0 pairs, and the xfail entry came off in the same commit)', { lobeDepth: 0.3, buckleAmp: 0.3, buckleFreq: 3 }],
     ['LOBES: x buckle 0.60 f 7 (the ladder forced uniform by the buckle — its 22 window rows hold 2 lobes)', { lobeDepth: 0.3, lobeCount: 2, buckleAmp: 0.6, buckleFreq: 7 }],
     ['LOBES: x roll 330 (over the quill, declared on main)', { lobeDepth: 0.3, petalRoll: 330 }],
     ['LOBES: x curl 360 (over the fiddlehead, declared on main)', { lobeDepth: 0.3, petalSpineCurl: 360 }],
     ['LOBES: x twist 180', { lobeDepth: 0.3, petalTwist: 180 }],
-    ['LOBES: x the shortest petal (20 mm x 10 asked at coverage 1 — the rows cap binds at 2; the pitch floor would allow 8)', { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1, petalLength: 20 }],
-    ['LOBES: NO ROOM by the pitch floor (20 mm petal at coverage 0.10 — a 1.0 mm window under the 1.20 mm floor; nothing cut, told)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1, petalLength: 20 }],
-    ['LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 4.2 mm window at a 2.40 mm floor)', { lobeDepth: 0.3, lobeCount: 4, lobeCoverage: 0.4, petalLength: 20, sheetThickness: 2.4 }],
+    ['LOBES: x the shortest petal (20 mm x 10 asked at coverage 1 — the rows cap binds at 8; the pitch floor would allow 28)', { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1, petalLength: 20 }],
+    ['LOBES: NO ROOM by the pitch floor (20 mm petal, sheet 2.40, coverage 0.10 — a 3.5 mm treated arc under a 2.40 mm pitch floor holds no period; nothing cut, told)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1, petalLength: 20, sheetThickness: 2.4 }],
+    ['LOBES: NO ROOM by the rows (coverage 0.10 under the buckle\'s frequency ceiling — the ladder is uniform there and holds 3 stations in the arc against a demand of 7)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1, buckleAmp: 0.3, buckleFreq: 7 }],
+    ['LOBES: NO ROOM by the RELIEF (20 mm petal at coverage 0.10 — the whole treated arc lies where the outline has already converged to the print floor; nothing to remove, told)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1, petalLength: 20 }],
+    ['LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 13.9 mm arc at a 2.40 mm floor; CLAMPED to 3 by rows)', { lobeDepth: 0.3, lobeCount: 4, lobeCoverage: 0.4, petalLength: 20, sheetThickness: 2.4 }],
     ['LOBES: x the thickest sheet (2.40 — the pitch floor doubles; the rows cap still binds first)', { lobeDepth: 0.3, lobeCount: 8, sheetThickness: 2.4 }],
     ['LOBES: x the thinnest sheet (0.60 — the floor is MIN_FEATURE_MM, not the sheet)', { lobeDepth: 0.3, lobeCount: 2, sheetThickness: 0.6 }],
-    ['LOBES: x petalTipShape 0.60 (uCap moves in to 0.65 — the window shortens, capacity 21 holds ONE lobe; CLAMPED by rows)', { lobeDepth: 0.3, lobeCount: 2, petalTipShape: 0.6 }],
+    ['LOBES: x petalTipShape 0.60 (an acute apex — the rim LENGTHENS to 55.6 mm and the teeth run over a point the cap used to own alone)', { lobeDepth: 0.3, lobeCount: 2, petalTipShape: 0.6 }],
     ['LOBES: x petalTipShape 3.00', { lobeDepth: 0.3, lobeCount: 2, petalTipShape: 3 }],
     ['LOBES: x the far-out widest point (a 3, b 0.6 — the window sits below the peak)', { lobeDepth: 0.3, lobeCount: 2, petalBaseTaper: 3, petalTipTaper: 0.6 }],
     ['LOBES: x 3 whorls (the inner petals are short — the floor binds there first)', { lobeDepth: 0.3, lobeCount: 2, layerCount: 3 }],
