@@ -1874,7 +1874,21 @@ comparison re-derived as an ULP BOUND alongside it — a whole-matrix partition 
 session.**
 **L8 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE MODEL**: L0–L7 are all blind to where
 the treated arc ENDS, so a tree that reverted to MODEL A would pass every one of them on
-a shorter rim. **AND L7's INSTRUMENT INVERTED WITH THE LAW'S FORM** — session 41 wrote
+a shorter rim. **AND ITS LOAD-BEARING CLAUSE NEEDED A SECOND HALF, WHICH RE-READING THE
+DIFF FOUND RATHER THAN A FAILURE** — session 41's L7 lesson in the family it was learned
+in, one session later. It built BOTH sides as NODE rebuilds of the state the page reports:
+right in CI, where the page and the rebuild run one source, and WORTH NOTHING under the
+mutant table, which serves its mutation to the PAGE alone (`page.route`) and imports a
+separate in-memory copy only for the witness — so a tree reverted to MODEL A on the page
+leaves both halves unmutated and green. The second clause reads TWO ARRAYS THE BUILDER
+EMITTED (`petalProfile` against `petalProfileBase`), so a cut stopping at the apex entry
+shows as the two agreeing on every row above `uCap`; reference `shapeBaseAt`, which the
+treatment does not write, quantity under test `shapeAt`, which is what a revert moves.
+**`the-treatment-terminates-at-the-apex-entry` is the mutant that was missing** — one
+clause on `cutMm`, the single change that makes the session's premise false, witnessed on
+the MUTATED module's own outline in LIVE (the export floor would mask a cut the law still
+made). **ASK OF EVERY CLAUSE NOT ONLY WHO OWNS THE TWO SIDES BUT WHETHER EITHER SIDE IS
+THE THING THE INSTRUMENT CAN ACTUALLY MOVE.** **AND L7's INSTRUMENT INVERTED WITH THE LAW'S FORM** — session 41 wrote
 that the RATIO `1 - h/hb` is right and the DIFFERENCE `hb - h` wrong; under a relief in
 millimetres it is the other way round, because the difference is exactly `R_k g` and the
 ratio carries the taper as a `1/hb` term LINEAR in the offset. Measured before it moved:
