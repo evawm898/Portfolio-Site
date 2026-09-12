@@ -1914,7 +1914,11 @@ section('items 29–30 — the two new dimensions stack, and count honestly');
 {
   const p = await reseed([
     { id:'f1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', tags:['fine line'], stars:3, markers:['booked'], notes:'' },
-    { id:'f2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', tags:['fine line'], stars:1, markers:[], notes:'' },
+    // f2 carries the marker AND a different rating, so the marker count can
+    // tell "respects the rating" from "counts every marked entry". With every
+    // marked entry sharing one rating the count is the same either way and
+    // the check below proves nothing.
+    { id:'f2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', tags:['fine line'], stars:1, markers:['booked'], notes:'' },
     { id:'f3', name:'Cyd Marr', handle:'@cyd.marr', category:'tattoo', tags:['blackwork'], stars:3, markers:[], notes:'' },
   ]);
   await p.locator('#starChips .chip[data-star="3"]').click();
@@ -1936,7 +1940,16 @@ section('items 29–30 — the two new dimensions stack, and count honestly');
   await p.waitForTimeout(150);
   check('rating and marker stack', (await visibleNames()).join() === 'Ada Vance');
   const markerChip = (await p.textContent('#markerChips .chip[data-marker="booked"]')).trim();
-  check('the marker chip counts against the rating but not itself', /\(1\)$/.test(markerChip), markerChip);
+  // Named for what it can actually see. It was called "...but not itself",
+  // and that half is UNOBSERVABLE while one marker ships: the count is
+  // |base AND hasMarker(booked)|, and adding matchesMarkers to the base
+  // intersects with hasMarker(booked) again, which changes nothing. The
+  // mutation that makes every facet count against itself therefore leaves
+  // this number at 1 — it was claimed as a witness and is not one. Two
+  // markers make the self-count observable; until then this is the honest
+  // claim, and `the rating chips still count the whole non-rating base`
+  // carries the self-counting property for the rows where it IS visible.
+  check('the marker chip counts against the active rating', /\(1\)$/.test(markerChip), markerChip);
 }
 
 section('screenshots + page health');

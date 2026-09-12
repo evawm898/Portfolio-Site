@@ -612,6 +612,114 @@
     text-decoration:none;
   }
   .entry-handle:hover{text-decoration:underline;}
+  /* Rating and markers are BARE GLYPHS -- no border, no background -- where
+     a style tag is a bordered word pill. That is the strongest separation
+     available and it costs nothing, which is what keeps the tags the
+     dominant read on a row carrying both. */
+  .entry-marks{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-end;
+    gap:4px;
+    flex-shrink:0;
+    padding-top:2px;
+  }
+  .entry-stars{
+    display:flex;
+    gap:1px;
+    font-size:13px;
+    line-height:1;
+    /* Not a target on a touch device at all, so a scroll can never set a
+       rating by accident. Re-enabled below only where there is a real
+       pointer that can hover. */
+    pointer-events:none;
+  }
+  .entry-stars .star{ color:var(--teal); }
+  .entry-stars .star[data-on="false"]{ color:var(--line-strong); }
+  /* Unrated rows keep the SPACE (so rows stay aligned and there is something
+     to aim at) but show nothing until the pointer is over the row. */
+  .entry-stars[data-stars="0"]{ opacity:0; transition:opacity 90ms linear; }
+  @media (hover:hover) and (pointer:fine){
+    .entry-stars{ pointer-events:auto; }
+    .entry-stars .star{ cursor:pointer; }
+    .entry:hover .entry-stars[data-stars="0"]{ opacity:0.55; }
+    .entry-stars .star:hover{ color:var(--paper); }
+  }
+  .entry-markers{
+    display:flex;
+    gap:4px;
+    font-size:12px;
+    line-height:1;
+    color:var(--dim);
+  }
+  .map-panel-item .entry-marks{ padding-top:0; }
+
+  .filter-row--marks .chip{ letter-spacing:0.06em; text-transform:none; }
+  .filter-row--marks .chip[data-star]{ font-size:12px; }
+
+  /* Drawer controls: the canonical, keyboard-reachable pair. */
+  .tag-escape{ margin-top:10px; }
+  .tag-escape-toggle{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.1em;
+    background:none;
+    border:none;
+    padding:0;
+    color:var(--dim-2);
+    cursor:pointer;
+    text-decoration:underline;
+    text-underline-offset:3px;
+  }
+  .tag-escape-toggle:hover{ color:var(--teal); }
+  .tag-escape-toggle[aria-expanded="true"]{ color:var(--teal); }
+  #tagEscapeBox{ margin-top:8px; }
+  .tag-escape-note{
+    margin:6px 0 0;
+    font-size:10px;
+    line-height:1.6;
+    color:var(--dim-2);
+  }
+
+  .mark-input{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    padding-top:4px;
+  }
+  .star-btn{
+    background:none;
+    border:none;
+    padding:0 1px;
+    font-size:20px;
+    line-height:1;
+    cursor:pointer;
+    color:var(--line-strong);
+  }
+  .star-btn[data-on="true"]{ color:var(--teal); }
+  .star-btn:hover{ color:var(--paper); }
+  .star-btn:focus-visible{ outline:1px solid var(--teal); outline-offset:2px; }
+  .mark-note{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--dim-2);
+  }
+  .marker-btn{
+    font-family:var(--font-mono);
+    font-size:10px;
+    letter-spacing:0.1em;
+    background:none;
+    color:var(--dim-2);
+    border:1px solid var(--line);
+    padding:5px 10px;
+    cursor:pointer;
+  }
+  .marker-btn[data-on="true"]{ color:var(--teal); border-color:var(--teal); }
+  .marker-btn:hover{ color:var(--paper); }
+
   .entry-tags{
     display:flex;
     flex-wrap:wrap;
@@ -1123,6 +1231,7 @@
         <select class="sort-select" id="sortSelect">
           <option value="name">sort: name</option>
           <option value="category">sort: category</option>
+          <option value="added">sort: newest first</option>
           <option value="date">sort: upcoming date</option>
         </select>
       </div>
@@ -1140,6 +1249,13 @@
         <button class="chip" data-gender="woman">women only</button>
         <button class="chip" data-gender="unknown">unknown</button>
       </div>
+
+      <!-- Rating and markers. Symbols rather than word pills, deliberately:
+           the tag chips below stay the dominant read, and these must not
+           look like more of them. Both rows are BUILT from tables in the
+           script, so adding a marker type is one row in MARKERS. -->
+      <div class="filter-row filter-row--marks" id="starChips"></div>
+      <div class="filter-row filter-row--marks" id="markerChips"></div>
 
       <div class="filter-row">
         <span class="filter-label">region</span>
@@ -1276,6 +1392,16 @@ another.handle"></textarea>
       </div>
       <div class="field-row">
         <div class="field">
+          <label>rating</label>
+          <div class="mark-input" id="fStars"></div>
+        </div>
+        <div class="field">
+          <label>markers</label>
+          <div class="mark-input" id="fMarkers"></div>
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
           <label for="fGender">gender</label>
           <select id="fGender">
             <option value="unknown">unknown</option>
@@ -1324,7 +1450,19 @@ another.handle"></textarea>
         <div class="field">
           <span class="field-label">style tags</span>
           <div class="tag-picker" id="tagPicker"></div>
-          <input id="fTags" type="text" placeholder="type a custom tag, then Enter" autocomplete="off">
+          <!-- The picker is the input. The free-text box behind this toggle is
+               the deliberate act that lets a tenth tag in -- it is NOT inside
+               #tagPicker, because that container's children are counted as
+               vocabulary chips. -->
+          <div class="tag-escape">
+            <button type="button" class="tag-escape-toggle" id="tagEscapeToggle"
+                    aria-expanded="false" aria-controls="tagEscapeBox">+ a tag outside the nine</button>
+            <div id="tagEscapeBox" hidden>
+              <input id="fTags" type="text" placeholder="a tag that is not one of the nine" autocomplete="off">
+              <p class="tag-escape-note">The nine above are the vocabulary. Anything typed here is kept and
+                 will show as an extra chip, but it is drift — an import reports the same thing.</p>
+            </div>
+          </div>
         </div>
       </div>
       <div class="panel-actions">
@@ -1404,6 +1542,10 @@ another.handle"></textarea>
   let activeRegion = 'all';
   let activeCity = 'all';
   let activeTags = new Set();
+  let activeStars = 'all';
+  // Marker chips are OR'd, the same rule the tag chips follow, so the two
+  // chip rows behave alike even though they mean different things.
+  let activeMarkers = new Set();
   let showAllTags = false;
   let searchTerm = '';
   let sortMode = 'name';
@@ -1441,6 +1583,28 @@ another.handle"></textarea>
     }catch(e){ entries = []; lastPersisted = '[]'; }
     clearLegacyGeoFailures();
     seedGender();
+    backfillAddedAt();
+  }
+
+  // Everything already in storage predates this field, so it gets ONE stamp
+  // meaning "here before `addedAt` existed" -- not a staggered run of
+  // invented times.
+  //
+  // Staggering was considered and rejected: a fabricated timestamp is
+  // exported, carried into every backup, and compared against real ones by
+  // the `oldest` merge rule, so it stops being a display choice and becomes
+  // data. What "newest first" sorts the backfilled block by instead is
+  // STORAGE POSITION, which is real -- see the sort in render(). Same
+  // ordering on screen, nothing invented on disk.
+  function backfillAddedAt(){
+    const stamp = new Date().toISOString();
+    let changed = 0;
+    entries.forEach(e => {
+      if(typeof e.addedAt === 'string' && e.addedAt) return;
+      e.addedAt = stamp;
+      changed++;
+    });
+    if(changed) persist();
   }
 
   // The previous geocoder marked a location geoStatus:'failed' and never
@@ -1530,6 +1694,60 @@ another.handle"></textarea>
     if(v.startsWith('tat')) return null;
     if(v.startsWith('tour') || v.startsWith('rel')) return null;
     return v;
+  }
+
+  // --- rating and markers ---------------------------------------------------
+  //
+  // Two independent axes, and they are independent of the tags as well: a
+  // rating is ORDERED (so it sorts and filters as a threshold) while markers
+  // are a SET (an artist can carry several at once).
+  //
+  // THREE STARS, NOT FIVE. Across a few hundred artists a five-point scale
+  // cannot be held consistently, and an inconsistent scale makes the filter
+  // meaningless -- "2+" has to mean the same thing in March as in January.
+  // Three maps onto the decisions that actually exist: maybe / strong /
+  // would book tomorrow. Widening 3 -> 5 later keeps every existing value
+  // valid; narrowing 5 -> 3 does not, so this is the reversible direction.
+  const MAX_STARS = 3;
+
+  // One row per marker. The entry row, the drawer, the filter row and the
+  // gate all walk this, so a new marker type is one row here and nothing
+  // else. Shipping with one: a second was considered (`favorite`) and left
+  // out because it had no meaning a 3-star rating did not already carry.
+  const MARKERS = [
+    { id:'booked', glyph:'✓', label:'booked before',
+      title:'You have been tattooed by them' },
+  ];
+
+  function markerDef(id){ return MARKERS.find(m => m.id === id) || null; }
+
+  // Storage is hand-editable and arrives from imports, so both accessors
+  // clamp rather than trust. An out-of-range rating reads as its nearest
+  // legal value; an unknown marker id is dropped rather than rendered blank.
+  function starsOf(e){
+    const n = Number(e && e.stars);
+    if(!Number.isFinite(n)) return 0;
+    return Math.max(0, Math.min(MAX_STARS, Math.round(n)));
+  }
+  function markersOf(e){
+    if(!e || !Array.isArray(e.markers)) return [];
+    return e.markers.filter(id => markerDef(id));
+  }
+  function hasMarker(e, id){ return markersOf(e).indexOf(id) !== -1; }
+
+  // The rating filter reads as a threshold except at its two ends, which are
+  // the two questions a threshold cannot ask: "the best only" and "the ones
+  // I have not judged yet". `unrated` is browsable on purpose -- it is the
+  // backlog, and the same reasoning as the gender filter's "unknown".
+  const STAR_FILTERS = [
+    { id:'all',     label:'all',      test: () => true },
+    { id:'3',       label:'★★★',   test: e => starsOf(e) === 3 },
+    { id:'2',       label:'★★+',  test: e => starsOf(e) >= 2 },
+    { id:'1',       label:'★+',   test: e => starsOf(e) >= 1 },
+    { id:'unrated', label:'unrated',  test: e => starsOf(e) === 0 },
+  ];
+  function starFilterDef(id){
+    return STAR_FILTERS.find(f => f.id === id) || STAR_FILTERS[0];
   }
 
   // Click-to-apply style tags. Free typing still works — this is a floor,
@@ -2048,22 +2266,60 @@ another.handle"></textarea>
     );
     return hay.includes(searchTerm);
   }
+  function matchesStars(e){ return starFilterDef(activeStars).test(e); }
+  function matchesMarkers(e){
+    if(activeMarkers.size === 0) return true;
+    return [...activeMarkers].some(id => hasMarker(e, id));
+  }
+
+  // One row per filter dimension. The facet bases used to be written out by
+  // hand at each call site -- every predicate except the one being counted,
+  // repeated -- which is a list that has to be edited in four places every
+  // time a dimension is added, and drifts the first time one is missed.
+  const FILTERS = [
+    { id:'category', fn: matchesCategory },
+    { id:'gender',   fn: matchesGender },
+    { id:'location', fn: matchesLocation },
+    { id:'tags',     fn: matchesTags },
+    { id:'stars',    fn: matchesStars },
+    { id:'markers',  fn: matchesMarkers },
+    { id:'search',   fn: matchesSearch },
+  ];
+
+  // A facet counts against every filter EXCEPT itself, or its own numbers
+  // describe a list nobody is looking at. Pass null to apply all of them.
+  function matchesAllExcept(e, skip){
+    return FILTERS.every(f => f.id === skip || f.fn(e));
+  }
 
   function render(){
     const list = document.getElementById('list');
 
     // Facet bases: everything except the dimension being counted.
-    populateLocationOptions(entries.filter(e =>
-      matchesCategory(e) && matchesGender(e) && matchesTags(e) && matchesSearch(e)));
-    populateTagChips(entries.filter(e =>
-      matchesCategory(e) && matchesGender(e) && matchesLocation(e) && matchesSearch(e)));
+    populateLocationOptions(entries.filter(e => matchesAllExcept(e, 'location')));
+    populateTagChips(entries.filter(e => matchesAllExcept(e, 'tags')));
+    syncStarChips(entries.filter(e => matchesAllExcept(e, 'stars')));
+    syncMarkerChips(entries.filter(e => matchesAllExcept(e, 'markers')));
     syncGenderChips();
 
-    let filtered = entries.filter(e =>
-      matchesCategory(e) && matchesGender(e) && matchesLocation(e)
-      && matchesTags(e) && matchesSearch(e));
+    let filtered = entries.filter(e => matchesAllExcept(e, null));
+
+    // Storage position is insertion order and it is REAL: nothing mutates
+    // `entries`' order -- this sort runs on a copy that `filter` made. It is
+    // the tiebreak for "newest first", which is what lets a library whose
+    // addedAt was backfilled in one go still order meaningfully without a
+    // fabricated timestamp being written, exported and merged as if it were
+    // one. It never leaves the page.
+    const pos = new Map();
+    entries.forEach((e, i) => pos.set(e.id, i));
 
     filtered.sort((a,b) => {
+      if(sortMode === 'added'){
+        const aa = a.addedAt || '';
+        const ba = b.addedAt || '';
+        if(aa !== ba) return ba.localeCompare(aa);
+        return (pos.get(b.id) || 0) - (pos.get(a.id) || 0);
+      }
       if(sortMode === 'category'){
         return a.category.localeCompare(b.category) || a.name.localeCompare(b.name);
       }
@@ -2283,6 +2539,78 @@ another.handle"></textarea>
     }
   }
 
+  // Both mark rows are BUILT from their tables, once, then re-counted on
+  // every render. Adding a marker type is a row in MARKERS and nothing here.
+  function buildMarkRows(){
+    const starBox = document.getElementById('starChips');
+    if(starBox.dataset.built !== 'true'){
+      starBox.dataset.built = 'true';
+      const lab = document.createElement('span');
+      lab.className = 'filter-label';
+      lab.textContent = 'rating';
+      starBox.appendChild(lab);
+      STAR_FILTERS.forEach(f => {
+        const b = document.createElement('button');
+        b.className = 'chip';
+        b.dataset.star = f.id;
+        b.onclick = () => { activeStars = f.id; render(); };
+        starBox.appendChild(b);
+      });
+    }
+    const mBox = document.getElementById('markerChips');
+    if(mBox.dataset.built !== 'true'){
+      mBox.dataset.built = 'true';
+      const lab = document.createElement('span');
+      lab.className = 'filter-label';
+      lab.textContent = 'marked';
+      mBox.appendChild(lab);
+      MARKERS.forEach(m => {
+        const b = document.createElement('button');
+        b.className = 'chip';
+        b.dataset.marker = m.id;
+        b.title = m.title;
+        b.onclick = () => {
+          if(activeMarkers.has(m.id)) activeMarkers.delete(m.id);
+          else activeMarkers.add(m.id);
+          render();
+        };
+        mBox.appendChild(b);
+      });
+    }
+  }
+
+  // The tag chips' own "label (n)" shape, reused so the three chip rows read
+  // as one vocabulary of controls rather than three conventions.
+  function chipLabel(btn, text, n){
+    btn.textContent = '';
+    btn.appendChild(document.createTextNode(text + ' '));
+    const c = document.createElement('span');
+    c.className = 'tag-chip-count';
+    c.textContent = '(' + n + ')';
+    btn.appendChild(c);
+  }
+
+  function syncStarChips(base){
+    buildMarkRows();
+    document.querySelectorAll('#starChips .chip').forEach(c => {
+      const f = starFilterDef(c.dataset.star);
+      const n = f.id === 'all' ? base.length : base.filter(f.test).length;
+      chipLabel(c, f.label, n);
+      c.dataset.active = (activeStars === f.id) ? 'true' : 'false';
+    });
+  }
+
+  function syncMarkerChips(base){
+    buildMarkRows();
+    document.querySelectorAll('#markerChips .chip').forEach(c => {
+      const d = markerDef(c.dataset.marker);
+      if(!d) return;
+      const n = base.filter(e => hasMarker(e, d.id)).length;
+      chipLabel(c, d.glyph + ' ' + d.label, n);
+      c.dataset.active = activeMarkers.has(d.id) ? 'true' : 'false';
+    });
+  }
+
   function syncGenderChips(){
     document.querySelectorAll('#genderChips .chip').forEach(c => {
       c.dataset.active = (c.dataset.gender === activeGender) ? 'true' : 'false';
@@ -2405,7 +2733,75 @@ another.handle"></textarea>
     }
 
     row.appendChild(main);
+    row.appendChild(renderMarks(e));
     return row;
+  }
+
+  // Only what is SET is drawn. At a few hundred rows, an always-present slot
+  // per marker is several hundred glyphs carrying no information -- so an
+  // unmarked artist shows nothing at all.
+  //
+  // The star zone is the one exception: it keeps its space so rows stay
+  // aligned and so there is something to aim at, and at zero it is invisible
+  // until the pointer is over the row. On a touch device it is not a target
+  // at all (`pointer-events` in the CSS), which is what stops a scroll from
+  // setting a rating by accident -- there, the drawer is the way in.
+  //
+  // Clicking inside it does NOT open the drawer. That is a deliberate
+  // exception to "the whole row is one target": a star sets a value in place
+  // rather than navigating somewhere else, and rating a few hundred artists
+  // through a drawer round-trip each time is not something anyone would do.
+  function renderMarks(e){
+    const wrap = document.createElement('div');
+    wrap.className = 'entry-marks';
+
+    const stars = starsOf(e);
+    const sBox = document.createElement('div');
+    sBox.className = 'entry-stars';
+    sBox.dataset.stars = String(stars);
+    for(let v = 1; v <= MAX_STARS; v++){
+      const st = document.createElement('span');
+      st.className = 'star';
+      st.dataset.v = String(v);
+      st.dataset.on = v <= stars ? 'true' : 'false';
+      st.textContent = v <= stars ? '★' : '☆';
+      st.setAttribute('role', 'button');
+      st.setAttribute('aria-label', 'rate ' + v + ' of ' + MAX_STARS);
+      // Deliberately not tab-focusable: three stops per row across a few
+      // hundred rows would make the list unusable by keyboard, and the
+      // drawer carries the canonical control that IS reachable that way.
+      st.tabIndex = -1;
+      st.onclick = (ev) => {
+        ev.stopPropagation();
+        setStars(e.id, stars === v ? 0 : v);
+      };
+      sBox.appendChild(st);
+    }
+    wrap.appendChild(sBox);
+
+    const set = markersOf(e);
+    if(set.length){
+      const mBox = document.createElement('div');
+      mBox.className = 'entry-markers';
+      set.forEach(id => {
+        const d = markerDef(id);
+        const g = document.createElement('span');
+        g.className = 'marker-glyph';
+        g.textContent = d.glyph;
+        g.title = d.label;
+        mBox.appendChild(g);
+      });
+      wrap.appendChild(mBox);
+    }
+    return wrap;
+  }
+
+  function setStars(id, v){
+    const e = entries.find(x => x.id === id);
+    if(!e) return;
+    if(starsOf(e) === v) return;
+    e.stars = v;
+    if(persist()) render();
   }
 
   function formatDate(iso){
@@ -2650,6 +3046,13 @@ another.handle"></textarea>
     addDetailRow(dl, 'location', textNode(e.location));
     addDetailRow(dl, 'pronouns', textNode(e.pronouns));
     addDetailRow(dl, 'gender', textNode(GENDER_LABEL[genderOf(e)]));
+    addDetailRow(dl, 'rating', starsOf(e)
+      ? textNode('\u2605'.repeat(starsOf(e)) + '\u2606'.repeat(MAX_STARS - starsOf(e))
+          + '  (' + starsOf(e) + ' of ' + MAX_STARS + ')')
+      : null);
+    addDetailRow(dl, 'marked', markersOf(e).length
+      ? textNode(markersOf(e).map(id => markerDef(id).glyph + ' ' + markerDef(id).label).join(', '))
+      : null);
     addDetailRow(dl, 'date', e.date ? textNode(formatDate(e.date)) : null);
 
     if(e.tags && e.tags.length){
@@ -2721,6 +3124,54 @@ another.handle"></textarea>
 
   // Tags being edited right now. Committed on save like every other field.
   let pendingTags = new Set();
+  let pendingStars = 0;
+  let pendingMarkers = new Set();
+
+  // The canonical, keyboard-reachable rating control. The row's stars are a
+  // fast path for triage; this is the one a tab key can get to.
+  function renderStarInput(){
+    const box = document.getElementById('fStars');
+    box.innerHTML = '';
+    for(let v = 1; v <= MAX_STARS; v++){
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'star-btn';
+      b.dataset.v = String(v);
+      b.dataset.on = v <= pendingStars ? 'true' : 'false';
+      b.textContent = v <= pendingStars ? '★' : '☆';
+      b.setAttribute('aria-label', 'rate ' + v + ' of ' + MAX_STARS);
+      b.setAttribute('aria-pressed', v <= pendingStars ? 'true' : 'false');
+      // Clicking the current rating clears it, so a rating can be taken back
+      // without a separate control for "none".
+      b.onclick = () => { pendingStars = (pendingStars === v) ? 0 : v; renderStarInput(); };
+      box.appendChild(b);
+    }
+    const note = document.createElement('span');
+    note.className = 'mark-note';
+    note.textContent = pendingStars ? '(' + pendingStars + ' of ' + MAX_STARS + ')' : 'unrated';
+    box.appendChild(note);
+  }
+
+  function renderMarkerInput(){
+    const box = document.getElementById('fMarkers');
+    box.innerHTML = '';
+    MARKERS.forEach(m => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'marker-btn';
+      b.dataset.marker = m.id;
+      b.dataset.on = pendingMarkers.has(m.id) ? 'true' : 'false';
+      b.setAttribute('aria-pressed', pendingMarkers.has(m.id) ? 'true' : 'false');
+      b.title = m.title;
+      b.textContent = m.glyph + '  ' + m.label;
+      b.onclick = () => {
+        if(pendingMarkers.has(m.id)) pendingMarkers.delete(m.id);
+        else pendingMarkers.add(m.id);
+        renderMarkerInput();
+      };
+      box.appendChild(b);
+    });
+  }
 
   function clearQuickForm(){
     QUICK_TEXT_FIELDS.forEach(id => document.getElementById(id).value = '');
@@ -2729,6 +3180,11 @@ another.handle"></textarea>
     document.getElementById('saveEntry').textContent = 'save entry';
     pendingTags = new Set();
     renderTagPicker();
+    pendingStars = 0;
+    pendingMarkers = new Set();
+    renderStarInput();
+    renderMarkerInput();
+    setTagEscape(false);
     pendingPhoto = null;
     setPhotoState('');
     refreshPhotoPreview();
@@ -2805,6 +3261,27 @@ another.handle"></textarea>
   // A tag left sitting in the box when the user clicks save still counts.
   document.getElementById('fTags').addEventListener('blur', commitTypedTags);
 
+  // The vocabulary is the input; free text is behind one deliberate click.
+  //
+  // The nine are a controlled vocabulary, and before this the drawer could
+  // mint a tenth from a typo -- `fineline` at one in the morning -- which the
+  // import-side drift detection can never see, because it only ever reads a
+  // pasted file. Constraining the common path is what makes that detection
+  // mean anything.
+  //
+  // It is a REVEAL and not a refusal: an override that does not exist is an
+  // override you work around by mislabelling something as one of the nine.
+  function setTagEscape(open){
+    const box = document.getElementById('tagEscapeBox');
+    const btn = document.getElementById('tagEscapeToggle');
+    box.hidden = !open;
+    btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+    if(open) document.getElementById('fTags').focus();
+  }
+  document.getElementById('tagEscapeToggle').onclick = () => {
+    setTagEscape(document.getElementById('tagEscapeBox').hidden);
+  };
+
   function fillQuickForm(e){
     if(!e){ clearQuickForm(); return; }
     document.getElementById('fName').value = e.name || '';
@@ -2820,6 +3297,13 @@ another.handle"></textarea>
     document.getElementById('fTags').value = '';
     pendingTags = new Set(e.tags || []);
     renderTagPicker();
+    pendingStars = starsOf(e);
+    pendingMarkers = new Set(markersOf(e));
+    renderStarInput();
+    renderMarkerInput();
+    // Each entry opens with the hatch shut: it is a per-edit deliberate act,
+    // never a mode the drawer stays in.
+    setTagEscape(false);
     // A stored data-URL photo is an embedded image, not something to dump
     // into a text box as 40KB of base64 — it stays in pendingPhoto and the
     // url field shows only real URLs.
@@ -2850,6 +3334,8 @@ another.handle"></textarea>
       // clears the pasted one, so only one of the two is ever set.
       photo: pendingPhoto || document.getElementById('fPhoto').value.trim(),
       tags: [...pendingTags],
+      stars: pendingStars,
+      markers: [...pendingMarkers],
     };
     let savedId = detailId;
     if(detailId){
@@ -2867,7 +3353,7 @@ another.handle"></textarea>
       }
     }else{
       savedId = uid();
-      entries.push({ id: savedId, ...data });
+      entries.push({ id: savedId, addedAt: new Date().toISOString(), ...data });
     }
     // A failed write has already rolled the list back; leave the form as the
     // user typed it so nothing is lost while they free up space.
@@ -3095,6 +3581,18 @@ another.handle"></textarea>
     { field:'notes',    rule:'text',   bulk:false },
     { field:'gender',   rule:'unset',  bulk:true,  unset:'unknown', read:genderOf },
     { field:'tags',     rule:'union',  bulk:true,  key:tagKey },
+    // A rating and a marker set are yours, not the research file's -- the
+    // paste has no column for either, so `bulk:false`. 0 is the rating's
+    // unset sentinel, which is why it is a `unset` row and not a `text` one:
+    // without that, merge mode would read a real 0 as a value worth keeping
+    // and overwrite mode would treat "no rating" as an opinion.
+    { field:'stars',    rule:'unset',  bulk:false, unset:0 },
+    { field:'markers',  rule:'union',  bulk:false },
+    // The EARLIER stamp wins, in every mode including overwrite: the field
+    // records when an entry first arrived, and a later copy of it is not
+    // news. Restoring an old backup over a live list therefore cannot make
+    // an entry look newer than it is.
+    { field:'addedAt',  rule:'oldest', bulk:false },
   ];
 
   // `handle` is deliberately absent: it is the key the two entries MATCHED on,
@@ -3267,7 +3765,7 @@ another.handle"></textarea>
         return;
       }
 
-      const created = { id: uid(), ...data, date: '', notes: '' };
+      const created = { id: uid(), addedAt: new Date().toISOString(), ...data, date: '', notes: '' };
       if(extraTag) addTags(created, [extraTag]);
       entries.push(created);
       if(key) handleIndex.set(key, created);
@@ -3963,7 +4461,9 @@ another.handle"></textarea>
         return;
       }
 
-      const created = { ...inc, id: inc.id || uid() };
+      // A restored entry keeps the stamp its backup carried; only one that
+      // never had one is stamped now.
+      const created = { ...inc, id: inc.id || uid(), addedAt: inc.addedAt || new Date().toISOString() };
       entries.push(created);
       if(key && !handleIndex.has(key)) handleIndex.set(key, created);
       r.added++;
