@@ -258,19 +258,112 @@ within that of a sample boundary the two engines take different samples.
 **This exposure is PRE-EXISTING and identical on the plain path; MODEL B
 reshuffled which rows sit on the knife edge.**
 
-The fix is to remove the discreteness rather than to widen a tolerance: under a
-demand the station is INTERPOLATED between the two bracketing samples, so an
-ulp of disagreement moves it by an ulp instead of by a sample. It is the same
-law — "place at equal increments of the measure" — evaluated exactly rather
-than to the nearest sample above.
+### The first fix was tried, measured, and REVERTED
 
-**ONLY UNDER A DEMAND, and that is a scoping rather than a second law.** The
-plain path keeps main's stations to the bit, which is what lets this session's
-byte partition stay the rows that build a cut. **Removing the exposure
-everywhere is the schedulable item**: it is a one-line change to the same
-function and a WHOLE-MATRIX byte partition, a new frozen phase, and a full
-self-intersection re-baseline — a session of its own, and the right one to
-schedule, because the knife edge is still under every plain row.
+Interpolating between the two bracketing samples makes the station a
+CONTINUOUS function of the measure, so an ulp of disagreement moves it by an
+ulp instead of by a sample. It removes the discreteness at the root, and it is
+the wrong trade here — **measured, not reasoned about**: `sampleU(hi)` is an
+exactly-computed function of an INTEGER, so two engines that agree on `hi`
+emit the same double TO THE BIT, which is why main's 674 rows pass X0 at all.
+Interpolation makes EVERY station a function of the diverging sum, so every
+coordinate differs in its last bits and X0's exact float32 comparison straddles
+a rounding boundary somewhere. The run that followed turned ONE row's 2.5e-4 mm
+sample jump into last-bit disagreements on TWO OTHER rows
+(`LOBES: x CONTINUOUS x 3 turns` at 2.4e-10 mm, `LOBES: x SPHERE` at 9.3e-10) —
+smaller in millimetres and worse as a gate outcome, because they are one
+float32 ulp apart at a boundary rather than a real move.
+
+### Half the fix: the one NEW input to the measure lands on a grid
+
+The first diagnosis said the divergence came from the RELIEF, and **that was
+right about two rows of three and wrong as a general statement** — it is
+recorded that way rather than rewritten, because the incomplete reading is
+what cost the extra cycle. Each period's relief is read at a sinus station a
+BISECTION on the arc table produces, so it carries that station's last bit
+times the outline's own slope — measured **1.776e-15 mm** between the two
+engines, against `sinusU`'s own **2.220e-16**. The relief enters
+`ladderHalfAt`, which is the turning measure, and `placeInto`'s search is a
+discrete decision on it.
+
+So `reliefMm` is FLOORED onto `LOBE_RELIEF_GRID = 2^-16` mm — a power of two,
+so the quantisation is exact in IEEE-754 and the only arithmetic left is a
+floor; FLOORED and not rounded, so the per-period guard's inequality stays
+intact (a relief rounded UP could take the outline a few parts in 10^5 below
+the print floor). 1.5e-5 mm is four orders under the print floor and eleven
+above the divergence it removes.
+
+**It cleared `LOBES: x CONTINUOUS x 3 turns` and `LOBES: x SPHERE` and did
+NOTHING for `LOBES: x petalTipShape 0.60`**, which came back on the next gate
+run at the same 2.5e-4 mm. The relief was A source of divergence, not THE one.
+
+### The rest of the fix: the target and the sample are EQUAL BY CONSTRUCTION
+
+Re-diagnosed by MEASURING THE SEARCH'S OWN MARGINS rather than by reasoning
+about the measure again — for every station `placeInto` places on that row,
+how far is the target from the sample it landed on? Four of the 56 decisions
+sit within 1e-9 of a sample. Three of them are the `j === count` case session
+38 already made exact, at a margin of **exactly 0**. The fourth is the one
+that moved:
+
+| decision | target | sample | margin | local step |
+|---|---|---|---|---|
+| tip sub-region, station 4 of 8 | `cA + (cB-cA)/2` | 6943 | **1.97e-13** | 8.19e-4 |
+
+That is not a coincidence and it is not sensitivity. **Over any stretch where
+the outline law is inactive — the tip cap's straight lerp among them — the
+turning term is identically zero and the arc term is constant, so `cum` is an
+exact ARITHMETIC PROGRESSION**; the sub-region spans 2114 samples, and its
+midpoint therefore IS sample 6943. The two sides of the comparison are the
+same number reached by two routes: `cA + (cB - cA) * j / count` on one side,
+6943 accumulated additions on the other. A strict `<` between them is decided
+by their last bits, and the last bits are not the same in every engine.
+
+**This is session 38 §B10.7's own finding at the INTERIOR stations.** That
+session fixed the region's LAST station by asking for `cB` itself; the
+interior ones were left computing a target by a different route from the
+samples, and Model B is what made a whole sub-region linear enough for one to
+land on a sample exactly.
+
+**THE FIX IS A SLACK DERIVED FROM THE ACCUMULATION, NOT A TYPED TOLERANCE.**
+`cum[m]` is m roundings of values bounded by `total`, so its representation
+error is at most `m * EPS * total / 2`; the terms themselves (a difference of
+two `atan2`, which V8 rounds to within an ulp) add at most `EPS * total`.
+`tol = LADDER_SAMPLES * EPS * total` bounds both — **1.86e-11** on this row —
+and the search becomes `cum[m] < target - tol`, so a target within `tol` of a
+sample takes THAT sample in either engine. The emitted station is still
+`sampleU` of an integer; nothing about the geometry is made approximate.
+
+**MEASURED, in both directions.**
+
+* **It is inert on the geometry.** Pre-fix tree against post-fix tree, the
+  whole 680-row live matrix, both modes, every ring — **2,352 ladders
+  compared, 0 stations moved**. So the Node-side byte partition below is
+  untouched by it, by construction rather than by re-running: `placeInto`'s
+  only output is the stations.
+* **The sweep can see the tree it is comparing against.** Positive control —
+  the same sweep with the pre-fix tree given a 1e-6 tolerance reports **78
+  moved stations** across 11 rows. Five orders of magnitude separate "inert"
+  from "moves things", and the derived bound sits at the inert end.
+* **It is what the page needed.** The failing row's page build and Node
+  rebuild now agree on **all 56 stations, bit for bit, in both modes**, where
+  before they differed at station 51. The row passes X0 through the real gate.
+
+The tolerance is the one that changes an ANSWER on the page and not in Node,
+which is exactly the asymmetry to expect: Node was already landing on the
+sample, and the page was landing one past it.
+
+### What is still open
+
+**Removing the exposure at its root is still the schedulable item**, and it is
+now better specified than before this session. The remaining exposure is a
+target that is NEARLY but not exactly a sample — genuine sensitivity rather
+than a tie, at a probability this session did not measure. Interpolation is
+the right law for that and the wrong instrument-compatibility, so it wants
+X0's comparison re-derived alongside it — a bound in float32 ulps rather than
+an exact equality. That is a whole-matrix byte partition, a frozen phase, a
+full census re-baseline and a gate-clause change, and it should be its own
+session.
 
 ---
 
@@ -397,11 +490,17 @@ inside the window; it never adds one.
   millimetres subtracted from the base shape, so a second level is one more
   subtraction guarded by the same headroom — and what it would really cost is
   the DEMAND and the depth cap, not the law.
-* **`placeInto`'s knife edge on the plain path.** §6: the interpolation is
-  scoped to the demand path so this session's byte partition stays the rows
-  that build a cut. The same exposure is under every plain row and the fix is
-  the same line; it is a whole-matrix partition, a frozen phase and a full
-  census re-baseline, and it should be its own session.
+* **`placeInto`'s RESIDUAL knife edge.** §6: the by-construction tie is closed
+  on every path (the derived slack is not scoped to the demand — it is in the
+  one search both paths take, and it moves 0 stations over the whole matrix).
+  What is left is the case the slack cannot reach: a target NEARLY but not
+  exactly on a sample, where the two engines genuinely disagree about which
+  side of it they are on. Interpolation is the law for that, and it needs X0's
+  exact float32 comparison re-derived as an ULP BOUND in the same commit —
+  a whole-matrix partition, a frozen phase and a full census re-baseline, and
+  it should be its own session. **This session did not measure how often that
+  residual case is close enough to bite**, which is the first thing that
+  session should do.
 * **`LOBE_BREAK_POWER`'s level is still typed** at 1.5 (session 41 flagged it).
   Nothing here moved it: the crest and notch powers below which a feature is
   DECLARED a tangent break are the same numbers on the same scale, and MODEL B

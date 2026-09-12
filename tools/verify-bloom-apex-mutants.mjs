@@ -169,8 +169,18 @@ function lobePowers(M) {
    together and a witness that read the record would be agreeing with the
    defect (session 39's fourth durable rule). */
 function lobeRelief(M, set) {
+  /* IN LIVE, AND THAT IS THE POINT. The EXPORT floor is TIP_HALF_MM — the very
+     bound the guard exists to keep — so in export a broken guard is INVISIBLE
+     on the emitted outline: the cut over-reaches, `max(..., tipFloor)` catches
+     it, and the half-width reads exactly 0.8 whatever the law asked for.
+     Measured: `guard-reads-the-widest-period` reported "the behaviour did not
+     move" against an export build while removing the guard entirely. The LIVE
+     mesh floor is 0.15 mm, so there the over-cut shows on the geometry itself.
+     This is also why L5's own print-floor clause is stated on the MODE-FREE
+     lamina against the record rather than on the emitted export half-width,
+     where it would be vacuous. */
   const state = { ...REGISTRY_DEFAULTS, ...set };
-  const acc = new M.MeshBuilder({ exportMode: true });
+  const acc = new M.MeshBuilder({ exportMode: false });
   let got;
   try {
     const fr = M.footRing(state, acc);
@@ -234,10 +244,10 @@ const MUTANTS = [
       if (!m || !c) return 'the guard row built no cut';
       const cl = c.filter((x) => x.keeps < c[0].keeps - 1e-9 || x.relief < c[0].relief - 1e-9);
       if (!cl.length) return 'the clean module limits no period on this row — the guard does not bind and the mutation is unobservable';
-      const worst = Math.min(...m.map((x) => x.keeps));
-      return worst < M.TIP_HALF_MM - 1e-9
+      const worst = Math.min(...m.map((x) => x.keeps)), was = Math.min(...c.map((x) => x.keeps));
+      return worst < M.TIP_HALF_MM - 1e-9 && was >= M.TIP_HALF_MM - 1e-9
         ? null
-        : `the mutant still keeps ${worst.toFixed(4)} mm at its shallowest sinus, at or above the print floor ${M.TIP_HALF_MM} — the guard did not stop reading each period's own headroom`;
+        : `the mutant keeps ${worst.toFixed(4)} mm at its shallowest sinus where the clean module keeps ${was.toFixed(4)} — the guard did not stop reading each period's own headroom (the print floor is ${M.TIP_HALF_MM})`;
     } },
   { id: 'relief-target-is-not-the-widest-half-width',
     why: 'the relief target is a fraction of the FOOT\'s half-width rather than of the petal\'s widest, so every tooth is the wrong depth while the guard still holds',

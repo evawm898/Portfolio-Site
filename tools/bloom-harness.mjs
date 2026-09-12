@@ -4873,7 +4873,6 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      either side — a printer sees nothing — but X2 admits only 0 or a declaration, and a
      declaration is the honest one: X1 will say when a ladder change lands 0 here again,
      and the entry comes off then. Both counts are unmoved by the seam clearance. */
-  'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)': '1 pair, worst span 0.0000 mm (was 3 before session 41 moved the demand from 11 to 9 stations a lobe on this shape; the PLAIN cup 0.40 build reads 2 span-0 touches, so they are the cup\'s)',
   /* DECLARED BY SESSION 41, and the entry is the two-sided build rather than
      a reading. This row asked for lobes over a buckle whose OWN contacts are
      already declared — `BUCKLE: the default frequency at a strong amplitude
@@ -4884,9 +4883,10 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      the default shape, against the ruled 11), the stations moved, and they
      now land on the buckle's own hairline contacts. The two-sided build is
      the evidence: PLAIN 8 pairs / 0.0104 mm, LOBED 20 / 0.0965. */
-  'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)': '724 pairs, worst span 0.4626 mm (was 722 / 0.2891 before session 41; over "petalCup max (1.2)", which reads 752 pairs / 0.1268 mm on THIS tree)',
-  'LOBES: x roll 330 (over the quill, declared on main)': '18712 pairs, worst span 1.6115 mm (was 18072 / 1.6072 before session 41; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm on THIS tree)',
-  'LOBES: x curl 360 (over the fiddlehead, declared on main)': '784 pairs, worst span 0.8971 mm (was 816 / 0.6999 before session 41; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm on THIS tree)',
+  'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)': '1 pair, worst span 0.0000 mm (was 3 before session 41 moved the demand from 11 to 9 stations a lobe on this shape; the PLAIN cup 0.40 build reads 2 span-0 touches, so they are the cup\'s. SESSION 42 re-measured it through the gate on MODEL B: the SAME 1 pair at the SAME span 0.0000 mm, at (-5.91, 19.08, 7.47) — a tangency of the census triangles against the cup\'s own form-onset crease, which the rim model does not reach. It read 0 on an intermediate tree of this branch and the entry was taken off on that reading; the ladder-search tolerance below put the station back and the entry with it, which is the count being a property of where the stations land on a crease rather than of a fold)',
+  'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)': '724 pairs, worst span 0.2155 mm (session 42 re-baselined on the branch: the COUNT is unchanged at 724 and the worst span falls from main\'s 0.4626; over "petalCup max (1.2)", which reads 752 pairs / 0.1268 mm)',
+  'LOBES: x roll 330 (over the quill, declared on main)': '16360 pairs, worst span 1.6115 mm (session 42 re-baselined on the branch: 18712 on main at the same control set, so MODEL B takes 2,352 pairs OFF the quill; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm)',
+  'LOBES: x curl 360 (over the fiddlehead, declared on main)': '864 pairs, worst span 0.8971 mm (session 42 re-baselined on the branch: 784 on main at the same control set; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm)',
   'LOBES: x the whole centre (stamens and a style under a lobed whorl)': '272 pairs, worst span 0.0796 mm',
   'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '11824 pairs, worst span 0.7468 mm (was 12264 / 0.7032 before session 41)',
   'LOBES: x the domed hub (head rise 1.00)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)',

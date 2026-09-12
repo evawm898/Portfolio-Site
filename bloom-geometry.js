@@ -3354,32 +3354,48 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
   const total = cum[LADDER_SAMPLES];
   if (!(total > 0)) return seamBinds ? fallback() : uniform;
+  /* THE SEARCH BELOW COMPARES TWO ROUTES TO ONE NUMBER, AND ITS SLACK IS
+     DERIVED FROM THE ACCUMULATION RATHER THAN TYPED (session 42). A region's
+     interior target is `cA + (cB - cA) * j / count`; the samples it is
+     compared against are partial sums of LADDER_SAMPLES terms. WHERE THE
+     MEASURE IS AN ARITHMETIC PROGRESSION — which it exactly is over any
+     stretch the law is inactive on, the tip cap's straight lerp among them —
+     those two routes reach the SAME VALUE BY CONSTRUCTION, and a strict `<`
+     then decides a whole sample on their last bits. Measured on
+     `LOBES: x petalTipShape 0.60`: the tip sub-region's midpoint sits
+     1.97e-13 from sample 6943 against a real step of 8.19e-4, the page's V8
+     and the Node rebuild landed either side of it, and the station came out
+     8.93e-5 of `u` apart — 2.5e-4 mm of geometry, which X0 refused as not
+     that state's build. Session 38 fixed this for the region's LAST station
+     by asking for `cB` itself; this is the same defect at the interior ones.
+
+     THE BOUND IS THE SUM'S OWN: `cum[m]` is m roundings of values bounded by
+     `total`, so its representation error is at most `m * EPS * total / 2`,
+     and the terms themselves (a difference of two `atan2`, which V8 rounds to
+     within an ulp) contribute at most `EPS * total` more. `LADDER_SAMPLES *
+     EPS * total` bounds both with room to spare — 1.86e-11 on that row, 100x
+     the divergence actually seen and SEVEN ORDERS below the step it has to
+     stay clear of, so it can only ever merge a target with a sample it was
+     already equal to. It is not a tolerance on the geometry: the emitted
+     station is still `sampleU` of an integer, exactly as before. */
+  const tol = LADDER_SAMPLES * Number.EPSILON * total;
   /* Stations at equal increments of the measure between two of its values —
      the whole blade when there is no demand (today's placement, verbatim), one
      region at a time when there is. */
-  /* AND UNDER A DEMAND THE STATION IS INTERPOLATED, NOT SNAPPED TO A SAMPLE
-     (session 42, the FIFTH instance of a discrete decision on a continuous
-     quantity in this function). The search below finds the first sample whose
-     cumulative measure reaches the target and takes THAT SAMPLE'S `u`. The
-     measure is transcendental at every term and reads ~1e-12 apart between
-     the page's V8 and Node's, so wherever a target sits within that of a
-     sample boundary the two engines take DIFFERENT SAMPLES — a whole ladder
-     sample, 8.5e-5 of u, and 2.5e-4 mm of coordinate after the blend damps
-     it. X0 caught exactly that on `LOBES: x petalTipShape 0.60`: the exported
-     STL and the Node rebuild of the page's own state differed at one float.
-     Interpolating between the two bracketing samples makes the station a
-     CONTINUOUS function of the measure, so an ulp of disagreement moves it by
-     an ulp instead of by a sample. It is the same law — "place at equal
-     increments of the measure" — evaluated exactly rather than to the nearest
-     sample above.
-
-     ONLY UNDER A DEMAND, and that is a SCOPING rather than a second law. The
-     plain path keeps main's stations to the bit, which is what lets this
-     session's byte partition stay the rows that build a cut; the exposure is
-     PRE-EXISTING and identical on both paths, and removing it everywhere is a
-     whole-matrix partition of its own. Recorded in the session-42 outcome doc
-     as the schedulable fix, with its cost. */
-  const placeInto = (rows, cA, cB, count, interp = false) => {
+  /* THE STATION IS SNAPPED TO A SAMPLE, AND THAT IS LOAD-BEARING FOR
+     REPRODUCIBILITY (session 42, measured both ways). `sampleU(hi)` is an
+     exactly-computed function of an INTEGER, so two engines that agree on
+     `hi` emit the same double to the bit; interpolating between the two
+     bracketing samples was tried and makes every station a continuous
+     function of a transcendental sum that reads ~1e-12 apart between the
+     page's V8 and Node's — so EVERY coordinate then differs in its last bits
+     and X0's exact float32 comparison straddles a rounding boundary
+     somewhere. Measured: interpolation turned ONE row's 2.5e-4 mm sample jump
+     into last-bit disagreements on two OTHER rows. Snapping is stable
+     wherever `hi` agrees, which is what makes main's 674 rows pass X0, and
+     what this session does instead is remove the one NEW input that made `hi`
+     disagree — see the relief's grid in `widthProfile`. */
+  const placeInto = (rows, cA, cB, count) => {
     for (let j = 1; j <= count; j++) {
       /* The region's LAST station is asked for at cB ITSELF, not at
          `cA + (cB - cA)`, which is cB give or take an ulp: under a demand cB
@@ -3392,14 +3408,8 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
          and the answer is the top sample either way. */
       const target = j === count ? cB : cA + (cB - cA) * j / count;
       let lo = 0, hi = LADDER_SAMPLES;
-      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
-      if (!interp) { rows.push(sampleU(hi)); continue; }
-      /* The bracketing samples' own measure values; a zero-width bracket
-         (a flat stretch of the measure) takes the sample, which is what the
-         un-interpolated branch does and is the only answer available. */
-      const c0 = cum[hi - 1], c1 = cum[hi], span = c1 - c0;
-      const t = span > 0 ? (target - c0) / span : 1;
-      rows.push(sampleU(hi - 1) + (sampleU(hi) - sampleU(hi - 1)) * (t < 0 ? 0 : t > 1 ? 1 : t));
+      while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target - tol) lo = m; else hi = m; }
+      rows.push(sampleU(hi));
     }
   };
   const cumAt = (u) => { const i = Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES))); return cum[i]; };
@@ -3428,7 +3438,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
     if (T < minTip) { T = minTip; S = R - T; }
     if (S < 0) { S = 0; T = R; }
     regions = { S, W, T };
-    placeInto(out, 0, cS, S, true);
+    placeInto(out, 0, cS, S);
     /* THE WINDOW'S OWN SUB-REGIONS — ONE PER PERIOD (session 42). A window
        TOTAL cannot express a PER-PERIOD criterion: the ladder spreads it by
        its own turning measure, which is concentrated at the tip, so the
@@ -3476,7 +3486,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
           ns[big]--;
         }
       }
-      for (let i = 0; i < n; i++) placeInto(out, edges[i], edges[i + 1], ns[i], true);
+      for (let i = 0; i < n; i++) placeInto(out, edges[i], edges[i + 1], ns[i]);
       regions = { S, W, T, sub: ns };
       /* WHAT WAS PLACED, PER SUB-REGION, BEFORE THE GAP-BOUND BLEND. The
          blend that follows pulls every station toward uniform and can carry
@@ -3486,10 +3496,10 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
          identity and reports the second. */
       if (report) report.placedSub = ns.slice();
     } else {
-      placeInto(out, cS, cW, W, true);
+      placeInto(out, cS, cW, W);
       if (report) report.placedSub = [W];
     }
-    placeInto(out, cW, total, T, true);
+    placeInto(out, cW, total, T);
   }
   /* THE REGIONS ARE DECIDED BEFORE THE BLEND AND DO NOT MOVE WITH IT, so
      they are reported HERE rather than at the end — the gap bound has an
@@ -4059,7 +4069,24 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        its distance-from-the-apex's, and that is |d|. */
     const headroomOf = (dd) => { const a = Math.abs(dd); return headroomAt(onMargin(a) ? uAtD(a) : 1); };
     const reliefAskedMm = depthAsked * Math.max(0, peakHalfMm - TIP_HALF_MM);
-    const reliefMm = sinusD.map((dd) => Math.min(reliefAskedMm, headroomOf(dd)));
+    /* THE RELIEF LANDS ON A GRID, AND THAT IS ABOUT REPRODUCIBILITY RATHER
+       THAN PRECISION (session 42). Each period's relief is read at a sinus
+       station that a BISECTION on the arc table produces, so it carries that
+       station's last bit times the outline's own slope — measured 1.776e-15
+       mm between the page's V8 and Node's. That is harmless in itself and
+       ruinous downstream: the relief enters `ladderHalfAt`, which is the
+       turning measure, and `placeInto`'s search is a DISCRETE decision on it,
+       so one last bit can move a whole ladder sample (8.5e-5 of u, 2.5e-4 mm
+       of coordinate after the blend) and X0 refuses the export as not this
+       state's build. It did, on `LOBES: x petalTipShape 0.60`.
+
+       FLOORED, never rounded, and onto a POWER-OF-TWO grid in millimetres so
+       the quantisation itself is exact in IEEE-754. Flooring keeps the
+       per-period guard's inequality intact — a relief rounded UP could take
+       the outline a few parts in 10^5 below the print floor — and
+       2^-16 mm is 1.5e-5, four orders under the 0.8 mm floor and eleven
+       above the divergence it removes. */
+    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);
     /* THE APEX NOTCH IS ITS OWN FACT AND NOT A CLAMP. At an EVEN count a
        sinus sits at d = 0, on the terminal mini-face, where the base outline
        is already at the print floor — so its headroom is exactly 0 and its
@@ -4696,6 +4723,10 @@ export const LOBE_SAMPLES_PER_LOBE = 11;
    (PR 1's R3 table), so 1024 is within ~2e-4 mm of the limit on the default
    — three orders under the pitch floor. */
 export const LOBE_ARC_SAMPLES = 1024;
+/* THE GRID EVERY PERIOD'S RELIEF IS FLOORED ONTO — see the relief law in
+   `widthProfile`. A POWER OF TWO in millimetres, so the quantisation is exact
+   in IEEE-754 and the only arithmetic left is a floor. */
+export const LOBE_RELIEF_GRID = 2 ** -16;
 /* THE GUARD. `!x` rather than `=== 0` for the reason buckleIsFlat gives: a
    state with no registry row reads the key as undefined and must read as
    plain. The registry's twin is PREDICATES.lobesEngaged; the harness checks

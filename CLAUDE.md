@@ -1781,6 +1781,133 @@ Eva's images — the 3 x 3 shape square (at count 3, because the demand is a fun
 shape and a higher count would CLAMP the blunt corner, leaving the grid varying the count
 as well) and the serration / midpoint / lobing row on the shipped sliders with no hook.
 
+**THE RIM IS ONE CURVE, THE APEX IS A POINT ON IT, AND THE RELIEF IS A LENGTH — MODEL B
+SHIPS** (session 42 — read `docs/bloom-lobe-model.md` for Eva's model, then
+`docs/bloom-session-42-outcome.md`, before touching `widthProfile`'s lobes block,
+`bladeStations`' region split or the L family). Coverage is a SYMMETRIC ARC centred on
+the apex — Eva's clock, "just twelve o'clock, or eleven through one, or the whole clock
+excluding six" — so **twelve is the one point coverage never removes** and the apex is
+INTERIOR to the treatment at every coverage. Session 40 established MODEL A as an
+IDENTITY (the profile above `uCap` `Object.is`-equal to a petal with no lobes at all,
+4001 of 4001 samples, both modes); **its own instrument, unchanged, now reads 3075 of
+4001 DIFFERING** — `node tools/bloom-lobe-model-b.mjs --section=0`, whose verdict is
+DERIVED from the rows it prints rather than written as a literal, so it stays a witness
+when the answer moves again.
+**THE COUNT IS TEETH AND THE PARITY IS DERIVED**: `periods = count + 1`, the rim's
+midpoint is a crest iff that is even, so an ODD count puts a crest at twelve and an EVEN
+one a notch. `LOBE_COUNT_RANGE` opens to [1, 10] for Eva's "one lobe at twelve".
+**AN EVEN COUNT'S APEX NOTCH HAS NOTHING TO CUT AND THAT IS A PRINTABILITY FACT**: its
+sinus sits on the terminal mini-face, already at the print floor in BOTH modes, so its
+headroom and its relief are exactly zero at every depth and the two teeth either side
+read as one wide one. Told on the read-out, carried as `apexIsCrest` / `apexReliefMm`,
+asserted by L8 in both directions, photographed as the second row of
+`docs/img/lobe-apex-arc.png`. **NOT fixable from this side** — fixing it means SHORTENING
+the petal at the apex, which is `petalLength`'s and `petalTipShape`'s region, and the
+u = 1 mini-face may never be collapsed (session 32's upstream contract, §5).
+**THE DEPTH IS A RELIEF IN MILLIMETRES WITH A PER-PERIOD GUARD, AND THAT KILLS THE FADE.**
+`R = depth * (peakHalf - TIP_HALF_MM)`, `R_k = min(R, headroom(u_k))`, `cut = R_k * g`.
+So `depth` is still a fraction of a half-width — of the petal's OWN WIDEST one rather
+than of the local one. On session 40's own state the three notches go **2.366 / 1.923 /
+0.933 -> 2.160 / 2.160 / 2.160, spread 1.434 -> 0.000**, and at the default coverage and
+count 0 of the margin's teeth are relief-limited. **THERE IS NO GLOBAL DEPTH CLAMP** —
+that coupling is exactly what let the apex's scarcity shorten every tooth on the blade;
+`depthBuilt === depthAsked` always and `depthCap` is telemetry. A FOURTH `noRoom` cause,
+`relief`, replaces the `region` one MODEL B makes unreachable.
+**THE GUARD IS PER PERIOD BECAUSE THE OTHER TWO WERE MEASURED AND ARE WORSE**: a pointwise
+`min` gives the identical relief and a **26.8–37.8 degree** break mid-flank in LIVE; a
+strict per-period guard has no break and ZEROES the apex-most tooth. What the shipped one
+costs is over-reach the outline's own floor absorbs — **0 samples of 4001 under the print
+floor on the lamina in EXPORT on every row**, and in LIVE the 0.15 mm mesh floor lets the
+cut reach 0.42 mm below the mode-free bound over the last stretch of blade. 0 severed.
+**THE RESIDUAL IS REPORTED AND NOT CLAIMED GONE**: 0.491 mm of shortfall at 7 teeth over
+the full clock, 4.892 at depth 1.00, and **coverage 0.10 gets 0.243 mm of 2.160 asked** —
+the whole treated arc lies in the converging tip. The apex has the least material on the
+petal; exact parity at the last fraction of a millimetre is not available on a 1 mm sheet.
+**THE COUNT CEILING, EXPORT, default petal, coverage 0.10 / 0.40 / 0.80 / 1.00**: the
+shipped shape **2 / 4 / 6 / 7** (MODEL A gave 3 at the round default), the triangle wave
+3 / 10 / 10 / 10, cusped 3 / 8 / 10 / 10, flat 3 / 4 / 7 / 9. **RESOLUTION binds from
+below, the PRINT PITCH floor from above at the narrowest coverages.**
+**THE DEMAND IS A LIST NOW, ONE SUB-REGION PER PERIOD.** A window TOTAL cannot express a
+PER-PERIOD criterion — session 39 found it, session 42 measured it again under the arc:
+7 teeth at coverage 1.00 had the ladder hand **10/11/10/8 against a floor of 9**, and
+raising the total cannot fix it because the window already holds every free row. The
+ladder is still the ONE owner of row placement; it is told where the periods are, never
+where the rows go. After: 10/10/10/9. `bladeStations` reports `placedSub`, and L6 splits
+its clause into what the ladder PLACED (an identity) and what the gap-bound blend then
+moved (bounded at one station per boundary, reported).
+**A MODE-FREE BREAK LIST WAS OWED THE MOMENT THE ARC TABLE RAN THROUGH THE TIP FLOOR**
+(u 0.9945 export, 0.9993 live). `laminaWinner` is it, beside `winnerOf`. Row positions
+are topology; session 32's mode-dependence defect refusing a third shipping.
+**AND THE FIFTH DISCRETE-DECISION-ON-A-CONTINUOUS-QUANTITY, WITH ITS FIRST FIX REVERTED
+AFTER MEASUREMENT.** X0 went red at 2.5e-4 mm on `LOBES: x petalTipShape 0.60`: every
+scalar of the record agreed, `sinusU` differed by ONE ULP, and one station by 7.978e-6 in
+u — one ladder sample. Interpolating `placeInto` between the bracketing samples removes
+the discreteness and **is the wrong trade**: `sampleU(hi)` is an exact function of an
+INTEGER, so snapping is bit-identical wherever `hi` agrees (which is why main's 674 rows
+pass X0), while interpolation makes EVERY coordinate a function of a sum that reads ~1e-12
+apart between the page's V8 and Node's. Measured: it turned one row's 2.5e-4 mm jump into
+last-bit float32 straddles on two OTHER rows. **The grid on the one NEW input is HALF the fix**:
+`reliefMm` FLOORED onto `LOBE_RELIEF_GRID = 2^-16` mm (a power of two, so the quantisation
+is exact; floored, so the guard's inequality survives) — it cleared `CONTINUOUS x 3 turns`
+and `SPHERE` and **did nothing at all for the tip-shape row**, so "the divergence came from
+the relief" was right about two rows of three and wrong as a statement; the incomplete
+reading cost a gate cycle and is recorded rather than rewritten.
+**THE OTHER HALF IS SESSION 38 §B10.7'S OWN FINDING AT THE *INTERIOR* STATIONS, and only
+MEASURING THE SEARCH'S MARGINS found it.** Of the 56 decisions on that row, four sit within
+1e-9 of a sample: three are the `j === count` case session 38 already made exact (margin
+EXACTLY 0), and the fourth is the tip sub-region's midpoint at **1.97e-13 against a local
+step of 8.19e-4**. Not sensitivity — an IDENTITY: where the outline law is INACTIVE the
+turning term is identically zero and the arc term constant, so `cum` is an exact ARITHMETIC
+PROGRESSION and a region spanning 2114 samples has its midpoint ON sample 6943. `cA + (cB -
+cA) * j / count` and 6943 accumulated additions are the same number by two routes, and a
+strict `<` between them is decided by the last bit. **MODEL B is what made a whole
+sub-region linear enough to land on one.** The fix is a slack DERIVED FROM THE ACCUMULATION
+— `tol = LADDER_SAMPLES * EPS * total` (1.86e-11 there), because `cum[m]` is m roundings of
+values bounded by `total` plus the terms' own ulp — with the search reading `cum[m] < target
+- tol`. The emitted station is still `sampleU` of an INTEGER; nothing is made approximate.
+**Measured both ways: 0 stations moved over 2,352 ladders (680 rows x both modes x every
+ring) on the Node side — so the byte partition is untouched by construction — while the same
+sweep with a 1e-6 tolerance moves 78, and the failing row's page and Node builds now agree
+on all 56 stations to the BIT in both modes.** **Interpolation is still the right law for
+the residual (a target NEARLY but not exactly on a sample) and wants X0's exact float32
+comparison re-derived as an ULP BOUND alongside it — a whole-matrix partition and its own
+session.**
+**L8 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE MODEL**: L0–L7 are all blind to where
+the treated arc ENDS, so a tree that reverted to MODEL A would pass every one of them on
+a shorter rim. **AND L7's INSTRUMENT INVERTED WITH THE LAW'S FORM** — session 41 wrote
+that the RATIO `1 - h/hb` is right and the DIFFERENCE `hb - h` wrong; under a relief in
+millimetres it is the other way round, because the difference is exactly `R_k g` and the
+ratio carries the taper as a `1/hb` term LINEAR in the offset. Measured before it moved:
+an asked notch power of 3.00 read **1.966**. Both notes are kept, the old above the new,
+so the inversion is checkable. L3's minima count moved onto the mode-free lamina (the
+mode's own floor manufactured a THIRD dip on a two-sinus row).
+**#221 IS CLOSED and one half of it is VACUOUS under MODEL B**, which the table says
+rather than shipping a mutant that can never apply: the per-period guard is derived so no
+floor can bind AT a sinus. And **the L5 guard mutant's witness must build in LIVE** — the
+EXPORT floor IS the bound the guard protects, so in export a broken guard is invisible on
+the emitted outline (it reported "the behaviour did not move" while removing the guard
+entirely). That is also why L5's print-floor clause is stated on the mode-free lamina
+against the record rather than on the emitted export half-width, where it is vacuous.
+**ZERO TRIANGLES**: 19,040 live and export at the default, 929.8 KiB — the same counts as
+main. MODEL B is a boundary change on a fixed row-and-column lattice.
+The image is `node tools/shot-bloom-apex-arc.mjs <dir>` ->
+**`docs/img/lobe-apex-arc.png`** (session 40's `serration-range.png` and session 41's
+`lobe-shape-law.png` stay put — each records a law that was shipping when it was
+rendered). The measurements are `node tools/bloom-lobe-relief.mjs`.
+
+**BOTH STL GATES TELL THE TRUTH ABOUT A FAILING RUN NOW** (#220, session 42's first
+commit). The headline divided by `results.length` — the SURVIVORS — so a dropped row left
+both numerator and denominator and the ratio read N/N; and the failure block went to
+stderr while the summary went to stdout, so in a combined CI log it flushed EARLIER than
+the summary it follows. Session 41 read `672/672 rows are ONE connected piece` off a
+674-row matrix. Three changes per gate, no assertion touched: the headline is the three
+real populations (attempted · reached the results · passed) and carries a DROPPED marker
+inline, a one-line pointer goes to STDOUT when the validity block fires, and the verdict
+is printed to stdout on BOTH branches so the last line can never read as a pass on a
+failing run. Verified with a two-row `--only` run against a copy with one row
+force-dropped. **Session 42 leaned on it repeatedly** — every diagnosis in its outcome doc
+started from a summary line that named the dropped rows and the clause that dropped them.
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
