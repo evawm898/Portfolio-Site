@@ -298,6 +298,36 @@ does not write. A clause that took its expected exponent out of the lobe record 
 move with the defect and could not fail — session 39's A8 blend clause and session
 38's `seam-floor-removed`, the same defect twice, and the brief names both.
 
+### 6c. L7's first version fired on the clean tree, and only the mutant table said so
+
+**The measurement was wrong, and wrong in the way that looks right.** It read the
+log-log slope of the REMOVED MATERIAL, `hb - h`. That is `hb · depth · g(r)` — a
+PRODUCT — so the base outline's own taper rides in it, and its maximum is not the
+sinus but the point where `hb' · g + hb · g' = 0`, which is a **stationary point**.
+A log-log slope read at a stationary point is 2 whatever the exponent: the notch
+measured **2.021 for an asked 2.50**, and the crest measured correctly only where its
+own exponent was at or below 1 (where the minimum is a genuine corner).
+
+So L7 fired on the UNMUTATED tree, and `shapes-swapped`'s witness reported the
+exchange failing for a reason that was the instrument's rather than the geometry's:
+clean (crest 1.011, notch 2.021), mutant (crest 2.508, notch 1.013) — the swap had in
+fact worked perfectly, and the clean tree's notch reading is what did not.
+
+**THE FIX IS THE RATIO, NOT THE DIFFERENCE.** `1 - h/hb` IS `depth · g(r)` wherever
+the shape term wins: `hb` divides out, so its minimum IS the crest (exactly 0), its
+maximum IS the sinus (exactly `depthBuilt`), and its local powers ARE the two
+exponents. Measured over ten states spanning the whole square, the worst error is
+**0.0269** against a tolerance of 0.10, and the triangle wave returns exactly
+**1.0000 / 1.0000**.
+
+**WHAT THIS IS AN INSTANCE OF**, because it is not a new class: a clause whose
+reference is entangled with something it did not mean to measure. The brief names
+three prior cases and this is a fourth in the same family — the quantity under test
+was the exponent and the measurement carried the base outline's taper as well. The
+mutant table is what found it; nothing else could, because on the clean tree the
+number was plausible (2.021 is a believable notch power) and on the mutated tree the
+swap still looked like a swap.
+
 **WHAT L0–L6 ARE BLIND TO, measured rather than assumed:** the count, the two caps, the
 window, the pitch, the demand and the crests-at-the-ends identity are all unchanged by
 swapping the two controls, coupling them, or serving both from one expression.

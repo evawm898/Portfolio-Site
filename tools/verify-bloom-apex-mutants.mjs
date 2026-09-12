@@ -121,7 +121,11 @@ function lobePowers(M) {
   } catch { return null; }
   const L = got.lobes;
   if (!L || L.noRoom || L.countBuilt < 2 || L.depthClamped) return null;
-  const removed = (u) => got.halfWidthBaseAt(u) - got.halfWidthAt(u);
+  /* THE CUT FRACTION, not the removed material — see the harness's L7: the
+     difference carries the base outline's taper and its maximum is a
+     stationary point of a product, so a slope read there is 2 for every
+     exponent. The ratio is `depth * g(r)` and its powers are the exponents. */
+  const removed = (u) => 1 - got.halfWidthAt(u) / got.halfWidthBaseAt(u);
   const span = (L.windowU[1] - L.windowU[0]) / L.countBuilt;
   const ternary = (lo, hi, want) => {
     for (let k = 0; k < 220; k++) {
