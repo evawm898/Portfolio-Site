@@ -1740,7 +1740,21 @@ family beside the apex one (it was A-only) and carries `shapes-swapped` and
 the assertion it names, on a row whose two exponents are set APART (a swap of equal values
 is undetectable by construction). **THE NOTCH IS A TANGENT BREAK when its power is at or
 below 1 and is DECLARED — `LOBE_SINUS`, new**; the retired family was parabolic at its
-minimum at every value so a notch could never be one. These do not reach the lobe
+minimum at every value so a notch could never be one. **AND A NOTCH POWER BELOW 1 IS A
+HÖLDER EXPONENT, WHICH MAKES THE EMITTED HALF-WIDTH ILL-CONDITIONED AT THE SINUS** — the
+cut goes as `1 - g ~ e^notch`, so the derivative is UNBOUNDED there and **one ulp of the
+station `u` moves `h` by 4.041e-9 mm at notch 0.60 against 8.882e-16 at notch 2.00**
+(measured, depth 0.30, default petal). L5 shipped comparing the PAGE's record against the
+NODE rebuild on an ABSOLUTE 1e-9 bar, so it went **red in CI on exactly the two
+cusped-notch rows** and the flood fill itself was clean — `672/672` printed over a 674-row
+matrix, the gate's own row-census clause naming the two it had dropped. THIRD instance of
+the exact-equality-across-two-routes class, and **invisible to every local instrument by
+construction**: in Node both sides share one call chain and the difference is exactly 0,
+and no smoke row carries a cusped notch. The bar is now the quantity's own conditioning —
+`LOBE_SINUS_STATION_ULPS = 8` times the per-ulp sensitivity measured from the build's own
+profile, FLOORED at 1e-9 so it tightens nowhere and loosens only where it was measuring the
+two engines. §6e of the outcome doc has the table. **No mutant names L5**, so that clause
+rests on its own reading; recorded, not closed. These do not reach the lobe
 stationing and cannot: the arc table is built on the outline BEFORE the cut.
 **THE LADDER DOES NOT PILE AT THE NEW KINKS, measured rather than assumed** (the turning
 measure integrates |d tangent| and a kink is a DELTA — four prior instances of that bug

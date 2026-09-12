@@ -69,6 +69,30 @@ const GEOMETRY = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')
    derivation and both measured endpoints: 1.5 ULP worst over the live matrix,
    2.41e15 ULP on the mutant that names A7. */
 const SEAM_FRAME_RESIDUAL_ULP = 8;
+/* L5's STATION BUDGET, and the reason it cannot be an absolute bar on a
+   half-width. L5 compares the BUILDER's recorded deepest sinus against the law
+   rebuilt HERE at the builder's own recorded stations — two owners, which is
+   the point — but the record is made in the PAGE's V8 and the rebuild runs in
+   NODE's, and `sinusU` is transcendental at every term, so the two engines'
+   stations differ in their last bits (session 38 §B10.7 measured that split on
+   the ladder's own cumulative measure).
+   THAT DIFFERENCE IS NOT AMPLIFIED EQUALLY. At the sinus the cut goes as
+   `1 - g ~ e^notch`, so the notch exponent IS the local Hölder exponent: above
+   1 the derivative is bounded and the two routes agree to ~1e-15, while BELOW 1
+   the derivative is UNBOUNDED and one ulp of the station moves the half-width
+   by 2-4e-9 mm. Measured at depth 0.30 on the default petal, one ulp of `u`
+   moves `h` by 4.041e-9 at notch 0.60 and 1.855e-9 at the DENTATE corner
+   against 8.882e-16 at notch 2.00 and 3.00 — six orders of magnitude, entirely
+   from the exponent.
+   So the bar is the quantity's OWN CONDITIONING, measured on the spot from the
+   gate's own emitted profile rather than modelled or fitted: the per-ulp
+   sensitivity at the recorded stations times this budget, FLOORED at the
+   absolute 1e-9 the clause shipped with so it tightens nowhere it already
+   passes and loosens only where the law is genuinely ill-conditioned. The
+   clause prints the budget it used and what fraction of it the observed
+   difference spent. 8 ulps for the same reason A7's bound is 8: a handful of
+   last-bit steps between two engines, not a number chosen to admit the data. */
+const LOBE_SINUS_STATION_ULPS = 8;
 
 export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, MAX_LAYERS, GOLDEN_ANGLE, SPIRAL_LEGIBLE_COUNT,
          /* THE APEX'S TWO MODE FLOORS, imported rather than restated: A4
@@ -1327,7 +1351,17 @@ export async function lobeAssertions(page, row) {
     const wantDepth = Math.min(Number(ui.lobeDepth), L.depthCap);
     if (Math.abs(L.depthBuilt - wantDepth) > 1e-12) bad.push(`L5: depthBuilt ${L.depthBuilt} is not min(asked ${ui.lobeDepth}, cap ${L.depthCap})`);
     if (L.depthClamped !== (Number(ui.lobeDepth) > L.depthCap)) bad.push(`L5: depthClamped ${L.depthClamped} disagrees with asked ${ui.lobeDepth} against cap ${L.depthCap}`);
-    if (Math.abs(L.sinusMinHalfMm - sinusMin) > 1e-9) bad.push(`L5: the record's deepest sinus ${L.sinusMinHalfMm} is not the law's ${sinusMin} at the recorded stations`);
+    /* THE BAR IS DERIVED FROM THE QUANTITY — see LOBE_SINUS_STATION_ULPS.
+       `nextUp` steps one double; the sensitivity is read off THIS build's own
+       profile at the recorded stations, so a cusped notch opens the bar by
+       exactly as much as its own Hölder exponent requires and a smooth one
+       does not open it at all. */
+    const nextUp = (x) => { const b = new Float64Array(1); b[0] = x; const i = new BigInt64Array(b.buffer); i[0] += 1n; return b[0]; };
+    let perUlp = 0;
+    for (const us of L.sinusU) perUlp = Math.max(perUlp, Math.abs(h(us) - h(nextUp(us))));
+    const sinusTol = Math.max(1e-9, LOBE_SINUS_STATION_ULPS * perUlp);
+    const sinusGap = Math.abs(L.sinusMinHalfMm - sinusMin);
+    if (sinusGap > sinusTol) bad.push(`L5: the record's deepest sinus ${L.sinusMinHalfMm} is not the law's ${sinusMin} at the recorded stations — ${sinusGap.toExponential(3)} mm apart against a bound of ${sinusTol.toExponential(3)} (${LOBE_SINUS_STATION_ULPS} station ulps at ${perUlp.toExponential(3)} mm each, floored at 1e-9), so this is the geometry and not the two engines' last bits`);
     if (!(sinusMin >= TIP_HALF_MM - 1e-9)) bad.push(`L5: the deepest sinus keeps ${sinusMin.toFixed(4)} mm of half-width, under the print floor's ${TIP_HALF_MM} — the cap did not hold`);
     for (const us of L.sinusU) if (!(us > u0 && us < u1)) bad.push(`L6: a sinus at u ${us} is not strictly inside the window ${u0}..${u1}`);
   }

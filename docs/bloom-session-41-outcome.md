@@ -413,6 +413,75 @@ asserted and all 61 claimed by a row's path, both directions**, with L7 among th
 matrix BLOCK was added, so the block count is unchanged at 25 — the shape rows went
 into block 29 where they belong.
 
+### 6e. L5 WENT RED IN CI ON THE TWO CUSPED-NOTCH ROWS, AND THE NOTCH EXPONENT IS A HÖLDER EXPONENT
+
+`bloom-connectedness` failed on `380ebee` with the flood fill itself clean — every row
+`ok`, `672/672 rows are ONE connected piece`. **The headline divided by 672 where the live
+matrix is 674**, which is this gate's own line-265 trap working exactly as written: an
+assertion failure `continue`s out of the loop, so a dropped row never reaches `results`,
+and the `row census` clause is what names it. The two dropped rows were **`LOBES: both
+CUSPED`** and **`LOBES: a FLAT crest over a CUSPED notch (DENTATE)`** — the only two rows
+in the matrix carrying `lobeNotchShape` 0.60 with a cut actually built.
+
+**The clause was L5, not L7**, and it read:
+
+```
+L5: the record's deepest sinus 3.9969159016530362 is not the law's 3.996915903722801
+L5: the record's deepest sinus 4.120909240231553 is not the law's 4.12090924205863
+```
+
+2.07e-9 and 1.83e-9 mm apart, against an **absolute 1e-9 bar on a half-width of ~4 mm**.
+
+**THE MECHANISM, MEASURED RATHER THAN MODELLED.** Near the sinus the cut goes as
+`1 - g ~ e^notch`, so **the notch exponent IS the local Hölder exponent of the emitted
+outline**: at or above 1 the derivative is bounded, and below 1 it is UNBOUNDED. Probed on
+the gate's own rebuilt profile at depth 0.30 on the default petal, ONE ULP of the station
+`u` moves the half-width `h` by:
+
+| crest / notch | one ulp of `u` moves `h` by |
+|---|---|
+| 0.60 / **0.60** | **4.041e-9 mm** |
+| 3.00 / **0.60** | **1.855e-9 mm** |
+| 1.00 / 1.00 | 7.105e-15 |
+| 2.00 / 1.00 | 3.553e-15 |
+| 0.60 / 3.00 | 1.776e-15 |
+| 3.00 / 3.00 | 8.882e-16 |
+| 1.00 / 2.00 | 8.882e-16 |
+
+Six orders of magnitude, entirely from the exponent — and the DENTATE row's 1.855e-9 is
+its observed CI failure of 1.83e-9 to within the probe's own step. L5 compares the
+BUILDER's record, made in the PAGE's V8, against the law rebuilt HERE in NODE's, and
+`sinusU` is transcendental at every term, so the two engines' stations differ in their last
+bits (session 38 §B10.7 measured that split on the ladder's cumulative measure). **At a
+cusp that last bit is amplified ten-millionfold. The clause was asking for more precision
+than the quantity carries.**
+
+**WHY NOTHING LOCAL COULD HAVE CAUGHT IT**, which is the part worth keeping: in pure Node
+the record and the rebuild come from ONE call chain, so the difference is **exactly 0** —
+the probe above reads `0.000e+0` on every pair. It is observable only page-against-Node.
+And the smoke subset holds one row per block and no cusped-notch row, so `--conn` was
+clean, the mutant table was clean (it is Node-against-Node by construction), and the
+byte partition was clean. **This is the THIRD instance of the exact-equality-across-two-routes
+class** (after `seamFrameResidual === 0` and A8's first blend clause) and the FIFTH of a
+too-exact decision on a continuous quantity. It arrived the same way the first did: red in
+CI, on a row the iteration subset does not contain.
+
+**THE FIX IS THE PRESCRIBED REMEDY — bound the difference in the unit the quantity carries,
+derived from the quantity.** `LOBE_SINUS_STATION_ULPS = 8` is the declared owner (8 for A7's
+reason: a handful of last-bit steps between two engines, not a number chosen to admit the
+data), and the bar is that budget times the **per-ulp sensitivity measured on the spot from
+this build's own emitted profile**, FLOORED at the 1e-9 the clause shipped with. So the bar
+opens by exactly as much as a row's own Hölder exponent requires and does not move at all
+where the law is smooth: at notch 2.00 or 3.00 the sensitivity is ~9e-16, eight ulps of it
+is 7e-15, and the floor holds — **the clause tightens nowhere and loosens only where it was
+measuring the two engines rather than the geometry.** The message now prints the bound, the
+per-ulp figure and that the difference is the geometry's if it is exceeded. On the cusped
+rows the observed 2.07e-9 spends 6.4% of a 3.2e-8 budget.
+
+**WHAT IS NOT CLOSED:** no mutant names L5, so that clause's coverage is asserted by nothing
+but its own reading — a pre-existing hole this change neither widens nor closes, recorded
+here rather than fixed under a merge.
+
 ### 6a. The byte partition, predeclared
 
 The matrix grew **666 → 674**: eight rows for the shape axis (the two retired
