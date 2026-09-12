@@ -448,8 +448,18 @@ await pasteGeneratedImage('#drawer', 600, 600);
 await page.waitForTimeout(SLIDE);
 check('paste with the drawer (not a field) focused still works', await page.locator('#photoThumb img').count() === 1);
 await page.fill('#fPhoto', 'https://example.com/p.jpg');
-await page.waitForTimeout(100);
-check('typing a url drops the pasted image', (await page.locator('#photoThumb img').getAttribute('src')) === 'https://example.com/p.jpg');
+// WAIT FOR THE SIGNAL, NOT A FIXED SLEEP. The thumbnail is swapped
+// asynchronously, so a bare `waitForTimeout` then `getAttribute` samples an
+// arbitrary point: when the box is loaded (fifteen browser runs back to back
+// during a mutation sweep) the img can be momentarily absent and the read
+// hangs the whole harness for 30s. Measured: this site killed four different
+// mutant runs across two sweeps, on four unrelated mutations, and never on a
+// base run -- which is what "it is the harness, not the page" looks like.
+const urlSwapped = await page.waitForFunction(
+  () => { const i = document.querySelector('#photoThumb img'); return i && i.src; },
+  null, { timeout: 5000 }).then(h => h.jsonValue()).catch(() => null);
+check('typing a url drops the pasted image', urlSwapped === 'https://example.com/p.jpg',
+  String(urlSwapped));
 await page.locator('#saveEntry').click();
 await page.waitForTimeout(200);
 check('url fallback saved', (await page.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='a1').photo)) === 'https://example.com/p.jpg');
@@ -1048,8 +1058,15 @@ if(haveMore){
     [...document.querySelectorAll('#tagChips .tag-chip')].pop().dataset.tag);
   await tp.locator('.tag-chip[data-tag="' + lastKey + '"]').click();
   await tp.waitForTimeout(120);
-  await tp.locator('.tag-chip-more').click();
-  await tp.waitForTimeout(120);
+  // Assert it is THERE before clicking it. A mutation that removes the cap
+  // otherwise hangs here for 30s and takes every later check down with it, so
+  // the sweep learns nothing from a mutation that genuinely broke something.
+  const hasMore = await tp.locator('.tag-chip-more').count() === 1;
+  check('the collapse control is on screen to click', hasMore);
+  if(hasMore){
+    await tp.locator('.tag-chip-more').click();
+    await tp.waitForTimeout(120);
+  }
   check('a selected low-rank tag survives collapsing',
     await tp.locator('.tag-chip[data-tag="' + lastKey + '"]').isVisible());
   check('...and can be cleared', await tp.locator('.tag-chip-clear').isVisible());
@@ -1596,12 +1613,19 @@ section('item 28b — a backup states what it holds, and import applies nothing 
   // THE REGRESSION. The old import concatenated, so restoring a backup of the
   // current list on top of itself doubled every entry with nothing to undo it.
   await offer(exported);
-  check('choosing a file shows a card instead of importing', await p.locator('#ioReport .import-report').isVisible());
+  // Everything here is read only once the card is known to exist. A mutation
+  // that imports without asking leaves no card, and reading `#ioDedupe` off a
+  // page that has none hangs rather than failing -- which is the difference
+  // between a sweep that reports and one that dies at check 317.
+  const carded = await p.locator('#ioReport .import-report').count() === 1;
+  const cardText = carded ? await p.textContent('#ioReport') : '';
+  check('choosing a file shows a card instead of importing', carded);
   check('...naming what is in the file and what is already here',
-    /2 in the file/.test(await p.textContent('#ioReport')) && /2 already here/.test(await p.textContent('#ioReport')));
-  check('...and the overlap it is about to act on', /2 handle\(s\) in both/.test(await p.textContent('#ioReport')));
+    /2 in the file/.test(cardText) && /2 already here/.test(cardText));
+  check('...and the overlap it is about to act on', /2 handle\(s\) in both/.test(cardText));
   check('...defaulting to the mode that cannot destroy work',
-    await p.inputValue('#ioDedupe') === 'merge');
+    carded && await p.locator('#ioDedupe').count() === 1
+      && await p.inputValue('#ioDedupe') === 'merge');
   check('NOTHING has been imported yet', await count() === 2);
 
   await p.locator('#ioReport button', { hasText:'cancel' }).click();
