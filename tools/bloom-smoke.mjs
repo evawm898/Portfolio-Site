@@ -584,8 +584,17 @@ export const SMOKE_BLOCKS = [
         path: 'L5 in its BINDING direction — depth 1.00 asked, built at 1 - TIP_HALF_MM / the shallowest sinus, CLAMPED told, the deepest sinus keeping exactly the print floor\'s half-width in live mode too; L3 with the count unclamped' },
       { label: 'LOBES: NO ROOM by the pitch floor (20 mm petal at coverage 0.10 — a 1.0 mm window under the 1.20 mm floor; nothing cut, told)',
         path: 'the PITCH FLOOR as the cause of NO ROOM — L3\'s noRoom branch naming the pitch (the window under max(sheet, MIN_FEATURE_MM) holds no lobe while the rows cap would allow one), L2 the outline identical to the base everywhere, L1 the record present and telling; the one direction the count cap has that the rows cap does not exercise' },
-      { label: 'LOBES: GATED — count, coverage and tip shape at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)',
+      { label: 'LOBES: GATED — count, coverage and BOTH shapes at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)',
         path: 'the OTHER direction — L0 and L1 on a plain petal: depth 0 with every sub-control at its extreme builds no cut and reports no record; the row the byte tool proves bit-identical to the default' },
+      /* THE SHAPE AXIS (session 41). L7 is measured on the EMITTED outline,
+         so the row has to be one where BOTH of its measurements run: the
+         notch needs an UNCLAMPED depth (a clamped one holds the sinus on the
+         print floor, where the removed material is the floor's rather than
+         the law's) and the crest needs an INTERIOR crest, which exists only
+         from two lobes up. The triangle wave is the cheapest such row AND
+         the one the shipped one-exponent family could not draw at all. */
+      { label: 'LOBES: the TRIANGLE wave (crest 1.00, notch 1.00 — both acute, the serrate margin; g(r) = r to the bit)',
+        path: 'THE TWO SHAPE EXPONENTS — L7 in both of its measurements at once, on a row with an unclamped depth and interior crests: the local power of the removed material (hb - h) at a ternary-searched crest is the page\'s own lobeCrestShape and at a sinus its lobeNotchShape, so a build whose two controls are swapped, coupled or served by one expression fails here and nowhere else; and L3\'s demand clause with the SHAPE-dependent floor away from its ceiling (a triangle wave asks 3 stations a lobe, not 11), which is the one path on which the count cap is not the ruled constant\'s' },
     ],
   },
 ];

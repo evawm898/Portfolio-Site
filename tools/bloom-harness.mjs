@@ -79,7 +79,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
          BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT, BUCKLE_ROWS_PER_CYCLE_MIN, BLADE_ROWS,
-         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_TIP_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_TIP_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, ladderWindowCapacity, LADDER_BLEND_GRID,
+         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, lobeSamplesPerLobe, ladderWindowCapacity, LADDER_BLEND_GRID,
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
@@ -287,7 +287,8 @@ const LOBE_EXPECTED = {
   lobeDepth: { range: LOBE_DEPTH_RANGE, dflt: 0, section: 'lobes' },
   lobeCount: { range: LOBE_COUNT_RANGE, dflt: LOBE_COUNT_DEFAULT, section: 'lobes' },
   lobeCoverage: { range: LOBE_COVERAGE_RANGE, dflt: LOBE_COVERAGE_DEFAULT, section: 'lobes' },
-  lobeTipShape: { range: LOBE_TIP_SHAPE_RANGE, dflt: LOBE_TIP_SHAPE_DEFAULT, section: 'lobes' },
+  lobeCrestShape: { range: LOBE_SHAPE_RANGE, dflt: LOBE_SHAPE_DEFAULT, section: 'lobes' },
+  lobeNotchShape: { range: LOBE_SHAPE_RANGE, dflt: LOBE_SHAPE_DEFAULT, section: 'lobes' },
 };
 for (const [id, want] of Object.entries(LOBE_EXPECTED)) {
   const c = CONTROLS.find((x) => x.id === id);
@@ -1141,6 +1142,19 @@ export async function formAssertions(page, row) {
        CLAMPED agrees both ways; the deepest sinus built keeps at least
        TIP_HALF_MM of half-width in EITHER mode (the cap is derived from the
        export floor and is mode-free).
+   L7  THE TWO SHAPE EXPONENTS ARE PROPERTIES OF THE EMITTED OUTLINE, AND
+       THEY ARE INDEPENDENT (session 41). The cut's LOCAL POWER at a crest is
+       the crest exponent and at a sinus the notch exponent, each measured as
+       a log-log slope of the REMOVED MATERIAL (hb - h) against the offset
+       from a feature the ternary search pins on the emitted curve — never
+       from the record, which is the thing under test. THE REFERENCE IS THE
+       PAGE'S OWN READ-BACK CONTROL VALUES, an owner the outline does not
+       write: a clause that took its expected exponent out of the lobe record
+       would move with the defect and could not fail (A8's first blend clause,
+       session 39). A build whose two controls are swapped, coupled, or read
+       by one expression passes L0-L6 unchanged — the count, the caps, the
+       window, the pitch and the demand are all blind to WHICH SHAPE the cut
+       carries.
    L6  THE WINDOW AND THE ROWS. The window lies inside [ROOT_BLEND_END, uCap],
        the outline meets the base exactly at both ends (crests), every sinus
        is strictly inside, and the rows per lobe are what the emitted stations
@@ -1149,12 +1163,12 @@ export async function formAssertions(page, row) {
        station, so no lobe is skipped by the mesh.
    =================================================================== */
 export const LOBE_SCOPE =
-  'L0-L6 read the builder\'s own lobe record against the outline law rebuilt in Node from the page\'s read-back state; both STL gates are structurally blind to a cut in the wrong place, at the wrong depth, with the wrong count or not made at all.';
+  'L0-L7 read the builder\'s own lobe record against the outline law rebuilt in Node from the page\'s read-back state; both STL gates are structurally blind to a cut in the wrong place, at the wrong depth, with the wrong count, with the wrong SHAPE at either of its two features, or not made at all.';
 
 export function lobeResultLine(L) {
   if (!L) return 'LOBES: none';
   if (L.noRoom) return `LOBES: NO ROOM (${L.noRoomWhy}) — ${L.countAsked} asked, capacity ${L.rowsCapacity} rows at ${L.samplesPerLobe} a lobe (rows cap ${L.countRowsCap}), pitch cap ${L.countFloorCap} on ${L.windowMm.toFixed(2)} mm at a ${L.pitchFloorMm.toFixed(2)} mm floor; nothing cut`;
-  return `LOBES: ${L.countAsked} asked -> ${L.countBuilt} built${L.countClamped ? ` (CLAMPED by ${L.clampedBy}: capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})` : ` (capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})`} · depth ${L.depthAsked.toFixed(2)} -> ${L.depthBuilt.toFixed(2)}x${L.depthClamped ? ' (CLAMPED)' : ''} (cap ${L.depthCap.toFixed(3)}) · pitch ${L.pitchMm.toFixed(3)} mm (floor ${L.pitchFloorMm.toFixed(2)})${L.pitchBelowFloor ? ' BELOW THE FLOOR — told' : ''} · window u ${L.windowU[0].toFixed(4)}-${L.windowU[1].toFixed(4)} (${L.windowMm.toFixed(2)} of ${L.regionMm.toFixed(2)} mm) · ${L.rowsInWindow} stations, ${L.rowsPerLobe.toFixed(2)} rows per lobe · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(3)} mm across`;
+  return `LOBES: crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)} (demand ${L.samplesPerLobe} a lobe) · ${L.countAsked} asked -> ${L.countBuilt} built${L.countClamped ? ` (CLAMPED by ${L.clampedBy}: capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})` : ` (capacity ${L.rowsCapacity} rows -> ${L.countRowsCap}, pitch -> ${L.countFloorCap})`} · depth ${L.depthAsked.toFixed(2)} -> ${L.depthBuilt.toFixed(2)}x${L.depthClamped ? ' (CLAMPED)' : ''} (cap ${L.depthCap.toFixed(3)}) · pitch ${L.pitchMm.toFixed(3)} mm (floor ${L.pitchFloorMm.toFixed(2)})${L.pitchBelowFloor ? ' BELOW THE FLOOR — told' : ''} · window u ${L.windowU[0].toFixed(4)}-${L.windowU[1].toFixed(4)} (${L.windowMm.toFixed(2)} of ${L.regionMm.toFixed(2)} mm) · ${L.rowsInWindow} stations, ${L.rowsPerLobe.toFixed(2)} rows per lobe · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(3)} mm across`;
 }
 
 /* The buckle frequency the ladder's gap bound reads on this row: 0 when the
@@ -1236,7 +1250,17 @@ export async function lobeAssertions(page, row) {
      pitch floor. The floor is the derived constant (tools/bloom-lobe-
      resolution.mjs), asserted here to be what the record was built at
      unless a CAPABILITY named another. */
-  const samples = row.capability && row.capability.lobeSamplesPerLobe ? Number(row.capability.lobeSamplesPerLobe) : LOBE_SAMPLES_PER_LOBE;
+  /* THE SAMPLES-PER-LOBE FLOOR IS A FUNCTION OF THE SHAPE now (session 41),
+     so the expected value is the law's own `lobeSamplesPerLobe` at the
+     exponents the PAGE reports — a PLUMBING clause: it proves the demand the
+     record carries is the one the shape asks for, and it CANNOT prove the
+     table itself is right, because it reads that table. The table's own
+     independent witness is `node tools/bloom-lobe-resolution.mjs --verify`,
+     which re-derives every cell from the clauses rather than reading it. */
+  const samples = row.capability && row.capability.lobeSamplesPerLobe ? Number(row.capability.lobeSamplesPerLobe)
+    : lobeSamplesPerLobe(Number(ui.lobeCrestShape), Number(ui.lobeNotchShape));
+  if (!(row.capability && row.capability.lobeSamplesPerLobe) && !(samples >= 2 && samples <= LOBE_SAMPLES_PER_LOBE))
+    bad.push(`L3: the shape's demand is ${samples} stations a lobe, outside [2, the ruled ceiling ${LOBE_SAMPLES_PER_LOBE}] — no shape may ask more than session 38's derived resolution`);
   if (L.samplesPerLobe !== samples) bad.push(`L3: the record was built at ${L.samplesPerLobe} stations a lobe, the floor is ${samples}`);
   const capacity = ladderWindowCapacity(u0, u1, buckleFreqOf(ui));
   if (L.rowsCapacity !== capacity) bad.push(`L3: the record's capacity ${L.rowsCapacity} is not the ladder's ${capacity} for the window ${u0.toFixed(4)}-${u1.toFixed(4)}`);
@@ -1311,6 +1335,77 @@ export async function lobeAssertions(page, row) {
       let near = Infinity;
       for (const u of all) near = Math.min(near, Math.abs(u - us));
       if (near > half + 1e-12) bad.push(`L6: the sinus at u ${us.toFixed(4)} has no emitted station within half a period (${half.toFixed(4)}; nearest ${near.toFixed(4)}) — the mesh skips this lobe`);
+    }
+  }
+
+  /* L7 — THE SHAPE, MEASURED ON THE EMITTED OUTLINE (session 41).
+
+     The two exponents ARE the local powers of the cut at its two features,
+     by construction of the law; so they are readable off the emitted
+     half-width and need not be taken on trust. `removed(u) = hb(u) - h(u)`
+     is the material the cut took: exactly 0 at a crest, greatest at a sinus,
+     and `hb * depth * g(r)` in between — so its log-log slope against the
+     offset from a feature IS that feature's exponent, whatever the constant
+     in front, which is why neither the depth nor the local half-width has to
+     be known here.
+
+     THE FEATURE IS PINNED ON THE CURVE, NOT READ FROM THE RECORD: a ternary
+     search over `removed` finds the crest (its minimum) and the sinus (its
+     maximum). The record's crestU / sinusU are used only to BRACKET the
+     search, so a record that misplaced a feature would be caught by the
+     power coming back wrong rather than silently believed.
+
+     THE EXPECTED VALUE COMES FROM `ui`, the page's own read-back control
+     state — an owner `widthProfile` does not write. Reading it from the lobe
+     record instead would entangle the clause with the quantity it checks and
+     it could not fail (session 39's A8, session 38's seam-floor-removed).
+
+     WHAT IT CANNOT SEE, stated: a row whose depth is CLAMPED has its sinus
+     held at the print floor, so `removed` is not the law's there and the
+     notch power is not measurable; and a single-lobe window has no INTERIOR
+     crest, only the two branch ends. Both are SKIPPED — this family has no
+     note channel, so the skips are written down here and the smoke row that
+     claims L7 is chosen to be one where BOTH measurements run. */
+  if (Array.isArray(L.sinusU) && Array.isArray(L.crestU) && L.depthBuilt > 0) {
+    const removed = (u) => hb(u) - h(u);
+    const span = (u1 - u0) / L.countBuilt;
+    const ternary = (lo, hi, want) => {
+      for (let k = 0; k < 220; k++) {
+        const a1 = lo + (hi - lo) / 3, b1 = hi - (hi - lo) / 3;
+        const fa = removed(a1), fb = removed(b1);
+        if (want === 'min' ? fa <= fb : fa >= fb) hi = b1; else lo = a1;
+      }
+      return (lo + hi) / 2;
+    };
+    /* the log-log slope over offsets ONE DECADE apart, so the quotient of
+       logs is the exponent with no constant to cancel. */
+    const powerAt = (uf, dir) => {
+      const at0 = removed(uf);
+      const d1 = span * 1e-3, d2 = span * 1e-2;
+      const r1 = Math.abs(removed(uf + dir * d1) - at0), r2 = Math.abs(removed(uf + dir * d2) - at0);
+      if (!(r1 > 0 && r2 > r1)) return null;
+      return Math.log(r2 / r1) / Math.log(10);
+    };
+    const TOL = 0.10;
+    const wantCrest = Number(ui.lobeCrestShape), wantNotch = Number(ui.lobeNotchShape);
+    /* THE NOTCH — the middle sinus, skipped where the depth cap holds the
+       sinus at the print floor (then `removed` is the floor's, not the law's). */
+    if (!L.depthClamped) {
+      const us0 = L.sinusU[Math.floor(L.sinusU.length / 2)];
+      const us = ternary(us0 - span * 0.35, us0 + span * 0.35, 'max');
+      const pn = powerAt(us, -1);
+      if (pn === null) bad.push(`L7: the removed material does not vary either side of the sinus at u ${us.toFixed(5)} — the notch has no measurable power`);
+      else if (Math.abs(pn - wantNotch) > TOL) bad.push(`L7: the emitted outline's NOTCH power is ${pn.toFixed(3)} and the control asks ${wantNotch.toFixed(2)} (tolerance ${TOL}) — measured at u ${us.toFixed(5)} on hb - h, expected read from the page's own lobeNotchShape`);
+    }
+    /* THE CREST — an INTERIOR crest, which exists only from two lobes up;
+       the window's two ends are the branch boundary and not the law's own
+       feature. */
+    if (L.countBuilt >= 2) {
+      const uc0 = L.crestU[Math.round(L.crestU.length / 2) - 1] ?? L.crestU[1];
+      const uc = ternary(uc0 - span * 0.35, uc0 + span * 0.35, 'min');
+      const pc = powerAt(uc, +1);
+      if (pc === null) bad.push(`L7: the removed material does not vary above the crest at u ${uc.toFixed(5)} — the crest has no measurable power`);
+      else if (Math.abs(pc - wantCrest) > TOL) bad.push(`L7: the emitted outline's CREST power is ${pc.toFixed(3)} and the control asks ${wantCrest.toFixed(2)} (tolerance ${TOL}) — measured at u ${uc.toFixed(5)} on hb - h, expected read from the page's own lobeCrestShape`);
     }
   }
   return bad;
@@ -6079,8 +6174,18 @@ export function buildMatrix() {
     ['LOBES: 10 asked at maximum coverage — CLAMPED to 2 (capacity 31 rows; the ruled 10 does not survive the floor)', { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 }],
     ['LOBES: coverage min (0.10) — ONE lobe: the rows cap and the pitch cap both read 1 on a 1.8 mm window (CLAMPED by rows, told)', { lobeDepth: 0.3, lobeCount: 2, lobeCoverage: 0.1 }],
     ['LOBES: THE DEPTH CAP (1.00 asked — CLAMPED where the deepest sinus reaches the print floor)', { lobeDepth: 1, lobeCount: 2 }],
-    ['LOBES: pointed lobes (tip shape 0.50)', { lobeDepth: 0.3, lobeTipShape: 0.5 }],
-    ['LOBES: flat-topped lobes (tip shape 2.00)', { lobeDepth: 0.3, lobeTipShape: 2 }],
+    /* THE SHAPE AXIS (session 41). Two exponents, each the LOCAL POWER of
+       the cut at its own feature: 1.00 a corner, 2.00 parabolic, 3.00 flat,
+       under 1.00 a cusp. The corners of the square plus the two asymmetric
+       margins the shipped one-exponent family could not draw at all. */
+    ['LOBES: a POINT over a round U (crest 1.00, notch 2.00 — the old pointed lobe, drawn by the new law)', { lobeDepth: 0.3, lobeCrestShape: 1, lobeNotchShape: 2 }],
+    ['LOBES: a ROUND crest over a V (crest 2.00, notch 1.00 — CRENATE; unreachable on the shipped family at any exponent)', { lobeDepth: 0.3, lobeCrestShape: 2, lobeNotchShape: 1 }],
+    ['LOBES: the TRIANGLE wave (crest 1.00, notch 1.00 — both acute, the serrate margin; g(r) = r to the bit)', { lobeDepth: 0.3, lobeCount: 8, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['LOBES: SERRATION (8 asked at the triangle wave, low depth — the count the shape now buys: demand 3 a lobe, not 11)', { lobeDepth: 0.12, lobeCount: 8, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['LOBES: both CUSPED (crest 0.60, notch 0.60 — a needle over a slit, both local powers under 1)', { lobeDepth: 0.3, lobeCount: 4, lobeCrestShape: 0.6, lobeNotchShape: 0.6 }],
+    ['LOBES: both FLAT (crest 3.00, notch 3.00 — a square wave drawn as bends; the flattest reachable pair)', { lobeDepth: 0.3, lobeCrestShape: 3, lobeNotchShape: 3 }],
+    ['LOBES: a CUSPED crest over a FLAT notch (crest 0.60, notch 3.00 — the most asymmetric pair the square holds)', { lobeDepth: 0.3, lobeCrestShape: 0.6, lobeNotchShape: 3 }],
+    ['LOBES: a FLAT crest over a CUSPED notch (crest 3.00, notch 0.60 — the other corner; DENTATE)', { lobeDepth: 0.3, lobeCrestShape: 3, lobeNotchShape: 0.6 }],
     ['LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', { lobeDepth: 0.3, petalCup: 0.4 }],
     ['LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', { lobeDepth: 0.3, petalCup: 1.2 }],
     ['LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; the lobed ladder\'s stations miss them — 0 pairs)', { lobeDepth: 0.3, buckleAmp: 0.3, buckleFreq: 3 }],
@@ -6104,8 +6209,8 @@ export function buildMatrix() {
     ['LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)', { lobeDepth: 0.3, lobeCount: 2, layerCount: 2, innerCurl: 360, innerCup: 1.2 }],
     ['LOBES: x petalCount 40', { lobeDepth: 0.3, lobeCount: 2, petalCount: 40 }],
     ['LOBES: x the domed hub (head rise 1.00)', { lobeDepth: 0.3, lobeCount: 2, headRise: 1 }],
-    ['LOBES: GATED — count, coverage and tip shape at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 10, lobeCoverage: 1, lobeTipShape: 2 }],
-    ['LOBES: GATED — count, coverage and tip shape at MINIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 2, lobeCoverage: 0.1, lobeTipShape: 0.5 }],
+    ['LOBES: GATED — count, coverage and BOTH shapes at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 10, lobeCoverage: 1, lobeCrestShape: 3, lobeNotchShape: 3 }],
+    ['LOBES: GATED — count, coverage and BOTH shapes at MINIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 2, lobeCoverage: 0.1, lobeCrestShape: 0.6, lobeNotchShape: 0.6 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
