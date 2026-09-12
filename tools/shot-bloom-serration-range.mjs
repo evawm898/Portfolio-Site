@@ -127,7 +127,7 @@ async function cell({ id, count, depth, crest, notch, coverage, samples }) {
   const frame = { r: FRAME_R, at, dir: m.petalNormal };
   const buf = await shoot(path.join(outDir, `${id}.png`), frame);
   return { id, buf, frame, L, line, m,
-    asked: { count, depth, q, coverage }, samples: L.samplesPerLobe,
+    asked: { count, depth, crest, notch, coverage }, samples: L.samplesPerLobe,
     built: L.countBuilt, rowsPerLobe: L.rowsPerLobe, rowsInWindow: L.rowsInWindow };
 }
 
