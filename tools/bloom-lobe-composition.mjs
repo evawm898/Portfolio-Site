@@ -112,7 +112,7 @@ for (const spec of ROWS) {
   const st = stateOf(row);
   if (!(st.lobeDepth > 0)) { invalid.push(`${spec.label}: lobeDepth ${st.lobeDepth} — this row engages no lobes`); continue; }
   const lob = build(st);
-  const { lobeDepth, lobeCount, lobeCoverage, lobeTipShape, ...plainState } = st;
+  const { lobeDepth, lobeCount, lobeCoverage, lobeCrestShape, lobeNotchShape, ...plainState } = st;
   const plain = build(plainState);
   if (!lob.lobes) { invalid.push(`${spec.label}: the lobed build reports no lobe record`); continue; }
   if (plain.lobes) { invalid.push(`${spec.label}: the plain build reports a lobe record`); continue; }

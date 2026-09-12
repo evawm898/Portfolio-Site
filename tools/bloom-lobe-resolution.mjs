@@ -3,10 +3,53 @@
 
      node tools/bloom-lobe-resolution.mjs [--json]
 
-   THE QUESTION (Eva, session 38, the ruling amendment): how many stations
-   per lobe period does the emitted polyline need before LOBE TIP SHAPE is
-   distinguishable across its range — before 0.50 (pointed), 1.00 (the raised
-   cosine) and 2.00 (flat-topped) stop being the same triangle wave? Four
+   SESSION 41 — TWO EXPONENTS, AND THE TABLE THE GEOMETRY CARRIES.
+   `lobeTipShape` is retired and the cut is `lobeCutProfile(f, crest, notch)`,
+   whose two exponents are the LOCAL POWERS of the cut at its own two
+   features. So the floor is a SURFACE and not a number, and it is what
+   decides the count ceiling. This tool is the ONE OWNER of that derivation:
+     node tools/bloom-lobe-resolution.mjs              the shipped family (the calibration)
+     node tools/bloom-lobe-resolution.mjs --calibrate  the calibration, as a pass/fail
+     node tools/bloom-lobe-resolution.mjs --table      the table, in the form bloom-geometry.js pastes
+     node tools/bloom-lobe-resolution.mjs --verify     re-derive every cell and compare with the shipped table
+     node tools/bloom-lobe-resolution.mjs --surface    the demand over a readable (crest, notch) grid
+   `--verify` is the table's ONLY independent witness. The harness's L3 reads
+   the shipped table, so it can prove the record carries the demand the shape
+   asks for and can never prove the table.
+
+   THE CALIBRATION IS THE ARGUMENT THAT THE GENERALISATION IS ONE. Session
+   40's premise — "a corner does not need resolving; what needs resolving is
+   the ROUND band" — was prose its formula did not implement, because on the
+   shipped family the binding feature is parabolic or flatter at every
+   reachable value. Weighting the bar by `clamp(power - 1, 0, 1)` therefore
+   leaves the bar at EXACTLY 2 everywhere on that family and must reproduce
+   its floors: ladder 10 / 11 / 8 and uniform 7 / 10 / 6. It does, 3 of 3.
+
+   AND ONE DEFECT IN THE SHIPPED CLAUSE, found by running it on the new law.
+   `gapsPerBroad` divided the band by the widest gap OVERLAPPING it without
+   requiring the gaps to COVER it — so two coincident stations left one gap
+   of ~0 touching the band and the ratio blew up: the clause PASSED ON
+   PILING, which is the opposite of what it asks. It never bit on the
+   shipped family (at most one corner, and the floor search started at n = 3)
+   and it bit at once on a law with two. The gaps are read on the CIRCLE now,
+   so they tile the period and sum to 1, the crest band needs no phase shift,
+   and the answers are identical wherever the old form's gaps did tile.
+
+   AND THE LAW MUST BE THE SHIPPED EXPRESSION, NOT AN ALGEBRAIC EQUIVALENT.
+   `((1 - cos 2 pi f)/2)^q` and `sin(pi f)^{2q}` are the same function on
+   [0, 1] and are NOT the same function outside it — the first is even and
+   periodic, the second is not — and this tool's tangent probe reads f
+   slightly outside at the period's ends. Substituting the second form moved
+   the q = 0.50 ladder floor from 10 to 7: a station set 0.072 from the crest
+   became one 0.150 away. The law is imported from the geometry now, and any
+   law reached through a triangle phase is wrapped explicitly, because
+   `Math.pow` of a negative r is NaN and would poison the whole measure.
+
+   THE ORIGINAL QUESTION (Eva, session 38, the ruling amendment): how many
+   stations per lobe period does the emitted polyline need before the shape
+   control is distinguishable across its range — before 0.50 (pointed), 1.00
+   (the raised cosine) and 2.00 (flat-topped) stop being the same triangle
+   wave? Four
    samples per period cannot carry a shape (the buckle's own f 7 at NU 28),
    and the first lobe sheet stood on that floor: 3.0 rows per lobe at eight
    lobes, 4.2 at six, both a staircase, the tip-shape control inert to the eye.
@@ -65,124 +108,198 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 const JSON_OUT = process.argv.includes('--json');
 
-/* THE SHAPE SET. The shipped range's ends and its middle by default; `--q`
-   takes any comma list so the floor can be read AS A FUNCTION OF THE SHAPE
-   (session 40, item 3) rather than only as the set-wide number. Clause (i)
-   is per-shape and is reported per shape; clause (ii) is a statement about
-   the SET and needs at least two members. */
-const qArg = process.argv.find((a) => a.startsWith('--q='));
-const Q = qArg ? qArg.slice(4).split(',').map(Number) : [0.5, 1, 2];
-if (Q.some((q) => !(q > 0))) throw new Error(`--q: every exponent must be > 0, got ${Q.join(',')}`);
-const DEPTH = 0.30, HALF = 5.4, PITCH = 2.38;          // the sheet's default cell, in mm
-const law = (q) => (f) => HALF * (1 - DEPTH * Math.pow((1 - Math.cos(2 * Math.PI * f)) / 2, q));
-const DENSE = 4000;
+/* ---- THE TWO LAWS ---------------------------------------------------
+   THE SHIPPED ONE is `lobeCutProfile`, imported — never restated, because a
+   restatement is a second owner of the thing under test.
+   THE RETIRED ONE is carried here as a frozen copy, IN THE EXPRESSION IT
+   SHIPPED IN, for the calibration alone: `lobeTipShape` is in RETIRED_IDS,
+   so the geometry no longer holds it, and the calibration needs it to show
+   that the new clause reproduces session 38's ruled floors. An algebraic
+   equivalent will NOT do — see the header. */
+const wrap = (f) => f - Math.floor(f);
+const retiredCut = (q) => (f) => Math.pow((1 - Math.cos(2 * Math.PI * wrap(f))) / 2, q);
+const newCut = (crest, notch) => (f) => G.lobeCutProfile(f, crest, notch);
 
-/* The ladder's measure over one period: turning of the outline (in the
-   (s, h) plane, s = f * PITCH) plus the arc share, cumulative; stations at
-   equal increments, the period's ends (crests) held. */
-function ladderStations(q, n) {
-  const h = law(q);
-  const tangent = (f) => { const e = 1e-6; return Math.atan2(h(f + e) - h(f - e), 2 * e * PITCH); };
+const DEPTH = 0.30, HALF = 5.4, PITCH = 2.38;          // the sheet's default cell, in mm
+const DENSE = 4000;
+const RELIEF = DEPTH * HALF;
+const lawOf = (cut) => (f) => HALF * (1 - DEPTH * cut(f));
+
+/* THE BANDS, read NUMERICALLY off the cut itself rather than from a closed
+   form, so that ONE definition serves both laws and the comparison between
+   them is honest: the fraction of the period on which the cut is within a
+   tenth of its minimum (the crest band) and within a tenth of its maximum
+   (the sinus band). Reproduces the retired law's own closed forms to three
+   decimals — 0.064 / 0.287, 0.205 / 0.205, 0.380 / 0.145. */
+const BAND_N = 200000;
+function bandsOf(cut) {
+  let crest = 0, sinus = 0;
+  for (let i = 0; i < BAND_N; i++) { const v = cut((i + 0.5) / BAND_N); if (v <= 0.1) crest++; if (v >= 0.9) sinus++; }
+  return { crest: crest / BAND_N, sinus: sinus / BAND_N };
+}
+/* THE LOCAL POWER at each feature, by log-log slope at a scale that neither
+   underflows nor leaves the asymptotic regime. It is MEASURED rather than
+   taken from the control, so this tool says what the law does rather than
+   what it was asked for. */
+function powersOf(cut) {
+  const d = 1e-4;
+  return { crest: Math.log(cut(2 * d) / cut(d)) / Math.log(2),
+           notch: Math.log((1 - cut(0.5 - 2 * d)) / (1 - cut(0.5 - d))) / Math.log(2) };
+}
+/* The ladder's measure over one period: turning of the outline in the (s, h)
+   plane plus LADDER_ARC_SHARE of arc length, cumulative; stations at equal
+   increments, the period's ends (crests) held. The constants are read from
+   the geometry, not restated. */
+function ladderStations(law, n) {
+  const tangent = (f) => { const e = 1e-6; return Math.atan2(law(f + e) - law(f - e), 2 * e * PITCH); };
   const S = 4000, dT = [], dA = [];
-  let turn = 0, arc = 0, pT = tangent(1e-9), pX = 0, pY = h(0);
+  let turn = 0, arc = 0, pT = tangent(1e-9), pX = 0, pY = law(0);
   for (let i = 1; i <= S; i++) {
-    const f = i / S, t = tangent(f), x = f * PITCH, y = h(f);
+    const f = i / S, t = tangent(f), x = f * PITCH, y = law(f);
     let d = Math.abs(t - pT); if (d > Math.PI) d = 2 * Math.PI - d;
-    const s = Math.hypot(x - pX, y - pY);
-    dT.push(d); dA.push(s); turn += d; arc += s; pT = t; pX = x; pY = y;
+    const sg = Math.hypot(x - pX, y - pY);
+    dT.push(d); dA.push(sg); turn += d; arc += sg; pT = t; pX = x; pY = y;
   }
   const beta = (G.LADDER_ARC_SHARE / (1 - G.LADDER_ARC_SHARE)) * turn;
   const cum = [0];
   for (let i = 0; i < S; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
-  const total = cum[S];
-  const out = [0];
+  const total = cum[S], out = [0];
   for (let j = 1; j < n; j++) {
-    const target = total * j / n;
-    let lo = 0, hi = S;
+    const target = total * j / n; let lo = 0, hi = S;
     while (hi - lo > 1) { const m = (lo + hi) >> 1; if (cum[m] < target) lo = m; else hi = m; }
     out.push(hi / S);
   }
-  out.push(1);
-  return out;
+  out.push(1); return out;
 }
 const uniformStations = (n) => Array.from({ length: n + 1 }, (_, j) => j / n);
-const polyline = (q, st) => { const h = law(q); const pts = st.map((f) => [f * PITCH, h(f)]); return (f) => { const x = f * PITCH; let k = 1; while (k < pts.length - 1 && pts[k][0] < x) k++; const [x0, y0] = pts[k - 1], [x1, y1] = pts[k]; return y0 + (y1 - y0) * (x - x0) / (x1 - x0 || 1); }; };
-const maxOver = (fn) => { let m = 0; for (let i = 0; i <= DENSE; i++) m = Math.max(m, Math.abs(fn(i / DENSE))); return m; };
+const PLACERS = { ladder: ladderStations, uniform: (law, n) => uniformStations(n) };
 
-/* The bands, from the law: cut(f) = ((1 - cos 2 pi f)/2)^q = sin(pi f)^(2q).
-   Crest band: cut <= 0.1  ->  |f| <= asin(0.1^(1/2q)) / pi, width twice that.
-   Sinus band: cut >= 0.9  ->  |f - 1/2| <= 1/2 - asin(0.9^(1/2q)) / pi. */
-const bands = Object.fromEntries(Q.map((q) => {
-  const crest = 2 * Math.asin(Math.pow(0.1, 1 / (2 * q))) / Math.PI;
-  const sinus = 1 - 2 * Math.asin(Math.pow(0.9, 1 / (2 * q))) / Math.PI;
-  return [q, { crest, sinus, broad: crest >= sinus ? 'crest' : 'sinus', broadWidth: Math.max(crest, sinus) }];
-}));
-/* The band's width over the widest gap it meets: the gaps between consecutive
-   stations that lie in the band, plus the two gaps that bracket it. The crest
-   band wraps the period's ends (crests), so it is read in the shifted phase
-   f' = f + 1/2 where the crest sits at 1/2 like the sinus does. */
-const gapsPerBroad = (q, st) => {
-  const b = bands[q];
-  const c = 0.5, half = b.broadWidth / 2;
-  const ph = b.broad === 'crest' ? st.map((f) => (f + 0.5) % 1).sort((x, y) => x - y) : st.slice();
-  const pts = [...new Set(ph)];
+/* CLAUSE (i) — the band's width over the widest gap it meets, ON THE CIRCLE.
+   The period is a circle, so the gaps TILE it and sum to 1 and the crest
+   band is simply the arc about 0. The shipped form read the gaps linearly
+   and did not require them to cover the band, so two coincident stations
+   left ONE gap of ~0 overlapping it and the ratio blew up — the clause
+   passed on PILING. Identical answers wherever the old form's gaps tiled. */
+function bandOverWidestGap(width, which, st) {
+  const pts = st.map(wrap).sort((x, y) => x - y), gaps = [];
+  for (let i = 1; i < pts.length; i++) gaps.push([pts[i - 1], pts[i]]);
+  gaps.push([pts[pts.length - 1], pts[0] + 1]);
+  const c = which === 'crest' ? 1 : 0.5, half = width / 2;
   let widest = 0;
-  for (let i = 1; i < pts.length; i++) {
-    const a = pts[i - 1], z = pts[i];
-    if (z >= c - half && a <= c + half) widest = Math.max(widest, z - a);   // the gap overlaps the band
+  for (const [a, z] of gaps) for (const sh of [-1, 0, 1]) {
+    if (z + sh >= c - half && a + sh <= c + half) widest = Math.max(widest, z - a);
   }
-  return widest > 0 ? b.broadWidth / widest : 0;
-};
-/* Every unordered pair of the set — was the three of the shipped triple. */
-const pairs = [];
-for (let i = 0; i < Q.length; i++) for (let j = i + 1; j < Q.length; j++) pairs.push([Q[i], Q[j]]);
-const trueSep = Object.fromEntries(pairs.map(([a, b]) => [`${a}-${b}`, maxOver((f) => law(a)(f) - law(b)(f))]));
-const table = [];
-let floorLadder = null, floorUniform = null;
-for (let n = 3; n <= 14; n++) {
-  const row = { n };
-  for (const [name, place] of [['ladder', ladderStations], ['uniform', (q, n) => uniformStations(n)]]) {
-    const ST = Object.fromEntries(Q.map((q) => [q, place(q, n)]));
-    const P = Object.fromEntries(Q.map((q) => [q, polyline(q, ST[q])]));
-    const E = Object.fromEntries(Q.map((q) => [q, maxOver((f) => P[q](f) - law(q)(f))]));
-    const D = Object.fromEntries(pairs.map(([a, b]) => [`${a}-${b}`, maxOver((f) => P[a](f) - P[b](f))]));
-    const inBroad = Object.fromEntries(Q.map((q) => [q, gapsPerBroad(q, ST[q])]));
-    const drawn = Q.every((q) => inBroad[q] >= 2);
-    const separated = pairs.every(([a, b]) => D[`${a}-${b}`] > Math.max(E[a], E[b]) && D[`${a}-${b}`] >= 0.5 * trueSep[`${a}-${b}`]);
-    const pass = drawn && separated;
-    row[name] = { E, D, inBroad, drawn, separated, pass };
-    if (pass && name === 'ladder' && floorLadder === null) floorLadder = n;
-    if (pass && name === 'uniform' && floorUniform === null) floorUniform = n;
-  }
-  table.push(row);
+  return widest > 0 ? width / widest : 0;
 }
-/* THE PER-SHAPE FLOOR — clause (i) alone, which is the only per-shape clause
-   there is: the smallest n at which THIS shape's own broad band spans two
-   station gaps. The set-wide floor above is the largest of these AND clause
-   (ii); reported separately so "the floor is a function of sharpness" is a
-   number rather than an inference. */
-const floorPerQ = Object.fromEntries(Q.map((q) => {
-  const row = table.find((r) => r.ladder.inBroad[q] >= 2);
-  const rowU = table.find((r) => r.uniform.inBroad[q] >= 2);
-  return [q, { ladder: row ? row.n : null, uniform: rowU ? rowU.n : null }];
-}));
-const out = { model: { depth: DEPTH, halfMm: HALF, pitchMm: PITCH, arcShare: G.LADDER_ARC_SHARE }, bands, trueSepMm: trueSep, floor: { ladder: floorLadder, uniform: floorUniform }, floorPerQ, table };
-if (JSON_OUT) { console.log(JSON.stringify(out, null, 1)); }
-else {
-  console.log(`one lobe period of cut(f) = ((1 - cos 2 pi f)/2)^q at depth ${DEPTH} on a ${HALF} mm half-width, pitch ${PITCH} mm; ladder = turning + ${G.LADDER_ARC_SHARE} arc share, ends on crests; dense phase ${DENSE}`);
-  console.log(`true separation of the laws (mm): ${pairs.map(([a, b]) => `${a} vs ${b}: ${trueSep[`${a}-${b}`].toFixed(3)}`).join(' · ')}`);
-  console.log(`bands (fraction of the period): ${Q.map((q) => `q ${q}: crest ${bands[q].crest.toFixed(3)}, sinus ${bands[q].sinus.toFixed(3)} -> broad ${bands[q].broad} ${bands[q].broadWidth.toFixed(3)}`).join(' · ')}`);
-  /* THE COLUMN LABELS ARE DERIVED FROM THE SETS THEY LABEL. They were three
-     literals matching the shipped triple; once `--q` made Q settable the
-     literal would have named a different column from the one printed beside
-     it (the pair list is now every unordered pair of Q, in Q's own order). */
-  const qLab = Q.join(' / '), pLab = pairs.map(([a, b]) => `${a}-${b}`).join(' / ');
-  console.log(`\n n | placement | broad feature / widest gap in it (${qLab}) | chord error E (${qLab}) | drawn separation D (${pLab}) | (i) drawn | (ii) separated`);
-  for (const r of table) for (const name of ['ladder', 'uniform']) {
-    const x = r[name];
-    console.log(`${String(r.n).padStart(2)} | ${name.padEnd(9)} | ${Q.map((q) => x.inBroad[q].toFixed(2).padStart(5)).join(' / ')} | ${Q.map((q) => x.E[q].toFixed(3)).join(' / ')} | ${pairs.map(([a, b]) => x.D[`${a}-${b}`].toFixed(3)).join(' / ')} | ${x.drawn ? 'yes' : 'no '} | ${x.separated ? 'yes' : 'no '}${x.pass ? '  PASS' : ''}`);
+/* CLAUSE (iii) — the drawn amplitude at the WORST phase. A piecewise-linear
+   function's extrema are at its breakpoints, so the drawn amplitude over one
+   period IS the spread of the law over the stations: no dense sampling is
+   needed and the answer is exact. */
+const PHASES = 200;
+function worstPhaseAmp(cut, n) {
+  const law = lawOf(cut);
+  let worst = Infinity;
+  for (let k = 0; k < PHASES; k++) {
+    const phi = k / PHASES / n;
+    let lo = Infinity, hi = -Infinity;
+    for (let j = 0; j <= n; j++) { const v = law(phi + j / n); if (v < lo) lo = v; if (v > hi) hi = v; }
+    worst = Math.min(worst, (hi - lo) / RELIEF);
   }
-  console.log(`\nPER-SHAPE FLOOR, clause (i) only (the smallest n at which this shape's own broad band spans two station gaps):`);
-  for (const q of Q) console.log(`   q ${String(q).padEnd(5)} broad ${bands[q].broad.padEnd(5)} ${bands[q].broadWidth.toFixed(3)} of the period -> ladder ${String(floorPerQ[q].ladder).padStart(3)}, uniform ${String(floorPerQ[q].uniform).padStart(3)}`);
-  console.log(`\nFLOOR: ${floorLadder} stations per lobe under the ladder's placement (uniform: ${floorUniform}) — the smallest n at which every tip shape's broad feature spans two station gaps AND every pair is drawn further apart than either drawing's chord error, keeping half its true separation.`);
+  return worst;
+}
+const N_MAX = 24;
+/* THE DEMAND for one shape: the smallest n at which the BINDING feature's
+   band spans `2 x roundness` station gaps AND the drawn tooth keeps half its
+   amplitude at every phase. Floored at 2 (a period needs a crest and a
+   sinus) and REPORTED against the ruled ceiling rather than clamped to it. */
+function demandOf(cut, placer = 'ladder') {
+  const law = lawOf(cut), B = bandsOf(cut), P = powersOf(cut);
+  const wt = (pw) => Math.min(1, Math.max(0, pw - 1));
+  const binding = B.crest >= B.sinus
+    ? { which: 'crest', width: B.crest, power: P.crest }
+    : { which: 'sinus', width: B.sinus, power: P.notch };
+  binding.weight = wt(binding.power);
+  const bar = 2 * binding.weight;
+  let nI = 2, nIII = 2;
+  for (let n = 2; n <= N_MAX; n++) { if (bandOverWidestGap(binding.width, binding.which, PLACERS[placer](law, n)) >= bar) { nI = n; break; } nI = null; }
+  for (let n = 2; n <= N_MAX; n++) { if (worstPhaseAmp(cut, n) >= 0.5) { nIII = n; break; } nIII = null; }
+  const n = Math.max(nI ?? N_MAX, nIII ?? N_MAX, 2);
+  return { n, clauseI: nI, clauseIII: nIII, bar, binding, bands: B, powers: P };
+}
+
+/* ---- the shape grid the table covers: the control's own steps ---------- */
+const [SLO, SHI] = G.LOBE_SHAPE_RANGE, STEP = G.LOBE_SHAPE_STEP;
+const NSTEP = Math.round((SHI - SLO) / STEP) + 1;
+const axis = Array.from({ length: NSTEP }, (_, i) => +(SLO + i * STEP).toFixed(10));
+const tableRow = (crest) => axis.map((notch) => demandOf(newCut(crest, notch)).n.toString(36)).join('');
+
+/* ---- the calibration: the retired family, whose floors are ruled ------- */
+const RULED = { 0.5: { ladder: 10, uniform: 7 }, 1: { ladder: 11, uniform: 10 }, 2: { ladder: 8, uniform: 6 } };
+function calibrate() {
+  const rows = [];
+  for (const q of [0.5, 1, 2]) {
+    const cut = retiredCut(q);
+    const L = demandOf(cut, 'ladder'), U = demandOf(cut, 'uniform');
+    rows.push({ q, ladder: L, uniform: U, ok: L.n === RULED[q].ladder && U.n === RULED[q].uniform });
+  }
+  return rows;
+}
+
+const MODE = process.argv.includes('--table') ? 'table'
+  : process.argv.includes('--verify') ? 'verify'
+  : process.argv.includes('--surface') ? 'surface'
+  : process.argv.includes('--calibrate') ? 'calibrate' : 'default';
+
+if (MODE === 'table' || MODE === 'verify') {
+  const rows = axis.map((c) => tableRow(c));
+  if (MODE === 'table') {
+    console.log(`/* DERIVED — do not edit by hand. Regenerate with:`);
+    console.log(` *   node tools/bloom-lobe-resolution.mjs --table`);
+    console.log(` * ${NSTEP} x ${NSTEP} cells over [${SLO}, ${SHI}] at a step of ${STEP}: row = the CREST`);
+    console.log(` * exponent, column = the NOTCH exponent, the cell the demand in base 36.`);
+    console.log(` * \`--verify\` re-derives every cell from the clauses and compares. */`);
+    for (let i = 0; i < rows.length; i++) console.log(`  '${rows[i]}',${i === 0 ? '   // crest ' + SLO.toFixed(2) : i === rows.length - 1 ? '   // crest ' + SHI.toFixed(2) : ''}`);
+  } else {
+    const shipped = G.LOBE_DEMAND_ROWS;
+    const bad = [];
+    if (shipped.length !== rows.length) bad.push(`the shipped table has ${shipped.length} rows and the derivation ${rows.length}`);
+    else for (let i = 0; i < rows.length; i++) {
+      if (shipped[i] === rows[i]) continue;
+      for (let j = 0; j < rows[i].length; j++) if (shipped[i][j] !== rows[i][j])
+        bad.push(`crest ${axis[i].toFixed(2)} notch ${axis[j].toFixed(2)}: shipped ${parseInt(shipped[i][j], 36)}, derived ${parseInt(rows[i][j], 36)}`);
+    }
+    const cal = calibrate();
+    for (const r of cal) if (!r.ok) bad.push(`CALIBRATION crest/notch-weighted clause does not reproduce the retired family at q ${r.q}: ladder ${r.ladder.n} (ruled ${RULED[r.q].ladder}), uniform ${r.uniform.n} (ruled ${RULED[r.q].uniform})`);
+    let over = 0;
+    for (const row of rows) for (const ch of row) if (parseInt(ch, 36) > G.LOBE_SAMPLES_PER_LOBE) over++;
+    if (over) bad.push(`${over} cells exceed the ruled ceiling LOBE_SAMPLES_PER_LOBE = ${G.LOBE_SAMPLES_PER_LOBE}`);
+    console.log(`--verify: ${rows.length} x ${rows[0].length} = ${rows.length * rows[0].length} cells re-derived from the clauses`);
+    console.log(`  calibration on the RETIRED family (the ruled floors): ${cal.filter((r) => r.ok).length} of ${cal.length} reproduce`);
+    for (const r of cal) console.log(`    q ${String(r.q).padEnd(4)} binding ${r.ladder.binding.which.padEnd(6)} band ${r.ladder.binding.width.toFixed(3)} power ${r.ladder.binding.power.toFixed(2)} weight ${r.ladder.binding.weight.toFixed(2)} bar ${r.ladder.bar.toFixed(2)} -> ladder ${r.ladder.n} (ruled ${RULED[r.q].ladder}), uniform ${r.uniform.n} (ruled ${RULED[r.q].uniform}) ${r.ok ? 'MATCH' : 'DIFFERS'}`);
+    console.log(`  no cell above the ruled ceiling ${G.LOBE_SAMPLES_PER_LOBE}: ${over === 0 ? 'yes' : `NO — ${over} cells`}`);
+    if (bad.length) { console.error(`\nFAIL — ${bad.length} finding(s):`); for (const b of bad.slice(0, 40)) console.error('  ' + b); process.exit(1); }
+    console.log('\nPASS — the shipped table is the derivation, cell for cell.');
+  }
+} else if (MODE === 'surface') {
+  const AX = [0.6, 0.8, 1.0, 1.25, 1.5, 2.0, 2.5, 3.0];
+  console.log(`THE DEMAND OVER THE SHAPE SQUARE — one period at depth ${DEPTH} on a ${HALF} mm half-width, pitch ${PITCH} mm, LADDER placement.`);
+  console.log(`cells are demand (clause i / clause iii); the ruled ceiling is ${G.LOBE_SAMPLES_PER_LOBE}.\n`);
+  console.log('  crest\\notch ' + AX.map((b) => String(b).padStart(10)).join(''));
+  for (const a of AX) console.log('  ' + String(a).padEnd(11) + AX.map((b) => { const D = demandOf(newCut(a, b)); return `${D.n}(${D.clauseI ?? '>'}/${D.clauseIII ?? '>'})`.padStart(10); }).join(''));
+  console.log('\n  which feature binds, its band and its roundness weight:');
+  console.log('  crest\\notch ' + AX.map((b) => String(b).padStart(14)).join(''));
+  for (const a of AX) console.log('  ' + String(a).padEnd(11) + AX.map((b) => { const D = demandOf(newCut(a, b)); return `${D.binding.which[0].toUpperCase()} ${D.binding.width.toFixed(2)} w${D.binding.weight.toFixed(2)}`.padStart(14); }).join(''));
+} else {
+  const cal = calibrate();
+  console.log(`one lobe period at depth ${DEPTH} on a ${HALF} mm half-width, pitch ${PITCH} mm; ladder = turning + ${G.LADDER_ARC_SHARE} arc share, ends on crests.`);
+  console.log(`\nTHE CALIBRATION — the RETIRED one-exponent family, whose floors session 38 ruled on.`);
+  console.log(`The weighted bar is 2 x clamp(power - 1, 0, 1), and the binding feature is parabolic or flatter at every`);
+  console.log(`reachable value there, so the weight is 1 and the bar is EXACTLY session 38's "two station gaps".\n`);
+  console.log(' q    | binding | band  | power | weight | bar  | clause(i) | clause(iii) | demand | ruled  | ');
+  for (const r of cal) console.log(` ${String(r.q).padEnd(5)}| ${r.ladder.binding.which.padEnd(8)}| ${r.ladder.binding.width.toFixed(3)} | ${r.ladder.binding.power.toFixed(2)}  | ${r.ladder.binding.weight.toFixed(2)}   | ${r.ladder.bar.toFixed(2)} | ${String(r.ladder.clauseI).padStart(9)} | ${String(r.ladder.clauseIII).padStart(11)} | ${String(r.ladder.n).padStart(6)} | ${String(RULED[r.q].ladder).padStart(6)} | ${r.ok ? 'MATCH' : 'DIFFERS'}`);
+  console.log(`\n${cal.filter((r) => r.ok).length} of ${cal.length} reproduce the ruled ladder floor AND the ruled uniform floor (7 / 10 / 6).`);
+  console.log(`Clause (iii) is SLACK on the whole retired family (${cal.map((r) => r.ladder.clauseIII).join(' / ')} against clause (i)'s ${cal.map((r) => r.ladder.clauseI).join(' / ')}),`);
+  console.log(`so session 38's ruled constant ${G.LOBE_SAMPLES_PER_LOBE} is untouched by the new clause.`);
+  console.log(`\nTHE SHIPPED LAW's own surface: --surface for a readable grid, --table to regenerate`);
+  console.log(`bloom-geometry.js's LOBE_DEMAND_ROWS, --verify to prove the shipped table is this derivation.`);
 }

@@ -40,6 +40,9 @@ import path from 'node:path';
 import { decodePNG } from './pngdec.mjs';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame,
          settleBuild, modeTag, shownModeOf, DEFAULTS } from './bloom-harness.mjs';
+/* The demand is the SHAPE's now, so the sheet asks the law rather than
+   restating the ruled constant it used to compare against. */
+import { lobeSamplesPerLobe } from '../bloom-geometry.js';
 
 const outDir = process.argv[2] || '/tmp/bloom-serration-range';
 const onlyArg = process.argv.indexOf('--only');
@@ -94,8 +97,8 @@ const FRAME_R = Number(DEFAULTS.petalLength) * 0.30;
    instead of half the cell being sky. */
 const AIM_BACK = 0.33;
 
-async function cell({ id, count, depth, q, coverage, samples }) {
-  const sets = { lobeDepth: depth, lobeCount: count, lobeTipShape: q, lobeCoverage: coverage };
+async function cell({ id, count, depth, crest, notch, coverage, samples }) {
+  const sets = { lobeDepth: depth, lobeCount: count, lobeCrestShape: crest, lobeNotchShape: notch, lobeCoverage: coverage };
   await openBloom(page, port);
   const bad = await applyConfig(page, set(sets));
   if (bad.length) await die(`${id}: ${bad.join('; ')}`);
@@ -112,7 +115,9 @@ async function cell({ id, count, depth, q, coverage, samples }) {
   if (m.shownMode !== 'export' || m.liveTris !== null) await die(`${id}: not the export build on screen`);
   const L = m.petalLobes;
   if (!L || L.noRoom) await die(`${id}: no lobes built`);
-  const want = samples === null ? 11 : samples;
+  /* THE DEMAND IS THE SHAPE'S, so the expected value is the law's own
+     function of the two exponents rather than the ruled constant. */
+  const want = samples === null ? lobeSamplesPerLobe(sets.lobeCrestShape, sets.lobeNotchShape) : samples;
   if (L.samplesPerLobe !== want) await die(`${id}: built at ${L.samplesPerLobe} stations a lobe, ${want} asked`);
   const readout = await page.evaluate(() => document.getElementById('readout').textContent);
   const line = (readout.match(/LOBES [^\n]+/) || [''])[0];
@@ -126,21 +131,46 @@ async function cell({ id, count, depth, q, coverage, samples }) {
     built: L.countBuilt, rowsPerLobe: L.rowsPerLobe, rowsInWindow: L.rowsInWindow };
 }
 
-/* ---- the six cells ---------------------------------------------------- */
+/* ---- the cells: TWO IMAGES (session 41, Eva's item 5) ----------------
+
+   (a) THE SHAPE SQUARE, 3 x 3 — the notch exponent across, the crest
+       exponent down, at a FIXED count and depth, so the only thing varying
+       in the grid is the pair of shape controls. It is the picture that has
+       to show they are INDEPENDENT: each row should hold its crest while its
+       notches change, and each column the reverse.
+       THE COUNT IS 3 AND NOT 4, and the reason is a measurement rather than
+       a layout choice: the demand is a function of the shape, so at count 4
+       the sharp corner of the square builds 4 and the blunt corner CLAMPS to
+       3 — the grid would be varying the count as well as the shape, which is
+       the one thing it must not do. 3 is the largest count every one of the
+       nine cells reaches unclamped.
+
+   (b) THE THREE CELLS SESSION 40 RENDERED — serration, the midpoint,
+       lobing — on the new law, at the counts that are now ACTUALLY
+       REACHABLE. Session 40 needed the capability hook for its second row
+       because the count was capped at 2 whatever the shape; under the new
+       law the demand falls with the sharpness, so all three build at their
+       asked count through the SHIPPED sliders and there is no hook. Every
+       caption carries all FIVE control values.
+   ---------------------------------------------------------------------- */
 const COVER = 1.00;
+const GRID_AX = [1.0, 2.0, 3.0];
+const GRID_COUNT = 3, GRID_DEPTH = 0.45;
 const CELLS = [
-  { id: 'ship-a', row: 'ship', title: 'SERRATION as far as the sliders go',
-    count: 8, depth: 0.15, q: 0.50, coverage: COVER, samples: null },
-  { id: 'ship-c', row: 'ship', title: 'THE MIDPOINT',
-    count: 4, depth: 0.45, q: 1.25, coverage: COVER, samples: null },
-  { id: 'ship-b', row: 'ship', title: 'LOBING',
-    count: 2, depth: 0.75, q: 2.00, coverage: COVER, samples: null },
-  { id: 'desc-a', row: 'desc', title: 'SERRATION as described',
-    count: 8, depth: 0.15, q: 0.50, coverage: COVER, samples: 3 },
-  { id: 'desc-c', row: 'desc', title: 'THE MIDPOINT as described',
-    count: 4, depth: 0.45, q: 1.25, coverage: COVER, samples: 7 },
-  { id: 'desc-b', row: 'desc', title: 'LOBING as described',
-    count: 2, depth: 0.75, q: 2.00, coverage: COVER, samples: 11 },
+  /* (b) — the range, on the shipped sliders */
+  { id: 'range-serration', row: 'range', title: 'SERRATION',
+    count: 8, depth: 0.15, crest: 1.0, notch: 1.0, coverage: COVER, samples: null },
+  { id: 'range-midpoint', row: 'range', title: 'THE MIDPOINT',
+    count: 4, depth: 0.45, crest: 1.25, notch: 1.25, coverage: COVER, samples: null },
+  { id: 'range-lobing', row: 'range', title: 'LOBING',
+    count: 2, depth: 0.75, crest: 2.0, notch: 2.0, coverage: COVER, samples: null },
+  /* (a) — the shape square */
+  ...GRID_AX.flatMap((crest) => GRID_AX.map((notch) => ({
+    id: `grid-c${(crest * 100).toFixed(0)}-n${(notch * 100).toFixed(0)}`,
+    row: `grid${(crest * 100).toFixed(0)}`,
+    title: `crest ${crest.toFixed(2)} · notch ${notch.toFixed(2)}`,
+    count: GRID_COUNT, depth: GRID_DEPTH, crest, notch, coverage: COVER, samples: null,
+  }))),
 ];
 const chosen = ONLY ? CELLS.filter((c) => ONLY.test(c.id)) : CELLS;
 if (!chosen.length) { console.error(`--only ${ONLY} matched no cell`); process.exit(2); }
@@ -150,7 +180,7 @@ for (const c of chosen) shots.push({ ...c, ...(await cell(c)) });
 
 /* ---- the same-tree controls, REPORTED never a bar --------------------- */
 const controls = {};
-for (const id of ['ship-a', 'desc-a']) {
+for (const id of ['range-serration', 'grid-c100-n100']) {
   const s = shots.find((x) => x.id === id);
   if (!s) continue;
   const again = await cell(CELLS.find((c) => c.id === id));
@@ -159,25 +189,32 @@ for (const id of ['ship-a', 'desc-a']) {
 }
 
 /* ---- compose ONE image ------------------------------------------------ */
+/* ALL FIVE CONTROL VALUES ON EVERY CAPTION (Eva's item 5), plus the two
+   DRAWN included angles beside the chord they were read through — an angle
+   at a curved feature is a function of its chord, so a bare figure would be
+   a claim rather than a measurement. */
 const capOf = (s) => {
   const a = s.asked;
-  const clamp = s.built < a.count ? ` (CLAMPED from ${a.count} — the ladder cannot resolve more)` : '';
-  return `count ${s.built}${clamp} · depth ${a.depth.toFixed(2)} · sharpness ${a.q.toFixed(2)} · coverage ${(a.coverage * 100).toFixed(0)}%<br>` +
-    `${s.samples} stations a lobe${s.samples < 11 ? ' — <b>UNDER the shipped floor of 11</b>' : ''} · ${s.rowsPerLobe.toFixed(1)} rows per lobe emitted · ${s.rowsInWindow} stations in the window`;
+  const clamp = s.built < a.count ? ` (CLAMPED from ${a.count})` : '';
+  const ang = (v) => (v === null ? '&mdash;' : `${v.toFixed(1)}&deg;`);
+  return `count <b>${s.built}</b>${clamp} · depth ${a.depth.toFixed(2)} · crest <b>${a.crest.toFixed(2)}</b> · notch <b>${a.notch.toFixed(2)}</b> · coverage ${(a.coverage * 100).toFixed(0)}%<br>` +
+    `drawn: crest ${ang(s.L.crestAngleDeg)} / notch ${ang(s.L.notchAngleDeg)} included on a ${s.L.angleChordMm.toFixed(2)} mm chord<br>` +
+    `this shape demands <b>${s.samples}</b> stations a lobe (the ruled ceiling is 11) · ${s.rowsPerLobe.toFixed(1)} rows per lobe emitted · pitch ${s.L.pitchMm.toFixed(2)} mm`;
 };
 const dataUri = (b) => `data:image/png;base64,${b.toString('base64')}`;
 const rowHtml = (row, heading, note) => {
   const rs = shots.filter((s) => s.row === row);
   if (!rs.length) return '';
-  return `<div class="rowhead">${heading}</div><div class="note">${note}</div><div class="grid">` +
+  return `${heading ? `<div class="rowhead">${heading}</div>` : ''}${note ? `<div class="note">${note}</div>` : ''}<div class="grid">` +
     rs.map((s) => `<figure><img src="${dataUri(s.buf)}"><figcaption><b>${s.title}</b><br>${capOf(s)}</figcaption></figure>`).join('') +
     '</div>';
 };
 const html = `<style>
   body{margin:0;background:#111;color:#e8e8e8;font:13px/1.45 -apple-system,Segoe UI,Roboto,sans-serif;padding:22px 24px 28px}
   h1{font-size:19px;margin:0 0 4px;font-weight:600}
+  h2{font-size:16px;margin:26px 0 3px;font-weight:600;color:#fff}
   .sub{color:#9a9a9a;font-size:12.5px;margin:0 0 18px;max-width:1180px}
-  .rowhead{font-size:14px;font-weight:600;margin:16px 0 2px;color:#fff}
+  .rowhead{font-size:13.5px;font-weight:600;margin:14px 0 2px;color:#fff}
   .note{color:#9a9a9a;font-size:12px;margin:0 0 10px;max-width:1180px}
   .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;max-width:1180px}
   figure{margin:0}
@@ -186,11 +223,17 @@ const html = `<style>
   .foot{color:#8d8d8d;font-size:11.5px;margin-top:20px;max-width:1180px}
   b{color:#e8e8e8}
 </style>
-<h1>One generator, serration to lobing — the shipping default petal, EXPORT (print preview on)</h1>
-<p class="sub">Every cell is the same 35 mm petal at coverage ${(COVER * 100).toFixed(0)}%, framed on its own TIP down its own normal, so the apex is in every crop. Depth is a fraction of the local half-width; sharpness is <code>lobeTipShape</code> (0.50 pointed crest &rarr; 2.00 flat-topped crest).</p>
-${rowHtml('ship', 'ROW 1 — what the shipped sliders reach', 'The COUNT axis is inert here: the row placer caps the built count at TWO at every coverage on every petal length in the range, so all three cells are two lobes and only depth and sharpness are varying. Serration is not a slider position on this tree.')}
-${rowHtml('desc', 'ROW 2 — the same depth and sharpness at Eva&rsquo;s counts, through the CAPABILITY hook (NOT SHIPPING)', 'The station floor is lowered per cell so the count can be built at all. A shape drawn under the floor of 11 is a polygon rather than the law&rsquo;s curve — that is what the serration cell is showing, and it is the cost of the count, not a property of the shape.')}
-<p class="foot">Same-tree controls, reported and never used as a bar: ${Object.entries(controls).map(([k, v]) => `${k} ${v} px`).join(' · ') || '(none — --only run)'}. Every cell settled to two byte-identical frames; <code>shownMode</code> asserted &ldquo;export&rdquo; on each.</p>`;
+<h1>The lobe cut law — two independent shape controls, and the range they reach</h1>
+<p class="sub">Every cell is the same 35 mm petal at coverage ${(COVER * 100).toFixed(0)}%, EXPORT (print preview on, <code>shownMode</code> asserted), framed on its own TIP down its own normal so <b>the apex is in every crop</b>. The cut is <code>r^crest / (r^crest + (1-r)^notch)</code>: each exponent is the LOCAL POWER of the cut at its own feature — 1.00 a corner, 2.00 parabolic, 3.00 flat — and rising means blunter in both. Depth is a fraction of the local half-width.</p>
+
+<h2>(a) The shape square — the notch across, the crest down, at a fixed count and depth</h2>
+<p class="note">Count ${GRID_COUNT} and depth ${GRID_DEPTH.toFixed(2)} on all nine cells, so the <b>only</b> thing varying is the pair of shape controls. Read it as a matrix: along a row the crest should hold while the notch opens; down a column the notch should hold while the crest blunts. ${GRID_COUNT} is the largest count all nine reach unclamped &mdash; the demand is a function of the shape, so a higher count would clamp the blunt corner and the grid would be varying the count too.</p>
+${GRID_AX.map((c) => rowHtml(`grid${(c * 100).toFixed(0)}`, `crest ${c.toFixed(2)}`, '')).join('')}
+
+<h2>(b) Serration to lobing, on the shipped sliders</h2>
+<p class="note">The same three states session 40 rendered. <b>There is no capability hook on this row.</b> Session 40 needed one because the built count was capped at TWO whatever the shape, so its &ldquo;as described&rdquo; row was non-shipping; under the new law the resolution demand falls with the sharpness (3 stations a lobe at the triangle wave against 9 at the round default), so all three of these build at their asked count through the shipped controls.</p>
+${rowHtml('range', '', '')}
+<p class="foot">Same-tree controls, reported and never used as a bar: ${Object.entries(controls).map(([k, v]) => `${k} ${v} px`).join(' · ') || '(none — --only run)'}. Every cell settled to two byte-identical frames.</p>`;
 
 await page.setViewportSize({ width: 1240, height: 1100 });
 await page.setContent(html);
@@ -198,7 +241,7 @@ await page.waitForTimeout(400);
 const sheet = await page.screenshot({ fullPage: true });
 fs.writeFileSync(path.join(outDir, 'serration-range.png'), sheet);
 
-const lines = shots.map((s) => `${s.id}: ${s.title} · asked count ${s.asked.count} depth ${s.asked.depth} sharpness ${s.asked.q} coverage ${s.asked.coverage} · built ${s.built} at ${s.samples} stations a lobe · ${modeTag(s.m)} · ${s.line}`);
+const lines = shots.map((s) => `${s.id}: ${s.title} · asked count ${s.asked.count} depth ${s.asked.depth} crest ${s.asked.crest} notch ${s.asked.notch} coverage ${s.asked.coverage} · built ${s.built} at ${s.samples} stations a lobe · ${modeTag(s.m)} · ${s.line}`);
 lines.push(`same-tree controls: ${Object.entries(controls).map(([k, v]) => `${k} ${v} px`).join(' · ')}`);
 fs.writeFileSync(path.join(outDir, 'captions.txt'), lines.join('\n') + '\n');
 console.log(lines.join('\n'));
