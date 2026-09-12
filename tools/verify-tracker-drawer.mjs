@@ -631,10 +631,34 @@ await page.locator('#list .entry', { hasText:'Ana Silva' }).click();
 await page.waitForTimeout(SLIDE);
 await page.locator('#detailEdit').click();
 const toggles = await page.locator('#tagPicker .tag-toggle').allTextContents();
-check('starter tags are offered as chips', toggles.length >= 18, toggles.length + ' chips');
-for(const t of ['fine line','black & grey','blackwork','botanical / floral','neo-traditional','micro / tiny']){
-  check('starter tag offered: ' + t, toggles.includes(t));
+// The vocabulary is NINE buckets now, not the old eighteen-tag starter set.
+// This asserts the exact list, not a floor: a tenth appearing is as much a
+// drift as one going missing, and ">= 9" would hide both.
+const NINE = ['fine line','blackwork','color','realism','illustrative',
+  'dark & gothic','botanical & animal','anime & pop culture','ornamental & traditional'];
+const starters = toggles.filter(t => NINE.includes(t));
+check('the nine-tag vocabulary is offered as chips', starters.length === 9,
+  starters.length + ' of 9 — got: ' + JSON.stringify(toggles));
+// Counted off the data-custom flag, so a TENTH starter creeping in fails
+// here directly rather than only tripping some downstream check.
+const starterFlagged = await page.evaluate(() =>
+  [...document.querySelectorAll('#tagPicker .tag-toggle')]
+    .filter(b => b.dataset.custom !== 'true').map(b => b.textContent));
+check('the starter set is exactly nine, no more', starterFlagged.length === 9,
+  starterFlagged.length + ': ' + JSON.stringify(starterFlagged));
+for(const t of NINE) check('vocabulary tag offered: ' + t, toggles.includes(t));
+// A retired bucket is gone from the STARTER set — but if an entry still
+// carries it, the picker must keep offering it (marked custom) or there
+// would be no way to un-tag that entry. Both halves are asserted.
+for(const t of ['black & grey','botanical / floral','neo-traditional','baroque','cute']){
+  check('retired starter tag, unused, is gone: ' + t, !toggles.includes(t));
 }
+const stillUsed = await page.evaluate(() =>
+  [...document.querySelectorAll('#tagPicker .tag-toggle')]
+    .filter(b => b.textContent === 'micro / tiny')
+    .map(b => b.dataset.custom || 'starter'));
+check('a retired tag still ON an entry stays clickable, marked custom',
+  stillUsed.length === 1 && stillUsed[0] === 'true', JSON.stringify(stillUsed));
 check('the entry’s own tag reads as selected',
   await page.locator('#tagPicker .tag-toggle[data-on="true"]').count() === 1);
 await page.locator('#tagPicker .tag-toggle', { hasText:/^fine line$/ }).click();
@@ -840,7 +864,10 @@ async function reseed(rows, setup){
   await stub(tp);
   tp.on('pageerror', e => pageErrors.push(e.message));
   await tp.goto(URL_, { waitUntil:'domcontentloaded' });
-  await tp.waitForSelector('#list .entry');
+  // An empty fixture renders no rows, so waiting on one would hang. The
+  // toolbar is always there; wait on rows only when rows were seeded.
+  await tp.waitForSelector('.add-row');
+  if(rows.length) await tp.waitForSelector('#list .entry');
   await tp.locator('.chip[data-cat="all"]').click();
   return tp;
 }
@@ -1038,6 +1065,56 @@ check('...with their line numbers', /line 4 has 5 fields/.test(report) && /line 
 check('the report is toned as a warning', await tp.evaluate(() =>
   document.querySelector('.import-report').dataset.tone === 'warn'));
 check('the report counts what did land', /3 added/.test(report), JSON.stringify(report.slice(0,120)));
+
+section('item 15c2 — tags outside the nine are reported, never dropped');
+// The nine are a controlled vocabulary, but an off-vocabulary tag is still
+// REAL DATA — dropping it silently would lose work. It imports, and the
+// report names it and its line so a drift upstream is visible.
+await reseed([], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => r.abort());
+});
+await tp.locator('#bulkToggle').click();
+await tp.selectOption('#bulkDedupe', 'overwrite');
+await tp.fill('#bulkText', [
+  'In Vocab|@inv|Tattoo|Berlin, Germany|||instagram.com/inv||fine line, blackwork|',
+  'Off Vocab|@offv|Tattoo|Paris, France|||instagram.com/offv||steampunk, fine line|',
+  'Also Off|@offv2|Tattoo|London, UK|||instagram.com/offv2||steampunk|',
+  'Spelling|@spell|Tattoo|Lyon, France|||instagram.com/spell||Fine-Line|',
+].join('\n'));
+await tp.locator('#saveBulk').click();
+await tp.waitForTimeout(600);
+const vocabReport = await tp.locator('#bulkReport').innerText();
+check('all four lines import', /4 added/.test(vocabReport), JSON.stringify(vocabReport.slice(0,90)));
+check('the off-vocabulary tag is NOT dropped from the entry',
+  await tp.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1'))
+    .find(e => e.handle === '@offv').tags.includes('steampunk')));
+check('...and the report names it', /steampunk/.test(vocabReport), JSON.stringify(vocabReport.slice(0,400)));
+check('...with the lines it appeared on', /lines 2, 3/.test(vocabReport), JSON.stringify(vocabReport.slice(0,400)));
+check('one off-vocabulary tag is counted once, not once per use',
+  /1 tag\(s\) outside the nine/.test(vocabReport), JSON.stringify(vocabReport.slice(0,400)));
+check('an in-vocabulary tag is never flagged', !/fine line \(line/.test(vocabReport));
+check('a different SPELLING of a vocabulary tag is not flagged as drift',
+  !/Fine-Line/.test(vocabReport), JSON.stringify(vocabReport.slice(0,400)));
+check('the report is toned as a warning when the vocabulary drifts',
+  await tp.evaluate(() => document.querySelector('.import-report').dataset.tone === 'warn'));
+await tp.locator('#cancelBulk').click();
+
+// A clean paste must NOT cry wolf.
+await reseed([], async (c) => {
+  await c.route('**://nominatim.openstreetmap.org/**', r => r.abort());
+});
+await tp.locator('#bulkToggle').click();
+await tp.fill('#bulkText',
+  'Clean One|@c1|Tattoo|Berlin, Germany|||instagram.com/c1||fine line, dark & gothic|\n'
++ 'Clean Two|@c2|Tattoo|Paris, France|||instagram.com/c2||botanical & animal|');
+await tp.locator('#saveBulk').click();
+await tp.waitForTimeout(600);
+const cleanReport = await tp.locator('#bulkReport').innerText();
+check('a paste using only the nine reports no drift',
+  !/outside the nine/.test(cleanReport), JSON.stringify(cleanReport));
+check('...and stays toned as a clean run',
+  await tp.evaluate(() => document.querySelector('.import-report').dataset.tone === 'ok'));
+await tp.locator('#cancelBulk').click();
 
 section('item 15d — what happens to a handle already in the list');
 async function pasteWith(mode, text){
