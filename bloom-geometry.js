@@ -3846,8 +3846,17 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        the window's two ends are the branch boundary between the cut and the
        base outline, and the turn there is the apex/base JOIN that session 38
        measured (-39.7 and -44.7 degrees), a different quantity with a
-       different owner. */
-    const hOf = (uu) => shapeBaseAt(uu) * (1 - cutAt(uu));
+       different owner.
+
+       AND IT READS THE EMITTED OUTLINE, FLOORS AND ALL, not the cut law's
+       own product. Under the shipped depth cap the two agree inside the
+       window by construction — the cap is derived so the deepest sinus keeps
+       at least the print floor's half-width — but a read-out that reported
+       the LAW's angle would be reporting a shape the geometry does not draw
+       the moment a floor did bind, and the whole point of printing a degree
+       figure here is that it is the one the object carries. Same expression
+       the shape term goes through below. */
+    const hOf = (uu) => Math.max(shapeBaseAt(uu) * (1 - cutAt(uu)), rootBlend(uu), tipFloor);
     const angleChordMm = pitchMm / 8;
     const includedAt = (uf) => {
       const sf = table.sAt(uf), d = angleChordMm;
