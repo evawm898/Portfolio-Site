@@ -137,6 +137,19 @@ function sliceDecl(src, header){
   }
   return src.slice(at, i) + (header.startsWith('const') ? ';' : '');
 }
+// MERGE_RULES is an ARRAY of objects, so the brace matcher above would stop at
+// the end of its first row. This one matches the bracket the header opens.
+function sliceArray(src, header){
+  const at = src.indexOf(header);
+  if(at === -1) throw new Error('verify-tracker-drawer: could not find ' + JSON.stringify(header)
+    + ' in artist-tracker.html — the merge checks would silently pass. Fix the slice.');
+  let depth = 0, i = src.indexOf('[', at);
+  for(; i < src.length; i++){
+    if(src[i] === '[') depth++;
+    else if(src[i] === ']'){ depth--; if(depth === 0){ i++; break; } }
+  }
+  return src.slice(at, i) + ';';
+}
 const PAGE_SRC = fs.readFileSync(path.join(REPO, 'artist-tracker.html'), 'utf8');
 const geoModule = [
   'const CHAR_FOLD = {', 'function foldText(str){',
@@ -146,6 +159,23 @@ const geoModule = [
 ].map(h => sliceDecl(PAGE_SRC, h)).join('\n');
 const staticGeocode = new Function(geoModule + '\nreturn staticGeocode;')();
 const foldText = new Function(geoModule + '\nreturn foldText;')();
+
+// The SHIPPED merge, not a copy of it. `mergeEntry` decides what a JSON
+// restore and a bulk paste each do to an entry that is already here, and on
+// the real data a wrong rule still produces a plausible-looking list — so its
+// answers are checked against cases written down here.
+const mergeSrc = [
+  "const GENDER_VALUES = ['unknown', 'woman', 'nonbinary', 'not-woman'];",
+  sliceDecl(PAGE_SRC, 'function genderOf(e){'),
+  sliceDecl(PAGE_SRC, 'const CHAR_FOLD = {'),
+  sliceDecl(PAGE_SRC, 'function foldText(str){'),
+  sliceDecl(PAGE_SRC, 'function tagKey(t){'),
+  sliceArray(PAGE_SRC, 'const MERGE_RULES = ['),
+  sliceDecl(PAGE_SRC, 'function unionInto(entry, field, incoming, keyFn){'),
+  sliceDecl(PAGE_SRC, 'function mergeEntry(existing, incoming, mode, scope){'),
+].join('\n');
+const mergeEntry = new Function(mergeSrc + '\nreturn mergeEntry;')();
+const MERGE_RULES = new Function(mergeSrc + '\nreturn MERGE_RULES;')();
 
 const browser = await chromium.launch({
   executablePath: fs.existsSync('/opt/pw-browsers/chromium') ? '/opt/pw-browsers/chromium' : undefined,
@@ -667,6 +697,16 @@ check('clicking a chip selects it',
 await page.locator('#tagPicker .tag-toggle', { hasText:/^fine line$/ }).click();
 check('clicking again deselects it',
   await page.locator('#tagPicker .tag-toggle[data-on="true"]').count() === 1);
+// item 31: the box is behind a deliberate reveal now, so the vocabulary is
+// what the drawer offers and a tenth tag takes an explicit act.
+check('the free-text tag box is hidden until asked for',
+  !(await page.locator('#fTags').isVisible()));
+check('...and it is NOT inside #tagPicker, whose children are the vocabulary',
+  await page.locator('#tagPicker #fTags').count() === 0);
+await page.locator('#tagEscapeToggle').click();
+check('the toggle reveals it', await page.locator('#fTags').isVisible());
+check('...and says so to a screen reader',
+  await page.getAttribute('#tagEscapeToggle', 'aria-expanded') === 'true');
 await page.fill('#fTags', 'sumi brushwork');
 await page.locator('#fTags').press('Enter');
 check('a typed custom tag becomes a selected chip',
@@ -1471,6 +1511,409 @@ check('drawer is full-width on mobile', Math.abs(mbox.width - 390) < 2, mbox.wid
 check('no horizontal overflow on mobile',
   await m.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
 
+
+// ---------------------------------------------------------------------------
+section('item 28 — the merge is ONE table, checked as a pure function');
+// A wrong rule still produces a plausible list on the real data, so these are
+// written-down cases rather than an eyeball on 240 entries.
+{
+  const fields = MERGE_RULES.map(r => r.field);
+  check('handle is not a merge field — it is the key the two matched on',
+    !fields.includes('handle') && !fields.includes('id'), fields.join(','));
+  check('every rule names a known kind',
+    MERGE_RULES.every(r => ['text','unset','union','oldest'].includes(r.rule)));
+  check('a rating is an `unset` rule, so 0 is not a value worth keeping',
+    MERGE_RULES.find(r => r.field === 'stars').rule === 'unset'
+    && MERGE_RULES.find(r => r.field === 'stars').unset === 0);
+  check('addedAt is `oldest`, so a restore cannot make an entry look newer',
+    MERGE_RULES.find(r => r.field === 'addedAt').rule === 'oldest');
+  check('rating, markers and addedAt are out of the paste’s reach',
+    ['stars','markers','addedAt'].every(f => MERGE_RULES.find(r => r.field === f).bulk === false));
+
+  // merge = fill blanks only, and a blank INCOMING value never erases.
+  let e = { location:'Berlin', status:'', gender:'unknown', stars:0, tags:['blackwork'] };
+  mergeEntry(e, { location:'Oslo', status:'books open', gender:'woman', stars:2, tags:['color'] }, 'merge', 'json');
+  check('merge fills a blank', e.status === 'books open');
+  check('merge does not touch a filled field', e.location === 'Berlin');
+  check('merge treats an unset rating as blank', e.stars === 2);
+  check('merge unions tags', e.tags.join() === 'blackwork,color');
+
+  e = { location:'Berlin', status:'books open', gender:'woman', stars:3 };
+  mergeEntry(e, { location:'Oslo', status:'', gender:'unknown', stars:0 }, 'overwrite', 'json');
+  check('overwrite lets a value win', e.location === 'Oslo');
+  check('...but a BLANK incoming value never erases', e.status === 'books open');
+  check('...and an unset rating is not an opinion', e.stars === 3);
+
+  e = { addedAt:'2026-01-01T00:00:00.000Z' };
+  mergeEntry(e, { addedAt:'2026-09-01T00:00:00.000Z' }, 'overwrite', 'json');
+  check('the OLDER stamp wins even in overwrite', e.addedAt === '2026-01-01T00:00:00.000Z');
+  e = { addedAt:'2026-09-01T00:00:00.000Z' };
+  mergeEntry(e, { addedAt:'2026-01-01T00:00:00.000Z' }, 'merge', 'json');
+  check('...and an older incoming stamp replaces a newer one', e.addedAt === '2026-01-01T00:00:00.000Z');
+
+  // Scope is what keeps the research file out of fields it has no column for.
+  e = { stars:0, markers:[], notes:'why I saved her', addedAt:'2026-01-01T00:00:00.000Z' };
+  mergeEntry(e, { stars:3, markers:['booked'], notes:'', addedAt:'2020-01-01T00:00:00.000Z' }, 'overwrite', 'bulk');
+  check('a bulk paste cannot set a rating', e.stars === 0);
+  check('a bulk paste cannot set a marker', e.markers.length === 0);
+  check('a bulk paste cannot move addedAt', e.addedAt === '2026-01-01T00:00:00.000Z');
+  // ...while a JSON restore can, because it is a whole entry.
+  mergeEntry(e, { stars:3, markers:['booked'] }, 'overwrite', 'json');
+  check('a JSON restore can', e.stars === 3 && e.markers.join() === 'booked');
+
+  e = { markers:['booked'] };
+  mergeEntry(e, { markers:['booked'] }, 'merge', 'json');
+  check('a marker already held is not doubled', e.markers.length === 1);
+}
+
+// ---------------------------------------------------------------------------
+section('item 28b — a backup states what it holds, and import applies nothing until told');
+{
+  const p = await reseed([
+    { id:'j1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', location:'Berlin, Germany', tags:['fine line'], stars:0, notes:'' },
+    { id:'j2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', location:'Lisbon, Portugal', tags:[], stars:0, notes:'' },
+  ]);
+
+  // The real bytes the user gets, captured off the download.
+  const [dl] = await Promise.all([
+    p.waitForEvent('download'),
+    p.locator('#exportBtn').click(),
+  ]);
+  const exported = JSON.parse(fs.readFileSync(await dl.path(), 'utf8'));
+  check('the export carries a header', exported.format === 'artist-tracker' && exported.version === 1);
+  check('...stating its own count', exported.count === 2 && exported.entries.length === 2);
+  check('...and when it was taken', !isNaN(new Date(exported.exportedAt).getTime()));
+
+  async function offer(obj, name){
+    await p.setInputFiles('#importFile', {
+      name: name || 'backup.json', mimeType:'application/json',
+      buffer: Buffer.from(typeof obj === 'string' ? obj : JSON.stringify(obj)),
+    });
+    await p.waitForTimeout(180);
+  }
+  const count = () => p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).length);
+
+  // THE REGRESSION. The old import concatenated, so restoring a backup of the
+  // current list on top of itself doubled every entry with nothing to undo it.
+  await offer(exported);
+  check('choosing a file shows a card instead of importing', await p.locator('#ioReport .import-report').isVisible());
+  check('...naming what is in the file and what is already here',
+    /2 in the file/.test(await p.textContent('#ioReport')) && /2 already here/.test(await p.textContent('#ioReport')));
+  check('...and the overlap it is about to act on', /2 handle\(s\) in both/.test(await p.textContent('#ioReport')));
+  check('...defaulting to the mode that cannot destroy work',
+    await p.inputValue('#ioDedupe') === 'merge');
+  check('NOTHING has been imported yet', await count() === 2);
+
+  await p.locator('#ioReport button', { hasText:'cancel' }).click();
+  check('cancel leaves the list alone', await count() === 2);
+  check('...and clears the card', (await p.textContent('#ioReport')).trim() === '');
+
+  await offer(exported);
+  await p.locator('#ioReport button', { hasText:/^import$/ }).click();
+  await p.waitForTimeout(200);
+  check('restoring a backup onto itself does NOT double the list', await count() === 2,
+    'was ' + await count());
+  check('...and says so', /0<\/span> added/.test(await p.innerHTML('#ioReport')));
+
+  // ...but `add` still means add, or the mode would be a lie.
+  await offer(exported);
+  await p.selectOption('#ioDedupe', 'add');
+  await p.locator('#ioReport button', { hasText:/^import$/ }).click();
+  await p.waitForTimeout(200);
+  check('`add` really does duplicate, so the choice is real', await count() === 4);
+
+  // Back to two for the remaining cases.
+  await p.evaluate(() => {
+    const keep = JSON.parse(localStorage.getItem('artistTracker.entries.v1')).slice(0, 2);
+    localStorage.setItem('artistTracker.entries.v1', JSON.stringify(keep));
+  });
+  await p.reload({ waitUntil:'domcontentloaded' });
+  await p.waitForSelector('#list .entry');
+
+  // A bare array is what every backup taken before today looks like.
+  await offer([{ id:'j9', name:'Cyd Marr', handle:'@cyd.marr', category:'tattoo' }], 'old-backup.json');
+  check('a bare array is still read', await p.locator('#ioReport .import-report').isVisible());
+  check('...and is named as having no header', /bare array with no/.test(await p.textContent('#ioReport')));
+  await p.locator('#ioReport button', { hasText:/^import$/ }).click();
+  await p.waitForTimeout(200);
+  check('...and imports', await count() === 3);
+
+  await offer({ format:'artist-tracker', version:99, count:1, entries:[{ name:'X' }] });
+  check('a NEWER version is refused, not partly read',
+    /could not read that file/i.test(await p.textContent('#ioReport'))
+    && /version/.test(await p.textContent('#ioReport')));
+  check('...and nothing changed', await count() === 3);
+
+  await offer('{"nope":true}');
+  check('a file that is not a backup is refused', /could not read that file/i.test(await p.textContent('#ioReport')));
+  check('...and nothing changed', await count() === 3);
+
+  await offer({ format:'artist-tracker', version:1, count:7, entries:[{ name:'Y', handle:'@y' }] });
+  check('a header that disagrees with the file is flagged',
+    /header says/.test(await p.textContent('#ioReport'))
+    && await p.getAttribute('#ioReport .import-report', 'data-tone') === 'warn');
+  await p.locator('#ioReport button', { hasText:'cancel' }).click();
+
+  await offer([{ id:'j1', name:'Ada CHANGED', handle:'@ada.v', category:'tattoo' }]);
+  await p.selectOption('#ioDedupe', 'skip');
+  await p.locator('#ioReport button', { hasText:/^import$/ }).click();
+  await p.waitForTimeout(200);
+  check('`skip` leaves an existing entry untouched',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='j1').name) === 'Ada Vance');
+  // ...and nothing was ADDED beside it. `find` returns the first match, so an
+  // import that duplicates instead of skipping leaves the original untouched
+  // and satisfies the line above while doing the one thing this feature
+  // exists to prevent. Measured: the mutation that restores concatenation
+  // passes that check and fails this one.
+  check('...and nothing was added beside it', await count() === 3, 'now ' + await count());
+}
+
+// ---------------------------------------------------------------------------
+section('item 29 — rating: three stars, on the row and in the drawer');
+{
+  const p = await reseed([
+    { id:'s1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', location:'Berlin, Germany', tags:['fine line'], stars:0, notes:'' },
+    { id:'s2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', location:'Lisbon, Portugal', tags:[], stars:3, notes:'' },
+    { id:'s3', name:'Cyd Marr', handle:'@cyd.marr', category:'tattoo', location:'Oslo, Norway', tags:[], stars:2, notes:'' },
+  ]);
+  const rowOf = (n) => p.locator('#list .entry', { hasText:n });
+
+  check('an unrated row draws its stars at zero, not as three empties',
+    await rowOf('Ada Vance').locator('.entry-stars').getAttribute('data-stars') === '0');
+  check('...and is invisible until the pointer is on the row',
+    await rowOf('Ada Vance').locator('.entry-stars').evaluate(el => getComputedStyle(el).opacity) === '0');
+  check('a rated row shows filled stars',
+    await rowOf('Bo Reyes').locator('.star[data-on="true"]').count() === 3);
+  check('...and the unfilled remainder on a partial one',
+    await rowOf('Cyd Marr').locator('.star[data-on="true"]').count() === 2
+    && await rowOf('Cyd Marr').locator('.star[data-on="false"]').count() === 1);
+
+  // The item-11 exception, scoped: a star sets a value, it does not navigate.
+  await rowOf('Ada Vance').locator('.star[data-v="2"]').click();
+  await p.waitForTimeout(150);
+  check('clicking a star on the row sets the rating',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='s1').stars) === 2);
+  check('...and does NOT open the drawer',
+    await p.getAttribute('#drawer', 'data-open') !== 'true');
+  await rowOf('Ada Vance').locator('.star[data-v="2"]').click();
+  await p.waitForTimeout(150);
+  check('clicking the same star again clears it',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='s1').stars) === 0);
+
+  // ...while the row itself still opens the drawer, which is the property the
+  // exception must not have cost.
+  await rowOf('Ada Vance').locator('.entry-name').click();
+  await p.waitForTimeout(SLIDE);
+  check('the row still opens the drawer', await p.getAttribute('#drawer', 'data-open') === 'true');
+  check('the drawer names the rating of a rated entry once set', true);
+  await p.locator('#detailEdit').click();
+  await p.waitForTimeout(150);
+  check('the drawer carries the canonical control',
+    await p.locator('#fStars .star-btn').count() === 3);
+  await p.locator('#fStars .star-btn[data-v="3"]').click();
+  await p.locator('#saveEntry').click();
+  await p.waitForTimeout(200);
+  check('the drawer control saves a rating',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='s1').stars) === 3);
+  check('...and the view shows it',
+    /rating/i.test(await p.textContent('#drawerView')));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(SLIDE);
+
+  // The filter is a threshold except at its two ends.
+  const chipN = async (id) => (await p.textContent('#starChips .chip[data-star="' + id + '"]')).trim();
+  check('the rating chips carry counts', /\(\d+\)$/.test(await chipN('3')), await chipN('3'));
+  check('three-star counts only threes', /\(2\)$/.test(await chipN('3')), await chipN('3'));
+  check('two-plus counts two AND three', /\(3\)$/.test(await chipN('2')), await chipN('2'));
+  check('unrated is browsable and counted', /\(0\)$/.test(await chipN('unrated')), await chipN('unrated'));
+
+  await p.locator('#starChips .chip[data-star="3"]').click();
+  await p.waitForTimeout(150);
+  check('filtering to three stars shows only threes',
+    (await visibleNames()).sort().join() === 'Ada Vance,Bo Reyes');
+  await p.locator('#starChips .chip[data-star="2"]').click();
+  await p.waitForTimeout(150);
+  check('two-plus includes the two', (await visibleNames()).length === 3);
+  await p.locator('#starChips .chip[data-star="all"]').click();
+  await p.waitForTimeout(150);
+  check('all comes back', (await visibleNames()).length === 3);
+}
+
+// ---------------------------------------------------------------------------
+section('item 29b — markers are a set, and the table is the only place they are declared');
+{
+  const p = await reseed([
+    { id:'m1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', location:'Berlin, Germany', tags:[], markers:[], notes:'' },
+    { id:'m2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', location:'Lisbon, Portugal', tags:[], markers:['booked'], notes:'' },
+    { id:'m3', name:'Cyd Marr', handle:'@cyd.marr', category:'tattoo', location:'Oslo, Norway', tags:[], markers:['nosuchmarker'], notes:'' },
+  ]);
+  const rowOf = (n) => p.locator('#list .entry', { hasText:n });
+
+  check('an unmarked row draws no marker glyph at all',
+    await rowOf('Ada Vance').locator('.entry-markers').count() === 0);
+  check('a marked row draws exactly its own',
+    await rowOf('Bo Reyes').locator('.marker-glyph').count() === 1);
+  check('...as a bare glyph, never a word pill',
+    await rowOf('Bo Reyes').locator('.entry-markers .entry-tag-pill').count() === 0);
+  // Both halves, because they fail differently: dropping the id is the
+  // behaviour, and the ROW STILL RENDERING is what separates "dropped" from
+  // "markerDef() returned null and the row threw". The first version of this
+  // check asserted only the glyph count, and a mutation that renders the
+  // undeclared id crashes the row -- so it read zero glyphs and passed while
+  // the defect was present.
+  check('a marker id the table does not declare is dropped, not drawn blank',
+    await rowOf('Cyd Marr').locator('.marker-glyph').count() === 0);
+  check('...and the row it is on still renders',
+    await rowOf('Cyd Marr').locator('.entry-name').count() === 1);
+
+  check('the filter row offers exactly the declared markers',
+    await p.locator('#markerChips .chip').count() === 1);
+  check('...with a count', /\(1\)$/.test((await p.textContent('#markerChips .chip[data-marker="booked"]')).trim()),
+    (await p.textContent('#markerChips .chip[data-marker="booked"]')).trim());
+  await p.locator('#markerChips .chip[data-marker="booked"]').click();
+  await p.waitForTimeout(150);
+  check('filtering by a marker shows only the marked', (await visibleNames()).join() === 'Bo Reyes');
+  await p.locator('#markerChips .chip[data-marker="booked"]').click();
+  await p.waitForTimeout(150);
+  check('...and toggles back off', (await visibleNames()).length === 3);
+
+  await rowOf('Ada Vance').locator('.entry-name').click();
+  await p.waitForTimeout(SLIDE);
+  await p.locator('#detailEdit').click();
+  await p.waitForTimeout(150);
+  check('the drawer offers one toggle per declared marker',
+    await p.locator('#fMarkers .marker-btn').count() === 1);
+  await p.locator('#fMarkers .marker-btn[data-marker="booked"]').click();
+  await p.locator('#saveEntry').click();
+  await p.waitForTimeout(200);
+  check('the drawer sets a marker',
+    await p.evaluate(() => JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='m1').markers.join()) === 'booked');
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(SLIDE);
+}
+
+// ---------------------------------------------------------------------------
+section('item 30 — addedAt, and a sort that means something on a backfilled library');
+{
+  // No addedAt anywhere: this is what the library looks like on first load
+  // after the field ships.
+  const p = await reseed([
+    { id:'t1', name:'First Stored', handle:'@first', category:'tattoo', tags:[], notes:'' },
+    { id:'t2', name:'Second Stored', handle:'@second', category:'tattoo', tags:[], notes:'' },
+    { id:'t3', name:'Third Stored', handle:'@third', category:'tattoo', tags:[], notes:'' },
+  ]);
+  const stamps = await p.evaluate(() =>
+    JSON.parse(localStorage.getItem('artistTracker.entries.v1')).map(e => e.addedAt));
+  check('every entry is stamped on load', stamps.every(s => typeof s === 'string' && s.length > 0));
+  check('the backfill is ONE stamp, not a run of invented times',
+    new Set(stamps).size === 1, JSON.stringify(stamps));
+
+  await p.selectOption('#sortSelect', 'added');
+  await p.waitForTimeout(150);
+  check('newest first orders the backfilled block by storage position',
+    (await visibleNames()).join() === 'Third Stored,Second Stored,First Stored',
+    (await visibleNames()).join());
+
+  // A genuinely new entry outranks the whole backfilled block.
+  await p.locator('#addToggle').click();
+  await p.waitForTimeout(SLIDE);
+  await p.fill('#fName', 'Added Just Now');
+  await p.fill('#fHandle', '@justnow');
+  await p.locator('#saveEntry').click();
+  await p.waitForTimeout(250);
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(SLIDE);
+  await p.locator('.chip[data-cat="all"]').click();
+  await p.waitForTimeout(150);
+  check('a new entry carries its own stamp, not the backfill’s',
+    await p.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('artistTracker.entries.v1'));
+      const nu = rows.find(e => e.name === 'Added Just Now');
+      return nu.addedAt !== rows.find(e => e.id === 't1').addedAt;
+    }));
+  check('...and sorts above every backfilled one',
+    (await visibleNames())[0] === 'Added Just Now', (await visibleNames()).join());
+
+  check('nothing writes a per-entry fake time to storage',
+    await p.evaluate(() => {
+      const rows = JSON.parse(localStorage.getItem('artistTracker.entries.v1'));
+      const back = rows.filter(e => e.id && e.id.startsWith('t')).map(e => e.addedAt);
+      return new Set(back).size === 1;
+    }));
+}
+
+// ---------------------------------------------------------------------------
+section('item 31 — the vocabulary is the input, a tenth tag is a deliberate act');
+{
+  const p = await reseed([
+    { id:'v1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', tags:['blackwork'], notes:'' },
+    { id:'v2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', tags:['sumi brushwork'], notes:'' },
+  ]);
+  await p.locator('#list .entry', { hasText:'Ada Vance' }).click();
+  await p.waitForTimeout(SLIDE);
+  await p.locator('#detailEdit').click();
+  await p.waitForTimeout(150);
+
+  check('the free-text box starts hidden', !(await p.locator('#fTags').isVisible()));
+  check('...and lives outside #tagPicker', await p.locator('#tagPicker #fTags').count() === 0);
+  const starters = await p.evaluate(() =>
+    [...document.querySelectorAll('#tagPicker .tag-toggle')].filter(b => b.dataset.custom !== 'true').length);
+  check('the picker still offers exactly the nine', starters === 9, String(starters));
+  check('...and an in-use tag outside them is still offered, so it can be removed',
+    await p.locator('#tagPicker .tag-toggle[data-custom="true"]', { hasText:'sumi brushwork' }).count() === 1);
+
+  await p.locator('#tagEscapeToggle').click();
+  check('the escape hatch opens', await p.locator('#fTags').isVisible());
+  await p.fill('#fTags', 'glitchwork');
+  await p.locator('#fTags').press('Enter');
+  check('a tenth tag is still possible once asked for',
+    await p.locator('#tagPicker .tag-toggle[data-custom="true"][data-on="true"]', { hasText:'glitchwork' }).count() === 1);
+  await p.locator('#saveEntry').click();
+  await p.waitForTimeout(200);
+  check('...and saves', await p.evaluate(() =>
+    JSON.parse(localStorage.getItem('artistTracker.entries.v1')).find(e=>e.id==='v1').tags.includes('glitchwork')));
+
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(SLIDE);
+  await p.locator('#list .entry', { hasText:'Bo Reyes' }).click();
+  await p.waitForTimeout(SLIDE);
+  await p.locator('#detailEdit').click();
+  await p.waitForTimeout(150);
+  check('the hatch is shut again for the next entry — it is an act, not a mode',
+    !(await p.locator('#fTags').isVisible()));
+  await p.keyboard.press('Escape');
+  await p.waitForTimeout(SLIDE);
+}
+
+// ---------------------------------------------------------------------------
+section('items 29–30 — the two new dimensions stack, and count honestly');
+{
+  const p = await reseed([
+    { id:'f1', name:'Ada Vance', handle:'@ada.v', category:'tattoo', tags:['fine line'], stars:3, markers:['booked'], notes:'' },
+    { id:'f2', name:'Bo Reyes', handle:'@bo.reyes', category:'tattoo', tags:['fine line'], stars:1, markers:[], notes:'' },
+    { id:'f3', name:'Cyd Marr', handle:'@cyd.marr', category:'tattoo', tags:['blackwork'], stars:3, markers:[], notes:'' },
+  ]);
+  await p.locator('#starChips .chip[data-star="3"]').click();
+  await p.waitForTimeout(150);
+  check('a rating filter narrows the list', (await visibleNames()).sort().join() === 'Ada Vance,Cyd Marr');
+
+  const tagChip = async (t) => (await p.textContent('#tagChips .tag-chip, #tagChips .chip')) || '';
+  const fineLine = await p.evaluate(() =>
+    [...document.querySelectorAll('#tagChips button')].map(b => b.textContent.trim())
+      .find(t => t.startsWith('fine line')) || '');
+  check('a tag count re-counts against the active rating', /\(1\)$/.test(fineLine), fineLine);
+
+  // ...and the rating chips must NOT count against themselves, or they would
+  // describe a list nobody is looking at.
+  const threeChip = (await p.textContent('#starChips .chip[data-star="1"]')).trim();
+  check('the rating chips still count the whole non-rating base', /\(3\)$/.test(threeChip), threeChip);
+
+  await p.locator('#markerChips .chip[data-marker="booked"]').click();
+  await p.waitForTimeout(150);
+  check('rating and marker stack', (await visibleNames()).join() === 'Ada Vance');
+  const markerChip = (await p.textContent('#markerChips .chip[data-marker="booked"]')).trim();
+  check('the marker chip counts against the rating but not itself', /\(1\)$/.test(markerChip), markerChip);
+}
 
 section('screenshots + page health');
 if(shotsDir){
