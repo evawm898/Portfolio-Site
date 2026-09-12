@@ -3229,9 +3229,18 @@ export function seamLatticeStep(seamMm, length) {
 }
 
 /* The blend grid a demand's ladder is taken down to — see the note at the
-   end of bladeStations. */
-const LADDER_BLEND_GRID = 4096;
-export function bladeStations(profile, length, buckle = null, seamMm = 0) {
+   end of bladeStations. EXPORTED because A8 bounds how far below the bound a
+   blended ladder may sit, and that slack IS one step of this grid: restating
+   4096 in the harness would make the bound agree with itself. */
+export const LADDER_BLEND_GRID = 4096;
+export function bladeStations(profile, length, buckle = null, seamMm = 0, report = null) {
+  /* WHAT THE BLEND DID, for A8's own clause (session 39). 1 says "the
+     bisection never ran", which is what every early return below means. It is
+     the ONE thing the gate cannot read off the emitted stations: whether this
+     ladder is the base measure's own or something pulled back toward uniform.
+     The gap it is judged against is read from the rows, never reported here —
+     a measure that reported its own verdict would justify its own defect. */
+  if (report) report.blend = 1;
   const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
   /* The rows the root blend can reach keep their uniform stations, exactly. */
   const held = HELD_ROWS;
@@ -3401,8 +3410,35 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
   for (let i = 1; i < NU; i++) if (out[i] <= out[i - 1]) out[i] = Math.min(1, out[i - 1] + 1e-5);
 
   /* Bound the widest gap by blending back toward uniform in u. Monotone in
-     the blend, so a bisection finds the largest admissible ladder. */
-  const widest = (r) => { let m = r[0]; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
+     the blend, so a bisection finds the largest admissible ladder.
+
+     THE GAPS BETWEEN STATIONS, AND THE LEADING ONE IS A7'S (session 39, and
+     the reason that session exists). This measure opened with `r[0]` — the
+     offset from the seam to the FIRST BLADE ROW. Before session 38 that was
+     always exactly 1 / NU, so it could never be the widest gap and the term
+     was vacuous; with the seam floor it is `seamStep / NU`, and at a seam
+     step of 2 it already exceeds every cap this function is ever handed.
+     THE BLEND CANNOT MOVE IT — `mix()` keeps every held row by construction,
+     for the bit-identity reason below — so the cap was unsatisfiable for
+     every blend, the bisection converged to 0, and the whole turning-rate
+     ladder was DISCARDED: the blade placed EXACTLY uniformly wherever the
+     seam floor binds. Nothing could see it. A uniform ladder is watertight,
+     one piece, the right triangle count, inside every bound and past every
+     assertion; it is simply session 32's redistribution switched off, at 16x
+     the apex chord error in EXPORT on the incurve target (0.0660 mm against
+     0.0041 with the ladder).
+
+     A8 IN THE HARNESS ALREADY EXCLUDES THIS GAP BY NAME and says why — it is
+     "placed by the clearance law and PINNED by A7", where the ladder's own
+     question is whether its REDISTRIBUTION starved the wave. This is that
+     same clause, in the geometry, so the one rule stops having two owners
+     that disagree; it is deliberately not a second rule. A8 gained the
+     matching assertion on the same day, and it reads the gap off the EMITTED
+     stations rather than off anything reported from here: a measure that
+     handed the gate its own verdict would hand over the number that excuses
+     it. What IS reported is the blend alone — the one thing the emitted rows
+     cannot say. */
+  const widest = (r) => { let m = 0; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
   const cap = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU;
   if (widest(out) <= cap) return out;
   /* The blend touches ONLY the redistributed rows. Running it over the held
@@ -3453,6 +3489,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0) {
      ulp of a grid line. Only under a demand: with none, every row keeps the
      placement main ships, to the bit. */
   if (demand !== null) lo = Math.floor(lo * LADDER_BLEND_GRID) / LADDER_BLEND_GRID;
+  if (report) report.blend = lo;
   return mix(lo);
 }
 const NV = 10;   // columns across one span
@@ -5591,7 +5628,10 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      care for the same reason. */
   const seamFrameResidual = Math.abs(
     (footN[0] * nrm[0] + footN[1] * nrm[1] + footN[2] * nrm[2]) - Math.cos(seamTurnRad));
-  const stations = bladeStations(profile, length, form && form.buckle, seamClearMm);
+  /* ASKED, never re-derived: the ladder reports what its own bound did, so
+     A8 can assert the blend ran for a reason inside its own measure. */
+  const ladderReport = {};
+  const stations = bladeStations(profile, length, form && form.buckle, seamClearMm, ladderReport);
   for (let i = 1; i <= NU; i++) rows.push(surface.rowAt(stations[i - 1]));
   /* ===================================================================
      THE TRUE SURFACE NORMAL — the ONE place the offset direction stops being
@@ -5951,6 +5991,14 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
       seamFrameResidual,
       gapFactor: ladderGapFactor(form && form.buckle && form.buckle.A ? form.buckle.f : 0),
       buckleFreq: form && form.buckle && form.buckle.A ? form.buckle.f : 0,
+      /* THE MIX THE BISECTION LANDED ON, 1 when it never ran (session 39).
+         The bound is enforced by blending the redistributed rows back toward
+         uniform, so the blend is the one thing that can throw the whole
+         turning-rate ladder away — and a discarded ladder is watertight, one
+         piece, the right triangle count and inside every bound, so without
+         this field no gate here can tell that it happened. A8 pairs it with
+         the gap measured off the EMITTED rows. */
+      blend: ladderReport.blend,
     },
     /* ZYGOMORPHY TELEMETRY — READ FROM THE EFFECTIVE STATE THE BUILDER
        ACTUALLY USED, which is the whole point of reporting it here rather

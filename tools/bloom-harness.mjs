@@ -79,7 +79,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
          BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT, BUCKLE_ROWS_PER_CYCLE_MIN, BLADE_ROWS,
-         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_TIP_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_TIP_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, ladderWindowCapacity,
+         LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_TIP_SHAPE_RANGE, LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_TIP_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE, ladderWindowCapacity, LADDER_BLEND_GRID,
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
@@ -1894,8 +1894,9 @@ export async function thicknessAssertions(page, row) {
        frequency, and at the ceiling the bound is exactly 1, i.e. uniform.
        Read from the builder's declared gapFactor rather than recomputed, and
        checked against BUCKLE_ROWS_PER_CYCLE_MIN imported from the geometry. */
-    for (const [ld, pu] of ladders) {
+    for (const [ld, pu, ring] of ladders) {
       if (!ld || !Array.isArray(pu)) continue;
+      const at = ladders.length > 1 ? `ring ${ring}: ` : '';
       const blade = pu.filter((u) => u > 0);
       /* THE GAPS BETWEEN STATIONS, and the leading one is A7's now. Before
          session 38 this measure opened with `blade[0]`, which was ALWAYS
@@ -1910,16 +1911,55 @@ export async function thicknessAssertions(page, row) {
       let widest = 0;
       for (let i = 1; i < blade.length; i++) widest = Math.max(widest, blade[i] - blade[i - 1]);
       if (widest > ld.gapFactor / ld.rows + 1e-9) {
-        bad.push(`A8: the widest row gap is ${(widest * ld.rows).toFixed(4)} x uniform, past the declared bound of ${ld.gapFactor.toFixed(4)}`);
+        bad.push(`A8: ${at}the widest row gap is ${(widest * ld.rows).toFixed(4)} x uniform, past the declared bound of ${ld.gapFactor.toFixed(4)}`);
       }
       if (ld.buckleFreq) {
         const perCycle = (1 / ld.buckleFreq) / widest;
         const want = BUCKLE_ROWS_PER_CYCLE_MIN;
         if (ld.buckleFreq === BUCKLE_FREQ_RANGE[1] && widest > 1 / ld.rows + 1e-9) {
-          bad.push(`A8: at the frequency ceiling the ladder must be uniform (56 rows over 7 cycles is ${want} per cycle with no slack), and the widest gap is ${(widest * ld.rows).toFixed(4)} x uniform`);
+          bad.push(`A8: ${at}at the frequency ceiling the ladder must be uniform (56 rows over 7 cycles is ${want} per cycle with no slack), and the widest gap is ${(widest * ld.rows).toFixed(4)} x uniform`);
         }
         if (perCycle < want - 1e-6) {
-          bad.push(`A8: the buckle gets ${perCycle.toFixed(2)} rows per cycle at its widest gap, below the bar of ${want} — the ladder has taken rows the wave needs`);
+          bad.push(`A8: ${at}the buckle gets ${perCycle.toFixed(2)} rows per cycle at its widest gap, below the bar of ${want} — the ladder has taken rows the wave needs`);
+        }
+      }
+      /* A BLENDED LADDER SITS AT THE BOUND, BECAUSE THE BLEND IS THE LARGEST
+         ADMISSIBLE ONE (session 39). The bound is enforced by mixing the
+         redistributed rows back toward uniform, so the blend is the one
+         thing that can throw the whole turning-rate ladder away — and it did,
+         on `main`, silently: the geometry's own gap measure counted the
+         seam-to-first-row offset, which this family excludes by name above
+         and which `mix()` cannot move, so on every seam-shifted row the cap
+         was unsatisfiable whatever the blend, the bisection converged to 0
+         and the blade came out EXACTLY uniform. That is watertight, one
+         piece, the right triangle count, inside every bound and past every
+         other assertion here — 34 row-modes of the live matrix, layer 0 of
+         the incurve target among them, at 16x the export apex chord error.
+
+         THE GAP IS THE ONE MEASURED ABOVE, OFF THE EMITTED STATIONS, and
+         that is the whole point: the builder reports the blend it landed on
+         and NOT the measure it landed there by, so a measure that has
+         started counting the wrong thing cannot hand over the number that
+         excuses it. (Written the other way round first — `blend < 1` implies
+         the BUILDER's own raw widest exceeded the cap — it went green on the
+         very mutation it exists for, because the mutant's raw widest is the
+         mutant's. That is the session-38 `seam-floor-removed` lesson: a
+         clause that asks the defect whether it fired asks nothing.)
+
+         ONE DIRECTION on purpose: `blend < 1` must imply the emitted ladder
+         is AT the bound. The converse — at the bound implies blended — is
+         false at the knife edge where the base measure lands exactly on the
+         cap and the early return takes it unblended.
+
+         THE SLACK IS DERIVED, NOT TYPED. A bisection to 2^-60 lands on the
+         boundary to the last bit; under a demand the blend is then floored to
+         a grid of 1/LADDER_BLEND_GRID (imported, never restated), and each
+         gap is LINEAR in the blend with a slope under 1 in u, so one grid
+         step is the whole of the shortfall. */
+      if (typeof ld.blend === 'number' && ld.blend < 1 - 1e-12) {
+        const floor = ld.gapFactor / ld.rows - 1 / LADDER_BLEND_GRID;
+        if (widest < floor) {
+          bad.push(`A8: ${at}the ladder was blended to ${ld.blend.toFixed(6)} and its widest emitted gap is ${(widest * ld.rows).toFixed(4)} x uniform, short of the declared bound of ${ld.gapFactor.toFixed(4)} by more than one blend step — the blend ran for something this family does not measure, and a blend that runs for nothing discards the ladder`);
         }
       }
     }

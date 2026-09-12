@@ -24,13 +24,17 @@
         and without.
      4. THE LOBE CAP. `ladderWindowCapacity` over `LOBE_SAMPLES_PER_LOBE` —
         the arm is the only thing deciding how many lobes the rim carries.
-     5. THE SEAM COLLAPSE. `bladeStations`' own `widest()` opens with `r[0]`,
-        the offset from the seam to the FIRST BLADE ROW, which the blend
-        cannot move (it keeps every held row) — so wherever the seam floor
-        binds, `mUsed / NU` exceeds the cap for every blend and the bisection
-        lands on 0: the ladder is discarded and the blade is placed UNIFORMLY.
-        A8 in the harness already rules that gap is A7's and not the ladder's;
-        the geometry's own `widest()` was not given the same clause.
+     5. THE SEAM COLLAPSE. `bladeStations`' own `widest()` USED TO OPEN with
+        `r[0]`, the offset from the seam to the FIRST BLADE ROW, which the
+        blend cannot move (it keeps every held row) — so wherever the seam
+        floor bound, `mUsed / NU` exceeded the cap for every blend and the
+        bisection landed on 0: the ladder discarded and the blade placed
+        UNIFORMLY. A8 in the harness already ruled that gap A7's and not the
+        ladder's; the geometry was not given the same clause until PR 2 of
+        this session gave it one. THIS SECTION IS NOW THE STANDING WITNESS
+        rather than the finding: it read 34 of 36 collapsed on `main` and
+        reads 0 here, with the 2 that stay uniform doing so at the buckle's
+        frequency ceiling, where the bound IS uniform.
 
    HOW THE COMPARISON IS MADE. A one-line variant of bloom-geometry.js is
    written to a temp directory (the mutant tables' own mechanism) with
@@ -172,7 +176,15 @@ const freed = lobeRows.filter((r) => r.countOff > r.countOn);
 /* ---------- 5. the seam collapse ---------- */
 const UNI = 1e-12;
 const collapsedOn = out.filter((r) => r.uniformOn < UNI);
-const seamCollapsed = collapsedOn.filter((r) => r.seamStep > 1);
+/* THE TWO CLASSES OVERLAP, AND ON A FIXED TREE THE OVERLAP IS ALL THAT IS
+   LEFT (session 39, PR 2). A uniform ladder at the buckle's frequency ceiling
+   is uniform BY DESIGN — the bound there is exactly 1 — whether or not the
+   seam floor also binds on that row, so "the seam discarded it" is only true
+   of a uniform row whose bound is NOT already uniform. Classified as a
+   disjoint partition for that reason: the first reading of this section
+   counted the two overlapping and would have reported 2 rows as a surviving
+   defect on a tree where the defect is gone. */
+const seamCollapsed = collapsedOn.filter((r) => r.seamStep > 1 && r.gapFactor !== 1);
 const seamRows = out.filter((r) => r.seamStep > 1);
 
 const report = {
@@ -218,7 +230,7 @@ else {
   console.log('');
   console.log(`5. THE SEAM COLLAPSE — the ladder discarded where the seam floor binds.`);
   console.log(`   ${report.seamCollapse.seamShiftedRowModes} row-modes have seamStep >= 2 · ${report.seamCollapse.collapsedToUniform} row-modes place the blade EXACTLY uniformly`);
-  console.log(`   of those, ${report.seamCollapse.ofWhichAtTheBuckleCeiling} are the buckle's frequency ceiling (uniform BY DESIGN) and ${report.seamCollapse.ofWhichSeamShifted} are the seam floor (not by design)`);
+  console.log(`   of those, ${report.seamCollapse.ofWhichAtTheBuckleCeiling} are the buckle's frequency ceiling (uniform BY DESIGN, whatever the seam does) and ${report.seamCollapse.ofWhichSeamShifted} are the seam floor with a bound that is NOT uniform (not by design)`);
   console.log(`   seam-shifted row-modes that keep a real ladder: ${report.seamCollapse.seamShiftedNotCollapsed}`);
 }
 fs.rmSync(tmp, { recursive: true, force: true });
