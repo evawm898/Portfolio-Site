@@ -387,7 +387,8 @@ range and touches nothing at the other two.** Reported; not fixed, as instructed
   partition plus a frozen-phase re-measure and a full CI cycle.
 * **`LOBE_SAMPLES_PER_LOBE` was not lowered.** §5 says what it rests on; the trade is on
   the image.
-* **The seam collapse (§4) was not fixed**, for the same byte-partition reason.
+* **The seam collapse (§4) was not fixed** here, for the same byte-partition reason —
+  it is ruling 3's own PR, and it comes before any lobe change.
 * **The reserve was not given its own owner** (§3b). It is the real derivation that is
   missing, and it is bigger than one constant.
 * **No gate was run.** Nothing shipped that any gate covers: the geometry, the registry,
@@ -395,6 +396,54 @@ range and touches nothing at the other two.** Reported; not fixed, as instructed
   measurement tool, which triggers the two FLOWER gates through their `'tools/**'` filter
   — they test flower geometry and are not evidence about anything here.
 
-## 9. Ball
+## 9. EVA'S RULINGS on this report, and what follows
 
-**WAITING ON EVA** — see the report.
+Three, recorded here because this document is the measurement record the next sessions
+read. **The menu §6 offered was not taken.**
+
+**RULING 1 — the floor's band is as typed as 1.40 was.** Clause (i)'s structure and its
+threshold of 2 are real; the band at one tenth is not. The floor is 11 because someone
+wrote 0.10, and the eye's reading of the cells (11 round, 10 the same, 8 faceted, 6
+polygonal) corresponds to t = 0.15–0.20 — a floor of 9 or 8 and **FOUR** lobes, not
+three. So: **derive the band from something physical, or establish that it cannot be
+derived and declare it openly as a visual threshold set from Eva's eye.** Either outcome
+is acceptable; presenting a typed number as a derivation is not, and which of the two it
+is may itself be the finding.
+
+**RULING 2 — take the third lobe, but not by removing the arm outright.** §3b's cost is
+the reason: `ladderOutsideMinima` needs **its own owner with a bar stated in
+MILLIMETRES** before the arm comes out. That first, then the removal.
+
+**RULING 3 — §4 outranks everything else in this report, and it is not this PR's.** The
+turning-rate ladder is silently discarded and the blade placed uniformly on 34 of 36
+seam-shifted row-modes, including the incurve target flat and domed, at 16× the apex
+chord error. **Every lobe measurement taken on a tree where the ladder is off is
+measuring the wrong thing.** It ships as its OWN PR, geometry only, BEFORE any lobe
+change; it moves bytes, so it owes a predeclared byte partition and the full bloom
+gates; and A8's existing exclusion-by-name gets its matching clause in the geometry
+rather than a second rule.
+
+### 9a. What §4 does and does not invalidate in this document
+
+Stated rather than left to be worked out. **Every row quoted by name in §2's cost table
+has `seamStep` 1 and is not collapsed** (`petalTipShape` max, `TIP SHAPE: 3.00 ×` the
+longest widest petal, `LOBES: × petalTipShape 3.00`, `petalWidth` min, `buckleAmp` max),
+and so do the default petal and every row in §3, §3a, §3b, §5 and §5a — 4 of 66 lobed
+row-modes carry `seamStep ≥ 2` and none of them is quoted. So the lobe capacities, the
+lobe counts, the mm costs and the clause-(i) readings all stand.
+
+What does NOT stand unchanged is §2's **census over the whole matrix** — the 197
+constrained, the 199 moved and the 34 collapsed are counted on a tree where the ladder
+is off for those 34. **The census is owed a re-measurement after the §4 fix lands**, and
+the instrument is committed here so it is one command.
+
+### 9b. Re-scoped, for the session that resumes the lobe work
+
+Lobes and serration are ONE generator at different settings — high count / low depth /
+acute is serration, low count / high depth / obtuse is lobing; the controls are depth,
+count, sharpness. **Do not design around it yet**; it is recorded here so ruling 1's
+band is not derived in a way that only makes sense for round crests.
+
+## 10. Ball
+
+**DONE** — merged as the measurement record. The §4 fix follows as its own PR.
