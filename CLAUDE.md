@@ -5175,6 +5175,16 @@ they and who is near who (region filter + map), and why did I save them
     tag chips' own `label (n)` shape so the three chip rows read as one
     vocabulary of controls. `unrated` is browsable on purpose — it is the
     backlog, the same reasoning as the gender filter's "unknown".
+    **A GLYPH NEEDS MORE SIZE THAN A WORD, AND GLYPH-ONLY CHIP LABELS READ AS
+    PUNCTUATION.** The rating chips first shipped as `★★★` / `★★+` / `★+`
+    and the two-plus chip read as `**+` — uncountable at a glance. Number
+    first, ONE star as the unit: `3★` / `2+★` / `1+★`, at 13px against the
+    word chips' 12. **No assertion could have caught it; a rendered sheet did.**
+    And on MOBILE the marks cost a whole line per row (`.entry` is
+    `flex-direction:column` there, so a right-aligned 52px column becomes its
+    own line with the glyphs floating in it) — they lay along the row now, and
+    since the stars are not a target on a touch device an unrated row reserves
+    no space at all: 260px → 247px.
 31. **`addedAt`, and a sort that means something on a BACKFILLED library.**
     Set on create, on bulk paste, on JSON import (a restored entry keeps the
     stamp its backup carried). Existing entries are backfilled on load with
@@ -5216,7 +5226,7 @@ counts can exclude their own dimension.
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
 drawer, paste-to-add, shortlist and import work (items 11–32) ship with a
-behaviour gate, `node tools/verify-tracker-drawer.mjs` (382 checks;
+behaviour gate, `node tools/verify-tracker-drawer.mjs` (385 checks;
 `--shots <dir>` also writes a contact sheet). `staticGeocode()` is a pure
 function, so its ANSWERS are unit-checked against declarations SLICED OUT of
 `artist-tracker.html` itself (the app is inside an IIFE) rather than inferred
@@ -5256,6 +5266,33 @@ its storage tiebreak, the tag box free-text again, and a facet counting
 against itself. **Check every anchor BEFORE running any mutant** — a `from`
 that has moved, or that now matches twice, disarms a mutant silently, and a
 sweep that costs a full gate run per mutation is not one you notice a hole in.
+**15 of 15 behave**, and getting there cost three sweeps and taught four things:
+
+* **READ THE `FAIL` LINES OFF THE STREAM, NEVER THE FINAL `FAILURES:` BLOCK.**
+  A mutation bad enough to make the harness throw never prints that block, so
+  parsing only it threw away everything the run had already established: NINE
+  of fifteen reported `<crashed before reporting>` and said nothing at all. A
+  crash is its own fact and is reported as one, and checks after it never ran
+  so they cannot be held against the mutant.
+* **A MISSING ELEMENT MUST BE A RED CHECK, NEVER A 30s HANG.** Three sites read
+  an element without establishing it was there, so a mutation that CORRECTLY
+  broke something hung and took every later check with it — one mutant died at
+  check 202 reporting `NOTHING IT CLAIMS FIRED`, on a mutation that had
+  genuinely broken the thing it names.
+* **TWO OF THE NEW CHECKS WERE BLIND AND ONLY A MUTATION SAID SO.** `find`
+  returns the FIRST match, so an import that duplicates rather than skipping
+  leaves the original untouched and satisfies `skip leaves an existing entry
+  untouched` while doing the one thing item 29 exists to prevent — it asserts
+  the count now too. And the undeclared-marker check passed BECAUSE THE PAGE
+  WAS BROKEN: the mutation that renders the id makes `d.glyph` throw inside
+  `renderMarks`, so the row never renders and the glyph count is zero.
+* **AND ONE CLAIM WAS UNOBSERVABLE.** `the marker chip counts against the
+  rating but not itself` claimed something provably invisible while ONE marker
+  ships: the count is `|base ∧ hasMarker|`, and intersecting the base with
+  `matchesMarkers` hits the same set again. Renamed to what it can see; the
+  RATING row is the only witness for self-counting until a second marker
+  exists. A mutation that stays green is sometimes the CLAIM being wrong
+  rather than the check.
 
 **THE DENSITY QUESTION HAS ITS OWN SHEET, AND IT IS ASKED AT THE RIGHT STATE.**
 `node tools/shot-tracker-marks.mjs <dir>` seeds 240 artists in the real file's
@@ -5267,6 +5304,16 @@ you what a rated one looks like. Every figure on it is measured off the rendered
 page. Note the contact-sheet rule from the bloom work applies here too: no pixel
 DELTA is quoted anywhere on it, because this renderer is not deterministic
 between page sessions.
+**THE SHEET LIED TWICE BEFORE IT ANSWERED ANYTHING, and both are the class to
+watch for.** Its fixture hashed with `% 1000` while the name pools are mod 10,
+so every "Ada Vance" (i a multiple of 10) hashed to a multiple of 10 and
+therefore to rating 0 — the default sort put two dozen UNRATED rows first and
+the cell meant to show ratings showed none. The modulus is prime now. Then it
+MEASURED BEFORE SCROLLING, so its numbers described a frame it did not capture.
+Scroll, measure, shoot, in that order — and it reports `rowsInFrame` /
+`ratedInFrame` / `markedInFrame`, because a whole-list total of 377 lit stars is
+perfectly consistent with a photograph of none. **A sheet has to show the thing
+it is about, and a count over the whole fixture cannot tell you whether it does.**
 
 **MERGE SEMANTICS ARE UNIT-CHECKED AGAINST THE SHIPPED FUNCTION, NOT THROUGH
 THE UI.** `mergeEntry` and `MERGE_RULES` are sliced out of the page the same
