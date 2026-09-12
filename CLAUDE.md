@@ -1603,6 +1603,130 @@ capability hook, labelled non-shipping with the stations per lobe on every capti
 **ZERO BYTES OF GEOMETRY: `bloom-geometry.js`, `bloom-registry.js` and `bloom.js` are
 untouched by session 40.**
 
+**THE LOBE CUT LAW IS TWO INDEPENDENT EXPONENTS, THE DEMAND IS A FUNCTION OF THE SHAPE,
+AND THE COUNT CEILING IS 10 RATHER THAN 2** (session 41 — read
+`docs/bloom-lobe-model.md` FIRST for Eva's model, then
+`docs/bloom-session-41-outcome.md`, before touching `widthProfile`'s lobes block,
+`lobeCutProfile`, `LOBE_DEMAND_ROWS` or the L family). **AND DO NOT GO LOOKING FOR
+`claude/lobes-serration-status.md` — it is not in this repository and never was; it
+lives in a Cowork project the sessions cannot read, sessions 38 and 40 each spent time
+establishing that, and `docs/bloom-lobe-model.md` exists so a fourth session does not.**
+`lobeTipShape` is RETIRED (`RETIRED_IDS`, session 41); the cut within one period is
+`g(r) = r^a / (r^a + (1-r)^b)` on `r = 1 - |2f - 1|`, and `lobeCrestShape` / `lobeNotchShape`
+(0.60-3.00, step 0.05, default 2.00 each) are **the LOCAL POWERS of the cut at its own two
+features** — 1.00 a corner, 2.00 parabolic, 3.00 flat, below 1.00 a cusp — measured
+independent to six figures. **TWO CONTROLS IS NOT A REGISTRATION VIOLATION** (the brief):
+the rule forbids two controls moving ONE quantity, and the retired control was the other
+error, ONE control over TWO. **THE SUPERELLIPSE DOES NOT FIT AND THE REASONS ARE
+MEASUREMENTS, so do not re-propose it**: one exponent couples the powers INVERSELY (n at
+the crest, 1/n at the notch — session 40's measured trade), the two-exponent Lame form
+`(1 - (1-r)^b)^a` decouples them but is NOT symmetric at a = b (`g(1/2) = 0.5625` at
+a = b = 2, so equal settings draw a lopsided wave), and the piecewise-power form is
+symmetric but puts a THIRD tangent break mid-flank whenever a != b. **TWO EXACT VALUES ARE
+LOAD-BEARING:** `g(0) = 0` and `g(1) = 1` to the bit at every exponent, so the crests still
+meet the base outline exactly and L6's `Object.is` clause is unchanged; and **a = b = 1 is
+the triangle wave to the bit** (max |g(r) - r| = 0 over 100,001 samples), so the serrate
+margin is an identity rather than an approximation. **IT COMPOSES BY FORM**: the cut is a
+REDUCTION FACTOR, so a second shorter-wavelength level is one more factor in the same
+product and cannot make the outline multi-valued (0 of 260,496 samples leave (0, 1] over
+1,296 exponent quadruples) — not built, costed in §1b, and what it would really cost is
+the DEMAND and the depth cap, not the law.
+**THE CONTROLS ARE NOT CALIBRATED IN DEGREES AND MUST NOT BE.** The angle an exponent
+DRAWS depends on the depth, the pitch AND the local half-width, and the fine/coarse chords
+differ by up to 145 degrees on one state — so a slider reading 90 would draw something
+else the moment any of the three moved. The exponent is the control; the DRAWN included
+angle is measured on the build's own outline and printed in the read-out **beside the
+chord it was read through**, which is the one place a degree figure can be true. Rising =
+blunter in both (session 31's `antherPinch` ruling). **MEASURED: the notch spans 32.6 to
+178.6 degrees and the crest 67.7 to 178.0 on a 0.50 mm chord, each control owning its own
+feature with the other drifting at most 16.7 degrees** — the shared denominator of the
+law, reported as the size of the cross-talk rather than claimed absent.
+**THE DEMAND IS `LOBE_DEMAND_ROWS`, A 49 x 49 TABLE OVER THE CONTROL'S OWN STEPS** (no
+interpolation, one cell per reachable pair), derived by
+`node tools/bloom-lobe-resolution.mjs --table` and verified cell for cell by `--verify`,
+**which is its ONLY independent witness — the harness's L3 READS the table, so it can
+prove the record carries the demand the shape asks for and never the table itself.**
+Clause (i)'s bar is `2 x clamp(power - 1, 0, 1)`: session 40 wrote the premise in prose
+("a corner does not need resolving; what needs resolving is the ROUND band") and its
+formula did not implement it, because on the retired family the binding feature is
+parabolic or flatter at every reachable value — so the weight is 1 there, the bar is
+EXACTLY session 38's "two station gaps", and the generalisation reproduces the ruled
+10 / 11 / 8 and the uniform 7 / 10 / 6, 3 of 3. **A BINARY CORNER TEST WAS TRIED AND
+REJECTED: it stepped the demand 2 -> 20 between notch 1.00 and 1.25**, a cliff in the
+count under one slider step. **CLAUSE (iii) IS NEW AND IS WHY NO CELL READS 2** — the
+per-period model pins the period's ends ON crests, which the builder does at the WINDOW's
+ends and at no interior crest, so the model reads the FAVOURABLE phase: measured over 200
+offsets, **the drawn tooth at 2 stations a period ranges from 100% of its true amplitude
+down to ZERO**, both stations landing at mid-flank. It is slack on the whole retired
+family (4 / 3 / 3), so session 38's ruled constant is untouched. **NO CELL EXCEEDS
+`LOBE_SAMPLES_PER_LOBE`, asserted rather than clamped** — the ruled 11 stays the CEILING
+and this session's contribution is the reduction below it.
+**AND THE SHIPPED CLAUSE HAD A DEFECT THAT ONLY THE NEW LAW COULD SHOW**: `gapsPerBroad`
+divided the band by the widest gap OVERLAPPING it without requiring the gaps to COVER it,
+so two coincident stations left one gap of ~0 and the ratio blew up — **the clause PASSED
+ON PILING.** The gaps are read on the CIRCLE now (they tile the period and sum to 1) and
+the answers are identical wherever the old form's gaps did tile.
+**A LAW MUST BE THE SHIPPED EXPRESSION, NOT AN ALGEBRAIC EQUIVALENT** — `((1-cos 2 pi f)/2)^q`
+and `sin(pi f)^{2q}` agree on [0, 1] and NOT outside it (the first is even and periodic),
+and the tool's tangent probe reads slightly outside at the period's ends: substituting the
+second moved the q 0.50 ladder floor from **10 to 7**. Any law reached through a triangle
+phase is wrapped explicitly, because `Math.pow` of a negative r is NaN.
+**THE COUNT CEILING, EXPORT, the shipping default petal, 10 asked: 9 at coverage 0.80 and
+10 at 1.00 on the triangle wave (10 is the RANGE's own maximum, so the count is no longer
+capped at all there), 7 near it, 6 cusped, 3 at the round default — against 2 for every
+shape before.** Serration is reachable through the shipped sliders with NO capability
+hook. **WHAT IS STILL MODEL B's, plainly: the APEX.** Eva's model requires the apex to be
+a point on the rim and its treatment indistinguishable from the side's, and Model A cannot
+satisfy that at ANY parameter value — session 40 proved as an identity that the treated
+region ends at `uCap` and the apex above is bit-identical to a petal with no lobes. Low
+coverage is also still Model B's (1 lobe at coverage 0.10, a PHYSICAL pitch floor on a
+1.8 mm window); and Model B would raise the count AGAIN on top of this PR, because the
+apex region reserves 8-10 rows that would become available.
+**THE RELIEF FADE IS INVARIANT UNDER BOTH SHAPE CONTROLS, provably**: the relief at a
+sinus is `hb * depth * g(1)` and `g(1) = 1` exactly at every exponent, so every shape
+reads the same **2.393 / 2.206 / 1.817 mm** over the shape square, worst difference
+1.7e-9 mm. Session 40's own five-tooth row reproduces at 2.366 / 1.923 / 0.933. **The fade
+belongs to the PROPORTIONAL depth rule against a converging blade and the shape cannot
+reach it** — Model B, which moves where the teeth sit, can; coverage cannot, because
+Eva's coverage is an arc about the apex.
+**L7 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE SHAPE.** It reads the LOCAL POWER of
+the removed material (`hb - h`, exactly 0 at a crest and greatest at a sinus) off the
+EMITTED outline at a feature a TERNARY SEARCH pins on the curve — the record's crestU /
+sinusU only BRACKET it. **Its reference is the page's own read-back control state**, an
+owner `widthProfile` does not write: a clause that read its expected exponent from the
+lobe record would move with the defect and could not fail (session 39's A8, session 38's
+`seam-floor-removed`). **L0-L6 are blind to WHICH SHAPE the cut carries** — the count, the
+caps, the window, the pitch, the demand and the crests-at-the-ends identity are all
+unchanged by swapping the two controls or coupling them. **THE MUTANT TABLE WAS RE-RUN
+BECAUSE A FAMILY WAS ADDED**: `tools/verify-bloom-apex-mutants.mjs` now runs the LOBE
+family beside the apex one (it was A-only) and carries `shapes-swapped` and
+`shapes-coupled`, each witnessed on the MUTATED MODULE's own emitted powers rather than on
+the assertion it names, on a row whose two exponents are set APART (a swap of equal values
+is undetectable by construction). **THE NOTCH IS A TANGENT BREAK when its power is at or
+below 1 and is DECLARED — `LOBE_SINUS`, new**; the retired family was parabolic at its
+minimum at every value so a notch could never be one. These do not reach the lobe
+stationing and cannot: the arc table is built on the outline BEFORE the cut.
+**THE LADDER DOES NOT PILE AT THE NEW KINKS, measured rather than assumed** (the turning
+measure integrates |d tangent| and a kink is a DELTA — four prior instances of that bug
+class here): over crest exponents 0.60 to 3.00 at 2 and 8 lobes, **ZERO gaps at or under
+`bladeStations`' own 1e-5 repair step and zero under uniform/10**, narrowest 6.0e-3
+against a uniform 1.786e-2. What contains it is the `LADDER_MAX_GAP_FACTOR` blend — a
+THIRD job for a constant session 39 already found doing two — so **if that arm is ever
+removed (session 39's ruling 2 proposes exactly that), RETAKE this measurement.**
+**THE PARTITION: 39 MOVED / 635 HELD of the 674-row live matrix**, predeclared from the
+BUILDER'S OWN RECORD (a row moves iff a ring actually builds a cut — present, not
+`noRoom`, count >= 1, depth > 0) rather than from the control set, regex exact in both
+directions. The three lobe-labelled HOLDERS are `NO ROOM by the pitch floor` (no cut
+built) and the two GATED rows; the two non-lobe MOVERS are `lobeDepth max (1)` and
+**`ALL MAX`** — session 38's own lesson honoured. The matrix grew 666 -> 674 (eight shape
+rows, plus two from the blanket slider sweep for the net new slider), so **`frozen/phase25`
+is owed at `3f238bd`**. No matrix BLOCK was added: the shape rows went into block 29 and
+the block count is unchanged at 25.
+The sheet is `node tools/shot-bloom-serration-range.mjs <dir>`, which now renders BOTH of
+Eva's images — the 3 x 3 shape square (at count 3, because the demand is a function of the
+shape and a higher count would CLAMP the blunt corner, leaving the grid varying the count
+as well) and the serration / midpoint / lobing row on the shipped sliders with no hook.
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the

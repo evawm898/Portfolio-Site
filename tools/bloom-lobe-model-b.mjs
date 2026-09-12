@@ -413,7 +413,7 @@ if (want('2')) {
   }
   out.section2 = { rows };
   say('\n=== §2 — PROPORTIONAL OR ABSOLUTE DEPTH, at the apex ======================');
-  say('  Model B prototype, coverage 1.00 (the whole clock), q 1.00, so the treatment reaches u = 1.');
+  say('  Model B prototype, coverage 1.00 (the whole clock), the shape controls at their defaults, so the treatment reaches u = 1.');
   say('  PROPORTIONAL = a fraction of the LOCAL half-width (the shipped rule). ABSOLUTE = the same');
   say('  millimetres everywhere, matched to what the proportional rule removes at u = 0.50.');
   say('  RELIEF FLOOR = max(sheetThickness, MIN_FEATURE_MM), the same physical length the lobe PITCH');
