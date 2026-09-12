@@ -1369,6 +1369,64 @@ row-modes of the live matrix** (measured), below `fround` so X0 has never seen i
 move those bytes and is not this PR's. Fourth instance of a discrete decision on a continuous
 quantity here; do not write a fifth.
 
+**`LADDER_MAX_GAP_FACTOR = 1.4` IS TYPED, IT CAPS THE LOBE COUNT AT TWO ALL BY ITSELF,
+AND THE SEAM FLOOR SILENTLY DISCARDS THE LADDER ON THE INCURVE ROWS** (session 39,
+discovery — read `docs/bloom-session-39-outcome.md` before touching `ladderGapFactor`,
+`ladderOutsideMinima` or `bladeStations`' blend; `node tools/bloom-ladder-gap-bound.mjs`
+reproduces every figure in ~45 s with no browser). **THE CONSTANT IS NOT DERIVED:** its
+definition carries no comment, the commit that added it describes `ladderGapFactor(f)` as
+`NU / (BAR * f)` with no `min` and no 1.4, session 32's outcome doc never names it, and
+its ONE number in `bladeStations`' header — *"it costs the apex nothing at all (0.1025 mm
+with the bound and without)"* — is the WITHDRAWN live scratch-tree figure, quoted 59 lines
+below the paragraph in the SAME comment that retracts it by name. That paragraph also
+says *"at the frequency cap the minimum falls 8.00 -> 5.71 with this bound"*, which is
+false of the shipped code: `ladderGapFactor(7)` is exactly 1 and the minimum reads
+**8.00**. **THE STATED REASON IS MEASURABLY NOT WHAT IT DOES** — the buckle's own
+requirement is the OTHER arm of the same `min`, so removing the 1.40 arm takes **0 of 68
+buckled row-modes** below `BUCKLE_ROWS_PER_CYCLE_MIN` (8.00 either way). It binds only
+where nothing asks for it: f ≤ 4 and f = 0. `56/(8*5) === 1.4` to the bit, which no doc
+claims and which would be an extension rather than a derivation anyway. **WHAT IT ACTUALLY
+DOES, measured over 1,332 row-modes:** it constrains 197, changes a sagitta zone on 199 —
+**worse on 103 and better on 87**, noise in both directions — and is worst at
+`petalTipShape` 3.00, the ceiling Eva ruled reachable: **0.1341 mm against 0.0090 in
+EXPORT (14.9x)** on the longest, widest petal. On the shipping default it is inert (the
+plain ladder reads 1.295 x uniform, under the cap). **IT IS TWO JOBS UNDER ONE NAME** —
+the blend's bound, and `ladderOutsideMinima`'s RESERVE, which is the only thing capping
+the lobe count. Remove the arm and the count goes **2 -> 3 at coverage 0.40, 0.80 and
+1.00** (30 of 66 lobed row-modes build more), at **11.33 stations a lobe, still above the
+floor**, for **+0.0092 mm of EXPORT apex chord error and +0.0550 mm LIVE**. **THREE IS THE
+CEILING AT FLOOR 11 WHATEVER THE BOUND** — `NU - HELD_ROWS = 40`, the two outside regions
+cannot take less than one station each, `floor(38/11) = 3`; a fourth is arithmetic, not
+the bound. Removing the arm ENTIRELY is not free: at coverage 0.40 the tip cap drops to 3
+stations and the LIVE apex goes 0.0712 -> 0.2462 mm, so **the reserve needs its own owner
+and a chord-error bar in mm, not a ratio shared with a bound that has nothing to do with
+it.** **THE FLOOR OF 11'S STRUCTURE IS DERIVED AND ITS LEVEL IS NOT:** clause (i)'s "two
+segments inside a broad feature" is sound and its threshold 2 is not a tolerance, but the
+BAND is typed at one tenth, and the floor moves as ~1/sqrt(t) — **15 / 13 / 11 / 9 / 8 / 7
+/ 6 at t = 0.05 / 0.075 / 0.10 / 0.15 / 0.20 / 0.25 / 0.30**, which is 2 / 2 / 3 / 4 / 4 /
+5 / 6 lobes. The eye stops reporting a difference about where t = 0.15-0.20 puts it.
+**AND THE DEMAND IS A WINDOW TOTAL WHERE THE CRITERION IS PER PERIOD** — the first durable
+rule inside the lobe feature's own demand: at three lobes the ladder hands 12/11/11 and
+the topmost lobe reads clause (i) **1.93 against the bar of 2** on the builder's own
+stations at the default tip shape, while the model the floor was derived on predicts 2.20.
+**THE SEAM FLOOR DISCARDS THE LADDER, AND A8 ALREADY RULED WHY IT SHOULD NOT:**
+`bladeStations`' own `widest()` opens with `r[0]`, the seam-to-first-blade-row offset the
+blend CANNOT move (`mix()` keeps every held row), so wherever `seamStep >= 2` the cap is
+unsatisfiable for every blend, the bisection lands on 0 and the blade is placed **exactly
+uniformly** — **34 of 36 seam-shifted row-modes, layer 0 alone**, among them `DOME: the
+INCURVE TARGET` flat and at rise 0.5 and the CURL / SPHERE / STAMENS / GYNOECIUM rows over
+it, costing **0.0660 mm of EXPORT apex chord error against 0.0041 with the ladder (16x)**.
+The harness's A8 excludes that gap by name ("placed by the clearance law and PINNED by
+A7"); the geometry's `widest()` was never given the same clause — two owners of one
+predicate, in the same function as §9b(i)'s duplicate-expression finding. One line to fix,
+NOT fixed here (it moves bytes and owes a partition). **AND THE PARKED APEX JOIN GETS
+SHARPER WITH THE THIRD LOBE:** the corner at `lobeTipShape` 0.50 is the pointed law's own
+crest derivative, `pi * depth * h / pitch`, so a third lobe takes the pitch 7.14 -> 4.76 mm
+and the join **39.7 -> 55.9 degrees**; tangent-continuous at 1.00 and 2.00 at both counts.
+The image is `docs/img/lobe-count-trade.png` (floors 11 / 8 / 6 at 3 / 4 / 6 lobes, macro,
+print preview ON, same-tree control 0 px, rendered on a scratch tree with the arm
+removed).
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
