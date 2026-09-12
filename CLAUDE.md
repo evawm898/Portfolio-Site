@@ -1152,10 +1152,17 @@ job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses 
 (`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
 **`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
 THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
-**(1) THE PUSH FAILS FROM A SESSION** whenever the baseline predates a workflow change —
-session 17's limit, unchanged: a GitHub App token cannot push a tag whose `.github/workflows`
-differs from the default branch's, and #191 changed a workflow after `b323268`. This recurs by
-construction, so expect it again.
+**(1) THE PUSH FAILS FROM A SESSION** — and the STATED REASON IS NOT THE WHOLE STORY, measured
+session 41. What was written here was session 17's reading: a GitHub App token cannot push a tag
+whose `.github/workflows` differs from the default branch's, and #191 changed a workflow after
+`b323268`. **Session 41 tried it in the one case that reading exempts and it still failed.**
+`frozen/phase25` points at `3f238bd`, which WAS `origin/main`'s own head at the time, and the
+branch pushing it changed no workflow file at all (`git diff --stat <base>..HEAD -- .github/` is
+empty) — so no `.github/workflows` difference existed anywhere, and `git push origin
+refs/tags/frozen/phase25` still returned a flat **HTTP 403** ("RPC failed; send-pack: unexpected
+disconnect"). So the restriction is on TAG REFS from a session token generally, not on workflow
+divergence. Expect it always, not only after a workflow change, and do not spend time
+engineering around the workflow condition.
 **(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
 TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
 tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
@@ -1689,6 +1696,24 @@ reads the same **2.393 / 2.206 / 1.817 mm** over the shape square, worst differe
 belongs to the PROPORTIONAL depth rule against a converging blade and the shape cannot
 reach it** — Model B, which moves where the teeth sit, can; coverage cannot, because
 Eva's coverage is an arc about the apex.
+**AND THE FOUR-OWNERS RULE HAS A MIRROR IMAGE: NAME THE OWNER OF THE *MEASURED*
+VALUE TOO, AND CHECK IT IS THE ARTEFACT** (session 41, learned twice in one clause
+and both times from the mutant table, never from a green run). Eva's rule is that a
+clause's REFERENCE must have a different owner from the quantity under test. L7's
+reference was independent from the start and the clause was still worthless twice
+over, because the MEASURED side was reading something else: **first** it took a
+log-log slope of `hb - h`, which is a PRODUCT carrying the base outline's own taper,
+so the ternary search landed on a stationary point and the slope read 2 for every
+exponent (2.021 for an asked 2.50) — it fired on the CLEAN tree; **then**, once the
+ratio `1 - h/hb` fixed that, it measured a NODE rebuild while the mutant table serves
+its mutation only to the PAGE, so both shape mutants fired NOTHING. Every other
+clause in that family survives the Node rebuild because it compares the rebuild
+against the page's own RECORD and a defect shows as the two disagreeing; a clause
+with no record to disagree with has both halves on the same unmutated module. **A
+clause that is always green and a clause that is always red look nothing alike and
+have the same cause.** Ask, of every clause: who owns the expected value, who owns
+the measured one, and is the measured one the thing that ships?
+
 **L7 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE SHAPE.** It reads the LOCAL POWER of
 the removed material (`hb - h`, exactly 0 at a crest and greatest at a sinus) off the
 EMITTED outline at a feature a TERNARY SEARCH pins on the curve — the record's crestU /

@@ -320,13 +320,36 @@ exponents. Measured over ten states spanning the whole square, the worst error i
 **0.0269** against a tolerance of 0.10, and the triangle wave returns exactly
 **1.0000 / 1.0000**.
 
-**WHAT THIS IS AN INSTANCE OF**, because it is not a new class: a clause whose
-reference is entangled with something it did not mean to measure. The brief names
-three prior cases and this is a fourth in the same family — the quantity under test
-was the exponent and the measurement carried the base outline's taper as well. The
-mutant table is what found it; nothing else could, because on the clean tree the
-number was plausible (2.021 is a believable notch power) and on the mutated tree the
-swap still looked like a swap.
+### 6d. And then it measured the wrong tree — the SAME mutant table, the next run
+
+With the ratio in place the control went silent. **And both shape mutants fired
+NOTHING.**
+
+Every other clause in this family rebuilds the law in Node and compares it against
+the RECORD the page reported, so a defect shows up as the two disagreeing. L7 has no
+record to disagree with — the exponents are what the outline IS — so both halves of
+its comparison came from the same unmutated Node module, and a mutation served only
+to the page was invisible to it. The clause was measuring a tree the defect had never
+reached.
+
+**The measurement now runs INSIDE THE PAGE**, on the page's own
+`/bloom-geometry.js`, which is the artefact; the expected value stays the page's
+read-back control state. Two owners, neither of them the outline's law. Measured
+after: control **silent**, `shapes-swapped` **fires L7**, `shapes-coupled` **fires
+L7**, and L7 fires on **no** apex mutant — the collateral that the broken version
+produced on every one of them is gone too.
+
+**WHAT BOTH OF THESE ARE AN INSTANCE OF**, because together they are one lesson
+rather than two: the brief's rule says *"every gate clause names where its reference
+value comes from, and that source is independent of the quantity under test"* — and
+in both defects the REFERENCE was independent all along. It was the **measured** side
+that was reading something other than the thing under test: first a quantity polluted
+by the base outline's taper, then a module the mutation never reached. **The rule has
+a mirror image and it is worth writing down: name the owner of the MEASURED value
+too, and check that it is the artefact.** The mutant table is what found both;
+nothing else could, because on the clean tree the first number was plausible (2.021
+is a believable notch power) and the second failure mode is a clause that is simply
+always green.
 
 **WHAT L0–L6 ARE BLIND TO, measured rather than assumed:** the count, the two caps, the
 window, the pitch, the demand and the crests-at-the-ends identity are all unchanged by
