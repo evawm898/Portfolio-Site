@@ -4828,10 +4828,11 @@ tour/release dates worth watching. No backend, no build step: a SHA-256
 password gate (`crypto.subtle` + a hardcoded hash, unlock flag in
 `sessionStorage`) guards a `localStorage`-backed CRUD tracker.
 
-**Status: items 1–27 are MERGED to `main`** — PRs #121 and #125 (items
-1–12) and #132 (items 13–27, which carried #127's commits; #127 itself was
-closed as superseded rather than merged). Item 28 is in review on branch
-`claude/tracker-v3-nine-tags`.
+**Status: items 1–28 are MERGED to `main`** — PRs #121 and #125 (items
+1–12), #132 (items 13–27, which carried #127's commits; #127 itself was
+closed as superseded rather than merged) and #219 (item 28, the nine-tag
+vocabulary, merged as `31c79eb`). Items 29–32 are in review on branch
+`claude/tracker-ratings-markers`.
 Review through the Netlify Deploy Preview — `localStorage` is per-origin, so
 preview data does not carry over to production and vice versa; move it with
 the app's own JSON export/import. The production page is
@@ -5105,6 +5106,105 @@ they and who is near who (region filter + map), and why did I save them
     `vocabularyKeys` is built LAZILY on first use: `tagKey()` reaches
     `CHAR_FOLD`, declared further down the IIFE, so computing it eagerly at
     declaration hits the temporal dead zone and throws before first paint.
+29. **JSON import states what it will do before it does it, and ONE TABLE
+    owns every merge.** The old import ran `entries.concat(imported)` — no
+    dedupe, no confirm — so restoring a backup onto a populated tracker
+    doubled every entry silently, with no undo. It now parses, reports what
+    the file holds against what is already here (counts on both sides, the
+    overlapping handles, the file's own provenance) and applies **nothing
+    until a second click**. Four modes, the bulk paste's own: merge /
+    overwrite / skip / add, **defaulting to merge** — fill blanks only is the
+    one mode that cannot destroy work, and this control is reached most often
+    when something has already gone wrong.
+    The export gains a header (`format` / `version` / `exportedAt` / `count`),
+    which is what lets the card state provenance and flag a `count` that
+    disagrees with the file's own length. **`readBackup` accepts a bare array
+    PERMANENTLY, not as a migration window** — every backup taken before this
+    shipped is one, and those files do not stop being backups because the
+    writer moved on. A NEWER version is refused outright rather than partly
+    read: ignoring fields you do not understand is a silent partial restore.
+    **`MERGE_RULES` replaced `FILLABLE_FIELDS` and both hand-written
+    exceptions beside it** (`gender`, whose unset value is a sentinel rather
+    than a blank; `tags`, which unions). Four rule kinds — `text` (a blank
+    INCOMING value is "no opinion", so overwrite still cannot wipe a field),
+    `unset` (a sentinel counts as blank on both sides), `union`, `oldest`.
+    Bulk paste and JSON import walk the SAME table, and `bulk:false` keeps a
+    field out of the paste's reach — that file is research about artists and
+    has no column for a rating, a marker or an arrival time. **Adding a field
+    is one row.** Items 30 and 31 each added theirs and touched no branch,
+    which is the whole point: three more hand-written exceptions was the
+    `FORM_IDS` drift this repo already has a rule about.
+30. **An interest RATING (1–3) and independent MARKERS, both as symbols.**
+    Two axes, independent of each other and of the tags: a rating is ORDERED
+    (so it filters as a threshold) and markers are a SET.
+    **THREE STARS, NOT FIVE, and the reason is reversibility as much as
+    consistency.** Across a few hundred artists a five-point scale cannot be
+    held steady, and "2+" only means something if it means the same thing in
+    March as in January; three maps onto the decisions that exist (maybe /
+    strong / would book). Widening 3 → 5 later keeps every existing value
+    valid; narrowing 5 → 3 does not. What it gives up is ordering WITHIN the
+    top band — if the threes crowd, the answer is a marker or a widen.
+    **`MARKERS` is the one declaration** — `{id, glyph, label, title}` —
+    walked by the row, the drawer, the filter row and the gate, so a new
+    marker type is one row. **Shipping with ONE, `✓ booked before`.** A
+    `♥ favorite` was designed and deliberately NOT built: Eva's own call,
+    on the ground that it carried no meaning a 3-star did not already carry,
+    and a second control for one idea is a noisier filter row for nothing.
+    **BARE GLYPHS, never word pills** — `.entry-tag-pill` is bordered, these
+    are not, which is the strongest separation available at no cost and is
+    what keeps the tags the dominant read. Not emoji: the page is monospace
+    on three colours and emoji bring their own font and palette.
+    **ONLY WHAT IS SET IS DRAWN.** An unmarked artist shows no glyph at all —
+    an always-present slot per marker across a few hundred rows is hundreds of
+    targets carrying no information. The star zone is the one exception: it
+    keeps its space so rows stay aligned and there is something to aim at, and
+    at zero it is `opacity:0` until the pointer is on the row.
+    **ON-ROW STAR TOGGLING IS A DELIBERATE EXCEPTION TO ITEM 11's ONE-TARGET
+    RULING** (Eva, ruled explicitly: *"I'm rating 240 artists — a drawer
+    round-trip each time means I won't do it"*). It is scoped by
+    `stopPropagation`, and it is different in kind — a star sets a value in
+    place rather than navigating somewhere else. **On touch it is not a target
+    at all**: `pointer-events:none` with the interactive rules behind
+    `@media (hover:hover) and (pointer:fine)`, which is what stops a scroll
+    from setting a rating, rather than a slop heuristic that mostly works.
+    The stars are **deliberately not tab-focusable** (three stops per row over
+    240 rows makes the list unusable by keyboard); the drawer carries the
+    canonical control that IS reachable that way, and clicking the current
+    rating clears it so there is no separate "none".
+    Both filter rows are BUILT from their tables and both carry counts, in the
+    tag chips' own `label (n)` shape so the three chip rows read as one
+    vocabulary of controls. `unrated` is browsable on purpose — it is the
+    backlog, the same reasoning as the gender filter's "unknown".
+31. **`addedAt`, and a sort that means something on a BACKFILLED library.**
+    Set on create, on bulk paste, on JSON import (a restored entry keeps the
+    stamp its backup carried). Existing entries are backfilled on load with
+    **ONE stamp**, meaning "here before `addedAt` existed".
+    **STAGGERING THE BACKFILL WAS ASKED FOR AND ARGUED DOWN, and the reason is
+    worth keeping.** All 240 sharing a timestamp makes "newest first" dead
+    across the existing library, which is a real complaint — but a fabricated
+    timestamp is exported, carried into every backup, and compared against
+    real ones by the `oldest` merge rule, so it stops being a display choice
+    and becomes data. Worse, the order it would encode is the research file's
+    order, which nothing knows the meaning of: if that file is alphabetical,
+    "newest first" is reverse-alphabetical wearing a timestamp.
+    **What the sort tiebreaks on instead is STORAGE POSITION, which is real**
+    — `entries` is persisted in insertion order and nothing mutates it
+    (`render()` sorts a copy that `filter` made). Identical result on screen;
+    nothing invented on disk, and it never leaves the page. `addedAt` merges
+    `oldest` in EVERY mode including overwrite, so restoring an old backup
+    cannot make an entry look newer than it is.
+32. **Manual tag entry is constrained to the nine, behind a deliberate
+    reveal.** The picker is the input; `#fTags` is hidden until
+    `#tagEscapeToggle` is pressed. Before this the drawer could mint a tenth
+    tag from a typo at one in the morning, which item 28's import-side drift
+    detection can NEVER see — it only ever reads a pasted file. Constraining
+    the common path is what makes that detection mean anything.
+    **A reveal and not a refusal**: an override that does not exist is an
+    override you route around by mislabelling something as one of the nine.
+    The hatch shuts again on every form load, so it is a per-edit act and
+    never a mode the drawer sits in. **The input is NOT inside `#tagPicker`**,
+    whose children are counted as the vocabulary — putting it there would
+    break item 28's "exactly nine non-custom chips" check.
 
 **Facet counts are computed against every filter except themselves** — with
 the view defaulting to tattoo artists, a region count taken over the whole
@@ -5115,8 +5215,8 @@ counts can exclude their own dimension.
 **Testing approach:** no CI workflow covers this file (every GitHub
 Actions gate in this repo is path-filtered to `flower*`/`bloom*` files
 only — only Netlify's own informational checks run on this PR). The
-drawer, paste-to-add, shortlist and import work (items 11–24) ship with a
-behaviour gate, `node tools/verify-tracker-drawer.mjs` (289 checks;
+drawer, paste-to-add, shortlist and import work (items 11–32) ship with a
+behaviour gate, `node tools/verify-tracker-drawer.mjs` (382 checks;
 `--shots <dir>` also writes a contact sheet). `staticGeocode()` is a pure
 function, so its ANSWERS are unit-checked against declarations SLICED OUT of
 `artist-tracker.html` itself (the app is inside an IIFE) rather than inferred
@@ -5142,6 +5242,38 @@ emptying `CITY_COORDS`, making a geocoding failure permanent again, removing
 the retry backoff, dropping the legacy-tombstone sweep, disabling
 off-vocabulary detection, and letting a TENTH tag into the vocabulary — each
 turns it red, on the checks that name that behaviour.
+
+**The falsifiability protocol here is hand-applied mutations, and there is no
+`--negative-control` flag in this gate.** The list above was built one
+mutation at a time. Items 29–32 added fifteen more, each with the checks it
+must redden written down beside it: import concatenating again, the export
+dropping its header, import applying without asking, a newer version read
+anyway, `addedAt` as an ordinary field, the paste reaching a rating, an unset
+rating counting as an opinion, a star click also opening the drawer, unrated
+stars always visible, an unmarked row still drawing a slot, an undeclared
+marker drawn anyway, the backfill inventing a sequence, "newest first" losing
+its storage tiebreak, the tag box free-text again, and a facet counting
+against itself. **Check every anchor BEFORE running any mutant** — a `from`
+that has moved, or that now matches twice, disarms a mutant silently, and a
+sweep that costs a full gate run per mutation is not one you notice a hole in.
+
+**THE DENSITY QUESTION HAS ITS OWN SHEET, AND IT IS ASKED AT THE RIGHT STATE.**
+`node tools/shot-tracker-marks.mjs <dir>` seeds 240 artists in the real file's
+proportions and shoots the list twice: as it looks the day the feature ships
+(nothing rated, nothing marked) and **as it looks after a triage pass**. The
+second is the cell that answers "do the glyphs read badly at this size", and it
+is the one nobody can see by opening the page — an unrated library cannot show
+you what a rated one looks like. Every figure on it is measured off the rendered
+page. Note the contact-sheet rule from the bloom work applies here too: no pixel
+DELTA is quoted anywhere on it, because this renderer is not deterministic
+between page sessions.
+
+**MERGE SEMANTICS ARE UNIT-CHECKED AGAINST THE SHIPPED FUNCTION, NOT THROUGH
+THE UI.** `mergeEntry` and `MERGE_RULES` are sliced out of the page the same
+way `staticGeocode` is, because on real data a wrong merge rule still produces
+a perfectly plausible list — the cases are written down instead. Note
+`MERGE_RULES` is an ARRAY, so the existing brace-matching `sliceDecl` stops at
+the end of its first row; `sliceArray` matches the bracket.
 
 **The gate reads no bulk-paste file.** Its only `readFileSync` calls are
 `artist-tracker.html` and the leaflet vendor bundles; every fixture is
