@@ -287,7 +287,7 @@ const MUTANTS = [
   { id: 'the-treatment-terminates-at-the-apex-entry',
     why: 'MODEL A restored — the cut stops at `uCap` and the apex is bit-identical to a petal with no lobes, which is exactly the objection this session exists to answer',
     find: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));',
-    into: '    const cutMm = (u) => (u > uCap || dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['L8'],
+    into: '    const cutMm = (u) => (u >= uCap || dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['L8'],
     witness: (M, C) => {
       const set = { lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 0.9, lobeCrestShape: 1, lobeNotchShape: 1 };
       const m = lobeOutline(M, set), c = lobeOutline(C, set);
@@ -299,8 +299,13 @@ const MUTANTS = [
     } },
   { id: 'guard-reads-the-widest-period',
     why: 'every period takes the relief the WIDEST point could give instead of its own sinus\'s, so a tooth near the tip cuts past the print floor',
-    find: '    const reliefMm = sinusD.map((dd) => Math.min(reliefAskedMm, headroomOf(dd)));',
-    into: '    const reliefMm = sinusD.map(() => Math.min(reliefAskedMm, headroomAt(uPk)));', names: ['L5'],
+    /* RE-ANCHORED (session 42): the relief's quantisation onto
+       LOBE_RELIEF_GRID moved the line this edits, and the table reported
+       MUTATION DID NOT APPLY rather than passing falsely — which is the one
+       thing that makes a disarmed mutant survivable. Fourth instance here of
+       a refactor disarming a mutant; the anchor check is what says so. */
+    find: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);',
+    into: '    const reliefMm = sinusD.map(() => Math.floor(Math.min(reliefAskedMm, headroomAt(uPk)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);', names: ['L5'],
     witness: (M, C) => {
       const set = { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 };
       const m = lobeRelief(M, set), c = lobeRelief(C, set);

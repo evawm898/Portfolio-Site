@@ -439,11 +439,33 @@ premise false — with a witness that reads the MUTATED module's own outline
 (`halfWidthBaseAt` against `halfWidthAt` over `[uCap, 1]`, in LIVE so the
 export floor cannot mask it), never the assertion it names.
 
-**PENDING MEASUREMENT — the claim above is read off the code and not yet
-run.** The experiment that settles it is the mutant against the harness
-WITHOUT the page-side clause: if that pairing really is blind, it names L8 and
-L8 stays green. Until that run is in hand this paragraph is a prediction, and
-it is labelled one.
+**MEASURED, by running the mutant against a harness with the page-side clause
+STASHED OUT.** With only the Node-rebuild clause present the mutant reports
+
+```
+the-treatment-terminates-at-the-apex-entry: ... names L8 · fired L5, L7   *** SILENT: L8
+```
+
+and with the clause restored it reports `names L8 · fired L5, L7, L8   ok`.
+The blindness is real and the new clause is load-bearing, not redundant. (L5
+and L7 redden either way and both are true of the mutation: with the cut
+stopped at `uCap` the relief rebuilt at a sinus above it is zero, and L7's
+power has no feature there to measure.)
+
+**AND THE TABLE FOUND A SECOND DEFECT ON ITS FIRST RUN, IN A MUTANT THAT WAS
+ALREADY THERE.** `guard-reads-the-widest-period` reported `MUTATION DID NOT
+APPLY (matched 0x)`: quantising the relief onto `LOBE_RELIEF_GRID` — this
+session's own fix, two commits earlier — moved the line it edits. **A refactor
+disarms a mutant, and "did not apply" is the one thing that makes that
+survivable**; fourth instance in this repository. Re-anchored, it fires L5
+again.
+
+**The first version of the L8 mutant was also wrong, and the witness is what
+said so** rather than a green run. It gated the cut at `u > uCap`, which
+leaves the cut ON at `uCap` itself, so the emitted outline still differed
+there — the witness reported *the edit applied but the BEHAVIOUR did not
+move* at 1.0548 mm against the clean module's 2.1599. `u >= uCap` is MODEL A's
+own boundary and takes the cut above the apex entry to exactly zero.
 
 ### What the other L clauses needed, and why
 
@@ -514,6 +536,33 @@ do. Measured on both trees:
 
 Identical to `main` on every row of that table. The demand moves rows around
 inside the window; it never adds one.
+
+---
+
+## 10b. What was verified, and on what
+
+| instrument | result |
+|---|---|
+| `verify-bloom-export.mjs --only "^LOBES:"` | **PASS** — 46 attempted, 46 reached the results, 46 watertight, 0 validity assertions, 455 s |
+| `verify-bloom-surface-bytes.mjs --movers ...` | **PASS** — 43 of 43 predeclared movers moved; **0 floats moved on the 637 holders**, positionally under `Object.is`, over 680,954,472 export floats and 71,715,330 captured-grid values |
+| `verify-bloom-apex-mutants.mjs` | **PASS** — every family fires on a mutation that names it and is silent on the clean tree; two defects found and fixed on the way (below) |
+| `bloom-smoke.mjs --check [--negative-control]` | **PASS** — 63 smoke rows over 25 blocks of 680, 62 families claimed and asserted both ways (L8 included), control fires both directions |
+| `bloom-lobe-model-b.mjs --section=0` | **MODEL B**, identical in both modes: `windowU[1] === uCap : false`, cut at `uCap` 2.53e-4, 3075 of 4001 samples differing |
+| `diff-bloom-bytes.mjs --verify-frozen --phase26` | **PASS** — `phase26Matrix()` deep-equal to `d4fd9a9`'s own `buildMatrix()`, 674 rows |
+| `shot-bloom-apex-arc.mjs` | six cells, print preview ON with `shownMode` asserted, same-tree controls **0 px and 1 px**, reported not used as a bar |
+
+**`frozen/phase26` is owed and shipped**: the 674 rows at `d4fd9a9`, because
+block 29 gained six rows (the three coverages Eva named as a clock, the two
+parities, and the RELIEF no-room corner the per-period guard made reachable),
+674 -> 680. Registered in `FROZEN_BASE_COMMITS` and `FROZEN_MATRICES` — the
+harness throws at module load if those two disagree, which is session 32's
+finding and the reason phase21 shipped verified by nothing.
+
+**Expect the tag push to fail from a session and do not engineer around it.**
+Session 41 tried it in the one case the old workflow-divergence reading
+exempts and still got a flat 403; what refuses the push is not established.
+The commit is on `main`'s history and `main` is never force-pushed here, so
+the definitions stay replayable without the tag.
 
 ---
 
