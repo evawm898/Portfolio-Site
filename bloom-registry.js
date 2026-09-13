@@ -1359,7 +1359,16 @@ export const CONTROLS = [
            + ` · it carries ${T.ceiling} tooth${T.ceiling === 1 ? '' : 'es'} at the ${T.floorMm.toFixed(2)} mm floor`
            + ` · dead below ${(100 * T.deadBelow).toFixed(0)}% on this petal`;
     },
-    cap: (shown) => (shown && shown.fringe ? shown.fringe.deadBelow : null),
+    /* NO `cap` ROW, DELIBERATELY, and the reason is which END the dead travel
+       is at. `applyCaps` marks the travel ABOVE its value — which is right for
+       `stamenSpread` and `lobeDepth`, whose dead and saturated stretches are at
+       the TOP — and this control's dead travel is at the BOTTOM. Declaring
+       `cap: deadBelow` would hatch 0.10 to 1.00 on the shipping petal: 90% of
+       the track marked dead when the dead 10% is underneath it, which is worse
+       than no mark at all. So the number is TOLD in the read-out above and the
+       track is left alone until there is a low-end hatch to draw it with —
+       one field and one CSS rule, mirroring `.bl-ctrl--capped`, the day it is
+       wanted. */
     visibleWhen: { all: [] } },
   { id: 'fringeCount', section: 'fringe', kind: 'slider',
     min: FRINGE_COUNT_RANGE[0], max: FRINGE_COUNT_RANGE[1], step: 1, default: 0,

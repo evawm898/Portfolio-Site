@@ -68,8 +68,18 @@ longer exists (it lived in a session scratchpad; `997c556` is docs-only and
 **The dead travel is told, never trimmed** (`stamenSpread`'s ruling): below
 `TIP_HALF_MM / peakHalf` the terminal is under the print floor and delivers
 nothing, and that fraction moves with the petal's width — 20.0% of the track at
-`petalWidth` 8, 5.3% at 30 — so no static range is dead-free. The read-out
-prints it and the panel hatches the track.
+`petalWidth` 8, 5.3% at 30 — so no static range is dead-free.
+
+**BUT THE TRACK IS NOT HATCHED, AND THAT IS A DELIBERATE HALF OF THE RULING
+RATHER THAN AN OVERSIGHT.** `applyCaps` marks the travel ABOVE a control's
+declared `cap`, which is right for `stamenSpread` and `lobeDepth` — their dead
+and saturated stretches are at the TOP — and this control's dead travel is at
+the BOTTOM. Declaring `cap: deadBelow` would hatch 0.10 to 1.00 on the shipping
+petal: **90% of the track marked dead when the dead 10% is underneath it**,
+which is worse than no mark. The number is told in the read-out and the track is
+left alone until there is a low-end hatch to draw it with — one field and one
+CSS rule mirroring `.bl-ctrl--capped`, the day it is wanted. (`/plot` already
+has that mirror for its own left-end dead travel, on a different page.)
 
 **AND IT COSTS NOTHING IN THE CENSUS.** All eight `the terminal alone` matrix
 rows read **exactly 0** within-shell pairs — every value including the ceiling,
@@ -264,9 +274,17 @@ FR4 has already earned its place — see §3b.
 
 Clause C drops a claimed family whose whole PREFIX is absent from the roster
 (`familiesClaimed` filters on `prefixes.has(...)`), so the FR0–FR5 the new smoke
-rows cite were silently uncounted until the first FR assertion existed. It
-catches `JS99` — a bad code under a live prefix — and cannot catch a wholly new
-one. Narrow, and the same shape as Z2 being hidden by a range.
+rows cite were silently uncounted **for as long as the rows existed without the
+assertions** — which is exactly the window Eva's "rows first, seen red" ruling
+creates. With the family shipped the census reads **75 asserted, 75 claimed,
+both directions**, FR0 through FR5 among them. It catches `JS99` — a bad code
+under a live prefix — and cannot catch a wholly new one. Narrow, and the same
+shape as Z2 being hidden by a range. Recorded, not fixed here.
+
+**The census earned its keep twice more in the same session**: it refused the
+tree until block 31 had smoke rows at all, and it caught two matrix labels this
+session renamed without propagating — *"a renamed row is a row this subset
+stopped covering"*.
 
 ## 10. WHAT THIS DOES NOT SETTLE
 
