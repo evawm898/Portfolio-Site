@@ -346,3 +346,84 @@ contact sheet shows both.
 * `node tools/verify-bloom-export.mjs --only '^FRINGE:'` and
   `node tools/verify-bloom-connectedness.mjs` — FR0–FR5 ride in both.
 * `node tools/bloom-self-intersection.mjs`'s `census()` — every pair count.
+
+---
+
+## §8 — THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THE REFUSAL IS DECLARED (Eva's ruling, Sep 13)
+
+CI went red on both STL gates after this feature merged its harness fix: one row of 736
+dropped, `ALL MAX`, on the validity assertion `no STL download`. It is not a harness
+artefact and not a broken export. `bloom.js`'s own guard refused it:
+
+```
+export refused: 2,412,512 tris (export) exceeds the 1,500,000 budget
+```
+
+`EXPORT_TRI_BUDGET` is pre-existing, and its own comment says the budget *"exists so the
+refusal path is real before it is ever needed"*. **The carnation fringe is the first
+configuration ever to reach it.**
+
+### The attribution, one tree, only the three new controls moved
+
+| `ALL MAX` (40 petals x 6 layers = 240 petals) | tris (export) | STL | export |
+|---|---|---|---|
+| the three new controls at their shipped defaults | 636,672 | 30.4 MiB | fine |
+| the blanket sweep's maxima (tipEnd 1, count 10, depth 0.50) | **2,412,512** | 115.0 MiB | **REFUSED** |
+
+The fringe is **3.79x this row on its own**, +1,775,840 triangles, clearing the budget by
+912,512. A cross-tree comparison would have carried every other difference between `main`
+and the branch; building the same control set twice on one tree isolates the feature.
+
+### The envelope on that row
+
+| teeth | tris (export) | |
+|---|---|---|
+| 0 | 636,672 | exports (42% of budget) |
+| 1 | 654,912 | exports |
+| 2 | 961,152 | exports |
+| **3** | **1,267,392** | **exports — 84.5% of budget** |
+| **4** | **1,519,392** | **refused, by 19,392 (1.3%)** |
+| 10 | 2,412,512 | refused |
+
+**Three teeth is the ceiling at 240 petals.** The marginal cost per tooth FALLS as the count
+rises (+306,240 for the 2nd and 3rd, ~+99,000 for the 9th and 10th) because the count ceiling
+clamps the inner whorls' narrower petals: the feature is already self-limiting at scale, just
+not enough for this row.
+
+### What was ruled, and the three answers that were refused
+
+Eva's ruling is a fourth option: **declare the refusal as the expected outcome and assert it.**
+The row runs, the geometry builds, and the gate asserts that the export was REFUSED, that the
+reason was the TRIANGLE BUDGET specifically, and that the reported count exceeded it —
+failing hard if any of those stops being true, including if the row ever starts exporting.
+
+Refused, each for its own reason: **raising the budget** is a guard tuned to the thing it
+guards against (115 MiB is a file no slicer opens); **trimming `ALL MAX`** makes a row stop
+meaning its own label, when "everything at maximum" genuinely IS a state this generator
+refuses to export; **a skip** loses the coverage, which is the repo's own `MAX_VOXELS` note.
+
+`EXPORT_REFUSED_XFAIL` carries one entry, one row, one number — the `SELF_INTERSECTION_XFAIL`
+shape — and like that list it does not gate MAGNITUDE, for the same reason.
+
+### Two things the work exposed
+
+1. **`selfIntersectionCoverage` and the refusal contradicted each other.** `ALL MAX` is in
+   `SELF_INTERSECTION_XFAIL`, and a refused row produces no STL to census — so X1's coverage
+   clause reported it as a census the matrix failed to run. That is why the export gate raised
+   THREE validity assertions where connectedness, which runs no census, raised two. The two
+   declarations are reconciled explicitly now: the exemption is bounded by `EXPORT_REFUSED_XFAIL`
+   and is NAMED out loud rather than being silent, and the entry stays because its count was
+   really measured and governs the row again the moment the refusal lifts.
+2. **A gate crashed where it should have asserted.** `exportStl()` waited 120 s for the download
+   while giving `page.click('#exportStl')` only the page default of 30 s — and the click does not
+   resolve until the synchronous export build finishes. On any runner slower than CI the gate
+   threw an unhandled `TimeoutError` on exactly the rows XR1 exists to assert. The click budget
+   now matches the download budget. The underlying cost — a refusal pays a full build (120.4 s)
+   before returning nothing — is filed as #231, pre-existing and not this feature's.
+
+### Every clause was fired before it was believed
+
+An undeclared refusal (XR2), a declared row that exports (XR1), a declared row that fails for
+some other reason (XR1), a declaration naming a row the matrix never ran (XR coverage), and the
+census exemption in both directions. `node tools/bloom-smoke.mjs --check` reads 77 families,
+both directions, XR1 and XR2 among them; `--conn` is clean on 73 rows with the refusal named.

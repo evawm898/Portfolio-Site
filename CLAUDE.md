@@ -2113,6 +2113,61 @@ and the lobe cut it used to carry is no longer built — that entry went stale o
 **`docs/img/carnation-fringe-shipped.png`**, driving the shipped controls (the picture session's
 `docs/img/carnation-fringe.png` stays put — it records the state before the feature existed).
 
+**THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THAT REFUSAL IS NOW A DECLARED,
+ASSERTED OUTCOME — XR1/XR2** (Eva's ruling, Sep 13, on the fringe's own CI failure).
+`bloom.js`'s `EXPORT_TRI_BUDGET` (1,500,000) refuses the export above its bar, and its own
+comment said the budget *"exists so the refusal path is real before it is ever needed"* —
+**the fringe is the first configuration ever to reach it**, so the first thing to need it is
+also the thing that proves the path works. `ALL MAX` builds **2,412,512 tris (export), a
+115.0 MiB file**, and the app refuses. The gate used to read that as `no STL download` — a
+BROKEN export — and dropped the row: 735 of 736 reached the results, `connectedness: FAILED`.
+**A REFUSAL IS NOT A BROKEN EXPORT**, and `exportRefusalAssertion()` is the one place that
+distinction is drawn, in both STL gates. Three clauses, and **failing if a declared row ever
+EXPORTS matters exactly as much as failing if it refuses wrongly**, because either is a change
+nobody asked for. The reference has a different owner from the quantity (the fourth durable
+rule): the refusal is read off the APP's own read-out, the count is cross-checked against the
+BUILDER's tally through `__bloomMetrics()`, and neither the budget nor the count is restated
+in the harness. `EXPORT_REFUSED_XFAIL` carries one entry, one row, one number, the
+`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE, and for the same
+reason. **THE THREE OBVIOUS ANSWERS WERE ALL REFUSED AND EACH IS WORTH NOT RE-PROPOSING:**
+raising the budget is a guard tuned to the thing it guards against (and 115 MiB is a file no
+slicer opens); trimming `ALL MAX` makes a row stop meaning its own label, when "everything at
+maximum" genuinely IS a state this generator refuses to export; and a SKIP loses the coverage,
+which is the repo's own `MAX_VOXELS` note. The row RUNS, the geometry BUILDS, and the refusal
+is the assertion. Every clause was fired on a must-fail before it was believed — an undeclared
+refusal, a declared row that exports, a declared row that fails for some other reason, and a
+declaration naming a row the matrix never ran.
+
+**`ALL MAX` IS NOW THE BINDING CONSTRAINT ON ANY FUTURE PER-PETAL FEATURE, AND THE NEXT ONE
+SHOULD CHECK THAT CORNER FIRST RATHER THAN LAST.** Measured, same control set, one tree, only
+the three new controls moved: **636,672 tris at their shipped defaults (42% of budget, headroom
+2.36x) against 2,412,512 with the fringe at maximum — 3.79x**, which is what breached. The
+blanket sweep hands every new slider its maximum onto a **240-petal head (40 x 6)**, so a
+per-petal feature's cost is multiplied by 240 there and by 8 anywhere else in the matrix. The
+envelope on that row, measured: **three teeth export (1,267,392, 84.5% of budget) and the
+fourth misses by 19,392 — 1.3%**. Note the marginal cost per tooth FALLS as the count rises
+(+306,240 for the 2nd and 3rd, ~+99,000 for the 9th and 10th) because the count ceiling clamps
+the inner whorls' narrower petals — the feature is already self-limiting at scale, just not
+enough for this row.
+
+**AND THE REFUSAL COSTS A FULL BUILD BEFORE IT RETURNS NOTHING — 120.4 s on that row, filed as
+#231, pre-existing and not the fringe's.** The handler builds the export mesh and THEN checks
+`acc.triangleCount`. It also made a gate CRASH rather than assert: `exportStl()` waited 120 s
+for the download while giving `page.click('#exportStl')` only the page default of 30 s, and the
+click does not resolve until that synchronous build finishes — so on any runner slower than CI
+the gate threw an unhandled TimeoutError on exactly the rows XR1 exists to assert. The click
+budget now matches the download budget; the underlying cost is #231.
+
+**MEASURE THE CORNER, NOT THE REPRESENTATIVE CASE** (this session's own reporting failure,
+recorded as the class it belongs to). The fringe's cost was reported at **173,792 triangles for
+`FRINGE: x 40 petals`** — a real number, honestly measured, and the WRONG ONE: it is 40 petals
+in ONE whorl, where the matrix's blanket row is 40 x 6. The corner was never checked, so a
+breach of a shipped guard reached CI as a red gate rather than a sentence in a report. The
+working agreement says to estimate cost BEFORE building; a representative row satisfies the
+letter of that and not its purpose. **The number that matters is the one at the worst corner the
+matrix can reach, and on this generator that corner is `ALL MAX`.**
+
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
@@ -2314,6 +2369,29 @@ better one, because there is no stable one to have: the point of the measurement
 and it is wide enough that no single number — this paragraph's included — can size a wait. It is
 here as evidence that the rule above is load-bearing, and a session that quotes it instead of
 reading `actions_list` at the time has made exactly the mistake it documents.
+
+**AND WHEN A GATE GOES RED, THE LOG IS NOT DOWNLOADABLE FROM HERE — REPRODUCE LOCALLY**
+(Sep 13, hit twice in one session). `get_job_logs` hands back a
+`productionresultssa2.blob.core.windows.net` URL and **the agent proxy denies it on
+organization policy** (`connect_rejected`, a flat 403) — that is a policy denial to report,
+never to engineer around. What is left is `return_content: true`, which only takes a
+`tail_lines`, so **the end of the log is reachable and the beginning is not**.
+**THAT MATTERS BECAUSE THE `HARNESS INVALID` BLOCK IS ON STDERR AND STDOUT IS BUFFERED TO
+EXIT**: every per-row line arrives in one flush at the end with a single timestamp, so the
+stderr block — written moments earlier — sits ABOVE roughly two thousand lines of stdout,
+i.e. near the START of the file, where no tail can reach it. The summary's own pointer says
+so in as many words ("it may appear ABOVE this line in a combined log"). **So the route is a
+LOCAL REPRODUCTION, and the cheap version of it is the gate's own per-row PREFIX**: the
+assertion families run before the STL export, so a script that replays openBloom / applyConfig
+/ fullStateDrift / shownMode / capability and then the SHIPPED assertion functions sweeps all
+736 rows in ~38 minutes with no exports at all. **Its premise has one hole, which is how this
+session used it and got 0 findings on a red matrix: there are validity assertions AFTER the
+export too** (`no STL download`, the export floor, orientation, crowding), so a clean prefix
+sweep narrows the search to the post-export half rather than clearing the tree.
+**AND DO NOT PIPE THE RUN THROUGH `tail`** — `node tools/bloom-smoke.mjs --conn 2>&1 | tail -40`
+keeps the last forty lines of the COMBINED stream, which is the tail of the stdout dump, and
+throws away the stderr block for the same reason the CI log does. Write the whole run to a file
+and grep it. This session recorded that lesson and then repeated it within the hour.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
