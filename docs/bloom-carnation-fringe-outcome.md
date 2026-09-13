@@ -197,11 +197,15 @@ can see.
 * **THE VERTEX-WELD SHELL COUNT IS NOT THE CONNECTEDNESS TEST, and the picture
   session's report of it was the wrong instrument.** That session cited
   `shells 9` — the plain build's own count — as evidence the overlap welds every
-  finger. It is 9 only at N = 5, by a coincidence of `2N−1 = 9 = NV−1` that puts
-  every tooth boundary on a base column; at other counts the interior teeth
-  share no vertex with the base and the count rises (13 at N=4, 57 at N=8).
-  **The conclusion held and the evidence did not** — CLAUDE.md's own rule that
-  component count is not how connectedness is checked here.
+  finger. **The conclusion held and the evidence did not.** The count depends on
+  whether a tooth's span boundary happens to land on a base column, which is a
+  coincidence of N against `NV`: the export gate reads `shells=9` on the 4- and
+  7-tooth rows and **57** on the 8-tooth ones, and an exact-double weld in Node
+  reads 13 at N=4 where the gate's float32 weld reads 9. The gate labels the
+  column **`(unrated)`** in its own output line for exactly this reason, and
+  CLAUDE.md states the rule: component count is not how connectedness is
+  checked here. The voxel flood fill is, and it reads **ONE CONNECTED PIECE**
+  at the maximum count on the maximum terminal.
 * **The census reads in the DECLARED cleft class** on every fringed row, and the
   attribution is measured: with the base panel pulled clear of the teeth, every
   count reads **exactly 0** within-shell pairs, so no tooth folds into another

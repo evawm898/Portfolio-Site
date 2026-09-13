@@ -636,10 +636,10 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',
         path: 'the feature CONSTRUCTED, both halves at once — FR0 (the registry\'s fringeEligible and the geometry\'s agree, and the builder declares a fringe iff the state asks for one), FR1 (built iff declared: N+1 panels and N spans at the petal\'s END, from the builder\'s own tally), FR2 (the terminal is a TERM with its own domain, it never wins below uPk, and the emitted half-width at u=1 IS the terminal), FR3 (the split is owned in PHYSICAL units — the target station is 1 - fringeDepth and the landed station is within half a row gap of it), FR4 (every tooth and every gap clears MIN_FEATURE_MM at the station where it is narrowest), FR5 (the count ceiling is the TERMINAL\'s width and the clamp is a biconditional)' },
-      { label: 'FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.15; told, never refused)',
+      { label: 'FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.30; told, never refused)',
         path: 'the CLAMP\'s live arm — FR5 with countAsked above countBuilt and the reason named, on the terminal that is barely clear of its own dead travel; the row where the ceiling binds hardest without the petal changing size' },
-      { label: 'FRINGE: NO ROOM — a fringe asked with no terminal at all (the converging apex; told)',
-        path: 'the NO ROOM arm — a fringe asked where the blade converges to 2 x TIP_HALF_MM, which is the state the picture session measured as unbuildable at any count; FR5 must refuse it, name the cause, and leave the petal a single span' },
+      { label: 'FRINGE: NO ROOM — a fringe asked with no terminal at all (no end to cut teeth into; told, and bit-identical to the default)',
+        path: 'the NO ROOM arm — a fringe asked where the blade converges to 2 x TIP_HALF_MM, which is the state the picture session measured as unbuildable at any count; FR1 must refuse it in BOTH directions (not built when the end is under the mode-free floor, and never built when it is above), name the cause, and leave the petal a single span' },
       { label: 'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)',
         path: 'the mutual exclusion in the direction that can silently fail — the lobe family at MAXIMUM under a live fringe must contribute NOTHING, so L0\'s own record is absent and the emitted outline is the fringe\'s alone; the defect this catches is a lobe cut still narrowing every finger, which no count and no span check can see' },
       { label: 'FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)',
