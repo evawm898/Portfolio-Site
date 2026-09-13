@@ -1281,18 +1281,28 @@ export const CONTROLS = [
   { id: 'lobeDepth', section: 'lobes', kind: 'slider',
     min: LOBE_DEPTH_RANGE[0], max: LOBE_DEPTH_RANGE[1], step: 0.01, default: 0,
     label: 'Lobe depth', tier: 'standard', role: 'petal',
+    /* THE RELIEF IS IN MILLIMETRES AND IT IS THE SAME ON EVERY TOOTH THAT
+       HAS ROOM (session 42). `depth` is a fraction of the petal's OWN WIDEST
+       half-width, not of the local one: under MODEL A it was local, so the
+       relief fell with the blade and the apex-most teeth faded to nothing
+       (2.37 / 1.92 / 0.93 mm across three notches, session 40). Here the
+       asked relief is held everywhere the material allows and only the
+       periods that cannot take it fall short — and by how much is told. */
     fmt: (v, ui, shown) => {
       const d = Number(v);
       if (d === 0) return 'plain — no lobes';
       const L = shown && shown.lobes;
-      if (L && L.noRoom) return `${Number(v).toFixed(2)}x asked — NO ROOM (${L.noRoomWhy === 'region' ? 'no rim below the apex entry' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows here and a lobe needs ${L.samplesPerLobe}` : `${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}); nothing cut, told`;
-      if (!L) return `${d.toFixed(2)}x the local half-width cut in at each sinus`;
+      if (L && L.noRoom) return `${d.toFixed(2)}x asked — NO ROOM (${L.noRoomWhy === 'region' ? 'the margin has no arc at all' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows here and one period needs ${L.samplesPerLobe}` : L.noRoomWhy === 'relief' ? 'the whole treated arc lies where the outline is already at the print floor — there is nothing to remove' : `${(2 * L.treatedHalfMm).toFixed(1)} mm of treated rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}); nothing cut, told`;
+      if (!L) return `${d.toFixed(2)}x the petal's widest half-width, cut in at each sinus`;
+      const asked = `${d.toFixed(2)}x the widest half-width — ${L.reliefAskedMm.toFixed(2)} mm of relief asked`;
+      const apex = L.apexIsCrest ? '' : ` · the apex sinus is on the terminal face, already at the print floor, so it cuts 0.00 mm — an EVEN count flattens at twelve`;
       if (L.depthClamped) {
-        return `${d.toFixed(2)}x asked — CLAMPED at ${L.depthCap.toFixed(2)}x: the deepest sinus is on the print floor `
-             + `(${(2 * L.sinusMinHalfMm).toFixed(2)} mm across); the travel above the mark is dead`;
+        return `${asked}, and ${L.reliefLimited} of the teeth on the margin cannot take it — the apex-most gets ${Math.min(...L.reliefMm.filter((r, i) => L.apexIsCrest || i !== (L.periods - 1) / 2)).toFixed(2)} mm`
+             + ` · every period saturates above ${L.depthCap.toFixed(2)}x, the mark on the slider${apex}`;
       }
-      return `${d.toFixed(2)}x the local half-width — the deepest sinus leaves ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across`
-           + (L.depthCap < LOBE_DEPTH_RANGE[1] ? ` · reaches the print floor at ${L.depthCap.toFixed(2)}x, the mark on the slider` : '');
+      return `${asked}, and every tooth on the margin gets it`
+           + (L.depthCap < LOBE_DEPTH_RANGE[1] ? ` · the first one saturates at ${L.depthCap.toFixed(2)}x, the mark on the slider` : '')
+           + apex;
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.depthCap : null),
     visibleWhen: { all: [] } },
@@ -1306,20 +1316,29 @@ export const CONTROLS = [
     fmt: (v, ui, shown) => {
       const n = Number(v);
       const L = shown && shown.lobes;
-      if (!L) return `${n} lobes`;
+      if (!L) return `${n} teeth around the rim`;
       if (L.noRoom) {
-        return L.noRoomWhy === 'region' ? `${n} asked — NO ROOM: the apex entry sits at or below the root blend, there is no rim to cut`
-          : L.noRoomWhy === 'rows' ? `${n} asked — NO ROOM: the ladder can place ${L.rowsCapacity} rows in this window and one lobe needs ${L.samplesPerLobe}; nothing cut, told`
-          : `${n} asked — NO ROOM: ${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor; nothing cut, told`;
+        return L.noRoomWhy === 'region' ? `${n} asked — NO ROOM: the margin has no arc at all`
+          : L.noRoomWhy === 'rows' ? `${n} asked — NO ROOM: the ladder can place ${L.rowsCapacity} rows in this window and one period needs ${L.samplesPerLobe}; nothing cut, told`
+          : L.noRoomWhy === 'relief' ? `${n} asked — NO ROOM: every period's sinus sits where the outline has already converged to the print floor, so there is nothing to remove anywhere in the arc; nothing cut, told`
+          : `${n} asked — NO ROOM: ${(2 * L.treatedHalfMm).toFixed(1)} mm of treated rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor; nothing cut, told`;
       }
+      /* THE PARITY IS THE FIRST THING SAID, because it decides whether the
+         apex gets a tooth or a flat: an ODD count puts a crest at twelve and
+         an EVEN one puts a notch there, on a terminal face that is already at
+         the print floor. Derived from the law (periods = count + 1, and the
+         rim's midpoint is a crest iff periods is even), never asserted. */
+      const parity = L.apexIsCrest
+        ? `a CREST at twelve (odd count — the apex carries a tooth)`
+        : `a NOTCH at twelve (even count — it lands on the terminal face, already at the print floor, so it is FLATTENED rather than cut)`;
       const pitch = `pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm)`;
-      const rows = `${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} stations in the window, ${L.samplesPerLobe} demanded a lobe)`;
-      const caps = `the ladder holds ${L.countRowsCap} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} a lobe), the pitch floor ${L.countFloorCap}`;
+      const rows = `${L.rowsPerPeriod.join('/')} stations per period base to apex (${L.samplesPerLobe} demanded of each)`;
+      const caps = `the ladder holds ${L.countRowsCap} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} a period), the pitch floor ${L.countFloorCap}`;
       if (L.countClamped) {
-        return `${n} asked — CLAMPED at ${L.countBuilt} by ${L.clampedBy === 'pitch' ? `the pitch floor (${L.windowMm.toFixed(1)} mm of rim holds ${L.countBuilt} at ${L.pitchFloorMm.toFixed(2)} mm)` : `the rows the ladder has (${L.rowsCapacity} free rows in this window at ${L.samplesPerLobe} stations a lobe)`}`
-             + ` · ${pitch} · ${rows}; the travel above the mark is dead`;
+        return `${n} asked — CLAMPED at ${L.countBuilt} by ${L.clampedBy === 'pitch' ? `the pitch floor (${(2 * L.treatedHalfMm).toFixed(1)} mm of treated rim holds ${L.countBuilt + 1} periods at ${L.pitchFloorMm.toFixed(2)} mm)` : `the rows the ladder has (${L.rowsCapacity} free rows in this window at ${L.samplesPerLobe} stations a period)`}`
+             + ` · ${parity} · ${pitch} · ${rows}; the travel above the mark is dead`;
       }
-      return `${n} lobes · ${pitch} · ${rows}`
+      return `${n} teeth · ${parity} · ${pitch} · ${rows}`
            + (L.countCap < LOBE_COUNT_RANGE[1] ? ` · clamps at ${L.countCap}, the mark on the slider — ${caps}` : '');
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.countCap : null),
@@ -1327,14 +1346,18 @@ export const CONTROLS = [
   { id: 'lobeCoverage', section: 'lobes', kind: 'slider',
     min: LOBE_COVERAGE_RANGE[0], max: LOBE_COVERAGE_RANGE[1], step: 0.05, default: LOBE_COVERAGE_DEFAULT,
     label: 'Coverage', tier: 'standard', role: 'petal',
-    /* How much of the rim between the root blend's end and the apex entry
-       carries lobes, measured from the apex down; and the ceiling it buys,
-       from the law's own function rather than a restatement. */
+    /* A SYMMETRIC ARC CENTRED ON THE APEX — Eva's clock (session 42): "is it
+       just twelve o'clock, or eleven through one, or the whole clock
+       excluding six". Said in HOURS as well as millimetres, because the
+       clock is the model and an hour is the unit it is stated in: the
+       treated span is coverage x 12 hours, six being the base. */
     fmt: (v, ui, shown) => {
       const c = Number(v);
       const L = shown && shown.lobes;
-      return `${(c * 100).toFixed(0)}% of the rim below the apex, from the apex down`
-           + (L ? ` — ${L.windowMm.toFixed(1)} mm of ${L.regionMm.toFixed(1)}` + (L.noRoom ? '' : ` · the ladder holds ${L.countRowsCap} lobe${L.countRowsCap === 1 ? '' : 's'} here (${L.rowsCapacity} free rows at ${LOBE_SAMPLES_PER_LOBE} stations a lobe)`) : '');
+      const hrs = c * 12;
+      return `${(c * 100).toFixed(0)}% of the rim — ${hrs.toFixed(1)} hours of the clock, centred on twelve`
+           + (L ? ` (${(2 * L.treatedHalfMm).toFixed(1)} mm of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back)` : '')
+           + (L && !L.noRoom ? ` · the ladder holds ${L.countRowsCap} ${L.countRowsCap === 1 ? 'tooth' : 'teeth'} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} stations a period), the pitch floor ${L.countFloorCap}` : '');
     },
     visibleWhen: { ref: 'lobesEngaged' } },
   /* THE TWO SHAPE EXPONENTS (session 41). Eva's model names the tooth's two

@@ -438,8 +438,19 @@ for (const r of results) {
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
 }
-console.log(`\n${results.length - failures.length - skipped.length}/${results.length} rows are ONE connected piece`
-  + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')
+/* THE DENOMINATOR ITSELF, asserted — and asserted BEFORE the headline, so the
+   headline can carry the verdict rather than contradict it (#220). Session 32
+   added this census and left the headline dividing by `results.length`, which
+   is the SURVIVORS: a dropped row leaves BOTH numerator and denominator, so
+   the ratio reads N/N however many rows were lost, and the matrix size was
+   never printed to compare it against. Session 41 read `672/672 rows are ONE
+   connected piece` off a run that had exited 1 over a 674-row matrix. */
+const got = new Set(results.map((r) => r.label));
+const dropped = attempted.filter((l) => !got.has(l));
+if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
+console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length - skipped.length} are ONE connected piece`
+  + (skipped.length ? ` · ${skipped.length} skipped (grid too large — NOT a pass)` : '')
+  + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass, and every ratio below divides by the ${results.length} that survived` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
 console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
@@ -452,15 +463,15 @@ console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a fla
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
-/* THE DENOMINATOR ITSELF, asserted. */
-if (results.length !== attempted.length) {
-  const got = new Set(results.map((r) => r.label));
-  validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
-}
-
 let bad = false;
 if (validity.length) {
   bad = true;
+  /* THE POINTER GOES TO STDOUT. stderr is unbuffered and stdout is block
+     buffered, so piped into a CI log this block flushes EARLIER than the
+     summary it logically follows — and reading the tail of a 2,400-line log
+     is the normal way to read it. The detail stays here; the fact that there
+     IS detail belongs in the stream that carries the summary. */
+  console.log(`\nconnectedness: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the "HARNESS INVALID" block (stderr; it may appear ABOVE this line in a combined log).`);
   console.error(`\nconnectedness: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
   for (const v of validity) console.error(`  - ${v}`);
 }
@@ -474,5 +485,9 @@ if (NEGATIVE_CONTROL) {
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   process.exit(1);
 }
-if (bad) process.exit(1);
-console.log('connectedness: PASS — every row above exports as a single connected body.');
+if (bad) {
+  /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
+  console.log(`\nconnectedness: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} row(s) not one piece. Nothing above is a pass.`);
+  process.exit(1);
+}
+console.log(`\nconnectedness: PASS — all ${attempted.length} attempted rows reached the results and every one exports as a single connected body.`);
