@@ -49,6 +49,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
+         fringeAssertions,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
@@ -129,7 +130,14 @@ for (const row of rows) {
      blind to a cut in the wrong place or not made: it exports watertight and
      one piece either way. Rebuilt in Node from the page's own state. */
   const lob = await lobeAssertions(page, row);
+  /* THE FRINGE (FR0-FR5, Sep 13) — see fringeAssertions()'s header. Both
+     gates are structurally BLIND here: every tooth is its own closed panel
+     overlapping the base, so a fringe with the wrong count, the wrong taper,
+     the wrong split row or teeth under the printable floor exports
+     watertight AND as one connected piece. */
+  const frn = await fringeAssertions(page, row);
   if (lob.length) { validity.push(`${row.label}: ${lob.join('; ')}`); continue; }
+  if (frn.length) { validity.push(`${row.label}: ${frn.join('; ')}`); continue; }
   /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
      emitted spine rows against the law rebuilt from OTHER owners. Both STL
      gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that

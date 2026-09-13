@@ -887,6 +887,41 @@ function spineLine(petals) {
    sweep 3..40 at the defaults reads 0 on every row. Depth is what the root
    blend adds; the form's own apex folds are session 35 §7.4's and are
    in the xfail list by row. */
+/* THE FRINGE LINE (Eva's ruling, Sep 13) — the squared end and the teeth,
+   read from ring 0's petal record and never re-derived from the sliders.
+   Asked beside built for the count, the clamp and WHY it bound, the tooth and
+   gap at the two stations where each is narrowest, the split asked beside the
+   station it landed on, and — when a fringe is live — the fact that the lobe
+   family is standing down. Absent when neither control is off its default. */
+function fringeLine(petals) {
+  const F = petals && petals[0] && petals[0].fringe;
+  if (!F) return '';
+  const end = F.tipEnd === 0
+    ? 'CONVERGING END — the apex law runs to its own point'
+    : F.deadTravel
+      ? `SQUARED END ${(F.tipEnd * 100).toFixed(0)}% — DEAD: ${F.endWidthMm.toFixed(2)} mm is under the ${F.floorMm.toFixed(2)} mm print floor, so the petal still ends on the floor's own ${(2 * F.tipHalfMm).toFixed(2)} mm (dead below ${(100 * F.deadBelow).toFixed(0)}% on this petal — told, never trimmed)`
+      : `SQUARED END ${F.endWidthMm.toFixed(2)} mm across, ${(100 * F.endWidthMm / (2 * F.peakHalfMm)).toFixed(0)}% of the petal's width · it carries ${F.ceiling} tooth${F.ceiling === 1 ? '' : 'es'} at the ${F.floorMm.toFixed(2)} mm floor`;
+  if (F.noRoom) return `FRINGE NO ROOM — ${F.asked} teeth asked and ${F.noRoomWhy}, so none are cut: the petal converges to `
+    + `${(2 * F.tipHalfMm).toFixed(2)} mm, which carries one tooth at the ${F.floorMm.toFixed(2)} mm floor, and one tooth is the petal. `
+    + `Told, never refused — raise the squared end above ${(100 * F.deadBelow).toFixed(0)}% and the teeth appear.\n`;
+  if (!F.built) return `${end}\n`;
+  /* CLAMPED AND TOLD. The ceiling is the END's width and nothing else, so the
+     reason names the width that bound and what the end would have to be. */
+  const count = F.clamped
+    ? `${F.asked} asked → ${F.count} built (CLAMPED: the end is ${F.wMinMm.toFixed(2)} mm at its narrowest and ${F.asked} teeth need ${((2 * F.asked - 1) * F.floorMm).toFixed(1)} mm`
+      + (F.tipEnd === 0 ? ' — there is no squared end to carry them)' : `, so the squared end would have to be ${(100 * ((2 * F.asked - 1) * F.floorMm) / (2 * F.peakHalfMm)).toFixed(0)}% of the width)`)
+    : `${F.count} teeth`;
+  const split = F.peakClamped
+    ? `split CLAMPED to the widest point (u ${F.uPk.toFixed(4)}) — a tooth may not reach below it into the base taper`
+    : `${F.depthMm.toFixed(2)} mm deep, asked at u ${F.uAsked.toFixed(4)} and landed on the row at u ${F.uSplitRow.toFixed(4)} (${F.residualMm.toFixed(3)} mm off, inside the ${F.rowGapMm.toFixed(3)} mm row)`;
+  /* THE MUTUAL EXCLUSION IS SAID OUT LOUD. A family that went quiet without
+     saying so is a control that stopped working as far as anyone can tell. */
+  const lobes = ' · LOBES stand down — both treat the apex, and a rim cut narrows every tooth including the middle ones (measured)';
+  return `FRINGE ${count} · ${end} · teeth ${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+       + (F.count > 1 ? `, gaps ${F.gapSplitMm.toFixed(2)} → ${F.gapTipMm.toFixed(2)} mm` : '')
+       + ` · ${split}${lobes}\n`;
+}
+
 /* THE LOBES LINE (session 38, PR 2) — read from ring 0's petal record, never
    re-derived from the sliders: asked beside built for the count and the depth,
    each cap and whether it bound, the pitch against its floor, and the rows the
@@ -1190,6 +1225,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + seamLine(petals)
        + spineLine(petals)
        + lobeLine(petals)
+       + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
@@ -1247,7 +1283,11 @@ function regenerate() {
                   buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
                   /* THE LOBES' two caps join the record for the same reason (session
                      38): the count's and the depth's marks print the OWNER's numbers. */
-                  lobes: (built.petal && built.petal.lobes) || null };
+                  lobes: (built.petal && built.petal.lobes) || null,
+                  /* THE FRINGE's record joins for the same reason: the squared end's
+                     dead travel and the tooth count's ceiling are the OWNER's numbers,
+                     and both print on the track as well as in the read-out. */
+                  fringe: (built.petal && built.petal.fringe) || null };
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -1579,6 +1619,7 @@ window.__bloomMetrics = () => ({
      are structurally blind to a wrong cut (a petal cut in the wrong place is
      watertight and one piece), so the L family reads this. */
   petalLobes: lastPetal ? (lastPetal.lobes ?? null) : null,
+  petalFringe: lastPetal ? (lastPetal.fringe ?? null) : null,
   petalFootFrames: lastPetal ? lastPetal.footFrames : null,
   petalGuardResidual: lastPetal ? lastPetal.guardResidual : null,
   /* THE FOOT RING'S OWN CROSS-SECTION, exposed so the reworked foot

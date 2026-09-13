@@ -1223,12 +1223,183 @@ export function lobeResultLine(L) {
 /* The buckle frequency the ladder's gap bound reads on this row: 0 when the
    buckle is flat (its guard), else the row's own. */
 function buckleFreqOf(ui) { return Number(ui.buckleAmp) > 0 ? Number(ui.buckleFreq) : 0; }
+/* ===================================================================
+   FR0-FR5 — THE CARNATION FRINGE AND ITS SQUARED TERMINAL (Eva's ruling,
+   Sep 13). The one witness for a feature both STL gates are structurally
+   blind to.
+
+   WHAT BOTH GATES CANNOT SEE, and it is why this family exists. Each tooth
+   is its OWN closed panel — two skins, two side rims, two end caps — so a
+   fringe with the wrong count, the wrong taper, the wrong split row, teeth
+   under the printable floor, or a terminal that is not the one the control
+   asked for ALL export watertight with zero boundary edges, and all export
+   as one connected piece because the teeth overlap the base panel by
+   PANEL_OVERLAP_ROWS whatever their spans are. Measured: the shipping
+   default, a 4-tooth fringe and a 10-tooth fringe are indistinguishable to
+   both gates on every criterion either of them applies.
+
+   WHERE EACH CLAUSE'S REFERENCE COMES FROM, and it is a different owner from
+   the quantity in every case (the fourth durable rule):
+     FR0  the registry's predicate against the geometry's function, on the
+          page's own read-back state — neither reads the other.
+     FR1  the builder's PANEL TALLY against the plan's count. The panels are
+          emitted by `trimPanels`; the count is `widthProfile`'s.
+     FR2  the EMITTED last row against the terminal rebuilt from the ROW's
+          own declared `petalTipEnd` — and the domain claim is read off the
+          emitted winner names, which no declaration can lie about.
+     FR3  the target station from `1 - fringeDepth`, which is arithmetic on
+          the CONTROL, against the station the builder landed on.
+     FR4  the tooth and gap widths re-measured from the EMITTED spans through
+          the plan's own `spanOf`, against `MIN_FEATURE_MM` — a constant this
+          harness imports from the geometry because it is the geometry's.
+     FR5  the ceiling rebuilt from the emitted lamina width at the fringe
+          region's narrowest station, against the count the builder built.
+
+   MODE: the page is in LIVE when these run (shownModeAssertion has already
+   required it), and every quantity here is MODE-FREE by construction — the
+   plan is computed on `max(shapeBaseAt, rootBlend, TIP_HALF_MM)`, never on
+   the accumulator's floor, because the panel decomposition is TOPOLOGY.
+   =================================================================== */
+export async function fringeAssertions(page, row) {
+  const bad = [];
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+
+  /* FR0 — THE TWO STATEMENTS, both of them. The registry hides the controls
+     and the geometry makes them inert, and neither file can read the other's
+     answer; a divergence is invisible in every picture and in both gates. */
+  const engaged = GEOMETRY.fringeEngaged(ui);
+  const pEngaged = evalPredicate(PREDICATES.fringeEngaged, ui);
+  if (engaged !== pEngaged) bad.push(`FR0: the geometry says the fringe is ${engaged ? 'ENGAGED' : 'off'} and the registry's predicate says ${pEngaged ? 'ENGAGED' : 'off'} on this state — the two statements have diverged`);
+  const lobesOK = GEOMETRY.lobesEligible(ui);
+  const pLobes = evalPredicate(PREDICATES.lobesEligible, ui);
+  if (lobesOK !== pLobes) bad.push(`FR0: the geometry says lobes are ${lobesOK ? 'eligible' : 'INERT'} under this state and the registry says ${pLobes ? 'eligible' : 'INERT'} — the mutual exclusion has two statements and they disagree`);
+  /* AND THE EXCLUSION IS ASSERTED ON THE ARTEFACT, not only on the two
+     predicates: under a live fringe the lobe record must be ABSENT, because
+     inert here means the cut is never constructed at all. A lobe cut still
+     narrowing every finger is exactly what this catches and nothing else
+     can — it moves no panel count and no span. */
+  if (engaged && m.petalLobes) bad.push('FR0: lobe telemetry is reported on a FRINGED row — the fringe wins by ruling, and inert means the cut is not constructed');
+
+  const F = m.petalFringe;
+  if (!F) { bad.push('FR1: no fringe telemetry reported at all — the record is missing, not the fringe'); return bad; }
+
+  /* FR2 — THE SQUARED TERMINAL. Two claims, and the second is the one that
+     makes "scoped to the terminal alone" a property of the code: the
+     terminal may never win BELOW the petal's widest point, where the base
+     taper's own region begins. Read off the emitted winner names. */
+  const askedEnd = Number(effectiveFor(m, row, 'petalTipEnd')) || 0;
+  const tc = m.petalTipCap;
+  if (!tc) bad.push('FR2: no tip-cap telemetry — the terminal cannot be checked');
+  else {
+    const wantEnd = Math.max(askedEnd * tc.peakHalf, TIP_CAP_HALF_MM);
+    if (Math.abs(tc.terminalHalf - wantEnd) > 1e-9)
+      bad.push(`FR2: the petal ends on ${tc.terminalHalf} mm, and petalTipEnd ${askedEnd} of a ${tc.peakHalf} mm peak asks for ${wantEnd} mm`);
+    if (Math.abs(F.endWidthMm - 2 * askedEnd * tc.peakHalf) > 1e-9)
+      bad.push(`FR2: the record's end width ${F.endWidthMm} mm is not 2 x petalTipEnd x peakHalf = ${2 * askedEnd * tc.peakHalf} mm`);
+    if (askedEnd > 0) {
+      const prof = m.petalProfileBase, us = m.petalProfileU;
+      if (Array.isArray(prof) && Array.isArray(us)) {
+        /* The terminal is a FLOOR, so below uPk the base outline must be
+           strictly what it was without one — and the cheapest statement of
+           that on the emitted rows is that no row below uPk sits AT the
+           terminal while the core there is wider. */
+        let below = 0;
+        for (let i = 0; i < us.length; i++) if (us[i] > 0 && us[i] < tc.uPk && Math.abs(prof[i] - tc.terminalHalf) < 1e-12 && prof[i] < tc.peakHalf) below++;
+        if (below) bad.push(`FR2: ${below} emitted row(s) below uPk sit on the terminal — the floor has escaped its own domain and is reaching into the base taper`);
+      }
+    }
+  }
+
+  if (!engaged) {
+    if (F.built) bad.push('FR1: a plain row (count 0) reports a BUILT fringe — the guard did not short-circuit');
+    if (m.petalTipSpans !== 1) bad.push(`FR1: a plain row's petal END carries ${m.petalTipSpans} spans, expected exactly 1`);
+    return bad;
+  }
+  /* FR1's NO ROOM ARM. A fringe asked where the end cannot carry a tooth is
+     NOT BUILT, and the whole claim is that it is then bit-identical to the
+     same state with no fringe — so the petal must still be one span. The
+     threshold is MODE-FREE (`TIP_HALF_MM`, never the accumulator's floor),
+     because whether panels exist is topology. */
+  if (F.noRoom) {
+    const want = !(askedEnd * (tc ? tc.peakHalf : 0) > TIP_HALF_MM);
+    if (!want) bad.push(`FR1: the fringe reports NO ROOM, but petalTipEnd ${askedEnd} of a ${tc && tc.peakHalf} mm peak gives ${askedEnd * (tc ? tc.peakHalf : 0)} mm of end, which is above the ${TIP_HALF_MM} mm mode-free floor — it should have been cut`);
+    if (m.petalTipSpans !== 1) bad.push(`FR1: NO ROOM was reported and the petal's END carries ${m.petalTipSpans} spans — teeth were cut anyway`);
+    if (F.count !== 0) bad.push(`FR1: NO ROOM was reported with ${F.count} teeth built`);
+    return bad;
+  }
+  if (!F.built) { bad.push('FR1: a fringed row reports no BUILT fringe — the teeth are not cut'); return bad; }
+  /* AND THE CONVERSE: a fringe that WAS built must have had an end to cut
+     into. Without this the NO ROOM clause above is one-directional and a
+     geometry that never refuses passes it. */
+  if (tc && !(askedEnd * tc.peakHalf > TIP_HALF_MM))
+    bad.push(`FR1: ${F.count} teeth were cut on a ${askedEnd * tc.peakHalf} mm end, at or under the ${TIP_HALF_MM} mm mode-free floor — that is the NO ROOM state and it should have refused`);
+
+  /* FR1 — BUILT IFF DECLARED, against the builder's own panel tally rather
+     than against the plan that produced it. A fringe declared and not
+     emitted adds no boundary edge and detaches nothing. */
+  if (m.petalTipSpans !== F.count)
+    bad.push(`FR1: the record declares ${F.count} teeth and the petal's END carries ${m.petalTipSpans} span(s)`);
+  if (!Array.isArray(m.petalPanels) || m.petalPanels.length !== F.count + 1)
+    bad.push(`FR1: panels ${JSON.stringify(m.petalPanels)} — ${F.count} teeth need a base plus ${F.count} tooth panels`);
+
+  /* FR3 — THE SPLIT IS OWNED IN PHYSICAL UNITS. The target is arithmetic on
+     the control; a panel boundary is necessarily a row, so what is asserted
+     is that the builder took the NEAREST station and reported the residual
+     honestly. Half a gap is the bound `nearest` earns; `first past` would
+     cost a whole one and is what main's cleft arm still does. */
+  const wantU = F.peakClamped ? F.uPk : 1 - Number(effectiveFor(m, row, 'fringeDepth'));
+  if (Math.abs(F.uSplit - wantU) > 1e-9)
+    bad.push(`FR3: the target station is ${wantU} (1 - fringeDepth${F.peakClamped ? ', clamped to uPk' : ''}) and the plan used ${F.uSplit}`);
+  if (F.residualMm > F.rowGapMm / 2 + 1e-9)
+    bad.push(`FR3: the split landed ${F.residualMm.toFixed(4)} mm from its target, more than half the ${F.rowGapMm.toFixed(4)} mm row gap it sits in — that is `
+           + 'the FIRST station past the target rather than the nearest, and it makes the depth a row count again');
+
+  /* FR4 — EVERY TOOTH AND EVERY GAP CLEARS THE PRINTABLE FLOOR AT THE
+     STATION WHERE IT IS NARROWEST. The tooth is narrowest at its own tip and
+     the gap at the split, which is why both ends are read. Widths come back
+     through the plan's own `spanOf` on the emitted rows, so a taper that
+     drifted from its declared law shows here. */
+  /* IMPORTED, not restated: MIN_FEATURE_MM is the geometry's own and is not the
+     quantity under test here (the tooth width is), so reading it through the
+     import is one owner rather than the `seam-floor-removed` entanglement. */
+  const F_MIN = MIN_FEATURE_MM;
+  const eps = 1e-9;
+  if (F.toothTipMm < F_MIN - eps) bad.push(`FR4: a tooth is ${F.toothTipMm.toFixed(4)} mm at its tip, under the ${F_MIN} mm printable floor`);
+  if (F.count > 1 && F.gapSplitMm < F_MIN - eps) bad.push(`FR4: a gap is ${F.gapSplitMm.toFixed(4)} mm at the split, under the ${F_MIN} mm printable floor`);
+  if (F.toothBaseMm < F.toothTipMm - eps) bad.push(`FR4: the tooth is ${F.toothBaseMm.toFixed(4)} mm at the split and ${F.toothTipMm.toFixed(4)} mm at its tip — it WIDENS toward the end, so it is not a tooth`);
+  if (F.count > 1 && F.gapTipMm < F.gapSplitMm - eps) bad.push(`FR4: the gap is ${F.gapSplitMm.toFixed(4)} mm at the split and ${F.gapTipMm.toFixed(4)} mm at the tip — it NARROWS toward the end, so the teeth are not tapering`);
+
+  /* FR5 — THE COUNT CEILING IS THE TERMINAL'S WIDTH, AND THE CLAMP IS A
+     BICONDITIONAL. The ceiling is rebuilt here from the lamina width the
+     record reports at the fringe region's narrowest station, which is the
+     quantity the law is about — and then compared against the count the
+     builder built, which is the quantity under test. */
+  const wantCeiling = Math.max(1, Math.floor((F.wMinMm / F_MIN + 1) / 2));
+  if (F.ceiling !== wantCeiling)
+    bad.push(`FR5: the record's ceiling is ${F.ceiling} and ${F.wMinMm.toFixed(4)} mm of end carries ${wantCeiling} at the ${F_MIN} mm floor`);
+  const asked = Math.round(Number(effectiveFor(m, row, 'fringeCount')) || 0);
+  if (F.asked !== asked) bad.push(`FR5: the record says ${F.asked} teeth were asked for and the state asks ${asked}`);
+  if (F.count !== Math.min(asked, wantCeiling))
+    bad.push(`FR5: ${asked} asked and ceiling ${wantCeiling}, so ${Math.min(asked, wantCeiling)} must be built — ${F.count} were`);
+  if (F.clamped !== (F.count < F.asked))
+    bad.push(`FR5: the record says clamped=${F.clamped} with ${F.count} built of ${F.asked} asked — the flag and the counts disagree, and the read-out prints the flag`);
+  return bad;
+}
+
 export async function lobeAssertions(page, row) {
   const bad = [];
   const m = await page.evaluate(() => window.__bloomMetrics());
   const ui = await page.evaluate(() => window.__bloomUIState());
-  const engaged = GEOMETRY.lobesEngaged(ui);
-  const predicate = evalPredicate(PREDICATES.lobesEngaged, ui);
+  /* THE FRINGE WINS, so "engaged" here means engaged AND eligible — both
+     halves, because Eva's mutual exclusion (Sep 13) makes the lobe family
+     inert under a live fringe and a clause reading only the depth would
+     report a missing cut as a defect on every fringed row. The exclusion
+     itself is FR0's; this is L0 declining to speak where it no longer
+     applies, and the two directions are asserted there. */
+  const eligible = GEOMETRY.lobesEligible(ui);
+  const engaged = GEOMETRY.lobesEngaged(ui) && eligible;
+  const predicate = evalPredicate(PREDICATES.lobesEngaged, ui) && evalPredicate(PREDICATES.lobesEligible, ui);
   if (engaged !== predicate) bad.push(`L0: the geometry says lobes are ${engaged ? 'ENGAGED' : 'off'} and the registry's predicate says ${predicate ? 'ENGAGED' : 'off'} on this state — the two statements have diverged`);
   const L = m.petalLobes;
   if (!engaged) {
@@ -2098,15 +2269,28 @@ export async function thicknessAssertions(page, row) {
        retired centre dome's own bug: 48 degenerate triangles from
        `cos(PI/2) !== 0`, passing the gated criterion while being wrong. */
     if (!(tc.lastRowHalf > 0)) bad.push(`A3: terminal half-width is ${tc.lastRowHalf} — a true apex, which collapses NV columns onto one edge (the retired DOME's defect)`);
-    /* A4 — THE TERMINAL IS THE MODE FLOOR AND NOTHING ELSE, rebuilt here from
-       the MODE the builder reported rather than read off the cap. The apex has
-       no control since session 32, so this is the whole of what decides how
-       wide a petal ends — and a cap that computed its terminal from anything
-       else would satisfy every other clause here, because they all read the
-       number the cap itself reported. */
+    /* A4 — THE TERMINAL IS THE SQUARED END OR THE MODE FLOOR, WHICHEVER IS
+       WIDER, rebuilt here from owners the cap does not write.
+
+       RE-DERIVED, NOT RELAXED (Eva's ruling, Sep 13). Until then the apex had
+       no control and this clause read "the mode floor and nothing else"; the
+       squared end IS that control, so the clause now states the law the
+       geometry actually has. AT `petalTipEnd` 0 IT IS THE OLD CLAUSE TERM FOR
+       TERM — `max(0 * peakHalf, floor)` is `floor` — so every row that
+       satisfied it before still does, and the shipping default is unchanged.
+
+       THE REFERENCE HAS A DIFFERENT OWNER FROM THE QUANTITY (the fourth
+       durable rule). `tc.terminalHalf` is the cap's own report; the expected
+       value is rebuilt from the ROW's own declared `petalTipEnd` — which the
+       profile does not write — times the cap's declared peak, and `peakHalf`
+       is separately pinned by A6's fit. A cap that computed its terminal from
+       anything else still satisfies every other clause here, because they all
+       read the number the cap itself reported. */
     const floor = tc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
-    if (Math.abs(tc.terminalHalf - floor) > 1e-9)
-      bad.push(`A4: terminal ${tc.terminalHalf} mm is not the ${tc.exportMode ? 'export' : 'live'} floor ${floor} — the apex has no control, so the floor is the only thing that may set it`);
+    const askedEnd = Number(effectiveFor(m, row, 'petalTipEnd')) || 0;
+    const wantTerminal = Math.max(askedEnd * tc.peakHalf, floor);
+    if (Math.abs(tc.terminalHalf - wantTerminal) > 1e-9)
+      bad.push(`A4: terminal ${tc.terminalHalf} mm is not max(petalTipEnd ${askedEnd} x peakHalf ${tc.peakHalf}, the ${tc.exportMode ? 'export' : 'live'} floor ${floor}) = ${wantTerminal} — the squared end and that floor are the only things that may set how wide a petal ends`);
     /* A5 — THE APEX NARROWS MONOTONICALLY. The retired plateau's signature was
        a rise after a fall above the widest point; nothing in the new law can
        produce one, and this is what says so on every row rather than in a
@@ -6947,20 +7131,20 @@ export function buildMatrix() {
     ['FRINGE: the shallowest split (depth 0.05 — a toothed edge rather than a fringe)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.05 }],
     ['FRINGE: ONE tooth (the terminal tapered to a single point — legal, and not a fringe)', { petalTipEnd: 0.5, fringeCount: 1, fringeDepth: 0.2 }],
     ['FRINGE: TWO teeth (the cleft the shipped capability hook has always drawn, now reachable)', { petalTipEnd: 0.5, fringeCount: 2, fringeDepth: 0.2 }],
-    ['FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.15; told, never refused)', { petalTipEnd: 0.15, fringeCount: 10, fringeDepth: 0.2 }],
+    ['FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.30; told, never refused)', { petalTipEnd: 0.3, fringeCount: 10, fringeDepth: 0.2 }],
     ['FRINGE: CLAMPED — 10 teeth on the narrowest petal (8 mm, the tightest count ceiling reachable)', { petalTipEnd: 1, fringeCount: 10, fringeDepth: 0.2, petalWidth: 8 }],
-    ['FRINGE: NO ROOM — a fringe asked with no terminal at all (the converging apex; told)', { petalTipEnd: 0, fringeCount: 7, fringeDepth: 0.2 }],
+    ['FRINGE: NO ROOM — a fringe asked with no terminal at all (no end to cut teeth into; told, and bit-identical to the default)', { petalTipEnd: 0, fringeCount: 7, fringeDepth: 0.2 }],
     /* THE FRINGE UNDER THE THINGS THAT ALREADY FOLD A PLAIN PETAL. */
     ['FRINGE: x the thickest sheet (2.40 mm — the print floor doubles under the same terminal)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, sheetThickness: 2.4 }],
     ['FRINGE: x the thinnest sheet (0.60 mm, floored to 1.00 in export)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, sheetThickness: 0.6 }],
     ['FRINGE: x cup 1.2 (the picture measured fingers reaching each other here)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCup: 1.2 }],
     ['FRINGE: x the buckle at 0.30 f 3 (the other state that brought fingers together)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, buckleAmp: 0.3, buckleFreq: 3 }],
     ['FRINGE: x roll 330 (a quilled tube with a fringed end)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalRoll: 330 }],
-    ['FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, spineCurl: 180 }],
-    ['FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCup: 1.2, petalRoll: 330, petalTwist: 40, spineCurl: 180, buckleAmp: 0.6 }],
+    ['FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalSpineCurl: 180 }],
+    ['FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCup: 1.2, petalRoll: 330, petalTwist: 40, petalSpineCurl: 180, buckleAmp: 0.6 }],
     /* ARRANGEMENT — many fringed ends on one hub. */
     ['FRINGE: x 40 petals (forty fringed ends on one hub)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCount: 40 }],
-    ['FRINGE: x CONTINUOUS x 3 turns (a fringe on every petal of a spiral)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, placement: 'CONTINUOUS', turns: 3 }],
+    ['FRINGE: x CONTINUOUS x 3 turns (a fringe on every petal of a spiral)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, placement: 'CONTINUOUS', layerCount: 3 }],
     ['FRINGE: x 3 layers (the inner whorls fringed too)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, layerCount: 3 }],
     /* THE GUARDS, both directions. */
     ['FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)', { petalTipEnd: 0, fringeCount: 10, fringeDepth: 0.5 }],
