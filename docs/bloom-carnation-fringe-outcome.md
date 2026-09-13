@@ -224,10 +224,29 @@ can see.
   count reads **exactly 0** within-shell pairs, so no tooth folds into another
   or into itself.
 
-## 6. THE PARTITION — 30 movers / 706 holders of 736 rows
+## 6. THE PARTITION — 30 movers / 706 holders of 736 rows, VERIFIED
 
 Predeclared from the BUILDER'S OWN RECORD (a row moves iff its emitted outline
-or its panel decomposition actually differs), not from the control set.
+or its panel decomposition actually differs), not from the control set — so a
+row that sets a control to a value the geometry ignores is correctly a holder.
+`fringeCount max (10)` is exactly that: with no terminal it is NO ROOM, nothing
+is cut, and it holds. **The ruling showing up as a measurement.**
+
+`node tools/verify-bloom-fringe-bytes.mjs --base <worktree of 994aea4>`:
+
+```
+736 rows · 30 predeclared MOVERS · 706 predeclared HOLDERS
+682,971,192 export floats compared with Object.is
+movers that did NOT move: 0
+holders that MOVED: 0
+PASS — every predeclared mover moved and every holder held, both modes.
+```
+
+**BOTH DIRECTIONS, because neither alone is evidence**: a feature that adds rows
+cannot claim "0 moved" over the whole matrix, and a tool that only checked the
+holders would pass on a feature that does nothing at all. `--control` perturbs
+one coordinate of every holder by 1e-9 and requires the comparison to fail; it
+fires.
 
 * **Movers outside block 31: exactly 2** — `petalTipEnd max (1)` and **`ALL
   MAX`**, session 38's own lesson that a row sweeping every control is a mover
