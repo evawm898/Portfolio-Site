@@ -231,6 +231,15 @@ const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
    stops working. Every id and value is checked against the registry below, so
    a range change cannot leave this table quietly out of bounds. */
 const WITNESS = {
+  /* THE STEM (session 43) — collapsed at first load, witnessed by the LENGTH
+     through the builder's own stem record. The witness reaches PAST the slider
+     into the hub: a stem's presence is what makes the hub-to-stem join ACTIVE,
+     and the join is a DERIVED thickening with no control of its own, so
+     `hubJoinActive` is a reading no stem control can write directly. A witness
+     that leaves the control's own part is the stronger one — the `shape` row's
+     own reasoning, applied one level down. */
+  stem: { id: 'stemLength', value: '60',
+          read: (m) => `${m.stem && m.stem.lengthMm}/${m.hubJoinActive}`, what: 'stem.lengthMm/hubJoinActive' },
   shape: { id: 'petalWidth', value: '30',
            /* The silhouette costs no triangles either (fixed-topology grid),
               so width is witnessed where it reaches PAST the blade: footRing()'s
