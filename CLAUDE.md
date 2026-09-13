@@ -2040,6 +2040,79 @@ names it and the clean tree silent on every row, with all 25 anchors matching ex
 and every non-stem mutant now runs over the SPHERE row too. The per-mutant table, with the
 collateral each one legitimately reddens, is in §6b of the outcome doc.
 
+**THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
+read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
+then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
+term, `fringePlan`, `trimPanels`' fringe arm or the FR family). `petalTipEnd` (PETAL SHAPE,
+0–1 of the peak half-width, default 0), `fringeCount` (Fringe, 0–10, default 0) and
+`fringeDepth` (Fringe, 0.05–0.50 of the petal's own length, default 0.20).
+**NEITHER SHIPS ALONE AND THE GEOMETRY SAYS SO WITH A BRANCH:** every tooth of a panel
+fringe runs to `u` = 1 and `TIP_HALF_MM` is ABSOLUTE, so without a terminal the blade is
+**1.600 mm across at the apex at EVERY petal size** — ten teeth read as a carnation over most
+of their length and then converge into one shared spike. A fringe asked where the end does not
+clear the print floor is **NOT CUT** (NO ROOM, told), and that row is bit-identical to the same
+state with no fringe. **The threshold is `TIP_HALF_MM`, never `tipFloor`** — whether PANELS
+EXIST is topology and the export floor may not decide it; session 32's mode-dependence defect
+declining a fourth time, and the ceiling is measured identical in live and export on all 35
+cells of the size sweep.
+**THE TERMINAL IS A TERM WITH ITS OWN DOMAIN `[uPk, 1]`, not a fold into `tipFloor`** — so
+`shapeWinner` NAMES it, `slopeBreaks` finds its crossover, `lawIsActiveAt` stops claiming the
+superellipse where it has taken over, and `shapeBaseAt` carries it so every form law reads the
+squared outline. **Its domain edge costs nothing**: the ceiling `t <= 1` means it ARRIVES
+BELOW the CORE at `uPk` (the core's maximum), measured TERMINAL-wins-below-uPk on **0 of 7143**
+samples and **0 of 7143** moved at the ceiling. It reproduces §6e's own recorded table exactly
+(1.600 / 2.400 / 5.600 / 8.000 / 16.000 mm) — **the anchor for a patch that no longer exists**,
+since `terminal-control.patch` lived in a session scratchpad and `997c556` is docs-only.
+**THE SPLIT IS OWNED IN PHYSICAL UNITS** — a fraction of the petal's OWN length, so the target
+station is `1 - depth` exactly. A panel boundary IS a row, so `trimPanels` takes the **NEAREST**
+station (not the first past it, which is biased by a whole gap; the cleft arm keeps `first past`
+because its nine xfail entries are pinned to the rows it picks) and FR3 bounds the residual at
+half a gap — measured 0.003 mm inside a 0.875 mm row.
+**THE TAPER IS A LAW ABOUT AN INTERVAL, AND THE FIRST VERSION WAS RIGHT AT TWO STATIONS AND
+WRONG BETWEEN THEM.** It set the tooth from the width at the PLANNED split and interpolated;
+the landed row sits up to half a gap higher where the blade is narrower, so under the buckle
+the emitted gap came out **0.9910 mm against a 1.0 mm floor** — exporting watertight, one
+piece, identical triangle count, and **FR4 was the only thing that saw it**. What ships:
+teeth and gaps tile the lamina, so given `W >= (2N-1)F` the admissible gap is exactly
+`[F, (W - N*F)/(N-1)]` and a linear ramp across it clears both floors at EVERY station.
+**THAT MAKES THE POINTEDNESS AN IDENTITY OF THE FLOOR**: a count ON its own ceiling has every
+tooth and gap already at `MIN_FEATURE_MM`, so the teeth are SQUARE by necessity; below it they
+point (4 teeth on the ceiling terminal run 3.250 -> 1.000 mm).
+**THE COUNT CEILING IS THE TERMINAL'S WIDTH** — `W >= (2N-1) * MIN_FEATURE_MM` at the fringe
+region's NARROWEST station, both binding constraints reducing to one inequality. Across the
+size range at the full terminal: **4 / 6 / 8 / 11 / 15 at `petalWidth` 8 / 12 / 16 / 22 / 30**
+(`node tools/bloom-fringe-ceiling.mjs`), **`petalLength` does not move it at all** (8 at 20, 35,
+45 and 60 mm — width is the only lever, the picture session's finding from the other side), and
+**above 16 mm THE RANGE binds before the geometry does** (10 against 11 and 15) — the inverse of
+`stamenSpread`'s dead travel, taking the same ruling, with the geometry's own ceiling printed
+beside the count so the headroom is visible. CLAMPED AND TOLD.
+**LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE AND THE FRINGE WINS.** Both own the apex, and
+composing them was MEASURED to narrow EVERY tooth including interior ones nowhere near the rim
+(middle finger **0.5873 -> 0.4599 mm at coverage 0.40**) because a v-span is a fraction of the
+CUT half-width. Two statements (`lobesEligible` in both files, `perPetalEligible`'s shape), and
+**the proof it is really inert is an IDENTITY**: the lobes-at-maximum row reads exactly the same
+census as the same state with none (7288 pairs, identical worst span).
+**FR0–FR5 IS THE NEW FAMILY AND BOTH STL GATES ARE BLIND WITHOUT IT** — each tooth is its own
+closed panel overlapping the base, so the wrong count, the wrong taper, the wrong split row,
+teeth under the floor and a terminal that is not the control's ALL export watertight AND as one
+connected piece. **A4 IS RE-DERIVED, NOT RELAXED** (it read "the apex has no control"; at
+`petalTipEnd` 0 the new clause is the old one term for term).
+**THE VERTEX-WELD SHELL COUNT IS NOT THE CONNECTEDNESS TEST, and the picture session cited it
+as one** — it reads 9 on the 4- and 7-tooth rows and **57** on the 8-tooth ones, the gate labels
+the column `(unrated)`, and the voxel flood fill is the authority: ONE CONNECTED PIECE at the
+maximum count on the maximum terminal. **NO LOW-END HATCH IS DRAWN** for the squared end's dead
+travel: `applyCaps` marks the travel ABOVE a cap, and this one's dead stretch is at the BOTTOM,
+so declaring it would hatch 90% of the track — told in the read-out instead.
+**30 MOVERS / 706 HOLDERS of 736 rows**, predeclared from the BUILDER'S OWN RECORD; movers
+outside block 31 are exactly `petalTipEnd max (1)` and **`ALL MAX`** (session 38's lesson again),
+and the matrix grew 699 -> 736 because the blanket sweep adds SIX rows of its own for three new
+sliders. `frozen/phase28` is the 699 rows at `994aea4`, registered in BOTH maps. **`ALL MAX`
+re-measured and IMPROVED** (135969 / 4.7312 -> 130004 / 3.1556) because it now sweeps the fringe
+and the lobe cut it used to carry is no longer built — that entry went stale once already and
+#213 still does not gate magnitude. The sheet is `node tools/shot-bloom-fringe.mjs <dir>` ->
+**`docs/img/carnation-fringe-shipped.png`**, driving the shipped controls (the picture session's
+`docs/img/carnation-fringe.png` stays put — it records the state before the feature existed).
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
