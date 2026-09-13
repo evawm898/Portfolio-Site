@@ -5132,10 +5132,33 @@ never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: twelve mutations, each naming the checks it must redden,
+a changed harness**: thirteen mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
-alone in seconds.
+alone in seconds, and the guard is SECTION-AWARE so that combination does not
+report every part-two name as stale.
+
+**THE FIRST SWEEP FOUND TWO CHECKS THAT WERE GREEN FOR THE WRONG REASON, AND
+BOTH WERE THE STRONGEST-SOUNDING ONES IN THEIR SECTION.** Recorded because the
+shape recurs:
+* **`fish/any-ripple-gets-the-same-reaction`** — the brief's central claim —
+  seeded a school at RANDOM around a fixed ripple, so whether any koi was inside
+  the reach at all, and whether its trait sat far enough from the indifferent
+  midpoint for the ripple term to weigh anything, was up to the seed. It passed
+  on a pond where the ripple could not have changed anything. The koi are placed
+  and their traits set by hand now, and the fixture carries its own vacuity
+  clause: the ripple must be shown to have MOVED them.
+* **`wind/the-rest-angle-is-exactly-vertical`** — decaying from exactly 1.0 at
+  exactly 1/240 s a step lands on exactly 0 BY THE ARITHMETIC, with no clamp
+  involved; measured on a tree with the clamp neutered, which settled on the
+  same exact zero. It is exercised from a value no whole number of steps can
+  reach now, and asserts the wind STAYS at zero rather than hunting either side
+  of it.
+**And one mutant's claim had simply stopped being true**: counting only visible
+koi no longer churns the population, because the containment fix removed the
+straying it fed on. The claim came off that mutant and the churn check got one
+of its own — a departure that never leaves — rather than the check being
+loosened.
 
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*`, so `scene*` is covered by nothing — run

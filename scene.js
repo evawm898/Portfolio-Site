@@ -161,7 +161,17 @@ async function activate(id, { updateUrl = true } = {}) {
   teardown();
   measure();
   const host = makeHost(seedFromUrl(window.location.search));
-  const instance = mod.default(host);
+  let instance;
+  try {
+    instance = mod.default(host);
+  } catch (err) {
+    // The stage is already empty at this point, so the alternative to catching
+    // is a blank page and a rejection escaping an async call nobody awaits.
+    console.error('[/scene] scene', id, 'threw while being built', err);
+    stage.replaceChildren();
+    paintNav();
+    return false;
+  }
   active = { id, instance, meta: mod.meta || {} };
   if (typeof instance.resize === 'function') instance.resize(w, h);
 

@@ -47,6 +47,13 @@ export function createRain({ rand, ripples }) {
       return base * (width * height) / REF_AREA;
     },
 
+    // `fallDir` IS ACCEPTED AND DELIBERATELY NOT USED, which is the point
+    // rather than an oversight: the wind decides the line a drop travels down,
+    // and the renderer draws that — but where the drop LANDS is chosen first,
+    // in the viewport, and no gale moves it. If this function ever starts
+    // reading the direction, a gale sweeps the whole fall into one corner of
+    // the pond. `rain/the-wind-does-not-move-where-a-drop-lands` is the
+    // witness, and it is why the parameter stays visible here.
     advance(dt, { width, height, intensity, fallDir, surface }) {
       const I = Math.max(0, Math.min(1, intensity));
       const speed = FALL_SPEED[0] + (FALL_SPEED[1] - FALL_SPEED[0]) * I;
