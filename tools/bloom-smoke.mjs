@@ -175,6 +175,13 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'ALL MIN',
         path: 'the blanket minimum corner — the bare bloom the flower shipped in seven pieces for months; every row is bare now, and this is the one where the feet cross the axis' },
+      /* THE BLANKET MAXIMUM IS THE ONLY ROW THAT ENGAGES XR1, so the subset
+         has to carry it or the family has no witness short of the full matrix.
+         It is also the most expensive row here — the refusal costs a full
+         export-mode build (~120 s) before it returns nothing — and that is the
+         honest price of the family having a witness at all. */
+      { label: 'ALL MAX',
+        path: 'the blanket MAXIMUM corner, and the one configuration this generator REFUSES to export — XR1 (declared in EXPORT_REFUSED_XFAIL: the export is refused, the reason is the TRIANGLE BUDGET specifically, and the count reported exceeds the budget, cross-checked against the builder\'s own tally through a different owner) and XR2 in its silent direction on every other row of this subset (an undeclared row must produce a file). The refusal is asserted rather than skipped, so a row that ever starts exporting fails as hard as one that refuses wrongly' },
     ],
   },
   {

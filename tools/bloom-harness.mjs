@@ -780,9 +780,19 @@ export async function fullStateDrift(page, sets) {
 
 export async function exportStl(page, tmpDir) {
   await page.waitForTimeout(400);   // let the rAF-coalesced rebuild land
+  /* THE CLICK GETS THE SAME BUDGET AS THE DOWNLOAD, and that is not a
+     convenience. The handler builds the whole export-mode mesh SYNCHRONOUSLY
+     before it either serialises a file or refuses, so the click does not
+     resolve until that build is done — and the slowest build of all is the
+     over-budget one, which then returns no file at all. With the click left on
+     the page default (30 s) while the download already waited 120 s, the gate
+     THREW an unhandled TimeoutError on exactly the rows XR1 exists to assert,
+     instead of reporting them: measured on ALL MAX, where the refusal takes
+     120 s of building to produce nothing. A gate that crashes where it should
+     assert is the failure mode this pair of numbers now rules out. */
   const [dl] = await Promise.all([
     page.waitForEvent('download', { timeout: 120000 }).catch(() => null),
-    page.click('#exportStl'),
+    page.click('#exportStl', { timeout: 120000 }),
   ]);
   if (!dl) return null;
   const fp = path.join(tmpDir, 'bloom.stl');
@@ -5045,6 +5055,105 @@ export function orientationAssertions(positions, row, sphere) {
    whose count doubles passes silently. That is how the 15 above could regress
    without a red. Recorded as a backlog item, not built — a magnitude gate is
    its own ruling. */
+/* ===================================================================
+   XR1-XR2 — THE EXPORT THE GENERATOR REFUSES, DECLARED AND ASSERTED
+   (Eva's ruling, Sep 13, on the carnation fringe's own ALL MAX)
+
+   `bloom.js` refuses to export above `EXPORT_TRI_BUDGET` (1,500,000), and
+   its own comment says the budget "exists so the refusal path is real before
+   it is ever needed". IT IS NEEDED NOW: the fringe is the first configuration
+   ever to reach it, and this is the declaration that makes the first thing to
+   reach it also the thing that proves the path works.
+
+   WHY NOT THE THREE OBVIOUS ANSWERS (each was costed and each was refused):
+     * RAISING THE BUDGET is a guard tuned to the thing it guards against, and
+       2,412,512 triangles is a 115 MiB file no slicer will open.
+     * TRIMMING `ALL MAX` makes a row stop meaning its own label — "everything
+       at maximum" genuinely IS a state this generator refuses to export, and
+       that is worth knowing rather than editing away.
+     * A SKIP loses the coverage: the repo's own `MAX_VOXELS` note says a row
+       that used to be measured and goes quiet is coverage lost to a change.
+
+   SO THE ROW RUNS, THE GEOMETRY BUILDS, AND THE REFUSAL IS THE ASSERTION.
+   Three clauses, and failing if a declared row ever EXPORTS matters exactly as
+   much as failing if it refuses wrongly, because either is a change nobody
+   asked for:
+     XR1  a row declared here must be REFUSED, the reason must be the TRIANGLE
+          BUDGET specifically (not some other error that also yields no file),
+          and the count it reports must exceed the budget it names.
+     XR2  a row NOT declared here must export. An undeclared refusal is the
+          same event this list exists to make loud, and it stays a hard failure.
+
+   THE TWO SIDES HAVE DIFFERENT OWNERS (the fourth durable rule). The measured
+   side is the APP's own post-export read-out — the only thing that knows a
+   refusal happened, since a refusal produces no file to inspect. The reference
+   for the COUNT is the BUILDER's own tally through `__bloomMetrics()`, which
+   reaches the harness by a different route entirely, so a refusal message that
+   quoted a stale or invented number cannot satisfy the clause. Neither the
+   budget nor the count is restated here: restating the budget would make this
+   file a second owner of it, which is the drift `seam-floor-removed` names.
+
+   THE ENTRY CARRIES ITS MEASURED COUNT AND ITS REASON, the
+   `SELF_INTERSECTION_XFAIL` shape: one entry, one row, one number, so the row
+   is named with its figure on every run rather than going quiet. Like that
+   list, this one does not gate MAGNITUDE — a declared row whose count drifts
+   further above the budget still passes — and for the same reason: a magnitude
+   gate is its own ruling. What it DOES gate is the boolean and the cause.  */
+export const EXPORT_REFUSED_XFAIL = Object.freeze({
+  'ALL MAX': '2,412,512 tris (export) against the 1,500,000 budget, a 115.0 MiB file — the blanket sweep hands the three new controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.',
+});
+export const EXPORT_REFUSED_HAS = (label) => Object.prototype.hasOwnProperty.call(EXPORT_REFUSED_XFAIL, label);
+
+/* Called by BOTH STL gates at the one place a missing file is observable.
+   `gotStl` is whether `exportStl` returned bytes. Returns the assertions and,
+   on a correctly-refused row, the figures the gate prints so the row is loud. */
+export async function exportRefusalAssertion(page, row, gotStl) {
+  const declared = EXPORT_REFUSED_HAS(row.label);
+  const bad = [];
+  /* EVERY CLAUSE GOES THROUGH `bad.push`, which is not a style choice: the
+     smoke census scans this file for assertion SITES in exactly that form, so
+     a clause returned as an array literal is a family the subset can never be
+     made to claim. It caught XR2 written that way. */
+  if (gotStl) {
+    if (declared) bad.push(`XR1: this row is declared EXPORT-REFUSED (${EXPORT_REFUSED_XFAIL[row.label]}) and it EXPORTED. The refusal is gone — remove its EXPORT_REFUSED_XFAIL entry in the same commit.`);
+    return { bad, declared, refused: false, r: null };
+  }
+  /* No file. Everything below distinguishes "the generator refused, for the
+     reason it declares" from "the export broke", which is the distinction the
+     bare `no STL download` could not make. */
+  const txt = await page.evaluate(() => document.getElementById('readout')?.textContent || '');
+  const m = /export refused:\s*([\d,]+)\s*tris \(export\) exceeds the\s*([\d,]+)\s*budget/.exec(txt);
+  if (!declared) {
+    if (m) bad.push(`XR2: no STL download and this row is not declared in EXPORT_REFUSED_XFAIL — the generator REFUSED the export (${m[1]} tris against the ${m[2]} budget). A NEW over-budget configuration: declare it with its measured count, or bring the count down.`);
+    else bad.push(`XR2: no STL download, this row is not declared in EXPORT_REFUSED_XFAIL, and the read-out shows no budget refusal either — so the export BROKE rather than being refused. Read-out was: ${txt.replace(/\s+/g, ' ').trim().slice(0, 240)}`);
+    return { bad, declared: false, refused: !!m, r: null };
+  }
+  if (!m) {
+    bad.push(`XR1: this row is declared EXPORT-REFUSED, but the read-out carries no triangle-budget refusal — so it produced no file for some OTHER reason, which this declaration does not cover. Read-out was: ${txt.replace(/\s+/g, ' ').trim().slice(0, 240)}`);
+    return { bad, declared: true, refused: false, r: null };
+  }
+  const said = Number(m[1].replace(/,/g, ''));
+  const budget = Number(m[2].replace(/,/g, ''));
+  if (!(said > budget)) bad.push(`XR1: the read-out refused the export at ${said} tris against a ${budget} budget — it did not report a count OVER the budget, so the refusal does not say what it claims`);
+  /* The count, from an owner the read-out does not write. */
+  const live = await page.evaluate(() => { const m2 = window.__bloomMetrics(); return m2 ? (m2.shownTris ?? m2.liveTris ?? null) : null; });
+  if (live == null) bad.push('XR1: no builder tally to check the refused count against — the count has only one owner and the clause is worth nothing');
+  else if (!(live > budget)) bad.push(`XR1: the read-out refused at ${said} tris but the BUILDER's own tally is ${live}, which is not over the ${budget} budget — the refusal and the geometry disagree about the size of this build`);
+  return { bad, declared: true, refused: true, r: { said, budget, live, mib: (said * 50 + 84) / 1048576 } };
+}
+
+export function exportRefusedLine(label, r) {
+  return `EXPORT REFUSED, DECLARED (${label}): ${r.said.toLocaleString('en-US')} tris (export) over the ${r.budget.toLocaleString('en-US')} budget, ${r.mib.toFixed(1)} MiB — the generator's own guard, asserted by XR1, not a pass and not a skip`;
+}
+
+/* A declaration naming a row the matrix did not run is worse than an absence —
+   `SELF_INTERSECTION_XFAIL`'s own coverage clause, for the same reason. */
+export function exportRefusedCoverage(attemptedLabels) {
+  const have = new Set(attemptedLabels);
+  const stray = Object.keys(EXPORT_REFUSED_XFAIL).filter((l) => !have.has(l));
+  return stray.length ? [`XR coverage: EXPORT_REFUSED_XFAIL names ${stray.length} row(s) the matrix did not run — ${stray.map((l) => `"${l}"`).join(', ')} — a declaration nothing measures is worse than an absence`] : [];
+}
+
 export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnProperty.call(SELF_INTERSECTION_XFAIL, label);
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'petalCup min (-0.8)': '384 pairs, worst span 0.2104 mm',
@@ -5422,11 +5531,35 @@ export async function selfIntersectionAssertions(page, buf, row) {
 }
 
 /* Matrix-level: every declared xfail names a row the matrix ran. Not made on
-   a filtered run, like the other coverage clauses. */
-export function selfIntersectionCoverage(labels) {
+   a filtered run, like the other coverage clauses.
+
+   THE ONE EXEMPTION IS A ROW THE GENERATOR REFUSES TO EXPORT, and it is an
+   exemption rather than a hole because it is bounded by the OTHER declaration:
+   a row in `EXPORT_REFUSED_XFAIL` produces no STL, so there is nothing for the
+   triangle-pair census to read, and `ALL MAX` is in BOTH lists. Without this
+   the two declarations contradict each other — the refusal is asserted and the
+   same row is then reported as a census the matrix failed to run — which is
+   how it presented in CI: three validity assertions where the connectedness
+   gate, which runs no census, raised two.
+
+   IT IS NOT SILENT. The exempted rows come back so the gate can NAME them, and
+   the entry stays in `SELF_INTERSECTION_XFAIL` rather than being deleted: the
+   count it carries was really measured, and if the refusal ever lifts the row
+   is censused again and X1/X2 govern it exactly as before (with XR1 firing in
+   the same run to say the refusal is gone). What is true meanwhile, and said
+   out loud, is that the figure cannot be re-measured while the refusal stands. */
+export function selfIntersectionCoverage(labels, refusedLabels = []) {
   const have = new Set(labels);
-  const stray = Object.keys(SELF_INTERSECTION_XFAIL).filter((l) => !have.has(l));
+  const refused = new Set(refusedLabels);
+  const stray = Object.keys(SELF_INTERSECTION_XFAIL).filter((l) => !have.has(l) && !refused.has(l));
   return stray.length ? [`X1 coverage: SELF_INTERSECTION_XFAIL names ${stray.length} row(s) the matrix did not run — ${stray.map((l) => `"${l}"`).join(', ')} — a declaration nothing measures is worse than an absence`] : [];
+}
+
+/* The loud half of that exemption: which declared self-intersectors could not
+   be censused this run because the generator refused to export them. */
+export function selfIntersectionRefusedNote(refusedLabels) {
+  const both = refusedLabels.filter((l) => SELF_INTERSECTION_XFAIL_HAS(l));
+  return both.length ? `X1 coverage: ${both.length} declared self-intersector(s) could NOT be censused this run because the generator REFUSED to export them (${both.map((l) => `"${l}"`).join(', ')}) — their SELF_INTERSECTION_XFAIL counts stand as last measured and cannot be re-measured while the refusal stands (XR1)` : null;
 }
 
 export function orientationLine(o) {
