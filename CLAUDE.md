@@ -1781,6 +1781,163 @@ Eva's images — the 3 x 3 shape square (at count 3, because the demand is a fun
 shape and a higher count would CLAMP the blunt corner, leaving the grid varying the count
 as well) and the serration / midpoint / lobing row on the shipped sliders with no hook.
 
+**THE RIM IS ONE CURVE, THE APEX IS A POINT ON IT, AND THE RELIEF IS A LENGTH — MODEL B
+SHIPS** (session 42 — read `docs/bloom-lobe-model.md` for Eva's model, then
+`docs/bloom-session-42-outcome.md`, before touching `widthProfile`'s lobes block,
+`bladeStations`' region split or the L family). Coverage is a SYMMETRIC ARC centred on
+the apex — Eva's clock, "just twelve o'clock, or eleven through one, or the whole clock
+excluding six" — so **twelve is the one point coverage never removes** and the apex is
+INTERIOR to the treatment at every coverage. Session 40 established MODEL A as an
+IDENTITY (the profile above `uCap` `Object.is`-equal to a petal with no lobes at all,
+4001 of 4001 samples, both modes); **its own instrument, unchanged, now reads 3075 of
+4001 DIFFERING** — `node tools/bloom-lobe-model-b.mjs --section=0`, whose verdict is
+DERIVED from the rows it prints rather than written as a literal, so it stays a witness
+when the answer moves again.
+**THE COUNT IS TEETH AND THE PARITY IS DERIVED**: `periods = count + 1`, the rim's
+midpoint is a crest iff that is even, so an ODD count puts a crest at twelve and an EVEN
+one a notch. `LOBE_COUNT_RANGE` opens to [1, 10] for Eva's "one lobe at twelve".
+**AN EVEN COUNT'S APEX NOTCH HAS NOTHING TO CUT AND THAT IS A PRINTABILITY FACT**: its
+sinus sits on the terminal mini-face, already at the print floor in BOTH modes, so its
+headroom and its relief are exactly zero at every depth and the two teeth either side
+read as one wide one. Told on the read-out, carried as `apexIsCrest` / `apexReliefMm`,
+asserted by L8 in both directions, photographed as the second row of
+`docs/img/lobe-apex-arc.png`. **NOT fixable from this side** — fixing it means SHORTENING
+the petal at the apex, which is `petalLength`'s and `petalTipShape`'s region, and the
+u = 1 mini-face may never be collapsed (session 32's upstream contract, §5).
+**THE DEPTH IS A RELIEF IN MILLIMETRES WITH A PER-PERIOD GUARD, AND THAT KILLS THE FADE.**
+`R = depth * (peakHalf - TIP_HALF_MM)`, `R_k = min(R, headroom(u_k))`, `cut = R_k * g`.
+So `depth` is still a fraction of a half-width — of the petal's OWN WIDEST one rather
+than of the local one. On session 40's own state the three notches go **2.366 / 1.923 /
+0.933 -> 2.160 / 2.160 / 2.160, spread 1.434 -> 0.000**, and at the default coverage and
+count 0 of the margin's teeth are relief-limited. **THERE IS NO GLOBAL DEPTH CLAMP** —
+that coupling is exactly what let the apex's scarcity shorten every tooth on the blade;
+`depthBuilt === depthAsked` always and `depthCap` is telemetry. A FOURTH `noRoom` cause,
+`relief`, replaces the `region` one MODEL B makes unreachable.
+**THE GUARD IS PER PERIOD BECAUSE THE OTHER TWO WERE MEASURED AND ARE WORSE**: a pointwise
+`min` gives the identical relief and a **26.8–37.8 degree** break mid-flank in LIVE; a
+strict per-period guard has no break and ZEROES the apex-most tooth. What the shipped one
+costs is over-reach the outline's own floor absorbs — **0 samples of 4001 under the print
+floor on the lamina in EXPORT on every row**, and in LIVE the 0.15 mm mesh floor lets the
+cut reach 0.42 mm below the mode-free bound over the last stretch of blade. 0 severed.
+**THE RESIDUAL IS REPORTED AND NOT CLAIMED GONE**: 0.491 mm of shortfall at 7 teeth over
+the full clock, 4.892 at depth 1.00, and **coverage 0.10 gets 0.243 mm of 2.160 asked** —
+the whole treated arc lies in the converging tip. The apex has the least material on the
+petal; exact parity at the last fraction of a millimetre is not available on a 1 mm sheet.
+**THE COUNT CEILING, EXPORT, default petal, coverage 0.10 / 0.40 / 0.80 / 1.00**: the
+shipped shape **2 / 4 / 6 / 7** (MODEL A gave 3 at the round default), the triangle wave
+3 / 10 / 10 / 10, cusped 3 / 8 / 10 / 10, flat 3 / 4 / 7 / 9. **RESOLUTION binds from
+below, the PRINT PITCH floor from above at the narrowest coverages.**
+**THE DEMAND IS A LIST NOW, ONE SUB-REGION PER PERIOD.** A window TOTAL cannot express a
+PER-PERIOD criterion — session 39 found it, session 42 measured it again under the arc:
+7 teeth at coverage 1.00 had the ladder hand **10/11/10/8 against a floor of 9**, and
+raising the total cannot fix it because the window already holds every free row. The
+ladder is still the ONE owner of row placement; it is told where the periods are, never
+where the rows go. After: 10/10/10/9. `bladeStations` reports `placedSub`, and L6 splits
+its clause into what the ladder PLACED (an identity) and what the gap-bound blend then
+moved (bounded at one station per boundary, reported).
+**A MODE-FREE BREAK LIST WAS OWED THE MOMENT THE ARC TABLE RAN THROUGH THE TIP FLOOR**
+(u 0.9945 export, 0.9993 live). `laminaWinner` is it, beside `winnerOf`. Row positions
+are topology; session 32's mode-dependence defect refusing a third shipping.
+**AND THE FIFTH DISCRETE-DECISION-ON-A-CONTINUOUS-QUANTITY, WITH ITS FIRST FIX REVERTED
+AFTER MEASUREMENT.** X0 went red at 2.5e-4 mm on `LOBES: x petalTipShape 0.60`: every
+scalar of the record agreed, `sinusU` differed by ONE ULP, and one station by 7.978e-6 in
+u — one ladder sample. Interpolating `placeInto` between the bracketing samples removes
+the discreteness and **is the wrong trade**: `sampleU(hi)` is an exact function of an
+INTEGER, so snapping is bit-identical wherever `hi` agrees (which is why main's 674 rows
+pass X0), while interpolation makes EVERY coordinate a function of a sum that reads ~1e-12
+apart between the page's V8 and Node's. Measured: it turned one row's 2.5e-4 mm jump into
+last-bit float32 straddles on two OTHER rows. **The grid on the one NEW input is HALF the fix**:
+`reliefMm` FLOORED onto `LOBE_RELIEF_GRID = 2^-16` mm (a power of two, so the quantisation
+is exact; floored, so the guard's inequality survives) — it cleared `CONTINUOUS x 3 turns`
+and `SPHERE` and **did nothing at all for the tip-shape row**, so "the divergence came from
+the relief" was right about two rows of three and wrong as a statement; the incomplete
+reading cost a gate cycle and is recorded rather than rewritten.
+**THE OTHER HALF IS SESSION 38 §B10.7'S OWN FINDING AT THE *INTERIOR* STATIONS, and only
+MEASURING THE SEARCH'S MARGINS found it.** Of the 56 decisions on that row, four sit within
+1e-9 of a sample: three are the `j === count` case session 38 already made exact (margin
+EXACTLY 0), and the fourth is the tip sub-region's midpoint at **1.97e-13 against a local
+step of 8.19e-4**. Not sensitivity — an IDENTITY: where the outline law is INACTIVE the
+turning term is identically zero and the arc term constant, so `cum` is an exact ARITHMETIC
+PROGRESSION and a region spanning 2114 samples has its midpoint ON sample 6943. `cA + (cB -
+cA) * j / count` and 6943 accumulated additions are the same number by two routes, and a
+strict `<` between them is decided by the last bit. **MODEL B is what made a whole
+sub-region linear enough to land on one.** The fix is a slack DERIVED FROM THE ACCUMULATION
+— `tol = LADDER_SAMPLES * EPS * total` (1.86e-11 there), because `cum[m]` is m roundings of
+values bounded by `total` plus the terms' own ulp — with the search reading `cum[m] < target
+- tol`. The emitted station is still `sampleU` of an INTEGER; nothing is made approximate.
+**Measured both ways: 0 stations moved over 2,352 ladders (680 rows x both modes x every
+ring) on the Node side — so the byte partition is untouched by construction — while the same
+sweep with a 1e-6 tolerance moves 78, and the failing row's page and Node builds now agree
+on all 56 stations to the BIT in both modes.** **Interpolation is still the right law for
+the residual (a target NEARLY but not exactly on a sample) and wants X0's exact float32
+comparison re-derived as an ULP BOUND alongside it — a whole-matrix partition and its own
+session.**
+**THE CENSUS IS THE VERDICT AND IT READS NO NEW FOLD ON ANY OF THE 48 LOBE-FAMILY ROWS**,
+both trees, matched BY CONTROL SET because the labels moved (a label match would compare
+different states). One row FIXED — `LOBES: x buckle 0.30 f 3`, 20 pairs to 0, entry off in
+the same commit. **The declared rows move in BOTH directions and the xfail list does not
+gate magnitude (#213), so all of it passes silently**: ZYGO 2 whorls 11,824 -> 6,176, roll
+330 18,712 -> 16,360, cup 1.2 same 724 at half the worst span, curl 360 784 -> 864, and
+**`ALL MAX` 116,127 -> 135,969, the one real regression — reported, not tuned around**.
+**AND `ALL MAX`'s SHIPPED ENTRY WAS ALREADY STALE BEFORE THIS SESSION**: it read 72,348 /
+2.6011 where main itself measures 116,127 / 4.8182 on the same control set, because #212
+gave that row `lobeDepth 1.00` and nobody re-measured — both figures are in the entry now.
+**AND `LOBES: x cup 0.40` IS A KNIFE EDGE THAT COST A CYCLE**: one span-0 pair on both
+trees, a tangency of the census triangles against the CUP's own form-onset crease. It read
+0 on an intermediate tree, X1 fired "the pre-existing self-intersection is FIXED, remove
+its entry", the entry came off — and the ladder-search tolerance put the station back and
+the entry with it. A span-0 touch is a property of where the stations land on a crease, not
+of a fold, and the list cannot tell those apart.
+**L8 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE MODEL**: L0–L7 are all blind to where
+the treated arc ENDS, so a tree that reverted to MODEL A would pass every one of them on
+a shorter rim. **AND ITS LOAD-BEARING CLAUSE NEEDED A SECOND HALF, WHICH RE-READING THE
+DIFF FOUND RATHER THAN A FAILURE** — session 41's L7 lesson in the family it was learned
+in, one session later. It built BOTH sides as NODE rebuilds of the state the page reports:
+right in CI, where the page and the rebuild run one source, and WORTH NOTHING under the
+mutant table, which serves its mutation to the PAGE alone (`page.route`) and imports a
+separate in-memory copy only for the witness — so a tree reverted to MODEL A on the page
+leaves both halves unmutated and green. The second clause reads TWO ARRAYS THE BUILDER
+EMITTED (`petalProfile` against `petalProfileBase`), so a cut stopping at the apex entry
+shows as the two agreeing on every row above `uCap`; reference `shapeBaseAt`, which the
+treatment does not write, quantity under test `shapeAt`, which is what a revert moves.
+**`the-treatment-terminates-at-the-apex-entry` is the mutant that was missing** — one
+clause on `cutMm`, the single change that makes the session's premise false, witnessed on
+the MUTATED module's own outline in LIVE (the export floor would mask a cut the law still
+made). **ASK OF EVERY CLAUSE NOT ONLY WHO OWNS THE TWO SIDES BUT WHETHER EITHER SIDE IS
+THE THING THE INSTRUMENT CAN ACTUALLY MOVE.** **AND L7's INSTRUMENT INVERTED WITH THE LAW'S FORM** — session 41 wrote
+that the RATIO `1 - h/hb` is right and the DIFFERENCE `hb - h` wrong; under a relief in
+millimetres it is the other way round, because the difference is exactly `R_k g` and the
+ratio carries the taper as a `1/hb` term LINEAR in the offset. Measured before it moved:
+an asked notch power of 3.00 read **1.966**. Both notes are kept, the old above the new,
+so the inversion is checkable. L3's minima count moved onto the mode-free lamina (the
+mode's own floor manufactured a THIRD dip on a two-sinus row).
+**#221 IS CLOSED and one half of it is VACUOUS under MODEL B**, which the table says
+rather than shipping a mutant that can never apply: the per-period guard is derived so no
+floor can bind AT a sinus. And **the L5 guard mutant's witness must build in LIVE** — the
+EXPORT floor IS the bound the guard protects, so in export a broken guard is invisible on
+the emitted outline (it reported "the behaviour did not move" while removing the guard
+entirely). That is also why L5's print-floor clause is stated on the mode-free lamina
+against the record rather than on the emitted export half-width, where it is vacuous.
+**ZERO TRIANGLES**: 19,040 live and export at the default, 929.8 KiB — the same counts as
+main. MODEL B is a boundary change on a fixed row-and-column lattice.
+The image is `node tools/shot-bloom-apex-arc.mjs <dir>` ->
+**`docs/img/lobe-apex-arc.png`** (session 40's `serration-range.png` and session 41's
+`lobe-shape-law.png` stay put — each records a law that was shipping when it was
+rendered). The measurements are `node tools/bloom-lobe-relief.mjs`.
+
+**BOTH STL GATES TELL THE TRUTH ABOUT A FAILING RUN NOW** (#220, session 42's first
+commit). The headline divided by `results.length` — the SURVIVORS — so a dropped row left
+both numerator and denominator and the ratio read N/N; and the failure block went to
+stderr while the summary went to stdout, so in a combined CI log it flushed EARLIER than
+the summary it follows. Session 41 read `672/672 rows are ONE connected piece` off a
+674-row matrix. Three changes per gate, no assertion touched: the headline is the three
+real populations (attempted · reached the results · passed) and carries a DROPPED marker
+inline, a one-line pointer goes to STDOUT when the validity block fires, and the verdict
+is printed to stdout on BOTH branches so the last line can never read as a pass on a
+failing run. Verified with a two-row `--only` run against a copy with one row
+force-dropped. **Session 42 leaned on it repeatedly** — every diagnosis in its outcome doc
+started from a summary line that named the dropped rows and the clause that dropped them.
+
 **THE STEM ATTACHES TO THE HUB; IT DOES NOT ATTACH TO THE PETALS** (Eva's ruling, session 43
 — read `docs/bloom-session-43-outcome.md` before touching `stemPlan`, `buildStemInto`,
 `buildHubInto`'s join arms or the ST family). The petals join the hub, the hub joins the
@@ -5113,6 +5270,260 @@ strand modes) is in that doc so it is not re-derived.
    40 x 3 grid is 120 petals and **4.5 MB**, about four times the sample's
    segment count, and three of THOSE in one composition is a real number rather
    than a hypothetical one.
+
+## `/scene` — the ambient scene shell, and scene 1
+
+`scene.html` / `scene.css` / `scene.js` / `scene/*` are a full-viewport section
+built to host up to **eight** independent ambient scenes, one at a time. It is
+`noindex`, it exports nothing, and it touches no other page. Scene 1 (a koi pond
+in the rain) is built; slots 2-8 are declared and render as disabled nav numbers.
+
+**IT DOES NOT LOAD `styles.css` AND THAT IS THE POINT.** The rest of the
+portfolio is teal on #0A0A0C; this section is thin light line art on near-black
+and has its own identity. Per the brief, **colour palettes per scene are a later
+phase and nothing here is built for them**: there is one ink and one ground,
+declared once at the top of `scene.css`.
+
+**TWO GUARANTEES MAKE A SCENE SWAP CLEAN, AND BOTH ARE STRUCTURAL RATHER THAN
+RULES SOMEBODY HAS TO KEEP.** They are the whole reason this is a shell and not
+one big canvas, and `tools/verify-scene.mjs` asserts each of them twice — once
+against the shipped SOURCE and once against a synthetic probe scene in a real
+browser.
+* **THERE IS ONE ANIMATION LOOP AND `scene.js` OWNS IT.** A scene never calls
+  `requestAnimationFrame`. A scene that owned its own loop could leave it running
+  after teardown — drawing into a canvas the next scene now owns, or quietly
+  burning a core forever — and the symptom is invisible until it is a battery
+  complaint. A disposed scene here simply stops being called, and the probe
+  measures that its frame counter FREEZES while the shell's keeps rising.
+* **THERE IS ONE SET OF INPUT LISTENERS AND `scene.js` OWNS THEM.** They are
+  bound once at boot against a mutable `active` and routed, so a scene cannot
+  leak one and a swap rebinds nothing. (This is /print's own "the wiring is
+  registered once at module load against mutable module-level state", one level
+  up.)
+
+**A SCENE MODULE DEFAULT-EXPORTS A FACTORY**; every method is optional except
+`frame`: `frame(dt, wall)` / `resize(w, h)` / `pointer(x, y, wall)` /
+`wheel(deltaY, deltaMode)` / `dispose()` / `state()`. The host it is handed
+supplies `canvas2d()` (a DPR-correct canvas, mounted and auto-resized), live
+`width`/`height`, `reducedMotion` and `seed`. `dt` is CLAMPED at 1/20 s, so a
+tab switch cannot teleport a simulation.
+
+**THE LOAD TOKEN IS TAKEN BEFORE THE ALREADY-ACTIVE EARLY RETURN, AND THAT ORDER
+IS LOAD-BEARING.** Scene modules are imported dynamically, so a click on 2 while
+1 is showing leaves an import in flight; clicking 1 again must CANCEL it, or 2
+arrives a second later over the scene you went back to. Bumping the token before
+the early return is what cancels it. The mutant `a-stale-scene-load-is-mounted-anyway`
+is the witness, and the gate serves scene 2's module with a deliberate delay so
+the race is real rather than argued.
+
+**THE VIEWPOINT IS SHELL-LEVEL, NOT SCENE 1'S** (`scene/surface.js`), because the
+brief states it as a property of the section: one fixed steep-oblique angle,
+**a single 0.60 squash on the plane's y axis, everywhere and forever**. There is
+no perspective and no horizon — a true camera would give every point of an
+infinite plane its own foreshortening, so a ripple near the top of the screen
+would be a different shape from the same ripple at the bottom and "infinite,
+bleeds off all four edges" would stop being true at the horizon. **ALL
+SIMULATION HAPPENS IN PLANE COORDINATES, WHICH ARE ISOTROPIC**, and the squash is
+applied once, to POINTS, at draw time. Mixing the two spaces is the one mistake
+available here: a steering force computed on screen coordinates makes a fish
+measurably faster sideways than up, which reads as "the fish are odd" long
+before anyone finds it.
+**AND THE SQUASH IS NEVER `ctx.scale(1, squash)`** — that would squash the STROKE
+too, so every line would come out thinner across a fish than along it, which is
+the one thing a line-art piece cannot afford.
+
+**A RIPPLE CARRIES NO RECORD OF WHAT MADE IT, AND THAT IS A PROPERTY OF THE TYPE
+RATHER THAN A RULE.** `RIPPLE_FIELDS` in `scene/koi-ripples.js` is the whole
+record — position, front radius, age, life, strength, ring count — and there is
+no `source`, no `kind`, no `fromClick`. The fish system cannot branch on a cause
+that is not in the data it is handed, so "fish react to ripples generically"
+needs nobody to remember it. Ambient rain, storm rain and a click all go through
+one spawner; what differs is the NUMBERS, which is the physical size of the
+disturbance and exactly what a fish can actually perceive. **A bigger splash is
+still a bigger splash; what it must not have is a label.**
+
+**THERE IS NO TEXT ON THIS PAGE OUTSIDE THE NAV, AND "NO CHROME BESIDES THE
+NAV" IS LITERAL** (Eva's ruling, overruling this session's own judgement call).
+A one-off hint line — "click the water. scroll for wind.", faded out after seven
+seconds and gone for good — shipped on the argument that the two interactions
+are otherwise undiscoverable. It is gone: the element, the CSS, the timer and
+the scene's `blurb` field. **The rule is not "that sentence is deleted"** —
+`shell/there-is-no-text-on-the-page-but-the-nav` walks the RENDERED text and
+fails on any future caption, and its mutant puts a hint back. Two things it
+measured that are easy to get wrong: **`display:none` is NOT how Chromium
+reports a `<noscript>` it is not rendering** (it says `display: inline`,
+`visibility: visible`, and zero client rects), so the filter asks
+`checkVisibility()` and the client rects — the platform's own answer to "is this
+painted"; and **opacity is deliberately not an exemption**, because a hint
+mid-fade is still a hint.
+
+**A KOI IS NEVER PLACED IN VIEW AND NEVER VANISHES FROM IT** (Eva's second
+ruling on the same review). Every fish is born OUTSIDE the visible frame and
+swims in; every fish that leaves swims out and is removed only once its whole
+body is clear. **THE TRANSITIONS ARE GEOMETRIC, NOT TIMED**: `entering` becomes
+`cruising` on the frame `surface.onScreen` first says yes, and `leaving` is
+culled on the frame it is last off screen — so the state cannot drift from the
+thing it claims. Four consequences, each of which was a real edit rather than a
+rename:
+* **THE FADE IS GONE.** A koi fading out is a koi disappearing while it is being
+  looked at, which is the same defect in softer clothing. `koi-draw.js` draws at
+  a constant `FISH_ALPHA`.
+* **CONTAINMENT CARRIES A KOI IN AS WELL AS TURNING ONE BACK** — the same
+  inward force, doing both jobs, so entry needed no new mechanism. **But the
+  EDGE BRAKE had to be gated on heading-outward**: it exists to buy a turn the
+  distance it needs, and an entering koi is as deep in the band as anything ever
+  gets, so ungated it throttled every arrival to a third speed. Measured, the
+  mean entry is **4.2 s** gated; ungated it is over fifteen. `leaving` skips
+  containment entirely and is steered out by the edge it is nearest AND already
+  pointed at.
+* **A KOI SENT AWAY CAN BE RECALLED**, and that is what keeps the count honest.
+  A departure is no longer instant, so a storm that ends a second after one
+  begins leaves a koi that is still in the frame and wanted again; spawning
+  there puts an eighth on the water while the seventh is still swimming off.
+  `recall()` turns the deepest-in leaver back instead.
+* **THE SEED OBEYS THE RULE TOO, which is the case most likely to be exempted
+  by accident.** The koi the page opens with are spawned outside like any other
+  and swum in over 18 s of SIMULATED time inside `seed()`, before a frame is
+  drawn — ~5 ms, allocation-free, no canvas. So the pond opens full and there is
+  still no koi anywhere that was placed in view.
+`visibleCount` is state-agnostic now (a koi on its way out is still on the
+water); `presentCount` — the koi that are STAYING — is what the population
+manager reads, and conflating them is still the defect that once filled the pond
+with sixteen koi to keep seven on screen.
+**THE GATE JUDGES THIS FROM AN INDEPENDENT OWNER.** The school records where it
+put each koi (`spawnLog`, bounded at 64) and nothing else; whether that was
+inside the frame is decided on the far side by `surface.visible()`, which
+`koi-fish.js` does not write. A self-reported "I spawned outside" flag would be
+the claim under test answering for itself.
+
+**THE THREE KOI TRAITS ARE SLIDERS, NOT ARCHETYPES** — each drawn uniformly in
+[0, 1] and used as a SIGNED weight about its midpoint, so 0.5 is genuinely
+indifferent rather than a third mode. **SEPARATION IS NOT A TRAIT**: koi do not
+overlap whatever their sociability, because that is a body and not a
+personality, so the short-range push sits outside the signed social term.
+
+**FOUR DEFECTS THIS SESSION FOUND, EACH OF WHICH DREW A PLAUSIBLE PICTURE:**
+* **`ctx.ellipse()` DOES NOT BEGIN A SUBPATH — IT CONNECTS FROM THE CURRENT
+  POINT.** Batching a few hundred ripples into one path is what makes a downpour
+  affordable, and without a `moveTo` it drew a straight chord between every
+  ripple and the next: a heavy shower came out as a spiderweb of long diagonals
+  across the whole viewport, at a third of the frame rate. The `moveTo` lives in
+  `surface.ellipse` so no caller can reintroduce it.
+* **THE POPULATION MANAGER COUNTED ONLY STRICTLY-VISIBLE KOI** while containment
+  lets one nose past the edge and pulls it back — so it replaced fish that were
+  on their way in. Sixteen koi alive to keep seven on screen. `visibleCount` and
+  `presentCount` are two questions and conflating them is the defect.
+* **THE CONTAINMENT FORCE RAMPED WITH HOW FAR A KOI HAD ALREADY OVERSHOT**, so
+  full strength only existed OUTSIDE the frame. On a phone-width pond the koi
+  spent a third of the time out of shot. The band is measured INWARD from each
+  edge now, and sized from the fish's own turning circle rather than as a fixed
+  distance.
+* **SEPARATION LOST TO COHESION AT FULL SOCIABILITY ON KINEMATICS, NOT ON
+  PRIORITY.** Two koi closing head-on cross a separation band faster than either
+  can turn out of it, so no weight could fix it; what fixed it is the fish
+  SLOWING as it comes about, which is what a real one does. 21 px -> 46 px.
+
+**WALL TIME IS NOT SCENE TIME, AND A BROWSER CHECK THAT SLEEPS IS MEASURING THE
+MACHINE.** A scene advances by the sum of its CLAMPED frame deltas, so a page
+rendering at 18 fps against a 1/20 clamp advances 0.9 s of pond per second of
+wall. Two timing checks that slept and asserted went red under a mutation that
+only made the page slow — `waitSceneSeconds()` asks the page how much pond has
+gone by instead. **Never `waitForTimeout` before asserting something about the
+simulation's own clock.**
+
+**AND THE DELTA A PAGE RECEIVES IS NOT THE DELTA PLAYWRIGHT SENDS.** Measured: an
+injected `mouse.wheel(0, 120)` arrives as `deltaY` 120 at `deviceScaleFactor` 1
+and as **60** at dsf 2. That is an artifact of converting a synthetic wheel into
+CSS coordinates, not something a hardware notch does — so the gate scales what it
+sends and asserts what the page actually RECEIVED before concluding anything
+about the wind.
+
+**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
+shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
+ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
+never imported from the module under test, because a clause that reads its
+expected value out of the thing it is checking measures its own consistency.
+Part two drives the real page and measures the DOM, the reported state and the
+rasterised pixels. **`--negative-control` is required before quoting a pass from
+a changed harness**: nineteen mutations, each naming the checks it must redden,
+with a stale-name guard and an anchor check that run for EVERY mutant before any
+of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
+alone in seconds, and the guard is SECTION-AWARE so that combination does not
+report every part-two name as stale.
+
+**THE FIRST SWEEP FOUND TWO CHECKS THAT WERE GREEN FOR THE WRONG REASON, AND
+BOTH WERE THE STRONGEST-SOUNDING ONES IN THEIR SECTION.** Recorded because the
+shape recurs:
+* **`fish/any-ripple-gets-the-same-reaction`** — the brief's central claim —
+  seeded a school at RANDOM around a fixed ripple, so whether any koi was inside
+  the reach at all, and whether its trait sat far enough from the indifferent
+  midpoint for the ripple term to weigh anything, was up to the seed. It passed
+  on a pond where the ripple could not have changed anything. The koi are placed
+  and their traits set by hand now, and the fixture carries its own vacuity
+  clause: the ripple must be shown to have MOVED them.
+* **`wind/the-rest-angle-is-exactly-vertical`** — decaying from exactly 1.0 at
+  exactly 1/240 s a step lands on exactly 0 BY THE ARITHMETIC, with no clamp
+  involved; measured on a tree with the clamp neutered, which settled on the
+  same exact zero. It is exercised from a value no whole number of steps can
+  reach now, and asserts the wind STAYS at zero rather than hunting either side
+  of it.
+**And one mutant's claim had simply stopped being true**: counting only visible
+koi no longer churns the population, because the containment fix removed the
+straying it fed on. The claim came off that mutant and the churn check got one
+of its own — a departure that never leaves — rather than the check being
+loosened.
+
+**AND THE ENTRY/EXIT SWEEP FOUND TWO MORE THINGS ABOUT THE INSTRUMENT, NEITHER
+OF THEM A LOOSENING.**
+* **`makeSchool` COULD HAND A FIXTURE A POND IT NEVER BUILT.** Several fish
+  checks take the seeded school and then write `school.fish.length = 4` and
+  place those four by hand — which silently does NOTHING on an array of two and
+  nothing at all on an empty one. Measured on `an-entering-koi-is-not-carried-in`:
+  `seed()` returned **ZERO** koi and two ripple checks failed with a message
+  about ripples. The helper now refuses a seed that did not produce the target
+  count, so the failure is the sentence it actually is.
+* **THE SEPARATION CHECK'S CONTROL TREE IS NOT THE TREE UNDER TEST.**
+  `fish/separation-is-a-body-not-a-personality` compares the pond against a
+  second tree built with `W_SEPARATE = 0` — and `loadScene` builds that from the
+  source ON DISK, so during a sweep `M` carries the mutation and the control
+  does not. Any mutation that moves the koi about therefore shifts one side of
+  the ratio and not the other, which is why five fish mutants list it as
+  collateral they are ALLOWED to redden. **The fix is written down and
+  deliberately not taken**: `loadScene` would take a LIST of edits and chain
+  them onto one file, so the control carries the sweep's mutation too. It is
+  shared machinery three pre-existing mutants already depend on, and naming the
+  collateral keeps the check exactly as strict in the meantime.
+**AND THREE PRE-EXISTING MUTANTS GAINED A WIDER BLAST RADIUS, EACH WIDENING
+MEASURED RATHER THAN REASONED — WHICH IS HOW ONE OF THEM CORRECTED THE GUESS.**
+`the-population-counts-only-what-is-in-frame` was predicted to kill the recall;
+run on a probe tree it still recalls **9 of the shipped 10**, and what it
+actually does is reach **EIGHT koi on screen** — so the recall check catches it
+on its COUNT bar, which is the brief's own "3-7 on screen". `a-departure-never-
+leaves` stops the population machinery dead (0 spawns beyond the seed and 0
+recalls over 150 s of swinging storm, the pond stuck at 7 against a target of 3),
+and `an-entering-koi-is-not-carried-in` leaves `seed()` returning an EMPTY pond on
+every seed — so between them they redden every entry/exit check's vacuity guard.
+That breadth is the mutations being severe, not the checks being fragile.
+
+**Nothing here runs in CI.** Every GitHub Actions gate in this repo is
+path-filtered to `flower*` / `bloom*`, so `scene*` is covered by nothing — run
+the gate by hand before calling a `/scene` change done. Note the corollary
+/print, /plot and /cards already hit: the flower workflows are path-filtered on
+`'tools/**'`, so ADDING `tools/verify-scene.mjs` makes both flower gates run on a
+scene PR. They still test flower geometry.
+
+**Dev-only deps:** none beyond a global `playwright-core`/`playwright`. The page
+loads no library at all — no three, no CDN JavaScript — only one Google font,
+which is chrome and which the gate stubs.
+
+**OPEN, AND EVA'S TO RULE ON** (recorded in the session report on #223):
+`noindex`, which is on; whether `/scene` should be linked from the site nav at
+all; and the lightning placeholder, which the brief said not to over-invest in
+and which is one white wash plus a jolt. **The hint line came off this list by
+being ruled on** — see the no-text section above.
+
+**Out of scope on purpose, and none of it foreclosed:** colour palettes and
+time-of-day variants, scenes 2-8, sound, and any change to the other pages.
 
 ## Artist Tracker (`artist-tracker.html`)
 

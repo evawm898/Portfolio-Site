@@ -895,14 +895,26 @@ function spineLine(petals) {
 function lobeLine(petals) {
   const L = petals && petals[0] && petals[0].lobes;
   if (!L) return '';
-  if (L.noRoom) return `LOBES NO ROOM — ${L.noRoomWhy === 'region' ? 'the apex entry sits at or below the root blend' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows in this window and a lobe needs ${L.samplesPerLobe}` : `${L.windowMm.toFixed(1)} mm of rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}; nothing cut, told\n`;
+  if (L.noRoom) return `LOBES NO ROOM — ${L.noRoomWhy === 'region' ? 'the margin has no arc at all' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows in this window and one period needs ${L.samplesPerLobe}` : L.noRoomWhy === 'relief' ? `every period's sinus sits where the outline has already converged to the print floor (the asked relief was ${L.reliefAskedMm.toFixed(2)} mm) — there is nothing to remove anywhere in the arc` : `${(2 * L.treatedHalfMm).toFixed(1)} mm of treated rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}; nothing cut, told\n`;
   const count = L.countClamped
-    ? `${L.countAsked} asked → ${L.countBuilt} built (CLAMPED by ${L.clampedBy === 'pitch' ? 'the pitch floor' : `the rows the ladder has — ${L.rowsCapacity} free in this window at ${L.samplesPerLobe} a lobe`})`
-    : `${L.countBuilt} lobes`;
-  const depth = L.depthClamped
-    ? `depth ${L.depthAsked.toFixed(2)}x asked → ${L.depthBuilt.toFixed(2)}x built (CLAMPED at the print floor)`
-    : `depth ${L.depthBuilt.toFixed(2)}x (cap ${L.depthCap.toFixed(2)}x)`;
-  return `LOBES ${count} · ${depth} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% (${L.windowMm.toFixed(1)} of ${L.regionMm.toFixed(1)} mm, u ${L.windowU[0].toFixed(3)}–${L.windowU[1].toFixed(3)}) · crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)}${L.crestAngleDeg === null ? '' : ` (crest ${L.crestAngleDeg.toFixed(1)}\u00b0`}${L.notchAngleDeg === null ? (L.crestAngleDeg === null ? '' : ')') : `${L.crestAngleDeg === null ? ' (' : ', '}notch ${L.notchAngleDeg.toFixed(1)}\u00b0 included on a ${L.angleChordMm.toFixed(2)} mm chord)`} · ${L.samplesPerLobe} stations a lobe demanded by this shape · ${L.rowsPerLobe.toFixed(1)} rows per lobe (${L.rowsInWindow} emitted stations in the window) · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
+    ? `${L.countAsked} asked → ${L.countBuilt} built (CLAMPED by ${L.clampedBy === 'pitch' ? 'the pitch floor' : `the rows the ladder has — ${L.rowsCapacity} free in this window at ${L.samplesPerLobe} a period`})`
+    : `${L.countBuilt} teeth`;
+  /* THE APEX IS A POINT ON THE RIM NOW, so the first thing this line says is
+     what is AT it — the parity fact, which is a printability statement and
+     not a look: an even count's apex sinus lands on the terminal mini-face,
+     which is already at the print floor in both modes, so it is flattened
+     rather than cut. Derived from the law, never asserted (session 42). */
+  const apex = L.apexIsCrest
+    ? 'a CREST at twelve'
+    : `a NOTCH at twelve — on the terminal face, already at the print floor, so it cuts ${L.apexReliefMm.toFixed(2)} mm and reads as ONE wide tooth`;
+  /* THE RELIEF, AND THE RESIDUAL FADE. Every period that has room gets the
+     asked relief exactly; the ones that do not are named with what they got,
+     which is the honest statement of what is left of session 40's fade. */
+  const margin = L.reliefMm.filter((r, i) => L.apexIsCrest || i !== (L.periods - 1) / 2);
+  const relief = L.reliefLimited === 0
+    ? `relief ${L.reliefAskedMm.toFixed(2)} mm on every tooth on the margin (depth ${L.depthBuilt.toFixed(2)}x the widest half-width ${L.peakHalfMm.toFixed(2)} mm; the first saturates at ${L.depthCap.toFixed(2)}x)`
+    : `relief ${L.reliefAskedMm.toFixed(2)} mm asked, ${Math.min(...margin).toFixed(2)}–${Math.max(...margin).toFixed(2)} mm built — ${L.reliefLimited} of the margin's teeth are limited by the material at their own sinus (every period saturates above ${L.depthCap.toFixed(2)}x)`;
+  return `LOBES ${count} · ${apex} · ${relief} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% = ${(L.coverage * 12).toFixed(1)} hours of the clock (${(2 * L.treatedHalfMm).toFixed(1)} of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back) · crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)}${L.crestAngleDeg === null ? '' : ` (crest ${L.crestAngleDeg.toFixed(1)}\u00b0`}${L.notchAngleDeg === null ? (L.crestAngleDeg === null ? '' : ')') : `${L.crestAngleDeg === null ? ' (' : ', '}notch ${L.notchAngleDeg.toFixed(1)}\u00b0 included on a ${L.angleChordMm.toFixed(2)} mm chord)`} · ${L.samplesPerLobe} stations a period demanded by this shape · ${L.rowsPerPeriod.join('/')} placed base to apex · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
 }
 
 function rootBlendLine(layers, cont) {
@@ -1530,6 +1542,10 @@ window.__bloomMetrics = () => ({
      — `profile` leads with the foot rows, so the offset is however many of
      those there are. The builder already knows; this passes it through. */
   petalProfileU: lastPetal ? lastPetal.profileU : null,
+  /* AND THE BASE HALF-WIDTH AT EACH ROW — the outline before the lobe cut.
+     A6 fits PETAL TIP SHAPE's own curve, and under MODEL B the cut reaches
+     the apex, so the emitted half-width is no longer that curve. */
+  petalProfileBase: lastPetal ? lastPetal.profileBase : null,
   petalFootRows: lastPetal ? lastPetal.footRows : null,
   petalPanels: lastPetal ? lastPetal.panels : null,
   petalTipSpans: lastPetal ? lastPetal.tipSpans : null,

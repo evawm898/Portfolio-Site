@@ -447,19 +447,19 @@ for (const r of results) {
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
 }
-/* THE THREE REAL POPULATIONS, NOT ONE RATIO (#220). `results.length` is the
-   SURVIVORS of every validity assertion, so a dropped row leaves BOTH sides of
-   `passed/results` and the ratio reads N/N however many rows were lost — twice
-   now, on a 622-row matrix and on a 674-row one. The count the reader needs to
-   compare against is `attempted`, and it was never printed. It is printed first
-   here, and the line says DROPPED in its own words when the two differ rather
-   than leaving the reader to subtract. `skipped` stays a third category: a skip
-   is labelled and deliberate, a drop is a validity failure. */
-const dropped = attempted.length - results.length;
-console.log(`\n${attempted.length} rows attempted · ${results.length} reached the results`
-  + (dropped ? ` · ${dropped} DROPPED before reporting (validity failures — see below)` : '')
-  + ` · ${results.length - failures.length - skipped.length} of those are ONE connected piece`
+/* THE DENOMINATOR ITSELF, asserted — and asserted BEFORE the headline, so the
+   headline can carry the verdict rather than contradict it (#220). Session 32
+   added this census and left the headline dividing by `results.length`, which
+   is the SURVIVORS: a dropped row leaves BOTH numerator and denominator, so
+   the ratio reads N/N however many rows were lost, and the matrix size was
+   never printed to compare it against. Session 41 read `672/672 rows are ONE
+   connected piece` off a run that had exited 1 over a 674-row matrix. */
+const got = new Set(results.map((r) => r.label));
+const dropped = attempted.filter((l) => !got.has(l));
+if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
+console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length - skipped.length} are ONE connected piece`
   + (skipped.length ? ` · ${skipped.length} skipped (grid too large — NOT a pass)` : '')
+  + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass, and every ratio below divides by the ${results.length} that survived` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
 console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
@@ -473,21 +473,15 @@ console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a fla
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
-/* THE DENOMINATOR ITSELF, asserted. */
-if (results.length !== attempted.length) {
-  const got = new Set(results.map((r) => r.label));
-  validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
-}
-
 let bad = false;
 if (validity.length) {
   bad = true;
-  /* THE POINTER GOES TO STDOUT (#220). stderr is unbuffered and stdout is
-     block-buffered, so piped into a CI log this block flushes EARLIER than the
-     summary it logically follows — which is how a failing run comes to have a
-     pass-shaped tail. The detail stays on stderr; one line saying it exists
-     goes into the same stream as the summary, where the tail-reader is looking. */
-  console.log(`\nconnectedness: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the detail on stderr. No result above is trustworthy.`);
+  /* THE POINTER GOES TO STDOUT. stderr is unbuffered and stdout is block
+     buffered, so piped into a CI log this block flushes EARLIER than the
+     summary it logically follows — and reading the tail of a 2,400-line log
+     is the normal way to read it. The detail stays here; the fact that there
+     IS detail belongs in the stream that carries the summary. */
+  console.log(`\nconnectedness: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the "HARNESS INVALID" block (stderr; it may appear ABOVE this line in a combined log).`);
   console.error(`\nconnectedness: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
   for (const v of validity) console.error(`  - ${v}`);
 }
@@ -502,12 +496,9 @@ if (NEGATIVE_CONTROL) {
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   process.exit(1);
 }
-/* THE VERDICT IS UNCONDITIONAL AND ON STDOUT (#220). Printing PASS only on
-   success and the failure text only on stderr is exactly the asymmetry that
-   produces a pass-shaped tail: the last line of stdout must never read as a
-   pass on a failing run. */
 if (bad) {
-  console.log(`\nconnectedness: FAILED — ${dropped} row(s) dropped before reporting, ${failures.length} row(s) failed, of ${attempted.length} attempted.`);
+  /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
+  console.log(`\nconnectedness: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} row(s) not one piece. Nothing above is a pass.`);
   process.exit(1);
 }
 console.log(`\nconnectedness: PASS — all ${attempted.length} attempted rows reached the results and every one exports as a single connected body.`);

@@ -120,13 +120,28 @@ function lobePowers(M) {
     got = M.petalSurface(state, ring, slot, null, acc).profile;
   } catch { return null; }
   const L = got.lobes;
-  if (!L || L.noRoom || L.countBuilt < 2 || L.depthClamped) return null;
-  /* THE CUT FRACTION, not the removed material — see the harness's L7: the
-     difference carries the base outline's taper and its maximum is a
-     stationary point of a product, so a slope read there is 2 for every
-     exponent. The ratio is `depth * g(r)` and its powers are the exponents. */
-  const removed = (u) => 1 - got.halfWidthAt(u) / got.halfWidthBaseAt(u);
-  const span = (L.windowU[1] - L.windowU[0]) / L.countBuilt;
+  if (!L || L.noRoom || L.crestU.length < 2 || !Array.isArray(L.reliefMm)) return null;
+  /* THE REMOVED MILLIMETRES, not the cut fraction — and that is the OPPOSITE
+     of what session 41 wrote here, because MODEL B changed the law's FORM.
+     Under MODEL A the cut was a fraction of the local half-width, so the
+     RATIO was exactly `depth * g` with the half-width cancelled and the
+     DIFFERENCE carried the outline's taper as a product. Under MODEL B the
+     cut is a RELIEF IN MILLIMETRES, constant within a period, so the
+     DIFFERENCE is exactly `R_k * g` and it is the RATIO that carries the
+     taper — its `1/hb` term is LINEAR in the offset and swamps an e^3 notch.
+     See the harness's L7, where the same inversion is recorded. */
+  const removed = (u) => got.halfWidthBaseAt(u) - got.halfWidthAt(u);
+  /* AND THE SPANS ARE THE FEATURES' OWN PERIODS IN `u`: MODEL B's periods are
+     even in ARC and the arc runs through the converging tip, so a uniform
+     slice of the window reaches several periods away at one end. */
+  const live = (k) => Number(L.reliefMm[k]) > 0;
+  const sCand = []; for (let j = 0; j < L.sinusU.length; j++) if (live(j)) sCand.push(j);
+  const cCand = []; for (let i = 1; i < L.crestU.length; i++) if (live(i - 1) && live(i)) cCand.push(i);
+  if (!sCand.length || !cCand.length) return null;
+  const si = sCand[Math.floor(sCand.length / 2)], ci = cCand[Math.floor(cCand.length / 2)];
+  const sinusAt = L.sinusU[si], crestAt = L.crestU[ci];
+  const spanS = Math.max(1e-6, (L.crestU[si + 1] !== undefined ? L.crestU[si + 1] : L.windowU[1]) - (L.crestU[si] !== undefined ? L.crestU[si] : L.windowU[0]));
+  const spanC = Math.max(1e-6, 2 * Math.min(crestAt - L.crestU[ci - 1], (L.crestU[ci + 1] !== undefined ? L.crestU[ci + 1] : L.windowU[1]) - crestAt));
   const ternary = (lo, hi, want) => {
     for (let k = 0; k < 220; k++) {
       const a1 = lo + (hi - lo) / 3, b1 = hi - (hi - lo) / 3;
@@ -135,15 +150,15 @@ function lobePowers(M) {
     }
     return (lo + hi) / 2;
   };
-  const powerAt = (uf, dir) => {
+  const powerAt = (uf, dir, span) => {
     const at0 = removed(uf), d1 = span * 1e-3, d2 = span * 1e-2;
     const r1 = Math.abs(removed(uf + dir * d1) - at0), r2 = Math.abs(removed(uf + dir * d2) - at0);
     if (!(r1 > 0 && r2 > r1)) return NaN;
     return Math.log(r2 / r1) / Math.log(10);
   };
-  const us = ternary(L.sinusU[Math.floor(L.sinusU.length / 2)] - span * 0.35, L.sinusU[Math.floor(L.sinusU.length / 2)] + span * 0.35, 'max');
-  const uc = ternary(L.crestU[1] - span * 0.35, L.crestU[1] + span * 0.35, 'min');
-  const notch = powerAt(us, -1), crest = powerAt(uc, +1);
+  const us = ternary(sinusAt - spanS * 0.35, sinusAt + spanS * 0.35, 'max');
+  const uc = ternary(crestAt - spanC * 0.35, crestAt + spanC * 0.35, 'min');
+  const notch = powerAt(us, -1, spanS), crest = powerAt(uc, +1, spanC);
   return Number.isFinite(notch) && Number.isFinite(crest) ? { crest, notch } : null;
 }
 
@@ -199,6 +214,79 @@ function stemInnerRadius(M, state = STEM_STATE()) {
   } catch { return null; }
 }
 
+/* THE EMITTED RELIEF, PER MARGIN SINUS, on a given module — the witness for
+   the two L5 mutants below. It reads the module's OWN outline (the base
+   half-width less the cut one) rather than the lobe record's `reliefMm`,
+   because a mutation inside the guard would move the record and the outline
+   together and a witness that read the record would be agreeing with the
+   defect (session 39's fourth durable rule). */
+/* THE DEEPEST CUT ABOVE THE APEX ENTRY, off the MUTATED module's own
+   emitted outline — `shapeAt` against `shapeBaseAt` over [uCap, 1], which is
+   exactly the region session 40 proved MODEL A never touches. Built in LIVE
+   for `lobeRelief`'s reason: the export floor would mask a cut that the law
+   still made. Nothing here reads the lobe RECORD — a witness that asked the
+   record whether the record moved would be agreeing with the defect. */
+function lobeOutline(M, set) {
+  const state = { ...REGISTRY_DEFAULTS, ...set };
+  const acc = new M.MeshBuilder({ exportMode: false });
+  let got;
+  try {
+    const fr = M.footRing(state, acc);
+    const ring = fr.slotRings[0][0];
+    let slot = null;
+    M.buildWhorlInto({ count: fr.slotCount, radius: ring.radius, height: 0, sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra, phase: ring.phase, placement: state.placement, fan: fr.fan,
+      blade: (sl) => { if (!slot) slot = sl; } });
+    got = M.petalSurface(state, ring, slot, null, acc).profile;
+  } catch { return null; }
+  if (!got.lobes || got.lobes.noRoom) return null;
+  /* `halfWidthBaseAt` is the outline the treatment is SUBTRACTED FROM — the
+     same pair `lobeRelief` reads, on the same profile, so the mutated module
+     supplies both and neither is a record. */
+  const uCap = got.uCap;
+  let cutAbove = 0;
+  for (let i = 0; i <= 2000; i++) {
+    const u = uCap + (1 - uCap) * i / 2000;
+    const d = got.halfWidthBaseAt(u) - got.halfWidthAt(u);
+    if (d > cutAbove) cutAbove = d;
+  }
+  return { uCap, cutAbove };
+}
+
+function lobeRelief(M, set) {
+  /* IN LIVE, AND THAT IS THE POINT. The EXPORT floor is TIP_HALF_MM — the very
+     bound the guard exists to keep — so in export a broken guard is INVISIBLE
+     on the emitted outline: the cut over-reaches, `max(..., tipFloor)` catches
+     it, and the half-width reads exactly 0.8 whatever the law asked for.
+     Measured: `guard-reads-the-widest-period` reported "the behaviour did not
+     move" against an export build while removing the guard entirely. The LIVE
+     mesh floor is 0.15 mm, so there the over-cut shows on the geometry itself.
+     This is also why L5's own print-floor clause is stated on the MODE-FREE
+     lamina against the record rather than on the emitted export half-width,
+     where it would be vacuous. */
+  const state = { ...REGISTRY_DEFAULTS, ...set };
+  const acc = new M.MeshBuilder({ exportMode: false });
+  let got;
+  try {
+    const fr = M.footRing(state, acc);
+    const ring = fr.slotRings[0][0];
+    let slot = null;
+    M.buildWhorlInto({ count: fr.slotCount, radius: ring.radius, height: 0, sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra, phase: ring.phase, placement: state.placement, fan: fr.fan,
+      blade: (sl) => { if (!slot) slot = sl; } });
+    got = M.petalSurface(state, ring, slot, null, acc).profile;
+  } catch { return null; }
+  const L = got.lobes;
+  if (!L || L.noRoom || !L.sinusU.length) return null;
+  /* The MODE-FREE lamina at each sinus, and what the outline actually keeps
+     there — so "the cut went past the print floor" is readable without
+     trusting any record. */
+  return L.sinusU.map((u) => {
+    const lam = Math.max(got.halfWidthBaseAt(u), M.TIP_HALF_MM);
+    return { u, relief: got.halfWidthBaseAt(u) - got.halfWidthAt(u), keeps: lam - (got.halfWidthBaseAt(u) - got.halfWidthAt(u)) };
+  });
+}
+
 const MUTANTS = [
   /* ===================================================================
      THE LOBE SHAPE (session 41). L7's own two mutations, and its witness is
@@ -214,6 +302,85 @@ const MUTANTS = [
      and the crests-at-the-ends identity are all blind to WHICH SHAPE the
      cut carries, so without L7 either mutation ships silently.
      =================================================================== */
+  /* ===================================================================
+     L5 — THE PER-PERIOD GUARD AND THE PRINT FLOOR (#221, filed by session 41
+     and closed here). L5 is the clause that reddened CI on `380ebee` and the
+     clause whose tolerance session 41 then edited, and NOTHING in this table
+     named it: the print-floor claim rested on its own reading.
+
+     WHAT #221 PROPOSED AND WHY ONE HALF OF IT IS VACUOUS UNDER MODEL B. Its
+     second mutant — record the law's own product at the deepest sinus rather
+     than the value AS BUILT, i.e. skip the `max` with the floors — cannot
+     fire here: the per-period guard is derived so that
+     `lamina(sinus) - relief >= TIP_HALF_MM`, and TIP_HALF_MM dominates the
+     live mesh floor, so no floor can ever bind AT a sinus and the two
+     expressions are equal on every reachable state. Stating that is better
+     than shipping a mutant that reports MUTATION DID NOT APPLY for the rest
+     of the project's life. What replaces it is a mutation on the OTHER owner
+     L5's expected value is built from: the relief TARGET.
+     =================================================================== */
+  /* ===================================================================
+     L8 — THE MODEL ITSELF, and the reason the clause it fires needed a
+     second half. MODEL A terminated the treatment at the apex entry `uCap`,
+     and session 40 established as an IDENTITY that the profile above it was
+     `Object.is`-equal to a petal with no lobes at all. This mutation puts
+     that back — the one change that makes this session's whole premise
+     false — and every other L clause is blind to it: the count, the caps,
+     the window's LOWER end, the pitch, the demand and the crests-at-the-ends
+     identity are all unchanged by where the treatment STOPS.
+
+     THE WITNESS READS THE MUTATED MODULE'S OWN OUTLINE, never the assertion
+     it names: the cut above `uCap`, which must go to exactly nothing.
+
+     AND IT IS WHY L8 GAINED A PAGE-SIDE CLAUSE. The table serves its
+     mutation to the PAGE; L8's first model clause compares two NODE
+     rebuilds, so this mutant would have left both halves of it unmutated
+     and passed — the reason the second clause is there. */
+  { id: 'the-treatment-terminates-at-the-apex-entry',
+    why: 'MODEL A restored — the cut stops at `uCap` and the apex is bit-identical to a petal with no lobes, which is exactly the objection this session exists to answer',
+    find: '    const cutMm = (u) => (dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));',
+    into: '    const cutMm = (u) => (u >= uCap || dAt(u) > treatedHalfMm ? 0 : reliefMm[periodOf(u)] * lobeCutProfile(phaseAt(u), crestShape, notchShape));', names: ['L8'],
+    witness: (M, C) => {
+      const set = { lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 0.9, lobeCrestShape: 1, lobeNotchShape: 1 };
+      const m = lobeOutline(M, set), c = lobeOutline(C, set);
+      if (!m || !c) return 'the lobed row built no cut';
+      if (!(c.cutAbove > 1e-6)) return `the clean module cuts only ${c.cutAbove.toExponential(2)} mm above uCap on this row — the mutation is unobservable here`;
+      return m.cutAbove < 1e-12
+        ? null
+        : `the mutant still cuts ${m.cutAbove.toFixed(4)} mm above uCap ${m.uCap.toFixed(4)} (the clean module cuts ${c.cutAbove.toFixed(4)}) — the treatment did not stop at the apex entry`;
+    } },
+  { id: 'guard-reads-the-widest-period',
+    why: 'every period takes the relief the WIDEST point could give instead of its own sinus\'s, so a tooth near the tip cuts past the print floor',
+    /* RE-ANCHORED (session 42): the relief's quantisation onto
+       LOBE_RELIEF_GRID moved the line this edits, and the table reported
+       MUTATION DID NOT APPLY rather than passing falsely — which is the one
+       thing that makes a disarmed mutant survivable. Fourth instance here of
+       a refactor disarming a mutant; the anchor check is what says so. */
+    find: '    const reliefMm = sinusD.map((dd) => Math.floor(Math.min(reliefAskedMm, headroomOf(dd)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);',
+    into: '    const reliefMm = sinusD.map(() => Math.floor(Math.min(reliefAskedMm, headroomAt(uPk)) / LOBE_RELIEF_GRID) * LOBE_RELIEF_GRID);', names: ['L5'],
+    witness: (M, C) => {
+      const set = { lobeDepth: 0.3, lobeCount: 10, lobeCoverage: 1 };
+      const m = lobeRelief(M, set), c = lobeRelief(C, set);
+      if (!m || !c) return 'the guard row built no cut';
+      const cl = c.filter((x) => x.keeps < c[0].keeps - 1e-9 || x.relief < c[0].relief - 1e-9);
+      if (!cl.length) return 'the clean module limits no period on this row — the guard does not bind and the mutation is unobservable';
+      const worst = Math.min(...m.map((x) => x.keeps)), was = Math.min(...c.map((x) => x.keeps));
+      return worst < M.TIP_HALF_MM - 1e-9 && was >= M.TIP_HALF_MM - 1e-9
+        ? null
+        : `the mutant keeps ${worst.toFixed(4)} mm at its shallowest sinus where the clean module keeps ${was.toFixed(4)} — the guard did not stop reading each period's own headroom (the print floor is ${M.TIP_HALF_MM})`;
+    } },
+  { id: 'relief-target-is-not-the-widest-half-width',
+    why: 'the relief target is a fraction of the FOOT\'s half-width rather than of the petal\'s widest, so every tooth is the wrong depth while the guard still holds',
+    find: '    const peakHalfMm = laminaHalf(uPk);',
+    into: '    const peakHalfMm = laminaHalf(ROOT_BLEND_END);', names: ['L5'],
+    witness: (M, C) => {
+      const set = { lobeDepth: 0.3, lobeCount: 3, lobeCoverage: 0.8 };
+      const m = lobeRelief(M, set), c = lobeRelief(C, set);
+      if (!m || !c) return 'the lobed row built no cut';
+      const dm = Math.max(...m.map((x, i) => Math.abs(x.relief - c[i].relief)));
+      return dm > 1e-3 ? null
+        : `the emitted relief moved by at most ${dm.toExponential(2)} mm — the target did not change`;
+    } },
   { id: 'shapes-swapped', why: 'the crest exponent is applied at the notch and the notch exponent at the crest — the two controls exchanged',
     find: '  const P = Math.pow(r, crest), Q = Math.pow(1 - r, notch);',
     into: '  const P = Math.pow(r, notch), Q = Math.pow(1 - r, crest);', names: ['L7'],
@@ -592,6 +759,12 @@ const ROWS = [
      on main with no layers involved at all. At the shipping tilt the
      clearance is 0.2536 mm against a first station at 0.625 mm, so without
      this row all four seam mutations are no-ops. */
+  /* A LOBED ROW WHERE THE PER-PERIOD GUARD BINDS (session 42). At three
+     teeth over the full clock every period has room, so `guard-reads-the-
+     widest-period` is a no-op there; at ten the apex-most periods are
+     relief-limited and the mutation cuts them past the print floor. */
+  { label: 'a lobed rim where the PER-PERIOD guard binds (10 teeth at full coverage, 0.30x)',
+    set: [{ id: 'lobeDepth', value: '0.3' }, { id: 'lobeCount', value: '10' }, { id: 'lobeCoverage', value: '1' }] },
   { label: 'the seam floor binding (tilt 75, length 20, sheet 2.4 — a SINGLE layer)',
     set: [{ id: 'petalTilt', value: '75' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '2.4' }] },
   /* THE EXPORT FLOOR BINDING TOO, and it is a second row rather than a wider
