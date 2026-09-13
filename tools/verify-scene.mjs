@@ -161,7 +161,9 @@ const MUTANTS = [
     breaks: ['storm/a-full-downpour-holds-three-seconds-before-it-ebbs'],
     mayAlso: ['storm/a-second-burst-at-full-downpour-flashes',
               'storm/the-flash-and-the-jolt-decay-to-nothing',
+              'scene1/five-rapid-clicks-bring-on-a-downpour',
               'scene1/a-second-burst-at-full-downpour-throws-lightning',
+              'scene1/the-storm-ebbs-back-to-idle-on-its-own',
               'reduced-motion/the-flash-is-damped-when-motion-is-not-wanted'],
     why: 'the plateau is a stated behaviour, not a side effect of the ramp',
   },
@@ -183,6 +185,7 @@ const MUTANTS = [
     to: '      if (w.value === 0) return;',
     breaks: ['wind/three-rapid-scroll-actions-reach-the-maximum'],
     mayAlso: ['wind/the-maximum-is-a-diagonal',
+              'wind/the-wind-decays-to-zero-six-seconds-after-the-last-scroll',
               'scene1/scrolling-tilts-the-rain-and-it-comes-back-to-vertical'],
     why: 'a tank that leaks while it fills cannot be filled by the gesture that is meant to fill it',
   },
@@ -212,13 +215,23 @@ const MUTANTS = [
     file: 'scene/koi-fish.js',
     from: '      const live = school.presentCount();',
     to: '      const live = school.visibleCount(w, h);',
-    breaks: ['fish/the-pond-holds-three-to-seven-koi-on-screen',
-             'fish/the-population-does-not-churn-at-a-steady-intensity'],
+    breaks: ['fish/the-pond-holds-three-to-seven-koi-on-screen'],
     mayAlso: ['scene1/the-pond-has-koi-in-it-and-draws-them',
               'scene1/the-traits-are-per-fish-and-span-the-sliders',
               'fish/separation-is-a-body-not-a-personality',
               'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones'],
     why: 'the defect that filled the pond with sixteen koi to keep seven on screen',
+  },
+  {
+    id: 'a-departure-never-leaves',
+    file: 'scene/koi-fish.js',
+    from: "      if (pick) { pick.state = 'leaving'; school.departures++; }",
+    to: '      if (pick) { school.departures++; }',
+    breaks: ['fish/the-population-does-not-churn-at-a-steady-intensity'],
+    mayAlso: ['fish/the-pond-holds-three-to-seven-koi-on-screen',
+              'scene1/the-pond-has-koi-in-it-and-draws-them',
+              'scene1/the-traits-are-per-fish-and-span-the-sliders'],
+    why: 'a manager whose count never registers what it just did departs a koi every cooldown, for ever',
   },
   {
     id: 'the-wind-moves-where-the-rain-lands',
@@ -233,7 +246,7 @@ const MUTANTS = [
     file: 'scene.js',
     from: '  if (token !== loadToken) return false;   // the stale-load guard',
     to: '  /* guard removed */',
-    breaks: ['shell/the-last-scene-asked-for-is-the-one-that-mounts'],
+    breaks: ['swap/the-last-scene-asked-for-is-the-one-that-mounts'],
     why: 'two dynamic imports in flight resolve in whatever order the network gives',
   },
 ];
@@ -405,25 +418,21 @@ async function partOne(mutant) {
   });
 
   check('a full downpour decays to idle in ten seconds', () => {
-    let t0 = null, t1 = null;
-    runStorm(({ st, advance, click, now }) => {
-      for (let i = 0; i < 5; i++) { click(); advance(0.02); }
-      advance(2.0 + 3.0 + 0.01);
-      t0 = now();
-      for (let i = 0; i < Math.round(12 / DT) && st.intensity > 0; i++) { st.advance(DT); }
-      t1 = now() + 0;
-      // count the ebb itself rather than reading the clock through the helper
-      let n = 0; const st2 = null; void st2;
-      void n;
-    });
-    // Measured directly: from exactly 1.0, how long to reach 0?
+    // MEASURED FROM EXACTLY FULL, which is what the brief's ten seconds is
+    // about: the ebb is a RATE, so a shallower plateau takes proportionally
+    // less and only the full one is a stated number.
     const st = M.storm.createStorm();
     st.intensity = 1; st.target = 1; st.phase = 'ebbing';
     let secs = 0;
     while (st.intensity > 0 && secs < 20) { st.advance(DT); secs += DT; }
     near(secs, 10, 0.02, 'full downpour to idle');
-    void t0; void t1;
-    return `${secs.toFixed(3)} s`;
+    // And a partial plateau ebbs at that same rate rather than in its own ten.
+    const half = M.storm.createStorm();
+    half.intensity = 0.5; half.target = 0.5; half.phase = 'ebbing';
+    let halfSecs = 0;
+    while (half.intensity > 0 && halfSecs < 20) { half.advance(DT); halfSecs += DT; }
+    near(halfSecs, 5, 0.02, 'half a downpour, at the same rate');
+    return `${secs.toFixed(3)} s from full, ${halfSecs.toFixed(3)} s from half`;
   });
 
   check('the first burst does not flash', () => {
@@ -494,11 +503,26 @@ async function partOne(mutant) {
     assert.ok(Object.is(w.angleRad, 0), `a fresh wind reads ${w.angleRad}`);
     const d = w.fallDir();
     assert.ok(Object.is(d.x, 0) && d.y === 1, `fallDir at rest is ${JSON.stringify(d)}`);
-    // and after a full decay, still exactly — not nearly
-    for (let i = 0; i < 3; i++) w.scroll(M.wind.normalizeWheel(120, 0, 800));
-    for (let i = 0; i < Math.round(6 / DT); i++) w.advance(DT);
-    assert.ok(Object.is(w.angleRad, 0), `after decaying it reads ${w.angleRad}`);
-    return 'exactly 0 rad, before and after';
+
+    // THE CLAMP HAS TO LAND ON ZERO FROM ANY VALUE AT ANY FRAME RATE, so it is
+    // exercised from one that no whole number of steps can reach. Decaying from
+    // exactly 1.0 at exactly 1/240 s a step arrives at exactly 0 by the
+    // arithmetic alone — measured, on a tree with the clamp neutered, which
+    // settled on the same exact zero — so the obvious version of this check
+    // passes with the clause it is named for removed and says nothing at all.
+    const odd = M.wind.createWind();
+    odd.scroll(M.wind.normalizeWheel(97, 0, 800));
+    odd.scroll(M.wind.normalizeWheel(-233, 0, 800));
+    const dt = 1 / 61.3;
+    for (let i = 0; i < Math.ceil(9 / dt); i++) odd.advance(dt);
+    assert.ok(Object.is(odd.angleRad, 0), `an uneven decay settled at ${odd.angleRad} rad`);
+    // AND IT STAYS THERE. Without the clamp the value hunts either side of zero
+    // for ever — it reads -8.9e-4 and climbing when this is run against one.
+    for (let i = 0; i < 200; i++) {
+      odd.advance(dt);
+      if (!Object.is(odd.value, 0)) throw new Error(`it left zero again, at ${odd.value}`);
+    }
+    return 'exactly 0 rad at rest, after an uneven decay, and it stays there';
   });
 
   check('three rapid scroll actions reach the maximum', () => {
@@ -734,15 +758,22 @@ async function partOne(mutant) {
     const school = M.fish.createSchool({ rand, surface: surf, width: 1440, height: 900 });
     const ripples = M.ripples.createRipples();
     const rain = M.rain.createRain({ rand, ripples });
-    school.seed(1440, 900);
-    for (let i = 0; i < 60 * 120; i++) {
-      rain.advance(1 / 60, { width: 1440, height: 900, intensity: 0, fallDir: { x: 0, y: 1 }, surface: surf });
+    school.seed(1440, 900);                      // seven koi, the calm target
+    const step = (I) => {
+      rain.advance(1 / 60, { width: 1440, height: 900, intensity: I, fallDir: { x: 0, y: 1 }, surface: surf });
       ripples.advance(1 / 60);
-      school.advance(1 / 60, { ripples: ripples.list, intensity: 0, width: 1440, height: 900 });
-    }
-    const churn = school.arrivals + school.departures;
-    if (churn > 2) throw new Error(`${churn} arrivals+departures over two calm minutes`);
-    return `${churn} over 120 s at a fixed intensity`;
+      school.advance(1 / 60, { ripples: ripples.list, intensity: I, width: 1440, height: 900 });
+    };
+    // Fall to the downpour target and settle there. This part SHOULD cost
+    // departures: it is the population change the brief asks for.
+    for (let i = 0; i < 60 * 45; i++) step(1);
+    const settled = school.arrivals + school.departures;
+    if (!(settled >= 3)) throw new Error(`the pond never shed koi for the storm: ${settled} changes`);
+    // From here the target does not move, so nothing should.
+    for (let i = 0; i < 60 * 120; i++) step(1);
+    const after = school.arrivals + school.departures - settled;
+    if (after > 1) throw new Error(`${after} arrivals+departures over two settled minutes`);
+    return `${settled} changes falling 7 -> ${school.target}, then ${after} over 120 s held there`;
   });
 
   check('any ripple gets the same reaction', () => {
@@ -750,9 +781,34 @@ async function partOne(mutant) {
     // one ripple. The ripples agree on every quantity a disturbance HAS —
     // where it is, how far its front has reached, how hard it hit — and differ
     // only in `rings`, which is how many circles the renderer strokes. If the
-    // fish move differently, something in the fish is reading the cause.
+    // koi move differently, something in the fish is reading the cause.
+    //
+    // THE KOI ARE PLACED BY HAND AND THEIR TRAITS ARE SET BY HAND, and the
+    // first version of this did neither. Seeded at random around a fixed
+    // ripple, whether ANY koi was inside the 330 px reach was up to the seed,
+    // and a koi whose ripple trait sits near the indifferent midpoint weights
+    // the whole term by nearly zero — so the check passed on a pond where the
+    // ripple could not have changed anything, and MISSED the mutation it
+    // exists for. Four koi, ringed around the ripple well inside the reach, at
+    // the two extremes of the trait and two points between.
     const build = (rings) => {
       const school = makeSchool(64);
+      school.fish.length = 4;
+      school._cool = 1e9;
+      const traits = [0, 0.25, 0.75, 1];
+      school.fish.forEach((f, i) => {
+        const a = i * Math.PI / 2;
+        f.traits.ripple = traits[i];
+        f.traits.social = 0.5;
+        f.baseSpeed = 40; f.speed = 40; f.alarm = 0;
+        f.x = 700 + Math.cos(a) * 150;
+        f.y = 700 + Math.sin(a) * 150;
+        f.heading = a + Math.PI / 2;
+        for (let k = 0; k < f.spine.length; k++) {
+          f.spine[k].x = f.x - Math.cos(f.heading) * f.seg * k;
+          f.spine[k].y = f.y - Math.sin(f.heading) * f.seg * k;
+        }
+      });
       const rip = { x: 700, y: 700, r: 0, maxR: 120, age: 0, life: 2.3, strength: 0.98, rings };
       for (let i = 0; i < 60 * 3; i++) {
         rip.age += 1 / 60;
@@ -771,7 +827,33 @@ async function partOne(mutant) {
         }
       }
     }
-    return `${a.length} koi, bit-identical after 3 s under a "rain" and a "click" ripple`;
+    // And the fixture is not vacuous: the ripple genuinely moved these koi.
+    const still = (() => {
+      const school = makeSchool(64);
+      school.fish.length = 4; school._cool = 1e9;
+      school.fish.forEach((f, i) => {
+        const ang = i * Math.PI / 2;
+        f.traits.ripple = [0, 0.25, 0.75, 1][i]; f.traits.social = 0.5;
+        f.baseSpeed = 40; f.speed = 40; f.alarm = 0;
+        f.x = 700 + Math.cos(ang) * 150; f.y = 700 + Math.sin(ang) * 150;
+        f.heading = ang + Math.PI / 2;
+        for (let k = 0; k < f.spine.length; k++) {
+          f.spine[k].x = f.x - Math.cos(f.heading) * f.seg * k;
+          f.spine[k].y = f.y - Math.sin(f.heading) * f.seg * k;
+        }
+      });
+      for (let i = 0; i < 60 * 3; i++) {
+        school.advance(1 / 60, { ripples: [], intensity: 0, width: 1440, height: 900 });
+      }
+      return school.fish.map(f => [f.x, f.y]);
+    })();
+    const moved = a.reduce((m, f, i) => Math.max(m, Math.hypot(f[0] - still[i][0], f[1] - still[i][1])), 0);
+    if (!(moved > 25)) {
+      throw new Error(`the ripple moved the koi by only ${moved.toFixed(1)} px against no ripple at all — `
+        + 'this fixture cannot see the difference it is testing for');
+    }
+    return `${a.length} koi across the whole trait range, bit-identical under a "rain" and a "click" `
+      + `ripple, and displaced ${moved.toFixed(0)} px by it`;
   });
 
   check('some koi swim to a ripple and some flee it', () => {
@@ -1076,6 +1158,20 @@ async function openPage(browser, base, { reducedMotion = 'no-preference', seed =
 
 // Mean brightness of the scene canvas, read back from the rasterised pixels
 // rather than from anything the page says about itself.
+// WAIT ON THE SIMULATION'S OWN CLOCK, NOT THE WALL'S. A scene advances by the
+// sum of its CLAMPED frame deltas, so a page rendering at 18 fps against a
+// clamp of 1/20 advances 0.9 s of pond per second of wall — and a check that
+// slept 5.4 s and asserted the storm had begun to ebb was really asserting
+// something about how fast the machine was. Measured: the ellipse mutant drops
+// the frame rate by a factor of three and reddened two timing checks that have
+// nothing to do with it. This asks the page how much pond has actually gone by.
+async function waitSceneSeconds(page, secs, capMs = 30000) {
+  const from = await page.evaluate(() => window.__scene.sceneState().clock);
+  await page.waitForFunction(
+    ([t0, want]) => window.__scene.sceneState().clock - t0 >= want,
+    [from, secs], { timeout: capMs, polling: 50 });
+}
+
 const CANVAS_STATS = `(() => {
   const c = document.querySelector('.scene-canvas');
   const g = c.getContext('2d');
@@ -1199,7 +1295,7 @@ async function partTwo(browser, mutant, shotsDir) {
 
       await checkAsync('ambient rain makes ripples with no hand on the mouse', async () => {
         const before = await page.evaluate(() => window.__scene.sceneState().spawned);
-        await page.waitForTimeout(2500);
+        await waitSceneSeconds(page, 2.5);
         const after = await page.evaluate(() => window.__scene.sceneState());
         if (!(after.spawned > before)) throw new Error('no ripple appeared on its own');
         if (!(after.landed > 0)) throw new Error('no drop ever landed');
@@ -1234,7 +1330,7 @@ async function partTwo(browser, mutant, shotsDir) {
 
       await checkAsync('five rapid clicks bring on a downpour', async () => {
         for (let i = 0; i < 5; i++) { await page.mouse.click(500 + i * 40, 300 + i * 30); await page.waitForTimeout(70); }
-        await page.waitForTimeout(2300);
+        await waitSceneSeconds(page, 2.2);
         const st = await page.evaluate(() => window.__scene.sceneState());
         near(st.intensity, 1, 0.02, 'intensity two seconds after five rapid clicks');
         if (!(st.drops > 10)) throw new Error(`only ${st.drops} drops in the air during a downpour`);
@@ -1250,11 +1346,11 @@ async function partTwo(browser, mutant, shotsDir) {
       });
 
       await checkAsync('the storm ebbs back to idle on its own', async () => {
-        // FIVE SECONDS AND A BIT, not three: a click at full downpour restarts
-        // the two-second ramp before the three-second hold, so the plateau
-        // runs five seconds past the last click. See koi-storm.js — it is what
-        // makes clicking sustain a downpour.
-        await page.waitForTimeout(5400);
+        // FIVE SECONDS AND A BIT OF POND, not three: a click at full downpour
+        // restarts the two-second ramp before the three-second hold, so the
+        // plateau runs five seconds past the last click. See koi-storm.js — it
+        // is what makes clicking sustain a downpour.
+        await waitSceneSeconds(page, 5.2);
         const mid = await page.evaluate(() => window.__scene.sceneState());
         if (!(mid.intensity < 1)) throw new Error('it never started to ebb');
         return `ebbing at ${mid.intensity.toFixed(3)} (${mid.phase})`;
@@ -1280,7 +1376,7 @@ async function partTwo(browser, mutant, shotsDir) {
         near(seen, 360, 1, 'the page received three 120 px scroll actions');
         const windy = await page.evaluate(() => window.__scene.sceneState());
         near(Math.abs(windy.windDeg), 45, 0.5, 'three notches');
-        await page.waitForTimeout(6400);
+        await waitSceneSeconds(page, 6.1);
         const calm = await page.evaluate(() => window.__scene.sceneState());
         assert.strictEqual(calm.windRad, 0, `it settled at ${calm.windRad} rad rather than exactly vertical`);
         return `${windy.windDeg.toFixed(1)}deg -> exactly 0 after six seconds`;
@@ -1301,7 +1397,7 @@ async function partTwo(browser, mutant, shotsDir) {
 
       await checkAsync('the frame is affordable during a downpour', async () => {
         for (let i = 0; i < 5; i++) { await page.mouse.click(400 + i * 60, 250 + i * 40); await page.waitForTimeout(60); }
-        await page.waitForTimeout(2200);
+        await waitSceneSeconds(page, 2.2);
         const cost = await page.evaluate(async () => {
           const f0 = window.__scene.frames, t0 = performance.now();
           await new Promise(r => setTimeout(r, 2500));
@@ -1340,7 +1436,7 @@ async function partTwo(browser, mutant, shotsDir) {
       const { page, ctx } = await openPage(browser, base, { reducedMotion: reduced ? 'reduce' : 'no-preference' });
       try {
         for (let i = 0; i < 5; i++) { await page.mouse.click(500, 400); await page.waitForTimeout(70); }
-        await page.waitForTimeout(2300);
+        await waitSceneSeconds(page, 2.2);
         const flagged = await page.evaluate(() => window.__scene.reducedMotion);
         for (let i = 0; i < 5; i++) { await page.mouse.click(500, 400); await page.waitForTimeout(70); }
         let peak = 0;
@@ -1402,7 +1498,6 @@ async function partTwo(browser, mutant, shotsDir) {
       });
 
       await checkAsync('the scene that left is disposed and stops being drawn', async () => {
-        const before = await page.evaluate(() => window.__probe.frames);
         await page.click('[data-scene="1"]');
         await page.waitForFunction(() => window.__scene.activeId === 1, null, { timeout: 5000 });
         await page.waitForTimeout(120);
@@ -1416,7 +1511,6 @@ async function partTwo(browser, mutant, shotsDir) {
           `the disposed scene drew ${after.frames - at.frames} more frames — its loop leaked`);
         assert.strictEqual(after.canvases, 1, `${after.canvases} canvases`);
         assert.strictEqual(after.children, 1, `${after.children} elements on the stage`);
-        void before;
         return `disposed, frozen at ${at.frames} frames while the shell kept running`;
       });
 
@@ -1511,10 +1605,15 @@ async function main() {
       // exactly like a mutation the gate is genuinely blind to. /plot lost a
       // twenty-minute chunk to that one; it costs a millisecond to refuse it.
       const known = new Set(base.map(r => r.name));
+      // Only sections that actually RAN can be judged. Under --no-browser the
+      // part-two names are absent because nothing ran them, not because they
+      // are stale, and flagging those would make the two flags mean the same
+      // thing — which is the confusion this guard exists to remove.
+      const ranSections = new Set(base.map(r => r.name.split('/')[0]));
       const stale = [];
       for (const m of MUTANTS) {
         for (const n of [...(m.breaks || []), ...(m.mayAlso || [])]) {
-          if (!known.has(n)) stale.push(`${m.id} names "${n}"`);
+          if (ranSections.has(n.split('/')[0]) && !known.has(n)) stale.push(`${m.id} names "${n}"`);
         }
       }
       if (stale.length) {
@@ -1541,17 +1640,23 @@ async function main() {
           }
           console.log(`\n${'='.repeat(74)}\nNEGATIVE CONTROL — ${list.length} mutation(s)\n${'='.repeat(74)}`);
           let bad = 0;
+          const ran = new Set(base.map(r => r.name.split('/')[0]));
           for (const m of list) {
+            const claimable = (m.breaks || []).filter(n => ran.has(n.split('/')[0]));
+            if (!claimable.length) {
+              console.log(`\nSKIP ${m.id}\n     every check it claims is in a section this invocation did not run`);
+              continue;
+            }
             const res = await runAll(browser, m, null);
             const red = new Set(res.filter(r => !r.ok).map(r => r.name));
-            const missed = (m.breaks || []).filter(n => !red.has(n));
+            const missed = claimable.filter(n => !red.has(n));
             const allowed = new Set([...(m.breaks || []), ...(m.mayAlso || [])]);
             const unclaimed = [...red].filter(n => !allowed.has(n));
             const ok = !missed.length && !unclaimed.length;
             if (!ok) bad++;
             console.log(`\n${ok ? 'OK  ' : 'BAD '} ${m.id}`);
             console.log(`     ${m.why}`);
-            console.log(`     reddened ${red.size} check(s); claimed ${(m.breaks || []).length}`
+            console.log(`     reddened ${red.size} check(s); claimed ${claimable.length}`
               + ((m.mayAlso || []).length ? `, collateral allowed ${(m.mayAlso).filter(n => red.has(n)).length}/${m.mayAlso.length}` : ''));
             if (missed.length) console.log(`     MISSED (stayed green): ${missed.join(', ')}`);
             if (unclaimed.length) console.log(`     UNCLAIMED (went red, not named): ${unclaimed.join(', ')}`);

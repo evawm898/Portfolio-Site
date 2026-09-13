@@ -27,7 +27,6 @@ export const INK = [226, 232, 238];       // ripples: the brightest thing here
 export const INK_FISH = [214, 221, 228];
 export const INK_RAIN = [198, 208, 219];
 export const GROUND = '#08090b';
-export const BODY_FILL = 'rgba(13, 15, 18, 0.86)';
 
 const RIPPLE_BINS = 12;
 const RAIN_BINS = 6;

@@ -256,7 +256,11 @@ export function createSchool({ rand, surface = createSurface(), width, height })
     // fish are the first to go, which is the behaviour the traits describe
     // rather than a rule about storms.
     depart(w, h) {
-      const cx = w / 2, cy = height ? height / 2 / surface.squash : h / 2 / surface.squash;
+      // THE CURRENT HEIGHT, NOT THE ONE THE SCHOOL WAS BUILT WITH. `height` is
+      // the constructor's argument and goes stale the moment the window is
+      // resized, which would have this picking a departure by distance from a
+      // centre the pond no longer has.
+      const cx = w / 2, cy = h / 2 / surface.squash;
       let pick = null, bestScore = -Infinity;
       const diag = Math.hypot(w, h / surface.squash) || 1;
       for (const f of school.fish) {

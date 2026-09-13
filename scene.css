@@ -159,7 +159,12 @@ html, body {
 }
 
 @media (max-width: 30rem) {
-  .scene-nav { padding-left: 0.6rem; padding-right: 0.6rem; }
+  /* NINE BUTTONS AND A RETURN LINK DO NOT FIT ON A PHONE'S TOP ROW, and what
+     they do instead of not fitting matters: left alone, flex wrapped the LAST
+     button onto a line of its own, so "?" sat orphaned under the 8 and read as
+     a mistake. The whole group moves to its own line instead. */
+  .scene-nav { padding-left: 0.6rem; padding-right: 0.6rem; flex-wrap: wrap; }
+  .scene-nav__scenes { flex: 0 0 100%; margin-top: 0.5rem; }
   .scene-nav__btn { width: 1.75rem; height: 1.7rem; font-size: 0.66rem; }
   .scene-nav__return { padding: 0.36rem 0.6rem; font-size: 0.66rem; }
   .scene-hint { font-size: 0.62rem; white-space: normal; text-align: center; max-width: 90vw; }

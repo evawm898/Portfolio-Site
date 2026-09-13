@@ -85,7 +85,6 @@ export function createRain({ rand, ripples }) {
         live[w++] = d;
       }
       live.length = w;
-      rain._dir = fallDir;
     },
 
     clear() { rain.drops.length = 0; rain._acc = 0; },
