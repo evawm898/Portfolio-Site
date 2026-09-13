@@ -1311,9 +1311,23 @@ export async function fringeAssertions(page, row) {
     }
   }
 
+  /* WHAT A PETAL WITH NO FRINGE CARRIES AT ITS END IS THE ROW'S OWN DECLARED
+     CAPABILITY, NOT 1 — and writing `1` here was a defect of this session's
+     own, caught by the gate on the CAPABILITY cleft rows. The CLEFT hook has
+     expressed a TWO-SPAN end since it shipped; it is the existing instance of
+     the very decomposition this feature reuses (the discovery doc's §6f), so
+     "no fringe means one span" is false on exactly the rows that prove the
+     mechanism predates the fringe. The reference is the HARNESS's own row
+     declaration — an owner `trimPanels` does not write — because reading the
+     expected count off `m.petalPanels` would be the geometry answering for
+     itself (the fourth durable rule). A fringe that IS built bypasses the
+     cleft arm entirely, which is why only the two un-built arms need this. */
+  const capSpans = (row && row.capability && row.capability.cleft) ? 2 : 1;
+  const capWhy = capSpans === 2 ? ' (this row declares the CLEFT capability, whose two lobes both reach u = 1)' : '';
+
   if (!engaged) {
     if (F.built) bad.push('FR1: a plain row (count 0) reports a BUILT fringe — the guard did not short-circuit');
-    if (m.petalTipSpans !== 1) bad.push(`FR1: a plain row's petal END carries ${m.petalTipSpans} spans, expected exactly 1`);
+    if (m.petalTipSpans !== capSpans) bad.push(`FR1: a plain row's petal END carries ${m.petalTipSpans} spans, expected exactly ${capSpans}${capWhy}`);
     return bad;
   }
   /* FR1's NO ROOM ARM. A fringe asked where the end cannot carry a tooth is
@@ -1324,7 +1338,7 @@ export async function fringeAssertions(page, row) {
   if (F.noRoom) {
     const want = !(askedEnd * (tc ? tc.peakHalf : 0) > TIP_HALF_MM);
     if (!want) bad.push(`FR1: the fringe reports NO ROOM, but petalTipEnd ${askedEnd} of a ${tc && tc.peakHalf} mm peak gives ${askedEnd * (tc ? tc.peakHalf : 0)} mm of end, which is above the ${TIP_HALF_MM} mm mode-free floor — it should have been cut`);
-    if (m.petalTipSpans !== 1) bad.push(`FR1: NO ROOM was reported and the petal's END carries ${m.petalTipSpans} spans — teeth were cut anyway`);
+    if (m.petalTipSpans !== capSpans) bad.push(`FR1: NO ROOM was reported and the petal's END carries ${m.petalTipSpans} spans, expected ${capSpans}${capWhy} — teeth were cut anyway`);
     if (F.count !== 0) bad.push(`FR1: NO ROOM was reported with ${F.count} teeth built`);
     return bad;
   }
