@@ -290,6 +290,53 @@ anyone wrote about the join — **because nothing in the suite compares against 
 byte partition is the only instrument here that could have seen it, which is the argument for
 predeclaring a partition on every session that claims a guard is inert.
 
+### 6c. `main` moved mid-session, and the partition was re-run against the new base
+
+Session 42 (MODEL B — the lobe treatment over the apex) merged to `main` while this PR's
+gates were running, taking `main` from `8421d3c` to `8e4c93e`. The PR went `dirty` and the
+base was merged in. **`bloom-geometry.js`, `bloom-registry.js` and `bloom.js` auto-merged
+cleanly** — the stem is a new part on the hub and MODEL B is the lobe cut's window, so they
+touch different code. Five files conflicted: both STL gates, the mutant table, the harness
+and `CLAUDE.md`.
+
+**THE PHASE NUMBER COLLIDED, AND THE DUPLICATE WAS DROPPED RATHER THAN RENAMED.** Both
+sessions froze a baseline and both called it `phase26` — session 42 at `d4fd9a9`, this one
+at `8421d3c`. Session 42 merged first, so its number stands. Checked rather than assumed:
+parsing both captures and deep-comparing shows **the same 674 definitions** (`8421d3c` is
+`d4fd9a9` plus a tracker commit touching no bloom file), so a rename would have left two
+names for one snapshot — the duplication `FROZEN_MATRICES`' census exists to refuse. What
+this session owes instead is a phase for what it now branches from: **`phase27` = the 680
+rows at `8e4c93e`**, generated from main's own `buildMatrix()` and `--verify-frozen
+--phase27` deep-equal, row for row.
+
+**AND THE TWO CAPTURES ARE NOT IDENTICAL — A FINDING, NOT A CONFLICT.** Main's `phase26`
+drops the `coverage` and `solidCoverage` assertion fields on **six rows** (the two INCURVE
+TARGET rows and four solid-angle rows). `--verify-frozen` compares row order, labels, the
+set list and the capability spec, so it cannot see those fields and the capture passes.
+The same capture-fidelity defect bit this session's own first capture, which dropped
+`capability` until it was regenerated with `JSON.stringify(r)` over the whole row.
+**Recorded, not fixed here** — editing a frozen matrix is what `CLAUDE.md` forbids by name,
+and this is not this PR's to change.
+
+**#220 WAS FIXED TWICE, INDEPENDENTLY.** Session 42 shipped its own version of the same
+summary rework, so main's is the shipped one and all six conflicted hunks in the two STL
+gates take main's side. **This PR's first commit is thereby superseded** — said plainly
+rather than left looking like work that landed. The stem's own wiring auto-merged around it
+and is intact in both gates. The mutant table's conflict was two ADDITIVE witness sets and
+both are kept: 28 mutants.
+
+**THE PARTITION RE-RUN, against `8e4c93e`: PASS.** *16 of 16 movers MOVED, 683 holders
+compared to the bit — 0 floats moved on the holders, positionally, under `Object.is`.* Over
+**671,671,656 export floats across 74,630,184 triangles**, 699 rows × 2 modes, plus
+**72,167,088 captured-grid values over 8,211 panels**. The earlier 16/677 result was measured
+against `8421d3c` and **does not carry** — a census partition cannot be re-used across a base
+it was not measured against (session 38's own rule, arriving here from the other direction).
+
+On the merged tree: the harness loads, so the `FROZEN_MATRICES` / `FROZEN_BASE_COMMITS`
+census agrees; the live matrix is **699 rows** = main's 680 plus this session's 19; and the
+smoke census reads **26 blocks over 699 rows, 69 families both directions** (68 plus session
+42's L8).
+
 ### 6b. The mutant table ran and FAILED, and four of its findings were in the stem's own assertion family
 
 The sweep is the instrument that finds this class, so it doing its job looks like a red
