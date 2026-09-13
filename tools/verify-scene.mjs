@@ -219,7 +219,12 @@ const MUTANTS = [
     mayAlso: ['scene1/the-pond-has-koi-in-it-and-draws-them',
               'scene1/the-traits-are-per-fish-and-span-the-sliders',
               'fish/separation-is-a-body-not-a-personality',
-              'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones'],
+              'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
+              // Measured on this mutation: a koi on its way out is counted as
+              // present, so the manager stops recalling in time and the pond
+              // reaches EIGHT on screen. The recall check's own count bar is
+              // what sees it — not its recall bar, which still reads 9 of 10.
+              'fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
     why: 'the defect that filled the pond with sixteen koi to keep seven on screen',
   },
   {
@@ -230,7 +235,16 @@ const MUTANTS = [
     breaks: ['fish/the-population-does-not-churn-at-a-steady-intensity'],
     mayAlso: ['fish/the-pond-holds-three-to-seven-koi-on-screen',
               'scene1/the-pond-has-koi-in-it-and-draws-them',
-              'scene1/the-traits-are-per-fish-and-span-the-sliders'],
+              'scene1/the-traits-are-per-fish-and-span-the-sliders',
+              // WITH NOTHING EVER LEAVING, THE MANAGER NEVER ACTS AGAIN.
+              // Measured: 0 spawns beyond the seed and 0 recalls over 150 s of
+              // swinging storm, the population stuck at 7 against a target of
+              // 3. Every entry/exit check needs that machinery to run, so each
+              // fires its own vacuity guard rather than its claim.
+              'fish/a-koi-is-never-placed-inside-the-frame',
+              'fish/no-koi-appears-or-vanishes-in-view',
+              'fish/a-koi-swims-in-rather-than-crawling-in',
+              'fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
     why: 'a manager whose count never registers what it just did departs a koi every cooldown, for ever',
   },
   {
@@ -292,11 +306,17 @@ const MUTANTS = [
               'fish/separation-is-a-body-not-a-personality',
               'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
               'fish/no-koi-appears-or-vanishes-in-view',
-              // seed() returns an EMPTY pond under this one — measured — so
-              // every fixture that takes the seeded koi and places them by hand
-              // has nothing to place.
+              // seed() returns an EMPTY pond under this one — measured, 0 koi
+              // on every seed — so the blast radius is every fixture that
+              // builds a seeded pond at all: the ones that place koi by hand
+              // have nothing to place, and the rest trip makeSchool's own
+              // vacuity guard. That breadth is the mutation being severe, not
+              // the checks being fragile.
               'fish/any-ripple-gets-the-same-reaction',
-              'fish/some-koi-swim-to-a-ripple-and-some-flee-it'],
+              'fish/some-koi-swim-to-a-ripple-and-some-flee-it',
+              'fish/every-trait-is-a-slider-in-nought-to-one',
+              'fish/koi-vary-mildly-in-size-around-an-inch',
+              'fish/the-pond-is-fuller-when-it-is-calm-than-when-it-storms'],
     why: 'a koi born outside and then steered outward never arrives, and the pond empties',
   },
   {
