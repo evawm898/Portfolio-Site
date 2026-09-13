@@ -1781,6 +1781,75 @@ Eva's images — the 3 x 3 shape square (at count 3, because the demand is a fun
 shape and a higher count would CLAMP the blunt corner, leaving the grid varying the count
 as well) and the serration / midpoint / lobing row on the shipped sliders with no hook.
 
+**THE STEM ATTACHES TO THE HUB; IT DOES NOT ATTACH TO THE PETALS** (Eva's ruling, session 43
+— read `docs/bloom-session-43-outcome.md` before touching `stemPlan`, `buildStemInto`,
+`buildHubInto`'s join arms or the ST family). The petals join the hub, the hub joins the
+stem, TWO JOINS WITH TWO RULES. The thickened region where the hub meets the stem is the
+**HUB-TO-STEM JOIN**, `stemJoin` in code — Eva has explicitly rejected the botanical term
+for this part; do not use it in code, comments, docs, control labels or a report.
+**THE HUB IS THE BETTER SITE AND THAT IS MEASURED, NOT TIDIER.** The turn a stem makes
+against the surface it leaves is **115 to 176 degrees at the FOOT** over the reachable
+range — past the right angle where `seamClearanceMm`'s own algebra REVERSES and no spacing
+satisfies it — and **90.0000 degrees exactly on a flat hub underside, 87.49 at a dome's
+apex**, because a stem on the axis meets a downward-facing surface at a right angle and
+CANNOT exceed one. Ninety is where that law SATURATES rather than reverses. Two readings of
+that turn differ by exactly 90 and BOTH are real (LEAN, stem axis against the underside's
+normal, is 0 flat; SURFACE, normal to normal, is 90); name which one you mean.
+**THE HUB IS A UNIFORM PLATE AND A DOMED ONE IS A BOWL** (measured off the emitted
+triangles): 1.2000 mm at r = 0 AND at r = 8.75, underside a closed planar disc at
+**z = −0.6**, the slab straddling z = 0; a domed hub's LOWEST material is its RIM, so the
+attachment face is high inside the bowl (3.35 mm at rise 0.50, 8.13 at a hemisphere) and
+**the read-out prints TOTAL and VISIBLE length separately**, derived per build.
+**A WIDER STEM BUYS MORE THAN A THICKER HUB DOES.** The hub's thickness is uniform so no
+radius is thinner; what shrinks is the section the load crosses, `2 pi r t`, falling
+LINEARLY TO ZERO at the axis while the moment grows as `ln(R0/r)` — both compound inward,
+and where they stop is the STEM's radius and nothing the hub does. The petal load arrives
+at **r 23.34 mm, 2.64x the hub radius** (area-weighted over every emitted petal triangle).
+**WHETHER 1.2 mm CAN CARRY A FLOWER IS NOT ANSWERABLE FROM THIS REPOSITORY** — no material,
+no density, nothing ever printed.
+***THREE FLOORS NOW COEXIST AND IT IS AN OPEN QUESTION FOR THE COUPON PRINT, resolved by
+choosing NOTHING and blocking nothing: `MIN_FEATURE_MM` 1.0 (a declared guess),
+`SHEET_THICKNESS_MM` 1.2 (the shipped sheet and the hub), `STEM_MIN_WALL_MM` 1.5 (Eva,
+Sep 13, a stated print requirement). THE 1.5 GOVERNS THE STEM ONLY*** — a stem is a
+cantilever tube on a long lever, a hub is a plate supported all the way round, and they do
+not share a floor. Eva's one rule is `bore = max(0, outerRadius - 1.5)`, so the stem is
+SOLID at the 3 mm floor and hollow above it with a wall of exactly 1.5 mm.
+**THE JOIN IS DERIVED, WITH NO CONTROL AND NOTHING TO TUNE:** it is as strong in bending as
+the stem it feeds, which collapses to `T = (sqrt(3)/2) sqrt(r^4 - bore^4) / r` floored at
+the hub's own thickness — so a thin stem leaves the hub alone and the join is INERT BY
+BRANCH (`domeIsFlat`'s shape). It grows DOWNWARD only, so the face the feet sit on cannot
+move; **J4a's hub-thickness equality is now a statement about the RIM, not the whole hub**,
+restated deliberately rather than relaxed. The blend is not local and that is accepted:
+r = 6.92 of an 8.84 mm hub at a 6 mm stem. **The placer is in MILLIMETRES OF ARC from the
+hub, never in `u`** — a straight tube is exact at TWO stations, so no pitch constant is
+invented and curvature is where a pitch law is owed.
+**TWO DEFECTS THE GATES FOUND, AND ONE THE SESSION SHIPPED FOR AN HOUR.** (i) A SOLID
+stem's centre-fan cap puts a vertex at exactly `[0, 0, topZ]` — **the hub's own top-fan
+apex, the same double** — so the two shells WELD and a by-design overlap of two coplanar
+discs becomes a WITHIN-SHELL self-intersection: **528 pairs on the 3 mm row, 0 on every
+hollow one** (a bore leaves no axis vertex to share). The cap is a RIM FAN now. (ii) ST5
+asked for an EXACT equality on a cap's emitted thickness, which is `outerRad - innerRad`,
+and `a - (a - x)` is not `x` — FOURTH instance of that class here; bounded in ULP of the
+magnitude the builder differenced it from. (iii) the flat arm REPORTED a computed triangle
+count and it was wrong by 48; it is measured now, as both other arms already were.
+**`STEM: x a hemisphere` IS THE HEAD'S FOLD, NOT THE STEM'S**, proved two-sidedly: the
+identical state at `stemLength` 0 reads the same 216 pairs / 0.4176 mm at the same point,
+and so does `headRise max (1)`.
+**SPHERE REFUSES A STEM IN THIS PR AND THE REASON THE OBVIOUS MECHANISM DIED IS MEASURED:**
+growing `dome.reserved` and re-placing the petals over a reduced arc **moves FEET, not
+BLADES** — at 30 degrees of reservation the pole-most petal goes 0.68 -> 0.88 mm of clear
+radius while its neighbour clears entirely — so ANY stem costs 46-51 degrees and the stem's
+own radius is worth only a further 5-8. It cannot be derived from the stem radius as
+proposed, and **S3 clause (b) forbids a bald cap by name**. Eva's replacement — petals whose
+geometry would collide with the stem are NOT BUILT, everything else untouched — is its own
+small PR immediately after, so the stem's byte partition is not entangled with sphere rows.
+**16 MOVERS / 677 HOLDERS**, predeclared from the BUILDER'S OWN RECORD (a row moves iff a
+stem is actually present) rather than from the control set; the two non-`STEM:` movers are
+`stemLength max (120)` and **`ALL MAX`** — session 38's lesson honoured again.
+`frozen/phase26` is the 674 rows at `8421d3c`, registered in BOTH maps. **ST0-ST6 WERE ADDED
+BEFORE THE GEOMETRY AND SEEN RED**; a mutant table for them is OWED, NOT WRITTEN — the smoke
+census's own header says a citation is never evidence a family can FIRE.
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
