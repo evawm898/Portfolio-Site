@@ -201,9 +201,12 @@ can see.
 
 ## 5. THE MESH — what the gates say
 
-* **Export contract: boundary edges 0** on every one of the 31 block-31 rows.
-* **Connectedness: ONE CONNECTED PIECE** at the maximum count on the maximum
-  terminal, by voxel flood fill.
+* **Export contract: boundary edges 0 on all 31 block-31 rows** — the gate reads
+  `31 attempted · 31 reached the results · 31 watertight`, with identical live
+  and export triangle counts and zero degenerate triangles on every one.
+* **Connectedness: ONE CONNECTED PIECE on all 31**, by voxel flood fill at
+  0.6 mm — `31 attempted · 31 reached the results · 31 are ONE connected piece`,
+  including the maximum count on the maximum terminal.
 * **THE VERTEX-WELD SHELL COUNT IS NOT THE CONNECTEDNESS TEST, and the picture
   session's report of it was the wrong instrument.** That session cited
   `shells 9` — the plain build's own count — as evidence the overlap welds every
