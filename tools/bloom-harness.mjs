@@ -6871,6 +6871,72 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
+  /* 31. THE SQUARED TIP (the carnation fringe). Eva's ask was that the teeth
+     "rotate 90 degrees" — and teeth bite perpendicular to the edge they are cut
+     into, so that is a statement about the petal's END, not about the teeth.
+     `petalTipEnd` is a FLOOR under the shape scoped to u >= uPk: the terminal
+     edge the fringe then lands on. `docs/bloom-squared-tip-discovery.md` is the
+     brief; nothing here touches the cut law, the count, the depth, the coverage
+     arc or the 49x49 demand table.
+
+     WHY THESE ROWS EXIST RATHER THAN A NUMBER IN A HEADER, and each is a claim
+     the discovery could not make:
+
+     THE CENSUS ROWS COME FIRST, BY RULING. The discovery measured 0 within-shell
+     pairs on every fringed state it could reach and said in writing that the
+     reading was CALIBRATION AND NOT COVERAGE: the acute row was vacuous (0.0199
+     mm of relief — no tooth was cut at all), and on the other two the tip-floor
+     corner sits 0.265 mm and 0.008 mm from the apex, so no tooth could straddle
+     it at any reachable coverage. A WIDE SQUARED TERMINAL WITH REAL TEETH ON THE
+     CORNER WAS THEREFORE UNMEASURED, and it is the one state this family exists
+     to put under the census. Both sides of the corner are covered on purpose:
+     a coverage small enough to keep every tooth ON the terminal face, and one
+     large enough that the treated arc runs THROUGH the corner and down the side.
+
+     THE GUARD IN BOTH DIRECTIONS. `petalTipEnd` 0 is the shipped expression term
+     for term — `max(0, tipFloor)` is `tipFloor` in BOTH modes — so the GATED rows
+     below must be bit-identical to the default, and a control hidden and not
+     inert is the defect they exist to catch.
+
+     THE DEAD TRAVEL IS A ROW, NOT A FOOTNOTE. Below `TIP_HALF_MM / peakHalf` the
+     floor sits under the print floor and the control delivers nothing; that
+     fraction MOVES WITH THE PETAL'S WIDTH (20.0% of the track at width 8, 5.3%
+     at 30), so no static range is dead-free and the range is neither narrowed
+     nor made adaptive — `stamenSpread`'s ruling. The narrow-petal row is where
+     that bites hardest.
+
+     THE CEILING IS DERIVED, not picked: a floor ABOVE the peak half-width raises
+     the outline past its own widest point — a rise after a fall, which is exactly
+     what retired `petalTipBreadth`. So 1.00 squares the whole tip taper and
+     leaves the base taper alone, and the scoping to u >= uPk is what makes that
+     true (a GLOBAL floor at the ceiling binds over 100.0% of the blade and
+     destroys the base taper — measured). */
+  for (const [name, sets] of [
+    ['SQUARED TIP: the shipped middle (0.35 of the peak — a 5.60 mm terminal, 35% of the width)', { petalTipEnd: 0.35 }],
+    ['SQUARED TIP: the narrowest terminal clear of the dead travel (0.15)', { petalTipEnd: 0.15 }],
+    ['SQUARED TIP: the CEILING (1.00 — the tip taper fully squared, the base taper untouched)', { petalTipEnd: 1 }],
+    ['SQUARED TIP: x the acute apex law (0.60 — the taper the terminal replaces)', { petalTipEnd: 0.35, petalTipShape: 0.6 }],
+    ['SQUARED TIP: x the round apex law (3.00 — a blunt shoulder meeting a flat end)', { petalTipEnd: 0.35, petalTipShape: 3 }],
+    ['SQUARED TIP: x the narrowest petal (8 mm — where the dead travel is 20% of the track)', { petalTipEnd: 0.35, petalWidth: 8 }],
+    ['SQUARED TIP: x the widest petal (30 mm)', { petalTipEnd: 0.35, petalWidth: 30 }],
+    ['SQUARED TIP: x the shortest petal (20 mm — the terminal is a larger share of the blade)', { petalTipEnd: 0.5, petalLength: 20 }],
+    ['SQUARED TIP: x the thickest sheet (2.40 mm — the print floor doubles under the same terminal)', { petalTipEnd: 0.35, sheetThickness: 2.4 }],
+    ['SQUARED TIP: x the thinnest sheet (0.60 mm, floored to 1.00 in export)', { petalTipEnd: 0.35, sheetThickness: 0.6 }],
+    /* THE CARNATION, and the two census rows the ruling put first. */
+    ['SQUARED TIP: THE CARNATION — teeth on the terminal face alone (coverage 0.10, an odd count so a crest sits at twelve)', { petalTipEnd: 0.35, lobeDepth: 0.6, lobeCoverage: 0.1, lobeCount: 5, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['SQUARED TIP: THE CENSUS ROW — teeth ACROSS THE CORNER (coverage 0.40 runs the arc through the terminal-to-taper corner and down the side)', { petalTipEnd: 0.35, lobeDepth: 0.6, lobeCoverage: 0.4, lobeCount: 7, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['SQUARED TIP: THE CENSUS ROW at the CEILING — the widest terminal with teeth across both corners', { petalTipEnd: 1, lobeDepth: 0.6, lobeCoverage: 0.4, lobeCount: 7, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['SQUARED TIP: x a cusped notch over the corner (the sharpest sinus the cut law reaches)', { petalTipEnd: 0.35, lobeDepth: 0.6, lobeCoverage: 0.4, lobeCount: 5, lobeCrestShape: 0.6, lobeNotchShape: 0.6 }],
+    ['SQUARED TIP: x the whole clock (coverage 1.00 — the terminal is one stretch of a fully treated rim)', { petalTipEnd: 0.35, lobeDepth: 0.6, lobeCoverage: 1, lobeCount: 9, lobeCrestShape: 1, lobeNotchShape: 1 }],
+    ['SQUARED TIP: x CONTINUOUS x 3 turns (a squared tip on every petal of a spiral)', { petalTipEnd: 0.35, lobeDepth: 0.6, placement: 'CONTINUOUS', turns: 3 }],
+    ['SQUARED TIP: x 40 petals (forty flat ends on one hub)', { petalTipEnd: 0.35, petalCount: 40 }],
+    ['SQUARED TIP: x ALL FORM MAX (a flat end under every deformation at once)', { petalTipEnd: 0.35, petalCup: 1.2, petalRoll: 330, petalTwist: 40, spineCurl: 180, buckleAmp: 0.6 }],
+    ['SQUARED TIP: GATED — the terminal at 0 with the fringe at maximum (inert; bit-identical to the same state with no terminal)', { petalTipEnd: 0, lobeDepth: 1, lobeCoverage: 1, lobeCount: 10 }],
+    ['SQUARED TIP: GATED — the terminal at 0 under the whole apex range (inert both ends)', { petalTipEnd: 0, petalTipShape: 3 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
   return rows;
 }
 

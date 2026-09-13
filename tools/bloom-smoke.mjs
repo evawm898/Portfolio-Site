@@ -621,6 +621,38 @@ export const SMOKE_BLOCKS = [
         path: 'the OTHER direction — ST0 and ST1 on a stemless bloom: the diameter at its extreme builds no stem and leaves the join INERT, so the hub takes its pre-stem expression verbatim; the row the byte tool proves bit-identical to the default' },
     ],
   },
+  {
+    n: 31,
+    anchor: 'SQUARED TIP: the shipped middle (0.35 of the peak — a 5.60 mm terminal, 35% of the width)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches a terminal edge adds are
+       whether the floor is CONSTRUCTED at all (the guard at 0), whether it BINDS
+       where it is constructed (the dead travel below TIP_HALF_MM / peakHalf),
+       and whether the fringe's teeth land ON the terminal face or run THROUGH
+       the corner where it meets the tip taper. Cheapest row per path.
+
+       THE CENSUS ROW IS HERE BY RULING, not by coverage arithmetic. The
+       discovery read 0 within-shell pairs on every fringed state it could reach
+       and recorded that as CALIBRATION AND NOT COVERAGE: its acute row was
+       vacuous at 0.0199 mm of relief, and on the other two the corner sat 0.265
+       mm and 0.008 mm from the apex, so no tooth could straddle it. A wide
+       terminal with real teeth ON the corner is the state nothing had measured.
+
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: every placement
+       but RADIAL, the widest hub, the deformed rim (cup, roll, buckle over a
+       flat end), and the narrow-petal corner where the dead travel is 20% of
+       the track — all of which are live-matrix rows in block 31 and none of
+       which is the cheapest row for any path here. */
+    rows: [
+      { label: 'SQUARED TIP: the shipped middle (0.35 of the peak — a 5.60 mm terminal, 35% of the width)',
+        path: 'the floor CONSTRUCTED and BINDING with no fringe on it — the terminal edge exists, is scoped to u >= uPk so the base taper is untouched, and the outline stays single-valued where it meets the tip taper' },
+      { label: 'SQUARED TIP: THE CENSUS ROW — teeth ACROSS THE CORNER (coverage 0.40 runs the arc through the terminal-to-taper corner and down the side)',
+        path: 'X0, X1 and X2 on the one state the discovery could not reach — a WIDE flat terminal whose treated arc runs THROUGH the corner where the terminal meets the tip taper, so teeth straddle a declared tangent break at a half-width several millimetres above the print floor rather than 0.008 mm from the apex; the census is the verdict here because V4 and V5 are blind to a fold' },
+      { label: 'SQUARED TIP: THE CARNATION — teeth on the terminal face alone (coverage 0.10, an odd count so a crest sits at twelve)',
+        path: 'the OTHER side of the corner — every tooth ON the terminal face, where the guard now has real headroom (terminal half-width less TIP_HALF_MM) rather than the exactly-zero it has on a terminal at the print floor; the row that says whether the fringe Eva asked for is reachable at all' },
+      { label: 'SQUARED TIP: GATED — the terminal at 0 with the fringe at maximum (inert; bit-identical to the same state with no terminal)',
+        path: 'the OTHER direction — the guard at 0 with the fringe at its maximum: max(0, tipFloor) is tipFloor in BOTH modes, so the terminal is hidden AND inert and the row is bit-identical to the same state with no terminal at all; a control hidden and not inert is what this catches' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
