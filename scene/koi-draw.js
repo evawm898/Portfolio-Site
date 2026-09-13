@@ -83,6 +83,28 @@ const TAIL_NOTCH_LEN = 0.20;            // of body length, root to the fork curv
 const TAIL_BOW = 0.17;                  // of body length, how far each lobe's edge bows past its
                                          // own straight chord — the thing that makes it a paddle
 
+// VOLUME CUES — the body is a flat oval by construction (surfacePoint has no
+// height), so a rounded cross-section is IMPLIED, never modelled: a fixed
+// world direction stands in for "the way the tilted view leans", and each
+// fish's two flanks read as nearer or farther by how much that fish's OWN
+// heading turns its width axis (R) toward or away from it. This is NOT the
+// position-based perspective surface.js's own header rules out — nothing
+// here depends on WHERE a fish is on the plane, only on which way it faces,
+// which is exactly what an orthographic view still shows for a curved
+// surface (a normal facing the light reads bright regardless of distance).
+// NEAR_DIR = world +Y is an arbitrary but fixed pick, applied the same way
+// to every fish; VOL_ALIGN is |cos(heading)| because a fish whose R is
+// aligned with world X (heading pi/2 or 3pi/2) presents both flanks equally
+// edge-on to a Y-tilted view, and every effect below must fall to exactly
+// zero there rather than flip sides with a visible pop.
+const BODY_FILL_RGB = [14, 16, 19];     // close to the old flat fill's own [13,15,18]
+const BODY_FILL_A = 0.86;               // the flat body fill this replaces
+const BODY_FILL_TONE_SPAN = 15;         // max +/- PER CHANNEL at full alignment
+const FAR_FIN_COMPRESS = 0.16;          // max shrink on the far pectoral's own reach
+const DORSAL_VOL_SPAN = 0.16;           // max +/- on the dorsal's own peak reach
+const RIDGE_U0 = 0.12, RIDGE_U1 = 0.86; // the spine highlight's own span
+const RIDGE_ALPHA = 0.24;               // its peak alpha, at full alignment
+
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
 // Smooth a closed polygon by curving through the midpoints of its edges. Cheap,
@@ -149,6 +171,13 @@ export function createRenderer(ctx, surface) {
     // the whole fish, not only the tail.
     const F = { x: Math.cos(f.heading), y: Math.sin(f.heading) };
     const R = { x: -F.y, y: F.x };
+    // See "VOLUME CUES" above the constants: nearAlign is R's own alignment
+    // with the fixed world direction standing in for the tilt (R.y === F.x,
+    // so this is exactly cos(heading), computed once and read by every
+    // shading/sizing decision below rather than re-derived per appendage).
+    const nearAlign = F.x;
+    const nearSide = nearAlign >= 0 ? 1 : -1;
+    const volMag = Math.abs(nearAlign);
     const pos = (u) => ({ x: f.x - F.x * u * L, y: f.y - F.y * u * L });
     const widthAt = (u) => {
       const n = WIDTH_PROFILE.length;
@@ -170,13 +199,71 @@ export function createRenderer(ctx, surface) {
     for (let i = SAMPLES - 1; i >= 0; i--) { const e = edge(i / (SAMPLES - 1), -1); outline.push(P(e.x, e.y)); }
 
     // Body: a dark fill so the koi reads as a solid under the water and the
-    // vignette does not show through it, then the outline over the top.
-    ctx.beginPath(); closedSmooth(ctx, outline);
-    ctx.fillStyle = `rgba(13,15,18,${(0.86 * a).toFixed(3)})`;
-    ctx.fill();
-    ctx.lineWidth = 1.15;
-    ctx.strokeStyle = rgba(INK_FISH, 0.70 * a);
-    ctx.stroke();
+    // vignette does not show through it, then the outline over the top. The
+    // fill is a gradient across the SHORT axis, not a flat colour — the near
+    // flank a touch less dense (catching the tilt), the far flank a touch
+    // more (receding from it) — which is what implies the flat oval has a
+    // rounded belly-to-back cross-section rather than reading as a disc.
+    // Both stops converge on BODY_FILL_A itself as volMag -> 0, so a fish
+    // caught edge-on to the tilt (heading pi/2 or 3pi/2) fills flat rather
+    // than showing a gradient with nothing left for it to mean.
+    {
+      // TONE, NOT ALPHA. The ground behind a koi is near-black and the flat
+      // fill was already close to it ([13,15,18] on [8,9,11]), so swinging
+      // the fill's ALPHA barely moved the composited pixel — the two colours
+      // were too close to begin with for transparency to separate them.
+      // Swinging the RGB channels themselves (still both dark, still within
+      // the same restrained range) is what actually reads as one flank
+      // catching a little light and the other receding from it.
+      const farPt = sEdge(0.45, -nearSide, 1), nearPt = sEdge(0.45, nearSide, 1);
+      const swing = volMag * BODY_FILL_TONE_SPAN;
+      const nearRGB = BODY_FILL_RGB.map((c) => c + swing);
+      const farRGB = BODY_FILL_RGB.map((c) => Math.max(0, c - swing));
+      const grad = ctx.createLinearGradient(farPt.x, farPt.y, nearPt.x, nearPt.y);
+      grad.addColorStop(0, rgba(farRGB, BODY_FILL_A * a));
+      grad.addColorStop(1, rgba(nearRGB, BODY_FILL_A * a));
+      ctx.beginPath(); closedSmooth(ctx, outline);
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.lineWidth = 1.15;
+      ctx.strokeStyle = rgba(INK_FISH, 0.70 * a);
+      ctx.stroke();
+    }
+
+    // THE SPINE RIDGE — one light stroke along the near flank, standing in
+    // for a rounded back distinct from the belly. It rides the same nearSide
+    // the fill gradient uses (so the two cues never disagree about which
+    // edge is "up") and the same volMag fade (so it has nothing left to draw
+    // at the crossover heading rather than hopping to the other side). Kept
+    // to a single thin stroke, well inside the body's own outline (0.72 of
+    // the half-width), because this is the one cue most likely to clutter
+    // the smallest koi in the pond (79px) — checked at that size before
+    // shipping, not assumed safe from the formula alone.
+    {
+      const ridgeA = RIDGE_ALPHA * volMag * a;
+      if (ridgeA > 0.004) {
+        const steps = 6;
+        const pts = [];
+        for (let i = 0; i <= steps; i++) {
+          const u = RIDGE_U0 + (RIDGE_U1 - RIDGE_U0) * (i / steps);
+          pts.push(sEdge(u, nearSide, 0.72));
+        }
+        // Curved through midpoints, the same technique closedSmooth uses, so
+        // a light spine line reads as smoothly as the outline it sits inside
+        // rather than as a faceted polyline.
+        ctx.beginPath();
+        ctx.moveTo(pts[0].x, pts[0].y);
+        for (let i = 0; i < pts.length - 1; i++) {
+          const a0 = pts[i], b0 = pts[i + 1];
+          const mx = (a0.x + b0.x) / 2, my = (a0.y + b0.y) / 2;
+          ctx.quadraticCurveTo(a0.x, a0.y, mx, my);
+        }
+        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+        ctx.lineWidth = 0.7;
+        ctx.strokeStyle = rgba(INK_FISH, ridgeA);
+        ctx.stroke();
+      }
+    }
 
     // NO GILL LINE. The reference this pass was drawn against reads the head
     // and body as ONE continuous smooth silhouette — nothing marks a seam
@@ -226,9 +313,17 @@ export function createRenderer(ctx, surface) {
     // does not all lean the same way.
     {
       const side = (f.id % 2 === 0) ? 1 : -1;
+      // The same volume cue as the body and fins: whichever flank the dorsal
+      // happens to sit on this heading reads a little fuller when it is the
+      // near one and a little lower when it is the far one, so the fin's own
+      // apparent width turns WITH the fish rather than staying fixed while
+      // everything around it implies rotation. side * nearAlign is already
+      // signed (+ when this fin's side matches nearSide, - otherwise) and
+      // magnitude-bounded by volMag, so it needs no separate near/far branch.
+      const peakK = DORSAL_PEAK_K * (1 + DORSAL_VOL_SPAN * side * nearAlign);
       const baseA = sEdge(DORSAL_U0, side, 1);
       const baseB = sEdge(DORSAL_U1, side, 1);
-      const peak = sEdge(DORSAL_PEAK_U, side, DORSAL_PEAK_K);
+      const peak = sEdge(DORSAL_PEAK_U, side, peakK);
       ctx.beginPath();
       ctx.moveTo(baseA.x, baseA.y);
       ctx.quadraticCurveTo(peak.x, peak.y, baseB.x, baseB.y);
@@ -318,7 +413,14 @@ export function createRenderer(ctx, surface) {
         // quarter turn.
         const axX = R.x * side * ca - F.x * sa, axY = R.y * side * ca - F.y * sa;
         const bxX = -axY, bxY = axX;
-        const len = PECT_LEN * L * flap, wid = PECT_WIDTH * L;
+        // THE FAR FIN READS SMALLER, NEVER THE NEAR ONE. Two mirrored ovals
+        // of identical size is exactly the flat-cutout look this pass is
+        // meant to break; max(0, -side*nearAlign) is 0 on the near side
+        // (side===nearSide) at any heading and rises to volMag on the far
+        // side, so the near fin is always drawn at its full, undiminished
+        // reach and only the far one compresses.
+        const compress = 1 - FAR_FIN_COMPRESS * Math.max(0, -side * nearAlign);
+        const len = PECT_LEN * L * flap * compress, wid = PECT_WIDTH * L * compress;
         const cx = root.x + axX * len * PECT_ROOT_T, cy = root.y + axY * len * PECT_ROOT_T;
         const blob = [];
         for (let k = 0; k < 12; k++) {
