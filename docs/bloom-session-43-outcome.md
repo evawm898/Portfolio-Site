@@ -287,10 +287,36 @@ any of them runs**: `/plot`'s measured lesson, that a refactor disarms a mutant 
 moving its `from` or by making it match twice, and the disarmed one nobody sees is the one
 inside a mutant a subset skipped.
 
-After the fixes: **ST0 / ST1 / ST2 / ST3 each fire on the mutation that names them, and the
-clean tree is silent on all three stem rows including the new SPHERE one.** The export gate
-passes 17/17 STEM rows plus `ALL MAX`, `stemLength max` and `stemLength min` under the
-stricter clauses.
+**THE FULL SWEEP THEN PASSED: 25 of 25**, every family firing on a mutation that names it and
+the clean tree silent on every row — including the new SPHERE row, which every non-stem mutant
+also now runs over. The nine stem mutants, with what each actually reddened:
+
+| mutant | names | fired |
+|---|---|---|
+| `stem-eligible-disagrees-with-the-registry` | ST0 | ST0, ST1 |
+| `stem-declared-and-not-built` | ST1 | ST1, ST2, ST3 |
+| `stem-off-the-axis` | ST2 | ST2, ST3 |
+| `stem-runs-the-wrong-length` | ST2 | ST2 |
+| `bore-is-not-evas-rule` | ST3 | ST3, ST5 |
+| `hairline-root` | ST4 | ST4 |
+| `join-is-not-the-law` | ST5 | ST5 |
+| `join-reaches-past-where-it-says-it-stops` | ST5 | ST5 |
+| `the-join-grows-upward-into-the-feet` | ST6 | ST6 |
+
+The collateral is true in each case rather than noise: a stem built off the axis has emitted
+radii that are not the control's (ST3), a stem that is never built has no stations or radii to
+read (ST2, ST3), a bore that is not Eva's rule changes the section the join is derived from
+(ST5), and a geometry that stops refusing SPHERE then BUILDS a stem where the registry hides
+the controls (ST1). The tool fails only on a family a mutant NAMED staying green, so collateral
+is reported and not required — but every entry above was checked against what the mutation
+does, not waved through.
+
+And the anchor pre-check reports **25 of 25 matching their find-string exactly once**, so no
+mutant in this table is disarmed.
+
+The export gate passes 17/17 STEM rows plus `ALL MAX`, `stemLength max` and `stemLength min`
+under the stricter clauses, and the smoke census reads 26 blocks over 693 rows with 68 families
+claimed in both directions, ST0–ST6 among them.
 
 
 ## 7. What this session did NOT do

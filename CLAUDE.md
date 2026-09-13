@@ -1878,6 +1878,10 @@ sweep a container restart eats, reported as a SUBSET with the count not run and 
 sweep — **and an ANCHOR PRE-CHECK OVER ALL 25 MUTANTS before any of them runs**, because a
 refactor disarms a mutant either by moving its `from` or by making it match twice, and the
 one nobody sees is inside a mutant a subset skipped (`/plot`'s measured lesson).
+**AFTER THE FIXES THE FULL SWEEP PASSES 25 OF 25**, every family firing on a mutation that
+names it and the clean tree silent on every row, with all 25 anchors matching exactly once —
+and every non-stem mutant now runs over the SPHERE row too. The per-mutant table, with the
+collateral each one legitimately reddens, is in §6b of the outcome doc.
 
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
