@@ -1356,7 +1356,7 @@ export const CONTROLS = [
       const w = T.endWidthMm;
       if (T.deadTravel) return `${(t * 100).toFixed(0)}% — DEAD: ${w.toFixed(2)} mm is under the ${T.floorMm.toFixed(2)} mm print floor, so the end is the floor's own ${(2 * T.tipHalfMm).toFixed(2)} mm; the hatched travel on the track`;
       return `a ${w.toFixed(2)} mm flat end, ${(100 * w / (2 * T.peakHalfMm)).toFixed(0)}% of the petal's width`
-           + ` · it carries ${T.ceiling} tooth${T.ceiling === 1 ? '' : 'es'} at the ${T.floorMm.toFixed(2)} mm floor`
+           + ` · it carries ${T.ceiling} ${T.ceiling === 1 ? 'tooth' : 'teeth'} at the ${T.floorMm.toFixed(2)} mm floor`
            + ` · dead below ${(100 * T.deadBelow).toFixed(0)}% on this petal`;
     },
     /* NO `cap` ROW, DELIBERATELY, and the reason is which END the dead travel
@@ -1383,15 +1383,15 @@ export const CONTROLS = [
       const n = Math.round(Number(v));
       if (n === 0) return 'plain — no fringe';
       const F = shown && shown.fringe;
-      if (!F || !F.built) return `${n} tooth${n === 1 ? '' : 'es'} asked`;
-      const base = `${F.count} tooth${F.count === 1 ? '' : 'es'}`;
+      if (!F || !F.built) return `${n} ${n === 1 ? 'tooth' : 'teeth'} asked`;
+      const base = `${F.count} ${F.count === 1 ? 'tooth' : 'teeth'}`;
       if (F.clamped) {
         return `${n} asked, ${base} built — CLAMPED: the end is ${F.wMinMm.toFixed(2)} mm at its narrowest and ${n} teeth need `
              + `${((2 * n - 1) * F.floorMm).toFixed(1)} mm at the ${F.floorMm.toFixed(2)} mm floor`
              + (F.tipEnd === 0 ? ' — there is no squared end to carry them' : `, so the squared end would have to be ${(100 * ((2 * n - 1) * F.floorMm) / (2 * F.peakHalfMm)).toFixed(0)}% of the width`);
       }
-      return `${base}, each ${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
-           + ` · the gaps run ${F.gapSplitMm.toFixed(2)} mm to ${F.gapTipMm.toFixed(2)} mm`
+      return `${base}, ${F.count === 1 ? '' : 'each '}${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+           + (F.count > 1 ? ` · the gaps run ${F.gapSplitMm.toFixed(2)} mm to ${F.gapTipMm.toFixed(2)} mm` : ' · no gaps — one tooth is the whole end')
            + ` · the ceiling here is ${F.ceiling}`;
     },
     visibleWhen: { all: [] } },

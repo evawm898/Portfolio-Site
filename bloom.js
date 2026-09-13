@@ -900,7 +900,7 @@ function fringeLine(petals) {
     ? 'CONVERGING END — the apex law runs to its own point'
     : F.deadTravel
       ? `SQUARED END ${(F.tipEnd * 100).toFixed(0)}% — DEAD: ${F.endWidthMm.toFixed(2)} mm is under the ${F.floorMm.toFixed(2)} mm print floor, so the petal still ends on the floor's own ${(2 * F.tipHalfMm).toFixed(2)} mm (dead below ${(100 * F.deadBelow).toFixed(0)}% on this petal — told, never trimmed)`
-      : `SQUARED END ${F.endWidthMm.toFixed(2)} mm across, ${(100 * F.endWidthMm / (2 * F.peakHalfMm)).toFixed(0)}% of the petal's width · it carries ${F.ceiling} tooth${F.ceiling === 1 ? '' : 'es'} at the ${F.floorMm.toFixed(2)} mm floor`;
+      : `SQUARED END ${F.endWidthMm.toFixed(2)} mm across, ${(100 * F.endWidthMm / (2 * F.peakHalfMm)).toFixed(0)}% of the petal's width · it carries ${F.ceiling} ${F.ceiling === 1 ? 'tooth' : 'teeth'} at the ${F.floorMm.toFixed(2)} mm floor`;
   if (F.noRoom) return `FRINGE NO ROOM — ${F.asked} teeth asked and ${F.noRoomWhy}, so none are cut: the petal converges to `
     + `${(2 * F.tipHalfMm).toFixed(2)} mm, which carries one tooth at the ${F.floorMm.toFixed(2)} mm floor, and one tooth is the petal. `
     + `Told, never refused — raise the squared end above ${(100 * F.deadBelow).toFixed(0)}% and the teeth appear.\n`;
@@ -917,7 +917,7 @@ function fringeLine(petals) {
   /* THE MUTUAL EXCLUSION IS SAID OUT LOUD. A family that went quiet without
      saying so is a control that stopped working as far as anyone can tell. */
   const lobes = ' · LOBES stand down — both treat the apex, and a rim cut narrows every tooth including the middle ones (measured)';
-  return `FRINGE ${count} · ${end} · teeth ${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+  return `FRINGE ${count} · ${end} · ${F.count === 1 ? 'the tooth is' : 'teeth'} ${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
        + (F.count > 1 ? `, gaps ${F.gapSplitMm.toFixed(2)} → ${F.gapTipMm.toFixed(2)} mm` : '')
        + ` · ${split}${lobes}\n`;
 }
