@@ -110,7 +110,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
-         STEM_MIN_WALL_MM, stemEligible, stemBoreRadius,
+         STEM_MIN_WALL_MM,
          /* `tipWaistFactor` is deliberately NOT imported: JS7 RESTATES the
             waist law in closed form rather than calling the shipped one, so a
             floor derived from the wrong quantity fails instead of agreeing
@@ -4198,10 +4198,14 @@ export async function gynoeciumAssertions(page, row) {
          check nothing, which is exactly what `seam-floor-removed` did to
          every A7 clause in session 38.
      ST6 expects a STEMLESS build's own hub, captured on the same page.
-   The two symbols this file does import from the geometry — STEM_MIN_WALL_MM
-   and stemBoreRadius — are the ones whose whole content IS Eva's stated rule;
-   a gate restating a stated requirement would be a second place for it to
-   drift from what she wrote.
+   THE ONE SYMBOL THIS FILE IMPORTS from the geometry is STEM_MIN_WALL_MM —
+   Eva's stated number, whose whole content IS her requirement and which a gate
+   restating would give a second place to drift from what she wrote.
+   `stemBoreRadius` is DERIVED from it and is NOT imported: it is the quantity
+   ST3 is about, so a clause reading its reference through it would mutate with
+   it and check nothing (session 38's `seam-floor-removed`, session 39's A8).
+   Measured: with it imported, `bore-is-not-evas-rule` left ST3's own bore
+   comparison green on every diameter, and only the wall clause could fire.
    =================================================================== */
 export const STEM_SCOPE =
   "stem claims read the builder's own emitted stem record, its root span through the hub and the hub's own emitted underside, NOT the STL; a stem declared and not built, built off the axis, built to the wrong length, built with a bore that is not Eva's rule, rooted as a hairline instead of through the slab, and a hub-to-stem join whose thickening is not the law it declares ALL export watertight and as one piece, because a solid overlapping the hub is one connected region with zero boundary edges however wrong it is";
@@ -4209,8 +4213,9 @@ export const STEM_SCOPE =
 /* THE JOIN'S LAW, RESTATED (not imported). Two expressions, both from owners
    outside the join record: the thickness the stem's own section asks for, and
    the constant-stress profile that carries it out to where the plate suffices. */
+const boreExpected = (outerR) => Math.max(0, outerR - STEM_MIN_WALL_MM);
 function stemJoinExpected(hubR, hubT, outerR) {
-  const bore = stemBoreRadius(outerR);
+  const bore = boreExpected(outerR);
   const joinT = Math.max(hubT, (Math.sqrt(3) / 2) * Math.sqrt(Math.max(0, outerR ** 4 - bore ** 4)) / outerR);
   const inert = !(joinT > hubT);
   const denom = Math.log(hubR / outerR);
@@ -4233,8 +4238,16 @@ export async function stemAssertions(page, row) {
      precedent: the registry HIDES on this condition and the geometry makes it
      INERT, and a green run must not be able to endorse one without the other. */
   const regElig = evalPredicate({ ref: 'stemEligible' }, ui);
-  const geoElig = stemEligible(ui);
-  if (regElig !== geoElig) bad.push(`ST0: the registry's stemEligible says ${regElig} and the geometry's says ${geoElig} on this state`);
+  /* THE GEOMETRY'S HALF COMES FROM THE PAGE, never from this file's own import
+     of the geometry. A gate that calls the predicate in Node compares one
+     unmutated module against another: both halves move together or neither
+     does, and the clause cannot disagree with anything. Session 41's L7 —
+     "a clause that is always green and a clause that is always red look nothing
+     alike and have the same cause" — measured here as
+     `stem-eligible-disagrees-with-the-registry` firing NOTHING. */
+  const geoElig = m.stemEligible;
+  if (geoElig === undefined) bad.push('ST0: the metrics hook reports no `stemEligible` — the geometry states no eligibility, so the two-statement claim cannot be made');
+  else if (regElig !== geoElig) bad.push(`ST0: the registry's stemEligible says ${regElig} and the geometry's — as the running module answered it — says ${geoElig} on this state`);
   const want = regElig && Number(ui.stemLength) > 0;
   const S = m.stem === undefined ? undefined : m.stem;
   if (S === undefined) { bad.push('ST1: the metrics hook reports no `stem` key at all — the builder declares nothing about a stem, so nothing below can be checked'); return bad; }
@@ -4250,6 +4263,23 @@ export async function stemAssertions(page, row) {
     if (m.hubJoinActive) bad.push('ST5: the hub reports an ACTIVE hub-to-stem join on a state with no stem');
     return bad;
   }
+  /* ST1, THE OTHER DIRECTION: a stem the plan DECLARES must also be EMITTED,
+     and to the shape the plan declares. Both STL gates are blind here — a stem
+     that is never built adds no boundary edge and detaches nothing, so the
+     export is watertight and the flood fill reads one piece. The count is the
+     cross-check: the PLAN owns the station list and the side count, the BUILDER
+     owns the triangles, and the arithmetic between them is stated here.
+     Measured: `stem-declared-and-not-built` fired NOTHING before this clause —
+     the old ST1 only ever asked about a stem that should NOT exist. */
+  if (!Array.isArray(S.stations) || S.stations.length < 2 || !(S.sides > 2)) {
+    bad.push(`ST1: the plan declares ${S.stations && S.stations.length} station(s) on ${S.sides} sides — the emitted count cannot be predicted from it`);
+  } else {
+    const N = S.sides, bands = S.stations.length;   // rings = bands + 1 (the root band)
+    const wantTris = S.boreR > 0
+      ? 4 * N * bands + 4 * N                       // two walls, two annuli
+      : 2 * N * bands + 2 * (N - 2);                // one wall, two rim fans
+    if (m.stemTris !== wantTris) bad.push(`ST1: the builder emitted ${m.stemTris} triangles for a ${S.boreR > 0 ? 'hollow' : 'solid'} stem of ${bands} band(s) on ${N} sides; the plan's own station list and side count ask for ${wantTris}`);
+  }
   const hubT = m.hubThickness, hubR = m.hubRadius;
   /* ST2 — ON THE AXIS, DOWN, AND THE LENGTH THE CONTROL ASKED FOR. */
   const L = Number(ui.stemLength);
@@ -4259,6 +4289,17 @@ export async function stemAssertions(page, row) {
   if (!(S.tip[2] < S.root[2])) bad.push(`ST2: the stem's tip z ${S.tip[2]} is not below its root z ${S.root[2]} — it does not run downward`);
   const free = S.root[2] - S.tip[2];
   if (Math.abs(free - L) > 1e-9) bad.push(`ST2: the stem runs ${free} mm from the hub's underside; the control asked for ${L}`);
+  /* AND THE SAME TWO CLAIMS ON THE RINGS THE BUILDER ACTUALLY EMITTED. The two
+     above read the PLAN, which is what was asked for; these read what came out.
+     Measured: `stem-off-the-axis` offsets every emitted ring by a millimetre
+     and leaves the plan — and therefore every clause above — untouched, and it
+     fired NOTHING until this pair existed. The ring centres are a mean of N
+     equally spaced points, so on the axis the offset is float dust and the bar
+     is a hair rather than an exact zero; a defect worth a clause is millimetres. */
+  if (S.emittedAxisOffset === undefined) bad.push('ST2: the builder reports no emitted axis offset — the on-the-axis claim can only be made about the plan');
+  else if (!(S.emittedAxisOffset < 1e-9)) bad.push(`ST2: the emitted rings' centres stand ${S.emittedAxisOffset} mm off the axis, on a plan that declares the stem on it`);
+  if (S.emittedTipZ === undefined) bad.push('ST2: the builder reports no emitted tip — the length claim can only be made about the plan');
+  else if (Math.abs((S.root[2] - S.emittedTipZ) - L) > 1e-9) bad.push(`ST2: the emitted stem reaches ${S.root[2] - S.emittedTipZ} mm below the hub's underside; the control asked for ${L}`);
   /* THE PLACER'S OWN ARGUMENT IS MILLIMETRES OF ARC (Eva's ruling), so its
      stations are checked in millimetres against the same control — never in u. */
   if (!Array.isArray(S.stations) || S.stations.length < 2) bad.push(`ST2: the placer emitted ${S.stations && S.stations.length} stations; a stem needs at least two`);
@@ -4270,12 +4311,24 @@ export async function stemAssertions(page, row) {
   /* ST3 — EVA'S BORE RULE, ON THE EMITTED RADII. Expected from the CONTROL and
      from her stated wall; measured from what the builder emitted. */
   const R = Number(ui.stemDiameter) / 2;
-  const bore = stemBoreRadius(R);
+  const bore = boreExpected(R);
   if (Math.abs(S.outerR - R) > 1e-9) bad.push(`ST3: the stem's emitted outer radius ${S.outerR} is not the control's ${R}`);
   if (Math.abs(S.boreR - bore) > 1e-9) bad.push(`ST3: the stem's emitted bore ${S.boreR} is not max(0, ${R} - ${STEM_MIN_WALL_MM}) = ${bore}`);
   if (bore > 0 && Math.abs((S.outerR - S.boreR) - STEM_MIN_WALL_MM) > 1e-9) bad.push(`ST3: a hollow stem's wall measures ${S.outerR - S.boreR} mm against Eva's stated ${STEM_MIN_WALL_MM}`);
   if (bore === 0 && S.boreR !== 0) bad.push(`ST3: the stem is at or under the ${2 * STEM_MIN_WALL_MM} mm solid threshold and still reports a ${S.boreR} mm bore`);
   if (!(S.outerR - S.boreR >= STEM_MIN_WALL_MM - 1e-9)) bad.push(`ST3: the stem's wall ${S.outerR - S.boreR} mm is under Eva's stated ${STEM_MIN_WALL_MM} mm floor`);
+  /* AND ON THE RINGS THAT CAME OUT. Every clause above reads the plan's two
+     radii; these read the widest and narrowest vertex the builder emitted, so a
+     stem rung at a radius the plan never asked for is visible. The emitted
+     extremes ARE the two radii — a polygon's vertices all sit on their own
+     circle — so this is an equality, not a bound. A SOLID stem emits no inner
+     ring, so its narrowest vertex is the outer radius too. */
+  if (S.emittedMaxR === undefined || S.emittedMinR === undefined) bad.push('ST3: the builder reports no emitted radii — the bore claim can only be made about the plan');
+  else {
+    if (Math.abs(S.emittedMaxR - R) > 1e-9) bad.push(`ST3: the emitted stem's widest vertex stands at ${S.emittedMaxR} mm; the control asks for an outer radius of ${R}`);
+    const wantMin = bore > 0 ? bore : R;
+    if (Math.abs(S.emittedMinR - wantMin) > 1e-9) bad.push(`ST3: the emitted stem's narrowest vertex stands at ${S.emittedMinR} mm; a ${bore > 0 ? 'hollow' : 'solid'} stem of outer radius ${R} under Eva's ${STEM_MIN_WALL_MM} mm wall asks for ${wantMin}`);
+  }
   /* ST4 — ROOTED THROUGH THE HUB, NOT A HAIRLINE. JS3's own statement for the
      stamens, which both STL gates are blind to: the root must span the hub's
      material so the overlap the slicer unions is a SOLID and never a touch. */

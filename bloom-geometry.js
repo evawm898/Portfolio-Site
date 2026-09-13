@@ -6738,13 +6738,37 @@ export function buildStemInto(acc, plan) {
   const ringAt = (rad, z) => Array.from({ length: N }, (_, k) => {
     const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];
   });
+  /* WHAT THE RINGS ACTUALLY CAME OUT AS — ST2's and ST3's measured side, and
+     they are here because reading the PLAN's declared radii and axis put BOTH
+     sides of those clauses on the plan. A builder that rang every station a
+     millimetre off the axis, or at a radius the plan never asked for, leaves
+     the plan untouched and the clause green: measured, `stem-off-the-axis`
+     fired NOTHING. Session 41's mirror of Eva's fourth durable rule — name the
+     owner of the MEASURED value too, and check it is the artefact. These fold
+     over the very arrays handed to `acc.quad`, so they ARE the artefact. */
+  let emittedMaxR = 0, emittedMinR = Infinity, emittedAxisOffset = 0;
+  const measure = (rings) => {
+    for (const ring of rings) {
+      let sx = 0, sy = 0;
+      for (const [x, y] of ring) {
+        const rr = Math.hypot(x, y);
+        if (rr > emittedMaxR) emittedMaxR = rr;
+        if (rr < emittedMinR) emittedMinR = rr;
+        sx += x; sy += y;
+      }
+      const off = Math.hypot(sx / ring.length, sy / ring.length);
+      if (off > emittedAxisOffset) emittedAxisOffset = off;
+    }
+  };
   const outer = zs.map((z) => ringAt(R, z));
+  measure(outer);
   for (let i = 0; i < outer.length - 1; i++) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
   }
   if (b > 0) {
     const inner = zs.map((z) => ringAt(b, z));
+    measure(inner);
     for (let i = 0; i < inner.length - 1; i++) {
       const up = inner[i], dn = inner[i + 1];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
@@ -6772,7 +6796,8 @@ export function buildStemInto(acc, plan) {
       acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
     }
   }
-  return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1] };
+  return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1],
+           emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset };
 }
 
 /* ===================================================================

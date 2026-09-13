@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemEligible } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -481,7 +481,7 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
-let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null;
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemEligible = true;
 /* THE FOOT FRAMES' DIGEST — ST6's measured side. A stemmed and a stemless build
    of the SAME state must agree here exactly, which is the whole of "the
    hub-to-stem join does not change the petal-to-hub junction". One function
@@ -573,6 +573,9 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastStem = built.stem && built.stem.present ? built.stem : null;
     lastStemTris = built.stemBuilt ? built.stemBuilt.tris : 0;
     lastStemBuilt = built.stemBuilt || null;
+    /* THE GEOMETRY'S OWN ELIGIBILITY, on the state this build was made from.
+       ST0 needs the answer the RUNNING module gave; see __bloomMetrics. */
+    lastStemEligible = stemEligible(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
@@ -1608,8 +1611,23 @@ window.__bloomMetrics = () => ({
     rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
     stations: lastStem.stations.slice(), sides: lastStem.sides,
     hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
+    /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
+       these, never the plan beside them. Same reason as rootSpanMm above: the
+       plan is what was ASKED FOR and these are what came out. */
+    emittedMaxR: lastStemBuilt ? lastStemBuilt.emittedMaxR : undefined,
+    emittedMinR: lastStemBuilt ? lastStemBuilt.emittedMinR : undefined,
+    emittedAxisOffset: lastStemBuilt ? lastStemBuilt.emittedAxisOffset : undefined,
+    emittedTipZ: lastStemBuilt ? lastStemBuilt.emittedTipZ : undefined,
   } : null,
   stemTris: lastStemTris,
+  /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
+     module that is actually running. ST0 compares it against the REGISTRY's
+     declaration, and it has to arrive through the page: a gate calling the
+     geometry's predicate in Node compares one unmutated module against another
+     and can never disagree — session 41's L7, measured again here, where
+     `stem-eligible-disagrees-with-the-registry` fired nothing until this key
+     existed. */
+  stemEligible: lastStemEligible,
   hubJoinActive: !!lastHubBuilt.joinActive,
   hubJoinThickness: lastHubBuilt.joinThickness,
   hubJoinBlendRadius: lastHubBuilt.joinBlendRadius,

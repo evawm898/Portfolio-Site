@@ -520,7 +520,16 @@ const MUTANTS = [
   { id: 'bore-is-not-evas-rule', why: "the bore is half the outer radius instead of `max(0, outerRadius - 1.5)` — a wall that is no longer Eva's stated 1.5 mm",
     find: 'export function stemBoreRadius(outerR) { return Math.max(0, outerR - STEM_MIN_WALL_MM); }',
     into: 'export function stemBoreRadius(outerR) { return outerR / 2; }', names: ['ST3'],
-    witness: (M, C) => { const m = stemInnerRadius(M), c = stemInnerRadius(C);
+    /* PROBED ON THE SOLID ROW, NOT THE DEFAULT STEM STATE, and that is a
+       measured correction rather than a preference: at `stemDiameter` 6 the
+       outer radius is 3, and `max(0, 3 - 1.5)` and `3 / 2` are the SAME 1.5 —
+       so on its first run this witness reported the behaviour had not moved
+       when the edit was live and correct. A mutation is invisible wherever the
+       law it replaces happens to agree with it, and the probe has to be chosen
+       to separate them. At 3 mm the clean tree is SOLID (bore 0) and the mutant
+       is HOLLOW (bore 0.75), which is also a row this table actually runs. */
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemDiameter: 3 };
+      const m = stemInnerRadius(M, st), c = stemInnerRadius(C, st);
       if (m === null || c === null) return 'the witness could not build a stem';
       return (Math.abs(m - c) > 0.1) ? null : `the emitted inner radius is ${m} against ${c} — the bore did not move`; } },
 
@@ -620,6 +629,16 @@ const ROWS = [
      would pass on a single row. */
   { label: 'a stem, hollow (60 mm x 6 mm — the bore open, the join well clear of the hub)', set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
   { label: "a stem, SOLID at Eva's floor (60 mm x 3 mm — the bore closes, the join barely active)", set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '3' }] },
+  /* AND A THIRD, WHICH IS THE ONLY STATE ST0 CAN SPEAK ON. ST0 compares the
+     registry's predicate against the geometry's, and on any row where a stem is
+     eligible the two agree whatever either one says — so a geometry that has
+     stopped refusing SPHERE is invisible on both rows above, and
+     `stem-eligible-disagrees-with-the-registry` fired NOTHING until this row
+     existed. The row a two-statement clause needs is the one where the
+     statement BITES; session 35's stale-harness-row lesson, arriving as a row
+     that was never chosen rather than one that went stale. */
+  { label: 'a stem asked for under SPHERE (hidden AND inert — the state where the two statements can disagree)',
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '24' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
 
 ];
 
@@ -656,6 +675,30 @@ async function famsOn(rows) {
   return seen;
 }
 
+/* EVERY MUTANT'S ANCHOR IS CHECKED BEFORE ANY MUTANT RUNS, and for ALL of
+   them rather than only the selected ones — `/plot`'s own measured lesson. A
+   refactor disarms a mutant in two ways: a `from` that has MOVED (reported as
+   "did not apply", survivable only if somebody runs it) and a `from` that now
+   matches TWICE, which mutates the first occurrence and says nothing. Both are
+   invisible in a sweep nobody finishes, and a stale anchor inside a SKIPPED
+   mutant is precisely the one no run reports. This costs a string scan. */
+{
+  const stale = MUTANTS.map((mu) => [mu.id, SRC.split(mu.find).length - 1]).filter(([, n]) => n !== 1);
+  console.log(`ANCHORS: ${MUTANTS.length} mutants, ${MUTANTS.length - stale.length} matching their find-string exactly once`);
+  for (const [id, n] of stale) console.log(`  *** ${id}: anchor matches ${n}x — disarmed`);
+  if (stale.length) { await browser.close(); server.close(); console.log('\nAPEX MUTANT TABLE: FAILED (disarmed anchors)'); process.exit(1); }
+}
+
+/* `--only=<id>[,<id>...]` runs a subset. A full sweep is every mutant over
+   every row and is not survivable in a container that restarts, so the subset
+   is how a family is re-verified after a change; it NEVER reports as a sweep. */
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1];
+const SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+if (SELECTED) {
+  const unknown = SELECTED.filter((id) => !MUTANTS.some((m) => m.id === id));
+  if (unknown.length) { await browser.close(); server.close(); console.log(`--only names no such mutant: ${unknown.join(', ')}`); process.exit(1); }
+}
+
 console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
 const clean = await famsOn(ROWS);
 console.log(`  fired: ${clean.size ? [...clean].sort().join(', ') : '(none)'}\n`);
@@ -668,6 +711,7 @@ const NEUTER = (process.argv.find((a) => a.startsWith('--neuter=')) || '').split
 REGISTRY_DEFAULTS = (await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href)).DEFAULTS;
 const CLEAN = await mutatedModule('__clean', SRC);
 for (const mu of MUTANTS) {
+  if (SELECTED && !SELECTED.includes(mu.id)) continue;
   const n = SRC.split(mu.find).length - 1;
   if (n !== 1) { console.log(`  ${mu.id}: MUTATION DID NOT APPLY (matched ${n}x) — ${mu.why}`); fail = true; continue; }
   const into = NEUTER === mu.id ? mu.find + ' /* neutered */' : mu.into;
@@ -693,6 +737,11 @@ if (NEUTER) {
   console.log(fail ? `\nguard check: the sweep REPORTED the neutered mutant "${NEUTER}" — the witness clause fires.`
                    : `\nguard check: FAIL — "${NEUTER}" was neutered and the sweep stayed green.`);
   process.exit(fail ? 0 : 1);
+}
+if (SELECTED) {
+  console.log(fail ? `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): FAILED`
+                   : `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): each selected family fires on a mutation that names it, and is silent on the clean tree. THIS IS NOT A SWEEP — ${MUTANTS.length - SELECTED.length} mutants were not run.`);
+  process.exit(fail ? 1 : 0);
 }
 console.log(fail ? '\nAPEX MUTANT TABLE: FAILED' : '\nAPEX MUTANT TABLE: every family fires on a mutation that names it, and is silent on the clean tree');
 process.exit(fail ? 1 : 0);
