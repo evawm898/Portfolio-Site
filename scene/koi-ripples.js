@@ -28,14 +28,21 @@
 // cause — is a defect, and the gate says so.
 export const RIPPLE_FIELDS = ['x', 'y', 'r', 'maxR', 'age', 'life', 'strength', 'rings'];
 
-export const MAX_RIPPLES = 320;    // a downpour is capped here, oldest dropped
+export const MAX_RIPPLES = 340;    // a downpour is capped here, the one nearest its own end dropped
 export const RING_LAG = 0.13;      // each inner ring trails the front by this much of a life
 
 // The two callers' parameter sets, declared here rather than at the call sites,
 // so the difference between a raindrop and a click is one readable table and
 // neither caller can quietly grow a field the other lacks.
-export const DROP_RIPPLE = { maxR: [30, 58], life: [1.5, 2.3], strength: [0.30, 0.55], rings: 2 };
-export const STORM_RIPPLE = { maxR: [22, 44], life: [0.9, 1.5], strength: [0.22, 0.42], rings: 2 };
+//
+// WIDENED FOR VARIETY, ON PURPOSE: the low end of each range is well under the
+// old floor and the high end well over the old ceiling, so a field of these
+// reads as a mix of quick small ones and lingering large ones rather than a
+// crowd of near-identical rings. rollRipple() below correlates `maxR` and
+// `life` from one shared draw so the two ends of that mix are "small and
+// fast" and "big and slow" — never "big and gone in a blink".
+export const DROP_RIPPLE = { maxR: [20, 66], life: [1.0, 2.9], strength: [0.24, 0.58], rings: 2 };
+export const STORM_RIPPLE = { maxR: [14, 46], life: [0.6, 1.6], strength: [0.20, 0.44], rings: 2 };
 export const CLICK_RIPPLE = { maxR: [104, 132], life: [2.1, 2.5], strength: [0.95, 1.0], rings: 3 };
 
 // How far the front has travelled at age u (0..1 of its life): fast out of the
@@ -63,11 +70,17 @@ export function createRipples() {
     // thing that differs is the numbers, and the numbers are physical.
     spawn(x, y, { maxR, life, strength, rings }) {
       if (field.list.length >= MAX_RIPPLES) {
-        // Drop the oldest rather than refusing the new one: under a downpour
-        // the newest ripples are the ones the eye and the fish are following.
-        let oldest = 0;
+        // Drop the one CLOSEST TO ITS OWN NATURAL END, rather than the one
+        // with the most raw seconds on it: with size and decay now varied, a
+        // long-lived ripple at 1s in is barely started while a quick one at
+        // the same raw age is nearly gone, so age alone is not "oldest" any
+        // more. age/life is — and it is also, by construction, the faintest
+        // one on screen (see fadeAt), so evicting it is the one eviction the
+        // eye is least likely to notice.
+        let oldest = 0, oldestFrac = field.list[0].age / field.list[0].life;
         for (let i = 1; i < field.list.length; i++) {
-          if (field.list[i].age > field.list[oldest].age) oldest = i;
+          const frac = field.list[i].age / field.list[i].life;
+          if (frac > oldestFrac) { oldest = i; oldestFrac = frac; }
         }
         field.list.splice(oldest, 1);
       }
@@ -114,11 +127,29 @@ export function lerpRippleTable(a, b, k) {
   };
 }
 
+// How strongly a ripple's life is pulled toward what its own reach implies —
+// 0 would be two fully independent rolls, 1 would make `life` a pure function
+// of `maxR` with no spread of its own. Short of either, on purpose: enough
+// pull that a mixed field reads as "small and quick" against "big and slow"
+// rather than the two rolling apart at random, not so much that every ripple
+// of a given size lives for the same length of time.
+const LIFE_FOLLOWS_SIZE = 0.7;
+
 export function rollRipple(rand, table) {
-  return {
-    maxR: rand.range(table.maxR[0], table.maxR[1]),
-    life: rand.range(table.life[0], table.life[1]),
-    strength: rand.range(table.strength[0], table.strength[1]),
-    rings: table.rings,
-  };
+  // THREE ROLLS, SAME ORDER AS BEFORE. `rand` is the one shared stream a
+  // scene draws everything from, so adding or dropping a draw here shifts
+  // every number anything downstream reads for the rest of the run — including
+  // the fish, who share it. So `maxR`, `life` and `strength` are each still
+  // exactly one call, in this order, whatever the tables above say — and a
+  // real splash disperses its energy over more area AND more time together,
+  // so `life` is then pulled toward what `maxR`'s own draw implies rather
+  // than adding a fourth roll to correlate them.
+  const maxR = rand.range(table.maxR[0], table.maxR[1]);
+  const lifeRoll = rand.range(table.life[0], table.life[1]);
+  const strength = rand.range(table.strength[0], table.strength[1]);
+  const span = table.maxR[1] - table.maxR[0];
+  const k = span > 0 ? (maxR - table.maxR[0]) / span : 0.5;
+  const implied = table.life[0] + (table.life[1] - table.life[0]) * k;
+  const life = lifeRoll + (implied - lifeRoll) * LIFE_FOLLOWS_SIZE;
+  return { maxR, life, strength, rings: table.rings };
 }
