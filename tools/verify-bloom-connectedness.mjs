@@ -438,8 +438,19 @@ for (const r of results) {
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
 }
-console.log(`\n${results.length - failures.length - skipped.length}/${results.length} rows are ONE connected piece`
-  + (skipped.length ? `; ${skipped.length} skipped (grid too large — NOT a pass)` : '')
+/* THE THREE REAL POPULATIONS, NOT ONE RATIO (#220). `results.length` is the
+   SURVIVORS of every validity assertion, so a dropped row leaves BOTH sides of
+   `passed/results` and the ratio reads N/N however many rows were lost — twice
+   now, on a 622-row matrix and on a 674-row one. The count the reader needs to
+   compare against is `attempted`, and it was never printed. It is printed first
+   here, and the line says DROPPED in its own words when the two differ rather
+   than leaving the reader to subtract. `skipped` stays a third category: a skip
+   is labelled and deliberate, a drop is a validity failure. */
+const dropped = attempted.length - results.length;
+console.log(`\n${attempted.length} rows attempted · ${results.length} reached the results`
+  + (dropped ? ` · ${dropped} DROPPED before reporting (validity failures — see below)` : '')
+  + ` · ${results.length - failures.length - skipped.length} of those are ONE connected piece`
+  + (skipped.length ? ` · ${skipped.length} skipped (grid too large — NOT a pass)` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log('LIMITS: surface occupancy, not solid; cannot see free ends or sub-cell gaps; covers only the matrix above. See the header.');
 console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under layers — the wrong-hub mutation passes this gate on every configuration tried.');
@@ -461,11 +472,18 @@ if (results.length !== attempted.length) {
 let bad = false;
 if (validity.length) {
   bad = true;
+  /* THE POINTER GOES TO STDOUT (#220). stderr is unbuffered and stdout is
+     block-buffered, so piped into a CI log this block flushes EARLIER than the
+     summary it logically follows — which is how a failing run comes to have a
+     pass-shaped tail. The detail stays on stderr; one line saying it exists
+     goes into the same stream as the summary, where the tail-reader is looking. */
+  console.log(`\nconnectedness: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the detail on stderr. No result above is trustworthy.`);
   console.error(`\nconnectedness: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
   for (const v of validity) console.error(`  - ${v}`);
 }
 if (failures.length) {
   bad = true;
+  console.log(`\nconnectedness: ${failures.length} ROW(S) FAILED — see the detail on stderr.`);
   console.error(`\nconnectedness: FAIL — ${failures.length} row(s) export as more than one piece:`);
   for (const f of failures) console.error(`  - ${f.label}: ${f.comps} components, ${(f.strayFraction * 100).toFixed(2)}% of surface detached`);
 }
@@ -474,5 +492,12 @@ if (NEGATIVE_CONTROL) {
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   process.exit(1);
 }
-if (bad) process.exit(1);
-console.log('connectedness: PASS — every row above exports as a single connected body.');
+/* THE VERDICT IS UNCONDITIONAL AND ON STDOUT (#220). Printing PASS only on
+   success and the failure text only on stderr is exactly the asymmetry that
+   produces a pass-shaped tail: the last line of stdout must never read as a
+   pass on a failing run. */
+if (bad) {
+  console.log(`\nconnectedness: FAILED — ${dropped} row(s) dropped before reporting, ${failures.length} row(s) failed, of ${attempted.length} attempted.`);
+  process.exit(1);
+}
+console.log(`\nconnectedness: PASS — all ${attempted.length} attempted rows reached the results and every one exports as a single connected body.`);

@@ -333,7 +333,17 @@ if (results.length !== attempted.length) {
   const got = new Set(results.map((r) => r.label));
   validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${attempted.filter((l) => !got.has(l)).join(', ')}`);
 }
-console.log(`\n${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
+/* THE THREE REAL POPULATIONS FIRST, AND WHAT EVERY RATIO BELOW DIVIDES BY (#220).
+   Every summary line in this file divides by `results.length` — the rows that
+   survived every validity assertion — so a dropped row shrinks the denominator of
+   ALL of them at once and each reads as a clean ratio. The denominator is named
+   here, once, and the line says DROPPED in its own words when rows were lost, so
+   the ratios below are read as what they are: over survivors, not over the matrix. */
+const dropped = attempted.length - results.length;
+console.log(`\n${attempted.length} rows attempted · ${results.length} reached the results`
+  + (dropped ? ` · ${dropped} DROPPED before reporting (validity failures — see below)` : '')
+  + ' — every ratio below is over the rows that REACHED THE RESULTS');
+console.log(`${results.length - failures.length}/${results.length} configs watertight (boundary = 0); ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 console.log(`${results.length - countMoved.length}/${results.length} configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
 console.log(`${results.length - degenerates.length}/${results.length} configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
@@ -393,11 +403,18 @@ if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) =>
 let bad = false;
 if (validity.length) {
   bad = true;
+  /* THE POINTER GOES TO STDOUT (#220). stderr is unbuffered and stdout is
+     block-buffered, so piped into a CI log these blocks flush EARLIER than the
+     summary they logically follow — which is how a failing run comes to have a
+     pass-shaped tail. The detail stays on stderr; one line saying it exists
+     goes into the same stream as the summary, where the tail-reader is looking. */
+  console.log(`\nexport gate: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the detail on stderr. No result above is trustworthy.`);
   console.error(`\nexport gate: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
   for (const v of validity) console.error(`  - ${v}`);
 }
 if (failures.length) {
   bad = true;
+  console.log(`\nexport gate: ${failures.length} CONFIG(S) NOT WATERTIGHT — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${failures.length} config(s) export with open (boundary) edges:`);
   for (const f of failures) console.error(`  - ${f.label}: boundary=${f.boundary}`);
 }
@@ -408,6 +425,7 @@ if (failures.length) {
    rated rather than reported. */
 if (degenerates.length) {
   bad = true;
+  console.log(`\nexport gate: ${degenerates.length} CONFIG(S) EMIT DEGENERATE TRIANGLES — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${degenerates.length} config(s) emit degenerate (zero-area) triangles:`);
   for (const f of degenerates) console.error(`  - ${f.label}: degenerate=${f.degenerate} of ${f.tris} (export)`);
 }
@@ -420,6 +438,7 @@ if (degenerates.length) {
    as boundary === 0 and nothing else. */
 if (countMoved.length) {
   bad = true;
+  console.log(`\nexport gate: ${countMoved.length} CONFIG(S) MOVED TRIANGLE COUNT BETWEEN MODES — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${countMoved.length} config(s) have DIFFERENT live and export triangle counts. The export floor is meant to change geometry and never topology:`);
   for (const f of countMoved) console.error(`  - ${f.label}: tris(live)=${f.liveTris} tris(export)=${f.tris}`);
 }
@@ -428,5 +447,12 @@ if (NEGATIVE_CONTROL) {
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   process.exit(1);
 }
-if (bad) process.exit(1);
-console.log('export gate: PASS — every config above exports watertight.');
+/* THE VERDICT IS UNCONDITIONAL AND ON STDOUT (#220). Printing PASS only on
+   success and the failure text only on stderr is exactly the asymmetry that
+   produces a pass-shaped tail: the last line of stdout must never read as a
+   pass on a failing run. */
+if (bad) {
+  console.log(`\nexport gate: FAILED — ${dropped} row(s) dropped before reporting, ${failures.length} not watertight, ${degenerates.length} degenerate, ${countMoved.length} count-moved, of ${attempted.length} attempted.`);
+  process.exit(1);
+}
+console.log(`\nexport gate: PASS — all ${attempted.length} attempted rows reached the results and every one exports watertight.`);
