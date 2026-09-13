@@ -14,6 +14,17 @@ repository and never was — it lives in a Cowork project the sessions cannot re
 Sessions 38, 40 and 41 each established that. `docs/bloom-lobe-model.md` exists so
 a fifth session does not.
 
+> ## → IF YOU ARE THE FOLLOW-UP SESSION, READ §6f FIRST
+>
+> This document costs three routes to a carnation fringe and **takes none**, and
+> two of the three need Eva's single-valued-outline invariant to move. **Do not
+> start there.** §6f is the cheaper question that comes before all of them, and
+> it is Eva's ruling of Sep 13: **the bloom already has cleft rows, so a fringe
+> may be N shallow clefts confined to the tip rather than a new topology** — in
+> which case the invariant never has to move and the three routes are moot.
+> `trimPanels` is verified to hold the machinery, the budget is four to five
+> fingers on the shipping petal, and the first question is an IMAGE, not a build.
+
 ---
 
 ## 0. Eva's ask, and the translation that is the whole brief
@@ -495,15 +506,27 @@ measurement:** `widthProfile` holds `h(u)` — ONE half-width per station — so
 material at station `u` is the single span `[−h, +h]`, one interval, at every
 parameter value. A fringe across the END needs the end's position to vary with
 the across-coordinate, `u(v)`; and a fringe of separate teeth needs SEVERAL
-disjoint spans at one station. Neither is expressible, and no control can make
-them so.
+disjoint spans at one station. Neither is expressible **in `widthProfile`**, and
+no control on the outline can make them so.
+
+> **CORRECTION, and it is the third self-correction of this session — see §6f.**
+> The sentence above originally ended *"Neither is expressible, and no control can
+> make them so."* That named `widthProfile`'s owner correctly and then made a
+> claim about the **petal**, which has a different owner. Several disjoint spans
+> at one station ARE expressible, one layer up, by `trimPanels` — whose own
+> header says so in as many words. The half about `u(v)` survives unchanged; the
+> half about disjoint spans does not. **The same class of error the fourth
+> durable rule is about: I checked who owned the quantity and not who owned the
+> capability.**
 
 **This collides with the lobe model's own invariant.** `docs/bloom-lobe-model.md`
 §1: *"The outline stays single-valued — split and cleft petals are out of scope
 at every parameter value."* A carnation's fringe IS a row of separate fingers at
-the petal's end, which is exactly a multi-valued outline there. **Eva's carnation
-ask and her single-valued-outline invariant cannot both hold**, and which gives
-way is a ruling rather than a measurement.
+the petal's end. **Eva's carnation ask and that invariant cannot both hold as
+stated**, and which gives way is a ruling rather than a measurement — *and Eva
+has since said which: the invariant is her ruling of Sep 5 ("lobe and cleft are
+dropped — not parked, removed"), carried into the model doc on Sep 12, and it
+CAN be changed.* §6f is what must be measured before anyone changes it.
 
 ### So the trade has no good corner, and that is measured rather than argued
 
@@ -511,6 +534,105 @@ way is a ruling rather than a measurement.
   0.35) → the cut only narrows the end, drawing nothing.
 * **Large coverage + wide terminal** → the teeth return to the MARGIN → the
   sideways spurs of §5, which is the complaint this session opened on.
+
+### 6f. THE FIRST QUESTION FOR THE FOLLOW-UP SESSION — the cleft machinery ALREADY EXISTS
+
+**Eva's ruling, Sep 13, and it comes before every route below.** The
+single-valued-outline invariant is not a property of the code; it is Eva's ruling
+of Sep 5, carried into `docs/bloom-lobe-model.md` §1 on Sep 12, and it can be
+changed. **But a carnation fringe may be N shallow clefts confined to the tip
+rather than a new topology — in which case the invariant never has to move and
+all three routes below are moot.** That is the first thing to measure.
+
+**The premise is verified, and it is stronger than the ruling assumed.** Checked
+against the source rather than taken on trust:
+
+* **`trimPanels` is THE ONE OWNER of the petal's domain decomposition**, and its
+  own header states the capability §6e said did not exist: *"The petal's boundary
+  is a TRIMMABLE DOMAIN: per row, which spans of the cross-width coordinate `v`
+  carry material. The default is one span over every row. **A CLEFT is two spans
+  with a gap**, and the machinery that makes that watertight is the reason this
+  abstraction exists at all."*
+* **Watertightness is by construction, not by argument.** *"A clefted petal is
+  not one grid with a hole, it is a base panel plus two lobe panels, each
+  individually closed"* — two faces, two side rims, two end caps each — so the
+  export contract holds however many panels there are.
+* **Nothing hard-codes three panels.** `trimPanels` returns a LIST and
+  `buildPetalInto` loops it (`for (const panel of panels)`); the only place a
+  count appears is the cleft arm's own literal.
+* **`spanAt` already receives the row index** — `emitPanel` calls
+  `panel.spanAt(i)` with the GLOBAL row index, and the cleft arm simply ignores
+  it (`spanAt: () => [-1, -gHalf]`, a constant gap). So a span that varies down
+  the finger — a **tapering, pointed** tooth rather than a parallel-sided slot —
+  needs no change to the emitter at all.
+* **Connectedness has a named mechanism**: `PANEL_OVERLAP_ROWS = 1`. The lobe
+  panels start one row BELOW the split and evaluate their span there too, so the
+  shared slab is a real overlapping volume and the separate solids are one body.
+* **It is proven, not claimed.** `CAPABILITY_CLEFT = { cleft: { from: 0.55, gap:
+  0.35 } }` drives nine `CAPABILITY: cleft*` matrix rows plus `TIP SHAPE: 3.00 x
+  a cleft margin`, each declared in `SELF_INTERSECTION_XFAIL` with its reason
+  (*"the lobe panels reach `PANEL_OVERLAP_ROWS` into the base panel by design and
+  share its vertices, so one shell"*). It is a **capability hook and has never
+  been a shipping control** — which is exactly what Eva's Sep 5 ruling did.
+
+**AND THE SHAPE IS RIGHT, not merely the mechanism.** A carnation's fringe
+fingers run ALONG the length and are separated ACROSS the width. That is
+precisely a `v`-span decomposition at a row — what `trimPanels` does — and NOT
+the `u(v)` terminal edge of route 1. §6e's surviving half (teeth *across* the
+terminal mini-face need `u(v)`) is about a different object from the one a
+carnation actually has.
+
+**THE BUDGET, measured on the shipping default so the question is not asked
+blind.** EXPORT and LIVE agree to the station on every figure below, as row
+positions must (session 32's mode-dependence rule). Petal 35 mm long, 16.00 mm
+wide, `uPk` 0.3571, `uCap` 0.8000, `NU` 56, `HELD_ROWS` 16. Fingers-that-fit is
+`N` fingers and `N−1` gaps all at `MIN_FEATURE_MM` (1.0 mm, itself a declared
+guess — §18b):
+
+| split `u` | rows above it (a finger's own rows) | width there | fingers that fit at the printable floor |
+|---|---|---|---|
+| 0.55 *(today's cleft)* | 27 | 14.750 mm | 7 |
+| 0.70 | 21 | 12.492 mm | 6 |
+| **0.80** *(= `uCap` exactly)* | **16** | **10.253 mm** | **5** |
+| **0.85** | **13** | **8.822 mm** | **4** |
+| 0.90 | 10 | 7.076 mm | 4 |
+| 0.95 | 7 | 4.788 mm | 2 |
+
+**So rows are NOT the scarce resource** — 13 rows down a finger at a
+tip-confined split is ample. **The scarce axis is the WIDTH**, and the budget is
+four to five fingers before the printable floor binds. A split at `uCap`
+(0.8000) is where the apex law already takes over, which makes it the natural
+candidate rather than a tuned number.
+
+**WHAT THE FOLLOW-UP SESSION MUST ESTABLISH, in this order:**
+
+1. **Does a 4–5 finger tip-confined cleft READ as a carnation?** Four fingers is
+   coarse against the reference photograph. This is Eva's to rule from an image
+   and it is the cheapest question in the whole problem — the machinery to render
+   it already exists behind the capability hook, so it costs a render and no
+   geometry at all. **If the answer is no, ask it again at a longer or wider
+   petal before concluding anything**: the budget above is a fact about the
+   shipping petal's proportions, not about the law.
+2. **Does `trimPanels` generalise from 3 panels to N+1 without a rewrite?** The
+   loop and `spanAt`'s signature say it should. What is NOT yet checked: the
+   triangle cost (each panel is its own `NV`-column grid plus caps and rims, so
+   cost scales with N), whether `PANEL_OVERLAP_ROWS = 1` still connects every
+   finger at N > 2, and what `SELF_INTERSECTION_XFAIL`'s cleft class does when
+   the declared overlap count rises.
+3. **The split is a ROW INDEX, and that is ladder-sensitive.** `trimPanels` takes
+   the first row whose `u` exceeds `cleft.from`; CLAUDE.md already records that
+   this split has MOVED on two separate sessions (session 38's seam clearance and
+   session 39's `widest()` fix each changed three cleft rows' triangle counts). A
+   fringe pinned to a row index inherits that. Whether the split should be placed
+   in ARC LENGTH instead is the same question the lobe stationing already
+   answered once.
+4. **Only if all three fail** does the invariant have to move, and only then are
+   the routes below live.
+
+**What this does NOT settle**, stated so it is not read as more than it is: that
+the machinery *exists* is not evidence that a fringe drawn through it is
+printable, watertight at N fingers, or good-looking. It is evidence that the
+question is cheap to answer, which is why it goes first.
 
 ### What would actually reach it, costed, none taken
 
@@ -529,9 +651,10 @@ way is a ruling rather than a measurement.
 
 ### What is NOT owed, and why the branch is where it is
 
-The geometry and the registry row are **reverted**; the branch carries the
-discovery doc and matrix block 31's rows, which stay RED on the control's
-absence. Shipping the control as written would ship a record that reports teeth
+The geometry and the registry row are **reverted**, and so is matrix block 31
+(`a110531`) — a PR permanently red on a control that no longer exists teaches
+everyone to ignore its red. The branch is docs-only; the rows come back the day
+there is a control to test. Shipping the control as written would ship a record that reports teeth
 the geometry does not draw, and `petalTipEnd` as a pure shape control — a
 squared tip that the fringe cannot land on — is a different feature from the one
 Eva asked for and is hers to rule on, not a session's to substitute.
