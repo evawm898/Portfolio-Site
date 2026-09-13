@@ -5012,6 +5012,260 @@ strand modes) is in that doc so it is not re-derived.
    segment count, and three of THOSE in one composition is a real number rather
    than a hypothetical one.
 
+## `/scene` — the ambient scene shell, and scene 1
+
+`scene.html` / `scene.css` / `scene.js` / `scene/*` are a full-viewport section
+built to host up to **eight** independent ambient scenes, one at a time. It is
+`noindex`, it exports nothing, and it touches no other page. Scene 1 (a koi pond
+in the rain) is built; slots 2-8 are declared and render as disabled nav numbers.
+
+**IT DOES NOT LOAD `styles.css` AND THAT IS THE POINT.** The rest of the
+portfolio is teal on #0A0A0C; this section is thin light line art on near-black
+and has its own identity. Per the brief, **colour palettes per scene are a later
+phase and nothing here is built for them**: there is one ink and one ground,
+declared once at the top of `scene.css`.
+
+**TWO GUARANTEES MAKE A SCENE SWAP CLEAN, AND BOTH ARE STRUCTURAL RATHER THAN
+RULES SOMEBODY HAS TO KEEP.** They are the whole reason this is a shell and not
+one big canvas, and `tools/verify-scene.mjs` asserts each of them twice — once
+against the shipped SOURCE and once against a synthetic probe scene in a real
+browser.
+* **THERE IS ONE ANIMATION LOOP AND `scene.js` OWNS IT.** A scene never calls
+  `requestAnimationFrame`. A scene that owned its own loop could leave it running
+  after teardown — drawing into a canvas the next scene now owns, or quietly
+  burning a core forever — and the symptom is invisible until it is a battery
+  complaint. A disposed scene here simply stops being called, and the probe
+  measures that its frame counter FREEZES while the shell's keeps rising.
+* **THERE IS ONE SET OF INPUT LISTENERS AND `scene.js` OWNS THEM.** They are
+  bound once at boot against a mutable `active` and routed, so a scene cannot
+  leak one and a swap rebinds nothing. (This is /print's own "the wiring is
+  registered once at module load against mutable module-level state", one level
+  up.)
+
+**A SCENE MODULE DEFAULT-EXPORTS A FACTORY**; every method is optional except
+`frame`: `frame(dt, wall)` / `resize(w, h)` / `pointer(x, y, wall)` /
+`wheel(deltaY, deltaMode)` / `dispose()` / `state()`. The host it is handed
+supplies `canvas2d()` (a DPR-correct canvas, mounted and auto-resized), live
+`width`/`height`, `reducedMotion` and `seed`. `dt` is CLAMPED at 1/20 s, so a
+tab switch cannot teleport a simulation.
+
+**THE LOAD TOKEN IS TAKEN BEFORE THE ALREADY-ACTIVE EARLY RETURN, AND THAT ORDER
+IS LOAD-BEARING.** Scene modules are imported dynamically, so a click on 2 while
+1 is showing leaves an import in flight; clicking 1 again must CANCEL it, or 2
+arrives a second later over the scene you went back to. Bumping the token before
+the early return is what cancels it. The mutant `a-stale-scene-load-is-mounted-anyway`
+is the witness, and the gate serves scene 2's module with a deliberate delay so
+the race is real rather than argued.
+
+**THE VIEWPOINT IS SHELL-LEVEL, NOT SCENE 1'S** (`scene/surface.js`), because the
+brief states it as a property of the section: one fixed steep-oblique angle,
+**a single 0.60 squash on the plane's y axis, everywhere and forever**. There is
+no perspective and no horizon — a true camera would give every point of an
+infinite plane its own foreshortening, so a ripple near the top of the screen
+would be a different shape from the same ripple at the bottom and "infinite,
+bleeds off all four edges" would stop being true at the horizon. **ALL
+SIMULATION HAPPENS IN PLANE COORDINATES, WHICH ARE ISOTROPIC**, and the squash is
+applied once, to POINTS, at draw time. Mixing the two spaces is the one mistake
+available here: a steering force computed on screen coordinates makes a fish
+measurably faster sideways than up, which reads as "the fish are odd" long
+before anyone finds it.
+**AND THE SQUASH IS NEVER `ctx.scale(1, squash)`** — that would squash the STROKE
+too, so every line would come out thinner across a fish than along it, which is
+the one thing a line-art piece cannot afford.
+
+**A RIPPLE CARRIES NO RECORD OF WHAT MADE IT, AND THAT IS A PROPERTY OF THE TYPE
+RATHER THAN A RULE.** `RIPPLE_FIELDS` in `scene/koi-ripples.js` is the whole
+record — position, front radius, age, life, strength, ring count — and there is
+no `source`, no `kind`, no `fromClick`. The fish system cannot branch on a cause
+that is not in the data it is handed, so "fish react to ripples generically"
+needs nobody to remember it. Ambient rain, storm rain and a click all go through
+one spawner; what differs is the NUMBERS, which is the physical size of the
+disturbance and exactly what a fish can actually perceive. **A bigger splash is
+still a bigger splash; what it must not have is a label.**
+
+**THERE IS NO TEXT ON THIS PAGE OUTSIDE THE NAV, AND "NO CHROME BESIDES THE
+NAV" IS LITERAL** (Eva's ruling, overruling this session's own judgement call).
+A one-off hint line — "click the water. scroll for wind.", faded out after seven
+seconds and gone for good — shipped on the argument that the two interactions
+are otherwise undiscoverable. It is gone: the element, the CSS, the timer and
+the scene's `blurb` field. **The rule is not "that sentence is deleted"** —
+`shell/there-is-no-text-on-the-page-but-the-nav` walks the RENDERED text and
+fails on any future caption, and its mutant puts a hint back. Two things it
+measured that are easy to get wrong: **`display:none` is NOT how Chromium
+reports a `<noscript>` it is not rendering** (it says `display: inline`,
+`visibility: visible`, and zero client rects), so the filter asks
+`checkVisibility()` and the client rects — the platform's own answer to "is this
+painted"; and **opacity is deliberately not an exemption**, because a hint
+mid-fade is still a hint.
+
+**A KOI IS NEVER PLACED IN VIEW AND NEVER VANISHES FROM IT** (Eva's second
+ruling on the same review). Every fish is born OUTSIDE the visible frame and
+swims in; every fish that leaves swims out and is removed only once its whole
+body is clear. **THE TRANSITIONS ARE GEOMETRIC, NOT TIMED**: `entering` becomes
+`cruising` on the frame `surface.onScreen` first says yes, and `leaving` is
+culled on the frame it is last off screen — so the state cannot drift from the
+thing it claims. Four consequences, each of which was a real edit rather than a
+rename:
+* **THE FADE IS GONE.** A koi fading out is a koi disappearing while it is being
+  looked at, which is the same defect in softer clothing. `koi-draw.js` draws at
+  a constant `FISH_ALPHA`.
+* **CONTAINMENT CARRIES A KOI IN AS WELL AS TURNING ONE BACK** — the same
+  inward force, doing both jobs, so entry needed no new mechanism. **But the
+  EDGE BRAKE had to be gated on heading-outward**: it exists to buy a turn the
+  distance it needs, and an entering koi is as deep in the band as anything ever
+  gets, so ungated it throttled every arrival to a third speed. Measured, the
+  mean entry is **4.2 s** gated; ungated it is over fifteen. `leaving` skips
+  containment entirely and is steered out by the edge it is nearest AND already
+  pointed at.
+* **A KOI SENT AWAY CAN BE RECALLED**, and that is what keeps the count honest.
+  A departure is no longer instant, so a storm that ends a second after one
+  begins leaves a koi that is still in the frame and wanted again; spawning
+  there puts an eighth on the water while the seventh is still swimming off.
+  `recall()` turns the deepest-in leaver back instead.
+* **THE SEED OBEYS THE RULE TOO, which is the case most likely to be exempted
+  by accident.** The koi the page opens with are spawned outside like any other
+  and swum in over 18 s of SIMULATED time inside `seed()`, before a frame is
+  drawn — ~5 ms, allocation-free, no canvas. So the pond opens full and there is
+  still no koi anywhere that was placed in view.
+`visibleCount` is state-agnostic now (a koi on its way out is still on the
+water); `presentCount` — the koi that are STAYING — is what the population
+manager reads, and conflating them is still the defect that once filled the pond
+with sixteen koi to keep seven on screen.
+**THE GATE JUDGES THIS FROM AN INDEPENDENT OWNER.** The school records where it
+put each koi (`spawnLog`, bounded at 64) and nothing else; whether that was
+inside the frame is decided on the far side by `surface.visible()`, which
+`koi-fish.js` does not write. A self-reported "I spawned outside" flag would be
+the claim under test answering for itself.
+
+**THE THREE KOI TRAITS ARE SLIDERS, NOT ARCHETYPES** — each drawn uniformly in
+[0, 1] and used as a SIGNED weight about its midpoint, so 0.5 is genuinely
+indifferent rather than a third mode. **SEPARATION IS NOT A TRAIT**: koi do not
+overlap whatever their sociability, because that is a body and not a
+personality, so the short-range push sits outside the signed social term.
+
+**FOUR DEFECTS THIS SESSION FOUND, EACH OF WHICH DREW A PLAUSIBLE PICTURE:**
+* **`ctx.ellipse()` DOES NOT BEGIN A SUBPATH — IT CONNECTS FROM THE CURRENT
+  POINT.** Batching a few hundred ripples into one path is what makes a downpour
+  affordable, and without a `moveTo` it drew a straight chord between every
+  ripple and the next: a heavy shower came out as a spiderweb of long diagonals
+  across the whole viewport, at a third of the frame rate. The `moveTo` lives in
+  `surface.ellipse` so no caller can reintroduce it.
+* **THE POPULATION MANAGER COUNTED ONLY STRICTLY-VISIBLE KOI** while containment
+  lets one nose past the edge and pulls it back — so it replaced fish that were
+  on their way in. Sixteen koi alive to keep seven on screen. `visibleCount` and
+  `presentCount` are two questions and conflating them is the defect.
+* **THE CONTAINMENT FORCE RAMPED WITH HOW FAR A KOI HAD ALREADY OVERSHOT**, so
+  full strength only existed OUTSIDE the frame. On a phone-width pond the koi
+  spent a third of the time out of shot. The band is measured INWARD from each
+  edge now, and sized from the fish's own turning circle rather than as a fixed
+  distance.
+* **SEPARATION LOST TO COHESION AT FULL SOCIABILITY ON KINEMATICS, NOT ON
+  PRIORITY.** Two koi closing head-on cross a separation band faster than either
+  can turn out of it, so no weight could fix it; what fixed it is the fish
+  SLOWING as it comes about, which is what a real one does. 21 px -> 46 px.
+
+**WALL TIME IS NOT SCENE TIME, AND A BROWSER CHECK THAT SLEEPS IS MEASURING THE
+MACHINE.** A scene advances by the sum of its CLAMPED frame deltas, so a page
+rendering at 18 fps against a 1/20 clamp advances 0.9 s of pond per second of
+wall. Two timing checks that slept and asserted went red under a mutation that
+only made the page slow — `waitSceneSeconds()` asks the page how much pond has
+gone by instead. **Never `waitForTimeout` before asserting something about the
+simulation's own clock.**
+
+**AND THE DELTA A PAGE RECEIVES IS NOT THE DELTA PLAYWRIGHT SENDS.** Measured: an
+injected `mouse.wheel(0, 120)` arrives as `deltaY` 120 at `deviceScaleFactor` 1
+and as **60** at dsf 2. That is an artifact of converting a synthetic wheel into
+CSS coordinates, not something a hardware notch does — so the gate scales what it
+sends and asserts what the page actually RECEIVED before concluding anything
+about the wind.
+
+**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
+shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
+ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
+never imported from the module under test, because a clause that reads its
+expected value out of the thing it is checking measures its own consistency.
+Part two drives the real page and measures the DOM, the reported state and the
+rasterised pixels. **`--negative-control` is required before quoting a pass from
+a changed harness**: nineteen mutations, each naming the checks it must redden,
+with a stale-name guard and an anchor check that run for EVERY mutant before any
+of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
+alone in seconds, and the guard is SECTION-AWARE so that combination does not
+report every part-two name as stale.
+
+**THE FIRST SWEEP FOUND TWO CHECKS THAT WERE GREEN FOR THE WRONG REASON, AND
+BOTH WERE THE STRONGEST-SOUNDING ONES IN THEIR SECTION.** Recorded because the
+shape recurs:
+* **`fish/any-ripple-gets-the-same-reaction`** — the brief's central claim —
+  seeded a school at RANDOM around a fixed ripple, so whether any koi was inside
+  the reach at all, and whether its trait sat far enough from the indifferent
+  midpoint for the ripple term to weigh anything, was up to the seed. It passed
+  on a pond where the ripple could not have changed anything. The koi are placed
+  and their traits set by hand now, and the fixture carries its own vacuity
+  clause: the ripple must be shown to have MOVED them.
+* **`wind/the-rest-angle-is-exactly-vertical`** — decaying from exactly 1.0 at
+  exactly 1/240 s a step lands on exactly 0 BY THE ARITHMETIC, with no clamp
+  involved; measured on a tree with the clamp neutered, which settled on the
+  same exact zero. It is exercised from a value no whole number of steps can
+  reach now, and asserts the wind STAYS at zero rather than hunting either side
+  of it.
+**And one mutant's claim had simply stopped being true**: counting only visible
+koi no longer churns the population, because the containment fix removed the
+straying it fed on. The claim came off that mutant and the churn check got one
+of its own — a departure that never leaves — rather than the check being
+loosened.
+
+**AND THE ENTRY/EXIT SWEEP FOUND TWO MORE THINGS ABOUT THE INSTRUMENT, NEITHER
+OF THEM A LOOSENING.**
+* **`makeSchool` COULD HAND A FIXTURE A POND IT NEVER BUILT.** Several fish
+  checks take the seeded school and then write `school.fish.length = 4` and
+  place those four by hand — which silently does NOTHING on an array of two and
+  nothing at all on an empty one. Measured on `an-entering-koi-is-not-carried-in`:
+  `seed()` returned **ZERO** koi and two ripple checks failed with a message
+  about ripples. The helper now refuses a seed that did not produce the target
+  count, so the failure is the sentence it actually is.
+* **THE SEPARATION CHECK'S CONTROL TREE IS NOT THE TREE UNDER TEST.**
+  `fish/separation-is-a-body-not-a-personality` compares the pond against a
+  second tree built with `W_SEPARATE = 0` — and `loadScene` builds that from the
+  source ON DISK, so during a sweep `M` carries the mutation and the control
+  does not. Any mutation that moves the koi about therefore shifts one side of
+  the ratio and not the other, which is why five fish mutants list it as
+  collateral they are ALLOWED to redden. **The fix is written down and
+  deliberately not taken**: `loadScene` would take a LIST of edits and chain
+  them onto one file, so the control carries the sweep's mutation too. It is
+  shared machinery three pre-existing mutants already depend on, and naming the
+  collateral keeps the check exactly as strict in the meantime.
+**AND THREE PRE-EXISTING MUTANTS GAINED A WIDER BLAST RADIUS, EACH WIDENING
+MEASURED RATHER THAN REASONED — WHICH IS HOW ONE OF THEM CORRECTED THE GUESS.**
+`the-population-counts-only-what-is-in-frame` was predicted to kill the recall;
+run on a probe tree it still recalls **9 of the shipped 10**, and what it
+actually does is reach **EIGHT koi on screen** — so the recall check catches it
+on its COUNT bar, which is the brief's own "3-7 on screen". `a-departure-never-
+leaves` stops the population machinery dead (0 spawns beyond the seed and 0
+recalls over 150 s of swinging storm, the pond stuck at 7 against a target of 3),
+and `an-entering-koi-is-not-carried-in` leaves `seed()` returning an EMPTY pond on
+every seed — so between them they redden every entry/exit check's vacuity guard.
+That breadth is the mutations being severe, not the checks being fragile.
+
+**Nothing here runs in CI.** Every GitHub Actions gate in this repo is
+path-filtered to `flower*` / `bloom*`, so `scene*` is covered by nothing — run
+the gate by hand before calling a `/scene` change done. Note the corollary
+/print, /plot and /cards already hit: the flower workflows are path-filtered on
+`'tools/**'`, so ADDING `tools/verify-scene.mjs` makes both flower gates run on a
+scene PR. They still test flower geometry.
+
+**Dev-only deps:** none beyond a global `playwright-core`/`playwright`. The page
+loads no library at all — no three, no CDN JavaScript — only one Google font,
+which is chrome and which the gate stubs.
+
+**OPEN, AND EVA'S TO RULE ON** (recorded in the session report on #223):
+`noindex`, which is on; whether `/scene` should be linked from the site nav at
+all; and the lightning placeholder, which the brief said not to over-invest in
+and which is one white wash plus a jolt. **The hint line came off this list by
+being ruled on** — see the no-text section above.
+
+**Out of scope on purpose, and none of it foreclosed:** colour palettes and
+time-of-day variants, scenes 2-8, sound, and any change to the other pages.
+
 ## Artist Tracker (`artist-tracker.html`)
 
 Private, single-file, client-side artist/tattoo-artist tracker for

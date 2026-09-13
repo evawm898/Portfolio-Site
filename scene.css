@@ -1,0 +1,146 @@
+/* scene.css — /scene's own identity.
+ *
+ * THIS SECTION IS BLACK AND WHITE ON PURPOSE AND DOES NOT INHERIT THE SITE'S
+ * PALETTE. styles.css is not loaded here at all: the rest of the portfolio is
+ * teal on #0A0A0C, and these scenes are thin light line art on near-black. Per
+ * the brief, colour palettes per scene are a later phase, so there is exactly
+ * one ink here and one ground, and both are declared once below.
+ *
+ * THE PAGE IS A TAKEOVER. No document scroll, no chrome but the nav, and the
+ * stage is the viewport. `overscroll-behavior: none` stops a trackpad from
+ * rubber-banding or arming a back-swipe over a scene that has taken the wheel.
+ */
+
+:root {
+  --scene-ground: #08090b;
+  --scene-ink: #e2e8ee;
+  --scene-ink-dim: rgba(226, 232, 238, 0.52);
+  --scene-line: rgba(226, 232, 238, 0.22);
+  --scene-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  color-scheme: dark;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+  background: var(--scene-ground);
+  color: var(--scene-ink);
+  font-family: var(--scene-mono);
+}
+
+#scene-stage {
+  position: fixed;
+  inset: 0;
+  /* The scene consumes the pointer entirely: there is no page gesture left to
+     conflict with, and a browser-supplied pan on a full-viewport simulation
+     reads as the simulation stuttering. */
+  touch-action: none;
+  cursor: crosshair;
+}
+
+.scene-canvas { display: block; width: 100%; height: 100%; }
+
+/* --- nav ---------------------------------------------------------------
+   Hairline boxes in the same ink as the scenes. Legible at rest — the brief
+   asks for the Return to be always visible, so nothing here fades out on idle
+   — and brighter under the pointer. */
+
+.scene-nav {
+  position: fixed;
+  inset: 0 auto auto 0;
+  width: 100%;
+  padding: max(1rem, env(safe-area-inset-top)) max(1rem, env(safe-area-inset-right))
+           0 max(1rem, env(safe-area-inset-left));
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  pointer-events: none;         /* the gaps stay clickable water */
+  z-index: 2;
+}
+
+.scene-nav__return,
+.scene-nav__btn {
+  pointer-events: auto;
+  font-family: var(--scene-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--scene-ink-dim);
+  background: rgba(8, 9, 11, 0.55);
+  border: 1px solid var(--scene-line);
+  border-radius: 2px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease, background-color 140ms ease;
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
+}
+
+.scene-nav__return { padding: 0.42rem 0.75rem; display: inline-flex; align-items: center; gap: 0.45rem; }
+.scene-nav__arrow { font-size: 0.9em; }
+
+.scene-nav__scenes { display: flex; gap: 0.3rem; flex-wrap: wrap; justify-content: flex-end; }
+
+.scene-nav__btn {
+  width: 2rem;
+  height: 1.9rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-nav__return:hover,
+.scene-nav__return:focus-visible,
+.scene-nav__btn:not(:disabled):hover,
+.scene-nav__btn:not(:disabled):focus-visible {
+  color: var(--scene-ink);
+  border-color: rgba(226, 232, 238, 0.55);
+  background: rgba(8, 9, 11, 0.8);
+  outline: none;
+}
+
+/* The active scene is marked by a solid edge rather than a fill — the section
+   is line art, and a filled chip would be the only solid shape on the page. */
+.scene-nav__btn.is-active {
+  color: var(--scene-ink);
+  border-color: var(--scene-ink);
+}
+
+/* AN UNBUILT SLOT IS SHOWN, NOT HIDDEN. The shell holds eight; a row that grew
+   a button at a time would never say how far along the section is. */
+.scene-nav__btn:disabled {
+  color: rgba(226, 232, 238, 0.16);
+  border-color: rgba(226, 232, 238, 0.09);
+  background: rgba(8, 9, 11, 0.35);
+  cursor: default;
+}
+
+.scene-nav__btn--random { margin-left: 0.35rem; }
+
+.scene-noscript {
+  position: fixed; inset: auto 0 2rem 0; text-align: center;
+  font-size: 0.8rem; color: var(--scene-ink-dim);
+}
+.scene-noscript a { color: var(--scene-ink); }
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-nav__return, .scene-nav__btn { transition: none; }
+}
+
+@media (max-width: 30rem) {
+  /* NINE BUTTONS AND A RETURN LINK DO NOT FIT ON A PHONE'S TOP ROW, and what
+     they do instead of not fitting matters: left alone, flex wrapped the LAST
+     button onto a line of its own, so "?" sat orphaned under the 8 and read as
+     a mistake. The whole group moves to its own line instead. */
+  .scene-nav { padding-left: 0.6rem; padding-right: 0.6rem; flex-wrap: wrap; }
+  .scene-nav__scenes { flex: 0 0 100%; margin-top: 0.5rem; }
+  .scene-nav__btn { width: 1.75rem; height: 1.7rem; font-size: 0.66rem; }
+  .scene-nav__return { padding: 0.36rem 0.6rem; font-size: 0.66rem; }
+}

@@ -25,3 +25,8 @@ tools/.cache/
 # tools/.scratch — throwaway harnesses and gate logs from a working session.
 # Regenerate, never commit.
 tools/.scratch/
+
+# tools/verify-scene.mjs writes a mutated copy of scene/ beside the original,
+# because those modules import each other by relative path. Swept at start and
+# in a finally; ignored here so a crashed run cannot dirty the tree.
+scene/__mutant__*/
