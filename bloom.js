@@ -481,7 +481,7 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
-let lastStem = null, lastStemTris = 0, lastFootDigest = 0;
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null;
 /* THE FOOT FRAMES' DIGEST — ST6's measured side. A stemmed and a stemless build
    of the SAME state must agree here exactly, which is the whole of "the
    hub-to-stem join does not change the petal-to-hub junction". One function
@@ -572,6 +572,7 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastFilamentStyle = built.filamentStyle;
     lastStem = built.stem && built.stem.present ? built.stem : null;
     lastStemTris = built.stemBuilt ? built.stemBuilt.tris : 0;
+    lastStemBuilt = built.stemBuilt || null;
     lastFootDigest = footFramesDigest(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
@@ -1600,7 +1601,11 @@ window.__bloomMetrics = () => ({
   stem: lastStem ? {
     lengthMm: lastStem.lengthMm, outerR: lastStem.outerR, boreR: lastStem.boreR, wallMm: lastStem.wallMm,
     root: [0, 0, lastStem.rootZ], tip: [0, 0, lastStem.tipZ],
-    rootSpanMm: lastStem.topZ - lastStem.rootZ,
+    /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
+       heights: ST4 asks whether the root really runs THROUGH the slab, and a
+       builder that started at the underside would leave the plan saying it
+       did. See buildStemInto's own note. */
+    rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
     stations: lastStem.stations.slice(), sides: lastStem.sides,
     hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
   } : null,

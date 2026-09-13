@@ -6729,6 +6729,12 @@ export function buildStemInto(acc, plan) {
   /* THE RINGS ARE THE PLACER'S OWN STATIONS, in millimetres of arc from the
      hub, plus the root band above them. Station 0 is the underside. */
   const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];
+  /* THE TOP THE BUILDER ACTUALLY EMITTED — ST4's measured side. Reading the
+     plan's own `topZ - rootZ` would put BOTH sides of that clause on the plan,
+     which is the entanglement Eva's fourth durable rule forbids: a builder that
+     started at the underside instead of through the slab would leave the plan
+     untouched and the clause green. */
+  const emittedTopZ = zs[0];
   const ringAt = (rad, z) => Array.from({ length: N }, (_, k) => {
     const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];
   });
@@ -6766,7 +6772,7 @@ export function buildStemInto(acc, plan) {
       acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
     }
   }
-  return { tris: acc.triangleCount - before };
+  return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1] };
 }
 
 /* ===================================================================
