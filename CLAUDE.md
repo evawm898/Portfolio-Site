@@ -1872,6 +1872,22 @@ on all 56 stations to the BIT in both modes.** **Interpolation is still the righ
 the residual (a target NEARLY but not exactly on a sample) and wants X0's exact float32
 comparison re-derived as an ULP BOUND alongside it — a whole-matrix partition and its own
 session.**
+**THE CENSUS IS THE VERDICT AND IT READS NO NEW FOLD ON ANY OF THE 48 LOBE-FAMILY ROWS**,
+both trees, matched BY CONTROL SET because the labels moved (a label match would compare
+different states). One row FIXED — `LOBES: x buckle 0.30 f 3`, 20 pairs to 0, entry off in
+the same commit. **The declared rows move in BOTH directions and the xfail list does not
+gate magnitude (#213), so all of it passes silently**: ZYGO 2 whorls 11,824 -> 6,176, roll
+330 18,712 -> 16,360, cup 1.2 same 724 at half the worst span, curl 360 784 -> 864, and
+**`ALL MAX` 116,127 -> 135,969, the one real regression — reported, not tuned around**.
+**AND `ALL MAX`'s SHIPPED ENTRY WAS ALREADY STALE BEFORE THIS SESSION**: it read 72,348 /
+2.6011 where main itself measures 116,127 / 4.8182 on the same control set, because #212
+gave that row `lobeDepth 1.00` and nobody re-measured — both figures are in the entry now.
+**AND `LOBES: x cup 0.40` IS A KNIFE EDGE THAT COST A CYCLE**: one span-0 pair on both
+trees, a tangency of the census triangles against the CUP's own form-onset crease. It read
+0 on an intermediate tree, X1 fired "the pre-existing self-intersection is FIXED, remove
+its entry", the entry came off — and the ladder-search tolerance put the station back and
+the entry with it. A span-0 touch is a property of where the stations land on a crease, not
+of a fold, and the list cannot tell those apart.
 **L8 IS THE NEW FAMILY AND THE ONLY WITNESS FOR THE MODEL**: L0–L7 are all blind to where
 the treated arc ENDS, so a tree that reverted to MODEL A would pass every one of them on
 a shorter rim. **AND ITS LOAD-BEARING CLAUSE NEEDED A SECOND HALF, WHICH RE-READING THE

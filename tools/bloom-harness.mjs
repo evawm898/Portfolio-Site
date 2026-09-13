@@ -4644,7 +4644,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'petalRoll max (330)': '18776 pairs, worst span 1.3837 mm',
   'headRise max (1)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)',
   'ALL MIN': '537 pairs, worst span 0.4270 mm',
-  'ALL MAX': '72348 pairs, worst span 2.6011 mm (EFFECTIVE TILT PAST 90 — 165.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)',
+  'ALL MAX': '135969 pairs, worst span 4.7312 mm (EFFECTIVE TILT PAST 90 — 165.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. RE-MEASURED session 42, and the shipped 72348 / 2.6011 was ALREADY STALE on main: the same control set reads 116127 / 4.8182 there, because #212 gave this row lobeDepth 1.00 and nobody re-measured it. MODEL B takes it to 135969 / 4.7312 — 19842 MORE pairs at a slightly SMALLER worst span, the largest magnitude regression in the lobe family and the reason issue #213 — the xfail list not gating magnitude — is worth closing)',
   'FORM: QUILL (roll alone, toward a tube)': '18776 pairs, worst span 1.3837 mm',
   'FORM: FIDDLEHEAD (spine curl alone)': '1008 pairs, worst span 0.5233 mm',
   'FORM: REFLEXED (cup min x curl below the plane)': '360 pairs, worst span 0.1991 mm',
@@ -4913,7 +4913,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'LOBES: x roll 330 (over the quill, declared on main)': '16360 pairs, worst span 1.6115 mm (session 42 re-baselined on the branch: 18712 on main at the same control set, so MODEL B takes 2,352 pairs OFF the quill; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm)',
   'LOBES: x curl 360 (over the fiddlehead, declared on main)': '864 pairs, worst span 0.8971 mm (session 42 re-baselined on the branch: 784 on main at the same control set; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm)',
   'LOBES: x the whole centre (stamens and a style under a lobed whorl)': '272 pairs, worst span 0.0796 mm',
-  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '11824 pairs, worst span 0.7468 mm (was 12264 / 0.7032 before session 41)',
+  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '6176 pairs, worst span 0.4481 mm (session 42 re-baselined on the branch: main reads 11824 / 0.7468 at the same control set, so MODEL B takes 5648 pairs OFF this row and nearly halves the worst span; was 12264 / 0.7032 before session 41)',
   'LOBES: x the domed hub (head rise 1.00)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)',
 });
 

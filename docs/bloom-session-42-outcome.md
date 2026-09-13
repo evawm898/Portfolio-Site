@@ -566,6 +566,52 @@ the definitions stay replayable without the tag.
 
 ---
 
+## 10c. The census is the verdict, and it says NO NEW FOLD anywhere
+
+`tools/bloom-self-intersection.mjs` over **all 48 lobe-family rows, on BOTH
+trees, matched by CONTROL SET** (the labels moved, so a label match would have
+compared different states):
+
+**NEW folds: 0.** Not one row that is clean on `main` self-intersects on this
+tree. **FIXED: 1** — `LOBES: x buckle 0.30 f 3` goes 20 pairs to 0 and its
+xfail entry came off in the same commit, which is the list working in the
+direction that fails hard.
+
+The rows declared on both trees move in both directions, and the xfail list
+does not gate magnitude (**issue #213**), so all of this passes silently and is
+reported here instead:
+
+| row | main | this tree |
+|---|---|---|
+| `ALL MAX` | 116,127 / 4.8182 mm | **135,969 / 4.7312 mm** |
+| `LOBES: x ZYGO 2 whorls x ALL INNER MAX` | 11,824 / 0.7468 | **6,176 / 0.4481** |
+| `LOBES: x roll 330` | 18,712 / — | **16,360 / 1.6115** |
+| `LOBES: x curl 360` | 784 / — | **864 / 0.8971** |
+| `LOBES: x cup 1.2` | 724 / 0.4626 | **724 / 0.2155** |
+| `LOBES: x the domed hub` | 216 / 0.4176 | 216 / 0.4176 |
+| `LOBES: x the whole centre` | 272 / 0.0796 | 272 / 0.0796 |
+
+**`ALL MAX` is the one real regression — 19,842 more pairs at a slightly
+smaller worst span — and its shipped entry was ALREADY STALE before this
+session touched it**: it read 72,348 / 2.6011 while `main` itself measures
+116,127 / 4.8182 on the same control set, because #212 gave that row
+`lobeDepth 1.00` and nobody re-measured. Both figures are now in the entry.
+It is a row with every control at maximum and an effective tilt of 165 degrees
+at the deepest ring, where the blade's own mid-surface lies back over its foot
+and no station spacing can clear it — the class session 38 named EFFECTIVE
+TILT PAST 90. **Reported, not tuned around.**
+
+**And `LOBES: x cup 0.40` is the knife edge, recorded because it cost a
+cycle.** It reads ONE span-0 pair on both trees — a tangency of the census
+triangles against the cup's own form-onset crease. On an intermediate tree of
+this branch it read 0, X1 fired *the pre-existing self-intersection is FIXED,
+remove its entry*, and the entry came off; the ladder-search tolerance put the
+station back and the entry with it. A span-0 touch is a property of where the
+stations land on a crease, not of a fold, and the list cannot tell those
+apart.
+
+---
+
 ## 11. What is NOT done, and what it would cost
 
 * **The second cut level** (sub-teeth riding on lobes) stays unbuilt, as
