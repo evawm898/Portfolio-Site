@@ -6871,6 +6871,106 @@ export function buildMatrix() {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
 
+  /* 31. THE CARNATION FRINGE AND ITS SQUARED TERMINAL — ONE FEATURE (Eva's
+     ruling, Sep 13). Teeth across the petal's END, pointing along its length.
+     `docs/bloom-squared-tip-discovery.md` is the brief and
+     `docs/bloom-carnation-fringe-picture.md` is the measurement that closed it.
+
+     WHY THEY ARE ONE FEATURE RATHER THAN TWO, measured before either was
+     built: a panel fringe's fingers all run to u = 1, and `TIP_HALF_MM` is an
+     ABSOLUTE constant, so the blade is 1.600 mm across at the apex at EVERY
+     petal size. Ten fingers read as a carnation over most of their length and
+     then converge into one shared spike, and no count and no petal size can
+     fix it. `petalTipEnd` is what makes the end wide enough to carry teeth;
+     the fringe is what cuts them. Each is useless without the other, which is
+     why neither ships alone.
+
+     THE CENSUS ROWS COME FIRST, BY RULING, and they are the point of this
+     block. The picture session measured every fringed state it could reach and
+     read EXACTLY 0 within-shell pairs with the base panel pulled clear — but
+     every one of those states had a converging apex, so the teeth met at a
+     point and no two of them could straddle a wide flat end. A FRINGE AT
+     MAXIMUM COUNT ON A MAXIMUM TERMINAL IS THE STATE NOTHING HAS EVER
+     MEASURED: N teeth each a real width, side by side, each its own closed
+     panel overlapping the base. It is carried here at both ends of the
+     terminal and at both ends of the count.
+
+     THE GUARD IN BOTH DIRECTIONS. `petalTipEnd` 0 contributes a term of 0 to a
+     `max` and is not pushed onto the term list at all, and `fringeCount` 0
+     returns the single 'full' span — so the GATED rows must be bit-identical
+     to the default, and a control hidden but NOT inert is the defect they
+     exist to catch.
+
+     THE DEAD TRAVEL IS A ROW, NOT A FOOTNOTE. Below `TIP_HALF_MM / peakHalf`
+     the terminal sits under the print floor and delivers nothing, and that
+     fraction MOVES WITH THE PETAL'S WIDTH (20.0% of the track at width 8, 5.3%
+     at 30), so no static range is dead-free and the range is neither narrowed
+     nor made adaptive — `stamenSpread`'s ruling. The narrow-petal row is where
+     it bites hardest.
+
+     THE COUNT CEILING IS THE TERMINAL'S WIDTH, not the apex's. Every tooth and
+     every gap must clear `MIN_FEATURE_MM` at the station where it is
+     NARROWEST — the tooth at its own tip, the gap at the split — and both
+     reduce to `2 * Wt >= (2N - 1) * MIN_FEATURE_MM`. The rows at the ceiling
+     and at the narrow petal are the two ends of that.
+
+     THE SPLIT IS OWNED IN PHYSICAL UNITS. `fringeDepth` is a fraction of the
+     petal's OWN LENGTH, so the target station is `1 - fringeDepth` exactly and
+     the depth in millimetres is `fringeDepth * length` — one owner, no row
+     count standing for a depth. The builder reports the station it actually
+     landed on and the residual, because a panel boundary IS a row and the
+     ladder decides where the rows are.
+
+     LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE, BY RULING. Both own the
+     apex, and composing them was measured to narrow EVERY finger including
+     interior ones nowhere near the rim (middle finger 0.5873 -> 0.4599 mm at
+     coverage 0.40), because a v-span is a fraction of the CUT half-width. The
+     lobe family is hidden AND inert under a fringe; the GATED rows assert it
+     in both directions.
+
+     Nothing here touches the cut law, the count, the depth, the coverage arc,
+     the 49x49 demand table, `bladeStations` or the ladder's ownership. */
+  for (const [name, sets] of [
+    /* THE TERMINAL ALONE — no fringe. The squared end as a shape family. */
+    ['FRINGE: the terminal alone at the shipped middle (0.35 of the peak — a 5.60 mm end, 35% of the width)', { petalTipEnd: 0.35 }],
+    ['FRINGE: the terminal alone, narrowest clear of the dead travel (0.15)', { petalTipEnd: 0.15 }],
+    ['FRINGE: the terminal alone at the CEILING (1.00 — the tip taper fully squared, the base taper untouched)', { petalTipEnd: 1 }],
+    ['FRINGE: the terminal x the acute apex law (0.60 — the taper the terminal replaces)', { petalTipEnd: 0.35, petalTipShape: 0.6 }],
+    ['FRINGE: the terminal x the round apex law (3.00 — a blunt shoulder meeting a flat end)', { petalTipEnd: 0.35, petalTipShape: 3 }],
+    ['FRINGE: the terminal x the narrowest petal (8 mm — where the dead travel is 20% of the track)', { petalTipEnd: 0.35, petalWidth: 8 }],
+    ['FRINGE: the terminal x the widest petal (30 mm)', { petalTipEnd: 0.35, petalWidth: 30 }],
+    ['FRINGE: the terminal x the shortest petal (20 mm — the end is a larger share of the blade)', { petalTipEnd: 0.5, petalLength: 20 }],
+    /* THE FRINGE, ON THE TERMINAL. The carnation. */
+    ['FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2 }],
+    ['FRINGE: THE CENSUS ROW — the MAXIMUM count on the MAXIMUM terminal (the state nothing has measured)', { petalTipEnd: 1, fringeCount: 10, fringeDepth: 0.2 }],
+    ['FRINGE: THE CENSUS ROW at the deepest split (10 teeth, depth 0.50 — the longest teeth reachable)', { petalTipEnd: 1, fringeCount: 10, fringeDepth: 0.5 }],
+    ['FRINGE: the shallowest split (depth 0.05 — a toothed edge rather than a fringe)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.05 }],
+    ['FRINGE: ONE tooth (the terminal tapered to a single point — legal, and not a fringe)', { petalTipEnd: 0.5, fringeCount: 1, fringeDepth: 0.2 }],
+    ['FRINGE: TWO teeth (the cleft the shipped capability hook has always drawn, now reachable)', { petalTipEnd: 0.5, fringeCount: 2, fringeDepth: 0.2 }],
+    ['FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.15; told, never refused)', { petalTipEnd: 0.15, fringeCount: 10, fringeDepth: 0.2 }],
+    ['FRINGE: CLAMPED — 10 teeth on the narrowest petal (8 mm, the tightest count ceiling reachable)', { petalTipEnd: 1, fringeCount: 10, fringeDepth: 0.2, petalWidth: 8 }],
+    ['FRINGE: NO ROOM — a fringe asked with no terminal at all (the converging apex; told)', { petalTipEnd: 0, fringeCount: 7, fringeDepth: 0.2 }],
+    /* THE FRINGE UNDER THE THINGS THAT ALREADY FOLD A PLAIN PETAL. */
+    ['FRINGE: x the thickest sheet (2.40 mm — the print floor doubles under the same terminal)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, sheetThickness: 2.4 }],
+    ['FRINGE: x the thinnest sheet (0.60 mm, floored to 1.00 in export)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, sheetThickness: 0.6 }],
+    ['FRINGE: x cup 1.2 (the picture measured fingers reaching each other here)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCup: 1.2 }],
+    ['FRINGE: x the buckle at 0.30 f 3 (the other state that brought fingers together)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, buckleAmp: 0.3, buckleFreq: 3 }],
+    ['FRINGE: x roll 330 (a quilled tube with a fringed end)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalRoll: 330 }],
+    ['FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, spineCurl: 180 }],
+    ['FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCup: 1.2, petalRoll: 330, petalTwist: 40, spineCurl: 180, buckleAmp: 0.6 }],
+    /* ARRANGEMENT — many fringed ends on one hub. */
+    ['FRINGE: x 40 petals (forty fringed ends on one hub)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, petalCount: 40 }],
+    ['FRINGE: x CONTINUOUS x 3 turns (a fringe on every petal of a spiral)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, placement: 'CONTINUOUS', turns: 3 }],
+    ['FRINGE: x 3 layers (the inner whorls fringed too)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, layerCount: 3 }],
+    /* THE GUARDS, both directions. */
+    ['FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)', { petalTipEnd: 0, fringeCount: 10, fringeDepth: 0.5 }],
+    ['FRINGE: GATED — a MAXIMUM terminal with the count at 0 (the terminal alone; no panel is split)', { petalTipEnd: 1, fringeCount: 0, fringeDepth: 0.5 }],
+    ['FRINGE: GATED — the count at 0 with the depth at MAXIMUM (hidden and inert; bit-identical to the default)', { fringeCount: 0, fringeDepth: 0.5 }],
+    ['FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, lobeDepth: 1, lobeCount: 10, lobeCoverage: 1 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
   return rows;
 }
 

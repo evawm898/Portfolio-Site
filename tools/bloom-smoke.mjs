@@ -621,6 +621,31 @@ export const SMOKE_BLOCKS = [
         path: 'the OTHER direction — ST0 and ST1 on a stemless bloom: the diameter at its extreme builds no stem and leaves the join INERT, so the hub takes its pre-stem expression verbatim; the row the byte tool proves bit-identical to the default' },
     ],
   },
+  {
+    n: 31,
+    anchor: 'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this family adds are the
+       TERMINAL term (pushed onto the term list or not), the fringe's own panel
+       decomposition (one 'full' span or N+1 panels), the COUNT CLAMP in both
+       of its arms, NO ROOM (a fringe asked with no terminal to carry it), and
+       the lobe family going inert under a fringe. Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: every placement
+       but RADIAL, the form controls (cup, roll, curl, the buckle) over a
+       fringe, multiple whorls, and the extreme sheets — all of which are live
+       matrix rows and none of which is in the subset. */
+    rows: [
+      { label: 'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',
+        path: 'the feature CONSTRUCTED, both halves at once — FR0 (the registry\'s fringeEligible and the geometry\'s agree, and the builder declares a fringe iff the state asks for one), FR1 (built iff declared: N+1 panels and N spans at the petal\'s END, from the builder\'s own tally), FR2 (the terminal is a TERM with its own domain, it never wins below uPk, and the emitted half-width at u=1 IS the terminal), FR3 (the split is owned in PHYSICAL units — the target station is 1 - fringeDepth and the landed station is within half a row gap of it), FR4 (every tooth and every gap clears MIN_FEATURE_MM at the station where it is narrowest), FR5 (the count ceiling is the TERMINAL\'s width and the clamp is a biconditional)' },
+      { label: 'FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.15; told, never refused)',
+        path: 'the CLAMP\'s live arm — FR5 with countAsked above countBuilt and the reason named, on the terminal that is barely clear of its own dead travel; the row where the ceiling binds hardest without the petal changing size' },
+      { label: 'FRINGE: NO ROOM — a fringe asked with no terminal at all (the converging apex; told)',
+        path: 'the NO ROOM arm — a fringe asked where the blade converges to 2 x TIP_HALF_MM, which is the state the picture session measured as unbuildable at any count; FR5 must refuse it, name the cause, and leave the petal a single span' },
+      { label: 'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)',
+        path: 'the mutual exclusion in the direction that can silently fail — the lobe family at MAXIMUM under a live fringe must contribute NOTHING, so L0\'s own record is absent and the emitted outline is the fringe\'s alone; the defect this catches is a lobe cut still narrowing every finger, which no count and no span check can see' },
+      { label: 'FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)',
+        path: 'the OTHER direction — both guards at once on a bloom that must be the shipping default to the bit: the terminal term is not pushed and trimPanels returns the single \'full\' span, so FR0 and FR1 read absent and the byte tool proves the row unmoved' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
