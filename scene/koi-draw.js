@@ -88,15 +88,42 @@ const NOSE_LEAD = 0.030;     // how far the snout reaches past the first joint
 const FISH_ALPHA = 1;       // see drawFish — a koi never fades
 const EYE_R = 1.15;          // screen px — a koi's eye is tiny and it reads
 
-// THE RIGID FRAME'S ORIENTATION LAGS f.heading, AND THIS IS THE WHOLE OF THE
-// FIX FOR "the fish pivots on its nose" (see the comment above F in drawFish
-// for why). SPINE_ORIENT_WEIGHT is how much of F comes from f.spine's own
-// bulk direction versus straight from f.heading — 1 would be the chain alone,
-// which reads as too sluggish to resolve a hard alarm turn and too noisy on a
-// fish that is nearly stationary (a short chain has no reliable direction);
-// 0 is today's bug (a rigid body built straight from heading, with no memory
-// of where it just was). Tuned by eye against a slow drift and a sharp turn.
-const SPINE_ORIENT_WEIGHT = 0.4;
+// THE BODY BENDS NOW, AND THE BEND IS ONE MEASURED SCALAR, NOT NINE
+// INDEPENDENT JOINTS (see the comment above headDir in drawFish for the
+// mechanism and why it is one number rather than a per-joint frame — that
+// second thing is exactly what the single-rigid-frame rewrite fixed, and
+// this does not undo it). BEND_MAX_RAD caps how far the tail's own current
+// direction is allowed to have fallen behind the nose's before the drawn
+// body stops opening the difference any further — a real koi caught mid
+// startle curls close to this; past it the clamp is what keeps a noisy
+// reading (a fish an instant after spawning, say) from folding the body
+// through itself. BEND_EPS is where "nearly straight" is treated as exactly
+// straight, so the arc formula never has to divide by a near-zero angle.
+const BEND_MAX_RAD = 2.6;             // ~149 degrees, tail to nose, over the body's length
+const BEND_EPS = 1e-4;
+// TWO APPENDAGES ARE ALSO CAPPED AGAINST THE LOCAL BEND RADIUS, AND FOR A
+// DIFFERENT REASON THAN THE SHARED-FRAME FIX ABOVE THEM SOLVES A DIFFERENT
+// FAILURE — this one has nothing to do with fins disagreeing with each
+// other and everything to do with a fixed-length appendage extending in a
+// STRAIGHT LINE off a body that is no longer straight. The dorsal's peak
+// reaches several half-widths off the surface and the tail's own paddle
+// reaches OVER HALF THE BODY'S LENGTH off its root — both sized for a body
+// whose local radius of curvature is effectively infinite (straight). On a
+// tightly curled body that radius can fall to the same order as either
+// reach, and extending a straight segment PAST the radius it is curling
+// around does not read as "a fin off the surface" — it reads as a shape
+// flung out into open space, past the curl, which for the tail measured as
+// a wedge torn sideways across the body's own silhouette (found by
+// disabling each appendage in turn until the wedge disappeared: the dorsal
+// alone did not explain it, the tail alone did). Both fractions cap the
+// relevant reach at this share of |rr|, the local arc radius; a straight
+// body has no radius to cap against and neither is affected. Tuned
+// separately by eye (a peak and a paddle are different shapes reaching off
+// a curl, and 0.55 alone left the tail's own wedge largely unchanged) —
+// TAIL_REACH_RADIUS_FRAC is not "the same idea, smaller number" so much as
+// the number this particular appendage needed.
+const DORSAL_PEAK_RADIUS_FRAC = 0.55;
+const TAIL_REACH_RADIUS_FRAC = 0.35;
 
 // EVERY APPENDAGE IS A FRACTION ALONG (u, 0 nose -> 1 tail) AND A FRACTION
 // ACROSS (a multiplier on the body's own half-width at that u), through the
@@ -225,78 +252,94 @@ export function createRenderer(ctx, surface) {
     const a = FISH_ALPHA;
     const L = f.len;
 
-    // ONE RIGID FRAME FOR THE WHOLE FISH, AND EVERY APPENDAGE GOES THROUGH IT.
-    // The previous version threaded each fin's own tangent and normal off a
-    // per-joint slice of a spine that was also being distorted by a swim
-    // wave — so a dorsal fin, a pectoral and the tail fin each reasoned about
-    // "which way is sideways" from a slightly different, curving frame, and
-    // the three disagreed with each other and with the eye (a dorsal fused
-    // into the head's own curve; pectorals that read as nearer the tail than
-    // the head). F is the fish's forward (nose) direction and R its right,
-    // both fixed for the whole fish this frame; `pos(u)` walks from the nose
-    // (u=0) to the tail (u=1) along F, and `edge(u, side, k)` is the point k
-    // half-widths out from that station, on the given flank. The body is
-    // still one rigid tapered oval, never a per-joint bend — but F's OWN
-    // direction is NOT read straight off f.heading, and that is a real
-    // behaviour fix rather than a leftover of the old per-joint renderer.
-    // f.heading is already turn-rate-limited in koi-fish.js, but a rigid body
-    // built from it directly still snaps to exactly where the fish is
-    // steering RIGHT NOW, every single frame — which reads as a compass
-    // needle turning on its own pin, not as a body a head has to drag around.
-    // f.spine is that drag, computed every frame in koi-fish.js whether this
-    // file reads it or not: each joint chases a fixed distance behind the one
-    // ahead of it, so during a turn the chain trails the head's new direction
-    // and only straightens out once the fish has actually been travelling
-    // that way for a while. The vector from the chain's last joint back to
-    // the head (its own bulk direction) is what F reads, blended with raw
-    // heading by SPINE_ORIENT_WEIGHT so the frame is not sluggish on a fish
-    // that just spawned or noisy on one that is barely moving. This is what
-    // turns "the whole fish pivots on its nose" into "the body settles into
-    // the turn" — the nose still moves along the fish's true simulated path,
-    // it is only the ORIENTATION drawn through it that now has memory.
+    // THE BODY BENDS, AND THE BEND IS ONE MEASURED SCALAR — NOT NINE
+    // INDEPENDENTLY WOBBLING JOINTS, WHICH IS WHAT THE SINGLE-RIGID-FRAME
+    // REWRITE WAS BUILT TO AVOID (its own comment, restated because it still
+    // applies): the previous per-joint renderer threaded each fin's own
+    // tangent and normal off a slice of a spine that was ALSO being
+    // distorted by a swim wave, so a dorsal fin, a pectoral and the tail fin
+    // each reasoned about "which way is sideways" from a slightly different,
+    // NOISY frame, and the three disagreed with each other and with the eye.
+    // A rigid oval built straight from f.heading fixed that disagreement but
+    // threw away real information along with the noise: it reads as a
+    // compass needle, the whole body swinging in lockstep with wherever the
+    // fish steers NOW, rather than a body a head has to visibly drag around
+    // — a real koi's spine genuinely curves along its length mid-turn, the
+    // head already round while the tail is still travelling roughly where
+    // the head just was. f.spine (koi-fish.js's own lagged chase chain)
+    // measures exactly that lag every frame, but reading it PER JOINT is the
+    // noisy path back to the old defect. What is read instead is ONE number:
+    // headDir is the nose's true, instantaneous direction (f.heading, not
+    // lagged — the nose is exactly where the fish points right now); the
+    // spine's LAST segment (sp[N-2] to sp[N-1], the freshest evidence of
+    // where the body pointed a moment ago) gives tailFwd, its own local
+    // "toward the nose" direction — the reverse of the segment itself,
+    // because each joint is laid down BEHIND the one before it. The signed
+    // angle from headDir to tailFwd (BEND, clamped) is then swept smoothly
+    // along the body as a circular arc: Fu(u) rotates headDir by BEND*u, so
+    // every station's local frame is a DETERMINISTIC function of u — a
+    // smooth curve, not a ninth independent sample — which is what lets fins
+    // root on a bending body without reopening the old disagreement. Fu(0)
+    // is exactly headDir and pos/Fu reduce to the old straight, single-frame
+    // formulas exactly when BEND is ~0 (straight swimming), so an
+    // undisturbed fish is unaffected down to the last bit.
     const sp = f.spine;
-    const tailJoint = sp[sp.length - 1];
-    const headHx = Math.cos(f.heading), headHy = Math.sin(f.heading);
-    let lagX = f.x - tailJoint.x, lagY = f.y - tailJoint.y;
-    const lagM = Math.hypot(lagX, lagY);
-    let F;
-    if (lagM > 1e-6) {
-      lagX /= lagM; lagY /= lagM;
-      const bx = lagX * SPINE_ORIENT_WEIGHT + headHx * (1 - SPINE_ORIENT_WEIGHT);
-      const by = lagY * SPINE_ORIENT_WEIGHT + headHy * (1 - SPINE_ORIENT_WEIGHT);
-      const bm = Math.hypot(bx, by) || 1;
-      F = { x: bx / bm, y: by / bm };
-    } else {
-      // A degenerate chain (every joint exactly on the head) has no bulk
-      // direction to read — falls back to heading alone rather than to a
-      // division by zero. Not reachable from makeFish's own seeding, kept
-      // as a guard the way the rest of this file guards a zero-length vector.
-      F = { x: headHx, y: headHy };
-    }
-    const R = { x: -F.y, y: F.x };
-    // See "VOLUME CUES" above the constants: nearAlign is R's own alignment
-    // with the fixed world direction standing in for the tilt (R.y === F.x).
-    // F is no longer exactly heading, so this is the blended frame's own
-    // alignment rather than a literal cos(heading) — read by every
-    // shading/sizing decision below rather than re-derived per appendage.
-    const nearAlign = F.x;
+    const headDir = { x: Math.cos(f.heading), y: Math.sin(f.heading) };
+    const tA = sp[sp.length - 2], tB = sp[sp.length - 1];
+    let ttx = tB.x - tA.x, tty = tB.y - tA.y;
+    const ttm = Math.hypot(ttx, tty) || 1;
+    ttx /= ttm; tty /= ttm;
+    const tailFwd = { x: -ttx, y: -tty };
+    // perp90CCW(headDir) — the axis Fu(u) sweeps toward as u leaves 0.
+    const N0 = { x: -headDir.y, y: headDir.x };
+    const rawBend = Math.atan2(
+      headDir.x * tailFwd.y - headDir.y * tailFwd.x,
+      headDir.x * tailFwd.x + headDir.y * tailFwd.y,
+    );
+    const BEND = Math.max(-BEND_MAX_RAD, Math.min(BEND_MAX_RAD, rawBend));
+    const straight = Math.abs(BEND) < BEND_EPS;
+    const rr = straight ? 0 : L / BEND;      // signed arc radius; unused while straight
+    const Fu = (u) => {
+      const ang = BEND * u, c = Math.cos(ang), s = Math.sin(ang);
+      return { x: headDir.x * c + N0.x * s, y: headDir.y * c + N0.y * s };
+    };
+    const Ru = (u) => { const d = Fu(u); return { x: -d.y, y: d.x }; };
+    const pos = (u) => {
+      if (straight) return { x: f.x - headDir.x * u * L, y: f.y - headDir.y * u * L };
+      const ang = BEND * u, s = Math.sin(ang), c = Math.cos(ang);
+      return {
+        x: f.x - rr * s * headDir.x - rr * (1 - c) * N0.x,
+        y: f.y - rr * s * headDir.y - rr * (1 - c) * N0.y,
+      };
+    };
+    // See "VOLUME CUES" above the constants: this is a property of the
+    // WHOLE FISH's facing (which way the fixed tilt leans it), not of any
+    // one station along a body that may now be curved, so it reads the
+    // true, unlagged heading — exactly cos(heading), same as before any of
+    // this shipped — rather than a station-dependent Fu(u).
+    const nearAlign = headDir.x;
     const nearSide = nearAlign >= 0 ? 1 : -1;
     const volMag = Math.abs(nearAlign);
-    const pos = (u) => ({ x: f.x - F.x * u * L, y: f.y - F.y * u * L });
     const widthAt = (u) => {
       const n = WIDTH_PROFILE.length;
       const fi = Math.max(0, Math.min(n - 1, u * (n - 1)));
       const i0 = Math.min(n - 2, Math.floor(fi)), fr = fi - i0;
       return (WIDTH_PROFILE[i0] + (WIDTH_PROFILE[i0 + 1] - WIDTH_PROFILE[i0]) * fr) * L;
     };
+    // Every appendage's own "sideways" now comes from Ru AT ITS OWN STATION,
+    // not a fish-wide constant — which is safe here (see above) because Fu
+    // is a smooth analytic function of u rather than a per-joint sample.
     const edge = (u, side, k = 1) => {
-      const c = pos(u), w = widthAt(u) * k;
-      return { x: c.x + R.x * side * w, y: c.y + R.y * side * w };
+      const c = pos(u), r_ = Ru(u), w = widthAt(u) * k;
+      return { x: c.x + r_.x * side * w, y: c.y + r_.y * side * w };
     };
     const sEdge = (u, side, k = 1) => { const e = edge(u, side, k); return P(e.x, e.y); };
 
     const SAMPLES = WIDTH_PROFILE.length;
-    const nose = P(pos(0).x + F.x * NOSE_LEAD * L, pos(0).y + F.y * NOSE_LEAD * L);
+    // Fu(0) === headDir exactly (angle 0), so the nose still extends in the
+    // fish's true current heading — the leading point of a bending body is
+    // still exactly where the fish points right now.
+    const nose = P(pos(0).x + headDir.x * NOSE_LEAD * L, pos(0).y + headDir.y * NOSE_LEAD * L);
 
     const outline = [nose];
     for (let i = 0; i < SAMPLES; i++) { const e = edge(i / (SAMPLES - 1), 1); outline.push(P(e.x, e.y)); }
@@ -376,15 +419,16 @@ export function createRenderer(ctx, surface) {
     // hard edge on an otherwise soft fish. The eyes are the head cue now, the
     // same way the reference uses only the patch pattern and the taper.
 
-    // Markings. Drawn in the body's own frame (u along, R across), so a
-    // patch stays put on the fish however it turns.
+    // Markings. Drawn in the body's own LOCAL frame at the patch's own
+    // station (u along, Ru(u) across), so a patch stays put on the fish —
+    // and rides the bend with the surface it sits on — however it turns.
     if (f.patches.length) {
       ctx.lineWidth = 0.75;
       for (const pt of f.patches) {
-        const c = pos(pt.s), halfW = widthAt(pt.s);
-        const ox = c.x + R.x * pt.t * halfW, oy = c.y + R.y * pt.t * halfW;
+        const c = pos(pt.s), halfW = widthAt(pt.s), fLocal = Fu(pt.s), rLocal = Ru(pt.s);
+        const ox = c.x + rLocal.x * pt.t * halfW, oy = c.y + rLocal.y * pt.t * halfW;
         const ca = Math.cos(pt.rot), sa = Math.sin(pt.rot);
-        const ax = F.x * ca - F.y * sa, ay = F.x * sa + F.y * ca;   // patch long axis
+        const ax = fLocal.x * ca - fLocal.y * sa, ay = fLocal.x * sa + fLocal.y * ca;   // patch long axis
         const bx = -ay, by = ax;
         // ACROSS THE BODY A PATCH IS MEASURED IN HALF-WIDTHS, NOT IN BODY
         // LENGTHS. Sized off L in both axes, a marking came out wider than the
@@ -425,9 +469,27 @@ export function createRenderer(ctx, surface) {
       // signed (+ when this fin's side matches nearSide, - otherwise) and
       // magnitude-bounded by volMag, so it needs no separate near/far branch.
       const peakK = DORSAL_PEAK_K * (1 + DORSAL_VOL_SPAN * side * nearAlign);
-      const baseA = sEdge(DORSAL_U0, side, 1);
-      const baseB = sEdge(DORSAL_U1, side, 1);
-      const peak = sEdge(DORSAL_PEAK_U, side, peakK);
+      // ONE LOCAL FRAME FOR THE WHOLE FIN — at its own midpoint station,
+      // not one Ru(u) per point the way the outline itself reads it. Read
+      // per-point, a hard bend rotates Ru across the fin's own span (U0
+      // 0.46 to U1 0.74) by tens of degrees and the three points disagree
+      // about which way is outward — the exact disagreement the
+      // single-rigid-frame rewrite exists to prevent, reopened WITHIN one
+      // fin instead of between fins. `pos(u)` still tracks each point along
+      // the true curved centreline; only the "which way is outward"
+      // direction is shared.
+      const dorsalR = Ru(DORSAL_PEAK_U);
+      const baseAc = pos(DORSAL_U0), baseBc = pos(DORSAL_U1), peakC = pos(DORSAL_PEAK_U);
+      const wA = widthAt(DORSAL_U0), wB = widthAt(DORSAL_U1);
+      // See DORSAL_PEAK_RADIUS_FRAC above the constants: the shared frame
+      // fixes WHICH WAY the peak reaches, but not HOW FAR — a big reach off
+      // a tight curl still flings the point past its own bend, which is the
+      // OTHER failure the first version of this shipped with.
+      let wP = widthAt(DORSAL_PEAK_U) * peakK;
+      if (!straight) wP = Math.min(wP, DORSAL_PEAK_RADIUS_FRAC * Math.abs(rr));
+      const baseA = P(baseAc.x + dorsalR.x * side * wA, baseAc.y + dorsalR.y * side * wA);
+      const baseB = P(baseBc.x + dorsalR.x * side * wB, baseBc.y + dorsalR.y * side * wB);
+      const peak = P(peakC.x + dorsalR.x * side * wP, peakC.y + dorsalR.y * side * wP);
       ctx.beginPath();
       ctx.moveTo(baseA.x, baseA.y);
       ctx.quadraticCurveTo(peak.x, peak.y, baseB.x, baseB.y);
@@ -445,7 +507,9 @@ export function createRenderer(ctx, surface) {
 
     // THE CAUDAL FIN IS A SOFT FLARED PADDLE, NOT A KITE — every edge a
     // curve, none of them a straight line meeting another at a point. `back`
-    // is the body's own -F, and rotating it by ±TAIL_SPREAD gives the two
+    // is the body's own LOCAL -Fu AT THE TAIL ROOT (not a fish-wide
+    // constant, so the fin flicks off wherever a bending body's own end
+    // actually points), and rotating it by ±TAIL_SPREAD gives the two
     // lobes' directions exactly as before; what changed is how the three
     // points between them are connected. Each lobe's leading edge (root to
     // its tip) BOWS outward past its own straight chord — `bow()` is the
@@ -454,23 +518,30 @@ export function createRenderer(ctx, surface) {
     // two tips is ONE quadratic curve with NOTCH as its control point rather
     // than a vertex: a quadratic curve does not reach its control point, so
     // the fork dips TOWARD where the old fork's point was without ever
-    // sharpening into it — a scallop, not a V. Static and rigid with the
-    // body, per the brief for this pass.
+    // sharpening into it — a scallop, not a V.
     {
       const root = pos(TAIL_ROOT_U);
       const tailTip = pos(1);
-      const back = { x: -F.x, y: -F.y };
+      const tailDir = Fu(TAIL_ROOT_U);
+      const back = { x: -tailDir.x, y: -tailDir.y };
       const rot = (v, ang) => {
         const c = Math.cos(ang), s = Math.sin(ang);
         return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
       };
       const dirUp = rot(back, TAIL_SPREAD), dirDown = rot(back, -TAIL_SPREAD);
-      const tipUp = { x: tailTip.x + dirUp.x * TAIL_LEN * L, y: tailTip.y + dirUp.y * TAIL_LEN * L };
-      const tipDown = { x: tailTip.x + dirDown.x * TAIL_LEN * L, y: tailTip.y + dirDown.y * TAIL_LEN * L };
-      const notch = { x: tailTip.x + back.x * TAIL_NOTCH_LEN * L, y: tailTip.y + back.y * TAIL_NOTCH_LEN * L };
+      // See TAIL_REACH_RADIUS_FRAC above the constants: TAIL_LEN reaches
+      // over half the body's own length in a straight line off the root,
+      // which on a tightly curled body overshoots past the curl itself.
+      // `reach` scales TAIL_LEN, TAIL_NOTCH_LEN and TAIL_BOW down TOGETHER
+      // so the paddle shrinks as one shape rather than losing its own
+      // proportions — never grows past 1, so a straight body is unaffected.
+      const reach = straight ? 1 : Math.min(1, (TAIL_REACH_RADIUS_FRAC * Math.abs(rr)) / (TAIL_LEN * L));
+      const tipUp = { x: tailTip.x + dirUp.x * TAIL_LEN * L * reach, y: tailTip.y + dirUp.y * TAIL_LEN * L * reach };
+      const tipDown = { x: tailTip.x + dirDown.x * TAIL_LEN * L * reach, y: tailTip.y + dirDown.y * TAIL_LEN * L * reach };
+      const notch = { x: tailTip.x + back.x * TAIL_NOTCH_LEN * L * reach, y: tailTip.y + back.y * TAIL_NOTCH_LEN * L * reach };
       const bow = (p0, p1, dir) => ({
-        x: (p0.x + p1.x) / 2 + dir.x * TAIL_BOW * L,
-        y: (p0.y + p1.y) / 2 + dir.y * TAIL_BOW * L,
+        x: (p0.x + p1.x) / 2 + dir.x * TAIL_BOW * L * reach,
+        y: (p0.y + p1.y) / 2 + dir.y * TAIL_BOW * L * reach,
       });
       const bowUp = bow(root, tipUp, dirUp), bowDown = bow(root, tipDown, dirDown);
       const rootP = P(root.x, root.y), tipUpP = P(tipUp.x, tipUp.y),
@@ -511,11 +582,13 @@ export function createRenderer(ctx, surface) {
       const flap = 0.72 + Math.sin(f.finPhase) * 0.28;
       for (const side of [1, -1]) {
         const root = edge(PECT_U, side, 0.92);
+        const fLocal = Fu(PECT_U), rLocal = Ru(PECT_U);
         const ca = Math.cos(PECT_ANGLE), sa = Math.sin(PECT_ANGLE);
-        // Long axis: straight outward (R*side), swept back toward the tail
-        // (-F) by PECT_ANGLE. Short axis is just the long one turned a
-        // quarter turn.
-        const axX = R.x * side * ca - F.x * sa, axY = R.y * side * ca - F.y * sa;
+        // Long axis: straight outward (Ru(PECT_U)*side), swept back toward
+        // the tail (-Fu(PECT_U)) by PECT_ANGLE — the fin's own station's
+        // local frame, not a fish-wide constant. Short axis is just the
+        // long one turned a quarter turn.
+        const axX = rLocal.x * side * ca - fLocal.x * sa, axY = rLocal.y * side * ca - fLocal.y * sa;
         const bxX = -axY, bxY = axX;
         // THE FAR FIN READS SMALLER, NEVER THE NEAR ONE. Two mirrored ovals
         // of identical size is exactly the flat-cutout look this pass is
@@ -547,12 +620,13 @@ export function createRenderer(ctx, surface) {
       ctx.strokeStyle = rgba(INK_FISH, 0.30 * a);
       const wig = Math.sin(f.finPhase * 1.4) * 0.012;
       const c = pos(BARBEL_U), baseW = widthAt(BARBEL_U);
+      const fLocal = Fu(BARBEL_U), rLocal = Ru(BARBEL_U);
       for (const side of [1, -1]) {
         const base = sEdge(BARBEL_U, side, 0.5);
-        const tip = P(c.x + R.x * side * (baseW * 0.5 + 0.085 * L) + F.x * (0.02 + wig) * L,
-                      c.y + R.y * side * (baseW * 0.5 + 0.085 * L) + F.y * (0.02 + wig) * L);
-        const ctrl = P(c.x + R.x * side * (baseW * 0.5 + 0.03 * L) + F.x * 0.06 * L,
-                       c.y + R.y * side * (baseW * 0.5 + 0.03 * L) + F.y * 0.06 * L);
+        const tip = P(c.x + rLocal.x * side * (baseW * 0.5 + 0.085 * L) + fLocal.x * (0.02 + wig) * L,
+                      c.y + rLocal.y * side * (baseW * 0.5 + 0.085 * L) + fLocal.y * (0.02 + wig) * L);
+        const ctrl = P(c.x + rLocal.x * side * (baseW * 0.5 + 0.03 * L) + fLocal.x * 0.06 * L,
+                       c.y + rLocal.y * side * (baseW * 0.5 + 0.03 * L) + fLocal.y * 0.06 * L);
         ctx.beginPath();
         ctx.moveTo(base.x, base.y);
         ctx.quadraticCurveTo(ctrl.x, ctrl.y, tip.x, tip.y);
