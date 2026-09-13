@@ -272,7 +272,23 @@ than the `domeIsFlat()` guard shape here because there is nothing that can drift
 probe building both trees and comparing every emitted float under `Object.is` reads **0 moved**
 on the flat default and on `headRise` 0.5, 1, 1 × 40 petals and 0.5 × 6 layers, in BOTH modes;
 the one stem state differs by exactly **5,184 floats = 576 triangles**, which is the hollow
-stem itself. The partition was then re-run in full on the corrected tree.
+stem itself.
+
+**THE RE-RUN ON THE CORRECTED TREE: PASS.** *16 of 16 rows named by `--movers` MOVED (every one
+must), 677 holders compared to the bit — 0 floats moved on the holders, positionally, under
+`Object.is`.* Over **669,615,336 export floats across 74,401,704 triangles**, 693 rows × 2
+modes, plus **72,113,940 captured-grid values over 8,205 panels** — the grid clause matters
+because it carries the mid-surface and the per-column normal, which the STL never sees, so a
+change that cancelled in the two skins would still show there.
+
+**WHAT THIS SAYS ABOUT THE REST OF THE SUITE.** Every other instrument was GREEN on the tree
+that carried this defect: the export gate (17/17 STEM rows, boundary 0), the connectedness
+gate, the self-intersection census, the panel gate, the smoke census, the full 25-mutant table
+and all seven ST clauses. A domed hub one ulp thicker on its inner surface is still watertight,
+still one connected piece, still the right triangle count, and still satisfies every assertion
+anyone wrote about the join — **because nothing in the suite compares against `main`.** The
+byte partition is the only instrument here that could have seen it, which is the argument for
+predeclaring a partition on every session that claims a guard is inert.
 
 ### 6b. The mutant table ran and FAILED, and four of its findings were in the stem's own assertion family
 
