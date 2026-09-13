@@ -1,27 +1,40 @@
-// scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black:
-// no fills that carry tone, no colour, no shading. The identity is line art, so
-// a koi is an outline with a dark body behind it rather than a shape with a
-// value, and the only thing that varies is how brightly a line is drawn.
+// scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
+// so a koi is an outline with a dark body behind it rather than a shape with a
+// value, and colour never enters it — everything here is one grayscale ink at
+// a varying brightness.
+//
+// TWO FILLS CARRY TONE, ON PURPOSE, AND BOTH ARE KEPT DELIBERATELY FAINT: a
+// fixed grain over the whole frame (GRAIN_MAX_A) so open water between ripples
+// does not read as one flat value, and a soft wash under each ripple's own
+// front (WASH_MAX_A) so disturbed water reads as very slightly brighter than
+// the still water around it. Neither is a light source, a reflection or a
+// colour — both are the same INK the lines are, at a low, capped alpha — so
+// the "no colour, no shading" identity holds; only "no fill carries tone" is
+// the one rule this pair narrowly overrides, and it does so by a few percent
+// of full white at most.
 //
 // THE SQUASH IS APPLIED TO POINTS, NEVER TO THE CANVAS. A ctx.scale(1, squash)
 // would be one line shorter and would also squash the STROKE — every line would
 // come out thinner across the fish than along it, which is exactly the thing a
 // line-art piece cannot afford. So every plane point is projected by hand at
 // the moment it is drawn and all stroking happens in screen space, where a
-// 1.1 px line is 1.1 px in every direction.
+// 1.1 px line is 1.1 px in every direction. The grain and the wash are filled
+// circles on the same water plane, so they go through the same `surface.ellipse`
+// every ripple does — a wash is exactly as "on the water" as the ring above it.
 //
-// THE ORDER IS PHYSICAL AND IT IS THE ONLY DEPTH CUE HERE: water, then the
-// fish (which are UNDER the surface), then the ripples (which are ON it, and so
-// cross over a koi that passes beneath), then the rain (which is in the air in
-// front of all of it), then the flash. A fish drawn over its own ripples reads
-// as a paper cut-out immediately, and nothing else in this scene says which
-// side of the water anything is on.
+// THE ORDER IS PHYSICAL AND IT IS THE ONLY DEPTH CUE HERE: water (the ground,
+// the vignette, the grain and the ripple wash — all of it the surface itself),
+// then the fish (which are UNDER the surface), then the ripples (which are ON
+// it, and so cross over a koi that passes beneath), then the rain (which is in
+// the air in front of all of it), then the flash. A fish drawn over its own
+// ripples reads as a paper cut-out immediately, and nothing else in this scene
+// says which side of the water anything is on.
 //
 // ALPHA IS BUCKETED AND STROKED IN BATCHES. A downpour is several hundred rings
 // and a hundred streaks; giving each its own strokeStyle string is several
 // hundred allocations and state changes a frame. Each family is binned into a
-// fixed number of alpha levels and each bin strokes once, so the cost is a
-// dozen state changes whatever the weather.
+// fixed number of alpha levels and each bin strokes (or fills) once, so the
+// cost is a dozen state changes whatever the weather.
 
 export const INK = [226, 232, 238];       // ripples: the brightest thing here
 export const INK_FISH = [214, 221, 228];
@@ -31,6 +44,30 @@ export const GROUND = '#08090b';
 const RIPPLE_BINS = 12;
 const RAIN_BINS = 6;
 const RIPPLE_MIN_A = 0.014;
+
+// The wash under a ripple's own front: a flat, batched fill (never a per-
+// ripple gradient — hundreds of those would cost real time) so it reads as a
+// soft brightening rather than a hard coin, its ceiling is kept low enough
+// that the edge is not the thing anyone notices.
+const WASH_BINS = 5;
+const WASH_MAX_A = 0.05;
+
+// The grain: a fixed field of single-pixel points, jittered off a grid so it
+// does not read as a lattice, cached per canvas size exactly like the
+// vignette below. It is chrome, not simulation — deterministic off its own
+// cell coordinates rather than the seeded stream, because it never needs to
+// be reproducible from `?seed=` and never varies frame to frame (a twinkling
+// version would cost a rebuild of the path every frame for an effect nobody
+// asked to be louder than "not flat").
+const GRAIN_CELL = 20;      // px between points, before jitter
+const GRAIN_MAX_A = 0.05;
+
+function hash01(x, y) {
+  let h = (x * 374761393 + y * 668265263) | 0;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
 
 // A KOI FROM DIRECTLY ABOVE, and the proportions matter more than anything
 // else here: the first version was a fifth as wide as it was long with a broad
@@ -78,7 +115,9 @@ export function createRenderer(ctx, surface) {
   // piece is the whole of what the viewer would notice.
   const rippleBins = Array.from({ length: RIPPLE_BINS }, () => []);
   const rainBins = Array.from({ length: RAIN_BINS }, () => []);
+  const washBins = Array.from({ length: WASH_BINS }, () => []);
   let vignette = null, vigKey = '';
+  let grain = null, grainKey = '';
 
   function groundFor(w, h) {
     const key = `${w}x${h}`;
@@ -90,6 +129,27 @@ export function createRenderer(ctx, surface) {
       vignette = g; vigKey = key;
     }
     return vignette;
+  }
+
+  // Built once per canvas size, like the vignette: a Path2D of single-pixel
+  // points on a jittered grid, filled whole every frame at one flat alpha.
+  // Cheap because it is ONE fill of a cached path — the point positions never
+  // move, so there is nothing to recompute after the first frame at a size.
+  function grainFor(w, h) {
+    const key = `${w}x${h}`;
+    if (key !== grainKey) {
+      const path = new Path2D();
+      const cols = Math.ceil(w / GRAIN_CELL), rows = Math.ceil(h / GRAIN_CELL);
+      for (let gy = 0; gy <= rows; gy++) {
+        for (let gx = 0; gx <= cols; gx++) {
+          const x = gx * GRAIN_CELL + hash01(gx, gy) * GRAIN_CELL;
+          const y = gy * GRAIN_CELL + hash01(gx + 97, gy + 61) * GRAIN_CELL;
+          path.rect(x, y, 1, 1);
+        }
+      }
+      grain = path; grainKey = key;
+    }
+    return grain;
   }
 
   // --- one fish -----------------------------------------------------------
@@ -314,18 +374,32 @@ export function createRenderer(ctx, surface) {
     ctx.fillStyle = groundFor(width, height);
     ctx.fillRect(0, 0, width, height);
 
+    // The grain: one fill of a cached path, so open water carries a fixed,
+    // faint texture instead of reading as a single flat value between rings.
+    ctx.fillStyle = rgba(INK, GRAIN_MAX_A);
+    ctx.fill(grainFor(width, height));
+
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
     for (const f of fish) drawFish(f);
 
-    // Ripples, binned by alpha and stroked a bin at a time.
+    // Ripples, binned by alpha and stroked a bin at a time. A wash rides
+    // under them at a fraction of the alpha, one fill per bin, off the SAME
+    // pass over the list — the disturbed water reading very slightly
+    // brighter than the still water around it, never a second read of
+    // `ripples`.
     for (const b of rippleBins) b.length = 0;
+    for (const b of washBins) b.length = 0;
     for (const rip of ripples) {
       const u = rip.age / rip.life;
       if (u <= 0 || u >= 1) continue;
       const attack = u < 0.06 ? u / 0.06 : 1;
       const base = attack * ((1 - u) * 0.6 + Math.pow(1 - u, 3) * 0.4) * (0.30 + 0.70 * rip.strength);
+      if (rip.r > 1 && base > 0.02) {
+        const wbin = Math.min(WASH_BINS - 1, Math.floor(base * WASH_BINS));
+        washBins[wbin].push(rip.x, rip.y, rip.r);
+      }
       for (let k = 0; k < rip.rings; k++) {
         const uk = u - k * 0.13;
         if (uk <= 0) continue;
@@ -335,6 +409,14 @@ export function createRenderer(ctx, surface) {
         const bin = Math.min(RIPPLE_BINS - 1, Math.floor(ak * RIPPLE_BINS));
         rippleBins[bin].push(rip.x, rip.y, rk);
       }
+    }
+    for (let b = 0; b < WASH_BINS; b++) {
+      const bin = washBins[b];
+      if (!bin.length) continue;
+      ctx.beginPath();
+      for (let i = 0; i < bin.length; i += 3) surface.ellipse(ctx, bin[i], bin[i + 1], bin[i + 2]);
+      ctx.fillStyle = rgba(INK, ((b + 0.5) / WASH_BINS) * WASH_MAX_A);
+      ctx.fill();
     }
     ctx.lineWidth = 1.05;
     for (let b = 0; b < RIPPLE_BINS; b++) {
