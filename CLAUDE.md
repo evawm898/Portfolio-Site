@@ -1847,8 +1847,37 @@ small PR immediately after, so the stem's byte partition is not entangled with s
 stem is actually present) rather than from the control set; the two non-`STEM:` movers are
 `stemLength max (120)` and **`ALL MAX`** — session 38's lesson honoured again.
 `frozen/phase26` is the 674 rows at `8421d3c`, registered in BOTH maps. **ST0-ST6 WERE ADDED
-BEFORE THE GEOMETRY AND SEEN RED**; a mutant table for them is OWED, NOT WRITTEN — the smoke
+BEFORE THE GEOMETRY AND SEEN RED**, and the nine stem mutants ARE written — the smoke
 census's own header says a citation is never evidence a family can FIRE.
+**THE TABLE RAN AND FAILED, AND FOUR OF ITS FINDINGS WERE IN THE STEM'S OWN CLAUSES**
+(§6b of the outcome doc has all four). Three are instances of classes already in this
+file, which is the useful part — none was a new kind of mistake. **ST2 and ST3 READ THE
+PLAN, WHICH IS NOT THE ARTEFACT**: `stem-off-the-axis` offsets every emitted ring by a
+millimetre and left the plan untouched, so ST2 fired NOTHING — session 41's mirror rule,
+and note that **an independent REFERENCE does not save a clause whose MEASURED side is
+looking at the wrong object**; `buildStemInto` now folds over the very arrays it hands
+`acc.quad` and reports the widest and narrowest emitted vertex and the ring centres' offset
+from the axis. **ST1 ONLY EVER ASKED ABOUT A STEM THAT SHOULD NOT EXIST** — a declared stem
+that is never built adds no boundary edge and detaches nothing, exactly the blindness
+`STEM SCOPE` names, so the clause now predicts the count from the PLAN's stations and sides
+and compares it against the BUILDER's tally. **ST0 HAD BOTH HALVES ON THE SAME UNMUTATED
+MODULE**, calling the geometry's predicate through the harness's own Node import while the
+table serves its mutation only to the PAGE — session 41's L7 verbatim; the geometry's half
+comes through `__bloomMetrics` now, and the table gained the SPHERE row without which the
+two statements could never disagree.
+**AND A MUTATION IS INVISIBLE WHEREVER THE LAW IT REPLACES HAPPENS TO AGREE WITH IT — CHOOSE
+THE PROBE TO SEPARATE THEM.** `bore-is-not-evas-rule` reported "the behaviour did not move"
+while its edit was live and correct: at `stemDiameter` 6 the outer radius is 3, and
+`max(0, 3 - 1.5)` and `3 / 2` are the SAME 1.5. A witness state is part of the claim, not a
+convenience. It probes the SOLID row now, where the clean tree has no bore and the mutant
+has 0.75. The harness also stopped importing `stemBoreRadius` (the quantity ST3 is about,
+so a reference through it mutates with it — `seam-floor-removed`); Eva's stated 1.5 mm IS
+still imported, because it is her number.
+**THE TABLE GAINED `--only=<id>[,...]`** — a family re-verified in minutes rather than a
+sweep a container restart eats, reported as a SUBSET with the count not run and never as a
+sweep — **and an ANCHOR PRE-CHECK OVER ALL 25 MUTANTS before any of them runs**, because a
+refactor disarms a mutant either by moving its `from` or by making it match twice, and the
+one nobody sees is inside a mutant a subset skipped (`/plot`'s measured lesson).
 
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before

@@ -234,6 +234,65 @@ the two non-`STEM:` movers are the ones that matter:
 
 The three `STEM: GATED` rows are HOLDERS by construction (length 0, or SPHERE).
 
+### 6b. The mutant table ran and FAILED, and four of its findings were in the stem's own assertion family
+
+The sweep is the instrument that finds this class, so it doing its job looks like a red
+run. Every one of the four is mine, and three are instances of classes already written
+down in `CLAUDE.md` — which is the useful part: none of them was a new kind of mistake.
+
+**(i) ST2 AND ST3 READ THE PLAN, WHICH IS NOT THE ARTEFACT.** Both clauses asked the stem
+*record* — what was asked for — while claiming to measure what was built. `stem-off-the-axis`
+offsets every emitted ring by a millimetre: watertight, one piece, the same triangle count,
+the plan untouched, **ST2 fired NOTHING**. This is session 41's mirror of Eva's fourth
+durable rule — *name the owner of the MEASURED value too, and check it is the artefact* —
+and it is worth noting that the clause's *reference* was independent all along. An
+independent reference does not save a clause whose measured side is looking at the wrong
+object. `buildStemInto` now folds over the very arrays it hands `acc.quad` and reports the
+widest and narrowest emitted vertex and the ring centres' offset from the axis; ST2 and ST3
+read those *beside* the plan, never instead of the control.
+
+**(ii) ST1 ONLY EVER ASKED ABOUT A STEM THAT SHOULD NOT EXIST.** The `!want` branch checked
+that a state with no stem emits no triangles; nothing checked the other direction. A stem
+the plan declares and the builder never emits adds no boundary edge and detaches nothing,
+so both STL gates are green — the exact blindness `STEM SCOPE` is written about — and so
+was ST1. The new clause predicts the triangle count from the PLAN's own station list and
+side count (`4·N·bands + 4·N` hollow, `2·N·bands + 2·(N−2)` solid) and compares it against
+the BUILDER's tally: two owners, and it catches a truncated build as well as an absent one.
+
+**(iii) ST0 HAD BOTH HALVES ON THE SAME UNMUTATED MODULE.** It called the geometry's
+`stemEligible` through the harness's own Node import, while the mutant table serves its
+mutation only to the PAGE. Both sides moved together or neither did, so the clause could
+never disagree with anything. **Session 41's L7, verbatim**, and the file already says why:
+*"a clause that is always green and a clause that is always red look nothing alike and have
+the same cause."* The geometry's half now arrives through `__bloomMetrics` as the running
+module answered it. **And the table had no row on which the two statements COULD disagree** —
+on any row where a stem is eligible the two predicates agree whatever either one says — so a
+third mutant-table row asks for a stem under SPHERE. Session 35's stale-harness-row lesson,
+arriving as a row that was never chosen rather than one that went stale.
+
+**(iv) THE BORE WITNESS WAS DEGENERATE ON ITS OWN PROBE STATE.** At `stemDiameter` 6 the
+outer radius is 3, and `max(0, 3 − 1.5)` and `3 / 2` are the same **1.5** — so the witness
+reported the behaviour had not moved while the edit was live and correct. *A mutation is
+invisible wherever the law it replaces happens to agree with it, and the probe has to be
+chosen to separate them.* It probes the SOLID row now (outer radius 1.5: clean tree bore 0,
+mutant 0.75), which is also a row the table runs. The harness additionally stops importing
+`stemBoreRadius`: it is the quantity ST3 is about, so a reference read through it mutates
+with it — session 38's `seam-floor-removed`. Eva's stated **1.5 mm is still imported**,
+because it is her number and a gate restating it would be a second place for it to drift.
+
+**Two things the table itself gained.** `--only=<id>[,...]`, so a family can be re-verified
+in minutes rather than a sweep a container restart eats — reported as a SUBSET, with the
+count not run, and never as a sweep. And an **anchor pre-check over all 25 mutants before
+any of them runs**: `/plot`'s measured lesson, that a refactor disarms a mutant either by
+moving its `from` or by making it match twice, and the disarmed one nobody sees is the one
+inside a mutant a subset skipped.
+
+After the fixes: **ST0 / ST1 / ST2 / ST3 each fire on the mutation that names them, and the
+clean tree is silent on all three stem rows including the new SPHERE one.** The export gate
+passes 17/17 STEM rows plus `ALL MAX`, `stemLength max` and `stemLength min` under the
+stricter clauses.
+
+
 ## 7. What this session did NOT do
 
 * **The sphere omission.** Eva's ruling is recorded in §4; it is its own PR immediately
