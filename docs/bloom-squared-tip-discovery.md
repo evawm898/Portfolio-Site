@@ -434,6 +434,110 @@ session's own strongest-looking number.
 
 ---
 
+## 6e. THE BUILD WAS STARTED AND STOPPED — a squared tip CANNOT carry the fringe, and the reason is structural
+
+**Written after Eva ruled option (c) and the build began. The control was
+written, measured, and reverted; the finding is why.** The diff is preserved at
+`terminal-control.patch` in the session scratchpad and is reproducible from §9's
+rigs.
+
+### What worked
+
+`petalTipEnd` as a shape TERM (not a floor) squares the tip exactly as derived.
+Measured, EXPORT and LIVE: at 0.35 of the peak, `halfWidthAt(1)` reads **2.8000
+mm in BOTH modes** — a 5.60 mm flat end, 35% of the width, and mode-independent
+where it binds, which is the improvement §6a predicted. The guard then has real
+headroom: relief **2.00 mm uniform across all four periods** (asked 4.32,
+limited by `terminal − TIP_HALF_MM` = exactly 2.0, as §1b derived).
+
+### And the first version was wrong in a way the gate caught
+
+Folded in beside the print floor, the terminal is applied **after** the lobe
+cut, so it fills every tooth back in: `L8` reported *"the outline over [uCap, 1]
+is identical to a plain petal at all 2001 samples — the apex is untreated and
+this is MODEL A"*, on a tree that had just been given a terminal. The teeth have
+to bite INTO the squared end, so the terminal belongs in the `terms` list the
+cut is subtracted from. Moving it there cleared L8.
+
+### THE FINDING — the end is ONE STATION, and a fringe across it is not a half-width
+
+`L5` stayed red, and chasing it down is the session's real result.
+`Math.min(...[])` is `Infinity` because **`sinusU` was empty**: with a wide
+terminal the treated arc lands on the terminal FACE and not on the margin at
+all. Measured, EXPORT, coverage 0.10:
+
+| `petalTipEnd` | faceMm | treatedHalf | MARGIN sinuses | face share of the treated arc |
+|---|---|---|---|---|
+| 0.00 (today) | 1.600 | 2.704 | 1 | 29.6% |
+| 0.15 | 2.400 | 2.722 | 1 | 44.1% |
+| **0.35** | 5.600 | 2.820 | **0** | **99.3%** |
+| 0.50 | 8.000 | 2.908 | **0** | **100.0%** |
+| 1.00 | 16.000 | 3.251 | **0** | **100.0%** |
+
+**The wider the terminal, the MORE of the fringe lands on the face** — and the
+face is the single station `u = 1`. The emitted geometry says what that costs,
+fringed against plain at the same terminal:
+
+```
+ v      FRINGED end point           PLAIN end point
+-1.00   40.565, -2.743, 14.792      40.565, -2.800, 14.792
+ 0.00   40.565,  0.000, 14.792      40.565,  0.000, 14.792
++1.00   40.565,  2.743, 14.792      40.565,  2.800, 14.792
+```
+
+Every point shares the same along-length coordinate in **both** builds: the end
+is **perfectly straight**. The only difference is a uniform 2% narrowing,
+2.800 → 2.743 mm. **The record claimed 3 teeth and 2.000 mm of relief on four
+periods while the emitted end carried no notch at all.**
+
+**THE STRUCTURAL STATEMENT, and it is a property of the type rather than a
+measurement:** `widthProfile` holds `h(u)` — ONE half-width per station — so the
+material at station `u` is the single span `[−h, +h]`, one interval, at every
+parameter value. A fringe across the END needs the end's position to vary with
+the across-coordinate, `u(v)`; and a fringe of separate teeth needs SEVERAL
+disjoint spans at one station. Neither is expressible, and no control can make
+them so.
+
+**This collides with the lobe model's own invariant.** `docs/bloom-lobe-model.md`
+§1: *"The outline stays single-valued — split and cleft petals are out of scope
+at every parameter value."* A carnation's fringe IS a row of separate fingers at
+the petal's end, which is exactly a multi-valued outline there. **Eva's carnation
+ask and her single-valued-outline invariant cannot both hold**, and which gives
+way is a ruling rather than a measurement.
+
+### So the trade has no good corner, and that is measured rather than argued
+
+* **Small coverage + wide terminal** → the whole fringe is on the face (99.3% at
+  0.35) → the cut only narrows the end, drawing nothing.
+* **Large coverage + wide terminal** → the teeth return to the MARGIN → the
+  sideways spurs of §5, which is the complaint this session opened on.
+
+### What would actually reach it, costed, none taken
+
+1. **The terminal edge becomes a curve `u(v)` rather than a station.** This is
+   the one that draws the reference. It is not a `widthProfile` change at all —
+   it changes how the blade's last row is laid, so it reaches `buildPetalInto`,
+   the panel emitter and the terminal mini-face's own contract (session 32 §5:
+   the `u = 1` mini-face may never be collapsed). Substantial, and its own
+   session.
+2. **A second field acting on LENGTH near the end.** Forbidden by the model as
+   stated — *"serration is NOT a separate feature to schedule"* — and it is a
+   second generator over one region.
+3. **Relax the single-valued invariant at the apex only.** The smallest change
+   that reaches a true fringe, and the one that needs Eva's ruling first,
+   because the invariant is hers and every lobe cap exists to keep it.
+
+### What is NOT owed, and why the branch is where it is
+
+The geometry and the registry row are **reverted**; the branch carries the
+discovery doc and matrix block 31's rows, which stay RED on the control's
+absence. Shipping the control as written would ship a record that reports teeth
+the geometry does not draw, and `petalTipEnd` as a pure shape control — a
+squared tip that the fringe cannot land on — is a different feature from the one
+Eva asked for and is hers to rule on, not a session's to substitute.
+
+---
+
 ## 7. SEQUENCING — why this doc exists before any branch
 
 **PR #225 (the stem on the hub) is open against `bloom-geometry.js`.** Builds
