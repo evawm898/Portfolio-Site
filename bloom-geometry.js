@@ -4384,29 +4384,55 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     const ceiling = Math.max(1, Math.floor((wMinMm / MIN_FEATURE_MM + 1) / 2));
     const count = Math.min(asked, ceiling);
     const wSplitMm = 2 * laminaHalfAt(uSplit);
-    /* THE TOOTH'S WIDTH AT EACH END, in millimetres. At the split the gaps
-       are exactly at the floor and the teeth take the rest; at the tip the
-       teeth are at the floor and the gaps take the rest. */
-    const toothBaseMm = (wSplitMm - (count - 1) * MIN_FEATURE_MM) / count;
-    const toothTipMm = MIN_FEATURE_MM;
-    const toothAt = (u) => {
-      const sp = 1 - uSplit;
-      const sFrac = sp > 0 ? clamp((u - uSplit) / sp, 0, 1) : 0;
-      return toothBaseMm + (toothTipMm - toothBaseMm) * sFrac;
+    /* THE TAPER, PARAMETERISED BY THE GAP SO BOTH FLOORS HOLD BY
+       CONSTRUCTION AT EVERY STATION — not only at the two the plan names.
+
+       THE FIRST VERSION DID NOT, AND FR4 CAUGHT IT. It set the tooth's base
+       width from the width at the PLANNED split and tapered from there; but a
+       panel boundary is a row, the landed row sits up to half a gap above the
+       target, and the blade is narrower there — so under the buckle (which
+       moves the ladder) the emitted gap came out 0.9910 mm against a 1.0 mm
+       floor. A law that is right at two stations and interpolated between
+       them is not a law about the stations in between.
+
+       WHAT REPLACES IT. At any station the teeth and gaps tile the lamina:
+       `N * tooth + (N-1) * gap = W`. Given `W >= (2N-1) * F` — which the
+       count ceiling guarantees at the region's NARROWEST station, and
+       therefore everywhere in it — the admissible gap is exactly the interval
+       `[F, (W - N*F)/(N-1)]`: its low end puts the gaps on the floor and the
+       teeth take the rest, its high end puts the TEETH on the floor and the
+       gaps take the rest. Sliding `g` from 0 to 1 across that interval walks
+       from one to the other, and BOTH widths clear the floor at every point
+       of it, at every station, for any W the region contains. The taper is
+       then a property of the interval rather than of two sampled widths. */
+    const admissible = (u) => {
+      const hL = laminaHalfAt(u), W = 2 * hL;
+      const lo = MIN_FEATURE_MM;
+      const hi = count > 1 ? (W - count * MIN_FEATURE_MM) / (count - 1) : 0;
+      return { hL, W, lo, hi: Math.max(lo, hi) };
     };
+    /* g: 0 at the split (gaps on the floor), 1 at the tip (teeth on the
+       floor). Linear in the fraction of the fringe's own length. */
+    const gAt = (u) => { const sp = 1 - uSplit; return sp > 0 ? clamp((u - uSplit) / sp, 0, 1) : 0; };
+    const widthsAtU = (u) => {
+      const { hL, W, lo, hi } = admissible(u);
+      if (count < 2) return { hL, W, tooth: Math.min(W, lo + (W - lo) * (1 - gAt(u))), gap: 0 };
+      const gap = lo + (hi - lo) * gAt(u);
+      return { hL, W, tooth: (W - (count - 1) * gap) / count, gap };
+    };
+    const toothBaseMm = widthsAtU(uSplit).tooth;
+    const toothTipMm = widthsAtU(1).tooth;
     /* THE SPAN OF TOOTH k AT STATION u, in the GLOBAL v the row's own
        cross-section is a function of. Teeth and gaps tile the lamina, so the
        gap is whatever is left after the teeth — never a second law. */
     const spanOf = (u, k) => {
-      const hL = laminaHalfAt(u), W = 2 * hL;
-      const tw = Math.min(toothAt(u), W / count);
-      const gw = count > 1 ? (W - count * tw) / (count - 1) : 0;
-      const a = -hL + k * (tw + gw);
-      return [a / hL, (a + tw) / hL];
+      const { hL, tooth, gap } = widthsAtU(u);
+      const a = -hL + k * (tooth + gap);
+      return [a / hL, (a + tooth) / hL];
     };
     return { asked, count, ceiling, clamped: count < asked, depth, depthMm: length === null ? null : depth * length,
              uAsked, uSplit, peakClamped: uSplit > uAsked, wMinMm, uMin, wSplitMm,
-             toothBaseMm, toothTipMm, toothAt, spanOf, laminaHalfAt };
+             toothBaseMm, toothTipMm, widthsAtU, spanOf, laminaHalfAt };
   })();
 
   const shapeAt = (lobes === null || lobes.noRoom)
