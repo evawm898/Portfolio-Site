@@ -107,6 +107,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          MAX_FAN_GROUPS, PETAL_ROLE_ORDER, petalGroupCount, perPetalEligible, ROLE_ALL, allPetalsEligible, spineLaw, curlIsUniform, curlStartFloored, CURL_START_MIN, sphereMode,
          MAX_STAMENS, STAMEN_SIDES, tippedRodTris, ANTHER_DIAMETER_FACTOR, ANTHER_LENGTH_FACTOR, androeciumEligible,
          STIGMA_LOBES, STIGMA_LOBE_SPREAD_DEG, gynoeciumEligible,
+         STEM_MIN_WALL_MM, stemEligible, stemBoreRadius,
          /* `tipWaistFactor` is deliberately NOT imported: JS7 RESTATES the
             waist law in closed form rather than calling the shipped one, so a
             floor derived from the wrong quantity fails instead of agreeing
@@ -4168,6 +4169,153 @@ export async function gynoeciumAssertions(page, row) {
 }
 
 /* ===================================================================
+   THE STEM AND THE HUB-TO-STEM JOIN (ST0-ST6) — session 43.
+
+   WHY THIS FAMILY HAS TO EXIST, and it is not a general caution: A STEM THAT
+   IS ATTACHED AND WATERTIGHT AND STILL WRONG PASSES EVERY GATE THIS PROJECT
+   HAS. A stem solid overlapping the hub is ONE connected region with zero
+   boundary edges whatever its wall thickness, whatever it is rooted into, and
+   whether or not the join carries anything — so the flood fill and the edge
+   census are both green on it by construction. The flower already pays for a
+   fourth gate for exactly this class, and says so in its own header:
+   "connectedness counts detached bodies; a spine attached to its petal above
+   and dangling below is ONE body and a print hazard at the same time."
+
+   EVERY CLAUSE'S REFERENCE HAS A DIFFERENT OWNER FROM THE QUANTITY IT CHECKS
+   (Eva's fourth durable rule). Named, clause by clause, because the rule is
+   mechanical and this is where it is checked:
+     ST2 expects the CONTROL's own `stemLength`; it measures the EMITTED axis.
+     ST3 expects `stemDiameter` and Eva's stated STEM_MIN_WALL_MM; it measures
+         the EMITTED radii.
+     ST4 expects the HUB's own thickness; it measures the EMITTED root span.
+     ST5 RESTATES the join's one-line law here and rebuilds its expected value
+         from the hub radius, the hub thickness and the stem's outer radius —
+         three owners the join record does not write. Importing
+         `hubThicknessAt` would make the clause mutate WITH the defect and
+         check nothing, which is exactly what `seam-floor-removed` did to
+         every A7 clause in session 38.
+     ST6 expects a STEMLESS build's own hub, captured on the same page.
+   The two symbols this file does import from the geometry — STEM_MIN_WALL_MM
+   and stemBoreRadius — are the ones whose whole content IS Eva's stated rule;
+   a gate restating a stated requirement would be a second place for it to
+   drift from what she wrote.
+   =================================================================== */
+export const STEM_SCOPE =
+  "stem claims read the builder's own emitted stem record, its root span through the hub and the hub's own emitted underside, NOT the STL; a stem declared and not built, built off the axis, built to the wrong length, built with a bore that is not Eva's rule, rooted as a hairline instead of through the slab, and a hub-to-stem join whose thickening is not the law it declares ALL export watertight and as one piece, because a solid overlapping the hub is one connected region with zero boundary edges however wrong it is";
+
+/* THE JOIN'S LAW, RESTATED (not imported). Two expressions, both from owners
+   outside the join record: the thickness the stem's own section asks for, and
+   the constant-stress profile that carries it out to where the plate suffices. */
+function stemJoinExpected(hubR, hubT, outerR) {
+  const bore = stemBoreRadius(outerR);
+  const joinT = Math.max(hubT, (Math.sqrt(3) / 2) * Math.sqrt(Math.max(0, outerR ** 4 - bore ** 4)) / outerR);
+  const inert = !(joinT > hubT);
+  const denom = Math.log(hubR / outerR);
+  const blend = (inert || !(denom > 0))
+    ? outerR
+    : Math.max(outerR, Math.min(hubR, hubR * Math.pow(outerR / hubR, (hubT / joinT) ** 2)));
+  const at = (r) => {
+    if (inert || !(hubR > outerR) || !(denom > 0)) return inert ? hubT : joinT;
+    const rr = Math.min(hubR, Math.max(outerR, r));
+    return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));
+  };
+  return { joinT, inert, blend, at };
+}
+
+export async function stemAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+  const bad = [];
+  /* ST0 — THE TWO STATEMENTS, the slotRolesEligible / androeciumEligible
+     precedent: the registry HIDES on this condition and the geometry makes it
+     INERT, and a green run must not be able to endorse one without the other. */
+  const regElig = evalPredicate({ ref: 'stemEligible' }, ui);
+  const geoElig = stemEligible(ui);
+  if (regElig !== geoElig) bad.push(`ST0: the registry's stemEligible says ${regElig} and the geometry's says ${geoElig} on this state`);
+  const want = regElig && Number(ui.stemLength) > 0;
+  const S = m.stem === undefined ? undefined : m.stem;
+  if (S === undefined) { bad.push('ST1: the metrics hook reports no `stem` key at all — the builder declares nothing about a stem, so nothing below can be checked'); return bad; }
+  if ((S !== null) !== want) {
+    bad.push(`ST1: the builder ${S ? 'reports a stem' : 'reports none'} while the state ${want ? `asks for ${ui.stemLength} mm` : (regElig ? 'asks for none (length 0)' : 'is a SPHERE (hidden and inert)')}`);
+    return bad;
+  }
+  /* INERTNESS IN BOTH DIRECTIONS. A control hidden under SPHERE must also
+     BUILD nothing there — hidden-and-not-inert is the defect PP7 and JS0 exist
+     for, and it is invisible to every other family here. */
+  if (!want) {
+    if (m.stemTris) bad.push(`ST1: ${m.stemTris} stem triangles emitted on a state with no stem`);
+    if (m.hubJoinActive) bad.push('ST5: the hub reports an ACTIVE hub-to-stem join on a state with no stem');
+    return bad;
+  }
+  const hubT = m.hubThickness, hubR = m.hubRadius;
+  /* ST2 — ON THE AXIS, DOWN, AND THE LENGTH THE CONTROL ASKED FOR. */
+  const L = Number(ui.stemLength);
+  if (!Array.isArray(S.root) || !Array.isArray(S.tip)) { bad.push('ST2: the stem record carries no root/tip point'); return bad; }
+  if (!(S.root[0] === 0 && S.root[1] === 0)) bad.push(`ST2: the stem's root stands at plan (${S.root[0]}, ${S.root[1]}), not exactly on the axis`);
+  if (!(S.tip[0] === 0 && S.tip[1] === 0)) bad.push(`ST2: the stem's tip stands at plan (${S.tip[0]}, ${S.tip[1]}), not exactly on the axis`);
+  if (!(S.tip[2] < S.root[2])) bad.push(`ST2: the stem's tip z ${S.tip[2]} is not below its root z ${S.root[2]} — it does not run downward`);
+  const free = S.root[2] - S.tip[2];
+  if (Math.abs(free - L) > 1e-9) bad.push(`ST2: the stem runs ${free} mm from the hub's underside; the control asked for ${L}`);
+  /* THE PLACER'S OWN ARGUMENT IS MILLIMETRES OF ARC (Eva's ruling), so its
+     stations are checked in millimetres against the same control — never in u. */
+  if (!Array.isArray(S.stations) || S.stations.length < 2) bad.push(`ST2: the placer emitted ${S.stations && S.stations.length} stations; a stem needs at least two`);
+  else {
+    if (S.stations[0] !== 0) bad.push(`ST2: the placer's first station is ${S.stations[0]} mm, not 0 — arc is measured from the hub`);
+    if (Math.abs(S.stations[S.stations.length - 1] - L) > 1e-9) bad.push(`ST2: the placer's last station is ${S.stations[S.stations.length - 1]} mm against a ${L} mm stem`);
+    for (let i = 1; i < S.stations.length; i++) if (!(S.stations[i] > S.stations[i - 1])) bad.push(`ST2: the placer's stations are not increasing at ${i}: ${S.stations[i - 1]} then ${S.stations[i]}`);
+  }
+  /* ST3 — EVA'S BORE RULE, ON THE EMITTED RADII. Expected from the CONTROL and
+     from her stated wall; measured from what the builder emitted. */
+  const R = Number(ui.stemDiameter) / 2;
+  const bore = stemBoreRadius(R);
+  if (Math.abs(S.outerR - R) > 1e-9) bad.push(`ST3: the stem's emitted outer radius ${S.outerR} is not the control's ${R}`);
+  if (Math.abs(S.boreR - bore) > 1e-9) bad.push(`ST3: the stem's emitted bore ${S.boreR} is not max(0, ${R} - ${STEM_MIN_WALL_MM}) = ${bore}`);
+  if (bore > 0 && Math.abs((S.outerR - S.boreR) - STEM_MIN_WALL_MM) > 1e-9) bad.push(`ST3: a hollow stem's wall measures ${S.outerR - S.boreR} mm against Eva's stated ${STEM_MIN_WALL_MM}`);
+  if (bore === 0 && S.boreR !== 0) bad.push(`ST3: the stem is at or under the ${2 * STEM_MIN_WALL_MM} mm solid threshold and still reports a ${S.boreR} mm bore`);
+  if (!(S.outerR - S.boreR >= STEM_MIN_WALL_MM - 1e-9)) bad.push(`ST3: the stem's wall ${S.outerR - S.boreR} mm is under Eva's stated ${STEM_MIN_WALL_MM} mm floor`);
+  /* ST4 — ROOTED THROUGH THE HUB, NOT A HAIRLINE. JS3's own statement for the
+     stamens, which both STL gates are blind to: the root must span the hub's
+     material so the overlap the slicer unions is a SOLID and never a touch. */
+  if (!(S.rootSpanMm >= hubT - 1e-9)) bad.push(`ST4: the stem's root spans ${S.rootSpanMm} mm of a ${hubT} mm hub — it is a hairline overlap, not a root through the slab`);
+  /* ST5 — THE JOIN IS THE LAW IT DECLARES, read off the hub's OWN emitted
+     underside against a reference rebuilt here from three other owners. */
+  const E = stemJoinExpected(hubR, hubT, R);
+  if (m.hubJoinActive !== !E.inert) bad.push(`ST5: the hub reports the join ${m.hubJoinActive ? 'ACTIVE' : 'INERT'} while the law on a ${hubR} mm hub of ${hubT} mm under a ${R} mm stem says ${E.inert ? 'INERT' : 'ACTIVE'}`);
+  if (Math.abs(m.hubJoinThickness - E.joinT) > 1e-9) bad.push(`ST5: the hub declares a join thickness of ${m.hubJoinThickness}; the stem's own section asks for ${E.joinT}`);
+  if (Math.abs(m.hubJoinBlendRadius - E.blend) > 1e-9) bad.push(`ST5: the hub declares the join blending out at ${m.hubJoinBlendRadius} mm; the law says ${E.blend}`);
+  const und = m.hubUnderside;
+  if (!Array.isArray(und) || und.length < 2) bad.push(`ST5: the hub reports ${und && und.length} underside samples — the profile cannot be read`);
+  else {
+    let worst = 0, worstAt = null, outside = 0;
+    for (const [r, thick] of und) {
+      const e = E.at(r);
+      const d = Math.abs(thick - e);
+      if (d > worst) { worst = d; worstAt = r; }
+      /* OUTSIDE THE BLEND THE HUB IS ITS OWN THICKNESS EXACTLY — not nearly.
+         That is what makes a stemless hub and a thin-stemmed one byte-identical
+         by branch, so it is an identity and carries no tolerance. */
+      if (r > E.blend + 1e-9 && thick !== hubT) outside++;
+    }
+    if (worst > 1e-9) bad.push(`ST5: the hub's emitted thickness is ${worst} mm off the join's declared law, worst at plan radius ${worstAt}`);
+    if (outside) bad.push(`ST5: ${outside} underside sample(s) beyond the ${E.blend} mm blend radius are not the hub's own ${hubT} mm exactly — the join reached past where it says it stops`);
+  }
+  /* ST6 — THE PETAL-TO-HUB JUNCTION IS UNTOUCHED. The reference is a STEMLESS
+     build of this same state, made on this same page, which is an owner the
+     stem code does not write at all: if the join moved a foot frame, the hub's
+     radius or the top face, this is the only clause here that could see it. */
+  const ref = await page.evaluate(() => window.__bloomStemlessHub());
+  if (!ref) bad.push('ST6: the page exposes no stemless-hub reference — the untouched-junction claim cannot be made');
+  else {
+    if (ref.hubRadius !== hubR) bad.push(`ST6: the hub radius is ${hubR} with a stem and ${ref.hubRadius} without — the stem resized the hub`);
+    if (ref.hubThickness !== hubT) bad.push(`ST6: the hub's own thickness is ${hubT} with a stem and ${ref.hubThickness} without`);
+    if (Math.abs(ref.topFaceZ - m.hubTopFaceZ) > 0) bad.push(`ST6: the hub's TOP face sits at ${m.hubTopFaceZ} with a stem and ${ref.topFaceZ} without — the join grew upward into the feet`);
+    if (ref.footFrames !== m.footFramesDigest) bad.push('ST6: the emitted foot frames differ between a stemmed and a stemless build of the same state — the petal-to-hub junction moved');
+  }
+  return bad;
+}
+
+
+/* ===================================================================
    ORIENTATION (O1-O2) AND THE SELF-INTERSECTION CENSUS (X1-X2) — session 36,
    Eva's ruling on session 35's two findings. Both read the EXPORTED STL's own
    bytes, never the live build, because the question is what the slicer gets.
@@ -6302,6 +6450,42 @@ export function buildMatrix() {
     ['LOBES: x the domed hub (head rise 1.00)', { lobeDepth: 0.3, lobeCount: 2, headRise: 1 }],
     ['LOBES: GATED — count, coverage and BOTH shapes at MAXIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 10, lobeCoverage: 1, lobeCrestShape: 3, lobeNotchShape: 3 }],
     ['LOBES: GATED — count, coverage and BOTH shapes at MINIMUM with depth 0 (hidden and inert; bit-identical to the default)', { lobeDepth: 0, lobeCount: 2, lobeCoverage: 0.1, lobeCrestShape: 0.6, lobeNotchShape: 0.6 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+  /* 30. THE STEM ON THE HUB (session 43). The stem attaches to the HUB, not to
+     the petals: the petals join the hub, the hub joins the stem, two joins with
+     two rules. Every row here is about the second one.
+     WHAT THE ROWS HAVE TO COVER, and why each is here rather than as a number
+     in a header: the guard in BOTH directions (a stem declared and built, and a
+     length of 0 with the diameter at both ends of its range, which must be
+     BIT-IDENTICAL to the shipping default); Eva's bore rule at the SOLID end
+     (3 mm, bore 0) and at the HOLLOW end; the hub-to-stem join INERT (a stem
+     thin enough to need no thickening) and ACTIVE at its widest; the domed head,
+     where the attachment face is high inside the bowl and the visible length is
+     shorter than the total; and SPHERE, where the stem is hidden AND inert in
+     this PR by ruling.
+     THE GATED ROWS ARE THE INERTNESS CLAIM. A control hidden and NOT inert is
+     the defect PP7 and JS0 exist for and is invisible to every other family. */
+  for (const [name, sets] of [
+    ['STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)', { stemLength: 60, stemDiameter: 6 }],
+    ['STEM: SOLID at the floor (3 mm OD — the bore closes, Eva\'s rule)', { stemLength: 60, stemDiameter: 3 }],
+    ['STEM: the widest (12 mm OD — the join reaches most of the hub)', { stemLength: 60, stemDiameter: 12 }],
+    ['STEM: the shortest built stem (1 mm)', { stemLength: 1, stemDiameter: 6 }],
+    ['STEM: the longest (120 mm)', { stemLength: 120, stemDiameter: 6 }],
+    ['STEM: x a domed head (rise 0.50 — part of the stem is inside the bowl)', { stemLength: 60, stemDiameter: 6, headRise: 0.5 }],
+    ['STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)', { stemLength: 60, stemDiameter: 6, headRise: 1 }],
+    ['STEM: x 3 whorls (a bigger hub under the same stem — the join blends out sooner in fraction)', { stemLength: 60, stemDiameter: 6, layerCount: 3 }],
+    ['STEM: x 40 petals (the widest hub reachable in one whorl)', { stemLength: 60, stemDiameter: 12, petalCount: 40 }],
+    ['STEM: x CONTINUOUS', { stemLength: 60, stemDiameter: 6, placement: 'CONTINUOUS' }],
+    ['STEM: x FAN', { stemLength: 60, stemDiameter: 6, placement: 'FAN' }],
+    ['STEM: x the whole centre (stamens and a style rooted through the same slab)', { stemLength: 60, stemDiameter: 6, stamenCount: 60, gynoecium: 'STYLE' }],
+    ['STEM: x a thick sheet (2.40 mm — the hub is thicker, so the join is inert further out)', { stemLength: 60, stemDiameter: 6, sheetThickness: 2.4 }],
+    ['STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export)', { stemLength: 60, stemDiameter: 6, sheetThickness: 0.6 }],
+    ['STEM: GATED — SPHERE with a stem asked for (hidden AND inert, by ruling, in this PR)', { stemLength: 60, stemDiameter: 6, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 24 }],
+    ['STEM: GATED — diameter at MAXIMUM with length 0 (hidden and inert; bit-identical to the default)', { stemLength: 0, stemDiameter: 12 }],
+    ['STEM: GATED — diameter at MINIMUM with length 0 (hidden and inert; bit-identical to the default)', { stemLength: 0, stemDiameter: 3 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }

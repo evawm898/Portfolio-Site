@@ -123,7 +123,8 @@ import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
-         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
+         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
+         stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE } from './bloom-harness.mjs';
 
@@ -336,6 +337,14 @@ for (const row of rows) {
      hairline root or a missing lobe reads as watertight and one piece. */
   const gyn = await gynoeciumAssertions(page, row);
   if (gyn.length) { validity.push(`${row.label}: ${gyn.join('; ')}`); continue; }
+  /* THE STEM AND THE HUB-TO-STEM JOIN (ST0-ST6) — session 43. This gate is
+     STRUCTURALLY BLIND to every claim in that family: the stem is a closed
+     solid overlapping the hub, so a stem built off the axis, to the wrong
+     length, with a bore that is not Eva's rule, rooted as a hairline, or with a
+     join whose thickening is not the law it declares, ALL export watertight and
+     as one piece. See stemAssertions()'s own header. */
+  const stem = await stemAssertions(page, row);
+  if (stem.length) { validity.push(`${row.label}: ${stem.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable
@@ -457,6 +466,7 @@ console.log('LIMITS (LAYERS): a PASS here does NOT endorse the junction under la
 console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
+console.log(`STEM SCOPE: ${STEM_SCOPE}`);
 console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);

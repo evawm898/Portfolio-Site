@@ -6526,6 +6526,131 @@ function emitPanel(acc, rows, panel, tAt) {
 }
 
 /* ===================================================================
+   THE STEM, AND THE HUB-TO-STEM JOIN (session 43, Eva's ruling Sep 13).
+
+   THE ARCHITECTURE, and it is a correction to an earlier reading: THE STEM
+   ATTACHES TO THE HUB. IT DOES NOT ATTACH TO THE PETALS. The petals join the
+   hub; the hub joins the stem; two separate joins with two separate rules.
+   Nothing in this block reaches a petal's row list, its ladder, its seam or
+   its foot — measured, and asserted by ST6 against a stemless build.
+
+   WHY THAT IS THE BETTER SITE, measured rather than asserted (session 43 A2).
+   The turn a stem makes against the surface it leaves is, at the FOOT, 115 to
+   176 degrees over the reachable range — past the right angle where
+   seamClearanceMm's own algebra reverses and no spacing satisfies it. At the
+   HUB UNDERSIDE it is 90.0000 degrees exactly on a flat cap and 87.49 at a
+   dome's apex, because a stem on the axis meets a downward-facing surface at a
+   right angle and CANNOT exceed one. Ninety degrees is where that law
+   SATURATES rather than reverses: the clearance it asks for is (t/2) sin 90,
+   which is t/2 — its maximum, and 0.6 mm on the shipping sheet.
+
+   THE LOAD PATH, and the sentence worth keeping from the measurement: A WIDER
+   STEM BUYS MORE THAN A THICKER HUB DOES. The hub's thickness is uniform (1.2
+   mm at r = 0 and at r = 8.75, measured off the emitted triangles), so no
+   radius is thinner than another; what shrinks is the section the load must
+   cross, 2 pi r t, which falls LINEARLY TO ZERO at the axis, while the radial
+   moment grows as ln(R0/r). Both compound inward, and where they stop is set
+   by the stem's radius and by nothing the hub does.
+
+   THE 1.5 mm WALL IS EVA'S, STATED, NOT DERIVED: "minimum wall 1.5 mm,
+   minimum 3 mm outer diameter, bore radius = max(0, outerRadius - 1.5)"
+   (Eva, Sep 13, print requirement). It governs THE STEM ONLY.
+   SHEET_THICKNESS_MM does not move, the petals do not move and the hub does
+   not move to satisfy it: a stem is a cantilever tube on a long lever and a
+   hub is a plate supported all the way round, and they do not share a floor.
+
+   *** THREE FLOORS NOW COEXIST IN ONE OBJECT AND THIS IS AN OPEN QUESTION FOR
+   THE COUPON PRINT — the only thing that can settle it. Recorded with all
+   three provenances, resolved by choosing NOTHING, and blocking nothing:
+       MIN_FEATURE_MM       1.0 mm  a geometry constant, a DECLARED GUESS
+       SHEET_THICKNESS_MM   1.2 mm  the shipped sheet, and the hub
+       STEM_MIN_WALL_MM     1.5 mm  Eva, Sep 13, a stated print requirement
+   Nothing in this project has ever been printed (charter), so the first two
+   are guesses and the third is a requirement; they are not in conflict as
+   statements, only as numbers sitting in one solid. ***
+   =================================================================== */
+/* EVA'S RULE, as one expression and one owner. Solid at the 3 mm floor
+   (bore 0) and hollow above it; the wall is exactly STEM_MIN_WALL_MM at every
+   diameter above the floor, which is what makes the rule one line. */
+export const STEM_MIN_WALL_MM = 1.5;
+export const STEM_LENGTH_RANGE = Object.freeze([0, 120]);
+export const STEM_DIAMETER_RANGE = Object.freeze([3, 12]);
+export function stemBoreRadius(outerR) { return Math.max(0, outerR - STEM_MIN_WALL_MM); }
+/* THE TWO STATEMENTS, the androeciumEligible / gynoeciumEligible pattern: the
+   registry HIDES the controls on this condition and this makes them INERT,
+   and the harness asserts the two agree at module load.
+   SPHERE REFUSES A STEM IN THIS PR. Eva has ruled the mechanism that will let
+   it have one — petals whose geometry would collide with the stem are NOT
+   BUILT, with the sequence, the equal-area law, the golden angle and the
+   existing one-step reservation all left exactly as they are — and it ships as
+   its own small PR immediately after this one, so the stem's byte partition is
+   not entangled with sphere rows. TODO(session 43, PR 2): remove this arm. */
+export function stemEligible(state) { return !sphereMode(state); }
+export function stemIsAbsent(state) { return !stemEligible(state) || !state.stemLength; }
+
+/* THE JOIN'S THICKNESS, DERIVED, WITH NOTHING TO TUNE (Eva's ruling: option
+   (b), no new control). The join is as strong in bending as the stem it feeds
+   — not stronger, which is wasteful, and not weaker, which would make the
+   join the weak link the whole part exists to avoid.
+
+   The stem's own section modulus is pi (r^4 - bore^4) / 4r. The hub plate's,
+   per full circumference at radius r, is 2 pi r T^2 / 6. Setting them equal
+   and solving for T collapses to one closed form with no constant in it:
+
+       T  =  (sqrt(3) / 2) * sqrt(r^4 - bore^4) / r
+
+   FLOORED AT THE HUB'S OWN THICKNESS, so a stem thin enough to need no
+   thickening leaves the hub alone and the join is INERT — the domeIsFlat
+   guard's shape, and what makes a stemless or thin-stemmed hub byte-identical
+   by branch rather than by an argument about arithmetic. */
+export function stemJoinThickness(outerR, hubT) {
+  const bore = stemBoreRadius(outerR);
+  const needed = (Math.sqrt(3) / 2) * Math.sqrt(Math.max(0, outerR ** 4 - bore ** 4)) / outerR;
+  return Math.max(hubT, needed);
+}
+/* WHERE THE THICKENING BLENDS OUT. The plate at its own thickness t suffices
+   wherever ln(R0/r) <= (t/T)^2 ln(R0/r_s) — the same constant-stress relation
+   the profile below is, solved for r. Clamped into [r_s, R0]: a stem at or
+   past the hub's own radius makes the whole hub the join, which is told rather
+   than refused. */
+export function stemJoinBlendRadius(hubR, outerR, hubT, joinT) {
+  if (!(joinT > hubT) || !(hubR > outerR)) return Math.min(hubR, Math.max(outerR, hubR));
+  return Math.max(outerR, Math.min(hubR, hubR * Math.pow(outerR / hubR, (hubT / joinT) ** 2)));
+}
+/* THE PROFILE — the hub's thickness at plan radius r. A MAX over two terms
+   with the winner decidable, which is widthProfile()'s own shape and is why
+   the C0 join at the blend radius is DECLARED rather than smoothed: smoothing
+   it would need a blend function, and a blend function is the thing Eva's
+   ruling says there is none of. Flat at the join's thickness inside the stem's
+   own radius, the constant-stress curve between, the hub's own thickness
+   outside. Returns hubT exactly — not nearly — wherever the join is inert. */
+export function hubThicknessAt(r, { hubR, hubT, outerR, joinT }) {
+  if (!(joinT > hubT)) return hubT;
+  if (!(hubR > outerR)) return joinT;
+  const denom = Math.log(hubR / outerR);
+  if (!(denom > 0)) return joinT;
+  const rr = Math.min(hubR, Math.max(outerR, r));
+  return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));
+}
+
+/* THE PLACER, IN MILLIMETRES OF ARC FROM THE HUB (Eva's ruling), never in `u`
+   — `u` is the blade's parameter and its [0, 1] is already spoken for. `s` is
+   distance along the stem's centreline from where it leaves the hub, so a
+   later leaf asking "how far along the stem am I" reads the placer's own
+   argument rather than a second producer of the centreline.
+
+   A STRAIGHT TUBE IS EXACT AT TWO STATIONS, so that is what this emits and
+   there is no pitch constant to invent. Curvature is where a pitch law is
+   owed, and it is out of scope by ruling; the parameterisation is established
+   here so that session's placer is a change of law rather than a change of
+   argument. */
+export function stemStations(lengthMm) { return [0, lengthMm]; }
+
+/* THE STEM'S OWN LATTICE is the hub's, so the tube's facets match the surface
+   it emerges from. One owner; buildHubInto reads it too. */
+export const HUB_SECTORS = 48;
+
+/* ===================================================================
    buildHubInto — the derived junction. PLUMBING, not a designed centre
    (phase 2 B2 owns the reproductive parts; conflating the two cost the
    flower several cycles, and the A/B centre rig that stood in for them is

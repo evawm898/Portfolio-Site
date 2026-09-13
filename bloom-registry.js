@@ -45,7 +45,8 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_SIZE_RANGE, TIP_ELONGATION_RANGE, TIP_LOBES_RANGE, TIP_PINCH_RANGE, TIP_ROUNDEDNESS_RANGE,
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
-         LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE } from './bloom-geometry.js';
+         LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -287,6 +288,17 @@ export const PREDICATES = {
   ...Object.fromEntries(TIP_INSTANCES.map((t) => [t.outlineLive, { all: [{ ref: t.present }, { not: { id: `${t.prefix}Roundedness`, min: 1 } }] }])),
   gynoeciumEligible: { not: { ref: 'sphereMode' } },
   gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
+
+  /* THE STEM'S TWO STATEMENTS (session 43). This is the twin of the geometry's
+     `stemEligible`: the registry HIDES the stem controls on this condition and
+     the geometry makes them INERT, and the harness asserts the two agree at
+     module load — the slotRolesEligible precedent, and the same relation
+     androeciumEligible and gynoeciumEligible already carry. SPHERE refuses a
+     stem in this PR; Eva's ruling for it is its own PR immediately after. */
+  stemEligible: { not: { ref: 'sphereMode' } },
+  /* The DIAMETER is hidden AND inert at length 0 — the curl family's own
+     gating, and lobeDepth's: one control is the guard and the rest follow it. */
+  stemPresent: { all: [{ ref: 'stemEligible' }, { id: 'stemLength', min: 1 }] },
 
   /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
@@ -583,6 +595,9 @@ export const SECTIONS = [
      `open: false` — ARRANGEMENT holds the one first-load open. Inside the
      container the accordion rule holds one level down: opening Gynoecium
      closes Androecium and leaves Center open. */
+  /* STEM sits below HEAD because that is what it attaches to: the petals join
+     the hub, the hub joins the stem. It holds its two controls and no more. */
+  { id: 'stem', label: 'Stem', open: false },
   { id: 'center', label: 'Center', open: false },
   /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
      reproductive parts the retired CENTER section was standing in for
@@ -2657,6 +2672,35 @@ export const CONTROLS = [
   { id: 'styleCurl', section: 'gynoecium', kind: 'slider', min: -180, max: 180, step: 5, default: 0,
     label: 'Style curl', fmt: (v) => (Number(v) === 0 ? 'straight, up the axis' : `${v}° — bends over the apex`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumPresent' } },
+
+  /* THE STEM'S TWO CONTROLS (session 43). Length is the GUARD — 0 is no stem,
+     and the diameter is hidden AND inert there — which is lobeDepth's shape and
+     stamenCount's, and is what keeps every pre-stem row byte-identical by
+     branch rather than by an argument about arithmetic.
+     BOTH RANGES ARE IMPORTED from the geometry, never restated (Q6): the 3 mm
+     floor is Eva's stated minimum outer diameter and the bore rule reads it. */
+  { id: 'stemLength', section: 'stem', kind: 'slider',
+    min: STEM_LENGTH_RANGE[0], max: STEM_LENGTH_RANGE[1], step: 1, default: 0,
+    label: 'Stem length',
+    /* TOTAL AND VISIBLE ARE TWO NUMBERS (Eva, Sep 13). On a domed head the
+       attachment face is high inside the bowl, so part of the stem is hidden by
+       the head itself — 4.13 mm at rise 0.5 and 8.12 at a hemisphere, measured.
+       A user setting 30 mm and seeing 22 mm would think it was broken, so the
+       read-out says both; the hidden part is DERIVED per build and printed
+       there, never tabulated here. */
+    fmt: (v) => (Number(v) === 0 ? 'none — no stem is built' : `${v} mm total, from the hub's underside (the read-out says how much of it the head hides)`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemEligible' } },
+  { id: 'stemDiameter', section: 'stem', kind: 'slider',
+    min: STEM_DIAMETER_RANGE[0], max: STEM_DIAMETER_RANGE[1], step: 0.5, default: 6,
+    label: 'Stem diameter',
+    /* THE BORE IS DERIVED AND TOLD, never a control: Eva's one rule is
+       `bore = max(0, outerRadius - 1.5)`, so the stem is a SOLID cylinder at
+       the 3 mm floor and hollow above it, with a wall of exactly 1.5 mm
+       wherever it is hollow. The read-out states which of the two it is. */
+    fmt: (v) => { const R = Number(v) / 2, bore = stemBoreRadius(R);
+      return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
+                        : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
