@@ -6301,6 +6301,32 @@ are evaluated against the WHOLE PR diff) and `cancel-in-progress` killed the two
 mid-flight, losing 23 minutes. Full worked case, including the session's own retraction of a
 wrong first reading, in the charter's push-once entry.
 
+**AND `cancel-in-progress` IS NOT A CLEANUP MECHANISM — IT ONLY FIRES WHEN A NEW RUN ENTERS
+THE SAME CONCURRENCY GROUP, so REMOVING the path-matching files from a PR ORPHANS the
+in-flight runs rather than cancelling them** (Eva, Sep 13, the squared-tip session — the exact
+converse of session 29's case above, and it costs more). Session 29 pushed and the gates
+re-triggered, so `cancel-in-progress` killed the old runs. The squared-tip session pushed a
+REVERT: `be03235` added matrix block 31 (`tools/bloom-harness.mjs`, in both long gates' path
+filters), `997c556` kept it and re-triggered — correctly killing `be03235`'s runs — and then
+`a110531` reverted the block, leaving the PR's cumulative diff **docs-only**. No workflow
+matched, so **no run started, nothing entered the group, and nothing was cancelled**: four
+runs kept going on the stale sha `997c556` — `bloom-export-watertight`,
+`bloom-connectedness`, `bloom-panel` and `flower-export-watertight` — burning toward three
+hours to test a tree the PR no longer had. **The check-suite notice said the PR was green,
+which was true and not the question.** Verify with `actions_list` filtered on the branch and
+read the `head_sha`, then cancel by hand, one call per run:
+`mcp__github__actions_run_trigger` with `method: 'cancel_workflow_run'`, `run_id: <id>` — and
+re-read the list afterwards to confirm 0 in progress, because a cancel is a request. **The
+trigger to watch for is any push whose net effect REMOVES a path-filtered file** — a revert, a
+`git restore`, a branch reset, or moving work out of `tools/`.
+
+**COMMIT SEPARATELY, PUSH ONCE** (Eva, Sep 13, accepting that session's own self-criticism on
+sequencing, and it is the general rule rather than a note about one PR).
+Gate-rows-before-geometry is right and earns its keep when the gate runs LOCALLY in seconds —
+that session saw block 31 red in 4 seconds and the reading was worth having. What cost three
+hours was giving it its own PUSH. The two are separable: keep the commits separate so the
+history shows the rows were seen red before the feature existed, and push the pair.
+
 **DEBUG THE TOOL ON TWO ROWS, NOT ON THE FULL GRID** — the charter's own section, *Debugging an
 instrument*. Session 29 spent five fifty-minute sheet runs finding bugs in a sheet tool while
 the geometry passed all sixteen rows every time; none of the five failures was about the bloom.
