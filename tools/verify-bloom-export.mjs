@@ -50,7 +50,8 @@ import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
-         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE } from './bloom-harness.mjs';
+         stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
+         stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
@@ -177,6 +178,14 @@ for (const row of rows) {
      hairline root or a missing lobe reads as watertight and one piece. */
   const gyn = await gynoeciumAssertions(page, row);
   if (gyn.length) { validity.push(`${row.label}: ${gyn.join('; ')}`); continue; }
+  /* THE STEM AND THE HUB-TO-STEM JOIN (ST0-ST6) — session 43. This gate is
+     STRUCTURALLY BLIND to every claim in that family: the stem is a closed
+     solid overlapping the hub, so a stem built off the axis, to the wrong
+     length, with a bore that is not Eva's rule, rooted as a hairline, or with a
+     join whose thickening is not the law it declares, ALL export watertight and
+     as one piece. See stemAssertions()'s own header. */
+  const stem = await stemAssertions(page, row);
+  if (stem.length) { validity.push(`${row.label}: ${stem.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -352,6 +361,7 @@ console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
+console.log(`STEM SCOPE: ${STEM_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE SAGITTA SUMMARY — a REPORT, and the worst is named with WHERE it sits,
@@ -409,6 +419,7 @@ if (validity.length) {
 }
 if (failures.length) {
   bad = true;
+  console.log(`\nexport gate: ${failures.length} CONFIG(S) NOT WATERTIGHT — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${failures.length} config(s) export with open (boundary) edges:`);
   for (const f of failures) console.error(`  - ${f.label}: boundary=${f.boundary}`);
 }
@@ -419,6 +430,7 @@ if (failures.length) {
    rated rather than reported. */
 if (degenerates.length) {
   bad = true;
+  console.log(`\nexport gate: ${degenerates.length} CONFIG(S) EMIT DEGENERATE TRIANGLES — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${degenerates.length} config(s) emit degenerate (zero-area) triangles:`);
   for (const f of degenerates) console.error(`  - ${f.label}: degenerate=${f.degenerate} of ${f.tris} (export)`);
 }
@@ -431,6 +443,7 @@ if (degenerates.length) {
    as boundary === 0 and nothing else. */
 if (countMoved.length) {
   bad = true;
+  console.log(`\nexport gate: ${countMoved.length} CONFIG(S) MOVED TRIANGLE COUNT BETWEEN MODES — see the detail on stderr.`);
   console.error(`\nexport gate: FAIL — ${countMoved.length} config(s) have DIFFERENT live and export triangle counts. The export floor is meant to change geometry and never topology:`);
   for (const f of countMoved) console.error(`  - ${f.label}: tris(live)=${f.liveTris} tris(export)=${f.tris}`);
 }

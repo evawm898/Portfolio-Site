@@ -172,6 +172,13 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        parts are counted in R1 together and rasterised never (a stigma over
        the disc is not crown closure either). */
     if (frHC.gynoecium) mod.buildStyleInto(accST, frHC.gynoecium);
+    /* THE STEM (session 43) joins this third accumulator for R1's own reason:
+       R1 counts the parts through an accumulator that EMITS, so it sees the
+       ORCHESTRATION — a part emitted and not recorded, or recorded and emitted
+       twice. A NEW part that emits and is absent here makes R1 fire at once,
+       which is what it did the first time a stem was built, on this exact
+       clause. The plan is asked of its ONE owner, never re-derived. */
+    mod.buildStemInto(accST, mod.stemPlan(ui, frHC.hub, accST));
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
@@ -273,7 +280,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     /* R1 */
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
     if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens and style: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style and stem: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {

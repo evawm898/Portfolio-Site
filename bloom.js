@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemEligible } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -479,6 +479,22 @@ let lastRings = [];                               // every ring, in build order
 let lastHub = { radius: 0, thickness: 0 };
 let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
+/* THE STEM (session 43) — the plan its ONE owner made and what the builder
+   emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemEligible = true;
+/* THE FOOT FRAMES' DIGEST — ST6's measured side. A stemmed and a stemless build
+   of the SAME state must agree here exactly, which is the whole of "the
+   hub-to-stem join does not change the petal-to-hub junction". One function
+   makes both numbers, which is right: the digest is a MEASUREMENT METHOD and
+   the two sides are two different BUILDS, so the owners that differ are the
+   ones that matter. */
+function footFramesDigest(built) {
+  let h = 0;
+  for (const p of (built.petals || [])) for (const f of (p.footFrames || [])) {
+    for (const v of [...f.C, ...f.N, ...f.T, f.h, f.t]) { h = (h * 31 + (Number.isFinite(v) ? v : 0)) % 1e15; }
+  }
+  return h;
+}
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
 /* THE BUILDER'S OWN TALLY of buildPetalInto calls — Z1's independent
@@ -554,6 +570,13 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
     lastFilamentStyle = built.filamentStyle;
+    lastStem = built.stem && built.stem.present ? built.stem : null;
+    lastStemTris = built.stemBuilt ? built.stemBuilt.tris : 0;
+    lastStemBuilt = built.stemBuilt || null;
+    /* THE GEOMETRY'S OWN ELIGIBILITY, on the state this build was made from.
+       ST0 needs the answer the RUNNING module gave; see __bloomMetrics. */
+    lastStemEligible = stemEligible(uiForBuild);
+    lastFootDigest = footFramesDigest(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -1067,6 +1090,25 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    highest anther — the pair on the sheet, said in millimetres), the
    wider-than-the-hub corner and the petal-root annulus as FLAGS, the spine
    floor told. Absent when the gynoecium is absent. */
+/* THE STEM LINE (session 43). TOTAL AND VISIBLE ARE TWO NUMBERS, and the read-out
+   says both (Eva, Sep 13): on a domed head the attachment face is high inside the
+   bowl, so the head swallows part of the stem, and a user asking for 30 mm and
+   being shown only "30" while 22 is visible would think it was broken. The hidden
+   part is DERIVED per build by the plan's one owner — never tabulated — and is 0
+   on a flat head by the same construction.
+   THE JOIN IS TOLD, NOT TUNED: it has no control, so the only way anyone can see
+   what it did is for this line to say it. CLAMPED AND TOLD is the project's own
+   form, and the bore's closing at Eva's floor is exactly that. */
+function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode) {
+  if (!stem) return '';
+  const hollow = stem.boreR > 0;
+  return `STEM ${stem.lengthMm} mm total`
+    + (stem.hiddenMm > 1e-9 ? ` · ${stem.visibleMm.toFixed(1)} mm VISIBLE (${stem.hiddenMm.toFixed(1)} mm of it is inside the head's own bowl)` : ' · all of it visible (a flat head hides none)')
+    + ` · ${(stem.outerR * 2).toFixed(1)} mm across, `
+    + (hollow ? `${(stem.boreR * 2).toFixed(1)} mm bore, a ${stem.wallMm.toFixed(2)} mm wall` : `SOLID — the bore CLOSES at this diameter (told, not refused)`)
+    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : `INERT — a ${(stem.outerR * 2).toFixed(1)} mm stem asks for no more than the hub's own ${stem.hubT.toFixed(2)} mm, so the hub is untouched`}\n`;
+}
+
 function styleLine(fr, styles, stamens, mode) {
   const G = fr.gynoecium;
   if (!G || !styles.length) return '';
@@ -1149,6 +1191,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + spineLine(petals)
        + lobeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
+       + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1569,6 +1612,45 @@ window.__bloomMetrics = () => ({
      from an incorrect one. J3 below is the assertion that can. */
   hubRadius: lastHub.radius,
   hubThickness: lastHub.thickness,
+  /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
+     `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
+     builder says there is none" from "the builder says nothing", and a missing
+     key is the second. The root and tip are built here from the plan's own two
+     heights rather than stored twice. */
+  stem: lastStem ? {
+    lengthMm: lastStem.lengthMm, outerR: lastStem.outerR, boreR: lastStem.boreR, wallMm: lastStem.wallMm,
+    root: [0, 0, lastStem.rootZ], tip: [0, 0, lastStem.tipZ],
+    /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
+       heights: ST4 asks whether the root really runs THROUGH the slab, and a
+       builder that started at the underside would leave the plan saying it
+       did. See buildStemInto's own note. */
+    rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
+    stations: lastStem.stations.slice(), sides: lastStem.sides,
+    hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
+    /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
+       these, never the plan beside them. Same reason as rootSpanMm above: the
+       plan is what was ASKED FOR and these are what came out. */
+    emittedMaxR: lastStemBuilt ? lastStemBuilt.emittedMaxR : undefined,
+    emittedMinR: lastStemBuilt ? lastStemBuilt.emittedMinR : undefined,
+    emittedAxisOffset: lastStemBuilt ? lastStemBuilt.emittedAxisOffset : undefined,
+    emittedTipZ: lastStemBuilt ? lastStemBuilt.emittedTipZ : undefined,
+  } : null,
+  stemTris: lastStemTris,
+  /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
+     module that is actually running. ST0 compares it against the REGISTRY's
+     declaration, and it has to arrive through the page: a gate calling the
+     geometry's predicate in Node compares one unmutated module against another
+     and can never disagree — session 41's L7, measured again here, where
+     `stem-eligible-disagrees-with-the-registry` fired nothing until this key
+     existed. */
+  stemEligible: lastStemEligible,
+  hubJoinActive: !!lastHubBuilt.joinActive,
+  hubJoinThickness: lastHubBuilt.joinThickness,
+  hubJoinBlendRadius: lastHubBuilt.joinBlendRadius,
+  hubJoinUndersideMagnitude: lastHubBuilt.undersideMagnitude,
+  hubUnderside: (lastHubBuilt.underside || []).map((p) => p.slice()),
+  hubTopFaceZ: lastHubBuilt.topFaceZ,
+  footFramesDigest: lastFootDigest,
   /* THE DOME (Sep 4) — footRing()'s own cap, null under the guard: the rise
      asked and built, the cap's radius and centre, the apex floor's clamp, and
      the surface-to-plan ratio over the feet's annulus. J1 places every foot
@@ -1794,6 +1876,24 @@ window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) =>
    through the rAF coalescer so a caller can read __bloomMetrics back on the
    next line and get the design it just asked for. Pass null to clear. */
 window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); return capability; };
+/* ST6'S REFERENCE — A STEMLESS BUILD OF THE SAME STATE, made here on the same
+   page and thrown away (session 43). It is the only owner in this file that the
+   stem code does not write at all, which is exactly what Eva's fourth durable
+   rule asks of a clause's expected value: if the hub-to-stem join moved a foot
+   frame, resized the hub or grew UPWARD into the face the feet sit on, this is
+   the only thing that could see it. Not a control, invisible to every gate's
+   whole-state read-back, and called by the gates alone. */
+window.__bloomStemlessHub = () => {
+  const ui = { ...readUI(), stemLength: 0 };
+  const acc = new MeshBuilder({ exportMode: shownMode() === 'export' });
+  const built = buildBloomInto(acc, ui, { below: null, capability });
+  return {
+    hubRadius: built.hub.radius,
+    hubThickness: built.hub.thickness,
+    topFaceZ: built.hubBuilt.topFaceZ,
+    footFrames: footFramesDigest(built),
+  };
+};
 
 /* ---------------- go ---------------- */
 applyVisibility();

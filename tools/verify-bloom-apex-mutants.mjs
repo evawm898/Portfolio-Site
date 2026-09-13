@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -160,6 +160,58 @@ function lobePowers(M) {
   const uc = ternary(crestAt - spanC * 0.35, crestAt + spanC * 0.35, 'min');
   const notch = powerAt(us, -1, spanS), crest = powerAt(uc, +1, spanC);
   return Number.isFinite(notch) && Number.isFinite(crest) ? { crest, notch } : null;
+}
+
+/* THE STEM WITNESS (session 43). Builds a stem on the module under test and
+   reads what it EMITTED — the plan's own numbers plus the geometry the builder
+   actually put in the accumulator — so the witness and the assertion have
+   different owners. Asking the gate whether the gate fired is the circularity
+   this table exists to avoid (session 35), and session 41 found the same defect
+   twice in one clause by measuring the wrong tree: every witness here reads the
+   MUTATED module `M`, never the clean one except to compare against.
+   MODE: EXPORT. SAMPLING: every vertex the stem builder emitted. */
+const STEM_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 60, stemDiameter: 6 });
+function stemFacts(M, state = STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildStemInto(sacc, plan);
+    const P = sacc.positions;
+    let maxOffAxis = 0, zlo = Infinity, zhi = -Infinity;
+    for (let i = 0; i < P.length; i += 3) {
+      const r = Math.hypot(P[i], P[i + 1]);
+      const z = P[i + 2];
+      if (z < zlo) zlo = z; if (z > zhi) zhi = z;
+      /* how far the ring CENTRES are from the axis: the max and min radius of a
+         ring on the axis are equal to its own radius, so an off-axis stem shows
+         as a spread between them. */
+      if (r > maxOffAxis) maxOffAxis = r;
+    }
+    const hacc = new M.MeshBuilder({ exportMode: true });
+    const hub = M.buildHubInto(hacc, state, fr.hub);
+    return { plan, tris: built.tris, maxR: maxOffAxis, zlo, zhi, hub,
+             emittedSpan: plan.present && built.emittedTopZ !== undefined ? built.emittedTopZ - plan.rootZ : 0,
+             free: plan.present ? plan.rootZ - plan.tipZ : 0,
+             rootSpan: plan.present ? plan.topZ - plan.rootZ : 0 };
+  } catch (e) { return { threw: e.message }; }
+}
+/* The minimum distance any emitted stem vertex comes to the axis — 0 only for a
+   solid cap's own rim fan, and the bore radius for a hollow one. Read from the
+   emitted stream so a bore rule that changed in NAME only cannot pass. */
+function stemInnerRadius(M, state = STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    M.buildStemInto(sacc, plan);
+    const P = sacc.positions;
+    let best = Infinity;
+    for (let i = 0; i < P.length; i += 3) { const r = Math.hypot(P[i], P[i + 1]); if (r < best) best = r; }
+    return best;
+  } catch { return null; }
 }
 
 /* THE EMITTED RELIEF, PER MARGIN SINUS, on a given module — the witness for
@@ -594,6 +646,92 @@ const MUTANTS = [
       return a === 0 && b > 0 ? null
         : `the blend is ${a} on the mutant against ${b} on the clean tree — the ladder was not discarded`;
     } },
+  /* ===================================================================
+     THE STEM FAMILY (session 43) — ST0-ST6. Added because this project's own
+     rule says so: "re-run the mutant table when an assertion family is added",
+     and a family seen red only in the degenerate state where its subject does
+     not exist is a family nobody has watched fail on a DEFECT.
+
+     WHY THESE SEVEN. Each is a way the stem could be built wrong while still
+     exporting watertight and as ONE connected piece — which is the whole
+     argument for the family existing. Every one of them leaves the boundary
+     census, the flood fill and the triangle-count identity completely
+     unchanged, so without ST0-ST6 each ships silently. */
+  { id: 'stem-eligible-disagrees-with-the-registry', why: "the geometry says a stem is eligible under SPHERE while the registry still hides the controls there — the hidden-and-NOT-inert defect PP7 and JS0 exist for, and it is invisible to every other family here",
+    find: 'export function stemEligible(state) { return !sphereMode(state); }',
+    into: 'export function stemEligible(state) { return true; }', names: ['ST0'],
+    witness: (M, C) => { const sph = { ...REGISTRY_DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60 };
+      const m = M.stemIsAbsent(sph), c = C.stemIsAbsent(sph);
+      return (m === false && c === true) ? null : `stemIsAbsent under SPHERE reads ${m} on the mutant and ${c} on the clean tree — the predicate did not move`; } },
+
+  { id: 'stem-declared-and-not-built', why: 'the builder returns before emitting anything, while the plan still declares a stem',
+    find: '  if (!plan.present) return { tris: 0 };',
+    into: '  if (!plan.present || plan.present) return { tris: 0 };', names: ['ST1'],
+    witness: (M) => { const f = stemFacts(M); return f.threw ? `the witness threw: ${f.threw}`
+      : (f.tris === 0 && f.plan.present ? null : `the stem still emitted ${f.tris} triangles`); } },
+
+  { id: 'stem-off-the-axis', why: 'every stem ring is offset from the axis by a millimetre — watertight, one piece, the same triangle count',
+    find: '    const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];',
+    into: '    const th = (k * TAU) / N; return [rad * Math.cos(th) + 1, rad * Math.sin(th), z];', names: ['ST2'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.maxR - c.maxR) > 0.5) ? null : `the emitted stem's furthest vertex is ${m.maxR} against the clean tree's ${c.maxR} — it did not move off the axis`; } },
+
+  { id: 'stem-runs-the-wrong-length', why: 'the free stem is built at 90% of the length the control asked for',
+    find: '  const tipZ = rootZ - lengthMm;',
+    into: '  const tipZ = rootZ - lengthMm * 0.9;', names: ['ST2'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.free - c.free) > 1) ? null : `the emitted free length is ${m.free} against ${c.free} — it did not change`; } },
+
+  { id: 'bore-is-not-evas-rule', why: "the bore is half the outer radius instead of `max(0, outerRadius - 1.5)` — a wall that is no longer Eva's stated 1.5 mm",
+    find: 'export function stemBoreRadius(outerR) { return Math.max(0, outerR - STEM_MIN_WALL_MM); }',
+    into: 'export function stemBoreRadius(outerR) { return outerR / 2; }', names: ['ST3'],
+    /* PROBED ON THE SOLID ROW, NOT THE DEFAULT STEM STATE, and that is a
+       measured correction rather than a preference: at `stemDiameter` 6 the
+       outer radius is 3, and `max(0, 3 - 1.5)` and `3 / 2` are the SAME 1.5 —
+       so on its first run this witness reported the behaviour had not moved
+       when the edit was live and correct. A mutation is invisible wherever the
+       law it replaces happens to agree with it, and the probe has to be chosen
+       to separate them. At 3 mm the clean tree is SOLID (bore 0) and the mutant
+       is HOLLOW (bore 0.75), which is also a row this table actually runs. */
+    witness: (M, C) => { const st = { ...STEM_STATE(), stemDiameter: 3 };
+      const m = stemInnerRadius(M, st), c = stemInnerRadius(C, st);
+      if (m === null || c === null) return 'the witness could not build a stem';
+      return (Math.abs(m - c) > 0.1) ? null : `the emitted inner radius is ${m} against ${c} — the bore did not move`; } },
+
+  { id: 'hairline-root', why: 'the stem STARTS at the hub underside instead of running THROUGH the slab — the overlap becomes a touch, and no boundary census or flood fill can see the difference',
+    find: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
+    into: '  const zs = [plan.rootZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST4'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ms = m.emittedSpan, cs = c.emittedSpan;
+      return (ms < 1e-9 && cs > 0.5) ? null : `the emitted root spans ${ms} mm against the clean tree's ${cs} — it still runs through the slab`; } },
+
+  { id: 'join-is-not-the-law', why: "the join's thickness is 1.4x what the stem's own section asks for — thicker than the law, and every shape check below it still passes",
+    find: '  return Math.max(hubT, needed);',
+    into: '  return Math.max(hubT, needed * 1.4);', names: ['ST5'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.plan.joinT - c.plan.joinT) > 0.1) ? null : `the join thickness is ${m.plan.joinT} against ${c.plan.joinT} — it did not move`; } },
+
+  { id: 'join-reaches-past-where-it-says-it-stops', why: 'the profile drops its floor at the hub\'s own thickness, so the thickening runs all the way to the rim instead of blending out at the radius the owner declares',
+    find: '  return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));',
+    into: '  return hubT + joinT * Math.sqrt(Math.log(hubR / rr) / denom);', names: ['ST5'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mu = m.hub.underside, cu = c.hub.underside;
+      if (!mu || !cu || mu.length !== cu.length) return 'the two undersides are not comparable';
+      let worst = 0; for (let i = 0; i < mu.length; i++) worst = Math.max(worst, Math.abs(mu[i][1] - cu[i][1]));
+      return worst > 0.01 ? null : `the emitted underside moved by at most ${worst} mm — the profile did not change`; } },
+
+  { id: 'the-join-grows-upward-into-the-feet', why: "the thickening is split either side of the mid-surface, so the hub's TOP face — the one the feet sit on and J1/J4a read — moves with the stem's diameter",
+    find: '  const zTop = t / 2, zBot = -t / 2;',
+    into: '  const zTop = t / 2 + (joinActive ? (plan.joinT - t) / 2 : 0), zBot = -t / 2;', names: ['ST6'],
+    witness: (M, C) => { const m = stemFacts(M), c = stemFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.hub.topFaceZ - c.hub.topFaceZ) > 0.05) ? null
+        : `the hub's top face is at ${m.hub.topFaceZ} against the clean tree's ${c.hub.topFaceZ} — it did not move`; } },
 ];
 
 /* Rows chosen so every mutation has something to bite on. */
@@ -657,6 +795,24 @@ const ROWS = [
      is this row with the exponent simply left alone. */
   { label: 'the ladder saturated in LIVE mode (buckle 0.30 at f 1, the default exponent)', set: [{ id: 'buckleAmp', value: '0.3' }, { id: 'buckleFreq', value: '1' }] },
   { label: 'the buckle at its frequency ceiling (0.20 at f 7 — the bound is exactly uniform)', set: [{ id: 'buckleAmp', value: '0.2' }, { id: 'buckleFreq', value: '7' }] },
+  /* THE STEM ROWS (session 43). Two, and the pair is the point: the hollow one
+     has Eva's bore OPEN and the join well clear of the hub's own thickness; the
+     solid one closes the bore at her 3 mm floor with the join barely active
+     (1.299 mm over 1.200). A mutation biting on only one arm of either branch
+     would pass on a single row. */
+  { label: 'a stem, hollow (60 mm x 6 mm — the bore open, the join well clear of the hub)', set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
+  { label: "a stem, SOLID at Eva's floor (60 mm x 3 mm — the bore closes, the join barely active)", set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '3' }] },
+  /* AND A THIRD, WHICH IS THE ONLY STATE ST0 CAN SPEAK ON. ST0 compares the
+     registry's predicate against the geometry's, and on any row where a stem is
+     eligible the two agree whatever either one says — so a geometry that has
+     stopped refusing SPHERE is invisible on both rows above, and
+     `stem-eligible-disagrees-with-the-registry` fired NOTHING until this row
+     existed. The row a two-statement clause needs is the one where the
+     statement BITES; session 35's stale-harness-row lesson, arriving as a row
+     that was never chosen rather than one that went stale. */
+  { label: 'a stem asked for under SPHERE (hidden AND inert — the state where the two statements can disagree)',
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '24' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
+
 ];
 
 const { server, port } = await serveRepo();
@@ -683,8 +839,37 @@ async function famsOn(rows) {
     for (const msg of await lobeAssertions(page, row)) {
       const mm = /^(L\d)/.exec(msg); if (mm) seen.add(mm[1]);
     }
+    /* THE STEM FAMILY (session 43) — same rule again: a family added is a
+       family this table must be able to fire. */
+    for (const msg of await stemAssertions(page, row)) {
+      const mm = /^(ST\d)/.exec(msg); if (mm) seen.add(mm[1]);
+    }
   }
   return seen;
+}
+
+/* EVERY MUTANT'S ANCHOR IS CHECKED BEFORE ANY MUTANT RUNS, and for ALL of
+   them rather than only the selected ones — `/plot`'s own measured lesson. A
+   refactor disarms a mutant in two ways: a `from` that has MOVED (reported as
+   "did not apply", survivable only if somebody runs it) and a `from` that now
+   matches TWICE, which mutates the first occurrence and says nothing. Both are
+   invisible in a sweep nobody finishes, and a stale anchor inside a SKIPPED
+   mutant is precisely the one no run reports. This costs a string scan. */
+{
+  const stale = MUTANTS.map((mu) => [mu.id, SRC.split(mu.find).length - 1]).filter(([, n]) => n !== 1);
+  console.log(`ANCHORS: ${MUTANTS.length} mutants, ${MUTANTS.length - stale.length} matching their find-string exactly once`);
+  for (const [id, n] of stale) console.log(`  *** ${id}: anchor matches ${n}x — disarmed`);
+  if (stale.length) { await browser.close(); server.close(); console.log('\nAPEX MUTANT TABLE: FAILED (disarmed anchors)'); process.exit(1); }
+}
+
+/* `--only=<id>[,<id>...]` runs a subset. A full sweep is every mutant over
+   every row and is not survivable in a container that restarts, so the subset
+   is how a family is re-verified after a change; it NEVER reports as a sweep. */
+const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1];
+const SELECTED = ONLY ? ONLY.split(',').map((x) => x.trim()).filter(Boolean) : null;
+if (SELECTED) {
+  const unknown = SELECTED.filter((id) => !MUTANTS.some((m) => m.id === id));
+  if (unknown.length) { await browser.close(); server.close(); console.log(`--only names no such mutant: ${unknown.join(', ')}`); process.exit(1); }
 }
 
 console.log('CONTROL (unmutated tree): the family must be SILENT on every row');
@@ -699,6 +884,7 @@ const NEUTER = (process.argv.find((a) => a.startsWith('--neuter=')) || '').split
 REGISTRY_DEFAULTS = (await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href)).DEFAULTS;
 const CLEAN = await mutatedModule('__clean', SRC);
 for (const mu of MUTANTS) {
+  if (SELECTED && !SELECTED.includes(mu.id)) continue;
   const n = SRC.split(mu.find).length - 1;
   if (n !== 1) { console.log(`  ${mu.id}: MUTATION DID NOT APPLY (matched ${n}x) — ${mu.why}`); fail = true; continue; }
   const into = NEUTER === mu.id ? mu.find + ' /* neutered */' : mu.into;
@@ -724,6 +910,11 @@ if (NEUTER) {
   console.log(fail ? `\nguard check: the sweep REPORTED the neutered mutant "${NEUTER}" — the witness clause fires.`
                    : `\nguard check: FAIL — "${NEUTER}" was neutered and the sweep stayed green.`);
   process.exit(fail ? 0 : 1);
+}
+if (SELECTED) {
+  console.log(fail ? `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): FAILED`
+                   : `\nAPEX MUTANT TABLE (SUBSET of ${SELECTED.length}/${MUTANTS.length}): each selected family fires on a mutation that names it, and is silent on the clean tree. THIS IS NOT A SWEEP — ${MUTANTS.length - SELECTED.length} mutants were not run.`);
+  process.exit(fail ? 1 : 0);
 }
 console.log(fail ? '\nAPEX MUTANT TABLE: FAILED' : '\nAPEX MUTANT TABLE: every family fires on a mutation that names it, and is silent on the clean tree');
 process.exit(fail ? 1 : 0);
