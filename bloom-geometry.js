@@ -2931,14 +2931,19 @@ export const TIP_HALF_MM = 0.8;
    ceiling of 1 is the derived one: a floor above the peak would raise the
    outline past its own widest point, which is what retired `petalTipBreadth`.
 
-   `FRINGE_COUNT_RANGE`'s 0 is the GUARD (no fringe, the single 'full' span)
-   and its ceiling is the largest count the widest reachable terminal can
-   carry: at `petalTipEnd` 1 on a 30 mm petal the end is 30.00 mm across and
-   `2W >= (2N-1) * MIN_FEATURE_MM` gives 15 — the range stops at 10 because
-   that is what the SHIPPING petal's own ceiling reaches at the widest
-   terminal (16.00 mm -> 8) plus the two steps the widest petal adds before
-   the count stops reading as a fringe and starts reading as a comb. Above
-   the reachable ceiling the count is CLAMPED AND TOLD, never refused.
+   `FRINGE_COUNT_RANGE`'s 0 is the GUARD (no fringe, the single 'full' span).
+   ITS CEILING OF 10 IS A CHOICE ABOUT WHAT READS AS A FRINGE, AND THE
+   GEOMETRY REACHES FURTHER — said plainly because the measurement says so.
+   The ceiling the SHAPE can carry is `W >= (2N-1) * MIN_FEATURE_MM` at the
+   fringe region's narrowest station, and across the petal-size range at the
+   full terminal that is 4 / 6 / 8 / 11 / 15 at `petalWidth` 8 / 12 / 16 / 22
+   / 30. So on the shipping 16 mm petal the geometry binds first (8) and the
+   range never does; on a 22 or 30 mm petal THE RANGE binds first and there
+   is real headroom the control cannot reach. That is the inverse of
+   `stamenSpread`'s dead travel and it takes the same ruling: the range is not
+   widened and the maximum is not adaptive, and the read-out prints the
+   geometry's own ceiling beside the count so the headroom is visible rather
+   than silent. Above whichever binds, the count is CLAMPED AND TOLD.
 
    `FRINGE_DEPTH_RANGE` is a fraction of the petal's OWN LENGTH measured from
    the tip, which is what makes the split a PHYSICAL quantity with one owner

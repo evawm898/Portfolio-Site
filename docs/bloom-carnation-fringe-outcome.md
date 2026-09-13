@@ -140,6 +140,36 @@ Reproducing the arithmetic the picture session did on §6e's measured terminals.
 **CLAMPED AND TOLD** — the read-out names the count asked, the count built, the
 width that bound and what the end would have to be.
 
+**ACROSS THE PETAL-SIZE RANGE** (`node tools/bloom-fringe-ceiling.mjs`), and
+`--` is NO ROOM:
+
+| `petalWidth` | t=0.00 | 0.15 | 0.30 | 0.50 | 0.70 | 0.85 | 1.00 |
+|---|---|---|---|---|---|---|---|
+| 8 mm | — | — | 1 | 2 | 3 | 3 | 4 |
+| 12 mm | — | 1 | 2 | 3 | 4 | 5 | 6 |
+| **16 mm** (shipped) | — | 1 | 2 | 4 | 6 | 7 | **8** |
+| 22 mm | — | 2 | 3 | 6 | 8 | 9 | 11 |
+| 30 mm | — | 2 | 5 | 8 | 11 | 13 | **15** |
+
+Two things fall out and both are stated rather than left implicit.
+
+**THE CEILING IS IDENTICAL IN LIVE AND EXPORT ON EVERY CELL** — zero mode
+differences over the whole table, which is what "the panel decomposition is
+topology" means when it is measured instead of asserted.
+
+**`petalLength` DOES NOT MOVE IT AT ALL** — 8 at 20, 35, 45 and 60 mm — so
+width is the only lever, exactly as the picture session found. What length does
+move is the DEPTH, which is a fraction of it: 4.00 / 7.00 / 9.00 / 12.00 mm of
+teeth at the shipped 0.20.
+
+**AND ABOVE 16 mm THE RANGE BINDS BEFORE THE GEOMETRY DOES.**
+`FRINGE_COUNT_RANGE` stops at 10 while a 22 mm petal carries 11 and a 30 mm
+petal 15. That is the inverse of `stamenSpread`'s dead travel and takes the same
+ruling — the range is not widened and the maximum is not adaptive — but the
+read-out prints the geometry's own ceiling beside the count, so the headroom is
+visible rather than silent. **Whether 10 is the right cap is Eva's**, and it is
+one constant.
+
 ## 4. LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE — the fringe wins
 
 Both own the apex (the coverage arc is centred on it by construction), and
