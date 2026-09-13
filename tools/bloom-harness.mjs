@@ -69,6 +69,9 @@ const GEOMETRY = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')
    derivation and both measured endpoints: 1.5 ULP worst over the live matrix,
    2.41e15 ULP on the mutant that names A7. */
 const SEAM_FRAME_RESIDUAL_ULP = 8;
+/* ST5's OWN BUDGET, declared here as its one owner rather than inline at the
+   clause — see the clause for the whole derivation. */
+const STEM_JOIN_ULP = 8;
 /* L5's STATION BUDGET, and the reason it cannot be an absolute bar on a
    half-width. L5 compares the BUILDER's recorded deepest sinus against the law
    rebuilt HERE at the builder's own recorded stations — two owners, which is
@@ -4286,17 +4289,28 @@ export async function stemAssertions(page, row) {
   const und = m.hubUnderside;
   if (!Array.isArray(und) || und.length < 2) bad.push(`ST5: the hub reports ${und && und.length} underside samples — the profile cannot be read`);
   else {
+    const mag = m.hubJoinUndersideMagnitude || hubT;
     let worst = 0, worstAt = null, outside = 0;
     for (const [r, thick] of und) {
       const e = E.at(r);
       const d = Math.abs(thick - e);
       if (d > worst) { worst = d; worstAt = r; }
-      /* OUTSIDE THE BLEND THE HUB IS ITS OWN THICKNESS EXACTLY — not nearly.
-         That is what makes a stemless hub and a thin-stemmed one byte-identical
-         by branch, so it is an identity and carries no tolerance. */
-      if (r > E.blend + 1e-9 && thick !== hubT) outside++;
+      /* OUTSIDE THE BLEND THE HUB IS ITS OWN THICKNESS, TO EIGHT ULP OF THE
+         MAGNITUDE THE BUILDER DIFFERENCED IT FROM — not exactly, and the
+         difference matters. On a FLAT hub the recorded thickness is the law's
+         own value and the identity IS exact; on a CAP it is
+         `outerRad - innerRad(phi)`, and `a - (a - x)` is not `x` in IEEE-754
+         because the emitted vertices are rounded. Asking for an exact equality
+         there asks for more precision than the representation carries —
+         session 38's `seamFrameResidual === 0` and session 41's L5, both of
+         which went red in CI on float noise, and this clause did the same on
+         the first domed row it ever saw. The prescribed remedy is exactly this:
+         bound the difference in the unit the quantity carries. EIGHT ULP for
+         A7's own reason — a handful of last-bit steps, not a number chosen to
+         admit the data. */
+      if (r > E.blend + 1e-9 && Math.abs(thick - hubT) > STEM_JOIN_ULP * Number.EPSILON * mag) outside++;
     }
-    if (worst > 1e-9) bad.push(`ST5: the hub's emitted thickness is ${worst} mm off the join's declared law, worst at plan radius ${worstAt}`);
+    if (worst > STEM_JOIN_ULP * Number.EPSILON * mag) bad.push(`ST5: the hub's emitted thickness is ${worst} mm off the join's declared law, worst at plan radius ${worstAt} (budget ${STEM_JOIN_ULP} ULP of ${mag})`);
     if (outside) bad.push(`ST5: ${outside} underside sample(s) beyond the ${E.blend} mm blend radius are not the hub's own ${hubT} mm exactly — the join reached past where it says it stops`);
   }
   /* ST6 — THE PETAL-TO-HUB JUNCTION IS UNTOUCHED. The reference is a STEMLESS
@@ -4764,6 +4778,15 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'LOBES: x the whole centre (stamens and a style under a lobed whorl)': '272 pairs, worst span 0.0796 mm',
   'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': '11824 pairs, worst span 0.7468 mm (was 12264 / 0.7032 before session 41)',
   'LOBES: x the domed hub (head rise 1.00)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)',
+  /* THE STEM'S HEMISPHERE ROW IS THE HEAD'S FOLD, NOT THE STEM'S, and that is
+     a two-sided measurement rather than a reading of the label: the SAME state
+     built WITHOUT a stem reads 216 pairs, worst span 0.4176 mm, at the SAME
+     point (-5.76, -7.37, 0.87) — identical in every digit to this row and to
+     "headRise max (1)" on this tree. The stem adds nothing to it. Same class as
+     the lobe session's own 20 mm/2.40 mm sheet row: a pre-existing fold that no
+     row on main names because the matrix varies one control at a time, found
+     the moment a new block put two controls together. */
+  'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)")',
 });
 
 /* THE CENSUS RUNS ON THE BUILDER'S DOUBLES, NOT ON THE STL'S FLOAT32, AND

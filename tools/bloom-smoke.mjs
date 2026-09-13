@@ -597,6 +597,30 @@ export const SMOKE_BLOCKS = [
         path: 'THE TWO SHAPE EXPONENTS — L7 in both of its measurements at once, on a row with an unclamped depth and interior crests: the local power of the removed material (hb - h) at a ternary-searched crest is the page\'s own lobeCrestShape and at a sinus its lobeNotchShape, so a build whose two controls are swapped, coupled or served by one expression fails here and nowhere else; and L3\'s demand clause with the SHAPE-dependent floor away from its ceiling (a triangle wave asks 3 stations a lobe, not 11), which is the one path on which the count cap is not the ruled constant\'s' },
     ],
   },
+  {
+    n: 30,
+    anchor: 'STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)',
+    /* DERIVED BY THE HEADER'S OWN METHOD (session 43): the branches a stem adds
+       are `stemIsAbsent` (whether a stem is CONSTRUCTED at all), Eva's bore rule
+       in BOTH of its arms (solid at the 3 mm floor, hollow above it), the
+       hub-to-stem join ACTIVE and INERT, and the domed head, where the
+       attachment face is high inside the bowl so the visible length differs from
+       the total. Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: SPHERE (where
+       the stem is hidden AND inert by ruling, and the whole of that claim is a
+       GATED live-matrix row), every placement but RADIAL, the widest hub, and
+       the centre rooted through the same slab. */
+    rows: [
+      { label: 'STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)',
+        path: 'a stem CONSTRUCTED with the join ACTIVE and the bore OPEN at once — ST0 (the registry\'s stemEligible and the geometry\'s agree, and the builder declares a stem iff the state asks for one), ST1 (built iff declared), ST2 (on the axis, running down, the length the control asked for, and the placer\'s stations in MILLIMETRES OF ARC from the hub), ST3 (Eva\'s bore rule on the EMITTED radii, wall exactly 1.5), ST4 (rooted THROUGH the slab, never a hairline), ST5 (the hub\'s emitted underside IS the join\'s declared law, and the hub\'s own thickness beyond the blend radius), ST6 (the petal-to-hub junction untouched, against a stemless build of the same state)' },
+      { label: 'STEM: SOLID at the floor (3 mm OD — the bore closes, Eva\'s rule)',
+        path: 'the OTHER arm of the bore rule — ST3 with bore 0, the capped-cylinder branch whose cap must be fanned from a RIM vertex and never from the axis (a centre fan shares the hub\'s own apex vertex EXACTLY, welds the two shells and turns a by-design overlap into a within-shell self-intersection: measured 528 pairs before the fix, 0 after), and ST5 with the join barely active at 1.299 mm over the hub\'s 1.200' },
+      { label: 'STEM: x a domed head (rise 0.50 — part of the stem is inside the bowl)',
+        path: 'the CAP arm of the join, where the hub\'s underside is a curved plate and its emitted thickness is a DIFFERENCE of two radii rather than the law\'s own value — ST5\'s ULP bound in the unit the quantity carries, which an exact equality got wrong on the first domed row it ever saw; and the two lengths differing, which is the whole reason the read-out prints both' },
+      { label: 'STEM: GATED — diameter at MAXIMUM with length 0 (hidden and inert; bit-identical to the default)',
+        path: 'the OTHER direction — ST0 and ST1 on a stemless bloom: the diameter at its extreme builds no stem and leaves the join INERT, so the hub takes its pre-stem expression verbatim; the row the byte tool proves bit-identical to the default' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

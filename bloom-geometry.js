@@ -6650,6 +6650,125 @@ export function stemStations(lengthMm) { return [0, lengthMm]; }
    it emerges from. One owner; buildHubInto reads it too. */
 export const HUB_SECTORS = 48;
 
+/* THE ONE OWNER OF EVERYTHING ABOUT A STEM ON THIS HUB — read by
+   buildHubInto (for the join's profile), by buildStemInto (for the solid) and
+   by the metrics hook (for the read-out and the gates). Nothing recomputes any
+   of it; a second producer of `joinT` would be the defect ST5 exists to catch,
+   one level up.
+
+   THE TWO HEIGHTS ARE DIFFERENT QUANTITIES AND BOTH ARE REPORTED (Eva, Sep 13).
+   `topZ` is the hub's TOP face on the axis — the stem is rooted THROUGH the
+   slab to there, the stamens' and the style's own rule, so the overlap the
+   slicer unions is a solid and never a touch. `rootZ` is the hub's UNDERSIDE on
+   the axis, where the free stem begins, and on a domed head that face is high
+   INSIDE the bowl: `hiddenMm` is how much of the stem the head swallows, and
+   `visibleMm` is what a reader sees. A user setting 30 mm and being shown 30
+   when 22 is visible would think it was broken, so the read-out says both — and
+   both are DERIVED here per build, never tabulated. */
+export function stemPlan(state, ring, acc) {
+  const hubT = acc.floorThickness(ring.thickness);
+  const hubR = ring.radius;
+  if (stemIsAbsent(state)) {
+    return { present: false, hubT, hubR, joinT: hubT, blendR: 0, inert: true, outerR: 0, boreR: 0 };
+  }
+  const lengthMm = Number(state.stemLength);
+  const outerR = Number(state.stemDiameter) / 2;
+  const boreR = stemBoreRadius(outerR);
+  const joinT = stemJoinThickness(outerR, hubT);
+  const blendR = stemJoinBlendRadius(hubR, outerR, hubT, joinT);
+  const inert = !(joinT > hubT);
+  const dome = ring.dome;
+  /* THE HUB'S OWN TOP FACE ON THE AXIS. Flat: the slab's own +t/2. Cap: the
+     apex of the OUTER cap, which is the mid-surface sphere offset by +t/2 —
+     buildHubInto's own `cap(Rd + t/2, ...)` apex, read from the same two
+     numbers rather than from a second expression. */
+  const topZ = dome ? dome.centreZ + dome.Rd + hubT / 2 : hubT / 2;
+  /* THE UNDERSIDE ON THE AXIS is the top face less the thickness the join puts
+     there, which at r = 0 is the join's own thickness by construction. */
+  const rootZ = topZ - joinT;
+  const tipZ = rootZ - lengthMm;
+  /* HOW MUCH THE HEAD HIDES: the stem is inside the head wherever it is above
+     the head's LOWEST material. On a flat hub that is the slab's own underside
+     and nothing is hidden; on a cap it is the rim, which sits well below the
+     apex the stem leaves from. Derived from the cap's own two numbers. */
+  const lowestHubZ = dome
+    ? dome.centreZ + (dome.Rd + hubT / 2) * Math.cos(Math.asin(Math.min(1, hubR / dome.Rd))) - hubT
+    : hubT / 2 - hubT;
+  const hiddenMm = Math.max(0, Math.min(lengthMm, rootZ - lowestHubZ));
+  return {
+    present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
+    hubT, hubR, joinT, blendR, inert,
+    topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
+    stations: stemStations(lengthMm), sides: HUB_SECTORS,
+  };
+}
+
+/* ===================================================================
+   buildStemInto — ONE closed solid on the axis, overlapping the hub.
+
+   NOT A BOOLEAN AND NOT A CONTINUATION OF A PETAL. The export contract is
+   "every primitive is an individually closed solid; overlapping closed shells
+   are fine — the slicer unions them", which is what every stamen and the style
+   already rely on, and it is why nothing here has to cut anything.
+
+   ROOTED THROUGH THE SLAB, exactly as `rodInto` roots a filament: the solid
+   starts at the hub's TOP face and runs down past the underside, so the
+   overlap is a solid annulus at every setting and never a hairline touch.
+   ST4 is what asserts that, and both STL gates are blind to it.
+
+   SOLID OR HOLLOW BY EVA'S ONE RULE, with no branch of its own beyond the
+   bore being zero: at or under a 3 mm outer diameter `stemBoreRadius` returns
+   0 and this emits a capped cylinder; above it, a tube with the inner wall
+   wound the other way so the shell encloses the MATERIAL and its signed volume
+   is positive (O1's own criterion — this is one welded shell, unlike the
+   SPHERE hub's two separate concentric spheres, so it needs no exception). */
+export function buildStemInto(acc, plan) {
+  if (!plan.present) return { tris: 0 };
+  const N = plan.sides, R = plan.outerR, b = plan.boreR;
+  const before = acc.triangleCount;
+  /* THE RINGS ARE THE PLACER'S OWN STATIONS, in millimetres of arc from the
+     hub, plus the root band above them. Station 0 is the underside. */
+  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];
+  const ringAt = (rad, z) => Array.from({ length: N }, (_, k) => {
+    const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z];
+  });
+  const outer = zs.map((z) => ringAt(R, z));
+  for (let i = 0; i < outer.length - 1; i++) {
+    const up = outer[i], dn = outer[i + 1];
+    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
+  }
+  if (b > 0) {
+    const inner = zs.map((z) => ringAt(b, z));
+    for (let i = 0; i < inner.length - 1; i++) {
+      const up = inner[i], dn = inner[i + 1];
+      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
+    }
+    const tOut = outer[0], tIn = inner[0], bOut = outer[outer.length - 1], bIn = inner[inner.length - 1];
+    for (let k = 0; k < N; k++) {
+      const k2 = (k + 1) % N;
+      acc.quad(tIn[k], tIn[k2], tOut[k2], tOut[k]);     // top annulus, facing up
+      acc.quad(bOut[k], bOut[k2], bIn[k2], bIn[k]);     // bottom annulus, facing down
+    }
+  } else {
+    /* A SOLID STEM IS CAPPED FROM A RIM VERTEX, NEVER FROM THE AXIS, and that
+       is a measured defect rather than a style choice. A centre-fan puts a
+       vertex at exactly [0, 0, topZ] — which is the hub's own top-fan apex,
+       the same double — so the two shells WELD, and a by-design overlap of two
+       coplanar discs becomes a WITHIN-SHELL self-intersection: measured 528
+       pairs on the 3 mm row, worst span 0.1962 mm, against 0 on every hollow
+       one (a bore leaves no axis vertex to share). A rim fan emits N - 2
+       triangles over the same convex disc, none degenerate, and the stem's
+       shell then shares no vertex with the hub's — so the overlap stays
+       cross-shell and by-design, exactly as every stamen's does. */
+    const tOut = outer[0], bOut = outer[outer.length - 1];
+    for (let k = 1; k < N - 1; k++) {
+      acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // top cap, facing up
+      acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
+    }
+  }
+  return { tris: acc.triangleCount - before };
+}
+
 /* ===================================================================
    buildHubInto — the derived junction. PLUMBING, not a designed centre
    (phase 2 B2 owns the reproductive parts; conflating the two cost the
@@ -6665,7 +6784,31 @@ export const HUB_SECTORS = 48;
    flower (charter). */
 export function buildHubInto(acc, state, ring) {
   const t = acc.floorThickness(ring.thickness);
-  const N = 48;
+  const N = HUB_SECTORS;
+  /* THE HUB-TO-STEM JOIN (session 43). `plan.inert` is the GUARD, and it is a
+     BRANCH rather than a ramp for the reason `domeIsFlat` is: with no stem, or
+     with a stem thin enough that its own section asks for no more than the hub
+     already has, every expression below is the pre-stem one VERBATIM and the
+     bytes are identical by construction rather than by an argument about
+     arithmetic. `joinAt` is the profile, asked of its one owner. */
+  const plan = stemPlan(state, ring, acc);
+  const joinActive = plan.present && !plan.inert;
+  const joinAt = (r) => hubThicknessAt(r, { hubR: ring.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT });
+  /* THE UNDERSIDE THE BUILDER ACTUALLY EMITTED, as (plan radius, thickness)
+     pairs at its own rings — ST5's measured side. Reported rather than
+     re-derived: a clause that rebuilt the profile here and compared it against
+     the same profile would be checking its own consistency (Eva's fourth
+     durable rule), so the gate rebuilds the LAW from other owners and this
+     carries the geometry. */
+  const underside = [];
+  /* THE MAGNITUDE THE UNDERSIDE'S THICKNESS IS DIFFERENCED FROM. On a cap the
+     emitted thickness is `outerRad - innerRad(phi)`, and `outerRad - (outerRad
+     - x)` is NOT exactly `x` in IEEE-754 — the vertices are rounded, so an
+     EXACT identity there is asking for more precision than the representation
+     carries (session 38's A7 residual and session 41's L5, a third time). ST5
+     bounds it in ULP of THIS magnitude instead, which is the prescribed remedy:
+     bound the difference in the unit the quantity carries. */
+  const joinReport = { joinActive, joinThickness: plan.joinT, joinBlendRadius: joinActive ? plan.blendR : 0, underside, undersideMagnitude: t };
   /* THE DOMED SHELL (Sep 4) — the flat slab BENT, not a solid boss: the
      mid-surface is footRing()'s cap, the two faces are its normal offsets
      by t/2 (concentric spheres of radius Rd +/- t/2), the rim is the band
@@ -6713,40 +6856,86 @@ export function buildHubInto(acc, state, ring) {
     const before = acc.triangleCount;
     sphereInto(Rd + t / 2, true);
     sphereInto(Rd - t / 2, false);
-    return { dome: { Rd, centreZ: cz, H: dome.H, closed: true, rimPhi: Math.PI, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
+    underside.push([0, t], [Rd, t]);                                   // a sphere's wall is t everywhere; the stem is refused here by ruling
+    return { dome: { Rd, centreZ: cz, H: dome.H, closed: true, rimPhi: Math.PI, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before, topFaceZ: cz + Rd + t / 2, ...joinReport };
   }
   if (dome) {
     const Rd = dome.Rd, cz = dome.centreZ, K = HUB_DOME_RINGS;
     const phiRim = Math.asin(Math.min(1, ring.radius / Rd));
     const ringAt = (rad, phi) => Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.sin(phi) * Math.cos(th), rad * Math.sin(phi) * Math.sin(th), cz + rad * Math.cos(phi)]; });
-    const cap = (rad, outward) => {
-      let lower = ringAt(rad, phiRim);
+    /* THE INNER CAP CARRIES THE JOIN, the outer one never does: the thickening
+       grows DOWNWARD (inward, here) so the face the feet sit on cannot move.
+       `radAt` is a FUNCTION of the polar angle, and at the rim it returns
+       Rd - t/2 exactly — the profile's own value there — so the rim band below
+       and the guard's byte-identity both still hold. */
+    const cap = (radAt, outward) => {
+      let lower = ringAt(radAt(phiRim), phiRim);
       for (let i = 1; i < K; i++) {
-        const upper = ringAt(rad, phiRim * (1 - i / K));
+        const phi = phiRim * (1 - i / K);
+        const upper = ringAt(radAt(phi), phi);
         for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.quad(lower[k], lower[k2], upper[k2], upper[k]); else acc.quad(lower[k2], lower[k], upper[k], upper[k2]); }
         lower = upper;
       }
-      const apex = [0, 0, cz + rad];
+      const apex = [0, 0, cz + radAt(0)];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; if (outward) acc.tri(lower[k], lower[k2], apex); else acc.tri(lower[k2], lower[k], apex); }
     };
     const before = acc.triangleCount;
-    cap(Rd + t / 2, true);
-    cap(Rd - t / 2, false);
-    const top = ringAt(Rd + t / 2, phiRim), bot = ringAt(Rd - t / 2, phiRim);
+    const outerRad = Rd + t / 2;
+    /* The inner surface at polar phi sits one THICKNESS in from the outer one,
+       and the thickness is read at that station's own PLAN radius — which is
+       what the profile is a function of. Inert: `joinAt` returns t and this is
+       the shipped `Rd - t/2` term for term. */
+    const innerRad = (phi) => outerRad - joinAt(Rd * Math.sin(phi));
+    joinReport.undersideMagnitude = outerRad;
+    cap(() => outerRad, true);
+    for (let i = 0; i <= K; i++) { const phi = phiRim * (1 - i / K); underside.push([Rd * Math.sin(phi), outerRad - innerRad(phi)]); }   // the EMITTED difference, round-trip and all
+    cap(innerRad, false);
+    const top = ringAt(outerRad, phiRim), bot = ringAt(innerRad(phiRim), phiRim);
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(top[k], bot[k], bot[k2], top[k2]); }
-    return { dome: { Rd, centreZ: cz, H: dome.H, closed: false, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before };
+    return { dome: { Rd, centreZ: cz, H: dome.H, closed: false, rimPhi: phiRim, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before, topFaceZ: cz + outerRad, ...joinReport };
   }
   const r = ring.radius;
   const zTop = t / 2, zBot = -t / 2;
   const pt = (k, z) => [r * Math.cos((k * TAU) / N), r * Math.sin((k * TAU) / N), z];
   const cTop = [0, 0, zTop], cBot = [0, 0, zBot];
+  const beforeFlat = acc.triangleCount;
+  /* THE TOP FACE AND THE RIM ARE UNTOUCHED BY THE JOIN AT EVERY SETTING, and
+     that is the whole of "do not change the petal-to-hub junction": the feet
+     sit on the top face and J1/J4a read it, so the thickening grows DOWNWARD
+     only. ST6 is what asserts it, against a stemless build of the same state. */
   for (let k = 0; k < N; k++) {
     const k2 = (k + 1) % N;
     acc.tri(cTop, pt(k, zTop), pt(k2, zTop));                      // top fan (up)
-    acc.tri(cBot, pt(k2, zBot), pt(k, zBot));                      // bottom fan (down)
+    if (!joinActive) acc.tri(cBot, pt(k2, zBot), pt(k, zBot));     // bottom fan (down)
     acc.quad(pt(k, zTop), pt(k, zBot), pt(k2, zBot), pt(k2, zTop)); // rim
   }
-  return { dome: null, tris: N * 4 };
+  if (!joinActive) {
+    underside.push([r, t], [0, t]);                                  // one flat face, the hub's own thickness everywhere
+    return { dome: null, tris: N * 4, topFaceZ: zTop, ...joinReport };   // N*4 is the shipped literal, kept
+  }
+  /* THE SWELLING UNDERSIDE. Radial rings at the cap's own lattice, so a flat
+     hub's join facets exactly as a domed hub of the same radius would — one
+     owner for the radial resolution rather than a second constant. The
+     OUTERMOST ring is the rim's own zBot exactly (the profile returns the hub's
+     own thickness there by construction), so the rim quad above still closes. */
+  const K = HUB_DOME_RINGS;
+  const botRing = (rad) => { const z = zTop - joinAt(rad); return Array.from({ length: N }, (_, k) => { const th = (k * TAU) / N; return [rad * Math.cos(th), rad * Math.sin(th), z]; }); };
+  let O = botRing(r); underside.push([r, joinAt(r)]);
+  for (let i = 1; i < K; i++) {
+    const rr = r * (1 - i / K);
+    const I = botRing(rr); underside.push([rr, joinAt(rr)]);
+    for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(O[k2], O[k], I[k], I[k2]); }
+    O = I;
+  }
+  underside.push([0, joinAt(0)]);
+  const apexB = [0, 0, zTop - joinAt(0)];
+  for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.tri(apexB, O[k2], O[k]); }
+  /* MEASURED, NEVER COMPUTED. The first version of this line carried the
+     arithmetic and was WRONG BY 48 — it reported 1872 against an emitted 1824,
+     because the top fan is N triangles and it had been written 2N. Both other
+     arms already read `acc.triangleCount`; this one does now too, so the
+     reported count is the emitted count by construction. */
+  return { dome: null, tris: acc.triangleCount - beforeFlat, topFaceZ: zTop, ...joinReport };
 }
 
 /* ===================================================================
@@ -7166,6 +7355,14 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   }
   const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
+  /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
+     hub slab, overlapping it exactly as every stamen and the style already do.
+     Absent when the state asks for none (length 0) and under SPHERE, where it
+     is hidden AND inert by ruling. The plan is asked of its one owner, the same
+     object buildHubInto shaped the join from, so the stem and the hollow it
+     leaves in the hub cannot disagree about where the underside is. */
+  const stemPlanned = stemPlan(state, fr.hub, acc);
+  const stemBuilt = buildStemInto(acc, stemPlanned);
   /* THE ANDROECIUM (session 21) — read from the descriptor, placed through
      the arrangement primitive's EXISTING azimuth arms (RING: the RADIAL law;
      DISC: SPIRAL's golden angle over the Vogel radii the owner stamped), one
@@ -7249,5 +7446,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     }
     return { ...best, threshold, crossing: best.mm < threshold };
   })();
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt };
 }
