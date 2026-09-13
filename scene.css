@@ -124,29 +124,6 @@ html, body {
 
 .scene-nav__btn--random { margin-left: 0.35rem; }
 
-/* --- the one-off hint ---------------------------------------------------
-   Transient, never interactive, and gone on the first input. See the note in
-   scene.js for why it exists at all given "no chrome besides the nav". */
-.scene-hint {
-  position: fixed;
-  left: 50%;
-  bottom: max(1.4rem, env(safe-area-inset-bottom));
-  transform: translateX(-50%);
-  margin: 0;
-  padding: 0.4rem 0.8rem;
-  font-size: 0.68rem;
-  letter-spacing: 0.09em;
-  text-transform: lowercase;
-  color: rgba(226, 232, 238, 0.42);
-  pointer-events: none;
-  user-select: none;
-  white-space: nowrap;
-  opacity: 1;
-  transition: opacity 1100ms ease;
-  z-index: 2;
-}
-.scene-hint.is-gone { opacity: 0; }
-
 .scene-noscript {
   position: fixed; inset: auto 0 2rem 0; text-align: center;
   font-size: 0.8rem; color: var(--scene-ink-dim);
@@ -154,7 +131,6 @@ html, body {
 .scene-noscript a { color: var(--scene-ink); }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene-hint { transition: none; }
   .scene-nav__return, .scene-nav__btn { transition: none; }
 }
 
@@ -167,5 +143,4 @@ html, body {
   .scene-nav__scenes { flex: 0 0 100%; margin-top: 0.5rem; }
   .scene-nav__btn { width: 1.75rem; height: 1.7rem; font-size: 0.66rem; }
   .scene-nav__return { padding: 0.36rem 0.6rem; font-size: 0.66rem; }
-  .scene-hint { font-size: 0.62rem; white-space: normal; text-align: center; max-width: 90vw; }
 }

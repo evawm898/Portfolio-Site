@@ -22,11 +22,11 @@
 
 <!-- THE STAGE IS THE WHOLE VIEWPORT AND IT IS EMPTY IN THE MARKUP. Whatever a
      scene mounts, it mounts here, and the shell empties it on the way out — so
-     a scene's canvas cannot outlive the scene. Nothing else is ever put inside
-     it, which is why the hint below is a sibling rather than a child. -->
+     a scene's canvas cannot outlive the scene. NOTHING ELSE IS EVER PUT INSIDE
+     IT, and nothing is put beside it either: "no chrome besides the nav" is
+     literal, so there is no instructional text on this page, not even a
+     transient one. -->
 <div id="scene-stage" role="img" aria-label="Scene"></div>
-
-<p id="scene-hint" class="scene-hint" hidden></p>
 
 <nav class="scene-nav" aria-label="Scene navigation">
   <a class="scene-nav__return" href="index.html">

@@ -29,6 +29,16 @@
 // that is a body, not a personality — so the short-range push is unconditional
 // and sits outside the signed social term.
 //
+// A KOI IS NEVER PLACED IN VIEW AND NEVER VANISHES FROM IT. Every fish is born
+// outside the visible frame and swims in, and every fish that leaves swims out
+// and is removed only once its whole body is clear. There is no fade and no
+// pop: `entering` becomes `cruising` on the frame the koi is first on screen,
+// and `leaving` is culled on the frame it is last off it — both GEOMETRIC
+// transitions, decided by the surface's own onScreen, so nothing here has to be
+// trusted to report its own arrival honestly. That is also why a koi that has been sent
+// away can be RECALLED: a storm that ends a second after a departure must not
+// put an eighth fish on the water while the seventh is still swimming off.
+//
 // THE FRONT IS WHAT STARTLES, NOT THE SPLASH. A fish is disturbed when the
 // expanding ring actually reaches it (|distance - r| small), not the instant
 // the drop lands somewhere across the pond. The steering pull toward or away
@@ -48,8 +58,31 @@ const STORM_TARGET = 3.1;             // rounds to 3 — "lower when it is"
 const TARGET_HOLD_S = 1.2;            // the target must persist before acting
 const SPAWN_COOL_S = 1.6;
 const DEPART_COOL_S = 1.3;
-const ARRIVE_S = 2.6;                 // fades up from depth
-const LEAVE_S = 2.6;                  // fades down into it
+
+// HOW FAR OUTSIDE A KOI IS BORN. A whole body clear of the edge, at the
+// LARGEST size a fish can roll, so the figure is outside for every fish rather
+// than for the average one — and the spine trails further out still, since it
+// is laid down behind a head that is pointing in.
+const SPAWN_OUT = BODY_LEN_PX * SIZE_VAR[1] * 1.35;
+const ENTRY_JITTER = 0.45;            // rad either side of straight in
+const ENTRY_TRIES = 12;
+// A departing koi is removed one body length past the edge, which is where the
+// last of it has gone. CULL_MARGIN is the safety net for the other states.
+const LEAVE_CLEAR_LEN = 1.1;
+const W_EXIT = 3.2;                   // as strong as containment, and opposed
+const EXIT_BIAS = 0.25;               // how much an aligned edge is preferred
+const RECALL_MARGIN = 40;             // still near enough to turn back
+const SPAWN_LOG_MAX = 64;
+
+// THE POND OPENS FULL, AND IT STILL OBEYS THE RULE. The koi the page starts
+// with are spawned outside like every other and then swum in, in simulated
+// time, before the first frame is drawn — so "no koi is ever placed inside the
+// frame" has no exception for the seed. Eighteen seconds at ~39 plane px/s is
+// about 700 px of travel, which puts a fish well past the containment band and
+// into the body of the pond; the whole warm-up is a few hundred allocation-free
+// steps and does not touch the canvas.
+const SEED_WARMUP_S = 18;
+const SEED_WARMUP_DT = 1 / 30;
 
 const SPEED_RANGE = [21, 57];         // plane px/s, by traits.speed
 const TURN_RANGE = [0.75, 1.25];      // rad/s, cruising
@@ -174,8 +207,10 @@ function makeFish(rand, id, x, y, heading, state) {
     alarm: 0,
     phase: rand.range(0, Math.PI * 2),
     finPhase: rand.range(0, Math.PI * 2),
-    state,                              // arriving | cruising | leaving
-    fade: state === 'arriving' ? 0 : 1,
+    // entering (outside, swimming in) | cruising | leaving (swimming out).
+    // Both edges of that are geometric: see the note at the top of the file.
+    // There is no fade, so a koi is never partly there while it is in view.
+    state,
   };
 }
 
@@ -192,6 +227,10 @@ export function createSchool({ rand, surface = createSurface(), width, height })
     // very hard to see and trivial to count.
     arrivals: 0,
     departures: 0,
+    recalls: 0,
+    // Where every koi was born, with the viewport it was born into. Bounded,
+    // and read by the gate rather than by anything that draws.
+    spawnLog: [],
 
     // The target population for a storm intensity. Exposed because it is a
     // claim the brief makes ("higher when calm, lower when storming") and a
@@ -202,52 +241,64 @@ export function createSchool({ rand, surface = createSurface(), width, height })
     },
 
     // TWO COUNTS, AND CONFLATING THEM IS A REAL DEFECT rather than a nicety.
-    // `visibleCount` is what the brief's "3-7 koi on screen" is about and what
-    // the read-out says. `presentCount` is what the population manager must
-    // use, because containment lets a fish nose past the edge and pulls it
-    // back: counting those as gone makes the manager spawn a replacement for a
-    // fish that is on its way in, and the pond fills up. Measured with one
-    // count doing both jobs: eighteen fish alive to keep seven on screen, and
-    // a spawn or a departure every few seconds forever.
+    // `visibleCount` answers the brief's "3-7 koi on screen" literally: how
+    // many koi are within the frame, whatever they are doing — a koi on its
+    // way out is still on the water and still being looked at.
+    // `presentCount` is what the population manager must use: it is the count
+    // of koi that are STAYING, so a fish that is merely nosing past the edge
+    // and being pulled back is not replaced (that conflation is what once
+    // filled the pond with sixteen koi to keep seven on screen) and a fish
+    // that has been sent away does not keep the manager from acting.
     visibleCount(w, h) {
       let n = 0;
-      for (const f of school.fish) {
-        if (f.state === 'leaving') continue;
-        if (surface.onScreen(f.x, f.y, w, h, 0)) n++;
-      }
+      for (const f of school.fish) if (surface.onScreen(f.x, f.y, w, h, 0)) n++;
       return n;
     },
 
-    // Every fish containment is holding, which after the inset above is every
-    // fish that has not been sent away. The manager counts these so it cannot
-    // spawn a replacement for a koi that is merely turning around.
     presentCount() {
       let n = 0;
       for (const f of school.fish) if (f.state !== 'leaving') n++;
       return n;
     },
 
-    // A place for a new fish: on screen, as far from the others as a handful of
-    // tries can manage. A fish surfacing on top of another reads as a glitch.
-    _spawnSpot(w, h) {
+    // WHERE A KOI COMES FROM: outside the frame, pointing in. The edge is
+    // chosen with the heading, not after it — a fish enters through the edge
+    // it is aimed at, which is what makes the entry read as swimming in rather
+    // than as a spawn that then turns around. Among a handful of candidates the
+    // one furthest from the koi already in the pond wins, so entries spread
+    // along the edges instead of stacking in one corner.
+    _entrySpot(w, h) {
       const vis = surface.visible(w, h, 0);
       let best = null, bestD = -1;
-      for (let k = 0; k < 14; k++) {
-        const x = vis.x0 + vis.w * rand.range(0.10, 0.90);
-        const y = vis.y0 + vis.h * rand.range(0.10, 0.90);
+      for (let k = 0; k < ENTRY_TRIES; k++) {
+        const edge = rand.int(0, 3);
+        const t = rand.range(0.08, 0.92);
+        let x, y, inward;
+        if (edge === 0)      { x = vis.x0 - SPAWN_OUT; y = vis.y0 + vis.h * t; inward = 0; }
+        else if (edge === 1) { x = vis.x1 + SPAWN_OUT; y = vis.y0 + vis.h * t; inward = Math.PI; }
+        else if (edge === 2) { x = vis.x0 + vis.w * t; y = vis.y0 - SPAWN_OUT; inward = Math.PI / 2; }
+        else                 { x = vis.x0 + vis.w * t; y = vis.y1 + SPAWN_OUT; inward = -Math.PI / 2; }
+        const heading = inward + rand.range(-ENTRY_JITTER, ENTRY_JITTER);
         let d = Infinity;
         for (const f of school.fish) d = Math.min(d, Math.hypot(f.x - x, f.y - y));
-        if (d > bestD) { bestD = d; best = { x, y }; }
+        if (d > bestD) { bestD = d; best = { x, y, heading }; }
       }
       return best;
     },
 
-    spawn(w, h, state = 'arriving') {
-      const spot = school._spawnSpot(w, h);
-      const f = makeFish(rand, school.nextId++, spot.x, spot.y, rand.range(0, Math.PI * 2), state);
+    spawn(w, h, { counted = true } = {}) {
+      const spot = school._entrySpot(w, h);
+      const f = makeFish(rand, school.nextId++, spot.x, spot.y, spot.heading, 'entering');
       f.speed = f.baseSpeed;
       school.fish.push(f);
-      if (state === 'arriving') school.arrivals++;
+      if (counted) school.arrivals++;
+      // THE GATE JUDGES THIS, NOT THE SCHOOL. What is recorded is the position
+      // and the viewport it was born into; whether that is inside the frame is
+      // decided by surface.visible() on the far side, which is an owner this
+      // file does not write. A self-reported "I spawned outside" flag would be
+      // exactly the claim under test answering for itself.
+      school.spawnLog.push({ id: f.id, x: spot.x, y: spot.y, w, h });
+      if (school.spawnLog.length > SPAWN_LOG_MAX) school.spawnLog.shift();
       return f;
     },
 
@@ -273,11 +324,42 @@ export function createSchool({ rand, surface = createSurface(), width, height })
       return pick;
     },
 
-    // Fill the pond at full visibility, for a page that opens with koi already
-    // in it rather than fading up out of nothing.
+    // TURN ONE BACK RATHER THAN CALL A NEW ONE IN. A koi that was sent away a
+    // moment ago and is still in the frame is the cheapest fish in the pond:
+    // it is already on screen, so recalling it costs nothing and shows nothing,
+    // where spawning would put an extra koi on the water while this one is
+    // still swimming off — which is how a downpour that ends promptly used to
+    // be able to leave eight koi in view. The deepest-in one is chosen, since
+    // it has the least distance to undo.
+    recall(w, h) {
+      const vis = surface.visible(w, h, 0);
+      let pick = null, best = -Infinity;
+      for (const f of school.fish) {
+        if (f.state !== 'leaving') continue;
+        const depth = Math.min(f.x - vis.x0, vis.x1 - f.x, f.y - vis.y0, vis.y1 - f.y);
+        if (depth < -RECALL_MARGIN) continue;     // effectively gone already
+        if (depth > best) { best = depth; pick = f; }
+      }
+      if (pick) { pick.state = 'cruising'; school.recalls++; }
+      return pick;
+    },
+
+    // THE POND OPENS FULL, AND THE SEED OBEYS THE SAME RULE AS EVERYTHING ELSE.
+    // These koi are spawned outside the frame like any other and then swum in,
+    // in simulated time, before a single frame is drawn — so the page opens on
+    // a pond rather than on a page that is still filling, and there is still no
+    // koi anywhere in this file that was placed in view. The population manager
+    // is held off for the warm-up so it cannot act on a pond that is mid-entry.
     seed(w, h, n) {
       const count = n === undefined ? school.targetFor(0) : n;
-      for (let i = 0; i < count; i++) school.spawn(w, h, 'cruising');
+      for (let i = 0; i < count; i++) school.spawn(w, h, { counted: false });
+      const steps = Math.round(SEED_WARMUP_S / SEED_WARMUP_DT);
+      school._cool = Infinity;
+      for (let i = 0; i < steps; i++) {
+        school.advance(SEED_WARMUP_DT, { ripples: [], intensity: 0, width: w, height: h });
+      }
+      school._cool = 0;
+      school._heldT = 0;
     },
 
     advance(dt, { ripples = [], intensity = 0, width: w = width, height: h = height } = {}) {
@@ -323,11 +405,16 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         let cx = 0, cy = 0, ax = 0, ay = 0, n = 0;
         let sx = 0, sy = 0, sepPeak = 0;
         for (const o of school.fish) {
-          if (o === f || o.state === 'leaving') continue;
+          if (o === f) continue;
           const dx = o.x - f.x, dy = o.y - f.y;
           const d = Math.hypot(dx, dy);
           if (d < 1e-6) continue;
-          if (d < SOCIAL_RANGE) {
+          // A KOI ON ITS WAY OUT IS NOT COMPANY, BUT IT IS STILL A BODY. It is
+          // no longer part of the school to join or avoid — following one would
+          // drag a stayer toward the edge, and being followed would drag the
+          // leaver back — but it is on screen for the whole of its exit now,
+          // so it must not be swum through.
+          if (d < SOCIAL_RANGE && o.state !== 'leaving' && f.state !== 'leaving') {
             cx += o.x; cy += o.y;
             ax += Math.cos(o.heading); ay += Math.sin(o.heading);
             n++;
@@ -346,19 +433,40 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         addNorm(steer, sx, sy, W_SEPARATE * (1 + SEP_URGENCY * sepPeak));
 
         // --- the frame is not a wall, but it is a preference ----------------
-        let ox = 0, oy = 0;
-        const reach = EDGE_BAND_BASE + f.speed * EDGE_BAND_LOOKAHEAD;
-        const bandX = Math.min(capX, reach), bandY = Math.min(capY, reach);
+        // CONTAINMENT IS FOR THE KOI THAT ARE STAYING. It pulls INWARD, which
+        // is what carries an entering fish in from outside as well as what
+        // turns a cruising one back — the same force, doing both jobs, because
+        // both are "the pond is that way". A koi that has been sent away is the
+        // one case where inward is wrong, so it is steered the other way
+        // instead: see the exit below.
         const dLeft = f.x - vis.x0, dRight = vis.x1 - f.x;
         const dTop = f.y - vis.y0, dBottom = vis.y1 - f.y;
-        if (dLeft < bandX) ox += Math.min(EDGE_OUT_MAX, (bandX - dLeft) / bandX);
-        if (dRight < bandX) ox -= Math.min(EDGE_OUT_MAX, (bandX - dRight) / bandX);
-        if (dTop < bandY) oy += Math.min(EDGE_OUT_MAX, (bandY - dTop) / bandY);
-        if (dBottom < bandY) oy -= Math.min(EDGE_OUT_MAX, (bandY - dBottom) / bandY);
-        let edgeMag = 0;
-        if (ox !== 0 || oy !== 0) {
-          edgeMag = Math.min(EDGE_OUT_MAX, Math.hypot(ox, oy));
-          addNorm(steer, ox, oy, W_EDGE * edgeMag);
+        let ox = 0, oy = 0, edgeMag = 0;
+        if (f.state === 'leaving') {
+          // OUT BY THE NEAREST EDGE IT IS ALREADY POINTED AT. Distance alone
+          // would turn a koi that is swimming right and two body lengths from
+          // the left edge back across the whole frame; the alignment term makes
+          // the edge it is heading for cheaper, and EXIT_BIAS keeps a genuinely
+          // much nearer edge reachable when the fish is pointed at neither.
+          const outs = [[-1, 0, dLeft], [1, 0, dRight], [0, -1, dTop], [0, 1, dBottom]];
+          let bx = -1, by = 0, bestCost = Infinity;
+          for (const [dx, dy, dist] of outs) {
+            const align = Math.max(0, fx * dx + fy * dy);
+            const cost = Math.max(0, dist) / (EXIT_BIAS + align);
+            if (cost < bestCost) { bestCost = cost; bx = dx; by = dy; }
+          }
+          addNorm(steer, bx, by, W_EXIT);
+        } else {
+          const reach = EDGE_BAND_BASE + f.speed * EDGE_BAND_LOOKAHEAD;
+          const bandX = Math.min(capX, reach), bandY = Math.min(capY, reach);
+          if (dLeft < bandX) ox += Math.min(EDGE_OUT_MAX, (bandX - dLeft) / bandX);
+          if (dRight < bandX) ox -= Math.min(EDGE_OUT_MAX, (bandX - dRight) / bandX);
+          if (dTop < bandY) oy += Math.min(EDGE_OUT_MAX, (bandY - dTop) / bandY);
+          if (dBottom < bandY) oy -= Math.min(EDGE_OUT_MAX, (bandY - dBottom) / bandY);
+          if (ox !== 0 || oy !== 0) {
+            edgeMag = Math.min(EDGE_OUT_MAX, Math.hypot(ox, oy));
+            addNorm(steer, ox, oy, W_EDGE * edgeMag);
+          }
         }
 
         // --- resolve --------------------------------------------------------
@@ -370,7 +478,22 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         }
         f.alarm = Math.min(1, f.alarm) * Math.exp(-dt / ALARM_TAU);
 
-        const brake = (1 - (1 - EDGE_BRAKE) * Math.min(1, edgeMag)) * (1 - SEP_BRAKE * sepPeak);
+        // THE EDGE BRAKE IS FOR A KOI HEADING OUT, NOT FOR ONE NEAR THE EDGE.
+        // It exists to buy a turn the distance it needs, and a fish already
+        // pointed back into the pond has no turn left to buy. Ungated it also
+        // applies to an ENTERING koi, which is as deep in the band as anything
+        // ever gets: measured, an entry at 35% of cruising speed took fifteen
+        // seconds to cross a hundred and fifty plane px, so the pond spent its
+        // time waiting for fish that were visibly barely moving. Scaling by how
+        // far the heading is from where containment is pulling leaves the
+        // coming-about case exactly as it was and costs the entry nothing.
+        let edgeBrake = 0;
+        if (edgeMag > 0) {
+          const im = Math.hypot(ox, oy) || 1;
+          const against = Math.max(0, -(fx * ox + fy * oy) / im);
+          edgeBrake = (1 - EDGE_BRAKE) * Math.min(1, edgeMag) * against;
+        }
+        const brake = (1 - edgeBrake) * (1 - SEP_BRAKE * sepPeak);
         const wantSpeed = f.baseSpeed * (1 + f.alarm * ALARM_SPEED) * brake;
         f.speed += (wantSpeed - f.speed) * Math.min(1, dt * SPEED_LERP);
 
@@ -392,17 +515,21 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         f.phase += dt * (2.2 + f.speed * 0.055);
         f.finPhase += dt * 1.7;
 
-        if (f.state === 'arriving') {
-          f.fade += dt / ARRIVE_S;
-          if (f.fade >= 1) { f.fade = 1; f.state = 'cruising'; }
-        } else if (f.state === 'leaving') {
-          f.fade -= dt / LEAVE_S;
+        // A KOI HAS ARRIVED WHEN IT IS ON SCREEN, and that is the whole test.
+        // Not a timer, not a distance travelled: the thing the state claims is
+        // exactly the thing surface.onScreen answers, so the two cannot drift.
+        if (f.state === 'entering' && surface.onScreen(f.x, f.y, w, h, 0)) {
+          f.state = 'cruising';
         }
       }
 
       // --- remove what has gone --------------------------------------------
-      school.fish = school.fish.filter(f =>
-        f.fade > 0 && surface.onScreen(f.x, f.y, w, h, CULL_MARGIN));
+      // A departing koi is removed a body length past the edge, which is the
+      // first moment none of it is in view; everything else keeps the old wide
+      // safety net, for a fish that somehow got a long way out.
+      school.fish = school.fish.filter(f => f.state === 'leaving'
+        ? surface.onScreen(f.x, f.y, w, h, f.len * LEAVE_CLEAR_LEN)
+        : surface.onScreen(f.x, f.y, w, h, CULL_MARGIN));
 
       // --- population -------------------------------------------------------
       const target = school.targetFor(intensity);
@@ -413,8 +540,12 @@ export function createSchool({ rand, surface = createSurface(), width, height })
 
       const live = school.presentCount();
       if (school._heldT >= TARGET_HOLD_S && school._cool <= 0) {
-        if (live < target) { school.spawn(w, h); school._cool = SPAWN_COOL_S; }
-        else if (live > target) { school.depart(w, h); school._cool = DEPART_COOL_S; }
+        if (live < target) {
+          if (school.recall(w, h)) school._cool = DEPART_COOL_S;
+          else { school.spawn(w, h); school._cool = SPAWN_COOL_S; }
+        } else if (live > target) {
+          school.depart(w, h); school._cool = DEPART_COOL_S;
+        }
       }
     },
   };

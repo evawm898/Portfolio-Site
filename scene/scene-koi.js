@@ -29,9 +29,11 @@ import { createRain } from './koi-rain.js';
 import { createSchool } from './koi-fish.js';
 import { createRenderer } from './koi-draw.js';
 
+// The title is chrome-free: it names the tab and the stage's aria-label, and
+// nothing draws it on screen. There is no blurb — "no chrome besides the nav"
+// is literal, so the two interactions are discovered by trying them.
 export const meta = {
   title: 'Koi rain pond',
-  blurb: 'Click the water. Scroll for wind.',
 };
 
 export default function createKoiScene(host) {
@@ -49,9 +51,9 @@ export default function createKoiScene(host) {
   let width = host.width, height = host.height;
   let clock = 0;
 
-  // The pond opens with koi already in it. Seeding them as 'cruising' rather
-  // than 'arriving' is the difference between a pond and a page that is still
-  // loading.
+  // The pond opens with koi already in it — but they are still spawned OUTSIDE
+  // the frame and swum in, in simulated time, before the first frame is drawn.
+  // See scene/koi-fish.js: no koi is ever placed in view, the seed included.
   school.seed(width, height);
 
   const scene = {
@@ -119,6 +121,16 @@ export default function createKoiScene(host) {
         visible: school.visibleCount(width, height),
         target: school.target,
         traits: school.fish.map(f => ({ ...f.traits })),
+        // Where every koi is and what it is doing, so a gate can watch the
+        // real page for a fish that appeared or vanished in view rather than
+        // only running the simulation in Node.
+        fishAt: school.fish.map(f => [f.id, f.x, f.y, f.state]),
+        // Bounded at 64 by the school. Whether a spawn was inside the frame is
+        // decided on the far side by surface.visible(), not reported here.
+        spawns: school.spawnLog.map(s2 => [s2.id, s2.x, s2.y, s2.w, s2.h]),
+        arrivals: school.arrivals,
+        departures: school.departures,
+        recalls: school.recalls,
         squash: surface.squash,
         width, height, clock,
       };

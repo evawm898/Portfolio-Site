@@ -50,6 +50,7 @@ const WIDTH_PROFILE = [0.084, 0.118, 0.131, 0.126, 0.112, 0.092, 0.068, 0.043, 0
 const WAVE_AMP = 0.052;      // of body length, at the tail
 const WAVE_K = 0.72;         // radians of phase lag per joint
 const NOSE_LEAD = 0.030;     // how far the snout reaches past the first joint
+const FISH_ALPHA = 1;       // see drawFish — a koi never fades
 const EYE_R = 1.15;          // screen px — a koi's eye is tiny and it reads
 
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
@@ -93,8 +94,13 @@ export function createRenderer(ctx, surface) {
 
   // --- one fish -----------------------------------------------------------
   function drawFish(f) {
-    const a = f.fade;
-    if (a <= 0.001) return;
+    // NO FADE, ON PURPOSE. A koi is either in the pond at full ink or it is not
+    // in the pond: it swims in from outside the frame and swims out again, so
+    // there is never a moment where one is half-there in view (see the note at
+    // the top of scene/koi-fish.js). The constant is kept because every mark
+    // below is already written against it, so the day a scene wants a koi to
+    // fade for some other reason it is one line rather than six.
+    const a = FISH_ALPHA;
     const N = f.spine.length, L = f.len;
     const speedF = Math.max(0.4, Math.min(1.7, f.speed / 38));
 

@@ -44,11 +44,9 @@ import { seedFromUrl } from './scene/rng.js';
 const MAX_DT = 1 / 20;        // a tab switch must not teleport a simulation
 const MAX_DPR = 2;            // thin lines are crisp at 2x; 3x quadruples fill
 const CLICK_SLOP_PX = 6;      // a pointer that travelled further was a drag
-const HINT_MS = 7000;
 
 const stage = document.getElementById('scene-stage');
 const navScenes = document.getElementById('scene-nav-scenes');
-const hintEl = document.getElementById('scene-hint');
 
 const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
@@ -59,7 +57,6 @@ let last = 0;
 let halted = false;
 let w = 0, h = 0, dpr = 1;
 const canvases = [];          // only ever the CURRENT scene's
-let hintTimer = 0;
 let downAt = null;
 let frames = 0;               // what a leaked loop would keep advancing
 
@@ -180,7 +177,6 @@ async function activate(id, { updateUrl = true } = {}) {
   document.title = `${title} — Scene — Eva Maskalenko`;
   stage.setAttribute('aria-label', title);
   if (updateUrl) writeUrl(id);
-  showHint(active.meta.blurb);
   startLoop();
   return true;
 }
@@ -244,29 +240,6 @@ function goRandom() {
   if (id != null) activate(id);
 }
 
-// --- the one-off hint ----------------------------------------------------
-// A JUDGEMENT CALL, FLAGGED. The brief says no chrome besides the nav, and
-// this is a line of text that fades out and never returns — but it is still
-// something on screen that the brief did not ask for. It is here because the
-// two interactions (click the water, scroll for wind) are otherwise
-// undiscoverable, and an interactive piece nobody discovers is an ambient one.
-// Deleting it is one call to showHint() and one element.
-function showHint(text) {
-  if (!hintEl) return;
-  clearTimeout(hintTimer);
-  if (!text) { hintEl.hidden = true; return; }
-  hintEl.textContent = text;
-  hintEl.hidden = false;
-  hintEl.classList.remove('is-gone');
-  hintTimer = setTimeout(dismissHint, HINT_MS);
-}
-
-function dismissHint() {
-  if (!hintEl || hintEl.hidden) return;
-  clearTimeout(hintTimer);
-  hintEl.classList.add('is-gone');
-}
-
 // --- input, owned here and routed --------------------------------------
 function route(method, ...args) {
   if (!active || halted) return;
@@ -290,7 +263,6 @@ function bindInput() {
     // touch screen), not a tap on the water.
     if (moved > CLICK_SLOP_PX) return;
     const r = stage.getBoundingClientRect();
-    dismissHint();
     route('pointer', e.clientX - r.left, e.clientY - r.top, performance.now() / 1000);
   });
 
@@ -301,7 +273,6 @@ function bindInput() {
   // the document or triggering a browser back-swipe over the scene.
   window.addEventListener('wheel', (e) => {
     e.preventDefault();
-    dismissHint();
     route('wheel', e.deltaY, e.deltaMode);
   }, { passive: false });
 
@@ -318,7 +289,6 @@ function bindInput() {
     // Dragging the finger UP is content moving down, which is a positive
     // wheel delta — the same sign a wheel gives for the same intent.
     route('wheel', touchY - y, 0);
-    if (Math.abs(touchY - y) > 2) dismissHint();
     touchY = y;
   }, { passive: false });
   stage.addEventListener('touchend', () => { touchY = null; }, { passive: true });

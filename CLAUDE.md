@@ -5083,6 +5083,60 @@ one spawner; what differs is the NUMBERS, which is the physical size of the
 disturbance and exactly what a fish can actually perceive. **A bigger splash is
 still a bigger splash; what it must not have is a label.**
 
+**THERE IS NO TEXT ON THIS PAGE OUTSIDE THE NAV, AND "NO CHROME BESIDES THE
+NAV" IS LITERAL** (Eva's ruling, overruling this session's own judgement call).
+A one-off hint line — "click the water. scroll for wind.", faded out after seven
+seconds and gone for good — shipped on the argument that the two interactions
+are otherwise undiscoverable. It is gone: the element, the CSS, the timer and
+the scene's `blurb` field. **The rule is not "that sentence is deleted"** —
+`shell/there-is-no-text-on-the-page-but-the-nav` walks the RENDERED text and
+fails on any future caption, and its mutant puts a hint back. Two things it
+measured that are easy to get wrong: **`display:none` is NOT how Chromium
+reports a `<noscript>` it is not rendering** (it says `display: inline`,
+`visibility: visible`, and zero client rects), so the filter asks
+`checkVisibility()` and the client rects — the platform's own answer to "is this
+painted"; and **opacity is deliberately not an exemption**, because a hint
+mid-fade is still a hint.
+
+**A KOI IS NEVER PLACED IN VIEW AND NEVER VANISHES FROM IT** (Eva's second
+ruling on the same review). Every fish is born OUTSIDE the visible frame and
+swims in; every fish that leaves swims out and is removed only once its whole
+body is clear. **THE TRANSITIONS ARE GEOMETRIC, NOT TIMED**: `entering` becomes
+`cruising` on the frame `surface.onScreen` first says yes, and `leaving` is
+culled on the frame it is last off screen — so the state cannot drift from the
+thing it claims. Four consequences, each of which was a real edit rather than a
+rename:
+* **THE FADE IS GONE.** A koi fading out is a koi disappearing while it is being
+  looked at, which is the same defect in softer clothing. `koi-draw.js` draws at
+  a constant `FISH_ALPHA`.
+* **CONTAINMENT CARRIES A KOI IN AS WELL AS TURNING ONE BACK** — the same
+  inward force, doing both jobs, so entry needed no new mechanism. **But the
+  EDGE BRAKE had to be gated on heading-outward**: it exists to buy a turn the
+  distance it needs, and an entering koi is as deep in the band as anything ever
+  gets, so ungated it throttled every arrival to a third speed. Measured, the
+  mean entry is **4.2 s** gated; ungated it is over fifteen. `leaving` skips
+  containment entirely and is steered out by the edge it is nearest AND already
+  pointed at.
+* **A KOI SENT AWAY CAN BE RECALLED**, and that is what keeps the count honest.
+  A departure is no longer instant, so a storm that ends a second after one
+  begins leaves a koi that is still in the frame and wanted again; spawning
+  there puts an eighth on the water while the seventh is still swimming off.
+  `recall()` turns the deepest-in leaver back instead.
+* **THE SEED OBEYS THE RULE TOO, which is the case most likely to be exempted
+  by accident.** The koi the page opens with are spawned outside like any other
+  and swum in over 18 s of SIMULATED time inside `seed()`, before a frame is
+  drawn — ~5 ms, allocation-free, no canvas. So the pond opens full and there is
+  still no koi anywhere that was placed in view.
+`visibleCount` is state-agnostic now (a koi on its way out is still on the
+water); `presentCount` — the koi that are STAYING — is what the population
+manager reads, and conflating them is still the defect that once filled the pond
+with sixteen koi to keep seven on screen.
+**THE GATE JUDGES THIS FROM AN INDEPENDENT OWNER.** The school records where it
+put each koi (`spawnLog`, bounded at 64) and nothing else; whether that was
+inside the frame is decided on the far side by `surface.visible()`, which
+`koi-fish.js` does not write. A self-reported "I spawned outside" flag would be
+the claim under test answering for itself.
+
 **THE THREE KOI TRAITS ARE SLIDERS, NOT ARCHETYPES** — each drawn uniformly in
 [0, 1] and used as a SIGNED weight about its midpoint, so 0.5 is genuinely
 indifferent rather than a third mode. **SEPARATION IS NOT A TRAIT**: koi do not
@@ -5125,14 +5179,14 @@ CSS coordinates, not something a hardware notch does — so the gate scales what
 sends and asserts what the page actually RECEIVED before concluding anything
 about the wind.
 
-**Verify with `node tools/verify-scene.mjs`** (69 checks). Part one drives the
+**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: thirteen mutations, each naming the checks it must redden,
+a changed harness**: nineteen mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not
@@ -5160,6 +5214,27 @@ straying it fed on. The claim came off that mutant and the churn check got one
 of its own — a departure that never leaves — rather than the check being
 loosened.
 
+**AND THE ENTRY/EXIT SWEEP FOUND TWO MORE THINGS ABOUT THE INSTRUMENT, NEITHER
+OF THEM A LOOSENING.**
+* **`makeSchool` COULD HAND A FIXTURE A POND IT NEVER BUILT.** Several fish
+  checks take the seeded school and then write `school.fish.length = 4` and
+  place those four by hand — which silently does NOTHING on an array of two and
+  nothing at all on an empty one. Measured on `an-entering-koi-is-not-carried-in`:
+  `seed()` returned **ZERO** koi and two ripple checks failed with a message
+  about ripples. The helper now refuses a seed that did not produce the target
+  count, so the failure is the sentence it actually is.
+* **THE SEPARATION CHECK'S CONTROL TREE IS NOT THE TREE UNDER TEST.**
+  `fish/separation-is-a-body-not-a-personality` compares the pond against a
+  second tree built with `W_SEPARATE = 0` — and `loadScene` builds that from the
+  source ON DISK, so during a sweep `M` carries the mutation and the control
+  does not. Any mutation that moves the koi about therefore shifts one side of
+  the ratio and not the other, which is why five fish mutants list it as
+  collateral they are ALLOWED to redden. **The fix is written down and
+  deliberately not taken**: `loadScene` would take a LIST of edits and chain
+  them onto one file, so the control carries the sweep's mutation too. It is
+  shared machinery three pre-existing mutants already depend on, and naming the
+  collateral keeps the check exactly as strict in the meantime.
+
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*`, so `scene*` is covered by nothing — run
 the gate by hand before calling a `/scene` change done. Note the corollary
@@ -5171,11 +5246,11 @@ scene PR. They still test flower geometry.
 loads no library at all — no three, no CDN JavaScript — only one Google font,
 which is chrome and which the gate stubs.
 
-**OPEN, AND EVA'S TO RULE ON** (all recorded in the session report on #223):
-the one-off hint line ("click the water. scroll for wind.") against the brief's
-*no chrome besides the nav*; `noindex`, which is on; whether `/scene` should be
-linked from the site nav at all; and the lightning placeholder, which the brief
-said not to over-invest in and which is one white wash plus a jolt.
+**OPEN, AND EVA'S TO RULE ON** (recorded in the session report on #223):
+`noindex`, which is on; whether `/scene` should be linked from the site nav at
+all; and the lightning placeholder, which the brief said not to over-invest in
+and which is one white wash plus a jolt. **The hint line came off this list by
+being ruled on** — see the no-text section above.
 
 **Out of scope on purpose, and none of it foreclosed:** colour palettes and
 time-of-day variants, scenes 2-8, sound, and any change to the other pages.

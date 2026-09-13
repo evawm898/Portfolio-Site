@@ -234,6 +234,91 @@ const MUTANTS = [
     why: 'a manager whose count never registers what it just did departs a koi every cooldown, for ever',
   },
   {
+    id: 'a-koi-is-placed-inside-the-frame',
+    file: 'scene/koi-fish.js',
+    from: 'const SPAWN_OUT = BODY_LEN_PX * SIZE_VAR[1] * 1.35;',
+    to: 'const SPAWN_OUT = -BODY_LEN_PX;',
+    breaks: ['fish/a-koi-is-never-placed-inside-the-frame',
+             'fish/no-koi-appears-or-vanishes-in-view'],
+    mayAlso: ['fish/a-koi-sent-away-is-called-back-rather-than-replaced',
+              'fish/the-pond-holds-three-to-seven-koi-on-screen',
+              'fish/a-koi-swims-in-rather-than-crawling-in',
+              // Seven koi placed just inside the edges start far closer to one
+              // another than seven that swam in, and the control tree that
+              // check compares against does not carry this mutation.
+              'fish/separation-is-a-body-not-a-personality'],
+    why: 'a koi conjured in clear water is the thing the whole entry model exists to stop',
+  },
+  {
+    id: 'a-departure-vanishes-where-it-stands',
+    file: 'scene/koi-fish.js',
+    from: `      school.fish = school.fish.filter(f => f.state === 'leaving'
+        ? surface.onScreen(f.x, f.y, w, h, f.len * LEAVE_CLEAR_LEN)
+        : surface.onScreen(f.x, f.y, w, h, CULL_MARGIN));`,
+    to: `      school.fish = school.fish.filter(f => f.state !== 'leaving'
+        && surface.onScreen(f.x, f.y, w, h, CULL_MARGIN));`,
+    breaks: ['fish/no-koi-appears-or-vanishes-in-view',
+             'fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
+    mayAlso: ['fish/the-population-does-not-churn-at-a-steady-intensity',
+              'fish/the-pond-holds-three-to-seven-koi-on-screen'],
+    why: 'the other half of the rule — leaving has to be a swim, not a deletion',
+  },
+  {
+    id: 'an-entering-koi-is-braked-like-one-turning-back',
+    file: 'scene/koi-fish.js',
+    from: '          const against = Math.max(0, -(fx * ox + fy * oy) / im);',
+    to: '          const against = 1;',
+    breaks: ['fish/a-koi-swims-in-rather-than-crawling-in'],
+    mayAlso: ['fish/the-pond-holds-three-to-seven-koi-on-screen',
+              'fish/a-koi-sent-away-is-called-back-rather-than-replaced',
+              'fish/no-koi-appears-or-vanishes-in-view',
+              'fish/the-population-does-not-churn-at-a-steady-intensity',
+              // Koi that crawl in bunch along the edges they came through, and
+              // the control tree does not carry this mutation either.
+              'fish/separation-is-a-body-not-a-personality'],
+    why: 'containment carries a koi IN as well as turning one back, and braking both throttles the entry',
+  },
+  {
+    id: 'an-entering-koi-is-not-carried-in',
+    file: 'scene/koi-fish.js',
+    from: "        if (f.state === 'leaving') {",
+    to: "        if (f.state !== 'cruising') {",
+    breaks: ['fish/a-koi-swims-in-rather-than-crawling-in',
+             'fish/the-pond-holds-three-to-seven-koi-on-screen'],
+    mayAlso: ['fish/a-koi-sent-away-is-called-back-rather-than-replaced',
+              'fish/the-population-does-not-churn-at-a-steady-intensity',
+              'scene1/the-pond-has-koi-in-it-and-draws-them',
+              'scene1/the-traits-are-per-fish-and-span-the-sliders',
+              'fish/separation-is-a-body-not-a-personality',
+              'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
+              'fish/no-koi-appears-or-vanishes-in-view',
+              // seed() returns an EMPTY pond under this one — measured — so
+              // every fixture that takes the seeded koi and places them by hand
+              // has nothing to place.
+              'fish/any-ripple-gets-the-same-reaction',
+              'fish/some-koi-swim-to-a-ripple-and-some-flee-it'],
+    why: 'a koi born outside and then steered outward never arrives, and the pond empties',
+  },
+  {
+    id: 'a-koi-sent-away-is-never-called-back',
+    file: 'scene/koi-fish.js',
+    from: `          if (school.recall(w, h)) school._cool = DEPART_COOL_S;
+          else { school.spawn(w, h); school._cool = SPAWN_COOL_S; }`,
+    to: '          school.spawn(w, h); school._cool = SPAWN_COOL_S;',
+    breaks: ['fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
+    mayAlso: ['fish/the-pond-holds-three-to-seven-koi-on-screen',
+              'fish/the-population-does-not-churn-at-a-steady-intensity'],
+    why: 'an eighth koi called in while the seventh is still swimming off is how the count breaks',
+  },
+  {
+    id: 'the-page-carries-a-hint-again',
+    file: 'scene.html',
+    from: '<div id="scene-stage" role="img" aria-label="Scene"></div>',
+    to: '<div id="scene-stage" role="img" aria-label="Scene"></div>\n<p class="scene-hint">click the water. scroll for wind.</p>',
+    breaks: ['shell/there-is-no-text-on-the-page-but-the-nav'],
+    why: '"no chrome besides the nav" is literal, and a transient line is still a line',
+  },
+  {
     id: 'the-wind-moves-where-the-rain-lands',
     file: 'scene/koi-rain.js',
     from: '          ripples.spawn(surface.px(d.lx), surface.py(d.ly), rollRipple(rand, splash));',
@@ -274,7 +359,7 @@ function sweepMutantFiles() {
 // a clean run on an unmutated tree.
 let mutantSeq = 0;
 async function loadScene(mutant) {
-  if (!mutant || mutant.file === 'scene.js') {
+  if (!mutant || !mutant.file.startsWith('scene/')) {
     const bust = `?v=${++mutantSeq}`;
     const m = async (f) => import(pathToFileURL(path.join(SCENE, f)).href + bust);
     return {
@@ -681,10 +766,22 @@ async function partOne(mutant) {
 
   // ------------------------------------------------------------------- fish
   setSection('fish');
+  // A FIXTURE MUST NOT BE HANDED FEWER KOI THAN IT THINKS IT HAS. Several
+  // checks below take the seeded pond and then write `school.fish.length = 4`
+  // and place those four by hand — which SILENTLY DOES NOTHING on an array of
+  // two, and nothing at all on an empty one, so the fixture measures a pond it
+  // never built and reports the miss as a failure of whatever it was checking.
+  // Measured on a mutation that stops containment carrying an entering koi in:
+  // seed() returned ZERO fish and two ripple checks failed with a message about
+  // ripples. The guard turns that into the sentence it actually is.
   const makeSchool = (seed, W = 1440, H = 900) => {
     const rand = M.rng.makeRandom(seed);
     const s = M.fish.createSchool({ rand, surface: M.surface.createSurface(), width: W, height: H });
     s.seed(W, H);
+    const want = s.targetFor(0);
+    if (s.fish.length !== want) {
+      throw new Error(`seed() left ${s.fish.length} koi, not ${want} — the fixture has no pond to measure`);
+    }
     return s;
   };
 
@@ -774,6 +871,174 @@ async function partOne(mutant) {
     const after = school.arrivals + school.departures - settled;
     if (after > 1) throw new Error(`${after} arrivals+departures over two settled minutes`);
     return `${settled} changes falling 7 -> ${school.target}, then ${after} over 120 s held there`;
+  });
+
+  // THE ENTRY AND THE EXIT. The brief's "3-7 koi on screen" is a statement
+  // about a POND, and a pond does not conjure a fish in the middle of it: a koi
+  // that blinks into existence in clear water, or out of it, reads as a bug in
+  // the page rather than as weather. Every check below judges inside/outside
+  // with surface.visible(), which is an owner koi-fish.js does not write — the
+  // school records WHERE it put each koi and nothing else, so the claim under
+  // test never gets to answer for itself.
+
+  check('a koi is never placed inside the frame', () => {
+    const surf = M.surface.createSurface();
+    let spawns = 0, bad = 0, worstIn = -Infinity, nearest = Infinity;
+    // Four viewports (one of them phone-shaped, where the frame is small enough
+    // that an "outside" figure tuned on a desktop could still land in view) and
+    // a storm that swings, because a spawn only happens when the target moves.
+    for (const [W, H] of [[1440, 900], [390, 844], [1920, 1080], [820, 1180]]) {
+      for (let seed = 1; seed <= 4; seed++) {
+        const school = M.fish.createSchool({
+          rand: M.rng.makeRandom(seed * 97), surface: surf, width: W, height: H });
+        const seen = new Set();
+        const drain = () => {
+          for (const sp of school.spawnLog) {
+            if (seen.has(sp.id)) continue;
+            seen.add(sp.id);
+            spawns++;
+            const vis = surf.visible(sp.w, sp.h, 0);
+            // How far OUTSIDE the frame it is, on its worst axis. Positive is
+            // outside; anything at or below zero is a koi placed in view.
+            const out = Math.max(vis.x0 - sp.x, sp.x - vis.x1, vis.y0 - sp.y, sp.y - vis.y1);
+            if (out <= 0) bad++;
+            worstIn = Math.max(worstIn, -out);
+            nearest = Math.min(nearest, out);
+          }
+        };
+        // The SEED is in this too, and it is the case most likely to be
+        // exempted by accident: a page that opens full is the one place it is
+        // tempting to just put seven koi on the water.
+        school.seed(W, H);
+        drain();
+        for (let i = 0; i < 60 * 150; i++) {
+          const t = (i / 60) % 60;
+          const I = t < 12 ? 0 : t < 30 ? 1 : t < 45 ? 0 : 1;
+          school.advance(1 / 60, { ripples: [], intensity: I, width: W, height: H });
+          if (i % 30 === 0) drain();
+        }
+        drain();
+      }
+    }
+    if (spawns < 200) throw new Error(`only ${spawns} spawns to judge — the fixture is not exercising the manager`);
+    if (bad > 0) throw new Error(`${bad} of ${spawns} koi were placed inside the frame`);
+    return `${spawns} spawns across four viewports, every one outside the frame (nearest ${nearest.toFixed(0)} plane px out)`;
+  });
+
+  check('no koi appears or vanishes in view', () => {
+    // THE PROPERTY THE SPAWN LOG CANNOT STATE. A koi could be born outside and
+    // still be culled mid-frame, or be teleported after birth. This watches
+    // every koi that ever exists and asks two questions about it: was it off
+    // screen the first time it was seen, and was it off screen the last time?
+    const surf = M.surface.createSurface();
+    let born = 0, poppedIn = 0, poppedOut = 0, ended = 0;
+    for (const [W, H] of [[1440, 900], [390, 844], [1920, 1080]]) {
+      for (let seed = 1; seed <= 3; seed++) {
+        const school = M.fish.createSchool({
+          rand: M.rng.makeRandom(seed * 31), surface: surf, width: W, height: H });
+        school.seed(W, H);
+        // The seed's koi are ALREADY swum in by the time seed() returns — that
+        // is the whole point of the warm-up — so the watch starts from the ids
+        // it produced and asks the question of everyone after them.
+        const seeded = new Set(school.fish.map((f) => f.id));
+        const rec = new Map();
+        for (let i = 0; i < 60 * 180; i++) {
+          const t = (i / 60) % 60;
+          const I = t < 12 ? 0 : t < 30 ? 1 : t < 45 ? 0 : 1;
+          school.advance(1 / 60, { ripples: [], intensity: I, width: W, height: H });
+          const alive = new Set();
+          for (const f of school.fish) {
+            alive.add(f.id);
+            const on = surf.onScreen(f.x, f.y, W, H, 0);
+            let r = rec.get(f.id);
+            if (!r) { r = { firstOn: on, lastOn: on }; rec.set(f.id, r); if (!seeded.has(f.id)) born++; }
+            r.lastOn = on;
+          }
+          for (const [id, r] of rec) {
+            if (!r.gone && !alive.has(id)) { r.gone = true; if (!seeded.has(id)) { ended++; if (r.lastOn) poppedOut++; } }
+          }
+        }
+        for (const [id, r] of rec) if (!seeded.has(id) && r.firstOn) poppedIn++;
+      }
+    }
+    if (born < 100) throw new Error(`only ${born} koi were born — the fixture is not exercising the manager`);
+    if (ended < 50) throw new Error(`only ${ended} koi left — nothing is being culled`);
+    if (poppedIn > 0) throw new Error(`${poppedIn} of ${born} koi were already in view the first frame they existed`);
+    if (poppedOut > 0) throw new Error(`${poppedOut} of ${ended} koi were still in view the frame they were removed`);
+    return `${born} koi in and ${ended} out over three viewports, none of either in view`;
+  });
+
+  check('a koi swims in rather than crawling in', () => {
+    // THE WITNESS FOR THE BRAKE. Containment is what carries an entering koi in,
+    // and it is also what slows a koi that is coming about — so applied
+    // indiscriminately it throttles the entry to a third speed at the exact
+    // point the fish is deepest in the band. Measured with it ungated the mean
+    // entry took over fifteen seconds and the pond spent its time waiting.
+    const surf = M.surface.createSurface();
+    const W = 1440, H = 900;
+    const times = [];
+    for (let seed = 1; seed <= 4; seed++) {
+      const school = M.fish.createSchool({
+        rand: M.rng.makeRandom(seed * 13), surface: surf, width: W, height: H });
+      school.seed(W, H);
+      const born = new Map();
+      const seeded = new Set(school.fish.map((f) => f.id));
+      let t = 0;
+      for (let i = 0; i < 60 * 150; i++) {
+        const u = (i / 60) % 50;
+        const I = u < 10 ? 0 : u < 25 ? 1 : 0;
+        school.advance(1 / 60, { ripples: [], intensity: I, width: W, height: H });
+        t += 1 / 60;
+        for (const f of school.fish) {
+          if (seeded.has(f.id)) continue;
+          if (!born.has(f.id)) born.set(f.id, { t0: t, tIn: null });
+          const r = born.get(f.id);
+          if (r.tIn === null && surf.onScreen(f.x, f.y, W, H, 0)) r.tIn = t;
+        }
+      }
+      for (const r of born.values()) if (r.tIn !== null) times.push(r.tIn - r.t0);
+    }
+    if (times.length < 20) throw new Error(`only ${times.length} entries to measure`);
+    const mean = times.reduce((a, b) => a + b, 0) / times.length;
+    const worst = Math.max(...times);
+    // Loose bars on purpose: what is being ruled out is a koi that is visibly
+    // barely moving, not a particular speed. A fish crossing ~150 plane px at
+    // a third of a 21-57 px/s cruise takes 11 s at best and 40 at worst.
+    if (mean > 8) throw new Error(`a koi takes ${mean.toFixed(1)} s on average to swim into frame`);
+    if (worst > 20) throw new Error(`one koi took ${worst.toFixed(1)} s to swim into frame`);
+    return `${times.length} entries, ${mean.toFixed(1)} s mean and ${worst.toFixed(1)} s worst from spawn to in frame`;
+  });
+
+  check('a koi sent away is called back rather than replaced', () => {
+    // A DEPARTURE IS NOT INSTANT ANY MORE, which creates a state that could not
+    // exist while a leaving koi faded out on the spot: one that has been sent
+    // away, is still in the frame, and is wanted again. Spawning there puts an
+    // eighth koi on the water while the seventh is still swimming off. Both
+    // halves are asserted — that the recall happens, and that the count it is
+    // protecting never breaks.
+    const surf = M.surface.createSurface();
+    const W = 1440, H = 900;
+    let recalls = 0, spawnsInWindow = 0, worstVisible = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const school = M.fish.createSchool({
+        rand: M.rng.makeRandom(seed * 7 + 1), surface: surf, width: W, height: H });
+      school.seed(W, H);
+      const step = (I) => {
+        school.advance(1 / 60, { ripples: [], intensity: I, width: W, height: H });
+        worstVisible = Math.max(worstVisible, school.visibleCount(W, H));
+      };
+      for (let i = 0; i < 60 * 6; i++) step(0);
+      // Storm just long enough to send one or two away, then stop at once —
+      // the fish that were sent are still on screen when the pond wants them.
+      const before = school.recalls, spawnedBefore = school.arrivals;
+      for (let i = 0; i < 60 * 5; i++) step(1);
+      for (let i = 0; i < 60 * 10; i++) step(0);
+      recalls += school.recalls - before;
+      spawnsInWindow += school.arrivals - spawnedBefore;
+    }
+    if (recalls === 0) throw new Error('no koi was ever called back, over six short storms');
+    if (worstVisible > M.fish.MAX_ON_SCREEN) throw new Error(`${worstVisible} koi were on screen at one point`);
+    return `${recalls} recalled and ${spawnsInWindow} newly called in over six short storms, never more than ${worstVisible} on screen`;
   });
 
   check('any ripple gets the same reaction', () => {
@@ -922,6 +1187,18 @@ async function partOne(mutant) {
     // slider: it is a body, not a personality. So the same pond is run against
     // a tree with the separation term removed, and the difference is the
     // measurement.
+    // THE CONTROL TREE IS BUILT FROM THE SOURCE ON DISK, WHICH IS NOT THE TREE
+    // UNDER TEST DURING A SWEEP. loadScene reads the pristine file and applies
+    // only this one edit, so while --negative-control has a koi-fish mutation
+    // active, `M` carries it and `control` does not — and any mutation that
+    // moves the koi about therefore shifts one side of the ratio and not the
+    // other. That is why several fish mutants list this check as collateral
+    // they are ALLOWED to redden: it is the comparison losing its footing, not
+    // the claim failing. Composing the sweep's mutation into the control would
+    // fix it (loadScene would take a list of edits and chain them onto one
+    // file) and is deliberately not done here — it is shared machinery three
+    // pre-existing mutants already depend on, and naming the collateral keeps
+    // the check exactly as strict in the meantime.
     const control = await loadScene({ id: 'no-separation-control', file: 'scene/koi-fish.js',
       from: 'const W_SEPARATE = 1.7;', to: 'const W_SEPARATE = 0;' });
     const closest = (mod, social) => {
@@ -1090,7 +1367,7 @@ const PROBE_SCENE = `
 // guarantees observable: it counts the frames it is given and records that it
 // was disposed, so a leaked loop or a skipped teardown is a number rather than
 // an inference.
-export const meta = { title: 'Probe', blurb: 'probe' };
+export const meta = { title: 'Probe' };
 export default function createProbe(host) {
   const { ctx } = host.canvas2d();
   window.__probe = { frames: 0, disposed: false, built: (window.__probe?.built || 0) + 1 };
@@ -1268,6 +1545,61 @@ async function partTwo(browser, mutant, shotsDir) {
         assert.strictEqual(st.x, 0, 'the document scrolled sideways');
         assert.strictEqual(st.tall, true, 'the document is taller than the viewport');
         return `no scroll after six wheel events, overflow ${st.overflow}`;
+      });
+
+      await checkAsync('there is no text on the page but the nav', async () => {
+        // "NO CHROME BESIDES THE NAV" IS LITERAL. This page once carried a line
+        // of instructional text that faded out after seven seconds, on the
+        // grounds that the two interactions are otherwise undiscoverable; that
+        // was overruled, and the rule is that there is no on-screen text
+        // outside the nav EVER, not that a particular string is gone. So the
+        // check walks the rendered text rather than looking for that sentence,
+        // and any future caption fails it the day it is added.
+        //
+        // WHAT COUNTS AS SHOWN IS ASKED OF THE BROWSER, NOT OF THE STYLESHEET.
+        // The obvious filter — display:none or visibility:hidden — is WRONG
+        // here, measured rather than assumed: Chromium reports `display:
+        // inline` and `visibility: visible` for a <noscript> whose contents it
+        // is not rendering at all, and the noscript block is the one piece of
+        // text on this page that genuinely must stay (it is what a visitor with
+        // scripting off gets instead of a blank viewport). What it DOES report
+        // is zero client rects and checkVisibility() false, which is the
+        // platform's own answer to "is this painted" and is the thing the rule
+        // is actually about.
+        //
+        // OPACITY IS NOT AN EXEMPTION, on purpose: a hint mid-fade is still a
+        // hint, and checkVisibility() ignores opacity unless asked, so a line
+        // fading out is still caught.
+        const strayText = () => page.evaluate(() => {
+          const nav = document.querySelector('.scene-nav');
+          const out = [];
+          const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+          for (let n = walk.nextNode(); n; n = walk.nextNode()) {
+            const t = n.textContent.replace(/\s+/g, ' ').trim();
+            if (!t) continue;
+            const el = n.parentElement;
+            if (!el || (nav && nav.contains(el))) continue;
+            const painted = el.checkVisibility
+              ? el.checkVisibility()
+              : el.getClientRects().length > 0;
+            if (!painted || el.getClientRects().length === 0) continue;
+            out.push(`<${el.tagName.toLowerCase()}${el.id ? '#' + el.id : ''}> "${t.slice(0, 60)}"`);
+          }
+          return out;
+        });
+        // Twice, a few seconds apart: once now, and once after anything on a
+        // timer would have had its moment.
+        const now = await strayText();
+        await waitSceneSeconds(page, 2.5);
+        const later = await strayText();
+        const stray = [...new Set([...now, ...later])];
+        if (stray.length) throw new Error(`text outside the nav: ${stray.join(' | ')}`);
+        const nav = await page.evaluate(() => {
+          const n = document.querySelector('.scene-nav');
+          return n ? n.innerText.replace(/\s+/g, ' ').trim() : '';
+        });
+        assert.ok(nav.length > 0, 'the nav itself has no text');
+        return `nothing outside the nav, which reads "${nav}"`;
       });
 
       setSection('scene1');
