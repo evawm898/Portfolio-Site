@@ -5234,6 +5234,17 @@ OF THEM A LOOSENING.**
   them onto one file, so the control carries the sweep's mutation too. It is
   shared machinery three pre-existing mutants already depend on, and naming the
   collateral keeps the check exactly as strict in the meantime.
+**AND THREE PRE-EXISTING MUTANTS GAINED A WIDER BLAST RADIUS, EACH WIDENING
+MEASURED RATHER THAN REASONED — WHICH IS HOW ONE OF THEM CORRECTED THE GUESS.**
+`the-population-counts-only-what-is-in-frame` was predicted to kill the recall;
+run on a probe tree it still recalls **9 of the shipped 10**, and what it
+actually does is reach **EIGHT koi on screen** — so the recall check catches it
+on its COUNT bar, which is the brief's own "3-7 on screen". `a-departure-never-
+leaves` stops the population machinery dead (0 spawns beyond the seed and 0
+recalls over 150 s of swinging storm, the pond stuck at 7 against a target of 3),
+and `an-entering-koi-is-not-carried-in` leaves `seed()` returning an EMPTY pond on
+every seed — so between them they redden every entry/exit check's vacuity guard.
+That breadth is the mutations being severe, not the checks being fragile.
 
 **Nothing here runs in CI.** Every GitHub Actions gate in this repo is
 path-filtered to `flower*` / `bloom*`, so `scene*` is covered by nothing — run
