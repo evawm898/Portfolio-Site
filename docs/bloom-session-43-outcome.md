@@ -337,6 +337,37 @@ census agrees; the live matrix is **699 rows** = main's 680 plus this session's 
 smoke census reads **26 blocks over 699 rows, 69 families both directions** (68 plus session
 42's L8).
 
+### 6d. Close-out on the merged tree
+
+**THE FULL MUTANT SWEEP, RE-RUN AFTER THE MERGE: 28 of 28.** Every family fires on a mutation
+that names it, the clean tree is silent on every row, and all **28 anchors match their
+find-string exactly once**, so nothing in the table is disarmed. That covers this session's
+nine stem mutants, session 42's three MODEL B mutants and the A / L families — run in full
+rather than resting on "I did not change that code", because a merge combines two trees and
+the mutant table was one of the conflicted files.
+
+**ALL SEVEN CI JOBS GREEN on `4f9e9d4`:**
+
+| job | result |
+|---|---|
+| `bloom-export-watertight` | SUCCESS — 196.2 min on the watertight step, 699 rows |
+| `bloom-connectedness` | SUCCESS — 119.7 min |
+| `bloom-panel` | SUCCESS |
+| `bloom-frozen-matrices` | SUCCESS |
+| `bloom-grid` | SUCCESS |
+| `flower-export-watertight` | SUCCESS |
+| `flower-geometry-quality` | SUCCESS |
+
+The export gate's wall-thickness gates V1–V4 and their negative control ran as separate steps
+before the matrix, and both passed.
+
+**AND ONE NOTE ON CI TIMING, as a correction to this session's own method rather than a new
+constant.** Sized off `actions_list` on the workflow's own recent completed runs, as the rule
+requires: the export gate read **200.7 min** on the 693-row tree and **196.2 min** on the
+699-row merged tree, and connectedness **104 min** then **119.7 min**. Both sit inside the
+151.8–203.5 min spread session 41 recorded. The spread is still the measurement; no single
+figure here sizes a wait, this paragraph's included.
+
 ### 6b. The mutant table ran and FAILED, and four of its findings were in the stem's own assertion family
 
 The sweep is the instrument that finds this class, so it doing its job looks like a red
