@@ -234,6 +234,46 @@ the two non-`STEM:` movers are the ones that matter:
 
 The three `STEM: GATED` rows are HOLDERS by construction (length 0, or SPHERE).
 
+**AND THE FIRST RUN OF IT FAILED, ON THE HOLDERS, AND THAT IS THE MOST USEFUL THING THE
+PARTITION DID.** 16 of 16 movers moved — the predeclaration was right — and **41 findings
+landed on holder rows, every single one DOMED**, at roughly one ulp, at the very end of the
+buffer. Flat holders were clean. The end of the buffer is the hub, and "domed only" names the
+cap arm exactly.
+
+`buildHubInto`'s cap arm on `main` builds the shell straddling the mid-surface —
+`cap(Rd + t/2)` and `cap(Rd - t/2)`. This session made the inner radius a function so the
+join could thicken it, and wrote it as `outerRad - joinAt(r)`. With `outerRad = Rd + t/2` and
+an inert `joinAt` returning exactly `t`, that evaluates **`(Rd + t/2) - t`** — the same
+SURFACE as `Rd - t/2` and not the same DOUBLE. So every domed row's hub moved on a tree where
+no stem is built at all.
+
+**The comment above it asserted the very property that was false** — *"Inert: `joinAt` returns
+t and this is the shipped `Rd - t/2` term for term"* — which it is not, term for term or
+otherwise. A comment claiming bit-identity is not a construction.
+
+**FIFTH INSTANCE OF THE `a - (a - x)` CLASS IN THIS PROJECT, AND THE FIRST INSIDE THE GEOMETRY
+RATHER THAN A GATE CLAUSE.** The previous four are gate-side (ST5's own, this session; A7's
+`seamFrameResidual === 0`; L5's absolute sinus bar; the ladder's last-station comparison), and
+all four were answered by bounding the difference in the unit the quantity carries. **That
+remedy is not available here**, because the claim is byte identity and there is no tolerance
+in a byte. The fix has to be a CONSTRUCTION.
+
+It is written as a difference from zero instead:
+
+```js
+const innerRad = (phi) => (Rd - t / 2) - (joinAt(Rd * Math.sin(phi)) - t);
+```
+
+`joinAt(r) - t` is exactly `0` wherever the join is inert, and `x - 0` is exactly `x`, so this
+is main's own expression term for term — **with no branch to keep in step**, which is better
+than the `domeIsFlat()` guard shape here because there is nothing that can drift.
+
+**Verified directly rather than by re-running the hour-long partition first:** a six-state
+probe building both trees and comparing every emitted float under `Object.is` reads **0 moved**
+on the flat default and on `headRise` 0.5, 1, 1 × 40 petals and 0.5 × 6 layers, in BOTH modes;
+the one stem state differs by exactly **5,184 floats = 576 triangles**, which is the hollow
+stem itself. The partition was then re-run in full on the corrected tree.
+
 ### 6b. The mutant table ran and FAILED, and four of its findings were in the stem's own assertion family
 
 The sweep is the instrument that finds this class, so it doing its job looks like a red

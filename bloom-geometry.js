@@ -6912,11 +6912,20 @@ export function buildHubInto(acc, state, ring) {
     };
     const before = acc.triangleCount;
     const outerRad = Rd + t / 2;
-    /* The inner surface at polar phi sits one THICKNESS in from the outer one,
-       and the thickness is read at that station's own PLAN radius — which is
-       what the profile is a function of. Inert: `joinAt` returns t and this is
-       the shipped `Rd - t/2` term for term. */
-    const innerRad = (phi) => outerRad - joinAt(Rd * Math.sin(phi));
+    /* THE INNER SURFACE IS THE SHIPPED ONE LESS THE JOIN'S *EXTRA* THICKNESS,
+       and it is written that way so the inert case is exact.
+       `outerRad - joinAt(r)` is the same SURFACE and it is NOT the same double:
+       it evaluates `(Rd + t/2) - t`, which differs from `Rd - t/2` by an ulp on
+       most radii, so every domed row's hub moved on a tree where no stem is
+       built. Measured: 41 findings over the live matrix's holders, all domed,
+       all ~1 ulp, flat rows clean — and the comment that stood here asserted
+       "the shipped `Rd - t/2` term for term", which was the false half.
+       FIFTH instance of the a - (a - x) class in this project and the first
+       inside the geometry rather than a gate clause.
+       Written as a DIFFERENCE FROM ZERO instead: `joinAt(r) - t` is exactly 0
+       wherever the join is inert, and `x - 0` is exactly `x`, so this is main's
+       own expression term for term with no branch to keep in step. */
+    const innerRad = (phi) => (Rd - t / 2) - (joinAt(Rd * Math.sin(phi)) - t);
     joinReport.undersideMagnitude = outerRad;
     cap(() => outerRad, true);
     for (let i = 0; i <= K; i++) { const phi = phiRim * (1 - i / K); underside.push([Rd * Math.sin(phi), outerRad - innerRad(phi)]); }   // the EMITTED difference, round-trip and all
