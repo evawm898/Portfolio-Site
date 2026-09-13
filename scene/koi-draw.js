@@ -88,6 +88,16 @@ const NOSE_LEAD = 0.030;     // how far the snout reaches past the first joint
 const FISH_ALPHA = 1;       // see drawFish — a koi never fades
 const EYE_R = 1.15;          // screen px — a koi's eye is tiny and it reads
 
+// THE RIGID FRAME'S ORIENTATION LAGS f.heading, AND THIS IS THE WHOLE OF THE
+// FIX FOR "the fish pivots on its nose" (see the comment above F in drawFish
+// for why). SPINE_ORIENT_WEIGHT is how much of F comes from f.spine's own
+// bulk direction versus straight from f.heading — 1 would be the chain alone,
+// which reads as too sluggish to resolve a hard alarm turn and too noisy on a
+// fish that is nearly stationary (a short chain has no reliable direction);
+// 0 is today's bug (a rigid body built straight from heading, with no memory
+// of where it just was). Tuned by eye against a slow drift and a sharp turn.
+const SPINE_ORIENT_WEIGHT = 0.4;
+
 // EVERY APPENDAGE IS A FRACTION ALONG (u, 0 nose -> 1 tail) AND A FRACTION
 // ACROSS (a multiplier on the body's own half-width at that u), through the
 // ONE frame drawFish builds — never a per-joint tangent. Named here, not
@@ -225,16 +235,50 @@ export function createRenderer(ctx, surface) {
     // the head). F is the fish's forward (nose) direction and R its right,
     // both fixed for the whole fish this frame; `pos(u)` walks from the nose
     // (u=0) to the tail (u=1) along F, and `edge(u, side, k)` is the point k
-    // half-widths out from that station, on the given flank. Nothing here
-    // reads the spine at all — the body is a rigid tapered oval carried by
-    // heading, the koi-fish.js note's own "static tail is fine" extended to
-    // the whole fish, not only the tail.
-    const F = { x: Math.cos(f.heading), y: Math.sin(f.heading) };
+    // half-widths out from that station, on the given flank. The body is
+    // still one rigid tapered oval, never a per-joint bend — but F's OWN
+    // direction is NOT read straight off f.heading, and that is a real
+    // behaviour fix rather than a leftover of the old per-joint renderer.
+    // f.heading is already turn-rate-limited in koi-fish.js, but a rigid body
+    // built from it directly still snaps to exactly where the fish is
+    // steering RIGHT NOW, every single frame — which reads as a compass
+    // needle turning on its own pin, not as a body a head has to drag around.
+    // f.spine is that drag, computed every frame in koi-fish.js whether this
+    // file reads it or not: each joint chases a fixed distance behind the one
+    // ahead of it, so during a turn the chain trails the head's new direction
+    // and only straightens out once the fish has actually been travelling
+    // that way for a while. The vector from the chain's last joint back to
+    // the head (its own bulk direction) is what F reads, blended with raw
+    // heading by SPINE_ORIENT_WEIGHT so the frame is not sluggish on a fish
+    // that just spawned or noisy on one that is barely moving. This is what
+    // turns "the whole fish pivots on its nose" into "the body settles into
+    // the turn" — the nose still moves along the fish's true simulated path,
+    // it is only the ORIENTATION drawn through it that now has memory.
+    const sp = f.spine;
+    const tailJoint = sp[sp.length - 1];
+    const headHx = Math.cos(f.heading), headHy = Math.sin(f.heading);
+    let lagX = f.x - tailJoint.x, lagY = f.y - tailJoint.y;
+    const lagM = Math.hypot(lagX, lagY);
+    let F;
+    if (lagM > 1e-6) {
+      lagX /= lagM; lagY /= lagM;
+      const bx = lagX * SPINE_ORIENT_WEIGHT + headHx * (1 - SPINE_ORIENT_WEIGHT);
+      const by = lagY * SPINE_ORIENT_WEIGHT + headHy * (1 - SPINE_ORIENT_WEIGHT);
+      const bm = Math.hypot(bx, by) || 1;
+      F = { x: bx / bm, y: by / bm };
+    } else {
+      // A degenerate chain (every joint exactly on the head) has no bulk
+      // direction to read — falls back to heading alone rather than to a
+      // division by zero. Not reachable from makeFish's own seeding, kept
+      // as a guard the way the rest of this file guards a zero-length vector.
+      F = { x: headHx, y: headHy };
+    }
     const R = { x: -F.y, y: F.x };
     // See "VOLUME CUES" above the constants: nearAlign is R's own alignment
-    // with the fixed world direction standing in for the tilt (R.y === F.x,
-    // so this is exactly cos(heading), computed once and read by every
-    // shading/sizing decision below rather than re-derived per appendage).
+    // with the fixed world direction standing in for the tilt (R.y === F.x).
+    // F is no longer exactly heading, so this is the blended frame's own
+    // alignment rather than a literal cos(heading) — read by every
+    // shading/sizing decision below rather than re-derived per appendage.
     const nearAlign = F.x;
     const nearSide = nearAlign >= 0 ? 1 : -1;
     const volMag = Math.abs(nearAlign);
