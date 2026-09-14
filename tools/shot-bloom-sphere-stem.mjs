@@ -138,7 +138,7 @@ const runs = (list) => {
 const capOf = (s) => {
   const O = s.m.stemOmission;
   const asked = s.m.rings.length;
-  if (!O) return `<b>${asked} petals asked &middot; ${s.m.petalsBuilt} BUILT</b> &middot; no stem, so nothing is omitted<br>${s.m.exportTris ?? s.m.shownTris} triangles &middot; ${modeTag(s.m)}`;
+  if (!O) return `<b>${asked} petals asked &middot; ${s.m.petalsBuilt} BUILT</b> &middot; no stem, so nothing is omitted<br>${s.m.shownTris} triangles &middot; ${modeTag(s.m)}`;
   const near = Math.min(O.nearestKeptMm.live, O.nearestKeptMm.export);
   return `<b>${O.asked} petals asked &middot; ${O.built} BUILT</b> &middot; ${O.omitted.length} not (slot${O.omitted.length === 1 ? '' : 's'} ${runs(O.omitted)})<br>` +
     `the stem passes within the ${O.clearanceMm.toFixed(2)} mm printable gap of them; nearest petal KEPT ${Number.isFinite(near) ? near.toFixed(2) + ' mm' : '&mdash;'}<br>` +

@@ -700,7 +700,7 @@ const MUTANTS = [
 
   { id: 'the-omission-renumbers', why: 'the whorl is run at the SURVIVING count instead of the asked-for one, so every petal takes the descriptor and the azimuth of a slot that is not its own — Eva\'s "do not impact anything else" broken in the one way no STL check can see',
     find: '      count: fr.rings.length,\n      radius: (i) => fr.rings[i].radius,',
-    into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST8', 'J1', 'Z1'],
+    into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST7', 'ST8', 'J1', 'Z1'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.azCount < c.azCount && m.firstAz === c.firstAz) ? null
