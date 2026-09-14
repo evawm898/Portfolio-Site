@@ -239,26 +239,7 @@ const BEND_SAMPLES = 28;         // spine steps; every drawn point lerps between
 // from 77 px to 7 on a 96 px body — which is the wave disappearing in favour of
 // a static turn-bend, exactly the failure this rebuild is for.
 const BEND_MAX_TURN = 0.45;      // rad of turn BIAS, snout to tail tip, saturated
-// WHAT THE TURN BIAS READS IS THE CHAIN, NOT THE TURN RATE. koi-fish.js drags a
-// joint chain behind the head with each joint's turn capped, and the angle from
-// the head's backward axis to the chain's last segment is a koi's body lying
-// along the path it has just swum. Feeding THAT through the bias is the whole
-// of the hybrid: the chain supplies the character — history rather than rate,
-// lagged by geometry rather than by a filter — and the integrated spine below
-// supplies bounded curvature, so the flank stays smooth.
-//
-// IT IS NOT f.omega AND THE DIFFERENCE IS MEASURED: the two correlate at only
-// r = 0.66 over the gate's own sampling, because a koi that turned and
-// straightened still has a curved body while its turn rate is back to zero.
-// (An earlier 0.44 is quoted in places; that was a different tree and a
-// different intensity schedule. 0.66 is what this one measures.)
-//
-// AND IT IS NOT THE CHAIN ITSELF. Riding the chain directly was built and
-// measured: it bends the body ~46 degrees at the median against this bias's
-// 25.8 total, and a flank drawn at nine vertices shows that as angularity —
-// median flank turn 22.6 degrees against 9.1. Bounded curvature is the half of
-// the old construction worth keeping.
-const BEND_TURN_REF = 1.92;      // rad of chain swing reaching ~0.76 of the bias
+const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it
 // Where along the snout-to-tail-tip length the spine is pinned, as a fraction
 // of it. 0.20 of the 1.54 body lengths that span is about a third of a BODY
 // back from the snout, which is roughly where a swimming fish's yaw pivot sits.
@@ -475,7 +456,9 @@ export function createRenderer(ctx, surface) {
     // physical omega/speed arc: measured over 90 s of the real pond, the median
     // |omega| would sweep the body 91 degrees and p90 would sweep it 417, since
     // the steering lets a koi turn well inside its own body length.
-    const turnK = (BEND_MAX_TURN * Math.tanh((f.chainTurn || 0) / BEND_TURN_REF)) / reachBack;
+    // f.bend, not f.omega: the SECOND lag, so the curvature ramps in and out
+    // over a short window instead of tracking the turn rate 1:1 each frame.
+    const turnK = (BEND_MAX_TURN * Math.tanh((f.bend || 0) / BEND_OMEGA_REF)) / reachBack;
 
     // Curvature at arc length `a` behind the nose: the travelling wave, grown
     // toward the tail, plus the turn's bias.

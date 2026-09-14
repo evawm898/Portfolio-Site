@@ -245,20 +245,12 @@ const MUTANTS = [
     why: 'the jitter itself: the koi drawn at the raw 60 Hz placement it swims',
   },
   {
-    id: 'the-bend-reads-the-turn-rate-again',
+    id: 'the-bend-bias-snaps-to-the-turn-rate',
     file: 'scene/koi-fish.js',
-    from: '        f.chainTurn = -turn;',
-    to: '        f.chainTurn = f.omega * 0.55;',
+    from: '        f.bend += (f.omega - f.bend) * Math.min(1, dt / BEND_TAU);',
+    to: '        f.bend = f.omega;',
     breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
-    why: 'the hybrid collapsed back to an expensive way of writing f.omega',
-  },
-  {
-    id: 'the-net-turn-is-wrapped-into-half-a-circle',
-    file: 'scene/koi-fish.js',
-    from: '        f.chainTurn = -turn;',
-    to: '        f.chainTurn = -Math.atan2(Math.sin(turn), Math.cos(turn));',
-    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
-    why: 'the chain swings past a half turn, so wrapping it jumps a full one',
+    why: 'a body that changes its curvature the instant the turn rate does',
   },
   {
     id: 'the-drawn-heading-is-lagged-without-its-position',
@@ -1150,7 +1142,6 @@ async function partOne(mutant) {
     // as sharp is the step CHANGING abruptly, which is the second difference.
     const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
     let jRaw = 0, jDrawn = 0, sRaw = 0, sDrawn = 0, offMax = 0, n = 0;
-    let cn = 0, cT = 0, cO = 0, cTT = 0, cOO = 0, cTO = 0;
     for (const seed of [11, 37]) {
       const surf = M.surface.createSurface();
       const W = 1440, H = 900, dt = 1 / 60;
@@ -1173,10 +1164,7 @@ async function partOne(mutant) {
           const stepD = p ? wrap(f.drawHeading - p.dh) : null;
           if (p) {
             sRaw = Math.max(sRaw, Math.abs(f.omega - p.o));
-            sDrawn = Math.max(sDrawn, Math.abs(wrap(f.chainTurn - p.b)));
-            cn++; cT += f.chainTurn; cO += f.omega;
-            cTT += f.chainTurn * f.chainTurn; cOO += f.omega * f.omega;
-            cTO += f.chainTurn * f.omega;
+            sDrawn = Math.max(sDrawn, Math.abs(f.bend - p.b));
             if (p.stepH !== null) {
               jRaw = Math.max(jRaw, Math.abs(stepH - p.stepH));
               jDrawn = Math.max(jDrawn, Math.abs(stepD - p.stepD));
@@ -1192,8 +1180,8 @@ async function partOne(mutant) {
               n++;
             }
           }
-          prev.set(f.id, { h: f.heading, dh: f.drawHeading, o: f.omega,
-                           b: f.chainTurn, dx: f.drawX, dy: f.drawY, stepH, stepD });
+          prev.set(f.id, { h: f.heading, dh: f.drawHeading, o: f.omega, b: f.bend,
+                           dx: f.drawX, dy: f.drawY, stepH, stepD });
         }
       }
     }
@@ -1202,25 +1190,10 @@ async function partOne(mutant) {
     // Bars with real headroom over the measured 0.132 / 0.323 / 5.2 deg: what
     // is ruled out is a placement drawn RAW, not a particular time constant.
     if (!(jr <= 0.40)) throw new Error(`drawn heading jerk is ${(jr * 100).toFixed(0)}% of the raw jerk`);
-    // THE BEND IS DRIVEN BY THE CHAIN'S NET SWING, AND TWO THINGS MUST HOLD OF
-    // IT. It has to be SMOOTH in its own right — it is lagged by geometry
-    // rather than by a filter, so nothing downstream will rescue it — and it
-    // has to be genuinely DIFFERENT from the turn rate, or the hybrid is an
-    // expensive way to write f.omega. Measured: max step 1.3 degrees a frame,
-    // and r = 0.66 against omega, because a koi that turned and straightened
-    // still has a curved body while its turn rate is back to zero.
-    const r = (cn * cTO - cT * cO)
-      / Math.sqrt(Math.max(1e-12, (cn * cTT - cT * cT) * (cn * cOO - cO * cO)));
-    // THE BAR IS SET TO CATCH A DISCONTINUITY, NOT TO POLICE DEGREES. What a
-    // wrap bug does to this quantity is a FULL TURN in one frame (6.28 rad);
-    // ordinary swinging measures 9.4 degrees. The bar sits between them with
-    // room on both sides. How smooth the drawn body actually is belongs to the
-    // jerk clause above, which reads the emitted vertices.
-    if (!(sDrawn <= 0.25)) throw new Error(`the chain's net turn steps ${(sDrawn * 180 / Math.PI).toFixed(1)} deg in a frame`);
-    if (!(Math.abs(r) <= 0.80)) throw new Error(`the chain's net turn is just the turn rate (r = ${r.toFixed(2)})`);
+    if (!(sr <= 0.60)) throw new Error(`drawn bend steps ${(sr * 100).toFixed(0)}% as hard as the turn rate`);
     if (!(offDeg <= 15)) throw new Error(`the drawn koi points ${offDeg.toFixed(1)} deg off its own drawn travel`);
-    return `jerk ${(jr * 100).toFixed(0)}% of raw, chain turn steps ${(sDrawn * 180 / Math.PI).toFixed(1)} deg a frame `
-         + `at r=${r.toFixed(2)} to the turn rate, points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
+    return `jerk ${(jr * 100).toFixed(0)}% of raw, bend steps ${(sr * 100).toFixed(0)}% of raw, `
+         + `points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
   });
 
   check('the bend moves the head too', () => {
@@ -1249,7 +1222,7 @@ async function partOne(mutant) {
     const grab = (bend) => {
       pts = [];
       rend.drawFish({ id: 1, x: X, y: Y, heading: 0, drawX: X, drawY: Y, drawHeading: 0,
-        len: L, speed: 40, phase: 0.8, finPhase: 0.7, omega: bend, chainTurn: bend,
+        len: L, speed: 40, phase: 0.8, finPhase: 0.7, omega: bend, bend,
         patches: [{ s: 0.26, t: -0.10, rx: 0.08, ry: 0.6, rot: 0.2 }] });
       return pts.slice();
     };
