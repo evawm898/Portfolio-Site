@@ -705,7 +705,15 @@ const MUTANTS = [
      piece, and the right triangle count for whatever it built. */
   { id: 'the-stem-channel-never-fires', why: 'the channel is computed and then thrown away, so every petal is built and the stem passes straight through the pole-most ones — watertight, one connected piece, and the only thing wrong with it is the picture',
     find: '  if (!plan || !plan.present || !fr.sphereMode) return null;',
-    into: '  if (!plan || !plan.present || !fr.sphereMode || fr.sphereMode) return null;', names: ['ST7', 'ST9'],
+    /* ST9 IS NOT ON THIS LIST AND CANNOT BE: this table calls `stemAssertions`
+       and never `stemChannelAssertions`, which takes the EXPORTED STL — so ST9
+       has no way to fire here and naming it reported MISSED, which is
+       indistinguishable from a clause that is genuinely blind (`/plot`'s own
+       lesson). ST9's own entanglement — its guard and its bar both read from
+       the channel record — was found by RE-READING the clause and is fixed;
+       what is still owed is a witness that can run it, recorded in the outcome
+       doc rather than claimed here. */
+    into: '  if (!plan || !plan.present || !fr.sphereMode || fr.sphereMode) return null;', names: ['ST7'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.channel === null && c.channel !== null && m.built > c.built) ? null
@@ -713,7 +721,16 @@ const MUTANTS = [
 
   { id: 'the-omission-renumbers', why: 'the whorl is run at the SURVIVING count instead of the asked-for one, so every petal takes the descriptor and the azimuth of a slot that is not its own — Eva\'s "do not impact anything else" broken in the one way no STL check can see',
     find: '      count: fr.rings.length,\n      radius: (i) => fr.rings[i].radius,',
-    into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST7', 'ST8', 'J1', 'Z1'],
+    into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST7', 'ST8'],
+    /* J1 AND Z1 ARE NOT ON THIS LIST, and both were over-claimed rather than
+       blind by accident. The mutation runs the whorl at the SURVIVING count, so
+       slot i takes a 6-slot whorl's azimuth instead of an 8-slot one — but the
+       RADIUS callback still indexes `fr.rings[i]`, so every foot that IS built
+       still sits on the cap its own ring declares, which is all J1 asserts; and
+       Z1 is about a role's controls being visible iff the role is non-empty,
+       where a CONTINUOUS sphere carries no slot roles at all. ST8 is the clause
+       written for exactly this — the mask against a STEMLESS build of the same
+       state — and it fires. */
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       /* MEASURED on this tree at 8 petals x a 6 mm stem: the clean tree defines
@@ -725,7 +742,7 @@ const MUTANTS = [
 
   { id: 'the-channel-clearance-is-typed', why: 'the printable gap the channel clears is replaced by a twentieth of a millimetre, so petals are kept that the stem passes within a gap no process can make',
     find: 'export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;',
-    into: 'export const STEM_PETAL_CLEARANCE_MM = 0.05;', names: ['ST7', 'ST9'],
+    into: 'export const STEM_PETAL_CLEARANCE_MM = 0.05;', names: ['ST7'],      // ST9: see the note above — this table cannot run it
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.channel && c.channel && m.channel.clearanceMm < c.channel.clearanceMm) ? null

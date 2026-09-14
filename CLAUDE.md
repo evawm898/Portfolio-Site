@@ -2165,6 +2165,22 @@ was adopted that could not be reproduced from a definition this session can stat
 overlapping each other stays the CROWDING instrument's (`D_max 1`, `NN 1.578 w` at 8 and
 1.554 at 40 — and the omission moves NN by exactly nothing, which is condition 2 showing up
 in an instrument that knows nothing about it).
+**BLOCKING AND UNRESOLVED: A HEAD THAT FITS INSIDE THE STEM'S BORE EXPORTS AS TWO SOLIDS.**
+`bloom-smoke --conn` is RED on `SPHERE STEM: THE BARE CORNER` — watertight (boundary 0) and
+**2 connected pieces**, 3 at a 0.3 mm cell. Decomposed: the stem is HOLLOW with a 4.5 mm bore
+(Eva's `max(0, r - 1.5)` at the 12 mm maximum) and the whole head has an outer radius of
+1.8 mm, so the head sits INSIDE the pipe and the two share no material. **The condition is
+`headOuterRadius < stemBoreRadius`**, equivalently `stemDiameter > 2*headOuterRadius +
+2*STEM_MIN_WALL_MM` — so with the 12 mm maximum **every head under 4.5 mm of outer radius can
+be disconnected**, and every head at or above it is safe at any setting. **IT IS NOT THE
+OMISSION'S**: measured with 2, 3 and 6 petals SURVIVING (8, 12 and 20 asked, petal width 8,
+spread 0.6), so it is a property of the STEM ON A SPHERE. It is newly reachable only because
+this PR gives SPHERE a stem at all. **NOTHING WAS DONE ABOUT IT** — the brief's scope forbids
+touching the bore rule or the stem's controls and says to stop and report with the
+measurement, and the three answers (a SOLID root band on a sphere, which is the one this
+session would recommend; refusing the stem where the head fits inside its bore; narrowing
+`stemDiameter` against the head, rejected on `stamenSpread`'s adaptive-maximum ruling) all
+decide something that is Eva's. §9e of the outcome doc has the table.
 **A FROZEN PHASE IS OWED**: the live matrix goes 736 -> 744 (nine rows added in block 32, one
 GATED sphere row removed from block 30). The image is
 `node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**.

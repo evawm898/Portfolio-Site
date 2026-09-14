@@ -510,6 +510,72 @@ every time. It is still the right construction — the boundary is a slider posi
 and an assertion that can fail is worse than a construction that cannot — but a session
 that removes it owes this measurement again.
 
+## 9e. BLOCKING: A HEAD THAT FITS INSIDE THE STEM'S BORE EXPORTS AS TWO SOLIDS
+
+**`node tools/bloom-smoke.mjs --conn` is RED, and it is a hard-invariant failure rather
+than a flag.** `SPHERE STEM: THE BARE CORNER` exports watertight (boundary 0) and as
+**2 connected pieces** — 3 at a 0.3 mm cell, 0.82% of surface detached.
+
+**IT IS NOT THE OMISSION'S.** Decomposed into vertex-welded shells:
+
+| shell | tris | z | r max | area |
+|---|---|---|---|---|
+| outer sphere | 3,360 | [−1.800, 1.800] | 1.800 | 0.97% |
+| inner sphere | 3,360 | [−0.600, 0.600] | 0.600 | 0.11% |
+| stem | 576 | [−61.800, −0.600] | 6.000 | 98.92% |
+
+The stem is HOLLOW with a **4.5 mm bore** (Eva's `max(0, r − 1.5)` at the 12 mm maximum) and
+the whole head has an outer radius of **1.8 mm**. The head sits entirely inside the bore; the
+tube's material is the annulus 4.5 ≤ r ≤ 6 and the two never touch. The 2-vs-3 component count
+is the two concentric spheres merging at the coarser cell, which is the gate's own re-read.
+
+**THE CONDITION, measured across the reachable range:**
+
+```
+    headOuterRadius < stemBoreRadius        i.e.   Rd + t/2 < max(0, stemDiameter/2 − 1.5)
+```
+
+| state | head outer R | bore | built / asked | disjoint |
+|---|---|---|---|---|
+| bare corner, 12 mm stem | 1.800 | 4.50 | 0 / 3 | **yes** |
+| 8 petals, w 8, spread 0.6, 12 mm | 2.350 | 4.50 | 2 / 8 | **yes** |
+| 12 petals, w 8, spread 0.6, 12 mm | 2.736 | 4.50 | 3 / 12 | **yes** |
+| 20 petals, w 8, spread 0.6, 12 mm | 3.350 | 4.50 | 6 / 20 | **yes** |
+| 3 petals, default width, 12 mm | 5.738 | 4.50 | 2 / 3 | no |
+| same tiny head, 6 mm stem | 1.800 | 1.50 | 1 / 3 | no |
+| 40 petals, default, 12 mm | 18.896 | 4.50 | 33 / 40 | no |
+
+**It happens with 2, 3 and 6 petals SURVIVING**, so it is a property of the STEM ON A SPHERE
+and not of the channel. Equivalently `stemDiameter > 2·headOuterRadius + 2·STEM_MIN_WALL_MM`,
+so with the 12 mm maximum **every head under 4.5 mm of outer radius can be disconnected by a
+wide enough stem**, and every head at or above it is safe at any setting. The bare corner is
+simply where the matrix landed on the region.
+
+**IT IS NEWLY REACHABLE BECAUSE THIS PR GIVES SPHERE A STEM AT ALL** — on `main` SPHERE
+refuses one, so no state in the region existed.
+
+**NOTHING WAS DONE ABOUT IT, ON PURPOSE.** The brief's scope list forbids changing the stem's
+bore rule or its controls, and says in as many words: *"If you believe something outside this
+list must change for the omission to work, STOP and say so with the measurement that shows it.
+Do not do it."* The print-safety invariant says the same thing from the other side. The three
+answers all decide something that is Eva's:
+
+1. **A SOLID ROOT BAND on a sphere.** The band that roots THROUGH the head would carry no
+   bore, so its top cap is a full disc that always crosses the head's material. It does not
+   touch Eva's 1.5 mm wall, which governs the FREE stem — a cantilever tube on a long lever —
+   and it is how the joint would actually be printed. It adds material and moves bytes on
+   every sphere-stem row.
+2. **REFUSE the stem where the head fits inside its bore**, clamped and told, the way every
+   other corner here is. It makes a reachable control combination inert, which this project
+   normally tells rather than refuses.
+3. **Narrow `stemDiameter` against the head.** Rejected on sight for the reason
+   `stamenSpread`'s ruling gives: an adaptive maximum makes one slider position mean
+   different things on different states.
+
+**Option 1 is the one this session would recommend** — it is the only one that keeps every
+reachable state buildable and does not make a control lie — but it is a geometry change that
+was not asked for, so it is recorded rather than built.
+
 ## 10. What this session did NOT do
 
 * **It did not grow `dome.reserved`, touch S3, or change the equal-area placement law.**
