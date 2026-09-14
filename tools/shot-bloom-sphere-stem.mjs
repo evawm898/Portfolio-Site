@@ -19,9 +19,20 @@
    the stem.
 
    THE OUTPUT IS `sphere-stem.png`. Every cell: PRINT PREVIEW ON (the app's own
-   `shownMode` asserted "export"), framed from BELOW the far pole at a radius
-   read from the build's own sphere rather than from a layout guess, settled to
-   two byte-identical frames. A PIXEL NUMBER IS ONLY A MEASUREMENT WITH ITS OWN
+   `shownMode` asserted "export"), framed from BELOW the far pole, settled to
+   two byte-identical frames.
+
+   THE FRAME RADIUS IS THE ROW'S OWN STEMLESS BUILD'S `maxDimMm`, HALVED, and
+   the first version of this tool got it wrong in a way worth writing down: it
+   framed on the build's own SPHERE (`Rd * 1.55`), which IS read from the build
+   rather than guessed and is still the wrong owner — the blades radiate well
+   past Rd, so every petal fell outside the picture and each cell read as a
+   close-up of a ball. THE POLE WAS IN FRAME AND THE OMISSION WAS NOT, which is
+   the one thing the sheet exists to show. `maxDimMm` is the app's own
+   measurement of how big the object is; it is measured once per ROW from the
+   stemless cell so all three cells share one camera, and the stem is
+   deliberately outside it because a 60 mm stick would frame the head down to
+   nothing. A PIXEL NUMBER IS ONLY A MEASUREMENT WITH ITS OWN
    CONTROL: one cell of each row is shot twice on the same tree at the same
    camera and the difference is REPORTED, never used as a bar.
    =================================================================== */
@@ -71,7 +82,7 @@ async function previewOn() {
    plan of the pole hides how far the surviving blades stand off the stem. */
 const FROM_BELOW = [0.42, -0.42, -1];
 
-async function cell({ id, petals, layers, stem }) {
+async function cell({ id, petals, layers, stem }, frameR = null) {
   const sets = { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: petals, layerCount: layers,
                  stemLength: 60, stemDiameter: stem === null ? 6 : stem };
   if (stem === null) sets.stemLength = 0;
@@ -95,8 +106,17 @@ async function cell({ id, petals, layers, stem }) {
      below the equator so the FAR POLE — the one the stem leaves and the one
      the channel is about — is what the eye lands on. */
   const Rd = m.hubDome.Rd;
+  /* THE FRAME HOLDS THE WHOLE HEAD, not the sphere alone: the blades radiate
+     well past Rd, and a radius read from the sphere put every petal outside
+     the picture — the pole was in frame and the OMISSION was not, which is the
+     thing Eva asked to see. The radius is the row's own STEMLESS build's
+     `maxDimMm` (the app's own measurement of how big the object is) halved,
+     because fitCamera's `radius` is an object RADIUS; measured once per row so
+     all three cells share one camera, and read from a build rather than
+     guessed. The stem is deliberately not in it — a 60 mm stick would frame
+     the head down to nothing. */
   await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir, null),
-    { r: Rd * 1.55, at: [0, 0, -Rd * 0.55], dir: FROM_BELOW });
+    { r: frameR !== null ? frameR : Rd * 1.55, at: [0, 0, -Rd * 0.55], dir: FROM_BELOW });
   const settled = await settleOnly();
   if (settled < 0) await die(`${id}: never came to rest`);
   const buf = await page.screenshot({ clip: { x: 0, y: 0, width: VIEW, height: VIEW }, timeout: 180000 });
@@ -116,15 +136,23 @@ const CELLS = [
 const chosen = ONLY ? CELLS.filter((c) => ONLY.test(c.id)) : CELLS;
 if (!chosen.length) { console.error(`--only ${ONLY} matched no cell`); process.exit(2); }
 
+/* MEASURE FIRST, SHOOT SECOND. The row's frame radius comes from its own
+   stemless cell, so it is a property of the head rather than of the tool. */
+const frameFor = {};
+for (const row of [...new Set(chosen.map((c) => c.row))]) {
+  const none = CELLS.find((c) => c.row === row && c.stem === null);
+  const probe = await cell(none);
+  frameFor[row] = probe.m.maxDimMm / 2;
+}
 const shots = [];
-for (const c of chosen) shots.push({ ...c, ...(await cell(c)) });
+for (const c of chosen) shots.push({ ...c, ...(await cell(c, frameFor[c.row])) });
 
 /* ---- the same-tree controls, REPORTED never a bar --------------------- */
 const controls = {};
 for (const id of ['a-12mm', 'b-12mm']) {
   const s = shots.find((x) => x.id === id);
   if (!s) continue;
-  const again = await cell(CELLS.find((c) => c.id === id));
+  const again = await cell(CELLS.find((c) => c.id === id), frameFor[s.row]);
   controls[id] = pixelDiff(s.buf, again.buf);
   fs.writeFileSync(path.join(outDir, `${id}--control.png`), again.buf);
 }
@@ -173,7 +201,7 @@ const html = `<style>
   b{color:#e8e8e8}
 </style>
 <h1>The sphere&rsquo;s stem &mdash; and the petals it does not build</h1>
-<p class="sub">Every cell is a SPHERE head seen <b>from below</b>, the far pole (the one the stem leaves) toward the eye, EXPORT (print preview on, <code>shownMode</code> asserted), framed at a radius read from the build&rsquo;s own sphere. On a sphere the stem leaves a pole the petal sequence runs through, and footRing&rsquo;s law sends every blade TOWARD that pole &mdash; so without the channel the stem passes straight through the pole-most petals (session 43 measured their clear radius at exactly 0.00 mm). <b>Petals the stem would pass through are NOT BUILT</b>, in both modes; the sequence, the equal-area law, the golden angle and the one-step reservation are untouched, so no surviving petal moved. The first cell of each row is the SAME head with no stem, at the same camera, which is the only way the omission is legible.</p>
+<p class="sub">Every cell is a SPHERE head seen <b>from below</b>, the far pole (the one the stem leaves) toward the eye, EXPORT (print preview on, <code>shownMode</code> asserted), framed at a radius read from the row&rsquo;s own STEMLESS build &mdash; the app&rsquo;s own <code>maxDimMm</code>, halved &mdash; so all three cells of a row share ONE camera and the whole head is in it. (Framing on the SPHERE&rsquo;s radius instead put every blade outside the picture: the pole was in frame and the omission was not.) On a sphere the stem leaves a pole the petal sequence runs through, and footRing&rsquo;s law sends every blade TOWARD that pole &mdash; so without the channel the stem passes straight through the pole-most petals (session 43 measured their clear radius at exactly 0.00 mm). <b>Petals the stem would pass through are NOT BUILT</b>, in both modes; the sequence, the equal-area law, the golden angle and the one-step reservation are untouched, so no surviving petal moved. The first cell of each row is the SAME head with no stem, at the same camera, which is the only way the omission is legible.</p>
 
 <h2>The shipping sphere &mdash; 8 petals</h2>
 <p class="note">The pole-most petals go and the rest stand clear. The caption gives the nearest petal that was KEPT, against the 1.00 mm printable gap the channel clears &mdash; that number is the headroom, and at the widest stem it is the thing to look at.</p>

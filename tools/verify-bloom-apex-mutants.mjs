@@ -711,8 +711,16 @@ const MUTANTS = [
        indistinguishable from a clause that is genuinely blind (`/plot`'s own
        lesson). ST9's own entanglement — its guard and its bar both read from
        the channel record — was found by RE-READING the clause and is fixed;
-       what is still owed is a witness that can run it, recorded in the outcome
-       doc rather than claimed here. */
+       ST9's own entanglement — its guard and its bar both read from
+       the channel record — was found by RE-READING the clause and is fixed;
+       THE WITNESS THAT CAN RUN IT IS BUILT NOW and is
+       `tools/verify-bloom-stem-channel.mjs`, which parses this table's own
+       `find`/`into` by id (so the mutation text has one owner), builds on the
+       mutated module in Node, and hands ST9 the float32-rounded positions with
+       the clause imported from the UNMUTATED harness. Both mutants fire there.
+       They still do not belong on this list: naming a family a table cannot
+       run reports MISSED, which is indistinguishable from a clause that is
+       genuinely blind. */
     into: '  if (!plan || !plan.present || !fr.sphereMode || fr.sphereMode) return null;', names: ['ST7'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
@@ -742,7 +750,7 @@ const MUTANTS = [
 
   { id: 'the-channel-clearance-is-typed', why: 'the printable gap the channel clears is replaced by a twentieth of a millimetre, so petals are kept that the stem passes within a gap no process can make',
     find: 'export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;',
-    into: 'export const STEM_PETAL_CLEARANCE_MM = 0.05;', names: ['ST7'],      // ST9: see the note above — this table cannot run it
+    into: 'export const STEM_PETAL_CLEARANCE_MM = 0.05;', names: ['ST7'],      // ST9: see the note above — this table cannot run it; verify-bloom-stem-channel.mjs does, and this mutation is INERT below ~1 mm of separation
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.channel && c.channel && m.channel.clearanceMm < c.channel.clearanceMm) ? null

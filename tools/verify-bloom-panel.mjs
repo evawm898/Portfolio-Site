@@ -211,6 +211,21 @@
          defaults; six layers at spread max), from the app's metrics rather
          than from the row's own expectation alone, so a frozen flag in the
          owner and a stuck line in the read-out both fire.
+
+     (w) THE STEM CHANNEL AND THE MERIDIAN PACKING MARGIN, BOTH DIRECTIONS
+         (the sphere-stem session). A user who asks for 40 petals and is
+         shown 33 must be told, and this project's clamped-and-told form is
+         TWO places — the control's own value read-out and the read-out panel
+         — so both are asserted against the BUILDER's own record rather than
+         against each other (`stamenSpread`'s route, HEAD RISE's discipline).
+         The margin rides here because it is TOLD on every sphere that has a
+         stem and is EXACTLY EXHAUSTED at one reachable corner, so a line that
+         silently stopped printing would take the word EXHAUSTED with it and
+         nobody would ever have seen it print: the route drives 4 petals on a
+         12 mm stem, where the margin reads 0.652 with 2 of 4 built, and the
+         two INERT states (a sphere with no stem, a stem on a CAP) where both
+         lines must be ABSENT. `(w)` and not `(t)`: `(t)` is the anther's
+         seven, above.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -1923,7 +1938,28 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
 }
 
-/* ---------------- (t) THE STEM CHANNEL IS CLAMPED AND TOLD ----------------
+/* ---------------- (w) THE STEM CHANNEL IS CLAMPED AND TOLD ----------------
+   (w), NOT (t): (t) is session 29's ANTHER'S SEVEN, declared in this file's
+   own header and named at its own banner below. Two routes under one letter
+   makes "route (t) passed" say nothing about which one, which is the whole
+   point of naming them. c, u, w, x, y, z were free; w is the one that cannot
+   be misread as a neighbour of an existing letter.
+
+   IT HAS TWO CONTROLS AND EACH COVERS WHAT THE OTHER CANNOT, which is worth
+   saying rather than leaving implied. The FIRST is its own shape: every clause
+   here is a BICONDITIONAL driven in both directions on the same page, so a
+   line stuck ON fires on the two inert states (a sphere with no stem, a stem
+   on a CAP, where both lines must be ABSENT), a line stuck OFF fires on the
+   three active ones, and a reader whose regex never matched — or always
+   matched — is caught by the same pair. What that CANNOT see is a route that
+   never ran at all. The SECOND is --negative-control, which freezes the
+   read-out: this route's clauses fire there on all five of its states, and
+   BOTH of its lines are now REQUIRED by that run's completeness check
+   (`sawChannel`, `sawPacking`). They are two lines with two owners, so a fix
+   for one is no evidence about the other and the check names them separately.
+   Measured: it shipped fired-but-not-required, so the summary could have
+   printed a pass with the channel's lines never looked at.
+
    (the sphere-stem session). A user who asks for 40 petals and is shown 33
    must be told, and this project's clamped-and-told form is TWO places: the
    control's own value read-out and the read-out panel. So both are asserted,
@@ -2707,12 +2743,21 @@ if (NEGATIVE_CONTROL) {
     const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
     const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
     const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL FIFTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    /* ROUTE (w), THE STEM CHANNEL. It is REQUIRED here and not merely allowed:
+       route (w)'s own biconditionals catch a line stuck on or off, but nothing
+       makes them run, and a route that fired NOTHING under the frozen read-out
+       would leave this summary printing a pass while the channel's two lines
+       were never looked at. Both are named, because they are two different
+       read-out lines with two different owners and a fix for one is no
+       evidence about the other. */
+    const sawChannel = fail.some((f) => /^\[stem channel\] .*STEM CHANNEL line is ABSENT while the geometry has a channel/.test(f));
+    const sawPacking = fail.some((f) => /^\[stem channel\] .*MERIDIAN PACKING line is absent on a sphere with a stem/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SIXTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

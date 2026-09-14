@@ -15,10 +15,18 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
       - tools/chromium-harness.mjs
+      # NOT tools/verify-bloom-apex-mutants.mjs, deliberately, even though the
+      # step below PARSES it for its two mutations: a stale anchor there is a
+      # REFUSAL at run time, so it is caught whenever this gate runs for any
+      # other reason — and a session that edits that table has essentially
+      # always edited the geometry or the harness too, both of which are above.
+      # Listing it would put a three-hour gate behind every mutant-table edit
+      # for coverage that is already there.
       - .github/workflows/bloom-export-watertight.yml
   push:
     branches: [main]
@@ -30,6 +38,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
@@ -77,6 +86,26 @@ jobs:
       # bloom-frozen-matrices.yml.
       - name: Install render deps (pinned three + playwright)
         run: npm i --no-save three@0.161.0 playwright@1.62.1
+      # ST9 reads the EXPORTED FILE and rides in this gate on every sphere-stem
+      # row, and the mutant table cannot fire it at all (it calls
+      # `stemAssertions`, never `stemChannelAssertions`). So its witness rides
+      # here for the wall instrument's own reasons — the same question, Node-only,
+      # fifteen seconds — because a clause that has silently stopped being able to
+      # fire makes THIS GATE green on a broken channel.
+      #
+      # IT SITS AFTER THE npm INSTALL AND BEFORE THE BROWSER, not beside the wall
+      # instrument, and that is not a preference: it imports
+      # `stemChannelAssertions` from tools/bloom-harness.mjs, which imports
+      # `playwright-core` at MODULE LOAD. Run any earlier and it dies on a missing
+      # module, red for a reason that has nothing to do with the channel. The wall
+      # instrument can go first because it imports the harness not at all — that is
+      # what buys it the position, not the fact that it needs no browser.
+      # Duplicating ST9 here to avoid the import is the one thing it must not do:
+      # the clause under test would stop being the clause that ships.
+      - name: ST9 must be able to fire on the channel's two defects
+        run: node tools/verify-bloom-stem-channel.mjs
+      - name: ... and it must be able to fail
+        run: node tools/verify-bloom-stem-channel.mjs --control
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Every config must export watertight (boundary edges = 0)

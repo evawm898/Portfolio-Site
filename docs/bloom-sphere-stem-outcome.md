@@ -153,7 +153,20 @@ exercised with ZERO petals built.
   omitted it says so with the headroom.
 * **The ARRANGEMENT line** carries the two counts too, because a bloom reporting
   "petals 240" while 218 are on it would be the panel's own headline lying.
-* **Panel route (t)** asserts both places in BOTH DIRECTIONS against the builder's own
+**AND THE PANEL ROUTE SHIPPED FIRED-BUT-NOT-REQUIRED.** `--negative-control` freezes the
+read-out, and route (w)'s clauses fire there on all five of its states — but the run's
+COMPLETENESS CHECK is a hand-written list of flags, route (w) was not on it, and the summary
+therefore printed `ALL FIFTEEN ROUTES … OBSERVED THE FAILURE` while the channel's two lines
+could have been looked at by nothing at all. A route that fires and is not required is a route
+that can go silent without the gate noticing. Both lines are required now (`sawChannel`,
+`sawPacking`), named separately because they are two read-out lines with two owners and a fix
+for one is no evidence about the other, and the summary says SIXTEEN. Found by reading the
+negative control's own output rather than by a failure.
+
+* **Panel route (w)** — **`(w)` and not `(t)`: `(t)` is session 29's ANTHER'S SEVEN, and this
+  route shipped under the same letter until the sweep caught it. Two routes under one letter
+  makes "route (t) passed" say nothing about which one, which is the entire point of naming
+  them; c, u, w, x, y, z were free.** It asserts both places in BOTH DIRECTIONS against the builder's own
   record — the line and the control's value where there is a channel, and neither where
   there is not. The inert direction is the load-bearing one: at `stemLength` 0 there is
   no channel, no omission and no line, which is the branch that keeps every sphere row
@@ -207,7 +220,7 @@ and the flag is asserted in both directions.
 
 **THE WORD *EXHAUSTED* HAS ITS OWN CELL, because no matrix row reaches it.** The shipped
 sphere's margin falls to 1.003 at the widest stem and no further, so the clause that prints
-EXHAUSTED would never have been shown to print. Panel route (t) drives **4 petals on a 12 mm
+EXHAUSTED would never have been shown to print. Panel route (w) drives **4 petals on a 12 mm
 stem — 0.652 with 2 of 4 built**, a real margin under one foot's length rather than the
 degenerate 0 the bare corner gives. Reachable neighbours, measured: 3 petals × 12 mm reads
 0.000 (2 of 3 built), 3 × 10 mm reads 0.581, 5 × 12 mm reads 1.042 and is not exhausted.
@@ -460,6 +473,78 @@ Two more findings, neither a defect in a clause:
   stem outright is caught by ST1 before ST7 is reached — and there is no channel left for ST7
   to have an opinion about. ST0 and ST1 are its witnesses; ST7 is about a channel that EXISTS.
 
+### 9b-ter. ST9 HAS A WITNESS NOW, AND IT NEEDED A PROBE STATE BEFORE IT MEANT ANYTHING
+
+§9b-bis fixed ST9's two entanglements by RE-READING the clause. A fix that rests on a
+re-reading rests on nothing that can fail, and the apex table cannot close it: it calls
+`stemAssertions` and never `stemChannelAssertions`, which takes the exported STL. So
+**`node tools/verify-bloom-stem-channel.mjs` (+ `--control`)** is the thing those two removed
+claims were traded for.
+
+**HOW IT RUNS ST9 WITHOUT A BROWSER.** ST9 is a PURE function of `(positions, row, m, ui)` —
+`row` is unread, `m` only for `sphereMode`. So the artefact is built in Node on a MUTATED
+geometry module while the clause is imported from the UNMUTATED harness: the bar
+(`MIN_FEATURE_MM`) and the geometry then have **different owners**, which is precisely the
+property `the-channel-clearance-is-typed` destroyed. Positions are rounded with `Math.fround`
+before the clause sees them, because that is what the file stores and what `stlPositions` hands
+the shipped gate — the builder's doubles are a different object.
+
+**ONE OWNER OF THE MUTATION TEXT.** The `find`/`into` pair is **parsed out of the apex table's
+source by id** rather than restated, and the run REFUSES if the id is missing, if the pair is
+not a single-line literal, or if the anchor does not match `bloom-geometry.js` exactly once.
+Both refusals are **seen failing** — `--table <a copy with the id renamed>` and `--table <a copy
+whose find-string no longer matches>` each exit 1 with the reason named.
+
+**AND THE PROBE STATE IS PART OF THE CLAIM — the tool reported a false negative first.**
+`the-channel-clearance-is-typed` replaces the 1.00 mm bar with 0.05, so it moves **no geometry
+at all** unless some petal stands BETWEEN the two. At 8 petals the omitted petals *intersect*
+the stem (0.000 mm) and the nearest kept stands 6.14 mm off, so the mutation is inert there,
+`built` reads 6 on both trees, and ST9's silence says nothing about ST9. That is
+`bore-is-not-evas-rule` verbatim, one family later. A sweep over 160 reachable states found
+**34 that separate the bars**; the three widest are the tool's rows, and the 8-petal state is
+kept as a **declared INERT row where ST9 must stay silent** — the other half of the claim.
+
+| row | clean | `the-stem-channel-never-fires` | `the-channel-clearance-is-typed` |
+|---|---|---|---|
+| 40 petals × 1, stem 60 × 6 | silent, 33 built | **FIRED**, 40 built, nearest 0.0000 | **FIRED**, 34 built, nearest **0.9327** |
+| 20 petals × 2, stem 60 × 7 | silent, 33 built | **FIRED**, 40 built, nearest 0.0000 | **FIRED**, 34 built, nearest **0.8686** |
+| 5 petals × 1, stem 60 × 10 | silent, 3 built | **FIRED**, 5 built, nearest 0.0000 | **FIRED**, 4 built, nearest **0.7546** |
+| 8 petals × 1, stem 60 × 6 (declared INERT for the second) | silent, 6 built | **FIRED**, 8 built | **silent**, 6 built |
+
+**THE NEAREST-INTRUDER FIGURES CORROBORATE THE SWEEP THROUGH AN INSTRUMENT THAT SHARES NO CODE
+WITH IT**: 0.9327 / 0.8686 / 0.7546 against the sweep's predicted 0.932 / 0.868 / 0.755, where
+the sweep reads the builder's own `approach` record and ST9 reads the emitted positions.
+
+`--control` swaps the clearance mutation's replacement for its own find-string — an edit that
+applies and changes nothing — and the run must FAIL. It does, with three findings, one per
+separating row.
+
+**IT RIDES IN `bloom-export-watertight.yml`, AFTER THE npm INSTALL AND BEFORE THE BROWSER**,
+for exactly the reasons the wall instrument rides there at all: the same question, Node-only,
+fifteen seconds, and a gate a developer has to remember to run is not a safety net.
+**IT DOES NOT SIT BESIDE THE WALL INSTRUMENT, AND THAT IS NOT A PREFERENCE**: it imports
+`stemChannelAssertions` from `tools/bloom-harness.mjs`, which imports `playwright-core` at
+MODULE LOAD (line 43), so placed any earlier it dies on a missing module and reads red for a
+reason that has nothing to do with the channel. The wall instrument can go first because it
+imports the harness NOT AT ALL — that is what buys it the position, not the fact that it needs
+no browser, and the first draft of this wiring got that wrong. Duplicating ST9 into the tool to
+avoid the import is the one thing it must not do: the clause under test would stop being the
+clause that ships. ST9 rides in BOTH STL gates on every
+sphere-stem row, so a clause that has silently stopped being able to fire makes those gates
+green on a broken channel — which is the whole failure this tool exists to make impossible.
+The bloom gate count is unchanged at five. `tools/verify-bloom-apex-mutants.mjs` is
+deliberately NOT in that workflow's path filter even though this step parses it: a stale
+anchor there is a REFUSAL at run time, caught whenever the gate runs for any other reason, and
+a session that edits the mutant table has essentially always edited the geometry or the
+harness too — listing it would put a three-hour gate behind every mutant-table edit for
+coverage that is already there.
+
+**WHAT IT STILL DOES NOT COVER**, stated rather than implied: it runs ST9 on the BUILDER's
+emitted stream rounded to float32, not on a file that came out of the app's own export handler,
+so an export path that dropped or reordered triangles between the accumulator and the download
+is outside it — that is `stemChannelAssertions`' own home in both STL gates, where it rides on
+every row.
+
 ### 9c. The matrix, the census and the gates
 
 * **The live matrix goes 736 -> 744.** Nine rows added (block 32), one removed (block 30's
@@ -552,7 +637,10 @@ wide enough stem**, and every head at or above it is safe at any setting. The ba
 simply where the matrix landed on the region.
 
 **IT IS NEWLY REACHABLE BECAUSE THIS PR GIVES SPHERE A STEM AT ALL** — on `main` SPHERE
-refuses one, so no state in the region existed.
+refuses one, so no state in the region existed. **That claim is about THE SPHERE and only the
+sphere: §9e-bis below is a SECOND, different `>1 piece` failure, on a CAP, pre-existing on
+`main`, measured identically on both trees.** The two share a root and not a symptom; do not
+read either table as evidence about the other.
 
 **NOTHING WAS DONE ABOUT IT, ON PURPOSE.** The brief's scope list forbids changing the stem's
 bore rule or its controls, and says in as many words: *"If you believe something outside this
@@ -575,6 +663,87 @@ answers all decide something that is Eva's:
 **Option 1 is the one this session would recommend** — it is the only one that keeps every
 reachable state buildable and does not make a control lie — but it is a geometry change that
 was not asked for, so it is recorded rather than built.
+
+### 9e-bis. AND A SECOND, DIFFERENT `>1 piece` FAILURE IS PRE-EXISTING ON `main` — THE JOIN EMITS A FLAT SHELL WHEN THE HUB IS NARROWER THAN THE STEM
+
+**The two must not be conflated, and this one was found by refusing to accept the first
+one's story without measuring it.** §9e above asserted the head "never touches the tube".
+Checked, on the CAP states that reach the same region: the nearest HEAD vertex to the tube's
+material reads **0.000 mm, at r = 4.60, z = −0.28** — inside the annulus, inside the stem's
+z range. The head DOES touch the tube there and the flood fill still says two pieces, so the
+mechanism is not the one the shell table suggested and the detached part had to be **named**
+rather than reasoned about.
+
+**IT IS A FLAT SHELL AT A SINGLE z.** Per-component bounding boxes, world mm, the gate's own
+0.6 mm cell, `main` at `5f9c0c7`:
+
+| state | pieces | the detached one |
+|---|---|---|
+| `DEFAULTS + spread 0.6 + stem 120 × 12` | **2** | 79 cells (0.15%), r 0.24–2.98, **z −3.70 … −3.70** |
+| `3 petals + spread/width/delicacy min + stem 120 × 12` | **2** | 12 cells (0.03%), r 0.29–1.10, **z −3.70 … −3.70** |
+
+Both survive the gate's own re-read at half the cell (still 2 at 0.3 mm), so neither is a
+rasterisation artefact. z = −3.696 is exactly `hubT/2 − joinT` — **the hub-to-stem join's own
+underside** — and the shell is 1,680 triangles with every vertex at that one z. A closed
+surface all of whose vertices share a z encloses zero volume: it is a zero-thickness surface,
+not a solid.
+
+**THE CONDITION IS ONE COMPARISON, PREDICTED THEN MEASURED, EXACT ON 8 OF 8 STATES:**
+
+```
+    hubR < stemOuterRadius           ( = stemDiameter / 2 )
+```
+
+which is `hubThicknessAt`'s own early return — `if (!(hubR > outerR)) return joinT;`
+(`bloom-geometry.js:7367`), the branch that gives a hub narrower than the stem the full join
+thickness uniformly instead of a blend.
+
+| state | hubR | outerR | predicted | measured |
+|---|---|---|---|---|
+| spread min, stem 5 mm | 2.653 | 2.50 | ok | ok |
+| spread min, stem 6 mm | 2.653 | 3.00 | FLAT | **FLAT**, 1,680 t at z −1.916 |
+| spread min, stem 12 mm | 2.653 | 6.00 | FLAT | **FLAT**, 1,680 t at z −3.696 |
+| DEFAULTS, stem 12 mm | 8.845 | 6.00 | ok | ok |
+| DEFAULTS, the shipped stem 60 × 6 | 8.845 | 3.00 | ok | ok |
+| DEFAULTS, no stem (the shipping default) | 8.845 | 0.00 | ok | ok |
+| `footDelicacy` min, stem 12 mm | 4.422 | 6.00 | FLAT | **FLAT**, 1,680 t at z −3.696 |
+| `footDelicacy` min, stem 8 mm | 4.422 | 4.00 | ok | ok |
+
+**THE FLAT SHELL APPEARS FROM 6 mm — THE SHIPPED DEFAULT DIAMETER — AND DETACHES ONLY ABOVE
+THE HUB.** It is held onto the rest of the model by nothing but intersecting the stem's WALL,
+so while the wall passes under the hub's radius the flood fill reads one piece and the defect
+is invisible; a wide enough stem moves the wall outside the hub's radius and the disc floats
+free. That is why `spread min × 6 mm` reads ONE piece with the flat shell present and
+`spread min × 12 mm` reads TWO.
+
+**IT IS INVISIBLE TO THE MATRIX BY CONSTRUCTION**, the same sentence §18a already carries for
+`cup × petalTipShape`: the matrix varies ONE control from DEFAULTS, `stemLength`'s default is
+0, and reaching the failure needs a non-default `spread` (or `footDelicacy`) AND a stem AND a
+wide one. Each of its three controls reads ONE PIECE alone — `spread` min with no stem, `spread`
+min with the 6 mm stem, and DEFAULTS with the 12 mm stem are all one piece.
+
+**IDENTICAL ON BOTH TREES, ROW FOR ROW** — every number above reproduces on this branch, which
+is the strongest available statement that it is pre-existing and none of this session's.
+
+**SO THE TWO FAILURES SHARE A ROOT AND NOT A SYMPTOM.** Both are *a hub narrower than the
+stem's outer radius*. On a CAP the join is active and the symptom is a detached zero-thickness
+disc; on a SPHERE the join is INERT by declaration (§5), so no disc arises and the symptom is
+the whole head floating inside the bore with nothing left to bridge. §9e's *"newly reachable
+because this PR gives SPHERE a stem at all"* stands **for the sphere case only**: on `main`
+SPHERE refuses a stem, so that state did not exist — while the CAP case above has been shipping
+and is not this PR's to fix.
+
+**WHAT THAT CHANGES FOR THE RULING.** Option 1 (a solid root band on a sphere) answers the
+sphere case and does nothing for the CAP one, which is a separate fix in `buildHubInto`'s join
+arm. Both are the join's or the stem's, both are on the brief's DO-NOT list, and the CAP one is
+**filed as #236** rather than fixed here — which also gives the connectedness gate's own xfail
+policy (*"If one is ever added it must cite a tracked issue"*) an issue to cite, if that is the
+route Eva takes.
+
+`node $S/floodmain.mjs`, `whichpiece.mjs` and `disc.mjs` are the three probes; the flood fill in
+the first is lifted verbatim from `tools/verify-bloom-connectedness.mjs` because **the
+vertex-weld shell count is not the connectedness test** — this repo's own recorded rule, and
+the first pass of this investigation used the weld and would have got the mechanism wrong.
 
 ## 10. What this session did NOT do
 
@@ -599,3 +768,13 @@ was not asked for, so it is recorded rather than built.
   by design, and it is already told on every row (`D_max`, `D_mean`, `NN … w`). §7b records
   what the two closest readings of it measure and that neither reproduces the brief's
   0.563, rather than adopting a figure with no definition behind it.
+* **IT DID NOT FIX EITHER `>1 piece` FAILURE, and that is the ball it is handing back.**
+  §9e's is the sphere's and needs a ruling; §9e-bis's is `main`'s, is filed as #236, and is
+  a fix in `buildHubInto`'s join arm — both on the brief's DO-NOT list, and the brief says in
+  as many words to stop and report with the measurement rather than do it.
+* **It did not add an xfail to the connectedness gate.** That gate has an xfail POLICY in its
+  own header (*"If one is ever added it must cite a tracked issue, PASS while the defect
+  persists, and FAIL HARD the moment the row exports as one piece"*) and NO xfail MECHANISM:
+  `ok: v.comps === 1` consults nothing. Building one is a decision about a HARD invariant —
+  connectedness, unlike self-intersection, is not a flag here — so it is Eva's, and #236 now
+  exists for such an entry to cite if that is the route she takes.

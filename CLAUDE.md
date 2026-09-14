@@ -2103,6 +2103,47 @@ petals BUILT — 6 against 4 — now), and `stem-present-disagrees-with-the-regi
 ST7, because ST1 compares the control's length against the builder's `m.stem` and RETURNS, so
 a geometry refusing the stem outright never reaches ST7 and leaves no channel to have an
 opinion about.
+**A ROUTE THAT FIRES AND IS NOT REQUIRED IS A ROUTE THAT CAN GO SILENT WITHOUT THE GATE
+NOTICING** (the sphere-stem session, twice over in the panel gate). The stem-channel route
+shipped under **`(t)`**, which is session 29's ANTHER'S SEVEN — two routes under one letter
+makes "route (t) passed" say nothing about which one, and it is **`(w)`** now, documented in
+the file's header beside every other route. And `--negative-control`'s completeness check is a
+HAND-WRITTEN LIST OF FLAGS: the route's clauses fired on all five of its states and it was not
+on the list, so the summary printed `ALL FIFTEEN ROUTES … OBSERVED THE FAILURE` while the
+channel's two lines could have been looked at by nothing. Both are required now (`sawChannel`,
+`sawPacking`), named separately because they are two read-out lines with two owners, and the
+summary says SIXTEEN. **Adding a route to this gate is therefore THREE edits, not one** — the
+banner, the header entry, and the negative control's flag list.
+**ST9 HAS ITS OWN WITNESS AND THE APEX TABLE CANNOT BE IT** — that table calls
+`stemAssertions` and never `stemChannelAssertions`, which takes the exported STL, so naming ST9
+there reported MISSED, which is indistinguishable from a clause that is genuinely blind.
+`node tools/verify-bloom-stem-channel.mjs` (+ `--control`) runs it in Node: ST9 is a PURE
+function, so the artefact is built on a MUTATED geometry module while the clause is imported
+from the UNMUTATED harness — the bar (`MIN_FEATURE_MM`) and the geometry then have DIFFERENT
+OWNERS, which is exactly what `the-channel-clearance-is-typed` destroyed — and the positions are
+`Math.fround`ed because that is what the file stores. The mutation text is PARSED OUT OF the
+apex table by id (one owner) and the run refuses on a missing id or an anchor that no longer
+matches, both SEEN FAILING via `--table <copy>`. **AND THE PROBE STATE IS PART OF THE CLAIM:**
+the typed-clearance mutation moves NO geometry unless a petal stands between 1.00 and 0.05 mm,
+and at 8 petals the omitted petals INTERSECT the stem while the nearest kept stands 6.14 mm
+off — so it is inert there and ST9's silence says nothing (`bore-is-not-evas-rule`, one family
+later). A sweep found 34 separating states; the three widest are the tool's rows and the
+8-petal state is a DECLARED INERT row where ST9 must stay silent. Its nearest-intruder figures
+(0.9327 / 0.8686 / 0.7546 mm) reproduce the sweep's predictions through an instrument sharing
+no code with it.
+**IT RIDES IN `bloom-export-watertight.yml`, AFTER THE npm INSTALL AND BEFORE THE BROWSER** —
+not beside the wall instrument, and that is not a preference: it imports
+`stemChannelAssertions` from `tools/bloom-harness.mjs`, which imports `playwright-core` at
+MODULE LOAD, so any earlier it dies on a missing module and reads red for a reason that has
+nothing to do with the channel. The wall instrument goes first because it imports the harness
+NOT AT ALL — that is what buys it the position, not the fact that it needs no browser.
+Duplicating ST9 to avoid the import is the one thing it must not do: the clause under test
+would stop being the clause that ships. It rides there for the wall instrument's own reasons — same question, Node-only, fifteen seconds — because ST9 rides in
+BOTH STL gates on every sphere-stem row and a clause that has silently stopped being able to
+fire makes those gates green on a broken channel. The bloom gate count stays at FIVE. The apex
+table is deliberately NOT in that workflow's path filter even though the step parses it: a
+stale anchor there is a REFUSAL at run time, so it is caught whenever the gate runs for any
+other reason, and listing it would put a three-hour gate behind every mutant-table edit.
 **ST7 / ST8 / ST9 ARE THE NEW FAMILIES AND EACH SEES SOMETHING THE OTHER TWO CANNOT.** ST7 is
 the criterion's own biconditional (it reads the channel's report, so it can only say the
 criterion is self-consistent); ST8 is the MASK, against a STEMLESS build of the same state on
@@ -2174,16 +2215,40 @@ in an instrument that knows nothing about it).
 2*STEM_MIN_WALL_MM` — so with the 12 mm maximum **every head under 4.5 mm of outer radius can
 be disconnected**, and every head at or above it is safe at any setting. **IT IS NOT THE
 OMISSION'S**: measured with 2, 3 and 6 petals SURVIVING (8, 12 and 20 asked, petal width 8,
-spread 0.6), so it is a property of the STEM ON A SPHERE. It is newly reachable only because
-this PR gives SPHERE a stem at all. **NOTHING WAS DONE ABOUT IT** — the brief's scope forbids
+spread 0.6), so it is a property of the STEM ON A SPHERE. **This one** is newly reachable only
+because this PR gives SPHERE a stem at all — a claim about the SPHERE and not about the class,
+see the paragraph below. **NOTHING WAS DONE ABOUT IT** — the brief's scope forbids
 touching the bore rule or the stem's controls and says to stop and report with the
 measurement, and the three answers (a SOLID root band on a sphere, which is the one this
 session would recommend; refusing the stem where the head fits inside its bore; narrowing
 `stemDiameter` against the head, rejected on `stamenSpread`'s adaptive-maximum ruling) all
 decide something that is Eva's. §9e of the outcome doc has the table.
+**AND A SECOND, DIFFERENT `>1 piece` FAILURE IS PRE-EXISTING ON `main` — DO NOT CONFLATE THEM**
+(§9e-bis, filed as #236, measured IDENTICALLY on both trees). Whenever the hub is NARROWER than
+the stem's outer radius, `buildHubInto`'s join arm emits a **1,680-triangle shell with every
+vertex at ONE z** — the join's own underside at `z = hubT/2 - joinT` — instead of a thickened
+hub; a closed surface all of whose vertices share a z encloses ZERO VOLUME. It is held on by
+nothing but intersecting the stem's WALL, so it reads one piece while the wall passes under the
+hub's radius and DETACHES the moment it does not: `DEFAULTS + spread 0.6 + stem 120 x 12` is
+**2 pieces on main**, 0.15% detached, still 2 at half the cell, while each of its three controls
+alone reads ONE. The condition is `hubR < outerR` — `hubThicknessAt`'s own early return
+(`bloom-geometry.js:7367`) — PREDICTED then measured exact on 8 of 8 states, and the flat shell
+appears from the SHIPPED DEFAULT 6 mm diameter. **Invisible to the matrix by construction**
+(one control from DEFAULTS, `stemLength` default 0, and the failure needs three together — the
+`cup x petalTipShape` sentence again). **THE TWO SHARE A ROOT AND NOT A SYMPTOM**: both are a
+hub narrower than the stem, but on a CAP the join is active and the symptom is the detached
+disc, while on a SPHERE the join is INERT so the symptom is the whole head inside the bore. So
+option 1 answers the sphere case and does nothing for the CAP one.
+**AND THE FIRST PASS OF THAT INVESTIGATION GOT THE MECHANISM WRONG BY USING THE WELD**: the
+vertex-weld shell count is not the connectedness test (this file's own rule), and it suggested
+"the head never reaches the tube" where the nearest head vertex to the tube's material reads
+**0.000 mm at r 4.60, z -0.28**. The voxel flood fill plus PER-COMPONENT BOUNDING BOXES is what
+named the detached part; a shell table names shells.
 **A FROZEN PHASE IS OWED**: the live matrix goes 736 -> 744 (nine rows added in block 32, one
 GATED sphere row removed from block 30). The image is
-`node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**.
+`node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**, and its frame
+radius is the row's own STEMLESS build's `maxDimMm` halved: a radius read from the SPHERE put
+every blade outside the picture, so the pole was in frame and the OMISSION was not.
 
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
