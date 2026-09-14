@@ -723,6 +723,23 @@ const MUTANTS = [
       const cl = c.channel && c.channel.approach.live.filter((x) => Number.isFinite(x)).length;
       return (ml === 0 && cl > 0) ? null : `the mutant measured ${ml} live approaches against the clean tree's ${cl} — both modes still ran`; } },
 
+  /* THE MERIDIAN PACKING MARGIN'S OWN MUTANT. The stem has TWO radii and the
+     channel is about the OUTSIDE of it, so reading the bore is the slip that
+     is actually available here — and it produces a perfectly plausible larger
+     margin on a row where nothing else moves at all: the same petals, the same
+     triangles, the same omitted set, one telemetry number a reader would act
+     on reading 2.71x where the geometry has 2.20x. Only ST7's rebuild from the
+     HUB BUILDER's sphere and the STEM BUILDER's own widest EMITTED vertex can
+     see it; every other clause in the family reads the channel's own report. */
+  { id: 'the-meridian-margin-reads-the-bore', why: "the stem's footprint on the sphere is taken from the BORE radius instead of the outer one, so the margin the read-out prints is measured against a stem narrower than the one that is built",
+    find: '  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.outerR / Rd)));',
+    into: '  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.boreR / Rd)));', names: ['ST7'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const mm = m.channel && m.channel.meridian, cm = c.channel && c.channel.meridian;
+      if (!mm || !cm || mm.margin === null || cm.margin === null) return `the witness found no meridian margin to compare (mutant ${JSON.stringify(mm)}, clean ${JSON.stringify(cm)})`;
+      return (mm.margin > cm.margin + 0.1) ? null : `the mutant reports a margin of ${mm.margin} against the clean tree's ${cm.margin} — the cap edge did not move`; } },
+
   { id: 'the-sphere-takes-the-plate-join', why: "the hub-to-stem join is derived for a PLATE and applied to a closed shell, so the plan declares a thickening the sphere arm of buildHubInto never builds — a plan describing geometry nobody emitted",
     find: '  const joinT = sphere ? hubT : stemJoinThickness(outerR, hubT);',
     into: '  const joinT = stemJoinThickness(outerR, hubT);', names: ['ST5'],
