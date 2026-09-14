@@ -102,20 +102,38 @@ const CHAIN_MAX_BEND = 0.42;     // rad between consecutive segments
 // lobes trailing from one root would collapse onto the same line.
 export const LOBE_JOINTS = 6;
 export const TAIL_LOBE_REST = 0.31;   // rad off the body's backward axis
+
+// A LOBE SETTLES MORE THAN THE BODY DOES, AND IT STAYS BEHIND THE FISH. A tail
+// that trails on exactly the body's terms reads as WAGGING rather than
+// following: it is light, it hangs off the end of a moving root, and on its own
+// terms it develops a swing of its own that has nothing to do with the curl the
+// body is in. Two bounds rather than one, because they stop different things —
+// the per-joint cap keeps it smooth, the cone keeps it astern.
+const LOBE_MAX_BEND = 0.20;           // rad per joint, against the body's 0.42
+const LOBE_MAX_DIVERGE = 0.34;        // rad a lobe may lie off its own rest line
 const LOBE_SPAN = 0.70;               // of body length, so the fan never runs past it
 
 // Place `n` one segment behind `lead`, in the direction it already lay, with
 // the turn from `refAng` capped. Returns the direction actually used, which is
 // the reference for the joint behind it.
-function trail(lead, n, seg, refAng) {
+function trail(lead, n, seg, refAng, maxBend, cone, coneMax) {
   const dx = n.x - lead.x, dy = n.y - lead.y;
   const d = Math.hypot(dx, dy);
   // A joint sitting exactly on its leader has no direction of its own; keep the
   // one in front rather than letting atan2(0, 0) snap it to +x.
   let ang = d > 1e-9 ? Math.atan2(dy, dx) : refAng;
   const turn = wrapAngle(ang - refAng);
-  if (turn > CHAIN_MAX_BEND) ang = refAng + CHAIN_MAX_BEND;
-  else if (turn < -CHAIN_MAX_BEND) ang = refAng - CHAIN_MAX_BEND;
+  if (turn > maxBend) ang = refAng + maxBend;
+  else if (turn < -maxBend) ang = refAng - maxBend;
+  // AND, WHERE A CONE IS GIVEN, HOW FAR IT MAY LIE FROM ONE FIXED DIRECTION.
+  // The per-joint cap bounds how sharply a chain bends; it says nothing about
+  // how far the whole chain may wander, because small turns accumulate. A tail
+  // lobe needs both: it must trail smoothly AND stay behind the fish.
+  if (cone !== undefined) {
+    const off = wrapAngle(ang - cone);
+    if (off > coneMax) ang = cone + coneMax;
+    else if (off < -coneMax) ang = cone - coneMax;
+  }
   n.x = lead.x + Math.cos(ang) * seg;
   n.y = lead.y + Math.sin(ang) * seg;
   return ang;
@@ -713,7 +731,9 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         const sp = f.spine;
         sp[0].x = f.drawX; sp[0].y = f.drawY;
         let ref = f.drawHeading + Math.PI;        // backward, from the head
-        for (let i = 1; i < sp.length; i++) ref = trail(sp[i - 1], sp[i], f.seg, ref);
+        for (let i = 1; i < sp.length; i++) {
+          ref = trail(sp[i - 1], sp[i], f.seg, ref, CHAIN_MAX_BEND);
+        }
 
         // Each lobe: the first segment rigid to the body at its rest angle,
         // every joint behind it trailing on its own.
@@ -721,10 +741,13 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         for (let k = 0; k < f.lobes.length; k++) {
           const lb = f.lobes[k], side = k === 0 ? 1 : -1;
           lb[0].x = root.x; lb[0].y = root.y;
-          let la = ref + side * TAIL_LOBE_REST;
+          const rest = ref + side * TAIL_LOBE_REST;
+          let la = rest;
           lb[1].x = lb[0].x + Math.cos(la) * f.lobeSeg;
           lb[1].y = lb[0].y + Math.sin(la) * f.lobeSeg;
-          for (let i = 2; i < lb.length; i++) la = trail(lb[i - 1], lb[i], f.lobeSeg, la);
+          for (let i = 2; i < lb.length; i++) {
+            la = trail(lb[i - 1], lb[i], f.lobeSeg, la, LOBE_MAX_BEND, rest, LOBE_MAX_DIVERGE);
+          }
         }
 
         f.phase += dt * (2.2 + f.speed * 0.055);

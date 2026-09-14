@@ -224,10 +224,20 @@ const DORSAL_U0 = 0.20, DORSAL_U1 = 0.82, DORSAL_A = 0.22;
 // polyline, so the body, both fin pairs, the markings and the tail cannot
 // disagree about where the fish is.
 const WAVE_AMP = 0.052;          // of body length, at the tail
-const WAVE_K = 0.72;             // radians of phase lag per joint
+// THE WAVE'S PHASE IS SPREAD OVER THE BODY, NOT OVER THE JOINTS, and that is
+// the difference between a chain whose resolution can be raised and one whose
+// resolution is welded to its look. Expressed per JOINT — which is how the
+// original wrote it, at the only joint count it ever had — the spatial
+// frequency moves with SPINE_JOINTS: measured, taking the chain from 9 joints
+// to 21 put 2.3 wavelengths across the body and the flank turned a median 68
+// degrees against 22.6, folding outright at 17. Per unit LENGTH the wave is the
+// same shape at every joint count, and the count is free to be chosen for how
+// finely the body needs to bend.
+const WAVE_TOTAL = 5.76;         // radians of phase across the whole body
 const WAVE_POW = 1.6;            // how fast the amplitude grows tailward
 const WAVE_SPEED_REF = 38;       // px/s at which the wave is at full size
-const WAVE_TAIL_LAG = 2.2;       // joints' worth of extra phase across the tail
+const WAVE_TAIL_LAG = 0.125;     // extra phase across the tail, as a fraction of the body's
+const WAVE_TAIL_GROW = 0.35;     // how much the wave grows across the tail
 const TAIL_BLEND = 0.5;          // sweep either side of the fork the lobes share
 
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
@@ -440,8 +450,9 @@ export function createRenderer(ctx, surface) {
       const p0 = sp[i > 0 ? i - 1 : 0], p1 = sp[i < N - 1 ? i + 1 : N - 1];
       let tx = p1.x - p0.x, ty = p1.y - p0.y;
       const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
-      const amp = WAVE_AMP * L * Math.pow(i / (N - 1), WAVE_POW) * speedF;
-      const off = Math.sin(phase - i * WAVE_K) * amp;
+      const u = i / (N - 1);
+      const amp = WAVE_AMP * L * Math.pow(u, WAVE_POW) * speedF;
+      const off = Math.sin(phase - u * WAVE_TOTAL) * amp;
       cen[i].x = sp[i].x - ty * off;
       cen[i].y = sp[i].y + tx * off;
     }
@@ -467,12 +478,17 @@ export function createRenderer(ctx, surface) {
       const fr = t - i;
       const cx = cen[i].x + (cen[i + 1].x - cen[i].x) * fr;
       const cy = cen[i].y + (cen[i + 1].y - cen[i].y) * fr;
-      // The POSITION extrapolates past the chain's ends, the DIRECTION does
-      // not: extrapolating a tangent turns it further with every step past the
-      // last joint, which bent the snout and put a corner where the tail's
-      // leading edge meets the flank.
-      let tx = tans[i].x + (tans[i + 1].x - tans[i].x) * fr;
-      let ty = tans[i].y + (tans[i + 1].y - tans[i].y) * fr;
+      // THE POSITION EXTRAPOLATES PAST THE CHAIN'S ENDS, THE DIRECTION DOES
+      // NOT, and that is a fix owed at BOTH ends rather than one. Extrapolating
+      // a tangent turns the frame further with every step past the last joint:
+      // at the tail it put a corner where the leading edge meets the flank, and
+      // at the HEAD the snout domes 0.062 L forward of station 0 — 0.55 of a
+      // segment — so the frame was being turned better than half the way from
+      // the first joint's tangent AWAY from the second's, which pinches a waist
+      // into the flank just behind the nose exactly where the body is widest.
+      const fc = fr < 0 ? 0 : fr > 1 ? 1 : fr;
+      let tx = tans[i].x + (tans[i + 1].x - tans[i].x) * fc;
+      let ty = tans[i].y + (tans[i + 1].y - tans[i].y) * fc;
       const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
       // The chain runs nose -> tail, so its tangent points BACKWARD along the
       // body; the canonical frame's +x is forward, which is why the lateral
@@ -547,10 +563,17 @@ export function createRenderer(ctx, surface) {
       // The wave carried on past the body: the same law, its phase and its
       // amplitude continuing from the last joint rather than stopping at it,
       // and referenced to the root so the tail does not jump where it attaches.
+      // THE TAIL CONTINUES THE BODY'S WAVE; IT DOES NOT START ONE OF ITS OWN.
+      // Growing the amplitude as (1 + q)^WAVE_POW tripled it across the tail —
+      // 0.158 L of sideways throw at the tip against the body's own 0.052 L,
+      // and eight times the whip the original tail carried. That is not a tail
+      // following a fish, it is a tail on its own schedule, which is what read
+      // as wagging. It grows mildly now and lags by about one joint rather than
+      // two, so the tip and the root stay nearly in step.
       const q = r / Math.max(1e-6, TAIL_LEN * L);
-      const amp = WAVE_AMP * L * Math.pow(1 + q, WAVE_POW) * speedF;
-      const off = Math.sin(phase - (N - 1 + q * WAVE_TAIL_LAG) * WAVE_K) * amp
-                - Math.sin(phase - (N - 1) * WAVE_K) * WAVE_AMP * L * speedF;
+      const amp = WAVE_AMP * L * (1 + WAVE_TAIL_GROW * q) * speedF;
+      const off = Math.sin(phase - (1 + q * WAVE_TAIL_LAG) * WAVE_TOTAL) * amp
+                - Math.sin(phase - WAVE_TOTAL) * WAVE_AMP * L * speedF;
       const px = rootW.x + dx * r - dy * off + bA.x + (bB.x - bA.x) * m;
       const py = rootW.y + dy * r + dx * off + bA.y + (bB.y - bA.y) * m;
       return { x: px, y: py * sq };
