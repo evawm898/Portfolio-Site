@@ -5568,7 +5568,13 @@ export function orientationAssertions(positions, row, head) {
   const declared = SELF_INTERSECTION_XFAIL_HAS(row.label);
   if (o.disagreements !== 0 && !declared) bad.push(`O2: the divergence-theorem sign and the ray-parity test DISAGREE on ${o.disagreements} of ${o.shells} shells on a row the census reads clean — one of the two methods is not measuring orientation here`);
   if (!(o.totalVolumeMm3 > 0)) bad.push(`O1: total signed volume ${o.totalVolumeMm3.toFixed(1)} mm^3 is not positive`);
-  return { bad, r: o };
+  /* THE BASELINE IS RETURNED, so a caller reporting on it reads the number
+     THIS clause used rather than re-deriving it. A summary line that carried
+     its own copy went stale the moment the stem gained a cavity — it kept
+     `sphere ? 1 : 0` and read 26/27 on a run where the assertion passed 27/27,
+     which is this project's own two-owners rule landing one line away from the
+     clause it duplicates. One owner, read by both. */
+  return { bad, r: { ...o, declaredInward: hollow } };
 }
 
 /* MEASURED ON THIS BRANCH, ON THE TREE THAT NOW EXISTS — RE-BASELINED IN THE

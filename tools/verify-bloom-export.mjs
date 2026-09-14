@@ -420,7 +420,7 @@ console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 {
   const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === (r.sphere ? 1 : 0)).length}/${results.length} configs meeting the orientation baseline (every shell outward; under SPHERE exactly one inward, the hub's inner face)`);
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face and the stem bore's own sealed cavity where each exists)`);
 }
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
