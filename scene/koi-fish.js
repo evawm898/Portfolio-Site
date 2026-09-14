@@ -73,10 +73,9 @@ export function bodyScale(width, height) {
 }
 export const SPINE_JOINTS = 9;
 
-// WHERE THE BODY ENDS AND THE TAIL BEGINS, shared by the simulation and the
-// renderer because it is one fact about the animal: the last body joint IS the
-// root the tail lobes hang from, so neither side can place it somewhere the
-// other does not.
+// WHERE THE BODY ENDS AND THE TAIL BEGINS. The chain spans exactly this far, so
+// its last joint sits at the tail root and the whole of the drawn body has
+// chain under it.
 export const TAIL_ROOT_U = 0.90;
 
 // THE CHAIN CANNOT HAIRPIN, AND THAT IS A CONSTRAINT RATHER THAN A FILTER.
@@ -88,30 +87,12 @@ export const TAIL_ROOT_U = 0.90;
 // four minutes of pond: the angle between consecutive segments reaches 180
 // degrees, exceeds 120 on 0.28% of joint-frames and 90 on 0.55%.
 //
-// Capping that angle makes the fold UNREACHABLE rather than unlikely. It is
-// the one place the constraint belongs: downstream of it every consumer — the
-// contour, the fins, the markings, both tail lobes — is safe by construction,
-// where a smoothing pass would only make a fold rarer.
+// Capping it matters here for a different reason than it did when the contour
+// rode the chain directly: a folded chain has a MEANINGLESS net turn, swinging
+// by half a revolution between frames, and the net turn is the only thing the
+// chain is still for. The cap is what makes that signal worth reading.
 const CHAIN_MAX_BEND = 0.42;     // rad between consecutive segments
 
-// THE TAIL IS TWO CHAINS, NOT ONE HINGED FAN. Each lobe trails on its own, so
-// the chain's lag reaches all the way through the tail instead of stopping at
-// a rigid piece bolted to the last joint. The first segment of each is RIGID to
-// the body — it is the lobe's attachment, and it is what gives the two lobes
-// their splay; a pure follow-the-leader chain has no rest direction, so two
-// lobes trailing from one root would collapse onto the same line.
-export const LOBE_JOINTS = 6;
-export const TAIL_LOBE_REST = 0.31;   // rad off the body's backward axis
-
-// A LOBE SETTLES MORE THAN THE BODY DOES, AND IT STAYS BEHIND THE FISH. A tail
-// that trails on exactly the body's terms reads as WAGGING rather than
-// following: it is light, it hangs off the end of a moving root, and on its own
-// terms it develops a swing of its own that has nothing to do with the curl the
-// body is in. Two bounds rather than one, because they stop different things —
-// the per-joint cap keeps it smooth, the cone keeps it astern.
-const LOBE_MAX_BEND = 0.20;           // rad per joint, against the body's 0.42
-const LOBE_MAX_DIVERGE = 0.34;        // rad a lobe may lie off its own rest line
-const LOBE_SPAN = 0.70;               // of body length, so the fan never runs past it
 
 // Place `n` one segment behind `lead`, in the direction it already lay, with
 // the turn from `refAng` capped. Returns the direction actually used, which is
@@ -185,14 +166,6 @@ const OMEGA_TAU = 0.22;
 // fifth of a body would not.
 const DRAW_TAU = 0.12;
 
-// AND THE BEND BIAS EASES ON TOP OF THAT, WHICH IS A SECOND STAGE RATHER THAN A
-// LONGER FIRST ONE. f.omega is the MEASUREMENT — how hard this koi is turning,
-// smoothed just enough to be a number — and f.bend is what the body is DRAWN
-// curving by. A body does not change its curvature the instant the turn rate
-// does, and two first-order stages in series reject the reversal burst far
-// better than one stage of the same total delay: the fast one keeps the
-// measurement honest, the slow one keeps the drawn spine from flapping.
-const BEND_TAU = 0.28;
 
 export const MIN_ON_SCREEN = 3;
 export const MAX_ON_SCREEN = 7;
@@ -341,22 +314,10 @@ function makeFish(rand, id, x, y, heading, state, scale = 1) {
   // lands on the tail root and no part of the outline has to be extrapolated
   // off the end of it.
   const seg = TAIL_ROOT_U * len / (SPINE_JOINTS - 1);
-  const lobeSeg = LOBE_SPAN * len / (LOBE_JOINTS - 1);
   const spine = [];
   for (let i = 0; i < SPINE_JOINTS; i++) {
     spine.push({ x: x - Math.cos(heading) * seg * i, y: y - Math.sin(heading) * seg * i });
   }
-  // Both lobes seeded straight out along their own rest direction, so a koi's
-  // first drawn frame is the same fish its hundredth is.
-  const root = spine[SPINE_JOINTS - 1];
-  const lobes = [1, -1].map((side) => {
-    const a = heading + Math.PI + side * TAIL_LOBE_REST;
-    const arr = [];
-    for (let i = 0; i < LOBE_JOINTS; i++) {
-      arr.push({ x: root.x + Math.cos(a) * lobeSeg * i, y: root.y + Math.sin(a) * lobeSeg * i });
-    }
-    return arr;
-  });
   // KOI MARKINGS. Part of the fish's identity, so they are rolled here with
   // the rest of it rather than in the renderer — a fish must not change its
   // pattern because a frame was drawn.
@@ -375,8 +336,10 @@ function makeFish(rand, id, x, y, heading, state, scale = 1) {
     id, x, y, heading, omega: 0,
     // Render state. Seeded at the spawn pose so the first frame draws the koi
     // where it actually is rather than easing in from the origin.
-    drawX: x, drawY: y, drawHeading: heading, bend: 0,
-    traits, len, seg, lobeSeg, spine, lobes, patches,
+    drawX: x, drawY: y, drawHeading: heading,
+    traits, len, seg, spine, patches,
+    // The chain's own net turn, which is what the renderer bends the body by.
+    chainTurn: 0,
     baseSpeed: (SPEED_RANGE[0] + (SPEED_RANGE[1] - SPEED_RANGE[0]) * traits.speed) * speedVar,
     turnRate: rand.range(TURN_RANGE[0], TURN_RANGE[1]),
     wanderRate: rand.range(WANDER_RATE[0], WANDER_RATE[1]),
@@ -721,7 +684,6 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         f.drawY += (f.y - f.drawY) * kDraw;
         f.drawHeading = wrapAngle(f.drawHeading
           + wrapAngle(f.heading - f.drawHeading) * kDraw);
-        f.bend += (f.omega - f.bend) * Math.min(1, dt / BEND_TAU);
 
         // THE BODY FOLLOWS THE HEAD, AND THE TAIL FOLLOWS THE BODY. Each joint
         // is pulled to a fixed distance behind the one in front with its turn
@@ -731,24 +693,29 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         const sp = f.spine;
         sp[0].x = f.drawX; sp[0].y = f.drawY;
         let ref = f.drawHeading + Math.PI;        // backward, from the head
+        let turn = 0;
         for (let i = 1; i < sp.length; i++) {
-          ref = trail(sp[i - 1], sp[i], f.seg, ref, CHAIN_MAX_BEND);
+          const next = trail(sp[i - 1], sp[i], f.seg, ref, CHAIN_MAX_BEND);
+          // SUMMED PER JOINT, NEVER WRAPPED AT THE END. The chain can swing
+          // 8 x CHAIN_MAX_BEND = 192 degrees, which is PAST A HALF TURN, so
+          // taking the net angle and wrapping it into +/-pi makes the signal
+          // JUMP by a full turn the moment it crosses — measured, that put a
+          // 43.5 px spike into the drawn body where the whole frame budget is
+          // 2.3. Each joint's own turn is bounded by the cap and so is never
+          // ambiguous; their sum is continuous however far the body swings.
+          turn += wrapAngle(next - ref);
+          ref = next;
         }
+        // HOW FAR THE BODY HAS SWUNG AGAINST ITS OWN HEAD. This is the one
+        // number the chain exists to produce: the angle from the head's
+        // backward axis to the last segment's, which is a koi's body lying
+        // along the path it has just swum. It carries the turn's HISTORY
+        // rather than its rate — measured, it correlates with f.omega at only
+        // r = 0.44 — and it is lagged by geometry rather than by a filter, so
+        // it needs no smoothing of its own: per-frame jerk max 1.3 degrees, and
+        // the step itself 9.4, against the full turn a wrap bug would put here.
+        f.chainTurn = -turn;
 
-        // Each lobe: the first segment rigid to the body at its rest angle,
-        // every joint behind it trailing on its own.
-        const root = sp[sp.length - 1];
-        for (let k = 0; k < f.lobes.length; k++) {
-          const lb = f.lobes[k], side = k === 0 ? 1 : -1;
-          lb[0].x = root.x; lb[0].y = root.y;
-          const rest = ref + side * TAIL_LOBE_REST;
-          let la = rest;
-          lb[1].x = lb[0].x + Math.cos(la) * f.lobeSeg;
-          lb[1].y = lb[0].y + Math.sin(la) * f.lobeSeg;
-          for (let i = 2; i < lb.length; i++) {
-            la = trail(lb[i - 1], lb[i], f.lobeSeg, la, LOBE_MAX_BEND, rest, LOBE_MAX_DIVERGE);
-          }
-        }
 
         f.phase += dt * (2.2 + f.speed * 0.055);
         f.finPhase += dt * 1.7;
