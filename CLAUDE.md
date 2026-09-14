@@ -5459,6 +5459,43 @@ supplies `canvas2d()` (a DPR-correct canvas, mounted and auto-resized), live
 `width`/`height`, `reducedMotion` and `seed`. `dt` is CLAMPED at 1/20 s, so a
 tab switch cannot teleport a simulation.
 
+**A SCENE MAY HAVE SEVERAL PLANES, AND BOTH HALVES OF THAT WERE BROKEN UNTIL
+SOMEBODY CALLED `canvas2d()` TWICE** (session of Sep 14, answering scene 2's
+blocking question). The shell always looked ready for it — `canvases` is an
+array and `sizeCanvas` is per-entry — but **scene 1 is the only caller and it
+asks for one canvas, so the multiplane path had never once been exercised** and
+every claim about it was an inference. Measured, at an 800x600 viewport:
+* **THE PLANES STACKED INSTEAD OF OVERLAPPING.** `.scene-canvas` was in normal
+  flow, so the second canvas landed at **y = 600** — a full viewport below the
+  first, with the stage scrolling to **1200**. It is `position: absolute` now,
+  and DOM order is the depth order (later call = nearer the viewer).
+* **EVERY PLANE WAS OPAQUE.** `getContext('2d', { alpha: false })` was
+  hardcoded, and **on an opaque context even `clearRect()` yields opaque BLACK
+  rather than transparency** — the front plane read `[0,0,0,255]` where nothing
+  had been drawn, so it would have painted over everything behind it.
+**ALPHA IS NOT LEFT TO THE CALLER TO REMEMBER**, because only the BACKMOST plane
+can be opaque and that is a fact about compositing rather than a preference:
+`canvas2d()` defaults to *opaque iff I am the first layer*, which keeps a
+one-canvas scene exactly as it was and makes a stack composite correctly without
+the scene knowing any of this. `canvas2d({ alpha: true })` on the first call is
+there for a scene that wants the page ground showing through its own backmost
+plane. **SCENE 1 DID NOT MOVE, and a framebuffer equality is not the instrument
+for saying so** (this repo's own measured rule — the renderer is not
+deterministic between page sessions). What is compared against a worktree of the
+base commit is what IS exact, and all of it is identical: one canvas, one stage
+child, rect (0,0,900,640), backing store 1800x1280, `alpha: false`, stage
+scrollHeight 640.
+**THE GATE IS 79 CHECKS AND 22 MUTANTS.** The five `layers/*` checks are the only
+witnesses for any of it — **every other check in that file stays green on a shell
+that cannot layer at all** — and the composite one reads the RASTERISED
+framebuffer, because `getImageData` on each canvas says what that plane HOLDS and
+cannot say what survived compositing. Three mutants carry it:
+`the-planes-stack-instead-of-overlapping`, `every-plane-is-opaque` and
+`every-plane-is-transparent` — the last of which costs nothing visible, which is
+the point: only the alpha flag itself can see it.
+**WHAT IS STILL EVA'S:** scene 2's layer count and its palette, and the SVG
+assets themselves. Nothing about scene 2 is built.
+
 **THE LOAD TOKEN IS TAKEN BEFORE THE ALREADY-ACTIVE EARLY RETURN, AND THAT ORDER
 IS LOAD-BEARING.** Scene modules are imported dynamically, so a click on 2 while
 1 is showing leaves an import in flight; clicking 1 again must CANCEL it, or 2
