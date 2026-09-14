@@ -339,6 +339,33 @@ claim measured rather than argued. **Nothing outside block 32 moves at all** —
 `stemLength max (120)` row, no `ALL MAX`, because neither is a sphere (`hubShape` is a
 CHOICE and the blanket sweep is sliders only).
 
+**AND THE TOOL NEEDED A SECOND CONTROL, WHICH RE-READING IT FOUND RATHER THAN A FAILURE.**
+`--control` perturbs a HOLDER, which exercises CLAUSE 1 — and it SKIPPED clause 2 entirely
+(`if (!CONTROL)`), so the clause this whole feature is about was a log line that had never
+been shown able to fail. That is this repo's own recorded lesson, verbatim: *"a control that
+fires only the first leaves the second a log line"* (`verify-bloom-seam-bytes.mjs`'s
+`--control-mode`, session 38). `--control-only` moves the FIRST float of a MOVER's emitted
+stream — the first SURVIVING petal's first vertex, and therefore by construction not in any
+omitted petal's block, which is exactly the condition-2 violation clause 2 exists to catch
+(on the bare corner, where no petal survives, it lands on the hub, which is condition 3).
+
+```
+node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree> --control-only --only '^SPHERE STEM'
+  9 rows · 8 predeclared MOVERS · 1 predeclared HOLDERS · 460,224 export floats
+  CLAUSE 1  movers that did NOT move: 0
+  CLAUSE 1  holders that MOVED: 0
+  CLAUSE 2  movers where something OTHER than the omitted petals moved: 16
+  CONTROL-ONLY OK — CLAUSE 2 reported 16 of 16 (mover x mode) builds where a KEPT petal had moved
+```
+
+**Clause 1 stays clean under it**, which is the separation that makes the two controls two
+claims rather than one: a mover that moves is all clause 1 asks, so only clause 2 can see a
+kept petal move. The run REFUSES as vacuous if the row set holds no movers at all, because a
+control with nothing to perturb reports the same silence as a clause that cannot fire.
+
+**And `--control` now says which clause it exercised**, rather than "the perturbation was
+detected" — the conflation the second control exists to undo.
+
 ### 9b. FOUR RESIDUALS WERE COMPUTED ON SLOT 0 BECAUSE SLOT 0 ALWAYS EXISTED
 
 `buildPetalInto` carries four one-petal checks — the flat-form guard residual, the

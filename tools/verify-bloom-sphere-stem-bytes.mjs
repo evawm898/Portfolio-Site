@@ -46,6 +46,19 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const BASE = process.argv.includes('--base') ? process.argv[process.argv.indexOf('--base') + 1] : null;
 const CONTROL = process.argv.includes('--control');
+/* THE SECOND CONTROL, AND IT IS OWED RATHER THAN OPTIONAL. `--control`
+   perturbs a HOLDER and exercises CLAUSE 1 only — it SKIPS clause 2 entirely,
+   so the clause this whole feature is about would have been a log line that
+   had never been shown able to fail. That is this repo's own recorded lesson
+   ("a control that fires only the first leaves the second a log line",
+   `verify-bloom-seam-bytes.mjs`'s `--control-mode`), and the hole was found by
+   re-reading the tool after its first clean run rather than by a failure.
+   `--control-only` moves the FIRST float of a MOVER's emitted stream, which is
+   the first SURVIVING petal's first vertex and therefore by construction not
+   in any omitted petal's block — exactly the condition-2 violation (a petal
+   that was kept but moved) clause 2 exists to catch. Clause 1 stays clean
+   under it, because a mover that moves is all clause 1 asks. */
+const CONTROL_ONLY = process.argv.includes('--control-only');
 if (!BASE || !fs.existsSync(BASE)) { console.error('verify-bloom-sphere-stem-bytes: need --base <worktree of the base commit>'); process.exit(2); }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
@@ -85,6 +98,8 @@ function movesByRecord(set) {
 /* CLAUSE 2's slicer. Returns null (with a reason) rather than guessing. */
 function onlyTheOmittedWent(set, em) {
   const { acc: accB, b: bb } = build(G, DEFAULTS, set, em);
+  /* `--control-only`: a kept petal moves by 1e-9. See the flag's own note. */
+  if (CONTROL_ONLY && accB.positions.length) accB.positions[0] += 1e-9;
   const { acc: accA, b: ba } = build(GB, DB, set, em);
   const om = new Set(bb.stemOmission.omitted);
   const K = ba.rings.length;
@@ -162,6 +177,17 @@ if (!CONTROL) {
   for (const b of badOnly.slice(0, 12)) console.log('   ' + b);
 }
 const pass = !badMove.length && !badHold.length && !badOnly.length;
-console.log(CONTROL ? (pass ? '\nCONTROL FAILED TO FIRE — the comparison cannot see a 1e-9 perturbation, so neither clause is evidence' : '\nCONTROL OK — the perturbation was detected on the holders')
+/* THE TWO CONTROLS HAVE TWO VERDICTS, because each is about a different
+   clause and a run that reported "the control fired" without saying WHICH
+   would be the conflation this second control exists to undo. */
+if (CONTROL_ONLY) {
+  const fired = badOnly.length > 0;
+  console.log(fired
+    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where a KEPT petal had moved`
+    : '\nCONTROL-ONLY FAILED TO FIRE — clause 2 cannot see a kept petal moving, so its PASS is not evidence');
+  if (!movers) console.log('   (and there were NO MOVERS in this row set, so the control was vacuous — narrow to rows that build a stem on a sphere)');
+  process.exit(fired && movers ? 0 : 1);
+}
+console.log(CONTROL ? (pass ? '\nCONTROL FAILED TO FIRE — the comparison cannot see a 1e-9 perturbation, so neither clause is evidence' : '\nCONTROL OK — CLAUSE 1 detected the perturbation on the holders (clause 2 is NOT exercised here — that is `--control-only`)')
                     : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : '\nPASS — every predeclared mover moved, every holder held, and on every mover the ONLY floats that went are the omitted petals\' own.') : '\nFAIL'));
 process.exit(CONTROL ? (pass ? 1 : 0) : (pass ? 0 : 1));

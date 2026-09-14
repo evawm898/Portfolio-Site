@@ -2107,6 +2107,15 @@ A surviving petal that moved is a re-placement; a hub that moved was sized from 
 0 holders moved, and 0 movers where anything OTHER than the omitted petals went.** The eight
 are the block-32 rows that actually build a stem on a sphere; the ninth (`GATED`, at
 `stemLength` 0) is a HOLDER, which is the inert-by-branch claim measured rather than argued.
+**AND THE TOOL OWED A SECOND CONTROL, WHICH RE-READING IT FOUND AFTER ITS FIRST CLEAN RUN:**
+`--control` perturbs a HOLDER and SKIPPED clause 2 entirely, so the clause this feature is
+about had never been shown able to fail — this file's own `--control-mode` lesson, one tool
+later. **`--control-only` moves the first float of a MOVER's stream** (the first SURVIVING
+petal's first vertex, by construction outside every omitted block; the hub on the bare
+corner) and clause 2 reports **16 of 16 mover x mode builds** while clause 1 stays clean,
+which is what makes the two controls two claims. It REFUSES as vacuous on a row set with no
+movers, and `--control` now names the clause it exercised instead of saying "the
+perturbation was detected".
 **`ALL MAX` IS UNMOVED AND THAT IS NOT LUCK**: retiring `stemEligible` took `stemDiameter` out
 of `PLACEMENT_SUBS`, which would have let the blanket sweep hand it 12 mm — `STEM_SUB_IDS` is
 the derivation that keeps it out of block 1 and out of `SWEEPABLE`, on the CURL_SUBS shape
