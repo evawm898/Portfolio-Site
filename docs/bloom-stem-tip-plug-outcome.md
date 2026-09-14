@@ -333,6 +333,39 @@ not all at one height, and the bottom face is exactly the triangles all at one h
 so without it **the one surface this change is about would be the one surface clause 2
 had defined itself out of** — the fifth durable rule, and the band's own recorded trap.
 
+**MEASURED, PASS, over the whole 746-row matrix in both modes against a worktree of
+`41d7a87`:**
+
+| | |
+|---|---|
+| rows | **746**, both modes |
+| predeclared MOVERS | **24** |
+| predeclared HOLDERS | **722** |
+| export floats compared with `Object.is` | **690,627,240** |
+| CLAUSE 1 — movers that did NOT move | **0** |
+| CLAUSE 1 — holders that MOVED | **0** |
+| CLAUSE 2 — movers where the wall moved, anything outside the stem did, or the bottom is not a DISC | **0** |
+
+The 24 are every row that builds a hollow stem: the whole of block 30 bar its two solid
+and two gated rows, eight of block 32's, and the two non-`STEM:` rows `stemLength max
+(120)` and **`ALL MAX`** — session 38's own lesson honoured, since a row that sweeps
+every control carries a stem too. **The two rows WITH a stem that are HOLDERS are the
+two SOLID ones**, at the 3 mm floor where Eva's bore rule already closed the bore: that
+is the inertness half measured rather than argued.
+
+**AND CLAUSE 2(a) WAS INDEX-ALIGNED, WHICH IS WRONG ONCE ANYTHING FOLLOWS THE STEM —
+found by running it.** `buildBloomInto` emits petals, hub, STEM, androecium, gynoecium.
+The band only fires on SPHERE rows where the centre is hidden AND inert, so nothing
+follows and the index-aligned form is valid there; the plug fires on rows that carry a
+centre, where the stem's own count changing (576 → 476) SHIFTS everything after it. The
+first whole-matrix run reported CLAUSE 1 clean and CLAUSE 2 firing on exactly the two
+rows with parts after the stem — `ALL MAX` and `STEM: x the whole centre` — naming
+"(r 1.5000, z 0.6000) against (r 8.2447, z −0.6000)", the bore's own ring against the
+hub's rim. **The replacement is strictly stronger:** scanning in from BOTH ENDS finds the
+one CONTIGUOUS run that differs, so everything outside it is bit-identical by
+CONSTRUCTION, and the two streams' LENGTH difference must equal the stem's own triangle
+delta exactly.
+
 **ALL THREE CLAUSES ARE SHOWN ABLE TO FAIL:**
 
 | control | what it perturbs | what fired |
@@ -340,6 +373,37 @@ had defined itself out of** — the fifth durable rule, and the band's own recor
 | `--control` | one coordinate of every HOLDER by 1e-9 | CLAUSE 1 on both narrowed holders |
 | `--control-only` | the first float of a MOVER's stream | CLAUSE 2 on 6 of 6 (mover × mode) builds |
 | `--base` pointed at a tree that ALREADY has the plug | nothing — the base's own bottom face | CLAUSE 2(c): "the BASE's bottom face measures 28.1937 mm² at z = −61.9156; the tube's own section is 21.1452" |
+
+---
+
+## 8d. The gates, run
+
+| | |
+|---|---|
+| export gate, `--only '^(STEM\|SPHERE STEM):'` | **PASS — 27 of 27** rows reached the results, every one watertight |
+| connectedness, same rows | **PASS — 27 of 27** one connected piece, `stray=0` on every one |
+| panel gate | **PASS**, route (x) green on all six of its states |
+| panel gate `--negative-control` | **PASS** — *ALL SEVENTEEN ROUTES* observed the failure they exist to catch |
+| `bloom-smoke --check` | 77 smoke rows over **28** blocks of 746 rows; family census **81 of 81**, both directions, ST10 among them |
+| `bloom-smoke --check --negative-control` | **PASS** — with JS5 renamed the census reports both halves |
+| `--verify-frozen --phase30` | **PASS** — deep-equal to `41d7a87`'s own `buildMatrix()`, 744 of 744 |
+| the three plug mutants | each fires ST10, clean tree silent |
+| the five pre-existing stem mutants over code this session changed | each fires the family it names |
+| `bloom-smoke --conn` | **clean** — both gates on the subset, 76 of 77 watertight with the 77th `ALL MAX`'s declared EXPORT REFUSAL (XR1), and the flood fill green |
+
+**THE TWO ROWS THAT MATTER MOST READ:** `SPHERE STEM: THE BARE CORNER` —
+`components=1 stray=0 tris=7192 boundary=0`, and `SPHERE STEM: THE TWO CLOSURES MEET` —
+`components=1 stray=0 tris=7004 boundary=0`. **The sealed cavity does not split the
+flood fill**, which was the risk worth checking rather than assuming: the raster is a
+surface-occupancy test and a void entirely inside solid material is one piece, which is
+also the physical truth.
+
+**THE SELF-INTERSECTION CENSUS IS THE VERDICT AND IT READS NO NEW FOLD.** X1/X2 ride in
+the export gate and it passed: 25 of 27 rows free of within-shell self-intersection, the
+other 2 the declared XFAILs (`STEM: x a hemisphere` and `SPHERE STEM: x 40 petals x 6
+turns`), each still failing as declared and each proved in the sphere-stem session to be
+the HEAD's fold and not the stem's. No row went from clean to self-intersecting, and no
+xfail entry was added or removed.
 
 ---
 
