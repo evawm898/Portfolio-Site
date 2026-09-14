@@ -1096,14 +1096,7 @@ export async function formAssertions(page, row) {
      same assertion, and the layer-0-only version would have kept passing
      while every inner whorl went unchecked. */
 
-  /* A BLOOM WITH NO PETALS CANNOT MAKE A CLAIM ABOUT ONE, and the only way to
-     reach that state is the stem channel taking every slot (the bare corner: a
-     stem wider than the head has room for, told rather than refused). Reported
-     as ABSENT rather than as passed, and NOT a blanket skip: the channel must
-     DECLARE that it took every slot, so a bloom that built no petals for any
-     other reason still fires the clause below. ST7 and ST8 pin the declaration
-     to the geometry. */
-  if (m.petalsBuilt === 0 && m.stemOmission && m.stemOmission.built === 0 && m.stemOmission.asked > 0) return bad;
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
   if (!m.petalForm) {
     const g = m.petalGuardResidual;
     if (typeof g !== 'number') bad.push(`flat row reports guard residual ${JSON.stringify(g)} — not measured`);
@@ -1281,6 +1274,7 @@ function buckleFreqOf(ui) { return Number(ui.buckleAmp) > 0 ? Number(ui.buckleFr
 export async function fringeAssertions(page, row) {
   const bad = [];
   const m = await page.evaluate(() => window.__bloomMetrics());
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
   const ui = await page.evaluate(() => window.__bloomUIState());
 
   /* FR0 — THE TWO STATEMENTS, both of them. The registry hides the controls
@@ -1422,6 +1416,7 @@ export async function fringeAssertions(page, row) {
 export async function lobeAssertions(page, row) {
   const bad = [];
   const m = await page.evaluate(() => window.__bloomMetrics());
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
   const ui = await page.evaluate(() => window.__bloomUIState());
   /* THE FRINGE WINS, so "engaged" here means engaged AND eligible — both
      halves, because Eva's mutual exclusion (Sep 13) makes the lobe family
@@ -2083,6 +2078,7 @@ export async function curlAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const ui = await page.evaluate(() => window.__bloomUIState());
   const bad = [];
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
   const spines = m.petalRingSpine, layers = m.rings, roots = m.petalRingRootRows;
   if (!Array.isArray(spines) || !Array.isArray(layers) || spines.length !== layers.length || !Array.isArray(roots) || roots.length !== layers.length) {
     bad.push(`C1: expected spine telemetry for ${layers && layers.length} rings, got ${JSON.stringify(spines && spines.length)} (root rows ${JSON.stringify(roots && roots.length)})`);
@@ -2219,11 +2215,7 @@ export const THICKNESS_SCOPE =
 export async function thicknessAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
   const bad = [];
-  /* NO PETALS, NO PETAL CLAIM — formAssertions' own guard, for its own reason:
-     the stem channel taking every slot is the one reachable state with no petal
-     at all, and it must DECLARE it. Anything else that reports no thickness
-     telemetry still fires the clause below. */
-  if (m.petalsBuilt === 0 && m.stemOmission && m.stemOmission.built === 0 && m.stemOmission.asked > 0) return bad;
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
   const th = m.petalThickness;
   if (!th) { bad.push('no thickness telemetry reported'); return bad; }
 
@@ -4756,6 +4748,22 @@ export async function gynoeciumAssertions(page, row) {
    EXACTLY this set, in both directions, against a stemless build — so a petal
    that went missing without being declared is a red, not a skip. One owner for
    the set, so a family cannot skip a different one from the one ST8 checks. */
+/* A BLOOM WITH NO PETALS AT ALL. The only reachable way there is the stem
+   channel taking every slot — the BARE CORNER, a stem wider than the head has
+   room for, told rather than refused (`stemJoinBlendRadius`'s own precedent).
+   Every family that reads the REPRESENTATIVE petal's telemetry has to decline
+   there, because there is no petal to make a claim about; reported as ABSENT,
+   never as passed.
+
+   IT IS NOT A BLANKET SKIP AND THAT IS THE WHOLE POINT: the channel must
+   DECLARE that it took every slot, so a bloom that built no petals for any
+   OTHER reason still fires the clause it was going to fire. ST7 and ST8 pin the
+   declaration to the geometry — one owner for the predicate, so a family cannot
+   decline on a different condition from the one they check. */
+export function noPetalBuilt(m) {
+  return m && m.petalsBuilt === 0 && m.stemOmission && m.stemOmission.built === 0 && m.stemOmission.asked > 0;
+}
+
 export function omittedSlotSet(m) {
   const O = m && m.stemOmission;
   return O && Array.isArray(O.omitted) ? new Set(O.omitted) : new Set();
@@ -5188,7 +5196,7 @@ export const SELF_INTERSECTION_SCOPE =
    piece with it — so the coverage is free and the blindness is the reason.
    =================================================================== */
 export const STEM_CHANNEL_SCOPE =
-  'ST9 reads the EXPORTED STL: no vertex lies within the printable gap of the FREE stem (the hub\'s underside down to the tip) except the stem\'s own, which stand at its outer or bore radius exactly. It is the only witness here that does not read the stem channel\'s own report. Blind to a petal that clears the vertices and whose TRIANGLE dips nearer between them (a sub-mesh-chord effect, bounded by the mesh\'s own chord scale and shared with the criterion, which measures the same population); blind to the root band inside the hub, where the stem and the material are in the same place by design.';
+  'ST9 reads the EXPORTED STL: below the hub\'s own outer surface, no vertex lies within the printable gap of the FREE stem (the hub\'s underside down to the tip) except the stem\'s own, which stand at its outer or bore radius exactly. It is the only witness here that does not read the stem channel\'s own report. Blind to a petal that clears the vertices and whose TRIANGLE dips nearer between them (a sub-mesh-chord effect, bounded by the mesh\'s own chord scale and shared with the criterion, which measures the same population); blind to the root band inside the hub, where the stem and the material are in the same place by design.';
 
 export function stemChannelAssertions(positions, row, m, ui) {
   const bad = [];
@@ -5216,8 +5224,24 @@ export function stemChannelAssertions(positions, row, m, ui) {
     bad.push(`ST9: the file's two lowest stem rings stand ${(rootZ - tipZ).toFixed(4)} mm apart against the ${lengthMm} mm the control asked for — the free stem cannot be located, so no claim is made about the channel`);
     return bad;
   }
-  /* AND NOW THE CLAIM. */
+  /* AND NOW THE CLAIM — but the region has to exclude the HUB as well as the
+     stem, and that is not a special case: the stem is rooted THROUGH the hub,
+     so the two share their boundary by construction and the hub's own far-pole
+     apex sits at EXACTLY `rootZ`, on the axis, distance 0 from the channel.
+     Measured: it reads 288 to 1488 vertices on every sphere-stem row, all of
+     them the hub's south apex fan and the ring just above it.
+
+     THE HUB'S OUTER SURFACE IS A SPHERE ABOUT THE EQUATOR PLANE (footRing's own
+     sphere arm puts `centreZ` at exactly 0, and S4 is the clause that says so —
+     a different owner), and its radius is `-rootZ`, because the far pole IS its
+     lowest point and `rootZ` is where the free stem begins. So "below the hub"
+     at plan radius r is `z < -sqrt(Rout^2 - r^2)`, derived from the file's own
+     three stem rings and the control's own length and nothing else. The same
+     1e-3 mm the radii use, for the same reason: a foot's outer skin lies ON
+     that surface and float32 can put it a hundredth of that below. */
   const clear = O.clearanceMm;
+  const Rout = -rootZ;
+  if (!(Rout > 0)) { bad.push(`ST9: the free stem's root stands at z ${rootZ}, which is not below the equator — the hub's outer surface cannot be located`); return bad; }
   let intruders = 0, worst = Infinity, worstAt = null;
   for (let i = 0; i < positions.length; i += 3) {
     const x = positions[i], y = positions[i + 1], z = positions[i + 2];
@@ -5225,6 +5249,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
     const d = Math.hypot(Math.max(0, r - outerR), Math.max(0, tipZ - z, z - rootZ));
     if (!(d < clear)) continue;
     if (Math.abs(r - outerR) <= TOL || (boreR > 0 && Math.abs(r - boreR) <= TOL)) continue;   // the stem's own
+    if (z >= -Math.sqrt(Math.max(0, Rout * Rout - r * r)) - TOL) continue;                    // the hub's own, or on its surface
     intruders++;
     if (d < worst) { worst = d; worstAt = [x, y, z]; }
   }

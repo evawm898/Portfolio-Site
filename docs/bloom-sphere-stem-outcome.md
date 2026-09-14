@@ -229,6 +229,16 @@ partition is what says so.
 the row census named all eight, and the block above named the clause. Before #220 that
 run's tail would have read `1/1 watertight`.
 
+**AND ST9's FIRST REGION INCLUDED THE HUB.** The stem is rooted THROUGH the hub, so the
+two share their boundary by construction, and on a sphere the hub's own far-pole apex sits
+at EXACTLY `rootZ`, on the axis — distance 0 from the channel. Measured: 288 to 1488
+vertices on every sphere-stem row, all of them the hub's south apex fan and the ring just
+above it. The region excludes the hub's own outer surface now, derived from the file and
+one other clause's owner: on a sphere `footRing` puts the centre at exactly 0 (S4 is what
+says so), so the outer surface is a sphere of radius `-rootZ` and "below the hub" at plan
+radius r is `z < -sqrt(Rout² - r²)`. **That is the clause finding a real property of the
+solid rather than a defect — and it is the only reason to trust it when it reads zero.**
+
 **AND THE CROWDING RASTER COUNTED FEET THAT WERE NOT BUILT.** `readFeet` builds its foot
 list from `footRing()`'s rings — all K of them — while `crowding R3` compares that list
 against the builder's own `petalsBuilt`, and `R4` wants a representative petal per
