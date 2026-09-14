@@ -158,7 +158,7 @@ const FISH_ALPHA = 1;         // see drawFish — a koi never fades
 // with a wavy edge. Same envelope, different numbers: TAIL_LOBES is what sets
 // how many maxima the trailing edge has, and the scallop and fork depths are
 // what carry the fork back.
-const TAIL_LEN = 0.64;        // of body length, the outer tips' own reach
+const TAIL_LEN = 0.84;        // of body length, the outer tips' own reach
 // THE CHAIN REACHES EXACTLY AS FAR AS THE DRAWN FISH DOES, and the two owners
 // of that length are checked against each other here rather than trusted to
 // stay in step. koi-fish.js sizes its segments from CHAIN_SPAN_U; this file
@@ -167,7 +167,23 @@ const TAIL_LEN = 0.64;        // of body length, the outer tips' own reach
 if (Math.abs(CHAIN_SPAN_U - (TAIL_ROOT_U + TAIL_LEN)) > 1e-9) {
   throw new Error(`the chain spans ${CHAIN_SPAN_U} body lengths but the fish is drawn over ${TAIL_ROOT_U + TAIL_LEN}`);
 }
-const TAIL_SPREAD = 0.62;     // rad, half-angle the fan covers
+// THE FAN IS LONGER THAN IT IS WIDE, WHICH IS THE REFERENCE'S SHAPE AND NOT THE
+// ONE THIS FILE STARTED WITH. At 0.62 rad over a 0.64 L reach the fan drew
+// 0.744 L across against 0.531 L long — WIDER than long, 1.40:1, where the ink
+// koi's tails stream backward along the body. Cutting the half-angle and
+// holding the fan's AREA (area goes as r^2 * theta, so r as 1/sqrt(theta):
+// 0.64 * sqrt(0.62/0.36) = 0.84) gives 0.592 L across by 0.786 L long, 0.75:1.
+//
+// WHAT IT DOES NOT BUY IS THE TURN, and that is worth writing down so it is not
+// re-attempted: the fan still compresses on the inside of a bend by exactly as
+// much as before. The cap is DERIVED from the fan's own extent, so the ceiling
+// emitted/HE lands on 0.9935 here against 0.9924 shipped — the same number to
+// three figures, because scaling the contour scales both terms together.
+// Measured over 45 s of pond, the fan's drawn area on a sharp turn is 0.777 of
+// a straight fish's, against 0.779 before. The shape changed; the compression
+// did not, and no contour can move it. Only the margin in CHAIN_MAX_HALF_EXTENT_U
+// can, and that is a ruling about how sharply a koi may bend.
+const TAIL_SPREAD = 0.36;     // rad, half-angle the fan covers
 const TAIL_LOBES = 2;         // maxima across the trailing edge
 const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
 const TAIL_FORK = 0.26;       // the extra notch on the axis — the fork itself
@@ -200,11 +216,19 @@ const tailHalfExtentU = (() => {
   return m;
 })();
 // The body and the fins are narrower and are NOT covered by this check — stated
-// rather than implied. Measured off this renderer's own emitted contour on a
-// straight chain: the widest fin station stands 25.7 px off the centre on a
-// 96 px koi against the tail's 37.1, so the tail is what binds and the check
-// that matters is the one below. If a future fin is made to reach further than
-// the tail does, it will fold and nothing here will say so.
+// rather than implied, AND THE MARGIN IS MUCH THINNER THAN IT WAS. Measured off
+// this renderer's own emitted contour on a straight chain, on a 96 px koi: the
+// widest fin station stands 25.7 px off the centre against the tail's 29.6, a
+// margin of 3.9 px. Before the tail was narrowed the tail stood at 37.2 and the
+// margin was 11.5.
+//
+// SO NARROWING THE TAIL COMPRESSED THE FINS. The cap is 1/HE, and HE fell with
+// the tail, so every OTHER part of the fish now sits at a larger share of the
+// bend's own radius: the widest fin's k*y goes 0.686 -> 0.864. The fins do not
+// fold and this is not a defect, but the headroom that used to be there is
+// mostly spent, and a fin made any longer would reach the tail's own extent —
+// at which point it folds and nothing here says so, because this check only
+// ever looks at the tail.
 if (tailHalfExtentU > CHAIN_MAX_HALF_EXTENT_U) {
   throw new Error(
     `the tail reaches ${tailHalfExtentU.toFixed(4)} body lengths off the centreline but ` +

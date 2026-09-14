@@ -71,8 +71,8 @@ export function bodyScale(width, height) {
   const short = Math.max(1, Math.min(width, height));
   return Math.max(BODY_MIN_SCALE, Math.min(1, short / BODY_REF_SHORT));
 }
-// Fifteen rather than nine, because the chain is 1.54 body lengths long now
-// instead of 0.90 and a segment should stay about a ninth of a body. This is
+// Fifteen rather than nine, because the chain is 1.74 body lengths long now
+// instead of 0.90 and a segment should stay about an eighth of a body. This is
 // only a free choice because the swim wave's phase is spread over the body's
 // LENGTH rather than over its joints — written per joint, as the original had
 // it, raising this constant would have put 2.3 wavelengths across the fish.
@@ -89,7 +89,7 @@ export const TAIL_ROOT_U = 0.90;
 // one curve. koi-draw.js checks this against its own TAIL_ROOT_U + TAIL_LEN at
 // module load: two owners of one length is exactly the drift this pair spent a
 // session on.
-export const CHAIN_SPAN_U = 1.54;
+export const CHAIN_SPAN_U = 1.74;
 
 // THE CHAIN CANNOT HAIRPIN, AND THAT IS A CONSTRAINT RATHER THAN A FILTER.
 // A plain follow-the-leader chain places each joint one segment behind the one
@@ -111,16 +111,17 @@ export const CHAIN_SPAN_U = 1.54;
 // curve self-inverts wherever the offset exceeds the centreline's own radius of
 // curvature: points on the inside of the bend cross the centre and the shape
 // turns inside out. The body is narrow (half-width peaks at 0.131 L) and never
-// reaches it. THE TAIL IS NOT — its outer tips stand 0.372 L off the centre by
-// koi-draw's own envelope, 0.387 as the renderer actually emits them (the tail
+// reaches it. THE TAIL IS NOT — its outer tips stand 0.296 L off the centre by
+// koi-draw's own envelope, 0.308 as the renderer actually emits them (the tail
 // rays and the stroke reach a little past the envelope), and with the chain
 // running through the tail those tips ride the offset map.
 //
-// Measured on the shipped tree at a typed cap of 0.42, over 45 s of pond: the
-// chain's tightest radius sits at exactly seg/0.42 = 25.1 px against a tail
-// half-extent of 37.1 px, so the fan inverted on 13.6% of at-rest frames, 38.5%
-// of slow turns and 100% of sharp ones — which is the thin trailing spike the
-// tail collapsed into. The cap has to be the one the WIDTH admits, so it is:
+// Measured at a typed cap of 0.42, over 45 s of pond, on the wide fan this pair
+// shipped with: the chain's tightest radius sat at exactly seg/0.42 = 25.1 px
+// against a tail half-extent of 37.1 px, so the fan inverted on 13.6% of
+// at-rest frames, 38.5% of slow turns and 100% of sharp ones — which is the
+// thin trailing spike the tail collapsed into. The cap has to be the one the
+// WIDTH admits, so it is:
 //
 //   R = seg / maxBend  must be >= the widest half-extent
 //   seg = CHAIN_SPAN_U·len / (SPINE_JOINTS-1),  half-extent = HALF_EXTENT_U·len
@@ -130,16 +131,17 @@ export const CHAIN_SPAN_U = 1.54;
 // size — which it must be, since folding is a property of the shape and not of
 // how large it is drawn.
 //
-// What it costs is measured and small: the cap falls 24.1 to 16.2 degrees a
-// joint, and 14 joints still admit 227 degrees of total curl, so a koi can
-// still bend past a half-circle. It is the local sharpness that goes, which is
-// the thing that was folding.
+// What it costs is measured and small: against the 24.1 degrees a joint an
+// unsized cap allowed, this admits 23.0, and 14 joints still carry 322 degrees
+// of total curl — most of a full turn. It is the local sharpness that goes,
+// which is the thing that was folding.
 //
-// THE VALUE IS THE EMITTED EXTENT, NOT THE ENVELOPE'S — 0.39 covers the 0.387
-// the renderer actually draws, where the envelope alone would have said 0.372
+// THE VALUE IS THE EMITTED EXTENT, NOT THE ENVELOPE'S — 0.31 covers the 0.308
+// the renderer actually draws, where the envelope alone would have said 0.296
 // and sized the cap 4% too loose. A bound on a drawn shape is taken off what is
-// drawn.
-export const CHAIN_MAX_HALF_EXTENT_U = 0.39;
+// drawn. (The pair before the tail was narrowed was 0.39 over an emitted 0.387,
+// the same 1.007x of margin.)
+export const CHAIN_MAX_HALF_EXTENT_U = 0.31;
 
 // koi-draw.js owns the shape and therefore owns this length; it recomputes its
 // tail's widest across-reach in closed form from its own constants and throws
@@ -207,14 +209,17 @@ const OMEGA_TAU = 0.22;
 // against a tree without them: 119,550 behaviour values over a minute of pond,
 // 0 differ.
 //
-// WHERE IT DOES MEET A GEOMETRIC TEST, THE MARGIN IS THE ANSWER AND IT WAS
-// CHECKED RATHER THAN ASSUMED. A lagged koi is drawn BEHIND where the
-// simulation has it — measured, 7.3% of a body length at the median and 18.8%
-// at the worst — while a leaving koi is kept until LEAVE_CLEAR_LEN puts it 1.1
-// body lengths clear. So at the moment one is culled the DRAWN koi is still at
-// least 0.9 body lengths outside the frame, and the rule that no koi vanishes
-// in view survives the lag with room to spare. Shortening that margin toward a
-// fifth of a body would not.
+// WHERE IT DOES MEET A GEOMETRIC TEST, THE MARGIN IS THE ANSWER. A lagged koi
+// is drawn BEHIND where the simulation has it — measured, 7.3% of a body length
+// at the median and 18.8% at the worst — so the cull margin has to carry that
+// lag as well as the fish. See LEAVE_CLEAR_LEN, which is derived from both.
+//
+// THE PARAGRAPH THAT STOOD HERE REASONED ABOUT THE KOI AS A POINT and was
+// wrong because of it: it carried the lag correctly and then concluded the rule
+// was safe because the HEAD was 0.9 body lengths outside — with 1.54 body
+// lengths of fish trailing behind that head. Measured over 90 s of pond on the
+// tree that carried it, every one of 9 culls happened with part of the koi
+// still on screen and the worst had 38.8% of its drawn silhouette in frame.
 const DRAW_TAU = 0.12;
 
 // AND THE BEND BIAS EASES ON TOP OF THAT, WHICH IS A SECOND STAGE RATHER THAN A
@@ -241,9 +246,23 @@ const DEPART_COOL_S = 1.3;
 const SPAWN_OUT = BODY_LEN_PX * SIZE_VAR[1] * 1.35;
 const ENTRY_JITTER = 0.45;            // rad either side of straight in
 const ENTRY_TRIES = 12;
-// A departing koi is removed one body length past the edge, which is where the
-// last of it has gone. CULL_MARGIN is the safety net for the other states.
-const LEAVE_CLEAR_LEN = 1.1;
+// HOW FAR PAST THE EDGE A DEPARTING KOI IS REMOVED, AND IT IS THE DRAWN FISH'S
+// OWN LENGTH RATHER THAN A BODY'S. `f.x, f.y` is the HEAD; the rest of the koi
+// trails behind it along the chain, so the last of it has gone only once the
+// head is the whole DRAWN length past the edge — and the drawn length is
+// CHAIN_SPAN_U (nose to tail TIP), not 1. A margin of 1.1 deleted koi with up
+// to 38.8% of themselves still in frame, which is the one thing the entry/exit
+// ruling forbids.
+//
+// PLUS THE DRAW LAG, because the margin is applied to the SIMULATION's head
+// while what must be clear is the DRAWN one, and the drawn koi trails the
+// simulated one by up to 18.8% of a body (see DRAW_TAU above). 0.20 covers the
+// measured worst with a little over.
+//
+// DERIVED, so a future change to the tail's reach carries this with it: the
+// same mistake is only reachable again by writing a number here.
+const DRAW_LAG_LEN = 0.20;
+const LEAVE_CLEAR_LEN = CHAIN_SPAN_U + DRAW_LAG_LEN;
 const W_EXIT = 3.2;                   // as strong as containment, and opposed
 const EXIT_BIAS = 0.25;               // how much an aligned edge is preferred
 const RECALL_MARGIN = 40;             // still near enough to turn back
