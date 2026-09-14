@@ -54,7 +54,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -225,8 +225,16 @@ for (const row of rows) {
      36 — see their header in bloom-harness.mjs. Read from THIS row's STL
      bytes. Both are things this gate is structurally blind to: an inside-out
      petal and a petal folded through itself are watertight and one piece. */
-  const ori = orientationAssertions(stlPositions(buf), row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  const stlPos = stlPositions(buf);
+  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
+  /* ST9 — THE STEM CHANNEL, read from THIS row's STL bytes. ST7 asks the stem
+     channel whether the stem channel fired, which is the circularity Eva's
+     fourth durable rule is about; this asks the FILE. See STEM_CHANNEL_SCOPE. */
+  const chan = stemChannelAssertions(stlPos, row,
+    await page.evaluate(() => window.__bloomMetrics()),
+    await page.evaluate(() => window.__bloomUIState()));
+  if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
   const sx = await selfIntersectionAssertions(page, buf, row);
   if (sx.bad.length) { validity.push(`${row.label}: ${sx.bad.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the one thing
@@ -395,6 +403,7 @@ console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 console.log(`STEM SCOPE: ${STEM_SCOPE}`);
+console.log(`STEM CHANNEL SCOPE: ${STEM_CHANNEL_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE SAGITTA SUMMARY — a REPORT, and the worst is named with WHERE it sits,

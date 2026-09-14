@@ -313,16 +313,20 @@ export const PREDICATES = {
   gynoeciumEligible: { not: { ref: 'sphereMode' } },
   gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
 
-  /* THE STEM'S TWO STATEMENTS (session 43). This is the twin of the geometry's
-     `stemEligible`: the registry HIDES the stem controls on this condition and
-     the geometry makes them INERT, and the harness asserts the two agree at
-     module load — the slotRolesEligible precedent, and the same relation
-     androeciumEligible and gynoeciumEligible already carry. SPHERE refuses a
-     stem in this PR; Eva's ruling for it is its own PR immediately after. */
-  stemEligible: { not: { ref: 'sphereMode' } },
-  /* The DIAMETER is hidden AND inert at length 0 — the curl family's own
+  /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
+     This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
+     diameter on this condition and the geometry makes it INERT, and ST0
+     asserts the two agree — the androeciumEligible / gynoeciumEligible
+     relation, one control down.
+     `stemEligible` IS RETIRED, not relaxed. SPHERE refused a stem when the
+     stem shipped; Eva's ruling that petals the stem would pass through are NOT
+     BUILT removed the last state that refuses one, and a predicate true
+     everywhere is a statement nobody can disagree with. Retiring it is not a
+     RETIRED_IDS event — it is a predicate, not a control id — and at
+     `stemLength` 0 what is left is the retired expression term for term.
+     The DIAMETER is hidden AND inert at length 0 — the curl family's own
      gating, and lobeDepth's: one control is the guard and the rest follow it. */
-  stemPresent: { all: [{ ref: 'stemEligible' }, { id: 'stemLength', min: 1 }] },
+  stemPresent: { id: 'stemLength', min: 1 },
 
   /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
@@ -962,6 +966,17 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     if (!c.section) bad.push(`control "${c.id}" declares no section`);
     else if (!ids.has(c.section)) bad.push(`control "${c.id}" names section "${c.section}", which is not in SECTIONS`);
     else used.add(c.section);
+    /* EVERY CONTROL CARRIES A `visibleWhen`, and "never gated" is the explicit
+       `{ all: [] }` sentinel rather than an absent field (the sphere-channel
+       session, Sep 14, on its own defect). Retiring a predicate and simply
+       DROPPING the field left `stemLength` the one control in 112 without one;
+       evalPredicate and predicateDrivers both read `pred == null` as "shown,
+       no drivers" and were fine, but the panel gate reads the SHAPE directly
+       and died on `x.visibleWhen.id` — a TypeError two hours into CI where the
+       registry could have named it at module load. A missing element must be a
+       red check, never a crash. The sentinel also says the absence is
+       DELIBERATE, which an omitted field cannot. */
+    if (c.visibleWhen === undefined) bad.push(`control "${c.id}" declares no \`visibleWhen\` — a control that is never gated declares the \`{ all: [] }\` sentinel, which is what every other ungated control carries; an omitted field is indistinguishable from a forgotten one`);
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
      renders as a header that opens onto nothing, and the reason it is empty is
@@ -1189,7 +1204,19 @@ export function tipControls(t) {
 
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
-    label: 'Petals', fmt: (v) => `${v}`, tier: 'standard', role: 'petal',
+    /* CLAMPED AND TOLD, ON THE CONTROL (the sphere-stem session). On a SPHERE
+       with a stem, petals the stem would pass through are NOT BUILT — so this
+       slider's own number stops being the number of petals on the object, and
+       the first place anyone would notice is here. The count is the OWNER's
+       (`stemOmission`, the builder's own record); the reason is one line down
+       in the read-out's STEM CHANNEL line, which is where the slots and the
+       clearance are named. Absent wherever the question does not arise. */
+    label: 'Petals', tier: 'standard', role: 'petal',
+    fmt: (v, ui, shown) => {
+      const ch = shown && shown.stemChannel;
+      if (!ch || !ch.omitted.length) return `${v}`;
+      return `${v} asked — ${ch.built} BUILT, ${ch.omitted.length} not (the stem passes through them; see STEM CHANNEL)`;
+    },
     /* HIDDEN UNDER FAN, and it is the layerPhase treatment rather than a
        reinterpretation (Eva's ruling, Sep 2). A fan's petal count is DERIVED —
        2 * perSide + a mirror-line petal — so this slider has no job there.
@@ -2832,7 +2859,13 @@ export const CONTROLS = [
        read-out says both; the hidden part is DERIVED per build and printed
        there, never tabulated here. */
     fmt: (v) => (Number(v) === 0 ? 'none — no stem is built' : `${v} mm total, from the hub's underside (the read-out says how much of it the head hides)`),
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemEligible' } },
+    /* `{ all: [] }` is this registry's own "never gated" sentinel, carried by
+       every ungated control rather than left off: evalPredicate returns true
+       for it, predicateDrivers returns nothing for it, and the panel gate reads
+       the shape directly. The stem's length used to be gated on a placement
+       predicate; the sphere channel retired that, and the row takes the
+       sentinel rather than dropping the field. */
+    tier: 'standard', role: 'stem', visibleWhen: { all: [] } },
   { id: 'stemDiameter', section: 'stem', kind: 'slider',
     min: STEM_DIAMETER_RANGE[0], max: STEM_DIAMETER_RANGE[1], step: 0.5, default: 6,
     label: 'Stem diameter',

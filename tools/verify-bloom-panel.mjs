@@ -211,6 +211,21 @@
          defaults; six layers at spread max), from the app's metrics rather
          than from the row's own expectation alone, so a frozen flag in the
          owner and a stuck line in the read-out both fire.
+
+     (w) THE STEM CHANNEL AND THE MERIDIAN PACKING MARGIN, BOTH DIRECTIONS
+         (the sphere-stem session). A user who asks for 40 petals and is
+         shown 33 must be told, and this project's clamped-and-told form is
+         TWO places — the control's own value read-out and the read-out panel
+         — so both are asserted against the BUILDER's own record rather than
+         against each other (`stamenSpread`'s route, HEAD RISE's discipline).
+         The margin rides here because it is TOLD on every sphere that has a
+         stem and is EXACTLY EXHAUSTED at one reachable corner, so a line that
+         silently stopped printing would take the word EXHAUSTED with it and
+         nobody would ever have seen it print: the route drives 4 petals on a
+         12 mm stem, where the margin reads 0.652 with 2 of 4 built, and the
+         two INERT states (a sphere with no stem, a stem on a CAP) where both
+         lines must be ABSENT. `(w)` and not `(t)`: `(t)` is the anther's
+         seven, above.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -581,7 +596,14 @@ const declaredDepth = (id) => ancestry(id).length;
 let screenAgreed = 0;
 {
   const sec = (id, parent) => ({ id, label: id, open: false, ...(parent ? { parent } : {}) });
-  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal' });
+  /* The fixture control carries `visibleWhen: { all: [] }` — the registry's
+     own "never gated" sentinel — because verifySections() now refuses a
+     control without one, and a fixture that is not the shape a real control
+     carries would fail these six cases for a reason none of them is about.
+     Two of the four MUST-FAILs check the refusal's WORDING; the other two
+     only check that it threw, so a fixture defect there would have read as
+     the case passing. */
+  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal', visibleWhen: { all: [] } });
   const threw = (what, controls, sections) => {
     try { verifySections(controls, sections); return null; } catch (e) { return String(e.message); }
   };
@@ -1916,6 +1938,124 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
 }
 
+/* ---------------- (w) THE STEM CHANNEL IS CLAMPED AND TOLD ----------------
+   (w), NOT (t): (t) is session 29's ANTHER'S SEVEN, declared in this file's
+   own header and named at its own banner below. Two routes under one letter
+   makes "route (t) passed" say nothing about which one, which is the whole
+   point of naming them. c, u, w, x, y, z were free; w is the one that cannot
+   be misread as a neighbour of an existing letter.
+
+   IT HAS TWO CONTROLS AND EACH COVERS WHAT THE OTHER CANNOT, which is worth
+   saying rather than leaving implied. The FIRST is its own shape: every clause
+   here is a BICONDITIONAL driven in both directions on the same page, so a
+   line stuck ON fires on the two inert states (a sphere with no stem, a stem
+   on a CAP, where both lines must be ABSENT), a line stuck OFF fires on the
+   three active ones, and a reader whose regex never matched — or always
+   matched — is caught by the same pair. What that CANNOT see is a route that
+   never ran at all. The SECOND is --negative-control, which freezes the
+   read-out: this route's clauses fire there on all five of its states, and
+   BOTH of its lines are now REQUIRED by that run's completeness check
+   (`sawChannel`, `sawPacking`). They are two lines with two owners, so a fix
+   for one is no evidence about the other and the check names them separately.
+   Measured: it shipped fired-but-not-required, so the summary could have
+   printed a pass with the channel's lines never looked at.
+
+   (the sphere-stem session). A user who asks for 40 petals and is shown 33
+   must be told, and this project's clamped-and-told form is TWO places: the
+   control's own value read-out and the read-out panel. So both are asserted,
+   in BOTH DIRECTIONS, against the BUILDER's own record rather than against
+   each other — `stamenSpread`'s route and HEAD RISE's discipline.
+
+   AND THE MERIDIAN PACKING MARGIN RIDES HERE for the same reason: it is TOLD
+   on every sphere that has a stem and it is EXACTLY EXHAUSTED at one
+   reachable corner, so a line that silently stopped printing would take the
+   one number that says the base is spent with it.
+
+   THE INERT DIRECTION IS THE LOAD-BEARING ONE. At `stemLength` 0 — the
+   shipped default — there is no stem, so there is no channel, no omission and
+   no line; that is the branch that keeps every sphere row on this tree
+   byte-identical to the tree before the feature, and a route that only ever
+   drove the stem ON could not see it come undone. The negative control
+   freezes the read-out so neither line can appear where the geometry has one. */
+{
+  const tag = '[stem channel]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const O = m.stemOmission;
+      return {
+        sphere: m.sphereMode === true, stemPresent: !!(m.stem && m.stem.present !== false && m.stem.lengthMm > 0),
+        hasChannel: O !== null && O !== undefined,
+        asked: O ? O.asked : null, built: O ? O.built : null, omitted: O ? O.omitted.length : null,
+        margin: O && O.meridian ? O.meridian.margin : null,
+        exhausted: !!(O && O.meridian && O.meridian.exhausted),
+        petalsBuilt: m.petalsBuilt,
+        countSaid: document.getElementById('petalCount').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+        chanSaid: /STEM CHANNEL/.test(txt),
+        chanBuilt: (txt.match(/STEM CHANNEL (\d+) of (\d+) petals BUILT — (\d+) NOT BUILT/) || []).slice(1).map(Number),
+        chanAllClear: /STEM CHANNEL every one of the \d+ petals clears the stem/.test(txt),
+        nothingLeft: /NOTHING IS LEFT/.test(txt),
+        packSaid: /MERIDIAN PACKING/.test(txt),
+        packNum: (txt.match(/MERIDIAN PACKING ([\d.]+)x/) || [])[1],
+        packNa: /MERIDIAN PACKING n\/a/.test(txt),
+        packExhausted: /MERIDIAN PACKING [^\n]*EXHAUSTED/.test(txt),
+      };
+    });
+    const p = [];
+    const wantChannel = res.sphere && res.stemPresent;
+    if (res.hasChannel !== wantChannel) p.push(`the builder ${res.hasChannel ? 'reports' : 'reports no'} stem channel while the state is ${res.sphere ? 'a sphere' : 'not a sphere'} with ${res.stemPresent ? 'a stem' : 'no stem'}`);
+    if (res.chanSaid !== wantChannel) p.push(`the STEM CHANNEL line is ${res.chanSaid ? 'SHOWN' : 'ABSENT'} while the geometry ${wantChannel ? 'has a channel' : 'has none'}`);
+    if (wantChannel) {
+      if (res.omitted > 0) {
+        if (res.chanAllClear) p.push(`the line says every petal clears the stem while ${res.omitted} were not built`);
+        if (res.chanBuilt.length !== 3) p.push('the STEM CHANNEL line does not name built / asked / not-built');
+        else if (res.chanBuilt[0] !== res.built || res.chanBuilt[1] !== res.asked || res.chanBuilt[2] !== res.omitted) p.push(`the line says ${res.chanBuilt.join('/')} where the builder says ${res.built}/${res.asked}/${res.omitted}`);
+        /* THE CONTROL'S OWN HALF. A read-out sentence three panels down is not
+           where somebody dragging the petal count is looking. */
+        if (!new RegExp(`${res.asked} asked`).test(res.countSaid) || !new RegExp(`${res.built} BUILT`).test(res.countSaid)) {
+          p.push(`the petal count control reads "${res.countSaid}" — it must say what was asked AND what was built (${res.asked} / ${res.built})`);
+        }
+      } else if (!res.chanAllClear) p.push('nothing was omitted, yet the line does not say every petal clears the stem');
+      if (res.built !== res.petalsBuilt) p.push(`the channel says ${res.built} built, the builder's own tally is ${res.petalsBuilt}`);
+      if (res.nothingLeft !== (res.built === 0)) p.push(`the NOTHING IS LEFT clause is ${res.nothingLeft ? 'shown' : 'absent'} while ${res.built} petals were built`);
+      if (!res.packSaid) p.push('the MERIDIAN PACKING line is absent on a sphere with a stem — it is told on every one of them, not only where it is tight');
+      else if (res.built === 0) {
+        if (!res.packNa) p.push('every petal was taken, yet the MERIDIAN PACKING line prints a number — there is no surviving foot to measure the arc against');
+      } else if (res.packNum === undefined) p.push('the MERIDIAN PACKING line prints no margin');
+      else {
+        if (Math.abs(Number(res.packNum) - res.margin) > 0.0005) p.push(`the line says ${res.packNum}x, the builder says ${res.margin}`);
+        if (res.packExhausted !== res.exhausted) p.push(`the EXHAUSTED clause is ${res.packExhausted ? 'shown' : 'absent'} while the builder reports ${res.exhausted} (margin ${res.margin})`);
+      }
+    } else if (res.packSaid) p.push('the MERIDIAN PACKING line is shown where there is no stem channel to pack against');
+    if (want.omitted !== undefined && res.omitted !== want.omitted) p.push(`${res.omitted} petals were omitted, this step expects ${want.omitted}`);
+    if (want.tris !== undefined && res.petalsBuilt !== want.tris) p.push(`${res.petalsBuilt} petals were built where the previous step built ${want.tris} — the stem reached a state it should not have`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${wantChannel ? `channel ${res.built}/${res.asked} (${res.omitted} not built), margin ${res.margin === null ? 'n/a' : res.margin.toFixed(3)}${res.exhausted ? ' EXHAUSTED' : ''}` : 'no channel, no lines'}`);
+    return res;
+  };
+  const sphere = [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }];
+  const off = await step('a SPHERE at stemLength 0 — no stem, no channel, no line (the shipped default, inert by branch)', [...sphere, { id: 'petalCount', value: '8' }, { id: 'layerCount', value: '1' }]);
+  await step('the shipped stem on that sphere (60 x 6 mm): two petals not built, and both places say so', [{ id: 'stemLength', value: '60' }]);
+  await step('the widest stem (12 mm) — the margin is EXACTLY EXHAUSTED at one foot length', [{ id: 'stemDiameter', value: '12' }]);
+  await step('40 petals on the widest stem — more petals, more omitted, a wider sphere and a looser margin', [{ id: 'petalCount', value: '40' }]);
+  /* THE ONLY PLACE THE WORD *EXHAUSTED* IS REACHED. No matrix row produces a
+     margin under 1 with petals still built — the shipped sphere's margin falls
+     to 1.003 at the widest stem and no further — so without this cell the
+     clause that prints it would never have been shown to print. 4 petals on a
+     12 mm stem reads 0.652 with 2 of 4 built: a real margin under one foot's
+     length, not the degenerate 0 the bare corner gives. */
+  await step('4 petals on the widest stem — the margin goes UNDER one foot length and the line says EXHAUSTED', [{ id: 'petalCount', value: '4' }]);
+  await step('THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'spread', value: '0.6' }], { omitted: 3 });
+  await step('the stem back to 0 on that same corner — the channel and both lines go with it', [{ id: 'stemLength', value: '0' }]);
+  if (off) await step('RADIAL with a stem — a cap has no pole the sequence runs through, so no channel', [{ id: 'placement', value: 'RADIAL' }, { id: 'stemLength', value: '60' }]);
+}
+
 /* ===================================================================
    ROUTE (n) — THE RETIREMENT (session 20). RETIRED_IDS is a reservation with
    a check behind it, and the halves that need the DOM or the SOURCE live
@@ -2603,12 +2743,21 @@ if (NEGATIVE_CONTROL) {
     const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
     const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
     const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL FIFTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    /* ROUTE (w), THE STEM CHANNEL. It is REQUIRED here and not merely allowed:
+       route (w)'s own biconditionals catch a line stuck on or off, but nothing
+       makes them run, and a route that fired NOTHING under the frozen read-out
+       would leave this summary printing a pass while the channel's two lines
+       were never looked at. Both are named, because they are two different
+       read-out lines with two different owners and a fix for one is no
+       evidence about the other. */
+    const sawChannel = fail.some((f) => /^\[stem channel\] .*STEM CHANNEL line is ABSENT while the geometry has a channel/.test(f));
+    const sawPacking = fail.some((f) => /^\[stem channel\] .*MERIDIAN PACKING line is absent on a sphere with a stem/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SIXTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

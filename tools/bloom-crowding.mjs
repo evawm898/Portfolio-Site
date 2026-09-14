@@ -517,8 +517,17 @@ export async function readFeet(page, capability = null) {
       const fr = built.foot;
       const feet = [];
       const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
+      /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the
+         sphere-stem session). This raster counts how many feet STACK on the
+         most crowded point, so counting a descriptor whose petal was never
+         built would report crowding that is not there — and R3 compares this
+         list against the builder's own `petalsBuilt`, so it would fire on
+         every sphere with a stem. The omitted set is the BUILDER's own record;
+         with no channel it is empty and the `filter` keeps every foot, which
+         is this line unchanged. */
+      const omitted = new Set((built.stemOmission && built.stemOmission.omitted) || []);
       if (fr.continuousMode) {
-        fr.rings.forEach((r, k) => feet.push(rec(r, built.slotAzimuths[0][k], 0, k)));
+        fr.rings.forEach((r, k) => { if (!omitted.has(k)) feet.push(rec(r, built.slotAzimuths[0][k], 0, k)); });
       } else {
         for (let L = 0; L < fr.layerCount; L++) {
           const row = fr.slotRings[L];
@@ -537,6 +546,10 @@ export async function readFeet(page, capability = null) {
         /* One representative petal per descriptor, with its foot frames as
            EMITTED and the slot it was built for — R4's input. */
         reps: built.petals.map((p, i) => (p ? { slotIndex: p.slotIndex, layer: fr.continuousMode ? 0 : fr.rings[i].lambda, frames: p.footFrames } : null)),
+        /* WHICH DESCRIPTORS HAVE NO PETAL, AND WHY — so R4 can tell "the stem
+           channel did not build this one" from "the representative is
+           missing", which are different failures. ST8 is what pins the set. */
+        omitted: [...omitted],
       };
     }
     out.app = { liveTris: window.__bloomMetrics().liveTris, hubRadius: window.__bloomMetrics().hubRadius };
@@ -571,6 +584,7 @@ export async function footCrowding(page, row, stl = null) {
   /* R4 — every emitted frame sits where the rectangle model puts it. */
   for (const [name, M] of [['export', E], ['live', Lv]]) {
     M.reps.forEach((rep, i) => {
+      if (!rep && (M.omitted || []).includes(i)) return;          // the stem channel did not build it; ST8 pins the set
       if (!rep) { bad.push(`crowding R4 (${name}): descriptor ${i} reports no representative petal`); return; }
       const f = M.feet.find((x) => x.layer === rep.layer && x.slot === rep.slotIndex);
       if (!f) { bad.push(`crowding R4 (${name}): descriptor ${i}'s petal (layer ${rep.layer}, slot ${rep.slotIndex}) has no foot rectangle`); return; }
@@ -620,6 +634,22 @@ export async function footCrowding(page, row, stl = null) {
         if (fr.h !== f.width / 2) bad.push(`crowding R4 (${name}): descriptor ${i} foot row ${k} half-width ${fr.h} is not width/2 = ${f.width / 2}`);
       });
     });
+  }
+
+  /* A BLOOM WITH NO FEET HAS NO CROWDING TO MEASURE (the sphere-stem session).
+     Reachable only where the stem channel took every slot — the bare corner,
+     a stem wider than the head has room for, told rather than refused — and it
+     is the one state where `E.feet[0]` does not exist. Reported as ABSENT
+     rather than as a passing D_max of 0, which is the difference between "there
+     is no crowding here" and "nobody looked".
+     R1-R4 HAVE ALREADY RUN AND HOLD on an empty list — R3 compares 0 feet
+     against 0 petals built and R4 has nothing to iterate — so what this
+     declines is the MEASUREMENT and not the validity. Without it the instrument
+     THREW rather than asserting, which this project's own rule calls out: a
+     missing element must be a red check, never a crash. */
+  if (!E.feet.length || !Lv.feet.length) {
+    return { bad, r: { n: E.feet.length, noFeet: true, crowded: false, registered, exportTris: E.tris,
+                       hubR: E.hub.radius, hubRLive: Lv.hub.radius, dome: null } };
   }
 
   /* THE NUMBERS, export first, then live for the divergence line. */
@@ -692,6 +722,9 @@ export async function footCrowding(page, row, stl = null) {
 /* One line, every gate row. EXPORT numbers; live printed only where it
    differs, on the print-truth line's discipline. */
 export function crowdingLine(r) {
+  /* NO FEET, NO READING — and the line says which, rather than printing a
+     D_max of 0 that nobody measured. */
+  if (r.noFeet) return `CROWDING (export): NO FEET — the stem channel took every petal on this row, so there is no base to crowd (told, not refused); hub ${r.hubR.toFixed(2)} mm, ${r.exportTris} tris`;
   const at = r.dmaxAt ? ` at r ${r.dmaxAt.r.toFixed(2)} mm` : '';
   const diverges = r.liveDmax !== r.dmax || Math.abs(r.liveDmean - r.dmean) > 0.005;
   return `CROWDING (export): feet ${r.n} · stack D_max ${r.dmax}${at}${r.dmaxPass === 'local' ? ` (resolved locally; hub-pitch raster read ${r.hubPassDmax})` : ''} · D_mean ${r.dmean.toFixed(2)}`

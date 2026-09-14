@@ -394,6 +394,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     let petalsBuilt = 0;
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
+    const omittedHere = new Set((builtFull.stemOmission && builtFull.stemOmission.omitted) || []);
     if (fr.continuousMode) {
       mod.buildWhorlInto({
         count: fr.rings.length,
@@ -404,9 +405,18 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         phase: fr.rings[0].phase,
         placement: ui.placement,
         blade: (slot) => {
+          /* A SLOT THE STEM CHANNEL DID NOT BUILD IS NOT PART OF THE
+             ORCHESTRATION (the sphere-stem session). R1 exists because this
+             census EMITS the petals a second time and so can see the builder's
+             own orchestration; emitting one the builder deliberately did not
+             would make the census describe a bloom nobody built, and R1/R2/R3
+             would all fire on every sphere with a stem. The mask is the
+             BUILDER's own record, and ST8 is what pins it. With no channel the
+             set is empty and this line is the shipped one. */
+          if (omittedHere.has(slot.index)) return;
           petalsBuilt++;
           const acc = new mod.MeshBuilder({ exportMode: true });
-          const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability);
+          const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability, petalsBuilt === 1);
           petalAccs.push(acc);
           const ref = builtFull.petals[slot.index];
           if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: continuous slot ${slot.index}'s captured petal does not bit-match builtFull.petals[${slot.index}]`);
