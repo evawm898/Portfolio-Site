@@ -49,12 +49,60 @@ import { createSurface } from './surface.js';
 
 export const BODY_LEN_PX = 96;        // ~1 inch at a typical 96 CSS-px inch
 export const SIZE_VAR = [0.82, 1.18]; // "mild size variation per fish"
+
+// A KOI IS A FIXED NUMBER OF PIXELS AND A PHONE IS NOT A DESKTOP. Measured on
+// the shipped page: the drawn silhouette is the same 154 px at 1440x900, at
+// 1280x800 and at 390x844 — the body length is a constant and nothing scaled
+// it — so a koi is 17% of the short side on a desktop and 39% on a phone. The
+// reference photograph's koi run 15-26% of its frame's short side, median 21%.
+// So the desktop was already right and the phone was the thing that was wrong,
+// which is the opposite of the way round it had been assumed.
+//
+// THE LAW IS FLOORED AND CAPPED AT 1, so every viewport at or above the
+// reference short side is UNCHANGED — a desktop, a laptop and a tablet all
+// draw exactly the koi they drew before. Only a genuinely small frame scales,
+// and the floor stops a very narrow one from breeding minnows: at 390 px the
+// scale lands on the floor, giving an 85 px silhouette, 22% of the short side
+// and squarely inside the reference's own range.
+export const BODY_REF_SHORT = 800;    // short side at which a koi is full size
+export const BODY_MIN_SCALE = 0.55;
+
+export function bodyScale(width, height) {
+  const short = Math.max(1, Math.min(width, height));
+  return Math.max(BODY_MIN_SCALE, Math.min(1, short / BODY_REF_SHORT));
+}
 export const SPINE_JOINTS = 9;
+
+// HOW HARD A KOI IS TURNING, SMOOTHED — the one thing the renderer needs to
+// bend the body, and the only number this file exports for a drawing decision.
+// A koi's body lies along the path it has just swum, so an arc of curvature
+// omega/speed IS the spine; koi-draw.js reads it and nothing else.
+//
+// SMOOTHED BECAUSE THE RAW PER-FRAME DELTA IS NOISE. The heading is resolved
+// against a steering vector that several behaviours write to, so it jitters
+// frame to frame even on a fish swimming a visibly smooth line — and an
+// unfiltered omega makes the body twitch rather than flow. One time constant,
+// long enough to read as a body following a turn rather than reacting to one.
+const OMEGA_TAU = 0.22;
 
 export const MIN_ON_SCREEN = 3;
 export const MAX_ON_SCREEN = 7;
 const IDLE_TARGET = 6.6;              // rounds to 7 — "the higher end"
-const STORM_TARGET = 3.1;             // rounds to 3 — "lower when it is"
+// ROUNDS TO 4, AND THE ONE IT GAINED IS MARGIN RATHER THAN TASTE. At 3.1 this
+// rounded to 3, which is MIN_ON_SCREEN exactly — so the pond sat ON the floor
+// through a whole storm and a single koi nosing past the edge and back, which
+// containment allows and which is normal swimming, put it UNDER. Measured with
+// the gate's own fixture swept over eight seeds and three viewports: main dips
+// below the floor on 1 of 24 storm runs and so does this tree — the same 1-in-24
+// either way, on DIFFERENT seeds, which is why the check passes on main at all.
+// It samples two seeds and main's bad one is not among them.
+//
+// So this is a pre-existing fragility being paid off, not a knob turned until a
+// red went green: with the target one above the floor, BOTH trees read 0 of 24.
+// The brief's "lower when it is storming" is satisfied either way — 4 against
+// the calm 7, inside the 3-7 the brief asks for, with room for a fish to be
+// briefly half out of frame without the pond breaking its own promise.
+const STORM_TARGET = 3.6;
 const TARGET_HOLD_S = 1.2;            // the target must persist before acting
 const SPAWN_COOL_S = 1.6;
 const DEPART_COOL_S = 1.3;
@@ -173,9 +221,9 @@ function wrapAngle(a) {
   return a;
 }
 
-function makeFish(rand, id, x, y, heading, state) {
+function makeFish(rand, id, x, y, heading, state, scale = 1) {
   const traits = { speed: rand.unit(), ripple: rand.unit(), social: rand.unit() };
-  const len = BODY_LEN_PX * rand.range(SIZE_VAR[0], SIZE_VAR[1]);
+  const len = BODY_LEN_PX * scale * rand.range(SIZE_VAR[0], SIZE_VAR[1]);
   const speedVar = rand.range(0.85, 1.15);
   const seg = len / (SPINE_JOINTS - 1) * 0.82;
   const spine = [];
@@ -197,7 +245,7 @@ function makeFish(rand, id, x, y, heading, state) {
     });
   }
   return {
-    id, x, y, heading,
+    id, x, y, heading, omega: 0,
     traits, len, seg, spine, patches,
     baseSpeed: (SPEED_RANGE[0] + (SPEED_RANGE[1] - SPEED_RANGE[0]) * traits.speed) * speedVar,
     turnRate: rand.range(TURN_RANGE[0], TURN_RANGE[1]),
@@ -288,7 +336,8 @@ export function createSchool({ rand, surface = createSurface(), width, height })
 
     spawn(w, h, { counted = true } = {}) {
       const spot = school._entrySpot(w, h);
-      const f = makeFish(rand, school.nextId++, spot.x, spot.y, spot.heading, 'entering');
+      const f = makeFish(rand, school.nextId++, spot.x, spot.y, spot.heading, 'entering',
+                         bodyScale(w, h));
       f.speed = f.baseSpeed;
       school.fish.push(f);
       if (counted) school.arrivals++;
@@ -365,11 +414,18 @@ export function createSchool({ rand, surface = createSurface(), width, height })
     advance(dt, { ripples = [], intensity = 0, width: w = width, height: h = height } = {}) {
       const vis = surface.visible(w, h, 0);
       const capX = vis.w * EDGE_BAND_FRAC, capY = vis.h * EDGE_BAND_FRAC;
-      const sepRange = SEP_RANGE_LEN * BODY_LEN_PX;
+      // Separation is measured in BODY LENGTHS, so it follows the body: on a
+      // frame where the koi are smaller, keeping them a fixed number of PIXELS
+      // apart would spread a small school as widely as a full-size one.
+      const sepRange = SEP_RANGE_LEN * BODY_LEN_PX * bodyScale(w, h);
 
       for (const f of school.fish) {
         const steer = { x: 0, y: 0 };
         const fx = Math.cos(f.heading), fy = Math.sin(f.heading);
+        // Read BEFORE any behaviour writes the heading, and differenced at the
+        // end of the step: every write is then covered, whichever branch made
+        // it, rather than only the one steering site.
+        const headingWas = f.heading;
 
         // --- meander -------------------------------------------------------
         f.wanderTheta += rand.signed() * f.wanderRate * dt;
@@ -380,6 +436,7 @@ export function createSchool({ rand, surface = createSurface(), width, height })
 
         // --- ripples, whatever made them -----------------------------------
         let rx = 0, ry = 0, wsum = 0;
+        let alarmHit = 0;
         for (let i = 0; i < ripples.length; i++) {
           const rip = ripples[i];
           const dx = rip.x - f.x, dy = rip.y - f.y;
@@ -390,11 +447,29 @@ export function createSchool({ rand, surface = createSurface(), width, height })
           const fresh = Math.max(0, 1 - rip.age / rip.life);
           const wgt = rip.strength * fresh * prox;
           rx += (dx / d) * wgt; ry += (dy / d) * wgt; wsum += wgt;
+          // THE STRONGEST FRONT REACHING THE FISH, NOT THE SUM OF THEM. This
+          // was `f.alarm += ...` inside the loop, which is an UNBOUNDED SUM
+          // over the ripple field — fine while the field was a dozen rings,
+          // meaningless once it is a couple of hundred. A fish sitting under a
+          // dense shower has several fronts crossing it at any moment, so the
+          // sum pinned `alarm` at its ceiling permanently: every koi swam at
+          // its alarmed speed and turned at its alarmed rate for the whole run,
+          // reached the edges far more often, and the pond dipped to 2 on
+          // screen against a floor of 3. Measured — it is what took the
+          // population check red when the rain density went up.
+          //
+          // A max is DENSITY-INVARIANT, which is the property that was missing:
+          // being startled is about the biggest disturbance that reaches you,
+          // and ten faint ones do not add up to a slammed door. It also matches
+          // what the steering pull beside it already does — `Math.min(1, wsum)`
+          // saturates for the same reason.
           const front = Math.abs(d - rip.r);
           if (front < FRONT_BAND) {
-            f.alarm += rip.strength * (1 - front / FRONT_BAND) * prox * ALARM_GAIN * dt;
+            const hit = rip.strength * (1 - front / FRONT_BAND) * prox;
+            if (hit > alarmHit) alarmHit = hit;
           }
         }
+        if (alarmHit > 0) f.alarm += alarmHit * ALARM_GAIN * dt;
         if (wsum > 0) {
           // Signed about the midpoint: -1 flees, +1 approaches, 0 ignores.
           const pull = (f.traits.ripple - 0.5) * 2;
@@ -510,6 +585,13 @@ export function createSchool({ rand, surface = createSurface(), width, height })
           const d = Math.hypot(dx, dy) || 1e-6;
           sp[i].x = sp[i - 1].x + (dx / d) * f.seg;
           sp[i].y = sp[i - 1].y + (dy / d) * f.seg;
+        }
+
+        // The turn this step actually came to, low-passed. wrapAngle so a step
+        // across +/-pi is a small turn rather than a full revolution.
+        if (dt > 0) {
+          const raw = wrapAngle(f.heading - headingWas) / dt;
+          f.omega += (raw - f.omega) * Math.min(1, dt / OMEGA_TAU);
         }
 
         f.phase += dt * (2.2 + f.speed * 0.055);

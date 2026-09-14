@@ -43,7 +43,19 @@ export const GROUND = '#08090b';
 
 const RIPPLE_BINS = 12;
 const RAIN_BINS = 6;
-const RIPPLE_MIN_A = 0.014;
+// FAINT RINGS ARE CULLED, AND THIS IS THE ONE LEVER THAT COST NOTHING TO PULL.
+// At 0.014 a ring composites to about 4/255 over the ground — under the noise
+// floor of the image — and at a couple of hundred live ripples, each drawing
+// two rings, most of the stroke work in a frame was going into rings nobody can
+// see. Measured on the real page during a downpour, 1280x800 headless:
+//   0.014 -> 13.6 fps, 90% of the idle surface covered
+//   0.035 -> 15.2 fps, 89%
+//   0.060 -> 17.8 fps, 92%
+// The size ceiling was tried first and is the WRONG lever — dropping the reach
+// from 170 to 100 plane px takes idle coverage 94% -> 55% and buys 1.6 fps,
+// because the large slow rings are most of what makes the surface read as
+// covered. This drops invisible work instead, which is why the picture holds.
+const RIPPLE_MIN_A = 0.06;
 
 // The wash under a ripple's own front: a flat, batched fill (never a per-
 // ripple gradient — hundreds of those would cost real time) so it reads as a
@@ -51,6 +63,18 @@ const RIPPLE_MIN_A = 0.014;
 // that the edge is not the thing anyone notices.
 const WASH_BINS = 5;
 const WASH_MAX_A = 0.05;
+// THE WASH RIDES THE FRESH HALF OF A RIPPLE ONLY, AND THE DENSITY IS WHY. Its
+// job is to make disturbed water read brighter than still water — but with the
+// surface now better than 90% covered there IS no still water to read against,
+// so a wash under every ring at every age is a flat brightening of the whole
+// frame that happens to cost the most expensive thing in the renderer: a large
+// translucent filled ellipse, hundreds of them a frame. Measured on the real
+// page during a downpour, 1280x800 headless: 13.1 fps with the wash on every
+// ripple against 15.1 with none at all, and the ripple CAP makes no difference
+// at all to either (600, 450 and 340 all read 13). Keeping it to the fresh half
+// is where it still says something — a ring that has just landed against the
+// older ones spreading around it.
+const WASH_UNTIL = 0.5;        // of a ripple's own life
 
 // The grain: a fixed field of single-pixel points, jittered off a grid so it
 // does not read as a lattice, cached per canvas size exactly like the
@@ -168,6 +192,37 @@ const PELVIC_U = 0.60, PELVIC_ANGLE = 1.14, PELVIC_LEN = 0.17, PELVIC_ROOT = 0.3
 // shading cue.
 const DORSAL_U0 = 0.20, DORSAL_U1 = 0.82, DORSAL_A = 0.22;
 
+// THE BEND. One curvature for the whole animal: every point of the contour,
+// both pectorals, both pelvics, the tail and every marking go through ONE
+// mapping onto ONE arc, so nothing can fall out of step with anything else.
+// There is no per-part frame, no swim wave and no second oscillator. That is
+// the whole reason the Step 1 rewrite was worth doing.
+//
+// IT IS NOT THE PHYSICAL ARC, AND THE MEASUREMENT IS WHY. A real koi's body
+// lies along the path it has just swum, which would make the spine an arc of
+// curvature omega/speed — and that is what this was first written as. Sampled
+// over 90 s of the real pond, three viewports, cruising fish only: the MEDIAN
+// |omega| is 0.679 rad/s at 36.9 px/s, which over the 1.54 body lengths from
+// snout to tail tip is 91 DEGREES of sweep; p90 is 417 degrees and the tail
+// curls back through the head. The steering lets a koi turn well inside its
+// own body length — fine for a point being pushed around, meaningless as a
+// shape — so the physical law cannot be used and no clamp on it would leave
+// anything but a binary straight/bent flip, because the median is already
+// four times over any sane cap.
+//
+// SO THE TURN IS MAPPED, SMOOTHLY AND SATURATING. `tanh` because it is
+// monotone, C-infinity and has no threshold anywhere — a clamp would put a
+// visible corner in the motion at whatever value it bound. Against the
+// measured distribution this gives about 18 degrees of sweep at the median
+// turn, 32 at p90 and 41 at the hardest turn the pond produces.
+//
+// KEYED ON OMEGA ALONE, NOT ON OMEGA/SPEED. Koi brake as they turn hard (see
+// the edge brake in koi-fish.js), so dividing by speed would amplify the bend
+// exactly where it is already largest, and a nearly stopped fish would bend
+// hardest of all — which is the opposite of what a slowing fish looks like.
+const BEND_MAX_TURN = 0.80;      // rad of sweep, snout to tail tip, at saturation
+const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it
+
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
 const OUTLINE_W = 1.0;
@@ -193,6 +248,9 @@ function closedSmooth(ctx, pts) {
 
 export function createRenderer(ctx, surface) {
   const sq = surface.squash;
+  // The plain plane->screen projection. drawFish SHADOWS this with its own,
+  // which carries the bend as well; everything else on the water is already
+  // in plane coordinates and only needs the squash.
   const P = (x, y) => ({ x, y: y * sq });
 
   // Reused bins — allocating these per frame is the one place this renderer
@@ -279,7 +337,7 @@ export function createRenderer(ctx, surface) {
   // The rays inside a fin: straight lines from just outside the root to just
   // short of the envelope. The reference draws a lot of these; a handful reads
   // as the same thing at the size a koi is on this page.
-  function raysInto(origin, axis, spread, reach, count, inner, outer) {
+  function raysInto(P, origin, axis, spread, reach, count, inner, outer) {
     for (let k = 0; k < count; k++) {
       const u = count === 1 ? 0 : (k / (count - 1)) * 2 - 1;
       const d = rotUnit(axis, -u * spread), r = reach(u);
@@ -298,14 +356,59 @@ export function createRenderer(ctx, surface) {
     const a = FISH_ALPHA;
     const L = f.len;
 
-    // ONE RIGID FRAME. F is the fish's forward (nose) direction and R its
-    // right, both fixed for the whole fish this frame; `pos(u)` walks the axis
-    // from nose to tail root and `edge(u, side, k)` is k half-widths out from
-    // that station. Nothing reads a per-joint tangent, and nothing anywhere
-    // reads the heading for anything but building these two vectors.
-    const F = { x: Math.cos(f.heading), y: Math.sin(f.heading) };
-    const R = { x: -F.y, y: F.x };
-    const pos = (u) => ({ x: f.x - F.x * u * L, y: f.y - F.y * u * L });
+    // ONE CANONICAL FRAME, AND ONE MAPPING OUT OF IT. Every shape below is
+    // built with the nose at the origin pointing along +x — so `pos(u)` walks
+    // straight back down the axis and `edge(u, side, k)` is k half-widths out
+    // from it — and `P` is the single place that carries a canonical point onto
+    // the bent spine, into the world, and through the squash. Nothing between
+    // here and there knows the fish's heading, its position or its curvature,
+    // which is what makes it impossible for two parts to disagree about them.
+    const F = { x: 1, y: 0 };
+    const R = { x: 0, y: 1 };
+    const pos = (u) => ({ x: -u * L, y: 0 });
+
+    // Canonical x runs FORWARD from the nose, so the distance back along the
+    // body is -x; canonical y is the lateral offset, on the fish's own right.
+    // The spine's heading at that distance is h0 - k*a, and the exact arc is
+    //   C(a) = nose - a * sinc(ka/2) * dir(h0 - ka/2)
+    // with the tangent dir(h0 - ka) — which at k = 0 is `nose - a * dir(h0)`,
+    // the straight construction. The k === 0 branch below takes that directly
+    // rather than relying on the limit, so a fish that is not turning pays no
+    // trigonometry per point and cannot drift toward the curved arm.
+    //
+    // IT IS NOT BIT-IDENTICAL TO THE PRE-BEND TREE, AND THE BOUND IS MEASURED
+    // RATHER THAN ASSUMED. Collapsing `pos(u)` and `edge()`'s two separate
+    // accumulations into one expression regroups the arithmetic, so 425 of
+    // 2240 emitted coordinates move — by at most 2.27e-13 plane px, which is
+    // a ten-thousandth of a billionth of a pixel. Stated as a bound in the
+    // unit the quantity carries, because an exact-equality claim across two
+    // routes is a claim about floating point rather than about geometry.
+    const h0 = f.heading;
+    // Guarded: a zero-length fish would make this 0, and 0/0 is NaN rather
+    // than the 0 the straight branch is keyed on — which would take the
+    // curved arm with a NaN curvature and draw nothing at all.
+    const reachBack = Math.max(1e-6, (TAIL_ROOT_U + TAIL_LEN) * L);   // snout to tail tip
+    const om = f.omega || 0;
+    const sweep = BEND_MAX_TURN * Math.tanh(om / BEND_OMEGA_REF);
+    const k = sweep / reachBack;
+
+    const cosH0 = Math.cos(h0), sinH0 = Math.sin(h0);
+    const P = k === 0
+      ? (x, y) => ({ x: f.x + cosH0 * x - sinH0 * y,
+                     y: (f.y + sinH0 * x + cosH0 * y) * sq })
+      : (x, y) => {
+          const a = -x;
+          const half = k * a * 0.5;
+          const sinc = half === 0 ? 1 : Math.sin(half) / half;
+          const hm = h0 - half;
+          const cx = f.x - a * sinc * Math.cos(hm);
+          const cy = f.y - a * sinc * Math.sin(hm);
+          // the spine's own forward tangent there, and its normal (= R when
+          // straight, so the lateral offset keeps its meaning under the bend)
+          const ht = h0 - k * a;
+          const tx = Math.cos(ht), ty = Math.sin(ht);
+          return { x: cx - ty * y, y: (cy + tx * y) * sq };
+        };
     const widthAt = (u) => {
       const n = WIDTH_PROFILE.length;
       const fi = Math.max(0, Math.min(n - 1, u * (n - 1)));
@@ -366,7 +469,7 @@ export function createRenderer(ctx, surface) {
       ctx.strokeStyle = rgba(INK_FISH, FIN_LINE_A * a);
       ctx.stroke();
       ctx.beginPath();
-      raysInto(fin.origin, fin.axis, fin.spread, fin.reach, FIN_RAYS, 0.30, 0.90);
+      raysInto(P, fin.origin, fin.axis, fin.spread, fin.reach, FIN_RAYS, 0.30, 0.90);
       ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
       ctx.stroke();
     }
@@ -401,7 +504,7 @@ export function createRenderer(ctx, surface) {
 
     // The tail's own rays, over its fill.
     ctx.beginPath();
-    raysInto(pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
+    raysInto(P, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
     ctx.lineWidth = FIN_LINE_W;
     ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
     ctx.stroke();
@@ -486,7 +589,7 @@ export function createRenderer(ctx, surface) {
       if (u <= 0 || u >= 1) continue;
       const attack = u < 0.06 ? u / 0.06 : 1;
       const base = attack * ((1 - u) * 0.6 + Math.pow(1 - u, 3) * 0.4) * (0.30 + 0.70 * rip.strength);
-      if (rip.r > 1 && base > 0.02) {
+      if (rip.r > 1 && base > 0.02 && u < WASH_UNTIL) {
         const wbin = Math.min(WASH_BINS - 1, Math.floor(base * WASH_BINS));
         washBins[wbin].push(rip.x, rip.y, rip.r);
       }
