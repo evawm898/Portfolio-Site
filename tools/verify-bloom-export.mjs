@@ -236,7 +236,18 @@ for (const row of rows) {
     const m = window.__bloomMetrics(), S = m.stem;
     return {
       sphere: m.sphereMode === true,
-      cavity: S && S.voidMm > 0 ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
+      /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
+         narrower than "the bore survives" and was corrected by measurement:
+         O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on
+         every FLAT-hub stem. Where there is no root band the bore is a BLIND
+         HOLE — its wall reaches the top face and welds to the outer shell
+         through the annulus there, so the stem stays ONE shell. It is only
+         where a root band shuts the top as well that the bore's wall shares no
+         vertex with anything and becomes its own closed surface. (The PART is
+         sealed either way once a slicer unions the hub over the blind hole's
+         mouth; this is about what the exported MESH's shells are.) */
+      cavity: S && S.voidMm > 0 && S.solidBandMm > 0 && S.tipPlugMm > 0
+        ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
     };
   }));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }

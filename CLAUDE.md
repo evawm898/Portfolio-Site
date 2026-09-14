@@ -2400,6 +2400,87 @@ frozen matrix carries a sphere whose head is inside its bore. The image is
 radius is the row's own STEMLESS build's `maxDimMm` halved: a radius read from the SPHERE put
 every blade outside the picture, so the pole was in frame and the OMISSION was not.
 
+**THE STEM'S BORE IS AN INTERVAL, CLOSED AT BOTH ENDS, AND THE PLUG'S LENGTH IS EVA'S OWN
+WALL** (Eva's ask, the tip-plug session: *"i want the bottom of the stem when it is a bored
+cylinder to still look solid"* — read `docs/bloom-stem-tip-plug-outcome.md` before touching
+`stemPlan`'s void fields, `buildStemInto`'s `endFace` or ST10). A hollow stem's bottom was an
+ANNULUS — watertight, one piece, zero boundary edges, and it reads as a cut pipe. The root band
+closes the bore where the HEAD would otherwise stand inside it; the TIP PLUG closes it where a
+viewer would otherwise look up it. **ONE LAW, TWO ENDS**: `endFace(face, cap, closed, up)` opens
+or shuts ONE end and is called twice, and the three arms are two — where no bore survives, the
+no-void arm emits a capped cylinder, which is the pre-plug SOLID arm verbatim.
+**THE LENGTH IS `STEM_MIN_WALL_MM` AND NOT `wallMm`, WHICH IS THE NEARER-LOOKING OWNER AND THE
+WRONG ONE**: `outerR - boreR` is a DIFFERENCE and `a - (a - x)` is not `x` (at a 3.1 mm diameter
+it reads 1.4999999999999998), so the plug would carry a per-diameter wobble and the crossover
+would be decided on it — this file's own ST5 trap, refused rather than repeated.
+**THE CROSSOVER IS DERIVED AND THE PLAIN `> 0` IS THE SAFE COMPARISON, MEASURED.** Over
+**3,996,000 reachable hollow-stem states in BOTH modes** the nearest `voidMm` comes to zero is
+**0.0999999999999996 mm** and NOTHING lands on it. **The obvious "safer" alternative is
+measurably WORSE**: a `voidMm >= MIN_FEATURE_MM` floor sits EXACTLY on a reachable state (a
+sphere at sheet 1.50, a 3.5 mm stem, 1 mm long, whose void is exactly 1.0). The
+derived-looking floor is the dangerous one here and only the sweep says so.
+**ITS MODE-DEPENDENCE IS INHERITED AND NOT ITS OWN**: over 843,600 control sets built in both
+modes, stem topology differs live/export on **2,400** — the SAME 2,400 on both trees, 0 added
+and 0 removed, and exactly the set where the ROOT BAND's `headInsideBore` differs (it reads
+`dome.Rd + hubT/2`, and `hubT` is floored at export). **Pre-existing, the BAND's, recorded not
+fixed** — the omission's own union-over-both-modes is the available remedy and it is one
+condition and its own PR.
+**INERT, MEASURED: 0 floats at `stemLength` 0 and on every solid stem**, both modes, `Object.is`,
+over the whole bloom; the control (a hollow stem) moves 2,559 floats and 100 triangles.
+**AND BOTH OF THE PRE-PLUG TUBE'S ANNULI WERE WOUND INWARD — A PRE-EXISTING DEFECT NO GATE HERE
+COULD SEE.** Measured on the shipping 60 x 6 mm stem: the top face's mean n_z was **-1.000**
+where the material is below it and the bottom face's **+1.000** where it is above, so the
+shell's signed volume came out **440.64 mm^3** against a true **1321.91** (the outer prism less
+the bore). `analyzeStl`'s edge census keys on a SORTED pair so it is **UNDIRECTED** — two
+triangles crossing one edge the SAME way count as a matched pair — and O1 asks only for a
+shell's volume SIGN, which a dominant outer wall keeps positive; the flood fill, the degeneracy
+census and the self-intersection census are blind for the same reason, because the faces are in
+the right PLACES. **Found by computing the volume in closed form and disbelieving the
+disagreement**, session 35's own route one solid later. Corrected in `endFace`, and it has a
+witness because a fix without one is folklore: `buildStemInto` folds a DIRECTED-edge census over
+the triangles it emitted and ST10 asserts it is zero (**0 of 27 stem rows** on the branch against
+**22 of 27** on main). **The whole-mesh census is RECORDED, NOT BUILT, and the reason is a
+distinction it would have to draw**: flagged rows split into UNMATCHED edges (a real inversion)
+and DUPLICATED edges only (two by-design closed shells sharing a quantised vertex — every FRINGE
+row sampled), and a clause that did not separate them would redden rows the export contract
+permits.
+**THREE GATES LEARNED THE NEW GEOMETRY, EACH SEEN RED FIRST.** ST1's prediction reads the VOID
+and the two ENDS (and is **structurally blind to every mutation of the plan's own closure
+lengths** — both its sides read `voidMm`, which is what it is FOR: a builder-against-plan check);
+ST3 learned that a stem emits no inner ring in TWO cases, not one; and **O1 gained a SECOND
+declared inward shell** — with both ends shut the bore is an enclosed CAVITY, so the stem's
+boundary has two components, which is the correct boundary of a solid with a void and not a
+winding error. **O1's predicate was corrected BY MEASUREMENT**: the first cut declared a cavity
+wherever the bore survived and read *"0 of 10 shells are wound INWARD"* on every FLAT-hub stem —
+without a root band the bore is a BLIND HOLE whose wall welds to the outer shell through the top
+annulus, so a separate shell needs **both ends shut in the mesh**. The cavity is BOUNDED against
+the bore's own closed-form prism, not merely counted.
+**ST10 IS THE NEW FAMILY AND IT IS OWED BECAUSE BOTH STL GATES ARE BLIND BY CONSTRUCTION** — a
+tube open at the bottom is a perfectly good closed shell, so watertight, connectedness,
+orientation and the degeneracy census all pass on the very defect it exists for. Its bar is Eva's
+stated wall (IMPORTED — ST3's precedent, which imports her 1.5 mm and deliberately does not
+import `stemBoreRadius`); its measurement is the rings the builder folds over on its way to
+`acc.quad`. **Its declared blindness:** nothing in the harness reads the exported FILE for the
+plug — the clause that does is the byte tool's own **bottom-face AREA** (a full disc `poly(R)`
+against the tube's section `poly(R) - poly(b)`, a 56% difference at the widest bore), which
+exists precisely because clause 2(b) defines the wall as the triangles NOT all at one height and
+the bottom face is exactly the triangles all at one height — **the fifth durable rule, in the
+clause written for the claim**.
+**AND THE MUTANT TABLE MISATTRIBUTED THE FIRST TWO-DIGIT FAMILY IN THE PROJECT.** `famsOn`
+captured `/^(ST\d)/` — ONE digit — so every `ST10:` message was recorded as `ST1`: a mutant
+naming only ST10 reported *"fired ST1"*, SILENT on the clause it exists for and CREDITED to one
+that could not have moved. **It is a class**: any family whose code is a PREFIX of a new one is
+misattributed the moment the new one exists, in BOTH directions, and a green table looks exactly
+the same. Anchored on the colon now (`/^(ST\d+):/`, and the same for `A` and `L`).
+**Three mutants, each witnessed on the MUTATED module's own bottom-face area**; the crossover's
+needed a ROW of its own (`Math.max(0, x)` and `Math.abs(x)` agree for every non-negative x, so it
+fired NOTHING until the table gained the meeting-closures state) — `seam-reads-the-live-sheet`'s
+lesson one family later. **`frozen/phase30` is the 744 rows at `41d7a87`**, registered in BOTH
+maps and proved deep-equal. The image is `node tools/shot-bloom-stem-plug.mjs <dir> --base
+<worktree>` -> **`docs/img/stem-tip-plug.png`**, whose BEFORE cells are a real render of the old
+code served from its own HTTP server, and which quotes NO pixel delta for any pair (two trees,
+two servers, two page sessions).
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL

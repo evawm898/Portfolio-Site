@@ -7869,11 +7869,20 @@ export function meridianPacking(fr, plan, omitted) {
        crossover is therefore the same geometry reached by a second road rather
        than a case named in an `if`.
 
-     * THE BORE IS A SEALED CAVITY. With both ends shut it is no longer a
-       channel through the solid, so the shell has an INNER surface that closes
-       on itself. The winding still encloses the MATERIAL: the outer wall and
-       both end discs face outward, and the void's wall and its two caps face
-       INTO the void, which is where this solid's material is not. */
+     * THE BORE IS A SEALED CAVITY IN THE PART, and its shell count in the MESH
+       depends on which ends this solid shuts itself. Once a slicer unions the
+       hub over the bore's mouth the cavity is sealed on every hollow stem — so
+       the printed object traps whatever is in there, which is a real fact
+       about a resin print and is named rather than discovered. In the exported
+       MESH, though, a stem with no root band leaves its own top open: the
+       bore is a BLIND HOLE whose wall welds to the outer wall through the top
+       annulus, and the stem is ONE shell. Only where a root band shuts the top
+       as well does the bore's wall share no vertex with anything and become its
+       own closed surface — two boundary components, which is the correct
+       boundary of a solid with a void in it and is what O1 declares. The
+       winding encloses the MATERIAL either way: the outer wall and the end
+       discs face outward, and the void's wall and its caps face INTO the void,
+       which is where this solid's material is not. */
 export function buildStemInto(acc, plan) {
   if (!plan.present) return { tris: 0 };
   const N = plan.sides, R = plan.outerR, b = plan.boreR;
