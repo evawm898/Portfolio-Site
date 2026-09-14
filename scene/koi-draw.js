@@ -194,34 +194,52 @@ const DORSAL_U0 = 0.20, DORSAL_U1 = 0.82, DORSAL_A = 0.22;
 
 // THE BEND. One curvature for the whole animal: every point of the contour,
 // both pectorals, both pelvics, the tail and every marking go through ONE
-// mapping onto ONE arc, so nothing can fall out of step with anything else.
-// There is no per-part frame, no swim wave and no second oscillator. That is
-// the whole reason the Step 1 rewrite was worth doing.
+// mapping onto ONE spine. There is no per-part frame and no second oscillator.
 //
-// IT IS NOT THE PHYSICAL ARC, AND THE MEASUREMENT IS WHY. A real koi's body
-// lies along the path it has just swum, which would make the spine an arc of
-// curvature omega/speed — and that is what this was first written as. Sampled
-// over 90 s of the real pond, three viewports, cruising fish only: the MEDIAN
-// |omega| is 0.679 rad/s at 36.9 px/s, which over the 1.54 body lengths from
-// snout to tail tip is 91 DEGREES of sweep; p90 is 417 degrees and the tail
-// curls back through the head. The steering lets a koi turn well inside its
-// own body length — fine for a point being pushed around, meaningless as a
-// shape — so the physical law cannot be used and no clamp on it would leave
-// anything but a binary straight/bent flip, because the median is already
-// four times over any sane cap.
+// THE CURVATURE IS A FUNCTION OF (POSITION ALONG THE BODY, TIME) AND THE TURN,
+// IN THAT ORDER OF IMPORTANCE. A travelling S-wave runs down the body ALWAYS —
+// swimming dead straight included — and the turn is a BIAS added on top of it,
+// never a replacement for it. Keyed on turn rate alone the fish was a rigid arc
+// whenever it was not turning, and the bend appeared and vanished with the
+// steering rather than flowing: that reads as choppy because a fish that is not
+// undulating is not swimming, it is being dragged. So a turning koi shows the
+// same wave skewed toward the turn, which is what a fish actually does.
 //
-// SO THE TURN IS MAPPED, SMOOTHLY AND SATURATING. `tanh` because it is
-// monotone, C-infinity and has no threshold anywhere — a clamp would put a
-// visible corner in the motion at whatever value it bound. Against the
-// measured distribution this gives about 18 degrees of sweep at the median
-// turn, 32 at p90 and 41 at the hardest turn the pond produces.
+// THE WAVE GROWS TOWARD THE TAIL. A koi's head barely leaves the line of travel
+// while the tail sweeps widely, so the curvature amplitude is enveloped along
+// the body rather than uniform — a uniform wave wags the snout, which is the
+// one thing that never happens.
 //
-// KEYED ON OMEGA ALONE, NOT ON OMEGA/SPEED. Koi brake as they turn hard (see
-// the edge brake in koi-fish.js), so dividing by speed would amplify the bend
-// exactly where it is already largest, and a nearly stopped fish would bend
-// hardest of all — which is the opposite of what a slowing fish looks like.
-const BEND_MAX_TURN = 0.80;      // rad of sweep, snout to tail tip, at saturation
-const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it
+// THE PHASE IS THE FISH'S OWN SWIM CLOCK (`f.phase` in koi-fish.js), which
+// already advances faster the faster it swims. So a koi driving hard beats
+// faster than one drifting, with nothing here to keep in step.
+//
+// IT IS INTEGRATED, NOT CLOSED FORM, AND THAT IS THE COST OF THE WAVE. With a
+// constant curvature the arc has an exact solution; with k varying along the
+// body the heading is its integral and the spine is the integral of that, so
+// the spine is walked once per fish per frame at BEND_SAMPLES steps and every
+// drawn point interpolates between them. The buffers are hoisted to the
+// renderer and reused, because per-fish allocation every frame is the one place
+// this renderer could put pressure on the collector.
+const BEND_WAVES = 1.15;         // wavelengths along the snout-to-tail-tip length
+const BEND_WAVE_SWEEP = 1.60;    // rad of heading swing the wave imposes
+// THE ENVELOPE HAS A FLOOR, AND WITHOUT IT THE BODY IS RIGID. A pure u^p
+// envelope leaves the front two thirds of the fish with almost no curvature —
+// measured, at u 0.5 it is 0.39 of full and at 0.25 it is 0.16 — so the S never
+// forms along the BODY and only the tail flicks, which reads as a stiff fish
+// with a loose tail rather than as swimming. The reference plate's curve runs
+// the whole length: the head yaws a little, the middle bows, the tail sweeps
+// most. A floor of about a fifth gives the head that much and no more.
+const BEND_ENV_BASE = 0.22;      // the head's own share of the wave
+const BEND_ENV_POW = 1.10;       // how fast the rest grows tailward
+const BEND_SAMPLES = 28;         // spine steps; every drawn point lerps between
+// THE TURN'S BIAS IS DELIBERATELY SMALLER THAN THE WAVE'S SWING, because a
+// turning fish must still be seen to be SWIMMING. At 0.80 the bias swamped the
+// wave at hard turns — measured, the tail tip's swing over a cycle collapsed
+// from 77 px to 7 on a 96 px body — which is the wave disappearing in favour of
+// a static turn-bend, exactly the failure this rebuild is for.
+const BEND_MAX_TURN = 0.45;      // rad of turn BIAS, snout to tail tip, saturated
+const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it      // rad/s — the turn rate that reaches ~0.76 of it
 
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
@@ -259,6 +277,12 @@ export function createRenderer(ctx, surface) {
   const rippleBins = Array.from({ length: RIPPLE_BINS }, () => []);
   const rainBins = Array.from({ length: RAIN_BINS }, () => []);
   const washBins = Array.from({ length: WASH_BINS }, () => []);
+  // The spine, walked once per fish per frame and interpolated by every drawn
+  // point. Hoisted and reused: allocating three arrays per fish per frame is
+  // exactly the collector pressure this renderer's header warns about.
+  const spineX = new Float64Array(BEND_SAMPLES + 1);
+  const spineY = new Float64Array(BEND_SAMPLES + 1);
+  const spineH = new Float64Array(BEND_SAMPLES + 1);
   let vignette = null, vigKey = '';
   let grain = null, grainKey = '';
 
@@ -367,48 +391,6 @@ export function createRenderer(ctx, surface) {
     const R = { x: 0, y: 1 };
     const pos = (u) => ({ x: -u * L, y: 0 });
 
-    // Canonical x runs FORWARD from the nose, so the distance back along the
-    // body is -x; canonical y is the lateral offset, on the fish's own right.
-    // The spine's heading at that distance is h0 - k*a, and the exact arc is
-    //   C(a) = nose - a * sinc(ka/2) * dir(h0 - ka/2)
-    // with the tangent dir(h0 - ka) — which at k = 0 is `nose - a * dir(h0)`,
-    // the straight construction. The k === 0 branch below takes that directly
-    // rather than relying on the limit, so a fish that is not turning pays no
-    // trigonometry per point and cannot drift toward the curved arm.
-    //
-    // IT IS NOT BIT-IDENTICAL TO THE PRE-BEND TREE, AND THE BOUND IS MEASURED
-    // RATHER THAN ASSUMED. Collapsing `pos(u)` and `edge()`'s two separate
-    // accumulations into one expression regroups the arithmetic, so 425 of
-    // 2240 emitted coordinates move — by at most 2.27e-13 plane px, which is
-    // a ten-thousandth of a billionth of a pixel. Stated as a bound in the
-    // unit the quantity carries, because an exact-equality claim across two
-    // routes is a claim about floating point rather than about geometry.
-    const h0 = f.heading;
-    // Guarded: a zero-length fish would make this 0, and 0/0 is NaN rather
-    // than the 0 the straight branch is keyed on — which would take the
-    // curved arm with a NaN curvature and draw nothing at all.
-    const reachBack = Math.max(1e-6, (TAIL_ROOT_U + TAIL_LEN) * L);   // snout to tail tip
-    const om = f.omega || 0;
-    const sweep = BEND_MAX_TURN * Math.tanh(om / BEND_OMEGA_REF);
-    const k = sweep / reachBack;
-
-    const cosH0 = Math.cos(h0), sinH0 = Math.sin(h0);
-    const P = k === 0
-      ? (x, y) => ({ x: f.x + cosH0 * x - sinH0 * y,
-                     y: (f.y + sinH0 * x + cosH0 * y) * sq })
-      : (x, y) => {
-          const a = -x;
-          const half = k * a * 0.5;
-          const sinc = half === 0 ? 1 : Math.sin(half) / half;
-          const hm = h0 - half;
-          const cx = f.x - a * sinc * Math.cos(hm);
-          const cy = f.y - a * sinc * Math.sin(hm);
-          // the spine's own forward tangent there, and its normal (= R when
-          // straight, so the lateral offset keeps its meaning under the bend)
-          const ht = h0 - k * a;
-          const tx = Math.cos(ht), ty = Math.sin(ht);
-          return { x: cx - ty * y, y: (cy + tx * y) * sq };
-        };
     const widthAt = (u) => {
       const n = WIDTH_PROFILE.length;
       const fi = Math.max(0, Math.min(n - 1, u * (n - 1)));
@@ -440,9 +422,9 @@ export function createRenderer(ctx, surface) {
       const bx = R.x * side * Math.cos(ang) - F.x * Math.sin(ang);
       const by = R.y * side * Math.cos(ang) - F.y * Math.sin(ang);
       const m = Math.hypot(bx, by) || 1;
+      const base = { x: bx / m, y: by / m };
       return {
-        origin: edge(u, side, rootK), axis: { x: bx / m, y: by / m },
-        spread: FIN_SPREAD,
+        origin: edge(u, side, rootK), axis: base, spread: FIN_SPREAD,
         reach: (q) => len * L * Math.pow(Math.max(0, 1 - q * q), FIN_TAPER),
       };
     };
@@ -453,6 +435,57 @@ export function createRenderer(ctx, surface) {
       finAt(PELVIC_U, 1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
       finAt(PELVIC_U, -1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
     ];
+
+    const h0 = f.heading;
+    // Guarded: a zero-length fish would make this 0 and every station would
+    // divide by it.
+    const reachBack = Math.max(1e-6, (TAIL_ROOT_U + TAIL_LEN) * L);   // snout to tail tip
+
+    // The turn's contribution, as a constant bias across the whole body. tanh
+    // rather than a clamp because it is monotone and C-infinity — a clamp puts
+    // a visible corner in the motion at whatever value it binds. It is NOT the
+    // physical omega/speed arc: measured over 90 s of the real pond, the median
+    // |omega| would sweep the body 91 degrees and p90 would sweep it 417, since
+    // the steering lets a koi turn well inside its own body length.
+    const turnK = (BEND_MAX_TURN * Math.tanh((f.omega || 0) / BEND_OMEGA_REF)) / reachBack;
+
+    // Curvature at arc length `a` behind the nose: the travelling wave, grown
+    // toward the tail, plus the turn's bias.
+    const waveK = BEND_WAVE_SWEEP / reachBack;
+    const phase = f.phase || 0;
+    const kAt = (a) => {
+      const u = a < 0 ? 0 : (a > reachBack ? 1 : a / reachBack);
+      const env = BEND_ENV_BASE + (1 - BEND_ENV_BASE) * Math.pow(u, BEND_ENV_POW);
+      return waveK * env * Math.sin(Math.PI * 2 * u * BEND_WAVES - phase) + turnK;
+    };
+
+    // Walk the spine once, then let every drawn point interpolate along it.
+    const N = BEND_SAMPLES, da = reachBack / N;
+    spineX[0] = f.x; spineY[0] = f.y; spineH[0] = h0;
+    for (let i = 0; i < N; i++) {
+      const kMid = kAt((i + 0.5) * da);
+      const hMid = spineH[i] - kMid * da * 0.5;      // midpoint heading
+      spineX[i + 1] = spineX[i] - Math.cos(hMid) * da;
+      spineY[i + 1] = spineY[i] - Math.sin(hMid) * da;
+      spineH[i + 1] = spineH[i] - kMid * da;
+    }
+
+    // Canonical x runs FORWARD from the nose, so the distance back along the
+    // body is -x; canonical y is the lateral offset on the fish's own right.
+    // Outside [0, reachBack] the clamp on `i` makes this a linear EXTRAPOLATION
+    // along the end segment, which is what carries the blunt snout's own dome
+    // (it reaches forward of the nose) without a special case.
+    const P = (x, y) => {
+      const t = -x / da;
+      let i = Math.floor(t);
+      if (i < 0) i = 0; else if (i > N - 1) i = N - 1;
+      const fr = t - i;
+      const hh = spineH[i] + (spineH[i + 1] - spineH[i]) * fr;
+      const cx = spineX[i] + (spineX[i + 1] - spineX[i]) * fr;
+      const cy = spineY[i] + (spineY[i + 1] - spineY[i]) * fr;
+      const tx = Math.cos(hh), ty = Math.sin(hh);
+      return { x: cx - ty * y, y: (cy + tx * y) * sq };
+    };
 
     // THE FINS GO DOWN FIRST, UNDER THE BODY. Their roots sit inside the flank
     // (PECT_ROOT / PELVIC_ROOT are fractions of the half-width there), so the

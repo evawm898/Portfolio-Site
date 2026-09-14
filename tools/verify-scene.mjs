@@ -858,35 +858,15 @@ async function partOne(mutant) {
   check('the pond is fuller when it is calm than when it storms', () => {
     const s = makeSchool(5);
     const calm = s.targetFor(0), storm = s.targetFor(1);
-    // THE STORM TARGET IS 4, NOT THE BRIEF'S 3, AND THE TWO REQUIREMENTS
-    // GENUINELY CONFLICT AT 3. The brief asks for 3-7 koi ON SCREEN and for
-    // fewer during a storm. A target of exactly 3 sits ON the floor, so the
-    // moment any one of the three drifts out of frame — which containment
-    // allows and which is ordinary swimming, not a defect — the pond is at 2
-    // and has broken the brief's own lower bound.
-    //
-    // MEASURED, AND IT IS PRE-EXISTING RATHER THAN SOMETHING THE DENSITY WORK
-    // CAUSED: swept over eight seeds x three viewports at full storm, main dips
-    // below 3 on 1 of 24 runs and this tree dips on 1 of 24 — the same rate, on
-    // different seeds. This check's sibling below samples two seeds, and main's
-    // bad seed is not one of them, which is the only reason it has been green.
-    // Instrumented at the dip: three koi alive, all three CRUISING, one of them
-    // momentarily outside the frame. No leaver, no replacement in transit.
-    //
-    // With the target one above the floor both trees read 0 of 24. Raised here
-    // rather than by loosening the sibling's bound, because the thing that was
-    // wrong is the margin and not the measurement. IT IS A RULED NUMBER AND THE
-    // SESSION THAT CHANGED IT FLAGGED IT AS SUCH — if 3 is wanted back, the fix
-    // it needs is containment that keeps a cruising koi in frame, not this.
     assert.strictEqual(calm, 7, `calm target is ${calm}`);
-    assert.strictEqual(storm, 4, `storm target is ${storm}`);
+    assert.strictEqual(storm, 3, `storm target is ${storm}`);
     let prev = calm;
     for (let i = 1; i <= 10; i++) {
       const t = s.targetFor(i / 10);
       if (t > prev) throw new Error(`the target rose with the storm at ${i / 10}`);
       prev = t;
     }
-    return `7 calm, 4 in a downpour, monotone between`;
+    return `7 calm, 3 in a downpour, monotone between`;
   });
 
   check('the pond holds three to seven koi on screen', () => {

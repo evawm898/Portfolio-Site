@@ -88,21 +88,7 @@ const OMEGA_TAU = 0.22;
 export const MIN_ON_SCREEN = 3;
 export const MAX_ON_SCREEN = 7;
 const IDLE_TARGET = 6.6;              // rounds to 7 — "the higher end"
-// ROUNDS TO 4, AND THE ONE IT GAINED IS MARGIN RATHER THAN TASTE. At 3.1 this
-// rounded to 3, which is MIN_ON_SCREEN exactly — so the pond sat ON the floor
-// through a whole storm and a single koi nosing past the edge and back, which
-// containment allows and which is normal swimming, put it UNDER. Measured with
-// the gate's own fixture swept over eight seeds and three viewports: main dips
-// below the floor on 1 of 24 storm runs and so does this tree — the same 1-in-24
-// either way, on DIFFERENT seeds, which is why the check passes on main at all.
-// It samples two seeds and main's bad one is not among them.
-//
-// So this is a pre-existing fragility being paid off, not a knob turned until a
-// red went green: with the target one above the floor, BOTH trees read 0 of 24.
-// The brief's "lower when it is storming" is satisfied either way — 4 against
-// the calm 7, inside the 3-7 the brief asks for, with room for a fish to be
-// briefly half out of frame without the pond breaking its own promise.
-const STORM_TARGET = 3.6;
+const STORM_TARGET = 3.1;             // rounds to 3 — "lower when it is"
 const TARGET_HOLD_S = 1.2;            // the target must persist before acting
 const SPAWN_COOL_S = 1.6;
 const DEPART_COOL_S = 1.3;
@@ -195,7 +181,24 @@ const W_EDGE = 3.2;
 // as it comes about — which is what a real one does and what the geometry here
 // actually needs.
 const EDGE_BAND_BASE = 58;
-const EDGE_BAND_LOOKAHEAD = 1.9;      // seconds of travel the band must hold
+// SECONDS OF TRAVEL THE BAND MUST HOLD. Raised from 1.9 to 2.8 so containment
+// starts pulling a koi round EARLIER, and the reason is the brief's own floor
+// rather than anything about how the swimming looks.
+//
+// THE POND IS MEANT TO SHOW 3-7 KOI AND TO THIN DURING A STORM, and the storm
+// target is 3 — the floor exactly. So a single CRUISING koi drifting out of
+// frame, which is ordinary swimming rather than a defect, put the pond at 2 and
+// broke the brief. Instrumented at the dip: three koi alive, all three cruising,
+// one of them momentarily outside the frame; no leaver, no replacement in
+// transit. At 1.9 s of lookahead that happens on 1 of 48 storm runs (16 seeds x
+// three viewports, 70 s each) — and on main too, on a different seed, which is
+// the only reason the gate has been green.
+//
+// THE ALTERNATIVE WAS TO RAISE THE STORM TARGET TO 4, which buys the same
+// margin and was measured to work; it is not taken, because the target is a
+// ruled number and the koi leaving the frame is the actual defect. At 2.8 the
+// dip rate is 0 of 48 and the target stays where the brief put it.
+const EDGE_BAND_LOOKAHEAD = 2.8;      // seconds of travel the band must hold
 const EDGE_BAND_FRAC = 0.28;          // but never more than this of the span
 const EDGE_OUT_MAX = 1.6;             // how much harder it pulls once outside
 const EDGE_BRAKE = 0.35;              // speed multiplier when coming about
