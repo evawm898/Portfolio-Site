@@ -308,48 +308,7 @@ tree until block 31 had smoke rows at all, and it caught two matrix labels this
 session renamed without propagating — *"a renamed row is a row this subset
 stopped covering"*.
 
-## 10. WHAT THIS DOES NOT SETTLE
-
-**Nothing in this project has ever been printed.** `MIN_FEATURE_MM` = 1.0 is a
-declared guess (§18b), so every "clears the floor" figure above is a comparison
-against a line we drew ourselves — including the count ceiling, which is that
-constant divided into a width.
-
-**Whether the shipped defaults are right is Eva's, from the
-image.** Both controls default to OFF, so the shipping bloom is unchanged; what
-the range should be centred on is a ruling and not a measurement.
-
-**The teeth are straight-sided.** The taper is linear in the fringe's own
-length, which draws Eva's zigzag. A curved tooth (concave, convex) is one more
-law in `widthsAtU` and is not built.
-
-**Cup and the buckle bring teeth into each other** — the picture session
-measured 2,280 pairs against a plain petal's 752 under cup 1.2 with the base
-pulled clear. Both rows are declared with their counts, reported rather than
-tuned around.
-
-**THE TEETH ARE POINTED ONLY WHERE THERE IS SLACK, and that is an identity of
-the floor rather than a choice.** A count sitting ON its own ceiling has every
-tooth and every gap already at `MIN_FEATURE_MM`, so there is nothing left for a
-taper to spend and the teeth come out SQUARE. Below the ceiling they come to
-points: at 4 teeth on the ceiling terminal the tooth runs 3.25 mm at the split
-to 1.00 mm at the tip. Square teeth are what a maximum count costs, and the
-contact sheet shows both.
-
----
-
-## Instruments
-
-* `node tools/shot-bloom-fringe.mjs <dir>` — `docs/img/carnation-fringe-shipped.png`.
-  Every cell is reachable by a hand on a slider; the mutation the picture
-  session carried is gone.
-* `node tools/verify-bloom-export.mjs --only '^FRINGE:'` and
-  `node tools/verify-bloom-connectedness.mjs` — FR0–FR5 ride in both.
-* `node tools/bloom-self-intersection.mjs`'s `census()` — every pair count.
-
----
-
-## §8 — THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THE REFUSAL IS DECLARED (Eva's ruling, Sep 13)
+## 10. THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THAT REFUSAL IS A DECLARED, ASSERTED OUTCOME (Eva's ruling, Sep 13)
 
 CI went red on both STL gates after this feature merged its harness fix: one row of 736
 dropped, `ALL MAX`, on the validity assertion `no STL download`. It is not a harness
@@ -427,3 +386,92 @@ An undeclared refusal (XR2), a declared row that exports (XR1), a declared row t
 some other reason (XR1), a declaration naming a row the matrix never ran (XR coverage), and the
 census exemption in both directions. `node tools/bloom-smoke.mjs --check` reads 77 families,
 both directions, XR1 and XR2 among them; `--conn` is clean on 73 rows with the refusal named.
+
+### Three findings, not three notes — each one binds the NEXT session
+
+**(1) `ALL MAX` IS THE BINDING CONSTRAINT ON EVERY FUTURE PER-PETAL FEATURE, AND THE NEXT
+ONE CHECKS THAT CORNER FIRST RATHER THAN LAST.** Before this work that row sat at
+**636,672 triangles — 42% of the budget, headroom 2.36x**; the fringe at its maxima wanted
+**3.79x** and breached. The blanket slider sweep hands every new control its maximum onto a
+**240-petal head** (40 x 6), so a per-petal cost is multiplied by 240 there and by 8
+everywhere else in the matrix — `ALL MAX` is not one row among 736, it is the only row that
+composes every maximum at the largest petal count the generator builds. The headroom is a
+shared resource and this feature spent most of it. **Measure `ALL MAX` before writing the
+control, not after CI goes red.**
+
+**(2) MEASURE THE CORNER, NOT THE REPRESENTATIVE CASE.** This session reported the fringe's
+cost as **173,792 triangles on `FRINGE: x 40 petals`** — a real number, honestly measured,
+and the wrong one: that row is 40 petals in ONE whorl, where the blanket row is 40 x 6 and
+the true figure is **1,775,840**, a factor of 10.2 out. The corner was never checked, so a
+breach of a shipped guard arrived as a red gate rather than as a sentence in a report. The
+working agreement's "estimate cost before building" is satisfied in letter by a
+representative row and defeated in purpose. **Eva's own framing: the same class as measuring
+the arc's direction and not its extent** — the measurement was sound and answered a
+different question from the one that governed. Ask what quantity actually binds, then
+measure THAT.
+
+**(3) THE REFUSAL PATH HAD NEVER BEEN EXERCISED UNTIL THIS FEATURE REACHED IT, AND
+`bloom.js:23`'S OWN COMMENT ANTICIPATED EXACTLY THAT.** `EXPORT_TRI_BUDGET` has been in the
+app since long before the fringe, carrying the line that the budget *"exists so the refusal
+path is real before it is ever needed"*. It was needed here for the first time, and the
+thing that proved the path works is the same thing that first tripped it. Two consequences
+worth keeping: a guard nobody has ever fired is a guard nobody has ever tested, and the
+gates around it had never been asked to tell a REFUSAL from a BROKEN EXPORT — they could
+not, and read the first as the second.
+
+---
+
+## 11. WHAT THIS DOES NOT SETTLE
+
+**Nothing in this project has ever been printed.** `MIN_FEATURE_MM` = 1.0 is a
+declared guess (§18b), so every "clears the floor" figure above is a comparison
+against a line we drew ourselves — including the count ceiling, which is that
+constant divided into a width.
+
+**`fringeCount` STOPS AT 10 WHERE THE GEOMETRY REACHES 15, AND RAISING IT IS THE FIRST ITEM
+FOR THE NEXT PR THAT TOUCHES THIS AREA** (Eva's ruling, Sep 14, deferred with its reason
+rather than dropped). At `petalWidth` 30 with a full terminal the count ceiling derived in
+§3c is **15**, so the slider's 10 is an ARTIFICIAL ceiling today and raising it to what
+the geometry actually reaches is right. It was not done in this PR because it is not a
+one-line range change: `ALL MAX` sweeps `fringeCount` to its maximum, so a new maximum
+means **re-measuring the refusal entry's count in `EXPORT_REFUSED_XFAIL`** (finding 1
+above — that row is already 3.79x over) and another **≈3.5 hours of gates on a PR that is
+already green**. Deferred on cost, not on doubt. Whoever opens that PR: raise the range,
+re-measure `ALL MAX` FIRST, and update the one entry and its number.
+
+**THE DEFAULTS STAY OFF — RULED, not left open** (Eva, Sep 14), and the ground
+is the byte-identical guarantee rather than taste: at `petalTipEnd` 0 and
+`fringeCount` 0 the shipping bloom is the same object it was before this PR, and
+§6's partition is what proves it (706 holders, 0 floats moved). A default that
+ships a feature ON would trade that guarantee for a look nobody had asked for.
+What the range should be CENTRED on, if the defaults ever move, stays a ruling
+and not a measurement.
+
+**The teeth are straight-sided.** The taper is linear in the fringe's own
+length, which draws Eva's zigzag. A curved tooth (concave, convex) is one more
+law in `widthsAtU` and is not built.
+
+**Cup and the buckle bring teeth into each other** — the picture session
+measured 2,280 pairs against a plain petal's 752 under cup 1.2 with the base
+pulled clear. Both rows are declared with their counts, reported rather than
+tuned around.
+
+**THE TEETH ARE POINTED ONLY WHERE THERE IS SLACK, and that is an identity of
+the floor rather than a choice.** A count sitting ON its own ceiling has every
+tooth and every gap already at `MIN_FEATURE_MM`, so there is nothing left for a
+taper to spend and the teeth come out SQUARE. Below the ceiling they come to
+points: at 4 teeth on the ceiling terminal the tooth runs 3.25 mm at the split
+to 1.00 mm at the tip. Square teeth are what a maximum count costs, and the
+contact sheet shows both.
+
+---
+
+## Instruments
+
+* `node tools/shot-bloom-fringe.mjs <dir>` — `docs/img/carnation-fringe-shipped.png`.
+  Every cell is reachable by a hand on a slider; the mutation the picture
+  session carried is gone.
+* `node tools/verify-bloom-export.mjs --only '^FRINGE:'` and
+  `node tools/verify-bloom-connectedness.mjs` — FR0–FR5 ride in both.
+* `node tools/bloom-self-intersection.mjs`'s `census()` — every pair count.
+
