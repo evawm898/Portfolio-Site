@@ -205,9 +205,9 @@ function movesByRecord(set) {
        Identified geometrically rather than by stream offset, so it holds
        whatever order the builder emits in. */
 function onlyTheStemsInteriorWent(set, em) {
-  const { acc: accB } = build(G, DEFAULTS, set, em);
+  const { acc: accB, b: repB } = build(G, DEFAULTS, set, em);
   if (CONTROL_ONLY && accB.positions.length) accB.positions[0] += 1e-9;
-  const { acc: accA } = build(GB, DB, set, em);
+  const { acc: accA, b: repA } = build(GB, DB, set, em);
   const st = { ...DEFAULTS, ...set };
   const plan = G.stemPlan(st, G.footRing(st, new G.MeshBuilder({ exportMode: em })).hub,
                           new G.MeshBuilder({ exportMode: em }));
@@ -246,6 +246,55 @@ function onlyTheStemsInteriorWent(set, em) {
   const wa = wall(a), wb = wall(b);
   if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the ${CHANGE} changed a surface that can be SEEN`;
   for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the ${CHANGE} moved the tube's own side, which neither closure has any business reaching`;
+  /* (a) — AND UNDER `--change plug` IT IS A CONTIGUOUS-RUN COMPARISON, because
+     an INDEX-ALIGNED one is wrong the moment anything follows the stem.
+
+     `buildBloomInto` emits petals, then the hub, then the STEM, then the
+     androecium and the gynoecium. The band only ever fires on SPHERE rows,
+     where the centre is hidden AND inert so nothing follows — there the
+     index-aligned form below is valid, and it is left alone. The PLUG fires on
+     every hollow stem, including rows that carry a centre, and there the stem's
+     own triangle count changing (576 -> 476) SHIFTS everything after it: the
+     comparison then reads a stem vertex against a stamen's and reports a
+     difference the geometry does not have. MEASURED — the first whole-matrix
+     run failed on exactly the two rows with parts after the stem (`ALL MAX` and
+     `STEM: x the whole centre`), naming "(r 1.5000, z 0.6000) against
+     (r 8.2447, z -0.6000)", which is the bore's own ring against the hub's rim.
+
+     THE REPLACEMENT IS STRICTLY STRONGER, not a loosening. Scanning in from
+     BOTH ENDS finds the one contiguous run that differs; everything outside it
+     is then bit-identical BY CONSTRUCTION rather than by assertion. Three
+     claims follow: the run is contained in the stem's own envelope, the two
+     streams' LENGTH difference is exactly the stem's own triangle delta, and
+     the outer cylinder wall (below) is untouched. A change that moved a petal
+     as well as the stem would widen the run past the envelope; one that moved
+     something and compensated elsewhere would break the length identity. */
+  if (CHANGE === 'plug') {
+    const la = a.length, lb = b.length;
+    const stemA = repA.stemBuilt ? repA.stemBuilt.tris : 0;
+    const stemB = repB.stemBuilt ? repB.stemBuilt.tris : 0;
+    if (la - lb !== (stemA - stemB) * 9) {
+      return `the two streams differ by ${la - lb} floats while the STEM's own triangle count differs by ${stemA - stemB} (${(stemA - stemB) * 9} floats) — something other than the stem changed size`;
+    }
+    const lim = Math.min(la, lb);
+    let i0 = 0; while (i0 < lim && Object.is(a[i0], b[i0])) i0++;
+    let k0 = 0; while (k0 < lim - i0 && Object.is(a[la - 1 - k0], b[lb - 1 - k0])) k0++;
+    if (i0 >= lim && la === lb) return null;                 // nothing differed at all
+    const inEnv = (x, y, z) => Math.hypot(x, y) <= R + 1e-6 && z <= plan.topZ + 1e-6 && z >= plan.tipZ - 1e-6;
+    /* The run is walked on VERTEX boundaries: `i0` can land mid-vertex, so it is
+       rounded down to a multiple of 3 and the tail up, which only ever WIDENS
+       the region being checked. */
+    const lo = Math.floor(i0 / 3) * 3;
+    for (const [arr, len] of [[a, la], [b, lb]]) {
+      const hi = Math.ceil((len - k0) / 3) * 3;
+      for (let i = lo; i < hi && i + 2 < len; i += 3) {
+        if (!inEnv(arr[i], arr[i + 1], arr[i + 2])) {
+          return `the one contiguous run that differs reaches OUTSIDE the stem's own envelope at float ${i}: (r ${Math.hypot(arr[i], arr[i + 1]).toFixed(4)}, z ${arr[i + 2].toFixed(4)}) against a stem of radius ${R} spanning z ${plan.tipZ.toFixed(4)}..${plan.topZ.toFixed(4)} — the plug reached the head, a petal, the hub or the centre`;
+        }
+      }
+    }
+    return bottomFaceClause(a, b, plan, R);
+  }
   /* (a) — compare only where the two streams align; the differing tail is the
      band's own, and its vertices are checked against the envelope. */
   const n = Math.min(a.length, b.length);
@@ -280,7 +329,10 @@ function onlyTheStemsInteriorWent(set, em) {
 
      It is the file-side clause ST10 declares itself blind to, arriving here
      because this tool already holds both streams and ST10 does not. */
-  if (CHANGE !== 'plug') return null;
+  return null;
+}
+
+function bottomFaceClause(a, b, plan, R) {
   const poly = (rad) => 0.5 * plan.sides * rad * rad * Math.sin(2 * Math.PI / plan.sides);
   const faceArea = (pos, z) => {
     let A = 0;

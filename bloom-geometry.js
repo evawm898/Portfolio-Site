@@ -7590,8 +7590,9 @@ export function stemPlan(state, ring, acc) {
      TOLD in the read-out, never silently produced.
 
      WHY A PLAIN `> 0` AND NOT A DERIVED EPSILON, MEASURED RATHER THAN ARGUED.
-     A branch on a continuous quantity is this project's most-repeated defect
-     (six instances), so the margin was swept rather than assumed: over
+     A branch on a continuous quantity is this project's most-repeated defect —
+     SIX recorded instances before this one, the last of them the root band's own
+     ladder — so this SEVENTH had its margin swept rather than assumed: over
      3,996,000 reachable hollow-stem states in BOTH modes the nearest `voidMm`
      ever comes to zero is 0.0999999999999996 mm and NOTHING lands on it — a
      tenth of a millimetre against a float noise of ~1e-16, fifteen orders of
@@ -7998,10 +7999,14 @@ export function buildStemInto(acc, plan) {
        void's ends land exactly ON a station for a SPHERE and between two for a
        CAP, so a `z < voidTopZ` filter would decide by the last bit whether a
        station an ulp away is kept — and a kept one an ulp from a closure's edge
-       is a DEGENERATE quad, not merely a different ladder. SIXTH instance of
-       the discrete-decision-on-a-continuous-quantity class this file records
-       (the root band was the first caught before it shipped rather than after);
-       the ladder asks the placer for a LENGTH instead.
+       is a DEGENERATE quad, not merely a different ladder. That is the ROOT
+       BAND's own reasoning — the SIXTH instance of the
+       discrete-decision-on-a-continuous-quantity class this file records —
+       GENERALISED to both ends rather than a seventh instance of it; the
+       ladder asks the placer for a LENGTH instead of filtering stations.
+       The genuinely NEW decision here is `voidMm > 0`, which is a seventh, and
+       it is swept rather than argued: §3 of the outcome doc, 0.0999999999999996
+       mm of nearest approach over 3,996,000 states.
 
        IT IS ALSO WHY THE PLAIN HOLLOW STEM'S INNER WALL IS ONE SEGMENT NOW
        WHERE IT USED TO FOLLOW THE OUTER TUBE'S TWO. The void's extent is not

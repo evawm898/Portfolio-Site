@@ -79,8 +79,11 @@ Both closures are lengths, so on a short enough stem they MEET and no bore survi
 takes runs. There is no third shape and no `if` naming the case.
 
 **WHY A PLAIN `> 0` AND NOT A DERIVED EPSILON — MEASURED RATHER THAN ARGUED.** A
-branch on a continuous quantity is this project's most-repeated defect (six recorded
-instances), so the margin was swept rather than assumed. Over **3,996,000 reachable
+branch on a continuous quantity is this project's most-repeated defect — SIX recorded instances
+before this one, the last of them the root band's own ladder — so this SEVENTH had its margin
+swept rather than assumed. (The void's LADDER is not an eighth: it is the band's sixth
+generalised to both ends, asking the placer for a LENGTH rather than filtering stations by a
+comparison.) Over **3,996,000 reachable
 hollow-stem states in BOTH modes** (`stemLength` 1–120 × `stemDiameter` 3–12 step 0.5
 × `sheetThickness` 0.6–2.4 step 0.05 × flat / cap / sphere heads at many sizes):
 
