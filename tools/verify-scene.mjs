@@ -18,7 +18,7 @@
 // reported state actually say.
 //
 // --negative-control IS REQUIRED BEFORE QUOTING A PASS from a changed harness.
-// It applies eleven deliberate defects — each one a mistake that was either
+// It applies 22 deliberate defects — each one a mistake that was either
 // actually made while building this, or is the obvious way to break a claim —
 // and fails if a mutation does not apply, if a check the mutant NAMES stays
 // green, or if the base pass was not clean. A mutation that cannot be applied
@@ -353,6 +353,38 @@ const MUTANTS = [
     to: '  /* guard removed */',
     breaks: ['swap/the-last-scene-asked-for-is-the-one-that-mounts'],
     why: 'two dynamic imports in flight resolve in whatever order the network gives',
+  },
+  {
+    // The shipped defect, before it was measured: canvases in normal flow.
+    id: 'the-planes-stack-instead-of-overlapping',
+    file: 'scene.css',
+    from: '.scene-canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }',
+    to: '.scene-canvas { display: block; width: 100%; height: 100%; }',
+    breaks: ['layers/two-planes-occupy-the-same-rect-rather-than-stacking',
+             'layers/the-back-plane-reaches-the-screen-through-the-front-one'],
+    why: 'in normal flow the second plane lands a full viewport below the first',
+  },
+  {
+    // The other half of the same defect, and the quieter one: the geometry is
+    // right and the front plane is opaque black everywhere it did not draw.
+    id: 'every-plane-is-opaque',
+    file: 'scene.js',
+    from: '      const alpha = opts.alpha !== undefined ? !!opts.alpha : canvases.length > 0;',
+    to: '      const alpha = false;',
+    breaks: ['layers/only-the-backmost-plane-is-opaque',
+             'layers/the-back-plane-reaches-the-screen-through-the-front-one'],
+    why: 'on an opaque context even clearRect yields black, so the front plane hides the back',
+  },
+  {
+    // The obvious "simplification" in the other direction. It costs nothing
+    // visible — which is the point: only the alpha flag itself can see it.
+    id: 'every-plane-is-transparent',
+    file: 'scene.js',
+    from: '      const alpha = opts.alpha !== undefined ? !!opts.alpha : canvases.length > 0;',
+    to: '      const alpha = true;',
+    breaks: ['layers/only-the-backmost-plane-is-opaque',
+             'layers/a-one-canvas-scene-is-still-a-single-opaque-plane'],
+    why: 'the backmost plane is the one that can be opaque, and scene 1 must stay that way',
   },
 ];
 
@@ -1399,7 +1431,34 @@ export default function createProbe(host) {
 }
 `;
 
-function serveRepo({ mutant, withProbe }) {
+// A synthetic MULTIPLANE scene, served only by the gate. Nothing that ships
+// calls host.canvas2d() more than once, so without this the layering contract
+// is exercised by nobody and every claim about it is an inference. The back
+// plane floods red; the front plane clears itself and draws one blue square,
+// well clear of the nav's translucent chrome (sampling under that measures the
+// nav, not the plane).
+const LAYER_PROBE = `
+export const meta = { title: 'Planes' };
+export const LAYER_SQUARE = { x: 300, y: 300, w: 200, h: 200 };
+export default function createLayers(host) {
+  const back = host.canvas2d();
+  const front = host.canvas2d();
+  window.__layers = { frames: 0, square: { x: 300, y: 300, w: 200, h: 200 } };
+  return {
+    frame() {
+      window.__layers.frames++;
+      back.ctx.fillStyle = '#ff0000';
+      back.ctx.fillRect(0, 0, host.width, host.height);
+      front.ctx.clearRect(0, 0, host.width, host.height);
+      front.ctx.fillStyle = '#0000ff';
+      front.ctx.fillRect(300, 300, 200, 200);
+    },
+    state() { return { layers: true, frames: window.__layers.frames }; },
+  };
+}
+`;
+
+function serveRepo({ mutant, withProbe, withLayers }) {
   const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png' };
   const state = { probeDelayMs: 0 };
@@ -1415,6 +1474,8 @@ function serveRepo({ mutant, withProbe }) {
       return send(PROBE_SCENE, 'text/javascript');
     }
 
+    if (rel === 'scene/scene-layers.js') return send(LAYER_PROBE, 'text/javascript');
+
     const file = path.join(REPO, rel);
     if (!file.startsWith(REPO) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404); res.end('not found'); return;
@@ -1427,6 +1488,14 @@ function serveRepo({ mutant, withProbe }) {
         "  { id: 2, title: null, load: null },",
         "  { id: 2, title: 'Probe', load: () => import('./scene-probe.js') },");
       if (swapped === src) throw new Error('the probe could not be injected into the registry');
+      body = Buffer.from(swapped);
+    }
+    if (withLayers && rel === 'scene/registry.js') {
+      const src = body.toString();
+      const swapped = src.replace(
+        "  { id: 3, title: null, load: null },",
+        "  { id: 3, title: 'Planes', load: () => import('./scene-layers.js') },");
+      if (swapped === src) throw new Error('the layer probe could not be injected into the registry');
       body = Buffer.from(swapped);
     }
     send(body, MIME[path.extname(file)] || 'application/octet-stream');
@@ -1902,6 +1971,110 @@ async function partTwo(browser, mutant, shotsDir) {
       });
 
       await checkAsync('the swap pass reports no errors', async () => {
+        assert.deepStrictEqual(errors, [], errors.join(' | '));
+        return 'clean console';
+      });
+    } finally {
+      await ctx.close();
+      server.close();
+    }
+  }
+
+  // -------------------------------------------- pass C: the planes ---------
+  // MULTIPLANE IS A SHELL CAPABILITY WITH NO SHIPPED CALLER, which is exactly
+  // why it is gated here: scene 1 uses one canvas, so every other check in this
+  // file stays green on a shell that cannot layer at all. Both halves of the
+  // contract were broken when they were first measured — the planes stacked a
+  // full viewport apart, and the front one was opaque black where nothing had
+  // been drawn — and neither is visible in anything scene 1 does.
+  {
+    const { server } = await serveRepo({ mutant, withProbe: false, withLayers: true });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const { page, ctx, errors } = await openPage(browser, base);
+    try {
+      setSection('layers');
+
+      // Scene 1 first, on this same page, because the claim that layering was
+      // added WITHOUT moving the one-canvas case is the other half of it.
+      await checkAsync('a one-canvas scene is still a single opaque plane', async () => {
+        await page.waitForFunction(() => window.__scene.activeId === 1, null, { timeout: 5000 });
+        const st = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          return { canvases: window.__scene.canvasCount,
+                   children: window.__scene.stageChildren,
+                   alpha: c.getContext('2d').getContextAttributes().alpha,
+                   scrollH: document.getElementById('scene-stage').scrollHeight,
+                   h: window.__scene.viewport.h };
+        });
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases`);
+        assert.strictEqual(st.children, 1, `${st.children} stage children`);
+        // An opaque backmost plane is the cheap path and is what scene 1 has
+        // always had; a default that flipped every plane to alpha would be
+        // invisible on screen and is what this clause exists to catch.
+        assert.strictEqual(st.alpha, false, 'scene 1\'s only canvas stopped being opaque');
+        assert.strictEqual(st.scrollH, st.h, 'the stage scrolls with one canvas on it');
+        return 'one canvas, opaque, stage does not scroll';
+      });
+
+      await checkAsync('two planes occupy the same rect rather than stacking', async () => {
+        await page.click('[data-scene="3"]');
+        await page.waitForFunction(() => window.__scene.activeId === 3, null, { timeout: 5000 });
+        await page.waitForTimeout(200);
+        const st = await page.evaluate(() => {
+          const cs = [...document.querySelectorAll('.scene-canvas')];
+          const r = cs.map(c => { const b = c.getBoundingClientRect();
+            return { x: Math.round(b.x), y: Math.round(b.y),
+                     w: Math.round(b.width), h: Math.round(b.height) }; });
+          return { n: cs.length, rects: r,
+                   scrollH: document.getElementById('scene-stage').scrollHeight,
+                   h: window.__scene.viewport.h };
+        });
+        assert.strictEqual(st.n, 2, `${st.n} canvases for a two-plane scene`);
+        assert.deepStrictEqual(st.rects[1], st.rects[0],
+          `the planes are at different rects: ${JSON.stringify(st.rects)}`);
+        // The measured symptom of the original defect: the stage grew to twice
+        // the viewport and the front plane sat entirely below the fold.
+        assert.strictEqual(st.scrollH, st.h,
+          `the stage scrolls to ${st.scrollH} against a ${st.h} viewport`);
+        return `both planes at ${JSON.stringify(st.rects[0])}, stage does not scroll`;
+      });
+
+      await checkAsync('only the backmost plane is opaque', async () => {
+        const alpha = await page.evaluate(() => [...document.querySelectorAll('.scene-canvas')]
+          .map(c => c.getContext('2d').getContextAttributes().alpha));
+        assert.deepStrictEqual(alpha, [false, true],
+          `context alpha flags are ${JSON.stringify(alpha)}, want [false, true]`);
+        return 'back plane opaque, front plane transparent';
+      });
+
+      await checkAsync('the back plane reaches the screen through the front one', async () => {
+        // THE RASTERISED COMPOSITE IS THE ONLY INSTRUMENT FOR THIS. Reading each
+        // canvas with getImageData says what that plane HOLDS; it cannot say
+        // what survived compositing, which is the whole question.
+        const vp = page.viewportSize();
+        const png = await page.screenshot({ clip: { x: 0, y: 0, width: vp.width, height: vp.height } });
+        const px = await page.evaluate(async (b64) => {
+          const img = new Image();
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej;
+            img.src = 'data:image/png;base64,' + b64; });
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+          // The screenshot is in device pixels; the square is declared in CSS.
+          const s = img.width / window.innerWidth;
+          const at = (cx, cy) => { const d = g.getImageData(Math.round(cx * s), Math.round(cy * s), 1, 1).data;
+            return [d[0], d[1], d[2]]; };
+          const q = window.__layers.square;
+          return { onSquare: at(q.x + q.w / 2, q.y + q.h / 2), offSquare: at(q.x + q.w + 120, q.y + q.h / 2) };
+        }, png.toString('base64'));
+        assert.deepStrictEqual(px.offSquare, [255, 0, 0],
+          `the back plane does not reach the screen: ${JSON.stringify(px.offSquare)}`);
+        assert.deepStrictEqual(px.onSquare, [0, 0, 255],
+          `the front plane is not on top: ${JSON.stringify(px.onSquare)}`);
+        return 'back plane red where the front drew nothing, front plane blue where it did';
+      });
+
+      await checkAsync('the plane pass reports no errors', async () => {
         assert.deepStrictEqual(errors, [], errors.join(' | '));
         return 'clean console';
       });
