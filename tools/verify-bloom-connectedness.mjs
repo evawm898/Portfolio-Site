@@ -127,7 +127,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 
 const CELL_MM = 0.6;        // below the 1.0 mm min feature (assumed, uncouponed)
 /* Grids beyond this are SKIPPED and reported, NEVER passed — so this number
@@ -386,8 +386,18 @@ for (const row of rows) {
      Read from THIS row's STL bytes; an inside-out petal is one piece here.
      The self-intersection census (X0-X2) rides in the EXPORT gate only, on
      cost — its header says why. */
-  const ori = orientationAssertions(stlPositions(buf), row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  const stlPos = stlPositions(buf);
+  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
+  /* ST9 — THE STEM CHANNEL, from THIS row's STL bytes. It rides in BOTH STL
+     gates where X0-X2 ride in the export one alone, and the difference is
+     COST: the census is quadratic in triangles and this is one linear pass.
+     A petal standing in the channel is one connected piece with the stem, so
+     this gate's own criterion is blind to it by construction. */
+  const chan = stemChannelAssertions(stlPos, row,
+    await page.evaluate(() => window.__bloomMetrics()),
+    await page.evaluate(() => window.__bloomUIState()));
+  if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the ONE thing in
      this file that can see OVER-connection. This gate's whole criterion is
      "one region": 120 feet fused into a single mass at the base are the most
@@ -500,6 +510,7 @@ console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 console.log(`STEM SCOPE: ${STEM_SCOPE}`);
+console.log(`STEM CHANNEL SCOPE: ${STEM_CHANNEL_SCOPE}`);
 console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a flag, not a failure — a fused base is ONE piece here by definition) · CROWDING SCOPE: ${CROWDING_SCOPE}`);

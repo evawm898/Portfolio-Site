@@ -64,12 +64,20 @@ const setOf = (r) => Object.fromEntries(r.set.map((x) => [x.id, isNaN(Number(x.v
 
 const build = (M, D, set, em) => { const acc = new M.MeshBuilder({ exportMode: em }); const b = M.buildBloomInto(acc, { ...D, ...set }); return { acc, b }; };
 
-/* PREDECLARED, from the builder's own record: a row moves iff it reports a
-   stem channel, which is a stem present on a sphere and nothing else. */
+/* PREDECLARED FROM THE BUILDER'S OWN OWNERS, never from the control set: a row
+   moves iff `stemPlan` reports a stem PRESENT on a head `footRing` reports as a
+   SPHERE, which is `stemOmission`'s own guard read from the two objects that
+   answer it rather than from the labels a row happens to carry. It is asked of
+   both modes because the plan reads the accumulator's floor. Deliberately NOT a
+   full `buildBloomInto` — footRing and stemPlan emit nothing, and running the
+   whole builder twice more per row to read one flag costs half the tool's
+   runtime on `ALL MAX` alone. */
 function movesByRecord(set) {
   for (const em of [true, false]) {
-    const { b } = build(G, DEFAULTS, set, em);
-    if (b.stemOmission) return true;
+    const acc = new G.MeshBuilder({ exportMode: em });
+    const st = { ...DEFAULTS, ...set };
+    const fr = G.footRing(st, acc);
+    if (fr.sphereMode && G.stemPlan(st, fr.hub, acc).present) return true;
   }
   return false;
 }

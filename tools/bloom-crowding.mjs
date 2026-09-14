@@ -517,8 +517,17 @@ export async function readFeet(page, capability = null) {
       const fr = built.foot;
       const feet = [];
       const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
+      /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the
+         sphere-stem session). This raster counts how many feet STACK on the
+         most crowded point, so counting a descriptor whose petal was never
+         built would report crowding that is not there — and R3 compares this
+         list against the builder's own `petalsBuilt`, so it would fire on
+         every sphere with a stem. The omitted set is the BUILDER's own record;
+         with no channel it is empty and the `filter` keeps every foot, which
+         is this line unchanged. */
+      const omitted = new Set((built.stemOmission && built.stemOmission.omitted) || []);
       if (fr.continuousMode) {
-        fr.rings.forEach((r, k) => feet.push(rec(r, built.slotAzimuths[0][k], 0, k)));
+        fr.rings.forEach((r, k) => { if (!omitted.has(k)) feet.push(rec(r, built.slotAzimuths[0][k], 0, k)); });
       } else {
         for (let L = 0; L < fr.layerCount; L++) {
           const row = fr.slotRings[L];
@@ -537,6 +546,10 @@ export async function readFeet(page, capability = null) {
         /* One representative petal per descriptor, with its foot frames as
            EMITTED and the slot it was built for — R4's input. */
         reps: built.petals.map((p, i) => (p ? { slotIndex: p.slotIndex, layer: fr.continuousMode ? 0 : fr.rings[i].lambda, frames: p.footFrames } : null)),
+        /* WHICH DESCRIPTORS HAVE NO PETAL, AND WHY — so R4 can tell "the stem
+           channel did not build this one" from "the representative is
+           missing", which are different failures. ST8 is what pins the set. */
+        omitted: [...omitted],
       };
     }
     out.app = { liveTris: window.__bloomMetrics().liveTris, hubRadius: window.__bloomMetrics().hubRadius };
@@ -571,6 +584,7 @@ export async function footCrowding(page, row, stl = null) {
   /* R4 — every emitted frame sits where the rectangle model puts it. */
   for (const [name, M] of [['export', E], ['live', Lv]]) {
     M.reps.forEach((rep, i) => {
+      if (!rep && (M.omitted || []).includes(i)) return;          // the stem channel did not build it; ST8 pins the set
       if (!rep) { bad.push(`crowding R4 (${name}): descriptor ${i} reports no representative petal`); return; }
       const f = M.feet.find((x) => x.layer === rep.layer && x.slot === rep.slotIndex);
       if (!f) { bad.push(`crowding R4 (${name}): descriptor ${i}'s petal (layer ${rep.layer}, slot ${rep.slotIndex}) has no foot rectangle`); return; }

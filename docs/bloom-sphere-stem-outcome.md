@@ -210,8 +210,92 @@ located from the BASE tree's own per-petal triangle counts, built one at a time 
 own module through its own whorl primitive, and the tool REFUSES rather than guesses if
 those counts do not add up to the stream it is slicing.
 
-### 9b. The matrix, the census and the gates
+### 9b. FOUR RESIDUALS WERE COMPUTED ON SLOT 0 BECAUSE SLOT 0 ALWAYS EXISTED
 
-### 9c. Cost
+`buildPetalInto` carries four one-petal checks — the flat-form guard residual, the
+uniform-thickness guard residual, the curl integrator's residual and the flat-dome frame
+residual — and every one of them was gated on `slot.index === 0`. They are checks of a
+LAW rather than of a petal, and slot 0 was simply the petal that was always there.
+
+**On a sphere the stem takes the pole-most slots, and slot 0 is the FIRST to go.** So all
+four went absent, and the form and thickness families reported their guard residual as
+NOT MEASURED on rows that were perfectly well built. `representative` is the fix — the
+caller names the first slot actually built, and `undefined` keeps `slot.index === 0` for
+every caller that does not, so nothing moves anywhere else. Telemetry only; the byte
+partition is what says so.
+
+**THE GATE NAMED IT EXACTLY, WHICH IS #220 EARNING ITS KEEP.** The summary line read
+`9 attempted · 1 reached the results · 8 DROPPED by a validity assertion — NOT a pass`,
+the row census named all eight, and the block above named the clause. Before #220 that
+run's tail would have read `1/1 watertight`.
+
+**AND THE CROWDING RASTER COUNTED FEET THAT WERE NOT BUILT.** `readFeet` builds its foot
+list from `footRing()`'s rings — all K of them — while `crowding R3` compares that list
+against the builder's own `petalsBuilt`, and `R4` wants a representative petal per
+descriptor. Both fire on every sphere with a stem. The list is filtered by the builder's
+own omitted set now, which is also the correct measurement: a foot that was never built is
+not on the base, so counting it would report crowding that is not there.
+
+### 9c. The matrix, the census and the gates
+
+* **The live matrix goes 736 -> 744.** Nine rows added (block 32), one removed (block 30's
+  `STEM: GATED — SPHERE`, which is no longer gated). **`frozen/phase29` is the 736 rows at
+  `5f9c0c7`**, registered in BOTH `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS`, and
+  `--verify-frozen --phase29` is deep-equal to that commit's own `buildMatrix()`, row for
+  row. (It went red first: the snapshot was written from `{label, set}` and dropped the
+  eleven rows' `capability` field — the check doing its job in 24 seconds.)
+* **Smoke census: 28 matrix blocks** (the block count rose, which is session 34's trap
+  avoided) **and 80 families, both directions**, ST7/ST8/ST9 among them.
+* **The self-intersection census on all nine block-32 rows, EXPORT:** eight read exactly
+  **0** within-shell pairs. The ninth — the 240-foot head — reads **199 pairs, worst span
+  0.2394 mm at (0.13, 2.72, 33.21)**, and that is **the HEAD's fold at the FACE pole, not
+  the stem's**: the identical state at `stemLength` 0 reads the same 199 pairs at the same
+  point, and so does a worktree of main with and without a stem asked for. Four readings,
+  one number. Declared in `SELF_INTERSECTION_XFAIL` with that tag. The far pole, which is
+  where the stem is, is clean on every row.
+* **`ALL MAX` IS UNMOVED, AND THAT TOOK A DELIBERATE DERIVATION.** Retiring `stemEligible`
+  took `stemDiameter` out of `PLACEMENT_SUBS` (its predicate no longer reaches `placement`
+  through `sphereMode`), which would have let block 1 sweep it at length 0 — a row naming
+  a control that did nothing, #124's trap from a SEVENTH direction — and let the blanket
+  corners hand it 12 mm, moving `ALL MAX` as a SIDE EFFECT of retiring a predicate.
+  `STEM_SUB_IDS` is the CURL_SUBS derivation applied to it: a slider hidden at DEFAULTS
+  because its GUARD is at 0. Measured: `ALL MAX` carries the identical control set on both
+  trees and builds **2,412,512 triangles in both modes on both**, so its declared
+  export-refusal entry stands unchanged.
+* **THE FEATURE REMOVES TRIANGLES.** The default sphere goes 25,568 -> 21,432 with a
+  60 x 6 mm stem (six petals instead of eight, plus 576 stem triangles); the 240-foot head
+  goes 572,160 -> 527,972.
+
+### 9d. Cost, measured and reported
+
+The channel costs **two petal builds per slot, on a sphere with a stem, and nothing at all
+anywhere else** — the branch is the guard. Measured on this tree, EXPORT:
+
+| | whole bloom, no stem | with the channel |
+|---|---|---|
+| the default sphere (8 petals) | 90 ms | ~240 ms |
+| 40 x 1 | 422 ms | ~1.0 s |
+| 40 x 6 (240 feet) | 2.85 s | 7.4 s |
+
+Two ways to halve it are costed and deliberately not built in a PR this size: absorbing
+the matching-mode probe into the real accumulator (which needs a `MeshBuilder` that can
+take another's positions), and a cheap reach envelope that skips petals nowhere near the
+pole. **And the union has not yet had to do anything**: swept over 456 reachable states
+(6 petal counts x 4 sheet thicknesses x 19 diameters) the two modes omit the SAME set
+every time. It is still the right construction — the boundary is a slider position away,
+and an assertion that can fail is worse than a construction that cannot — but a session
+that removes it owes this measurement again.
 
 ## 10. What this session did NOT do
+
+* **It did not grow `dome.reserved`, touch S3, or change the equal-area placement law.**
+  Session 43 Phase A measured that mechanism and it does not work; §1 carries the numbers.
+* **It did not renumber a slot**, change the hub, the hub-to-stem join's derivation, the
+  stem's controls or its bore rule, or move `STEM_MIN_WALL_MM`, `MIN_FEATURE_MM` or
+  `SHEET_THICKNESS_MM`.
+* **It did not derive a hub-to-stem join for a SHELL.** That is a different derivation —
+  membrane rather than plate bending — and it is its own session. Today the join is inert
+  on a sphere and the read-out says why.
+* **It did not build stem curvature, droop, nodes, taper or branches.**
+* **It did not touch the fringe, the cut law, the coverage arc, the demand table,
+  `bladeStations`, the ladder's ownership, `HELD_ROWS`, `CURL_START_MIN` or `trimPanels`.**

@@ -6497,7 +6497,19 @@ export function petalRim(surface, samples = RIM_SAMPLES) {
    Returns the petal's own measurements for the metrics hook, so the gates
    and the contact sheet ASK THE BUILDER rather than recomputing anything.
    =================================================================== */
-export function buildPetalInto(acc, state, ring, slot, cap = null) {
+/* `representative` — WHICH PETAL CARRIES THE SLOT-0 TELEMETRY (the sphere-stem
+   session). Four guards and residuals here are computed on ONE petal because
+   they are checks of a LAW rather than of a petal, and slot 0 was simply the
+   one that always existed. Under the stem channel it need not: on a sphere the
+   pole-most slots are the ones the stem passes through, so slot 0 is the FIRST
+   to go, and with it every one of those four numbers — which the form and
+   thickness families then read as NOT MEASURED on a row that is perfectly well
+   built. The caller names the representative instead; `undefined` keeps
+   `slot.index === 0` for every caller that does not, so nothing moves. It is
+   TELEMETRY ONLY — no geometry reads it, and the byte partition is what says
+   so rather than this sentence. */
+export function buildPetalInto(acc, state, ring, slot, cap = null, representative = undefined) {
+  const isRep = representative === undefined ? slot.index === 0 : !!representative;
   /* ONE construction of the surface, and every constant below is READ off
      it. A builder that re-derived any of them beside the evaluator would be
      the two-producers defect this project repeats most. */
@@ -6632,7 +6644,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      stops the short-circuit hiding a wrong thick path — the same role
      formGuardResidual plays for the four curves. */
   let thicknessGuardResidual = null;
-  if (uniformThickness && slot.index === 0) {
+  if (uniformThickness && isRep) {
     thicknessGuardResidual = 0;
     for (const row of rows) {
       thicknessGuardResidual = Math.max(thicknessGuardResidual, Math.abs(acc.floorThickness(profileT.at(row.u)) - row.tUsed));
@@ -6658,7 +6670,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      which is the case that made a pure IEEE-754 argument unattractive in
      the first place. Both gates assert this below 1e-9 on every row. */
   let guardResidual = null;
-  if (!form && slot.index === 0) {
+  if (!form && isRep) {
     const zero = petalForm({ petalCup: 0, petalSpineCurl: 0, petalRoll: 0, petalTwist: 0, curlBias: 0, curlStart: 0, petalRollTaper: 0, petalCupGradient: 0 }, halfW, t);
     guardResidual = 0;
     const dev = (a, b) => { for (let k = 0; k < 3; k++) guardResidual = Math.max(guardResidual, Math.abs(a[k] - b[k])); };
@@ -6701,7 +6713,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      reads it — and this is the same repair on the same class of defect. */
   const spineRowU = rows.slice(footS.length).map((r) => r.u);
   let integrationResidual = null;
-  if (law !== null && form.curlUniform && slot.index === 0) {
+  if (law !== null && form.curlUniform && isRep) {
     integrationResidual = 0;
     for (let i = 1; i <= NU; i++) {
       const s = (i / NU) * length, q = law.at(s), c = spineAt(s).C;
@@ -6790,7 +6802,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
      the instrument for that. Null on domed builds: a claim nothing can make
      reads as absent, never as a passing 0. */
   let domeGuardResidual = null;
-  if (dome === null && slot.index === 0) {
+  if (dome === null && isRep) {
     domeGuardResidual = 0;
     const dev = (a, b) => { for (let k = 0; k < 3; k++) domeGuardResidual = Math.max(domeGuardResidual, Math.abs(a[k] - b[k])); };
     const zeroRows = domeRows(0);
@@ -8264,8 +8276,12 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
       blade: (slot) => {
         azOf[slot.index] = slot.azimuth;
         if (omission && omission.omittedSet.has(slot.index)) { petals.push(null); return; }
+        /* THE REPRESENTATIVE IS THE FIRST SLOT ACTUALLY BUILT. On every row
+           that has ever shipped that is slot 0, so this is the shipped
+           argument; under the stem channel slot 0 can be one the stem passes
+           through, and the four slot-0 residuals would go with it. */
+        const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability, petalsBuilt === 0);
         petalsBuilt++;
-        const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability);
         petals.push(p); petalsAll.push(p);
       },
     });
@@ -8412,5 +8428,21 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     }
     return { ...best, threshold, crossing: best.mm < threshold };
   })();
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission };
+  /* THE REPRESENTATIVE PETAL AND ITS RING ARE THE SAME DESCRIPTOR, and it is
+     the first one that actually HAS a petal (the sphere-stem session). Under
+     the stem channel descriptor 0 can be one the stem passes through, and
+     `petals[0]` is then null — so every `lastPetal ?` field in the metrics hook
+     reads absent and the form and thickness families report their guard
+     residual as NOT MEASURED on a row that is perfectly well built. Reporting a
+     petal that does not exist is the alternative and is worse.
+     INERT WHERE NOTHING IS OMITTED: `petals[0]` is non-null on every row that
+     has ever shipped, so `at` is 0 and both fields are the expressions they
+     were. Pairing them matters — the ring carries the width, the radius and the
+     tilt the petal was built at, and a representative petal beside a different
+     descriptor's ring would be two answers to one question. It is the
+     `perDescriptor` ruling one level on: report a petal that IS one.
+     WITH NO PETAL AT ALL (the bare corner, where the stem takes every one) both
+     stay at descriptor 0 and `petal` is null, which is the truth. */
+  const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
+  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission };
 }
