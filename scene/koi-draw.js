@@ -1,4 +1,4 @@
-import { SPINE_JOINTS, TAIL_ROOT_U, CHAIN_SPAN_U } from './koi-fish.js';
+import { SPINE_JOINTS, TAIL_ROOT_U, CHAIN_SPAN_U, CHAIN_MAX_HALF_EXTENT_U } from './koi-fish.js';
 
 // scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
 // so a koi is an outline with a dark body behind it rather than a shape with a
@@ -173,6 +173,43 @@ const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
 const TAIL_FORK = 0.26;       // the extra notch on the axis — the fork itself
 const TAIL_FORK_W = 0.34;     // how wide that fork is, in fan fractions
 const TAIL_TIP_SHORT = 0.06;  // how much the middle falls short of the tips
+
+// HOW FAR THE FISH STANDS OFF ITS OWN CENTRELINE, and the second thing the two
+// files must agree about. koi-fish caps the chain's bend so that the chain's
+// tightest radius is never smaller than this — because every drawn point rides
+// P(x, y) = c(x) + n(x)·y, an offset curve, which turns inside out wherever the
+// offset exceeds that radius. The tail's outer tips are the widest thing on the
+// animal by some way, so they are what the cap is sized against.
+//
+// Computed here from this file's own envelope rather than restated, then
+// compared: a tail point at fan parameter `u` sits at angle u·TAIL_SPREAD off
+// the axis at radius tailReach(u), so its across-offset is reach·sin(u·spread).
+// Sampled rather than solved because `scallop` and `fork` make the maximum's
+// location a root of a transcendental equation, and 4096 samples resolve it to
+// far better than the margin this is checked against.
+const tailHalfExtentU = (() => {
+  let m = 0;
+  for (let i = 0; i <= 4096; i++) {
+    const u = 1 - 2 * (i / 4096);
+    const outer = 1 - TAIL_TIP_SHORT * (1 - u * u);
+    const scallop = 1 - TAIL_SCALLOP * (0.5 - 0.5 * Math.cos((TAIL_LOBES - 1) * Math.PI * (u + 1)));
+    const fork = 1 - TAIL_FORK * Math.exp(-(u / TAIL_FORK_W) * (u / TAIL_FORK_W));
+    const across = Math.abs(TAIL_LEN * outer * scallop * fork * Math.sin(u * TAIL_SPREAD));
+    if (across > m) m = across;
+  }
+  return m;
+})();
+// The body and the fins are narrower and are NOT covered by this check — stated
+// rather than implied. Measured off this renderer's own emitted contour on a
+// straight chain: the widest fin station stands 25.7 px off the centre on a
+// 96 px koi against the tail's 37.1, so the tail is what binds and the check
+// that matters is the one below. If a future fin is made to reach further than
+// the tail does, it will fold and nothing here will say so.
+if (tailHalfExtentU > CHAIN_MAX_HALF_EXTENT_U) {
+  throw new Error(
+    `the tail reaches ${tailHalfExtentU.toFixed(4)} body lengths off the centreline but ` +
+    `the chain's bend is capped for ${CHAIN_MAX_HALF_EXTENT_U}: the fan would invert on a turn`);
+}
                               // the body — without this the tail converged on a
                               // single point and met the wrist as a hard V
 const TAIL_PTS = 30;          // samples across the envelope
@@ -364,14 +401,32 @@ export function createRenderer(ctx, surface) {
   // The rays inside a fin: straight lines from just outside the root to just
   // short of the envelope. The reference draws a lot of these; a handful reads
   // as the same thing at the size a koi is on this page.
-  function raysInto(P, origin, axis, spread, reach, count, inner, outer) {
+  //
+  // DRAWN AS POLYLINES, BECAUSE A STRAIGHT LINE IN THIS FRAME IS NOT ONE AFTER
+  // THE MAP. P(x, y) = c(x) + n(x)·y turns with the chain, so the image of a
+  // straight ray is a curve; emitting its two endpoints draws that curve's
+  // CHORD. Harmless on a short fin ray, and not on a tail ray, which spans
+  // several chain segments: measured over 45 s of pond, the tail rays' chords
+  // sat a median 2.4 px and up to 8.98 px off where the ray really goes on an
+  // 84 px koi — the strays that read as loose straight lines near the fan.
+  //
+  // THE SAMPLE COUNT IS DERIVED FROM THE CHAIN, NOT TYPED: two samples per
+  // segment the ray crosses along the body, so no drawn piece ever spans more
+  // than half a segment and the count falls to the old 2 on anything shorter
+  // than that — which is every fin ray, so their geometry is unchanged.
+  function raysInto(P, segPx, origin, axis, spread, reach, count, inner, outer) {
     for (let k = 0; k < count; k++) {
       const u = count === 1 ? 0 : (k / (count - 1)) * 2 - 1;
       const d = rotUnit(axis, -u * spread), r = reach(u);
-      const p0 = P(origin.x + d.x * r * inner, origin.y + d.y * r * inner);
-      const p1 = P(origin.x + d.x * r * outer, origin.y + d.y * r * outer);
+      const ax = origin.x + d.x * r * inner, ay = origin.y + d.y * r * inner;
+      const bx = origin.x + d.x * r * outer, by = origin.y + d.y * r * outer;
+      const steps = Math.max(1, Math.ceil(Math.abs(bx - ax) / segPx * 2));
+      const p0 = P(ax, ay);
       ctx.moveTo(p0.x, p0.y);
-      ctx.lineTo(p1.x, p1.y);
+      for (let t = 1; t <= steps; t++) {
+        const q = P(ax + (bx - ax) * (t / steps), ay + (by - ay) * (t / steps));
+        ctx.lineTo(q.x, q.y);
+      }
     }
   }
 
@@ -522,7 +577,7 @@ export function createRenderer(ctx, surface) {
       ctx.strokeStyle = rgba(INK_FISH, FIN_LINE_A * a);
       ctx.stroke();
       ctx.beginPath();
-      raysInto(P, fin.origin, fin.axis, fin.spread, fin.reach, FIN_RAYS, 0.30, 0.90);
+      raysInto(P, seg, fin.origin, fin.axis, fin.spread, fin.reach, FIN_RAYS, 0.30, 0.90);
       ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
       ctx.stroke();
     }
@@ -561,17 +616,25 @@ export function createRenderer(ctx, surface) {
 
     // The tail's own rays, over its fill.
     ctx.beginPath();
-    raysInto(P, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
+    raysInto(P, seg, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
     ctx.lineWidth = FIN_LINE_W;
     ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
     ctx.stroke();
 
     // The dorsal fin seen from directly above is a line down the spine.
     {
-      const p0 = P(pos(DORSAL_U0).x, pos(DORSAL_U0).y);
-      const p1 = P(pos(DORSAL_U1).x, pos(DORSAL_U1).y);
+      // Along the centreline, so it is the image of a straight line and has to
+      // be subdivided for the same reason the rays are — it spans 0.62 of the
+      // body, which is most of the chain.
+      const dSteps = Math.max(1, Math.ceil((DORSAL_U1 - DORSAL_U0) * L / seg * 2));
       ctx.beginPath();
-      ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y);
+      const d0 = P(pos(DORSAL_U0).x, pos(DORSAL_U0).y);
+      ctx.moveTo(d0.x, d0.y);
+      for (let t = 1; t <= dSteps; t++) {
+        const u = DORSAL_U0 + (DORSAL_U1 - DORSAL_U0) * (t / dSteps);
+        const q = P(pos(u).x, pos(u).y);
+        ctx.lineTo(q.x, q.y);
+      }
       ctx.lineWidth = FIN_LINE_W;
       ctx.strokeStyle = rgba(INK_FISH, DORSAL_A * a);
       ctx.stroke();

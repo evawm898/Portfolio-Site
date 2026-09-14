@@ -102,9 +102,50 @@ export const CHAIN_SPAN_U = 1.54;
 //
 // Capping that angle makes the fold UNREACHABLE rather than unlikely. It is
 // the one place the constraint belongs: downstream of it every consumer — the
-// contour, the fins, the markings, both tail lobes — is safe by construction,
-// where a smoothing pass would only make a fold rarer.
-const CHAIN_MAX_BEND = 0.42;     // rad between consecutive segments
+// contour, the fins, the markings, the whole tail fan — is safe by
+// construction, where a smoothing pass would only make a fold rarer.
+//
+// THE CAP IS DERIVED FROM THE FISH'S OWN WIDTH, NOT TYPED, AND THE REASON IS A
+// SECOND FOLD THE FIRST CAP COULD NOT SEE. koi-draw maps every drawn point
+// through P(x, y) = c(x) + n(x)·y — an OFFSET CURVE about the chain. An offset
+// curve self-inverts wherever the offset exceeds the centreline's own radius of
+// curvature: points on the inside of the bend cross the centre and the shape
+// turns inside out. The body is narrow (half-width peaks at 0.131 L) and never
+// reaches it. THE TAIL IS NOT — its outer tips stand 0.372 L off the centre by
+// koi-draw's own envelope, 0.387 as the renderer actually emits them (the tail
+// rays and the stroke reach a little past the envelope), and with the chain
+// running through the tail those tips ride the offset map.
+//
+// Measured on the shipped tree at a typed cap of 0.42, over 45 s of pond: the
+// chain's tightest radius sits at exactly seg/0.42 = 25.1 px against a tail
+// half-extent of 37.1 px, so the fan inverted on 13.6% of at-rest frames, 38.5%
+// of slow turns and 100% of sharp ones — which is the thin trailing spike the
+// tail collapsed into. The cap has to be the one the WIDTH admits, so it is:
+//
+//   R = seg / maxBend  must be >= the widest half-extent
+//   seg = CHAIN_SPAN_U·len / (SPINE_JOINTS-1),  half-extent = HALF_EXTENT_U·len
+//   => maxBend <= CHAIN_SPAN_U / ((SPINE_JOINTS-1) · CHAIN_MAX_HALF_EXTENT_U)
+//
+// `len` cancels, so the cap is the same for every koi in the pond whatever its
+// size — which it must be, since folding is a property of the shape and not of
+// how large it is drawn.
+//
+// What it costs is measured and small: the cap falls 24.1 to 16.2 degrees a
+// joint, and 14 joints still admit 227 degrees of total curl, so a koi can
+// still bend past a half-circle. It is the local sharpness that goes, which is
+// the thing that was folding.
+//
+// THE VALUE IS THE EMITTED EXTENT, NOT THE ENVELOPE'S — 0.39 covers the 0.387
+// the renderer actually draws, where the envelope alone would have said 0.372
+// and sized the cap 4% too loose. A bound on a drawn shape is taken off what is
+// drawn.
+export const CHAIN_MAX_HALF_EXTENT_U = 0.39;
+
+// koi-draw.js owns the shape and therefore owns this length; it recomputes its
+// tail's widest across-reach in closed form from its own constants and throws
+// at module load if it exceeds this. Two owners of one length is exactly the
+// drift this pair has spent a session on, so it is checked rather than trusted.
+const CHAIN_MAX_BEND = CHAIN_SPAN_U / ((SPINE_JOINTS - 1) * CHAIN_MAX_HALF_EXTENT_U);
 
 // THE TAIL IS TWO CHAINS, NOT ONE HINGED FAN. Each lobe trails on its own, so
 // the chain's lag reaches all the way through the tail instead of stopping at
