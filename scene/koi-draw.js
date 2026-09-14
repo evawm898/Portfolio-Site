@@ -1,4 +1,4 @@
-import { SPINE_JOINTS, TAIL_ROOT_U, TAIL_LOBE_REST } from './koi-fish.js';
+import { SPINE_JOINTS, TAIL_ROOT_U, CHAIN_SPAN_U } from './koi-fish.js';
 
 // scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
 // so a koi is an outline with a dark body behind it rather than a shape with a
@@ -159,6 +159,14 @@ const FISH_ALPHA = 1;         // see drawFish — a koi never fades
 // how many maxima the trailing edge has, and the scallop and fork depths are
 // what carry the fork back.
 const TAIL_LEN = 0.64;        // of body length, the outer tips' own reach
+// THE CHAIN REACHES EXACTLY AS FAR AS THE DRAWN FISH DOES, and the two owners
+// of that length are checked against each other here rather than trusted to
+// stay in step. koi-fish.js sizes its segments from CHAIN_SPAN_U; this file
+// decides where the tail root sits and how far the tips reach. If they drift,
+// the fan runs off the end of the chain and is drawn on an extrapolation.
+if (Math.abs(CHAIN_SPAN_U - (TAIL_ROOT_U + TAIL_LEN)) > 1e-9) {
+  throw new Error(`the chain spans ${CHAIN_SPAN_U} body lengths but the fish is drawn over ${TAIL_ROOT_U + TAIL_LEN}`);
+}
 const TAIL_SPREAD = 0.62;     // rad, half-angle the fan covers
 const TAIL_LOBES = 2;         // maxima across the trailing edge
 const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
@@ -236,9 +244,6 @@ const WAVE_AMP = 0.052;          // of body length, at the tail
 const WAVE_TOTAL = 5.76;         // radians of phase across the whole body
 const WAVE_POW = 1.6;            // how fast the amplitude grows tailward
 const WAVE_SPEED_REF = 38;       // px/s at which the wave is at full size
-const WAVE_TAIL_LAG = 0.125;     // extra phase across the tail, as a fraction of the body's
-const WAVE_TAIL_GROW = 0.35;     // how much the wave grows across the tail
-const TAIL_BLEND = 0.5;          // sweep either side of the fork the lobes share
 
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
@@ -469,7 +474,7 @@ export function createRenderer(ctx, surface) {
     // body is -x and station i sits at x = -i * seg. Outside the chain the
     // clamp on `i` makes this a linear EXTRAPOLATION along the end segment,
     // which is what carries the blunt snout's own dome (it reaches forward of
-    // the nose) and, until the lobes take it, the tail.
+    // the nose) and the tail's own outermost reach.
     const seg = Math.max(1e-6, f.seg);
     const P = (x, y) => {
       const t = -x / seg;
@@ -496,88 +501,11 @@ export function createRenderer(ctx, surface) {
       return { x: cx + ty * y, y: (cy - tx * y) * sq };
     };
 
-    // THE TAIL RIDES ITS OWN TWO CHAINS, AS A TURN RATHER THAN AS A FRAME.
-    // Each lobe is a chain koi-fish.js trails from the last body joint, so the
-    // lag runs all the way through the tail instead of stopping at a piece
-    // hinged off the end — and because the two trail separately, the lobes
-    // answer a turn at slightly different times rather than swinging as one
-    // rigid fan.
-    //
-    // WHAT IS TAKEN FROM A LOBE IS ITS CUMULATIVE TURN, NOT ITS FRAME, and that
-    // is the whole difference between a tail and a wedge. Re-expressing each
-    // fan point in its lobe's own (along, across) coordinates was tried first:
-    // the two lobes' frames sit 2 x TAIL_LOBE_REST apart at the root, so the
-    // same envelope came out splayed into an angular paper dart that no longer
-    // resembled the approved fan. Rotating the canonical point about the root
-    // by how far the lobe has bent BY THAT RADIUS keeps the envelope exactly as
-    // drawn at zero lag and bends it with the chain as the lag grows.
-    const rootW = cen[N - 1], rootC = sp[N - 1];
-    const backW = tans[N - 1];                 // world backward, already waved
-
-    // WHAT IS TAKEN FROM A LOBE IS HOW FAR IT HAS BENT AWAY FROM STRAIGHT, as a
-    // DISPLACEMENT. Two other readings were built and measured first and both
-    // deform the envelope rather than bend it:
-    //
-    //   its FRAME — re-expressing each fan point in the lobe's own (along,
-    //   across) coordinates. The two lobes' frames sit 2 x TAIL_LOBE_REST apart
-    //   at the root, so the approved fan came out splayed into an angular
-    //   paper dart.
-    //
-    //   its cumulative TURN — rotating the canonical point about the root by
-    //   how far the lobe has turned by that radius. The lobes can reach five
-    //   capped joints of bend, so at a hard turn the fan was being wound
-    //   through 120 degrees and spiralled through itself.
-    //
-    // A displacement has neither failure: it is bounded by the chain's own
-    // excursion, it is exactly zero when the lobe is straight (so the envelope
-    // at rest is the one that was approved, to the bit), and blending the two
-    // lobes' displacements moves a point a little rather than between two
-    // widely separated frames.
-    const lobeBend = (k, s, out) => {
-      const lb = f.lobes[k], seg2 = f.lobeSeg;
-      const t = Math.max(0, s) / seg2;
-      let i = Math.floor(t);
-      if (i > lb.length - 2) i = lb.length - 2;
-      const fr = t - i;
-      const cxp = lb[i].x + (lb[i + 1].x - lb[i].x) * fr;
-      const cyp = lb[i].y + (lb[i + 1].y - lb[i].y) * fr;
-      // where the same station would sit if the lobe had never bent: along its
-      // OWN first segment, which is the rigid attachment
-      let rx = lb[1].x - lb[0].x, ry = lb[1].y - lb[0].y;
-      const m = Math.hypot(rx, ry) || 1; rx /= m; ry /= m;
-      out.x = cxp - (lb[0].x + rx * Math.max(0, s));
-      out.y = cyp - (lb[0].y + ry * Math.max(0, s));
-    };
-
-    // Both lobes answer every point and their BENDS are crossfaded, so the fork
-    // at u = 0 is one point of one path rather than a jump between two chains.
-    const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
-    const bA = { x: 0, y: 0 }, bB = { x: 0, y: 0 };
-    const tailPoint = (u) => {
-      const r = tailReach(u);
-      const m = smooth01((u / TAIL_BLEND + 1) * 0.5);
-      lobeBend(0, r, bA); lobeBend(1, r, bB);
-      const th = -u * TAIL_SPREAD;
-      const ca = Math.cos(th), sa = Math.sin(th);
-      const dx = backW.x * ca - backW.y * sa, dy = backW.x * sa + backW.y * ca;
-      // The wave carried on past the body: the same law, its phase and its
-      // amplitude continuing from the last joint rather than stopping at it,
-      // and referenced to the root so the tail does not jump where it attaches.
-      // THE TAIL CONTINUES THE BODY'S WAVE; IT DOES NOT START ONE OF ITS OWN.
-      // Growing the amplitude as (1 + q)^WAVE_POW tripled it across the tail —
-      // 0.158 L of sideways throw at the tip against the body's own 0.052 L,
-      // and eight times the whip the original tail carried. That is not a tail
-      // following a fish, it is a tail on its own schedule, which is what read
-      // as wagging. It grows mildly now and lags by about one joint rather than
-      // two, so the tip and the root stay nearly in step.
-      const q = r / Math.max(1e-6, TAIL_LEN * L);
-      const amp = WAVE_AMP * L * (1 + WAVE_TAIL_GROW * q) * speedF;
-      const off = Math.sin(phase - (1 + q * WAVE_TAIL_LAG) * WAVE_TOTAL) * amp
-                - Math.sin(phase - WAVE_TOTAL) * WAVE_AMP * L * speedF;
-      const px = rootW.x + dx * r - dy * off + bA.x + (bB.x - bA.x) * m;
-      const py = rootW.y + dy * r + dx * off + bA.y + (bB.y - bA.y) * m;
-      return { x: px, y: py * sq };
-    };
+    // THE TAIL IS ON THE SAME CHAIN AS THE REST OF THE FISH. It used to hang
+    // off two sub-chains branching at the root, which made the lobes answer a
+    // turn on their own schedule; the chain runs through to the tail TIP now,
+    // so the fan is built canonically like every other part and carried by the
+    // one mapping. Nothing here knows the tail is a tail.
 
     // THE FINS GO DOWN FIRST, UNDER THE BODY. Their roots sit inside the flank
     // (PECT_ROOT / PELVIC_ROOT are fractions of the half-width there), so the
@@ -605,27 +533,26 @@ export function createRenderer(ctx, surface) {
     // at the outer tips, so the peduncle's own two corners join straight to
     // them: that pair of segments IS the tail's leading edge, and there is no
     // seam anywhere for a fill to leak through.
-    // Built in WORLD points rather than canonical ones, because the flanks ride
-    // the body chain and the tail rides the lobes: two different curves, one
-    // path. It is still a single closed contour with no seam for a fill to
-    // leak through — the envelope's first and last points are the outer tips,
-    // and the peduncle's own two corners join straight to them.
+    // ONE array of canonical points, one mapping. The flanks and the tail fan
+    // are the same curve's stations now, so there is no seam for a fill to leak
+    // through — the envelope's first and last points are the outer tips, and
+    // the peduncle's own two corners join straight to them.
     const S = WIDTH_PROFILE.length;
     const c = [];
-    for (let i = 0; i < S; i++) { const e = edge(i / (S - 1), 1); c.push(P(e.x, e.y)); }
-    for (let i = 0; i <= TAIL_PTS; i++) c.push(tailPoint(1 - 2 * (i / TAIL_PTS)));
-    for (let i = S - 1; i >= 0; i--) { const e = edge(i / (S - 1), -1); c.push(P(e.x, e.y)); }
+    for (let i = 0; i < S; i++) c.push(edge(i / (S - 1), 1));
+    fanPts(c, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_PTS);
+    for (let i = S - 1; i >= 0; i--) c.push(edge(i / (S - 1), -1));
     const nc = pos(0), nw = widthAt(0);
     for (let k = 1; k < NOSE_PTS; k++) {
       const th = -Math.PI / 2 + Math.PI * (k / NOSE_PTS);
-      c.push(P(nc.x + F.x * NOSE_ROUND * L * Math.cos(th) + R.x * nw * Math.sin(th),
-               nc.y + F.y * NOSE_ROUND * L * Math.cos(th) + R.y * nw * Math.sin(th)));
+      c.push({ x: nc.x + F.x * NOSE_ROUND * L * Math.cos(th) + R.x * nw * Math.sin(th),
+               y: nc.y + F.y * NOSE_ROUND * L * Math.cos(th) + R.y * nw * Math.sin(th) });
     }
 
     // Body: a FLAT dark fill so the koi reads as a solid under the water and
     // the grain does not show through it, then the one outline over the top.
     // Flat, not a gradient across the flanks — see the header.
-    ctx.beginPath(); closedSmooth(ctx, c);
+    ctx.beginPath(); closedSmooth(ctx, c.map(p => P(p.x, p.y)));
     ctx.fillStyle = rgba(INK_FISH, BODY_FILL_A * a);
     ctx.fill();
     ctx.lineWidth = OUTLINE_W;
@@ -634,16 +561,7 @@ export function createRenderer(ctx, surface) {
 
     // The tail's own rays, over its fill.
     ctx.beginPath();
-    for (let k = 0; k < TAIL_RAYS; k++) {
-      const u = TAIL_RAYS === 1 ? 0 : (k / (TAIL_RAYS - 1)) * 2 - 1;
-      // Along the SAME blended envelope the outline uses, so a ray cannot leave
-      // the fin it is drawn inside.
-      const root = tailPoint(u), tip = tailPoint(u);
-      const rx = rootW.x, ry = rootW.y * sq;
-      const inner = { x: rx + (root.x - rx) * 0.26, y: ry + (root.y - ry) * 0.26 };
-      const outer = { x: rx + (tip.x - rx) * 0.93, y: ry + (tip.y - ry) * 0.93 };
-      ctx.moveTo(inner.x, inner.y); ctx.lineTo(outer.x, outer.y);
-    }
+    raysInto(P, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
     ctx.lineWidth = FIN_LINE_W;
     ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
     ctx.stroke();
