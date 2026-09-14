@@ -1179,6 +1179,13 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
     + (stem.hiddenMm > 1e-9 ? ` · ${stem.visibleMm.toFixed(1)} mm VISIBLE (${stem.hiddenMm.toFixed(1)} mm of it is inside the head's own bowl)` : ' · all of it visible (a flat head hides none)')
     + ` · ${(stem.outerR * 2).toFixed(1)} mm across, `
     + (hollow ? `${(stem.boreR * 2).toFixed(1)} mm bore, a ${stem.wallMm.toFixed(2)} mm wall` : `SOLID — the bore CLOSES at this diameter (told, not refused)`)
+    /* THE SOLID ROOT BAND IS TOLD, because without this clause the line above
+       claims a bore the root does not have. It is the same "clamped and told"
+       form as the bore closing at Eva's floor, and it is ABSENT wherever the
+       band is — a passing "0 mm solid" would be a number nobody measured. */
+    + (stem.solidBandMm > 0
+        ? ` · SOLID for the first ${stem.solidBandMm.toFixed(2)} mm — the head is ${(stem.headOuterMm * 2).toFixed(1)} mm across against a ${(stem.boreR * 2).toFixed(1)} mm bore, so it would otherwise stand INSIDE the pipe with nothing bridging the two (told, not refused)`
+        : '')
     + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : inertBecause}\n`
     + stemChannelLine(omission);
 }
@@ -1773,9 +1780,13 @@ window.__bloomMetrics = () => ({
     /* THE SOLID ROOT BAND (Eva's ruling). The PLAN's own answer, which is what
        ST1 predicts the triangle count from — the builder owns the count and the
        plan owns the shape it was asked for, and those two owners are the whole
-       point of that clause. `headOuterMm` rides with it because the read-out
-       and ST10 both want the length the condition was decided on, not just the
-       verdict. */
+       point of that clause. `headOuterMm` rides with it because the READ-OUT
+       wants the length the condition was decided on and not just the verdict.
+       (An earlier draft of this comment also named an `ST10`. There is no ST10:
+       the band's EXTENT is asserted by nothing, which is stated as a declared
+       blindness in §8 of the outcome doc rather than left to be discovered — a
+       comment naming a clause that does not exist is this project's own
+       recorded defect, and it is not going to ship from here.) */
     headOuterMm: lastStem.headOuterMm, headInsideBore: lastStem.headInsideBore,
     solidBandMm: lastStem.solidBandMm, solidBandZ: lastStem.solidBandZ,
     /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read

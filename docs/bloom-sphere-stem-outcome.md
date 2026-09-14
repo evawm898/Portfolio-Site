@@ -320,6 +320,27 @@ between two cleared vertices can dip nearer than either — distance to a convex
 convex along a segment — by at most the mesh's own chord scale. They share the population,
 so they cannot disagree; the bound is named rather than absorbed into the bar.
 
+**AND THE SOLID ROOT BAND'S *EXTENT* IS ASSERTED BY NOTHING — THERE IS NO ST10, DELIBERATELY.**
+Four instruments touch the band and none of them measures how LONG it is:
+
+| | what it would catch |
+|---|---|
+| **ST1** (count predicted from the PLAN) | a band arm emitting the wrong triangles — but the void's ladder is 2 stations at ANY band length, so the count does not move with it |
+| **the connectedness gate**, on `SPHERE STEM: THE BARE CORNER` | a band that is TOO SHORT — the head detaches again and the row goes to 2 pieces |
+| **the export gate** | a band that is not a closed shell |
+| **the byte partition's clause 2** | a band that leaves the stem's envelope, which bounds a too-LONG band at the whole tube |
+
+**So the failure-making direction is caught and the other one is not:** too short reddens a
+row that is already in the matrix, while too long — up to a fully solid stem — passes every
+gate here, costing print material and nothing else. It is bounded by the envelope and by the
+derivation having ONE owner in `stemPlan`, and it is stated here rather than left to be
+discovered. **An ST10 was considered and not built**, on two grounds: the only reference
+available to `stemAssertions` for the head's own extent is `footRing`'s dome, which is the
+SAME owner `stemPlan` read (Eva's fourth rule — a clause reading its reference from the
+quantity under test measures its own consistency), and building a genuinely independent one
+means reading the EXPORTED file, which is ST9's territory and its own piece of work. The
+read-out TELLS the band's length on every row that has one, so the number is at least visible.
+
 ## 9. Verification
 
 ### 9a. The byte partition, predeclared from the builder's own record
