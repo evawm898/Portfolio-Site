@@ -180,6 +180,36 @@ So the mutant table is the instrument that finds this class, not a guarantee aga
 it caught one of the three, CI caught one, and an adversarial read of the diff caught one.
 **Write the clause so its reference has a different owner in the first place.**
 
+**A CLAUSE THAT DEFINES ITS SUBJECT SO AS TO EXCLUDE THE THING IT DOUBTS CANNOT FAIL** (Eva,
+the sphere-stem session — the fifth durable rule, and the same family as the fourth rather
+than a separate idea). The fourth rule is about the two OWNERS of a comparison; this one is
+about the DEFINITION of what is compared. *A clause carves out a subject, and if the carving
+happens to exclude exactly the case the clause exists to doubt, it will be green forever —
+not because the tree is right but because the clause is asking about a set the failure cannot
+be in.* It is worse than an entangled reference, because there is no red to explain and no
+mutant to catch it: the mutation lands OUTSIDE the clause's subject and the clause is
+correct, in scope, and empty.
+
+Three instances here, and they look nothing alike:
+  * **The band's invisibility clause EXCLUDED THE TOP FACE BY CONSTRUCTION.** The byte tool's
+    clause 2 defined "the stem's OUTER WALL" as the triangles NOT all at one height — and the
+    stem's top face is exactly the triangles all at one height. So the one surface the band
+    demonstrably changes was the one surface the clause had defined itself out of. It could
+    not have failed at any band length, on any row.
+  * **ST9's guard READ THE RECORD IT CHECKS** (`if (!m.stemOmission) return`), so the mutation
+    that destroys the channel made the clause return before claiming anything. Its subject was
+    "rows where the channel reported something", which a broken channel is never in.
+  * **BOTH STL GATES' HEADLINES DIVIDED BY THE SURVIVORS** (#220): `results.length` counts the
+    rows that REACHED the results, so a dropped row left the numerator and the denominator
+    together and the ratio read N/N. The subject was "rows that did not fall over", which the
+    rows that fell over are never in — and session 41 read `672/672` off a 674-row matrix.
+
+**THE TEST, and it is not a mutant:** state the clause's subject as a SET, then ask whether the
+failure you are worried about is IN that set. If the failure would leave the set, the clause is
+worth nothing however strict it looks. **All three were found by re-reading the diff against
+the clause — which is the only thing that finds them**, because a green run, a mutant table and
+CI are all instruments that ask the clause its own question.
+
 **AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
 ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
 triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
@@ -2293,12 +2323,28 @@ against the stem's 6.000. **The derivation has not overshot in LENGTH** — it i
 the head's own lowest material and no further — and no shorter band is available: the head is at
 the TOP of the bore, so any closure that reaches it at all sits where the head is, and on these
 rows the closure is necessarily wider than the head. **A disc reaching only as far as the head's
-own silhouette would not touch the tube and would be a SECOND DETACHED PIECE.** Flagged for Eva
-rather than accepted quietly: the alternative is not a tighter band but a different ruling.
-**AND THE CLAUSE WRITTEN TO CHECK THAT CLAIM COULD NOT HAVE SEEN IT FAIL** — clause 2 defined
-"the stem's outer wall" as excluding triangles whose vertices share one height, which is exactly
-the top face. Found by re-reading the diff rather than by a red, and it is the fourth durable
-rule's mirror once more: name the owner of the MEASURED side too.
+own silhouette would not touch the tube and would be a SECOND DETACHED PIECE.**
+**RULED ACCEPTED** (Eva, the sphere-stem session, from the preview: *"i think it looks good."*)
+— **and the constraint itself was WITHDRAWN as wrongly premised, by its own author.** Eva's
+constraint 4 asked that the band not be visible, on the premise that it would sit INSIDE the
+stem. It cannot: the band exists only where the head is narrower than the BORE, which is the
+same condition that leaves that face exposed in the first place. So the constraint was
+unsatisfiable by construction, not missed. **The session measured it and said so rather than
+accepting the premise, and that is the behaviour to repeat** — a constraint handed down is a
+claim about the geometry like any other, and the geometry is what settles it.
+**THE BAND'S EXTENT IS ASSERTED BY NOTHING — THERE IS NO ST10, DELIBERATELY, AND THE TWO
+DIRECTIONS ARE NOT SYMMETRIC.** A band that is TOO SHORT is caught, by the connectedness gate
+on `SPHERE STEM: THE BARE CORNER` — the head detaches again and that row is already in the
+matrix. A band that is TOO LONG is caught by **nothing**: ST1 predicts the count from the plan
+and the void's ladder is 2 stations at ANY band length, so the count does not move with it; the
+export gate only wants a closed shell; and the byte partition's clause 2 bounds it at the stem's
+own envelope, so the worst case is a fully solid stem that passes every gate here and costs only
+material. **An ST10 was considered and NOT built on grounds rather than on time**: the only
+reference available to `stemAssertions` for the head's extent is `footRing`'s dome, which is the
+SAME owner `stemPlan` read (the fourth durable rule), and a genuinely independent one reads the
+EXPORTED file, which is ST9's territory and its own piece of work. §8 of the outcome doc carries
+the table; the read-out TELLS the band's length on every row that has one, so the number is at
+least visible.
 **ST1 CAUGHT THE FIRST CUT** (`the builder emitted 476 triangles … the plan asks for 576`),
 which is that clause doing the job it was strengthened for in this same PR: it predicts from the
 PLAN and compares against the BUILDER's tally, so a third emission arm with no third prediction
@@ -2336,9 +2382,19 @@ named the detached part; a shell table names shells.
 GATED sphere row removed from block 30). **AND TWO TAGS' BYTES STOP REPRODUCING, ONE ROW EACH,
 SWEPT OVER ALL 28 REGISTERED FROZEN MATRICES**: `frozen/phase28` (1 of 699) and
 `frozen/phase29` (1 of 736), the SAME row in both — `STEM: GATED — SPHERE with a stem asked
-for`, gated when those snapshots were taken and not gated now, **63,264 -> 52,060 triangles**
-in both modes. Every other phase reads 0. Their definitions still deep-compare, so they join
-phase17/19/21/23/24 in that class. **The SOLID ROOT BAND moves no frozen row at all** — no
+for`, **63,264 -> 52,060 triangles** in both modes. Every other phase reads 0. Their definitions
+still deep-compare, so they join phase17/19/21/23/24 in that class.
+**STATED PLAINLY, BECAUSE THE ROW'S OWN NAME NOW MISDESCRIBES IT:** that row asks for a 60 mm
+stem at 6 mm on a CONTINUOUS SPHERE at 24 petals. Its label says GATED because `stemEligible`
+REFUSED exactly that — and retiring that refusal is what this PR did. So it is not a row whose
+stem is switched off by a control; it is the row the retirement was ABOUT, and the move is real
+geometry: a stem is now built where none was, and the channel takes the petals it passes
+through. The arithmetic closes — **63,264 − 52,060 = 11,204, which is about five petals at
+~2,356 each less the stem's own +576.** **AND THE LABEL CANNOT BE FIXED**, because this file's
+own rule is NEVER EDIT A LABEL INSIDE A FROZEN MATRIX (it is a verbatim snapshot of that base
+commit's `buildMatrix()`, and `--verify-frozen` goes red on row 400 if you try). So a frozen
+row now carries a name describing a behaviour that no longer exists, `--verify-frozen` is
+green on it and correct to be, and **this paragraph is the only place that truth can live.** **The SOLID ROOT BAND moves no frozen row at all** — no
 frozen matrix carries a sphere whose head is inside its bore. The image is
 `node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**, and its frame
 radius is the row's own STEMLESS build's `maxDimMm` halved: a radius read from the SPHERE put
@@ -2673,6 +2729,25 @@ better one, because there is no stable one to have: the point of the measurement
 and it is wide enough that no single number — this paragraph's included — can size a wait. It is
 here as evidence that the rule above is load-bearing, and a session that quotes it instead of
 reading `actions_list` at the time has made exactly the mistake it documents.
+**AND THE SPHERE-STEM SESSION SET A NEW MAXIMUM: 214.8 min, so the measured spread is now
+151.8 to 214.8** (`bloom-export-watertight`, run 34854690257, matrix step 14:19:32 -> 17:52:34
+= 213.0 min, job total 214.8). It exceeded the old ceiling by 11 minutes while
+`bloom-connectedness` on the same head ran an ordinary 123.9. **This is the third widening and
+it is the point of the rule, not an exception to it** — the spread is now a factor of 1.41
+between fastest and slowest of one workflow, so no figure in this file can size a wait and the
+only correct move is still to read `actions_list` at the time.
+
+**AND `get_job_logs` RETURNS HTTP 404 WHILE A JOB IS STILL RUNNING, so NOTHING HERE CAN SEE
+INSIDE A GATE MID-RUN** (measured, the sphere-stem session, on job 104011064304 at 207 minutes).
+**That is a DIFFERENT failure from the blob-URL policy denial recorded above**, which applies to
+a COMPLETED run's log: the 404 is GitHub declining to serve an archive that does not exist yet.
+Combined with the fact that a matrix gate is ONE long step, the consequence is worth stating
+because it decides what to do when a gate runs long: **step granularity says nothing, the log
+says nothing, and there is therefore no instrument that can distinguish SLOW from HUNG.** So
+exceeding the measured spread is not evidence of a hang. **Do not cancel and re-run on
+suspicion** — that spends three hours to learn nothing, and this file's own rule is that a
+re-run is only for a failure demonstrably not the PR's. Wait, and let the 6-hour job timeout be
+the thing that declares a real hang. The sphere-stem session waited and the gate passed.
 
 **AND WHEN A GATE GOES RED, THE LOG IS NOT DOWNLOADABLE FROM HERE — REPRODUCE LOCALLY**
 (Sep 13, hit twice in one session). `get_job_logs` hands back a

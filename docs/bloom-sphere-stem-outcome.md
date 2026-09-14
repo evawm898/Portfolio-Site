@@ -968,10 +968,29 @@ sits where the head is, and there the closure is necessarily wider than the head
 covering only the part under the head (r ≤ 1.828 at that height) would not reach the tube's
 wall — a second detached piece, fixing nothing.
 
-**So this is flagged for Eva rather than absorbed.** The alternative is not a tighter
-derivation; it is a different ruling (refuse the stem on such a head, or narrow `stemDiameter`
-against it — the two she rejected). If a plugged bore reads wrong to the eye on the bare
-corner, that is the ruling to revisit, and this section is here so it can be.
+**RULED ACCEPTED, AND THE CONSTRAINT WITHDRAWN BY ITS OWN AUTHOR.** Eva, from the preview:
+*"i think it looks good."* And, on constraint 4 itself: *"it was mine and it was wrong — I
+asserted the band would be inside the stem. It cannot be: the band exists only where the head
+is narrower than the bore, which is the same condition that leaves that face exposed."* So the
+constraint was **unsatisfiable by construction, not missed** — the same inequality that creates
+a band is the one that exposes the face, and no band at any length could have met it.
+
+**The behaviour to repeat is the measuring, not the flagging.** A constraint handed down is a
+claim about the geometry like any other; this section exists because the session measured the
+face (51.15 of 63.62 mm², 80.4%) and reported that the claim was false, rather than quietly
+scoping the band to fit a premise it could not satisfy.
+
+**AND THE REAL KEEPER IS THE CLAUSE, NOT THE BAND — IT IS A CLASS** (Eva's ruling, this
+session): **A CLAUSE THAT DEFINES ITS SUBJECT SO AS TO EXCLUDE THE THING IT DOUBTS CANNOT
+FAIL.** Clause 2 defined "the stem's OUTER WALL" as the triangles NOT all at one height, and
+the stem's top face is exactly the triangles all at one height — so the one surface the band
+demonstrably changes is the one surface the clause had defined itself out of. It was correct,
+in scope, and empty, at any band length on any row. **Same family as ST9's guard reading the
+very record it checks, and as the STL gates' headline dividing by the SURVIVORS (#220), which
+made a dropped row read N/N.** The test is not a mutant: state the clause's subject as a SET
+and ask whether the failure you fear is IN it. All three were found by **re-reading the diff
+against the clause, which is the only thing that finds them** — a green run, a mutant table
+and CI all ask the clause its own question. CLAUDE.md carries it as the fifth durable rule.
 
 **What CLAUSE 2 does still carry, stated as the narrower claim it is:** the stem's outer
 cylinder is bit-identical between trees, and every differing float lies inside the stem's own
