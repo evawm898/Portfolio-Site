@@ -5256,8 +5256,19 @@ export const STEM_CHANNEL_SCOPE =
 
 export function stemChannelAssertions(positions, row, m, ui) {
   const bad = [];
-  const O = m && m.stemOmission;
-  if (!O) return bad;                       // no stem, or not a sphere — nothing to claim
+  /* ST9 ENTERS ON THE SPHERE AND THE CONTROL, NEVER ON THE CHANNEL'S OWN
+     RECORD, and that is the whole point of this clause existing beside ST7.
+     It shipped guarded on `m.stemOmission` — the very object a broken channel
+     destroys — so `the-stem-channel-never-fires` (the channel computed and
+     thrown away, every petal built, the stem straight through the pole-most
+     ones) made ST9 RETURN before claiming anything and it stayed SILENT on
+     the one state it exists for. That is `seam-floor-removed` verbatim, one
+     family later: a clause that asks the defect whether it fired asks nothing.
+     The two owners here are `footRing`'s own `sphereMode` and the CONTROL's
+     own length, neither of which the channel writes. */
+  const onSphere = m && m.sphereMode === true;
+  const asked = Number(ui.stemLength) > 0;
+  if (!onSphere || !asked) return bad;      // no stem, or not a sphere — nothing to claim
   const outerR = Number(ui.stemDiameter) / 2;
   const boreR = boreExpected(outerR);
   const lengthMm = Number(ui.stemLength);
@@ -5295,7 +5306,14 @@ export function stemChannelAssertions(positions, row, m, ui) {
      three stem rings and the control's own length and nothing else. The same
      1e-3 mm the radii use, for the same reason: a foot's outer skin lies ON
      that surface and float32 can put it a hundredth of that below. */
-  const clear = O.clearanceMm;
+  /* AND THE BAR IS THE LAW RESTATED, NOT THE CHANNEL'S DECLARED CLEARANCE.
+     It shipped as `O.clearanceMm`, so `the-channel-clearance-is-typed` (the
+     gap replaced by a twentieth of a millimetre) shrank ST9's own bar along
+     with the geometry's and ST9 stayed SILENT while petals were kept that the
+     stem passes 0.05 mm from. The clearance IS this project's minimum
+     printable gap — ST7 is the clause that asserts the channel declares it,
+     and ST9 measures against it directly so the two cannot move together. */
+  const clear = MIN_FEATURE_MM;
   const Rout = -rootZ;
   if (!(Rout > 0)) { bad.push(`ST9: the free stem's root stands at z ${rootZ}, which is not below the equator — the hub's outer surface cannot be located`); return bad; }
   let intruders = 0, worst = Infinity, worstAt = null;

@@ -423,6 +423,43 @@ petal, and every one was found by the gate rather than by reading the code. The 
 the first thing in this generator that can make a declared slot empty, and what that costs
 is exactly this list — five places that had no reason to be written any other way.
 
+### 9b-bis. THE MUTANT TABLE FOUND TWO REAL DEFECTS IN ST9, AND BOTH ARE EVA'S FOURTH RULE
+
+**ST9 is the only clause here that does not read the stem channel's own report — and it
+read it twice.** The sweep of the seven stem/channel mutants came back 3 clean and 4 with
+findings, and the two that matter are the same defect in two places:
+
+* **`the-stem-channel-never-fires`** — the channel computed and thrown away, so every petal
+  is built and the stem passes straight through the pole-most ones. ST7 fired. **ST9 stayed
+  SILENT**, because it was guarded on `if (!m.stemOmission) return bad;` — the very object
+  the mutation destroys. The clause that exists to read the EXPORTED FILE returned before
+  claiming anything, on the exact state it was written for.
+* **`the-channel-clearance-is-typed`** — the printable gap replaced by a twentieth of a
+  millimetre, so petals are kept that the stem passes 0.05 mm from. ST7 fired. **ST9 stayed
+  SILENT**, because its bar was `clear = O.clearanceMm` — so the mutation shrank ST9's own
+  threshold along with the geometry's and there was nothing left to exceed.
+
+That is `seam-floor-removed` verbatim, one family later: *a clause that asks the defect
+whether it fired asks nothing*. Both halves are rebuilt from owners the channel does not
+write — the guard from `footRing`'s own `sphereMode` and the CONTROL's own `stemLength`, the
+bar from `MIN_FEATURE_MM` restated as the law (ST7 is the clause that asserts the channel
+DECLARES that gap; ST9 measures against it directly, so the two cannot move together).
+**Neither defect was visible on any green run** — the whole matrix, the smoke subset and the
+block-32 gate are all silent on a tree carrying both.
+
+Two more findings, neither a defect in a clause:
+
+* **`the-omission-renumbers`' WITNESS read a quantity the mutation cannot move.** It compared
+  `slotAzimuths[0].length`, which is PRE-SIZED to the descriptor count — 8 on both trees.
+  Measured at 8 petals × a 6 mm stem: the clean tree DEFINES 8 azimuths and builds 6 petals,
+  the mutant defines **6** and builds **4**, with the array 8 long on both. The witness reads
+  what the whorl VISITED and the builder EMITTED now.
+* **`stem-present-disagrees-with-the-registry` over-claimed ST7**, and the claim was wrong
+  rather than the clause blind: `stemAssertions` compares the control's length against the
+  builder's own `m.stem` and **RETURNS** on a disagreement, so a geometry that refuses the
+  stem outright is caught by ST1 before ST7 is reached — and there is no channel left for ST7
+  to have an opinion about. ST0 and ST1 are its witnesses; ST7 is about a channel that EXISTS.
+
 ### 9c. The matrix, the census and the gates
 
 * **The live matrix goes 736 -> 744.** Nine rows added (block 32), one removed (block 30's

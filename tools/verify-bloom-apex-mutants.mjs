@@ -207,7 +207,13 @@ function channelFacts(M, state = SPHERE_STEM_STATE()) {
     const built = M.buildBloomInto(acc, state);
     const az = built.slotAzimuths[0] || [];
     return { channel: built.stemOmission || null, built: built.petalsBuilt,
-             azCount: az.length, firstAz: az[0], joinT: built.stem.joinT, tris: acc.triangleCount };
+             /* `azCount` is the ARRAY's length and is PRE-SIZED to the descriptor
+                count, so it cannot move when a whorl visits fewer slots — which is
+                what made `the-omission-renumbers`' witness read 8 against 8 on a
+                mutation that genuinely shortened the sequence. `azDefined` counts
+                the slots the whorl actually VISITED, which is the quantity. */
+             azCount: az.length, azDefined: az.filter((v) => v !== undefined).length,
+             firstAz: az[0], joinT: built.stem.joinT, tris: acc.triangleCount };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -681,7 +687,14 @@ const MUTANTS = [
      swapped, and still invisible to every other family here. */
   { id: 'stem-present-disagrees-with-the-registry', why: "the geometry still refuses a stem under SPHERE while the registry shows the controls there — the controls move nothing, which is the mirror of the hidden-and-NOT-inert defect PP7 and JS0 exist for",
     find: 'export function stemIsAbsent(state) { return !state.stemLength; }',
-    into: 'export function stemIsAbsent(state) { return !state.stemLength || sphereMode(state); }', names: ['ST0', 'ST1', 'ST7'],
+    /* ST7 IS NOT ON THIS LIST, AND THE CLAIM WAS WRONG RATHER THAN THE CLAUSE
+       BLIND. `stemAssertions` compares the CONTROL's length against the
+       builder's own `m.stem` and RETURNS on a disagreement, so a geometry that
+       refuses the stem outright is caught by ST1 before ST7 is ever reached —
+       and there is no channel left for ST7 to have an opinion about. ST0 (the
+       two-statement guard) and ST1 are the witnesses; ST7 is about a channel
+       that EXISTS. Measured: it fired ST0 and ST1 and stayed silent on ST7. */
+    into: 'export function stemIsAbsent(state) { return !state.stemLength || sphereMode(state); }', names: ['ST0', 'ST1'],
     witness: (M, C) => { const sph = { ...REGISTRY_DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60 };
       const m = M.stemIsAbsent(sph), c = C.stemIsAbsent(sph);
       return (m === true && c === false) ? null : `stemIsAbsent under SPHERE reads ${m} on the mutant and ${c} on the clean tree — the predicate did not move`; } },
@@ -703,8 +716,12 @@ const MUTANTS = [
     into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST7', 'ST8', 'J1', 'Z1'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.azCount < c.azCount && m.firstAz === c.firstAz) ? null
-        : `the mutant emits ${m.azCount} azimuths against the clean tree's ${c.azCount} — the sequence was not shortened`; } },
+      /* MEASURED on this tree at 8 petals x a 6 mm stem: the clean tree defines
+         8 azimuths and builds 6 petals; the mutant defines 6 and builds 4, while
+         the ARRAY stays 8 long on both. So the witness reads what the whorl
+         VISITED and the builder EMITTED, never the pre-sized array. */
+      return (m.azDefined < c.azDefined && m.built < c.built && m.azCount === c.azCount) ? null
+        : `the mutant defined ${m.azDefined} azimuths and built ${m.built} petals against the clean tree's ${c.azDefined} and ${c.built} — the sequence was not shortened`; } },
 
   { id: 'the-channel-clearance-is-typed', why: 'the printable gap the channel clears is replaced by a twentieth of a millimetre, so petals are kept that the stem passes within a gap no process can make',
     find: 'export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;',

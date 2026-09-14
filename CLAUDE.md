@@ -2086,6 +2086,23 @@ INERT ARM** — the thinnest stem on the shipping sheet already asks 1.299 mm ag
 **A BARE HEAD IS REACHABLE AND IS TOLD, NEVER REFUSED**: a 12 mm stem on the smallest sphere
 takes all 3 petals (`stemJoinBlendRadius`'s own precedent), and it is a matrix row so every
 family indexed by descriptor runs with ZERO petals built.
+**AND ST9 READ THE CHANNEL'S OWN RECORD TWICE, WHICH ONLY THE MUTANT TABLE SAID.** It is the
+one clause here that is supposed to be independent of that record, and it was guarded on
+`if (!m.stemOmission) return` and barred on `clear = O.clearanceMm`. So
+`the-stem-channel-never-fires` (the channel thrown away, the stem straight through the
+pole-most petals) made it RETURN before claiming anything, and `the-channel-clearance-is-typed`
+(the gap replaced by 0.05 mm) shrank ST9's own threshold along with the geometry's — **SILENT
+on both, on the two states it exists for, while ST7 fired on each.** `seam-floor-removed`
+verbatim, one family later. The guard is now `footRing`'s own `sphereMode` plus the CONTROL's
+own `stemLength`, and the bar is `MIN_FEATURE_MM` restated as the law (ST7 asserts the channel
+DECLARES that gap; ST9 measures against it, so the two cannot move together). **Neither defect
+was visible on any green run.** Two further findings were the TABLE's own, not a clause's: the
+renumber mutant's witness compared `slotAzimuths[0].length`, which is PRE-SIZED to the
+descriptor count and reads 8 on both trees (it reads azimuths DEFINED — 8 against 6 — and
+petals BUILT — 6 against 4 — now), and `stem-present-disagrees-with-the-registry` over-claimed
+ST7, because ST1 compares the control's length against the builder's `m.stem` and RETURNS, so
+a geometry refusing the stem outright never reaches ST7 and leaves no channel to have an
+opinion about.
 **ST7 / ST8 / ST9 ARE THE NEW FAMILIES AND EACH SEES SOMETHING THE OTHER TWO CANNOT.** ST7 is
 the criterion's own biconditional (it reads the channel's report, so it can only say the
 criterion is self-consistent); ST8 is the MASK, against a STEMLESS build of the same state on
