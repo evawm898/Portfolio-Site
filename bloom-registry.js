@@ -46,7 +46,8 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
-         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius } from './bloom-geometry.js';
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
+         TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -246,6 +247,29 @@ export const PREDICATES = {
      least 0.005 away from 0 and the two statements agree on every reachable
      state; the harness checks that at load and on every row (L0). */
   lobesEngaged: { id: 'lobeDepth', awayFrom: 0, by: 0.005 },
+
+  /* THE FRINGE ENGAGED (Eva's ruling, Sep 13) — the registry's statement of
+     the geometry's `fringeEngaged()`: the depth is hidden AND inert at count
+     0, the curl family's own rule. The slider's step is 1, so every reachable
+     non-zero count is at least 1 away from 0 and the two statements agree on
+     every reachable state; the harness checks that at load and on every row
+     (FR0). */
+  fringeEngaged: { id: 'fringeCount', min: 1 },
+  /* LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE, AND THE FRINGE WINS (Eva's
+     ruling, Sep 13). Both own the apex — the coverage arc is centred on it
+     by construction — and composing them was MEASURED to narrow every finger
+     including interior ones nowhere near the rim (middle finger 0.5873 ->
+     0.4599 mm at coverage 0.40), because a v-span is a fraction of the CUT
+     half-width. So a rim treatment moved the petal's CENTRAL fingers, which
+     is a coupling no control could own honestly.
+
+     THE WHOLE LOBE FAMILY IS HIDDEN AND INERT under a live fringe, and the
+     geometry makes it inert through its own `lobesEligible()` — the same
+     two-statement shape `perPetalEligible` carries, for the same reason:
+     neither file can read the other's answer and both must act on it. The
+     read-out says which one is standing down. Recovery is one predicate in
+     two files. */
+  lobesEligible: { all: [{ id: 'fringeCount', oneOf: ['0'] }] },
 
   /* ===================================================================
      WHERE THE ANDROECIUM APPLIES (session 21, phase 2 B2) — everywhere but
@@ -638,6 +662,10 @@ export const SECTIONS = [
      parent because three of the four are gated on the first, the "Petal
      roles" shape. */
   { id: 'lobes', label: 'Lobes', open: false, parent: 'shape' },
+  /* A fringe is a change of TOPOLOGY at the petal's end, not another term in
+     the outline, so it gets its own drop-down rather than sitting beside the
+     shape sliders. Declared AFTER its parent, which verifySections() requires. */
+  { id: 'fringe', label: 'Fringe', open: false, parent: 'shape' },
   { id: 'form', label: 'Petal form', open: false },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
      session-16 Phase A proposal): petal tilt, spine curl, curl bias, curl
@@ -1293,6 +1321,98 @@ export const CONTROLS = [
      the SHOWN build's record, so every number printed here is the builder's
      and none is re-derived from the sliders.
      =================================================================== */
+  /* ===================================================================
+     THE CARNATION FRINGE AND ITS SQUARED TERMINAL — ONE FEATURE (Eva's
+     ruling, Sep 13). Teeth across the petal's END, pointing along its
+     length. Read `docs/bloom-carnation-fringe-picture.md` before touching
+     any of it.
+
+     THEY SHIP TOGETHER BECAUSE NEITHER WORKS ALONE, and that is measured
+     rather than asserted: every finger of a panel fringe runs to u = 1, and
+     `TIP_HALF_MM` is an ABSOLUTE constant, so the blade is 1.600 mm across
+     at the apex at EVERY petal size. Ten fingers read as a carnation over
+     most of their length and then converge into one shared spike. The
+     terminal holds the end open; the fringe cuts it.
+
+     `petalTipEnd` sits in PETAL SHAPE beside `petalTipShape`, whose region
+     it shares: the terminal is a floor over [uPk, 1] and the apex law owns
+     exactly that interval. The fringe gets its own drop-down inside it,
+     because a fringe is a change of TOPOLOGY at the end and not another
+     term in the outline. =================================================================== */
+  { id: 'petalTipEnd', section: 'shape', kind: 'slider',
+    min: TIP_END_RANGE[0], max: TIP_END_RANGE[1], step: 0.05, default: 0,
+    label: 'Squared end', tier: 'standard', role: 'petal',
+    /* THE DEAD TRAVEL IS TOLD, NEVER TRIMMED — `stamenSpread`'s ruling.
+       Below `TIP_HALF_MM / peakHalf` the terminal sits under the print floor
+       and delivers nothing, and that fraction MOVES WITH THE PETAL'S WIDTH
+       (20.0% of the track at petalWidth 8, 5.3% at 30), so no static range
+       is dead-free and an adaptive maximum would make one slider position
+       mean different things on different petals. */
+    fmt: (v, ui, shown) => {
+      const t = Number(v);
+      const T = shown && shown.fringe;
+      if (t === 0) return 'converging — the apex law runs to its own point';
+      if (!T) return `${(t * 100).toFixed(0)}% of the widest half-width`;
+      const w = T.endWidthMm;
+      if (T.deadTravel) return `${(t * 100).toFixed(0)}% — DEAD: ${w.toFixed(2)} mm is under the ${T.floorMm.toFixed(2)} mm print floor, so the end is the floor's own ${(2 * T.tipHalfMm).toFixed(2)} mm; the hatched travel on the track`;
+      return `a ${w.toFixed(2)} mm flat end, ${(100 * w / (2 * T.peakHalfMm)).toFixed(0)}% of the petal's width`
+           + ` · it carries ${T.ceiling} ${T.ceiling === 1 ? 'tooth' : 'teeth'} at the ${T.floorMm.toFixed(2)} mm floor`
+           + ` · dead below ${(100 * T.deadBelow).toFixed(0)}% on this petal`;
+    },
+    /* NO `cap` ROW, DELIBERATELY, and the reason is which END the dead travel
+       is at. `applyCaps` marks the travel ABOVE its value — which is right for
+       `stamenSpread` and `lobeDepth`, whose dead and saturated stretches are at
+       the TOP — and this control's dead travel is at the BOTTOM. Declaring
+       `cap: deadBelow` would hatch 0.10 to 1.00 on the shipping petal: 90% of
+       the track marked dead when the dead 10% is underneath it, which is worse
+       than no mark at all. So the number is TOLD in the read-out above and the
+       track is left alone until there is a low-end hatch to draw it with —
+       one field and one CSS rule, mirroring `.bl-ctrl--capped`, the day it is
+       wanted. */
+    visibleWhen: { all: [] } },
+  { id: 'fringeCount', section: 'fringe', kind: 'slider',
+    min: FRINGE_COUNT_RANGE[0], max: FRINGE_COUNT_RANGE[1], step: 1, default: 0,
+    label: 'Teeth', tier: 'standard', role: 'petal',
+    /* CLAMPED AND TOLD, never refused. The ceiling is the TERMINAL's own
+       width — every tooth and every gap must clear `MIN_FEATURE_MM` at the
+       station where it is narrowest, and both reduce to the same
+       `W >= (2N - 1) x MIN_FEATURE_MM` at the fringe region's narrowest
+       station. Without a terminal that station carries exactly one tooth,
+       which is the whole reason the two controls ship together. */
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      if (n === 0) return 'plain — no fringe';
+      const F = shown && shown.fringe;
+      if (!F || !F.built) return `${n} ${n === 1 ? 'tooth' : 'teeth'} asked`;
+      const base = `${F.count} ${F.count === 1 ? 'tooth' : 'teeth'}`;
+      if (F.clamped) {
+        return `${n} asked, ${base} built — CLAMPED: the end is ${F.wMinMm.toFixed(2)} mm at its narrowest and ${n} teeth need `
+             + `${((2 * n - 1) * F.floorMm).toFixed(1)} mm at the ${F.floorMm.toFixed(2)} mm floor`
+             + (F.tipEnd === 0 ? ' — there is no squared end to carry them' : `, so the squared end would have to be ${(100 * ((2 * n - 1) * F.floorMm) / (2 * F.peakHalfMm)).toFixed(0)}% of the width`);
+      }
+      return `${base}, ${F.count === 1 ? '' : 'each '}${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+           + (F.count > 1 ? ` · the gaps run ${F.gapSplitMm.toFixed(2)} mm to ${F.gapTipMm.toFixed(2)} mm` : ' · no gaps — one tooth is the whole end')
+           + ` · the ceiling here is ${F.ceiling}`;
+    },
+    visibleWhen: { all: [] } },
+  { id: 'fringeDepth', section: 'fringe', kind: 'slider',
+    min: FRINGE_DEPTH_RANGE[0], max: FRINGE_DEPTH_RANGE[1], step: 0.01, default: FRINGE_DEPTH_DEFAULT,
+    label: 'Tooth depth', tier: 'standard', role: 'petal',
+    /* THE SPLIT IS OWNED IN PHYSICAL UNITS. A fraction of the petal's OWN
+       LENGTH from the tip, so the target station is `1 - depth` exactly and
+       the depth in millimetres is `depth x length` — one owner, and no row
+       count standing for a depth. A panel boundary IS a row, so the read-out
+       prints the station the builder landed on beside the one asked for. */
+    fmt: (v, ui, shown) => {
+      const d = Number(v);
+      const F = shown && shown.fringe;
+      if (!F || !F.built) return `${(d * 100).toFixed(0)}% of the petal's length`;
+      const land = `${F.depthMm.toFixed(2)} mm of teeth, split asked at u ${F.uAsked.toFixed(4)} and landed at u ${F.uSplitRow.toFixed(4)}`;
+      return F.peakClamped
+        ? `${land} — CLAMPED to the widest point (u ${F.uPk.toFixed(4)}); a tooth may not reach below it into the base taper`
+        : `${land} (${(F.residualMm).toFixed(3)} mm off, within the ${F.rowGapMm.toFixed(3)} mm row it landed on)`;
+    },
+    visibleWhen: { ref: 'fringeEngaged' } },
   { id: 'lobeDepth', section: 'lobes', kind: 'slider',
     min: LOBE_DEPTH_RANGE[0], max: LOBE_DEPTH_RANGE[1], step: 0.01, default: 0,
     label: 'Lobe depth', tier: 'standard', role: 'petal',
@@ -1320,7 +1440,7 @@ export const CONTROLS = [
            + apex;
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.depthCap : null),
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'lobesEligible' } },
   { id: 'lobeCount', section: 'lobes', kind: 'slider',
     min: LOBE_COUNT_RANGE[0], max: LOBE_COUNT_RANGE[1], step: 1, default: LOBE_COUNT_DEFAULT,
     label: 'Lobes', tier: 'standard', role: 'petal',
@@ -1357,7 +1477,7 @@ export const CONTROLS = [
            + (L.countCap < LOBE_COUNT_RANGE[1] ? ` · clamps at ${L.countCap}, the mark on the slider — ${caps}` : '');
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.countCap : null),
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   { id: 'lobeCoverage', section: 'lobes', kind: 'slider',
     min: LOBE_COVERAGE_RANGE[0], max: LOBE_COVERAGE_RANGE[1], step: 0.05, default: LOBE_COVERAGE_DEFAULT,
     label: 'Coverage', tier: 'standard', role: 'petal',
@@ -1374,7 +1494,7 @@ export const CONTROLS = [
            + (L ? ` (${(2 * L.treatedHalfMm).toFixed(1)} mm of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back)` : '')
            + (L && !L.noRoom ? ` · the ladder holds ${L.countRowsCap} ${L.countRowsCap === 1 ? 'tooth' : 'teeth'} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} stations a period), the pitch floor ${L.countFloorCap}` : '');
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   /* THE TWO SHAPE EXPONENTS (session 41). Eva's model names the tooth's two
      features separately — "notch angle, the included angle of the valley
      between teeth" and "crest point, how pointed the tooth's own peak is" —
@@ -1409,7 +1529,7 @@ export const CONTROLS = [
         : L && !L.noRoom ? ' · one lobe, so the window carries no interior crest to measure' : '';
       return `${a.toFixed(2)} · ${name}${ang}`;
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   { id: 'lobeNotchShape', section: 'lobes', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
     label: 'Notch', tier: 'standard', role: 'petal',
@@ -1429,7 +1549,7 @@ export const CONTROLS = [
         : '';
       return `${b.toFixed(2)} · ${name}${ang}`;
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
 
   /* THE APEX HAS NO CONTROL, AND THAT IS A STATED INTERIM (Eva, session 32).
      `petalTipBreadth` is retired and nothing replaced it: the converging cap

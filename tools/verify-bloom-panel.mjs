@@ -266,6 +266,30 @@ const WITNESS = {
   lobes: { id: 'lobeDepth', value: '0.5',
            read: (m) => (m.petalLobes ? `${m.petalLobes.countBuilt}/${m.petalLobes.sinusMinHalfMm.toFixed(6)}/${m.petalLobes.rowsInWindow}` : 'no lobe record'),
            what: "the builder's lobe count / the deepest sinus as built / the stations inside the window" },
+  /* THE FRINGE (Eva's ruling, Sep 13) — a drop-down inside Petal shape,
+     collapsed at first load, and the one section whose witness needs a
+     PRECONDITION for a reason that is the feature itself: the fringe and the
+     squared terminal are ONE feature, so at the shipping `petalTipEnd` of 0
+     driving the count builds NOTHING (NO ROOM — the blade converges to
+     2 x TIP_HALF_MM, which carries one tooth, and one tooth is the petal).
+     Driven there the witness would read a refusal, which is a true thing about
+     the geometry and a WEAK thing to test reactivity with. So the terminal is
+     opened in `pre` and the count is the witness.
+
+     IT REACHES PAST THE SLIDER, twice over. `petalTipSpans` is the EMITTER's
+     own tally of how many spans the petal's END carries — a count `trimPanels`
+     produces and no control holds — and the tooth width at the tip is a LENGTH
+     in millimetres that the slider does not hold either, arrived at through
+     the taper's admissible interval. A build that stored the number and split
+     the domain anyway, or split it and drew the teeth at the wrong widths, is
+     exactly what this must catch. The clamp, NO ROOM, the dead travel and the
+     lobe exclusion are the FR family's in both STL gates, not this one's. */
+  fringe: { id: 'fringeCount', value: '4',
+            pre: [{ id: 'petalTipEnd', value: '1' }],
+            read: (m) => (m.petalFringe && m.petalFringe.built
+              ? `${m.petalTipSpans}/${m.petalFringe.count}/${m.petalFringe.toothTipMm.toFixed(6)}`
+              : 'no fringe built'),
+            what: "the emitter's own tip-span tally / the count as built / the tooth's tip width in mm" },
   /* PETAL CURL (session 16) — the spine's own section, collapsed at first
      load; witnessed by spine curl through the builder's own spine record. */
   curl: { id: 'petalSpineCurl', value: '150',

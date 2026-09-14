@@ -2923,6 +2923,45 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
    truncated it and then capped the truncation. */
 export const TIP_HALF_MM = 0.8;
 
+/* THE CARNATION FRINGE'S THREE RANGES, exported so the registry IMPORTS them
+   rather than restating them (Q6 — the harness fails at module load if a
+   registry bound became a literal).
+
+   `TIP_END_RANGE` is a fraction of the petal's own PEAK half-width, so its
+   ceiling of 1 is the derived one: a floor above the peak would raise the
+   outline past its own widest point, which is what retired `petalTipBreadth`.
+
+   `FRINGE_COUNT_RANGE`'s 0 is the GUARD (no fringe, the single 'full' span).
+   ITS CEILING OF 10 IS A CHOICE ABOUT WHAT READS AS A FRINGE, AND THE
+   GEOMETRY REACHES FURTHER — said plainly because the measurement says so.
+   The ceiling the SHAPE can carry is `W >= (2N-1) * MIN_FEATURE_MM` at the
+   fringe region's narrowest station, and across the petal-size range at the
+   full terminal that is 4 / 6 / 8 / 11 / 15 at `petalWidth` 8 / 12 / 16 / 22
+   / 30. So on the shipping 16 mm petal the geometry binds first (8) and the
+   range never does; on a 22 or 30 mm petal THE RANGE binds first and there
+   is real headroom the control cannot reach. That is the inverse of
+   `stamenSpread`'s dead travel and it takes the same ruling: the range is not
+   widened and the maximum is not adaptive, and the read-out prints the
+   geometry's own ceiling beside the count so the headroom is visible rather
+   than silent. Above whichever binds, the count is CLAMPED AND TOLD.
+
+   `FRINGE_DEPTH_RANGE` is a fraction of the petal's OWN LENGTH measured from
+   the tip, which is what makes the split a PHYSICAL quantity with one owner
+   rather than a row index: the target station is `1 - fringeDepth` exactly
+   and the depth in millimetres is `fringeDepth * length`. Its floor is one
+   blade row's worth of length at NU 56 rounded up to a usable tooth, and its
+   ceiling stops well short of `ROOT_BLEND_END` so a tooth can never reach
+   into the root blend. */
+export const TIP_END_RANGE = [0, 1];
+export const FRINGE_COUNT_RANGE = [0, 10];
+export const FRINGE_DEPTH_RANGE = [0.05, 0.50];
+export const FRINGE_DEPTH_DEFAULT = 0.20;
+/* The scan that finds the fringe region's NARROWEST station. It is a search
+   over a monotone-looking lamina, not a sampling of a feature, so the count
+   is about conditioning rather than resolution: 2048 puts the worst station
+   within 2.4e-4 of u on the shortest reachable fringe. */
+const FRINGE_SAMPLES = 2048;
+
 /* THE LIVE MESH FLOOR on the terminal face — NOT a print number and
    deliberately an order of magnitude below one. Live is authoring-true, so it
    should reach a point; a true apex cannot ship, for two measured reasons
@@ -3717,6 +3756,69 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   ];
   if (stalk) terms.push({ name: 'STALK', from: 0, to: stalk.until, at: () => stalk.halfWidth });
 
+  /* ===================================================================
+     THE SQUARED TERMINAL — `petalTipEnd`, session 32's deferred "terminal
+     width" family, ruled and built with the fringe because neither is any
+     use without the other (Eva, Sep 13).
+
+     WHAT IT IS: a FLOOR under the shape scoped to [uPk, 1], expressed as a
+     fraction `t` of the petal's own PEAK half-width. `halfW` IS that peak —
+     the CORE term is `halfW * tipLaw(u)` and `tipLaw(uPk)` is exactly 1 —
+     so the terminal is DERIVED FROM A LENGTH rather than from a row count
+     or a constant, and it scales with the petal by construction.
+
+     WHY IT IS A TERM AND NOT A FOLD INTO `tipFloor`. Four things fall out
+     of the term list that a fold would each have needed separately:
+     `shapeWinner` NAMES it, so `winnerAt` reports it and `slopeBreaks`
+     locates its own crossover for free; `lawIsActiveAt` stops claiming the
+     superellipse where the terminal has taken over, with no second
+     statement of the same predicate; `shapeBaseAt` carries it, so every
+     form law that scales with the half-width (cup, cup gradient, the
+     buckle, the apex sweep) reads the squared outline rather than the
+     converging one it replaced; and the DOMAIN is where "scoped to the
+     terminal alone" stops being a statement of intent and becomes a
+     property of the code.
+
+     WHY [uPk, 1] IS THE RIGHT DOMAIN, measured before it was chosen: a
+     GLOBAL floor at the ceiling binds over 100.0% of the blade — the petal
+     becomes a full-width rectangle from the foot up and the BASE taper is
+     destroyed, a region `petalBaseTaper` owns and this family must not
+     reach. Scoped to the region `petalTipShape` already owns, the ceiling
+     squares the tip taper and leaves the base taper untouched.
+
+     AND THE DOMAIN'S OWN EDGE COSTS NOTHING, which is why there is no new
+     seam at uPk: the ceiling is `t <= 1`, so `Wt <= halfW`, and at uPk the
+     CORE is exactly `halfW` — its maximum. The terminal therefore ARRIVES
+     BELOW THE INCUMBENT and can only start winning further along, where
+     the core has already fallen past it. FR2 asserts that in both
+     directions rather than leaving it as an argument.
+
+     THE CEILING IS DERIVED FROM A RETIRED CONTROL'S OWN REASON. A floor
+     ABOVE the peak would raise the outline past its own widest point — a
+     rise after a fall — which is precisely what retired `petalTipBreadth`
+     ("max-ing a RISING ramp against a FALLING core puts a waist in the
+     blade", 3,795 of 3,795 taper pairs). So `Wt <= halfW`, i.e. `t <= 1`.
+
+     THE DEFAULT IS 0 AND THAT IS A MODE CHECK, NOT A PREFERENCE. `tipFloor`
+     is mode-dependent (0.80 export / 0.15 live). A control defaulting to
+     `TIP_HALF_MM` would jump every LIVE row's terminal 0.15 -> 0.80 and
+     reproduce `petalTipBreadth`'s retirement reason word for word. At t = 0
+     the term is not pushed onto the list AT ALL, so the profile is the
+     shipped expression term for term in both modes — a BRANCH, the
+     `domeIsFlat` / `lobeDepth`-0 guard pattern, and not an arithmetic
+     coincidence that a later reader has to re-derive.
+
+     THE DEAD TRAVEL IS TOLD, NEVER TRIMMED. Below `TIP_HALF_MM / halfW` the
+     terminal sits under the print floor and delivers nothing, and that
+     fraction MOVES WITH THE PETAL'S WIDTH (20.0% of the track at petalWidth
+     8, 5.3% at 30) — so no static range is dead-free, the range is not
+     narrowed and the maximum is not adaptive. `stamenSpread`'s ruling
+     exactly: the read-out prints the number and the panel hatches the
+     track. =================================================================== */
+  const tipEnd = clamp(Number(state.petalTipEnd) || 0, TIP_END_RANGE[0], TIP_END_RANGE[1]);
+  const terminalHalf = tipEnd * halfW;
+  if (terminalHalf > 0) terms.push({ name: 'TERMINAL', from: uPk, to: 1, at: () => terminalHalf });
+
   /* The claw's shoulder: a stalk narrower than the foot is the whole point,
      so the foot-continuity floor stands down for it — and ONLY for it. */
   const rootBlend = stalk ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
@@ -3967,7 +4069,10 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      go.
      =================================================================== */
   const lobes = (() => {
-    if (!lobesEngaged(state)) return null;
+    /* THE FRINGE WINS. Hidden in the registry, INERT here — and inert means
+       the lobe record is never constructed at all, so nothing downstream can
+       read a cut that the outline does not carry. */
+    if (!lobesEligible(state) || !lobesEngaged(state)) return null;
     if (!(length > 0)) throw new Error('widthProfile: a lobed outline needs the blade LENGTH in mm to station its lobes on the lamina — pass it');
     const coverage = state.lobeCoverage === undefined ? LOBE_COVERAGE_DEFAULT : Number(state.lobeCoverage);
     const crestShape = state.lobeCrestShape === undefined ? LOBE_SHAPE_DEFAULT : Number(state.lobeCrestShape);
@@ -4177,6 +4282,164 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      fraction, because constant RELIEF is a statement about millimetres; the
      crest identity survives it unchanged, since `x - 0 === x` in IEEE-754
      for every finite x, negative zero included. */
+  /* ===================================================================
+     THE CARNATION FRINGE — `fringeCount` and `fringeDepth`, and THIS IS THE
+     ONE OWNER of every quantity that describes it. `trimPanels` reads the
+     plan and computes nothing; the read-out reads the plan; the gate reads
+     the plan and checks it against the EMITTED rows.
+
+     THE TEETH ARE PANELS, NOT A CUT. A fringe is N separate fingers at the
+     petal's END, and that is a DOMAIN DECOMPOSITION — which `trimPanels` has
+     expressed since the cleft shipped — and not a half-width. A half-width
+     holds ONE span per station; a fringe needs N. The two are different
+     objects and the lobe cut cannot draw this at any parameter value.
+
+     WHY IT NEEDS THE TERMINAL, measured before either was built: every
+     finger runs to u = 1, and without a terminal the blade is
+     2 x TIP_HALF_MM = 1.600 mm across there at EVERY petal size, so N
+     fingers and N-1 gaps must meet inside 1.6 mm. Ten fingers read as a
+     carnation over most of their length and then converge into one shared
+     spike. The terminal is what holds the end open; the fringe is what cuts
+     it. Neither ships alone.
+
+     THE SPLIT IS OWNED IN PHYSICAL UNITS, which is Eva's ruling and this
+     project's first durable rule. `fringeDepth` is a fraction of the petal's
+     OWN LENGTH measured from the tip, so the target station is `1 - depth`
+     EXACTLY and the depth in millimetres is `depth * length` — one owner, a
+     length derived from a length, and no row count standing for a depth. A
+     panel boundary IS a row, so the builder reports the station it landed on
+     and the residual against the target; FR3 bounds that by half a row gap
+     rather than letting the ladder silently move the fringe's depth. Measured
+     on main before this shipped: the same asked u = 0.80 landed on row
+     43 / 46 / 41 under three lobe settings.
+
+     THE TEETH TAPER TO POINTS, which is what makes it a carnation rather
+     than a comb. Each tooth is widest at the split and narrows linearly to
+     the print floor at u = 1; the gaps therefore WIDEN toward the tip. So
+     the tooth is narrowest at its own tip and the gap is narrowest at the
+     split, and each is set to `MIN_FEATURE_MM` exactly at the station where
+     it binds. `spanAt` already receives the row index and the cleft arm
+     simply ignored it — a tapering tooth needs no change to `emitPanel`.
+
+     THE COUNT CEILING IS THE TERMINAL'S WIDTH AND IT IS DERIVED, not picked.
+     Both binding constraints — the tooth at its tip and the gap at the split
+     — reduce to the same inequality, `W >= (2N - 1) * MIN_FEATURE_MM`,
+     applied at the NARROWEST station of the fringe's own region. With a
+     terminal that station is u = 1 and the width is the terminal's; without
+     one it is the converging apex's 1.600 mm, which carries exactly one
+     tooth. CLAMPED AND TOLD, never refused.
+
+     IT IS MEASURED ON THE MODE-FREE LAMINA, never on the emitted half-width.
+     The panel decomposition is TOPOLOGY and the export floor may not move
+     topology (session 32's rule, refusing to ship a third time), so the
+     count, the split row and every v-span are computed from
+     `max(shapeBaseAt, rootBlend, TIP_HALF_MM)` — the same mode-free outline
+     the ladder stations on. The v-spans are therefore identical in both
+     modes and only the millimetres they land on differ, and only inside the
+     terminal's own dead travel.
+
+     LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE, BY RULING (Eva, Sep 13).
+     Both own the apex — the coverage arc is centred on it by construction —
+     and composing them was MEASURED to narrow every finger including
+     interior ones nowhere near the rim (middle finger 0.5873 -> 0.4599 mm at
+     coverage 0.40), because a v-span is a fraction of the CUT half-width.
+     The fringe wins: `lobesEligible` is false under a live fringe, the lobe
+     family is hidden AND inert, and the read-out says so. Recovery is one
+     predicate in two files. =================================================================== */
+  const laminaHalfAt = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
+  const fringe = (() => {
+    const asked = Math.round(clamp(Number(state.fringeCount) || 0, FRINGE_COUNT_RANGE[0], FRINGE_COUNT_RANGE[1]));
+    if (asked < 1) return null;
+    /* NO ROOM — A FRINGE NEEDS AN END TO CUT TEETH INTO, and this is where
+       "one feature" stops being a sentence in a doc and becomes a branch.
+       A terminal that does not clear the print floor leaves the petal
+       converging to 2 x TIP_HALF_MM = 1.600 mm, which carries exactly ONE
+       tooth at the printable minimum — and one tooth is the petal, not a
+       fringe. So the teeth are NOT CUT, the row is bit-identical to the same
+       state with no fringe asked, and the read-out says why. Told, never
+       refused, and never silently building something else. */
+    /* AGAINST `TIP_HALF_MM` AND NEVER `tipFloor`. The floor is mode-dependent
+       (0.80 export / 0.15 live) and this decides whether PANELS EXIST — a
+       topology decision, which the export floor may never make. A 0.5 mm
+       terminal against `tipFloor` would build a fringe in live and refuse one
+       in export: session 32's mode-dependence defect, declining to ship a
+       fourth time. */
+    if (!(terminalHalf > TIP_HALF_MM)) return { asked, count: 0, built: false, noRoom: true,
+      noRoomWhy: tipEnd === 0 ? 'no squared end at all' : 'the squared end is under the print floor',
+      terminalHalf, tipEnd };
+    const depth = clamp(Number(state.fringeDepth) || FRINGE_DEPTH_DEFAULT, FRINGE_DEPTH_RANGE[0], FRINGE_DEPTH_RANGE[1]);
+    /* THE TARGET STATION, from the depth alone. Clamped at uPk so a tooth can
+       never reach below the petal's widest point into the region the BASE
+       taper owns — reachable on a spatulate taper, where uPk goes to 0.833
+       while the deepest split asks for 0.500. */
+    const uAsked = 1 - depth;
+    const uSplit = Math.max(uAsked, uPk);
+    /* THE NARROWEST STATION OF THE FRINGE'S OWN REGION. The lamina falls
+       monotonically to the terminal over [uSplit, 1], so this is u = 1 — but
+       it is MEASURED rather than assumed, because the claim is about the
+       shape the controls actually built. */
+    let wMinMm = Infinity, uMin = 1;
+    for (let i = 0; i <= FRINGE_SAMPLES; i++) {
+      const u = uSplit + ((1 - uSplit) * i) / FRINGE_SAMPLES;
+      const w = 2 * laminaHalfAt(u);
+      if (w < wMinMm) { wMinMm = w; uMin = u; }
+    }
+    /* THE CEILING. N teeth and N-1 gaps all at the printable minimum need
+       (2N - 1) x MIN_FEATURE_MM at the narrowest station. */
+    const ceiling = Math.max(1, Math.floor((wMinMm / MIN_FEATURE_MM + 1) / 2));
+    const count = Math.min(asked, ceiling);
+    const wSplitMm = 2 * laminaHalfAt(uSplit);
+    /* THE TAPER, PARAMETERISED BY THE GAP SO BOTH FLOORS HOLD BY
+       CONSTRUCTION AT EVERY STATION — not only at the two the plan names.
+
+       THE FIRST VERSION DID NOT, AND FR4 CAUGHT IT. It set the tooth's base
+       width from the width at the PLANNED split and tapered from there; but a
+       panel boundary is a row, the landed row sits up to half a gap above the
+       target, and the blade is narrower there — so under the buckle (which
+       moves the ladder) the emitted gap came out 0.9910 mm against a 1.0 mm
+       floor. A law that is right at two stations and interpolated between
+       them is not a law about the stations in between.
+
+       WHAT REPLACES IT. At any station the teeth and gaps tile the lamina:
+       `N * tooth + (N-1) * gap = W`. Given `W >= (2N-1) * F` — which the
+       count ceiling guarantees at the region's NARROWEST station, and
+       therefore everywhere in it — the admissible gap is exactly the interval
+       `[F, (W - N*F)/(N-1)]`: its low end puts the gaps on the floor and the
+       teeth take the rest, its high end puts the TEETH on the floor and the
+       gaps take the rest. Sliding `g` from 0 to 1 across that interval walks
+       from one to the other, and BOTH widths clear the floor at every point
+       of it, at every station, for any W the region contains. The taper is
+       then a property of the interval rather than of two sampled widths. */
+    const admissible = (u) => {
+      const hL = laminaHalfAt(u), W = 2 * hL;
+      const lo = MIN_FEATURE_MM;
+      const hi = count > 1 ? (W - count * MIN_FEATURE_MM) / (count - 1) : 0;
+      return { hL, W, lo, hi: Math.max(lo, hi) };
+    };
+    /* g: 0 at the split (gaps on the floor), 1 at the tip (teeth on the
+       floor). Linear in the fraction of the fringe's own length. */
+    const gAt = (u) => { const sp = 1 - uSplit; return sp > 0 ? clamp((u - uSplit) / sp, 0, 1) : 0; };
+    const widthsAtU = (u) => {
+      const { hL, W, lo, hi } = admissible(u);
+      if (count < 2) return { hL, W, tooth: Math.min(W, lo + (W - lo) * (1 - gAt(u))), gap: 0 };
+      const gap = lo + (hi - lo) * gAt(u);
+      return { hL, W, tooth: (W - (count - 1) * gap) / count, gap };
+    };
+    const toothBaseMm = widthsAtU(uSplit).tooth;
+    const toothTipMm = widthsAtU(1).tooth;
+    /* THE SPAN OF TOOTH k AT STATION u, in the GLOBAL v the row's own
+       cross-section is a function of. Teeth and gaps tile the lamina, so the
+       gap is whatever is left after the teeth — never a second law. */
+    const spanOf = (u, k) => {
+      const { hL, tooth, gap } = widthsAtU(u);
+      const a = -hL + k * (tooth + gap);
+      return [a / hL, (a + tooth) / hL];
+    };
+    return { asked, count, ceiling, clamped: count < asked, depth, depthMm: length === null ? null : depth * length,
+             uAsked, uSplit, peakClamped: uSplit > uAsked, wMinMm, uMin, wSplitMm,
+             toothBaseMm, toothTipMm, widthsAtU, spanOf, laminaHalfAt };
+  })();
+
   const shapeAt = (lobes === null || lobes.noRoom)
     ? shapeBaseAt
     : (u) => (u > lobes.u0 ? shapeBaseAt(u) - lobes.cutMm(u) : shapeBaseAt(u));
@@ -4184,13 +4447,25 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
 
   return {
     uPk, terms, footHalf, uCap, tipFloor,
+    /* THE SQUARED TERMINAL AND THE FRINGE — the plan, not a second copy of
+       it. `fringe` is null at the guard (count 0), which is what every
+       consumer branches on. */
+    terminalHalf, tipEnd, fringe,
     /* THE SHAPE TERM BEFORE THE FLOORS — on a lobed profile the cut one, on a
        plain profile the base's own closure. The L family re-derives the depth
        cap from a plain profile's `shapeAt` at the sinus stations. */
     shapeAt,
     /* The cap's entry and terminal half-widths, reported for the gates and
        the contact sheet rather than re-derived by either. */
-    capEntryHalf: hEntry, capTerminalHalf: tipFloor,
+    capEntryHalf: hEntry,
+    /* THE TERMINAL THE PETAL ACTUALLY ENDS ON. Until Eva's ruling of Sep 13
+       this was `tipFloor` and nothing else, because the apex had no control;
+       `petalTipEnd` is that control, and at its default of 0 the expression
+       below is `tipFloor` term for term in both modes. A4 no longer reads the
+       mode floor alone — it rebuilds this product from the ROW's own declared
+       `petalTipEnd` and the cap's declared peak, so the clause's reference
+       still has an owner the profile does not write. */
+    capTerminalHalf: Math.max(terminalHalf, tipFloor),
     /* WHICH TERM WON, from the ONE expression that decides it. The turning
        ladder needs to know where the LAW is the active branch — a kink's
        turning is a delta function, so it must not integrate through the
@@ -4415,7 +4690,39 @@ export function thicknessProfile(ring, state) {
    three solids one connected body. See PANEL_OVERLAP_ROWS above for what
    happens when that overlap is dropped, and why it is the positive control.
    =================================================================== */
-export function trimPanels(rowCount, uAt, cap) {
+export function trimPanels(rowCount, uAt, cap, fringe = null) {
+  /* THE CARNATION FRINGE — N teeth at the petal's END, each its own panel.
+     `fringe` is `widthProfile`'s plan and THIS READS IT AND COMPUTES NOTHING:
+     the count, the ceiling, the split station, the taper and every v-span
+     have one owner, and a second derivation here is the defect this project
+     repeats most. Null at the guard, which is the shipping default.
+
+     THE SPLIT ROW IS THE NEAREST TO THE TARGET, NOT THE FIRST PAST IT. A
+     panel boundary is necessarily a row, so the depth's physical value can
+     only be approximated — but `first past` is BIASED (it always overshoots
+     by up to a full gap) where `nearest` is centred and bounded by half a
+     gap. The cleft arm below keeps `first past` deliberately: it is a
+     non-shipping capability whose nine xfail entries are pinned to the rows
+     it currently picks, and moving it would move them for no gain.
+
+     THE TEETH OVERLAP THE BASE PANEL exactly as the cleft's lobes do — see
+     PANEL_OVERLAP_ROWS, whose positive control is what established that one
+     row of shared slab is what makes the separate closed solids one body.
+     Measured at N up to 10: boundary edges 0 and the shell count equal to a
+     plain build's, so the weld holds at every count. */
+  if (fringe && !fringe.noRoom) {
+    let mF = rowCount - 1, best = Infinity;
+    for (let i = 0; i < rowCount; i++) {
+      const d = Math.abs(uAt(i) - fringe.uSplit);
+      if (d < best) { best = d; mF = i; }
+    }
+    const tF = Math.max(0, mF - PANEL_OVERLAP_ROWS);
+    const out = [{ label: 'base', rowFrom: 0, rowTo: mF, spanAt: () => [-1, 1] }];
+    for (let k = 0; k < fringe.count; k++) {
+      out.push({ label: `tooth${k}`, rowFrom: tF, rowTo: rowCount - 1, spanAt: (i) => fringe.spanOf(uAt(i), k) });
+    }
+    return out;
+  }
   const cleft = (cap && cap.cleft) || null;
   if (!cleft) return [{ label: 'full', rowFrom: 0, rowTo: rowCount - 1, spanAt: () => [-1, 1] }];
 
@@ -4732,6 +5039,15 @@ export const LOBE_RELIEF_GRID = 2 ** -16;
    plain. The registry's twin is PREDICATES.lobesEngaged; the harness checks
    the two agree at load and on every row (L0). */
 export function lobesEngaged(state) { return !!state.lobeDepth; }
+/* THE FRINGE'S TWO STATEMENTS. `fringeEngaged` is the geometry's half of the
+   registry's `fringeEngaged` predicate (the depth is hidden AND inert at
+   count 0); `lobesEligible` is the geometry's half of the registry's
+   `lobesEligible` — LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE AND THE
+   FRINGE WINS (Eva, Sep 13). Neither file can read the other's answer and
+   both must act on it, which is why there are two statements and why the
+   harness asserts they agree at module load and on every row (FR0). */
+export function fringeEngaged(state) { return Math.round(Number(state.fringeCount) || 0) >= 1; }
+export function lobesEligible(state) { return !fringeEngaged(state); }
 /* THE LADDER'S CAPACITY FOR A WINDOW — how many of its free rows it can
    place inside [u0, u1] without the rows OUTSIDE breaking its own widest-gap
    bound (LADDER_MAX_GAP_FACTOR / NU in u, or uniform at the buckle's
@@ -6296,7 +6612,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
   };
   if (form && form.buckle !== null) trueNormalRows(rows, footS.length);
 
-  const panels = trimPanels(rows.length, (i) => rows[i].u, cap);
+  const panels = trimPanels(rows.length, (i) => rows[i].u, cap, profile.fringe || null);
   /* ONE CAPTURED GRID PER PANEL, in emission order and labelled with the
      panel's own name. A cleft is three panels — a shared base and two lobes
      that BOTH start PANEL_OVERLAP_ROWS below the split — so the petal's
@@ -6540,6 +6856,66 @@ export function buildPetalInto(acc, state, ring, slot, cap = null) {
          repeated defect. */
       peakHalf: profile.halfWidthBaseAt(profile.uPk),
     },
+    /* THE CARNATION FRINGE AND ITS SQUARED TERMINAL — the plan's own numbers
+       plus what the EMITTED rows did with them. Everything derived is
+       derived here, once, and the read-out, the panel caps and the FR family
+       all read this record rather than re-deriving any of it.
+
+       THE RESIDUAL IS THE POINT OF THE `uSplitRow` FIELDS. The depth is
+       owned in physical units — `1 - fringeDepth` is the target station
+       exactly — but a panel boundary IS a row, so the achieved depth can
+       only be the nearest station. Both are reported, with the gap of the
+       row it landed on, so FR3 can bound the residual instead of letting an
+       unrelated control silently move the fringe's depth. */
+    fringe: (() => {
+      const F = profile.fringe;
+      const peakHalfMm = profile.halfWidthBaseAt(profile.uPk);
+      const tipHalfMm = TIP_HALF_MM;
+      const floorMm = MIN_FEATURE_MM;
+      /* THE DEAD TRAVEL, from the lengths it is about: below this fraction
+         the terminal is under the print floor and delivers nothing. */
+      const deadBelow = peakHalfMm > 0 ? tipHalfMm / peakHalfMm : 0;
+      const endWidthMm = 2 * profile.terminalHalf;
+      const common = { tipEnd: profile.tipEnd, endWidthMm, peakHalfMm, tipHalfMm, floorMm, deadBelow,
+                       deadTravel: profile.tipEnd > 0 && profile.tipEnd < deadBelow,
+                       /* The count the END could carry, whether or not one was
+                          asked for — so the terminal's own read-out can say
+                          what it buys before a fringe exists. */
+                       ceiling: Math.max(1, Math.floor((2 * Math.max(profile.terminalHalf, tipHalfMm) / floorMm + 1) / 2)) };
+      if (F === null) return { ...common, built: false, asked: 0, count: 0, clamped: false, noRoom: false };
+      if (F.noRoom) return { ...common, built: false, asked: F.asked, count: 0, clamped: false, noRoom: true, noRoomWhy: F.noRoomWhy };
+      /* WHERE THE SPLIT LANDED, and the row gap it landed inside — both read
+         off the EMITTED stations, never from the plan. */
+      const bladeU = rows.map((r) => r.u).filter((u) => u > 0);
+      let mF = 0, best = Infinity;
+      for (let i = 0; i < rows.length; i++) { const d = Math.abs(rows[i].u - F.uSplit); if (d < best) { best = d; mF = i; } }
+      const uSplitRow = rows[mF].u;
+      const gapU = (() => {
+        const lo = mF > 0 ? rows[mF - 1].u : rows[mF].u, hi = mF < rows.length - 1 ? rows[mF + 1].u : rows[mF].u;
+        return Math.max(uSplitRow - lo, hi - uSplitRow);
+      })();
+      /* THE EMITTED TOOTH AND GAP, at the two stations where each binds —
+         read through the plan's own `spanOf` on the ROW the builder used, so
+         a defect in the span law shows here rather than being smoothed over
+         by a second derivation. */
+      const widthsAt = (u) => {
+        const hL = F.laminaHalfAt(u);
+        const sp = F.spanOf(u, 0);
+        const tooth = (sp[1] - sp[0]) * hL;
+        const gap = F.count > 1 ? ((F.spanOf(u, 1)[0] - sp[1]) * hL) : 0;
+        return { tooth, gap };
+      };
+      const atSplit = widthsAt(uSplitRow), atTip = widthsAt(1);
+      return { ...common, built: true, asked: F.asked, count: F.count, clamped: F.clamped,
+               ceiling: F.ceiling, wMinMm: F.wMinMm, uMin: F.uMin,
+               depth: F.depth, depthMm: F.depthMm, uAsked: F.uAsked, uPk: profile.uPk,
+               uSplit: F.uSplit, peakClamped: F.peakClamped,
+               uSplitRow, splitRow: mF, rowGapMm: gapU * length,
+               residualMm: Math.abs(uSplitRow - F.uSplit) * length,
+               toothBaseMm: atSplit.tooth, toothTipMm: atTip.tooth,
+               gapSplitMm: atSplit.gap, gapTipMm: atTip.gap,
+               toothPlanBaseMm: F.toothBaseMm, toothPlanTipMm: F.toothTipMm };
+    })(),
     /* THE LOBES (session 38, PR 2): the profile's own record plus the rows
        the ladder actually gave the window — a ROW COUNT, read off the emitted
        stations, said as one. Null on a plain petal. */

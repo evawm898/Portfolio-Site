@@ -49,11 +49,12 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
+         fringeAssertions,
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -79,6 +80,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-export-'));
 
 const results = [];
 const validity = [];
+/* Rows the generator REFUSED to export, declared in EXPORT_REFUSED_XFAIL and
+   asserted by XR1. Collected so the summary NAMES them with their figures —
+   a declared row that went quiet would be the coverage loss a skip is. */
+const refused = [];
 const t0 = Date.now();
 
 /* R6 — THE SOLID-ANGLE MEASURE'S CALIBRATION, once per run before any row
@@ -129,7 +134,14 @@ for (const row of rows) {
      blind to a cut in the wrong place or not made: it exports watertight and
      one piece either way. Rebuilt in Node from the page's own state. */
   const lob = await lobeAssertions(page, row);
+  /* THE FRINGE (FR0-FR5, Sep 13) — see fringeAssertions()'s header. Both
+     gates are structurally BLIND here: every tooth is its own closed panel
+     overlapping the base, so a fringe with the wrong count, the wrong taper,
+     the wrong split row or teeth under the printable floor exports
+     watertight AND as one connected piece. */
+  const frn = await fringeAssertions(page, row);
   if (lob.length) { validity.push(`${row.label}: ${lob.join('; ')}`); continue; }
+  if (frn.length) { validity.push(`${row.label}: ${frn.join('; ')}`); continue; }
   /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
      emitted spine rows against the law rebuilt from OTHER owners. Both STL
      gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
@@ -195,7 +207,15 @@ for (const row of rows) {
   const zyg = await zygoAssertions(page, row);
   if (zyg.length) { validity.push(`${row.label}: ${zyg.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
-  if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
+  /* A REFUSAL IS NOT A BROKEN EXPORT (XR1/XR2, Eva's ruling Sep 13) — see
+     exportRefusalAssertion()'s header. The generator refuses an over-budget
+     model ON PURPOSE, and the bare "no STL download" could not tell that from
+     the export breaking. A declared row must refuse, for the budget, with a
+     count over it; an undeclared one must export; and a declared row that
+     starts exporting fails as hard as one that refuses wrongly. */
+  const ref = await exportRefusalAssertion(page, row, !!buf);
+  if (ref.bad.length) { validity.push(`${row.label}: ${ref.bad.join('; ')}`); continue; }
+  if (!buf) { refused.push({ label: row.label, ...ref.r }); console.log(`  ${exportRefusedLine(row.label, ref.r)}`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
      live build never floors, so no live metric can answer this. */
   const flr = await exportFloorAssertion(page);
@@ -337,15 +357,28 @@ for (const r of results) {
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
 }
+/* THE ROWS THE GENERATOR REFUSED, NAMED WITH THEIR FIGURES (XR1, Eva's ruling
+   Sep 13). A declared refusal is neither a pass nor a skip — it is an ASSERTED
+   outcome — and it is printed on every run with its count so the row can never
+   go quiet, which is precisely the coverage loss a skip would have been. */
+for (const rr of refused) console.log(`\n${exportRefusedLine(rr.label, rr)}`);
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...exportRefusedCoverage(attempted));
+
 /* THE DENOMINATOR ITSELF, asserted — and the three real populations printed
    beside it (#220). Every ratio in this summary divides by `results.length`,
    which is the SURVIVORS of the validity assertions, so a dropped row shrinks
    BOTH sides of seven ratios at once and each of them still reads as a clean
    pass. The matrix count was never printed to compare them against. */
 const got = new Set(results.map((r) => r.label));
-const dropped = attempted.filter((l) => !got.has(l));
+/* A DECLARED REFUSAL IS NOT A DROPPED ROW (XR1). It reached no `results`
+   entry because there is no STL to analyse, but it is an ASSERTED outcome
+   rather than a row the gate lost — so it is excluded from the census and
+   named on its own line instead, which is what keeps it from going quiet. */
+const refusedLabels = new Set(refused.map((r) => r.label));
+const dropped = attempted.filter((l) => !got.has(l) && !refusedLabels.has(l));
 if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
 console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length} watertight (boundary = 0)`
+  + (refused.length ? ` · ${refused.length} EXPORT REFUSED by the generator's own triangle budget (declared, asserted by XR1 — not a pass and not a skip)` : '')
   + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 if (dropped.length) console.log(`  ^ every ratio below divides by the ${results.length} row(s) that SURVIVED, not by the ${attempted.length} in the matrix.`);
@@ -383,7 +416,8 @@ console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a 
 /* MATRIX-LEVEL claims (a flag raised somewhere, an asserted row somewhere)
    are claims about the MATRIX, so a filtered `--only` run does not make them. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label)));
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label), refused.map((r) => r.label)));
+{ const note = selfIntersectionRefusedNote(refused.map((r) => r.label)); if (note) console.log(note); }
 /* THE SELF-CONTACT FLAG, both directions at matrix level (session 16). */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
 {
@@ -457,4 +491,4 @@ if (bad) {
   console.log(`\nexport gate: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} not watertight, ${degenerates.length} with degenerate triangles, ${countMoved.length} whose triangle count moved between modes. Nothing above is a pass.`);
   process.exit(1);
 }
-console.log(`\nexport gate: PASS — all ${attempted.length} attempted configs reached the results and every one exports watertight.`);
+console.log(`\nexport gate: PASS — ${results.length} of ${attempted.length} attempted configs reached the results and every one exports watertight${refused.length ? `; ${refused.length} config(s) the generator REFUSED on its own triangle budget, declared and asserted by XR1 (named above) rather than skipped` : ''}.`);
