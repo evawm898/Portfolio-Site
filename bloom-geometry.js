@@ -8069,14 +8069,27 @@ export function buildStemInto(acc, plan) {
      measurement that would scope it is in this session's outcome doc rather
      than in a gate nobody has run over the matrix. Scoped here, it is a few
      hundred map entries on a solid that never exceeds ~500 triangles. */
-  let directedMismatch = 0;
+  let directedMismatch = 0, emittedBottomAreaMm2 = 0;
   {
     const seen = new Map();
     const P = acc.positions;
     const k = (i) => `${P[i]},${P[i + 1]},${P[i + 2]}`;
+    const tipZ = zs[zs.length - 1];
     for (let t = before * 9; t < P.length; t += 9) {
       const v = [k(t), k(t + 3), k(t + 6)];
       for (let e = 0; e < 3; e++) { const key = `${v[e]}>${v[(e + 1) % 3]}`; seen.set(key, (seen.get(key) || 0) + 1); }
+      /* THE BOTTOM FACE'S OWN AREA, in the same pass — ST10's DIRECT witness for
+         the thing Eva asked for. Without it ST10 only says where the bore
+         STOPS, and that the bottom is a DISC rather than an ANNULUS follows by
+         implication (an annulus would need an inner ring at this z, which would
+         move ST1's count). An implication is not an assertion: this measures
+         the face itself, off the triangles handed to `acc.tri`, against a
+         closed form the harness owns. */
+      if (P[t + 2] === tipZ && P[t + 5] === tipZ && P[t + 8] === tipZ) {
+        const ux = P[t + 3] - P[t], uy = P[t + 4] - P[t + 1];
+        const vx = P[t + 6] - P[t], vy = P[t + 7] - P[t + 1];
+        emittedBottomAreaMm2 += Math.abs(ux * vy - uy * vx) / 2;
+      }
     }
     for (const key of seen.keys()) {
       const [a, bq] = key.split('>');
@@ -8084,7 +8097,7 @@ export function buildStemInto(acc, plan) {
     }
   }
   return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1],
-           emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch,
+           emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch, emittedBottomAreaMm2,
            emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset };
 }
 

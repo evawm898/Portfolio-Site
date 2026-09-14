@@ -5096,6 +5096,25 @@ export async function stemAssertions(page, row) {
     } else if (P.directedMismatch !== 0) {
       bad.push(`ST10: ${P.directedMismatch} of the stem's directed edges have no opposite — a face is wound the wrong way round, which leaves the mesh watertight, manifold and one connected piece while enclosing the wrong volume`);
     }
+    /* (c-bis) AND THE BOTTOM FACE IS THE SHAPE EVA ASKED FOR, asserted rather
+       than implied. The clauses below say where the bore STOPS; that the bottom
+       is a DISC and not an ANNULUS then follows only by implication (an annulus
+       would need an inner ring at the tip's z, which would move ST1's count) —
+       and an implication is not an assertion. This is the face itself: the
+       builder sums the area of the triangles it emitted at its own lowest z,
+       and the bar is the closed form of a regular N-gon, which the harness
+       owns and `buildStemInto` does not. A full DISC where the plug closes it,
+       the tube's own section where there is nothing to close. */
+    if (P.emittedBottomAreaMm2 === undefined) {
+      bad.push('ST10: the builder reports no bottom-face area — that the bottom is a DISC rather than an ANNULUS is then implied by a triangle count and asserted by nothing');
+    } else {
+      const poly = (rad) => 0.5 * P.sides * rad * rad * Math.sin(2 * Math.PI / P.sides);
+      const closed = !hollow || P.tipPlugMm > 0;
+      const want = poly(P.outerR) - (closed ? 0 : poly(P.boreR));
+      if (Math.abs(P.emittedBottomAreaMm2 - want) > 1e-6 * Math.max(1, want)) {
+        bad.push(`ST10: the stem's bottom face measures ${P.emittedBottomAreaMm2} mm^2 where a ${closed ? 'closed DISC' : 'tube section'} of outer radius ${P.outerR} on ${P.sides} sides is ${want} — the bottom is not the shape the plan asked for`);
+      }
+    }
     if (P.emittedVoid) {
       /* (d) AND THE PLUG IS WHERE IT SAYS IT IS — the measured half, off the
          emitted rings against Eva's own number. A plug built at the TOP, or at

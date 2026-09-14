@@ -1820,6 +1820,7 @@ window.__bloomMetrics = () => ({
     emittedVoidTopZ: lastStemBuilt ? lastStemBuilt.emittedVoidTopZ : undefined,
     emittedVoidBottomZ: lastStemBuilt ? lastStemBuilt.emittedVoidBottomZ : undefined,
     directedMismatch: lastStemBuilt ? lastStemBuilt.directedMismatch : undefined,
+    emittedBottomAreaMm2: lastStemBuilt ? lastStemBuilt.emittedBottomAreaMm2 : undefined,
     /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
        these, never the plan beside them. Same reason as rootSpanMm above: the
        plan is what was ASKED FOR and these are what came out. */
