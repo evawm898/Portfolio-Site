@@ -613,13 +613,13 @@ export const SMOKE_BLOCKS = [
        hub-to-stem join ACTIVE and INERT, and the domed head, where the
        attachment face is high inside the bowl so the visible length differs from
        the total. Cheapest row per path.
-       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: SPHERE (where
-       the stem is hidden AND inert by ruling, and the whole of that claim is a
-       GATED live-matrix row), every placement but RADIAL, the widest hub, and
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: SPHERE (which
+       is block 32's — on a sphere the stem decides which petals are built, and
+       that is its own claim), every placement but RADIAL, the widest hub, and
        the centre rooted through the same slab. */
     rows: [
       { label: 'STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)',
-        path: 'a stem CONSTRUCTED with the join ACTIVE and the bore OPEN at once — ST0 (the registry\'s stemEligible and the geometry\'s agree, and the builder declares a stem iff the state asks for one), ST1 (built iff declared), ST2 (on the axis, running down, the length the control asked for, and the placer\'s stations in MILLIMETRES OF ARC from the hub), ST3 (Eva\'s bore rule on the EMITTED radii, wall exactly 1.5), ST4 (rooted THROUGH the slab, never a hairline), ST5 (the hub\'s emitted underside IS the join\'s declared law, and the hub\'s own thickness beyond the blend radius), ST6 (the petal-to-hub junction untouched, against a stemless build of the same state)' },
+        path: 'a stem CONSTRUCTED with the join ACTIVE and the bore OPEN at once — ST0 (the registry\'s stemPresent and the geometry\'s stemIsAbsent are exact complements, and the builder declares a stem iff the state asks for one), ST1 (built iff declared), ST2 (on the axis, running down, the length the control asked for, and the placer\'s stations in MILLIMETRES OF ARC from the hub), ST3 (Eva\'s bore rule on the EMITTED radii, wall exactly 1.5), ST4 (rooted THROUGH the slab, never a hairline), ST5 (the hub\'s emitted underside IS the join\'s declared law, and the hub\'s own thickness beyond the blend radius), ST6 (the petal-to-hub junction untouched, against a stemless build of the same state)' },
       { label: 'STEM: SOLID at the floor (3 mm OD — the bore closes, Eva\'s rule)',
         path: 'the OTHER arm of the bore rule — ST3 with bore 0, the capped-cylinder branch whose cap must be fanned from a RIM vertex and never from the axis (a centre fan shares the hub\'s own apex vertex EXACTLY, welds the two shells and turns a by-design overlap into a within-shell self-intersection: measured 528 pairs before the fix, 0 after), and ST5 with the join barely active at 1.299 mm over the hub\'s 1.200' },
       { label: 'STEM: x a domed head (rise 0.50 — part of the stem is inside the bowl)',
@@ -651,6 +651,30 @@ export const SMOKE_BLOCKS = [
         path: 'the mutual exclusion in the direction that can silently fail — the lobe family at MAXIMUM under a live fringe must contribute NOTHING, so L0\'s own record is absent and the emitted outline is the fringe\'s alone; the defect this catches is a lobe cut still narrowing every finger, which no count and no span check can see' },
       { label: 'FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)',
         path: 'the OTHER direction — both guards at once on a bloom that must be the shipping default to the bit: the terminal term is not pushed and trimPanels returns the single \'full\' span, so FR0 and FR1 read absent and the byte tool proves the row unmoved' },
+    ],
+  },
+  {
+    n: 32,
+    anchor: 'SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this family adds are the
+       channel EXISTING at all (a sphere with a stem) or not (any other head, or
+       no stem), the mask firing on SOME slots and on ALL of them, and the
+       sphere's own arms of `stemPlan` (the stem leaving the RESERVED pole, and
+       the join INERT on a shell — which is also the first row in this project
+       ever to reach ST5's inert arm). Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: the 240-foot
+       head (the most petals the channel ever sorts — a live matrix row and the
+       most expensive one in it), the longest stem, the thinnest sheet (where
+       the two modes measure different geometry and the mode-free union is the
+       only thing that could be doing work), and every form control over a
+       sphere. All are live matrix rows and none is in the subset. */
+    rows: [
+      { label: 'SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)',
+        path: 'the channel CONSTRUCTED — ST7 (the omission is the stem\'s own in BOTH directions: every slot NOT built collides in at least one mode, every slot built clears the printable gap in both, the clearance IS MIN_FEATURE_MM and the counts add up), ST8 (it is a MASK: against a STEMLESS build of the same state every slot keeps its azimuth and every SURVIVING petal keeps its foot, and the hub is the size the ASKED-FOR count made it), ST9 (and the EXPORTED FILE carries nothing but the stem inside the channel), beside ST0-ST6 on the sphere\'s own arms of the plan — the stem leaving the RESERVED pole and the join INERT on a shell, which is ST5\'s inert arm reached for the first time' },
+      { label: 'SPHERE STEM: THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)',
+        path: 'the mask at its limit — every slot omitted, so the bloom is a head on a stick: ST7 and ST8 must hold with ZERO petals built (the per-slot foot digests are all null and all declared), and every family indexed by descriptor must skip the declared set rather than report a missing record. TOLD, never refused — the stemJoinBlendRadius precedent, and the read-out says so' },
+      { label: 'SPHERE STEM: GATED — the widest stem at length 0 on a sphere (bit-identical to an untouched sphere)',
+        path: 'the OTHER direction — the guard: no stem, so no channel, so nothing omitted. ST7 must read the channel ABSENT rather than as a passing "0 omitted", and the byte tool proves the row bit-identical to a sphere with the stem controls never touched — which is what makes every sphere row that shipped before this session unmoved' },
     ],
   },
 ];

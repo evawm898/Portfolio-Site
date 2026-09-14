@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemEligible } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -481,7 +481,12 @@ let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequ
 let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
-let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemEligible = true;
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true;
+/* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
+   built, and how near the stem every one of them came. Null wherever the
+   question does not arise (no stem, or not a sphere), never a passing 0. */
+let lastStemOmission = null;
+let lastFootBySlot = [];
 /* THE FOOT FRAMES' DIGEST — ST6's measured side. A stemmed and a stemless build
    of the SAME state must agree here exactly, which is the whole of "the
    hub-to-stem join does not change the petal-to-hub junction". One function
@@ -490,10 +495,31 @@ let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null,
    ones that matter. */
 function footFramesDigest(built) {
   let h = 0;
-  for (const p of (built.petals || [])) for (const f of (p.footFrames || [])) {
+  /* A DESCRIPTOR WHOSE PETAL WAS NOT BUILT HAS NO FOOT FRAME, and `petals`
+     carries a null there so the array stays index-matched to `fr.rings`. ST6
+     compares this against a STEMLESS build, where nothing is omitted, so a
+     stemmed sphere and its stemless twin legitimately have different
+     POPULATIONS — which is why the per-slot list below exists and why ST6 and
+     ST8 read that instead of this scalar wherever any slot was omitted. */
+  for (const p of (built.petals || [])) for (const f of ((p && p.footFrames) || [])) {
     for (const v of [...f.C, ...f.N, ...f.T, f.h, f.t]) { h = (h * 31 + (Number.isFinite(v) ? v : 0)) % 1e15; }
   }
   return h;
+}
+/* THE SAME DIGEST, ONE PER SLOT — null where no petal was built. This is what
+   makes "the omission does not renumber" checkable: slot 4's foot frame must be
+   the SAME NUMBER with the stem and without it, whatever happened to slot 3.
+   One function for both builds again, for footFramesDigest's own reason: the
+   digest is a measurement METHOD and the two sides are two different BUILDS. */
+function footFramesBySlot(built) {
+  return (built.petals || []).map((p) => {
+    if (!p || !p.footFrames) return null;
+    let h = 0;
+    for (const f of p.footFrames) for (const v of [...f.C, ...f.N, ...f.T, f.h, f.t]) {
+      h = (h * 31 + (Number.isFinite(v) ? v : 0)) % 1e15;
+    }
+    return h;
+  });
 }
 let lastPetal = null;                             // layer 0's petal — likewise
 let lastPetals = [];
@@ -573,10 +599,13 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastStem = built.stem && built.stem.present ? built.stem : null;
     lastStemTris = built.stemBuilt ? built.stemBuilt.tris : 0;
     lastStemBuilt = built.stemBuilt || null;
-    /* THE GEOMETRY'S OWN ELIGIBILITY, on the state this build was made from.
-       ST0 needs the answer the RUNNING module gave; see __bloomMetrics. */
-    lastStemEligible = stemEligible(uiForBuild);
+    lastStemOmission = built.stemOmission || null;
+    /* THE GEOMETRY'S OWN ANSWER TO "IS A STEM ABSENT HERE", on the state this
+       build was made from. ST0 needs the answer the RUNNING module gave; see
+       __bloomMetrics. */
+    lastStemAbsent = stemIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
+    lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
   }
   const geo = new THREE.BufferGeometry();
@@ -1134,14 +1163,50 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    THE JOIN IS TOLD, NOT TUNED: it has no control, so the only way anyone can see
    what it did is for this line to say it. CLAMPED AND TOLD is the project's own
    form, and the bore's closing at Eva's floor is exactly that. */
-function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode) {
+function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
   if (!stem) return '';
   const hollow = stem.boreR > 0;
+  /* THE JOIN NAMES ITS OWN REASON FOR DOING NOTHING. "A 12 mm stem asks for no
+     more than the hub's own 1.20 mm" is FALSE of a 12 mm stem and would be the
+     read-out repeating an arithmetic nobody performed: on a closed SPHERE the
+     plan declares the join inert because a plate's section modulus does not
+     describe a shell, which is a different sentence and is the one that is
+     true there. `joinReason` is the plan's own word. */
+  const inertBecause = stem.joinReason === 'shell'
+    ? `INERT — the head is a closed SPHERE, whose wall is ${stem.hubT.toFixed(2)} mm all the way round; the join is DERIVED for a PLATE and a shell carries a root hole differently, so it is not applied here (told, not silent)`
+    : `INERT — a ${(stem.outerR * 2).toFixed(1)} mm stem asks for no more than the hub's own ${stem.hubT.toFixed(2)} mm, so the hub is untouched`;
   return `STEM ${stem.lengthMm} mm total`
     + (stem.hiddenMm > 1e-9 ? ` · ${stem.visibleMm.toFixed(1)} mm VISIBLE (${stem.hiddenMm.toFixed(1)} mm of it is inside the head's own bowl)` : ' · all of it visible (a flat head hides none)')
     + ` · ${(stem.outerR * 2).toFixed(1)} mm across, `
     + (hollow ? `${(stem.boreR * 2).toFixed(1)} mm bore, a ${stem.wallMm.toFixed(2)} mm wall` : `SOLID — the bore CLOSES at this diameter (told, not refused)`)
-    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : `INERT — a ${(stem.outerR * 2).toFixed(1)} mm stem asks for no more than the hub's own ${stem.hubT.toFixed(2)} mm, so the hub is untouched`}\n`;
+    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : inertBecause}\n`
+    + stemChannelLine(omission);
+}
+
+/* THE STEM CHANNEL (the sphere-stem session) — CLAMPED AND TOLD. A user asking
+   for 40 petals and being shown 33 must be told which seven are missing and
+   why, in the form every other clamp in this panel takes. Absent wherever the
+   question does not arise, never a passing "0 omitted". */
+function stemChannelLine(omission) {
+  if (!omission) return '';
+  const o = omission;
+  if (!o.omitted.length) {
+    return `     STEM CHANNEL every one of the ${o.asked} petals clears the stem`
+      + ` — nearest ${Math.min(o.nearestKeptMm.live, o.nearestKeptMm.export).toFixed(2)} mm against the ${o.clearanceMm.toFixed(2)} mm printable gap\n`;
+  }
+  const runs = [];
+  for (const k of o.omitted) {
+    const last = runs[runs.length - 1];
+    if (last && last[1] === k - 1) last[1] = k; else runs.push([k, k]);
+  }
+  const said = runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(', ');
+  const kept = Math.min(o.nearestKeptMm.live, o.nearestKeptMm.export);
+  return `     STEM CHANNEL ${o.built} of ${o.asked} petals BUILT — ${o.omitted.length} NOT BUILT (slot${o.omitted.length === 1 ? '' : 's'} ${said}),`
+    + ` because the stem passes within the ${o.clearanceMm.toFixed(2)} mm printable gap of them.`
+    + ` The sequence, the equal-area law and the golden angle are untouched: this is a mask over the slots, so no surviving petal moved.`
+    + (o.built === 0
+        ? ` NOTHING IS LEFT — this stem is wider than the head has room for, told rather than refused.\n`
+        : ` Nearest petal that was kept: ${Number.isFinite(kept) ? kept.toFixed(2) : '—'} mm.\n`);
 }
 
 function styleLine(fr, styles, stamens, mode) {
@@ -1193,7 +1258,13 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
   /* UNDER FAN THE COUNT IS DERIVED AND `petalCount` IS HIDDEN, so printing
      the slider would be printing a number nothing read. `fr.slotCount` is
      footRing()'s own answer, which is what the builder actually placed. */
-  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)`
+  /* AND WHEN THE STEM TAKES SOME OF THEM, THIS LINE SAYS SO TOO — the headline
+     count is the first place a reader looks, and a bloom reporting "petals 240"
+     while 218 are on it would be the panel's own number lying. The reason lives
+     on the STEM CHANNEL line below; this one carries the two counts. */
+  const omitted = built && built.stemOmission ? built.stemOmission.omitted.length : 0;
+  const short = omitted ? ` — ${fr.sequenceLength - omitted} BUILT, ${omitted} not (the stem, see below)` : '';
+  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)${short}`
     : fr.fan ? `petals ${fr.slotCount} (${fr.fan.perSide}/side${fr.fan.centre ? ' + one on the line' : ''})`
     : `petals ${ui.petalCount}`;
   /* EVERY RING'S RADIUS is what this line has always printed, and at up to
@@ -1227,7 +1298,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + lobeLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
-       + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode) : '')
+       + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1287,7 +1358,14 @@ function regenerate() {
                   /* THE FRINGE's record joins for the same reason: the squared end's
                      dead travel and the tooth count's ceiling are the OWNER's numbers,
                      and both print on the track as well as in the read-out. */
-                  fringe: (built.petal && built.petal.fringe) || null };
+                  fringe: (built.petal && built.petal.fringe) || null,
+                  /* THE SPHERE'S STEM CHANNEL joins the record for the same reason
+                     again: a user asking for 40 petals and being handed 33 must
+                     read it ON THE CONTROL they set, not only three lines down in
+                     the read-out. It is the OWNER's number — how many of this
+                     slider's own petals the stem took — and nothing here derives
+                     it. Null wherever the question does not arise. */
+                  stemChannel: built.stemOmission || null };
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -1684,7 +1762,20 @@ window.__bloomMetrics = () => ({
      and can never disagree — session 41's L7, measured again here, where
      `stem-eligible-disagrees-with-the-registry` fired nothing until this key
      existed. */
-  stemEligible: lastStemEligible,
+  stemAbsent: lastStemAbsent,
+  /* THE SPHERE'S STEM CHANNEL — ST7's and ST8's measured side, and the
+     read-out's. The per-mode approach arrays ride too, because "the two modes
+     omit the same set" is a claim about both of them and a gate sees one build
+     at a time; the builder computes both to form the union, so reporting them
+     costs nothing and makes the union checkable rather than believed. */
+  stemOmission: lastStemOmission ? {
+    clearanceMm: lastStemOmission.clearanceMm,
+    asked: lastStemOmission.asked, built: lastStemOmission.built,
+    omitted: lastStemOmission.omitted.slice(),
+    byMode: { live: lastStemOmission.byMode.live.slice(), export: lastStemOmission.byMode.export.slice() },
+    approach: { live: lastStemOmission.approach.live.slice(), export: lastStemOmission.approach.export.slice() },
+    nearestKeptMm: { ...lastStemOmission.nearestKeptMm },
+  } : null,
   hubJoinActive: !!lastHubBuilt.joinActive,
   hubJoinThickness: lastHubBuilt.joinThickness,
   hubJoinBlendRadius: lastHubBuilt.joinBlendRadius,
@@ -1692,6 +1783,11 @@ window.__bloomMetrics = () => ({
   hubUnderside: (lastHubBuilt.underside || []).map((p) => p.slice()),
   hubTopFaceZ: lastHubBuilt.topFaceZ,
   footFramesDigest: lastFootDigest,
+  /* ONE FOOT-FRAME DIGEST PER SLOT, null where no petal was built — ST8's
+     measured side. The scalar above cannot answer "did slot 4 move" on a build
+     where slot 3 is missing, which is exactly the question the stem channel
+     makes askable. */
+  footFramesBySlot: lastFootBySlot.slice(),
   /* THE DOME (Sep 4) — footRing()'s own cap, null under the guard: the rise
      asked and built, the cap's radius and centre, the apex floor's clamp, and
      the surface-to-plan ratio over the feet's annulus. J1 places every foot
@@ -1933,6 +2029,15 @@ window.__bloomStemlessHub = () => {
     hubThickness: built.hub.thickness,
     topFaceZ: built.hubBuilt.topFaceZ,
     footFrames: footFramesDigest(built),
+    /* ST8's REFERENCE — the same state with no stem, so nothing is omitted and
+       every slot carries a petal. The stem code writes none of this, which is
+       what makes it an owner the omission cannot move: if a surviving petal's
+       foot moved, or the sequence renumbered, or the hub resized, this is the
+       only thing on the page that can say so. */
+    footFramesBySlot: footFramesBySlot(built),
+    petalsBuilt: built.petalsBuilt,
+    slotAzimuths: built.slotAzimuths.map((row) => [...row]),
+    ringCount: built.rings.length,
   };
 };
 

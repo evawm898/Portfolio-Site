@@ -1992,14 +1992,16 @@ count and it was wrong by 48; it is measured now, as both other arms already wer
 **`STEM: x a hemisphere` IS THE HEAD'S FOLD, NOT THE STEM'S**, proved two-sidedly: the
 identical state at `stemLength` 0 reads the same 216 pairs / 0.4176 mm at the same point,
 and so does `headRise max (1)`.
-**SPHERE REFUSES A STEM IN THIS PR AND THE REASON THE OBVIOUS MECHANISM DIED IS MEASURED:**
+**SPHERE REFUSED A STEM IN THAT PR (it has one now — see the block below) AND THE REASON THE
+OBVIOUS MECHANISM DIED IS MEASURED:**
 growing `dome.reserved` and re-placing the petals over a reduced arc **moves FEET, not
 BLADES** — at 30 degrees of reservation the pole-most petal goes 0.68 -> 0.88 mm of clear
 radius while its neighbour clears entirely — so ANY stem costs 46-51 degrees and the stem's
 own radius is worth only a further 5-8. It cannot be derived from the stem radius as
 proposed, and **S3 clause (b) forbids a bald cap by name**. Eva's replacement — petals whose
-geometry would collide with the stem are NOT BUILT, everything else untouched — is its own
-small PR immediately after, so the stem's byte partition is not entangled with sphere rows.
+geometry would collide with the stem are NOT BUILT, everything else untouched — shipped as
+its own small PR immediately after, so the stem's byte partition was not entangled with
+sphere rows; it is the block below, and the rejection above still stands.
 **16 MOVERS / 677 HOLDERS**, predeclared from the BUILDER'S OWN RECORD (a row moves iff a
 stem is actually present) rather than from the control set; the two non-`STEM:` movers are
 `stemLength max (120)` and **`ALL MAX`** — session 38's lesson honoured again.
@@ -2039,6 +2041,78 @@ one nobody sees is inside a mutant a subset skipped (`/plot`'s measured lesson).
 names it and the clean tree silent on every row, with all 25 anchors matching exactly once —
 and every non-stem mutant now runs over the SPHERE row too. The per-mutant table, with the
 collateral each one legitimately reddens, is in §6b of the outcome doc.
+
+**THE SPHERE HAS A STEM, AND THE PETALS IT WOULD PASS THROUGH ARE NOT BUILT** (Eva's
+ruling, the sphere-stem session — read `docs/bloom-sphere-stem-outcome.md` before touching
+`stemPlan`'s sphere arm, `stemOmission` or the ST family). Session 43's TODO, discharged.
+`stemEligible` IS RETIRED on both sides (a predicate, not a control id, so `RETIRED_IDS`
+does not apply): nothing refuses a stem any more, and a predicate true everywhere is a
+statement nobody can disagree with. **THE SEQUENCE, THE EQUAL-AREA LAW, THE GOLDEN ANGLE
+AND THE ONE-STEP RESERVATION ARE ALL UNTOUCHED** — this is a MASK over the slot sequence
+and nothing else, and session 43's measured rejection of growing `dome.reserved` stands:
+it moves FEET, not BLADES, ANY stem costs 46-51 degrees and the radius is worth 5-8, so it
+cannot be derived from the stem. **Do not revisit it; S3 forbids the bald cap by name.**
+**THE CRITERION IS THE PETAL THE SHIPPED BUILDER EMITS**, built into a throwaway
+accumulator and measured over every emitted vertex — `petalFreeStemApproachMm`, which
+re-derives no surface (session 43's ST2, session 41's L7, one sentence). **It reproduces
+session 43's Phase A exactly through an instrument that shares no code with it**: 6 of 40
+at a 3 mm stem reads 2.433 mm to the stem SOLID against Phase A's 3.933 mm of clear radius,
+and 2.433 + 1.500 is 3.933.
+**MODE-FREE BY CONSTRUCTION, NOT BY OBSERVATION**: a slot is omitted if it collides in
+EITHER mode, so the set is the same set in both by the symmetry of a union and every built
+petal clears in the mode it was built in. Which petals EXIST is topology, refused as
+mode-dependent four times before (session 32's ladder, 38's seam step, the fringe's count
+threshold, 42's lamina). **Swept over 456 reachable states the two modes NEVER disagree**,
+so the union is inert on that grid and costs a second petal build for a guarantee it has
+not yet had to make — reported, and the right trade, because the boundary is a slider
+position away and an assertion that can fail is worse than a construction that cannot.
+**THE SOLID TESTED IS THE *FREE* STEM** (the hub's underside down to the tip), never the
+root band inside the hub, where the design already puts the stem and the material in one
+place. **AND THE CHANNEL IS THE SPHERE'S AND ONLY THE SPHERE'S, measured**: on a flat head
+with the widest stem **all 8 feet read 0.000 mm** from the free stem, because a foot's
+bottom skin is COPLANAR with the hub's underside — the measure is degenerate there by
+construction and a criterion applied there would empty an ordinary bloom. On a sphere the
+stem leaves a POLE THE SEQUENCE RUNS THROUGH. **THE CLEARANCE IS `MIN_FEATURE_MM`**, this
+project's one owner of the minimum printable GAP, derived from a length and not typed; a
+declared guess like every floor here, and not weakened for being one.
+**THE JOIN IS INERT ON A SPHERE BY DECLARATION, AND TOLD**: `stemJoinThickness` equates the
+stem's section with a **PLATE's**, a closed shell carries a root hole in membrane instead,
+and the sphere arm of `buildHubInto` emits a uniform wall and reads no join — so a plan
+declaring a thickening would describe geometry nobody builds. `joinReason` is the plan's own
+word and the read-out speaks it. **THIS IS THE FIRST ROW IN THIS PROJECT EVER TO REACH ST5's
+INERT ARM** — the thinnest stem on the shipping sheet already asks 1.299 mm against the hub's
+1.200 — and the harness's expected blend radius there was `outerR` where the builder reports
+0, which would have fired on the first inert row anyone built. Fixed in the same commit.
+**A BARE HEAD IS REACHABLE AND IS TOLD, NEVER REFUSED**: a 12 mm stem on the smallest sphere
+takes all 3 petals (`stemJoinBlendRadius`'s own precedent), and it is a matrix row so every
+family indexed by descriptor runs with ZERO petals built.
+**ST7 / ST8 / ST9 ARE THE NEW FAMILIES AND EACH SEES SOMETHING THE OTHER TWO CANNOT.** ST7 is
+the criterion's own biconditional (it reads the channel's report, so it can only say the
+criterion is self-consistent); ST8 is the MASK, against a STEMLESS build of the same state on
+the same page — the only owner the stem code does not write, and the only thing that could see
+a renumbering, since a bloom whose petals all moved one place round passes every STL check ever
+written here; **ST9 reads the EXPORTED FILE** and asks whether any petal is in the channel at
+all, locating the cylinder from the FILE's own three stem rings and the CONTROL's own length
+rather than from the plan. **DECLARED BLINDNESS**: nothing asserts the region is the FREE stem
+rather than the whole one — a criterion including the root band would omit MORE petals and all
+three clauses would stay green. That choice is pinned by the flat-head measurement above and by
+this sentence, not by a clause.
+**THE BYTE PARTITION'S SECOND CLAUSE IS THE ONE THIS FEATURE IS ABOUT**
+(`node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree> [--control] [--only re]`):
+on every mover the branch's stream is EXACTLY the base's with the omitted petals' triangle
+blocks deleted and the stem's own appended after the hub, float for float under `Object.is`.
+A surviving petal that moved is a re-placement; a hub that moved was sized from the survivors.
+**`ALL MAX` IS UNMOVED AND THAT IS NOT LUCK**: retiring `stemEligible` took `stemDiameter` out
+of `PLACEMENT_SUBS`, which would have let the blanket sweep hand it 12 mm — `STEM_SUB_IDS` is
+the derivation that keeps it out of block 1 and out of `SWEEPABLE`, on the CURL_SUBS shape
+(a slider hidden at DEFAULTS because its GUARD is at 0), so ALL MAX still carries a 120 mm stem
+at the default 6 mm and reads **2,412,512 tris on both trees in both modes**. Its declared
+export-refusal entry is unchanged. **The one new self-intersection entry is NOT the stem's**:
+`SPHERE STEM: x 40 petals x 6 turns` reads 199 pairs at the FACE pole, identical with
+`stemLength` 0 and identical on a worktree of main — four readings, one number.
+**A FROZEN PHASE IS OWED**: the live matrix goes 736 -> 744 (nine rows added in block 32, one
+GATED sphere row removed from block 30). The image is
+`node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**.
 
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,

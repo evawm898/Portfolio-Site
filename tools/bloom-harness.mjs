@@ -2915,6 +2915,7 @@ export async function junctionAssertions(page, row) {
   }
 
   const frames = m.petalRingFootFrames;
+  const omitted = omittedSlotSet(m);
   if (!Array.isArray(frames) || frames.length !== layers.length) {
     bad.push(`J1: expected foot frames for ${layers.length} rings, got ${JSON.stringify(frames && frames.length)}`);
   }
@@ -2959,6 +2960,12 @@ export async function junctionAssertions(page, row) {
        width direction is perpendicular to the radial direction and lies in
        the hub plane, and the normal is the plane's own. */
     const ff = frames && frames[L];
+    /* A DESCRIPTOR WHOSE PETAL THE STEM CHANNEL DID NOT BUILD HAS NO FOOT, and
+       it is not a missing record: ST8 asserts the nulls are exactly the
+       declared set. J2/J3/J4 above still run on the descriptor, because the
+       RING is still part of the bloom's own geometry whether or not a petal
+       stands on it — what is absent is the petal, not the ring. */
+    if (ff === null && omitted.has(L)) return;
     if (!Array.isArray(ff) || ff.length !== 3) {
       bad.push(`J1: ring ${L} foot frames: expected 3 rows, got ${JSON.stringify(ff && ff.length)}`);
       return;
@@ -3535,8 +3542,18 @@ export async function zygoAssertions(page, row) {
       bad.push(`Z1: descriptor ${i} (${r.slotRole}) lists ${r.slots.length} slots but reports roleCount ${r.roleCount} — the area rule and the builder disagree about how big this group is`);
     }
   });
-  if (slots !== m.petalsBuilt) {
-    bad.push(`Z1: the role groups account for ${slots} slots against the ${m.petalsBuilt} petals the builder actually emitted — the partition is not total, so the area rule is summing a different set of feet from the one the bloom has`);
+  /* THE ROLE GROUPS ACCOUNT FOR EVERY *SLOT*, AND THE BUILDER EMITS EVERY ONE
+     THE STEM DID NOT TAKE. The area rule sums the feet the hub was SIZED from,
+     which is the asked-for count — sizing it from the survivors is exactly the
+     defect the sphere-stem session's condition 3 names — so the partition is
+     over slots, and the omission is subtracted here rather than hidden. The
+     two numbers have different owners: `roleCount` is footRing()'s, and
+     `petalsBuilt` + the omitted list are the BUILDER's own tallies. With no
+     stem channel `omittedHere` is 0 and this is the shipped clause term for
+     term. */
+  const omittedHere = omittedSlotSet(m).size;
+  if (slots !== m.petalsBuilt + omittedHere) {
+    bad.push(`Z1: the role groups account for ${slots} slots against the ${m.petalsBuilt} petals the builder actually emitted${omittedHere ? ` plus the ${omittedHere} the stem channel did not build` : ''} — the partition is not total, so the area rule is summing a different set of feet from the one the bloom has`);
   }
   /* THE SLOT PARTITION IS TOTAL AND DISJOINT WITHIN EACH WHORL — every slot
      of every split whorl claimed exactly once. */
@@ -3569,8 +3586,11 @@ export async function zygoAssertions(page, row) {
 
   /* ===================================================================
      Z2 — THE RECORD AND THE BLADE AGREE, IN BOTH DIRECTIONS. */
+  const omittedZ = omittedSlotSet(m);
   rings.forEach((r, i) => {
     const a = applied[i];
+    /* NO PETAL, NO RECORD — and that is declared, not missing (ST8 pins it). */
+    if (a === null && omittedZ.has(i)) return;
     if (!a) { bad.push(`Z2: descriptor ${i} reported no applied record from the builder`); return; }
     if (a.role !== r.role) bad.push(`Z2: descriptor ${i}'s builder says layer role ${a.role}, footRing() says ${r.role} — two answers to one question`);
     if (a.slotRole !== r.slotRole) bad.push(`Z2: descriptor ${i}'s builder says slot role ${a.slotRole}, footRing() says ${r.slotRole} — two answers to one question`);
@@ -4715,20 +4735,45 @@ export async function gynoeciumAssertions(page, row) {
    Measured: with it imported, `bore-is-not-evas-rule` left ST3's own bore
    comparison green on every diameter, and only the wall clause could fire.
    =================================================================== */
+/* THE SLOTS THE STEM CHANNEL DECLARES NOT BUILT (the sphere-stem session).
+   Every family that is INDEXED BY DESCRIPTOR reads this, because a descriptor
+   whose petal was not built carries a null where a record used to be, and a
+   family that treated that as a missing record would fire on the shipped tree.
+   THE SKIPS ARE SAFE BECAUSE ST8 PINS THE POPULATION: it asserts the nulls are
+   EXACTLY this set, in both directions, against a stemless build — so a petal
+   that went missing without being declared is a red, not a skip. One owner for
+   the set, so a family cannot skip a different one from the one ST8 checks. */
+export function omittedSlotSet(m) {
+  const O = m && m.stemOmission;
+  return O && Array.isArray(O.omitted) ? new Set(O.omitted) : new Set();
+}
+
 export const STEM_SCOPE =
-  "stem claims read the builder's own emitted stem record, its root span through the hub and the hub's own emitted underside, NOT the STL; a stem declared and not built, built off the axis, built to the wrong length, built with a bore that is not Eva's rule, rooted as a hairline instead of through the slab, and a hub-to-stem join whose thickening is not the law it declares ALL export watertight and as one piece, because a solid overlapping the hub is one connected region with zero boundary edges however wrong it is";
+  "stem claims read the builder's own emitted stem record, its root span through the hub and the hub's own emitted underside, NOT the STL; a stem declared and not built, built off the axis, built to the wrong length, built with a bore that is not Eva's rule, rooted as a hairline instead of through the slab, and a hub-to-stem join whose thickening is not the law it declares ALL export watertight and as one piece, because a solid overlapping the hub is one connected region with zero boundary edges however wrong it is. ST7 reads the stem channel's own report (which slots were not built, and how near the stem every slot came) and ST8 reads a STEMLESS build of the same state; neither reads the STL, and ST9 — which does — is the only witness that the channel is clear in the file";
 
 /* THE JOIN'S LAW, RESTATED (not imported). Two expressions, both from owners
    outside the join record: the thickness the stem's own section asks for, and
    the constant-stress profile that carries it out to where the plate suffices. */
 const boreExpected = (outerR) => Math.max(0, outerR - STEM_MIN_WALL_MM);
-function stemJoinExpected(hubR, hubT, outerR) {
+function stemJoinExpected(hubR, hubT, outerR, sphere = false) {
   const bore = boreExpected(outerR);
-  const joinT = Math.max(hubT, (Math.sqrt(3) / 2) * Math.sqrt(Math.max(0, outerR ** 4 - bore ** 4)) / outerR);
+  /* THE SHELL ARM, RESTATED HERE RATHER THAN IMPORTED (the seam gate's own
+     discipline — importing `stemJoinThickness` would mutate with it and check
+     nothing). THE ONE-LINE LAW: a closed SPHERE's hub is a shell of uniform
+     wall and the join is DERIVED FOR A PLATE, so it is not applied there; the
+     hub's thickness is its own everywhere and the blend radius is 0. */
+  const joinT = sphere ? hubT
+    : Math.max(hubT, (Math.sqrt(3) / 2) * Math.sqrt(Math.max(0, outerR ** 4 - bore ** 4)) / outerR);
   const inert = !(joinT > hubT);
   const denom = Math.log(hubR / outerR);
+  /* AN INERT JOIN HAS NO BLEND RADIUS AND THE BUILDER REPORTS 0, so the
+     reference does too. This arm had never been reached: the thinnest stem on
+     the shipping sheet already asks for 1.299 mm against the hub's 1.200, so
+     every row that ever carried a stem carried an ACTIVE join, and the
+     expected-`outerR` this line replaces would have fired on the first inert
+     one. The sphere is that first row. */
   const blend = (inert || !(denom > 0))
-    ? outerR
+    ? (inert ? 0 : outerR)
     : Math.max(outerR, Math.min(hubR, hubR * Math.pow(outerR / hubR, (hubT / joinT) ** 2)));
   const at = (r) => {
     if (inert || !(hubR > outerR) || !(denom > 0)) return inert ? hubT : joinT;
@@ -4744,8 +4789,17 @@ export async function stemAssertions(page, row) {
   const bad = [];
   /* ST0 — THE TWO STATEMENTS, the slotRolesEligible / androeciumEligible
      precedent: the registry HIDES on this condition and the geometry makes it
-     INERT, and a green run must not be able to endorse one without the other. */
-  const regElig = evalPredicate({ ref: 'stemEligible' }, ui);
+     INERT, and a green run must not be able to endorse one without the other.
+
+     RE-DERIVED, NOT RELAXED (the sphere-stem session). It used to read the
+     ELIGIBILITY predicate — "may this state have a stem" — and Eva's ruling that
+     petals the stem would pass through are NOT BUILT removed the last state
+     that refuses one, so `stemEligible` is retired on both sides. What is left
+     is the PRESENCE relation, which is the retired clause term for term at
+     `stemLength` 0: the registry hides the DIAMETER exactly where the geometry
+     builds no stem. `stem-present-disagrees-with-the-registry` restores the
+     retired arm in the geometry alone, and this is what must catch it. */
+  const regPresent = evalPredicate({ ref: 'stemPresent' }, ui);
   /* THE GEOMETRY'S HALF COMES FROM THE PAGE, never from this file's own import
      of the geometry. A gate that calls the predicate in Node compares one
      unmutated module against another: both halves move together or neither
@@ -4753,22 +4807,23 @@ export async function stemAssertions(page, row) {
      "a clause that is always green and a clause that is always red look nothing
      alike and have the same cause" — measured here as
      `stem-eligible-disagrees-with-the-registry` firing NOTHING. */
-  const geoElig = m.stemEligible;
-  if (geoElig === undefined) bad.push('ST0: the metrics hook reports no `stemEligible` — the geometry states no eligibility, so the two-statement claim cannot be made');
-  else if (regElig !== geoElig) bad.push(`ST0: the registry's stemEligible says ${regElig} and the geometry's — as the running module answered it — says ${geoElig} on this state`);
-  const want = regElig && Number(ui.stemLength) > 0;
+  const geoAbsent = m.stemAbsent;
+  if (geoAbsent === undefined) bad.push('ST0: the metrics hook reports no `stemAbsent` — the geometry states nothing about whether a stem is present, so the two-statement claim cannot be made');
+  else if (regPresent === geoAbsent) bad.push(`ST0: the registry's stemPresent says ${regPresent} and the geometry — as the running module answered it — says the stem is ${geoAbsent ? 'ABSENT' : 'present'} on this state; the two must be exact complements`);
+  const want = Number(ui.stemLength) > 0;
   const S = m.stem === undefined ? undefined : m.stem;
   if (S === undefined) { bad.push('ST1: the metrics hook reports no `stem` key at all — the builder declares nothing about a stem, so nothing below can be checked'); return bad; }
   if ((S !== null) !== want) {
-    bad.push(`ST1: the builder ${S ? 'reports a stem' : 'reports none'} while the state ${want ? `asks for ${ui.stemLength} mm` : (regElig ? 'asks for none (length 0)' : 'is a SPHERE (hidden and inert)')}`);
+    bad.push(`ST1: the builder ${S ? 'reports a stem' : 'reports none'} while the state ${want ? `asks for ${ui.stemLength} mm` : 'asks for none (length 0)'}`);
     return bad;
   }
-  /* INERTNESS IN BOTH DIRECTIONS. A control hidden under SPHERE must also
-     BUILD nothing there — hidden-and-not-inert is the defect PP7 and JS0 exist
-     for, and it is invisible to every other family here. */
+  /* INERTNESS IN BOTH DIRECTIONS. A control hidden at length 0 must also BUILD
+     nothing there — hidden-and-not-inert is the defect PP7 and JS0 exist for,
+     and it is invisible to every other family here. */
   if (!want) {
     if (m.stemTris) bad.push(`ST1: ${m.stemTris} stem triangles emitted on a state with no stem`);
     if (m.hubJoinActive) bad.push('ST5: the hub reports an ACTIVE hub-to-stem join on a state with no stem');
+    if (m.stemOmission) bad.push('ST7: the builder reports a stem channel on a state with no stem — a claim nothing can make must read as absent');
     return bad;
   }
   /* ST1, THE OTHER DIRECTION: a stem the plan DECLARES must also be EMITTED,
@@ -4843,7 +4898,7 @@ export async function stemAssertions(page, row) {
   if (!(S.rootSpanMm >= hubT - 1e-9)) bad.push(`ST4: the stem's root spans ${S.rootSpanMm} mm of a ${hubT} mm hub — it is a hairline overlap, not a root through the slab`);
   /* ST5 — THE JOIN IS THE LAW IT DECLARES, read off the hub's OWN emitted
      underside against a reference rebuilt here from three other owners. */
-  const E = stemJoinExpected(hubR, hubT, R);
+  const E = stemJoinExpected(hubR, hubT, R, m.sphereMode === true);
   if (m.hubJoinActive !== !E.inert) bad.push(`ST5: the hub reports the join ${m.hubJoinActive ? 'ACTIVE' : 'INERT'} while the law on a ${hubR} mm hub of ${hubT} mm under a ${R} mm stem says ${E.inert ? 'INERT' : 'ACTIVE'}`);
   if (Math.abs(m.hubJoinThickness - E.joinT) > 1e-9) bad.push(`ST5: the hub declares a join thickness of ${m.hubJoinThickness}; the stem's own section asks for ${E.joinT}`);
   if (Math.abs(m.hubJoinBlendRadius - E.blend) > 1e-9) bad.push(`ST5: the hub declares the join blending out at ${m.hubJoinBlendRadius} mm; the law says ${E.blend}`);
@@ -4879,12 +4934,131 @@ export async function stemAssertions(page, row) {
      stem code does not write at all: if the join moved a foot frame, the hub's
      radius or the top face, this is the only clause here that could see it. */
   const ref = await page.evaluate(() => window.__bloomStemlessHub());
+  const O = m.stemOmission === undefined ? undefined : m.stemOmission;
   if (!ref) bad.push('ST6: the page exposes no stemless-hub reference — the untouched-junction claim cannot be made');
   else {
     if (ref.hubRadius !== hubR) bad.push(`ST6: the hub radius is ${hubR} with a stem and ${ref.hubRadius} without — the stem resized the hub`);
     if (ref.hubThickness !== hubT) bad.push(`ST6: the hub's own thickness is ${hubT} with a stem and ${ref.hubThickness} without`);
     if (Math.abs(ref.topFaceZ - m.hubTopFaceZ) > 0) bad.push(`ST6: the hub's TOP face sits at ${m.hubTopFaceZ} with a stem and ${ref.topFaceZ} without — the join grew upward into the feet`);
-    if (ref.footFrames !== m.footFramesDigest) bad.push('ST6: the emitted foot frames differ between a stemmed and a stemless build of the same state — the petal-to-hub junction moved');
+    /* THE SCALAR DIGEST STILL CARRIES IT WHERE NOTHING WAS OMITTED — which is
+       every row that existed before the stem channel did, so this is the
+       shipped clause term for term there. Where a slot IS omitted the two
+       builds have different POPULATIONS and the scalar cannot be equal; the
+       per-slot comparison below is what states the claim then, and it is
+       strictly stronger (it localises a difference to a slot). */
+    if (!(O && O.omitted.length) && ref.footFrames !== m.footFramesDigest) {
+      bad.push('ST6: the emitted foot frames differ between a stemmed and a stemless build of the same state — the petal-to-hub junction moved');
+    }
+  }
+
+  /* ===================================================================
+     ST7 — THE OMISSION IS THE STEM'S OWN, IN BOTH DIRECTIONS.
+
+     Every slot that was NOT built must be one the stem passes within the
+     printable gap of, in at least one mode; every slot that WAS built must
+     clear it in BOTH. A clause written only one way would pass a tree that
+     omitted nothing (the geometry is then just the old refusal wearing a new
+     name) and a tree that omitted everything alike.
+
+     THE REFERENCE AND THE MEASURED SIDE HAVE DIFFERENT OWNERS. The reference
+     is `MIN_FEATURE_MM` — the geometry's one owner of the minimum printable
+     gap, which the stem channel does not write — against the clearance the
+     channel DECLARES; the measured side is the per-slot approach the criterion
+     read off the petals the shipped builder emitted. A clearance typed to
+     something else fires here.
+
+     WHAT THIS CLAUSE CANNOT SEE, said rather than implied: it reads the
+     channel's own report, so a criterion that measured the wrong thing would
+     agree with itself. ST9 is the witness for that — it reads the EXPORTED
+     FILE and asks whether any petal is in the channel at all. */
+  if (O === undefined) bad.push('ST7: the metrics hook reports no `stemOmission` key — the builder declares nothing about the stem channel, so nothing below can be checked');
+  else if (m.sphereMode !== true) {
+    if (O !== null) bad.push('ST7: a non-SPHERE row reports a stem channel — the channel exists where the stem leaves a pole the petal sequence runs through, and a claim nothing can make must read as absent');
+  } else if (O === null) {
+    bad.push('ST7: a SPHERE row with a stem reports no stem channel — the omission is what lets a sphere have a stem at all, and its absence is the old refusal wearing a new name');
+  } else {
+    if (Math.abs(O.clearanceMm - MIN_FEATURE_MM) > 0) {
+      bad.push(`ST7: the channel declares a clearance of ${O.clearanceMm} mm; the minimum printable gap this project bars every self-approach at is ${MIN_FEATURE_MM} mm — a clearance with its own number is a constant nobody derived`);
+    }
+    const K = Array.isArray(m.rings) ? m.rings.length : -1;
+    if (O.asked !== K) bad.push(`ST7: the channel says ${O.asked} petals were asked for; footRing() declares ${K} descriptors`);
+    if (O.built !== m.petalsBuilt) bad.push(`ST7: the channel says ${O.built} petals were built; the builder's own tally is ${m.petalsBuilt}`);
+    if (O.built + O.omitted.length !== O.asked) bad.push(`ST7: ${O.built} built + ${O.omitted.length} omitted is not the ${O.asked} asked for — the mask lost or invented a slot`);
+    const om = new Set(O.omitted);
+    if (om.size !== O.omitted.length) bad.push(`ST7: the omitted list names a slot twice (${O.omitted.length} entries, ${om.size} distinct)`);
+    /* THE UNION IS THE CONSTRUCTION THAT MAKES THE SET MODE-FREE, so it is
+       asserted rather than believed: the omitted set must be exactly the union
+       of the two per-mode lists. Where the two lists AGREE the union is doing
+       nothing, which is the ordinary case and is fine; where they differ it is
+       load-bearing, and this is what says which. */
+    const union = new Set([...(O.byMode.live || []), ...(O.byMode.export || [])]);
+    if (union.size !== om.size || [...union].some((k) => !om.has(k))) {
+      bad.push(`ST7: the omitted set ${JSON.stringify([...om].sort((a, b) => a - b))} is not the union of the two modes' own lists (live ${JSON.stringify(O.byMode.live)}, export ${JSON.stringify(O.byMode.export)}) — the set is mode-free only if it is that union`);
+    }
+    for (const mode of ['live', 'export']) {
+      const ap = O.approach[mode];
+      if (!Array.isArray(ap) || ap.length !== O.asked) { bad.push(`ST7: the channel reports ${ap && ap.length} ${mode} approach(es) for ${O.asked} slots`); continue; }
+      for (let k = 0; k < ap.length; k++) {
+        if (!Number.isFinite(ap[k])) { bad.push(`ST7: slot ${k} reports a ${mode} approach of ${ap[k]} — every slot is measured, built or not`); continue; }
+        if (om.has(k)) continue;
+        if (!(ap[k] >= O.clearanceMm)) bad.push(`ST7: slot ${k} was BUILT and stands ${ap[k].toFixed(4)} mm from the free stem in ${mode.toUpperCase()}, inside the ${O.clearanceMm} mm printable gap — a petal was kept that the stem passes through`);
+      }
+      for (const k of O.byMode[mode] || []) {
+        if (!(O.approach[mode][k] < O.clearanceMm)) bad.push(`ST7: slot ${k} is listed as colliding in ${mode.toUpperCase()} while its own approach reads ${O.approach[mode][k]} mm, at or beyond the ${O.clearanceMm} mm gap`);
+      }
+    }
+    for (const k of om) {
+      if (!(O.approach.live[k] < O.clearanceMm || O.approach.export[k] < O.clearanceMm)) {
+        bad.push(`ST7: slot ${k} was NOT built while it clears the stem in both modes (live ${O.approach.live[k]}, export ${O.approach.export[k]}, gap ${O.clearanceMm}) — a petal was dropped for no reason the stem gives`);
+      }
+    }
+  }
+
+  /* ===================================================================
+     ST8 — THE OMISSION IS A MASK: IT DOES NOT RENUMBER AND IT DOES NOT RESIZE.
+
+     Eva's ruling keeps the sequence, the equal-area law, the golden angle and
+     the one-step reservation exactly as they are, so a petal that survives must
+     be the SAME PETAL it would have been with no stem at all — same azimuth,
+     same foot, on the same slot index. And the hub is sized from the petal
+     count that was ASKED for: footRing()'s area rule runs before any of this,
+     so omitting petals must not shrink it.
+
+     THE REFERENCE IS A STEMLESS BUILD OF THIS SAME STATE, made on this same
+     page — an owner the stem code does not write at all. If dropping slot 3
+     shifted slot 4, or the hub were sized from the survivors, this is the only
+     thing here that could say so: every STL check stays green on a bloom whose
+     petals all moved one place round. */
+  if (ref && O) {
+    if (ref.ringCount !== O.asked) bad.push(`ST8: the stemless build declares ${ref.ringCount} descriptors and the stemmed one ${O.asked} — the omission changed the SEQUENCE, not just which of it was built`);
+    if (ref.petalsBuilt !== O.asked) bad.push(`ST8: the stemless build emitted ${ref.petalsBuilt} petals against ${O.asked} slots — the reference is not a full bloom, so nothing below compares like with like`);
+    const azA = m.slotAzimuths, azB = ref.slotAzimuths;
+    if (!Array.isArray(azA) || !Array.isArray(azB) || azA.length !== azB.length) {
+      bad.push(`ST8: the two builds report ${azA && azA.length} and ${azB && azB.length} azimuth rows — the sequence cannot be compared`);
+    } else azA.forEach((rowA, L) => {
+      const rowB = azB[L];
+      if (!Array.isArray(rowA) || !Array.isArray(rowB) || rowA.length !== rowB.length) {
+        bad.push(`ST8: whorl ${L} reports ${rowA && rowA.length} azimuths with a stem and ${rowB && rowB.length} without — a slot stopped existing rather than stopping being built`);
+        return;
+      }
+      for (let k = 0; k < rowA.length; k++) {
+        if (rowA[k] !== rowB[k]) { bad.push(`ST8: slot ${k} of whorl ${L} sits at azimuth ${rowA[k]} with a stem and ${rowB[k]} without — the omission RENUMBERED the sequence`); break; }
+      }
+    });
+    const fA = m.footFramesBySlot, fB = ref.footFramesBySlot;
+    if (!Array.isArray(fA) || !Array.isArray(fB) || fA.length !== fB.length) {
+      bad.push(`ST8: the two builds report ${fA && fA.length} and ${fB && fB.length} per-slot foot digests — the survivors cannot be compared one for one`);
+    } else {
+      const omSet = new Set(O.omitted);
+      for (let k = 0; k < fA.length; k++) {
+        if (omSet.has(k)) {
+          if (fA[k] !== null) bad.push(`ST8: slot ${k} is listed as NOT BUILT and still carries a foot frame — it was hidden, not omitted, and a petal on screen that does not print is what this ruling exists to prevent`);
+          continue;
+        }
+        if (fA[k] === null) { bad.push(`ST8: slot ${k} is not in the omitted list and carries no foot frame — a petal went missing without being declared`); continue; }
+        if (fA[k] !== fB[k]) { bad.push(`ST8: slot ${k}'s foot digest is ${fA[k]} with a stem and ${fB[k]} without — a SURVIVING petal moved, so this is a re-placement and not a mask`); break; }
+      }
+    }
   }
   return bad;
 }
@@ -4967,6 +5141,79 @@ export const ORIENTATION_SCOPE =
   'O1/O2 read the exported STL as vertex-welded shells: a shell wound outward has POSITIVE signed volume (divergence theorem) and an EVEN ray-parity from outside its largest facet, and the two must agree; every other family here passes on an inside-out solid, measured. Blind to an inward primitive welded to a larger outward one (their volumes sum), which no shipped primitive does.';
 export const SELF_INTERSECTION_SCOPE =
   'X1/X2 count triangle pairs that intersect WITHIN one closed shell, with the shared-feature exclusion per intersection POINT (a pair sharing a vertex and crossing elsewhere is reported). Cross-shell pairs are the export contract\'s overlapping closed solids and are reported, never gated. Blind to petal-against-petal crossing (a cross-shell quantity) and to the printable AIR GAP between distinct parts of one sheet (V5\'s, in tools/bloom-wall-thickness.mjs).';
+
+/* ===================================================================
+   ST9 — THE CHANNEL IS CLEAR IN THE FILE THAT WILL BE PRINTED.
+
+   ST7 reads the stem channel's own report, so it can say the criterion is
+   self-consistent and no more; a criterion measuring the wrong thing agrees
+   with itself (session 39's A8, session 41's L7). THIS clause reads the
+   EXPORTED STL — the artefact, which no declaration can lie about — and asks
+   the question the ruling actually makes: is there any petal in the channel?
+
+   THE CYLINDER IS FOUND IN THE FILE AND THE CONTROLS, NEVER IN THE PLAN.
+   `buildStemInto` emits exactly three rings at the stem's outer radius —
+   `topZ`, `rootZ` and `tipZ` — and every vertex of the stem, wall, bore and
+   caps alike, stands at `outerR` or `boreR` exactly (ST3 asserts that from the
+   builder's own extremes). So: take the vertices at the control's own outer
+   radius, group them by z, and the three heaviest groups ARE those rings; the
+   free stem is the one running `stemLength` — the control's own number — below
+   the middle of them. If that identity does not hold the clause says so and
+   makes no claim, rather than asserting against a region it guessed.
+
+   THE TOLERANCE IS THE FILE'S OWN. STL stores float32, so a coordinate near
+   150 mm carries about 1e-5 mm of quantisation and a radius (a hypot of two)
+   about twice that; 1e-3 mm is two orders above it and two orders below
+   anything this is for. A petal vertex sitting within 1e-3 mm of the stem's own
+   radius would be read as stem material and missed — measure-zero, named here
+   rather than left for someone to find.
+   =================================================================== */
+export const STEM_CHANNEL_SCOPE =
+  'ST9 reads the EXPORTED STL: no vertex lies within the printable gap of the FREE stem (the hub\'s underside down to the tip) except the stem\'s own, which stand at its outer or bore radius exactly. It is the only witness here that does not read the stem channel\'s own report. Blind to a petal that clears the vertices and whose TRIANGLE dips nearer between them (a sub-mesh-chord effect, bounded by the mesh\'s own chord scale and shared with the criterion, which measures the same population); blind to the root band inside the hub, where the stem and the material are in the same place by design.';
+
+export function stemChannelAssertions(positions, row, m, ui) {
+  const bad = [];
+  const O = m && m.stemOmission;
+  if (!O) return bad;                       // no stem, or not a sphere — nothing to claim
+  const outerR = Number(ui.stemDiameter) / 2;
+  const boreR = boreExpected(outerR);
+  const lengthMm = Number(ui.stemLength);
+  const TOL = 1e-3;
+  /* THE THREE RINGS, from the file. */
+  const byZ = new Map();
+  for (let i = 0; i < positions.length; i += 3) {
+    const r = Math.hypot(positions[i], positions[i + 1]);
+    if (Math.abs(r - outerR) > TOL) continue;
+    const key = Math.round(positions[i + 2] * 1e4);
+    byZ.set(key, (byZ.get(key) || 0) + 1);
+  }
+  const levels = [...byZ.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([k]) => k / 1e4).sort((a, b) => a - b);
+  if (levels.length < 3) {
+    bad.push(`ST9: the exported file carries ${levels.length} z-level(s) of vertices at the stem's own ${outerR} mm radius; buildStemInto emits three rings, so the channel cannot be located in the artefact`);
+    return bad;
+  }
+  const tipZ = levels[0], rootZ = levels[1];
+  if (Math.abs((rootZ - tipZ) - lengthMm) > 1e-2) {
+    bad.push(`ST9: the file's two lowest stem rings stand ${(rootZ - tipZ).toFixed(4)} mm apart against the ${lengthMm} mm the control asked for — the free stem cannot be located, so no claim is made about the channel`);
+    return bad;
+  }
+  /* AND NOW THE CLAIM. */
+  const clear = O.clearanceMm;
+  let intruders = 0, worst = Infinity, worstAt = null;
+  for (let i = 0; i < positions.length; i += 3) {
+    const x = positions[i], y = positions[i + 1], z = positions[i + 2];
+    const r = Math.hypot(x, y);
+    const d = Math.hypot(Math.max(0, r - outerR), Math.max(0, tipZ - z, z - rootZ));
+    if (!(d < clear)) continue;
+    if (Math.abs(r - outerR) <= TOL || (boreR > 0 && Math.abs(r - boreR) <= TOL)) continue;   // the stem's own
+    intruders++;
+    if (d < worst) { worst = d; worstAt = [x, y, z]; }
+  }
+  if (intruders) {
+    bad.push(`ST9: ${intruders} exported vertex/vertices stand inside the ${clear} mm printable gap of the free stem and are not the stem's own — nearest ${worst.toFixed(4)} mm at ${JSON.stringify(worstAt && worstAt.map((v) => Number(v.toFixed(3))))}. The channel is not clear in the file that will be printed.`);
+  }
+  return bad;
+}
 
 /* The exported STL's coordinates as the census wants them — one Float64Array
    of the float32 values the file stores, so a triangle's corners weld by
@@ -5490,6 +5737,16 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      row on main names because the matrix varies one control at a time, found
      the moment a new block put two controls together. */
   'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': '216 pairs, worst span 0.4176 mm (EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)")',
+  /* AND THE SAME SHAPE ONE BLOCK ON (the sphere-stem session), measured the
+     same two-sided way rather than read off the label: the identical state with
+     `stemLength` 0 reads the SAME 199 pairs at the SAME point, and so does a
+     worktree of main with and without a stem asked for — four readings, one
+     number. The fold is at z = +33.21, which is the FACE pole (+Rd = 32.72);
+     the stem leaves the FAR one. A 240-foot sphere crowds its own blades at the
+     face pole and has since session 18; no row on main names it because the
+     matrix varies one control at a time. The stem adds nothing to it, and the
+     channel REMOVED 44,188 triangles from this row without touching the count. */
+  'SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)': '199 pairs, worst span 0.2394 mm at (0.13, 2.72, 33.21) — the HEAD\'s fold at the FACE pole, not the stem\'s: the identical state with stemLength 0 reads the same 199 pairs at the same point on this tree AND on a worktree of main',
 });
 
 /* THE CENSUS RUNS ON THE BUILDER'S DOUBLES, NOT ON THE STL'S FLOAT32, AND
@@ -5708,9 +5965,27 @@ const STAMEN_SUB_IDS = () => new Set(STAMEN_SUBS().map((c) => c.id));
    this session. Named so block 1's skip says why. */
 const GYNO_SUBS = () => CONTROLS.filter((c) => c.visibleWhen && predicateDrivers(c.visibleWhen).has('gynoecium') && !evalPredicate(c.visibleWhen, DEFAULTS));
 const GYNO_SUB_IDS = () => new Set(GYNO_SUBS().map((c) => c.id));
-/* Every non-centre, non-layer-gated, non-placement-gated slider — the set the
-   blanket sweep and the ALL MIN / ALL MAX corners are entitled to move. */
-const SWEEPABLE = () => SLIDERS().filter((c) => !LAYER_SUB_IDS().has(c.id) && !PLACEMENT_SUB_IDS().has(c.id));
+/* THE STEM'S SUB-CONTROL (session 43, and it became visible here the moment the
+   sphere-stem session retired `stemEligible`). `stemDiameter` is hidden at the
+   shipping defaults because its GUARD — `stemLength` — is 0 there, which is the
+   CURL_SUBS shape exactly: a blanket row naming the diameter at length 0 would
+   build the shipping bloom and pass under a label naming a control that did
+   nothing, #124's trap arriving from a SEVENTH direction. Block 30 sweeps it by
+   name at 3 / 6 / 12 mm, which is where it is live.
+   IT IS ALSO KEPT OUT OF SWEEPABLE, and that is a deliberate choice rather than
+   a consequence: while `stemEligible` existed the diameter satisfied
+   PLACEMENT_SUBS (its predicate reached `placement` through sphereMode) and the
+   corners already left it alone, so ALL MAX has always carried a 120 mm stem at
+   the DEFAULT 6 mm diameter. Letting it in now would move ALL MAX — whose
+   declared export-refusal and self-intersection entries both name measured
+   numbers — as a SIDE EFFECT of retiring a predicate rather than on purpose.
+   PREDECLARED: ALL MAX and ALL MIN are unmoved by this session. */
+const STEM_SUBS = () => CONTROLS.filter((c) => c.visibleWhen && predicateDrivers(c.visibleWhen).has('stemLength') && !evalPredicate(c.visibleWhen, DEFAULTS));
+const STEM_SUB_IDS = () => new Set(STEM_SUBS().map((c) => c.id));
+/* Every non-centre, non-layer-gated, non-placement-gated, non-stem-gated
+   slider — the set the blanket sweep and the ALL MIN / ALL MAX corners are
+   entitled to move. */
+const SWEEPABLE = () => SLIDERS().filter((c) => !LAYER_SUB_IDS().has(c.id) && !PLACEMENT_SUB_IDS().has(c.id) && !STEM_SUB_IDS().has(c.id));
 
 export function buildMatrix() {
   const rows = [{ label: 'DEFAULT (the shipping configuration)', set: [] }];
@@ -5727,6 +6002,7 @@ export function buildMatrix() {
     if (PLACEMENT_SUB_IDS().has(c.id)) continue;         // needs a placement it is gated on; see block 13
     if (SLOT_SUB_IDS().has(c.id)) continue;              // slot roles; see block 12
     if (CURL_SUB_IDS().has(c.id)) continue;              // hidden at the defaults (curl bias, curl start, roll taper); see block 21
+    if (STEM_SUB_IDS().has(c.id)) continue;              // needs stemLength >= 1; see block 30
     rows.push({ label: `${c.id} min (${c.min})`, set: [{ id: c.id, value: String(c.min) }] });
     rows.push({ label: `${c.id} max (${c.max})`, set: [{ id: c.id, value: String(c.max) }] });
   }
@@ -7220,8 +7496,9 @@ export function buildMatrix() {
      (3 mm, bore 0) and at the HOLLOW end; the hub-to-stem join INERT (a stem
      thin enough to need no thickening) and ACTIVE at its widest; the domed head,
      where the attachment face is high inside the bowl and the visible length is
-     shorter than the total; and SPHERE, where the stem is hidden AND inert in
-     this PR by ruling.
+     shorter than the total. SPHERE was a GATED row here when the stem shipped
+     and is not any more — block 32 owns it now, because on a sphere the stem
+     decides which petals are built and that is its own claim.
      THE GATED ROWS ARE THE INERTNESS CLAIM. A control hidden and NOT inert is
      the defect PP7 and JS0 exist for and is invisible to every other family. */
   for (const [name, sets] of [
@@ -7239,7 +7516,6 @@ export function buildMatrix() {
     ['STEM: x the whole centre (stamens and a style rooted through the same slab)', { stemLength: 60, stemDiameter: 6, stamenCount: 60, gynoecium: 'STYLE' }],
     ['STEM: x a thick sheet (2.40 mm — the hub is thicker, so the join is inert further out)', { stemLength: 60, stemDiameter: 6, sheetThickness: 2.4 }],
     ['STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export)', { stemLength: 60, stemDiameter: 6, sheetThickness: 0.6 }],
-    ['STEM: GATED — SPHERE with a stem asked for (hidden AND inert, by ruling, in this PR)', { stemLength: 60, stemDiameter: 6, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 24 }],
     ['STEM: GATED — diameter at MAXIMUM with length 0 (hidden and inert; bit-identical to the default)', { stemLength: 0, stemDiameter: 12 }],
     ['STEM: GATED — diameter at MINIMUM with length 0 (hidden and inert; bit-identical to the default)', { stemLength: 0, stemDiameter: 3 }],
   ]) {
@@ -7342,6 +7618,41 @@ export function buildMatrix() {
     ['FRINGE: GATED — a MAXIMUM terminal with the count at 0 (the terminal alone; no panel is split)', { petalTipEnd: 1, fringeCount: 0, fringeDepth: 0.5 }],
     ['FRINGE: GATED — the count at 0 with the depth at MAXIMUM (hidden and inert; bit-identical to the default)', { fringeCount: 0, fringeDepth: 0.5 }],
     ['FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)', { petalTipEnd: 0.5, fringeCount: 7, fringeDepth: 0.2, lobeDepth: 1, lobeCount: 10, lobeCoverage: 1 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+  /* 32. THE SPHERE'S STEM CHANNEL — PETALS THE STEM WOULD PASS THROUGH ARE NOT
+     BUILT (Eva's ruling, the sphere-stem session). On a sphere the stem leaves
+     the RESERVED pole, which is a pole the petal sequence runs through and the
+     one every blade leaves toward, so the channel exists here and nowhere else
+     — block 30's stem rows are the cap and the flat hub, where the stem leaves
+     the opposite face from the one every foot sits on.
+     WHAT THE ROWS HAVE TO COVER, and why each is here rather than as a number
+     in a header: the DEFAULT sphere at the shipped stem (a handful of the eight
+     go); the widest stem on it (more go, and the join is INERT — the first row
+     in this project ever to reach ST5's inert arm); ONE TURN at 40 petals and
+     SIX at 40, which is the 240-foot head and the most petals the channel ever
+     has to sort; the BARE corner, where a stem wider than the head has room for
+     takes every petal and the bloom is a sphere on a stick — TOLD, not refused,
+     the `stemJoinBlendRadius` precedent; a THIN SHEET, where the export floor
+     moves the hub's wall and therefore the free stem's own start, so the two
+     modes measure different geometry and the union that makes the set mode-free
+     is doing real work if it ever does; and the GATED row, a sphere asking for
+     the widest stem at length 0, which must be BIT-IDENTICAL to a sphere with
+     no stem controls touched at all.
+     THE GATED ROW IS THE GUARD'S CLAIM: nothing is omitted where there is no
+     stem, so every sphere row that shipped before this session is unmoved. */
+  for (const [name, sets] of [
+    ['SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60, stemDiameter: 6 }],
+    ['SPHERE STEM: the widest stem on the default sphere (12 mm — the join is INERT on a shell)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60, stemDiameter: 12 }],
+    ['SPHERE STEM: SOLID at the floor (3 mm OD — the bore closes, Eva\'s rule, on a shell)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60, stemDiameter: 3 }],
+    ['SPHERE STEM: x 40 petals in ONE turn', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 40, stemLength: 60, stemDiameter: 6 }],
+    ['SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 40, layerCount: 6, stemLength: 60, stemDiameter: 6 }],
+    ['SPHERE STEM: the longest stem (120 mm)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 120, stemDiameter: 6 }],
+    ['SPHERE STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export — the two modes measure different geometry)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60, stemDiameter: 6, sheetThickness: 0.6 }],
+    ['SPHERE STEM: THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 3, spread: 0.6, layerSize: 0.5, stemLength: 120, stemDiameter: 12 }],
+    ['SPHERE STEM: GATED — the widest stem at length 0 on a sphere (bit-identical to an untouched sphere)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 0, stemDiameter: 12 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }

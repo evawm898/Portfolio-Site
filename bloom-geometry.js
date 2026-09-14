@@ -7299,16 +7299,20 @@ export const STEM_LENGTH_RANGE = Object.freeze([0, 120]);
 export const STEM_DIAMETER_RANGE = Object.freeze([3, 12]);
 export function stemBoreRadius(outerR) { return Math.max(0, outerR - STEM_MIN_WALL_MM); }
 /* THE TWO STATEMENTS, the androeciumEligible / gynoeciumEligible pattern: the
-   registry HIDES the controls on this condition and this makes them INERT,
-   and the harness asserts the two agree at module load.
-   SPHERE REFUSES A STEM IN THIS PR. Eva has ruled the mechanism that will let
-   it have one — petals whose geometry would collide with the stem are NOT
-   BUILT, with the sequence, the equal-area law, the golden angle and the
-   existing one-step reservation all left exactly as they are — and it ships as
-   its own small PR immediately after this one, so the stem's byte partition is
-   not entangled with sphere rows. TODO(session 43, PR 2): remove this arm. */
-export function stemEligible(state) { return !sphereMode(state); }
-export function stemIsAbsent(state) { return !stemEligible(state) || !state.stemLength; }
+   registry HIDES a control on this condition and this makes it INERT, and the
+   harness asserts the two agree (ST0).
+
+   SPHERE HAS A STEM NOW (Eva's ruling, the sphere-stem session), so the
+   ELIGIBILITY arm is retired rather than relaxed: `stemEligible` said "may this
+   state have a stem", and nothing refuses one any more, so a predicate that is
+   true everywhere is a statement nobody can disagree with. What is left is the
+   PRESENCE relation — the length is the guard, 0 is no stem — which the
+   registry's `stemPresent` and this expression state on two sides, and which at
+   `stemLength` 0 is the retired clause term for term. `stemEligible` is NOT a
+   control id, so `RETIRED_IDS` does not apply; what replaces it is ST0's
+   re-derived clause and the `stem-present-disagrees-with-the-registry` mutant,
+   whose edit restores exactly the arm this line drops. */
+export function stemIsAbsent(state) { return !state.stemLength; }
 
 /* THE JOIN'S THICKNESS, DERIVED, WITH NOTHING TO TUNE (Eva's ruling: option
    (b), no new control). The join is as strong in bending as the stem it feeds
@@ -7391,37 +7395,207 @@ export function stemPlan(state, ring, acc) {
   const hubT = acc.floorThickness(ring.thickness);
   const hubR = ring.radius;
   if (stemIsAbsent(state)) {
-    return { present: false, hubT, hubR, joinT: hubT, blendR: 0, inert: true, outerR: 0, boreR: 0 };
+    return { present: false, hubT, hubR, joinT: hubT, blendR: 0, inert: true, joinReason: 'none', outerR: 0, boreR: 0 };
   }
   const lengthMm = Number(state.stemLength);
   const outerR = Number(state.stemDiameter) / 2;
   const boreR = stemBoreRadius(outerR);
-  const joinT = stemJoinThickness(outerR, hubT);
-  const blendR = stemJoinBlendRadius(hubR, outerR, hubT, joinT);
-  const inert = !(joinT > hubT);
   const dome = ring.dome;
-  /* THE HUB'S OWN TOP FACE ON THE AXIS. Flat: the slab's own +t/2. Cap: the
-     apex of the OUTER cap, which is the mid-surface sphere offset by +t/2 —
-     buildHubInto's own `cap(Rd + t/2, ...)` apex, read from the same two
-     numbers rather than from a second expression. */
-  const topZ = dome ? dome.centreZ + dome.Rd + hubT / 2 : hubT / 2;
+  /* A SPHERE'S HEAD IS A CLOSED SHELL AND THE PLATE DERIVATION DOES NOT
+     DESCRIBE ONE, so the hub-to-stem join is INERT there BY DECLARATION rather
+     than by its own arithmetic coming out at the hub's thickness. Two reasons,
+     and neither is convenience: `stemJoinThickness` equates the stem's section
+     modulus with a PLATE's per-circumference one, and a closed shell carries a
+     root hole in membrane rather than in bending — a different derivation, and
+     not this session's; and `buildHubInto`'s sphere arm emits a wall of exactly
+     t all the way round and reads no join, so a plan declaring a thickened one
+     would be describing geometry nobody builds. TOLD, never silent: the
+     read-out names the shell as the reason (`joinReason`), because "INERT — a
+     12 mm stem asks for no more than the hub's own 1.20 mm" is false of a 12 mm
+     stem and would be the plan lying about its own arithmetic. */
+  const sphere = !!(dome && dome.closed);
+  const joinReason = sphere ? 'shell' : 'section';
+  const joinT = sphere ? hubT : stemJoinThickness(outerR, hubT);
+  const blendR = sphere ? 0 : stemJoinBlendRadius(hubR, outerR, hubT, joinT);
+  const inert = !(joinT > hubT);
+  /* THE HUB'S OWN TOP FACE ON THE AXIS — "top" meaning the face the stem is
+     rooted THROUGH from, which is the one the flower's own material is on.
+     Flat: the slab's own +t/2. Cap: the apex of the OUTER cap, which is the
+     mid-surface sphere offset by +t/2 — buildHubInto's own `cap(Rd + t/2, ...)`
+     apex, read from the same two numbers rather than from a second expression.
+     SPHERE: the stem leaves the RESERVED pole (footRing's own sequence note
+     says so: "the far pole is the STEM's someday"), so the face it is rooted
+     through is the INNER sphere there — `Rd - t/2` at polar angle pi, which is
+     `centreZ - (Rd - t/2)`. The stem then runs DOWN through the wall and out,
+     so the overlap the slicer unions is a solid annulus at every setting, which
+     is the identical property the flat arm's "rooted through the slab" has. */
+  const topZ = sphere ? dome.centreZ - (dome.Rd - hubT / 2)
+    : dome ? dome.centreZ + dome.Rd + hubT / 2
+    : hubT / 2;
   /* THE UNDERSIDE ON THE AXIS is the top face less the thickness the join puts
-     there, which at r = 0 is the join's own thickness by construction. */
+     there, which at r = 0 is the join's own thickness by construction. On the
+     sphere that is the wall, so this lands on `centreZ - (Rd + t/2)` — the
+     OUTER sphere's far pole — with no second expression for it. */
   const rootZ = topZ - joinT;
   const tipZ = rootZ - lengthMm;
   /* HOW MUCH THE HEAD HIDES: the stem is inside the head wherever it is above
      the head's LOWEST material. On a flat hub that is the slab's own underside
      and nothing is hidden; on a cap it is the rim, which sits well below the
-     apex the stem leaves from. Derived from the cap's own two numbers. */
-  const lowestHubZ = dome
-    ? dome.centreZ + (dome.Rd + hubT / 2) * Math.cos(Math.asin(Math.min(1, hubR / dome.Rd))) - hubT
+     apex the stem leaves from. Derived from the cap's own two numbers. On a
+     SPHERE the lowest material IS the far pole the stem leaves from, so this
+     equals `rootZ` and `hiddenMm` comes out 0 — derived, not special-cased. */
+  const lowestHubZ = sphere ? dome.centreZ - (dome.Rd + hubT / 2)
+    : dome ? dome.centreZ + (dome.Rd + hubT / 2) * Math.cos(Math.asin(Math.min(1, hubR / dome.Rd))) - hubT
     : hubT / 2 - hubT;
   const hiddenMm = Math.max(0, Math.min(lengthMm, rootZ - lowestHubZ));
   return {
     present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
-    hubT, hubR, joinT, blendR, inert,
+    hubT, hubR, joinT, blendR, inert, joinReason,
     topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
     stations: stemStations(lengthMm), sides: HUB_SECTORS,
+  };
+}
+
+/* ===================================================================
+   THE SPHERE'S STEM CHANNEL — PETALS THE STEM WOULD PASS THROUGH ARE NOT
+   BUILT (Eva's ruling, the sphere-stem session).
+
+   THE SEQUENCE, THE EQUAL-AREA LAW, THE GOLDEN ANGLE AND THE ONE-STEP
+   RESERVATION ARE ALL UNTOUCHED. This is a MASK over the slot sequence and
+   nothing else: `buildWhorlInto` still runs 0..K-1 and every azimuth is still
+   `phase + i * GOLDEN_ANGLE` on the same `i`, so omitting slot 3 moves nothing
+   about slot 4. The alternative Eva rejected — growing `dome.reserved` and
+   re-placing the petals over a reduced arc — was measured in session 43 Phase A
+   and does not work: the reservation moves FEET, not BLADES, so the pole-most
+   petal's blade still leaves toward the far pole however far round its foot
+   goes, and clearing the channel costs 46-51 degrees whether the stem is 3 mm
+   or 12 (a further 5-8). It cannot be derived from the stem radius, which was
+   the premise. Do not revisit it; S3 forbids the bald cap by name.
+
+   WHY THE SPHERE AND ONLY THE SPHERE, measured rather than scoped for
+   convenience. On a flat or cap head the stem leaves the hub's UNDERSIDE and
+   every foot sits on the opposite face, so the only place the two share is
+   INSIDE the slab, where the overlap is the "rooted THROUGH the slab" one the
+   design intends and every stamen already relies on. Measured on this tree, a
+   flat head with the widest stem: all 8 feet read 0.000 mm from the free stem,
+   because a foot's bottom skin is COPLANAR with the hub's underside, which is
+   exactly where the free stem begins — the measure is degenerate there by
+   construction, and a criterion applied there would empty an ordinary bloom.
+   On a sphere the stem leaves a POLE THE SEQUENCE RUNS THROUGH, and footRing's
+   own law sends every blade toward that pole. That is why the channel exists
+   here and nowhere else.
+
+   THE SOLID TESTED IS THE *FREE* STEM — `rootZ` down to `tipZ`, never the root
+   band above it. The root band is inside the hub wall, which is where the
+   design already puts the stem and the material in the same place on purpose.
+   Including it would report the by-design overlap as a collision, which is the
+   flat head's degeneracy arriving on the sphere.
+
+   THE CLEARANCE IS DERIVED FROM A LENGTH, NOT TYPED: `MIN_FEATURE_MM` is this
+   project's one owner of the MINIMUM PRINTABLE GAP — the bar V5 holds
+   self-approach at — and a petal nearer than that to the stem leaves a gap no
+   process can make. It is a declared guess like every floor in this file
+   (nothing here has ever been printed) and it is not weakened for being one.
+   =================================================================== */
+export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;
+
+/* Distance from a point to the FREE stem solid; 0 inside it. The cylinder is
+   the plan's own three numbers, so nothing here re-derives where the stem is. */
+export function freeStemDistanceMm(plan, x, y, z) {
+  const dr = Math.max(0, Math.hypot(x, y) - plan.outerR);
+  const dz = Math.max(0, plan.tipZ - z, z - plan.rootZ);
+  return Math.hypot(dr, dz);
+}
+
+/* HOW CLOSE ONE PETAL COMES TO THE FREE STEM — measured on the petal THE
+   SHIPPED BUILDER EMITS, into a throwaway accumulator, over every vertex it
+   wrote. Nothing here re-derives a petal's surface: a second producer would
+   agree with a broken surface by being broken alongside it, which is session
+   43's ST2 and session 41's L7 in the same sentence. The geometry does not
+   depend on accumulator STATE — `floorThickness` returns a pure function of its
+   argument and only the telemetry it also updates is per-accumulator — so a
+   petal built into a probe is the same petal, float for float, as one built
+   into the real one.
+
+   NAMES ITS SAMPLING: emitted VERTICES, which is the population the assertion
+   reads too, so the criterion and its witness measure the same thing. A chord
+   between two cleared vertices can dip nearer than either (distance to a convex
+   set is convex along a segment), by at most the mesh's own chord scale; that
+   is a sub-mesh effect, it is reported rather than absorbed into the bar, and
+   it cannot make the two disagree because they share the population. */
+export function petalFreeStemApproachMm(state, ring, slot, cap, plan, exportMode) {
+  const probe = new MeshBuilder({ exportMode });
+  buildPetalInto(probe, state, ring, slot, cap);
+  const P = probe.positions;
+  let best = Infinity;
+  for (let i = 0; i < P.length; i += 3) {
+    const d = freeStemDistanceMm(plan, P[i], P[i + 1], P[i + 2]);
+    if (d < best) best = d;
+  }
+  return best;
+}
+
+/* WHICH SLOTS ARE NOT BUILT. Null where the question does not arise (no stem,
+   or not a sphere), so a caller cannot read a passing 0 out of a claim nothing
+   can make — the `dome.reserved` / `faceReach` discipline.
+
+   MODE-FREE BY CONSTRUCTION, AND THAT IS NOT A PREFERENCE. Which petals EXIST
+   is topology, and this project has refused a mode-dependent topology four
+   times (session 32's ladder, session 38's seam step, the fringe's own count
+   threshold, session 42's lamina). A petal is omitted if it collides in EITHER
+   mode, so the set is the same set in both by the symmetry of a union — LIVE
+   and EXPORT show the same flower — and every petal that IS built clears the
+   stem in the mode it was built in, which is what makes the assertion
+   unconditional. The two per-mode lists are reported so the union can be seen
+   doing work (or not) rather than believed.
+
+   THE COST IS TWO PETAL BUILDS PER SLOT ON A SPHERE WITH A STEM, and nothing at
+   all anywhere else — the branch is the guard. Measured on this tree: the
+   default sphere goes 90 -> ~270 ms a rebuild and the 240-foot sphere 2.85 ->
+   ~7.7 s. Reported, not optimised around; the two ways to halve it (absorbing
+   the matching-mode probe into the real accumulator, and a cheap reach envelope
+   that skips petals nowhere near the pole) are costed in the outcome doc and
+   deliberately not built in a PR this size. */
+export function stemOmission(state, fr, cap, plan) {
+  if (!plan || !plan.present || !fr.sphereMode) return null;
+  const clearanceMm = STEM_PETAL_CLEARANCE_MM;
+  const K = fr.rings.length;
+  const byMode = { live: [], export: [] };
+  const approach = { live: new Array(K).fill(Infinity), export: new Array(K).fill(Infinity) };
+  const omitted = [];
+  /* THE SLOTS COME FROM THE WHORL PRIMITIVE ITSELF, never from a second copy of
+     the azimuth law — an instrument that recomputed it would agree with a
+     mutated law by mutating alongside it (buildBloomInto's own note, one level
+     up). The build pass below drives the identical call, so the two passes see
+     the same slots in the same order. */
+  buildWhorlInto({
+    count: K,
+    radius: (i) => fr.rings[i].radius,
+    height: 0,
+    sizeRamp: (i) => fr.rings[i].scale,
+    angleRamp: (i) => fr.rings[i].tiltExtra,
+    phase: fr.rings[0].phase,
+    placement: state.placement,
+    blade: (slot) => {
+      const ring = fr.rings[slot.index];
+      let hit = false;
+      for (const m of ['live', 'export']) {
+        const d = petalFreeStemApproachMm(state, ring, slot, cap, plan, m === 'export');
+        approach[m][slot.index] = d;
+        if (d < clearanceMm) { byMode[m].push(slot.index); hit = true; }
+      }
+      if (hit) omitted.push(slot.index);
+    },
+  });
+  return {
+    clearanceMm, asked: K, built: K - omitted.length,
+    omitted, omittedSet: new Set(omitted), byMode, approach,
+    /* THE NEAREST PETAL THAT WAS KEPT, in each mode — the headroom the read-out
+       prints and the number a reader can act on. Null when nothing was kept. */
+    nearestKeptMm: {
+      live: approach.live.filter((_, i) => !omitted.includes(i)).reduce((a, b) => Math.min(a, b), Infinity),
+      export: approach.export.filter((_, i) => !omitted.includes(i)).reduce((a, b) => Math.min(a, b), Infinity),
+    },
   };
 }
 
@@ -7609,7 +7783,13 @@ export function buildHubInto(acc, state, ring) {
     const before = acc.triangleCount;
     sphereInto(Rd + t / 2, true);
     sphereInto(Rd - t / 2, false);
-    underside.push([0, t], [Rd, t]);                                   // a sphere's wall is t everywhere; the stem is refused here by ruling
+    /* A SPHERE'S WALL IS t EVERYWHERE and the hub-to-stem join is INERT here
+       by declaration, not by arithmetic: `stemPlan` returns joinT = hubT on a
+       closed shell (see its own note — a plate's section modulus does not
+       describe one), so `joinAt` is the identity and this arm reads no join at
+       all. The stem itself is BUILT on a sphere now; what is refused is the
+       thickening, and the read-out names the shell as the reason. */
+    underside.push([0, t], [Rd, t]);
     return { dome: { Rd, centreZ: cz, H: dome.H, closed: true, rimPhi: Math.PI, thickness: t, outerRadius: Rd + t / 2, innerRadius: Rd - t / 2 }, tris: acc.triangleCount - before, topFaceZ: cz + Rd + t / 2, ...joinReport };
   }
   if (dome) {
@@ -8047,6 +8227,14 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      footRing() invented would agree with a broken derivation by being broken
      alongside it; checked against the builder's own tally it cannot. */
   let petalsBuilt = 0;
+  /* THE STEM'S PLAN IS ASKED BEFORE THE PETALS NOW, because on a SPHERE it
+     decides which of them are built. It EMITS NOTHING — `buildStemInto` still
+     runs after the hub, in the same place and the same order — so no byte moves
+     by asking earlier. `stemOmission` is null wherever the question does not
+     arise (no stem, or not a sphere), and every consumer branches on that
+     rather than on a passing 0. */
+  const stemPlanned = stemPlan(state, fr.hub, acc);
+  const omission = stemOmission(state, fr, capability, stemPlanned);
   if (fr.continuousMode) {
     /* ONE WHORL, so one azimuth row — the continuous sequence's own. */
     const azOf = new Array(fr.rings.length);
@@ -8062,7 +8250,24 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          a thing. */
       phase: fr.rings[0].phase,
       placement: state.placement,
-      blade: (slot) => { petalsBuilt++; azOf[slot.index] = slot.azimuth; const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability); petals.push(p); petalsAll.push(p); },
+      /* THE OMISSION IS A MASK AND NOT A RENUMBERING, and this is where that is
+         true or false. The whorl primitive still runs every slot 0..K-1 and
+         still hands each one the azimuth its own index earns, so dropping slot
+         3 moves nothing about slot 4; `azOf` records EVERY slot's azimuth
+         because the slot exists whether or not a petal was built on it, which
+         is what makes the sequence checkable against a stemless build.
+         `petals` keeps ONE ENTRY PER DESCRIPTOR — a null where none was built —
+         because four of the metrics hook's arrays are index-matched to
+         `fr.rings` through it (petalRingSpine, petalRingRootRows,
+         petalRingFootFrames, petalRingApplied, which are J1's, Z2's and Z6's
+         own inputs). `petalsAll` and `petalsBuilt` count what was EMITTED. */
+      blade: (slot) => {
+        azOf[slot.index] = slot.azimuth;
+        if (omission && omission.omittedSet.has(slot.index)) { petals.push(null); return; }
+        petalsBuilt++;
+        const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability);
+        petals.push(p); petalsAll.push(p);
+      },
     });
     slotAzimuths.push(azOf);
   } else {
@@ -8118,12 +8323,11 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
   }
   const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
-     hub slab, overlapping it exactly as every stamen and the style already do.
-     Absent when the state asks for none (length 0) and under SPHERE, where it
-     is hidden AND inert by ruling. The plan is asked of its one owner, the same
-     object buildHubInto shaped the join from, so the stem and the hollow it
-     leaves in the hub cannot disagree about where the underside is. */
-  const stemPlanned = stemPlan(state, fr.hub, acc);
+     hub wall, overlapping it exactly as every stamen and the style already do.
+     Absent when the state asks for none (length 0). The plan was asked of its
+     one owner above, the same object buildHubInto shaped the join from, so the
+     stem and the hollow it leaves in the hub cannot disagree about where the
+     underside is; it is emitted HERE, after the hub, where it always was. */
   const stemBuilt = buildStemInto(acc, stemPlanned);
   /* THE ANDROECIUM (session 21) — read from the descriptor, placed through
      the arrangement primitive's EXISTING azimuth arms (RING: the RADIAL law;
@@ -8208,5 +8412,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     }
     return { ...best, threshold, crossing: best.mm < threshold };
   })();
-  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt };
+  return { ring: fr.rings[0], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[0], petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission };
 }

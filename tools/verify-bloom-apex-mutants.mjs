@@ -197,6 +197,20 @@ function stemFacts(M, state = STEM_STATE()) {
              rootSpan: plan.present ? plan.topZ - plan.rootZ : 0 };
   } catch (e) { return { threw: e.message }; }
 }
+/* THE SPHERE'S STEM CHANNEL, as the builder reports it on a state that has
+   one — the witnesses above read this rather than the assertion they name,
+   which is the circularity the table exists to avoid. */
+const SPHERE_STEM_STATE = () => ({ ...REGISTRY_DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 8, stemLength: 60, stemDiameter: 6 });
+function channelFacts(M, state = SPHERE_STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildBloomInto(acc, state);
+    const az = built.slotAzimuths[0] || [];
+    return { channel: built.stemOmission || null, built: built.petalsBuilt,
+             azCount: az.length, firstAz: az[0], joinT: built.stem.joinT, tris: acc.triangleCount };
+  } catch (e) { return { threw: e.message }; }
+}
+
 /* The minimum distance any emitted stem vertex comes to the axis — 0 only for a
    solid cap's own rim fan, and the bore radius for a hollow one. Read from the
    emitted stream so a bore rule that changed in NAME only cannot pass. */
@@ -657,12 +671,64 @@ const MUTANTS = [
      argument for the family existing. Every one of them leaves the boundary
      census, the flood fill and the triangle-count identity completely
      unchanged, so without ST0-ST6 each ships silently. */
-  { id: 'stem-eligible-disagrees-with-the-registry', why: "the geometry says a stem is eligible under SPHERE while the registry still hides the controls there — the hidden-and-NOT-inert defect PP7 and JS0 exist for, and it is invisible to every other family here",
-    find: 'export function stemEligible(state) { return !sphereMode(state); }',
-    into: 'export function stemEligible(state) { return true; }', names: ['ST0'],
+  /* RE-ANCHORED, NOT DELETED (the sphere-stem session). Its old edit —
+     `stemEligible` returning true — is what SHIPPED the moment Eva ruled that
+     petals the stem would pass through are not built, so a mutant whose
+     mutation is the shipped code tests nothing. The defect it names is still
+     reachable and is now the OTHER direction: the geometry keeping the retired
+     SPHERE arm while the registry has dropped it, so the controls SHOW under
+     SPHERE and build nothing — hidden-and-not-inert with the two halves
+     swapped, and still invisible to every other family here. */
+  { id: 'stem-present-disagrees-with-the-registry', why: "the geometry still refuses a stem under SPHERE while the registry shows the controls there — the controls move nothing, which is the mirror of the hidden-and-NOT-inert defect PP7 and JS0 exist for",
+    find: 'export function stemIsAbsent(state) { return !state.stemLength; }',
+    into: 'export function stemIsAbsent(state) { return !state.stemLength || sphereMode(state); }', names: ['ST0', 'ST1', 'ST7'],
     witness: (M, C) => { const sph = { ...REGISTRY_DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60 };
       const m = M.stemIsAbsent(sph), c = C.stemIsAbsent(sph);
-      return (m === false && c === true) ? null : `stemIsAbsent under SPHERE reads ${m} on the mutant and ${c} on the clean tree — the predicate did not move`; } },
+      return (m === true && c === false) ? null : `stemIsAbsent under SPHERE reads ${m} on the mutant and ${c} on the clean tree — the predicate did not move`; } },
+
+  /* ===================================================================
+     THE SPHERE'S STEM CHANNEL (the sphere-stem session) — ST7-ST9. Each is a
+     way the omission could be wrong while the export stays watertight, one
+     piece, and the right triangle count for whatever it built. */
+  { id: 'the-stem-channel-never-fires', why: 'the channel is computed and then thrown away, so every petal is built and the stem passes straight through the pole-most ones — watertight, one connected piece, and the only thing wrong with it is the picture',
+    find: '  if (!plan || !plan.present || !fr.sphereMode) return null;',
+    into: '  if (!plan || !plan.present || !fr.sphereMode || fr.sphereMode) return null;', names: ['ST7', 'ST9'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.channel === null && c.channel !== null && m.built > c.built) ? null
+        : `the mutant reports ${m.channel ? 'a channel' : 'no channel'} and built ${m.built} petals against the clean tree's ${c.built} — the omission did not stop`; } },
+
+  { id: 'the-omission-renumbers', why: 'the whorl is run at the SURVIVING count instead of the asked-for one, so every petal takes the descriptor and the azimuth of a slot that is not its own — Eva\'s "do not impact anything else" broken in the one way no STL check can see',
+    find: '      count: fr.rings.length,\n      radius: (i) => fr.rings[i].radius,',
+    into: '      count: fr.rings.length - (omission ? omission.omitted.length : 0),\n      radius: (i) => fr.rings[i].radius,', names: ['ST8', 'J1', 'Z1'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.azCount < c.azCount && m.firstAz === c.firstAz) ? null
+        : `the mutant emits ${m.azCount} azimuths against the clean tree's ${c.azCount} — the sequence was not shortened`; } },
+
+  { id: 'the-channel-clearance-is-typed', why: 'the printable gap the channel clears is replaced by a twentieth of a millimetre, so petals are kept that the stem passes within a gap no process can make',
+    find: 'export const STEM_PETAL_CLEARANCE_MM = MIN_FEATURE_MM;',
+    into: 'export const STEM_PETAL_CLEARANCE_MM = 0.05;', names: ['ST7', 'ST9'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.channel && c.channel && m.channel.clearanceMm < c.channel.clearanceMm) ? null
+        : `the mutant declares a clearance of ${m.channel && m.channel.clearanceMm} against ${c.channel && c.channel.clearanceMm} — it did not move`; } },
+
+  { id: 'the-channel-reads-one-mode', why: 'the channel measures the EXPORT build only, so the set stops being the union and a petal that collides in LIVE alone is kept — the mode-dependent topology this project has refused five times',
+    find: "      for (const m of ['live', 'export']) {",
+    into: "      for (const m of ['export']) {", names: ['ST7'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const ml = m.channel && m.channel.approach.live.filter((x) => Number.isFinite(x)).length;
+      const cl = c.channel && c.channel.approach.live.filter((x) => Number.isFinite(x)).length;
+      return (ml === 0 && cl > 0) ? null : `the mutant measured ${ml} live approaches against the clean tree's ${cl} — both modes still ran`; } },
+
+  { id: 'the-sphere-takes-the-plate-join', why: "the hub-to-stem join is derived for a PLATE and applied to a closed shell, so the plan declares a thickening the sphere arm of buildHubInto never builds — a plan describing geometry nobody emitted",
+    find: '  const joinT = sphere ? hubT : stemJoinThickness(outerR, hubT);',
+    into: '  const joinT = stemJoinThickness(outerR, hubT);', names: ['ST5'],
+    witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.joinT > c.joinT + 1e-9) ? null : `the plan declares a join of ${m.joinT} mm against ${c.joinT} on the clean tree — it did not move`; } },
 
   { id: 'stem-declared-and-not-built', why: 'the builder returns before emitting anything, while the plan still declares a stem',
     find: '  if (!plan.present) return { tris: 0 };',
@@ -807,10 +873,12 @@ const ROWS = [
      eligible the two agree whatever either one says — so a geometry that has
      stopped refusing SPHERE is invisible on both rows above, and
      `stem-eligible-disagrees-with-the-registry` fired NOTHING until this row
-     existed. The row a two-statement clause needs is the one where the
+     existed — and it is now the row the whole STEM CHANNEL family needs, for
+     the same reason one level on: on a cap or a flat hub there is no channel
+     to get wrong. The row a two-statement clause needs is the one where the
      statement BITES; session 35's stale-harness-row lesson, arriving as a row
      that was never chosen rather than one that went stale. */
-  { label: 'a stem asked for under SPHERE (hidden AND inert — the state where the two statements can disagree)',
+  { label: 'a stem on a SPHERE — the stem channel, where petals the stem would pass through are NOT built',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '24' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
 
 ];
