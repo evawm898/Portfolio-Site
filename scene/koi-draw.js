@@ -1,3 +1,5 @@
+import { SPINE_JOINTS, TAIL_ROOT_U, TAIL_LOBE_REST } from './koi-fish.js';
+
 // scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
 // so a koi is an outline with a dark body behind it rather than a shape with a
 // value, and colour never enters it — everything here is one grayscale ink at
@@ -163,7 +165,6 @@ const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
 const TAIL_FORK = 0.26;       // the extra notch on the axis — the fork itself
 const TAIL_FORK_W = 0.34;     // how wide that fork is, in fan fractions
 const TAIL_TIP_SHORT = 0.06;  // how much the middle falls short of the tips
-const TAIL_ROOT_U = 0.90;     // the fan's apex, pulled forward so it hides under
                               // the body — without this the tail converged on a
                               // single point and met the wrist as a hard V
 const TAIL_PTS = 30;          // samples across the envelope
@@ -212,40 +213,22 @@ const DORSAL_U0 = 0.20, DORSAL_U1 = 0.82, DORSAL_A = 0.22;
 //
 // THE PHASE IS THE FISH'S OWN SWIM CLOCK (`f.phase` in koi-fish.js), which
 // already advances faster the faster it swims. So a koi driving hard beats
-// faster than one drifting, with nothing here to keep in step.
+// THE SWIM WAVE, LAID OVER THE JOINT CHAIN. There is no curvature formula here
+// and no integrated spine: TURNING is the chain's own physical lag, which is
+// what a body following a head actually does, and this is only the undulation
+// on top of it. Amplitude grows toward the tail and the phase lags down the
+// body, so the wave travels backwards along the fish.
 //
-// IT IS INTEGRATED, NOT CLOSED FORM, AND THAT IS THE COST OF THE WAVE. With a
-// constant curvature the arc has an exact solution; with k varying along the
-// body the heading is its integral and the spine is the integral of that, so
-// the spine is walked once per fish per frame at BEND_SAMPLES steps and every
-// drawn point interpolates between them. The buffers are hoisted to the
-// renderer and reused, because per-fish allocation every frame is the one place
-// this renderer could put pressure on the collector.
-const BEND_WAVES = 1.15;         // wavelengths along the snout-to-tail-tip length
-const BEND_WAVE_SWEEP = 1.60;    // rad of heading swing the wave imposes
-// THE ENVELOPE HAS A FLOOR, AND WITHOUT IT THE BODY IS RIGID. A pure u^p
-// envelope leaves the front two thirds of the fish with almost no curvature —
-// measured, at u 0.5 it is 0.39 of full and at 0.25 it is 0.16 — so the S never
-// forms along the BODY and only the tail flicks, which reads as a stiff fish
-// with a loose tail rather than as swimming. The reference plate's curve runs
-// the whole length: the head yaws a little, the middle bows, the tail sweeps
-// most. A floor of about a fifth gives the head that much and no more.
-const BEND_ENV_BASE = 0.22;      // the head's own share of the wave
-const BEND_ENV_POW = 1.10;       // how fast the rest grows tailward
-const BEND_SAMPLES = 28;         // spine steps; every drawn point lerps between
-// THE TURN'S BIAS IS DELIBERATELY SMALLER THAN THE WAVE'S SWING, because a
-// turning fish must still be seen to be SWIMMING. At 0.80 the bias swamped the
-// wave at hard turns — measured, the tail tip's swing over a cycle collapsed
-// from 77 px to 7 on a 96 px body — which is the wave disappearing in favour of
-// a static turn-bend, exactly the failure this rebuild is for.
-const BEND_MAX_TURN = 0.45;      // rad of turn BIAS, snout to tail tip, saturated
-const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it
-// Where along the snout-to-tail-tip length the spine is pinned, as a fraction
-// of it. 0.20 of the 1.54 body lengths that span is about a third of a BODY
-// back from the snout, which is roughly where a swimming fish's yaw pivot sits.
-// 0.5 would minimise the worst excursion and is wrong: a head that swings as
-// far as a tail does not read as a fish.
-const BEND_ANCHOR_U = 0.20;
+// IT IS A LATERAL OFFSET ON THE JOINTS, not a bend of the axis — the shape the
+// contour rides is the chain, waved. Everything downstream reads that one
+// polyline, so the body, both fin pairs, the markings and the tail cannot
+// disagree about where the fish is.
+const WAVE_AMP = 0.052;          // of body length, at the tail
+const WAVE_K = 0.72;             // radians of phase lag per joint
+const WAVE_POW = 1.6;            // how fast the amplitude grows tailward
+const WAVE_SPEED_REF = 38;       // px/s at which the wave is at full size
+const WAVE_TAIL_LAG = 2.2;       // joints' worth of extra phase across the tail
+const TAIL_BLEND = 0.5;          // sweep either side of the fork the lobes share
 
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
@@ -286,9 +269,8 @@ export function createRenderer(ctx, surface) {
   // The spine, walked once per fish per frame and interpolated by every drawn
   // point. Hoisted and reused: allocating three arrays per fish per frame is
   // exactly the collector pressure this renderer's header warns about.
-  const spineX = new Float64Array(BEND_SAMPLES + 1);
-  const spineY = new Float64Array(BEND_SAMPLES + 1);
-  const spineH = new Float64Array(BEND_SAMPLES + 1);
+  const centres = Array.from({ length: SPINE_JOINTS }, () => ({ x: 0, y: 0 }));
+  const tans = Array.from({ length: SPINE_JOINTS }, () => ({ x: 1, y: 0 }));
   let vignette = null, vigKey = '';
   let grain = null, grainKey = '';
 
@@ -442,84 +424,136 @@ export function createRenderer(ctx, surface) {
       finAt(PELVIC_U, -1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
     ];
 
-    // THE LAGGED PLACEMENT, NEVER f.x / f.heading — see koi-fish.js's own note.
-    // The steering genuinely reverses frame to frame; this is where that stops
-    // being something the eye can see.
-    const h0 = f.drawHeading;
-    // Guarded: a zero-length fish would make this 0 and every station would
-    // divide by it.
-    const reachBack = Math.max(1e-6, (TAIL_ROOT_U + TAIL_LEN) * L);   // snout to tail tip
-
-    // The turn's contribution, as a constant bias across the whole body. tanh
-    // rather than a clamp because it is monotone and C-infinity — a clamp puts
-    // a visible corner in the motion at whatever value it binds. It is NOT the
-    // physical omega/speed arc: measured over 90 s of the real pond, the median
-    // |omega| would sweep the body 91 degrees and p90 would sweep it 417, since
-    // the steering lets a koi turn well inside its own body length.
-    // f.bend, not f.omega: the SECOND lag, so the curvature ramps in and out
-    // over a short window instead of tracking the turn rate 1:1 each frame.
-    const turnK = (BEND_MAX_TURN * Math.tanh((f.bend || 0) / BEND_OMEGA_REF)) / reachBack;
-
-    // Curvature at arc length `a` behind the nose: the travelling wave, grown
-    // toward the tail, plus the turn's bias.
-    const waveK = BEND_WAVE_SWEEP / reachBack;
+    // THE CHAIN IS THE SHAPE. f.spine is the joint chain koi-fish.js drags
+    // behind the head with each joint's turn capped; every point drawn below
+    // rides it. There is no curvature law here at all — a turning koi bends
+    // because its body is physically behind its head, which is the one thing
+    // this construction had been doing with arithmetic instead.
+    const sp = f.spine, N = sp.length;
+    const speedF = Math.max(0.4, Math.min(1.7, f.speed / WAVE_SPEED_REF));
     const phase = f.phase || 0;
-    const kAt = (a) => {
-      const u = a < 0 ? 0 : (a > reachBack ? 1 : a / reachBack);
-      const env = BEND_ENV_BASE + (1 - BEND_ENV_BASE) * Math.pow(u, BEND_ENV_POW);
-      return waveK * env * Math.sin(Math.PI * 2 * u * BEND_WAVES - phase) + turnK;
-    };
 
-    // THE SPINE IS PINNED INSIDE THE BODY, NOT AT THE NOSE, so a change in
-    // curvature is SHARED. Pinned at station 0 the nose cannot move and the
-    // whole excursion lands on the tail — which is exactly the "pivots around
-    // the nose" read: the head is the one part of the animal that never
-    // participates. Pinned a fifth of the way back, the head takes its own
-    // fifth of every bend and the tail's arm is 0.8 of what it was.
-    //
-    // TWO CHECKS, BOTH MEASURED RATHER THAN ARGUED. Pinned at station 0 this
-    // walk reproduces the one-way walk it replaces EXACTLY — 0 of 4,105,360
-    // emitted coordinates differ over a 20 s run — so the anchor is the whole
-    // of the change and none of it is a rewrite artefact. And on a body forced
-    // straight (both bend amplitudes 0) moving the anchor changes nothing the
-    // eye could hold: worst 1.14e-12 px over the same run, which is summation
-    // order and not geometry. It is NOT bit-identical there and must not be
-    // claimed to be.
-    const N = BEND_SAMPLES, da = reachBack / N;
-    const iA = Math.round(BEND_ANCHOR_U * N);
-    spineH[iA] = h0;
-    spineX[iA] = f.drawX - Math.cos(h0) * (iA * da);
-    spineY[iA] = f.drawY - Math.sin(h0) * (iA * da);
-    for (let i = iA; i < N; i++) {          // tailward
-      const kMid = kAt((i + 0.5) * da);
-      const hMid = spineH[i] - kMid * da * 0.5;      // midpoint heading
-      spineX[i + 1] = spineX[i] - Math.cos(hMid) * da;
-      spineY[i + 1] = spineY[i] - Math.sin(hMid) * da;
-      spineH[i + 1] = spineH[i] - kMid * da;
+    // The chain with the swim wave laid over it: each joint pushed sideways
+    // from the line its neighbours make, growing toward the tail.
+    const cen = centres;
+    for (let i = 0; i < N; i++) {
+      const p0 = sp[i > 0 ? i - 1 : 0], p1 = sp[i < N - 1 ? i + 1 : N - 1];
+      let tx = p1.x - p0.x, ty = p1.y - p0.y;
+      const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
+      const amp = WAVE_AMP * L * Math.pow(i / (N - 1), WAVE_POW) * speedF;
+      const off = Math.sin(phase - i * WAVE_K) * amp;
+      cen[i].x = sp[i].x - ty * off;
+      cen[i].y = sp[i].y + tx * off;
     }
-    for (let i = iA; i > 0; i--) {          // headward, the same walk reversed
-      const kMid = kAt((i - 0.5) * da);
-      const hMid = spineH[i] + kMid * da * 0.5;
-      spineX[i - 1] = spineX[i] + Math.cos(hMid) * da;
-      spineY[i - 1] = spineY[i] + Math.sin(hMid) * da;
-      spineH[i - 1] = spineH[i] + kMid * da;
+    // Frames along the WAVED line, so the body's width is perpendicular to the
+    // shape actually being drawn rather than to the chain underneath it.
+    for (let i = 0; i < N; i++) {
+      const p0 = cen[i > 0 ? i - 1 : 0], p1 = cen[i < N - 1 ? i + 1 : N - 1];
+      let tx = p1.x - p0.x, ty = p1.y - p0.y;
+      const m = Math.hypot(tx, ty) || 1;
+      tans[i].x = tx / m; tans[i].y = ty / m;
     }
 
     // Canonical x runs FORWARD from the nose, so the distance back along the
-    // body is -x; canonical y is the lateral offset on the fish's own right.
-    // Outside [0, reachBack] the clamp on `i` makes this a linear EXTRAPOLATION
-    // along the end segment, which is what carries the blunt snout's own dome
-    // (it reaches forward of the nose) without a special case.
+    // body is -x and station i sits at x = -i * seg. Outside the chain the
+    // clamp on `i` makes this a linear EXTRAPOLATION along the end segment,
+    // which is what carries the blunt snout's own dome (it reaches forward of
+    // the nose) and, until the lobes take it, the tail.
+    const seg = Math.max(1e-6, f.seg);
     const P = (x, y) => {
-      const t = -x / da;
+      const t = -x / seg;
       let i = Math.floor(t);
-      if (i < 0) i = 0; else if (i > N - 1) i = N - 1;
+      if (i < 0) i = 0; else if (i > N - 2) i = N - 2;
       const fr = t - i;
-      const hh = spineH[i] + (spineH[i + 1] - spineH[i]) * fr;
-      const cx = spineX[i] + (spineX[i + 1] - spineX[i]) * fr;
-      const cy = spineY[i] + (spineY[i + 1] - spineY[i]) * fr;
-      const tx = Math.cos(hh), ty = Math.sin(hh);
-      return { x: cx - ty * y, y: (cy + tx * y) * sq };
+      const cx = cen[i].x + (cen[i + 1].x - cen[i].x) * fr;
+      const cy = cen[i].y + (cen[i + 1].y - cen[i].y) * fr;
+      // The POSITION extrapolates past the chain's ends, the DIRECTION does
+      // not: extrapolating a tangent turns it further with every step past the
+      // last joint, which bent the snout and put a corner where the tail's
+      // leading edge meets the flank.
+      let tx = tans[i].x + (tans[i + 1].x - tans[i].x) * fr;
+      let ty = tans[i].y + (tans[i + 1].y - tans[i].y) * fr;
+      const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
+      // The chain runs nose -> tail, so its tangent points BACKWARD along the
+      // body; the canonical frame's +x is forward, which is why the lateral
+      // term is (+ty, -tx) here where an integrated spine used (-ty, +tx).
+      return { x: cx + ty * y, y: (cy - tx * y) * sq };
+    };
+
+    // THE TAIL RIDES ITS OWN TWO CHAINS, AS A TURN RATHER THAN AS A FRAME.
+    // Each lobe is a chain koi-fish.js trails from the last body joint, so the
+    // lag runs all the way through the tail instead of stopping at a piece
+    // hinged off the end — and because the two trail separately, the lobes
+    // answer a turn at slightly different times rather than swinging as one
+    // rigid fan.
+    //
+    // WHAT IS TAKEN FROM A LOBE IS ITS CUMULATIVE TURN, NOT ITS FRAME, and that
+    // is the whole difference between a tail and a wedge. Re-expressing each
+    // fan point in its lobe's own (along, across) coordinates was tried first:
+    // the two lobes' frames sit 2 x TAIL_LOBE_REST apart at the root, so the
+    // same envelope came out splayed into an angular paper dart that no longer
+    // resembled the approved fan. Rotating the canonical point about the root
+    // by how far the lobe has bent BY THAT RADIUS keeps the envelope exactly as
+    // drawn at zero lag and bends it with the chain as the lag grows.
+    const rootW = cen[N - 1], rootC = sp[N - 1];
+    const backW = tans[N - 1];                 // world backward, already waved
+
+    // WHAT IS TAKEN FROM A LOBE IS HOW FAR IT HAS BENT AWAY FROM STRAIGHT, as a
+    // DISPLACEMENT. Two other readings were built and measured first and both
+    // deform the envelope rather than bend it:
+    //
+    //   its FRAME — re-expressing each fan point in the lobe's own (along,
+    //   across) coordinates. The two lobes' frames sit 2 x TAIL_LOBE_REST apart
+    //   at the root, so the approved fan came out splayed into an angular
+    //   paper dart.
+    //
+    //   its cumulative TURN — rotating the canonical point about the root by
+    //   how far the lobe has turned by that radius. The lobes can reach five
+    //   capped joints of bend, so at a hard turn the fan was being wound
+    //   through 120 degrees and spiralled through itself.
+    //
+    // A displacement has neither failure: it is bounded by the chain's own
+    // excursion, it is exactly zero when the lobe is straight (so the envelope
+    // at rest is the one that was approved, to the bit), and blending the two
+    // lobes' displacements moves a point a little rather than between two
+    // widely separated frames.
+    const lobeBend = (k, s, out) => {
+      const lb = f.lobes[k], seg2 = f.lobeSeg;
+      const t = Math.max(0, s) / seg2;
+      let i = Math.floor(t);
+      if (i > lb.length - 2) i = lb.length - 2;
+      const fr = t - i;
+      const cxp = lb[i].x + (lb[i + 1].x - lb[i].x) * fr;
+      const cyp = lb[i].y + (lb[i + 1].y - lb[i].y) * fr;
+      // where the same station would sit if the lobe had never bent: along its
+      // OWN first segment, which is the rigid attachment
+      let rx = lb[1].x - lb[0].x, ry = lb[1].y - lb[0].y;
+      const m = Math.hypot(rx, ry) || 1; rx /= m; ry /= m;
+      out.x = cxp - (lb[0].x + rx * Math.max(0, s));
+      out.y = cyp - (lb[0].y + ry * Math.max(0, s));
+    };
+
+    // Both lobes answer every point and their BENDS are crossfaded, so the fork
+    // at u = 0 is one point of one path rather than a jump between two chains.
+    const smooth01 = (t) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+    const bA = { x: 0, y: 0 }, bB = { x: 0, y: 0 };
+    const tailPoint = (u) => {
+      const r = tailReach(u);
+      const m = smooth01((u / TAIL_BLEND + 1) * 0.5);
+      lobeBend(0, r, bA); lobeBend(1, r, bB);
+      const th = -u * TAIL_SPREAD;
+      const ca = Math.cos(th), sa = Math.sin(th);
+      const dx = backW.x * ca - backW.y * sa, dy = backW.x * sa + backW.y * ca;
+      // The wave carried on past the body: the same law, its phase and its
+      // amplitude continuing from the last joint rather than stopping at it,
+      // and referenced to the root so the tail does not jump where it attaches.
+      const q = r / Math.max(1e-6, TAIL_LEN * L);
+      const amp = WAVE_AMP * L * Math.pow(1 + q, WAVE_POW) * speedF;
+      const off = Math.sin(phase - (N - 1 + q * WAVE_TAIL_LAG) * WAVE_K) * amp
+                - Math.sin(phase - (N - 1) * WAVE_K) * WAVE_AMP * L * speedF;
+      const px = rootW.x + dx * r - dy * off + bA.x + (bB.x - bA.x) * m;
+      const py = rootW.y + dy * r + dx * off + bA.y + (bB.y - bA.y) * m;
+      return { x: px, y: py * sq };
     };
 
     // THE FINS GO DOWN FIRST, UNDER THE BODY. Their roots sit inside the flank
@@ -548,22 +582,27 @@ export function createRenderer(ctx, surface) {
     // at the outer tips, so the peduncle's own two corners join straight to
     // them: that pair of segments IS the tail's leading edge, and there is no
     // seam anywhere for a fill to leak through.
+    // Built in WORLD points rather than canonical ones, because the flanks ride
+    // the body chain and the tail rides the lobes: two different curves, one
+    // path. It is still a single closed contour with no seam for a fill to
+    // leak through — the envelope's first and last points are the outer tips,
+    // and the peduncle's own two corners join straight to them.
     const S = WIDTH_PROFILE.length;
     const c = [];
-    for (let i = 0; i < S; i++) c.push(edge(i / (S - 1), 1));
-    fanPts(c, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_PTS);
-    for (let i = S - 1; i >= 0; i--) c.push(edge(i / (S - 1), -1));
+    for (let i = 0; i < S; i++) { const e = edge(i / (S - 1), 1); c.push(P(e.x, e.y)); }
+    for (let i = 0; i <= TAIL_PTS; i++) c.push(tailPoint(1 - 2 * (i / TAIL_PTS)));
+    for (let i = S - 1; i >= 0; i--) { const e = edge(i / (S - 1), -1); c.push(P(e.x, e.y)); }
     const nc = pos(0), nw = widthAt(0);
     for (let k = 1; k < NOSE_PTS; k++) {
       const th = -Math.PI / 2 + Math.PI * (k / NOSE_PTS);
-      c.push({ x: nc.x + F.x * NOSE_ROUND * L * Math.cos(th) + R.x * nw * Math.sin(th),
-               y: nc.y + F.y * NOSE_ROUND * L * Math.cos(th) + R.y * nw * Math.sin(th) });
+      c.push(P(nc.x + F.x * NOSE_ROUND * L * Math.cos(th) + R.x * nw * Math.sin(th),
+               nc.y + F.y * NOSE_ROUND * L * Math.cos(th) + R.y * nw * Math.sin(th)));
     }
 
     // Body: a FLAT dark fill so the koi reads as a solid under the water and
     // the grain does not show through it, then the one outline over the top.
     // Flat, not a gradient across the flanks — see the header.
-    ctx.beginPath(); closedSmooth(ctx, c.map(p => P(p.x, p.y)));
+    ctx.beginPath(); closedSmooth(ctx, c);
     ctx.fillStyle = rgba(INK_FISH, BODY_FILL_A * a);
     ctx.fill();
     ctx.lineWidth = OUTLINE_W;
@@ -572,7 +611,16 @@ export function createRenderer(ctx, surface) {
 
     // The tail's own rays, over its fill.
     ctx.beginPath();
-    raysInto(P, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
+    for (let k = 0; k < TAIL_RAYS; k++) {
+      const u = TAIL_RAYS === 1 ? 0 : (k / (TAIL_RAYS - 1)) * 2 - 1;
+      // Along the SAME blended envelope the outline uses, so a ray cannot leave
+      // the fin it is drawn inside.
+      const root = tailPoint(u), tip = tailPoint(u);
+      const rx = rootW.x, ry = rootW.y * sq;
+      const inner = { x: rx + (root.x - rx) * 0.26, y: ry + (root.y - ry) * 0.26 };
+      const outer = { x: rx + (tip.x - rx) * 0.93, y: ry + (tip.y - ry) * 0.93 };
+      ctx.moveTo(inner.x, inner.y); ctx.lineTo(outer.x, outer.y);
+    }
     ctx.lineWidth = FIN_LINE_W;
     ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
     ctx.stroke();
