@@ -210,9 +210,14 @@ rule, and session 41's mirror of it). The cap edge is rebuilt from the HUB BUILD
 emitted sphere radius and the STEM BUILDER's own widest EMITTED vertex — the artefacts, not
 the plan that asked for them — and the foot from `footRing()`'s own per-ring `arc` and
 `overhang`. The bound is **in millimetres, the unit the quantity carries**, on each of the
-three LENGTHS rather than on the ratio they form: the two routes differ only in arithmetic
-order over the same doubles, so 1e-9 mm is millions of ulps of headroom on a 3-to-80 mm arc
-and still catches any real disagreement. The ratio is then asserted to BE those two
+three LENGTHS rather than on the ratio they form. **The bar is sized from the one input the
+two routes do not share**: `Rd` reaches the hub builder as `const Rd = dome.Rd`, the same
+double, but `emittedMaxR` is `hypot(R cos θ, R sin θ)` maximised over the emitted ring, which
+is `R` to within about two ulps rather than exactly `R`. The cap edge's sensitivity to that is
+`dArc/dR = −1/sqrt(1 − (R/Rd)²)`, which is 1.46 at the exhausted corner and 4.3 at the tightest
+state where the clause still runs (it is clamped, and skipped, once the stem is as wide as its
+head), so a two-ulp input error moves the arc by ~1e-14 mm. **1e-9 mm is five orders of headroom
+over that and still five orders below the 0.1 mm a reader could act on.** The ratio is then asserted to BE those two
 lengths, which is an identity inside the record and is **not** evidence about the
 geometry — it is there so a read-out printing one number while the record holds another
 cannot pass.
@@ -255,7 +260,10 @@ about it.
   collides in at least one mode; every built slot clears the printable gap in BOTH; the
   omitted set IS the union of the two per-mode lists; the clearance is `MIN_FEATURE_MM`;
   the counts add up. *It reads the channel's own report*, so a criterion measuring the
-  wrong thing would agree with itself — which is why ST9 exists.
+  wrong thing would agree with itself — which is why ST9 exists. **It also carries the
+  MERIDIAN PACKING MARGIN** (§7b), and that clause is the exception to the sentence
+  before it: its reference is rebuilt from the hub builder's sphere, the stem builder's
+  emitted vertices and `footRing()`'s rings, so it is not reading the quantity it checks.
 * **ST8 — it is a MASK.** Against a STEMLESS build of the same state: every slot keeps
   its azimuth, every SURVIVING petal keeps its foot digest at its own slot index, the
   descriptor count is unchanged, the hub is unchanged, and the nulls are EXACTLY the
