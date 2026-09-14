@@ -246,6 +246,20 @@ descriptor. Both fire on every sphere with a stem. The list is filtered by the b
 own omitted set now, which is also the correct measurement: a foot that was never built is
 not on the base, so counting it would report crowding that is not there.
 
+**AND THE SOLID-ANGLE CENSUS EMITTED THE PETALS THE BUILDER DID NOT.** R1 exists because
+that instrument counts the parts through a THIRD accumulator that EMITS, so it sees the
+builder's own orchestration — and the omission is part of the orchestration. Unmasked it
+read `solid R1: petals-only (18848) + hub-only (6720) + centre-only (576) = 26144, but a
+whole-bloom build has 21432`, `solid R2: captured 8 petals but builtFull.petalsBuilt is 6`,
+and an `solid R3` for every omitted slot. It reads the builder's own omitted set now. **The
+PLAN raster needed nothing** — it returns on a sphere before a petal is built, which is
+session 18's own labelled skip doing a second job.
+
+**THE SHAPE OF ALL FOUR.** Every one is an instrument that assumed a slot always carries a
+petal, and every one was found by the gate rather than by reading the code. The omission is
+the first thing in this generator that can make a declared slot empty, and what that costs
+is exactly this list — four places that had no reason to be written any other way.
+
 ### 9c. The matrix, the census and the gates
 
 * **The live matrix goes 736 -> 744.** Nine rows added (block 32), one removed (block 30's
