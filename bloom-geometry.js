@@ -7608,7 +7608,60 @@ export function stemOmission(state, fr, cap, plan) {
       live: approach.live.filter((_, i) => !omitted.includes(i)).reduce((a, b) => Math.min(a, b), Infinity),
       export: approach.export.filter((_, i) => !omitted.includes(i)).reduce((a, b) => Math.min(a, b), Infinity),
     },
+    meridian: meridianPacking(fr, plan, omitted),
   };
+}
+
+/* ===================================================================
+   THE MERIDIAN PACKING MARGIN — TELEMETRY, NEVER A CLAMP, and the only
+   quantity in this block that is about the BASE rather than about a blade.
+   Reported because it is EXACTLY EXHAUSTED at one reachable corner and would
+   otherwise pass silently (the brief's own instruction).
+
+   WHAT IT IS. The stem's footprint on the closed sphere is the cap where the
+   sphere's own cylindrical radius equals the stem's outer radius, so the cap's
+   edge stands at polar angle `pi - asin(min(1, R/Rd))` and at meridian arc
+   `Rd *` that, measured from the FACE pole the way `footRing()` measures every
+   ring's own `arc`. A foot lands ON its ring circle and runs INWARD by its own
+   `overhang` — the length it occupies along that same meridian. So
+
+       clearMm = (the cap edge's arc) - (the pole-most SURVIVING foot's arc)
+       margin  = clearMm / that foot's own overhang
+
+   says how many of its OWN lengths of clear meridian the base has left on the
+   stem's side. Below 1 the arc the stem leaves is shorter than the single foot
+   standing next to it: the meridian is spent, and no petal could be put back
+   there whatever a placement law did.
+
+   A LENGTH OVER A LENGTH, FROM TWO OWNERS THAT ARE NOT EACH OTHER. The arc and
+   the overhang are `footRing()`'s own per-ring fields; the cap edge is
+   `stemPlan`'s own `outerR` and the dome's own `Rd`. Neither side reads the
+   omission it is reported beside, and no constant here stands for a length it
+   was not derived from (Eva's fourth durable rule, and the mode/sampling one).
+
+   MEASURED ON THIS TREE, EXPORT, the shipped sphere at one turn: at 8 petals
+   the margin falls 2.706 / 2.539 / 2.196 / 1.834 / 1.444 / 1.003 across stem
+   diameters 3 / 4 / 6 / 8 / 10 / 12 mm — EXACTLY EXHAUSTED at the widest stem,
+   which is the corner the brief names. It is never tighter at higher counts
+   (40 petals reads 1.798 at 12 mm, 240 feet 1.878), because the sphere grows
+   with the count faster than the stem does. The one state that reads 0.0000 is
+   a stem WIDER THAN ITS OWN HEAD (12 mm on a 3-petal sphere, Rd 5.14), where
+   the cap swallows the whole lower hemisphere; that is the bare corner, told.
+   =================================================================== */
+export function meridianPacking(fr, plan, omitted) {
+  const dome = fr.dome;
+  if (!dome || dome.closed !== true || !plan || !plan.present) return null;
+  const kept = fr.rings.filter((r, k) => !omitted.includes(k));
+  if (!kept.length) return { margin: null, clearMm: null, overhangMm: null, capArcMm: null, keptArcMm: null, slot: null, exhausted: false, why: 'the channel took every petal' };
+  const Rd = dome.Rd;
+  const capArcMm = Rd * (Math.PI - Math.asin(Math.min(1, plan.outerR / Rd)));
+  /* The POLE-MOST survivor is the one with the greatest arc from the face pole
+     — the foot nearest the stem, which is the only one this margin is about. */
+  const poleMost = kept.reduce((a, b) => (b.arc > a.arc ? b : a));
+  const clearMm = Math.max(0, capArcMm - poleMost.arc);
+  const margin = clearMm / poleMost.overhang;
+  return { margin, clearMm, overhangMm: poleMost.overhang, capArcMm, keptArcMm: poleMost.arc,
+           slot: fr.rings.indexOf(poleMost), exhausted: margin < 1, why: null };
 }
 
 /* ===================================================================

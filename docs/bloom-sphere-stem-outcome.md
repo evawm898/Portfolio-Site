@@ -153,6 +153,95 @@ exercised with ZERO petals built.
   omitted it says so with the headroom.
 * **The ARRANGEMENT line** carries the two counts too, because a bloom reporting
   "petals 240" while 218 are on it would be the panel's own headline lying.
+* **Panel route (t)** asserts both places in BOTH DIRECTIONS against the builder's own
+  record — the line and the control's value where there is a channel, and neither where
+  there is not. The inert direction is the load-bearing one: at `stemLength` 0 there is
+  no channel, no omission and no line, which is the branch that keeps every sphere row
+  byte-identical, and a route that only ever drove the stem ON could not see it come
+  undone. `--negative-control` freezes the read-out so neither line can appear.
+
+## 7b. THE MERIDIAN PACKING MARGIN — told, and EXACTLY EXHAUSTED at one corner
+
+The brief named this as a separate clamp-and-tell: *"the meridian packing margin (1.005 at
+8 petals, largest stem) is a separate clamp-and-tell. Do not let it pass silently."*
+
+**WHAT SHIPPED IS A QUANTITY WITH ONE DEFINITION, STATED WHERE IT IS COMPUTED.**
+`meridianPacking()` in `bloom-geometry.js` is its one owner. The stem's footprint on the
+closed sphere is the cap where the sphere's own cylindrical radius equals the stem's outer
+radius, so the cap's edge stands at polar angle `π − asin(min(1, R/Rd))` and at meridian
+arc `Rd ·` that, measured from the FACE pole exactly as `footRing()` measures every ring's
+own `arc`. A foot lands ON its ring circle and runs INWARD by its own `overhang` — the
+length it occupies along that same meridian. So
+
+```
+clearMm = (the cap edge's arc) − (the pole-most SURVIVING foot's arc)
+margin  = clearMm / that foot's own overhang
+```
+
+is how many of its OWN lengths of clear meridian the base has left on the stem's side.
+Below 1 the arc the stem leaves is shorter than the single foot standing next to it: the
+meridian is spent, and no petal could be put back there whatever a placement law did.
+**It is a length over a length**, and neither side is a row count (this project's first
+durable rule).
+
+**MEASURED, EXPORT, the shipped sphere at one turn, `petalCount` × `stemDiameter`:**
+
+| stem Ø (mm) | 3 | 4 | 6 | 8 | 10 | 12 |
+|---|---|---|---|---|---|---|
+| 8 petals | 2.706 | 2.539 | 2.196 | 1.834 | 1.443 | **1.003** |
+| 40 petals | 2.534 | — | 2.341 | — | — | 1.798 |
+| 40 × 6 (240 feet) | 2.422 | — | 2.225 | — | — | 1.878 |
+
+**EXACTLY EXHAUSTED at 8 petals on the widest stem — one foot's length of clear arc and no
+more.** It is never tighter at higher counts, because the sphere grows with the petal count
+faster than the stem's own cap does. The one state that reads **0.000** is a stem WIDER THAN
+ITS OWN HEAD (12 mm on a 3-petal sphere, Rd 5.14 mm), where the cap swallows the entire
+lower hemisphere; that is the bare corner, and it is told rather than refused like every
+other statement about it.
+
+**THE READ-OUT PRINTS IT TO THREE DECIMALS, and the reason is this tree's own corner:**
+1.003 rounds to `1.00` at two, which is indistinguishable from exhausted on the one row
+where the distinction is the whole point. There is no band and no second threshold — the
+only word is EXHAUSTED, at the only place the quantity has a meaning of its own (`< 1`),
+and the flag is asserted in both directions.
+
+**ST7 CHECKS IT FROM THREE OWNERS, NONE OF WHICH IS THE QUANTITY** (Eva's fourth durable
+rule, and session 41's mirror of it). The cap edge is rebuilt from the HUB BUILDER's own
+emitted sphere radius and the STEM BUILDER's own widest EMITTED vertex — the artefacts, not
+the plan that asked for them — and the foot from `footRing()`'s own per-ring `arc` and
+`overhang`. The bound is **in millimetres, the unit the quantity carries**, on each of the
+three LENGTHS rather than on the ratio they form: the two routes differ only in arithmetic
+order over the same doubles, so 1e-9 mm is millions of ulps of headroom on a 3-to-80 mm arc
+and still catches any real disagreement. The ratio is then asserted to BE those two
+lengths, which is an identity inside the record and is **not** evidence about the
+geometry — it is there so a read-out printing one number while the record holds another
+cannot pass.
+
+**THE BRIEF'S TWO FIGURES: ONE REPRODUCES TO 0.2%, THE OTHER IS A DIFFERENT QUANTITY AND IS
+NOT ADOPTED.** The 8-petal figure the brief quotes is **1.005**; the definition above reads
+**1.0032** — agreement to 0.25%, with the qualitative claim ("exactly exhausted") exact, and
+the residual is most likely the Phase-A rig taking the cap edge through a chord where this
+takes it through the arc. That is reported rather than tuned: nothing here was adjusted to
+land on 1.005.
+
+The brief's second figure — *"at 40 petals the feet already overlap on the shipped tree
+(0.563), which is pre-existing and by design"* — is **not this quantity**. It is the feet
+against EACH OTHER rather than against the stem, it has no stem in it, and this session did
+not identify a definition that produces it. The two closest readings that can be built from
+`footRing()`'s own fields are the consecutive-ring meridian step over the mean **overhang**
+(8 petals 0.632, 40 petals **0.125**) and over the mean **width** (0.370 / **0.166**);
+neither is 0.563 at either count. Feet overlapping each other is the CROWDING instrument's
+territory and is already told on every row (`D_max`, `D_mean`, `NN … w`), where the shipped
+sphere reads `D_max 1` and `NN 1.578 w` at 8 petals and `NN 1.554 w` at 40 — no stacking at
+either. **No figure was adopted that this session could not reproduce with a definition it
+can state.**
+
+**AND THE OMISSION DOES NOT MOVE IT** — measured, both directions: `NN` reads 1.5781 w at 8
+petals with no stem and 1.5781 w with a 12 mm stem that takes two petals, and 1.5540 w at 40
+petals with and without a 12 mm stem that takes seven. Removing feet can only ever increase
+a nearest-neighbour distance, and here the closest pair survives in every case. That is
+condition 2 (filter, do not renumber) showing up in a second instrument that knows nothing
+about it.
 
 ## 8. What is asserted, and what each clause cannot see
 

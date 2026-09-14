@@ -2110,6 +2110,30 @@ at the default 6 mm and reads **2,412,512 tris on both trees in both modes**. It
 export-refusal entry is unchanged. **The one new self-intersection entry is NOT the stem's**:
 `SPHERE STEM: x 40 petals x 6 turns` reads 199 pairs at the FACE pole, identical with
 `stemLength` 0 and identical on a worktree of main — four readings, one number.
+**THE MERIDIAN PACKING MARGIN IS TOLD ON EVERY SPHERE WITH A STEM, AND IT IS EXACTLY
+EXHAUSTED AT ONE REACHABLE CORNER.** `meridianPacking()` is its one owner: the stem's
+footprint on the sphere is the cap where the sphere's own cylindrical radius equals the
+stem's outer radius, and the margin is the CLEAR MERIDIAN ARC above that cap edge divided
+by the pole-most SURVIVING foot's own `overhang` — the length that foot occupies along the
+same meridian. A length over a length, never a row count. Measured, EXPORT, one turn: at 8
+petals it falls **2.706 / 2.539 / 2.196 / 1.834 / 1.443 / 1.003** across stem diameters
+3 / 4 / 6 / 8 / 10 / 12 mm — **one foot's length of clear arc and no more at the widest
+stem** — and it is never tighter at higher counts (40 petals 1.798, 240 feet 1.878),
+because the sphere grows with the count faster than the stem's cap does. The only 0.000 is
+a stem WIDER THAN ITS HEAD. **The read-out prints THREE decimals because 1.003 rounds to
+"1.00" at two**, which is indistinguishable from exhausted on the one row where the
+distinction is the point; EXHAUSTED (`< 1`) is the only word and is asserted both ways.
+**ST7 rebuilds it from three owners that are not the quantity** — the HUB BUILDER's own
+emitted sphere radius, the STEM BUILDER's own widest EMITTED vertex and `footRing()`'s own
+per-ring `arc` and `overhang` — bounded **in millimetres on the three LENGTHS**, not on the
+ratio. **THE BRIEF'S 1.005 REPRODUCES TO 0.25% AND ITS 0.563 IS A DIFFERENT QUANTITY**
+(feet against EACH OTHER, no stem in it): the two closest readings buildable from
+`footRing()`'s own fields are 0.632 / 0.125 (step over overhang) and 0.370 / 0.166 (over
+width) at 8 / 40 petals, neither of them 0.563 — reported rather than tuned, and **no figure
+was adopted that could not be reproduced from a definition this session can state.** Feet
+overlapping each other stays the CROWDING instrument's (`D_max 1`, `NN 1.578 w` at 8 and
+1.554 at 40 — and the omission moves NN by exactly nothing, which is condition 2 showing up
+in an instrument that knows nothing about it).
 **A FROZEN PHASE IS OWED**: the live matrix goes 736 -> 744 (nine rows added in block 32, one
 GATED sphere row removed from block 30). The image is
 `node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**.

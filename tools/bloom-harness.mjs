@@ -5033,6 +5033,62 @@ export async function stemAssertions(page, row) {
         bad.push(`ST7: slot ${k} was NOT built while it clears the stem in both modes (live ${O.approach.live[k]}, export ${O.approach.export[k]}, gap ${O.clearanceMm}) — a petal was dropped for no reason the stem gives`);
       }
     }
+
+    /* ------------------------------------------------------------------
+       ST7 — THE MERIDIAN PACKING MARGIN IS THE ONE THE GEOMETRY HAS.
+
+       A TOLD number that nothing checks is a number that can drift from the
+       thing it describes while still reading plausibly, and this one is
+       EXACTLY EXHAUSTED at a reachable corner (8 petals on the widest stem,
+       1.003x on this tree) — so a drift of a few percent is the difference
+       between "spent" and "fine" and no reader could tell.
+
+       THE REFERENCE HAS THREE OWNERS AND NONE OF THEM IS THE QUANTITY. The
+       cap edge is rebuilt from the HUB BUILDER's own emitted sphere radius
+       and the STEM BUILDER's own widest EMITTED vertex — the artefacts, not
+       the plan that asked for them (session 41's mirror of Eva's fourth
+       durable rule) — and the foot is footRing()'s own per-ring `arc` and
+       `overhang`. `meridianPacking()` reads `fr.dome`, `plan.outerR` and the
+       same rings, so two of the three arrive by a different route entirely.
+
+       THE BOUND IS IN MILLIMETRES, the unit the quantity carries, on each of
+       the three LENGTHS rather than on the ratio they form — the difference
+       between the two routes is arithmetic order over the same doubles, so a
+       1e-9 mm bar is millions of ulps of headroom on a 3-to-80 mm arc and
+       still catches any real disagreement. The ratio itself is then asserted
+       to BE those two lengths, which is an identity inside the record and is
+       not evidence about the geometry — it is here so a read-out printing one
+       number while the record holds another cannot pass. */
+    const MP = O.meridian;
+    if (MP === undefined) bad.push('ST7: the channel reports no `meridian` key — the meridian packing margin is TOLD on every sphere with a stem, and a number nothing declares cannot be checked');
+    else if (MP === null) bad.push('ST7: the channel reports a null meridian packing margin on a SPHERE with a stem — the quantity exists wherever the channel does');
+    else if (O.built === 0) {
+      if (MP.margin !== null) bad.push(`ST7: every petal was taken, yet the meridian margin reads ${MP.margin} — with no surviving foot there is nothing to measure the stem's clear arc against`);
+      if (!MP.why) bad.push('ST7: the meridian margin is absent on the bare corner without saying why — an absent number must name its own reason');
+    } else if (!(m.hubBuilt && m.hubBuilt.dome && Number.isFinite(m.hubBuilt.dome.Rd)) || !(m.stem && Number.isFinite(m.stem.emittedMaxR))) {
+      bad.push('ST7: the hub builder reports no sphere radius, or the stem builder no emitted radius — the meridian margin cannot be rebuilt from owners other than itself, so it is unchecked on this row');
+    } else {
+      const Rd = m.hubBuilt.dome.Rd, Rst = m.stem.emittedMaxR;
+      const capArc = Rd * (Math.PI - Math.asin(Math.min(1, Rst / Rd)));
+      /* KEYED BY ARRAY POSITION, never by the ring's own `index` field: the
+         omitted set is a set of SLOT indices and the two coincide on a sphere
+         today, which is exactly the kind of coincidence that stops holding
+         quietly. */
+      const kept = m.rings.map((r, k) => ({ r, k })).filter(({ k }) => !om.has(k));
+      const poleMost = kept.reduce((a, b) => (b.r.arc > a.r.arc ? b : a));
+      const TOL = 1e-9;
+      if (Math.abs(capArc - MP.capArcMm) > TOL) bad.push(`ST7: the channel puts the stem's cap edge at ${MP.capArcMm} mm of meridian arc; the hub builder's own sphere (Rd ${Rd}) and the stem builder's own widest emitted vertex (${Rst}) put it at ${capArc} mm`);
+      if (MP.slot !== poleMost.k) bad.push(`ST7: the channel measures the margin against slot ${MP.slot}; the pole-most SURVIVING foot footRing() declares is slot ${poleMost.k} (arc ${poleMost.r.arc} mm)`);
+      if (Math.abs(poleMost.r.arc - MP.keptArcMm) > TOL) bad.push(`ST7: the channel puts that foot at ${MP.keptArcMm} mm of arc; footRing() puts it at ${poleMost.r.arc} mm`);
+      if (Math.abs(poleMost.r.overhang - MP.overhangMm) > TOL) bad.push(`ST7: the channel gives that foot an overhang of ${MP.overhangMm} mm; footRing() gives it ${poleMost.r.overhang} mm`);
+      const wantClear = Math.max(0, capArc - poleMost.r.arc);
+      if (Math.abs(wantClear - MP.clearMm) > TOL) bad.push(`ST7: the channel reports ${MP.clearMm} mm of clear meridian arc; the cap edge less that foot's own arc is ${wantClear} mm`);
+      if (!(MP.overhangMm > 0)) bad.push(`ST7: the margin's denominator is ${MP.overhangMm} mm — a foot with no extent along the meridian is not a length this ratio can be taken against`);
+      else if (Math.abs(MP.margin - MP.clearMm / MP.overhangMm) > 1e-12) bad.push(`ST7: the margin reads ${MP.margin} where its own two lengths give ${MP.clearMm / MP.overhangMm} — the number told is not the number held`);
+      /* BOTH DIRECTIONS. A flag that only ever fires one way is a flag that
+         has never been shown not to fire. */
+      if (MP.exhausted !== (MP.margin < 1)) bad.push(`ST7: the margin reads ${MP.margin} and the EXHAUSTED flag reads ${MP.exhausted} — the flag is "under one foot's own length", in both directions`);
+    }
   }
 
   /* ===================================================================

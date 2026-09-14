@@ -1206,7 +1206,31 @@ function stemChannelLine(omission) {
     + ` The sequence, the equal-area law and the golden angle are untouched: this is a mask over the slots, so no surviving petal moved.`
     + (o.built === 0
         ? ` NOTHING IS LEFT — this stem is wider than the head has room for, told rather than refused.\n`
-        : ` Nearest petal that was kept: ${Number.isFinite(kept) ? kept.toFixed(2) : '—'} mm.\n`);
+        : ` Nearest petal that was kept: ${Number.isFinite(kept) ? kept.toFixed(2) : '—'} mm.\n`)
+    + meridianPackingLine(o.meridian);
+}
+
+/* THE MERIDIAN PACKING MARGIN — TOLD, never clamped, and told on EVERY sphere
+   that has a stem rather than only where it is tight, because a number that
+   appears only at its own limit reads as an error rather than as a measurement.
+   It is EXACTLY EXHAUSTED (1.00) at one reachable corner — 8 petals at the
+   widest stem — which is why it may not pass silently. The clause names its
+   own units: a clear meridian arc, in that foot's OWN lengths along the same
+   meridian. */
+function meridianPackingLine(m) {
+  if (!m) return '';
+  if (m.margin === null) return `     MERIDIAN PACKING n/a — ${m.why}\n`;
+  /* THREE DECIMALS, not two, and the reason is this tree's own corner: the
+     margin reads 1.003 at 8 petals on the widest stem, which two decimals
+     round to "1.00" — indistinguishable from exhausted on the one row where
+     the distinction is the whole point. No band and no second threshold: the
+     only word here is EXHAUSTED, at the only place the quantity has a
+     meaning of its own. */
+  return `     MERIDIAN PACKING ${m.margin.toFixed(3)}x — the stem's own footprint leaves ${m.clearMm.toFixed(2)} mm of clear meridian arc above it,`
+    + ` against the ${m.overhangMm.toFixed(2)} mm the pole-most petal it kept (slot ${m.slot}) occupies along that same meridian`
+    + (m.exhausted
+        ? `. EXHAUSTED — the arc the stem leaves is SHORTER than the one foot standing next to it; no petal could be put back there whatever the placement did. Told, never refused.\n`
+        : `.\n`);
 }
 
 function styleLine(fr, styles, stamens, mode) {
@@ -1775,6 +1799,10 @@ window.__bloomMetrics = () => ({
     byMode: { live: lastStemOmission.byMode.live.slice(), export: lastStemOmission.byMode.export.slice() },
     approach: { live: lastStemOmission.approach.live.slice(), export: lastStemOmission.approach.export.slice() },
     nearestKeptMm: { ...lastStemOmission.nearestKeptMm },
+    /* THE MERIDIAN PACKING MARGIN — the base's own number, beside the blades'.
+       ST7 reads it here and rebuilds the expectation from `footRing()`'s and
+       `stemPlan`'s own fields rather than from this record. */
+    meridian: lastStemOmission.meridian ? { ...lastStemOmission.meridian } : null,
   } : null,
   hubJoinActive: !!lastHubBuilt.joinActive,
   hubJoinThickness: lastHubBuilt.joinThickness,

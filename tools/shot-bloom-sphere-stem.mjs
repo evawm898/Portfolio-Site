@@ -140,8 +140,16 @@ const capOf = (s) => {
   const asked = s.m.rings.length;
   if (!O) return `<b>${asked} petals asked &middot; ${s.m.petalsBuilt} BUILT</b> &middot; no stem, so nothing is omitted<br>${s.m.shownTris} triangles &middot; ${modeTag(s.m)}`;
   const near = Math.min(O.nearestKeptMm.live, O.nearestKeptMm.export);
+  /* THE MERIDIAN PACKING MARGIN ON EVERY CAPTION, because the cell where it
+     is exactly exhausted is a cell Eva is being asked to look at, and a number
+     that appears only at its own limit reads as an error rather than as a
+     measurement. Three decimals: 1.003 rounds to 1.00 at two. */
+  const MP = O.meridian;
+  const pack = !MP ? '' : MP.margin === null
+    ? ` &middot; meridian packing n/a (${MP.why})`
+    : ` &middot; meridian packing <b>${MP.margin.toFixed(3)}&times;</b>${MP.exhausted ? ' EXHAUSTED' : ''}`;
   return `<b>${O.asked} petals asked &middot; ${O.built} BUILT</b> &middot; ${O.omitted.length} not (slot${O.omitted.length === 1 ? '' : 's'} ${runs(O.omitted)})<br>` +
-    `the stem passes within the ${O.clearanceMm.toFixed(2)} mm printable gap of them; nearest petal KEPT ${Number.isFinite(near) ? near.toFixed(2) + ' mm' : '&mdash;'}<br>` +
+    `the stem passes within the ${O.clearanceMm.toFixed(2)} mm printable gap of them; nearest petal KEPT ${Number.isFinite(near) ? near.toFixed(2) + ' mm' : '&mdash;'}${pack}<br>` +
     `${s.m.stemTris} stem triangles &middot; join ${s.m.hubJoinActive ? 'ACTIVE' : 'INERT (a shell)'} &middot; ${modeTag(s.m)}`;
 };
 const dataUri = (b) => `data:image/png;base64,${b.toString('base64')}`;

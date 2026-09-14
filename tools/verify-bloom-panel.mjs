@@ -581,7 +581,14 @@ const declaredDepth = (id) => ancestry(id).length;
 let screenAgreed = 0;
 {
   const sec = (id, parent) => ({ id, label: id, open: false, ...(parent ? { parent } : {}) });
-  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal' });
+  /* The fixture control carries `visibleWhen: { all: [] }` — the registry's
+     own "never gated" sentinel — because verifySections() now refuses a
+     control without one, and a fixture that is not the shape a real control
+     carries would fail these six cases for a reason none of them is about.
+     Two of the four MUST-FAILs check the refusal's WORDING; the other two
+     only check that it threw, so a fixture defect there would have read as
+     the case passing. */
+  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal', visibleWhen: { all: [] } });
   const threw = (what, controls, sections) => {
     try { verifySections(controls, sections); return null; } catch (e) { return String(e.message); }
   };
@@ -1914,6 +1921,96 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('RADIAL with SPHERE stored (the enum hides, the cap stays a cap)', [{ id: 'hubShape', value: 'SPHERE' }, { id: 'placement', value: 'RADIAL' }]);
   await step('back to CONTINUOUS (the sphere returns)', [{ id: 'placement', value: 'CONTINUOUS' }]);
   await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
+}
+
+/* ---------------- (t) THE STEM CHANNEL IS CLAMPED AND TOLD ----------------
+   (the sphere-stem session). A user who asks for 40 petals and is shown 33
+   must be told, and this project's clamped-and-told form is TWO places: the
+   control's own value read-out and the read-out panel. So both are asserted,
+   in BOTH DIRECTIONS, against the BUILDER's own record rather than against
+   each other — `stamenSpread`'s route and HEAD RISE's discipline.
+
+   AND THE MERIDIAN PACKING MARGIN RIDES HERE for the same reason: it is TOLD
+   on every sphere that has a stem and it is EXACTLY EXHAUSTED at one
+   reachable corner, so a line that silently stopped printing would take the
+   one number that says the base is spent with it.
+
+   THE INERT DIRECTION IS THE LOAD-BEARING ONE. At `stemLength` 0 — the
+   shipped default — there is no stem, so there is no channel, no omission and
+   no line; that is the branch that keeps every sphere row on this tree
+   byte-identical to the tree before the feature, and a route that only ever
+   drove the stem ON could not see it come undone. The negative control
+   freezes the read-out so neither line can appear where the geometry has one. */
+{
+  const tag = '[stem channel]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const O = m.stemOmission;
+      return {
+        sphere: m.sphereMode === true, stemPresent: !!(m.stem && m.stem.present !== false && m.stem.lengthMm > 0),
+        hasChannel: O !== null && O !== undefined,
+        asked: O ? O.asked : null, built: O ? O.built : null, omitted: O ? O.omitted.length : null,
+        margin: O && O.meridian ? O.meridian.margin : null,
+        exhausted: !!(O && O.meridian && O.meridian.exhausted),
+        petalsBuilt: m.petalsBuilt,
+        countSaid: document.getElementById('petalCount').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+        chanSaid: /STEM CHANNEL/.test(txt),
+        chanBuilt: (txt.match(/STEM CHANNEL (\d+) of (\d+) petals BUILT — (\d+) NOT BUILT/) || []).slice(1).map(Number),
+        chanAllClear: /STEM CHANNEL every one of the \d+ petals clears the stem/.test(txt),
+        nothingLeft: /NOTHING IS LEFT/.test(txt),
+        packSaid: /MERIDIAN PACKING/.test(txt),
+        packNum: (txt.match(/MERIDIAN PACKING ([\d.]+)x/) || [])[1],
+        packNa: /MERIDIAN PACKING n\/a/.test(txt),
+        packExhausted: /MERIDIAN PACKING [^\n]*EXHAUSTED/.test(txt),
+      };
+    });
+    const p = [];
+    const wantChannel = res.sphere && res.stemPresent;
+    if (res.hasChannel !== wantChannel) p.push(`the builder ${res.hasChannel ? 'reports' : 'reports no'} stem channel while the state is ${res.sphere ? 'a sphere' : 'not a sphere'} with ${res.stemPresent ? 'a stem' : 'no stem'}`);
+    if (res.chanSaid !== wantChannel) p.push(`the STEM CHANNEL line is ${res.chanSaid ? 'SHOWN' : 'ABSENT'} while the geometry ${wantChannel ? 'has a channel' : 'has none'}`);
+    if (wantChannel) {
+      if (res.omitted > 0) {
+        if (res.chanAllClear) p.push(`the line says every petal clears the stem while ${res.omitted} were not built`);
+        if (res.chanBuilt.length !== 3) p.push('the STEM CHANNEL line does not name built / asked / not-built');
+        else if (res.chanBuilt[0] !== res.built || res.chanBuilt[1] !== res.asked || res.chanBuilt[2] !== res.omitted) p.push(`the line says ${res.chanBuilt.join('/')} where the builder says ${res.built}/${res.asked}/${res.omitted}`);
+        /* THE CONTROL'S OWN HALF. A read-out sentence three panels down is not
+           where somebody dragging the petal count is looking. */
+        if (!new RegExp(`${res.asked} asked`).test(res.countSaid) || !new RegExp(`${res.built} BUILT`).test(res.countSaid)) {
+          p.push(`the petal count control reads "${res.countSaid}" — it must say what was asked AND what was built (${res.asked} / ${res.built})`);
+        }
+      } else if (!res.chanAllClear) p.push('nothing was omitted, yet the line does not say every petal clears the stem');
+      if (res.built !== res.petalsBuilt) p.push(`the channel says ${res.built} built, the builder's own tally is ${res.petalsBuilt}`);
+      if (res.nothingLeft !== (res.built === 0)) p.push(`the NOTHING IS LEFT clause is ${res.nothingLeft ? 'shown' : 'absent'} while ${res.built} petals were built`);
+      if (!res.packSaid) p.push('the MERIDIAN PACKING line is absent on a sphere with a stem — it is told on every one of them, not only where it is tight');
+      else if (res.built === 0) {
+        if (!res.packNa) p.push('every petal was taken, yet the MERIDIAN PACKING line prints a number — there is no surviving foot to measure the arc against');
+      } else if (res.packNum === undefined) p.push('the MERIDIAN PACKING line prints no margin');
+      else {
+        if (Math.abs(Number(res.packNum) - res.margin) > 0.0005) p.push(`the line says ${res.packNum}x, the builder says ${res.margin}`);
+        if (res.packExhausted !== res.exhausted) p.push(`the EXHAUSTED clause is ${res.packExhausted ? 'shown' : 'absent'} while the builder reports ${res.exhausted} (margin ${res.margin})`);
+      }
+    } else if (res.packSaid) p.push('the MERIDIAN PACKING line is shown where there is no stem channel to pack against');
+    if (want.omitted !== undefined && res.omitted !== want.omitted) p.push(`${res.omitted} petals were omitted, this step expects ${want.omitted}`);
+    if (want.tris !== undefined && res.petalsBuilt !== want.tris) p.push(`${res.petalsBuilt} petals were built where the previous step built ${want.tris} — the stem reached a state it should not have`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${wantChannel ? `channel ${res.built}/${res.asked} (${res.omitted} not built), margin ${res.margin === null ? 'n/a' : res.margin.toFixed(3)}${res.exhausted ? ' EXHAUSTED' : ''}` : 'no channel, no lines'}`);
+    return res;
+  };
+  const sphere = [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }];
+  const off = await step('a SPHERE at stemLength 0 — no stem, no channel, no line (the shipped default, inert by branch)', [...sphere, { id: 'petalCount', value: '8' }, { id: 'layerCount', value: '1' }]);
+  await step('the shipped stem on that sphere (60 x 6 mm): two petals not built, and both places say so', [{ id: 'stemLength', value: '60' }]);
+  await step('the widest stem (12 mm) — the margin is EXACTLY EXHAUSTED at one foot length', [{ id: 'stemDiameter', value: '12' }]);
+  await step('40 petals on the widest stem — more petals, more omitted, a wider sphere and a looser margin', [{ id: 'petalCount', value: '40' }]);
+  await step('THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'spread', value: '0.6' }], { omitted: 3 });
+  await step('the stem back to 0 on that same corner — the channel and both lines go with it', [{ id: 'stemLength', value: '0' }]);
+  if (off) await step('RADIAL with a stem — a cap has no pole the sequence runs through, so no channel', [{ id: 'placement', value: 'RADIAL' }, { id: 'stemLength', value: '60' }]);
 }
 
 /* ===================================================================
