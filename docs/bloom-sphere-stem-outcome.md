@@ -442,3 +442,13 @@ that removes it owes this measurement again.
 * **It did not build stem curvature, droop, nodes, taper or branches.**
 * **It did not touch the fringe, the cut law, the coverage arc, the demand table,
   `bladeStations`, the ladder's ownership, `HELD_ROWS`, `CURL_START_MIN` or `trimPanels`.**
+* **It did not make the meridian packing margin gate anything.** It is telemetry, on this
+  project's standing rule that a metric consumed as a geometric input becomes a target
+  (the `headRise` ruling). Nothing is refused, nothing is clamped, and `depthBuilt`-style
+  "asked vs built" does not arise: the margin describes the base the placement law already
+  produced.
+* **It did not take the feet-against-each-other packing off the CROWDING instrument.**
+  That is a different quantity from this one, it has no stem in it, it is pre-existing and
+  by design, and it is already told on every row (`D_max`, `D_mean`, `NN … w`). §7b records
+  what the two closest readings of it measure and that neither reproduces the brief's
+  0.563, rather than adopting a figure with no definition behind it.
