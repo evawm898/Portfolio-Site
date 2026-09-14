@@ -2008,6 +2008,13 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('the shipped stem on that sphere (60 x 6 mm): two petals not built, and both places say so', [{ id: 'stemLength', value: '60' }]);
   await step('the widest stem (12 mm) — the margin is EXACTLY EXHAUSTED at one foot length', [{ id: 'stemDiameter', value: '12' }]);
   await step('40 petals on the widest stem — more petals, more omitted, a wider sphere and a looser margin', [{ id: 'petalCount', value: '40' }]);
+  /* THE ONLY PLACE THE WORD *EXHAUSTED* IS REACHED. No matrix row produces a
+     margin under 1 with petals still built — the shipped sphere's margin falls
+     to 1.003 at the widest stem and no further — so without this cell the
+     clause that prints it would never have been shown to print. 4 petals on a
+     12 mm stem reads 0.652 with 2 of 4 built: a real margin under one foot's
+     length, not the degenerate 0 the bare corner gives. */
+  await step('4 petals on the widest stem — the margin goes UNDER one foot length and the line says EXHAUSTED', [{ id: 'petalCount', value: '4' }]);
   await step('THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'spread', value: '0.6' }], { omitted: 3 });
   await step('the stem back to 0 on that same corner — the channel and both lines go with it', [{ id: 'stemLength', value: '0' }]);
   if (off) await step('RADIAL with a stem — a cap has no pole the sequence runs through, so no channel', [{ id: 'placement', value: 'RADIAL' }, { id: 'stemLength', value: '60' }]);

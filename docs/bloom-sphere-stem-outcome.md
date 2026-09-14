@@ -205,6 +205,21 @@ where the distinction is the whole point. There is no band and no second thresho
 only word is EXHAUSTED, at the only place the quantity has a meaning of its own (`< 1`),
 and the flag is asserted in both directions.
 
+**THE WORD *EXHAUSTED* HAS ITS OWN CELL, because no matrix row reaches it.** The shipped
+sphere's margin falls to 1.003 at the widest stem and no further, so the clause that prints
+EXHAUSTED would never have been shown to print. Panel route (t) drives **4 petals on a 12 mm
+stem — 0.652 with 2 of 4 built**, a real margin under one foot's length rather than the
+degenerate 0 the bare corner gives. Reachable neighbours, measured: 3 petals × 12 mm reads
+0.000 (2 of 3 built), 3 × 10 mm reads 0.581, 5 × 12 mm reads 1.042 and is not exhausted.
+
+**AND IT HAS ITS OWN MUTANT.** `the-meridian-margin-reads-the-bore` takes the stem's
+footprint from the BORE radius instead of the outer one — the slip that is actually
+available, since the stem has two radii and the channel is about the outside of it. What
+makes it the right mutant is what it does NOT move: measured in Node on the sphere-stem row,
+the same 6 petals, the same 21,432 triangles, the same omitted set `[0, 1]`, and a margin of
+**2.706x where the geometry has 2.196x** — a plausible larger number a reader would act on.
+Every other clause in the family reads the channel's own report and stays green.
+
 **ST7 CHECKS IT FROM THREE OWNERS, NONE OF WHICH IS THE QUANTITY** (Eva's fourth durable
 rule, and session 41's mirror of it). The cap edge is rebuilt from the HUB BUILDER's own
 emitted sphere radius and the STEM BUILDER's own widest EMITTED vertex — the artefacts, not
