@@ -1770,6 +1770,14 @@ window.__bloomMetrics = () => ({
     rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
     stations: lastStem.stations.slice(), sides: lastStem.sides,
     hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
+    /* THE SOLID ROOT BAND (Eva's ruling). The PLAN's own answer, which is what
+       ST1 predicts the triangle count from — the builder owns the count and the
+       plan owns the shape it was asked for, and those two owners are the whole
+       point of that clause. `headOuterMm` rides with it because the read-out
+       and ST10 both want the length the condition was decided on, not just the
+       verdict. */
+    headOuterMm: lastStem.headOuterMm, headInsideBore: lastStem.headInsideBore,
+    solidBandMm: lastStem.solidBandMm, solidBandZ: lastStem.solidBandZ,
     /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
        these, never the plan beside them. Same reason as rootSpanMm above: the
        plan is what was ASKED FOR and these are what came out. */

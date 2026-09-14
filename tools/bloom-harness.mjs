@@ -4859,7 +4859,17 @@ export async function stemAssertions(page, row) {
     bad.push(`ST1: the plan declares ${S.stations && S.stations.length} station(s) on ${S.sides} sides — the emitted count cannot be predicted from it`);
   } else {
     const N = S.sides, bands = S.stations.length;   // rings = bands + 1 (the root band)
-    const wantTris = S.boreR > 0
+    /* THREE ARMS, because the SOLID ROOT BAND is a third emission and not a
+       tweak of the hollow one (Eva's ruling). With the bore closed over the
+       band the top face is a full DISC rather than an annulus, the inner wall
+       runs only over the void — its own two-ring ladder from the one placer,
+       so ONE segment whatever the outer tube has — and the void gains a
+       ceiling. Both new discs are RIM fans, which is why they cost N - 2 and
+       not N: a centre fan would put a vertex on the axis and weld to the hub's
+       own apex, the measured defect the solid arm below already carries. */
+    const wantTris = S.boreR > 0 && S.solidBandMm > 0
+      ? 2 * N * bands + 4 * N + 2 * (N - 2)         // outer wall, void wall, bottom annulus, two rim fans
+      : S.boreR > 0
       ? 4 * N * bands + 4 * N                       // two walls, two annuli
       : 2 * N * bands + 2 * (N - 2);                // one wall, two rim fans
     if (m.stemTris !== wantTris) bad.push(`ST1: the builder emitted ${m.stemTris} triangles for a ${S.boreR > 0 ? 'hollow' : 'solid'} stem of ${bands} band(s) on ${N} sides; the plan's own station list and side count ask for ${wantTris}`);

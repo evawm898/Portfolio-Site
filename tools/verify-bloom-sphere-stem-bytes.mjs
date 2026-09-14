@@ -59,6 +59,12 @@ const CONTROL = process.argv.includes('--control');
    that was kept but moved) clause 2 exists to catch. Clause 1 stays clean
    under it, because a mover that moves is all clause 1 asks. */
 const CONTROL_ONLY = process.argv.includes('--control-only');
+/* PER CHANGE, NOT PER TOOL — the seam tool's own precedent (session 39): this
+   file is named for its FIRST caller and the tool is not. `omission` is the
+   channel that named it; `band` is the SOLID ROOT BAND, whose movers and whose
+   second clause are different questions about the same builder. */
+const CHANGE = process.argv.includes('--change') ? process.argv[process.argv.indexOf('--change') + 1] : 'omission';
+if (!['omission', 'band'].includes(CHANGE)) { console.error(`--change must be omission|band, not ${CHANGE}`); process.exit(2); }
 if (!BASE || !fs.existsSync(BASE)) { console.error('verify-bloom-sphere-stem-bytes: need --base <worktree of the base commit>'); process.exit(2); }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
@@ -90,9 +96,101 @@ function movesByRecord(set) {
     const acc = new G.MeshBuilder({ exportMode: em });
     const st = { ...DEFAULTS, ...set };
     const fr = G.footRing(st, acc);
-    if (fr.sphereMode && G.stemPlan(st, fr.hub, acc).present) return true;
+    if (CHANGE === 'band') {
+      /* THE BAND'S OWN RECORD, and it is the BUILT length rather than the
+         condition that decides it: `solidBandMm > 0` is the one thing on this
+         change that can move a byte. A row whose head merely happens to be
+         small, or that sets `stemDiameter` wide with `stemLength` 0, is
+         correctly a HOLDER — which is Eva's constraint 2 stated as a
+         predicate rather than checked afterwards. */
+      if (!fr.hub) continue;
+      const plan = G.stemPlan(st, fr.hub, acc);
+      if (plan.present && plan.solidBandMm > 0) return true;
+    } else if (fr.sphereMode && G.stemPlan(st, fr.hub, acc).present) return true;
   }
   return false;
+}
+
+/* CLAUSE 2 FOR THE BAND — TWO HALVES, and the second is Eva's constraint 4
+   measured instead of argued.
+
+   (a) NOTHING OUTSIDE THE STEM MOVED. Every differing float must belong to a
+       vertex inside the stem's own envelope (radius <= outerR, z within
+       [tipZ, topZ]). If the head, a petal or the hub moved, the band reached
+       something it has no business reaching.
+
+   (b) THE OUTER CYLINDER WALL IS BIT-IDENTICAL — and what that does NOT mean is
+       stated here, because the first version of this comment got it wrong and
+       the clause was built around the error. It said the wall plus the bottom
+       face is "the whole of what can be seen of a stem, since the top face lies
+       inside the head's own hollow". THAT IS FALSE where the stem is wider than
+       the head, which is the only place the band ever fires: measured on the
+       bare corner, 80.4% of the closed top face lies outside the head's
+       silhouette and IS seen from above. Worse, this clause's own definition of
+       "wall" excludes triangles that share one height — which is exactly the top
+       face — so it could not have noticed.
+
+       SO (b) IS THE NARROWER CLAIM IT ACTUALLY TESTS: the stem's outer CYLINDER
+       did not move, so the band did not reach a surface it has no business
+       reaching. It is NOT a claim that the band is invisible; the band is
+       visible, that is the closure itself, and §11d records the number.
+       Identified geometrically rather than by stream offset, so it holds
+       whatever order the builder emits in. */
+function onlyTheStemsInteriorWent(set, em) {
+  const { acc: accB } = build(G, DEFAULTS, set, em);
+  if (CONTROL_ONLY && accB.positions.length) accB.positions[0] += 1e-9;
+  const { acc: accA } = build(GB, DB, set, em);
+  const st = { ...DEFAULTS, ...set };
+  const plan = G.stemPlan(st, G.footRing(st, new G.MeshBuilder({ exportMode: em })).hub,
+                          new G.MeshBuilder({ exportMode: em }));
+  const R = plan.outerR, EPS = 1e-9;
+  const a = accA.positions, b = accB.positions;
+  if (a.length !== b.length) {
+    /* A LENGTH CHANGE IS EXPECTED HERE — the band emits a different triangle
+       count — so this is not a failure by itself; the wall check below is what
+       carries the claim, and the envelope check runs over the shorter stream's
+       own triangles on each side independently. */
+  }
+  const outside = (pos) => {
+    const bad = [];
+    for (let i = 0; i < pos.length; i += 3) {
+      const r = Math.hypot(pos[i], pos[i + 1]), z = pos[i + 2];
+      if (r > R + 1e-6 || z > plan.topZ + 1e-6 || z < plan.tipZ - 1e-6) bad.push(i);
+    }
+    return bad;
+  };
+  /* The wall's triangles: all three vertices at radius outerR, and NOT all at
+     one height (which is what separates the wall from the top and bottom
+     faces, whose rim fans also sit at outerR). */
+  const wall = (pos) => {
+    const out = [];
+    for (let i = 0; i < pos.length; i += 9) {
+      let onR = true; const zs = [];
+      for (let k = 0; k < 3; k++) {
+        const r = Math.hypot(pos[i + k * 3], pos[i + k * 3 + 1]);
+        if (Math.abs(r - R) > 1e-6) { onR = false; break; }
+        zs.push(pos[i + k * 3 + 2]);
+      }
+      if (onR && !(zs[0] === zs[1] && zs[1] === zs[2])) out.push(pos.slice(i, i + 9).join(','));
+    }
+    return out.sort();
+  };
+  const wa = wall(a), wb = wall(b);
+  if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the band changed a surface that can be SEEN`;
+  for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the band is visible from outside and the derivation has overshot`;
+  /* (a) — compare only where the two streams align; the differing tail is the
+     band's own, and its vertices are checked against the envelope. */
+  const n = Math.min(a.length, b.length);
+  for (let i = 0; i < n; i += 3) {
+    if (Object.is(a[i], b[i]) && Object.is(a[i + 1], b[i + 1]) && Object.is(a[i + 2], b[i + 2])) continue;
+    const rA = Math.hypot(a[i], a[i + 1]), rB = Math.hypot(b[i], b[i + 1]);
+    const inA = rA <= R + 1e-6 && a[i + 2] <= plan.topZ + 1e-6 && a[i + 2] >= plan.tipZ - 1e-6;
+    const inB = rB <= R + 1e-6 && b[i + 2] <= plan.topZ + 1e-6 && b[i + 2] >= plan.tipZ - 1e-6;
+    if (!inA || !inB) return `a vertex OUTSIDE the stem's own envelope moved at float ${i}: base (r ${rA.toFixed(4)}, z ${a[i + 2].toFixed(4)}) against branch (r ${rB.toFixed(4)}, z ${b[i + 2].toFixed(4)}) — the band reached the head, a petal or the hub`;
+  }
+  const strayB = outside(b.slice(n)), strayA = outside(a.slice(n));
+  if (strayA.length || strayB.length) return `the differing tail holds ${strayA.length + strayB.length} vertices outside the stem's own envelope`;
+  return null;
 }
 
 /* CLAUSE 2's slicer. Returns null (with a reason) rather than guessing. */
@@ -161,19 +259,21 @@ for (const r of rows) {
     movers++;
     if (!differs) badMove.push(r.label);
     if (!CONTROL) for (const em of [true, false]) {
-      const why = onlyTheOmittedWent(set, em);
+      const why = CHANGE === 'band' ? onlyTheStemsInteriorWent(set, em) : onlyTheOmittedWent(set, em);
       if (why) badOnly.push(`${r.label} [${em ? 'EXPORT' : 'LIVE'}]: ${why}`);
     }
   } else { holders++; if (differs) badHold.push(`${r.label} (${n} floats)`); }
 }
-console.log(`BASE ${BASE}${NARROWED ? `  (${rows.length} NAMED ROWS ONLY — never a pass of the matrix)` : ''}`);
+console.log(`BASE ${BASE}  ·  --change ${CHANGE}${NARROWED ? `  (${rows.length} NAMED ROWS ONLY — never a pass of the matrix)` : ''}`);
 console.log(`${rows.length} rows · ${movers} predeclared MOVERS · ${holders} predeclared HOLDERS · ${floats.toLocaleString('en-US')} export floats compared with Object.is`);
 console.log(`CLAUSE 1  movers that did NOT move: ${badMove.length}`);
 for (const b of badMove) console.log('   ' + b);
 console.log(`CLAUSE 1  holders that MOVED: ${badHold.length}`);
 for (const b of badHold.slice(0, 12)) console.log('   ' + b);
 if (!CONTROL) {
-  console.log(`CLAUSE 2  movers where something OTHER than the omitted petals moved: ${badOnly.length}`);
+  console.log(CHANGE === 'band'
+    ? `CLAUSE 2  movers where the stem's OUTER WALL moved, or anything outside the stem did: ${badOnly.length}`
+    : `CLAUSE 2  movers where something OTHER than the omitted petals moved: ${badOnly.length}`);
   for (const b of badOnly.slice(0, 12)) console.log('   ' + b);
 }
 const pass = !badMove.length && !badHold.length && !badOnly.length;

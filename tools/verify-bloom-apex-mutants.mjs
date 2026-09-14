@@ -711,8 +711,6 @@ const MUTANTS = [
        indistinguishable from a clause that is genuinely blind (`/plot`'s own
        lesson). ST9's own entanglement — its guard and its bar both read from
        the channel record — was found by RE-READING the clause and is fixed;
-       ST9's own entanglement — its guard and its bar both read from
-       the channel record — was found by RE-READING the clause and is fixed;
        THE WITNESS THAT CAN RUN IT IS BUILT NOW and is
        `tools/verify-bloom-stem-channel.mjs`, which parses this table's own
        `find`/`into` by id (so the mutation text has one owner), builds on the
@@ -720,7 +718,18 @@ const MUTANTS = [
        the clause imported from the UNMUTATED harness. Both mutants fire there.
        They still do not belong on this list: naming a family a table cannot
        run reports MISSED, which is indistinguishable from a clause that is
-       genuinely blind. */
+       genuinely blind.
+
+       AND BRINGING IT IN IS NOT ONE IMPORT — measured against this file
+       rather than guessed, because that was the bar for doing it now (Eva,
+       the sphere-stem session). This table is PAGE-driven: `page.route`
+       serves the mutated geometry and every family reads `__bloomMetrics()`.
+       It exports no STL anywhere, and ST9 takes exported positions. So it is
+       either a NEW export capability here — download plumbing, plus a full
+       export per mutant row on a matrix that already carries rows the
+       generator REFUSES — or a SECOND COPY of the standalone tool's
+       build-in-Node construction, which is the duplicate-owner trap this
+       project keeps recording. Filed rather than started. */
     into: '  if (!plan || !plan.present || !fr.sphereMode || fr.sphereMode) return null;', names: ['ST7'],
     witness: (M, C) => { const m = channelFacts(M), c = channelFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;

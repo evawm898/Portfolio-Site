@@ -7460,10 +7460,90 @@ export function stemPlan(state, ring, acc) {
     : dome ? dome.centreZ + (dome.Rd + hubT / 2) * Math.cos(Math.asin(Math.min(1, hubR / dome.Rd))) - hubT
     : hubT / 2 - hubT;
   const hiddenMm = Math.max(0, Math.min(lengthMm, rootZ - lowestHubZ));
+  /* ===================================================================
+     THE SOLID ROOT BAND — CLOSE THE BORE WHERE THE HEAD WOULD OTHERWISE SIT
+     INSIDE IT (Eva's ruling, the sphere-stem session, on the blocker this PR
+     reported rather than fixed).
+
+     THE FAILURE, measured: `SPHERE STEM: THE BARE CORNER` exported WATERTIGHT
+     (boundary 0) and as TWO CONNECTED PIECES. The head's outer radius is
+     1.800 mm and the bore is 4.500 mm (Eva's `max(0, r - 1.5)` at the 12 mm
+     maximum), so the whole head stands inside the pipe, the tube's material is
+     the annulus 4.5 <= r <= 6, and with every petal taken by the channel there
+     is nothing left to bridge them. It is NOT the omission's — reproduced with
+     2, 3 and 6 petals SURVIVING — it is a property of the stem on a sphere,
+     newly reachable only because this session gives SPHERE a stem at all.
+
+     THE ANSWER IS THE GEOMETRY'S OWN: close the bore over the length where the
+     head could otherwise be inside it. Eva rejected the two alternatives by
+     name — refusing the stem takes a reachable flower away, and narrowing
+     `stemDiameter` against the head makes one control silently eat another's
+     range (`stamenSpread`'s adaptive-maximum ruling).
+
+     THE EXTENT IS DERIVED FROM THE HEAD'S OWN GEOMETRY, IN MILLIMETRES, FROM A
+     LENGTH — never from a row count and never typed. Two lengths, both already
+     owned here: `headOuterMm` is the head's greatest cylindrical radius, and
+     `lowestHubZ` (above) is its lowest material, which this file already
+     derives per head shape for `hiddenMm`. The band runs from the face the stem
+     is rooted through DOWN to whichever comes first, the head's lowest material
+     or the stem's own tip.
+
+     IT IS INERT BY BRANCH WHERE THE CONDITION DOES NOT HOLD, which is the
+     `domeIsFlat` / `plan.inert` shape and is what makes an ordinary head
+     byte-identical by construction rather than by an argument about arithmetic:
+     a head that reaches the bore wall is already touched by the tube, so there
+     is nothing to close and `solidBandMm` is exactly 0. On the shipping default
+     sphere the head reads 8.85 mm against a 1.50 mm bore, and at the widest
+     stem 8.85 against 4.50 — inert either way.
+
+     AND IT IS VISIBLE — MEASURED, AND REPORTED RATHER THAN ACCEPTED QUIETLY
+     (Eva's constraint 4: if it can be seen from outside, say so). The first
+     version of this comment claimed it could not be, on the reasoning that the
+     band adds material INSIDE the tube. That reasoning is right about the outer
+     wall and the stem's length, both of which are untouched, and WRONG about
+     the top face. On the bare corner the head's whole silhouette is 1.992 mm of
+     radius and the stem's is 6.000: the face the band closes spans r 0..4.500,
+     and r 1.992..4.500 of it lies outside the head entirely — **51.15 mm^2 of
+     63.62, i.e. 80.4% of the new face is exposed from directly above**, where
+     before there was an open bore to look down.
+
+     IT IS NOT OVERSHOOT, AND THE DISTINCTION IS WORTH THE WORDS. The band's
+     LENGTH is the head's own wall and nothing more. What is seen is the CLOSURE
+     ITSELF, and no closure of that hole can be invisible: a disc covering only
+     the part under the head (r <= 1.828 at this z) would not reach the tube's
+     wall, so it would be a second detached piece and would fix nothing. The
+     hole was visible; a plugged hole is visible. What would have been a defect
+     is the band reaching a surface it has no business reaching, and the byte
+     tool's CLAUSE 2 is what rules that out. */
+  const headOuterMm = sphere ? dome.Rd + hubT / 2 : hubR;
+  /* AND IT IS THE CLOSED SHELL'S CASE, MEASURED RATHER THAN SCOPED FOR
+     CONVENIENCE. `headOuterMm < boreR` is reachable on a CAP too — 291 of 4,608
+     swept states, with hub radii down to 0.812 mm against bores to 4.500 — and
+     on every one of them THE BAND FIXES NOTHING, because the head was never the
+     detached part. Measured on `CAP, 3 petals, width 4, spread 0.6, 12 mm stem`:
+     components 2 at 0.6 mm and 2 at 0.3 mm, IDENTICAL with the band and without,
+     and the stray piece is 12 voxels lying at the single height z = -3.696 —
+     which is `hubT/2 - joinT` to four decimals, i.e. #236's flat zero-volume
+     join shell and not the head at all. The head is in the main body, spanning
+     r 0.29..33.19.
+
+     WHY THE TWO DIFFER, and it is the same distinction `joinReason` already
+     draws: on a CAP or a flat hub the stem is rooted THROUGH the head's own
+     slab and the join thickens that slab around the axis, so the head and the
+     stem share material by construction whatever the bore does. On a closed
+     shell the stem leaves a POLE, the head is a thin skin at radius
+     `headOuterMm`, and the whole of it can stand inside the bore with nothing
+     bridging the two — which is the failure, and the only place the band has
+     work to do. Firing it on a CAP would move bytes for no benefit and would be
+     SEEN, because there a narrow hub leaves the bore's mouth open to the sky. */
+  const headInsideBore = sphere && headOuterMm < boreR;
+  const solidBandMm = headInsideBore ? Math.max(0, topZ - Math.max(tipZ, lowestHubZ)) : 0;
+  const solidBandZ = topZ - solidBandMm;
   return {
     present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
     hubT, hubR, joinT, blendR, inert, joinReason,
     topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
+    headOuterMm, headInsideBore, solidBandMm, solidBandZ,
     stations: stemStations(lengthMm), sides: HUB_SECTORS,
   };
 }
@@ -7727,7 +7807,46 @@ export function buildStemInto(acc, plan) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
   }
-  if (b > 0) {
+  if (b > 0 && plan.solidBandMm > 0) {
+    /* THE SOLID ROOT BAND (Eva's ruling). The bore is CLOSED over the length
+       `stemPlan` derived from the head's own geometry, so the head cannot sit
+       inside it with nothing to bridge the two. A SEPARATE BRANCH rather than a
+       ramp, for `domeIsFlat`'s reason: where the band is zero the arm below is
+       the pre-ruling code VERBATIM and those rows are byte-identical by
+       construction rather than by an argument about arithmetic.
+
+       THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
+       rather than the outer tube's stations filtered by a comparison. That is
+       deliberate: `solidBandZ` lands exactly on a station for a SPHERE (where
+       it is `rootZ`) and between two for a CAP (where it is the hub's own
+       underside), so a `z < solidBandZ` filter would decide by the last bit
+       whether a station an ulp away is kept — and a kept one an ulp from the
+       band's edge is a DEGENERATE quad, not merely a different ladder. Fifth
+       instance of the discrete-decision-on-a-continuous-quantity class this
+       file keeps recording; the ladder asks the placer for a length instead. */
+    const inner = stemStations(plan.solidBandZ - plan.tipZ)
+      .map((mm) => ringAt(b, plan.solidBandZ - mm));
+    measure(inner);
+    for (let i = 0; i < inner.length - 1; i++) {
+      const up = inner[i], dn = inner[i + 1];
+      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
+    }
+    const tOut = outer[0], bOut = outer[outer.length - 1], bIn = inner[inner.length - 1];
+    const cIn = inner[0];
+    /* BOTH DISCS ARE RIM FANS, never centre fans — the solid arm's own measured
+       defect, one branch down: a vertex at exactly [0, 0, z] is a double the
+       hub's apex fan also emits, the two shells WELD, and a by-design overlap
+       of coplanar discs becomes a within-shell self-intersection (528 pairs,
+       measured). A rim fan shares no axis vertex with anything. */
+    for (let k = 1; k < N - 1; k++) {
+      acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // the closed top face, facing up
+      acc.tri(cIn[0], cIn[k + 1], cIn[k]);              // the void's ceiling, facing DOWN into it
+    }
+    for (let k = 0; k < N; k++) {
+      const k2 = (k + 1) % N;
+      acc.quad(bOut[k], bOut[k2], bIn[k2], bIn[k]);     // bottom annulus, facing down
+    }
+  } else if (b > 0) {
     const inner = zs.map((z) => ringAt(b, z));
     measure(inner);
     for (let i = 0; i < inner.length - 1; i++) {
