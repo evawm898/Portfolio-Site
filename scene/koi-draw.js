@@ -116,7 +116,7 @@ function hash01(x, y) {
 // view IS — so these are a compromise, landing near 5:1 across the screen and
 // correspondingly stubby on a fish swimming away. Judged at the page's own 96px
 // body, not at a magnification: at 2.6x every value here looked fine.
-const WIDTH_PROFILE = [0.081, 0.122, 0.140, 0.133, 0.118, 0.101, 0.085, 0.068, 0.052];
+const WIDTH_PROFILE = [0.076, 0.114, 0.131, 0.125, 0.111, 0.095, 0.080, 0.064, 0.049];
 const NOSE_ROUND = 0.062;     // how far the blunt snout domes past station 0
 const NOSE_PTS = 7;           // points in that dome, endpoints excluded
 const FISH_ALPHA = 1;         // see drawFish — a koi never fades
@@ -125,25 +125,41 @@ const FISH_ALPHA = 1;         // see drawFish — a koi never fades
 // notches in a single envelope, never separate pieces sharing a root — see the
 // note above fanPts for the construction that was tried first and why no value
 // of its constants could have worked.
-const TAIL_LEN = 0.52;        // of body length, the outer tips' own reach
-const TAIL_SPREAD = 0.78;     // rad, half-angle the fan covers
-const TAIL_LOBES = 4;         // maxima across the trailing edge
-const TAIL_SCALLOP = 0.17;    // how deep the notches between them cut
-const TAIL_FORK = 0.30;       // the extra notch on the axis — the fork itself
-const TAIL_FORK_W = 0.24;     // how wide that fork is, in fan fractions
-const TAIL_TIP_SHORT = 0.08;  // how much the middle falls short of the tips
+//
+// TWO LOBES, DEEPLY FORKED, NOT A BROAD FOUR-LOBE FAN. The ink reference is a
+// pair of long tapering streamers splayed about 35 degrees either side of the
+// axis with the fork cutting most of the way back between them — not a paddle
+// with a wavy edge. Same envelope, different numbers: TAIL_LOBES is what sets
+// how many maxima the trailing edge has, and the scallop and fork depths are
+// what carry the fork back.
+const TAIL_LEN = 0.64;        // of body length, the outer tips' own reach
+const TAIL_SPREAD = 0.62;     // rad, half-angle the fan covers
+const TAIL_LOBES = 2;         // maxima across the trailing edge
+const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
+const TAIL_FORK = 0.26;       // the extra notch on the axis — the fork itself
+const TAIL_FORK_W = 0.34;     // how wide that fork is, in fan fractions
+const TAIL_TIP_SHORT = 0.06;  // how much the middle falls short of the tips
 const TAIL_ROOT_U = 0.90;     // the fan's apex, pulled forward so it hides under
                               // the body — without this the tail converged on a
                               // single point and met the wrist as a hard V
 const TAIL_PTS = 30;          // samples across the envelope
-const TAIL_RAYS = 9;
+const TAIL_RAYS = 11;
 
-// The paired fins, the same envelope at a smaller size: broad and rounded at
-// the outer edge rather than tapering to a point, which is what separates a fin
-// from a leaf.
-const FIN_SPREAD = 0.40, FIN_ROUND = 0.44, FIN_RAYS = 4;
-const PECT_U = 0.22, PECT_ANGLE = 0.86, PECT_LEN = 0.30, PECT_ROOT = 0.30;
-const PELVIC_U = 0.58, PELVIC_ANGLE = 0.96, PELVIC_LEN = 0.150, PELVIC_ROOT = 0.35;
+// The paired fins, the same envelope at a smaller size. LONG, POINTED AND
+// SWEPT WELL BACK — the ink reference's pectorals are streamers reaching about
+// half the body length, not the short rounded blades that were here. `reach`
+// is (1 - q^2)^FIN_TAPER: full length straight out along the fin's own axis,
+// falling to nothing at either side, so the lobe comes to a point at its far
+// end and is widest near its root. A rounded outer edge is what made these
+// read as lily-pads; a taper is what makes them read as fins.
+//
+// AND THE PELVICS ARE PLAINLY SMALLER THAN THE PECTORALS. Four streamers of
+// near-equal length around one body read as a rosette however well each single
+// one is drawn — measured by looking at it. In the ink reference the pectorals
+// carry the gesture and the pelvics are tucked and short.
+const FIN_SPREAD = 0.25, FIN_TAPER = 0.62, FIN_RAYS = 4;
+const PECT_U = 0.23, PECT_ANGLE = 1.00, PECT_LEN = 0.40, PECT_ROOT = 0.30;
+const PELVIC_U = 0.60, PELVIC_ANGLE = 1.14, PELVIC_LEN = 0.17, PELVIC_ROOT = 0.35;
 
 // The dorsal fin seen from directly above is a line down the spine, which is
 // exactly what the reference draws. NOT the removed spine ridge: that sat on
@@ -156,7 +172,7 @@ const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
 const OUTLINE_W = 1.0;
 const FIN_FILL_A = 0.09, FIN_LINE_A = 0.28, FIN_LINE_W = 0.75;
-const RAY_A = 0.15;           // the fin rays, the reference's own detail
+const RAY_A = 0.22;           // the fin rays, the reference's own detail
 const PATCH_FILL_A = 0.11;    // no stroke — the reference's markings have no edge
 
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
@@ -323,7 +339,8 @@ export function createRenderer(ctx, surface) {
       const m = Math.hypot(bx, by) || 1;
       return {
         origin: edge(u, side, rootK), axis: { x: bx / m, y: by / m },
-        spread: FIN_SPREAD, reach: (q) => len * L * (1 - FIN_ROUND * q * q),
+        spread: FIN_SPREAD,
+        reach: (q) => len * L * Math.pow(Math.max(0, 1 - q * q), FIN_TAPER),
       };
     };
 
