@@ -2102,6 +2102,11 @@ this sentence, not by a clause.
 on every mover the branch's stream is EXACTLY the base's with the omitted petals' triangle
 blocks deleted and the stem's own appended after the hub, float for float under `Object.is`.
 A surviving petal that moved is a re-placement; a hub that moved was sized from the survivors.
+**MEASURED, PASS, the whole 744-row matrix in both modes against a worktree of `5f9c0c7`:
+8 predeclared MOVERS / 736 HOLDERS over 741,700,440 export floats — 0 movers failed to move,
+0 holders moved, and 0 movers where anything OTHER than the omitted petals went.** The eight
+are the block-32 rows that actually build a stem on a sphere; the ninth (`GATED`, at
+`stemLength` 0) is a HOLDER, which is the inert-by-branch claim measured rather than argued.
 **`ALL MAX` IS UNMOVED AND THAT IS NOT LUCK**: retiring `stemEligible` took `stemDiameter` out
 of `PLACEMENT_SUBS`, which would have let the blanket sweep hand it 12 mm — `STEM_SUB_IDS` is
 the derivation that keeps it out of block 1 and out of `SWEEPABLE`, on the CURL_SUBS shape

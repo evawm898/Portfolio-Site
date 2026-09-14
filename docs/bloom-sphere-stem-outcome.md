@@ -322,6 +322,23 @@ located from the BASE tree's own per-petal triangle counts, built one at a time 
 own module through its own whorl primitive, and the tool REFUSES rather than guesses if
 those counts do not add up to the stream it is slicing.
 
+**MEASURED, the whole 744-row live matrix, both modes, against a worktree of `5f9c0c7`:**
+
+```
+744 rows · 8 predeclared MOVERS · 736 predeclared HOLDERS
+741,700,440 export floats compared with Object.is
+CLAUSE 1  movers that did NOT move: 0
+CLAUSE 1  holders that MOVED: 0
+CLAUSE 2  movers where something OTHER than the omitted petals moved: 0
+PASS
+```
+
+The 8 movers are the eight block-32 rows that actually build a stem on a sphere; the
+ninth (`GATED — the widest stem at length 0`) is a HOLDER, which is the inert-by-branch
+claim measured rather than argued. **Nothing outside block 32 moves at all** — no
+`stemLength max (120)` row, no `ALL MAX`, because neither is a sphere (`hubShape` is a
+CHOICE and the blanket sweep is sliders only).
+
 ### 9b. FOUR RESIDUALS WERE COMPUTED ON SLOT 0 BECAUSE SLOT 0 ALWAYS EXISTED
 
 `buildPetalInto` carries four one-petal checks — the flat-form guard residual, the
