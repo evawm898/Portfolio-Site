@@ -255,10 +255,17 @@ and an `solid R3` for every omitted slot. It reads the builder's own omitted set
 PLAN raster needed nothing** — it returns on a sphere before a petal is built, which is
 session 18's own labelled skip doing a second job.
 
-**THE SHAPE OF ALL FOUR.** Every one is an instrument that assumed a slot always carries a
+**AND THE CROWDING RASTER THREW RATHER THAN ASSERTING** on the one row with no feet at
+all: its report is built from `feet[0]`, and the bare corner has none. It declines the
+MEASUREMENT there now — after R1-R4 have run and held, since R3 compares 0 feet against 0
+petals built and R4 has nothing to iterate — and the read-out says `NO FEET` rather than a
+D_max of 0 nobody measured. This project's own rule, arriving in a new place: a missing
+element must be a red check, never a crash.
+
+**THE SHAPE OF ALL FIVE.** Every one is an instrument that assumed a slot always carries a
 petal, and every one was found by the gate rather than by reading the code. The omission is
 the first thing in this generator that can make a declared slot empty, and what that costs
-is exactly this list — four places that had no reason to be written any other way.
+is exactly this list — five places that had no reason to be written any other way.
 
 ### 9c. The matrix, the census and the gates
 

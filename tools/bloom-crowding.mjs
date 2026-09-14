@@ -636,6 +636,22 @@ export async function footCrowding(page, row, stl = null) {
     });
   }
 
+  /* A BLOOM WITH NO FEET HAS NO CROWDING TO MEASURE (the sphere-stem session).
+     Reachable only where the stem channel took every slot — the bare corner,
+     a stem wider than the head has room for, told rather than refused — and it
+     is the one state where `E.feet[0]` does not exist. Reported as ABSENT
+     rather than as a passing D_max of 0, which is the difference between "there
+     is no crowding here" and "nobody looked".
+     R1-R4 HAVE ALREADY RUN AND HOLD on an empty list — R3 compares 0 feet
+     against 0 petals built and R4 has nothing to iterate — so what this
+     declines is the MEASUREMENT and not the validity. Without it the instrument
+     THREW rather than asserting, which this project's own rule calls out: a
+     missing element must be a red check, never a crash. */
+  if (!E.feet.length || !Lv.feet.length) {
+    return { bad, r: { n: E.feet.length, noFeet: true, crowded: false, registered, exportTris: E.tris,
+                       hubR: E.hub.radius, hubRLive: Lv.hub.radius, dome: null } };
+  }
+
   /* THE NUMBERS, export first, then live for the divergence line. */
   const cell = cellFor(E.hub.radius);
   const domeE = E.hub.dome, domeL = Lv.hub.dome;
@@ -706,6 +722,9 @@ export async function footCrowding(page, row, stl = null) {
 /* One line, every gate row. EXPORT numbers; live printed only where it
    differs, on the print-truth line's discipline. */
 export function crowdingLine(r) {
+  /* NO FEET, NO READING — and the line says which, rather than printing a
+     D_max of 0 that nobody measured. */
+  if (r.noFeet) return `CROWDING (export): NO FEET — the stem channel took every petal on this row, so there is no base to crowd (told, not refused); hub ${r.hubR.toFixed(2)} mm, ${r.exportTris} tris`;
   const at = r.dmaxAt ? ` at r ${r.dmaxAt.r.toFixed(2)} mm` : '';
   const diverges = r.liveDmax !== r.dmax || Math.abs(r.liveDmean - r.dmean) > 0.005;
   return `CROWDING (export): feet ${r.n} · stack D_max ${r.dmax}${at}${r.dmaxPass === 'local' ? ` (resolved locally; hub-pitch raster read ${r.hubPassDmax})` : ''} · D_mean ${r.dmean.toFixed(2)}`
