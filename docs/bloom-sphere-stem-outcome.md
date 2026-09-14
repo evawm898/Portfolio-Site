@@ -553,6 +553,37 @@ every row.
   `--verify-frozen --phase29` is deep-equal to that commit's own `buildMatrix()`, row for
   row. (It went red first: the snapshot was written from `{label, set}` and dropped the
   eleven rows' `capability` field — the check doing its job in 24 seconds.)
+* **AND `frozen/phase29` COULD NOT BE PUBLISHED FROM THIS SESSION — one attempt, measured,
+  read back off the REMOTE rather than off the exit code.** The tag was created locally at
+  `5f9c0c7` (confirmed on `origin/main` by `git branch -r --contains`, so the baseline is a
+  commit on `main` and not a branch head, which is the charter's rule) and
+  `git push origin refs/tags/frozen/phase29` — one explicit refspec, no `--tags`, no
+  `--force` — returned a flat **HTTP 403** (`RPC failed; send-pack: unexpected disconnect`),
+  with `git ls-remote --tags origin 'refs/tags/frozen/phase29'` coming back EMPTY. Three
+  independent observations of that refusal now stand and **this one closes the workflow
+  divergence reading from the OTHER side**: session 41's case changed no `.github/workflows`
+  file at all and was refused, and this branch DOES change one
+  (`bloom-export-watertight.yml`) and is refused identically. So the refusal is insensitive
+  to that condition in BOTH directions. **That is still not a replacement mechanism** —
+  what actually refuses remains unestablished, and the charter's instruction not to engineer
+  around a successor condition stands.
+* **THE ROUTE THAT WORKS IS `bloom-frozen-tags`, AND ITS RIGHT MOMENT IS AFTER THE MERGE, NOT
+  NOW.** That workflow is `workflow_dispatch`-only, is already on the default branch (so it
+  is dispatchable), and runs `tools/publish-frozen-tags.sh` on a runner, which has neither
+  this environment's limit. It was deliberately NOT dispatched here, for two reasons that are
+  about correctness rather than caution. **(i)** Dispatched on this BRANCH it would pin a
+  baseline `main`'s own harness does not register — a tag whose matrix exists nowhere on the
+  default branch, which is the wrong half of the census's own
+  "a base commit with no matrix is a phase nobody wrote". **(ii)** The script publishes the
+  WHOLE declared set through `git push origin --tags` and refuses a partial one by design, and
+  the remote today carries **eighteen** `frozen/*` tags — phase2 through phase20, phase5
+  absent — so **phases 21 through 29 are ALL unpublished**. Publishing eight other sessions'
+  missing baselines is strictly protective and is not this PR's to decide. One dispatch from
+  `main` after this merges closes the whole gap at once.
+* **NONE OF THAT IS LOAD-BEARING, so do not re-litigate it.** `5f9c0c7` is on `main`, `main`
+  is never force-pushed here, so the commit cannot be orphaned and phase29's definitions stay
+  replayable without the tag; the load-bearing half is the REGISTRATION, which is done in both
+  maps and is what `bloom-frozen-matrices` proves green on this head.
 * **Smoke census: 28 matrix blocks** (the block count rose, which is session 34's trap
   avoided) **and 80 families, both directions**, ST7/ST8/ST9 among them.
 * **The self-intersection census on all nine block-32 rows, EXPORT:** eight read exactly

@@ -1166,8 +1166,11 @@ what actually refuses the push is NOT ESTABLISHED, and no replacement mechanism 
 The server said 403 and named no reason; a session token, the tag ref namespace, a push rule and
 the proxy are all consistent with what was observed and none was isolated. So: expect the push to
 fail, do not engineer around the workflow condition — and do not engineer around a successor
-condition either, because there is no measured one to engineer around. What IS measured is one
-failure in the exempt case.
+condition either, because there is no measured one to engineer around. What IS measured is now
+a failure in the exempt case AND one in the NON-exempt case: the sphere-stem session's `frozen/phase29` push was refused identically
+(flat 403; `git ls-remote --tags origin 'refs/tags/frozen/phase29'` read back EMPTY) from a branch
+that DOES change a workflow file, so the condition is measured insensitive in BOTH directions.
+That strengthens the refutation and still supplies no successor.
 **(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
 TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
 tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
@@ -1183,6 +1186,14 @@ force-pushed here, so the commit cannot be orphaned and the definitions stay rep
 the tag. 18 `frozen/*` tags are on the remote (phase5 was already absent) and they remain the
 pattern: **a future baseline should still be tagged whenever it can be** — via the web UI
 (Releases → Tags), or one `git push origin refs/tags/…` from a clone with a user's credentials.
+**AND THE ROUTE THAT ACTUALLY WORKS FROM HERE IS `bloom-frozen-tags`** — `workflow_dispatch`-only,
+already on the default branch and therefore dispatchable, running `tools/publish-frozen-tags.sh`
+on a RUNNER, which has neither this environment's limit. Two things decide its moment: dispatch it
+from `main` AFTER the phase is merged (on a branch it would pin a baseline main's own harness does
+not register), and it publishes the WHOLE declared set through `git push origin --tags`, refusing a
+partial one by design. As of the sphere-stem session the remote still carries only phase2..phase20
+(phase5 absent), so **phases 21 through 29 are ALL unpublished** and one dispatch from `main` closes
+the entire gap at once.
 **THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
 session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
 error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
