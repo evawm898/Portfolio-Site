@@ -966,6 +966,17 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     if (!c.section) bad.push(`control "${c.id}" declares no section`);
     else if (!ids.has(c.section)) bad.push(`control "${c.id}" names section "${c.section}", which is not in SECTIONS`);
     else used.add(c.section);
+    /* EVERY CONTROL CARRIES A `visibleWhen`, and "never gated" is the explicit
+       `{ all: [] }` sentinel rather than an absent field (the sphere-channel
+       session, Sep 14, on its own defect). Retiring a predicate and simply
+       DROPPING the field left `stemLength` the one control in 112 without one;
+       evalPredicate and predicateDrivers both read `pred == null` as "shown,
+       no drivers" and were fine, but the panel gate reads the SHAPE directly
+       and died on `x.visibleWhen.id` — a TypeError two hours into CI where the
+       registry could have named it at module load. A missing element must be a
+       red check, never a crash. The sentinel also says the absence is
+       DELIBERATE, which an omitted field cannot. */
+    if (c.visibleWhen === undefined) bad.push(`control "${c.id}" declares no \`visibleWhen\` — a control that is never gated declares the \`{ all: [] }\` sentinel, which is what every other ungated control carries; an omitted field is indistinguishable from a forgotten one`);
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
      renders as a header that opens onto nothing, and the reason it is empty is
@@ -2848,7 +2859,13 @@ export const CONTROLS = [
        read-out says both; the hidden part is DERIVED per build and printed
        there, never tabulated here. */
     fmt: (v) => (Number(v) === 0 ? 'none — no stem is built' : `${v} mm total, from the hub's underside (the read-out says how much of it the head hides)`),
-    tier: 'standard', role: 'stem' },
+    /* `{ all: [] }` is this registry's own "never gated" sentinel, carried by
+       every ungated control rather than left off: evalPredicate returns true
+       for it, predicateDrivers returns nothing for it, and the panel gate reads
+       the shape directly. The stem's length used to be gated on a placement
+       predicate; the sphere channel retired that, and the row takes the
+       sentinel rather than dropping the field. */
+    tier: 'standard', role: 'stem', visibleWhen: { all: [] } },
   { id: 'stemDiameter', section: 'stem', kind: 'slider',
     min: STEM_DIAMETER_RANGE[0], max: STEM_DIAMETER_RANGE[1], step: 0.5, default: 6,
     label: 'Stem diameter',
