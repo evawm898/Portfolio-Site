@@ -7507,14 +7507,28 @@ export function stemPlan(state, ring, acc) {
      63.62, i.e. 80.4% of the new face is exposed from directly above**, where
      before there was an open bore to look down.
 
-     IT IS NOT OVERSHOOT, AND THE DISTINCTION IS WORTH THE WORDS. The band's
-     LENGTH is the head's own wall and nothing more. What is seen is the CLOSURE
-     ITSELF, and no closure of that hole can be invisible: a disc covering only
-     the part under the head (r <= 1.828 at this z) would not reach the tube's
-     wall, so it would be a second detached piece and would fix nothing. The
-     hole was visible; a plugged hole is visible. What would have been a defect
-     is the band reaching a surface it has no business reaching, and the byte
-     tool's CLAUSE 2 is what rules that out. */
+     AND IT IS THE CONDITION THAT IS VISIBLE, NOT THE EXTENT — which is provable
+     here rather than measured on one row. A band exists iff `headOuterMm <
+     boreR`, and `boreR = outerR - STEM_MIN_WALL_MM` is always LESS than
+     `outerR`: so a band implies a head narrower than the TUBE, i.e. a head that
+     could never have covered the stem's top face. On exactly the rows where the
+     band exists, that face is exposed with it and without it, and what a viewer
+     directly above sees change is a HOLE BECOMING A DISC.
+
+     The band's LENGTH is the head's own wall and nothing more, and no shorter
+     one exists: the head sits at the TOP of the bore, so any closure that
+     reaches it sits where the head is, and there the closure is necessarily
+     wider than the head. A disc covering only the part under the head
+     (r <= 1.828 at this z) would not reach the tube's wall — a second detached
+     piece, fixing nothing.
+
+     SO THIS IS FLAGGED FOR EVA RATHER THAN ABSORBED: the alternative is not a
+     tighter derivation, it is a different ruling (refuse the stem on such a
+     head, or narrow `stemDiameter` against it — the two she rejected). What
+     WOULD have been a defect is the band reaching a surface it has no business
+     reaching, and the byte tool's CLAUSE 2 is what rules that out — stated as
+     the narrower claim it is, since that clause excludes the top face by
+     construction and its header now says so. */
   const headOuterMm = sphere ? dome.Rd + hubT / 2 : hubR;
   /* AND IT IS THE CLOSED SHELL'S CASE, MEASURED RATHER THAN SCOPED FOR
      CONVENIENCE. `headOuterMm < boreR` is reachable on a CAP too — 291 of 4,608
@@ -7821,9 +7835,11 @@ export function buildStemInto(acc, plan) {
        it is `rootZ`) and between two for a CAP (where it is the hub's own
        underside), so a `z < solidBandZ` filter would decide by the last bit
        whether a station an ulp away is kept — and a kept one an ulp from the
-       band's edge is a DEGENERATE quad, not merely a different ladder. Fifth
+       band's edge is a DEGENERATE quad, not merely a different ladder. SIXTH
        instance of the discrete-decision-on-a-continuous-quantity class this
-       file keeps recording; the ladder asks the placer for a length instead. */
+       file keeps recording (session 42's Model B named itself the fifth, and
+       this comment said "fifth" for one commit); the ladder asks the placer for
+       a length instead. */
     const inner = stemStations(plan.solidBandZ - plan.tipZ)
       .map((mm) => ringAt(b, plan.solidBandZ - mm));
     measure(inner);
