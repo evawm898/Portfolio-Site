@@ -1179,13 +1179,26 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
     + (stem.hiddenMm > 1e-9 ? ` · ${stem.visibleMm.toFixed(1)} mm VISIBLE (${stem.hiddenMm.toFixed(1)} mm of it is inside the head's own bowl)` : ' · all of it visible (a flat head hides none)')
     + ` · ${(stem.outerR * 2).toFixed(1)} mm across, `
     + (hollow ? `${(stem.boreR * 2).toFixed(1)} mm bore, a ${stem.wallMm.toFixed(2)} mm wall` : `SOLID — the bore CLOSES at this diameter (told, not refused)`)
-    /* THE SOLID ROOT BAND IS TOLD, because without this clause the line above
-       claims a bore the root does not have. It is the same "clamped and told"
-       form as the bore closing at Eva's floor, and it is ABSENT wherever the
-       band is — a passing "0 mm solid" would be a number nobody measured. */
-    + (stem.solidBandMm > 0
-        ? ` · SOLID for the first ${stem.solidBandMm.toFixed(2)} mm — the head is ${(stem.headOuterMm * 2).toFixed(1)} mm across against a ${(stem.boreR * 2).toFixed(1)} mm bore, so it would otherwise stand INSIDE the pipe with nothing bridging the two (told, not refused)`
-        : '')
+    /* THE BORE'S TWO CLOSURES ARE TOLD, because without them the clause above
+       claims a bore that runs the length of the stem when it does not. Same
+       "clamped and told" form as the bore closing at Eva's own floor, and each
+       is ABSENT wherever it does not apply — a passing "0 mm solid" would be a
+       number nobody measured.
+
+       AND WHERE THEY MEET, ONE SENTENCE REPLACES BOTH. Both closures are
+       derived from lengths, so across a short enough stem they overlap and no
+       bore survives; printing "solid for the first 1.20" and "solid for the
+       last 1.50" of a 2.20 mm stem would be two true clauses adding up to a
+       false picture. The crossover is the plan's own `solidThrough`, so this
+       line cannot disagree with the geometry about which case it is in. */
+    + (stem.solidThrough
+        ? ` · SOLID THROUGHOUT — a ${stem.solidBandMm.toFixed(2)} mm root band and a ${stem.tipPlugMm.toFixed(2)} mm tip plug MEET across a ${(stem.topZ - stem.tipZ).toFixed(2)} mm stem, so no bore is left between them (told, not refused)`
+        : (stem.solidBandMm > 0
+            ? ` · SOLID for the first ${stem.solidBandMm.toFixed(2)} mm — the head is ${(stem.headOuterMm * 2).toFixed(1)} mm across against a ${(stem.boreR * 2).toFixed(1)} mm bore, so it would otherwise stand INSIDE the pipe with nothing bridging the two (told, not refused)`
+            : '')
+          + (stem.tipPlugMm > 0
+              ? ` · SOLID for the last ${stem.tipPlugMm.toFixed(2)} mm — the bore is CLOSED at the TIP, as thick as the ${stem.wallMm.toFixed(2)} mm wall it closes, so the bottom reads as a stem end and not a cut pipe; ${stem.voidMm.toFixed(2)} mm of SEALED bore between the two`
+              : ''))
     + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : inertBecause}\n`
     + stemChannelLine(omission);
 }
@@ -1788,7 +1801,25 @@ window.__bloomMetrics = () => ({
        comment naming a clause that does not exist is this project's own
        recorded defect, and it is not going to ship from here.) */
     headOuterMm: lastStem.headOuterMm, headInsideBore: lastStem.headInsideBore,
-    solidBandMm: lastStem.solidBandMm, solidBandZ: lastStem.solidBandZ,
+    solidBandMm: lastStem.solidBandMm,
+    /* THE BORE AS AN INTERVAL (the tip-plug session). The root band shuts it
+       where the head would otherwise stand inside it and the TIP PLUG shuts it
+       where a viewer would otherwise look up it, so what the plan declares is
+       the bore that SURVIVES the two — and where they meet, none does. ST1
+       predicts the triangle count from these and ST10 checks the plug against
+       Eva's own wall thickness, which is why both the ASKED-FOR shape and the
+       EMITTED rings are here: the plan owns the first and the builder the
+       second, and a clause holding both would be checking a record against
+       itself. `solidBandZ` is gone with them — it was `voidTopZ` under an older
+       name, and two names for one number is a second producer. */
+    tipPlugMm: lastStem.tipPlugMm, voidMm: lastStem.voidMm,
+    voidTopZ: lastStem.voidTopZ, voidBottomZ: lastStem.voidBottomZ,
+    solidThrough: lastStem.solidThrough,
+    emittedTopZ: lastStemBuilt ? lastStemBuilt.emittedTopZ : undefined,
+    emittedVoid: lastStemBuilt ? lastStemBuilt.emittedVoid : undefined,
+    emittedVoidTopZ: lastStemBuilt ? lastStemBuilt.emittedVoidTopZ : undefined,
+    emittedVoidBottomZ: lastStemBuilt ? lastStemBuilt.emittedVoidBottomZ : undefined,
+    directedMismatch: lastStemBuilt ? lastStemBuilt.directedMismatch : undefined,
     /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
        these, never the plan beside them. Same reason as rootSpanMm above: the
        plan is what was ASKED FOR and these are what came out. */

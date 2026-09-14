@@ -387,7 +387,19 @@ for (const row of rows) {
      The self-intersection census (X0-X2) rides in the EXPORT gate only, on
      cost — its header says why. */
   const stlPos = stlPositions(buf);
-  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  /* THE HEAD AND THE STEM'S OWN CAVITY, both read from the build's own record:
+     O1's declared-inward baseline is a count derived from what this state
+     actually builds, never from the head shape alone. `cavity` is non-null iff
+     the bore SURVIVES its two closures — a solid stem, a stem at length 0 and
+     a stem whose closures meet all leave it null, which is the inertness half
+     of the tip-plug ruling arriving in the orientation gate. */
+  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
+    const m = window.__bloomMetrics(), S = m.stem;
+    return {
+      sphere: m.sphereMode === true,
+      cavity: S && S.voidMm > 0 ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
+    };
+  }));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
   /* ST9 — THE STEM CHANNEL, from THIS row's STL bytes. It rides in BOTH STL
      gates where X0-X2 ride in the export one alone, and the difference is

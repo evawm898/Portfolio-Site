@@ -4859,20 +4859,34 @@ export async function stemAssertions(page, row) {
     bad.push(`ST1: the plan declares ${S.stations && S.stations.length} station(s) on ${S.sides} sides — the emitted count cannot be predicted from it`);
   } else {
     const N = S.sides, bands = S.stations.length;   // rings = bands + 1 (the root band)
-    /* THREE ARMS, because the SOLID ROOT BAND is a third emission and not a
-       tweak of the hollow one (Eva's ruling). With the bore closed over the
-       band the top face is a full DISC rather than an annulus, the inner wall
-       runs only over the void — its own two-ring ladder from the one placer,
-       so ONE segment whatever the outer tube has — and the void gains a
-       ceiling. Both new discs are RIM fans, which is why they cost N - 2 and
-       not N: a centre fan would put a vertex on the axis and weld to the hub's
-       own apex, the measured defect the solid arm below already carries. */
-    const wantTris = S.boreR > 0 && S.solidBandMm > 0
-      ? 2 * N * bands + 4 * N + 2 * (N - 2)         // outer wall, void wall, bottom annulus, two rim fans
-      : S.boreR > 0
-      ? 4 * N * bands + 4 * N                       // two walls, two annuli
-      : 2 * N * bands + 2 * (N - 2);                // one wall, two rim fans
-    if (m.stemTris !== wantTris) bad.push(`ST1: the builder emitted ${m.stemTris} triangles for a ${S.boreR > 0 ? 'hollow' : 'solid'} stem of ${bands} band(s) on ${N} sides; the plan's own station list and side count ask for ${wantTris}`);
+    /* TWO ARMS, because the bore is an INTERVAL and not a through-hole (the
+       tip-plug session). What the stem emits is the bore that SURVIVES the two
+       closures, so the question is whether one survives at all — and where it
+       does, each END is independently a DISC plus a cap into the void, or an
+       annulus between the two walls.
+
+       THE THREE ARMS THIS REPLACES were the solid stem, the hollow stem and the
+       root band, and the last two differed only in which end was shut. Reading
+       the prediction off the two ends rather than off a three-way condition is
+       what makes the CROSSOVER — the two closures meeting across a short stem —
+       arrive here as `voidMm <= 0` and not as a fourth case.
+
+       EVERY DISC IS A RIM FAN, which is why a closed end costs 2(N - 2) and not
+       2N: a centre fan would put a vertex on the axis and weld to the hub's own
+       apex, the measured defect (528 pairs) the no-void arm already carries.
+       The void's wall is ONE segment whatever the outer tube has, because its
+       ladder comes from the placer over the VOID's own length. */
+    const hasVoid = S.voidMm > 0;
+    const endTris = (closed) => (closed ? 2 * (N - 2) : 2 * N);
+    const wantTris = hasVoid
+      ? 2 * N * bands + 2 * N + endTris(S.solidBandMm > 0) + endTris(S.tipPlugMm > 0)
+      : 2 * N * bands + 2 * (N - 2);
+    if (m.stemTris !== wantTris) {
+      const shape = !hasVoid
+        ? (S.boreR > 0 ? 'a stem whose two closures MEET, so no bore survives' : 'a SOLID stem')
+        : `a stem with ${S.voidMm} mm of bore left, ${S.solidBandMm > 0 ? 'closed' : 'open'} at the top and ${S.tipPlugMm > 0 ? 'closed' : 'open'} at the tip`;
+      bad.push(`ST1: the builder emitted ${m.stemTris} triangles for ${shape} of ${bands} band(s) on ${N} sides; the plan's own station list and side count ask for ${wantTris}`);
+    }
   }
   const hubT = m.hubThickness, hubR = m.hubRadius;
   /* ST2 — ON THE AXIS, DOWN, AND THE LENGTH THE CONTROL ASKED FOR. */
@@ -4915,13 +4929,31 @@ export async function stemAssertions(page, row) {
      radii; these read the widest and narrowest vertex the builder emitted, so a
      stem rung at a radius the plan never asked for is visible. The emitted
      extremes ARE the two radii — a polygon's vertices all sit on their own
-     circle — so this is an equality, not a bound. A SOLID stem emits no inner
-     ring, so its narrowest vertex is the outer radius too. */
+     circle — so this is an equality, not a bound.
+
+     A STEM EMITS NO INNER RING IN TWO CASES, NOT ONE, and the second is what
+     the crossover added (the tip-plug session): a SOLID stem has no bore to
+     ring, and a hollow stem whose two closures MEET has none LEFT. Both then
+     put the narrowest emitted vertex on the outer radius. Measured red on
+     `SPHERE STEM: THE TWO CLOSURES MEET` before this clause knew the second
+     case — which is this clause doing its job rather than a reason to loosen
+     it: nothing here is relaxed, the condition simply names the geometry that
+     now exists.
+
+     THE CONDITION READS THE PLAN'S `voidMm` AND THE MEASUREMENT READS THE
+     BUILDER, deliberately. The builder's own `emittedVoid` would be the nearer
+     flag and the wrong one — both sides of the comparison would then be the
+     builder's, so a builder that dropped its bore would move the expectation
+     with it and the clause would be green. Whether the builder and the plan
+     agree about the void EXISTING is ST10's biconditional, which is a
+     different question asked of a different pair. */
   if (S.emittedMaxR === undefined || S.emittedMinR === undefined) bad.push('ST3: the builder reports no emitted radii — the bore claim can only be made about the plan');
   else {
     if (Math.abs(S.emittedMaxR - R) > 1e-9) bad.push(`ST3: the emitted stem's widest vertex stands at ${S.emittedMaxR} mm; the control asks for an outer radius of ${R}`);
-    const wantMin = bore > 0 ? bore : R;
-    if (Math.abs(S.emittedMinR - wantMin) > 1e-9) bad.push(`ST3: the emitted stem's narrowest vertex stands at ${S.emittedMinR} mm; a ${bore > 0 ? 'hollow' : 'solid'} stem of outer radius ${R} under Eva's ${STEM_MIN_WALL_MM} mm wall asks for ${wantMin}`);
+    const boreSurvives = bore > 0 && S.voidMm > 0;
+    const wantMin = boreSurvives ? bore : R;
+    const why = boreSurvives ? 'hollow' : bore > 0 ? 'hollow stem whose two closures MEET, so no bore survives to be rung,' : 'solid';
+    if (Math.abs(S.emittedMinR - wantMin) > 1e-9) bad.push(`ST3: the emitted stem's narrowest vertex stands at ${S.emittedMinR} mm; a ${why} stem of outer radius ${R} under Eva's ${STEM_MIN_WALL_MM} mm wall asks for ${wantMin}`);
   }
   /* ST4 — ROOTED THROUGH THE HUB, NOT A HAIRLINE. JS3's own statement for the
      stamens, which both STL gates are blind to: the root must span the hub's
@@ -5045,8 +5077,27 @@ export async function stemAssertions(page, row) {
     if (P.emittedVoid !== (P.voidMm > 0)) {
       bad.push(`ST10: the builder ${P.emittedVoid ? 'emitted' : 'emitted no'} bore while the plan leaves ${P.voidMm} mm of it between a ${P.solidBandMm} mm root band and a ${P.tipPlugMm} mm tip plug across a ${P.topZ - P.tipZ} mm stem`);
     }
+    /* (c) AND THE FACES POINT THE WAY THEY SAY — ON EVERY STEM, not only a
+       bored one, because the no-void arm emits two rim-fan caps of its own.
+       Every gate in this project is blind to an end face wound the wrong way:
+       `analyzeStl`'s edge census keys on a SORTED pair so it is UNDIRECTED (two
+       triangles crossing one edge the same way count as a matched pair, and the
+       mesh reads watertight and manifold), and O1 asks only for a shell's
+       volume SIGN, which a dominant outer wall keeps positive. BOTH of the
+       pre-plug tube's annuli were wound inward — measured, the shipping
+       60 x 6 mm stem's shell enclosed 440.64 mm^3 against a true 1321.91, the
+       outer prism less the bore. The builder folds a DIRECTED census over the
+       triangles it emitted, so the correction has a number attached rather than
+       a comment. Its scope is the STEM's own solid and is declared so: the same
+       census over the whole bloom is a real instrument and its own session, and
+       what would scope it is in this session's outcome doc. */
+    if (P.directedMismatch === undefined) {
+      bad.push('ST10: the builder reports no directed-edge census — which way the stem\'s faces point is then asserted by nothing here, and no other family in this project can see it');
+    } else if (P.directedMismatch !== 0) {
+      bad.push(`ST10: ${P.directedMismatch} of the stem's directed edges have no opposite — a face is wound the wrong way round, which leaves the mesh watertight, manifold and one connected piece while enclosing the wrong volume`);
+    }
     if (P.emittedVoid) {
-      /* (c) AND THE PLUG IS WHERE IT SAYS IT IS — the measured half, off the
+      /* (d) AND THE PLUG IS WHERE IT SAYS IT IS — the measured half, off the
          emitted rings against Eva's own number. A plug built at the TOP, or at
          five times its length, emits the SAME triangle count and sails through
          ST1; this is the only clause that can tell where the void stops. */
@@ -5068,7 +5119,7 @@ export async function stemAssertions(page, row) {
         bad.push(`ST10: the emitted bore starts ${bandBuilt} mm below the emitted top face; the plan's root band is ${P.solidBandMm} mm`);
       }
     } else if (hollow) {
-      /* (d) WHERE THE TWO MEET, NO INNER RING WAS EMITTED AT ALL. The narrowest
+      /* (e) WHERE THE TWO MEET, NO INNER RING WAS EMITTED AT ALL. The narrowest
          emitted radius is then the tube's own outer one — which a solid stem's
          own arm already satisfies, so this says the two arms really are one
          geometry reached by two roads rather than two shapes that resemble
@@ -5322,7 +5373,7 @@ export async function stemAssertions(page, row) {
    union's business respectively.
    =================================================================== */
 export const ORIENTATION_SCOPE =
-  'O1/O2 read the exported STL as vertex-welded shells: a shell wound outward has POSITIVE signed volume (divergence theorem) and an EVEN ray-parity from outside its largest facet, and the two must agree; every other family here passes on an inside-out solid, measured. Blind to an inward primitive welded to a larger outward one (their volumes sum), which no shipped primitive does.';
+  'O1/O2 read the exported STL as vertex-welded shells: a shell wound outward has POSITIVE signed volume (divergence theorem) and an EVEN ray-parity from outside its largest facet, and the two must agree; every other family here passes on an inside-out solid, measured. The INWARD shells are declared and counted from the build\'s own record — the SPHERE hub\'s inner face, and the stem bore\'s own cavity where the two closures leave one — and the cavity is additionally bounded against the bore\'s closed-form prism. Blind to an inward primitive welded to a larger outward one (their volumes sum), which no shipped primitive does.';
 export const SELF_INTERSECTION_SCOPE =
   'X1/X2 count triangle pairs that intersect WITHIN one closed shell, with the shared-feature exclusion per intersection POINT (a pair sharing a vertex and crossing elsewhere is reported). Cross-shell pairs are the export contract\'s overlapping closed solids and are reported, never gated. Blind to petal-against-petal crossing (a cross-shell quantity) and to the printable AIR GAP between distinct parts of one sheet (V5\'s, in tools/bloom-wall-thickness.mjs).';
 
@@ -5455,17 +5506,64 @@ export function stlPositions(buf) {
   return out;
 }
 
-export function orientationAssertions(positions, row, sphere) {
+/* THE INWARD SHELLS THIS PROJECT DECLARES, AND THE SECOND ONE ARRIVED WITH THE
+   TIP PLUG. O1's baseline was a COUNT — one on a sphere (the hub's inner face),
+   zero elsewhere — and it is still a count, but it is DERIVED from the build's
+   own record now rather than from the head shape alone, because a solid can
+   legitimately have more than one inner face.
+
+   WHY THE STEM NOW HAS ONE, and it is geometry rather than a winding mistake:
+   with the bore closed at BOTH ends the hole stops being a channel through the
+   solid and becomes an ENCLOSED CAVITY, so the stem's boundary has two
+   connected components — an outer surface wound outward and a cavity wall wound
+   into the void, which is where the material is not. That is the correct
+   boundary of a solid with a void in it, and it is not avoidable: an inner and
+   an outer boundary of an annulus genuinely do not touch, so they can only be
+   one welded shell while an END is open, which is what the pre-plug tube had.
+
+   MEASURED RED before it was declared, on `SPHERE STEM: THE BARE CORNER` —
+   "2 of 4 shells are wound INWARD" — which is O1 doing its job: a second inner
+   face is exactly the thing it exists to notice, and the answer is to declare
+   and BOUND it rather than to widen the count and move on.
+
+   SO IT IS BOUNDED, AND BY A DIFFERENT OWNER FROM THE ONE ST10 USES. ST10 asks
+   whether the PLAN's plug is Eva's own wall thickness and whether the BUILDER's
+   rings sit where the plan says; this asks whether the EXPORTED FILE's cavity
+   is the size the plan asked for — `poly(boreR) x voidMm`, the bore's own
+   prism. A builder that emitted a cavity of the wrong extent passes ST10's
+   ring check only by moving the rings, which this would then catch on volume;
+   a wrong PLAN moves this bar with it and is ST10's, against Eva's constant.
+   Three owners, three questions, and neither clause is the other's reference. */
+export function orientationAssertions(positions, row, head) {
   const bad = [];
+  const sphere = head === true || !!(head && head.sphere);
+  const cavity = head && head.cavity ? head.cavity : null;
   const o = shellOrientation(positions);
   if (o.shells === 0) { bad.push('O1: the STL holds no shell at all'); return { bad, r: o }; }
-  const hollow = sphere ? 1 : 0;
+  const hollow = (sphere ? 1 : 0) + (cavity ? 1 : 0);
+  const names = [sphere ? 'the SPHERE hub\'s inner face' : null, cavity ? 'the stem bore\'s own cavity, sealed at both ends' : null].filter(Boolean);
   if (o.inward !== hollow) {
     const w = o.perShell.filter((s) => !s.outwardByVolume).slice(0, 3).map((s) => `${s.tris} tris ${s.volumeMm3.toFixed(2)} mm^3`).join(', ');
-    bad.push(`O1: ${o.inward} of ${o.shells} shells are wound INWARD (negative signed volume: ${w}${o.inward > 3 ? ', …' : ''}) — the declared baseline is ${hollow ? 'exactly one, the SPHERE hub\'s inner face' : 'every shell outward'}; total ${o.totalVolumeMm3.toFixed(1)} mm^3`);
+    bad.push(`O1: ${o.inward} of ${o.shells} shells are wound INWARD (negative signed volume: ${w}${o.inward > 3 ? ', …' : ''}) — the declared baseline is ${hollow ? `${hollow} (${names.join(' and ')})` : 'every shell outward'}; total ${o.totalVolumeMm3.toFixed(1)} mm^3`);
   } else if (hollow) {
-    const inner = o.perShell.find((s) => !s.outwardByVolume), outer = o.perShell.reduce((a, s) => (s.volumeMm3 > a.volumeMm3 ? s : a), o.perShell[0]);
-    if (!(Math.abs(inner.volumeMm3) < outer.volumeMm3)) bad.push(`O1: the one inward shell (${inner.volumeMm3.toFixed(1)} mm^3) is not smaller than the largest outward shell (${outer.volumeMm3.toFixed(1)}) — it is not the sphere's inner face`);
+    const inwards = o.perShell.filter((s) => !s.outwardByVolume);
+    const outer = o.perShell.reduce((a, s) => (s.volumeMm3 > a.volumeMm3 ? s : a), o.perShell[0]);
+    for (const inner of inwards) {
+      if (!(Math.abs(inner.volumeMm3) < outer.volumeMm3)) bad.push(`O1: an inward shell (${inner.volumeMm3.toFixed(1)} mm^3) is not smaller than the largest outward shell (${outer.volumeMm3.toFixed(1)}) — it is not an inner face of anything`);
+    }
+    if (cavity) {
+      /* THE BORE'S OWN PRISM, in closed form from the side count the plan
+         declares — the emitted cavity is a regular N-gon swept over the void's
+         own length, so this is an equality with a relative tolerance and not a
+         bound picked to pass. Matched to the NEAREST inward shell by volume so
+         a sphere's inner face and a bore's cavity cannot be confused for each
+         other on a row that has both. */
+      const want = 0.5 * cavity.sides * cavity.boreR * cavity.boreR * Math.sin(2 * Math.PI / cavity.sides) * cavity.voidMm;
+      const got = inwards.reduce((a, s) => (Math.abs(Math.abs(s.volumeMm3) - want) < Math.abs(Math.abs(a.volumeMm3) - want) ? s : a), inwards[0]);
+      if (!(Math.abs(Math.abs(got.volumeMm3) - want) <= 1e-6 * Math.max(1, want))) {
+        bad.push(`O1: the stem bore's cavity encloses ${Math.abs(got.volumeMm3).toFixed(4)} mm^3; a ${cavity.boreR} mm bore over the ${cavity.voidMm} mm the two closures leave is ${want.toFixed(4)} — the cavity is not the void the plan asked for`);
+      }
+    }
   }
   const declared = SELF_INTERSECTION_XFAIL_HAS(row.label);
   if (o.disagreements !== 0 && !declared) bad.push(`O2: the divergence-theorem sign and the ray-parity test DISAGREE on ${o.disagreements} of ${o.shells} shells on a row the census reads clean — one of the two methods is not measuring orientation here`);

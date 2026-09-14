@@ -197,6 +197,37 @@ function stemFacts(M, state = STEM_STATE()) {
              rootSpan: plan.present ? plan.topZ - plan.rootZ : 0 };
   } catch (e) { return { threw: e.message }; }
 }
+/* THE BORE'S TWO CLOSURES, as the MUTATED module emits them (the tip-plug
+   session). The strongest quantity available is the BOTTOM FACE'S AREA, read
+   off the emitted triangles at the stem's own lowest z: a closed bottom is a
+   full N-gon and an open one is that less the bore's, so the two differ by 25%
+   on the shipped stem and by 56% at the widest bore. It is the feature itself
+   rather than a proxy for it, and it is measured on the mutant's own geometry —
+   never on the clause the mutant names, which is the circularity this table
+   exists to avoid. */
+function plugFacts(M, state = STEM_STATE()) {
+  try {
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const fr = M.footRing(state, acc);
+    const plan = M.stemPlan(state, fr.hub, acc);
+    const sacc = new M.MeshBuilder({ exportMode: true });
+    const built = M.buildStemInto(sacc, plan);
+    const P = sacc.positions;
+    let tipZ = Infinity;
+    for (let i = 2; i < P.length; i += 3) if (P[i] < tipZ) tipZ = P[i];
+    let bottomArea = 0;
+    for (let i = 0; i < P.length; i += 9) {
+      if (!(P[i + 2] === tipZ && P[i + 5] === tipZ && P[i + 8] === tipZ)) continue;
+      const ux = P[i + 3] - P[i], uy = P[i + 4] - P[i + 1];
+      const vx = P[i + 6] - P[i], vy = P[i + 7] - P[i + 1];
+      bottomArea += Math.abs(ux * vy - uy * vx) / 2;
+    }
+    return { plan, tris: built.tris, bottomArea, tipZ,
+             emittedVoid: !!built.emittedVoid,
+             plugMm: built.emittedVoid ? built.emittedVoidBottomZ - built.emittedTipZ : null };
+  } catch (e) { return { threw: e.message }; }
+}
+
 /* THE SPHERE'S STEM CHANNEL, as the builder reports it on a state that has
    one — the witnesses above read this rather than the assertion they name,
    which is the circularity the table exists to avoid. */
@@ -834,6 +865,65 @@ const MUTANTS = [
       if (m === null || c === null) return 'the witness could not build a stem';
       return (Math.abs(m - c) > 0.1) ? null : `the emitted inner radius is ${m} against ${c} — the bore did not move`; } },
 
+  /* ===== THE BORE'S TIP PLUG (the tip-plug session) ===== */
+
+  { id: 'the-tip-plug-is-never-built', why: 'the bore runs all the way to the tip again, so a hollow stem ends as a CUT PIPE — watertight, one connected piece, the same shell count, and the only thing wrong with it is the picture Eva asked for',
+    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
+    /* NAMES ST10 AND NOT ST1, WHICH IS A CORRECTION THE TABLE MADE RATHER THAN
+       A JUDGEMENT: ST1 predicts the triangle count FROM THE PLAN, and this
+       mutation moves the plan — it declares an open bottom and the builder
+       emits one, so the two agree and ST1 is correctly blind. Measured SILENT
+       before the claim came off. The clause is right; the claim was wrong. */
+    into: '  const tipPlugMm = 0;', names: ['ST10'],
+    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* THE BOTTOM FACE'S OWN AREA. On the clean tree it is a full disc; with
+         the plug gone it is the tube's section, a quarter smaller at this
+         diameter. A triangle COUNT would also move here, but the area is what
+         says WHICH way — a count cannot tell a closed bottom from an open one
+         with a different ladder. */
+      return (m.bottomArea < c.bottomArea * 0.95) ? null
+        : `the emitted bottom face measures ${m.bottomArea} mm^2 against the clean tree's ${c.bottomArea} — it did not re-open`; } },
+
+  { id: 'the-tip-plug-is-typed', why: "the plug is a typed 3 mm instead of the wall Eva's own bore rule already spends — the SAME triangle count, the same shells, the same faces, and a closure that is no longer derived from anything",
+    find: '  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;',
+    into: '  const tipPlugMm = boreR > 0 ? 3 : 0;', names: ['ST10'],
+    /* THE ONE THAT ISOLATES ST10'S EXTENT CLAUSE. The bottom stays closed and
+       the void keeps its own two-ring ladder, so the count is unmoved and ST1
+       is blind by construction; the census, the flood fill, the orientation
+       gate and the byte tool's own bottom-face clause are all blind for the
+       same reason. What moved is WHERE the bore stops, and one clause reads
+       that. */
+    witness: (M, C) => { const m = plugFacts(M), c = plugFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (m.tris !== c.tris) return `the triangle count moved ${c.tris} -> ${m.tris}; this mutant's whole point is that it does not`;
+      return (m.plugMm !== null && c.plugMm !== null && Math.abs(m.plugMm - c.plugMm) > 1) ? null
+        : `the emitted plug is ${m.plugMm} mm against the clean tree's ${c.plugMm} — it did not move`; } },
+
+  { id: 'the-two-closures-are-allowed-to-cross', why: 'the crossover is an absolute value instead of a floor, so where the root band and the tip plug MEET the builder emits a void anyway — one that runs out through the bottom of the stem',
+    find: '  const voidMm = boreR > 0 ? Math.max(0, (voidTopZ - tipZ) - tipPlugMm) : 0;',
+    into: '  const voidMm = boreR > 0 ? Math.abs((voidTopZ - tipZ) - tipPlugMm) : 0;', names: ['ST10'],
+    /* ST10 AND NOT ST1, FOR THE SAME REASON AS THE MUTANT ABOVE, and the table
+       said so twice before the claim came off. ST1 predicts the triangle count
+       FROM THE PLAN and compares it against the BUILDER — both of its sides
+       read `voidMm`, so a mutation INSIDE the plan moves the prediction and the
+       emission together and ST1 is green by construction. That is not a hole in
+       ST1: it is a builder-against-plan consistency check and says so, and it
+       catches a builder that ignores the plan. What checks the PLAN'S OWN LAW
+       is ST10, whose bar is Eva's stated wall and whose measurement is where
+       the emitted rings stand. */
+    /* PROBED ON THE CROSSOVER STATE, because everywhere else the two
+       expressions agree exactly: `Math.max(0, x)` and `Math.abs(x)` are the
+       same number for every non-negative x, and the void is non-negative on
+       every state but this one. A mutation is invisible wherever the law it
+       replaces happens to agree with it (`bore-is-not-evas-rule`'s own lesson),
+       so the witness has to be driven where they part. */
+    witness: (M, C) => { const st = { ...REGISTRY_DEFAULTS, placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 3, spread: 0.6, layerSize: 0.35, stemLength: 1, stemDiameter: 12 };
+      const m = plugFacts(M, st), c = plugFacts(C, st);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      if (c.emittedVoid) return 'the CLEAN tree already emits a void on the crossover state — the probe is not the crossover';
+      return m.emittedVoid ? null : 'the mutant emitted no void on the crossover state either — the two closures still cannot cross'; } },
+
   { id: 'hairline-root', why: 'the stem STARTS at the hub underside instead of running THROUGH the slab — the overlap becomes a touch, and no boundary census or flood fill can see the difference',
     find: '  const zs = [plan.topZ, ...plan.stations.map((mm) => plan.rootZ - mm)];',
     into: '  const zs = [plan.rootZ, ...plan.stations.map((mm) => plan.rootZ - mm)];', names: ['ST4'],
@@ -899,6 +989,17 @@ const ROWS = [
      relief-limited and the mutation cuts them past the print floor. */
   { label: 'a lobed rim where the PER-PERIOD guard binds (10 teeth at full coverage, 0.30x)',
     set: [{ id: 'lobeDepth', value: '0.3' }, { id: 'lobeCount', value: '10' }, { id: 'lobeCoverage', value: '1' }] },
+  /* THE TWO CLOSURES MEETING, without which the crossover's own mutation is a
+     no-op everywhere. `Math.max(0, x)` and `Math.abs(x)` are the SAME number
+     for every non-negative x, and the void is non-negative on every state but
+     this one — so `the-two-closures-are-allowed-to-cross` fired NOTHING until
+     this row existed, which is `seam-reads-the-live-sheet`'s lesson one family
+     later. A 1 mm stem on the smallest sphere: a 1.20 mm root band and a
+     1.50 mm tip plug across a 2.20 mm stem. */
+  { label: 'the two closures MEETING (a 1 mm stem on the smallest sphere — no bore survives)',
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '3' },
+          { id: 'spread', value: '0.6' }, { id: 'layerSize', value: '0.35' },
+          { id: 'stemLength', value: '1' }, { id: 'stemDiameter', value: '12' }] },
   { label: 'the seam floor binding (tilt 75, length 20, sheet 2.4 — a SINGLE layer)',
     set: [{ id: 'petalTilt', value: '75' }, { id: 'petalLength', value: '20' }, { id: 'sheetThickness', value: '2.4' }] },
   /* THE EXPORT FLOOR BINDING TOO, and it is a second row rather than a wider
@@ -969,16 +1070,30 @@ async function famsOn(rows) {
        table when a family is added" is this project's own rule. A lobe
        mutation that fired nothing would otherwise look exactly like a clean
        tree. */
+    /* THE FAMILY CODE IS THE WHOLE RUN OF DIGITS, ANCHORED ON ITS COLON, and
+       that is a defect this table shipped until the first TWO-DIGIT family
+       arrived. `/^(ST\d)/` captures ONE digit, so every `ST10:` message was
+       recorded as `ST1` — which made a mutant naming only ST10 report "fired
+       ST1", i.e. SILENT on the clause it exists for and CREDITED to a clause
+       that could not have moved. Measured on `the-tip-plug-is-typed`, whose
+       triangle count is unchanged by construction so ST1 is blind to it.
+
+       IT IS A CLASS, NOT AN INCIDENT: any family whose code is a PREFIX of a
+       new one is misattributed the moment the new one exists, in BOTH
+       directions — the new family reads as silent and the old one reads as
+       having fired. A green table is exactly what it looks like. The colon is
+       what makes the capture unambiguous, since every assertion message here is
+       `FAMILY: text`. */
     for (const msg of await thicknessAssertions(page, row)) {
-      const mm = /^(A\d)/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(A\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     for (const msg of await lobeAssertions(page, row)) {
-      const mm = /^(L\d)/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(L\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
     /* THE STEM FAMILY (session 43) — same rule again: a family added is a
        family this table must be able to fire. */
     for (const msg of await stemAssertions(page, row)) {
-      const mm = /^(ST\d)/.exec(msg); if (mm) seen.add(mm[1]);
+      const mm = /^(ST\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

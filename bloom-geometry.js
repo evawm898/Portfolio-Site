@@ -7552,12 +7552,89 @@ export function stemPlan(state, ring, acc) {
      SEEN, because there a narrow hub leaves the bore's mouth open to the sky. */
   const headInsideBore = sphere && headOuterMm < boreR;
   const solidBandMm = headInsideBore ? Math.max(0, topZ - Math.max(tipZ, lowestHubZ)) : 0;
-  const solidBandZ = topZ - solidBandMm;
+  /* ===================================================================
+     THE TIP PLUG — THE SAME LAW AT THE OTHER END (Eva's ask, the tip-plug
+     session: "i want the bottom of the stem when it is a bored cylinder to
+     still look solid").
+
+     THE DEFECT. A hollow stem's bottom was an ANNULUS — watertight, one piece,
+     and it reads as a cut length of pipe. On the shipping preview a 4 mm stem
+     shows an open channel where the 3 mm solid one reads as a proper stem end.
+
+     ONE LAW, TWO ENDS. The root band above closes the bore where the HEAD
+     would otherwise stand inside it; this closes it where a viewer would
+     otherwise look up it. So the bore is no longer a through-hole with a lid:
+     it is an INTERVAL with material above and below, and everything downstream
+     reads that interval rather than a pair of special cases. `buildStemInto`
+     closes an end with one expression called twice.
+
+     THE LENGTH IS DERIVED FROM A LENGTH — Eva's own `STEM_MIN_WALL_MM`, the
+     thickness this bore rule already spends on the SIDE of the tube. A plug as
+     thick as the wall is as strong in the same sense the wall is; nothing is
+     typed and no constant is added.
+
+     AND IT IS THE CONSTANT AND NOT `wallMm`, WHICH IS THE NEARER-LOOKING OWNER
+     AND THE WRONG ONE. `wallMm` is `outerR - boreR`, a DIFFERENCE, and
+     `a - (a - x)` is not `x`: at a 3.1 mm diameter it reads 1.4999999999999998
+     rather than 1.5, so the plug's length would carry a per-diameter wobble and
+     the crossover below would be decided on it. That is this file's own
+     recorded ST5 trap (FOURTH instance, session 43) and it is refused here
+     rather than repeated. Eva's rule states the wall as a CONSTANT and derives
+     the bore from it; the plug reads the constant for the same reason.
+
+     THE CROSSOVER IS DERIVED, NOT SPECIAL-CASED. Both closures are lengths, so
+     on a short enough stem they MEET and no bore survives — the stem is then
+     SOLID THROUGHOUT and the builder's own no-void arm emits it, the same arm a
+     stem at the 3 mm floor takes. There is no third shape and no `if` naming
+     the case: `voidMm` simply comes out non-positive and the same branch runs.
+     TOLD in the read-out, never silently produced.
+
+     WHY A PLAIN `> 0` AND NOT A DERIVED EPSILON, MEASURED RATHER THAN ARGUED.
+     A branch on a continuous quantity is this project's most-repeated defect
+     (six instances), so the margin was swept rather than assumed: over
+     3,996,000 reachable hollow-stem states in BOTH modes the nearest `voidMm`
+     ever comes to zero is 0.0999999999999996 mm and NOTHING lands on it — a
+     tenth of a millimetre against a float noise of ~1e-16, fifteen orders of
+     margin. The obvious "safer" alternative was measured too and is WORSE: a
+     `voidMm >= MIN_FEATURE_MM` floor would put the boundary EXACTLY on a
+     reachable state (a sphere at sheet 1.50, a 3.5 mm stem, 1 mm long, whose
+     void is exactly 1.0), which is the knife edge the plain comparison avoids.
+     The derived-looking floor is the dangerous one here; only the sweep says so.
+
+     WHAT IT COSTS A PRINT, named rather than discovered: with both ends closed
+     the bore stops being a channel and becomes a SEALED CAVITY, so a slicer
+     printing tip-down bridges across it once at the void's floor — a 9 mm span
+     at the widest bore, off 1.5 mm of solid material, which is routine. The
+     root band already introduced the mirror of that at the top.
+
+     ITS MODE-DEPENDENCE IS INHERITED AND NOT ITS OWN, measured over 843,600
+     control sets built in both modes: the stem's topology differs live/export
+     on 2,400 of them, that set is EXACTLY the set where the root band's own
+     `headInsideBore` differs between modes, and it is the SAME 2,400 on this
+     tree as on the tree before this change — 0 added, 0 removed. `voidMm` is
+     mode-free wherever the band's condition is, because on a sphere the band IS
+     the join and the head's thickness cancels out of the difference. The
+     pre-existing half is the BAND's and is not touched here. */
+  const tipPlugMm = boreR > 0 ? STEM_MIN_WALL_MM : 0;
+  const voidTopZ = topZ - solidBandMm;
+  /* THE BORE THAT SURVIVES THE TWO CLOSURES. `voidBottomZ` is derived FROM
+     `voidMm` rather than from `tipZ + tipPlugMm`, so that the ladder
+     `buildStemInto` asks the placer for lands on it EXACTLY: the builder maps
+     station `mm` to `voidTopZ - mm`, and `voidTopZ - voidMm` is this number by
+     construction rather than to within a rounding. */
+  const voidMm = boreR > 0 ? Math.max(0, (voidTopZ - tipZ) - tipPlugMm) : 0;
+  const voidBottomZ = voidTopZ - voidMm;
+  /* SOLID THROUGHOUT — a bore the two closures leave nothing of. Distinct from
+     `boreR === 0`, which is a stem that never had one, and the read-out says
+     which: one is Eva's bore rule closing at the 3 mm floor, the other is the
+     two derived closures meeting across a short stem. */
+  const solidThrough = boreR > 0 && !(voidMm > 0);
   return {
     present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
     hubT, hubR, joinT, blendR, inert, joinReason,
     topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
-    headOuterMm, headInsideBore, solidBandMm, solidBandZ,
+    headOuterMm, headInsideBore, solidBandMm,
+    tipPlugMm, voidTopZ, voidMm, voidBottomZ, solidThrough,
     stations: stemStations(lengthMm), sides: HUB_SECTORS,
   };
 }
@@ -7776,7 +7853,27 @@ export function meridianPacking(fr, plan, omitted) {
    0 and this emits a capped cylinder; above it, a tube with the inner wall
    wound the other way so the shell encloses the MATERIAL and its signed volume
    is positive (O1's own criterion — this is one welded shell, unlike the
-   SPHERE hub's two separate concentric spheres, so it needs no exception). */
+   SPHERE hub's two separate concentric spheres, so it needs no exception).
+
+   AND WHAT IS HOLLOW IS AN INTERVAL, NOT A THROUGH-HOLE (the tip-plug session).
+   `stemPlan` closes the bore at BOTH ends — the ROOT BAND where the head would
+   otherwise stand inside it, the TIP PLUG where a viewer would otherwise look
+   up it — so what this emits is the bore that SURVIVES the two closures. Two
+   consequences worth stating at the top rather than leaving to be read out of
+   the branches:
+
+     * THE THREE ARMS ARE TWO. Where the void survives, one expression
+       (`endFace`) closes or opens each end and is called twice; where it does
+       not — because the bore is zero at the floor, OR because the two closures
+       MEET across a short stem — the no-void arm emits a capped cylinder. The
+       crossover is therefore the same geometry reached by a second road rather
+       than a case named in an `if`.
+
+     * THE BORE IS A SEALED CAVITY. With both ends shut it is no longer a
+       channel through the solid, so the shell has an INNER surface that closes
+       on itself. The winding still encloses the MATERIAL: the outer wall and
+       both end discs face outward, and the void's wall and its two caps face
+       INTO the void, which is where this solid's material is not. */
 export function buildStemInto(acc, plan) {
   if (!plan.present) return { tris: 0 };
   const N = plan.sides, R = plan.outerR, b = plan.boreR;
@@ -7821,78 +7918,159 @@ export function buildStemInto(acc, plan) {
     const up = outer[i], dn = outer[i + 1];
     for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k], dn[k], dn[k2], up[k2]); }
   }
-  if (b > 0 && plan.solidBandMm > 0) {
-    /* THE SOLID ROOT BAND (Eva's ruling). The bore is CLOSED over the length
-       `stemPlan` derived from the head's own geometry, so the head cannot sit
-       inside it with nothing to bridge the two. A SEPARATE BRANCH rather than a
-       ramp, for `domeIsFlat`'s reason: where the band is zero the arm below is
-       the pre-ruling code VERBATIM and those rows are byte-identical by
-       construction rather than by an argument about arithmetic.
+  /* ===================================================================
+     THE BORE'S TWO ENDS, ONE LAW AND ONE EXPRESSION (the tip-plug session;
+     Eva: "one law, two ends"). An end of the bore is either CLOSED over a
+     length — the outer face is a full DISC and the void gets a cap facing into
+     it — or OPEN, an annulus between the two walls. `face` is the tube's own
+     ring at that end, `cap` is the VOID's ring there: coincident with the face
+     when that end is open (the closure's length is exactly 0, so the ladder
+     lands on the face's own z to the bit) and standing a closure's length away
+     when it is shut.
 
-       THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
+     TWO CALL SITES, AND THE OPEN ARM IS EXERCISED BY THE TOP ONE. Under the
+     shipped law a hollow stem's BOTTOM is always closed, so that call never
+     takes the open arm; the TOP one takes it on every hollow stem without a
+     root band, which is nearly all of them. The arm is therefore live code
+     reached by one caller rather than a branch nobody runs — which is the
+     reason to write this as one expression rather than two shapes that
+     resemble each other.
+
+     THE THREE ARMS THIS REPLACES were the solid stem, the hollow stem and the
+     root band, and the last two shared everything but which end was shut. What
+     is left is the VOID or the absence of one. */
+  const endFace = (face, cap, closed, up) => {
+    if (closed) {
+      /* BOTH DISCS ARE RIM FANS, never centre fans — the solid arm's own
+         measured defect, one branch down: a vertex at exactly [0, 0, z] is a
+         double the hub's apex fan also emits, the two shells WELD, and a
+         by-design overlap of coplanar discs becomes a within-shell
+         self-intersection (528 pairs, measured). A rim fan shares no axis
+         vertex with anything. */
+      for (let k = 1; k < N - 1; k++) {
+        if (up) { acc.tri(face[0], face[k], face[k + 1]); acc.tri(cap[0], cap[k + 1], cap[k]); }
+        else { acc.tri(face[0], face[k + 1], face[k]); acc.tri(cap[0], cap[k], cap[k + 1]); }
+      }
+    } else {
+      /* AND THE OPEN ARM'S WINDING IS THE OTHER WAY ROUND FROM THE ONE THIS
+         FILE SHIPPED, WHICH IS A MEASUREMENT AND NOT A TIDY-UP. Both annuli of
+         the pre-plug hollow stem were emitted INVERTED — measured on the
+         shipping 60 x 6 mm stem, the top face's mean n_z was -1.000 where the
+         material is below it and the bottom face's was +1.000 where the
+         material is above it — so the shell's own signed volume came out
+         440.64 mm^3 against a true 1321.91, the outer prism less the bore.
+         The bottom half of that goes with the plug (that face is a DISC now);
+         this is the top half, and it is corrected here because this expression
+         is the one that emits it.
+
+         NOTHING HERE COULD SEE IT, which is why it stood. `analyzeStl`'s edge
+         census keys on a SORTED pair, so it is UNDIRECTED: two triangles
+         crossing one edge the SAME way still count as two, so boundary stays 0
+         and nonManifold stays 0. O1 asks only for the shell's volume SIGN, and
+         the outer wall dominates, so +440.64 passes exactly as +1321.91 would.
+         The flood fill, the degeneracy census and the self-intersection census
+         are all blind for the same reason: the faces are in the right PLACES.
+         Found by computing the shell's volume in closed form and disbelieving
+         the disagreement — session 35's own route to the petals' inside-out
+         shells, one solid later. */
+      for (let k = 0; k < N; k++) {
+        const k2 = (k + 1) % N;
+        if (up) acc.quad(face[k], face[k2], cap[k2], cap[k]);
+        else acc.quad(cap[k], cap[k2], face[k2], face[k]);
+      }
+    }
+  };
+  const tOut = outer[0], bOut = outer[outer.length - 1];
+  let emittedVoid = false, emittedVoidTopZ, emittedVoidBottomZ;
+  if (plan.voidMm > 0) {
+    /* THE VOID GETS ITS OWN LADDER FROM THE ONE PLACER, over its own length,
        rather than the outer tube's stations filtered by a comparison. That is
-       deliberate: `solidBandZ` lands exactly on a station for a SPHERE (where
-       it is `rootZ`) and between two for a CAP (where it is the hub's own
-       underside), so a `z < solidBandZ` filter would decide by the last bit
-       whether a station an ulp away is kept — and a kept one an ulp from the
-       band's edge is a DEGENERATE quad, not merely a different ladder. SIXTH
-       instance of the discrete-decision-on-a-continuous-quantity class this
-       file keeps recording (session 42's Model B named itself the fifth, and
-       this comment said "fifth" for one commit); the ladder asks the placer for
-       a length instead. */
-    const inner = stemStations(plan.solidBandZ - plan.tipZ)
-      .map((mm) => ringAt(b, plan.solidBandZ - mm));
+       deliberate and it is the root band's own construction generalised: the
+       void's ends land exactly ON a station for a SPHERE and between two for a
+       CAP, so a `z < voidTopZ` filter would decide by the last bit whether a
+       station an ulp away is kept — and a kept one an ulp from a closure's edge
+       is a DEGENERATE quad, not merely a different ladder. SIXTH instance of
+       the discrete-decision-on-a-continuous-quantity class this file records
+       (the root band was the first caught before it shipped rather than after);
+       the ladder asks the placer for a LENGTH instead.
+
+       IT IS ALSO WHY THE PLAIN HOLLOW STEM'S INNER WALL IS ONE SEGMENT NOW
+       WHERE IT USED TO FOLLOW THE OUTER TUBE'S TWO. The void's extent is not
+       the stem's extent, so its sampling is not the stem's sampling; the same
+       surface either way, and one rule instead of a rule per arm. When
+       curvature arrives the placer owes the void a pitch law exactly as it owes
+       the tube one, which is the note `stemStations` already carries. */
+    const inner = stemStations(plan.voidMm).map((mm) => ringAt(b, plan.voidTopZ - mm));
     measure(inner);
     for (let i = 0; i < inner.length - 1; i++) {
       const up = inner[i], dn = inner[i + 1];
       for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
     }
-    const tOut = outer[0], bOut = outer[outer.length - 1], bIn = inner[inner.length - 1];
-    const cIn = inner[0];
-    /* BOTH DISCS ARE RIM FANS, never centre fans — the solid arm's own measured
-       defect, one branch down: a vertex at exactly [0, 0, z] is a double the
-       hub's apex fan also emits, the two shells WELD, and a by-design overlap
-       of coplanar discs becomes a within-shell self-intersection (528 pairs,
-       measured). A rim fan shares no axis vertex with anything. */
-    for (let k = 1; k < N - 1; k++) {
-      acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // the closed top face, facing up
-      acc.tri(cIn[0], cIn[k + 1], cIn[k]);              // the void's ceiling, facing DOWN into it
-    }
-    for (let k = 0; k < N; k++) {
-      const k2 = (k + 1) % N;
-      acc.quad(bOut[k], bOut[k2], bIn[k2], bIn[k]);     // bottom annulus, facing down
-    }
-  } else if (b > 0) {
-    const inner = zs.map((z) => ringAt(b, z));
-    measure(inner);
-    for (let i = 0; i < inner.length - 1; i++) {
-      const up = inner[i], dn = inner[i + 1];
-      for (let k = 0; k < N; k++) { const k2 = (k + 1) % N; acc.quad(up[k2], dn[k2], dn[k], up[k]); }
-    }
-    const tOut = outer[0], tIn = inner[0], bOut = outer[outer.length - 1], bIn = inner[inner.length - 1];
-    for (let k = 0; k < N; k++) {
-      const k2 = (k + 1) % N;
-      acc.quad(tIn[k], tIn[k2], tOut[k2], tOut[k]);     // top annulus, facing up
-      acc.quad(bOut[k], bOut[k2], bIn[k2], bIn[k]);     // bottom annulus, facing down
-    }
+    /* THE EMITTED VOID — ST10's measured side, and it is here rather than read
+       off the plan for ST2's and ST3's own reason: a builder that put the plug
+       at the wrong end, or at five times its length, emits the SAME triangle
+       count and leaves the plan untouched, so a clause reading the plan would
+       be green on it. These are the rings handed to `acc.quad` above. */
+    emittedVoid = true;
+    emittedVoidTopZ = inner[0][0][2];
+    emittedVoidBottomZ = inner[inner.length - 1][0][2];
+    endFace(tOut, inner[0], plan.solidBandMm > 0, true);
+    endFace(bOut, inner[inner.length - 1], plan.tipPlugMm > 0, false);
   } else {
-    /* A SOLID STEM IS CAPPED FROM A RIM VERTEX, NEVER FROM THE AXIS, and that
-       is a measured defect rather than a style choice. A centre-fan puts a
-       vertex at exactly [0, 0, topZ] — which is the hub's own top-fan apex,
-       the same double — so the two shells WELD, and a by-design overlap of two
+    /* NO BORE LEFT TO SEE — either the stem never had one (at or under the 3 mm
+       floor `stemBoreRadius` returns 0) or the two closures MEET across a short
+       stem and nothing survives between them. ONE geometry reached by two
+       roads, and that is the crossover derived rather than special-cased: this
+       arm is the pre-plug solid arm VERBATIM, so a stem at the floor is
+       byte-identical by branch rather than by an argument about arithmetic.
+
+       A SOLID STEM IS CAPPED FROM A RIM VERTEX, NEVER FROM THE AXIS, and that
+       is a measured defect rather than a style choice. A centre fan puts a
+       vertex at exactly [0, 0, topZ] — which is the hub's own top-fan apex, the
+       same double — so the two shells WELD, and a by-design overlap of two
        coplanar discs becomes a WITHIN-SHELL self-intersection: measured 528
        pairs on the 3 mm row, worst span 0.1962 mm, against 0 on every hollow
-       one (a bore leaves no axis vertex to share). A rim fan emits N - 2
-       triangles over the same convex disc, none degenerate, and the stem's
-       shell then shares no vertex with the hub's — so the overlap stays
-       cross-shell and by-design, exactly as every stamen's does. */
-    const tOut = outer[0], bOut = outer[outer.length - 1];
+       one (a bore leaves no axis vertex to share). */
     for (let k = 1; k < N - 1; k++) {
       acc.tri(tOut[0], tOut[k], tOut[k + 1]);           // top cap, facing up
       acc.tri(bOut[0], bOut[k + 1], bOut[k]);           // bottom cap, facing down
     }
   }
+  /* THE STEM'S OWN DIRECTED-EDGE CENSUS — ST10's witness for which way these
+     faces point, and the only one available.
+
+     WHY IT IS OWED. The shipped `analyzeStl` census keys each edge on a SORTED
+     pair, so it is UNDIRECTED: two triangles crossing one edge the SAME way
+     count as a matched pair, and the mesh reads watertight and manifold. O1
+     asks only for a shell's volume SIGN, which a dominant outer wall keeps
+     positive. So an END FACE wound the wrong way is invisible to every gate in
+     this project — and both of the pre-plug tube's annuli WERE (measured: the
+     shipping 60 x 6 mm stem's shell enclosed 440.64 mm^3 against a true
+     1321.91, the outer prism less the bore). This counts directed edges with no
+     opposite, over the triangles this function just emitted, so a face that
+     turns over has a number attached to it.
+
+     IT IS THE STEM'S OWN AND NOT THE MESH'S, deliberately: the same census over
+     the whole bloom is a real instrument and its own piece of work, and the
+     measurement that would scope it is in this session's outcome doc rather
+     than in a gate nobody has run over the matrix. Scoped here, it is a few
+     hundred map entries on a solid that never exceeds ~500 triangles. */
+  let directedMismatch = 0;
+  {
+    const seen = new Map();
+    const P = acc.positions;
+    const k = (i) => `${P[i]},${P[i + 1]},${P[i + 2]}`;
+    for (let t = before * 9; t < P.length; t += 9) {
+      const v = [k(t), k(t + 3), k(t + 6)];
+      for (let e = 0; e < 3; e++) { const key = `${v[e]}>${v[(e + 1) % 3]}`; seen.set(key, (seen.get(key) || 0) + 1); }
+    }
+    for (const key of seen.keys()) {
+      const [a, bq] = key.split('>');
+      if (seen.get(key) !== 1 || !seen.has(`${bq}>${a}`)) directedMismatch++;
+    }
+  }
   return { tris: acc.triangleCount - before, emittedTopZ, emittedTipZ: zs[zs.length - 1],
+           emittedVoid, emittedVoidTopZ, emittedVoidBottomZ, directedMismatch,
            emittedMaxR, emittedMinR: emittedMinR === Infinity ? 0 : emittedMinR, emittedAxisOffset };
 }
 
