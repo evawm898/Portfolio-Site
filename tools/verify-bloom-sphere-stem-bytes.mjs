@@ -28,12 +28,36 @@
    on accumulator state. The tool REFUSES rather than guesses if the counts it
    derives do not add up to the base stream it is slicing.
 
+   UNDER `--change band` CLAUSE 2 ASKS A DIFFERENT QUESTION OF THE SAME BUILDER:
+   the band may only change the stem's INTERIOR. Two halves. (a) every float
+   that differs, on either side, lies inside the stem's own envelope (radius
+   <= outerR, z within [tipZ, topZ]) — so a band that reached the head, a petal
+   or the hub is named rather than absorbed; (b) the stem's OUTER CYLINDER WALL
+   is bit-identical, triangle for triangle, sorted — so the silhouette from any
+   side is untouched.
+
+   ITS DECLARED BLINDNESS, because the first version of this file claimed more
+   than it could see: (b) EXCLUDES the top and bottom faces by construction
+   (their rim fans also sit at outerR, and are separated from the wall by having
+   all three vertices at one height). The band DOES change the top face — that is
+   what closing a bore is — and on the rows where a band exists the head is by
+   the condition narrower than the tube, so that face is exposed with the band
+   and without it. What (b) carries is therefore "the tube's side is untouched",
+   never "nothing the eye can reach moved". The first draft of this header said
+   the latter; it was corrected by re-reading the diff against the clause, not
+   by a red.
+
    THE PARTITION IS PREDECLARED FROM THE BUILDER'S OWN RECORD, never from the
    control set (session 41's discipline): a row moves iff the builder actually
    reports a stem channel on it — a stem present on a sphere — which is the only
    thing on this branch that can move a byte. A row that sets `stemDiameter` to
    an extreme with `stemLength` 0 is correctly a HOLDER, and so is every sphere
    row that shipped before this session.
+
+   AND A ROW MOVES UNDER `--change band` IFF `stemPlan` ITSELF REPORTS A BAND
+   (`solidBandMm > 0`) — the plan's own record again, not the control set, so a
+   row that merely sets a wide stem on a normal head is correctly a HOLDER and
+   the inert-by-branch claim is measured rather than argued.
 
    THE CONTROL IS `--control`, required before quoting a pass from a changed
    harness: it perturbs one coordinate of every HOLDER by 1e-9 and requires the
@@ -57,7 +81,15 @@ const CONTROL = process.argv.includes('--control');
    the first SURVIVING petal's first vertex and therefore by construction not
    in any omitted petal's block — exactly the condition-2 violation (a petal
    that was kept but moved) clause 2 exists to catch. Clause 1 stays clean
-   under it, because a mover that moves is all clause 1 asks. */
+   under it, because a mover that moves is all clause 1 asks.
+   UNDER `--change band` THE SAME FLOAT IS THE FIRST PETAL'S OR (on the bare
+   corner, which builds none) THE HUB'S — either way OUTSIDE the stem, which is
+   half (a)'s own claim, so it is the band escaping the stem that is exercised.
+   Half (b) is exercised by the mutation the apex table would carry rather than
+   from here: a wall triangle can only move if the band's own ladder reaches the
+   tube, and no perturbation of the emitted stream can manufacture that without
+   also violating (a) first. Named so the asymmetry is a declared property of
+   this control and not an oversight. */
 const CONTROL_ONLY = process.argv.includes('--control-only');
 /* PER CHANGE, NOT PER TOOL — the seam tool's own precedent (session 39): this
    file is named for its FIRST caller and the tool is not. `omission` is the
@@ -283,11 +315,13 @@ const pass = !badMove.length && !badHold.length && !badOnly.length;
 if (CONTROL_ONLY) {
   const fired = badOnly.length > 0;
   console.log(fired
-    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where a KEPT petal had moved`
+    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where ${CHANGE === 'band' ? 'a float OUTSIDE the stem had moved' : 'a KEPT petal had moved'}`
     : '\nCONTROL-ONLY FAILED TO FIRE — clause 2 cannot see a kept petal moving, so its PASS is not evidence');
   if (!movers) console.log('   (and there were NO MOVERS in this row set, so the control was vacuous — narrow to rows that build a stem on a sphere)');
   process.exit(fired && movers ? 0 : 1);
 }
 console.log(CONTROL ? (pass ? '\nCONTROL FAILED TO FIRE — the comparison cannot see a 1e-9 perturbation, so neither clause is evidence' : '\nCONTROL OK — CLAUSE 1 detected the perturbation on the holders (clause 2 is NOT exercised here — that is `--control-only`)')
-                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : '\nPASS — every predeclared mover moved, every holder held, and on every mover the ONLY floats that went are the omitted petals\' own.') : '\nFAIL'));
+                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : (CHANGE === 'band'
+                        ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem while its outer wall stayed bit-identical.'
+                        : '\nPASS — every predeclared mover moved, every holder held, and on every mover the ONLY floats that went are the omitted petals\' own.')) : '\nFAIL'));
 process.exit(CONTROL ? (pass ? 1 : 0) : (pass ? 0 : 1));
