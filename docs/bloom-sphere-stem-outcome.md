@@ -258,7 +258,11 @@ takes it through the arc. That is reported rather than tuned: nothing here was a
 land on 1.005.
 
 The brief's second figure — *"at 40 petals the feet already overlap on the shipped tree
-(0.563), which is pre-existing and by design"* — is **not this quantity**. It is the feet
+(0.563), which is pre-existing and by design"* — is **not this quantity**. **Its provenance
+is now known and it is EVA'S OWN, quoted forward from session 43's Phase A** (Eva, on the
+ruling): it could not be reproduced here because it is a different measurement, not because
+it was wrong where it came from. What follows is recorded so the real readings are on the
+record and the number itself is not carried any further. It is the feet
 against EACH OTHER rather than against the stem, it has no stem in it, and this session did
 not identify a definition that produces it. The two closest readings that can be built from
 `footRing()`'s own fields are the consecutive-ring meridian step over the mean **overhang**
@@ -379,7 +383,29 @@ control with nothing to perturb reports the same silence as a clause that cannot
 **And `--control` now says which clause it exercised**, rather than "the perturbation was
 detected" — the conflation the second control exists to undo.
 
-### 9b. FOUR RESIDUALS WERE COMPUTED ON SLOT 0 BECAUSE SLOT 0 ALWAYS EXISTED
+### 9b. THE CLASS: AN INSTRUMENT THAT INDEXES BY SLOT AND NEVER ASKS WHETHER THE SLOT WAS BUILT
+
+**This is one defect class, not a list of incidents**, and writing it as the class is Eva's
+instruction: *an instrument that indexes by slot and never asks whether the slot was built.*
+Every generator here has run on the premise that the slot sequence and the built set are the
+same set. They stopped being the same set the moment a petal could be omitted, and several
+instruments broke at once. **Eva named four from the report** — the slot-0 residuals, the
+representative petal, the crowding raster's foot count, and the solid-angle census re-emitting
+petals the builder did not build. **A FIFTH is the same premise at count ZERO** (the crowding
+raster reading `feet[0]` on the row that builds no petal at all), and it belongs in the class
+rather than beside it. None of them is about the stem; all five are about a premise nobody had
+written down because nothing had ever violated it.
+
+**One finding below is NOT an instance and is marked as such** — ST9's first region including
+the hub is a region-definition error, not a slot-index one. It is kept here because it surfaced
+in the same run and because the reason it reads zero honestly is worth having in one place.
+
+**THE TEST THAT FINDS THE NEXT ONE: for any instrument keyed on a slot index, ask what it
+reads when that slot is not built — and what it reads when NONE of them is.** "It always exists" is the answer that was true until this
+session and is not an argument. The four below are what that question caught; a fifth is
+found by asking it, not by waiting for a red.
+
+#### 9b(i). Four residuals were computed on slot 0 because slot 0 always existed
 
 `buildPetalInto` carries four one-petal checks — the flat-form guard residual, the
 uniform-thickness guard residual, the curl integrator's residual and the flat-dome frame
@@ -398,7 +424,8 @@ partition is what says so.
 the row census named all eight, and the block above named the clause. Before #220 that
 run's tail would have read `1/1 watertight`.
 
-**AND ST9's FIRST REGION INCLUDED THE HUB.** The stem is rooted THROUGH the hub, so the
+**AND ST9's FIRST REGION INCLUDED THE HUB — NOT AN INSTANCE OF THE CLASS, recorded here
+because it came out of the same run.** The stem is rooted THROUGH the hub, so the
 two share their boundary by construction, and on a sphere the hub's own far-pole apex sits
 at EXACTLY `rootZ`, on the axis — distance 0 from the channel. Measured: 288 to 1488
 vertices on every sphere-stem row, all of them the hub's south apex fan and the ring just
@@ -431,10 +458,12 @@ petals built and R4 has nothing to iterate — and the read-out says `NO FEET` r
 D_max of 0 nobody measured. This project's own rule, arriving in a new place: a missing
 element must be a red check, never a crash.
 
-**THE SHAPE OF ALL FIVE.** Every one is an instrument that assumed a slot always carries a
-petal, and every one was found by the gate rather than by reading the code. The omission is
-the first thing in this generator that can make a declared slot empty, and what that costs
-is exactly this list — five places that had no reason to be written any other way.
+**THE SHAPE OF ALL FIVE.** Every one of the five is an instrument that assumed a slot always
+carries a petal (four at "some slot is missing", the fifth at "no slot was built"), and every
+one was found by the gate rather than by reading the code. The omission is the first thing in
+this generator that can make a declared slot empty, and what that costs is exactly this list —
+five places that had no reason to be written any other way. **The test above is what finds the
+sixth**, and it is a question to ask rather than a red to wait for.
 
 ### 9b-bis. THE MUTANT TABLE FOUND TWO REAL DEFECTS IN ST9, AND BOTH ARE EVA'S FOURTH RULE
 
@@ -545,6 +574,24 @@ so an export path that dropped or reordered triangles between the accumulator an
 is outside it — that is `stemChannelAssertions`' own home in both STL gates, where it rides on
 every row.
 
+### 9b-quater. THE FIRST IMAGE WAS FRAMED ON A QUANTITY READ FROM THE BUILD, AND IT WAS STILL THE WRONG OWNER
+
+`shot-bloom-sphere-stem.mjs` framed each cell at `Rd * 1.55` — the head's own sphere radius,
+**read from the build rather than typed**, which is the discipline this project asks for and
+is exactly why the mistake was not obvious. It is still the wrong owner: the blades radiate
+well past `Rd`, so every petal fell outside the picture. **The pole was in frame and THE
+OMISSION WAS NOT** — the one thing the image exists to show.
+
+The fix is the row's own STEMLESS build's `maxDimMm`, halved: what the bloom actually
+occupies, asked of the build that has no stem in it so the frame cannot move when the stem
+does.
+
+**THE CLASS, and it is the one Eva named:** *the same class as measuring an arc's direction
+instead of its extent.* Reading a number off the artefact is necessary and not sufficient —
+the question is whether that number is the quantity the claim is about. "Derived, not typed"
+and "derived from the RIGHT length" are two different bars, and this project's own
+mode-and-sampling rule is the first half of the same sentence.
+
 ### 9c. The matrix, the census and the gates
 
 * **The live matrix goes 736 -> 744.** Nine rows added (block 32), one removed (block 30's
@@ -584,6 +631,30 @@ every row.
   is never force-pushed here, so the commit cannot be orphaned and phase29's definitions stay
   replayable without the tag; the load-bearing half is the REGISTRATION, which is done in both
   maps and is what `bloom-frozen-matrices` proves green on this head.
+* **TWO FROZEN TAGS' BYTES NO LONGER REPRODUCE — ONE ROW EACH, NAMED, and it is the
+  OMISSION's rather than the band's.** This project's rule is that a frozen tag pins row
+  DEFINITIONS and never bytes, and that a session which moves frozen bytes must say which tag
+  and how many rows. Measured over **all 28 registered frozen matrices** by asking `footRing`
+  + `stemPlan` of every row in both modes which could possibly move (a stem present on a
+  sphere, or a band), then byte-comparing exactly those against a worktree of `5f9c0c7`:
+
+  | tag | rows | rows whose bytes move |
+  |---|---|---|
+  | `frozen/phase2` .. `frozen/phase27` | 76 .. 680 | **0** |
+  | **`frozen/phase28`** (699 rows at `994aea4`) | 699 | **1** |
+  | **`frozen/phase29`** (736 rows at `5f9c0c7`) | 736 | **1** |
+
+  It is the SAME row in both: `STEM: GATED — SPHERE with a stem asked for`, which was gated
+  when those snapshots were taken and is not gated now — it builds a stem and loses the petals
+  the channel omits, **63,264 → 52,060 triangles** in both modes. That is the ruling working,
+  not a regression; it is also exactly why the row was removed from the LIVE matrix. **Their
+  definitions still deep-compare**, which is what `bloom-frozen-matrices` proves. phase28 and
+  phase29 join phase17, phase19, phase21, phase23 and phase24 in the
+  definitions-reproduce-bytes-do-not class.
+
+  **THE BAND MOVES NO FROZEN ROW AT ALL** — no frozen matrix carries a sphere whose head is
+  inside its bore, which the same sweep shows by finding one candidate rather than two.
+
 * **Smoke census: 28 matrix blocks** (the block count rose, which is session 34's trap
   avoided) **and 80 families, both directions**, ST7/ST8/ST9 among them.
 * **The self-intersection census on all nine block-32 rows, EXPORT:** eight read exactly
@@ -626,7 +697,11 @@ every time. It is still the right construction — the boundary is a slider posi
 and an assertion that can fail is worse than a construction that cannot — but a session
 that removes it owes this measurement again.
 
-## 9e. BLOCKING: A HEAD THAT FITS INSIDE THE STEM'S BORE EXPORTS AS TWO SOLIDS
+## 9e. ~~BLOCKING~~ RULED AND FIXED: A HEAD THAT FITS INSIDE THE STEM'S BORE EXPORTED AS TWO SOLIDS
+
+> **RESOLVED by Eva's ruling — THE SOLID ROOT BAND. See §10 for what was built, the
+> measurement that narrowed it, and the acceptance test. This section is kept as the
+> diagnosis it was, unedited, because the ruling was made on it.**
 
 **`node tools/bloom-smoke.mjs --conn` is RED, and it is a hard-invariant failure rather
 than a flag.** `SPHERE STEM: THE BARE CORNER` exports watertight (boundary 0) and as
@@ -776,7 +851,211 @@ the first is lifted verbatim from `tools/verify-bloom-connectedness.mjs` because
 vertex-weld shell count is not the connectedness test** — this repo's own recorded rule, and
 the first pass of this investigation used the weld and would have got the mechanism wrong.
 
-## 10. What this session did NOT do
+## 10. THE SOLID ROOT BAND — EVA'S RULING, BUILT
+
+**The ruling:** *close the bore where the head is.* Refusing the stem takes a reachable
+flower away; narrowing `stemDiameter` against the head makes one control silently eat
+another's range (`stamenSpread`'s adaptive-maximum ruling). The geometry has a direct
+answer, so it is the one taken.
+
+### 10a. THE EXTENT IS DERIVED FROM THE HEAD'S OWN GEOMETRY, IN MILLIMETRES
+
+Two lengths, both already owned by `stemPlan` and neither typed:
+
+```
+headOuterMm  = dome.Rd + hubT/2          the head's greatest cylindrical radius
+lowestHubZ   (already derived per head shape, for hiddenMm)
+solidBandMm  = topZ - max(tipZ, lowestHubZ)      when the condition binds, else 0
+```
+
+The band runs from the face the stem is rooted through DOWN to whichever comes first, the
+head's lowest material or the stem's own tip. **On a sphere `lowestHubZ` is `rootZ` by the
+plan's own derivation**, so the band is the wall's own thickness and nothing is invented for
+it. On the bare corner: 1.2000 mm, `topZ −0.7919 → −1.9919`.
+
+### 10b. IT IS THE CLOSED SHELL'S CASE, AND THAT WAS MEASURED RATHER THAN SCOPED
+
+The first cut applied the condition to any head. **`headOuterMm < boreR` is reachable on a
+CAP too — 291 of 4,608 swept states, hub radii down to 0.812 mm against bores to 4.500 — and
+on every one of them the band fixed NOTHING:**
+
+| CAP state (3 petals, width 4, spread 0.6) | components, base | components, with the band |
+|---|---|---|
+| 12 mm stem (bore 4.50) | 2 @ 0.6 mm · 2 @ 0.3 | **2 · 2, identical** |
+| 9 mm stem (bore 3.00) | 2 · 2 | **2 · 2, identical** |
+| 6 mm stem (bore 1.50) | 1 · 2 | **1 · 2, identical** |
+
+Because the head was never the detached part there. Decomposed, the stray piece on the CAP
+case is **12 voxels lying at the single height z = −3.696**, and `hubT/2 − joinT` is
+−3.6962 — it is **#236's flat zero-volume join shell**, not the head, which sits in the main
+body spanning r 0.29..33.19.
+
+**Why the two differ, and it is the distinction `joinReason` already draws:** on a CAP or a
+flat hub the stem is rooted THROUGH the head's own slab and the join thickens that slab
+around the axis, so head and stem share material whatever the bore does. On a closed shell
+the stem leaves a POLE, the head is a thin skin at `headOuterMm`, and the whole of it can
+stand inside the bore with nothing bridging the two. So `headInsideBore` carries
+`sphere &&`, and firing it on a CAP would have moved bytes for no benefit **and would have
+been SEEN** — there a narrow hub leaves the bore's mouth open to the sky.
+
+### 10c. THE ACCEPTANCE TEST, AT BOTH CELLS AND IN BOTH MODES
+
+| | cell 0.6 mm | cell 0.3 mm |
+|---|---|---|
+| LIVE | **components=1, stray=0** | **components=1, stray=0** |
+| EXPORT | **components=1, stray=0** | **components=1, stray=0** |
+
+**The probe is calibrated**: the same raster on a worktree of `7513472` reads
+`components=2 stray=0.00821` at 0.6 mm and `3` at 0.3 — reproducing CI's own figures for that
+row exactly, which is what makes the pass mean something. The gate itself agrees:
+`node tools/verify-bloom-connectedness.mjs --only 'SPHERE STEM'` is **PASS, 9 of 9**, and the
+other eight rows' triangle counts are unchanged to the integer.
+
+### 10d. IT IS VISIBLE, AND THAT IS REPORTED RATHER THAN ACCEPTED QUIETLY
+
+Eva's constraint 4 was *"the band is inside the stem; if it is visible from outside in any
+state, the derivation has overshot — say so rather than accepting it."* **It is visible, and
+this section is the saying so.**
+
+The first version of this work asserted the opposite, in a code comment and in this doc: the
+band adds material inside the tube, so nothing outside changes. That is right about the outer
+wall and the stem's length, and **wrong about the top face**. Measured on the bare corner:
+
+| | |
+|---|---|
+| head's whole silhouette | **1.992 mm** of radius |
+| stem's outer radius | 6.000 mm |
+| the face the band closes | r 0..**4.500** (the bore) |
+| of it, outside the head entirely | r 1.992..4.500 — **51.15 of 63.62 mm², 80.4%** |
+
+Where before there was an open bore to look down, from directly above.
+
+**AND THE CLAUSE WRITTEN TO CHECK IT COULD NOT HAVE SEEN IT.** CLAUSE 2 identifies the stem's
+"outer wall" as triangles with all three vertices at `outerR` **and not all at one height** —
+which excludes precisely the top face. The measured side was scoped so the claim could not
+fail. That is this project's most-recorded defect class, committed here in the clause written
+for the claim, and caught by re-reading the diff rather than by any run.
+
+**IT IS THE CONDITION THAT IS VISIBLE, NOT THE EXTENT, AND THAT IS PROVABLE RATHER THAN
+MEASURED ON ONE ROW.** A band exists iff `headOuterMm < boreR`, and `boreR = outerR − 1.5` is
+always less than `outerR` — so **a band implies a head narrower than the TUBE**, i.e. a head
+that could never have covered the stem's top face. On exactly the rows where the band exists,
+that face is exposed with it and without it; what a viewer directly above sees change is a
+**hole becoming a disc**. The band's LENGTH is the head's own wall and nothing more, and no
+shorter one is available: the head sits at the TOP of the bore, so any closure that reaches it
+sits where the head is, and there the closure is necessarily wider than the head. A disc
+covering only the part under the head (r ≤ 1.828 at that height) would not reach the tube's
+wall — a second detached piece, fixing nothing.
+
+**So this is flagged for Eva rather than absorbed.** The alternative is not a tighter
+derivation; it is a different ruling (refuse the stem on such a head, or narrow `stemDiameter`
+against it — the two she rejected). If a plugged bore reads wrong to the eye on the bare
+corner, that is the ruling to revisit, and this section is here so it can be.
+
+**What CLAUSE 2 does still carry, stated as the narrower claim it is:** the stem's outer
+cylinder is bit-identical between trees, and every differing float lies inside the stem's own
+envelope — so the band did not reach the head, a petal or the hub. That is worth having. It is
+not a claim of invisibility.
+
+### 10e. ST1 CAUGHT THE FIRST CUT, WHICH IS THE CLAUSE EARNING ITS KEEP
+
+The band changes the stem's emission, and ST1 predicts the triangle count from the PLAN's own
+stations and sides:
+
+```
+ST1: the builder emitted 476 triangles for a hollow stem of 2 band(s) on 48 sides;
+     the plan's own station list and side count ask for 576
+```
+
+That is the clause this session had already strengthened — it used to ask only about a stem
+that should NOT exist, and `stem-declared-and-not-built` fired nothing against it. ST1 now
+carries three arms, because the band is a third emission and not a tweak of the hollow one:
+with the bore closed the top face is a full DISC rather than an annulus, the inner wall runs
+only over the void, and the void gains a ceiling. Both new discs are RIM fans (cost `N − 2`,
+not `N`) — a centre fan would put a vertex on the axis and weld to the hub's own apex, the
+measured defect the solid arm already carries.
+
+### 10f. AND THE VOID'S LADDER COMES FROM THE PLACER, NOT FROM A COMPARISON
+
+`solidBandZ` lands exactly on a station for a SPHERE and between two for a CAP, so filtering
+the outer tube's stations by `z < solidBandZ` would decide by the last bit whether a station
+an ulp away is kept — and a kept one an ulp from the band's edge is a **degenerate quad**, not
+merely a different ladder. The void asks `stemStations` for its own length instead. **SIXTH**
+instance of the discrete-decision-on-a-continuous-quantity class this project records (session
+42's Model B was the fifth and named itself so), and the first one caught before it shipped
+rather than after.
+
+### 10f-bis. COST, AND NO FROZEN PHASE IS OWED BY THE BAND
+
+**No row is added or removed** — the band fires on a row the matrix already ran — so
+`frozen/phase29` (the 736 rows at `5f9c0c7`) is still the baseline this PR owes and the band
+adds no second one. Its byte effect is one row of the live matrix (§10g), and no frozen matrix
+names a sphere row with a head inside its bore, so **no tag's bytes stop reproducing because of
+it.**
+
+| row | triangles before | after |
+|---|---|---|
+| `SPHERE STEM: THE BARE CORNER` | 7,296 | **7,196** |
+| every other `SPHERE STEM:` row | 21,432 / 21,140 / 85,044 / 527,972 / 25,568 | **unchanged to the integer** |
+
+**The count FALLS, and the arithmetic is ST1's own** — the STEM's own triangles go **576 → 476**
+on that row (N = 48 sides, 2 bands):
+
+| | hollow arm | band arm |
+|---|---|---|
+| full-length walls | `4N·bands` = 384 | `2N·bands` = 192 (one wall) |
+| void wall + bottom annulus | — | `4N` = 192 |
+| top + bottom annuli | `4N` = 192 | — |
+| two RIM fans (top disc, void ceiling) | — | `2(N−2)` = 92 |
+| **total** | **576** | **476** |
+
+**RIM fans, never centre fans**, and that is not a saving but a defect avoided: a centre fan
+puts a vertex at `[0, 0, z]`, which on a SOLID stem is the hub's own top-fan apex to the double
+— the two shells then WELD and a by-design overlap of two coplanar discs becomes a
+within-shell self-intersection. Measured earlier in this session on the solid arm: **528 pairs
+on the 3 mm row, 0 on every hollow one** (a bore leaves no axis vertex to share). The band is
+the second place that would have arrived.
+
+### 10g. THE BYTE PARTITION — INERT BY BRANCH, MEASURED OVER THE WHOLE MATRIX
+
+Eva's constraint 2 was *"predeclare it that way and confirm it; if a normal-sized head moves a
+float, the derivation is wrong."*
+
+`node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree of 7513472> --change band`
+
+| | |
+|---|---|
+| rows | **744**, both modes |
+| predeclared MOVERS | **1** |
+| predeclared HOLDERS | **743** |
+| export floats compared with `Object.is` | **754,658,352** |
+| CLAUSE 1 — movers that did NOT move | **0** |
+| CLAUSE 1 — holders that MOVED | **0** |
+| CLAUSE 2 — movers where the outer wall moved, or anything outside the stem did | **0** |
+
+**PASS.** The single mover is `SPHERE STEM: THE BARE CORNER`. Every other row in the matrix —
+including the eight other `SPHERE STEM:` rows, `ALL MAX`, and every CAP row that sets a wide
+stem — is bit-identical. **No normal-sized head moves a float**, which is the derivation
+answering for itself rather than a comment claiming it does.
+
+**THE MOVERS ARE PREDECLARED FROM `stemPlan`'S OWN RECORD** (`solidBandMm > 0`), never from the
+control set — session 41's discipline, and the same owner the omission's partition uses. A row
+that merely sets an extreme `stemDiameter` on an ordinary head is correctly a HOLDER.
+
+**BOTH CLAUSES ARE SHOWN ABLE TO FAIL, because one control would have left the other a log
+line** (this file's own `--control-mode` lesson):
+
+| control | what it perturbs | what fired |
+|---|---|---|
+| `--control` | one coordinate of every HOLDER by 1e-9 | CLAUSE 1 on **8 of 8** narrowed holders |
+| `--control-only` | the first float of a MOVER's stream (here the hub's, the bare corner building no petals) | CLAUSE 2 on **2 of 2** (mover x mode) builds |
+
+**Its declared asymmetry, named rather than left to be noticed:** `--control-only` exercises
+clause 2's *envelope* half. Its *wall* half cannot be reached by perturbing the emitted stream
+at all — a wall triangle can only move if the band's own ladder reaches the tube, and that
+violates the envelope half first. The tool's header says so.
+
+## 11. What this session did NOT do
 
 * **It did not grow `dome.reserved`, touch S3, or change the equal-area placement law.**
   Session 43 Phase A measured that mechanism and it does not work; §1 carries the numbers.
@@ -799,10 +1078,13 @@ the first pass of this investigation used the weld and would have got the mechan
   by design, and it is already told on every row (`D_max`, `D_mean`, `NN … w`). §7b records
   what the two closest readings of it measure and that neither reproduces the brief's
   0.563, rather than adopting a figure with no definition behind it.
-* **IT DID NOT FIX EITHER `>1 piece` FAILURE, and that is the ball it is handing back.**
-  §9e's is the sphere's and needs a ruling; §9e-bis's is `main`'s, is filed as #236, and is
-  a fix in `buildHubInto`'s join arm — both on the brief's DO-NOT list, and the brief says in
-  as many words to stop and report with the measurement rather than do it.
+* **IT FIXED ONE OF THE TWO `>1 piece` FAILURES AND DELIBERATELY LEFT THE OTHER.** §9e's is
+  the sphere's, was ruled on, and is §10; **§9e-bis's is `main`'s, stays filed as #236, and was
+  NOT chased here** — Eva's instruction was to check whether the band closed it and report
+  either way, which §10b does: a CAP's component count is identical with the band and without,
+  because the stray piece is #236's flat join shell and not the head. It is a fix in
+  `buildHubInto`'s join arm and it wants its own PR. **Recorded plainly: `main` today ships a
+  reachable state that violates the one-connected-solid invariant.**
 * **It did not add an xfail to the connectedness gate.** That gate has an xfail POLICY in its
   own header (*"If one is ever added it must cite a tracked issue, PASS while the defect
   persists, and FAIL HARD the moment the row exports as one piece"*) and NO xfail MECHANISM:
