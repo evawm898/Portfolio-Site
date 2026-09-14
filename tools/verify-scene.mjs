@@ -220,6 +220,15 @@ const MUTANTS = [
               'scene1/the-traits-are-per-fish-and-span-the-sliders',
               'fish/separation-is-a-body-not-a-personality',
               'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
+              // AND IT CHURNS, which is a true statement about this mutation
+              // rather than a check that needs loosening. A koi crossing the
+              // frame edge is ordinary swimming, so a manager counting only
+              // what is IN FRAME sees a population that oscillates on its own
+              // and spawns and departs against it — which is what the churn
+              // check measures. It went unnamed until the density work shifted
+              // the sequence enough to surface it; the mutation is more plainly
+              // broken now, not less.
+              'fish/the-population-does-not-churn-at-a-steady-intensity',
               // Measured on this mutation: a koi on its way out is counted as
               // present, so the manager stops recalling in time and the pond
               // reaches EIGHT on screen. The recall check's own count bar is
