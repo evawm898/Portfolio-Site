@@ -4983,6 +4983,103 @@ export async function stemAssertions(page, row) {
   }
 
   /* ===================================================================
+     ST10 — THE BORE IS CLOSED AT BOTH ENDS, MEASURED ON THE RINGS THE BUILDER
+     ACTUALLY EMITTED (the tip-plug session).
+
+     WHY IT IS OWED AT ALL, and it is not "because a feature shipped": BOTH STL
+     GATES ARE BLIND HERE BY CONSTRUCTION. A tube left OPEN at the bottom is a
+     perfectly good closed shell — zero boundary edges, one connected piece,
+     positive volume, consistent winding — so watertight, connected, manifold,
+     orientation and the degeneracy census all pass on the very defect this
+     clause exists for. The only thing that changes is what the bottom of the
+     stem LOOKS like, which is Eva's whole ask, and no gate here looks.
+
+     WHAT OWNS EACH SIDE, because that is the fourth durable rule's test.
+       EXPECTED: `STEM_MIN_WALL_MM`, imported — Eva's own stated print
+         requirement, an external fact rather than a quantity under test. It is
+         the same discipline ST3 already draws: that clause imports Eva's 1.5 mm
+         and deliberately does NOT import `stemBoreRadius`, because a reference
+         read through the thing it checks moves with the defect. Here the
+         quantity under test is the PLUG'S LENGTH, and its owner in the geometry
+         is `stemPlan`; so this clause reads NOTHING from `stemPlan` for its bar.
+       MEASURED: the builder's own emitted inner rings. `buildStemInto` folds
+         over the very arrays it hands `acc.quad`, so these ARE the artefact —
+         session 43's ST2/ST3 lesson, where a clause reading the PLAN's declared
+         radii left `stem-off-the-axis` firing nothing.
+
+     AND THE BICONDITIONAL IS THE CROSSOVER. The two closures are derived, not
+     dialled, so on a short enough stem they MEET and there is no bore left at
+     all. That is not a special case to except out: the clause asks whether the
+     builder emitted a void iff the plan says one survives, in BOTH directions,
+     so a builder that silently kept a sliver of bore where the law says none —
+     or dropped one where the law says it survives — is named either way.
+
+     ITS DECLARED BLINDNESS, stated here rather than left to be found. Nothing
+     reads the EXPORTED FILE for the plug. ST9 does that for the channel because
+     the channel's claim is about what the file contains; the plug's claim is
+     about what the builder emitted, and the emitted rings are the artefact. The
+     file-side clause that WOULD be independent is the bottom face's AREA — a
+     full disc is `pi R^2` and an annulus is `pi (R^2 - b^2)`, a 56% difference
+     at the widest bore — and it is available rather than built. If a session
+     ever makes the builder's report and the file disagree, that is the clause
+     to write. */
+  const P = S;
+  if (P.tipPlugMm === undefined) {
+    bad.push('ST10: the plan declares nothing about a tip plug — the bore\'s bottom end has no law, so a hollow stem ends as a cut pipe and nothing here can say otherwise');
+  } else if (P.emittedVoid === undefined) {
+    bad.push('ST10: the builder reports nothing about the void it emitted — the plug can only be checked against the plan that asked for it, which is both sides on one owner');
+  } else {
+    const hollow = P.boreR > 0;
+    /* (a) THE PLUG EXISTS IFF THERE IS A BORE TO CLOSE. On a stem at or under
+       the 3 mm floor `stemBoreRadius` already returns 0, so there is nothing to
+       plug and a plug there would be a solid inside a solid — the inertness
+       half of Eva's ruling, in the direction a green run cannot show. */
+    if ((P.tipPlugMm > 0) !== hollow) {
+      bad.push(`ST10: the plan asks for a ${P.tipPlugMm} mm tip plug on a stem whose bore radius is ${P.boreR} — a plug exists iff there is a bore to close`);
+    }
+    if (hollow && Math.abs(P.tipPlugMm - STEM_MIN_WALL_MM) > 0) {
+      bad.push(`ST10: the tip plug is ${P.tipPlugMm} mm; a plug as thick as the wall is as thick as ${STEM_MIN_WALL_MM} mm — Eva's own stated minimum, which the bore rule already spends on the side of the tube`);
+    }
+    /* (b) THE CROSSOVER, BOTH DIRECTIONS. The builder emitted a void iff the
+       plan says one survives the two closures. */
+    if (P.emittedVoid !== (P.voidMm > 0)) {
+      bad.push(`ST10: the builder ${P.emittedVoid ? 'emitted' : 'emitted no'} bore while the plan leaves ${P.voidMm} mm of it between a ${P.solidBandMm} mm root band and a ${P.tipPlugMm} mm tip plug across a ${P.topZ - P.tipZ} mm stem`);
+    }
+    if (P.emittedVoid) {
+      /* (c) AND THE PLUG IS WHERE IT SAYS IT IS — the measured half, off the
+         emitted rings against Eva's own number. A plug built at the TOP, or at
+         five times its length, emits the SAME triangle count and sails through
+         ST1; this is the only clause that can tell where the void stops. */
+      const plugBuilt = P.emittedVoidBottomZ - P.emittedTipZ;
+      if (Math.abs(plugBuilt - STEM_MIN_WALL_MM) > 1e-9) {
+        bad.push(`ST10: the lowest ring of the emitted bore stands ${plugBuilt} mm above the emitted tip; Eva's wall asks for ${STEM_MIN_WALL_MM}`);
+      }
+      if (!(P.emittedVoidBottomZ > P.emittedTipZ)) {
+        bad.push(`ST10: the emitted bore reaches the stem's own tip (${P.emittedVoidBottomZ} against ${P.emittedTipZ}) — the bottom is an annulus and the stem ends as a cut pipe`);
+      }
+      /* THE ROOT BAND'S OWN END, for the same reason and with the same shape:
+         the band is `stemPlan`'s and this is the only place the EMITTED bore is
+         compared against it. Not a second owner of the band's law — the bar is
+         the plan's declared `solidBandMm`, so what this catches is a BUILDER
+         that ignored it, never a plan that derived it wrongly. Said narrowly
+         rather than claimed broadly. */
+      const bandBuilt = P.emittedTopZ - P.emittedVoidTopZ;
+      if (Math.abs(bandBuilt - P.solidBandMm) > 1e-9) {
+        bad.push(`ST10: the emitted bore starts ${bandBuilt} mm below the emitted top face; the plan's root band is ${P.solidBandMm} mm`);
+      }
+    } else if (hollow) {
+      /* (d) WHERE THE TWO MEET, NO INNER RING WAS EMITTED AT ALL. The narrowest
+         emitted radius is then the tube's own outer one — which a solid stem's
+         own arm already satisfies, so this says the two arms really are one
+         geometry reached by two roads rather than two shapes that resemble
+         each other. */
+      if (!(Math.abs(P.emittedMinR - P.outerR) < 1e-9)) {
+        bad.push(`ST10: the two closures meet, so the stem is solid throughout — yet the builder emitted a ring at radius ${P.emittedMinR} against the tube's own ${P.outerR}`);
+      }
+    }
+  }
+
+  /* ===================================================================
      ST7 — THE OMISSION IS THE STEM'S OWN, IN BOTH DIRECTIONS.
 
      Every slot that was NOT built must be one the stem passes within the
@@ -7780,6 +7877,27 @@ export function buildMatrix() {
     ['SPHERE STEM: the longest stem (120 mm)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 120, stemDiameter: 6 }],
     ['SPHERE STEM: x the thinnest sheet (0.60 mm, floored to 1.00 in export — the two modes measure different geometry)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 60, stemDiameter: 6, sheetThickness: 0.6 }],
     ['SPHERE STEM: THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 3, spread: 0.6, layerSize: 0.35, stemLength: 120, stemDiameter: 12 }],
+    /* THE TWO CLOSURES MEET — the bare corner's own control set at the SHORTEST
+       built stem. The root band runs the head's own wall down from the top face
+       and the tip plug runs Eva's own wall thickness up from the tip; across a
+       2.20 mm stem the two overlap by 0.50 mm, so there is no bore left and the
+       stem is SOLID THROUGHOUT. It is the CROSSOVER derived rather than
+       special-cased, and it is the only row on which the void's own branch is
+       taken the other way while a bore still exists — every other hollow row
+       leaves one. Measured mode-free: -0.50 mm of void in LIVE and in EXPORT
+       alike, because on a sphere the band IS the join and the head's thickness
+       cancels out of the difference. */
+    ['SPHERE STEM: THE TWO CLOSURES MEET — a 1 mm stem on the bare corner (solid throughout, told)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', petalCount: 3, spread: 0.6, layerSize: 0.35, stemLength: 1, stemDiameter: 12 }],
+    /* THE THINNEST BORE THE GEOMETRY EVER LEAVES, and it is the nearest any
+       reachable state comes to the crossover from the other side: 0.100 mm of
+       sealed bore in LIVE. Swept over the whole control grid — 3,996,000
+       hollow-stem states in both modes — nothing lands nearer, and nothing
+       lands on zero, which is what makes `voidMm > 0` a comparison against a
+       real length rather than a decision on a last bit. Its EXPORT twin reads
+       0.500 mm, because the sheet floors from 0.60 to 1.00 and the join is the
+       wall; the void's EXISTENCE is the same in both, which is the half that
+       is topology. */
+    ['SPHERE STEM: the thinnest bore left (0.100 mm between the two closures, live)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', sheetThickness: 0.6, stemLength: 1, stemDiameter: 3.5 }],
     ['SPHERE STEM: GATED — the widest stem at length 0 on a sphere (bit-identical to an untouched sphere)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 0, stemDiameter: 12 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
