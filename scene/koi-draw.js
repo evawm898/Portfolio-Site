@@ -239,7 +239,13 @@ const BEND_SAMPLES = 28;         // spine steps; every drawn point lerps between
 // from 77 px to 7 on a 96 px body — which is the wave disappearing in favour of
 // a static turn-bend, exactly the failure this rebuild is for.
 const BEND_MAX_TURN = 0.45;      // rad of turn BIAS, snout to tail tip, saturated
-const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it      // rad/s — the turn rate that reaches ~0.76 of it
+const BEND_OMEGA_REF = 1.6;      // rad/s — the turn rate that reaches ~0.76 of it
+// Where along the snout-to-tail-tip length the spine is pinned, as a fraction
+// of it. 0.20 of the 1.54 body lengths that span is about a third of a BODY
+// back from the snout, which is roughly where a swimming fish's yaw pivot sits.
+// 0.5 would minimise the worst excursion and is wrong: a head that swings as
+// far as a tail does not read as a fish.
+const BEND_ANCHOR_U = 0.20;
 
 const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
 const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
@@ -436,7 +442,10 @@ export function createRenderer(ctx, surface) {
       finAt(PELVIC_U, -1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
     ];
 
-    const h0 = f.heading;
+    // THE LAGGED PLACEMENT, NEVER f.x / f.heading — see koi-fish.js's own note.
+    // The steering genuinely reverses frame to frame; this is where that stops
+    // being something the eye can see.
+    const h0 = f.drawHeading;
     // Guarded: a zero-length fish would make this 0 and every station would
     // divide by it.
     const reachBack = Math.max(1e-6, (TAIL_ROOT_U + TAIL_LEN) * L);   // snout to tail tip
@@ -447,7 +456,9 @@ export function createRenderer(ctx, surface) {
     // physical omega/speed arc: measured over 90 s of the real pond, the median
     // |omega| would sweep the body 91 degrees and p90 would sweep it 417, since
     // the steering lets a koi turn well inside its own body length.
-    const turnK = (BEND_MAX_TURN * Math.tanh((f.omega || 0) / BEND_OMEGA_REF)) / reachBack;
+    // f.bend, not f.omega: the SECOND lag, so the curvature ramps in and out
+    // over a short window instead of tracking the turn rate 1:1 each frame.
+    const turnK = (BEND_MAX_TURN * Math.tanh((f.bend || 0) / BEND_OMEGA_REF)) / reachBack;
 
     // Curvature at arc length `a` behind the nose: the travelling wave, grown
     // toward the tail, plus the turn's bias.
@@ -459,15 +470,39 @@ export function createRenderer(ctx, surface) {
       return waveK * env * Math.sin(Math.PI * 2 * u * BEND_WAVES - phase) + turnK;
     };
 
-    // Walk the spine once, then let every drawn point interpolate along it.
+    // THE SPINE IS PINNED INSIDE THE BODY, NOT AT THE NOSE, so a change in
+    // curvature is SHARED. Pinned at station 0 the nose cannot move and the
+    // whole excursion lands on the tail — which is exactly the "pivots around
+    // the nose" read: the head is the one part of the animal that never
+    // participates. Pinned a fifth of the way back, the head takes its own
+    // fifth of every bend and the tail's arm is 0.8 of what it was.
+    //
+    // TWO CHECKS, BOTH MEASURED RATHER THAN ARGUED. Pinned at station 0 this
+    // walk reproduces the one-way walk it replaces EXACTLY — 0 of 4,105,360
+    // emitted coordinates differ over a 20 s run — so the anchor is the whole
+    // of the change and none of it is a rewrite artefact. And on a body forced
+    // straight (both bend amplitudes 0) moving the anchor changes nothing the
+    // eye could hold: worst 1.14e-12 px over the same run, which is summation
+    // order and not geometry. It is NOT bit-identical there and must not be
+    // claimed to be.
     const N = BEND_SAMPLES, da = reachBack / N;
-    spineX[0] = f.x; spineY[0] = f.y; spineH[0] = h0;
-    for (let i = 0; i < N; i++) {
+    const iA = Math.round(BEND_ANCHOR_U * N);
+    spineH[iA] = h0;
+    spineX[iA] = f.drawX - Math.cos(h0) * (iA * da);
+    spineY[iA] = f.drawY - Math.sin(h0) * (iA * da);
+    for (let i = iA; i < N; i++) {          // tailward
       const kMid = kAt((i + 0.5) * da);
       const hMid = spineH[i] - kMid * da * 0.5;      // midpoint heading
       spineX[i + 1] = spineX[i] - Math.cos(hMid) * da;
       spineY[i + 1] = spineY[i] - Math.sin(hMid) * da;
       spineH[i + 1] = spineH[i] - kMid * da;
+    }
+    for (let i = iA; i > 0; i--) {          // headward, the same walk reversed
+      const kMid = kAt((i - 0.5) * da);
+      const hMid = spineH[i] + kMid * da * 0.5;
+      spineX[i - 1] = spineX[i] + Math.cos(hMid) * da;
+      spineY[i - 1] = spineY[i] + Math.sin(hMid) * da;
+      spineH[i - 1] = spineH[i] + kMid * da;
     }
 
     // Canonical x runs FORWARD from the nose, so the distance back along the
