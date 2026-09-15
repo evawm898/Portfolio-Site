@@ -6097,6 +6097,66 @@ leaf. All three were found by rendering, not by reasoning — the sheet is
 pond is never still, so there is no settled frame to compare against and every number
 on it is read off the page's own reported state.
 
+**THE PADS ARE 25 TO 145 PLANE PX ACROSS, AND `PAD_ACROSS` IS THE DECLARATION
+BECAUSE `PAD_R` WAS LYING** (Eva's ruling: "update the pad widths to range between
+25 - 145px across, increase the up-down px proportionally"). The ruled quantity is
+the DRAWN WIDTH, so that is the constant and the radius is derived from it —
+`PAD_R = [PAD_ACROSS[0] / (2 * CLUSTER_SIZE_K[0]), PAD_ACROSS[1] / 2]`, inverting
+the two things that actually decide the realized ends: the cluster multiplier at
+the floor and `ensure`'s own clamp at the ceiling.
+**THE OLD CONSTANT MISDESCRIBED THE FIELD IT PRODUCED, and only measuring found
+it:** `PAD_R` read `[15, 58]` while the realized floor was `15 x 0.55 = 8.25` —
+**half the smallest pad the constant named** — because `CLUSTER_SIZE_K` multiplies
+every pad in a clump and nothing inverted it. Measured on the base tree over seeds
+1-40 at 1280x800 (1,585 pads): nominal diameter **16.7 .. 116.0**, not the 30 .. 116
+the constant implied. `CLUSTER_SIZE_K` moved up beside the size law so the derivation
+can read it — a module-level `const` read before its own declaration is a temporal
+dead zone THROW at load, not a subtle bug.
+**THE UP-DOWN NEEDED NO SECOND NUMBER AND MUST NOT HAVE ONE.** A pad is a DISC in
+plane space and the viewpoint's 0.60 squash is applied to POINTS at draw time, so
+every pad's own disc is drawn 0.60 as tall as it is wide, at every size —
+"proportionally" is already an identity here rather than something to arrange. A
+separate vertical range would be a second viewpoint, and the squash is shell-level
+and fixed. Measured across the change, same seeds, as the bounding box of each
+pad's EMITTED outline through `padPoint`: **across 15.8-119.3 -> 24.6-149.2,
+up-down 10.0-71.7 -> 15.1-89.5**.
+**THE BOUNDING BOX'S OWN ASPECT IS NOT 0.60 AND NEVER WAS — SAY WHICH QUANTITY THE
+IDENTITY IS ABOUT.** Per pad it spreads **0.535 .. 0.670 on the base tree and
+0.535 .. 0.678 on the branch** — same floor to four figures, so the size change is not
+what puts it off 0.60 — because the rim is LOBED: its widest chord across and its tallest chord up-down sit at different rim
+angles, so their ratio carries the lobes rather than the squash. The squash is exact
+on every POINT and on the nominal disc; it is not exact on a lumpy outline's box, and
+a "0.60 on every row" reading is the nominal being reported as the drawn.
+**THE DRAWN CHORD IS WITHIN ±3% OF `PAD_ACROSS` AND NOT ON IT**, for the same reason
+— the lobes push the rim out as well as in: nominal `2R` hits **25.1 .. 145.0**
+exactly while the drawn box reads 24.6 (-1.6%) .. 149.2 (+2.9%). Per pad against its
+OWN disc the outline's box runs **0.911 .. 1.033, median 1.000, in both axes alike** —
+the lobes act isotropically in the plane, which is why the squash survives as a
+statistic and fails as a per-pad identity. That residue is the rim being organic and
+is REPORTED rather than tuned away; chasing it would mean flattening the thing the
+lobes exist for. **THE SHEET'S MACRO CAPTION SAID `drawn 145x87 CSS px` AND THAT WAS
+THE NOMINAL WEARING THE WORD `drawn`** — it is `2R` times the squash, which is the
+disc the pad is built on rather than the outline it emits. It names the disc now and
+prints the 0.91-1.03 spread beside it, which is the same correction as the paragraph
+above arriving in a caption instead of a constant.
+**WHAT IT COST ELSEWHERE, measured rather than assumed:** bigger pads fail
+`PAD_GAP` placement more often, so a field holds slightly fewer of them (**1,585 ->
+1,515 pads over seeds 1-40**; blooms 97 -> 98, still 2-3 per field) — clumping still
+passes on every gate seed, and the frame cost is **0.17-0.22 ms** over four runs for
+46 pads against the 600-ripple cap (it was 0.15-0.17 at 44; one 0.613 outlier on a busy
+box was noise, confirmed by three re-runs — quote the spread here, not one reading).
+**AND A MUTANT THAT DELETES A `rand` DRAW IS A MUTANT ABOUT THE WHOLE POND.**
+`every-wedge-is-cut-at-the-same-angle` replaced `rand.range(...)` with a constant,
+which deletes ONE DRAW PER PAD and shifts every number the shared pad stream hands
+out after it — so every pad's size and position moved and it reddened the CLUMPING
+check, which is not a statement about wedge angles. It went BAD only once the pads
+got bigger; on the smaller field the shifted layout happened to still pass. The
+mutation is a comma expression now — it takes the draw and throws it away — so the
+field is bit-identical and the only thing that moves is the angle. **A mutation
+must consume exactly what the line it replaces consumes, or it is not testing what
+it names.** This is `koi-ripples.js`'s own forked-stream lesson arriving inside the
+mutant table.
+
 **THE PADS ARE ROUNDER AND THE STEM CUT IS A PER-PAD ANGLE FROM 5 TO 65 DEGREES**
 (Eva's ruling, on the shipped pads). Two constants and one law. `LOBE_AMP` is halved
 to `[0.024, 0.017, 0.009]` with a tighter per-pad multiplier, measured through one

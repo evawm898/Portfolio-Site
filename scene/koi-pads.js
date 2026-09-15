@@ -63,7 +63,34 @@ import { createSurface } from './surface.js';
 // compass, and cut from rim to centre. How WIDE that cut is varies from pad to
 // pad, from a slit to a bite; how lumpy the rim is does not vary much at all.
 
-export const PAD_R = [15, 58];        // plane px, the radius before the lumps
+// THE RULED QUANTITY IS THE DRAWN WIDTH ACROSS, so that is what is declared
+// and the radius is DERIVED from it (Eva: "pad widths to range between
+// 25 - 145px across"). `PAD_R` used to be the declaration and it MISDESCRIBED
+// the field it produced: `CLUSTER_SIZE_K` multiplies every pad in a clump, so
+// the realized floor was `PAD_R[0] * CLUSTER_SIZE_K[0]` — 8.25 where the
+// constant said 15, half the smallest pad it named, and nobody reading the
+// constant could have known. The realized ends are `PAD_R[0] * sizeK_min` and
+// `PAD_R[1]` (the clamp in `ensure`), so those are what the derivation inverts.
+//
+// AND THE UP-DOWN NEEDS NO SECOND NUMBER — it must not have one. A pad is a
+// DISC in plane space and the viewpoint's squash is applied to points at draw
+// time, so its drawn height is its drawn width times `surface.squash`, on every
+// pad and at every size. Widening this range widens both in step, which is what
+// "increase the up-down proportionally" already means here; a separate vertical
+// range would be a second viewpoint and the squash is shell-level and fixed.
+export const PAD_ACROSS = [25, 145];  // plane px, the DRAWN width — the ruling
+// A CLUSTER HAS A SIZE CHARACTER: each one draws this multiplier once and every
+// pad in it is measured against it, so the pond has big-pad clumps and small-pad
+// clumps rather than every clump being the same mixture. It lives HERE, beside
+// the range it stretches, because it is half of what decides how big a pad is —
+// and because `PAD_R` below could not be derived from a constant declared after
+// it (a module-level `const` read before its declaration is a temporal dead zone
+// throw at load, not a subtle bug).
+export const CLUSTER_SIZE_K = [0.55, 1.25];
+export const PAD_R = [
+  PAD_ACROSS[0] / (2 * CLUSTER_SIZE_K[0]),  // the floor the multiplier reaches
+  PAD_ACROSS[1] / 2,                        // the ceiling `ensure` clamps at
+];
 export const PAD_R_SKEW = 1.7;        // >1 biases the draw small; see makePad
 export const LOBES = [2, 3, 5];       // harmonics that make the rim organic
 // ROUNDER THAN THE FIRST CUT, BY RULING (Eva: "make the lily pads rounder").
@@ -419,17 +446,19 @@ export function padPoint(item, lx, ly, out = { x: 0, y: 0, z: 0 }) {
 // far apart, then pads around each one — and the clumping is the structure
 // rather than a statistic somebody tuned toward.
 //
-// A CLUSTER HAS A SIZE CHARACTER. Each one draws a size multiplier once and
-// every pad in it is drawn against that, so the pond has big-pad clumps and
-// small-pad clumps rather than every clump being the same mixture. Rolling each
-// pad independently gives a field whose clusters are statistically identical,
-// which reads as one texture at one scale — the thing the reference is not.
+// A CLUSTER HAS A SIZE CHARACTER (`CLUSTER_SIZE_K`, declared with the size law
+// at the top of this file). Each one draws its multiplier once and every pad in
+// it is measured against that, so the pond has big-pad clumps and small-pad
+// clumps rather than every clump being the same mixture. Rolling each pad
+// independently gives a field whose clusters are statistically identical, which
+// reads as one texture at one scale — the thing the reference is not.
 
 export const CLUSTER_AREA = 2.6e5;       // plane px^2 of pond per cluster
 export const CLUSTER_SEP = 210;          // plane px between cluster centres
 export const CLUSTER_SPREAD = [55, 150]; // how far a cluster's pads reach
 export const PER_CLUSTER = [2, 8];
-export const CLUSTER_SIZE_K = [0.55, 1.25];
+// CLUSTER_SIZE_K is declared with the size law at the top of the file, because
+// PAD_R is derived from it and cannot read a constant declared below itself.
 export const PAD_GAP = 0.56;             // of the two radii: below 1 they overlap
 export const MAX_PADS = 120;
 export const BLOOMS = [2, 3];

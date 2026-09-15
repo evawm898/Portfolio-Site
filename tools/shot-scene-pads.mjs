@@ -159,8 +159,17 @@ async function main() {
           await crop(page, path.join(dir, 'pad-macro.png'), big.x, big.y, box, Math.round(box * 0.8));
           cells.push({
             file: 'pad-macro.png', title: 'One pad',
-            note: `Radius ${big.R.toFixed(0)} plane px, drawn ${(big.R * 2).toFixed(0)}x`
-              + `${(big.R * 2 * s.squash).toFixed(0)} CSS px. Crop of the live frame at `
+            // THE NUMBER IS THE PAD'S OWN DISC AND THE CAPTION SAYS SO. `R` is the
+            // radius the pad is built on, so `2R` x the squash is the disc it would
+            // draw if its rim were a circle — which it is not. Measured over seeds
+            // 1-40 (1,515 pads), the lobed outline's own box runs 0.91 to 1.03 of
+            // that, median 1.00, in BOTH axes alike. Calling the nominal "drawn"
+            // is the nominal reported as the drawn, which is the reading this
+            // sheet exists to make checkable.
+            note: `Radius ${big.R.toFixed(0)} plane px, so its own disc is `
+              + `${(big.R * 2).toFixed(0)}x${(big.R * 2 * s.squash).toFixed(0)} CSS px — `
+              + `the lobed rim carries the silhouette between 0.91 and 1.03 of that. `
+              + `Crop of the live frame at `
               + `${DSF}x, so ${DSF} image px per CSS px. The rim is organic rather than `
               + `circular, the wedge is the stem notch, the midrib runs from its apex.`,
           });

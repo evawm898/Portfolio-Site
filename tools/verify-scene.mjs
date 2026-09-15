@@ -537,8 +537,18 @@ const MUTANTS = [
   {
     id: 'every-wedge-is-cut-at-the-same-angle',
     file: 'scene/koi-pads.js',
+    // IT STILL TAKES THE DRAW AND THROWS IT AWAY, and that is the whole
+    // difference between a mutation about wedges and a mutation about the
+    // pond. Deleting the `rand.range` deletes one draw PER PAD, which shifts
+    // every number the shared pad stream hands out after it — so every pad's
+    // size and position moves and the field is a different field. Measured:
+    // it reddened the CLUMPING check as well, which is not a statement about
+    // wedge angles and not something this mutant should be allowed to claim
+    // or to excuse. The comma expression consumes exactly what the shipped
+    // line consumes and yields the constant, so the field is bit-identical
+    // and the only thing that moved is the angle each wedge is cut at.
     from: '  const notchDeg = rand.range(NOTCH_DEG[0], NOTCH_DEG[1]);',
-    to: '  const notchDeg = NOTCH_DEG[0];',
+    to: '  const notchDeg = (rand.range(NOTCH_DEG[0], NOTCH_DEG[1]), NOTCH_DEG[0]);',
     breaks: ['pads/the-stem-wedge-is-cut-at-a-different-angle-on-every-pad'],
     why: 'the ruling is a variety of angles from 5 to 65, and a field cut at one width is what it replaced',
   },
