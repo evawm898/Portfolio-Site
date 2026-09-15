@@ -207,9 +207,75 @@ because there is no measurement to set one from. **Clamp and tell, never refuse.
 
 ---
 
-## Phase B — planning only, and what Phase A changed about it
+## EVA'S RULING — the leaf angle default is **35°**
 
-Not started. What A1 and A2 settle:
+Ruled from the angle row of `docs/img/leaf-phase-a.png`, Sep 15. It is the
+sheet's own third cell, and it was ruled with that cell's overhang figure in
+front of it.
+
+**Recorded, not re-argued: 35° from horizontal is a 55° overhang from vertical,
+which is past the classic 45° FDM line** — the sheet prints exactly that under
+the cell, in red. Two things make this a ruling rather than an oversight, and
+both are already on the record: the 45° rule is **a declared guess like every
+floor in this project**, nothing here has ever been printed, and the coupon is
+the only thing that can turn it into a bound. So the default stands at 35° and
+the overhang figure stands beside it, the way the `petalTipShape` 1.70 default
+stands beside 2.50 as Eva's preferred look.
+
+**The RANGE is not decided by this.** 50° and 70° are both under the 45° line on
+the same sheet, so a printable angle is one slider step away, and ruling 7's
+"drooping through upright" keeps the full span reachable.
+
+---
+
+## Phase B — the plan, and what Phase A changed about it
+
+**Not started.** Two items on the brief's own Phase B list are changed by what
+Phase A measured, and both are flagged for Eva before a build spends a session
+on them:
+
+1. **The node bands are dropped.** A2 measured the premise false. They solve
+   nothing about attachment, and taking them would move O1's declared
+   inward-shell count and ST1's triangle prediction — two shipped gate
+   declarations — for a problem a rooting radius answers for free.
+2. **Leaf serration needs its own controls**, and that is a decision rather than
+   a reading. Ruling 2 names "the g(r) cut law, crest and notch shape, count,
+   depth" as the machinery a leaf shares. Sharing the *machinery* is not sharing
+   the *values*: if a leaf read `lobeDepth` and friends, turning on petal lobes
+   would serrate every leaf and vice versa — the organ-to-organ coupling session
+   22 ruled against when it refused to let a style's presence move every stamen.
+   So the plan gives leaves four of their own (`leafSerrationDepth`, `…Count`,
+   `…CrestShape`, `…NotchShape`) in a nested drop-down, the `antherTip` /
+   `stigmaTip` precedent. **Nine new controls total** — the panel cost is real
+   and is the reason this is flagged rather than assumed.
+
+### What A1 and A2 settle, and the build order
+
+* **The blade** is `widthProfile` + `petalForm` on a petiole frame, stationed
+  **uniformly**. No `petalSurface`, no `bladeStations`, no seam clearance, no
+  foot rows. The three substitutions in A1 are the whole of the plumbing:
+  the `stalk` off-switch, a lamina start replacing `ROOT_BLEND_END`, and a leaf
+  row capacity replacing `ladderWindowCapacity`.
+* **The petiole roots in the stem wall's mid-thickness**, `(boreR + outerR) / 2`,
+  derived from two lengths `stemPlan` already owns. Embedded at every angle, more
+  so as the angle steepens. **No node bands.**
+* **Node placement** is the flower's law in millimetres, with the top inset
+  derived from the leaf (`inset ≥ Lf·sin(θ)`), clamped and told — §6 measured the
+  flower's stem-fraction inset fouling the head on 30 of 30 states.
+* **Controls**: `leafLength` / `leafWidth` in absolute mm (ruling 5),
+  `leafAngle` default **35°** (ruling 7, now ruled), `leafNodes` as its own
+  control, `phyllotaxy` as the three ported laws (ruling 8), plus the four
+  serration rows above. `leafLength` 0 is the guard, byte-identical by branch
+  (ruling 6).
+* **The assertion family comes first and is SEEN RED**, before any geometry —
+  including specifically **a leaf on a HOLLOW stem**, which is the state the
+  flower's gates could never reach and the one A2 §5 shows can actually detach.
+  A steep-angle row is owed beside it, because that is the reachable failure.
+* Then: the matrix block, the predeclared byte partition from the **builder's own
+  record** (a row moves iff a leaf is actually built), and the owed frozen phase.
+* `node tools/bloom-smoke.mjs --check` must report a **higher block count** — a
+  green census that does not mention the new block is not a pass (session 34's
+  block-27 lesson).
 
 * **The blade** is `widthProfile` + `petalForm` on a petiole frame, stationed
   uniformly. No `petalSurface`, no `bladeStations`, no seam clearance, no foot

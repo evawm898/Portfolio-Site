@@ -300,6 +300,7 @@ const blit=(src,sw,sh,x0,y0)=>{for(let y=0;y<sh;y++)for(let x=0;x<sw;x++){
   sheet[d]=src[s2];sheet[d+1]=src[s2+1];sheet[d+2]=src[s2+2];}};
 
 text(sheet,SW,SH,24,22,'LEAVES ON THE BLOOM STEM - PHASE A',INK,3);
+text(sheet,SW,SH,660,30,'ANGLE RULED: 35 DEG',[150,210,150],2);
 text(sheet,SW,SH,24,52,"SCRATCH RIG - SHIPS NOTHING. THIS RENDERER IS NOT THE APP'S. EXPORT MODE (PRINT PREVIEW ON).",DIM,2);
 text(sheet,SW,SH,24,68,'SAME-TREE CONTROL = 0 BYTES, AN IDENTITY (NO GPU, NO PAGE SESSION).',DIM,2);
 text(sheet,SW,SH,24,84,`STEM ${STEM.stemLength} x ${STEM.stemDiameter} MM . BLOOM AT DEFAULTS . LEAF ${LEAF.L} x ${LEAF.W} MM . PETIOLE ${f(2*LEAF.petioleR,1)} MM DIA x ${LEAF.petioleLen} MM`,DIM,2);
@@ -313,11 +314,11 @@ for(let row=0;row<2;row++){
     const x0=col*CW, y0=110+row*CH;
     blit(r.buf,CW,CH,x0,y0);
     text(sheet,SW,SH,x0+16,y0+12,`${c.phyllo.toUpperCase()} . ${c.nodes} NODES . ${b.leaves} LEAVES`,INK,2);
-    text(sheet,SW,SH,x0+16,y0+30,`${LEAF.L}x${LEAF.W} MM . ${c.angleDeg} DEG . 9 TEETH`,DIM,2);
+    text(sheet,SW,SH,x0+16,y0+30,`${LEAF.L}x${LEAF.W} MM . ${c.angleDeg} DEG (RULED) . 9 TEETH`,DIM,2);
   }
 }
 const yA=152+2*CH;
-text(sheet,SW,SH,24,yA+2,'THE ANGLE - WHAT THIS SHEET IS FOR. ALTERNATE, 3 NODES, ONE SCALE.',INK,2);
+text(sheet,SW,SH,24,yA+2,'THE ANGLE - WHAT THIS SHEET IS FOR. ALTERNATE, 3 NODES, ONE SCALE. EVA RULED 35 DEG.',INK,2);
 text(sheet,SW,SH,24,yA+18,'OVERHANG IS MEASURED FROM VERTICAL: A LEAF AT 0 DEG IS A PURE OVERHANG.',DIM,2);
 for(let col=0;col<5;col++){
   const b=built[idx++]; const c=b.c;
@@ -325,13 +326,16 @@ for(let col=0;col<5;col++){
   const x0=col*CW2, y0=yA+40;
   blit(r.buf,CW2,CH2,x0,y0);
   const over=90-c.angleDeg;
-  text(sheet,SW,SH,x0+12,y0+8,`${c.angleDeg} DEG`,INK,2);
+  /* EVA RULED 35 DEG (Sep 15), from this row. Marked on the sheet so the image
+     is self-documenting; the overhang figure stays beside it unchanged. */
+  const ruled = c.angleDeg === 35;
+  text(sheet,SW,SH,x0+12,y0+8,`${c.angleDeg} DEG${ruled?'  - RULED':''}`,ruled?[150,210,150]:INK,2);
   text(sheet,SW,SH,x0+12,y0+26,`OVERHANG ${over}`,over>45?[214,150,120]:DIM,2);
   text(sheet,SW,SH,x0+12,y0+42,over>45?'PAST 45 - SUPPORT':'UNDER 45 - OK',over>45?[214,150,120]:[140,180,140],2);
 }
 text(sheet,SW,SH,24,SH-52,'THE 45 DEG OVERHANG RULE IS THE CLASSIC FDM ONE AND IS A DECLARED GUESS,',DIM,2);
 text(sheet,SW,SH,24,SH-36,'LIKE EVERY FLOOR HERE - NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED.',DIM,2);
-text(sheet,SW,SH,24,SH-18,'EVA RULES THE DEFAULT ANGLE FROM THIS ROW. NO DEFAULT IS TYPED IN CODE.',INK,2);
+text(sheet,SW,SH,24,SH-18,'RULED 35 DEG - PAST 45, AND RULED WITH THAT FIGURE IN VIEW. THE RANGE IS NOT DECIDED BY IT.',INK,2);
 
 fs.mkdirSync(OUT,{recursive:true});
 fs.writeFileSync(`${OUT}/leaf-phase-a.png`,png(SW,SH,sheet));
