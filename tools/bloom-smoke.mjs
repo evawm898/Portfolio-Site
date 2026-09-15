@@ -679,6 +679,38 @@ export const SMOKE_BLOCKS = [
         path: 'the OTHER direction — the guard: no stem, so no channel, so nothing omitted. ST7 must read the channel ABSENT rather than as a passing "0 omitted", and the byte tool proves the row bit-identical to a sphere with the stem controls never touched — which is what makes every sphere row that shipped before this session unmoved' },
     ],
   },
+  {
+    n: 33,
+    anchor: 'LEAVES: alternate x 3 nodes at the ruled 35 deg',
+    /* LEAVES ON THE STEM. Both STL gates are blind to this whole family by
+       construction, which is why LF0-LF7 exist at all: a leaf DECLARED and
+       never built adds no boundary edge and detaches nothing; a petiole rooted
+       ON THE AXIS of a hollow stem still reads ONE PIECE (measured in Phase A
+       — a radial rod crosses the wall annulus on its way out), so the flood
+       fill cannot tell it from the wall-rooted one that ships; and nothing in
+       this project measures an AZIMUTH except J7, Z4b and Z8, none of which
+       looks at a leaf. The subset takes the three arrangements, both ends of
+       the attachment question (the widest bore and the solid floor), the steep
+       angle Phase A measured detaching, and both directions of both guards. */
+    rows: [
+      { label: 'LEAVES: alternate x 3 nodes at the ruled 35 deg',
+        path: 'the shipping arrangement at Eva\'s own ruled angle — LF0 (the registry hides the leaf sub-controls exactly where the geometry builds nothing, and a green run must not endorse one without the other), LF1 (the plan\'s azimuth list predicts the count and the builder\'s tally is the other owner), LF4 (the nodes are strictly apart, inset from both ends, and the top one clears the head iff the plan claims it does), LF5 (one leaf a node, which nothing else here can see), LF6 (the blade carries no foot — the root blend is stood down and the outline stops reading ring.width at all) and LF7 (the serration is the LEAF\'s own values, not the petal\'s). LF8 rides here too: the shell is CONSISTENTLY WOUND, read from the builder\'s own DIRECTED-edge census — both STL gates key theirs on a SORTED pair, so a face wound the wrong way still counts as a matched edge and still exports watertight, which is exactly how this builder shipped its first cut with 134 unmatched directed edges a leaf' },
+      { label: 'LEAVES: whorled x 8 nodes (24 leaves — the most the controls reach)',
+        path: 'the count ceiling — LF5 on a THREE-leaf whorl, where the per-node spacing and not just the per-node count is the claim: 120 degrees apart, asserted against the LAW restated in the gate rather than imported from the geometry it is checking. Also the worst leaf triangle count the controls reach, and the densest node packing, so LF4\'s pitch floor is exercised' },
+      { label: 'LEAVES: on a HOLLOW stem at the widest bore (12 mm — the petiole crosses 1.5 mm of wall)',
+        path: 'THE STATE THE FLOWER\'S GATES COULD NEVER REACH — LF2 (every petiole roots INSIDE the wall, read off the builder\'s own emitted ring centroid and never the plan beside it) and LF3 (and it crosses real solid on its way out). A petiole in the bore is in VOID, and both STL gates read the result as one piece regardless' },
+      { label: 'LEAVES: the STEEP angle (85 deg — axis-rooted this DETACHES; wall-rooted it does not)',
+        path: 'THE REACHABLE FAILURE, and the reason the petiole roots in the wall rather than on the axis: the escape length for an axis-rooted petiole is outerR/cos(theta), which runs away as the angle steepens, and Phase A measured TWO COMPONENTS at 75 and 85 degrees. LF3 is what holds it — the wall-rooted petiole only gets MORE embedded here, and the clause reads the crossing the builder actually made' },
+      { label: 'LEAVES: the LONGEST leaf on the SHORTEST stem (the head cannot be cleared; the node count gives)',
+        path: 'the corner where the geometry cannot do what was asked — a 120 mm leaf needs more inset than a 20 mm stem has, so no node position clears the head. LF4 in the direction a green run cannot show: TOLD, never refused (overlapping closed shells are the export contract, so a leaf through the head is legal geometry), the plan\'s `insetSatisfied` claim and the emitted node depth must agree, and the node COUNT is what gives at the pitch floor rather than every node collapsing onto one point — which is the defect LF4 caught before this geometry existed' },
+      { label: 'LEAVES: serration OFF (an entire margin — the guard, inert)',
+        path: 'the edge guard\'s inert arm — LF7 in the direction that silently fails: depth 0 must cut NO teeth rather than reporting a passing count, and the four shape rows are hidden AND inert' },
+      { label: 'LEAVES: x a SPHERE with a stem (the channel and the leaves on one head)',
+        path: 'THE COMPOSITION, and it is in this subset because leaving it out cost a CI cycle. ST9 — another family\'s clause, which enters only on a SPHERE with a stem — reads the EXPORTED FILE and asks whether anything stands in the free stem\'s printable gap that is not the stem\'s own. A leaf is the THIRD part ever to live in that region and its petiole is rooted THROUGH the wall by design, so it reads distance EXACTLY 0 and ST9 dropped this row: 198 vertices, every one a petiole\'s, 0 anything else. The subset could not see it because block 33\'s anchor is the `alternate` row on a CAP head, where ST9 returns before claiming anything — so a subset covering phyllotaxy, bore, angle, inset, serration and both guards was still blind to the one axis that reaches another family. A subset earns its keep by covering the axes a feature HAS, not the failures somebody predicted' },
+      { label: 'LEAVES: GATED — length 0 with every other leaf control at maximum',
+        path: 'the OTHER direction — the feature guard (ruling 6): every leaf control at its maximum with the length at 0 builds NOTHING. LF1 must read the builder\'s "none" rather than a missing key, LF0\'s two statements must still be complements, and the byte tool proves the row bit-identical to a stem with the leaf controls never touched' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

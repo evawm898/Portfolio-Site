@@ -178,7 +178,20 @@ export async function measure(page, { capability = null, wantMask = false } = {}
        twice. A NEW part that emits and is absent here makes R1 fire at once,
        which is what it did the first time a stem was built, on this exact
        clause. The plan is asked of its ONE owner, never re-derived. */
-    mod.buildStemInto(accST, mod.stemPlan(ui, frHC.hub, accST));
+    const stPlan = mod.stemPlan(ui, frHC.hub, accST);
+    mod.buildStemInto(accST, stPlan);
+    /* THE LEAVES (the leaf sessions) join the same third accumulator, for the
+       reason the comment above already states: R1 counts the parts through an
+       accumulator that EMITS, so a NEW part that emits and is absent here makes
+       it fire at once. It did, on this exact clause, the first time a leaf was
+       built — which is the second time this clause has caught a new part, after
+       the stem. The plan is asked of its ONE owner and nothing is re-derived. */
+    const lfPlan = mod.leafPlan(ui, stPlan, accST);
+    if (lfPlan.present) {
+      for (let i = 0; i < lfPlan.azimuths.length; i++) {
+        for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az);
+      }
+    }
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard
@@ -280,7 +293,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     /* R1 */
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
     if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
-      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style and stem: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
+      bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);
     }
     /* R2 */
     if (petalsBuilt !== builtFull.petalsBuilt) {

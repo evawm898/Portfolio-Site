@@ -2481,6 +2481,184 @@ maps and proved deep-equal. The image is `node tools/shot-bloom-stem-plug.mjs <d
 code served from its own HTTP server, and which quotes NO pixel delta for any pair (two trees,
 two servers, two page sessions).
 
+**LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
+PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
+`docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
+before touching `leafPlan`, `buildLeafInto`, `leafBladeState` or the LF family).
+SIMPLE leaves, one blade per node. Nine controls: `leafLength` / `leafWidth` in
+absolute MILLIMETRES (ruling 5 — the flower's `leafSize` multiplies only the length
+while the width is fixed in world units, which is why three of its four types come out
+wider than long), `leafAngle` (**EVA RULED 35 DEG**), `leafNodes`, `leafPhyllotaxy`
+(all three ported), and four serration rows nested inside. **`leafLength` 0 is the
+GUARD** and the default is 19,040 tris, exactly what it was.
+**THE OUTLINE AND CUT MACHINERY SEPARATE FROM THE FOOT AND THE LADDER, MEASURED**:
+`widthProfile` reads exactly TWO fields off a `ring` — `width` (the foot-continuity
+floor alone) and `thickness` — and with the floor stood down (`cap.petiole`) the
+emitted outline stops reading `width` at all, **0 of 4001 half-widths moving between
+ring widths of 3 and 40 mm in both modes**. `petalForm` TAKES ITS FRAME AS AN ARGUMENT,
+so a leaf hands it a petiole frame and gets the cup with no ring in existence. And the
+LADDER IS NOT NEEDED: stationed UNIFORMLY the drawn tooth comes out at **80-95% of its
+analytic amplitude at the worst of 200 phase offsets**. Three substitutions, one term
+each, proved inert against main (0 of 64,016 half-widths, every lobe record identical).
+**THE ATTACHMENT PREMISE WAS TESTED BEFORE THE FIX WAS, AND IT WAS FALSE.** A petiole
+rooted ON THE AXIS of a hollow stem is NOT detached — a radial rod crosses the wall
+annulus on its way out, exactly **2 x STEM_MIN_WALL_MM = 3.00 mm at every hollow
+diameter** — and reads ONE PIECE. What IS reachable is detachment through the LEAF
+ANGLE: the escape length is `outerR / cos(theta)`, which runs away as the angle
+steepens, and a 10 mm axis-rooted petiole reads **TWO COMPONENTS at 75 and 85 degrees**.
+So the petiole roots at the WALL'S MID-THICKNESS, where it only gets MORE embedded as
+the angle steepens. **NO NODE BANDS** — they solve nothing here and would SPLIT the bore
+into N+1 cavities, moving O1's declared inward-shell count and ST1's triangle prediction.
+Do not re-propose them.
+**THE FLOWER'S GOLDEN-ANGLE / AZIMUTH DISAGREEMENT IS RECORDED SO IT IS NOT REPRODUCED
+WHEN CURVATURE ARRIVES**: `stemCenterline` kinks the flower's stem at `k * GOLDEN_ANGLE`
+while its `leafAzimuths` flips leaves 180 degrees — two different laws for one arrangement,
+confirmed present in `flower.js`. MOOT here while the bloom's stem is straight
+(`stemStations` returns `[0, lengthMm]`), and it must not come back with curvature.
+**THE TOP INSET IS DERIVED FROM THE LEAF, NEVER FROM THE STEM**: the flower's
+`0.16 x stemLength` fouls the head on **30 of 30 sampled states**, because the inset
+scales with the STEM while the rise scales with the LEAF and its ANGLE. A leaf longer
+than its stem clears at no inset: told, never refused (overlapping closed shells are the
+export contract), and the NODE COUNT gives at a pitch floor of two petiole radii.
+**CUP IS FIXED AND TWIST IS ZERO — a decision, not a reading.** Ruling 3 asked for both;
+Eva approved NINE controls and neither is among them, so a leaf reading `petalCup` would
+couple two organs. `LEAF_CUP` is the one constant and a control is one registry row.
+**THE OUTLINE IS DECOUPLED STRUCTURALLY, NOT ASSERTED** — `leafBladeState` overrides
+every field that could carry a petal's value into a leaf, checked as an IDENTITY by
+`node tools/verify-bloom-leaf-decoupled.mjs` (199 petal-side control values x 2 modes,
+0 leaf floats moved; `--control` required). **`sheetThickness` IS shared and is the
+declared exception: it is the MATERIAL.**
+**LF0-LF8 WERE WRITTEN BEFORE THE GEOMETRY AND SEEN RED, TWICE** — the census statically
+("claimed by NO smoke row") and at runtime against a builder that answered nothing. Both
+STL gates are blind to the whole family: a leaf declared and never built, a petiole on
+the axis of a hollow stem, a wrong PHYLLOTAXY (nothing here measures an azimuth except
+J7, Z4b and Z8), a leaf reading the PETAL's serration, and a node inset through the head
+ALL export watertight and as one piece. **THE FAMILY CAUGHT TWO DEFECTS IN THE GEOMETRY
+IT WAS WRITTEN FOR.** LF4: a 120 mm leaf on a 20 mm stem collapsed every node onto ONE
+POINT — and the clause had to change too, to a BICONDITIONAL against the plan's own
+`insetSatisfied`, because a leaf through the head is legal geometry and asserting
+clearance outright fires on a state the geometry is entitled to build. **LF8: the two
+side rims shared a winding and so did the two end rims, giving 134 duplicated and 134
+unmatched DIRECTED edges a leaf — and BOTH STL GATES ARE BLIND, because `analyzeStl`'s
+census keys on a SORTED pair, so a face wound the wrong way still counts as a matched
+edge.** A signed-volume check is not sensitive enough either (a thin sheet's rim is a
+rounding error against its blade; the volume agreed to 15% with a flipped rim in place).
+Only **O2** noticed, as its two orientation methods DISAGREEING — the right alarm naming
+the instrument rather than the defect. ST10's precedent: a fix without a witness is
+folklore.
+**THE PETIOLE RING IS OFFSET A HALF STEP, AND WITHOUT IT A LEAF IS ONE SHELL AT NINE
+AZIMUTHS OUT OF TEN.** X2 read **3180 within-shell pairs on `LEAVES: whorled x 8 nodes`,
+worst span 0.3076 mm**, and attributed by part every one of them is a leaf's own PETIOLE
+against its own BLADE — the by-design overlap of a rod with the blade it holds, which the
+export contract permits as a CROSS-shell overlap and which reads as a fold only once the
+two shells have been WELDED into one. The weld is exact and its mechanism is measured:
+**`petioleR` IS `t/2`, the same double as the blade's own skin offset** (both come from
+`acc.floorThickness`), and the ring's binormal axis IS the blade's normal at `u = 0`, so
+the ring vertex at `sin a = 1` lands on `C + N*t/2` — the blade's base-row centre column,
+to the bit. Counted: **0 shared vertices at azimuth 0, exactly 2 at 120, exactly 2 at
+240.** **IT IS THE NORM AND NOT A COINCIDENCE — swept over 360 azimuths at one degree,
+325 WELD and 35 do not**; `alternate` (0, 180) and `opposite` (0, 90, 180, 270) sit
+entirely on the clear 9.7% at every node and `whorled` does not. **So an XFAIL ENTRY WAS
+DECLINED**: its count would be a function of which azimuths a phyllotaxy happens to land
+on, and #213 does not gate MAGNITUDE, so it would absorb a real fold in silence — an
+xfail is a declaration somebody can check, and that one would not have been. The fix
+REMOVES THE VERTEX rather than declaring the pairs (session 43's stem cap verbatim, a
+centre fan sharing the hub's apex made a rim fan), and it is `NV = 10`'s reasoning one
+solid later: **the binormal axis is exactly where the rod is TANGENT to the blade's
+skin, so the lattice straddles it instead of putting a vertex on it.** Half a step of the
+ring's OWN step, derived, never typed. After: 0 of 360 weld, all twelve block-33 rows
+read 0 within-shell pairs and `directedMismatch` 0, shells are exactly 2 a leaf (3 leaves
+16, 24 leaves 58, no leaf 10), and TRIANGLE COUNTS ARE UNCHANGED TO THE INTEGER — a ring
+rotation is not a lattice change.
+**AND THE DEFECT WAS MODE-DEPENDENT, WHICH IS WORSE THAN ARBITRARY** (the sweep names its
+MODE and its SAMPLING because the answer MOVES: every azimuth of a 1-degree sweep, 360
+states, one whorl node). At the shipping sheet 1.20 both modes read **325 of 360** welded,
+because `floorThickness` returns 1.20 unchanged. **At sheet 0.60 they DISAGREE — 340 LIVE
+against 324 EXPORT** — because the export floor takes `t` to 1.000 and `petioleR` with it, so
+on the pre-fix tree WHETHER A LEAF WAS ONE SHELL OR TWO differed between the modes on 16 of
+360 azimuths. Which shells a solid has is TOPOLOGY, refused as mode-dependent four times
+before (session 32's ladder, 38's seam step, the fringe's count threshold, 42's lamina). The
+half step reads **0 in both modes at both sheets** — measured, not argued from the fact that
+both quantities come from one `floorThickness` call.
+**THE WITNESS IS THE ROW THAT FOUND IT** — X2 on `LEAVES: whorled x 8 nodes`, which
+rides in the EXPORT gate and in the SMOKE SUBSET both, so the fix gets no clause of its
+own (a shell count in the harness would be a second producer of the vertex weld, which
+the census owns). **And the subset caught it only because that row is in it for a
+DIFFERENT REASON**: block 33's anchor is the `alternate` row, whose azimuths (0, 180) sit
+on the clear 9.7%, so an anchor-only subset would have been silent — the whorled row is
+there for LF5's per-node SPACING claim and found a defect nobody was looking for. A
+subset earns its keep by covering the axes a feature HAS, not the failures somebody
+predicted.
+**AND R1 FIRED ON FIVE LEAF ROWS, EXACTLY AS ITS OWN COMMENT PREDICTED** ("a NEW part
+that emits and is absent here makes R1 fire at once, which is what it did the first time
+a stem was built, on this exact clause"). The leaves are the SECOND time that clause has
+caught a new part; both coverage instruments build them from `leafPlan`'s own record now.
+**A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S GUARDS ARE TRUTHINESS TESTS ON
+NUMBERS** — `!'0'` is FALSE. The page never hits it (`readUI` hands back numbers) and the
+registry predicates are number-safe, so LF0's two-statement clause is what would catch
+it there; a NODE-side tool must coerce, as `verify-bloom-seam-bytes.mjs` does. This cost
+a byte-partition run, and the tool's own ONE-SIDED guard is what found it: a row that
+throws on BOTH trees carries no information and is excluded and counted, a row that
+throws on ONE is a regression.
+**2,548 triangles a leaf, FIXED** — the lattice does not vary with size. Worst reachable
+is 24 leaves (whorled x 8) = 61,152, and leaves are NOT per-petal, so `ALL MAX` never
+reaches them (the whole family is hidden at DEFAULTS, so the blanket sweep does not
+touch it — measured, not assumed). **`frozen/phase31` is the 746 rows at `1fd0af5`**;
+block 33 takes the live matrix to 758 and the smoke census from 28 to 29 blocks.
+**THE CANTILEVER IS REPORTED AND NOT SOLVED**: the worst lever is a 120 mm leaf on the
+derived 1.2 mm petiole, **L/d = 100**, printed on every leafed build and joining the
+stamens' and style's line verbatim — `UNMEASURED — no coupon has been printed`.
+
+**AND ST9 IS THE FOURTH THING THE LEAVES BROKE, IN ANOTHER FAMILY'S CLAUSE — THE PETIOLES
+ARE EXCUSED AND THE BLADES ARE NOT** (read §"And CI named a FOURTH" of
+`docs/bloom-leaves-outcome.md` before touching `stemChannelAssertions` or `petioleAxis`).
+`bloom-connectedness` went RED in CI with **0 rows not one piece**: the flood fill was clean
+on all 756 rows that reached the results, every leaf row read `components=1 stray=0`, and ONE
+row was DROPPED by a validity assertion — `LEAVES: x a SPHERE with a stem`, on **ST9: 198
+exported vertices inside the free stem's 1 mm printable gap, nearest 0.0000 mm**. Two
+assertions, one root: ST9 fired and #220's row census reported the drop, which is the only
+reason it was diagnosable from the summary rather than from a hunt.
+**A LEAF IS THE THIRD PART EVER TO LIVE BELOW THE HUB AND IT IS THERE BY DESIGN** — the
+petiole is rooted THROUGH the wall, ST9's distance is to the SOLID cylinder, so every embedded
+vertex reads exactly 0; the nearest is at radius **1.652 mm = `rootR − petioleR` to the bit**.
+**Attributed by part: 198 of 198 are a petiole's own and 0 are anything else**, so the channel
+was clear of petals on the row it dropped — and a clearance criterion means nothing between two
+solids that are FUSED, which is what ST9's own scope already says about the root band and what
+this project measured on a flat head (all 8 feet at 0.000 mm). It is the R1 lesson in a clause
+nobody thought to check: both coverage instruments were taught the leaves, **ST9 was not,
+because nobody looks for a clause in another family that reasons about a region.**
+**THE FIX NAMES THE PETIOLE AND DOES NOT WIDEN THE REGION** — the fifth durable rule, because
+a region wide enough to hold a petiole is wide enough to hold a petal. It is the rod's own axis
+SEGMENT, one petiole radius wide, read from `petioleAxis` — **the two rings' own centroids the
+BUILDER emitted**, beside `emittedRootR` and for its reason (re-deriving from `leafPlan`'s
+`rootR` and `angleDeg` is a second producer; session 43's ST2). Its owner is the LEAF builder,
+not the quantity under test, so ST9 still reads none of the channel's report. Three
+measurements: the row is **silent** (198 excused, 0 intruders); **with the rods emptied ST9
+reports 198 again** (1584 on a 24-leaf whorl), so the exemption is what moved the answer; and
+a synthetic vertex 0.4 mm outside the wall at an azimuth no rod occupies **still FIRES**. Every
+sphere-stem row that shipped before is silent, unchanged.
+**AND THE BLADE IS A REAL PRINTABILITY FINDING THAT IS NOT THE CHANNEL'S.** ST9's `other`
+count — neither stem, hub, nor petiole — is **0 on all 35 swept states**, so the omission mask
+is clear everywhere on that grid. What appears above 60° is the BLADE, measured as a pure
+geometric quantity with no ST9 in it (nearest approach of any blade vertex to the free stem's
+solid): **1.853 / 4.356 / 5.492 / 4.910 / 4.019 / 2.804 / 1.853 / 0.824 / 0.289 / 0.000 mm at
+`leafAngle` −60 / −30 / 0 / 20 / 35 / 50 / 60 / 70 / 75 / 80–90** — **identical on a CAP and a
+SPHERE to four decimals and identical in LIVE and EXPORT**, so it is the leaf against the stem
+and has nothing to do with spheres or the channel. **From 70° up it is under
+`MIN_FEATURE_MM`**, the top fifth of a −60…90 range; **Eva's ruled 35° reads 4.019 mm, four
+times the gap.** REPORTED, NOT GATED — §18a's `cup × petalTipShape` treatment, and the matrix
+varies one control at a time so it is invisible to it by construction. The one thing done is
+that **ST9's message now says what it cannot tell apart**, so "the channel is not clear" does
+not send a reader looking for a petal that is not there.
+**AND THE SUBSET WAS BLIND TO IT: `bloom-smoke --conn` was CLEAN LOCALLY on all seven of its
+leaf rows.** It covered phyllotaxy, the bore, the angle, the inset, the serration and both
+guards — every axis the feature has — and NOT the one axis that reaches another family's
+clause, because block 33's anchor is the `alternate` row on a CAP head where ST9 returns before
+claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 families).
+**A SUBSET EARNS ITS KEEP BY COVERING THE AXES A FEATURE HAS — INCLUDING THE AXIS THAT IS
+ANOTHER FAMILY'S REGION.** Session's own X2 defect was caught by a subset row that was there
+for a DIFFERENT reason; this one was missed because no row was there for this reason at all.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
