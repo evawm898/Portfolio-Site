@@ -8379,8 +8379,25 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   /* ---- the petiole ---------------------------------------------------- */
   const sides = LEAF_PETIOLE_SIDES, rp = plan.petioleR;
   const bi = [D0[1] * T[2] - D0[2] * T[1], D0[2] * T[0] - D0[0] * T[2], D0[0] * T[1] - D0[1] * T[0]];
+  /* THE RING IS OFFSET A HALF STEP, AND THAT IS WHAT KEEPS THE PETIOLE AND THE
+     BLADE TWO SHELLS. `rp` IS `t/2` — the same double as the blade's own skin
+     offset — and `bi` is the blade's normal at u = 0, so a ring vertex sitting
+     at exactly `sin a = 1` lands on `C + N*t/2`: the blade's base-row centre
+     column, to the bit. Two shared vertices weld the rod into the blade, and
+     the by-design overlap of a rod with the blade it holds is then read as a
+     WITHIN-shell self-intersection rather than the cross-shell overlap the
+     export contract permits. Measured over 360 azimuths at one degree: 325
+     weld and 35 do not, so the clear case is the accident — `alternate` (0,
+     180) and `opposite` (0, 90, 180, 270) happen to be clear at every node
+     while `whorled` welds at 120 and 240. Same geometry either way; only the
+     classification moves, on the last bit of a cosine. Session 43's stem cap
+     is the precedent (a centre fan sharing the hub's apex vertex, fixed by
+     removing the vertex rather than declaring the pairs), and the half step is
+     `NV = 10`'s reasoning one solid later: the binormal axis is where the rod
+     is TANGENT to the blade's skin, so the lattice straddles it instead of
+     putting a vertex on it. Derived from the ring's own step, never typed. */
   const pring = (sv) => Array.from({ length: sides }, (_, i) => {
-    const a = (2 * Math.PI * i) / sides, c = Math.cos(a) * rp, d = Math.sin(a) * rp;
+    const a = (2 * Math.PI * (i + 0.5)) / sides, c = Math.cos(a) * rp, d = Math.sin(a) * rp;
     return [base[0] + D0[0] * sv + T[0] * c + bi[0] * d, base[1] + D0[1] * sv + T[1] * c + bi[1] * d, base[2] + D0[2] * sv + T[2] * c + bi[2] * d];
   });
   const PA = pring(-plan.embedMm), PB = pring(plan.petioleLenMm);
