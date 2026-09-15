@@ -2,7 +2,8 @@
    verify-bloom-sphere-stem-bytes.mjs — THE SPHERE STEM CHANNEL'S BYTE
    PARTITION, AND THE CLAIM THAT ONLY THE OMITTED PETALS WENT.
 
-     node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree> [--control] [--rows N]
+     node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree>
+        [--change omission|band|plug] [--control] [--control-only] [--rows N] [--only re]
 
    TWO CLAUSES, and the second is the one this feature is actually about.
 
@@ -27,6 +28,27 @@
    itself uses, and legitimate for the same reason: the geometry does not depend
    on accumulator state. The tool REFUSES rather than guesses if the counts it
    derives do not add up to the base stream it is slicing.
+
+   UNDER `--change plug` CLAUSE 2 ASKS THE QUESTION THE BAND'S COULD NOT. It
+   keeps the band's two halves — every differing float inside the stem's own
+   envelope, and the outer cylinder wall bit-identical — and adds the one the
+   band's header had to declare itself blind to: THE BOTTOM FACE'S OWN AREA.
+   On the base it is the tube's section, `poly(R) - poly(b)`; on the branch it
+   is a full disc, `poly(R)` — a 56% difference at the widest bore. The
+   reference is the closed form of a regular N-gon's area, owned by neither
+   `stemPlan` nor `buildStemInto`; the measured side is the emitted triangles'
+   own cross products. That clause exists because half (b) DEFINES the wall as
+   the triangles not all at one height, and the bottom face is exactly the
+   triangles all at one height — so without it the one surface this change is
+   about would be the one surface clause 2 had defined itself out of, correct,
+   in scope and empty at any plug length on any row (the fifth durable rule,
+   and the band's own recorded trap).
+
+   ITS MOVERS ARE THE WIDEST OF THE THREE: a row moves iff `stemPlan` reports a
+   stem PRESENT with a BORE to close, which is every hollow stem in the matrix
+   and nothing else. A stem at or under the 3 mm floor has no bore and is a
+   HOLDER; so is every row at `stemLength` 0. Rows where the two closures MEET
+   are movers, and have to be — the bore they used to carry is gone entirely.
 
    UNDER `--change band` CLAUSE 2 ASKS A DIFFERENT QUESTION OF THE SAME BUILDER:
    the band may only change the stem's INTERIOR. Two halves. (a) every float
@@ -96,7 +118,7 @@ const CONTROL_ONLY = process.argv.includes('--control-only');
    channel that named it; `band` is the SOLID ROOT BAND, whose movers and whose
    second clause are different questions about the same builder. */
 const CHANGE = process.argv.includes('--change') ? process.argv[process.argv.indexOf('--change') + 1] : 'omission';
-if (!['omission', 'band'].includes(CHANGE)) { console.error(`--change must be omission|band, not ${CHANGE}`); process.exit(2); }
+if (!['omission', 'band', 'plug'].includes(CHANGE)) { console.error(`--change must be omission|band|plug, not ${CHANGE}`); process.exit(2); }
 if (!BASE || !fs.existsSync(BASE)) { console.error('verify-bloom-sphere-stem-bytes: need --base <worktree of the base commit>'); process.exit(2); }
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const G = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
@@ -138,6 +160,20 @@ function movesByRecord(set) {
       if (!fr.hub) continue;
       const plan = G.stemPlan(st, fr.hub, acc);
       if (plan.present && plan.solidBandMm > 0) return true;
+    } else if (CHANGE === 'plug') {
+      /* THE PLUG'S OWN RECORD, and it is the widest predicate of the three
+         because the plug is the widest change: a row moves iff the plan reports
+         a stem that is PRESENT and has a BORE to close. Not "iff a plug was
+         built" — that would be the same statement with an extra step, since
+         `tipPlugMm` is non-zero exactly when `boreR` is. Rows where the two
+         closures MEET are movers too, and have to be: the bore they used to
+         carry is gone entirely, which is a bigger move than plugging one end.
+         Both halves are mode-free (`stemDiameter` and `stemLength` are the only
+         inputs), so the two-mode loop here can only agree with itself — kept
+         for the shape the other two changes need rather than for its own sake. */
+      if (!fr.hub) continue;
+      const plan = G.stemPlan(st, fr.hub, acc);
+      if (plan.present && plan.boreR > 0) return true;
     } else if (fr.sphereMode && G.stemPlan(st, fr.hub, acc).present) return true;
   }
   return false;
@@ -169,9 +205,9 @@ function movesByRecord(set) {
        Identified geometrically rather than by stream offset, so it holds
        whatever order the builder emits in. */
 function onlyTheStemsInteriorWent(set, em) {
-  const { acc: accB } = build(G, DEFAULTS, set, em);
+  const { acc: accB, b: repB } = build(G, DEFAULTS, set, em);
   if (CONTROL_ONLY && accB.positions.length) accB.positions[0] += 1e-9;
-  const { acc: accA } = build(GB, DB, set, em);
+  const { acc: accA, b: repA } = build(GB, DB, set, em);
   const st = { ...DEFAULTS, ...set };
   const plan = G.stemPlan(st, G.footRing(st, new G.MeshBuilder({ exportMode: em })).hub,
                           new G.MeshBuilder({ exportMode: em }));
@@ -208,8 +244,57 @@ function onlyTheStemsInteriorWent(set, em) {
     return out.sort();
   };
   const wa = wall(a), wb = wall(b);
-  if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the band changed a surface that can be SEEN`;
-  for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the band is visible from outside and the derivation has overshot`;
+  if (wa.length !== wb.length) return `the stem's OUTER WALL has ${wa.length} triangles on the base and ${wb.length} on the branch — the ${CHANGE} changed a surface that can be SEEN`;
+  for (let i = 0; i < wa.length; i++) if (wa[i] !== wb[i]) return `a stem OUTER WALL triangle moved (${wa[i]} -> ${wb[i]}) — the ${CHANGE} moved the tube's own side, which neither closure has any business reaching`;
+  /* (a) — AND UNDER `--change plug` IT IS A CONTIGUOUS-RUN COMPARISON, because
+     an INDEX-ALIGNED one is wrong the moment anything follows the stem.
+
+     `buildBloomInto` emits petals, then the hub, then the STEM, then the
+     androecium and the gynoecium. The band only ever fires on SPHERE rows,
+     where the centre is hidden AND inert so nothing follows — there the
+     index-aligned form below is valid, and it is left alone. The PLUG fires on
+     every hollow stem, including rows that carry a centre, and there the stem's
+     own triangle count changing (576 -> 476) SHIFTS everything after it: the
+     comparison then reads a stem vertex against a stamen's and reports a
+     difference the geometry does not have. MEASURED — the first whole-matrix
+     run failed on exactly the two rows with parts after the stem (`ALL MAX` and
+     `STEM: x the whole centre`), naming "(r 1.5000, z 0.6000) against
+     (r 8.2447, z -0.6000)", which is the bore's own ring against the hub's rim.
+
+     THE REPLACEMENT IS STRICTLY STRONGER, not a loosening. Scanning in from
+     BOTH ENDS finds the one contiguous run that differs; everything outside it
+     is then bit-identical BY CONSTRUCTION rather than by assertion. Three
+     claims follow: the run is contained in the stem's own envelope, the two
+     streams' LENGTH difference is exactly the stem's own triangle delta, and
+     the outer cylinder wall (below) is untouched. A change that moved a petal
+     as well as the stem would widen the run past the envelope; one that moved
+     something and compensated elsewhere would break the length identity. */
+  if (CHANGE === 'plug') {
+    const la = a.length, lb = b.length;
+    const stemA = repA.stemBuilt ? repA.stemBuilt.tris : 0;
+    const stemB = repB.stemBuilt ? repB.stemBuilt.tris : 0;
+    if (la - lb !== (stemA - stemB) * 9) {
+      return `the two streams differ by ${la - lb} floats while the STEM's own triangle count differs by ${stemA - stemB} (${(stemA - stemB) * 9} floats) — something other than the stem changed size`;
+    }
+    const lim = Math.min(la, lb);
+    let i0 = 0; while (i0 < lim && Object.is(a[i0], b[i0])) i0++;
+    let k0 = 0; while (k0 < lim - i0 && Object.is(a[la - 1 - k0], b[lb - 1 - k0])) k0++;
+    if (i0 >= lim && la === lb) return null;                 // nothing differed at all
+    const inEnv = (x, y, z) => Math.hypot(x, y) <= R + 1e-6 && z <= plan.topZ + 1e-6 && z >= plan.tipZ - 1e-6;
+    /* The run is walked on VERTEX boundaries: `i0` can land mid-vertex, so it is
+       rounded down to a multiple of 3 and the tail up, which only ever WIDENS
+       the region being checked. */
+    const lo = Math.floor(i0 / 3) * 3;
+    for (const [arr, len] of [[a, la], [b, lb]]) {
+      const hi = Math.ceil((len - k0) / 3) * 3;
+      for (let i = lo; i < hi && i + 2 < len; i += 3) {
+        if (!inEnv(arr[i], arr[i + 1], arr[i + 2])) {
+          return `the one contiguous run that differs reaches OUTSIDE the stem's own envelope at float ${i}: (r ${Math.hypot(arr[i], arr[i + 1]).toFixed(4)}, z ${arr[i + 2].toFixed(4)}) against a stem of radius ${R} spanning z ${plan.tipZ.toFixed(4)}..${plan.topZ.toFixed(4)} — the plug reached the head, a petal, the hub or the centre`;
+        }
+      }
+    }
+    return bottomFaceClause(a, b, plan, R);
+  }
   /* (a) — compare only where the two streams align; the differing tail is the
      band's own, and its vertices are checked against the envelope. */
   const n = Math.min(a.length, b.length);
@@ -218,10 +303,58 @@ function onlyTheStemsInteriorWent(set, em) {
     const rA = Math.hypot(a[i], a[i + 1]), rB = Math.hypot(b[i], b[i + 1]);
     const inA = rA <= R + 1e-6 && a[i + 2] <= plan.topZ + 1e-6 && a[i + 2] >= plan.tipZ - 1e-6;
     const inB = rB <= R + 1e-6 && b[i + 2] <= plan.topZ + 1e-6 && b[i + 2] >= plan.tipZ - 1e-6;
-    if (!inA || !inB) return `a vertex OUTSIDE the stem's own envelope moved at float ${i}: base (r ${rA.toFixed(4)}, z ${a[i + 2].toFixed(4)}) against branch (r ${rB.toFixed(4)}, z ${b[i + 2].toFixed(4)}) — the band reached the head, a petal or the hub`;
+    if (!inA || !inB) return `a vertex OUTSIDE the stem's own envelope moved at float ${i}: base (r ${rA.toFixed(4)}, z ${a[i + 2].toFixed(4)}) against branch (r ${rB.toFixed(4)}, z ${b[i + 2].toFixed(4)}) — the ${CHANGE} reached the head, a petal or the hub`;
   }
   const strayB = outside(b.slice(n)), strayA = outside(a.slice(n));
   if (strayA.length || strayB.length) return `the differing tail holds ${strayA.length + strayB.length} vertices outside the stem's own envelope`;
+  /* (c) — AND UNDER `--change plug`, THE BOTTOM FACE IS THE FEATURE, SO IT IS
+     ASSERTED RATHER THAN EXCLUDED.
+
+     THIS CLAUSE EXISTS BECAUSE (b) CANNOT HOLD IT, and that is the fifth
+     durable rule rather than an oversight: (b) defines "the stem's outer wall"
+     as the triangles NOT all at one height, and the bottom face is exactly the
+     triangles all at one height — so the one surface this change is about is
+     the one surface (b) had defined itself out of. The band's own header
+     records that trap; here the same clause would have been correct, in scope
+     and EMPTY at any plug length on any row.
+
+     SO THE SUBJECT IS STATED AS A SET AND THE FAILURE IS IN IT: the triangles
+     whose three vertices all sit at the stem's own tip z. Their total AREA is
+     the claim — an ANNULUS on the base (the tube's section, `poly(R) - poly(b)`)
+     and a full DISC on the branch (`poly(R)`), a 56% difference at the widest
+     bore. The reference is the CLOSED FORM of a regular N-gon's area, whose
+     owner is neither `stemPlan` nor `buildStemInto`; the measured side is the
+     emitted triangles' own cross products. Neither side can move with a defect
+     in the other.
+
+     It is the file-side clause ST10 declares itself blind to, arriving here
+     because this tool already holds both streams and ST10 does not. */
+  return null;
+}
+
+function bottomFaceClause(a, b, plan, R) {
+  const poly = (rad) => 0.5 * plan.sides * rad * rad * Math.sin(2 * Math.PI / plan.sides);
+  const faceArea = (pos, z) => {
+    let A = 0;
+    for (let i = 0; i < pos.length; i += 9) {
+      if (!(pos[i + 2] === z && pos[i + 5] === z && pos[i + 8] === z)) continue;
+      const ux = pos[i + 3] - pos[i], uy = pos[i + 4] - pos[i + 1];
+      const vx = pos[i + 6] - pos[i], vy = pos[i + 7] - pos[i + 1];
+      A += Math.abs(ux * vy - uy * vx) / 2;
+    }
+    return A;
+  };
+  const tip = plan.tipZ;
+  const wantBase = poly(R) - poly(plan.boreR);          // the tube's own section: an annulus
+  const wantBranch = poly(R);                           // closed: a full disc
+  const gotBase = faceArea(a, tip), gotBranch = faceArea(b, tip);
+  const tol = 1e-6 * Math.max(1, poly(R));
+  if (Math.abs(gotBase - wantBase) > tol) {
+    return `the BASE's bottom face measures ${gotBase.toFixed(4)} mm^2 at z = ${tip}; the tube's own section is ${wantBase.toFixed(4)} — this tool is not reading the face it thinks it is`;
+  }
+  if (Math.abs(gotBranch - wantBranch) > tol) {
+    return `the bottom face measures ${gotBranch.toFixed(4)} mm^2 against a closed disc's ${wantBranch.toFixed(4)} — the bore is NOT closed at the tip and the stem still ends as a cut pipe`;
+  }
   return null;
 }
 
@@ -291,7 +424,7 @@ for (const r of rows) {
     movers++;
     if (!differs) badMove.push(r.label);
     if (!CONTROL) for (const em of [true, false]) {
-      const why = CHANGE === 'band' ? onlyTheStemsInteriorWent(set, em) : onlyTheOmittedWent(set, em);
+      const why = CHANGE === 'band' || CHANGE === 'plug' ? onlyTheStemsInteriorWent(set, em) : onlyTheOmittedWent(set, em);
       if (why) badOnly.push(`${r.label} [${em ? 'EXPORT' : 'LIVE'}]: ${why}`);
     }
   } else { holders++; if (differs) badHold.push(`${r.label} (${n} floats)`); }
@@ -303,7 +436,9 @@ for (const b of badMove) console.log('   ' + b);
 console.log(`CLAUSE 1  holders that MOVED: ${badHold.length}`);
 for (const b of badHold.slice(0, 12)) console.log('   ' + b);
 if (!CONTROL) {
-  console.log(CHANGE === 'band'
+  console.log(CHANGE === 'plug'
+    ? `CLAUSE 2  movers where the stem's OUTER WALL moved, anything outside the stem did, or the bottom face is not a closed DISC: ${badOnly.length}`
+    : CHANGE === 'band'
     ? `CLAUSE 2  movers where the stem's OUTER WALL moved, or anything outside the stem did: ${badOnly.length}`
     : `CLAUSE 2  movers where something OTHER than the omitted petals moved: ${badOnly.length}`);
   for (const b of badOnly.slice(0, 12)) console.log('   ' + b);
@@ -315,13 +450,15 @@ const pass = !badMove.length && !badHold.length && !badOnly.length;
 if (CONTROL_ONLY) {
   const fired = badOnly.length > 0;
   console.log(fired
-    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where ${CHANGE === 'band' ? 'a float OUTSIDE the stem had moved' : 'a KEPT petal had moved'}`
+    ? `\nCONTROL-ONLY OK — CLAUSE 2 reported ${badOnly.length} of ${movers * 2} (mover x mode) builds where ${CHANGE === 'band' || CHANGE === 'plug' ? 'a float OUTSIDE the stem had moved' : 'a KEPT petal had moved'}`
     : '\nCONTROL-ONLY FAILED TO FIRE — clause 2 cannot see a kept petal moving, so its PASS is not evidence');
   if (!movers) console.log('   (and there were NO MOVERS in this row set, so the control was vacuous — narrow to rows that build a stem on a sphere)');
   process.exit(fired && movers ? 0 : 1);
 }
 console.log(CONTROL ? (pass ? '\nCONTROL FAILED TO FIRE — the comparison cannot see a 1e-9 perturbation, so neither clause is evidence' : '\nCONTROL OK — CLAUSE 1 detected the perturbation on the holders (clause 2 is NOT exercised here — that is `--control-only`)')
-                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : (CHANGE === 'band'
+                    : (pass ? (NARROWED ? '\nOK on the named rows — NOT a pass of the matrix.' : (CHANGE === 'plug'
+                        ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem, its outer wall stayed bit-identical, and its bottom face came out a CLOSED DISC where the base had an annulus.'
+                        : CHANGE === 'band'
                         ? '\nPASS — every predeclared mover moved, every holder held, and on every mover every float that went lies INSIDE the stem while its outer wall stayed bit-identical.'
                         : '\nPASS — every predeclared mover moved, every holder held, and on every mover the ONLY floats that went are the omitted petals\' own.')) : '\nFAIL'));
 process.exit(CONTROL ? (pass ? 1 : 0) : (pass ? 0 : 1));

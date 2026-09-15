@@ -226,6 +226,22 @@
          two INERT states (a sphere with no stem, a stem on a CAP) where both
          lines must be ABSENT. `(w)` and not `(t)`: `(t)` is the anther's
          seven, above.
+
+     (x) THE BORE'S TWO CLOSURES ARE TOLD, AND SO IS THE CROSSOVER (the
+         tip-plug session). Eva's ask was that the bottom of a bored stem
+         LOOK solid; the geometry answering that is ST10's, and this route is
+         the other half of the ruling — that where the two closures MEET and
+         the stem becomes solid throughout, it is SAID rather than silently
+         produced. Four states, each a biconditional driven on one page
+         against the BUILDER's own record: a hollow stem (the plug's clause
+         shown, the crossover's absent), a stem at the 3 mm floor (neither —
+         there is no bore to close, so a passing "0.00 mm" would be a number
+         nobody measured), the CROSSOVER itself (one sentence naming both
+         closures and the stem they meet across, and NEITHER of the separate
+         clauses, because "solid for the first 1.20" and "solid for the last
+         1.50" of a 2.20 mm stem are two true clauses adding to a false
+         picture), and length 0 (no STEM line at all). The numbers are read
+         back against `__bloomMetrics`, never against each other.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -2056,6 +2072,100 @@ for (const [label, sets, wantDome, wantClamp] of [
   if (off) await step('RADIAL with a stem — a cap has no pole the sequence runs through, so no channel', [{ id: 'placement', value: 'RADIAL' }, { id: 'stemLength', value: '60' }]);
 }
 
+/* ------- (x) THE BORE'S TWO CLOSURES, AND THE CROSSOVER, ARE TOLD -------
+   (the tip-plug session).
+
+   WHAT THIS ROUTE IS FOR, and it is not "a feature shipped so a route was
+   added". Eva's ask was that the bottom of a bored stem LOOK solid. Whether
+   it IS closed is ST10's, measured on the rings the builder emitted; whether
+   the panel SAYS SO is nobody's but this route's, and the two are different
+   claims with different failure modes. A read-out that silently stopped
+   printing the plug would leave the STEM line claiming a bore that runs the
+   length of the stem when it does not.
+
+   THE CROSSOVER IS THE LOAD-BEARING CELL. Both closures are derived from
+   lengths, so on a short enough stem they MEET and no bore survives. That is
+   ruled to be TOLD rather than silently produced — and the sentence is ONE
+   sentence, because "solid for the first 1.20 mm" and "solid for the last
+   1.50 mm" of a 2.20 mm stem are two true clauses adding up to a false
+   picture. So this route asserts the joint clause APPEARS and BOTH separate
+   ones are ABSENT there, which no single-direction check could carry.
+
+   AND THE 3 mm FLOOR IS THE OTHER INERT DIRECTION. There the bore is already
+   closed by Eva's own rule, so there is nothing to plug: a passing
+   "SOLID for the last 0.00 mm" would be a number nobody measured, and the
+   clause must be absent rather than zero. That is the branch that keeps every
+   solid-stem row byte-identical, and a route that only ever drove a hollow
+   stem could not see it come undone.
+
+   EVERY NUMBER IS READ BACK AGAINST `__bloomMetrics`, never against the text
+   that printed it: the plan owns `tipPlugMm`, `voidMm` and `solidThrough`,
+   and this route owns only the question of whether the panel agrees. */
+{
+  const tag = '[stem closures]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const S = m.stem;
+      return {
+        present: !!S, boreR: S ? S.boreR : null, plug: S ? S.tipPlugMm : null,
+        voidMm: S ? S.voidMm : null, band: S ? S.solidBandMm : null,
+        solidThrough: S ? !!S.solidThrough : null,
+        heightMm: S ? S.root[2] + (S.rootSpanMm || 0) - S.tip[2] : null,
+        stemSaid: /\bSTEM \d/.test(txt),
+        plugSaid: /SOLID for the last ([\d.]+) mm/.exec(txt),
+        bandSaid: /SOLID for the first ([\d.]+) mm/.exec(txt),
+        throughSaid: /SOLID THROUGHOUT — a ([\d.]+) mm root band and a ([\d.]+) mm tip plug MEET across a ([\d.]+) mm stem/.exec(txt),
+        sealedSaid: /([\d.]+) mm of SEALED bore between the two/.exec(txt),
+      };
+    });
+    const p = [];
+    if (!res.present) {
+      if (res.stemSaid) p.push('the STEM line is shown on a state with no stem at all');
+      if (res.plugSaid || res.bandSaid || res.throughSaid) p.push('a closure clause is shown on a state with no stem at all');
+    } else {
+      const hollow = res.boreR > 0;
+      /* THE PLUG EXISTS IFF THERE IS A BORE, and the panel must agree with the
+         plan about which — not with itself. */
+      if ((res.plug > 0) !== hollow) p.push(`the plan asks for a ${res.plug} mm plug on a stem whose bore radius is ${res.boreR}`);
+      const wantThrough = res.solidThrough;
+      const wantPlug = hollow && !wantThrough;
+      const wantBand = res.band > 0 && !wantThrough;
+      if (!!res.throughSaid !== wantThrough) p.push(`the SOLID THROUGHOUT clause is ${res.throughSaid ? 'shown' : 'absent'} while the builder reports solidThrough=${wantThrough} (${res.voidMm} mm of bore left)`);
+      if (!!res.plugSaid !== wantPlug) p.push(`the tip-plug clause is ${res.plugSaid ? 'shown' : 'absent'} while the state ${wantPlug ? 'has a bore to close and a void that survives' : 'does not'}`);
+      if (!!res.bandSaid !== wantBand) p.push(`the root-band clause is ${res.bandSaid ? 'shown' : 'absent'} while the builder reports a ${res.band} mm band and solidThrough=${wantThrough}`);
+      if (res.plugSaid && Math.abs(Number(res.plugSaid[1]) - res.plug) > 0.005) p.push(`the line says the plug is ${res.plugSaid[1]} mm, the plan says ${res.plug}`);
+      if (res.sealedSaid && Math.abs(Number(res.sealedSaid[1]) - res.voidMm) > 0.005) p.push(`the line says ${res.sealedSaid[1]} mm of sealed bore, the plan leaves ${res.voidMm}`);
+      if (res.throughSaid) {
+        if (Math.abs(Number(res.throughSaid[1]) - res.band) > 0.005) p.push(`the joint clause names a ${res.throughSaid[1]} mm band where the plan says ${res.band}`);
+        if (Math.abs(Number(res.throughSaid[2]) - res.plug) > 0.005) p.push(`the joint clause names a ${res.throughSaid[2]} mm plug where the plan says ${res.plug}`);
+        if (res.sealedSaid) p.push('the joint clause is shown AND a sealed-bore figure with it — there is no bore left to have a length');
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${res.present ? `bore ${res.boreR}, band ${res.band}, plug ${res.plug}, void ${res.voidMm}${res.solidThrough ? ' SOLID THROUGH' : ''}` : 'no stem, no line'}`);
+  };
+  await step('the shipped stem on a flat hub (60 x 6 mm) — a bore to close, and the plug clause says so', [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }]);
+  await step('the widest stem (12 mm) — the widest bore the plug ever closes', [{ id: 'stemDiameter', value: '12' }]);
+  await step('the 3 mm floor — Eva\'s bore rule already closed it, so there is nothing to plug and the clause is ABSENT', [{ id: 'stemDiameter', value: '3' }]);
+  /* THE CROSSOVER. The bare corner's own control set at the shortest built
+     stem: a 1.20 mm root band and a 1.50 mm tip plug across a 2.20 mm stem, so
+     the two overlap and nothing is left. It is the only state in this gate
+     where a HOLLOW stem reports no bore, and the only one where the joint
+     clause can be shown to print. */
+  await step('THE TWO CLOSURES MEET — one sentence naming both, and NEITHER of the separate clauses',
+    [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '3' },
+     { id: 'spread', value: '0.6' }, { id: 'layerSize', value: '0.35' }, { id: 'stemDiameter', value: '12' }, { id: 'stemLength', value: '1' }]);
+  await step('the same corner at 2 mm — half a millimetre of bore survives, so the two separate clauses come back', [{ id: 'stemLength', value: '2' }]);
+  await step('the stem back to 0 — no stem, no STEM line, no closure clause', [{ id: 'stemLength', value: '0' }]);
+}
+
 /* ===================================================================
    ROUTE (n) — THE RETIREMENT (session 20). RETIRED_IDS is a reservation with
    a check behind it, and the halves that need the DOM or the SOURCE live
@@ -2752,12 +2862,20 @@ if (NEGATIVE_CONTROL) {
        evidence about the other. */
     const sawChannel = fail.some((f) => /^\[stem channel\] .*STEM CHANNEL line is ABSENT while the geometry has a channel/.test(f));
     const sawPacking = fail.some((f) => /^\[stem channel\] .*MERIDIAN PACKING line is absent on a sphere with a stem/.test(f));
+    /* ROUTE (x), THE BORE'S TWO CLOSURES, required for route (w)'s own reason
+       one session later: the route's clauses are biconditionals, and nothing
+       makes them RUN. Two flags, not one — the tip plug's clause and the
+       crossover's are two sentences with two owners, and a frozen read-out that
+       still happened to satisfy one would otherwise print a pass. */
+    const sawPlug = fail.some((f) => /^\[stem closures\] .*tip-plug clause is (shown|absent)/.test(f));
+    const sawThrough = fail.some((f) => /^\[stem closures\] .*SOLID THROUGHOUT clause is (shown|absent)/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SIXTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SEVENTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

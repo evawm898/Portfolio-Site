@@ -226,7 +226,30 @@ for (const row of rows) {
      bytes. Both are things this gate is structurally blind to: an inside-out
      petal and a petal folded through itself are watertight and one piece. */
   const stlPos = stlPositions(buf);
-  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  /* THE HEAD AND THE STEM'S OWN CAVITY, both read from the build's own record:
+     O1's declared-inward baseline is a count derived from what this state
+     actually builds, never from the head shape alone. `cavity` is non-null iff
+     the bore SURVIVES its two closures — a solid stem, a stem at length 0 and
+     a stem whose closures meet all leave it null, which is the inertness half
+     of the tip-plug ruling arriving in the orientation gate. */
+  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
+    const m = window.__bloomMetrics(), S = m.stem;
+    return {
+      sphere: m.sphereMode === true,
+      /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
+         narrower than "the bore survives" and was corrected by measurement:
+         O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on
+         every FLAT-hub stem. Where there is no root band the bore is a BLIND
+         HOLE — its wall reaches the top face and welds to the outer shell
+         through the annulus there, so the stem stays ONE shell. It is only
+         where a root band shuts the top as well that the bore's wall shares no
+         vertex with anything and becomes its own closed surface. (The PART is
+         sealed either way once a slicer unions the hub over the blind hole's
+         mouth; this is about what the exported MESH's shells are.) */
+      cavity: S && S.voidMm > 0 && S.solidBandMm > 0 && S.tipPlugMm > 0
+        ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
+    };
+  }));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
   /* ST9 — THE STEM CHANNEL, read from THIS row's STL bytes. ST7 asks the stem
      channel whether the stem channel fired, which is the circularity Eva's
@@ -397,7 +420,7 @@ console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 {
   const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === (r.sphere ? 1 : 0)).length}/${results.length} configs meeting the orientation baseline (every shell outward; under SPHERE exactly one inward, the hub's inner face)`);
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face and the stem bore's own sealed cavity where each exists)`);
 }
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
