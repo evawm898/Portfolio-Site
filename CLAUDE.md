@@ -2510,6 +2510,11 @@ So the petiole roots at the WALL'S MID-THICKNESS, where it only gets MORE embedd
 the angle steepens. **NO NODE BANDS** — they solve nothing here and would SPLIT the bore
 into N+1 cavities, moving O1's declared inward-shell count and ST1's triangle prediction.
 Do not re-propose them.
+**THE FLOWER'S GOLDEN-ANGLE / AZIMUTH DISAGREEMENT IS RECORDED SO IT IS NOT REPRODUCED
+WHEN CURVATURE ARRIVES**: `stemCenterline` kinks the flower's stem at `k * GOLDEN_ANGLE`
+while its `leafAzimuths` flips leaves 180 degrees — two different laws for one arrangement,
+confirmed present in `flower.js`. MOOT here while the bloom's stem is straight
+(`stemStations` returns `[0, lengthMm]`), and it must not come back with curvature.
 **THE TOP INSET IS DERIVED FROM THE LEAF, NEVER FROM THE STEM**: the flower's
 `0.16 x stemLength` fouls the head on **30 of 30 sampled states**, because the inset
 scales with the STEM while the rise scales with the LEAF and its ANGLE. A leaf longer
