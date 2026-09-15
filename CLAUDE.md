@@ -2481,6 +2481,82 @@ maps and proved deep-equal. The image is `node tools/shot-bloom-stem-plug.mjs <d
 code served from its own HTTP server, and which quotes NO pixel delta for any pair (two trees,
 two servers, two page sessions).
 
+**LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
+PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
+`docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
+before touching `leafPlan`, `buildLeafInto`, `leafBladeState` or the LF family).
+SIMPLE leaves, one blade per node. Nine controls: `leafLength` / `leafWidth` in
+absolute MILLIMETRES (ruling 5 — the flower's `leafSize` multiplies only the length
+while the width is fixed in world units, which is why three of its four types come out
+wider than long), `leafAngle` (**EVA RULED 35 DEG**), `leafNodes`, `leafPhyllotaxy`
+(all three ported), and four serration rows nested inside. **`leafLength` 0 is the
+GUARD** and the default is 19,040 tris, exactly what it was.
+**THE OUTLINE AND CUT MACHINERY SEPARATE FROM THE FOOT AND THE LADDER, MEASURED**:
+`widthProfile` reads exactly TWO fields off a `ring` — `width` (the foot-continuity
+floor alone) and `thickness` — and with the floor stood down (`cap.petiole`) the
+emitted outline stops reading `width` at all, **0 of 4001 half-widths moving between
+ring widths of 3 and 40 mm in both modes**. `petalForm` TAKES ITS FRAME AS AN ARGUMENT,
+so a leaf hands it a petiole frame and gets the cup with no ring in existence. And the
+LADDER IS NOT NEEDED: stationed UNIFORMLY the drawn tooth comes out at **80-95% of its
+analytic amplitude at the worst of 200 phase offsets**. Three substitutions, one term
+each, proved inert against main (0 of 64,016 half-widths, every lobe record identical).
+**THE ATTACHMENT PREMISE WAS TESTED BEFORE THE FIX WAS, AND IT WAS FALSE.** A petiole
+rooted ON THE AXIS of a hollow stem is NOT detached — a radial rod crosses the wall
+annulus on its way out, exactly **2 x STEM_MIN_WALL_MM = 3.00 mm at every hollow
+diameter** — and reads ONE PIECE. What IS reachable is detachment through the LEAF
+ANGLE: the escape length is `outerR / cos(theta)`, which runs away as the angle
+steepens, and a 10 mm axis-rooted petiole reads **TWO COMPONENTS at 75 and 85 degrees**.
+So the petiole roots at the WALL'S MID-THICKNESS, where it only gets MORE embedded as
+the angle steepens. **NO NODE BANDS** — they solve nothing here and would SPLIT the bore
+into N+1 cavities, moving O1's declared inward-shell count and ST1's triangle prediction.
+Do not re-propose them.
+**THE TOP INSET IS DERIVED FROM THE LEAF, NEVER FROM THE STEM**: the flower's
+`0.16 x stemLength` fouls the head on **30 of 30 sampled states**, because the inset
+scales with the STEM while the rise scales with the LEAF and its ANGLE. A leaf longer
+than its stem clears at no inset: told, never refused (overlapping closed shells are the
+export contract), and the NODE COUNT gives at a pitch floor of two petiole radii.
+**CUP IS FIXED AND TWIST IS ZERO — a decision, not a reading.** Ruling 3 asked for both;
+Eva approved NINE controls and neither is among them, so a leaf reading `petalCup` would
+couple two organs. `LEAF_CUP` is the one constant and a control is one registry row.
+**THE OUTLINE IS DECOUPLED STRUCTURALLY, NOT ASSERTED** — `leafBladeState` overrides
+every field that could carry a petal's value into a leaf, checked as an IDENTITY by
+`node tools/verify-bloom-leaf-decoupled.mjs` (199 petal-side control values x 2 modes,
+0 leaf floats moved; `--control` required). **`sheetThickness` IS shared and is the
+declared exception: it is the MATERIAL.**
+**LF0-LF8 WERE WRITTEN BEFORE THE GEOMETRY AND SEEN RED, TWICE** — the census statically
+("claimed by NO smoke row") and at runtime against a builder that answered nothing. Both
+STL gates are blind to the whole family: a leaf declared and never built, a petiole on
+the axis of a hollow stem, a wrong PHYLLOTAXY (nothing here measures an azimuth except
+J7, Z4b and Z8), a leaf reading the PETAL's serration, and a node inset through the head
+ALL export watertight and as one piece. **THE FAMILY CAUGHT TWO DEFECTS IN THE GEOMETRY
+IT WAS WRITTEN FOR.** LF4: a 120 mm leaf on a 20 mm stem collapsed every node onto ONE
+POINT — and the clause had to change too, to a BICONDITIONAL against the plan's own
+`insetSatisfied`, because a leaf through the head is legal geometry and asserting
+clearance outright fires on a state the geometry is entitled to build. **LF8: the two
+side rims shared a winding and so did the two end rims, giving 134 duplicated and 134
+unmatched DIRECTED edges a leaf — and BOTH STL GATES ARE BLIND, because `analyzeStl`'s
+census keys on a SORTED pair, so a face wound the wrong way still counts as a matched
+edge.** A signed-volume check is not sensitive enough either (a thin sheet's rim is a
+rounding error against its blade; the volume agreed to 15% with a flipped rim in place).
+Only **O2** noticed, as its two orientation methods DISAGREEING — the right alarm naming
+the instrument rather than the defect. ST10's precedent: a fix without a witness is
+folklore.
+**A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S GUARDS ARE TRUTHINESS TESTS ON
+NUMBERS** — `!'0'` is FALSE. The page never hits it (`readUI` hands back numbers) and the
+registry predicates are number-safe, so LF0's two-statement clause is what would catch
+it there; a NODE-side tool must coerce, as `verify-bloom-seam-bytes.mjs` does. This cost
+a byte-partition run, and the tool's own ONE-SIDED guard is what found it: a row that
+throws on BOTH trees carries no information and is excluded and counted, a row that
+throws on ONE is a regression.
+**2,548 triangles a leaf, FIXED** — the lattice does not vary with size. Worst reachable
+is 24 leaves (whorled x 8) = 61,152, and leaves are NOT per-petal, so `ALL MAX` never
+reaches them (the whole family is hidden at DEFAULTS, so the blanket sweep does not
+touch it — measured, not assumed). **`frozen/phase31` is the 746 rows at `1fd0af5`**;
+block 33 takes the live matrix to 758 and the smoke census from 28 to 29 blocks.
+**THE CANTILEVER IS REPORTED AND NOT SOLVED**: the worst lever is a 120 mm leaf on the
+derived 1.2 mm petiole, **L/d = 100**, printed on every leafed build and joining the
+stamens' and style's line verbatim — `UNMEASURED — no coupon has been printed`.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL

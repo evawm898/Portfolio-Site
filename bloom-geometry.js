@@ -8203,6 +8203,9 @@ export const LEAF_PHYLLOTAXY = Object.freeze(['alternate', 'opposite', 'whorled'
 export const LEAF_PETIOLE_FRACTION = 0.12;
 export const LEAF_PETIOLE_SIDES = 12;
 export const LEAF_CUP = 0.35;
+/* The leaf's own outline: a LANCEOLATE blade, widest below the middle. Fixed
+   rather than inherited — see leafBladeState's own note. */
+export const LEAF_BASE_TAPER = 0.85, LEAF_TIP_TAPER = 1.15, LEAF_TIP_SHAPE = 1.30;
 /* The node span, the flower's own law (ruling 9) ported as FRACTIONS OF THE
    STEM and then taken to millimetres by its one owner below. The TOP inset is
    a floor rather than a value, because Phase A measured that a fraction of the
@@ -8228,11 +8231,22 @@ export function leafAzimuths(phyllo, i) {
 /* THE NODES, IN MILLIMETRES DOWN FROM THE HUB'S UNDERSIDE — the one owner.
    `insetMm` is the TOP inset actually used: the flower's fraction raised to
    whatever the leaf itself needs to clear the head. */
-export function leafNodeDepthsMm(n, lengthMm, insetMm) {
+export function leafNodeDepthsMm(n, lengthMm, insetMm, pitchFloorMm = 0) {
   const bottom = LEAF_NODE_BOTTOM * lengthMm;
-  if (n === 1) return [Math.min(Math.max(LEAF_NODE_SOLO * lengthMm, insetMm), bottom)];
   const top = Math.min(insetMm, bottom);
-  return Array.from({ length: n }, (_, k) => top + (bottom - top) * (k / (n - 1)));
+  if (n === 1) return [Math.min(Math.max(LEAF_NODE_SOLO * lengthMm, insetMm), bottom)];
+  /* A SPAN TOO SHORT FOR THE COUNT COLLAPSES THE NODES ONTO EACH OTHER, and
+     that is reachable: a leaf longer than its own stem needs more inset than
+     the stem has, so `top` saturates at `bottom` and every node lands on one
+     point. LF4 caught it — written before this function existed, which is what
+     that ordering is for. The span is divided at the PITCH FLOOR (two petiole
+     radii, so adjacent petioles cannot merge) and the COUNT is what gives:
+     clamped and told, never refused, and `leafPlan` reports both. */
+  const span = Math.max(0, bottom - top);
+  const fit = pitchFloorMm > 0 ? 1 + Math.floor(span / pitchFloorMm) : n;
+  const k = Math.max(1, Math.min(n, fit));
+  if (k === 1) return [top];
+  return Array.from({ length: k }, (_, i) => top + (span * i) / (k - 1));
 }
 
 /* leafPlan — THE ONE OWNER of where leaves are and what they are made of.
@@ -8257,22 +8271,40 @@ export function leafPlan(state, stem, acc) {
   const insetNeededMm = Math.max(0, rise);
   const insetMm = Math.max(insetAskedMm, insetNeededMm);
   const insetClamped = insetNeededMm > insetAskedMm;
-  const nodeDepthsMm = leafNodeDepthsMm(nodes, stem.lengthMm, insetMm);
+  /* CAN THE HEAD BE CLEARED AT ALL? A leaf that rises further than the stem's
+     own node span is long has nowhere to sit that clears the head, and that is
+     a reachable corner (120 mm of leaf on a 20 mm stem). It is TOLD rather
+     than refused — overlapping closed shells are this project's export
+     contract, so a leaf through the head is legal geometry and an aesthetic
+     fact, not an invariant violation. LF4 asserts the BICONDITIONAL against
+     this flag rather than asserting clearance outright, which would fire on a
+     state the geometry is entitled to build. */
+  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
+  const petioleR0 = acc.floorThickness(state.sheetThickness) / 2;
+  const nodeDepthsMm = leafNodeDepthsMm(nodes, stem.lengthMm, insetMm, 2 * petioleR0);
+  const nodesClamped = nodeDepthsMm.length < nodes;
   const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
   /* THE PETIOLE. Its root radius is the WALL'S MID-THICKNESS — Phase A's
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
   const rootR = (stem.boreR + stem.outerR) / 2;
-  const petioleR = acc.floorThickness(state.sheetThickness) / 2;
+  const petioleR = petioleR0;
   const clearMm = (stem.outerR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
   const petioleLenMm = Math.max(LEAF_PETIOLE_FRACTION * lengthMm, clearMm);
   const embedMm = (stem.outerR - stem.boreR) / 2;
   return {
-    present: true, lengthMm, widthMm, angleDeg, nodes, phyllotaxy: phyllo,
+    present: true, lengthMm, widthMm, angleDeg, nodes: nodeDepthsMm.length, phyllotaxy: phyllo,
     nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm,
-    insetAskedMm, insetNeededMm, insetMm, insetClamped,
+    insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
+    nodesAsked: nodes, nodesBuilt: nodeDepthsMm.length, nodesClamped,
     boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemLengthMm: stem.lengthMm,
     built: azimuths.reduce((n, a) => n + a.length, 0),
+    /* THE SERRATION THE BLADE IS BUILT FROM — the LEAF's own controls, read
+       here so LF7 can compare them against the PAGE's read-back control state,
+       which is an owner this plan does not write. A leaf reading the petal's
+       `lobe*` values shows up as these two disagreeing. */
+    toothDepth: Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
+    notchShape: Number(state.leafNotchShape), toothCount: Math.round(Number(state.leafToothCount)),
     /* SLENDERNESS, the coupon question. Reported, never a bound: nothing in
        this project has ever been printed. */
     slenderness: lengthMm / (2 * petioleR),
@@ -8287,15 +8319,44 @@ export function leafPlan(state, stem, acc) {
    petal lobes came on — the organ-to-organ coupling session 22 ruled against.
    NO LOBE COVERAGE ARC, NO FRINGE, NO SQUARED TERMINAL on a leaf (ruling 2). */
 export function leafBladeState(state) {
+  /* THE DECOUPLING IS STRUCTURAL, NOT ASSERTED. The spread is what makes every
+     field the two laws read defined; every one that could make a LEAF change
+     when a PETAL control moves is overridden BELOW it, so there is nothing for
+     a clause to catch and nothing to drift. That is the stronger form of the
+     same argument the serration split rests on — sharing the MACHINERY is not
+     sharing the VALUES — and it is checked as an IDENTITY by
+     `tools/verify-bloom-leaf-decoupled.mjs`: sweep every petal control over its
+     own range and not one emitted leaf float moves.
+
+     `sheetThickness` IS shared, deliberately and as the one exception: it is
+     the MATERIAL, not a petal control, and this file has exactly one owner of
+     how thick the sheet is. A leaf on a different sheet from the petals it
+     grows with would be two materials in one print. */
   return {
     ...state,
+    /* the leaf's own size (ruling 5: millimetres, not a multiplier) */
     petalLength: Number(state.leafLength), petalWidth: Number(state.leafWidth),
+    /* the leaf's own EDGE — its four, never the petal's `lobe*` */
     lobeDepth: Number(state.leafToothDepth), lobeCount: Math.round(Number(state.leafToothCount)),
     lobeCrestShape: Number(state.leafCrestShape), lobeNotchShape: Number(state.leafNotchShape),
     lobeCoverage: 1,
+    /* THE OUTLINE IS THE LEAF'S OWN SHAPE, fixed. A lanceolate blade: widest
+       below the middle, tapering to a point. Inheriting `petalBaseTaper` and
+       friends would make every leaf change shape when a petal slider moved —
+       the same non-local surprise the serration split exists to prevent — and
+       leaf outline controls are not among the nine Eva approved. Three
+       constants; a control is one registry row the day it is wanted. */
+    petalBaseTaper: LEAF_BASE_TAPER, petalTipTaper: LEAF_TIP_TAPER, petalTipShape: LEAF_TIP_SHAPE,
+    /* NO APEX FAMILY ON A LEAF (ruling 2: no lobes-as-coverage-arc, no fringe,
+       no squared terminal) */
     petalTipEnd: 0, fringeCount: 0,
-    petalCup: LEAF_CUP, petalTwist: 0, petalRoll: 0, petalSpineCurl: 0,
-    buckleAmp: 0, petalCupGradient: 0,
+    /* THE FORM. Cup is the one deformation a leaf carries (ruling 3's stated
+       reason: the flower forced its blades flat and they read as paper
+       cutouts); everything else the petal can do is off, so nothing here moves
+       when a petal's form control does. */
+    petalCup: LEAF_CUP, petalCupGradient: 0, petalTwist: 0, petalRoll: 0, petalRollTaper: 0,
+    petalSpineCurl: 0, curlBias: 0, curlStart: 0, buckleAmp: 0,
+    petalTilt: 0, tipThinning: 0,
   };
 }
 
@@ -8304,6 +8365,7 @@ export function leafBladeState(state) {
    asks "what came out" must read the builder and not the plan (session 43's
    ST2/ST3, where a clause reading the plan fired nothing). */
 export function buildLeafInto(acc, plan, state, nodeIndex, az) {
+  const tris0 = acc.triangleCount;
   const th = (plan.angleDeg * Math.PI) / 180;
   const R = [Math.cos(az), Math.sin(az), 0], T = [-Math.sin(az), Math.cos(az), 0];
   const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
@@ -8362,15 +8424,48 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
     acc.quad(off(A.P, A.n, t / 2), off(D.P, D.n, t / 2), off(C2.P, C2.n, t / 2), off(B.P, B.n, t / 2));
     acc.quad(off(A.P, A.n, -t / 2), off(B.P, B.n, -t / 2), off(C2.P, C2.n, -t / 2), off(D.P, D.n, -t / 2));
   }
+  /* THE RIMS, AND THE TWO OF EACH PAIR ARE WOUND OPPOSITELY. The margin at
+     v = -1 faces the other way from the one at v = +1, and the base end faces
+     the other way from the tip end, so a single winding for both members of a
+     pair leaves the shell INCONSISTENT — 134 duplicated and 134 unmatched
+     DIRECTED edges, measured. Both STL gates are blind to it by construction:
+     `analyzeStl`'s edge census keys on a SORTED pair, so two traversals the
+     same way count as a matched edge and boundary-edge = 0 still holds. O2
+     caught it as a validity failure on the 24-leaf row ("the divergence sign
+     and the ray parity DISAGREE"), which is the right alarm and the wrong
+     resolution; LF8 is the clause that names it. */
   for (let i = 0; i < NU; i++) for (const j of [0, NV]) {
     const A = rows[i][j], B = rows[i + 1][j];
-    acc.quad(off(A.P, A.n, t / 2), off(B.P, B.n, t / 2), off(B.P, B.n, -t / 2), off(A.P, A.n, -t / 2));
+    const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
+    const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
+    if (j === 0) acc.quad(a, d, c, b); else acc.quad(a, b, c, d);
   }
   for (const i of [0, NU]) for (let j = 0; j < NV; j++) {
     const A = rows[i][j], B = rows[i][j + 1];
-    acc.quad(off(A.P, A.n, t / 2), off(B.P, B.n, t / 2), off(B.P, B.n, -t / 2), off(A.P, A.n, -t / 2));
+    const a = off(A.P, A.n, t / 2), b = off(B.P, B.n, t / 2);
+    const c = off(B.P, B.n, -t / 2), d = off(A.P, A.n, -t / 2);
+    if (i === 0) acc.quad(a, b, c, d); else acc.quad(a, d, c, b);
+  }
+  /* THE DIRECTED-EDGE CENSUS, folded over the triangles THIS call emitted —
+     the stem's ST10 precedent, and owed for the same reason: a fix without a
+     witness is folklore. On a closed, consistently wound shell every edge is
+     traversed exactly once in each direction. */
+  let directedMismatch = 0;
+  {
+    const q = (x) => Math.round(x * 1e4) / 1e4;
+    const k = (i) => `${q(acc.positions[i])},${q(acc.positions[i + 1])},${q(acc.positions[i + 2])}`;
+    const dir = new Map();
+    for (let t = tris0 * 9; t < acc.positions.length; t += 9) {
+      const v = [k(t), k(t + 3), k(t + 6)];
+      for (let m = 0; m < 3; m++) { const e = `${v[m]}|${v[(m + 1) % 3]}`; dir.set(e, (dir.get(e) || 0) + 1); }
+    }
+    for (const [e, n] of dir) {
+      const [a, b] = e.split('|');
+      if ((dir.get(`${b}|${a}`) || 0) !== n) directedMismatch++;
+    }
   }
   return {
+    directedMismatch,
     /* THE RADIUS THE PETIOLE ACTUALLY ROOTS AT, from the CENTROID of the ring
        this builder just emitted — not from `plan.rootR` beside it. A mutation
        that offsets every emitted ring leaves the plan saying the right thing,
@@ -8381,6 +8476,11 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       return Math.hypot(x / PA.length, y / PA.length);
     })(),
     crossesSolidMm,
+    /* THE BUILDER'S OWN TALLY, not a formula beside it — ST1's lesson one
+       family later: a computed count and an emitted one are two owners, and
+       this file has already shipped a stem arm whose computed count was wrong
+       by 48. */
+    tris: acc.triangleCount - tris0,
     rootBlendDown: prof.footHalf === 0 || widthProfileBlendIsDown(prof),
     serrationBuilt: prof.lobes && !prof.lobes.noRoom ? prof.lobes.countBuilt : 0,
   };
@@ -9017,6 +9117,19 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      stem and the hollow it leaves in the hub cannot disagree about where the
      underside is; it is emitted HERE, after the hub, where it always was. */
   const stemBuilt = buildStemInto(acc, stemPlanned);
+  /* LEAVES ON THE STEM. Built AFTER the stem because they read its plan for
+     the three lengths they need (`boreR`, `outerR`, `rootZ`) and compute none
+     of them — the petiole roots in the WALL, which is the one thing Phase A's
+     §5 settled. ABSENT BY BRANCH at `leafLength` 0 (ruling 6): `leafPlan`
+     returns `present: false`, the loop does not run, and the row is the
+     pre-leaf expression term for term. */
+  const leafPlanned = leafPlan(state, stemPlanned, acc);
+  const leavesBuilt = [];
+  if (leafPlanned.present) {
+    for (let i = 0; i < leafPlanned.azimuths.length; i++) {
+      for (const az of leafPlanned.azimuths[i]) leavesBuilt.push(buildLeafInto(acc, leafPlanned, state, i, az));
+    }
+  }
   /* THE ANDROECIUM (session 21) — read from the descriptor, placed through
      the arrangement primitive's EXISTING azimuth arms (RING: the RADIAL law;
      DISC: SPIRAL's golden angle over the Vogel radii the owner stamped), one
@@ -9116,5 +9229,5 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      WITH NO PETAL AT ALL (the bare corner, where the stem takes every one) both
      stay at descriptor 0 and `petal` is null, which is the truth. */
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
-  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission };
+  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt };
 }

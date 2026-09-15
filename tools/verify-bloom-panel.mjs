@@ -271,6 +271,30 @@ const WITNESS = {
      own reasoning, applied one level down. */
   stem: { id: 'stemLength', value: '60',
           read: (m) => `${m.stem && m.stem.lengthMm}/${m.hubJoinActive}`, what: 'stem.lengthMm/hubJoinActive' },
+  /* LEAVES — collapsed at first load, witnessed by the LENGTH through the
+     BUILDER's own leaf record. The witness reaches PAST the slider in the same
+     way the stem's does: `built` is how many leaves the builder EMITTED, which
+     the length control cannot write directly (it is the node count times the
+     phyllotaxy's own per-node count, both derived), and `nodeDepthsMm` is the
+     node law's answer. A length that moved the slider and built nothing would
+     pass a witness that only read the control back. The row needs a STEM to
+     hang off, which is why the driver sets both. */
+  leaves: { id: 'leafLength', value: '52', pre: [{ id: 'stemLength', value: '70' }],
+            read: (m) => `${m.leaf && m.leaf.built}/${m.leaf && m.leaf.nodeDepthsMm.length}`, what: 'leaf.built/leaf.nodeDepthsMm.length' },
+  /* THE SERRATION — a drop-down inside Leaves, collapsed at first load;
+     witnessed by the tooth DEPTH through the builder's own count of teeth
+     CUT, which is 0 at depth 0 (the guard) and the asked count above it. The
+     depth cannot write that number: the count is the cut law's own answer on
+     the emitted outline. */
+  leafSerration: { id: 'leafToothCount', value: '12',
+                   pre: [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '52' }],
+                   /* THE COUNT, NOT THE DEPTH — measured, not assumed. Driving
+                      the DEPTH from its default 0.26 to 0.5 leaves the teeth
+                      CUT at 9 both times, so that witness read the same number
+                      twice and the gate said so. The count moves it 9 -> 10,
+                      and the 10 is the cut law's OWN ceiling clamping an asked
+                      12, which is a quantity no control can write directly. */
+                   read: (m) => `${m.leaf && m.leaf.serration && m.leaf.serration.count}`, what: 'leaf.serration.count' },
   shape: { id: 'petalWidth', value: '30',
            /* The silhouette costs no triangles either (fixed-topology grid),
               so width is witnessed where it reaches PAST the blade: footRing()'s
