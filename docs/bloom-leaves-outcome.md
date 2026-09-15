@@ -134,6 +134,77 @@ override in a real mutated module copy and the sweep finds it.
 > 6,597 floats "moved" on a leaf whose shape had not changed. Pinning the
 > node's height before the build is the exact one.
 
+## The census is the verdict, and it named a third defect
+
+`bloom-smoke --conn` came back with **X2 on `LEAVES: whorled x 8 nodes`:
+3180 within-shell intersecting pairs, worst span 0.3076 mm** — a new
+self-intersection, not one of the 261 declared.
+
+**Attributed by part, every one of them is a leaf's own PETIOLE against its own
+BLADE.** That is the by-design overlap of a rod with the blade it holds, which
+the export contract permits as a *cross-shell* overlap and which reads as a fold
+only once the two shells have been welded into one. The table, at one whorl node:
+
+| leaves built | shells | within | cross |
+|---|---|---|---|
+| 1 (azimuth 0)      | 2 | 0   | 192 |
+| 2 (0, 120)         | 3 | 159 | — |
+| 3 (0, 120, 240)    | 4 | 318 | — |
+
+Each extra leaf adds **one** shell where it should add two, so the petiole and
+the blade of leaves 1 and 2 are one shell and those of leaf 0 are not.
+
+### The mechanism is measured, and it is exact
+
+`petioleR` is `t / 2` — **the same double** as the blade's own skin offset,
+because both come from `acc.floorThickness(sheetThickness)` — and the petiole
+ring's binormal axis *is* the blade's normal at `u = 0`. So the ring vertex at
+`sin a = 1` lands on `C + N·t/2`, the blade's base-row centre column, **to the
+bit**. Counted directly: **0 exactly-shared vertices at azimuth 0, exactly 2 at
+120°, exactly 2 at 240°.**
+
+Two shared vertices weld the rod into the blade, and the classification moves
+from cross to within on geometry that has not changed at all.
+
+### It is the norm, not a coincidence — which is what decided the remedy
+
+Swept over 360 azimuths at one degree: **325 weld and 35 do not.** `alternate`
+(0, 180) and `opposite` (0, 90, 180, 270) sit entirely on the clear 9.7% at
+every node; `whorled` does not.
+
+So a `SELF_INTERSECTION_XFAIL` entry was **declined**. Its count would be a
+function of which azimuths a phyllotaxy happens to land on — and #213 does not
+gate magnitude, so the entry would absorb a real fold on that row in silence. An
+xfail is a declaration somebody can check; this one would not have been.
+
+**The fix removes the vertex rather than declaring the pairs.** Session 43's stem
+cap is the precedent — a centre fan sharing the hub's apex vertex, made a rim fan
+— and `NV = 10`'s reasoning is the same idea one solid later: the binormal axis
+is exactly where the rod is **tangent** to the blade's skin, so the lattice
+should straddle it rather than put a vertex on it. The ring starts a **half
+step** round, `(i + 0.5)` of its own `sides`, derived from the ring's own step
+and never typed.
+
+### After
+
+* **0 of 360 azimuths weld.**
+* **All twelve block-33 rows read 0 within-shell pairs**, worst span 0.0000 mm,
+  `directedMismatch` 0, in export mode.
+* **Shells are exactly 2 per leaf**: 3 leaves → 16, 10 leaves → 30, 24 leaves →
+  58, `GATED` (no leaf) → 10.
+* **Triangle counts are unchanged to the integer.** A ring rotation is not a
+  lattice change, and the serration is unmoved — still 0 / 9 / 10 teeth built at
+  depth 0 / 0.26 / 1.00, the 10 being the cut law's own ceiling, clamped and told.
+
+> **And R1 fired on five leaf rows, exactly as its own comment predicted.** Both
+> coverage instruments count the parts through a third accumulator that EMITS,
+> so *"a NEW part that emits and is absent here makes R1 fire at once, which is
+> what it did the first time a stem was built, on this exact clause."* The leaves
+> are the second time it has caught a new part. Both tools now build them from
+> `leafPlan`'s own record; R1 still sees only the ORCHESTRATION of parts and
+> never a defect inside a builder, which is the declared blindness in both
+> headers and is unchanged.
+
 ## The partition, the phase and the block
 
 * **Matrix block 33, twelve rows.** Measured against main: **746 → 758, +12,

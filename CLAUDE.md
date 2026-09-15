@@ -2541,6 +2541,34 @@ rounding error against its blade; the volume agreed to 15% with a flipped rim in
 Only **O2** noticed, as its two orientation methods DISAGREEING — the right alarm naming
 the instrument rather than the defect. ST10's precedent: a fix without a witness is
 folklore.
+**THE PETIOLE RING IS OFFSET A HALF STEP, AND WITHOUT IT A LEAF IS ONE SHELL AT NINE
+AZIMUTHS OUT OF TEN.** X2 read **3180 within-shell pairs on `LEAVES: whorled x 8 nodes`,
+worst span 0.3076 mm**, and attributed by part every one of them is a leaf's own PETIOLE
+against its own BLADE — the by-design overlap of a rod with the blade it holds, which the
+export contract permits as a CROSS-shell overlap and which reads as a fold only once the
+two shells have been WELDED into one. The weld is exact and its mechanism is measured:
+**`petioleR` IS `t/2`, the same double as the blade's own skin offset** (both come from
+`acc.floorThickness`), and the ring's binormal axis IS the blade's normal at `u = 0`, so
+the ring vertex at `sin a = 1` lands on `C + N*t/2` — the blade's base-row centre column,
+to the bit. Counted: **0 shared vertices at azimuth 0, exactly 2 at 120, exactly 2 at
+240.** **IT IS THE NORM AND NOT A COINCIDENCE — swept over 360 azimuths at one degree,
+325 WELD and 35 do not**; `alternate` (0, 180) and `opposite` (0, 90, 180, 270) sit
+entirely on the clear 9.7% at every node and `whorled` does not. **So an XFAIL ENTRY WAS
+DECLINED**: its count would be a function of which azimuths a phyllotaxy happens to land
+on, and #213 does not gate MAGNITUDE, so it would absorb a real fold in silence — an
+xfail is a declaration somebody can check, and that one would not have been. The fix
+REMOVES THE VERTEX rather than declaring the pairs (session 43's stem cap verbatim, a
+centre fan sharing the hub's apex made a rim fan), and it is `NV = 10`'s reasoning one
+solid later: **the binormal axis is exactly where the rod is TANGENT to the blade's
+skin, so the lattice straddles it instead of putting a vertex on it.** Half a step of the
+ring's OWN step, derived, never typed. After: 0 of 360 weld, all twelve block-33 rows
+read 0 within-shell pairs and `directedMismatch` 0, shells are exactly 2 a leaf (3 leaves
+16, 24 leaves 58, no leaf 10), and TRIANGLE COUNTS ARE UNCHANGED TO THE INTEGER — a ring
+rotation is not a lattice change.
+**AND R1 FIRED ON FIVE LEAF ROWS, EXACTLY AS ITS OWN COMMENT PREDICTED** ("a NEW part
+that emits and is absent here makes R1 fire at once, which is what it did the first time
+a stem was built, on this exact clause"). The leaves are the SECOND time that clause has
+caught a new part; both coverage instruments build them from `leafPlan`'s own record now.
 **A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S GUARDS ARE TRUTHINESS TESTS ON
 NUMBERS** — `!'0'` is FALSE. The page never hits it (`readUI` hands back numbers) and the
 registry predicates are number-safe, so LF0's two-statement clause is what would catch
