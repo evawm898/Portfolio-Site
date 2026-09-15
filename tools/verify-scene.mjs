@@ -478,7 +478,7 @@ const MUTANTS = [
     from: '    h += amp * g;',
     to: '    h += 0;',
     breaks: ['pads/a-passing-front-rocks-a-pad-and-lets-it-go',
-             'scene1/a-ripple-passing-under-a-pad-rocks-it-and-it-settles'],
+             'scene1/the-pads-on-the-real-page-are-riding-the-water'],
     mayAlso: ['pads/the-rock-is-subtle-and-a-downpour-does-not-peg-it',
               'pads/a-pad-answers-any-ripple-the-same-way'],
     why: 'a pad that does not read the height field does not bob, and the gradient alone is half the law',
@@ -2797,56 +2797,64 @@ async function partTwo(browser, mutant, shotsDir) {
         return 'viewport, canvas and scene all agree after a resize';
       });
 
-      await checkAsync('a ripple passing under a pad rocks it and it settles', async () => {
-        // ON THE REAL PAGE, on the pad's own reported rock. A click is the only
-        // splash a gate can place, and the pad cannot tell it from a raindrop —
-        // which is exactly what part one proves and what this exercises.
-        const st2 = await page.evaluate(() => window.__scene.sceneState());
-        const cand = st2.padAt
-          .map(([x, y, R], i) => ({ i, R, sx: x, sy: y * st2.squash }))
-          .filter(p => p.R > 22 && p.sx > 200 && p.sx < st2.width - 200
-                    && p.sy > 160 && p.sy < st2.height - 160)
-          .sort((a, b) => b.R - a.R)[0];
-        if (!cand) throw new Error('no pad is far enough inside the frame to click beside');
-        const rest = Math.hypot(0, 0);
-        void rest;
-        const before = st2.padAt[cand.i][3];
-        await page.mouse.click(Math.round(cand.sx - cand.R * 1.5), Math.round(cand.sy));
-        // POLLED ON THE POND'S CLOCK, NOT THE WALL'S — this repo's own lesson,
-        // and the sweep is what taught it here. Sampling every 70 ms of WALL
-        // time covers three seconds of pond on a healthy page and one second on
-        // a page rendering at a third the rate, so the front had not yet reached
-        // the pad and this check went red under `ellipse-without-the-moveto`, a
-        // mutation that has nothing to do with pads and only makes the frame
-        // expensive. How much POND has gone by is the thing the claim is about.
-        let peak = 0, peakLift = 0;
+      await checkAsync('the pads on the real page are riding the water', async () => {
+        // WHAT A BROWSER CAN HONESTLY SAY ABOUT THE ROCK, AND IT IS NOT WHAT
+        // THIS CHECK FIRST CLAIMED. It used to click beside a pad and assert
+        // that pad rocked and then settled. Both halves are unmeasurable here,
+        // and the sweep is what proved it — the check went red under
+        // `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+        // an outline is sampled, consumes no randomness and touches nothing this
+        // check reads. It was flaky, not collateral.
+        //
+        // MEASURED, on the shipped page: AMBIENT RAIN ROCKS A PAD AS HARD AS A
+        // CLICK DOES. Peaks over a window at idle ran 1.07-3.77 degrees with no
+        // hand on the mouse, against 3.11-4.66 for a pad clicked beside — and on
+        // one run the settle reading four and a half seconds later was 3.98
+        // degrees, HIGHER than the click's own peak of 3.83, because another
+        // drop happened to be crossing. A paired control pad 500-650 px away was
+        // no better: the click-to-control ratio ran 1.10x to 2.65x, because the
+        // control is in the same rain. There is no bar there.
+        //
+        // So attributing a rock to a click, and watching one decay, both belong
+        // where there IS no ambient field: `pads/a-passing-front-rocks-a-pad-and-
+        // lets-it-go` drives one ripple over one pad in Node and asserts the
+        // reversal AND the return to rest, and `pads/the-rock-is-subtle-and-a-
+        // downpour-does-not-peg-it` owns the cap. What is left for the page is
+        // the thing Node cannot say: that the wiring is LIVE — real pads are
+        // being advanced against the real ripple list every frame, each reading
+        // its own patch of water, inside the ruled bounds.
+        const seen = [];
         for (let t = 0; t < 26; t++) {
           const s2 = await page.evaluate(() => window.__scene.sceneState());
-          peak = Math.max(peak, s2.padAt[cand.i][3]);
-          peakLift = Math.max(peakLift, Math.abs(s2.padAt[cand.i][4]));
+          s2.padAt.forEach(([, , , tilt, lift], i) => {
+            const e = seen[i] || (seen[i] = { tilt: 0, lift: 0 });
+            e.tilt = Math.max(e.tilt, tilt);
+            e.lift = Math.max(e.lift, Math.abs(lift));
+          });
           await waitSceneSeconds(page, 0.12);
         }
-        if (!(peak > before + 0.004)) {
-          throw new Error(`the pad's tilt peaked at ${peak.toFixed(5)} rad against ${before.toFixed(5)} before the click`);
+        if (seen.length < 5) throw new Error(`only ${seen.length} pads to watch`);
+        const tilts = seen.map(e => e.tilt), lifts = seen.map(e => e.lift);
+        const maxTilt = Math.max(...tilts), maxLift = Math.max(...lifts);
+        // THE PADS ARE ANSWERING THE WATER. Ambient alone reaches degrees, so
+        // this bar is well under what was measured and far above nothing.
+        if (!(maxTilt > 0.008)) throw new Error(`no pad rocked more than ${(maxTilt * 180 / Math.PI).toFixed(3)}° in ${seen.length} pads over the window`);
+        // AND THE BOB IS THE OTHER HALF OF THE LAW. A pad that reads only the
+        // gradient still rocks, so a tilt bar alone leaves the height unmeasured
+        // on the page — which is exactly the mutation that stayed green here.
+        if (!(maxLift > 0.2)) throw new Error(`no pad rode up a wave (${maxLift.toFixed(3)} px of bob)`);
+        // BOUNDED, ON THE REAL PAGE, not only in the fixture.
+        const TILT_MAX = 0.125 + 1e-9, BOB_MAX = 5.0 + 1e-9;
+        if (!(maxTilt <= TILT_MAX)) throw new Error(`a pad reached ${maxTilt} rad against the ruled cap`);
+        if (!(maxLift <= BOB_MAX)) throw new Error(`a pad bobbed ${maxLift} px against the ruled cap`);
+        // AND EACH READS ITS OWN PATCH OF WATER. One global number handed to
+        // every pad would draw a field of leaves all leaning together.
+        const distinct = new Set(tilts.map(v => v.toFixed(6))).size;
+        if (!(distinct > seen.length * 0.5)) {
+          throw new Error(`${distinct} distinct peaks across ${seen.length} pads — they are not reading their own water`);
         }
-        // SUBTLE, which is what the brief asks for: visible, not a lurch.
-        if (!(peak * 180 / Math.PI < 9)) throw new Error(`it rocked ${(peak * 180 / Math.PI).toFixed(1)}° — that is not slight`);
-        // AND IT RODE UP THE WAVE. The rock and the bob are the two halves of
-        // one law — the gradient and the height — and asserting only the tilt
-        // leaves the height unmeasured on the real page: measured, the mutation
-        // that stops a pad reading the height field at all still rocks it, and
-        // this check stayed green until it asked about the bob.
-        if (!(peakLift > 0.3)) throw new Error(`the pad never rode up the wave (${peakLift.toFixed(3)} px of bob)`);
-        // AND IT LETS GO. A pad that kept the tilt would read as a leaf stuck at
-        // an angle, which no wave leaves behind.
-        await waitSceneSeconds(page, 4.5);
-        const after = await page.evaluate(() => window.__scene.sceneState());
-        const now = after.padAt[cand.i][3];
-        if (!(now < Math.max(0.02, peak * 0.85))) {
-          throw new Error(`it is still tilted ${now.toFixed(4)} rad four seconds later (peak ${peak.toFixed(4)})`);
-        }
-        return `peak ${(peak * 180 / Math.PI).toFixed(2)}° and ${peakLift.toFixed(2)} px of bob, `
-          + `down to ${(now * 180 / Math.PI).toFixed(2)}° after`;
+        return `${seen.length} pads, peaks to ${(maxTilt * 180 / Math.PI).toFixed(2)}° and `
+          + `${maxLift.toFixed(2)} px, ${distinct} distinct, all inside the ruled caps`;
       });
 
       await checkAsync('the frame is affordable during a downpour', async () => {

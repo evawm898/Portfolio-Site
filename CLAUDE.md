@@ -6135,6 +6135,28 @@ still rocks: the browser check asserted only the tilt and stayed green until it 
 about the bob as well. **The rock and the bob are the two halves of one law and a check
 that measures one of them measures half a feature.**
 
+**AMBIENT RAIN ROCKS A PAD AS HARD AS A CLICK DOES, SO A CLICK'S ROCK IS NOT
+SEPARABLE ON THE LIVE PAGE — AND ONLY THE SWEEP SAID SO.** The browser check
+first clicked beside a pad and asserted that pad rocked and then settled. It went
+red under `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+an outline is sampled, consumes no randomness and touches nothing the check
+reads: **flaky, not collateral**, and the same flake had already been booked once
+as collateral on a second mutant before a third made it undeniable. Measured on
+the shipped page: peaks at idle with no hand on the mouse run **1.07-3.77
+degrees** against **3.11-4.66** for a pad clicked beside, and on one run the
+settle reading four and a half seconds later was **3.98 degrees — HIGHER than
+that run's own click peak of 3.83**, because another drop happened to be
+crossing. A PAIRED CONTROL PAD 500-650 px away is no better (click-to-control
+ratios of **1.10x to 2.65x**), because the control is in the same rain. There is
+no bar there and no fixture on the page that removes the weather.
+**SO THE CLAIM MOVED TO WHERE THERE IS NO AMBIENT FIELD**: attributing a rock to
+one ripple, and watching it decay, are both Node checks driving one ripple over
+one pad. What is left for the page is the thing Node cannot say — that the wiring
+is LIVE: real pads advanced against the real ripple list every frame, each
+reading its own patch of water (35 distinct peaks over 36 pads), inside the ruled
+caps. **A BROWSER CHECK SHOULD CLAIM WHAT A BROWSER CAN SEE THAT NOTHING ELSE
+CAN, not restate a Node check on a noisier instrument.**
+
 **AND A CHECK THAT POLLS ON WALL TIME MEASURES THE MACHINE.** `ellipse-without-the-
 moveto` — a pre-existing mutation with nothing to do with pads — reddened the rocking
 check, because it drops the frame rate by a factor of three and the check sampled every
