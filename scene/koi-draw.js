@@ -1,3 +1,5 @@
+import { SPINE_JOINTS, TAIL_ROOT_U, CHAIN_SPAN_U, CHAIN_MAX_HALF_EXTENT_U } from './koi-fish.js';
+
 // scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
 // so a koi is an outline with a dark body behind it rather than a shape with a
 // value, and colour never enters it — everything here is one grayscale ink at
@@ -43,7 +45,19 @@ export const GROUND = '#08090b';
 
 const RIPPLE_BINS = 12;
 const RAIN_BINS = 6;
-const RIPPLE_MIN_A = 0.014;
+// FAINT RINGS ARE CULLED, AND THIS IS THE ONE LEVER THAT COST NOTHING TO PULL.
+// At 0.014 a ring composites to about 4/255 over the ground — under the noise
+// floor of the image — and at a couple of hundred live ripples, each drawing
+// two rings, most of the stroke work in a frame was going into rings nobody can
+// see. Measured on the real page during a downpour, 1280x800 headless:
+//   0.014 -> 13.6 fps, 90% of the idle surface covered
+//   0.035 -> 15.2 fps, 89%
+//   0.060 -> 17.8 fps, 92%
+// The size ceiling was tried first and is the WRONG lever — dropping the reach
+// from 170 to 100 plane px takes idle coverage 94% -> 55% and buys 1.6 fps,
+// because the large slow rings are most of what makes the surface read as
+// covered. This drops invisible work instead, which is why the picture holds.
+const RIPPLE_MIN_A = 0.06;
 
 // The wash under a ripple's own front: a flat, batched fill (never a per-
 // ripple gradient — hundreds of those would cost real time) so it reads as a
@@ -51,6 +65,18 @@ const RIPPLE_MIN_A = 0.014;
 // that the edge is not the thing anyone notices.
 const WASH_BINS = 5;
 const WASH_MAX_A = 0.05;
+// THE WASH RIDES THE FRESH HALF OF A RIPPLE ONLY, AND THE DENSITY IS WHY. Its
+// job is to make disturbed water read brighter than still water — but with the
+// surface now better than 90% covered there IS no still water to read against,
+// so a wash under every ring at every age is a flat brightening of the whole
+// frame that happens to cost the most expensive thing in the renderer: a large
+// translucent filled ellipse, hundreds of them a frame. Measured on the real
+// page during a downpour, 1280x800 headless: 13.1 fps with the wash on every
+// ripple against 15.1 with none at all, and the ripple CAP makes no difference
+// at all to either (600, 450 and 340 all read 13). Keeping it to the fresh half
+// is where it still says something — a ring that has just landed against the
+// older ones spreading around it.
+const WASH_UNTIL = 0.5;        // of a ripple's own life
 
 // The grain: a fixed field of single-pixel points, jittered off a grid so it
 // does not read as a lattice, cached per canvas size exactly like the
@@ -69,78 +95,223 @@ function hash01(x, y) {
   return (h >>> 0) / 4294967296;
 }
 
-// A KOI FROM DIRECTLY ABOVE, and the proportions matter more than anything
-// else here: the first version was a fifth as wide as it was long with a broad
-// triangular tail, and it read unmistakably as a paper aeroplane. A carp is
-// BLUNT at the snout, barely narrower across the head than across the body,
-// widest just behind the gills at roughly a quarter of its length, and then
-// tapers a long way to a slim wrist before the tail. Fractions of body length,
-// one per spine joint; the widest full width is about L/4.4.
-// THE SQUASH IS WHY THESE ARE WIDER THAN A KOI. Seen from directly above a
-// carp is about 4.5 to 1; seen through a 0.60 squash, a fish swimming left to
-// right has its WIDTH foreshortened and its length untouched, so a true 4.5:1
-// draws as 7.5:1 and reads as a pike. These are the plane-space widths that
-// land near 5:1 on a horizontal fish — and correspondingly stubby on one
-// swimming away, which is what foreshortening is and what the single-squash
-// rule buys. Judged from a rendered rig at three headings, not derived.
-const WIDTH_PROFILE = [0.084, 0.118, 0.131, 0.126, 0.112, 0.092, 0.068, 0.043, 0.020];
-const NOSE_LEAD = 0.030;     // how far the snout reaches past the first joint
-const FISH_ALPHA = 1;       // see drawFish — a koi never fades
-const EYE_R = 1.15;          // screen px — a koi's eye is tiny and it reads
-
-// EVERY APPENDAGE IS A FRACTION ALONG (u, 0 nose -> 1 tail) AND A FRACTION
-// ACROSS (a multiplier on the body's own half-width at that u), through the
-// ONE frame drawFish builds — never a per-joint tangent. Named here, not
-// buried in the function, so a fin that is in the wrong place is a number to
-// change rather than a path to re-derive.
+// A KOI FROM DIRECTLY ABOVE, DRAWN AS ONE CONTINUOUS CONTOUR. The nose, both
+// flanks and every strand of the tail are a SINGLE closed path, built once and
+// stroked once, and that is the whole construction rather than a detail of it.
+// What it replaces was a body oval with a tail, two pectorals and a dorsal
+// swell composited over it as separate shapes — which is what let the tail read
+// as a kite bolted to a dart, and what gave the reverted bend work somewhere to
+// come apart. There is nothing here that can fall out of step with anything
+// else, because there is only one path to be in step with.
 //
-// EVERY FIN BELOW IS BUILT FROM CURVES, NEVER STRAIGHT EDGES MEETING AT A
-// POINT. The reference this pass was drawn against — a flat, iconic koi
-// illustration — has no sharp corners anywhere: the tail is a soft flared
-// paddle, the pectoral a rounded blade rooted under the body, the dorsal a
-// low blended swell rather than a spike. A shape built from line segments
-// reads as folded paper against that; one built from curves reads as a fish.
-const EYE_U = 0.09;
-const BARBEL_U = 0.03;
-const DORSAL_U0 = 0.46, DORSAL_U1 = 0.74, DORSAL_PEAK_U = 0.58;
-const DORSAL_PEAK_K = 3.2;              // a quadratic curve undershoots its own control point
-const PECT_U = 0.16;                    // where along the body the fin roots — right behind the
-                                         // head, and clear of the dorsal's own u-range below
-const PECT_ANGLE = 0.45;                // radians the fin's long axis sweeps back from straight-out
-const PECT_LEN = 0.30;                  // of body length — the fin's own long axis
-const PECT_WIDTH = 0.13;                // of body length — the fin's own short axis
-const PECT_ROOT_T = 0.15;               // fraction of PECT_LEN the oval's centre sits ahead of the
-                                         // root, along its own axis — so (0.5 - this) of the fin's
-                                         // length sits behind the root, hidden under the body
-const TAIL_ROOT_U = 0.97;               // pulled forward of u=1 so the root hides under the body
-const TAIL_SPREAD = 0.50;               // radians each lobe swings out from the body's own axis
-const TAIL_LEN = 0.54;                  // of body length, root to a lobe tip
-const TAIL_NOTCH_LEN = 0.20;            // of body length, root to the fork curve's control point —
-                                         // shallow, so the corner at each tip stays soft
-const TAIL_BOW = 0.17;                  // of body length, how far each lobe's edge bows past its
-                                         // own straight chord — the thing that makes it a paddle
+// THE CONTOUR'S ORDER, every point of it in the fish's own rigid frame:
+//   the right flank, nose (u=0) -> tail root (u=1)
+//   the tail, rightmost strand to leftmost: out along each strand's right edge,
+//     around its tip, back along its left edge
+//   the left flank, tail root -> nose
+//   the blunt snout, swept around the front to close
+//
+// THE STRANDS' ROOTS TILE THE TAIL ROOT'S OWN WIDTH EXACTLY — strand k's left
+// edge at the root IS strand k-1's right edge, and the outermost strand's outer
+// root edge IS the flank's last point. So the fork between two strands is this
+// one path returning to the root and going out again: a notch, never a seam
+// between two shapes, and there is no gap for a fill to leak through however
+// the fish is turned or (later) bent.
+//
+// NOTHING HERE IMPLIES A CAMERA ANGLE OR A THIRD DIMENSION. The koi is a flat
+// drawing: one ink, one line weight family, no gradient across the body, no
+// highlight along a flank, no fin that shrinks because it is the far one, no
+// quantity anywhere keyed on cos(heading). The water carries the viewpoint —
+// that is what the squash in surface.js is for — and the fish does not repeat
+// the claim. (This is a ruled direction, not a reading of it: see the session
+// that removed the volume cues #226 had added.)
 
-// VOLUME CUES — the body is a flat oval by construction (surfacePoint has no
-// height), so a rounded cross-section is IMPLIED, never modelled: a fixed
-// world direction stands in for "the way the tilted view leans", and each
-// fish's two flanks read as nearer or farther by how much that fish's OWN
-// heading turns its width axis (R) toward or away from it. This is NOT the
-// position-based perspective surface.js's own header rules out — nothing
-// here depends on WHERE a fish is on the plane, only on which way it faces,
-// which is exactly what an orthographic view still shows for a curved
-// surface (a normal facing the light reads bright regardless of distance).
-// NEAR_DIR = world +Y is an arbitrary but fixed pick, applied the same way
-// to every fish; VOL_ALIGN is |cos(heading)| because a fish whose R is
-// aligned with world X (heading pi/2 or 3pi/2) presents both flanks equally
-// edge-on to a Y-tilted view, and every effect below must fall to exactly
-// zero there rather than flip sides with a visible pop.
-const BODY_FILL_RGB = [14, 16, 19];     // close to the old flat fill's own [13,15,18]
-const BODY_FILL_A = 0.86;               // the flat body fill this replaces
-const BODY_FILL_TONE_SPAN = 15;         // max +/- PER CHANNEL at full alignment
-const FAR_FIN_COMPRESS = 0.16;          // max shrink on the far pectoral's own reach
-const DORSAL_VOL_SPAN = 0.16;           // max +/- on the dorsal's own peak reach
-const RIDGE_U0 = 0.12, RIDGE_U1 = 0.86; // the spine highlight's own span
-const RIDGE_ALPHA = 0.24;               // its peak alpha, at full alignment
+// Fractions of BODY LENGTH (nose to tail root), one per station, linearly
+// interpolated between. BLUNT AT THE SNOUT: station 0 is a real width, not a
+// point, and the nose is closed by a dome of its own rather than by running the
+// outline into a vertex — a carp is barely narrower across the head than across
+// the shoulders, and a pointed snout was most of what made the old silhouette
+// read as a dart. Widest just behind the head, then a long even taper to a
+// wrist that still has width in it for the tail to grow out of.
+//
+// AND THE SQUASH IS WHY THESE ARE WIDER THAN A CARP. Seen from directly above a
+// koi is about 4.5 to 1; seen through a 0.60 squash, a fish swimming across the
+// screen has its WIDTH foreshortened and its length untouched, so a true 4.5:1
+// draws nearer 7.5:1 and reads as a pike. One squash means the apparent
+// proportion has to change with heading — that is what an oblique orthographic
+// view IS — so these are a compromise, landing near 5:1 across the screen and
+// correspondingly stubby on a fish swimming away. Judged at the page's own 96px
+// body, not at a magnification: at 2.6x every value here looked fine.
+const WIDTH_PROFILE = [0.076, 0.114, 0.131, 0.125, 0.111, 0.095, 0.080, 0.064, 0.049];
+const NOSE_ROUND = 0.062;     // how far the blunt snout domes past station 0
+const NOSE_PTS = 7;           // points in that dome, endpoints excluded
+const FISH_ALPHA = 1;         // see drawFish — a koi never fades
+
+// THE TAIL IS ONE MEMBRANE WITH A SCALLOPED TRAILING EDGE. Its lobes are
+// notches in a single envelope, never separate pieces sharing a root — see the
+// note above fanPts for the construction that was tried first and why no value
+// of its constants could have worked.
+//
+// TWO LOBES, DEEPLY FORKED, NOT A BROAD FOUR-LOBE FAN. The ink reference is a
+// pair of long tapering streamers splayed about 35 degrees either side of the
+// axis with the fork cutting most of the way back between them — not a paddle
+// with a wavy edge. Same envelope, different numbers: TAIL_LOBES is what sets
+// how many maxima the trailing edge has, and the scallop and fork depths are
+// what carry the fork back.
+const TAIL_LEN = 0.84;        // of body length, the outer tips' own reach
+// THE CHAIN REACHES EXACTLY AS FAR AS THE DRAWN FISH DOES, and the two owners
+// of that length are checked against each other here rather than trusted to
+// stay in step. koi-fish.js sizes its segments from CHAIN_SPAN_U; this file
+// decides where the tail root sits and how far the tips reach. If they drift,
+// the fan runs off the end of the chain and is drawn on an extrapolation.
+if (Math.abs(CHAIN_SPAN_U - (TAIL_ROOT_U + TAIL_LEN)) > 1e-9) {
+  throw new Error(`the chain spans ${CHAIN_SPAN_U} body lengths but the fish is drawn over ${TAIL_ROOT_U + TAIL_LEN}`);
+}
+// THE FAN IS LONGER THAN IT IS WIDE, WHICH IS THE REFERENCE'S SHAPE AND NOT THE
+// ONE THIS FILE STARTED WITH. At 0.62 rad over a 0.64 L reach the fan drew
+// 0.744 L across against 0.531 L long — WIDER than long, 1.40:1, where the ink
+// koi's tails stream backward along the body. Cutting the half-angle and
+// holding the fan's AREA (area goes as r^2 * theta, so r as 1/sqrt(theta):
+// 0.64 * sqrt(0.62/0.36) = 0.84) gives 0.592 L across by 0.786 L long, 0.75:1.
+//
+// WHAT IT DOES NOT BUY IS THE TURN, and that is worth writing down so it is not
+// re-attempted: the fan still compresses on the inside of a bend by exactly as
+// much as before. The cap is DERIVED from the fan's own extent, so the ceiling
+// emitted/HE lands on 0.9935 here against 0.9924 shipped — the same number to
+// three figures, because scaling the contour scales both terms together.
+// Measured over 45 s of pond, the fan's drawn area on a sharp turn is 0.777 of
+// a straight fish's, against 0.779 before. The shape changed; the compression
+// did not, and no contour can move it. Only the margin in CHAIN_MAX_HALF_EXTENT_U
+// can, and that is a ruling about how sharply a koi may bend.
+const TAIL_SPREAD = 0.36;     // rad, half-angle the fan covers
+const TAIL_LOBES = 2;         // maxima across the trailing edge
+const TAIL_SCALLOP = 0.46;    // how deep the notches between them cut
+const TAIL_FORK = 0.26;       // the extra notch on the axis — the fork itself
+const TAIL_FORK_W = 0.34;     // how wide that fork is, in fan fractions
+const TAIL_TIP_SHORT = 0.06;  // how much the middle falls short of the tips
+
+// HOW FAR THE FISH STANDS OFF ITS OWN CENTRELINE, and the second thing the two
+// files must agree about. koi-fish caps the chain's bend so that the chain's
+// tightest radius is never smaller than this — because every drawn point rides
+// P(x, y) = c(x) + n(x)·y, an offset curve, which turns inside out wherever the
+// offset exceeds that radius. The tail's outer tips are the widest thing on the
+// animal by some way, so they are what the cap is sized against.
+//
+// Computed here from this file's own envelope rather than restated, then
+// compared: a tail point at fan parameter `u` sits at angle u·TAIL_SPREAD off
+// the axis at radius tailReach(u), so its across-offset is reach·sin(u·spread).
+// Sampled rather than solved because `scallop` and `fork` make the maximum's
+// location a root of a transcendental equation, and 4096 samples resolve it to
+// far better than the margin this is checked against.
+const tailHalfExtentU = (() => {
+  let m = 0;
+  for (let i = 0; i <= 4096; i++) {
+    const u = 1 - 2 * (i / 4096);
+    const outer = 1 - TAIL_TIP_SHORT * (1 - u * u);
+    const scallop = 1 - TAIL_SCALLOP * (0.5 - 0.5 * Math.cos((TAIL_LOBES - 1) * Math.PI * (u + 1)));
+    const fork = 1 - TAIL_FORK * Math.exp(-(u / TAIL_FORK_W) * (u / TAIL_FORK_W));
+    const across = Math.abs(TAIL_LEN * outer * scallop * fork * Math.sin(u * TAIL_SPREAD));
+    if (across > m) m = across;
+  }
+  return m;
+})();
+// The body and the fins are narrower and are NOT covered by this check — stated
+// rather than implied, AND THE MARGIN IS MUCH THINNER THAN IT WAS. Measured off
+// this renderer's own emitted contour on a straight chain, on a 96 px koi: the
+// widest fin station stands 25.7 px off the centre against the tail's 29.6, a
+// margin of 3.9 px. Before the tail was narrowed the tail stood at 37.2 and the
+// margin was 11.5.
+//
+// SO NARROWING THE TAIL COMPRESSED THE FINS. The cap is 1/HE, and HE fell with
+// the tail, so every OTHER part of the fish now sits at a larger share of the
+// bend's own radius: the widest fin's k*y goes 0.686 -> 0.864. The fins do not
+// fold and this is not a defect, but the headroom that used to be there is
+// mostly spent, and a fin made any longer would reach the tail's own extent —
+// at which point it folds and nothing here says so, because this check only
+// ever looks at the tail.
+if (tailHalfExtentU > CHAIN_MAX_HALF_EXTENT_U) {
+  throw new Error(
+    `the tail reaches ${tailHalfExtentU.toFixed(4)} body lengths off the centreline but ` +
+    `the chain's bend is capped for ${CHAIN_MAX_HALF_EXTENT_U}: the fan would invert on a turn`);
+}
+                              // the body — without this the tail converged on a
+                              // single point and met the wrist as a hard V
+const TAIL_PTS = 30;          // samples across the envelope
+const TAIL_RAYS = 11;
+
+// The paired fins, the same envelope at a smaller size. LONG, POINTED AND
+// SWEPT WELL BACK — the ink reference's pectorals are streamers reaching about
+// half the body length, not the short rounded blades that were here. `reach`
+// is (1 - q^2)^FIN_TAPER: full length straight out along the fin's own axis,
+// falling to nothing at either side, so the lobe comes to a point at its far
+// end and is widest near its root. A rounded outer edge is what made these
+// read as lily-pads; a taper is what makes them read as fins.
+//
+// AND THE PELVICS ARE PLAINLY SMALLER THAN THE PECTORALS. Four streamers of
+// near-equal length around one body read as a rosette however well each single
+// one is drawn — measured by looking at it. In the ink reference the pectorals
+// carry the gesture and the pelvics are tucked and short.
+const FIN_SPREAD = 0.25, FIN_TAPER = 0.62, FIN_RAYS = 4;
+const PECT_U = 0.23, PECT_ANGLE = 1.00, PECT_LEN = 0.40, PECT_ROOT = 0.30;
+const PELVIC_U = 0.60, PELVIC_ANGLE = 1.14, PELVIC_LEN = 0.17, PELVIC_ROOT = 0.35;
+
+// The dorsal fin seen from directly above is a line down the spine, which is
+// exactly what the reference draws. NOT the removed spine ridge: that sat on
+// one FLANK and swung with the heading to imply a rounded back. This is on the
+// axis, the same at every heading, and it is an edge of the fish rather than a
+// shading cue.
+const DORSAL_U0 = 0.20, DORSAL_U1 = 0.82, DORSAL_A = 0.22;
+
+// THE BEND. One curvature for the whole animal: every point of the contour,
+// both pectorals, both pelvics, the tail and every marking go through ONE
+// mapping onto ONE spine. There is no per-part frame and no second oscillator.
+//
+// THE CURVATURE IS A FUNCTION OF (POSITION ALONG THE BODY, TIME) AND THE TURN,
+// IN THAT ORDER OF IMPORTANCE. A travelling S-wave runs down the body ALWAYS —
+// swimming dead straight included — and the turn is a BIAS added on top of it,
+// never a replacement for it. Keyed on turn rate alone the fish was a rigid arc
+// whenever it was not turning, and the bend appeared and vanished with the
+// steering rather than flowing: that reads as choppy because a fish that is not
+// undulating is not swimming, it is being dragged. So a turning koi shows the
+// same wave skewed toward the turn, which is what a fish actually does.
+//
+// THE WAVE GROWS TOWARD THE TAIL. A koi's head barely leaves the line of travel
+// while the tail sweeps widely, so the curvature amplitude is enveloped along
+// the body rather than uniform — a uniform wave wags the snout, which is the
+// one thing that never happens.
+//
+// THE PHASE IS THE FISH'S OWN SWIM CLOCK (`f.phase` in koi-fish.js), which
+// already advances faster the faster it swims. So a koi driving hard beats
+// THE SWIM WAVE, LAID OVER THE JOINT CHAIN. There is no curvature formula here
+// and no integrated spine: TURNING is the chain's own physical lag, which is
+// what a body following a head actually does, and this is only the undulation
+// on top of it. Amplitude grows toward the tail and the phase lags down the
+// body, so the wave travels backwards along the fish.
+//
+// IT IS A LATERAL OFFSET ON THE JOINTS, not a bend of the axis — the shape the
+// contour rides is the chain, waved. Everything downstream reads that one
+// polyline, so the body, both fin pairs, the markings and the tail cannot
+// disagree about where the fish is.
+const WAVE_AMP = 0.052;          // of body length, at the tail
+// THE WAVE'S PHASE IS SPREAD OVER THE BODY, NOT OVER THE JOINTS, and that is
+// the difference between a chain whose resolution can be raised and one whose
+// resolution is welded to its look. Expressed per JOINT — which is how the
+// original wrote it, at the only joint count it ever had — the spatial
+// frequency moves with SPINE_JOINTS: measured, taking the chain from 9 joints
+// to 21 put 2.3 wavelengths across the body and the flank turned a median 68
+// degrees against 22.6, folding outright at 17. Per unit LENGTH the wave is the
+// same shape at every joint count, and the count is free to be chosen for how
+// finely the body needs to bend.
+const WAVE_TOTAL = 5.76;         // radians of phase across the whole body
+const WAVE_POW = 1.6;            // how fast the amplitude grows tailward
+const WAVE_SPEED_REF = 38;       // px/s at which the wave is at full size
+
+const BODY_FILL_A = 0.13;     // the koi as a solid under the water, flat
+const OUTLINE_A = 0.42;       // softened: this was the hardest edge in the frame
+const OUTLINE_W = 1.0;
+const FIN_FILL_A = 0.09, FIN_LINE_A = 0.28, FIN_LINE_W = 0.75;
+const RAY_A = 0.22;           // the fin rays, the reference's own detail
+const PATCH_FILL_A = 0.11;    // no stroke — the reference's markings have no edge
 
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
@@ -160,6 +331,9 @@ function closedSmooth(ctx, pts) {
 
 export function createRenderer(ctx, surface) {
   const sq = surface.squash;
+  // The plain plane->screen projection. drawFish SHADOWS this with its own,
+  // which carries the bend as well; everything else on the water is already
+  // in plane coordinates and only needs the squash.
   const P = (x, y) => ({ x, y: y * sq });
 
   // Reused bins — allocating these per frame is the one place this renderer
@@ -168,6 +342,11 @@ export function createRenderer(ctx, surface) {
   const rippleBins = Array.from({ length: RIPPLE_BINS }, () => []);
   const rainBins = Array.from({ length: RAIN_BINS }, () => []);
   const washBins = Array.from({ length: WASH_BINS }, () => []);
+  // The spine, walked once per fish per frame and interpolated by every drawn
+  // point. Hoisted and reused: allocating three arrays per fish per frame is
+  // exactly the collector pressure this renderer's header warns about.
+  const centres = Array.from({ length: SPINE_JOINTS }, () => ({ x: 0, y: 0 }));
+  const tans = Array.from({ length: SPINE_JOINTS }, () => ({ x: 1, y: 0 }));
   let vignette = null, vigKey = '';
   let grain = null, grainKey = '';
 
@@ -205,40 +384,95 @@ export function createRenderer(ctx, surface) {
   }
 
   // --- one fish -----------------------------------------------------------
+  // A FIN IS A POLAR ENVELOPE ABOUT ITS OWN ROOT, AND THAT IS THE WHOLE OF THE
+  // FIN GEOMETRY HERE — the tail's, the pectorals', the pelvics'. `reach(u)` is
+  // how far the fin gets at u across its own spread (+1 one side, -1 the other),
+  // and the outline is simply that curve swept through the fan.
+  //
+  // WHAT THIS REPLACED, AND WHY IT COULD NOT BE TUNED INTO WORKING: the tail was
+  // built as four separate STRANDS radiating out and back from the peduncle. A
+  // caudal fin is not that. It is one broad membrane whose TRAILING EDGE is
+  // scalloped, and four strands sharing a root produce, at every setting, the
+  // same two failures — the roots crowd into a knot at the peduncle (they all
+  // start within one root-width of each other) and the fish reads as pinched
+  // then sprayed. Widening the fan separates the roots and splays the blades;
+  // narrowing it tightens the knot. There is no value in between, because the
+  // shape being asked for is not in the family. Here the lobes are notches in
+  // ONE envelope, so there is no root to crowd.
+  const rotUnit = (v, ang) => {
+    const c = Math.cos(ang), s = Math.sin(ang);
+    return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
+  };
+
+  // Sweep the envelope from +1 (the fish's RIGHT) to -1, pushing PLANE points.
+  //
+  // THE SIGN ON THE ANGLE IS LOAD-BEARING AND ITS ABSENCE LOOKED ALMOST RIGHT.
+  // `axis` for the tail is -F, and rotating -F by a POSITIVE angle lands on the
+  // fish's LEFT — so sweeping +1 to -1 with `+u * spread` entered the fan on the
+  // wrong flank, and the contour crossed itself twice at the peduncle: once
+  // going in, once coming out. A nonzero fill unions straight over that, so the
+  // tail still looked like a tail; what gave it away was the STROKE, which drew
+  // both crossings as a faint X on the wrist. Negated here, where both the tail
+  // and the paired fins read it, rather than at either call site.
+  function fanPts(out, origin, axis, spread, reach, samples) {
+    for (let i = 0; i <= samples; i++) {
+      const u = 1 - 2 * (i / samples);
+      const d = rotUnit(axis, -u * spread), r = reach(u);
+      out.push({ x: origin.x + d.x * r, y: origin.y + d.y * r });
+    }
+  }
+
+  // The rays inside a fin: straight lines from just outside the root to just
+  // short of the envelope. The reference draws a lot of these; a handful reads
+  // as the same thing at the size a koi is on this page.
+  //
+  // DRAWN AS POLYLINES, BECAUSE A STRAIGHT LINE IN THIS FRAME IS NOT ONE AFTER
+  // THE MAP. P(x, y) = c(x) + n(x)·y turns with the chain, so the image of a
+  // straight ray is a curve; emitting its two endpoints draws that curve's
+  // CHORD. Harmless on a short fin ray, and not on a tail ray, which spans
+  // several chain segments: measured over 45 s of pond, the tail rays' chords
+  // sat a median 2.4 px and up to 8.98 px off where the ray really goes on an
+  // 84 px koi — the strays that read as loose straight lines near the fan.
+  //
+  // THE SAMPLE COUNT IS DERIVED FROM THE CHAIN, NOT TYPED: two samples per
+  // segment the ray crosses along the body, so no drawn piece ever spans more
+  // than half a segment and the count falls to the old 2 on anything shorter
+  // than that — which is every fin ray, so their geometry is unchanged.
+  function raysInto(P, segPx, origin, axis, spread, reach, count, inner, outer) {
+    for (let k = 0; k < count; k++) {
+      const u = count === 1 ? 0 : (k / (count - 1)) * 2 - 1;
+      const d = rotUnit(axis, -u * spread), r = reach(u);
+      const ax = origin.x + d.x * r * inner, ay = origin.y + d.y * r * inner;
+      const bx = origin.x + d.x * r * outer, by = origin.y + d.y * r * outer;
+      const steps = Math.max(1, Math.ceil(Math.abs(bx - ax) / segPx * 2));
+      const p0 = P(ax, ay);
+      ctx.moveTo(p0.x, p0.y);
+      for (let t = 1; t <= steps; t++) {
+        const q = P(ax + (bx - ax) * (t / steps), ay + (by - ay) * (t / steps));
+        ctx.lineTo(q.x, q.y);
+      }
+    }
+  }
+
   function drawFish(f) {
     // NO FADE, ON PURPOSE. A koi is either in the pond at full ink or it is not
     // in the pond: it swims in from outside the frame and swims out again, so
     // there is never a moment where one is half-there in view (see the note at
-    // the top of scene/koi-fish.js). The constant is kept because every mark
-    // below is already written against it, so the day a scene wants a koi to
-    // fade for some other reason it is one line rather than six.
+    // the top of scene/koi-fish.js).
     const a = FISH_ALPHA;
     const L = f.len;
 
-    // ONE RIGID FRAME FOR THE WHOLE FISH, AND EVERY APPENDAGE GOES THROUGH IT.
-    // The previous version threaded each fin's own tangent and normal off a
-    // per-joint slice of a spine that was also being distorted by a swim
-    // wave — so a dorsal fin, a pectoral and the tail fin each reasoned about
-    // "which way is sideways" from a slightly different, curving frame, and
-    // the three disagreed with each other and with the eye (a dorsal fused
-    // into the head's own curve; pectorals that read as nearer the tail than
-    // the head). F is the fish's forward (nose) direction and R its right,
-    // both fixed for the whole fish this frame; `pos(u)` walks from the nose
-    // (u=0) to the tail (u=1) along F, and `edge(u, side, k)` is the point k
-    // half-widths out from that station, on the given flank. Nothing here
-    // reads the spine at all — the body is a rigid tapered oval carried by
-    // heading, the koi-fish.js note's own "static tail is fine" extended to
-    // the whole fish, not only the tail.
-    const F = { x: Math.cos(f.heading), y: Math.sin(f.heading) };
-    const R = { x: -F.y, y: F.x };
-    // See "VOLUME CUES" above the constants: nearAlign is R's own alignment
-    // with the fixed world direction standing in for the tilt (R.y === F.x,
-    // so this is exactly cos(heading), computed once and read by every
-    // shading/sizing decision below rather than re-derived per appendage).
-    const nearAlign = F.x;
-    const nearSide = nearAlign >= 0 ? 1 : -1;
-    const volMag = Math.abs(nearAlign);
-    const pos = (u) => ({ x: f.x - F.x * u * L, y: f.y - F.y * u * L });
+    // ONE CANONICAL FRAME, AND ONE MAPPING OUT OF IT. Every shape below is
+    // built with the nose at the origin pointing along +x — so `pos(u)` walks
+    // straight back down the axis and `edge(u, side, k)` is k half-widths out
+    // from it — and `P` is the single place that carries a canonical point onto
+    // the bent spine, into the world, and through the squash. Nothing between
+    // here and there knows the fish's heading, its position or its curvature,
+    // which is what makes it impossible for two parts to disagree about them.
+    const F = { x: 1, y: 0 };
+    const R = { x: 0, y: 1 };
+    const pos = (u) => ({ x: -u * L, y: 0 });
+
     const widthAt = (u) => {
       const n = WIDTH_PROFILE.length;
       const fi = Math.max(0, Math.min(n - 1, u * (n - 1)));
@@ -249,104 +483,199 @@ export function createRenderer(ctx, surface) {
       const c = pos(u), w = widthAt(u) * k;
       return { x: c.x + R.x * side * w, y: c.y + R.y * side * w };
     };
-    const sEdge = (u, side, k = 1) => { const e = edge(u, side, k); return P(e.x, e.y); };
 
-    const SAMPLES = WIDTH_PROFILE.length;
-    const nose = P(pos(0).x + F.x * NOSE_LEAD * L, pos(0).y + F.y * NOSE_LEAD * L);
+    // THE TAIL'S ENVELOPE. Three terms, each one shape the reference has:
+    //   `outer` — the two outermost tips reach furthest
+    //   `scallop` — TAIL_LOBES maxima across the fan, so the trailing edge
+    //     waves instead of arcing; the lobes ARE these, not separate pieces
+    //   `fork`  — one deeper notch on the axis, which is what makes it a
+    //     forked tail rather than a scalloped paddle
+    const back = { x: -F.x, y: -F.y };
+    const tailReach = (u) => {
+      const outer = 1 - TAIL_TIP_SHORT * (1 - u * u);
+      const scallop = 1 - TAIL_SCALLOP * (0.5 - 0.5 * Math.cos((TAIL_LOBES - 1) * Math.PI * (u + 1)));
+      const fork = 1 - TAIL_FORK * Math.exp(-(u / TAIL_FORK_W) * (u / TAIL_FORK_W));
+      return TAIL_LEN * L * outer * scallop * fork;
+    };
 
-    const outline = [nose];
-    for (let i = 0; i < SAMPLES; i++) { const e = edge(i / (SAMPLES - 1), 1); outline.push(P(e.x, e.y)); }
-    for (let i = SAMPLES - 1; i >= 0; i--) { const e = edge(i / (SAMPLES - 1), -1); outline.push(P(e.x, e.y)); }
+    // A paired fin: a fan about a root just inside the flank, swept back toward
+    // the tail. Broad and rounded at its outer edge — a fin, not a leaf.
+    const finAt = (u, side, ang, len, rootK) => {
+      const bx = R.x * side * Math.cos(ang) - F.x * Math.sin(ang);
+      const by = R.y * side * Math.cos(ang) - F.y * Math.sin(ang);
+      const m = Math.hypot(bx, by) || 1;
+      const base = { x: bx / m, y: by / m };
+      return {
+        origin: edge(u, side, rootK), axis: base, spread: FIN_SPREAD,
+        reach: (q) => len * L * Math.pow(Math.max(0, 1 - q * q), FIN_TAPER),
+      };
+    };
 
-    // Body: a dark fill so the koi reads as a solid under the water and the
-    // vignette does not show through it, then the outline over the top. The
-    // fill is a gradient across the SHORT axis, not a flat colour — the near
-    // flank a touch less dense (catching the tilt), the far flank a touch
-    // more (receding from it) — which is what implies the flat oval has a
-    // rounded belly-to-back cross-section rather than reading as a disc.
-    // Both stops converge on BODY_FILL_A itself as volMag -> 0, so a fish
-    // caught edge-on to the tilt (heading pi/2 or 3pi/2) fills flat rather
-    // than showing a gradient with nothing left for it to mean.
-    {
-      // TONE, NOT ALPHA. The ground behind a koi is near-black and the flat
-      // fill was already close to it ([13,15,18] on [8,9,11]), so swinging
-      // the fill's ALPHA barely moved the composited pixel — the two colours
-      // were too close to begin with for transparency to separate them.
-      // Swinging the RGB channels themselves (still both dark, still within
-      // the same restrained range) is what actually reads as one flank
-      // catching a little light and the other receding from it.
-      const farPt = sEdge(0.45, -nearSide, 1), nearPt = sEdge(0.45, nearSide, 1);
-      const swing = volMag * BODY_FILL_TONE_SPAN;
-      const nearRGB = BODY_FILL_RGB.map((c) => c + swing);
-      const farRGB = BODY_FILL_RGB.map((c) => Math.max(0, c - swing));
-      const grad = ctx.createLinearGradient(farPt.x, farPt.y, nearPt.x, nearPt.y);
-      grad.addColorStop(0, rgba(farRGB, BODY_FILL_A * a));
-      grad.addColorStop(1, rgba(nearRGB, BODY_FILL_A * a));
-      ctx.beginPath(); closedSmooth(ctx, outline);
-      ctx.fillStyle = grad;
+    const fins = [
+      finAt(PECT_U, 1, PECT_ANGLE, PECT_LEN, PECT_ROOT),
+      finAt(PECT_U, -1, PECT_ANGLE, PECT_LEN, PECT_ROOT),
+      finAt(PELVIC_U, 1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
+      finAt(PELVIC_U, -1, PELVIC_ANGLE, PELVIC_LEN, PELVIC_ROOT),
+    ];
+
+    // THE CHAIN IS THE SHAPE. f.spine is the joint chain koi-fish.js drags
+    // behind the head with each joint's turn capped; every point drawn below
+    // rides it. There is no curvature law here at all — a turning koi bends
+    // because its body is physically behind its head, which is the one thing
+    // this construction had been doing with arithmetic instead.
+    const sp = f.spine, N = sp.length;
+    const speedF = Math.max(0.4, Math.min(1.7, f.speed / WAVE_SPEED_REF));
+    const phase = f.phase || 0;
+
+    // The chain with the swim wave laid over it: each joint pushed sideways
+    // from the line its neighbours make, growing toward the tail.
+    const cen = centres;
+    for (let i = 0; i < N; i++) {
+      const p0 = sp[i > 0 ? i - 1 : 0], p1 = sp[i < N - 1 ? i + 1 : N - 1];
+      let tx = p1.x - p0.x, ty = p1.y - p0.y;
+      const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
+      const u = i / (N - 1);
+      const amp = WAVE_AMP * L * Math.pow(u, WAVE_POW) * speedF;
+      const off = Math.sin(phase - u * WAVE_TOTAL) * amp;
+      cen[i].x = sp[i].x - ty * off;
+      cen[i].y = sp[i].y + tx * off;
+    }
+    // Frames along the WAVED line, so the body's width is perpendicular to the
+    // shape actually being drawn rather than to the chain underneath it.
+    for (let i = 0; i < N; i++) {
+      const p0 = cen[i > 0 ? i - 1 : 0], p1 = cen[i < N - 1 ? i + 1 : N - 1];
+      let tx = p1.x - p0.x, ty = p1.y - p0.y;
+      const m = Math.hypot(tx, ty) || 1;
+      tans[i].x = tx / m; tans[i].y = ty / m;
+    }
+
+    // Canonical x runs FORWARD from the nose, so the distance back along the
+    // body is -x and station i sits at x = -i * seg. Outside the chain the
+    // clamp on `i` makes this a linear EXTRAPOLATION along the end segment,
+    // which is what carries the blunt snout's own dome (it reaches forward of
+    // the nose) and the tail's own outermost reach.
+    const seg = Math.max(1e-6, f.seg);
+    const P = (x, y) => {
+      const t = -x / seg;
+      let i = Math.floor(t);
+      if (i < 0) i = 0; else if (i > N - 2) i = N - 2;
+      const fr = t - i;
+      const cx = cen[i].x + (cen[i + 1].x - cen[i].x) * fr;
+      const cy = cen[i].y + (cen[i + 1].y - cen[i].y) * fr;
+      // THE POSITION EXTRAPOLATES PAST THE CHAIN'S ENDS, THE DIRECTION DOES
+      // NOT, and that is a fix owed at BOTH ends rather than one. Extrapolating
+      // a tangent turns the frame further with every step past the last joint:
+      // at the tail it put a corner where the leading edge meets the flank, and
+      // at the HEAD the snout domes 0.062 L forward of station 0 — 0.55 of a
+      // segment — so the frame was being turned better than half the way from
+      // the first joint's tangent AWAY from the second's, which pinches a waist
+      // into the flank just behind the nose exactly where the body is widest.
+      const fc = fr < 0 ? 0 : fr > 1 ? 1 : fr;
+      let tx = tans[i].x + (tans[i + 1].x - tans[i].x) * fc;
+      let ty = tans[i].y + (tans[i + 1].y - tans[i].y) * fc;
+      const m = Math.hypot(tx, ty) || 1; tx /= m; ty /= m;
+      // The chain runs nose -> tail, so its tangent points BACKWARD along the
+      // body; the canonical frame's +x is forward, which is why the lateral
+      // term is (+ty, -tx) here where an integrated spine used (-ty, +tx).
+      return { x: cx + ty * y, y: (cy - tx * y) * sq };
+    };
+
+    // THE TAIL IS ON THE SAME CHAIN AS THE REST OF THE FISH. It used to hang
+    // off two sub-chains branching at the root, which made the lobes answer a
+    // turn on their own schedule; the chain runs through to the tail TIP now,
+    // so the fan is built canonically like every other part and carried by the
+    // one mapping. Nothing here knows the tail is a tail.
+
+    // THE FINS GO DOWN FIRST, UNDER THE BODY. Their roots sit inside the flank
+    // (PECT_ROOT / PELVIC_ROOT are fractions of the half-width there), so the
+    // body fill that follows covers the attachment and each fin reads as
+    // growing OUT of the fish. Drawn after it, a fin is a shape lying on top of
+    // a fish, which is the cut-out look this construction exists to avoid.
+    for (const fin of fins) {
+      const fp = [fin.origin];
+      fanPts(fp, fin.origin, fin.axis, fin.spread, fin.reach, 9);
+      ctx.beginPath(); closedSmooth(ctx, fp.map(p => P(p.x, p.y)));
+      ctx.fillStyle = rgba(INK_FISH, FIN_FILL_A * a);
       ctx.fill();
-      ctx.lineWidth = 1.15;
-      ctx.strokeStyle = rgba(INK_FISH, 0.70 * a);
+      ctx.lineWidth = FIN_LINE_W;
+      ctx.strokeStyle = rgba(INK_FISH, FIN_LINE_A * a);
+      ctx.stroke();
+      ctx.beginPath();
+      raysInto(P, seg, fin.origin, fin.axis, fin.spread, fin.reach, FIN_RAYS, 0.30, 0.90);
+      ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
       ctx.stroke();
     }
 
-    // THE SPINE RIDGE — one light stroke along the near flank, standing in
-    // for a rounded back distinct from the belly. It rides the same nearSide
-    // the fill gradient uses (so the two cues never disagree about which
-    // edge is "up") and the same volMag fade (so it has nothing left to draw
-    // at the crossover heading rather than hopping to the other side). Kept
-    // to a single thin stroke, well inside the body's own outline (0.72 of
-    // the half-width), because this is the one cue most likely to clutter
-    // the smallest koi in the pond (79px) — checked at that size before
-    // shipping, not assumed safe from the formula alone.
-    {
-      const ridgeA = RIDGE_ALPHA * volMag * a;
-      if (ridgeA > 0.004) {
-        const steps = 6;
-        const pts = [];
-        for (let i = 0; i <= steps; i++) {
-          const u = RIDGE_U0 + (RIDGE_U1 - RIDGE_U0) * (i / steps);
-          pts.push(sEdge(u, nearSide, 0.72));
-        }
-        // Curved through midpoints, the same technique closedSmooth uses, so
-        // a light spine line reads as smoothly as the outline it sits inside
-        // rather than as a faceted polyline.
-        ctx.beginPath();
-        ctx.moveTo(pts[0].x, pts[0].y);
-        for (let i = 0; i < pts.length - 1; i++) {
-          const a0 = pts[i], b0 = pts[i + 1];
-          const mx = (a0.x + b0.x) / 2, my = (a0.y + b0.y) / 2;
-          ctx.quadraticCurveTo(a0.x, a0.y, mx, my);
-        }
-        ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-        ctx.lineWidth = 0.7;
-        ctx.strokeStyle = rgba(INK_FISH, ridgeA);
-        ctx.stroke();
-      }
+    // THE CONTOUR — one array, one path: right flank nose to tail root, the
+    // tail's whole envelope, left flank back to the nose, then the blunt snout
+    // swept around the front to close. The envelope's first and last points sit
+    // at the outer tips, so the peduncle's own two corners join straight to
+    // them: that pair of segments IS the tail's leading edge, and there is no
+    // seam anywhere for a fill to leak through.
+    // ONE array of canonical points, one mapping. The flanks and the tail fan
+    // are the same curve's stations now, so there is no seam for a fill to leak
+    // through — the envelope's first and last points are the outer tips, and
+    // the peduncle's own two corners join straight to them.
+    const S = WIDTH_PROFILE.length;
+    const c = [];
+    for (let i = 0; i < S; i++) c.push(edge(i / (S - 1), 1));
+    fanPts(c, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_PTS);
+    for (let i = S - 1; i >= 0; i--) c.push(edge(i / (S - 1), -1));
+    const nc = pos(0), nw = widthAt(0);
+    for (let k = 1; k < NOSE_PTS; k++) {
+      const th = -Math.PI / 2 + Math.PI * (k / NOSE_PTS);
+      c.push({ x: nc.x + F.x * NOSE_ROUND * L * Math.cos(th) + R.x * nw * Math.sin(th),
+               y: nc.y + F.y * NOSE_ROUND * L * Math.cos(th) + R.y * nw * Math.sin(th) });
     }
 
-    // NO GILL LINE. The reference this pass was drawn against reads the head
-    // and body as ONE continuous smooth silhouette — nothing marks a seam
-    // between them — and a light arc across the shoulder (the previous
-    // version's attempt at a head cue) fought that directly: it was the one
-    // hard edge on an otherwise soft fish. The eyes are the head cue now, the
-    // same way the reference uses only the patch pattern and the taper.
+    // Body: a FLAT dark fill so the koi reads as a solid under the water and
+    // the grain does not show through it, then the one outline over the top.
+    // Flat, not a gradient across the flanks — see the header.
+    ctx.beginPath(); closedSmooth(ctx, c.map(p => P(p.x, p.y)));
+    ctx.fillStyle = rgba(INK_FISH, BODY_FILL_A * a);
+    ctx.fill();
+    ctx.lineWidth = OUTLINE_W;
+    ctx.strokeStyle = rgba(INK_FISH, OUTLINE_A * a);
+    ctx.stroke();
 
-    // Markings. Drawn in the body's own frame (u along, R across), so a
-    // patch stays put on the fish however it turns.
+    // The tail's own rays, over its fill.
+    ctx.beginPath();
+    raysInto(P, seg, pos(TAIL_ROOT_U), back, TAIL_SPREAD, tailReach, TAIL_RAYS, 0.26, 0.93);
+    ctx.lineWidth = FIN_LINE_W;
+    ctx.strokeStyle = rgba(INK_FISH, RAY_A * a);
+    ctx.stroke();
+
+    // The dorsal fin seen from directly above is a line down the spine.
+    {
+      // Along the centreline, so it is the image of a straight line and has to
+      // be subdivided for the same reason the rays are — it spans 0.62 of the
+      // body, which is most of the chain.
+      const dSteps = Math.max(1, Math.ceil((DORSAL_U1 - DORSAL_U0) * L / seg * 2));
+      ctx.beginPath();
+      const d0 = P(pos(DORSAL_U0).x, pos(DORSAL_U0).y);
+      ctx.moveTo(d0.x, d0.y);
+      for (let t = 1; t <= dSteps; t++) {
+        const u = DORSAL_U0 + (DORSAL_U1 - DORSAL_U0) * (t / dSteps);
+        const q = P(pos(u).x, pos(u).y);
+        ctx.lineTo(q.x, q.y);
+      }
+      ctx.lineWidth = FIN_LINE_W;
+      ctx.strokeStyle = rgba(INK_FISH, DORSAL_A * a);
+      ctx.stroke();
+    }
+
+    // Markings. In the body's own frame, so a patch stays put on the fish
+    // however it turns. Soft fill, NO stroke: the reference's markings have no
+    // edge, and an outlined blob read as a disc sitting on the koi.
     if (f.patches.length) {
-      ctx.lineWidth = 0.75;
+      ctx.fillStyle = rgba(INK_FISH, PATCH_FILL_A * a);
       for (const pt of f.patches) {
-        const c = pos(pt.s), halfW = widthAt(pt.s);
-        const ox = c.x + R.x * pt.t * halfW, oy = c.y + R.y * pt.t * halfW;
+        const pc = pos(pt.s), halfW = widthAt(pt.s);
+        const ox = pc.x + R.x * pt.t * halfW, oy = pc.y + R.y * pt.t * halfW;
         const ca = Math.cos(pt.rot), sa = Math.sin(pt.rot);
-        const ax = F.x * ca - F.y * sa, ay = F.x * sa + F.y * ca;   // patch long axis
+        const ax = F.x * ca - F.y * sa, ay = F.x * sa + F.y * ca;
         const bx = -ay, by = ax;
-        // ACROSS THE BODY A PATCH IS MEASURED IN HALF-WIDTHS, NOT IN BODY
-        // LENGTHS. Sized off L in both axes, a marking came out wider than the
-        // fish it sat on — two dark discs overhanging the outline, which is
-        // most of what made the first koi unreadable. Along the body L is the
-        // right unit; across it, it is not.
+        // ACROSS THE BODY A PATCH IS MEASURED IN HALF-WIDTHS, NOT BODY LENGTHS.
         const blob = [];
         for (let k = 0; k < 10; k++) {
           const th = (k / 10) * Math.PI * 2;
@@ -354,180 +683,14 @@ export function createRenderer(ctx, surface) {
           blob.push(P(ox + ax * u + bx * v, oy + ay * u + by * v));
         }
         ctx.beginPath(); closedSmooth(ctx, blob);
-        ctx.fillStyle = rgba(INK_FISH, 0.13 * a);
-        ctx.fill();
-        ctx.strokeStyle = rgba(INK_FISH, 0.34 * a);
-        ctx.stroke();
-      }
-    }
-
-    // THE DORSAL FIN IS ONE CURVE, NOT TWO STRAIGHT LEGS MEETING AT A POINT —
-    // a single quadraticCurveTo from one base point to the other, with the
-    // peak as its CONTROL point rather than a vertex the outline passes
-    // through. A quadratic curve undershoots its own control point (at
-    // t=0.5 the curve sits only halfway from the base chord toward it), so
-    // the result is a low, rounded swell blended into the body's own edge at
-    // both ends — never a spike — which is why DORSAL_PEAK_K is taller than
-    // the old triangle's. Which flank it sits on is a stable per-fish choice
-    // (the fish's own id, not a coin flipped every frame), so the school
-    // does not all lean the same way.
-    {
-      const side = (f.id % 2 === 0) ? 1 : -1;
-      // The same volume cue as the body and fins: whichever flank the dorsal
-      // happens to sit on this heading reads a little fuller when it is the
-      // near one and a little lower when it is the far one, so the fin's own
-      // apparent width turns WITH the fish rather than staying fixed while
-      // everything around it implies rotation. side * nearAlign is already
-      // signed (+ when this fin's side matches nearSide, - otherwise) and
-      // magnitude-bounded by volMag, so it needs no separate near/far branch.
-      const peakK = DORSAL_PEAK_K * (1 + DORSAL_VOL_SPAN * side * nearAlign);
-      const baseA = sEdge(DORSAL_U0, side, 1);
-      const baseB = sEdge(DORSAL_U1, side, 1);
-      const peak = sEdge(DORSAL_PEAK_U, side, peakK);
-      ctx.beginPath();
-      ctx.moveTo(baseA.x, baseA.y);
-      ctx.quadraticCurveTo(peak.x, peak.y, baseB.x, baseB.y);
-      ctx.fillStyle = rgba(INK_FISH, 0.20 * a);
-      ctx.fill();
-      ctx.lineWidth = 0.9;
-      ctx.strokeStyle = rgba(INK_FISH, 0.52 * a);
-      // THE BASE ITSELF IS NOT STROKED — it is exactly the body's own edge,
-      // so drawing it again would only double a line already there.
-      ctx.beginPath();
-      ctx.moveTo(baseA.x, baseA.y);
-      ctx.quadraticCurveTo(peak.x, peak.y, baseB.x, baseB.y);
-      ctx.stroke();
-    }
-
-    // THE CAUDAL FIN IS A SOFT FLARED PADDLE, NOT A KITE — every edge a
-    // curve, none of them a straight line meeting another at a point. `back`
-    // is the body's own -F, and rotating it by ±TAIL_SPREAD gives the two
-    // lobes' directions exactly as before; what changed is how the three
-    // points between them are connected. Each lobe's leading edge (root to
-    // its tip) BOWS outward past its own straight chord — `bow()` is the
-    // chord's midpoint pushed out along the lobe's own direction — so the
-    // paddle has a convex belly instead of a flat side. The fork between the
-    // two tips is ONE quadratic curve with NOTCH as its control point rather
-    // than a vertex: a quadratic curve does not reach its control point, so
-    // the fork dips TOWARD where the old fork's point was without ever
-    // sharpening into it — a scallop, not a V. Static and rigid with the
-    // body, per the brief for this pass.
-    {
-      const root = pos(TAIL_ROOT_U);
-      const tailTip = pos(1);
-      const back = { x: -F.x, y: -F.y };
-      const rot = (v, ang) => {
-        const c = Math.cos(ang), s = Math.sin(ang);
-        return { x: v.x * c - v.y * s, y: v.x * s + v.y * c };
-      };
-      const dirUp = rot(back, TAIL_SPREAD), dirDown = rot(back, -TAIL_SPREAD);
-      const tipUp = { x: tailTip.x + dirUp.x * TAIL_LEN * L, y: tailTip.y + dirUp.y * TAIL_LEN * L };
-      const tipDown = { x: tailTip.x + dirDown.x * TAIL_LEN * L, y: tailTip.y + dirDown.y * TAIL_LEN * L };
-      const notch = { x: tailTip.x + back.x * TAIL_NOTCH_LEN * L, y: tailTip.y + back.y * TAIL_NOTCH_LEN * L };
-      const bow = (p0, p1, dir) => ({
-        x: (p0.x + p1.x) / 2 + dir.x * TAIL_BOW * L,
-        y: (p0.y + p1.y) / 2 + dir.y * TAIL_BOW * L,
-      });
-      const bowUp = bow(root, tipUp, dirUp), bowDown = bow(root, tipDown, dirDown);
-      const rootP = P(root.x, root.y), tipUpP = P(tipUp.x, tipUp.y),
-            tipDownP = P(tipDown.x, tipDown.y), notchP = P(notch.x, notch.y),
-            bowUpP = P(bowUp.x, bowUp.y), bowDownP = P(bowDown.x, bowDown.y);
-      // FILL CLOSES THE SHAPE WITH ITS OWN CURVE BACK TO THE ROOT; THE
-      // STROKE MUST NOT DRAW THAT SEGMENT. The root sits just inside the
-      // body outline (TAIL_ROOT_U < 1) so the seam hides under it — stroking
-      // it would draw that seam as a visible line across the peduncle.
-      ctx.beginPath();
-      ctx.moveTo(rootP.x, rootP.y);
-      ctx.quadraticCurveTo(bowUpP.x, bowUpP.y, tipUpP.x, tipUpP.y);
-      ctx.quadraticCurveTo(notchP.x, notchP.y, tipDownP.x, tipDownP.y);
-      ctx.quadraticCurveTo(bowDownP.x, bowDownP.y, rootP.x, rootP.y);
-      ctx.fillStyle = rgba(INK_FISH, 0.16 * a);
-      ctx.fill();
-      ctx.lineWidth = 0.85;
-      ctx.strokeStyle = rgba(INK_FISH, 0.42 * a);
-      ctx.beginPath();
-      ctx.moveTo(rootP.x, rootP.y);
-      ctx.quadraticCurveTo(bowUpP.x, bowUpP.y, tipUpP.x, tipUpP.y);
-      ctx.quadraticCurveTo(notchP.x, notchP.y, tipDownP.x, tipDownP.y);
-      ctx.stroke();
-    }
-
-    // Pectorals — a ROUNDED PADDLE on the LEFT and RIGHT edges, just behind
-    // the nose, not a triangle. Two straight legs meeting at a tip read as a
-    // shark fin or, worse, a hook once the tip is small; the reference's
-    // pectoral is a soft blade rooted under the body and tapering to a blunt
-    // rounded end. Built exactly the way a marking is — a closed ellipse of
-    // points run through closedSmooth — and rooted so only its outward
-    // PECT_ROOT_T-to-1 stretch shows past the body's own edge, PECT_ROOT_T
-    // of it sitting back under the body fill: that partial hiding is what
-    // makes it read as growing OUT of the fish instead of floating beside
-    // it. On its own slower clock (`finPhase`) so it reads as alive without
-    // the spine's help.
-    {
-      const flap = 0.72 + Math.sin(f.finPhase) * 0.28;
-      for (const side of [1, -1]) {
-        const root = edge(PECT_U, side, 0.92);
-        const ca = Math.cos(PECT_ANGLE), sa = Math.sin(PECT_ANGLE);
-        // Long axis: straight outward (R*side), swept back toward the tail
-        // (-F) by PECT_ANGLE. Short axis is just the long one turned a
-        // quarter turn.
-        const axX = R.x * side * ca - F.x * sa, axY = R.y * side * ca - F.y * sa;
-        const bxX = -axY, bxY = axX;
-        // THE FAR FIN READS SMALLER, NEVER THE NEAR ONE. Two mirrored ovals
-        // of identical size is exactly the flat-cutout look this pass is
-        // meant to break; max(0, -side*nearAlign) is 0 on the near side
-        // (side===nearSide) at any heading and rises to volMag on the far
-        // side, so the near fin is always drawn at its full, undiminished
-        // reach and only the far one compresses.
-        const compress = 1 - FAR_FIN_COMPRESS * Math.max(0, -side * nearAlign);
-        const len = PECT_LEN * L * flap * compress, wid = PECT_WIDTH * L * compress;
-        const cx = root.x + axX * len * PECT_ROOT_T, cy = root.y + axY * len * PECT_ROOT_T;
-        const blob = [];
-        for (let k = 0; k < 12; k++) {
-          const th = (k / 12) * Math.PI * 2;
-          const u = Math.cos(th) * len * 0.5, v = Math.sin(th) * wid * 0.5;
-          blob.push(P(cx + axX * u + bxX * v, cy + axY * u + bxY * v));
-        }
-        ctx.beginPath(); closedSmooth(ctx, blob);
-        ctx.fillStyle = rgba(INK_FISH, 0.20 * a);
-        ctx.fill();
-        ctx.lineWidth = 0.8;
-        ctx.strokeStyle = rgba(INK_FISH, 0.50 * a);
-        ctx.stroke();
-      }
-    }
-
-    // Barbels — two of them, which is what makes a carp a koi at a glance.
-    {
-      ctx.lineWidth = 0.7;
-      ctx.strokeStyle = rgba(INK_FISH, 0.30 * a);
-      const wig = Math.sin(f.finPhase * 1.4) * 0.012;
-      const c = pos(BARBEL_U), baseW = widthAt(BARBEL_U);
-      for (const side of [1, -1]) {
-        const base = sEdge(BARBEL_U, side, 0.5);
-        const tip = P(c.x + R.x * side * (baseW * 0.5 + 0.085 * L) + F.x * (0.02 + wig) * L,
-                      c.y + R.y * side * (baseW * 0.5 + 0.085 * L) + F.y * (0.02 + wig) * L);
-        const ctrl = P(c.x + R.x * side * (baseW * 0.5 + 0.03 * L) + F.x * 0.06 * L,
-                       c.y + R.y * side * (baseW * 0.5 + 0.03 * L) + F.y * 0.06 * L);
-        ctx.beginPath();
-        ctx.moveTo(base.x, base.y);
-        ctx.quadraticCurveTo(ctrl.x, ctrl.y, tip.x, tip.y);
-        ctx.stroke();
-      }
-    }
-
-    // Two eyes. A koi's eye is about a pixel across at this size and it is the
-    // cheapest mark on the fish by far — it is also the one that settles which
-    // end is the head, which nothing else here does at a glance.
-    {
-      ctx.fillStyle = rgba(INK_FISH, 0.55 * a);
-      for (const side of [1, -1]) {
-        const e = sEdge(EYE_U, side, 0.72);
-        ctx.beginPath();
-        ctx.arc(e.x, e.y, EYE_R, 0, Math.PI * 2);
         ctx.fill();
       }
     }
+
+    // NO EYES, NO BARBELS, NO GILL LINE. The reference spends its detail on the
+    // body's curve and the flow of the fins and almost none on the face; what
+    // settles which end is the head is the blunt snout against the tapering
+    // wrist, which is how the reference settles it too.
   }
 
   // --- the whole frame -----------------------------------------------------
@@ -570,7 +733,7 @@ export function createRenderer(ctx, surface) {
       if (u <= 0 || u >= 1) continue;
       const attack = u < 0.06 ? u / 0.06 : 1;
       const base = attack * ((1 - u) * 0.6 + Math.pow(1 - u, 3) * 0.4) * (0.30 + 0.70 * rip.strength);
-      if (rip.r > 1 && base > 0.02) {
+      if (rip.r > 1 && base > 0.02 && u < WASH_UNTIL) {
         const wbin = Math.min(WASH_BINS - 1, Math.floor(base * WASH_BINS));
         washBins[wbin].push(rip.x, rip.y, rip.r);
       }

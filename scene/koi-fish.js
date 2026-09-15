@@ -49,7 +49,187 @@ import { createSurface } from './surface.js';
 
 export const BODY_LEN_PX = 96;        // ~1 inch at a typical 96 CSS-px inch
 export const SIZE_VAR = [0.82, 1.18]; // "mild size variation per fish"
-export const SPINE_JOINTS = 9;
+
+// A KOI IS A FIXED NUMBER OF PIXELS AND A PHONE IS NOT A DESKTOP. Measured on
+// the shipped page: the drawn silhouette is the same 154 px at 1440x900, at
+// 1280x800 and at 390x844 — the body length is a constant and nothing scaled
+// it — so a koi is 17% of the short side on a desktop and 39% on a phone. The
+// reference photograph's koi run 15-26% of its frame's short side, median 21%.
+// So the desktop was already right and the phone was the thing that was wrong,
+// which is the opposite of the way round it had been assumed.
+//
+// THE LAW IS FLOORED AND CAPPED AT 1, so every viewport at or above the
+// reference short side is UNCHANGED — a desktop, a laptop and a tablet all
+// draw exactly the koi they drew before. Only a genuinely small frame scales,
+// and the floor stops a very narrow one from breeding minnows: at 390 px the
+// scale lands on the floor, giving an 85 px silhouette, 22% of the short side
+// and squarely inside the reference's own range.
+export const BODY_REF_SHORT = 800;    // short side at which a koi is full size
+export const BODY_MIN_SCALE = 0.55;
+
+export function bodyScale(width, height) {
+  const short = Math.max(1, Math.min(width, height));
+  return Math.max(BODY_MIN_SCALE, Math.min(1, short / BODY_REF_SHORT));
+}
+// Fifteen rather than nine, because the chain is 1.74 body lengths long now
+// instead of 0.90 and a segment should stay about an eighth of a body. This is
+// only a free choice because the swim wave's phase is spread over the body's
+// LENGTH rather than over its joints — written per joint, as the original had
+// it, raising this constant would have put 2.3 wavelengths across the fish.
+export const SPINE_JOINTS = 15;
+
+// WHERE THE BODY ENDS AND THE TAIL BEGINS, shared by the simulation and the
+// renderer because it is one fact about the animal, and the drawn tail fan is
+// rooted there.
+export const TAIL_ROOT_U = 0.90;
+
+// HOW FAR THE CHAIN REACHES, NOSE TO TAIL TIP, in body lengths. The chain runs
+// through the TAIL now rather than stopping at its root and handing over to
+// something else, so the whole drawn animal — flanks, fan and every ray — rides
+// one curve. koi-draw.js checks this against its own TAIL_ROOT_U + TAIL_LEN at
+// module load: two owners of one length is exactly the drift this pair spent a
+// session on.
+export const CHAIN_SPAN_U = 1.74;
+
+// THE CHAIN CANNOT HAIRPIN, AND THAT IS A CONSTRAINT RATHER THAN A FILTER.
+// A plain follow-the-leader chain places each joint one segment behind the one
+// ahead in whatever direction it already lay, and says nothing about the angle
+// between consecutive segments — so when a koi turns inside its own segment
+// length (it can: at 21 px/s and 4 rad/s the turn radius is half a segment) the
+// body doubles back on itself. Measured on the chain without this clamp, over
+// four minutes of pond: the angle between consecutive segments reaches 180
+// degrees, exceeds 120 on 0.28% of joint-frames and 90 on 0.55%.
+//
+// Capping that angle makes the fold UNREACHABLE rather than unlikely. It is
+// the one place the constraint belongs: downstream of it every consumer — the
+// contour, the fins, the markings, the whole tail fan — is safe by
+// construction, where a smoothing pass would only make a fold rarer.
+//
+// THE CAP IS DERIVED FROM THE FISH'S OWN WIDTH, NOT TYPED, AND THE REASON IS A
+// SECOND FOLD THE FIRST CAP COULD NOT SEE. koi-draw maps every drawn point
+// through P(x, y) = c(x) + n(x)·y — an OFFSET CURVE about the chain. An offset
+// curve self-inverts wherever the offset exceeds the centreline's own radius of
+// curvature: points on the inside of the bend cross the centre and the shape
+// turns inside out. The body is narrow (half-width peaks at 0.131 L) and never
+// reaches it. THE TAIL IS NOT — its outer tips stand 0.296 L off the centre by
+// koi-draw's own envelope, 0.308 as the renderer actually emits them (the tail
+// rays and the stroke reach a little past the envelope), and with the chain
+// running through the tail those tips ride the offset map.
+//
+// Measured at a typed cap of 0.42, over 45 s of pond, on the wide fan this pair
+// shipped with: the chain's tightest radius sat at exactly seg/0.42 = 25.1 px
+// against a tail half-extent of 37.1 px, so the fan inverted on 13.6% of
+// at-rest frames, 38.5% of slow turns and 100% of sharp ones — which is the
+// thin trailing spike the tail collapsed into. The cap has to be the one the
+// WIDTH admits, so it is:
+//
+//   R = seg / maxBend  must be >= the widest half-extent
+//   seg = CHAIN_SPAN_U·len / (SPINE_JOINTS-1),  half-extent = HALF_EXTENT_U·len
+//   => maxBend <= CHAIN_SPAN_U / ((SPINE_JOINTS-1) · CHAIN_MAX_HALF_EXTENT_U)
+//
+// `len` cancels, so the cap is the same for every koi in the pond whatever its
+// size — which it must be, since folding is a property of the shape and not of
+// how large it is drawn.
+//
+// What it costs is measured and small: against the 24.1 degrees a joint an
+// unsized cap allowed, this admits 23.0, and 14 joints still carry 322 degrees
+// of total curl — most of a full turn. It is the local sharpness that goes,
+// which is the thing that was folding.
+//
+// THE VALUE IS THE EMITTED EXTENT, NOT THE ENVELOPE'S — 0.31 covers the 0.308
+// the renderer actually draws, where the envelope alone would have said 0.296
+// and sized the cap 4% too loose. A bound on a drawn shape is taken off what is
+// drawn. (The pair before the tail was narrowed was 0.39 over an emitted 0.387,
+// the same 1.007x of margin.)
+export const CHAIN_MAX_HALF_EXTENT_U = 0.31;
+
+// koi-draw.js owns the shape and therefore owns this length; it recomputes its
+// tail's widest across-reach in closed form from its own constants and throws
+// at module load if it exceeds this. Two owners of one length is exactly the
+// drift this pair has spent a session on, so it is checked rather than trusted.
+const CHAIN_MAX_BEND = CHAIN_SPAN_U / ((SPINE_JOINTS - 1) * CHAIN_MAX_HALF_EXTENT_U);
+
+// THE TAIL IS TWO CHAINS, NOT ONE HINGED FAN. Each lobe trails on its own, so
+// the chain's lag reaches all the way through the tail instead of stopping at
+// a rigid piece bolted to the last joint. The first segment of each is RIGID to
+// the body — it is the lobe's attachment, and it is what gives the two lobes
+// their splay; a pure follow-the-leader chain has no rest direction, so two
+// lobes trailing from one root would collapse onto the same line.
+
+// Place `n` one segment behind `lead`, in the direction it already lay, with
+// the turn from `refAng` capped. Returns the direction actually used, which is
+// the reference for the joint behind it.
+function trail(lead, n, seg, refAng, maxBend) {
+  const dx = n.x - lead.x, dy = n.y - lead.y;
+  const d = Math.hypot(dx, dy);
+  // A joint sitting exactly on its leader has no direction of its own; keep the
+  // one in front rather than letting atan2(0, 0) snap it to +x.
+  let ang = d > 1e-9 ? Math.atan2(dy, dx) : refAng;
+  const turn = wrapAngle(ang - refAng);
+  if (turn > maxBend) ang = refAng + maxBend;
+  else if (turn < -maxBend) ang = refAng - maxBend;
+  n.x = lead.x + Math.cos(ang) * seg;
+  n.y = lead.y + Math.sin(ang) * seg;
+  return ang;
+}
+
+// HOW HARD A KOI IS TURNING, SMOOTHED — the one thing the renderer needs to
+// bend the body, and the only number this file exports for a drawing decision.
+// A koi's body lies along the path it has just swum, so an arc of curvature
+// omega/speed IS the spine; koi-draw.js reads it and nothing else.
+//
+// SMOOTHED BECAUSE THE RAW PER-FRAME DELTA IS NOISE. The heading is resolved
+// against a steering vector that several behaviours write to, so it jitters
+// frame to frame even on a fish swimming a visibly smooth line — and an
+// unfiltered omega makes the body twitch rather than flow. One time constant,
+// long enough to read as a body following a turn rather than reacting to one.
+const OMEGA_TAU = 0.22;
+
+// WHERE THE KOI IS DRAWN IS NOT WHERE THE KOI IS, AND THAT IS THE WHOLE FIX FOR
+// THE JITTER. The steering vector several behaviours write to genuinely
+// REVERSES frame to frame — measured over a 60 s run, the sign of the turn
+// flips on 2.7% of fish-frames at rest and 5.8% in a storm, and a single frame
+// carried the turn rate from -3.749 to +3.752 to -3.756 rad/s. That is real
+// behaviour and it is not wrong: a koi picking its way through a crowded ripple
+// field does change its mind. What is wrong is DRAWING it at 60 Hz.
+//
+// So the renderer reads a lagged placement — drawX / drawY / drawHeading — and
+// never f.x / f.y / f.heading. Position and heading are lagged with ONE time
+// constant ON PURPOSE: a low-pass of both together is (near enough) the same
+// fish a tenth of a second ago, so the nose still points along the way the
+// drawn body is actually moving — measured, within 1.5 degrees of it at p99
+// and 5.2 at the worst. Lagging the HEADING alone leaves a koi aimed 21.5
+// degrees off its own travel at p99 and 24.9 at the worst, which is a fish
+// swimming sideways; that split is a mutant.
+//
+// NOTHING BEHAVIOURAL READS ANY OF THEM. Steering, containment, the population
+// and every geometric state test are on f.x / f.y / f.heading exactly as
+// before, so this moves no check in the gate: it is a drawing decision living
+// beside the simulation that feeds it, not a change to the simulation. Measured
+// against a tree without them: 119,550 behaviour values over a minute of pond,
+// 0 differ.
+//
+// WHERE IT DOES MEET A GEOMETRIC TEST, THE MARGIN IS THE ANSWER. A lagged koi
+// is drawn BEHIND where the simulation has it — measured, 7.3% of a body length
+// at the median and 18.8% at the worst — so the cull margin has to carry that
+// lag as well as the fish. See LEAVE_CLEAR_LEN, which is derived from both.
+//
+// THE PARAGRAPH THAT STOOD HERE REASONED ABOUT THE KOI AS A POINT and was
+// wrong because of it: it carried the lag correctly and then concluded the rule
+// was safe because the HEAD was 0.9 body lengths outside — with 1.54 body
+// lengths of fish trailing behind that head. Measured over 90 s of pond on the
+// tree that carried it, every one of 9 culls happened with part of the koi
+// still on screen and the worst had 38.8% of its drawn silhouette in frame.
+const DRAW_TAU = 0.12;
+
+// AND THE BEND BIAS EASES ON TOP OF THAT, WHICH IS A SECOND STAGE RATHER THAN A
+// LONGER FIRST ONE. f.omega is the MEASUREMENT — how hard this koi is turning,
+// smoothed just enough to be a number — and f.bend is what the body is DRAWN
+// curving by. A body does not change its curvature the instant the turn rate
+// does, and two first-order stages in series reject the reversal burst far
+// better than one stage of the same total delay: the fast one keeps the
+// measurement honest, the slow one keeps the drawn spine from flapping.
+const BEND_TAU = 0.28;
 
 export const MIN_ON_SCREEN = 3;
 export const MAX_ON_SCREEN = 7;
@@ -66,9 +246,23 @@ const DEPART_COOL_S = 1.3;
 const SPAWN_OUT = BODY_LEN_PX * SIZE_VAR[1] * 1.35;
 const ENTRY_JITTER = 0.45;            // rad either side of straight in
 const ENTRY_TRIES = 12;
-// A departing koi is removed one body length past the edge, which is where the
-// last of it has gone. CULL_MARGIN is the safety net for the other states.
-const LEAVE_CLEAR_LEN = 1.1;
+// HOW FAR PAST THE EDGE A DEPARTING KOI IS REMOVED, AND IT IS THE DRAWN FISH'S
+// OWN LENGTH RATHER THAN A BODY'S. `f.x, f.y` is the HEAD; the rest of the koi
+// trails behind it along the chain, so the last of it has gone only once the
+// head is the whole DRAWN length past the edge — and the drawn length is
+// CHAIN_SPAN_U (nose to tail TIP), not 1. A margin of 1.1 deleted koi with up
+// to 38.8% of themselves still in frame, which is the one thing the entry/exit
+// ruling forbids.
+//
+// PLUS THE DRAW LAG, because the margin is applied to the SIMULATION's head
+// while what must be clear is the DRAWN one, and the drawn koi trails the
+// simulated one by up to 18.8% of a body (see DRAW_TAU above). 0.20 covers the
+// measured worst with a little over.
+//
+// DERIVED, so a future change to the tail's reach carries this with it: the
+// same mistake is only reachable again by writing a number here.
+const DRAW_LAG_LEN = 0.20;
+const LEAVE_CLEAR_LEN = CHAIN_SPAN_U + DRAW_LAG_LEN;
 const W_EXIT = 3.2;                   // as strong as containment, and opposed
 const EXIT_BIAS = 0.25;               // how much an aligned edge is preferred
 const RECALL_MARGIN = 40;             // still near enough to turn back
@@ -147,7 +341,24 @@ const W_EDGE = 3.2;
 // as it comes about — which is what a real one does and what the geometry here
 // actually needs.
 const EDGE_BAND_BASE = 58;
-const EDGE_BAND_LOOKAHEAD = 1.9;      // seconds of travel the band must hold
+// SECONDS OF TRAVEL THE BAND MUST HOLD. Raised from 1.9 to 2.8 so containment
+// starts pulling a koi round EARLIER, and the reason is the brief's own floor
+// rather than anything about how the swimming looks.
+//
+// THE POND IS MEANT TO SHOW 3-7 KOI AND TO THIN DURING A STORM, and the storm
+// target is 3 — the floor exactly. So a single CRUISING koi drifting out of
+// frame, which is ordinary swimming rather than a defect, put the pond at 2 and
+// broke the brief. Instrumented at the dip: three koi alive, all three cruising,
+// one of them momentarily outside the frame; no leaver, no replacement in
+// transit. At 1.9 s of lookahead that happens on 1 of 48 storm runs (16 seeds x
+// three viewports, 70 s each) — and on main too, on a different seed, which is
+// the only reason the gate has been green.
+//
+// THE ALTERNATIVE WAS TO RAISE THE STORM TARGET TO 4, which buys the same
+// margin and was measured to work; it is not taken, because the target is a
+// ruled number and the koi leaving the frame is the actual defect. At 2.8 the
+// dip rate is 0 of 48 and the target stays where the brief put it.
+const EDGE_BAND_LOOKAHEAD = 2.8;      // seconds of travel the band must hold
 const EDGE_BAND_FRAC = 0.28;          // but never more than this of the span
 const EDGE_OUT_MAX = 1.6;             // how much harder it pulls once outside
 const EDGE_BRAKE = 0.35;              // speed multiplier when coming about
@@ -173,11 +384,14 @@ function wrapAngle(a) {
   return a;
 }
 
-function makeFish(rand, id, x, y, heading, state) {
+function makeFish(rand, id, x, y, heading, state, scale = 1) {
   const traits = { speed: rand.unit(), ripple: rand.unit(), social: rand.unit() };
-  const len = BODY_LEN_PX * rand.range(SIZE_VAR[0], SIZE_VAR[1]);
+  const len = BODY_LEN_PX * scale * rand.range(SIZE_VAR[0], SIZE_VAR[1]);
   const speedVar = rand.range(0.85, 1.15);
-  const seg = len / (SPINE_JOINTS - 1) * 0.82;
+  // The chain spans exactly as far as the drawn body does, so the last joint
+  // lands on the tail root and no part of the outline has to be extrapolated
+  // off the end of it.
+  const seg = CHAIN_SPAN_U * len / (SPINE_JOINTS - 1);
   const spine = [];
   for (let i = 0; i < SPINE_JOINTS; i++) {
     spine.push({ x: x - Math.cos(heading) * seg * i, y: y - Math.sin(heading) * seg * i });
@@ -197,7 +411,10 @@ function makeFish(rand, id, x, y, heading, state) {
     });
   }
   return {
-    id, x, y, heading,
+    id, x, y, heading, omega: 0,
+    // Render state. Seeded at the spawn pose so the first frame draws the koi
+    // where it actually is rather than easing in from the origin.
+    drawX: x, drawY: y, drawHeading: heading, bend: 0,
     traits, len, seg, spine, patches,
     baseSpeed: (SPEED_RANGE[0] + (SPEED_RANGE[1] - SPEED_RANGE[0]) * traits.speed) * speedVar,
     turnRate: rand.range(TURN_RANGE[0], TURN_RANGE[1]),
@@ -288,7 +505,8 @@ export function createSchool({ rand, surface = createSurface(), width, height })
 
     spawn(w, h, { counted = true } = {}) {
       const spot = school._entrySpot(w, h);
-      const f = makeFish(rand, school.nextId++, spot.x, spot.y, spot.heading, 'entering');
+      const f = makeFish(rand, school.nextId++, spot.x, spot.y, spot.heading, 'entering',
+                         bodyScale(w, h));
       f.speed = f.baseSpeed;
       school.fish.push(f);
       if (counted) school.arrivals++;
@@ -365,11 +583,18 @@ export function createSchool({ rand, surface = createSurface(), width, height })
     advance(dt, { ripples = [], intensity = 0, width: w = width, height: h = height } = {}) {
       const vis = surface.visible(w, h, 0);
       const capX = vis.w * EDGE_BAND_FRAC, capY = vis.h * EDGE_BAND_FRAC;
-      const sepRange = SEP_RANGE_LEN * BODY_LEN_PX;
+      // Separation is measured in BODY LENGTHS, so it follows the body: on a
+      // frame where the koi are smaller, keeping them a fixed number of PIXELS
+      // apart would spread a small school as widely as a full-size one.
+      const sepRange = SEP_RANGE_LEN * BODY_LEN_PX * bodyScale(w, h);
 
       for (const f of school.fish) {
         const steer = { x: 0, y: 0 };
         const fx = Math.cos(f.heading), fy = Math.sin(f.heading);
+        // Read BEFORE any behaviour writes the heading, and differenced at the
+        // end of the step: every write is then covered, whichever branch made
+        // it, rather than only the one steering site.
+        const headingWas = f.heading;
 
         // --- meander -------------------------------------------------------
         f.wanderTheta += rand.signed() * f.wanderRate * dt;
@@ -380,6 +605,7 @@ export function createSchool({ rand, surface = createSurface(), width, height })
 
         // --- ripples, whatever made them -----------------------------------
         let rx = 0, ry = 0, wsum = 0;
+        let alarmHit = 0;
         for (let i = 0; i < ripples.length; i++) {
           const rip = ripples[i];
           const dx = rip.x - f.x, dy = rip.y - f.y;
@@ -390,11 +616,29 @@ export function createSchool({ rand, surface = createSurface(), width, height })
           const fresh = Math.max(0, 1 - rip.age / rip.life);
           const wgt = rip.strength * fresh * prox;
           rx += (dx / d) * wgt; ry += (dy / d) * wgt; wsum += wgt;
+          // THE STRONGEST FRONT REACHING THE FISH, NOT THE SUM OF THEM. This
+          // was `f.alarm += ...` inside the loop, which is an UNBOUNDED SUM
+          // over the ripple field — fine while the field was a dozen rings,
+          // meaningless once it is a couple of hundred. A fish sitting under a
+          // dense shower has several fronts crossing it at any moment, so the
+          // sum pinned `alarm` at its ceiling permanently: every koi swam at
+          // its alarmed speed and turned at its alarmed rate for the whole run,
+          // reached the edges far more often, and the pond dipped to 2 on
+          // screen against a floor of 3. Measured — it is what took the
+          // population check red when the rain density went up.
+          //
+          // A max is DENSITY-INVARIANT, which is the property that was missing:
+          // being startled is about the biggest disturbance that reaches you,
+          // and ten faint ones do not add up to a slammed door. It also matches
+          // what the steering pull beside it already does — `Math.min(1, wsum)`
+          // saturates for the same reason.
           const front = Math.abs(d - rip.r);
           if (front < FRONT_BAND) {
-            f.alarm += rip.strength * (1 - front / FRONT_BAND) * prox * ALARM_GAIN * dt;
+            const hit = rip.strength * (1 - front / FRONT_BAND) * prox;
+            if (hit > alarmHit) alarmHit = hit;
           }
         }
+        if (alarmHit > 0) f.alarm += alarmHit * ALARM_GAIN * dt;
         if (wsum > 0) {
           // Signed about the midpoint: -1 flees, +1 approaches, 0 ignores.
           const pull = (f.traits.ripple - 0.5) * 2;
@@ -500,17 +744,36 @@ export function createSchool({ rand, surface = createSurface(), width, height })
         f.x += Math.cos(f.heading) * f.speed * dt;
         f.y += Math.sin(f.heading) * f.speed * dt;
 
-        // The body follows the head: each joint is pulled to a fixed distance
-        // behind the one in front. Turning then makes the S-curve on its own,
-        // with no swim wave needed to sell it.
-        const sp = f.spine;
-        sp[0].x = f.x; sp[0].y = f.y;
-        for (let i = 1; i < sp.length; i++) {
-          const dx = sp[i].x - sp[i - 1].x, dy = sp[i].y - sp[i - 1].y;
-          const d = Math.hypot(dx, dy) || 1e-6;
-          sp[i].x = sp[i - 1].x + (dx / d) * f.seg;
-          sp[i].y = sp[i - 1].y + (dy / d) * f.seg;
+
+        // The turn this step actually came to, low-passed. wrapAngle so a step
+        // across +/-pi is a small turn rather than a full revolution.
+        if (dt > 0) {
+          const raw = wrapAngle(f.heading - headingWas) / dt;
+          f.omega += (raw - f.omega) * Math.min(1, dt / OMEGA_TAU);
         }
+
+        // The drawn placement follows the real one. wrapAngle again, so the
+        // lag takes the short way round +/-pi instead of unwinding a whole
+        // revolution the koi never swam.
+        const kDraw = Math.min(1, dt / DRAW_TAU);
+        f.drawX += (f.x - f.drawX) * kDraw;
+        f.drawY += (f.y - f.drawY) * kDraw;
+        f.drawHeading = wrapAngle(f.drawHeading
+          + wrapAngle(f.heading - f.drawHeading) * kDraw);
+        f.bend += (f.omega - f.bend) * Math.min(1, dt / BEND_TAU);
+
+        // THE BODY FOLLOWS THE HEAD, AND THE TAIL FOLLOWS THE BODY. Each joint
+        // is pulled to a fixed distance behind the one in front with its turn
+        // capped, so the S-curve through a turn is the chain's own physical lag
+        // and there is no curvature formula anywhere. Driven from the LAGGED
+        // placement, not the raw one, for the reason in the note above it.
+        const sp = f.spine;
+        sp[0].x = f.drawX; sp[0].y = f.drawY;
+        let ref = f.drawHeading + Math.PI;        // backward, from the head
+        for (let i = 1; i < sp.length; i++) {
+          ref = trail(sp[i - 1], sp[i], f.seg, ref, CHAIN_MAX_BEND);
+        }
+
 
         f.phase += dt * (2.2 + f.speed * 0.055);
         f.finPhase += dt * 1.7;

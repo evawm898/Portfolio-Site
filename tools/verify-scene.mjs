@@ -220,12 +220,55 @@ const MUTANTS = [
               'scene1/the-traits-are-per-fish-and-span-the-sliders',
               'fish/separation-is-a-body-not-a-personality',
               'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
+              // AND IT CHURNS, which is a true statement about this mutation
+              // rather than a check that needs loosening. A koi crossing the
+              // frame edge is ordinary swimming, so a manager counting only
+              // what is IN FRAME sees a population that oscillates on its own
+              // and spawns and departs against it — which is what the churn
+              // check measures. It went unnamed until the density work shifted
+              // the sequence enough to surface it; the mutation is more plainly
+              // broken now, not less.
+              'fish/the-population-does-not-churn-at-a-steady-intensity',
               // Measured on this mutation: a koi on its way out is counted as
               // present, so the manager stops recalling in time and the pond
               // reaches EIGHT on screen. The recall check's own count bar is
               // what sees it — not its recall bar, which still reads 9 of 10.
               'fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
     why: 'the defect that filled the pond with sixteen koi to keep seven on screen',
+  },
+  {
+    id: 'the-drawn-placement-is-not-lagged',
+    file: 'scene/koi-fish.js',
+    from: '        const kDraw = Math.min(1, dt / DRAW_TAU);',
+    to: '        const kDraw = 1;',
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'the jitter itself: the koi drawn at the raw 60 Hz placement it swims',
+  },
+  {
+    id: 'the-bend-bias-snaps-to-the-turn-rate',
+    file: 'scene/koi-fish.js',
+    from: '        f.bend += (f.omega - f.bend) * Math.min(1, dt / BEND_TAU);',
+    to: '        f.bend = f.omega;',
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'a body that changes its curvature the instant the turn rate does',
+  },
+  {
+    id: 'the-drawn-heading-is-lagged-without-its-position',
+    file: 'scene/koi-fish.js',
+    from: `        f.drawX += (f.x - f.drawX) * kDraw;
+        f.drawY += (f.y - f.drawY) * kDraw;`,
+    to: `        f.drawX = f.x;
+        f.drawY = f.y;`,
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'the two lags split apart, which aims the koi off its own travel',
+  },
+  {
+    id: 'the-spine-is-pinned-at-the-nose',
+    file: 'scene/koi-draw.js',
+    from: 'const BEND_ANCHOR_U = 0.20;',
+    to: 'const BEND_ANCHOR_U = 0;',
+    breaks: ['fish/the-bend-moves-the-head-too'],
+    why: 'the head as the one part of the animal that never participates',
   },
   {
     id: 'a-departure-never-leaves',
@@ -419,6 +462,7 @@ async function loadScene(mutant) {
       storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
       ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
       fish: await m('koi-fish.js'), registry: await m('registry.js'),
+      draw: await m('koi-draw.js'),
     };
   }
   const dir = path.join(SCENE, `${MUTANT_PREFIX}${++mutantSeq}`);
@@ -435,6 +479,7 @@ async function loadScene(mutant) {
     storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
     ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
     fish: await m('koi-fish.js'), registry: await m('registry.js'),
+    draw: await m('koi-draw.js'),
   };
 }
 
@@ -753,9 +798,20 @@ async function partOne(mutant) {
       f.advance(0.001);
     }
     assert.strictEqual(f.list.length, M.ripples.MAX_RIPPLES, 'the cap did not hold');
-    const ages = f.list.map(r => r.age);
-    if (!(Math.max(...ages) < 0.35)) throw new Error('an old ripple survived the eviction');
-    return `capped at ${M.ripples.MAX_RIPPLES}, oldest evicted`;
+    // WHICH ONES SURVIVED, NOT HOW OLD THEY ARE. This asserted `max(age) < 0.35`,
+    // which reads as a statement about the eviction and is really a statement
+    // about the CAP: the fixture spawns one per millisecond, so the bar was just
+    // the old MAX_RIPPLES of 340 written as a time. Raising the cap took it red
+    // on an eviction that was working perfectly.
+    //
+    // Each ripple is spawned at x = its own index, so the survivors ARE the
+    // claim: with 40 spawned past the cap, the 40 oldest must be the 40 gone and
+    // the lowest surviving index must be exactly 40. That is stronger than the
+    // age bar it replaces and it does not move when the cap does.
+    const xs = f.list.map(r => r.x);
+    assert.strictEqual(Math.min(...xs), 40, 'the oldest 40 were not the ones evicted');
+    assert.strictEqual(Math.max(...xs), M.ripples.MAX_RIPPLES + 39, 'the newest did not survive');
+    return `capped at ${M.ripples.MAX_RIPPLES}, the 40 oldest evicted and the newest kept`;
   });
 
   // ------------------------------------------------------------------- rain
@@ -764,9 +820,19 @@ async function partOne(mutant) {
     const r = M.rain.createRain({ rand: M.rng.makeRandom(1), ripples: M.ripples.createRipples() });
     const idle = r.rateFor(0, 1440, 900), storm = r.rateFor(1, 1440, 900);
     const big = r.rateFor(0, 2880, 1800);
-    if (!(storm > idle * 20)) throw new Error(`idle ${idle}, downpour ${storm}`);
+    // THE BAR WAS 20x AND IS 4x, AND THAT IS A WEAKENING WITH A REASON RATHER
+    // THAN A THRESHOLD TUNED UNTIL A RED WENT GREEN. It was written when idle
+    // was 2.0 drops/s; idle is 45 now, deliberately, so the surface is dense at
+    // rest (see koi-rain.js). The RATE ratio is therefore 5.3x where it was
+    // 120x — but the rate is no longer the whole of the escalation. Across the
+    // same step the fall SPEED goes 900 -> 1900 px/s, the streak alpha rises,
+    // the splash switches to the small sharp storm table, and the drops in the
+    // AIR roughly double (23 -> 40, measured at 1440x900). What this check can
+    // still catch is the thing it is named for — rain that does not respond to
+    // the storm at all — and a 4x bar catches that as decisively as 20x did.
+    if (!(storm > idle * 4)) throw new Error(`idle ${idle}, downpour ${storm}`);
     near(big / idle, 4, 1e-9, 'four times the area');
-    return `${idle.toFixed(1)}/s idle, ${storm.toFixed(0)}/s downpour, x4 on x4 area`;
+    return `${idle.toFixed(1)}/s idle, ${storm.toFixed(0)}/s downpour (${(storm/idle).toFixed(1)}x), x4 on x4 area`;
   });
 
   check('a drop that lands makes exactly one ripple, where it landed', () => {
@@ -1091,6 +1157,122 @@ async function partOne(mutant) {
     if (recalls === 0) throw new Error('no koi was ever called back, over six short storms');
     if (worstVisible > M.fish.MAX_ON_SCREEN) throw new Error(`${worstVisible} koi were on screen at one point`);
     return `${recalls} recalled and ${spawnsInWindow} newly called in over six short storms, never more than ${worstVisible} on screen`;
+  });
+
+  check('the drawn koi is smoother than the one it follows', () => {
+    // THE WITNESS FOR THE LAGS, AND ITS REFERENCE HAS A DIFFERENT OWNER. The
+    // expected values are f.heading and f.omega, which the steering writes and
+    // the lag never touches; the quantities under test are f.drawHeading and
+    // f.bend, which only the lag writes. DRAW_TAU and BEND_TAU are deliberately
+    // NOT imported — a bar read out of the constant under test would move with
+    // a defect in it and could not fail.
+    //
+    // THE STATISTIC IS THE JERK, NOT THE STEP, and that distinction is the
+    // whole reading. A drawn heading MUST track a sustained turn, so its
+    // per-frame step is about the same as the raw one at the maximum (measured,
+    // ratio 0.955) and a bar on the step would say nothing at all. What reads
+    // as sharp is the step CHANGING abruptly, which is the second difference.
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    let jRaw = 0, jDrawn = 0, sRaw = 0, sDrawn = 0, offMax = 0, n = 0;
+    for (const seed of [11, 37]) {
+      const surf = M.surface.createSurface();
+      const W = 1440, H = 900, dt = 1 / 60;
+      const rand = M.rng.makeRandom(seed);
+      const school = M.fish.createSchool({ rand, surface: surf, width: W, height: H });
+      const ripples = M.ripples.createRipples();
+      const rain = M.rain.createRain({ rand, ripples });
+      school.seed(W, H);
+      const prev = new Map();
+      for (let i = 0; i < 60 * 40; i++) {
+        // Both weathers: the reversals this exists for are worst in a crowded
+        // ripple field, and the plain pond is where a lag could hide.
+        const I = ((i / 60) % 40) < 20 ? 0 : 0.8;
+        rain.advance(dt, { width: W, height: H, intensity: I, fallDir: { x: 0, y: 1 }, surface: surf });
+        ripples.advance(dt);
+        school.advance(dt, { ripples: ripples.list, intensity: I, width: W, height: H });
+        for (const f of school.fish) {
+          const p = prev.get(f.id);
+          const stepH = p ? wrap(f.heading - p.h) : null;
+          const stepD = p ? wrap(f.drawHeading - p.dh) : null;
+          if (p) {
+            sRaw = Math.max(sRaw, Math.abs(f.omega - p.o));
+            sDrawn = Math.max(sDrawn, Math.abs(f.bend - p.b));
+            if (p.stepH !== null) {
+              jRaw = Math.max(jRaw, Math.abs(stepH - p.stepH));
+              jDrawn = Math.max(jDrawn, Math.abs(stepD - p.stepD));
+            }
+            // ...AND IT IS STILL A LAG RATHER THAN A DISCONNECT. Position and
+            // heading are lagged with ONE constant so the drawn koi is (near
+            // enough) the koi a tenth of a second ago: a coherent fish, whose
+            // nose points along the way its own drawn body is going. Without
+            // this clause a FROZEN drawn placement would pass the two above.
+            const ddx = f.drawX - p.dx, ddy = f.drawY - p.dy;
+            if (Math.hypot(ddx, ddy) > 1e-3) {
+              offMax = Math.max(offMax, Math.abs(wrap(Math.atan2(ddy, ddx) - f.drawHeading)));
+              n++;
+            }
+          }
+          prev.set(f.id, { h: f.heading, dh: f.drawHeading, o: f.omega, b: f.bend,
+                           dx: f.drawX, dy: f.drawY, stepH, stepD });
+        }
+      }
+    }
+    if (n < 5000) throw new Error(`only ${n} moving samples to measure`);
+    const jr = jDrawn / jRaw, sr = sDrawn / sRaw, offDeg = offMax * 180 / Math.PI;
+    // Bars with real headroom over the measured 0.132 / 0.323 / 5.2 deg: what
+    // is ruled out is a placement drawn RAW, not a particular time constant.
+    if (!(jr <= 0.40)) throw new Error(`drawn heading jerk is ${(jr * 100).toFixed(0)}% of the raw jerk`);
+    if (!(sr <= 0.60)) throw new Error(`drawn bend steps ${(sr * 100).toFixed(0)}% as hard as the turn rate`);
+    if (!(offDeg <= 15)) throw new Error(`the drawn koi points ${offDeg.toFixed(1)} deg off its own drawn travel`);
+    return `jerk ${(jr * 100).toFixed(0)}% of raw, bend steps ${(sr * 100).toFixed(0)}% of raw, `
+         + `points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
+  });
+
+  check('the bend moves the head too', () => {
+    // THE WITNESS FOR THE ANCHOR, and nothing else here can see it: where the
+    // spine is pinned is a drawing decision, so this drives the SHIPPED
+    // renderer through a recording context rather than restating the bend law.
+    //
+    // Swing the turn bias from one saturated end to the other with everything
+    // else held. Pinned at the nose, station 0 IS the nominal nose and cannot
+    // move at all; pinned a fifth of the way back, the head takes its own
+    // share. The vertex is identified by INDEX in the first draw and read at
+    // the same index in the second, so the two are the same anatomical point.
+    const surf = M.surface.createSurface();
+    let pts = [];
+    const noop = () => {};
+    const rec = new Proxy({
+      moveTo: (x, y) => pts.push(x, y), lineTo: (x, y) => pts.push(x, y),
+      quadraticCurveTo: (a, b, x, y) => pts.push(a, b, x, y),
+      bezierCurveTo: (a, b, c, d, x, y) => pts.push(a, b, c, d, x, y),
+      ellipse: (x, y) => pts.push(x, y), arc: (x, y) => pts.push(x, y),
+      createRadialGradient: () => ({ addColorStop: noop }),
+      createLinearGradient: () => ({ addColorStop: noop }),
+    }, { get: (t, k) => (k in t ? t[k] : noop), set: () => true });
+    const rend = M.draw.createRenderer(rec, surf);
+    const L = 96, X = 400, Y = 300;
+    const grab = (bend) => {
+      pts = [];
+      rend.drawFish({ id: 1, x: X, y: Y, heading: 0, drawX: X, drawY: Y, drawHeading: 0,
+        len: L, speed: 40, phase: 0.8, finPhase: 0.7, omega: bend, bend,
+        patches: [{ s: 0.26, t: -0.10, rx: 0.08, ry: 0.6, rot: 0.2 }] });
+      return pts.slice();
+    };
+    const a = grab(-6), b = grab(6);          // both ends of the saturated bias
+    if (a.length !== b.length || a.length < 200) throw new Error(`the two draws do not correspond (${a.length} vs ${b.length})`);
+    let iNose = -1, best = Infinity, tail = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      const r = Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y);
+      if (r < best) { best = r; iNose = k; }
+      if (r > 0.95 * L) tail = Math.max(tail, Math.hypot(a[k] - b[k], a[k + 1] - b[k + 1]));
+    }
+    const nose = Math.hypot(a[iNose] - b[iNose], a[iNose + 1] - b[iNose + 1]);
+    if (!(tail > 5)) throw new Error(`the bias barely moved the tail (${tail.toFixed(2)} px) — nothing to compare against`);
+    // Measured: 2.50 px and a 7.8% share pinned a fifth back, against 0.06 px
+    // and 0.1% pinned at the nose.
+    if (!(nose > 0.5)) throw new Error(`the head does not move with the bend (${nose.toFixed(3)} px)`);
+    if (!(nose / tail > 0.02)) throw new Error(`the head takes only ${(nose / tail * 100).toFixed(1)}% of the tail's excursion`);
+    return `head ${nose.toFixed(2)} px against the tail's ${tail.toFixed(1)}, a ${(nose / tail * 100).toFixed(1)}% share`;
   });
 
   check('any ripple gets the same reaction', () => {
