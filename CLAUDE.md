@@ -6114,11 +6114,20 @@ the marks and the ambient rings barely clear it either (2 lit pixels over 30 fra
 **What actually distinguishes a pad from water is MOTION**: a pad's interior is static
 apart from its own rock, while open water has rings sweeping through it continuously.
 So the check compares the VARIATION of each disc's mean brightness across frames, needs
-no threshold at all, and says exactly what the claim is — measured **0.129 levels
-inside against 1.275 on an equal patch of open water**, and the control is a patch of
+no threshold at all, and says exactly what the claim is — measured **0.026-0.199 levels
+inside against 2.158 on an equal patch of open water**, and the control is a patch of
 OPEN WATER rather than a ring around the pad's own rim, because the brief guarantees
 open water exists and a ring does not (the first cut demanded 1.9 radii of clearance
 and simply **failed to run** the day the field was reseeded and no pad had it).
+**AND IT WATCHES FIVE PADS, NOT ONE, WHICH IS THE DIFFERENCE BETWEEN A CHECK THAT FIRES
+AND ONE THAT MIGHT.** Watching a single pad, whether any ring crosses ITS patch during
+the window is luck — the sweep caught that as a **MISSED**, the one failure direction
+that matters: the mutation which deletes the reset entirely left the check GREEN on a
+run where its one pad sat over quiet water, having reddened it on an earlier run. With
+the reset gone EVERY pad shows the water through it, so the WORST ratio over five makes
+the mutation unmissable and costs the clean tree nothing. **EVERY DISC IS THE SAME SIZE**
+— variance scales with area, so a single ring moves a small disc's mean far more than a
+large one's and discs of different radii cannot be compared at all.
 
 **THREE MUTANT CLAIMS WERE WRONG AND THE SWEEP IS WHAT SAID SO, ALL THREE IN THE SAME
 DIRECTION — the check was fine and the claim was not.** `the-rock-is-clamped-rather-

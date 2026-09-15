@@ -2376,28 +2376,35 @@ const CANVAS_STATS = `(() => {
 // dimmer than a stack of freckles — that half of the claim is measured by
 // `pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, in Node, on the order the
 // renderer actually emits.
-const RING_LEVEL = 120;
-const ELLIPSE_STATS = `(cx, cy, rx, ry, k, level) => {
+// (the measured brightness table above is kept because it is WHY this check is
+// a variance; no clause reads a level any more.)
+// Mean brightness inside each of several equal-sized screen ellipses, read back
+// from the RASTERISED framebuffer in ONE call per frame — so several pads and
+// their control are sampled at the same instant and are directly comparable.
+// EVERY DISC IS THE SAME SIZE, because variance scales with area: a single ring
+// crossing a small disc moves its mean far more than it moves a large one, so
+// discs of different radii cannot be compared to each other at all.
+const DISC_MEANS = `(discs, rx, ry) => {
   const c = document.querySelector('.scene-canvas');
   const g = c.getContext('2d');
   const dpr = c.width / parseFloat(c.style.width);
-  const R = Math.ceil(rx * k * dpr) + 2, Ry = Math.ceil(ry * k * dpr) + 2;
-  const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Ry);
-  const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Ry * 2);
-  if (w <= 0 || h <= 0) return null;
-  const d = g.getImageData(x0, y0, w, h).data;
-  let n = 0, sum = 0, hot = 0;
-  for (let py = 0; py < h; py++) {
-    for (let px = 0; px < w; px++) {
-      const i = (py * w + px) * 4;
-      const dx = ((x0 + px) / dpr - cx) / rx, dy = ((y0 + py) / dpr - cy) / ry;
-      if (Math.hypot(dx, dy) > k) continue;
-      const v = (d[i] + d[i + 1] + d[i + 2]) / 3;
-      n++; sum += v;
-      if (v > level) hot++;
+  return discs.map(([cx, cy]) => {
+    const R = Math.ceil(rx * dpr) + 2, Ry = Math.ceil(ry * dpr) + 2;
+    const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Ry);
+    const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Ry * 2);
+    if (w <= 0 || h <= 0) return null;
+    const d = g.getImageData(x0, y0, w, h).data;
+    let n = 0, sum = 0;
+    for (let py = 0; py < h; py++) {
+      for (let px = 0; px < w; px++) {
+        const i = (py * w + px) * 4;
+        const dx = ((x0 + px) / dpr - cx) / rx, dy = ((y0 + py) / dpr - cy) / ry;
+        if (Math.hypot(dx, dy) > 1) continue;
+        n++; sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      }
     }
-  }
-  return { n, mean: sum / n, hot };
+    return n ? sum / n : null;
+  });
 }`;
 
 async function partTwo(browser, mutant, shotsDir) {
@@ -2571,115 +2578,98 @@ async function partTwo(browser, mutant, shotsDir) {
         // THE OCCLUSION, READ OFF THE RASTERISED FRAME rather than off the draw
         // order the page reports. A lily pad floats ON the water: a ring spreads
         // around it and a koi swims beneath it, and neither can be seen through
-        // a leaf. Nothing in this scene occluded anything before the pads — every
-        // other mark is translucent ink — so this is the one check that can say
-        // the reset works.
+        // a leaf. Nothing in this scene occluded anything before the pads —
+        // every other mark is translucent ink — so this is the one check that
+        // can say the reset works in pixels.
         //
-        // AT IDLE, AND NOT DURING A STORM, FOR TWO MEASURED REASONS. The first
-        // cut clicked four times to put rings on the water and then read 3.16%
-        // of the pad's interior lit against 13.14% outside — and the interior
-        // was RAIN, which falls in FRONT of a pad and is supposed to. Ambient
-        // rings already cover most of the idle surface, so the signal outside is
-        // there without a storm and there is almost nothing in the air to cross
-        // the pad. (The second reason is that the clicks left the storm ebbing
-        // into the next check, which asserts the resting state.)
+        // WHAT SEPARATES A PAD FROM WATER IS NOT BRIGHTNESS, IT IS MOTION, and
+        // two threshold-based cuts had to fail before that was obvious. A pad's
+        // freckles composite to ~71, two overlapping reach ~103 and three ~123 —
+        // past a koi's outline at ~97 — so at any level low enough to catch the
+        // rings the pad's own texture matches them (3.135% against 2.981% at
+        // level 70), and at any level high enough to exclude the texture the
+        // ambient rings barely clear it either (2 lit pixels over 30 frames at
+        // 120). There is no threshold in between. A pad's interior is STATIC
+        // apart from its own rock, while open water has rings sweeping through
+        // it continuously, so what is measured is the VARIATION of each disc's
+        // mean brightness across frames.
         //
-        // AVERAGED OVER FRAMES, because a single ambient drop crossing the pad
-        // on the one frame sampled is the difference between a clean read and a
-        // flake — and taking the best frame instead would be choosing the answer.
-        //
-        // AN ISOLATED PAD, because the comparison is against the water JUST
-        // OUTSIDE its own rim: a neighbour's body, or a bloom, sitting in that
-        // annulus would be measuring something else.
+        // SEVERAL PADS, NOT ONE, AND THAT IS THE DIFFERENCE BETWEEN A CHECK THAT
+        // FIRES AND ONE THAT MIGHT. Watching a single pad, whether any ring
+        // crosses ITS patch during the window is luck: the sweep caught this as
+        // a MISSED — the mutation that deletes the reset entirely left the check
+        // GREEN — on a run where the one pad it had picked sat over quiet water,
+        // and the same mutation had reddened it on an earlier run. With the
+        // reset gone EVERY pad shows the water through it, so taking the WORST
+        // ratio over several makes the mutation unmissable while costing the
+        // clean tree nothing: on a correct pad the interior is quiet wherever it
+        // sits.
         const st2 = await page.evaluate(() => window.__scene.sceneState());
-        // MEASURED AGAINST AN EQUAL PATCH OF OPEN WATER, NOT AGAINST A RING
-        // AROUND THE PAD'S OWN RIM, and the two cuts before this one are why.
-        // The first demanded 1.9 radii of clear water around a pad and then
-        // FAILED TO RUN the day the pad field was reseeded and no pad had it —
-        // a check that depends on the layout coming out a particular way goes
-        // red for a reason that is not the code's. The second sized that ring
-        // from whatever clearance the frame offered, which always runs and
-        // collects almost nothing: a band a quarter of a radius wide holds too
-        // few ring pixels to say anything (0.033% against 0.042%).
-        //
-        // Open water is what the brief GUARANTEES is there — loose clusters with
-        // gaps between them — so the control is a disc the same size as the pad,
-        // in a gap, at a similar distance from the frame's centre so the
-        // vignette over the two is comparable.
-        const away = (x, y, r) => st2.padAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + r + 6)
-          && st2.bloomAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + r + 6);
-        const cx0 = st2.width / 2, cy0 = st2.height / st2.squash / 2;
-        const pads2 = st2.padAt.map(([x, y, R], i) => ({ i, x, y, R, sx: x, sy: y * st2.squash }))
-          .filter(p => p.R > 20
+        const inFrame = st2.padAt
+          .map(([x, y, R], i) => ({ i, x, y, R, sx: x, sy: y * st2.squash }))
+          .filter(p => p.R > 24
             && p.sx - p.R > 6 && p.sx + p.R < st2.width - 6
             && p.sy - p.R * st2.squash > 6 && p.sy + p.R * st2.squash < st2.height - 6)
-          .sort((a2, b2) => b2.R - a2.R);
-        let lone = null, spot = null;
-        for (const p of pads2) {
-          const want = Math.hypot(p.x - cx0, p.y - cy0);
-          const found = [];
-          for (let gx = 0; gx < 48; gx++) {
-            for (let gy = 0; gy < 48; gy++) {
-              const x = (gx + 0.5) / 48 * st2.width, y = (gy + 0.5) / 48 * (st2.height / st2.squash);
-              if (x - p.R < 6 || x + p.R > st2.width - 6) continue;
-              if (y * st2.squash - p.R * st2.squash < 6 || y * st2.squash + p.R * st2.squash > st2.height - 6) continue;
-              if (!away(x, y, p.R)) continue;
-              found.push({ x, y, d: Math.abs(Math.hypot(x - cx0, y - cy0) - want) });
-            }
-          }
-          if (!found.length) continue;
-          found.sort((a2, b2) => a2.d - b2.d);
-          lone = p; spot = found[0];
-          break;
-        }
-        if (!lone) throw new Error('no pad of a usable size has an equal patch of open water to compare against');
+          .sort((a2, b2) => b2.R - a2.R)
+          .slice(0, 5);
+        if (inFrame.length < 3) throw new Error(`only ${inFrame.length} pads are fully in frame`);
+        // ONE RADIUS FOR EVERY DISC, the smallest chosen pad's, so the pads and
+        // the control are the same area and their variances are comparable.
+        const rx = Math.min(...inFrame.map(p => p.R)) * 0.9, ry = rx * st2.squash;
 
-        // WHAT SEPARATES A PAD FROM WATER IS NOT BRIGHTNESS, IT IS MOTION, and
-        // two threshold-based cuts of this check had to fail before that was
-        // obvious. A pad's freckles composite to ~71, two overlapping reach
-        // ~103 and three ~123 — past a koi's outline at ~97 — so at any level
-        // low enough to catch the rings the pad's own texture matches them
-        // (3.135% against 2.981% at level 70), and at any level high enough to
-        // exclude the texture the ambient rings barely clear it either (2 lit
-        // pixels over 30 frames at 120). There is no threshold in between.
-        //
-        // The pad's interior is STATIC — freckles and a vein that move only as
-        // far as the rock carries them — while open water has rings sweeping
-        // through it continuously. So the measurement is the VARIATION of each
-        // disc's mean brightness across frames, which needs no threshold at all
-        // and says exactly what the claim is: the things on the water do not
-        // reach the inside of the pad.
-        const padSeq = [], waterSeq = [];
-        let frames = 0;
-        const sample = (x, y) => page.evaluate(
-          `(${ELLIPSE_STATS})(${x}, ${y * st2.squash}, ${lone.R * 0.9}, ${lone.R * 0.9 * st2.squash}, 1, ${RING_LEVEL})`);
-        // ON THE POND'S CLOCK, because what this needs is rings that have MOVED
-        // between samples, and how much pond a wall-clock wait covers depends on
-        // how fast the machine is.
-        for (let t = 0; t < 30; t++) {
-          const a2 = await sample(lone.x, lone.y), b2 = await sample(spot.x, spot.y);
-          if (a2 && b2 && a2.n > 0 && b2.n > 0) { padSeq.push(a2.mean); waterSeq.push(b2.mean); frames++; }
+        // The control is a disc of the SAME size on open water, which the brief
+        // guarantees exists — loose clusters with gaps between them — placed at
+        // a similar distance from the frame's centre so the vignette matches.
+        const away = (x, y) => st2.padAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6)
+          && st2.bloomAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6);
+        const cx0 = st2.width / 2, cy0 = st2.height / st2.squash / 2;
+        const want = Math.hypot(inFrame[0].x - cx0, inFrame[0].y - cy0);
+        const open = [];
+        for (let gx = 0; gx < 44; gx++) {
+          for (let gy = 0; gy < 44; gy++) {
+            const x = (gx + 0.5) / 44 * st2.width, y = (gy + 0.5) / 44 * (st2.height / st2.squash);
+            if (x - rx < 6 || x + rx > st2.width - 6) continue;
+            if (y * st2.squash - ry < 6 || y * st2.squash + ry > st2.height - 6) continue;
+            if (!away(x, y)) continue;
+            open.push({ x, y, d: Math.abs(Math.hypot(x - cx0, y - cy0) - want) });
+          }
+        }
+        if (!open.length) throw new Error('no patch of open water the size of a pad to compare against');
+        open.sort((a2, b2) => a2.d - b2.d);
+        const spot = open[0];
+
+        const discs = [...inFrame.map(p => [p.sx, p.sy]), [spot.x, spot.y * st2.squash]];
+        const series = discs.map(() => []);
+        // ON THE POND'S CLOCK: what this needs is rings that have MOVED between
+        // samples, and how much pond a wall-clock wait covers depends on how
+        // fast the machine is.
+        for (let t = 0; t < 28; t++) {
+          const means = await page.evaluate(`(${DISC_MEANS})(${JSON.stringify(discs)}, ${rx}, ${ry})`);
+          if (means && means.every(m => m !== null)) means.forEach((m, k) => series[k].push(m));
           await waitSceneSeconds(page, 0.10);
         }
+        const frames = series[0].length;
         if (frames < 10) throw new Error(`only ${frames} frames could be sampled`);
         const sd = (xs) => {
           const m = xs.reduce((p2, q) => p2 + q, 0) / xs.length;
           return Math.sqrt(xs.reduce((p2, q) => p2 + (q - m) * (q - m), 0) / xs.length);
         };
-        const padSd = sd(padSeq), waterSd = sd(waterSeq);
+        const padSds = series.slice(0, inFrame.length).map(sd);
+        const waterSd = sd(series[inFrame.length]);
+        const worst = Math.max(...padSds);
         // NOT VACUOUS: the open water has to be visibly doing something, or a
         // pad that hid nothing would pass beside water that showed nothing.
         if (!(waterSd > 0.35)) {
           throw new Error(`an equal patch of open water varies by only ${waterSd.toFixed(3)} levels `
             + `across ${frames} frames — nothing was sweeping it, so there is nothing to hide`);
         }
-        if (!(padSd < waterSd * 0.35)) {
-          throw new Error(`the pad's interior varies by ${padSd.toFixed(3)} levels against the open `
-            + `water's ${waterSd.toFixed(3)} — things on the water are sweeping through it`);
+        if (!(worst < waterSd * 0.35)) {
+          const k = padSds.indexOf(worst);
+          throw new Error(`pad ${k} of ${inFrame.length} varies by ${worst.toFixed(3)} levels against the `
+            + `open water's ${waterSd.toFixed(3)} — things on the water are sweeping through it`);
         }
-        return `interior varies ${padSd.toFixed(3)} levels against open water's ${waterSd.toFixed(3)} `
-          + `over ${frames} frames, pad R ${lone.R.toFixed(0)}`;
-          + `with ${lone.gap.toFixed(2)} radii of clear water, annulus ${kIn}-${kOut.toFixed(2)}`;
+        return `${inFrame.length} pads vary ${Math.min(...padSds).toFixed(3)}-${worst.toFixed(3)} levels `
+          + `against open water's ${waterSd.toFixed(3)} over ${frames} frames, discs r=${rx.toFixed(0)}`;
       });
 
       await checkAsync('the traits are per fish and span the sliders', async () => {
