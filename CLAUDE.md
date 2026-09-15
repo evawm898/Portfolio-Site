@@ -2565,6 +2565,15 @@ ring's OWN step, derived, never typed. After: 0 of 360 weld, all twelve block-33
 read 0 within-shell pairs and `directedMismatch` 0, shells are exactly 2 a leaf (3 leaves
 16, 24 leaves 58, no leaf 10), and TRIANGLE COUNTS ARE UNCHANGED TO THE INTEGER — a ring
 rotation is not a lattice change.
+**THE WITNESS IS THE ROW THAT FOUND IT** — X2 on `LEAVES: whorled x 8 nodes`, which
+rides in the EXPORT gate and in the SMOKE SUBSET both, so the fix gets no clause of its
+own (a shell count in the harness would be a second producer of the vertex weld, which
+the census owns). **And the subset caught it only because that row is in it for a
+DIFFERENT REASON**: block 33's anchor is the `alternate` row, whose azimuths (0, 180) sit
+on the clear 9.7%, so an anchor-only subset would have been silent — the whorled row is
+there for LF5's per-node SPACING claim and found a defect nobody was looking for. A
+subset earns its keep by covering the axes a feature HAS, not the failures somebody
+predicted.
 **AND R1 FIRED ON FIVE LEAF ROWS, EXACTLY AS ITS OWN COMMENT PREDICTED** ("a NEW part
 that emits and is absent here makes R1 fire at once, which is what it did the first time
 a stem was built, on this exact clause"). The leaves are the SECOND time that clause has

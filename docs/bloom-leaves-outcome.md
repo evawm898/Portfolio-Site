@@ -196,6 +196,22 @@ and never typed.
   lattice change, and the serration is unmoved — still 0 / 9 / 10 teeth built at
   depth 0 / 0.26 / 1.00, the 10 being the cut law's own ceiling, clamped and told.
 
+### The witness is the row that found it
+
+The fix does not get a clause of its own, and it does not need one: **X2 on
+`LEAVES: whorled x 8 nodes` is already the witness**, and it rides in the export
+gate and in the smoke subset both. A shell count in the harness would be a second
+producer of the vertex weld — the one thing the census owns — so the census stays
+the owner and the row stays in the subset.
+
+**It was caught by the subset only because that row is in it for a different
+reason.** Block 33's anchor is `LEAVES: alternate x 3 nodes`, whose azimuths (0,
+180) sit on the clear 9.7%; had the subset carried the anchor alone it would have
+been silent. The whorled row is there for **LF5**'s per-node *spacing* claim —
+120° apart on a three-leaf whorl — and it caught a defect nobody was looking for.
+An iteration subset earns its keep by covering the axes a feature has, not the
+failures somebody predicted.
+
 > **And R1 fired on five leaf rows, exactly as its own comment predicted.** Both
 > coverage instruments count the parts through a third accumulator that EMITS,
 > so *"a NEW part that emits and is absent here makes R1 fire at once, which is
