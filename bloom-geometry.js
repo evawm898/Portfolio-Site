@@ -8493,6 +8493,30 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       return Math.hypot(x / PA.length, y / PA.length);
     })(),
     crossesSolidMm,
+    /* THE AXIS OF THE ROD THIS BUILDER JUST EMITTED — the two rings' own
+       centroids, never `base` and `D0` beside them, for `emittedRootR`'s
+       reason one field later.
+
+       IT EXISTS FOR ST9, and the need is a CLASS rather than an incident. A
+       leaf is the third part to live below the hub, and the two before it are
+       both already declared exempt from that clause's region: the stem's own
+       vertices, which stand at `outerR` or `boreR` exactly, and the hub's own
+       surface. A petiole is rooted THROUGH the stem's wall, so it stands
+       INSIDE the free stem's outer cylinder by design and reads distance 0
+       from it — and a clearance criterion means nothing between two solids
+       that are fused, which is exactly what ST9's own scope already says
+       about the root band inside the hub. Without this ST9 cannot tell that
+       third part from the petal it exists to doubt, and the answer is to name
+       the petiole rather than to widen the region, because a region wide
+       enough to hold a petiole is wide enough to hold a petal. */
+    petioleAxis: (() => {
+      const mid = (ring) => {
+        let x = 0, y = 0, z = 0;
+        for (const q of ring) { x += q[0]; y += q[1]; z += q[2]; }
+        return [x / ring.length, y / ring.length, z / ring.length];
+      };
+      return { inner: mid(PA), outer: mid(PB), radiusMm: plan.petioleR };
+    })(),
     /* THE BUILDER'S OWN TALLY, not a formula beside it — ST1's lesson one
        family later: a computed count and an emitted one are two owners, and
        this file has already shipped a stem arm whose computed count was wrong

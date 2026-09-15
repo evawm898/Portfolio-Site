@@ -5652,7 +5652,7 @@ export async function leafAssertions(page, row) {
    piece with it — so the coverage is free and the blindness is the reason.
    =================================================================== */
 export const STEM_CHANNEL_SCOPE =
-  'ST9 reads the EXPORTED STL: below the hub\'s own outer surface, no vertex lies within the printable gap of the FREE stem (the hub\'s underside down to the tip) except the stem\'s own, which stand at its outer or bore radius exactly. It is the only witness here that does not read the stem channel\'s own report. Blind to a petal that clears the vertices and whose TRIANGLE dips nearer between them (a sub-mesh-chord effect, bounded by the mesh\'s own chord scale and shared with the criterion, which measures the same population); blind to the root band inside the hub, where the stem and the material are in the same place by design.';
+  'ST9 reads the EXPORTED STL: below the hub\'s own outer surface, no vertex lies within the printable gap of the FREE stem (the hub\'s underside down to the tip) except the stem\'s own, which stand at its outer or bore radius exactly, and the PETIOLES\', which are rooted through the wall by design and are excused on the axis each leaf\'s BUILDER emitted, one petiole radius wide. It is the only witness here that does not read the stem channel\'s own report. Blind to a petal that clears the vertices and whose TRIANGLE dips nearer between them (a sub-mesh-chord effect, bounded by the mesh\'s own chord scale and shared with the criterion, which measures the same population); blind to the root band inside the hub, where the stem and the material are in the same place by design; and blind to a petal lying within ONE PETIOLE RADIUS of a leaf\'s own rod, which is the price of naming the petiole rather than widening the region.';
 
 export function stemChannelAssertions(positions, row, m, ui) {
   const bad = [];
@@ -5714,9 +5714,56 @@ export function stemChannelAssertions(positions, row, m, ui) {
      printable gap — ST7 is the clause that asserts the channel declares it,
      and ST9 measures against it directly so the two cannot move together. */
   const clear = MIN_FEATURE_MM;
+  /* AND THE PETIOLES ARE THE THIRD PART DECLARED TO LIVE IN THIS REGION — the
+     leaf sessions' arrival on this clause, and a CLASS rather than an incident.
+     Every part below the hub is either the stem's own, the hub's own surface,
+     or something this clause doubts; a leaf is the first new inhabitant since
+     the clause was written, and it is rooted THROUGH the stem's wall, so its
+     petiole stands INSIDE the free stem's outer cylinder and reads distance
+     EXACTLY 0 from it. Measured on `LEAVES: x a SPHERE with a stem`: 198
+     vertices, nearest 0.0000 mm, and ALL 198 are a petiole's — 0 are anything
+     else, so the channel was clear of petals on the row this clause dropped.
+
+     A CLEARANCE CRITERION MEANS NOTHING BETWEEN TWO SOLIDS THAT ARE FUSED,
+     which is what the scope sentence above already says about the root band
+     inside the hub, and what this project measured on a flat head where all
+     eight feet read 0.000 mm from the free stem because a foot's bottom skin
+     is coplanar with the hub's underside.
+
+     SO THE PETIOLE IS NAMED, NOT THE REGION WIDENED, and that distinction is
+     the fifth durable rule doing its work: a region wide enough to hold a
+     petiole is wide enough to hold a petal, and a clause that excused the
+     stem's whole interior could not fail on a petal driven straight through
+     it. The exemption is the rod's own axis SEGMENT, one petiole radius wide,
+     so a petal is outside it unless it lies within 0.6 mm of a leaf's own rod
+     — declared in the scope rather than claimed impossible.
+
+     THE AXIS IS THE ONE THE BUILDER EMITTED (the two petiole rings' own
+     centroids), never `leafPlan`'s `rootR` and `angleDeg` beside it, for
+     `emittedRootR`'s reason: a rod that is emitted somewhere other than where
+     the plan says is session 43's ST2, and re-deriving the axis here would be
+     a second producer of it. Its owner is the LEAF builder, which is not the
+     quantity this clause is about — the stem channel's own report is, and
+     ST9 still reads none of it. A row with no leaves has no rods and every
+     expression below is the pre-leaf one verbatim. */
+  const rods = (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : [])
+    .filter((a) => a && Array.isArray(a.inner) && Array.isArray(a.outer) && Number.isFinite(a.radiusMm) && a.radiusMm > 0);
+  const onAPetiole = (x, y, z) => {
+    for (const a of rods) {
+      const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
+      const L2 = ax * ax + ay * ay + az * az;
+      let t = L2 > 0 ? ((x - a.inner[0]) * ax + (y - a.inner[1]) * ay + (z - a.inner[2]) * az) / L2 : 0;
+      t = t < 0 ? 0 : t > 1 ? 1 : t;
+      /* The rod's own vertices stand at EXACTLY `radiusMm` from this axis, so
+         the only slack wanted is the file's own float32 quantisation — the
+         same TOL the radii above use, for the same reason. */
+      if (Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) <= a.radiusMm + TOL) return true;
+    }
+    return false;
+  };
   const Rout = -rootZ;
   if (!(Rout > 0)) { bad.push(`ST9: the free stem's root stands at z ${rootZ}, which is not below the equator — the hub's outer surface cannot be located`); return bad; }
-  let intruders = 0, worst = Infinity, worstAt = null;
+  let intruders = 0, excused = 0, worst = Infinity, worstAt = null;
   for (let i = 0; i < positions.length; i += 3) {
     const x = positions[i], y = positions[i + 1], z = positions[i + 2];
     const r = Math.hypot(x, y);
@@ -5724,11 +5771,27 @@ export function stemChannelAssertions(positions, row, m, ui) {
     if (!(d < clear)) continue;
     if (Math.abs(r - outerR) <= TOL || (boreR > 0 && Math.abs(r - boreR) <= TOL)) continue;   // the stem's own
     if (z >= -Math.sqrt(Math.max(0, Rout * Rout - r * r)) - TOL) continue;                    // the hub's own, or on its surface
+    if (onAPetiole(x, y, z)) { excused++; continue; }                                          // a leaf's own rod, rooted through the wall
     intruders++;
     if (d < worst) { worst = d; worstAt = [x, y, z]; }
   }
   if (intruders) {
-    bad.push(`ST9: ${intruders} exported vertex/vertices stand inside the ${clear} mm printable gap of the free stem and are not the stem's own — nearest ${worst.toFixed(4)} mm at ${JSON.stringify(worstAt && worstAt.map((v) => Number(v.toFixed(3))))}. The channel is not clear in the file that will be printed.`);
+    /* The excused count rides in the message rather than being silent: a
+       diagnosis wants both populations, and "N excused" beside "M intruders"
+       is what says whether the exemption is doing more work than it should. */
+    const excusedNote = rods.length
+      /* AND WHERE THERE ARE LEAVES THE MESSAGE SAYS WHAT IT CANNOT TELL APART.
+         Only the PETIOLES are excused; a leaf's BLADE is not, and from
+         `leafAngle` 70 deg up the blade approaches the stem below the printable
+         gap on ANY head and in BOTH modes (0.8237 mm at 70, 0.2894 at 75,
+         contact at 80 and above, against 4.0192 at the ruled 35). That is a
+         real unprintable gap rather than a clause artefact — but it is not a
+         petal, and "the channel is not clear" would send a reader looking for
+         one. Named here rather than excused, because a carve wide enough to
+         hold a blade is wide enough to hold a petal. */
+      ? ` (${excused} further vertex/vertices are the ${rods.length} petiole(s)' own and are excused. NOTE: this build has leaves and only their PETIOLES are excused, so a steep leaf's BLADE against the stem reads here too — a real unprintable gap, but not a petal.)`
+      : '';
+    bad.push(`ST9: ${intruders} exported vertex/vertices stand inside the ${clear} mm printable gap of the free stem and are not the stem's own — nearest ${worst.toFixed(4)} mm at ${JSON.stringify(worstAt && worstAt.map((v) => Number(v.toFixed(3))))}. The channel is not clear in the file that will be printed.${excusedNote}`);
   }
   return bad;
 }

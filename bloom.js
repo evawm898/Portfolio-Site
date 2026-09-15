@@ -1887,6 +1887,11 @@ window.__bloomMetrics = () => ({
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
+    /* ST9's measured side — the axis of the rod each leaf's builder actually
+       emitted. A petiole is rooted THROUGH the stem's wall, so it stands
+       inside the free stem's own cylinder by design; ST9 reads these to tell
+       that third part from the petal it exists to doubt. */
+    petioleAxes: (lastLeavesBuilt || []).map((r) => r.petioleAxis),
     /* LF8's measured side — the builder's own DIRECTED-edge census, which both
        STL gates are blind to because theirs keys on a sorted pair. */
     directedMismatch: (lastLeavesBuilt || []).map((r) => r.directedMismatch),
