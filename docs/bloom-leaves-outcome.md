@@ -196,6 +196,30 @@ and never typed.
   lattice change, and the serration is unmoved — still 0 / 9 / 10 teeth built at
   depth 0 / 0.26 / 1.00, the 10 being the cut law's own ceiling, clamped and told.
 
+### And the defect was MODE-DEPENDENT, which is worse than arbitrary
+
+The sweep above names its mode and its sampling, because the rule requires it and
+because the answer moves. Sampling: every azimuth of a 1-degree sweep, 360 states,
+one whorl node, counting a leaf as welded if its petiole and blade share **any**
+vertex exactly.
+
+| sheet | mode | floored `t` | `petioleR` | welded, pre-fix | welded, shipped |
+|---|---|---|---|---|---|
+| 1.20 | LIVE | 1.200 | 0.600 | **325** of 360 | **0** |
+| 1.20 | EXPORT | 1.200 | 0.600 | **325** of 360 | **0** |
+| 0.60 | LIVE | 0.600 | 0.300 | **340** of 360 | **0** |
+| 0.60 | EXPORT | 1.000 | 0.500 | **324** of 360 | **0** |
+
+At the shipping sheet the two modes agree, because 1.20 is above `MIN_FEATURE_MM`
+and `floorThickness` returns it unchanged. **At 0.60 they do not** — the export
+floor takes `t` to 1.000 and `petioleR` with it — so on the pre-fix tree **whether
+a leaf was one shell or two differed between LIVE and EXPORT on 16 of 360
+azimuths.** Which shells a solid has is topology, and this project has refused a
+mode-dependent topology four times before (session 32's ladder, 38's seam step, the
+fringe's count threshold, 42's lamina). The half step reads **0 in both modes at
+both sheets**, so it removes the mode-dependence as well as the weld — measured,
+not argued from the fact that both quantities come from one `floorThickness` call.
+
 ### The witness is the row that found it
 
 The fix does not get a clause of its own, and it does not need one: **X2 on

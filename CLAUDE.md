@@ -2570,6 +2570,16 @@ ring's OWN step, derived, never typed. After: 0 of 360 weld, all twelve block-33
 read 0 within-shell pairs and `directedMismatch` 0, shells are exactly 2 a leaf (3 leaves
 16, 24 leaves 58, no leaf 10), and TRIANGLE COUNTS ARE UNCHANGED TO THE INTEGER — a ring
 rotation is not a lattice change.
+**AND THE DEFECT WAS MODE-DEPENDENT, WHICH IS WORSE THAN ARBITRARY** (the sweep names its
+MODE and its SAMPLING because the answer MOVES: every azimuth of a 1-degree sweep, 360
+states, one whorl node). At the shipping sheet 1.20 both modes read **325 of 360** welded,
+because `floorThickness` returns 1.20 unchanged. **At sheet 0.60 they DISAGREE — 340 LIVE
+against 324 EXPORT** — because the export floor takes `t` to 1.000 and `petioleR` with it, so
+on the pre-fix tree WHETHER A LEAF WAS ONE SHELL OR TWO differed between the modes on 16 of
+360 azimuths. Which shells a solid has is TOPOLOGY, refused as mode-dependent four times
+before (session 32's ladder, 38's seam step, the fringe's count threshold, 42's lamina). The
+half step reads **0 in both modes at both sheets** — measured, not argued from the fact that
+both quantities come from one `floorThickness` call.
 **THE WITNESS IS THE ROW THAT FOUND IT** — X2 on `LEAVES: whorled x 8 nodes`, which
 rides in the EXPORT gate and in the SMOKE SUBSET both, so the fix gets no clause of its
 own (a shell count in the harness would be a second producer of the vertex weld, which
