@@ -6005,14 +6005,133 @@ CSS coordinates, not something a hardware notch does — so the gate scales what
 sends and asserts what the page actually RECEIVED before concluding anything
 about the wind.
 
-**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
+**LILY PADS FLOAT ON THE WATER, AND THEY ARE THE FIRST THING IN THIS SCENE THAT
+OCCLUDES ANYTHING** (`scene/koi-pads.js`, and `drawPad`/`drawBloom`/`drawPads` in
+koi-draw.js — read that module's header before touching any of it). Loose clusters
+of pads with open water between them, two or three blooms rising among them, a pad
+rocking as a ripple's front passes under it, and koi swimming beneath them.
+
+**THE WATER IS A HEIGHT FIELD AND A FLOATING DISC READS IT TWICE — ONE LAW, NOT
+TWO MECHANISMS.** A leaf on water sits AT THE WATER'S HEIGHT and lies ALONG ITS
+LOCAL TANGENT PLANE, so `waveAt(ripples, x, y)` returns `{ h, gx, gy }` and the pad
+takes its BOB from the height and its ROCK from the gradient. Nothing in it knows a
+ripple is a ring: it asks the water where it is and which way it is leaning.
+**A PAD CANNOT TELL A CLICK FROM A RAINDROP, structurally** — `waveAt` reads x, y,
+r, age, life and strength and nothing else, which is the whole of `RIPPLE_FIELDS`,
+so there is no `source` to branch on. The same claim the fish carry, one module
+along, and the gate proves it the same way: two ponds whose ripples agree on every
+quantity a disturbance HAS and differ only in `rings` come out identical to the bit.
+
+**`surface.lift` IS DERIVED FROM THE SQUASH AND IS WHAT MAKES A ROCK SIGNED.** The
+view is an oblique orthographic with `sin(elevation) = squash`, so one plane unit of
+HEIGHT draws `sqrt(1 - squash^2) = 0.80` screen px UPWARD; `syAt(py, 0)` is exactly
+`sy(py)`, so nothing that floats is drawn by a second camera. **A FORESHORTENING
+ALONE CANNOT READ AS A ROCK** — a disc tilted by theta draws `cos(theta)` narrower
+along the tilt, and cos is EVEN, so a pure squash looks the same tilted either way
+and reads as a PULSE at twice the wave's frequency. The height term beside it is odd
+in theta, so one edge visibly lifts while the other drops. `padPoint` is the one
+place a local point becomes a place on the water and it carries both terms, so a
+pad's rim, its freckles and its vein cannot be drawn under three different tilts.
+
+**A FIRST-ORDER LAG, AND NO SPRING, BECAUSE THE FORCING ALREADY OSCILLATES.** As a
+front crosses a pad the slope under it runs 0 -> + -> 0 -> - -> 0, so a plain lag on
+that target IS a rock with a phase delay; a second-order response would add ringing
+after the wave has gone, which the water damps. The tilt is lagged as a VECTOR, so
+nothing wraps. **THE SATURATION IS SOFT AND THAT IS NOT A DETAIL:** a hard clamp
+respects the same ceiling and also pins every pad in the pond at it for the whole of
+a storm. Measured: tilt caps at 7.16 degrees, bob at 5 plane px.
+
+**FISH SWIM UNDER PADS AND NOTHING STEERS THEM ROUND ONE.** Occlusion rather than
+avoidance, for four reasons and the first is not a preference: koi-draw.js's own
+header says draw order is **the ONLY depth cue here**, so a koi drawn OVER a pad
+would read instantly as a pad painted on the pond floor — the pad has to come after
+the fish whatever else is decided. Avoidance would also be wrong about koi (they
+shelter under pads, which is what the reference photograph is a picture of), would
+need the school's already-ruled weights re-tuned, and would turn a mid-pond cluster
+into a hole the school never enters, which reads as a bug. **A PAD THEREFORE NEEDS
+AN OPAQUE RESET, because nothing in this scene occluded anything before it** — every
+other mark is translucent ink, so a koi would simply tint through. A pad fills
+`GROUND`, then re-fills the same path with the **vignette's own gradient**: filling
+the ground alone is right mid-frame and WRONG at the corners, where the vignette
+darkens the water and would not darken the pad, so a pad near an edge would be a
+bright patch. It also loses the water's GRAIN inside its rim, which is free and
+correct — a pad is not water, and its freckles are its texture in the grain's place.
+**Pads are drawn BACK TO FRONT and each one whole**, so a nearer pad covers a
+farther one's rim and the GAPS between overlapping pads stay water — which is what
+lets a koi under a cluster be glimpsed through it instead of vanishing under one mass.
+**Rain falls in FRONT of a pad and is supposed to** (it is in the air); it is the one
+thing that legitimately appears inside a rim, and it cost the occlusion check a cycle.
+
+**THE PADS DRAW FROM THEIR OWN FORKED STREAM, AND NOTHING ELSE WOULD HAVE NOTICED.**
+koi-ripples.js says it in as many words: every draw on the shared stream shifts every
+number taken after it for the rest of the run, and the fish share that stream. A pad
+field placed from `rand` hands the pond a DIFFERENT SET OF KOI — still seven, still
+distinct, still swimming, and no check in the file could see it. `padRand` is forked
+from the same seed so `?seed=` still reproduces everything, and
+`pads/wiring-in-the-pads-did-not-move-the-koi` is the witness: a school built from the
+seed ALONE, with no scene around it, against the school the wired scene actually has.
+
+**A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT.** `ensure(w, h)` tops the
+field up over water that has just come into view and NOTHING already placed ever moves
+or is removed — a fixed object that jumped when the window changed size would stop
+reading as fixed, and a re-generation is what makes every pad jump. The gate compares
+pads by OBJECT IDENTITY across a resize, because a field that replaced its pads with
+the same number of different ones passes a count. **The blooms are the PICTURE's, not
+the pond area's**: two or three, capped for the field, so a resize cannot breed a fourth.
+
+**THE SHAPE IS THREE NUMBERS AND THE FIRST TWO CUTS WERE BOTH WRONG BY EYE.** The
+notch's width is set at the RIM as a fraction of the pad's own DIAMETER, not as an
+angle: a half-angle of 0.19 rad opens a gap of 0.38 of the diameter, which draws as a
+slice out of a pie rather than a stem slit (`NOTCH_GAP` is 0.10 now). And **the veins
+were five lines and are one** — a midrib with two pairs of laterals drew a palm frond,
+which is the most detailed thing in a frame whose koi have no eyes, no barbels and no
+gill line; it also **stops three quarters of the way out**, because a bright straight
+line run edge to edge over a filled convex shape reads as a CRACK rather than a vein.
+The interior fill went 0.055 -> 0.095 in the same pass: at the lower value the reset
+had made a pad DARKER than the water it displaced and it read as a hole rather than a
+leaf. All three were found by rendering, not by reasoning — the sheet is
+`node tools/shot-scene-pads.mjs <dir>`, and **it quotes no pixel delta anywhere**: a
+pond is never still, so there is no settled frame to compare against and every number
+on it is read off the page's own reported state.
+
+**TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM ARE
+MEASURED BY TWO DIFFERENT INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The pixel check
+reads an isolated pad's interior against the water just outside it, and its threshold
+is a MEASURED CLIFF rather than a guess: a pad's freckles composite to ~71, two
+overlapping reach ~103 and three ~123, which is past a koi's own outline (~97) — so
+**no brightness threshold separates a fish under a pad from the pad's own marks**.
+Sampled over 22 frames, interior against annulus: 3.135%/2.981% at level 70,
+2.447%/1.599% at 90, 0.053%/0.446% at 110, **0.000%/0.210% at 120**. So the pixel
+check runs at 120 and sees the WATER; the koi half is `pads/a-pad-is-drawn-over-the-
+fish-and-the-ripples`, which drives the shipped `draw()` through a recording context
+and asserts the op ORDER and that the pad's first PAINT is a ground fill. **That
+recorder's first cut tagged every path point with the fill style in effect at the time
+of the POINT** — a path is built first and painted after, so a pad's outline came back
+wearing whatever the ripple pass had left set. Paints are their own events now.
+**And `the-rock-is-clamped-rather-than-saturated` stayed GREEN on its first run**: the
+check sampled twelve pads under a storm and asked whether their tilts still differed at
+the END, and they did under the clamp too, because by then the ripples had aged and the
+clamp was no longer binding. **A pond does not hold still long enough to be a controlled
+experiment; the law does** — it sweeps `respond` over forty slopes and asserts the
+response is STRICTLY RISING at every step, which is exactly what a clamp is not.
+
+**THE COST IS MEASURED AND IT IS NOT THE PADS.** `waveAt` is one pass per pad over the
+ripple list with a squared-distance reject before the sqrt: **0.19 ms a frame for 50
+pads against the 600-ripple cap**, and the page reads 22 fps on headless software GL
+during a downpour against the gate's floor of 12. The pad field is placed once and only
+its transform moves per frame; the outline, the freckles and the vein are built at
+placement. **`koi-pads.js` HAD TO BE ADDED TO THE DISCIPLINE SCAN'S `SCENE_MODULES`**,
+which is a hand-written coverage list — a module missing from it passes every discipline
+check by not being read.
+
+**Verify with `node tools/verify-scene.mjs`** (95 checks). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: nineteen mutations, each naming the checks it must redden,
+a changed harness**: thirty-seven mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not

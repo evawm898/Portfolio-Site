@@ -1,4 +1,5 @@
 import { SPINE_JOINTS, TAIL_ROOT_U, CHAIN_SPAN_U, CHAIN_MAX_HALF_EXTENT_U } from './koi-fish.js';
+import { padPoint } from './koi-pads.js';
 
 // scene/koi-draw.js — every mark scene 1 makes. Thin light lines on near-black,
 // so a koi is an outline with a dark body behind it rather than a shape with a
@@ -312,6 +313,48 @@ const OUTLINE_W = 1.0;
 const FIN_FILL_A = 0.09, FIN_LINE_A = 0.28, FIN_LINE_W = 0.75;
 const RAY_A = 0.22;           // the fin rays, the reference's own detail
 const PATCH_FILL_A = 0.11;    // no stroke — the reference's markings have no edge
+
+// A LILY PAD IS THE FIRST THING IN THIS SCENE THAT OCCLUDES ANYTHING, AND THAT
+// IS WHY IT NEEDS TWO FILLS NOBODY ELSE DOES. Every other mark here is
+// translucent ink laid over the water: a koi's body fill is INK at 0.13, so a
+// koi does not hide the ripple it swims under, it tints it. A pad is a solid
+// leaf floating ON the surface — a koi passes BENEATH it and a ring passes
+// AROUND it, and neither can be seen through a leaf. So a pad resets its own
+// interior to the water's value first and draws itself on top of that.
+//
+// THE RESET IS TWO FILLS AND THE SECOND ONE IS NOT OPTIONAL. Filling GROUND
+// alone is right in the middle of the frame and WRONG at its corners, because
+// the vignette darkens the water there and would not darken the pad: a pad near
+// an edge would come out as a bright patch, which is the one thing a hole in
+// the water must not be. Re-filling the same path with the vignette's own
+// gradient puts the pad's interior at exactly the value the water it displaced
+// had. Two fills of a path that is already built, per pad, ~30 pads: cheaper
+// than one of the wash ellipses this renderer already draws hundreds of.
+//
+// AND THE PAD LOSES THE GRAIN, WHICH IS CORRECT AND FREE. The grain is the
+// water's texture; painting over it inside the rim is what makes a pad read as
+// a different SURFACE from the pond rather than as a shape drawn on it. The
+// speckles are the pad's own texture in its place — the reference's freckling,
+// which on near-black is light rather than dark.
+// FAINT, BUT NOT SO FAINT THAT A PAD IS A HOLE. The first cut ran this at
+// 0.055 and the pads read as shadows in the water rather than as leaves on it —
+// the reset had made them darker than the water they displaced and nothing put
+// them back. A pad is still mostly its RIM and its freckles; this is what makes
+// it a body carrying them.
+const PAD_FILL_A = 0.095;
+const PAD_LINE_A = 0.38;      // under the koi's 0.42 — the fish stays the drawn thing
+const PAD_LINE_W = 1.0;
+const PAD_SPECK_A = 0.20;
+const PAD_RIB_A = 0.15;   // one line, and faint: at 0.22 a long pad read as cracked
+const PAD_RIB_W = 0.7;
+
+// The bloom is the brightest thing on the water after a ripple, which is what a
+// white flower is. Its petals occlude the same way a pad does.
+const BLOOM_FILL_A = 0.10;
+const BLOOM_LINE_A = 0.52;
+const BLOOM_LINE_W = 0.85;
+const BLOOM_STAMEN_A = 0.46;
+const BLOOM_CENTRE_A = 0.30;
 
 const rgba = (c, a) => `rgba(${c[0]},${c[1]},${c[2]},${a.toFixed(3)})`;
 
@@ -693,8 +736,132 @@ export function createRenderer(ctx, surface) {
     // wrist, which is how the reference settles it too.
   }
 
+  // --- one pad, one bloom ---------------------------------------------------
+  // BOTH GO THROUGH ONE POINT MAP. `padPoint` (scene/koi-pads.js) carries a
+  // local point onto the water under whatever rock the thing is doing and
+  // returns plane x, y and a HEIGHT; `surface.syAt` projects the height with
+  // the viewpoint's own `lift`. So a pad's rim, its freckles and its ribs
+  // cannot be drawn under three different tilts, and a bloom standing above the
+  // water uses the same camera as the water does.
+  const pp = { x: 0, y: 0, z: 0 };
+  const mapTo = (item, out, pts) => {
+    for (let i = 0; i < pts.length; i++) {
+      padPoint(item, pts[i].x, pts[i].y, pp);
+      const o = out[i] || (out[i] = { x: 0, y: 0 });
+      o.x = pp.x; o.y = surface.syAt(pp.y, pp.z);
+    }
+    out.length = pts.length;
+    return out;
+  };
+  const scratch = [];
+
+  // Trace an already-mapped ring as a plain polyline. NOT closedSmooth: the
+  // notch is a straight-sided wedge and curving through the edge midpoints
+  // rounds its apex into a bite. The rim carries enough samples that a polygon
+  // reads as a curve anyway (see OUTLINE_PTS), and the notch keeps its corner.
+  const tracePoly = (pts) => {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length; i++) ctx.lineTo(pts[i].x, pts[i].y);
+    ctx.closePath();
+  };
+
+  function drawPad(pad, w, h) {
+    const pts = mapTo(pad, scratch, pad.outline);
+    tracePoly(pts);
+    // The reset: the water's ground, then the water's own vignette over it.
+    ctx.fillStyle = GROUND;
+    ctx.fill();
+    ctx.fillStyle = groundFor(w, h);
+    ctx.fill();
+    ctx.fillStyle = rgba(INK, PAD_FILL_A);
+    ctx.fill();
+
+    // The freckles. One path, one fill — the same batching everything else here
+    // uses, at the scale of a single pad.
+    if (pad.specks.length) {
+      ctx.beginPath();
+      for (const sp of pad.specks) {
+        padPoint(pad, sp.x, sp.y, pp);
+        const cy = surface.syAt(pp.y, pp.z);
+        ctx.moveTo(pp.x + sp.r, cy);
+        ctx.ellipse(pp.x, cy, sp.r, sp.r * sq, 0, 0, Math.PI * 2);
+      }
+      ctx.fillStyle = rgba(INK, PAD_SPECK_A);
+      ctx.fill();
+    }
+
+    // The midrib and its pair of ribs, faint: the koi has no eyes and no gill
+    // line, so a pad does not get a full vein set.
+    ctx.beginPath();
+    for (const rib of pad.ribs) {
+      padPoint(pad, rib[0].x, rib[0].y, pp);
+      ctx.moveTo(pp.x, surface.syAt(pp.y, pp.z));
+      padPoint(pad, rib[1].x, rib[1].y, pp);
+      ctx.lineTo(pp.x, surface.syAt(pp.y, pp.z));
+    }
+    ctx.strokeStyle = rgba(INK, PAD_RIB_A);
+    ctx.lineWidth = PAD_RIB_W;
+    ctx.stroke();
+
+    tracePoly(pts);
+    ctx.strokeStyle = rgba(INK, PAD_LINE_A);
+    ctx.lineWidth = PAD_LINE_W;
+    ctx.stroke();
+  }
+
+  function drawBloom(b, w, h) {
+    // PETAL BY PETAL, BACK TIER FIRST, each one resetting its own interior the
+    // way a pad does — so a near petal covers the one behind it and the flower
+    // reads as layered rather than as a flat star with every edge showing.
+    ctx.lineWidth = BLOOM_LINE_W;
+    for (const pet of b.petals) {
+      const pts = mapTo(b, scratch, pet);
+      ctx.beginPath();
+      closedSmooth(ctx, pts);
+      ctx.fillStyle = GROUND;
+      ctx.fill();
+      ctx.fillStyle = groundFor(w, h);
+      ctx.fill();
+      ctx.fillStyle = rgba(INK, BLOOM_FILL_A);
+      ctx.fill();
+      ctx.strokeStyle = rgba(INK, BLOOM_LINE_A);
+      ctx.stroke();
+    }
+    // The centre: the reference's yellow boss, which in one grey ink is a small
+    // disc with the stamens standing out of it.
+    padPoint(b, 0, 0, pp);
+    const cx = pp.x, cy = surface.syAt(pp.y, pp.z);
+    ctx.beginPath();
+    ctx.moveTo(cx + b.centre, cy);
+    ctx.ellipse(cx, cy, b.centre, b.centre * sq, 0, 0, Math.PI * 2);
+    ctx.fillStyle = rgba(INK, BLOOM_CENTRE_A);
+    ctx.fill();
+    ctx.beginPath();
+    for (const st of b.stamens) {
+      padPoint(b, st[0].x, st[0].y, pp);
+      ctx.moveTo(pp.x, surface.syAt(pp.y, pp.z));
+      padPoint(b, st[1].x, st[1].y, pp);
+      ctx.lineTo(pp.x, surface.syAt(pp.y, pp.z));
+    }
+    ctx.strokeStyle = rgba(INK, BLOOM_STAMEN_A);
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+  }
+
+  // The pad pass, as its own call rather than inline in draw(), so WHERE it sits
+  // in the frame is one line that can be moved — which is what makes the depth
+  // order something a mutant can break and a check can catch.
+  function drawPads(w, h, pads) {
+    if (!pads) return;
+    for (const item of pads.drawOrder) {
+      if (item.kind === 'bloom') drawBloom(item, w, h);
+      else drawPad(item, w, h);
+    }
+  }
+
   // --- the whole frame -----------------------------------------------------
-  function draw({ width, height, fish, ripples, drops, fallDir, storm, reducedMotion, ripplePhase }) {
+  function draw({ width, height, fish, ripples, drops, pads, fallDir, storm, reducedMotion, ripplePhase }) {
     ctx.clearRect(0, 0, width, height);
     ctx.fillStyle = GROUND;
     ctx.fillRect(0, 0, width, height);
@@ -765,6 +932,24 @@ export function createRenderer(ctx, surface) {
       ctx.stroke();
     }
 
+    // THE PADS GO OVER THE RIPPLES, NOT UNDER THEM, AND THE ORDER IS THE WHOLE
+    // OF THE FISH-AND-PAD INTERACTION. A lily pad floats ON the water: a koi
+    // swims under it and a ring spreads around it, so a pad occludes both. That
+    // is not a preference between two ways of doing it — this renderer's own
+    // header says the draw order is the ONLY depth cue here, so a koi drawn
+    // OVER a pad would read instantly as a pad painted on the pond floor.
+    // Nothing steers a fish around a pad: koi shelter under lily pads, which is
+    // what the reference photograph is a picture of.
+    //
+    // BACK TO FRONT, AND EACH PAD WHOLE. `pads.drawOrder` is sorted by plane y
+    // — further up the screen is further away under this viewpoint — and each
+    // pad lays its own reset, fill, freckles, ribs and rim before the next one
+    // starts, so a nearer pad covers a farther one's rim where they overlap. It
+    // also leaves the GAPS between overlapping pads as water, which is what
+    // lets a koi under a cluster be glimpsed through it rather than vanishing
+    // under one opaque mass.
+    drawPads(width, height, pads);
+
     // Rain, same trick. A streak is a straight line in the air, so it is drawn
     // in screen space and the squash never touches it.
     for (const b of rainBins) b.length = 0;
@@ -799,5 +984,5 @@ export function createRenderer(ctx, surface) {
     }
   }
 
-  return { draw, drawFish };
+  return { draw, drawFish, drawPad, drawBloom };
 }
