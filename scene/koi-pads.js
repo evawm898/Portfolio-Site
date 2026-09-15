@@ -59,23 +59,44 @@ import { createSurface } from './surface.js';
 
 // ---------------------------------------------------------------- the shape
 // A pad is a near-circle with a wedge cut out of one side where its stem comes
-// up — the reference's own silhouette: organically lumpy rather than drawn with
-// a compass, and split from rim to centre by a narrow notch.
+// up — the reference's own silhouette: gently organic rather than drawn with a
+// compass, and cut from rim to centre. How WIDE that cut is varies from pad to
+// pad, from a slit to a bite; how lumpy the rim is does not vary much at all.
 
 export const PAD_R = [15, 58];        // plane px, the radius before the lumps
 export const PAD_R_SKEW = 1.7;        // >1 biases the draw small; see makePad
 export const LOBES = [2, 3, 5];       // harmonics that make the rim organic
-export const LOBE_AMP = [0.048, 0.034, 0.018];
-// THE NOTCH IS A SLIT AND ITS WIDTH IS SET AT THE RIM, NOT AS AN ANGLE. Half
-// an angular width of `a` opens a gap of 2*R*sin(a) across the rim — a fraction
-// of the pad's own DIAMETER — so the number that matters is that fraction and
-// the angle is what it implies. At 0.19 rad the gap is 0.38 of the diameter,
-// which draws as a slice out of a pie; the reference's is nearer a seventh.
-export const NOTCH_GAP = 0.10;        // of the pad's diameter, at the rim
-export const NOTCH_HALF = Math.asin(NOTCH_GAP / 2);
+// ROUNDER THAN THE FIRST CUT, BY RULING (Eva: "make the lily pads rounder").
+// These were [0.048, 0.034, 0.018] and drew rims varying 7-16% of their own
+// radius, which reads as lumpy rather than as a leaf — the lumps were the
+// loudest thing about a pad. Halved, with a tighter per-pad multiplier so the
+// lumpiest pad in a field sits nearer the quietest. The rim is still not a
+// compass circle, which is what keeps it organic; it is just no longer what
+// you notice first.
+export const LOBE_AMP = [0.024, 0.017, 0.009];
+export const LOBE_VARY = [0.65, 1.30];
+// THE WEDGE'S WIDTH IS A PER-PAD DRAW (Eva: "the cut out a variety of angles
+// ranging from 5 to 65"). The number is the INCLUDED angle — the whole wedge,
+// flank to flank — drawn uniformly per pad, so one field carries everything
+// from a slit you have to look for to a bite a sixth of the way round. The
+// half-angle the geometry wants is that over two, and it is a property of the
+// PAD rather than of the module: nothing below may read a module constant for
+// it.
+//
+// SUPERSEDED NOTE, KEPT SO THE CHANGE IS CHECKABLE. This was ONE fixed width,
+// set at the RIM as a fraction of the diameter (`NOTCH_GAP` 0.10, an included
+// angle of 5.7 degrees), on the reasoning that a half-angle of 0.19 rad opens
+// a gap of 0.38 of the diameter and "draws as a slice out of a pie". That
+// reasoning is correct about a single width and is not an argument against a
+// RANGE: the old value is now this range's own floor, and what the ceiling
+// buys is that no two pads in a clump are cut the same way. The gap a given
+// angle opens is still 2*sin(half) of the diameter — 0.09 at 5 degrees, 0.54
+// at 65 — so the top of the range IS the pie slice, deliberately, as the far
+// end of a variety rather than as every pad.
+export const NOTCH_DEG = [5, 65];     // INCLUDED angle of the wedge, per pad
 export const NOTCH_INNER = 0.05;      // how near the centre its apex reaches
 export const OUTLINE_PTS = 96;        // around the rim, before the notch's own
-export const NOTCH_PTS = 8;           // extra samples inside the slit
+export const NOTCH_PTS_MIN = 8;       // floor on the wedge's own samples
 
 // Speckles: the reference's pads are freckled, and on near-black an ink speck
 // is a LIGHT one. Deterministic per pad, in the pad's own local frame, so they
@@ -123,8 +144,10 @@ const TAU = Math.PI * 2;
 export function makePad(rand, x, y, R) {
   const spin = rand.range(0, TAU);
   const phases = LOBES.map(() => rand.range(0, TAU));
-  const amps = LOBE_AMP.map(a => a * rand.range(0.55, 1.45));
+  const amps = LOBE_AMP.map(a => a * rand.range(LOBE_VARY[0], LOBE_VARY[1]));
   const notch = rand.range(0, TAU);
+  const notchDeg = rand.range(NOTCH_DEG[0], NOTCH_DEG[1]);
+  const notchHalf = notchDeg * Math.PI / 360;   // included degrees -> half-angle
 
   const radiusAt = (t) => {
     let k = 1;
@@ -134,23 +157,36 @@ export function makePad(rand, x, y, R) {
     // sides, and a smoothstep here rounds it into a bite.
     let d = t - notch;
     d = d - TAU * Math.round(d / TAU);
-    const q = Math.abs(d) / NOTCH_HALF;
+    const q = Math.abs(d) / notchHalf;
     if (q < 1) k *= NOTCH_INNER + (1 - NOTCH_INNER) * q;
     return R * k;
   };
 
-  // Sampled densely inside the wedge, because a narrow angular window sampled
-  // at the rim's own spacing reads as a jagged bite rather than a cut.
+  // Sampled densely inside the wedge, because an angular window sampled at the
+  // rim's own spacing reads as a jagged bite rather than a cut — and the COUNT
+  // IS DERIVED FROM THE WEDGE'S OWN WIDTH rather than fixed, because the width
+  // is now a per-pad draw over a thirteenfold range. Eight samples is dense
+  // across a five-degree slit and COARSER THAN THE RIM ITSELF across a
+  // sixty-five degree one, which is precisely the jaggedness this pass exists
+  // to remove. Half the rim's step, so the wedge is always the better resolved
+  // of the two however wide it is cut.
+  //
+  // AND THE COUNT IS EVEN, WHICH IS NOT TIDINESS. The samples are laid from
+  // one flank to the other, so the APEX is a sample only when the count is
+  // even — an odd one steps over it and leaves the wedge with a small flat
+  // where its point should be, at the one place the pad's own midrib starts.
+  const rimStep = TAU / OUTLINE_PTS;
+  const notchPts = 2 * Math.max(NOTCH_PTS_MIN / 2, Math.ceil(2 * notchHalf / rimStep));
   const angles = [];
   for (let i = 0; i < OUTLINE_PTS; i++) {
     const t = (i / OUTLINE_PTS) * TAU;
     let d = t - notch;
     d = d - TAU * Math.round(d / TAU);
-    if (Math.abs(d) < NOTCH_HALF) continue;
+    if (Math.abs(d) < notchHalf) continue;
     angles.push(t);
   }
-  for (let i = 0; i <= NOTCH_PTS; i++) {
-    angles.push(notch - NOTCH_HALF + (i / NOTCH_PTS) * 2 * NOTCH_HALF);
+  for (let i = 0; i <= notchPts; i++) {
+    angles.push(notch - notchHalf + (i / notchPts) * 2 * notchHalf);
   }
   angles.sort((a, b) => a - b);
 
@@ -204,6 +240,14 @@ export function makePad(rand, x, y, R) {
 
   return {
     kind: 'pad', x, y, R, outline, specks, ribs, folds,
+    // The wedge, DECLARED: where its apex points in this pad's own drawn frame
+    // and how wide it was cut. Nothing in the module reads these back — they
+    // are here so an instrument can ask which stretch of the rim is the notch
+    // instead of inferring it from a radius, which cannot be done once the
+    // width varies (a wide wedge's own flank lands samples at every radius
+    // between its apex and the rim).
+    notchAt: ((notch + spin) % TAU + TAU) % TAU,
+    notchHalf, notchDeg,
     // The rock, as a VECTOR whose magnitude is the tilt angle: lagging an angle
     // and a direction separately means wrapping, and a wrap in the middle of a
     // lag is a pad that snaps round.

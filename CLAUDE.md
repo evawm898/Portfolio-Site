@@ -6080,9 +6080,12 @@ the same number of different ones passes a count. **The blooms are the PICTURE's
 the pond area's**: two or three, capped for the field, so a resize cannot breed a fourth.
 
 **THE SHAPE IS THREE NUMBERS AND THE FIRST TWO CUTS WERE BOTH WRONG BY EYE.** The
-notch's width is set at the RIM as a fraction of the pad's own DIAMETER, not as an
+notch's width was set at the RIM as a fraction of the pad's own DIAMETER, not as an
 angle: a half-angle of 0.19 rad opens a gap of 0.38 of the diameter, which draws as a
-slice out of a pie rather than a stem slit (`NOTCH_GAP` is 0.10 now). And **the veins
+slice out of a pie rather than a stem slit (`NOTCH_GAP` was 0.10 — **SUPERSEDED by the
+per-pad angle below, whose range reaches further than this paragraph warns against;
+the reasoning is right about one fixed width and is not an argument against a range**).
+And **the veins
 were five lines and are one** — a midrib with two pairs of laterals drew a palm frond,
 which is the most detailed thing in a frame whose koi have no eyes, no barbels and no
 gill line; it also **stops three quarters of the way out**, because a bright straight
@@ -6093,6 +6096,62 @@ leaf. All three were found by rendering, not by reasoning — the sheet is
 `node tools/shot-scene-pads.mjs <dir>`, and **it quotes no pixel delta anywhere**: a
 pond is never still, so there is no settled frame to compare against and every number
 on it is read off the page's own reported state.
+
+**THE PADS ARE ROUNDER AND THE STEM CUT IS A PER-PAD ANGLE FROM 5 TO 65 DEGREES**
+(Eva's ruling, on the shipped pads). Two constants and one law. `LOBE_AMP` is halved
+to `[0.024, 0.017, 0.009]` with a tighter per-pad multiplier, measured through one
+instrument over 20 fields and 792 pads: **the worst rim in a field varies by
+0.093-0.106 of its own radius where the amplitudes it replaced gave 0.203-0.234**, so
+the two distributions do not touch and the roundness bar sits at **0.16**, a third of
+headroom either way and set from the two distributions rather than from the data in
+hand. `the-rim-is-as-lumpy-as-it-was` restores the old amplitudes and is what stops
+the ruling drifting back.
+**THE WEDGE'S WIDTH IS THE INCLUDED ANGLE, DRAWN UNIFORMLY PER PAD** (`NOTCH_DEG`,
+`NOTCH_GAP`/`NOTCH_HALF` retired): the old fixed 5.7 degrees is this range's own
+floor, and the gap a given angle opens across the rim is still `2 sin(half)` of the
+diameter — 0.09 at 5 degrees and **0.54 at 65**, so the top of the range IS the "slice
+out of a pie" the fixed width was chosen to avoid, deliberately, as the far end of a
+variety rather than as every pad.
+**THE WEDGE'S SAMPLE COUNT IS DERIVED FROM ITS OWN WIDTH, AND IT IS EVEN.** Eight
+samples is dense across a 5-degree slit and COARSER THAN THE RIM across a 65-degree
+one, which draws the flanks as a staircase — so the count is whatever puts them half a
+rim step apart, and it is rounded to an EVEN number because the ladder runs flank to
+flank and the APEX is a sample only then. An odd count leaves a small flat where the
+point should be, at the one place the pad's own midrib starts.
+**A RANK CANNOT FIND THE RIM ANY MORE, AND THAT IS THE SAME DEFECT THIS CHECK WAS
+FIXED FOR ONCE ALREADY.** The flank is a continuous ramp from apex to rim, so it lands
+samples at every radius in between; the top-70%-by-rank window worked while the wedge
+was one fixed narrow width and is wrong at 65 degrees, where the wedge carries a THIRD
+of the samples and its flank climbs back into the window. What locates it now is the
+pad's own DECLARATION (`notchAt` / `notchHalf` / `notchDeg`, written by the builder and
+read by nobody in the module) — pinned to the shape by four clauses, because a
+declaration can lie: the one stretch that dives lies inside the declared window, it
+reaches the declared apex depth, **the window's own two edges are back up at the rim**
+(which is what pins the declared width to the width actually cut), and the half-angle
+is inside the ruled range. What is left is an over-declared window hiding a mangled
+rim, BOUNDED rather than closed at 18% of the ring by the 65-degree ceiling.
+**AND THE VARIETY IS MEASURED OFF THE DRAWN OUTLINE, NEVER OFF THE RECORD** — a field
+whose pads all DECLARE a different angle and all DRAW the same wedge passes any check
+that reads the declaration. The flank is a linear ramp from `NOTCH_INNER` to the rim,
+so the stretch under half a radius is a fixed fraction of the half-width; read its
+angular extent off the outline and it hands back the angle the pad was actually cut
+with. `every-wedge-is-cut-at-the-same-angle` is its witness.
+**THE WIDE WEDGE QUIETLY GREW THE OCCLUSION CHECK'S SUBJECT TO INCLUDE OPEN WATER, AND
+IT WAS STILL GREEN.** `scene1/a-pad-hides-the-water-under-it` sampled a disc centred on
+the pad at 0.9 of its radius — which at 65 degrees takes in a sector of the WEDGE, and
+a wedge is water. Measured across the change: the pads' median variation went **0.044-
+0.067 (one fixed 5.7-degree slit) to 0.193, worst pad 0.234 against a bar of 0.35** —
+passing, and no longer measuring only what it names. The disc is offset along the axis
+AWAY from the wedge now and is the largest that fits there: the flanks are rays from
+the pad's centre, so a disc on the opposite axis clears both exactly when its radius
+does not exceed its offset, and 0.42/0.40 satisfies that AT EVERY ANGLE THE RULING
+ALLOWS rather than on one field's luck. **It is a fifth of the old disc's area**, which
+is the honest cost of a cut that reaches the centre — a smaller disc averages fewer
+pixels, so rain and the pad's own rock move its mean further — and both sides are
+sampled at that radius so the ratio stays fair. **The ratio to open water went 0.091 to
+0.048 against a bar of 0.35**; the pre-wedge tree read 0.024, so about half the lost
+margin is recovered and the rest is the smaller disc. Nothing but re-reading the check
+against the new law could have found this: it never went red.
 
 **TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM NEED TWO
 INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The koi half is
@@ -6195,14 +6254,14 @@ placement. **`koi-pads.js` HAD TO BE ADDED TO THE DISCIPLINE SCAN'S `SCENE_MODUL
 which is a hand-written coverage list — a module missing from it passes every discipline
 check by not being read.
 
-**Verify with `node tools/verify-scene.mjs`** (95 checks). Part one drives the
+**Verify with `node tools/verify-scene.mjs`** (97 checks). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: thirty-seven mutations, each naming the checks it must redden,
+a changed harness**: thirty-nine mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not

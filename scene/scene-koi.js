@@ -158,7 +158,7 @@ export default function createKoiScene(host) {
         pads: pads.pads.length,
         blooms: pads.blooms.length,
         clusters: pads.clusters.length,
-        padAt: pads.pads.map(p => [p.x, p.y, p.R, Math.hypot(p.tx, p.ty), p.lift]),
+        padAt: pads.pads.map(p => [p.x, p.y, p.R, Math.hypot(p.tx, p.ty), p.lift, p.notchAt, p.notchDeg]),
         bloomAt: pads.blooms.map(b => [b.x, b.y, b.R, Math.hypot(b.tx, b.ty), b.lift]),
         padOrder: pads.drawOrder.map(i => i.y),
         padCovered: pads.coveredBox(),

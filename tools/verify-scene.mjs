@@ -526,12 +526,29 @@ const MUTANTS = [
     why: '"rising among the pad clusters" needs a leaf beside it; otherwise it is a flower alone on a pond',
   },
   {
-    id: 'the-notch-is-sampled-at-the-rims-own-spacing',
+    id: 'the-wedge-keeps-a-fixed-sample-count',
     file: 'scene/koi-pads.js',
-    from: '  for (let i = 0; i <= NOTCH_PTS; i++) {\n    angles.push(notch - NOTCH_HALF + (i / NOTCH_PTS) * 2 * NOTCH_HALF);\n  }',
-    to: '',
-    breaks: ['pads/a-pad-is-a-lumpy-near-circle-with-one-slit-in-it'],
-    why: 'a narrow angular window sampled at the rim spacing is a jagged bite rather than a stem slit',
+    from: '  const notchPts = 2 * Math.max(NOTCH_PTS_MIN / 2, Math.ceil(2 * notchHalf / rimStep));',
+    to: '  const notchPts = NOTCH_PTS_MIN;',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: 'eight samples is dense across a five-degree slit and coarser than the rim across a sixty-five degree wedge, '
+       + 'which draws its flanks as a staircase — and nothing else in the check can see it',
+  },
+  {
+    id: 'every-wedge-is-cut-at-the-same-angle',
+    file: 'scene/koi-pads.js',
+    from: '  const notchDeg = rand.range(NOTCH_DEG[0], NOTCH_DEG[1]);',
+    to: '  const notchDeg = NOTCH_DEG[0];',
+    breaks: ['pads/the-stem-wedge-is-cut-at-a-different-angle-on-every-pad'],
+    why: 'the ruling is a variety of angles from 5 to 65, and a field cut at one width is what it replaced',
+  },
+  {
+    id: 'the-rim-is-as-lumpy-as-it-was',
+    file: 'scene/koi-pads.js',
+    from: 'export const LOBE_AMP = [0.024, 0.017, 0.009];\nexport const LOBE_VARY = [0.65, 1.30];',
+    to: 'export const LOBE_AMP = [0.048, 0.034, 0.018];\nexport const LOBE_VARY = [0.55, 1.45];',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: '"make the lily pads rounder" is a ruling, and the amplitudes it replaced are the state it was ruled against',
   },
   {
     id: 'the-pads-draw-from-the-shared-stream',
@@ -1665,6 +1682,10 @@ async function partOne(mutant) {
   const padField = (seed, w = 1280, h = 800) => M.pads.createPads({
     rand: M.rng.makeRandom(seed), surface: M.surface.createSurface(), width: w, height: h,
   });
+  // Signed angular distance, so a wedge straddling angle zero is one stretch
+  // rather than two — which is what a naive sort of raw atan2 produces, and is
+  // the shape of the "two notches" failure the silhouette check counts.
+  const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
   check('the height of a thing on the water is derived from the squash', () => {
     // THE ONE NUMBER A FLOATING THING NEEDS, and it is not a free constant. The
@@ -1729,47 +1750,144 @@ async function partOne(mutant) {
     return rows.map(r => `seed ${r.seed}: ${r.n} pads, nn ${r.clumped.toFixed(0)} vs ${r.scattered.toFixed(0)} scattered`).join('; ');
   });
 
-  check('a pad is a lumpy near-circle with one slit in it', () => {
-    // The SILHOUETTE, off the shipped outline rather than off a picture. Two
-    // claims that a wrong shape breaks in different ways: the rim is
-    // near-circular but not a compass circle, and exactly one stretch of it
-    // dives toward the centre — the stem notch.
+  check('a pad is a near-circle with one wedge cut out of it', () => {
+    // The SILHOUETTE, off the shipped outline rather than off a picture.
     //
-    // THE ROUNDNESS IS MEASURED ON THE TOP 70% OF THE RADII, AND THE FIRST CUT
-    // OF THIS CHECK WAS WRONG ABOUT WHICH SAMPLES ARE RIM. It took everything
-    // above 55% of R as rim — but the notch's ramp is CONTINUOUS from its apex
-    // out to the rim, so its own flank lands samples at every value in between
-    // and several of them cleared the bar. The check read the notch's depth as
-    // the rim's variation (55% of a radius) and went red on a shape that is
-    // fine. There is no threshold that separates a continuous ramp from the rim
-    // it runs into; a RANK does, because the notch is a bounded fraction of the
-    // ring however deep it cuts. The clause below it is what covers a rim
-    // mangled inside the discarded 30%.
+    // THE RIM IS THE RING OUTSIDE THE DECLARED WEDGE, AND IT HAS TO BE — a
+    // RANK cannot find it any more. The first cut of this check took every
+    // sample above 55% of R as rim, and the wedge's flank is a CONTINUOUS ramp
+    // from its apex out to the rim, so it landed samples at every value in
+    // between and the check read the wedge's depth as the rim's variation. A
+    // rank window (the top 70%) fixed that while the wedge was one fixed
+    // narrow width and is wrong now that it is a per-pad draw: at 65 degrees
+    // the wedge carries a THIRD of the samples, so a rank cut at 70% lets its
+    // flank back in. What locates it instead is the pad's own declaration.
+    //
+    // A DECLARATION CAN LIE, so it is not taken on trust — four clauses below
+    // pin it to the shape: the one stretch that dives lies inside the declared
+    // window, it reaches the declared apex depth, the window's own two edges
+    // are back up at the rim, and the declared half-angle is inside the ruled
+    // range. What is left is an over-declared window hiding a mangled rim, and
+    // that is BOUNDED rather than closed: the ruled ceiling is 65 degrees, so
+    // at most 18% of the ring can be excluded by a declaration at all.
     const f = padField(4242);
-    let worstRound = 0, leastVary = Infinity;
+    const rimStep = (Math.PI * 2) / M.pads.OUTLINE_PTS;
+    let worstRound = 0, leastVary = Infinity, worstGap = 0;
     const bad = [];
     for (const pad of f.pads) {
-      const rs = pad.outline.map(p => Math.hypot(p.x, p.y) / pad.R);
-      const rim = rs.slice().sort((a, b) => b - a).slice(0, Math.floor(rs.length * 0.70));
-      const lo = rim[rim.length - 1], hi = rim[0];
+      const pts = pad.outline.map(p => ({
+        d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt),
+        r: Math.hypot(p.x, p.y) / pad.R,
+      }));
+      const rim = pts.filter(q => Math.abs(q.d) > pad.notchHalf).map(q => q.r);
+      const hi = Math.max(...rim), lo = Math.min(...rim);
       worstRound = Math.max(worstRound, hi - lo);
       leastVary = Math.min(leastVary, hi - lo);
-      // Exactly one notch: walk the ring and count the runs that dive under half
-      // the radius. A pad with two has been sampled or wrapped wrong (which is
-      // what a naive sort of a notch straddling angle zero produces); one with
-      // none has no stem.
-      let runs = 0;
-      for (let i = 0; i < rs.length; i++) {
-        const prev = rs[(i - 1 + rs.length) % rs.length];
-        if (rs[i] < 0.5 && prev >= 0.5) runs++;
+
+      // (i) exactly one stretch dives toward the centre, and it is the one the
+      // pad declared. Walk the ring in angle order; a pad with two runs has
+      // been sampled or wrapped wrong, one with none has no stem.
+      const ring = pts.slice().sort((a, b) => a.d - b.d);
+      let runs = 0, deepest = Infinity, deepestAt = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const prev = ring[(i - 1 + ring.length) % ring.length];
+        if (ring[i].r < 0.5 && prev.r >= 0.5) runs++;
+        if (ring[i].r < deepest) { deepest = ring[i].r; deepestAt = ring[i].d; }
       }
-      if (runs !== 1) bad.push(`${runs} notches`);
-      if (Math.min(...rs) > 0.4) bad.push('the notch does not reach in');
+      if (runs !== 1) bad.push(`${runs} wedges`);
+      if (Math.abs(deepestAt) > pad.notchHalf) bad.push('the dive is outside the declared wedge');
+      // (ii) the apex reaches the depth the law says it does.
+      if (Math.abs(deepest - M.pads.NOTCH_INNER) > 0.02) bad.push('the wedge does not reach its apex');
+      // (iii) the declared EDGES are at the rim, which is what pins the
+      // declared width to the width actually cut: a window declared wider than
+      // the cut would have rim inside it, and one declared narrower would have
+      // flank outside it (clause (i) catches that as a second run).
+      // The wedge's own ladder runs flank to flank, so both declared edges ARE
+      // samples — taken exactly rather than through a band, because a band as
+      // wide as the rim's step swallows the whole of a five-degree wedge and
+      // reads its apex as its edge.
+      // AND THE EMPTY CASE IS A COMPLAINT, NOT A PASS. `Math.min()` of nothing
+      // is Infinity, which clears any bar — so a declaration that named a
+      // window with no sample on its edge would satisfy this clause by having
+      // nothing in it, which is the one way a clause of this shape fails to be
+      // one at all.
+      const edges = ring.filter(q => Math.abs(Math.abs(q.d) - pad.notchHalf) < 1e-9);
+      if (edges.length < 2) bad.push('the declared wedge has no sample on its own edge');
+      else if (!(Math.min(...edges.map(q => q.r)) > 0.85)) bad.push('the declared wedge is wider than the cut');
+      // (iv) inside the ruled range.
+      const deg = pad.notchHalf * 360 / Math.PI;
+      if (deg < M.pads.NOTCH_DEG[0] - 1e-9 || deg > M.pads.NOTCH_DEG[1] + 1e-9) bad.push(`a wedge of ${deg.toFixed(1)} degrees`);
+
+      // (v) THE WEDGE IS THE BETTER RESOLVED OF THE TWO. Its sample count is
+      // derived from its own width, so a 65-degree wedge gets as many samples
+      // as it needs rather than the eight a 5-degree slit wants — a fixed
+      // count is coarser than the RIM at the wide end and draws the flanks as
+      // a staircase. Nothing above can see this: a coarse wedge still dives,
+      // still reaches its apex and still leaves the rim alone.
+      const inside = ring.filter(q => Math.abs(q.d) <= pad.notchHalf + 1e-12);
+      if (inside.length < 3) bad.push('the wedge carries fewer than three samples');
+      for (let i = 1; i < inside.length; i++) worstGap = Math.max(worstGap, inside[i].d - inside[i - 1].d);
     }
-    if (bad.length) throw new Error(`${bad.length} of ${f.pads.length} pads: ${[...new Set(bad)].join(', ')}`);
-    if (!(worstRound < 0.35)) throw new Error(`a rim varies by ${(worstRound * 100).toFixed(0)}% of its radius — that is not a pad`);
+    if (bad.length) throw new Error(`${bad.length} complaints over ${f.pads.length} pads: ${[...new Set(bad)].join(', ')}`);
+    // THE BAR IS SET FROM TWO MEASURED DISTRIBUTIONS, NOT FROM THE DATA IN
+    // HAND. Over 20 fields and 792 pads the worst rim in a field varies by
+    // 0.093-0.106 of its own radius under the ruled amplitudes and 0.203-0.234
+    // under the ones they replaced; 0.16 is between them with a third of
+    // headroom either way, and it is what carries "make the lily pads rounder"
+    // rather than leaving it as a number someone could quietly put back.
+    if (!(worstRound < 0.16)) throw new Error(`a rim varies by ${(worstRound * 100).toFixed(0)}% of its radius — that is lumpier than the ruling`);
     if (!(leastVary > 0.01)) throw new Error('a rim is a compass circle');
-    return `${f.pads.length} pads, one notch each, rims vary ${(leastVary * 100).toFixed(1)}-${(worstRound * 100).toFixed(0)}% of radius`;
+    if (!(worstGap <= rimStep / 2 + 1e-12)) throw new Error(`a wedge is sampled ${(worstGap / rimStep).toFixed(2)} of a rim step apart — coarser than half`);
+    return `${f.pads.length} pads, one wedge each, rims vary ${(leastVary * 100).toFixed(1)}-${(worstRound * 100).toFixed(1)}% of radius, `
+      + `wedges sampled within ${(worstGap / rimStep).toFixed(2)} of a rim step`;
+  });
+
+  check('the stem wedge is cut at a different angle on every pad', () => {
+    // EVA'S RULING: "the cut out a variety of angles ranging from 5 to 65".
+    // Two claims, and the one that matters is measured off the DRAWN outline
+    // rather than off the record, because a field whose pads all declare a
+    // different angle and all draw the same wedge satisfies a check that only
+    // reads the declaration.
+    //
+    // THE DRAWN ANGLE IS RECOVERED FROM WHERE THE RADII SIT. The flank is a
+    // linear ramp from NOTCH_INNER at the apex to the rim at the edge, so the
+    // stretch under half a radius is a fixed fraction of the half-width —
+    // (0.5 - NOTCH_INNER) / (1 - NOTCH_INNER) of it, either side. Read that
+    // stretch's angular extent off the outline and it hands back the wedge the
+    // pad was actually cut with, whatever the pad says about itself.
+    const f = padField(4242);
+    const frac = (0.5 - M.pads.NOTCH_INNER) / (1 - M.pads.NOTCH_INNER);
+    const drawn = [], said = [];
+    const bad = [];
+    for (const pad of f.pads) {
+      const dives = pad.outline
+        .map(p => ({ d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt), r: Math.hypot(p.x, p.y) / pad.R }))
+        .filter(q => q.r < 0.5).map(q => q.d);
+      const extent = Math.max(...dives) - Math.min(...dives);
+      // The samples are a finite ladder, so the run's two ends each fall short
+      // of the true crossing by up to one step; add a step back rather than
+      // widening the tolerance, which would hide a real disagreement. The step
+      // is read off the dive's own samples, so nothing here consults the
+      // wedge's declared width.
+      const step = dives.length > 1 ? extent / (dives.length - 1) : 0;
+      const deg = ((extent + step) / (2 * frac)) * 360 / Math.PI;
+      drawn.push(deg);
+      said.push(pad.notchDeg);
+      if (Math.abs(deg - pad.notchDeg) > 0.25 * pad.notchDeg + 1.5) {
+        bad.push(`a pad says ${pad.notchDeg.toFixed(1)} and draws ${deg.toFixed(1)} degrees`);
+      }
+    }
+    if (bad.length) throw new Error(`${bad.length} of ${f.pads.length} pads: ${[...new Set(bad)].slice(0, 3).join(', ')}`);
+    const loD = Math.min(...drawn), hiD = Math.max(...drawn);
+    // The range is 5 to 65 and the draw is uniform, so a field of this size
+    // reaches within a couple of degrees of each end; the bars are loose enough
+    // that an unlucky field is not a failure and tight enough that a narrowed
+    // range is. A FIELD THAT DRAWS ONE WIDTH FAILS BOTH.
+    if (!(loD < 15)) throw new Error(`the narrowest wedge drawn is ${loD.toFixed(1)} degrees — the range starts at ${M.pads.NOTCH_DEG[0]}`);
+    if (!(hiD > 50)) throw new Error(`the widest wedge drawn is ${hiD.toFixed(1)} degrees — the range ends at ${M.pads.NOTCH_DEG[1]}`);
+    if (!(new Set(said.map(v => v.toFixed(3))).size === said.length)) throw new Error('two pads were cut at exactly the same angle');
+    return `${f.pads.length} pads, drawn wedges ${loD.toFixed(1)}-${hiD.toFixed(1)} degrees `
+      + `(declared ${Math.min(...said).toFixed(1)}-${Math.max(...said).toFixed(1)}, range ${M.pads.NOTCH_DEG[0]}-${M.pads.NOTCH_DEG[1]})`;
   });
 
   check('a pad answers any ripple the same way', () => {
@@ -2606,16 +2724,46 @@ async function partTwo(browser, mutant, shotsDir) {
         // sits.
         const st2 = await page.evaluate(() => window.__scene.sceneState());
         const inFrame = st2.padAt
-          .map(([x, y, R], i) => ({ i, x, y, R, sx: x, sy: y * st2.squash }))
+          .map(([x, y, R, , , notchAt], i) => ({ i, x, y, R, notchAt, sx: x, sy: y * st2.squash }))
           .filter(p => p.R > 24
             && p.sx - p.R > 6 && p.sx + p.R < st2.width - 6
             && p.sy - p.R * st2.squash > 6 && p.sy + p.R * st2.squash < st2.height - 6)
           .sort((a2, b2) => b2.R - a2.R)
           .slice(0, 5);
         if (inFrame.length < 3) throw new Error(`only ${inFrame.length} pads are fully in frame`);
-        // ONE RADIUS FOR EVERY DISC, the smallest chosen pad's, so the pads and
-        // the control are the same area and their variances are comparable.
-        const rx = Math.min(...inFrame.map(p => p.R)) * 0.9, ry = rx * st2.squash;
+        // THE DISC SITS ON THE PAD'S OWN MATERIAL, WHICH IS NOT THE SAME AS ON
+        // THE PAD'S CENTRE — and the difference only started to matter when the
+        // stem wedge became a per-pad draw reaching 65 degrees. A disc centred
+        // on the pad and 0.9 of its radius across then takes in a sector of the
+        // wedge, which is OPEN WATER: the check's own subject quietly grew to
+        // include the thing it is comparing against. Measured on the tree that
+        // introduced the range, before this fix: the pads' median variation went
+        // 0.044-0.067 (one fixed 5.7-degree slit) to 0.193, with the worst pad
+        // at 0.234 against a bar of 0.35 — still green, and no longer measuring
+        // only what it names.
+        //
+        // So the disc is offset along the axis AWAY from the wedge, and it is
+        // the largest one that fits there. The wedge's two flanks are rays from
+        // the pad's own centre, so a disc on the opposite axis is clear of both
+        // exactly when it does not reach the centre — its radius must not
+        // exceed its offset — and it is inside the rim when the two together do
+        // not. 0.42 and 0.40 satisfies both AT EVERY ANGLE THE RULING ALLOWS
+        // rather than on this field's luck, with 0.02 R of clearance from the
+        // apex and 0.12 R from the nearest rim a tenth of variation can produce.
+        // The static marks it crosses — the midrib, a fold — cost a VARIANCE
+        // nothing, because they do not move between frames.
+        //
+        // IT IS A FIFTH OF THE AREA THE OLD CENTRED DISC HAD, and that is the
+        // honest cost of a cut that reaches the centre rather than a choice: a
+        // smaller disc averages fewer pixels, so rain and the pad's own rock
+        // move its mean further. Both sides are sampled at this radius, so the
+        // comparison stays fair; what it spends is margin, measured below.
+        const OFF = 0.42, DISC = 0.40;
+        const rx = Math.min(...inFrame.map(p => p.R)) * DISC, ry = rx * st2.squash;
+        for (const p of inFrame) {
+          p.sx = p.x - Math.cos(p.notchAt) * OFF * p.R;
+          p.sy = (p.y - Math.sin(p.notchAt) * OFF * p.R) * st2.squash;
+        }
 
         // The control is a disc of the SAME size on open water, which the brief
         // guarantees exists — loose clusters with gaps between them — placed at
