@@ -263,12 +263,19 @@ const MUTANTS = [
     why: 'the two lags split apart, which aims the koi off its own travel',
   },
   {
-    id: 'the-spine-is-pinned-at-the-nose',
+    // REPLACES `the-spine-is-pinned-at-the-nose`, whose anchor went with the
+    // curvature-bias drawing law it was written against. Same question — where
+    // is the drawing pinned to the chain — asked of the law that is there now.
+    // Forcing the station index to 0 makes every drawn point extrapolate along
+    // the FIRST segment, so the koi becomes a rigid straight fish hung off its
+    // head joint: it still translates with the chain and its nose is still at
+    // the head joint, and it stops bending at all.
+    id: 'the-drawing-hangs-off-one-joint',
     file: 'scene/koi-draw.js',
-    from: 'const BEND_ANCHOR_U = 0.20;',
-    to: 'const BEND_ANCHOR_U = 0;',
-    breaks: ['fish/the-bend-moves-the-head-too'],
-    why: 'the head as the one part of the animal that never participates',
+    from: '      let i = Math.floor(t);\n',
+    to: '      let i = 0;\n',
+    breaks: ['fish/the-drawn-koi-rides-the-chain-it-is-given'],
+    why: 'the drawing must be local to the chain, not a rigid body hung off one joint',
   },
   {
     id: 'a-departure-never-leaves',
@@ -1228,16 +1235,28 @@ async function partOne(mutant) {
          + `points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
   });
 
-  check('the bend moves the head too', () => {
-    // THE WITNESS FOR THE ANCHOR, and nothing else here can see it: where the
-    // spine is pinned is a drawing decision, so this drives the SHIPPED
-    // renderer through a recording context rather than restating the bend law.
+  check('the drawn koi rides the chain it is given', () => {
+    // WHERE THE DRAWING IS PINNED TO THE CHAIN, and nothing else here can see
+    // it: that is a rendering decision, so this drives the SHIPPED renderer
+    // through a recording context rather than restating the law.
     //
-    // Swing the turn bias from one saturated end to the other with everything
-    // else held. Pinned at the nose, station 0 IS the nominal nose and cannot
-    // move at all; pinned a fifth of the way back, the head takes its own
-    // share. The vertex is identified by INDEX in the first draw and read at
-    // the same index in the second, so the two are the same anatomical point.
+    // WHAT THIS REPLACED, AND WHY IT COULD NOT BE REPAIRED. It was
+    // `the bend moves the head too`, which swung `f.bend` from one saturated
+    // end to the other and asked how much of the excursion the head took. The
+    // chain rewrite deleted the mechanism underneath it: `drawFish` reads
+    // f.len, f.spine, f.seg, f.speed, f.phase, f.finPhase and f.patches, and
+    // `f.bend` is not among them — the body bends because it is physically
+    // behind the head, not because a curvature bias is applied to it. The check
+    // did not go quietly red on a stale claim, it THREW on a fixture with no
+    // `spine`, and its mutant's anchor had gone from the file at the same time.
+    // The two shielded each other: a dirty base pass stops the sweep before the
+    // anchor guard runs, so nothing reported the disarmed mutant either.
+    //
+    // THE CLAIM THAT SURVIVED THE REWRITE is the one worth keeping, and it is
+    // now three: the drawing is a function of the CHAIN (translate the chain and
+    // every vertex translates with it, exactly), it is LOCAL to the chain (bend
+    // the tail joints and the head end does not move), and its head end is at
+    // the chain's own head joint rather than somewhere along it.
     const surf = M.surface.createSurface();
     let pts = [];
     const noop = () => {};
@@ -1251,28 +1270,65 @@ async function partOne(mutant) {
     }, { get: (t, k) => (k in t ? t[k] : noop), set: () => true });
     const rend = M.draw.createRenderer(rec, surf);
     const L = 96, X = 400, Y = 300;
-    const grab = (bend) => {
+    const N = M.fish.SPINE_JOINTS;
+    const seg = M.fish.CHAIN_SPAN_U * L / (N - 1);
+    // Straight, nose at (X, Y), running back along -x: the chain koi-fish.js
+    // lays down behind a head pointing at +x.
+    const chain = (edit) => {
+      const sp = [];
+      for (let i = 0; i < N; i++) sp.push({ x: X - seg * i, y: Y });
+      if (edit) edit(sp);
+      return sp;
+    };
+    const grab = (spine) => {
       pts = [];
-      rend.drawFish({ id: 1, x: X, y: Y, heading: 0, drawX: X, drawY: Y, drawHeading: 0,
-        len: L, speed: 40, phase: 0.8, finPhase: 0.7, omega: bend, bend,
+      rend.drawFish({ id: 1, len: L, seg, spine, speed: 40, phase: 0.8, finPhase: 0.7,
         patches: [{ s: 0.26, t: -0.10, rx: 0.08, ry: 0.6, rot: 0.2 }] });
       return pts.slice();
     };
-    const a = grab(-6), b = grab(6);          // both ends of the saturated bias
-    if (a.length !== b.length || a.length < 200) throw new Error(`the two draws do not correspond (${a.length} vs ${b.length})`);
-    let iNose = -1, best = Infinity, tail = 0;
-    for (let k = 0; k < a.length; k += 2) {
-      const r = Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y);
-      if (r < best) { best = r; iNose = k; }
-      if (r > 0.95 * L) tail = Math.max(tail, Math.hypot(a[k] - b[k], a[k + 1] - b[k + 1]));
+
+    const a = grab(chain());
+    const D = 30;
+    const moved = grab(chain(sp => sp.forEach(j => { j.y += D; })));
+    const bent = grab(chain(sp => { for (let i = 8; i < N; i++) sp[i].y += D; }));
+    if (a.length < 200) throw new Error(`only ${a.length / 2} vertices were emitted`);
+    if (moved.length !== a.length || bent.length !== a.length) {
+      throw new Error(`the three draws do not correspond (${a.length}/${moved.length}/${bent.length})`);
     }
-    const nose = Math.hypot(a[iNose] - b[iNose], a[iNose + 1] - b[iNose + 1]);
-    if (!(tail > 5)) throw new Error(`the bias barely moved the tail (${tail.toFixed(2)} px) — nothing to compare against`);
-    // Measured: 2.50 px and a 7.8% share pinned a fifth back, against 0.06 px
-    // and 0.1% pinned at the nose.
-    if (!(nose > 0.5)) throw new Error(`the head does not move with the bend (${nose.toFixed(3)} px)`);
-    if (!(nose / tail > 0.02)) throw new Error(`the head takes only ${(nose / tail * 100).toFixed(1)}% of the tail's excursion`);
-    return `head ${nose.toFixed(2)} px against the tail's ${tail.toFixed(1)}, a ${(nose / tail * 100).toFixed(1)}% share`;
+
+    // (i) Translating the CHAIN translates the drawing, exactly. In screen space
+    // that is dy = D * squash and dx = 0, at every vertex — the drawing is a
+    // function of the chain and of no other position.
+    let worst = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      worst = Math.max(worst, Math.abs(moved[k] - a[k]),
+                              Math.abs((moved[k + 1] - a[k + 1]) - D * surf.squash));
+    }
+    if (!(worst < 1e-9)) throw new Error(`a translated chain moved a vertex by ${worst} off the translation`);
+
+    // (ii) LOCAL, not rigid: bending only the back half moves the tail a long
+    // way and leaves the head end exactly where it was. A koi hung off one joint
+    // passes (i) and (iii) and fails this.
+    let headMoved = 0, tailMoved = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      const d = Math.hypot(a[k] - bent[k], a[k + 1] - bent[k + 1]);
+      // The head end, in the fish's own frame: within a third of a body length
+      // forward of the nose joint, which is the head and the shoulders.
+      if (a[k] > X - L * 0.33) headMoved = Math.max(headMoved, d);
+      else tailMoved = Math.max(tailMoved, d);
+    }
+    if (!(tailMoved > 8)) throw new Error(`bending the back half barely moved the tail (${tailMoved.toFixed(2)} px)`);
+    if (!(headMoved < 1e-9)) throw new Error(`bending the back half moved the head by ${headMoved.toFixed(3)} px`);
+
+    // (iii) The head end is AT the chain's head joint. The nose domes forward of
+    // it and the flanks stand off it, so this is a body width rather than zero —
+    // what it refuses is a drawing whose nose sits a joint or more back.
+    let nearest = Infinity;
+    for (let k = 0; k < a.length; k += 2) {
+      nearest = Math.min(nearest, Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y));
+    }
+    if (!(nearest < L * 0.14)) throw new Error(`the nearest drawn vertex is ${nearest.toFixed(1)} px from the chain's head joint`);
+    return `translation exact to ${worst.toExponential(1)}, tail ${tailMoved.toFixed(1)} px against a head of 0, nose ${nearest.toFixed(1)} px off the joint`;
   });
 
   check('any ripple gets the same reaction', () => {
