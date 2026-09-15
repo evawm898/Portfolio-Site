@@ -2609,6 +2609,56 @@ block 33 takes the live matrix to 758 and the smoke census from 28 to 29 blocks.
 derived 1.2 mm petiole, **L/d = 100**, printed on every leafed build and joining the
 stamens' and style's line verbatim — `UNMEASURED — no coupon has been printed`.
 
+**AND ST9 IS THE FOURTH THING THE LEAVES BROKE, IN ANOTHER FAMILY'S CLAUSE — THE PETIOLES
+ARE EXCUSED AND THE BLADES ARE NOT** (read §"And CI named a FOURTH" of
+`docs/bloom-leaves-outcome.md` before touching `stemChannelAssertions` or `petioleAxis`).
+`bloom-connectedness` went RED in CI with **0 rows not one piece**: the flood fill was clean
+on all 756 rows that reached the results, every leaf row read `components=1 stray=0`, and ONE
+row was DROPPED by a validity assertion — `LEAVES: x a SPHERE with a stem`, on **ST9: 198
+exported vertices inside the free stem's 1 mm printable gap, nearest 0.0000 mm**. Two
+assertions, one root: ST9 fired and #220's row census reported the drop, which is the only
+reason it was diagnosable from the summary rather than from a hunt.
+**A LEAF IS THE THIRD PART EVER TO LIVE BELOW THE HUB AND IT IS THERE BY DESIGN** — the
+petiole is rooted THROUGH the wall, ST9's distance is to the SOLID cylinder, so every embedded
+vertex reads exactly 0; the nearest is at radius **1.652 mm = `rootR − petioleR` to the bit**.
+**Attributed by part: 198 of 198 are a petiole's own and 0 are anything else**, so the channel
+was clear of petals on the row it dropped — and a clearance criterion means nothing between two
+solids that are FUSED, which is what ST9's own scope already says about the root band and what
+this project measured on a flat head (all 8 feet at 0.000 mm). It is the R1 lesson in a clause
+nobody thought to check: both coverage instruments were taught the leaves, **ST9 was not,
+because nobody looks for a clause in another family that reasons about a region.**
+**THE FIX NAMES THE PETIOLE AND DOES NOT WIDEN THE REGION** — the fifth durable rule, because
+a region wide enough to hold a petiole is wide enough to hold a petal. It is the rod's own axis
+SEGMENT, one petiole radius wide, read from `petioleAxis` — **the two rings' own centroids the
+BUILDER emitted**, beside `emittedRootR` and for its reason (re-deriving from `leafPlan`'s
+`rootR` and `angleDeg` is a second producer; session 43's ST2). Its owner is the LEAF builder,
+not the quantity under test, so ST9 still reads none of the channel's report. Three
+measurements: the row is **silent** (198 excused, 0 intruders); **with the rods emptied ST9
+reports 198 again** (1584 on a 24-leaf whorl), so the exemption is what moved the answer; and
+a synthetic vertex 0.4 mm outside the wall at an azimuth no rod occupies **still FIRES**. Every
+sphere-stem row that shipped before is silent, unchanged.
+**AND THE BLADE IS A REAL PRINTABILITY FINDING THAT IS NOT THE CHANNEL'S.** ST9's `other`
+count — neither stem, hub, nor petiole — is **0 on all 35 swept states**, so the omission mask
+is clear everywhere on that grid. What appears above 60° is the BLADE, measured as a pure
+geometric quantity with no ST9 in it (nearest approach of any blade vertex to the free stem's
+solid): **1.853 / 4.356 / 5.492 / 4.910 / 4.019 / 2.804 / 1.853 / 0.824 / 0.289 / 0.000 mm at
+`leafAngle` −60 / −30 / 0 / 20 / 35 / 50 / 60 / 70 / 75 / 80–90** — **identical on a CAP and a
+SPHERE to four decimals and identical in LIVE and EXPORT**, so it is the leaf against the stem
+and has nothing to do with spheres or the channel. **From 70° up it is under
+`MIN_FEATURE_MM`**, the top fifth of a −60…90 range; **Eva's ruled 35° reads 4.019 mm, four
+times the gap.** REPORTED, NOT GATED — §18a's `cup × petalTipShape` treatment, and the matrix
+varies one control at a time so it is invisible to it by construction. The one thing done is
+that **ST9's message now says what it cannot tell apart**, so "the channel is not clear" does
+not send a reader looking for a petal that is not there.
+**AND THE SUBSET WAS BLIND TO IT: `bloom-smoke --conn` was CLEAN LOCALLY on all seven of its
+leaf rows.** It covered phyllotaxy, the bore, the angle, the inset, the serration and both
+guards — every axis the feature has — and NOT the one axis that reaches another family's
+clause, because block 33's anchor is the `alternate` row on a CAP head where ST9 returns before
+claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 families).
+**A SUBSET EARNS ITS KEEP BY COVERING THE AXES A FEATURE HAS — INCLUDING THE AXIS THAT IS
+ANOTHER FAMILY'S REGION.** Session's own X2 defect was caught by a subset row that was there
+for a DIFFERENT reason; this one was missed because no row was there for this reason at all.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL

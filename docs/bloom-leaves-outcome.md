@@ -245,6 +245,142 @@ failures somebody predicted.
 > never a defect inside a builder, which is the declared blindness in both
 > headers and is unchanged.
 
+## And CI named a FOURTH, in another family's clause — ST9
+
+`bloom-connectedness` went **RED in CI** on `cca9464` with **0 rows not one
+piece**: the flood fill was clean on all 756 rows that reached the results,
+every one of the twelve leaf rows read `components=1 stray=0`, and what failed
+was **one row DROPPED by a validity assertion**.
+
+```
+connectedness: HARNESS INVALID — 2 validity assertion(s) failed. No result above is trustworthy.
+  - LEAVES: x a SPHERE with a stem (the channel and the leaves on one head): ST9: 198
+    exported vertex/vertices stand inside the 1 mm printable gap of the free stem and
+    are not the stem's own — nearest 0.0000 mm at [1.547,0.58,-34.964]. The channel is
+    not clear in the file that will be printed.
+  - row census: 758 rows attempted but 756 reached the results — dropped: LEAVES: x a
+    SPHERE with a stem (the channel and the leaves on one head)
+```
+
+**Two assertions, ONE root**: ST9 fired, which drops the row, and #220's row
+census then reported the drop. That census is the reason this was diagnosable
+from the summary line rather than from a hunt — it names the dropped row and
+the clause that dropped it, and the verdict says *"Nothing above is a pass"*
+where the old headline would have divided by the survivors and read 756/756.
+
+### It is the R1 lesson in a clause nobody thought to check
+
+ST9 is the sphere-stem session's: it reads the EXPORTED STL and asks whether
+anything stands inside the free stem's printable gap that is not the stem's
+own. Its purpose is to doubt the **petal-omission mask** — to catch a petal the
+mask failed to remove — and it reads none of the channel's own report, which is
+what makes it worth having beside ST7.
+
+**A leaf is the third part ever to live in that region, and it is there by
+design.** The petiole is rooted THROUGH the stem's wall, so it stands *inside*
+the free stem's outer cylinder; ST9's distance is to the solid cylinder, so
+every embedded vertex reads **exactly 0**. The nearest one is at
+`[1.547, 0.58, −34.964]`, i.e. radius **1.652 mm** — which is
+`rootR − petioleR = 2.25 − 0.60` to the bit: the petiole's inner skin at the
+wall's mid-thickness, exactly where the geometry puts it.
+
+This is the same class the leaf work had already hit once and fixed: *"a NEW
+part that emits and is absent here makes R1 fire at once."* Both coverage
+instruments were taught the leaves; **ST9 was not, because nobody looks for a
+clause in another family that reasons about a region.** The two parts that
+already lived below the hub are *both* already declared exempt from it — the
+stem's own vertices, which stand at `outerR` or `boreR` exactly, and the hub's
+own outer surface — so the exemption is a pattern the clause already had, not a
+new kind of concession.
+
+**Attributed by part, and the attribution is what settles it:** of the 198,
+**198 are a petiole's own and 0 are anything else.** So the channel was clear
+of petals on the row ST9 dropped, and a clearance criterion means nothing
+between two solids that are *fused* — which is what ST9's own scope sentence
+already says about the root band inside the hub, and what this project measured
+on a flat head, where all eight feet read 0.000 mm from the free stem because a
+foot's bottom skin is coplanar with the hub's underside.
+
+### The fix names the PETIOLE and does not widen the REGION
+
+That distinction is the fifth durable rule doing its work. **A region wide
+enough to hold a petiole is wide enough to hold a petal**, so a clause that
+excused the stem's whole interior could not fail on a petal driven straight
+through it — green forever, in scope, and empty. What ships instead is the
+rod's own axis SEGMENT, one petiole radius wide:
+
+* **The axis is the one the BUILDER emitted** — the two petiole rings' own
+  centroids, reported as `petioleAxis` beside `emittedRootR` and for its
+  reason. Re-deriving it here from `leafPlan`'s `rootR` and `angleDeg` would be
+  a second producer of it, and a rod emitted somewhere other than where the
+  plan says is session 43's ST2 measured firing nothing.
+* **Its owner is the LEAF builder, which is not the quantity under test.** ST9
+  is about the stem channel and still reads none of its report, so the fourth
+  durable rule is satisfied: the reference and the measured side have different
+  owners.
+* **The slack is the file's own float32 quantisation** (the same `TOL` the radii
+  use), because the rod's vertices stand at *exactly* `radiusMm` from that axis.
+* **A row with no leaves has no rods** and every expression is the pre-leaf one
+  verbatim — measured silent on every sphere-stem row that shipped before this
+  session.
+
+Three measurements, and the second is the one that makes it a fix rather than a
+carve:
+
+| | |
+|---|---|
+| **the dropped row** | ST9 **silent**; 198 excused, **0 intruders** |
+| **the exemption is LOAD-BEARING** | with the rods emptied ST9 reports **198** again on that row, **1584** on a 24-leaf whorl — so the exemption is what moved the answer and nothing else did |
+| **it cannot swallow a petal** | one synthetic vertex 0.4 mm outside the wall, mid-free-stem, at an azimuth no rod occupies → ST9 **FIRES**, `nearest 0.4000 mm`, on every row tried |
+
+### And the sweep found a real printability finding that is NOT the channel's
+
+Swept over head shape × leaf angle × stem diameter, ST9's `other` count — a
+vertex that is neither the stem's, the hub's, nor a petiole's — is **0 on all
+35 states**, so the omission mask is clear everywhere on that grid. What *does*
+appear above 60° is the leaf's **BLADE**, which is not excused and should not
+be. Measured as a pure geometric quantity with no ST9 in it — the nearest
+approach of any blade vertex to the free stem's solid:
+
+| `leafAngle` | −60 | −30 | 0 | 20 | **35** | 50 | 60 | **70** | 75 | 80–90 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| nearest approach, mm | 1.853 | 4.356 | 5.492 | 4.910 | **4.019** | 2.804 | 1.853 | **0.824** | 0.289 | 0.000 |
+
+**Identical on a CAP and on a SPHERE to four decimals, and identical in LIVE
+and EXPORT** — so it is a property of the leaf against the stem and has nothing
+to do with spheres or with the channel; ST9 merely happens to be the only thing
+that looks there. **From `leafAngle` 70° up the blade approaches the stem below
+`MIN_FEATURE_MM`**, the top fifth of a −60…90 range. **Eva's ruled 35° reads
+4.019 mm — four times the printable gap** — and the drooping end is clear at
+1.853.
+
+**Reported, not solved, and not gated**, which is the treatment this project
+gives §18a's `cup × petalTipShape` (1.031 → 0.832 mm) and session 34's
+composition finding: two controls both pushed, no closed form in either alone,
+neither control alone doing it, and **the matrix varies one control at a time
+so it is invisible to it by construction.** Narrowing `leafAngle` would remove
+states nothing has ruled against, on the strength of a threshold that is itself
+a declared guess (§18b — nothing in this project has ever been printed). The
+one thing done about it is that **ST9's message now says what it cannot tell
+apart**: where a build has leaves it names that only their petioles are
+excused, so *"the channel is not clear"* does not send a reader looking for a
+petal that is not there.
+
+### The subset was blind to it, and that is the lesson worth keeping
+
+`bloom-smoke --conn` was **clean locally on all seven of its leaf rows** before
+this reached CI. The subset covered phyllotaxy, the bore, the angle, the inset,
+the serration and both guards — every axis the feature has — and **not the one
+axis that reaches another family's clause.** Block 33's anchor is the
+`alternate` row on a CAP head, where ST9 returns before claiming anything.
+
+So `LEAVES: x a SPHERE with a stem` is **in the subset now** (85 rows, 29
+blocks, 90 families all claimed both directions). The X2 defect earlier in this
+session was caught by a subset row that was there *for a different reason*; this
+one was missed because no row was there for this reason at all. **A subset earns
+its keep by covering the axes a feature HAS — including the axis that is another
+family's region.**
+
 ## The partition, the phase and the block
 
 * **Matrix block 33, twelve rows.** Measured against main: **746 → 758, +12,
