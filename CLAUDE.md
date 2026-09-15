@@ -6119,13 +6119,25 @@ inside against 2.158 on an equal patch of open water**, and the control is a pat
 OPEN WATER rather than a ring around the pad's own rim, because the brief guarantees
 open water exists and a ring does not (the first cut demanded 1.9 radii of clearance
 and simply **failed to run** the day the field was reseeded and no pad had it).
-**AND IT WATCHES FIVE PADS, NOT ONE, WHICH IS THE DIFFERENCE BETWEEN A CHECK THAT FIRES
-AND ONE THAT MIGHT.** Watching a single pad, whether any ring crosses ITS patch during
+**AND IT IS A MEDIAN OVER FIVE PADS AGAINST A MEDIAN OVER FIVE PATCHES OF OPEN WATER,
+WHICH TOOK THREE FLAKES AND A MISS TO ARRIVE AT.** The noise source is RAIN, which is
+drawn in FRONT of a pad and is supposed to be: one streak crossing a disc of this size
+moves its mean by about a level, the same order as the whole signal open water carries.
+On a CLEAN tree that shows as a factor of EIGHT between the quietest and the noisiest of
+five equally-correct pads (0.026 against 0.199) — so a WORST-of-five reads the weather,
+and it went red three times on mutations that provably could not reach it, the last
+being a storm ramp that is inert until the first click, which this check runs before.
+A SINGLE control patch is exactly as luck-dependent on the other side: measured across
+two runs of an unchanged tree it read **3.041 and then 0.751**, a factor of four. Both
+sides are medians over five now — measured 1.828 and 2.291 for the water across runs,
+against pad medians of 0.067 and 0.044, ten to fifty times under the bar.
+**AND WATCHING FIVE PADS IS ALSO WHAT MAKES IT FIRE AT ALL.** Watching a single pad, whether any ring crosses ITS patch during
 the window is luck — the sweep caught that as a **MISSED**, the one failure direction
 that matters: the mutation which deletes the reset entirely left the check GREEN on a
 run where its one pad sat over quiet water, having reddened it on an earlier run. With
-the reset gone EVERY pad shows the water through it, so the WORST ratio over five makes
-the mutation unmissable and costs the clean tree nothing. **EVERY DISC IS THE SAME SIZE**
+the reset gone EVERY pad shows the water through it, so the MIDDLE one rises with the
+rest while a couple of unlucky drops move one or two and leave it alone. **EVERY DISC IS
+THE SAME SIZE**
 — variance scales with area, so a single ring moves a small disc's mean far more than a
 large one's and discs of different radii cannot be compared at all.
 

@@ -2636,14 +2636,27 @@ async function partTwo(browser, mutant, shotsDir) {
         }
         if (!open.length) throw new Error('no patch of open water the size of a pad to compare against');
         open.sort((a2, b2) => a2.d - b2.d);
-        const spot = open[0];
+        // FIVE CONTROL PATCHES, NOT ONE, FOR THE SAME REASON THERE ARE FIVE PADS
+        // — and the first cut of this fix used five pads against ONE patch,
+        // which left the comparison exactly as luck-dependent on the other side:
+        // measured across two runs of an unchanged tree, a single patch's
+        // variation read 3.041 and then 0.751, a factor of four, purely from how
+        // many rings happened to cross it. Both sides are medians over five now,
+        // so neither is one draw.
+        const spots = [];
+        for (const c of open) {
+          if (spots.every(o => Math.hypot(o.x - c.x, o.y - c.y) > rx * 2.2)) spots.push(c);
+          if (spots.length === 5) break;
+        }
+        if (spots.length < 3) throw new Error(`only ${spots.length} separate patches of open water to compare against`);
 
-        const discs = [...inFrame.map(p => [p.sx, p.sy]), [spot.x, spot.y * st2.squash]];
+        const discs = [...inFrame.map(p => [p.sx, p.sy]),
+                       ...spots.map(c => [c.x, c.y * st2.squash])];
         const series = discs.map(() => []);
         // ON THE POND'S CLOCK: what this needs is rings that have MOVED between
         // samples, and how much pond a wall-clock wait covers depends on how
         // fast the machine is.
-        for (let t = 0; t < 28; t++) {
+        for (let t = 0; t < 34; t++) {
           const means = await page.evaluate(`(${DISC_MEANS})(${JSON.stringify(discs)}, ${rx}, ${ry})`);
           if (means && means.every(m => m !== null)) means.forEach((m, k) => series[k].push(m));
           await waitSceneSeconds(page, 0.10);
@@ -2654,22 +2667,41 @@ async function partTwo(browser, mutant, shotsDir) {
           const m = xs.reduce((p2, q) => p2 + q, 0) / xs.length;
           return Math.sqrt(xs.reduce((p2, q) => p2 + (q - m) * (q - m), 0) / xs.length);
         };
+        const mid = (xs) => xs.slice().sort((a2, b2) => a2 - b2)[Math.floor(xs.length / 2)];
         const padSds = series.slice(0, inFrame.length).map(sd);
-        const waterSd = sd(series[inFrame.length]);
-        const worst = Math.max(...padSds);
+        const waterSds = series.slice(inFrame.length).map(sd);
+        const waterSd = mid(waterSds);
+        // THE MEDIAN OF THE FIVE, NOT THE WORST, AND RAIN IS WHY. A streak is in
+        // the AIR and is drawn in FRONT of a pad — correct behaviour, not a leak
+        // — and one crossing a disc of this size moves its mean by about a
+        // level, the same order as the whole signal the open water carries. That
+        // is visible on a CLEAN tree as the spread between the quietest and the
+        // noisiest of five equally-correct pads: 0.026 against 0.199, a factor
+        // of eight, entirely from where the drops happened to fall. Taking the
+        // WORST therefore reads the weather, and it went red three times on
+        // mutations that provably could not reach it — the last being a storm
+        // ramp that is inert until the first click, which this check runs before.
+        //
+        // The median is the statistic the CLAIM wants: a missing reset shows the
+        // water through EVERY pad, so the middle one rises with the rest, while
+        // a couple of unlucky drops move one or two and leave the middle alone.
+        const median = mid(padSds);
         // NOT VACUOUS: the open water has to be visibly doing something, or a
         // pad that hid nothing would pass beside water that showed nothing.
         if (!(waterSd > 0.35)) {
-          throw new Error(`an equal patch of open water varies by only ${waterSd.toFixed(3)} levels `
-            + `across ${frames} frames — nothing was sweeping it, so there is nothing to hide`);
+          throw new Error(`the median of ${waterSds.length} equal patches of open water varies by only `
+            + `${waterSd.toFixed(3)} levels across ${frames} frames — nothing was sweeping them, `
+            + `so there is nothing to hide (all: ${waterSds.map(v => v.toFixed(3)).join(', ')})`);
         }
-        if (!(worst < waterSd * 0.35)) {
-          const k = padSds.indexOf(worst);
-          throw new Error(`pad ${k} of ${inFrame.length} varies by ${worst.toFixed(3)} levels against the `
-            + `open water's ${waterSd.toFixed(3)} — things on the water are sweeping through it`);
+        if (!(median < waterSd * 0.35)) {
+          throw new Error(`the median of ${inFrame.length} pads varies by ${median.toFixed(3)} levels against `
+            + `the open water's ${waterSd.toFixed(3)} — things on the water are sweeping through them `
+            + `(all of them: ${padSds.map(v => v.toFixed(3)).join(', ')})`);
         }
-        return `${inFrame.length} pads vary ${Math.min(...padSds).toFixed(3)}-${worst.toFixed(3)} levels `
-          + `against open water's ${waterSd.toFixed(3)} over ${frames} frames, discs r=${rx.toFixed(0)}`;
+        return `${inFrame.length} pads vary ${Math.min(...padSds).toFixed(3)}-${Math.max(...padSds).toFixed(3)} `
+          + `levels, median ${median.toFixed(3)}; ${waterSds.length} open-water patches `
+          + `${Math.min(...waterSds).toFixed(3)}-${Math.max(...waterSds).toFixed(3)}, median `
+          + `${waterSd.toFixed(3)}; over ${frames} frames, discs r=${rx.toFixed(0)}`;
       });
 
       await checkAsync('the traits are per fish and span the sliders', async () => {
