@@ -363,6 +363,10 @@ const MUTANTS = [
               // vacuity guard. That breadth is the mutation being severe, not
               // the checks being fragile.
               'fish/any-ripple-gets-the-same-reaction',
+              // And the pad check that compares the wired scene's koi against a
+              // school built from the seed ALONE: with nothing seeded there is
+              // nothing to compare, so it refuses rather than passing vacuously.
+              'pads/wiring-in-the-pads-did-not-move-the-koi',
               'fish/some-koi-swim-to-a-ripple-and-some-flee-it',
               'fish/every-trait-is-a-slider-in-nought-to-one',
               'fish/koi-vary-mildly-in-size-around-an-inch',
