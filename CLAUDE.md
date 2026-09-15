@@ -6086,14 +6086,323 @@ CSS coordinates, not something a hardware notch does — so the gate scales what
 sends and asserts what the page actually RECEIVED before concluding anything
 about the wind.
 
-**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
+**LILY PADS FLOAT ON THE WATER, AND THEY ARE THE FIRST THING IN THIS SCENE THAT
+OCCLUDES ANYTHING** (`scene/koi-pads.js`, and `drawPad`/`drawBloom`/`drawPads` in
+koi-draw.js — read that module's header before touching any of it). Loose clusters
+of pads with open water between them, two or three blooms rising among them, a pad
+rocking as a ripple's front passes under it, and koi swimming beneath them.
+
+**THE WATER IS A HEIGHT FIELD AND A FLOATING DISC READS IT TWICE — ONE LAW, NOT
+TWO MECHANISMS.** A leaf on water sits AT THE WATER'S HEIGHT and lies ALONG ITS
+LOCAL TANGENT PLANE, so `waveAt(ripples, x, y)` returns `{ h, gx, gy }` and the pad
+takes its BOB from the height and its ROCK from the gradient. Nothing in it knows a
+ripple is a ring: it asks the water where it is and which way it is leaning.
+**A PAD CANNOT TELL A CLICK FROM A RAINDROP, structurally** — `waveAt` reads x, y,
+r, age, life and strength and nothing else, which is the whole of `RIPPLE_FIELDS`,
+so there is no `source` to branch on. The same claim the fish carry, one module
+along, and the gate proves it the same way: two ponds whose ripples agree on every
+quantity a disturbance HAS and differ only in `rings` come out identical to the bit.
+
+**`surface.lift` IS DERIVED FROM THE SQUASH AND IS WHAT MAKES A ROCK SIGNED.** The
+view is an oblique orthographic with `sin(elevation) = squash`, so one plane unit of
+HEIGHT draws `sqrt(1 - squash^2) = 0.80` screen px UPWARD; `syAt(py, 0)` is exactly
+`sy(py)`, so nothing that floats is drawn by a second camera. **A FORESHORTENING
+ALONE CANNOT READ AS A ROCK** — a disc tilted by theta draws `cos(theta)` narrower
+along the tilt, and cos is EVEN, so a pure squash looks the same tilted either way
+and reads as a PULSE at twice the wave's frequency. The height term beside it is odd
+in theta, so one edge visibly lifts while the other drops. `padPoint` is the one
+place a local point becomes a place on the water and it carries both terms, so a
+pad's rim, its freckles and its vein cannot be drawn under three different tilts.
+
+**A FIRST-ORDER LAG, AND NO SPRING, BECAUSE THE FORCING ALREADY OSCILLATES.** As a
+front crosses a pad the slope under it runs 0 -> + -> 0 -> - -> 0, so a plain lag on
+that target IS a rock with a phase delay; a second-order response would add ringing
+after the wave has gone, which the water damps. The tilt is lagged as a VECTOR, so
+nothing wraps. **THE SATURATION IS SOFT AND THAT IS NOT A DETAIL:** a hard clamp
+respects the same ceiling and also pins every pad in the pond at it for the whole of
+a storm. Measured: tilt caps at 7.16 degrees, bob at 5 plane px.
+
+**FISH SWIM UNDER PADS AND NOTHING STEERS THEM ROUND ONE.** Occlusion rather than
+avoidance, for four reasons and the first is not a preference: koi-draw.js's own
+header says draw order is **the ONLY depth cue here**, so a koi drawn OVER a pad
+would read instantly as a pad painted on the pond floor — the pad has to come after
+the fish whatever else is decided. Avoidance would also be wrong about koi (they
+shelter under pads, which is what the reference photograph is a picture of), would
+need the school's already-ruled weights re-tuned, and would turn a mid-pond cluster
+into a hole the school never enters, which reads as a bug. **A PAD THEREFORE NEEDS
+AN OPAQUE RESET, because nothing in this scene occluded anything before it** — every
+other mark is translucent ink, so a koi would simply tint through. A pad fills
+`GROUND`, then re-fills the same path with the **vignette's own gradient**: filling
+the ground alone is right mid-frame and WRONG at the corners, where the vignette
+darkens the water and would not darken the pad, so a pad near an edge would be a
+bright patch. It also loses the water's GRAIN inside its rim, which is free and
+correct — a pad is not water, and its freckles are its texture in the grain's place.
+**Pads are drawn BACK TO FRONT and each one whole**, so a nearer pad covers a
+farther one's rim and the GAPS between overlapping pads stay water — which is what
+lets a koi under a cluster be glimpsed through it instead of vanishing under one mass.
+**Rain falls in FRONT of a pad and is supposed to** (it is in the air); it is the one
+thing that legitimately appears inside a rim, and it cost the occlusion check a cycle.
+
+**THE PADS DRAW FROM THEIR OWN FORKED STREAM, AND NOTHING ELSE WOULD HAVE NOTICED.**
+koi-ripples.js says it in as many words: every draw on the shared stream shifts every
+number taken after it for the rest of the run, and the fish share that stream. A pad
+field placed from `rand` hands the pond a DIFFERENT SET OF KOI — still seven, still
+distinct, still swimming, and no check in the file could see it. `padRand` is forked
+from the same seed so `?seed=` still reproduces everything, and
+`pads/wiring-in-the-pads-did-not-move-the-koi` is the witness: a school built from the
+seed ALONE, with no scene around it, against the school the wired scene actually has.
+
+**A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT.** `ensure(w, h)` tops the
+field up over water that has just come into view and NOTHING already placed ever moves
+or is removed — a fixed object that jumped when the window changed size would stop
+reading as fixed, and a re-generation is what makes every pad jump. The gate compares
+pads by OBJECT IDENTITY across a resize, because a field that replaced its pads with
+the same number of different ones passes a count. **The blooms are the PICTURE's, not
+the pond area's**: two or three, capped for the field, so a resize cannot breed a fourth.
+
+**THE SHAPE IS THREE NUMBERS AND THE FIRST TWO CUTS WERE BOTH WRONG BY EYE.** The
+notch's width was set at the RIM as a fraction of the pad's own DIAMETER, not as an
+angle: a half-angle of 0.19 rad opens a gap of 0.38 of the diameter, which draws as a
+slice out of a pie rather than a stem slit (`NOTCH_GAP` was 0.10 — **SUPERSEDED by the
+per-pad angle below, whose range reaches further than this paragraph warns against;
+the reasoning is right about one fixed width and is not an argument against a range**).
+And **the veins
+were five lines and are one** — a midrib with two pairs of laterals drew a palm frond,
+which is the most detailed thing in a frame whose koi have no eyes, no barbels and no
+gill line; it also **stops three quarters of the way out**, because a bright straight
+line run edge to edge over a filled convex shape reads as a CRACK rather than a vein.
+The interior fill went 0.055 -> 0.095 in the same pass: at the lower value the reset
+had made a pad DARKER than the water it displaced and it read as a hole rather than a
+leaf. All three were found by rendering, not by reasoning — the sheet is
+`node tools/shot-scene-pads.mjs <dir>`, and **it quotes no pixel delta anywhere**: a
+pond is never still, so there is no settled frame to compare against and every number
+on it is read off the page's own reported state.
+
+**THE PADS ARE 25 TO 145 PLANE PX ACROSS, AND `PAD_ACROSS` IS THE DECLARATION
+BECAUSE `PAD_R` WAS LYING** (Eva's ruling: "update the pad widths to range between
+25 - 145px across, increase the up-down px proportionally"). The ruled quantity is
+the DRAWN WIDTH, so that is the constant and the radius is derived from it —
+`PAD_R = [PAD_ACROSS[0] / (2 * CLUSTER_SIZE_K[0]), PAD_ACROSS[1] / 2]`, inverting
+the two things that actually decide the realized ends: the cluster multiplier at
+the floor and `ensure`'s own clamp at the ceiling.
+**THE OLD CONSTANT MISDESCRIBED THE FIELD IT PRODUCED, and only measuring found
+it:** `PAD_R` read `[15, 58]` while the realized floor was `15 x 0.55 = 8.25` —
+**half the smallest pad the constant named** — because `CLUSTER_SIZE_K` multiplies
+every pad in a clump and nothing inverted it. Measured on the base tree over seeds
+1-40 at 1280x800 (1,585 pads): nominal diameter **16.7 .. 116.0**, not the 30 .. 116
+the constant implied. `CLUSTER_SIZE_K` moved up beside the size law so the derivation
+can read it — a module-level `const` read before its own declaration is a temporal
+dead zone THROW at load, not a subtle bug.
+**THE UP-DOWN NEEDED NO SECOND NUMBER AND MUST NOT HAVE ONE.** A pad is a DISC in
+plane space and the viewpoint's 0.60 squash is applied to POINTS at draw time, so
+every pad's own disc is drawn 0.60 as tall as it is wide, at every size —
+"proportionally" is already an identity here rather than something to arrange. A
+separate vertical range would be a second viewpoint, and the squash is shell-level
+and fixed. Measured across the change, same seeds, as the bounding box of each
+pad's EMITTED outline through `padPoint`: **across 15.8-119.3 -> 24.6-149.2,
+up-down 10.0-71.7 -> 15.1-89.5**.
+**THE BOUNDING BOX'S OWN ASPECT IS NOT 0.60 AND NEVER WAS — SAY WHICH QUANTITY THE
+IDENTITY IS ABOUT.** Per pad it spreads **0.535 .. 0.670 on the base tree and
+0.535 .. 0.678 on the branch** — same floor to four figures, so the size change is not
+what puts it off 0.60 — because the rim is LOBED: its widest chord across and its tallest chord up-down sit at different rim
+angles, so their ratio carries the lobes rather than the squash. The squash is exact
+on every POINT and on the nominal disc; it is not exact on a lumpy outline's box, and
+a "0.60 on every row" reading is the nominal being reported as the drawn.
+**THE DRAWN CHORD IS WITHIN ±3% OF `PAD_ACROSS` AND NOT ON IT**, for the same reason
+— the lobes push the rim out as well as in: nominal `2R` hits **25.1 .. 145.0**
+exactly while the drawn box reads 24.6 (-1.6%) .. 149.2 (+2.9%). Per pad against its
+OWN disc the outline's box runs **0.911 .. 1.033, median 1.000, in both axes alike** —
+the lobes act isotropically in the plane, which is why the squash survives as a
+statistic and fails as a per-pad identity. That residue is the rim being organic and
+is REPORTED rather than tuned away; chasing it would mean flattening the thing the
+lobes exist for. **THE SHEET'S MACRO CAPTION SAID `drawn 145x87 CSS px` AND THAT WAS
+THE NOMINAL WEARING THE WORD `drawn`** — it is `2R` times the squash, which is the
+disc the pad is built on rather than the outline it emits. It names the disc now and
+prints the 0.91-1.03 spread beside it, which is the same correction as the paragraph
+above arriving in a caption instead of a constant.
+**WHAT IT COST ELSEWHERE, measured rather than assumed:** bigger pads fail
+`PAD_GAP` placement more often, so a field holds slightly fewer of them (**1,585 ->
+1,515 pads over seeds 1-40**; blooms 97 -> 98, still 2-3 per field) — clumping still
+passes on every gate seed, and the frame cost is **0.17-0.22 ms** over four runs for
+46 pads against the 600-ripple cap (it was 0.15-0.17 at 44; one 0.613 outlier on a busy
+box was noise, confirmed by three re-runs — quote the spread here, not one reading).
+**AND A MUTANT THAT DELETES A `rand` DRAW IS A MUTANT ABOUT THE WHOLE POND.**
+`every-wedge-is-cut-at-the-same-angle` replaced `rand.range(...)` with a constant,
+which deletes ONE DRAW PER PAD and shifts every number the shared pad stream hands
+out after it — so every pad's size and position moved and it reddened the CLUMPING
+check, which is not a statement about wedge angles. It went BAD only once the pads
+got bigger; on the smaller field the shifted layout happened to still pass. The
+mutation is a comma expression now — it takes the draw and throws it away — so the
+field is bit-identical and the only thing that moves is the angle. **A mutation
+must consume exactly what the line it replaces consumes, or it is not testing what
+it names.** This is `koi-ripples.js`'s own forked-stream lesson arriving inside the
+mutant table.
+
+**THE PADS ARE ROUNDER AND THE STEM CUT IS A PER-PAD ANGLE FROM 5 TO 65 DEGREES**
+(Eva's ruling, on the shipped pads). Two constants and one law. `LOBE_AMP` is halved
+to `[0.024, 0.017, 0.009]` with a tighter per-pad multiplier, measured through one
+instrument over 20 fields and 792 pads: **the worst rim in a field varies by
+0.093-0.106 of its own radius where the amplitudes it replaced gave 0.203-0.234**, so
+the two distributions do not touch and the roundness bar sits at **0.16**, a third of
+headroom either way and set from the two distributions rather than from the data in
+hand. `the-rim-is-as-lumpy-as-it-was` restores the old amplitudes and is what stops
+the ruling drifting back.
+**THE WEDGE'S WIDTH IS THE INCLUDED ANGLE, DRAWN UNIFORMLY PER PAD** (`NOTCH_DEG`,
+`NOTCH_GAP`/`NOTCH_HALF` retired): the old fixed 5.7 degrees is this range's own
+floor, and the gap a given angle opens across the rim is still `2 sin(half)` of the
+diameter — 0.09 at 5 degrees and **0.54 at 65**, so the top of the range IS the "slice
+out of a pie" the fixed width was chosen to avoid, deliberately, as the far end of a
+variety rather than as every pad.
+**THE WEDGE'S SAMPLE COUNT IS DERIVED FROM ITS OWN WIDTH, AND IT IS EVEN.** Eight
+samples is dense across a 5-degree slit and COARSER THAN THE RIM across a 65-degree
+one, which draws the flanks as a staircase — so the count is whatever puts them half a
+rim step apart, and it is rounded to an EVEN number because the ladder runs flank to
+flank and the APEX is a sample only then. An odd count leaves a small flat where the
+point should be, at the one place the pad's own midrib starts.
+**A RANK CANNOT FIND THE RIM ANY MORE, AND THAT IS THE SAME DEFECT THIS CHECK WAS
+FIXED FOR ONCE ALREADY.** The flank is a continuous ramp from apex to rim, so it lands
+samples at every radius in between; the top-70%-by-rank window worked while the wedge
+was one fixed narrow width and is wrong at 65 degrees, where the wedge carries a THIRD
+of the samples and its flank climbs back into the window. What locates it now is the
+pad's own DECLARATION (`notchAt` / `notchHalf` / `notchDeg`, written by the builder and
+read by nobody in the module) — pinned to the shape by four clauses, because a
+declaration can lie: the one stretch that dives lies inside the declared window, it
+reaches the declared apex depth, **the window's own two edges are back up at the rim**
+(which is what pins the declared width to the width actually cut), and the half-angle
+is inside the ruled range. What is left is an over-declared window hiding a mangled
+rim, BOUNDED rather than closed at 18% of the ring by the 65-degree ceiling.
+**AND THE VARIETY IS MEASURED OFF THE DRAWN OUTLINE, NEVER OFF THE RECORD** — a field
+whose pads all DECLARE a different angle and all DRAW the same wedge passes any check
+that reads the declaration. The flank is a linear ramp from `NOTCH_INNER` to the rim,
+so the stretch under half a radius is a fixed fraction of the half-width; read its
+angular extent off the outline and it hands back the angle the pad was actually cut
+with. `every-wedge-is-cut-at-the-same-angle` is its witness.
+**THE WIDE WEDGE QUIETLY GREW THE OCCLUSION CHECK'S SUBJECT TO INCLUDE OPEN WATER, AND
+IT WAS STILL GREEN.** `scene1/a-pad-hides-the-water-under-it` sampled a disc centred on
+the pad at 0.9 of its radius — which at 65 degrees takes in a sector of the WEDGE, and
+a wedge is water. Measured across the change: the pads' median variation went **0.044-
+0.067 (one fixed 5.7-degree slit) to 0.193, worst pad 0.234 against a bar of 0.35** —
+passing, and no longer measuring only what it names. The disc is offset along the axis
+AWAY from the wedge now and is the largest that fits there: the flanks are rays from
+the pad's centre, so a disc on the opposite axis clears both exactly when its radius
+does not exceed its offset, and 0.42/0.40 satisfies that AT EVERY ANGLE THE RULING
+ALLOWS rather than on one field's luck. **It is a fifth of the old disc's area**, which
+is the honest cost of a cut that reaches the centre — a smaller disc averages fewer
+pixels, so rain and the pad's own rock move its mean further — and both sides are
+sampled at that radius so the ratio stays fair. **The ratio to open water went 0.091 to
+0.048 against a bar of 0.35**; the pre-wedge tree read 0.024, so about half the lost
+margin is recovered and the rest is the smaller disc. Nothing but re-reading the check
+against the new law could have found this: it never went red.
+
+**TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM NEED TWO
+INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The koi half is
+`pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, which drives the shipped `draw()`
+through a recording context and asserts the op ORDER and that the pad's first PAINT is
+a ground fill. **That recorder's first cut tagged every path point with the fill style
+in effect at the time of the POINT** — a path is built first and painted after, so a
+pad's own outline came back wearing whatever the ripple pass had left set. Paints are
+their own events now.
+
+**AND THE PIXEL HALF IS A VARIANCE, NOT A BRIGHTNESS, WHICH TOOK TWO FAILED CUTS TO
+SEE.** A pad's freckles composite to ~71 over the ground, two overlapping reach ~103
+and three ~123 — **past a koi's own outline at ~97** — so there is no threshold that
+separates "something is showing through the pad" from "the pad has texture". Measured
+on an isolated pad at idle, interior against the water beside it: **3.135%/2.981% at
+level 70, 2.447%/1.599% at 90, 0.053%/0.446% at 110, 0.000%/0.210% at 120** — low
+enough to catch the rings and the pad's own marks match them; high enough to exclude
+the marks and the ambient rings barely clear it either (2 lit pixels over 30 frames).
+**What actually distinguishes a pad from water is MOTION**: a pad's interior is static
+apart from its own rock, while open water has rings sweeping through it continuously.
+So the check compares the VARIATION of each disc's mean brightness across frames, needs
+no threshold at all, and says exactly what the claim is — measured **0.026-0.199 levels
+inside against 2.158 on an equal patch of open water**, and the control is a patch of
+OPEN WATER rather than a ring around the pad's own rim, because the brief guarantees
+open water exists and a ring does not (the first cut demanded 1.9 radii of clearance
+and simply **failed to run** the day the field was reseeded and no pad had it).
+**AND IT IS A MEDIAN OVER FIVE PADS AGAINST A MEDIAN OVER FIVE PATCHES OF OPEN WATER,
+WHICH TOOK THREE FLAKES AND A MISS TO ARRIVE AT.** The noise source is RAIN, which is
+drawn in FRONT of a pad and is supposed to be: one streak crossing a disc of this size
+moves its mean by about a level, the same order as the whole signal open water carries.
+On a CLEAN tree that shows as a factor of EIGHT between the quietest and the noisiest of
+five equally-correct pads (0.026 against 0.199) — so a WORST-of-five reads the weather,
+and it went red three times on mutations that provably could not reach it, the last
+being a storm ramp that is inert until the first click, which this check runs before.
+A SINGLE control patch is exactly as luck-dependent on the other side: measured across
+two runs of an unchanged tree it read **3.041 and then 0.751**, a factor of four. Both
+sides are medians over five now — measured 1.828 and 2.291 for the water across runs,
+against pad medians of 0.067 and 0.044, ten to fifty times under the bar.
+**AND WATCHING FIVE PADS IS ALSO WHAT MAKES IT FIRE AT ALL.** Watching a single pad, whether any ring crosses ITS patch during
+the window is luck — the sweep caught that as a **MISSED**, the one failure direction
+that matters: the mutation which deletes the reset entirely left the check GREEN on a
+run where its one pad sat over quiet water, having reddened it on an earlier run. With
+the reset gone EVERY pad shows the water through it, so the MIDDLE one rises with the
+rest while a couple of unlucky drops move one or two and leave it alone. **EVERY DISC IS
+THE SAME SIZE**
+— variance scales with area, so a single ring moves a small disc's mean far more than a
+large one's and discs of different radii cannot be compared at all.
+
+**THREE MUTANT CLAIMS WERE WRONG AND THE SWEEP IS WHAT SAID SO, ALL THREE IN THE SAME
+DIRECTION — the check was fine and the claim was not.** `the-rock-is-clamped-rather-
+than-saturated` stayed GREEN because the check sampled twelve pads under a storm and
+asked whether their tilts still differed at the END, and they did under the clamp too:
+by then the ripples had aged and the clamp was no longer binding. **A pond does not
+hold still long enough to be a controlled experiment; the law does** — it sweeps
+`respond` over forty slopes and asserts the response is STRICTLY RISING at every step,
+which is what a clamp is not. `a-pad-is-drawn-under-the-fish` only PREPENDED a pad pass
+and left the real one in place, so the pads were drawn twice and the later pass still
+covered everything — the mutation applied, looked right, and changed nothing. And
+`the-pads-cannot-feel-the-water` kills the HEIGHT and leaves the gradient, so the pad
+still rocks: the browser check asserted only the tilt and stayed green until it asked
+about the bob as well. **The rock and the bob are the two halves of one law and a check
+that measures one of them measures half a feature.**
+
+**AMBIENT RAIN ROCKS A PAD AS HARD AS A CLICK DOES, SO A CLICK'S ROCK IS NOT
+SEPARABLE ON THE LIVE PAGE — AND ONLY THE SWEEP SAID SO.** The browser check
+first clicked beside a pad and asserted that pad rocked and then settled. It went
+red under `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+an outline is sampled, consumes no randomness and touches nothing the check
+reads: **flaky, not collateral**, and the same flake had already been booked once
+as collateral on a second mutant before a third made it undeniable. Measured on
+the shipped page: peaks at idle with no hand on the mouse run **1.07-3.77
+degrees** against **3.11-4.66** for a pad clicked beside, and on one run the
+settle reading four and a half seconds later was **3.98 degrees — HIGHER than
+that run's own click peak of 3.83**, because another drop happened to be
+crossing. A PAIRED CONTROL PAD 500-650 px away is no better (click-to-control
+ratios of **1.10x to 2.65x**), because the control is in the same rain. There is
+no bar there and no fixture on the page that removes the weather.
+**SO THE CLAIM MOVED TO WHERE THERE IS NO AMBIENT FIELD**: attributing a rock to
+one ripple, and watching it decay, are both Node checks driving one ripple over
+one pad. What is left for the page is the thing Node cannot say — that the wiring
+is LIVE: real pads advanced against the real ripple list every frame, each
+reading its own patch of water (35 distinct peaks over 36 pads), inside the ruled
+caps. **A BROWSER CHECK SHOULD CLAIM WHAT A BROWSER CAN SEE THAT NOTHING ELSE
+CAN, not restate a Node check on a noisier instrument.**
+
+**AND A CHECK THAT POLLS ON WALL TIME MEASURES THE MACHINE.** `ellipse-without-the-
+moveto` — a pre-existing mutation with nothing to do with pads — reddened the rocking
+check, because it drops the frame rate by a factor of three and the check sampled every
+70 ms of WALL time: three seconds of pond on a healthy page, one on a slow one, so the
+front had not yet reached the pad. Both browser pad checks poll `waitSceneSeconds` now.
+This file already records the rule; it was broken again the first time a new check was
+written.
+
+**THE COST IS MEASURED AND IT IS NOT THE PADS.** `waveAt` is one pass per pad over the
+ripple list with a squared-distance reject before the sqrt: **0.19 ms a frame for 50
+pads against the 600-ripple cap**, and the page reads 22 fps on headless software GL
+during a downpour against the gate's floor of 12. The pad field is placed once and only
+its transform moves per frame; the outline, the freckles and the vein are built at
+placement. **`koi-pads.js` HAD TO BE ADDED TO THE DISCIPLINE SCAN'S `SCENE_MODULES`**,
+which is a hand-written coverage list — a module missing from it passes every discipline
+check by not being read.
+
+**Verify with `node tools/verify-scene.mjs`** (97 checks). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: nineteen mutations, each naming the checks it must redden,
+a changed harness**: thirty-nine mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not

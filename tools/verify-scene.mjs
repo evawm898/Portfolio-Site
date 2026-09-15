@@ -263,12 +263,19 @@ const MUTANTS = [
     why: 'the two lags split apart, which aims the koi off its own travel',
   },
   {
-    id: 'the-spine-is-pinned-at-the-nose',
+    // REPLACES `the-spine-is-pinned-at-the-nose`, whose anchor went with the
+    // curvature-bias drawing law it was written against. Same question — where
+    // is the drawing pinned to the chain — asked of the law that is there now.
+    // Forcing the station index to 0 makes every drawn point extrapolate along
+    // the FIRST segment, so the koi becomes a rigid straight fish hung off its
+    // head joint: it still translates with the chain and its nose is still at
+    // the head joint, and it stops bending at all.
+    id: 'the-drawing-hangs-off-one-joint',
     file: 'scene/koi-draw.js',
-    from: 'const BEND_ANCHOR_U = 0.20;',
-    to: 'const BEND_ANCHOR_U = 0;',
-    breaks: ['fish/the-bend-moves-the-head-too'],
-    why: 'the head as the one part of the animal that never participates',
+    from: '      let i = Math.floor(t);\n',
+    to: '      let i = 0;\n',
+    breaks: ['fish/the-drawn-koi-rides-the-chain-it-is-given'],
+    why: 'the drawing must be local to the chain, not a rigid body hung off one joint',
   },
   {
     id: 'a-departure-never-leaves',
@@ -356,6 +363,10 @@ const MUTANTS = [
               // vacuity guard. That breadth is the mutation being severe, not
               // the checks being fragile.
               'fish/any-ripple-gets-the-same-reaction',
+              // And the pad check that compares the wired scene's koi against a
+              // school built from the seed ALONE: with nothing seeded there is
+              // nothing to compare, so it refuses rather than passing vacuously.
+              'pads/wiring-in-the-pads-did-not-move-the-koi',
               'fish/some-koi-swim-to-a-ripple-and-some-flee-it',
               'fish/every-trait-is-a-slider-in-nought-to-one',
               'fish/koi-vary-mildly-in-size-around-an-inch',
@@ -429,6 +440,134 @@ const MUTANTS = [
              'layers/a-one-canvas-scene-is-still-a-single-opaque-plane'],
     why: 'the backmost plane is the one that can be opaque, and scene 1 must stay that way',
   },
+  // ------------------------------------------------------------------ pads --
+  {
+    id: 'a-pad-is-drawn-under-the-fish',
+    file: 'scene/koi-draw.js',
+    // IT HAS TO MOVE THE PASS, NOT ADD A SECOND ONE. The first version only
+    // prepended a call and left the real one in place, so the pads were drawn
+    // twice and the later pass still covered everything — the mutation applied,
+    // looked right, and changed nothing the checks could see. `pads` is a
+    // destructured parameter, so nulling it is what disarms the later call.
+    from: '    for (const f of fish) drawFish(f);\n',
+    to: '    drawPads(width, height, pads);\n    for (const f of fish) drawFish(f);\n    pads = null;\n',
+    breaks: ['pads/a-pad-is-drawn-over-the-fish-and-the-ripples',
+             'scene1/a-pad-hides-the-water-under-it'],
+    why: 'draw order is the only depth cue here; a pad under the koi reads as painted on the pond floor',
+  },
+  {
+    id: 'a-pad-does-not-reset-the-water-under-it',
+    file: 'scene/koi-draw.js',
+    from: '    ctx.fillStyle = GROUND;\n    ctx.fill();\n    ctx.fillStyle = groundFor(w, h);\n    ctx.fill();\n    ctx.fillStyle = rgba(INK, PAD_FILL_A);',
+    to: '    ctx.fillStyle = rgba(INK, PAD_FILL_A);',
+    breaks: ['pads/a-pad-is-drawn-over-the-fish-and-the-ripples',
+             'scene1/a-pad-hides-the-water-under-it'],
+    why: 'every other mark here is translucent ink, so without the opaque reset the order buys nothing',
+  },
+  {
+    id: 'a-pad-reads-the-cause-of-a-ripple',
+    file: 'scene/koi-pads.js',
+    from: '    const amp = WAVE_AMP * rip.strength * env;',
+    to: '    const amp = WAVE_AMP * rip.strength * env * (rip.rings >= 3 ? 2.5 : 1);',
+    breaks: ['pads/a-pad-answers-any-ripple-the-same-way'],
+    why: 'a pad may feel how big a splash was and must not be able to tell what made it',
+  },
+  {
+    id: 'the-pads-cannot-feel-the-water',
+    file: 'scene/koi-pads.js',
+    from: '    h += amp * g;',
+    to: '    h += 0;',
+    breaks: ['pads/a-passing-front-rocks-a-pad-and-lets-it-go',
+             'scene1/the-pads-on-the-real-page-are-riding-the-water'],
+    mayAlso: ['pads/the-rock-is-subtle-and-a-downpour-does-not-peg-it',
+              'pads/a-pad-answers-any-ripple-the-same-way'],
+    why: 'a pad that does not read the height field does not bob, and the gradient alone is half the law',
+  },
+  {
+    id: 'a-pad-only-foreshortens',
+    file: 'scene/koi-pads.js',
+    from: '  out.z = base + a * Math.sin(theta);',
+    to: '  out.z = base;',
+    breaks: ['pads/a-tilted-pad-is-foreshortened-one-way-and-lifted-the-other'],
+    why: 'cos is even, so a foreshortening alone reads as a pulse at twice the wave rather than a rock',
+  },
+  {
+    id: 'the-rock-is-clamped-rather-than-saturated',
+    file: 'scene/koi-pads.js',
+    from: '    const theta = TILT_MAX * k * Math.tanh(slope / TILT_REF);',
+    to: '    const theta = Math.min(TILT_MAX * k, slope);',
+    breaks: ['pads/the-rock-is-subtle-and-a-downpour-does-not-peg-it'],
+    why: 'a hard clamp puts every pad in the pond at the ceiling for the whole of a storm',
+  },
+  {
+    id: 'pads-scatter-instead-of-clumping',
+    file: 'scene/koi-pads.js',
+    from: '          const at = put || scatter(spot, spread, R);',
+    to: '          const at = put || scatter({ x: rand.range(want.x0, want.x1), y: rand.range(want.y0, want.y1) }, spread, R);',
+    breaks: ['pads/pads-clump-and-there-is-open-water-between-the-clumps'],
+    mayAlso: ['pads/blooms-rise-among-the-pads-and-there-are-two-or-three',
+              'scene1/the-pond-has-lily-pads-on-it-in-clumps-with-blooms-among-them'],
+    why: 'the brief asks for loose clusters with open water between them, which is what a scatter is not',
+  },
+  {
+    id: 'the-pad-field-is-regenerated-on-a-resize',
+    file: 'scene/koi-pads.js',
+    from: '      const newArea = (want.x1 - want.x0) * (want.y1 - want.y0)\n        - (covered ? overlapArea(want, covered) : 0);',
+    to: '      field.pads.length = 0; field.clusters.length = 0; covered = null;\n      const newArea = (want.x1 - want.x0) * (want.y1 - want.y0);',
+    breaks: ['pads/growing-the-frame-grows-the-field-and-moves-nothing'],
+    why: 'a pad is a thing in the pond, and a fixed object that jumps on a resize stops reading as fixed',
+  },
+  {
+    id: 'a-bloom-lands-anywhere-in-its-cluster',
+    file: 'scene/koi-pads.js',
+    from: '      if (ok && beside) return { x, y };',
+    to: '      if (ok) return { x, y };',
+    breaks: ['pads/blooms-rise-among-the-pads-and-there-are-two-or-three'],
+    why: '"rising among the pad clusters" needs a leaf beside it; otherwise it is a flower alone on a pond',
+  },
+  {
+    id: 'the-wedge-keeps-a-fixed-sample-count',
+    file: 'scene/koi-pads.js',
+    from: '  const notchPts = 2 * Math.max(NOTCH_PTS_MIN / 2, Math.ceil(2 * notchHalf / rimStep));',
+    to: '  const notchPts = NOTCH_PTS_MIN;',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: 'eight samples is dense across a five-degree slit and coarser than the rim across a sixty-five degree wedge, '
+       + 'which draws its flanks as a staircase — and nothing else in the check can see it',
+  },
+  {
+    id: 'every-wedge-is-cut-at-the-same-angle',
+    file: 'scene/koi-pads.js',
+    // IT STILL TAKES THE DRAW AND THROWS IT AWAY, and that is the whole
+    // difference between a mutation about wedges and a mutation about the
+    // pond. Deleting the `rand.range` deletes one draw PER PAD, which shifts
+    // every number the shared pad stream hands out after it — so every pad's
+    // size and position moves and the field is a different field. Measured:
+    // it reddened the CLUMPING check as well, which is not a statement about
+    // wedge angles and not something this mutant should be allowed to claim
+    // or to excuse. The comma expression consumes exactly what the shipped
+    // line consumes and yields the constant, so the field is bit-identical
+    // and the only thing that moved is the angle each wedge is cut at.
+    from: '  const notchDeg = rand.range(NOTCH_DEG[0], NOTCH_DEG[1]);',
+    to: '  const notchDeg = (rand.range(NOTCH_DEG[0], NOTCH_DEG[1]), NOTCH_DEG[0]);',
+    breaks: ['pads/the-stem-wedge-is-cut-at-a-different-angle-on-every-pad'],
+    why: 'the ruling is a variety of angles from 5 to 65, and a field cut at one width is what it replaced',
+  },
+  {
+    id: 'the-rim-is-as-lumpy-as-it-was',
+    file: 'scene/koi-pads.js',
+    from: 'export const LOBE_AMP = [0.024, 0.017, 0.009];\nexport const LOBE_VARY = [0.65, 1.30];',
+    to: 'export const LOBE_AMP = [0.048, 0.034, 0.018];\nexport const LOBE_VARY = [0.55, 1.45];',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: '"make the lily pads rounder" is a ruling, and the amplitudes it replaced are the state it was ruled against',
+  },
+  {
+    id: 'the-pads-draw-from-the-shared-stream',
+    file: 'scene/scene-koi.js',
+    from: '  const padRand = makeRandom((host.seed ^ PAD_SEED_SALT) >>> 0);',
+    to: '  const padRand = rand;',
+    breaks: ['pads/wiring-in-the-pads-did-not-move-the-koi'],
+    why: 'a draw on the shared stream shifts every number taken after it, the koi included',
+  },
 ];
 
 function applyMutant(m) {
@@ -462,7 +601,8 @@ async function loadScene(mutant) {
       storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
       ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
       fish: await m('koi-fish.js'), registry: await m('registry.js'),
-      draw: await m('koi-draw.js'),
+      pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
+      sceneKoi: await m('scene-koi.js'),
     };
   }
   const dir = path.join(SCENE, `${MUTANT_PREFIX}${++mutantSeq}`);
@@ -479,7 +619,8 @@ async function loadScene(mutant) {
     storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
     ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
     fish: await m('koi-fish.js'), registry: await m('registry.js'),
-    draw: await m('koi-draw.js'),
+    pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
+    sceneKoi: await m('scene-koi.js'),
   };
 }
 
@@ -1228,16 +1369,28 @@ async function partOne(mutant) {
          + `points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
   });
 
-  check('the bend moves the head too', () => {
-    // THE WITNESS FOR THE ANCHOR, and nothing else here can see it: where the
-    // spine is pinned is a drawing decision, so this drives the SHIPPED
-    // renderer through a recording context rather than restating the bend law.
+  check('the drawn koi rides the chain it is given', () => {
+    // WHERE THE DRAWING IS PINNED TO THE CHAIN, and nothing else here can see
+    // it: that is a rendering decision, so this drives the SHIPPED renderer
+    // through a recording context rather than restating the law.
     //
-    // Swing the turn bias from one saturated end to the other with everything
-    // else held. Pinned at the nose, station 0 IS the nominal nose and cannot
-    // move at all; pinned a fifth of the way back, the head takes its own
-    // share. The vertex is identified by INDEX in the first draw and read at
-    // the same index in the second, so the two are the same anatomical point.
+    // WHAT THIS REPLACED, AND WHY IT COULD NOT BE REPAIRED. It was
+    // `the bend moves the head too`, which swung `f.bend` from one saturated
+    // end to the other and asked how much of the excursion the head took. The
+    // chain rewrite deleted the mechanism underneath it: `drawFish` reads
+    // f.len, f.spine, f.seg, f.speed, f.phase, f.finPhase and f.patches, and
+    // `f.bend` is not among them — the body bends because it is physically
+    // behind the head, not because a curvature bias is applied to it. The check
+    // did not go quietly red on a stale claim, it THREW on a fixture with no
+    // `spine`, and its mutant's anchor had gone from the file at the same time.
+    // The two shielded each other: a dirty base pass stops the sweep before the
+    // anchor guard runs, so nothing reported the disarmed mutant either.
+    //
+    // THE CLAIM THAT SURVIVED THE REWRITE is the one worth keeping, and it is
+    // now three: the drawing is a function of the CHAIN (translate the chain and
+    // every vertex translates with it, exactly), it is LOCAL to the chain (bend
+    // the tail joints and the head end does not move), and its head end is at
+    // the chain's own head joint rather than somewhere along it.
     const surf = M.surface.createSurface();
     let pts = [];
     const noop = () => {};
@@ -1251,28 +1404,65 @@ async function partOne(mutant) {
     }, { get: (t, k) => (k in t ? t[k] : noop), set: () => true });
     const rend = M.draw.createRenderer(rec, surf);
     const L = 96, X = 400, Y = 300;
-    const grab = (bend) => {
+    const N = M.fish.SPINE_JOINTS;
+    const seg = M.fish.CHAIN_SPAN_U * L / (N - 1);
+    // Straight, nose at (X, Y), running back along -x: the chain koi-fish.js
+    // lays down behind a head pointing at +x.
+    const chain = (edit) => {
+      const sp = [];
+      for (let i = 0; i < N; i++) sp.push({ x: X - seg * i, y: Y });
+      if (edit) edit(sp);
+      return sp;
+    };
+    const grab = (spine) => {
       pts = [];
-      rend.drawFish({ id: 1, x: X, y: Y, heading: 0, drawX: X, drawY: Y, drawHeading: 0,
-        len: L, speed: 40, phase: 0.8, finPhase: 0.7, omega: bend, bend,
+      rend.drawFish({ id: 1, len: L, seg, spine, speed: 40, phase: 0.8, finPhase: 0.7,
         patches: [{ s: 0.26, t: -0.10, rx: 0.08, ry: 0.6, rot: 0.2 }] });
       return pts.slice();
     };
-    const a = grab(-6), b = grab(6);          // both ends of the saturated bias
-    if (a.length !== b.length || a.length < 200) throw new Error(`the two draws do not correspond (${a.length} vs ${b.length})`);
-    let iNose = -1, best = Infinity, tail = 0;
-    for (let k = 0; k < a.length; k += 2) {
-      const r = Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y);
-      if (r < best) { best = r; iNose = k; }
-      if (r > 0.95 * L) tail = Math.max(tail, Math.hypot(a[k] - b[k], a[k + 1] - b[k + 1]));
+
+    const a = grab(chain());
+    const D = 30;
+    const moved = grab(chain(sp => sp.forEach(j => { j.y += D; })));
+    const bent = grab(chain(sp => { for (let i = 8; i < N; i++) sp[i].y += D; }));
+    if (a.length < 200) throw new Error(`only ${a.length / 2} vertices were emitted`);
+    if (moved.length !== a.length || bent.length !== a.length) {
+      throw new Error(`the three draws do not correspond (${a.length}/${moved.length}/${bent.length})`);
     }
-    const nose = Math.hypot(a[iNose] - b[iNose], a[iNose + 1] - b[iNose + 1]);
-    if (!(tail > 5)) throw new Error(`the bias barely moved the tail (${tail.toFixed(2)} px) — nothing to compare against`);
-    // Measured: 2.50 px and a 7.8% share pinned a fifth back, against 0.06 px
-    // and 0.1% pinned at the nose.
-    if (!(nose > 0.5)) throw new Error(`the head does not move with the bend (${nose.toFixed(3)} px)`);
-    if (!(nose / tail > 0.02)) throw new Error(`the head takes only ${(nose / tail * 100).toFixed(1)}% of the tail's excursion`);
-    return `head ${nose.toFixed(2)} px against the tail's ${tail.toFixed(1)}, a ${(nose / tail * 100).toFixed(1)}% share`;
+
+    // (i) Translating the CHAIN translates the drawing, exactly. In screen space
+    // that is dy = D * squash and dx = 0, at every vertex — the drawing is a
+    // function of the chain and of no other position.
+    let worst = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      worst = Math.max(worst, Math.abs(moved[k] - a[k]),
+                              Math.abs((moved[k + 1] - a[k + 1]) - D * surf.squash));
+    }
+    if (!(worst < 1e-9)) throw new Error(`a translated chain moved a vertex by ${worst} off the translation`);
+
+    // (ii) LOCAL, not rigid: bending only the back half moves the tail a long
+    // way and leaves the head end exactly where it was. A koi hung off one joint
+    // passes (i) and (iii) and fails this.
+    let headMoved = 0, tailMoved = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      const d = Math.hypot(a[k] - bent[k], a[k + 1] - bent[k + 1]);
+      // The head end, in the fish's own frame: within a third of a body length
+      // forward of the nose joint, which is the head and the shoulders.
+      if (a[k] > X - L * 0.33) headMoved = Math.max(headMoved, d);
+      else tailMoved = Math.max(tailMoved, d);
+    }
+    if (!(tailMoved > 8)) throw new Error(`bending the back half barely moved the tail (${tailMoved.toFixed(2)} px)`);
+    if (!(headMoved < 1e-9)) throw new Error(`bending the back half moved the head by ${headMoved.toFixed(3)} px`);
+
+    // (iii) The head end is AT the chain's head joint. The nose domes forward of
+    // it and the flanks stand off it, so this is a body width rather than zero —
+    // what it refuses is a drawing whose nose sits a joint or more back.
+    let nearest = Infinity;
+    for (let k = 0; k < a.length; k += 2) {
+      nearest = Math.min(nearest, Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y));
+    }
+    if (!(nearest < L * 0.14)) throw new Error(`the nearest drawn vertex is ${nearest.toFixed(1)} px from the chain's head joint`);
+    return `translation exact to ${worst.toExponential(1)}, tail ${tailMoved.toFixed(1)} px against a head of 0, nose ${nearest.toFixed(1)} px off the joint`;
   });
 
   check('any ripple gets the same reaction', () => {
@@ -1497,6 +1687,560 @@ async function partOne(mutant) {
     return `mean separation ${together.toFixed(0)} px schooling against ${apart.toFixed(0)} px solitary`;
   });
 
+  // ------------------------------------------------------------------- pads
+  setSection('pads');
+  const padField = (seed, w = 1280, h = 800) => M.pads.createPads({
+    rand: M.rng.makeRandom(seed), surface: M.surface.createSurface(), width: w, height: h,
+  });
+  // Signed angular distance, so a wedge straddling angle zero is one stretch
+  // rather than two — which is what a naive sort of raw atan2 produces, and is
+  // the shape of the "two notches" failure the silhouette check counts.
+  const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+  check('the height of a thing on the water is derived from the squash', () => {
+    // THE ONE NUMBER A FLOATING THING NEEDS, and it is not a free constant. The
+    // view is an oblique orthographic with sin(elevation) = squash, so
+    // cos(elevation) is what a unit of height draws as — and the two must
+    // satisfy the identity, or the pads are riding a second camera.
+    const surf = M.surface.createSurface();
+    const id = surf.squash * surf.squash + surf.lift * surf.lift;
+    near(id, 1, 1e-12, 'squash^2 + lift^2');
+    if (!(surf.lift > 0)) throw new Error('nothing above the water would move at all');
+    // At height 0 it is not merely close to the flat projection, it IS it.
+    for (const y of [0, 123.456, -900.5]) {
+      if (surf.syAt(y, 0) !== surf.sy(y)) throw new Error(`height 0 at y=${y} is not the flat projection`);
+    }
+    return `squash ${surf.squash}, lift ${surf.lift}, exact at height 0`;
+  });
+
+  check('pads clump, and there is open water between the clumps', () => {
+    // THE BRIEF'S OWN WORDS: loose clusters, not a uniform grid or scatter. The
+    // witness is a comparison against the scatter the brief rules out — the SAME
+    // number of pads spread uniformly over the same water — because "are these
+    // clumped" has no answer without something to be clumped against, and a
+    // threshold on a nearest-neighbour distance alone would be a number picked
+    // to pass. Measured on the field's own reported positions, three seeds.
+    const rows = [];
+    for (const seed of [4242, 7, 90210]) {
+      const f = padField(seed);
+      const pads = f.pads;
+      if (!(pads.length >= 12)) throw new Error(`seed ${seed} placed only ${pads.length} pads`);
+      if (!(f.clusters.length >= 2)) throw new Error(`seed ${seed} made ${f.clusters.length} clusters`);
+      const box = M.surface.createSurface().visible(1280, 800, M.pads.FIELD_MARGIN);
+      const rand = M.rng.makeRandom(seed ^ 0x5eed);
+      const nn = (pts) => {
+        let sum = 0;
+        for (const a of pts) {
+          let best = Infinity;
+          for (const b of pts) if (b !== a) best = Math.min(best, Math.hypot(a.x - b.x, a.y - b.y));
+          sum += best;
+        }
+        return sum / pts.length;
+      };
+      const flat = pads.map(() => ({ x: rand.range(box.x0, box.x1), y: rand.range(box.y0, box.y1) }));
+      const clumped = nn(pads), scattered = nn(flat);
+      // And the OPEN WATER: the largest gap a pad-free straight run of the
+      // frame's own width leaves. A scatter leaves none worth the name.
+      const gapOf = (pts) => {
+        const xs = pts.map(p => p.x).sort((a, b) => a - b);
+        let g = 0;
+        for (let i = 1; i < xs.length; i++) g = Math.max(g, xs[i] - xs[i - 1]);
+        return g;
+      };
+      rows.push({ seed, n: pads.length, clumped, scattered, gap: gapOf(pads), flatGap: gapOf(flat) });
+      if (!(clumped < scattered * 0.78)) {
+        throw new Error(`seed ${seed}: mean nearest neighbour ${clumped.toFixed(0)} px against `
+          + `${scattered.toFixed(0)} for the same pads scattered — that is not clumping`);
+      }
+      if (!(rows[rows.length - 1].gap > rows[rows.length - 1].flatGap)) {
+        throw new Error(`seed ${seed}: the widest pad-free band is ${rows[rows.length - 1].gap.toFixed(0)} px, `
+          + `narrower than the ${rows[rows.length - 1].flatGap.toFixed(0)} a scatter leaves`);
+      }
+    }
+    return rows.map(r => `seed ${r.seed}: ${r.n} pads, nn ${r.clumped.toFixed(0)} vs ${r.scattered.toFixed(0)} scattered`).join('; ');
+  });
+
+  check('a pad is a near-circle with one wedge cut out of it', () => {
+    // The SILHOUETTE, off the shipped outline rather than off a picture.
+    //
+    // THE RIM IS THE RING OUTSIDE THE DECLARED WEDGE, AND IT HAS TO BE — a
+    // RANK cannot find it any more. The first cut of this check took every
+    // sample above 55% of R as rim, and the wedge's flank is a CONTINUOUS ramp
+    // from its apex out to the rim, so it landed samples at every value in
+    // between and the check read the wedge's depth as the rim's variation. A
+    // rank window (the top 70%) fixed that while the wedge was one fixed
+    // narrow width and is wrong now that it is a per-pad draw: at 65 degrees
+    // the wedge carries a THIRD of the samples, so a rank cut at 70% lets its
+    // flank back in. What locates it instead is the pad's own declaration.
+    //
+    // A DECLARATION CAN LIE, so it is not taken on trust — four clauses below
+    // pin it to the shape: the one stretch that dives lies inside the declared
+    // window, it reaches the declared apex depth, the window's own two edges
+    // are back up at the rim, and the declared half-angle is inside the ruled
+    // range. What is left is an over-declared window hiding a mangled rim, and
+    // that is BOUNDED rather than closed: the ruled ceiling is 65 degrees, so
+    // at most 18% of the ring can be excluded by a declaration at all.
+    const f = padField(4242);
+    const rimStep = (Math.PI * 2) / M.pads.OUTLINE_PTS;
+    let worstRound = 0, leastVary = Infinity, worstGap = 0;
+    const bad = [];
+    for (const pad of f.pads) {
+      const pts = pad.outline.map(p => ({
+        d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt),
+        r: Math.hypot(p.x, p.y) / pad.R,
+      }));
+      const rim = pts.filter(q => Math.abs(q.d) > pad.notchHalf).map(q => q.r);
+      const hi = Math.max(...rim), lo = Math.min(...rim);
+      worstRound = Math.max(worstRound, hi - lo);
+      leastVary = Math.min(leastVary, hi - lo);
+
+      // (i) exactly one stretch dives toward the centre, and it is the one the
+      // pad declared. Walk the ring in angle order; a pad with two runs has
+      // been sampled or wrapped wrong, one with none has no stem.
+      const ring = pts.slice().sort((a, b) => a.d - b.d);
+      let runs = 0, deepest = Infinity, deepestAt = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const prev = ring[(i - 1 + ring.length) % ring.length];
+        if (ring[i].r < 0.5 && prev.r >= 0.5) runs++;
+        if (ring[i].r < deepest) { deepest = ring[i].r; deepestAt = ring[i].d; }
+      }
+      if (runs !== 1) bad.push(`${runs} wedges`);
+      if (Math.abs(deepestAt) > pad.notchHalf) bad.push('the dive is outside the declared wedge');
+      // (ii) the apex reaches the depth the law says it does.
+      if (Math.abs(deepest - M.pads.NOTCH_INNER) > 0.02) bad.push('the wedge does not reach its apex');
+      // (iii) the declared EDGES are at the rim, which is what pins the
+      // declared width to the width actually cut: a window declared wider than
+      // the cut would have rim inside it, and one declared narrower would have
+      // flank outside it (clause (i) catches that as a second run).
+      // The wedge's own ladder runs flank to flank, so both declared edges ARE
+      // samples — taken exactly rather than through a band, because a band as
+      // wide as the rim's step swallows the whole of a five-degree wedge and
+      // reads its apex as its edge.
+      // AND THE EMPTY CASE IS A COMPLAINT, NOT A PASS. `Math.min()` of nothing
+      // is Infinity, which clears any bar — so a declaration that named a
+      // window with no sample on its edge would satisfy this clause by having
+      // nothing in it, which is the one way a clause of this shape fails to be
+      // one at all.
+      const edges = ring.filter(q => Math.abs(Math.abs(q.d) - pad.notchHalf) < 1e-9);
+      if (edges.length < 2) bad.push('the declared wedge has no sample on its own edge');
+      else if (!(Math.min(...edges.map(q => q.r)) > 0.85)) bad.push('the declared wedge is wider than the cut');
+      // (iv) inside the ruled range.
+      const deg = pad.notchHalf * 360 / Math.PI;
+      if (deg < M.pads.NOTCH_DEG[0] - 1e-9 || deg > M.pads.NOTCH_DEG[1] + 1e-9) bad.push(`a wedge of ${deg.toFixed(1)} degrees`);
+
+      // (v) THE WEDGE IS THE BETTER RESOLVED OF THE TWO. Its sample count is
+      // derived from its own width, so a 65-degree wedge gets as many samples
+      // as it needs rather than the eight a 5-degree slit wants — a fixed
+      // count is coarser than the RIM at the wide end and draws the flanks as
+      // a staircase. Nothing above can see this: a coarse wedge still dives,
+      // still reaches its apex and still leaves the rim alone.
+      const inside = ring.filter(q => Math.abs(q.d) <= pad.notchHalf + 1e-12);
+      if (inside.length < 3) bad.push('the wedge carries fewer than three samples');
+      for (let i = 1; i < inside.length; i++) worstGap = Math.max(worstGap, inside[i].d - inside[i - 1].d);
+    }
+    if (bad.length) throw new Error(`${bad.length} complaints over ${f.pads.length} pads: ${[...new Set(bad)].join(', ')}`);
+    // THE BAR IS SET FROM TWO MEASURED DISTRIBUTIONS, NOT FROM THE DATA IN
+    // HAND. Over 20 fields and 792 pads the worst rim in a field varies by
+    // 0.093-0.106 of its own radius under the ruled amplitudes and 0.203-0.234
+    // under the ones they replaced; 0.16 is between them with a third of
+    // headroom either way, and it is what carries "make the lily pads rounder"
+    // rather than leaving it as a number someone could quietly put back.
+    if (!(worstRound < 0.16)) throw new Error(`a rim varies by ${(worstRound * 100).toFixed(0)}% of its radius — that is lumpier than the ruling`);
+    if (!(leastVary > 0.01)) throw new Error('a rim is a compass circle');
+    if (!(worstGap <= rimStep / 2 + 1e-12)) throw new Error(`a wedge is sampled ${(worstGap / rimStep).toFixed(2)} of a rim step apart — coarser than half`);
+    return `${f.pads.length} pads, one wedge each, rims vary ${(leastVary * 100).toFixed(1)}-${(worstRound * 100).toFixed(1)}% of radius, `
+      + `wedges sampled within ${(worstGap / rimStep).toFixed(2)} of a rim step`;
+  });
+
+  check('the stem wedge is cut at a different angle on every pad', () => {
+    // EVA'S RULING: "the cut out a variety of angles ranging from 5 to 65".
+    // Two claims, and the one that matters is measured off the DRAWN outline
+    // rather than off the record, because a field whose pads all declare a
+    // different angle and all draw the same wedge satisfies a check that only
+    // reads the declaration.
+    //
+    // THE DRAWN ANGLE IS RECOVERED FROM WHERE THE RADII SIT. The flank is a
+    // linear ramp from NOTCH_INNER at the apex to the rim at the edge, so the
+    // stretch under half a radius is a fixed fraction of the half-width —
+    // (0.5 - NOTCH_INNER) / (1 - NOTCH_INNER) of it, either side. Read that
+    // stretch's angular extent off the outline and it hands back the wedge the
+    // pad was actually cut with, whatever the pad says about itself.
+    const f = padField(4242);
+    const frac = (0.5 - M.pads.NOTCH_INNER) / (1 - M.pads.NOTCH_INNER);
+    const drawn = [], said = [];
+    const bad = [];
+    for (const pad of f.pads) {
+      const dives = pad.outline
+        .map(p => ({ d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt), r: Math.hypot(p.x, p.y) / pad.R }))
+        .filter(q => q.r < 0.5).map(q => q.d);
+      const extent = Math.max(...dives) - Math.min(...dives);
+      // The samples are a finite ladder, so the run's two ends each fall short
+      // of the true crossing by up to one step; add a step back rather than
+      // widening the tolerance, which would hide a real disagreement. The step
+      // is read off the dive's own samples, so nothing here consults the
+      // wedge's declared width.
+      const step = dives.length > 1 ? extent / (dives.length - 1) : 0;
+      const deg = ((extent + step) / (2 * frac)) * 360 / Math.PI;
+      drawn.push(deg);
+      said.push(pad.notchDeg);
+      if (Math.abs(deg - pad.notchDeg) > 0.25 * pad.notchDeg + 1.5) {
+        bad.push(`a pad says ${pad.notchDeg.toFixed(1)} and draws ${deg.toFixed(1)} degrees`);
+      }
+    }
+    if (bad.length) throw new Error(`${bad.length} of ${f.pads.length} pads: ${[...new Set(bad)].slice(0, 3).join(', ')}`);
+    const loD = Math.min(...drawn), hiD = Math.max(...drawn);
+    // The range is 5 to 65 and the draw is uniform, so a field of this size
+    // reaches within a couple of degrees of each end; the bars are loose enough
+    // that an unlucky field is not a failure and tight enough that a narrowed
+    // range is. A FIELD THAT DRAWS ONE WIDTH FAILS BOTH.
+    if (!(loD < 15)) throw new Error(`the narrowest wedge drawn is ${loD.toFixed(1)} degrees — the range starts at ${M.pads.NOTCH_DEG[0]}`);
+    if (!(hiD > 50)) throw new Error(`the widest wedge drawn is ${hiD.toFixed(1)} degrees — the range ends at ${M.pads.NOTCH_DEG[1]}`);
+    if (!(new Set(said.map(v => v.toFixed(3))).size === said.length)) throw new Error('two pads were cut at exactly the same angle');
+    return `${f.pads.length} pads, drawn wedges ${loD.toFixed(1)}-${hiD.toFixed(1)} degrees `
+      + `(declared ${Math.min(...said).toFixed(1)}-${Math.max(...said).toFixed(1)}, range ${M.pads.NOTCH_DEG[0]}-${M.pads.NOTCH_DEG[1]})`;
+  });
+
+  check('a pad answers any ripple the same way', () => {
+    // THE SAME CLAIM THE FISH CARRY, one module along, and for the same reason:
+    // the cause of a ripple is not in the record, so nothing can branch on it.
+    // Two ponds, one pad each in the same place, each given one ripple that
+    // agrees on every quantity a disturbance HAS and differs only in `rings` —
+    // which is how many circles the renderer strokes and nothing a leaf can
+    // feel. If the pads rock differently, something is reading the cause.
+    const mk = (rings) => {
+      const rip = { x: 300, y: 300, r: 0, maxR: 120, age: 0, life: 2.2, strength: 0.9, rings };
+      const pad = M.pads.makePad(M.rng.makeRandom(5), 380, 300, 40);
+      return { rip, pad };
+    };
+    const a = mk(2), b = mk(3);
+    let moved = 0;
+    for (let i = 0; i < 600; i++) {
+      for (const s2 of [a, b]) {
+        s2.rip.age += DT;
+        s2.rip.r = s2.rip.maxR * M.ripples.frontAt(s2.rip.age / s2.rip.life);
+        M.pads.respond(s2.pad, M.pads.waveAt([s2.rip], s2.pad.x, s2.pad.y), DT);
+      }
+      moved = Math.max(moved, Math.hypot(a.pad.tx, a.pad.ty), Math.abs(a.pad.lift));
+    }
+    // Not vacuous: the ripple must actually have rocked the pad.
+    if (!(moved > 0.01)) throw new Error(`the ripple did not move the pad at all (${moved})`);
+    for (const k of ['tx', 'ty', 'lift']) {
+      if (a.pad[k] !== b.pad[k]) throw new Error(`${k} came out ${a.pad[k]} against ${b.pad[k]}`);
+    }
+    return `peak response ${moved.toFixed(4)}, identical to the bit on both`;
+  });
+
+  check('a passing front rocks a pad and lets it go', () => {
+    // THE SHAPE OF THE RESPONSE, not merely that there is one. A front crossing
+    // a pad tips it one way, then the OTHER as the crest passes the centre, and
+    // then the pad comes back to flat — that reversal is what makes it a rock
+    // rather than a shove, and it comes out of the slope under the pad changing
+    // sign rather than out of any oscillator.
+    const pad = M.pads.makePad(M.rng.makeRandom(11), 500, 300, 42);
+    const rip = { x: 300, y: 300, r: 0, maxR: 320, age: 0, life: 3.0, strength: 1, rings: 2 };
+    let along = [], peak = 0, peakLift = 0;
+    for (let i = 0; i < 3.0 / DT; i++) {
+      rip.age += DT;
+      rip.r = rip.maxR * M.ripples.frontAt(rip.age / rip.life);
+      M.pads.respond(pad, M.pads.waveAt([rip], pad.x, pad.y), DT);
+      // The component along the line from the splash: positive is tipped away.
+      along.push(pad.tx);
+      peak = Math.max(peak, Math.hypot(pad.tx, pad.ty));
+      peakLift = Math.max(peakLift, pad.lift);
+    }
+    const hi = Math.max(...along), lo = Math.min(...along);
+    if (!(hi > 0.004)) throw new Error(`the front never tipped the pad toward the splash (${hi})`);
+    if (!(lo < -0.004)) throw new Error(`the pad never tipped back the other way (${lo}) — that is a shove, not a rock`);
+    const rest = Math.hypot(pad.tx, pad.ty);
+    if (!(rest < peak * 0.2)) throw new Error(`it is still rocking at ${rest} after the ripple died (peak ${peak})`);
+    if (!(peakLift > 0.05)) throw new Error(`the pad never rode up the wave (${peakLift})`);
+    return `tilt ${(lo * 180 / Math.PI).toFixed(2)}° to ${(hi * 180 / Math.PI).toFixed(2)}°, `
+      + `bob ${peakLift.toFixed(2)} px, back to ${(rest * 180 / Math.PI).toFixed(3)}° at rest`;
+  });
+
+  check('the rock is subtle and a downpour does not peg it', () => {
+    // BOUNDED, AND NOT BY A CLAMP. The brief asks for a slight rock; a hard
+    // clamp would deliver that and would also put every pad in the pond at the
+    // ceiling for the whole of a storm, which is one thing a field of leaves
+    // must not do. What separates the two is not the ceiling, which both
+    // respect — it is whether there is a FLAT REGION above it, so the law is
+    // swept as a function rather than sampled on a fixture.
+    //
+    // THE FIRST CUT OF THIS CHECK LOOKED AT A FIXTURE AND MISSED THE MUTATION
+    // IT EXISTS FOR. It ran twelve pads under a hundred and twenty ripples and
+    // asked whether their tilts still differed from one another at the end —
+    // and they did under the clamp too, because by then the ripples had aged
+    // and the clamp was no longer binding on any of them. A pond does not hold
+    // still long enough to be a controlled experiment; the law does.
+    const settled = (slope) => {
+      const pad = M.pads.makePad(M.rng.makeRandom(1), 0, 0, 30);
+      const wave = { h: 0, gx: slope, gy: 0 };
+      for (let i = 0; i < 400; i++) M.pads.respond(pad, wave, 1 / 60);
+      return Math.hypot(pad.tx, pad.ty);
+    };
+    const xs = [], ys = [];
+    for (let i = 1; i <= 40; i++) { const g = i * M.pads.TILT_REF * 0.25; xs.push(g); ys.push(settled(g)); }
+    const top = ys[ys.length - 1];
+    if (!(top <= M.pads.TILT_MAX + 1e-9)) throw new Error(`a slope of ${xs[xs.length - 1]} reached ${top} rad against a cap of ${M.pads.TILT_MAX}`);
+    if (!(M.pads.TILT_MAX * 180 / Math.PI < 9)) throw new Error(`the cap itself is ${(M.pads.TILT_MAX * 180 / Math.PI).toFixed(1)}° — that is not a slight rock`);
+    // NO FLAT REGION, ANYWHERE. A clamp is flat above its ceiling by definition,
+    // so this is the clause that tells the two apart — and it is asserted over
+    // the WHOLE sweep, including ten times the reference slope, because a clamp
+    // placed high enough would pass a sweep that stopped short of it.
+    for (let i = 1; i < ys.length; i++) {
+      if (!(ys[i] > ys[i - 1])) {
+        throw new Error(`the response is flat between slopes ${xs[i - 1].toFixed(3)} and ${xs[i].toFixed(3)} `
+          + `(both ${ys[i].toFixed(6)} rad) — that is a clamp, not a saturation`);
+      }
+    }
+    // AND IT HOLDS ON A REAL POND, where a hundred crests overlap under one pad
+    // and the naive sum would be many times the ceiling.
+    const rand = M.rng.makeRandom(3);
+    const pads = [];
+    for (let i = 0; i < 12; i++) pads.push(M.pads.makePad(rand, 400 + i * 37, 300 + (i % 4) * 29, 34));
+    const rips = [];
+    for (let i = 0; i < 120; i++) {
+      rips.push({ x: rand.range(300, 900), y: rand.range(200, 500), r: 0,
+        maxR: rand.range(60, 170), age: rand.range(0.1, 0.5), life: 2.4, strength: 1, rings: 2 });
+    }
+    let worst = 0, worstLift = 0;
+    for (let i = 0; i < 400; i++) {
+      for (const r of rips) { r.age += DT; r.r = r.maxR * M.ripples.frontAt(Math.min(0.99, r.age / r.life)); }
+      for (const p of pads) {
+        M.pads.respond(p, M.pads.waveAt(rips, p.x, p.y), DT);
+        worst = Math.max(worst, Math.hypot(p.tx, p.ty));
+        worstLift = Math.max(worstLift, Math.abs(p.lift));
+      }
+    }
+    if (!(worst <= M.pads.TILT_MAX + 1e-9)) throw new Error(`a pad reached ${worst} rad against a cap of ${M.pads.TILT_MAX}`);
+    if (!(worstLift <= M.pads.BOB_MAX + 1e-9)) throw new Error(`a pad bobbed ${worstLift} px against a cap of ${M.pads.BOB_MAX}`);
+    if (!(worst > M.pads.TILT_MAX * 0.5)) throw new Error(`the storm only reached ${worst} rad — the cap was never approached`);
+    return `strictly rising over 40 slopes to ${(top * 180 / Math.PI).toFixed(3)}° of a `
+      + `${(M.pads.TILT_MAX * 180 / Math.PI).toFixed(2)}° cap; under 120 ripples `
+      + `${(worst * 180 / Math.PI).toFixed(2)}° and ${worstLift.toFixed(2)} px of bob`;
+  });
+
+  check('a tilted pad is foreshortened one way and lifted the other', () => {
+    // BOTH HALVES OF THE ROCK, because a foreshortening ALONE is even in the
+    // tilt — cos(-t) is cos(t) — so a pad drawn with only that reads as pulsing
+    // at twice the wave's frequency rather than rocking. The height term is odd
+    // in the tilt, and it is what makes one edge visibly lift while the other
+    // drops. Measured on `padPoint`, which is the one place a local point
+    // becomes a place on the water.
+    const pad = M.pads.makePad(M.rng.makeRandom(2), 0, 0, 50);
+    pad.tx = 0; pad.ty = 0; pad.lift = 0;
+    const flat = M.pads.padPoint(pad, 50, 0);
+    if (!(flat.x === 50 && flat.y === 0 && flat.z === 0)) throw new Error('an untilted pad is not flat');
+    const T = 0.1;
+    pad.tx = T;                       // tipped up toward +x
+    const up = M.pads.padPoint(pad, 50, 0);
+    const down = M.pads.padPoint(pad, -50, 0);
+    const across = M.pads.padPoint(pad, 0, 50);
+    near(up.x, 50 * Math.cos(T), 1e-12, 'the near edge foreshortens');
+    near(up.z, 50 * Math.sin(T), 1e-12, 'the near edge rises');
+    near(down.z, -50 * Math.sin(T), 1e-12, 'the far edge drops');
+    if (!(up.z > 0 && down.z < 0)) throw new Error('both edges moved the same way — that is a pulse, not a rock');
+    near(across.z, 0, 1e-12, 'the tilt axis itself does not move');
+    near(Math.hypot(across.x, across.y), 50, 1e-12, 'the tilt axis is not foreshortened');
+    // And it is SIGNED: tilting the other way swaps which edge is up.
+    pad.tx = -T;
+    const flipped = M.pads.padPoint(pad, 50, 0);
+    near(flipped.z, -up.z, 1e-12, 'reversing the tilt reverses the height');
+    near(flipped.x, up.x, 1e-12, 'reversing the tilt leaves the foreshortening alone');
+    return `at ${(T * 180 / Math.PI).toFixed(1)}°: near edge +${up.z.toFixed(2)} px, far edge ${down.z.toFixed(2)}, `
+      + `axis exactly 0, foreshortened to ${up.x.toFixed(3)} of 50`;
+  });
+
+  check('growing the frame grows the field and moves nothing', () => {
+    // A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT. A resize that
+    // re-generated the field would make every pad jump, which is the one thing
+    // a fixed object must not do; one that did nothing would leave the new water
+    // bare. Both directions are asserted, and the pads are compared by IDENTITY
+    // rather than by count — a field that replaced its pads with the same number
+    // of different ones passes a count.
+    const f = padField(4242, 900, 620);
+    const before = f.pads.slice();
+    const where = before.map(p => [p.x, p.y, p.R]);
+    f.ensure(1600, 1000);
+    const after = f.pads;
+    if (!(after.length > before.length)) throw new Error(`the field did not grow (${before.length} -> ${after.length})`);
+    for (let i = 0; i < before.length; i++) {
+      if (after[i] !== before[i]) throw new Error(`pad ${i} is not the same object after a resize`);
+      const [x, y, R] = where[i];
+      if (after[i].x !== x || after[i].y !== y || after[i].R !== R) throw new Error(`pad ${i} moved`);
+    }
+    // Shrinking keeps everything: the pond does not lose its leaves because the
+    // window got smaller.
+    f.ensure(700, 500);
+    if (f.pads.length !== after.length) throw new Error(`shrinking the frame changed the field ${after.length} -> ${f.pads.length}`);
+    // And the blooms are the PICTURE's, not the pond area's: a resize must not
+    // breed a fourth.
+    if (!(f.blooms.length >= M.pads.BLOOMS[0] && f.blooms.length <= M.pads.BLOOMS[1])) {
+      throw new Error(`${f.blooms.length} blooms after two resizes, outside the ruled ${M.pads.BLOOMS.join('-')}`);
+    }
+    return `${before.length} pads over 900x620 -> ${after.length} over 1600x1000, none moved, ${f.blooms.length} blooms`;
+  });
+
+  check('blooms rise among the pads and there are two or three', () => {
+    const rows = [];
+    for (const seed of [4242, 7, 90210, 31337]) {
+      const f = padField(seed);
+      if (!(f.blooms.length >= M.pads.BLOOMS[0] && f.blooms.length <= M.pads.BLOOMS[1])) {
+        throw new Error(`seed ${seed} placed ${f.blooms.length} blooms`);
+      }
+      for (const b of f.blooms) {
+        let nearest = Infinity, inside = false;
+        for (const p of f.pads) {
+          const d = Math.hypot(p.x - b.x, p.y - b.y);
+          nearest = Math.min(nearest, d / p.R);
+          if (d < p.R * 0.80) inside = true;
+        }
+        // AMONG the pads: a leaf beside it, and not sitting on one. One without
+        // the other is a flower alone on a pond, or a flower growing out of a leaf.
+        if (inside) throw new Error(`seed ${seed}: a bloom sits inside a pad's rim`);
+        if (!(nearest <= M.pads.BLOOM_BESIDE)) {
+          throw new Error(`seed ${seed}: the nearest pad to a bloom is ${nearest.toFixed(2)} of its own radius away`);
+        }
+      }
+      rows.push(`${seed}:${f.blooms.length}`);
+    }
+    return `blooms per seed ${rows.join(' ')}, each beside a pad and on none`;
+  });
+
+  check('wiring in the pads did not move the koi', () => {
+    // THE FORKED STREAM, AND IT IS NOT TIDINESS. koi-ripples.js says it in as
+    // many words: every draw on the shared stream shifts every number taken
+    // after it for the rest of the run, and the fish share that stream. A pad
+    // field placed from it would hand the pond a different set of koi — so the
+    // koi would have changed for a reason that has nothing to do with pads, and
+    // NOTHING ELSE HERE WOULD NOTICE: they would still be seven, still distinct,
+    // still swimming.
+    //
+    // The witness is a school built from the seed ALONE, with no scene around
+    // it, against the school the wired scene actually has. `state()` is read
+    // before a single frame is advanced, so the traits are the seeded ones.
+    const seed = 4242, W = 1280, H = 800;
+    const alone = M.fish.createSchool({ rand: M.rng.makeRandom(seed),
+      surface: M.surface.createSurface(), width: W, height: H });
+    alone.seed(W, H);
+    const wired = M.sceneKoi.default({
+      width: W, height: H, seed, reducedMotion: false,
+      canvas2d: () => ({ canvas: null, ctx: new Proxy({}, { get: () => () => {}, set: () => true }) }),
+    });
+    const st2 = wired.state();
+    if (!(st2.pads > 0)) throw new Error('the scene built no pads, so this proves nothing');
+    const mine = alone.fish.map(f => JSON.stringify(f.traits));
+    const theirs = st2.traits.map(t => JSON.stringify(t));
+    if (mine.length !== theirs.length) throw new Error(`${mine.length} koi alone against ${theirs.length} wired`);
+    if (!mine.length) throw new Error('no koi were seeded, so this proves nothing');
+    for (let i = 0; i < mine.length; i++) {
+      if (mine[i] !== theirs[i]) {
+        throw new Error(`koi ${i} is ${theirs[i]} in the scene and ${mine[i]} from the seed alone — `
+          + 'the pads are drawing from the stream the fish use');
+      }
+    }
+    wired.dispose();
+    return `${mine.length} koi identical to the seed's own, with ${st2.pads} pads and ${st2.blooms} blooms placed`;
+  });
+
+  check('a pad is drawn over the fish and the ripples', () => {
+    // THE DEPTH ORDER, MEASURED ON THE OPS THE RENDERER ACTUALLY EMITS. The
+    // renderer's own header says draw order is the ONLY depth cue in this scene,
+    // and a lily pad floats ON the water: a koi swims beneath it and a ring
+    // spreads around it, so the pad has to come after both. The browser half
+    // proves the pad hides the WATER in pixels; it cannot see the koi, whose
+    // outline is dimmer than a stack of the pad's own freckles. This can, and it
+    // is the claim in its general form — one placement in draw() decides both.
+    //
+    // The three are put in three places along the frame so an op belongs to
+    // whichever it is nearest, with no overlap to argue about.
+    const surf = M.surface.createSurface();
+    // TWO KINDS OF EVENT, AND THE FIRST CUT OF THIS RECORDER CONFLATED THEM. It
+    // tagged every path point with the fill style in effect AT THE TIME OF THE
+    // POINT — but a path is built first and painted after, so a pad's own
+    // outline came back wearing whatever the ripple pass had left set. The
+    // paints are recorded as their own events now and a shape's paint is the
+    // first one after its points.
+    const ops = [];
+    const noop = () => {};
+    const at = (x) => ops.push({ kind: 'pt', x });
+    const rec = new Proxy({
+      moveTo: (x) => at(x), lineTo: (x) => at(x),
+      quadraticCurveTo: (a, b, x) => at(x), bezierCurveTo: (a, b, c, d, x) => at(x),
+      ellipse: (x) => at(x), arc: (x) => at(x), rect: (x) => at(x),
+      fill: () => ops.push({ kind: 'fill', style: String(rec.fillStyle) }),
+      stroke: () => ops.push({ kind: 'stroke', style: String(rec.strokeStyle) }),
+      createRadialGradient: () => ({ addColorStop: noop, toString: () => 'GRADIENT' }),
+      createLinearGradient: () => ({ addColorStop: noop, toString: () => 'GRADIENT' }),
+    }, {
+      get: (t, k) => (k in t ? t[k] : (t[k] !== undefined ? t[k] : noop)),
+      set: (t, k, v) => { t[k] = v; return true; },
+    });
+
+    // The grain is a cached Path2D, which Node has no notion of. Stubbed for the
+    // length of this check and removed after: the grain is water, it is filled
+    // before anything else in the frame, and none of its points is near the
+    // three things being ordered.
+    const hadPath2D = 'Path2D' in globalThis;
+    if (!hadPath2D) globalThis.Path2D = class { rect() {} moveTo() {} lineTo() {} closePath() {} };
+    try {
+      const rend = M.draw.createRenderer(rec, surf);
+      const N = M.fish.SPINE_JOINTS, L = 96;
+      const seg = M.fish.CHAIN_SPAN_U * L / (N - 1);
+      const spine = [];
+      for (let i = 0; i < N; i++) spine.push({ x: 300 - seg * i, y: 400 });
+      const pad = M.pads.makePad(M.rng.makeRandom(1), 700, 400, 45);
+      rend.draw({
+        width: 1280, height: 800,
+        fish: [{ id: 1, len: L, seg, spine, speed: 40, phase: 0, finPhase: 0, patches: [] }],
+        ripples: [{ x: 1100, y: 400, r: 60, maxR: 120, age: 0.5, life: 2, strength: 1, rings: 2 }],
+        drops: [], pads: { drawOrder: [pad], pads: [pad], blooms: [] },
+        fallDir: { x: 0, y: 1 }, storm: { shake: 0, flash: 0 },
+        reducedMotion: false, ripplePhase: 0,
+      });
+    } finally { if (!hadPath2D) delete globalThis.Path2D; }
+
+    const band = (lo, hi) => ops.map((o, i) => ({ ...o, i }))
+      .filter(o => o.kind === 'pt' && o.x > lo && o.x < hi);
+    const fishOps = band(120, 480), padOps = band(620, 780), ripOps = band(950, 1250);
+    if (!fishOps.length || !padOps.length || !ripOps.length) {
+      throw new Error(`nothing to compare (${fishOps.length} fish / ${padOps.length} pad / ${ripOps.length} ripple ops)`);
+    }
+    const lastFish = fishOps[fishOps.length - 1].i;
+    const lastRip = ripOps[ripOps.length - 1].i;
+    const firstPad = padOps[0].i;
+    if (!(firstPad > lastFish)) throw new Error(`the pad starts at op ${firstPad}, before the koi ends at ${lastFish}`);
+    if (!(firstPad > lastRip)) throw new Error(`the pad starts at op ${firstPad}, before the ripples end at ${lastRip}`);
+    // AND THE RESET IS THE FIRST THING IT PAINTS. Every other mark in this scene
+    // is translucent ink, so without an opaque fill of the water's own value the
+    // order buys nothing — the koi would simply tint through.
+    const firstPaint = ops.slice(firstPad).find(o => o.kind === 'fill' || o.kind === 'stroke');
+    if (!firstPaint || firstPaint.kind !== 'fill' || firstPaint.style !== M.draw.GROUND) {
+      throw new Error(`the pad's first paint is a ${firstPaint ? firstPaint.kind : 'nothing'} `
+        + `with "${firstPaint ? firstPaint.style : ''}" rather than a fill of the ground`);
+    }
+    return `koi ops end at ${lastFish}, ripples at ${lastRip}, the pad starts at ${firstPad} with a ground fill`;
+  });
+
+  check('the pad field costs a frame nothing it cannot afford', () => {
+    // The wave field is read once per pad per frame over the whole ripple list,
+    // which during a downpour is the cap. Measured rather than reasoned about,
+    // because "one pass over a bounded list" is how every accidental quadratic
+    // starts.
+    const f = padField(4242, 1440, 900);
+    const rand = M.rng.makeRandom(9);
+    const rips = [];
+    for (let i = 0; i < M.ripples.MAX_RIPPLES; i++) {
+      rips.push({ x: rand.range(0, 1440), y: rand.range(0, 1500), r: rand.range(0, 160),
+        maxR: 170, age: rand.range(0.2, 1.2), life: 3.0, strength: 0.6, rings: 2 });
+    }
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < 60; i++) f.advance(1 / 60, { ripples: rips });
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 60;
+    if (!(ms < 2.0)) throw new Error(`${ms.toFixed(2)} ms a frame for ${f.pads.length} pads against ${rips.length} ripples`);
+    return `${ms.toFixed(3)} ms a frame, ${f.pads.length} pads x ${rips.length} ripples (the cap)`;
+  });
+
   // --------------------------------------------------------------- registry
   setSection('registry');
   check('there are eight slots and one is built', () => {
@@ -1540,8 +2284,13 @@ async function partOne(mutant) {
   // source. Comments are stripped first, since every one of these rules is
   // also WRITTEN ABOUT in the headers it governs.
   setSection('discipline');
+  // A NEW SCENE MODULE MUST BE ADDED HERE OR IT IS SCANNED BY NOTHING. The list
+  // is the scan's own coverage, and a module missing from it passes every
+  // discipline check by not being read — the hole this repo has found in a
+  // hand-written coverage list more than once.
   const SCENE_MODULES = ['surface.js', 'koi-storm.js', 'koi-wind.js', 'koi-ripples.js',
-                         'koi-rain.js', 'koi-fish.js', 'koi-draw.js', 'scene-koi.js'];
+                         'koi-rain.js', 'koi-fish.js', 'koi-pads.js', 'koi-draw.js',
+                         'scene-koi.js'];
   const stripComments = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
@@ -1732,6 +2481,60 @@ const CANVAS_STATS = `(() => {
   return { mean: sum / (d.length / 4), lit, px: d.length / 4 };
 })()`;
 
+// Bright pixels inside a screen-space ellipse and in an annulus just outside
+// it, read back from the RASTERISED framebuffer. The threshold sits above the
+// pad's own body and freckles and below a ripple ring or a koi's outline, so
+// what it counts is things ON the water rather than the pad itself.
+// THE LEVEL IS A MEASURED CLIFF, NOT A GUESS, and the first two numbers tried
+// were both wrong for reasons worth writing down. A pad's own FRECKLES
+// composite to about 71 over the ground — one over a threshold of 70 — so at
+// that level the check was counting the pad's texture as something showing
+// through it. And freckles OVERLAP: two on top of each other reach ~103 and
+// three ~123, which is past a koi's own outline (~97), so no threshold
+// separates "a fish under the pad" from "the pad's own marks" by brightness.
+// Sampled over 22 frames on an isolated pad at idle, interior against the water
+// just outside it:
+//     level    inside    outside
+//        70    3.135%     2.981%
+//        90    2.447%     1.599%
+//       110    0.053%     0.446%
+//       120    0.000%     0.210%
+// So 120 is above everything a pad draws on itself and below plenty of what the
+// water carries. WHAT IT THEREFORE CANNOT SEE is the koi, whose outline is
+// dimmer than a stack of freckles — that half of the claim is measured by
+// `pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, in Node, on the order the
+// renderer actually emits.
+// (the measured brightness table above is kept because it is WHY this check is
+// a variance; no clause reads a level any more.)
+// Mean brightness inside each of several equal-sized screen ellipses, read back
+// from the RASTERISED framebuffer in ONE call per frame — so several pads and
+// their control are sampled at the same instant and are directly comparable.
+// EVERY DISC IS THE SAME SIZE, because variance scales with area: a single ring
+// crossing a small disc moves its mean far more than it moves a large one, so
+// discs of different radii cannot be compared to each other at all.
+const DISC_MEANS = `(discs, rx, ry) => {
+  const c = document.querySelector('.scene-canvas');
+  const g = c.getContext('2d');
+  const dpr = c.width / parseFloat(c.style.width);
+  return discs.map(([cx, cy]) => {
+    const R = Math.ceil(rx * dpr) + 2, Ry = Math.ceil(ry * dpr) + 2;
+    const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Ry);
+    const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Ry * 2);
+    if (w <= 0 || h <= 0) return null;
+    const d = g.getImageData(x0, y0, w, h).data;
+    let n = 0, sum = 0;
+    for (let py = 0; py < h; py++) {
+      for (let px = 0; px < w; px++) {
+        const i = (py * w + px) * 4;
+        const dx = ((x0 + px) / dpr - cx) / rx, dy = ((y0 + py) / dpr - cy) / ry;
+        if (Math.hypot(dx, dy) > 1) continue;
+        n++; sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      }
+    }
+    return n ? sum / n : null;
+  });
+}`;
+
 async function partTwo(browser, mutant, shotsDir) {
   // ---------------------------------------------------- pass A: the page ---
   {
@@ -1883,6 +2686,182 @@ async function partTwo(browser, mutant, shotsDir) {
         return `${st.visible} koi, ${st.ripples} ripples, ${ink.lit} lit pixels`;
       });
 
+      await checkAsync('the pond has lily pads on it, in clumps, with blooms among them', async () => {
+        const st2 = await page.evaluate(() => window.__scene.sceneState());
+        if (!(st2.pads >= 12)) throw new Error(`${st2.pads} pads on the water`);
+        if (!(st2.clusters >= 2)) throw new Error(`${st2.clusters} clusters`);
+        if (!(st2.blooms >= 2 && st2.blooms <= 3)) throw new Error(`${st2.blooms} blooms`);
+        // Back to front, which is what lets a nearer pad cover a farther one's
+        // rim: ascending plane y is the painter's order under this viewpoint.
+        for (let i = 1; i < st2.padOrder.length; i++) {
+          if (st2.padOrder[i] < st2.padOrder[i - 1]) throw new Error('the draw order is not back to front');
+        }
+        if (st2.padOrder.length !== st2.pads + st2.blooms) {
+          throw new Error(`${st2.padOrder.length} things are drawn against ${st2.pads + st2.blooms} placed`);
+        }
+        return `${st2.pads} pads in ${st2.clusters} clusters, ${st2.blooms} blooms, drawn back to front`;
+      });
+
+      await checkAsync('a pad hides the water under it', async () => {
+        // THE OCCLUSION, READ OFF THE RASTERISED FRAME rather than off the draw
+        // order the page reports. A lily pad floats ON the water: a ring spreads
+        // around it and a koi swims beneath it, and neither can be seen through
+        // a leaf. Nothing in this scene occluded anything before the pads —
+        // every other mark is translucent ink — so this is the one check that
+        // can say the reset works in pixels.
+        //
+        // WHAT SEPARATES A PAD FROM WATER IS NOT BRIGHTNESS, IT IS MOTION, and
+        // two threshold-based cuts had to fail before that was obvious. A pad's
+        // freckles composite to ~71, two overlapping reach ~103 and three ~123 —
+        // past a koi's outline at ~97 — so at any level low enough to catch the
+        // rings the pad's own texture matches them (3.135% against 2.981% at
+        // level 70), and at any level high enough to exclude the texture the
+        // ambient rings barely clear it either (2 lit pixels over 30 frames at
+        // 120). There is no threshold in between. A pad's interior is STATIC
+        // apart from its own rock, while open water has rings sweeping through
+        // it continuously, so what is measured is the VARIATION of each disc's
+        // mean brightness across frames.
+        //
+        // SEVERAL PADS, NOT ONE, AND THAT IS THE DIFFERENCE BETWEEN A CHECK THAT
+        // FIRES AND ONE THAT MIGHT. Watching a single pad, whether any ring
+        // crosses ITS patch during the window is luck: the sweep caught this as
+        // a MISSED — the mutation that deletes the reset entirely left the check
+        // GREEN — on a run where the one pad it had picked sat over quiet water,
+        // and the same mutation had reddened it on an earlier run. With the
+        // reset gone EVERY pad shows the water through it, so taking the WORST
+        // ratio over several makes the mutation unmissable while costing the
+        // clean tree nothing: on a correct pad the interior is quiet wherever it
+        // sits.
+        const st2 = await page.evaluate(() => window.__scene.sceneState());
+        const inFrame = st2.padAt
+          .map(([x, y, R, , , notchAt], i) => ({ i, x, y, R, notchAt, sx: x, sy: y * st2.squash }))
+          .filter(p => p.R > 24
+            && p.sx - p.R > 6 && p.sx + p.R < st2.width - 6
+            && p.sy - p.R * st2.squash > 6 && p.sy + p.R * st2.squash < st2.height - 6)
+          .sort((a2, b2) => b2.R - a2.R)
+          .slice(0, 5);
+        if (inFrame.length < 3) throw new Error(`only ${inFrame.length} pads are fully in frame`);
+        // THE DISC SITS ON THE PAD'S OWN MATERIAL, WHICH IS NOT THE SAME AS ON
+        // THE PAD'S CENTRE — and the difference only started to matter when the
+        // stem wedge became a per-pad draw reaching 65 degrees. A disc centred
+        // on the pad and 0.9 of its radius across then takes in a sector of the
+        // wedge, which is OPEN WATER: the check's own subject quietly grew to
+        // include the thing it is comparing against. Measured on the tree that
+        // introduced the range, before this fix: the pads' median variation went
+        // 0.044-0.067 (one fixed 5.7-degree slit) to 0.193, with the worst pad
+        // at 0.234 against a bar of 0.35 — still green, and no longer measuring
+        // only what it names.
+        //
+        // So the disc is offset along the axis AWAY from the wedge, and it is
+        // the largest one that fits there. The wedge's two flanks are rays from
+        // the pad's own centre, so a disc on the opposite axis is clear of both
+        // exactly when it does not reach the centre — its radius must not
+        // exceed its offset — and it is inside the rim when the two together do
+        // not. 0.42 and 0.40 satisfies both AT EVERY ANGLE THE RULING ALLOWS
+        // rather than on this field's luck, with 0.02 R of clearance from the
+        // apex and 0.12 R from the nearest rim a tenth of variation can produce.
+        // The static marks it crosses — the midrib, a fold — cost a VARIANCE
+        // nothing, because they do not move between frames.
+        //
+        // IT IS A FIFTH OF THE AREA THE OLD CENTRED DISC HAD, and that is the
+        // honest cost of a cut that reaches the centre rather than a choice: a
+        // smaller disc averages fewer pixels, so rain and the pad's own rock
+        // move its mean further. Both sides are sampled at this radius, so the
+        // comparison stays fair; what it spends is margin, measured below.
+        const OFF = 0.42, DISC = 0.40;
+        const rx = Math.min(...inFrame.map(p => p.R)) * DISC, ry = rx * st2.squash;
+        for (const p of inFrame) {
+          p.sx = p.x - Math.cos(p.notchAt) * OFF * p.R;
+          p.sy = (p.y - Math.sin(p.notchAt) * OFF * p.R) * st2.squash;
+        }
+
+        // The control is a disc of the SAME size on open water, which the brief
+        // guarantees exists — loose clusters with gaps between them — placed at
+        // a similar distance from the frame's centre so the vignette matches.
+        const away = (x, y) => st2.padAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6)
+          && st2.bloomAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6);
+        const cx0 = st2.width / 2, cy0 = st2.height / st2.squash / 2;
+        const want = Math.hypot(inFrame[0].x - cx0, inFrame[0].y - cy0);
+        const open = [];
+        for (let gx = 0; gx < 44; gx++) {
+          for (let gy = 0; gy < 44; gy++) {
+            const x = (gx + 0.5) / 44 * st2.width, y = (gy + 0.5) / 44 * (st2.height / st2.squash);
+            if (x - rx < 6 || x + rx > st2.width - 6) continue;
+            if (y * st2.squash - ry < 6 || y * st2.squash + ry > st2.height - 6) continue;
+            if (!away(x, y)) continue;
+            open.push({ x, y, d: Math.abs(Math.hypot(x - cx0, y - cy0) - want) });
+          }
+        }
+        if (!open.length) throw new Error('no patch of open water the size of a pad to compare against');
+        open.sort((a2, b2) => a2.d - b2.d);
+        // FIVE CONTROL PATCHES, NOT ONE, FOR THE SAME REASON THERE ARE FIVE PADS
+        // — and the first cut of this fix used five pads against ONE patch,
+        // which left the comparison exactly as luck-dependent on the other side:
+        // measured across two runs of an unchanged tree, a single patch's
+        // variation read 3.041 and then 0.751, a factor of four, purely from how
+        // many rings happened to cross it. Both sides are medians over five now,
+        // so neither is one draw.
+        const spots = [];
+        for (const c of open) {
+          if (spots.every(o => Math.hypot(o.x - c.x, o.y - c.y) > rx * 2.2)) spots.push(c);
+          if (spots.length === 5) break;
+        }
+        if (spots.length < 3) throw new Error(`only ${spots.length} separate patches of open water to compare against`);
+
+        const discs = [...inFrame.map(p => [p.sx, p.sy]),
+                       ...spots.map(c => [c.x, c.y * st2.squash])];
+        const series = discs.map(() => []);
+        // ON THE POND'S CLOCK: what this needs is rings that have MOVED between
+        // samples, and how much pond a wall-clock wait covers depends on how
+        // fast the machine is.
+        for (let t = 0; t < 34; t++) {
+          const means = await page.evaluate(`(${DISC_MEANS})(${JSON.stringify(discs)}, ${rx}, ${ry})`);
+          if (means && means.every(m => m !== null)) means.forEach((m, k) => series[k].push(m));
+          await waitSceneSeconds(page, 0.10);
+        }
+        const frames = series[0].length;
+        if (frames < 10) throw new Error(`only ${frames} frames could be sampled`);
+        const sd = (xs) => {
+          const m = xs.reduce((p2, q) => p2 + q, 0) / xs.length;
+          return Math.sqrt(xs.reduce((p2, q) => p2 + (q - m) * (q - m), 0) / xs.length);
+        };
+        const mid = (xs) => xs.slice().sort((a2, b2) => a2 - b2)[Math.floor(xs.length / 2)];
+        const padSds = series.slice(0, inFrame.length).map(sd);
+        const waterSds = series.slice(inFrame.length).map(sd);
+        const waterSd = mid(waterSds);
+        // THE MEDIAN OF THE FIVE, NOT THE WORST, AND RAIN IS WHY. A streak is in
+        // the AIR and is drawn in FRONT of a pad — correct behaviour, not a leak
+        // — and one crossing a disc of this size moves its mean by about a
+        // level, the same order as the whole signal the open water carries. That
+        // is visible on a CLEAN tree as the spread between the quietest and the
+        // noisiest of five equally-correct pads: 0.026 against 0.199, a factor
+        // of eight, entirely from where the drops happened to fall. Taking the
+        // WORST therefore reads the weather, and it went red three times on
+        // mutations that provably could not reach it — the last being a storm
+        // ramp that is inert until the first click, which this check runs before.
+        //
+        // The median is the statistic the CLAIM wants: a missing reset shows the
+        // water through EVERY pad, so the middle one rises with the rest, while
+        // a couple of unlucky drops move one or two and leave the middle alone.
+        const median = mid(padSds);
+        // NOT VACUOUS: the open water has to be visibly doing something, or a
+        // pad that hid nothing would pass beside water that showed nothing.
+        if (!(waterSd > 0.35)) {
+          throw new Error(`the median of ${waterSds.length} equal patches of open water varies by only `
+            + `${waterSd.toFixed(3)} levels across ${frames} frames — nothing was sweeping them, `
+            + `so there is nothing to hide (all: ${waterSds.map(v => v.toFixed(3)).join(', ')})`);
+        }
+        if (!(median < waterSd * 0.35)) {
+          throw new Error(`the median of ${inFrame.length} pads varies by ${median.toFixed(3)} levels against `
+            + `the open water's ${waterSd.toFixed(3)} — things on the water are sweeping through them `
+            + `(all of them: ${padSds.map(v => v.toFixed(3)).join(', ')})`);
+        }
+        return `${inFrame.length} pads vary ${Math.min(...padSds).toFixed(3)}-${Math.max(...padSds).toFixed(3)} `
+          + `levels, median ${median.toFixed(3)}; ${waterSds.length} open-water patches `
+          + `${Math.min(...waterSds).toFixed(3)}-${Math.max(...waterSds).toFixed(3)}, median `
+          + `${waterSd.toFixed(3)}; over ${frames} frames, discs r=${rx.toFixed(0)}`;
+      });
+
       await checkAsync('the traits are per fish and span the sliders', async () => {
         const traits = await page.evaluate(() => window.__scene.sceneState().traits);
         assert.ok(traits.length >= 3, 'too few fish to say anything');
@@ -1996,6 +2975,66 @@ async function partTwo(browser, mutant, shotsDir) {
         await page.setViewportSize({ width: 1280, height: 800 });
         await page.waitForTimeout(200);
         return 'viewport, canvas and scene all agree after a resize';
+      });
+
+      await checkAsync('the pads on the real page are riding the water', async () => {
+        // WHAT A BROWSER CAN HONESTLY SAY ABOUT THE ROCK, AND IT IS NOT WHAT
+        // THIS CHECK FIRST CLAIMED. It used to click beside a pad and assert
+        // that pad rocked and then settled. Both halves are unmeasurable here,
+        // and the sweep is what proved it — the check went red under
+        // `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+        // an outline is sampled, consumes no randomness and touches nothing this
+        // check reads. It was flaky, not collateral.
+        //
+        // MEASURED, on the shipped page: AMBIENT RAIN ROCKS A PAD AS HARD AS A
+        // CLICK DOES. Peaks over a window at idle ran 1.07-3.77 degrees with no
+        // hand on the mouse, against 3.11-4.66 for a pad clicked beside — and on
+        // one run the settle reading four and a half seconds later was 3.98
+        // degrees, HIGHER than the click's own peak of 3.83, because another
+        // drop happened to be crossing. A paired control pad 500-650 px away was
+        // no better: the click-to-control ratio ran 1.10x to 2.65x, because the
+        // control is in the same rain. There is no bar there.
+        //
+        // So attributing a rock to a click, and watching one decay, both belong
+        // where there IS no ambient field: `pads/a-passing-front-rocks-a-pad-and-
+        // lets-it-go` drives one ripple over one pad in Node and asserts the
+        // reversal AND the return to rest, and `pads/the-rock-is-subtle-and-a-
+        // downpour-does-not-peg-it` owns the cap. What is left for the page is
+        // the thing Node cannot say: that the wiring is LIVE — real pads are
+        // being advanced against the real ripple list every frame, each reading
+        // its own patch of water, inside the ruled bounds.
+        const seen = [];
+        for (let t = 0; t < 26; t++) {
+          const s2 = await page.evaluate(() => window.__scene.sceneState());
+          s2.padAt.forEach(([, , , tilt, lift], i) => {
+            const e = seen[i] || (seen[i] = { tilt: 0, lift: 0 });
+            e.tilt = Math.max(e.tilt, tilt);
+            e.lift = Math.max(e.lift, Math.abs(lift));
+          });
+          await waitSceneSeconds(page, 0.12);
+        }
+        if (seen.length < 5) throw new Error(`only ${seen.length} pads to watch`);
+        const tilts = seen.map(e => e.tilt), lifts = seen.map(e => e.lift);
+        const maxTilt = Math.max(...tilts), maxLift = Math.max(...lifts);
+        // THE PADS ARE ANSWERING THE WATER. Ambient alone reaches degrees, so
+        // this bar is well under what was measured and far above nothing.
+        if (!(maxTilt > 0.008)) throw new Error(`no pad rocked more than ${(maxTilt * 180 / Math.PI).toFixed(3)}° in ${seen.length} pads over the window`);
+        // AND THE BOB IS THE OTHER HALF OF THE LAW. A pad that reads only the
+        // gradient still rocks, so a tilt bar alone leaves the height unmeasured
+        // on the page — which is exactly the mutation that stayed green here.
+        if (!(maxLift > 0.2)) throw new Error(`no pad rode up a wave (${maxLift.toFixed(3)} px of bob)`);
+        // BOUNDED, ON THE REAL PAGE, not only in the fixture.
+        const TILT_MAX = 0.125 + 1e-9, BOB_MAX = 5.0 + 1e-9;
+        if (!(maxTilt <= TILT_MAX)) throw new Error(`a pad reached ${maxTilt} rad against the ruled cap`);
+        if (!(maxLift <= BOB_MAX)) throw new Error(`a pad bobbed ${maxLift} px against the ruled cap`);
+        // AND EACH READS ITS OWN PATCH OF WATER. One global number handed to
+        // every pad would draw a field of leaves all leaning together.
+        const distinct = new Set(tilts.map(v => v.toFixed(6))).size;
+        if (!(distinct > seen.length * 0.5)) {
+          throw new Error(`${distinct} distinct peaks across ${seen.length} pads — they are not reading their own water`);
+        }
+        return `${seen.length} pads, peaks to ${(maxTilt * 180 / Math.PI).toFixed(2)}° and `
+          + `${maxLift.toFixed(2)} px, ${distinct} distinct, all inside the ruled caps`;
       });
 
       await checkAsync('the frame is affordable during a downpour', async () => {
