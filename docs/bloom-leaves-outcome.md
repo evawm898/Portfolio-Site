@@ -152,18 +152,36 @@ override in a real mutated module copy and the sweep finds it.
   perturbs a HOLDER and fires clause 1, `--control-only` perturbs a MOVER's
   shared prefix and fires clause 2.
 
-  **Its own one-sided guard caught a third defect, in the tool itself.** 52
-  row-modes throw identically on BOTH trees — this tool drives
-  `buildBloomInto` directly and applies no `capability` hook, which is the
-  page's to apply — and those carry no information about the partition, so
-  they are excluded and COUNTED. A row that throws on **one** tree is a real
-  regression, and one did: the **GATED** row built on main and threw on the
-  branch, because **a matrix row's values are STRINGS and the geometry's guards
-  are truthiness tests on numbers — `!'0'` is false.** The page never hits it
-  (`readUI` hands back numbers) and the registry predicate is number-safe, so
-  **LF0's two-statement clause would have caught it there**; what needed fixing
-  was the tool, which now uses the same coercion `verify-bloom-seam-bytes.mjs`
-  does.
+  **Its own one-sided guard caught a third defect, in the tool itself.** The
+  **GATED** row built on main and threw on the branch, and 52 further row-modes
+  threw on both. One cause: **a matrix row's values are STRINGS and the
+  geometry's guards are truthiness tests on numbers — `!'0'` is false**, so a
+  zero-length leaf was built and a string reached arithmetic that wanted a
+  number. The page never hits it (`readUI` hands back numbers) and the registry
+  predicate is number-safe, so **LF0's two-statement clause is what would catch
+  it there**; what needed fixing was the tool, which now uses the same coercion
+  `verify-bloom-seam-bytes.mjs` does. **After it: 0 excluded, 0 one-sided.**
+
+### The measured partition
+
+```
+758 rows x 2 modes, 759,870,288 base floats, Object.is
+  11 MOVERS / 747 HOLDERS, predeclared from the builder's own record
+  clause 1  movers that failed to move: 0 · holders that moved: 0
+  clause 2  movers where anything but the leaves moved: 0
+```
+
+The 11 are exactly the block-33 rows that **build a leaf**. The twelfth —
+`LEAVES: GATED` — is a **HOLDER**, which is ruling 6's guard proved by bytes
+rather than argued. And there are **0 movers outside block 33**: `ALL MAX` and
+every other row in the matrix is bit-identical, so the feature reaches nothing
+it was not asked to.
+
+> The first run predeclared **12/746** and was wrong for the same string-vs-number
+> reason: `movesByRecord` asked the builder, the builder was handed `'0'`, and
+> the GATED row counted as a mover. The predeclaration reading the builder's
+> record is what makes that visible — a list of control names would have said
+> 12 and stayed saying 12.
 
 ## Cost
 
