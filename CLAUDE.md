@@ -6094,26 +6094,54 @@ leaf. All three were found by rendering, not by reasoning — the sheet is
 pond is never still, so there is no settled frame to compare against and every number
 on it is read off the page's own reported state.
 
-**TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM ARE
-MEASURED BY TWO DIFFERENT INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The pixel check
-reads an isolated pad's interior against the water just outside it, and its threshold
-is a MEASURED CLIFF rather than a guess: a pad's freckles composite to ~71, two
-overlapping reach ~103 and three ~123, which is past a koi's own outline (~97) — so
-**no brightness threshold separates a fish under a pad from the pad's own marks**.
-Sampled over 22 frames, interior against annulus: 3.135%/2.981% at level 70,
-2.447%/1.599% at 90, 0.053%/0.446% at 110, **0.000%/0.210% at 120**. So the pixel
-check runs at 120 and sees the WATER; the koi half is `pads/a-pad-is-drawn-over-the-
-fish-and-the-ripples`, which drives the shipped `draw()` through a recording context
-and asserts the op ORDER and that the pad's first PAINT is a ground fill. **That
-recorder's first cut tagged every path point with the fill style in effect at the time
-of the POINT** — a path is built first and painted after, so a pad's outline came back
-wearing whatever the ripple pass had left set. Paints are their own events now.
-**And `the-rock-is-clamped-rather-than-saturated` stayed GREEN on its first run**: the
-check sampled twelve pads under a storm and asked whether their tilts still differed at
-the END, and they did under the clamp too, because by then the ripples had aged and the
-clamp was no longer binding. **A pond does not hold still long enough to be a controlled
-experiment; the law does** — it sweeps `respond` over forty slopes and asserts the
-response is STRICTLY RISING at every step, which is exactly what a clamp is not.
+**TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM NEED TWO
+INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The koi half is
+`pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, which drives the shipped `draw()`
+through a recording context and asserts the op ORDER and that the pad's first PAINT is
+a ground fill. **That recorder's first cut tagged every path point with the fill style
+in effect at the time of the POINT** — a path is built first and painted after, so a
+pad's own outline came back wearing whatever the ripple pass had left set. Paints are
+their own events now.
+
+**AND THE PIXEL HALF IS A VARIANCE, NOT A BRIGHTNESS, WHICH TOOK TWO FAILED CUTS TO
+SEE.** A pad's freckles composite to ~71 over the ground, two overlapping reach ~103
+and three ~123 — **past a koi's own outline at ~97** — so there is no threshold that
+separates "something is showing through the pad" from "the pad has texture". Measured
+on an isolated pad at idle, interior against the water beside it: **3.135%/2.981% at
+level 70, 2.447%/1.599% at 90, 0.053%/0.446% at 110, 0.000%/0.210% at 120** — low
+enough to catch the rings and the pad's own marks match them; high enough to exclude
+the marks and the ambient rings barely clear it either (2 lit pixels over 30 frames).
+**What actually distinguishes a pad from water is MOTION**: a pad's interior is static
+apart from its own rock, while open water has rings sweeping through it continuously.
+So the check compares the VARIATION of each disc's mean brightness across frames, needs
+no threshold at all, and says exactly what the claim is — measured **0.129 levels
+inside against 1.275 on an equal patch of open water**, and the control is a patch of
+OPEN WATER rather than a ring around the pad's own rim, because the brief guarantees
+open water exists and a ring does not (the first cut demanded 1.9 radii of clearance
+and simply **failed to run** the day the field was reseeded and no pad had it).
+
+**THREE MUTANT CLAIMS WERE WRONG AND THE SWEEP IS WHAT SAID SO, ALL THREE IN THE SAME
+DIRECTION — the check was fine and the claim was not.** `the-rock-is-clamped-rather-
+than-saturated` stayed GREEN because the check sampled twelve pads under a storm and
+asked whether their tilts still differed at the END, and they did under the clamp too:
+by then the ripples had aged and the clamp was no longer binding. **A pond does not
+hold still long enough to be a controlled experiment; the law does** — it sweeps
+`respond` over forty slopes and asserts the response is STRICTLY RISING at every step,
+which is what a clamp is not. `a-pad-is-drawn-under-the-fish` only PREPENDED a pad pass
+and left the real one in place, so the pads were drawn twice and the later pass still
+covered everything — the mutation applied, looked right, and changed nothing. And
+`the-pads-cannot-feel-the-water` kills the HEIGHT and leaves the gradient, so the pad
+still rocks: the browser check asserted only the tilt and stayed green until it asked
+about the bob as well. **The rock and the bob are the two halves of one law and a check
+that measures one of them measures half a feature.**
+
+**AND A CHECK THAT POLLS ON WALL TIME MEASURES THE MACHINE.** `ellipse-without-the-
+moveto` — a pre-existing mutation with nothing to do with pads — reddened the rocking
+check, because it drops the frame rate by a factor of three and the check sampled every
+70 ms of WALL time: three seconds of pond on a healthy page, one on a slow one, so the
+front had not yet reached the pad. Both browser pad checks poll `waitSceneSeconds` now.
+This file already records the rule; it was broken again the first time a new check was
+written.
 
 **THE COST IS MEASURED AND IT IS NOT THE PADS.** `waveAt` is one pass per pad over the
 ripple list with a squared-distance reject before the sqrt: **0.19 ms a frame for 50

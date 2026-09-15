@@ -347,6 +347,8 @@ const PAD_LINE_W = 1.0;
 const PAD_SPECK_A = 0.20;
 const PAD_RIB_A = 0.15;   // one line, and faint: at 0.22 a long pad read as cracked
 const PAD_RIB_W = 0.7;
+const PAD_FOLD_A = 0.17;  // near the vein's own weight: at 0.13 it vanished
+const PAD_FOLD_W = 0.8;
 
 // The bloom is the brightest thing on the water after a ripple, which is what a
 // white flower is. Its petals occlude the same way a pad does.
@@ -803,6 +805,23 @@ export function createRenderer(ctx, surface) {
     ctx.strokeStyle = rgba(INK, PAD_RIB_A);
     ctx.lineWidth = PAD_RIB_W;
     ctx.stroke();
+
+    // The turned margin, if this pad has one. Its own pass rather than folded in
+    // with the vein, because it is fainter and because the two are different
+    // things: one is anatomy, the other is how the leaf is sitting.
+    if (pad.folds.length) {
+      ctx.beginPath();
+      for (const arc of pad.folds) {
+        for (let i = 0; i < arc.length; i++) {
+          padPoint(pad, arc[i].x, arc[i].y, pp);
+          const sy2 = surface.syAt(pp.y, pp.z);
+          if (i === 0) ctx.moveTo(pp.x, sy2); else ctx.lineTo(pp.x, sy2);
+        }
+      }
+      ctx.strokeStyle = rgba(INK, PAD_FOLD_A);
+      ctx.lineWidth = PAD_FOLD_W;
+      ctx.stroke();
+    }
 
     tracePoly(pts);
     ctx.strokeStyle = rgba(INK, PAD_LINE_A);

@@ -96,6 +96,25 @@ export const SPECK_R = [0.012, 0.030];   // of the pad's own radius
 // like one. Ending it three quarters of the way out is what makes it anatomy.
 export const RIB_REACH = 0.74;
 
+// A FOLD IS AN ARC INSET FROM THE RIM, AND IT IS THE ONE PIECE OF INTERIOR
+// DETAIL BESIDES THE VEIN. The reference's pads are not flat discs: their
+// margins turn up, and the mark an illustrator makes for that is a line running
+// just inside the edge over a stretch of it — the far side of the curl, seen
+// across the leaf. NOT a crease across the middle, which is a different thing
+// and reads as damage.
+//
+// AND NOT ON EVERY PAD. Five radiating veins already read as a palm frond once
+// in this file; a fold on every leaf is the same mistake at the margin. Rather
+// more than half carry one, so a clump has both kinds in it.
+export const FOLD_CHANCE = 0.62;
+export const FOLD_ARC = [0.9, 2.0];    // rad of rim the curl runs along
+// INSET FAR ENOUGH TO SEPARATE FROM THE RIM. At 0.74-0.88 the arc ran close
+// beside the outline, which is three times its weight, and it simply
+// disappeared into it — a fold has to be visibly INSIDE the leaf to read as the
+// far side of a curl rather than as a thick edge.
+export const FOLD_INSET = [0.58, 0.78]; // of the local radius
+export const FOLD_PTS = 12;
+
 const TAU = Math.PI * 2;
 
 // One pad's static geometry, in its OWN plane-space frame (centre at the
@@ -164,8 +183,27 @@ export function makePad(rand, x, y, R) {
       y: Math.sin(away) * radiusAt(notch + Math.PI) * RIB_REACH },
   ]];
 
+  // The fold, if this pad has one: an arc of the rim brought inward, clear of
+  // the notch so it never reads as a second slit.
+  const folds = [];
+  if (rand.chance(FOLD_CHANCE)) {
+    const span = rand.range(FOLD_ARC[0], FOLD_ARC[1]);
+    const mid = notch + Math.PI + rand.range(-1.0, 1.0);
+    const inset = rand.range(FOLD_INSET[0], FOLD_INSET[1]);
+    const arc = [];
+    for (let i = 0; i <= FOLD_PTS; i++) {
+      const t = mid - span / 2 + (i / FOLD_PTS) * span;
+      // Eased in at both ends, so the fold MEETS the rim rather than stopping
+      // dead in the middle of the leaf — a line with two loose ends is a scratch.
+      const q = Math.sin(Math.PI * (i / FOLD_PTS));
+      const r = radiusAt(t) * (1 - (1 - inset) * q);
+      arc.push({ x: Math.cos(t + spin) * r, y: Math.sin(t + spin) * r });
+    }
+    folds.push(arc);
+  }
+
   return {
-    kind: 'pad', x, y, R, outline, specks, ribs,
+    kind: 'pad', x, y, R, outline, specks, ribs, folds,
     // The rock, as a VECTOR whose magnitude is the tilt angle: lagging an angle
     // and a direction separately means wrapping, and a wrap in the middle of a
     // lag is a pad that snaps round.

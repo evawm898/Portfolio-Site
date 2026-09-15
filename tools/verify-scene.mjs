@@ -440,8 +440,13 @@ const MUTANTS = [
   {
     id: 'a-pad-is-drawn-under-the-fish',
     file: 'scene/koi-draw.js',
+    // IT HAS TO MOVE THE PASS, NOT ADD A SECOND ONE. The first version only
+    // prepended a call and left the real one in place, so the pads were drawn
+    // twice and the later pass still covered everything — the mutation applied,
+    // looked right, and changed nothing the checks could see. `pads` is a
+    // destructured parameter, so nulling it is what disarms the later call.
     from: '    for (const f of fish) drawFish(f);\n',
-    to: '    drawPads(width, height, pads);\n    for (const f of fish) drawFish(f);\n',
+    to: '    drawPads(width, height, pads);\n    for (const f of fish) drawFish(f);\n    pads = null;\n',
     breaks: ['pads/a-pad-is-drawn-over-the-fish-and-the-ripples',
              'scene1/a-pad-hides-the-water-under-it'],
     why: 'draw order is the only depth cue here; a pad under the koi reads as painted on the pond floor',
@@ -2368,27 +2373,27 @@ const CANVAS_STATS = `(() => {
 // `pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, in Node, on the order the
 // renderer actually emits.
 const RING_LEVEL = 120;
-const ELLIPSE_STATS = `(cx, cy, rx, ry, k0, k1, level) => {
+const ELLIPSE_STATS = `(cx, cy, rx, ry, k, level) => {
   const c = document.querySelector('.scene-canvas');
   const g = c.getContext('2d');
   const dpr = c.width / parseFloat(c.style.width);
-  const R = Math.ceil(rx * k1 * dpr) + 2;
-  const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Math.ceil(ry * k1 * dpr) - 2);
-  const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Math.ceil(ry * k1 * dpr) * 2 + 4);
+  const R = Math.ceil(rx * k * dpr) + 2, Ry = Math.ceil(ry * k * dpr) + 2;
+  const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Ry);
+  const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Ry * 2);
   if (w <= 0 || h <= 0) return null;
   const d = g.getImageData(x0, y0, w, h).data;
-  let inN = 0, inHot = 0, outN = 0, outHot = 0;
+  let n = 0, sum = 0, hot = 0;
   for (let py = 0; py < h; py++) {
     for (let px = 0; px < w; px++) {
       const i = (py * w + px) * 4;
-      const v = (d[i] + d[i + 1] + d[i + 2]) / 3;
       const dx = ((x0 + px) / dpr - cx) / rx, dy = ((y0 + py) / dpr - cy) / ry;
-      const q = Math.hypot(dx, dy);
-      if (q <= k0) { inN++; if (v > level) inHot++; }
-      else if (q >= k1 * 0.72 && q <= k1) { outN++; if (v > level) outHot++; }
+      if (Math.hypot(dx, dy) > k) continue;
+      const v = (d[i] + d[i + 1] + d[i + 2]) / 3;
+      n++; sum += v;
+      if (v > level) hot++;
     }
   }
-  return { inN, inHot, outN, outHot };
+  return { n, mean: sum / n, hot };
 }`;
 
 async function partTwo(browser, mutant, shotsDir) {
@@ -2583,44 +2588,94 @@ async function partTwo(browser, mutant, shotsDir) {
         // OUTSIDE its own rim: a neighbour's body, or a bloom, sitting in that
         // annulus would be measuring something else.
         const st2 = await page.evaluate(() => window.__scene.sceneState());
-        const clear = (p, x, y, r) => Math.hypot(x - p.x, y - p.y) > (p.R + r) * 1.6;
-        const lone = st2.padAt
-          .map(([x, y, R], i) => ({ i, x, y, R, sx: x, sy: y * st2.squash }))
-          .filter(p => p.R > 24
-            && p.sx - p.R * 1.9 > 8 && p.sx + p.R * 1.9 < st2.width - 8
-            && p.sy - p.R * 1.9 * st2.squash > 8 && p.sy + p.R * 1.9 * st2.squash < st2.height - 8
-            && st2.padAt.every(([ox, oy, oR], j) => j === p.i || clear(p, ox, oy, oR))
-            && st2.bloomAt.every(([ox, oy, oR]) => clear(p, ox, oy, oR)))
-          .sort((a, b) => b.R - a.R)[0];
-        if (!lone) throw new Error('no pad on this frame is clear enough of its neighbours to measure');
-
-        let inN = 0, inHot = 0, outN = 0, outHot = 0, frames = 0;
-        for (let t = 0; t < 40; t++) {
-          const r = await page.evaluate(`(${ELLIPSE_STATS})(${lone.sx}, ${lone.sy}, ${lone.R}, ${lone.R * st2.squash}, 0.55, 1.9, ${RING_LEVEL})`);
-          if (r && r.inN > 0 && r.outN > 0) {
-            inN += r.inN; inHot += r.inHot; outN += r.outN; outHot += r.outHot; frames++;
+        // MEASURED AGAINST AN EQUAL PATCH OF OPEN WATER, NOT AGAINST A RING
+        // AROUND THE PAD'S OWN RIM, and the two cuts before this one are why.
+        // The first demanded 1.9 radii of clear water around a pad and then
+        // FAILED TO RUN the day the pad field was reseeded and no pad had it —
+        // a check that depends on the layout coming out a particular way goes
+        // red for a reason that is not the code's. The second sized that ring
+        // from whatever clearance the frame offered, which always runs and
+        // collects almost nothing: a band a quarter of a radius wide holds too
+        // few ring pixels to say anything (0.033% against 0.042%).
+        //
+        // Open water is what the brief GUARANTEES is there — loose clusters with
+        // gaps between them — so the control is a disc the same size as the pad,
+        // in a gap, at a similar distance from the frame's centre so the
+        // vignette over the two is comparable.
+        const away = (x, y, r) => st2.padAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + r + 6)
+          && st2.bloomAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + r + 6);
+        const cx0 = st2.width / 2, cy0 = st2.height / st2.squash / 2;
+        const pads2 = st2.padAt.map(([x, y, R], i) => ({ i, x, y, R, sx: x, sy: y * st2.squash }))
+          .filter(p => p.R > 20
+            && p.sx - p.R > 6 && p.sx + p.R < st2.width - 6
+            && p.sy - p.R * st2.squash > 6 && p.sy + p.R * st2.squash < st2.height - 6)
+          .sort((a2, b2) => b2.R - a2.R);
+        let lone = null, spot = null;
+        for (const p of pads2) {
+          const want = Math.hypot(p.x - cx0, p.y - cy0);
+          const found = [];
+          for (let gx = 0; gx < 48; gx++) {
+            for (let gy = 0; gy < 48; gy++) {
+              const x = (gx + 0.5) / 48 * st2.width, y = (gy + 0.5) / 48 * (st2.height / st2.squash);
+              if (x - p.R < 6 || x + p.R > st2.width - 6) continue;
+              if (y * st2.squash - p.R * st2.squash < 6 || y * st2.squash + p.R * st2.squash > st2.height - 6) continue;
+              if (!away(x, y, p.R)) continue;
+              found.push({ x, y, d: Math.abs(Math.hypot(x - cx0, y - cy0) - want) });
+            }
           }
-          await page.waitForTimeout(80);
+          if (!found.length) continue;
+          found.sort((a2, b2) => a2.d - b2.d);
+          lone = p; spot = found[0];
+          break;
         }
-        if (!frames) throw new Error('the pad could not be sampled');
-        const outside = outHot / outN, inside = inHot / inN;
-        // NOT VACUOUS: there has to be something outside to be hidden.
-        // NOT VACUOUS, AS A COUNT RATHER THAN A FRACTION. What matters is that
-        // real ring pixels were in the annulus to be hidden; a fraction of a
-        // large area can read small while the count is plainly a signal.
-        if (!(outHot >= 40)) throw new Error(`only ${outHot} lit pixels beside the pad over ${frames} frames — nothing to hide`);
-        // THE HEADROOM IS FOR RAIN, WHICH IS ALLOWED INSIDE. A streak is in the
-        // AIR and is drawn in front of everything including a pad, so an
-        // ambient drop crossing the rim is correct behaviour and reads here as
-        // a few interior pixels. Measured 0.000% against 0.210% outside, so the
-        // bar has room for several drops and still refuses anything that lets
-        // the water itself through.
-        if (!(inside < outside * 0.30)) {
-          throw new Error(`${(inside * 100).toFixed(3)}% of the pad's interior is lit against `
-            + `${(outside * 100).toFixed(3)}% of the water beside it — things on the water are showing through it`);
+        if (!lone) throw new Error('no pad of a usable size has an equal patch of open water to compare against');
+
+        // WHAT SEPARATES A PAD FROM WATER IS NOT BRIGHTNESS, IT IS MOTION, and
+        // two threshold-based cuts of this check had to fail before that was
+        // obvious. A pad's freckles composite to ~71, two overlapping reach
+        // ~103 and three ~123 — past a koi's outline at ~97 — so at any level
+        // low enough to catch the rings the pad's own texture matches them
+        // (3.135% against 2.981% at level 70), and at any level high enough to
+        // exclude the texture the ambient rings barely clear it either (2 lit
+        // pixels over 30 frames at 120). There is no threshold in between.
+        //
+        // The pad's interior is STATIC — freckles and a vein that move only as
+        // far as the rock carries them — while open water has rings sweeping
+        // through it continuously. So the measurement is the VARIATION of each
+        // disc's mean brightness across frames, which needs no threshold at all
+        // and says exactly what the claim is: the things on the water do not
+        // reach the inside of the pad.
+        const padSeq = [], waterSeq = [];
+        let frames = 0;
+        const sample = (x, y) => page.evaluate(
+          `(${ELLIPSE_STATS})(${x}, ${y * st2.squash}, ${lone.R * 0.9}, ${lone.R * 0.9 * st2.squash}, 1, ${RING_LEVEL})`);
+        // ON THE POND'S CLOCK, because what this needs is rings that have MOVED
+        // between samples, and how much pond a wall-clock wait covers depends on
+        // how fast the machine is.
+        for (let t = 0; t < 30; t++) {
+          const a2 = await sample(lone.x, lone.y), b2 = await sample(spot.x, spot.y);
+          if (a2 && b2 && a2.n > 0 && b2.n > 0) { padSeq.push(a2.mean); waterSeq.push(b2.mean); frames++; }
+          await waitSceneSeconds(page, 0.10);
         }
-        return `interior ${inHot} lit px (${(inside * 100).toFixed(3)}%) against ${outHot} outside `
-          + `(${(outside * 100).toFixed(3)}%) over ${frames} frames, pad R ${lone.R.toFixed(0)}`;
+        if (frames < 10) throw new Error(`only ${frames} frames could be sampled`);
+        const sd = (xs) => {
+          const m = xs.reduce((p2, q) => p2 + q, 0) / xs.length;
+          return Math.sqrt(xs.reduce((p2, q) => p2 + (q - m) * (q - m), 0) / xs.length);
+        };
+        const padSd = sd(padSeq), waterSd = sd(waterSeq);
+        // NOT VACUOUS: the open water has to be visibly doing something, or a
+        // pad that hid nothing would pass beside water that showed nothing.
+        if (!(waterSd > 0.35)) {
+          throw new Error(`an equal patch of open water varies by only ${waterSd.toFixed(3)} levels `
+            + `across ${frames} frames — nothing was sweeping it, so there is nothing to hide`);
+        }
+        if (!(padSd < waterSd * 0.35)) {
+          throw new Error(`the pad's interior varies by ${padSd.toFixed(3)} levels against the open `
+            + `water's ${waterSd.toFixed(3)} — things on the water are sweeping through it`);
+        }
+        return `interior varies ${padSd.toFixed(3)} levels against open water's ${waterSd.toFixed(3)} `
+          + `over ${frames} frames, pad R ${lone.R.toFixed(0)}`;
+          + `with ${lone.gap.toFixed(2)} radii of clear water, annulus ${kIn}-${kOut.toFixed(2)}`;
       });
 
       await checkAsync('the traits are per fish and span the sliders', async () => {
@@ -2753,18 +2808,31 @@ async function partTwo(browser, mutant, shotsDir) {
         void rest;
         const before = st2.padAt[cand.i][3];
         await page.mouse.click(Math.round(cand.sx - cand.R * 1.5), Math.round(cand.sy));
+        // POLLED ON THE POND'S CLOCK, NOT THE WALL'S — this repo's own lesson,
+        // and the sweep is what taught it here. Sampling every 70 ms of WALL
+        // time covers three seconds of pond on a healthy page and one second on
+        // a page rendering at a third the rate, so the front had not yet reached
+        // the pad and this check went red under `ellipse-without-the-moveto`, a
+        // mutation that has nothing to do with pads and only makes the frame
+        // expensive. How much POND has gone by is the thing the claim is about.
         let peak = 0, peakLift = 0;
-        for (let t = 0; t < 30; t++) {
+        for (let t = 0; t < 26; t++) {
           const s2 = await page.evaluate(() => window.__scene.sceneState());
           peak = Math.max(peak, s2.padAt[cand.i][3]);
           peakLift = Math.max(peakLift, Math.abs(s2.padAt[cand.i][4]));
-          await page.waitForTimeout(70);
+          await waitSceneSeconds(page, 0.12);
         }
         if (!(peak > before + 0.004)) {
           throw new Error(`the pad's tilt peaked at ${peak.toFixed(5)} rad against ${before.toFixed(5)} before the click`);
         }
         // SUBTLE, which is what the brief asks for: visible, not a lurch.
         if (!(peak * 180 / Math.PI < 9)) throw new Error(`it rocked ${(peak * 180 / Math.PI).toFixed(1)}° — that is not slight`);
+        // AND IT RODE UP THE WAVE. The rock and the bob are the two halves of
+        // one law — the gradient and the height — and asserting only the tilt
+        // leaves the height unmeasured on the real page: measured, the mutation
+        // that stops a pad reading the height field at all still rocks it, and
+        // this check stayed green until it asked about the bob.
+        if (!(peakLift > 0.3)) throw new Error(`the pad never rode up the wave (${peakLift.toFixed(3)} px of bob)`);
         // AND IT LETS GO. A pad that kept the tilt would read as a leaf stuck at
         // an angle, which no wave leaves behind.
         await waitSceneSeconds(page, 4.5);
