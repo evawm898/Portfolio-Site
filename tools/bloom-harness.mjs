@@ -5397,6 +5397,194 @@ export const SELF_INTERSECTION_SCOPE =
   'X1/X2 count triangle pairs that intersect WITHIN one closed shell, with the shared-feature exclusion per intersection POINT (a pair sharing a vertex and crossing elsewhere is reported). Cross-shell pairs are the export contract\'s overlapping closed solids and are reported, never gated. Blind to petal-against-petal crossing (a cross-shell quantity) and to the printable AIR GAP between distinct parts of one sheet (V5\'s, in tools/bloom-wall-thickness.mjs).';
 
 /* ===================================================================
+   LEAVES ON THE STEM — THE LF FAMILY.
+
+   WRITTEN BEFORE THE GEOMETRY AND SEEN RED, which is the brief's own order
+   and not a formality: a clause written against geometry that already exists
+   is a clause fitted to it. Every field it reads below is a CONTRACT the
+   builder must then satisfy, and the family failing on a tree with no leaf
+   code is the evidence that it can fail at all.
+
+   WHAT BOTH STL GATES ARE BLIND TO HERE, which is why this family is owed.
+   Each of these exports watertight AND as one connected piece:
+     - a leaf DECLARED and never built (adds no boundary edge, detaches
+       nothing);
+     - a petiole rooted ON THE AXIS of a hollow stem. Measured in Phase A:
+       it still reads ONE PIECE, because a radial rod crosses the wall
+       annulus on its way out. The flood fill cannot tell it from the
+       wall-rooted one this design ships, so LF2 is the only witness;
+     - a leaf whose AZIMUTHS are wrong. Nothing in this project measures an
+       azimuth except J7, Z4b and Z8, none of which looks at a leaf;
+     - a leaf reading the PETAL's serration controls instead of its own —
+       identical topology, identical counts, a different plant;
+     - a node whose INSET puts the top leaf inside the head. Overlapping
+       closed shells are the export contract, so that is legal geometry and
+       silent everywhere else.
+   The ONE failure the flood fill does catch is the steep-angle detachment
+   LF3 names, and LF3 is kept anyway: it is cheap, it runs on every row
+   rather than on the connectedness gate's subset, and it names the cause
+   where `components=2` does not.
+
+   THE CLAUSES READ THE BUILDER'S OWN EMITTED RECORD, never the plan beside
+   it, wherever the question is "what came out" — session 43's ST2/ST3
+   lesson, where a clause reading the plan fired NOTHING against a mutation
+   that offset every emitted ring. The plan is what was ASKED FOR.
+   =================================================================== */
+export const LEAF_SCOPE =
+  'LF0-LF7 carry the leaf. Blind by declaration: nothing here reads the exported FILE (the petiole\'s weld is asserted from the builder\'s emitted rings against the plan\'s own bore and outer radii, not from the STL); nothing here asserts the blade\'s SURFACE is the one petalForm drew, which is the petal\'s own form coverage reached through a different frame; and nothing bounds the cantilever, which is UNMEASURED — no coupon has been printed.';
+
+export async function leafAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+  const bad = [];
+  const asked = Number(ui.leafLength) > 0;
+
+  /* LF0 — THE TWO STATEMENTS. The registry HIDES the leaf's sub-controls on
+     the same condition the geometry builds nothing on, and a green run must
+     not endorse one without the other (slotRolesEligible / ST0 precedent).
+     The geometry's half arrives THROUGH THE PAGE: a gate calling the
+     predicate from its own Node import compares one unmutated module against
+     another and can never disagree (session 41's L7). */
+  const regPresent = evalPredicate({ ref: 'leafPresent' }, ui);
+  const geoAbsent = m.leafAbsent;
+  if (geoAbsent === undefined) bad.push('LF0: the metrics hook reports no `leafAbsent` — the geometry states nothing about whether leaves are present, so the two-statement claim cannot be made');
+  else if (regPresent === geoAbsent) bad.push(`LF0: the registry's leafPresent says ${regPresent} and the geometry says leaves are ${geoAbsent ? 'ABSENT' : 'present'}; the two must be exact complements`);
+
+  const L = m.leaf === undefined ? undefined : m.leaf;
+  if (L === undefined) { bad.push('LF1: the metrics hook reports no `leaf` key at all — the builder declares nothing about leaves, so nothing below can be checked'); return bad; }
+  if ((L !== null) !== asked) {
+    bad.push(`LF1: the builder ${L ? 'reports leaves' : 'reports none'} while the state ${asked ? `asks for ${ui.leafLength} mm` : 'asks for none (length 0)'}`);
+    return bad;
+  }
+  /* INERTNESS IN BOTH DIRECTIONS — hidden-and-not-inert is the defect PP7 and
+     JS0 exist for, and it is invisible to every other family here. */
+  if (!asked) {
+    if (m.leafTris) bad.push(`LF1: ${m.leafTris} leaf triangles emitted on a state with no leaves`);
+    return bad;
+  }
+
+  /* LF1 — DECLARED AND EMITTED, and to the shape the plan declares. The PLAN
+     owns the node list and the per-node azimuth counts; the BUILDER owns the
+     tally. Two owners, and the arithmetic between them is stated here. */
+  if (!Array.isArray(L.azimuths) || !L.azimuths.length) {
+    bad.push('LF1: the plan declares no azimuth list — the emitted leaf count cannot be predicted from it');
+  } else {
+    const want = L.azimuths.reduce((n, a) => n + a.length, 0);
+    if (L.built !== want) bad.push(`LF1: the plan asks for ${want} leaves (${L.azimuths.length} nodes) and the builder emitted ${L.built}`);
+  }
+
+  /* LF2 — EVERY PETIOLE IS ROOTED IN THE WALL. This is Phase A's ruling
+     measured on every row: a petiole on the AXIS of a hollow stem still reads
+     ONE PIECE, so the flood fill cannot see the difference and this clause is
+     the only thing that can. Read off the BUILDER's emitted root radii, never
+     the plan's chosen one — a mutation that offsets what it emits leaves the
+     plan saying the right thing (session 43's ST2). */
+  const S = m.stem;
+  if (!S) bad.push('LF2: leaves are built with no stem plan reported — a leaf has nothing to attach to');
+  else if (!Array.isArray(L.emittedRootR) || L.emittedRootR.length !== L.built) {
+    bad.push(`LF2: the builder reports ${L.emittedRootR ? L.emittedRootR.length : 'no'} emitted root radii for ${L.built} leaves`);
+  } else {
+    for (let i = 0; i < L.emittedRootR.length; i++) {
+      const r = L.emittedRootR[i];
+      if (!(r >= S.boreR - 1e-6 && r <= S.outerR + 1e-6)) {
+        bad.push(`LF2: leaf ${i}'s petiole roots at r = ${r.toFixed(4)} mm, outside the stem's wall [${S.boreR.toFixed(3)}, ${S.outerR.toFixed(3)}] — on a hollow stem a root inside the bore is in VOID, and both STL gates read it as one piece regardless`);
+        break;
+      }
+    }
+  }
+
+  /* LF3 — THE LEAF ON A HOLLOW STEM IS ATTACHED, which is the state the
+     flower's gates could never reach, and the steep angle is the reachable
+     failure: the escape length for an axis-rooted petiole is outerR/cos(th),
+     which runs away as the angle steepens. The builder reports the SOLID SPAN
+     each petiole crosses; a leaf crossing nothing is a detached shell that
+     exports watertight. */
+  if (!Array.isArray(L.crossesSolidMm) || L.crossesSolidMm.length !== L.built) {
+    bad.push(`LF3: the builder reports no per-leaf solid crossing for ${L.built} leaves — whether a leaf is attached at all is then asserted by nothing`);
+  } else {
+    const worst = Math.min(...L.crossesSolidMm);
+    if (!(worst > 0)) bad.push(`LF3: a petiole crosses ${worst.toFixed(4)} mm of solid — it is a DETACHED shell, and it exports watertight`);
+    else if (worst + 1e-9 < MIN_FEATURE_MM / 2) bad.push(`LF3: the thinnest petiole weld crosses ${worst.toFixed(4)} mm of solid, under half the minimum printable feature (${(MIN_FEATURE_MM / 2).toFixed(3)} mm)`);
+  }
+
+  /* LF4 — THE NODES, AND THE INSET DERIVED FROM THE LEAF. Phase A measured
+     the flower's stem-fraction inset fouling the head on 30 of 30 sampled
+     states: the inset scales with the STEM and the rise with the LEAF and its
+     ANGLE, so no fraction of one holds the other two. The clause rebuilds the
+     required inset from the CONTROLS (length and angle), which the leaf plan
+     does not write, and asserts the clamp as a biconditional. */
+  if (!Array.isArray(L.nodeDepthsMm) || !L.nodeDepthsMm.length) {
+    bad.push('LF4: the builder reports no node depths');
+  } else {
+    const rise = Number(ui.leafLength) * Math.sin(Number(ui.leafAngle) * Math.PI / 180);
+    const needed = Math.max(0, rise);
+    const top = L.nodeDepthsMm[0];
+    if (!(top >= needed - 1e-6)) bad.push(`LF4: the topmost node sits ${top.toFixed(3)} mm below the hub while a ${ui.leafLength} mm leaf at ${ui.leafAngle} deg rises ${needed.toFixed(3)} mm above it — the top leaf is inside the head`);
+    if ((L.insetClamped === true) !== (needed > L.insetAskedMm + 1e-9)) {
+      bad.push(`LF4: insetClamped reads ${L.insetClamped} while the leaf needs ${needed.toFixed(3)} mm against an asked ${Number(L.insetAskedMm).toFixed(3)} mm — the clamp must be a biconditional`);
+    }
+    for (let i = 1; i < L.nodeDepthsMm.length; i++) {
+      if (!(L.nodeDepthsMm[i] > L.nodeDepthsMm[i - 1])) { bad.push(`LF4: node depths are not strictly increasing down the stem at index ${i}`); break; }
+    }
+    const last = L.nodeDepthsMm[L.nodeDepthsMm.length - 1];
+    if (S && !(last < S.lengthMm)) bad.push(`LF4: the lowest node sits ${last.toFixed(3)} mm down a ${S.lengthMm} mm stem — past its own tip`);
+  }
+
+  /* LF5 — THE PHYLLOTAXY, WHICH NOTHING ELSE HERE CAN SEE. This project
+     measures an azimuth in exactly three places (J7, Z4b, Z8) and none of
+     them looks at a leaf, so a leaf set that silently builds one arrangement
+     while the control says another exports watertight, as one piece, at an
+     identical triangle count. The expected counts are restated here from the
+     LAW rather than imported from the geometry: a reference that mutates with
+     the quantity under test checks nothing (`seam-floor-removed`). */
+  const PER = { alternate: 1, opposite: 2, whorled: 3 };
+  const wantPer = PER[String(ui.leafPhyllotaxy)];
+  if (wantPer === undefined) bad.push(`LF5: the control reports an unknown phyllotaxy '${ui.leafPhyllotaxy}'`);
+  else if (Array.isArray(L.azimuths)) {
+    for (let i = 0; i < L.azimuths.length; i++) {
+      if (L.azimuths[i].length !== wantPer) { bad.push(`LF5: node ${i} carries ${L.azimuths[i].length} leaves where ${ui.leafPhyllotaxy} is ${wantPer}`); break; }
+    }
+    /* AND THE SPACING WITHIN A NODE, which a count alone cannot see: opposite
+       is two across (180 deg) and whorled is three at 120. */
+    if (wantPer > 1) {
+      const step = (2 * Math.PI) / wantPer;
+      for (let i = 0; i < L.azimuths.length; i++) {
+        const a = L.azimuths[i];
+        let worst = 0;
+        for (let k = 1; k < a.length; k++) {
+          const d = ((a[k] - a[0]) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+          worst = Math.max(worst, Math.abs(d - k * step));
+        }
+        if (worst > 1e-9) { bad.push(`LF5: node ${i}'s leaves are ${(worst * 180 / Math.PI).toFixed(4)} deg off the ${(step * 180 / Math.PI).toFixed(1)} deg ${ui.leafPhyllotaxy} spacing`); break; }
+      }
+    }
+  }
+
+  /* LF6 — THE BLADE CARRIES NO FOOT. Phase A's A1: with the root blend stood
+     down the outline is independent of `ring.width` (0 of 4001 samples move),
+     and that is what lets a leaf share the petal's outline at all. A leaf that
+     quietly kept the foot-continuity floor would draw a blade swelling to the
+     hub's foot width at its base — legal geometry, silent everywhere else. */
+  if (L.rootBlendDown !== true) bad.push(`LF6: the leaf profile reports rootBlendDown = ${L.rootBlendDown} — the blade is carrying the petal's foot-continuity floor, which a petiole has no foot for`);
+
+  /* LF7 — THE SERRATION IS THE LEAF'S OWN. Sharing the MACHINERY is not
+     sharing the VALUES: a leaf reading `lobeDepth` would serrate every time
+     petal lobes came on and vice versa, the organ-to-organ coupling session 22
+     ruled against. The reference is the page's own read-back control state,
+     an owner the leaf plan does not write. */
+  if (!L.serration) bad.push('LF7: the builder reports no leaf serration record');
+  else {
+    const want4 = { depth: Number(ui.leafToothDepth), count: Math.round(Number(ui.leafToothCount)), crest: Number(ui.leafCrestShape), notch: Number(ui.leafNotchShape) };
+    for (const k of ['depth', 'crest', 'notch']) {
+      if (Math.abs(Number(L.serration[k]) - want4[k]) > 1e-9) { bad.push(`LF7: the leaf's serration ${k} reads ${L.serration[k]} where the LEAF's own control says ${want4[k]} — a leaf reading the petal's lobe controls is the coupling this splits`); break; }
+    }
+    if (want4.depth > 0 && !(L.serration.count >= 1)) bad.push(`LF7: leaf serration depth is ${want4.depth} but the builder cut ${L.serration.count} teeth`);
+    if (!(want4.depth > 0) && L.serration.count) bad.push(`LF7: leaf serration depth is 0 but the builder reports ${L.serration.count} teeth — the guard must be inert`);
+  }
+  return bad;
+}
+
+/* ===================================================================
    ST9 — THE CHANNEL IS CLEAR IN THE FILE THAT WILL BE PRINTED.
 
    ST7 reads the stem channel's own report, so it can say the criterion is

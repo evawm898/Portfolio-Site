@@ -125,7 +125,8 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          fringeAssertions,
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
-         stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
+         stemAssertions, STEM_SCOPE,
+         leafAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 
@@ -357,6 +358,15 @@ for (const row of rows) {
      as one piece. See stemAssertions()'s own header. */
   const stem = await stemAssertions(page, row);
   if (stem.length) { validity.push(`${row.label}: ${stem.join('; ')}`); continue; }
+  /* LEAVES (LF0-LF7). Both STL gates are blind to the whole family by
+     construction — a leaf declared and never built adds no boundary edge and
+     detaches nothing; a petiole rooted on the AXIS of a hollow stem still
+     reads ONE PIECE, measured, because a radial rod crosses the wall on its
+     way out; and nothing here measures an azimuth, so a leaf set building the
+     wrong phyllotaxy exports watertight at an identical triangle count. See
+     leafAssertions()'s own header. */
+  const leaf = await leafAssertions(page, row);
+  if (leaf.length) { validity.push(`${row.label}: ${leaf.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable
