@@ -302,6 +302,12 @@ const WITNESS = {
               and a larger ring. A witness that leaves the control's own part is
               the stronger one. */
            read: (m) => `${m.ringWidth}/${m.ringRadius}`, what: 'ringWidth/ringRadius' },
+  /* PETAL (the leaf tip-shape session) — the container holding Petal shape,
+     Petal form, Petal curl and Petal roles, collapsed at first load, with no
+     control of its own; witnessed through a CHILD's control exactly as
+     "Center" is, driven while the container and the child are both shut. The
+     child's own row witnesses the child. */
+  petal: { id: 'petalWidth', value: '30', read: (m) => `${m.ringWidth}/${m.ringRadius}`, what: 'ringWidth/ringRadius (through the Petal shape child)' },
   form: { id: 'petalCup', value: '0.6',
           /* The four curves cost ZERO triangles by construction, so the count
              cannot be the witness. Cup is the one of the four that stretches

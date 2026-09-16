@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -956,7 +956,51 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (Math.abs(m.hub.topFaceZ - c.hub.topFaceZ) > 0.05) ? null
         : `the hub's top face is at ${m.hub.topFaceZ} against the clean tree's ${c.hub.topFaceZ} — it did not move`; } },
+
+  /* ===================================================================
+     THE LEAF TIP (the leaf tip-shape session) — LF9. The family was added, so
+     the table runs it. Two mutations, each the plausible way the control could
+     be wired wrong while every other family and both STL gates stay green: a
+     blade that ignores the control and keeps the retired constant (the plan
+     still reports the control, so only the READ-BACK clause can see it — the
+     whole reason LF9 has a clause (b)), and a clamp record that lies about
+     where the terminal begins (the read-out would print the lie, and nothing
+     else reads that record). Both witnessed on the MUTATED module's own
+     builder output in Node, never on the assertion they name. */
+  { id: 'leaf-tip-ignores-the-control', why: 'the blade is built at the retired constant whatever the slider says, while the plan reports the slider — hidden-and-not-inert with a truthful-looking record beside it',
+    find: '    petalTipShape: Number(state.leafTipShape),',
+    into: '    petalTipShape: LEAF_TIP_SHAPE,', names: ['LF9'],
+    witness: (M, C) => { const m = leafFacts(M, 0.6), c = leafFacts(C, 0.6);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      /* The rows the blade was built from at 0.60 differ between the trees
+         (the mutant's are the 1.30 outline), while the plan's record agrees. */
+      return (m.plan.tipShape === 0.6 && c.plan.tipShape === 0.6 && m.rowsDiffer(c) && m.clamp.fromU !== c.clamp.fromU) ? null
+        : `the mutant's blade rows ${m.rowsDiffer(c) ? 'differ' : 'AGREE'} with the clean tree's at 0.60 (plan says ${m.plan.tipShape} / ${c.plan.tipShape}) — the behaviour did not move`; } },
+
+  { id: 'leaf-clamp-record-lies', why: 'the clamp record places the terminal at the widest point, so the read-out prints a stub covering the whole tip on every leaf; the blade itself is untouched, so only the biconditional against its rows can see it',
+    find: '    const fromU = hi;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };',
+    into: '    const fromU = prof.uPk;\n    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };', names: ['LF9'],
+    witness: (M, C) => { const m = leafFacts(M, 1.3), c = leafFacts(C, 1.3);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
+        : `the mutant's clamp station is ${m.clamp.fromU} against ${c.clamp.fromU} and its rows ${m.rowsDiffer(c) ? 'moved' : 'held'} — the record did not move on its own`; } },
 ];
+
+/* THE LEAF WITNESS — one leaf, alone, from a module's own builder at a given
+   tip exponent: the plan's record, the rows the blade was built from and the
+   clamp record, so a mutation is judged on what that module EMITS. */
+function leafFacts(MOD, n) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 1, leafTipShape: n };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const fr = MOD.footRing(st, acc);
+    const plan = MOD.leafPlan(st, MOD.stemPlan(st, fr.hub, acc), acc);
+    const solo = new MOD.MeshBuilder({ exportMode: true });
+    const rep = MOD.buildLeafInto(solo, plan, st, 0, 0);
+    return { plan, rows: rep.rowHalfBaseMm, clamp: rep.tipClamp,
+      rowsDiffer(other) { return this.rows.length !== other.rows.length || this.rows.some((h, i) => h !== other.rows[i]); } };
+  } catch (e) { return { threw: e.message }; }
+}
 
 /* Rows chosen so every mutation has something to bite on. */
 const ROWS = [
@@ -1049,6 +1093,12 @@ const ROWS = [
      that was never chosen rather than one that went stale. */
   { label: 'a stem on a SPHERE — the stem channel, where petals the stem would pass through are NOT built',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '24' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }] },
+  /* THE LEAF ROW (the leaf tip-shape session) — at the ACUTE end, because a
+     mutation pinning the exponent at the old 1.30 reads 1.30 against 0.60 here
+     and would read 1.30 against 1.30 at the default: a witness state is part
+     of the claim (`bore-is-not-evas-rule`'s lesson, one family later). */
+  { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
+    set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
 
 ];
 
@@ -1094,6 +1144,10 @@ async function famsOn(rows) {
        family this table must be able to fire. */
     for (const msg of await stemAssertions(page, row)) {
       const mm = /^(ST\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
+    for (const msg of await leafAssertions(page, row)) {
+      const mm = /^(LF\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

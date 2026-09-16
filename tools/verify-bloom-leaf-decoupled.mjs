@@ -82,10 +82,14 @@ let MUT = G;
 if (CONTROL) {
   const fs = await import('node:fs');
   const src = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
-  const from = 'petalBaseTaper: LEAF_BASE_TAPER, petalTipTaper: LEAF_TIP_TAPER, petalTipShape: LEAF_TIP_SHAPE,';
+  /* RE-ANCHORED when the tip shape became the leaf's own control (the leaf
+     tip-shape session): the override is now `Number(state.leafTipShape)`, and
+     the neutered form reads the PETAL's exponent instead. */
+  const from = 'petalTipShape: Number(state.leafTipShape),';
   if (!src.includes(from)) { console.error('the control\'s anchor is no longer in the source — it would mutate nothing'); process.exit(2); }
   const out = path.join(ROOT, '.leaf-decoupled-control.mjs');
-  fs.writeFileSync(out, src.replace(from, 'petalBaseTaper: LEAF_BASE_TAPER, petalTipTaper: LEAF_TIP_TAPER, petalTipShape: Number(state.petalTipShape),'));
+  if (src.split(from).length !== 2) { console.error(`the control's anchor matches ${src.split(from).length - 1}x — re-anchor it`); process.exit(2); }
+  fs.writeFileSync(out, src.replace(from, 'petalTipShape: Number(state.petalTipShape),'));
   MUT = await import(pathToFileURL(out).href);
   process.on('exit', () => { try { fs.unlinkSync(out); } catch { /* nothing to clean */ } });
 }

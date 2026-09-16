@@ -8205,7 +8205,27 @@ export const LEAF_PETIOLE_SIDES = 12;
 export const LEAF_CUP = 0.35;
 /* The leaf's own outline: a LANCEOLATE blade, widest below the middle. Fixed
    rather than inherited — see leafBladeState's own note. */
-export const LEAF_BASE_TAPER = 0.85, LEAF_TIP_TAPER = 1.15, LEAF_TIP_SHAPE = 1.30;
+export const LEAF_BASE_TAPER = 0.85, LEAF_TIP_TAPER = 1.15;
+/* THE LEAF'S TIP SHAPE IS A CONTROL (Eva, the leaf tip-shape session: "there's
+   no way to change it"). `leafTipShape` is the petal's superellipse exponent
+   — the SAME LAW over [widest point, 1], `widthProfile`'s one owner of the
+   apex — on the LEAF's own control, so neither organ moves the other (the
+   serration split's rule). 1.30 was the fixed constant and is the DEFAULT, so
+   every leaf that shipped before the control is bit-identical by construction;
+   the range is the petal's, imported by the registry rather than restated.
+
+   WHAT THE CONTROL CANNOT DO, measured before it was built (the squared-tip
+   discovery said the same of the petal): the superellipse reaches EXACTLY
+   ZERO half-width at u = 1 at every exponent, and buildLeafInto floors the
+   half-width at TIP_HALF_MM — the constant, in BOTH modes — so every leaf ends
+   1.60 mm across whatever is asked. The control moves the SHOULDER. And a
+   POINTIER exponent hugs that floor for LONGER: on a 17 mm blade the last
+   21.3% of the length is the 1.6 mm stub at 0.60, 2.1% at 1.30, 0.02% at 3.00.
+   The share is a property of the WIDTH and the exponent and not of the length
+   ((W/2) f(u) = 0.8 is a width equation); the builder reports it as `tipClamp`
+   and the read-out tells it. Clamped and told, never refused. */
+export const LEAF_TIP_SHAPE = 1.30;
+export const LEAF_TIP_SHAPE_RANGE = Object.freeze([0.6, 3]);
 /* The node span, the flower's own law (ruling 9) ported as FRACTIONS OF THE
    STEM and then taken to millimetres by its one owner below. The TOP inset is
    a floor rather than a value, because Phase A measured that a fraction of the
@@ -8305,6 +8325,13 @@ export function leafPlan(state, stem, acc) {
        `lobe*` values shows up as these two disagreeing. */
     toothDepth: Number(state.leafToothDepth), crestShape: Number(state.leafCrestShape),
     notchShape: Number(state.leafNotchShape), toothCount: Math.round(Number(state.leafToothCount)),
+    /* THE TIP EXPONENT THE BLADE IS BUILT FROM — the LEAF's own control, read
+       here so LF9 can compare it against the PAGE's read-back state, an owner
+       this plan does not write; LF9's second clause reads the exponent back
+       off the half-widths the builder actually used, because a plan that
+       reports the control while the blade is built from something else is
+       exactly what this field cannot see. */
+    tipShape: Number(state.leafTipShape),
     /* SLENDERNESS, the coupon question. Reported, never a bound: nothing in
        this project has ever been printed. */
     slenderness: lengthMm / (2 * petioleR),
@@ -8346,7 +8373,10 @@ export function leafBladeState(state) {
        the same non-local surprise the serration split exists to prevent — and
        leaf outline controls are not among the nine Eva approved. Three
        constants; a control is one registry row the day it is wanted. */
-    petalBaseTaper: LEAF_BASE_TAPER, petalTipTaper: LEAF_TIP_TAPER, petalTipShape: LEAF_TIP_SHAPE,
+    petalBaseTaper: LEAF_BASE_TAPER, petalTipTaper: LEAF_TIP_TAPER,
+    /* THE TIP SHAPE IS THE LEAF'S OWN CONTROL — the one outline value a leaf
+       carries, on the same superellipse the petal reads. */
+    petalTipShape: Number(state.leafTipShape),
     /* NO APEX FAMILY ON A LEAF (ruling 2: no lobes-as-coverage-arc, no fringe,
        no squared terminal) */
     petalTipEnd: 0, fringeCount: 0,
@@ -8419,13 +8449,14 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
   }
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bb = [base[0] + D0[0] * plan.petioleLenMm, base[1] + D0[1] * plan.petioleLenMm, base[2] + D0[2] * plan.petioleLenMm];
-  const rows = [];
+  const rows = [], rowHalfBaseMm = [];
   for (let i = 0; i <= NU; i++) {
     const u = i / NU;
     const fr = form ? form.frameAt(R, T, th, u) : { D: D0, T, N: [-R[0] * Math.sin(th), -R[1] * Math.sin(th), Math.cos(th)] };
     const C = [bb[0] + fr.D[0] * u * plan.lengthMm, bb[1] + fr.D[1] * u * plan.lengthMm, bb[2] + fr.D[2] * u * plan.lengthMm];
     const h = Math.max(prof.halfWidthAt(u), TIP_HALF_MM);
     const hb = Math.max(prof.halfWidthBaseAt(u), TIP_HALF_MM);
+    rowHalfBaseMm.push(hb);
     const sect = form ? form.sectAt(C, fr.T, fr.N, h, u, hb) : null;
     const cols = [];
     for (let j = 0; j <= NV; j++) {
@@ -8481,8 +8512,30 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
       if ((dir.get(`${b}|${a}`) || 0) !== n) directedMismatch++;
     }
   }
+  /* THE TERMINAL CLAMP, TOLD (the leaf tip-shape session). The half-width
+     above is `max(profile, TIP_HALF_MM)`, so the blade ends 2 x TIP_HALF_MM
+     across at every exponent and in both modes; where the outline MEETS that
+     floor is the one number that says how much of the leaf is the stub. Found
+     on the profile's own base outline by bisection over [widest point, 1] —
+     the outline is monotone there, and the floor is the constant rather than
+     the mode floor, so the station is the same in LIVE and EXPORT (measured:
+     identical to six figures at every exponent). A LENGTH derived from a
+     length: the station times the leaf's own length, never a row count. */
+  const tipClamp = (() => {
+    let lo = prof.uPk, hi = 1;
+    if (!(prof.halfWidthBaseAt(lo) > TIP_HALF_MM)) hi = lo;
+    else for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (prof.halfWidthBaseAt(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
+    const fromU = hi;
+    return { fromU, fraction: 1 - fromU, mm: (1 - fromU) * plan.lengthMm, terminalMm: 2 * TIP_HALF_MM, ofWidth: (2 * TIP_HALF_MM) / plan.widthMm };
+  })();
   return {
     directedMismatch,
+    /* THE HALF-WIDTHS THE BLADE WAS BUILT FROM, row by row, the BASE outline
+       before any cut — the value handed to the cross-section as `hb`. LF9
+       reads the tip exponent back off these, so a plan reporting one exponent
+       while the blade is built from another shows as the two disagreeing. */
+    rowHalfBaseMm,
+    tipClamp,
     /* THE RADIUS THE PETIOLE ACTUALLY ROOTS AT, from the CENTROID of the ring
        this builder just emitted — not from `plan.rootR` beside it. A mutation
        that offsets every emitted ring leaves the plan saying the right thing,
