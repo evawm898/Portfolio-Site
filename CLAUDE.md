@@ -2995,6 +2995,18 @@ reading `actions_list` at the time has made exactly the mistake it documents.
 it is the point of the rule, not an exception to it** — the spread is now a factor of 1.41
 between fastest and slowest of one workflow, so no figure in this file can size a wait and the
 only correct move is still to read `actions_list` at the time.
+**AND THE LEAF SESSION WIDENED IT TWICE MORE, WHICH MAKES SIX — 219.5 AND 221.4 min**
+(`bloom-export-watertight`, runs 34908046877 and 35003665560; the first cross-checked against
+`get_workflow_run_usage`'s `run_duration_ms` 13,169,000, the second being that PR's own gate,
+17:50:13 -> 21:31:39). Both are past the 214.8 ceiling above, and `bloom-connectedness` on the
+same head ran an ordinary 119.1. **THE SHAPE OF THE SPREAD HAS CHANGED AND THAT IS THE ONLY
+THING WORTH READING OFF IT: the five most recent successes at the time read 214.8 / 215.0 /
+215.1 / 216.5 / 219.5 — TIGHT AT THE TOP — so the 151.8 min FLOOR recorded above is no longer
+representative of anything**, and a wait sized from the bottom of the written range would come
+up an hour and a quarter short. **Do not update this paragraph with a seventh number and do
+not quote any figure in it.** Six widenings in, the only thing that has held is the rule
+itself: size every CI wait off `actions_list`'s own recent completed runs, read at the time.
+Every constant here has been superseded; the instruction has not.
 
 **AND `get_job_logs` RETURNS HTTP 404 WHILE A JOB IS STILL RUNNING, so NOTHING HERE CAN SEE
 INSIDE A GATE MID-RUN** (measured, the sphere-stem session, on job 104011064304 at 207 minutes).

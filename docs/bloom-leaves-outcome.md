@@ -112,6 +112,17 @@ resolution: it names the instrument, not the defect. **LF8** reads the
 builder's own directed-edge census and names it — the stem's ST10 precedent,
 for the same stated reason: a fix without a witness is folklore. 0 after.
 
+**THE CLASS, and it is not this feature's: AN UNDIRECTED EDGE CENSUS CANNOT SEE A
+WINDING ERROR, AND SIGNED VOLUME IS NOT A SUBSTITUTE FOR ONE.** Every
+surface check in this project keys on a sorted vertex pair, so all of them —
+watertight, connected, manifold, degenerate-free, the self-intersection census —
+pass on a solid whose faces are in the right places and wound the wrong way. The
+volume agreeing to 15% is the measurement that says a magnitude check will not
+rescue it either, because a rim's contribution is a rounding error against the
+blade it borders. **Any future part whose rims are emitted as pairs owes a
+DIRECTED census of its own**; the two that exist are ST10's and LF8's, both
+written after the defect rather than before it.
+
 ### And the leaf's outline is decoupled structurally, not asserted
 
 `leafBladeState` spreads the whole control set so every field the two laws read
@@ -172,10 +183,17 @@ Swept over 360 azimuths at one degree: **325 weld and 35 do not.** `alternate`
 (0, 180) and `opposite` (0, 90, 180, 270) sit entirely on the clear 9.7% at
 every node; `whorled` does not.
 
-So a `SELF_INTERSECTION_XFAIL` entry was **declined**. Its count would be a
-function of which azimuths a phyllotaxy happens to land on — and #213 does not
-gate magnitude, so the entry would absorb a real fold on that row in silence. An
-xfail is a declaration somebody can check; this one would not have been.
+So a `SELF_INTERSECTION_XFAIL` entry was **declined, and that is a finding about
+the xfail mechanism rather than a preference about this row.** Its count is a
+function of which azimuths a phyllotaxy happens to land on AND — measured below,
+and discovered after this paragraph was first written — **of which MODE you asked
+in**. Against a list that does not gate magnitude (#213), a number that moves for
+two reasons unrelated to any fold is not a declaration at all: the entry would
+have sat there absorbing a real fold on that row in silence, in whichever mode
+the real fold happened to appear. **An xfail is a declaration somebody can
+check, and the test of one is whether its number is a property of the GEOMETRY.
+This one's was a property of the sampling.** Where it is not, remove the cause
+instead — which is what shipped.
 
 **The fix removes the vertex rather than declaring the pairs.** Session 43's stem
 cap is the precedent — a centre fan sharing the hub's apex vertex, made a rim fan
@@ -302,6 +320,25 @@ on a flat head, where all eight feet read 0.000 mm from the free stem because a
 foot's bottom skin is coplanar with the hub's underside.
 
 ### The fix names the PETIOLE and does not widen the REGION
+
+**THE CLASS, stated first because it is the transferable half and it is not
+about leaves: A CLAUSE IN ANOTHER ASSERTION FAMILY, REASONING ABOUT A REGION,
+WILL REDDEN ON A NEW PART THAT HAS EVERY RIGHT TO BE THERE — AND THE REMEDY
+NAMES THE PART, NEVER THE REGION.** ST9 belongs to the stem channel and doubts
+the sphere's petal-omission mask; it has no opinion about leaves and never
+mentioned them. What it owns is a REGION — the free stem's printable gap — and
+a region is indifferent to which part enters it. So the moment a feature put a
+third part below the hub, a clause nobody had read went red on geometry that was
+correct. **Both coverage instruments were taught the leaves earlier in this same
+session and ST9 was not, because a feature's own checklist is written from the
+feature's own families.** The test that finds the next one: for every REGION any
+clause anywhere asserts about, ask which parts can now be in it — and note that
+the two parts already living there, the root band and the stem itself, were
+*both* already exempt, so this was a pattern the clause had rather than a new
+concession.
+
+**And the remedy is where the rule earns its keep.** Widening the region is the
+one-line fix and it is the wrong one:
 
 That distinction is the fifth durable rule doing its work. **A region wide
 enough to hold a petiole is wide enough to hold a petal**, so a clause that
@@ -439,7 +476,67 @@ default is unchanged at 19,040.
 
 ## Reported, not solved
 
-The cantilever. The worst lever the controls reach is a 120 mm leaf on the
+Two hazards ship ungated and on purpose. Both are stated here rather than only
+in the sections that measured them, because this is where a reader looks for
+what the gates will NOT catch.
+
+**THE CANTILEVER.** The worst lever the controls reach is a 120 mm leaf on the
 petiole's derived 1.2 mm diameter — **L/d = 100** — and the read-out prints
 it on every leafed build, joining the stamens' and style's line verbatim:
-**UNMEASURED — no coupon has been printed.** Clamp and tell, never refuse.
+**UNMEASURED — no coupon has been printed.** Clamp and tell, never refuse. It is
+the same unanswered question the stamens and the style have carried since they
+shipped: nothing in this project has ever been printed, so every slenderness
+figure here is a number without a bar beside it. **The leaf does not make that
+question harder, it makes it larger** — L/d = 100 against the filament's own
+worst, on a part that hangs off the side of a tube rather than standing on a
+plate. It is the strongest argument yet for the parked coupon print.
+
+**AND THE BLADE AGAINST THE STEM, which is a real printability finding and NOT
+the channel's.** Nearest approach of any blade vertex to the free stem's solid,
+measured as a pure geometric quantity with no ST9 in it (§"the sweep found a
+real printability finding" has the full table and its method):
+
+| `leafAngle` | −60 | 0 | 20 | **35** | 50 | 60 | **70** | 75 | 80–90 |
+|---|---|---|---|---|---|---|---|---|---|
+| mm | 1.853 | 5.492 | 4.910 | **4.019** | 2.804 | 1.853 | **0.824** | 0.289 | 0.000 |
+
+**Identical on a CAP and a SPHERE to four decimals and identical in LIVE and
+EXPORT** — so it is the leaf against the stem, and it has nothing to do with
+spheres, the omission mask or the channel. **From 70° up it is under
+`MIN_FEATURE_MM`**, which is the top fifth of a −60…90 range; Eva's ruled 35°
+reads 4.019 mm, four times the printable gap, and the drooping end is clear at
+1.853.
+
+**Ungated deliberately, on §18a's grounds.** Narrowing `leafAngle` would remove
+states nothing has ruled against, on the strength of a threshold that is itself
+a declared guess (§18b — `MIN_FEATURE_MM` has never been validated against a
+printed part). And the hazard is invisible to the matrix **by construction**:
+the matrix varies one control at a time, so an angle that is only dangerous
+*because there is a stem under it* cannot appear on any row — the same sentence
+`cup × petalTipShape` and the buckle composition already earned. A combination
+gate over predeclared control products is the schedulable item; it is recorded
+here, not pre-empted.
+
+## And the export gate's spread widened twice more — the sixth time
+
+Recorded because this project's rule about CI waits is load-bearing and its
+evidence is exactly this list of widenings. Measured off `actions_list` on the
+workflow's own recent completed runs (`run_started_at` → `updated_at`), the way
+the rule says to:
+
+| run | duration |
+|---|---|
+| 34908046877 | **219.5 min** — cross-checked against `get_workflow_run_usage`, `run_duration_ms` 13,169,000 |
+| 35003665560 (this PR's own) | **221.4 min** — 17:50:13 → 21:31:39 |
+
+Both are past the **214.8 min** ceiling `CLAUDE.md` records, and the five most
+recent successes at the time read **214.8 / 215.0 / 215.1 / 216.5 / 219.5** —
+much tighter at the top than the historical range and with **the 151.8 min floor
+no longer anywhere near representative**. `bloom-connectedness` on this head ran
+119.1 min, mid-range for itself.
+
+**The point is not the new number.** Six widenings in, the only thing that has
+held is the file's own instruction: **size every CI wait off `actions_list` at
+the time, never off a figure written down anywhere** — including this table,
+which is stale the moment a matrix row is added. It is here as evidence that the
+rule is load-bearing, not as a replacement constant.
