@@ -572,113 +572,42 @@ const SLOT_ROLES_BEHIND_OFFSET = {
 const tipSection = (prefix) => { const t = TIP_INSTANCES.find((x) => x.prefix === prefix); return { id: t.section, label: t.sectionLabel, open: false, parent: t.parent }; };
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
-  /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
-     on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
-     A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
-     placement (Eva's ruling): Arrangement is how petals distribute in the
-     plane, Center is the ornament at the pole, and neither is "is the head
-     flat, domed or a sphere". `headRise` moved here from ARRANGEMENT —
-     presentation only, `section` is never persisted — as the cap's own
-     sub-control, on session 16's PETAL FORM / PETAL CURL precedent (a
-     registry-driven section move asserted 0 moved).
-
-     TWO VALUES, NOT THREE, and the reason is a measurement (Phase A, Q5):
-     a FLAT / DOMED / SPHERICAL enum with `headRise` as DOMED's sub-control
-     would resolve 35 phase13 rows and 42 live rows that pin `headRise`
-     above zero with no hub-shape value to a FLAT default and build them
-     flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
-     CAP carries `headRise` and is the default, so its predicate is TRUE on
-     every pre-existing row and the move is 0 moved by construction. Neither
-     value is called "dome", which is what dissolved the collision with the
-     since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
-  { id: 'head', label: 'Head', open: false },
   /* ===================================================================
-     CENTER — A CONTAINER, NOT A CONTROL (Eva, Sep 6, session 23). The
-     reproductive parts are parts of ONE thing, and until this session they
-     sat at top level beside PETAL SHAPE as though they were peers of the
-     petals. They are now two drop-downs inside "Center", directly below
-     HEAD — the shape "Petal roles" already has: a parent holding only child
-     sections, no sliders of its own.
+     PETAL — A CONTAINER, NOT A CONTROL (Eva's ruling, the leaf tip-shape
+     session): "the idea is to have an overarching petal drop down and then
+     within that have the three." Petal shape, Petal form and Petal curl were
+     three top-level sections standing beside Head and Stem as though a petal
+     were three organs; they are now three drop-downs inside one, on the
+     "Center" shape (session 23): a parent holding only child sections, with
+     no control, no predicate and no read-out of its own, HIDDEN when and only
+     when every child is — which for these children is never.
 
-     IT HAS NO VALUE AND NO `NONE`, on purpose. "No centre" is what a visitor
-     sees when both parts are off (stamens 0, style NONE), and that state is
-     already reachable through the parts themselves; a NONE on the container
-     would be a SECOND definition of the same state — the registration
-     failure this project has cleaned up twice (the receptacle condition, the
-     rim's two producers). So the container carries no control, no predicate
-     and no read-out of its own: it is HIDDEN when and only when both parts
-     are hidden (under SPHERE), by the one derived rule every section obeys —
-     applyVisibility() reads its children, adds no declaration, and the panel
-     gate asserts the derivation in both directions.
+     PETAL ROLES IS ITS FOURTH CHILD, AND THAT IS A PLACEMENT MADE WITHOUT A
+     RULING. Eva's structure names three children and does not mention Petal
+     roles at all; the alternatives were a fourth child here or a top-level
+     section her list does not contain. It is nested because a role is an
+     adjustment TO PETALS (that section's own label says so), and because
+     nesting it keeps the top level EXACTLY her seven. Its groups therefore
+     sit at the panel's third level, which session 27 made legal and session
+     29 gave its CSS. One `parent` field moves it back out.
 
-     WHY THE PARTS ARE DECLARED HERE, DIRECTLY AFTER THEIR PARENT (the
-     session-21 note, carried): the generator appends a nested drop-down
-     inside its parent's element, so the DOM's document order is parent then
-     children, and the panel gate's census compares that order against THIS
-     array. A child declared anywhere but immediately after its parent reads
-     as out of order there (measured, session 21).
+     THE CHILDREN KEEP THEIR FULL NAMES ("Petal shape" under "Petal"), which
+     reads redundantly and is left so ON PURPOSE: the panel gate keys on
+     section identity and every route names these ids, and Eva has not ruled
+     on the shorter "Shape / Form / Curl" — a rename is one label each and
+     her word, never a session's guess.
 
      PRESENTATION ONLY, 0 MOVED BY CONSTRUCTION: `section` and `parent` are
-     never persisted and no geometry reads either; every control id, law,
-     predicate and default is unchanged. The precedent is session 16's PETAL
-     FORM / PETAL CURL split and session 18's Head move, both proved
-     byte-identical across the frozen baseline — the same two guarantees are
-     stated apart in docs/bloom-session-23-outcome.md.
+     never persisted and no geometry reads either. The byte partition on the
+     commit that made this change is 0 movers / 758 holders against main, and
+     that is measured rather than argued — a section reorder that moved a
+     float would be something reading ORDER where it should read IDENTITY,
+     which would be a defect worth more than the feature.
 
-     WHAT "OFF" MEANS, said on the parts' own read-outs (Eva, Sep 6): setting
-     the count to 0 or the style to NONE HIDES the part's sub-controls and
-     makes them inert, and it KEEPS their values — turning the part back on
-     restores them. That behaviour already existed and nothing announced it,
-     so it read as destructive. The two read-outs now say so, with the kept
-     values, at the moment the visitor turns the part off. NOT a mute: a
-     control that is visible and not building is the mirror of the defect the
-     panel gate exists to catch, so the sub-controls stay hidden AND inert.
-
-     `open: false` — ARRANGEMENT holds the one first-load open. Inside the
-     container the accordion rule holds one level down: opening Gynoecium
-     closes Androecium and leaves Center open. */
-  /* STEM sits below HEAD because that is what it attaches to: the petals join
-     the hub, the hub joins the stem. It holds its two controls and no more. */
-  { id: 'stem', label: 'Stem', open: false },
-  /* LEAVES sit below STEM because that is what they attach to — the petals
-     join the hub, the hub joins the stem, the leaves join the stem. SERRATION
-     is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
-     leaf's own edge treatment and not a second top-level family. */
-  { id: 'leaves', label: 'Leaves', open: false },
-  { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
-  { id: 'center', label: 'Center', open: false },
-  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
-     reproductive parts the retired CENTER section was standing in for
-     (session 20). Correct botanical naming (Eva): the androecium is the
-     filaments and anthers; the gynoecium (style and stigma) is B3 and its
-     own drop-down beside this one. Hidden whole under SPHERE by every
-     control's predicate. */
-  { id: 'androecium', label: 'Androecium', open: false, parent: 'center' },
-  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
-     second reproductive part and the last piece of the centre. Its own
-     drop-down, on the session-21 note above: each part independently present
-     or absent. Hidden whole under SPHERE by every control's predicate. */
-  /* THE TIP SECTIONS (session 29's Tip, session 30's pair) are declared
-     below Gynoecium — a drop-down INSIDE each part and therefore the panel's
-     third level, which session 27 made legal by lifting the nesting bound
-     and replacing it with the precedence check the declaration relies on.
-     WHY A SECTION RATHER THAN SEVEN MORE ROWS IN THE PART: the part's own
-     rows describe WHERE its rods are and how long; the seven describe the
-     shape of one small solid at the end of each — the "Petal roles" shape
-     one level further in. */
-  /* THE ANTHER'S TIP SECTION (session 30) — one statement per instance,
-     `tipSection()`, so a tip with controls and no drop-down cannot happen:
-     the Anther inside Androecium (session 29's `tip`, renamed — `section` is
-     never persisted, so the id is free). Two sections labelled "Tip" would
-     have shared a name on screen, which the panel gate refuses; each is named
-     for the part it shapes. DECLARED IN RENDER ORDER — directly after its
-     parent, as the DOM will nest it — because the panel gate's census
-     compares document order against this array. */
-  tipSection('anther'),
-  { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
-  /* THE STIGMA'S TIP SECTION — the same statement, inside Gynoecium. */
-  tipSection('stigma'),
-  { id: 'shape', label: 'Petal shape', open: false },
+     DECLARED DIRECTLY BEFORE ITS CHILDREN, which verifySections() requires
+     and the panel gate's census compares against document order. */
+  { id: 'petal', label: 'Petal', open: false },
+  { id: 'shape', label: 'Petal shape', open: false, parent: 'petal' },
   /* LOBES (session 38, PR 2) — a drop-down INSIDE Petal shape, declared in
      render order directly after its parent. A lobe is a cut in the OUTLINE
      (widthProfile's), so it belongs under the section that owns the outline
@@ -690,7 +619,7 @@ export const SECTIONS = [
      the outline, so it gets its own drop-down rather than sitting beside the
      shape sliders. Declared AFTER its parent, which verifySections() requires. */
   { id: 'fringe', label: 'Fringe', open: false, parent: 'shape' },
-  { id: 'form', label: 'Petal form', open: false },
+  { id: 'form', label: 'Petal form', open: false, parent: 'petal' },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
      session-16 Phase A proposal): petal tilt, spine curl, curl bias, curl
      start, twist. Tilt moves WITH curl rather than to Arrangement, because
@@ -701,34 +630,7 @@ export const SECTIONS = [
      spine). PETAL FORM keeps the cross-width family: cup, cup gradient, roll,
      roll taper. Presentation only — `section` is never persisted, no role
      changed, zero geometry, asserted by the retention run. */
-  { id: 'curl', label: 'Petal curl', open: false },
-  /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
-     ruling Sep 5: the centre is the reproductive parts and nothing else) and
-     is BACK AS A CONTAINER for exactly those parts (session 23), declared
-     below HEAD above. `center` was never a control id and sections are not
-     persisted, so the section id was never in RETIRED_IDS; the five control
-     ids are, and the panel gate's retirement route now asserts that the
-     container holds NO control of its own. The junction still never gets a
-     section. */
-  /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
-     WITH THE LABEL on purpose. An id that contradicts its label is a stored
-     label-lie: it reads as a declaration, a later reader checks it and
-     believes it, and this project's most repeated defect is a name for a
-     thing that is not the thing. There is no saved-design debt to weigh
-     against that — `section` is panel presentation, never persisted, and it
-     is not a control id, so RETIRED_IDS does not apply and no migration is
-     owed. (Were a section id ever to reach a saved design, that calculus
-     inverts and the rename becomes a retirement.)
-
-     WHAT THE NAME IS SLIGHTLY WRONG ABOUT, stated rather than discovered:
-     this section also holds `footDelicacy`, which scales a WIDTH, not a
-     thickness. It sits here because the three controls are one layer — the
-     part's own material dimensions, the things that decide how delicate the
-     printed object is — and because delicacy's width is what the area rule
-     reads to size the ring. If the name ever reads wrong at the panel, the
-     LABEL moves on one ruling and the id moves with it, exactly as it did
-     here. Do not fix it by re-homing the control. */
-  { id: 'thickness', label: 'Part thickness', open: false },
+  { id: 'curl', label: 'Petal curl', open: false, parent: 'petal' },
   /* PETAL ROLES — which petals differ from the others, and how (Eva's name,
      Sep 2). It holds two independent axes: session A's LAYER roles (whorl vs
      whorl) and session B's SLOT roles (where a petal sits within its whorl).
@@ -744,7 +646,7 @@ export const SECTIONS = [
      already nine controls, and session A recorded that the pair wanted a home
      of its own once slot roles arrived. Moving `inner*` here is presentation
      only — `section` is never persisted and no geometry reads it. */
-  { id: 'roles', label: 'Petal roles', open: false },
+  { id: 'roles', label: 'Petal roles', open: false, parent: 'petal' },
 
   /* ===================================================================
      THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
@@ -857,6 +759,146 @@ export const SECTIONS = [
        avoid. */
     parent: 'roles',
   })),
+  /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
+     on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
+     A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
+     placement (Eva's ruling): Arrangement is how petals distribute in the
+     plane, Center is the ornament at the pole, and neither is "is the head
+     flat, domed or a sphere". `headRise` moved here from ARRANGEMENT —
+     presentation only, `section` is never persisted — as the cap's own
+     sub-control, on session 16's PETAL FORM / PETAL CURL precedent (a
+     registry-driven section move asserted 0 moved).
+
+     TWO VALUES, NOT THREE, and the reason is a measurement (Phase A, Q5):
+     a FLAT / DOMED / SPHERICAL enum with `headRise` as DOMED's sub-control
+     would resolve 35 phase13 rows and 42 live rows that pin `headRise`
+     above zero with no hub-shape value to a FLAT default and build them
+     flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
+     CAP carries `headRise` and is the default, so its predicate is TRUE on
+     every pre-existing row and the move is 0 moved by construction. Neither
+     value is called "dome", which is what dissolved the collision with the
+     since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
+  { id: 'head', label: 'Head', open: false },
+  /* ===================================================================
+     CENTER — A CONTAINER, NOT A CONTROL (Eva, Sep 6, session 23). The
+     reproductive parts are parts of ONE thing, and until this session they
+     sat at top level beside PETAL SHAPE as though they were peers of the
+     petals. They are now two drop-downs inside "Center", directly below
+     HEAD — the shape "Petal roles" already has: a parent holding only child
+     sections, no sliders of its own.
+
+     IT HAS NO VALUE AND NO `NONE`, on purpose. "No centre" is what a visitor
+     sees when both parts are off (stamens 0, style NONE), and that state is
+     already reachable through the parts themselves; a NONE on the container
+     would be a SECOND definition of the same state — the registration
+     failure this project has cleaned up twice (the receptacle condition, the
+     rim's two producers). So the container carries no control, no predicate
+     and no read-out of its own: it is HIDDEN when and only when both parts
+     are hidden (under SPHERE), by the one derived rule every section obeys —
+     applyVisibility() reads its children, adds no declaration, and the panel
+     gate asserts the derivation in both directions.
+
+     WHY THE PARTS ARE DECLARED HERE, DIRECTLY AFTER THEIR PARENT (the
+     session-21 note, carried): the generator appends a nested drop-down
+     inside its parent's element, so the DOM's document order is parent then
+     children, and the panel gate's census compares that order against THIS
+     array. A child declared anywhere but immediately after its parent reads
+     as out of order there (measured, session 21).
+
+     PRESENTATION ONLY, 0 MOVED BY CONSTRUCTION: `section` and `parent` are
+     never persisted and no geometry reads either; every control id, law,
+     predicate and default is unchanged. The precedent is session 16's PETAL
+     FORM / PETAL CURL split and session 18's Head move, both proved
+     byte-identical across the frozen baseline — the same two guarantees are
+     stated apart in docs/bloom-session-23-outcome.md.
+
+     WHAT "OFF" MEANS, said on the parts' own read-outs (Eva, Sep 6): setting
+     the count to 0 or the style to NONE HIDES the part's sub-controls and
+     makes them inert, and it KEEPS their values — turning the part back on
+     restores them. That behaviour already existed and nothing announced it,
+     so it read as destructive. The two read-outs now say so, with the kept
+     values, at the moment the visitor turns the part off. NOT a mute: a
+     control that is visible and not building is the mirror of the defect the
+     panel gate exists to catch, so the sub-controls stay hidden AND inert.
+
+     `open: false` — ARRANGEMENT holds the one first-load open. Inside the
+     container the accordion rule holds one level down: opening Gynoecium
+     closes Androecium and leaves Center open. */
+  { id: 'center', label: 'Center', open: false },
+  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
+     reproductive parts the retired CENTER section was standing in for
+     (session 20). Correct botanical naming (Eva): the androecium is the
+     filaments and anthers; the gynoecium (style and stigma) is B3 and its
+     own drop-down beside this one. Hidden whole under SPHERE by every
+     control's predicate. */
+  { id: 'androecium', label: 'Androecium', open: false, parent: 'center' },
+  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
+     second reproductive part and the last piece of the centre. Its own
+     drop-down, on the session-21 note above: each part independently present
+     or absent. Hidden whole under SPHERE by every control's predicate. */
+  /* THE TIP SECTIONS (session 29's Tip, session 30's pair) are declared
+     below Gynoecium — a drop-down INSIDE each part and therefore the panel's
+     third level, which session 27 made legal by lifting the nesting bound
+     and replacing it with the precedence check the declaration relies on.
+     WHY A SECTION RATHER THAN SEVEN MORE ROWS IN THE PART: the part's own
+     rows describe WHERE its rods are and how long; the seven describe the
+     shape of one small solid at the end of each — the "Petal roles" shape
+     one level further in. */
+  /* THE ANTHER'S TIP SECTION (session 30) — one statement per instance,
+     `tipSection()`, so a tip with controls and no drop-down cannot happen:
+     the Anther inside Androecium (session 29's `tip`, renamed — `section` is
+     never persisted, so the id is free). Two sections labelled "Tip" would
+     have shared a name on screen, which the panel gate refuses; each is named
+     for the part it shapes. DECLARED IN RENDER ORDER — directly after its
+     parent, as the DOM will nest it — because the panel gate's census
+     compares document order against this array. */
+  tipSection('anther'),
+  { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
+  /* THE STIGMA'S TIP SECTION — the same statement, inside Gynoecium. */
+  tipSection('stigma'),
+  /* STEM sits below CENTER, and it did sit directly below HEAD before the
+     leaf tip-shape session: Eva's ruled top-level order is Arrangement,
+     Petal, Head, Center, Stem, Part thickness. What it attaches to is
+     unchanged — the petals join the hub, the hub joins the stem. It holds
+     its two controls, and since that session it also holds LEAVES as a
+     nested drop-down: a leaf exists only where a stem does, so the nesting
+     states a dependency that was already real (`leafPresent` reads
+     `stemLength`). Stem > Leaves > Serration is the panel's second third
+     level, beside Center > Androecium > Anther. */
+  { id: 'stem', label: 'Stem', open: false },
+  /* LEAVES sit below STEM because that is what they attach to — the petals
+     join the hub, the hub joins the stem, the leaves join the stem. SERRATION
+     is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
+     leaf's own edge treatment and not a second top-level family. */
+  { id: 'leaves', label: 'Leaves', open: false, parent: 'stem' },
+  { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
+  /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
+     ruling Sep 5: the centre is the reproductive parts and nothing else) and
+     is BACK AS A CONTAINER for exactly those parts (session 23), declared
+     below HEAD above. `center` was never a control id and sections are not
+     persisted, so the section id was never in RETIRED_IDS; the five control
+     ids are, and the panel gate's retirement route now asserts that the
+     container holds NO control of its own. The junction still never gets a
+     section. */
+  /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
+     WITH THE LABEL on purpose. An id that contradicts its label is a stored
+     label-lie: it reads as a declaration, a later reader checks it and
+     believes it, and this project's most repeated defect is a name for a
+     thing that is not the thing. There is no saved-design debt to weigh
+     against that — `section` is panel presentation, never persisted, and it
+     is not a control id, so RETIRED_IDS does not apply and no migration is
+     owed. (Were a section id ever to reach a saved design, that calculus
+     inverts and the rename becomes a retirement.)
+
+     WHAT THE NAME IS SLIGHTLY WRONG ABOUT, stated rather than discovered:
+     this section also holds `footDelicacy`, which scales a WIDTH, not a
+     thickness. It sits here because the three controls are one layer — the
+     part's own material dimensions, the things that decide how delicate the
+     printed object is — and because delicacy's width is what the area rule
+     reads to size the ring. If the name ever reads wrong at the panel, the
+     LABEL moves on one ruling and the id moves with it, exactly as it did
+     here. Do not fix it by re-homing the control. */
+  { id: 'thickness', label: 'Part thickness', open: false },
   /* ANDROECIUM and GYNOECIUM stood here, LAST, as top-level sections
      (sessions 21 and 22); since session 23 they are declared directly after
      their parent, "Center", above — the same census rule that put them last

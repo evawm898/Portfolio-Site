@@ -23,6 +23,17 @@
         hub, a petal or the stem would pass clause 1 (the row is a declared
         mover, so it is ALLOWED to differ) and fail only here.
 
+   `--change tipShape` (the leaf tip-shape session) PREDECLARES A DIFFERENT
+   PARTITION FROM THE SAME RECORD: a row moves iff a leaf is built AND the plan
+   reports a tip exponent other than the default `LEAF_TIP_SHAPE`. Clause 2
+   changes with it, because a tip change is NOT additive — the leaf's own floats
+   move in place — so it becomes: with the leaves removed (the same row rebuilt
+   at `leafLength` 0 on each tree) the two trees are identical AND each
+   leafless stream is a prefix of its own full stream, so every differing float
+   lies in the leaf tail and nothing else moved. The tool prints how many plans
+   carry a tip exponent at all, so a run where none does (the panel-only commit,
+   which must read 0 movers) is visibly a run about nothing but holders.
+
    BOTH CLAUSES ARE SHOWN ABLE TO FAIL, and they need two different controls —
    this file's own recorded lesson, one tool later. `--control` perturbs a
    HOLDER and fires clause 1; `--control-only` perturbs the FIRST SURVIVING
@@ -40,6 +51,8 @@ if (!BASE) { console.error('verify-bloom-leaf-bytes: --base <worktree> is requir
 const MATRIX = argOf('matrix') || 'live';
 const EXPECT = argOf('expect');
 const CONTROL = has('control'), CONTROL_ONLY = has('control-only');
+const CHANGE = argOf('change') || 'leaves';
+if (!['leaves', 'tipShape'].includes(CHANGE)) { console.error(`verify-bloom-leaf-bytes: --change must be leaves or tipShape, not ${CHANGE}`); process.exit(2); }
 
 const A = await import(pathToFileURL(path.join(ROOT, 'bloom-geometry.js')).href);
 const B = await import(pathToFileURL(path.join(BASE, 'bloom-geometry.js')).href);
@@ -66,22 +79,31 @@ const stateOf = (row, D) => {
 };
 
 /* THE PREDECLARATION — the BUILDER's own record, asked before any comparison. */
+let plansWithTip = 0;
 function movesByRecord(row) {
   for (const mode of [false, true]) {
     const st = stateOf(row, RA.DEFAULTS);
     const acc = new A.MeshBuilder({ exportMode: mode });
     const fr = A.footRing(st, acc);
     const plan = A.stemPlan(st, fr.hub, acc);
-    if (A.leafPlan(st, plan, acc).present) return true;
+    const lp = A.leafPlan(st, plan, acc);
+    if (CHANGE === 'leaves') { if (lp.present) return true; continue; }
+    /* tipShape: the BUILDER's own record of the exponent the blade was built
+       from, against the geometry's own default. A plan with no such field is a
+       tree without the control, which can move nothing — counted, so a run
+       over such a tree says so rather than reading as a partition. */
+    if (lp.present && lp.tipShape !== undefined) { if (mode) plansWithTip++; if (lp.tipShape !== A.LEAF_TIP_SHAPE) return true; }
   }
   return false;
 }
-function build(mod, D, row, mode) {
+function build(mod, D, row, mode, leafless = false) {
   const st = stateOf(row, D);
+  if (leafless) st.leafLength = 0;
   const acc = new mod.MeshBuilder({ exportMode: mode });
   mod.buildBloomInto(acc, st);
   return acc.positions;
 }
+const isPrefix = (pre, full) => { if (pre.length > full.length) return false; for (let i = 0; i < pre.length; i++) if (!Object.is(pre[i], full[i])) return false; return true; };
 
 let movers = 0, holders = 0, failedMove = 0, movedHold = 0, c2 = 0, floats = 0, skipped = 0, oneSided = 0;
 const notes = [];
@@ -115,18 +137,29 @@ for (const row of rows) {
     if (shouldMove && !differs) { failedMove++; notes.push(`${row.label} [${mode ? 'export' : 'live'}]: predeclared a MOVER and did not move`); }
     if (!shouldMove && differs) { movedHold++; notes.push(`${row.label} [${mode ? 'export' : 'live'}]: predeclared a HOLDER and MOVED`); }
     /* CLAUSE 2 — purely additive, on movers only. */
-    if (shouldMove) {
+    if (shouldMove && CHANGE === 'leaves') {
       let bad = pa.length < pb.length;
       if (!bad) for (let i = 0; i < pb.length; i++) if (!Object.is(pa[i], pb[i])) { bad = true; break; }
       if (bad) { c2++; notes.push(`${row.label} [${mode ? 'export' : 'live'}]: the base's stream is NOT a prefix of the branch's — something other than the leaves moved`); }
+    }
+    if (shouldMove && CHANGE === 'tipShape') {
+      /* Everything that is not a leaf is identical across the trees, and on
+         each tree the leaves are the tail: so every float that differs is a
+         leaf's. `--control-only` has already perturbed pa[0], which is inside
+         the leafless prefix, and this is what reports it. */
+      const la = build(A, RA.DEFAULTS, row, mode, true), lb = build(B, RB.DEFAULTS, row, mode, true);
+      let same = la.length === lb.length;
+      if (same) for (let i = 0; i < la.length; i++) if (!Object.is(la[i], lb[i])) { same = false; break; }
+      const bad = !same || !isPrefix(la, pa) || !isPrefix(lb, pb);
+      if (bad) { c2++; notes.push(`${row.label} [${mode ? 'export' : 'live'}]: with the leaves removed the two trees ${same ? 'agree' : 'DIFFER'}, and the leafless stream is ${isPrefix(la, pa) && isPrefix(lb, pb) ? '' : 'NOT '}a prefix of the full one — something other than the leaves' own floats moved`); }
     }
   }
 }
 const ok = !failedMove && !movedHold && !c2 && !oneSided;
 console.log(`\nleaf bytes — matrix ${MATRIX}, ${rows.length} rows x 2 modes, ${floats.toLocaleString('en-US')} base floats, Object.is`);
-console.log(`  predeclared from the BUILDER's record: ${movers} MOVERS / ${holders} HOLDERS`);
+console.log(`  change: ${CHANGE} · predeclared from the BUILDER's record: ${movers} MOVERS / ${holders} HOLDERS${CHANGE === 'tipShape' ? ` (${plansWithTip} plans carry a tip exponent at all)` : ''}`);
 console.log(`  clause 1  movers that failed to move: ${failedMove} · holders that moved: ${movedHold}`);
-console.log(`  clause 2  movers where anything but the leaves moved: ${c2}`);
+console.log(`  clause 2  movers where anything but the leaves ${CHANGE === 'tipShape' ? "' own floats" : ''} moved: ${c2}`);
 console.log(`  excluded  ${skipped} row-mode build(s) threw IDENTICALLY on both trees — pre-existing, this tool applies no capability hook`);
 if (oneSided) console.log(`  ONE-SIDED ${oneSided} row-mode build(s) threw on one tree and not the other — a real regression`);
 for (const n of notes.slice(0, 12)) console.log(`    - ${n}`);
