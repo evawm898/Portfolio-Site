@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -482,6 +482,7 @@ let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actu
 /* THE STEM (session 43) — the plan its ONE owner made and what the builder
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
 let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true;
+let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
    question does not arise (no stem, or not a sphere), never a passing 0. */
@@ -604,6 +605,16 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
        build was made from. ST0 needs the answer the RUNNING module gave; see
        __bloomMetrics. */
     lastStemAbsent = stemIsAbsent(uiForBuild);
+    /* LEAVES — LF0-LF7's measured side. `leaf` is NULL and not absent where
+       there are none: LF1 distinguishes "the builder says there are none" from
+       "the builder says nothing", and a missing key is the second. The
+       per-leaf records come from the BUILDER, never from the plan beside it —
+       LF2 and LF3 ask what came OUT, and a mutation that offsets what it emits
+       leaves the plan saying the right thing (session 43's ST2). */
+    lastLeaf = built.leaf && built.leaf.present ? built.leaf : null;
+    lastLeavesBuilt = built.leavesBuilt || null;
+    lastLeafTris = (built.leavesBuilt || []).reduce((n, r) => n + r.tris, 0);
+    lastLeafAbsent = leafIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
@@ -1163,6 +1174,32 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    THE JOIN IS TOLD, NOT TUNED: it has no control, so the only way anyone can see
    what it did is for this line to say it. CLAMPED AND TOLD is the project's own
    form, and the bore's closing at Eva's floor is exactly that. */
+/* THE LEAVES LINE. Everything this feature clamps, it TELLS — the top inset
+   raised off the flower's stem-fraction to what the leaf itself needs, the node
+   count giving way at the pitch floor where the span cannot hold it, the head
+   that cannot be cleared at all on a leaf longer than its stem, and the
+   OVERHANG, which ruling 7 made a printability question and which the ruled
+   default sits on the wrong side of. SLENDERNESS joins the stamens' and the
+   style's line verbatim: nothing here has ever been printed. */
+function leafLine(leaf) {
+  const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
+  const over = 90 - Math.abs(leaf.angleDeg);
+  return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
+    + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
+    + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
+    + `\n     PETIOLE rooted at r = ${leaf.rootR.toFixed(2)} mm, the WALL's mid-thickness — embedded at every angle, and more so as the angle steepens`
+    + ` · ${(2 * leaf.petioleR).toFixed(2)} mm across x ${leaf.petioleLenMm.toFixed(2)} mm`
+    + `\n     NODES top ${leaf.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    + (leaf.insetClamped
+        ? ` — RAISED from the stem's own ${leaf.insetAskedMm.toFixed(1)} mm to the ${leaf.insetNeededMm.toFixed(1)} mm this leaf needs to clear the head`
+        : ` (the stem's own inset; the leaf needs ${leaf.insetNeededMm.toFixed(1)} mm and has it)`)
+    + (leaf.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: a ${leaf.lengthMm} mm leaf rises further than this stem's node span is long, so the top leaf stands inside the head (told, not refused)`)
+    + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
+    + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
+        ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
+    + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
+}
+
 function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
   if (!stem) return '';
   const hollow = stem.boreR > 0;
@@ -1343,6 +1380,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
+       + (built && built.leaf && built.leaf.present ? leafLine(built.leaf) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1830,6 +1868,54 @@ window.__bloomMetrics = () => ({
     emittedTipZ: lastStemBuilt ? lastStemBuilt.emittedTipZ : undefined,
   } : null,
   stemTris: lastStemTris,
+  /* THE LEAVES (LF0-LF7). The PLAN's own declarations beside the BUILDER's own
+     emitted records, which is the split every clause here rests on: LF1
+     predicts the count from the plan's azimuth list and compares it against the
+     tally, LF2 reads the emitted root radii, LF3 the emitted solid crossing.
+     Two owners, and the arithmetic between them is stated in the clause. */
+  leaf: lastLeaf ? {
+    lengthMm: lastLeaf.lengthMm, widthMm: lastLeaf.widthMm, angleDeg: lastLeaf.angleDeg,
+    nodes: lastLeaf.nodes, phyllotaxy: lastLeaf.phyllotaxy,
+    nodeDepthsMm: lastLeaf.nodeDepthsMm.slice(),
+    azimuths: lastLeaf.azimuths.map((a) => a.slice()),
+    rootR: lastLeaf.rootR, petioleR: lastLeaf.petioleR, petioleLenMm: lastLeaf.petioleLenMm,
+    insetAskedMm: lastLeaf.insetAskedMm, insetNeededMm: lastLeaf.insetNeededMm,
+    insetMm: lastLeaf.insetMm, insetClamped: lastLeaf.insetClamped,
+    insetSatisfied: lastLeaf.insetSatisfied,
+    nodesAsked: lastLeaf.nodesAsked, nodesBuilt: lastLeaf.nodesBuilt, nodesClamped: lastLeaf.nodesClamped,
+    slenderness: lastLeaf.slenderness,
+    built: (lastLeavesBuilt || []).length,
+    emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
+    crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
+    /* ST9's measured side — the axis of the rod each leaf's builder actually
+       emitted. A petiole is rooted THROUGH the stem's wall, so it stands
+       inside the free stem's own cylinder by design; ST9 reads these to tell
+       that third part from the petal it exists to doubt. */
+    petioleAxes: (lastLeavesBuilt || []).map((r) => r.petioleAxis),
+    /* LF8's measured side — the builder's own DIRECTED-edge census, which both
+       STL gates are blind to because theirs keys on a sorted pair. */
+    directedMismatch: (lastLeavesBuilt || []).map((r) => r.directedMismatch),
+    /* THE BLADE CARRIES NO FOOT — read off the EMITTED outline by the builder
+       rather than from the flag that set it, so a leaf quietly keeping the
+       petal's foot-continuity floor is visible as geometry (LF6). */
+    rootBlendDown: (lastLeavesBuilt || []).every((r) => r.rootBlendDown),
+    /* THE SERRATION IS THE LEAF'S OWN (LF7) — the values the BLADE was built
+       from, so a leaf reading the petal's `lobe*` controls shows as these
+       disagreeing with the leaf's own read-back state. */
+    serration: {
+      depth: lastLeaf.toothDepth, count: (lastLeavesBuilt || []).reduce((n, r) => Math.max(n, r.serrationBuilt), 0),
+      crest: lastLeaf.crestShape, notch: lastLeaf.notchShape,
+    },
+    /* THE TOOTH COUNT IS THE CUT LAW'S TO CLAMP, and on a short or narrow
+       blade it does: an asked 12 comes back as 10 at the shipped leaf size.
+       Told on the read-out; LF7 asserts only that a positive depth cuts
+       SOMETHING, because the ceiling is the lobe machinery's own and this
+       family does not restate it. */
+    teethAsked: lastLeaf.toothCount,
+    teethBuilt: (lastLeavesBuilt || []).reduce((n, r) => Math.max(n, r.serrationBuilt), 0),
+  } : null,
+  leafTris: lastLeafTris,
+  leafAbsent: lastLeafAbsent,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the

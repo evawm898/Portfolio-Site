@@ -47,7 +47,9 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
          STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
-         TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT } from './bloom-geometry.js';
+         TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
+         LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT,
+         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -327,6 +329,18 @@ export const PREDICATES = {
      The DIAMETER is hidden AND inert at length 0 — the curl family's own
      gating, and lobeDepth's: one control is the guard and the rest follow it. */
   stemPresent: { id: 'stemLength', min: 1 },
+
+  /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
+     lobeDepth pattern, one control the guard and the rest following it, hidden
+     AND inert. NODE COUNT IS ITS OWN CONTROL, so a stem can carry nodes with no
+     leaves; what it cannot do is carry leaves with no stem, which is why the
+     geometry's `leafIsAbsent` reads BOTH lengths and LF0 compares the two
+     statements. The registry states the leaf's half; the geometry states its
+     own, and a green run must not endorse one without the other. */
+  leafPresent: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }] },
+  /* The serration follows the leaf AND its own depth guard — the curl family's
+     gating one level down, so the four shape rows are inert at depth 0. */
+  leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
 
   /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
@@ -626,6 +640,12 @@ export const SECTIONS = [
   /* STEM sits below HEAD because that is what it attaches to: the petals join
      the hub, the hub joins the stem. It holds its two controls and no more. */
   { id: 'stem', label: 'Stem', open: false },
+  /* LEAVES sit below STEM because that is what they attach to — the petals
+     join the hub, the hub joins the stem, the leaves join the stem. SERRATION
+     is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
+     leaf's own edge treatment and not a second top-level family. */
+  { id: 'leaves', label: 'Leaves', open: false },
+  { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
   { id: 'center', label: 'Center', open: false },
   /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
      reproductive parts the retired CENTER section was standing in for
@@ -2877,6 +2897,87 @@ export const CONTROLS = [
       return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
                         : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+
+  /* ===================================================================
+     LEAVES (Eva's rulings). SIMPLE leaves — one blade per node, no leaflets.
+     Nine controls: five for the arrangement and four for the edge.
+     =================================================================== */
+  { id: 'leafLength', section: 'leaves', kind: 'slider',
+    min: LEAF_LENGTH_RANGE[0], max: LEAF_LENGTH_RANGE[1], step: 1, default: 0,
+    label: 'Leaf length',
+    /* SIZE IS IN MILLIMETRES, NOT A MULTIPLIER (ruling 5). The flower's
+       `leafSize` multiplies only the length while the width is fixed in world
+       units, which is why three of its four leaf types come out wider than
+       long at the default — a length multiplier wearing a size control's name.
+       Both axes here are absolute. */
+    fmt: (v) => (Number(v) === 0 ? 'none — no leaves are built' : `${v} mm from the petiole to the tip`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'leafWidth', section: 'leaves', kind: 'slider',
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: 17,
+    label: 'Leaf width',
+    fmt: (v, ui) => `${v} mm across at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafAngle', section: 'leaves', kind: 'slider',
+    min: LEAF_ANGLE_RANGE[0], max: LEAF_ANGLE_RANGE[1], step: 1, default: LEAF_ANGLE_DEFAULT,
+    label: 'Leaf angle',
+    /* EVA'S RULING, 35 degrees, from the angle row of the Phase A sheet. The
+       OVERHANG is printed beside it because ruling 7 made this partly a
+       printability question and the default is past the classic 45 line —
+       ruled with that figure in view, on a project that has never printed
+       anything. Told, never clamped. */
+    fmt: (v) => { const a = Number(v), over = 90 - Math.abs(a);
+      return `${a} deg from horizontal (${a < 0 ? 'drooping' : a === 0 ? 'level' : 'rising'}) · ${over} deg overhang from vertical${over > 45 ? ' — PAST the classic 45, supports likely' : ''}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafNodes', section: 'leaves', kind: 'slider',
+    min: LEAF_NODE_RANGE[0], max: LEAF_NODE_RANGE[1], step: 1, default: 3,
+    label: 'Nodes',
+    fmt: (v, ui) => { const n = Math.round(Number(v));
+      const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
+      return `${n} along the stem · ${n * per} leaves`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafPhyllotaxy', section: 'leaves', kind: 'choice', default: 'alternate',
+    options: [
+      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      { value: 'opposite', label: 'Opposite (two across, decussate)' },
+      { value: 'whorled', label: 'Whorled (three at 120)' },
+    ],
+    label: 'Arrangement',
+    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
+      return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+
+  /* THE EDGE. Serration is botanically a LEAF feature, which is what Eva ruled
+     in September, and this applies it to the organ it belongs on. It shares the
+     petal's CUT MACHINERY — the same `g(r)` two-exponent law, the same crest
+     and notch powers — and NOT the petal's VALUES: a leaf reading `lobeDepth`
+     would serrate every time petal lobes came on and vice versa, the
+     organ-to-organ coupling session 22 ruled against when it refused to let a
+     style's presence move every stamen. LF7 is the witness for the split. */
+  { id: 'leafToothDepth', section: 'leafSerration', kind: 'slider',
+    min: 0, max: 1, step: 0.01, default: 0.26,
+    label: 'Tooth depth',
+    fmt: (v) => (Number(v) === 0 ? 'none — an entire margin' : `${Number(v).toFixed(2)}x the blade's own half-width`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
+    min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
+    label: 'Teeth',
+    fmt: (v) => `${Math.round(Number(v))} along each margin`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+  { id: 'leafCrestShape', section: 'leafSerration', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Tooth tip',
+    /* THE LOCAL POWER of the cut at its own feature (session 41): 1.00 a
+       corner, 2.00 parabolic, 3.00 flat, below 1.00 a cusp. Rising = blunter,
+       the antherPinch ruling. */
+    fmt: (v) => { const k = Number(v);
+      return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-topped'}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+  { id: 'leafNotchShape', section: 'leafSerration', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Notch',
+    fmt: (v) => { const k = Number(v);
+      return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-bottomed'}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
 ];
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
