@@ -1181,9 +1181,16 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    OVERHANG, which ruling 7 made a printability question and which the ruled
    default sits on the wrong side of. SLENDERNESS joins the stamens' and the
    style's line verbatim: nothing here has ever been printed. */
-function leafLine(leaf) {
+function leafLine(leaf, leavesBuilt) {
   const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
   const over = 90 - Math.abs(leaf.angleDeg);
+  /* THE TIP, CLAMPED AND TOLD — the BUILDER's own clamp record (every leaf on
+     a build shares one profile, so the first built leaf's is every leaf's). */
+  const cl = leavesBuilt && leavesBuilt[0] && leavesBuilt[0].tipClamp;
+  const tipLine = cl
+    ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · ends ${cl.terminalMm.toFixed(2)} mm across (the print terminal, both modes) — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
+      + (cl.fraction > 0.05 ? ` — CLAMPED: a pointier shape LENGTHENS the stub and a wider leaf shortens it; the share is set by the width, never the length` : '')
+    : '';
   return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
     + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
     + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
@@ -1197,6 +1204,7 @@ function leafLine(leaf) {
     + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
     + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
         ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
+    + tipLine
     + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
 }
 
@@ -1380,7 +1388,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
-       + (built && built.leaf && built.leaf.present ? leafLine(built.leaf) : '')
+       + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1884,6 +1892,11 @@ window.__bloomMetrics = () => ({
     insetSatisfied: lastLeaf.insetSatisfied,
     nodesAsked: lastLeaf.nodesAsked, nodesBuilt: lastLeaf.nodesBuilt, nodesClamped: lastLeaf.nodesClamped,
     slenderness: lastLeaf.slenderness,
+    /* THE TIP (LF9): the exponent the PLAN declares, the half-widths the BLADE
+       was built from, and the terminal-clamp record the read-out prints. */
+    tipShape: lastLeaf.tipShape,
+    rowHalfBaseMm: (lastLeavesBuilt || []).map((r) => r.rowHalfBaseMm),
+    tipClamp: (lastLeavesBuilt || []).map((r) => r.tipClamp),
     built: (lastLeavesBuilt || []).length,
     emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
     crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),

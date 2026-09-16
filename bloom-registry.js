@@ -48,7 +48,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
          STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
-         LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT,
+         LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
 
 /* ===================================================================
@@ -2986,6 +2986,45 @@ export const CONTROLS = [
     label: 'Arrangement',
     fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
       return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+
+  /* THE TIP SHAPE (Eva, the leaf tip-shape session: "it always shows as this
+     very thick tip when it should be coming to a point, or at least have the
+     option of coming to a point or being rounded"). The petal's superellipse
+     exponent on the LEAF's own control: same law, separate control, so neither
+     organ moves the other. The six named states are the petal ruling's and the
+     read-out speaks them; 1.30 is the constant that shipped and is the default.
+
+     AND THE READ-OUT TELLS THE TRUTH ABOUT THE LIMIT, which is the half of this
+     control that matters. The blade ENDS 2 x TIP_HALF_MM = 1.60 mm across at
+     every exponent, in both modes (the builder floors at the constant), so a
+     point is not printable and the control moves the SHOULDER. The clamp
+     clause prints the builder's own record: the last N mm (M% of the length)
+     is that stub, and the stub is P% of the width. It says which way the
+     levers run, because both are the opposite of what the label suggests: a
+     POINTIER exponent hugs the floor for LONGER (21.3% of a 17 mm blade at
+     0.60, 2.1% at 1.30, 0.02% at 3.00), and the share is set by the WIDTH and
+     never by the length. `fmt`'s third argument is the SHOWN build's record
+     (the stamen spread's precedent), so the figure is the builder's and not a
+     second producer of the clamp. Clamped and told, never refused. */
+  { id: 'leafTipShape', section: 'leaves', kind: 'slider',
+    min: LEAF_TIP_SHAPE_RANGE[0], max: LEAF_TIP_SHAPE_RANGE[1], step: 0.05, default: LEAF_TIP_SHAPE,
+    label: 'Tip shape',
+    fmt: (v, ui, shown) => {
+      const n = Number(v);
+      const name = n <= 0.70 ? 'acute'
+        : n < 1.05 ? 'a straight point'
+        : n < 1.45 ? 'pointed (the shipped leaf)'
+        : n < 1.90 ? 'between pointed and the true ellipse'
+        : n < 2.25 ? 'the true ellipse'
+        : n < 2.80 ? 'width held, then turning'
+        : 'the held-width round tip';
+      const cl = shown && shown.leaf && shown.leaf.tipClamp && shown.leaf.tipClamp[0];
+      if (!cl) return `${n.toFixed(2)} · ${name}`;
+      return `${n.toFixed(2)} · ${name} · ends ${cl.terminalMm.toFixed(2)} mm across, the print terminal, in both modes`
+        + ` — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
+        + (cl.fraction > 0.05 ? ` — CLAMPED: a point below ${cl.terminalMm.toFixed(2)} mm cannot be printed, and a pointier shape only LENGTHENS the stub; a WIDER leaf shortens it (the share is set by the width, never the length)` : '');
+    },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
 
   /* THE EDGE. Serration is botanically a LEAF feature, which is what Eva ruled
