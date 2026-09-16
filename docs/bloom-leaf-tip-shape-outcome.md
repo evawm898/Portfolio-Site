@@ -242,7 +242,8 @@ word.
   rows over 29 blocks — the export half **PASS, 85 of 86 watertight and the one
   declared ALL MAX refusal asserted by XR1**, in 965 s; the acute tip row reads
   **0 within-shell pairs** (7,343 cross-shell, the by-design overlaps) with LF9
-  green; the flood fill: FLOOD_FILL_RESULT.
+  green; the flood fill at 0.6 mm **PASS, 85 of 86 ONE connected piece**, in 603 s. Six commits
+  in all, one push.
 * **Mutants** `--only=leaf-tip-ignores-the-control,leaf-clamp-record-lies`:
   clean tree silent, both fire LF9 (see §1).
 * **Cost**: 2,548 triangles a leaf, unchanged at every exponent (the lattice
