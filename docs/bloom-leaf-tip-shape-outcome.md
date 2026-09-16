@@ -128,10 +128,14 @@ commit before the feature:
   (session 41's L7: the measured side has to be the artefact). Measured on the
   clean tree: the fit reproduces the exponent to **5.6e-16 at 0.60, 1.6e-14 at
   1.30, 3.9e-10 at 3.00** (worst row), against a 1e-6 bar;
-* **(c)** the clamp record is a biconditional against those rows: every row
-  below the declared station above the floor, every row at or past it exactly
-  on it, and the millimetres and fractions are that station applied to the
-  control's own length and width.
+* **(c)** the clamp record is a biconditional against those rows OVER THE TIP
+  STRETCH `[uPk, 1]`: every row below the declared station above the floor,
+  every row at or past it exactly on it, and the millimetres and fractions are
+  that station applied to the control's own length and width. **The first cut
+  swept every row and fired on the CLEAN tree at row 0** — the leaf's base
+  outline reaches zero where it meets the petiole, so u = 0 sits on the same
+  floor for a reason that is not the tip's. The mutant table's control pass
+  found it before any mutant ran.
 
 Two mutants in `tools/verify-bloom-apex-mutants.mjs`, which now runs the LF
 family and carries a leaf row at the ACUTE end (a mutation pinning the exponent
@@ -140,7 +144,10 @@ the witness state is part of the claim): `leaf-tip-ignores-the-control` (the
 blade at the constant, the plan truthful — only (b) sees it) and
 `leaf-clamp-record-lies` (the record at the widest point, the blade untouched —
 only (c) sees it). Each witnessed on the MUTATED module's own builder output.
-Result: **see §4.**
+**Result: the clean tree is SILENT on every row and both mutants fire LF9** —
+a subset of 2 of 39, the other 37 not run; all 39 anchors match exactly once.
+And the table's control pass found the clause defect above (row 0 on the
+floor) before any mutant ran, which is what the control pass is for.
 
 `tools/verify-bloom-leaf-decoupled.mjs` re-anchored (its control neuters the
 new override): 199 petal-side values x 2 modes, **0 leaf floats moved**; the
@@ -186,7 +193,9 @@ positions, and every id is unchanged.
 
 **0 moved, measured on the panel commit alone** (`e614a77`) with
 `node tools/verify-bloom-leaf-bytes.mjs --base <worktree of 3f664be> --change
-tipShape --expect 0/758`: **see §4.** A section reorder that moved a float would
+tipShape --expect 0/758`: **0 MOVERS / 758 HOLDERS, PASS**, over 759,870,288
+base floats in both modes under `Object.is`, the tool printing that 0 plans on
+that tree carry a tip exponent at all. A section reorder that moved a float would
 have meant something reading order where it should read identity — there was
 none.
 
@@ -221,11 +230,21 @@ word.
   phase31's, registered in BOTH maps, `--verify-frozen --phase32 --base` PASS.
 * **The byte partition** (`--change tipShape`, predeclared from the builder's
   record — a row moves iff a leaf is built AND its plan reports an exponent
-  other than the default): PENDING — filled in below when the runs land.
-* **The self-intersection census is the verdict**: `bloom-smoke --conn` —
-  PENDING.
-* **Mutants** `--only=leaf-tip-ignores-the-control,leaf-clamp-record-lies` —
-  PENDING.
+  other than the default), live matrix, 762 rows x 2 modes, 764,649,288 base
+  floats, `Object.is`: **4 MOVERS / 758 HOLDERS, PASS** — 0 movers that failed
+  to move, 0 holders that moved, 0 movers where anything but the leaves' own
+  floats moved (with the leaves removed the two trees agree, and each leafless
+  stream is a prefix of its own full one). The four movers are the four new
+  rows; the GATED row at length 0 with the slider at 3.00 HOLDS, which is the
+  guard proved by bytes. Both controls fire: `--control` on a holder (clause 1,
+  2 findings), `--control-only` on a mover (clause 2, 8 of 8 mover x mode).
+* **The self-intersection census is the verdict**: `bloom-smoke --conn`, 86
+  rows over 29 blocks — the export half **PASS, 85 of 86 watertight and the one
+  declared ALL MAX refusal asserted by XR1**, in 965 s; the acute tip row reads
+  **0 within-shell pairs** (7,343 cross-shell, the by-design overlaps) with LF9
+  green; the flood fill: FLOOD_FILL_RESULT.
+* **Mutants** `--only=leaf-tip-ignores-the-control,leaf-clamp-record-lies`:
+  clean tree silent, both fire LF9 (see §1).
 * **Cost**: 2,548 triangles a leaf, unchanged at every exponent (the lattice
   does not vary with the outline); the shipping default is 19,040.
 
