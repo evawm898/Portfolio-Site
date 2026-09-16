@@ -199,7 +199,28 @@ that tree carry a tip exponent at all. A section reorder that moved a float woul
 have meant something reading order where it should read identity — there was
 none.
 
-## 3. Two things placed without a ruling — WAITING ON EVA
+## 3. Two things placed without a ruling — RULED (Eva, Sep 16, from the deploy preview)
+
+Eva saw the built panel on the Deploy Preview and approved the order as-is.
+Both placements below are recorded as they were put to her, with her ruling
+under each.
+
+**Ruling 1 — Petal roles stays as Petal's fourth child.** It is a per-petal
+control and belongs in the Petal container; it was absent from her section list
+because the list transcribed the three visible sections, not the whole tree.
+Confirmed against `bloom-registry.js`: `{ id: 'roles', label: 'Petal roles',
+parent: 'petal' }`, with `labellumGroup` / `hoodGroup` and the per-petal groups
+under `roles` at depth three. No change.
+
+**Ruling 2 — no rename.** The children stay `Petal shape` / `Petal form` /
+`Petal curl`. The shorter labels were this session's proposal, not Eva's
+request, and the tree she approved is the one on the preview. The rename was
+considered and DECLINED on the grounds that the panel gate keys on section
+identity and a label change is not worth a second full gate cycle. If a future
+PR touches the panel for a substantive reason it may carry the rename, and it
+must then prove route coverage unchanged in IDENTITY (which routes exercise
+which sections) and not merely in count.
+
 
 **(i) Petal roles.** Eva's list names three children under Petal and does not
 mention Petal roles. It is nested as Petal's FOURTH child, because a role is an
@@ -215,6 +236,48 @@ gate, the app and the sheets key on section IDs (`shape`, `form`, `curl`,
 labels are read as text is the gate's "no two sections on screen share a name"
 clause, which "Shape" / "Form" / "Curl" still satisfy. Not renamed: it is Eva's
 word.
+
+## 3b. Findings — brief defects with their mechanism, and one clause defect
+
+These are FINDINGS, not notes, filed in the same register as the
+flower-controls-quoted-into-a-bloom-brief error: a premise in the brief, the
+mechanism that makes it wrong, and the corrected statement.
+
+1. **The 1.6 mm terminal is a WIDTH, not a length.** The outline meets the
+   print floor where `(W/2) · f(u) = TIP_HALF_MM`, a width equation, so the
+   stub's share of the blade's LENGTH is invariant in the length — "at what
+   length does the clamp stop dominating" has no answer, because width is the
+   only lever (and the exponent). Restated correctly: at the default 1.30 the
+   stub drops under 5% of the length from 9 mm of width and under 2% from
+   17.5 mm; the 12 mm blade's terminal is 13.3% of its WIDTH at every exponent.
+   Corrects a premise in the brief.
+2. **A pointier exponent LENGTHENS the stub rather than sharpening it.** The
+   superellipse hugs the floor longer the lower `n` is: at `leafTipShape` 0.60
+   the last fifth (21.3%) of a 17 mm blade is the 1.6 mm stub; at 1.30 it is
+   2.1%; at 3.00 it is 0.02%. The control moves the SHOULDER; the end is
+   1.60 mm across at every value, in both modes. Corrects a premise in the
+   brief.
+3. **LF9 fired on the CLEAN tree, caught by the mutant table's own control pass
+   before any mutant ran.** Clause (c) applied its "on the floor iff inside the
+   clamp record" biconditional to ALL rows, and the leaf blade's base outline
+   also reaches the floor at `u = 0` (the petiole), so row 0 was on the floor
+   outside the record and the clause reddened geometry it was never about.
+   Fixed by restricting the clause to `[uPk, 1]`, the tip stretch the record
+   describes. **A fresh instance of the class: a clause that defines its
+   subject too BROADLY passes — or here, fires — on geometry it was never
+   about.** It is the mirror of CLAUDE.md's fifth durable rule (a subject
+   defined to EXCLUDE the doubted case cannot fail); a subject defined to
+   INCLUDE cases the law does not govern fails for reasons that are not the
+   law's. State the clause's subject as a set and ask whether every member is
+   one the law makes a claim about.
+
+**And the export gate widened a seventh time — 231.6 min on this PR's own
+`bloom-export-watertight` run (35050155538, 03:00:41Z -> 06:52:16Z), past the
+221.4 recorded ceiling — and the rule is untouched:** size every CI wait off
+`actions_list`'s own recent completed runs, read at the time, never off a
+written figure in a brief or in CLAUDE.md. That instruction is the only one
+that has survived all seven widenings; every constant beside it has been
+superseded.
 
 ## 4. Verification
 
