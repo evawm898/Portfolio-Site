@@ -3,6 +3,7 @@
 
      node tools/verify-bloom-leaf-bytes.mjs --base <worktree> [--control]
           [--control-only] [--matrix live|phaseNN] [--expect M/H]
+          [--change leaves|tipShape] [--only <label regex>]
 
    THE PARTITION IS PREDECLARED FROM THE BUILDER'S OWN RECORD, never from the
    control set: a row MOVES iff `leafPlan(...)` comes back present — a leaf is
@@ -60,7 +61,10 @@ const RA = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href
 const RB = await import(pathToFileURL(path.join(BASE, 'bloom-registry.js')).href);
 const HA = await import(pathToFileURL(path.join(ROOT, 'tools/bloom-harness.mjs')).href);
 
-const rows = MATRIX === 'live' ? HA.buildMatrix() : HA.FROZEN_MATRICES[MATRIX]();
+const ONLY = argOf('only') ? new RegExp(argOf('only')) : null;
+/* `--only <regex>` filters rows by LABEL, for the CONTROLS and for debugging a
+   tool on two rows — never for a partition claim, which is over the matrix. */
+const rows = (MATRIX === 'live' ? HA.buildMatrix() : HA.FROZEN_MATRICES[MATRIX]()).filter((r) => !ONLY || ONLY.test(r.label));
 /* THE ROW'S VALUES ARE STRINGS and the geometry's guards are truthiness tests
    on numbers — `!state.leafLength` with '0' is FALSE, because a non-empty
    string is truthy. The page never hits it (readUI hands back numbers); a Node

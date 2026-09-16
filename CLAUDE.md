@@ -2659,6 +2659,30 @@ claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 f
 ANOTHER FAMILY'S REGION.** Session's own X2 defect was caught by a subset row that was there
 for a DIFFERENT reason; this one was missed because no row was there for this reason at all.
 
+**THE LEAF HAS A TIP SHAPE CONTROL, ITS END IS 1.60 mm ACROSS AT EVERY VALUE, AND THE STUB'S
+SHARE IS A WIDTH QUESTION** (the leaf tip-shape session — read
+`docs/bloom-leaf-tip-shape-outcome.md` before touching `leafBladeState`, the leaf's
+`tipClamp` record or LF9). `leafTipShape` (Leaves, 0.60–3.00, default 1.30 = the constant it
+replaced, so 0 moved by construction) is `petalTipShape`'s superellipse on the LEAF's own
+control. **THE BRIEF'S PREMISE WAS WRONG IN A WAY THAT MATTERS**: it read `2 x TIP_HALF_MM` as a
+fraction of LENGTH; the outline meets the floor where `(W/2) f(u) = 0.8 mm`, a WIDTH equation, so
+the stub's share of the length is invariant in the length (21.28% at 12, 52 and 120 mm alike at
+0.60 on a 17 mm blade) and *"at what length does the clamp stop dominating"* has no answer —
+width is the lever, and the exponent. **AND A POINTIER EXPONENT LENGTHENS THE STUB**: 21.3% of
+the length at 0.60, 2.1% at 1.30, 0.02% at 3.00; the control moves the SHOULDER and the end is
+1.60 mm whatever is asked. Both modes agree exactly because `buildLeafInto` floors at the
+CONSTANT, not the mode floor. Clamped and told: the builder reports `tipClamp` and the read-out
+prints it, with the direction of both levers once the stub passes 5% of the length. **LF9 is the
+family**, and its load-bearing clause reads the exponent BACK off the half-widths the blade was
+built from (the law restated in the gate; the clean tree reproduces it to 3.9e-10 worst) — a plan
+reporting the control while the blade is built from the constant is what clause (a) cannot see.
+**THE PANEL IS EVA'S LIST VERBATIM**: Arrangement / Petal (> shape, form, curl, roles) / Head /
+Center / Stem (> Leaves (> Serration)) / Part thickness — a `petal` container on the Center shape
+and `leaves` under `stem`; Stem > Leaves > Serration is the second third level and costs nothing
+(session 27's bound is gone, session 29's CSS is paid). **Petal roles as Petal's fourth child and
+the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
+`frozen/phase32` is the 758 rows at `3f664be`.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
