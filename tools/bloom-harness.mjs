@@ -101,7 +101,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
          /* THE APEX'S TWO MODE FLOORS, imported rather than restated: A4
             rebuilds the cap's terminal from the state and must floor it at
             the number the builder actually floors at, in the mode it built. */
-         TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END,
+         TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END, LEAF_BASE_TAPER, LEAF_TIP_TAPER,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
@@ -5431,7 +5431,7 @@ export const SELF_INTERSECTION_SCOPE =
    that offset every emitted ring. The plan is what was ASKED FOR.
    =================================================================== */
 export const LEAF_SCOPE =
-  'LF0-LF8 carry the leaf. Blind by declaration: nothing here reads the exported FILE (the petiole\'s weld is asserted from the builder\'s emitted rings against the plan\'s own bore and outer radii, not from the STL); nothing here asserts the blade\'s SURFACE is the one petalForm drew, which is the petal\'s own form coverage reached through a different frame; and nothing bounds the cantilever, which is UNMEASURED — no coupon has been printed.';
+  'LF0-LF9 carry the leaf. Blind by declaration: nothing here reads the exported FILE (the petiole\'s weld is asserted from the builder\'s emitted rings against the plan\'s own bore and outer radii, not from the STL); nothing here asserts the blade\'s SURFACE is the one petalForm drew, which is the petal\'s own form coverage reached through a different frame; and nothing bounds the cantilever, which is UNMEASURED — no coupon has been printed.';
 
 export async function leafAssertions(page, row) {
   const m = await page.evaluate(() => window.__bloomMetrics());
@@ -5615,6 +5615,78 @@ export async function leafAssertions(page, row) {
     }
     if (want4.depth > 0 && !(L.serration.count >= 1)) bad.push(`LF7: leaf serration depth is ${want4.depth} but the builder cut ${L.serration.count} teeth`);
     if (!(want4.depth > 0) && L.serration.count) bad.push(`LF7: leaf serration depth is 0 but the builder reports ${L.serration.count} teeth — the guard must be inert`);
+  }
+
+  /* LF9 — THE TIP IS THE LEAF'S OWN EXPONENT, AND THE TERMINAL CLAMP IS TOLD
+     TRUTHFULLY (the leaf tip-shape session). Two owners on each side, named:
+       (a) the exponent the PLAN says the blade was built from, against the
+           page's own read-back CONTROL — an owner the plan does not write;
+       (b) the exponent READ BACK OFF THE HALF-WIDTHS THE BLADE WAS BUILT FROM
+           (the builder's own per-row `hb`, the base outline before any cut,
+           which is the value it handed the cross-section), against the same
+           control. The law is RESTATED here — `y^n + s^n = 1` over the
+           stretch above the widest point and above the floor — never imported
+           from the geometry it is checking (the seam gate's precedent), and
+           the widest point is rebuilt from the leaf's two fixed taper
+           constants and the CONTROL's own width. A plan that reports the
+           control's exponent while the blade is built from another is exactly
+           what (a) cannot see and (b) can: session 41's L7 lesson, that the
+           MEASURED side has to be the artefact.
+       (c) the clamp record: the station the builder declares the outline
+           meets the 2 x TIP_HALF_MM terminal at must be a BICONDITIONAL
+           against its own rows — every row below it above the floor, every
+           row at or past it exactly on it — and the millimetres and the two
+           fractions it prints must be that station applied to the control's
+           own length and width. Told, never refused: nothing here bounds the
+           stub, because the print floor is a declared guess (§18b) and the
+           control's honest limit is the read-out's to say.
+     The fit's tolerance is the fit's own: bisection to 2^-50 on a stretch of
+     doubles produced by the same law, measured to agree with the control to
+     under 1e-9 on the clean tree; 1e-6 leaves three decades and still fails
+     the mutant that pins the exponent at the retired constant (1.30 against
+     0.60, a difference of 0.7). */
+  const nWant = Number(ui.leafTipShape);
+  if (L.tipShape === undefined) bad.push('LF9: the plan reports no `tipShape` — which exponent the blade was built from is asserted by nothing');
+  else if (Math.abs(Number(L.tipShape) - nWant) > 1e-9) bad.push(`LF9: the plan reports the blade built at tip shape ${L.tipShape} where the LEAF's own control says ${nWant}`);
+  if (!Array.isArray(L.rowHalfBaseMm) || L.rowHalfBaseMm.length !== L.built) {
+    bad.push(`LF9: the builder reports no per-row base half-widths for ${L.built} leaves — the exponent the blade was actually built from cannot be read back`);
+  } else if (!Array.isArray(L.tipClamp) || L.tipClamp.length !== L.built) {
+    bad.push(`LF9: the builder reports no terminal-clamp record for ${L.built} leaves — the read-out's clamp clause would then be printed from nothing`);
+  } else {
+    const a = LEAF_BASE_TAPER, b = LEAF_TIP_TAPER, uPk = a / (a + b);
+    const halfW = Number(ui.leafWidth) / 2, lengthMm = Number(ui.leafLength);
+    for (let i = 0; i < L.built; i++) {
+      const rows = L.rowHalfBaseMm[i], NU_ = rows.length - 1, cl = L.tipClamp[i];
+      /* (b) the exponent off the rows. `hb` is `max(profile, TIP_HALF_MM)`, so
+         only rows strictly above the floor carry the law. */
+      const ns = [];
+      for (let j = 0; j <= NU_; j++) {
+        const u = j / NU_;
+        if (u <= uPk || !(rows[j] > TIP_HALF_MM * (1 + 1e-9))) continue;
+        const sPow = (u - uPk) / (1 - uPk), y = rows[j] / halfW;
+        if (!(y > 0 && y < 1 && sPow > 0 && sPow < 1)) continue;
+        let lo = 0.05, hi = 40;
+        for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (Math.pow(y, mid) + Math.pow(sPow, mid) > 1) lo = mid; else hi = mid; }
+        ns.push((lo + hi) / 2);
+      }
+      if (ns.length < 3) { bad.push(`LF9: leaf ${i} has only ${ns.length} row(s) above the widest point and above the floor — the exponent cannot be read back (the terminal has taken the whole tip)`); break; }
+      ns.sort((x, y) => x - y);
+      const nRead = ns[Math.floor(ns.length / 2)];
+      if (Math.abs(nRead - nWant) > 1e-6) { bad.push(`LF9: leaf ${i}'s blade reads back a tip exponent of ${nRead.toFixed(6)} off the half-widths it was built from, where the LEAF's own control says ${nWant} (the plan says ${L.tipShape})`); break; }
+      /* (c) the clamp, a biconditional against the same rows. */
+      if (!cl || !(cl.fromU >= uPk && cl.fromU <= 1)) { bad.push(`LF9: leaf ${i}'s clamp record is missing or places the terminal at u = ${cl && cl.fromU}, outside [widest point, 1]`); break; }
+      let wrong = null;
+      for (let j = 0; j <= NU_; j++) {
+        const u = j / NU_, atFloor = rows[j] === TIP_HALF_MM;
+        if (u < cl.fromU && atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) sits ON the floor below the declared clamp station ${cl.fromU.toFixed(4)}`; break; }
+        if (u >= cl.fromU && !atFloor) { wrong = `row ${j} (u ${u.toFixed(4)}) is ${rows[j].toFixed(4)} mm ABOVE the floor at or past the declared clamp station ${cl.fromU.toFixed(4)}`; break; }
+      }
+      if (wrong) { bad.push(`LF9: the terminal clamp the read-out prints is not what the blade was built from — ${wrong}`); break; }
+      if (Math.abs(cl.terminalMm - 2 * TIP_HALF_MM) > 1e-12) { bad.push(`LF9: leaf ${i} declares a ${cl.terminalMm} mm terminal where the leaf's floor is ${2 * TIP_HALF_MM} mm`); break; }
+      if (Math.abs(cl.fraction - (1 - cl.fromU)) > 1e-12 || Math.abs(cl.mm - (1 - cl.fromU) * lengthMm) > 1e-9 || Math.abs(cl.ofWidth - (2 * TIP_HALF_MM) / (2 * halfW)) > 1e-12) {
+        bad.push(`LF9: leaf ${i}'s clamp record (${cl.mm} mm, ${cl.fraction} of the length, ${cl.ofWidth} of the width) is not its own station ${cl.fromU} applied to the control's ${lengthMm} x ${2 * halfW} mm`); break;
+      }
+    }
   }
   return bad;
 }
@@ -8339,7 +8411,26 @@ export function buildMatrix() {
     ['LEAVES: serration at MAXIMUM (depth 1, 12 teeth, a cusped notch on a cusped crest)', { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 3, leafToothDepth: 1, leafToothCount: 12, leafCrestShape: 0.6, leafNotchShape: 3 }],
     ['LEAVES: the LONGEST leaf on the SHORTEST stem (the head cannot be cleared; the node count gives)', { stemLength: 20, stemDiameter: 6, leafLength: 120, leafWidth: 40, leafAngle: 35, leafNodes: 3 }],
     ['LEAVES: x a SPHERE with a stem (the channel and the leaves on one head)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', stemLength: 70, stemDiameter: 6, leafLength: 45, leafWidth: 15, leafNodes: 3 }],
-    ['LEAVES: GATED — length 0 with every other leaf control at maximum', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafWidth: 40, leafAngle: 90, leafNodes: 8, leafPhyllotaxy: 'whorled', leafToothDepth: 1, leafToothCount: 12 }],
+    /* THE TIP SHAPE (the leaf tip-shape session, Eva: "there's no way to
+       change it"). `leafTipShape` is the petal's superellipse exponent on the
+       LEAF's own control — same law, separate control, so neither organ moves
+       the other. Both ends of the range, because the two ends are the two
+       halves of the finding: the terminal is CLAMPED at 2 x TIP_HALF_MM in
+       BOTH modes (the leaf builder floors at the constant, not at the mode
+       floor), and a POINTIER exponent hugs that floor for LONGER — 21.3% of
+       the length at 0.60 against 0.02% at 3.00 on a 17 mm blade — so the
+       acute end is where the read-out's clamp clause bites hardest and the
+       round end is where it all but vanishes. The fraction is a property of
+       the WIDTH and the exponent and NOT of the length (a width equation:
+       (W/2) f(u) = 0.8), which the narrowest row is here to show: at 3 mm
+       across the 1.6 mm terminal is over HALF the blade. The serration row
+       composes the cut law over the acute tip, where the stations under the
+       clamp are the most. LF9 is the family; L1's tally and L6 stand as before. */
+    ['LEAVES: tip shape ACUTE (0.60 — the floor; the 1.6 mm terminal stub is at its longest)', { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 3, leafTipShape: 0.6 }],
+    ['LEAVES: tip shape the held-width ROUND tip (3.00 — the ceiling; the stub all but vanishes)', { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 3, leafTipShape: 3 }],
+    ['LEAVES: tip shape 0.60 x serration at maximum (the cut law over the acute tip)', { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 17, leafNodes: 3, leafTipShape: 0.6, leafToothDepth: 1, leafToothCount: 12 }],
+    ['LEAVES: tip shape 3.00 on the NARROWEST leaf (3 mm across — the terminal is over half the width)', { stemLength: 70, stemDiameter: 6, leafLength: 52, leafWidth: 3, leafNodes: 3, leafTipShape: 3 }],
+    ['LEAVES: GATED — length 0 with every other leaf control at maximum', { stemLength: 70, stemDiameter: 6, leafLength: 0, leafWidth: 40, leafAngle: 90, leafNodes: 8, leafPhyllotaxy: 'whorled', leafToothDepth: 1, leafToothCount: 12, leafTipShape: 3 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
