@@ -2551,6 +2551,58 @@ tools/shot-bloom-sepals.mjs <dir>` → **`docs/img/sepals.png`** — the foot on
 at MAX × MAX framed on the rim from below, and the angle under / at / beyond its limit, the
 last through `{ sepalAngleUnclamped: true }`, a capability hook no control reaches.
 
+**THE SEPALS ATTACH PARTWAY DOWN THE HUB, THE LIMIT IS RE-DRAWN THERE, AND THE FOOT LINE
+LEADS WITH THE CHORD** (Eva's three rulings, sepals part 1 second round — §12 of
+`docs/bloom-sepals-outcome.md` before touching `sepalAttachment`, the sepal descriptor's
+`height`, or SP3). `sepalHeight` (Sepals, 0–1, step 0.05, **default 0.75**, a slider because
+0.75 was named to be tuned against the render) is a FRACTION OF THE HUB'S AXIAL EXTENT — and
+"the hub" is Eva's word for the hub-to-stem JOIN, so the extent runs from the STEM END
+(`stemPlan`'s own `rootZ`) up to where the join MEETS THE HEAD (the plate's underside at the
+blend radius; a cap's undeformed inner sphere there), both ends read off the profile the hub
+builder emits. **THE OTHER READING — the extent to the head's TOP face — WAS CONSIDERED AND
+NOT BUILT, and the two differ at the SHIPPED DEFAULT**: the 6 mm stem's join reaches 2.52 mm,
+a quarter of that from the top lands 0.03 mm under the plate's mid-plane — where the sepals
+already were — while the join reading puts the foot 0.33 mm below the head's underside and
+2.9 mm inside the rim (r 5.93, z −0.93). AXIAL, not surface-arc, as ruled; the arc reading is
+solved beside it and told (0.004 mm apart on the default, up to 1.9 mm on a half-amount
+GOBLET bowl, 0 on ANGLED). **THE FOOT LANDS ON THE SURFACE**: the attachment point is on the
+underside profile and the foot ring row sits `t/2` above it, so the foot's bottom skin passes
+through the point — the same relation a rim foot has to the plate's underside, which is why
+the FALLBACK is the same formula: where there is no hub below the head (`stemLength` 0, an
+inert join, a domed head whose bowl holds the stem end ABOVE the join's rim — every rise from
+about 0.15 at the default stem) the sepals sit at the RIM, the first construction to the bit,
+and the record says which. The foot rows run inward at that height through the whorl
+primitive's `height` argument (the petal builder's FLAT arm; the argument session 1 reserved
+for exactly this), buried because the join thickens inward, measured on a dome.
+**THE LIMIT MOVES WITH IT AND IT TIGHTENS AT THE DEFAULT, THE OPPOSITE OF THE EXPECTATION:**
+the scan reads the descriptor's ring and height, and at the shipped stem the interleaved limit
+goes 21° → **18°**, aligned 24° → 20°, cupped 25° → 21° — a sepal starting inside the rim rises
+THROUGH the plate and stands over the petal's root sooner — while on the deep GOBLET (19.4 mm
+down) it loosens to **90°, no contact in the range**, and the crowded corners on the three MAX
+hubs go 24° → 46° / 51° / 50°. Dense confirmation: **80 states, 0 disagreements, worst 0.00°**
+— **and the tool's first re-run reported 44, all its own** (its dense sepal still drawn at the
+rim's `z: 0` against a whorl built 0.93 mm lower; the third durable rule inside the instrument
+written to confirm the feature). **THE ALIGNED WELD IS GONE WHEREVER THE FOOT IS ON THE FLARE**:
+the three crowded corners with a stem read **0 pairs** from 25358 and their xfail entries are
+removed; the stemless corner still welds and stays declared. **ANGLED IS RESOLVED FOR THE FOOT**:
+on the cone's SIDE the tangent and the chord are one number (asserted to 1e-6 where the chord
+stays on the cone; a 1.3 mm cone at auto reach lets the chord run off onto the plate, told as
+`chordOnCone`) and there is no shoulder under the foot — the shoulder is still at the join's rim,
+where the foot no longer is; what part 2 meets on every style at MAX is a foot at 84–86° leaving
+a straight or near-straight face. **THE READ-OUT LEADS WITH THE CHORD** (`the underside RISES
+18.21° over the first 1.00 mm outward from the foot (the chord a print meets; tangent there
+17.88°)`): a tangent that read 0.00° while the underside fell 49° and 81° over the first
+millimetre is a headline that cannot be wrong and never says what the foot meets — the same
+shape as a clause reading its reference from the thing it checks — so the chord goes first and
+the tangent stays, labelled. SP3 is re-derived onto the attachment from OTHER owners (the stem
+record's `rootZ`, the hub builder's emitted top face and underside rings — the point must lie
+BETWEEN its two bracketing emitted rings, an interval), two mutants (`sepal-height-ignored`,
+`sepal-limit-drawn-at-the-rim`) witnessed on the mutated module's own solve, block 35 65 → 72
+rows (matrix 852), no frozen phase owed beyond phase34. The decoupling tool's PASS had exited 1
+(its two branches reversed) — fixed when it was re-run. Sheet: `node tools/shot-bloom-sepals.mjs
+<dir>` → `docs/img/sepals.png`, every cell on the default stem, the foot row framed on the GAP
+between sepal and petal.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
