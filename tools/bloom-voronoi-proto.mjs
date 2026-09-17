@@ -169,7 +169,14 @@ export function slotContext(st, ring, slot, acc, cap = null) {
   const p = G.buildPetalInto(a2, st, ring, slot, cap, true);
   return { st, ring, slot, surface, rows: p.grid[0].rows, t: surface.t, L: surface.length, plainTris: a2.triangleCount, frame: { dir: surface.dir, nrm: surface.nrm, base: surface.base } };
 }
-function splitRow(ctx) { let m = 0, best = Infinity; for (let i = 0; i < ctx.rows.length; i++) { const d = Math.abs(ctx.rows[i].u - U0); if (d < best) { best = d; m = i; } } return m; }
+/* WHERE THE SOLID BASAL ZONE ENDS. The target defaults to `U0` (ROOT_BLEND_END),
+   which is what every call made before the base-boundary session, so the shipped
+   answer is unchanged by construction. It SNAPS to the nearest emitted row, which
+   is the mechanism it always used: the split is a row index, so a target between
+   two stations has to land on one of them. Only the SPLIT moves — the field's own
+   metric, seeding, relaxation, grading, fillet and wall law are untouched, and
+   they read their own region through `xB` exactly as before. */
+function splitRow(ctx, target = U0) { let m = 0, best = Infinity; for (let i = 0; i < ctx.rows.length; i++) { const d = Math.abs(ctx.rows[i].u - target); if (d < best) { best = d; m = i; } } return m; }
 function mapPt(ctx, x, y) { const u = Math.min(1, Math.max(0, x / ctx.L)); const hh = ctx.surface.profile.halfWidthAt(u); const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0)); return ctx.surface.at(u, v); }
 
 /* Shared: classify every cell edge as OUTLINE (in one cell) or WALL (in two), exactly, by key. */
@@ -183,9 +190,9 @@ function simplifyOutlineRuns(cells, onOut) {
 }
 
 /* LEGACY field — the first prototype's: isotropic, uniform, plain Lloyd, no fillet. */
-export function fieldLegacy(ctx, N, seed = SEED) {
+export function fieldLegacy(ctx, N, seed = SEED, opts = {}) {
   const { rows, L, surface } = ctx; const h = (x) => surface.profile.halfWidthAt(x / L);
-  const mSplit = splitRow(ctx); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
+  const mSplit = splitRow(ctx, opts.u0 ?? U0); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
   const outline = outlinePoly(h, xB, L, 240); const rng = mulberry32(seed);
   const seeds = []; const target = Math.ceil(N / 2); let guard = 0;
   while (seeds.length < target && guard < 5000) { let best = null, bestD = -1; for (let c = 0; c < 12; c++) { guard++; const x = xB + (L - xB) * rng(); const hh = h(x); if (hh < 0.3) continue; const y = hh * 0.95 * rng(); if (!pointInPoly(x, y, outline)) continue; let d = 1e9; for (const s of seeds) { d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2, (s.x - x) ** 2 + (-s.y - y) ** 2); } d = Math.min(d, (2 * y) ** 2); if (d > bestD) { bestD = d; best = { x, y }; } } if (best) seeds.push(best); }
@@ -200,7 +207,7 @@ export function fieldLegacy(ctx, N, seed = SEED) {
 export function fieldSalvage(ctx, N, opts = {}) {
   const { rows, L, surface } = ctx; const h = (x) => surface.profile.halfWidthAt(x / L);
   const a = opts.aniso ?? ANISO, passes = opts.passes ?? LLOYD_PASSES, relaxMetric = opts.relaxMetric ?? 'aniso', cellMetric = opts.cellMetric ?? 'aniso', seed = opts.seed ?? SEED;
-  const mSplit = splitRow(ctx); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
+  const mSplit = splitRow(ctx, opts.u0 ?? U0); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
   const outline = outlinePoly(h, xB, L, 240);
   let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, h(xB + (L - xB) * i / 200));
   const hB = h(xB); const Lc = CONVERGE_FRACTION * L;
@@ -310,11 +317,11 @@ export function measure(ctx, F, wall) {
   return { kind: F.kind, wall, cells: F.cells.length, tris: r.tris, baseTris: r.baseTris, holes: r.annular, solid: r.solid, real, holeMedian: opens.length ? opens[Math.floor(opens.length / 2)] : 0, holeMin: opens[0] ?? 0, holeMax: opens[opens.length - 1] ?? 0, wallFraction: 1 - r.holeArea / lamina, capMm, capFloorMm, anisoMid: ratios.length ? ratios[Math.floor(ratios.length / 2)] : null, anisoAlongX: mid.length ? mid.reduce((a, e) => a + e.alongX, 0) / mid.length : null, boundary: c.boundary, nonManifold: c.nonManifold, shells: c.shells, voxel06: floodFill(r.acc.pos, 0.6), voxel03: floodFill(r.acc.pos, 0.3), acc: r.acc };
 }
 /* The whole bloom: every slot of the shipped whorl, each petal from its own seed, plus the shipped hub. */
-export function wholeBloom(field, N, wall, st = { ...DEFAULTS }) {
+export function wholeBloom(field, N, wall, st = { ...DEFAULTS }, u0 = U0) {
   const accB = new G.MeshBuilder({ exportMode: true }); const fr = G.footRing(st, accB); const out = new Acc(); let petals = 0;
   const ring0 = fr.slotRings[0][0];
   G.buildWhorlInto({ count: fr.slotCount, radius: ring0.radius, height: 0, sizeRamp: () => ring0.scale, angleRamp: () => ring0.tiltExtra, phase: ring0.phase, placement: st.placement, fan: fr.fan,
-    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131) : fieldSalvage(c2, N, { seed: SEED + slot.index * 131 }); const r = cutThrough(c2, F, wall); out.pos.push(...r.acc.pos); petals++; } });
+    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131, { u0 }) : fieldSalvage(c2, N, { seed: SEED + slot.index * 131, u0 }); const r = cutThrough(c2, F, wall); out.pos.push(...r.acc.pos); petals++; } });
   G.buildHubInto(accB, st, fr.hub); out.pos.push(...accB.positions);
   return { acc: out, tris: out.tris, petals, hubTris: accB.triangleCount };
 }

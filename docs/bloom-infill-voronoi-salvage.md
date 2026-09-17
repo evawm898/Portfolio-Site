@@ -180,6 +180,12 @@ which the sheet shows and which a higher `ANISO` or fewer passes would raise.
   at u ≈ 0.05; the basal zone is 27 % of the blade's plan area and is exactly what J1–J4, A7,
   the crowding raster and the seam clearance read. Starting the Voronoi at `ROOT_BLEND_END`
   leaves all of it untouched.
+  **THE WAIST FIGURE NAMES A ROW, NOT THE OUTLINE, and the boundary session corrected it:**
+  2.6286 mm is the half-width at emitted **row 5** (u = 0.0535714); the waist as a property of the
+  outline is **2.5820 mm at u = 0.057939**, which is the same station as `rootBlend` handing the
+  width to the core and as session 37's declared 44.54 degree tangent break. The enumeration this
+  bullet gestures at is done by line, and the boundary is measured against it, in
+  `docs/bloom-infill-base-boundary.md` — which finds that 0.30 is already the correct floor.
 - **Margin rib.** The tiling construction leaves a half-wall lip along the outline by itself,
   so a rib is not a precondition for the invariant; it is a precondition for the print floor,
   which is why outline edges are inset by the full wall now. 0 orphan wall segments at 10–44
