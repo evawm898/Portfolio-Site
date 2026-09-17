@@ -1046,11 +1046,25 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.form === null && c.form !== null) ? null : `the mutant's sepal ${m.form ? 'carries' : 'has no'} form record and the clean tree's ${c.form ? 'carries one' : 'has none'} (sepalCup 0.6, petalCup 0) — the twins were not bypassed`; } },
   { id: 'sepal-ring-off-the-rim', why: 'the sepal ring sits inside the rim at 0.9 of the hub radius — a whorl of sepals rooted in the slab short of the edge, watertight and one piece',
-    find: '    const radius = hub.radius;\n    const { slope, z, arc, relief } = surfaceAt(radius, null);\n    const overhang = Math.max(1.5, radius * 0.4);',
-    into: '    const radius = hub.radius * 0.9;\n    const { slope, z, arc, relief } = surfaceAt(radius, null);\n    const overhang = Math.max(1.5, radius * 0.4);', names: ['SP3'],
+    find: '    const radius = onHub ? attachment.rAttach : hub.radius;\n    const surf = surfaceAt(radius, null);',
+    into: '    const radius = onHub ? attachment.rAttach : hub.radius * 0.9;\n    const surf = surfaceAt(radius, null);', names: ['SP3'],
     witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.rimR < c.rimR - 0.5) ? null : `the mutant's sepal ring row sits at r ${m.rimR} against the clean tree's ${c.rimR} — the ring did not move`; } },
+  /* THE ATTACHMENT HEIGHT (the second-round ruling) — two mutations, each
+     witnessed on the mutated module's own solve, on the flare row. */
+  { id: 'sepal-height-ignored', why: "the attachment lands where the hub meets the head whatever `sepalHeight` asks — the foot at the join's rim, a quarter of a millimetre under the plate, the control dead; watertight and one piece",
+    find: '  const zAttach = stemEnd.z + frac * extentMm;',
+    into: '  const zAttach = stemEnd.z + 1 * extentMm;', names: ['SP3'],
+    witness: (M, C) => { const m = sepalFacts(M, { stemLength: 60, sepalHeight: 0.75 }), c = sepalFacts(C, { stemLength: 60, sepalHeight: 0.75 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.attachZ > c.attachZ + 0.1) ? null : `the mutant's attachment is at z ${m.attachZ} against the clean tree's ${c.attachZ} (0.75 asked on a 60 x 6 stem) — the height still applies`; } },
+  { id: 'sepal-limit-drawn-at-the-rim', why: "the angle scan draws its trial sepal at the plate's mid-plane (the first construction's height) while the whorl is built at the attachment — a limit drawn against a foot that is not where the foot is; both STL gates read a cross-shell overlap or a clear whorl either way",
+    find: '  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };',
+    into: '  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: 0, scale: sepals.scale, tiltExtra: 0 };', names: ['SP8'],
+    witness: (M, C) => { const m = sepalFacts(M, { stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40, sepalAngle: 90 }), c = sepalFacts(C, { stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40, sepalAngle: 90 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.limit !== c.limit) ? null : `the mutant drew the limit at ${m.limit} and the clean tree at ${c.limit} (90 asked, the foot 19.4 mm down the flare) — the scan's height did not move`; } },
   { id: 'sepal-count-unclamped', why: 'the count builds what was asked, past the petal count — 40 sepals on 8 petals, five to a pitch, watertight and one piece',
     find: '    const count = Math.min(asked, ceiling);\n    const scale = Number(state.sepalScale)',
     into: '    const count = asked;\n    const scale = Number(state.sepalScale)', names: ['SP2'],
@@ -1092,9 +1106,10 @@ function sepalFacts(MOD, extra = {}) {
     const acc = new MOD.MeshBuilder({ exportMode: true });
     const b = MOD.buildBloomInto(acc, st);
     const S = b.sepals;
-    if (!S) return { count: 0, tilt: null, form: null, rimR: null, az0: null, length: null, footH: null };
+    if (!S) return { count: 0, tilt: null, form: null, rimR: null, az0: null, length: null, footH: null, attachZ: null, limit: null };
     const p = S.built[0];
-    return { count: S.count, tilt: p.builtFrom.petalTilt, form: p.form, rimR: Math.hypot(p.footFrames[2].C[0], p.footFrames[2].C[1]), az0: S.azimuths[0], length: p.length, footH: p.footFrames[2].h };
+    return { count: S.count, tilt: p.builtFrom.petalTilt, form: p.form, rimR: Math.hypot(p.footFrames[2].C[0], p.footFrames[2].C[1]), az0: S.azimuths[0], length: p.length, footH: p.footFrames[2].h,
+      attachZ: S.attachment.mode === 'HUB' ? S.attachment.zAttach : null, limit: S.limit.limitDeg };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -1240,6 +1255,12 @@ const ROWS = [
     set: [{ id: 'sepalCount', value: '40' }, { id: 'sepalAngle', value: '60' }, { id: 'sepalFootBreadth', value: '0.25' }, { id: 'sepalCup', value: '0.6' }] },
   { label: 'sepals asked on a SPHERE (8 asked on a closed head — none built, told)',
     set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'sepalCount', value: '8' }] },
+  /* THE ATTACHMENT (the second-round ruling): a whorl on the hub's FLARE — the
+     deepest GOBLET, so the foot sits 19.4 mm down it and a limit drawn at the
+     rim is a different number from one drawn at the foot. 90 asked so the
+     clamp binds. */
+  { label: "a sepal whorl on the hub's flare (5 on a 60 x 6 stem, GOBLET at MAX amount x MAX length, 90 asked)",
+    set: [{ id: 'sepalCount', value: '5' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }, { id: 'sepalAngle', value: '90' }] },
 
 ];
 

@@ -744,10 +744,14 @@ export const SMOKE_BLOCKS = [
        feet and the flood fill is the only witness that the whorl is one piece
        with the hub at the crowded corner. Six rows: the shipped whorl, the
        aligned weld, the clamped angle, a fan (the LIST arm), the crowded
-       ANGLED corner (with a stem, --conn), and the two guards. */
+       ANGLED corner (with a stem, --conn), the shipped attachment on the default stem and the inverted-extent fallback, and the two guards. */
     rows: [
       { label: "SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)",
         path: "the whorl at its defaults — SP0 (the registry hides the sepal sub-controls exactly where the geometry builds nothing), SP1 (declared and emitted, the tally the builder's own), SP2 (the ceiling is the outer whorl the builder placed), SP3 (every sepal ring row sits on the outer whorl's own emitted rim, the foot the descriptor's and inside the print floors), SP4 (the interleaved default lands mid-way between petal 0 and petal 1, read off the petals' own emitted azimuths), SP5 (length and peak half-width are the petal's times the size), SP6 (every blade built from the SEPAL's own twins, no role reaching it) and SP8 (the built angle is min(asked, limit), the root frame carries it, and the harness's own contact test finds the built angle clear in both modes and the step above the limit clipping)" },
+      { label: "SEPALS: height 0.75 (the shipped default) on the default stem — 60 x 6, GOBLET auto (the foot 0.33 mm below the head)",
+        path: "THE ATTACHMENT on the hub's flare — SP3's HUB arm: the mode decided from the stem record's own stem end against the hub builder's head end, the height the law restated, the point between the bracketing rings of the EMITTED underside, every ring row t/2 above it with its bottom skin through it; SP8 with the limit re-drawn at the attachment (the harness's own contact test at the built angle and one step above)" },
+      { label: "SEPALS: height on a DOME with a stem (rise 0.5 — the bowl holds the stem end above the join's rim, the extent INVERTED: at the rim, told)",
+        path: "THE FALLBACK told — SP3's RIM arm on a stem whose join is active but whose head is a bowl: the extent's sign decides the mode as a biconditional, the record names the inversion, and the ring row is the outer whorl's own" },
       { label: "SEPALS: ALIGNED at size 1.00 (the sepal foot IS the petal foot — welded by construction)",
         path: "the weld the census reads: X1 — this row is declared self-intersecting (the two whorls share a foot lattice bit for bit and the fork's crotch is then counted within-shell) and must STILL read pairs; SP3 with the foot at the petal's own width; SP8 where the limit is the petal tilt less one step (coincident at 25)" },
       { label: "SEPALS: angle 90 asked — CLAMPED at the drawn limit (the last angle clear of the petals)",
@@ -755,7 +759,7 @@ export const SMOKE_BLOCKS = [
       { label: "SEPALS: on a FAN (5 sepals on 7 slots, interleaved)",
         path: "the LIST arm of the whorl primitive — SP2 (the ceiling is the fan's derived slot count), SP4 (the fan's lattice shifted by the phase, the count nearest the mirror line, and whether the set is mirror-symmetric is declared)" },
       { label: "SEPALS: THE CROWDED CORNER on ANGLED",
-        path: "THE CROWDED CORNER — 40 petals x 40 sepals x size 1 x aligned x 90 asked on a stem whose ANGLED shoulder sits at the rim under the foot: --conn is the witness that the whorl, the join and the hub are one piece there; X1/X2 the verdict on the welded foot lattice; SP8 the clamp at 40 congruent neighbourhoods" },
+        path: "THE CROWDED CORNER — 40 petals x 40 sepals x size 1 x aligned x 90 asked on a stem, the forty feet 20 mm down an ANGLED cone's side (SP3's HUB arm on the cone: chord = tangent): --conn is the witness that the whorl, the flare and the hub are one piece there; X1/X2 the verdict — 0 pairs, the rim weld gone with the foot off the petal foot's lattice; SP8 the clamp at 40 congruent neighbourhoods" },
       { label: "SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)",
         path: "the GUARD — SP7: every sepal control at its maximum with the count at 0 builds nothing, SP1 reads the builder's none rather than a missing key, and the byte tool proves the row bit-identical to the default" },
       { label: "SEPALS: GATED — asked under SPHERE (8 asked on a closed head: none built, UNAVAILABLE told)",

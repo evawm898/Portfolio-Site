@@ -5826,12 +5826,31 @@ export const STEM_CHANNEL_SCOPE =
           the OTHER owner — the whorl the builder placed (`slotAzimuths[0]`)
           under RADIAL/FAN, the control under CONTINUOUS — never from the
           descriptor's own `ceiling`; the clamp flag is a biconditional.
-     SP3  the ring is the hub's rim, on the petals' footing: every sepal's
-          emitted ring-row frame sits at the outer whorl's OWN emitted ring
-          radius and height; the emitted foot half-width is the descriptor's
+     SP3  THE ATTACHMENT (the attachment-height ruling): the sepals attach
+          partway down the HUB — the hub-to-stem join — at `sepalHeight` of
+          its AXIAL extent from the stem end up to where it meets the head,
+          the foot landing ON the hub's surface there; where there is no hub
+          below the head (no stem, an inert join, a bowl holding the stem
+          end above the join's rim) they sit at the RIM on the petals'
+          footing, told. Both halves are rebuilt from OTHER owners: the stem
+          end is the PLAN's own `rootZ` through the stem record, the head end
+          the hub builder's emitted top face less its thickness (a cap's
+          inner sphere at the blend radius), the mode is decided from that
+          extent's sign as a biconditional, the target height is the law
+          restated (`zStemEnd + frac x extent`, exact), the attachment point
+          must lie ON the underside as the CONTROLS' own law places it (ST11's
+          restatement, to 1e-9) and — on a flat hub, whose profile is monotone —
+          BETWEEN the two bracketing rings the hub builder EMITTED (an
+          interval, no tolerance), and every sepal's
+          emitted ring-row frame sits t/2 above it with its bottom skin
+          through it — or, at the rim, at the outer whorl's OWN emitted ring
+          radius and height. The emitted foot half-width is the descriptor's
           foot, and that foot is the outer whorl's foot x size x breadth
           clamped into the print floors, rebuilt here from the page's ring
-          width and the two controls; the clamp flag is a biconditional.
+          width and the two controls; the clamp flag is a biconditional. On
+          ANGLED with the foot on the cone's side the record's tangent and
+          chord must agree (a straight face) — the shoulder is not under the
+          foot there, which is a finding and is asserted as one.
      SP4  the phase: the azimuths the whorl primitive PLACED (the builder's
           record) are the outer whorl's first azimuth plus the fraction of
           the pitch the control asks, evenly spaced — rebuilt from the
@@ -5907,20 +5926,101 @@ export async function sepalAssertions(page, row) {
   if (S.countClamped !== (asked > outerCount)) bad.push(`SP2: countClamped reads ${S.countClamped} with ${asked} asked on ${outerCount} — the flag and the arithmetic disagree`);
   if (S.asked !== asked) bad.push(`SP2: the descriptor records ${S.asked} asked, the page says ${asked}`);
 
-  /* SP3 — the ring and the foot */
+  /* SP3 — the attachment, the ring and the foot */
   const outerFrames = m.petalRingFootFrames && m.petalRingFootFrames.find((f) => f);
-  if (!outerFrames) bad.push('SP3: no petal foot frames reported — the sepal ring cannot be compared against the outer whorl\'s');
+  const A = S.attachment;
+  const hubT = m.hubThickness;
+  if (!A) bad.push('SP3: the descriptor carries no attachment record — where the whorl sits is declared by nothing');
+  else if (!outerFrames) bad.push('SP3: no petal foot frames reported — the sepal ring cannot be compared against the outer whorl\'s');
   else {
-    const rimR = Math.hypot(outerFrames[2].C[0], outerFrames[2].C[1]), rimZ = outerFrames[2].C[2];
-    for (const p of S.petals) {
-      const f = p.footFrames;
-      if (!f || f.length !== 3) { bad.push(`SP3: sepal ${p.slotIndex} reports ${f ? f.length : 'no'} foot frames, expected 3`); continue; }
-      const r = Math.hypot(f[2].C[0], f[2].C[1]);
-      if (Math.abs(r - rimR) > 1e-9 || Math.abs(f[2].C[2] - rimZ) > 1e-9) bad.push(`SP3: sepal ${p.slotIndex}'s ring row sits at r ${r.toFixed(6)}, z ${f[2].C[2].toFixed(6)}; the outer whorl's own ring row is at r ${rimR.toFixed(6)}, z ${rimZ.toFixed(6)} — the sepal is not on the hub's rim`);
-      for (let k = 0; k < 3; k++) if (Math.abs(f[k].h - S.footMm / 2) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex} foot row ${k} half-width ${f[k].h} is not the descriptor's foot ${S.footMm} / 2`);
-      if (Math.abs(f[2].t - S.ring.thickness) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex}'s foot is ${f[2].t} mm thick against the ring's ${S.ring.thickness}`);
+    const frac = Number(ui.sepalHeight);
+    if (!Object.is(A.frac, frac)) bad.push(`SP3: the attachment records height ${A.frac}, the control reads ${frac}`);
+    /* THE EXPECTED MODE, from the stem record and the hub builder — never
+       from the descriptor's own `extentMm`. */
+    const st = m.stem;
+    let wantHub = false, zStemEnd = null, zHead = null;
+    if (st && st.swellActive) {
+      zStemEnd = st.root[2];
+      const D = m.hubBuilt && m.hubBuilt.dome;
+      if (D && D.closed) wantHub = false;
+      else if (D) { const phiB = Math.asin(Math.min(1, m.hubJoinBlendRadius / D.Rd)); zHead = D.centreZ + (D.Rd - hubT / 2) * Math.cos(phiB); wantHub = zHead - zStemEnd > 0; }
+      else { zHead = m.hubTopFaceZ - hubT; wantHub = zHead - zStemEnd > 0; }
     }
-    if (Math.abs(S.ring.radius - rimR) > 1e-9) bad.push(`SP3: the sepal ring's declared radius ${S.ring.radius} is not the outer whorl's emitted ring radius ${rimR}`);
+    if ((A.mode === 'HUB') !== wantHub) bad.push(`SP3: the attachment is ${A.mode} where the stem record (${st ? (st.swellActive ? `swell active, stem end z ${zStemEnd}, head z ${zHead}` : 'join inert') : 'no stem'}) says the sepals should sit ${wantHub ? 'on the hub' : 'at the rim'}`);
+    else if (!wantHub && st && st.swellActive && !(zHead - zStemEnd > 0) && !(A.why && /INVERTED/.test(A.why))) bad.push('SP3: the extent is inverted and the record does not say so');
+    const rimR = Math.hypot(outerFrames[2].C[0], outerFrames[2].C[1]), rimZ = outerFrames[2].C[2];
+    if (A.mode === 'HUB') {
+      const extent = zHead - zStemEnd;
+      const zWant = zStemEnd + frac * extent;
+      if (Math.abs(A.zAttach - zWant) > 1e-9) bad.push(`SP3: the attachment height is z ${A.zAttach}; ${frac} of the way from the stem end ${zStemEnd} to the head ${zHead} is ${zWant}`);
+      if (Math.abs(A.extentMm - extent) > 1e-9) bad.push(`SP3: the record's extent ${A.extentMm} is not ${zHead} - ${zStemEnd} = ${extent}`);
+      if (Math.abs(A.belowHeadMm - (zHead - A.zAttach)) > 1e-9) bad.push(`SP3: belowHeadMm ${A.belowHeadMm} is not head ${zHead} less the attachment ${A.zAttach}`);
+      /* THE POINT IS ON THE HUB'S SURFACE — two owners, neither the descriptor's
+         solve. (i) THE LAW RESTATED FROM THE CONTROLS (`hubShapeExpected`, ST11's
+         own restatement, with `stemJoinExpected`'s joinT): the underside at plan
+         radius rAttach must be zAttach to 1e-9 — on a flat hub `topFace - law(r)`,
+         on a cap the inner sphere less the law's extra, the cap's own construction
+         (`buildHubInto`'s `innerRad`), solved for the polar angle whose plan radius
+         is rAttach. (ii) ON A FLAT HUB ALSO THE EMITTED RINGS: the profile is
+         monotone there, so the point lies BETWEEN the two bracketing rings the hub
+         builder emitted, as an interval in z with no tolerance. A domed hub's
+         emitted rings are 5° apart and its profile need not be monotone between
+         them (ALL MAX: a 194 mm hemisphere whose first ring is 17 mm out while the
+         swell puts a 4 mm bump under the apex — measured, the interval clause went
+         red on a correct attachment), so (ii) is stated on flat hubs only. */
+      const D = m.hubBuilt && m.hubBuilt.dome;
+      const R = Number(ui.stemDiameter) / 2;
+      const Ej = stemJoinExpected(m.hubRadius, hubT, R, false);
+      const Hl = hubShapeExpected(m.hubRadius, hubT, R, false, ui.hubStyle || 'GOBLET', ui.hubShapeAmount === undefined ? 1 : Number(ui.hubShapeAmount), ui.hubLength === undefined ? 0 : Number(ui.hubLength), Ej.joinT, D && !D.closed ? D.Rd : 0);
+      let zLaw;
+      if (!D) zLaw = m.hubTopFaceZ - Hl.at(A.rAttach);
+      else {
+        const inner = (phi) => (D.Rd - hubT / 2) - (Hl.at(D.Rd * Math.sin(phi)) - hubT);
+        let lo = 0, hi = Math.asin(Math.min(1, m.hubJoinBlendRadius / D.Rd));
+        for (let k = 0; k < 80; k++) { const mid = (lo + hi) / 2; if (inner(mid) * Math.sin(mid) < A.rAttach) lo = mid; else hi = mid; }
+        const phi = (lo + hi) / 2; zLaw = D.centreZ + inner(phi) * Math.cos(phi);
+      }
+      if (Math.abs(zLaw - A.zAttach) > 1e-9) bad.push(`SP3: the attachment (r ${A.rAttach.toFixed(4)}, z ${A.zAttach.toFixed(6)}) is not on the hub's underside as the controls' own law places it (z ${zLaw.toFixed(6)} at that radius)`);
+      const und = m.hubUnderside;
+      if (!Array.isArray(und) || und.length < 2) bad.push('SP3: the hub reports no underside samples — the attachment cannot be placed against the emitted surface');
+      else if (!D) {
+        const pts = und.map(([r, thick]) => ({ r, z: m.hubTopFaceZ - thick })).sort((a, b) => a.r - b.r);
+        let k = 0; while (k < pts.length - 1 && pts[k + 1].r < A.rAttach) k++;
+        if (A.rAttach < pts[0].r - 1e-9 || A.rAttach > pts[pts.length - 1].r + 1e-9) bad.push(`SP3: the attachment radius ${A.rAttach} is outside the emitted underside's ${pts[0].r}..${pts[pts.length - 1].r}`);
+        else {
+          const lo = Math.min(pts[k].z, pts[k + 1].z), hi = Math.max(pts[k].z, pts[k + 1].z);
+          if (A.zAttach < lo - 1e-9 || A.zAttach > hi + 1e-9) bad.push(`SP3: the attachment (r ${A.rAttach.toFixed(4)}, z ${A.zAttach.toFixed(4)}) is not on the emitted underside — the bracketing rings at r ${pts[k].r.toFixed(4)} and ${pts[k + 1].r.toFixed(4)} span z ${lo.toFixed(4)}..${hi.toFixed(4)}`);
+        }
+      }
+      if (Math.abs(S.height - (A.zAttach + S.ring.thickness / 2)) > 1e-12) bad.push(`SP3: the whorl's height ${S.height} is not the attachment ${A.zAttach} plus half the sheet ${S.ring.thickness}`);
+      if (S.ring.onDome || S.ring.domeLean !== 0) bad.push('SP3: a sepal ring on the hub\'s flare must be FLAT (the petal builder\'s flat arm) with no dome lean');
+      if (Math.abs(S.ring.radius - A.rAttach) > 1e-12) bad.push(`SP3: the ring's radius ${S.ring.radius} is not the attachment's ${A.rAttach}`);
+      if (A.onCone !== (ui.hubStyle === 'ANGLED' && A.sAttach > 0 && A.sAttach < 1)) bad.push(`SP3: onCone reads ${A.onCone} on ${ui.hubStyle} at s ${A.sAttach}`);
+      if (A.onCone && A.chordOnCone && Math.abs(A.undersideTangentDeg - A.undersideChordDeg) > 1e-6) bad.push(`SP3: on ANGLED's straight face the tangent (${A.undersideTangentDeg}) and the chord (${A.undersideChordDeg}) must agree — the foot is not on the cone's side`);
+      if (A.onCone && !A.chordOnCone && !(A.undersideChordDeg < A.undersideTangentDeg)) bad.push(`SP3: the chord runs off the cone onto the plate and must read SHALLOWER than the cone's tangent (${A.undersideChordDeg} against ${A.undersideTangentDeg})`);
+      for (const p of S.petals) {
+        const f = p.footFrames;
+        if (!f || f.length !== 3) { bad.push(`SP3: sepal ${p.slotIndex} reports ${f ? f.length : 'no'} foot frames, expected 3`); continue; }
+        const r = Math.hypot(f[2].C[0], f[2].C[1]);
+        if (Math.abs(r - A.rAttach) > 1e-9 || Math.abs(f[2].C[2] - S.height) > 1e-9) bad.push(`SP3: sepal ${p.slotIndex}'s ring row sits at r ${r.toFixed(6)}, z ${f[2].C[2].toFixed(6)}; the attachment puts it at r ${A.rAttach.toFixed(6)}, z ${S.height.toFixed(6)}`);
+        const skin = f[2].C[2] - f[2].N[2] * (f[2].t / 2);
+        if (Math.abs(f[2].N[2] - 1) > 1e-12 || Math.abs(skin - A.zAttach) > 1e-9) bad.push(`SP3: sepal ${p.slotIndex}'s bottom skin at the ring row is z ${skin.toFixed(6)} (normal ${f[2].N}); the attachment point is z ${A.zAttach.toFixed(6)} — the foot does not land on the surface`);
+        for (let k = 0; k < 3; k++) if (Math.abs(f[k].h - S.footMm / 2) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex} foot row ${k} half-width ${f[k].h} is not the descriptor's foot ${S.footMm} / 2`);
+        if (Math.abs(f[2].t - S.ring.thickness) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex}'s foot is ${f[2].t} mm thick against the ring's ${S.ring.thickness}`);
+      }
+    } else {
+      if (S.height !== 0) bad.push(`SP3: at the rim the whorl's height must be 0 (the plate's mid-plane through slot.z), it is ${S.height}`);
+      if (!A.why) bad.push('SP3: the sepals sit at the rim and the record gives no reason');
+      for (const p of S.petals) {
+        const f = p.footFrames;
+        if (!f || f.length !== 3) { bad.push(`SP3: sepal ${p.slotIndex} reports ${f ? f.length : 'no'} foot frames, expected 3`); continue; }
+        const r = Math.hypot(f[2].C[0], f[2].C[1]);
+        if (Math.abs(r - rimR) > 1e-9 || Math.abs(f[2].C[2] - rimZ) > 1e-9) bad.push(`SP3: sepal ${p.slotIndex}'s ring row sits at r ${r.toFixed(6)}, z ${f[2].C[2].toFixed(6)}; the outer whorl's own ring row is at r ${rimR.toFixed(6)}, z ${rimZ.toFixed(6)} — the sepal is not on the hub's rim`);
+        for (let k = 0; k < 3; k++) if (Math.abs(f[k].h - S.footMm / 2) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex} foot row ${k} half-width ${f[k].h} is not the descriptor's foot ${S.footMm} / 2`);
+        if (Math.abs(f[2].t - S.ring.thickness) > 1e-12) bad.push(`SP3: sepal ${p.slotIndex}'s foot is ${f[2].t} mm thick against the ring's ${S.ring.thickness}`);
+      }
+      if (Math.abs(S.ring.radius - rimR) > 1e-9) bad.push(`SP3: the sepal ring's declared radius ${S.ring.radius} is not the outer whorl's emitted ring radius ${rimR}`);
+    }
   }
   const askedFoot = m.ringWidth * Number(ui.sepalScale) * Number(ui.sepalFootBreadth);
   const wantFoot = Math.min(FOOT_MAX_WIDTH_MM, Math.max(FOOT_MIN_WIDTH_MM, askedFoot));
@@ -6041,7 +6141,7 @@ export function sepalContactCheck(ui, row, L) {
       const a2 = new GEOMETRY.MeshBuilder({ exportMode, captureLamina: true });
       const fr = built.foot;
       const lam = [];
-      GEOMETRY.buildWhorlInto({ count: fr.sepals.count, radius: fr.sepals.ring.radius, height: 0, sizeRamp: () => fr.sepals.scale, angleRamp: () => 0, phase: fr.sepals.startAzimuth,
+      GEOMETRY.buildWhorlInto({ count: fr.sepals.count, radius: fr.sepals.ring.radius, height: fr.sepals.height, sizeRamp: () => fr.sepals.scale, angleRamp: () => 0, phase: fr.sepals.startAzimuth,
         placement: fr.sepals.placement, fan: null, azimuths: fr.sepals.placement === 'LIST' ? fr.sepals.azimuths : null,
         blade: (slot) => { lam.push(harnessLamina(GEOMETRY.buildPetalInto(a2, GEOMETRY.sepalBladeState(st, deg), fr.sepals.ring, slot, null, false).grid)); } });
       return lam;
@@ -6885,9 +6985,15 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'SEPALS: on a FAN with no mirror-line petal (4 sepals, aligned)': '2439 pairs, worst span 1.2256 mm (THE ALIGNED WELD — at phase 0 the sepal foot\'s column products are BIT-EQUAL to the petal foot\'s (0.6 x 1.0 is 3/5 and the two feet share exact vertices on the rim; at size 1.00 the sepal foot IS the petal foot), so the census\'s exact-position weld reads the sepal and its petal as ONE shell and the two blades\' by-design overlap at the foot as a within-shell fold. The same state with the sepals removed reads 0; at the interleaved default every angle reads 0. A property of the vertex-welded shell definition, the STYLE-at-272 / CLEFT class, not of the geometry) — the fan\'s LIST arm at phase 0 puts every sepal on a petal\'s own slot',
   'SEPALS: on the HEMISPHERE (rise 1)': '216 pairs, worst span 0.4176 mm (THE HEAD\'S OWN FOLD, not the sepals\' — the identical count and span as `headRise max (1)` and `STEM: x a hemisphere`, and the identical state with the sepals removed reads the same 216; EFFECTIVE TILT PAST 90 on the petals at the hemisphere\'s rim)',
   'SEPALS: THE CROWDED CORNER, no stem — 40 x 40 x size 1 x ALIGNED x 90 asked': '25358 pairs, worst span 1.2624 mm (THE ALIGNED WELD — at phase 0 the sepal foot\'s column products are BIT-EQUAL to the petal foot\'s (0.6 x 1.0 is 3/5 and the two feet share exact vertices on the rim; at size 1.00 the sepal foot IS the petal foot), so the census\'s exact-position weld reads the sepal and its petal as ONE shell and the two blades\' by-design overlap at the foot as a within-shell fold. The same state with the sepals removed reads 0; at the interleaved default every angle reads 0. A property of the vertex-welded shell definition, the STYLE-at-272 / CLEFT class, not of the geometry) — forty sepals at size 1.00 aligned on forty petals, every one welded to its petal at the clamped angle (the brief\'s crowded corner, declared with its figure rather than trimmed)',
-  'SEPALS: THE CROWDED CORNER on GOBLET (stem 60 x 6, amount 2, length 40)': '25358 pairs, worst span 1.2624 mm (THE ALIGNED WELD — at phase 0 the sepal foot\'s column products are BIT-EQUAL to the petal foot\'s (0.6 x 1.0 is 3/5 and the two feet share exact vertices on the rim; at size 1.00 the sepal foot IS the petal foot), so the census\'s exact-position weld reads the sepal and its petal as ONE shell and the two blades\' by-design overlap at the foot as a within-shell fold. The same state with the sepals removed reads 0; at the interleaved default every angle reads 0. A property of the vertex-welded shell definition, the STYLE-at-272 / CLEFT class, not of the geometry) — identical to the stemless corner: the hub\'s shape adds nothing to it',
-  'SEPALS: THE CROWDED CORNER on ANGLED': '25358 pairs, worst span 1.2624 mm (THE ALIGNED WELD — at phase 0 the sepal foot\'s column products are BIT-EQUAL to the petal foot\'s (0.6 x 1.0 is 3/5 and the two feet share exact vertices on the rim; at size 1.00 the sepal foot IS the petal foot), so the census\'s exact-position weld reads the sepal and its petal as ONE shell and the two blades\' by-design overlap at the foot as a within-shell fold. The same state with the sepals removed reads 0; at the interleaved default every angle reads 0. A property of the vertex-welded shell definition, the STYLE-at-272 / CLEFT class, not of the geometry) — identical to the stemless corner: the hub\'s shape adds nothing to it',
-  'SEPALS: THE CROWDED CORNER on CURVED': '25358 pairs, worst span 1.2624 mm (THE ALIGNED WELD — at phase 0 the sepal foot\'s column products are BIT-EQUAL to the petal foot\'s (0.6 x 1.0 is 3/5 and the two feet share exact vertices on the rim; at size 1.00 the sepal foot IS the petal foot), so the census\'s exact-position weld reads the sepal and its petal as ONE shell and the two blades\' by-design overlap at the foot as a within-shell fold. The same state with the sepals removed reads 0; at the interleaved default every angle reads 0. A property of the vertex-welded shell definition, the STYLE-at-272 / CLEFT class, not of the geometry) — identical to the stemless corner: the hub\'s shape adds nothing to it',
+  /* THE THREE CROWDED CORNERS WITH A STEM ARE NOT DECLARED ANY MORE (the
+     attachment-height ruling): with the sepal foot on the hub's FLARE — 20 mm
+     down it on these MAX x MAX hubs — the sepal foot's lattice no longer
+     shares a vertex with the petal foot's on the rim, the exact-position weld
+     that made the aligned overlap read within-shell has nothing to weld, and
+     all three read 0 pairs (measured on the branch, export build; they read
+     25358 / 1.2624 mm at the rim). The STEMLESS crowded corner above still
+     welds and stays declared: with no hub below the head the sepals sit at
+     the rim, the first construction to the bit. */
   'SEPALS: sepalCup min (-0.8)': '250 pairs, worst span 0.3417 mm (THE PETAL BUILDER\'S OWN CUP FOLD on the sepal\'s shorter blade — the petal\'s own `petalCup min (-0.8)` row declares 384 / 0.2104; the twin reaches the same law on a 21 mm blade)',
   'SEPALS: sepalCup max (1.2)': '502 pairs, worst span 0.2896 mm (THE PETAL BUILDER\'S OWN CUP FOLD on the sepal\'s shorter blade — the petal\'s own `petalCup max (1.2)` row declares 752 / 0.1268)',
   'SEPALS: sepalCupGradient min (-0.8)': '240 pairs, worst span 0.2598 mm (THE PETAL BUILDER\'S OWN CUP FOLD on the sepal\'s shorter blade — the petal\'s own `petalCupGradient min (-0.8)` row declares 360 / 0.1930)',
@@ -8995,8 +9101,22 @@ export function buildMatrix() {
     ['SEPALS: x 3 whorls (the ceiling is the OUTER whorl)', { layerCount: 3, sepalCount: 8 }],
     ['SEPALS: on the thickest sheet (2.40 — seventeen seam-step buckets)', { sepalCount: 5, sheetThickness: 2.4 }],
     ['SEPALS: on the thinnest sheet (0.60 — the export floor moves t, the mode union binds)', { sepalCount: 5, sheetThickness: 0.6 }],
+    /* THE ATTACHMENT HEIGHT (the second-round ruling): the sepals attach
+       partway down the hub's flare wherever there is one. The shipped 0.75 on
+       the default stem (the state Eva sees first), the two ends of the
+       control, the middle of the deepest GOBLET, an INERT join (amount 0 —
+       at the rim, told), a domed head whose bowl holds the stem end above the
+       join's rim (INVERTED — at the rim, told) and a shallow dome with a
+       hanging hub (the domed arm of the solve). */
+    ['SEPALS: height 0.75 (the shipped default) on the default stem — 60 x 6, GOBLET auto (the foot 0.33 mm below the head)', { sepalCount: 5, stemLength: 60 }],
+    ['SEPALS: height min (0 — at the stem end, where the flare meets the stem)', { sepalCount: 5, stemLength: 60, sepalHeight: 0 }],
+    ['SEPALS: height max (1 — where the hub meets the head)', { sepalCount: 5, stemLength: 60, sepalHeight: 1 }],
+    ['SEPALS: height 0.50 on GOBLET at MAX amount x MAX length (half-way down a 77.6 mm hub)', { sepalCount: 5, stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40, sepalHeight: 0.5 }],
+    ['SEPALS: height on an INERT join (amount 0 — a straight join has no flare: at the rim, told)', { sepalCount: 5, stemLength: 60, hubShapeAmount: 0 }],
+    ['SEPALS: height on a DOME with a stem (rise 0.5 — the bowl holds the stem end above the join\'s rim, the extent INVERTED: at the rim, told)', { sepalCount: 5, stemLength: 60, headRise: 0.5 }],
+    ['SEPALS: height on a shallow DOME with a hanging hub (rise 0.1 x length 40 — the domed arm of the solve)', { sepalCount: 5, stemLength: 60, headRise: 0.1, hubLength: 40 }],
     ['SEPALS: with a stem — GOBLET at MAX amount x MAX length (the blend reaches the rim)', { sepalCount: 5, stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 }],
-    ['SEPALS: with a stem — ANGLED at MAX amount x MAX length (the shoulder sits at the rim under the foot)', { sepalCount: 5, stemLength: 60, hubStyle: 'ANGLED', hubShapeAmount: 2, hubLength: 40 }],
+    ['SEPALS: with a stem — ANGLED at MAX amount x MAX length (the foot on the cone\'s SIDE, a straight face — no shoulder under it)', { sepalCount: 5, stemLength: 60, hubStyle: 'ANGLED', hubShapeAmount: 2, hubLength: 40 }],
     ['SEPALS: with a stem — CURVED at MAX amount x MAX length', { sepalCount: 5, stemLength: 60, hubStyle: 'CURVED', hubShapeAmount: 2, hubLength: 40 }],
     ['SEPALS: with a stem and leaves (the whole plant)', { sepalCount: 5, stemLength: 70, leafLength: 52 }],
     ['SEPALS: THE CROWDED CORNER, no stem — 40 x 40 x size 1 x ALIGNED x 90 asked', { ...crowded }],
@@ -9017,7 +9137,7 @@ export function buildMatrix() {
     }
   }
   for (const [name, sets] of [
-    ['SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)', { sepalCount: 0, sepalScale: 1, sepalPhase: 1, sepalFootBreadth: 1.5, sepalAngle: 90, sepalCup: 1.2, sepalSpineCurl: 360, sepalRoll: 330, sepalTwist: 180, sepalBuckleAmp: 0.6, sepalTipShape: 3 }],
+    ['SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)', { sepalCount: 0, sepalScale: 1, sepalHeight: 1, sepalPhase: 1, sepalFootBreadth: 1.5, sepalAngle: 90, sepalCup: 1.2, sepalSpineCurl: 360, sepalRoll: 330, sepalTwist: 180, sepalBuckleAmp: 0.6, sepalTipShape: 3 }],
     ['SEPALS: GATED — asked under SPHERE (8 asked on a closed head: none built, UNAVAILABLE told)', { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
