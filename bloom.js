@@ -1235,11 +1235,27 @@ function sepalLine(ui, built, mode) {
     : L.everywhere ? `CLAMPED to ${L.angleBuiltDeg}° — the sepals clip the petals at every angle in the range (${L.kind} on petal ${L.petal})`
     : L.clamped ? `${L.askedDeg}° asked, CLAMPED to ${L.angleBuiltDeg}°: at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`
     : `${L.angleBuiltDeg}° (clear up to ${L.limitDeg}°${L.contactDeg === null ? ', no contact in the range' : `; at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`})`;
-  return `     SEPALS ${B.count} on the hub's rim` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
+  /* WHERE THE FOOT IS, from the descriptor's own attachment record: on the
+     hub's flare at the height asked, or at the rim with the reason. THE FOOT
+     LINE LEADS WITH THE CHORD AND KEEPS THE TANGENT BESIDE IT, LABELLED
+     (Eva's ruling, second round): a tangent that reads 0.00° on GOBLET and
+     CURVED while the underside falls 49° and 81° over the first millimetre is
+     a number that is always right and never useful — the chord one printable
+     feature along the blade's way is the honest measurement, so it goes
+     first. */
+  const A = S.attachment;
+  const onHub = A && A.mode === 'HUB';
+  const where = onHub
+    ? `on the hub's flare — ${A.frac.toFixed(2)} of the way up from the stem end (r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside; the hub hangs ${A.extentMm.toFixed(2)} mm; AXIAL reading built, the surface-arc reading lands ${A.arc.deltaMm.toFixed(2)} mm away)`
+    : `at the hub's rim (height ${A ? A.frac.toFixed(2) : '?'} asked, INERT: ${A ? A.why : 'no attachment record'})`;
+  const footSurface = onHub
+    ? `foot on the flare, bottom skin through the attachment point (mid-surface ${(S.height).toFixed(2)} mm) · the underside RISES ${A.undersideChordDeg.toFixed(2)}° over the first ${A.undersideChordMm.toFixed(2)} mm outward from the foot (the chord a print meets; tangent there ${A.undersideTangentDeg.toFixed(2)}°${A.onCone ? " — ANGLED's straight face, the chord IS the tangent and the shoulder is not under the foot" : ''})` + (A.footBuriedMm < 0 ? ` · the foot's inner rows POKE OUT ${(-A.footBuriedMm).toFixed(2)} mm below the flare (told)` : ` · inner rows buried ${A.footBuriedMm.toFixed(2)} mm`)
+    : `buried in the rim on the same footing as the petal foot · the underside FALLS ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in from the rim (the chord a print meets; tangent at the rim ${B.footTangentDeg.toFixed(2)}°)`;
+  return `     SEPALS ${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
     + ` · offset ${S.phaseFrac.toFixed(2)} of ${S.phaseAgainst} = ${S.phaseDeg.toFixed(2)}° of ${S.pitchDeg.toFixed(2)}°` + (S.mirrorSymmetric === false ? ' — NOT mirror-symmetric on this fan (told)' : '')
     + ` · size ${S.scale.toFixed(2)}x` + (first ? ` (${first.length.toFixed(1)} mm)` : '')
     + `\n     SEPAL FOOT ${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
-    + ` · buried in the rim on the same footing as the petal foot` + (B.footTangentDeg !== undefined ? ` · foot tangent ${B.footTangentDeg.toFixed(2)}° off the underside at the rim${B.blendGapMm !== null && B.blendGapMm < B.undersideChordMm ? ` (analytic; the underside falls ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in — the chord a print meets)` : ''}` : '')
+    + ` · ${footSurface}`
     + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
 }
 
@@ -2010,7 +2026,12 @@ window.__bloomMetrics = () => ({
     scale: lastSepals.scale, breadth: lastSepals.breadth, phaseFrac: lastSepals.phaseFrac, pitchRad: lastSepals.pitchRad, phaseRad: lastSepals.phaseRad, phaseDeg: lastSepals.phaseDeg, pitchDeg: lastSepals.pitchDeg,
     startAzimuth: lastSepals.startAzimuth, azimuths: lastSepals.azimuths.slice(), placement: lastSepals.placement, mirrorSymmetric: lastSepals.mirrorSymmetric,
     footAskedMm: lastSepals.footAskedMm, footMm: lastSepals.footMm, footClamped: lastSepals.footClamped, footFloorMm: lastSepals.footFloorMm, footCeilingMm: lastSepals.footCeilingMm,
-    ring: { radius: lastSepals.ring.radius, width: lastSepals.ring.width, thickness: lastSepals.ring.thickness, overhang: lastSepals.ring.overhang, z: lastSepals.ring.z, slope: lastSepals.ring.slope, domeLean: lastSepals.ring.domeLean },
+    ring: { radius: lastSepals.ring.radius, width: lastSepals.ring.width, thickness: lastSepals.ring.thickness, overhang: lastSepals.ring.overhang, z: lastSepals.ring.z, slope: lastSepals.ring.slope, domeLean: lastSepals.ring.domeLean, onDome: lastSepals.ring.dome !== null },
+    /* THE ATTACHMENT (SP3): the whorl's height and the descriptor's own solve —
+       mode, the extent's two ends, the point the foot landed on, the arc
+       reading beside it, and the surface figures where the foot meets. */
+    height: lastSepals.height,
+    attachment: JSON.parse(JSON.stringify(lastSepals.attachment)),
     built: lastSepalsBuilt ? lastSepalsBuilt.count : 0,
     builtAzimuths: lastSepalsBuilt ? lastSepalsBuilt.azimuths.slice() : [],
     tris: lastSepalTris,

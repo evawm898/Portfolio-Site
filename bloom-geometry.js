@@ -2723,8 +2723,20 @@ export function footRing(state, acc) {
     const outer = rings[0];
     const footAskedMm = outer.width * scale * breadth;
     const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
-    const radius = hub.radius;
-    const { slope, z, arc, relief } = surfaceAt(radius, null);
+    /* WHERE THE WHORL SITS (the attachment-height ruling — `sepalAttachment`
+       below the sepal block owns the solve): partway down the hub's flare at
+       `sepalHeight` of its axial extent when there is a hub below the head,
+       at the RIM — the first construction, to the bit — otherwise, told. On
+       the flare the ring is FLAT (the petal builder's flat arm, handed the
+       height through the whorl primitive's `height`), its row `t/2` above
+       the attachment point so the foot's bottom skin passes through it. */
+    const attachment = sepalAttachment(state, hub, acc);
+    const onHub = attachment.mode === 'HUB';
+    const radius = onHub ? attachment.rAttach : hub.radius;
+    const surf = surfaceAt(radius, null);
+    const slope = onHub ? 0 : surf.slope, arc = surf.arc, relief = surf.relief;
+    const height = onHub ? attachment.zAttach + thickness / 2 : 0;
+    const z = onHub ? height : surf.z;
     const overhang = Math.max(1.5, radius * 0.4);
     let azimuths, placement, startAzimuth = outer.phase + phaseRad, mirrorSymmetric = null;
     if (fanMode) {
@@ -2747,12 +2759,16 @@ export function footRing(state, acc) {
       phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
       startAzimuth, azimuths, placement, mirrorSymmetric,
       footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM,
+      /* THE ATTACHMENT — the whorl's height (the `height` the whorl primitive
+         is handed; 0 at the rim, where the flat arm reads `slot.z` as the
+         plate's mid-plane) and the solve's own record. */
+      height, attachment,
       ring: {
         index: -1, radius, derivedRadius, width: footMm, thickness, overhang,
-        scale: 1, phase: startAzimuth, domeLean: dome && !sphere ? (slope * 180) / Math.PI : 0, tiltExtra: 0, lambda: 0,
+        scale: 1, phase: startAzimuth, domeLean: !onHub && dome && !sphere ? (slope * 180) / Math.PI : 0, tiltExtra: 0, lambda: 0,
         role: 'SEPAL', roleCount: count, slotRole: null, petalRole: null, allRole: null,
         slots: Array.from({ length: count }, (_, i) => i), overrides: null, roles: ['SEPAL'],
-        z, slope, arc, relief, dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius, clamped: [],
+        z, slope, arc, relief, dome: onHub ? null : dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius, clamped: [],
       },
     };
   })();
@@ -9605,14 +9621,25 @@ export function rotateLamina(S, az, base0, dt) {
    seam-step bucket; every other angle is a rotation of it (see the header). */
 export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
   const acc = new MeshBuilder({ exportMode, captureLamina: true });
-  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: 0, scale: sepals.scale, tiltExtra: 0 };
+  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };
   const p = buildPetalInto(acc, sepalBladeState(state, angleDeg), sepals.ring, slot, null, false);
   return { lamina: laminaFromPanels(p.grid), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
 }
 /* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
    mode emitted, through the surface's own front door. The ladder is mode-free
    (its stations are the built rows' own `u`), the outline and the sheet are
-   not, which is exactly what the union is for. */
+   not, which is exactly what the union is for.
+   A DECLARED BLINDNESS OF THE LATTICE (the attachment-height session): the
+   emitted columns sit at v = ±0.1 .. ±0.9 (NV 10 is even), so the outer tenth
+   of the half-width — the margin — lies between lattice lines and a
+   margin-led clip is seen one row or column late. The dense drawing in
+   `tools/bloom-sepal-contact.mjs` (40 columns, ±1 included, a quarter step)
+   is the witness that it costs less than one slider step: 0 disagreements
+   over 80 states at the attachment. (The first re-run there reported 44 and
+   they were the TOOL's — its dense sepal was drawn at the rim's height
+   against a whorl built at the attachment; margin columns were added here
+   and then taken out again once that was found, so the scan reads the
+   builder's own lattice exactly as it shipped.) */
 function petalLaminaInMode(site, state, exportMode) {
   const acc = new MeshBuilder({ exportMode });
   const surface = petalSurface(state, site.ring, site.slot, site.cap, acc);
@@ -9621,6 +9648,228 @@ function petalLaminaInMode(site, state, exportMode) {
   }));
   return laminaFromPanels(panels);
 }
+/* ===================================================================
+   THE ATTACHMENT HEIGHT (Eva's ruling, sepals part 1, second round): the
+   sepals attach PARTWAY DOWN THE HUB, not at its rim — a little below the
+   petals rather than tucked under them. `sepalHeight` is a FRACTION ALONG
+   THE HUB'S AXIAL EXTENT, default 0.75: three quarters of the way up from
+   the stem end toward the head, a quarter of the way down from the hub's
+   rim. A slider, not a constant, because 0.75 was named to be tuned against
+   the render.
+
+   WHAT "THE HUB" IS HERE: Eva's word for the thing that connects the HEAD to
+   the STEM — the hub-to-stem JOIN (`stemPlan`, `hubJoinThicknessAt`, the
+   swelling underside `buildHubInto` emits), never the head's own plate. So
+   the extent runs from the STEM END — the plan's own `rootZ`, the join's
+   underside on the axis, where the free stem begins — up to where the join
+   meets the HEAD: the plate's underside at the blend radius on a flat head
+   (`-t/2`), the undeformed inner cap at the blend radius on a domed one.
+   Both ends are read off the SAME profile the hub builder emits (`at(0)` and
+   `at(1)` below), so the extent is the join's own and not a second
+   expression of it. THE OTHER READING — the extent taken to the head's TOP
+   face, so the plate's own thickness counts — was considered and NOT used:
+   at the shipping 6 mm stem the join reaches 2.52 mm and a quarter of that
+   from the top lands INSIDE the rim's own thickness, 0.03 mm below the
+   plate's mid-plane, which is where the sepals already were. The join
+   reading puts the shipping default 0.33 mm below the head's underside and
+   2.9 mm inside the rim, which is what "a little below the petals" asks for.
+   The outcome doc carries both figures side by side.
+
+   AXIAL, NOT SURFACE-ARC — and both are reported. The fraction is measured
+   along z (the hub's AXIAL extent, as ruled); the point where the same
+   fraction of the underside's ARC LENGTH from the stem end lands is solved
+   beside it (`arc`), with the distance between the two, so a deep GOBLET —
+   where a quarter-ellipse bowl's arc and height disagree most — says by how
+   much. The AXIAL point is the one the foot is built on.
+
+   THE FOOT LANDS ON THE HUB'S SURFACE AT THAT HEIGHT: the attachment point
+   `(rAttach, zAttach)` is ON the underside profile, and the sepal's foot
+   ring row sits `t/2` directly above it, so the foot's own BOTTOM SKIN
+   passes through the attachment point and the blade leaves the surface with
+   its underside flush to it. The foot rows run inward from there at that
+   height (the petal builder's flat arm, handed the height through the whorl
+   primitive's own `height` argument — the argument that has waited since
+   session 1 for exactly this caller), and they are inside the join's
+   material because the join thickens INWARD: every row inward of the
+   attachment sits above a lower underside. On a domed head the cap rises
+   inward while the swell pushes down, so the burial is MEASURED there
+   (`footBuriedMm`, the smallest clearance of the three rows' bottom skins
+   above the emitted underside) rather than argued; negative means the foot
+   pokes out below the flare, a visual fact and never a gate.
+
+   THE FALLBACK IS THE RIM, TOLD — the same ring row the outer whorl's feet
+   use, `t/2` above the plate's underside at `hub.radius`, which is the
+   construction that shipped first. It is taken when there is NO HUB BELOW
+   THE HEAD to attach partway down: no stem at all (the shipped whorl —
+   sepals remain available without a stem, as ruled), a stem whose join is
+   inert (a thin stem asking for no more than the sheet, amount 0, a SPHERE),
+   or a domed head whose bowl holds the stem end ABOVE the join's rim (the
+   extent inverted — at the default stem every rise from 0.15 up does this,
+   because the cap's sagitta exceeds the join's reach). In each case the
+   record says which, and the read-out prints it. So at `stemLength` 0 the
+   height control is INERT and the sepals sit at the rim exactly as before:
+   measured, the fallback reproduces the first construction to the bit.
+
+   THE LIMIT MOVES WITH IT. The angle scan reads the descriptor's ring and
+   height (`sepalTrialLamina` builds its trial at the whorl's own `height`),
+   so the drawn limit is drawn at the attachment — a sixth variable in a
+   bound that had five, and the reason it is re-drawn per build rather than
+   tabulated.
+   =================================================================== */
+export const SEPAL_HEIGHT_RANGE = Object.freeze([0, 1]);          // 0 the stem end · 1 where the hub meets the head
+export const SEPAL_HEIGHT_DEFAULT = 0.75;
+const ATTACH_PROFILE_SAMPLES = 512;
+export function sepalAttachment(state, hub, acc) {
+  const frac = clamp(state.sepalHeight === undefined ? SEPAL_HEIGHT_DEFAULT : Number(state.sepalHeight), SEPAL_HEIGHT_RANGE[0], SEPAL_HEIGHT_RANGE[1]);
+  const t = acc.floorThickness(hub.thickness);
+  const plan = stemPlan(state, hub, acc);
+  const dome = hub.dome;
+  const rim = (why, extra = {}) => ({
+    mode: 'RIM', frac, why, hubT: t, rimR: hub.radius,
+    zStemEnd: plan.present ? plan.rootZ : null, zHead: null, extentMm: plan.present && !plan.inert ? extra.extentMm ?? 0 : 0,
+    zAttach: null, rAttach: null, belowHeadMm: 0, arc: null, footBuriedMm: 0,
+    plan: { present: plan.present, inert: plan.inert, joinReason: plan.joinReason, style: plan.hubStyle ?? null, amount: plan.hubAmount ?? null, axisDepth: plan.axisDepth ?? null, outerR: plan.outerR, blendR: plan.blendR, rootZ: plan.rootZ ?? null },
+    ...rimSurface(plan, hub, t), ...extra,
+  });
+  if (!plan.present) return rim('no stem — there is no hub below the head to attach partway down, so the sepals sit at the rim');
+  if (plan.inert) return rim(plan.joinReason === 'shell' ? 'the head is a closed SPHERE and the join is inert there' : `the join is INERT — the ${(plan.outerR * 2).toFixed(1)} mm stem asks for no more than the hub's own ${t.toFixed(2)} mm sheet, so there is no flare to attach on`);
+  /* THE PROFILE, from the stem end (s = 0) to where the join meets the head
+     (s = 1), the hub builder's own law asked of its one owner. */
+  const P = { hubR: hub.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT, style: plan.hubStyle, amount: plan.hubAmount, axisDepth: plan.axisDepth };
+  const joinAt = (r) => hubJoinThicknessAt(r, P);
+  let at, headAt;
+  if (!dome) {
+    at = (s) => { const r = plan.outerR + s * (plan.blendR - plan.outerR); return { r, z: t / 2 - joinAt(r) }; };
+    headAt = (r) => ({ r, z: t / 2 - t });                                  // the plate's underside, beyond the blend
+  } else {
+    const Rd = dome.Rd, cz = dome.centreZ;
+    const phiS = Math.asin(Math.min(1, plan.outerR / Rd)), phiB = Math.asin(Math.min(1, plan.blendR / Rd));
+    const innerRad = (phi) => (Rd - t / 2) - (joinAt(Rd * Math.sin(phi)) - t);   // buildHubInto's own inner cap, term for term
+    at = (s) => { const phi = phiS + s * (phiB - phiS); const rad = innerRad(phi); return { r: rad * Math.sin(phi), z: cz + rad * Math.cos(phi) }; };
+    headAt = (r) => { const phi = Math.asin(Math.min(1, r / (Rd - t / 2))); return { r, z: cz + (Rd - t / 2) * Math.cos(phi) }; };
+  }
+  const stemEnd = at(0), head = at(1);
+  /* THE STEM END IS THE PLAN'S OWN `rootZ` — the join's underside ON THE AXIS,
+     where the free stem begins — and not the profile's first sample, which is
+     the underside at the stem's WALL: on a flat hub the two are one number
+     (the underside is flat inside the stem's own radius), on a domed head the
+     inner cap has already fallen `innerRad (1 - cos phiS)` by the wall
+     (0.023 mm on ALL MAX), and SP3 rebuilds the extent from the plan's `rootZ`
+     through the stem record. The walk still starts at the wall, so `sepalHeight`
+     0 lands where the flare meets the stem and never inside it. */
+  const zStemEnd = plan.rootZ;
+  const extentMm = head.z - zStemEnd;
+  if (!(extentMm > 0)) return rim(`the hub's extent is INVERTED — the stem end (z ${zStemEnd.toFixed(2)}) sits ${(-extentMm).toFixed(2)} mm ABOVE where the join meets the head (z ${head.z.toFixed(2)}): the head's bowl holds the stem end inside it, so there is no hub hanging below to attach partway down`, { extentMm });
+  const zAttach = zStemEnd + frac * extentMm;
+  /* THE SOLVE: walk the profile from the stem end and bisect the first
+     segment that reaches the height. The flat profile is monotone (every
+     style is); the domed one need not be, and the first crossing from the
+     stem end is the one nearest the stem, which is the ruling's picture. */
+  const N = ATTACH_PROFILE_SAMPLES;
+  const solveZ = (target) => {
+    if (target <= stemEnd.z) return { s: 0, ...stemEnd };
+    if (target >= head.z) return { s: 1, ...head };
+    let s0 = 0, p0 = stemEnd;
+    for (let i = 1; i <= N; i++) {
+      const s1 = i / N, p1 = at(s1);
+      if ((p0.z - target) * (p1.z - target) <= 0 && p1.z !== p0.z) {
+        let lo = s0, hi = s1, plo = p0, phi = p1;
+        for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2, pm = at(mid); if ((plo.z - target) * (pm.z - target) <= 0) { hi = mid; phi = pm; } else { lo = mid; plo = pm; } }
+        const s = (lo + hi) / 2; return { s, ...at(s) };
+      }
+      s0 = s1; p0 = p1;
+    }
+    return { s: 1, ...head };
+  };
+  const A = solveZ(zAttach);
+  /* THE ARC READING, beside it: the same fraction of the underside's own
+     arc length from the stem end, and how far that point is from the axial
+     one. Reported; the axial point is the one built on. */
+  let arcLen = 0; const cum = [0]; let prev = stemEnd;
+  for (let i = 1; i <= N; i++) { const p = at(i / N); arcLen += Math.hypot(p.r - prev.r, p.z - prev.z); cum.push(arcLen); prev = p; }
+  const want = frac * arcLen; let iA = 1; while (iA < N && cum[iA] < want) iA++;
+  const fA = cum[iA] === cum[iA - 1] ? 0 : (want - cum[iA - 1]) / (cum[iA] - cum[iA - 1]);
+  const arcP = at((iA - 1 + fA) / N);
+  const arc = { arcLenMm: arcLen, rArc: arcP.r, zArc: arcP.z, deltaMm: Math.hypot(arcP.r - A.r, arcP.z - A.z), deltaZMm: arcP.z - A.z };
+  /* THE SURFACE WHERE THE FOOT MEETS IT — the tangent (one-sided, OUTWARD
+     toward the rim, where the blade goes) and the chord one printable
+     feature outward, which is the number a print actually meets. Past the
+     join's rim the chord continues along the head's underside. */
+  const ds = 1e-6;
+  const q = A.s + ds <= 1 ? at(A.s + ds) : { r: A.r + ds * (head.r - stemEnd.r), z: headAt(A.r + ds * (head.r - stemEnd.r)).z };
+  const undersideTangentDeg = Math.atan2(q.z - A.z, q.r - A.r) * 180 / Math.PI;
+  const rChord = A.r + MIN_FEATURE_MM;
+  const solveR = (target) => {           // the profile point at plan radius `target`, or the head's underside past the join's rim
+    if (target >= head.r) return headAt(Math.min(target, hub.radius));
+    let lo = A.s, hi = 1;
+    for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (at(mid).r < target) lo = mid; else hi = mid; }
+    return at((lo + hi) / 2);
+  };
+  const c = solveR(rChord);
+  const undersideChordDeg = Math.atan2(c.z - A.z, c.r - A.r) * 180 / Math.PI;
+  /* ON THE CONE'S SIDE (ANGLED, the attachment strictly inside the flare) the
+     surface is a straight face and the chord IS the tangent — but only while
+     the chord's far end is still on the cone: one feature outward from a foot
+     near a SHORT cone's rim runs onto the plate's flat underside, and the
+     chord then reads shallower than the tangent (measured: 9.34 against 14.02
+     deg at amount 0.5, auto reach). Both are declared. */
+  const onCone = plan.hubStyle === 'ANGLED' && A.s > 0 && A.s < 1;
+  const chordOnCone = onCone && c.r <= head.r + 1e-12;
+  /* THE SHOULDER of the join's rim, where the first construction's foot sat —
+     kept on the record so the ANGLED finding can be stated in numbers: on
+     the cone's SIDE the tangent and the chord agree and the shoulder is not
+     under the foot. */
+  const surf = rimSurface(plan, hub, t);
+  /* THE BURIAL: the two INNER foot rows' bottom skins (footS = -overhang/2
+     and -overhang inward at the ring row's height; the ring row's own skin
+     is ON the surface by construction) against the law — the smallest
+     clearance above the underside, negative where a row pokes out below it. */
+  const overhang = Math.max(1.5, A.r * 0.4);
+  let footBuriedMm = Infinity;
+  for (const s of [-overhang / 2, -overhang]) {
+    const r = A.r + s; if (r < 0) continue;
+    const u = !dome ? t / 2 - joinAt(Math.max(r, 0)) : undersideZAtRadius(r);
+    footBuriedMm = Math.min(footBuriedMm, zAttach - u);
+  }
+  function undersideZAtRadius(r) {   // the domed underside's z at plan radius r, by the same profile (first match from the stem end); the cap's own inner sphere beyond the join
+    if (r >= head.r) return headAt(r).z;
+    let lo = 0, hi = 1; for (let k = 0; k < 60; k++) { const mid = (lo + hi) / 2; if (at(mid).r < r) lo = mid; else hi = mid; } return at((lo + hi) / 2).z;
+  }
+  return {
+    mode: 'HUB', frac, why: null, hubT: t, rimR: hub.radius,
+    zStemEnd, zHead: head.z, rStemEnd: stemEnd.r, zWall: stemEnd.z, rHead: head.r, extentMm,
+    zAttach: A.z, rAttach: A.r, sAttach: A.s, belowHeadMm: head.z - A.z, insideRimMm: hub.radius - A.r, arc, footBuriedMm, overhang,
+    plan: { present: true, inert: false, joinReason: plan.joinReason, style: plan.hubStyle, amount: plan.hubAmount, axisDepth: plan.axisDepth, outerR: plan.outerR, blendR: plan.blendR, rootZ: plan.rootZ },
+    undersideTangentDeg, undersideChordDeg, undersideChordMm: c.r - A.r, onCone, chordOnCone,
+    shoulderDeg: surf.shoulderDeg, rimTangentDeg: surf.undersideTangentDeg, rimChordDeg: surf.undersideChordDeg, blendReachesRim: surf.blendReachesRim, blendGapMm: surf.blendGapMm,
+  };
+}
+/* THE RIM'S OWN SURFACE FIGURES (the first construction's foot, and the
+   fallback's): the underside's slope AT THE RIM where the blade emerges — the
+   shoulder iff the blend reaches the rim, else the flat annulus — and the
+   chord one printable feature inward, because GOBLET and CURVED arrive at
+   their edge tangent-flat with UNBOUNDED curvature and a tangent of 0 is true
+   and misleading there (measured off the emitted hub, 15 to 72 deg over the
+   last 0.5 mm at MAX length while the tangent read 0). Null-safe on a plan
+   with no join. */
+function rimSurface(plan, hub, t) {
+  const out = { undersideTangentDeg: 0, shoulderDeg: 0, undersideChordDeg: 0, undersideChordMm: MIN_FEATURE_MM, blendReachesRim: false, blendGapMm: null, onCone: false };
+  if (!plan.present || plan.inert) return out;
+  const P = { hubR: hub.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT, style: plan.hubStyle, amount: plan.hubAmount, axisDepth: plan.axisDepth };
+  const R0 = hub.radius, b = plan.blendR;
+  const d = Math.max(1e-9, 1e-6 * (b - plan.outerR));
+  out.shoulderDeg = b > plan.outerR ? Math.atan((hubJoinThicknessAt(b - d, P) - hubJoinThicknessAt(b - 1e-12, P)) / (d - 1e-12)) * 180 / Math.PI : 0;
+  /* at the rim to within a hundredth of the printable feature — a LENGTH, not
+     an ulp: at MAX amount x MAX length the constant-stress law stops 2 µm
+     inside the rim (8.8424 of 8.8447 mm, measured), which no printer can tell
+     from the rim itself */
+  out.blendReachesRim = R0 - b < MIN_FEATURE_MM / 100;
+  out.undersideTangentDeg = out.blendReachesRim ? out.shoulderDeg : 0;
+  out.undersideChordDeg = Math.atan((hubJoinThicknessAt(R0 - MIN_FEATURE_MM, P) - hubJoinThicknessAt(R0, P)) / MIN_FEATURE_MM) * 180 / Math.PI;
+  out.blendGapMm = R0 - b;
+  return out;
+}
+
 /* sepalAngleLimit — THE DRAWN LIMIT. `sites` are the petals the builder
    emitted ({ p, ring, slot, cap }), with `p.grid` captured. Returns the
    record the read-out and SP8 read. */
@@ -9701,7 +9950,7 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
   const built = [], azimuths = [];
   const tris0 = acc.triangleCount;
   buildWhorlInto({
-    count: sepals.count, radius: sepals.ring.radius, height: 0,
+    count: sepals.count, radius: sepals.ring.radius, height: sepals.height,
     sizeRamp: () => sepals.scale, angleRamp: () => 0, phase: sepals.startAzimuth,
     placement: sepals.placement, fan: null, azimuths: sepals.placement === 'LIST' ? sepals.azimuths : null,
     blade: (slot) => {
@@ -9714,49 +9963,27 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
       built.push(p);
     },
   });
-  /* THE FOOT AGAINST THE HUB'S UNDERSIDE, per style, from the plan's own
-     thickness law (the same call buildHubInto shapes the join from): the
-     underside's slope at the RIM, where the blade emerges (0 wherever the
-     blend stops short of the rim, which is every style at every amount whose
-     blend radius is inside it); how deep the foot's INNER end is buried below
-     the sheet where the join thickens under it; and whether the blend reaches
-     the foot's span at all. The foot's own tangent at the rim is the ring's
-     (flat, or the cap's), so its mismatch to the underside IS the underside's
-     slope there. Told on the read-out; nothing here reads it back. */
-  let undersideSlopeDeg = 0, shoulderDeg = 0, undersideChordDeg = 0, footBuriedMm = 0, blendReachesFoot = false, blendReachesRim = false;
-  if (stemPlanned && stemPlanned.present && !stemPlanned.inert) {
+  /* THE FOOT AGAINST THE HUB'S SURFACE — read off the descriptor's own
+     attachment record (`sepalAttachment` is the one owner of the solve and
+     of the surface figures at the point the foot meets): the tangent and
+     the CHORD one printable feature along the blade's way (the chord first,
+     because a tangent that reads 0.00 on GOBLET and CURVED while the
+     underside falls 49 to 81 degrees over the first millimetre is a number
+     that is always right and never useful), how deep the foot's rows are
+     buried, and — at the rim — whether the blend reaches the foot's span.
+     Told on the read-out; nothing here reads it back. */
+  const A = sepals.attachment;
+  let footBuriedMm = A.footBuriedMm, blendReachesFoot = false;
+  if (A.mode === 'RIM' && stemPlanned && stemPlanned.present && !stemPlanned.inert) {
     const t = acc.floorThickness(fr.hub.thickness);
     const P = { hubR: fr.hub.radius, hubT: t, outerR: stemPlanned.outerR, joinT: stemPlanned.joinT, style: stemPlanned.hubStyle, amount: stemPlanned.hubAmount, axisDepth: stemPlanned.axisDepth };
-    const R0 = fr.hub.radius, b = stemPlanned.blendR;
-    /* THE SHOULDER: the underside's slope just INSIDE the blend edge, one-sided
-       (a difference straddling the edge reads the flat side). GOBLET and CURVED
-       arrive at their edge tangent-horizontal; ANGLED arrives at the cone's own
-       slope — a hard shoulder, by design. */
-    const d = Math.max(1e-9, 1e-6 * (b - stemPlanned.outerR));
-    shoulderDeg = b > stemPlanned.outerR ? Math.atan((hubJoinThicknessAt(b - d, P) - hubJoinThicknessAt(b - 1e-12, P)) / (d - 1e-12)) * 180 / Math.PI : 0;
-    /* AT THE RIM to within a hundredth of the printable feature — a LENGTH,
-       not an ulp: at MAX amount x MAX length the constant-stress law stops
-       2 µm inside the rim (8.8424 of 8.8447 mm, measured), which no printer
-       can tell from the rim itself. */
-    blendReachesRim = R0 - b < MIN_FEATURE_MM / 100;
-    /* AT THE RIM, where the blade emerges: the shoulder's slope iff the blend
-       reaches the rim, else the flat annulus — the foot's own tangent there is
-       the ring's, so this IS the foot-to-underside mismatch. */
-    undersideSlopeDeg = blendReachesRim ? shoulderDeg : 0;
-    /* AND THE CHORD ONE PRINTABLE FEATURE IN, because the tangent alone is
-       misleading on GOBLET and CURVED: both arrive at the rim tangent-flat
-       (0 deg analytically) with UNBOUNDED curvature at their edge, so the
-       underside a printer lays down is already falling steeply a millimetre
-       inside the rim — measured off the emitted hub, 15 to 72 deg over the
-       last 0.5 mm at MAX length while the tangent read 0. The chord over
-       MIN_FEATURE_MM is the number the foot actually meets; both are told. */
-    undersideChordDeg = Math.atan((hubJoinThicknessAt(R0 - MIN_FEATURE_MM, P) - hubJoinThicknessAt(R0, P)) / MIN_FEATURE_MM) * 180 / Math.PI;
+    const R0 = fr.hub.radius;
     footBuriedMm = Math.max(0, hubJoinThicknessAt(Math.max(stemPlanned.outerR, R0 - sepals.ring.overhang), P) - t);
-    blendReachesFoot = b > R0 - sepals.ring.overhang;
+    blendReachesFoot = stemPlanned.blendR > R0 - sepals.ring.overhang;
   }
-  return { built, azimuths, tris: acc.triangleCount - tris0, limit, count: built.length,
-           footTangentDeg: undersideSlopeDeg, undersideSlopeDeg, shoulderDeg, undersideChordDeg, undersideChordMm: MIN_FEATURE_MM, footBuriedMm, blendReachesFoot, blendReachesRim,
-           blendGapMm: stemPlanned && stemPlanned.present && !stemPlanned.inert ? fr.hub.radius - stemPlanned.blendR : null };
+  return { built, azimuths, tris: acc.triangleCount - tris0, limit, count: built.length, attachment: A,
+           footTangentDeg: A.undersideTangentDeg, undersideSlopeDeg: A.undersideTangentDeg, shoulderDeg: A.shoulderDeg, undersideChordDeg: A.undersideChordDeg, undersideChordMm: A.undersideChordMm,
+           footBuriedMm, blendReachesFoot, blendReachesRim: A.blendReachesRim, blendGapMm: A.blendGapMm };
 }
 
 export function buildBloomInto(acc, state, { below = null, capability = null } = {}) {

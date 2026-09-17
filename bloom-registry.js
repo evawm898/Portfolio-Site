@@ -37,7 +37,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
-import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -2947,7 +2947,9 @@ export const CONTROLS = [
       const S = shown && shown.sepals;
       if (!S) return `${n} asked`;
       if (S.unavailable) return `${n} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring (told, none built)`;
-      return `${S.count} on the hub's rim` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count (${S.ceilingOf}); the travel above the mark is dead` : ` (the ceiling is ${S.ceiling}: ${S.ceilingOf})`);
+      const A = S.attachment;
+      const where = A && A.mode === 'HUB' ? `on the hub's flare, ${A.frac.toFixed(2)} of the way up` : 'at the hub\'s rim';
+      return `${S.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count (${S.ceilingOf}); the travel above the mark is dead` : ` (the ceiling is ${S.ceiling}: ${S.ceilingOf})`);
     },
     cap: (shown) => (shown && shown.sepals && !shown.sepals.unavailable ? shown.sepals.ceiling : null),
     tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsEligible' } },
@@ -2955,6 +2957,22 @@ export const CONTROLS = [
     min: SEPAL_SCALE_RANGE[0], max: SEPAL_SCALE_RANGE[1], step: 0.05, default: SEPAL_SCALE_DEFAULT,
     label: 'Sepal size',
     fmt: (v, ui) => { const k = Number(v); return `${k.toFixed(2)}x the petal — ${(k * Number(ui.petalLength)).toFixed(1)} mm long, ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the width follows the length)`; },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalHeight', section: 'sepals', kind: 'slider',
+    min: SEPAL_HEIGHT_RANGE[0], max: SEPAL_HEIGHT_RANGE[1], step: 0.05, default: SEPAL_HEIGHT_DEFAULT,
+    label: 'Sepal height',
+    /* THE ATTACHMENT IS TOLD FROM THE BUILDER'S OWN SOLVE: a fraction of the
+       hub's AXIAL extent from the stem end up to where the hub meets the head,
+       the point the foot landed on, and — where there is no hub below the head
+       to attach partway down — that the sepals sit at the rim and why. */
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const base = `${f.toFixed(2)} of the way up the hub from the stem end${f === 1 ? ' — at the head' : f === 0 ? ' — at the stem end' : ''}`;
+      const S = shown && shown.sepals, A = S && !S.unavailable && S.attachment;
+      if (!A) return base;
+      if (A.mode !== 'HUB') return `${base} — INERT here, the sepals sit at the rim: ${A.why}`;
+      return `${base}: the foot lands on the flare at r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside (the hub hangs ${A.extentMm.toFixed(2)} mm; the same fraction of its surface ARC would land ${A.arc.deltaMm.toFixed(2)} mm away — the AXIAL reading is built)`;
+    },
     tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
   { id: 'sepalPhase', section: 'sepals', kind: 'slider',
     min: SEPAL_PHASE_RANGE[0], max: SEPAL_PHASE_RANGE[1], step: 0.01, default: SEPAL_PHASE_DEFAULT,
