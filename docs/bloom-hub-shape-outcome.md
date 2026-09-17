@@ -157,9 +157,18 @@ the section tree, not a count).
 `hubLength` **adds** to the object's height; `stemLength` is unchanged. The
 read-out prints the total below the head's top face on every stem row.
 
-## WAITING ON EVA
+## Ruled (Eva, from the preview and the render sheet)
 
-- The panel placement (`Hub` under `Stem`).
-- The `hubShapeAmount` / `hubShape` (head) name proximity.
-- The style curves and defaults, judged on `docs/img/hub-shape.png` and the
-  deploy preview.
+The three hub styles and their defaults are approved. Both reversible
+decisions stand: the `Hub` section stays under `Stem`, and `hubLength`
+continues to add to the object's height. Eva may rename the three dropdown
+options (GOBLET / ANGLED / CURVED) later; they are NOT renamed here, and the
+rename goes into whichever future PR next touches this section.
+
+### Naming risk, to resolve in the rename pass (not a defect)
+
+`hubShapeAmount` sits one word from the head's existing `hubShape` control
+(CAP / SPHERE), and the two mean unrelated things — the join's pronouncedness
+versus the head's cap-or-sphere shape. They never collide as ids and nothing
+is wrong today; it is a legibility risk for a reader scanning `hubShape*`.
+When Eva's option rename happens, that pair is resolved in the same pass.
