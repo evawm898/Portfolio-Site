@@ -546,7 +546,14 @@ asserted — unchanged by this PR.
 to `origin/main` at `7ebfb7f`; the diff names only `tools/`, `docs/` and `CLAUDE.md`:
 
 ```
-<<DIFF-STAT>>
+ CLAUDE.md                        |  25 ++
+ docs/bloom-xfail-magnitudes.md   | (this file)
+ tools/bloom-harness.mjs          | 626 ++++++++++++++++++++++-----------------
+ tools/bloom-lobe-composition.mjs |  16 +-
+ tools/bloom-wall-thickness.mjs   |  99 +++++--
+ tools/bloom-xfail-magnitudes.mjs | 183 ++++++++++++
+ tools/verify-bloom-export.mjs    |   6 +-
+ 7 files changed, 1269 insertions(+), 299 deletions(-)
 ```
 
 **Measured anyway, on the charter's convention:** every row of the live matrix but the refused
@@ -554,7 +561,8 @@ one, built in BOTH modes on a worktree of `7ebfb7f` and on this tree, compared f
 with `Object.is`:
 
 ```
-<<BYTES>>
+BYTES: 777 rows x 2 modes, 729617112 floats compared with Object.is, 0 row-modes moved, 0 threw; v20.20.2
+(ALL MAX, the refused row, is skipped here at 2.4M triangles a build; its export count is asserted by XR1 through the real page in §4(e))
 ```
 
 No row was added or removed, so **no frozen phase is owed**; `frozen/phase33` stays the newest
@@ -564,7 +572,39 @@ baseline and no tag's bytes stop reproducing.
 
 ## 6. Where the drift came from
 
-<<ATTRIBUTION>>
+Every drifted row was re-measured on worktrees of the merge commits that could have moved it,
+with each tree's OWN geometry, matrix and defaults — the same build-and-census path as the
+tool. The 23 self-intersection rows fall into two classes:
+
+**20 of 23 were moved by PR #215 — session 39's PR 2, the `widest()` fix that restored the
+turning-rate ladder on every seam-shifted ring.** Each of the twenty reads its RECORDED figure
+at `378a001` (the commit before #215) and its MAIN figure at `53439f5` (#215 merged), and
+nothing after #215 moved any of them (identical at `0ece7e7` and at `7ebfb7f`). They are exactly
+the rows that PR's own outcome named — multi-layer, ZYGO-three-layer, six-layer,
+cleft-at-depth and fiddlehead-on-a-sphere rows, the rings whose seam step is 2 or more — and
+that PR wrote, in so many words, *"20 declared rows' counts move, in both directions, which the
+xfail list does not gate (#213)"*. It named the class and left the numbers; the list carried
+stale figures from that day to this one. The nine WORSE rows in §2 are all in this twenty.
+
+**3 of 23 were never main's figure at all.** `LOBES: x roll 330` and `LOBES: x curl 360` read
+16360 / 1.6103 and 864 / 0.5070 on session 42's OWN merge commit (`8e4c93e`) and on every
+later one — the recorded 1.6115 and 0.8971 mm (same counts, different spans) were measured on
+an intermediate tree of that session and written into the list as if they were the merged
+tree's. `ALL MAX` likewise: 167,815 / 5.7392 at session 42 and at session 43, 129,803 / 3.1556
+from the fringe's own merge (`5f9c0c7`) onward — the recorded 130,004 was the fringe session's
+intermediate reading, and the tree it merged never read it. **A magnitude written down must be
+the MERGED tree's, measured after the last commit**, which is what the tool is for and why its
+header says to run it at the close.
+
+**The refused row's triangle count** was moved by the stem tip plug (PR #238): **2,412,512** at `41d7a87` (the sphere-stem merge, the commit before the plug) and **2,412,412** at `1fd0af5` (the plug merged), measured in Node with each tree's own geometry
+— a hollow 6 mm stem's bore closed at the bottom is one hundred triangles, exactly as that
+session's outcome doc says of its own control, and `ALL MAX` carries a 120 mm hollow stem.
+
+**The wall instrument's three** were not bracketed: their records date from session 34 and every
+ladder, seam and lobe change since has been entitled to move a self-approach on a rolled or
+curled blade. What matters is the direction — `buckle-on-form` now stands 0.045 mm CLOSER to
+itself than the record says and the V4 marker costs 0.005 mm more — and that from this commit
+on either would be a red.
 
 ---
 
