@@ -98,7 +98,7 @@ function densePetals(built, state, mode) {
 }
 function denseSepal(state, sepals, deg, mode, panelRows) {
   const acc = new G.MeshBuilder({ exportMode: mode });
-  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: 0, scale: sepals.scale, tiltExtra: 0 };
+  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };   // at the whorl's own height (the attachment), never 0: the first re-run of this section drew the dense sepal at the rim's height against a whorl built 0.93 mm lower and reported 44 disagreements that were the tool's
   const surface = G.petalSurface(G.sepalBladeState(state, deg), sepals.ring, slot, null, acc);
   return { lamina: G.laminaFromPanels([{ rows: denseRows(surface, panelRows) }]), base: surface.base, tilt: deg };
 }
@@ -114,7 +114,7 @@ function denseLimit(state, built, mode) {
      bloom's own sepals are emitted with the capture off) */
   const stationsAt = (deg) => {
     const acc = new G.MeshBuilder({ exportMode: mode, captureLamina: true });
-    const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: 0, scale: sepals.scale, tiltExtra: 0 };
+    const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };   // at the whorl's own height — the attachment, or 0 at the rim
     return G.buildPetalInto(acc, G.sepalBladeState(state, deg), sepals.ring, slot, null, false).grid[0].rows;
   };
   const lo = L.limitDeg === null ? G.SEPAL_ANGLE_RANGE[0] : Math.max(G.SEPAL_ANGLE_RANGE[0], L.limitDeg - 2 * STEP);
@@ -139,14 +139,16 @@ function denseLimit(state, built, mode) {
 
 /* ---- section A ------------------------------------------------------- */
 if (want('A')) {
-console.log('\nA. THE DRAWN LIMIT AGAINST A DENSER DRAWING (4x the lattice, 1/4 the step), both modes');
+console.log('\nA. THE DRAWN LIMIT AGAINST A DENSER DRAWING (4x the lattice, 1/4 the step), both modes — AT THE ATTACHMENT');
+console.log('   Three hubs: the DEFAULT STEM (60 x 6, GOBLET auto — the shipped attachment, 0.75 up a 1.32 mm flare) over the full grid; the DEEPEST GOBLET (MAX amount x MAX length, the foot 19.4 mm down) and NO STEM (the rim — the first construction, so the old figures stand beside the new) over the quick grid.');
 const phases = QUICK ? [0, 0.5] : [0, 0.25, 0.5, 1];
 const scales = QUICK ? [0.6] : [0.2, 0.6, 1];
 const counts = QUICK ? [5] : [1, 5, 8];
 const corollas = [['flat', {}], ['cupped 0.6', { petalCup: 0.6 }]];
+const hubs = [['default stem', { stemLength: 60, stemDiameter: 6 }, false], ['deep GOBLET', { stemLength: 60, stemDiameter: 6, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 }, true], ['no stem (rim)', {}, true]];
 let worstEarly = 0, statesA = 0, disagree = 0;
-for (const [cName, cSet] of corollas) for (const phase of phases) for (const scale of scales) for (const count of counts) {
-  const state = { ...DEFAULTS, ...cSet, sepalCount: count, sepalPhase: phase, sepalScale: scale, sepalAngle: 90 };
+for (const [hName, hSet, quickOnly] of hubs) for (const [cName, cSet] of corollas) for (const phase of (quickOnly ? [0, 0.5] : phases)) for (const scale of (quickOnly ? [0.6] : scales)) for (const count of (quickOnly ? [5] : counts)) {
+  const state = { ...DEFAULTS, ...cSet, ...hSet, sepalCount: count, sepalPhase: phase, sepalScale: scale, sepalAngle: 90 };
   const line = [];
   for (const mode of [false, true]) {
     const acc = new G.MeshBuilder({ exportMode: mode });
@@ -161,7 +163,7 @@ for (const [cName, cSet] of corollas) for (const phase of phases) for (const sca
     line.push(`${mode ? 'export' : 'live'} builder ${builderLimit === null ? 'floor' : builderLimit + '°'} (contact ${L.perMode[mode ? 'export' : 'live'].contactDeg ?? 'none'} ${L.perMode[mode ? 'export' : 'live'].kind || ''}) · dense ${d.lastClear === null ? 'floor' : d.lastClear.toFixed(2) + '°'} (first ${d.first ? `${d.first.deg.toFixed(2)}° ${d.first.kind} on petal ${d.first.petal}` : 'none in window'})`);
   }
   statesA++;
-  console.log(`  ${cName.padEnd(10)} phase ${phase} size ${scale} x${count}: ${line.join(' | ')}`);
+  console.log(`  [${hName.padEnd(13)}] ${cName.padEnd(10)} phase ${phase} size ${scale} x${count}: ${line.join(' | ')}`);
 }
 console.log(`  ${statesA} states · worst early-contact under the dense drawing ${worstEarly.toFixed(2)}° (bar: one step, ${STEP}°) · disagreements ${disagree}`);
 if (CONTROL) {
@@ -184,6 +186,12 @@ const rowsB = [
   ['ALIGNED, size 0.55, breadth 1.2', { sepalCount: 8, sepalPhase: 0, sepalScale: 0.55, sepalFootBreadth: 1.2 }],
 ];
 if (!QUICK) rowsB.push(['interleaved, 40 on 40, at the limit', { petalCount: 40, sepalCount: 40, sepalAngle: 90 }]);
+/* ON THE FLARE (the attachment-height ruling): the same two questions with the
+   foot partway down the default stem's hub, and the ALIGNED weld on the deep
+   GOBLET where the foot is 20 mm below the petal foot's lattice */
+rowsB.push(['ON THE FLARE — default stem, interleaved, at the limit', { sepalCount: 5, stemLength: 60, sepalAngle: 90 }]);
+rowsB.push(['ON THE FLARE — default stem, ALIGNED, shipped size (no shared rim vertex)', { sepalCount: 8, stemLength: 60, sepalPhase: 0 }]);
+rowsB.push(['ON THE FLARE — deep GOBLET, ALIGNED, size 1.00', { sepalCount: 8, stemLength: 60, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40, sepalPhase: 0, sepalScale: 1 }]);
 for (const [name, set] of rowsB) {
   const st = { ...DEFAULTS, ...set };
   const acc = new G.MeshBuilder({ exportMode: true }); const built = G.buildBloomInto(acc, st);
@@ -200,57 +208,64 @@ for (const [name, set] of rowsB) {
 
 /* ---- section C ------------------------------------------------------- */
 if (want('C')) {
-console.log('\nC. THE FOOT AGAINST THE HUB\'S UNDERSIDE — the record vs the EMITTED hub triangles, three styles x amount x length (stem 60 x 6, 5 sepals, export)');
-console.log('   Two numbers per corner, because the tangent alone misleads: the ANALYTIC tangent at the rim (the record) and the CHORD one printable feature in, read off the emitted hub — GOBLET and CURVED arrive tangent-flat with unbounded curvature at their edge.');
-const amounts = QUICK ? [1, 2] : [0.5, 1, 2];
+console.log('\nC. THE FOOT AGAINST THE HUB\'S SURFACE — the record vs the EMITTED hub triangles, three styles x amount x length (stem 60 x 6, 5 sepals, export), AT THE ATTACHMENT');
+console.log('   The foot lands on the hub\'s flare at sepalHeight of its axial extent (the attachment-height ruling); where there is no flare it sits at the rim. Two numbers per corner, the CHORD first: the chord one printable feature along the blade\'s way, read off the emitted hub, and the analytic tangent beside it.');
+const amounts = QUICK ? [1, 2] : [0, 0.5, 1, 2];
 const lengths = QUICK ? [0, 40] : [0, 10, 40];
-let worstChord = 0;
+let worstChord = 0, worstOnSurface = 0, coneCorners = 0;
 for (const style of G.HUB_STYLES) for (const amount of amounts) for (const len of lengths) {
   const st = { ...DEFAULTS, sepalCount: 5, stemLength: 60, stemDiameter: 6, hubStyle: style, hubShapeAmount: amount, hubLength: len };
   const acc = new G.MeshBuilder({ exportMode: true }); const built = G.buildBloomInto(acc, st);
-  const S = built.sepals, R0 = built.hub.radius;
+  const S = built.sepals, A = S.attachment, R0 = built.hub.radius;
   /* the hub's triangles are the block after the petals (the stream order:
-     petals, hub, ...) — its underside vertices, by radius */
+     petals, hub, ...) — its underside vertices, by radius: the LOWEST z at
+     each distinct radius is the underside */
   const petalTris = built.petalsAll.reduce((n, p) => n + p.tris, 0);
   const from = petalTris * 9, to = from + built.hubBuilt.tris * 9;
   const byR = new Map();
-  for (let o = from; o < to; o += 3) { const x = acc.positions[o], y = acc.positions[o + 1], z = acc.positions[o + 2]; const r = Math.hypot(x, y); if (z < 0 && r <= R0 + 1e-9 && r > R0 - 1.5) { const k = r.toFixed(6); if (!byR.has(k) || byR.get(k).z > z) byR.set(k, { r, z }); } }
-  const ring = [...byR.values()].sort((a, b) => b.r - a.r);   // outermost first; the LOWEST z at each radius is the underside
-  if (ring.length < 2) { fail(`${style} ${amount} ${len}: fewer than two distinct radii on the hub's underside near the rim`); continue; }
-  const rim = ring[0];
-  /* the emitted LAST SEGMENT (the mesh's own tangent at the rim) and the
-     emitted chord to the vertex nearest one printable feature in */
-  const seg = ring[1];
-  const lastSegDeg = Math.atan((seg.z - rim.z) / (rim.r - seg.r)) * 180 / Math.PI;
-  const near = ring.reduce((best, v) => (Math.abs(rim.r - v.r - S.undersideChordMm) < Math.abs(rim.r - best.r - S.undersideChordMm) ? v : best), ring[1]);
-  const chordDeg = Math.atan((near.z - rim.z) / (rim.r - near.r)) * 180 / Math.PI;
-  /* the record's chord is over exactly MIN_FEATURE_MM; the emitted one is to
-     the nearest STATION, so compare through the law at the emitted radius —
-     no: compare the two chords and report the station offset beside them */
-  const dChord = Math.abs(Math.abs(chordDeg) - Math.abs(S.undersideChordDeg));
-  /* FLAT means the blend stops short of the rim by MORE than the chord's own
-     length — the first cut read `!blendReachesRim` and went red on every
-     corner where the blend stopped 0.03-0.43 mm short: the tangent AT the rim
-     is on the flat annulus there and the chord one feature in is not. */
-  const flat = S.blendGapMm !== null && S.blendGapMm >= S.undersideChordMm;
-  console.log(`  ${style.padEnd(6)} amount ${amount} length ${String(len).padStart(2)}: record tangent ${S.undersideSlopeDeg.toFixed(2)}° (shoulder ${S.shoulderDeg.toFixed(2)}°, blend ${S.blendReachesRim ? 'reaches the rim' : `stops ${S.blendGapMm.toFixed(2)} mm short`}, foot buried ${S.footBuriedMm.toFixed(2)} mm) · record chord over ${S.undersideChordMm.toFixed(2)} mm ${S.undersideChordDeg.toFixed(2)}° · EMITTED last segment ${lastSegDeg.toFixed(2)}° (${(rim.r - seg.r).toFixed(3)} mm), chord ${chordDeg.toFixed(2)}° over ${(rim.r - near.r).toFixed(3)} mm`);
-  if (flat) {
-    /* the blend stops short of the rim: the annulus there is FLAT, exactly,
-       on the record and on the mesh alike */
-    if (Math.abs(lastSegDeg) > 1e-9 || Math.abs(chordDeg) > 1e-9 || Math.abs(S.undersideChordDeg) > 1e-9) fail(`${style} ${amount} ${len}: the blend stops more than one feature short of the rim but the underside is not flat there (${lastSegDeg.toFixed(3)}° / ${chordDeg.toFixed(3)}°)`);
-  } else {
-    if (Math.abs(rim.r - near.r - S.undersideChordMm) > 0.25) fail(`${style} ${amount} ${len}: no emitted station within 0.25 mm of one printable feature inside the rim (nearest ${(rim.r - near.r).toFixed(3)} mm)`);
-    else if (dChord > 1.5) fail(`${style} ${amount} ${len}: the record's chord ${S.undersideChordDeg.toFixed(2)}° and the emitted chord ${chordDeg.toFixed(2)}° disagree by more than 1.5°`);
+  for (let o = from; o < to; o += 3) { const x = acc.positions[o], y = acc.positions[o + 1], z = acc.positions[o + 2]; const r = Math.hypot(x, y); if (z < 0 && r <= R0 + 1e-9) { const k = r.toFixed(6); if (!byR.has(k) || byR.get(k).z > z) byR.set(k, { r, z }); } }
+  const ring = [...byR.values()].sort((a, b) => a.r - b.r);   // innermost first
+  if (ring.length < 2) { fail(`${style} ${amount} ${len}: fewer than two distinct radii on the hub's underside`); continue; }
+  const zAt = (r) => { let k = 0; while (k < ring.length - 2 && ring[k + 1].r < r) k++; const a = ring[k], b = ring[k + 1]; return a.z + (b.z - a.z) * ((r - a.r) / (b.r - a.r)); };
+  if (A.mode === 'HUB') {
+    /* THE ATTACHMENT POINT ON THE EMITTED SURFACE: between its bracketing
+       rings in z (an interval), and the emitted chord one feature OUTWARD
+       from it against the record's; the tangent as the emitted segment the
+       point sits on */
+    let k = 0; while (k < ring.length - 2 && ring[k + 1].r < A.rAttach) k++;
+    const lo = Math.min(ring[k].z, ring[k + 1].z), hi = Math.max(ring[k].z, ring[k + 1].z);
+    const onSurface = A.zAttach >= lo - 1e-9 && A.zAttach <= hi + 1e-9;
+    const off = Math.abs(A.zAttach - zAt(A.rAttach));
+    if (off > worstOnSurface) worstOnSurface = off;
+    if (!onSurface) fail(`${style} ${amount} ${len}: the attachment (r ${A.rAttach.toFixed(4)}, z ${A.zAttach.toFixed(4)}) is not between the emitted rings at r ${ring[k].r.toFixed(4)} / ${ring[k + 1].r.toFixed(4)} (z ${lo.toFixed(4)}..${hi.toFixed(4)})`);
+    const segDeg = Math.atan2(ring[k + 1].z - ring[k].z, ring[k + 1].r - ring[k].r) * 180 / Math.PI;
+    const rC = Math.min(A.rAttach + A.undersideChordMm, R0);
+    const chordDeg = Math.atan2(zAt(rC) - A.zAttach, rC - A.rAttach) * 180 / Math.PI;
+    const dChord = Math.abs(chordDeg - A.undersideChordDeg);
     if (dChord > worstChord) worstChord = dChord;
-    /* a cone's last segment IS its slope — where the cone reaches the last
-       segment at all: a blend stopping short of the rim by any length leaves
-       the last segment straddling its edge (part flat, part cone — measured
-       −72.22° against a 73.32° cone at 0.03 mm short), so the clause asks
-       only where the record says the cone reaches the rim */
-    if (style === 'ANGLED' && S.blendReachesRim && Math.abs(Math.abs(lastSegDeg) - Math.abs(S.shoulderDeg)) > 0.5) fail(`${style} ${amount} ${len}: a cone's emitted last segment (${lastSegDeg.toFixed(2)}°) is not the record's shoulder (${S.shoulderDeg.toFixed(2)}°)`);
+    console.log(`  ${style.padEnd(6)} amount ${String(amount).padEnd(3)} length ${String(len).padStart(2)}: ON THE FLARE ${A.frac.toFixed(2)} up (r ${A.rAttach.toFixed(2)}, ${A.belowHeadMm.toFixed(2)} mm below the head; arc reading ${A.arc.deltaMm.toFixed(3)} mm away) · CHORD ${A.undersideChordDeg.toFixed(2)}° over ${A.undersideChordMm.toFixed(2)} mm (emitted ${chordDeg.toFixed(2)}°) · tangent ${A.undersideTangentDeg.toFixed(2)}° (emitted segment ${segDeg.toFixed(2)}°)${A.onCone ? (A.chordOnCone ? ' · ON THE CONE — chord IS tangent, no shoulder under the foot' : ' · ON THE CONE (the chord runs off its short rim onto the plate)') : ''} · inner rows buried ${A.footBuriedMm.toFixed(2)} mm · point ${off.toExponential(2)} mm off the emitted chord`);
+    /* the emitted chord is a chord of the SAME curve over the same interval
+       (interpolated on the mesh's own rings), so the disagreement is the
+       mesh's sagitta over one feature — bounded at 1.5 deg as the rim clause
+       was, and reported */
+    if (dChord > 1.5) fail(`${style} ${amount} ${len}: the record's chord ${A.undersideChordDeg.toFixed(2)}° and the emitted chord ${chordDeg.toFixed(2)}° disagree by more than 1.5°`);
+    if (style === 'ANGLED' && A.onCone) {
+      coneCorners++;
+      if (A.chordOnCone && Math.abs(A.undersideTangentDeg - A.undersideChordDeg) > 1e-6) fail(`${style} ${amount} ${len}: on the cone's side the tangent (${A.undersideTangentDeg}) and the chord (${A.undersideChordDeg}) must agree`);
+      if (!A.chordOnCone && !(A.undersideChordDeg < A.undersideTangentDeg)) fail(`${style} ${amount} ${len}: the chord runs off a short cone onto the plate and must read shallower than the cone (${A.undersideChordDeg} against ${A.undersideTangentDeg})`);
+      if (Math.abs(segDeg - A.undersideTangentDeg) > 0.5) fail(`${style} ${amount} ${len}: the emitted cone segment under the foot (${segDeg.toFixed(2)}°) is not the record's tangent (${A.undersideTangentDeg.toFixed(2)}°)`);
+    }
+  } else {
+    /* THE RIM (an inert join): the first construction's clauses, exactly —
+       the annulus under the foot is FLAT on the record and on the mesh */
+    const rim = ring[ring.length - 1], seg = ring[ring.length - 2];
+    const lastSegDeg = Math.atan((seg.z - rim.z) / (rim.r - seg.r)) * 180 / Math.PI;
+    console.log(`  ${style.padEnd(6)} amount ${String(amount).padEnd(3)} length ${String(len).padStart(2)}: AT THE RIM (${A.why}) · record chord ${S.undersideChordDeg.toFixed(2)}° tangent ${S.undersideSlopeDeg.toFixed(2)}° · EMITTED last segment ${lastSegDeg.toFixed(2)}°`);
+    if (A.plan.present && !A.plan.inert) fail(`${style} ${amount} ${len}: an active join on a flat head must put the foot on the flare`);
+    if (Math.abs(lastSegDeg) > 1e-9 || Math.abs(S.undersideChordDeg) > 1e-9) fail(`${style} ${amount} ${len}: the join is inert but the underside is not flat at the rim (${lastSegDeg.toFixed(3)}° / ${S.undersideChordDeg.toFixed(3)}°)`);
   }
 }
-console.log(`  worst record-vs-emitted chord disagreement where the blend reaches the rim ${worstChord.toFixed(3)}° (bar 1.5°, the station offset; ${'flat corners are asserted exactly'})`);
+console.log(`  worst record-vs-emitted chord disagreement at the attachment ${worstChord.toFixed(3)}° (bar 1.5°, the mesh's sagitta over one feature) · worst attachment point off the emitted chord ${worstOnSurface.toExponential(2)} mm (interval-asserted) · ${coneCorners} ANGLED corner(s) with the foot on the cone's side, chord = tangent wherever the chord stays on the cone`);
 }
 console.log(failures ? `\nFAIL — ${failures} finding(s)` : '\nPASS');
 process.exit(failures ? 1 : 0);

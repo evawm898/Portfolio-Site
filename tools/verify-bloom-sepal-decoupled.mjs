@@ -16,9 +16,11 @@
    that not ONE emitted sepal float moves, under `Object.is`.
 
    THE RING AND THE SLOT ARE PINNED. Where a sepal STANDS is the hub's and the
-   petals' by design (the sepal ring is the hub's rim, the ceiling is the petal
+   petals' by design (the sepal ring is on the hub — partway down its flare at
+   `sepalHeight`, or the rim where there is no flare — the ceiling is the petal
    count, the angle limit is drawn against the petals), so a sweep over the
-   whole bloom would report placement as coupling. This sweep is about the
+   whole bloom would report placement as coupling: the stem's and the hub's
+   own controls MOVE the attachment, by ruling, and are not what this asks. This sweep is about the
    BLADE: one sepal, on the base state's own ring, at slot 0, at a fixed angle,
    so a difference is SHAPE and nothing else.
 
@@ -74,7 +76,7 @@ for (const mode of [false, true]) {
   const acc = new MUT.MeshBuilder({ exportMode: mode });
   const fr = MUT.footRing(BASE, acc);
   if (!fr.sepals) { console.error('the base state places no sepals — the sweep would be vacuous'); process.exit(2); }
-  pinned[mode] = { ring: fr.sepals.ring, slot: { index: 0, azimuth: fr.sepals.azimuths[0], radius: fr.sepals.ring.radius, z: 0, scale: fr.sepals.scale, tiltExtra: 0 } };
+  pinned[mode] = { ring: fr.sepals.ring, slot: { index: 0, azimuth: fr.sepals.azimuths[0], radius: fr.sepals.ring.radius, z: fr.sepals.height, scale: fr.sepals.scale, tiltExtra: 0 } };   // the whorl's own height (0: the base has no stem, so the attachment falls back to the rim)
 }
 function sepalFloats(state, mode) {
   const solo = new MUT.MeshBuilder({ exportMode: mode });
@@ -111,4 +113,4 @@ if (CONTROL) {
   process.exit(moved ? 0 : 1);
 }
 console.log(moved ? '\nFAIL — a petal-side control reaches the sepal blade' : '\nPASS — no petal-side control reaches the sepal blade');
-process.exit(moved ? 0 : 1);
+process.exit(moved ? 1 : 0);   // (the first version had these the wrong way round and exited 1 on a PASS — caught the day it was re-run)

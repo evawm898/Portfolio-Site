@@ -69,7 +69,7 @@ async function previewOn(id) {
   if (got !== 'export') await die(`${id}: print preview ON asked for, app reports shownMode "${got}"`);
 }
 
-const SIDE_LOW = [1, 0.12, -0.42];  // the foot row: a little from below, so the underside and the flare read
+const SIDE_LOW = [1, 0.14, -0.30];  // the foot row: a side elevation a little from below, so the flare, the sepal leaving it and the GAP up to the petal all read
 const SIDE = [1, 0.22, -0.18];      // the angle row: a side ELEVATION a little from below, so a sepal's angle against its petal reads as an angle
 
 async function cell(c) {
@@ -91,15 +91,23 @@ async function cell(c) {
   if (!m.sepal || !m.sepal.built) await die(`${c.id}: no sepals were built`);
   /* THE CAMERA IS THE BUILD'S OWN: the rim's radius from footRing's own
      record, the join's reach from the stem plan where there is one. */
-  const hubR = m.sepal.ring.radius;
-  const reach = m.stem && m.stem.axisDepth !== undefined ? m.stem.axisDepth : 0;
-  /* THE FOOT ROW TARGETS THE RIM, not the middle of the join's reach: at MAX
-     length the join runs 40 mm down the stem and a camera aimed at its middle
-     photographs a pipe with the foot at the top edge (the first run of this
-     sheet). The rim is where the foot meets the underside; the first few
-     millimetres of the flare below it are what the eye needs. */
-  const at = c.row === 'foot' ? [0, 0, -Math.min(reach, 8) * 0.5] : [0, 0, 5];
-  const r = c.row === 'foot' ? hubR * 2.4 : hubR * 4.4;
+  const hubR = m.hubRadius;
+  const A = m.sepal.attachment;
+  const zA = A && A.mode === 'HUB' ? A.zAttach : 0;
+  /* THE FOOT ROW FRAMES THE GAP: the camera targets half-way between the
+     attachment (the builder's own record — 19.4 mm down the deepest flare,
+     0.93 mm under the rim on the default stem) and the head's rim, at a
+     radius that holds both the sepal leaving the flare and the petal above
+     it. The first run of this sheet aimed at the middle of the join's reach
+     and photographed a pipe with the foot at its top edge; the second aimed at
+     the rim, which is where the foot no longer is. */
+  /* A CLOSE CELL frames the RIM itself: on the default stem the flare is
+     1.32 mm tall and the gap between a sepal and the petal above it is a third
+     of a millimetre, which a whole-head framing cannot show. The target is on
+     the rim nearest the camera and the radius a little over the hub's, so the
+     sepal leaving the flare and the petal foot above it fill the frame. */
+  const at = c.row === 'foot' ? (c.close ? [hubR * 0.8, 0, zA / 2 - 0.4] : [0, 0, zA / 2 - 1]) : [0, 0, 5];
+  const r = c.row === 'foot' ? (c.close ? hubR * 1.25 : Math.max(hubR * 2.4, (Math.abs(zA) + 10) * 1.9)) : hubR * 4.4;
   await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir, null), { r, at, dir: c.row === 'foot' ? SIDE_LOW : SIDE });
   const settled = await settleOnly();
   if (settled < 0) await die(`${c.id}: never came to rest`);
@@ -110,12 +118,16 @@ async function cell(c) {
   return { ...c, buf, m, lines };
 }
 
-const whorl = { sepalCount: 5 };
+/* EVERY CELL CARRIES THE DEFAULT STEM (60 x 6), because the attachment height
+   is a fraction of the HUB's extent and there is no hub without a stem: the
+   angle row is then drawn at the attachment, not at the rim. */
+const whorl = { sepalCount: 5, stemLength: 60, stemDiameter: 6 };
 const CELLS = [
-  { id: 'foot-goblet-default', row: 'foot', title: 'GOBLET at its DEFAULT (amount 1.00, length auto) &mdash; the control', sets: { ...whorl, stemLength: 60, stemDiameter: 6, hubStyle: 'GOBLET' } },
-  { id: 'foot-goblet-max', row: 'foot', title: 'GOBLET &middot; MAX amount &times; MAX length (the blend reaches the rim under the foot)', sets: { ...whorl, stemLength: 60, stemDiameter: 6, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 } },
-  { id: 'foot-angled-max', row: 'foot', title: 'ANGLED &middot; MAX &times; MAX (the cone&rsquo;s shoulder at the rim, under the foot)', sets: { ...whorl, stemLength: 60, stemDiameter: 6, hubStyle: 'ANGLED', hubShapeAmount: 2, hubLength: 40 } },
-  { id: 'foot-curved-max', row: 'foot', title: 'CURVED &middot; MAX &times; MAX', sets: { ...whorl, stemLength: 60, stemDiameter: 6, hubStyle: 'CURVED', hubShapeAmount: 2, hubLength: 40 } },
+  { id: 'foot-goblet-default', row: 'foot', close: true, title: 'GOBLET at its DEFAULT (amount 1.00, length auto), height 0.75 &mdash; the shipped attachment, CLOSE ON THE RIM: the foot 0.33 mm under the head, 2.9 mm inside the rim', sets: { ...whorl, hubStyle: 'GOBLET' } },
+  { id: 'foot-goblet-default-low', row: 'foot', close: true, title: 'The same hub at height 0.25, close on the rim &mdash; the control turned toward the stem end (0.99 mm under the head)', sets: { ...whorl, hubStyle: 'GOBLET', sepalHeight: 0.25 } },
+  { id: 'foot-goblet-max', row: 'foot', title: 'GOBLET &middot; MAX amount &times; MAX length, height 0.75 (19.4 mm down a 77.6 mm flare)', sets: { ...whorl, hubStyle: 'GOBLET', hubShapeAmount: 2, hubLength: 40 } },
+  { id: 'foot-angled-max', row: 'foot', title: 'ANGLED &middot; MAX &times; MAX &mdash; the foot on the cone&rsquo;s SIDE (a straight face: chord = tangent, no shoulder under it)', sets: { ...whorl, hubStyle: 'ANGLED', hubShapeAmount: 2, hubLength: 40 } },
+  { id: 'foot-curved-max', row: 'foot', title: 'CURVED &middot; MAX &times; MAX', sets: { ...whorl, hubStyle: 'CURVED', hubShapeAmount: 2, hubLength: 40 } },
   { id: 'angle-under', row: 'angle', title: 'THREE DEGREES UNDER the drawn limit', sets: { ...whorl, sepalAngle: 'LIMIT-3' } },
   { id: 'angle-at', row: 'angle', title: 'AT the limit (90&deg; asked, CLAMPED)', sets: { ...whorl, sepalAngle: 90 } },
   { id: 'angle-beyond', row: 'angle', title: 'SIX DEGREES BEYOND the limit &mdash; through the capability hook, NOT reachable by a control', sets: { ...whorl, sepalAngle: 'LIMIT+6' }, capability: { label: 'SEPAL_ANGLE_UNCLAMPED', sepalAngleUnclamped: true } },
