@@ -2370,9 +2370,13 @@ disc, while on a SPHERE the join is INERT so the symptom is the whole head insid
 option 1 answers the sphere case and does nothing for the CAP one — **predicted there, then
 MEASURED once the band shipped: a CAP's component count is IDENTICAL with the band and without
 it, and the stray piece is 12 voxels at a SINGLE z of −3.696, which is `hubT/2 − joinT`
-exactly.** That is #236's own zero-volume join shell and not the head, so **#236 STAYS FILED,
-OPEN AND UNTOUCHED** — and `main` today still ships a reachable state that violates the
-one-connected-solid invariant. It wants its own PR.
+exactly.** That is #236's own zero-volume join shell and not the head, so #236 was filed open
+here and it wanted its own PR — **and it got one: #236 is CLOSED by #242 (`f64f3bc`, the hub's
+shape session).** The join is inert where the head is not wider than the stem, so the
+zero-volume shell is no longer built, and the solid root band is generalised from sphere-only
+to cap and flat heads; both halves, all three styles, one connected piece, measured there.
+(This line corrected by the inflorescence discovery's rulings PR, Sep 17; the paragraph's
+measurements above describe the tree as it was when #236 was filed.)
 **AND THE FIRST PASS OF THAT INVESTIGATION GOT THE MECHANISM WRONG BY USING THE WELD**: the
 vertex-weld shell count is not the connectedness test (this file's own rule), and it suggested
 "the head never reaches the tube" where the nearest head vertex to the tube's material reads
