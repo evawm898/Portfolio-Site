@@ -676,6 +676,87 @@ Lead with the two that decide the rest.
 12. **Cyme controls per level:** side × plane as two choices per level, or one combined
     choice of the four named forms (helicoid / scorpioid / drepanium / rhipidium).
 
+---
+
+## Rulings (Eva, Sep 17, 2026 — on the twelve questions above)
+
+Each is a RULING, not a recommendation. Where it contradicts a recommendation made above, the
+contradiction is named in one line rather than edited around.
+
+1. **Capitulum ownership — the head owns it.** A mum is one flower with 120 petals and one
+   centre. The inflorescence carries heads; it never assembles a floret disc. The 120-floret
+   reading is refused now, not forever: revisit only if a single centre reads wrong at print
+   size. *Against the doc:* Q4 recommended route (a) and left "one centre or 120" open with a
+   per-floret centre as a later value; the ruling closes it at one centre and withdraws the
+   per-floret centre from the schedule.
+2. **Panel home — a new top-level `Inflorescence` section**, a law enum defaulting to NONE
+   gating generated `Level k` sections, on the `stemLength` gating pattern. Presets are a
+   BUTTON that writes slider values, never a registry row of values. (As recommended in Q5.)
+3. **Instancing — Route A.** Build each head at the origin into its own accumulator and append
+   it under a rigid transform. Size comes from parameters, never from scaling the matrix. (As
+   recommended in Q2.)
+4. **The floret — petal-count reduction only.** `NU` stays fixed; there is no second ruled
+   exception to "derive, don't expose". 952k triangles at 50 heads is 63% of the budget and
+   fits. Reopen only when a preset is actually blocked by the budget. *Against the doc:* Q2's
+   "a reduced floret build is needed above ~78 default heads" is withdrawn as a plan; it is a
+   budget fact to reopen on, not a thing to build.
+5. **The first build session stops at instancing plus one raceme of identical florets**, and
+   opens only after #243 merges. No presets in that session. (As recommended in Q12, with the
+   no-presets condition added.)
+6. **Openness — deferred to the bell/corolla session** (`docs/bloom-bell-corolla-discovery.md`,
+   #245), which renders the bud-pose sheet and issues the effective-tilt-past-90° ruling as
+   part of its own work. No maturation ramp is designed before that sheet exists. *Against the
+   doc:* Q8 and Q12 scheduled the pose as this programme's own session after instancing; the
+   ruling moves the pose and the tilt ruling to the bell session and leaves only the per-node
+   ramp here, after it.
+7. **Sessile means embedded.** A spike's head is rooted into the rachis wall by one wall
+   thickness — a root law, no control. (As recommended in Q6 and question 7.)
+8. **Droop — its own axis-curvature session**, after the bell work and before any catkin or
+   wisteria preset. *Against the doc:* Q9 ordered it only relative to the catkin presets; the
+   ruling adds "after the bell work".
+9. **`ALL MAX` — inflorescence sub-controls stay out of the blanket sweep**, with one declared
+   `INFLO: ALL MAX` refusal row. **CONDITIONAL ON RULING 11**: this removes a safety net and the
+   combination gate is what replaces it, so 9 does not stand without 11. *Against the doc:* Q5
+   and Q11 recommended the exclusion outright; the ruling attaches the condition.
+10. **Per-flower editing — shared head controls plus per-node deltas through the existing
+    resolver.** Per-node × per-petal groups are refused. (As recommended in Q5.)
+11. **The combination gate is this feature's main gate**: a predeclared product grid, sized
+    before the first build ships. Not a footnote and not deferred. (As recommended in Q11; now
+    a prerequisite of the first build session rather than a schedulable item.)
+12. **Cyme controls — two choices per level, side × plane.** The four named forms (helicoid,
+    scorpioid, drepanium, rhipidium) live in preset names, not in the panel's controls. (Q3 and
+    question 12 offered both shapes without a recommendation; this decides it.)
+
+Also authorised: the `CLAUDE.md` #236 line is corrected in the same PR as these rulings (it
+is closed by #242); the "Sepals … Untouched" line is left alone because #243 owns it and will
+make it false on merge.
+
+### Q12 restated under the rulings
+
+Rulings 1, 4, 6, 8 and 11 move the grouping. "Head" is no longer an inflorescence type (the
+head owns the capitulum), the floret is a petal count and needs no build, the pose belongs to
+the bell/corolla session, droop follows the bell work, and the combination grid is inside the
+first session rather than beside it.
+
+| group | types | prerequisites | sessions |
+|---|---|---|---|
+| **0 — instancing + one raceme** | a raceme of identical 3–5-petal florets on a straight rachis; no presets | #243 merged; the combination grid predeclared and sized (ruling 11) BEFORE it ships; `INFLO_SUBS` + the `INFLO: ALL MAX` refusal row (ruling 9, standing only with 11); the per-instance metrics hook; IN0–IN5 | **1, large** |
+| **A — axis-0** | umbel, fascicle | group 0 | 1 |
+| **B — one rachis** | spike (sessile = embedded, ruling 7), corymb (derived level-tops), botryoid (terminal flower) | group 0 | 1–2 |
+| **Bell / corolla** (not this programme's) | the bud-pose sheet and the tilt-past-90° ruling (ruling 6) | its own discovery, #245 | its own |
+| **Openness ramp** | per-node maturation through the resolver | the bell session's pose sheet | 1 |
+| **Droop** | an axis-curvature session (ruling 8) | after the bell work | 1 |
+| **C — cymes** | side × plane as two choices (ruling 12); the four forms as preset names | group 0, recursion, the openness ramp for the distinction to be visible | 2 |
+| **D — compound at depth 2–3** | compound umbel, panicle, thyrse; heads-in-a-corymb is heads on a corymb (ruling 1) | group C | 1–2 |
+| **Then reachable** | catkin, wisteria | droop | inside B's shape |
+| **Out of scope, unchanged** | spathe, cyathium, fig, grass spikelets, cauliflory | — | — |
+
+**Honest total, this programme's own sessions: 8–10** (0 through D plus the openness ramp and
+the droop session), with the bell/corolla session's sheet and ruling as an external
+prerequisite of two of them. The first session's stop is unchanged from the finding above and
+now carries the grid inside it.
+
+
 *Measurement scripts for this doc lived in the session scratchpad and are not committed;
 every figure above can be reproduced from `bloom-registry.js`'s `DEFAULTS` plus the named
 sets through `buildBloomInto` in Node, as `tools/bloom-wall-thickness.mjs` does.*
