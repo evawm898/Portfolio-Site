@@ -1244,7 +1244,15 @@ function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
           + (stem.tipPlugMm > 0
               ? ` · SOLID for the last ${stem.tipPlugMm.toFixed(2)} mm — the bore is CLOSED at the TIP, as thick as the ${stem.wallMm.toFixed(2)} mm wall it closes, so the bottom reads as a stem end and not a cut pipe; ${stem.voidMm.toFixed(2)} mm of SEALED bore between the two`
               : ''))
-    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — DERIVED from the stem's own section, no control` : inertBecause}\n`
+    + `\n     HUB ${stem.hubStyle}`
+    + (stem.swellActive
+        ? ` · ${stem.hubAmount.toFixed(2)}x pronounced · reaches ${stem.axisDepth.toFixed(2)} mm below the head`
+          + (stem.hubLengthAuto ? ' (auto — the derived join depth)' : ' (Hub length)')
+        : stem.joinReason === 'shell' ? ' · INERT on a sphere — the shell wall IS the join, so style, amount and length do nothing here (told)'
+          : Number(stem.hubAmount) === 0 ? ' · STRAIGHT — amount 0, no flare'
+          : ' · STRAIGHT — the head is not wider than the stem, so there is no room for a flare (the stem\'s solid root band joins them)')
+    + ` · TOTAL ${stem.belowHeadMm.toFixed(1)} mm below the head\'s top face (hub ${stem.axisDepth.toFixed(2)} + stem ${stem.lengthMm} — Hub length ADDS to the height, stem length unchanged)`
+    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm thick at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — thickness DERIVED from the stem's own section, no control` : inertBecause}\n`
     + stemChannelLine(omission);
 }
 
@@ -1836,6 +1844,15 @@ window.__bloomMetrics = () => ({
     rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
     stations: lastStem.stations.slice(), sides: lastStem.sides,
     hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
+    /* THE HUB SHAPE (the hub-shape session) — style, pronouncedness and reach,
+       plus the reach-below-the-head and the total-below-the-head the read-out
+       and the gates read. `swellActive` is the plan's own inert flag (a styled
+       swell is built iff true); `hubLengthAuto` says the reach is the derived
+       joinT rather than an asked length. */
+    hubStyle: lastStem.hubStyle, hubAmount: lastStem.hubAmount, hubR: lastStem.hubR, hubT: lastStem.hubT,
+    hubLengthAsked: lastStem.hubLengthAsked, hubLengthAuto: lastStem.hubLengthAuto, hubReachClamped: lastStem.hubReachClamped,
+    axisDepth: lastStem.axisDepth, swellActive: lastStem.swellActive,
+    belowHeadMm: lastStem.belowHeadMm, joinReason: lastStem.joinReason,
     /* THE SOLID ROOT BAND (Eva's ruling). The PLAN's own answer, which is what
        ST1 predicts the triangle count from — the builder owns the count and the
        plan owns the shape it was asked for, and those two owners are the whole

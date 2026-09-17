@@ -713,6 +713,28 @@ export const SMOKE_BLOCKS = [
         path: 'the OTHER direction — the feature guard (ruling 6): every leaf control at its maximum with the length at 0 builds NOTHING. LF1 must read the builder\'s "none" rather than a missing key, LF0\'s two statements must still be complements, and the byte tool proves the row bit-identical to a stem with the leaf controls never touched' },
     ],
   },
+  {
+    n: 34,
+    anchor: 'HUB: CURVED at MAX amount x MAX length',
+    /* THE HUB'S SHAPE — a NEW geometry mode, so --conn is REQUIRED here (the
+       header's own rule): a styled swelling underside and, on #236's corner, a
+       fill instead of a funnel, are exactly where the junction assertions may
+       not model the failure yet and the flood fill is the only witness. The
+       three rows: a styled swell at its deepest (the profile that would fold if
+       a style curve were wrong), a #236 corner (a hub narrower than its stem —
+       ONE PIECE where main exports two, the fix, which only the flood fill
+       sees), and the GATED inertness row (length 0 with every hub control at
+       maximum, bit-identical to the default). The byte-exact default is block
+       30's 'shipped middle' and is not repeated. */
+    rows: [
+      { label: 'HUB: CURVED at MAX amount x MAX length',
+        path: 'the deepest reachable styled swell — ST11 on the emitted underside (the profile is the style/amount/reach the plan declares, read off the hub builder\'s own samples), and the row where a wrong style curve or a non-monotone profile would fold the funnel or self-intersect it; --conn confirms the deep swell still leaves one connected piece' },
+      { label: 'HUB: #236 — the narrow hub on a CAP head (rise 0.5), the shape #236 was filed on',
+        path: 'THE #236 FIX, and only the flood fill sees it — a hub NARROWER than the stem exported as TWO pieces on main (the flat zero-volume join shell plus a head sitting in the bore). ST11 asserts no flat shell is emitted (the join is inert where the head is not wider than the stem) and the head embeds in the stem\'s solid root band; the connectedness gate is the witness that the result is one piece, which is why this row is in the subset with --conn' },
+      { label: 'HUB: GATED — length 0 with style/amount/length at MAXIMUM (hidden and inert; bit-identical to the default)',
+        path: 'the inertness direction — every hub control at its maximum with the stem length 0 builds no hub at all, so ST11 must read the join absent and the byte tool proves the row bit-identical to the shipped default; the hub controls are STEM_SUBS, so the blanket sweep never reaches them either' },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

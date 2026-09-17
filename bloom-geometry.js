@@ -7392,6 +7392,93 @@ export function hubThicknessAt(r, { hubR, hubT, outerR, joinT }) {
   return Math.max(hubT, joinT * Math.sqrt(Math.log(hubR / rr) / denom));
 }
 
+/* ===================================================================
+   THE HUB'S SHAPE — GOBLET / ANGLED / CURVED (Eva's ruling, the hub-shape
+   session). "The hub" is Eva's word for the thing that connects the HEAD to
+   the STEM — which in this code is the hub-to-stem JOIN (stemJoinThickness,
+   hubThicknessAt, the swelling underside buildHubInto emits, joinReason). It
+   is NOT the code's `hub`, `hubR`, `hubT` or the `hubShape` control, all of
+   which name the HEAD's own base plate; those are untouched here. The mapping
+   is stated in full in the PR and in the session outcome doc.
+
+   THE STANDING RULING THIS REVERSES: `stemJoinThickness`'s own comment above
+   says "DERIVED, WITH NOTHING TO TUNE (Eva's ruling: option (b), no new
+   control)", and the charter block in CLAUDE.md repeats it. Eva has now made
+   the join's SHAPE a controlled thing. WHAT STAYS DERIVED IS THICKNESS — the
+   sheet the hub is made of (`hubT`) and the section-modulus strength (`joinT`)
+   are unchanged and never become controls. What the three new controls move
+   is the join's SHAPE (rounded / angled / curved), how PRONOUNCED it is, and
+   how far it REACHES below the head. (The `claude/bloom-roadmap-sep-2026.md`
+   the ruling was said to live in does not exist in this repository; the
+   superseded line is the two named above, and this comment is the record.)
+
+   THE PARAMETERISATION, and why GOBLET's default is a NONZERO value rather
+   than 0 (which is unusual here — new controls almost always default to their
+   inert end). One style has to land on today's shape at one slider value, and
+   that fixes the family:
+     * `hubShapeAmount` is how PRONOUNCED the flare is. At 0 all three styles
+       collapse to a STRAIGHT join — no flare, the flat underside a thin stem
+       already has (`joinActive` false). It is a MULTIPLIER on the swell, and
+       its default is 1.00 EXACTLY, where `x * 1 === x` in IEEE-754 reproduces
+       today's arithmetic term for term. The range is one-sided (0..2): 1.00
+       is today, above it is exaggerated, and there is no waisted/inward half.
+     * `hubLength` is how far the hub reaches below the head. Its default is 0,
+       which is the SENTINEL "auto" — the reach is the DERIVED join depth
+       (`joinT`), exactly as today. A nonzero value overrides it with that many
+       millimetres. 0 = auto is the one honest default: today's reach is
+       `joinT`, which varies with the stem's own diameter, so no fixed number
+       could reproduce it "on every state where a stem exists" — the reach has
+       to stay derived at the default, and a real length takes over above it.
+   So GOBLET + amount 1.00 + length 0 (auto) reproduces today BYTE FOR BYTE on
+   every healthy state, by the `domeIsFlat` discipline (a branch to the verbatim
+   `hubThicknessAt` path), never by an argument about arithmetic. Off the
+   default the styled profile takes over; the topology is identical either way
+   (concentric rings on the cap lattice plus an apex fan — buildHubInto's own
+   machinery), so any monotone profile is watertight by construction.
+
+   THE STYLE CURVES map a normalised radial coordinate x (0 at the join's rim,
+   1 at the axis) to a swell fraction in [0, 1], each with f(0)=0, f(1)=1:
+     * ANGLED  — a straight cone frustum, f(x) = x. Hard shoulders at both ends.
+     * CURVED  — a smoothstep, f(x) = x^2 (3 - 2x). Zero slope at BOTH ends, so
+                 no shoulder at the rim and none where it meets the stem.
+     * GOBLET  — a rounded flare, and at amount 1 / length auto it is today's
+                 constant-stress `hubThicknessAt` VERBATIM (byte-exact). Off
+                 that default it is a quarter-ellipse bowl, 1 - sqrt(1 - x^2):
+                 tangent-horizontal at the rim, steep into the axis — the
+                 rounded goblet base today's curve draws.
+   =================================================================== */
+export const HUB_STYLES = Object.freeze(['GOBLET', 'ANGLED', 'CURVED']);
+export const HUB_SHAPE_AMOUNT_RANGE = Object.freeze([0, 2]);
+export const HUB_SHAPE_AMOUNT_DEFAULT = 1;
+export const HUB_LENGTH_RANGE = Object.freeze([0, 40]);   // 0 = auto (the derived joinT)
+
+/* THE STYLED JOIN PROFILE — the hub's total thickness at plan radius r, the
+   generalisation of `hubThicknessAt`. Only reached when the head is WIDER than
+   the stem (`hubR > outerR`); where it is not, there is no room for a swell on
+   the head and the stem's own solid root band carries connectedness (see
+   `stemPlan`, and #236 below). `p` carries {hubR, hubT, outerR, joinT, style,
+   amount, axisDepth} — `axisDepth` is the total thickness at the axis, joinT
+   at the default and hubLength when set. */
+export function hubJoinThicknessAt(r, p) {
+  const { hubR, hubT, outerR, joinT, style, amount, axisDepth } = p;
+  /* THE BYTE-EXACT DEFAULT, BY BRANCH (domeIsFlat's discipline). GOBLET at
+     amount 1 with the derived reach IS today's constant-stress profile, and
+     this returns it verbatim so no arithmetic below can move a healthy row's
+     bytes. */
+  if (style === 'GOBLET' && amount === 1 && axisDepth === joinT) return hubThicknessAt(r, p);
+  const swell = axisDepth - hubT;                         // how far below hubT the axis sits (amount already folded in)
+  if (!(swell > 0)) return hubT;                          // amount 0, or an auto reach at the floor: flat
+  const blendR = stemJoinBlendRadius(hubR, outerR, hubT, axisDepth);
+  if (!(blendR > outerR)) return r <= outerR ? hubT + swell : hubT;
+  if (r >= blendR) return hubT;
+  const x = Math.min(1, Math.max(0, (blendR - Math.max(r, outerR)) / (blendR - outerR)));
+  let f;
+  if (style === 'ANGLED') f = x;
+  else if (style === 'CURVED') f = x * x * (3 - 2 * x);
+  else f = 1 - Math.sqrt(Math.max(0, 1 - x * x));         // GOBLET, off its default
+  return hubT + swell * f;
+}
+
 /* THE PLACER, IN MILLIMETRES OF ARC FROM THE HUB (Eva's ruling), never in `u`
    — `u` is the blade's parameter and its [0, 1] is already spoken for. `s` is
    distance along the stem's centreline from where it leaves the hub, so a
@@ -7449,8 +7536,47 @@ export function stemPlan(state, ring, acc) {
   const sphere = !!(dome && dome.closed);
   const joinReason = sphere ? 'shell' : 'section';
   const joinT = sphere ? hubT : stemJoinThickness(outerR, hubT);
-  const blendR = sphere ? 0 : stemJoinBlendRadius(hubR, outerR, hubT, joinT);
-  const inert = !(joinT > hubT);
+  /* THE HUB'S SHAPE CONTROLS (the hub-shape session). `hubStyle` and
+     `hubShapeAmount` move the join's SHAPE; `hubLength` its reach. `axisDepth`
+     is the join's total thickness at the axis — the DERIVED `joinT` at the
+     default (`hubLength` 0 = auto, which is what makes GOBLET-default byte-exact
+     across every stem diameter), or the asked millimetres above it, floored at
+     the sheet. On a SPHERE the join is inert by declaration (a shell carries a
+     root hole in membrane, not a plate's swell), so the reach stays `joinT` and
+     the controls are TOLD inert rather than applied. */
+  const hubStyle = HUB_STYLES.includes(state.hubStyle) ? state.hubStyle : 'GOBLET';
+  const hubAmount = state.hubShapeAmount === undefined ? HUB_SHAPE_AMOUNT_DEFAULT : Number(state.hubShapeAmount);
+  const hubLengthAsked = state.hubLength === undefined ? 0 : Number(state.hubLength);
+  /* `refReach` is the reach the flare has AT amount 1 — the derived `joinT`
+     when hubLength is auto (0), or the asked millimetres (floored at the sheet)
+     when it is set. `axisDepth` folds the pronouncedness in ONCE, so the reach
+     and the funnel below cannot disagree: at amount 1 it IS `refReach` (and thus
+     `joinT` at the default, byte-exact), 0 flattens it to the sheet (a straight
+     join), and 2 doubles the swell. `rootZ` and `hubJoinThicknessAt` both read
+     `axisDepth` alone — amount is not applied a second time inside the profile. */
+  const refReach = sphere ? joinT : (hubLengthAsked > 0 ? Math.max(hubT, hubLengthAsked) : joinT);
+  const axisDepthRaw = hubAmount === 1 ? refReach : hubT + hubAmount * (refReach - hubT);
+  /* A DOMED HUB CARRIES THE SWELL AS A DEFORMATION OF ITS INNER CAP, and that
+     cap can only be pushed down so far before its apex would invert (the inner
+     sphere radius `Rd + t/2 - axisDepth` going negative) and self-intersect. A
+     flat hub carries it as a downward cone and has no such limit. So on a dome
+     the reach is CLAMPED to `Rd - t/2` (one sheet of inner apex kept), TOLD in
+     the read-out. The derived `joinT` is always well under this — 2.5 mm
+     against an 8 mm-ish cap — so the default never clamps and its byte-identity
+     is untouched; only a large hubLength or amount on a cap reaches it. */
+  const capReachMax = (dome && !sphere) ? Math.max(hubT, dome.Rd - hubT / 2) : Infinity;
+  const axisDepth = Math.min(axisDepthRaw, capReachMax);
+  const hubReachClamped = axisDepthRaw > axisDepth + 1e-9;
+  /* THE HEAD BEING WIDER THAN THE STEM is what makes a swell on the head
+     possible; where it is not (#236's corner) there is no room for one and the
+     stem's own solid root band carries connectedness (below). Amount 0 (axis at
+     the sheet) is a STRAIGHT join — the flat underside a thin stem already had.
+     At the default (GOBLET, amount 1, auto reach) `swellActive` is exactly
+     main's `joinT > hubT` on every healthy row, keeping the bytes identical by
+     branch. */
+  const swellActive = !sphere && hubR > outerR && (axisDepth - hubT) > 0;
+  const blendR = swellActive ? stemJoinBlendRadius(hubR, outerR, hubT, axisDepth) : 0;
+  const inert = !swellActive;
   /* THE HUB'S OWN TOP FACE ON THE AXIS — "top" meaning the face the stem is
      rooted THROUGH from, which is the one the flower's own material is on.
      Flat: the slab's own +t/2. Cap: the apex of the OUTER cap, which is the
@@ -7465,11 +7591,14 @@ export function stemPlan(state, ring, acc) {
   const topZ = sphere ? dome.centreZ - (dome.Rd - hubT / 2)
     : dome ? dome.centreZ + dome.Rd + hubT / 2
     : hubT / 2;
-  /* THE UNDERSIDE ON THE AXIS is the top face less the thickness the join puts
-     there, which at r = 0 is the join's own thickness by construction. On the
-     sphere that is the wall, so this lands on `centreZ - (Rd + t/2)` — the
-     OUTER sphere's far pole — with no second expression for it. */
-  const rootZ = topZ - joinT;
+  /* THE UNDERSIDE ON THE AXIS is the top face less the join's REACH there
+     (`axisDepth`) — the derived `joinT` at the default, or `hubLength` above it,
+     so hubLength ADDS to the height below the head exactly as Eva ruled. At the
+     default `axisDepth === joinT`, which is main's `topZ - joinT` to the bit. On
+     the sphere `axisDepth` is forced to `joinT` (the shell's wall), so this
+     still lands on `centreZ - (Rd + t/2)`, the OUTER sphere's far pole, with no
+     second expression for it. */
+  const rootZ = topZ - axisDepth;
   const tipZ = rootZ - lengthMm;
   /* HOW MUCH THE HEAD HIDES: the stem is inside the head wherever it is above
      the head's LOWEST material. On a flat hub that is the slab's own underside
@@ -7551,27 +7680,32 @@ export function stemPlan(state, ring, acc) {
      the narrower claim it is, since that clause excludes the top face by
      construction and its header now says so. */
   const headOuterMm = sphere ? dome.Rd + hubT / 2 : hubR;
-  /* AND IT IS THE CLOSED SHELL'S CASE, MEASURED RATHER THAN SCOPED FOR
-     CONVENIENCE. `headOuterMm < boreR` is reachable on a CAP too — 291 of 4,608
-     swept states, with hub radii down to 0.812 mm against bores to 4.500 — and
-     on every one of them THE BAND FIXES NOTHING, because the head was never the
-     detached part. Measured on `CAP, 3 petals, width 4, spread 0.6, 12 mm stem`:
-     components 2 at 0.6 mm and 2 at 0.3 mm, IDENTICAL with the band and without,
-     and the stray piece is 12 voxels lying at the single height z = -3.696 —
-     which is `hubT/2 - joinT` to four decimals, i.e. #236's flat zero-volume
-     join shell and not the head at all. The head is in the main body, spanning
-     r 0.29..33.19.
-
-     WHY THE TWO DIFFER, and it is the same distinction `joinReason` already
-     draws: on a CAP or a flat hub the stem is rooted THROUGH the head's own
-     slab and the join thickens that slab around the axis, so the head and the
-     stem share material by construction whatever the bore does. On a closed
-     shell the stem leaves a POLE, the head is a thin skin at radius
-     `headOuterMm`, and the whole of it can stand inside the bore with nothing
-     bridging the two — which is the failure, and the only place the band has
-     work to do. Firing it on a CAP would move bytes for no benefit and would be
-     SEEN, because there a narrow hub leaves the bore's mouth open to the sky. */
-  const headInsideBore = sphere && headOuterMm < boreR;
+  /* THE CAP CASE WAS SCOPED OUT ON MAIN AND THAT WAS HALF THE #236 STORY.
+     Main's comment here read: `headOuterMm < boreR` is reachable on a CAP too
+     (291 of 4,608 swept states) but "THE BAND FIXES NOTHING" there, because the
+     detached part was not the head in the bore — it was the flat ZERO-VOLUME
+     join shell `hubThicknessAt` emitted (12 voxels at z = hubT/2 - joinT, i.e.
+     `hubR <= outerR`'s `return joinT` making every underside ring one z). That
+     reading was correct about the SHELL and wrong to conclude the band should
+     stay sphere-only: the shell only existed because the join was still built
+     on a head narrower than its stem. This rewrite does not build it (see
+     `swellActive` — the join is inert where the head is not wider than the
+     stem), so the CAP's stray piece is gone, and generalising the band to the
+     CAP then embeds the narrow head that WAS in the bore. Both halves close
+     together; neither alone did, which is why main shipped #236 open. */
+  /* #236 — THE HEAD EMBEDS IN THE STEM'S SOLID ROOT BAND WHEREVER IT IS
+     NARROWER THAN THE BORE, on a CAP and a flat hub now, not only a sphere.
+     On main this was `sphere &&`, so a CAP or flat head whose narrow hub sat
+     inside a wide stem detached — one half of #236 is that head in the bore,
+     the other is the flat ZERO-VOLUME join shell `hubThicknessAt` emitted when
+     `hubR <= outerR` (its `return joinT` made every underside ring one z). This
+     rewrite no longer builds that shell (the join is inert where the head is
+     not wider than the stem — `swellActive` above), and generalising the fill
+     closes the head-in-bore half. Both together are the #236 fix, and it is the
+     SAME fill for all three styles because the style builds no funnel in this
+     corner. Healthy rows do not move: there `headOuterMm >= outerR > boreR`, so
+     the condition is false exactly as `sphere && ...` was. */
+  const headInsideBore = headOuterMm < boreR;
   const solidBandMm = headInsideBore ? Math.max(0, topZ - Math.max(tipZ, lowestHubZ)) : 0;
   /* ===================================================================
      THE TIP PLUG — THE SAME LAW AT THE OTHER END (Eva's ask, the tip-plug
@@ -7654,6 +7788,16 @@ export function stemPlan(state, ring, acc) {
   return {
     present: true, lengthMm, outerR, boreR, wallMm: outerR - boreR,
     hubT, hubR, joinT, blendR, inert, joinReason,
+    /* THE HUB SHAPE — Eva's controls, carried for the builder (which reads
+       style/amount/axisDepth for the profile), the read-out and the gates.
+       `axisDepth` is the reach below the head's top face; `hubLengthAuto` is
+       true wherever the reach is the derived joinT rather than an asked length,
+       so the read-out can say "auto (2.52 mm, derived)" rather than a bare 0.
+       `belowHeadMm` is the join's reach plus the stem — what hubLength ADDS to,
+       so Eva can read total height off the panel without measuring the export. */
+    hubStyle, hubAmount, hubLengthAsked, axisDepth, hubReachClamped,
+    hubLengthAuto: !sphere && !(hubLengthAsked > 0), swellActive,
+    belowHeadMm: axisDepth + lengthMm,
     topZ, rootZ, tipZ, lowestHubZ, hiddenMm, visibleMm: lengthMm - hiddenMm,
     headOuterMm, headInsideBore, solidBandMm,
     tipPlugMm, voidTopZ, voidMm, voidBottomZ, solidThrough,
@@ -8598,7 +8742,7 @@ export function buildHubInto(acc, state, ring) {
      arithmetic. `joinAt` is the profile, asked of its one owner. */
   const plan = stemPlan(state, ring, acc);
   const joinActive = plan.present && !plan.inert;
-  const joinAt = (r) => hubThicknessAt(r, { hubR: ring.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT });
+  const joinAt = (r) => hubJoinThicknessAt(r, { hubR: ring.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT, style: plan.hubStyle, amount: plan.hubAmount, axisDepth: plan.axisDepth });
   /* THE UNDERSIDE THE BUILDER ACTUALLY EMITTED, as (plan radius, thickness)
      pairs at its own rings — ST5's measured side. Reported rather than
      re-derived: a clause that rebuilt the profile here and compared it against
