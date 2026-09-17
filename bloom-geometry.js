@@ -711,8 +711,15 @@ export const PETAL_ROLE_ORDER =
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
 export class MeshBuilder {
-  constructor({ exportMode = false, captureGrid = false } = {}) {
+  constructor({ exportMode = false, captureGrid = false, captureLamina = false } = {}) {
     this.exportMode = !!exportMode;
+    /* THE LAMINA CAPTURE (sepals, part 1) — the same `if` in emitPanel as the
+       grid capture, and the same contract (it decides nothing about what is
+       BUILT): buildBloomInto sets it for the petal loop when a sepal whorl is
+       asked for, so the sepal angle limit can read the petals' own emitted
+       mid-surface rather than a second evaluation of it. Separate from
+       `captureGrid` so that flag keeps meaning exactly what session 28 said. */
+    this.captureLamina = !!captureLamina;
     /* THE MID-SURFACE CAPTURE (session 28) — OFF by default, and off is what
        every existing caller gets: `new MeshBuilder({ exportMode })` reads this
        as false, so the live rebuild and both STL gates allocate nothing new.
@@ -2677,10 +2684,85 @@ export function footRing(state, acc) {
     return byLayer;
   })();
 
+  /* ===================================================================
+     THE SEPAL RING (sepals, part 1) — this owner's FOURTH descriptor kind.
+     Null when absent (count 0) and null under SPHERE (no underside ring on a
+     closed shell; hidden and inert, the androecium's precedent). See the
+     sepal block above buildBloomInto for what a sepal IS; this is only WHERE
+     its whorl sits: the hub's rim, on the same footing as the outer whorl —
+     the same radius, the same surface-law point on it, the same overhang
+     expression, the same thickness — with the sepal's own foot width and its
+     own count, phase and scale. The ANGLE is not here: its limit is drawn
+     against the petals the builder emits, so buildBloomInto owns it.
+
+     THE COUNT CEILING IS THE PETAL COUNT, and what "the petal count" means is
+     read off this function's own variables rather than the control: RADIAL
+     and SPIRAL place `n` petals in the outer whorl; a FAN places
+     `fanCount` (2 x perSide + a mirror-line petal, derived); CONTINUOUS is
+     one whorl of `layerCount * n` at decreasing radii, of which `n` — one
+     turn — sit at the rim. Clamped and told.
+
+     THE PHASE IS A FRACTION OF THE PETAL PITCH: 2 pi / n on a ring, the fan's
+     own step on a fan. Under CONTINUOUS the rim's petals sit at golden-angle
+     azimuths and there is no pitch to interleave with; the offset is still
+     applied against slot 0's azimuth, in fractions of 2 pi / n, and the
+     read-out says that is what it is. On a fan the sepals take the fan's own
+     lattice shifted by the phase — the `count` positions nearest the mirror
+     line, positive side first on a tie — and whether that set is mirror-
+     symmetric is reported rather than assumed. */
+  const sepals = (() => {
+    if (!sepalsEligible(state)) return null;
+    const asked = Math.round(Number(state.sepalCount) || 0);
+    if (!(asked >= 1)) return null;
+    const ceiling = fanMode ? fanCount : n;
+    const ceilingOf = fanMode ? `the fan's ${fanCount} slots` : continuousMode ? `${n} petals a turn` : `the outer whorl's ${n} petals`;
+    const count = Math.min(asked, ceiling);
+    const scale = Number(state.sepalScale), breadth = Number(state.sepalFootBreadth), phaseFrac = Number(state.sepalPhase);
+    const pitchRad = fanMode ? fan.step : TAU / n;
+    const phaseRad = phaseFrac * pitchRad;
+    const outer = rings[0];
+    const footAskedMm = outer.width * scale * breadth;
+    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);
+    const radius = hub.radius;
+    const { slope, z, arc, relief } = surfaceAt(radius, null);
+    const overhang = Math.max(1.5, radius * 0.4);
+    let azimuths, placement, startAzimuth = outer.phase + phaseRad, mirrorSymmetric = null;
+    if (fanMode) {
+      placement = 'LIST';
+      const c0 = fan.centre ? 0 : 0.5;
+      const cands = [];
+      for (let k = -(count + 1); k <= count + 1; k++) cands.push((k + c0 + phaseFrac) * fan.step);
+      cands.sort((a, b) => Math.abs(a) - Math.abs(b) || b - a);
+      azimuths = cands.slice(0, count).sort((a, b) => a - b).map((a) => outer.phase + a);
+      const set = azimuths.map((a) => (a - outer.phase).toFixed(9));
+      mirrorSymmetric = azimuths.every((a) => set.includes((-(a - outer.phase)).toFixed(9)));
+      startAzimuth = azimuths[0];
+    } else {
+      placement = 'RADIAL';
+      azimuths = Array.from({ length: count }, (_, i) => startAzimuth + (i * TAU) / count);
+    }
+    return {
+      asked, count, ceiling, ceilingOf, countClamped: asked > ceiling,
+      scale, breadth, phaseFrac, pitchRad, pitchDeg: (pitchRad * 180) / Math.PI, phaseRad, phaseDeg: (phaseRad * 180) / Math.PI,
+      phaseAgainst: fanMode ? 'the fan step' : continuousMode ? 'a turn\'s pitch, 2 pi / n (a golden-angle spiral has no pitch to interleave with)' : 'the petal pitch',
+      startAzimuth, azimuths, placement, mirrorSymmetric,
+      footAskedMm, footMm, footClamped: footMm !== footAskedMm, footFloorMm: FOOT_MIN_WIDTH_MM, footCeilingMm: FOOT_MAX_WIDTH_MM,
+      ring: {
+        index: -1, radius, derivedRadius, width: footMm, thickness, overhang,
+        scale: 1, phase: startAzimuth, domeLean: dome && !sphere ? (slope * 180) / Math.PI : 0, tiltExtra: 0, lambda: 0,
+        role: 'SEPAL', roleCount: count, slotRole: null, petalRole: null, allRole: null,
+        slots: Array.from({ length: count }, (_, i) => i), overrides: null, roles: ['SEPAL'],
+        z, slope, arc, relief, dome, underFootFloor: radius < FOOT_MIN_WIDTH_MM, crossesAxis: overhang > radius, clamped: [],
+      },
+    };
+  })();
   return {
     rings, hub, derivedRadius, guardResidual, layerCount,
     /* THE DOME, footRing()'s own — null under the guard. */
     dome,
+    /* THE SEPAL RING, this owner's fourth kind — null when absent or under
+       SPHERE (sepals, part 1). */
+    sepals,
     /* THE ANDROECIUM, this owner's second kind — null when absent or under
        SPHERE (session 21). */
     androecium,
@@ -2829,7 +2911,18 @@ function fanAzimuth(i, { perSide, centre, step }) {
   return i < perSide ? (i + 0.5) * step : -((2 * perSide - 0.5 - i) * step);
 }
 
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null }) {
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null }) {
+  /* LIST (sepals, part 1): explicit azimuths, one per slot — the arm a fan's
+     sepals take, because their positions are footRing()'s own answer (the
+     fan's lattice shifted by the phase, the `count` nearest the mirror line)
+     and no closed form of (perSide, centre, step) reproduces that set at every
+     phase. A branch beside the others; the three shipped arms are untouched. */
+  if (placement === 'LIST') {
+    if (!Array.isArray(azimuths) || azimuths.length !== count) throw new Error(`placement LIST needs ${count} azimuths, was handed ${azimuths ? azimuths.length : 'none'}`);
+    const radiusAt = typeof radius === 'function' ? radius : () => radius;
+    for (let i = 0; i < count; i++) blade({ index: i, azimuth: azimuths[i], radius: radiusAt(i, count), z: height, scale: sizeRamp(i, count), tiltExtra: angleRamp(i, count) });
+    return;
+  }
   if (placement !== 'RADIAL' && placement !== 'SPIRAL' && placement !== 'CONTINUOUS' && placement !== 'FAN') {
     throw new Error(`unknown placement "${placement}" — the registry and the builder have diverged`);
   }
@@ -6530,6 +6623,7 @@ export function petalRim(surface, samples = RIM_SAMPLES) {
    TELEMETRY ONLY — no geometry reads it, and the byte partition is what says
    so rather than this sentence. */
 export function buildPetalInto(acc, state, ring, slot, cap = null, representative = undefined) {
+  const tris0 = acc.triangleCount;
   const isRep = representative === undefined ? slot.index === 0 : !!representative;
   /* ONE construction of the surface, and every constant below is READ off
      it. A builder that re-derived any of them beside the evaluator would be
@@ -6653,7 +6747,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      one array would be a claim the geometry does not make. At the shipping
      default `panels` is the single 'full' span and this is a one-element
      list, which is the case the export path draws. */
-  const capturedPanels = acc.captureGrid ? [] : null;
+  const capturedPanels = (acc.captureGrid || acc.captureLamina) ? [] : null;
   for (const panel of panels) {
     const g = emitPanel(acc, rows, panel, tAt);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
@@ -7039,6 +7133,11 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        wrong axis would otherwise be indistinguishable from a correct one. */
     petalRole: ring.petalRole, allRole: ring.allRole ?? null,
     slotIndex: slot.index,
+    /* THE BLADE'S OWN LENGTH IN MILLIMETRES, as built — the control times the
+       slot's scale (a sepal is a petal at `sepalScale`, an inner whorl at its
+       layer size). Telemetry: the read-out and the SP family print it rather
+       than re-multiplying two controls. */
+    length,
     /* WHERE THIS PETAL SITS AROUND THE AXIS, from the slot payload the whorl
        primitive produced. Reported for the same reason `tangent` is: a shot
        tool or an assertion deriving it from the controls would be a second
@@ -7108,6 +7207,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        docs/bloom-session-28-outcome.md for the measured step at that seam —
        it is the TILT, not a change of cross-section law. */
     grid: capturedPanels,
+    /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
+       precedent) — SP1 sums the sepals' own against the whorl's. */
+    tris: acc.triangleCount - tris0,
+    /* THE RING ROW'S POINT, THE SEAM STEP AND THE SLOT THIS PETAL WAS BUILT AT —
+       read by the sepal angle scan (a trial sepal is rotated about its ring
+       tangent through `base`, one builder call per seam-step bucket) and by
+       the other-mode lamina evaluation, which needs the slot payload to call
+       the surface's front door on the same lattice. Telemetry; nothing here
+       moves a byte. */
+    base, seamStep, slot: { index: slot.index, azimuth: slot.azimuth, radius: slot.radius, z: slot.z, scale: slot.scale, tiltExtra: slot.tiltExtra },
     /* WHERE THIS PETAL MEETS THE HUB — the quantity a downstream consumer
        cannot recover from the grid without knowing the foot's layout: the
        grid's own first row is the INNERMOST foot row, the one that runs
@@ -7194,7 +7303,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
 
    RETURNS null when the accumulator was not asked to capture. */
 function emitPanel(acc, rows, panel, tAt) {
-  const grid = acc.captureGrid ? [] : null;
+  const grid = (acc.captureGrid || acc.captureLamina) ? [] : null;
   const top = [], bot = [];
   for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
     const row = rows[i];
@@ -9156,6 +9265,500 @@ export function buildStyleInto(acc, G) {
    a-computation-nobody-performed defect this project keeps finding. It is
    an ARGUMENT here rather than a state key so it cannot be reached by
    anything that reads the control set. */
+/* ===================================================================
+   SEPALS, PART 1 — THE WHORL (Eva's ruling: "a sepal is a petal").
+
+   THERE IS NO SEPAL BLADE, NO SEPAL PROFILE AND NO SEPAL MODULE. A sepal is
+   `buildPetalInto` invoked a second time, against a SECOND PARAMETER SET on a
+   SECOND RING. That was reachable without restructuring the builder because
+   the builder already is a function of the state it is handed: `petalSurface`
+   resolves `ps = petalStateFor(state, ring)` and hands `ps` to every law —
+   widthProfile (12 reads), petalForm (9), petalFormIsFlat (5), buckleIsFlat
+   (2), fringeEngaged (1), thicknessIsUniform / thicknessProfile (1 each) and
+   its own six inline reads — so a spread substate reaches the whole outline,
+   form and curl machinery through the one door it already has. The census is
+   in docs/bloom-sepals-outcome.md; the one field that reads `state` rather
+   than `ps` is buildPetalInto's `shapeN` telemetry, which on every ring that
+   carries no override record is the same value, and on the sepal ring (which
+   never carries one) is the sepal's own.
+
+   THE SUBSTATE IS `sepalBladeState`: the caller's state with the SEPAL's own
+   copy of every shape, form and curl control mapped onto the names the laws
+   read (`SEPAL_TWINS`, the ONE table the registry also instances its rows
+   from), the sepal's ANGLE in `petalTilt`'s slot (a sepal is a petal at a
+   negative tilt on its own ring — the frame maths is `dir = Rs cos t + Up
+   sin t` either way, and the seam clearance law reads |t|), and the rim family
+   OFF (no lobes, no fringe, no squared terminal — part 2). `petalLength` and
+   `petalWidth` are the PETAL's, scaled through `slot.scale` = `sepalScale`
+   exactly as a layered whorl's size ramp already scales a blade, so length and
+   width follow together by the builder's own construction. `sheetThickness`
+   and the Part-thickness section are SHARED: they are the material.
+
+   THE RING IS THE HUB'S RIM, on the same footing as the outer whorl's
+   (`footRing`'s fourth descriptor kind, `fr.sepals`): radius `hub.radius`,
+   the surface law's own z / slope / arc / relief there, the same overhang
+   expression, the same thickness, and a foot width of its own (`sepalFoot-
+   Breadth` on the outer whorl's foot, floored at FOOT_MIN_WIDTH_MM and
+   told). The foot is therefore BURIED in the slab exactly as a petal's is —
+   mid-surface on the ring, skins flush with the top face and the underside —
+   and the blade leaves the rim downward. That is the standing junction
+   ruling read literally: the sepal's own material continuing into the hub,
+   its foot's tangent the rim's own; no fillet, no loft, no skin of revolution.
+   Where a hub-to-stem join thickens the underside inside the blend radius the
+   foot is buried deeper, and at the rim — where the blade emerges — the
+   underside is flat on all three styles unless the blend reaches the rim
+   (`footTangentDeg` on the builder's record is that angle, off the plan's
+   own law — AND `undersideChordDeg` beside it, the law's fall over one
+   printable feature inside the rim, because GOBLET and CURVED arrive at
+   their edge tangent-flat with unbounded curvature and a tangent of 0 is
+   true and misleading there; `tools/bloom-sepal-contact.mjs` §C reads both
+   off the emitted hub). The lamina helpers below (`laminaFromPanels`,
+   `laminaGrid`, `laminaContact`, `rotateLamina`, `sepalTrialLamina`) are
+   exported for that tool's denser re-drawing of the limit, not as an API.
+
+   THE ANGLE'S USABLE RANGE ENDS AT CONTACT WITH THE PETALS, AND THE LIMIT IS
+   DRAWN, NOT ANALYTIC. Five things move it at once (phase, scale, the petal
+   count, the petal tilt, the sepal's length) and every form control moves the
+   petal it would touch, so no closed form was attempted: `sepalAngleLimit`
+   scans the angle at the slider's own step from the range floor upward and
+   stops at the first slider position where a sepal CLIPS a petal — its
+   mid-surface crossing a petal's mid-surface, lying in it, or standing on the
+   petal's far (+n) side within one sheet of it inside the petal's own lamina.
+   The last two arms are what make "clip" mean what Eva means: a sepal tucked
+   UNDER a petal within a sheet of it is the fork's own crotch and is not a
+   clip; the same sepal ABOVE the petal is. It is evaluated on the builder's
+   own lattice (the emitted rows and columns, foot rows excluded) in BOTH
+   modes and the smaller limit is taken, so the clamp is one decision for one
+   state — session 32's mode-dependence refusal, a sixth time. The scan is
+   affordable because within one seam-step bucket the lamina at any tilt is a
+   RIGID ROTATION of the lamina at any other about the ring tangent through
+   the ring row (measured: 1e-14 mm on flat, cupped, curled, twisted, buckled
+   and domed sepals), so one builder call per bucket and per mode serves every
+   angle; a sepal slot whose neighbourhood of petals is congruent to another's
+   shares its scan.
+   =================================================================== */
+export const SEPAL_COUNT_RANGE = Object.freeze([0, 40]);          // the ceiling is DERIVED per build (the petal count); 40 is petalCount's own top
+export const SEPAL_SCALE_RANGE = Object.freeze([0.2, 1]);
+export const SEPAL_SCALE_DEFAULT = 0.6;
+export const SEPAL_PHASE_RANGE = Object.freeze([0, 1]);           // 0 aligned · 0.5 interleaved · 1 aligned with the next petal
+export const SEPAL_PHASE_DEFAULT = 0.5;
+export const SEPAL_ANGLE_RANGE = Object.freeze([-90, 90]);        // from the hub plane, positive UP toward the petals (petalTilt's own sense)
+export const SEPAL_ANGLE_STEP = 1;
+export const SEPAL_ANGLE_DEFAULT = 0;
+export const SEPAL_FOOT_BREADTH_RANGE = Object.freeze([0.25, 1.5]);
+export const SEPAL_FOOT_BREADTH_DEFAULT = 1;
+/* THE ONE TABLE. Each row is [the petal control the law reads, the sepal
+   control that stands in for it]. The registry instances its `sepal*` rows
+   from this table and `sepalBladeState` maps the values back through it, so
+   a petal control that gains a sepal twin is one row here and nowhere else.
+   Not in it, on purpose: the rim family (lobes, fringe, the squared terminal
+   — part 2), size (`sepalScale` scales the petal's length and width
+   together), tilt (`sepalAngle` is its own control with its own derived
+   limit) and thickness (the material, shared). */
+export const SEPAL_TWINS = Object.freeze([
+  ['petalBaseTaper', 'sepalBaseTaper'], ['petalTipShape', 'sepalTipShape'], ['petalTipTaper', 'sepalTipTaper'],
+  ['petalCup', 'sepalCup'], ['petalCupGradient', 'sepalCupGradient'],
+  ['buckleAmp', 'sepalBuckleAmp'], ['buckleFreq', 'sepalBuckleFreq'], ['buckleEnv', 'sepalBuckleEnv'],
+  ['petalApexSweep', 'sepalApexSweep'], ['petalRoll', 'sepalRoll'], ['petalRollTaper', 'sepalRollTaper'],
+  ['petalSpineCurl', 'sepalSpineCurl'], ['curlBias', 'sepalCurlBias'], ['curlStart', 'sepalCurlStart'], ['petalTwist', 'sepalTwist'],
+]);
+/* TWO STATEMENTS, one here and one in the registry (`PREDICATES.sepalsEligible`),
+   checked against each other by the harness (SP0). Under SPHERE there is no
+   underside ring to place a sepal on: the head is a closed shell whose
+   sequence runs pole to pole and whose "underside" is the reserved pole the
+   stem leaves from. Sepals are UNAVAILABLE there — hidden AND inert, the
+   androecium's own precedent — and the read-out says so. */
+export function sepalsEligible(state) { return !sphereMode(state); }
+export function sepalsAbsent(state) { return !sepalsEligible(state) || !(Number(state.sepalCount) >= 1); }
+export function sepalBladeState(state, angleDeg) {
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0 };
+  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);
+  return s;
+}
+
+/* ---- the lamina: a petal's mid-surface on the builder's own lattice ---- */
+/* From the captured panels (`p.grid`, the points emitPanel evaluated), THE
+   FOOT AND THE ROOT BLEND DROPPED (u < ROOT_BLEND_END): the three foot rows
+   are the junction's, and the root-blend rows are where every whorl's roots
+   overlap on one ring BY DESIGN — the crowding instrument's own region, where
+   a sepal's margin swings over a neighbouring petal's plane a few tens of
+   microns because the two leave a CIRCLE at different azimuths (measured:
+   0.022 mm at 1 mm from the rim, on eight interleaved sepals at 20 degrees).
+   That is root-exit stacking, not a clip, and the lamina this test asks about
+   starts where the blade's own outline does. Triangles are the lattice's own quads split; each carries which of
+   its edges lie on the lamina's boundary (the first blade row, the tip row and
+   the two margins of every panel) so a nearest-point query can say whether a
+   point projects INTO the lamina or onto its edge. */
+export function laminaFromPanels(panels) {
+  const pts = [], nrm = [], bnd = [], tris = [], segs = [];
+  let lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const panel of panels) {
+    const rows = panel.rows.filter((r) => r.u >= ROOT_BLEND_END);
+    if (rows.length < 2) continue;
+    const base = pts.length, C = rows[0].mid.length, R = rows.length;
+    for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) {
+      const P = rows[i].mid[j];
+      pts.push(P); nrm.push(rows[i].normal[j]);
+      /* a lattice vertex is on the lamina's boundary iff it sits on the first
+         blade row, the tip row or either margin of its panel */
+      bnd.push(i === 0 || i === R - 1 || j === 0 || j === C - 1);
+      for (let a = 0; a < 3; a++) { if (P[a] < lo[a]) lo[a] = P[a]; if (P[a] > hi[a]) hi[a] = P[a]; }
+    }
+    const at = (i, j) => base + i * C + j;
+    for (let i = 0; i < R; i++) for (let j = 0; j < C; j++) {
+      if (j + 1 < C) segs.push([at(i, j), at(i, j + 1)]);
+      if (i + 1 < R) segs.push([at(i, j), at(i + 1, j)]);
+    }
+    for (let i = 0; i + 1 < R; i++) for (let j = 0; j + 1 < C; j++) {
+      const a = at(i, j), b = at(i, j + 1), c = at(i + 1, j + 1), d = at(i + 1, j);
+      /* boundary flags per edge of (a, b, c) and (a, c, d): bit k set when edge k
+         (from corner k to corner k+1) lies on the lamina's boundary */
+      const bottom = i === 0, top = i + 2 === R, left = j === 0, right = j + 2 === C;
+      tris.push([a, b, c, (bottom ? 1 : 0) | (right ? 2 : 0)]);
+      tris.push([a, c, d, (top ? 2 : 0) | (left ? 4 : 0)]);
+    }
+  }
+  return { pts, nrm, bnd, tris, segs, lo, hi };
+}
+/* A uniform grid over a set of laminae's triangles, cell = one sheet. Keys
+   are integer cell coordinates packed into a string. */
+export function laminaGrid(laminae, cell) {
+  const grid = new Map();
+  const g = (x) => Math.floor(x / cell);
+  for (let L = 0; L < laminae.length; L++) {
+    const { pts, tris } = laminae[L];
+    for (let t = 0; t < tris.length; t++) {
+      const T = tris[t];
+      const A = pts[T[0]], B = pts[T[1]], Cc = pts[T[2]];
+      const x0 = g(Math.min(A[0], B[0], Cc[0])), x1 = g(Math.max(A[0], B[0], Cc[0]));
+      const y0 = g(Math.min(A[1], B[1], Cc[1])), y1 = g(Math.max(A[1], B[1], Cc[1]));
+      const z0 = g(Math.min(A[2], B[2], Cc[2])), z1 = g(Math.max(A[2], B[2], Cc[2]));
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+        const k = `${x},${y},${z}`;
+        let list = grid.get(k); if (!list) { list = []; grid.set(k, list); } list.push(L, t);
+      }
+    }
+  }
+  return { grid, cell };
+}
+/* Nearest point on triangle ABC to P (Ericson's closed form), with WHERE it
+   landed: 'in' (interior), or the edge / vertex index it lies on. */
+function closestOnTriangle(P, A, B, C) {
+  const ab = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], ac = [C[0] - A[0], C[1] - A[1], C[2] - A[2]], ap = [P[0] - A[0], P[1] - A[1], P[2] - A[2]];
+  const d1 = ab[0] * ap[0] + ab[1] * ap[1] + ab[2] * ap[2], d2 = ac[0] * ap[0] + ac[1] * ap[1] + ac[2] * ap[2];
+  if (d1 <= 0 && d2 <= 0) return { q: A, where: 'v0' };
+  const bp = [P[0] - B[0], P[1] - B[1], P[2] - B[2]];
+  const d3 = ab[0] * bp[0] + ab[1] * bp[1] + ab[2] * bp[2], d4 = ac[0] * bp[0] + ac[1] * bp[1] + ac[2] * bp[2];
+  if (d3 >= 0 && d4 <= d3) return { q: B, where: 'v1' };
+  const vc = d1 * d4 - d3 * d2;
+  if (vc <= 0 && d1 >= 0 && d3 <= 0) { const v = d1 / (d1 - d3); return { q: [A[0] + ab[0] * v, A[1] + ab[1] * v, A[2] + ab[2] * v], where: 'e0' }; }
+  const cp = [P[0] - C[0], P[1] - C[1], P[2] - C[2]];
+  const d5 = ab[0] * cp[0] + ab[1] * cp[1] + ab[2] * cp[2], d6 = ac[0] * cp[0] + ac[1] * cp[1] + ac[2] * cp[2];
+  if (d6 >= 0 && d5 <= d6) return { q: C, where: 'v2' };
+  const vb = d5 * d2 - d1 * d6;
+  if (vb <= 0 && d2 >= 0 && d6 <= 0) { const w = d2 / (d2 - d6); return { q: [A[0] + ac[0] * w, A[1] + ac[1] * w, A[2] + ac[2] * w], where: 'e2' }; }
+  const va = d3 * d6 - d5 * d4;
+  if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0) { const w = (d4 - d3) / ((d4 - d3) + (d5 - d6)); return { q: [B[0] + (C[0] - B[0]) * w, B[1] + (C[1] - B[1]) * w, B[2] + (C[2] - B[2]) * w], where: 'e1' }; }
+  const denom = 1 / (va + vb + vc), v = vb * denom, w = vc * denom;
+  return { q: [A[0] + ab[0] * v + ac[0] * w, A[1] + ab[1] * v + ac[1] * w, A[2] + ab[2] * v + ac[2] * w], where: 'in' };
+}
+/* Segment P -> P+D against triangle ABC (Möller–Trumbore, proper hits only —
+   a hit exactly on the triangle's edge or at the segment's end is not a
+   crossing of one sheet through another, and the coincident case has its
+   own arm in the point test). */
+function segCrossesTri(P, D, A, B, C) {
+  const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+  const h = [D[1] * e2[2] - D[2] * e2[1], D[2] * e2[0] - D[0] * e2[2], D[0] * e2[1] - D[1] * e2[0]];
+  const det = e1[0] * h[0] + e1[1] * h[1] + e1[2] * h[2];
+  if (Math.abs(det) < 1e-14) return false;
+  const inv = 1 / det, s = [P[0] - A[0], P[1] - A[1], P[2] - A[2]];
+  const u = inv * (s[0] * h[0] + s[1] * h[1] + s[2] * h[2]);
+  if (u <= 1e-9 || u >= 1 - 1e-9) return false;
+  const q = [s[1] * e1[2] - s[2] * e1[1], s[2] * e1[0] - s[0] * e1[2], s[0] * e1[1] - s[1] * e1[0]];
+  const v = inv * (D[0] * q[0] + D[1] * q[1] + D[2] * q[2]);
+  if (v <= 1e-9 || u + v >= 1 - 1e-9) return false;
+  const t = inv * (e2[0] * q[0] + e2[1] * q[1] + e2[2] * q[2]);
+  return t > 1e-9 && t < 1 - 1e-9;
+}
+const boundaryHit = (lam, T, where) => {
+  if (where === 'in') return false;
+  if (where === 'e0') return (T[3] & 1) !== 0;
+  if (where === 'e1') return (T[3] & 2) !== 0;
+  if (where === 'e2') return (T[3] & 4) !== 0;
+  /* a vertex: the lattice's own per-vertex flag (an edge flag would miss the
+     corner a triangle's diagonal happens to own) */
+  return lam.bnd[T[where === 'v0' ? 0 : where === 'v1' ? 1 : 2]];
+};
+/* THE CONTACT TEST — does the sepal lamina S clip any petal lamina in the
+   grid? Returns null or the first finding. `t` is the sheet. */
+export function laminaContact(S, petals, G, t) {
+  const cell = G.cell, g = (x) => Math.floor(x / cell);
+  const boxOverlaps = (L) => !(S.hi[0] < L.lo[0] - t || S.lo[0] > L.hi[0] + t || S.hi[1] < L.lo[1] - t || S.lo[1] > L.hi[1] + t || S.hi[2] < L.lo[2] - t || S.lo[2] > L.hi[2] + t);
+  const near = petals.map((L) => boxOverlaps(L));
+  if (!near.some(Boolean)) return null;
+  const seen = new Set();
+  /* (a) every sepal point against the petal laminae within one sheet: its
+     NEAREST point on any petal lamina must be interior, and the sepal point
+     must lie on that facet's +n side (or in it). Nearest FIRST, then the two
+     clauses — the first cut returned on the first candidate facet that
+     satisfied them and read a sepal point hovering over a petal's FOOT as
+     above its first blade quad's diagonal, 1.07 mm away, while the true
+     nearest point (0.56 mm, on the seam row) was a boundary hit. */
+  for (let i = 0; i < S.pts.length; i++) {
+    const P = S.pts[i];
+    seen.clear();
+    let best = null;
+    for (let x = g(P[0] - t); x <= g(P[0] + t); x++) for (let y = g(P[1] - t); y <= g(P[1] + t); y++) for (let z = g(P[2] - t); z <= g(P[2] + t); z++) {
+      const list = G.grid.get(`${x},${y},${z}`); if (!list) continue;
+      for (let k = 0; k < list.length; k += 2) {
+        const L = list[k], ti = list[k + 1];
+        if (!near[L]) continue;
+        const key = L * 1e7 + ti; if (seen.has(key)) continue; seen.add(key);
+        const lam = petals[L], T = lam.tris[ti];
+        const { q, where } = closestOnTriangle(P, lam.pts[T[0]], lam.pts[T[1]], lam.pts[T[2]]);
+        const d = Math.hypot(P[0] - q[0], P[1] - q[1], P[2] - q[2]);
+        if (d >= t) continue;
+        if (best === null || d < best.d) best = { d, q, where, L, T };
+      }
+    }
+    if (best === null) continue;
+    const { d, q, where, L, T } = best;
+    const lam = petals[L];
+    if (boundaryHit(lam, T, where)) continue;
+    const A = lam.pts[T[0]], B = lam.pts[T[1]], C = lam.pts[T[2]];
+    /* the facet's own normal, ORIENTED onto the emitted normal at its first
+       corner — the top skin's side, which is what `above` means. The bare
+       cross product points the other way (T x dir is -n), measured: it read
+       every sepal hanging below a petal as above it. */
+    const e1 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]], e2 = [C[0] - A[0], C[1] - A[1], C[2] - A[2]];
+    const n = [e1[1] * e2[2] - e1[2] * e2[1], e1[2] * e2[0] - e1[0] * e2[2], e1[0] * e2[1] - e1[1] * e2[0]];
+    const na = lam.nrm[T[0]];
+    if (n[0] * na[0] + n[1] * na[1] + n[2] * na[2] < 0) { n[0] = -n[0]; n[1] = -n[1]; n[2] = -n[2]; }
+    const nl = Math.hypot(n[0], n[1], n[2]); if (!(nl > 0)) continue;
+    const side = ((P[0] - q[0]) * n[0] + (P[1] - q[1]) * n[1] + (P[2] - q[2]) * n[2]) / nl;
+    if (side >= -1e-9) return { kind: d < 1e-9 ? 'coincident' : 'above', petal: L, at: q.slice(), mm: d, sepalAt: P.slice() };
+  }
+  /* (b) every sepal lattice segment through a petal facet */
+  for (const [a, b] of S.segs) {
+    const P = S.pts[a], Q = S.pts[b], D = [Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]];
+    seen.clear();
+    const x0 = g(Math.min(P[0], Q[0])), x1 = g(Math.max(P[0], Q[0])), y0 = g(Math.min(P[1], Q[1])), y1 = g(Math.max(P[1], Q[1])), z0 = g(Math.min(P[2], Q[2])), z1 = g(Math.max(P[2], Q[2]));
+    for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+      const list = G.grid.get(`${x},${y},${z}`); if (!list) continue;
+      for (let k = 0; k < list.length; k += 2) {
+        const L = list[k], ti = list[k + 1];
+        if (!near[L]) continue;
+        const key = L * 1e7 + ti; if (seen.has(key)) continue; seen.add(key);
+        const lam = petals[L], T = lam.tris[ti];
+        if (segCrossesTri(P, D, lam.pts[T[0]], lam.pts[T[1]], lam.pts[T[2]])) return { kind: 'crossing', petal: L, at: P.slice(), mm: 0, sepalAt: P.slice() };
+      }
+    }
+  }
+  /* (c) every near petal's lattice segments through a sepal facet — the other
+     half of a complete surface–surface crossing test */
+  const SG = laminaGrid([S], cell);
+  for (let L = 0; L < petals.length; L++) {
+    if (!near[L]) continue;
+    const lam = petals[L];
+    for (const [a, b] of lam.segs) {
+      const P = lam.pts[a], Q = lam.pts[b];
+      if (Math.max(P[0], Q[0]) < S.lo[0] || Math.min(P[0], Q[0]) > S.hi[0] || Math.max(P[1], Q[1]) < S.lo[1] || Math.min(P[1], Q[1]) > S.hi[1] || Math.max(P[2], Q[2]) < S.lo[2] || Math.min(P[2], Q[2]) > S.hi[2]) continue;
+      const D = [Q[0] - P[0], Q[1] - P[1], Q[2] - P[2]];
+      seen.clear();
+      const x0 = g(Math.min(P[0], Q[0])), x1 = g(Math.max(P[0], Q[0])), y0 = g(Math.min(P[1], Q[1])), y1 = g(Math.max(P[1], Q[1])), z0 = g(Math.min(P[2], Q[2])), z1 = g(Math.max(P[2], Q[2]));
+      for (let x = x0; x <= x1; x++) for (let y = y0; y <= y1; y++) for (let z = z0; z <= z1; z++) {
+        const list = SG.grid.get(`${x},${y},${z}`); if (!list) continue;
+        for (let k = 0; k < list.length; k += 2) {
+          const ti = list[k + 1]; if (seen.has(ti)) continue; seen.add(ti);
+          const T = S.tris[ti];
+          if (segCrossesTri(P, D, S.pts[T[0]], S.pts[T[1]], S.pts[T[2]])) return { kind: 'crossing', petal: L, at: P.slice(), mm: 0, sepalAt: S.pts[T[0]].slice() };
+        }
+      }
+    }
+  }
+  return null;
+}
+/* Rotate a lamina rigidly: about Z by `az` (a sepal slot's azimuth), then
+   about the ring tangent at that azimuth through the ring row by `dt` (a
+   change of tilt — the rotation from Rs toward Up is about MINUS T, measured
+   rather than assumed: +T gives a 14 mm residual, -T 1e-14). */
+export function rotateLamina(S, az, base0, dt) {
+  const ca = Math.cos(az), sa = Math.sin(az);
+  const base = [base0[0] * ca - base0[1] * sa, base0[0] * sa + base0[1] * ca, base0[2]];
+  const T = [-sa, ca, 0];
+  const c = Math.cos(-dt), s = Math.sin(-dt);
+  const pts = S.pts.map((p) => {
+    const x = p[0] * ca - p[1] * sa, y = p[0] * sa + p[1] * ca, z = p[2];
+    const v = [x - base[0], y - base[1], z - base[2]];
+    const d = v[0] * T[0] + v[1] * T[1] + v[2] * T[2];
+    const par = [T[0] * d, T[1] * d, T[2] * d];
+    const perp = [v[0] - par[0], v[1] - par[1], v[2] - par[2]];
+    const cr = [T[1] * perp[2] - T[2] * perp[1], T[2] * perp[0] - T[0] * perp[2], T[0] * perp[1] - T[1] * perp[0]];
+    return [base[0] + par[0] + perp[0] * c + cr[0] * s, base[1] + par[1] + perp[1] * c + cr[1] * s, base[2] + par[2] + perp[2] * c + cr[2] * s];
+  });
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const P of pts) for (let a = 0; a < 3; a++) { if (P[a] < lo[a]) lo[a] = P[a]; if (P[a] > hi[a]) hi[a] = P[a]; }
+  return { pts, tris: S.tris, segs: S.segs, lo, hi };
+}
+/* THE TRIAL SEPAL at one angle, in one mode, at azimuth 0: the shipped
+   builder into a throwaway accumulator with the lamina captured. One call per
+   seam-step bucket; every other angle is a rotation of it (see the header). */
+export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
+  const acc = new MeshBuilder({ exportMode, captureLamina: true });
+  const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: 0, scale: sepals.scale, tiltExtra: 0 };
+  const p = buildPetalInto(acc, sepalBladeState(state, angleDeg), sepals.ring, slot, null, false);
+  return { lamina: laminaFromPanels(p.grid), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
+}
+/* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
+   mode emitted, through the surface's own front door. The ladder is mode-free
+   (its stations are the built rows' own `u`), the outline and the sheet are
+   not, which is exactly what the union is for. */
+function petalLaminaInMode(site, state, exportMode) {
+  const acc = new MeshBuilder({ exportMode });
+  const surface = petalSurface(state, site.ring, site.slot, site.cap, acc);
+  const panels = site.p.grid.map((panel) => ({
+    rows: panel.rows.filter((r) => r.u >= ROOT_BLEND_END).map((r) => { const row = surface.rowAt(r.u); const q = r.v.map((v) => row.sect(v)); return { u: r.u, mid: q.map((x) => x.P), normal: q.map((x) => x.n) }; }),
+  }));
+  return laminaFromPanels(panels);
+}
+/* sepalAngleLimit — THE DRAWN LIMIT. `sites` are the petals the builder
+   emitted ({ p, ring, slot, cap }), with `p.grid` captured. Returns the
+   record the read-out and SP8 read. */
+export function sepalAngleLimit(state, fr, acc, sites) {
+  const t0 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  const sepals = fr.sepals;
+  const askedDeg = Number(state.sepalAngle);
+  const [lo, hi] = SEPAL_ANGLE_RANGE, step = SEPAL_ANGLE_STEP;
+  const modes = [acc.exportMode, !acc.exportMode];
+  const perMode = {};
+  let scanned = 0, configs = 0;
+  for (const exportMode of modes) {
+    const name = exportMode ? 'export' : 'live';
+    const t = acc.exportMode === exportMode ? acc.floorThickness(state.sheetThickness) : new MeshBuilder({ exportMode }).floorThickness(state.sheetThickness);
+    /* the petals in this mode */
+    const petals = sites.map((s) => (exportMode === acc.exportMode ? laminaFromPanels(s.p.grid) : petalLaminaInMode(s, state, exportMode)));
+    if (!petals.length) { perMode[name] = { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null }; continue; }
+    const G = laminaGrid(petals, t);
+    /* the distinct sepal configurations: a slot's neighbourhood is the set of
+       (petal descriptor, relative azimuth) it faces; congruent neighbourhoods
+       share one scan */
+    const configOf = new Map();
+    for (let j = 0; j < sepals.azimuths.length; j++) {
+      const az = sepals.azimuths[j];
+      const key = sites.map((s) => `${fr.rings.indexOf(s.ring)}:${(((s.slot.azimuth - az) % TAU + TAU) % TAU).toFixed(9)}`).sort().join('|');
+      if (!configOf.has(key)) configOf.set(key, j);
+    }
+    const reps = [...configOf.values()];
+    configs = Math.max(configs, reps.length);
+    const trials = new Map();   // seam-step bucket -> trial lamina at its representative angle
+    let found = null;
+    for (let deg = lo; deg <= hi && !found; deg += step) {
+      const seamStep = seamLatticeStep(seamClearanceMm(Math.abs(deg) * D2R, state.sheetThickness), state.petalLength * sepals.scale);
+      let trial = trials.get(seamStep);
+      if (!trial) { trial = sepalTrialLamina(state, sepals, deg, exportMode); trials.set(seamStep, trial); }
+      scanned++;
+      for (const j of reps) {
+        const S = rotateLamina(trial.lamina, sepals.azimuths[j], trial.base, (deg - trial.tilt) * D2R);
+        const hit = laminaContact(S, petals, G, t);
+        if (hit) { found = { deg, sepal: j, ...hit }; break; }
+      }
+    }
+    perMode[name] = found
+      ? { limitDeg: found.deg - step < lo ? null : found.deg - step, contactDeg: found.deg, kind: found.kind, petal: found.petal, sepal: found.sepal, at: found.at, mm: found.mm }
+      : { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null, mm: null };
+  }
+  /* THE UNION: the smaller limit of the two modes, so one state builds one
+     angle in both. `null` means contact at the very floor of the range. */
+  const lim = (m) => (m.limitDeg === null ? -Infinity : m.limitDeg);
+  const bound = lim(perMode.live) <= lim(perMode.export) ? 'live' : 'export';
+  const limitDeg = perMode[bound].limitDeg;
+  const angleBuiltDeg = limitDeg === null ? lo : Math.min(askedDeg, limitDeg);
+  const t1 = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return {
+    askedDeg, limitDeg, angleBuiltDeg, clamped: angleBuiltDeg < askedDeg, everywhere: limitDeg === null,
+    contactDeg: perMode[bound].contactDeg, kind: perMode[bound].kind, petal: perMode[bound].petal, sepal: perMode[bound].sepal, at: perMode[bound].at,
+    boundBy: bound, perMode, scanned, configs, costMs: t1 - t0, stepDeg: step, rangeDeg: [lo, hi], modeBuilt: acc.exportMode ? 'export' : 'live',
+  };
+}
+
+/* buildSepalsInto — the whorl. The angle is decided first (against the
+   petals the caller already built), then each sepal is the PETAL BUILDER on
+   the sepal ring with the sepal substate at that angle. Emitted LAST in the
+   bloom so the base tree's stream is a prefix of this one on every mover
+   (the byte tool's clause 2). Returns what it emitted. */
+export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap = null) {
+  const sepals = fr.sepals;
+  if (!sepals) return null;
+  const limit = sepalAngleLimit(state, fr, acc, sites);
+  /* THE CAPABILITY HOOK — `{ sepalAngleUnclamped: true }` builds the ASKED
+     angle past the drawn limit. No control reaches it (the clamp is the
+     point); the render sheet uses it to photograph the angle BEYOND its
+     limit beside the angle at it, and SP8 fires on any row that carries it,
+     which is what makes it a hook and not a setting. The limit's own record
+     is untouched so the read-out still says where contact was drawn. */
+  if (cap && cap.sepalAngleUnclamped) { limit.angleBuiltDeg = limit.askedDeg; limit.clamped = false; limit.unclamped = true; }
+  const bs = sepalBladeState(state, limit.angleBuiltDeg);
+  const built = [], azimuths = [];
+  const tris0 = acc.triangleCount;
+  buildWhorlInto({
+    count: sepals.count, radius: sepals.ring.radius, height: 0,
+    sizeRamp: () => sepals.scale, angleRamp: () => 0, phase: sepals.startAzimuth,
+    placement: sepals.placement, fan: null, azimuths: sepals.placement === 'LIST' ? sepals.azimuths : null,
+    blade: (slot) => {
+      azimuths[slot.index] = slot.azimuth;
+      const p = buildPetalInto(acc, bs, sepals.ring, slot, null, built.length === 0);
+      /* THE STATE THIS BLADE WAS BUILT FROM, keyed by the petal name the law
+         reads — SP6 compares it against the page's own sepal* read-back, an
+         owner the builder does not write. */
+      p.builtFrom = Object.fromEntries([['petalTilt', bs.petalTilt], ...SEPAL_TWINS.map(([pid]) => [pid, bs[pid]])]);
+      built.push(p);
+    },
+  });
+  /* THE FOOT AGAINST THE HUB'S UNDERSIDE, per style, from the plan's own
+     thickness law (the same call buildHubInto shapes the join from): the
+     underside's slope at the RIM, where the blade emerges (0 wherever the
+     blend stops short of the rim, which is every style at every amount whose
+     blend radius is inside it); how deep the foot's INNER end is buried below
+     the sheet where the join thickens under it; and whether the blend reaches
+     the foot's span at all. The foot's own tangent at the rim is the ring's
+     (flat, or the cap's), so its mismatch to the underside IS the underside's
+     slope there. Told on the read-out; nothing here reads it back. */
+  let undersideSlopeDeg = 0, shoulderDeg = 0, undersideChordDeg = 0, footBuriedMm = 0, blendReachesFoot = false, blendReachesRim = false;
+  if (stemPlanned && stemPlanned.present && !stemPlanned.inert) {
+    const t = acc.floorThickness(fr.hub.thickness);
+    const P = { hubR: fr.hub.radius, hubT: t, outerR: stemPlanned.outerR, joinT: stemPlanned.joinT, style: stemPlanned.hubStyle, amount: stemPlanned.hubAmount, axisDepth: stemPlanned.axisDepth };
+    const R0 = fr.hub.radius, b = stemPlanned.blendR;
+    /* THE SHOULDER: the underside's slope just INSIDE the blend edge, one-sided
+       (a difference straddling the edge reads the flat side). GOBLET and CURVED
+       arrive at their edge tangent-horizontal; ANGLED arrives at the cone's own
+       slope — a hard shoulder, by design. */
+    const d = Math.max(1e-9, 1e-6 * (b - stemPlanned.outerR));
+    shoulderDeg = b > stemPlanned.outerR ? Math.atan((hubJoinThicknessAt(b - d, P) - hubJoinThicknessAt(b - 1e-12, P)) / (d - 1e-12)) * 180 / Math.PI : 0;
+    /* AT THE RIM to within a hundredth of the printable feature — a LENGTH,
+       not an ulp: at MAX amount x MAX length the constant-stress law stops
+       2 µm inside the rim (8.8424 of 8.8447 mm, measured), which no printer
+       can tell from the rim itself. */
+    blendReachesRim = R0 - b < MIN_FEATURE_MM / 100;
+    /* AT THE RIM, where the blade emerges: the shoulder's slope iff the blend
+       reaches the rim, else the flat annulus — the foot's own tangent there is
+       the ring's, so this IS the foot-to-underside mismatch. */
+    undersideSlopeDeg = blendReachesRim ? shoulderDeg : 0;
+    /* AND THE CHORD ONE PRINTABLE FEATURE IN, because the tangent alone is
+       misleading on GOBLET and CURVED: both arrive at the rim tangent-flat
+       (0 deg analytically) with UNBOUNDED curvature at their edge, so the
+       underside a printer lays down is already falling steeply a millimetre
+       inside the rim — measured off the emitted hub, 15 to 72 deg over the
+       last 0.5 mm at MAX length while the tangent read 0. The chord over
+       MIN_FEATURE_MM is the number the foot actually meets; both are told. */
+    undersideChordDeg = Math.atan((hubJoinThicknessAt(R0 - MIN_FEATURE_MM, P) - hubJoinThicknessAt(R0, P)) / MIN_FEATURE_MM) * 180 / Math.PI;
+    footBuriedMm = Math.max(0, hubJoinThicknessAt(Math.max(stemPlanned.outerR, R0 - sepals.ring.overhang), P) - t);
+    blendReachesFoot = b > R0 - sepals.ring.overhang;
+  }
+  return { built, azimuths, tris: acc.triangleCount - tris0, limit, count: built.length,
+           footTangentDeg: undersideSlopeDeg, undersideSlopeDeg, shoulderDeg, undersideChordDeg, undersideChordMm: MIN_FEATURE_MM, footBuriedMm, blendReachesFoot, blendReachesRim,
+           blendGapMm: stemPlanned && stemPlanned.present && !stemPlanned.inert ? fr.hub.radius - stemPlanned.blendR : null };
+}
+
 export function buildBloomInto(acc, state, { below = null, capability = null } = {}) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
@@ -9257,6 +9860,15 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      rather than on a passing 0. */
   const stemPlanned = stemPlan(state, fr.hub, acc);
   const omission = stemOmission(state, fr, capability, stemPlanned);
+  /* THE PETALS' LAMINAE ARE CAPTURED WHEN A SEPAL WHORL IS ASKED FOR — the
+     sepal angle limit is drawn against the petals the builder emits, and the
+     capture is the emitted mid-surface itself (emitPanel's own vectors), so no
+     second evaluation of the surface exists. Restored after the petal loops;
+     inert by branch at sepalCount 0. `sites` pairs each emitted petal with the
+     ring and slot it was built on, for the other-mode lamina evaluation. */
+  const sites = [];
+  const laminaWas = acc.captureLamina;
+  if (fr.sepals) acc.captureLamina = true;
   if (fr.continuousMode) {
     /* ONE WHORL, so one azimuth row — the continuous sequence's own. */
     const azOf = new Array(fr.rings.length);
@@ -9293,6 +9905,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
         const p = buildPetalInto(acc, state, fr.rings[slot.index], slot, capability, petalsBuilt === 0);
         petalsBuilt++;
         petals.push(p); petalsAll.push(p);
+        sites.push({ p, ring: fr.rings[slot.index], slot, cap: capability });
       },
     });
     slotAzimuths.push(azOf);
@@ -9334,6 +9947,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
         const d = slotsFor[slot.index];
         const p = buildPetalInto(acc, state, d, slot, capability);
         petalsAll.push(p);
+        sites.push({ p, ring: d, slot, cap: capability });
         /* ONE REPORTED PETAL PER DESCRIPTOR — its first slot's. Under the
            collapsed arm that is slot 0 of the whorl, which is what every
            pre-session-B consumer read; under a split whorl it becomes one
@@ -9347,6 +9961,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     for (const d of fr.rings) if (d.lambda === L) petals.push(perDescriptor.get(d) ?? null);
   }
   }
+  acc.captureLamina = laminaWas;
   const hubBuilt = buildHubInto(acc, state, fr.hub);    // unconditional — the invariant's plumbing
   /* THE STEM (session 43) — ONE closed solid on the axis, rooted THROUGH the
      hub wall, overlapping it exactly as every stamen and the style already do.
@@ -9402,6 +10017,11 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      androecium's. */
   const styles = [];
   if (fr.gynoecium) styles.push(buildStyleInto(acc, fr.gynoecium));
+  /* THE SEPALS (sepals, part 1) — the petal builder a second time, on the
+     hub's rim, at the angle the drawn limit allows, EMITTED LAST so the
+     stream of a bloom without them is a prefix of the stream with them.
+     Null by branch at sepalCount 0 and under SPHERE. */
+  const sepalsBuilt = buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
   /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
      Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
      property of the range's ends, so what closes the question is an
@@ -9467,5 +10087,10 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      WITH NO PETAL AT ALL (the bare corner, where the stem takes every one) both
      stay at descriptor 0 and `petal` is null, which is the truth. */
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
-  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt };
+  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt,
+    /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
+       with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
+       so `tools/bloom-sepal-contact.mjs` can draw the same petals densely
+       without a second producer of which ring a petal stood on. */
+    petalSites: sites };
 }
