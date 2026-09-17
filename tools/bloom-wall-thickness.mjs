@@ -289,12 +289,28 @@ export function measureCurvature(grid, { footRows = 3, half = 2, uMin = 0.15, uM
        form-max          0.037 -> 0.010
        buckle-on-form    0.583 -> 0.299
    No state that passes on `main` fails here, which is the claim that makes
-   this list honest rather than convenient. */
+   this list honest rather than convenient.
+
+   AND THE MAGNITUDE IS GATED (#213, closed — docs/bloom-xfail-magnitudes.md).
+   `selfMm` is the self-approach the instrument read on THIS tree, EXPORT
+   mode, the shipped 56x10 grid, and V5 requires the row to still read it to
+   within SELF_XFAIL_TOLERANCE_MM in BOTH directions: half a unit in the third
+   decimal, the precision this instrument prints and the list records — the
+   record's own rounding, never a printability argument (the bar for THAT is
+   MIN_FEATURE_MM, above). Before this the figures in the strings were a
+   comment: measured 2026-09-17 on main at 7ebfb7f, `form-max` read 0.042
+   where the string said 0.010 and `buckle-on-form` 0.254 where it said
+   0.299 — one better, one WORSE, both silent. The history is kept in each
+   note so the drift is legible. */
+export const SELF_XFAIL_TOLERANCE_MM = 5e-4;
 export const SELF_XFAIL = Object.freeze({
-  'roll-max': 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 here. Pre-existing, recorded as found-in-passing by session 33, its own session.',
-  'form-max': 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 here, DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.',
-  'buckle-on-form': 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 here. This is the row that established self-approach as the hazard; it fails on main WITHOUT this session\'s controls, so it is pre-existing too.',
+  'roll-max': { selfMm: 0.659, note: 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 at session 34 and still 0.659 on main at 7ebfb7f (2026-09-17). Pre-existing, recorded as found-in-passing by session 33, its own session.' },
+  'form-max': { selfMm: 0.042, note: 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 at session 34, 0.042 on main at 7ebfb7f (2026-09-17 — IMPROVED since the string was written and nobody had re-recorded it), DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.' },
+  'buckle-on-form': { selfMm: 0.254, note: 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 at session 34, 0.254 on main at 7ebfb7f (2026-09-17 — WORSE since the string was written and nobody had re-recorded it: a finding, docs/bloom-xfail-magnitudes.md). This is the row that established self-approach as the hazard; it fails on main WITHOUT this session\'s controls, so it is pre-existing too.' },
 });
+for (const [id, e] of Object.entries(SELF_XFAIL)) {
+  if (!e || !(Number.isFinite(e.selfMm) && e.selfMm >= 0)) throw new Error(`SELF_XFAIL: "${id}" declares no self-approach in mm (${JSON.stringify(e)}) — an entry is {selfMm[, note]}, and a declaration without a number is a label`);
+}
 
 /* ------------------------------------------------------------------ states */
 
@@ -338,12 +354,17 @@ export const STATES = [
        that argument gets made in front of.
        IT IS AN XFAIL, NOT A WIDER BAR. The run FAILS HARD if it starts
        passing — that is the clamp landing, and the marker must come off in
-       the same commit. */
-    xfail: 'composition: SELF-APPROACH, not curvature — own contribution 0.602 mm at the shipped 56x10 '
+       the same commit. AND ITS MAGNITUDE IS GATED (#213): `ownDeficitMm` is
+       the buckle's own contribution the instrument read on this tree, and V4
+       requires it to reproduce within SELF_XFAIL_TOLERANCE_MM both ways —
+       measured 2026-09-17 on main at 7ebfb7f it read 0.607 where the string
+       said 0.602, WORSE by 0.005 mm and silent. */
+    xfail: { ownDeficitMm: 0.607,
+      note: 'composition: SELF-APPROACH, not curvature — own contribution 0.602 mm at the shipped 56x10 when session 34 wrote it, 0.607 on main at 7ebfb7f (2026-09-17) '
          + '(0.438 at 28x10, predicted 0.635 at 84x30, so the row count confirmed the prediction). '
          + 'Measured session 34: the composed principal curvature is LOWER than the base alone '
          + '(1.0625 against 1.1149 /mm) while the wall collapses and SELF ~ WALL, so no curvature '
-         + 'bound can catch it. Neither ingredient alone does it: cup+buckle reads 1.052, curl+buckle 1.182.' },
+         + 'bound can catch it. Neither ingredient alone does it: cup+buckle reads 1.052, curl+buckle 1.182.' } },
 ];
 
 /* ------------------------------------------------------------------- driver */
@@ -392,10 +413,18 @@ function floatDiff(a, b) {
   return { differ, len: a.length };
 }
 
-export async function verify({ root = ROOT, quiet = false } = {}) {
+export async function verify({ root = ROOT, quiet = false, perturb = null } = {}) {
   const fails = [];
   const say = (...a) => { if (!quiet) console.log(...a); };
   const { G, D, rows } = await run({ root });
+  /* THE RECORD CONTROL. `perturb` swaps ONE declared magnitude for a wrong
+     one — { selfXfail: { id, selfMm } } or { v4: { ownDeficitMm } } — so the
+     magnitude clauses below can be seen to fire without a geometry mutation.
+     It exists because a clause nobody has watched go red is a hope; the
+     negative control runs it after the geometry mutants. */
+  const xf = perturb && perturb.selfXfail ? { ...SELF_XFAIL, [perturb.selfXfail.id]: { ...SELF_XFAIL[perturb.selfXfail.id], selfMm: perturb.selfXfail.selfMm } } : SELF_XFAIL;
+  if (perturb && perturb.selfXfail && !SELF_XFAIL[perturb.selfXfail.id]) throw new Error(`perturb names "${perturb.selfXfail.id}", which SELF_XFAIL does not declare`);
+  for (const r of rows) if (perturb && perturb.v4 && r.xfail) r.xfail = { ...r.xfail, ownDeficitMm: perturb.v4.ownDeficitMm };
 
   say('bloom wall thickness — the distance between the two emitted skins.\n');
   say('  ' + 'state'.padEnd(42) + 'WALL'.padStart(8) + 'SELF'.padStart(8) + "  buckle's own".padStart(14) + '  rows/cyc  worst at (u, v)');
@@ -503,22 +532,26 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
     const bar = G.MIN_FEATURE_MM;
     if (typeof bar !== 'number') fails.push('V5 self-approach: the geometry does not export MIN_FEATURE_MM — this gate will not invent a bar');
     for (const r of rows) {
-      const known = Object.prototype.hasOwnProperty.call(SELF_XFAIL, r.id);
+      const known = Object.prototype.hasOwnProperty.call(xf, r.id);
       const under = r.self < bar;
       if (under && !known) {
-        fails.push(`V5 self-approach: "${r.label}" brings the sheet within ${r.self.toFixed(3)} mm of itself, under the ${bar.toFixed(2)} mm minimum printable gap — a NEW self-approach, not one of the ${Object.keys(SELF_XFAIL).length} declared pre-existing ones`);
+        fails.push(`V5 self-approach: "${r.label}" brings the sheet within ${r.self.toFixed(3)} mm of itself, under the ${bar.toFixed(2)} mm minimum printable gap — a NEW self-approach, not one of the ${Object.keys(xf).length} declared pre-existing ones`);
       } else if (!under && known) {
-        fails.push(`V5 xfail: "${r.label}" now clears the bar at ${r.self.toFixed(3)} mm and PASSES — the pre-existing self-approach is FIXED. Remove its SELF_XFAIL entry in the same commit. (was: ${SELF_XFAIL[r.id]})`);
+        fails.push(`V5 xfail: "${r.label}" now clears the bar at ${r.self.toFixed(3)} mm and PASSES — the pre-existing self-approach is FIXED. Remove its SELF_XFAIL entry in the same commit. (was: ${xf[r.id].selfMm.toFixed(3)} mm — ${xf[r.id].note})`);
+      } else if (under && known) {
+        /* THE MAGNITUDE (#213): the record must still reproduce, both ways. */
+        const d = r.self - xf[r.id].selfMm;
+        if (Math.abs(d) > SELF_XFAIL_TOLERANCE_MM) fails.push(`V5 xfail magnitude: "${r.label}" is declared at ${xf[r.id].selfMm.toFixed(3)} mm of self-approach and reads ${r.self.toFixed(3)} (${d > 0 ? '+' : ''}${d.toFixed(3)} mm, band ±${SELF_XFAIL_TOLERANCE_MM}) — ${d < 0 ? 'the sheet comes CLOSER to itself than the record says: the declared defect got WORSE' : 'the sheet clears more than the record says: it IMPROVED and nobody re-recorded it'}. Re-measure (this tool prints the figure) and re-record it in the commit that moved it, naming the move in its outcome doc.`);
       }
     }
-    const stray = Object.keys(SELF_XFAIL).filter((id) => !rows.some((r) => r.id === id));
+    const stray = Object.keys(xf).filter((id) => !rows.some((r) => r.id === id));
     if (stray.length) fails.push(`V5 xfail: SELF_XFAIL names ${stray.join(', ')}, which no longer exists in STATES — a declaration nothing measures is worse than an absence`);
     if (!fails.some((f) => f.startsWith('V5'))) {
-      const worst = rows.filter((r) => !SELF_XFAIL[r.id]).reduce((a, b) => (b.self < a.self ? b : a));
-      say(`  V5 self-approach: every state clears the ${bar.toFixed(2)} mm minimum printable gap except the ${Object.keys(SELF_XFAIL).length} declared pre-existing ones; closest passing is "${worst.label}" at ${worst.self.toFixed(3)} mm.`);
-      for (const id of Object.keys(SELF_XFAIL)) {
+      const worst = rows.filter((r) => !xf[r.id]).reduce((a, b) => (b.self < a.self ? b : a));
+      say(`  V5 self-approach: every state clears the ${bar.toFixed(2)} mm minimum printable gap except the ${Object.keys(xf).length} declared pre-existing ones; closest passing is "${worst.label}" at ${worst.self.toFixed(3)} mm.`);
+      for (const id of Object.keys(xf)) {
         const r = rows.find((x) => x.id === id);
-        say(`  V5 xfail (pre-existing, still failing as expected): "${r.label}" at ${r.self.toFixed(3)} mm — ${SELF_XFAIL[id]}`);
+        say(`  V5 xfail (pre-existing, still failing at its recorded ${xf[id].selfMm.toFixed(3)} mm ±${SELF_XFAIL_TOLERANCE_MM}): "${r.label}" at ${r.self.toFixed(3)} mm — ${xf[id].note}`);
       }
     }
   }
@@ -527,10 +560,15 @@ export async function verify({ root = ROOT, quiet = false } = {}) {
      rather than a quiet bonus — the marker has to come off in the same commit
      or the gate stops meaning anything for that row. */
   for (const r of buckled.filter((x) => x.xfail)) {
-    if (r.ownDeficit <= WALL_TOLERANCE) {
-      fails.push(`V4 xfail: "${r.label}" now costs only ${r.ownDeficit.toFixed(3)} mm and PASSES — the tracked defect is fixed. Remove its \`xfail\` marker in the same commit. (was: ${r.xfail})`);
+    if (!(Number.isFinite(r.xfail.ownDeficitMm) && r.xfail.ownDeficitMm > 0)) fails.push(`V4 xfail: "${r.label}" carries an xfail marker with no recorded magnitude — a marker is {ownDeficitMm, note}, and a marker without a number is a label`);
+    else if (r.ownDeficit <= WALL_TOLERANCE) {
+      fails.push(`V4 xfail: "${r.label}" now costs only ${r.ownDeficit.toFixed(3)} mm and PASSES — the tracked defect is fixed. Remove its \`xfail\` marker in the same commit. (was: ${r.xfail.ownDeficitMm.toFixed(3)} mm — ${r.xfail.note})`);
+    } else if (Math.abs(r.ownDeficit - r.xfail.ownDeficitMm) > SELF_XFAIL_TOLERANCE_MM) {
+      /* THE MAGNITUDE (#213): the record must still reproduce, both ways. */
+      const d = r.ownDeficit - r.xfail.ownDeficitMm;
+      fails.push(`V4 xfail magnitude: "${r.label}" is declared to cost ${r.xfail.ownDeficitMm.toFixed(3)} mm and reads ${r.ownDeficit.toFixed(3)} (${d > 0 ? '+' : ''}${d.toFixed(3)} mm, band ±${SELF_XFAIL_TOLERANCE_MM}) — ${d > 0 ? 'the tracked defect got WORSE' : 'the tracked defect IMPROVED and nobody re-recorded it'}. Re-measure (this tool prints the figure) and re-record it in the commit that moved it, naming the move in its outcome doc.`);
     } else {
-      say(`  V4 xfail (tracked, still failing as expected): "${r.label}" costs ${r.ownDeficit.toFixed(3)} mm — ${r.xfail}`);
+      say(`  V4 xfail (tracked, still failing at its recorded ${r.xfail.ownDeficitMm.toFixed(3)} mm ±${SELF_XFAIL_TOLERANCE_MM}): "${r.label}" costs ${r.ownDeficit.toFixed(3)} mm — ${r.xfail.note}`);
     }
   }
   for (const r of buckled.filter((x) => x.report)) {
@@ -851,7 +889,28 @@ if (IS_MAIN) {
        it, "all mutants behaved" is a sentence nobody has ever seen fail. */
     const d = (process.argv.find((a) => a.startsWith('--disarm=')) || '').split('=')[1] || null;
     const nu = (process.argv.find((a) => a.startsWith('--neuter=')) || '').split('=')[1] || null;
-    const bad = await negativeControl({ disarm: d, neuter: nu });
+    let bad = await negativeControl({ disarm: d, neuter: nu });
+    /* THE RECORD CONTROL (#213): each magnitude clause must be SEEN to fire on
+       a record that is wrong by more than its band, in both directions, with
+       the geometry untouched. A mutant table over the geometry cannot show
+       this — no geometry edit moves ONLY a declared row's number — so it is
+       its own leg, and it runs here so CI carries it. */
+    if (!d && !nu) {
+      const legs = [
+        ['V5 record stale, worse',  { selfXfail: { id: 'roll-max', selfMm: SELF_XFAIL['roll-max'].selfMm + 0.1 } }, 'V5 xfail magnitude'],
+        ['V5 record stale, better', { selfXfail: { id: 'roll-max', selfMm: SELF_XFAIL['roll-max'].selfMm - 0.1 } }, 'V5 xfail magnitude'],
+        ['V4 record stale, worse',  { v4: { ownDeficitMm: 0.3 } }, 'V4 xfail magnitude'],
+        ['V4 record stale, better', { v4: { ownDeficitMm: 0.9 } }, 'V4 xfail magnitude'],
+      ];
+      for (const [name, perturb, want] of legs) {
+        const { fails } = await verify({ quiet: true, perturb });
+        const hit = fails.filter((f) => f.startsWith(want));
+        const other = fails.filter((f) => !f.startsWith(want));
+        const ok = hit.length === 1 && other.length === 0;
+        console.log(`  ${ok ? 'ok  ' : 'FAIL'} record control: ${name.padEnd(24)} ${hit.length ? 'fired ' + want : 'did NOT fire ' + want}${other.length ? ' (and ' + other.length + ' other clause(s) fired, which a record perturbation must not cause)' : ''}`);
+        if (!ok) bad++;
+      }
+    }
     if (d || nu) {
       const what = d ? `disarmed ("${d}", stale anchor)` : `neutered ("${nu}", edit applies but changes nothing)`;
       console.log(bad ? `\nguard check: the sweep REPORTED the ${what} mutant — the guard fires.`

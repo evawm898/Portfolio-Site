@@ -210,6 +210,31 @@ worth nothing however strict it looks. **All three were found by re-reading the 
 the clause — which is the only thing that finds them**, because a green run, a mutant table and
 CI are all instruments that ask the clause its own question.
 
+**AN XFAIL ENTRY CARRIES ITS MAGNITUDE AS A NUMBER THE GATE READS, IN BOTH DIRECTIONS**
+(#213, closed — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
+`EXPORT_REFUSED_XFAIL`, the wall instrument's `SELF_XFAIL` or its V4 marker). Every entry is
+structured now — `{ pairs, worstMm, note }`, `{ tris, note }`, `{ selfMm, note }`,
+`{ ownDeficitMm, note }` — and the module REFUSES TO LOAD on an entry with no number. X1
+holds a declared row to its recorded pair count EXACTLY and its worst span within ±5e-5 mm
+(the record's own rounding); XR1 holds the refused row's triangle count exactly, on the read-out
+and on the builder's tally; V5 and V4 hold the wall records within ±5e-4 mm. **BOTH
+DIRECTIONS**: an entry is a record of the tree, and a record that stops reproducing is stale
+whether the row got worse or better — the message says which. A pair count has no noise on one
+engine (0 of 261 rows differ between Node 20 and Node 22, measured over the whole list), so it
+gets no band; a relative band was rejected because it passes a +17% regression at 25% and
+reddens a four-pair row on one tangency. **THE RE-MEASUREMENT INSTRUMENT IS `node
+tools/bloom-xfail-magnitudes.mjs`** (Node, minutes, no browser; `--emit` prints the entries the
+tree measures, `--control` is the must-fail, `--root <tree>` measures another geometry against
+this list): a session that legitimately moves a declared row's tessellation runs it, re-records
+the movers in the same commit and names them in its outcome doc — before the 3.5-hour gate says
+so. **WHAT THE GATE FOUND ON THE DAY IT LANDED:** 23 of 261 self-intersection entries, the
+refused row's count (2,412,512 recorded, 2,412,412 built — the stem tip plug's hundred
+triangles) and 3 of the wall instrument's 4 figures no longer matched what the tree measured,
+and not one of them had reddened anything; nine of the 23 were WORSE. They are recorded at
+today's measurement with the previous figure kept in each entry's note, and attributed in the
+doc. **Do not widen a band to keep the suite green** — a row that reads worse than its record
+is a finding for the change that moved it, and the doc is where it is named.
+
 **AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
 ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
 triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
@@ -2370,9 +2395,13 @@ disc, while on a SPHERE the join is INERT so the symptom is the whole head insid
 option 1 answers the sphere case and does nothing for the CAP one — **predicted there, then
 MEASURED once the band shipped: a CAP's component count is IDENTICAL with the band and without
 it, and the stray piece is 12 voxels at a SINGLE z of −3.696, which is `hubT/2 − joinT`
-exactly.** That is #236's own zero-volume join shell and not the head, so **#236 STAYS FILED,
-OPEN AND UNTOUCHED** — and `main` today still ships a reachable state that violates the
-one-connected-solid invariant. It wants its own PR.
+exactly.** That is #236's own zero-volume join shell and not the head, so #236 was filed open
+here and it wanted its own PR — **and it got one: #236 is CLOSED by #242 (`f64f3bc`, the hub's
+shape session).** The join is inert where the head is not wider than the stem, so the
+zero-volume shell is no longer built, and the solid root band is generalised from sphere-only
+to cap and flat heads; both halves, all three styles, one connected piece, measured there.
+(This line corrected by the inflorescence discovery's rulings PR, Sep 17; the paragraph's
+measurements above describe the tree as it was when #236 was filed.)
 **AND THE FIRST PASS OF THAT INVESTIGATION GOT THE MECHANISM WRONG BY USING THE WELD**: the
 vertex-weld shell count is not the connectedness test (this file's own rule), and it suggested
 "the head never reaches the tube" where the nearest head vertex to the tube's material reads
@@ -2544,9 +2573,12 @@ The twin sweep's other folds are the petal's own on a 21 mm blade (cup, roll, cu
 buckle at amp 0.3, which the PETAL does identically at those controls while no petal row asks
 for it). SP0–SP9 in both STL gates, SP8 the clamp with the harness's own contact test, eight
 mutants witnessed on the mutated module, block 35 (65 rows), smoke block 35 (7 rows, `--conn`
-required), `frozen/phase34` = the 778 rows at `f64f3bc`. `ALL MAX` re-measured at 104,563 /
-3.1556 with or without its 40 sepals (the 130,004 entry had gone stale again; #213) and exports
-2,506,652 tris (+94,140), still a declared refusal. The image is `node
+required), `frozen/phase34` = the 778 rows at `f64f3bc`. `ALL MAX` reads **129,803 / 3.1556** with
+or without its 40 sepals — main's own record from #246, reproduced through
+`tools/bloom-xfail-magnitudes.mjs` on the merged tree; the sepal session's first figure of
+104,563 came from an uncommitted script, did not reproduce, and is WITHDRAWN in the outcome doc
+— and it exports 2,506,652 tris (+94,240 over main's 2,412,412), still a declared refusal.
+The 20 sepal xfail entries are in #246's structured form and reproduce on the merged tree. The image is `node
 tools/shot-bloom-sepals.mjs <dir>` → **`docs/img/sepals.png`** — the foot on the three styles
 at MAX × MAX framed on the rim from below, and the angle under / at / beyond its limit, the
 last through `{ sepalAngleUnclamped: true }`, a capability hook no control reaches.

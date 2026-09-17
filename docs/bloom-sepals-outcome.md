@@ -282,10 +282,23 @@ crossing the foot's top plane; the descending blade's bottom skin against the fo
 at the rim is the case it was never asked about. The sepal angle range is the first thing in
 this project to turn a blade down; the range is kept as ruled and the rows are declared.
 
-**`ALL MAX` re-measured**: 104,563 pairs / 3.1556 mm, IDENTICAL with the row's 40 sepals and
-with `sepalCount` 0 — the sepals add nothing, and the entry had read 130,004 since #242
-(stale again; #213). It exports 2,506,652 triangles (119.5 MiB), +94,140 for the forty
-sepals, and stays a declared refusal.
+**`ALL MAX` re-measured — and the first figure is WITHDRAWN.** This session first recorded
+104,563 pairs / 3.1556 mm, "identical with the row's 40 sepals and with `sepalCount` 0".
+#246 (the magnitude gate, merged while this PR was in CI) measured the same row on `main` at
+**129,803 / 3.1556** and named the disagreement in its §6 and §7; run on the MERGED tree through
+that gate's own instrument (`node tools/bloom-xfail-magnitudes.mjs --include-refused --only
+'^ALL MAX$'` — EXPORT mode, the row's own set coerced by control kind, the builder's doubles)
+the row reads **129,803 pairs / 3.1556 mm WITH its forty sepals**, so the sepals still add no
+pair and the count is main's, not 104,563. The 104,563 was read through an uncommitted
+measuring script and does not reproduce through the shipped tool; why it differed is NOT
+established (a different coercion of the row's string values is the likely class — the
+`!'0'` trap this file's own §9 records — and it was not isolated), so the number is withdrawn
+rather than explained. What stands is the shipped tool's reading, which is what X1 gates.
+The row exports 2,506,652 triangles (119.5 MiB), +94,240 for the forty sepals over
+the 2,412,412 main records after the stem tip plug, and stays a declared refusal (XR1 holds
+that count exactly). **Every one of this session's 20 sepal xfail entries reproduces through
+the same tool on the merged tree, pair for pair and span for span**, and each is recorded in
+#246's structured form (`{ pairs, worstMm, note }`), which the module now requires to load.
 
 ## 9. The gates
 
