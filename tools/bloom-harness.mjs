@@ -5423,7 +5423,13 @@ export async function stemAssertions(page, row) {
        trees, every disagreeing shell (495 on the fixed tree, all petals)
        sits on a row the census reads pairs on, and NO clean row disagrees.
        On a declared row it is reported, never asserted.
-   X1  A ROW NAMED IN SELF_INTERSECTION_XFAIL STILL SELF-INTERSECTS. The list
+   X1  A ROW NAMED IN SELF_INTERSECTION_XFAIL STILL SELF-INTERSECTS, AT THE
+       MAGNITUDE IT DECLARES (#213, closed — the pair count EXACTLY and the
+       worst span within the record's own rounding, in BOTH directions; the
+       tolerance, its derivation and the re-measurement instrument are at the
+       list's foot, and every reading is in docs/bloom-xfail-magnitudes.md).
+       Before that the entry's figures were a COMMENT and fifteen rows once
+       regressed without a red. The list
        was RE-BASELINED ON THIS BRANCH IN SESSION 38 (it was main at ead8624
        until then, and the note above the list says why it could not stay
        there): the builder in export mode on its own doubles, every
@@ -6123,13 +6129,21 @@ export function orientationAssertions(positions, row, head) {
 
    THE ENTRY CARRIES ITS MEASURED COUNT AND ITS REASON, the
    `SELF_INTERSECTION_XFAIL` shape: one entry, one row, one number, so the row
-   is named with its figure on every run rather than going quiet. Like that
-   list, this one does not gate MAGNITUDE — a declared row whose count drifts
-   further above the budget still passes — and for the same reason: a magnitude
-   gate is its own ruling. What it DOES gate is the boolean and the cause.  */
+   is named with its figure on every run rather than going quiet. AND THE
+   COUNT IS GATED, EXACTLY (#213, closed): the read-out's refused count and the
+   builder's own tally must both equal `tris` to the integer. A triangle count
+   is topology — fixed by the control set, identical live and export on every
+   measured row, and reproduced to the integer under Node 20 and Node 22 — so
+   it carries no noise and gets no band; a declared row whose count moves in
+   EITHER direction is a record that stopped reproducing, and the commit that
+   moved it re-records it (`node tools/bloom-xfail-magnitudes.mjs`).  */
 export const EXPORT_REFUSED_XFAIL = Object.freeze({
-  'ALL MAX': '2,412,512 tris (export) against the 1,500,000 budget, a 115.0 MiB file — the blanket sweep hands the three new controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.',
+  'ALL MAX': { tris: 2412512, note: '2,412,512 tris (export) against the 1,500,000 budget, a 115.0 MiB file — the blanket sweep hands the three new controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
 });
+for (const [label, e] of Object.entries(EXPORT_REFUSED_XFAIL)) {
+  if (!e || !Number.isInteger(e.tris) || e.tris < 1) throw new Error(`EXPORT_REFUSED_XFAIL: "${label}" declares no triangle count (${JSON.stringify(e)}) — an entry is {tris[, note]}, and a declaration without a number is a label`);
+}
+export const exportRefusedText = (e) => `${e.tris.toLocaleString('en-US')} tris${e.note ? ' — ' + e.note : ''}`;
 export const EXPORT_REFUSED_HAS = (label) => Object.prototype.hasOwnProperty.call(EXPORT_REFUSED_XFAIL, label);
 
 /* Called by BOTH STL gates at the one place a missing file is observable.
@@ -6143,7 +6157,7 @@ export async function exportRefusalAssertion(page, row, gotStl) {
      a clause returned as an array literal is a family the subset can never be
      made to claim. It caught XR2 written that way. */
   if (gotStl) {
-    if (declared) bad.push(`XR1: this row is declared EXPORT-REFUSED (${EXPORT_REFUSED_XFAIL[row.label]}) and it EXPORTED. The refusal is gone — remove its EXPORT_REFUSED_XFAIL entry in the same commit.`);
+    if (declared) bad.push(`XR1: this row is declared EXPORT-REFUSED (${exportRefusedText(EXPORT_REFUSED_XFAIL[row.label])}) and it EXPORTED. The refusal is gone — remove its EXPORT_REFUSED_XFAIL entry in the same commit.`);
     return { bad, declared, refused: false, r: null };
   }
   /* No file. Everything below distinguishes "the generator refused, for the
@@ -6167,6 +6181,11 @@ export async function exportRefusalAssertion(page, row, gotStl) {
   const live = await page.evaluate(() => { const m2 = window.__bloomMetrics(); return m2 ? (m2.shownTris ?? m2.liveTris ?? null) : null; });
   if (live == null) bad.push('XR1: no builder tally to check the refused count against — the count has only one owner and the clause is worth nothing');
   else if (!(live > budget)) bad.push(`XR1: the read-out refused at ${said} tris but the BUILDER's own tally is ${live}, which is not over the ${budget} budget — the refusal and the geometry disagree about the size of this build`);
+  /* THE MAGNITUDE (#213): the declared count is a measurement of this row and
+     the row must still measure it — to the integer, in both directions. */
+  const want = EXPORT_REFUSED_XFAIL[row.label].tris;
+  if (said !== want) bad.push(`XR1: the read-out refused at ${said} tris where the declaration records ${want} (${said > want ? '+' : ''}${said - want}) — the refused build is not the size it was declared at. Re-measure it (node tools/bloom-xfail-magnitudes.mjs --include-refused) and re-record it in the commit that moved it, naming the move in its outcome doc.`);
+  if (live != null && live !== want) bad.push(`XR1: the BUILDER's own tally is ${live} where the declaration records ${want} — a count that differs from the refused export's is a mode-dependent topology, which no row here may have`);
   return { bad, declared: true, refused: true, r: { said, budget, live, mib: (said * 50 + 84) / 1048576 } };
 }
 
@@ -6530,6 +6549,71 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)': '199 pairs, worst span 0.2394 mm at (0.13, 2.72, 33.21) — the HEAD\'s fold at the FACE pole, not the stem\'s: the identical state with stemLength 0 reads the same 199 pairs at the same point on this tree AND on a worktree of main',
 });
 
+/* THE MAGNITUDE IS GATED (#213, closed — docs/bloom-xfail-magnitudes.md has
+   every reading, the ruling and the rows it found already moved).
+
+   WHAT AN ENTRY IS. `{ pairs, worstMm[, note] }`: the within-shell pair count
+   and the worst span the census read on THIS tree, in EXPORT mode on the
+   builder's own doubles (the mode and the sampling named, as the durable rule
+   asks — the gate's X0 proves those doubles are the STL's own). The module
+   refuses to load on an entry with no numbers, so a declaration can no longer
+   be a comment wearing a number's clothes — which is what every entry was
+   until this landed: the strings were written down, read by nobody, and
+   fifteen rows regressed under them without a red.
+
+   THE TOLERANCE, AND WHY IT IS TWO NUMBERS WITH TWO DERIVATIONS.
+     pairs    EXACT (band 0). A pair count is an integer property of the
+              tessellation, not a length, and on one engine it has no noise:
+              the whole list re-measured under Node 20 (CI's) and Node 22
+              agrees on every row to the pair. The seam-bytes list already
+              holds its triangle counts this way ("it is not a tolerance and
+              it is not a skip"), and bloom-lobe-composition.mjs has held five
+              of these entries to the exact pair since session 38.
+     worstMm  ±5e-5 mm. Half a unit in the fourth decimal — the precision the
+              list RECORDS — so the band is the record's own rounding and not
+              a print-resolution argument: whether a fold matters for printing
+              is X2's question (any fold is a fold), this clause only asks
+              whether the tree still reads what was written down. It is the
+              same figure the lobe-composition tool has used against this list
+              since session 38, and four orders above the ~1e-12 mm an engine
+              ulp can move a station by.
+   BOTH DIRECTIONS. An entry is a record of the tree; a record that stops
+   reproducing is stale whether the row got worse or better, and the two are
+   named differently in the message because they mean different things (a
+   regression, or a fix that went unrecorded). Improvement to ZERO stays X1's
+   own "fixed — remove the entry" clause. What this costs a session that
+   legitimately moves the tessellation is one Node run of
+   `node tools/bloom-xfail-magnitudes.mjs` (minutes, no browser) and the
+   re-recorded entries in the same commit, with the movers named in its
+   outcome doc — which is what the seam session and session 42 did by hand.
+   A fixed band, a relative band and a per-class millimetre bar were weighed
+   and are in the doc; a relative band would have passed the +17% ALL MAX
+   regression at 25% and reddened a four-pair row on one tangency. */
+export const SELF_INTERSECTION_TOLERANCE = Object.freeze({ pairs: 0, worstMm: 5e-5 });
+for (const [label, e] of Object.entries(SELF_INTERSECTION_XFAIL)) {
+  const ok = e && typeof e === 'object' && Number.isInteger(e.pairs) && e.pairs >= 1 && Number.isFinite(e.worstMm) && e.worstMm >= 0 && (e.note === undefined || typeof e.note === 'string');
+  if (!ok) throw new Error(`SELF_INTERSECTION_XFAIL: "${label}" declares no measurable magnitude (${JSON.stringify(e)}) — an entry is {pairs, worstMm[, note]}, and a declaration without a number is a label`);
+}
+/* The one formatter, so every message and every gate line prints an entry the
+   same way — a consumer restating the shape is the drift this list exists to
+   stop. */
+export const xfailMagnitudeText = (e) => `${e.pairs} pair${e.pairs === 1 ? '' : 's'}, worst span ${e.worstMm.toFixed(4)} mm${e.note ? ' ' + e.note : ''}`;
+/* THE CLAUSE, pure, so the re-measurement tool and the gate run the SAME
+   statement — a tool restating it would be a second owner, and a clause the
+   tool cannot run cannot be shown to fire without a browser. Returns nothing
+   on an undeclared row and on a declared row reading 0 (those are X2's and
+   X1's own boolean clauses); the declaration and tolerance are parameters
+   ONLY so a control can hand it a perturbed record. */
+export function selfIntersectionMagnitudeClauses(label, r, declared = SELF_INTERSECTION_XFAIL[label], tol = SELF_INTERSECTION_TOLERANCE) {
+  const bad = [];
+  if (!declared || !(r.within > 0)) return bad;
+  const dp = r.within - declared.pairs;
+  if (Math.abs(dp) > tol.pairs) bad.push(`X1: this row is declared at ${declared.pairs} within-shell pair(s) and reads ${r.within} (${dp > 0 ? '+' : ''}${dp}, band ±${tol.pairs}) — ${dp > 0 ? 'the declared self-intersection got WORSE' : 'the declared self-intersection IMPROVED and nobody re-recorded it'}. The entry is a measurement of the tree: re-measure with node tools/bloom-xfail-magnitudes.mjs and re-record it in the commit that moved it, naming the move in its outcome doc. Declared: ${xfailMagnitudeText(declared)}`);
+  const ds = r.worstSpanMm - declared.worstMm;
+  if (Math.abs(ds) > tol.worstMm) bad.push(`X1: this row is declared at a worst span of ${declared.worstMm.toFixed(4)} mm and reads ${r.worstSpanMm.toFixed(4)} (${ds > 0 ? '+' : ''}${ds.toFixed(4)} mm, band ±${tol.worstMm} mm) — ${ds > 0 ? 'the declared fold reaches FURTHER through the sheet' : 'the declared fold is SHALLOWER and nobody re-recorded it'}. Re-measure with node tools/bloom-xfail-magnitudes.mjs and re-record it in the commit that moved it, naming the move in its outcome doc.`);
+  return bad;
+}
+
 /* THE CENSUS RUNS ON THE BUILDER'S DOUBLES, NOT ON THE STL'S FLOAT32, AND
    X0 IS WHAT MAKES THOSE DOUBLES THE FILE'S OWN. Measured this session: on
    the flat shipping default the census reads exactly 0 on the doubles and
@@ -6563,7 +6647,9 @@ export async function selfIntersectionAssertions(page, buf, row) {
   if (r.within > 0 && !known) {
     bad.push(`X2: ${r.within} within-shell intersecting pair(s), worst span ${r.worstSpanMm.toFixed(4)} mm at (${(r.worstAt || []).map((x) => x.toFixed(2)).join(', ')}) — a NEW self-intersection, not one of the ${Object.keys(SELF_INTERSECTION_XFAIL).length} declared`);
   } else if (r.within === 0 && known) {
-    bad.push(`X1: this row is declared self-intersecting on main (${SELF_INTERSECTION_XFAIL[row.label]}) and now reads 0 pairs — the pre-existing self-intersection is FIXED. Remove its SELF_INTERSECTION_XFAIL entry in the same commit.`);
+    bad.push(`X1: this row is declared self-intersecting (${xfailMagnitudeText(SELF_INTERSECTION_XFAIL[row.label])}) and now reads 0 pairs — the pre-existing self-intersection is FIXED. Remove its SELF_INTERSECTION_XFAIL entry in the same commit.`);
+  } else if (known) {
+    bad.push(...selfIntersectionMagnitudeClauses(row.label, r));
   }
   return { bad, r };
 }
@@ -6597,7 +6683,7 @@ export function selfIntersectionCoverage(labels, refusedLabels = []) {
    be censused this run because the generator refused to export them. */
 export function selfIntersectionRefusedNote(refusedLabels) {
   const both = refusedLabels.filter((l) => SELF_INTERSECTION_XFAIL_HAS(l));
-  return both.length ? `X1 coverage: ${both.length} declared self-intersector(s) could NOT be censused this run because the generator REFUSED to export them (${both.map((l) => `"${l}"`).join(', ')}) — their SELF_INTERSECTION_XFAIL counts stand as last measured and cannot be re-measured while the refusal stands (XR1)` : null;
+  return both.length ? `X1 coverage: ${both.length} declared self-intersector(s) could NOT be censused this run because the generator REFUSED to export them (${both.map((l) => `"${l}"`).join(', ')}) — their SELF_INTERSECTION_XFAIL magnitudes stand as last measured (node tools/bloom-xfail-magnitudes.mjs --include-refused measures them in Node, where no export is needed) and X1 cannot gate them while the refusal stands (XR1)` : null;
 }
 
 export function orientationLine(o) {

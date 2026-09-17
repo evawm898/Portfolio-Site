@@ -55,7 +55,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          stemAssertions, STEM_SCOPE,
          leafAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -392,7 +392,7 @@ for (const r of results) {
   if (r.lobes) console.log(`       ^ ${lobeResultLine(r.lobes)} · SCOPE: ${LOBE_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
-  console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ' · XFAIL (declared on main at ead8624, still failing as expected)' : ''}`);
+  console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ` · XFAIL (declared at ${SELF_INTERSECTION_XFAIL[r.label].pairs} pairs / ${SELF_INTERSECTION_XFAIL[r.label].worstMm.toFixed(4)} mm, still failing at that magnitude — X1)` : ''}`);
   console.log(`       ^ ${sagittaLine(r.sagitta)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
@@ -430,7 +430,7 @@ console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 {
   const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face and the stem bore's own sealed cavity where each exists)`);
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL (each still failing at its RECORDED magnitude — the pair count exactly, the worst span within ±${SELF_INTERSECTION_TOLERANCE.worstMm} mm — asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face and the stem bore's own sealed cavity where each exists)`);
 }
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);

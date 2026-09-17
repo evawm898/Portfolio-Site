@@ -102,7 +102,11 @@ function nn(A, B) {
   return { max: s[s.length - 1], p95: s[Math.floor(0.95 * (s.length - 1))], median: s[Math.floor(s.length / 2)] };
 }
 const f = (x) => (x === null ? 'n/a (one side has no sites)' : `max ${x.max.toFixed(3)} · p95 ${x.p95.toFixed(3)} · median ${x.median.toFixed(3)} mm`);
-const parseDeclared = (s) => { const m = /^(\d+) pairs, worst span ([\d.]+) mm/.exec(s); return m ? { within: +m[1], worst: +m[2] } : null; };
+/* The declaration is structured now ({pairs, worstMm, note} — #213), read
+   through the harness's own fields rather than parsed out of prose; the span
+   band is the list's own SELF_INTERSECTION_TOLERANCE, one owner. */
+const parseDeclared = (e) => (e && Number.isInteger(e.pairs) ? { within: e.pairs, worst: e.worstMm } : null);
+const SPAN_BAND = H.SELF_INTERSECTION_TOLERANCE.worstMm;
 
 const invalid = [];
 const out = [];
@@ -117,9 +121,9 @@ for (const spec of ROWS) {
   if (!lob.lobes) { invalid.push(`${spec.label}: the lobed build reports no lobe record`); continue; }
   if (plain.lobes) { invalid.push(`${spec.label}: the plain build reports a lobe record`); continue; }
   if (spec.plainDeclared) {
-    const d = parseDeclared(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared] || '');
+    const d = parseDeclared(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]);
     if (!d) invalid.push(`${spec.label}: this tree's SELF_INTERSECTION_XFAIL declares no row "${spec.plainDeclared}"`);
-    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > 5e-5) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where the list declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT what the list declares, so nothing below has a baseline to compare against`);
+    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > SPAN_BAND) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where the list declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT what the list declares, so nothing below has a baseline to compare against`);
   }
   const [u0, u1] = lob.lobes.windowU;
   const inWin = (b) => b.sites.filter((p) => { const u = b.uOf(p); return u > u0 && u < u1; }).length;
@@ -130,7 +134,7 @@ for (const spec of ROWS) {
   out.push(rec);
   if (!JSON_OUT) {
     console.log(`\n${spec.label}`);
-    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — the list declares "${spec.plainDeclared}" at ${H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]}` : spec.note ? ` — ${spec.note}` : ''}`);
+    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — the list declares "${spec.plainDeclared}" at ${H.xfailMagnitudeText(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared])}` : spec.note ? ` — ${spec.note}` : ''}`);
     console.log(`  sites, lobed -> nearest plain: ${f(rec.lobedToPlain)}; plain -> nearest lobed: ${f(rec.plainToLobed)}`);
     console.log(`  inside the lobes' window (u ${u0.toFixed(3)}-${u1.toFixed(3)}): lobed ${rec.lobed.inWindow} of ${rec.lobed.sites}, plain ${rec.plain.inWindow} of ${rec.plain.sites}`);
   }
