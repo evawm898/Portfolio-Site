@@ -47,6 +47,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
          STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
+         HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
@@ -866,6 +867,11 @@ export const SECTIONS = [
      `stemLength`). Stem > Leaves > Serration is the panel's second third
      level, beside Center > Androecium > Anther. */
   { id: 'stem', label: 'Stem', open: false },
+  /* THE HUB is Eva's word for the head-to-stem connector (the code's join). It
+     sits under STEM, sibling to LEAVES, because its controls are inert without
+     a stem — a child of the thing they depend on, the LEAVES precedent. This
+     placement is a ruling made without Eva at the preview; she may move it. */
+  { id: 'hub', label: 'Hub', open: false, parent: 'stem' },
   /* LEAVES sit below STEM because that is what they attach to — the petals
      join the hub, the hub joins the stem, the leaves join the stem. SERRATION
      is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
@@ -2938,6 +2944,46 @@ export const CONTROLS = [
     fmt: (v) => { const R = Number(v) / 2, bore = stemBoreRadius(R);
       return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
                         : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+
+  /* ===================================================================
+     THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem
+     JOIN (the hub-shape session). Three controls, all inert without a stem
+     (`stemPresent`), which is what makes the default state untouched by
+     construction: `stemLength` is 0 by default, so none of these can move a
+     byte of the shipped bloom. GOBLET at amount 1 / length auto reproduces
+     today; see `hubJoinThicknessAt` and `stemPlan` for the byte-exactness.
+     NB `hubShapeAmount` is NOT the head's `hubShape` control (CAP/SPHERE) — it
+     is the join's pronouncedness; the two are flagged in the PR as adjacent
+     names Eva may want to separate on the preview.
+     =================================================================== */
+  { id: 'hubStyle', section: 'hub', kind: 'choice', default: 'GOBLET',
+    options: [
+      { value: 'GOBLET', label: 'Goblet (rounded flare — ships today)' },
+      { value: 'ANGLED', label: 'Angled (straight cone, hard shoulders)' },
+      { value: 'CURVED', label: 'Curved (smooth into the stem, no shoulder)' },
+    ],
+    label: 'Hub style',
+    fmt: (v) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem' : 'the rounded flare (today\'s shape at amount 1)'),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'hubShapeAmount', section: 'hub', kind: 'slider',
+    min: HUB_SHAPE_AMOUNT_RANGE[0], max: HUB_SHAPE_AMOUNT_RANGE[1], step: 0.05, default: HUB_SHAPE_AMOUNT_DEFAULT,
+    label: 'Hub amount',
+    /* THE UNUSUAL DEFAULT: 1.00 is mid-range, not an end. One style has to land
+       on today's shape at one slider value, and GOBLET does — at exactly 1.00,
+       where `x * 1 === x` reproduces today. 0 is a straight join (no flare) for
+       all three styles; above 1 exaggerates. One-sided by ruling — no waist. */
+    fmt: (v) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === 1 ? '1.00x — today\'s shape (GOBLET)' : `${Number(v).toFixed(2)}x pronounced`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'hubLength', section: 'hub', kind: 'slider',
+    min: HUB_LENGTH_RANGE[0], max: HUB_LENGTH_RANGE[1], step: 0.5, default: 0,
+    label: 'Hub length',
+    /* 0 = AUTO, the derived join depth (today's `joinT`), which varies with the
+       stem's own diameter — the one honest default, since no fixed number could
+       reproduce today on every state. Above 0 it is that reach in millimetres,
+       floored at the sheet. hubLength ADDS to the object's height; the read-out
+       states the total (Eva's ruling). */
+    fmt: (v) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`),
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
 
   /* ===================================================================

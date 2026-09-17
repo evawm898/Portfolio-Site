@@ -271,6 +271,15 @@ const WITNESS = {
      own reasoning, applied one level down. */
   stem: { id: 'stemLength', value: '60',
           read: (m) => `${m.stem && m.stem.lengthMm}/${m.hubJoinActive}`, what: 'stem.lengthMm/hubJoinActive' },
+  /* THE HUB — collapsed at first load, a child of Stem, witnessed by the
+     PRONOUNCEDNESS through the builder's own derived reach and blend radius. The
+     witness reaches PAST the slider the same way the others do: `hubShapeAmount`
+     2 takes the join's `axisDepth` from the derived 2.52 mm to 3.83 and the
+     blend radius from 6.92 to 7.95 — both `stemPlan`'s own answers, which the
+     amount cannot write directly. The row needs a STEM to hang off (the hub is
+     inert without one), which is why the driver sets both. */
+  hub: { id: 'hubShapeAmount', value: '2', pre: [{ id: 'stemLength', value: '60' }],
+         read: (m) => `${m.stem && m.stem.axisDepth}/${m.hubJoinBlendRadius}`, what: 'stem.axisDepth/hubJoinBlendRadius' },
   /* LEAVES — collapsed at first load, witnessed by the LENGTH through the
      BUILDER's own leaf record. The witness reaches PAST the slider in the same
      way the stem's does: `built` is how many leaves the builder EMITTED, which

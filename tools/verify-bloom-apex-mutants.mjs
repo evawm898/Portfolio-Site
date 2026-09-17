@@ -731,6 +731,40 @@ const MUTANTS = [
       return (m === true && c === false) ? null : `stemIsAbsent under SPHERE reads ${m} on the mutant and ${c} on the clean tree — the predicate did not move`; } },
 
   /* ===================================================================
+     THE HUB'S SHAPE (the hub-shape session) — ST5 and ST11. Each is a way the
+     styled join could be built wrong, or #236 could come back, while the export
+     stays watertight and the triangle count is whatever it built. The first
+     two fire on the STYLED and #236 rows; the byte-exact GOBLET-default arm IS
+     the derived law, so a style-ignoring mutation is invisible on a default
+     row by construction — which is why those rows are in ROWS. */
+  { id: 'hub-ignores-the-style', why: 'the hub is built from the DERIVED constant-stress law instead of the styled profile, so ANGLED and CURVED and every non-default GOBLET draw the rounded flare at the derived depth — the shape controls do nothing',
+    find: '  const joinAt = (r) => hubJoinThicknessAt(r, { hubR: ring.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT, style: plan.hubStyle, amount: plan.hubAmount, axisDepth: plan.axisDepth });',
+    into: '  const joinAt = (r) => hubThicknessAt(r, { hubR: ring.radius, hubT: t, outerR: plan.outerR, joinT: plan.joinT });', names: ['ST11'],
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, stemLength: 60, stemDiameter: 6, hubStyle: 'ANGLED', hubShapeAmount: 2, hubLength: 20 };
+      const mid = (T) => { const acc = new T.MeshBuilder({ exportMode: true }); const fr = T.footRing(st, acc); const ring = fr.rings[0]; const u = T.buildHubInto(acc, st, ring).underside; return u[Math.floor(u.length / 2)][1]; };
+      const a = mid(M), b = mid(C);
+      return Math.abs(a - b) > 1e-6 ? null : `the underside mid-thickness is ${a} on the mutant and ${b} on the clean tree — the style was not ignored`;
+    } },
+  { id: 'hub-236-fill-is-sphere-only', why: 'the solid root band that embeds a hub narrower than its stem is restored to SPHERE-only, so a CAP or flat head sits in the bore with nothing bridging it — half of #236, and the head detaches (the connectedness gate is the other witness)',
+    find: '  const headInsideBore = headOuterMm < boreR;',
+    into: '  const headInsideBore = sphere && headOuterMm < boreR;', names: ['ST11'],
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, petalCount: 3, spread: 0.6, petalWidth: 8, stemLength: 60, stemDiameter: 12 };
+      const band = (T) => { const acc = new T.MeshBuilder({ exportMode: true }); const fr = T.footRing(st, acc); const ring = fr.rings[0]; return T.stemPlan(st, ring, acc).solidBandMm; };
+      const a = band(M), b = band(C);
+      return a === 0 && b > 0 ? null : `the solid root band is ${a} mm on the mutant and ${b} mm on the clean tree — the fill did not go sphere-only`;
+    } },
+  { id: 'hub-flat-shell-returns', why: 'the join is built even where the head is NOT wider than the stem, so the flat zero-volume join shell hubThicknessAt used to emit comes back — the other half of #236, watertight and detached, which ST5 catches as a join ACTIVE where the shape says INERT',
+    find: '  const swellActive = !sphere && hubR > outerR && (axisDepth - hubT) > 0;',
+    into: '  const swellActive = !sphere && (axisDepth - hubT) > 0;', names: ['ST5'],
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, petalCount: 3, spread: 0.6, petalWidth: 8, stemLength: 60, stemDiameter: 12 };
+      const sa = (T) => { const acc = new T.MeshBuilder({ exportMode: true }); const fr = T.footRing(st, acc); const ring = fr.rings[0]; return T.stemPlan(st, ring, acc).swellActive; };
+      return sa(M) === true && sa(C) === false ? null : `swellActive reads ${sa(M)} on the mutant and ${sa(C)} on the clean tree — the flat-shell guard did not drop`;
+    } },
+
+  /* ===================================================================
      THE SPHERE'S STEM CHANNEL (the sphere-stem session) — ST7-ST9. Each is a
      way the omission could be wrong while the export stays watertight, one
      piece, and the right triangle count for whatever it built. */
@@ -1099,6 +1133,25 @@ const ROWS = [
      of the claim (`bore-is-not-evas-rule`'s lesson, one family later). */
   { label: 'a leaf at the acute tip (0.60 on a 70 mm stem — the exponent APART from the retired constant)',
     set: [{ id: 'stemLength', value: '70' }, { id: 'stemDiameter', value: '6' }, { id: 'leafLength', value: '52' }, { id: 'leafWidth', value: '17' }, { id: 'leafNodes', value: '1' }, { id: 'leafTipShape', value: '0.6' }] },
+  /* THE HUB SHAPE ROWS (the hub-shape session). A STYLED row so ST11's profile
+     clause has a curve to measure — ANGLED at amount 2 with an explicit reach,
+     apart from GOBLET-default so a mutation ignoring the style is observable
+     (the byte-exact GOBLET-default arm IS the derived law, so a style-ignoring
+     mutation would be undetectable there by construction — the witness state is
+     part of the claim). And a #236 corner — a hub NARROWER than the stem on a
+     cap — so ST11's #236 clause and ST5's active/inert have a state to bite on;
+     the derived law never reaches `hubR <= outerR` on a healthy hub. */
+  { label: 'a styled hub (ANGLED, amount 2, 20 mm reach — a cone the derived law never draws)',
+    set: [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }, { id: 'hubStyle', value: 'ANGLED' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '20' }] },
+  /* THE #236 CORNER IS FLAT, NOT A CAP, and the reason is the cap clamp: on a
+     narrow cap `capReachMax` (Rd - t/2) floors the reach to the sheet, so even
+     the flat-shell mutant's dropped `hubR > outerR` guard leaves the swell at 0
+     and ST5 never bites. A FLAT narrow hub has no such clamp, so the reach is
+     the derived joinT and the mutant builds a flat shell there. ST11's #236
+     clause and ST5 both fire here; the cap corner's ONE-PIECE claim is the
+     connectedness gate's, on block 34's own cap row. */
+  { label: 'a #236 corner — a hub narrower than the stem, flat (3 petals, spread 0.6, 8 mm petals, 12 mm stem)',
+    set: [{ id: 'petalCount', value: '3' }, { id: 'spread', value: '0.6' }, { id: 'petalWidth', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '12' }] },
 
 ];
 
