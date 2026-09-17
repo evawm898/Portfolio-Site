@@ -65,7 +65,7 @@ const JSON_OUT = process.argv.includes('--json');
 const ROWS = [
   { label: 'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', plainDeclared: null, note: 'span-0 touches at the form-onset crease on the cup alone; the lobed ladder lands three of its own, on other petals' },
   { label: 'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', plainDeclared: 'petalCup max (1.2)' },
-  { label: 'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; the lobed ladder\'s stations miss them — 0 pairs)', plainDeclared: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)' },
+  { label: 'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; MODEL B\'s stations no longer land on them — 0 pairs, and the xfail entry came off in the same commit)', plainDeclared: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)' },
   { label: 'LOBES: x roll 330 (over the quill, declared on main)', plainDeclared: 'petalRoll max (330)' },
   { label: 'LOBES: x curl 360 (over the fiddlehead, declared on main)', plainDeclared: 'petalSpineCurl max (360)' },
   { label: 'LOBES: x 3 whorls (the inner petals are short — the floor binds there first)', plainDeclared: null, note: 'the root blend at 3 layers' },
@@ -73,7 +73,7 @@ const ROWS = [
   { label: 'LOBES: x the whole centre (stamens and a style under a lobed whorl)', plainDeclared: null, note: 'the stigma\'s 272' },
   { label: 'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)', plainDeclared: null, note: 'the inner whorl at cup 1.2 x curl 360' },
   { label: 'LOBES: x the domed hub (head rise 1.00)', plainDeclared: 'headRise max (1)' },
-  { label: 'LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 4.2 mm window at a 2.40 mm floor)', plainDeclared: null, note: 'a 20 mm petal at a 2.40 mm sheet folds at the root blend with no lobe — no row on main names it' },
+  { label: 'LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 13.9 mm arc at a 2.40 mm floor; CLAMPED to 3 by rows)', plainDeclared: null, note: 'a 20 mm petal at a 2.40 mm sheet folds at the root blend with no lobe — no row on main names it' },
 ];
 
 const matrix = H.buildMatrix();

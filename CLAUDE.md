@@ -210,6 +210,31 @@ worth nothing however strict it looks. **All three were found by re-reading the 
 the clause — which is the only thing that finds them**, because a green run, a mutant table and
 CI are all instruments that ask the clause its own question.
 
+**AN XFAIL ENTRY CARRIES ITS MAGNITUDE AS A NUMBER THE GATE READS, IN BOTH DIRECTIONS**
+(#213, closed — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
+`EXPORT_REFUSED_XFAIL`, the wall instrument's `SELF_XFAIL` or its V4 marker). Every entry is
+structured now — `{ pairs, worstMm, note }`, `{ tris, note }`, `{ selfMm, note }`,
+`{ ownDeficitMm, note }` — and the module REFUSES TO LOAD on an entry with no number. X1
+holds a declared row to its recorded pair count EXACTLY and its worst span within ±5e-5 mm
+(the record's own rounding); XR1 holds the refused row's triangle count exactly, on the read-out
+and on the builder's tally; V5 and V4 hold the wall records within ±5e-4 mm. **BOTH
+DIRECTIONS**: an entry is a record of the tree, and a record that stops reproducing is stale
+whether the row got worse or better — the message says which. A pair count has no noise on one
+engine (0 of 261 rows differ between Node 20 and Node 22, measured over the whole list), so it
+gets no band; a relative band was rejected because it passes a +17% regression at 25% and
+reddens a four-pair row on one tangency. **THE RE-MEASUREMENT INSTRUMENT IS `node
+tools/bloom-xfail-magnitudes.mjs`** (Node, minutes, no browser; `--emit` prints the entries the
+tree measures, `--control` is the must-fail, `--root <tree>` measures another geometry against
+this list): a session that legitimately moves a declared row's tessellation runs it, re-records
+the movers in the same commit and names them in its outcome doc — before the 3.5-hour gate says
+so. **WHAT THE GATE FOUND ON THE DAY IT LANDED:** 23 of 261 self-intersection entries, the
+refused row's count (2,412,512 recorded, 2,412,412 built — the stem tip plug's hundred
+triangles) and 3 of the wall instrument's 4 figures no longer matched what the tree measured,
+and not one of them had reddened anything; nine of the 23 were WORSE. They are recorded at
+today's measurement with the previous figure kept in each entry's note, and attributed in the
+doc. **Do not widen a band to keep the suite green** — a row that reads worse than its record
+is a finding for the change that moved it, and the doc is where it is named.
+
 **AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
 ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
 triangle-triangle census that tests it, WITHIN each closed shell (cross-shell overlaps
