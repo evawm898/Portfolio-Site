@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -1018,7 +1018,85 @@ const MUTANTS = [
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.clamp.fromU < c.clamp.fromU - 0.1 && !m.rowsDiffer(c)) ? null
         : `the mutant's clamp station is ${m.clamp.fromU} against ${c.clamp.fromU} and its rows ${m.rowsDiffer(c) ? 'moved' : 'held'} — the record did not move on its own`; } },
+
+  /* ===================================================================
+     THE SEPALS (sepals, part 1) — SP0-SP9. A family was added, so the table
+     runs it. Eight mutations, each the plausible way the whorl could be
+     wired wrong while both STL gates stay green (a sepal is a closed shell
+     overlapping the hub, so every one of these exports watertight and as one
+     piece): the angle clamp removed (the row the brief names, with 60 asked
+     against a drawn limit of 21), the blade reading the PETAL's controls
+     instead of its own twins (with sepalCup 0.6 APART from petalCup 0, the
+     bore-is-not-evas-rule lesson), the ring off the rim, the count unclamped
+     (40 asked on 8), the phase ignored, the size ignored, the foot floor
+     removed (breadth 0.25 asks 0.96 mm against a 1.60 floor), and sepals
+     built under SPHERE (the two-statement guard). Every witness reads the
+     MUTATED module's own build, never the assertion it names.
+     =================================================================== */
+  { id: 'sepal-angle-clamp-removed', why: 'the whorl is built at the ASKED angle whatever the drawn limit says — the sepals clip the petals and both STL gates read a cross-shell overlap, which the export contract permits',
+    find: '  const bs = sepalBladeState(state, limit.angleBuiltDeg);',
+    into: '  const bs = sepalBladeState(state, limit.askedDeg);', names: ['SP8'],
+    witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.tilt === 60 && c.tilt < 60) ? null : `the mutant built its sepals at ${m.tilt} against the clean tree's ${c.tilt} (60 asked) — the clamp did not go`; } },
+  { id: 'sepal-reads-the-petals-controls', why: "the sepal blade is built from the PETAL's shape, form and curl controls while the sepal's own twins are read by nothing — hidden-and-not-inert on twenty controls at once",
+    find: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);',
+    into: '  for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[petalId]);', names: ['SP6'],
+    witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.form === null && c.form !== null) ? null : `the mutant's sepal ${m.form ? 'carries' : 'has no'} form record and the clean tree's ${c.form ? 'carries one' : 'has none'} (sepalCup 0.6, petalCup 0) — the twins were not bypassed`; } },
+  { id: 'sepal-ring-off-the-rim', why: 'the sepal ring sits inside the rim at 0.9 of the hub radius — a whorl of sepals rooted in the slab short of the edge, watertight and one piece',
+    find: '    const radius = hub.radius;\n    const { slope, z, arc, relief } = surfaceAt(radius, null);\n    const overhang = Math.max(1.5, radius * 0.4);',
+    into: '    const radius = hub.radius * 0.9;\n    const { slope, z, arc, relief } = surfaceAt(radius, null);\n    const overhang = Math.max(1.5, radius * 0.4);', names: ['SP3'],
+    witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.rimR < c.rimR - 0.5) ? null : `the mutant's sepal ring row sits at r ${m.rimR} against the clean tree's ${c.rimR} — the ring did not move`; } },
+  { id: 'sepal-count-unclamped', why: 'the count builds what was asked, past the petal count — 40 sepals on 8 petals, five to a pitch, watertight and one piece',
+    find: '    const count = Math.min(asked, ceiling);\n    const scale = Number(state.sepalScale)',
+    into: '    const count = asked;\n    const scale = Number(state.sepalScale)', names: ['SP2'],
+    witness: (M, C) => { const m = sepalFacts(M, { sepalCount: 40 }), c = sepalFacts(C, { sepalCount: 40 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.count === 40 && c.count === 8) ? null : `the mutant built ${m.count} sepals against the clean tree's ${c.count} (40 asked on 8) — the ceiling still binds`; } },
+  { id: 'sepal-phase-ignored', why: 'the whorl starts at the petals whatever the offset asks — every sepal ALIGNED under a petal at the interleaved default',
+    find: '    const phaseRad = phaseFrac * pitchRad;',
+    into: '    const phaseRad = 0;', names: ['SP4'],
+    witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (Math.abs(m.az0) < 1e-9 && Math.abs(c.az0) > 0.1) ? null : `the mutant's first sepal is at ${m.az0} rad against the clean tree's ${c.az0} — the offset still applies`; } },
+  { id: 'sepal-size-ignored', why: "the sepals are built at the petal's own size whatever sepalScale asks — a second corolla, watertight and one piece",
+    find: '    sizeRamp: () => sepals.scale, angleRamp: () => 0, phase: sepals.startAzimuth,',
+    into: '    sizeRamp: () => 1, angleRamp: () => 0, phase: sepals.startAzimuth,', names: ['SP5'],
+    witness: (M, C) => { const m = sepalFacts(M), c = sepalFacts(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.length > c.length + 5) ? null : `the mutant's sepal is ${m.length} mm long against the clean tree's ${c.length} — the size still applies`; } },
+  { id: 'sepal-foot-floor-removed', why: 'the sepal foot is whatever breadth asks with no print floor — 0.96 mm across at breadth 0.25, under the 1.60 mm foot floor every petal ring is held to',
+    find: '    const footMm = clamp(footAskedMm, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM);',
+    into: '    const footMm = footAskedMm;', names: ['SP3'],
+    witness: (M, C) => { const m = sepalFacts(M, { sepalFootBreadth: 0.25 }), c = sepalFacts(C, { sepalFootBreadth: 0.25 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.footH < 0.6 && c.footH >= 0.79) ? null : `the mutant's foot half-width is ${m.footH} against the clean tree's ${c.footH} at breadth 0.25 — the floor still binds`; } },
+  { id: 'sepals-built-under-sphere', why: 'the geometry builds a sepal whorl on a closed SPHERE while the registry hides every sepal control there — hidden and NOT inert, and the whorl sits on the equator of a head that has no underside',
+    find: 'export function sepalsEligible(state) { return !sphereMode(state); }',
+    into: 'export function sepalsEligible(state) { return true; }', names: ['SP0', 'SP9'],
+    witness: (M, C) => { const m = sepalFacts(M, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 }), c = sepalFacts(C, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.count === 8 && c.count === 0) ? null : `the mutant built ${m.count} sepals on a sphere against the clean tree's ${c.count} — the refusal still holds`; } },
 ];
+
+/* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
+   table's own probe state (5 asked on 8, 60 asked with a drawn limit of 21,
+   sepalCup 0.6 against petalCup 0): what the mutated module EMITTED. */
+function sepalFacts(MOD, extra = {}) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, sepalCount: 5, sepalAngle: 60, sepalCup: 0.6, ...extra };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const b = MOD.buildBloomInto(acc, st);
+    const S = b.sepals;
+    if (!S) return { count: 0, tilt: null, form: null, rimR: null, az0: null, length: null, footH: null };
+    const p = S.built[0];
+    return { count: S.count, tilt: p.builtFrom.petalTilt, form: p.form, rimR: Math.hypot(p.footFrames[2].C[0], p.footFrames[2].C[1]), az0: S.azimuths[0], length: p.length, footH: p.footFrames[2].h };
+  } catch (e) { return { threw: e.message }; }
+}
 
 /* THE LEAF WITNESS — one leaf, alone, from a module's own builder at a given
    tip exponent: the plan's record, the rows the blade was built from and the
@@ -1152,6 +1230,16 @@ const ROWS = [
      connectedness gate's, on block 34's own cap row. */
   { label: 'a #236 corner — a hub narrower than the stem, flat (3 petals, spread 0.6, 8 mm petals, 12 mm stem)',
     set: [{ id: 'petalCount', value: '3' }, { id: 'spread', value: '0.6' }, { id: 'petalWidth', value: '8' }, { id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '12' }] },
+  /* THE SEPAL ROWS (sepals, part 1). One row where every clamp BITES at once
+     — 40 asked on 8 (the ceiling), 60 asked against a drawn limit of 21 (the
+     angle), breadth 0.25 (the foot floor), the sepal's cup 0.6 APART from the
+     petals' 0 (the twins) — so a mutation removing any one of them is
+     observable here, and the probe state is part of each claim. And a
+     SPHERE with sepals asked, the only state SP0 and SP9 can speak on. */
+  { label: 'a sepal whorl with every clamp biting (40 asked on 8, 60 deg asked, breadth 0.25, cup 0.6 apart from the petals)',
+    set: [{ id: 'sepalCount', value: '40' }, { id: 'sepalAngle', value: '60' }, { id: 'sepalFootBreadth', value: '0.25' }, { id: 'sepalCup', value: '0.6' }] },
+  { label: 'sepals asked on a SPHERE (8 asked on a closed head — none built, told)',
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'sepalCount', value: '8' }] },
 
 ];
 
@@ -1201,6 +1289,10 @@ async function famsOn(rows) {
     /* THE LEAF FAMILY (the leaf tip-shape session) — the rule once more. */
     for (const msg of await leafAssertions(page, row)) {
       const mm = /^(LF\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE SEPAL FAMILY (sepals, part 1) — the rule again. */
+    for (const msg of await sepalAssertions(page, row)) {
+      const mm = /^(SP\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

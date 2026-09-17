@@ -53,7 +53,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
@@ -208,6 +208,13 @@ for (const row of rows) {
      leafAssertions()'s own header. */
   const leaf = await leafAssertions(page, row);
   if (leaf.length) { validity.push(`${row.label}: ${leaf.join('; ')}`); continue; }
+  /* SEPALS (SP0-SP9, sepals part 1). Both STL gates are blind to the whole
+     family by construction: a sepal whorl on the wrong ring, at the wrong
+     azimuth, from the petal's controls, or clipping through a petal exports
+     watertight and as one piece (a sepal through a petal is a cross-shell
+     overlap). See sepalAssertions()'s own header. */
+  const sep = await sepalAssertions(page, row);
+  if (sep.length) { validity.push(`${row.label}: ${sep.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the

@@ -735,6 +735,33 @@ export const SMOKE_BLOCKS = [
         path: 'the inertness direction — every hub control at its maximum with the stem length 0 builds no hub at all, so ST11 must read the join absent and the byte tool proves the row bit-identical to the shipped default; the hub controls are STEM_SUBS, so the blanket sweep never reaches them either' },
     ],
   },
+  {
+    n: 35,
+    anchor: "SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)",
+    /* SEPALS, PART 1 — a NEW geometry mode (a second whorl on the rim, emitted
+       by the petal builder against a second parameter set), so --conn is
+       REQUIRED here: the sepal feet are buried in the same slab as the petal
+       feet and the flood fill is the only witness that the whorl is one piece
+       with the hub at the crowded corner. Six rows: the shipped whorl, the
+       aligned weld, the clamped angle, a fan (the LIST arm), the crowded
+       ANGLED corner (with a stem, --conn), and the two guards. */
+    rows: [
+      { label: "SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)",
+        path: "the whorl at its defaults — SP0 (the registry hides the sepal sub-controls exactly where the geometry builds nothing), SP1 (declared and emitted, the tally the builder's own), SP2 (the ceiling is the outer whorl the builder placed), SP3 (every sepal ring row sits on the outer whorl's own emitted rim, the foot the descriptor's and inside the print floors), SP4 (the interleaved default lands mid-way between petal 0 and petal 1, read off the petals' own emitted azimuths), SP5 (length and peak half-width are the petal's times the size), SP6 (every blade built from the SEPAL's own twins, no role reaching it) and SP8 (the built angle is min(asked, limit), the root frame carries it, and the harness's own contact test finds the built angle clear in both modes and the step above the limit clipping)" },
+      { label: "SEPALS: ALIGNED at size 1.00 (the sepal foot IS the petal foot — welded by construction)",
+        path: "the weld the census reads: X1 — this row is declared self-intersecting (the two whorls share a foot lattice bit for bit and the fork's crotch is then counted within-shell) and must STILL read pairs; SP3 with the foot at the petal's own width; SP8 where the limit is the petal tilt less one step (coincident at 25)" },
+      { label: "SEPALS: angle 90 asked — CLAMPED at the drawn limit (the last angle clear of the petals)",
+        path: "THE CLAMP in the direction that matters — SP8: 90 asked, the limit drawn on the built rows, the built angle the limit, the flag a biconditional, and the harness's own rebuild finding the step above the limit clipping a petal" },
+      { label: "SEPALS: on a FAN (5 sepals on 7 slots, interleaved)",
+        path: "the LIST arm of the whorl primitive — SP2 (the ceiling is the fan's derived slot count), SP4 (the fan's lattice shifted by the phase, the count nearest the mirror line, and whether the set is mirror-symmetric is declared)" },
+      { label: "SEPALS: THE CROWDED CORNER on ANGLED",
+        path: "THE CROWDED CORNER — 40 petals x 40 sepals x size 1 x aligned x 90 asked on a stem whose ANGLED shoulder sits at the rim under the foot: --conn is the witness that the whorl, the join and the hub are one piece there; X1/X2 the verdict on the welded foot lattice; SP8 the clamp at 40 congruent neighbourhoods" },
+      { label: "SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)",
+        path: "the GUARD — SP7: every sepal control at its maximum with the count at 0 builds nothing, SP1 reads the builder's none rather than a missing key, and the byte tool proves the row bit-identical to the default" },
+      { label: "SEPALS: GATED — asked under SPHERE (8 asked on a closed head: none built, UNAVAILABLE told)",
+        path: "the REFUSAL — SP9: a closed head has no underside ring, so sepals asked there build nothing and the read-out says UNAVAILABLE; SP0's two statements must still be complements" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */
