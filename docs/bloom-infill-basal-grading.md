@@ -46,11 +46,14 @@ hole at all at either wall. **The direction that lightens the base is the opposi
 0.050.
 
 **3. WALL WIDTH IS THE BIGGEST SINGLE LEVER ON THE WHOLE BLADE.** Every state was rendered and
-measured at both. Over the four shortlisted gradings the whole-blade OPEN fraction moves
-**30.3 % → 34.1 % across the entire grading sweep at a 1.0 mm wall, and 30.3 % → 35.7 % by
-changing nothing but the wall.** In the basal band the grading is worth more than the wall
-(34 % → 53 % open against 34 % → 39 %); on the blade as a whole the wall is worth more. Eva has
-not ruled on wall width and rules it from the sheet.
+measured at both. Across the four shortlisted gradings the whole-blade OPEN fraction moves
+**30.3 % → 34.1 % at a 1.0 mm wall**, and **30.3 % → 35.7 % by changing nothing but the wall** —
+so on the blade as a whole the wall is worth more than the grading the shortlist spans. In the
+BASAL BAND the ranking reverses: the grading is worth 34 % → 53 % open and the wall 34 % → 39 %.
+*(Read against the FULL sweep rather than the shortlist the grading's span is wider — 26.2 % to
+34.1 % of the blade open at a 1.0 mm wall — but all of that extra span is in the HEAVIER
+direction, at `converge` 0.150 and 0.200, which is not a place anyone wants to go.)* Eva has not
+ruled on wall width and rules it from the sheet.
 
 **AND ONE THING NO GRADING CAN REACH, said plainly because the eye will blame the pattern for
 it.** The blade's plan area is **406.8 mm²**. The solid base panel — everything below
@@ -131,10 +134,12 @@ print-floor cost the 1.0 mm wall pays at `converge` 0.150 and above.
   the smallest hole holds at 0.90 mm and 14 of 17 are real; at 0.150 the smallest falls to 0.67 mm
   and at 0.200 two more holes drop under the print floor and only one basal hole survives. So the
   V's own ceiling is already where it is for a reason — what is available is the room BELOW it.
-* **THE V CANNOT REACH THE TIP AT ALL, and it is an identity rather than a measurement.** It
-  clips holes from below inside the basal band. Measured: the tip band's real-hole count, median
-  hole, wall fraction, the apex cap and its floor are **identical at every `converge` from 0 to
-  0.100** (tip median 1.58 mm, cap 2.72 mm at a 1.0 mm wall; 1.74 and 2.46 at 0.8).
+* **THE V CANNOT REACH THE TIP AT ALL.** It clips holes from below inside the basal band.
+  Measured: the tip band's real-hole count, median hole, wall fraction, the apex cap and its
+  floor are **identical at every one of the seven `converge` values, 0 through 0.200** — tip
+  median 1.58 mm, tip wall 72 %, cap 2.72 mm at a 1.0 mm wall; 1.74 mm, 64 % and 2.46 at 0.8.
+  What DOES move above 0.100 is the WHOLE-PETAL smallest hole and real count, and that is the V
+  eating basal holes, not anything happening at the tip.
 
 ---
 
