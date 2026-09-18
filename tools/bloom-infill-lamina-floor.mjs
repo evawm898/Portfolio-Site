@@ -236,6 +236,28 @@ async function main() {
     console.log('');
   }
 
+  /* ---- 1b. the structural figures, in one block ---- */
+  /* SAID ONCE, IN ONE PLACE, AND NOT ACTED ON. Eva asked for the structural cost in the
+     READ-OUT and the sheet; the sheet has it on every caption, and there is no read-out
+     to put it in because the infill is not in the app — so it is here, where the
+     instrument's reader is. A petal is a cantilever and the base carries the peak
+     bending moment, so the solid basal panel is load-bearing rather than decorative.
+     NOTHING here is clamped on structural grounds and no conclusion above argues from
+     them; no coupon has ever been printed. */
+  console.log('1b. THE STRUCTURAL FIGURES. The panel as a share of the blade, and the fraction of the blade\'s bottom 45 % that is SOLID.');
+  {
+    const mF = P.basalSplit(ctx, {});
+    const pick = (row, wall) => out.sweep.find((c) => c.row === row && c.wall === wall);
+    console.log('    cell                              | panel % of blade | bottom 45 % solid (w 1.0) | (w 0.8)');
+    for (const [nm, row] of [["the boundary the prototype shipped (row 19)", 19], [`F — the cell Eva approved (row ${F_ROW})`, F_ROW], ['one row below F', F_ROW - 1], ['two rows below F', F_ROW - 2], [`THE FLOOR (row ${mF})`, mF], [`(row ${mF - 1} — refused)`, mF - 1]]) {
+      const a1 = pick(row, 1.0), b1 = pick(row, 0.8);
+      if (!a1) continue;
+      console.log(`    ${nm.padEnd(33)} | ${(100 * a1.panelShare).toFixed(2).padStart(16)} | ${(100 * a1.bottom45Solid).toFixed(1).padStart(25)} | ${b1 ? (100 * b1.bottom45Solid).toFixed(1).padStart(7) : 'n/a'}`);
+    }
+    console.log(`    the section at the WAIST is ${(w.acrossMm * w.t).toFixed(2)} mm2 (${w.acrossMm.toFixed(3)} mm across on a ${w.t} mm sheet) against ${(w.footAcrossMm * w.t).toFixed(2)} at the foot and ${(w.peakAcrossMm * w.t).toFixed(2)} at the peak.`);
+    console.log('    Nothing is clamped on structural grounds and no figure above rests on them. NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED.\n');
+  }
+
   /* ---- 2. the mechanism ---- */
   console.log('2. THE MECHANISM — the waist, and three confirmations that it is what binds.');
   const mech = [];
