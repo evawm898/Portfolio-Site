@@ -3,6 +3,10 @@
 Merged as `06e4173` (#253). No geometry, no controls, no gate assertion, threshold or
 row definition touched. `FROZEN_BASE_COMMITS` is unchanged and remains the one owner.
 
+**§3b was added after the first dispatch of the merged workflow.** Run 10 failed, and it
+failed in the self-test #253 added rather than in the verdict #253 fixed — read §3b before
+concluding anything from that red X, which is the same instruction §1 exists to give.
+
 The session was opened on the premise that `bloom-frozen-tags` had never created a tag in
 nine dispatches, and that the fourteen refs `frozen/phase21`..`frozen/phase34` were all
 missing. **The premise was false**, and establishing that is most of what this session
@@ -168,6 +172,84 @@ table is exactly what did. The rule splits:
 and confirmed the failure is in it, ask whether the **particular instance** you built to
 represent that set is the *hardest* member or a random one. If a different random draw would
 have made the broken code pass, the fixture is the clause.
+
+---
+
+## §3b FINDING — THE HARDENED FIXTURE COULD NOT BE BUILT ON A RUNNER, AND IT REPORTED THAT AS BAD LUCK
+
+Run 10 (`35299447040`, dispatched from `main` at `09e2aca`, which carries #253) failed in
+37 s. **It is not a recurrence of §1: the verification loop never ran.** The `publish` job
+has four steps and it died on the third — `bash tools/publish-frozen-tags-selftest.sh`,
+40 passed / 3 failed — so `publish-frozen-tags.sh` was never invoked, nothing was pushed,
+and no verdict about the remote was produced at all. All three failures were §3's own
+hardened Case H.
+
+**The mechanism.** `git tag -a` writes a tag OBJECT, which carries a tagger line, so git
+refuses to make one without a name and an email. A GitHub runner has neither: nothing in
+this workflow sets `user.name` / `user.email`, and git's auto-detection fails on a runner
+hostname. The adversarial search suppressed that stderr (`>/dev/null 2>&1`) and read only
+the sha, so all 200 attempts created nothing, `git rev-parse` returned the literal string
+`frozen/phase30` 200 times — the 200 `fatal: ambiguous argument` lines that fill the log —
+and `[ "frozen/phase30" \< "41d7a87…" ]` is false, so the loop fell out reporting
+**"could not build an adversarial tag object in 200 tries; this case would be luck"**.
+
+**A fixture that cannot be built is not a fixture that was unlucky, and the message named
+the wrong one.** The search is a coin flip per attempt, so genuine bad luck is 2⁻²⁰⁰; the
+observed state was an environment in which the case could not be attempted at all. The two
+are distinguished now: git failing is an unbuildable fixture and aborts with
+`FIXTURE UNAVAILABLE` and git's own words, the way `setup_remote` already aborts on an
+unfetchable `phase10` base; 200 honest tries losing is the astronomically improbable thing
+the old message described.
+
+**WHY IT SURVIVED EVERY LOCAL RUN, WHICH IS THE DURABLE HALF.** A clone does not copy the
+source repo's LOCAL config, so `$WORK` resolves whatever GLOBAL config exists — an identity
+on a dev box, nothing on a runner. So the self-test passed on every machine it was written
+on and failed on the only machine it had to run on, **on identical code**. This is
+`calibration is not coverage` in a harness rather than in an instrument: the fixture's
+buildability was a property of the environment, and the environment was never varied.
+Measured both ways rather than argued — the pre-fix file, run locally with only the `[user]`
+section stripped from the global config, reproduces run 10 exactly at **40 passed, 3 failed,
+exit 1**; the fixed file under the same condition reads **46 passed, 0 failed, exit 0**.
+
+**The fix is in the SCRIPT, not the workflow**, and that is deliberate as well as smaller:
+`.github/workflows/bloom-frozen-tags.yml` is the file category GitHub's own refusal is
+about, so a fix that edits it would change the very input whose effect on the refused set
+is unexplained (§5). The identity is supplied per command — a self-test that mutates the
+machine's git identity is a worse thing than the bug it fixes — through `TAGGER` and one
+owner, `annotate()`, which reports whether git could and never decides what that means.
+
+**Case I is its must-fail control, and the guard needed one**, because the guard is
+unreachable on any machine that has a git identity — which is every machine this file was
+ever run on before it reached a runner. It reproduces the runner's condition deterministically
+(`GIT_CONFIG_GLOBAL` and `GIT_CONFIG_SYSTEM` neutralised, in a subshell, because in bash a
+`VAR=x func` assignment PERSISTS after the call) and requires the two halves to answer
+differently: with no identity git must refuse and create nothing, with the fixture's own
+identity it must succeed. The guard itself was then mutated — `TAGGER` neutered — and
+required to abort: **exit 2, `FIXTURE UNAVAILABLE`, git's real reason, 0 occurrences of
+"luck" and 0 of the 200 retry spins.**
+
+**AND THE REMOTE WAS VERIFIED DIRECTLY, WHICH IS WHAT ANSWERS §1's OPEN QUESTIONS.**
+`bash tools/publish-frozen-tags.sh --check` against the real remote, from a full clone:
+
+```
+33 declared · 30 published and correct · 3 missing but declared · 0 missing and UNDECLARED · 0 at the WRONG commit
+done — every frozen baseline this credential can pin has a permanent ref.
+```
+
+exit 0. So: **no baseline is mis-pinned** (`0 at the WRONG commit` — the identity check §1
+added, run against the real remote, finds nothing), **the refused set has not moved** (the
+three still missing are exactly the three declared, `0 missing and UNDECLARED`), and §2's
+count of thirty is corroborated by a second route — `git fetch --tags` into this clone
+brings down 30 `frozen/*` refs. **The verification loop #253 shipped is correct; run 10
+simply never reached it.**
+
+**What #253's own workflow edit does to the refused set is still unmeasured**, and `--check`
+cannot measure it because it pushes nothing. Note what bounds the question, though: git
+refuses to move an existing tag, so the 30 already published are a no-op on any future
+dispatch and **the only refs a next run can attempt are the three declared ones.** Either
+they publish — in which case the run says `NOW PRESENT`, calls the entries stale, and still
+exits 0 — or they do not, in which case they are declared and it exits 0. The set cannot
+become undeclared without a new baseline being registered.
 
 ---
 
