@@ -13,7 +13,7 @@ is known.
 **IT LIVES IN A PROTOTYPE, AS AN ALIAS FOR A CONSTANT THAT BELONGS TO SOMETHING ELSE.**
 
 ```
-tools/bloom-voronoi-proto.mjs:64    export const U0 = G.ROOT_BLEND_END;
+tools/bloom-voronoi-proto.mjs    export const U0 = G.ROOT_BLEND_END;      // as it stood at 09e2aca
 ```
 
 A **derived value**, and not derived from anything about the infill: `ROOT_BLEND_END` is a station
@@ -53,8 +53,10 @@ generator gains the one reader that owner needs. §7 costs the port, and §8 cos
    CONTROL (a petal with no waist), a MOVER (`petalWidth` 30 puts the waist a row lower and the
    step follows it), and the same reversal at **four gradings including no grading at all**. §2.
 3. **`HELD_ROWS` / `A7` DOES NOT BIND AT ANY BOUNDARY, AND #252's RECOMMENDED OPTION 2 IS REFUTED
-   BY EVA'S OWN RULING.** The infill places no station: the ladder is **bit-identical at all 17
-   boundaries swept**. And option 2 — "the boundary is the last held station" — lands on **row 18,
+   BY EVA'S OWN RULING.** The infill places no station, and the only route it could take is
+   MUTATING the rows it was handed: the field was run at all 17 boundaries and the builder's
+   stations compared afterwards against a FRESH build — **0 of 59 moved under `Object.is`**.
+   And option 2 — "the boundary is the last held station" — lands on **row 18,
    eight rows ABOVE the cell Eva picked**, at 25.49 % panel where she approved 8.83 %. It cannot
    be the answer to a ruling that asked for LOWER. §3.
 4. **NOTHING ELSE BINDS DOWN TO THE ARITHMETIC FLOOR.** Boundary edges 0, one voxel piece at
