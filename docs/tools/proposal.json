@@ -1,0 +1,38 @@
+{
+ "title": "Proposed Standard panel — one adjustment behind every Standard choice",
+ "lede": "Every choice the Standard view offers gains at least one Standard control that adjusts it. Thirteen promotions, no demotions, no section moves. Each panel below is the Standard roster as the registry would evaluate it under that choice — generated from flower-registry.js with the proposal applied in memory, so it shows what the panel would actually do, not a drawing of it.",
+ "amountSlot": { "tipLength": "jagged", "scallopHeight": "scallop", "edgeNoise": "ruffled" },
+ "promotions": [
+  {"id":"bilPerSide"},
+  {"id":"strandCount"},
+  {"id":"boneWidth"},
+  {"id":"spaceDensity"},
+  {"id":"tipLength","standardVisibleWhen":{"id":"tipStyle","oneOf":["jagged"]}},
+  {"id":"scallopHeight"},
+  {"id":"centerLength"},
+  {"id":"denseStamenLength"},
+  {"id":"discSize"},
+  {"id":"fillOuterSize"},
+  {"id":"sepalSize"},
+  {"id":"sepalCount"},
+  {"id":"leafSize"}
+ ],
+ "views": [
+  {"title":"1 — ARRANGEMENT: FAN","sub":"bloomType = bilateral · gains Petals per side","set":{"bloomType":"bilateral"}},
+  {"title":"2 — PATTERN: STRANDS","sub":"infillType = strands · gains Strand count","set":{"infillType":"strands"}},
+  {"title":"3 — PATTERN: LATTICE","sub":"infillType = bone · gains Bone width","set":{"infillType":"bone"}},
+  {"title":"4 — PATTERN: GROWTH","sub":"infillType = spacecol · gains Source density","set":{"infillType":"spacecol"}},
+  {"title":"5 — EDGE: TOOTHED","sub":"tipStyle = jagged · gains the Amount slot (tipLength)","set":{"tipStyle":"jagged"}},
+  {"title":"6 — EDGE: SCALLOPED","sub":"tipStyle = scallop · gains the Amount slot (scallopHeight)","set":{"tipStyle":"scallop"}},
+  {"title":"REFERENCE — EDGE: RUFFLED","sub":"tipStyle = ruffled · already works today (edgeNoise). Unchanged by this proposal — the pattern the two above copy.","set":{"tipStyle":"ruffled"}},
+  {"title":"7 — CENTER: CLASSIC","sub":"centerArch = classic · gains Length","set":{"centerArch":"classic"}},
+  {"title":"8 — CENTER: DENSE CLUSTER","sub":"centerArch = dense · gains Stamen length","set":{"centerArch":"dense"}},
+  {"title":"9 — CENTER: DISC","sub":"centerArch = disc · gains Disc size","set":{"centerArch":"disc"}},
+  {"title":"10 — CENTER: PETALOID FILL","sub":"centerArch = petaloid · gains Outer fill size","set":{"centerArch":"petaloid"}},
+  {"title":"11 — SEPALS","sub":"sepalsType = sepals · gains Sepal size AND Sepal count (the one two-control row)","set":{"sepalsType":"sepals"}},
+  {"title":"12 — LEAVES: COMPOUND","sub":"stem + leafType = compound · gains Leaf size","set":{"stemType":"stem","leafType":"compound"}},
+  {"title":"13a — LEAVES: LOBED","sub":"stem + leafType = lobed · same promotion","set":{"stemType":"stem","leafType":"lobed"}},
+  {"title":"13b — LEAVES: OVAL","sub":"stem + leafType = oval · same promotion","set":{"stemType":"stem","leafType":"oval"}},
+  {"title":"13c — LEAVES: NARROW","sub":"stem + leafType = narrow · same promotion","set":{"stemType":"stem","leafType":"narrow"}}
+ ]
+}
