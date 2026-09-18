@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -483,6 +483,10 @@ let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actu
    emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
 let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true;
 let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
+/* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
+   ceiling, the phase, the foot), the builder's own emitted whorl and the angle
+   limit it drew. SP0-SP9 read these; the read-out prints them. */
+let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepalTris = 0, lastSepalsAskedUnderSphere = 0;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
    question does not arise (no stem, or not a sphere), never a passing 0. */
@@ -615,6 +619,11 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastLeavesBuilt = built.leavesBuilt || null;
     lastLeafTris = (built.leavesBuilt || []).reduce((n, r) => n + r.tris, 0);
     lastLeafAbsent = leafIsAbsent(uiForBuild);
+    lastSepals = built.foot.sepals || null;
+    lastSepalsBuilt = built.sepals || null;
+    lastSepalTris = built.sepals ? built.sepals.tris : 0;
+    lastSepalsAbsent = sepalsAbsent(uiForBuild);
+    lastSepalsAskedUnderSphere = built.foot.sphereMode ? Math.round(Number(uiForBuild.sepalCount) || 0) : 0;
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
@@ -1208,6 +1217,48 @@ function leafLine(leaf, leavesBuilt) {
     + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
 }
 
+/* THE SEPALS LINE (part 1). Everything the whorl clamps, it TELLS from the
+   OWNER's own record: the count against the petal count (and what "the petal
+   count" means in this placement), the phase in degrees and in fractions of
+   the pitch, the foot against its floor, and the ANGLE against the drawn
+   limit with the reason (which sepal met which petal, how, at what angle),
+   the mode it was measured in and what the scan cost. Under SPHERE with
+   sepals asked the line says UNAVAILABLE rather than nothing. */
+function sepalLine(ui, built, mode) {
+  const asked = Math.round(Number(ui.sepalCount) || 0);
+  if (built.foot.sphereMode && asked >= 1) return `     SEPALS ${asked} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring to place them on (told, none built)\n`;
+  const S = built.foot.sepals, B = built.sepals;
+  if (!S || !B) return '';
+  const L = B.limit;
+  const first = B.built[0];
+  const angleWord = L.unclamped ? `${L.angleBuiltDeg}° — UNCLAMPED by the capability hook past the drawn limit of ${L.limitDeg}° (at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}; no control reaches this)`
+    : L.everywhere ? `CLAMPED to ${L.angleBuiltDeg}° — the sepals clip the petals at every angle in the range (${L.kind} on petal ${L.petal})`
+    : L.clamped ? `${L.askedDeg}° asked, CLAMPED to ${L.angleBuiltDeg}°: at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`
+    : `${L.angleBuiltDeg}° (clear up to ${L.limitDeg}°${L.contactDeg === null ? ', no contact in the range' : `; at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`})`;
+  /* WHERE THE FOOT IS, from the descriptor's own attachment record: on the
+     hub's flare at the height asked, or at the rim with the reason. THE FOOT
+     LINE LEADS WITH THE CHORD AND KEEPS THE TANGENT BESIDE IT, LABELLED
+     (Eva's ruling, second round): a tangent that reads 0.00° on GOBLET and
+     CURVED while the underside falls 49° and 81° over the first millimetre is
+     a number that is always right and never useful — the chord one printable
+     feature along the blade's way is the honest measurement, so it goes
+     first. */
+  const A = S.attachment;
+  const onHub = A && A.mode === 'HUB';
+  const where = onHub
+    ? `on the hub's flare — ${A.frac.toFixed(2)} of the way up from the stem end (r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside; the hub hangs ${A.extentMm.toFixed(2)} mm; AXIAL reading built, the surface-arc reading lands ${A.arc.deltaMm.toFixed(2)} mm away)`
+    : `at the hub's rim (height ${A ? A.frac.toFixed(2) : '?'} asked, INERT: ${A ? A.why : 'no attachment record'})`;
+  const footSurface = onHub
+    ? `foot on the flare, bottom skin through the attachment point (mid-surface ${(S.height).toFixed(2)} mm) · the underside RISES ${A.undersideChordDeg.toFixed(2)}° over the first ${A.undersideChordMm.toFixed(2)} mm outward from the foot (the chord a print meets; tangent there ${A.undersideTangentDeg.toFixed(2)}°${A.onCone ? " — ANGLED's straight face, the chord IS the tangent and the shoulder is not under the foot" : ''})` + (A.footBuriedMm < 0 ? ` · the foot's inner rows POKE OUT ${(-A.footBuriedMm).toFixed(2)} mm below the flare (told)` : ` · inner rows buried ${A.footBuriedMm.toFixed(2)} mm`)
+    : `buried in the rim on the same footing as the petal foot · the underside FALLS ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in from the rim (the chord a print meets; tangent at the rim ${B.footTangentDeg.toFixed(2)}°)`;
+  return `     SEPALS ${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
+    + ` · offset ${S.phaseFrac.toFixed(2)} of ${S.phaseAgainst} = ${S.phaseDeg.toFixed(2)}° of ${S.pitchDeg.toFixed(2)}°` + (S.mirrorSymmetric === false ? ' — NOT mirror-symmetric on this fan (told)' : '')
+    + ` · size ${S.scale.toFixed(2)}x` + (first ? ` (${first.length.toFixed(1)} mm)` : '')
+    + `\n     SEPAL FOOT ${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
+    + ` · ${footSurface}`
+    + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
+}
+
 function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
   if (!stem) return '';
   const hollow = stem.boreR > 0;
@@ -1397,6 +1448,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
        + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
+       + (built ? sepalLine(ui, built, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
@@ -1463,7 +1515,16 @@ function regenerate() {
                      the read-out. It is the OWNER's number — how many of this
                      slider's own petals the stem took — and nothing here derives
                      it. Null wherever the question does not arise. */
-                  stemChannel: built.stemOmission || null };
+                  stemChannel: built.stemOmission || null,
+                  /* THE SEPALS' record: the count ceiling and the angle limit are
+                     the OWNER's numbers (footRing's and the builder's own scan),
+                     printed on the two controls and hatched on their tracks; the
+                     sepal's own buckle record is what the sepal twins' read-outs
+                     see where the petal's fmt reads `shown.buckle`. Under SPHERE
+                     with sepals asked the record says UNAVAILABLE rather than
+                     going silent. */
+                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
+                    : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null) };
   refreshLabels(ui, shown);
   applyCaps(shown);
   if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
@@ -1954,6 +2015,46 @@ window.__bloomMetrics = () => ({
      `stem-eligible-disagrees-with-the-registry` fired nothing until this key
      existed. */
   stemAbsent: lastStemAbsent,
+  /* THE SEPALS (SP0-SP9). The RING's own declarations (footRing's descriptor)
+     beside the BUILDER's own emitted records: the count it built, each sepal's
+     azimuth as the whorl primitive placed it, its foot frames and length as
+     emitted, the effective state each blade was BUILT FROM, and the angle
+     limit as the scan drew it. Null when absent; `sepalsAbsent` is the
+     geometry's own predicate through the page, SP0's other statement. */
+  sepal: lastSepals ? {
+    asked: lastSepals.asked, count: lastSepals.count, ceiling: lastSepals.ceiling, ceilingOf: lastSepals.ceilingOf, countClamped: lastSepals.countClamped,
+    scale: lastSepals.scale, breadth: lastSepals.breadth, phaseFrac: lastSepals.phaseFrac, pitchRad: lastSepals.pitchRad, phaseRad: lastSepals.phaseRad, phaseDeg: lastSepals.phaseDeg, pitchDeg: lastSepals.pitchDeg,
+    startAzimuth: lastSepals.startAzimuth, azimuths: lastSepals.azimuths.slice(), placement: lastSepals.placement, mirrorSymmetric: lastSepals.mirrorSymmetric,
+    footAskedMm: lastSepals.footAskedMm, footMm: lastSepals.footMm, footClamped: lastSepals.footClamped, footFloorMm: lastSepals.footFloorMm, footCeilingMm: lastSepals.footCeilingMm,
+    ring: { radius: lastSepals.ring.radius, width: lastSepals.ring.width, thickness: lastSepals.ring.thickness, overhang: lastSepals.ring.overhang, z: lastSepals.ring.z, slope: lastSepals.ring.slope, domeLean: lastSepals.ring.domeLean, onDome: lastSepals.ring.dome !== null },
+    /* THE ATTACHMENT (SP3): the whorl's height and the descriptor's own solve —
+       mode, the extent's two ends, the point the foot landed on, the arc
+       reading beside it, and the surface figures where the foot meets. */
+    height: lastSepals.height,
+    attachment: JSON.parse(JSON.stringify(lastSepals.attachment)),
+    built: lastSepalsBuilt ? lastSepalsBuilt.count : 0,
+    builtAzimuths: lastSepalsBuilt ? lastSepalsBuilt.azimuths.slice() : [],
+    tris: lastSepalTris,
+    limit: lastSepalsBuilt ? JSON.parse(JSON.stringify(lastSepalsBuilt.limit)) : null,
+    footTangentDeg: lastSepalsBuilt ? lastSepalsBuilt.footTangentDeg : undefined,
+    undersideSlopeDeg: lastSepalsBuilt ? lastSepalsBuilt.undersideSlopeDeg : undefined,
+    shoulderDeg: lastSepalsBuilt ? lastSepalsBuilt.shoulderDeg : undefined,
+    undersideChordDeg: lastSepalsBuilt ? lastSepalsBuilt.undersideChordDeg : undefined,
+    blendReachesRim: lastSepalsBuilt ? lastSepalsBuilt.blendReachesRim : undefined,
+    footBuriedMm: lastSepalsBuilt ? lastSepalsBuilt.footBuriedMm : undefined,
+    petals: lastSepalsBuilt ? lastSepalsBuilt.built.map((p) => ({
+      length: p.length, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris,
+      footFrames: p.footFrames, rootRow: p.rootRow, tip: p.tip, applied: p.applied, overridden: p.overridden,
+      profile: p.profile, profileU: p.profileU, tipCap: p.tipCap, form: p.form, seamStep: p.seamStep,
+      /* THE STATE THE BLADE WAS BUILT FROM, keyed by the PETAL name the law
+         reads (SP6 compares it against the page's own sepal* read-back, an
+         owner the builder does not write) */
+      builtFrom: p.builtFrom,
+    })) : [],
+  } : null,
+  sepalTris: lastSepalTris,
+  sepalsAbsent: lastSepalsAbsent,
+  sepalsAskedUnderSphere: lastSepalsAskedUnderSphere,
   /* THE SPHERE'S STEM CHANNEL — ST7's and ST8's measured side, and the
      read-out's. The per-mode approach arrays ride too, because "the two modes
      omit the same set" is a claim about both of them and a gate sees one build

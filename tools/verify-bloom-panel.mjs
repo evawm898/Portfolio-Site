@@ -304,6 +304,22 @@ const WITNESS = {
                       and the 10 is the cut law's OWN ceiling clamping an asked
                       12, which is a quantity no control can write directly. */
                    read: (m) => `${m.leaf && m.leaf.serration && m.leaf.serration.count}`, what: 'leaf.serration.count' },
+  /* SEPALS (part 1) — a top-level section after Center, collapsed at first
+     load, holding the count and three drop-downs mirroring Petal's. Witnessed
+     by the COUNT through the builder's own tally — a count that moved the
+     slider and built nothing would pass a witness that only read it back.
+     The three children need a whorl present (their guard is the count), which
+     is why each driver sets it first: shape through the apex law's exponent
+     the sepal blade was actually built with, form through the sepal's own
+     metric ratio (the four curves cost no triangles), curl through the ANGLE
+     the clamp built — a number the control cannot write directly. */
+  sepals: { id: 'sepalCount', value: '5', read: (m) => `${m.sepal && m.sepal.built}`, what: 'sepal.built' },
+  sepalShape: { id: 'sepalTipShape', value: '3', pre: [{ id: 'sepalCount', value: '5' }],
+                read: (m) => `${m.sepal && m.sepal.petals[0] && m.sepal.petals[0].tipCap && m.sepal.petals[0].tipCap.shapeN}`, what: 'sepal.petals[0].tipCap.shapeN' },
+  sepalForm: { id: 'sepalCup', value: '0.6', pre: [{ id: 'sepalCount', value: '5' }],
+               read: (m) => `${m.sepal && m.sepal.petals[0] && m.sepal.petals[0].form && m.sepal.petals[0].form.metricMax}`, what: 'sepal.petals[0].form.metricMax' },
+  sepalCurl: { id: 'sepalAngle', value: '-40', pre: [{ id: 'sepalCount', value: '5' }],
+               read: (m) => `${m.sepal && m.sepal.limit && m.sepal.limit.angleBuiltDeg}`, what: 'sepal.limit.angleBuiltDeg' },
   shape: { id: 'petalWidth', value: '30',
            /* The silhouette costs no triangles either (fixed-topology grid),
               so width is witnessed where it reaches PAST the blade: footRing()'s
@@ -587,6 +603,15 @@ const INSTANCED_FAMILIES = [
      would be checking the generator against itself. */
   { what: 'the two tips (session 30, anther* and stigma* from one descriptor table)',
     id: /^(anther|stigma)(Size|Elongation|Roundedness|Points|Pinch|Lumps|Spread)$/, instances: 2, perInstanceDefault: new Set(['Lumps', 'Spread']) },
+  /* THE SEPAL TWINS (sepals, part 1): every petal shape, form and curl control
+     instanced once for the sepals from the geometry's own SEPAL_TWINS table.
+     Shared: kind, bounds, step, default, tier. PER-INSTANCE BY DESIGN and
+     therefore not compared: the label ("Petal cup" reads "Cup" on a sepal)
+     and the role ('petal' against 'sepal'), stated HERE rather than read from
+     the table — a check that read the registry's own generator would be
+     checking it against itself. */
+  { what: 'the sepal twins (sepals part 1, sepal* from SEPAL_TWINS)',
+    id: /^(?:petal|sepal|buckle|sepalBuckle|curl|sepalCurl)(BaseTaper|TipShape|TipTaper|CupGradient|Cup|Amp|Freq|Env|ApexSweep|RollTaper|Roll|SpineCurl|Bias|Start|Twist)$/, instances: 2, perInstanceDefault: new Set(), perInstanceLabelAndRole: true },
 ];
 /* NEGATIVE CONTROL for the tip family: drift ONE instance on a shared field
    (the stigma's size range) in a COPY of the rows and require the clause to
@@ -606,7 +631,7 @@ for (const fam of INSTANCED_FAMILIES) {
     if (!bySuffix.has(suffix)) bySuffix.set(suffix, []);
     bySuffix.get(suffix).push(c);
   }
-  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, c.label, c.tier, c.role,
+  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, fam.perInstanceLabelAndRole ? '(per-instance)' : c.label, c.tier, fam.perInstanceLabelAndRole ? '(per-instance)' : c.role,
     (c.options || []).map((o) => [o.value, o.label])]);
   const drifted = [];
   for (const [suffix, cs] of bySuffix) {

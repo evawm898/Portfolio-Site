@@ -126,7 +126,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 
@@ -367,6 +367,13 @@ for (const row of rows) {
      leafAssertions()'s own header. */
   const leaf = await leafAssertions(page, row);
   if (leaf.length) { validity.push(`${row.label}: ${leaf.join('; ')}`); continue; }
+  /* SEPALS (SP0-SP9, sepals part 1). Both STL gates are blind to the whole
+     family by construction: a sepal whorl on the wrong ring, at the wrong
+     azimuth, from the petal's controls, or clipping through a petal exports
+     watertight and as one piece (a sepal through a petal is a cross-shell
+     overlap). See sepalAssertions()'s own header. */
+  const sep = await sepalAssertions(page, row);
+  if (sep.length) { validity.push(`${row.label}: ${sep.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable

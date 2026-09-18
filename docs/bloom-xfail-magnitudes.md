@@ -610,10 +610,11 @@ on either would be a red.
 
 ## 7. Open, and named
 
-- **PR #243 (sepals, draft) touches `tools/bloom-harness.mjs` and adds entries to this list in
-  the old string form.** Whichever merges second rebases onto a list whose shape changed; its
-  session re-emits its entries with `--emit` and re-records `ALL MAX` (its own body already
-  measured 104,563 pairs and 2,506,652 triangles on its tree). Left to Eva's ordering.
+- **PR #243 (sepals) merged second and did what this item asked** (its outcome doc §8):
+  its 20 sepal entries were converted to the structured form and every one reproduces on the
+  merged tree through this tool; `ALL MAX` on the merged tree reads **129,803 / 3.1556 with its
+  forty sepals** — this list's own record, so #243's 104,563 is withdrawn there — and the refused
+  count is re-recorded at the merged tree's measurement (2,506,652, +94,240 for the sepals).
 - The flower's three lists (§1) carry boolean xfails; a magnitude there is a candidate, not
   built.
 - The per-row magnitude is asserted only in the EXPORT gate (X1 rides there; the connectedness
