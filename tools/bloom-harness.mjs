@@ -6688,8 +6688,8 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'FRINGE: x cup 1.2 (the picture measured fingers reaching each other here)': { pairs: 4250, worstMm: 1.2000, note: '(FRINGE + CUP — the picture session measured teeth reaching each other under cup with the base pulled clear, 2280 pairs against a plain petal\'s 752; reported, not tuned around)' },
   'FRINGE: x the buckle at 0.30 f 3 (the other state that brought fingers together)': { pairs: 2778, worstMm: 1.4645, note: '(FRINGE + BUCKLE — the other state the picture session measured adding tooth-on-tooth contact, 39 pairs against a plain petal\'s 8)' },
   'FRINGE: x roll 330 (a quilled tube with a fringed end)': { pairs: 32840, worstMm: 1.3908, note: '(FRINGE + ROLL — roll 330 is a declared self-intersector on its own, reading 18776 pairs on a PLAIN petal at this tree\'s own calibration, so most of this is the roll\'s and not the fringe\'s)' },
-  'FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)': { pairs: 9218, worstMm: 1.2703, note: '(FRINGE + CURL — a plain petal at curl 180 reads 0, so this is the overlap alone carried round the crozier)' },
-  'FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)': { pairs: 12586, worstMm: 1.6905, note: '(FRINGE + every form control at once — the corner the matrix cannot otherwise reach, since it varies one control at a time)' },
+  'FRINGE: x spine curl 180 (the fringe carried round a fiddlehead)': { pairs: 9219, worstMm: 1.3256, note: '(FRINGE + CURL — a plain petal at curl 180 reads 0, so this is the overlap alone carried round the crozier. Was 9218 / 1.2703 before the arc-stability session made the uniform arc sinc-stable: this row builds a uniform curled arc, so its last bits moved and a tangency count moved with them. The SPAN moved further than the others here — 0.0553 mm — which is a different pair becoming the worst rather than one pair deepening.)' },
+  'FRINGE: x ALL FORM MAX (a fringed end under every deformation at once)': { pairs: 12351, worstMm: 1.6905, note: '(FRINGE + every form control at once — the corner the matrix cannot otherwise reach, since it varies one control at a time. Was 12586 before the arc-stability session made the uniform arc sinc-stable — IMPROVED, and the span did not move at all; the list does not gate magnitude (#213) and this is recorded rather than celebrated.)' },
   'FRINGE: x 40 petals (forty fringed ends on one hub)': { pairs: 40759, worstMm: 1.2000, note: '(FRINGE — forty petals of the shipped carnation, and the per-petal share is close to the carnation\'s own, so this is mostly arithmetic rather than a new fold)' },
   'FRINGE: x CONTINUOUS x 3 turns (a fringe on every petal of a spiral)': { pairs: 14696, worstMm: 1.2000, note: '(FRINGE — every petal of a spiral fringed)' },
   'FRINGE: x 3 layers (the inner whorls fringed too)': { pairs: 15823, worstMm: 1.2000, note: '(FRINGE — the inner whorls carry the same overlap, and the short inner petals do not add a fold of their own)' },
@@ -6739,7 +6739,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'ORCHID x petalCount 4 (smallest even — hood is one slot) x 2 whorls in step': { pairs: 3, worstMm: 0.0000 },
   'ORCHID x petalCount 39 (odd at scale — hood is a straddling pair) x 2 whorls in step': { pairs: 1, worstMm: 0.0000 },
   'ORCHID x 3 layers x phase 0 (slot roles x layer roles)': { pairs: 5, worstMm: 0.0000 },
-  'ORCHID x the IRIS (both role axes, one bloom)': { pairs: 55, worstMm: 0.1413, note: '(EFFECTIVE TILT PAST 90 — 105.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
+  'ORCHID x the IRIS (both role axes, one bloom)': { pairs: 57, worstMm: 0.1413, note: '(EFFECTIVE TILT PAST 90 — 105.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. Was 55 before the arc-stability session made the uniform arc sinc-stable; the span is unmoved.)' },
   'ORCHID x ALL THIN x spread min (the junction at its thinnest) x 2 whorls in step': { pairs: 4, worstMm: 0.0000 },
   'ORCHID x the foot UPPER clamp (petalWidth 30) x 2 whorls in step': { pairs: 46, worstMm: 0.0000, note: '(WORSE since the magnitude gate landed: this entry read 39 / 0.0000 until 2026-09-17, re-measured on main at 7ebfb7f — docs/bloom-xfail-magnitudes.md)' },
   'SLOT: ALL MAX x 2 whorls in step': { pairs: 2619, worstMm: 1.4909 },
@@ -6750,7 +6750,15 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'SLOT: ALL MAX x ALL FORM MAX (every clamp binds at once) x 2 whorls in step': { pairs: 19790, worstMm: 2.4700 },
   'FAN: ALL FORM MAX': { pairs: 8631, worstMm: 1.2616 },
   'FAN: 3 layers x toggle ON x layerTilt max': { pairs: 910, worstMm: 0.3572, note: '(EFFECTIVE TILT PAST 90 — 135.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
-  'FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no controls)': { pairs: 2, worstMm: 0.0000 },
+  /* 'FAN x PER-PETAL: a MIDDLE group only (petal 2 — an orbit that was LATERAL and had no
+     controls)' WAS DECLARED HERE at 2 pairs, worst span 0.0000 mm, and the arc-stability
+     session's sinc-stable uniform arc takes it to 0 — so the entry comes off in the commit
+     that fixed it, which is X1's own rule. TWO SPAN-0 TOUCHES ARE A TANGENCY, NOT A FOLD
+     (session 42's `LOBES: x cup 0.40`): they are a property of where the stations land
+     against a crease, and correcting the arc's last bits moved the landing. **It can come
+     back**, on this row or another, the next time anything moves a curled row's last bits —
+     session 42 removed such an entry on an intermediate tree and had to put it back. If it
+     does, it is a knife edge returning and not a regression. */
   'FAN x PER-PETAL: 1/side x 170deg x petal 1 MAX (largest petal, widest spacing, fewest petals)': { pairs: 1247, worstMm: 1.4909 },
   'FAN x PER-PETAL: 1/side x 170deg x toggle OFF x petal 1 MAX (two petals, both are petal 1)': { pairs: 2494, worstMm: 1.4909 },
   'FAN x PER-PETAL: ALL PER-PETAL MAX x 8/side x 60deg (nine groups on a capped arc)': { pairs: 21233, worstMm: 1.4909 },
@@ -6822,7 +6830,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'DOME: rise 1 x petalTilt 75 x 3 layers x layerTilt 30 (135 deg effective on a hemisphere)': { pairs: 3168, worstMm: 0.6435, note: '(EFFECTIVE TILT PAST 90 — 166.2 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
   'DOME: rise 1 x FAN 3/side toggle ON': { pairs: 189, worstMm: 0.3982, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
   'DOME: rise 1 x SPIRAL': { pairs: 216, worstMm: 0.4176, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
-  'DOME: rise 1 x ORCHID at two whorls in step': { pairs: 351, worstMm: 0.6233, note: '(EFFECTIVE TILT PAST 90 — 155.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
+  'DOME: rise 1 x ORCHID at two whorls in step': { pairs: 352, worstMm: 0.6233, note: '(EFFECTIVE TILT PAST 90 — 155.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. Was 351 before the arc-stability session made the uniform arc sinc-stable; the span is unmoved.)' },
   'DOME: rise 1 x FAN 3/side x petal 1 max': { pairs: 1473, worstMm: 1.4909, note: '(EFFECTIVE TILT PAST 90 — 165.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
   'DOME: rise 1 x ALL THIN x spread min x 3 layers (feet across the apex)': { pairs: 136, worstMm: 0.2728, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
   'DOME: rise 1 x 6 layers x layerSize min (the 0.18 mm blade on a hemisphere)': { pairs: 6528, worstMm: 0.4946, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; SEAM CLAMPED — the blade is SHORTER than the fold it has to clear (3.253x its own length asked))' },

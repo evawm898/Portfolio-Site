@@ -5610,6 +5610,70 @@ export function petalFormIsFlat(state) {
    `CURL_START_MIN`, and the two are maxed. At every state where the seam
    floor does not bind the two are the same number and nothing moves.
    =================================================================== */
+/* ===================================================================
+   sinc(x) = sin(x)/x, AND `arcStep` — THE ONE OWNER of a circular arc's own
+   displacement, read by spineLaw's integrator AND by buildPetalInto's
+   closed-form uniform arc.
+
+   THE FORM THIS REPLACES, and why. An arc that turns from `p0` to `p1` over
+   arc length `ds` displaces by `(sin p1 - sin p0) / k` along the start
+   radial and `(cos p0 - cos p1) / k` along the start normal, where
+   `k = (p1 - p0) / ds`. That is exact in real arithmetic and it CANCELS as
+   `k -> 0`: the numerator is a difference of two nearly equal sines whose
+   own rounding is an ULP of ~1, the true difference is of order `k*ds`, and
+   dividing a one-ULP error by a vanishing `k` returns a displacement of
+   arbitrary size. spineLaw has carried the remedy since session 16, for its
+   own reason (a bias-1 law's first substep runs at `k ~ 1e-13`, where a
+   one-ULP disagreement in `Math.sin` between Node's V8 and Chromium's V8
+   became 1.4e-3 mm of spine on the incurve target's ring 0). THE UNIFORM
+   ARC — the shipped closed form, kept verbatim for byte identity since
+   phase 1 — did not, and it reaches the same branch from the other side:
+   `petalFormIsFlat` guards on EXACT zeros, so a spine curl of 1.1e-14
+   degrees constructs the form and hands the arc a `k` of ~5e-18.
+
+   MEASURED on the whole default bloom, EXPORT and LIVE alike, against the
+   build's own flat twin (docs/bloom-arc-stability-outcome.md): at curl
+   1e-14 the blade is laid onto the hub plane, 14.79 mm of vertex
+   displacement and 8,806 within-shell self-intersection pairs; the
+   arithmetic is wrong all the way up to curl ~1e-6 (1.8e-4 mm at 1e-9,
+   which no census can see), and correct at every value a slider can reach.
+   No control reaches the band — spine curl steps by 5 degrees — but a
+   per-slot variance field does, on every even-count whorl: at 8 petals a
+   wave `180 cos(theta)` hands the slots at 90 and 270 degrees
+   `180 * cos(pi/2)` = 1.1e-14, not 0. Ruled fixed before any field lands
+   (docs/bloom-organic-variance-discovery.md §4, §9.6).
+
+   THE PRODUCT FORM IS THE SAME ARC, algebraically — `sin p1 - sin p0`
+   is `2 cos((p0+p1)/2) sin((p1-p0)/2)` exactly — with the cancellation
+   moved out of a difference and into `sinc`, whose small-argument branch is
+   a Taylor series rather than a quotient. It is not an approximation and it
+   is not a guard: at `k = 0` it returns the straight-line displacement
+   `ds * cos(p0)`, which is the `kC === 0` branch's own expression, so the
+   two arms meet continuously instead of at a threshold.
+
+   THE EXACT-ZERO RESOLVER RULE WAS CONSIDERED AND REJECTED (Eva, Sep 17,
+   ruling 6) — recorded here, in the comment that owns the fix, because it
+   is the obvious saving and will be re-proposed otherwise. It would have a
+   per-slot field snap a slot delta below a fixed fraction of the base's
+   slider step to exactly 0, which is byte-identical and cheaper than this.
+   It is refused because it is a FIFTH TYPED THRESHOLD on a project that has
+   found four typed constants standing in for physical quantities
+   (LADDER_MAX_GAP_FACTOR, the lobe resolution band, the buckle cap, and the
+   ladder's own blend grid), and because it fixes the field rather than the
+   arithmetic: the arc would still return a displacement of arbitrary size
+   for any `k` the resolver's threshold let through, and the next producer
+   of a small `k` would find it again.
+   =================================================================== */
+export const sinc = (x) => (Math.abs(x) < 1e-4 ? 1 - (x * x) / 6 : Math.sin(x) / x);
+/* The displacement of an arc that turns from `p0` to `p1` over arc length
+   `ds`: `dAlong` on the axis `p0` is measured from, `dAcross` on its normal.
+   ONE expression, so spineLaw's substep and the uniform arc's whole-length
+   step cannot drift. */
+export function arcStep(p0, p1, ds) {
+  const pm = (p0 + p1) / 2, sc = ds * sinc((p1 - p0) / 2);
+  return { dAlong: Math.cos(pm) * sc, dAcross: Math.sin(pm) * sc };
+}
+
 export const SPINE_SUBSTEPS = 32;
 export const CURL_BIAS_POWER = 4;
 /* RED-THEN-GREEN (session 16, Eva's instruction: build Mutant A's witness
@@ -5650,13 +5714,6 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
   const dR = new Float64Array(N + 1), dZ = new Float64Array(N + 1), phi = new Float64Array(N + 1);
   phi[0] = tilt;
   let peakK = 0, clamped = false;
-  /* sin(x)/x, stable at the small x a tip-loaded law has near the root. The
-     exact-arc form (sin p1 - sin p0) / k CANCELS there: measured, a one-ULP
-     difference in Math.sin between Node's V8 and Chromium's V8 became
-     1.4e-3 mm of spine on the incurve target's ring 0, because k at the
-     first substep of a bias-1 law is ~1e-13. The product form below is the
-     same arc, algebraically, and it is portable. */
-  const sinc = (x) => (Math.abs(x) < 1e-4 ? 1 - (x * x) / 6 : Math.sin(x) / x);
   for (let i = 0; i < N; i++) {
     const u1 = (i + 1) / N;
     const kRaw = (Phi(u1) - Phi(i / N)) / ds;
@@ -5670,9 +5727,9 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
     phi[i + 1] = p1;
     if (k === 0) { dR[i + 1] = dR[i] + Math.cos(p0) * ds; dZ[i + 1] = dZ[i] + Math.sin(p0) * ds; }
     else {
-      const pm = (p0 + p1) / 2, sc = ds * sinc((p1 - p0) / 2);
-      dR[i + 1] = dR[i] + Math.cos(pm) * sc;
-      dZ[i + 1] = dZ[i] + Math.sin(pm) * sc;
+      const a = arcStep(p0, p1, ds);
+      dR[i + 1] = dR[i] + a.dAlong;
+      dZ[i + 1] = dZ[i] + a.dAcross;
     }
   }
   return {
@@ -5700,8 +5757,8 @@ export function spineLaw({ curlRad, bias, start, length, tilt, floorRadius, star
       const k = (phi[i + 1] - phi[i]) / ds;
       const p0 = phi[i], p1 = p0 + k * f * ds;
       if (k === 0) return { dR: dR[i] + Math.cos(p0) * f * ds, dZ: dZ[i] + Math.sin(p0) * f * ds, phi: p1 };
-      const pm = (p0 + p1) / 2, sc = f * ds * sinc((p1 - p0) / 2);
-      return { dR: dR[i] + Math.cos(pm) * sc, dZ: dZ[i] + Math.sin(pm) * sc, phi: p1 };
+      const a = arcStep(p0, p1, f * ds);
+      return { dR: dR[i] + a.dAlong, dZ: dZ[i] + a.dAcross, phi: p1 };
     },
     peakRadius: peakK === 0 ? Infinity : 1 / peakK,
     clamped,
@@ -6373,13 +6430,21 @@ export function petalSurface(state, ring, slot, cap, acc) {
   /* THE CURL FAMILY (session 16): with bias or start engaged the spine is
      spineLaw()'s table — the same turn, redistributed, floored at one sheet
      thickness of radius in the foot's own (Rs, Up) plane. The two arc
-     branches below are the shipped closed form, character for character,
-     and they are what a UNIFORM curl still builds from: `curlUniform` is a
+     branches below are what a UNIFORM curl builds from: `curlUniform` is a
      BRANCH, not an argument that `Math.pow(u, 1)` is `u`. The law is
      evaluated on every curled row regardless, because the gate's C1 reads
      its inputs from other owners and compares against the emitted rows,
      and C2 compares the table against the closed form on uniform rows —
-     the integrator's own validity, never assumed. */
+     the integrator's own validity, never assumed.
+
+     THEY ARE NO LONGER THE PHASE-1 CLOSED FORM CHARACTER FOR CHARACTER, and
+     that sentence stood here until the arc-stability session. `(sin p1 -
+     sin p0) / k` cancels as k -> 0 and a per-slot variance field reaches
+     that branch on every even-count whorl; both branches go through
+     `arcStep` now, which is the same arc algebraically and is the remedy
+     spineLaw's integrator has carried since session 16. It MOVES BYTES on
+     every row whose curl is engaged and uniform, by design and with its own
+     partition — see arcStep's header for the measurement and the ruling. */
   const floorRadius = ROLL_MIN_RADIUS_FACTOR * t;
   /* THE CURL START IS FLOORED AT THE FIRST BLADE ROW, RE-DERIVED (session 38).
      Eva's Sep 4 ruling floored it at ONE BLADE ROW so that "the root chord is
@@ -6408,14 +6473,12 @@ export function petalSurface(state, ring, slot, cap, acc) {
     })
     : dome === null ? (s) => {
       const phi = tilt + kC * s;
-      const dR = (Math.sin(phi) - Math.sin(tilt)) / kC;
-      const dZ = (Math.cos(tilt) - Math.cos(phi)) / kC;
+      const { dAlong: dR, dAcross: dZ } = arcStep(tilt, phi, s);
       return { C: [base[0] + R[0] * dR, base[1] + R[1] * dR, base[2] + dZ], phi };
     } : (s) => {
       /* The same arc in the foot's own (Rs, Up) plane. */
       const phi = tilt + kC * s;
-      const dR = (Math.sin(phi) - Math.sin(tilt)) / kC;
-      const dZ = (Math.cos(tilt) - Math.cos(phi)) / kC;
+      const { dAlong: dR, dAcross: dZ } = arcStep(tilt, phi, s);
       return { C: [base[0] + Rs[0] * dR + Up[0] * dZ, base[1] + Rs[1] * dR + Up[1] * dZ, base[2] + Rs[2] * dR + Up[2] * dZ], phi };
     };
 

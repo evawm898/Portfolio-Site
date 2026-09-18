@@ -15,6 +15,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -38,6 +39,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -74,6 +76,18 @@ jobs:
         run: node tools/bloom-wall-thickness.mjs
       - name: ... and those four assertions must be able to fail
         run: node tools/bloom-wall-thickness.mjs --negative-control
+      # THE ARC'S NEAR-ZERO BRANCH cannot be a matrix row: no slider reaches the
+      # band (spine curl steps by 5 degrees) and `applyConfig`'s read-back would
+      # refuse one if a row tried. So the witness calls the geometry directly,
+      # and it rides HERE for the wall instrument's own two reasons — the same
+      # question (a blade folded through itself is not printable), Node-only,
+      # under a minute — and before the npm install because it imports
+      # playwright not at all: `bloom-self-intersection.mjs` and the geometry,
+      # and nothing else.
+      - name: The uniform arc must be stable as its curvature goes to zero (AS0-AS4)
+        run: node tools/verify-bloom-arc-stability.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-arc-stability.mjs --negative-control
       # playwright alone, at an exact version. It pins the exact playwright-core it
       # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
       # browser that `npx playwright install` downloads can never disagree. Both
