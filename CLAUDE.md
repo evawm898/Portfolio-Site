@@ -2995,6 +2995,135 @@ and K2c's subject NAMED as a set because on a monotone petal no row is distingui
 sheet is `node tools/shot-bloom-lamina-floor.mjs <dir>`, **with F as the reference cell and one row
 PAST the floor on it** so the floor reads as a reason rather than a rule.
 
+**THE UNIFORM ARC IS SINC-STABLE NOW, AND A CLOSED FORM KEPT VERBATIM FOR BYTE IDENTITY IS A
+LIABILITY THE DAY A NEW PRODUCER REACHES ITS SINGULAR BRANCH** (the arc-stability session —
+read `docs/bloom-organic-variance-discovery.md` §4 and §9.6 for the ruling, then
+`docs/bloom-arc-stability-outcome.md`, before touching `arcStep`, `sinc`, `spineLaw`'s
+integrator or `buildPetalInto`'s `spineAt`). Discharges Eva's ruling 6: **the near-zero curl
+branch is fixed BEFORE any variance field lands.** `buildPetalInto`'s uniform spine was the
+phase-1 closed form `(sin p1 − sin p0) / k`, character for character since phase 1 — exact in
+real arithmetic and CANCELLING as `k → 0`, because the numerator is a difference of two nearly
+equal sines whose own rounding is one ulp of a number near 1 while the true difference is of
+order `k·s`. `sinc` and `arcStep` are lifted to module scope as **the ONE OWNER of a circular
+arc's own displacement**, read by `spineLaw`'s integrator (which has carried the remedy since
+session 16, for its own reason) AND by the uniform arc. The product form is the same arc —
+`sin p1 − sin p0` IS `2 cos((p0+p1)/2) sin((p1−p0)/2)` — and it is not a guard and has no
+threshold: at `k = 0` it returns `ds·cos(p0)`, the `kC === 0` branch's own expression, so the
+two arms meet continuously.
+**`petalFormIsFlat` GUARDS ON EXACT ZEROS, WHICH IS WHAT PUTS A FIELD INTO THE SINGULAR
+BRANCH**: at 8 petals a wave `180 cos(θ)` hands the slots at 90° and 270° `180 × cos(π/2)` =
+**1.1e-14, not 0** — and at the shipping tilt the true `dZ` increment there is 8.1e-17, LESS
+than one ulp of the `cos(tilt)` it is subtracted from, so it rounds to zero and **the blade is
+laid onto the hub plane**: 14.79 mm of vertex displacement, 8,806 within-shell pairs at
++1e-14 and 11,027 at −1e-14.
+**THE DEFECT REACHED TO ABOUT CURL 1e-6, NOT ONLY TO 1e-14, AND THAT CORRECTS THE DISCOVERY'S
+OWN TABLE** — §4 read *"from 1e-9 up, clean"*, which was clean **as the census measures it**,
+and the census is blind here by construction. Measured against the build's own flat twin,
+EXPORT and LIVE reading identically: **1.8e-4 mm at curl 1e-9 (89,000× the most a curl that
+size can move anything) and 2.0e-6 mm at 1e-7 (9.7×)** — neither displaces enough to fold
+anything, so no pair count can see either. **A DISCOVERY'S READING IS BOUNDED BY ITS
+INSTRUMENT, and an arithmetic defect needs an arithmetic instrument.**
+**THE BOUND IS GEOMETRY, NOT A TUNED NUMBER**: bending a blade by a total turn of `curlRad`
+about a pivot inside the model cannot move any vertex further than `|curlRad| × (the model's
+own bounding diagonal)`, plus 16 ulp of the largest coordinate as the float floor. Measured,
+the two populations do not touch — **0.045 to 0.165 on every value the arithmetic gets right,
+9.7 to 2.2e14 on every value it gets wrong** — so nothing in it is fitted to the data in hand.
+On the fixed tree the ratio is **0.138 at every magnitude over ten decades**, bottoming out at
+7.1054e-15 mm (0.78 ulp of a 40.819 mm coordinate).
+**THE EXACT-ZERO RESOLVER RULE WAS CONSIDERED AND REJECTED** (Eva, ruling 6), and the rejection
+is recorded in `arcStep`'s own header because it is the obvious saving and will be re-proposed
+otherwise: it is a FIFTH typed threshold on a project that has found four typed constants
+standing in for physical quantities, and it fixes the FIELD rather than the ARITHMETIC — the
+arc would still return a displacement of arbitrary size for any `k` the resolver let through.
+**`spineLaw` IS BYTE-IDENTICAL, MEASURED RATHER THAN ARGUED**: 1,536 laws × 9,216 stations plus
+all seven reported scalars per law, `Object.is`, **0 values moved, worst |d| exactly 0**.
+**AND THE DEFECT IS TILT-DEPENDENT — AT `petalTilt` 0 THE OLD FORM IS ACCIDENTALLY CORRECT,
+which the NEGATIVE CONTROL found and a reading of the code had not.** `dR`'s numerator loses
+an ulp of `sin(tilt)` against a true increment of `cos(tilt)·k·s`, so its relative error runs
+away toward tilt 90; `dZ`'s does the mirror image and runs away at tilt 0 — and at tilt
+exactly 0 `dR` is `sin(phi)/kC` with nothing to cancel against while `dZ`'s numerator rounds
+to 0 where the true value is 1.5e-36 mm, **so 0 is the right answer and the restored closed
+form produces NO finding there** (26 findings at the shipping tilt, 13 at tilt 75, **0 at tilt
+0**). Two consequences: **a variance field on a bloom at zero tilt would never have shown
+this**, and AS1's tilt-0 rungs are a clause whose subject this mutation is not in — so the
+witness DECLARES that (`CONTROL_REACHES`) and asserts the per-tilt coverage BOTH ways instead
+of leaving a silence a later reader would mistake for a hole.
+**AS0–AS4 IS THE NEW FAMILY AND `node tools/verify-bloom-arc-stability.mjs` IS THE ONLY WITNESS
+FOR ANY OF IT — IT CANNOT BE A MATRIX ROW, AND A ROW THAT TRIED WOULD BE SILENTLY GREEN
+RATHER THAN REFUSED.** That is a correction this session made to its own first draft, by
+measuring instead of reasoning: `petalSpineCurl` is `step: 5` and a stepped range input SNAPS,
+so setting 1e-14 / 1e-9 / 1e-6 / 1e-3 on the real `#petalSpineCurl` all read back **0**
+(measured on the page) — and `applyConfig`'s slider read-back band is `|set − got| < 1e-9`, so
+**a row at 1e-14 passes the read-back while the page holds curl 0 and builds the flat
+default**, which is the harness measuring a design other than the one it names. (1e-6 and 1e-3
+ARE refused; the band and the defect's band overlap rather than nest.) So the witness calls the
+geometry DIRECTLY. It rides in `bloom-export-watertight.yml` beside the wall
+instrument, BEFORE the npm install, because it imports playwright not at all. AS0 the default
+reaches no arc · AS1 the ladder is bounded on every rung in both modes · AS2 the census at
+±1e-14 is the flat build's, an integer with no tolerance · AS3 no triangle moved · AS4 the
+curl-graded 8-petal whorl (the shape the field will build, its near-zero values produced by
+`180 cos(θ)` rather than chosen) is clean and BOTH near-zero slots land where the same petal at
+curl exactly 0 does, **per petal, so one slot landing right cannot cover for another**.
+`--negative-control` restores the old closed form in a copy of the module and REFUSES on an
+anchor that does not match exactly once; **AS0 and AS3 are DECLARED SILENT with their reasons
+rather than demanded**, because a cancelling arc moves vertices and never a triangle count, and
+the default is at curl exactly 0 on both trees.
+**THE PARTITION: 116 MOVED / 736 HELD of the 852-row live matrix, and the MOVER SET IS
+PREDECLARED FROM THE BUILDER'S OWN RECORD RATHER THAN COUNTED.** A row moves iff some BUILT
+petal takes the uniform closed-form arc — `spine.curlRad !== 0 && spine.uniform`, read on
+`petalsAll` AND on `sepals.built`, because a sepal is the petal builder on a second ring and
+reaches the same branch through its `sepalSpineCurl` twin (leaves cannot — `leafBladeState`
+pins the curl to 0; stamens and the style cannot — `rodInto` calls `spineLaw` directly).
+**Read from the BASE tree**, so the prediction's owner is not the quantity under test. `node
+tools/verify-bloom-seam-bytes.mjs --base <worktree> --change arc --matrix live --control
+--control-mode` reads **PASS over 832,328,424 floats positionally under `Object.is`**: the
+set is EXACTLY as predeclared in both directions, the shipping DEFAULT is HELD (by branch —
+at curl 0 there is no form, so `spineAt` takes the straight arm), **triangle counts are
+unchanged on every row with 0 declared exceptions**, the FOOT is identical on every row
+(6,480,054 captured values — `footRowsAt()` never reads `spineAt`), and the two modes agree
+everywhere. **`arc` is the THIRD change to ride in that tool and the first that is not
+ladder-side**; it is also the first to predeclare the SET where `seam` and `widest`
+predeclare counts, which is the difference between a partition and a number.
+**FIVE XFAIL ENTRIES MOVED AND ONE CAME OFF, ALL OF THEM ROWS THAT BUILD A UNIFORM CURLED
+ARC** — `FRINGE: x spine curl 180` 9218/1.2703 → **9219/1.3256**, `FRINGE: x ALL FORM MAX`
+12586 → **12351** (IMPROVED), `ORCHID x the IRIS` 55 → **57**, `DOME: rise 1 x ORCHID at two
+whorls in step` 351 → **352**, and `FAN x PER-PETAL: a MIDDLE group only` **2 → 0, entry
+REMOVED**. Re-recorded with the previous figure kept in each note, never a widened band
+(#213); they move in BOTH directions and the list does not gate magnitude, so all of it would
+have passed silently. **`ALL MAX` is unmoved** (129,803 / 3.1556) and its export-refusal
+triangle count is untouched, because the arc moves no triangle. **THE REMOVAL IS A SPAN-0
+KNIFE EDGE AND CAN COME BACK** — two pairs at worst span 0.0000 are a tangency against a
+crease, session 42's `LOBES: x cup 0.40` verbatim, and correcting the last bits moved where
+the stations land. **ALL FIVE WERE RE-CHECKED IN THE BROWSER** (`verify-bloom-export.mjs
+--only`), not only in Node, because X1/X2 run on a Chromium build and a span-0 count is
+decided by last bits the two V8s need not agree on: 5 of 5 watertight, the four declared rows
+each still failing at their NEW magnitude, and the removed row reported FREE.
+**NO FROZEN PHASE IS OWED AND 31 OF THE 33 BASELINES' BYTES STOP REPRODUCING — the two
+halves of the same rule.** The row set cannot change here (the failing values are unreachable
+through the registry, so the witness is not a matrix row), and the charter is explicit that a
+phase is owed when the ROW SET changes and **never for a byte move the outcome doc names**
+(session 24) — measured, the live matrix is **852 rows on both trees, 0 rows differing in
+definition**, so `frozen/phase34` stays the newest baseline. What IS owed is the naming, and
+it is in §6 of the outcome doc: **31 of 33 tags move, 2,785 of 16,229 frozen rows**, phase34
+itself **112 of 778**, and the only two that hold entirely are `frozen/phase2` and
+`frozen/phase3` — the matrix carried no curled row until phase4. Every one of those tags'
+DEFINITIONS is untouched and `--verify-frozen` is green on all 33. **`node
+tools/verify-bloom-seam-bytes.mjs --change arc --frozen-sweep` is what answers that question
+now, and it is a CONSEQUENCE of the byte partition rather than a substitute for it**: it
+applies the change's own mover predicate, which the full byte comparison proves exact in both
+directions on the live matrix and on phase34 first; memoised on (control set, capability), so
+16,229 rows cost 999 builds. A change with no entry in `MOVER_BY_CHANGE` cannot use it.
+**THE NOISY BAND IS A DIFFERENT MECHANISM AND THIS FIX COVERS NONE OF IT — MEASURED PER PATH,
+AND THE TWO HALVES OF THE ANSWER DIFFER.** Cup, twist, roll, cup gradient and buckle at 1e-6 are
+**exactly inert — the same count to the integer** (10/10, 129/129, 1,264/1,264, 820/820,
+696/696): they are separate code paths and the arc cannot reach them. On the ARC's own path the
+counts MOVE IN BOTH DIRECTIONS WITHOUT GOING AWAY — 925 → 0 at curl 1e-6 and 200 → 17 at 1e-5,
+against 456 → 461 at 1e-3 and 495 → 572 at −1e-3 — and **every one is at worst span 0.0000 mm**,
+session 42's knife-edge class: a sheet grazing itself at a crease, decided by where the stations
+land, so correcting the last bits moves the landing and therefore the count. **It is a second
+finding and a second PR**, and a real one, because the same field that hands a slot 1e-14 hands
+its neighbours everything up through 1e-6.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
