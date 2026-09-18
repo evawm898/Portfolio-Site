@@ -271,7 +271,7 @@ bloom generator entirely.
 
 ## 3. Branches with no open PR
 
-Fifteen, plus one checkpoint. **Every `claude/*` branch here is "NOT an ancestor of main"
+Fifteen at the moment of the census, plus one checkpoint (and see the note on this session's own branch below). **Every `claude/*` branch here is "NOT an ancestor of main"
 by construction** — `main` squashes, so that check answers NO on a branch that merged
 perfectly, and it is not the test. What is reported instead is whether the branch's own
 first commit subject appears on `main`, and whether a PR for it was closed unmerged.
@@ -279,7 +279,7 @@ first commit subject appears on `main`, and whether a PR for it was closed unmer
 | branch | head | last commit | own commits | status |
 |---|---|---|---|---|
 | `checkpoint/pre-stabilization-e0766f7` | `e0766f7` | 2026-08-06 | 0 | **ancestor of `main`** — a plain checkpoint tag-as-branch |
-| `claude/zen-feynman-9uut0v` | `e804027` | 2026-09-18 | 0 | **ancestor of `main`** — this session's own branch, at `main`'s head |
+| `claude/zen-feynman-9uut0v` | `e804027` | 2026-09-18 | 0 | this session's own branch. At the moment of the census it sat exactly on `main`'s head with no commits of its own; it carries this document's single commit now, and PR #258 is its open PR — so by the time anyone reads this it belongs in §2 rather than here. Recorded as measured, corrected here rather than silently restated. |
 | `claude/eva-maskalenko-portfolio-qod1hn` | `9151afe` | 2026-08-07 | 1 | merged (subject on `main` as `ace092b`), undeleted |
 | `claude/flower-bloom-generator-wvxlwk` | `4655dea` | 2026-08-11 | 1 | PR #19 closed unmerged; its earlier sha merged as #16. Work on `main` by subject |
 | `claude/bodice-placement-curvature-31iz21` | `7e52b6b` | 2026-08-14 | 3 | PR #31 closed unmerged; subject present on `main` by another route |
