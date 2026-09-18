@@ -4686,7 +4686,16 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        Richardson check is what bounds what that could cost.
        This reports the SHIPPED law's own seams (session 37 measured 44.5
        and 73.7 degrees at u 0.057939 and 0.999562 on the default) and it
-       rules nothing about them. */
+       rules nothing about them.
+
+       AND IT IS MODE-DEPENDENT, WHICH IS WHY `laminaSlopeBreaks` SITS BESIDE
+       IT. `winnerOf` floors on `tipFloor`, which is TIP_CAP_HALF_MM live and
+       TIP_HALF_MM at export, so a petal whose FOOT is narrower than the print
+       floor names a different term at the base in the two modes: measured on
+       `footDelicacy` 0.25, the ROOT_BLEND -> CORE break reads u 0.015720245
+       LIVE and 0 EXPORT. That is correct for a list that reports the seams of
+       the outline a given mode draws, and it is the wrong list for anything
+       deciding TOPOLOGY. */
     slopeBreaks(grid = 4096) {
       const out = breaksOf(winnerOf(shapeAt), grid);
       /* A FEATURE OF THE CUT IS A TANGENT BREAK WHEN ITS LOCAL POWER IS AT
@@ -4718,6 +4727,32 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       }
       return out;
     },
+    /* THE LAMINA'S OWN SLOPE BREAKS — THE SAME LIST, MODE-FREE, AND THE ONE
+       A CONSUMER DECIDING TOPOLOGY MUST READ. It is `breaksOf` over
+       `laminaWinner`, which floors on TIP_HALF_MM in both modes rather than
+       on the accumulator's own `tipFloor`; session 42 built that winner for
+       the lobe arc table and read it through `breaksOf` there, and this is
+       the same expression under a name an outside reader can ask for.
+
+       IT EXISTS SO NOBODY RE-DERIVES IT. The alternative is a second
+       producer of the outline's term handover sitting outside
+       `widthProfile`, which is the defect this file has refused since
+       session 32; the infill's basal boundary is the first consumer that
+       needs it, and its floor is `from: 'ROOT_BLEND'` — the station where
+       the foot's width floor stops owning the outline and the core takes it,
+       which is the blade's own WAIST and the narrowest section it has
+       between the foot and the tip.
+
+       NOT A SECOND DEFINITION OF `slopeBreaks`: that one reports the seams
+       of the outline a given MODE draws and is right to be mode-dependent;
+       this one reports where the TERMS hand over, which is a property of the
+       petal and not of which floor a build happens to apply. Where the foot
+       clears the print floor the two lists are identical — measured over
+       nineteen reachable states, the one exception being the petal whose
+       foot does not (`footDelicacy` 0.25), where THIS list is the same in
+       both modes and `slopeBreaks` is not. The measurement is section 5 of
+       `node tools/bloom-infill-lamina-floor.mjs`. */
+    laminaSlopeBreaks(grid = 4096) { return breaksOf(laminaWinner, grid); },
     /* THE LOBES' RECORD — what was asked, what was built, the two caps and
        which bound, the pitch against its floor, the window and every
        station; `sinusMinHalfMm` is the deepest sinus AS BUILT (the max with
