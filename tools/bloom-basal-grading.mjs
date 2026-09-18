@@ -64,7 +64,7 @@ const n2 = (x, d = 2) => (x === null || x === undefined ? 'n/a' : x.toFixed(d));
 /* One (grading, wall) state, over all eight seeds. */
 export function state(opts, wall, seeds = SEEDS) {
   const per = seeds.map((seed) => {
-    const F = P.fieldSalvage(ctx, N_CELLS, { ...opts, seed });
+    const F = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, ...opts, seed });
     const m = P.measure(ctx, F, wall);
     return { F, m };
   });
@@ -108,8 +108,8 @@ async function inert(baseDir) {
   const cB = B.context({});
   let floats = 0, diffs = 0, states = 0;
   const cmp = (opts, wall, seed, useOpts) => {
-    const Fh = P.fieldSalvage(ctx, N_CELLS, { ...opts, seed });
-    const Fb = B.fieldSalvage(cB, N_CELLS, { seed });
+    const Fh = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, ...opts, seed });
+    const Fb = B.fieldSalvage(cB, N_CELLS, { u0: B.U0, seed });
     const a = P.cutThrough(ctx, Fh, wall).acc.pos, b = B.cutThrough(cB, Fb, wall).acc.pos;
     states++;
     if (a.length !== b.length) { diffs += Math.max(a.length, b.length); floats += Math.max(a.length, b.length); return; }
@@ -124,8 +124,8 @@ async function inert(baseDir) {
      up is a number meaning nothing. The control therefore says which of the two it got, and it
      is satisfied by either — both are proof that the option is reached. */
   let cFloats = 0, cDiffs = 0, cLen = false, cMsg = '';
-  { const Fh = P.fieldSalvage(ctx, N_CELLS, { converge: 0.05, baseNarrow: 0.45, seed: SEEDS[0] });
-    const Fb = B.fieldSalvage(cB, N_CELLS, { seed: SEEDS[0] });
+  { const Fh = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, converge: 0.05, baseNarrow: 0.45, seed: SEEDS[0] });
+    const Fb = B.fieldSalvage(cB, N_CELLS, { u0: B.U0, seed: SEEDS[0] });
     const a = P.cutThrough(ctx, Fh, 1.0).acc.pos, b = B.cutThrough(cB, Fb, 1.0).acc.pos;
     cFloats = a.length;
     if (a.length !== b.length) { cLen = true; cMsg = `the streams differ in LENGTH — ${a.length / 9} triangles against ${b.length / 9}`; }

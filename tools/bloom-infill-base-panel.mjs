@@ -330,14 +330,14 @@ async function inert(baseDir) {
   const ctx = P.context({}), cB = B.context({});
   let floats = 0, diffs = 0, states = 0;
   for (const wall of WALLS) for (const seed of SEEDS) {
-    const a = P.cutThrough(ctx, P.fieldSalvage(ctx, N_CELLS, { seed }), wall).acc.pos;
-    const b = B.cutThrough(cB, B.fieldSalvage(cB, N_CELLS, { seed }), wall).acc.pos;
+    const a = P.cutThrough(ctx, P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, seed }), wall).acc.pos;
+    const b = B.cutThrough(cB, B.fieldSalvage(cB, N_CELLS, { u0: B.U0, seed }), wall).acc.pos;
     states++;
     if (a.length !== b.length) { diffs += Math.max(a.length, b.length); floats += Math.max(a.length, b.length); continue; }
     floats += a.length; for (let i = 0; i < a.length; i++) if (!Object.is(a[i], b[i])) diffs++;
   }
   console.log(`INERT AT THE DEFAULT: ${diffs} of ${floats.toLocaleString('en-US')} floats differ over ${states} states (${SEEDS.length} seeds x ${WALLS.length} walls), head against ${baseDir}, Object.is.`);
-  const F = P.fieldSalvage(ctx, N_CELLS, { seed: SEEDS[0] });
+  const F = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, seed: SEEDS[0] });
   const withPlan = P.cutThrough(ctx, F, 1.0, { capturePlan: true });
   const without = P.cutThrough(ctx, F, 1.0);
   let d2 = 0; for (let i = 0; i < without.acc.pos.length; i++) if (!Object.is(withPlan.acc.pos[i], without.acc.pos[i])) d2++;
@@ -358,10 +358,10 @@ else {
   const ctx = P.context({});
   const hAt = (u) => ctx.surface.profile.halfWidthAt(u);
   const out = { petal: { L: ctx.L, sheet: ctx.t, plainTris: ctx.plainTris, N: N_CELLS, seeds: SEEDS, blade: areaU(hAt, ctx.L, 0, 1) },
-    shipped: { u0: P.U0, converge: P.CONVERGE_FRACTION, baseNarrow: P.BASE_NARROWING, baseReach: P.BASE_REACH, tipGamma: P.TIP_GAMMA },
+    shipped: { u0: P.basalSplit(ctx, {}) !== null ? ctx.rows[P.basalSplit(ctx, {})].u : null, laminaFloorU: P.laminaFloorU(ctx), rootBlendEnd: P.U0, converge: P.CONVERGE_FRACTION, baseNarrow: P.BASE_NARROWING, baseReach: P.BASE_REACH, tipGamma: P.TIP_GAMMA },
     panel: [], truncation: [], pairs: [], v1: [], masked: [], grid: [] };
   console.log(`default petal ${ctx.L} mm long, sheet ${ctx.t} mm, EXPORT mode; ${N_CELLS} cells; ${SEEDS.length} seeds.`);
-  console.log(`the blade's plan area is ${out.petal.blade.toFixed(1)} mm2; the shipped boundary is ROOT_BLEND_END = ${P.U0}.\n`);
+  console.log(`the blade's plan area is ${out.petal.blade.toFixed(1)} mm2. THIS TOOL'S TABLES SWEEP THE BOUNDARY EXPLICITLY and are unchanged; the shipped boundary is no longer ROOT_BLEND_END (${P.U0}) but the derived lamina floor — row ${P.basalSplit(ctx, {})}, u ${ctx.rows[P.basalSplit(ctx, {})].u.toFixed(7)}, floor u ${P.laminaFloorU(ctx).toFixed(7)}. See docs/bloom-infill-lamina-floor.md.\n`);
 
   /* ---- 1. the panel's share, per lattice station ---- */
   console.log('1. THE SOLID BASE PANEL, PER BOUNDARY. A function of the BOUNDARY ALONE — no grading moves a square millimetre of it.');

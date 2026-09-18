@@ -61,8 +61,73 @@ import { firstSlot } from './bloom-first-slot.mjs';
 const IS_MAIN = process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const arg = (k, d) => { const i = process.argv.indexOf(k); return i > 0 ? process.argv[i + 1] : d; };
 
-export const U0 = G.ROOT_BLEND_END;          // the solid basal zone ends where the root blend does
 export const WALL_DEFAULT = 1.0;              // mm — MIN_FEATURE_MM, the printable wall
+
+/* THE BOUNDARY'S OWN OWNER, AND WHY `U0` IS NO LONGER IT.
+
+   `U0` IS `ROOT_BLEND_END` AND IT WAS NEVER THE INFILL'S. It is a STATION ON
+   THE OUTLINE with seven other readers — `rootBlend`'s own decay, the lobes'
+   `laminaStart`, A5's excluded region, `bloom-sagitta.mjs`'s base bucket and
+   the sepal builder's four row filters — and it says where the foot's width
+   FLOOR decays to nothing, which is 0.30. The outline stops being the root
+   blend's five times lower than that, at the term handover the geometry
+   declares (u 0.0579388 on the default). So the sentence this file opened
+   with — "the solid basal zone (foot + root blend, u <= ROOT_BLEND_END)" —
+   described a region five times longer than the one it named, and the panel
+   Eva has been objecting to is the difference.
+
+   IT IS KEPT EXPORTED UNDER ITS OWN NAME, because #250/#251/#252 quote it by
+   name and their published figures must keep reproducing; every call site
+   that depends on it now passes it EXPLICITLY, so the dependency is visible
+   rather than a default. Nothing here defaults to it any more.
+
+   `laminaFloorU` IS THE FLOOR AND IT IS DERIVED FROM A LENGTH. It reads the
+   profile's own MODE-FREE break list for the station where ROOT_BLEND hands
+   the outline to the CORE — the blade's WAIST, and the narrowest section it
+   has between the foot and the tip (5.164 mm across on the default against
+   6.40 at the foot and 16.00 at mid-blade). Below it the outline turns and
+   widens again toward the foot, and a cell region containing that turn is
+   measurably WORSE: see `docs/bloom-infill-lamina-floor.md` §2, and
+   `node tools/bloom-infill-lamina-floor.mjs` for the sweep.
+
+   MODE-FREE BY CONSTRUCTION AND NOT BY OBSERVATION. It is
+   `laminaSlopeBreaks`, not `slopeBreaks`: the second floors on the
+   accumulator's own `tipFloor`, which differs live and export, and on
+   `footDelicacy` 0.25 it names the handover at u 0.015720245 LIVE and 0
+   EXPORT. Which rows carry the solid panel is TOPOLOGY, and this project has
+   refused a mode-dependent topology five times. */
+export const U0 = G.ROOT_BLEND_END;          // RETIRED AS THE DEFAULT (see above); still the root blend's own station
+export function laminaFloorU(ctx) {
+  const b = ctx.surface.profile.laminaSlopeBreaks().find((x) => x.from === 'ROOT_BLEND');
+  return b ? b.u : 0;
+}
+/* THE SECOND FLOOR, AND THE MUST-FAIL IS WHAT FOUND IT. A region that starts where
+   the blade is narrower than two wall insets plus a printable hole carries no hole at
+   all: the outline edges are inset by the FULL wall from each side (the established
+   constraint — a half-wall lip along the margin is under the print floor), so the
+   hole available across the region's base edge is `2 * (h(xB) - wall)` and it must
+   clear `MIN_FEATURE_MM`.
+
+   IT BINDS ON A THIN FOOT AND NOWHERE ELSE, measured over eighteen states: at
+   `footDelicacy` 0.25 the blade is 1.600 mm across at u = 0 — narrower than two
+   1.0 mm walls — and the waist has vanished (the foot never owns the outline), so the
+   waist alone would put the region's start at row 4 where no hole can exist. On every
+   other state measured the outline already clears it at u = 0 and this floor reads 0.
+   It was NOT predicted: the first cut of this feature had the waist alone, and
+   `--control`'s K2 fired on `footDelicacy` 0.25 — the petal that was supposed to be
+   the control for "no waist, no reversal" and instead turned out to have a different
+   floor. Scanned UPWARD FROM THE WAIST because `h` is not monotone below it. */
+export function wallFloorU(ctx, wall = WALL_DEFAULT) {
+  const hAt = (u) => ctx.surface.profile.halfWidthAt(u);
+  const need = wall + G.MIN_FEATURE_MM / 2;
+  const from = laminaFloorU(ctx);
+  const N = 4096;
+  for (let i = 0; i <= N; i++) { const u = from + (1 - from) * i / N; if (hAt(u) >= need) return u; }
+  return 1;
+}
+/* THE FLOOR IS THE STRICTER OF THE TWO, and each is a LENGTH with its own owner —
+   the outline's term handover and the printable gap. Neither is a row count. */
+export function basalFloorU(ctx, wall = WALL_DEFAULT) { return Math.max(laminaFloorU(ctx), wallFloorU(ctx, wall)); }
 export const ANISO = 2.2;                     // the salvage metric's stretch along the midrib
 export const LLOYD_PASSES = 4;
 export const FILLET_MM = 0.8;                 // target fillet radius on every hole corner
@@ -170,14 +235,51 @@ export function slotContext(st, ring, slot, acc, cap = null) {
   const p = G.buildPetalInto(a2, st, ring, slot, cap, true);
   return { st, ring, slot, surface, rows: p.grid[0].rows, t: surface.t, L: surface.length, plainTris: a2.triangleCount, frame: { dir: surface.dir, nrm: surface.nrm, base: surface.base } };
 }
-/* WHERE THE SOLID BASAL ZONE ENDS. The target defaults to `U0` (ROOT_BLEND_END),
-   which is what every call made before the base-boundary session, so the shipped
-   answer is unchanged by construction. It SNAPS to the nearest emitted row, which
-   is the mechanism it always used: the split is a row index, so a target between
-   two stations has to land on one of them. Only the SPLIT moves — the field's own
-   metric, seeding, relaxation, grading, fillet and wall law are untouched, and
-   they read their own region through `xB` exactly as before. */
-function splitRow(ctx, target = U0) { let m = 0, best = Infinity; for (let i = 0; i < ctx.rows.length; i++) { const d = Math.abs(ctx.rows[i].u - target); if (d < best) { best = d; m = i; } } return m; }
+/* WHERE THE SOLID BASAL ZONE ENDS. `splitRow` SNAPS TO THE NEAREST emitted row,
+   which is the mechanism this file always used for an explicit target: the split
+   is a row index, so a target between two stations has to land on one of them.
+   Only the SPLIT moves — the field's own metric, seeding, relaxation, grading,
+   fillet and wall law are untouched, and they read their own region through `xB`
+   exactly as before. */
+function splitRow(ctx, target) { let m = 0, best = Infinity; for (let i = 0; i < ctx.rows.length; i++) { const d = Math.abs(ctx.rows[i].u - target); if (d < best) { best = d; m = i; } } return m; }
+
+/* THE FEET ARE COUNTED OFF THE ROWS AND NOT TYPED. They are the leading rows the
+   builder emits at u = 0 — three on every state measured, and `bloom-infill-base-
+   panel.mjs` restates that 3 as `measureWall`'s own. A second copy of a number two
+   files already hold is the duplicate-expression defect §9b(i) names, so this one
+   is read off the data it is about and cannot drift. */
+function footRows(ctx) { let n = 0; while (n < ctx.rows.length && ctx.rows[n].u === 0) n++; return n; }
+
+/* THE FLOOR'S OWN ROW, AND IT IS NOT A NEAREST-SNAP. The cell region starts one
+   row BELOW the split (`xB = rows[mSplit - 1].u`), so the row that has to clear
+   the floor is the OVERLAP row and not the panel's top. A nearest-snap to the
+   floor lands on the wrong side of it: measured on the default, snapping to the
+   waist at u 0.0579388 gives row 5, whose cells start at u 0.0357143 — 0.022
+   BELOW the floor, which is the one thing the floor exists to prevent. So this
+   is the LOWEST row whose own overlap row is at or above the floor, which is a
+   statement about the region rather than about the nearest station.
+
+   AND IT NEVER EATS THE FEET. The three rows at u = 0 are the overhanging feet;
+   a panel that is feet alone has no blade row to weld its overlap to, and the
+   vertex-welded shell count goes 1 -> 2 there on every state measured. So the
+   split is floored at one row past the feet — three feet and one blade row, which
+   is exactly what the seam-shifted probe (`seamStep` 4) already builds and which
+   measures clean. */
+function floorRow(ctx, floorU) {
+  const first = footRows(ctx) + 1;
+  for (let m = first; m < ctx.rows.length; m++) if (ctx.rows[m - 1].u >= floorU - 1e-12) return m;
+  return ctx.rows.length - 1;
+}
+/* THE SHIPPED ANSWER: an explicit `u0` snaps as it always did; with none, the
+   boundary is the FLOOR — as low as the blade's own waist allows, which is what
+   Eva ruled for after the #252 sheet. It is DERIVED per state and there is no
+   constant to be wrong: at the shipping default it lands on row 7, on
+   `petalWidth` 30 (whose waist is lower) on row 6, and on the seam-shifted
+   `petalTilt` 75 x `petalLength` 20 x `sheetThickness` 2.40 on row 4, where the
+   ladder leaves no blade row below the waist at all. */
+export function basalSplit(ctx, opts = {}, wall = WALL_DEFAULT) {
+  return opts.u0 === undefined || opts.u0 === null ? floorRow(ctx, basalFloorU(ctx, opts.wall ?? wall)) : splitRow(ctx, opts.u0);
+}
 function mapPt(ctx, x, y) { const u = Math.min(1, Math.max(0, x / ctx.L)); const hh = ctx.surface.profile.halfWidthAt(u); const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0)); return ctx.surface.at(u, v); }
 
 /* Shared: classify every cell edge as OUTLINE (in one cell) or WALL (in two), exactly, by key. */
@@ -193,7 +295,7 @@ function simplifyOutlineRuns(cells, onOut) {
 /* LEGACY field — the first prototype's: isotropic, uniform, plain Lloyd, no fillet. */
 export function fieldLegacy(ctx, N, seed = SEED, opts = {}) {
   const { rows, L, surface } = ctx; const h = (x) => surface.profile.halfWidthAt(x / L);
-  const mSplit = splitRow(ctx, opts.u0 ?? U0); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
+  const mSplit = basalSplit(ctx, opts); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
   const outline = outlinePoly(h, xB, L, 240); const rng = mulberry32(seed);
   const seeds = []; const target = Math.ceil(N / 2); let guard = 0;
   while (seeds.length < target && guard < 5000) { let best = null, bestD = -1; for (let c = 0; c < 12; c++) { guard++; const x = xB + (L - xB) * rng(); const hh = h(x); if (hh < 0.3) continue; const y = hh * 0.95 * rng(); if (!pointInPoly(x, y, outline)) continue; let d = 1e9; for (const s of seeds) { d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2, (s.x - x) ** 2 + (-s.y - y) ** 2); } d = Math.min(d, (2 * y) ** 2); if (d > bestD) { bestD = d; best = { x, y }; } } if (best) seeds.push(best); }
@@ -214,7 +316,7 @@ export function fieldSalvage(ctx, N, opts = {}) {
      the tip's. The base term multiplies the tip term, so lowering `baseNarrow` shrinks cells
      toward the base without touching what the tip law does. */
   const converge = opts.converge ?? CONVERGE_FRACTION, baseNarrow = opts.baseNarrow ?? BASE_NARROWING, baseReach = opts.baseReach ?? BASE_REACH, tipGamma = opts.tipGamma ?? TIP_GAMMA;
-  const mSplit = splitRow(ctx, opts.u0 ?? U0); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
+  const mSplit = basalSplit(ctx, opts); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
   const outline = outlinePoly(h, xB, L, 240);
   let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, h(xB + (L - xB) * i / 200));
   const hB = h(xB); const Lc = converge * L;
@@ -391,9 +493,10 @@ if (IS_MAIN) {
   const quick = process.argv.includes('--quick');
   const ctx = context({});
   const save = (name, acc) => fs.writeFileSync(path.join(outDir, `${name}.bin`), Buffer.from(new Float32Array(acc.pos).buffer));
-  const report = { petal: { L: ctx.L, plainTris: ctx.plainTris, sheet: ctx.t, U0, ANISO, LLOYD_PASSES, FILLET_MM, CONVERGE_FRACTION, BASE_NARROWING, BASE_REACH, TIP_GAMMA }, rows: [] };
+  const mShip = basalSplit(ctx, {});
+  const report = { petal: { L: ctx.L, plainTris: ctx.plainTris, sheet: ctx.t, boundaryRow: mShip, boundaryU: ctx.rows[mShip].u, cellsFromU: ctx.rows[mShip - 1].u, laminaFloorU: laminaFloorU(ctx), wallFloorU: wallFloorU(ctx, WALL_DEFAULT), basalFloorU: basalFloorU(ctx, WALL_DEFAULT), U0, ANISO, LLOYD_PASSES, FILLET_MM, CONVERGE_FRACTION, BASE_NARROWING, BASE_REACH, TIP_GAMMA }, rows: [] };
   { const a = new Acc(); emitBase(a, ctx, ctx.rows.length - 1); save('plain', a); }
-  console.log(`default petal: L ${ctx.L} mm, sheet ${ctx.t} mm, plain ${ctx.plainTris} tris (export); basal zone u <= ${U0}`);
+  console.log(`default petal: L ${ctx.L} mm, sheet ${ctx.t} mm, plain ${ctx.plainTris} tris (export); solid basal zone u <= ${ctx.rows[mShip].u.toFixed(7)} (row ${mShip}, the DERIVED floor: waist ${laminaFloorU(ctx).toFixed(7)}, wall ${wallFloorU(ctx, WALL_DEFAULT).toFixed(7)}). ROOT_BLEND_END is ${U0} and owns the outline, not this.`);
   console.log('field | N | wall | cells | holes/solid | real (>=1.0) | hole min/med/max | wall frac | cap built / floor mm | aniso mid-blade (median, |cos| to midrib) | tris | boundary | nonMan | shells | voxel 0.6/0.3');
   const Ns = quick ? [16] : [10, 16, 24]; const walls = quick ? [1.0] : [1.0, 0.8];
   for (const wall of walls) for (const N of Ns) for (const kind of ['legacy', 'salvage']) {

@@ -76,7 +76,7 @@ const petalCam = (hh = 21, shift = [0, 0, 0]) => ({ dir: NRM, up: BLADE, center:
 const bloomAbove = (p) => ({ dir: [0, 0, 1], up: [0, 1, 0], center: bbox(p).c, halfHeight: 46 });
 const bloomQuarter = (p) => ({ dir: [0.62, -0.55, 0.56], up: [0, 0, 1], center: bbox(p).c, halfHeight: 42 });
 
-const F_REF = P.fieldSalvage(ctx, N_CELLS, { seed: P.SEED });
+const F_REF = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, seed: P.SEED });
 const U_PANEL_TOP = ctx.rows[F_REF.mSplit].u, U_OV = F_REF.uOv;
 const A_BLADE = areaU(0, 1), A_PANEL = areaU(0, U_PANEL_TOP), A_LAMINA = areaU(U_OV, 1), A_BASAL = areaU(U_OV, P.BASAL_BAND_TOP);
 const num = (x, d = 2) => (x === null || x === undefined ? 'n/a' : x.toFixed(d));
@@ -92,7 +92,7 @@ function shoot(name, positions, caption) { return (cam) => {
 
 /* ---- one petal, one seed, with the 8-seed median beside it ---- */
 function petal(S, wall) {
-  const F = P.fieldSalvage(ctx, N_CELLS, { ...S.opts, seed: P.SEED });
+  const F = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, ...S.opts, seed: P.SEED });
   const m = P.measure(ctx, F, wall);
   const r = P.cutThrough(ctx, F, wall);
   const agg = B.state(S.opts, wall);                       // the same field over all eight seeds
@@ -117,7 +117,7 @@ if (QUICK) {
   for (const wall of WALLS) for (const S of SETTINGS) { const { rec, pos } = petal(S, wall); shoot(`petal_${S.key}_w${wall.toFixed(1)}`, pos, cap(rec))(petalCam()); }
   /* THE MACRO IS WHERE THE PROPORTION READS. Framed on the base, one camera. */
   for (const S of SETTINGS) {
-    const F = P.fieldSalvage(ctx, N_CELLS, { ...S.opts, seed: P.SEED });
+    const F = P.fieldSalvage(ctx, N_CELLS, { u0: P.U0, ...S.opts, seed: P.SEED });
     const m = P.measure(ctx, F, 1.0); const r = P.cutThrough(ctx, F, 1.0);
     const a = B.state(S.opts, 1.0);
     shoot(`macro_${S.key}`, new Float32Array(r.acc.pos),

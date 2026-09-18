@@ -2893,6 +2893,82 @@ and `leaves` under `stem`; Stem > Leaves > Serration is the second third level a
 the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
 `frozen/phase32` is the 758 rows at `3f664be`.
 
+**THE VORONOI INFILL IS A PROTOTYPE, ITS BASAL BOUNDARY NOW HAS ITS OWN OWNER, AND THE FLOOR IS
+THE BLADE'S OWN WAIST** (the lamina-floor session — read `docs/bloom-infill-lamina-floor.md` §0
+FIRST, then `docs/bloom-infill-base-panel.md` for the sweep it continues). **THERE IS NO INFILL IN
+THE GENERATOR**: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and `bloom.html` hold 0
+occurrences of the word, no control and no matrix row — it is `tools/bloom-voronoi-proto.mjs`, and
+petal infill is on the charter's standing board. A session briefed to "ship the boundary" is
+briefed one stage early, and this is where that is written down so it is not re-derived.
+**THE BOUNDARY WAS `export const U0 = G.ROOT_BLEND_END` — A DERIVED VALUE ALIASED ONTO A CONSTANT
+THAT BELONGS TO SOMETHING ELSE.** `ROOT_BLEND_END` is a station on the OUTLINE with seven other
+readers (the root blend's own decay, the lobes' `laminaStart`, A5, `bloom-sagitta.mjs`'s base
+bucket, and #243's four sepal row filters) and it says where the foot's width FLOOR decays to
+nothing: 0.30. **The outline stops being the root blend's FIVE TIMES LOWER, at u 0.0579388**, so
+the prototype's own sentence — "the solid basal zone, u <= ROOT_BLEND_END" — named a region five
+times longer than the one it described, and the panel Eva was objecting to is the difference.
+`U0` is kept exported (#250/#251/#252 quote it) and **defaults to nothing**; the three tools whose
+published figures are pinned to it pass it EXPLICITLY now, proved by their own controls
+(`bloom-basal-grading --inert`: 0 of 394,848 floats; `bloom-infill-base-panel --control`: PASS,
+C2 at its published 112 of 560 and C3 reproducing #250's seven rows).
+**THE FLOOR IS `max(waist, wall floor)` — TWO LENGTHS, EACH WITH ITS OWN OWNER, NEITHER A ROW
+COUNT.** The WAIST is where `halfWidthAt`'s `max` hands the outline from the foot's floor to the
+core: the blade is **5.164 mm across** there against 6.400 at the foot and 16.000 at its widest —
+**the narrowest section it has between the foot and the tip, 6.20 mm² on the shipping sheet** — and
+below it the outline TURNS AND WIDENS AGAIN. **Below the floor the answer REVERSES: the bottom 45 %
+of the blade goes 49.6 % solid at row 7 to 62.0 % at row 6**, more solid rather than less, on 292
+fewer triangles, with cells carrying no hole at all going 1 -> 3 of 17. Three confirmations that it
+is the waist and not the row index — a CONTROL (a petal with no waist), a MOVER (`petalWidth` 30
+puts the waist a row lower and the step follows it), and the same reversal at four gradings
+INCLUDING NO GRADING AT ALL. And it buys nothing where it extends: **open area below the waist is
+0.000 mm² at every boundary from row 19 to row 6.**
+**THE SECOND FLOOR WAS FOUND BY THE MUST-FAIL AND NOT BY A READING OF THE CODE.** `--control`'s K2
+was written with `footDelicacy` 0.25 as the control for "no waist, therefore no reversal"; it
+FIRED. That petal's foot is 1.600 mm across — narrower than two 1.0 mm wall insets — so no hole can
+exist at the region's base edge until u 0.0322266. It binds on thin-footed states and nowhere else
+(measured over eighteen). **On that petal the floor is NOT the optimum**, costing 4.9 points of
+bottom-45 solid against row 7 — reported, not tuned, and the argmin alternative is refused on the
+`headRise` ruling (a metric consumed as a geometric input becomes a target).
+**THE SPLIT IS NOT A NEAREST-SNAP, MEASURED:** the region starts one row BELOW the split, so the
+row that must clear the floor is the OVERLAP row, and a nearest-snap to the waist lands on row 5
+whose cells start 0.022 below it. `floorRow` is the LOWEST row whose own overlap row clears the
+floor, itself floored one row past the feet — at row 3 the panel is the three feet alone, the
+vertex-welded shell count goes 1 -> 2 on every state and the overlap weld's two non-manifold edges
+disappear (the voxel fill still reads one piece and never binds anywhere on the sweep).
+**`HELD_ROWS` / A7 DOES NOT BIND AT ANY BOUNDARY AND #252's RECOMMENDED OPTION 2 IS REFUTED BY
+EVA'S OWN RULING.** The infill places no station: the petal was rebuilt at all 17 boundaries and
+its emitted ladder is **bit-identical under `Object.is`**. Option 2 — "the boundary is the last held
+station" — lands on **row 18, panel 25.49 %, eight rows ABOVE the cell Eva approved at 8.83 %**, so
+it cannot answer a ruling that asked for LOWER. It was right about the DEFECT (a boundary snapped
+against a fixed 0.30 whatever `seamStep` is) and wrong about the REMEDY; what replaces it is a
+THIRD owner, which is only available because this session measured the waist. **Option 1 is
+untouched and is still the ladder's.**
+**`profile.laminaSlopeBreaks()` IS THE ONE GENERATOR CHANGE AND IT EXISTS SO NOBODY RE-DERIVES THE
+HANDOVER.** `slopeBreaks` floors on the accumulator's own `tipFloor` and **disagrees live/export on
+a reachable state** (`footDelicacy` 0.25: u 0.015720245 live, 0 export) — correct for a list
+reporting the seams of the outline a MODE draws, and the wrong list for anything deciding
+TOPOLOGY. `laminaWinner` already existed (session 42 built it for the lobe arc table); this exposes
+the same expression under a name an outside reader can ask for. Measured **0 of 19 states differ
+live/export against `slopeBreaks`'s 1**. **0 BYTES MOVE** — `verify-bloom-surface-bytes --base
+<worktree>`, the full 852-row matrix in both modes, positionally under `Object.is` — and **NO
+FROZEN PHASE IS OWED**: no matrix row is added or removed, so `frozen/phase34` stays the newest
+baseline and no tag's bytes stop reproducing.
+**THE PORT IS NOT BLOCKED BY THE TRIANGLE BUDGET AND IS BLOCKED BY THE EMITTER.** CLAUDE.md's
+37,830-a-petal figure is the FLOWER's emitter; construction B is **2,496 a petal at the floor
+against a plain 2,356**, and the whole bloom **20,016 against 19,040 (+5.1 %)**. What disqualifies
+it is that `cutThrough` fans a solid cell FLAT — a chord across a surface that wraps — so under
+`petalRoll` 330, a shipped matrix row, a cell's own facet cuts through the tube and self-approach
+reads **0.0009 mm**. A shipping emitter must subdivide. The plan is also flat-computed (3.0x cell
+stretch at cup 1.2), fringe and cleft are excluded by ruling and lobes are not exercised.
+**A CONTROL IS COSTED AND CANNOT SHIP BEFORE THE INFILL DOES** (§8 of the doc): a FRACTION of the
+travel between the floor and `ROOT_BLEND_END` rather than a `u` station, because the floor is
+state-dependent; one registry row, two matrix rows from the blanket sweep, one panel-gate route,
+`stamenSpread`'s dead-travel treatment, and a frozen phase. The instrument is `node
+tools/bloom-infill-lamina-floor.mjs` (`--control` required — four clauses, every one seen to fire,
+and K2c's subject NAMED as a set because on a monotone petal no row is distinguishable by it); the
+sheet is `node tools/shot-bloom-lamina-floor.mjs <dir>`, **with F as the reference cell and one row
+PAST the floor on it** so the floor reads as a reason rather than a rule.
+
 **THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
 read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
 then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
