@@ -362,6 +362,18 @@ today it does not — `splitRow` snaps against a fixed 0.30 whatever `seamStep` 
 the infill's.** It moves shipped bytes; this session's does not, and the two should not be ruled
 on as one.
 
+**AND OPTION 1 GOT MORE EXPENSIVE DURING THIS SESSION, WHICH IS WORTH KNOWING BEFORE IT IS
+RULED ON.** The sepals merge (`eb2aaa7`, #243) landed on `main` while these sweeps were running
+and added **four new readers of `ROOT_BLEND_END`** — the sepal builder's own row filters
+(`panel.rows.filter((r) => r.u >= ROOT_BLEND_END)` at three sites, plus the contact instrument's
+`r.u >= GEOMETRY.ROOT_BLEND_END`), which is how a sepal drops its foot and root blend from its
+lamina. So that station now has a whole second organ reading it. It changes nothing measured
+here — every figure in this doc reproduces on the merged tree, §1b — and it changes option 1's
+blast radius: moving `ROOT_BLEND_END` would now move the sepal lamina as well as the petal's,
+which is a byte partition across two organs rather than one. It is a further argument for
+option 2, which touches neither: the infill reads the LADDER's own last held station and no
+shared constant moves at all.
+
 ---
 
 ## 5. The grid — boundary × basal V × base cell size
