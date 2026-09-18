@@ -139,6 +139,17 @@ count. The 0.8 mm wall buys back most of it (53 % / 2.32 mm at 16 cells; 57 % / 
 **On the default petal the salvaged pattern reads best at 16 cells; 24 is past what a 16 mm
 petal can carry at a printable wall.**
 
+**AND THE MECHANISM BEHIND "HEAVIER" IS NOT WHERE THIS PARAGRAPH IMPLIES, WHICH MATTERS BECAUSE
+IT DECIDES THE SIGN OF THE FIX** (measured in `docs/bloom-infill-basal-grading.md`, §3b).
+Reading the above, the natural move to lighten the base is to narrow `BASE_NARROWING` further.
+**That makes the base HEAVIER, monotonically** — 65.8 % → 73.6 % wall in the basal band as it
+falls 0.75 → 0.25 at a 1.0 mm wall, with the band's median hole going 2.23 → 1.19 mm. The wall
+is an ABSOLUTE width, so a cell's open fraction is about `1 − c·w/√A` (c = 2.478 measured at a
+1.0 mm wall): **a region cannot be lightened by subdividing it**, and under about 5 mm² a cell
+carries no hole at all. The levers that DO lighten a region are fewer, larger cells there
+(`BASE_NARROWING` above 1) and a thinner wall. The `CONVERGE_FRACTION` sweep is in the same
+doc — it is the dominant lever at the base and its whole range is census-clean.
+
 **Smallest achievable solid apex cap.** Built: 2.36 mm at 16 cells / 1.0 mm, 1.68 mm at 16 /
 0.8 mm — against outline floors of 1.79 and 1.41. The 0.8 mm figure sits under its floor
 because the topmost hole there is one of the three under 1.0 mm across (min 0.69); the cap
