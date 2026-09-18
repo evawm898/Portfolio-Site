@@ -243,6 +243,24 @@ count of thirty is corroborated by a second route — `git fetch --tags` into th
 brings down 30 `frozen/*` refs. **The verification loop #253 shipped is correct; run 10
 simply never reached it.**
 
+**AND THE GUARD FOR THE DISPATCH ONLY RUNS DURING THE DISPATCH — NAMED, NOT PATCHED.**
+`grep -l publish-frozen-tags-selftest .github/workflows/*.yml` returns exactly one file,
+`bloom-frozen-tags.yml`, which is `workflow_dispatch`-only. So **no CI check on a pull
+request exercises this self-test at all**, and a break in it is discovered only by spending
+one of Eva's dispatches — which is what run 10 was. The two `verify` jobs that do run on a
+PR touching this file are the FLOWER gates, pulled in by their `'tools/**'` path filter;
+they test flower geometry and are not evidence about anything here. That is this
+repository's own recorded corollary ("two green `verify` jobs on a print PR are not evidence
+that anything about `/print` was checked") landing on the frozen-tags tooling.
+
+It is left as it is. Wiring the self-test into a PR gate would catch this class one dispatch
+earlier and is a real option, but it is a new gate with its own network precondition (it
+fetches `refs/pull/140/head`) and is Eva's to rule on, not a session's to add while fixing
+something else. What closes the immediate gap instead is that the failure mode is now
+reproducible off the runner: stripping the `[user]` section from the global git config
+reproduces run 10 exactly, so the next change to this file can be tested against a runner's
+condition without spending a dispatch to find out.
+
 **What #253's own workflow edit does to the refused set is still unmeasured**, and `--check`
 cannot measure it because it pushes nothing. Note what bounds the question, though: git
 refuses to move an existing tag, so the 30 already published are a no-op on any future
