@@ -2510,6 +2510,131 @@ maps and proved deep-equal. The image is `node tools/shot-bloom-stem-plug.mjs <d
 code served from its own HTTP server, and which quotes NO pixel delta for any pair (two trees,
 two servers, two page sessions).
 
+**A SEPAL IS THE PETAL BUILDER ON A SECOND RING, AND THE ANGLE LIMIT IS DRAWN, NOT ANALYTIC**
+(Eva's ruling, sepals part 1 — read `docs/bloom-sepals-outcome.md` before touching
+`sepalBladeState`, `sepalAngleLimit`, `buildSepalsInto`, `footRing`'s `sepals` descriptor or the
+SP family). No sepal module, blade or profile: `buildSepalsInto` calls `buildPetalInto` on
+`fr.sepals.ring` (the hub's rim, `footRing()`'s FOURTH descriptor kind, the petal foot's own
+overhang expression, no stem needed) with `sepalBladeState(state, angle)` — the whole control set
+spread, `petalTilt` the built angle, the rim family zeroed (`petalTipEnd`, `fringeCount`,
+`lobeDepth` — part 2's), and every one of the FIFTEEN `SEPAL_TWINS` replaced by the sepal's own
+copy; `petalLength` / `petalWidth` scale through `slot.scale = sepalScale`, the inner whorls' own
+route. **THE INSTANCING CENSUS IS THE DELIVERABLE**: every `state.<name>` read in the builder is
+of a PARAMETER, none of a global — `petalSurface` resolves `ps = petalStateFor(state, ring)` and
+every law reads `ps`; the one read that bypasses the resolver (`shapeN` telemetry) reads the
+argument that IS the substate on the sepal ring. So instancing is reachable without restructuring
+and costs one spread per whorl build. The registry rows for the twins are GENERATED from the
+geometry's table (`sepalTwinControls`), so a pair cannot drift; the panel gate treats the family
+as INSTANCED with label and role per instance. Twenty controls, four sections (`Sepals` between
+`Center` and `Stem`, its three children mirroring Petal's). **`sepalCount` 0 IS THE GUARD, 0
+BYTES**: `node tools/verify-bloom-sepal-bytes.mjs --base <worktree>` reads 65 MOVERS / 780
+HOLDERS over the 845-row live matrix, every mover's base stream a PREFIX of the branch's with the
+tail exactly the builder's sepal tally (the sepals are emitted LAST), and `--matrix phase34`
+0 / 778. **THE COUNT CEILING IS THE PETAL COUNT PER PLACEMENT** (RADIAL/SPIRAL the outer whorl's
+n; FAN its slot count, through a new `LIST` arm of `buildWhorlInto`; CONTINUOUS one turn's n, the
+phase told as a fraction of `2π/n` because a golden-angle spiral has no pitch to interleave with;
+SPHERE UNAVAILABLE, told and asserted by SP9). `sepalPhase` 0.5 is interleaved, 0 aligned, 1.0
+aligned with the NEXT petal; `sepalScale` 0.60 is MINE (from the sheet), 0.2–1.0 of the petal;
+`sepalFootBreadth` clamps to the foot floors and is told; thickness is the sheet's — the whole
+`Part thickness` section is shared by declaration, which `verify-bloom-sepal-decoupled.mjs` reads
+off the registry (220 non-sepal values × 2 modes, 0 sepal floats moved, ring and slot pinned).
+**THE ANGLE LIMIT IS DRAWN**: `sepalAngleLimit` scans the slider's own 1° step over the
+builder's OWN lamina (the mid-surface lattice with the foot and root-blend rows dropped — with
+them in, root-exit stacking of 0.022 mm read as contact at every angle) against every petal's
+lamina, in BOTH modes, taking the smaller limit so one state builds one angle (topology is
+mode-free, session 32's rule a fifth time); a contact is a nearest-point interior hit within one
+sheet on the +n side, or a lattice segment crossing. Rigid rotation per seam-step bucket and one
+sepal per congruent neighbourhood keep it at 0.23–0.65 s a build, told. **IT MOVES WITH THE
+PHASE** — 21° interleaved / 24° aligned on the shipped corolla (the petal tilt less a step, which
+is what an analytic limit would say and only there), 25° on a cupped corolla, 22° at 40 on 40,
+and NEGATIVE (−37°) when the sepal's own curl carries it over the petals. `node
+tools/bloom-sepal-contact.mjs` re-draws it at 4× the lattice and ¼ the step and the dense drawing
+never finds contact earlier. **INTERPENETRATION IS VISUAL AT THE INTERLEAVED DEFAULT (0
+within-shell pairs at every angle to the limit, cross-shell overlap only) AND A CENSUS FAILURE
+WHEN ALIGNED, BY THE WELD**: at phase 0 the sepal foot's column products are BIT-EQUAL to the
+petal foot's whenever `scale × breadth` is a ratio the lattice reproduces (0.60 is 3/5 — 44
+shared rim vertices; at size 1.00 the foot IS the petal foot), the exact-position weld reads the
+two as one shell, and the by-design overlap becomes 2,130 within-shell pairs — at size 0.55 the
+same aligned whorl reads 0. Nine aligned rows are declared by name; the crowded corner (40 × 40
+× size 1 × aligned × clamped) reads 25,358 identically on all three hub styles. **THE FOOT
+TANGENT IS MISLEADING AND THE CHORD IS TOLD BESIDE IT**: GOBLET and CURVED arrive at the rim
+tangent-FLAT with UNBOUNDED curvature at their edge — the record read 0.00° while the emitted
+underside fell 15–72° over the last half millimetre at MAX length — so the record carries
+`undersideChordDeg` over `MIN_FEATURE_MM`, the read-out prints both, and the contact tool
+checks the chord against the emitted hub (worst 0.505°, the station offset). ANGLED cannot carry
+a smooth foot where its blend reaches the rim: 81–86°, the cone's own shoulder, by the style's
+definition — said, not smoothed. On today's GOBLET default the blend stops 1.93 mm inside the
+rim and the foot meets a flat underside. **THE PETAL BUILDER FOLDS AT ITS OWN SEAM ON A BLADE
+TURNED DOWN PAST ABOUT −55°, AND THE SEPAL ANGLE IS THE FIRST CONTROL HERE TO REACH IT** (a
+petal at tilt −60 reads 56 pairs, `petalTilt`'s floor is 0): 35 pairs / 0.5333 mm at −90, at the
+rim, the slab's underside — the seam clearance law was derived for the TOP skin and the
+descending case is the seam owner's, declared on three rows and recorded, not worked around.
+The twin sweep's other folds are the petal's own on a 21 mm blade (cup, roll, curl — and the
+buckle at amp 0.3, which the PETAL does identically at those controls while no petal row asks
+for it). SP0–SP9 in both STL gates, SP8 the clamp with the harness's own contact test, eight
+mutants witnessed on the mutated module, block 35 (65 rows), smoke block 35 (7 rows, `--conn`
+required), `frozen/phase34` = the 778 rows at `f64f3bc`. `ALL MAX` reads **129,803 / 3.1556** with
+or without its 40 sepals — main's own record from #246, reproduced through
+`tools/bloom-xfail-magnitudes.mjs` on the merged tree; the sepal session's first figure of
+104,563 came from an uncommitted script, did not reproduce, and is WITHDRAWN in the outcome doc
+— and it exports 2,506,652 tris (+94,240 over main's 2,412,412), still a declared refusal.
+The 20 sepal xfail entries are in #246's structured form and reproduce on the merged tree. The image is `node
+tools/shot-bloom-sepals.mjs <dir>` → **`docs/img/sepals.png`** — the foot on the three styles
+at MAX × MAX framed on the rim from below, and the angle under / at / beyond its limit, the
+last through `{ sepalAngleUnclamped: true }`, a capability hook no control reaches.
+
+**THE SEPALS ATTACH PARTWAY DOWN THE HUB, THE LIMIT IS RE-DRAWN THERE, AND THE FOOT LINE
+LEADS WITH THE CHORD** (Eva's three rulings, sepals part 1 second round — §12 of
+`docs/bloom-sepals-outcome.md` before touching `sepalAttachment`, the sepal descriptor's
+`height`, or SP3). `sepalHeight` (Sepals, 0–1, step 0.05, **default 0.75**, a slider because
+0.75 was named to be tuned against the render) is a FRACTION OF THE HUB'S AXIAL EXTENT — and
+"the hub" is Eva's word for the hub-to-stem JOIN, so the extent runs from the STEM END
+(`stemPlan`'s own `rootZ`) up to where the join MEETS THE HEAD (the plate's underside at the
+blend radius; a cap's undeformed inner sphere there), both ends read off the profile the hub
+builder emits. **THE OTHER READING — the extent to the head's TOP face — WAS CONSIDERED AND
+NOT BUILT, and the two differ at the SHIPPED DEFAULT**: the 6 mm stem's join reaches 2.52 mm,
+a quarter of that from the top lands 0.03 mm under the plate's mid-plane — where the sepals
+already were — while the join reading puts the foot 0.33 mm below the head's underside and
+2.9 mm inside the rim (r 5.93, z −0.93). AXIAL, not surface-arc, as ruled; the arc reading is
+solved beside it and told (0.004 mm apart on the default, up to 1.9 mm on a half-amount
+GOBLET bowl, 0 on ANGLED). **THE FOOT LANDS ON THE SURFACE**: the attachment point is on the
+underside profile and the foot ring row sits `t/2` above it, so the foot's bottom skin passes
+through the point — the same relation a rim foot has to the plate's underside, which is why
+the FALLBACK is the same formula: where there is no hub below the head (`stemLength` 0, an
+inert join, a domed head whose bowl holds the stem end ABOVE the join's rim — every rise from
+about 0.15 at the default stem) the sepals sit at the RIM, the first construction to the bit,
+and the record says which. The foot rows run inward at that height through the whorl
+primitive's `height` argument (the petal builder's FLAT arm; the argument session 1 reserved
+for exactly this), buried because the join thickens inward, measured on a dome.
+**THE LIMIT MOVES WITH IT AND IT TIGHTENS AT THE DEFAULT, THE OPPOSITE OF THE EXPECTATION:**
+the scan reads the descriptor's ring and height, and at the shipped stem the interleaved limit
+goes 21° → **18°**, aligned 24° → 20°, cupped 25° → 21° — a sepal starting inside the rim rises
+THROUGH the plate and stands over the petal's root sooner — while on the deep GOBLET (19.4 mm
+down) it loosens to **90°, no contact in the range**, and the crowded corners on the three MAX
+hubs go 24° → 46° / 51° / 50°. Dense confirmation: **80 states, 0 disagreements, worst 0.00°**
+— **and the tool's first re-run reported 44, all its own** (its dense sepal still drawn at the
+rim's `z: 0` against a whorl built 0.93 mm lower; the third durable rule inside the instrument
+written to confirm the feature). **THE ALIGNED WELD IS GONE WHEREVER THE FOOT IS ON THE FLARE**:
+the three crowded corners with a stem read **0 pairs** from 25358 and their xfail entries are
+removed; the stemless corner still welds and stays declared. **ANGLED IS RESOLVED FOR THE FOOT**:
+on the cone's SIDE the tangent and the chord are one number (asserted to 1e-6 where the chord
+stays on the cone; a 1.3 mm cone at auto reach lets the chord run off onto the plate, told as
+`chordOnCone`) and there is no shoulder under the foot — the shoulder is still at the join's rim,
+where the foot no longer is; what part 2 meets on every style at MAX is a foot at 84–86° leaving
+a straight or near-straight face. **THE READ-OUT LEADS WITH THE CHORD** (`the underside RISES
+18.21° over the first 1.00 mm outward from the foot (the chord a print meets; tangent there
+17.88°)`): a tangent that read 0.00° while the underside fell 49° and 81° over the first
+millimetre is a headline that cannot be wrong and never says what the foot meets — the same
+shape as a clause reading its reference from the thing it checks — so the chord goes first and
+the tangent stays, labelled. SP3 is re-derived onto the attachment from OTHER owners (the stem
+record's `rootZ`, the hub builder's emitted top face and underside rings — the point must lie
+BETWEEN its two bracketing emitted rings, an interval), two mutants (`sepal-height-ignored`,
+`sepal-limit-drawn-at-the-rim`) witnessed on the mutated module's own solve, block 35 65 → 72
+rows (matrix 852), no frozen phase owed beyond phase34. The decoupling tool's PASS had exited 1
+(its two branches reversed) — fixed when it was re-run. Sheet: `node tools/shot-bloom-sepals.mjs
+<dir>` → `docs/img/sepals.png`, every cell on the default stem, the foot row framed on the GAP
+between sepal and petal.
+
 **LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
 PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
 `docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,

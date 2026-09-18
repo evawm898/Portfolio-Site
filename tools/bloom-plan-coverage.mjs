@@ -215,7 +215,7 @@ export async function measure(page, { capability = null, wantMask = false } = {}
       for (let L = 0; L < fr.layerCount; L++) { const s = fr.slotRings[L]; if (!s.every((d) => d === s[0])) split.push(L); }
       if (split.length) return { bad, r: null, skipped: `split whorl (layer${split.length > 1 ? 's' : ''} ${split.join(', ')} carry slot-role or per-petal records): the plan raster's R3 identifies slots by rigid rotation and cannot check a split whorl — RECORDED, NOT BUILT` };
     }
-    const petalAccs = [];
+    const petalAccs = [], petalSites = [];
     let petalsBuilt = 0;
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
@@ -231,9 +231,9 @@ export async function measure(page, { capability = null, wantMask = false } = {}
         placement: ui.placement,
         blade: (slot) => {
           petalsBuilt++;
-          const acc = new mod.MeshBuilder({ exportMode: true });
+          const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
           const p = mod.buildPetalInto(acc, ui, fr.rings[slot.index], slot, capability);
-          petalAccs.push(acc);
+          petalAccs.push(acc); petalSites.push({ p, ring: fr.rings[slot.index], slot, cap: capability });
           const ref = builtFull.petals[slot.index];
           if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) {
             bad.push(`coverage R3: continuous slot ${slot.index}'s captured petal does not bit-match builtFull.petals[${slot.index}]`);
@@ -259,9 +259,9 @@ export async function measure(page, { capability = null, wantMask = false } = {}
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
-            const acc = new mod.MeshBuilder({ exportMode: true });
+            const acc = new mod.MeshBuilder({ exportMode: true, captureLamina: !!fr.sepals });
             const p = mod.buildPetalInto(acc, ui, d, slot, capability);
-            petalAccs.push(acc);
+            petalAccs.push(acc); petalSites.push({ p, ring: d, slot, cap: capability });
             if (!unsplit) {
               bad.push(`coverage R3: layer ${L} slot ${slot.index} sits in a SPLIT whorl (zygomorphy/slot roles engaged) — out of scope for this tool (RECORDED, NOT BUILT: see the header), refusing rather than guessing`);
               return;
@@ -291,6 +291,13 @@ export async function measure(page, { capability = null, wantMask = false } = {}
     }
 
     /* R1 */
+    /* THE SEPALS (sepals, part 1) join the third accumulator for R1's own
+       reason — a NEW part that emits and is absent here makes R1 fire at once
+       (the stem and the leaves both did). Built exactly as buildBloomInto builds
+       them, against the petal sites this loop just kept, so the angle limit is
+       drawn against the same laminae; the plan is asked of its one owner. */
+    if (fr.sepals) mod.buildSepalsInto(accST, ui, fr, petalSites, stPlan);
+
     const petalTris = petalAccs.reduce((s, a) => s + a.triangleCount, 0);
     if (petalTris + accHC.triangleCount + accST.triangleCount !== accFull.triangleCount) {
       bad.push(`coverage R1: petals-only (${petalTris}) + hub-only (${accHC.triangleCount}) + centre-only (stamens, style, stem and leaves: ${accST.triangleCount}) tris = ${petalTris + accHC.triangleCount + accST.triangleCount}, but a normal whole-bloom build has ${accFull.triangleCount} — the petal capture is not exactly buildBloomInto's own petals`);

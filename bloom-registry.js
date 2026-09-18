@@ -37,6 +37,7 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -329,6 +330,13 @@ export const PREDICATES = {
      `stemLength` 0 what is left is the retired expression term for term.
      The DIAMETER is hidden AND inert at length 0 — the curl family's own
      gating, and lobeDepth's: one control is the guard and the rest follow it. */
+  /* SEPALS (part 1). Two statements of one boundary, the geometry's
+     `sepalsEligible` being the other, checked against each other by SP0: no
+     underside ring exists on a closed SPHERE, so the whole family is hidden
+     AND inert there (the androecium's own shape). `sepalCount` 0 is the
+     GUARD — every other sepal control follows it, hidden and inert. */
+  sepalsEligible: { not: { ref: 'sphereMode' } },
+  sepalsPresent: { all: [{ ref: 'sepalsEligible' }, { id: 'sepalCount', min: 1 }] },
   stemPresent: { id: 'stemLength', min: 1 },
 
   /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
@@ -866,6 +874,14 @@ export const SECTIONS = [
      states a dependency that was already real (`leafPresent` reads
      `stemLength`). Stem > Leaves > Serration is the panel's second third
      level, beside Center > Androecium > Anther. */
+  /* SEPALS (part 1) — a TOP-LEVEL section after Center and before Stem (Eva's
+     order), with three children mirroring Petal's own: shape, form, curl. A
+     sepal is a petal, and its panel says so in the same three drop-downs. The
+     rim family (lobes, fringe, the squared end) is part 2 and is not here. */
+  { id: 'sepals', label: 'Sepals', open: false },
+  { id: 'sepalShape', label: 'Sepal shape', open: false, parent: 'sepals' },
+  { id: 'sepalForm', label: 'Sepal form', open: false, parent: 'sepals' },
+  { id: 'sepalCurl', label: 'Sepal curl', open: false, parent: 'sepals' },
   { id: 'stem', label: 'Stem', open: false },
   /* THE HUB is Eva's word for the head-to-stem connector (the code's join). It
      sits under STEM, sibling to LEAVES, because its controls are inert without
@@ -2911,6 +2927,95 @@ export const CONTROLS = [
     label: 'Style curl', fmt: (v) => (Number(v) === 0 ? 'straight, up the axis' : `${v}° — bends over the apex`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumPresent' } },
 
+  /* ===================================================================
+     SEPALS, PART 1 — THE WHORL (Eva's ruling: "a sepal is a petal"). Five
+     controls of its own, then one instanced copy of every petal shape, form
+     and curl control (`sepalTwinControls`, spliced in after this array from
+     the geometry's own SEPAL_TWINS table — see below). `sepalCount` is the
+     GUARD: 0 builds nothing and hides everything else, so the shipped default
+     is byte-identical by branch. Every range is IMPORTED from the geometry
+     (Q6). The COUNT's ceiling and the ANGLE's limit are DERIVED per build and
+     told on the control (the `stamenSpread` ruling: full range, clamped,
+     told, the dead travel hatched on the track).
+     =================================================================== */
+  { id: 'sepalCount', section: 'sepals', kind: 'slider',
+    min: SEPAL_COUNT_RANGE[0], max: SEPAL_COUNT_RANGE[1], step: 1, default: 0,
+    label: 'Sepals',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      if (n === 0) return 'none — no sepal whorl is built';
+      const S = shown && shown.sepals;
+      if (!S) return `${n} asked`;
+      if (S.unavailable) return `${n} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring (told, none built)`;
+      const A = S.attachment;
+      const where = A && A.mode === 'HUB' ? `on the hub's flare, ${A.frac.toFixed(2)} of the way up` : 'at the hub\'s rim';
+      return `${S.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count (${S.ceilingOf}); the travel above the mark is dead` : ` (the ceiling is ${S.ceiling}: ${S.ceilingOf})`);
+    },
+    cap: (shown) => (shown && shown.sepals && !shown.sepals.unavailable ? shown.sepals.ceiling : null),
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsEligible' } },
+  { id: 'sepalScale', section: 'sepals', kind: 'slider',
+    min: SEPAL_SCALE_RANGE[0], max: SEPAL_SCALE_RANGE[1], step: 0.05, default: SEPAL_SCALE_DEFAULT,
+    label: 'Sepal size',
+    fmt: (v, ui) => { const k = Number(v); return `${k.toFixed(2)}x the petal — ${(k * Number(ui.petalLength)).toFixed(1)} mm long, ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the width follows the length)`; },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalHeight', section: 'sepals', kind: 'slider',
+    min: SEPAL_HEIGHT_RANGE[0], max: SEPAL_HEIGHT_RANGE[1], step: 0.05, default: SEPAL_HEIGHT_DEFAULT,
+    label: 'Sepal height',
+    /* THE ATTACHMENT IS TOLD FROM THE BUILDER'S OWN SOLVE: a fraction of the
+       hub's AXIAL extent from the stem end up to where the hub meets the head,
+       the point the foot landed on, and — where there is no hub below the head
+       to attach partway down — that the sepals sit at the rim and why. */
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const base = `${f.toFixed(2)} of the way up the hub from the stem end${f === 1 ? ' — at the head' : f === 0 ? ' — at the stem end' : ''}`;
+      const S = shown && shown.sepals, A = S && !S.unavailable && S.attachment;
+      if (!A) return base;
+      if (A.mode !== 'HUB') return `${base} — INERT here, the sepals sit at the rim: ${A.why}`;
+      return `${base}: the foot lands on the flare at r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside (the hub hangs ${A.extentMm.toFixed(2)} mm; the same fraction of its surface ARC would land ${A.arc.deltaMm.toFixed(2)} mm away — the AXIAL reading is built)`;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalPhase', section: 'sepals', kind: 'slider',
+    min: SEPAL_PHASE_RANGE[0], max: SEPAL_PHASE_RANGE[1], step: 0.01, default: SEPAL_PHASE_DEFAULT,
+    label: 'Sepal offset',
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const word = f === 0 ? 'ALIGNED with the petals' : f === 1 ? 'ALIGNED with the next petal' : Math.abs(f - 0.5) < 1e-9 ? 'INTERLEAVED — half a pitch' : f < 0.5 ? 'toward aligned' : 'past interleaved';
+      const S = shown && shown.sepals;
+      return `${f.toFixed(2)} of ${S ? S.phaseAgainst : 'the petal pitch'}` + (S && !S.unavailable ? ` = ${S.phaseDeg.toFixed(2)}° of a ${S.pitchDeg.toFixed(2)}° pitch` : '') + ` — ${word}`;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalFootBreadth', section: 'sepals', kind: 'slider',
+    min: SEPAL_FOOT_BREADTH_RANGE[0], max: SEPAL_FOOT_BREADTH_RANGE[1], step: 0.05, default: SEPAL_FOOT_BREADTH_DEFAULT,
+    label: 'Foot breadth',
+    /* THE CLAMP IS TOLD FROM THE BUILDER'S OWN RECORD (the leaf tip's precedent),
+       never re-derived here from a constant. */
+    fmt: (v, ui, shown) => {
+      const k = Number(v).toFixed(2);
+      const S = shown && shown.sepals;
+      if (!S || S.unavailable) return `${k}x the sepal's share of the petal foot`;
+      return `${k}x — ${S.footMm.toFixed(2)} mm across where it meets the hub` + (S.footClamped ? ` (CLAMPED from ${S.footAskedMm.toFixed(2)}: the print floor is ${S.footFloorMm.toFixed(2)} mm, the ceiling ${S.footCeilingMm.toFixed(2)})` : ` (asked ${S.footAskedMm.toFixed(2)}, inside the ${S.footFloorMm.toFixed(2)}–${S.footCeilingMm.toFixed(2)} mm floors)`);
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalAngle', section: 'sepalCurl', kind: 'slider',
+    min: SEPAL_ANGLE_RANGE[0], max: SEPAL_ANGLE_RANGE[1], step: SEPAL_ANGLE_STEP, default: SEPAL_ANGLE_DEFAULT,
+    label: 'Sepal angle',
+    /* THE LIMIT IS DRAWN PER BUILD AND TOLD, WITH ITS REASON — the first slider
+       position at which a sepal clips a petal, read from the builder's own
+       scan, never from a typed number. The travel above it is hatched. */
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const S = shown && shown.sepals, L = S && S.limit;
+      const base = `${a}° from the hub plane${a > 0 ? ', toward the petals' : a < 0 ? ', reflexed below' : ' — flat'}`;
+      if (!L) return base;
+      if (L.everywhere) return `${base} — CLAMPED to ${L.angleBuiltDeg}°: the sepals clip the petals at EVERY angle here (${L.kind} on petal ${L.petal}), so the range floor is built`;
+      const reason = L.contactDeg === null ? 'no contact anywhere in the range' : `at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`;
+      return L.clamped
+        ? `${base} — CLAMPED to ${L.angleBuiltDeg}°, the last angle clear of the petals (${reason}); the travel above the mark is dead`
+        : `${base} — clear of the petals up to ${L.limitDeg}° (${reason}; measured on the built rows in both modes)`;
+    },
+    cap: (shown) => (shown && shown.sepals && shown.sepals.limit && !shown.sepals.unavailable ? (shown.sepals.limit.limitDeg === null ? SEPAL_ANGLE_RANGE[0] : shown.sepals.limit.limitDeg) : null),
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+
   /* THE STEM'S TWO CONTROLS (session 43). Length is the GUARD — 0 is no stem,
      and the diameter is hidden AND inert there — which is lobeDepth's shape and
      stamenCount's, and is what keeps every pre-stem row byte-identical by
@@ -3106,6 +3211,70 @@ export const CONTROLS = [
       return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-bottomed'}`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
 ];
+
+/* ===================================================================
+   THE SEPAL TWINS — every petal shape, form and curl control instanced ONCE
+   for the sepals, from the geometry's own SEPAL_TWINS table (the same table
+   `sepalBladeState` maps the values back through, so the two cannot name
+   different sets). Each twin shares its petal's kind, bounds, step, default
+   and tier — the panel gate's one-spec clause asserts that — and differs in
+   exactly what is per-instance by design: its id, its section (Sepal shape /
+   form / curl for Petal shape / form / curl), its role, its label ("Petal
+   cup" reads "Cup"), its read-out (the petal's own `fmt`, handed a VIEW of
+   the state in which the petal names carry the sepal's values and the length
+   is the sepal's), and its guard (the petal's own predicate re-pointed
+   through the table — a sepal's buckle frequency hides at the SEPAL's
+   amplitude 0 — under `sepalsPresent`).
+
+   SPLICED IN BEFORE THE STEM'S ROWS rather than written inside the literal,
+   because the twins READ the petal rows and an array literal cannot read
+   itself. Order within a section is registry order, and the sepal sections
+   sit between Center and Stem, so the rows go there. */
+function twinPredicate(pred, map) {
+  if (Array.isArray(pred)) return pred.map((p) => twinPredicate(p, map));
+  if (pred && typeof pred === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(pred)) {
+      if (k === 'id') { if (!map.has(val)) throw new Error(`a sepal twin's guard reaches ${val}, which has no sepal twin`); out.id = map.get(val); }
+      else out[k] = twinPredicate(val, map);
+    }
+    return out;
+  }
+  return pred;
+}
+/* THE VIEW a twin's read-out sees: the petal's names carrying the sepal's
+   values, the length and width scaled by the sepal's own size, and the
+   SEPAL's own form record where the petal's fmt reads `shown.buckle`. */
+function sepalView(ui) {
+  const v = { ...ui, petalLength: Number(ui.petalLength) * Number(ui.sepalScale), petalWidth: Number(ui.petalWidth) * Number(ui.sepalScale) };
+  for (const [petalId, sepalId] of SEPAL_TWINS) v[petalId] = ui[sepalId];
+  return v;
+}
+const sepalShown = (shown) => (shown ? { ...shown, buckle: shown.sepals && !shown.sepals.unavailable ? shown.sepals.buckle : null } : shown);
+export function sepalTwinControls(rows) {
+  const map = new Map(SEPAL_TWINS);
+  const sectionOf = { shape: 'sepalShape', form: 'sepalForm', curl: 'sepalCurl' };
+  return SEPAL_TWINS.map(([petalId, sepalId]) => {
+    const p = rows.find((c) => c.id === petalId);
+    if (!p) throw new Error(`SEPAL_TWINS names ${petalId}, which is not a control`);
+    if (!sectionOf[p.section]) throw new Error(`SEPAL_TWINS names ${petalId} in section ${p.section}, which has no sepal twin section`);
+    const own = twinPredicate(p.visibleWhen, map);
+    const guarded = own && own.all && own.all.length === 0;
+    return {
+      id: sepalId, section: sectionOf[p.section], kind: p.kind, min: p.min, max: p.max, step: p.step, default: p.default,
+      label: p.label.startsWith('Petal ') ? p.label.slice(6, 7).toUpperCase() + p.label.slice(7) : p.label,
+      fmt: (v, ui, shown) => p.fmt(v, sepalView(ui), sepalShown(shown)),
+      ...(typeof p.cap === 'function' ? { cap: (shown) => p.cap(sepalShown(shown)) } : {}),
+      tier: p.tier, role: 'sepal',
+      visibleWhen: guarded ? { ref: 'sepalsPresent' } : { all: [{ ref: 'sepalsPresent' }, own] },
+    };
+  });
+}
+{
+  const at = CONTROLS.findIndex((c) => c.section === 'stem');
+  if (at < 0) throw new Error('the stem rows are not where the sepal twins expect them');
+  CONTROLS.splice(at, 0, ...sepalTwinControls(CONTROLS));
+}
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
 

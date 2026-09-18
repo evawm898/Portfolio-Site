@@ -534,6 +534,11 @@ export async function readFeet(page, capability = null) {
           for (let i = 0; i < row.length; i++) feet.push(rec(row[i], built.slotAzimuths[L][i], L, i));
         }
       }
+      /* THE SEPAL FEET (sepals, part 1) stack on the same base as the petal
+         feet — the whorl is on the hub's rim, its feet in the same slab — so
+         they are counted here from the descriptor's ring and the azimuths the
+         builder's own whorl placed. R3's expected count carries them. */
+      if (built.sepals) built.sepals.azimuths.forEach((az, k) => feet.push(rec({ ...fr.sepals.ring, index: -1 }, az, 'sepal', k)));
       out[mode] = {
         feet,
         hub: { radius: fr.hub.radius, thickness: fr.hub.thickness, dome: fr.hub.dome ? { rise: fr.hub.dome.rise, riseBuilt: fr.hub.dome.riseBuilt, Rd: fr.hub.dome.Rd, H: fr.hub.dome.H, centreZ: fr.hub.dome.centreZ, clamped: fr.hub.dome.clamped,
@@ -542,6 +547,7 @@ export async function readFeet(page, capability = null) {
           closed: fr.hub.dome.closed === true, stepCos: fr.hub.dome.stepCos ?? null, reserved: fr.hub.dome.reserved ? { ...fr.hub.dome.reserved } : null, faceReach: fr.hub.dome.faceReach ? { ...fr.hub.dome.faceReach } : null } : null },
         tris: acc.triangleCount,
         petalsBuilt: built.petalsBuilt,
+        sepalsBuilt: built.sepals ? built.sepals.count : 0,
         continuousMode: fr.continuousMode,
         /* One representative petal per descriptor, with its foot frames as
            EMITTED and the slot it was built for — R4's input. */
@@ -579,7 +585,7 @@ export async function footCrowding(page, row, stl = null) {
   if (Lv.hub.radius !== F.app.hubRadius) bad.push(`crowding R2: the in-page live hub radius ${Lv.hub.radius} is not the app's ${F.app.hubRadius}`);
   /* R3 */
   for (const [name, M] of [['export', E], ['live', Lv]]) {
-    if (M.feet.length !== M.petalsBuilt) bad.push(`crowding R3 (${name}): ${M.feet.length} foot rectangles for ${M.petalsBuilt} petals built — a foot is missing or counted twice`);
+    if (M.feet.length !== M.petalsBuilt + M.sepalsBuilt) bad.push(`crowding R3 (${name}): ${M.feet.length} foot rectangles for ${M.petalsBuilt} petals and ${M.sepalsBuilt} sepals built — a foot is missing or counted twice`);
   }
   /* R4 — every emitted frame sits where the rectangle model puts it. */
   for (const [name, M] of [['export', E], ['live', Lv]]) {
