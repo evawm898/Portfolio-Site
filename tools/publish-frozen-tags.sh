@@ -200,7 +200,24 @@ fi
 # ------------------------------------------------------------------
 echo
 echo "verifying against the remote…"
-remote_refs=$(git ls-remote --tags origin 'refs/tags/frozen/*' | sed 's/\^{}$//' | awk '{print $2" "$1}' | sort -u)
+# AN ANNOTATED TAG REPORTS TWICE and the two lines carry DIFFERENT shas: the
+# tag OBJECT, and the commit it points at, suffixed `^{}`. A baseline is pinned
+# to the COMMIT, so the dereferenced line always wins. The lookup this replaces
+# stripped the suffix and ran both lines through `sort -u`, then took the first
+# match — so WHICH sha it returned depended on which one sorted lower, a coin
+# flip per tag, reporting a correctly-placed annotated tag as being at the WRONG
+# COMMIT about half the time. This script's own defect class in a new costume,
+# and the self-test's case H has to build an adversarial tag object to see it at
+# all. Every tag
+# this script creates is lightweight, so it does not bite today; a tag pushed by
+# hand from someone's own clone (which the failure message below tells them to
+# do) is one `git tag -a` away from it.
+remote_refs=$(git ls-remote --tags origin 'refs/tags/frozen/*' | awk '
+  { ref = $2; sha = $1; deref = 0
+    if (ref ~ /\^\{\}$/) { sub(/\^\{\}$/, "", ref); deref = 1 }
+    if (deref)            { val[ref] = sha; fixed[ref] = 1 }
+    else if (!(ref in fixed)) { val[ref] = sha } }
+  END { for (r in val) print r" "val[r] }')
 lookup() { printf '%s\n' "$remote_refs" | awk -v r="refs/tags/frozen/$1" '$1==r{print $2; exit}'; }
 
 undeclared_missing=0; wrong_commit=0; stale_xfail=0; ok=0; declared_missing=0

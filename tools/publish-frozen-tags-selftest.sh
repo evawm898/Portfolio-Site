@@ -188,6 +188,49 @@ has "the verdict is still the real one"   "30 published and correct" "$TMP/g.log
 after_tags=$(git -C "$FAKE" for-each-ref 'refs/tags/frozen/*' | wc -l)
 check "a failed fallback published nothing extra" "$after_tags" "30"
 
+# ---- H: an ANNOTATED tag at the right commit is not a wrong commit ----------
+echo
+echo "H. a correctly-placed ANNOTATED tag — it reports its tag-object sha and the"
+echo "   commit separately, and reading the wrong line would invent a failure"
+setup_remote; setup_work
+right=$(git -C "$WORK" rev-parse "$(node -e "import('$REPO/tools/bloom-harness.mjs').then(h=>console.log(h.FROZEN_BASE_COMMITS.phase30))" 2>/dev/null)")
+# THE FIXTURE MUST BE ADVERSARIAL OR IT PROVES NOTHING. The lookup this case
+# exists to protect used to pipe both lines through `sort -u` and take the
+# first, so WHICH sha it returned depended on which one sorted lower — a coin
+# flip per tag. A fixture that lets the commit win passes on the broken code
+# too (measured: it did, first time round). So the tag object is searched for
+# until its sha sorts BEFORE the commit's, which makes the pre-fix lookup
+# return the tag object deterministically.
+adversarial=0
+for attempt in $(seq 1 200); do
+  git -C "$WORK" tag -f -a -m "pushed by hand from a user clone ($attempt)" frozen/phase30 "$right" >/dev/null 2>&1
+  probe=$(git -C "$WORK" rev-parse frozen/phase30)
+  if [ "$probe" \< "$right" ]; then adversarial=1; break; fi
+done
+if [ "$adversarial" -eq 1 ]; then
+  ok "found a tag object that sorts before the commit — the pre-fix lookup must pick it"
+else
+  bad "could not build an adversarial tag object in 200 tries; this case would be luck"
+fi
+git -C "$WORK" push --quiet origin refs/tags/frozen/phase30:refs/tags/frozen/phase30
+# The fixture is worth nothing unless the remote really reports TWO lines with
+# DIFFERENT shas — that is the whole hazard. Note the wildcard: an EXACT pattern
+# does not match `...phase30^{}` and returns one line, which is how this check
+# first fooled itself.
+two=$(git -C "$WORK" ls-remote --tags origin 'refs/tags/frozen/*' | grep -c 'frozen/phase30')
+check "the remote reports the annotated tag on two lines" "$two" "2"
+tagobj=$(git -C "$WORK" ls-remote --tags origin 'refs/tags/frozen/*' | awk '$2=="refs/tags/frozen/phase30"{print $1}')
+if [ -n "$tagobj" ] && [ "$tagobj" != "$right" ]; then
+  ok "the two lines really disagree (tag object ${tagobj:0:12} vs commit ${right:0:12}) — the case can bite"
+else
+  bad "fixture vacuous: the tag object and the commit are the same sha"
+fi
+git -C "$WORK" tag -d frozen/phase30 >/dev/null
+run > "$TMP/h.log" 2>&1; rc=$?
+check "exit 0" "$rc" "0"
+has  "it reads the COMMIT, not the tag object" "frozen/phase30  published ${right:0:12}" "$TMP/h.log"
+hasnt "and does not invent a wrong commit"     "frozen/phase30  **WRONG COMMIT**" "$TMP/h.log"
+
 echo
 echo "=============================================================="
 printf '%d passed, %d failed\n' "$pass" "$fail"
