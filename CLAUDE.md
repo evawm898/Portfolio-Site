@@ -190,7 +190,7 @@ be in.* It is worse than an entangled reference, because there is no red to expl
 mutant to catch it: the mutation lands OUTSIDE the clause's subject and the clause is
 correct, in scope, and empty.
 
-Three instances here, and they look nothing alike:
+Four instances here, and they look nothing alike:
   * **The band's invisibility clause EXCLUDED THE TOP FACE BY CONSTRUCTION.** The byte tool's
     clause 2 defined "the stem's OUTER WALL" as the triangles NOT all at one height — and the
     stem's top face is exactly the triangles all at one height. So the one surface the band
@@ -203,12 +203,32 @@ Three instances here, and they look nothing alike:
     rows that REACHED the results, so a dropped row left the numerator and the denominator
     together and the ratio read N/N. The subject was "rows that did not fall over", which the
     rows that fell over are never in — and session 41 read `672/672` off a 674-row matrix.
+  * **THE ANNOTATED-TAG WITNESS WAS A COIN FLIP** (the frozen-tags session, §3 of
+    `docs/bloom-frozen-tags-outcome.md`). `ls-remote` reports an annotated tag on TWO lines
+    with DIFFERENT shas — the tag object, and the commit, suffixed `^{}` — and the lookup
+    under test took whichever sorted lower. Case H built one such tag and asserted the commit
+    was read back; run against the broken lookup it **PASSED**, because that run's tag object
+    happened to sort AFTER the commit and the defect returned the right answer by luck.
 
-**THE TEST, and it is not a mutant:** state the clause's subject as a SET, then ask whether the
-failure you are worried about is IN that set. If the failure would leave the set, the clause is
-worth nothing however strict it looks. **All three were found by re-reading the diff against
-the clause — which is the only thing that finds them**, because a green run, a mutant table and
-CI are all instruments that ask the clause its own question.
+**THE FOURTH IS A DIFFERENT ROUTE TO THE SAME PLACE, AND IT SPLITS THE RULE.** The first three
+are failures of DEFINITION: the clause carved out a subject the failure was never in. The
+fourth's subject was RIGHT — "a correctly-placed annotated tag" is exactly the thing to doubt —
+and what excluded the failure was the INSTANCE chosen to stand for it. **A fixture that is
+50/50 makes a must-fail control a coin flip, and a coin flip landing the friendly way is
+indistinguishable from a passing test.**
+
+**THE TEST, and for three of the four it is not a mutant:** state the clause's subject as a SET,
+then ask whether the failure you are worried about is IN that set. If the failure would leave
+the set, the clause is worth nothing however strict it looks. **The three DEFINITION cases were
+found by re-reading the diff against the clause, which is the only thing that finds THEM**,
+because a green run, a mutant table and CI all ask the clause its own question. **The fourth is
+the exception and the distinction is worth keeping**: there the mutation lands squarely INSIDE
+the clause's subject, so the mutant table CAN see it — and the mutant table is what did, on a
+clause its own author had written minutes earlier. So: subject wrongly defined, only the diff
+finds it; subject right but instance non-adversarial, the mutant finds it PROVIDED it is run
+and its result read. **Then ask the second question: is the instance you built the HARDEST
+member of that set, or a random one? If a different random draw would have let the broken code
+pass, the fixture IS the clause.**
 
 **AN XFAIL ENTRY CARRIES ITS MAGNITUDE AS A NUMBER THE GATE READS, IN BOTH DIRECTIONS**
 (#213, closed — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
@@ -1213,7 +1233,9 @@ merge. **Do not attempt the push, and DELETE any local tag rather than leaving i
 an unpushed `frozen/*` in a working clone reads like a published baseline to the next session
 that lists tags. The registration is the load-bearing half and CI proves it; the tag only keeps
 the base commit alive, and a commit on `main` cannot be orphaned here anyway.
-**THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS.** It
+**THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS**
+(read `docs/bloom-frozen-tags-outcome.md` before touching `tools/publish-frozen-tags.sh`,
+its self-test, or `TAG_PUSH_XFAIL`). It
 read *"the remote carries phase2..phase20 only (phase5 absent), so PHASES 21 THROUGH 29 ARE ALL
 UNPUBLISHED"*. **The remote carries THIRTY of the thirty-three declared baselines today** —
 everything except `frozen/phase5`, `frozen/phase22` and `frozen/phase23` — verified by
@@ -1234,10 +1256,15 @@ in `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh` with the workflow file Git
 fails on any UNDECLARED absence, and a declared entry that starts publishing is called out as
 stale — this project's own xfail idiom, applied to a credential instead of to geometry.
 **WHICH refs GitHub picks was NOT determined, and the ruled-out list is worth more than a guess**:
-it is not unreachability (all 33 bases are on main's first-parent line), not "the workflow files
+it is not unreachability — **32 of the 33 bases are on main's own first-parent line, INCLUDING
+all three that were rejected, while the ONE base that is genuinely not on `main` at all
+(phase10, recovered through `refs/pull/140/head`) PUBLISHED WITHOUT COMPLAINT**, which kills
+that hypothesis outright rather than merely failing to support it; not "the workflow files
 differ from main's" (phase21 and phase22 have IDENTICAL difference sets against main — one was
-accepted, one rejected), and not "the blob is already carried by an existing tag" (phase24's is
-carried by none and was accepted). The predicate is GitHub-internal; what matters is that it is a
+accepted, one rejected); and not "the blob is already carried by an existing tag" (phase24's is
+carried by none and was accepted). **#253's own body and commit message say "all 33 bases are
+on main's first-parent line" — that is one row loose, and the corrected figure is the stronger
+claim.** The predicate is GitHub-internal; what matters is that it is a
 property of the token class, it is stable, and it is not configurable.
 **THE DISPATCH IS STILL EVA'S TO FIRE, NOT A SESSION'S** — the rule above is unchanged.
 
