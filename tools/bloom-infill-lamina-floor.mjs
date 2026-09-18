@@ -6,6 +6,11 @@
      node tools/bloom-infill-lamina-floor.mjs [--json <file>] [--quick]
      node tools/bloom-infill-lamina-floor.mjs --control      (the must-fail)
 
+   `--quick` runs ONE wall, three of the twelve wall states and three boundaries, and
+   §5 on two states — enough to prove the tool on a couple of rows before the grid is
+   run once, which is this project's own convention for an instrument. It is NOT a
+   reading: every figure quoted anywhere comes from a full run.
+
    WHY IT EXISTS. `docs/bloom-infill-base-panel.md` (#252) swept the boundary from
    row 19 down to row 10 and found nothing binding: 768 (cell x seed) states all
    clean, and 0 of 120 masked-lattice rows reading closer than the plain petal. Eva
