@@ -35,6 +35,29 @@ check() { if [ "$2" = "$3" ]; then ok "$1 ($2)"; else bad "$1 — expected [$3],
 has()  { if grep -qF "$2" "$3"; then ok "$1"; else bad "$1 — not found: $2"; fi; }
 hasnt(){ if grep -qF "$2" "$3"; then bad "$1 — present but should not be: $2"; else ok "$1"; fi; }
 
+# ---- making an ANNOTATED tag, which needs a TAGGER IDENTITY -----------------
+# `git tag -a` writes a tag OBJECT, and a tag object carries a tagger line, so
+# git refuses to make one without a name and an email. A GitHub runner has
+# neither: nothing in this workflow sets user.name / user.email, and git's
+# auto-detection fails on a runner hostname. A clone does not copy the SOURCE
+# repo's local config either, so $WORK resolves whatever GLOBAL config exists —
+# an identity on a dev box, nothing on a runner.
+#
+# THAT ASYMMETRY IS WHY THIS WENT UNDETECTED: every local run of this file
+# passed and run 10 (35299447040) failed, on the same code. The identity is
+# supplied per command rather than written into git config — a self-test that
+# mutates the machine's git identity is a worse thing than the bug it fixes.
+TAGGER=(-c "user.name=frozen-tags selftest" -c user.email=selftest@example.invalid)
+
+# The ONE owner of making an annotated tag here. It REPORTS whether git could,
+# and never decides what that means: case H aborts on a failure, case I
+# REQUIRES one. Trailing arguments are passed to git before `tag`, which is how
+# case I strips the identity back off.
+annotate() { # repo tagname commit message [git -c args…]
+  local repo=$1 tagname=$2 commit=$3 msg=$4; shift 4
+  git -C "$repo" "$@" tag -f -a -m "$msg" "$tagname" "$commit"
+}
+
 # ---- the fake remote -------------------------------------------------------
 setup_remote() {
   rm -rf "$FAKE"
@@ -201,16 +224,33 @@ right=$(git -C "$WORK" rev-parse "$(node -e "import('$REPO/tools/bloom-harness.m
 # too (measured: it did, first time round). So the tag object is searched for
 # until its sha sorts BEFORE the commit's, which makes the pre-fix lookup
 # return the tag object deterministically.
+#
+# AND A FIXTURE THAT CANNOT BE BUILT IS NOT A FIXTURE THAT WAS UNLUCKY. The
+# first version swallowed `git tag -a`'s stderr and read only the sha, so on a
+# runner with no tagger identity it made nothing, spun all 200 attempts, and
+# blamed LUCK — run 10 reported "this case would be luck" about an environment
+# in which the case could not be attempted at all. The two are distinguished
+# now: git failing is an unbuildable fixture and aborts, the way setup_remote
+# already aborts on an unfetchable phase10 base; 200 honest tries losing a coin
+# flip 200 times is the astronomically improbable thing the message describes.
 adversarial=0
 for attempt in $(seq 1 200); do
-  git -C "$WORK" tag -f -a -m "pushed by hand from a user clone ($attempt)" frozen/phase30 "$right" >/dev/null 2>&1
+  if ! annotate "$WORK" frozen/phase30 "$right" \
+         "pushed by hand from a user clone ($attempt)" \
+         "${TAGGER[@]}" >/dev/null 2>"$TMP/h.tag.err"; then
+    echo
+    echo "FIXTURE UNAVAILABLE: git could not create an annotated tag here, so case H"
+    echo "would measure its own setup rather than the lookup under test. git said:"
+    sed 's/^/  /' "$TMP/h.tag.err"
+    exit 2
+  fi
   probe=$(git -C "$WORK" rev-parse frozen/phase30)
   if [ "$probe" \< "$right" ]; then adversarial=1; break; fi
 done
 if [ "$adversarial" -eq 1 ]; then
   ok "found a tag object that sorts before the commit — the pre-fix lookup must pick it"
 else
-  bad "could not build an adversarial tag object in 200 tries; this case would be luck"
+  bad "200 annotated tags were built and every one sorted after the commit; this case would be luck"
 fi
 git -C "$WORK" push --quiet origin refs/tags/frozen/phase30:refs/tags/frozen/phase30
 # The fixture is worth nothing unless the remote really reports TWO lines with
@@ -230,6 +270,36 @@ run > "$TMP/h.log" 2>&1; rc=$?
 check "exit 0" "$rc" "0"
 has  "it reads the COMMIT, not the tag object" "frozen/phase30  published ${right:0:12}" "$TMP/h.log"
 hasnt "and does not invent a wrong commit"     "frozen/phase30  **WRONG COMMIT**" "$TMP/h.log"
+
+# ---- I: must-fail — case H's own fixture guard, which run 10 needed ---------
+# The guard added above is unreachable on any machine that HAS a git identity,
+# which is every machine this file was ever run on before it reached a runner.
+# So it gets a control: the runner's condition is reproduced deliberately and
+# the guard's two halves are required to answer differently.
+echo
+echo "I. must-fail: an annotated tag with NO tagger identity — git must refuse it"
+echo "   and the fixture's own identity must be what lets case H build one"
+setup_work
+# A clone does not copy the source repo's LOCAL config, so neutralising GLOBAL
+# and SYSTEM leaves the identity genuinely unset — a runner, deterministically,
+# whatever the developer's own git is configured to. In a subshell because in
+# bash a `VAR=x func` assignment PERSISTS after the call and would leak
+# /dev/null as the global config into every case after this one.
+if ( export GIT_CONFIG_GLOBAL=/dev/null GIT_CONFIG_SYSTEM=/dev/null
+     annotate "$WORK" frozen/probe "$right" "no identity" \
+       -c user.useConfigOnly=true >/dev/null 2>"$TMP/i.err" ); then
+  bad "an annotated tag was built with no identity — this control proves nothing"
+else
+  ok "git refuses it: $(head -1 "$TMP/i.err")"
+fi
+check "and nothing was created — the state run 10 spent 200 attempts in" \
+      "$(git -C "$WORK" tag -l 'frozen/probe' | wc -l | tr -d ' ')" "0"
+if annotate "$WORK" frozen/probe "$right" "with the fixture's own identity" \
+     "${TAGGER[@]}" >/dev/null 2>&1; then
+  ok "and the identity case H supplies is what makes the fixture buildable"
+else
+  bad "the fixture's own tagger identity does not work"
+fi
 
 echo
 echo "=============================================================="
