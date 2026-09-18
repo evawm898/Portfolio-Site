@@ -263,9 +263,16 @@ export function emitBase(acc, ctx, rowTo) {
   for (let i = 0; i <= rowTo; i++) { const r = rows[i]; const ht = [], hb = []; for (let j = 0; j < NV; j++) { const P = r.mid[j], n = r.normal[j]; ht.push(add(P, n, t / 2)); hb.push(add(P, n, -t / 2)); } top.push(ht); bot.push(hb); }
   emitLattice(acc, top, bot);
 }
-export function cutThrough(ctx, F, wall = WALL_DEFAULT) {
+/* `opts.capturePlan` returns `canon` — the plan-keyed map every emitted cell vertex
+   came through, each entry carrying the plan (x, y) it was mapped FROM as well as the
+   two skin points it was mapped TO. It is the only way a reader of the emitted stream
+   can recover which plan point a triangle belongs to, which is what a self-approach
+   measurement on a HOLED shell needs to tell "the wall under this point" from "another
+   part of this sheet". GATED OFF by default: the map is built either way (it is the
+   canonicaliser), so capturing it moves no float and costs one property. */
+export function cutThrough(ctx, F, wall = WALL_DEFAULT, opts = {}) {
   const acc = new Acc(); const t = ctx.t; emitBase(acc, ctx, F.mSplit); const baseTris = acc.tris;
-  const canon = new Map(); const pt = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let o = canon.get(k); if (!o) { const s = mapPt(ctx, q.x, q.y); o = { T: add(s.P, s.n, t / 2), B: add(s.P, s.n, -t / 2) }; canon.set(k, o); } return o; };
+  const canon = new Map(); const pt = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let o = canon.get(k); if (!o) { const s = mapPt(ctx, q.x, q.y); o = { T: add(s.P, s.n, t / 2), B: add(s.P, s.n, -t / 2), x: q.x, y: q.y }; canon.set(k, o); } return o; };
   let solid = 0, annular = 0; const holes = []; const cellOpen = []; let holeArea = 0, apexX = -Infinity;
   for (const c of F.cells) {
     const k = c.length; const O = c.map(pt); const rimOK = (i) => F.isOutlineEdge(c[i], c[(i + 1) % k]);
@@ -287,7 +294,7 @@ export function cutThrough(ctx, F, wall = WALL_DEFAULT) {
     for (let i = 0; i < nb; i++) { const j = (i + 1) % nb; acc.quad(Bq[i].s.T, Bq[j].s.T, Bq[j].s.B, Bq[i].s.B); }
     for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); }
   }
-  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, cellOpen, holeArea, apexX };
+  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, cellOpen, holeArea, apexX, ...(opts.capturePlan ? { canon } : {}) };
 }
 
 /* ---------------- measurements ---------------- */

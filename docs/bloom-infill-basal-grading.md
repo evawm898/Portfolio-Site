@@ -12,6 +12,14 @@ its wall law are untouched.
 `docs/bloom-infill-base-boundary.md` measured it as already the floor; that measurement was
 not repeated.
 
+> **THAT RULING IS WITHDRAWN (Eva, Sep 18) and the measurement it rested on is corrected — see
+> `docs/bloom-infill-base-panel.md`.** This doc's own §5 says the honest thing in one line: *"if
+> Eva's 'a lot of solid area' is about the panel rather than the band, no grading on this sheet
+> answers it and the boundary ruling is what would have to move."* It is about the panel — 27.5 %
+> of the blade — and the boundary moved. Everything measured here about the FIELD stands
+> unchanged and composes with the boundary rather than cancelling against it; what is superseded
+> is only the premise that the boundary was fixed.
+
 The sheet is published as a private artifact:
 **https://claude.ai/artifact/Aizz8CGP4g4XhkGp6eRv4x**.
 

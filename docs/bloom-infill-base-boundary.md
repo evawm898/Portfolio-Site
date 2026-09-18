@@ -9,6 +9,17 @@ only `splitRow`'s target moves.
 The sheet is published as a private artifact:
 **https://claude.ai/artifact/CLCDBEYFeLuyhRi9dUhmyF**.
 
+> **§2's ANSWER IS CORRECTED AND ITS MECHANISM REFUTED — see `docs/bloom-infill-base-panel.md`
+> §3.** Two things measured after this doc was written: the sweep below steps about two lattice
+> rows at a time and **skipped row 18 (u = 0.2857143), which reproduces BOTH roll-330 readings
+> exactly**, so "u = 0.30 is already the correct floor" is one row off and the margin is not
+> one lattice row; and the stated mechanism — *"the pair's far end sits between 0.2857 and
+> 0.3007"* — is false, the far end being measured at u 0.267857 … 0.285714, in the same row band
+> as the query. Everything else here reproduces, including all seven of the sweep's own figures
+> and the 0.0017 mm on all-form-max. The caveat this doc names in its own §2 — that the wall
+> instrument's twelve STATES carry no infill — is the thing that session measured: **the
+> constraint does not bind on an infilled state at any boundary swept.**
+
 Adding a file under `tools/` makes the two FLOWER gates run on the PR (their `tools/**` filter);
 no bloom gate keys on these files. They test flower geometry and are not evidence about this.
 
