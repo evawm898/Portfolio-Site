@@ -250,6 +250,9 @@ lamina, the sphere stem's omission mask). So the floor reads `laminaSlopeBreaks`
 
 ### 6a. `bloom-geometry.js` — one reader, and the reason it is in the generator
 
+*(and `tools/verify-bloom-surface-bytes.mjs`, which is where the claim about it is made, and which
+could not make it until this PR — see the end of this section.)*
+
 `profile.laminaSlopeBreaks(grid = 4096)` — `breaksOf(laminaWinner, grid)`, beside the existing
 `slopeBreaks`. **`laminaWinner` already existed**: session 42 built it for the lobe arc table and
 read it through `breaksOf` there, and this exposes the same expression under a name an outside
@@ -263,8 +266,36 @@ measured state.
 **0 BYTES MOVE, and it is measured rather than argued** — `node
 tools/verify-bloom-surface-bytes.mjs --base <worktree of 09e2aca>`: every export float and every
 captured-grid value, positionally, under `Object.is`, over the full 852-row live matrix in both
-modes. Nothing in the generator calls the new method, and nothing enumerates the profile's keys
-(checked). **No matrix row is added or removed, so NO FROZEN PHASE IS OWED** — `frozen/phase34` (the
+modes. **PASS — 832,328,424 export floats over 92,480,936 triangles and 76,842,842 captured-grid
+values over 8,874 panels, 0 moved.** Nothing in the generator calls the new method, and nothing
+enumerates the profile's keys (checked).
+
+**AND THAT TOOL COULD NOT COMPLETE A FULL-MATRIX RUN ON ANY TREE UNTIL THIS PR FIXED IT — THE
+FIRST ATTEMPT AT THE CLAIM ABOVE CRASHED, AND THE CRASH IS PRE-EXISTING RATHER THAN THIS
+SESSION'S.** `gridFloatsOf` read `petals[p].grid` unguarded, and `built.petals` carries a NULL
+wherever a slot was DECLARED and NOT BUILT — which the sphere stem's omission mask is the first
+thing in this project ever to produce. Measured on both trees, both modes, over all 852 rows:
+**22 findings per tree, and the two sets are IDENTICAL** — the ten `SPHERE STEM:` rows that
+actually build a stem (every one but `GATED — the widest stem at length 0`, which builds no stem
+and omits no petal) plus `LEAVES: x a SPHERE with a stem`. Eleven rows, the same eleven on
+`09e2aca` as here, so the tool has been unable to finish since the sphere-stem session added
+them and nothing about this change caused it. CLAUDE.md §9b names the class in as many words: an
+instrument that indexes by slot and never asks whether the slot was built. **NO SHIPPED CLAIM RESTED ON A RUN THAT COULD NOT HAVE FINISHED**, checked rather than assumed: the last session to cite a full-matrix run of this tool is 42, whose close predates the omission mask entirely, and every citation since is a `--movers` or `--rows` run. The defect lay dormant because nothing had reason to ask for the whole matrix until now.
+**THE FIX IS NOT A `continue`, WHICH WOULD BE THE FIFTH DURABLE RULE'S OWN DEFECT** — a skip
+defines the subject so as to exclude the thing the clause doubts, because a petal built on one
+tree and omitted on the other would contribute nothing to either side and the comparison would
+be silent about the one difference that matters most here. The BUILT-NESS goes into the stream
+as a value (`p<N>.built:0|1`), so an omission that moved is a mismatch. Shown able to fire: a
+copy of the tool that nulls one BUILT slot on one tree alone reports
+`grid shape moved — 1 captured values against 4430` on the shipping default. The tool's own
+`--control` still fires both clauses after the edit (two findings, one per clause).
+**AND THE ELEVEN ROWS PASS**: run against them by name, `12 rows x 2 modes`, 14,610,816 export
+floats over 1,623,424 triangles and 2,702,390 captured values — **0 floats moved**. So the
+full-matrix figure above is a complete run over the whole matrix rather than one excluding the
+rows that used to stop it, and **it is the first complete full-matrix run this tool has produced
+since the sphere-stem session.**
+
+**No matrix row is added or removed, so NO FROZEN PHASE IS OWED** — `frozen/phase34` (the
 778 rows at `f64f3bc`) stays the newest baseline and no tag's bytes stop reproducing.
 
 ### 6b. `tools/bloom-voronoi-proto.mjs` — the boundary's own owner

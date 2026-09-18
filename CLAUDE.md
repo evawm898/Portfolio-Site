@@ -2959,9 +2959,26 @@ reporting the seams of the outline a MODE draws, and the wrong list for anything
 TOPOLOGY. `laminaWinner` already existed (session 42 built it for the lobe arc table); this exposes
 the same expression under a name an outside reader can ask for. Measured **0 of 19 states differ
 live/export against `slopeBreaks`'s 1**. **0 BYTES MOVE** — `verify-bloom-surface-bytes --base
-<worktree>`, the full 852-row matrix in both modes, positionally under `Object.is` — and **NO
+<worktree>`, the full 852-row matrix in both modes, positionally under `Object.is`: **832,328,424
+export floats over 92,480,936 triangles and 76,842,842 captured-grid values, 0 moved** — and **NO
 FROZEN PHASE IS OWED**: no matrix row is added or removed, so `frozen/phase34` stays the newest
 baseline and no tag's bytes stop reproducing.
+**AND THAT TOOL HAD NOT COMPLETED A FULL-MATRIX RUN SINCE THE SPHERE-STEM SESSION, ON ANY TREE —
+FIXED HERE, AND THE CRASH IS THE SLOT-OMISSION CLASS THIS FILE ALREADY NAMES.** `gridFloatsOf`
+read `petals[p].grid` unguarded and `built.petals` carries a NULL wherever a slot is DECLARED and
+NOT BUILT, which the sphere stem's omission mask is the first thing here ever to produce. It threw
+on **eleven rows — the ten `SPHERE STEM:` rows that build a stem (every one but `GATED`, which
+builds none) plus `LEAVES: x a SPHERE with a stem`** — and the sets are **IDENTICAL on both trees,
+22 findings each**, so it is pre-existing and not the change's. **NO SHIPPED CLAIM RESTED ON IT** — the
+last full-matrix citation is session 42's, which predates the omission mask; every one since is a
+`--movers` or `--rows` run. **THE FIX IS NOT A `continue`**: a
+skip defines the subject so as to exclude the thing the clause doubts (a petal built on one tree
+and omitted on the other contributes nothing to either side), so the BUILT-NESS goes into the
+compared stream as `p<N>.built:0|1`. Shown able to fire — a copy that nulls one BUILT slot on one
+tree alone reports `grid shape moved — 1 captured values against 4430` on the default — and the
+tool's own `--control` still fires both clauses. **THE ELEVEN PASS**: 14,610,816 export floats and
+2,702,390 captured values, 0 moved. **THE TEST, restated because it cost a run to find: for ANY
+instrument keyed on a slot index, ask what it reads when that slot is not built.**
 **THE PORT IS NOT BLOCKED BY THE TRIANGLE BUDGET AND IS BLOCKED BY THE EMITTER.** CLAUDE.md's
 37,830-a-petal figure is the FLOWER's emitter; construction B is **2,496 a petal at the floor
 against a plain 2,356**, and the whole bloom **20,016 against 19,040 (+5.1 %)**. What disqualifies
