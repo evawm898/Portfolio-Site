@@ -68,6 +68,7 @@ export const LLOYD_PASSES = 4;
 export const FILLET_MM = 0.8;                 // target fillet radius on every hole corner
 export const CONVERGE_FRACTION = 0.10;        // the basal V reaches this fraction of the length up the margins
 export const BASE_NARROWING = 0.75;           // cells at the base are this fraction of the mid-blade spacing
+export const BASE_REACH = 0.30;               // over this fraction of the length the base narrowing relaxes back to the tip law
 export const TIP_GAMMA = 1.0;                 // spacing follows halfWidth^gamma toward the tip
 export const AXIS_SHARE = 0.3;                // share of the seeds placed ON the midrib (the flower's own law), so the apex and the base get one axial cell each
 export const SEED = 7;
@@ -207,13 +208,19 @@ export function fieldLegacy(ctx, N, seed = SEED, opts = {}) {
 export function fieldSalvage(ctx, N, opts = {}) {
   const { rows, L, surface } = ctx; const h = (x) => surface.profile.halfWidthAt(x / L);
   const a = opts.aniso ?? ANISO, passes = opts.passes ?? LLOYD_PASSES, relaxMetric = opts.relaxMetric ?? 'aniso', cellMetric = opts.cellMetric ?? 'aniso', seed = opts.seed ?? SEED;
+  /* THE GRADING'S FOUR NUMBERS, each defaulting to its own constant so every prior call is
+     unchanged term for term. `converge` is the basal V's reach; `baseNarrow` and `baseReach`
+     are the BASE's own rate and how far it relaxes over, INDEPENDENT of `tipGamma`, which is
+     the tip's. The base term multiplies the tip term, so lowering `baseNarrow` shrinks cells
+     toward the base without touching what the tip law does. */
+  const converge = opts.converge ?? CONVERGE_FRACTION, baseNarrow = opts.baseNarrow ?? BASE_NARROWING, baseReach = opts.baseReach ?? BASE_REACH, tipGamma = opts.tipGamma ?? TIP_GAMMA;
   const mSplit = splitRow(ctx, opts.u0 ?? U0); const uOv = rows[mSplit - 1].u; const xB = uOv * L;
   const outline = outlinePoly(h, xB, L, 240);
   let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, h(xB + (L - xB) * i / 200));
-  const hB = h(xB); const Lc = CONVERGE_FRACTION * L;
+  const hB = h(xB); const Lc = converge * L;
   const vAt = (y) => xB + Lc * Math.pow(Math.min(1, Math.abs(y) / hB), 1.5);       // the basal V: the solid zone reaches higher at the margins
   /* relative spacing: shrinks toward the tip with the half-width, narrows toward the base */
-  const spacing = (x) => { const tip = Math.pow(Math.max(0.05, h(x) / hMax), TIP_GAMMA); const base = BASE_NARROWING + (1 - BASE_NARROWING) * Math.min(1, Math.max(0, (x - xB) / (0.30 * L))); return tip * base; };
+  const spacing = (x) => { const tip = Math.pow(Math.max(0.05, h(x) / hMax), tipGamma); const base = baseNarrow + (1 - baseNarrow) * Math.min(1, Math.max(0, (x - xB) / (baseReach * L))); return tip * base; };
   const rho = (x) => 1 / (spacing(x) ** 2);
   const rng = mulberry32(seed);
   const nAxis = Math.max(1, Math.round(N * AXIS_SHARE)); const axis = []; let guard = 0;
@@ -241,7 +248,7 @@ export function fieldSalvage(ctx, N, opts = {}) {
   const onBaseEdge = (A, B) => Math.abs(A.x - xB) < 1e-6 && Math.abs(B.x - xB) < 1e-6;
   const holeOf = (c, w) => { const inner = insetConvex(c, w / 2, (A, B) => (cls.isOutlineEdge(A, B) && !onBaseEdge(A, B) ? w : w / 2)); if (!inner) return null; const clipped = vClip(inner); return clipped ? filletPolygon(clipped, FILLET_MM) : null; };
   const holeMask = () => true;
-  return { kind: 'salvage', mSplit, uOv, xB, outline, cells, h, holeOf, holeMask, aniso: a, passes, metric: relaxMetric, cellMetric, vAt, spacing, ...cls };
+  return { kind: 'salvage', mSplit, uOv, xB, outline, cells, h, holeOf, holeMask, aniso: a, passes, metric: relaxMetric, cellMetric, vAt, spacing, converge, baseNarrow, baseReach, tipGamma, hB, ...cls };
 }
 
 /* ---------------- emission (construction B) ---------------- */
@@ -259,11 +266,12 @@ export function emitBase(acc, ctx, rowTo) {
 export function cutThrough(ctx, F, wall = WALL_DEFAULT) {
   const acc = new Acc(); const t = ctx.t; emitBase(acc, ctx, F.mSplit); const baseTris = acc.tris;
   const canon = new Map(); const pt = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let o = canon.get(k); if (!o) { const s = mapPt(ctx, q.x, q.y); o = { T: add(s.P, s.n, t / 2), B: add(s.P, s.n, -t / 2) }; canon.set(k, o); } return o; };
-  let solid = 0, annular = 0; const holes = []; let holeArea = 0, apexX = -Infinity;
+  let solid = 0, annular = 0; const holes = []; const cellOpen = []; let holeArea = 0, apexX = -Infinity;
   for (const c of F.cells) {
     const k = c.length; const O = c.map(pt); const rimOK = (i) => F.isOutlineEdge(c[i], c[(i + 1) % k]);
     const hole0 = F.holeOf(c, wall);
     const open = hole0 && polyArea(hole0) > 0.25 && 2 * inradiusConvex(hole0) >= 0.6 && F.holeMask(c, hole0);
+    cellOpen.push(!!open);                                                  // recorded BEFORE the early return, so the array is aligned with F.cells whatever the branch does
     if (!open) { solid++; for (let i = 1; i < k - 1; i++) { acc.tri(O[0].T, O[i].T, O[i + 1].T); acc.tri(O[0].B, O[i + 1].B, O[i].B); } for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); } continue; }
     annular++; holes.push(hole0); holeArea += polyArea(hole0); for (const q of hole0) apexX = Math.max(apexX, q.x);
     const inn = ccw(hole0); const cc = polyCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
@@ -279,10 +287,53 @@ export function cutThrough(ctx, F, wall = WALL_DEFAULT) {
     for (let i = 0; i < nb; i++) { const j = (i + 1) % nb; acc.quad(Bq[i].s.T, Bq[j].s.T, Bq[j].s.B, Bq[i].s.B); }
     for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); }
   }
-  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, holeArea, apexX };
+  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, cellOpen, holeArea, apexX };
 }
 
 /* ---------------- measurements ---------------- */
+/* BANDS — the pattern's reach DOWN THE BLADE, which is what a grading change is about and what
+   no figure in the salvage doc measures. A band is a u interval. Area is the honest measure:
+   every hole is CLIPPED to the band's own x range and summed, so a hole straddling a band's edge
+   contributes only the part inside it; the lamina underneath is the OUTLINE's own integral of
+   2h(x) dx, not the cells' area, so a band holding no cell reads 100 % wall rather than dividing
+   by nothing. Counts go by CENTROID, which is the only way to say "how many holes are down here".
+   BASAL_BAND_TOP and TIP_BAND_BOTTOM are the two ends this session reports; 0.15 is the brief's
+   own line and is reported beside them for what it says. */
+export const BASAL_BAND_TOP = 0.45;
+export const EDGE_ON_LINE_MM = 0.15;          // two hole bottoms this close are on the same line
+export const TIP_BAND_BOTTOM = 0.75;
+export function clipBandX(poly, xLo, xHi) { let out = clipHalfPlane(poly, -1, 0, xLo); if (out.length < 3) return null; out = clipHalfPlane(out, 1, 0, -xHi); return out.length >= 3 ? out : null; }
+export function laminaAreaX(hAtX, xLo, xHi, n = 800) { if (xHi <= xLo) return 0; let s = 0; for (let i = 0; i < n; i++) { const x0 = xLo + ((xHi - xLo) * i) / n, x1 = xLo + ((xHi - xLo) * (i + 1)) / n; s += (hAtX(x0) + hAtX(x1)) * (x1 - x0); } return s; }
+export function bandStats(ctx, F, r, uLo, uHi) {
+  const xLo = Math.max(F.xB, uLo * ctx.L), xHi = Math.min(ctx.L, uHi * ctx.L);
+  const lamina = laminaAreaX(F.h, xLo, xHi);
+  let holeArea = 0; const opens = [];
+  for (const hh of r.holes) {
+    const cl = clipBandX(hh, xLo, xHi); if (cl) holeArea += polyArea(cl);
+    const cu = polyCentroid(hh).x / ctx.L; if (cu >= uLo && cu < uHi) opens.push(2 * inradiusConvex(hh));
+  }
+  opens.sort((a, b) => a - b);
+  /* "ENDS ON A LINE" IS WHAT THE BASAL V EXISTS TO PREVENT, so it gets a number rather than a
+     word. `lowOf` is each hole's own lowest x; `edgeRangeMm` is how far apart those bottoms are
+     across the band, and `onLine` counts the ones sitting within EDGE_ON_LINE_MM of the lowest
+     bottom there is. A band whose holes all bottom out together reads onLine = holes and
+     edgeRange ~ 0; one the V has staggered reads onLine small and edgeRange a millimetre or more. */
+  const lowOf = []; for (const hh of r.holes) { const cu = polyCentroid(hh).x / ctx.L; if (cu < uLo || cu >= uHi) continue; let mn = Infinity; for (const q of hh) mn = Math.min(mn, q.x); lowOf.push(mn); }
+  const edgeLo = lowOf.length ? Math.min(...lowOf) : 0;
+  const edgeRangeMm = lowOf.length ? Math.max(...lowOf) - edgeLo : 0;
+  const onLine = lowOf.filter((x) => x - edgeLo <= EDGE_ON_LINE_MM).length;
+  let cells = 0, solid = 0; const ratios = [];
+  for (let i = 0; i < F.cells.length; i++) {
+    const cu = polyCentroid(F.cells[i]).x / ctx.L; if (cu < uLo || cu >= uHi) continue;
+    cells++; if (!r.cellOpen[i]) solid++; ratios.push(elongation(F.cells[i]).ratio);
+  }
+  ratios.sort((a, b) => a - b);
+  return { uLo, uHi, cells, solid, holes: opens.length, real: opens.filter((o) => o >= G.MIN_FEATURE_MM).length,
+    medianOpen: opens.length ? opens[Math.floor(opens.length / 2)] : 0,
+    wallFraction: lamina > 0 ? 1 - holeArea / lamina : 1, laminaMm2: lamina, holeMm2: holeArea,
+    edgeRangeMm, onLine, edgeLoMm: edgeLo,
+    aniso: ratios.length ? ratios[Math.floor(ratios.length / 2)] : null };
+}
 function key3(p) { return `${p[0].toFixed(7)},${p[1].toFixed(7)},${p[2].toFixed(7)}`; }
 export function census(pos) {
   const vid = new Map(); const id = (p) => { const k = key3(p); let v = vid.get(k); if (v === undefined) { v = vid.size; vid.set(k, v); } return v; };
@@ -314,14 +365,16 @@ export function measure(ctx, F, wall) {
   const capFloorMm = ctx.L - xFloor + wall;
   const mid = F.cells.filter((cell) => { const u = polyCentroid(cell).x / ctx.L; return u >= 0.45 && u <= 0.75; }).map(elongation);
   const ratios = mid.map((e) => e.ratio).sort((a, b) => a - b);
-  return { kind: F.kind, wall, cells: F.cells.length, tris: r.tris, baseTris: r.baseTris, holes: r.annular, solid: r.solid, real, holeMedian: opens.length ? opens[Math.floor(opens.length / 2)] : 0, holeMin: opens[0] ?? 0, holeMax: opens[opens.length - 1] ?? 0, wallFraction: 1 - r.holeArea / lamina, capMm, capFloorMm, anisoMid: ratios.length ? ratios[Math.floor(ratios.length / 2)] : null, anisoAlongX: mid.length ? mid.reduce((a, e) => a + e.alongX, 0) / mid.length : null, boundary: c.boundary, nonManifold: c.nonManifold, shells: c.shells, voxel06: floodFill(r.acc.pos, 0.6), voxel03: floodFill(r.acc.pos, 0.3), acc: r.acc };
+  let lowX = Infinity; for (const hh of r.holes) for (const q of hh) lowX = Math.min(lowX, q.x);
+  const basal = bandStats(ctx, F, r, F.uOv, BASAL_BAND_TOP), tip = bandStats(ctx, F, r, TIP_BAND_BOTTOM, 1.0), below015 = bandStats(ctx, F, r, 0, 0.15);
+  return { lowestHoleU: lowX < Infinity ? lowX / ctx.L : null, basal, tip, below015, kind: F.kind, wall, cells: F.cells.length, tris: r.tris, baseTris: r.baseTris, holes: r.annular, solid: r.solid, real, holeMedian: opens.length ? opens[Math.floor(opens.length / 2)] : 0, holeMin: opens[0] ?? 0, holeMax: opens[opens.length - 1] ?? 0, wallFraction: 1 - r.holeArea / lamina, capMm, capFloorMm, anisoMid: ratios.length ? ratios[Math.floor(ratios.length / 2)] : null, anisoAlongX: mid.length ? mid.reduce((a, e) => a + e.alongX, 0) / mid.length : null, boundary: c.boundary, nonManifold: c.nonManifold, shells: c.shells, voxel06: floodFill(r.acc.pos, 0.6), voxel03: floodFill(r.acc.pos, 0.3), acc: r.acc };
 }
 /* The whole bloom: every slot of the shipped whorl, each petal from its own seed, plus the shipped hub. */
-export function wholeBloom(field, N, wall, st = { ...DEFAULTS }, u0 = U0) {
+export function wholeBloom(field, N, wall, st = { ...DEFAULTS }, opts = {}) {
   const accB = new G.MeshBuilder({ exportMode: true }); const fr = G.footRing(st, accB); const out = new Acc(); let petals = 0;
   const ring0 = fr.slotRings[0][0];
   G.buildWhorlInto({ count: fr.slotCount, radius: ring0.radius, height: 0, sizeRamp: () => ring0.scale, angleRamp: () => ring0.tiltExtra, phase: ring0.phase, placement: st.placement, fan: fr.fan,
-    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131, { u0 }) : fieldSalvage(c2, N, { seed: SEED + slot.index * 131, u0 }); const r = cutThrough(c2, F, wall); out.pos.push(...r.acc.pos); petals++; } });
+    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131, opts) : fieldSalvage(c2, N, { ...opts, seed: SEED + slot.index * 131 }); const r = cutThrough(c2, F, wall); out.pos.push(...r.acc.pos); petals++; } });
   G.buildHubInto(accB, st, fr.hub); out.pos.push(...accB.positions);
   return { acc: out, tris: out.tris, petals, hubTris: accB.triangleCount };
 }
@@ -331,7 +384,7 @@ if (IS_MAIN) {
   const quick = process.argv.includes('--quick');
   const ctx = context({});
   const save = (name, acc) => fs.writeFileSync(path.join(outDir, `${name}.bin`), Buffer.from(new Float32Array(acc.pos).buffer));
-  const report = { petal: { L: ctx.L, plainTris: ctx.plainTris, sheet: ctx.t, U0, ANISO, LLOYD_PASSES, FILLET_MM, CONVERGE_FRACTION, BASE_NARROWING, TIP_GAMMA }, rows: [] };
+  const report = { petal: { L: ctx.L, plainTris: ctx.plainTris, sheet: ctx.t, U0, ANISO, LLOYD_PASSES, FILLET_MM, CONVERGE_FRACTION, BASE_NARROWING, BASE_REACH, TIP_GAMMA }, rows: [] };
   { const a = new Acc(); emitBase(a, ctx, ctx.rows.length - 1); save('plain', a); }
   console.log(`default petal: L ${ctx.L} mm, sheet ${ctx.t} mm, plain ${ctx.plainTris} tris (export); basal zone u <= ${U0}`);
   console.log('field | N | wall | cells | holes/solid | real (>=1.0) | hole min/med/max | wall frac | cap built / floor mm | aniso mid-blade (median, |cos| to midrib) | tris | boundary | nonMan | shells | voxel 0.6/0.3');
