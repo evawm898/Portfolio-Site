@@ -334,9 +334,15 @@ Published as a private artifact: **https://claude.ai/artifact/HUEqChDfpnYnyFQgpn
 
 ### 7a. The structural figures Eva asked for, on every new cell
 
-Stated, not acted on. **A petal is a cantilever and the base carries the peak bending moment**, so
-the solid basal panel is load-bearing rather than decorative. Nothing here is clamped on structural
-grounds and no conclusion above rests on them.
+Stated once, not acted on. **A petal is a cantilever and the base carries the peak bending
+moment**, so the solid basal panel is load-bearing rather than decorative. Nothing here is clamped
+on structural grounds and no conclusion above rests on them.
+
+**THE BRIEF ASKED FOR THEM IN THE READ-OUT AND THE SHEET, AND THERE IS NO READ-OUT.** The sheet
+carries them on every caption; the app has no infill to report, so there is no panel line to put
+them in. The instrument prints them as its own **§1b** — a named block rather than two columns
+among fifteen — and that is where a reader of the measurement finds them. Said, rather than
+quietly substituting one for the other.
 
 Every row is at **Eva's own grading** (`converge` 0.050, `baseNarrow` 1.50), so only the boundary
 varies down the column.
