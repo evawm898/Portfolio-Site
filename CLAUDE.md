@@ -1213,9 +1213,33 @@ merge. **Do not attempt the push, and DELETE any local tag rather than leaving i
 an unpushed `frozen/*` in a working clone reads like a published baseline to the next session
 that lists tags. The registration is the load-bearing half and CI proves it; the tag only keeps
 the base commit alive, and a commit on `main` cannot be orphaned here anyway.
-**THE GAP AS IT STANDS: the remote carries phase2..phase20 only (phase5 absent), so PHASES 21
-THROUGH 29 ARE ALL UNPUBLISHED — nine sessions' worth, closed by one dispatch from `main`.**
-That dispatch is EVA'S to fire, not a session's.
+**THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS.** It
+read *"the remote carries phase2..phase20 only (phase5 absent), so PHASES 21 THROUGH 29 ARE ALL
+UNPUBLISHED"*. **The remote carries THIRTY of the thirty-three declared baselines today** —
+everything except `frozen/phase5`, `frozen/phase22` and `frozen/phase23` — verified by
+`git ls-remote --tags origin` and by the GitHub tag API, each one identity-checked against
+`FROZEN_BASE_COMMITS`. Run 9 of `bloom-frozen-tags` (35295784427, Sep 18) created twelve of them
+in one go: phase21 and phase24..phase34. **THE ERROR WAS READING A RED X AS "IT DID NOTHING"** —
+the workflow had been publishing all along and failing its own verdict afterwards, for the reason
+in the next paragraph. **The lesson is the one this file already states about gates and about
+`672/672`: a run's exit code is not its outcome, and the outcome here is readable in one command
+that nobody ran** (`git ls-remote --tags origin 'refs/tags/frozen/*'`), or now by dispatching
+`bloom-frozen-tags` with `check_only`, which publishes nothing.
+**THE THREE THAT REMAIN CANNOT BE PUSHED BY A WORKFLOW AT ALL, AND THEY ARE DECLARED BY NAME.**
+GitHub refuses a GitHub App token — which `GITHUB_TOKEN` is — a ref it judges to create or update
+a file under `.github/workflows`, and **`GITHUB_TOKEN` cannot be granted `workflows` scope**, so
+no `permissions:` block reaches it (`contents: write` has been set since session 17 and was never
+the problem). phase5 has been rejected identically on every run since Sep 5. They are now entries
+in `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh` with the workflow file GitHub named, the run
+fails on any UNDECLARED absence, and a declared entry that starts publishing is called out as
+stale — this project's own xfail idiom, applied to a credential instead of to geometry.
+**WHICH refs GitHub picks was NOT determined, and the ruled-out list is worth more than a guess**:
+it is not unreachability (all 33 bases are on main's first-parent line), not "the workflow files
+differ from main's" (phase21 and phase22 have IDENTICAL difference sets against main — one was
+accepted, one rejected), and not "the blob is already carried by an existing tag" (phase24's is
+carried by none and was accepted). The predicate is GitHub-internal; what matters is that it is a
+property of the token class, it is stable, and it is not configurable.
+**THE DISPATCH IS STILL EVA'S TO FIRE, NOT A SESSION'S** — the rule above is unchanged.
 
 **`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
 THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
@@ -1247,7 +1271,11 @@ constructs `refs/heads/…`, so it cannot address `refs/tags/…`; and every wri
 (`create_or_update_file`, `push_files`) creates a TREE, which is the thing the hypothesis avoids.
 A session with a different tool surface COULD still attempt the POST — it is an open question,
 not a closed one — but under the rule above there is no longer a reason to: the runner route
-works, so the API question is a curiosity rather than a blocker.
+works, so the API question is a curiosity rather than a blocker. **IT IS NOW WIRED TO ANSWER
+ITSELF**: `tools/publish-frozen-tags.sh` tries that POST on the RUNNER, for the refs the push
+could not create and only those, prints whatever the API says, and cannot fail the run either
+way. The next dispatch settles a question this file has carried as untestable since Sep 5 — and
+if it works, the three declared entries come off the xfail list.
 **(3) IT IS BELT-AND-BRACES, NOT LOAD-BEARING, so do not re-litigate it.** `b323268` is in
 `main`'s history (a squash-merge, #188 — one parent, NOT a merge commit) and `main` is never
 force-pushed here, so the commit cannot be orphaned and the definitions stay replayable without
@@ -1259,10 +1287,11 @@ block**: not from a session, and not by hand, but by the `bloom-frozen-tags` dis
 already on the default branch and therefore dispatchable, running `tools/publish-frozen-tags.sh`
 on a RUNNER, which has neither this environment's limit. Two things decide its moment: dispatch it
 from `main` AFTER the phase is merged (on a branch it would pin a baseline main's own harness does
-not register), and it publishes the WHOLE declared set through `git push origin --tags`, refusing a
-partial one by design. As of the sphere-stem session the remote still carries only phase2..phase20
-(phase5 absent), so **phases 21 through 29 are ALL unpublished** and one dispatch from `main` closes
-the entire gap at once.
+not register), and it publishes the whole declared set. **The count in this paragraph is
+SUPERSEDED — see the correction above: 30 of 33 are published, and the three that are not are
+declared.** It pushes EXPLICIT REFSPECS now rather than `git push origin --tags`, which used to
+push whatever tags the clone happened to hold; and it no longer refuses a partial set on the
+strength of refs no credential can create.
 **THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
 session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
 error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
