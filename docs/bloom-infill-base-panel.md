@@ -71,6 +71,24 @@ Re-runnable: `node tools/bloom-infill-base-panel.mjs --inert <base-tree>`. Last 
 control still passes unchanged on this tree
 (`node tools/bloom-basal-grading.mjs --inert <base-tree>`, 0 of 394,848).
 
+### 1b. `main` moved under this session, and every figure was re-measured rather than trusted
+
+Every number below was taken against **`a11219b`**, which was `main`'s head when this session
+started. The sepals merge (**`eb2aaa7`**, #243) landed on `main` while the sweeps were running and
+moved `bloom-geometry.js` by 862 lines, `bloom-registry.js` by 169 and `tools/bloom-harness.mjs` by
+1,390. It touches **none of this branch's six paths**, so the merge is textually clean — but a
+clean merge is not evidence about a measurement, and this project's own rule is that a partition
+cannot be carried across a base it was not measured against.
+
+So the whole instrument was re-run on the merged tree and diffed against the recorded `a11219b`
+run, value by value: **0 divergences over 6,363 leaf values (5,978 of them numeric), under
+`Object.is`** — the 19 truncation rows, the 120 masked-lattice rows, the 96 grid cells, the pair
+locations, the per-station panel shares and the V1 residuals, all identical. All four controls
+fire on the merged tree as well (C1 moves, C2 removes 112 of 560, C3 reproduces #250's seven
+rows, C4 matches on three boundaries). The sepals work moved nothing this doc rests on, which is
+what its own byte partition (72 movers / 780 holders) predicted and is now measured from this
+side.
+
 **EIGHT SEEDS, ALWAYS** — `SEED + i*131`, which is exactly the set `wholeBloom` gives the eight
 petals of the shipping whorl, so the sweep's population IS the bloom's. Every figure below is
 the MEDIAN over those eight unless it says otherwise; the sheet's petal pictures are ONE seed
