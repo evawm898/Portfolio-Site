@@ -63,7 +63,10 @@ generator gains the one reader that owner needs. §7 costs the port, and §8 cos
    #252's §3c from row 5 to row 3. §1, §4.
 5. **A SECOND FLOOR EXISTS AND THE MUST-FAIL IS WHAT FOUND IT.** On a petal whose FOOT is narrower
    than two wall insets the waist vanishes and a width floor binds instead. It was not predicted:
-   `--control`'s K2 fired on the petal that was supposed to be the control. §2c.
+   `--control`'s K2 fired on the petal that was supposed to be the control. **And on that petal the
+   ROOT_BLEND term hands the outline to a DIFFERENT term** — to `TIP_FLOOR` at u ≈ 0 rather than to
+   the `CORE` — so "the waist" is what the floor is where the foot OWNS the outline and is not a
+   sentence true of every petal. K1 asserts both shapes. §2c.
 6. **THE FLOOR IS READ MODE-FREE, AND THAT NEEDED A GENERATOR CHANGE.** `profile.slopeBreaks()`
    floors on the accumulator's own `tipFloor` and **disagrees live/export on a reachable state**
    (`footDelicacy` 0.25: u 0.015720245 live, 0 export). Which rows carry the solid panel is
@@ -302,7 +305,7 @@ pass `u0: P.U0` **explicitly**, so the dependency is visible rather than a defau
 
 | | what it claims | how it is shown able to fail |
 |---|---|---|
-| **K1** | the declared floor IS the outline's own minimum | the bar is the SEARCH's own step (1.50e-6 in u, 5.94e-5 mm of outline) and not a typed epsilon; the same test REJECTS the TIP_FLOOR break |
+| **K1** | the declaration IS the outline, ON BOTH SHAPES — a waist where the foot owns the outline, and NO waist where it hands to the print floor | the bar is the SEARCH's own step (1.50e-6 in u, 5.94e-5 mm of outline), not a typed epsilon; the same test REJECTS the tip's own break |
 | **K2a** | the floor row's overlap row clears the floor and the row below does not | the half-widths are printed on both sides, on three petals |
 | **K2b** | every row below the floor reads MORE solid in the bottom 45 % | a strict comparison, no threshold; the reference is the field's emitted holes, which neither floor writes |
 | **K2c** | the floor is load-bearing IN THE ANSWER | move it down one row and K2b must break — **it fires on 2 of 3 petals, and the third is explained by a MEASURED monotone curve rather than excused** |

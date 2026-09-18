@@ -336,16 +336,38 @@ async function control() {
      to the outline by SEARCH — the minimum of the emitted half-width over the basal
      stretch — whose owner is `halfWidthAt` and not the break list. The must-fail
      looks up the WRONG break (the tip's) and requires the two to disagree. */
-  const w = waistOf(ctx);
-  const dU = Math.abs(w.u - w.searchU), dMm = Math.abs(w.halfMm - w.searchHalfMm);
-  const okDecl = dU <= w.searchStepU && dMm <= w.searchStepMm;
-  const wrong = ctx.surface.profile.laminaSlopeBreaks().find((x) => x.to === 'TIP_FLOOR');
-  const wrongU = wrong ? wrong.u : null;
-  const canFail = wrongU !== null && Math.abs(wrongU - w.searchU) > w.searchStepU;
-  console.log(`K1  the declared floor IS the outline's own minimum: declared u ${w.u.toFixed(7)} (half ${w.halfMm.toFixed(6)} mm) against the search's u ${w.searchU.toFixed(7)} (half ${w.searchHalfMm.toFixed(6)})`);
-  console.log(`    |du| ${dU.toExponential(2)} against the search's own step ${w.searchStepU.toExponential(2)}, |dh| ${dMm.toExponential(2)} mm against what the outline moves over that step ${w.searchStepMm.toExponential(2)} mm — ${okDecl ? 'AGREE' : '**DISAGREE**'}`);
-  console.log(`    and the clause can fail: the TIP_FLOOR break sits at u ${wrongU === null ? 'n/a' : wrongU.toFixed(7)}, which the same test ${canFail ? 'REJECTS' : '**ACCEPTS**'}`);
-  if (!(okDecl && canFail)) bad++;
+  /* TWO SHAPES, because the declaration means different things on them and a clause
+     that only ever saw one would not know. On a petal whose foot OWNS the outline the
+     ROOT_BLEND term hands over to the CORE and the station is a genuine local MINIMUM —
+     the waist. On a petal whose foot is under the print floor it hands over to
+     TIP_FLOOR at u ~ 0 and the outline is NON-DECREASING throughout: there is no waist,
+     the floor reads ~0, and it is the WALL floor that binds. Both are asserted. */
+  const probesK1 = [['DEFAULTS', {}, true], ['footDelicacy 0.25', { footDelicacy: 0.25 }, false]];
+  let k1 = true, k1CanFail = false;
+  for (const [nm, set, wantWaist] of probesK1) {
+    const c2 = P.context(set);
+    const ww = waistOf(c2, 1.0);
+    const hAt = (u) => c2.surface.profile.halfWidthAt(u);
+    const br = c2.surface.profile.laminaSlopeBreaks().find((x) => x.from === 'ROOT_BLEND');
+    /* is the outline non-decreasing over the basal stretch? (no interior minimum) */
+    let rises = true;
+    for (let i = 1; i <= 4096; i++) { const a = hAt(G.ROOT_BLEND_END * (i - 1) / 4096), b = hAt(G.ROOT_BLEND_END * i / 4096); if (b < a - 1e-12) { rises = false; break; } }
+    const hasWaist = !rises;
+    let ok;
+    if (wantWaist) {
+      ok = hasWaist && Math.abs(ww.u - ww.searchU) <= ww.searchStepU && Math.abs(ww.halfMm - ww.searchHalfMm) <= ww.searchStepMm;
+      console.log(`K1  ${nm.padEnd(18)} hands ROOT_BLEND -> ${br ? br.to : 'n/a'}; the outline HAS an interior minimum (${hasWaist}) and the declared u ${ww.u.toFixed(7)} sits |du| ${Math.abs(ww.u - ww.searchU).toExponential(2)} from the search's ${ww.searchU.toFixed(7)} (its own step ${ww.searchStepU.toExponential(2)}), |dh| ${Math.abs(ww.halfMm - ww.searchHalfMm).toExponential(2)} against ${ww.searchStepMm.toExponential(2)} mm — ${ok ? 'THE DECLARATION IS THE OUTLINE' : '**IT IS NOT**'}`);
+    } else {
+      ok = !hasWaist && ww.u < 1e-9 && ww.wallBinds;
+      console.log(`K1  ${nm.padEnd(18)} hands ROOT_BLEND -> ${br ? br.to : 'n/a'} at u ${ww.u.toExponential(2)}; the outline is NON-DECREASING over the basal stretch (no waist: ${!hasWaist}) and the WALL floor is what binds (${ww.wallBinds}, u ${ww.wallFloorU.toFixed(7)}) — ${ok ? 'AS THE DECLARATION SAYS' : '**NOT AS THE DECLARATION SAYS**'}`);
+    }
+    if (!ok) k1 = false;
+    /* and the clause can fail: the same test applied to the TIP_FLOOR break must reject it */
+    const wrong = c2.surface.profile.laminaSlopeBreaks().find((x) => x.to === 'TIP_FLOOR' && x.u > 0.5);
+    if (wrong && Math.abs(wrong.u - ww.searchU) > ww.searchStepU) k1CanFail = true;
+  }
+  console.log(`K1  and the test REJECTS the tip's own break when it is put in the floor's place: ${k1CanFail ? 'YES' : '**NO — the clause accepts anything**'}`);
+  if (!(k1 && k1CanFail)) bad++;
 
   /* K2 — THE REVERSAL IS NOT VACUOUS, AND IT IS THE WAIST'S. Three petals: one with a
      waist (the reversal must land on the first row below it), one with NO waist (there

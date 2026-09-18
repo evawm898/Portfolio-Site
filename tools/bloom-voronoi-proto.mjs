@@ -82,13 +82,20 @@ export const WALL_DEFAULT = 1.0;              // mm — MIN_FEATURE_MM, the prin
    rather than a default. Nothing here defaults to it any more.
 
    `laminaFloorU` IS THE FLOOR AND IT IS DERIVED FROM A LENGTH. It reads the
-   profile's own MODE-FREE break list for the station where ROOT_BLEND hands
-   the outline to the CORE — the blade's WAIST, and the narrowest section it
-   has between the foot and the tip (5.164 mm across on the default against
-   6.40 at the foot and 16.00 at mid-blade). Below it the outline turns and
-   widens again toward the foot, and a cell region containing that turn is
-   measurably WORSE: see `docs/bloom-infill-lamina-floor.md` §2, and
-   `node tools/bloom-infill-lamina-floor.mjs` for the sweep.
+   profile's own MODE-FREE break list for the station where the ROOT_BLEND term
+   stops owning the outline. WHAT THAT STATION IS DEPENDS ON THE PETAL, and both
+   cases are asserted by `--control`'s K1 rather than assumed:
+
+     * where the foot OWNS the outline it hands over to the CORE, and the station
+       is a genuine local MINIMUM — the blade's WAIST, the narrowest section it
+       has between the foot and the tip (5.164 mm across on the default against
+       6.400 at the foot and 16.000 at its widest). Below it the outline turns and
+       widens again toward the foot, and a cell region containing that turn is
+       measurably WORSE: `docs/bloom-infill-lamina-floor.md` §2.
+     * where the foot is at or under the print floor it hands over to TIP_FLOOR at
+       u ~ 0 (`footDelicacy` 0.25, whose `footHalf` is exactly TIP_HALF_MM), the
+       outline is NON-DECREASING throughout and there is no waist at all. This
+       floor then reads ~0 and `wallFloorU` below is what binds.
 
    MODE-FREE BY CONSTRUCTION AND NOT BY OBSERVATION. It is
    `laminaSlopeBreaks`, not `slopeBreaks`: the second floors on the
