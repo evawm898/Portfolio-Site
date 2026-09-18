@@ -125,19 +125,19 @@ export function cell(ctx, row, wall, opts = F_OPTS, seeds = SEEDS) {
   const xBot = BOTTOM_BAND_TOP * ctx.L;
   const laminaBot = P.laminaAreaX(hAtX, 0, xBot);
   const blade = areaU(hAt, ctx.L, 0, 1);
-  const waistX = P.basalFloorU(ctx, wall) * ctx.L;
+  const floorX = P.basalFloorU(ctx, wall) * ctx.L;
   const per = seeds.map((seed) => {
     const F = P.fieldSalvage(ctx, N_CELLS, { ...opts, u0: ctx.rows[row].u, seed });
     const m = P.measure(ctx, F, wall);
     const r = P.cutThrough(ctx, F, wall);
-    let openBot = 0, openAll = 0, openBelowWaist = 0;
+    let openBot = 0, openAll = 0, openBelowFloor = 0;
     for (const h of r.holes) {
       const cl = P.clipBandX(h, 0, xBot); if (cl) openBot += P.polyArea(cl);
-      const lo = P.clipBandX(h, 0, waistX); if (lo) openBelowWaist += P.polyArea(lo);
+      const lo = P.clipBandX(h, 0, floorX); if (lo) openBelowFloor += P.polyArea(lo);
       openAll += P.polyArea(h);
     }
     const nullHoles = F.cells.filter((c) => !F.holeOf(c, wall)).length;
-    return { F, m, openBot, openAll, openBelowWaist, nullHoles };
+    return { F, m, openBot, openAll, openBelowFloor, nullHoles };
   });
   const m = per.map((p) => p.m), F0 = per[0].F;
   const pick = (f) => m.map(f);
@@ -147,7 +147,7 @@ export function cell(ctx, row, wall, opts = F_OPTS, seeds = SEEDS) {
     panelShare: areaU(hAt, ctx.L, 0, ctx.rows[row].u) / blade,
     bottom45Solid: med(per.map((p) => 1 - p.openBot / laminaBot)),
     openBotMm2: med(per.map((p) => p.openBot)),
-    openBelowWaistMm2: med(per.map((p) => p.openBelowWaist)),
+    openBelowFloorMm2: med(per.map((p) => p.openBelowFloor)),
     bladeOpen: med(per.map((p) => p.openAll / blade)),
     laminaWall: med(pick((x) => x.wallFraction)),
     holes: med(pick((x) => x.holes)), real: med(pick((x) => x.real)),
@@ -275,7 +275,7 @@ async function main() {
     for (const row of band) {
       const c = cell(c2, row, 1.0);
       line.push(c);
-      console.log(`     ${String(row).padStart(3)} | ${c.uOv.toFixed(7)} | ${(c.aboveFloor ? 'above' : 'BELOW').padStart(5)} | ${(100 * c.bottom45Solid).toFixed(1).padStart(8)} | ${c.openBotMm2.toFixed(2).padStart(7)} | ${c.openBelowWaistMm2.toFixed(3).padStart(20)} | ${String(c.nullHoles).padStart(5)} | ${String(c.tris).padStart(5)}`);
+      console.log(`     ${String(row).padStart(3)} | ${c.uOv.toFixed(7)} | ${(c.aboveFloor ? 'above' : 'BELOW').padStart(5)} | ${(100 * c.bottom45Solid).toFixed(1).padStart(8)} | ${c.openBotMm2.toFixed(2).padStart(7)} | ${c.openBelowFloorMm2.toFixed(3).padStart(20)} | ${String(c.nullHoles).padStart(5)} | ${String(c.tris).padStart(5)}`);
     }
     /* THE STEP, NOT THE SIGN. A sweep drifts; what the floor predicts is a STEP, so the
        largest one and where it is are what the line reports — a rise of 0.4 points and a
