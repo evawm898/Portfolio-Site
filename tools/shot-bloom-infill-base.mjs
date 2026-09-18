@@ -119,7 +119,7 @@ if (QUICK) {
   const plainBloom = new Float32Array(accP.positions);
   const blooms = [{ key: 'plain', pos: plainBloom, label: 'PLAIN (what ships)', tris: accP.triangleCount, note: '' }];
   for (const b of [BOUNDS[0], BOUNDS[2]]) {
-    const wb = P.wholeBloom('salvage', 16, 1.0, { ...DEFAULTS }, b.target);
+    const wb = P.wholeBloom('salvage', 16, 1.0, { ...DEFAULTS }, { u0: b.target });
     const c = P.census(wb.acc.pos);
     blooms.push({ key: b.key, pos: new Float32Array(wb.acc.pos), label: b.label, tris: wb.tris,
       note: ` Boundary ${c.boundary}, ${P.floodFill(wb.acc.pos, 0.6)} voxel piece at 0.6 mm.`, b });
