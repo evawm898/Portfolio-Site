@@ -2922,6 +2922,12 @@ is the waist and not the row index — a CONTROL (a petal with no waist), a MOVE
 puts the waist a row lower and the step follows it), and the same reversal at four gradings
 INCLUDING NO GRADING AT ALL. And it buys nothing where it extends: **open area below the waist is
 0.000 mm² at every boundary from row 19 to row 6.**
+**AND THE ROOT_BLEND TERM DOES NOT ALWAYS HAND OVER TO THE CORE.** On `footDelicacy` 0.25 —
+whose `footHalf` is exactly `TIP_HALF_MM` — it hands to TIP_FLOOR at u 1.67e-17 and the outline is
+NON-DECREASING over the basal stretch: there is no waist at all. The floor reads ~0 there and the
+WALL floor is what binds, which is right; what would have been wrong is the sentence. K1 asserts
+BOTH shapes, and found this by re-reading the declaration against the clause rather than by a
+failure.
 **THE SECOND FLOOR WAS FOUND BY THE MUST-FAIL AND NOT BY A READING OF THE CODE.** `--control`'s K2
 was written with `footDelicacy` 0.25 as the control for "no waist, therefore no reversal"; it
 FIRED. That petal's foot is 1.600 mm across — narrower than two 1.0 mm wall insets — so no hole can
@@ -2936,8 +2942,11 @@ floor, itself floored one row past the feet — at row 3 the panel is the three 
 vertex-welded shell count goes 1 -> 2 on every state and the overlap weld's two non-manifold edges
 disappear (the voxel fill still reads one piece and never binds anywhere on the sweep).
 **`HELD_ROWS` / A7 DOES NOT BIND AT ANY BOUNDARY AND #252's RECOMMENDED OPTION 2 IS REFUTED BY
-EVA'S OWN RULING.** The infill places no station: the petal was rebuilt at all 17 boundaries and
-its emitted ladder is **bit-identical under `Object.is`**. Option 2 — "the boundary is the last held
+EVA'S OWN RULING.** The infill places no station, and the only route it could take is MUTATING the
+rows it was handed: the field was run at all 17 boundaries and the builder's stations compared
+afterwards against a FRESH build — **0 of 59 moved under `Object.is`**. The clause says that rather
+than "it does not call `bladeStations`", which is a claim about code where this is one about the
+artefact. Option 2 — "the boundary is the last held
 station" — lands on **row 18, panel 25.49 %, eight rows ABOVE the cell Eva approved at 8.83 %**, so
 it cannot answer a ruling that asked for LOWER. It was right about the DEFECT (a boundary snapped
 against a fixed 0.30 whatever `seamStep` is) and wrong about the REMEDY; what replaces it is a
