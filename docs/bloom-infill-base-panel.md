@@ -89,6 +89,13 @@ rows, C4 matches on three boundaries). The sepals work moved nothing this doc re
 what its own byte partition (72 movers / 780 holders) predicted and is now measured from this
 side.
 
+**And the SHEET reproduces to the byte.** `tools/bloom-soft-render.mjs` is a deterministic
+rasteriser, so this is an identity rather than a pixel threshold and needs no same-tree control:
+re-rendering the whole sheet on the merged tree gives **30 of 30 images byte-identical** to the
+ones published at the artifact link, with every triangle count unchanged (plain 19,040; 21,844 /
+21,512 / 20,856 / 19,808 at a 1.0 mm wall; 22,412 / 22,260 / 21,200 / 20,288 at 0.8). The picture
+Eva is ruling from is the picture this tree draws.
+
 **EIGHT SEEDS, ALWAYS** — `SEED + i*131`, which is exactly the set `wholeBloom` gives the eight
 petals of the shipping whorl, so the sweep's population IS the bloom's. Every figure below is
 the MEDIAN over those eight unless it says otherwise; the sheet's petal pictures are ONE seed
