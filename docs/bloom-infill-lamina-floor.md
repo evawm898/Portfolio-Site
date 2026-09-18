@@ -168,9 +168,15 @@ project's own `headRise` ruling: *a metric consumed as a geometric input becomes
 
 **THE INFILL PLACES NO STATION, SO A7 CANNOT FAIL AT ANY BOUNDARY.** A7 is about where
 `bladeStations` puts the ladder; the infill reads the builder's own captured rows and cuts holes in
-the lamina above a row index. Asserted on the ARTEFACT rather than argued from the call graph: the
-petal is rebuilt at every one of the 17 boundaries and its emitted stations compared under
-`Object.is` against the reference — **worst |delta| 0, identical, on all 17**.
+the lamina above a row index.
+
+**WHAT THE CLAUSE CAN ACTUALLY CATCH IS SAID RATHER THAN LEFT TO BE READ AS STRONGER.** The
+boundary is not a state field, so it cannot reach `bladeStations` by any route; the ONE way the
+infill could move the ladder is by MUTATING the rows the builder handed it. So a FRESH build
+supplies the reference — an owner the field does not write — the field is run at all 17 boundaries
+on the shared context, and the context's stations are compared afterwards: **0 of 59 moved, under
+`Object.is`**. K4 runs that same shipped clause against a reference bent by one ULP and requires it
+to report 1.
 
 So the answer to *"how far below F can the boundary go without touching `HELD_ROWS` / A7"* is
 **all the way to the floor. It does not bind anywhere.**
@@ -301,7 +307,7 @@ pass `u0: P.U0` **explicitly**, so the dependency is visible rather than a defau
 | **K2b** | every row below the floor reads MORE solid in the bottom 45 % | a strict comparison, no threshold; the reference is the field's emitted holes, which neither floor writes |
 | **K2c** | the floor is load-bearing IN THE ANSWER | move it down one row and K2b must break — **it fires on 2 of 3 petals, and the third is explained by a MEASURED monotone curve rather than excused** |
 | **K3** | the split is the floor's row and a nearest-snap would land below it | both rows and both stations printed |
-| **K4** | the ladder comparison can report a difference | one station moved by 1e-12 and the sweep must see it |
+| **K4** | the ladder comparison can report a difference | the SHIPPED clause is run twice — 0 moved against a fresh build, 1 against a reference bent by ONE ULP (+5.55e-17) at station 20 |
 
 **K2c IS WHERE THE SUBJECT HAD TO BE NAMED.** On `footDelicacy` 0.25 the bottom-45 curve degrades
 MONOTONICALLY below the floor, so no row is distinguishable by K2b there and a control that claimed

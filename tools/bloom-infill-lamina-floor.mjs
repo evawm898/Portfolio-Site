@@ -169,27 +169,33 @@ export function sweepRows(ctx) {
 
 /* THE LADDER IS THE BUILDER'S AND THE INFILL NEVER TOUCHES IT — asserted on the
    EMITTED stations rather than argued from the call graph, because "it does not call
-   `bladeStations`" is a claim about code and this is a claim about the artefact. The
-   rows are rebuilt at every boundary and compared to the bit. */
-export function ladderHeld(ctx, rows) {
-  const ref = ctx.rows.map((r) => r.u);
-  let worst = 0, checked = 0;
-  for (const row of rows) {
-    const F = P.fieldSalvage(ctx, N_CELLS, { ...F_OPTS, u0: ctx.rows[row].u, seed: SEEDS[0] });
-    /* the field reads the SAME ctx.rows the builder captured; rebuild the petal from
-       scratch at this boundary and compare the ladder it emits */
+   `bladeStations`" is a claim about code and this is a claim about the artefact.
+
+   WHAT IT CAN ACTUALLY CATCH, stated so the clause is not read as stronger than it is.
+   The boundary is not a state field, so it cannot reach `bladeStations` by any route;
+   the ONE way the infill could move the ladder is by MUTATING the rows the builder
+   handed it, and that is what this measures. A fresh build supplies the reference —
+   an owner the field does not write — the field is then run at every boundary on the
+   shared context, and the shared context's stations are compared against that
+   reference afterwards under `Object.is`. `ref` is injectable so K4 can perturb it
+   and require the comparison to report. */
+export function ladderHeld(ctx, rows, ref = null) {
+  const fresh = () => {
     const st = { ...DEFAULTS };
     const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
     const { ring, slot } = firstSlot(st, acc);
-    const p = G.buildPetalInto(acc, st, ring, slot, null, true);
-    const got = p.grid[0].rows.map((r) => r.u);
-    if (got.length !== ref.length) { worst = Infinity; continue; }
-    for (let i = 0; i < got.length; i++) if (!Object.is(got[i], ref[i])) worst = Math.max(worst, Math.abs(got[i] - ref[i]) || Number.MIN_VALUE);
-    checked++;
-    void F;
-  }
+    return G.buildPetalInto(acc, st, ring, slot, null, true).grid[0].rows.map((r) => r.u);
+  };
+  const reference = ref || fresh();
+  let built = 0;
+  for (const row of rows) { P.fieldSalvage(ctx, N_CELLS, { ...F_OPTS, u0: ctx.rows[row].u, seed: SEEDS[0] }); built++; }
+  const after = ctx.rows.map((r) => r.u);
+  let moved = 0, worst = 0;
+  if (after.length !== reference.length) { moved = Math.abs(after.length - reference.length); worst = Infinity; }
+  else for (let i = 0; i < after.length; i++) if (!Object.is(after[i], reference[i])) { moved++; worst = Math.max(worst, Math.abs(after[i] - reference[i])); }
   const seamStep = Math.round(ctx.rows.filter((r) => r.u > 0)[0].u * G.BLADE_ROWS);
-  return { checked, worst, seamStep, heldTopU: (seamStep + G.HELD_ROWS - 1) / G.BLADE_ROWS, heldRows: G.HELD_ROWS, rootBlendEnd: G.ROOT_BLEND_END };
+  return { checked: built, stations: after.length, moved, worst, seamStep,
+    heldTopU: (seamStep + G.HELD_ROWS - 1) / G.BLADE_ROWS, heldRows: G.HELD_ROWS, rootBlendEnd: G.ROOT_BLEND_END };
 }
 
 /* ------------------------------------------------------------------- report */
@@ -266,7 +272,7 @@ async function main() {
   console.log('3. THE `HELD_ROWS` / `A7` COLLISION — bounded.');
   const lad = ladderHeld(ctx, rows);
   out.ladder = lad;
-  console.log(`   the ladder, rebuilt at every one of ${lad.checked} boundaries and compared to the bit against the reference: worst |delta| ${lad.worst === 0 ? '0 (IDENTICAL)' : lad.worst}`);
+  console.log(`   the field was run at every one of ${lad.checked} boundaries and the builder's ${lad.stations} stations compared afterwards against a FRESH build: ${lad.moved} moved${lad.moved ? `, worst |delta| ${lad.worst}` : ' — IDENTICAL under Object.is'}`);
   console.log(`   seamStep ${lad.seamStep}; HELD_ROWS ${lad.heldRows}; the held block ends at u ${lad.heldTopU.toFixed(7)} (row ${Math.round(lad.heldTopU * G.BLADE_ROWS) - lad.seamStep + 1 + 3}); ROOT_BLEND_END ${lad.rootBlendEnd}`);
   const opt2Row = ctx.rows.findIndex((r) => Math.abs(r.u - lad.heldTopU) < 1e-9);
   console.log(`   #252's option 2 puts the boundary AT the last held station — row ${opt2Row}, u ${lad.heldTopU.toFixed(7)}, panel ${(100 * areaU((u) => ctx.surface.profile.halfWidthAt(u), ctx.L, 0, ctx.rows[opt2Row].u) / areaU((u) => ctx.surface.profile.halfWidthAt(u), ctx.L, 0, 1)).toFixed(2)} % of the blade.`);
@@ -411,15 +417,17 @@ async function control() {
   console.log(`    a NEAREST-snap to the same floor gives row ${snapped} (cells from u ${ctx.rows[snapped - 1].u.toFixed(7)}) — ${snapBelow ? 'BELOW it, which is why the rule is not a snap' : '**also clears it, so this clause proves nothing on this petal**'}`);
   if (!(derivedOk && snapBelow)) bad++;
 
-  /* K4 — THE LADDER CLAUSE CAN FAIL. §3 compares the emitted stations to the bit; a
-     comparison that cannot report a difference is a log line. Perturb one station and
-     require the comparison to see it. */
+  /* K4 — THE LADDER CLAUSE CAN FAIL. §3 compares the emitted stations against a
+     fresh build; a comparison that cannot report a difference is a log line. The
+     reference is perturbed by ONE ULP at one station and the SHIPPED clause — not a
+     copy of it — has to see it. */
+  const clean = ladderHeld(ctx, [P.basalSplit(ctx, {})]);
   const ref = ctx.rows.map((r) => r.u);
-  const perturbed = ref.slice(); perturbed[20] = perturbed[20] + 1e-12;
-  let sawIt = false;
-  for (let i = 0; i < ref.length; i++) if (!Object.is(perturbed[i], ref[i])) sawIt = true;
-  console.log(`K4  the ladder comparison can fail: one station moved by 1e-12 and the Object.is sweep ${sawIt ? 'SAW it' : '**MISSED it**'}`);
-  if (!sawIt) bad++;
+  const bent = ref.slice(); bent[20] = bent[20] + Number.EPSILON * bent[20];
+  const bad4 = ladderHeld(ctx, [P.basalSplit(ctx, {})], bent);
+  const ok4 = clean.moved === 0 && bad4.moved > 0;
+  console.log(`K4  the shipped ladder clause reports ${clean.moved} moved against a fresh build, and ${bad4.moved} against a reference bent by one ULP at station 20 (${bent[20] - ref[20] === 0 ? '**the bend was below the double**' : `+${(bent[20] - ref[20]).toExponential(2)}`}) — ${ok4 ? 'IT CAN FAIL' : '**IT CANNOT**'}`);
+  if (!ok4) bad++;
 
   console.log(bad === 0 ? 'PASS' : `FAIL — ${bad} control(s) did not behave`);
   if (bad) process.exit(1);
