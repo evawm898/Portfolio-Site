@@ -15,6 +15,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
@@ -39,6 +40,7 @@ on:
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
       - tools/bloom-wall-thickness.mjs
+      - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
@@ -76,6 +78,26 @@ jobs:
         run: node tools/bloom-wall-thickness.mjs
       - name: ... and those four assertions must be able to fail
         run: node tools/bloom-wall-thickness.mjs --negative-control
+      # THE COMBINATION GATE rides here for the wall instrument's own three
+      # reasons — the same question (print safety), Node-only, seconds — and
+      # it rides in THIS workflow rather than a sixth of its own because a
+      # separate workflow would buy a faster GREEN and cost a slower RED: a
+      # step in this job fails the job in under a minute, before the four
+      # minutes of Chromium, whereas its own workflow would run in parallel
+      # with a three-hour matrix that nothing would then stop. It goes AFTER
+      # the wall instrument because it IMPORTS `measureWall` from it: a red
+      # there is a red about the measure itself, and reading that first is
+      # what keeps this gate's red about the geometry.
+      #
+      # IT DOES NOT NEED THE HARNESS and so it does not need playwright —
+      # `tools/bloom-harness.mjs` imports `playwright-core` at MODULE LOAD,
+      # which is what pins ST9's witness after the npm install; this gate
+      # imports the geometry, the registry and the wall instrument and
+      # nothing else, so it can run before it.
+      - name: No PRODUCT of two controls may close the printable gap (CG0-CG5)
+        run: node tools/bloom-combination-gate.mjs
+      - name: ... and every one of those five clauses must be able to fail
+        run: node tools/bloom-combination-gate.mjs --control
       # THE ARC'S NEAR-ZERO BRANCH cannot be a matrix row: no slider reaches the
       # band (spine curl steps by 5 degrees) and `applyConfig`'s read-back would
       # refuse one if a row tried. So the witness calls the geometry directly,

@@ -1130,6 +1130,8 @@ the wall instrument's rows have the same shape. **No range limit, clamp or warni
 — narrowing the range would remove states Eva ruled reachable, on the strength of a threshold
 that is itself a guess. A COMBINATION GATE (a predeclared set of two-control products through
 the wall instrument) is the schedulable item; it is recorded, not pre-empted.
+**IT IS BUILT — see the combination-gate block below; §18a's table reproduces through it
+EXACTLY and is a declared magnitude now.**
 **AND THE 1.00 mm PRINTABLE GAP IS ITSELF AN UNVALIDATED CONSTANT** (§18b, recorded once):
 NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED, so `MIN_FEATURE_MM`, the printable gap, the
 sheet floor, the foot width and every curvature floor are DECLARED GUESSES rather than
@@ -3687,6 +3689,77 @@ split is CONDITIONAL and why Z5 asserts that collapse in both directions.
 until Z4 (the assignment is mirror-symmetric) and Z5 existed, and a third was
 silent above one whorl until Z6 (a role differentiates the BLADE, never the
 foot). Do not read a green run as endorsing any of it.
+
+**TWO CONTROLS AT ONCE — THE COMBINATION GATE, AND THE MATRIX IS BLIND TO THIS BY
+CONSTRUCTION** (#263 — read `docs/bloom-combination-gate.md` before adding, moving or
+retiring a pair, and before quoting any figure from it). `buildMatrix()` VARIES ONE CONTROL
+AT A TIME, which is what makes a row attributable and is exactly why a hazard living only in
+the PRODUCT of two settings cannot be seen by any gate here. `node
+tools/bloom-combination-gate.mjs` is the instrument: **one number — the NEAREST APPROACH IN
+MILLIMETRES between two surfaces that must not meet** — on a predeclared product grid,
+against `MIN_FEATURE_MM` (imported, never restated). It rides in
+`bloom-export-watertight.yml` BEFORE the browser install, beside the wall instrument, for
+that step's own three reasons; the bloom gate count stays at FIVE.
+**TWO MEASURES, EACH WITH ONE OWNER, NAMED PER PAIR:** `self` is `measureWall(grid).self`
+IMPORTED from `tools/bloom-wall-thickness.mjs` (V5's own quantity through V5's own function
+— a second implementation would agree with a broken one by being broken alongside it), and
+`leaf-stem` is every LEAF BLADE vertex against the free stem through the geometry's own
+`freeStemDistanceMm`, with the petiole rod excluded by the leaf builder's OWN reported
+`petioleAxis` (ST9's remedy: name the rod, never widen the region).
+**EVERY AXIS'S FIRST VALUE IS THAT CONTROL'S OWN REGISTRY DEFAULT**, asserted by CG0 — which
+is what makes the grid CONTAIN its two single-axis columns, so the product-only claim costs
+no extra builds and a moved default reddens the gate rather than silently re-pointing it.
+**CG4 IS THE CLAUSE THAT MAKES THIS A COMBINATION GATE RATHER THAN A SECOND COPY OF V5**: a
+BICONDITIONAL on each pair's `productOnly` — TRUE requires every single-axis cell to clear
+AND some interior cell to fail; FALSE requires a single-axis cell to fail. CG0 the grid · CG1
+per-axis reachability · CG2 the bar both ways · CG3 the magnitude both ways (#213) · CG5 a
+stray declaration.
+**TIER 1 ONLY SHIPS — five evidenced pairs, 64 cells, 13-14 s, and 20 declared cells**, each
+with its magnitude as a number the gate reads (band ±5e-4 mm, the wall instrument's own) and
+re-measurable by `node tools/bloom-xfail-magnitudes.mjs --combination`. **Tiers 2 and 3 are
+proposed, MEASURED and COSTED in that doc and NOT built** — nine and six pairs, 25.9 s and
+19.1 s, waiting on Eva. So are the REJECTIONS, which are as much the finding as the list.
+**WHAT IT FOUND THAT NOTHING HAD MEASURED.** §18a's hazard is NOT confined to `petalCup` 1.2
+— it reaches down to **cup 0.6 at tip shape 3.00 (0.929 mm)**. And `petalCup × petalSpineCurl`
+carries six failing cells from 0.945 mm down to **0.012 mm at cup 1.2 × curl 360** — a sheet
+twelve microns from touching itself on two shipped sliders, with both singles clear.
+**THE WALL INSTRUMENT HAS BUILT THE 0.945 mm CELL ON EVERY RUN SINCE SESSION 34** — it is
+`buckle-on-form`'s own buckle-free control — read its WALL and thrown its SELF away.
+**`self` IS NOT THE CENSUS AND A CLEARING CELL IS NEVER A CLAIM THAT THE PETAL DOES NOT
+FOLD**: `petalCup max (1.2)` is a declared census xfail (752 pairs / 0.1268 mm) while its
+`self` reads 1.031 and clears. X1/X2 own the census; this owns the approach. It is also blind
+to a TOP-to-TOP fold, reads ONE petal, and **its own floor SCALES WITH THE SHEET** — which is
+why every `sheetThickness` pair is REJECTED rather than declared (measured: `petalCup ×
+sheetThickness` has its worst cell at the DEFAULT thickness, so a thicker sheet reads BETTER
+while the geometry gets worse).
+**THE LEAF-AGAINST-STEM APPROACH IS A MEASUREMENT GAP, NOT A COMBINATION ONE — MEASURED.**
+Swept over six partners, the second control moves it by at most **0.002 mm**: the hazard is
+`leafAngle`'s alone, `LEAVES: the STEEP angle (85 deg)` is ALREADY a matrix row, and what was
+missing is that nothing in the repo measured blade-to-stem approach at all. That pair ships
+with `productOnly: FALSE` so CG4 ASSERTS the finding rather than leaving it in prose.
+**THE MUST-FAIL IS NINE LEGS AND EVERY ONE OF THE FIVE CLAUSES** (`--control`, 40 s): each
+plants into a COPY of the real `PAIRS` / `COMBINATION_XFAIL`, runs the SHIPPED `verify`,
+refuses a vacuous plant, and re-runs the last plant NOT quiet so the red is printed through
+the gate's own path. **It found a defect in CG1 on its first sweep** — written as "some cell
+differs from the default cell", the clause stayed GREEN on a collapsed second axis because
+the FIRST axis still moved plenty; it is PER AXIS now and its plant is `stamenCount`, which
+is measurably inert for `self` (bit-identical at 0, 60 and 120). **AND RE-READING THE FIXED
+CLAUSE FOUND THE SECOND HALF: per-axis under `Object.is` is satisfied by ONE ULP, and a real
+control does exactly that** — `lobeDepth` moves the cup column by 2e-16 mm. CG1's bar is
+`COMBINATION_TOLERANCE_MM` now, derived rather than typed: a control whose whole effect on
+the measure is under the band its records are held to is not reaching the measure. Tightest
+headroom on the shipped pairs is `stemDiameter` at 4.3x the band, which is the same finding
+CG4's FALSE arm asserts.
+**ALL 64 CELLS ARE BIT-IDENTICAL BETWEEN NODE 20 (CI's) AND NODE 22** — measured with
+`Object.is`, worst |delta| exactly 0 — which matters because `bladeStations`' gap-bound blend
+BINDS on several of them (0.656, 0.920) and a bisection on a transcendental cumulative
+measure is where session 38 §B10.7 found two engines disagreeing. The band is not absorbing
+engine noise.
+**ZERO GEOMETRY: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js`, `bloom.html` and
+`bloom.css` are untouched by #263** — sha256-identical to a worktree of `937263a`, and
+measured as well: `verify-bloom-surface-bytes --base <worktree>` reads **PASS, 0 of
+836,485,992 export floats and 0 of 77,135,222 captured-grid values** over the 860-row matrix
+in both modes. No frozen phase is owed and no tag's bytes stop reproducing.
 
 ## Flower generator — print-safety is a hard invariant
 
