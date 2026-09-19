@@ -373,3 +373,134 @@ stops.
 * **No sheet is owed.** The range's endpoints are photographed by nothing new; what changed is
   reachability, and the states it reaches are the ones the matrix now builds and the gates now
   census.
+
+---
+
+## 6. The follow-up — the definition guard, narrowed, and then made to fire
+
+This section is #262's, landed after the ruling merged. It is here rather than in a doc of its
+own because the clause it is about is the one §3's two redefined rows go through, and the
+defect it fixes was found BY those two rows.
+
+### 6a. The false red
+
+`tools/verify-bloom-seam-bytes.mjs` carries two clauses over one guard, and they are not
+symmetric:
+
+* **UNDECLARED ROW REDEFINITION** — the two trees' rows differ and the label is in no
+  declaration. That is a matrix edit nobody wrote down, and comparing the two would report a
+  byte move that is an edit rather than a geometry change.
+* **DECLARED REDEFINITION THAT DID NOT HAPPEN** — the label IS declared and the two trees'
+  definitions are identical. That is a stale declaration, and it must come off in the same
+  commit as the matrix edit that ended it (the connectedness gate's own xfail rule, applied to
+  a row definition).
+
+The second fired on **`--matrix phase34 --change tilt`**, on `ALL MAX`, while that run's
+partition passed exactly as predeclared. It was a FALSE red, and the reason is ownership:
+`ROW_DEF_MOVED_BY_CHANGE` describes redefinitions of the **LIVE** matrix, whose rows read
+today's registry. A frozen matrix is a **verbatim literal snapshot** of its base commit's
+`buildMatrix()` — this file's own rule is that a label inside one is never edited — so a
+declared row's definition there is identical on both trees BY CONSTRUCTION, on every frozen
+run that names one, for every change that will ever exist. The clause was asking a question
+whose answer is fixed before any geometry is built.
+
+The fix is `&& which === 'live'` on that clause alone. **The UNDECLARED half stays unscoped on
+purpose**: a frozen matrix whose rows DIFFER between trees is a frozen matrix somebody edited,
+which this project forbids outright, and it must stay loud wherever it happens.
+
+### 6b. Why the argument was not enough, and what was built instead
+
+The ownership argument above is sound and it is also **exactly the shape of change that can
+silently stop a clause firing** — this file's fifth durable rule, a clause defining its subject
+so as to exclude the thing it doubts. A narrowed clause has no red to explain and no mutant to
+catch it: it is correct, in scope, and empty. #213 exists because fifteen regressions landed
+without a red, and the two green checks on that PR are FLOWER gates, which say nothing about
+any of this.
+
+So the clause is not trusted on inspection. **`--control-redef` is the must-fail**, and it
+plants BOTH conditions into the LIVE matrix and requires BOTH clauses to fire:
+
+* **(a) a genuine UNDECLARED redefinition** — the head's copy of a row that is in no
+  declaration is **relabelled AND re-valued**, which is the matrix edit nobody declared. Both
+  halves of `sigOf` move, because a plant that moved only the label would test half a guard.
+  The value is bumped to another legal number rather than to a sentinel: a plant that could not
+  be built is a plant nobody could promote into a real row.
+* **(b) a DECLARED redefinition THAT DID NOT HAPPEN** — the head's copy of a declared row is
+  given the **BASE's own set**, i.e. the matrix edit reverted with its declaration left behind.
+  It looks for the declared row whose LABEL held while its SET moved, which is the harder half
+  and the one `ALL MAX` is; a row whose label moved too would fall into (a) instead.
+
+**Nothing about the guard is restated in the control.** The plants are two row objects; the
+clauses that must fire are the two in the real loop, on the real live matrix, over all 852
+comparable rows in both modes. The run is a MUST-FAIL — the tool refuses the tree and prints
+its ordinary FAIL block — and the control then says whether that is the RIGHT red, exiting 0
+only if both planted clauses are among the findings. That is the repo's `--negative-control`
+convention, where a clean sweep of deliberate breakage is a pass.
+
+Two refusals, both of which would otherwise let the control pass by being empty:
+
+* **`--matrix <frozen>` is REFUSED.** Running the control against a frozen matrix would assert
+  the very false red the scope removed.
+* **A VACUOUS plant is REFUSED.** If no row is undeclared, carries a set and is identical on
+  the two trees, or if the change declares no row whose label held while its set moved, there
+  is nothing to plant and a control with nothing to plant cannot have been wrong.
+
+### 6c. The red, and the run that produced it
+
+`node tools/verify-bloom-seam-bytes.mjs --base <worktree of 0db9969> --change tilt --matrix live
+--added 8 --control-redef`. **A full live run** — 852 comparable rows plus the 8 added, both
+modes, **831,855,024 floats** compared positionally under `Object.is`, 23.5 minutes. Nothing is
+subsetted and nothing is short-circuited: the guard runs where it always runs, inside the row
+loop, on the real matrix.
+
+```
+  control-redef: PLANTED into the head's live matrix —
+      row 1: "petalCount 3" relabelled, and its "petalCount" moved 3 -> 4, declared NOWHERE -> the UNDECLARED clause must fire
+      row 106: "ALL MAX" is declared in ROW_DEF_MOVED_BY_CHANGE.tilt and is given the BASE's own set, so its definition no longer differs -> the DECLARED clause must fire
+  this run is a MUST-FAIL: the tool is expected to refuse the tree, and the FAIL block below is the evidence.
+
+live matrix, change "tilt": 852 comparable rows (+8 ADDED on the head, outside the partition), both modes, 831,855,024 floats compared positionally under Object.is
+  MOVED 28   HELD 823   REDEFINED 1
+
+FAIL — 4 finding(s):
+  UNDECLARED ROW REDEFINITION at row 1: "petalCount 3" on the base is "petalCount 3 — CONTROL: relabelled and re-valued, undeclared" here (or carries a different set) — declare it in ROW_DEF_MOVED_BY_CHANGE.tilt or the partition is over two different populations
+  DECLARED REDEFINITION THAT DID NOT HAPPEN: "ALL MAX" is declared in ROW_DEF_MOVED_BY_CHANGE.tilt and its definition is IDENTICAL on both trees — remove the entry in the same commit
+  the mover predicate answered on 850 of the 851 comparable rows — a partition over a subset is not a partition
+  "ALL MAX" is declared as a REDEFINED row and no row by that label differs between the trees — remove the entry in the same commit as the matrix edit
+
+CONTROL SATISFIED — the run is red, and both planted clauses are among the findings:
+  · UNDECLARED ROW REDEFINITION fired on row 1 (unscoped clause, fires on any matrix)
+  · DECLARED REDEFINITION THAT DID NOT HAPPEN fired on "ALL MAX" (the clause --matrix live scopes, firing on the live matrix)
+```
+
+**Two of the four findings are the evidence and two are collateral, and the control says which.**
+The collateral is named as a CLASS rather than enumerated, because which rows the plants land on
+decides it — an earlier wording asserted that the reverted row would ALSO be reported as a
+predeclared mover that held, and **on this tree it is not**: `ALL MAX` engages no role override,
+so the mover predicate answers FALSE for it on the base tree and it holds exactly as predicted.
+That was a message over-claiming a finding it had not measured, found by reading the run's output
+against the message rather than by anything failing, and corrected before the run that is pasted
+above.
+
+### 6d. The other direction — the frozen run that used to false-red
+
+`--matrix phase34 --change tilt --expect 28/750 --control --control-mode` now **PASSES**, and the
+useful part is that **every figure in its summary is identical to the pre-fix run's**: 778
+comparable rows, 773,040,528 floats, MOVED 28 / HELD 750 / REDEFINED 0, the partition exactly as
+predeclared, 6,185,970 foot values identical, both controls firing. The fix removed one finding
+and moved nothing else — which is the claim, measured rather than asserted.
+
+| | pre-fix | post-fix |
+|---|---|---|
+| partition | 28 moved / 750 held, exactly as predeclared | **identical** |
+| floats compared | 773,040,528 | **identical** |
+| foot values identical | 6,185,970 | **identical** |
+| `--control` (held row + 1e-9) | fired | fired |
+| `--control-mode` (planted mode finding) | fired, exactly once | fired, exactly once |
+| findings | **2** — the planted one, and the FALSE RED | **1** — the planted one |
+| verdict | FAIL (2 against a budget of 1) | **PASS** |
+
+**Neither run is in CI and neither can be**, for the tool's own reason: it takes a worktree of a
+BASE COMMIT, and which commit a session claims to have moved nothing since is the session's to
+name (`verify-bloom-presentation-only.mjs`'s precedent). The two green checks on #262 are the
+`tools/**`-filtered FLOWER gates; they test flower geometry and are evidence about none of this.
