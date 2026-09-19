@@ -3699,7 +3699,9 @@ tools/bloom-combination-gate.mjs` is the instrument: **one number — the NEARES
 MILLIMETRES between two surfaces that must not meet** — on a predeclared product grid,
 against `MIN_FEATURE_MM` (imported, never restated). It rides in
 `bloom-export-watertight.yml` BEFORE the browser install, beside the wall instrument, for
-that step's own three reasons; the bloom gate count stays at FIVE.
+that step's own three reasons; the bloom gate count stays at FIVE. **IT COSTS 71 s ON THE
+RUNNER** — 18 s for the gate and 53 s for its `--control`, measured from the gate's own step
+timings and NOT from the session box, which reads 14 s / 41 s and is 1.3x faster.
 **TWO MEASURES, EACH WITH ONE OWNER, NAMED PER PAIR:** `self` is `measureWall(grid).self`
 IMPORTED from `tools/bloom-wall-thickness.mjs` (V5's own quantity through V5's own function
 — a second implementation would agree with a broken one by being broken alongside it), and
@@ -3714,7 +3716,7 @@ BICONDITIONAL on each pair's `productOnly` — TRUE requires every single-axis c
 AND some interior cell to fail; FALSE requires a single-axis cell to fail. CG0 the grid · CG1
 per-axis reachability · CG2 the bar both ways · CG3 the magnitude both ways (#213) · CG5 a
 stray declaration.
-**TIER 1 ONLY SHIPS — five evidenced pairs, 64 cells, 13-14 s, and 20 declared cells**, each
+**TIER 1 ONLY SHIPS — five evidenced pairs, 64 cells, and 20 declared cells**, each
 with its magnitude as a number the gate reads (band ±5e-4 mm, the wall instrument's own) and
 re-measurable by `node tools/bloom-xfail-magnitudes.mjs --combination`. **Tiers 2 and 3 are
 proposed, MEASURED and COSTED in that doc and NOT built** — nine and six pairs, 25.9 s and

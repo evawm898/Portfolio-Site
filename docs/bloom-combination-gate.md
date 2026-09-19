@@ -233,7 +233,7 @@ instrument.** Two steps: the gate, then its must-fail.
 
 | | its own workflow | a step in `bloom-export-watertight` (**chosen**) |
 |---|---|---|
-| runner time | ~1 min job (checkout + setup-node + 13 s + 40 s) | **+53 s** on a job that already runs 138–250 min |
+| runner time | ~1.5 min job (checkout + setup-node + 18 s + 53 s) | **+71 s** on a job that already runs 138–250 min |
 | time to a GREEN signal | ~1 min | only when the whole job finishes — 138–250 min |
 | time to a RED signal | ~1 min | **under a minute** — the step is fourth in the job and a failing step fails the job at once |
 | what a red costs | nothing else | the matrix never runs, which is the point: three hours of Chromium on a tree that already fails a print-safety check |
@@ -259,18 +259,30 @@ this gate does not touch the harness.
 
 ## 7. Runtime, measured
 
-| | Node 22 (this box) | Node 20 (CI's) |
-|---|---|---|
-| the gate | 13.1 / 13.4 / 13.8 / 14.1 / 14.3 s | 12.7 / 13.5 s |
-| `--control` (nine plants) | 40.5 / 40.7 s | 39.2 s |
-| **added to a full PR** | **~55 s** | |
+| | Node 22 (this box) | Node 20 (this box) | **Node 20, the CI RUNNER** |
+|---|---|---|---|
+| the gate | 13.1 / 13.4 / 13.8 / 14.1 / 14.3 s | 12.7 / 13.5 s | **18 s** |
+| `--control` (nine plants) | 40.5 / 40.7 s | 39.2 s | **53 s** |
+| **added to a full PR** | ~55 s | | **71 s** |
+
+**THE RUNNER COLUMN IS THE ONE THAT MATTERS AND IT IS THE ONE MEASURED LAST**, from
+`bloom-export-watertight` run 35451329086's own step timings on the merge commit — 15:18:21 →
+15:18:39 and 15:18:39 → 15:19:32. It is **1.3×** the session box, which is the same-state
+discipline the charter asks for: both halves of a ratio taken in one state, and the state
+named. The earlier columns are kept because a later session comparing a local run against
+this table needs to know which box it is comparing with.
 
 **Read from `actions_list` at the time rather than from any figure in this repository — every
 constant written down for it has been superseded, so the method is the rule and the number is
 not.** The ten most recent COMPLETED SUCCESSFUL `bloom-export-watertight` runs, `run_started_at`
 → `updated_at`, read on Sep 19: **138.1 / 142.9 / 173.1 / 211.7 / 222.9 / 239.2 / 246.7 / 246.9 /
-247.1 / 250.1 min.** Against the median of those, **55 s is 0.4 % of the job**; against the
-fastest, 0.7 %.
+247.1 / 250.1 min.** Against the median of those, **71 s is 0.5 % of the job**; against the
+fastest, 0.9 %.
+
+**This PR's own run added an eleventh reading at 249.9 min** (15:17:06 → 19:26:57), a
+hair under the ceiling of the ten above. **Do not quote it, and do not add it to a constant
+somewhere** — it is recorded only as one more observation that the spread is what the rule
+says it is, and the rule is to read `actions_list` at the time.
 
 **All 64 cells are bit-identical between Node 20 and Node 22** — measured, `Object.is` over
 every cell, worst |delta| exactly 0. That matters because `bladeStations`' gap-bound blend
@@ -362,11 +374,13 @@ the newest baseline and **no tag's bytes stop reproducing**.
    buy the six product-only ones (**17.9 s**, 81 cells), or none.
 2. **Tier 3 — six pairs, 80 cells, 19.1 s.** Two are product-only failures, three clear,
    and one (`lobeDepth × curl`) costs 8.5 s to clear. Guesses, at a measured price.
-3. **The gate-time budget.** Tier 1 is **~55 s** including its must-fail (13-14 s of gate,
-   40.5-40.7 s of control). All three tiers together would be **59.0 s of gate** and, since the
-   control pays one baseline plus two grid-changing plants, roughly three times that again —
-   **about four minutes**, or **1.6 % of a median `bloom-export-watertight` run**. Still small,
-   and no longer a rounding error, which is why it is a ruling rather than a default.
+3. **The gate-time budget, on the CI runner's own figures.** Tier 1 is **71 s** including its
+   must-fail (18 s of gate, 53 s of control — measured on the runner, not on the session box).
+   All three tiers together would be **59.0 s of gate on the session box, so about 78 s on the
+   runner**, and since the control pays one baseline plus two grid-changing plants, roughly
+   three times that again — **about five minutes**, or **2.1 % of a median
+   `bloom-export-watertight` run**. Still small, and no longer a rounding error, which is why
+   it is a ruling rather than a default.
 
 **And what this gate does NOT do, by instruction:** it does not fix `cup × petalTipShape`,
 the leaf-against-stem approach, or the cup fold. Every one of them is now a declared
