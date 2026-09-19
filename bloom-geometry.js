@@ -1191,16 +1191,34 @@ export const ROLE_OVERRIDES = [
   { role: ROLE_INNER, base: 'petalSpineCurl',  control: 'innerCurl',       law: 'delta', min: -180, max: 360 },
   { role: ROLE_INNER, base: 'petalCup',        control: 'innerCup',        law: 'delta', min: -0.8, max: 1.2 },
 
+  /* THE `petalTilt` ENVELOPE IS 0..120 (Eva's re-issued ruling, Sep 19), AND
+     IT MOVED BECAUSE THE RANGE DID — one number in two files. Every bound in
+     this table IS the base control's own min/max; bloom-geometry.js cannot
+     import the registry, so tools/bloom-harness.mjs throws at module load if
+     the restatement and the registry disagree, which is what keeps this from
+     becoming a second owner. 120 is DERIVED (the seam window closes at
+     |cos th| = 1/2 exactly) and the FLOOR STAYS AT 0 (the descending fold
+     fires from -8 degrees); both derivations live at the `petalTilt` row in
+     bloom-registry.js, which is the control that owns the range.
+
+     HOLDING THIS NARROWER THAN THE RANGE IS WRONG, NOT MERELY REFUSED. The
+     composed value is clamped ONCE after composition, so a +5 delta on a base
+     of 120 would land at 125 and come back as 75 — a petal 45 degrees BELOW
+     its own whorl. Saturation is this project's ruled behaviour; a composed
+     value landing below its own base is a discontinuity in a shipped slider.
+     THE DELTA CONTROLS' OWN RANGES DID NOT MOVE: -75..75 is inside the
+     clamp's usable reach (-120..120), and the harness's dead-zone check
+     refuses a delta WIDER than the reach, never a narrower one. */
   /* SLOT ROLES — the orchid. Labellum 5, hood 3 (Eva, Sep 2). */
   { role: SLOT_LABELLUM, base: 'petalLength',     control: 'labellumSize',       law: 'mul',   min: 20,   max: 60 },
   { role: SLOT_LABELLUM, base: 'petalWidth',      control: 'labellumSize',       law: 'mul',   min: 8,    max: 30 },
-  { role: SLOT_LABELLUM, base: 'petalTilt',       control: 'labellumTilt',       law: 'delta', min: 0,    max: 75 },
+  { role: SLOT_LABELLUM, base: 'petalTilt',       control: 'labellumTilt',       law: 'delta', min: 0,    max: 120 },
   { role: SLOT_LABELLUM, base: 'petalCup',        control: 'labellumCup',        law: 'delta', min: -0.8, max: 1.2 },
   { role: SLOT_LABELLUM, base: 'petalSpineCurl',  control: 'labellumCurl',       law: 'delta', min: -180, max: 360 },
 
   { role: SLOT_HOOD, base: 'petalLength', control: 'hoodSize', law: 'mul',   min: 20,   max: 60 },
   { role: SLOT_HOOD, base: 'petalWidth',  control: 'hoodSize', law: 'mul',   min: 8,    max: 30 },
-  { role: SLOT_HOOD, base: 'petalTilt',   control: 'hoodTilt', law: 'delta', min: 0,    max: 75 },
+  { role: SLOT_HOOD, base: 'petalTilt',   control: 'hoodTilt', law: 'delta', min: 0,    max: 120 },
   { role: SLOT_HOOD, base: 'petalCup',    control: 'hoodCup',  law: 'delta', min: -0.8, max: 1.2 },
 
   /* ===================================================================
@@ -1245,7 +1263,7 @@ export const ROLE_OVERRIDES = [
     return [
       { role, base: 'petalLength',    control: c('Size'), law: 'mul',   min: 20,   max: 60 },
       { role, base: 'petalWidth',     control: c('Size'), law: 'mul',   min: 8,    max: 30 },
-      { role, base: 'petalTilt',      control: c('Tilt'), law: 'delta', min: 0,    max: 75 },
+      { role, base: 'petalTilt',      control: c('Tilt'), law: 'delta', min: 0,    max: 120 },
       { role, base: 'petalCup',       control: c('Cup'),  law: 'delta', min: -0.8, max: 1.2 },
       { role, base: 'petalSpineCurl', control: c('Curl'), law: 'delta', min: -180, max: 360 },
     ];

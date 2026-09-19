@@ -3,8 +3,8 @@
    (session 38, generalised session 39, widened by the arc-stability session)
 
      node tools/verify-bloom-seam-bytes.mjs --base <worktree>
-          [--change seam|widest|arc] [--matrix live|phase23]
-          [--expect <moved>/<held>] [--control] [--control-mode]
+          [--change seam|widest|arc|tilt] [--matrix live|phase23]
+          [--expect <moved>/<held>] [--added <n>] [--control] [--control-mode]
 
    THE FILE IS NAMED FOR ITS FIRST CALLER AND THE TOOL IS NOT. Every clause
    below is a property of a change to the BLADE'S SPINE that leaves the FOOT
@@ -19,6 +19,33 @@
    agreeing), so it rides here rather than in a fourth copy of this
    comparison. `--change` names whose declarations to use; adding another
    means one entry in TRI_COUNT_XFAIL_BY_CHANGE, not a new file.
+
+   THE FOURTH IS `tilt` (the tilt-range session), AND IT IS THE FIRST THAT
+   MOVES THE BLADE'S FRAME RATHER THAN ITS SPINE — the `petalTilt` envelope
+   opening 0..75 -> 0..120, so a composed role override that used to clamp at
+   75 now lands where it was asked. It rides here because the five claims are
+   the same five and every one of them is the reason this file exists: the
+   partition is predeclared from the builder's own clamp record, the shipping
+   default holds BY BRANCH (nothing composes there, so resolveRoleOverrides
+   returns null and petalStateFor hands back the caller's own object), the
+   FOOT is untouched because a role differentiates the BLADE and nothing else
+   (Z6's own claim, measured here rather than inherited), the topology is
+   fixed at NU x NV per panel, and the two modes must agree because which
+   station a blade starts at is topology.
+
+   AND IT IS THE FIRST CHANGE HERE TO REDEFINE A MATRIX ROW, which needed a
+   third class rather than a wider tolerance. `petalTilt` is a SWEEPABLE
+   slider, so block 1's `petalTilt max (75)` becomes `petalTilt max (120)` and
+   block 4's `ALL MAX` hands the same slider a different number under the same
+   label. Those rows have NO COUNTERPART on the base tree — comparing them
+   would be comparing two different states — so they are DECLARED in
+   ROW_DEF_MOVED_BY_CHANGE, reported as REDEFINED, and left out of the
+   moved/held partition. The run REFUSES an undeclared redefinition and
+   REFUSES a declared one whose definition turns out identical, so the
+   declaration cannot rot in either direction. It is the charter's own
+   session-5 finding — a corner row's MEANING can grow in the live matrix
+   while its frozen twin stays fixed, and the two are different rows sharing a
+   label — arriving with an instrument that says so.
 
    ONE THING IS STRONGER FOR `arc` THAN FOR THE OTHER TWO, and it is stated
    here because it is the difference between a partition and a count: the arc
@@ -102,7 +129,7 @@ const argv = process.argv.slice(2);
 const arg = (k, d = null) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] ? argv[i + 1] : d; };
 const baseDir = arg('--base');
 const frozenSweep = argv.includes('--frozen-sweep');
-if (!baseDir && !frozenSweep) { console.error('usage: --base <worktree of the base commit>  |  --change <c> --frozen-sweep'); process.exit(2); }
+if (!baseDir && !frozenSweep) { console.error('usage: --base <worktree of the base commit>  |  --change <c> --frozen-sweep [--base <worktree>]'); process.exit(2); }
 const which = arg('--matrix', 'live');
 const change = arg('--change', 'seam');
 const expect = arg('--expect');
@@ -175,6 +202,27 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
      omitted — the refusal below makes "no exceptions" something somebody had
      to write down. */
   arc: {},
+  /* THE TILT ENVELOPE MOVES THE SEAM TURN, AND THE SEAM TURN MOVES THE
+     LATTICE STEP — so `trimPanels()`'s row-index split can move on a CLEFT
+     row whose tilt the envelope reaches, exactly as it does for `seam` and
+     `widest`. FILLED FROM THE MEASUREMENT rather than predicted; an empty
+     table here would have been a guess wearing a declaration's clothes. */
+  tilt: {},
+};
+
+/* WHICH ROWS' DEFINITIONS MOVED — labels and/or set lists that differ between
+   the two trees, so the row has NO COUNTERPART to compare against. DECLARED
+   PER CHANGE, in the diff, for the same reason the triangle-count table is: a
+   redefinition the tool discovers is a redefinition nobody reviewed. A row
+   named here is REDEFINED — neither moved nor held — and is left out of the
+   partition; the run fails on an undeclared one AND on a declared one whose
+   definition turns out identical. */
+const ROW_DEF_MOVED_BY_CHANGE = {
+  seam: {}, widest: {}, arc: {},
+  tilt: {
+    'petalTilt max (120)': "block 1 sweeps every SWEEPABLE slider to its own max, so this row's label and value ARE the range; the base tree calls it `petalTilt max (75)`",
+    'ALL MAX': 'block 4 hands every SWEEPABLE slider its max at once, so this row carries petalTilt 120 here and 75 on the base — one label over two different states',
+  },
 };
 
 /* WHICH ROWS A CHANGE EXPECTS TO MOVE, READ OFF THE BASE TREE'S OWN BUILDER
@@ -198,7 +246,26 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
    to an assertion. (The record is in fact identical on both trees, since the
    fix touches no telemetry; reading the base's is what makes that not
    something this tool has to assume.) */
+/* FOR `tilt`: a row moves iff some BUILT ring's composed `petalTilt` was
+   clamped DOWNWARD by the envelope — `asked > got`, which on the base tree is
+   exactly `asked > 75` and therefore exactly the values the new ceiling lets
+   through. A clamp that bit UPWARD (a negative composed value held at 0) is
+   unchanged because the FLOOR did not move, and the predicate says that by
+   reading the DIRECTION rather than by naming a number.
+
+   IT IS READ OFF footRing()'s OWN `overrideClamped` TELEMETRY, on rings the
+   builder actually built — never off the control set and never off a label.
+   That matters most for the GATED rows: sixteen live rows set a tilt delta to
+   its maximum in a state where the role is not eligible, so nothing resolves,
+   no ring carries a record, and the predicate declares them HOLDERS. Their
+   inertness is then MEASURED by the partition rather than asserted by a
+   sentence. Sepals reach nothing here: `fr.sepals.ring` carries
+   `overrides: null` and `clamped: []` by construction, and a sepal's angle
+   travels in petalTilt's slot through `sepalBladeState` without passing the
+   envelope at all. */
 const MOVER_BY_CHANGE = {
+  tilt: (built) => (built.rings || []).some((r) => (r.overrideClamped || [])
+    .some((c) => c.base === 'petalTilt' && c.asked > c.got)),
   arc: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
     .some((p) => p && p.spine && p.spine.curlRad !== 0 && p.spine.uniform),
 };
@@ -209,6 +276,23 @@ if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
 const TRI_COUNT_XFAIL = TRI_COUNT_XFAIL_BY_CHANGE[change];
 const triXfailSeen = new Set();
 const MOVER_OF = MOVER_BY_CHANGE[change] || null;
+/* WHAT THE PREDICATE MEANS, in the words the failure messages should use —
+   the arc change's two sentences were the only ones here and they named its
+   own mechanism, so a second change would have reported a true statement
+   about the wrong quantity. */
+const MOVER_WHY = {
+  arc: ['a petal takes the uniform arc there', 'no built petal takes the uniform arc there'],
+  tilt: ["a built ring's composed petalTilt is clamped down by the base tree's envelope there",
+         "no built ring's composed petalTilt is clamped down by the base tree's envelope there"],
+}[change] || ["the base tree's record predeclares it", "the base tree's record does not predeclare it"];
+if (!(change in ROW_DEF_MOVED_BY_CHANGE)) {
+  console.error(`REFUSED: --change ${change} has no declared row-definition table. Add one (even an empty {}) rather than running without a declaration.`);
+  process.exit(2);
+}
+const ROW_DEF_MOVED = ROW_DEF_MOVED_BY_CHANGE[change];
+const rowDefSeen = new Set();
+const redefined = [];
+const sigOf = (r) => JSON.stringify([r.label, (r.set || []).map((w) => [w.id, String(w.value)]), r.capability || null]);
 const predicted = new Map();      // label -> true (predeclared mover) | false
 
 /* ===================================================================
@@ -225,17 +309,35 @@ const predicted = new Map();      // label -> true (predeclared mover) | false
    is quoted. It is a consequence of that proof, not a substitute for it, and
    a change with no predicate in MOVER_BY_CHANGE cannot use it at all.
 
-   It reads THIS tree's builder record. The record is untouched by any change
-   that rides here (none of them writes `spine`), and the two byte
-   comparisons are what establish that rather than this sweep assuming it.
+   WHOSE RECORD IT READS IS A PROPERTY OF THE CHANGE, NOT OF THIS TOOL, AND
+   GETTING THAT WRONG IS SILENT. For `seam`, `widest` and `arc` the record is
+   untouched by the change (none of them writes `spine`), so this tree's is
+   the base tree's and `--base` is optional. **For `tilt` it is NOT**: the
+   predicate reads `overrideClamped`, which is EXACTLY what the change writes.
+   On the head a composed tilt of 100 is no longer clamped at all, so
+   `asked > got` is FALSE there and every mover would report as a holder — a
+   sweep that answers 0 on a change that moves a thousand rows, with nothing
+   failing. So `--frozen-sweep --base <worktree>` builds on the BASE tree and
+   the run REFUSES a change whose predicate reads what it writes without one.
+   That is the fourth durable rule applied to a sweep: the prediction's owner
+   must not be the quantity under test.
    Rows whose controls were retired after their freeze still BUILD in Node —
    an unknown id in the state is inert to the geometry — so a baseline that
    can no longer be byte-re-exported through the page is still counted here.
    =================================================================== */
+/* CHANGES WHOSE MOVER PREDICATE READS WHAT THE CHANGE ITSELF WRITES. Declared,
+   so a new change has to decide rather than inherit a default that is wrong
+   half the time. */
+const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt']);
 if (frozenSweep) {
   if (!MOVER_OF) { console.error(`REFUSED: --change ${change} declares no mover predicate, so there is nothing to sweep with.`); process.exit(2); }
+  if (PREDICATE_READS_WHAT_THE_CHANGE_WRITES.has(change) && !B) {
+    console.error(`REFUSED: --change ${change}'s mover predicate reads the very record the change writes, so it must be evaluated on the BASE tree. Pass --base <worktree of the base commit>.`);
+    process.exit(2);
+  }
+  const T = PREDICATE_READS_WHAT_THE_CHANGE_WRITES.has(change) ? B : A;
   const names = Object.keys(A.H.FROZEN_MATRICES);
-  console.log(`--frozen-sweep, change "${change}": ${names.length} registered frozen matrices, this tree's builder record.
+  console.log(`--frozen-sweep, change "${change}": ${names.length} registered frozen matrices (this tree's), built on ${T === A ? "THIS tree's geometry" : `the BASE tree's geometry (${BASE}) — the predicate reads what this change writes`}.
 `);
   let tags = 0, rowsTotal = 0, moversTotal = 0, builds = 0;
   /* MEMOISED ON THE STATE, not on the label. A frozen matrix is a snapshot, so
@@ -248,13 +350,13 @@ if (frozenSweep) {
     const rows = A.H.FROZEN_MATRICES[name]();
     let n = 0, threw = 0;
     for (const row of rows) {
-      const st = stateFor(A.R.DEFAULTS, row);
+      const st = stateFor(T.R.DEFAULTS, row);
       const key = JSON.stringify([st, row.capability || null]);
       let v = memo.get(key);
       if (v === undefined) {
         builds++;
-        const acc = new A.G.MeshBuilder({ exportMode: true });
-        try { v = MOVER_OF(A.G.buildBloomInto(acc, st, { below: null, capability: row.capability || null })); }
+        const acc = new T.G.MeshBuilder({ exportMode: true });
+        try { v = MOVER_OF(T.G.buildBloomInto(acc, st, { below: null, capability: row.capability || null })); }
         catch { v = 'threw'; }
         memo.set(key, v);
       }
@@ -272,9 +374,28 @@ if (frozenSweep) {
 
 const rowsOf = (T) => which === 'live' ? T.H.buildMatrix() : T.H.FROZEN_MATRICES[which]();
 const rowsA = rowsOf(A), rowsB = rowsOf(B);
-if (rowsA.length !== rowsB.length) {
-  console.error(`REFUSED: the ${which} matrix has ${rowsA.length} rows here and ${rowsB.length} on the base — a partition over two different populations is not a partition.`);
+/* ROWS THE HEAD ADDED have no counterpart either, and unlike a REDEFINED row
+   they are not a matrix EDIT — they are new coverage. They must be APPENDED
+   (the base's rows keep their indices) and DECLARED as a count, so a row
+   inserted in the middle, or a row the BASE has and the head lost, is a
+   refusal rather than a silent re-pairing of everything after it. */
+const added = rowsA.length - rowsB.length;
+if (added < 0) {
+  console.error(`REFUSED: the ${which} matrix has ${rowsA.length} rows here and ${rowsB.length} on the base — a row was REMOVED, and a partition over two different populations is not a partition.`);
   process.exit(1);
+}
+if (added > 0) {
+  const want = arg('--added');
+  if (want === null) {
+    console.error(`REFUSED: the ${which} matrix has ${added} more row(s) here than on the base. Declare the count with --added ${added} — an addition the tool discovers is an addition nobody reviewed.`);
+    process.exit(2);
+  }
+  if (Number(want) !== added) {
+    console.error(`REFUSED: --added ${want} was declared and ${added} row(s) were found.`);
+    process.exit(1);
+  }
+  console.log(`  ${added} row(s) ADDED on the head, declared — they are appended and have no counterpart, so they are outside the partition:`);
+  for (const r of rowsA.slice(rowsB.length)) console.log(`      + ${r.label}`);
 }
 
 
@@ -285,9 +406,25 @@ const movers = [];
 
 for (const mode of ['export', 'live']) {
   const exportMode = mode === 'export';
-  for (let i = 0; i < rowsA.length; i++) {
+  for (let i = 0; i < rowsB.length; i++) {
     const row = rowsA[i];
-    if (row.label !== rowsB[i].label) { bad.push(`row ${i}: label differs between trees ("${row.label}" / "${rowsB[i].label}")`); continue; }
+    /* THE DEFINITION GUARD, and it is on the SET as well as the label — a row
+       whose label held while its values moved is the harder half (`ALL MAX`).
+       A declared redefinition is REPORTED and skipped; an undeclared one is a
+       failure, because comparing two different states under one label would
+       report a byte move that is a matrix edit rather than a geometry one. */
+    const same = sigOf(row) === sigOf(rowsB[i]);
+    if (!same) {
+      if (mode === 'export') {
+        if (!(row.label in ROW_DEF_MOVED)) {
+          bad.push(`UNDECLARED ROW REDEFINITION at row ${i}: "${rowsB[i].label}" on the base is "${row.label}" here (or carries a different set) — declare it in ROW_DEF_MOVED_BY_CHANGE.${change} or the partition is over two different populations`);
+        } else { rowDefSeen.add(row.label); redefined.push(row.label); }
+      }
+      continue;
+    }
+    if (row.label in ROW_DEF_MOVED && mode === 'export') {
+      bad.push(`DECLARED REDEFINITION THAT DID NOT HAPPEN: "${row.label}" is declared in ROW_DEF_MOVED_BY_CHANGE.${change} and its definition is IDENTICAL on both trees — remove the entry in the same commit`);
+    }
     let pa, pb;   // reassigned to the position arrays below
     try { pa = buildOn(A, row, exportMode); pb = buildOn(B, rowsB[i], exportMode); }
     catch (e) { bad.push(`row ${i} (${row.label}) [${mode}]: build threw — ${e && e.message || e}`); continue; }
@@ -395,19 +532,31 @@ if (MOVER_OF) {
     if (want && !got) wrongHold.push(label);
     if (!want && got) wrongMove.push(label);
   }
-  if (predicted.size !== rowsA.length) bad.push(`the mover predicate answered on ${predicted.size} of ${rowsA.length} rows — a partition over a subset is not a partition`);
+  if (predicted.size !== rowsB.length - redefined.length) bad.push(`the mover predicate answered on ${predicted.size} of the ${rowsB.length - redefined.length} comparable rows — a partition over a subset is not a partition`);
   const declared = [...predicted.values()].filter(Boolean).length;
-  if (!declared) bad.push(`the mover predicate declares NO row a mover — a vacuous predeclaration cannot be wrong`);
-  for (const l of wrongHold.slice(0, 10)) bad.push(`PREDECLARED MOVER HELD: "${l}" — the base tree's own record says a petal takes the uniform arc there and not one float moved`);
-  for (const l of wrongMove.slice(0, 10)) bad.push(`UNDECLARED MOVER: "${l}" — no built petal takes the uniform arc there and its bytes moved anyway`);
+  /* "NO ROW MOVES" IS A LEGITIMATE ANSWER ON AN OLD FROZEN BASELINE whose
+     rows cannot reach the change at all, so this is discharged the same way
+     the vacuity guard beside it is — by `--control` or an explicit
+     `--expect`, either of which has shown the run could have said otherwise.
+     Bare, it still fails, which is what it was written for. */
+  if (!declared && !control && !expect) bad.push(`the mover predicate declares NO row a mover, and neither --control nor --expect ran — a vacuous predeclaration cannot be wrong`);
+  for (const l of wrongHold.slice(0, 10)) bad.push(`PREDECLARED MOVER HELD: "${l}" — the base tree's own record says ${MOVER_WHY[0]} and not one float moved`);
+  for (const l of wrongMove.slice(0, 10)) bad.push(`UNDECLARED MOVER: "${l}" — ${MOVER_WHY[1]} and its bytes moved anyway`);
   if (wrongHold.length > 10) bad.push(`... and ${wrongHold.length - 10} further predeclared movers that held`);
   if (wrongMove.length > 10) bad.push(`... and ${wrongMove.length - 10} further undeclared movers`);
-  if (!wrongHold.length && !wrongMove.length) console.log(`  the MOVER SET is exactly as the base tree's builder record predeclares it: ${declared} rows build a uniform curled arc, and those are the ${movedSet.size} rows whose bytes moved.`);
+  if (!wrongHold.length && !wrongMove.length) console.log(`  the MOVER SET is exactly as the base tree's builder record predeclares it, in both directions: ${declared} rows where ${MOVER_WHY[0]}, and those are the ${movedSet.size} rows whose bytes moved.`);
 }
 
-const movedRows = movers.length, heldRows = rowsA.length - movedRows;
-console.log(`\n${which} matrix, change "${change}": ${rowsA.length} rows, both modes, ${floats.toLocaleString()} floats compared positionally under Object.is`);
-console.log(`  MOVED ${movedRows}   HELD ${heldRows}   (per row, export; live agrees on every row or this run has already failed)`);
+/* A DECLARED REDEFINITION THAT STOPPED HAPPENING IS A MATRIX EDIT LANDING,
+   and its entry must come off in the same commit — the connectedness gate's
+   own xfail rule, applied to a row definition. */
+if (which === 'live') for (const l of Object.keys(ROW_DEF_MOVED)) {
+  if (!rowDefSeen.has(l)) bad.push(`"${l}" is declared as a REDEFINED row and no row by that label differs between the trees — remove the entry in the same commit as the matrix edit`);
+}
+const movedRows = movers.length, heldRows = rowsB.length - redefined.length - movedRows;
+console.log(`\n${which} matrix, change "${change}": ${rowsB.length} comparable rows${added ? ` (+${added} ADDED on the head, outside the partition)` : ''}, both modes, ${floats.toLocaleString()} floats compared positionally under Object.is`);
+console.log(`  MOVED ${movedRows}   HELD ${heldRows}   REDEFINED ${redefined.length}   (per row, export; live agrees on every row or this run has already failed)`);
+if (redefined.length) console.log(`  redefined (no counterpart on the base tree, declared): ${redefined.map((l) => `"${l}" — ${ROW_DEF_MOVED[l]}`).join('; ')}`);
 if (expect) {
   const [wm, wh] = expect.split('/').map(Number);
   if (movedRows !== wm || heldRows !== wh) bad.push(`PARTITION: predeclared ${wm} moved / ${wh} held, measured ${movedRows} / ${heldRows}`);

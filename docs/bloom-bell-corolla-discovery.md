@@ -570,10 +570,14 @@ did not ship, that is stated with what stopped it.
    put the ring panel third in the build order on the assumption the question would be
    answered; half of it is, and the half that would schedule Q2/Q3 is not.
 
-2. **Q2 (the tilt range) — RULED, AND NOT SHIPPED.** The ruling: **`petalTilt` opens from
-   0–75 to −30..120. Clamp only — the seam law ships unchanged, the default stays 25 and the
-   foot does not move.** Two things go with it, and both are recorded here rather than in a
-   code comment, because the code change did not land:
+2. **Q2 (the tilt range) — RE-ISSUED AND SHIPPED AS `0..120`, Sep 19. The `−30` FLOOR IS
+   WITHDRAWN.** The Sep 17 ruling was `−30..120`; it was measured rather than built (§1 and §2
+   of `docs/bloom-tilt-range-outcome.md`), the measurements were put back to Eva, and she
+   re-issued it: **`petalTilt` opens from 0–75 to 0..120. The floor stays at 0. The default
+   stays 25. The foot does not move. The seam law ships unchanged.** Shipped in
+   `docs/bloom-tilt-range-shipped.md`'s own session; the range lives at the `petalTilt` row in
+   `bloom-registry.js` and its restatement as the role-override envelope in
+   `bloom-geometry.js`'s `ROLE_OVERRIDES`.
 
    * **120 IS DERIVED, NOT TYPED, and it must not be rounded to a friendlier number later.**
      The clearance past a right angle is a WINDOW rather than a wall: the first blade row's
@@ -582,7 +586,8 @@ did not ship, that is stated with what stopped it.
      that window is non-empty iff `2cos²θ + |cos θ| − 1 ≤ 0`, i.e. **|cos θ| ≤ ½, θ ≤ 120°
      exactly**. §4 above is the derivation and the 22-row scratch probe that confirms it, row
      by row, against a prediction written from the closed form before the census ran. PR #210's
-     measured crossover of 115–123° is that window closing.
+     measured crossover of 115–123° is that window closing. The derivation is now in the
+     comment that owns the range, so a later session finds it at the number rather than here.
    * **THE SEAM-LAW EXTENSION WAS CONSIDERED AND REJECTED.** Replacing the saturation past 90°
      with the window's lower bound clears the flat folds inside the window — §4's own table:
      93°–100° fall from 341/338/338/339/339 pairs to span-0 touches of 2–7, 105° goes 336 → 0
@@ -592,36 +597,35 @@ did not ship, that is stated with what stopped it.
      every curled row and buys a second regime in a law that has one. **It is not wanted.**
      Recorded so a future session finds the rejection rather than proposing it as an obvious
      improvement.
-
-   **WHY IT DID NOT SHIP — two measured stop conditions, both of which the brief itself wrote
-   down.** Full numbers in `docs/bloom-tilt-range-outcome.md`:
-
-   * **−30 REACHES THE DESCENDING SEAM FOLD, AND SO DO ANGLES FAR SHORT OF IT.** Swept at one
-     degree over 22 states, the within-shell census leaves zero at **−8° on six whorls at the
-     thickest sheet**, −9° on a six-turn continuous head, −10°, −16° on three states including
-     six whorls at the SHIPPING sheet, and at −17 / −22 / −23 / −28 / −29 on five more; nine
-     states are clean to −30. EXPORT and LIVE agree on the first firing angle on all twelve
-     states checked in both modes, every worst site sits at exactly `z = −t/2` (the foot slab's
-     underside), and the same `|θ|` read UP is **0 pairs on 13 of 13 probes** — so it is the
-     descending case `docs/bloom-sepals-outcome.md` §8 handed to the seam owner, not the
-     clearance's own regime. **§2's own "tilt −30 … 0 pairs at cup 0" cell reproduces**: it is
-     true of the DEFAULTS petal, and the premise that carried it into the ruling generalised one
-     state to the range. **A shallower floor is not the answer either** — the shallowest onset
-     is −8, so a clean floor is −7, which reaches no reflexed form at all.
-   * **THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE NUMBER.** `ROLE_OVERRIDES` restates
-     `petalTilt`'s `0..75` as the clamp for `labellumTilt`, `hoodTilt` and the nine
-     `petalNTilt` rows, and the harness throws at module load if the two disagree; and holding
-     the envelope at 0..75 under a wider base is not merely refused, it is wrong — a `+5°`
-     delta on a base of 120 would compose to 125 and clamp back to **75**, dropping that petal
-     45° below its whorl. So the envelope widens with the range, and that **moves 43 live rows
-     (18 worse on the census, of which eleven go from clean to 42–84 pairs, and 23 crossing 90°
-     for the first time) and 1,072 rows across 27 frozen baselines** — seventeen declared
-     magnitudes to re-record and eleven to declare for the first time. "Prove the existing
-     matrix is 0 moved" is therefore not reachable.
-
-   **Neither is a reason the ruling is wrong; both are reasons it needs re-issuing with the
-   numbers in front of it.** The options are priced in §4 of the outcome doc. Nothing was
-   quietly clamped somewhere else, and the cup bound (ruling 5) was not touched.
+   * **THE FLOOR STAYS AT 0, AND WHY IS THE HALF THAT MUST NOT BE RE-OPENED.** Opening it to
+     −30 was ruled on Sep 17 and measured on Sep 19: swept at one degree over 22 states, the
+     within-shell census leaves zero at **−8° on six whorls at the thickest sheet**, −9° on a
+     six-turn continuous head, −10°, −16° on three states including six whorls at the SHIPPING
+     sheet, and at −17 / −22 / −23 / −28 / −29 on five more; nine states are clean to −30.
+     EXPORT and LIVE agree on the first firing angle on all twelve states checked in both
+     modes, every worst site sits at exactly `z = −t/2` (the foot slab's underside), and the
+     same `|θ|` read UP is **0 pairs on 13 of 13 probes** — so it is the descending case
+     `docs/bloom-sepals-outcome.md` §8 handed to the seam owner, not the clearance's own
+     regime. **A shallower floor is not the answer either**: the shallowest onset is −8, so a
+     clean floor is −7, a seventh of the ruled travel and short of any reflexed form. **§2's
+     own "tilt −30 … 0 pairs at cup 0" cell reproduces and is true of the DEFAULTS petal
+     alone** — do not re-open the floor from it. A descending petal is the SEAM OWNER's work,
+     not a range's, and it stays unscheduled.
+   * **THE ENVELOPE MOVED WITH THE RANGE, because they are one number in two files.**
+     `ROLE_OVERRIDES` restates `petalTilt`'s bounds as the clamp for `labellumTilt`,
+     `hoodTilt` and the nine `petalNTilt` rows, and the harness throws at module load if the
+     two disagree. Holding the envelope at 0..75 under a wider base is not merely refused, it
+     is wrong — a `+5°` delta on a base of 120 would compose to 125 and clamp back to **75**,
+     dropping that petal 45° below its whorl. What that costs, and the exact partition it
+     produced, is `docs/bloom-tilt-range-shipped.md`. The ceiling-only ruling reaches a strict
+     SUBSET of what `−30..120` would have moved, because a composed value below 0 clamps to 0
+     under both envelopes: **28 of the 43 live rows with a clamp biting, and 722 of the 1,072
+     frozen rows #259 predicted** — measured, and stated as the two counts rather than as a
+     fraction, because #259's own §4(iii) said "it would halve §2's BYTE cost" and what was
+     measured here is ROWS.
+   * **WHAT IS NOT IN THIS RULING:** the cup bound (ruling 5) is untouched, nothing was clamped
+     somewhere else, and the seam law's saturation past 90° is character for character what it
+     was.
 
 3. **Q3 — STILL OPEN, and downstream of Q1's unanswered half.** Whether a corolla coexists with
    the petals through a fusion fraction cannot be ruled before Q1 says whether the corolla is
@@ -641,6 +645,7 @@ did not ship, that is stated with what stopped it.
 7. **Q7 — MOOT. #243 merged as `eb2aaa7`.** The sequencing caveat that closed this document is
    spent: sepals part 1 is on `main`, and a build session no longer waits for it.
 
-*The rulings on Q1 and Q2 are Eva's, made Sep 17. Q2's implementation is the work of a later
-session, on a re-issued ruling; `docs/bloom-tilt-range-outcome.md` is what that session starts
-from.*
+*The rulings on Q1 and Q2 are Eva's. Q1's and Q2's first form were made Sep 17; Q2 was
+re-issued as `0..120` on Sep 19 after the two stop conditions were measured, and that is the
+form that shipped. `docs/bloom-tilt-range-outcome.md` is the measurement record that stopped
+the first form, and `docs/bloom-tilt-range-shipped.md` is what the second one cost.*

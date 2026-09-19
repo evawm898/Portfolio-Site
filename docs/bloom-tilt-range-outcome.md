@@ -1,5 +1,14 @@
 # The tilt range ruling — recorded, measured, and NOT shipped
 
+> **SUPERSEDED IN PART, Sep 19.** Eva re-issued the ruling with these measurements in front
+> of her: **`petalTilt` opens to `0..120` and the `−30` floor is WITHDRAWN.** That shipped —
+> `docs/bloom-tilt-range-shipped.md` is what it cost, and `docs/bloom-bell-corolla-discovery.md`
+> §9 item 2 carries the re-issued ruling. **Nothing below is retracted.** §1 is why the floor
+> did not move and is the record a future session needs before re-opening it; §2's envelope
+> finding is why the range and the clamp are one number, and its 43-row figure is the
+> `−30..120` cost — the ceiling-only ruling reaches a strict SUBSET of it, exactly as §4(iii)
+> predicted, and the shipped doc measures which. §4's options are spent.
+
 *Sep 19, 2026. The session opened to ship Eva's Sep 17 ruling that `petalTilt` opens from
 0–75 to −30..120, and to put the bell/corolla discovery's rulings into the repository. **The
 second half shipped; the first did not.** Two of the brief's own stop conditions fired, both
