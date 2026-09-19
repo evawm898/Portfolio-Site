@@ -546,3 +546,101 @@ visible bell costs none of them.
 6. **A "hanging" view preset** as view chrome, so the panel can show the object the way this
    sheet does — or not.
 7. **#243 sequencing:** this doc collides with nothing; any build session waits for it.
+
+---
+
+## 9. RULINGS (Eva, Sep 17, 2026 — on the seven questions above)
+
+**EVA'S RULINGS ARE MADE OUTSIDE THIS REPOSITORY, AND A RULING THAT IS NOT WRITTEN INTO A DOC
+DOES NOT EXIST AS FAR AS ANY SESSION IS CONCERNED.** That is why this section exists, and why
+it was owed the moment the rulings were made rather than when the code that implements them
+lands. This document shipped on Sep 17 with seven ranked questions and no rulings section; the
+tilt ruling was made the same day and, for two days, lived nowhere a session could read it.
+A later session opening on `#245` would have found the questions and re-asked them.
+
+Each entry below is a RULING, not a recommendation. Where one contradicts a recommendation
+made above, the contradiction is named in a line rather than edited around. Where the ruling
+did not ship, that is stated with what stopped it.
+
+1. **Q1 — PARTLY RULED. The shipped hung head IS a bell; the fused corolla is still open.**
+   Tilt 75 × cup 0.6 × curl −45 for the lip (§2 rows A–C) is accepted as a bell, so
+   **free-petal bells are the shipped answer and cost no build.** Whether Eva also wants the
+   seamless tube — a corolla with a real throat, which §2's overlap-closed tulip only imitates
+   — is **not decided**, so **the corolla primitive is NOT scheduled**. *Against the doc:* §0
+   put the ring panel third in the build order on the assumption the question would be
+   answered; half of it is, and the half that would schedule Q2/Q3 is not.
+
+2. **Q2 (the tilt range) — RULED, AND NOT SHIPPED.** The ruling: **`petalTilt` opens from
+   0–75 to −30..120. Clamp only — the seam law ships unchanged, the default stays 25 and the
+   foot does not move.** Two things go with it, and both are recorded here rather than in a
+   code comment, because the code change did not land:
+
+   * **120 IS DERIVED, NOT TYPED, and it must not be rounded to a friendlier number later.**
+     The clearance past a right angle is a WINDOW rather than a wall: the first blade row's
+     `+N` skin must clear the foot's top plane (`s₁ ≥ a(1+|cos θ|)/sin θ`) while the seam
+     panel's `−N` skin must not pass through the foot's own slab (`s₁ ≤ a·sin θ/|cos θ|`), and
+     that window is non-empty iff `2cos²θ + |cos θ| − 1 ≤ 0`, i.e. **|cos θ| ≤ ½, θ ≤ 120°
+     exactly**. §4 above is the derivation and the 22-row scratch probe that confirms it, row
+     by row, against a prediction written from the closed form before the census ran. PR #210's
+     measured crossover of 115–123° is that window closing.
+   * **THE SEAM-LAW EXTENSION WAS CONSIDERED AND REJECTED.** Replacing the saturation past 90°
+     with the window's lower bound clears the flat folds inside the window — §4's own table:
+     93°–100° fall from 341/338/338/339/339 pairs to span-0 touches of 2–7, 105° goes 336 → 0
+     at both blade lengths and at five petals, and 108°–115° read **0 on all ten probes** — and
+     it **makes the closed regime worse where it can do nothing**: 120°, where the window is a
+     single point, goes **336 → 576**, and 122° goes **336 → 592**. It also moves bytes on
+     every curled row and buys a second regime in a law that has one. **It is not wanted.**
+     Recorded so a future session finds the rejection rather than proposing it as an obvious
+     improvement.
+
+   **WHY IT DID NOT SHIP — two measured stop conditions, both of which the brief itself wrote
+   down.** Full numbers in `docs/bloom-tilt-range-outcome.md`:
+
+   * **−30 REACHES THE DESCENDING SEAM FOLD, AND SO DO ANGLES FAR SHORT OF IT.** Swept at one
+     degree over 22 states, the within-shell census leaves zero at **−8° on six whorls at the
+     thickest sheet**, −9° on a six-turn continuous head, −10°, −16° on three states including
+     six whorls at the SHIPPING sheet, and at −17 / −22 / −23 / −28 / −29 on five more; nine
+     states are clean to −30. EXPORT and LIVE agree on the first firing angle on all twelve
+     states checked in both modes, every worst site sits at exactly `z = −t/2` (the foot slab's
+     underside), and the same `|θ|` read UP is **0 pairs on 13 of 13 probes** — so it is the
+     descending case `docs/bloom-sepals-outcome.md` §8 handed to the seam owner, not the
+     clearance's own regime. **§2's own "tilt −30 … 0 pairs at cup 0" cell reproduces**: it is
+     true of the DEFAULTS petal, and the premise that carried it into the ruling generalised one
+     state to the range. **A shallower floor is not the answer either** — the shallowest onset
+     is −8, so a clean floor is −7, which reaches no reflexed form at all.
+   * **THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE NUMBER.** `ROLE_OVERRIDES` restates
+     `petalTilt`'s `0..75` as the clamp for `labellumTilt`, `hoodTilt` and the nine
+     `petalNTilt` rows, and the harness throws at module load if the two disagree; and holding
+     the envelope at 0..75 under a wider base is not merely refused, it is wrong — a `+5°`
+     delta on a base of 120 would compose to 125 and clamp back to **75**, dropping that petal
+     45° below its whorl. So the envelope widens with the range, and that **moves 43 live rows
+     (18 worse on the census, of which eleven go from clean to 42–84 pairs, and 23 crossing 90°
+     for the first time) and 1,072 rows across 27 frozen baselines** — seventeen declared
+     magnitudes to re-record and eleven to declare for the first time. "Prove the existing
+     matrix is 0 moved" is therefore not reachable.
+
+   **Neither is a reason the ruling is wrong; both are reasons it needs re-issuing with the
+   numbers in front of it.** The options are priced in §4 of the outcome doc. Nothing was
+   quietly clamped somewhere else, and the cup bound (ruling 5) was not touched.
+
+3. **Q3 — STILL OPEN, and downstream of Q1's unanswered half.** Whether a corolla coexists with
+   the petals through a fusion fraction cannot be ruled before Q1 says whether the corolla is
+   wanted at all. The table in Q3 above stands as the costing.
+
+4. **Q4 — STILL OPEN.** Nodding on a single head with a straight stem is orientation and not
+   geometry; the question of whether to accept that, or to build the oblique root as a stopgap
+   and photograph it, is not answered.
+
+5. **Q5 — STILL OPEN.** The axis-curvature session is costed above and is not scheduled here.
+   (The inflorescence doc's own ruling 8 orders it *after* the bell work, which this ruling does
+   not move.)
+
+6. **Q6 — STILL OPEN.** Nothing in this project has been printed; the overhang and pedicel
+   readings stand as comparisons against lines we drew ourselves.
+
+7. **Q7 — MOOT. #243 merged as `eb2aaa7`.** The sequencing caveat that closed this document is
+   spent: sepals part 1 is on `main`, and a build session no longer waits for it.
+
+*The rulings on Q1 and Q2 are Eva's, made Sep 17. Q2's implementation is the work of a later
+session, on a re-issued ruling; `docs/bloom-tilt-range-outcome.md` is what that session starts
+from.*

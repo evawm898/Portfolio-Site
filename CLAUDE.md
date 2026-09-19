@@ -3252,6 +3252,40 @@ letter of that and not its purpose. **The number that matters is the one at the 
 matrix can reach, and on this generator that corner is `ALL MAX`.**
 
 
+**THE TILT RANGE IS RULED AT −30..120 AND HAS NOT SHIPPED — TWO MEASURED STOPS, AND `petalTilt`
+IS STILL 0..75** (Sep 19 — read `docs/bloom-tilt-range-outcome.md` before re-opening it, and
+`docs/bloom-bell-corolla-discovery.md` §9 for the ruling itself). Eva ruled the range on Sep 17
+with the seam law unchanged, the default at 25 and the foot untouched; **120 is DERIVED** — the
+clearance past a right angle is a WINDOW, `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|`, non-empty
+iff `|cos θ| ≤ ½`, i.e. **θ ≤ 120° exactly**, which is PR #210's measured 115–123° crossover
+closing — and **the seam-law extension was considered and REJECTED** (it clears the window's
+inside and takes 120° from 336 to 576 pairs and 122° from 336 to 592; do not re-propose it).
+**WHAT STOPPED IT, both measured on the shipped builder.** (i) **−30 REACHES THE DESCENDING
+SEAM FOLD AND SO DO FAR SHALLOWER ANGLES** — swept at 1° over 22 states, the within-shell census
+leaves zero at **−8° on six whorls at the thickest sheet**, −9° on a six-turn continuous head,
+−10°, −16° on three states including six whorls at the SHIPPING sheet, and at −17 / −22 / −23 /
+−28 / −29 on five more; nine states are clean to −30, DEFAULTS among them, which is why the
+discovery sheet's own "tilt −30 … 0 pairs" cell reproduces and generalised ONE state. **So a
+shallower floor is not the answer either: the shallowest onset is −8, so a floor clean on all 22
+is −7 — a seventh of the ruled travel, and short of the reflexed shooting-star / cyclamen form
+the floor was opened for.** DEPTH is the strongest lever and the sheet the second,
+and the pair is invisible to the matrix by construction (one control at a time — §18a's
+sentence on a third pair). EXPORT and LIVE agree on the first firing angle on all twelve states
+checked in both modes, every worst site sits at exactly `z = −t/2` (the
+slab's UNDERSIDE), and the same `|θ|` read UP is **0 pairs on 13 of 13** — the clearance is
+symmetric in the tilt (`Math.abs`) and the fold is not, so it is the sepal session's descending
+case and not the clearance's regime. (ii) **THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE
+NUMBER**: `ROLE_OVERRIDES` restates `petalTilt`'s 0..75 as the clamp for `labellumTilt`,
+`hoodTilt` and the nine `petalNTilt` rows and the harness THROWS at module load if they
+disagree — and holding it narrower is not merely refused but wrong, since a `+5°` delta on a
+base of 120 would compose to 125 and clamp back to **75**, dropping that petal 45° below its
+whorl. So the envelope widens with the range and **43 live rows move** (18 worse, **eleven from
+clean to 42–84 pairs**, 23 crossing 90° for the first time; triangle counts unchanged on all 43)
+along with **1,072 rows across 27 frozen baselines** — seventeen declared magnitudes to
+re-record and eleven to declare. **"Prove the existing matrix is 0 moved" is not reachable**, and
+the ruling needs re-issuing with these numbers in front of it; the options are priced in §4 of
+the outcome doc. **Nothing was clamped somewhere else and the cup bound was not touched.**
+
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
 touching `bladeStations`, `seamClearanceMm` or A7). The defect session 35 filed under the
