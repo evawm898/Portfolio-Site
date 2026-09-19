@@ -49,6 +49,12 @@
      node tools/bloom-xfail-magnitudes.mjs --emit          print the entries this tree measures, in list form
      node tools/bloom-xfail-magnitudes.mjs --root <tree>   measure ANOTHER tree's geometry against THIS tree's list
      node tools/bloom-xfail-magnitudes.mjs --control       the must-fail: one record perturbed each way, the clause must fire
+   `--wall` and `--combination` ADD A SECTION; they do not SCOPE the run, so
+   either one on its own still sweeps every self-intersection row first. To
+   read one section alone, scope the sweep away with a regex that matches no
+   label: `--combination --only '^$'`. Said here because #263's doc called
+   `--combination` re-measurable "in seconds", which is the SECTION's cost and
+   not the invocation's.
    Exits non-zero on any declared row that does not measure its record, on
    a declared row the matrix no longer has, and on a control that does not fire.
    =================================================================== */
