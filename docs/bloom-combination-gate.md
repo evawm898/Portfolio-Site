@@ -392,20 +392,58 @@ code state both machines have measured.
 
 ### This box (Node 22), the whole fifteen-pair set
 
-| | runs | median |
-|---|---|---|
-| the gate (262 cells, 20 pairs) | see §11 | |
-| `--control` (nineteen legs) | see §11 | |
-| TIER 1 alone, the 64 cells #263 shipped | see §11 | |
+| | run 1 | run 2 | median |
+|---|---|---|---|
+| the gate (262 cells, 20 pairs) | 88.10 s | 87.83 s | **87.97 s** |
+| `--control` (nineteen legs) | 95.94 s | 94.75 s | **95.34 s** |
+| TIER 1 alone, the 64 cells #263 shipped | 20.06 s | 20.22 s | **20.14 s** |
 
-*(filled from the close-out's own measurements; see §11)*
+*(idle box, two passes each, `--only` scoping the tier-1 row to #263's five pairs. The
+spread across passes is 0.27 s on the gate and 1.19 s on the control, so these are
+measurements rather than single draws.)*
+
+**TWO RATIOS COME OUT OF THAT TABLE AND ONLY ONE OF THEM IS ABOUT SIZE.**
+
+**The gate is 4.37x its own tier-1 subset** (87.97 / 20.14) against **4.09x the cells**
+(262 / 64) — very nearly linear in cells, with the small excess being the fixed per-run
+module load.
+
+**The control is 1.08 BASELINES on this tree and was 2.9 on #263's** (95.34 / 87.97 here;
+53 / 18 on the runner there). **That is a change of STRUCTURE, not of magnitude**, and it
+is the independent corroboration of §8's claim about the two grid-changing legs: seventeen
+of nineteen legs reuse the baseline's measurements, and the two that cannot are `--only`-
+scoped to the single pair they plant into, so the whole must-fail costs one baseline plus
+about seven seconds. #263's own §10 projected "about three baselines" for all three tiers
+on the unscoped design, and that projection is what the scoping retired.
+
+**`--control` DOES NOT HONOUR `--only`** — it calls `control({})` unscoped — so a
+"tier-1 control" is not measurable through the shipped CLI, and on inspection it is not
+even well defined: the nineteen legs plant into pairs across all three tiers. The control
+row above is therefore the whole must-fail on both trees, and the ratio that carries
+forward is the BASELINE MULTIPLE rather than a cell count.
 
 ### The runner
 
 The definitive figure is **this PR's own `bloom-export-watertight` step timings**, read from
-the run that gated the merge, and it is in §11. Until it existed, the projection was this
-box's measurement divided by this box's own relation to the runner, derived from tier 1 —
-the one code state both have run.
+the run that gated the merge, and it is in §11. Until it existed, the projection was built
+from ratios whose two halves come from the SAME machine, applied to the runner's own
+measured tier-1 figures — never from this box's absolute seconds, which is the error the
+withdrawn 1.3x embodies:
+
+| | runner, TIER 1 (#263, measured) | expanded, PROJECTED | basis |
+|---|---|---|---|
+| the gate | 18 s | **~79 s** | x4.37, this box's own full/tier-1 ratio |
+| `--control` | 53 s | **~85 s** | x1.08 baselines, this box's own control/gate ratio |
+| both steps | 71 s | **~164 s** | |
+
+So the expansion is projected to add **~93 s** to a job whose matrix step runs for hours —
+**about 1.1% of a ~250-minute run, against 0.5% before**. That is the arithmetic behind
+Eva's ruling that runtime is not the cost, carried out on the shipped set rather than on
+the candidates.
+
+**THE PROJECTION IS NOT THE CLAIM AND IS SUPERSEDED BY §11'S MEASUREMENT.** It is recorded
+because a projection that is never checked against the thing it predicts is how a constant
+becomes folklore here.
 
 **Read the job's total from `actions_list` at the time rather than from any figure in this
 repository — every constant written down for it has been superseded, so the method is the
@@ -551,5 +589,42 @@ this:
 
 ## 11. The close (#265)
 
-*Filled at the close-out. Every figure here is this session's own box unless it says the
-runner.*
+*Every figure here is this session's own box unless it says the runner.*
+
+**WHAT SHIPPED.** All fifteen pairs #263 proposed, taking the gate from 5 pairs to 20:
+**5 tier-1 · 9 tier-2 · 6 tier-3, 262 cells, 78 declared cells across sixteen pairs**, and
+three clauses the expansion forced (CG4 three-valued, CG6 provenance, CG7 the inert record).
+
+**THE GRIDS ARE THE ONES EVA RULED ON.** #263 costed its candidates through `run()` and
+committed none of them, so the ladders were reconstructed and then checked against a table a
+different session wrote on a different box: every `worst` figure and every failing-cell count
+in both tier tables reproduces exactly — 0.914/2, 1.194/clears, 0.659, 0.818/3, 0.828/5,
+0.477/4, 0.010, 0.012/7, 0.754/8, 0.000, 1.200, 0.932/2, 0.924/4, 1.012, 1.226.
+
+**THE MEASUREMENTS.**
+
+| | |
+|---|---|
+| the gate | **87.97 s** median (88.10 / 87.83), CG0-CG7 clean |
+| `--control` | **95.34 s** median (95.94 / 94.75), **19 of 19 legs fired**, exit 0 |
+| `bloom-xfail-magnitudes --combination --only '^$'` | **78 ok, 0 stale** |
+| Node 20 (CI's) vs Node 22 | **262 of 262 cells `Object.is`-equal**, worst \|delta\| exactly 0 |
+| byte partition | **PASS — 0 floats moved** over 836,485,992 export floats / 92,942,888 triangles and 77,135,222 captured-grid values, 860 rows x 2 modes |
+| frozen phase | **none owed**; no row added or removed, `frozen/phase35` stays the newest baseline, no tag's bytes stop reproducing |
+
+**THE RUNNER'S OWN FIGURE REPLACES §7's PROJECTION ONCE THE GATE HAS RUN**, read from this
+PR's `bloom-export-watertight` step timings. The projection was ~79 s for the gate and ~85 s
+for the control.
+
+**AND A COUNT THAT LIVED ONLY IN PROSE HAD ALREADY DRIFTED BEFORE ANYONE READ IT.** This
+session wrote "78 declared cells across ELEVEN pairs" into four documents; the shipped list
+declares across **sixteen**. No clause was wrong — CG2, CG3 and CG5 each hold every
+individual declaration in both directions, and none of them has an opinion about how many
+pairs carry one. **Counting the shipped list is what found it**, and two further
+restatements fell to the same method: "262 cells over all FIFTEEN pairs" (it is twenty — the
+sentence contradicted itself) and a per-pair tier-1 breakdown written in the wrong row order.
+The remedy is this project's own rule from `/plot`: **a number nobody prints is a number
+nobody watches.** The gate prints `N cell(s) under the bar, M of them declared, across K
+pair(s)` on every run, counted from the cells THAT RUN measured rather than from the length
+of the list, so a `--only` subset reports its own subset and a doc quoting the figure can be
+checked against a run.

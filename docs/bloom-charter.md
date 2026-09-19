@@ -6251,6 +6251,29 @@ matters should be measured this way.
       sentence contradicted itself) and a per-pair breakdown written in the wrong row order.
       **Before quoting a count that lives in prose, count the thing.**
 
+    - **THE RUNTIME RATIO WAS RE-DERIVED, NOT CARRIED, AND THE CONTROL'S COST CHANGED
+      STRUCTURE RATHER THAN MAGNITUDE.** #263's 1.3x is runner / *that* box and #265 ran on a
+      different machine (its tier-1 code: 13.1-14.3 s there, **20.14 s** here), so the
+      projection was built from ratios whose two halves come from ONE machine and then applied
+      to the runner's own measured tier-1 figures. Idle box, two passes each: gate **87.97 s**,
+      `--control` **95.34 s**, tier-1 alone **20.14 s**. The gate is **4.37x** its tier-1
+      subset against 4.09x the cells; the control is **1.08 baselines** where #263's was
+      **2.9** — which is the independent corroboration that the two grid-changing legs are
+      `--only`-scoped. Projected: ~164 s of step time, about 1.1% of a ~250-minute run.
+      **`--control` does not honour `--only`**, so a "tier-1 control" is not measurable through
+      the shipped CLI and is not well defined — the nineteen legs plant across all three tiers.
+
+    - **THE BYTE PARTITION: PASS, 0 FLOATS MOVED** over 836,485,992 export floats /
+      92,942,888 triangles and 77,135,222 captured-grid values, the whole 860-row matrix in
+      both modes, positionally under `Object.is`, against a worktree of `c29a8b5`. The five
+      bloom source files were predeclared untouched before a line was written and are
+      sha256-identical to that worktree, so the stream is identical BY CONSTRUCTION and the
+      measurement sits beside the construction rather than instead of it. **No frozen phase is
+      owed** — no row added or removed, `frozen/phase35` stays the newest baseline, no tag's
+      bytes stop reproducing. **Both clauses are shown able to fail**: `--control --rows 6`
+      exits 1 with TWO findings, one per clause, which is what stops the captured-grid clause
+      being a log line.
+
     - **`--combination` ADDS A SECTION RATHER THAN SCOPING THE RUN.** `bloom-xfail-magnitudes`
       still sweeps all 261 self-intersection rows first, so the re-measurement invocation is
       `--combination --only '^$'`. #263's doc called it re-measurable "in seconds"; that was the

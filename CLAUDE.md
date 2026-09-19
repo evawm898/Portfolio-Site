@@ -3813,6 +3813,24 @@ on ONE cell of the 262 — and a CG3 red in CI cannot be an engine artefact.
 invocation is `node tools/bloom-xfail-magnitudes.mjs --combination --only '^$'`** — without
 the `--only` the tool sweeps all 261 self-intersection rows first. #263's doc said "in
 seconds" and that was the section's cost, not the invocation's.
+**THE RUNTIME IS TWO RATIOS AND ONLY ONE IS ABOUT SIZE; #263's 1.3x DOES NOT TRANSFER AND
+WAS RE-DERIVED RATHER THAN CARRIED.** That figure is runner / *#263's* box, and #265 ran on
+a different machine — the SAME tier-1 code #263 timed at 13.1-14.3 s takes **20.14 s**
+here, so quoting 1.3x would have been two halves from two machines, which is the error the
+charter's own rule names. Idle box, two passes each: **the gate 87.97 s** (88.10 / 87.83),
+**`--control` 95.34 s** (95.94 / 94.75), **tier-1 alone 20.14 s** (20.06 / 20.22).
+**The gate is 4.37x its tier-1 subset against 4.09x the cells** — near-linear, the excess
+being module load. **The control is 1.08 BASELINES where #263's was 2.9** (53/18 on the
+runner), which is a change of STRUCTURE and the independent corroboration that the two
+grid-changing legs are `--only`-scoped: seventeen of nineteen reuse the baseline.
+**`--control` does NOT honour `--only`** (it calls `control({})` unscoped), so a "tier-1
+control" is not measurable through the shipped CLI and is not well defined anyway — the
+nineteen legs plant across all three tiers — which is why the carried-forward ratio is the
+BASELINE MULTIPLE and not a cell count. Projected onto the runner's OWN tier-1 figures
+(18 s / 53 s): **~79 s + ~85 s = ~164 s, about 1.1% of a ~250-minute run against 0.5%
+before.** **Read the actual step timings off the PR's own gate run rather than quoting the
+projection** — a projection never checked against what it predicts is how a constant becomes
+folklore here.
 **ZERO GEOMETRY, PREDECLARED THEN MEASURED.** `bloom-geometry.js`, `bloom-registry.js`,
 `bloom.js`, `bloom.html` and `bloom.css` were named untouched before a line was written and
 are sha256-identical to a worktree of the base commit at close, so the exported stream is
