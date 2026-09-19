@@ -51,7 +51,19 @@ export const RING_LAG = 0.13;      // each inner ring trails the front by this m
 // so the storm stops being an escalation. Getting the density from LIFE and
 // SIZE as well reaches 92% covered on 23 drops in the air, half the rain for
 // twice the water. See rollRipple for the skew, which costs no extra draw.
-export const DROP_RIPPLE = { maxR: [10, 170], life: [3.0, 8.0], strength: [0.24, 0.58], rings: 2 };
+//
+// LIFE WAS SHORTENED AGAIN, IDLE ONLY: at [3.0, 8.0] the slowest quarter of
+// idle ripples sat on screen for the better part of ten seconds, well past
+// the point a real drop's ring has actually spread and faded, and read as the
+// surface visually dominated by a handful of ripples that would not leave.
+// [1.8, 4.5] roughly halves both ends and still keeps `life` correlated to
+// `maxR` (rollRipple below), so the largest, slowest-fading rings are still
+// the largest and slowest — they just stop taking twice as long to die as
+// everything else on the pond. STORM_RIPPLE is untouched: a storm ripple is
+// already an order of magnitude shorter-lived by construction, and
+// `lerpRippleTable` reads DROP_RIPPLE only at intensity 0, so nothing here
+// reaches a storm or downpour ripple at all.
+export const DROP_RIPPLE = { maxR: [10, 170], life: [1.8, 4.5], strength: [0.24, 0.58], rings: 2 };
 export const STORM_RIPPLE = { maxR: [14, 46], life: [0.6, 1.6], strength: [0.20, 0.44], rings: 2 };
 export const CLICK_RIPPLE = { maxR: [104, 132], life: [2.1, 2.5], strength: [0.95, 1.0], rings: 3 };
 
