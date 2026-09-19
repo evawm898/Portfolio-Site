@@ -8,7 +8,8 @@
    without a red (the seam session, PR #210). The gates now hold each
    declared row to its recorded magnitude — X1 in both STL gates for
    SELF_INTERSECTION_XFAIL, XR1 for EXPORT_REFUSED_XFAIL, V5 and V4 in the
-   wall instrument for its own two records. Those clauses run on the full
+   wall instrument for its own two records, and CG2/CG3 in the combination
+   gate for COMBINATION_XFAIL (#263). Those clauses run on the full
    matrix in CI, which is a 3.5-hour answer. This tool is the SAME clauses
    run in Node in minutes, with no browser: it is how a session that
    legitimately moves a declared row's magnitude (a ladder change, a hub
@@ -44,6 +45,7 @@
      node tools/bloom-xfail-magnitudes.mjs --only <regex>  a subset (matrix-level claims are not made)
      node tools/bloom-xfail-magnitudes.mjs --include-refused   ALL MAX too (2.4M triangles; minutes, no export needed here)
      node tools/bloom-xfail-magnitudes.mjs --wall          the wall instrument's two records beside its readings
+     node tools/bloom-xfail-magnitudes.mjs --combination   the combination gate's cell records beside its readings
      node tools/bloom-xfail-magnitudes.mjs --emit          print the entries this tree measures, in list form
      node tools/bloom-xfail-magnitudes.mjs --root <tree>   measure ANOTHER tree's geometry against THIS tree's list
      node tools/bloom-xfail-magnitudes.mjs --control       the must-fail: one record perturbed each way, the clause must fire
@@ -63,6 +65,7 @@ const INCLUDE_REFUSED = argv.includes('--include-refused');
 const EMIT = argv.includes('--emit');
 const CONTROL = argv.includes('--control');
 const WALL = argv.includes('--wall');
+const COMBINATION = argv.includes('--combination');
 const JSON_OUT = argv.includes('--json');
 
 /* THE LIST AND THE CLAUSE COME FROM THIS TREE'S HARNESS; the GEOMETRY from
@@ -167,6 +170,25 @@ if (WALL) {
   }
   for (const r of rows.filter((x) => x.xfail)) console.log(`  ${Math.abs(r.ownDeficit - r.xfail.ownDeficitMm) <= W.SELF_XFAIL_TOLERANCE_MM ? 'ok   ' : 'MOVED'} V4 xfail   ${r.id.padEnd(16)} costs ${r.ownDeficit.toFixed(3)} mm · declared ${r.xfail.ownDeficitMm.toFixed(3)} ±${W.SELF_XFAIL_TOLERANCE_MM}`);
   for (const f of fails) bad.push(`wall: ${f}`);
+}
+
+if (COMBINATION) {
+  /* THE COMBINATION GATE'S CELL RECORDS (#263), beside what it reads now —
+     through its own shipped `verify`, whose CG2/CG3 clauses ARE the gate.
+     Nothing here restates a clause or a band: a tool restating the gate's
+     statement is a second owner, and the day they drift the tool is green
+     on a red gate. */
+  const C = await load(HERE, 'tools/bloom-combination-gate.mjs');
+  const { fails, rows: cRows, bar } = await C.verify({ root: ROOT, quiet: true });
+  const read = new Map();
+  for (const { grid } of cRows) for (const cell of grid.flat()) read.set(cell.key, cell.mm);
+  console.log(`\ncombination gate (EXPORT mode, the shipped grid; bar ${bar.toFixed(2)} mm):`);
+  for (const [key, e] of Object.entries(C.COMBINATION_XFAIL)) {
+    const got = read.get(key);
+    const mark = got === undefined ? 'GONE ' : Math.abs(got - e.mm) <= C.COMBINATION_TOLERANCE_MM ? 'ok   ' : 'MOVED';
+    console.log(`  ${mark} ${key.padEnd(52)} reads ${got === undefined ? '—' : got.toFixed(3)} mm \u00b7 declared ${e.mm.toFixed(3)} +/-${C.COMBINATION_TOLERANCE_MM}`);
+  }
+  for (const f of fails) bad.push(`combination: ${f}`);
 }
 
 if (EMIT) {
