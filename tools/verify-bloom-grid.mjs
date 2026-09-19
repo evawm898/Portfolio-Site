@@ -431,10 +431,14 @@ async function run(geomUrl, gltfUrl, registryUrl) {
     /* 4b — the frame step across the seam IS petalTilt, on a flat hub. Pinned
        so that a change moving the junction could not pass as "the grid is
        fine": the ruling to keep the s = 0 row was made knowing this step is
-       the tilt and nothing else. */
+       the tilt and nothing else. 120 is here because the tilt range opened to
+       it (Sep 19) and the new ceiling is past a RIGHT ANGLE, where the two
+       normals' dot product goes negative — the one arithmetic the clause had
+       never been handed. Measured exactly 120.000000 before it was added, as
+       0 / 25 / 75 / 90 / 105 all are. */
     const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
     const nrm = (a) => Math.hypot(a[0], a[1], a[2]);
-    for (const tilt of [0, 25, 75]) {
+    for (const tilt of [0, 25, 75, 120]) {
       const acc = new MeshBuilder({ exportMode: false, captureGrid: true });
       const b = buildBloomInto(acc, { ...DEFAULTS, petalTilt: tilt });
       const g = b.petalsAll[0].grid[0].rows, nF = b.petalsAll[0].footRows;

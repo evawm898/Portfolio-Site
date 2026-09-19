@@ -3252,39 +3252,72 @@ letter of that and not its purpose. **The number that matters is the one at the 
 matrix can reach, and on this generator that corner is `ALL MAX`.**
 
 
-**THE TILT RANGE IS RULED AT −30..120 AND HAS NOT SHIPPED — TWO MEASURED STOPS, AND `petalTilt`
-IS STILL 0..75** (Sep 19 — read `docs/bloom-tilt-range-outcome.md` before re-opening it, and
-`docs/bloom-bell-corolla-discovery.md` §9 for the ruling itself). Eva ruled the range on Sep 17
-with the seam law unchanged, the default at 25 and the foot untouched; **120 is DERIVED** — the
-clearance past a right angle is a WINDOW, `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|`, non-empty
-iff `|cos θ| ≤ ½`, i.e. **θ ≤ 120° exactly**, which is PR #210's measured 115–123° crossover
-closing — and **the seam-law extension was considered and REJECTED** (it clears the window's
-inside and takes 120° from 336 to 576 pairs and 122° from 336 to 592; do not re-propose it).
-**WHAT STOPPED IT, both measured on the shipped builder.** (i) **−30 REACHES THE DESCENDING
-SEAM FOLD AND SO DO FAR SHALLOWER ANGLES** — swept at 1° over 22 states, the within-shell census
-leaves zero at **−8° on six whorls at the thickest sheet**, −9° on a six-turn continuous head,
-−10°, −16° on three states including six whorls at the SHIPPING sheet, and at −17 / −22 / −23 /
-−28 / −29 on five more; nine states are clean to −30, DEFAULTS among them, which is why the
-discovery sheet's own "tilt −30 … 0 pairs" cell reproduces and generalised ONE state. **So a
-shallower floor is not the answer either: the shallowest onset is −8, so a floor clean on all 22
-is −7 — a seventh of the ruled travel, and short of the reflexed shooting-star / cyclamen form
-the floor was opened for.** DEPTH is the strongest lever and the sheet the second,
-and the pair is invisible to the matrix by construction (one control at a time — §18a's
-sentence on a third pair). EXPORT and LIVE agree on the first firing angle on all twelve states
-checked in both modes, every worst site sits at exactly `z = −t/2` (the
-slab's UNDERSIDE), and the same `|θ|` read UP is **0 pairs on 13 of 13** — the clearance is
-symmetric in the tilt (`Math.abs`) and the fold is not, so it is the sepal session's descending
-case and not the clearance's regime. (ii) **THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE
-NUMBER**: `ROLE_OVERRIDES` restates `petalTilt`'s 0..75 as the clamp for `labellumTilt`,
-`hoodTilt` and the nine `petalNTilt` rows and the harness THROWS at module load if they
-disagree — and holding it narrower is not merely refused but wrong, since a `+5°` delta on a
-base of 120 would compose to 125 and clamp back to **75**, dropping that petal 45° below its
-whorl. So the envelope widens with the range and **43 live rows move** (18 worse, **eleven from
-clean to 42–84 pairs**, 23 crossing 90° for the first time; triangle counts unchanged on all 43)
-along with **1,072 rows across 27 frozen baselines** — seventeen declared magnitudes to
-re-record and eleven to declare. **"Prove the existing matrix is 0 moved" is not reachable**, and
-the ruling needs re-issuing with these numbers in front of it; the options are priced in §4 of
-the outcome doc. **Nothing was clamped somewhere else and the cup bound was not touched.**
+**`petalTilt` IS 0..120 NOW, 120 IS DERIVED, AND THE FLOOR STAYS AT 0** (Eva's re-issued ruling,
+Sep 19 — read `docs/bloom-tilt-range-shipped.md`, then §1 of `docs/bloom-tilt-range-outcome.md`
+before re-opening the floor, and `docs/bloom-bell-corolla-discovery.md` §4 for the derivation and
+§9 item 2 for the ruling). The default stays 25, the FOOT does not move, and **`seamClearanceMm`
+is character for character what it was** — the saturation past 90° stays, so 120 is a ceiling on
+the RANGE and not a change of regime; the window-lower-bound extension is costed and REJECTED in
+the discovery doc and must not be re-proposed. **120 IS WHERE THE SEAM WINDOW CLOSES, NOT A ROUND
+NUMBER**: past a right angle the clearance is a WINDOW, `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|`,
+non-empty iff `|cos θ| ≤ ½` — **θ ≤ 120° EXACTLY**, one point at 120 — and PR #210's measured
+115–123° crossover is that window closing. Do not round it later.
+**THE −30 FLOOR OF Sep 17 IS WITHDRAWN AND ITS REASON IS THE HALF THAT MUST NOT BE RE-OPENED**:
+swept at one degree over 22 states the within-shell census leaves zero at **−8°** on six whorls at
+the thickest sheet, −16° on six whorls at the SHIPPING sheet, and at −9 / −10 / −17 / −22 / −23 /
+−28 / −29 on the rest; every worst site is at exactly `z = −t/2` (the foot slab's UNDERSIDE) and
+the same `|θ|` read UP is **0 pairs on 13 of 13** — the DESCENDING seam case, which is the seam
+owner's work and is unscheduled. A shallower floor is not the answer: the shallowest onset is −8,
+so a clean floor is −7. The discovery doc's own "tilt −30 … 0 pairs" cell reproduces and is true
+of the DEFAULTS petal alone.
+**THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE NUMBER IN TWO FILES** — `ROLE_OVERRIDES`
+restates `petalTilt`'s bounds for `labellumTilt`, `hoodTilt` and the nine `petalNTilt` rows and the
+harness THROWS at module load if they disagree; holding it narrower is wrong, not merely refused
+(a +5° delta on a base of 120 would compose to 125 and clamp back to 75, dropping that petal 45°
+below its whorl). **The delta CONTROLS stayed at −75..75** — the dead-zone check refuses a delta
+WIDER than the clamp's reach, never a narrower one.
+**THE PARTITION: 28 MOVED / 822 HELD / 2 REDEFINED of the 852-row live matrix, +8 ADDED** —
+predeclared from the BASE tree's own `overrideClamped` record by DIRECTION (`asked > got` is the
+ceiling; `asked < got` is the floor and does not move). **#259 measured 43 rows with the clamp
+biting and this ruling reaches 28 of them; the other 15 are floor-only and are named in the
+shipped doc** — #259 §4(iii)'s own prediction, measured. Census: **17 WORSE / 10 better / 1 same
+count**, **eleven rows go clean → folded at exactly #259's own magnitudes**, sixteen declared
+magnitudes re-recorded, and **triangle counts unchanged on all 28**. The two REDEFINED rows are
+`petalTilt max (75)` → `petalTilt max (120)` and `ALL MAX` (one label, two states) — declared in
+`ROW_DEF_MOVED_BY_CHANGE`, which REFUSES an undeclared redefinition and a declared one that did
+not happen.
+**`ALL MAX` GETS SUBSTANTIALLY WORSE AND IT IS REPORTED, NOT TUNED AROUND: 129,803 → 192,270
+pairs (+48%) at an UNMOVED 3.1556 mm worst span**, its deepest ring going 165° → 210°. More
+contacts, none deeper. Its triangle count is unmoved at 2,506,652, so its declared export
+refusal is untouched. Trimming the row would make it stop meaning its own label.
+**BLOCK 36 IS THE PAST-90 REGIME THE BASE CONTROL NOW REACHES** (8 rows, both STL gates, 3 smoke
+rows). **TWO OF THEM READ EXACTLY 0 PAIRS AND ARE HELD THERE BY X2** — `TILT: 76` (the first
+newly reachable value, still under the right angle) and `TILT: 90` (where the law saturates) —
+so the block is not a set of rows that all happen to be declared. **`TILT: 105` reads 336 /
+0.4016, reproducing the discovery doc's own T1 cell** — measured there on a scratch tree with a
+LIFTED clamp, here through the shipped slider.
+**AND `verify-bloom-grid.mjs`'s clause 4b GAINED 120** — its "the seam frame step IS `petalTilt`"
+probe was written down at 0 / 25 / 75, all under a right angle, so the case where the two normals'
+dot goes NEGATIVE had never been handed to it. Reads exactly 120.000000.
+**`frozen/phase35` IS THE 852 ROWS AT `0db9969`** and a phase IS owed: the row set changed
+(two definitions moved, block 36 appended eight, 852 → 860). Every one of the 33 older frozen
+matrices deep-compares IDENTICAL between the trees — they pin the literal 75, which is what a
+verbatim snapshot is for.
+**THE SWEEP READS 722 OF 17,081 FROZEN ROWS OVER 28 OF THE 34 BASELINES**, against #259's
+predicted **1,072 over 27** for the withdrawn `-30..120` — and the two agree with the live
+partition to within a row: **722 - 28 (phase35, which did not exist then) = 694, and 694 / 1,072
+= 0.647 against the live matrix's own 28 / 43 = 0.651.** phase2..phase7 read EXACTLY 0 (no role
+override block yet), the count climbs 2 / 2 / 20 / 27 / 27 as the SLOT, per-petal and ORCHID rows
+arrive, and **saturates at 28 from phase13 on and never moves again** — the live mover count
+reached by an instrument that shares no code with the partition. A phase whose row count FELL
+(phase16, phase22) still reads 28: the retirements took no tilt row with them.
+**AND A MOVER PREDICATE THAT READS WHAT ITS OWN CHANGE WRITES CANNOT BE EVALUATED ON THE CHANGED
+TREE.** `verify-bloom-seam-bytes.mjs --frozen-sweep` read THIS tree's builder record — true of
+`seam`, `widest` and `arc`, none of which writes `spine`, and FALSE of `tilt`, whose predicate
+reads `overrideClamped`: on the head a composed 100 is not clamped at all, so **every mover would
+have reported as a holder and the sweep would have answered 0 in silence.** It builds on the BASE
+tree for a declared set of changes now and REFUSES without one. Fourth durable rule, applied to a
+sweep rather than to an assertion.
 
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before

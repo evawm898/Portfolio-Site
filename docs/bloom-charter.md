@@ -6031,3 +6031,104 @@ matters should be measured this way.
   low amplitude AND narrow. p = 1 is out of range rather than discouraged — |v| is not
   differentiable at 0, so it creases the midrib to C0. Amplitude's dead travel runs 0% at
   f 1-2 to **88% at f 7**, told and marked, range not narrowed (`stamenSpread`'s ruling).
+
+- **The tilt range (Sep 19): `petalTilt` OPENS TO `0..120`, THE `−30` FLOOR IS WITHDRAWN, AND
+  THE RANGE IS THE ROLE-OVERRIDE ENVELOPE.** Eva's ruling of Sep 17 was `−30..120`; #259
+  measured it, did not ship it, and put two stop conditions back to her; she re-issued it as
+  `0..120`. Full account: `docs/bloom-tilt-range-shipped.md`, with `docs/bloom-tilt-range-outcome.md`
+  as the measurement record that stopped the first form and `docs/bloom-bell-corolla-discovery.md`
+  §4 and §9 item 2 as the derivation and the ruling. Two literals and their restatement; the
+  seam law is untouched.
+
+    - **120 IS DERIVED AND MUST NOT BE ROUNDED.** Past a right angle the foot-to-blade
+      clearance is a WINDOW rather than a wall — `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|` —
+      non-empty iff `2cos²θ + |cos θ| − 1 ≤ 0`, i.e. **|cos θ| ≤ ½, θ ≤ 120° exactly**, a single
+      point at 120. PR #210's measured 115–123° crossover is that window closing, and a 22-row
+      scratch probe confirmed the closed form row by row against a prediction written first.
+      **The seam-law extension to the window's lower bound stays REJECTED** (it clears the folds
+      inside the window and makes the closed regime worse: 120° goes 336 → 576 pairs, 122° goes
+      336 → 592) — the derivation bounds the RANGE, it does not change the LAW.
+
+    - **THE FLOOR STAYS AT 0, AND THAT IS A MEASUREMENT RATHER THAN CAUTION.** Swept at one
+      degree over 22 states, the within-shell census leaves zero at **−8°** on six whorls at the
+      thickest sheet and −16° on six whorls at the SHIPPING sheet, with seven more onsets
+      between; every worst site is at exactly `z = −t/2`, the foot slab's UNDERSIDE, and the
+      same `|θ|` read UP is **0 pairs on 13 of 13**. It is the DESCENDING seam case the sepal
+      session handed to the seam owner, and the clearance law — symmetric in the tilt by
+      `Math.abs` — was never derived for it. A shallower floor buys nothing: the shallowest
+      onset is −8, so a clean floor is −7, a seventh of the ruled travel. **Do not re-open it
+      from the discovery doc's own "tilt −30 … 0 pairs" cell**: that cell reproduces and is true
+      of the DEFAULTS petal alone, which is the rationale-is-a-premise rule firing on a table row.
+
+    - **THE RANGE AND THE ENVELOPE ARE ONE NUMBER IN TWO FILES, AND HOLDING THEM APART IS WRONG
+      RATHER THAN MERELY REFUSED.** A +5° delta on a base of 120 would compose to 125 and clamp
+      back to 75 — a petal 45° BELOW its own whorl, which is a discontinuity in a shipped slider
+      and not the saturation this project ships elsewhere. The delta CONTROLS stayed at −75..75:
+      the harness's dead-zone check refuses a delta WIDER than the clamp's usable reach and says
+      nothing about a narrower one.
+
+    - **THE PARTITION IS 28 MOVED / 822 HELD / 2 REDEFINED / 8 ADDED, AND THE 28 ARE A SUBSET
+      #259 PREDICTED.** The mover set is predeclared from the BASE tree's own `overrideClamped`
+      record by DIRECTION — `asked > got` is the ceiling and moves, `asked < got` is the floor
+      and does not, because the floor did not move. #259 measured 43 rows with the clamp biting;
+      28 are ceiling, 15 are floor, 0 are both, and the 15 are named. **The eleven clean-to-folded
+      rows reproduce #259's magnitudes to the pair and to four decimals of the span**, through a
+      different instrument (#259 mutated `OVERRIDE_BOUNDS` in process; this session changed the
+      shipped literals and compared two trees). Triangle counts unchanged on all 28.
+
+    - **`ALL MAX` GETS 48% WORSE AND IS REPORTED RATHER THAN TUNED AROUND**: 129,803 → 192,270
+      pairs at an UNMOVED 3.1556 mm worst span, its deepest ring 165° → 210°. More contacts,
+      none deeper. Triangle count unmoved at 2,506,652, so its declared export refusal stands.
+      Trimming the row would make it stop meaning its own label — the session-13 ruling.
+
+    - **BLOCK 36 IS THE REGIME THE BASE CONTROL NOW REACHES, AND TWO OF ITS EIGHT ROWS READ
+      EXACTLY ZERO.** `TILT: 76` is the first newly reachable value and is still under the right
+      angle; `TILT: 90` is where `seamClearanceMm` stops following `sin` and holds at `t/2`. Both
+      are held to zero by X2, so the block is not a set of rows that all happen to be declared.
+      **`TILT: 105` reads 336 / 0.4016 — the discovery doc's own T1 cell, measured there on a
+      scratch tree with a LIFTED clamp and here through the shipped slider.**
+
+    - **`verify-bloom-grid.mjs`'s CLAUSE 4b GAINED THE NEW CEILING, one literal.** It pins *the
+      frame step across the seam IS `petalTilt`* at written-down tilts, and all three were under
+      a right angle — so the case where the two normals' dot product goes NEGATIVE had never been
+      exercised. Measured exactly 120.000000 (as 90 and 105 also are) before the literal was
+      added. The values are written down rather than read off the control's `max`, which is why
+      the range change did not move the clause on its own: extending it is a deliberate act, and
+      a probe list that tracked the control would have widened itself and proved nothing new.
+
+    - **`frozen/phase35` IS THE 852 ROWS AT `0db9969` AND A PHASE IS OWED** — the ROW SET
+      changed (`petalTilt max (75)` → `(120)`, `ALL MAX` over a different state, block 36's eight
+      appended), which is the session-13 and session-31 case rather than session-23's. All 33
+      older frozen matrices deep-compare IDENTICAL between the trees; they pin the literal 75,
+      which is what a verbatim snapshot is for.
+
+    - **THE FROZEN SWEEP: 722 OF 17,081 ROWS OVER 28 OF THE 34 BASELINES, against #259's
+      predicted 1,072 over 27 for the withdrawn `-30..120`** — and it agrees with the live
+      partition to within a row. `722 - 28` (phase35, which did not exist when #259 measured)
+      `= 694`, and `694 / 1,072 = 0.647` against the live matrix's own `28 / 43 = 0.651`.
+      phase2..phase7 read EXACTLY 0, because those matrices predate the role-override block and
+      carry no row whose composed tilt reaches the ceiling; the count then climbs 2 / 2 / 20 /
+      27 / 27 as the SLOT, per-petal and ORCHID rows arrive and **saturates at 28 from phase13
+      onward, never moving again** — the live matrix's own mover count reached by an instrument
+      sharing no code with the partition, which is the useful half of the reading. Two phases
+      whose row count FELL (phase16's 481, phase22's 562) still read 28: the retirements that
+      shrank them took no tilt row with them.
+
+    - **A MOVER PREDICATE THAT READS WHAT ITS OWN CHANGE WRITES CANNOT BE EVALUATED ON THE
+      CHANGED TREE, AND THE FAILURE IS SILENT.** `verify-bloom-seam-bytes.mjs --frozen-sweep`
+      read THIS tree's builder record — correct for `seam`, `widest` and `arc`, none of which
+      writes `spine`; FALSE for `tilt`, whose predicate reads `overrideClamped`. On the head a
+      composed tilt of 100 is not clamped at all, so `asked > got` is false and **every mover
+      would have reported as a holder: a sweep answering 0 on a change that moves a thousand
+      rows, with nothing failing.** It builds on the BASE tree for a DECLARED set of changes now
+      and REFUSES without one. That is the fourth durable rule applied to a sweep rather than to
+      an assertion, and it was found by naming the owner of each side before running it — which
+      is the only thing that finds this class.
+
+    - **AND THE TOOL GAINED A THIRD AND FOURTH ROW CLASS, because a range change redefines
+      rows rather than only moving bytes.** `ROW_DEF_MOVED_BY_CHANGE` declares the rows whose
+      DEFINITION differs between the trees (label and/or set), which are compared not at all and
+      reported as REDEFINED; `--added <n>` declares rows the head APPENDED. Both REFUSE an
+      undeclared instance and a declared one that did not happen. A redefinition the tool
+      discovers is a redefinition nobody reviewed, and comparing two different states under one
+      label would report a byte move that is a matrix edit.

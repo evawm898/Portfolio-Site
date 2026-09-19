@@ -766,6 +766,29 @@ export const SMOKE_BLOCKS = [
         path: "the REFUSAL — SP9: a closed head has no underside ring, so sepals asked there build nothing and the read-out says UNAVAILABLE; SP0's two statements must still be complements" },
     ],
   },
+  {
+    n: 36, title: 'the tilt range past a right angle',
+    anchor: 'TILT: 76 (one step past the old ceiling, still under the right angle)',
+    /* THREE ROWS, AND THE AXES ARE THE SEAM CLEARANCE'S OWN. The clearance is
+       (t/2) sin(turn) saturated past 90, and the first blade row is the first
+       LATTICE station strictly beyond it — so the two levers are the SHEET and
+       the BLADE LENGTH, and the angle decides whether the window is open. 90
+       is where the law saturates; 120 x the shortest blade is the coarsest
+       lattice station at the closing point; 120 x three whorls puts EVERY
+       whorl past the right angle rather than only the innermost, which is the
+       one shape the pre-ruling matrix could not produce from the base control.
+       The 76 and 105 rows and the dome are in the full matrix and not here: a
+       subset covers the AXES a feature has, and the sheet, the length and the
+       depth are those axes. */
+    rows: [
+      { label: "TILT: 90 (the right angle — where the clearance law saturates)",
+        path: "the saturation itself — A7 (the held block starts at the first lattice station strictly beyond seamClearanceMm, and the clearance is held at its right-angle value there rather than falling away with sin) and A8 (the emitted widest gap under the blend's bound)" },
+      { label: "TILT: 120 x 20 x 8 mm (the shortest blade — the coarsest lattice station)",
+        path: "the LATTICE arm of the seam floor — A7's seam step on a 20 mm blade, where one station is 0.36 mm rather than 0.62 and the clearance is the same t/2; C1 rebuilds the spine from other owners at a tilt the base control could not reach before" },
+      { label: "TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)",
+        path: "the DEPTH arm — J1/J8 (every foot still in the hub plane with the ring's own cross-section, and the spine's first chord leaving at tilt plus half the row's curl) on three whorls all past 90, the shape a tilt STEP on an inner whorl cannot make; X1/X2 the verdict on the folds the ruling accepts" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

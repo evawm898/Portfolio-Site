@@ -1854,7 +1854,58 @@ export const CONTROLS = [
     fmt: () => 'the bowl carries around the tip',
     visibleWhen: { all: [] } },
 
-  { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
+  /* THE CEILING IS 120 AND IT IS DERIVED, NOT TYPED — DO NOT ROUND IT LATER
+     (Eva's re-issued ruling, Sep 19; the derivation is §4 of
+     docs/bloom-bell-corolla-discovery.md and the ruling is its §9 item 2).
+
+     Past a right angle the foot-to-blade clearance is a WINDOW rather than a
+     wall. With the ring row at the origin, the foot along +r, the blade
+     leaving at the seam turn `th`, `a = t/2`, `c = cos th`, `s = sin th`:
+     the first blade row's +N skin must clear the foot's top plane, which
+     needs `s1 >= a (1 + |c|) / s`; and the seam panel's -N skin must not
+     pass through the foot's own slab, which needs `s1 <= a s / |c|`. The
+     window is non-empty iff `s^2 >= |c|(1 + |c|)`, i.e. `2c^2 + |c| - 1 <= 0`,
+     i.e. **|c| <= 1/2 — th <= 120 degrees EXACTLY**. At 120 it is a single
+     point; past it the fold is topological and no station spacing clears it.
+     PR #210's measured crossover of 115-123 degrees on the incurve target is
+     that window closing, and a 22-row scratch probe confirmed the closed form
+     row by row against a prediction written before the census ran.
+
+     THE SEAM LAW ITSELF IS UNCHANGED. `seamClearanceMm` still saturates at
+     its right-angle value past 90; replacing that with the window's lower
+     bound was costed and REJECTED (it clears the folds inside the window and
+     makes the CLOSED regime worse — 120 degrees goes 336 -> 576 pairs, 122
+     goes 336 -> 592 — and buys a second regime in a law that has one). So
+     this ceiling is where the window closes, not where the law changes.
+
+     THE FLOOR STAYS AT 0, AND THE -30 RULING OF Sep 17 IS WITHDRAWN. Opening
+     it was ruled and then measured: swept at one degree over 22 states, the
+     within-shell census leaves zero at **-8 degrees** on six whorls at the
+     thickest sheet, -9 on a six-turn continuous head, -16 on six whorls at
+     the SHIPPING sheet, and at -17 / -22 / -23 / -28 / -29 on five more. Every
+     worst site sits at exactly z = -t/2, the foot slab's UNDERSIDE, and the
+     same |theta| read UP is 0 pairs on 13 of 13 probes — so it is the
+     DESCENDING seam case (docs/bloom-sepals-outcome.md §8), which the
+     clearance law was never derived for: the clearance reads `Math.abs(tilt)`
+     and IS symmetric, and the fold is NOT, which is the whole of the claim.
+     A shallower floor is not the answer either: the shallowest
+     onset is -8, so a floor clean on all 22 is -7, a seventh of the ruled
+     travel and short of any reflexed form. Full numbers in
+     docs/bloom-tilt-range-outcome.md §1. Do not re-open the floor from the
+     discovery doc's own "tilt -30 ... 0 pairs" cell: that cell reproduces and
+     is true of the DEFAULTS petal alone.
+
+     AND THE RANGE IS THE ROLE-OVERRIDE ENVELOPE (one number, two files):
+     `ROLE_OVERRIDES` in bloom-geometry.js restates these bounds as the clamp
+     for `labellumTilt`, `hoodTilt` and the nine `petalNTilt` rows, and
+     tools/bloom-harness.mjs THROWS at module load if the two disagree.
+     Holding the envelope narrower is not merely refused, it is wrong: a +5
+     delta on a base of 120 would compose to 125 and clamp back to 75,
+     dropping that petal 45 degrees BELOW its own whorl. The delta CONTROLS
+     keep their own -75..75 ranges — a delta narrower than the clamp's reach
+     is a narrower delta, not a dead one, and widening them is a separate
+     ruling nobody has asked for. */
+  { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 120, step: 1, default: 25,
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
