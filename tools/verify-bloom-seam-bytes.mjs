@@ -422,7 +422,19 @@ for (const mode of ['export', 'live']) {
       }
       continue;
     }
-    if (row.label in ROW_DEF_MOVED && mode === 'export') {
+    /* SCOPED TO THE LIVE MATRIX, AND THE ASYMMETRY WITH THE CLAUSE ABOVE IS
+       THE POINT. `ROW_DEF_MOVED_BY_CHANGE` describes redefinitions of the
+       LIVE matrix, whose rows read today's registry; a FROZEN matrix is a
+       verbatim literal snapshot, so a declared row's definition there is
+       identical on both trees BY CONSTRUCTION and this clause would fire on
+       every frozen run that names one. Measured: `--matrix phase34 --change
+       tilt` reported `ALL MAX` as a redefinition that did not happen while
+       the partition itself passed exactly as predeclared — a FALSE RED in a
+       clause written to catch a stale declaration. The UNDECLARED half above
+       stays unscoped on purpose: a frozen matrix whose rows DIFFER between
+       trees is a frozen matrix somebody edited, which this project forbids
+       outright, and that must stay loud wherever it happens. */
+    if (row.label in ROW_DEF_MOVED && mode === 'export' && which === 'live') {
       bad.push(`DECLARED REDEFINITION THAT DID NOT HAPPEN: "${row.label}" is declared in ROW_DEF_MOVED_BY_CHANGE.${change} and its definition is IDENTICAL on both trees — remove the entry in the same commit`);
     }
     let pa, pb;   // reassigned to the position arrays below
