@@ -3813,6 +3813,17 @@ on ONE cell of the 262 — and a CG3 red in CI cannot be an engine artefact.
 invocation is `node tools/bloom-xfail-magnitudes.mjs --combination --only '^$'`** — without
 the `--only` the tool sweeps all 261 self-intersection rows first. #263's doc said "in
 seconds" and that was the section's cost, not the invocation's.
+**ZERO GEOMETRY, PREDECLARED THEN MEASURED.** `bloom-geometry.js`, `bloom-registry.js`,
+`bloom.js`, `bloom.html` and `bloom.css` were named untouched before a line was written and
+are sha256-identical to a worktree of the base commit at close, so the exported stream is
+identical BY CONSTRUCTION — and measured anyway, because by-construction is an argument and
+this project prefers a number: `verify-bloom-surface-bytes --base <worktree>` reads **PASS,
+0 floats moved** over **836,485,992 export floats / 92,942,888 triangles and 77,135,222
+captured-grid values**, the whole 860-row matrix in both modes, positionally under
+`Object.is`. **NO FROZEN PHASE IS OWED** — no matrix row is added or removed, so
+`frozen/phase35` stays the newest baseline and no tag's bytes stop reproducing. Its
+`--control` fires BOTH clauses (export stream and captured grid) on a 1e-9 perturbation,
+which is what stops the second one being a log line.
 
 ## Flower generator — print-safety is a hard invariant
 

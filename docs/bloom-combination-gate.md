@@ -495,8 +495,31 @@ predeclared before a line was written and **sha256-identical** to a worktree of 
 commit at close — so the exported stream is identical by CONSTRUCTION rather than by an
 argument about arithmetic.
 
-Measured as well, because by-construction is an argument and this project prefers a number —
-the figures are in §11.
+**Measured as well, because by-construction is an argument and this project prefers a
+number.** `node tools/verify-bloom-surface-bytes.mjs --base <worktree of c29a8b5>`, the whole
+860-row live matrix in both modes, positionally under `Object.is`:
+
+| | |
+|---|---|
+| export stream | **836,485,992 floats** over 92,942,888 triangles, 860 rows x 2 modes |
+| captured grid | **77,135,222 values** over 8,907 panels (live) |
+| verdict | **PASS — 0 floats moved** |
+| wall clock | 63.3 min on this box (21:16:10 → 22:19:29 UTC) |
+
+**BOTH CLAUSES ARE SHOWN ABLE TO FAIL, and that is the half worth checking** — a control
+firing only clause 1 leaves clause 2 a log line, which is this repo's own recorded lesson
+about single-clause controls. `--control --rows 6` perturbs one coordinate by 1e-9 and the
+run exits 1 with **two** findings, one per clause:
+
+```
+FAIL — 2 finding(s):
+  DEFAULT (live): 1 of 171360 floats moved, first at index 0 (tri 0):
+      5.306790136879714 against 5.306790135879714
+  DEFAULT (live): grid — 1 of 4430 values moved, first at 2: 1e-9 against 0
+```
+
+`--rows` scopes the control deliberately: its job is to show the clauses CAN fire, not to
+re-measure a matrix the full run has already closed over.
 
 **No frozen phase is owed**: no matrix row is added or removed, so `frozen/phase35` stays
 the newest baseline and **no tag's bytes stop reproducing**.
