@@ -326,6 +326,16 @@ boundary=0`**, in 77 s. **All 23 rows: watertight AND one piece.**
 blocks of 883 rows, and **109 families asserted, 109 claimed, both directions** — ID0
 through ID6 among them.
 
+**THE PANEL GATE REFUSED BOTH NEW SECTIONS ON ITS FIRST RUN, AND WAS RIGHT TO:** *section
+"inflorescence" ships collapsed but names no geometry witness in WITNESS — the reactivity
+assertion for it would be vacuous*, and the same for "floret". Each now names one, through
+a number the control cannot write directly — the table's own discipline. **The
+inflorescence's value is the range FLOOR, 1, and that is measured rather than tidy:** the
+area rule is already below its print minimum at the shipping five nodes (6 mm / 2 /
+sqrt(5) = 1.34 against 1.50), so going UP reads `pedicelR` 1.5000 twice and half the
+witness would be a number printed twice; at one node it is 3.0000 and both halves move.
+The floret's is the UNIT's own triangle count — 13,888 at five petals, 9,176 at three.
+
 ## 7. What is NOT built, and why
 
 * **No presets.** Ruling 10 makes a preset a button that writes slider values, never a
