@@ -378,6 +378,19 @@ for (const [id, want] of Object.entries(INFLO_EXPECTED)) {
     throw new Error(`registry inflorescence offers [${vals.join(', ')}], the geometry's own INFLORESCENCE_TYPES is [${INFLORESCENCE_TYPES.join(', ')}] — one owner of what the law can be`);
   }
   if (c.default !== 'NONE') throw new Error(`registry inflorescence defaults to ${c.default}, not NONE — NONE is the GUARD the whole byte claim rests on`);
+  /* THE PHYLLOTAXY IS THE LEAF'S OWN THREE, WORD FOR WORD. It has no range,
+     so it is not in `INFLO_EXPECTED` above — and a floret arrangement that
+     offered a fourth word, or the same three under different spellings, would
+     pass every clause in the ID family: ID1 rebuilds the per-node COUNT from
+     `ui.floretPhyllotaxy` through the law, and the law's own `else` arm reads
+     1, so an unknown word is silently `alternate`. One owner, checked here. */
+  const lf = CONTROLS.find((x) => x.id === 'leafPhyllotaxy');
+  const fp = CONTROLS.find((x) => x.id === 'floretPhyllotaxy');
+  if (!lf || !fp) throw new Error('the registry declares no leafPhyllotaxy/floretPhyllotaxy pair — the floret arrangement has no law to share');
+  const words = (x) => x.options.map((o) => String(o.value)).join(',');
+  if (words(lf) !== words(fp)) throw new Error(`floretPhyllotaxy offers [${words(fp)}] and leafPhyllotaxy [${words(lf)}] — one owner of what an arrangement down an axis can be, and an unknown word falls through to alternate in silence`);
+  if (fp.default !== lf.default) throw new Error(`floretPhyllotaxy defaults to ${fp.default} and leafPhyllotaxy to ${lf.default}`);
+  if (fp.section !== 'inflorescence') throw new Error(`registry floretPhyllotaxy sits in section ${fp.section}, the inflorescence's is inflorescence`);
   /* THE PEDICEL'S RANGE MUST LIE INSIDE THE STEM'S, because the pedicel IS
      the floret's own stem and every ST clause is proved on that control's
      own bounds. */

@@ -202,7 +202,7 @@ function infloFacts(M, over = {}) {
       floretPetals: P.floretPetals, unitPetals: B.unit.petalsBuilt,
       floretState: { ...B.floretState },
       headAt: q.headAt.slice(), rootAt: q.root.slice(), D: q.D.slice(),
-      cols: [col(0), col(1), col(2)], det,
+      cols: [col(0), col(1), col(2)], det, tx: q.M[3],
       maxDim: acc.maxDimensionMm, total: acc.triangleCount,
       /* THE EXTENT PER AXIS, because `maxDimensionMm` is the LARGEST of the
          three and on a raceme that is the RACHIS — 120 mm of stem down z,
@@ -210,6 +210,20 @@ function infloFacts(M, over = {}) {
          137.251 mm on both trees while every floret had been collapsed onto
          x = 0. A witness has to probe the axis the mutation acts on. */
       extent: [acc.hi[0] - acc.lo[0], acc.hi[1] - acc.lo[1], acc.hi[2] - acc.lo[2]],
+      /* AND THE FIRST PLACED BLOCK'S OWN CENTROID, read out of the emitted
+         stream at the offset the builder declared. The WHOLE bloom's extent
+         does not move either: the HEAD is 81.6 mm across and the florets on
+         20 mm pedicels reach less than that, so a collapse onto the axis is
+         invisible in the envelope — measured, 81.638 on both trees. Where a
+         block IS is a different statement from ID5's "the block equals the
+         unit under its own matrix", which is the clause this witness may not
+         be. */
+      blockCentroid: (() => {
+        const lo = q.at, hi = q.at + q.tris * 9;
+        let x = 0, y = 0, z = 0, n = 0;
+        for (let i = lo; i < hi; i += 3) { x += acc.positions[i]; y += acc.positions[i + 1]; z += acc.positions[i + 2]; n++; }
+        return n ? [x / n, y / n, z / n] : null;
+      })(),
       residual: B.placementResidual, compared: B.placementCompared,
     };
   } catch (e) { return { threw: String(e && e.message || e) }; }
@@ -892,12 +906,21 @@ const MUTANTS = [
     witness: (M, C) => {
       const [m, c] = infloPair(M, C);
       const t = bothBuilt(m, c); if (t) return t;
-      /* THE X EXTENT, not `maxDimensionMm`: the rachis is 120 mm down z and
-         dominates the largest dimension on every raceme, so the collapse is
-         invisible there. On the clean tree the florets stand off the axis at
-         their pedicel's reach; on the mutant every one of them is at x = 0. */
-      return (m.extent[0] < c.extent[0] - 1 && m.total === c.total) ? null
-        : `the built bloom spans ${m.extent[0].toFixed(3)} mm in x on the mutant and ${c.extent[0].toFixed(3)} clean at ${m.total} / ${c.total} triangles — the append did not move`;
+      /* THE FIRST FLORET'S OWN BLOCK CENTROID, not any envelope: the whole
+         bloom's x extent is the HEAD's 81.6 mm on both trees (the florets on
+         20 mm pedicels reach less), and `maxDimensionMm` is the RACHIS's
+         120 mm down z, which no placement defect can move. Two envelopes
+         measured and both blind — a witness has to probe the thing the
+         mutation acts on, and here that is where a block LANDS. */
+      if (!m.blockCentroid || !c.blockCentroid) return 'the witness could not read a placed block';
+      /* THE MUTANT'S BLOCK IS THE CLEAN ONE LESS EXACTLY M[3], because only
+         the X OFFSET is dropped — the rotated unit's own centroid stays, so
+         "it lands at zero" is the wrong bar and reads 2.9029 where the clean
+         block reads 21.4942. The DECLARED translation is the number to
+         subtract, and the placement record carries it. */
+      const want = c.blockCentroid[0] - c.tx;
+      return (Math.abs(m.blockCentroid[0] - want) < 1e-9 && Math.abs(c.tx) > 1 && m.total === c.total) ? null
+        : `the first floret's block sits at x = ${m.blockCentroid[0].toFixed(4)} on the mutant; the clean block's ${c.blockCentroid[0].toFixed(4)} less its own declared ${c.tx.toFixed(4)} offset is ${want.toFixed(4)}, at ${m.total} / ${c.total} triangles — the append did not drop exactly the translation`;
     } },
 
   { id: 'the-head-stands-at-the-node-not-the-pedicel-tip',

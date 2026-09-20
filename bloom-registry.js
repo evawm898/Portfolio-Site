@@ -3430,6 +3430,15 @@ export const CONTROLS = [
         + (p.sizeClamped ? ` — CLAMPED: ${p.lengthAsked.toFixed(1)} x ${p.widthAsked.toFixed(1)} mm asked, and a petal here is never smaller than the petal slider's own floor` : '')
         + dead;
     },
+    /* NO `cap` ROW, DELIBERATELY — `lobeCoverage`'s own reasoning, one
+       feature later, and for the same reason: `applyCaps` marks the travel
+       ABOVE its value, which is right where the dead stretch is at the TOP
+       (`stamenSpread`, `lobeDepth`) and wrong here, where it is at the
+       BOTTOM. On the shipping 35 x 16 mm head the size stops moving below
+       0.571x, so `cap: sizeDeadBelow` would hatch 0.571 to 1.00: nearly
+       half the track marked dead when the dead part is underneath it. The
+       number is TOLD above and the track is left alone until there is a
+       low-end hatch to draw it with. */
     tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 ];
 

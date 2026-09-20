@@ -217,6 +217,34 @@ find-string read `stemEnd.z + frac * extentMm` where the shipped expression read
 `zStemEnd + frac * extentMm` — **0 matches on BOTH trees**, so it had never applied and
 no run had said so. Re-anchored here.
 
+### (viii) The ID5 witness took three attempts, and every failure was an envelope being blind
+
+`the-append-drops-the-translation` drops `M[3]` from `appendTransformed`, so every floret
+is built at x = 0 however far off the axis its pedicel reaches. The mutation applies, the
+export is watertight, one piece, and the triangle count and STL byte length are identical —
+which is the whole argument for ID5. Its WITNESS is what was hard:
+
+1. **`maxDimensionMm` reads 137.251 on both trees.** It is the LARGEST of the three
+   extents, and on a raceme that is the RACHIS — 120 mm down z, which no placement defect
+   can move.
+2. **The whole bloom's X extent reads 81.638 on both trees.** The HEAD is 81.6 mm across
+   and florets on 20 mm pedicels reach less than that, so the collapse is inside the
+   envelope.
+3. **"The block lands at zero" is the wrong bar** — it reads 2.9029 where the clean block
+   reads 21.4942, because only the OFFSET is dropped and the rotated unit keeps its own
+   centroid.
+
+The shipped witness reads the first placed block's centroid out of the emitted stream at
+the offset the BUILDER declared, and compares it against the clean block's centroid LESS
+that placement's own declared translation — an exact identity, with the translation
+required to be more than a millimetre so the probe state is not vacuous. **An envelope is
+the natural thing to reach for and it was blind twice**; a witness has to probe the thing
+the mutation acts on, which here is where a block LANDS.
+
+**And `the-placement-carries-a-scale` legitimately reddens ID6 as well as ID3** — a scale
+on the rotation also scales the axis the head is facing along — which the table prints as
+collateral rather than treating as a failure.
+
 ## 5. R1 fired on the new part, for the third time
 
 Both coverage instruments' R1 counts the parts through a third accumulator that EMITS.
