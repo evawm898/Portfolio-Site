@@ -33,6 +33,8 @@ import { createSwash } from './beach-swash.js';
 import { createSets, normalizeWheel } from './beach-sets.js';
 import { createWater } from './beach-water.js';
 import { createRenderer } from './beach-draw.js';
+import { stageAt, waveStage, crestAt, brokenAt, bandWidthAt, faceAmountOf } from './beach-wave.js';
+import { WATERLINE_S } from './beach-shore.js';
 
 // A seed salt, for koi-pads.js's reason: every draw on a stream shifts every
 // number taken after it, so the streak field and the waves are forked from the
@@ -82,7 +84,11 @@ export default function createBeachScene(host) {
         wetAt: (u) => swash.wetAtU(u),
         glossDepth: swash.glossDepth,
         frontFoam: swash.sheet,
-        breakEnergy: sets.energy,
+        // EVERY LIVE WAVE, not a break energy. `breakEnergy` is gone with the
+        // fixed dip it drove: the renderer is handed the objects and draws
+        // them, and what the energy decided about each one was frozen into its
+        // record at birth.
+        waves: swash.waves,
         frontSeed: 7,
         drift: water.drift,
         streaks: water.streaks,
@@ -134,6 +140,15 @@ export default function createBeachScene(host) {
         waves: swash.waves.length,
         spawned: swash.spawned,
         waveFields: swash.waves.length ? Object.keys(swash.waves[0]) : [],
+        // The six stages, per live wave, at five along-shore positions — so a
+        // gate can watch a peel run across the frame rather than only that a
+        // wave exists. Test chrome; nothing in the scene reads it.
+        waveStages: swash.waves.map(w => ({
+          age: w.age, preS: w.preS, crest: crestAt(w, 0.5),
+          stage: waveStage(w, WATERLINE_S),
+          at: [0, 0.25, 0.5, 0.75, 1].map(u => stageAt(w, u, WATERLINE_S)),
+          band: bandWidthAt(w, brokenAt(w, 0.5)), face: faceAmountOf(w),
+        })),
         // Every wave's committed record, so a gate can watch a real wave run
         // rather than only that one exists.
         waveAt: swash.waves.map(w => [w.age, w.runup, w.advanceS, w.holdS, w.retreatS, w.peaked ? 1 : 0]),

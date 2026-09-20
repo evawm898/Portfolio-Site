@@ -47,9 +47,17 @@
 // `spawn()`. Deforming a running swash is unreachable rather than merely
 // avoided, which is koi-ripples.js's discipline applied to the quantity this
 // scene's brief actually cares about.
-export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];
+//
+// AND THE RECORD IS A WAVE'S NOW, NOT A SWASH'S. Everything below is stage
+// SIX of a life that starts `preS` seconds earlier, out at sea — see
+// beach-wave.js, which owns stages one to five and which this list is the
+// continuation of. `WAVE_FIELDS` plus these is the whole record, and the claim
+// the two lists make together is the one this file already made about energy:
+// there is no `energy` field in either.
+export const SWASH_FIELDS = ['life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];
 
 import { WATERLINE_S, RUNUP_NOMINAL, RUNUP_MAX, SAMPLES } from './beach-shore.js';
+import { makeWave } from './beach-wave.js';
 
 // --- TIMING -----------------------------------------------------------------
 // MEASURED, from the brief's own reading of the two clean drains in the
@@ -216,26 +224,34 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     const e = clamp01(energy || 0);
     const target = RUNUP_NOMINAL + e * (RUNUP_MAX - RUNUP_NOMINAL);
     const reach = target * rand.range(RUNUP_VARY[0], RUNUP_VARY[1]);
-    const w = {
-      age: 0,
-      runup: Math.min(1, WATERLINE_S + reach),
-      advanceS: ADVANCE_S * rand.range(0.82, 1.20),
-      holdS: HOLD_S * rand.range(0.6, 1.5),
-      retreatS: RETREAT_S * rand.range(0.85, 1.18),
-      wob: makeWob(),
-      peaked: false,
-      life: 0,
-    };
-    w.life = w.advanceS + w.holdS + w.retreatS;
+    // ONE RECORD, BORN AT SEA. `makeWave` freezes everything stages one to
+    // five need; the fields below are stage six's, and `preS` — which
+    // `makeWave` derives from the wave's own travel — is when the one hands
+    // over to the other. So a swash no longer begins out of nothing at the
+    // waterline: it is the arrival of a thing that has been in the frame,
+    // visibly, for the whole of its approach.
+    const w = makeWave({ rand, energy: e, waterline: WATERLINE_S, samples });
+    w.runup = Math.min(1, WATERLINE_S + reach);
+    w.advanceS = ADVANCE_S * rand.range(0.82, 1.20);
+    w.holdS = HOLD_S * rand.range(0.6, 1.5);
+    w.retreatS = RETREAT_S * rand.range(0.85, 1.18);
+    w.wob = makeWob();
+    w.peaked = false;
+    w.life = w.preS + w.advanceS + w.holdS + w.retreatS;
     waves.push(w);
     spawned++;
     return w;
   }
 
+  // THE SWASH'S OWN CLOCK, which is the wave's less its seaward life. Every
+  // stage-six law below reads THIS and never `w.age`, so the shipped envelope
+  // is untouched by the wave arriving earlier — it simply starts later.
+  const swashAge = (w) => w.age - w.preS;
+
   const WOB_S = 0.020;   // how deep the scallops on a front run, in frame heights
 
   function extentOf(w, i) {
-    const env = swashEnv(w.age, w.advanceS, w.holdS, w.retreatS);
+    const env = swashEnv(swashAge(w), w.advanceS, w.holdS, w.retreatS);
     if (env <= 0) return WATERLINE_S;
     const reach = (w.runup - WATERLINE_S) * env;
     return WATERLINE_S + reach + WOB_S * w.wob[i] * env;
@@ -250,7 +266,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
       // The thickest sheet on the beach right now, which is what the foam band
       // is drawn from. Zero when nothing is running.
       let m = 0;
-      for (const w of waves) m = Math.max(m, sheetAt(w.age, w.advanceS, w.holdS, w.retreatS));
+      for (const w of waves) m = Math.max(m, sheetAt(swashAge(w), w.advanceS, w.holdS, w.retreatS));
       return m;
     },
 
@@ -295,7 +311,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
       // extent" a literal statement rather than a prediction: at the end of a
       // wave's advance it has reached as far as it is going to.
       for (const w of waves) {
-        if (w.peaked || w.age < w.advanceS) continue;
+        if (w.peaked || swashAge(w) < w.advanceS) continue;
         w.peaked = true;
         let reached = WATERLINE_S, at = 0, over = -1;
         for (let i = 0; i < samples; i++) {

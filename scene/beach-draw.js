@@ -67,13 +67,57 @@ export const WEIGHT_BUCKETS = 10;  // segments batched by weight: ten strokes, n
 // Each entry is the reference's own measured ink coverage — taken against ITS
 // dry sand, so the two media's contrast does not enter — inverted through the
 // table above.
+// AND `deep` MOVED, FROM 0.78 TO 0.60, BECAUSE THE OLD FIGURE WAS MEASURED ON
+// WATER WITH A WAVE IN IT AND THEN USED AS THE WATER'S OWN TONE.
+//
+// The reference's deep water is L 62 with no wave approaching and L 41 with a
+// swell fully in it — a 21-level swing over about two seconds, which is the
+// SWELL, and the frames the shipped 47 came off are in the second half of
+// that. So the constant was the darkest the sea gets rather than its resting
+// value, and a scene that starts there has nothing left for a wave to spend.
+//
+// MEASURED, THROUGH THIS FILE'S OWN `__flatTone` HOOK, which is what makes
+// this a finding rather than a preference — the delivered ink coverage of the
+// shipped lattice:
+//
+//   tone      0.40  0.50  0.55  0.60  0.65  0.70  0.75  0.80  0.90  1.00
+//   coverage  0.47  0.59  0.72  0.86  0.87  0.97  0.98  0.99  1.00  1.00
+//
+// The ladder SATURATES at about 0.70. From there to 1.00 — thirty percent of
+// the control's travel — the ink moves 2.9 percentage points. So at the old
+// 0.78 the deep water was already 98% inked, and a swell pulling it to 0.93
+// would have changed the drawing by about one percentage point of coverage:
+// INVISIBLE, and invisible for the same reason `stamenSpread`'s dead travel is,
+// one repository over. The first mockup's swell cell was pixel-for-pixel its
+// no-wave control and that is why.
+//
+// 0.70 IS THE VALUE, AND IT WAS SWEPT RATHER THAN PICKED, because the two
+// things that matter pull opposite ways: the deep water has to read as a MASS
+// (the reference's is a smooth dark field) and a swell has to have somewhere
+// to go. Rendered at each resting tone, with the same swell over it:
+//
+//   TONE.deep            0.78   0.74   0.70   0.66   0.62   0.58
+//   resting coverage     0.972  0.968  0.930  0.864  0.808  0.763
+//   largest white gap     24px   21px   25px   44px   39px   46px
+//   what a swell buys    +0.005 +0.004 +0.016 +0.029 +0.035 +0.018
+//
+// At the shipped 0.78 A SWELL BUYS HALF A PERCENT OF INK. 0.70 buys three
+// times as much AT AN UNCHANGED GAP — 25 px against the shipped 24 — so it
+// costs the deep water's solidity nothing, which is why it is the value here
+// rather than the 0.62 that buys most. Below 0.66 the lattice's own gaps open
+// to 39-46 px and the sea stops reading as a mass at all; that is a real
+// trade and §7 of docs/beach-wave-object.md puts it to Eva rather than
+// settling it here.
+//
+// THE OLD VALUE IS ROUGHLY WHERE A FULL SWELL NOW ARRIVES, which is the honest
+// re-reading of the original calibration rather than a repudiation of it.
 export const TONE = {
   foam: 0.00,      // L 191-197 -> coverage 0.04; bare paper, and BRIGHTER THAN THE WET SAND
   dry: 0.00,       // L 185-194 -> coverage 0.03; the LATTICE's tone — the texture is drawDrySand's
   wet: 0.235,      // L 152-161 -> coverage 0.23
   gloss: 0.355,    // L 125     -> coverage 0.43
   shallow: 0.45,   // L 118-121 -> coverage 0.47
-  deep: 0.78,      // L 47      -> coverage 0.84
+  deep: 0.70,      // L 62 with no wave in it; a swell takes it to ~0.84 — see above
 };
 
 // THE PALETTE IS ONE DECLARATION AND THE POLARITY IS ONE CONSTANT. The brief
@@ -115,18 +159,22 @@ export const PALETTE = { ground: '#f1ede6', ink: '#16181c' };
 // it. So the base texture is deliberately SHALLOWER than the reference's own —
 // its marks sit at DRY_MARK_ALPHA of full ink, against the reference's ~0.32 —
 // and everything a later session draws starts at MARK_ALPHA_FLOOR or darker.
-// The gap between them is the headroom, asserted at module load below rather
-// than described: a base texture that crept up into the marks' register would
-// be a change nobody could see until the marks arrived.
+// The gap between them is the headroom.
+//
+// IT IS ASSERTED IN THE GATE, NOT AT MODULE LOAD, AND THAT IS A CORRECTION TO
+// HOW IT SHIPPED. The first cut threw here, on the grounds that a refusal is
+// stronger than a red check — and it is, at exactly the wrong moment. A
+// drifted constant is a mistake made while editing this file, which is a
+// thing CI is for; a module that refuses to load takes the whole scene down
+// for a VISITOR, who cannot act on it and did not make it. The two failure
+// modes are not interchangeable because they are not read by the same person.
+// `beach-tone/the-dry-sand-leaves-a-register-for-the-marks-session` in
+// tools/verify-scene.mjs carries the claim, with the bar taken from other
+// owners than this module's own MARK_HEADROOM, and the mutant that gives the
+// headroom away names that check.
 export const DRY_MARK_ALPHA = 0.26;     // the ink a base sand mark carries, 0..1 of full
 export const MARK_ALPHA_FLOOR = 0.60;   // a later session's DRAWN marks start here
 export const MARK_HEADROOM = 0.30;      // and this much has to separate the two registers
-
-if (MARK_ALPHA_FLOOR - DRY_MARK_ALPHA < MARK_HEADROOM) {
-  throw new Error(`the dry sand's texture at ${DRY_MARK_ALPHA} leaves only `
-    + `${(MARK_ALPHA_FLOOR - DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor `
-    + `${MARK_ALPHA_FLOOR}; ${MARK_HEADROOM} is the declared headroom`);
-}
 
 // THE MARKS CLUMP, AND A UNIFORM FIELD OF THEM IS THE WRONG PICTURE. Scattered
 // at an even density they read as felt — a homogeneous texture swatch — where
@@ -143,6 +191,7 @@ export const DRY_MARK_WEIGHT = 1.5;
 export const DRY_FADE_S = 0.035;        // marks fade in above the high-water mark as the sand dries
 
 import { WATERLINE_S } from './beach-shore.js';
+import { waveField, sortWaves, brokenAt, bandWidthAt, foamAlphaAt, crestAt } from './beach-wave.js';
 
 const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
 const lerp = (a, b, t) => a + (b - a) * t;
@@ -189,9 +238,16 @@ function hash2(a, b) {
 // 0.000 minimum in 100% of columns at every width tried; what the width buys is
 // the RUN, and 0.130 puts it at 3.57% against c1_001's 3.56% — the same frame
 // every other band figure here is measured against.
+// How far down the frame the foam streaks fade in. MEASURED: the reference's
+// row median carries no streak at all above s 0.05 and is fully populated by
+// about s 0.12.
+export const STREAK_FADE_S = 0.12;
 export const FOAM_BAND_S = 0.130;   // the band at the shore, in frame heights
-export const BREAK_BAND_S = 0.055;  // the broken water at the back
 export const FOAM_RAMP = 0.32;      // the seaward fraction of the foam band that is a ramp; the rest is paper
+// (BREAK_BAND_S is RETIRED — the broken water at the back is a wave now, and
+//  beach-wave.js's BAND_MAX is its width. Its measured range 0.055..0.135 is
+//  where this constant's 0.055 ended up: the OLD value was the new range's
+//  floor, i.e. the shipped break was as narrow as the smallest wave there is.)
 
 // Deepest at the top of frame, lightening toward the shore. Squared, because
 // 47 at the top against 118 at the shore is not a linear fall — the darkness
@@ -206,7 +262,7 @@ export const FOAM_RAMP = 0.32;      // the seaward fraction of the foam band tha
 // arriving over sand rather than as the sea rising.
 export const SHEET_TONE = 0.42;     // a thin sheet over wet sand, between shallow water and gloss
 
-export function waterTone(s, edge, foamW, breakS, breakW, breakE) {
+export function waterTone(s, edge, foamW) {
   const u = clamp01(s / WATERLINE_S);
   // THE RAMP IS A SMOOTHSTEP, AND NO SINGLE POWER FITS. Converted to tone, the
   // reference's water reads 1.00 · 1.00 · 0.96 · 0.91 · 0.85 · 0.74 · 0.69 ·
@@ -236,19 +292,13 @@ export function waterTone(s, edge, foamW, breakS, breakW, breakE) {
   const into = clamp01((s - (edge - fw)) / fw) / FOAM_RAMP;
   const ir = clamp01(into);
   t *= (1 - ir * ir * (3 - 2 * ir));
-  // The break: a dip, not a cut, so the water closes over again behind it.
-  // ITS DEPTH AND WIDTH BOTH SCALE WITH SET ENERGY. Fixed at a 0.92 cut and a
-  // width of 8% of frame it was, at REST, the brightest thing in the top of the
-  // picture — measured against the reference, which is at its DARKEST there
-  // (ink coverage 0.81 against this drawing's 0.41). A break is a wave; with no
-  // energy behind it there is very little to see.
-  if (breakW > 0) {
-    const d = Math.abs(s - breakS) / breakW;
-    if (d < 1) {
-      const f = (1 - d * d) * (1 - d * d);
-      t *= 1 - (0.30 + 0.62 * clamp01(breakE || 0)) * f;
-    }
-  }
+  // THE BREAK USED TO BE A CLAUSE HERE AND IT IS GONE. It was a fixed dip at a
+  // fixed station whose depth and width scaled with set energy — which is a
+  // TONE FIELD wearing a wave's name: it could not travel, could not peel,
+  // could not carry a dark face, and there was only ever one of it. A wave is
+  // an object now and beach-wave.js owns it; this function is the FIELD the
+  // objects are drawn into, which is exactly the division the brief asks for.
+  // `BREAK_BAND_S` went with it.
   return clamp01(t);
 }
 
@@ -327,11 +377,13 @@ export function createRenderer(ctx, shore) {
       ctx.fillRect(0, 0, w, h);
       ctx.lineCap = 'butt';
 
-      const be = clamp01(st.breakEnergy || 0);
       const thick = clamp01(st.frontFoam !== undefined ? st.frontFoam : 0.5);
       const foamW = FOAM_BAND_S * (0.45 + 0.75 * thick);
-      const breakS = 0.055 + 0.045 * be;
-      const breakW = BREAK_BAND_S * (0.24 + 1.05 * be);
+      // SORTED ONCE PER FRAME, NOT ONCE PER SAMPLE. The order IS the model —
+      // seaward first, so a nearer band of foam covers the water behind it —
+      // and re-deriving it inside `toneAt` would cost a sort per segment on a
+      // lattice that emits thousands of them.
+      const waves = sortWaves(st.waves || []);
       const gloss = Math.max(1e-4, st.glossDepth || 0.008);
       const drift = st.drift || 0;
       const pitch = ROW_PITCH_PX / h;
@@ -349,7 +401,14 @@ export function createRenderer(ctx, shore) {
         const edge = st.swashAt(u);
         if (s < edge) {
           const sw = s + swell(u, s, drift, s / Math.max(1e-4, edge));
-          return clamp01(waterTone(sw, edge, foamW, breakS, breakW, be) * grain(u, s, drift));
+          const base = clamp01(waterTone(sw, edge, foamW) * grain(u, s, drift));
+          // THE FIELD FIRST, THE OBJECTS INTO IT. The ramp, the along-shore
+          // swell and the grain are the SURFACE; the waves are things on it.
+          // Trying to make the ramp produce a wave is the tuning trap the
+          // brief names, and it is unreachable from here: `waterTone` cannot
+          // see a wave and `waveField` cannot see the ramp except as a number
+          // handed to it.
+          return waves.length ? waveField(waves, u, s, base) : base;
         }
         const wet = st.wetAt(u);
         if (s < wet) {
@@ -523,11 +582,9 @@ export function createRenderer(ctx, shore) {
     drawFoam(st, w, h) {
       const pal = st.palette || PALETTE;
       const edgeAt = (u) => st.swashAt(u);
-      const be = clamp01(st.breakEnergy || 0);
       const thick = clamp01(st.frontFoam !== undefined ? st.frontFoam : 0.5);
       const foamW = FOAM_BAND_S * (0.45 + 0.75 * thick);
-      const breakS = 0.055 + 0.045 * be;
-      const breakW = BREAK_BAND_S * (0.24 + 1.05 * be);
+      const waves = sortWaves(st.waves || []);
 
       // THE STREAKS, in PAPER, over the water. Persistent records drifting
       // shoreward — the broken foam lines the reference is full of, and the
@@ -538,6 +595,16 @@ export function createRenderer(ctx, shore) {
       ctx.beginPath();
       for (const f of (st.streaks || [])) {
         if (f.s >= edgeAt(f.u) - foamW) continue;   // inside the foam band it has nothing to mark
+        // AND THEY FADE OUT IN THE DEEP WATER, which is `swell()`'s own rule
+        // arriving for a second quantity and for the same measured reason.
+        // The reference's deep water is SMOOTH: the row median at s < 0.05
+        // reads L 41-62 with no bright streak in it at all, because broken
+        // foam is a thing that happens where water has broken. Drawn across
+        // the whole sea they shred the one region this drawing renders as a
+        // solid mass — and with waves in the water now, that mass is what a
+        // swell has to darken and a crest has to stand against.
+        if (f.s < STREAK_FADE_S && hash2((f.u * 977) | 0, (f.len * 5171) | 0)
+            > clamp01(f.s / STREAK_FADE_S)) continue;
         const half = f.len / 2;
         const a = clamp01(f.u - half), b = clamp01(f.u + half);
         if (b <= a) continue;
@@ -574,13 +641,26 @@ export function createRenderer(ctx, shore) {
             ctx.lineTo(u1 * w, shore.yAt(u1 * w, s2));
           }
         }
-        // the break at the back
-        for (let b = 0; b < 8; b++) {
-          const f = (b / 8) * 2 - 1;
-          if (hash2(k * 11 + b, 29) > 0.78 + Math.abs(f) * 0.20 * (1.25 - be)) {
-            const s2 = breakS + f * breakW * 0.85 + (hash2(k, b + 71) - 0.5) * breakW * 0.20;
-            ctx.moveTo(u0 * w, shore.yAt(u0 * w, s2));
-            ctx.lineTo(u1 * w, shore.yAt(u1 * w, s2));
+        // EVERY LIVE WAVE'S OWN BAND, not one fixed station at the back. The
+        // speckle is read off the wave's own geometry at THIS column, so it
+        // peels with the band rather than appearing across the whole width at
+        // once — and a wave whose band has not opened at this column yet gets
+        // no speckle there, which is the thing a fixed station cannot do.
+        for (let wi = 0; wi < waves.length; wi++) {
+          const wv = waves[wi];
+          const b = brokenAt(wv, um);
+          const bw = bandWidthAt(wv, b);
+          if (bw <= 0) continue;
+          const alpha = foamAlphaAt(wv, b);
+          if (alpha <= 0.02) continue;
+          const c = crestAt(wv, um);
+          for (let q = 0; q < 8; q++) {
+            const f = q / 8;
+            if (hash2(k * 11 + q + wi * 613, 29) > 0.80 + f * 0.18 * (1.25 - alpha)) {
+              const s2 = c + bw * f + (hash2(k, q + 71 + wi * 29) - 0.5) * bw * 0.20;
+              ctx.moveTo(u0 * w, shore.yAt(u0 * w, s2));
+              ctx.lineTo(u1 * w, shore.yAt(u1 * w, s2));
+            }
           }
         }
       }
