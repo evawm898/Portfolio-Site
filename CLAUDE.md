@@ -88,9 +88,24 @@ proves they are the file's own** (`fround` of every double equals the STL's floa
 float32 bytes manufacture 196 span-0 touches on the flat default. **Two defects in the
 census surfaced the first time it ran over the whole matrix**: its pair `Set` overflowed on
 ALL MAX (canonical-cell rule now), and its COUNT DEPENDED ON THE WINDING (corners are read
-in coordinate order now; identical on both trees). **THE ROOT BLEND IS NOT FIXED — its
-brief with all measurements is §5 of that doc**, and its 138 rows are in the xfail list
-by name; the fix is `footRing()`'s, never a blade-side correction. (The list holds three by-design overlaps the vertex-welded shell definition
+in coordinate order now; identical on both trees). **THE ROOT BLEND IS FIXED — SUPERSEDED, AND THIS SENTENCE USED TO SAY THE OPPOSITE**
+(read `docs/bloom-root-blend-superseded.md`; the session-35/36 claim is kept below, struck
+through, so the reversal is legible). Session 36 wrote *"THE ROOT BLEND IS NOT FIXED — its
+brief with all measurements is §5 of that doc, and its 138 rows are in the xfail list by
+name; the fix is `footRing()`'s, never a blade-side correction."* **The foot-to-blade seam
+session (#210, `a24ed69`) fixed it, under a different name and from a different mechanism,
+and neither this file nor the page was corrected** — so for six merges `CLAUDE.md` carried
+the claim in the present tense HERE and its supersession 3,200 lines further down, and a
+reader met the false half first. That cost a whole session, whose brief was written from
+it. **Measured, one census over two geometries** (`1740a2e`, the tree the fix was applied
+to, against `main`): all twelve of §5's published figures reproduce EXACTLY on the pre-fix
+tree — 72 at 8x3, 162/364/416/624 at four layers, 49/63/595 for its three controls, 376
+for session 38's single-layer state — and **every one reads 0 today at an identical
+triangle count**. Of the 138 tagged rows, **73 came off the list and 65 remain for a
+DIFFERENT, NAMED reason** (27 EFFECTIVE TILT PAST 90, 2 SEAM CLAMPED, 19 magnitude
+re-records, the STYLE's own 272-pair rod overlap, the buckle's apex fold); **0 are the root
+blend.** What still folds on the depth axis is the effective tilt — clean to 97 degrees,
+336 pairs at 103, 384 at 115 — which is the declared class and not this one. (The list holds three by-design overlaps the vertex-welded shell definition
 cannot tell from a fold — every STYLE row at exactly 272, the lobed tips, and every CLEFT row —
 named as such in the doc; and a sweep that applies control sets but not a row's `capability`
 hook measures the cleft rows without their cleft, which the smoke gate caught.) **RECORDED FOR EVA, as
@@ -115,18 +130,34 @@ pass unchanged on an inside-out solid. `node tools/bloom-self-intersection.mjs
 --orientation` is the check, calibrated on a unit cube (+1 outward, −1 reversed) with a
 positive control that reverses a real export and requires the verdict to move.
 
-**AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS** (session
-35). No cup, no buckle, no sweep: 0 pairs at 1 or 2 layers even with 40 petals, 72 at 3
-layers, 416 at 4. It is a petal crossing ITSELF (within-shell), not foot crowding, and
-it is **the short petals** — at 7×4 the innermost layer (reach 11.9 mm) has 43 pairs
-per petal and the next (19.3 mm) has 9, while the two outer layers are clean.
-`layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
-collapses a full-width foot across `ROOT_BLEND_END` and folds. `layerSize` 0.90 takes
-364 → 49; `petalTilt` 0 → 63; `footDelicacy` 0.25 → 595. **This is `footRing()`'s
-boundary, deferred three times, now measured as a real self-intersection rather than a
-chord statistic — and it means a multi-layer bloom is unprintable before any
-deformation control is touched.** Do not judge a deformation feature's printability on
-a multi-layer build until this is fixed.
+**~~AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS~~ — WITHDRAWN,
+AND THE MECHANISM WAS WRONG AS WELL AS THE STATUS** (session 35's claim, superseded by
+#210 and re-measured in `docs/bloom-root-blend-superseded.md`). **It reads 0 pairs at every
+depth 1 through 6 at the defaults today**, and `layerSize` 0.35..0.90, `footDelicacy`
+0.25..1.00 and `petalCount` 3..40 at six layers are ALL 0 — the whole axis, including the
+565,632-triangle corner. Session 35 wrote that it was *"a petal crossing ITSELF … the short
+petals … `layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
+collapses a full-width foot across `ROOT_BLEND_END` and folds"*, with `layerSize` 0.90
+taking 364 to 49, `petalTilt` 0 to 63 and `footDelicacy` 0.25 to 595, and concluded that
+**"a multi-layer bloom is unprintable before any deformation control is touched"**.
+**IT IS NOT THE ROOT BLEND AND IT WAS NEVER THE LAYER COUNT.** Session 38 established it
+as an OFFSET-SURFACE FOLD AT THE FOOT-TO-BLADE KINK — every site on the top skin at the
+ring radius at `dz = t/2`, both triangles of every pair a seam quad, zero pairs at zero
+tilt, and **a SINGLE layer at tilt 75 / length 20 / sheet 2.4 folding 376 pairs with no
+layers involved at all**. Layer count was a proxy for shorter petals (a smaller
+first-station spacing in mm) and stacked tilt (a sharper kink); the derived
+`seamClearanceMm` is the fix and it is the SEAM owner's, not `footRing()`'s. **The
+instruction that followed — "do not judge a deformation feature's printability on a
+multi-layer build until this is fixed" — is DISCHARGED and must not be re-inherited.**
+**WHAT STILL SHIPS SAYING OTHERWISE, and it is Eva's ruling rather than a cleanup:**
+`bloom.js`'s `rootBlendLine()` prints at 3+ layers that *"the inner layers' short petals
+fold through themselves at the root (a measured self-intersection at the defaults, session
+35)"* — its leading clause is now false, its trailing clause (one or two layers are clean
+at the default form; what folds a single petal is its own FORM, not the depth) is still
+exactly true — and the panel gate's **route (v)** asserts that sentence APPEARS, on a row
+labelled *"3 layers (the first depth that folds)"*. The line exists by session 36's ruling,
+so retiring or re-pointing it is a ruling; the three options and the gate cost are §7 of
+the superseded doc.
 
 **A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
 FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
