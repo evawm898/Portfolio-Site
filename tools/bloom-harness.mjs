@@ -6766,6 +6766,11 @@ export function stemChannelAssertions(positions, row, m, ui) {
      would be two owners of one predicate. What is NOT excused is the same as
      for a leaf: the FLORET's own hub and petals, which is what makes this a
      naming rather than a widening. */
+  /* COUNTED SEPARATELY ONLY SO THE MESSAGE CAN BE TRUE. The leaf note below
+     says a steep BLADE reads here, and once pedicels joined this list
+     `rods.length` stopped meaning "this build has leaves" — so a raceme with
+     no leaves at all would have printed it. */
+  const leafRods = (m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes.length : 0);
   const rods = [
     ...(m && m.leaf && Array.isArray(m.leaf.petioleAxes) ? m.leaf.petioleAxes : []),
     ...(m && m.inflorescenceBuilt && Array.isArray(m.inflorescenceBuilt.placed)
@@ -6878,7 +6883,7 @@ export function stemChannelAssertions(positions, row, m, ui) {
          petal, and "the channel is not clear" would send a reader looking for
          one. Named here rather than excused, because a carve wide enough to
          hold a blade is wide enough to hold a petal. */
-      ? ` (${excused} further vertex/vertices are the ${rods.length} rod(s)' own — petioles and pedicels, rooted through the wall by design — and are excused${florets ? `, and ${florets} are a floret's own body, nearest ${floretWorst.toFixed(4)} mm (reported, never gated: a floret hangs BESIDE the rachis and is in no region the design says must be empty)` : ''}. NOTE: this build has leaves and only their PETIOLES are excused, so a steep leaf's BLADE against the stem reads here too — a real unprintable gap, but not a petal.)`
+      ? ` (${excused} further vertex/vertices are the ${rods.length} rod(s)' own — petioles and pedicels, rooted through the wall by design — and are excused${florets ? `, and ${florets} are a floret's own body, nearest ${floretWorst.toFixed(4)} mm (reported, never gated: a floret hangs BESIDE the rachis and is in no region the design says must be empty)` : ''}.${leafRods ? ` NOTE: this build has leaves and only their PETIOLES are excused, so a steep leaf's BLADE against the stem reads here too — a real unprintable gap, but not a petal.` : ''})`
       : '';
     bad.push(`ST9: ${intruders} exported vertex/vertices stand inside the ${clear} mm printable gap of the free stem and are not the stem's own — nearest ${worst.toFixed(4)} mm at ${JSON.stringify(worstAt && worstAt.map((v) => Number(v.toFixed(3))))}. The channel is not clear in the file that will be printed.${excusedNote}`);
   }

@@ -1,7 +1,7 @@
 # Inflorescence, session 1 — instancing and one raceme
 
 Eva's twelve rulings are in `docs/bloom-inflorescence-discovery.md` and they govern.
-This is what the first session built against them, what it measured, and the four
+This is what the first session built against them, what it measured, and the EIGHT
 things it found that nobody had asked about.
 
 Scope, from ruling 5: **instancing, plus one raceme of identical florets. Nothing
@@ -112,7 +112,7 @@ one thing this session adds to the geometry's vocabulary is
 `r_rachis / sqrt(N)`, floored at `STEM_DIAMETER_RANGE[0] / 2` and TOLD. On the shipping
 6 mm rachis the floor binds from five florets up; at two it is 4.24 mm.
 
-## 4. The seven findings
+## 4. The eight findings
 
 ### (i) The area rule reads the ASKED count, because the built one is a fixed point
 
@@ -303,6 +303,11 @@ direct call on the MUTATED module and is deliberately not the assertion the muta
 and every one of the seven exports **watertight, as one connected piece, at the triangle
 count its own row predicts** — which is the argument for the family existing at all.
 `the-placement-carries-a-scale` reddens ID6 as well as ID3, printed as collateral.
+
+**AND EVERY ONE OF THEM IS ONE CONNECTED PIECE — the invariant, measured on the voxel
+flood fill rather than argued from the joins:** `verify-bloom-connectedness --only
+"^INFLO: (?!ALL MAX)"` reads **22 attempted · 22 reached the results · 22 are ONE
+connected piece**, every row `components=1 stray=0 boundary=0`, in 210 s.
 
 **The smoke census is green and the block count rose**: 105 smoke rows over **33** matrix
 blocks of 883 rows, and **109 families asserted, 109 claimed, both directions** — ID0
