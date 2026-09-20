@@ -106,7 +106,11 @@ phyllotaxis is `leafAzimuths`, the rod's root radius and embed are `rodWallRootM
 `rodWallEmbedMm`, the crossing is `rodWallCrossingMm`, the petal ranges the floret's
 size clamps into are `OVERRIDE_BOUNDS`, and the printable gap is `MIN_FEATURE_MM`. The
 one thing this session adds to the geometry's vocabulary is
-`MeshBuilder.appendTransformed(other, M)`.
+`MeshBuilder.appendTransformed(other, M)`. The rachis distance is
+`freeStemDistanceMm`'s — its first cut wrote that function out again, which is the same
+duplicate-expression defect `rodWallRootMm` had just been extracted to fix, in the same
+file on the same day, and it was found by reading the diff against the combination
+gate's own `leaf-stem` measure rather than by a failure.
 
 **THE PEDICEL'S RADIUS IS DERIVED AND IS NOT A CONTROL** — the area rule read downward,
 `r_rachis / sqrt(N)`, floored at `STEM_DIAMETER_RANGE[0] / 2` and TOLD. On the shipping
@@ -275,10 +279,17 @@ counts.
 | GATED (type NONE) | 21,148 | 1,033 |
 | GATED (no rachis) | 19,040 | 930 |
 
-**`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 of the 1,500,000 budget, 74.3%.** So **no
-`EXPORT_REFUSED_XFAIL` entry is owed**, and ruling 9's declared refusal row is not built:
-it was conditional on the row exceeding the budget and it does not. Widening a range until
-a row refuses would be tuning a control to exercise a gate.
+**`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 of the 1,500,000 budget, 74.3%. THE ROW
+EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, AND THAT IS A DISAGREEMENT WITH
+RULING 9 RATHER THAN A SHORTFALL.** Ruling 9 asks for the sub-controls out of the blanket
+sweep "with one declared `INFLO: ALL MAX` refusal row". The ROW is built and is in the
+matrix — 12 nodes x whorled x 12 petals x size 1.00 x a 60 mm pedicel straight up, the
+corner the sweep no longer reaches — and it simply does not breach: 36 florets at 30,380
+triangles each plus the head. So there is nothing to declare, and nothing was manufactured:
+widening a range until a row refuses would be tuning a control to exercise a gate, which is
+the `ALL MAX` ruling's own refusal (#230) read the other way round. The ceiling is
+**REPORTED with its headroom** and the day a later session raises the node cap or a
+per-node delta lands, that row is where it will breach and the entry is one line.
 
 **THE MUTANT TABLE PASSES ON ALL SEVEN, and the clean tree is silent on every row:**
 
@@ -307,7 +318,9 @@ count its own row predicts** — which is the argument for the family existing a
 **AND EVERY ONE OF THEM IS ONE CONNECTED PIECE — the invariant, measured on the voxel
 flood fill rather than argued from the joins:** `verify-bloom-connectedness --only
 "^INFLO: (?!ALL MAX)"` reads **22 attempted · 22 reached the results · 22 are ONE
-connected piece**, every row `components=1 stray=0 boundary=0`, in 210 s.
+connected piece**, every row `components=1 stray=0 boundary=0`, in 210 s — and
+`INFLO: ALL MAX` separately, at **1,114,828 triangles, `components=1 stray=0
+boundary=0`**, in 77 s. **All 23 rows: watertight AND one piece.**
 
 **The smoke census is green and the block count rose**: 105 smoke rows over **33** matrix
 blocks of 883 rows, and **109 families asserted, 109 claimed, both directions** — ID0

@@ -4003,9 +4003,15 @@ shipped `zStemEnd + frac * extentMm` — 0 matches on BOTH trees), re-anchored h
 its own comment predicts; both coverage instruments build the florets from
 `inflorescencePlan`'s own record now.
 **`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 export triangles of the 1,500,000 budget,
-74.3%, 54,435 KiB — SO NO `EXPORT_REFUSED_XFAIL` ENTRY IS OWED** and ruling 9's declared
-refusal row is not built: it was conditional on the row exceeding the budget and it does
-not. Widening a range until a row refuses would be tuning a control to exercise a gate.
+74.3%, 54,435 KiB — SO THE ROW EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, WHICH
+IS A DISAGREEMENT WITH RULING 9 RATHER THAN A SHORTFALL.** That ruling asks for the
+sub-controls out of the blanket sweep "with one declared `INFLO: ALL MAX` refusal row"; the
+ROW is built and is in the matrix — 12 nodes x whorled x 12 petals x size 1.00 x a 60 mm
+pedicel straight up, the corner the sweep no longer reaches — and it simply does not breach
+(36 florets at 30,380 triangles each plus the head). Nothing was manufactured: widening a
+range until a row refuses would be tuning a control to exercise a gate. The headroom is
+REPORTED, and the day a node cap rises or a per-node delta lands that row is where it will
+breach.
 **THE COMBINATION GATE'S REJECTION OF ARRANGEMENT CONTROLS STILL HOLDS WITH HEADS
 INSTANCED, AND FOR A SECOND REASON — SWEPT, NOT ARGUED.** `self` is `measureWall` on ONE
 petal and cannot see where a whole HEAD stands, so CG1 would refuse an inflorescence pair as
