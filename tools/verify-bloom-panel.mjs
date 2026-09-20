@@ -1805,40 +1805,18 @@ for (const [label, sets, want] of [
   else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'}, owner agrees (innermost ring ${res.inner.toFixed(3)} mm${res.anyCross ? ', feet cross the axis' : ''})`);
 }
 
-/* ---------------- (v) THE ROOT-BLEND LINE, BOTH DIRECTIONS (session 36) ---------------- */
-/* The read-out's ROOT BLEND line is a recorded MEASUREMENT (the inner layers'
-   petals self-intersect at the root from three layers up; one or two layers
-   export clean at any petal count) — Eva's workaround, printed where the
-   layer count is set. Asserted iff layerCount >= 3, against the control's
-   own value read back, in both directions and under both placements. */
-for (const [label, sets, want] of [
-  ['defaults (one layer)', [], false],
-  ['2 layers (the largest clean depth)', [{ id: 'layerCount', value: '2' }], false],
-  ['3 layers (the first depth that folds)', [{ id: 'layerCount', value: '3' }], true],
-  ['6 layers x 40 petals', [{ id: 'layerCount', value: '6' }, { id: 'petalCount', value: '40' }], true],
-  ['CONTINUOUS x 3 turns', [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }], true],
-]) {
-  const tag = `[root blend] ${label}`;
-  await openBloom(page, port);
-  if (NEGATIVE_CONTROL) {
-    /* NEGATIVE CONTROL, route (v): the read-out never changes again — the
-       line cannot appear where it must. */
-    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {}, configurable: true }); });
-  }
-  const bad = await applyConfig(page, sets);
-  if (bad.length) { note(`${tag}: config did not take: ${bad.join('; ')}`); continue; }
-  const res = await page.evaluate(() => {
-    const txt = document.getElementById('readout').textContent;
-    const layers = Number(window.__bloomUIState().layerCount);
-    return { layers, shown: /ROOT BLEND AT \d+ (LAYERS|TURNS)/.test(txt), workaround: /ONE OR TWO (layers|turns) exports free of self-intersection at any petal count at the default form/.test(txt) };
-  });
-  const problems = [];
-  if ((res.layers >= 3) !== want) problems.push(`the page reads layerCount ${res.layers}, this row expects ${want ? '3 or more' : 'fewer than 3'}`);
-  if (res.shown !== want) problems.push(`the ROOT BLEND line is ${res.shown ? 'SHOWN' : 'ABSENT'} at ${res.layers} layer(s)`);
-  if (res.workaround !== want) problems.push(`the one-or-two-layers workaround clause is ${res.workaround ? 'shown' : 'absent'} at ${res.layers} layer(s)`);
-  if (problems.length) note(`${tag}: ${problems.join('; ')}`);
-  else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'} at ${res.layers} layer(s)`);
-}
+/* ---------------- (v) IS RETIRED (Eva, Sep 20) ---------------- */
+/* Route (v) asserted the read-out's ROOT BLEND line appeared iff layerCount
+   was three or more, on five rows including one labelled "3 layers (the first
+   depth that folds)". The line is gone (bloom.js), so the route is gone with
+   it and its five rows existed only to carry it.
+   NOTE FOR THE BOOKKEEPING, because it is a finding rather than a
+   convenience: route (v) was in NONE of this gate's three route mechanisms —
+   no entry in the header's enumeration, no flag in --negative-control's
+   completeness list, and not counted in its "SEVENTEEN ROUTES" banner. It is
+   exactly the shape the sphere-stem session named: A ROUTE THAT FIRES AND IS
+   NOT REQUIRED IS A ROUTE THAT CAN GO SILENT WITHOUT THE GATE NOTICING. So
+   removing it moves no count and no list, and the letter (v) is not reused. */
 
 /* ---------------- (k) THE DOME LINE AND THE APEX CLAMP, BOTH DIRECTIONS ---------------- */
 /* The head-rise control's read-out (Sep 4): the HEAD RISE line is shown iff

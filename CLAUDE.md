@@ -112,8 +112,10 @@ hook measures the cleft rows without their cleft, which the smoke gate caught.) 
 MEASURED rather than as the ruling phrased it**: one or two layers export free of
 self-intersection at any petal count AT THE DEFAULT FORM (the petalCount sweep reads 0 on
 every row); cup beyond about −0.2..0.3, buckle from 0.3×, roll from 270° and curl 360° fold
-a single petal at ANY depth — the read-out's `ROOT BLEND AT N LAYERS` line says exactly
-that, at three layers and up, and the panel gate's route (v) asserts it both ways.
+a single petal at ANY depth. **That was printed by the read-out's `ROOT BLEND AT N LAYERS`
+line at three layers and up, with the panel gate's route (v) asserting it both ways — BOTH
+ARE RETIRED (Eva, Sep 20), and no line replaced them.** The form half of the sentence above
+is still true and is now carried here and in the outcome docs rather than on the page.
 
 **EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
 corroborated independently against an exported STL). Per-shell signed volume: the hub
@@ -149,15 +151,22 @@ first-station spacing in mm) and stacked tilt (a sharper kink); the derived
 `seamClearanceMm` is the fix and it is the SEAM owner's, not `footRing()`'s. **The
 instruction that followed — "do not judge a deformation feature's printability on a
 multi-layer build until this is fixed" — is DISCHARGED and must not be re-inherited.**
-**WHAT STILL SHIPS SAYING OTHERWISE, and it is Eva's ruling rather than a cleanup:**
-`bloom.js`'s `rootBlendLine()` prints at 3+ layers that *"the inner layers' short petals
-fold through themselves at the root (a measured self-intersection at the defaults, session
-35)"* — its leading clause is now false, its trailing clause (one or two layers are clean
-at the default form; what folds a single petal is its own FORM, not the depth) is still
-exactly true — and the panel gate's **route (v)** asserts that sentence APPEARS, on a row
-labelled *"3 layers (the first depth that folds)"*. The line exists by session 36's ruling,
-so retiring or re-pointing it is a ruling; the three options and the gate cost are §7 of
-the superseded doc.
+**AND THE READ-OUT LINE THAT SAID OTHERWISE IS DELETED — CREATED BY SESSION 36's RULING,
+RETIRED BY EVA'S ON Sep 20.** `bloom.js`'s `rootBlendLine()` printed at 3+ layers that *"the
+inner layers' short petals fold through themselves at the root (a measured self-intersection
+at the defaults, session 35)"*; its leading clause was false on this tree and its trailing
+clause (one or two layers clean at the default form; what folds a single petal is its own
+FORM, not the depth) was still true. Eva's ruling: **delete it — no line rather than one to
+maintain.** The panel gate's **route (v)**, which asserted the sentence appeared on five rows
+including one labelled *"3 layers (the first depth that folds)"*, went with it; those rows
+existed only to carry it. **A REPLACEMENT WARNING FOR THE EFFECTIVE-TILT FOLD WAS OFFERED AND
+DECLINED — do not add one**, and do not re-point or reword the old one.
+**AND ROUTE (v) WAS IN NONE OF THE PANEL GATE'S THREE ROUTE MECHANISMS**, which is a finding
+rather than a convenience: no entry in the header's enumeration, no flag in
+`--negative-control`'s completeness list, and not counted in its "SEVENTEEN ROUTES" banner.
+That is exactly the shape the sphere-stem session named — **a route that fires and is not
+required is a route that can go silent without the gate noticing** — so its removal moved no
+count and no list, and the letter (v) is not reused.
 
 **A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
 FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
