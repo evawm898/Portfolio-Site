@@ -347,7 +347,11 @@ it. The rule stands unchanged: a session registers the baseline in both maps, pr
 the merge, and that dispatch is Eva's.
 
 **What to expect from it.** The first green run in the workflow's history, printing
-`30 published and correct · 3 missing but declared`. If the `git/refs` fallback works it will
+`31 published and correct · 3 missing but declared`. (Written as 30 when this doc was
+written at 33 declared; `frozen/phase35` was registered by #261 and has never reached a
+dispatch, so it is the one ref a push can still attempt — the other 30 are no-ops, because
+git will not move an existing tag. The two verbatim `--check` transcripts above are
+measurements taken at 33 declared and are left as they were.) If the `git/refs` fallback works it will
 say `NOW PRESENT — the API route works` for one or more of `phase5` / `phase22` / `phase23`,
 and those entries should come off `TAG_PUSH_XFAIL` in the commit that observes it. If it does
 not, it will say `still absent — the API route is refused too`, which closes a question this
