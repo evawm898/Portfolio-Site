@@ -280,6 +280,30 @@ counts.
 it was conditional on the row exceeding the budget and it does not. Widening a range until
 a row refuses would be tuning a control to exercise a gate.
 
+**THE MUTANT TABLE PASSES ON ALL SEVEN, and the clean tree is silent on every row:**
+
+```
+ANCHORS: 59 mutants, 59 matching their find-string exactly once
+CONTROL (unmutated tree): the family must be SILENT on every row
+  fired: (none)
+      names ID0 · fired ID0   ok
+      names ID1 · fired ID1   ok
+      names ID2 · fired ID2   ok
+      names ID3 · fired ID3, ID6   ok
+      names ID4 · fired ID4   ok
+      names ID5 · fired ID5   ok
+      names ID6 · fired ID6   ok
+APEX MUTANT TABLE (SUBSET of 7/59): each selected family fires on a mutation that
+names it, and is silent on the clean tree. THIS IS NOT A SWEEP — 52 mutants were
+not run.
+```
+
+Every mutation is a real edit to `bloom-geometry.js` served in flight, every witness is a
+direct call on the MUTATED module and is deliberately not the assertion the mutant names,
+and every one of the seven exports **watertight, as one connected piece, at the triangle
+count its own row predicts** — which is the argument for the family existing at all.
+`the-placement-carries-a-scale` reddens ID6 as well as ID3, printed as collateral.
+
 **The smoke census is green and the block count rose**: 105 smoke rows over **33** matrix
 blocks of 883 rows, and **109 families asserted, 109 claimed, both directions** — ID0
 through ID6 among them.
@@ -293,11 +317,35 @@ through ID6 among them.
 * **The GRID export writes the head at the origin only.** A raceme's florets are not in
   the `.glb`, and the read-out says so on every build with an inflorescence. Closing it is
   `bloom-grid-gltf.js`'s own change.
-* **No combination-gate row.** The gate measures ONE petal through `measureWall`, and an
-  inflorescence control moves where a whole HEAD stands — the `self` measure cannot see
-  it, and CG1 would refuse the pair as inert exactly as it refused `leafToothDepth`. The
-  quantity a floret pair would want is the floret-against-rachis approach in §4(iv), which
-  is a different measure with a different owner; adding it is a measure the gate does not
-  have, not a row it does not have. **So the gate's rejection of arrangement controls
-  STILL HOLDS with heads instanced**, and what would have to change is the MEASURE, which
-  this session reports rather than builds.
+* **No combination-gate row, and the rejection holds for a SECOND reason once heads are
+  instanced — measured, not argued.** Two things were asked: whether the gate's rejection
+  of arrangement controls survives instancing, and if not, what would have to change.
+
+  **(1) `self` still cannot see it.** The gate's headline measure is `measureWall(grid).self`
+  on ONE petal, and an inflorescence control moves where a whole HEAD stands. CG1 would
+  refuse such a pair as inert exactly as it refused `leafToothDepth`.
+
+  **(2) The measure a floret pair WOULD want exists, was built and was swept — and it
+  fails the gate's own BAR rather than the geometry.** The quantity is §4(iv)'s
+  floret-against-rachis approach; the builder computes it through `freeStemDistanceMm`,
+  the same owner the gate's `leaf-stem` measure calls, with the pedicel rod excluded on
+  the axis the builder emitted. Two candidate grids, EXPORT, on a 120 mm rachis:
+
+  | `pedicelAngle` | CAP head | SPHERE head | | `pedicelLength` 20 | 5 | 40 | 60 |
+  |---|---|---|---|---|---|---|---|
+  | **35 (default)** | 8.248 | **0.823** | | 8.248 | **0.000** | 24.630 | 41.013 |
+  | −60 | **0.000** | **0.000** | | **0.000** | **0.000** | 1.998 | 11.998 |
+  | 60 | **0.000** | **0.000** | | **0.000** | **0.000** | 1.998 | 11.998 |
+  | 90 | **0.000** | **0.000** | | **0.000** | **0.000** | **0.000** | **0.000** |
+
+  Both grids are `single-reaches` — the hazard is `pedicelAngle` ALONE (and
+  `pedicelLength` alone at 5 mm) — and **11 of 16 cells are under the bar on each.**
+  Carrying either would mean declaring eleven `COMBINATION_XFAIL` magnitudes, which is
+  precisely the recurring cost Eva's #265 ruling names, **for a thing this project already
+  rules a FLAG**: `MIN_FEATURE_MM` is the minimum printable GAP, and a floret touching its
+  own rachis is OVER-connection — the crowding ruling's own grounds, and the same
+  reasoning that keeps the floret's body out of ST9's count.
+
+  **So what would have to change is the BAR, not the row list**, and no pair is added. A
+  gate that declares eleven magnitudes against a bar that does not apply to them says
+  nothing, and the number is TOLD on every build instead.

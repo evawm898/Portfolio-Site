@@ -10062,7 +10062,7 @@ export function inflorescencePlan(state, stem, acc) {
     nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
     rootR, embedMm, crossesSolidMm,
     insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
-    boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, rachisLengthMm: stem.lengthMm,
+    boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemTipZ: stem.tipZ, rachisLengthMm: stem.lengthMm,
     floretPetals: Math.round(Number(state.floretPetals)), scale,
     petalLength, petalWidth, lengthAsked, widthAsked, sizeClamped, sizeDeadBelow,
     built: azimuths.reduce((n, a) => n + a.length, 0),
@@ -10209,7 +10209,15 @@ export function buildInflorescenceInto(acc, state, plan) {
      BUILDER emitted, carried through this placement — never re-derived from
      the plan's length and angle, which is session 43's ST2. */
   let rachisApproach = Infinity;
-  const stemOuterR = plan.outerR, stemRootZ = plan.rootZ, stemTipZ = plan.rootZ - plan.rachisLengthMm;
+  /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
+     first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
+     out again here — which is that function term for term, i.e. exactly the
+     duplicate-expression defect `rodWallRootMm` had just been extracted to
+     fix, in the same file on the same day. Found by reading the diff against
+     the combination gate's own `leaf-stem` measure, which calls the owner.
+     The plan carries `stemTipZ` so this needs no third derivation of where
+     the rachis ends. */
+  const rachis = { outerR: plan.outerR, rootZ: plan.rootZ, tipZ: plan.stemTipZ };
   const onPedicelRod = (x, y, z, pl) => {
     const a = pl.axis3;
     if (!a) return false;
@@ -10262,8 +10270,7 @@ export function buildInflorescenceInto(acc, state, plan) {
            ruled stays reachable. */
         const X = acc.positions[at + k], Y = acc.positions[at + k + 1], Z = acc.positions[at + k + 2];
         if (!onPedicelRod(X, Y, Z, pl)) {
-          const rr = Math.hypot(X, Y);
-          const dd = Math.hypot(Math.max(0, rr - stemOuterR), Math.max(0, stemTipZ - Z, Z - stemRootZ));
+          const dd = freeStemDistanceMm(rachis, X, Y, Z);
           if (dd < rachisApproach) rachisApproach = dd;
         }
       }

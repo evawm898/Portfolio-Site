@@ -4007,10 +4007,18 @@ its own comment predicts; both coverage instruments build the florets from
 refusal row is not built: it was conditional on the row exceeding the budget and it does
 not. Widening a range until a row refuses would be tuning a control to exercise a gate.
 **THE COMBINATION GATE'S REJECTION OF ARRANGEMENT CONTROLS STILL HOLDS WITH HEADS
-INSTANCED**, and what would have to change is the MEASURE rather than the row list: the
-gate measures ONE petal through `measureWall`, `self` cannot see where a whole HEAD stands,
-and CG1 would refuse an inflorescence pair as inert exactly as it refused `leafToothDepth`.
-The quantity a floret pair would want is the floret-against-rachis approach above.
+INSTANCED, AND FOR A SECOND REASON — SWEPT, NOT ARGUED.** `self` is `measureWall` on ONE
+petal and cannot see where a whole HEAD stands, so CG1 would refuse an inflorescence pair as
+inert exactly as it refused `leafToothDepth`. And the measure such a pair WOULD want exists:
+the floret-against-rachis approach above, through `freeStemDistanceMm` — the same owner the
+gate's own `leaf-stem` measure calls — with the pedicel rod excluded. Swept on two candidate
+grids (`pedicelAngle` x `hubShape` and `pedicelAngle` x `pedicelLength`, EXPORT, 120 mm
+rachis) **both are `single-reaches` and 11 of 16 cells are UNDER THE BAR on each** — the
+hazard is `pedicelAngle` alone, and `pedicelLength` alone at 5 mm. Carrying either would
+declare eleven `COMBINATION_XFAIL` magnitudes (#265's own named recurring cost) **against a
+bar that does not apply**: `MIN_FEATURE_MM` is the minimum printable GAP and a floret
+touching its own rachis is OVER-connection, the crowding ruling's grounds. **So what would
+have to change is the BAR, not the row list**, and no pair is added.
 **THE GRID EXPORT WRITES THE HEAD AT THE ORIGIN ONLY** — a raceme's florets are not in the
 `.glb`, the read-out says so on every build with an inflorescence, and closing it is
 `bloom-grid-gltf.js`'s own change. `frozen/phase36` is the 860 rows at `3ed45df`.
