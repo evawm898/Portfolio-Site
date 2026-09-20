@@ -120,7 +120,7 @@ const MUTANTS = [
              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
     mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'swash/an-overrun-fires-with-the-extent-it-reached',
-              'scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open',
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
               'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
     why: 'ONE OSCILLATING WATERLINE — the failure mode the brief names by name',
   },
@@ -134,7 +134,7 @@ const MUTANTS = [
               'swash/an-overrun-fires-with-the-extent-it-reached',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
-              'scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open'],
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
     why: '"do not use one rate for the whole beach" — the saturated zone dried at the overrun rate',
   },
   {
@@ -230,7 +230,7 @@ const MUTANTS = [
     from: '      for (const f of streaks) {',
     to: '      for (const f of streaks) { place(f, true); }\n      for (const f of streaks) {',
     breaks: ['water/the-streaks-persist-and-drift-shoreward'],
-    mayAlso: ['scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
     why: 'a re-randomised surface reads as static rather than as water',
   },
   {
@@ -238,7 +238,7 @@ const MUTANTS = [
     file: 'scene/beach-draw.js',
     from: '        const phase = (drift * (0.4 + 0.6 * hash2(idx, 91))) % 1;',
     to: '        const phase = drift * (0.4 + 0.6 * hash2(idx, 91));',
-    breaks: ['scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open'],
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
     why: 'THE REAL BUG: drift is a distance, so after a minute the sea was not drawn at all',
   },
   {
@@ -246,7 +246,7 @@ const MUTANTS = [
     file: 'scene/beach-draw.js',
     from: '      if (st.dpr !== undefined) ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);',
     to: '      ctx.setTransform(st.dpr || 1, 0, 0, st.dpr || 1, 0, 0);',
-    breaks: ['scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open'],
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
     why: 'THE REAL BUG: it overwrote the shell\'s dpr scale and drew the beach into one corner',
   },
   {
@@ -262,7 +262,13 @@ const MUTANTS = [
     file: 'scene/beach-draw.js',
     from: '  const into = clamp01((s - (edge - fw)) / fw) / FOAM_RAMP;',
     to: '  const into = clamp01((s - (edge - fw)) / fw);',
-    breaks: ['beach-tone/the-foam-band-is-a-plateau-of-paper-not-a-ramp-to-one'],
+    // BOTH, and the second was short in the honest direction: the sweep reported
+    // it as UNCLAIMED. A band that ramps all the way to 1 instead of levelling
+    // off does not merely have the wrong SHAPE — it never reaches paper at all,
+    // which is precisely what the bare-run check is named for. The claim was
+    // wrong, not the check.
+    breaks: ['beach-tone/the-foam-band-is-a-plateau-of-paper-not-a-ramp-to-one',
+             'scene3/the-foam-band-reaches-bare-paper'],
     why: 'THE REAL BUG: it put the foam DARKER than the wet sand and inverted the reference\'s ordering',
   },
   {
@@ -271,8 +277,72 @@ const MUTANTS = [
     from: '  const fade = d * d * (3 - 2 * d);',
     to: '  const fade = 1;',
     breaks: ['beach-tone/the-swell-fades-out-in-the-deep-water'],
-    mayAlso: ['scene3/the-water-is-the-darkest-region-and-the-dry-sand-is-open'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
     why: 'THE REAL BUG: the rendered row profile oscillated 0.26 / 0.70 / 0.45 down a smooth sea',
+  },
+  {
+    id: 'the-dry-sand-is-blank-paper',
+    file: 'scene/beach-draw.js',
+    from: '      for (let ci = 0; ci < DRY_CELLS_U; ci++) {',
+    to: '      for (let ci = 0; ci < 0; ci++) {',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL DEFECT: "the open white" read as empty, and every band-MEAN comparison passed it',
+  },
+  {
+    id: 'the-sand-texture-is-in-the-marks-register',
+    file: 'scene/beach-draw.js',
+    from: '      ctx.globalAlpha = DRY_MARK_ALPHA;',
+    to: '      ctx.globalAlpha = 0.72;',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'the declaration and the drawing disagreeing — a base texture as dark as the marks that go on top of it',
+  },
+  {
+    id: 'the-register-headroom-is-given-away',
+    file: 'scene/beach-draw.js',
+    from: 'export const DRY_MARK_ALPHA = 0.26;',
+    to: 'export const DRY_MARK_ALPHA = 0.33;',
+    // THE MODULE REFUSES TO LOAD ON THIS ONE, which is why it names the load
+    // check rather than the register clause: giving the headroom away is an
+    // invariant the module asserts at module scope, and a refusal there is
+    // stronger than a red check because nothing can run on that tree at all.
+    //
+    // AND A MODULE THAT WILL NOT LOAD TAKES THE SCENE WITH IT. The sweep
+    // reported the mount as UNCLAIMED and it was right to: with beach-draw.js
+    // refusing, the page has no beach on it, which is not collateral but the
+    // same refusal seen from the browser. The claim was short, not the checks.
+    //
+    // THE TWO SWAP CHECKS ARE `mayAlso` BECAUSE THE BLAST RADIUS IS NOT
+    // DETERMINISTIC. The random button draws from the built scenes excluding
+    // the one showing, so whether any of its six picks lands on scene 3 — and
+    // therefore whether the failed import ever reaches the console — is down
+    // to that run. A single `breaks` list cannot be right about either of
+    // them; this is /plot's own a-handle-drag-also-orbits case in another
+    // gate.
+    breaks: ['load/every-scene-module-imports',
+             'scene3/the-beach-loads-draws-and-takes-over-the-nav'],
+    mayAlso: ['swap/the-random-button-never-picks-the-scene-that-is-showing',
+              'swap/the-swap-pass-reports-no-errors'],
+    why: 'the base texture creeping up to the reference\'s own footprint darkness, which a later session cannot draw over',
+  },
+  {
+    id: 'the-foam-band-is-narrower-than-a-row',
+    file: 'scene/beach-draw.js',
+    from: 'export const FOAM_BAND_S = 0.130;',
+    to: 'export const FOAM_BAND_S = 0.022;',
+    // IT NAMES THE RASTERISED CLAUSE, NOT THE PLATEAU ONE: a narrow band is
+    // still a plateau in SHAPE, so the plateau clause's subject does not
+    // contain this failure and it stays green on any width (measured).
+    //
+    // AND THE WIDTH HAD TO BE TAKEN THIS LOW TO FIRE, WHICH IS ITSELF THE
+    // FINDING. At half the shipped width the band still reads bare in a
+    // de-sheared strip — it is only the FULL-WIDTH mean that a narrow band
+    // fails, because one screen row spans more of the beach than the band is
+    // wide. So this clause asserts the band is genuinely bare SOMEWHERE, which
+    // needs a band narrower than the swell to break; the shipped width was set
+    // by the coverage comparison, and that is said in the outcome rather than
+    // implied by this mutant.
+    breaks: ['scene3/the-foam-band-reaches-bare-paper'],
+    why: 'a foam band narrower than the swell that displaces it never reads as bare paper at all',
   },
   {
     id: 'the-shoreline-is-level',
@@ -830,7 +900,22 @@ async function loadScene(mutant) {
 // The shipped modules, in Node, against numbers taken from the brief.
 
 async function partOne(mutant) {
-  const M = await loadScene(mutant);
+  // A MODULE THAT REFUSES TO LOAD IS A RED CHECK, NOT A DEAD SWEEP. Some of
+  // these modules assert their own invariants at module scope — the dry sand's
+  // register headroom is one — and a refusal there is STRONGER than a failed
+  // check, because nothing downstream can run on a tree that is wrong in that
+  // way. But an uncaught throw here takes the whole negative control down with
+  // it and reports nothing at all, so the refusal is caught and named.
+  let M;
+  setSection('load');
+  try {
+    M = await loadScene(mutant);
+    results.push({ name: 'load/every-scene-module-imports', ok: true, detail: `${Object.keys(M).length} modules` });
+  } catch (err) {
+    results.push({ name: 'load/every-scene-module-imports', ok: false,
+      detail: err && err.message ? err.message : String(err) });
+    return;
+  }
   const DT = 1 / 240;   // fine enough that a 2 s ramp is not a sampling claim
 
   // ---------------------------------------------------------------- surface
@@ -2784,6 +2869,29 @@ async function partOne(mutant) {
       return `deep ${deep.toFixed(2)} vs sheet ${sheet.toFixed(2)}; deep is edge-independent`;
     });
 
+    check('the dry sand leaves a register for the marks session', () => {
+      // The sand-marking session draws user marks into this region, so the base
+      // texture has to sit somewhere a drawn line can be read ON TOP of. The
+      // gap is declared rather than described, and the module refuses to load
+      // without it.
+      // THE BAR IS NOT IMPORTED FROM THE MODULE UNDER TEST. The first version
+      // of this clause asserted the gap against the module's own
+      // MARK_HEADROOM, which is the entangled-reference trap: a tree that gave
+      // the headroom away would lower that constant too and the clause would
+      // stay green while the registers collided. Both numbers here have other
+      // owners — 0.30 is the gap this session is committing to, restated, and
+      // 0.32 is MEASURED off the reference (its footprints sit about 70 levels
+      // under their ground on a 185/47 range).
+      const HEADROOM = 0.30, REF_FOOTPRINT_ALPHA = 0.32;
+      assert.ok(D.DRY_MARK_ALPHA > 0, 'the dry sand carries no texture at all');
+      assert.ok(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA >= HEADROOM,
+        `the base texture at ${D.DRY_MARK_ALPHA} leaves only `
+        + `${(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor`);
+      assert.ok(D.DRY_MARK_ALPHA < REF_FOOTPRINT_ALPHA,
+        `the base texture at ${D.DRY_MARK_ALPHA} is as dark as the reference's own footprints`);
+      return `base ${D.DRY_MARK_ALPHA} · drawn marks from ${D.MARK_ALPHA_FLOOR} · headroom ${D.MARK_HEADROOM}`;
+    });
+
     check('the swell fades out in the deep water', () => {
       // Near the top of frame the ramp is steepest, so a displacement there
       // swings the tone by a fifth and the sea bands.
@@ -3643,13 +3751,30 @@ async function partTwo(browser, mutant, shotsDir) {
     const { server } = await serveRepo({ mutant, withProbe: false });
     const base = `http://127.0.0.1:${server.address().port}`;
     const { page, ctx, errors } = await openPage(browser, base);
-    try {
+    // A MUTATION CAN STOP THE SCENE MODULE LOADING AT ALL, AND A BARE WAIT HERE
+    // TURNS THAT INTO A TimeoutError OUT OF THE WHOLE RUN — no summary, no
+    // FAILURES block, and every mutant after it in the sweep unrun. This repo's
+    // own rule: a missing thing is a RED CHECK, never a hang. The mutation that
+    // found it is `the-register-headroom-is-given-away`, which makes
+    // beach-draw.js refuse at module scope exactly as it is meant to, so the
+    // page never mounts scene 3 — the refusal IS the behaviour under test and
+    // it must be reportable. The mount is a check now, and the rest of the
+    // section is skipped rather than run against a page that has no beach on
+    // it, so the run still reaches its summary and still names what failed.
+    scene3: try {
       setSection('scene3');
       await page.evaluate(() => window.__scene.activate(3));
-      await page.waitForFunction(() => window.__scene.activeId === 3 && window.__scene.frames > 4,
-        null, { timeout: 10000 });
+      let mounted = false;
 
       await checkAsync('the beach loads, draws and takes over the nav', async () => {
+        try {
+          await page.waitForFunction(() => window.__scene.activeId === 3 && window.__scene.frames > 4,
+            null, { timeout: 10000 });
+          mounted = true;
+        } catch {
+          throw new Error('scene 3 never mounted — its module did not load, '
+            + `page errors: ${errors.length ? errors.join(' | ') : '(none reported)'}`);
+        }
         const st = await page.evaluate(() => ({
           id: window.__scene.activeId, running: window.__scene.running,
           canvases: window.__scene.canvasCount, children: window.__scene.stageChildren,
@@ -3665,6 +3790,11 @@ async function partTwo(browser, mutant, shotsDir) {
         assert.ok(/Beach/i.test(st.title), `the tab reads "${st.title}"`);
         return `scene 3, one canvas, nav marks 3, "${st.title}"`;
       });
+
+      // Everything below reads the beach's own state or its framebuffer; with
+      // no beach mounted they would each fail for the same one reason and bury
+      // it in twenty identical reds.
+      if (!mounted) break scene3;
 
       await checkAsync('the published interface is exactly the three things', async () => {
         // "Expose three things and nothing else." Birds need the first two;
@@ -3729,32 +3859,128 @@ async function partTwo(browser, mutant, shotsDir) {
         return `fitted slope: edge ${fit.edge.toFixed(4)}, high-water ${fit.wet.toFixed(4)}, shore declares ${fit.declared.toFixed(4)}`;
       });
 
-      await checkAsync('the water is the darkest region and the dry sand is open', async () => {
-        // THE VALUE STRUCTURE, off the rasterised framebuffer. The brief's
-        // "the water is the DARKEST region and the dry sand is the open white",
-        // measured rather than taken from the tone constants — which is what
-        // catches a drawing that computes the right tones and does not put
-        // them on the paper. (It is how the unwrapped drift phase was found:
-        // the sea simply stopped being drawn.)
+      await checkAsync('the value ordering holds and the dry sand is toned not blank', async () => {
+        // THE VALUE STRUCTURE, off the rasterised framebuffer, and it takes TWO
+        // statistics because one of them cannot see the defect this check was
+        // written for. The dry band first shipped as BARE PAPER — a uniform
+        // 237/255 at 0.000 ink coverage across the bottom third — and every
+        // band comparison passed it, because a comparison of band MEANS reads a
+        // uniformly empty region as "the lightest" and that is all the ordering
+        // asks. "Dry sand is the open white" is a statement about the value
+        // ordering: it is the lightest TONED region, not an empty one. The
+        // reference never gets lighter than a mean of ~181 and carries the
+        // trampled surface to the bottom edge at a local contrast of 14.5.
+        //
+        // So the ordering is asserted on the means, and the dry band is
+        // separately held to carrying TEXTURE — which a mean is blind to — and
+        // to staying inside its own register, under the floor a later session's
+        // drawn marks start at.
         await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
-        const band = await page.evaluate(() => {
+        const m = await page.evaluate(() => {
           const c = document.querySelector('.scene-canvas');
           const g = c.getContext('2d');
           const W = c.width, H = c.height;
-          const rows = (a, b) => {
-            const d = g.getImageData(0, Math.round(H * a), W, Math.max(1, Math.round(H * (b - a)))).data;
+          const band = (a, b) => {
+            const y0 = Math.round(H * a), hh = Math.max(1, Math.round(H * (b - a)));
+            const d = g.getImageData(0, y0, W, hh).data;
             let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i];
-            return s / (d.length / 4);
+            const mean = s / (d.length / 4);
+            // Local contrast: how far a pixel sits from the mean of its patch.
+            // A flat region reads ~0 however light or dark it is.
+            let loc = 0, n = 0;
+            const at = (x, y) => d[(y * W + x) * 4];
+            for (let y = 5; y < hh - 5; y += 3) for (let x = 5; x < W - 5; x += 3) {
+              let p = 0; for (let k = -4; k <= 4; k += 2) for (let j = -4; j <= 4; j += 2) p += at(x + j, y + k);
+              loc += Math.abs(at(x, y) - p / 25); n++;
+            }
+            // The darkest 1% — what the texture's own marks reach.
+            const px = []; for (let i = 0; i < d.length; i += 40) px.push(d[i]);
+            px.sort((a2, b2) => a2 - b2);
+            return { mean, loc: loc / n, p01: px[Math.floor(px.length * 0.01)], paper: px[px.length - 1] };
           };
-          return { top: rows(0.02, 0.12), mid: rows(0.18, 0.32), wet: rows(0.46, 0.54), dry: rows(0.80, 0.96) };
+          return { top: band(0.02, 0.12), mid: band(0.18, 0.32), wet: band(0.46, 0.54), dry: band(0.78, 0.97) };
         });
         await page.evaluate(() => window.__scene.pause(false));
-        assert.ok(band.top < band.mid, `the deep water (${band.top.toFixed(0)}) is not darker than the water below it (${band.mid.toFixed(0)})`);
-        assert.ok(band.mid < band.wet, `the water (${band.mid.toFixed(0)}) is not darker than the wet sand (${band.wet.toFixed(0)})`);
-        assert.ok(band.wet < band.dry, `the wet sand (${band.wet.toFixed(0)}) is not darker than the dry sand (${band.dry.toFixed(0)})`);
-        assert.ok(band.dry > 225, `the dry sand reads ${band.dry.toFixed(0)} — it is not open paper`);
-        assert.ok(band.top < 110, `the deep water reads ${band.top.toFixed(0)} — it is not a dark mass`);
-        return `deep ${band.top.toFixed(0)} < water ${band.mid.toFixed(0)} < wet ${band.wet.toFixed(0)} < dry ${band.dry.toFixed(0)}`;
+
+        assert.ok(m.top.mean < m.mid.mean, `the deep water (${m.top.mean.toFixed(0)}) is not darker than the water below it (${m.mid.mean.toFixed(0)})`);
+        assert.ok(m.mid.mean < m.wet.mean, `the water (${m.mid.mean.toFixed(0)}) is not darker than the wet sand (${m.wet.mean.toFixed(0)})`);
+        assert.ok(m.wet.mean < m.dry.mean, `the wet sand (${m.wet.mean.toFixed(0)}) is not darker than the dry sand (${m.dry.mean.toFixed(0)})`);
+        assert.ok(m.top.mean < 110, `the deep water reads ${m.top.mean.toFixed(0)} — it is not a dark mass`);
+
+        // THE DRY BAND IS TONED. A blank band reads ~0 local contrast; the
+        // reference's reads 14.5. Held well clear of flat, and under the
+        // reference's own so a drawn mark has somewhere to go.
+        assert.ok(m.dry.loc > 4, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)} — it is a blank band`);
+        assert.ok(m.dry.loc < 14.5, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)}, at or past the reference's own 14.5`);
+        assert.ok(m.dry.mean < 234, `the dry sand reads ${m.dry.mean.toFixed(0)} — it is bare paper`);
+
+        // AND ITS MARKS STAY IN THEIR REGISTER. The darkest 1% of the band is
+        // what the texture actually puts down; a later session's drawn marks
+        // start at MARK_ALPHA_FLOOR, so the base has to sit lighter than that.
+        const floor = m.dry.paper - (m.dry.paper - 22) * 0.60;
+        assert.ok(m.dry.p01 > floor,
+          `the sand texture reaches ${m.dry.p01} against a drawn-mark floor of ${floor.toFixed(0)} — the two registers collide`);
+        return `deep ${m.top.mean.toFixed(0)} < water ${m.mid.mean.toFixed(0)} < wet ${m.wet.mean.toFixed(0)} < dry ${m.dry.mean.toFixed(0)}; `
+          + `dry local contrast ${m.dry.loc.toFixed(1)} (ref 14.5), marks reach ${m.dry.p01} against a floor of ${floor.toFixed(0)}`;
+      });
+
+      await checkAsync('the foam band reaches bare paper', async () => {
+        // THE BAND HAS TO BE WIDER THAN A SCREEN ROW'S OWN s-RANGE, and the
+        // plateau clause next door cannot see that: a narrow band is still a
+        // plateau in shape, it just never reads as bare anywhere.
+        //
+        // MEASURED IN A CENTRAL STRIP, because these bands are SHEARED — at 3
+        // degrees on this frame one full-width row spans 0.079 of frame height
+        // in band coordinates, which is WIDER THAN THE BAND, so a full-width
+        // mean can never reach paper however bare the band is. Over the middle
+        // tenth the shear is under 1% of height.
+        //
+        // THE BAR IS THE REFERENCE'S OWN BARE RUN. Read off the clips with a
+        // PER-COLUMN statistic, which needs no strip and no slope at all —
+        // shear moves a band up or down per column and cannot smear anything
+        // within one — the longest bare run is 3.56% / 1.39% / 3.06% of frame
+        // on the three clips whose foam is not thin (0.43% on c3_001, which
+        // is), and 97-100% of their columns reach EXACTLY 0.000 coverage.
+        // FOAM_BAND_S is set from that; see its own block in beach-draw.js,
+        // including why the full-width figure cannot be satisfied at any width.
+        // The bar here sits under the thinnest of the three, so it fails a band
+        // that has stopped opening rather than one that is merely narrower than
+        // c1_001's.
+        await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
+        const m = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const W = c.width, H = c.height;
+          const x0 = Math.round(W * 0.45), ww = Math.round(W * 0.10);
+          const d = g.getImageData(x0, 0, ww, H).data;
+          const rows = [];
+          for (let y = 0; y < H; y++) {
+            let s2 = 0;
+            for (let x = 0; x < ww; x++) s2 += d[(y * ww + x) * 4];
+            rows.push(s2 / ww);
+          }
+          const paper = Math.max(...rows);
+          const st = window.__scene.sceneState();
+          // Between the deep water and the swash edge, in screen rows.
+          const lo = Math.round(H * 0.10), hi = Math.round(H * st.edge[2]);
+          // THE BARE EXTENT, NOT JUST WHETHER ONE ROW IS BARE. Any plateau at
+          // all leaves a row or two between lattice lines, so "it reaches
+          // paper somewhere" is satisfied by a band a tenth the shipped width
+          // — measured, it stayed green at FOAM_BAND_S 0.022. What the
+          // reference actually shows is a band bare across about 4% of frame.
+          let run = 0, best = 0, at = 0;
+          for (let y = lo; y < hi; y++) {
+            if (paper - rows[y] < 10) { run++; if (run > best) { best = run; at = y / H; } }
+            else run = 0;
+          }
+          return { paper, span: best / H, at, edge: st.edge[2] };
+        });
+        await page.evaluate(() => window.__scene.pause(false));
+        assert.ok(m.span > 0.025,
+          `the foam band is bare across only ${(m.span * 100).toFixed(2)}% of frame height `
+          + `— the reference's is bare across about 4%`);
+        return `bare across ${(m.span * 100).toFixed(2)}% of frame (ref 3.56 / 3.06 / 1.39%), ending at `
+          + `${(m.at * 100).toFixed(1)}%, swash edge at ${(m.edge * 100).toFixed(1)}%`;
       });
 
       await checkAsync('the swash runs and drains while the wet band stays', async () => {

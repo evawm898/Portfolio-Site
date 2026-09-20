@@ -6,8 +6,10 @@
 // ONE INK AND ONE GROUND, AND THE INVERSION IS WHICH END IS OPEN. The section
 // declares one ink and one ground (scene.css) and this scene keeps that count
 // — but the ground is the SAND and the ink accumulates seaward, so the water is
-// the darkest region and the dry sand is bare paper. That is what the brief
-// means by "the value structure inverts relative to scene 1".
+// the darkest region and the dry sand is the LIGHTEST one. That is what the
+// brief means by "the value structure inverts relative to scene 1", and
+// "lightest" is an ordering rather than an emptiness: the dry sand carries the
+// trampled texture all the way to the bottom edge (see DRY_MARK_ALPHA).
 //
 // TONE IS CARRIED BY WEIGHT AND DUTY ON A CONSTANT PITCH, NOT BY SPACING, and
 // that is the whole difference between water and plaid. The first cut packed
@@ -33,15 +35,20 @@ export const WEIGHT_BUCKETS = 10;  // segments batched by weight: ten strokes, n
 // (194 - L) / (194 - 47) from row-median luminances: deep water 47, water at
 // the shore 118, glossy wet sand 125, wet sand 152-161, dry sand 186-194.
 //
-// THE DRY SAND IS BARE PAPER AND THE FOAM READS BRIGHTER THAN IT BY LOCAL
-// CONTRAST, NOT BY BEING LIGHTER IN ABSOLUTE TERMS. The reference's foam (197)
-// really is brighter than its dry sand (186-194), and the first cut took that
-// literally — it gave the dry sand a tone so the foam had somewhere brighter
-// to go, and inked forty percent of the frame to buy three luminance levels.
-// A drawing does not work that way: the foam is a white gap inside the dark
-// water, so it reads as the brightest thing in the frame while being the same
-// paper the dry sand is. The dry sand is left open, which is also what the
-// brief asks for in as many words.
+// THE FOAM READS BRIGHTER THAN THE DRY SAND BY LOCAL CONTRAST, NOT BY BEING
+// LIGHTER IN ABSOLUTE TERMS. The reference's foam (197) really is brighter than
+// its dry sand (186-194), and the first cut took that literally — it gave the
+// dry sand a LATTICE tone so the foam had somewhere brighter to go, and inked
+// forty percent of the frame to buy three luminance levels. A drawing does not
+// work that way: the foam is a white gap inside the dark water, so it reads as
+// the brightest thing in the frame without the sand being pushed down to make
+// room for it.
+//
+// SO `dry` IS THE LATTICE'S TONE THERE AND IT IS ZERO — THE DRY SAND IS NOT
+// BLANK. The water's lattice stops at the high-water mark and the trampled
+// surface is drawn by drawDrySand() instead, in its own register and off this
+// ladder entirely (see DRY_MARK_ALPHA below). Reading `dry: 0` as "the bottom
+// third is paper" is exactly the mistake that shipped once.
 // THE CONSTANTS ARE SET FROM DELIVERED COVERAGE, NOT BY EYE, because tone is
 // not ink: the weight buckets, the duty law and the pitch compose, and what a
 // tone of 0.5 actually puts on the paper cannot be read off the code. Forced
@@ -62,7 +69,7 @@ export const WEIGHT_BUCKETS = 10;  // segments batched by weight: ten strokes, n
 // table above.
 export const TONE = {
   foam: 0.00,      // L 191-197 -> coverage 0.04; bare paper, and BRIGHTER THAN THE WET SAND
-  dry: 0.00,       // L 185-194 -> coverage 0.03; no sand marking this session
+  dry: 0.00,       // L 185-194 -> coverage 0.03; the LATTICE's tone — the texture is drawDrySand's
   wet: 0.235,      // L 152-161 -> coverage 0.23
   gloss: 0.355,    // L 125     -> coverage 0.43
   shallow: 0.45,   // L 118-121 -> coverage 0.47
@@ -76,6 +83,64 @@ export const TONE = {
 // at the end: a PHOTOGRAPHIC NEGATIVE of the same drawing rather than a second
 // mark plan, so the choice can be made in front of both.
 export const PALETTE = { ground: '#f1ede6', ink: '#16181c' };
+
+// THE DRY SAND IS THE LIGHTEST TONED REGION, NOT AN EMPTY ONE, AND THE FIRST
+// CUT HAD IT BLANK. "Dry sand is the open white" is a statement about the VALUE
+// ORDERING — lightest — and it was read as "bare paper": the bottom third of
+// the frame came out a uniform 237/255 at 0.000 ink coverage. The reference
+// never gets lighter than a mean of ~179-182 and carries the trampled surface
+// all the way to the bottom edge.
+//
+// AND THE BAND COMPARISON COULD NOT SEE IT, which is the more useful half. That
+// instrument measures each band's interior against the reference's, and a
+// uniformly empty band still comes out "lightest" — it satisfies the ordering
+// while carrying no information at all. A mean alone cannot distinguish an
+// empty region from a textured one of the same average, so the dry band is held
+// to the reference's LOCAL CONTRAST as well as to its coverage.
+//
+// MEASURED ON THE REFERENCE, dry sand against the two regions either side:
+//
+//   region      mean   p05   p50   p95   local contrast
+//   dry sand     181   121   191   206   14.5
+//   wet sand     153    --    --    --    3.9
+//   water        110    --    --    --   13.1
+//
+// So the dry sand is as textured as the WATER and four times as textured as the
+// wet sand, and its distribution is left-tailed: a bright ground with sparse
+// dark pocks about 70 levels under it, which is what a footprint is.
+//
+// THE REGISTER IS DECLARED HERE FOR THE SAND-MARKING SESSION, NOT LEFT FOR IT
+// TO DISCOVER. That session draws user marks into exactly this region, and a
+// drawn line has to read ON TOP of the base texture rather than compete with
+// it. So the base texture is deliberately SHALLOWER than the reference's own —
+// its marks sit at DRY_MARK_ALPHA of full ink, against the reference's ~0.32 —
+// and everything a later session draws starts at MARK_ALPHA_FLOOR or darker.
+// The gap between them is the headroom, asserted at module load below rather
+// than described: a base texture that crept up into the marks' register would
+// be a change nobody could see until the marks arrived.
+export const DRY_MARK_ALPHA = 0.26;     // the ink a base sand mark carries, 0..1 of full
+export const MARK_ALPHA_FLOOR = 0.60;   // a later session's DRAWN marks start here
+export const MARK_HEADROOM = 0.30;      // and this much has to separate the two registers
+
+if (MARK_ALPHA_FLOOR - DRY_MARK_ALPHA < MARK_HEADROOM) {
+  throw new Error(`the dry sand's texture at ${DRY_MARK_ALPHA} leaves only `
+    + `${(MARK_ALPHA_FLOOR - DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor `
+    + `${MARK_ALPHA_FLOOR}; ${MARK_HEADROOM} is the declared headroom`);
+}
+
+// THE MARKS CLUMP, AND A UNIFORM FIELD OF THEM IS THE WRONG PICTURE. Scattered
+// at an even density they read as felt — a homogeneous texture swatch — where
+// the reference is patchy: a footprint is a cluster of disturbance with smooth
+// sand either side of it, so the dry band has trampled passages and clear ones.
+// A low-frequency field over (u, s) modulates how many cells carry a mark,
+// which also softens the texture's own start at the high-water mark: the edge
+// of the trampled zone is ragged rather than a line where marks begin.
+export const DRY_CELLS_U = 132;         // the grid the marks are scattered over
+export const DRY_CELLS_S = 86;
+export const DRY_MARK_CHANCE = 0.62;    // how many cells carry one, before the patching
+export const DRY_PATCH = 0.72;          // how strongly the clumping modulates that
+export const DRY_MARK_WEIGHT = 1.5;
+export const DRY_FADE_S = 0.035;        // marks fade in above the high-water mark as the sand dries
 
 import { WATERLINE_S } from './beach-shore.js';
 
@@ -102,7 +167,29 @@ function hash2(a, b) {
 // The break at the back of frame is the same construction at the other end — a
 // second place the ink opens out — so the two bright bands cannot disagree
 // about what foam looks like.
-export const FOAM_BAND_S = 0.085;   // the band at the shore, in frame heights
+// THE WIDTH IS THE REFERENCE'S OWN BARE RUN, AND READING IT TOOK AN INSTRUMENT
+// THAT THE SHEAR CANNOT REACH. A FULL-WIDTH ROW MEAN CANNOT MEASURE A SHEARED
+// BAND AT ALL: at 3 degrees one screen row spans 0.079 of frame height in band
+// coordinates — wider than this band — so every "foam" row is part water and
+// part wet sand, and the figure it reports is a property of the TILT rather
+// than of the foam. Measured, the full-width coverage falls monotonically as
+// the band is widened (0.23 / 0.20 / 0.17 / 0.14 at 0.100 / 0.115 / 0.130 /
+// 0.145) and NEVER reaches the reference's 0.04 at any width, because what it
+// is reading is the smear. Widening the band to chase it is fitting a constant
+// to an artefact, and an earlier cut of this file did exactly that.
+//
+// A COLUMN IS IMMUNE, because shear moves a band up or down per column and
+// cannot smear anything within one. So the width is set by the per-column
+// longest BARE run, which needs no slope to be known, estimated or agreed on:
+//
+//   c1_001  3.56%   c1_050  1.39%   c2_001  3.06%   c3_001  0.43%
+//
+// and every one of those clips reaches EXACTLY 0.000 minimum coverage in 97-100%
+// of its columns (c3_001, whose foam is thin, in 51%). This drawing reads
+// 0.000 minimum in 100% of columns at every width tried; what the width buys is
+// the RUN, and 0.130 puts it at 3.57% against c1_001's 3.56% — the same frame
+// every other band figure here is measured against.
+export const FOAM_BAND_S = 0.130;   // the band at the shore, in frame heights
 export const BREAK_BAND_S = 0.055;  // the broken water at the back
 export const FOAM_RAMP = 0.32;      // the seaward fraction of the foam band that is a ramp; the rest is paper
 
@@ -185,6 +272,13 @@ export const SWELL_S = 0.022;      // how far the bands wave, in frame heights
 // profile oscillated 0.26 / 0.70 / 0.45 down the deep water where the
 // reference's is smooth at 0.74-0.90. It is also the right thing physically:
 // a swell is legible where it is shoaling, not out in flat water.
+// FADING IT OUT AGAIN AT THE SHORE WAS TRIED AND REVERTED. The foam band never
+// read as bare paper on a full-width row mean, and the swell displacing the
+// band's own position looked like the cause — it is at full amplitude exactly
+// where the band is. Measured, it was not: a hump-shaped fade left the foam
+// band where it was (0.11 either way) and lightened the deep water, which is
+// the half of this drawing that is calibrated. The real cause was the
+// MEASUREMENT — see FOAM_BAND_S below. Recorded so it is not re-proposed.
 export function swell(u, s, drift, depth) {
   const d = clamp01(depth === undefined ? 1 : depth);
   const fade = d * d * (3 - 2 * d);
@@ -212,6 +306,7 @@ export function createRenderer(ctx, shore) {
   const r = {
     rows: 0,
     segments: 0,
+    marks: 0,
 
     draw(st) {
       const { width: w, height: h } = st;
@@ -326,6 +421,11 @@ export function createRenderer(ctx, shore) {
         ctx.stroke();
       }
 
+      // --- the trampled dry sand -------------------------------------------
+      // Drawn BEFORE the foam pass, so nothing bright is laid over it, and in
+      // its own register (see DRY_MARK_ALPHA above).
+      r.drawDrySand(st, w, h);
+
       // --- the foam, which is the paper ------------------------------------
       ctx.strokeStyle = pal.ground;
       r.drawFoam(st, w, h);
@@ -340,6 +440,80 @@ export function createRenderer(ctx, shore) {
         ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
         ctx.restore();
       }
+    },
+
+    // THE TRAMPLED SURFACE. Scattered short marks — footprint edges, divots,
+    // drag marks — NOT the horizontal lattice the water is drawn with, because
+    // a pock is not a wave and drawing it as one would put the two regions in
+    // the same register. They are a pure function of their cell index, so they
+    // are stable frame to frame without being stored: sand does not move.
+    //
+    // WHERE THE SAND IS WET THE MARKS ARE NOT DRAWN, and they fade in over
+    // DRY_FADE_S above the high-water mark rather than switching on at it,
+    // because a film of water fills the pocks. In the reference that makes the
+    // wet/dry boundary a change of TEXTURE as well as of tone: local contrast
+    // 3.9 on the wet sand against 14.5 on the dry.
+    //
+    // THIS DRAWING DOES NOT REPRODUCE THAT CONTRAST INVERSION AND THE CLAIM IS
+    // NOT MADE. Measured here: 16.1 on the wet sand against 11.5 on the dry, so
+    // the wet band is the MORE textured of the two — the row lattice is visible
+    // at its pitch where the reference's wet sand is a smooth film. The tone
+    // ordering is right and the boundary is legible by tone, but a smooth wet
+    // band would need a finer lattice than the water can afford to share, and
+    // that is a change to the half of the picture that is calibrated.
+    drawDrySand(st, w, h) {
+      const pal = st.palette || PALETTE;
+      const ink = pal.ink;
+      ctx.strokeStyle = ink;
+      ctx.globalAlpha = DRY_MARK_ALPHA;
+      ctx.lineWidth = DRY_MARK_WEIGHT;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      let marks = 0;
+      for (let ci = 0; ci < DRY_CELLS_U; ci++) {
+        for (let cj = 0; cj < DRY_CELLS_S; cj++) {
+          const u = (ci + hash2(ci, cj * 3 + 1)) / DRY_CELLS_U;
+          const sBase = (cj + hash2(cj, ci * 5 + 2)) / DRY_CELLS_S;
+          // Two octaves of clumping, so the field has passages and clear sand.
+          const patch = 0.5 + 0.5 * (0.62 * Math.sin(u * 9.3 + sBase * 14.1)
+                                   + 0.38 * Math.sin(u * 23.7 - sBase * 31.0 + 2.2));
+          const chance = DRY_MARK_CHANCE * (1 - DRY_PATCH + 2 * DRY_PATCH * patch);
+          if (hash2(ci * 131 + cj, 7) > chance) continue;
+          // The dry band is whatever is below the high-water mark's own line at
+          // this u, so the texture follows the scalloped boundary rather than a
+          // straight one.
+          const wet = st.wetAt(u);
+          const above = sBase - wet;
+          if (above <= 0) continue;
+          const fade = above < DRY_FADE_S ? above / DRY_FADE_S : 1;
+          if (hash2(ci * 17 + cj, 11) > fade) continue;
+          // Marks grow toward the bottom of frame, which is what the reference
+          // shows: the same footprints, nearer the camera.
+          const grow = 0.55 + 0.85 * sBase;
+          const q = hash2(ci + cj * 7, 13);
+          const len = (0.0025 + q * q * 0.034) * grow;   // skewed small, with a few long drag marks
+          const ang = hash2(ci * 3 + cj * 29, 17) * Math.PI * 2;
+          const dx = Math.cos(ang) * len, dy = Math.sin(ang) * len * 0.45;
+          const x0 = (u - dx / 2) * w, x1 = (u + dx / 2) * w;
+          const s0 = sBase - dy / 2, s1 = sBase + dy / 2;
+          ctx.moveTo(x0, shore.yAt(x0, s0));
+          ctx.lineTo(x1, shore.yAt(x1, s1));
+          marks++;
+          // A divot reads as a pair: the rim beside the shadow. One extra
+          // stroke on some cells is what stops the field reading as hatching.
+          if (hash2(ci * 41 + cj, 23) < 0.34) {
+            const o = (0.0035 + hash2(ci, cj + 31) * 0.006) * grow;
+            const px0 = x0 + o * w * 0.4, px1 = x1 + o * w * 0.4;
+            ctx.moveTo(px0, shore.yAt(px0, s0 + o));
+            ctx.lineTo(px1, shore.yAt(px1, s1 + o));
+            marks++;
+          }
+        }
+      }
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+      ctx.lineCap = 'butt';
+      r.marks = marks;
     },
 
     // THE BRIGHT BANDS ARE ALREADY THERE — the water's own tone fell to bare
@@ -376,9 +550,15 @@ export function createRenderer(ctx, shore) {
       // scattered through the paper: densest at the band's shoreward edge where
       // the foam piles up, thinning seaward, so the band has a hard inner
       // boundary and a soft outer one — which is the way round a real foam edge
-      // reads. Without it a band of bare paper is a gap in the drawing.
+      // reads.
+      //
+      // IT IS A TRACE, NOT A TEXTURE, AND THE REFERENCE IS WHY. Measured, the
+      // foam band there is bare paper — coverage 0.00 across its whole width —
+      // so speckle heavy enough to read as foam in its own right is speckle
+      // that has stopped matching the thing it is drawn from. What is left is
+      // enough to stop the band being a geometric gap and no more.
       ctx.strokeStyle = pal.ink;
-      ctx.lineWidth = 1.25;
+      ctx.lineWidth = 1.1;
       ctx.beginPath();
       const N = 190;
       for (let k = 0; k < N; k++) {
@@ -388,7 +568,7 @@ export function createRenderer(ctx, shore) {
         const e = edgeAt(um);
         for (let b = 0; b < 9; b++) {
           const f = b / 9;
-          if (hash2(k * 7 + b, (st.frontSeed | 0) + 3) > 0.945 + f * 0.05) {
+          if (hash2(k * 7 + b, (st.frontSeed | 0) + 3) > 0.975 + f * 0.023) {
             const s2 = e - foamW * f + (hash2(k, b + 31) - 0.5) * foamW * 0.22;
             ctx.moveTo(u0 * w, shore.yAt(u0 * w, s2));
             ctx.lineTo(u1 * w, shore.yAt(u1 * w, s2));
