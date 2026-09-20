@@ -59,6 +59,24 @@ annotate() { # repo tagname commit message [git -c args…]
 }
 
 # ---- the fake remote -------------------------------------------------------
+# HOW MANY REFS THE HOOK BELOW REFUSES. Every case that asserts a published
+# count derives it from this, so registering a new baseline moves the
+# expectation with it — which is the whole reason this constant exists. Before
+# it, `DECLARED - 3` was written out at four sites and `30` at two more, and
+# when phase35 was registered (#261, DECLARED 33 -> 34) the four followed and
+# the two did not: run 12 of bloom-frozen-tags died in case G on a literal that
+# had been correct at 33 declared.
+#
+# IT IS DELIBERATELY NOT DERIVED FROM `TAG_PUSH_XFAIL`, and that is not an
+# omission. This is the count of refs THE FIXTURE'S OWN HOOK rejects, named
+# below; TAG_PUSH_XFAIL is the count the SCRIPT UNDER TEST declares. They are
+# two owners that must agree, and cases A and B are what checks that they do.
+# Reading the expected value out of the table inside the script being tested
+# would entangle the two: a wrongly-added TAG_PUSH_XFAIL entry would move the
+# expectation along with the behaviour and every case here would stay green on
+# it. Keep them independent. If the hook's list changes, change this number.
+REFUSED=3
+
 setup_remote() {
   rm -rf "$FAKE"
   git clone --bare --shared --quiet "$REPO" "$FAKE"
@@ -108,7 +126,8 @@ run() { ( cd "$WORK" && bash tools/publish-frozen-tags.sh "$@" ); }
 DECLARED=$(node -e "import('$REPO/tools/bloom-harness.mjs').then(h=>console.log(Object.keys(h.FROZEN_BASE_COMMITS).length))" 2>/dev/null)
 
 echo "=============================================================="
-echo "publish-frozen-tags.sh self-test — $DECLARED baselines declared"
+echo "publish-frozen-tags.sh self-test"
+echo "$DECLARED declared · $REFUSED refused by the fixture · $((DECLARED - REFUSED)) must publish"
 echo "=============================================================="
 
 # ---- A: the real-world case ------------------------------------------------
@@ -122,11 +141,11 @@ has  "phase5 named with GitHub's own reason"  "frozen/phase5   MISSING — decla
 has  "phase22 named"                          "frozen/phase22  MISSING — declared" "$TMP/a.log"
 has  "phase23 named"                          "frozen/phase23  MISSING — declared" "$TMP/a.log"
 hasnt "nothing is reported as undeclared"     "and NOT declared" "$TMP/a.log"
-grep -q "$((DECLARED - 3)) published and correct" "$TMP/a.log" \
-  && ok "$((DECLARED - 3)) of $DECLARED published and correct" \
+grep -q "$((DECLARED - REFUSED)) published and correct" "$TMP/a.log" \
+  && ok "$((DECLARED - REFUSED)) of $DECLARED published and correct" \
   || bad "wrong published count: $(grep -o '[0-9]* published and correct' "$TMP/a.log")"
 n=$(git -C "$FAKE" for-each-ref 'refs/tags/frozen/*' | wc -l)
-check "the remote really holds them (counted on the remote, not claimed)" "$n" "$((DECLARED - 3))"
+check "the remote really holds them (counted on the remote, not claimed)" "$n" "$((DECLARED - REFUSED))"
 for p in phase21 phase24 phase34 phase10; do
   want=$(git -C "$WORK" rev-parse "frozen/$p" 2>/dev/null)
   got=$(git -C "$FAKE" rev-parse "refs/tags/frozen/$p" 2>/dev/null)
@@ -138,7 +157,7 @@ echo
 echo "B. a second run over a remote that already holds them"
 run > "$TMP/b.log" 2>&1; rc=$?
 check "exit 0 — existing tags are not an error" "$rc" "0"
-grep -q "$((DECLARED - 3)) published and correct" "$TMP/b.log" \
+grep -q "$((DECLARED - REFUSED)) published and correct" "$TMP/b.log" \
   && ok "same verdict as the first run" || bad "verdict moved between runs"
 n2=$(git -C "$FAKE" for-each-ref 'refs/tags/frozen/*' | wc -l)
 check "the remote is unchanged" "$n2" "$n"
@@ -207,9 +226,10 @@ check "exit 0 despite the API being unreachable" "$rc" "0"
 has "the fallback announced itself"       "trying the git/refs API" "$TMP/g.log"
 has "it tried each refused ref"           "git/refs POST ->" "$TMP/g.log"
 has "and re-read the remote afterwards"   "still absent — the API route is refused too" "$TMP/g.log"
-has "the verdict is still the real one"   "30 published and correct" "$TMP/g.log"
+has "the verdict is still the real one ($((DECLARED - REFUSED)) published)" \
+    "$((DECLARED - REFUSED)) published and correct" "$TMP/g.log"
 after_tags=$(git -C "$FAKE" for-each-ref 'refs/tags/frozen/*' | wc -l)
-check "a failed fallback published nothing extra" "$after_tags" "30"
+check "a failed fallback published nothing extra" "$after_tags" "$((DECLARED - REFUSED))"
 
 # ---- H: an ANNOTATED tag at the right commit is not a wrong commit ----------
 echo
