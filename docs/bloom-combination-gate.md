@@ -1,8 +1,12 @@
 # The combination gate — two controls at once
 
-*Sep 19, 2026. `tools/bloom-combination-gate.mjs`, shipped with TIER 1 only. Tiers 2 and 3
-are proposed, measured and costed below and are NOT built — they wait on Eva's ruling and
-become a cheap expansion PR once the machinery exists.*
+*Sep 19, 2026. `tools/bloom-combination-gate.mjs`. #263 shipped TIER 1 and costed tiers 2
+and 3; #265 shipped all fifteen pairs on Eva's ruling. Her reasoning, verbatim: at 25.9 s
+and 19.1 s against a 249.9-minute export gate, **runtime is not the cost — the recurring
+cost is declared magnitudes, which is proportional to findings, which is what the gate is
+for.** The tier tables below are kept as #263 measured them, because the shipped gate
+reproduces every one of their figures and that agreement is the reason to trust the
+costing method next time.*
 
 ---
 
@@ -48,16 +52,45 @@ by CG0. That is not tidiness: it makes the grid CONTAIN its own two single-axis 
 the product-only claim costs no extra builds and a moved default reddens this gate rather
 than silently re-pointing it.
 
-### The five clauses
+**THE LADDERS ARE SHARED BETWEEN PAIRS ON PURPOSE.** `petalCup` is `[0, 0.6, 0.9, 1.2]` and
+`petalSpineCurl` is `[0, 180, 270, 360]` wherever either appears, so a cell that turns up in
+two grids is the same state read twice and its two records cannot disagree. A rotation in
+degrees is laddered by its own landmarks — half turn, three-quarter turn, the slider's own
+maximum — which is why `petalRoll` is `[0, 180, 270, 330]` rather than a set of even
+fractions: 330 is that slider's maximum and is `SELF_XFAIL['roll-max']`'s own state.
+
+### The eight clauses
 
 | | what it asserts |
 |---|---|
 | **CG0** | every declared value is inside its control's registry range, and each axis starts at that control's own default |
-| **CG1** | **per axis**, the control must move the measure by more than `COMBINATION_TOLERANCE_MM` somewhere on the grid. A pair whose second control cannot reach the measure is a single-axis sweep wearing a product's clothes, and it satisfies every other clause here perfectly. **The bar is the BAND and is derived rather than typed** — an `Object.is` test is satisfied by one ulp, and that is not hypothetical: `lobeDepth` moves the cup column by **2e-16 mm**, inert for every purpose and not bit-identical |
+| **CG1** | **per axis**, the control must move the measure by more than `COMBINATION_TOLERANCE_MM` somewhere on the grid. A pair whose second control cannot reach the measure is a single-axis sweep wearing a product's clothes, and it satisfies every other clause here perfectly. **The bar is the BAND and is derived rather than typed** — an `Object.is` test is satisfied by one ulp, and that is not hypothetical: `lobeDepth` moves the cup column by **2e-16 mm**, inert for every purpose and not bit-identical. An axis DECLARED in `COMBINATION_INERT` is CG7's instead |
 | **CG2** | no cell may come within `MIN_FEATURE_MM` except those declared in `COMBINATION_XFAIL` — **both directions**: a declared cell that starts CLEARING is the fix landing and fails hard |
 | **CG3** | a declared cell must still read its recorded millimetres within `COMBINATION_TOLERANCE_MM`, **both directions** (#213) |
-| **CG4** | **a biconditional on `productOnly`.** TRUE requires every single-axis cell to clear AND some interior cell to fail — that is what makes this a *combination* gate rather than a second copy of V5. FALSE requires a single-axis cell to fail |
+| **CG4** | **a three-way biconditional on `verdict`** — see below |
 | **CG5** | every key in `COMBINATION_XFAIL` names a cell some grid produces |
+| **CG6** | **provenance.** Every pair declares its `tier`, and a `cite` naming at least one file that EXISTS in this tree, and `guess: true` **iff** the tier is 3 — both directions, because a guess flag on a tier-1 or tier-2 pair means one of the two is wrong. Resolved against the gate's own tree and never against `--root`, which is where the GEOMETRY comes from |
+| **CG7** | **the inert record, both directions.** Every axis in `COMBINATION_INERT` must still move the measure by exactly the millimetres its record states. Plus the stray check CG5 makes for cells |
+
+### `verdict` is three-valued, and that is the clause the expansion forced
+
+#263 shipped `productOnly: true | false`. **A pair that clears entirely fails BOTH arms of
+a boolean** — it has no single-axis failure (so `false` is wrong) and no interior one (so
+`true` is wrong). **Four of the twenty clear** — `buckle-x-apexsweep`, `tipend-x-fringe`,
+`cup-x-length` and `lobedepth-x-curl`, every one of them a pair #265 bought, where all five
+of #263's own reach the bar. #263's tables predicted it and nothing could express it until
+the field had a third value. So:
+
+| verdict | what it requires |
+|---|---|
+| `product-only` | every single-axis cell clears AND some interior cell fails — the combination gate's own case, and the reason this is not a second copy of V5 |
+| `single-reaches` | some single-axis cell fails: one control reaches the hazard alone, so the matrix can see it and V5 usually already declares it. **It says nothing about the interior, on purpose** — a control that reaches the bar alone may also compose, and `petalCup × petalRoll` does: two singles and nine interior cells |
+| `clears` | NO cell anywhere comes within the bar |
+
+The three **partition** the possibilities — no cell fails · no single fails but some interior
+does · some single fails — so exactly one is satisfiable on any grid and no declaration is
+unfalsifiable. That is what makes keeping a clearing pair worth its builds: `clears` is a
+claim that fails loudly the day a pair nobody was watching stops clearing.
 
 ### What it is blind to, said here and in the tool's own header
 
@@ -79,29 +112,28 @@ than silently re-pointing it.
 
 ---
 
-## 2. TIER 1 — evidenced. **SHIPPED.**
+## 2. TIER 1 — evidenced. **SHIPPED (#263).**
 
 A defect measured and cited on this pair. Sorted by cost.
 
-| pair | measure | grid | cells | **cost** | worst cell | `productOnly` | citation |
+| pair | measure | grid | cells | **cost** | worst cell | verdict | citation |
 |---|---|---|---|---|---|---|---|
-| `leafAngle × stemDiameter` | leaf-stem | 4 × 3 | 12 | **1.6 s** | **0.000 mm** at 85° | **FALSE** | `docs/bloom-leaves-outcome.md` |
-| `petalCup × petalTipShape` | self | 4 × 3 | 12 | **2.6 s** | **0.832 mm** at 1.2 × 3.00 | TRUE | session 32 §18a |
-| `petalSpineCurl × buckleAmp` | self | 4 × 3 | 12 | **3.0 s** | **0.912 mm** at 360 × 0.4 | TRUE | `SELF_XFAIL['buckle-on-form']`'s note |
-| `petalCup × buckleAmp` | self | 4 × 3 | 12 | **3.1 s** | **0.963 mm** at 1.2 × 0.4 | TRUE | `SELF_XFAIL['buckle-on-form']`'s note |
-| `petalCup × petalSpineCurl` | self | 4 × 4 | 16 | **3.7 s** | **0.012 mm** at 1.2 × 360 | TRUE | the wall instrument's own control cell — see below |
+| `leafAngle × stemDiameter` | leaf-stem | 4 × 3 | 12 | **1.6 s** | **0.000 mm** at 85° | **single-reaches** | `docs/bloom-leaves-outcome.md` |
+| `petalCup × petalTipShape` | self | 4 × 3 | 12 | **2.6 s** | **0.832 mm** at 1.2 × 3.00 | product-only | session 32 §18a |
+| `petalSpineCurl × buckleAmp` | self | 4 × 3 | 12 | **3.0 s** | **0.912 mm** at 360 × 0.4 | product-only | `SELF_XFAIL['buckle-on-form']`'s note |
+| `petalCup × buckleAmp` | self | 4 × 3 | 12 | **3.1 s** | **0.963 mm** at 1.2 × 0.4 | product-only | `SELF_XFAIL['buckle-on-form']`'s note |
+| `petalCup × petalSpineCurl` | self | 4 × 4 | 16 | **3.7 s** | **0.012 mm** at 1.2 × 360 | product-only | the wall instrument's own control cell — see below |
 | | | | **64** | **14.0 s summed** | | | |
 
-*(the cost column is each pair run alone through `--only`, two runs each, this box)*
+*(the cost column is each pair run alone through `--only`, two runs each, #263's box)*
 
-**The whole gate measured end to end is 13.1 / 13.4 / 13.8 / 14.1 / 14.3 s (Node 22, five
-runs) and 12.7 / 13.5 s (Node 20, two); the per-pair figures each pay their own 60 ms of
-module load, so they sum a little high. This box, this session — a runtime from another
-machine is an anecdote (the charter's rule), and the CI runner is not this box.**
+**These five declare 20 cells** — 6 · 5 · 1 · 2 · 6 in table order — so with tier 2's 46 and
+tier 3's 12 the gate's total is **78 across sixteen of the twenty pairs**, and that sum is
+checkable against a run rather than against this sentence: the gate prints both totals.
 
 Two of the five carry something worth naming.
 
-**`petalCup × petalSpineCurl` is the finding of the session.** `tools/bloom-wall-thickness.mjs`
+**`petalCup × petalSpineCurl` is the finding of #263.** `tools/bloom-wall-thickness.mjs`
 has BUILT the cell `petalCup 1.2 × petalSpineCurl 180` on every run since session 34 — it is
 `buckle-on-form`'s own buckle-free control — read its WALL, and thrown its SELF away. It
 reads **0.945 mm**. The number has been one line away from a shipped gate for five
@@ -109,28 +141,31 @@ sessions and nothing looked at it. The grid's worst cell, `cup 1.2 × curl 360`,
 **0.012 mm**: a sheet twelve microns from touching itself, on two shipped sliders, with
 both singles clear at 1.031 and 1.245.
 
-**`leafAngle × stemDiameter` is declared `productOnly: FALSE`, and that is this session's
-own measurement rather than an admission.** Swept over six candidate partners —
+**`leafAngle × stemDiameter` is declared `single-reaches`, and that is #263's own
+measurement rather than an admission.** Swept over six candidate partners —
 `stemDiameter`, `leafLength`, `leafWidth`, `stemLength`, `leafNodes`, and `leafLength ×
 stemDiameter` — the second control moves the approach **by at most 0.002 mm**. The hazard
 is `leafAngle`'s alone. So **item 20 is a MEASUREMENT gap, not a combination gap**:
 `LEAVES: the STEEP angle (85 deg …)` is already a matrix row, built and exported on every
 full gate run, and what was missing is that nothing in the repository measured
 blade-to-stem approach at all. It rides here because this is that instrument, and CG4's
-FALSE arm is where the finding is *asserted* rather than merely written down.
+`single-reaches` arm is where the finding is *asserted* rather than merely written down.
 
 ### What TIER 1 declares
 
 **20 cells** in `COMBINATION_XFAIL` — 5 / 6 / 2 / 1 / 6 across the five pairs — each with
 its magnitude as a number the gate reads, band ±5e-4 mm (the wall instrument's own — the
 record's own rounding at three decimals, never a printability argument). The module REFUSES
-TO LOAD on an entry with no number. Re-measurable in seconds by
-`node tools/bloom-xfail-magnitudes.mjs --combination`, which reads the gate's OWN clauses
-rather than restating them.
+TO LOAD on an entry with no number. Re-measurable by
+`node tools/bloom-xfail-magnitudes.mjs --combination --only '^$'`, which reads the gate's OWN
+clauses rather than restating them. (**The `--only '^$'` is not decoration**: `--combination`
+ADDS a section rather than scoping the run, so without it the tool sweeps all 261
+self-intersection rows first. #263's doc said "in seconds" and that was the section's cost,
+not the invocation's.)
 
-**FOUR of the twenty were published before this session** — §18a's two cells under the bar
+**FOUR of the twenty were published before #263** — §18a's two cells under the bar
 (cup 1.2 × n 2.50 and 3.00) and the leaves doc's two on the 6 mm stem (`leafAngle` 70 and
-85). **The other SIXTEEN are measured here for the first time.** The three worth naming:
+85). **The other SIXTEEN were measured there for the first time.** The three worth naming:
 
 * **The §18a hazard is not confined to `petalCup` 1.2.** It reaches down to **cup 0.6 at tip
   shape 3.00 (0.929 mm)**, and cup 0.9 fails at both 2.50 (0.988) and 3.00 (0.854). §18a
@@ -139,18 +174,15 @@ rather than restating them.
 * **`cup 1.2 × buckleAmp 0.2` at 0.990 mm** — ten microns under the bar, which is the kind
   of cell a pair count cannot express and a distance can.
 
-Full tables are printed by the gate itself on every run.
-
 ---
 
-## 3. TIER 2 — shared mechanism. **PROPOSED, NOT BUILT.**
+## 3. TIER 2 — shared mechanism. **SHIPPED (#265).**
 
 Both controls write the same thing in the source. Argued from `bloom-geometry.js`, not
 from plausibility. Every cost below is **measured** by running the candidate through the
 gate's own `run()`, not estimated. Sorted by cost.
 
-`sectAt`'s return at `bloom-geometry.js:6071–6073` is the shared mechanism for most of
-this tier:
+`sectAt`'s return in `bloom-geometry.js` is the shared mechanism for most of this tier:
 
 ```
 const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)              // ROLL
@@ -159,53 +191,144 @@ const aN = (k === 0 ? 0 : (1 - Math.cos(k * a)) / k)              // ROLL
 ```
 
 Roll, cup and the buckle are three **additive summands of one normal displacement**, and
-the apex sweep's `kS` **multiplies two of them**.
+the apex sweep's `kS` **multiplies two of them**. (Cited by file and function rather than by
+line number — #263 cited `:6071–6073` and a line number in a citation goes stale silently.)
 
-| pair | cells | **cost** | worst | verdict as measured | the mechanism |
-|---|---|---|---|---|---|
-| `buckleAmp × petalTipShape` | 9 | **1.9 s** | 0.914 | **PRODUCT-ONLY**, 2 cells | the wave and the apex taper both act where the blade has least width |
-| `buckleAmp × petalApexSweep` | 9 | **2.0 s** | 1.194 | clears — nothing to gate | `kS` multiplies `bw` at :6073 |
-| `petalRoll × petalRollTaper` | 12 | **2.4 s** | 0.659 | single already fails (`roll-max`) | one term, two controls |
-| `petalCup × petalApexSweep` | 12 | **2.4 s** | 0.818 | **PRODUCT-ONLY**, 3 cells | `kS` multiplies `cupLift` at :6072 |
-| `petalCupGradient × petalTipShape` | 12 | **2.5 s** | 0.828 | **PRODUCT-ONLY**, 5 cells | §18a's argument with the gradient in the cup's place |
-| `petalCupGradient × petalSpineCurl` | 16 | **3.7 s** | 0.477 | **PRODUCT-ONLY**, 4 cells | `cAt(u, r)` is the cup's own coefficient and the gradient lives inside it |
-| `petalCup × petalRoll` | 16 | **3.7 s** | 0.010 | single already fails (`roll-max`) | two summands of `aN` |
-| `petalSpineCurl × petalTwist` | 16 | **3.7 s** | **0.012** | **PRODUCT-ONLY**, 7 cells | curl builds the centreline and base frame; twist rotates THAT frame about the curled length direction (the charter's own ordering argument) |
-| `petalCup × petalCupGradient` | 16 | **3.8 s** | 0.754 | **PRODUCT-ONLY**, 8 cells | one term, two controls |
-| | **118** | **25.9 s** | | | |
+| pair | cells | **cost** | worst | verdict | declared | the mechanism |
+|---|---|---|---|---|---|---|
+| `buckleAmp × petalTipShape` | 9 | **1.9 s** | 0.914 | product-only | 2 | the wave and the apex taper both act where the blade has least width |
+| `buckleAmp × petalApexSweep` | 9 | **2.0 s** | 1.194 | **clears** | 0 | `kS` multiplies `bw` in `sectAt` |
+| `petalRoll × petalRollTaper` | 12 | **2.4 s** | 0.659 | single-reaches | 6 | one term, two controls |
+| `petalCup × petalApexSweep` | 12 | **2.4 s** | 0.818 | product-only | 3 | `kS` multiplies `cupLift` in `sectAt` |
+| `petalCupGradient × petalTipShape` | 12 | **2.5 s** | 0.828 | product-only | 5 | §18a's argument with the gradient in the cup's place |
+| `petalCupGradient × petalSpineCurl` | 16 | **3.7 s** | 0.477 | product-only | 4 | `cAt(u, r)` is the cup's own coefficient and the gradient lives inside it |
+| `petalCup × petalRoll` | 16 | **3.7 s** | 0.010 | single-reaches | 11 | two summands of `aN` |
+| `petalSpineCurl × petalTwist` | 16 | **3.7 s** | **0.012** | product-only | 7 | curl builds the centreline and base frame; twist rotates THAT frame about the curled length direction (the charter's own ordering argument) |
+| `petalCup × petalCupGradient` | 16 | **3.8 s** | 0.754 | product-only | 8 | one term, two controls |
+| | **118** | **25.9 s** | | | **46** | |
 
-**The strongest candidate in this tier is `petalSpineCurl × petalTwist`** — 0.012 mm, seven
+*(the cost column is #263's box, measuring the candidates through `run()`; the `declared`
+column is what the shipped gate writes into `COMBINATION_XFAIL`)*
+
+**Every `worst` and every declared-cell count in that table is what the shipped gate
+measures**, cell for cell. That is the reproduction check that matters: #263 produced those
+figures from candidate grids it did not commit, and #265 rebuilt the grids from the ladders
+above and got the same numbers, which is what says the grids are the ones Eva ruled on.
+
+**The strongest pair in this tier is `petalSpineCurl × petalTwist`** — 0.012 mm, seven
 failing interior cells, and **both singles clear** (twist 180 reads 1.163, curl 360 reads
 1.245). It is Tier 2 only because no doc cites it; the mechanism argument is as strong as
-any in Tier 1.
+any in Tier 1, and it reaches the same twelve microns Tier 1's worst cell does.
 
-**Two of the nine would be declared with `productOnly: FALSE`** (`cup × roll`, `roll ×
-rollTaper`): `petalRoll` 330 alone already fails at 0.659 mm and is already declared as
-`roll-max` in the wall instrument's `SELF_XFAIL`, so those grids would mostly re-declare a
-hazard V5 already gates. **One clears entirely** (`buckle × apexSweep`) and would cost 2.0 s
-a run to prove nothing — it is listed because the mechanism argument is real and a
-*measured* clear is worth knowing.
+### Four things this tier measured that were not in #263's table
+
+* **THE MEASURE DEPENDS ON THE SUM OF THE CUP AND ITS GRADIENT.** Read `cup-x-gradient`'s
+  eight declared cells as `cup + gradient`: **1.5 reads 0.938 twice, 1.8 reads 0.862 three
+  times, 2.1 reads 0.801 twice, 2.4 reads 0.754.** Every cell on an anti-diagonal is the
+  same number to the third decimal. That is `cAt(u, r)` composing the two into one
+  coefficient, showing up as a measured symmetry rather than as a reading of the source.
+* **THE GRADIENT REPRODUCES §18a ALMOST EXACTLY.** `gradient-x-tipshape` against
+  `cup-x-tipshape` at the same numbers: 0.928/0.929, 0.985/0.988, 0.850/0.854, 0.974/0.977,
+  0.828/0.832 — five cells, all within **0.004 mm**, and the SAME five cells fail. The cup
+  and its along-blade ramp are interchangeable for this hazard at these amplitudes, which is
+  a statement about the hazard rather than about either control.
+* **`roll-max`'s 0.659 mm IS DECLARED THREE TIMES IN THIS FILE AND ONCE IN THE WALL
+  INSTRUMENT, and all four agree.** `petalRoll` 330 with no other control engaged is
+  `SELF_XFAIL['roll-max']`, and it is a single-axis cell of both `roll-x-rolltaper` and
+  `cup-x-roll`. Four records of one state, by two instruments, to the third decimal — which
+  is the strongest cross-check either list has.
+* **TWO PAIRS ARE NOT MONOTONE IN THEIR SECOND CONTROL, and a pair count could not say so.**
+  `buckle-x-tipshape` reads **0.914 at amplitude 0.2 and 0.925 at 0.4** — the amplitude CLAMP
+  binding, so the deeper ruffle is a different wave rather than a bigger one. `curl-x-twist`
+  reads **0.012 at 120° of twist and 0.025 at 180°**. Both are the kind of thing a distance
+  reports and a count cannot.
+
+**Two of the nine are declared `single-reaches`** (`cup × roll`, `roll × rollTaper`):
+`petalRoll` 330 alone already fails at 0.659 mm and is already declared as `roll-max` in the
+wall instrument's `SELF_XFAIL`, so those grids mostly re-declare a hazard V5 already gates.
+What they add is the interior: **`cup × roll` takes 0.659 mm down to 0.010** across eleven
+failing cells, the widest failing region in the gate. **One clears entirely**
+(`buckle × apexSweep`) and costs 2.0 s a run to prove it — listed because the mechanism
+argument is real and a *measured* clear is worth knowing, and now asserted by CG4's `clears`
+arm rather than merely written down.
 
 ---
 
-## 4. TIER 3 — speculative. **PROPOSED, NOT BUILT.**
+## 4. TIER 3 — speculative. **SHIPPED (#265).**
 
-**These are guesses, said plainly.** No citation, no shared term — only "it seems like it
-might interact". Costs measured the same way.
+**These were guesses, said plainly**, and they still say so: every tier-3 pair carries
+`guess: true` and CG6 fails the gate if one stops. No citation, no shared term — only "it
+seems like it might interact". Costs measured the same way.
 
-| pair | cells | **cost** | worst | verdict as measured |
+| pair | cells | **cost** | worst | verdict | declared |
+|---|---|---|---|---|---|
+| `leafAngle × leafToothDepth` | 12 | **1.6 s** | 0.000 | single-reaches | 6 |
+| `petalTipEnd × fringeCount` | 16 | **2.1 s** | 1.200 | **clears** | 0 |
+| `petalCup × petalWidth` | 12 | **2.3 s** | 0.932 | product-only | 2 |
+| `petalCup × tipThinning` | 12 | **2.3 s** | 0.924 | product-only | 4 |
+| `petalCup × petalLength` | 12 | **2.3 s** | 1.012 | **clears** | 0 |
+| `lobeDepth × petalSpineCurl` | 16 | **8.5 s** | 1.226 | **clears** | 0 |
+| | **80** | **19.1 s** | | | **12** |
+
+*(cost: #263's box, as above)*
+
+**Three of the six clear**, which is the honest yield of a tier of guesses and is exactly
+what CG4's `clears` arm is for. `petalCup × petalLength` clears by **twelve microns** —
+1.012 mm at cup 1.2 on a 20 mm blade — which is the best argument in the doc for keeping a
+clearing pair in the gate rather than dropping it.
+
+**`lobeDepth × petalSpineCurl` is the one to look at before buying a tier like this again**:
+8.5 s for a grid that clears — **four times the cost of any other candidate measured** —
+because a lobed build is expensive. Guesses are not all the same price.
+
+### `leafToothDepth` is bit-identically inert, and that is what CG7 exists for
+
+**`leafAngle × leafToothDepth` is the one pair in the ruling that this gate's own CG1
+refuses**, and #263 could not have known: the tier tables were produced by the gate's
+`run()`, which MEASURES, and never by `verify()`, which runs the clauses. So CG1 and CG4
+were never evaluated on any tier-2 or tier-3 candidate.
+
+Measured on this tree, full precision, all four angles, through the gate's own
+`measureLeafStemApproachMm`:
+
+| leafAngle | tooth 0.26 | tooth 0.6 | tooth 1 | max abs delta |
 |---|---|---|---|---|
-| `leafAngle × leafToothDepth` | 12 | **1.6 s** | 0.000 | single already fails |
-| `petalTipEnd × fringeCount` | 16 | **2.1 s** | 1.200 | clears |
-| `petalCup × petalWidth` | 12 | **2.3 s** | 0.932 | **PRODUCT-ONLY**, 2 cells |
-| `petalCup × tipThinning` | 12 | **2.3 s** | 0.924 | **PRODUCT-ONLY**, 4 cells |
-| `petalCup × petalLength` | 12 | **2.3 s** | 1.012 | clears (and close — 1.012 mm at cup 1.2 × 20 mm) |
-| `lobeDepth × petalSpineCurl` | 16 | **8.5 s** | 1.226 | clears |
-| | **80** | **19.1 s** | | |
+| 35 | 4.0191867045865646 | 4.0191867045865646 | 4.0191867045865646 | **0.000e+0** |
+| 50 | 2.8035739753118678 | 2.8035739753118678 | 2.8035739753118678 | **0.000e+0** |
+| 70 | 0.82373909718786775 | 0.82373909718786775 | 0.82373909718786775 | **0.000e+0** |
+| 85 | 0.0000000000000000 | 0.0000000000000000 | 0.0000000000000000 | **0.000e+0** |
 
-**`lobeDepth × petalSpineCurl` is the one to look at before buying this tier**: 8.5 s for a
-grid that clears — **four times the cost of any other candidate measured**, because a lobed
-build is expensive. Guesses are not all the same price.
+Not "under the band" — **bit-identical**. The reason is geometric and is worth stating,
+because it is the same reason a future leaf/stem pair will fail the same way: **the teeth
+are cut into the leaf's MARGIN and the nearest blade point to the stem is at the blade's
+BASE.** The control is wired and reaching the leaf — its emitted vertex stream differs at
+every tooth depth (checksum −249516.867 at 0.26 against −245875.089 at 1) — it just does not
+reach this measure.
+
+**So the whole content of this pair is the inertness record plus four `leafAngle` readings
+`leafangle-x-stem` already gates**, and six of its twelve cells are declared duplicates of
+states Tier 1 declares. It ships because Eva ruled tier 3 in full and because a measured
+inertness re-read on every run is worth more than the same sentence in a doc — but the
+honest form of the exemption is `COMBINATION_INERT`'s number **failing in both directions**,
+not a quiet carve-out. CG7 holds it: the day `leafToothDepth` starts reaching this measure,
+the gate says *"that control now REACHES this measure, so `leafangle-x-tooth` has become a
+real product pair: take the entry off, let CG1 have it back, and declare whatever cells
+fail."*
+
+**Whether that trade is worth twelve builds a run is Eva's, and it is the one place the
+ruling could not be executed as written.** The alternative is one line: move the pair into
+§5 below, where its measurement already belongs by §5's own rule, and drop the twelve
+builds. Nothing else in the fifteen is affected either way.
+
+### `tipThinning` SATURATES, and that is not the same thing as inert
+
+Worth keeping the two apart, because they look identical in a table. `cup-x-thinning` reads
+the SAME number at thinning 0.4 and 0.8 at every cup — because in EXPORT mode 0.4 has
+already taken the tip to the 1.00 mm print floor and there is nothing left for 0.8 to take.
+But the axis moves the measure by **0.191 mm** from its own default column, so it reaches
+this measure and CG1 is satisfied. `COMBINATION_INERT` is for a control that never reaches
+it at all; a saturating control is an ordinary one whose top end is covered by the cell
+below it (the same argument that stops `buckleAmp` at 0.4).
 
 ---
 
@@ -220,7 +343,7 @@ Each of these was measured, not reasoned about.
 | **any arrangement control** (`petalCount`, `spread`, `layerCount`, `layerSize`, `placement`) **× a petal-form control** | `self` reads ONE petal's own captured grid, so petal-to-petal crowding is invisible to it by construction. That is the crowding raster's question and `bloom-neighbour-gap.mjs`'s, not this one. |
 | **`sheetThickness` × anything, for `self`** | **the measure's own floor scales with the sheet.** Measured: `petalCup × sheetThickness` has its worst cell at the DEFAULT 1.20 mm — a thicker sheet reads BETTER while the geometry gets worse, because the ±2-cell exclusion distance grows with the offset. A pair here would be measuring the instrument. |
 | **a stamen / style / anther control × a petal control** | different parts. Measured bit-identical: `stamenCount` 0 / 60 / 120 moves `self` by exactly zero on the cup column. (This is precisely why it is the CG1 plant in the must-fail.) |
-| **`leafAngle` × a second leaf or stem control beyond `stemDiameter`** | measured over five partners; none moves the approach by more than 0.002 mm. The one pair that ships does so because it is the only instrument for that quantity, and it says `productOnly: FALSE`. |
+| **`leafAngle` × a second leaf or stem control beyond `stemDiameter`** | measured over five partners; none moves the approach by more than 0.002 mm. The one pair that ships does so because it is the only instrument for that quantity, and it says `single-reaches`. **`leafToothDepth` belongs in this row by that rule and is shipped in tier 3 instead, by ruling** — it moves the approach by exactly **0.000e+0**, bit-identically, at every angle. See §4. |
 | **`buckleAmp` 0.6 as a fourth column** | the amplitude CLAMP makes 0.6 float-identical to 0.4 at the default frequency 3 — measured on every cup and every curl of both grids. The top of the slider is covered by the cell below it; a fourth column would spend two builds re-measuring one state. |
 | **a sepal pair** (`sepalCup × sepalSpineCurl` and the rest) | a sepal is the petal builder on a second ring, so the hazards are the petal's own — but `measureWall` here reads `m.petal.grid`. Gating the sepals wants a THIRD measure (`m.sepals`), which is its own piece of work and is not this PR's. Recorded, not built. |
 
@@ -233,20 +356,20 @@ instrument.** Two steps: the gate, then its must-fail.
 
 | | its own workflow | a step in `bloom-export-watertight` (**chosen**) |
 |---|---|---|
-| runner time | ~1.5 min job (checkout + setup-node + 18 s + 53 s) | **+71 s** on a job that already runs 138–250 min |
+| runner time | ~1.5 min job (checkout + setup-node + the two steps) | **the two steps** on a job that already runs 138–250 min |
 | time to a GREEN signal | ~1 min | only when the whole job finishes — 138–250 min |
-| time to a RED signal | ~1 min | **under a minute** — the step is fourth in the job and a failing step fails the job at once |
-| what a red costs | nothing else | the matrix never runs, which is the point: three hours of Chromium on a tree that already fails a print-safety check |
+| time to a RED signal | ~1 min | **under three minutes** — the step is third in the job and a failing step fails the job at once |
+| what a red costs | nothing else | the matrix never runs, which is the point: hours of Chromium on a tree that already fails a print-safety check |
 | workflows a bloom PR runs | **six** | **five, unchanged** |
 | needs npm / playwright | no | no — it runs BEFORE the install |
 
 **The recommendation is the step, and the deciding argument is that a separate workflow
-buys a faster GREEN and costs a slower RED.** A failing step here fails the job inside a
-minute, before four minutes of Chromium and three hours of matrix; a separate workflow
-would go red in parallel with a matrix run that nothing would then stop. The precedent is
-explicit and already in that file three times over — the wall instrument, the arc-stability
-witness and ST9's witness all ride there, for the same three reasons stated in its own
-comments: the same question (print safety), Node-only, seconds.
+buys a faster GREEN and costs a slower RED.** A failing step here fails the job in minutes,
+before four minutes of Chromium and hours of matrix; a separate workflow would go red in
+parallel with a matrix run that nothing would then stop. The precedent is explicit and
+already in that file three times over — the wall instrument, the arc-stability witness and
+ST9's witness all ride there, for the same three reasons stated in its own comments: the
+same question (print safety), Node-only, seconds.
 
 **It goes AFTER the wall instrument** because it IMPORTS `measureWall` from it: a red there
 is a red about the *measure*, and reading that first is what keeps this gate's red about
@@ -259,85 +382,146 @@ this gate does not touch the harness.
 
 ## 7. Runtime, measured
 
-| | Node 22 (this box) | Node 20 (this box) | **Node 20, the CI RUNNER** |
+**THE RATIO #263 ESTABLISHED DOES NOT TRANSFER, AND THE REASON IS THE RULE RATHER THAN A
+SURPRISE.** #263 measured the CI runner at **1.3× its session box**. That ratio is
+runner ÷ *that* box, and this session ran on a different machine: the SAME tier-1 code
+#263's box ran in 13.1–14.3 s takes **20.0–20.3 s here**. The charter's rule — *take both
+sides of a ratio in the same state, and say which box they came from* — is exactly what
+stops 1.3× being carried forward into a wrong number. So it was re-derived, against the one
+code state both machines have measured.
+
+### This box (Node 22), the whole fifteen-pair set
+
+| | run 1 | run 2 | median |
 |---|---|---|---|
-| the gate | 13.1 / 13.4 / 13.8 / 14.1 / 14.3 s | 12.7 / 13.5 s | **18 s** |
-| `--control` (nine plants) | 40.5 / 40.7 s | 39.2 s | **53 s** |
-| **added to a full PR** | ~55 s | | **71 s** |
+| the gate (262 cells, 20 pairs) | 88.10 s | 87.83 s | **87.97 s** |
+| `--control` (nineteen legs) | 95.94 s | 94.75 s | **95.34 s** |
+| TIER 1 alone, the 64 cells #263 shipped | 20.06 s | 20.22 s | **20.14 s** |
 
-**THE RUNNER COLUMN IS THE ONE THAT MATTERS AND IT IS THE ONE MEASURED LAST**, from
-`bloom-export-watertight` run 35451329086's own step timings on the merge commit — 15:18:21 →
-15:18:39 and 15:18:39 → 15:19:32. It is **1.3×** the session box, which is the same-state
-discipline the charter asks for: both halves of a ratio taken in one state, and the state
-named. The earlier columns are kept because a later session comparing a local run against
-this table needs to know which box it is comparing with.
+*(idle box, two passes each, `--only` scoping the tier-1 row to #263's five pairs. The
+spread across passes is 0.27 s on the gate and 1.19 s on the control, so these are
+measurements rather than single draws.)*
 
-**Read from `actions_list` at the time rather than from any figure in this repository — every
-constant written down for it has been superseded, so the method is the rule and the number is
-not.** The ten most recent COMPLETED SUCCESSFUL `bloom-export-watertight` runs, `run_started_at`
-→ `updated_at`, read on Sep 19: **138.1 / 142.9 / 173.1 / 211.7 / 222.9 / 239.2 / 246.7 / 246.9 /
-247.1 / 250.1 min.** Against the median of those, **71 s is 0.5 % of the job**; against the
-fastest, 0.9 %.
+**TWO RATIOS COME OUT OF THAT TABLE AND ONLY ONE OF THEM IS ABOUT SIZE.**
 
-**This PR's own run added an eleventh reading at 249.9 min** (15:17:06 → 19:26:57), a
-hair under the ceiling of the ten above. **Do not quote it, and do not add it to a constant
-somewhere** — it is recorded only as one more observation that the spread is what the rule
-says it is, and the rule is to read `actions_list` at the time.
+**The gate is 4.37x its own tier-1 subset** (87.97 / 20.14) against **4.09x the cells**
+(262 / 64) — very nearly linear in cells, with the small excess being the fixed per-run
+module load.
 
-**All 64 cells are bit-identical between Node 20 and Node 22** — measured, `Object.is` over
-every cell, worst |delta| exactly 0. That matters because `bladeStations`' gap-bound blend
-BINDS on several of these cells (0.656 on `cup 1.2 × tipShape 3`, 0.920 on the buckled
-ones), and a bisection on a transcendental cumulative measure is exactly where session 38
-§B10.7 found two engines disagreeing. They do not disagree here, so the ±5e-4 mm band is
-not absorbing engine noise.
+**The control is 1.08 BASELINES on this tree and was 2.9 on #263's** (95.34 / 87.97 here;
+53 / 18 on the runner there). **That is a change of STRUCTURE, not of magnitude**, and it
+is the independent corroboration of §8's claim about the two grid-changing legs: seventeen
+of nineteen legs reuse the baseline's measurements, and the two that cannot are `--only`-
+scoped to the single pair they plant into, so the whole must-fail costs one baseline plus
+about seven seconds. #263's own §10 projected "about three baselines" for all three tiers
+on the unscoped design, and that projection is what the scoping retired.
+
+**`--control` DOES NOT HONOUR `--only`** — it calls `control({})` unscoped — so a
+"tier-1 control" is not measurable through the shipped CLI, and on inspection it is not
+even well defined: the nineteen legs plant into pairs across all three tiers. The control
+row above is therefore the whole must-fail on both trees, and the ratio that carries
+forward is the BASELINE MULTIPLE rather than a cell count.
+
+### The runner
+
+The definitive figure is **this PR's own `bloom-export-watertight` step timings**, read from
+the run that gated the merge, and it is in §11. Until it existed, the projection was built
+from ratios whose two halves come from the SAME machine, applied to the runner's own
+measured tier-1 figures — never from this box's absolute seconds, which is the error the
+withdrawn 1.3x embodies:
+
+| | runner, TIER 1 (#263, measured) | expanded, PROJECTED | basis |
+|---|---|---|---|
+| the gate | 18 s | **~79 s** | x4.37, this box's own full/tier-1 ratio |
+| `--control` | 53 s | **~85 s** | x1.08 baselines, this box's own control/gate ratio |
+| both steps | 71 s | **~164 s** | |
+
+So the expansion is projected to add **~93 s** to a job whose matrix step runs for hours —
+**about 1.1% of a ~250-minute run, against 0.5% before**. That is the arithmetic behind
+Eva's ruling that runtime is not the cost, carried out on the shipped set rather than on
+the candidates.
+
+**THE PROJECTION IS NOT THE CLAIM AND IS SUPERSEDED BY §11'S MEASUREMENT.** It is recorded
+because a projection that is never checked against the thing it predicts is how a constant
+becomes folklore here.
+
+**Read the job's total from `actions_list` at the time rather than from any figure in this
+repository — every constant written down for it has been superseded, so the method is the
+rule and the number is not.** The ten most recent COMPLETED SUCCESSFUL
+`bloom-export-watertight` runs, `run_started_at` → `updated_at`, read on Sep 19 by #263:
+**138.1 / 142.9 / 173.1 / 211.7 / 222.9 / 239.2 / 246.7 / 246.9 / 247.1 / 250.1 min**, and
+#263's own run added an eleventh at 249.9.
+
+**All 262 cells are bit-identical between Node 20 (CI's) and Node 22**, `Object.is` over
+every cell of all twenty pairs, worst |delta| **exactly 0** — and the gate itself runs
+green under both. #263 measured that over TIER 1's 64 and #265 extends it to the whole
+grid, which was owed rather than optional: `bladeStations`' gap-bound blend BINDS on several
+of these cells (0.656 on `cup 1.2 × tipShape 3`, 0.920 on the buckled ones), and a bisection
+on a transcendental cumulative measure is exactly where session 38 §B10.7 found two engines
+disagreeing. They do not disagree here, so the ±5e-4 mm band is not absorbing engine noise
+on one cell of the 262, and a CG3 red in CI cannot be an engine artefact.
 
 ---
 
 ## 8. The must-fail
 
-`node tools/bloom-combination-gate.mjs --control` — **nine legs, every one of the five
+`node tools/bloom-combination-gate.mjs --control` — **nineteen legs, every one of the eight
 clauses, and #262's standard throughout**: each leg PLANTS its condition into a copy of the
-real `PAIRS` / `COMBINATION_XFAIL` (the same objects an ordinary run reads, so no clause is
-restated in the control), runs the SHIPPED `verify`, and requires the clause that names it
-to be among the findings.
+real `PAIRS` / `COMBINATION_XFAIL` / `COMBINATION_INERT` (the same objects an ordinary run
+reads, so no clause is restated in the control), runs the SHIPPED `verify`, and requires the
+clause that names it to be among the findings.
 
 | leg | plants | must fire |
 |---|---|---|
 | 1 | an axis no longer starts at its control's default | CG0 |
 | 2 | an axis swapped for `stamenCount`, provably inert for this measure | CG1 |
-| 3 | a failing cell's declaration removed | CG2 |
-| 4 | a CLEARING cell declared as failing | CG2 |
-| 5–6 | a record stale by 0.1 mm, **each way** | CG3 |
-| 7 | a `productOnly: TRUE` pair flipped to FALSE | CG4 |
-| 8 | a `productOnly: FALSE` pair flipped to TRUE | CG4 |
-| 9 | a declaration naming a cell no grid produces | CG5 |
+| 3 | **the declared inertness is removed** | CG1 |
+| 4 | a failing cell's declaration removed | CG2 |
+| 5 | a CLEARING cell declared as failing | CG2 |
+| 6–7 | a record stale by 0.1 mm, **each way** | CG3 |
+| 8 | a `product-only` pair declared `clears` | CG4 |
+| 9 | a `product-only` pair declared `single-reaches` | CG4 |
+| 10 | a `single-reaches` pair declared `product-only` | CG4 |
+| 11 | a `clears` pair declared `product-only` | CG4 |
+| 12 | a verdict that is not one of the three | CG4 |
+| 13 | a declaration naming a cell no grid produces | CG5 |
+| 14 | a pair declaring no tier | CG6 |
+| 15 | a tier-3 pair that stops declaring itself a guess | CG6 |
+| 16 | a pair citing a file that does not exist | CG6 |
+| 17 | **an axis that MOVES the measure declared inert** | CG7 |
+| 18 | **the inert record overstating the movement** | CG7 |
+| 19 | an inert declaration naming no pair's axis | CG7 |
+
+**Legs 8–11 cover all four arms of CG4's switch**, which is what a three-valued biconditional
+costs and is the reason the count went from nine legs to nineteen. **Leg 3 is the one that
+makes the CG1 carve-out honest**: remove the `COMBINATION_INERT` entry and CG1 takes the axis
+straight back, which is what says the exemption is a declaration and not a hole.
 
 **It refuses a vacuous plant** (exit 2) if the tree has no declared cell, no clearing cell,
-or no pair on each side of `productOnly` — a control with nothing to plant cannot have been
-wrong. **It prints the red through the gate's own output path**: the last plant is re-run
-NOT quiet, so the whole table and the ordinary `FAIL` block are written verbatim and the
-control's red cannot drift from a genuine one.
+no pair on **each of the three verdict arms**, or no declared inert axis — a control with
+nothing to plant cannot have been wrong. **It prints the red through the gate's own output
+path**: the last plant is re-run NOT quiet, so the whole table and the ordinary `FAIL` block
+are written verbatim and the control's red cannot drift from a genuine one.
 
-**It found a defect in its own gate on the first sweep.** CG1 was written as "some cell
-differs from the (default, default) cell", and leg 2 reported **MISSED** — with the second
-axis collapsed, the FIRST axis still moved plenty, so the clause stayed green on a pair
-that was a single-axis sweep. CG1 is **per axis** now, and leg 2's plant is an axis that is
-measurably inert (`stamenCount`, exactly 0 mm of move) rather than a duplicated value.
+**THE TWO GRID-CHANGING LEGS ARE SCOPED WITH `--only` TO THE PAIR THEY PLANT INTO.** They
+cannot reuse the baseline's measurements, and rebuilding all 262 cells for each would cost
+minutes to re-measure states already measured; scoped, they rebuild the twelve or sixteen
+cells the plant actually describes. **That is why the control costs roughly one baseline
+rather than #263's projected three** — its own §10 estimated "about five minutes" for all
+three tiers' control on that reasoning, and the measured figure is in §11.
 
-**Re-reading the fixed clause found the second half.** Per-axis with `Object.is` is
-satisfied by ONE ULP, and a real control does exactly that: `lobeDepth` moves the cup column
-by 2e-16 mm. The bar is `COMBINATION_TOLERANCE_MM` now — a control whose whole effect on the
-measure is smaller than the band its records are held to is not reaching the measure — so no
-second constant is invented. Headroom on the shipped pairs, per axis: **0.372 / 0.284**
-(cup × tipShape), **1.233 / 1.020** (cup × curl), **0.257 / 0.077** (cup × buckle), **0.308 /
-0.334** (curl × buckle) and **4.020 / 0.00216** (leafAngle × stemDiameter). The tightest is
-`stemDiameter` at **4.3× the band**, which quantifies the same finding CG4's FALSE arm
-asserts: that control barely reaches this measure at all.
+**#263's control found a defect in its own gate on the first sweep,** and the finding stands:
+CG1 was written as "some cell differs from the (default, default) cell", and leg 2 reported
+**MISSED** — with the second axis collapsed, the FIRST axis still moved plenty, so the clause
+stayed green on a pair that was a single-axis sweep. CG1 is **per axis** now. Re-reading the
+fixed clause found the second half: per-axis with `Object.is` is satisfied by ONE ULP, and a
+real control does exactly that (`lobeDepth` moves the cup column by 2e-16 mm), so the bar is
+`COMBINATION_TOLERANCE_MM`.
 
-Seven of the nine legs change no geometry, so they reuse the baseline's measurements — and
-`verify` **REFUSES** cached rows whose pair ids or axis values disagree with the pairs
-handed in, so a cached clause evaluation can never measure a different grid from the one
-the plant describes. That is what takes the control from 2 m 25 s to 40 s.
+Seven of #263's nine legs changed no geometry and reused the baseline's measurements; the
+same holds for seventeen of nineteen here — and `verify` **REFUSES** cached rows whose pair
+ids or axis values disagree with the pairs handed in, so a cached clause evaluation can never
+measure a different grid from the one the plant describes.
 
 ---
 
@@ -345,44 +529,102 @@ the plant describes. That is what takes the control from 2 m 25 s to 40 s.
 
 **This adds a check. It does not change a shape.** `bloom-geometry.js`,
 `bloom-registry.js`, `bloom.js`, `bloom.html` and `bloom.css` are **untouched** —
-predeclared before a line was written and **sha256-identical** to a worktree of `937263a`
-at close — so the exported stream is identical by CONSTRUCTION rather than by an argument
-about arithmetic. The six files this PR does touch are
-`tools/bloom-combination-gate.mjs` (new), `tools/bloom-xfail-magnitudes.mjs`,
-`.github/workflows/bloom-export-watertight.yml`, this doc, `docs/bloom-state-of-play.md`
-and `CLAUDE.md`.
+predeclared before a line was written and **sha256-identical** to a worktree of the base
+commit at close — so the exported stream is identical by CONSTRUCTION rather than by an
+argument about arithmetic.
 
-Measured as well, because by-construction is an argument and this project prefers a
-number:
+**Measured as well, because by-construction is an argument and this project prefers a
+number.** `node tools/verify-bloom-surface-bytes.mjs --base <worktree of c29a8b5>`, the whole
+860-row live matrix in both modes, positionally under `Object.is`:
 
-* the live matrix is **860 rows on both trees, 0 rows differing in definition**;
-* `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 937263a>` over the whole
-  matrix in both modes, positionally under `Object.is` — **PASS, 0 floats moved over
-  836,485,992 export floats across 92,942,888 triangles, and 0 of 77,135,222 captured-grid
-  values over 8,907 panels** — with its own `--control` shown firing BOTH clauses on a
-  1e-9 perturbation.
+| | |
+|---|---|
+| export stream | **836,485,992 floats** over 92,942,888 triangles, 860 rows x 2 modes |
+| captured grid | **77,135,222 values** over 8,907 panels (live) |
+| verdict | **PASS — 0 floats moved** |
+| wall clock | 63.3 min on this box (21:16:10 → 22:19:29 UTC) |
+
+**BOTH CLAUSES ARE SHOWN ABLE TO FAIL, and that is the half worth checking** — a control
+firing only clause 1 leaves clause 2 a log line, which is this repo's own recorded lesson
+about single-clause controls. `--control --rows 6` perturbs one coordinate by 1e-9 and the
+run exits 1 with **two** findings, one per clause:
+
+```
+FAIL — 2 finding(s):
+  DEFAULT (live): 1 of 171360 floats moved, first at index 0 (tri 0):
+      5.306790136879714 against 5.306790135879714
+  DEFAULT (live): grid — 1 of 4430 values moved, first at 2: 1e-9 against 0
+```
+
+`--rows` scopes the control deliberately: its job is to show the clauses CAN fire, not to
+re-measure a matrix the full run has already closed over.
 
 **No frozen phase is owed**: no matrix row is added or removed, so `frozen/phase35` stays
 the newest baseline and **no tag's bytes stop reproducing**.
 
 ---
 
-## 10. Open for Eva
+## 10. What #263 left open, and what is open now
 
-1. **Tier 2 — nine pairs, 118 cells, 25.9 s.** SIX are product-only failures nothing gates;
-   `petalSpineCurl × petalTwist` alone reaches 0.012 mm with both singles clear. Buy all nine,
-   buy the six product-only ones (**17.9 s**, 81 cells), or none.
-2. **Tier 3 — six pairs, 80 cells, 19.1 s.** Two are product-only failures, three clear,
-   and one (`lobeDepth × curl`) costs 8.5 s to clear. Guesses, at a measured price.
-3. **The gate-time budget, on the CI runner's own figures.** Tier 1 is **71 s** including its
-   must-fail (18 s of gate, 53 s of control — measured on the runner, not on the session box).
-   All three tiers together would be **59.0 s of gate on the session box, so about 78 s on the
-   runner**, and since the control pays one baseline plus two grid-changing plants, roughly
-   three times that again — **about five minutes**, or **2.1 % of a median
-   `bloom-export-watertight` run**. Still small, and no longer a rounding error, which is why
-   it is a ruling rather than a default.
+#263's §10 asked three questions and **Eva answered all three: buy Tier 2 in full, buy
+Tier 3 in full, and runtime is not the cost.** Both tiers are shipped. What is open after
+this:
 
-**And what this gate does NOT do, by instruction:** it does not fix `cup × petalTipShape`,
-the leaf-against-stem approach, or the cup fold. Every one of them is now a declared
-magnitude with a number beside it; whether each is accepted as a look or fixed is Eva's
-ruling, and the numbers exist so it can be made.
+1. **`leafAngle × leafToothDepth` is the one pair whose second axis this gate's own CG1
+   refuses** — §4. It ships with the inertness declared and re-measured every run; the
+   alternative is one line moving it to §5. **Eva's, and the only part of her ruling that
+   could not be executed as written.**
+2. **The sepal measure** (§5's last row) is still the one rejection that is a piece of work
+   rather than a fact: `measureWall` reads `m.petal.grid`, so a sepal pair wants a third
+   measure. Recorded, not built.
+3. **What this gate does NOT do, by instruction:** it does not fix `cup × petalTipShape`,
+   the leaf-against-stem approach, or the cup fold. Every one of them is a declared magnitude
+   with a number beside it; whether each is accepted as a look or fixed is Eva's ruling, and
+   the numbers exist so it can be made. **78 cells across sixteen pairs** are under the bar;
+   the gate marks each one `x` in its own table and prints both totals in its summary, counted
+   from the cells THAT RUN measured rather than from the length of the list — so a `--only`
+   subset reports its own subset and a doc quoting the figure can be checked against a run.
+
+---
+
+## 11. The close (#265)
+
+*Every figure here is this session's own box unless it says the runner.*
+
+**WHAT SHIPPED.** All fifteen pairs #263 proposed, taking the gate from 5 pairs to 20:
+**5 tier-1 · 9 tier-2 · 6 tier-3, 262 cells, 78 declared cells across sixteen pairs**, and
+three clauses the expansion forced (CG4 three-valued, CG6 provenance, CG7 the inert record).
+
+**THE GRIDS ARE THE ONES EVA RULED ON.** #263 costed its candidates through `run()` and
+committed none of them, so the ladders were reconstructed and then checked against a table a
+different session wrote on a different box: every `worst` figure and every failing-cell count
+in both tier tables reproduces exactly — 0.914/2, 1.194/clears, 0.659, 0.818/3, 0.828/5,
+0.477/4, 0.010, 0.012/7, 0.754/8, 0.000, 1.200, 0.932/2, 0.924/4, 1.012, 1.226.
+
+**THE MEASUREMENTS.**
+
+| | |
+|---|---|
+| the gate | **87.97 s** median (88.10 / 87.83), CG0-CG7 clean |
+| `--control` | **95.34 s** median (95.94 / 94.75), **19 of 19 legs fired**, exit 0 |
+| `bloom-xfail-magnitudes --combination --only '^$'` | **78 ok, 0 stale** |
+| Node 20 (CI's) vs Node 22 | **262 of 262 cells `Object.is`-equal**, worst \|delta\| exactly 0 |
+| byte partition | **PASS — 0 floats moved** over 836,485,992 export floats / 92,942,888 triangles and 77,135,222 captured-grid values, 860 rows x 2 modes |
+| frozen phase | **none owed**; no row added or removed, `frozen/phase35` stays the newest baseline, no tag's bytes stop reproducing |
+
+**THE RUNNER'S OWN FIGURE REPLACES §7's PROJECTION ONCE THE GATE HAS RUN**, read from this
+PR's `bloom-export-watertight` step timings. The projection was ~79 s for the gate and ~85 s
+for the control.
+
+**AND A COUNT THAT LIVED ONLY IN PROSE HAD ALREADY DRIFTED BEFORE ANYONE READ IT.** This
+session wrote "78 declared cells across ELEVEN pairs" into four documents; the shipped list
+declares across **sixteen**. No clause was wrong — CG2, CG3 and CG5 each hold every
+individual declaration in both directions, and none of them has an opinion about how many
+pairs carry one. **Counting the shipped list is what found it**, and two further
+restatements fell to the same method: "262 cells over all FIFTEEN pairs" (it is twenty — the
+sentence contradicted itself) and a per-pair tier-1 breakdown written in the wrong row order.
+The remedy is this project's own rule from `/plot`: **a number nobody prints is a number
+nobody watches.** The gate prints `N cell(s) under the bar, M of them declared, across K
+pair(s)` on every run, counted from the cells THAT RUN measured rather than from the length
+of the list, so a `--only` subset reports its own subset and a doc quoting the figure can be
+checked against a run.
