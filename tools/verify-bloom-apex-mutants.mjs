@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -171,6 +171,52 @@ function lobePowers(M) {
    MUTATED module `M`, never the clean one except to compare against.
    MODE: EXPORT. SAMPLING: every vertex the stem builder emitted. */
 const STEM_STATE = () => ({ ...REGISTRY_DEFAULTS, stemLength: 60, stemDiameter: 6 });
+
+/* THE INFLORESCENCE WITNESS (the raceme session). Every clause below reads
+   the MUTATED module directly — `inflorescencePlan` and `buildInflorescenceInto`
+   run on M and on C and the two answers are compared — and deliberately not
+   the assertion the mutant names, which is the circularity the table exists
+   to avoid. `builtOn` above cannot serve: it reads the PETAL's grid, and
+   every quantity here is about where a SECOND HEAD stands. */
+const INFLO_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, stemLength: 120, inflorescence: 'RACEME', ...over });
+function infloFacts(M, over = {}) {
+  try {
+    const st = INFLO_STATE(over);
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, st);
+    const P = b.inflorescence, B = b.inflorescenceBuilt;
+    if (!P || !P.present || !B) return { threw: 'the state built no inflorescence at all' };
+    const q = B.placed[0];
+    /* THE MATRIX'S OWN COLUMN NORMS AND DETERMINANT — a rigid placement has
+       three unit columns and determinant +1, and a scale in the matrix moves
+       both. Read here rather than asserted, so ID3 and this do not share a
+       side. */
+    const col = (i) => Math.hypot(q.M[i], q.M[4 + i], q.M[8 + i]);
+    const det = q.M[0] * (q.M[5] * q.M[10] - q.M[6] * q.M[9])
+              - q.M[1] * (q.M[4] * q.M[10] - q.M[6] * q.M[8])
+              + q.M[2] * (q.M[4] * q.M[9] - q.M[5] * q.M[8]);
+    return {
+      count: B.count, unitTris: B.unitTris, tris: B.tris,
+      declared: P.built, nodes: P.nodes, perNode: P.perNode,
+      rootR: P.rootR, crosses: P.crossesSolidMm, pedicelR: P.pedicelR,
+      floretPetals: P.floretPetals, unitPetals: B.unit.petalsBuilt,
+      floretState: { ...B.floretState },
+      headAt: q.headAt.slice(), rootAt: q.root.slice(), D: q.D.slice(),
+      cols: [col(0), col(1), col(2)], det,
+      maxDim: acc.maxDimensionMm, total: acc.triangleCount,
+      /* THE EXTENT PER AXIS, because `maxDimensionMm` is the LARGEST of the
+         three and on a raceme that is the RACHIS — 120 mm of stem down z,
+         which no placement defect can move. Measured: the append mutant read
+         137.251 mm on both trees while every floret had been collapsed onto
+         x = 0. A witness has to probe the axis the mutation acts on. */
+      extent: [acc.hi[0] - acc.lo[0], acc.hi[1] - acc.lo[1], acc.hi[2] - acc.lo[2]],
+      residual: B.placementResidual, compared: B.placementCompared,
+    };
+  } catch (e) { return { threw: String(e && e.message || e) }; }
+}
+const infloPair = (M, C, over = {}) => [infloFacts(M, over), infloFacts(C, over)];
+const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw || c.threw}` : null;
+
 function stemFacts(M, state = STEM_STATE()) {
   try {
     const acc = new M.MeshBuilder({ exportMode: true });
@@ -764,6 +810,109 @@ const MUTANTS = [
       return sa(M) === true && sa(C) === false ? null : `swellActive reads ${sa(M)} on the mutant and ${sa(C)} on the clean tree — the flat-shell guard did not drop`;
     } },
 
+
+  /* ===================================================================
+     THE INFLORESCENCE (the raceme session) — ID0-ID6. Seven mutations, one a
+     family, and every one of them exports WATERTIGHT, as ONE CONNECTED
+     PIECE, with the triangle count the row's own arithmetic predicts: a
+     raceme whose florets are all piled at the origin, rooted on the axis of a
+     hollow rachis, scaled through the matrix, built from the head's own petal
+     count, or placed at the node instead of at the pedicel's tip is a
+     perfectly good solid. That is the whole argument for the family, and it
+     is measured here rather than asserted. */
+  { id: 'the-inflorescence-guard-disagrees-with-the-registry',
+    why: 'the geometry stops refusing an inflorescence on a bloom with no rachis, so the registry hides the sub-controls while the builder places florets off a stem that is not there — and nothing in either STL gate can see a disagreement between two predicates',
+    find: "  return String(state.inflorescence ?? 'NONE') === 'NONE' || !Number(state.stemLength);",
+    into: "  return String(state.inflorescence ?? 'NONE') === 'NONE';", names: ['ID0'],
+    witness: (M, C) => {
+      const st = { ...REGISTRY_DEFAULTS, stemLength: 0, inflorescence: 'RACEME' };
+      const a = M.inflorescenceIsAbsent(st), b = C.inflorescenceIsAbsent(st);
+      return (a === false && b === true) ? null
+        : `inflorescenceIsAbsent reads ${a} on the mutant and ${b} on the clean tree with no rachis — the guard did not move`;
+    } },
+
+  { id: 'a-floret-is-declared-and-never-built',
+    why: 'the first floret of every node is declared by the plan and never appended, so the plan and the builder disagree about how many heads exist — the export is watertight, one piece, and simply has fewer flowers on it than the read-out says',
+    find: '    for (const az of plan.azimuths[i]) {',
+    into: '    for (const az of plan.azimuths[i].slice(1)) {', names: ['ID1'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { floretPhyllotaxy: 'whorled' });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.count < c.count && m.declared === c.declared) ? null
+        : `the builder placed ${m.count} of a declared ${m.declared} on the mutant against ${c.count} of ${c.declared} clean — the drop did not happen`;
+    } },
+
+  { id: 'the-pedicel-roots-on-the-axis',
+    why: "the pedicel is rooted on the rachis's AXIS instead of its wall mid-thickness — the leaf's own LF2 trap one part later: on a HOLLOW rachis the root sits in the VOID, so the pedicel crosses no solid and is a detached shell, and both STL gates read it as one piece because the floret above it overlaps everything else",
+    /* THE ANCHOR IS THE PEDICEL'S OWN CALL, NOT THE BARE EXPRESSION. Its
+       first cut was `const rootR = (stem.boreR + stem.outerR) / 2;`, which
+       MATCHED TWICE — the leaf's petiole owns the same sentence — so the
+       mutation landed on the LEAF and said nothing about the pedicel it
+       names. Caught by the anchor scan above before any mutant ran, which is
+       exactly what that scan exists for, and fixed by giving the expression
+       ONE OWNER (`rodWallRootMm`) rather than by narrowing the string. */
+    find: '  const rootR = rodWallRootMm(stem);\n  const embedMm = rodWallEmbedMm(stem);',
+    into: '  const rootR = 0;\n  const embedMm = rodWallEmbedMm(stem);', names: ['ID2'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.rootR === 0 && c.rootR > 0) ? null
+        : `the pedicel roots at r = ${m.rootR} on the mutant and ${c.rootR} on the clean tree — the root did not move to the axis`;
+    } },
+
+  { id: 'the-placement-carries-a-scale',
+    why: "ruling 3's own prohibition, made false: the rigid transform gains a 0.9 scale, so the floret's SIZE comes from the matrix rather than from parameters — which silently carries a sheet that was floored at export through a shrink, i.e. a printable wall that is no longer printable, at an identical triangle count and a watertight, one-piece export",
+    find: '  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
+    into: '  for (let i = 0; i < 9; i++) r[i] *= 0.9;\n  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
+    names: ['ID3'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      const off = Math.max(...m.cols.map((v) => Math.abs(v - 1)));
+      const clean = Math.max(...c.cols.map((v) => Math.abs(v - 1)));
+      return (off > 0.05 && clean < 1e-9) ? null
+        : `the placement's column norms are off unity by ${off.toExponential(3)} on the mutant and ${clean.toExponential(3)} clean — the scale did not land`;
+    } },
+
+  { id: 'the-floret-inherits-the-head-petal-count',
+    why: "the floret is built from the HEAD's own petalCount rather than from `floretPetals`, so the control is dead and every floret is a copy of the head — watertight, one piece, and the only thing wrong with it is that a slider does nothing",
+    find: '    petalCount: plan.floretPetals,',
+    into: '    petalCount: state.petalCount,', names: ['ID4'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C, { floretPetals: 3 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (Number(m.floretState.petalCount) !== 3 && Number(c.floretState.petalCount) === 3) ? null
+        : `the floret was built with petalCount ${m.floretState.petalCount} on the mutant and ${c.floretState.petalCount} clean — the override did not drop`;
+    } },
+
+  { id: 'the-append-drops-the-translation',
+    why: "`appendTransformed` applies the rotation and drops the offset, so every floret is built at the ORIGIN however far down the rachis its node is — a raceme piled into one ball, which exports watertight with the identical triangle count and the identical STL byte length, and which the voxel flood fill reads as ONE connected piece",
+    find: '      const X = M[0] * x + M[1] * y + M[2] * z + M[3];',
+    into: '      const X = M[0] * x + M[1] * y + M[2] * z;', names: ['ID5'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      /* THE X EXTENT, not `maxDimensionMm`: the rachis is 120 mm down z and
+         dominates the largest dimension on every raceme, so the collapse is
+         invisible there. On the clean tree the florets stand off the axis at
+         their pedicel's reach; on the mutant every one of them is at x = 0. */
+      return (m.extent[0] < c.extent[0] - 1 && m.total === c.total) ? null
+        : `the built bloom spans ${m.extent[0].toFixed(3)} mm in x on the mutant and ${c.extent[0].toFixed(3)} clean at ${m.total} / ${c.total} triangles — the append did not move`;
+    } },
+
+  { id: 'the-head-stands-at-the-node-not-the-pedicel-tip',
+    why: "the placement forgets the pedicel's own length, so every floret sits ON the rachis with its pedicel buried inside it instead of at the far end — watertight, one piece, the same triangle count, and the pedicels are simply invisible",
+    find: '  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;',
+    into: '  const tx = root[0], ty = root[1], tz = root[2];', names: ['ID6'],
+    witness: (M, C) => {
+      const [m, c] = infloPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      const d = Math.hypot(m.headAt[0] - c.headAt[0], m.headAt[1] - c.headAt[1], m.headAt[2] - c.headAt[2]);
+      const stood = Math.hypot(m.headAt[0] - m.rootAt[0], m.headAt[1] - m.rootAt[1], m.headAt[2] - m.rootAt[2]);
+      return (d > 1 && stood < 1e-9) ? null
+        : `the head moved ${d.toFixed(3)} mm and stands ${stood.toFixed(3)} mm from its own root on the mutant — it did not collapse onto the node`;
+    } },
+
   /* ===================================================================
      THE SPHERE'S STEM CHANNEL (the sphere-stem session) — ST7-ST9. Each is a
      way the omission could be wrong while the export stays watertight, one
@@ -1054,8 +1203,16 @@ const MUTANTS = [
   /* THE ATTACHMENT HEIGHT (the second-round ruling) — two mutations, each
      witnessed on the mutated module's own solve, on the flare row. */
   { id: 'sepal-height-ignored', why: "the attachment lands where the hub meets the head whatever `sepalHeight` asks — the foot at the join's rim, a quarter of a millimetre under the plate, the control dead; watertight and one piece",
-    find: '  const zAttach = stemEnd.z + frac * extentMm;',
-    into: '  const zAttach = stemEnd.z + 1 * extentMm;', names: ['SP3'],
+    /* RE-ANCHORED (the raceme session), AND IT WAS STALE ON `main`. Its
+       find-string was `stemEnd.z + frac * extentMm` and the shipped
+       expression reads `zStemEnd + frac * extentMm` — measured 0 matches on
+       BOTH trees, so the mutant had been disarmed since it was written and no
+       run of this table had said so, because the anchor pre-check reports it
+       and a sweep nobody finishes never reaches the report. Found by that
+       pre-check on its first run here, which is the argument for checking
+       every anchor before any mutant runs. */
+    find: '  const zAttach = zStemEnd + frac * extentMm;',
+    into: '  const zAttach = zStemEnd + 1 * extentMm;', names: ['SP3'],
     witness: (M, C) => { const m = sepalFacts(M, { stemLength: 60, sepalHeight: 0.75 }), c = sepalFacts(C, { stemLength: 60, sepalHeight: 0.75 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.attachZ > c.attachZ + 0.1) ? null : `the mutant's attachment is at z ${m.attachZ} against the clean tree's ${c.attachZ} (0.75 asked on a 60 x 6 stem) — the height still applies`; } },
@@ -1261,6 +1418,50 @@ const ROWS = [
      clamp binds. */
   { label: "a sepal whorl on the hub's flare (5 on a 60 x 6 stem, GOBLET at MAX amount x MAX length, 90 asked)",
     set: [{ id: 'sepalCount', value: '5' }, { id: 'stemLength', value: '60' }, { id: 'hubStyle', value: 'GOBLET' }, { id: 'hubShapeAmount', value: '2' }, { id: 'hubLength', value: '40' }, { id: 'sepalAngle', value: '90' }] },
+  /* THE INFLORESCENCE ROWS (the raceme session). Three, and each exists for a
+     statement the other two cannot make.
+
+     (i) THE PLAIN RACEME — five nodes, one floret each, on a 20 mm pedicel at
+     the shipped angle. Nothing clamps here: the node count is satisfied, the
+     size is above both petal floors, the area rule sits ABOVE its own floor at
+     five florets on a 6 mm rachis, and the inset the pedicel needs is inside
+     the stem's own. So every ID clause runs on its unclamped arm and a
+     mutation that breaks one is not hidden behind a clamp that was going to
+     fire anyway.
+
+     (ii) THE CLAMPS BITING AT ONCE — twelve nodes on a 20 mm rachis, which the
+     pitch floor takes to two, at the smallest floret the range reaches and a
+     60 mm pedicel driven straight up so the inset cannot be satisfied. This is
+     the row where `nodesClamped`, `pedicelRClamped`, `insetClamped` and
+     `insetSatisfied` are all in their OTHER state, so every biconditional in
+     ID2 has a side to be wrong on. A clamp asserted only where it does not
+     bite is a clause with one arm.
+
+     (iii) A RACEME ON A SPHERE HEAD — the only state where the floret's OWN
+     stem channel fires, so ID4's omission biconditional has something to say,
+     and the only state where O1's declared inward count is not the head's
+     alone. Measured: 4 petals of 5 built on every floret, and six inward
+     shells against a pre-session baseline of one. */
+  { label: 'a raceme, nothing clamped (5 nodes x 1, 5-petal florets on 20 mm pedicels at 35 deg)',
+    set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }] },
+  { label: 'a raceme with every clamp biting (12 nodes on a 20 mm rachis, 0.20x florets, 60 mm straight up)',
+    set: [{ id: 'stemLength', value: '20' }, { id: 'inflorescence', value: 'RACEME' }, { id: 'floretNodes', value: '12' },
+          { id: 'floretScale', value: '0.2' }, { id: 'pedicelLength', value: '60' }, { id: 'pedicelAngle', value: '90' }] },
+  { label: "a raceme on a SPHERE head — the FLORET's own stem channel, the only state ID4's omission clause can speak on",
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' },
+          { id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }] },
+  /* (iv) A RACEME ASKED FOR WITH NO RACHIS, and it is the ONLY state ID0 can
+     speak on — measured, not reasoned. ID0 compares the geometry's guard
+     against the registry's predicate, and the two agree on every state where
+     a raceme is either plainly on or plainly off whatever either one says. A
+     guard that has stopped refusing the no-rachis case is invisible on all
+     three rows above, and `the-inflorescence-guard-disagrees-with-the-registry`
+     fired NOTHING until this row existed: `stem-eligible-disagrees-with-the-
+     registry`'s lesson one control later, and the reason the row a
+     two-statement clause needs is the one where the statement BITES. */
+  { label: 'a raceme asked for with NO RACHIS (the two statements, where they can disagree)',
+    set: [{ id: 'stemLength', value: '0' }, { id: 'inflorescence', value: 'RACEME' },
+          { id: 'floretNodes', value: '12' }, { id: 'pedicelLength', value: '60' }] },
 
 ];
 
@@ -1314,6 +1515,13 @@ async function famsOn(rows) {
     /* THE SEPAL FAMILY (sepals, part 1) — the rule again. */
     for (const msg of await sepalAssertions(page, row)) {
       const mm = /^(SP\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE INFLORESCENCE FAMILY (the raceme session) — the rule once more, and
+       it is the first family here whose subject is a SECOND HEAD: every clause
+       below is silent on a bloom that is one head at the origin, which is every
+       other row this table drives. */
+    for (const msg of await inflorescenceAssertions(page, row)) {
+      const mm = /^(ID\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

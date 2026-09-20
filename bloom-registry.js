@@ -37,6 +37,8 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
+import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
+  PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -316,6 +318,17 @@ export const PREDICATES = {
   ...Object.fromEntries(TIP_INSTANCES.map((t) => [t.outlineLive, { all: [{ ref: t.present }, { not: { id: `${t.prefix}Roundedness`, min: 1 } }] }])),
   gynoeciumEligible: { not: { ref: 'sphereMode' } },
   gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
+
+  /* THE INFLORESCENCE'S ONE STATEMENT (this session), and it is the twin of
+     the geometry's `inflorescenceIsAbsent`. TWO TERMS, the leaf's own shape:
+     the LAW enum must not be NONE, and there must be a RACHIS to hang the
+     florets on — you cannot carry flowers on a stem that is not there, which
+     is exactly why `leafIsAbsent` reads both lengths. ID0 asserts the two
+     statements agree per row, and the harness checks them at module load.
+     The enum ITSELF is gated on `stemPresent` alone, so a visitor who has a
+     stem sees the choice and a visitor who has none does not see a control
+     that could do nothing. */
+  inflorescencePresent: { all: [{ id: 'stemLength', min: 1 }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
 
   /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
      This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
@@ -894,6 +907,23 @@ export const SECTIONS = [
      leaf's own edge treatment and not a second top-level family. */
   { id: 'leaves', label: 'Leaves', open: false, parent: 'stem' },
   { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
+  /* THE INFLORESCENCE — a NEW TOP-LEVEL SECTION AFTER STEM (Eva's ruling 2,
+     `docs/bloom-inflorescence-discovery.md`), holding the law enum and the
+     axis's own controls, with FLORET as a drop-down inside it for the two
+     that describe the flower rather than the arrangement. The Leaves >
+     Serration shape exactly: a part's own sub-family is a child, not a second
+     top-level section.
+
+     IT IS AUTHORED PLAINLY AND IS NOT GENERATED, and that is session 27's
+     finding applied rather than ignored. Ruling 2's "generated `Level k`
+     sections" is for the COMPOUND levels ruling 5 puts out of scope; at depth
+     ONE a generator has a single instance, so "the levels cannot drift" is
+     unobservable — which is precisely why session 27 deferred the tip's own
+     generator to the session where a second instance existed. The day a
+     second level lands, `TIP_DESCRIPTORS x TIP_INSTANCES` is the pattern and
+     the panel gate's one-spec clause is the witness. */
+  { id: 'inflorescence', label: 'Inflorescence', open: false },
+  { id: 'floret', label: 'Floret', open: false, parent: 'inflorescence' },
   /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
      ruling Sep 5: the centre is the reproductive parts and nothing else) and
      is BACK AS A CONTAINER for exactly those parts (session 23), declared
@@ -3261,6 +3291,146 @@ export const CONTROLS = [
     fmt: (v) => { const k = Number(v);
       return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-bottomed'}`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+
+  /* ===================================================================
+     THE INFLORESCENCE — the law enum and the axis's five, plus the floret's
+     two in the drop-down below it. Eva's twelve rulings of Sep 17 are in
+     `docs/bloom-inflorescence-discovery.md`; `bloom-geometry.js`'s
+     inflorescence block is the geometry's own header.
+
+     EVERY RANGE IS IMPORTED, never a literal (Q6's discipline, session 29):
+     the geometry is the one owner of what a floret can be, and the harness
+     fails at module load if one of these became a number typed here.
+
+     `role: 'inflorescence'` IS ITS OWN ROLE, not the stem's, on the sepals'
+     precedent one part later: `role` says which part of the MODEL a control
+     owns, and the inflorescence is a part — it hangs off the stem the way the
+     leaves do, but a leaf is not a flower and its controls are not these. */
+  { id: 'inflorescence', section: 'inflorescence', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None (one flower)' },
+      { value: 'RACEME', label: 'Raceme (flowers on pedicels down the stem)' },
+    ],
+    label: 'Type',
+    fmt: (v, ui, shown) => {
+      if (String(v) === 'NONE') return 'one flower — the head and nothing else';
+      const b = shown && shown.inflorescenceBuilt;
+      const p = shown && shown.inflorescence;
+      if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
+      const per = p.perNode;
+      return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
+        + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each, ${b.tris.toLocaleString('en-US')} in all` : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'stemPresent' } },
+
+  { id: 'floretNodes', section: 'inflorescence', kind: 'slider',
+    min: FLORET_NODE_RANGE[0], max: FLORET_NODE_RANGE[1], step: 1, default: 5,
+    label: 'Nodes',
+    /* The CLAMP is the node law's own — the span divided at the pitch floor
+       (two pedicel radii), the COUNT giving. The figure comes from the
+       BUILDER's plan, never re-derived here (the stamen spread's precedent). */
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const per = ui.floretPhyllotaxy === 'opposite' ? 2 : ui.floretPhyllotaxy === 'whorled' ? 3 : 1;
+      const p = shown && shown.inflorescence;
+      const base = `${n} along the stem · ${n * per} floret${n * per === 1 ? '' : 's'}`;
+      if (!p || !p.present || !p.nodesClamped) return base;
+      return `${base} — CLAMPED to ${p.nodesBuilt}: the span between the head and the stem's end holds no more at a ${(2 * p.pedicelR).toFixed(2)} mm pitch floor`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE PHYLLOTAXIS READS `leafAzimuths` — the SAME three laws on the SAME
+     stem, and the geometry calls that one function rather than restating it.
+     There are already exactly two owners of "azimuth of the i-th organ" in
+     this project (`buildWhorlInto` and `leafAzimuths`) and a third would be
+     the registration rule's own failure. */
+  { id: 'floretPhyllotaxy', section: 'inflorescence', kind: 'choice', default: 'alternate',
+    options: [
+      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      { value: 'opposite', label: 'Opposite (two across, decussate)' },
+      { value: 'whorled', label: 'Whorled (three at 120)' },
+    ],
+    label: 'Arrangement',
+    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
+      return `${per} floret${per > 1 ? 's' : ''} a node · ${Math.round(Number(ui.floretNodes)) * per} in all`; },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE PEDICEL IS THE FLORET'S OWN STEM, so this is the floret's
+     `stemLength` and its range sits inside `STEM_LENGTH_RANGE`. The DIAMETER
+     is NOT a control: it is the area rule read downward from the rachis
+     (`r_rachis / sqrt(N)`), floored at the stem control's own minimum and
+     TOLD — the discovery's Q10 names that exact number as "the number to
+     design against, not a control". */
+  { id: 'pedicelLength', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_LENGTH_RANGE[0], max: PEDICEL_LENGTH_RANGE[1], step: 1, default: 20,
+    label: 'Pedicel',
+    fmt: (v, ui, shown) => {
+      const p = shown && shown.inflorescence;
+      const base = `${Number(v).toFixed(0)} mm from the stem to each floret`;
+      if (!p || !p.present) return base;
+      return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
+        + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
+          : ` — the area rule's own answer for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem`)
+        + ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE ANGLE IS THE LEAF'S OWN RANGE AND THE LEAF'S OWN DEFAULT (Eva ruled
+     35 deg for leaves): the quantity is the same quantity — a rod's angle
+     from horizontal at a node on this same stem — and a second range for it
+     would be two answers to one question. Its extremes are photographed
+     rather than refused, the standing pattern for extremes. */
+  { id: 'pedicelAngle', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_ANGLE_RANGE[0], max: PEDICEL_ANGLE_RANGE[1], step: 1, default: 35,
+    label: 'Angle',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const p = shown && shown.inflorescence;
+      const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
+      if (!p || !p.present) return base;
+      return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
+        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm to clear it` : '')
+        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets rise further than the stem is long, so they stand among the petals (told, never refused)');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE FLORET'S TWO. Ruling 4: a floret is a PETAL-COUNT REDUCTION with `NU`
+     untouched — there is no second ruled exception to "derive, don't expose",
+     so a floret costs `petals x 2,356` triangles like every other head and
+     the count is the only lever on that. SIZE is a multiplier on the head's
+     own two length controls (ruling 3: size through PARAMETERS, never through
+     the placement matrix), clamped into each base's own range and told. */
+  { id: 'floretPetals', section: 'floret', kind: 'slider',
+    min: FLORET_PETAL_RANGE[0], max: FLORET_PETAL_RANGE[1], step: 1, default: 5,
+    label: 'Petals',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const b = shown && shown.inflorescenceBuilt;
+      return `${n} a floret` + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each (pedicel included)` : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  { id: 'floretScale', section: 'floret', kind: 'slider',
+    min: FLORET_SCALE_RANGE[0], max: FLORET_SCALE_RANGE[1], step: 0.05, default: 0.60,
+    label: 'Size',
+    fmt: (v, ui, shown) => {
+      const k = Number(v);
+      const p = shown && shown.inflorescence;
+      const base = `${k.toFixed(2)}x the head's own petal`;
+      if (!p || !p.present) return base;
+      /* THE DEAD TRAVEL IS TOLD WITH ITS NUMBER AND THE RANGE IS NOT
+         NARROWED (`stamenSpread`'s ruling); no hatch is drawn because the
+         dead stretch is at the BOTTOM of the track (the carnation terminal's
+         own case). `sizeDeadBelow` is the PLAN's, derived from the HEAD's two
+         sliders, so this reads it and computes nothing. */
+      const dead = p.sizeDeadBelow > FLORET_SCALE_RANGE[0]
+        ? ` — below ${Math.min(p.sizeDeadBelow, FLORET_SCALE_RANGE[1]).toFixed(2)}x this slider draws the same floret (the petal sliders' own floors)`
+        : '';
+      return `${base} · ${p.petalLength.toFixed(1)} x ${p.petalWidth.toFixed(1)} mm`
+        + (p.sizeClamped ? ` — CLAMPED: ${p.lengthAsked.toFixed(1)} x ${p.widthAsked.toFixed(1)} mm asked, and a petal here is never smaller than the petal slider's own floor` : '')
+        + dead;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 ];
 
 /* ===================================================================
