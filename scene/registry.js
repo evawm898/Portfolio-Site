@@ -23,7 +23,11 @@ export const SCENES = [
     load: () => import('./scene-koi.js'),
   },
   { id: 2, title: null, load: null },
-  { id: 3, title: null, load: null },
+  {
+    id: 3,
+    title: 'Beach swash line',
+    load: () => import('./scene-beach.js'),
+  },
   { id: 4, title: null, load: null },
   { id: 5, title: null, load: null },
   { id: 6, title: null, load: null },

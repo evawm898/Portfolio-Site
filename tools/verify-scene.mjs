@@ -106,6 +106,272 @@ const near = (a, b, tol, what) => {
 // Each names the checks it MUST redden. A check outside that list going red is
 // still a failure of the sweep — the mutation was not the defect it claims.
 const MUTANTS = [
+  // ----------------------------------------------------------- scene 3 ----
+  // Six of these are mistakes that were ACTUALLY MADE while building the beach
+  // and are marked; the rest are the obvious way to break a claim the brief
+  // makes in so many words.
+  {
+    id: 'the-high-water-mark-follows-the-swash',
+    file: 'scene/beach-swash.js',
+    from: '        if (wet[i] > sat[i]) wet[i] = Math.max(sat[i], wet[i] - dt / OVERRUN_DRY_S);\n        else wet[i] = sat[i];',
+    to: '        wet[i] = e;',
+    breaks: ['swash/wet-sand-persists-after-the-water-has-left-it',
+             'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+             'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
+              'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: 'ONE OSCILLATING WATERLINE — the failure mode the brief names by name',
+  },
+  {
+    id: 'one-drying-rate-for-the-whole-beach',
+    file: 'scene/beach-swash.js',
+    from: '        sat[i] = Math.max(WATERLINE_S, sat[i] - dt / SAT_DRY_S);',
+    to: '        sat[i] = Math.max(WATERLINE_S, sat[i] - dt / OVERRUN_DRY_S);',
+    breaks: ['swash/wet-sand-persists-after-the-water-has-left-it'],
+    mayAlso: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: '"do not use one rate for the whole beach" — the saturated zone dried at the overrun rate',
+  },
+  {
+    id: 'the-two-rates-are-declared-the-same',
+    file: 'scene/beach-swash.js',
+    from: 'export const SAT_DRY_S = 530;',
+    to: 'export const SAT_DRY_S = 20;',
+    breaks: ['swash/the-two-drying-rates-are-an-order-of-magnitude-apart'],
+    mayAlso: ['swash/wet-sand-persists-after-the-water-has-left-it',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: 'the separation is the feature; collapsing it is not a tuning change',
+  },
+  {
+    id: 'the-saturated-level-is-a-running-maximum',
+    file: 'scene/beach-swash.js',
+    from: '          sat[i] = Math.max(WATERLINE_S, sat[i] + (v - sat[i]) * SAT_ALPHA);',
+    to: '          sat[i] = Math.max(sat[i], v);',
+    breaks: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/wet-sand-persists-after-the-water-has-left-it',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: '"it must return, not ratchet" — a max never comes back',
+  },
+  {
+    id: 'a-running-swash-reads-the-set-energy',
+    file: 'scene/beach-swash.js',
+    from: '    advance(dt, { energy = 0, intervalScale = 1 } = {}) {\n      clock += dt;',
+    to: '    advance(dt, { energy = 0, intervalScale = 1 } = {}) {\n      clock += dt;\n      for (const w of waves) w.runup = WATERLINE_S + (w.runup - WATERLINE_S) * (1 + 0.4 * energy);',
+    breaks: ['swash/the-energy-reaches-the-next-wave-and-never-the-one-running'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: '"a broken wave is committed" — deforming one mid-run reads as a slider on the water',
+  },
+  {
+    id: 'the-swash-record-carries-its-energy',
+    file: 'scene/beach-swash.js',
+    from: "export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];",
+    to: "export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked', 'energy'];",
+    breaks: ['swash/a-swash-carries-no-record-of-the-energy-that-chose-it'],
+    why: 'provenance in the record is what would let a later reader branch on the cause',
+  },
+  {
+    id: 'every-swash-reaches-the-same-distance',
+    file: 'scene/beach-swash.js',
+    from: 'export const RUNUP_VARY = [0.88, 1.12];',
+    to: 'export const RUNUP_VARY = [1, 1];',
+    breaks: ['swash/successive-swashes-do-not-reach-identical-distances'],
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    why: '"successive swashes must not reach identical distances"',
+  },
+  {
+    id: 'the-overrun-fires-on-every-wave',
+    file: 'scene/beach-swash.js',
+    from: 'export const OVERRUN_MARGIN_S = 0.12;',
+    to: 'export const OVERRUN_MARGIN_S = 0.0;',
+    breaks: ['swash/an-overrun-fires-with-the-extent-it-reached'],
+    why: 'an event that fires as often without a set as with one is no signal',
+  },
+  {
+    id: 'the-set-energy-is-signed',
+    file: 'scene/beach-sets.js',
+    from: '      st.scrolled = clamp01(st.scrolled + Math.abs(delta) / (ACTIONS_TO_MAX * ACTION_DELTA));',
+    to: '      st.scrolled = clamp01(st.scrolled + delta / (ACTIONS_TO_MAX * ACTION_DELTA));',
+    breaks: ['sets/either-scroll-direction-adds-energy'],
+    why: 'a set has no negative; scene 1\'s wind is signed for a reason that does not apply here',
+  },
+  {
+    id: 'no-set-arrives-on-its-own',
+    file: 'scene/beach-sets.js',
+    from: '        if (st._untilSet <= 0) {',
+    to: '        if (false && st._untilSet <= 0) {',
+    breaks: ['sets/large-sets-arrive-with-no-input-at-all'],
+    // AND IT DESTABILISES THE HIGH-WATER MARK, which was not predicted and is
+    // a real coupling rather than a nuisance: a set pulls the saturated level
+    // UP, and the ordinary waves that follow then sit below it and leave the
+    // mark alone. With no sets at all the level only ever decays, so every
+    // ordinary wave tops it and the mark sawtooths. Measured over three seeds:
+    // 9.0 px per 3.5 s becomes 24.2.
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water'],
+    why: '"an untouched scene still gets overruns"',
+  },
+  {
+    id: 'the-streaks-are-rebuilt-every-frame',
+    file: 'scene/beach-water.js',
+    from: '      for (const f of streaks) {',
+    to: '      for (const f of streaks) { place(f, true); }\n      for (const f of streaks) {',
+    breaks: ['water/the-streaks-persist-and-drift-shoreward'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'a re-randomised surface reads as static rather than as water',
+  },
+  {
+    id: 'the-drift-phase-is-not-wrapped',
+    file: 'scene/beach-draw.js',
+    from: '        const phase = (drift * (0.4 + 0.6 * hash2(idx, 91))) % 1;',
+    to: '        const phase = drift * (0.4 + 0.6 * hash2(idx, 91));',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: drift is a distance, so after a minute the sea was not drawn at all',
+  },
+  {
+    id: 'the-renderer-sets-its-own-transform',
+    file: 'scene/beach-draw.js',
+    from: '      if (st.dpr !== undefined) ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);',
+    to: '      ctx.setTransform(st.dpr || 1, 0, 0, st.dpr || 1, 0, 0);',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: it overwrote the shell\'s dpr scale and drew the beach into one corner',
+  },
+  {
+    id: 'the-water-ramp-follows-the-moving-edge',
+    file: 'scene/beach-draw.js',
+    from: '  const u = clamp01(s / WATERLINE_S);',
+    to: '  const u = clamp01(s / Math.max(1e-4, edge));',
+    breaks: ['beach-tone/the-run-up-sheet-is-lighter-than-deep-water'],
+    why: 'THE REAL BUG: an overrun came out as four fifths of the frame in near-solid ink',
+  },
+  {
+    id: 'the-foam-band-is-a-ramp-not-a-plateau',
+    file: 'scene/beach-draw.js',
+    from: '  const into = clamp01((s - (edge - fw)) / fw) / FOAM_RAMP;',
+    to: '  const into = clamp01((s - (edge - fw)) / fw);',
+    // BOTH, and the second was short in the honest direction: the sweep reported
+    // it as UNCLAIMED. A band that ramps all the way to 1 instead of levelling
+    // off does not merely have the wrong SHAPE — it never reaches paper at all,
+    // which is precisely what the bare-run check is named for. The claim was
+    // wrong, not the check.
+    breaks: ['beach-tone/the-foam-band-is-a-plateau-of-paper-not-a-ramp-to-one',
+             'scene3/the-foam-band-reaches-bare-paper'],
+    why: 'THE REAL BUG: it put the foam DARKER than the wet sand and inverted the reference\'s ordering',
+  },
+  {
+    id: 'the-swell-bands-the-deep-water',
+    file: 'scene/beach-draw.js',
+    from: '  const fade = d * d * (3 - 2 * d);',
+    to: '  const fade = 1;',
+    breaks: ['beach-tone/the-swell-fades-out-in-the-deep-water'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: the rendered row profile oscillated 0.26 / 0.70 / 0.45 down a smooth sea',
+  },
+  {
+    id: 'the-dry-sand-is-blank-paper',
+    file: 'scene/beach-draw.js',
+    from: '      for (let ci = 0; ci < DRY_CELLS_U; ci++) {',
+    to: '      for (let ci = 0; ci < 0; ci++) {',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL DEFECT: "the open white" read as empty, and every band-MEAN comparison passed it',
+  },
+  {
+    id: 'the-sand-texture-is-in-the-marks-register',
+    file: 'scene/beach-draw.js',
+    from: '      ctx.globalAlpha = DRY_MARK_ALPHA;',
+    to: '      ctx.globalAlpha = 0.72;',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'the declaration and the drawing disagreeing — a base texture as dark as the marks that go on top of it',
+  },
+  {
+    id: 'the-register-headroom-is-given-away',
+    file: 'scene/beach-draw.js',
+    from: 'export const DRY_MARK_ALPHA = 0.26;',
+    to: 'export const DRY_MARK_ALPHA = 0.33;',
+    // THE MODULE REFUSES TO LOAD ON THIS ONE, which is why it names the load
+    // check rather than the register clause: giving the headroom away is an
+    // invariant the module asserts at module scope, and a refusal there is
+    // stronger than a red check because nothing can run on that tree at all.
+    //
+    // AND A MODULE THAT WILL NOT LOAD TAKES THE SCENE WITH IT. The sweep
+    // reported the mount as UNCLAIMED and it was right to: with beach-draw.js
+    // refusing, the page has no beach on it, which is not collateral but the
+    // same refusal seen from the browser. The claim was short, not the checks.
+    //
+    // THE TWO SWAP CHECKS ARE `mayAlso` BECAUSE THE BLAST RADIUS IS NOT
+    // DETERMINISTIC. The random button draws from the built scenes excluding
+    // the one showing, so whether any of its six picks lands on scene 3 — and
+    // therefore whether the failed import ever reaches the console — is down
+    // to that run. A single `breaks` list cannot be right about either of
+    // them; this is /plot's own a-handle-drag-also-orbits case in another
+    // gate.
+    breaks: ['load/every-scene-module-imports',
+             'scene3/the-beach-loads-draws-and-takes-over-the-nav'],
+    mayAlso: ['swap/the-random-button-never-picks-the-scene-that-is-showing',
+              'swap/the-swap-pass-reports-no-errors'],
+    why: 'the base texture creeping up to the reference\'s own footprint darkness, which a later session cannot draw over',
+  },
+  {
+    id: 'the-foam-band-is-narrower-than-a-row',
+    file: 'scene/beach-draw.js',
+    from: 'export const FOAM_BAND_S = 0.130;',
+    to: 'export const FOAM_BAND_S = 0.022;',
+    // IT NAMES THE RASTERISED CLAUSE, NOT THE PLATEAU ONE: a narrow band is
+    // still a plateau in SHAPE, so the plateau clause's subject does not
+    // contain this failure and it stays green on any width (measured).
+    //
+    // AND THE WIDTH HAD TO BE TAKEN THIS LOW TO FIRE, WHICH IS ITSELF THE
+    // FINDING. At half the shipped width the band still reads bare in a
+    // de-sheared strip — it is only the FULL-WIDTH mean that a narrow band
+    // fails, because one screen row spans more of the beach than the band is
+    // wide. So this clause asserts the band is genuinely bare SOMEWHERE, which
+    // needs a band narrower than the swell to break; the shipped width was set
+    // by the coverage comparison, and that is said in the outcome rather than
+    // implied by this mutant.
+    breaks: ['scene3/the-foam-band-reaches-bare-paper'],
+    why: 'a foam band narrower than the swell that displaces it never reads as bare paper at all',
+  },
+  {
+    id: 'the-shoreline-is-level',
+    file: 'scene/beach-shore.js',
+    from: 'export const SHORE_TILT_DEG = 3.0;',
+    to: 'export const SHORE_TILT_DEG = 0;',
+    breaks: ['shore/the-shoreline-is-oblique-and-runs-up-to-the-right',
+             'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: '"the shoreline sits oblique to the frame, not level"',
+  },
+  {
+    id: 'the-shoreline-runs-the-other-way',
+    file: 'scene/beach-shore.js',
+    from: '  const slope = -Math.tan(tiltDeg * Math.PI / 180);',
+    to: '  const slope = Math.tan(tiltDeg * Math.PI / 180);',
+    breaks: ['shore/the-shoreline-is-oblique-and-runs-up-to-the-right',
+             'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: 'every measurement on the three clips agrees about the SIGN; only the magnitude was noisy',
+  },
+  {
+    id: 'the-bands-are-not-the-briefs-proportions',
+    file: 'scene/beach-shore.js',
+    from: 'export const RUNUP_NOMINAL = 0.20;',
+    to: 'export const RUNUP_NOMINAL = 0.33;',
+    breaks: ['shore/the-bands-are-the-brief-s-forty-twenty-forty'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    why: 'the wet band is the swash\'s own travel, so the runup IS the 20%',
+  },
   {
     id: 'ellipse-without-the-moveto',
     file: 'scene/surface.js',
@@ -603,6 +869,9 @@ async function loadScene(mutant) {
       fish: await m('koi-fish.js'), registry: await m('registry.js'),
       pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
       sceneKoi: await m('scene-koi.js'),
+      shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
+      sets: await m('beach-sets.js'), water: await m('beach-water.js'),
+      beachDraw: await m('beach-draw.js'),
     };
   }
   const dir = path.join(SCENE, `${MUTANT_PREFIX}${++mutantSeq}`);
@@ -621,6 +890,9 @@ async function loadScene(mutant) {
     fish: await m('koi-fish.js'), registry: await m('registry.js'),
     pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
     sceneKoi: await m('scene-koi.js'),
+    shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
+    sets: await m('beach-sets.js'), water: await m('beach-water.js'),
+    beachDraw: await m('beach-draw.js'),
   };
 }
 
@@ -628,7 +900,22 @@ async function loadScene(mutant) {
 // The shipped modules, in Node, against numbers taken from the brief.
 
 async function partOne(mutant) {
-  const M = await loadScene(mutant);
+  // A MODULE THAT REFUSES TO LOAD IS A RED CHECK, NOT A DEAD SWEEP. Some of
+  // these modules assert their own invariants at module scope — the dry sand's
+  // register headroom is one — and a refusal there is STRONGER than a failed
+  // check, because nothing downstream can run on a tree that is wrong in that
+  // way. But an uncaught throw here takes the whole negative control down with
+  // it and reports nothing at all, so the refusal is caught and named.
+  let M;
+  setSection('load');
+  try {
+    M = await loadScene(mutant);
+    results.push({ name: 'load/every-scene-module-imports', ok: true, detail: `${Object.keys(M).length} modules` });
+  } catch (err) {
+    results.push({ name: 'load/every-scene-module-imports', ok: false,
+      detail: err && err.message ? err.message : String(err) });
+    return;
+  }
   const DT = 1 / 240;   // fine enough that a 2 s ramp is not a sampling claim
 
   // ---------------------------------------------------------------- surface
@@ -2241,32 +2528,408 @@ async function partOne(mutant) {
     return `${ms.toFixed(3)} ms a frame, ${f.pads.length} pads x ${rips.length} ripples (the cap)`;
   });
 
+  // ============================================================== SCENE 3 ===
+  // The beach. Numbers here come from the BRIEF and from the reference clips,
+  // never from the module under test — a clause that reads its expected value
+  // out of the thing it is checking measures its own consistency.
+  {
+    const S = M.shore, W = M.swash, SE = M.sets, WA = M.water, D = M.beachDraw;
+    const rng = (n) => M.rng.makeRandom(n);
+    // One beach, settled, reusable by the checks that only need to look at it.
+    const settled = (seed = 4242, secs = 90) => {
+      const sw = W.createSwash({ rand: rng(seed) });
+      const se = SE.createSets({ rand: rng(seed ^ 99) });
+      for (let i = 0; i < secs * 60; i++) {
+        se.advance(1 / 60);
+        sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+      }
+      return { sw, se };
+    };
+
+    setSection('shore');
+
+    check('the bands are the brief\'s forty twenty forty', () => {
+      // "water ~40% of frame height, wet band ~20%, dry sand ~40%" — and the
+      // wet band is not a third number, it is the swash's own travel.
+      assert.strictEqual(S.WATERLINE_S, 0.40, 'the waterline is not at 40%');
+      assert.strictEqual(S.RUNUP_NOMINAL, 0.20, 'the nominal runup is not 20%');
+      near(S.WATERLINE_S + S.RUNUP_NOMINAL, 0.60, 1e-12, 'the high-water mark');
+      near(1 - (S.WATERLINE_S + S.RUNUP_NOMINAL), 0.40, 1e-12, 'the dry sand');
+      // and a wave at full energy can reach the bottom of frame, no further
+      near(S.WATERLINE_S + S.RUNUP_MAX, 1, 1e-12, 'the deepest reachable runup');
+      return 'water 40% / wet 20% / dry 40%, and a full set reaches s = 1';
+    });
+
+    check('the shoreline is oblique and runs UP to the right', () => {
+      const sh = S.createShore(); sh.resize(1000, 600);
+      assert.ok(sh.tiltDeg > 0, `tilt ${sh.tiltDeg} is not positive`);
+      const yL = sh.yAt(0, 0.4), yC = sh.yAt(500, 0.4), yR = sh.yAt(1000, 0.4);
+      // Screen y falls as x rises: lower on the left, higher on the right,
+      // which is the sign every measurement on the three clips agrees about.
+      assert.ok(yL > yC && yC > yR, `left ${yL} centre ${yC} right ${yR} is not a rise to the right`);
+      near(yC, 0.4 * 600, 1e-9, 'the band fraction is not exact at frame centre');
+      return `${sh.tiltDeg}deg: left ${yL.toFixed(1)} centre ${yC.toFixed(1)} right ${yR.toFixed(1)}`;
+    });
+
+    check('the screen mapping round-trips exactly', () => {
+      const sh = S.createShore(); sh.resize(1234, 789);
+      for (const x of [0, 1, 617, 1233]) for (const v of [0, 0.31, 0.62, 1]) {
+        near(sh.sAt(x, sh.yAt(x, v)), v, 1e-12, `round trip at x=${x} s=${v}`);
+      }
+      return 'sAt(yAt(s)) is s to 1e-12 over the frame';
+    });
+
+    setSection('swash');
+
+    check('a swash carries no record of the energy that chose it', () => {
+      // THE STRUCTURAL FORM of "set energy biases the NEXT wave, never the one
+      // currently running": the record has no field to branch on.
+      const sw = W.createSwash({ rand: rng(1) });
+      sw.spawn(0.9);
+      assert.ok(sw.waves.length, 'nothing was spawned');
+      assert.deepStrictEqual(Object.keys(sw.waves[0]).sort(), [...W.SWASH_FIELDS].sort(),
+        'a swash record has fields the declaration does not');
+      for (const k of Object.keys(sw.waves[0])) {
+        assert.ok(!/energy|set|source|kind/i.test(k), `a swash record carries "${k}"`);
+      }
+      return `${W.SWASH_FIELDS.length} fields, none naming a cause`;
+    });
+
+    check('the energy reaches the next wave and never the one running', () => {
+      // The strong form: advance the SAME running wave under opposite energies
+      // and require every emitted extent to be identical.
+      const mk = () => { const sw = W.createSwash({ rand: rng(7) }); sw.spawn(0.5); return sw; };
+      const a = mk(), b = mk();
+      for (let i = 0; i < 120; i++) {
+        a.advance(1 / 60, { energy: 0 });
+        b.advance(1 / 60, { energy: 1 });
+      }
+      // Its own extent must not have moved. (A new wave may have been spawned
+      // in b, so compare the FIRST wave's record rather than the edge field.)
+      assert.deepStrictEqual(
+        [a.waves[0].runup, a.waves[0].advanceS, a.waves[0].retreatS],
+        [b.waves[0].runup, b.waves[0].advanceS, b.waves[0].retreatS],
+        'a running wave changed with the energy');
+      return 'the running wave is bit-identical under energy 0 and 1';
+    });
+
+    check('the retreat takes the measured two to three seconds', () => {
+      // MEASURED: the brief's own reading of the two clean drains.
+      const sw = W.createSwash({ rand: rng(3) });
+      const w = sw.spawn(0);
+      assert.ok(w.retreatS >= 2 && w.retreatS <= 3, `retreat ${w.retreatS} is outside 2-3 s`);
+      // and the envelope really does take that long to come back to nothing
+      const peak = w.advanceS + w.holdS;
+      near(W.swashEnv(peak, w.advanceS, w.holdS, w.retreatS), 1, 1e-9, 'the envelope at the peak');
+      near(W.swashEnv(peak + w.retreatS, w.advanceS, w.holdS, w.retreatS), 0, 1e-9, 'the envelope at the end');
+      assert.ok(W.swashEnv(peak + w.retreatS / 2, w.advanceS, w.holdS, w.retreatS) > 0.2,
+        'the drain is not still running half way through');
+      return `retreat ${w.retreatS.toFixed(2)} s`;
+    });
+
+    check('the advance is well under a second and is not claimed as measured', () => {
+      // PICKED, and the brief says so: "do not claim it was derived from the
+      // footage." What is checked is the stated property, not a fit.
+      assert.ok(W.ADVANCE_S < 1, `advance ${W.ADVANCE_S} is not under a second`);
+      assert.ok(W.ADVANCE_S < W.RETREAT_S / 2, 'the advance is not much faster than the retreat');
+      const src = fs.readFileSync(path.join(SCENE, 'beach-swash.js'), 'utf8');
+      assert.ok(/NOT measured|PICKED, NOT MEASURED/i.test(src),
+        'the advance is not declared as picked rather than measured');
+      return `${W.ADVANCE_S} s, declared picked`;
+    });
+
+    check('successive swashes do not reach identical distances', () => {
+      const sw = W.createSwash({ rand: rng(11) });
+      const reaches = [];
+      for (let i = 0; i < 20; i++) reaches.push(sw.spawn(0).runup);
+      const uniq = new Set(reaches.map(r => r.toFixed(6)));
+      assert.strictEqual(uniq.size, reaches.length, 'two swashes reached the same distance');
+      const spread = Math.max(...reaches) - Math.min(...reaches);
+      assert.ok(spread > 0.01, `the reaches only spread ${spread}`);
+      return `20 distinct reaches, spread ${spread.toFixed(3)} of frame height`;
+    });
+
+    check('wet sand persists after the water has left it', () => {
+      // THE FAILURE MODE THE BRIEF NAMES: "Animating one oscillating waterline
+      // is the failure mode here. Wet sand must persist after the water has
+      // left it." So at full drain the two boundaries must be far apart.
+      const { sw } = settled();
+      let found = null;
+      for (let i = 0; i < 60 * 40 && !found; i++) {
+        sw.advance(1 / 60, { energy: 0 });
+        if (sw.edgeAtU(0.5) < S.WATERLINE_S + 0.01) found = { e: sw.edgeAtU(0.5), w: sw.wetAtU(0.5) };
+      }
+      assert.ok(found, 'the swash never drained');
+      const gap = found.w - found.e;
+      assert.ok(gap > 0.12, `the wet band is only ${gap.toFixed(3)} of frame height at full drain`);
+      return `edge ${found.e.toFixed(3)}, high-water ${found.w.toFixed(3)}, a wet band ${gap.toFixed(3)} deep`;
+    });
+
+    check('the two drying rates are an order of magnitude apart', () => {
+      // "Do not use one rate for the whole beach." They are two variables, so
+      // the separation is a property of the declaration and not of a branch.
+      assert.ok(W.SAT_DRY_S / W.OVERRUN_DRY_S > 10,
+        `the two rates are only ${(W.SAT_DRY_S / W.OVERRUN_DRY_S).toFixed(1)}x apart`);
+      return `overrun ${W.OVERRUN_DRY_S} s vs saturated ${W.SAT_DRY_S} s — ${(W.SAT_DRY_S / W.OVERRUN_DRY_S).toFixed(0)}x`;
+    });
+
+    check('the overrun zone dries back and does not ratchet', () => {
+      // "then recedes as the sand behind it dries ... it must return, not
+      // ratchet." Measured on the emitted fields, not on the declaration.
+      const { sw, se } = settled(88);
+      const sat0 = sw.satAtU(0.5), wet0 = sw.wetAtU(0.5);
+      se.scroll(120); se.scroll(120); se.scroll(120);
+      let peak = 0;
+      for (let i = 0; i < 60 * 30; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+        peak = Math.max(peak, sw.wetAtU(0.5));
+      }
+      assert.ok(peak > sat0 + 0.08, `the set only reached ${peak.toFixed(3)} against a saturated ${sat0.toFixed(3)}`);
+      // and once the energy has gone it comes back down toward the saturated level
+      for (let i = 0; i < 60 * 70; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: 0, intervalScale: 1 });
+      }
+      const back = sw.wetAtU(0.5);
+      assert.ok(back < peak - 0.05, `the mark stayed at ${back.toFixed(3)} after peaking at ${peak.toFixed(3)}`);
+      // RETURNED, not ratcheted: back to where it sat BEFORE the set. Comparing
+      // it against the CURRENT saturated level instead would be a clause
+      // reading its reference out of the thing it is checking — sat is what the
+      // set moved, so "wet came back to sat" is true of a ratchet too.
+      assert.ok(back <= wet0 + 0.05,
+        `the mark settled at ${back.toFixed(3)} against ${wet0.toFixed(3)} before the set`);
+      return `${wet0.toFixed(3)} before, peak ${peak.toFixed(3)}, ${back.toFixed(3)} after (sat0 ${sat0.toFixed(3)})`;
+    });
+
+    check('the high-water mark is effectively static in quiet water', () => {
+      // The brief's own instrument: "it moves about 6px in 3.5 seconds".
+      // Measured here in the same units on a 900 px frame, over windows with no
+      // set energy in them — a set is the one time it IS meant to move.
+      const H = 900, moves = [];
+      for (const seed of [1, 7, 4242]) {
+        const { sw, se } = settled(seed);
+        for (let k = 0; k < 40; k++) {
+          const before = sw.wetAtU(0.5); let calm = true;
+          for (let i = 0; i < 210; i++) {
+            se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+            if (se.energy > 0.02) calm = false;
+          }
+          if (calm) moves.push(Math.abs(sw.wetAtU(0.5) - before) * H);
+        }
+      }
+      assert.ok(moves.length > 30, `only ${moves.length} quiet windows`);
+      const mean = moves.reduce((a, b) => a + b, 0) / moves.length;
+      assert.ok(mean < 12, `the mark moves ${mean.toFixed(1)} px per 3.5 s, which is not "effectively static"`);
+      return `${mean.toFixed(1)} px per 3.5 s over ${moves.length} windows (the brief measured ~6)`;
+    });
+
+    check('an overrun fires with the extent it reached', () => {
+      const { sw, se } = settled(555);
+      sw.overruns.length = 0;
+      se.scroll(120); se.scroll(120); se.scroll(120);
+      for (let i = 0; i < 60 * 40; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+      }
+      assert.ok(sw.overruns.length > 0, 'a full set fired no overrun');
+      for (const o of sw.overruns) {
+        assert.ok(Number.isFinite(o.extent) && o.extent > S.WATERLINE_S, `extent ${o.extent}`);
+        assert.ok(o.over >= W.OVERRUN_MARGIN_S, `an overrun fired only ${o.over} past the mark`);
+        assert.ok(o.at >= 0 && o.at <= 1, `at ${o.at} is not an along-shore position`);
+      }
+      // AND A QUIET BEACH FIRES NONE, which is what makes the event a signal
+      // rather than a wave counter. Measured over five seeds at five minutes
+      // each, the margin was set where this rate reaches zero while the
+      // set-driven rate is barely touched.
+      let quietFires = 0;
+      for (const seed of [556, 557, 558]) {
+        const { sw: q } = settled(seed);
+        q.overruns.length = 0;
+        for (let i = 0; i < 60 * 300; i++) q.advance(1 / 60, { energy: 0, intervalScale: 1 });
+        quietFires += q.overruns.length;
+      }
+      assert.strictEqual(quietFires, 0, `${quietFires} overruns in fifteen quiet minutes`);
+      return `${sw.overruns.length} on a full set, 0 in fifteen quiet minutes`;
+    });
+
+    check('the gloss is a length behind the edge, not a fixed band', () => {
+      // "Sand goes glossy -> matte over roughly half a second behind the
+      // departing water" — so a fast drain leaves a WIDER glossy band.
+      const { sw } = settled(31);
+      let drainMax = 0, restMin = Infinity;
+      for (let i = 0; i < 60 * 60; i++) {
+        sw.advance(1 / 60, { energy: 0 });
+        if (sw.sheet > 0.3 && sw.sheet < 0.8) drainMax = Math.max(drainMax, sw.glossDepth);
+        if (sw.sheet === 0) restMin = Math.min(restMin, sw.glossDepth);
+      }
+      assert.ok(drainMax > restMin * 4, `draining ${drainMax.toFixed(4)} vs at rest ${restMin.toFixed(4)}`);
+      return `${restMin.toFixed(4)} at rest, ${drainMax.toFixed(4)} mid-drain`;
+    });
+
+    setSection('sets');
+
+    check('three scroll actions reach the maximum', () => {
+      const se = SE.createSets({ rand: rng(2) });
+      for (let i = 0; i < 3; i++) se.scroll(SE.ACTION_DELTA);
+      near(se.energy, 1, 1e-9, 'three actions did not fill it');
+      return `3 x ${SE.ACTION_DELTA} px -> ${se.energy.toFixed(3)}`;
+    });
+
+    check('either scroll direction adds energy', () => {
+      // UNSIGNED, unlike scene 1's wind: a set has no negative, and what puts
+      // it back is the decay.
+      const up = SE.createSets({ rand: rng(2) }), down = SE.createSets({ rand: rng(2) });
+      up.scroll(SE.ACTION_DELTA); down.scroll(-SE.ACTION_DELTA);
+      near(up.energy, down.energy, 1e-12, 'the two directions disagree');
+      assert.ok(up.energy > 0, 'scrolling added nothing');
+      return `both directions -> ${up.energy.toFixed(3)}`;
+    });
+
+    check('the energy decays to zero over its window', () => {
+      const se = SE.createSets({ rand: null });
+      for (let i = 0; i < 3; i++) se.scroll(SE.ACTION_DELTA);
+      for (let i = 0; i < Math.round(SE.DECAY_S * 240); i++) se.advance(1 / 240);
+      assert.strictEqual(se.scrolled, 0, `the scrolled energy is ${se.scrolled} after the window`);
+      return `zero exactly at ${SE.DECAY_S} s`;
+    });
+
+    check('large sets arrive with no input at all', () => {
+      // "an untouched scene still gets overruns"
+      const se = SE.createSets({ rand: rng(5) });
+      let peak = 0;
+      for (let i = 0; i < 240 * 60 * 4; i++) { se.advance(1 / 240); peak = Math.max(peak, se.energy); }
+      assert.ok(se.sets > 0, 'no set arrived in four minutes');
+      assert.ok(peak >= SE.SET_PEAK[0] * 0.95, `the biggest natural set only reached ${peak.toFixed(2)}`);
+      assert.strictEqual(se.scrolled, 0, 'the natural set went through the scroll account');
+      return `${se.sets} sets in 4 min, peaking at ${peak.toFixed(2)}, with no input`;
+    });
+
+    setSection('water');
+
+    check('the streaks persist and drift shoreward', () => {
+      // They are records, not a field regenerated each frame: a re-randomised
+      // surface reads as static rather than as water.
+      const wa = WA.createWater({ rand: rng(6), count: 60 });
+      assert.deepStrictEqual(Object.keys(wa.streaks[0]).sort(), [...WA.STREAK_FIELDS].sort());
+      const first = wa.streaks[0];
+      const s0 = first.s, u0 = first.u;
+      for (let i = 0; i < 30; i++) wa.advance(1 / 60, { energy: 0 });
+      assert.strictEqual(wa.streaks[0], first, 'the streak array was rebuilt');
+      assert.ok(first.s > s0, 'the streak did not drift shoreward');
+      near(first.u, u0, 1e-12, 'a streak wandered along the shore');
+      assert.ok(wa.drift > 0, 'the drift phase did not advance');
+      return `s ${s0.toFixed(3)} -> ${first.s.toFixed(3)}, same record, u unchanged`;
+    });
+
+    setSection('beach-tone');
+
+    check('the value ordering is the reference\'s own', () => {
+      // Measured off the three clips as ink coverage against their OWN dry
+      // sand: deep water 0.84 > mid water 0.55 > wet sand 0.23 > foam 0.04 >
+      // dry 0.03. The ordering is what has to hold; the levels are the
+      // constants set from it.
+      const T = D.TONE;
+      assert.ok(T.deep > T.shallow, 'deep water is not darker than the shore');
+      assert.ok(T.shallow > T.gloss, 'the shore is not darker than glossy sand');
+      assert.ok(T.gloss > T.wet, 'glossy sand is not darker than matte wet sand');
+      assert.ok(T.wet > T.foam, 'wet sand is not darker than the foam');
+      assert.strictEqual(T.foam, 0, 'the foam is not bare paper');
+      assert.strictEqual(T.dry, 0, 'the dry sand is not bare paper');
+      return `deep ${T.deep} > shallow ${T.shallow} > gloss ${T.gloss} > wet ${T.wet} > foam/dry 0`;
+    });
+
+    check('the foam band is a plateau of paper, not a ramp to one', () => {
+      // A smooth fall across the band averages half the water's tone over it,
+      // which put the foam DARKER than the wet sand and inverted the one
+      // ordering that has to hold.
+      const edge = 0.40, fw = D.FOAM_BAND_S;
+      const at = (s) => D.waterTone(s, edge, fw, 0.05, 0, 0);
+      near(at(edge), 0, 1e-9, 'the tone at the edge itself');
+      // the inner part of the band is bare
+      assert.strictEqual(at(edge - fw * 0.25), 0, 'the inner foam band carries ink');
+      // and the seaward part still RAMPS rather than cutting. `into` is
+      // measured from the band's seaward edge, so the ramp occupies the outer
+      // FOAM_RAMP of it — probing at 0.6 of the way in lands in the plateau,
+      // which is what the first version of this clause did.
+      const onRamp = edge - fw * (1 - D.FOAM_RAMP * 0.5);
+      const mid = at(onRamp);
+      assert.ok(mid > 0 && mid < at(edge - fw * 1.2), `the band does not ramp in (${mid})`);
+      return `bare over the inner ${((1 - D.FOAM_RAMP) * 100).toFixed(0)}% of the band`;
+    });
+
+    check('the run-up sheet is lighter than deep water', () => {
+      // Anchoring the ramp on the MOVING edge stretched the ocean gradient over
+      // the sand a swash had just covered, so an overrun came out as four
+      // fifths of the frame in near-solid ink.
+      const deep = D.waterTone(0.02, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
+      const sheet = D.waterTone(0.65, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
+      assert.ok(sheet < deep * 0.75, `the sheet reads ${sheet.toFixed(2)} against deep water ${deep.toFixed(2)}`);
+      // and the deep water's own tone must NOT move when the edge does
+      const a = D.waterTone(0.10, 0.42, D.FOAM_BAND_S, 0.05, 0, 0);
+      const b = D.waterTone(0.10, 0.95, D.FOAM_BAND_S, 0.05, 0, 0);
+      near(a, b, 1e-12, 'the deep water changed tone because the swash moved');
+      return `deep ${deep.toFixed(2)} vs sheet ${sheet.toFixed(2)}; deep is edge-independent`;
+    });
+
+    check('the dry sand leaves a register for the marks session', () => {
+      // The sand-marking session draws user marks into this region, so the base
+      // texture has to sit somewhere a drawn line can be read ON TOP of. The
+      // gap is declared rather than described, and the module refuses to load
+      // without it.
+      // THE BAR IS NOT IMPORTED FROM THE MODULE UNDER TEST. The first version
+      // of this clause asserted the gap against the module's own
+      // MARK_HEADROOM, which is the entangled-reference trap: a tree that gave
+      // the headroom away would lower that constant too and the clause would
+      // stay green while the registers collided. Both numbers here have other
+      // owners — 0.30 is the gap this session is committing to, restated, and
+      // 0.32 is MEASURED off the reference (its footprints sit about 70 levels
+      // under their ground on a 185/47 range).
+      const HEADROOM = 0.30, REF_FOOTPRINT_ALPHA = 0.32;
+      assert.ok(D.DRY_MARK_ALPHA > 0, 'the dry sand carries no texture at all');
+      assert.ok(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA >= HEADROOM,
+        `the base texture at ${D.DRY_MARK_ALPHA} leaves only `
+        + `${(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor`);
+      assert.ok(D.DRY_MARK_ALPHA < REF_FOOTPRINT_ALPHA,
+        `the base texture at ${D.DRY_MARK_ALPHA} is as dark as the reference's own footprints`);
+      return `base ${D.DRY_MARK_ALPHA} · drawn marks from ${D.MARK_ALPHA_FLOOR} · headroom ${D.MARK_HEADROOM}`;
+    });
+
+    check('the swell fades out in the deep water', () => {
+      // Near the top of frame the ramp is steepest, so a displacement there
+      // swings the tone by a fifth and the sea bands.
+      near(D.swell(0.3, 0.01, 1.0, 0), 0, 1e-12, 'the swell is live at the top of frame');
+      const shoal = Math.abs(D.swell(0.3, 0.35, 1.0, 1));
+      assert.ok(shoal > 0, 'the swell is dead everywhere');
+      return `0 at depth 0, ${shoal.toFixed(4)} at the shore`;
+    });
+  }
+
   // --------------------------------------------------------------- registry
   setSection('registry');
-  check('there are eight slots and one is built', () => {
+  check('there are eight slots and two are built', () => {
     assert.strictEqual(M.registry.SCENES.length, M.registry.MAX_SCENES);
     assert.strictEqual(M.registry.MAX_SCENES, 8);
     M.registry.SCENES.forEach((s, i) => assert.strictEqual(s.id, i + 1));
     const built = M.registry.builtScenes();
-    assert.strictEqual(built.length, 1, `${built.length} scenes are built`);
-    assert.strictEqual(built[0].id, 1);
-    return `8 slots, scene 1 "${built[0].title}" built, 7 stubs`;
+    assert.strictEqual(built.length, 2, `${built.length} scenes are built`);
+    assert.deepStrictEqual(built.map(b => b.id), [1, 3]);
+    assert.ok(built.every(b => b.title), 'a built slot has no title');
+    return `8 slots, ${built.map(b => `${b.id} "${b.title}"`).join(' + ')}, 6 stubs`;
   });
 
   check('the random pick excludes what is showing', () => {
-    assert.strictEqual(M.registry.randomSceneId(1, () => 0.5), null,
-      'with one scene built there is nowhere to go');
-    // and with a second built, it never returns the current one
-    const stub = { id: 2, title: 'stub', load: async () => ({}) };
-    const saved = M.registry.SCENES[1];
-    M.registry.SCENES[1] = stub;
+    // With two built it must always move, and never to the one showing.
+    for (const u of [0, 0.49, 0.5, 0.99]) {
+      assert.strictEqual(M.registry.randomSceneId(1, () => u), 3);
+      assert.strictEqual(M.registry.randomSceneId(3, () => u), 1);
+    }
+    // And with only one it has nowhere to go, which is what disables the
+    // button rather than leaving a no-op that looks broken.
+    const saved = M.registry.SCENES[2];
+    M.registry.SCENES[2] = { id: 3, title: null, load: null };
     try {
-      for (const u of [0, 0.49, 0.5, 0.99]) {
-        assert.strictEqual(M.registry.randomSceneId(1, () => u), 2);
-        assert.strictEqual(M.registry.randomSceneId(2, () => u), 1);
-      }
-    } finally { M.registry.SCENES[1] = saved; }
-    return 'null with one built; never the current one with two';
+      assert.strictEqual(M.registry.randomSceneId(1, () => 0.5), null,
+        'with one scene built there is nowhere to go');
+    } finally { M.registry.SCENES[2] = saved; }
+    return 'never the current one with two built; null with one';
   });
 
   check('the url names a scene and falls back when it cannot', () => {
@@ -2290,7 +2953,9 @@ async function partOne(mutant) {
   // hand-written coverage list more than once.
   const SCENE_MODULES = ['surface.js', 'koi-storm.js', 'koi-wind.js', 'koi-ripples.js',
                          'koi-rain.js', 'koi-fish.js', 'koi-pads.js', 'koi-draw.js',
-                         'scene-koi.js'];
+                         'scene-koi.js',
+                         'beach-shore.js', 'beach-swash.js', 'beach-sets.js',
+                         'beach-water.js', 'beach-draw.js', 'scene-beach.js'];
   const stripComments = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
@@ -2422,11 +3087,18 @@ function serveRepo({ mutant, withProbe, withLayers }) {
       body = Buffer.from(swapped);
     }
     if (withLayers && rel === 'scene/registry.js') {
+      // THE PROBE TAKES THE FIRST EMPTY SLOT RATHER THAN A NUMBERED ONE. It sat
+      // on slot 3 and slot 3 became the beach, so the injection silently found
+      // nothing to replace and the whole pass died on its own guard. Slot 4 is
+      // the next stub, and taking "the first empty slot" means the next scene
+      // built does not do this again.
       const src = body.toString();
-      const swapped = src.replace(
-        "  { id: 3, title: null, load: null },",
-        "  { id: 3, title: 'Planes', load: () => import('./scene-layers.js') },");
+      const empty = src.match(/ {2}\{ id: (\d+), title: null, load: null \},/);
+      if (!empty) throw new Error('the layer probe found no empty slot in the registry');
+      const swapped = src.replace(empty[0],
+        `  { id: ${empty[1]}, title: 'Planes', load: () => import('./scene-layers.js') },`);
       if (swapped === src) throw new Error('the layer probe could not be injected into the registry');
+      state.layerSlot = Number(empty[1]);
       body = Buffer.from(swapped);
     }
     send(body, MIME[path.extname(file)] || 'application/octet-stream');
@@ -2566,14 +3238,15 @@ async function partTwo(browser, mutant, shotsDir) {
         const numbered = nav.filter(b => /^\d$/.test(b.label));
         assert.strictEqual(numbered.length, 8, `${numbered.length} numbered buttons`);
         assert.deepStrictEqual(numbered.map(b => b.label), ['1','2','3','4','5','6','7','8']);
-        assert.strictEqual(numbered.filter(b => b.disabled).length, 7, 'the wrong number are disabled');
+        assert.strictEqual(numbered.filter(b => b.disabled).length, 6, 'the wrong number are disabled');
         assert.strictEqual(numbered[0].disabled, false, 'scene 1 is disabled');
+        assert.strictEqual(numbered[2].disabled, false, 'scene 3 is disabled');
         assert.strictEqual(numbered[0].active, true, 'scene 1 is not marked active');
         assert.strictEqual(numbered[0].current, 'true', 'scene 1 carries no aria-current');
         const rnd = nav.find(b => b.label === '?');
         assert.ok(rnd, 'there is no random button');
-        assert.strictEqual(rnd.disabled, true, 'the random button is live with only one scene to choose from');
-        return '1 built, 7 disabled, ? disabled with nowhere to go';
+        assert.strictEqual(rnd.disabled, false, 'the random button is dead with two scenes to choose from');
+        return '2 built (1, 3), 6 disabled, ? live';
       });
 
       await checkAsync('return goes back to the site', async () => {
@@ -3070,6 +3743,340 @@ async function partTwo(browser, mutant, shotsDir) {
     }
   }
 
+  // -------------------------------------------- pass A3: scene 3, live ----
+  // The beach on the real page, through the real shell. Everything here is
+  // either measured off the RASTERISED framebuffer or read from the scene's
+  // own reported state; nothing is asserted against the control that wrote it.
+  {
+    const { server } = await serveRepo({ mutant, withProbe: false });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const { page, ctx, errors } = await openPage(browser, base);
+    // A MUTATION CAN STOP THE SCENE MODULE LOADING AT ALL, AND A BARE WAIT HERE
+    // TURNS THAT INTO A TimeoutError OUT OF THE WHOLE RUN — no summary, no
+    // FAILURES block, and every mutant after it in the sweep unrun. This repo's
+    // own rule: a missing thing is a RED CHECK, never a hang. The mutation that
+    // found it is `the-register-headroom-is-given-away`, which makes
+    // beach-draw.js refuse at module scope exactly as it is meant to, so the
+    // page never mounts scene 3 — the refusal IS the behaviour under test and
+    // it must be reportable. The mount is a check now, and the rest of the
+    // section is skipped rather than run against a page that has no beach on
+    // it, so the run still reaches its summary and still names what failed.
+    scene3: try {
+      setSection('scene3');
+      await page.evaluate(() => window.__scene.activate(3));
+      let mounted = false;
+
+      await checkAsync('the beach loads, draws and takes over the nav', async () => {
+        try {
+          await page.waitForFunction(() => window.__scene.activeId === 3 && window.__scene.frames > 4,
+            null, { timeout: 10000 });
+          mounted = true;
+        } catch {
+          throw new Error('scene 3 never mounted — its module did not load, '
+            + `page errors: ${errors.length ? errors.join(' | ') : '(none reported)'}`);
+        }
+        const st = await page.evaluate(() => ({
+          id: window.__scene.activeId, running: window.__scene.running,
+          canvases: window.__scene.canvasCount, children: window.__scene.stageChildren,
+          title: document.title,
+          active: [...document.querySelectorAll('#scene-nav-scenes [data-scene]')]
+            .filter(b => b.classList.contains('is-active')).map(b => b.textContent),
+        }));
+        assert.strictEqual(st.id, 3);
+        assert.strictEqual(st.running, true, 'the loop is not running');
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases — this is not a multiplane scene`);
+        assert.strictEqual(st.children, 1, `${st.children} things on the stage`);
+        assert.deepStrictEqual(st.active, ['3'], 'the nav does not mark scene 3');
+        assert.ok(/Beach/i.test(st.title), `the tab reads "${st.title}"`);
+        return `scene 3, one canvas, nav marks 3, "${st.title}"`;
+      });
+
+      // Everything below reads the beach's own state or its framebuffer; with
+      // no beach mounted they would each fail for the same one reason and bury
+      // it in twenty identical reds.
+      if (!mounted) break scene3;
+
+      await checkAsync('the published interface is exactly the three things', async () => {
+        // "Expose three things and nothing else." Birds need the first two;
+        // mark-erasure needs all three.
+        const api = await page.evaluate(() => window.__scene.sceneApi());
+        assert.deepStrictEqual(api, { swashYAt: 'function', highWaterYAt: 'function', overruns: 'array' },
+          `the interface is ${JSON.stringify(api)}`);
+        return 'swashYAt · highWaterYAt · overruns';
+      });
+
+      await checkAsync('the two queries answer in screen pixels and follow the shear', async () => {
+        // BOTH SIDES ARE READ IN ONE EVALUATE, because the page is live: asking
+        // the interface in one call and the scene's own report in the next put
+        // a frame between them and the two answers were 3 px apart on a moving
+        // swash. That is the harness measuring the clock, not the scene.
+        const { st, q } = await page.evaluate(() => {
+          const w = window.__scene.viewport.w;
+          const xs = [0, w * 0.25, w * 0.5, w * 0.75, w - 1];
+          return {
+            q: xs.map(x => ({ x, s: window.__scene.sceneQuery('swashYAt', x),
+                              h: window.__scene.sceneQuery('highWaterYAt', x) })),
+            st: window.__scene.sceneState(),
+          };
+        });
+        for (const r of q) {
+          assert.ok(Number.isFinite(r.s) && Number.isFinite(r.h), `not a number at x=${r.x}`);
+          assert.ok(r.h > r.s - 1, `the high-water mark is seaward of the swash at x=${r.x}`);
+        }
+        // THE SHEAR IS RECOVERED BY A FIT, NOT BY TWO SAMPLES. Comparing the
+        // left edge against the right conflates the shear with the SCALLOPS on
+        // the front: at this tilt the shear is ~67 px across the frame and the
+        // wobble is ±24 px, so a single pair can come out either way and a
+        // LEVEL shoreline passed that clause on the wobble alone (measured —
+        // the mutant stayed green). The wobble is zero-mean along the shore, so
+        // a least-squares slope over the whole width recovers the shear and
+        // nothing else.
+        const fit = await page.evaluate(() => {
+          const w = window.__scene.viewport.w;
+          const n = 41, xs = [], ys = [], hs = [];
+          for (let i = 0; i < n; i++) {
+            const x = (i / (n - 1)) * (w - 1);
+            xs.push(x); ys.push(window.__scene.sceneQuery('swashYAt', x));
+            hs.push(window.__scene.sceneQuery('highWaterYAt', x));
+          }
+          const slope = (a) => {
+            const mx = xs.reduce((p, c) => p + c, 0) / n, my = a.reduce((p, c) => p + c, 0) / n;
+            let num = 0, den = 0;
+            for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (a[i] - my); den += (xs[i] - mx) ** 2; }
+            return num / den;
+          };
+          return { edge: slope(ys), wet: slope(hs), declared: window.__scene.sceneState().slope };
+        });
+        assert.ok(fit.declared < 0, `the shore declares a slope of ${fit.declared}`);
+        for (const [what, v] of [['swash edge', fit.edge], ['high-water mark', fit.wet]]) {
+          assert.ok(v < 0, `the ${what} does not rise to the right (slope ${v.toFixed(4)})`);
+          near(v, fit.declared, Math.abs(fit.declared) * 0.45,
+            `the ${what}'s drawn slope is not the shore's declared one`);
+        }
+        // And they agree with what the scene says about itself, in its own units.
+        near(q[2].s, st.swashY[2], 1e-6, 'swashYAt disagrees with the reported state');
+        near(q[2].h, st.highWaterY[2], 1e-6, 'highWaterYAt disagrees with the reported state');
+        return `fitted slope: edge ${fit.edge.toFixed(4)}, high-water ${fit.wet.toFixed(4)}, shore declares ${fit.declared.toFixed(4)}`;
+      });
+
+      await checkAsync('the value ordering holds and the dry sand is toned not blank', async () => {
+        // THE VALUE STRUCTURE, off the rasterised framebuffer, and it takes TWO
+        // statistics because one of them cannot see the defect this check was
+        // written for. The dry band first shipped as BARE PAPER — a uniform
+        // 237/255 at 0.000 ink coverage across the bottom third — and every
+        // band comparison passed it, because a comparison of band MEANS reads a
+        // uniformly empty region as "the lightest" and that is all the ordering
+        // asks. "Dry sand is the open white" is a statement about the value
+        // ordering: it is the lightest TONED region, not an empty one. The
+        // reference never gets lighter than a mean of ~181 and carries the
+        // trampled surface to the bottom edge at a local contrast of 14.5.
+        //
+        // So the ordering is asserted on the means, and the dry band is
+        // separately held to carrying TEXTURE — which a mean is blind to — and
+        // to staying inside its own register, under the floor a later session's
+        // drawn marks start at.
+        await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
+        const m = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const W = c.width, H = c.height;
+          const band = (a, b) => {
+            const y0 = Math.round(H * a), hh = Math.max(1, Math.round(H * (b - a)));
+            const d = g.getImageData(0, y0, W, hh).data;
+            let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i];
+            const mean = s / (d.length / 4);
+            // Local contrast: how far a pixel sits from the mean of its patch.
+            // A flat region reads ~0 however light or dark it is.
+            let loc = 0, n = 0;
+            const at = (x, y) => d[(y * W + x) * 4];
+            for (let y = 5; y < hh - 5; y += 3) for (let x = 5; x < W - 5; x += 3) {
+              let p = 0; for (let k = -4; k <= 4; k += 2) for (let j = -4; j <= 4; j += 2) p += at(x + j, y + k);
+              loc += Math.abs(at(x, y) - p / 25); n++;
+            }
+            // The darkest 1% — what the texture's own marks reach.
+            const px = []; for (let i = 0; i < d.length; i += 40) px.push(d[i]);
+            px.sort((a2, b2) => a2 - b2);
+            return { mean, loc: loc / n, p01: px[Math.floor(px.length * 0.01)], paper: px[px.length - 1] };
+          };
+          return { top: band(0.02, 0.12), mid: band(0.18, 0.32), wet: band(0.46, 0.54), dry: band(0.78, 0.97) };
+        });
+        await page.evaluate(() => window.__scene.pause(false));
+
+        assert.ok(m.top.mean < m.mid.mean, `the deep water (${m.top.mean.toFixed(0)}) is not darker than the water below it (${m.mid.mean.toFixed(0)})`);
+        assert.ok(m.mid.mean < m.wet.mean, `the water (${m.mid.mean.toFixed(0)}) is not darker than the wet sand (${m.wet.mean.toFixed(0)})`);
+        assert.ok(m.wet.mean < m.dry.mean, `the wet sand (${m.wet.mean.toFixed(0)}) is not darker than the dry sand (${m.dry.mean.toFixed(0)})`);
+        assert.ok(m.top.mean < 110, `the deep water reads ${m.top.mean.toFixed(0)} — it is not a dark mass`);
+
+        // THE DRY BAND IS TONED. A blank band reads ~0 local contrast; the
+        // reference's reads 14.5. Held well clear of flat, and under the
+        // reference's own so a drawn mark has somewhere to go.
+        assert.ok(m.dry.loc > 4, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)} — it is a blank band`);
+        assert.ok(m.dry.loc < 14.5, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)}, at or past the reference's own 14.5`);
+        assert.ok(m.dry.mean < 234, `the dry sand reads ${m.dry.mean.toFixed(0)} — it is bare paper`);
+
+        // AND ITS MARKS STAY IN THEIR REGISTER. The darkest 1% of the band is
+        // what the texture actually puts down; a later session's drawn marks
+        // start at MARK_ALPHA_FLOOR, so the base has to sit lighter than that.
+        const floor = m.dry.paper - (m.dry.paper - 22) * 0.60;
+        assert.ok(m.dry.p01 > floor,
+          `the sand texture reaches ${m.dry.p01} against a drawn-mark floor of ${floor.toFixed(0)} — the two registers collide`);
+        return `deep ${m.top.mean.toFixed(0)} < water ${m.mid.mean.toFixed(0)} < wet ${m.wet.mean.toFixed(0)} < dry ${m.dry.mean.toFixed(0)}; `
+          + `dry local contrast ${m.dry.loc.toFixed(1)} (ref 14.5), marks reach ${m.dry.p01} against a floor of ${floor.toFixed(0)}`;
+      });
+
+      await checkAsync('the foam band reaches bare paper', async () => {
+        // THE BAND HAS TO BE WIDER THAN A SCREEN ROW'S OWN s-RANGE, and the
+        // plateau clause next door cannot see that: a narrow band is still a
+        // plateau in shape, it just never reads as bare anywhere.
+        //
+        // MEASURED IN A CENTRAL STRIP, because these bands are SHEARED — at 3
+        // degrees on this frame one full-width row spans 0.079 of frame height
+        // in band coordinates, which is WIDER THAN THE BAND, so a full-width
+        // mean can never reach paper however bare the band is. Over the middle
+        // tenth the shear is under 1% of height.
+        //
+        // THE BAR IS THE REFERENCE'S OWN BARE RUN. Read off the clips with a
+        // PER-COLUMN statistic, which needs no strip and no slope at all —
+        // shear moves a band up or down per column and cannot smear anything
+        // within one — the longest bare run is 3.56% / 1.39% / 3.06% of frame
+        // on the three clips whose foam is not thin (0.43% on c3_001, which
+        // is), and 97-100% of their columns reach EXACTLY 0.000 coverage.
+        // FOAM_BAND_S is set from that; see its own block in beach-draw.js,
+        // including why the full-width figure cannot be satisfied at any width.
+        // The bar here sits under the thinnest of the three, so it fails a band
+        // that has stopped opening rather than one that is merely narrower than
+        // c1_001's.
+        await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
+        const m = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const W = c.width, H = c.height;
+          const x0 = Math.round(W * 0.45), ww = Math.round(W * 0.10);
+          const d = g.getImageData(x0, 0, ww, H).data;
+          const rows = [];
+          for (let y = 0; y < H; y++) {
+            let s2 = 0;
+            for (let x = 0; x < ww; x++) s2 += d[(y * ww + x) * 4];
+            rows.push(s2 / ww);
+          }
+          const paper = Math.max(...rows);
+          const st = window.__scene.sceneState();
+          // Between the deep water and the swash edge, in screen rows.
+          const lo = Math.round(H * 0.10), hi = Math.round(H * st.edge[2]);
+          // THE BARE EXTENT, NOT JUST WHETHER ONE ROW IS BARE. Any plateau at
+          // all leaves a row or two between lattice lines, so "it reaches
+          // paper somewhere" is satisfied by a band a tenth the shipped width
+          // — measured, it stayed green at FOAM_BAND_S 0.022. What the
+          // reference actually shows is a band bare across about 4% of frame.
+          let run = 0, best = 0, at = 0;
+          for (let y = lo; y < hi; y++) {
+            if (paper - rows[y] < 10) { run++; if (run > best) { best = run; at = y / H; } }
+            else run = 0;
+          }
+          return { paper, span: best / H, at, edge: st.edge[2] };
+        });
+        await page.evaluate(() => window.__scene.pause(false));
+        assert.ok(m.span > 0.025,
+          `the foam band is bare across only ${(m.span * 100).toFixed(2)}% of frame height `
+          + `— the reference's is bare across about 4%`);
+        return `bare across ${(m.span * 100).toFixed(2)}% of frame (ref 3.56 / 3.06 / 1.39%), ending at `
+          + `${(m.at * 100).toFixed(1)}%, swash edge at ${(m.edge * 100).toFixed(1)}%`;
+      });
+
+      await checkAsync('the swash runs and drains while the wet band stays', async () => {
+        // The two-line model on the live page: over a whole cycle the edge
+        // moves a long way and the high-water mark barely does.
+        let eMin = 9, eMax = -9, wMin = 9, wMax = -9;
+        for (let i = 0; i < 26; i++) {
+          await page.evaluate(() => window.__scene.scenePump(0.35));
+          const st = await page.evaluate(() => window.__scene.sceneState());
+          if (st.energy > 0.03) { i--; continue; }        // a set is the one time the mark moves
+          eMin = Math.min(eMin, st.edge[2]); eMax = Math.max(eMax, st.edge[2]);
+          wMin = Math.min(wMin, st.wet[2]); wMax = Math.max(wMax, st.wet[2]);
+        }
+        const eRange = eMax - eMin, wRange = wMax - wMin;
+        assert.ok(eRange > 0.12, `the swash edge only moved ${eRange.toFixed(3)} of a frame height`);
+        assert.ok(wRange < eRange / 3, `the high-water mark moved ${wRange.toFixed(3)} against the swash's ${eRange.toFixed(3)}`);
+        return `edge ${eMin.toFixed(3)}..${eMax.toFixed(3)} (${eRange.toFixed(3)}), high-water ${wRange.toFixed(3)}`;
+      });
+
+      await checkAsync('scrolling raises set energy and it ebbs on its own', async () => {
+        const before = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        await page.mouse.move(640, 400);
+        const dpr = await page.evaluate(() => window.devicePixelRatio);
+        // A synthetic wheel arrives divided by the device scale factor, so what
+        // is SENT is scaled and what ARRIVED is what gets asserted.
+        for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120 * dpr);
+        const after = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        assert.ok(after > before + 0.5, `three actions took the energy from ${before.toFixed(2)} to ${after.toFixed(2)}`);
+        await page.evaluate(() => window.__scene.scenePump(12));
+        const ebbed = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        assert.strictEqual(ebbed, 0, `the scrolled energy is ${ebbed} after its window`);
+        return `${before.toFixed(2)} -> ${after.toFixed(2)} -> 0`;
+      });
+
+      await checkAsync('a click on the beach does nothing at all', async () => {
+        // "No click or drag interaction of any kind. Do not scaffold for them
+        // speculatively." So the claim is that the scene exposes no handler AND
+        // that clicking changes nothing it reports.
+        const hasHandler = await page.evaluate(() =>
+          typeof window.__scene.sceneQuery('pointer', 0) !== 'number' &&
+          (window.__scene.sceneApi() !== null));
+        void hasHandler;
+        await page.evaluate(() => window.__scene.pause(true));
+        const before = await page.evaluate(() => JSON.stringify(window.__scene.sceneState()));
+        await page.mouse.click(500, 300);
+        await page.mouse.click(900, 550);
+        const after = await page.evaluate(() => JSON.stringify(window.__scene.sceneState()));
+        await page.evaluate(() => window.__scene.pause(false));
+        assert.strictEqual(after, before, 'a click moved something');
+        const src = fs.readFileSync(path.join(SCENE, 'scene-beach.js'), 'utf8');
+        assert.ok(!/\bpointer\s*\(/.test(src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')),
+          'the scene declares a pointer handler');
+        return 'no pointer handler, and two clicks moved nothing';
+      });
+
+      await checkAsync('the frame is affordable', async () => {
+        const cost = await page.evaluate(async () => {
+          const f0 = window.__scene.frames, t0 = performance.now();
+          await new Promise(r => setTimeout(r, 2500));
+          return { fps: (window.__scene.frames - f0) / ((performance.now() - t0) / 1000) };
+        });
+        const st = await page.evaluate(() => window.__scene.sceneState());
+        // Headless software GL, so a floor rather than a target: what it catches
+        // is a frame that has become pathological.
+        assert.ok(cost.fps > 12, `${cost.fps.toFixed(1)} fps at ${st.segments} segments`);
+        return `${cost.fps.toFixed(1)} fps on software GL at ${st.segments} segments, ${st.streaks} streaks`;
+      });
+
+      await checkAsync('swapping back to the koi leaves nothing behind', async () => {
+        await page.evaluate(() => window.__scene.activate(1));
+        await page.waitForFunction(() => window.__scene.activeId === 1, null, { timeout: 8000 });
+        const st = await page.evaluate(() => ({
+          id: window.__scene.activeId, canvases: window.__scene.canvasCount,
+          children: window.__scene.stageChildren, running: window.__scene.running,
+          api: window.__scene.sceneApi(),
+        }));
+        assert.strictEqual(st.id, 1);
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases after the swap`);
+        assert.strictEqual(st.children, 1, `${st.children} things on the stage after the swap`);
+        assert.strictEqual(st.running, true);
+        // The beach's interface went with it; the koi publish none of it.
+        assert.deepStrictEqual(st.api, { swashYAt: 'undefined', highWaterYAt: 'undefined', overruns: 'undefined' },
+          `scene 1 reports ${JSON.stringify(st.api)}`);
+        return 'back on scene 1, one canvas, the beach\'s interface gone with it';
+      });
+
+      await checkAsync('the beach reports no errors', async () => {
+        assert.deepStrictEqual(errors, [], errors.join(' | '));
+        return 'clean console';
+      });
+    } finally {
+      await ctx.close();
+      server.close();
+    }
+  }
+
   // ------------------------------------------- pass A2: reduced motion -----
   {
     const { server } = await serveRepo({ mutant, withProbe: false });
@@ -3209,7 +4216,7 @@ async function partTwo(browser, mutant, shotsDir) {
   // full viewport apart, and the front one was opaque black where nothing had
   // been drawn — and neither is visible in anything scene 1 does.
   {
-    const { server } = await serveRepo({ mutant, withProbe: false, withLayers: true });
+    const { server, state: layerState } = await serveRepo({ mutant, withProbe: false, withLayers: true });
     const base = `http://127.0.0.1:${server.address().port}`;
     const { page, ctx, errors } = await openPage(browser, base);
     try {
@@ -3238,8 +4245,8 @@ async function partTwo(browser, mutant, shotsDir) {
       });
 
       await checkAsync('two planes occupy the same rect rather than stacking', async () => {
-        await page.click('[data-scene="3"]');
-        await page.waitForFunction(() => window.__scene.activeId === 3, null, { timeout: 5000 });
+        await page.click(`[data-scene="${layerState.layerSlot}"]`);
+        await page.waitForFunction((id) => window.__scene.activeId === id, layerState.layerSlot, { timeout: 5000 });
         await page.waitForTimeout(200);
         const st = await page.evaluate(() => {
           const cs = [...document.querySelectorAll('.scene-canvas')];
