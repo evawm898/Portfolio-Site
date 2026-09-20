@@ -3617,6 +3617,28 @@ keeps the last forty lines of the COMBINED stream, which is the tail of the stdo
 throws away the stderr block for the same reason the CI log does. Write the whole run to a file
 and grep it. This session recorded that lesson and then repeated it within the hour.
 
+**AND BACKGROUND WORK DOES NOT SURVIVE THE END OF A TURN IN THIS CONTAINER — SO A LONG
+CAPTURE RUNS IN THE FOREGROUND, IN `timeout`-BOUNDED CHUNKS, WITH `--resume`** (the
+ROOT-BLEND-line session, measured twice; it cost ~51 minutes). The obvious move — launch the
+byte capture with `nohup`, end the turn, read it back at a check-in — CANNOT WORK, and the
+first reading of why was WRONG and is recorded here corrected. It was called "a container
+restarted", which is what `uptime` looks like; the arithmetic says otherwise. Resumed at
+139/137 rows and read back 51 minutes later at 181/180: **42 rows, which at the measured
+3.6 s/row is ~2.5 minutes of actual running.** The process runs while the turn is live and is
+killed the moment the session goes idle. No OOM, no disk pressure (29 G free), no in-process
+error, and **no `EXIT=` marker from the wrapper** — the whole process group is killed, never
+exited, which is the tell that separates this from a crash.
+**WHAT MAKES IT SURVIVABLE IS SESSION 20'S CHECKPOINT, AND IT IS WHY THAT MECHANISM EXISTS**
+(`--resume` in `tools/diff-bloom-bytes.mjs`, built after that session lost three captures to
+the same thing): the out file is rewritten after EVERY row with `complete:false`, `--compare`
+refuses a partial, and an interruption costs ONE ROW rather than a run. A 860-row capture
+then closes in six `timeout 555` chunks inside single Bash calls — the tool's ceiling is
+600 s, and foreground `sleep` is blocked, so the chunking is the whole answer rather than
+waiting in-turn. **A `send_later` check-in is NOT the thing that fails** — it wakes the
+session reliably; what does not survive is the PROCESS, so a check-in that expects to read a
+finished background run reads a dead one. Do not re-derive this by backgrounding a sweep and
+coming back to it.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
