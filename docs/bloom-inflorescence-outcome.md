@@ -326,6 +326,58 @@ boundary=0`**, in 77 s. **All 23 rows: watertight AND one piece.**
 blocks of 883 rows, and **109 families asserted, 109 claimed, both directions** — ID0
 through ID6 among them.
 
+**THE BYTE PARTITION: 21 MOVED / 862 HELD, over the whole 883-row matrix in BOTH
+MODES.** `node tools/verify-bloom-surface-bytes.mjs --base <worktree of 3ed45df> --movers
+"^INFLO: (?!GATED)"`:
+
+```
+partition     : 21 of 21 rows named by --movers MOVED (every one must), 862 holders
+                compared to the bit
+export stream : 837,209,376 floats over 93,023,264 triangles, 883 rows x 2 modes
+captured grid : 77,409,888 values over 8,938 panels (live)
+
+PASS — 0 floats moved on the 862 holders, positionally, under Object.is; all 21
+predeclared movers moved.
+```
+
+**AND THE TOOL IS SHOWN ABLE TO FAIL, ON BOTH CLAUSES** — `--control` perturbs one
+coordinate by 1e-9 and BOTH halves report, which is what stops the captured-grid clause
+being a log line:
+
+```
+FAIL — 2 finding(s):
+  DEFAULT (the shipping configuration) (live): 1 of 171360 floats moved, first at
+    index 0 (tri 0): 5.306790136879714 against 5.306790135879714
+  DEFAULT (the shipping configuration) (live): grid — 1 of 4430 values moved,
+    first at 2: 1e-9 against 0
+```
+
+**THE 862 HOLDERS ARE MAIN'S ENTIRE 860-ROW MATRIX PLUS THE TWO GATED ROWS**, which is the
+guard's own claim: **at `inflorescence: NONE`, and on a bloom with no rachis, nothing
+moves.** That is the first thing the brief asked to be proved and it is proved over every
+float, not over a hash.
+
+**THE MOVER SET IS PREDECLARED FROM THE GUARD PREDICATE, NOT FROM THE LABELS.** A row moves
+iff `inflorescenceIsAbsent(state)` is FALSE — the geometry's own two-term guard, read over
+the matrix's own row sets — and the 21 rows that predicate names are EXACTLY the 21 the
+regex `^INFLO: (?!GATED)` matches, in both directions. **No non-`INFLO:` row sets
+`inflorescence` at all** (measured: 0 of 883), which is `INFLO_SUB_IDS` keeping the six
+sub-controls out of `SWEEPABLE` and the law being a CHOICE the blanket sweep does not
+touch — so `ALL MAX` and `ALL MIN` are holders by construction and are measured as such.
+
+**`bloom.js` CANNOT MOVE A FLOAT HERE, AND THAT IS A READING OF THE DIFF RATHER THAN AN
+ASSUMPTION.** `verify-bloom-surface-bytes` never loads it, so the claim above is about the
+GEOMETRY. Every line this session adds to `bloom.js` is inside `infloLine` (text), inside
+the `__bloomMetrics()` projection (read-only, after the build returns), or a comment; the
+only change on the export path is one name added to an import list. `exportStl` still calls
+`buildGeometry({ exportMode: true })` and `STLExporter` on the accumulator's own positions,
+unchanged.
+
+**THE PANEL GATE PASSES AND ITS NEGATIVE CONTROL FIRES ON EVERY ROUTE:** *panel gate: PASS
+— every control is declared once, rendered once, and reachable through the real UI from
+inside a collapsed section*, and `--negative-control` closes with *ALL SEVENTEEN ROUTES,
+AND SESSION 23'S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.*
+
 **THE PANEL GATE REFUSED BOTH NEW SECTIONS ON ITS FIRST RUN, AND WAS RIGHT TO:** *section
 "inflorescence" ships collapsed but names no geometry witness in WITNESS — the reactivity
 assertion for it would be vacuous*, and the same for "floret". Each now names one, through

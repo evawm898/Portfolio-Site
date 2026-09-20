@@ -4027,7 +4027,21 @@ touching its own rachis is OVER-connection, the crowding ruling's grounds. **So 
 have to change is the BAR, not the row list**, and no pair is added.
 **THE GRID EXPORT WRITES THE HEAD AT THE ORIGIN ONLY** — a raceme's florets are not in the
 `.glb`, the read-out says so on every build with an inflorescence, and closing it is
-`bloom-grid-gltf.js`'s own change. `frozen/phase36` is the 860 rows at `3ed45df`.
+`bloom-grid-gltf.js`'s own change.
+**THE BYTE PARTITION IS 21 MOVED / 862 HELD OVER THE WHOLE 883-ROW MATRIX IN BOTH MODES,
+AND THE 862 ARE MAIN'S ENTIRE 860 PLUS THE TWO GATED ROWS** — `verify-bloom-surface-bytes
+--base <worktree of 3ed45df> --movers "^INFLO: (?!GATED)"` reads **PASS, 0 floats moved on
+the holders, positionally under `Object.is`, over 837,209,376 export floats / 93,023,264
+triangles and 77,409,888 captured-grid values**, with all 21 predeclared movers moving and
+`--control` firing BOTH clauses on a 1e-9 perturbation. **The mover set is predeclared from
+the GUARD PREDICATE, not from the labels** (a row moves iff `inflorescenceIsAbsent` is
+false), and the two agree in both directions; **no non-`INFLO:` row sets `inflorescence` at
+all** (0 of 883), so `ALL MAX` and `ALL MIN` are holders by construction and are measured
+as such. **`bloom.js` cannot move a float here and that is a reading of the diff**: every
+line it gains is `infloLine`'s text, the read-only metrics projection or a comment, and the
+only change on the export path is one name in an import list. `frozen/phase36` is the 860
+rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
+its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
 ## Flower generator — print-safety is a hard invariant
 
