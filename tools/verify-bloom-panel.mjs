@@ -211,6 +211,37 @@
          defaults; six layers at spread max), from the app's metrics rather
          than from the row's own expectation alone, so a frozen flag in the
          owner and a stuck line in the read-out both fire.
+
+     (w) THE STEM CHANNEL AND THE MERIDIAN PACKING MARGIN, BOTH DIRECTIONS
+         (the sphere-stem session). A user who asks for 40 petals and is
+         shown 33 must be told, and this project's clamped-and-told form is
+         TWO places — the control's own value read-out and the read-out panel
+         — so both are asserted against the BUILDER's own record rather than
+         against each other (`stamenSpread`'s route, HEAD RISE's discipline).
+         The margin rides here because it is TOLD on every sphere that has a
+         stem and is EXACTLY EXHAUSTED at one reachable corner, so a line that
+         silently stopped printing would take the word EXHAUSTED with it and
+         nobody would ever have seen it print: the route drives 4 petals on a
+         12 mm stem, where the margin reads 0.652 with 2 of 4 built, and the
+         two INERT states (a sphere with no stem, a stem on a CAP) where both
+         lines must be ABSENT. `(w)` and not `(t)`: `(t)` is the anther's
+         seven, above.
+
+     (x) THE BORE'S TWO CLOSURES ARE TOLD, AND SO IS THE CROSSOVER (the
+         tip-plug session). Eva's ask was that the bottom of a bored stem
+         LOOK solid; the geometry answering that is ST10's, and this route is
+         the other half of the ruling — that where the two closures MEET and
+         the stem becomes solid throughout, it is SAID rather than silently
+         produced. Four states, each a biconditional driven on one page
+         against the BUILDER's own record: a hollow stem (the plug's clause
+         shown, the crossover's absent), a stem at the 3 mm floor (neither —
+         there is no bore to close, so a passing "0.00 mm" would be a number
+         nobody measured), the CROSSOVER itself (one sentence naming both
+         closures and the stem they meet across, and NEITHER of the separate
+         clauses, because "solid for the first 1.20" and "solid for the last
+         1.50" of a 2.20 mm stem are two true clauses adding to a false
+         picture), and length 0 (no STEM line at all). The numbers are read
+         back against `__bloomMetrics`, never against each other.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -240,6 +271,85 @@ const WITNESS = {
      own reasoning, applied one level down. */
   stem: { id: 'stemLength', value: '60',
           read: (m) => `${m.stem && m.stem.lengthMm}/${m.hubJoinActive}`, what: 'stem.lengthMm/hubJoinActive' },
+  /* THE HUB — collapsed at first load, a child of Stem, witnessed by the
+     PRONOUNCEDNESS through the builder's own derived reach and blend radius. The
+     witness reaches PAST the slider the same way the others do: `hubShapeAmount`
+     2 takes the join's `axisDepth` from the derived 2.52 mm to 3.83 and the
+     blend radius from 6.92 to 7.95 — both `stemPlan`'s own answers, which the
+     amount cannot write directly. The row needs a STEM to hang off (the hub is
+     inert without one), which is why the driver sets both. */
+  hub: { id: 'hubShapeAmount', value: '2', pre: [{ id: 'stemLength', value: '60' }],
+         read: (m) => `${m.stem && m.stem.axisDepth}/${m.hubJoinBlendRadius}`, what: 'stem.axisDepth/hubJoinBlendRadius' },
+  /* LEAVES — collapsed at first load, witnessed by the LENGTH through the
+     BUILDER's own leaf record. The witness reaches PAST the slider in the same
+     way the stem's does: `built` is how many leaves the builder EMITTED, which
+     the length control cannot write directly (it is the node count times the
+     phyllotaxy's own per-node count, both derived), and `nodeDepthsMm` is the
+     node law's answer. A length that moved the slider and built nothing would
+     pass a witness that only read the control back. The row needs a STEM to
+     hang off, which is why the driver sets both. */
+  leaves: { id: 'leafLength', value: '52', pre: [{ id: 'stemLength', value: '70' }],
+            read: (m) => `${m.leaf && m.leaf.built}/${m.leaf && m.leaf.nodeDepthsMm.length}`, what: 'leaf.built/leaf.nodeDepthsMm.length' },
+  /* THE SERRATION — a drop-down inside Leaves, collapsed at first load;
+     witnessed by the tooth DEPTH through the builder's own count of teeth
+     CUT, which is 0 at depth 0 (the guard) and the asked count above it. The
+     depth cannot write that number: the count is the cut law's own answer on
+     the emitted outline. */
+  leafSerration: { id: 'leafToothCount', value: '12',
+                   pre: [{ id: 'stemLength', value: '70' }, { id: 'leafLength', value: '52' }],
+                   /* THE COUNT, NOT THE DEPTH — measured, not assumed. Driving
+                      the DEPTH from its default 0.26 to 0.5 leaves the teeth
+                      CUT at 9 both times, so that witness read the same number
+                      twice and the gate said so. The count moves it 9 -> 10,
+                      and the 10 is the cut law's OWN ceiling clamping an asked
+                      12, which is a quantity no control can write directly. */
+                   read: (m) => `${m.leaf && m.leaf.serration && m.leaf.serration.count}`, what: 'leaf.serration.count' },
+  /* SEPALS (part 1) — a top-level section after Center, collapsed at first
+     load, holding the count and three drop-downs mirroring Petal's. Witnessed
+     by the COUNT through the builder's own tally — a count that moved the
+     slider and built nothing would pass a witness that only read it back.
+     The three children need a whorl present (their guard is the count), which
+     is why each driver sets it first: shape through the apex law's exponent
+     the sepal blade was actually built with, form through the sepal's own
+     metric ratio (the four curves cost no triangles), curl through the ANGLE
+     the clamp built — a number the control cannot write directly. */
+  sepals: { id: 'sepalCount', value: '5', read: (m) => `${m.sepal && m.sepal.built}`, what: 'sepal.built' },
+  /* THE INFLORESCENCE (the raceme session) — a top-level section after Stem,
+     collapsed at first load, holding the law enum and the axis's own controls.
+     Witnessed by the NODE COUNT through the BUILDER's own tally, which reaches
+     PAST the slider twice over: `built` is how many FLORETS were emitted (the
+     node count times the phyllotaxy's per-node count, both derived) and
+     `pedicelR` is the AREA RULE's answer floored at the print minimum — a
+     number `floretNodes` cannot write directly.
+
+     THE VALUE IS THE FLOOR, 1, AND THAT IS MEASURED RATHER THAN CHOSEN FOR
+     TIDINESS. Going UP moves `built` and leaves `pedicelR` alone: the area
+     rule is already below its floor at the shipping five (6 mm / 2 / sqrt(5)
+     = 1.34 against a 1.50 minimum), so eight nodes reads 1.5000 exactly as
+     five does and half the witness would be a number printed twice. At ONE
+     node the rule is 3.0000 and clears the floor, so both halves move —
+     `built` 5 -> 1 and `pedicelR` 1.5 -> 3.0. It needs a RACHIS to hang off,
+     which is why the driver sets the stem and the law. */
+  inflorescence: { id: 'floretNodes', value: '1',
+                   pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
+                   read: (m) => `${m.inflorescence && m.inflorescence.built}/${m.inflorescence && m.inflorescence.pedicelR}`,
+                   what: 'inflorescence.built/inflorescence.pedicelR' },
+  /* THE FLORET — a drop-down inside Inflorescence, collapsed at first load,
+     holding the two controls that describe the FLOWER rather than the
+     arrangement. Witnessed by the PETAL COUNT through the floret UNIT's own
+     triangle count, which no control writes: the unit is a whole
+     `buildBloomInto` and its tally is the builder's answer to what a floret
+     costs. It moves 13,888 -> 9,176 between five petals and three. */
+  floret: { id: 'floretPetals', value: '3',
+            pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
+            read: (m) => `${m.inflorescenceBuilt && m.inflorescenceBuilt.unitTris}`,
+            what: 'inflorescenceBuilt.unitTris (the floret unit the builder emitted)' },
+  sepalShape: { id: 'sepalTipShape', value: '3', pre: [{ id: 'sepalCount', value: '5' }],
+                read: (m) => `${m.sepal && m.sepal.petals[0] && m.sepal.petals[0].tipCap && m.sepal.petals[0].tipCap.shapeN}`, what: 'sepal.petals[0].tipCap.shapeN' },
+  sepalForm: { id: 'sepalCup', value: '0.6', pre: [{ id: 'sepalCount', value: '5' }],
+               read: (m) => `${m.sepal && m.sepal.petals[0] && m.sepal.petals[0].form && m.sepal.petals[0].form.metricMax}`, what: 'sepal.petals[0].form.metricMax' },
+  sepalCurl: { id: 'sepalAngle', value: '-40', pre: [{ id: 'sepalCount', value: '5' }],
+               read: (m) => `${m.sepal && m.sepal.limit && m.sepal.limit.angleBuiltDeg}`, what: 'sepal.limit.angleBuiltDeg' },
   shape: { id: 'petalWidth', value: '30',
            /* The silhouette costs no triangles either (fixed-topology grid),
               so width is witnessed where it reaches PAST the blade: footRing()'s
@@ -247,6 +357,12 @@ const WITNESS = {
               and a larger ring. A witness that leaves the control's own part is
               the stronger one. */
            read: (m) => `${m.ringWidth}/${m.ringRadius}`, what: 'ringWidth/ringRadius' },
+  /* PETAL (the leaf tip-shape session) — the container holding Petal shape,
+     Petal form, Petal curl and Petal roles, collapsed at first load, with no
+     control of its own; witnessed through a CHILD's control exactly as
+     "Center" is, driven while the container and the child are both shut. The
+     child's own row witnesses the child. */
+  petal: { id: 'petalWidth', value: '30', read: (m) => `${m.ringWidth}/${m.ringRadius}`, what: 'ringWidth/ringRadius (through the Petal shape child)' },
   form: { id: 'petalCup', value: '0.6',
           /* The four curves cost ZERO triangles by construction, so the count
              cannot be the witness. Cup is the one of the four that stretches
@@ -266,6 +382,30 @@ const WITNESS = {
   lobes: { id: 'lobeDepth', value: '0.5',
            read: (m) => (m.petalLobes ? `${m.petalLobes.countBuilt}/${m.petalLobes.sinusMinHalfMm.toFixed(6)}/${m.petalLobes.rowsInWindow}` : 'no lobe record'),
            what: "the builder's lobe count / the deepest sinus as built / the stations inside the window" },
+  /* THE FRINGE (Eva's ruling, Sep 13) — a drop-down inside Petal shape,
+     collapsed at first load, and the one section whose witness needs a
+     PRECONDITION for a reason that is the feature itself: the fringe and the
+     squared terminal are ONE feature, so at the shipping `petalTipEnd` of 0
+     driving the count builds NOTHING (NO ROOM — the blade converges to
+     2 x TIP_HALF_MM, which carries one tooth, and one tooth is the petal).
+     Driven there the witness would read a refusal, which is a true thing about
+     the geometry and a WEAK thing to test reactivity with. So the terminal is
+     opened in `pre` and the count is the witness.
+
+     IT REACHES PAST THE SLIDER, twice over. `petalTipSpans` is the EMITTER's
+     own tally of how many spans the petal's END carries — a count `trimPanels`
+     produces and no control holds — and the tooth width at the tip is a LENGTH
+     in millimetres that the slider does not hold either, arrived at through
+     the taper's admissible interval. A build that stored the number and split
+     the domain anyway, or split it and drew the teeth at the wrong widths, is
+     exactly what this must catch. The clamp, NO ROOM, the dead travel and the
+     lobe exclusion are the FR family's in both STL gates, not this one's. */
+  fringe: { id: 'fringeCount', value: '4',
+            pre: [{ id: 'petalTipEnd', value: '1' }],
+            read: (m) => (m.petalFringe && m.petalFringe.built
+              ? `${m.petalTipSpans}/${m.petalFringe.count}/${m.petalFringe.toothTipMm.toFixed(6)}`
+              : 'no fringe built'),
+            what: "the emitter's own tip-span tally / the count as built / the tooth's tip width in mm" },
   /* PETAL CURL (session 16) — the spine's own section, collapsed at first
      load; witnessed by spine curl through the builder's own spine record. */
   curl: { id: 'petalSpineCurl', value: '150',
@@ -493,6 +633,15 @@ const INSTANCED_FAMILIES = [
      would be checking the generator against itself. */
   { what: 'the two tips (session 30, anther* and stigma* from one descriptor table)',
     id: /^(anther|stigma)(Size|Elongation|Roundedness|Points|Pinch|Lumps|Spread)$/, instances: 2, perInstanceDefault: new Set(['Lumps', 'Spread']) },
+  /* THE SEPAL TWINS (sepals, part 1): every petal shape, form and curl control
+     instanced once for the sepals from the geometry's own SEPAL_TWINS table.
+     Shared: kind, bounds, step, default, tier. PER-INSTANCE BY DESIGN and
+     therefore not compared: the label ("Petal cup" reads "Cup" on a sepal)
+     and the role ('petal' against 'sepal'), stated HERE rather than read from
+     the table — a check that read the registry's own generator would be
+     checking it against itself. */
+  { what: 'the sepal twins (sepals part 1, sepal* from SEPAL_TWINS)',
+    id: /^(?:petal|sepal|buckle|sepalBuckle|curl|sepalCurl)(BaseTaper|TipShape|TipTaper|CupGradient|Cup|Amp|Freq|Env|ApexSweep|RollTaper|Roll|SpineCurl|Bias|Start|Twist)$/, instances: 2, perInstanceDefault: new Set(), perInstanceLabelAndRole: true },
 ];
 /* NEGATIVE CONTROL for the tip family: drift ONE instance on a shared field
    (the stigma's size range) in a COPY of the rows and require the clause to
@@ -512,7 +661,7 @@ for (const fam of INSTANCED_FAMILIES) {
     if (!bySuffix.has(suffix)) bySuffix.set(suffix, []);
     bySuffix.get(suffix).push(c);
   }
-  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, c.label, c.tier, c.role,
+  const spec = (c, suffix) => JSON.stringify([c.kind, c.min ?? null, c.max ?? null, c.step ?? null, fam.perInstanceDefault.has(suffix) ? '(per-instance)' : c.default, fam.perInstanceLabelAndRole ? '(per-instance)' : c.label, c.tier, fam.perInstanceLabelAndRole ? '(per-instance)' : c.role,
     (c.options || []).map((o) => [o.value, o.label])]);
   const drifted = [];
   for (const [suffix, cs] of bySuffix) {
@@ -557,7 +706,14 @@ const declaredDepth = (id) => ancestry(id).length;
 let screenAgreed = 0;
 {
   const sec = (id, parent) => ({ id, label: id, open: false, ...(parent ? { parent } : {}) });
-  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal' });
+  /* The fixture control carries `visibleWhen: { all: [] }` — the registry's
+     own "never gated" sentinel — because verifySections() now refuses a
+     control without one, and a fixture that is not the shape a real control
+     carries would fail these six cases for a reason none of them is about.
+     Two of the four MUST-FAILs check the refusal's WORDING; the other two
+     only check that it threw, so a fixture defect there would have read as
+     the case passing. */
+  const ctl = (id, section) => ({ id, section, kind: 'slider', min: 0, max: 1, step: 1, default: 0, label: id, tier: 'standard', role: 'petal', visibleWhen: { all: [] } });
   const threw = (what, controls, sections) => {
     try { verifySections(controls, sections); return null; } catch (e) { return String(e.message); }
   };
@@ -1679,40 +1835,18 @@ for (const [label, sets, want] of [
   else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'}, owner agrees (innermost ring ${res.inner.toFixed(3)} mm${res.anyCross ? ', feet cross the axis' : ''})`);
 }
 
-/* ---------------- (v) THE ROOT-BLEND LINE, BOTH DIRECTIONS (session 36) ---------------- */
-/* The read-out's ROOT BLEND line is a recorded MEASUREMENT (the inner layers'
-   petals self-intersect at the root from three layers up; one or two layers
-   export clean at any petal count) — Eva's workaround, printed where the
-   layer count is set. Asserted iff layerCount >= 3, against the control's
-   own value read back, in both directions and under both placements. */
-for (const [label, sets, want] of [
-  ['defaults (one layer)', [], false],
-  ['2 layers (the largest clean depth)', [{ id: 'layerCount', value: '2' }], false],
-  ['3 layers (the first depth that folds)', [{ id: 'layerCount', value: '3' }], true],
-  ['6 layers x 40 petals', [{ id: 'layerCount', value: '6' }, { id: 'petalCount', value: '40' }], true],
-  ['CONTINUOUS x 3 turns', [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'layerCount', value: '3' }], true],
-]) {
-  const tag = `[root blend] ${label}`;
-  await openBloom(page, port);
-  if (NEGATIVE_CONTROL) {
-    /* NEGATIVE CONTROL, route (v): the read-out never changes again — the
-       line cannot appear where it must. */
-    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {}, configurable: true }); });
-  }
-  const bad = await applyConfig(page, sets);
-  if (bad.length) { note(`${tag}: config did not take: ${bad.join('; ')}`); continue; }
-  const res = await page.evaluate(() => {
-    const txt = document.getElementById('readout').textContent;
-    const layers = Number(window.__bloomUIState().layerCount);
-    return { layers, shown: /ROOT BLEND AT \d+ (LAYERS|TURNS)/.test(txt), workaround: /ONE OR TWO (layers|turns) exports free of self-intersection at any petal count at the default form/.test(txt) };
-  });
-  const problems = [];
-  if ((res.layers >= 3) !== want) problems.push(`the page reads layerCount ${res.layers}, this row expects ${want ? '3 or more' : 'fewer than 3'}`);
-  if (res.shown !== want) problems.push(`the ROOT BLEND line is ${res.shown ? 'SHOWN' : 'ABSENT'} at ${res.layers} layer(s)`);
-  if (res.workaround !== want) problems.push(`the one-or-two-layers workaround clause is ${res.workaround ? 'shown' : 'absent'} at ${res.layers} layer(s)`);
-  if (problems.length) note(`${tag}: ${problems.join('; ')}`);
-  else ok.push(`${tag}: line ${res.shown ? 'shown' : 'absent'} at ${res.layers} layer(s)`);
-}
+/* ---------------- (v) IS RETIRED (Eva, Sep 20) ---------------- */
+/* Route (v) asserted the read-out's ROOT BLEND line appeared iff layerCount
+   was three or more, on five rows including one labelled "3 layers (the first
+   depth that folds)". The line is gone (bloom.js), so the route is gone with
+   it and its five rows existed only to carry it.
+   NOTE FOR THE BOOKKEEPING, because it is a finding rather than a
+   convenience: route (v) was in NONE of this gate's three route mechanisms —
+   no entry in the header's enumeration, no flag in --negative-control's
+   completeness list, and not counted in its "SEVENTEEN ROUTES" banner. It is
+   exactly the shape the sphere-stem session named: A ROUTE THAT FIRES AND IS
+   NOT REQUIRED IS A ROUTE THAT CAN GO SILENT WITHOUT THE GATE NOTICING. So
+   removing it moves no count and no list, and the letter (v) is not reused. */
 
 /* ---------------- (k) THE DOME LINE AND THE APEX CLAMP, BOTH DIRECTIONS ---------------- */
 /* The head-rise control's read-out (Sep 4): the HEAD RISE line is shown iff
@@ -1890,6 +2024,218 @@ for (const [label, sets, wantDome, wantClamp] of [
   await step('RADIAL with SPHERE stored (the enum hides, the cap stays a cap)', [{ id: 'hubShape', value: 'SPHERE' }, { id: 'placement', value: 'RADIAL' }]);
   await step('back to CONTINUOUS (the sphere returns)', [{ id: 'placement', value: 'CONTINUOUS' }]);
   await step('the APEX CORNER on the sphere — ALL MIN x sheet 2.40 x spread min (held at one sheet, CLAMPED, told)', [{ id: 'headRise', value: '0' }, { id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'sheetThickness', value: '2.4' }, { id: 'footDelicacy', value: '0.25' }, { id: 'spread', value: '0.6' }], { clamped: true });
+}
+
+/* ---------------- (w) THE STEM CHANNEL IS CLAMPED AND TOLD ----------------
+   (w), NOT (t): (t) is session 29's ANTHER'S SEVEN, declared in this file's
+   own header and named at its own banner below. Two routes under one letter
+   makes "route (t) passed" say nothing about which one, which is the whole
+   point of naming them. c, u, w, x, y, z were free; w is the one that cannot
+   be misread as a neighbour of an existing letter.
+
+   IT HAS TWO CONTROLS AND EACH COVERS WHAT THE OTHER CANNOT, which is worth
+   saying rather than leaving implied. The FIRST is its own shape: every clause
+   here is a BICONDITIONAL driven in both directions on the same page, so a
+   line stuck ON fires on the two inert states (a sphere with no stem, a stem
+   on a CAP, where both lines must be ABSENT), a line stuck OFF fires on the
+   three active ones, and a reader whose regex never matched — or always
+   matched — is caught by the same pair. What that CANNOT see is a route that
+   never ran at all. The SECOND is --negative-control, which freezes the
+   read-out: this route's clauses fire there on all five of its states, and
+   BOTH of its lines are now REQUIRED by that run's completeness check
+   (`sawChannel`, `sawPacking`). They are two lines with two owners, so a fix
+   for one is no evidence about the other and the check names them separately.
+   Measured: it shipped fired-but-not-required, so the summary could have
+   printed a pass with the channel's lines never looked at.
+
+   (the sphere-stem session). A user who asks for 40 petals and is shown 33
+   must be told, and this project's clamped-and-told form is TWO places: the
+   control's own value read-out and the read-out panel. So both are asserted,
+   in BOTH DIRECTIONS, against the BUILDER's own record rather than against
+   each other — `stamenSpread`'s route and HEAD RISE's discipline.
+
+   AND THE MERIDIAN PACKING MARGIN RIDES HERE for the same reason: it is TOLD
+   on every sphere that has a stem and it is EXACTLY EXHAUSTED at one
+   reachable corner, so a line that silently stopped printing would take the
+   one number that says the base is spent with it.
+
+   THE INERT DIRECTION IS THE LOAD-BEARING ONE. At `stemLength` 0 — the
+   shipped default — there is no stem, so there is no channel, no omission and
+   no line; that is the branch that keeps every sphere row on this tree
+   byte-identical to the tree before the feature, and a route that only ever
+   drove the stem ON could not see it come undone. The negative control
+   freezes the read-out so neither line can appear where the geometry has one. */
+{
+  const tag = '[stem channel]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want = {}) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return null; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const O = m.stemOmission;
+      return {
+        sphere: m.sphereMode === true, stemPresent: !!(m.stem && m.stem.present !== false && m.stem.lengthMm > 0),
+        hasChannel: O !== null && O !== undefined,
+        asked: O ? O.asked : null, built: O ? O.built : null, omitted: O ? O.omitted.length : null,
+        margin: O && O.meridian ? O.meridian.margin : null,
+        exhausted: !!(O && O.meridian && O.meridian.exhausted),
+        petalsBuilt: m.petalsBuilt,
+        countSaid: document.getElementById('petalCount').closest('.bl-ctrl').querySelector('.bl-val').textContent,
+        chanSaid: /STEM CHANNEL/.test(txt),
+        chanBuilt: (txt.match(/STEM CHANNEL (\d+) of (\d+) petals BUILT — (\d+) NOT BUILT/) || []).slice(1).map(Number),
+        chanAllClear: /STEM CHANNEL every one of the \d+ petals clears the stem/.test(txt),
+        nothingLeft: /NOTHING IS LEFT/.test(txt),
+        packSaid: /MERIDIAN PACKING/.test(txt),
+        packNum: (txt.match(/MERIDIAN PACKING ([\d.]+)x/) || [])[1],
+        packNa: /MERIDIAN PACKING n\/a/.test(txt),
+        packExhausted: /MERIDIAN PACKING [^\n]*EXHAUSTED/.test(txt),
+      };
+    });
+    const p = [];
+    const wantChannel = res.sphere && res.stemPresent;
+    if (res.hasChannel !== wantChannel) p.push(`the builder ${res.hasChannel ? 'reports' : 'reports no'} stem channel while the state is ${res.sphere ? 'a sphere' : 'not a sphere'} with ${res.stemPresent ? 'a stem' : 'no stem'}`);
+    if (res.chanSaid !== wantChannel) p.push(`the STEM CHANNEL line is ${res.chanSaid ? 'SHOWN' : 'ABSENT'} while the geometry ${wantChannel ? 'has a channel' : 'has none'}`);
+    if (wantChannel) {
+      if (res.omitted > 0) {
+        if (res.chanAllClear) p.push(`the line says every petal clears the stem while ${res.omitted} were not built`);
+        if (res.chanBuilt.length !== 3) p.push('the STEM CHANNEL line does not name built / asked / not-built');
+        else if (res.chanBuilt[0] !== res.built || res.chanBuilt[1] !== res.asked || res.chanBuilt[2] !== res.omitted) p.push(`the line says ${res.chanBuilt.join('/')} where the builder says ${res.built}/${res.asked}/${res.omitted}`);
+        /* THE CONTROL'S OWN HALF. A read-out sentence three panels down is not
+           where somebody dragging the petal count is looking. */
+        if (!new RegExp(`${res.asked} asked`).test(res.countSaid) || !new RegExp(`${res.built} BUILT`).test(res.countSaid)) {
+          p.push(`the petal count control reads "${res.countSaid}" — it must say what was asked AND what was built (${res.asked} / ${res.built})`);
+        }
+      } else if (!res.chanAllClear) p.push('nothing was omitted, yet the line does not say every petal clears the stem');
+      if (res.built !== res.petalsBuilt) p.push(`the channel says ${res.built} built, the builder's own tally is ${res.petalsBuilt}`);
+      if (res.nothingLeft !== (res.built === 0)) p.push(`the NOTHING IS LEFT clause is ${res.nothingLeft ? 'shown' : 'absent'} while ${res.built} petals were built`);
+      if (!res.packSaid) p.push('the MERIDIAN PACKING line is absent on a sphere with a stem — it is told on every one of them, not only where it is tight');
+      else if (res.built === 0) {
+        if (!res.packNa) p.push('every petal was taken, yet the MERIDIAN PACKING line prints a number — there is no surviving foot to measure the arc against');
+      } else if (res.packNum === undefined) p.push('the MERIDIAN PACKING line prints no margin');
+      else {
+        if (Math.abs(Number(res.packNum) - res.margin) > 0.0005) p.push(`the line says ${res.packNum}x, the builder says ${res.margin}`);
+        if (res.packExhausted !== res.exhausted) p.push(`the EXHAUSTED clause is ${res.packExhausted ? 'shown' : 'absent'} while the builder reports ${res.exhausted} (margin ${res.margin})`);
+      }
+    } else if (res.packSaid) p.push('the MERIDIAN PACKING line is shown where there is no stem channel to pack against');
+    if (want.omitted !== undefined && res.omitted !== want.omitted) p.push(`${res.omitted} petals were omitted, this step expects ${want.omitted}`);
+    if (want.tris !== undefined && res.petalsBuilt !== want.tris) p.push(`${res.petalsBuilt} petals were built where the previous step built ${want.tris} — the stem reached a state it should not have`);
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${wantChannel ? `channel ${res.built}/${res.asked} (${res.omitted} not built), margin ${res.margin === null ? 'n/a' : res.margin.toFixed(3)}${res.exhausted ? ' EXHAUSTED' : ''}` : 'no channel, no lines'}`);
+    return res;
+  };
+  const sphere = [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }];
+  const off = await step('a SPHERE at stemLength 0 — no stem, no channel, no line (the shipped default, inert by branch)', [...sphere, { id: 'petalCount', value: '8' }, { id: 'layerCount', value: '1' }]);
+  await step('the shipped stem on that sphere (60 x 6 mm): two petals not built, and both places say so', [{ id: 'stemLength', value: '60' }]);
+  await step('the widest stem (12 mm) — the margin is EXACTLY EXHAUSTED at one foot length', [{ id: 'stemDiameter', value: '12' }]);
+  await step('40 petals on the widest stem — more petals, more omitted, a wider sphere and a looser margin', [{ id: 'petalCount', value: '40' }]);
+  /* THE ONLY PLACE THE WORD *EXHAUSTED* IS REACHED. No matrix row produces a
+     margin under 1 with petals still built — the shipped sphere's margin falls
+     to 1.003 at the widest stem and no further — so without this cell the
+     clause that prints it would never have been shown to print. 4 petals on a
+     12 mm stem reads 0.652 with 2 of 4 built: a real margin under one foot's
+     length, not the degenerate 0 the bare corner gives. */
+  await step('4 petals on the widest stem — the margin goes UNDER one foot length and the line says EXHAUSTED', [{ id: 'petalCount', value: '4' }]);
+  await step('THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)', [{ id: 'petalCount', value: '3' }, { id: 'petalWidth', value: '8' }, { id: 'spread', value: '0.6' }], { omitted: 3 });
+  await step('the stem back to 0 on that same corner — the channel and both lines go with it', [{ id: 'stemLength', value: '0' }]);
+  if (off) await step('RADIAL with a stem — a cap has no pole the sequence runs through, so no channel', [{ id: 'placement', value: 'RADIAL' }, { id: 'stemLength', value: '60' }]);
+}
+
+/* ------- (x) THE BORE'S TWO CLOSURES, AND THE CROSSOVER, ARE TOLD -------
+   (the tip-plug session).
+
+   WHAT THIS ROUTE IS FOR, and it is not "a feature shipped so a route was
+   added". Eva's ask was that the bottom of a bored stem LOOK solid. Whether
+   it IS closed is ST10's, measured on the rings the builder emitted; whether
+   the panel SAYS SO is nobody's but this route's, and the two are different
+   claims with different failure modes. A read-out that silently stopped
+   printing the plug would leave the STEM line claiming a bore that runs the
+   length of the stem when it does not.
+
+   THE CROSSOVER IS THE LOAD-BEARING CELL. Both closures are derived from
+   lengths, so on a short enough stem they MEET and no bore survives. That is
+   ruled to be TOLD rather than silently produced — and the sentence is ONE
+   sentence, because "solid for the first 1.20 mm" and "solid for the last
+   1.50 mm" of a 2.20 mm stem are two true clauses adding up to a false
+   picture. So this route asserts the joint clause APPEARS and BOTH separate
+   ones are ABSENT there, which no single-direction check could carry.
+
+   AND THE 3 mm FLOOR IS THE OTHER INERT DIRECTION. There the bore is already
+   closed by Eva's own rule, so there is nothing to plug: a passing
+   "SOLID for the last 0.00 mm" would be a number nobody measured, and the
+   clause must be absent rather than zero. That is the branch that keeps every
+   solid-stem row byte-identical, and a route that only ever drove a hollow
+   stem could not see it come undone.
+
+   EVERY NUMBER IS READ BACK AGAINST `__bloomMetrics`, never against the text
+   that printed it: the plan owns `tipPlugMm`, `voidMm` and `solidThrough`,
+   and this route owns only the question of whether the panel agrees. */
+{
+  const tag = '[stem closures]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const S = m.stem;
+      return {
+        present: !!S, boreR: S ? S.boreR : null, plug: S ? S.tipPlugMm : null,
+        voidMm: S ? S.voidMm : null, band: S ? S.solidBandMm : null,
+        solidThrough: S ? !!S.solidThrough : null,
+        heightMm: S ? S.root[2] + (S.rootSpanMm || 0) - S.tip[2] : null,
+        stemSaid: /\bSTEM \d/.test(txt),
+        plugSaid: /SOLID for the last ([\d.]+) mm/.exec(txt),
+        bandSaid: /SOLID for the first ([\d.]+) mm/.exec(txt),
+        throughSaid: /SOLID THROUGHOUT — a ([\d.]+) mm root band and a ([\d.]+) mm tip plug MEET across a ([\d.]+) mm stem/.exec(txt),
+        sealedSaid: /([\d.]+) mm of SEALED bore between the two/.exec(txt),
+      };
+    });
+    const p = [];
+    if (!res.present) {
+      if (res.stemSaid) p.push('the STEM line is shown on a state with no stem at all');
+      if (res.plugSaid || res.bandSaid || res.throughSaid) p.push('a closure clause is shown on a state with no stem at all');
+    } else {
+      const hollow = res.boreR > 0;
+      /* THE PLUG EXISTS IFF THERE IS A BORE, and the panel must agree with the
+         plan about which — not with itself. */
+      if ((res.plug > 0) !== hollow) p.push(`the plan asks for a ${res.plug} mm plug on a stem whose bore radius is ${res.boreR}`);
+      const wantThrough = res.solidThrough;
+      const wantPlug = hollow && !wantThrough;
+      const wantBand = res.band > 0 && !wantThrough;
+      if (!!res.throughSaid !== wantThrough) p.push(`the SOLID THROUGHOUT clause is ${res.throughSaid ? 'shown' : 'absent'} while the builder reports solidThrough=${wantThrough} (${res.voidMm} mm of bore left)`);
+      if (!!res.plugSaid !== wantPlug) p.push(`the tip-plug clause is ${res.plugSaid ? 'shown' : 'absent'} while the state ${wantPlug ? 'has a bore to close and a void that survives' : 'does not'}`);
+      if (!!res.bandSaid !== wantBand) p.push(`the root-band clause is ${res.bandSaid ? 'shown' : 'absent'} while the builder reports a ${res.band} mm band and solidThrough=${wantThrough}`);
+      if (res.plugSaid && Math.abs(Number(res.plugSaid[1]) - res.plug) > 0.005) p.push(`the line says the plug is ${res.plugSaid[1]} mm, the plan says ${res.plug}`);
+      if (res.sealedSaid && Math.abs(Number(res.sealedSaid[1]) - res.voidMm) > 0.005) p.push(`the line says ${res.sealedSaid[1]} mm of sealed bore, the plan leaves ${res.voidMm}`);
+      if (res.throughSaid) {
+        if (Math.abs(Number(res.throughSaid[1]) - res.band) > 0.005) p.push(`the joint clause names a ${res.throughSaid[1]} mm band where the plan says ${res.band}`);
+        if (Math.abs(Number(res.throughSaid[2]) - res.plug) > 0.005) p.push(`the joint clause names a ${res.throughSaid[2]} mm plug where the plan says ${res.plug}`);
+        if (res.sealedSaid) p.push('the joint clause is shown AND a sealed-bore figure with it — there is no bore left to have a length');
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${res.present ? `bore ${res.boreR}, band ${res.band}, plug ${res.plug}, void ${res.voidMm}${res.solidThrough ? ' SOLID THROUGH' : ''}` : 'no stem, no line'}`);
+  };
+  await step('the shipped stem on a flat hub (60 x 6 mm) — a bore to close, and the plug clause says so', [{ id: 'stemLength', value: '60' }, { id: 'stemDiameter', value: '6' }]);
+  await step('the widest stem (12 mm) — the widest bore the plug ever closes', [{ id: 'stemDiameter', value: '12' }]);
+  await step('the 3 mm floor — Eva\'s bore rule already closed it, so there is nothing to plug and the clause is ABSENT', [{ id: 'stemDiameter', value: '3' }]);
+  /* THE CROSSOVER. The bare corner's own control set at the shortest built
+     stem: a 1.20 mm root band and a 1.50 mm tip plug across a 2.20 mm stem, so
+     the two overlap and nothing is left. It is the only state in this gate
+     where a HOLLOW stem reports no bore, and the only one where the joint
+     clause can be shown to print. */
+  await step('THE TWO CLOSURES MEET — one sentence naming both, and NEITHER of the separate clauses',
+    [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'hubShape', value: 'SPHERE' }, { id: 'petalCount', value: '3' },
+     { id: 'spread', value: '0.6' }, { id: 'layerSize', value: '0.35' }, { id: 'stemDiameter', value: '12' }, { id: 'stemLength', value: '1' }]);
+  await step('the same corner at 2 mm — half a millimetre of bore survives, so the two separate clauses come back', [{ id: 'stemLength', value: '2' }]);
+  await step('the stem back to 0 — no stem, no STEM line, no closure clause', [{ id: 'stemLength', value: '0' }]);
 }
 
 /* ===================================================================
@@ -2579,12 +2925,29 @@ if (NEGATIVE_CONTROL) {
     const sawKeptStyle = fail.some((f) => /^\[style\] .*kept clause (is shown|names)/.test(f));
     const sawCap = fail.some((f) => /^\[stamens\] .*cap mark is absent/.test(f));
     const sawFlag = fail.some((f) => /^\[flag\]: .*FILAMENT AGAINST STYLE flag is absent while the owner reports a crossing/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL FIFTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+    /* ROUTE (w), THE STEM CHANNEL. It is REQUIRED here and not merely allowed:
+       route (w)'s own biconditionals catch a line stuck on or off, but nothing
+       makes them run, and a route that fired NOTHING under the frozen read-out
+       would leave this summary printing a pass while the channel's two lines
+       were never looked at. Both are named, because they are two different
+       read-out lines with two different owners and a fix for one is no
+       evidence about the other. */
+    const sawChannel = fail.some((f) => /^\[stem channel\] .*STEM CHANNEL line is ABSENT while the geometry has a channel/.test(f));
+    const sawPacking = fail.some((f) => /^\[stem channel\] .*MERIDIAN PACKING line is absent on a sphere with a stem/.test(f));
+    /* ROUTE (x), THE BORE'S TWO CLOSURES, required for route (w)'s own reason
+       one session later: the route's clauses are biconditionals, and nothing
+       makes them RUN. Two flags, not one — the tip plug's clause and the
+       crossover's are two sentences with two owners, and a frozen read-out that
+       still happened to satisfy one would otherwise print a pass. */
+    const sawPlug = fail.some((f) => /^\[stem closures\] .*tip-plug clause is (shown|absent)/.test(f));
+    const sawThrough = fail.some((f) => /^\[stem closures\] .*SOLID THROUGHOUT clause is (shown|absent)/.test(f));
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
+        && sawPlug && sawThrough
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SEVENTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 

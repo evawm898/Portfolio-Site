@@ -175,6 +175,13 @@ export const SMOKE_BLOCKS = [
     rows: [
       { label: 'ALL MIN',
         path: 'the blanket minimum corner — the bare bloom the flower shipped in seven pieces for months; every row is bare now, and this is the one where the feet cross the axis' },
+      /* THE BLANKET MAXIMUM IS THE ONLY ROW THAT ENGAGES XR1, so the subset
+         has to carry it or the family has no witness short of the full matrix.
+         It is also the most expensive row here — the refusal costs a full
+         export-mode build (~120 s) before it returns nothing — and that is the
+         honest price of the family having a witness at all. */
+      { label: 'ALL MAX',
+        path: 'the blanket MAXIMUM corner, and the one configuration this generator REFUSES to export — XR1 (declared in EXPORT_REFUSED_XFAIL: the export is refused, the reason is the TRIANGLE BUDGET specifically, and the count reported exceeds the budget, cross-checked against the builder\'s own tally through a different owner) and XR2 in its silent direction on every other row of this subset (an undeclared row must produce a file). The refusal is asserted rather than skipped, so a row that ever starts exporting fails as hard as one that refuses wrongly' },
     ],
   },
   {
@@ -606,19 +613,213 @@ export const SMOKE_BLOCKS = [
        hub-to-stem join ACTIVE and INERT, and the domed head, where the
        attachment face is high inside the bowl so the visible length differs from
        the total. Cheapest row per path.
-       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: SPHERE (where
-       the stem is hidden AND inert by ruling, and the whole of that claim is a
-       GATED live-matrix row), every placement but RADIAL, the widest hub, and
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: SPHERE (which
+       is block 32's — on a sphere the stem decides which petals are built, and
+       that is its own claim), every placement but RADIAL, the widest hub, and
        the centre rooted through the same slab. */
     rows: [
       { label: 'STEM: the shipped middle (60 mm x 6 mm, hollow, a 1.5 mm wall)',
-        path: 'a stem CONSTRUCTED with the join ACTIVE and the bore OPEN at once — ST0 (the registry\'s stemEligible and the geometry\'s agree, and the builder declares a stem iff the state asks for one), ST1 (built iff declared), ST2 (on the axis, running down, the length the control asked for, and the placer\'s stations in MILLIMETRES OF ARC from the hub), ST3 (Eva\'s bore rule on the EMITTED radii, wall exactly 1.5), ST4 (rooted THROUGH the slab, never a hairline), ST5 (the hub\'s emitted underside IS the join\'s declared law, and the hub\'s own thickness beyond the blend radius), ST6 (the petal-to-hub junction untouched, against a stemless build of the same state)' },
+        path: 'a stem CONSTRUCTED with the join ACTIVE and the bore OPEN at once — ST0 (the registry\'s stemPresent and the geometry\'s stemIsAbsent are exact complements, and the builder declares a stem iff the state asks for one), ST1 (built iff declared), ST2 (on the axis, running down, the length the control asked for, and the placer\'s stations in MILLIMETRES OF ARC from the hub), ST3 (Eva\'s bore rule on the EMITTED radii, wall exactly 1.5), ST4 (rooted THROUGH the slab, never a hairline), ST5 (the hub\'s emitted underside IS the join\'s declared law, and the hub\'s own thickness beyond the blend radius), ST6 (the petal-to-hub junction untouched, against a stemless build of the same state), ST10 (the bore is CLOSED at BOTH ends — the tip plug is Eva\'s own wall thickness measured off the EMITTED rings, and the void the two closures leave is emitted iff the plan leaves one)' },
       { label: 'STEM: SOLID at the floor (3 mm OD — the bore closes, Eva\'s rule)',
         path: 'the OTHER arm of the bore rule — ST3 with bore 0, the capped-cylinder branch whose cap must be fanned from a RIM vertex and never from the axis (a centre fan shares the hub\'s own apex vertex EXACTLY, welds the two shells and turns a by-design overlap into a within-shell self-intersection: measured 528 pairs before the fix, 0 after), and ST5 with the join barely active at 1.299 mm over the hub\'s 1.200' },
       { label: 'STEM: x a domed head (rise 0.50 — part of the stem is inside the bowl)',
         path: 'the CAP arm of the join, where the hub\'s underside is a curved plate and its emitted thickness is a DIFFERENCE of two radii rather than the law\'s own value — ST5\'s ULP bound in the unit the quantity carries, which an exact equality got wrong on the first domed row it ever saw; and the two lengths differing, which is the whole reason the read-out prints both' },
       { label: 'STEM: GATED — diameter at MAXIMUM with length 0 (hidden and inert; bit-identical to the default)',
         path: 'the OTHER direction — ST0 and ST1 on a stemless bloom: the diameter at its extreme builds no stem and leaves the join INERT, so the hub takes its pre-stem expression verbatim; the row the byte tool proves bit-identical to the default' },
+    ],
+  },
+  {
+    n: 31,
+    anchor: 'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this family adds are the
+       TERMINAL term (pushed onto the term list or not), the fringe's own panel
+       decomposition (one 'full' span or N+1 panels), the COUNT CLAMP in both
+       of its arms, NO ROOM (a fringe asked with no terminal to carry it), and
+       the lobe family going inert under a fringe. Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: every placement
+       but RADIAL, the form controls (cup, roll, curl, the buckle) over a
+       fringe, multiple whorls, and the extreme sheets — all of which are live
+       matrix rows and none of which is in the subset. */
+    rows: [
+      { label: 'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth',
+        path: 'the feature CONSTRUCTED, both halves at once — FR0 (the registry\'s fringeEligible and the geometry\'s agree, and the builder declares a fringe iff the state asks for one), FR1 (built iff declared: N+1 panels and N spans at the petal\'s END, from the builder\'s own tally), FR2 (the terminal is a TERM with its own domain, it never wins below uPk, and the emitted half-width at u=1 IS the terminal), FR3 (the split is owned in PHYSICAL units — the target station is 1 - fringeDepth and the landed station is within half a row gap of it), FR4 (every tooth and every gap clears MIN_FEATURE_MM at the station where it is narrowest), FR5 (the count ceiling is the TERMINAL\'s width and the clamp is a biconditional)' },
+      { label: 'FRINGE: CLAMPED — 10 teeth asked on a terminal that cannot carry them (0.30; told, never refused)',
+        path: 'the CLAMP\'s live arm — FR5 with countAsked above countBuilt and the reason named, on the terminal that is barely clear of its own dead travel; the row where the ceiling binds hardest without the petal changing size' },
+      { label: 'FRINGE: NO ROOM — a fringe asked with no terminal at all (no end to cut teeth into; told, and bit-identical to the default)',
+        path: 'the NO ROOM arm — a fringe asked where the blade converges to 2 x TIP_HALF_MM, which is the state the picture session measured as unbuildable at any count; FR1 must refuse it in BOTH directions (not built when the end is under the mode-free floor, and never built when it is above), name the cause, and leave the petal a single span' },
+      { label: 'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)',
+        path: 'the mutual exclusion in the direction that can silently fail — the lobe family at MAXIMUM under a live fringe must contribute NOTHING, so L0\'s own record is absent and the emitted outline is the fringe\'s alone; the defect this catches is a lobe cut still narrowing every finger, which no count and no span check can see' },
+      { label: 'FRINGE: GATED — the terminal at 0 with the fringe at MAXIMUM (no terminal, so no fringe; bit-identical to the default)',
+        path: 'the OTHER direction — both guards at once on a bloom that must be the shipping default to the bit: the terminal term is not pushed and trimPanels returns the single \'full\' span, so FR0 and FR1 read absent and the byte tool proves the row unmoved' },
+    ],
+  },
+  {
+    n: 32,
+    anchor: 'SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)',
+    /* DERIVED BY THE HEADER'S OWN METHOD: the branches this family adds are the
+       channel EXISTING at all (a sphere with a stem) or not (any other head, or
+       no stem), the mask firing on SOME slots and on ALL of them, and the
+       sphere's own arms of `stemPlan` (the stem leaving the RESERVED pole, and
+       the join INERT on a shell — which is also the first row in this project
+       ever to reach ST5's inert arm). Cheapest row per path.
+       WHAT THIS BLOCK IS BLIND TO, stated rather than assumed: the 240-foot
+       head (the most petals the channel ever sorts — a live matrix row and the
+       most expensive one in it), the longest stem, the thinnest sheet (where
+       the two modes measure different geometry and the mode-free union is the
+       only thing that could be doing work), and every form control over a
+       sphere. All are live matrix rows and none is in the subset. */
+    rows: [
+      { label: 'SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)',
+        path: 'the channel CONSTRUCTED — ST7 (the omission is the stem\'s own in BOTH directions: every slot NOT built collides in at least one mode, every slot built clears the printable gap in both, the clearance IS MIN_FEATURE_MM and the counts add up), ST8 (it is a MASK: against a STEMLESS build of the same state every slot keeps its azimuth and every SURVIVING petal keeps its foot, and the hub is the size the ASKED-FOR count made it), ST9 (and the EXPORTED FILE carries nothing but the stem inside the channel), beside ST0-ST6 on the sphere\'s own arms of the plan — the stem leaving the RESERVED pole and the join INERT on a shell, which is ST5\'s inert arm reached for the first time' },
+      { label: 'SPHERE STEM: THE BARE CORNER — a 12 mm stem on the smallest sphere takes every petal (told, not refused)',
+        path: 'the mask at its limit — every slot omitted, so the bloom is a head on a stick: ST7 and ST8 must hold with ZERO petals built (the per-slot foot digests are all null and all declared), and every family indexed by descriptor must skip the declared set rather than report a missing record. TOLD, never refused — the stemJoinBlendRadius precedent, and the read-out says so' },
+      { label: 'SPHERE STEM: THE TWO CLOSURES MEET — a 1 mm stem on the bare corner (solid throughout, told)',
+        path: 'the CROSSOVER — ST10 in the direction a green run cannot show: the root band and the tip plug are each derived from a length, so across a short enough stem they MEET and no bore survives. The builder must emit NO inner ring at all (the narrowest emitted radius is the tube\'s own), the plan must say so, and the two must agree in BOTH directions — a builder keeping a sliver of bore where the law leaves none, or dropping one where it does, is this clause\'s and nothing else\'s. It is also the one row where a HOLLOW stem takes the solid arm, so the two arms are proved to be one geometry rather than two that resemble each other' },
+      { label: 'SPHERE STEM: GATED — the widest stem at length 0 on a sphere (bit-identical to an untouched sphere)',
+        path: 'the OTHER direction — the guard: no stem, so no channel, so nothing omitted. ST7 must read the channel ABSENT rather than as a passing "0 omitted", and the byte tool proves the row bit-identical to a sphere with the stem controls never touched — which is what makes every sphere row that shipped before this session unmoved' },
+    ],
+  },
+  {
+    n: 33,
+    anchor: 'LEAVES: alternate x 3 nodes at the ruled 35 deg',
+    /* LEAVES ON THE STEM. Both STL gates are blind to this whole family by
+       construction, which is why LF0-LF7 exist at all: a leaf DECLARED and
+       never built adds no boundary edge and detaches nothing; a petiole rooted
+       ON THE AXIS of a hollow stem still reads ONE PIECE (measured in Phase A
+       — a radial rod crosses the wall annulus on its way out), so the flood
+       fill cannot tell it from the wall-rooted one that ships; and nothing in
+       this project measures an AZIMUTH except J7, Z4b and Z8, none of which
+       looks at a leaf. The subset takes the three arrangements, both ends of
+       the attachment question (the widest bore and the solid floor), the steep
+       angle Phase A measured detaching, and both directions of both guards. */
+    rows: [
+      { label: 'LEAVES: alternate x 3 nodes at the ruled 35 deg',
+        path: 'the shipping arrangement at Eva\'s own ruled angle — LF0 (the registry hides the leaf sub-controls exactly where the geometry builds nothing, and a green run must not endorse one without the other), LF1 (the plan\'s azimuth list predicts the count and the builder\'s tally is the other owner), LF4 (the nodes are strictly apart, inset from both ends, and the top one clears the head iff the plan claims it does), LF5 (one leaf a node, which nothing else here can see), LF6 (the blade carries no foot — the root blend is stood down and the outline stops reading ring.width at all) and LF7 (the serration is the LEAF\'s own values, not the petal\'s). LF8 rides here too: the shell is CONSISTENTLY WOUND, read from the builder\'s own DIRECTED-edge census — both STL gates key theirs on a SORTED pair, so a face wound the wrong way still counts as a matched edge and still exports watertight, which is exactly how this builder shipped its first cut with 134 unmatched directed edges a leaf' },
+      { label: 'LEAVES: whorled x 8 nodes (24 leaves — the most the controls reach)',
+        path: 'the count ceiling — LF5 on a THREE-leaf whorl, where the per-node spacing and not just the per-node count is the claim: 120 degrees apart, asserted against the LAW restated in the gate rather than imported from the geometry it is checking. Also the worst leaf triangle count the controls reach, and the densest node packing, so LF4\'s pitch floor is exercised' },
+      { label: 'LEAVES: on a HOLLOW stem at the widest bore (12 mm — the petiole crosses 1.5 mm of wall)',
+        path: 'THE STATE THE FLOWER\'S GATES COULD NEVER REACH — LF2 (every petiole roots INSIDE the wall, read off the builder\'s own emitted ring centroid and never the plan beside it) and LF3 (and it crosses real solid on its way out). A petiole in the bore is in VOID, and both STL gates read the result as one piece regardless' },
+      { label: 'LEAVES: the STEEP angle (85 deg — axis-rooted this DETACHES; wall-rooted it does not)',
+        path: 'THE REACHABLE FAILURE, and the reason the petiole roots in the wall rather than on the axis: the escape length for an axis-rooted petiole is outerR/cos(theta), which runs away as the angle steepens, and Phase A measured TWO COMPONENTS at 75 and 85 degrees. LF3 is what holds it — the wall-rooted petiole only gets MORE embedded here, and the clause reads the crossing the builder actually made' },
+      { label: 'LEAVES: the LONGEST leaf on the SHORTEST stem (the head cannot be cleared; the node count gives)',
+        path: 'the corner where the geometry cannot do what was asked — a 120 mm leaf needs more inset than a 20 mm stem has, so no node position clears the head. LF4 in the direction a green run cannot show: TOLD, never refused (overlapping closed shells are the export contract, so a leaf through the head is legal geometry), the plan\'s `insetSatisfied` claim and the emitted node depth must agree, and the node COUNT is what gives at the pitch floor rather than every node collapsing onto one point — which is the defect LF4 caught before this geometry existed' },
+      { label: 'LEAVES: serration OFF (an entire margin — the guard, inert)',
+        path: 'the edge guard\'s inert arm — LF7 in the direction that silently fails: depth 0 must cut NO teeth rather than reporting a passing count, and the four shape rows are hidden AND inert' },
+      { label: 'LEAVES: x a SPHERE with a stem (the channel and the leaves on one head)',
+        path: 'THE COMPOSITION, and it is in this subset because leaving it out cost a CI cycle. ST9 — another family\'s clause, which enters only on a SPHERE with a stem — reads the EXPORTED FILE and asks whether anything stands in the free stem\'s printable gap that is not the stem\'s own. A leaf is the THIRD part ever to live in that region and its petiole is rooted THROUGH the wall by design, so it reads distance EXACTLY 0 and ST9 dropped this row: 198 vertices, every one a petiole\'s, 0 anything else. The subset could not see it because block 33\'s anchor is the `alternate` row on a CAP head, where ST9 returns before claiming anything — so a subset covering phyllotaxy, bore, angle, inset, serration and both guards was still blind to the one axis that reaches another family. A subset earns its keep by covering the axes a feature HAS, not the failures somebody predicted' },
+      { label: 'LEAVES: tip shape ACUTE (0.60 — the floor; the 1.6 mm terminal stub is at its longest)',
+        path: 'THE TIP SHAPE, at the end where the finding bites — LF9 in all three clauses: the exponent the plan declares is the LEAF\'s own control (a), the exponent read back off the half-widths the blade was actually built from is the same one (b — the measured side is the artefact, session 41\'s L7), and the terminal-clamp record the read-out prints is a biconditional against those rows (c): the outline meets the 2 x TIP_HALF_MM floor where the builder says it does, in BOTH modes, and the stub is LONGEST here because an acute superellipse hugs the floor — 21.3% of a 17 mm blade\'s length at 0.60 against 2.1% at the shipped 1.30. The subset takes this end and not the round one because a mutation pinning the exponent at the old constant reads 1.30 against 0.60 here and 1.30 against 3.00 there, and the acute end is where the clamp clause has the most rows to be wrong about' },
+      { label: 'LEAVES: GATED — length 0 with every other leaf control at maximum',
+        path: 'the OTHER direction — the feature guard (ruling 6): every leaf control at its maximum with the length at 0 builds NOTHING. LF1 must read the builder\'s "none" rather than a missing key, LF0\'s two statements must still be complements, and the byte tool proves the row bit-identical to a stem with the leaf controls never touched' },
+    ],
+  },
+  {
+    n: 34,
+    anchor: 'HUB: CURVED at MAX amount x MAX length',
+    /* THE HUB'S SHAPE — a NEW geometry mode, so --conn is REQUIRED here (the
+       header's own rule): a styled swelling underside and, on #236's corner, a
+       fill instead of a funnel, are exactly where the junction assertions may
+       not model the failure yet and the flood fill is the only witness. The
+       three rows: a styled swell at its deepest (the profile that would fold if
+       a style curve were wrong), a #236 corner (a hub narrower than its stem —
+       ONE PIECE where main exports two, the fix, which only the flood fill
+       sees), and the GATED inertness row (length 0 with every hub control at
+       maximum, bit-identical to the default). The byte-exact default is block
+       30's 'shipped middle' and is not repeated. */
+    rows: [
+      { label: 'HUB: CURVED at MAX amount x MAX length',
+        path: 'the deepest reachable styled swell — ST11 on the emitted underside (the profile is the style/amount/reach the plan declares, read off the hub builder\'s own samples), and the row where a wrong style curve or a non-monotone profile would fold the funnel or self-intersect it; --conn confirms the deep swell still leaves one connected piece' },
+      { label: 'HUB: #236 — the narrow hub on a CAP head (rise 0.5), the shape #236 was filed on',
+        path: 'THE #236 FIX, and only the flood fill sees it — a hub NARROWER than the stem exported as TWO pieces on main (the flat zero-volume join shell plus a head sitting in the bore). ST11 asserts no flat shell is emitted (the join is inert where the head is not wider than the stem) and the head embeds in the stem\'s solid root band; the connectedness gate is the witness that the result is one piece, which is why this row is in the subset with --conn' },
+      { label: 'HUB: GATED — length 0 with style/amount/length at MAXIMUM (hidden and inert; bit-identical to the default)',
+        path: 'the inertness direction — every hub control at its maximum with the stem length 0 builds no hub at all, so ST11 must read the join absent and the byte tool proves the row bit-identical to the shipped default; the hub controls are STEM_SUBS, so the blanket sweep never reaches them either' },
+    ],
+  },
+  {
+    n: 35,
+    anchor: "SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)",
+    /* SEPALS, PART 1 — a NEW geometry mode (a second whorl on the rim, emitted
+       by the petal builder against a second parameter set), so --conn is
+       REQUIRED here: the sepal feet are buried in the same slab as the petal
+       feet and the flood fill is the only witness that the whorl is one piece
+       with the hub at the crowded corner. Six rows: the shipped whorl, the
+       aligned weld, the clamped angle, a fan (the LIST arm), the crowded
+       ANGLED corner (with a stem, --conn), the shipped attachment on the default stem and the inverted-extent fallback, and the two guards. */
+    rows: [
+      { label: "SEPALS: the shipped whorl (5 of 8, interleaved, size 0.60, angle 0)",
+        path: "the whorl at its defaults — SP0 (the registry hides the sepal sub-controls exactly where the geometry builds nothing), SP1 (declared and emitted, the tally the builder's own), SP2 (the ceiling is the outer whorl the builder placed), SP3 (every sepal ring row sits on the outer whorl's own emitted rim, the foot the descriptor's and inside the print floors), SP4 (the interleaved default lands mid-way between petal 0 and petal 1, read off the petals' own emitted azimuths), SP5 (length and peak half-width are the petal's times the size), SP6 (every blade built from the SEPAL's own twins, no role reaching it) and SP8 (the built angle is min(asked, limit), the root frame carries it, and the harness's own contact test finds the built angle clear in both modes and the step above the limit clipping)" },
+      { label: "SEPALS: height 0.75 (the shipped default) on the default stem — 60 x 6, GOBLET auto (the foot 0.33 mm below the head)",
+        path: "THE ATTACHMENT on the hub's flare — SP3's HUB arm: the mode decided from the stem record's own stem end against the hub builder's head end, the height the law restated, the point between the bracketing rings of the EMITTED underside, every ring row t/2 above it with its bottom skin through it; SP8 with the limit re-drawn at the attachment (the harness's own contact test at the built angle and one step above)" },
+      { label: "SEPALS: height on a DOME with a stem (rise 0.5 — the bowl holds the stem end above the join's rim, the extent INVERTED: at the rim, told)",
+        path: "THE FALLBACK told — SP3's RIM arm on a stem whose join is active but whose head is a bowl: the extent's sign decides the mode as a biconditional, the record names the inversion, and the ring row is the outer whorl's own" },
+      { label: "SEPALS: ALIGNED at size 1.00 (the sepal foot IS the petal foot — welded by construction)",
+        path: "the weld the census reads: X1 — this row is declared self-intersecting (the two whorls share a foot lattice bit for bit and the fork's crotch is then counted within-shell) and must STILL read pairs; SP3 with the foot at the petal's own width; SP8 where the limit is the petal tilt less one step (coincident at 25)" },
+      { label: "SEPALS: angle 90 asked — CLAMPED at the drawn limit (the last angle clear of the petals)",
+        path: "THE CLAMP in the direction that matters — SP8: 90 asked, the limit drawn on the built rows, the built angle the limit, the flag a biconditional, and the harness's own rebuild finding the step above the limit clipping a petal" },
+      { label: "SEPALS: on a FAN (5 sepals on 7 slots, interleaved)",
+        path: "the LIST arm of the whorl primitive — SP2 (the ceiling is the fan's derived slot count), SP4 (the fan's lattice shifted by the phase, the count nearest the mirror line, and whether the set is mirror-symmetric is declared)" },
+      { label: "SEPALS: THE CROWDED CORNER on ANGLED",
+        path: "THE CROWDED CORNER — 40 petals x 40 sepals x size 1 x aligned x 90 asked on a stem, the forty feet 20 mm down an ANGLED cone's side (SP3's HUB arm on the cone: chord = tangent): --conn is the witness that the whorl, the flare and the hub are one piece there; X1/X2 the verdict — 0 pairs, the rim weld gone with the foot off the petal foot's lattice; SP8 the clamp at 40 congruent neighbourhoods" },
+      { label: "SEPALS: GATED — count 0 with every sepal control at MAXIMUM (hidden and inert; bit-identical to the default)",
+        path: "the GUARD — SP7: every sepal control at its maximum with the count at 0 builds nothing, SP1 reads the builder's none rather than a missing key, and the byte tool proves the row bit-identical to the default" },
+      { label: "SEPALS: GATED — asked under SPHERE (8 asked on a closed head: none built, UNAVAILABLE told)",
+        path: "the REFUSAL — SP9: a closed head has no underside ring, so sepals asked there build nothing and the read-out says UNAVAILABLE; SP0's two statements must still be complements" },
+    ],
+  },
+  {
+    n: 36, title: 'the tilt range past a right angle',
+    anchor: 'TILT: 76 (one step past the old ceiling, still under the right angle)',
+    /* THREE ROWS, AND THE AXES ARE THE SEAM CLEARANCE'S OWN. The clearance is
+       (t/2) sin(turn) saturated past 90, and the first blade row is the first
+       LATTICE station strictly beyond it — so the two levers are the SHEET and
+       the BLADE LENGTH, and the angle decides whether the window is open. 90
+       is where the law saturates; 120 x the shortest blade is the coarsest
+       lattice station at the closing point; 120 x three whorls puts EVERY
+       whorl past the right angle rather than only the innermost, which is the
+       one shape the pre-ruling matrix could not produce from the base control.
+       The 76 and 105 rows and the dome are in the full matrix and not here: a
+       subset covers the AXES a feature has, and the sheet, the length and the
+       depth are those axes. */
+    rows: [
+      { label: "TILT: 90 (the right angle — where the clearance law saturates)",
+        path: "the saturation itself — A7 (the held block starts at the first lattice station strictly beyond seamClearanceMm, and the clearance is held at its right-angle value there rather than falling away with sin) and A8 (the emitted widest gap under the blend's bound)" },
+      { label: "TILT: 120 x 20 x 8 mm (the shortest blade — the coarsest lattice station)",
+        path: "the LATTICE arm of the seam floor — A7's seam step on a 20 mm blade, where one station is 0.36 mm rather than 0.62 and the clearance is the same t/2; C1 rebuilds the spine from other owners at a tilt the base control could not reach before" },
+      { label: "TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)",
+        path: "the DEPTH arm — J1/J8 (every foot still in the hub plane with the ring's own cross-section, and the spine's first chord leaving at tilt plus half the row's curl) on three whorls all past 90, the shape a tilt STEP on an inner whorl cannot make; X1/X2 the verdict on the folds the ruling accepts" },
+    ],
+  },
+  {
+    n: 37, title: 'the inflorescence — one raceme of identical florets',
+    anchor: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)',
+    /* FOUR ROWS, AND THE AXES ARE THE ONES THE FEATURE HAS — not the failures
+       anybody predicted. The leaf session's own lesson, paid for twice: its
+       subset covered phyllotaxy, the bore, the angle, the inset, the serration
+       and both guards and STILL missed the one axis that reaches another
+       family's clause, because no row was there for that reason.
+
+       So: the SHIPPING raceme (the anchor, and the only row where all seven
+       ID clauses run on a state anyone would build); the GATED row, because
+       hidden-and-not-inert is invisible to every STL property and the two-arm
+       guard is what the whole byte claim rests on; the SPHERE, because that is
+       this feature's cross-family axis — the main head's stem channel and the
+       florets share one rachis, and ST7/ST8/ST9 reason about a region the
+       pedicels now live in; and the WHORLED corner, because three pedicels at
+       one node is the densest placement and the only one where the pitch floor
+       and the area rule bind together.
+
+       WHAT IS NOT HERE AND WHY: the clamps (size, count, inset) are one-line
+       biconditionals that fire in Node on any row, and the full matrix carries
+       them by name; ALL MAX is 1.1 M triangles and is the full gate's. */
+    rows: [
+      { label: "INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)",
+        path: "the shipping raceme — ID0 (the registry's predicate against the geometry's guard), ID1 (the plan's azimuth list against the builder's tally and the triangle delta), ID2 (every pedicel rooted in the rachis WALL and crossing solid, with the area-rule diameter rebuilt from the stem's own radius), ID3 (every placement matrix orthonormal with determinant +1), ID4 (the six keys floretState overrides, the recursion capped at inflorescence NONE), ID5 (every placed head is the unit under its own matrix, residual exactly 0), ID6 (each head's axis IS its pedicel's direction and it stands at the rod's far end)" },
+      { label: "INFLO: GATED — every control at MAXIMUM with the type NONE (hidden AND inert)",
+        path: "the GUARD, in the arm the byte claim rests on — ID0 and ID1's inertness clauses in both directions (no record, no triangles, with every inflorescence control at its maximum), which is the only thing that can see a hidden control that still builds" },
+      { label: "INFLO: x a SPHERE head (the stem channel and the florets on one rachis)",
+        path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build, and the exported file's own clearance) on a rachis that now also carries pedicels, beside ID2's crossing and S1-S4 on the main head; the leaf session's ST9 defect is exactly this shape and was found by a row that was there for a different reason" },
+      { label: "INFLO: WHORLED (three at 120 deg a node)",
+        path: "the DENSEST placement — ID1's per-node count against the phyllotaxy law, ID2's pitch floor (two pedicel radii) and the area rule binding together at three pedicels a node, ID6 on three azimuths that share one node depth" },
     ],
   },
 ];

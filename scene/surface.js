@@ -40,6 +40,16 @@ export function createSurface(squash = SURFACE_SQUASH) {
   const s = {
     squash,
 
+    // HOW HIGH IS UP, IN SCREEN PIXELS. The view is an oblique orthographic
+    // whose elevation above the water satisfies sin(elevation) = squash (that
+    // IS what squashing the plane's y axis by `squash` means), so one plane
+    // unit of HEIGHT above the water draws cos(elevation) screen pixels
+    // UPWARD. Derived from the squash rather than typed, so a scene that
+    // floats something on the water — a lily pad riding a wave, a flower
+    // standing above one — cannot imply a second camera: at height 0 the term
+    // is exactly 0 and the projection is the one everything else uses.
+    lift: Math.sqrt(1 - squash * squash),
+
     // plane -> screen
     sx: (px) => px,
     sy: (py) => py * squash,
@@ -57,6 +67,11 @@ export function createSurface(squash = SURFACE_SQUASH) {
         w: width + 2 * margin, h: height / squash + 2 * margin,
       };
     },
+
+    // A plane point at height z, projected. Height 0 is exactly py * squash —
+    // the same expression `sy` gives — so nothing that floats above the water
+    // is drawn by a different camera from the water it floats on.
+    syAt(py, z) { return py * squash - z * s.lift; },
 
     // Is a plane point on screen (optionally with a plane-space margin)?
     onScreen(x, y, width, height, margin = 0) {

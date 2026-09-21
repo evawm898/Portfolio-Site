@@ -49,11 +49,13 @@ import os from 'node:os';
 import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, shownModeAssertion, curlAssertions, CURL_SCOPE,
+         fringeAssertions,
+         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
-         stemAssertions, STEM_SCOPE } from './bloom-harness.mjs';
+         stemAssertions, STEM_SCOPE,
+         leafAssertions, sepalAssertions, inflorescenceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
-import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE } from './bloom-harness.mjs';
+import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
@@ -79,6 +81,10 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-export-'));
 
 const results = [];
 const validity = [];
+/* Rows the generator REFUSED to export, declared in EXPORT_REFUSED_XFAIL and
+   asserted by XR1. Collected so the summary NAMES them with their figures —
+   a declared row that went quiet would be the coverage loss a skip is. */
+const refused = [];
 const t0 = Date.now();
 
 /* R6 — THE SOLID-ANGLE MEASURE'S CALIBRATION, once per run before any row
@@ -129,7 +135,14 @@ for (const row of rows) {
      blind to a cut in the wrong place or not made: it exports watertight and
      one piece either way. Rebuilt in Node from the page's own state. */
   const lob = await lobeAssertions(page, row);
+  /* THE FRINGE (FR0-FR5, Sep 13) — see fringeAssertions()'s header. Both
+     gates are structurally BLIND here: every tooth is its own closed panel
+     overlapping the base, so a fringe with the wrong count, the wrong taper,
+     the wrong split row or teeth under the printable floor exports
+     watertight AND as one connected piece. */
+  const frn = await fringeAssertions(page, row);
   if (lob.length) { validity.push(`${row.label}: ${lob.join('; ')}`); continue; }
+  if (frn.length) { validity.push(`${row.label}: ${frn.join('; ')}`); continue; }
   /* THE CURL FAMILY (C1-C3, session 16) — read from the builder's own
      emitted spine rows against the law rebuilt from OTHER owners. Both STL
      gates, J1-J9, form, thickness and Z1-Z9 are all blind to a spine that
@@ -186,6 +199,32 @@ for (const row of rows) {
      as one piece. See stemAssertions()'s own header. */
   const stem = await stemAssertions(page, row);
   if (stem.length) { validity.push(`${row.label}: ${stem.join('; ')}`); continue; }
+  /* LEAVES (LF0-LF7). Both STL gates are blind to the whole family by
+     construction — a leaf declared and never built adds no boundary edge and
+     detaches nothing; a petiole rooted on the AXIS of a hollow stem still
+     reads ONE PIECE, measured, because a radial rod crosses the wall on its
+     way out; and nothing here measures an azimuth, so a leaf set building the
+     wrong phyllotaxy exports watertight at an identical triangle count. See
+     leafAssertions()'s own header. */
+  const leaf = await leafAssertions(page, row);
+  if (leaf.length) { validity.push(`${row.label}: ${leaf.join('; ')}`); continue; }
+  /* SEPALS (SP0-SP9, sepals part 1). Both STL gates are blind to the whole
+     family by construction: a sepal whorl on the wrong ring, at the wrong
+     azimuth, from the petal's controls, or clipping through a petal exports
+     watertight and as one piece (a sepal through a petal is a cross-shell
+     overlap). See sepalAssertions()'s own header. */
+  const sep = await sepalAssertions(page, row);
+  if (sep.length) { validity.push(`${row.label}: ${sep.join('; ')}`); continue; }
+  /* THE INFLORESCENCE (ID0-ID6, this session). BOTH STL GATES ARE BLIND TO
+     PLACEMENT BY CONSTRUCTION, and it is measured rather than argued: a
+     raceme whose every floret is left at the ORIGIN is one closed watertight
+     solid with the identical triangle count and the identical STL byte
+     length, and the flood fill reads N heads piled on the rachis as one piece
+     more readily than as the right ones. A rigid transform changes no edge
+     census and splits no region. See inflorescenceAssertions()'s own
+     header for what each of the seven sees. */
+  const inflo = await inflorescenceAssertions(page, row);
+  if (inflo.length) { validity.push(`${row.label}: ${inflo.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -195,7 +234,15 @@ for (const row of rows) {
   const zyg = await zygoAssertions(page, row);
   if (zyg.length) { validity.push(`${row.label}: ${zyg.join('; ')}`); continue; }
   const buf = await exportStl(page, tmp);
-  if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
+  /* A REFUSAL IS NOT A BROKEN EXPORT (XR1/XR2, Eva's ruling Sep 13) — see
+     exportRefusalAssertion()'s header. The generator refuses an over-budget
+     model ON PURPOSE, and the bare "no STL download" could not tell that from
+     the export breaking. A declared row must refuse, for the budget, with a
+     count over it; an undeclared one must export; and a declared row that
+     starts exporting fails as hard as one that refuses wrongly. */
+  const ref = await exportRefusalAssertion(page, row, !!buf);
+  if (ref.bad.length) { validity.push(`${row.label}: ${ref.bad.join('; ')}`); continue; }
+  if (!buf) { refused.push({ label: row.label, ...ref.r }); console.log(`  ${exportRefusedLine(row.label, ref.r)}`); continue; }
   /* THE EXPORT FLOOR, read from the app's own post-export read-out — the
      live build never floors, so no live metric can answer this. */
   const flr = await exportFloorAssertion(page);
@@ -205,8 +252,54 @@ for (const row of rows) {
      36 — see their header in bloom-harness.mjs. Read from THIS row's STL
      bytes. Both are things this gate is structurally blind to: an inside-out
      petal and a petal folded through itself are watertight and one piece. */
-  const ori = orientationAssertions(stlPositions(buf), row, await page.evaluate(() => window.__bloomMetrics().sphereMode === true));
+  const stlPos = stlPositions(buf);
+  /* THE HEAD AND THE STEM'S OWN CAVITY, both read from the build's own record:
+     O1's declared-inward baseline is a count derived from what this state
+     actually builds, never from the head shape alone. `cavity` is non-null iff
+     the bore SURVIVES its two closures — a solid stem, a stem at length 0 and
+     a stem whose closures meet all leave it null, which is the inertness half
+     of the tip-plug ruling arriving in the orientation gate. */
+  const ori = orientationAssertions(stlPos, row, await page.evaluate(() => {
+    const m = window.__bloomMetrics(), S = m.stem;
+    return {
+      sphere: m.sphereMode === true,
+      /* A SEPARATE INWARD SHELL NEEDS BOTH ENDS SHUT IN THE MESH, which is
+         narrower than "the bore survives" and was corrected by measurement:
+         O1 read `0 of 10 shells are wound INWARD` against a baseline of 1 on
+         every FLAT-hub stem. Where there is no root band the bore is a BLIND
+         HOLE — its wall reaches the top face and welds to the outer shell
+         through the annulus there, so the stem stays ONE shell. It is only
+         where a root band shuts the top as well that the bore's wall shares no
+         vertex with anything and becomes its own closed surface. (The PART is
+         sealed either way once a slicer unions the hub over the blind hole's
+         mouth; this is about what the exported MESH's shells are.) */
+      cavity: S && S.voidMm > 0 && S.solidBandMm > 0 && S.tipPlugMm > 0
+        ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
+      /* THE FLORETS' OWN INNER FACES. A floret IS a bloom, so it declares
+         them by the same two conditions the head does, read off the floret's
+         own build record — and O1's baseline is a count over the FILE, so N
+         florets multiply it. Every floret on a build is the same unit under a
+         different matrix (ID5 measures that as an exact zero), which is why
+         one record describes all of them. */
+      florets: (() => {
+        const B = m.inflorescenceBuilt, U = B && B.unit;
+        if (!B || !U) return null;
+        return {
+          count: B.count,
+          sphere: U.sphereMode === true,
+          cavity: U.stemVoidMm > 0 && U.stemSolidBandMm > 0 && U.stemTipPlugMm > 0,
+        };
+      })(),
+    };
+  }));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
+  /* ST9 — THE STEM CHANNEL, read from THIS row's STL bytes. ST7 asks the stem
+     channel whether the stem channel fired, which is the circularity Eva's
+     fourth durable rule is about; this asks the FILE. See STEM_CHANNEL_SCOPE. */
+  const chan = stemChannelAssertions(stlPos, row,
+    await page.evaluate(() => window.__bloomMetrics()),
+    await page.evaluate(() => window.__bloomUIState()));
+  if (chan.length) { validity.push(`${row.label}: ${chan.join('; ')}`); continue; }
   const sx = await selfIntersectionAssertions(page, buf, row);
   if (sx.bad.length) { validity.push(`${row.label}: ${sx.bad.join('; ')}`); continue; }
   /* FOOT CROWDING — a FLAG, never a gate (Eva, Sep 3), and the one thing
@@ -331,21 +424,34 @@ for (const r of results) {
   if (r.lobes) console.log(`       ^ ${lobeResultLine(r.lobes)} · SCOPE: ${LOBE_SCOPE}`);
   console.log(`       ^ ${crowdingLine(r.crowding)}`);
   console.log(`       ^ ${orientationLine(r.orientation)}`);
-  console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ' · XFAIL (declared on main at ead8624, still failing as expected)' : ''}`);
+  console.log(`       ^ ${selfIntersectionLine(r.solidCensus)}${SELF_INTERSECTION_XFAIL_HAS(r.label) ? ` · XFAIL (declared at ${SELF_INTERSECTION_XFAIL[r.label].pairs} pairs / ${SELF_INTERSECTION_XFAIL[r.label].worstMm.toFixed(4)} mm, still failing at that magnitude — X1)` : ''}`);
   console.log(`       ^ ${sagittaLine(r.sagitta)}`);
   console.log(`       ^ ${r.coverageSkipped ? 'COVERAGE: SKIPPED — ' + r.coverageSkipped : coverageLine(r.coverage) + (r.coverageAsserted ? ' · ASSERTED on this row' : '')}`);
   console.log(`       ^ SOLID: ${r.solidSkipped ? 'SKIPPED — ' + r.solidSkipped : solidLine(r.solid).replace(/\n    /g, '\n         ') + (r.solidAsserted ? '\n         ASSERTED on this row: ' + r.solidHead.join(' · ') : '')}`);
   if (r.spine && r.spine.some((s) => s && s.curlRad !== 0)) console.log(`       ^ ${spineLine(r.spine)}`);
 }
+/* THE ROWS THE GENERATOR REFUSED, NAMED WITH THEIR FIGURES (XR1, Eva's ruling
+   Sep 13). A declared refusal is neither a pass nor a skip — it is an ASSERTED
+   outcome — and it is printed on every run with its count so the row can never
+   go quiet, which is precisely the coverage loss a skip would have been. */
+for (const rr of refused) console.log(`\n${exportRefusedLine(rr.label, rr)}`);
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...exportRefusedCoverage(attempted));
+
 /* THE DENOMINATOR ITSELF, asserted — and the three real populations printed
    beside it (#220). Every ratio in this summary divides by `results.length`,
    which is the SURVIVORS of the validity assertions, so a dropped row shrinks
    BOTH sides of seven ratios at once and each of them still reads as a clean
    pass. The matrix count was never printed to compare them against. */
 const got = new Set(results.map((r) => r.label));
-const dropped = attempted.filter((l) => !got.has(l));
+/* A DECLARED REFUSAL IS NOT A DROPPED ROW (XR1). It reached no `results`
+   entry because there is no STL to analyse, but it is an ASSERTED outcome
+   rather than a row the gate lost — so it is excluded from the census and
+   named on its own line instead, which is what keeps it from going quiet. */
+const refusedLabels = new Set(refused.map((r) => r.label));
+const dropped = attempted.filter((l) => !got.has(l) && !refusedLabels.has(l));
 if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
 console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length} watertight (boundary = 0)`
+  + (refused.length ? ` · ${refused.length} EXPORT REFUSED by the generator's own triangle budget (declared, asserted by XR1 — not a pass and not a skip)` : '')
   + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass` : '')
   + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 if (dropped.length) console.log(`  ^ every ratio below divides by the ${results.length} row(s) that SURVIVED, not by the ${attempted.length} in the matrix.`);
@@ -356,12 +462,13 @@ console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 {
   const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL on main at ead8624 (each still failing, asserted by X1) · ${results.filter((r) => r.orientation.inward === (r.sphere ? 1 : 0)).length}/${results.length} configs meeting the orientation baseline (every shell outward; under SPHERE exactly one inward, the hub's inner face)`);
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL (each still failing at its RECORDED magnitude — the pair count exactly, the worst span within ±${SELF_INTERSECTION_TOLERANCE.worstMm} mm — asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face, the stem bore's own sealed cavity, and every FLORET's own two where each exists)`);
 }
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
 console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
 console.log(`STEM SCOPE: ${STEM_SCOPE}`);
+console.log(`STEM CHANNEL SCOPE: ${STEM_CHANNEL_SCOPE}`);
 const crowdedRows = results.filter((r) => r.crowding.crowded);
 console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
 /* THE SAGITTA SUMMARY — a REPORT, and the worst is named with WHERE it sits,
@@ -383,7 +490,8 @@ console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a 
 /* MATRIX-LEVEL claims (a flag raised somewhere, an asserted row somewhere)
    are claims about the MATRIX, so a filtered `--only` run does not make them. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label)));
+if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label), refused.map((r) => r.label)));
+{ const note = selfIntersectionRefusedNote(refused.map((r) => r.label)); if (note) console.log(note); }
 /* THE SELF-CONTACT FLAG, both directions at matrix level (session 16). */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
 {
@@ -457,4 +565,4 @@ if (bad) {
   console.log(`\nexport gate: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} not watertight, ${degenerates.length} with degenerate triangles, ${countMoved.length} whose triangle count moved between modes. Nothing above is a pass.`);
   process.exit(1);
 }
-console.log(`\nexport gate: PASS — all ${attempted.length} attempted configs reached the results and every one exports watertight.`);
+console.log(`\nexport gate: PASS — ${results.length} of ${attempted.length} attempted configs reached the results and every one exports watertight${refused.length ? `; ${refused.length} config(s) the generator REFUSED on its own triangle budget, declared and asserted by XR1 (named above) rather than skipped` : ''}.`);

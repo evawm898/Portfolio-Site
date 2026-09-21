@@ -65,7 +65,7 @@ const JSON_OUT = process.argv.includes('--json');
 const ROWS = [
   { label: 'LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)', plainDeclared: null, note: 'span-0 touches at the form-onset crease on the cup alone; the lobed ladder lands three of its own, on other petals' },
   { label: 'LOBES: x cup 1.2 (over a fold declared on main — must not gain a new one)', plainDeclared: 'petalCup max (1.2)' },
-  { label: 'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; the lobed ladder\'s stations miss them — 0 pairs)', plainDeclared: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)' },
+  { label: 'LOBES: x buckle 0.30 f 3 (the buckle alone carries 8 hairline pairs at the tip; MODEL B\'s stations no longer land on them — 0 pairs, and the xfail entry came off in the same commit)', plainDeclared: 'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)' },
   { label: 'LOBES: x roll 330 (over the quill, declared on main)', plainDeclared: 'petalRoll max (330)' },
   { label: 'LOBES: x curl 360 (over the fiddlehead, declared on main)', plainDeclared: 'petalSpineCurl max (360)' },
   { label: 'LOBES: x 3 whorls (the inner petals are short — the floor binds there first)', plainDeclared: null, note: 'the root blend at 3 layers' },
@@ -73,7 +73,7 @@ const ROWS = [
   { label: 'LOBES: x the whole centre (stamens and a style under a lobed whorl)', plainDeclared: null, note: 'the stigma\'s 272' },
   { label: 'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)', plainDeclared: null, note: 'the inner whorl at cup 1.2 x curl 360' },
   { label: 'LOBES: x the domed hub (head rise 1.00)', plainDeclared: 'headRise max (1)' },
-  { label: 'LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 4.2 mm window at a 2.40 mm floor)', plainDeclared: null, note: 'a 20 mm petal at a 2.40 mm sheet folds at the root blend with no lobe — no row on main names it' },
+  { label: 'LOBES: ONE lobe by both caps (20 mm petal, sheet 2.40, coverage 0.40 — capacity 19 rows and a 13.9 mm arc at a 2.40 mm floor; CLAMPED to 3 by rows)', plainDeclared: null, note: 'a 20 mm petal at a 2.40 mm sheet folds at the root blend with no lobe — no row on main names it' },
 ];
 
 const matrix = H.buildMatrix();
@@ -102,7 +102,11 @@ function nn(A, B) {
   return { max: s[s.length - 1], p95: s[Math.floor(0.95 * (s.length - 1))], median: s[Math.floor(s.length / 2)] };
 }
 const f = (x) => (x === null ? 'n/a (one side has no sites)' : `max ${x.max.toFixed(3)} · p95 ${x.p95.toFixed(3)} · median ${x.median.toFixed(3)} mm`);
-const parseDeclared = (s) => { const m = /^(\d+) pairs, worst span ([\d.]+) mm/.exec(s); return m ? { within: +m[1], worst: +m[2] } : null; };
+/* The declaration is structured now ({pairs, worstMm, note} — #213), read
+   through the harness's own fields rather than parsed out of prose; the span
+   band is the list's own SELF_INTERSECTION_TOLERANCE, one owner. */
+const parseDeclared = (e) => (e && Number.isInteger(e.pairs) ? { within: e.pairs, worst: e.worstMm } : null);
+const SPAN_BAND = H.SELF_INTERSECTION_TOLERANCE.worstMm;
 
 const invalid = [];
 const out = [];
@@ -117,9 +121,9 @@ for (const spec of ROWS) {
   if (!lob.lobes) { invalid.push(`${spec.label}: the lobed build reports no lobe record`); continue; }
   if (plain.lobes) { invalid.push(`${spec.label}: the plain build reports a lobe record`); continue; }
   if (spec.plainDeclared) {
-    const d = parseDeclared(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared] || '');
+    const d = parseDeclared(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]);
     if (!d) invalid.push(`${spec.label}: this tree's SELF_INTERSECTION_XFAIL declares no row "${spec.plainDeclared}"`);
-    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > 5e-5) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where the list declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT what the list declares, so nothing below has a baseline to compare against`);
+    else if (d.within !== plain.within || Math.abs(d.worst - plain.worst) > SPAN_BAND) invalid.push(`${spec.label}: the plain build reads ${plain.within} pairs / ${plain.worst.toFixed(4)} mm where the list declares "${spec.plainDeclared}" at ${d.within} / ${d.worst.toFixed(4)} — the plain rows on this tree are NOT what the list declares, so nothing below has a baseline to compare against`);
   }
   const [u0, u1] = lob.lobes.windowU;
   const inWin = (b) => b.sites.filter((p) => { const u = b.uOf(p); return u > u0 && u < u1; }).length;
@@ -130,7 +134,7 @@ for (const spec of ROWS) {
   out.push(rec);
   if (!JSON_OUT) {
     console.log(`\n${spec.label}`);
-    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — the list declares "${spec.plainDeclared}" at ${H.SELF_INTERSECTION_XFAIL[spec.plainDeclared]}` : spec.note ? ` — ${spec.note}` : ''}`);
+    console.log(`  EXPORT, the builder's doubles · lobed ${rec.lobed.within} pairs (worst ${rec.lobed.worstMm.toFixed(4)} mm) · plain ${rec.plain.within} (worst ${rec.plain.worstMm.toFixed(4)} mm)${spec.plainDeclared ? ` — the list declares "${spec.plainDeclared}" at ${H.xfailMagnitudeText(H.SELF_INTERSECTION_XFAIL[spec.plainDeclared])}` : spec.note ? ` — ${spec.note}` : ''}`);
     console.log(`  sites, lobed -> nearest plain: ${f(rec.lobedToPlain)}; plain -> nearest lobed: ${f(rec.plainToLobed)}`);
     console.log(`  inside the lobes' window (u ${u0.toFixed(3)}-${u1.toFixed(3)}): lobed ${rec.lobed.inWindow} of ${rec.lobed.sites}, plain ${rec.plain.inWindow} of ${rec.plain.sites}`);
   }

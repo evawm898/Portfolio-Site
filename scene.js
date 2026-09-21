@@ -13,7 +13,10 @@
 //
 // and the host it is handed:
 //
-//   canvas2d()               a DPR-correct 2D canvas, mounted and auto-resized.
+//   canvas2d({alpha})        a DPR-correct 2D canvas, mounted and auto-resized.
+//                            Call it once per PLANE for a multiplane scene; each
+//                            call is nearer the viewer, and only the first is
+//                            opaque. See the method for why that is not optional.
 //   width, height            live CSS pixels.
 //   reducedMotion, seed
 //
@@ -85,11 +88,26 @@ function makeHost(seed) {
     get height() { return h; },
     reducedMotion,
     seed,
-    canvas2d() {
+    // Call it once for a single-canvas scene, or once per PLANE for a
+    // multiplane one. Layers are returned in DOM order, so each call sits
+    // NEARER THE VIEWER than the last.
+    //
+    // ALPHA IS NOT A PREFERENCE AND IS NOT LEFT TO THE CALLER TO REMEMBER.
+    // Only the BACKMOST layer can be opaque; any layer above one that is
+    // opaque paints over everything behind it, and on an `alpha: false`
+    // context even clearRect() yields opaque BLACK rather than transparency
+    // (measured: a second layer read [0,0,0,255] where nothing was drawn).
+    // So the default is "opaque iff I am the first layer" — which keeps a
+    // one-canvas scene exactly as it was, and makes a stack composite
+    // correctly without the scene having to know any of this. An explicit
+    // `{ alpha: true }` on the first call is there for a scene that wants
+    // the page ground showing through its own backmost plane.
+    canvas2d(opts = {}) {
+      const alpha = opts.alpha !== undefined ? !!opts.alpha : canvases.length > 0;
       const el = document.createElement('canvas');
       el.className = 'scene-canvas';
       stage.appendChild(el);
-      const ctx = el.getContext('2d', { alpha: false });
+      const ctx = el.getContext('2d', { alpha });
       const entry = { el, ctx };
       canvases.push(entry);
       sizeCanvas(entry);
@@ -328,6 +346,38 @@ window.__scene = {
   slots: () => SCENES.map(s => ({ id: s.id, title: s.title, built: isBuilt(s) })),
   sceneState: () => (active && typeof active.instance.state === 'function')
     ? active.instance.state() : null,
+  // Routed test chrome: a scene may expose __pump to advance itself in
+  // SIMULATED time so a gate can reach an exact state rather than waiting for
+  // one at the two frames a second headless gives. The shell only forwards it.
+  scenePump: (seconds, step) => (active && typeof active.instance.__pump === 'function')
+    ? active.instance.__pump(seconds, step) : null,
+  // The scene's published interface, for a gate that has to check it is there.
+  sceneApi: () => {
+    if (!active) return null;
+    const i = active.instance;
+    return {
+      swashYAt: typeof i.swashYAt === 'function' ? 'function' : typeof i.swashYAt,
+      highWaterYAt: typeof i.highWaterYAt === 'function' ? 'function' : typeof i.highWaterYAt,
+      overruns: Array.isArray(i.overruns) ? 'array' : typeof i.overruns,
+    };
+  },
+  sceneQuery: (name, x) => (active && typeof active.instance[name] === 'function')
+    ? active.instance[name](x) : null,
+  // FREEZE THE LOOP SO AN EXACT STATE CAN BE PHOTOGRAPHED. The rule this repo
+  // uses for contact sheets — screenshot until two consecutive frames are
+  // byte-identical — assumes the thing being shot comes to rest. A scene does
+  // not: it is an animation, so that loop can never terminate, runs its whole
+  // retry budget every cell and burns SECONDS of scene time doing it. Measured
+  // on scene 3: a cell pumped to a swash at its peak was photographed after the
+  // wave had fully drained. `pause` stops the shell calling frame(); `step`
+  // calls it once with dt 0, which advances nothing and redraws, so the
+  // screenshot is of the state that was asked for.
+  pause: (on) => { halted = !!on; if (!on) last = 0; },
+  step: () => {
+    if (!active) return false;
+    try { active.instance.frame(0, performance.now() / 1000); return true; }
+    catch (err) { console.error('[/scene] step threw', err); return false; }
+  },
   activate: (id) => activate(id),
 };
 

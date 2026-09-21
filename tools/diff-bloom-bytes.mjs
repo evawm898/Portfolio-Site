@@ -314,7 +314,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, FROZEN_MATRICES, CONTROLS, RETIRED_IDS } from './bloom-harness.mjs';
+import { launchPage, openBloom, applyConfig, kindsOf, exportStl, analyzeStl, legacyMatrix, buildMatrix, FROZEN_MATRICES, CONTROLS, RETIRED_IDS, exportRefusalAssertion } from './bloom-harness.mjs';
 
 /* THE ONE OWNER of the foot-region criterion. Both the header above and the
    run output quote this string rather than restating the rule — a region
@@ -492,11 +492,29 @@ if (process.argv.includes('--compare')) {
   const region = ri > 0 ? process.argv[ri + 1] : null;
   const movedSet = new Set();
   for (let k = 0; k < labels.length; k++) {
+    if (before.rows[k].refused || after.rows[k].refused) continue; /* no bytes — handled just below */
     if (before.rows[k].sha256 !== after.rows[k].sha256) movedSet.add(labels[k]);
+  }
+  /* A REFUSED row has no bytes on either tree, so `sha256` is null on BOTH and
+     the hash comparison above would call them equal without having looked at
+     anything — the fifth durable rule, in the one place it could bite here.
+     The row's outcome is the refusal and its count, so that is what is
+     compared; and a row refused on one tree and EXPORTED on the other is a
+     MOVE, which is the case that matters most, because the budget guard lives
+     in bloom.js. Rows with no `refused` field behave exactly as before. */
+  const refusedNote = [];
+  for (let k = 0; k < labels.length; k++) {
+    const b = before.rows[k], a = after.rows[k];
+    if (!b.refused && !a.refused) continue;
+    if (!b.refused || !a.refused) { movedSet.add(labels[k]); refusedNote.push(`${labels[k]}: REFUSED on ${b.refused ? 'before' : 'after'} and EXPORTED on the other — the export budget guard MOVED`); continue; }
+    if (b.refusedSaid !== a.refusedSaid || b.refusedLive !== a.refusedLive) { movedSet.add(labels[k]); refusedNote.push(`${labels[k]}: refused on both, at DIFFERENT counts (before ${b.refusedSaid}/${b.refusedLive}, after ${a.refusedSaid}/${a.refusedLive})`); continue; }
+    refusedNote.push(`${labels[k]}: EXPORT REFUSED on both trees at an identical ${a.refusedSaid.toLocaleString('en-US')} tris (read-out) / ${a.refusedLive.toLocaleString('en-US')} (builder tally) against the ${a.refusedBudget.toLocaleString('en-US')} budget — there are no bytes to compare, and that identity IS this row's comparison`);
   }
   console.log(`byte diff: ${labels.length} configs compared`);
   console.log(`  before: ${before.root} @ ${before.head || 'unrecorded'}`);
   console.log(`  after:  ${after.root} @ ${after.head || 'unrecorded'}\n`);
+  for (const n of refusedNote) console.log(`  ${n}`);
+  if (refusedNote.length) console.log('');
 
   /* THE RETIREMENT MODE — see the header. `before` is the old tree's TWIN
      capture, `after` the new tree's STRIPPED capture, --retirement the old
@@ -829,7 +847,31 @@ for (const row of MATRIX_FN[MATRIX]()) {
     if (Math.abs(Number(want[id]) - Number(got[id])) > 1e-9) validity.push(`${row.label}: ${id} expected ${want[id]}, live ${got[id]}`);
   }
   const buf = await exportStl(page, tmp);
-  if (!buf) { validity.push(`${row.label}: no STL download`); continue; }
+  /* A REFUSAL IS NOT A BROKEN EXPORT, and this tool never learned the
+     distinction both STL gates were taught (XR1/XR2, the fringe session).
+     `ALL MAX` is over the 1,500,000-triangle budget, so the generator refuses
+     it BY DESIGN — and a bare `no STL download` here made the whole capture
+     HARNESS INVALID on EVERY tree, `main` included, so no full-matrix byte
+     run could complete at all. Found on this PR's own partition, on the BASE
+     worktree as much as the head, which is what says it is pre-existing.
+     The clause is IMPORTED rather than restated, so EXPORT_REFUSED_XFAIL
+     keeps one owner and this tool cannot drift from the gates reading it. */
+  if (!buf) {
+    const xr = await exportRefusalAssertion(page, row, false);
+    if (xr.bad.length) { for (const b of xr.bad) validity.push(`${row.label}: ${b}`); continue; }
+    /* Declared, refused, and the read-out and the BUILDER agree on the count.
+       There are no bytes to hash and that IS the row's outcome, so it is
+       recorded as one (`sha256: null` plus both counts) and --compare holds a
+       refused pair to the same figures. Dropping the row instead is what left
+       the capture one row short of `complete` forever. */
+    rows.push({
+      label: row.label, pins: row.set.map((s) => s.id), tilt: Number(got.petalTilt), setEmptied,
+      state: got, refused: true, refusedSaid: xr.r.said, refusedLive: xr.r.live, refusedBudget: xr.r.budget,
+      bytes: null, tris: xr.r.live, sha256: null, footHash: null, footTris: null, footHalf: null,
+    });
+    checkpoint(false);
+    continue;
+  }
   /* `pins` records which controls the row set EXPLICITLY — the partition mode
      reads it rather than re-deriving the row's intent from its label. */
   const footHalf = footHalfSlab(got.sheetThickness);

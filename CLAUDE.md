@@ -88,17 +88,34 @@ proves they are the file's own** (`fround` of every double equals the STL's floa
 float32 bytes manufacture 196 span-0 touches on the flat default. **Two defects in the
 census surfaced the first time it ran over the whole matrix**: its pair `Set` overflowed on
 ALL MAX (canonical-cell rule now), and its COUNT DEPENDED ON THE WINDING (corners are read
-in coordinate order now; identical on both trees). **THE ROOT BLEND IS NOT FIXED — its
-brief with all measurements is §5 of that doc**, and its 138 rows are in the xfail list
-by name; the fix is `footRing()`'s, never a blade-side correction. (The list holds three by-design overlaps the vertex-welded shell definition
+in coordinate order now; identical on both trees). **THE ROOT BLEND IS FIXED — SUPERSEDED, AND THIS SENTENCE USED TO SAY THE OPPOSITE**
+(read `docs/bloom-root-blend-superseded.md`; the session-35/36 claim is kept below, struck
+through, so the reversal is legible). Session 36 wrote *"THE ROOT BLEND IS NOT FIXED — its
+brief with all measurements is §5 of that doc, and its 138 rows are in the xfail list by
+name; the fix is `footRing()`'s, never a blade-side correction."* **The foot-to-blade seam
+session (#210, `a24ed69`) fixed it, under a different name and from a different mechanism,
+and neither this file nor the page was corrected** — so for six merges `CLAUDE.md` carried
+the claim in the present tense HERE and its supersession 3,200 lines further down, and a
+reader met the false half first. That cost a whole session, whose brief was written from
+it. **Measured, one census over two geometries** (`1740a2e`, the tree the fix was applied
+to, against `main`): all twelve of §5's published figures reproduce EXACTLY on the pre-fix
+tree — 72 at 8x3, 162/364/416/624 at four layers, 49/63/595 for its three controls, 376
+for session 38's single-layer state — and **every one reads 0 today at an identical
+triangle count**. Of the 138 tagged rows, **73 came off the list and 65 remain for a
+DIFFERENT, NAMED reason** (27 EFFECTIVE TILT PAST 90, 2 SEAM CLAMPED, 19 magnitude
+re-records, the STYLE's own 272-pair rod overlap, the buckle's apex fold); **0 are the root
+blend.** What still folds on the depth axis is the effective tilt — clean to 97 degrees,
+336 pairs at 103, 384 at 115 — which is the declared class and not this one. (The list holds three by-design overlaps the vertex-welded shell definition
 cannot tell from a fold — every STYLE row at exactly 272, the lobed tips, and every CLEFT row —
 named as such in the doc; and a sweep that applies control sets but not a row's `capability`
 hook measures the cleft rows without their cleft, which the smoke gate caught.) **RECORDED FOR EVA, as
 MEASURED rather than as the ruling phrased it**: one or two layers export free of
 self-intersection at any petal count AT THE DEFAULT FORM (the petalCount sweep reads 0 on
 every row); cup beyond about −0.2..0.3, buckle from 0.3×, roll from 270° and curl 360° fold
-a single petal at ANY depth — the read-out's `ROOT BLEND AT N LAYERS` line says exactly
-that, at three layers and up, and the panel gate's route (v) asserts it both ways.
+a single petal at ANY depth. **That was printed by the read-out's `ROOT BLEND AT N LAYERS`
+line at three layers and up, with the panel gate's route (v) asserting it both ways — BOTH
+ARE RETIRED (Eva, Sep 20), and no line replaced them.** The form half of the sentence above
+is still true and is now carried here and in the outcome docs rather than on the page.
 
 **EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
 corroborated independently against an exported STL). Per-shell signed volume: the hub
@@ -115,18 +132,41 @@ pass unchanged on an inside-out solid. `node tools/bloom-self-intersection.mjs
 --orientation` is the check, calibrated on a unit cube (+1 outward, −1 reversed) with a
 positive control that reverses a real export and requires the verdict to move.
 
-**AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS** (session
-35). No cup, no buckle, no sweep: 0 pairs at 1 or 2 layers even with 40 petals, 72 at 3
-layers, 416 at 4. It is a petal crossing ITSELF (within-shell), not foot crowding, and
-it is **the short petals** — at 7×4 the innermost layer (reach 11.9 mm) has 43 pairs
-per petal and the next (19.3 mm) has 9, while the two outer layers are clean.
-`layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
-collapses a full-width foot across `ROOT_BLEND_END` and folds. `layerSize` 0.90 takes
-364 → 49; `petalTilt` 0 → 63; `footDelicacy` 0.25 → 595. **This is `footRing()`'s
-boundary, deferred three times, now measured as a real self-intersection rather than a
-chord statistic — and it means a multi-layer bloom is unprintable before any
-deformation control is touched.** Do not judge a deformation feature's printability on
-a multi-layer build until this is fixed.
+**~~AND THE ROOT BLEND SELF-INTERSECTS AT `layerCount >= 3`, AT THE DEFAULTS~~ — WITHDRAWN,
+AND THE MECHANISM WAS WRONG AS WELL AS THE STATUS** (session 35's claim, superseded by
+#210 and re-measured in `docs/bloom-root-blend-superseded.md`). **It reads 0 pairs at every
+depth 1 through 6 at the defaults today**, and `layerSize` 0.35..0.90, `footDelicacy`
+0.25..1.00 and `petalCount` 3..40 at six layers are ALL 0 — the whole axis, including the
+565,632-triangle corner. Session 35 wrote that it was *"a petal crossing ITSELF … the short
+petals … `layerSize` shrinks the blade but the foot is set by the hub ring, so a short petal
+collapses a full-width foot across `ROOT_BLEND_END` and folds"*, with `layerSize` 0.90
+taking 364 to 49, `petalTilt` 0 to 63 and `footDelicacy` 0.25 to 595, and concluded that
+**"a multi-layer bloom is unprintable before any deformation control is touched"**.
+**IT IS NOT THE ROOT BLEND AND IT WAS NEVER THE LAYER COUNT.** Session 38 established it
+as an OFFSET-SURFACE FOLD AT THE FOOT-TO-BLADE KINK — every site on the top skin at the
+ring radius at `dz = t/2`, both triangles of every pair a seam quad, zero pairs at zero
+tilt, and **a SINGLE layer at tilt 75 / length 20 / sheet 2.4 folding 376 pairs with no
+layers involved at all**. Layer count was a proxy for shorter petals (a smaller
+first-station spacing in mm) and stacked tilt (a sharper kink); the derived
+`seamClearanceMm` is the fix and it is the SEAM owner's, not `footRing()`'s. **The
+instruction that followed — "do not judge a deformation feature's printability on a
+multi-layer build until this is fixed" — is DISCHARGED and must not be re-inherited.**
+**AND THE READ-OUT LINE THAT SAID OTHERWISE IS DELETED — CREATED BY SESSION 36's RULING,
+RETIRED BY EVA'S ON Sep 20.** `bloom.js`'s `rootBlendLine()` printed at 3+ layers that *"the
+inner layers' short petals fold through themselves at the root (a measured self-intersection
+at the defaults, session 35)"*; its leading clause was false on this tree and its trailing
+clause (one or two layers clean at the default form; what folds a single petal is its own
+FORM, not the depth) was still true. Eva's ruling: **delete it — no line rather than one to
+maintain.** The panel gate's **route (v)**, which asserted the sentence appeared on five rows
+including one labelled *"3 layers (the first depth that folds)"*, went with it; those rows
+existed only to carry it. **A REPLACEMENT WARNING FOR THE EFFECTIVE-TILT FOLD WAS OFFERED AND
+DECLINED — do not add one**, and do not re-point or reword the old one.
+**AND ROUTE (v) WAS IN NONE OF THE PANEL GATE'S THREE ROUTE MECHANISMS**, which is a finding
+rather than a convenience: no entry in the header's enumeration, no flag in
+`--negative-control`'s completeness list, and not counted in its "SEVENTEEN ROUTES" banner.
+That is exactly the shape the sphere-stem session named — **a route that fires and is not
+required is a route that can go silent without the gate noticing** — so its removal moved no
+count and no list, and the letter (v) is not reused.
 
 **A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
 FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
@@ -179,6 +219,81 @@ all surface the same way, which is itself the point:
 So the mutant table is the instrument that finds this class, not a guarantee against it:
 it caught one of the three, CI caught one, and an adversarial read of the diff caught one.
 **Write the clause so its reference has a different owner in the first place.**
+
+**A CLAUSE THAT DEFINES ITS SUBJECT SO AS TO EXCLUDE THE THING IT DOUBTS CANNOT FAIL** (Eva,
+the sphere-stem session — the fifth durable rule, and the same family as the fourth rather
+than a separate idea). The fourth rule is about the two OWNERS of a comparison; this one is
+about the DEFINITION of what is compared. *A clause carves out a subject, and if the carving
+happens to exclude exactly the case the clause exists to doubt, it will be green forever —
+not because the tree is right but because the clause is asking about a set the failure cannot
+be in.* It is worse than an entangled reference, because there is no red to explain and no
+mutant to catch it: the mutation lands OUTSIDE the clause's subject and the clause is
+correct, in scope, and empty.
+
+Four instances here, and they look nothing alike:
+  * **The band's invisibility clause EXCLUDED THE TOP FACE BY CONSTRUCTION.** The byte tool's
+    clause 2 defined "the stem's OUTER WALL" as the triangles NOT all at one height — and the
+    stem's top face is exactly the triangles all at one height. So the one surface the band
+    demonstrably changes was the one surface the clause had defined itself out of. It could
+    not have failed at any band length, on any row.
+  * **ST9's guard READ THE RECORD IT CHECKS** (`if (!m.stemOmission) return`), so the mutation
+    that destroys the channel made the clause return before claiming anything. Its subject was
+    "rows where the channel reported something", which a broken channel is never in.
+  * **BOTH STL GATES' HEADLINES DIVIDED BY THE SURVIVORS** (#220): `results.length` counts the
+    rows that REACHED the results, so a dropped row left the numerator and the denominator
+    together and the ratio read N/N. The subject was "rows that did not fall over", which the
+    rows that fell over are never in — and session 41 read `672/672` off a 674-row matrix.
+  * **THE ANNOTATED-TAG WITNESS WAS A COIN FLIP** (the frozen-tags session, §3 of
+    `docs/bloom-frozen-tags-outcome.md`). `ls-remote` reports an annotated tag on TWO lines
+    with DIFFERENT shas — the tag object, and the commit, suffixed `^{}` — and the lookup
+    under test took whichever sorted lower. Case H built one such tag and asserted the commit
+    was read back; run against the broken lookup it **PASSED**, because that run's tag object
+    happened to sort AFTER the commit and the defect returned the right answer by luck.
+
+**THE FOURTH IS A DIFFERENT ROUTE TO THE SAME PLACE, AND IT SPLITS THE RULE.** The first three
+are failures of DEFINITION: the clause carved out a subject the failure was never in. The
+fourth's subject was RIGHT — "a correctly-placed annotated tag" is exactly the thing to doubt —
+and what excluded the failure was the INSTANCE chosen to stand for it. **A fixture that is
+50/50 makes a must-fail control a coin flip, and a coin flip landing the friendly way is
+indistinguishable from a passing test.**
+
+**THE TEST, and for three of the four it is not a mutant:** state the clause's subject as a SET,
+then ask whether the failure you are worried about is IN that set. If the failure would leave
+the set, the clause is worth nothing however strict it looks. **The three DEFINITION cases were
+found by re-reading the diff against the clause, which is the only thing that finds THEM**,
+because a green run, a mutant table and CI all ask the clause its own question. **The fourth is
+the exception and the distinction is worth keeping**: there the mutation lands squarely INSIDE
+the clause's subject, so the mutant table CAN see it — and the mutant table is what did, on a
+clause its own author had written minutes earlier. So: subject wrongly defined, only the diff
+finds it; subject right but instance non-adversarial, the mutant finds it PROVIDED it is run
+and its result read. **Then ask the second question: is the instance you built the HARDEST
+member of that set, or a random one? If a different random draw would have let the broken code
+pass, the fixture IS the clause.**
+
+**AN XFAIL ENTRY CARRIES ITS MAGNITUDE AS A NUMBER THE GATE READS, IN BOTH DIRECTIONS**
+(#213, closed — read `docs/bloom-xfail-magnitudes.md` before touching `SELF_INTERSECTION_XFAIL`,
+`EXPORT_REFUSED_XFAIL`, the wall instrument's `SELF_XFAIL` or its V4 marker). Every entry is
+structured now — `{ pairs, worstMm, note }`, `{ tris, note }`, `{ selfMm, note }`,
+`{ ownDeficitMm, note }` — and the module REFUSES TO LOAD on an entry with no number. X1
+holds a declared row to its recorded pair count EXACTLY and its worst span within ±5e-5 mm
+(the record's own rounding); XR1 holds the refused row's triangle count exactly, on the read-out
+and on the builder's tally; V5 and V4 hold the wall records within ±5e-4 mm. **BOTH
+DIRECTIONS**: an entry is a record of the tree, and a record that stops reproducing is stale
+whether the row got worse or better — the message says which. A pair count has no noise on one
+engine (0 of 261 rows differ between Node 20 and Node 22, measured over the whole list), so it
+gets no band; a relative band was rejected because it passes a +17% regression at 25% and
+reddens a four-pair row on one tangency. **THE RE-MEASUREMENT INSTRUMENT IS `node
+tools/bloom-xfail-magnitudes.mjs`** (Node, minutes, no browser; `--emit` prints the entries the
+tree measures, `--control` is the must-fail, `--root <tree>` measures another geometry against
+this list): a session that legitimately moves a declared row's tessellation runs it, re-records
+the movers in the same commit and names them in its outcome doc — before the 3.5-hour gate says
+so. **WHAT THE GATE FOUND ON THE DAY IT LANDED:** 23 of 261 self-intersection entries, the
+refused row's count (2,412,512 recorded, 2,412,412 built — the stem tip plug's hundred
+triangles) and 3 of the wall instrument's 4 figures no longer matched what the tree measured,
+and not one of them had reddened anything; nine of the 23 were WORSE. They are recorded at
+today's measurement with the previous figure kept in each entry's note, and attributed in the
+doc. **Do not widen a band to keep the suite green** — a row that reads worse than its record
+is a finding for the change that moved it, and the doc is where it is named.
 
 **AND WATERTIGHT PLUS CONNECTED DOES NOT MEAN PRINTABLE — A SOLID CAN PASS THROUGH
 ITSELF AND SATISFY BOTH** (session 35). `tools/bloom-self-intersection.mjs` is the
@@ -1055,6 +1170,8 @@ the wall instrument's rows have the same shape. **No range limit, clamp or warni
 — narrowing the range would remove states Eva ruled reachable, on the strength of a threshold
 that is itself a guess. A COMBINATION GATE (a predeclared set of two-control products through
 the wall instrument) is the schedulable item; it is recorded, not pre-empted.
+**IT IS BUILT — see the combination-gate block below; §18a's table reproduces through it
+EXACTLY and is a declared magnitude now.**
 **AND THE 1.00 mm PRINTABLE GAP IS ITSELF AN UNVALIDATED CONSTANT** (§18b, recorded once):
 NOTHING IN THIS PROJECT HAS EVER BEEN PRINTED, so `MIN_FEATURE_MM`, the printable gap, the
 sheet floor, the foot width and every curvature floor are DECLARED GUESSES rather than
@@ -1150,6 +1267,49 @@ VERBATIM SNAPSHOT of that base commit's `buildMatrix()`, where the trio had thre
 `--verify-frozen phase11` went red on row 400 in 24 seconds, which is that check doing its
 job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses the array form
 (`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
+**A SESSION DOES NOT PUSH FROZEN TAGS** (Eva's ruling, the sphere-stem session — THE RULE,
+and everything below it is the evidence that produced it rather than a procedure to retry).
+A session REGISTERS the baseline in both maps, PROVES it with `bloom-frozen-matrices`, and
+stops there. The tag is published by ONE `bloom-frozen-tags` dispatch from `main` AFTER the
+merge. **Do not attempt the push, and DELETE any local tag rather than leaving it as a trap** —
+an unpushed `frozen/*` in a working clone reads like a published baseline to the next session
+that lists tags. The registration is the load-bearing half and CI proves it; the tag only keeps
+the base commit alive, and a commit on `main` cannot be orphaned here anyway.
+**THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS**
+(read `docs/bloom-frozen-tags-outcome.md` before touching `tools/publish-frozen-tags.sh`,
+its self-test, or `TAG_PUSH_XFAIL`). It
+read *"the remote carries phase2..phase20 only (phase5 absent), so PHASES 21 THROUGH 29 ARE ALL
+UNPUBLISHED"*. **The remote carries THIRTY of the thirty-three declared baselines today** —
+everything except `frozen/phase5`, `frozen/phase22` and `frozen/phase23` — verified by
+`git ls-remote --tags origin` and by the GitHub tag API, each one identity-checked against
+`FROZEN_BASE_COMMITS`. Run 9 of `bloom-frozen-tags` (35295784427, Sep 18) created twelve of them
+in one go: phase21 and phase24..phase34. **THE ERROR WAS READING A RED X AS "IT DID NOTHING"** —
+the workflow had been publishing all along and failing its own verdict afterwards, for the reason
+in the next paragraph. **The lesson is the one this file already states about gates and about
+`672/672`: a run's exit code is not its outcome, and the outcome here is readable in one command
+that nobody ran** (`git ls-remote --tags origin 'refs/tags/frozen/*'`), or now by dispatching
+`bloom-frozen-tags` with `check_only`, which publishes nothing.
+**THE THREE THAT REMAIN CANNOT BE PUSHED BY A WORKFLOW AT ALL, AND THEY ARE DECLARED BY NAME.**
+GitHub refuses a GitHub App token — which `GITHUB_TOKEN` is — a ref it judges to create or update
+a file under `.github/workflows`, and **`GITHUB_TOKEN` cannot be granted `workflows` scope**, so
+no `permissions:` block reaches it (`contents: write` has been set since session 17 and was never
+the problem). phase5 has been rejected identically on every run since Sep 5. They are now entries
+in `TAG_PUSH_XFAIL` in `tools/publish-frozen-tags.sh` with the workflow file GitHub named, the run
+fails on any UNDECLARED absence, and a declared entry that starts publishing is called out as
+stale — this project's own xfail idiom, applied to a credential instead of to geometry.
+**WHICH refs GitHub picks was NOT determined, and the ruled-out list is worth more than a guess**:
+it is not unreachability — **32 of the 33 bases are on main's own first-parent line, INCLUDING
+all three that were rejected, while the ONE base that is genuinely not on `main` at all
+(phase10, recovered through `refs/pull/140/head`) PUBLISHED WITHOUT COMPLAINT**, which kills
+that hypothesis outright rather than merely failing to support it; not "the workflow files
+differ from main's" (phase21 and phase22 have IDENTICAL difference sets against main — one was
+accepted, one rejected); and not "the blob is already carried by an existing tag" (phase24's is
+carried by none and was accepted). **#253's own body and commit message say "all 33 bases are
+on main's first-parent line" — that is one row loose, and the corrected figure is the stronger
+claim.** The predicate is GitHub-internal; what matters is that it is a
+property of the token class, it is stable, and it is not configurable.
+**THE DISPATCH IS STILL EVA'S TO FIRE, NOT A SESSION'S** — the rule above is unchanged.
+
 **`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
 THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
 **(1) THE PUSH FAILS FROM A SESSION, AND THE MECHANISM RECORDED HERE IS REFUTED — NOT REPLACED**
@@ -1166,8 +1326,11 @@ what actually refuses the push is NOT ESTABLISHED, and no replacement mechanism 
 The server said 403 and named no reason; a session token, the tag ref namespace, a push rule and
 the proxy are all consistent with what was observed and none was isolated. So: expect the push to
 fail, do not engineer around the workflow condition — and do not engineer around a successor
-condition either, because there is no measured one to engineer around. What IS measured is one
-failure in the exempt case.
+condition either, because there is no measured one to engineer around. What IS measured is now
+a failure in the exempt case AND one in the NON-exempt case: the sphere-stem session's `frozen/phase29` push was refused identically
+(flat 403; `git ls-remote --tags origin 'refs/tags/frozen/phase29'` read back EMPTY) from a branch
+that DOES change a workflow file, so the condition is measured insensitive in BOTH directions.
+That strengthens the refutation and still supplies no successor.
 **(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
 TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
 tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
@@ -1175,14 +1338,29 @@ surface exposes only tag READERS (`get_tag`, `list_tags`, `get_release_by_tag`, 
 `get_latest_release`); the one ref-creating tool, `create_branch`, takes a branch NAME and
 constructs `refs/heads/…`, so it cannot address `refs/tags/…`; and every writing tool
 (`create_or_update_file`, `push_files`) creates a TREE, which is the thing the hypothesis avoids.
-A session with a different tool surface should still attempt the POST — it is an open question,
-not a closed one.
+A session with a different tool surface COULD still attempt the POST — it is an open question,
+not a closed one — but under the rule above there is no longer a reason to: the runner route
+works, so the API question is a curiosity rather than a blocker. **IT IS NOW WIRED TO ANSWER
+ITSELF**: `tools/publish-frozen-tags.sh` tries that POST on the RUNNER, for the refs the push
+could not create and only those, prints whatever the API says, and cannot fail the run either
+way. The next dispatch settles a question this file has carried as untestable since Sep 5 — and
+if it works, the three declared entries come off the xfail list.
 **(3) IT IS BELT-AND-BRACES, NOT LOAD-BEARING, so do not re-litigate it.** `b323268` is in
 `main`'s history (a squash-merge, #188 — one parent, NOT a merge commit) and `main` is never
 force-pushed here, so the commit cannot be orphaned and the definitions stay replayable without
 the tag. 18 `frozen/*` tags are on the remote (phase5 was already absent) and they remain the
-pattern: **a future baseline should still be tagged whenever it can be** — via the web UI
-(Releases → Tags), or one `git push origin refs/tags/…` from a clone with a user's credentials.
+pattern — but **HOW a future baseline gets tagged is settled by the rule at the top of this
+block**: not from a session, and not by hand, but by the `bloom-frozen-tags` dispatch from
+`main` after the merge.
+**AND THE ROUTE THAT ACTUALLY WORKS FROM HERE IS `bloom-frozen-tags`** — `workflow_dispatch`-only,
+already on the default branch and therefore dispatchable, running `tools/publish-frozen-tags.sh`
+on a RUNNER, which has neither this environment's limit. Two things decide its moment: dispatch it
+from `main` AFTER the phase is merged (on a branch it would pin a baseline main's own harness does
+not register), and it publishes the whole declared set. **The count in this paragraph is
+SUPERSEDED — see the correction above: 30 of 33 are published, and the three that are not are
+declared.** It pushes EXPLICIT REFSPECS now rather than `git push origin --tags`, which used to
+push whatever tags the clone happened to hold; and it no longer refuses a partial set on the
+strength of refs no credential can create.
 **THE SAGITTA IS MEASURED AND THE APEX READS EXACTLY 0.0000 mm, WHICH IS VACUOUS** (§13 of the
 session-32 doc): above `uCap` the profile is a straight lerp, and a straight line has no chord
 error against its own chords. The worst chord error is at the BASE — **0.6325 mm at u = 0.049**,
@@ -1992,14 +2170,16 @@ count and it was wrong by 48; it is measured now, as both other arms already wer
 **`STEM: x a hemisphere` IS THE HEAD'S FOLD, NOT THE STEM'S**, proved two-sidedly: the
 identical state at `stemLength` 0 reads the same 216 pairs / 0.4176 mm at the same point,
 and so does `headRise max (1)`.
-**SPHERE REFUSES A STEM IN THIS PR AND THE REASON THE OBVIOUS MECHANISM DIED IS MEASURED:**
+**SPHERE REFUSED A STEM IN THAT PR (it has one now — see the block below) AND THE REASON THE
+OBVIOUS MECHANISM DIED IS MEASURED:**
 growing `dome.reserved` and re-placing the petals over a reduced arc **moves FEET, not
 BLADES** — at 30 degrees of reservation the pole-most petal goes 0.68 -> 0.88 mm of clear
 radius while its neighbour clears entirely — so ANY stem costs 46-51 degrees and the stem's
 own radius is worth only a further 5-8. It cannot be derived from the stem radius as
 proposed, and **S3 clause (b) forbids a bald cap by name**. Eva's replacement — petals whose
-geometry would collide with the stem are NOT BUILT, everything else untouched — is its own
-small PR immediately after, so the stem's byte partition is not entangled with sphere rows.
+geometry would collide with the stem are NOT BUILT, everything else untouched — shipped as
+its own small PR immediately after, so the stem's byte partition was not entangled with
+sphere rows; it is the block below, and the rejection above still stands.
 **16 MOVERS / 677 HOLDERS**, predeclared from the BUILDER'S OWN RECORD (a row moves iff a
 stem is actually present) rather than from the control set; the two non-`STEM:` movers are
 `stemLength max (120)` and **`ALL MAX`** — session 38's lesson honoured again.
@@ -2039,6 +2219,1147 @@ one nobody sees is inside a mutant a subset skipped (`/plot`'s measured lesson).
 names it and the clean tree silent on every row, with all 25 anchors matching exactly once —
 and every non-stem mutant now runs over the SPHERE row too. The per-mutant table, with the
 collateral each one legitimately reddens, is in §6b of the outcome doc.
+
+**THE SPHERE HAS A STEM, AND THE PETALS IT WOULD PASS THROUGH ARE NOT BUILT** (Eva's
+ruling, the sphere-stem session — read `docs/bloom-sphere-stem-outcome.md` before touching
+`stemPlan`'s sphere arm, `stemOmission` or the ST family). Session 43's TODO, discharged.
+`stemEligible` IS RETIRED on both sides (a predicate, not a control id, so `RETIRED_IDS`
+does not apply): nothing refuses a stem any more, and a predicate true everywhere is a
+statement nobody can disagree with. **THE SEQUENCE, THE EQUAL-AREA LAW, THE GOLDEN ANGLE
+AND THE ONE-STEP RESERVATION ARE ALL UNTOUCHED** — this is a MASK over the slot sequence
+and nothing else, and session 43's measured rejection of growing `dome.reserved` stands:
+it moves FEET, not BLADES, ANY stem costs 46-51 degrees and the radius is worth 5-8, so it
+cannot be derived from the stem. **Do not revisit it; S3 forbids the bald cap by name.**
+**THE CRITERION IS THE PETAL THE SHIPPED BUILDER EMITS**, built into a throwaway
+accumulator and measured over every emitted vertex — `petalFreeStemApproachMm`, which
+re-derives no surface (session 43's ST2, session 41's L7, one sentence). **It reproduces
+session 43's Phase A exactly through an instrument that shares no code with it**: 6 of 40
+at a 3 mm stem reads 2.433 mm to the stem SOLID against Phase A's 3.933 mm of clear radius,
+and 2.433 + 1.500 is 3.933.
+**MODE-FREE BY CONSTRUCTION, NOT BY OBSERVATION**: a slot is omitted if it collides in
+EITHER mode, so the set is the same set in both by the symmetry of a union and every built
+petal clears in the mode it was built in. Which petals EXIST is topology, refused as
+mode-dependent four times before (session 32's ladder, 38's seam step, the fringe's count
+threshold, 42's lamina). **Swept over 456 reachable states the two modes NEVER disagree**,
+so the union is inert on that grid and costs a second petal build for a guarantee it has
+not yet had to make — reported, and the right trade, because the boundary is a slider
+position away and an assertion that can fail is worse than a construction that cannot.
+**THE SOLID TESTED IS THE *FREE* STEM** (the hub's underside down to the tip), never the
+root band inside the hub, where the design already puts the stem and the material in one
+place. **AND THE CHANNEL IS THE SPHERE'S AND ONLY THE SPHERE'S, measured**: on a flat head
+with the widest stem **all 8 feet read 0.000 mm** from the free stem, because a foot's
+bottom skin is COPLANAR with the hub's underside — the measure is degenerate there by
+construction and a criterion applied there would empty an ordinary bloom. On a sphere the
+stem leaves a POLE THE SEQUENCE RUNS THROUGH. **THE CLEARANCE IS `MIN_FEATURE_MM`**, this
+project's one owner of the minimum printable GAP, derived from a length and not typed; a
+declared guess like every floor here, and not weakened for being one.
+**THE JOIN IS INERT ON A SPHERE BY DECLARATION, AND TOLD**: `stemJoinThickness` equates the
+stem's section with a **PLATE's**, a closed shell carries a root hole in membrane instead,
+and the sphere arm of `buildHubInto` emits a uniform wall and reads no join — so a plan
+declaring a thickening would describe geometry nobody builds. `joinReason` is the plan's own
+word and the read-out speaks it. **THIS IS THE FIRST ROW IN THIS PROJECT EVER TO REACH ST5's
+INERT ARM** — the thinnest stem on the shipping sheet already asks 1.299 mm against the hub's
+1.200 — and the harness's expected blend radius there was `outerR` where the builder reports
+0, which would have fired on the first inert row anyone built. Fixed in the same commit.
+**A BARE HEAD IS REACHABLE AND IS TOLD, NEVER REFUSED**: a 12 mm stem on the smallest sphere
+takes all 3 petals (`stemJoinBlendRadius`'s own precedent), and it is a matrix row so every
+family indexed by descriptor runs with ZERO petals built.
+**AND ST9 READ THE CHANNEL'S OWN RECORD TWICE, WHICH ONLY THE MUTANT TABLE SAID.** It is the
+one clause here that is supposed to be independent of that record, and it was guarded on
+`if (!m.stemOmission) return` and barred on `clear = O.clearanceMm`. So
+`the-stem-channel-never-fires` (the channel thrown away, the stem straight through the
+pole-most petals) made it RETURN before claiming anything, and `the-channel-clearance-is-typed`
+(the gap replaced by 0.05 mm) shrank ST9's own threshold along with the geometry's — **SILENT
+on both, on the two states it exists for, while ST7 fired on each.** `seam-floor-removed`
+verbatim, one family later. The guard is now `footRing`'s own `sphereMode` plus the CONTROL's
+own `stemLength`, and the bar is `MIN_FEATURE_MM` restated as the law (ST7 asserts the channel
+DECLARES that gap; ST9 measures against it, so the two cannot move together). **Neither defect
+was visible on any green run.** Two further findings were the TABLE's own, not a clause's: the
+renumber mutant's witness compared `slotAzimuths[0].length`, which is PRE-SIZED to the
+descriptor count and reads 8 on both trees (it reads azimuths DEFINED — 8 against 6 — and
+petals BUILT — 6 against 4 — now), and `stem-present-disagrees-with-the-registry` over-claimed
+ST7, because ST1 compares the control's length against the builder's `m.stem` and RETURNS, so
+a geometry refusing the stem outright never reaches ST7 and leaves no channel to have an
+opinion about.
+**A ROUTE THAT FIRES AND IS NOT REQUIRED IS A ROUTE THAT CAN GO SILENT WITHOUT THE GATE
+NOTICING** (the sphere-stem session, twice over in the panel gate). The stem-channel route
+shipped under **`(t)`**, which is session 29's ANTHER'S SEVEN — two routes under one letter
+makes "route (t) passed" say nothing about which one, and it is **`(w)`** now, documented in
+the file's header beside every other route. And `--negative-control`'s completeness check is a
+HAND-WRITTEN LIST OF FLAGS: the route's clauses fired on all five of its states and it was not
+on the list, so the summary printed `ALL FIFTEEN ROUTES … OBSERVED THE FAILURE` while the
+channel's two lines could have been looked at by nothing. Both are required now (`sawChannel`,
+`sawPacking`), named separately because they are two read-out lines with two owners, and the
+summary says SIXTEEN. **Adding a route to this gate is therefore THREE edits, not one** — the
+banner, the header entry, and the negative control's flag list.
+**ST9 HAS ITS OWN WITNESS AND THE APEX TABLE CANNOT BE IT** — that table calls
+`stemAssertions` and never `stemChannelAssertions`, which takes the exported STL, so naming ST9
+there reported MISSED, which is indistinguishable from a clause that is genuinely blind.
+`node tools/verify-bloom-stem-channel.mjs` (+ `--control`) runs it in Node: ST9 is a PURE
+function, so the artefact is built on a MUTATED geometry module while the clause is imported
+from the UNMUTATED harness — the bar (`MIN_FEATURE_MM`) and the geometry then have DIFFERENT
+OWNERS, which is exactly what `the-channel-clearance-is-typed` destroyed — and the positions are
+`Math.fround`ed because that is what the file stores. The mutation text is PARSED OUT OF the
+apex table by id (one owner) and the run refuses on a missing id or an anchor that no longer
+matches, both SEEN FAILING via `--table <copy>`. **AND THE PROBE STATE IS PART OF THE CLAIM:**
+the typed-clearance mutation moves NO geometry unless a petal stands between 1.00 and 0.05 mm,
+and at 8 petals the omitted petals INTERSECT the stem while the nearest kept stands 6.14 mm
+off — so it is inert there and ST9's silence says nothing (`bore-is-not-evas-rule`, one family
+later). A sweep found 34 separating states; the three widest are the tool's rows and the
+8-petal state is a DECLARED INERT row where ST9 must stay silent. Its nearest-intruder figures
+(0.9327 / 0.8686 / 0.7546 mm) reproduce the sweep's predictions through an instrument sharing
+no code with it.
+**IT RIDES IN `bloom-export-watertight.yml`, AFTER THE npm INSTALL AND BEFORE THE BROWSER** —
+not beside the wall instrument, and that is not a preference: it imports
+`stemChannelAssertions` from `tools/bloom-harness.mjs`, which imports `playwright-core` at
+MODULE LOAD, so any earlier it dies on a missing module and reads red for a reason that has
+nothing to do with the channel. The wall instrument goes first because it imports the harness
+NOT AT ALL — that is what buys it the position, not the fact that it needs no browser.
+Duplicating ST9 to avoid the import is the one thing it must not do: the clause under test
+would stop being the clause that ships. It rides there for the wall instrument's own reasons — same question, Node-only, fifteen seconds — because ST9 rides in
+BOTH STL gates on every sphere-stem row and a clause that has silently stopped being able to
+fire makes those gates green on a broken channel. The bloom gate count stays at FIVE. The apex
+table is deliberately NOT in that workflow's path filter even though the step parses it: a
+stale anchor there is a REFUSAL at run time, so it is caught whenever the gate runs for any
+other reason, and listing it would put a three-hour gate behind every mutant-table edit.
+**ST7 / ST8 / ST9 ARE THE NEW FAMILIES AND EACH SEES SOMETHING THE OTHER TWO CANNOT.** ST7 is
+the criterion's own biconditional (it reads the channel's report, so it can only say the
+criterion is self-consistent); ST8 is the MASK, against a STEMLESS build of the same state on
+the same page — the only owner the stem code does not write, and the only thing that could see
+a renumbering, since a bloom whose petals all moved one place round passes every STL check ever
+written here; **ST9 reads the EXPORTED FILE** and asks whether any petal is in the channel at
+all, locating the cylinder from the FILE's own three stem rings and the CONTROL's own length
+rather than from the plan. **DECLARED BLINDNESS**: nothing asserts the region is the FREE stem
+rather than the whole one — a criterion including the root band would omit MORE petals and all
+three clauses would stay green. That choice is pinned by the flat-head measurement above and by
+this sentence, not by a clause.
+**AN INSTRUMENT THAT INDEXES BY SLOT AND NEVER ASKS WHETHER THE SLOT WAS BUILT IS A CLASS,
+NOT AN INCIDENT** (Eva, the sphere-stem session — §9b of `docs/bloom-sphere-stem-outcome.md`
+has all five). Every generator here ran on the premise that the slot SEQUENCE and the BUILT SET
+are the same set; the omission is the first thing that can make a declared slot empty, and five
+instruments broke at once — the four one-petal residuals gated on `slot.index === 0` (slot 0 is
+the FIRST the stem takes), the representative petal, the crowding raster's foot count, the
+solid-angle census re-emitting petals the builder did not build, and the crowding raster
+reading `feet[0]` on the row that builds NO petal at all. **THE TEST: for any instrument keyed
+on a slot index, ask what it reads when that slot is not built — and what it reads when NONE of
+them is.** "It always exists" was true until this session and is not an argument.
+
+**THE BYTE PARTITION'S SECOND CLAUSE IS THE ONE THIS FEATURE IS ABOUT**
+(`node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree> [--control] [--only re]`):
+on every mover the branch's stream is EXACTLY the base's with the omitted petals' triangle
+blocks deleted and the stem's own appended after the hub, float for float under `Object.is`.
+A surviving petal that moved is a re-placement; a hub that moved was sized from the survivors.
+**MEASURED, PASS, the whole 744-row matrix in both modes against a worktree of `5f9c0c7`:
+8 predeclared MOVERS / 736 HOLDERS over 741,700,440 export floats — 0 movers failed to move,
+0 holders moved, and 0 movers where anything OTHER than the omitted petals went.** The eight
+are the block-32 rows that actually build a stem on a sphere; the ninth (`GATED`, at
+`stemLength` 0) is a HOLDER, which is the inert-by-branch claim measured rather than argued.
+**AND THE TOOL OWED A SECOND CONTROL, WHICH RE-READING IT FOUND AFTER ITS FIRST CLEAN RUN:**
+`--control` perturbs a HOLDER and SKIPPED clause 2 entirely, so the clause this feature is
+about had never been shown able to fail — this file's own `--control-mode` lesson, one tool
+later. **`--control-only` moves the first float of a MOVER's stream** (the first SURVIVING
+petal's first vertex, by construction outside every omitted block; the hub on the bare
+corner) and clause 2 reports **16 of 16 mover x mode builds** while clause 1 stays clean,
+which is what makes the two controls two claims. It REFUSES as vacuous on a row set with no
+movers, and `--control` now names the clause it exercised instead of saying "the
+perturbation was detected".
+**`ALL MAX` IS UNMOVED AND THAT IS NOT LUCK**: retiring `stemEligible` took `stemDiameter` out
+of `PLACEMENT_SUBS`, which would have let the blanket sweep hand it 12 mm — `STEM_SUB_IDS` is
+the derivation that keeps it out of block 1 and out of `SWEEPABLE`, on the CURL_SUBS shape
+(a slider hidden at DEFAULTS because its GUARD is at 0), so ALL MAX still carries a 120 mm stem
+at the default 6 mm and reads **2,412,512 tris on both trees in both modes**. Its declared
+export-refusal entry is unchanged. **The one new self-intersection entry is NOT the stem's**:
+`SPHERE STEM: x 40 petals x 6 turns` reads 199 pairs at the FACE pole, identical with
+`stemLength` 0 and identical on a worktree of main — four readings, one number.
+**THE MERIDIAN PACKING MARGIN IS TOLD ON EVERY SPHERE WITH A STEM, AND IT IS EXACTLY
+EXHAUSTED AT ONE REACHABLE CORNER.** `meridianPacking()` is its one owner: the stem's
+footprint on the sphere is the cap where the sphere's own cylindrical radius equals the
+stem's outer radius, and the margin is the CLEAR MERIDIAN ARC above that cap edge divided
+by the pole-most SURVIVING foot's own `overhang` — the length that foot occupies along the
+same meridian. A length over a length, never a row count. Measured, EXPORT, one turn: at 8
+petals it falls **2.706 / 2.539 / 2.196 / 1.834 / 1.443 / 1.003** across stem diameters
+3 / 4 / 6 / 8 / 10 / 12 mm — **one foot's length of clear arc and no more at the widest
+stem** — and it is never tighter at higher counts (40 petals 1.798, 240 feet 1.878),
+because the sphere grows with the count faster than the stem's cap does. The only 0.000 is
+a stem WIDER THAN ITS HEAD. **The read-out prints THREE decimals because 1.003 rounds to
+"1.00" at two**, which is indistinguishable from exhausted on the one row where the
+distinction is the point; EXHAUSTED (`< 1`) is the only word and is asserted both ways.
+**ST7 rebuilds it from three owners that are not the quantity** — the HUB BUILDER's own
+emitted sphere radius, the STEM BUILDER's own widest EMITTED vertex and `footRing()`'s own
+per-ring `arc` and `overhang` — bounded **in millimetres on the three LENGTHS**, not on the
+ratio. **THE BRIEF'S 1.005 REPRODUCES TO 0.25% AND ITS 0.563 IS A DIFFERENT QUANTITY**
+(feet against EACH OTHER, no stem in it): the two closest readings buildable from
+`footRing()`'s own fields are 0.632 / 0.125 (step over overhang) and 0.370 / 0.166 (over
+width) at 8 / 40 petals, neither of them 0.563 — reported rather than tuned, and **no figure
+was adopted that could not be reproduced from a definition this session can state.** Feet
+overlapping each other stays the CROWDING instrument's (`D_max 1`, `NN 1.578 w` at 8 and
+1.554 at 40 — and the omission moves NN by exactly nothing, which is condition 2 showing up
+in an instrument that knows nothing about it).
+**THE BORE IS CLOSED WHERE THE HEAD IS — THE SOLID ROOT BAND, AND ITS EXTENT IS DERIVED
+FROM TWO LENGTHS `stemPlan` ALREADY OWNS** (Eva's ruling, the sphere-stem session — read
+§10 of `docs/bloom-sphere-stem-outcome.md` before touching `stemPlan`'s band fields or
+`buildStemInto`'s third arm). **THE FAILURE IT FIXES, measured before it was ruled on:**
+`bloom-smoke --conn` was RED on `SPHERE STEM: THE BARE CORNER` — watertight (boundary 0)
+and **2 connected pieces, 3 at a 0.3 mm cell** — because the stem is HOLLOW with a 4.5 mm
+bore (Eva's `max(0, r - 1.5)` at the 12 mm maximum) while the whole head has an outer radius
+of 1.8 mm, so the head sat INSIDE the pipe and the two shared no material. **The condition is
+`headOuterRadius < stemBoreRadius`**, equivalently `stemDiameter > 2*headOuterRadius +
+2*STEM_MIN_WALL_MM` — so with the 12 mm maximum **every head under 4.5 mm of outer radius
+can be disconnected**, and every head at or above it is safe at any setting. **IT IS NOT THE
+OMISSION'S**: measured with 2, 3 and 6 petals SURVIVING (8, 12 and 20 asked, petal width 8,
+spread 0.6), so it is a property of the STEM ON A SPHERE.
+**THE BAND RUNS `topZ` DOWN TO `max(tipZ, lowestHubZ)`, IN MILLIMETRES, FROM A LENGTH** —
+never a station count, and never typed: `lowestHubZ` is the plan's own lowest head material and
+`tipZ` its own far end, so the band covers exactly the stretch over which the head could
+otherwise stand inside the bore and stops there. **1.2000 mm on the bare corner**
+(`topZ` −0.7919 → −1.9919); on a sphere `lowestHubZ === rootZ` by the plan's own derivation.
+`stemPlan` is the one owner (`headOuterMm` / `headInsideBore` / `solidBandMm` / `solidBandZ`);
+`buildStemInto` gains a THIRD arm — outer wall, a VOID wall, a bottom annulus and two rim fans —
+and computes nothing. **The void's ladder asks `stemStations` for its OWN length** rather than
+filtering the tube's stations by `z < solidBandZ`: a filter is a strict comparison against a
+continuous quantity, and a station kept an ulp inside the band's edge is a DEGENERATE QUAD.
+Sixth instance of that class refused rather than written.
+**INERT BY BRANCH WHERE THE CONDITION DOES NOT HOLD, AND THE PARTITION IS THE PROOF RATHER THAN
+THE CLAIM.** Predeclared from the PLAN's own record (a row moves iff `plan.solidBandMm > 0`),
+never from the control set: `node tools/verify-bloom-sphere-stem-bytes.mjs --base <worktree>
+--change band` reads **PASS over the whole 744-row matrix in both modes — 1 predeclared MOVER /
+743 HOLDERS over 754,658,352 export floats under `Object.is`, 0 movers that failed to move,
+0 holders that moved, 0 clause-2 findings.** The one mover is THE BARE CORNER; **no
+normal-sized head moves a float**, which is Eva's own constraint 2 answering for itself.
+Clause 2 is the one this feature is about: every differing float lies INSIDE the stem's
+envelope AND the outer cylinder wall is bit-identical. **Both clauses are shown able to
+fail** — `--control` fires clause 1 on 8 of 8 holders, `--control-only` fires clause 2 on
+2 of 2 mover x mode builds, and the wall half's unreachability from a stream perturbation is a
+DECLARED asymmetry in the tool's header, not an oversight. The eight other sphere-stem rows'
+triangle counts are unchanged to the integer; the bare corner goes 7296 → 7196.
+**IT WAS NARROWED TO `sphere &&` BY MEASUREMENT, NOT BY TIDINESS.** The first cut fired on CAP
+heads too — 291 of 4,608 swept states — and fixed nothing on any of them, because a cap's
+disconnection is #236's flat join shell rather than a head in a bore.
+**IT IS VISIBLE FROM DIRECTLY ABOVE WHEREVER IT EXISTS, AND THAT IS THE CONDITION RATHER THAN
+THE EXTENT — SAID PLAINLY BECAUSE EVA'S CONSTRAINT 4 ASKED FOR IT TO BE.** The band exists iff
+`headOuterMm < boreR`, and `boreR < outerR` always, so **a band implies a head NARROWER THAN THE
+TUBE** — i.e. a head that cannot cover the stem's top face in the first place. The top of the
+stem is therefore exposed on exactly these rows WITH the band and WITHOUT it; what changes when
+you look straight down is that **a 4.5 mm hole becomes a closed disc**, and on the bare corner
+that is 51.15 of the face's 63.62 mm² (80.4%), the head's silhouette being 1.992 mm across
+against the stem's 6.000. **The derivation has not overshot in LENGTH** — it is `topZ` down to
+the head's own lowest material and no further — and no shorter band is available: the head is at
+the TOP of the bore, so any closure that reaches it at all sits where the head is, and on these
+rows the closure is necessarily wider than the head. **A disc reaching only as far as the head's
+own silhouette would not touch the tube and would be a SECOND DETACHED PIECE.**
+**RULED ACCEPTED** (Eva, the sphere-stem session, from the preview: *"i think it looks good."*)
+— **and the constraint itself was WITHDRAWN as wrongly premised, by its own author.** Eva's
+constraint 4 asked that the band not be visible, on the premise that it would sit INSIDE the
+stem. It cannot: the band exists only where the head is narrower than the BORE, which is the
+same condition that leaves that face exposed in the first place. So the constraint was
+unsatisfiable by construction, not missed. **The session measured it and said so rather than
+accepting the premise, and that is the behaviour to repeat** — a constraint handed down is a
+claim about the geometry like any other, and the geometry is what settles it.
+**THE BAND'S EXTENT IS ASSERTED BY NOTHING — THERE IS NO ST10, DELIBERATELY, AND THE TWO
+DIRECTIONS ARE NOT SYMMETRIC.** A band that is TOO SHORT is caught, by the connectedness gate
+on `SPHERE STEM: THE BARE CORNER` — the head detaches again and that row is already in the
+matrix. A band that is TOO LONG is caught by **nothing**: ST1 predicts the count from the plan
+and the void's ladder is 2 stations at ANY band length, so the count does not move with it; the
+export gate only wants a closed shell; and the byte partition's clause 2 bounds it at the stem's
+own envelope, so the worst case is a fully solid stem that passes every gate here and costs only
+material. **An ST10 was considered and NOT built on grounds rather than on time**: the only
+reference available to `stemAssertions` for the head's extent is `footRing`'s dome, which is the
+SAME owner `stemPlan` read (the fourth durable rule), and a genuinely independent one reads the
+EXPORTED file, which is ST9's territory and its own piece of work. §8 of the outcome doc carries
+the table; the read-out TELLS the band's length on every row that has one, so the number is at
+least visible.
+**ST1 CAUGHT THE FIRST CUT** (`the builder emitted 476 triangles … the plan asks for 576`),
+which is that clause doing the job it was strengthened for in this same PR: it predicts from the
+PLAN and compares against the BUILDER's tally, so a third emission arm with no third prediction
+is a red rather than a silent drift.
+**THE ACCEPTANCE TEST PASSES:** `SPHERE STEM: THE BARE CORNER` reads `components=1, stray=0` at
+the gate's 0.6 mm cell AND at 0.3 mm, in LIVE and EXPORT; the probe reproduces CI's own
+`components=2, stray=0.00821` on a worktree of the pre-ruling tree.
+**AND A SECOND, DIFFERENT `>1 piece` FAILURE IS PRE-EXISTING ON `main` — DO NOT CONFLATE THEM**
+(§9e-bis, filed as #236, measured IDENTICALLY on both trees). Whenever the hub is NARROWER than
+the stem's outer radius, `buildHubInto`'s join arm emits a **1,680-triangle shell with every
+vertex at ONE z** — the join's own underside at `z = hubT/2 - joinT` — instead of a thickened
+hub; a closed surface all of whose vertices share a z encloses ZERO VOLUME. It is held on by
+nothing but intersecting the stem's WALL, so it reads one piece while the wall passes under the
+hub's radius and DETACHES the moment it does not: `DEFAULTS + spread 0.6 + stem 120 x 12` is
+**2 pieces on main**, 0.15% detached, still 2 at half the cell, while each of its three controls
+alone reads ONE. The condition is `hubR < outerR` — `hubThicknessAt`'s own early return
+(`bloom-geometry.js:7367`) — PREDICTED then measured exact on 8 of 8 states, and the flat shell
+appears from the SHIPPED DEFAULT 6 mm diameter. **Invisible to the matrix by construction**
+(one control from DEFAULTS, `stemLength` default 0, and the failure needs three together — the
+`cup x petalTipShape` sentence again). **THE TWO SHARE A ROOT AND NOT A SYMPTOM**: both are a
+hub narrower than the stem, but on a CAP the join is active and the symptom is the detached
+disc, while on a SPHERE the join is INERT so the symptom is the whole head inside the bore. So
+option 1 answers the sphere case and does nothing for the CAP one — **predicted there, then
+MEASURED once the band shipped: a CAP's component count is IDENTICAL with the band and without
+it, and the stray piece is 12 voxels at a SINGLE z of −3.696, which is `hubT/2 − joinT`
+exactly.** That is #236's own zero-volume join shell and not the head, so #236 was filed open
+here and it wanted its own PR — **and it got one: #236 is CLOSED by #242 (`f64f3bc`, the hub's
+shape session).** The join is inert where the head is not wider than the stem, so the
+zero-volume shell is no longer built, and the solid root band is generalised from sphere-only
+to cap and flat heads; both halves, all three styles, one connected piece, measured there.
+(This line corrected by the inflorescence discovery's rulings PR, Sep 17; the paragraph's
+measurements above describe the tree as it was when #236 was filed.)
+**AND THE FIRST PASS OF THAT INVESTIGATION GOT THE MECHANISM WRONG BY USING THE WELD**: the
+vertex-weld shell count is not the connectedness test (this file's own rule), and it suggested
+"the head never reaches the tube" where the nearest head vertex to the tube's material reads
+**0.000 mm at r 4.60, z -0.28**. The voxel flood fill plus PER-COMPONENT BOUNDING BOXES is what
+named the detached part; a shell table names shells.
+**A FROZEN PHASE IS OWED**: the live matrix goes 736 -> 744 (nine rows added in block 32, one
+GATED sphere row removed from block 30). **AND TWO TAGS' BYTES STOP REPRODUCING, ONE ROW EACH,
+SWEPT OVER ALL 28 REGISTERED FROZEN MATRICES**: `frozen/phase28` (1 of 699) and
+`frozen/phase29` (1 of 736), the SAME row in both — `STEM: GATED — SPHERE with a stem asked
+for`, **63,264 -> 52,060 triangles** in both modes. Every other phase reads 0. Their definitions
+still deep-compare, so they join phase17/19/21/23/24 in that class.
+**STATED PLAINLY, BECAUSE THE ROW'S OWN NAME NOW MISDESCRIBES IT:** that row asks for a 60 mm
+stem at 6 mm on a CONTINUOUS SPHERE at 24 petals. Its label says GATED because `stemEligible`
+REFUSED exactly that — and retiring that refusal is what this PR did. So it is not a row whose
+stem is switched off by a control; it is the row the retirement was ABOUT, and the move is real
+geometry: a stem is now built where none was, and the channel takes the petals it passes
+through. The arithmetic closes — **63,264 − 52,060 = 11,204, which is about five petals at
+~2,356 each less the stem's own +576.** **AND THE LABEL CANNOT BE FIXED**, because this file's
+own rule is NEVER EDIT A LABEL INSIDE A FROZEN MATRIX (it is a verbatim snapshot of that base
+commit's `buildMatrix()`, and `--verify-frozen` goes red on row 400 if you try). So a frozen
+row now carries a name describing a behaviour that no longer exists, `--verify-frozen` is
+green on it and correct to be, and **this paragraph is the only place that truth can live.** **The SOLID ROOT BAND moves no frozen row at all** — no
+frozen matrix carries a sphere whose head is inside its bore. The image is
+`node tools/shot-bloom-sphere-stem.mjs <dir>` -> **`docs/img/sphere-stem.png`**, and its frame
+radius is the row's own STEMLESS build's `maxDimMm` halved: a radius read from the SPHERE put
+every blade outside the picture, so the pole was in frame and the OMISSION was not.
+
+**THE STEM'S BORE IS AN INTERVAL, CLOSED AT BOTH ENDS, AND THE PLUG'S LENGTH IS EVA'S OWN
+WALL** (Eva's ask, the tip-plug session: *"i want the bottom of the stem when it is a bored
+cylinder to still look solid"* — read `docs/bloom-stem-tip-plug-outcome.md` before touching
+`stemPlan`'s void fields, `buildStemInto`'s `endFace` or ST10). A hollow stem's bottom was an
+ANNULUS — watertight, one piece, zero boundary edges, and it reads as a cut pipe. The root band
+closes the bore where the HEAD would otherwise stand inside it; the TIP PLUG closes it where a
+viewer would otherwise look up it. **ONE LAW, TWO ENDS**: `endFace(face, cap, closed, up)` opens
+or shuts ONE end and is called twice, and the three arms are two — where no bore survives, the
+no-void arm emits a capped cylinder, which is the pre-plug SOLID arm verbatim.
+**THE LENGTH IS `STEM_MIN_WALL_MM` AND NOT `wallMm`, WHICH IS THE NEARER-LOOKING OWNER AND THE
+WRONG ONE**: `outerR - boreR` is a DIFFERENCE and `a - (a - x)` is not `x` (at a 3.1 mm diameter
+it reads 1.4999999999999998), so the plug would carry a per-diameter wobble and the crossover
+would be decided on it — this file's own ST5 trap, refused rather than repeated.
+**THE CROSSOVER IS DERIVED AND THE PLAIN `> 0` IS THE SAFE COMPARISON, MEASURED.** Over
+**3,996,000 reachable hollow-stem states in BOTH modes** the nearest `voidMm` comes to zero is
+**0.0999999999999996 mm** and NOTHING lands on it. **The obvious "safer" alternative is
+measurably WORSE**: a `voidMm >= MIN_FEATURE_MM` floor sits EXACTLY on a reachable state (a
+sphere at sheet 1.50, a 3.5 mm stem, 1 mm long, whose void is exactly 1.0). The
+derived-looking floor is the dangerous one here and only the sweep says so.
+**ITS MODE-DEPENDENCE IS INHERITED AND NOT ITS OWN**: over 843,600 control sets built in both
+modes, stem topology differs live/export on **2,400** — the SAME 2,400 on both trees, 0 added
+and 0 removed, and exactly the set where the ROOT BAND's `headInsideBore` differs (it reads
+`dome.Rd + hubT/2`, and `hubT` is floored at export). **Pre-existing, the BAND's, recorded not
+fixed** — the omission's own union-over-both-modes is the available remedy and it is one
+condition and its own PR.
+**INERT, MEASURED: 0 floats at `stemLength` 0 and on every solid stem**, both modes, `Object.is`,
+over the whole bloom; the control (a hollow stem) moves 2,559 floats and 100 triangles.
+**AND BOTH OF THE PRE-PLUG TUBE'S ANNULI WERE WOUND INWARD — A PRE-EXISTING DEFECT NO GATE HERE
+COULD SEE.** Measured on the shipping 60 x 6 mm stem: the top face's mean n_z was **-1.000**
+where the material is below it and the bottom face's **+1.000** where it is above, so the
+shell's signed volume came out **440.64 mm^3** against a true **1321.91** (the outer prism less
+the bore). `analyzeStl`'s edge census keys on a SORTED pair so it is **UNDIRECTED** — two
+triangles crossing one edge the SAME way count as a matched pair — and O1 asks only for a
+shell's volume SIGN, which a dominant outer wall keeps positive; the flood fill, the degeneracy
+census and the self-intersection census are blind for the same reason, because the faces are in
+the right PLACES. **Found by computing the volume in closed form and disbelieving the
+disagreement**, session 35's own route one solid later. Corrected in `endFace`, and it has a
+witness because a fix without one is folklore: `buildStemInto` folds a DIRECTED-edge census over
+the triangles it emitted and ST10 asserts it is zero (**0 of 27 stem rows** on the branch against
+**22 of 27** on main). **The whole-mesh census is RECORDED, NOT BUILT, and the reason is a
+distinction it would have to draw**: flagged rows split into UNMATCHED edges (a real inversion)
+and DUPLICATED edges only (two by-design closed shells sharing a quantised vertex — every FRINGE
+row sampled), and a clause that did not separate them would redden rows the export contract
+permits.
+**THREE GATES LEARNED THE NEW GEOMETRY, EACH SEEN RED FIRST.** ST1's prediction reads the VOID
+and the two ENDS (and is **structurally blind to every mutation of the plan's own closure
+lengths** — both its sides read `voidMm`, which is what it is FOR: a builder-against-plan check);
+ST3 learned that a stem emits no inner ring in TWO cases, not one; and **O1 gained a SECOND
+declared inward shell** — with both ends shut the bore is an enclosed CAVITY, so the stem's
+boundary has two components, which is the correct boundary of a solid with a void and not a
+winding error. **O1's predicate was corrected BY MEASUREMENT**: the first cut declared a cavity
+wherever the bore survived and read *"0 of 10 shells are wound INWARD"* on every FLAT-hub stem —
+without a root band the bore is a BLIND HOLE whose wall welds to the outer shell through the top
+annulus, so a separate shell needs **both ends shut in the mesh**. The cavity is BOUNDED against
+the bore's own closed-form prism, not merely counted.
+**ST10 IS THE NEW FAMILY AND IT IS OWED BECAUSE BOTH STL GATES ARE BLIND BY CONSTRUCTION** — a
+tube open at the bottom is a perfectly good closed shell, so watertight, connectedness,
+orientation and the degeneracy census all pass on the very defect it exists for. Its bar is Eva's
+stated wall (IMPORTED — ST3's precedent, which imports her 1.5 mm and deliberately does not
+import `stemBoreRadius`); its measurement is the rings the builder folds over on its way to
+`acc.quad`. **Its declared blindness:** nothing in the harness reads the exported FILE for the
+plug — the clause that does is the byte tool's own **bottom-face AREA** (a full disc `poly(R)`
+against the tube's section `poly(R) - poly(b)`, a 56% difference at the widest bore), which
+exists precisely because clause 2(b) defines the wall as the triangles NOT all at one height and
+the bottom face is exactly the triangles all at one height — **the fifth durable rule, in the
+clause written for the claim**.
+**AND THE MUTANT TABLE MISATTRIBUTED THE FIRST TWO-DIGIT FAMILY IN THE PROJECT.** `famsOn`
+captured `/^(ST\d)/` — ONE digit — so every `ST10:` message was recorded as `ST1`: a mutant
+naming only ST10 reported *"fired ST1"*, SILENT on the clause it exists for and CREDITED to one
+that could not have moved. **It is a class**: any family whose code is a PREFIX of a new one is
+misattributed the moment the new one exists, in BOTH directions, and a green table looks exactly
+the same. Anchored on the colon now (`/^(ST\d+):/`, and the same for `A` and `L`).
+**Three mutants, each witnessed on the MUTATED module's own bottom-face area**; the crossover's
+needed a ROW of its own (`Math.max(0, x)` and `Math.abs(x)` agree for every non-negative x, so it
+fired NOTHING until the table gained the meeting-closures state) — `seam-reads-the-live-sheet`'s
+lesson one family later. **`frozen/phase30` is the 744 rows at `41d7a87`**, registered in BOTH
+maps and proved deep-equal. The image is `node tools/shot-bloom-stem-plug.mjs <dir> --base
+<worktree>` -> **`docs/img/stem-tip-plug.png`**, whose BEFORE cells are a real render of the old
+code served from its own HTTP server, and which quotes NO pixel delta for any pair (two trees,
+two servers, two page sessions).
+
+**A SEPAL IS THE PETAL BUILDER ON A SECOND RING, AND THE ANGLE LIMIT IS DRAWN, NOT ANALYTIC**
+(Eva's ruling, sepals part 1 — read `docs/bloom-sepals-outcome.md` before touching
+`sepalBladeState`, `sepalAngleLimit`, `buildSepalsInto`, `footRing`'s `sepals` descriptor or the
+SP family). No sepal module, blade or profile: `buildSepalsInto` calls `buildPetalInto` on
+`fr.sepals.ring` (the hub's rim, `footRing()`'s FOURTH descriptor kind, the petal foot's own
+overhang expression, no stem needed) with `sepalBladeState(state, angle)` — the whole control set
+spread, `petalTilt` the built angle, the rim family zeroed (`petalTipEnd`, `fringeCount`,
+`lobeDepth` — part 2's), and every one of the FIFTEEN `SEPAL_TWINS` replaced by the sepal's own
+copy; `petalLength` / `petalWidth` scale through `slot.scale = sepalScale`, the inner whorls' own
+route. **THE INSTANCING CENSUS IS THE DELIVERABLE**: every `state.<name>` read in the builder is
+of a PARAMETER, none of a global — `petalSurface` resolves `ps = petalStateFor(state, ring)` and
+every law reads `ps`; the one read that bypasses the resolver (`shapeN` telemetry) reads the
+argument that IS the substate on the sepal ring. So instancing is reachable without restructuring
+and costs one spread per whorl build. The registry rows for the twins are GENERATED from the
+geometry's table (`sepalTwinControls`), so a pair cannot drift; the panel gate treats the family
+as INSTANCED with label and role per instance. Twenty controls, four sections (`Sepals` between
+`Center` and `Stem`, its three children mirroring Petal's). **`sepalCount` 0 IS THE GUARD, 0
+BYTES**: `node tools/verify-bloom-sepal-bytes.mjs --base <worktree>` reads 65 MOVERS / 780
+HOLDERS over the 845-row live matrix, every mover's base stream a PREFIX of the branch's with the
+tail exactly the builder's sepal tally (the sepals are emitted LAST), and `--matrix phase34`
+0 / 778. **THE COUNT CEILING IS THE PETAL COUNT PER PLACEMENT** (RADIAL/SPIRAL the outer whorl's
+n; FAN its slot count, through a new `LIST` arm of `buildWhorlInto`; CONTINUOUS one turn's n, the
+phase told as a fraction of `2π/n` because a golden-angle spiral has no pitch to interleave with;
+SPHERE UNAVAILABLE, told and asserted by SP9). `sepalPhase` 0.5 is interleaved, 0 aligned, 1.0
+aligned with the NEXT petal; `sepalScale` 0.60 is MINE (from the sheet), 0.2–1.0 of the petal;
+`sepalFootBreadth` clamps to the foot floors and is told; thickness is the sheet's — the whole
+`Part thickness` section is shared by declaration, which `verify-bloom-sepal-decoupled.mjs` reads
+off the registry (220 non-sepal values × 2 modes, 0 sepal floats moved, ring and slot pinned).
+**THE ANGLE LIMIT IS DRAWN**: `sepalAngleLimit` scans the slider's own 1° step over the
+builder's OWN lamina (the mid-surface lattice with the foot and root-blend rows dropped — with
+them in, root-exit stacking of 0.022 mm read as contact at every angle) against every petal's
+lamina, in BOTH modes, taking the smaller limit so one state builds one angle (topology is
+mode-free, session 32's rule a fifth time); a contact is a nearest-point interior hit within one
+sheet on the +n side, or a lattice segment crossing. Rigid rotation per seam-step bucket and one
+sepal per congruent neighbourhood keep it at 0.23–0.65 s a build, told. **IT MOVES WITH THE
+PHASE** — 21° interleaved / 24° aligned on the shipped corolla (the petal tilt less a step, which
+is what an analytic limit would say and only there), 25° on a cupped corolla, 22° at 40 on 40,
+and NEGATIVE (−37°) when the sepal's own curl carries it over the petals. `node
+tools/bloom-sepal-contact.mjs` re-draws it at 4× the lattice and ¼ the step and the dense drawing
+never finds contact earlier. **INTERPENETRATION IS VISUAL AT THE INTERLEAVED DEFAULT (0
+within-shell pairs at every angle to the limit, cross-shell overlap only) AND A CENSUS FAILURE
+WHEN ALIGNED, BY THE WELD**: at phase 0 the sepal foot's column products are BIT-EQUAL to the
+petal foot's whenever `scale × breadth` is a ratio the lattice reproduces (0.60 is 3/5 — 44
+shared rim vertices; at size 1.00 the foot IS the petal foot), the exact-position weld reads the
+two as one shell, and the by-design overlap becomes 2,130 within-shell pairs — at size 0.55 the
+same aligned whorl reads 0. Nine aligned rows are declared by name; the crowded corner (40 × 40
+× size 1 × aligned × clamped) reads 25,358 identically on all three hub styles. **THE FOOT
+TANGENT IS MISLEADING AND THE CHORD IS TOLD BESIDE IT**: GOBLET and CURVED arrive at the rim
+tangent-FLAT with UNBOUNDED curvature at their edge — the record read 0.00° while the emitted
+underside fell 15–72° over the last half millimetre at MAX length — so the record carries
+`undersideChordDeg` over `MIN_FEATURE_MM`, the read-out prints both, and the contact tool
+checks the chord against the emitted hub (worst 0.505°, the station offset). ANGLED cannot carry
+a smooth foot where its blend reaches the rim: 81–86°, the cone's own shoulder, by the style's
+definition — said, not smoothed. On today's GOBLET default the blend stops 1.93 mm inside the
+rim and the foot meets a flat underside. **THE PETAL BUILDER FOLDS AT ITS OWN SEAM ON A BLADE
+TURNED DOWN PAST ABOUT −55°, AND THE SEPAL ANGLE IS THE FIRST CONTROL HERE TO REACH IT** (a
+petal at tilt −60 reads 56 pairs, `petalTilt`'s floor is 0): 35 pairs / 0.5333 mm at −90, at the
+rim, the slab's underside — the seam clearance law was derived for the TOP skin and the
+descending case is the seam owner's, declared on three rows and recorded, not worked around.
+The twin sweep's other folds are the petal's own on a 21 mm blade (cup, roll, curl — and the
+buckle at amp 0.3, which the PETAL does identically at those controls while no petal row asks
+for it). SP0–SP9 in both STL gates, SP8 the clamp with the harness's own contact test, eight
+mutants witnessed on the mutated module, block 35 (65 rows), smoke block 35 (7 rows, `--conn`
+required), `frozen/phase34` = the 778 rows at `f64f3bc`. `ALL MAX` reads **129,803 / 3.1556** with
+or without its 40 sepals — main's own record from #246, reproduced through
+`tools/bloom-xfail-magnitudes.mjs` on the merged tree; the sepal session's first figure of
+104,563 came from an uncommitted script, did not reproduce, and is WITHDRAWN in the outcome doc
+— and it exports 2,506,652 tris (+94,240 over main's 2,412,412), still a declared refusal.
+The 20 sepal xfail entries are in #246's structured form and reproduce on the merged tree. The image is `node
+tools/shot-bloom-sepals.mjs <dir>` → **`docs/img/sepals.png`** — the foot on the three styles
+at MAX × MAX framed on the rim from below, and the angle under / at / beyond its limit, the
+last through `{ sepalAngleUnclamped: true }`, a capability hook no control reaches.
+
+**THE SEPALS ATTACH PARTWAY DOWN THE HUB, THE LIMIT IS RE-DRAWN THERE, AND THE FOOT LINE
+LEADS WITH THE CHORD** (Eva's three rulings, sepals part 1 second round — §12 of
+`docs/bloom-sepals-outcome.md` before touching `sepalAttachment`, the sepal descriptor's
+`height`, or SP3). `sepalHeight` (Sepals, 0–1, step 0.05, **default 0.75**, a slider because
+0.75 was named to be tuned against the render) is a FRACTION OF THE HUB'S AXIAL EXTENT — and
+"the hub" is Eva's word for the hub-to-stem JOIN, so the extent runs from the STEM END
+(`stemPlan`'s own `rootZ`) up to where the join MEETS THE HEAD (the plate's underside at the
+blend radius; a cap's undeformed inner sphere there), both ends read off the profile the hub
+builder emits. **THE OTHER READING — the extent to the head's TOP face — WAS CONSIDERED AND
+NOT BUILT, and the two differ at the SHIPPED DEFAULT**: the 6 mm stem's join reaches 2.52 mm,
+a quarter of that from the top lands 0.03 mm under the plate's mid-plane — where the sepals
+already were — while the join reading puts the foot 0.33 mm below the head's underside and
+2.9 mm inside the rim (r 5.93, z −0.93). AXIAL, not surface-arc, as ruled; the arc reading is
+solved beside it and told (0.004 mm apart on the default, up to 1.9 mm on a half-amount
+GOBLET bowl, 0 on ANGLED). **THE FOOT LANDS ON THE SURFACE**: the attachment point is on the
+underside profile and the foot ring row sits `t/2` above it, so the foot's bottom skin passes
+through the point — the same relation a rim foot has to the plate's underside, which is why
+the FALLBACK is the same formula: where there is no hub below the head (`stemLength` 0, an
+inert join, a domed head whose bowl holds the stem end ABOVE the join's rim — every rise from
+about 0.15 at the default stem) the sepals sit at the RIM, the first construction to the bit,
+and the record says which. The foot rows run inward at that height through the whorl
+primitive's `height` argument (the petal builder's FLAT arm; the argument session 1 reserved
+for exactly this), buried because the join thickens inward, measured on a dome.
+**THE LIMIT MOVES WITH IT AND IT TIGHTENS AT THE DEFAULT, THE OPPOSITE OF THE EXPECTATION:**
+the scan reads the descriptor's ring and height, and at the shipped stem the interleaved limit
+goes 21° → **18°**, aligned 24° → 20°, cupped 25° → 21° — a sepal starting inside the rim rises
+THROUGH the plate and stands over the petal's root sooner — while on the deep GOBLET (19.4 mm
+down) it loosens to **90°, no contact in the range**, and the crowded corners on the three MAX
+hubs go 24° → 46° / 51° / 50°. Dense confirmation: **80 states, 0 disagreements, worst 0.00°**
+— **and the tool's first re-run reported 44, all its own** (its dense sepal still drawn at the
+rim's `z: 0` against a whorl built 0.93 mm lower; the third durable rule inside the instrument
+written to confirm the feature). **THE ALIGNED WELD IS GONE WHEREVER THE FOOT IS ON THE FLARE**:
+the three crowded corners with a stem read **0 pairs** from 25358 and their xfail entries are
+removed; the stemless corner still welds and stays declared. **ANGLED IS RESOLVED FOR THE FOOT**:
+on the cone's SIDE the tangent and the chord are one number (asserted to 1e-6 where the chord
+stays on the cone; a 1.3 mm cone at auto reach lets the chord run off onto the plate, told as
+`chordOnCone`) and there is no shoulder under the foot — the shoulder is still at the join's rim,
+where the foot no longer is; what part 2 meets on every style at MAX is a foot at 84–86° leaving
+a straight or near-straight face. **THE READ-OUT LEADS WITH THE CHORD** (`the underside RISES
+18.21° over the first 1.00 mm outward from the foot (the chord a print meets; tangent there
+17.88°)`): a tangent that read 0.00° while the underside fell 49° and 81° over the first
+millimetre is a headline that cannot be wrong and never says what the foot meets — the same
+shape as a clause reading its reference from the thing it checks — so the chord goes first and
+the tangent stays, labelled. SP3 is re-derived onto the attachment from OTHER owners (the stem
+record's `rootZ`, the hub builder's emitted top face and underside rings — the point must lie
+BETWEEN its two bracketing emitted rings, an interval), two mutants (`sepal-height-ignored`,
+`sepal-limit-drawn-at-the-rim`) witnessed on the mutated module's own solve, block 35 65 → 72
+rows (matrix 852), no frozen phase owed beyond phase34. The decoupling tool's PASS had exited 1
+(its two branches reversed) — fixed when it was re-run. Sheet: `node tools/shot-bloom-sepals.mjs
+<dir>` → `docs/img/sepals.png`, every cell on the default stem, the foot row framed on the GAP
+between sepal and petal.
+
+**LEAVES HANG OFF THE STEM, THE PETIOLE ROOTS IN THE WALL, AND THE BLADE IS THE
+PETAL'S OWN OUTLINE ON A PETIOLE FRAME** (Eva's rulings, the leaf sessions — read
+`docs/bloom-leaf-phase-a.md` for the measurements, then `docs/bloom-leaves-outcome.md`,
+before touching `leafPlan`, `buildLeafInto`, `leafBladeState` or the LF family).
+SIMPLE leaves, one blade per node. Nine controls: `leafLength` / `leafWidth` in
+absolute MILLIMETRES (ruling 5 — the flower's `leafSize` multiplies only the length
+while the width is fixed in world units, which is why three of its four types come out
+wider than long), `leafAngle` (**EVA RULED 35 DEG**), `leafNodes`, `leafPhyllotaxy`
+(all three ported), and four serration rows nested inside. **`leafLength` 0 is the
+GUARD** and the default is 19,040 tris, exactly what it was.
+**THE OUTLINE AND CUT MACHINERY SEPARATE FROM THE FOOT AND THE LADDER, MEASURED**:
+`widthProfile` reads exactly TWO fields off a `ring` — `width` (the foot-continuity
+floor alone) and `thickness` — and with the floor stood down (`cap.petiole`) the
+emitted outline stops reading `width` at all, **0 of 4001 half-widths moving between
+ring widths of 3 and 40 mm in both modes**. `petalForm` TAKES ITS FRAME AS AN ARGUMENT,
+so a leaf hands it a petiole frame and gets the cup with no ring in existence. And the
+LADDER IS NOT NEEDED: stationed UNIFORMLY the drawn tooth comes out at **80-95% of its
+analytic amplitude at the worst of 200 phase offsets**. Three substitutions, one term
+each, proved inert against main (0 of 64,016 half-widths, every lobe record identical).
+**THE ATTACHMENT PREMISE WAS TESTED BEFORE THE FIX WAS, AND IT WAS FALSE.** A petiole
+rooted ON THE AXIS of a hollow stem is NOT detached — a radial rod crosses the wall
+annulus on its way out, exactly **2 x STEM_MIN_WALL_MM = 3.00 mm at every hollow
+diameter** — and reads ONE PIECE. What IS reachable is detachment through the LEAF
+ANGLE: the escape length is `outerR / cos(theta)`, which runs away as the angle
+steepens, and a 10 mm axis-rooted petiole reads **TWO COMPONENTS at 75 and 85 degrees**.
+So the petiole roots at the WALL'S MID-THICKNESS, where it only gets MORE embedded as
+the angle steepens. **NO NODE BANDS** — they solve nothing here and would SPLIT the bore
+into N+1 cavities, moving O1's declared inward-shell count and ST1's triangle prediction.
+Do not re-propose them.
+**THE FLOWER'S GOLDEN-ANGLE / AZIMUTH DISAGREEMENT IS RECORDED SO IT IS NOT REPRODUCED
+WHEN CURVATURE ARRIVES**: `stemCenterline` kinks the flower's stem at `k * GOLDEN_ANGLE`
+while its `leafAzimuths` flips leaves 180 degrees — two different laws for one arrangement,
+confirmed present in `flower.js`. MOOT here while the bloom's stem is straight
+(`stemStations` returns `[0, lengthMm]`), and it must not come back with curvature.
+**THE TOP INSET IS DERIVED FROM THE LEAF, NEVER FROM THE STEM**: the flower's
+`0.16 x stemLength` fouls the head on **30 of 30 sampled states**, because the inset
+scales with the STEM while the rise scales with the LEAF and its ANGLE. A leaf longer
+than its stem clears at no inset: told, never refused (overlapping closed shells are the
+export contract), and the NODE COUNT gives at a pitch floor of two petiole radii.
+**CUP IS FIXED AND TWIST IS ZERO — a decision, not a reading.** Ruling 3 asked for both;
+Eva approved NINE controls and neither is among them, so a leaf reading `petalCup` would
+couple two organs. `LEAF_CUP` is the one constant and a control is one registry row.
+**THE OUTLINE IS DECOUPLED STRUCTURALLY, NOT ASSERTED** — `leafBladeState` overrides
+every field that could carry a petal's value into a leaf, checked as an IDENTITY by
+`node tools/verify-bloom-leaf-decoupled.mjs` (199 petal-side control values x 2 modes,
+0 leaf floats moved; `--control` required). **`sheetThickness` IS shared and is the
+declared exception: it is the MATERIAL.**
+**LF0-LF8 WERE WRITTEN BEFORE THE GEOMETRY AND SEEN RED, TWICE** — the census statically
+("claimed by NO smoke row") and at runtime against a builder that answered nothing. Both
+STL gates are blind to the whole family: a leaf declared and never built, a petiole on
+the axis of a hollow stem, a wrong PHYLLOTAXY (nothing here measures an azimuth except
+J7, Z4b and Z8), a leaf reading the PETAL's serration, and a node inset through the head
+ALL export watertight and as one piece. **THE FAMILY CAUGHT TWO DEFECTS IN THE GEOMETRY
+IT WAS WRITTEN FOR.** LF4: a 120 mm leaf on a 20 mm stem collapsed every node onto ONE
+POINT — and the clause had to change too, to a BICONDITIONAL against the plan's own
+`insetSatisfied`, because a leaf through the head is legal geometry and asserting
+clearance outright fires on a state the geometry is entitled to build. **LF8: the two
+side rims shared a winding and so did the two end rims, giving 134 duplicated and 134
+unmatched DIRECTED edges a leaf — and BOTH STL GATES ARE BLIND, because `analyzeStl`'s
+census keys on a SORTED pair, so a face wound the wrong way still counts as a matched
+edge.** A signed-volume check is not sensitive enough either (a thin sheet's rim is a
+rounding error against its blade; the volume agreed to 15% with a flipped rim in place).
+Only **O2** noticed, as its two orientation methods DISAGREEING — the right alarm naming
+the instrument rather than the defect. ST10's precedent: a fix without a witness is
+folklore.
+**THE PETIOLE RING IS OFFSET A HALF STEP, AND WITHOUT IT A LEAF IS ONE SHELL AT NINE
+AZIMUTHS OUT OF TEN.** X2 read **3180 within-shell pairs on `LEAVES: whorled x 8 nodes`,
+worst span 0.3076 mm**, and attributed by part every one of them is a leaf's own PETIOLE
+against its own BLADE — the by-design overlap of a rod with the blade it holds, which the
+export contract permits as a CROSS-shell overlap and which reads as a fold only once the
+two shells have been WELDED into one. The weld is exact and its mechanism is measured:
+**`petioleR` IS `t/2`, the same double as the blade's own skin offset** (both come from
+`acc.floorThickness`), and the ring's binormal axis IS the blade's normal at `u = 0`, so
+the ring vertex at `sin a = 1` lands on `C + N*t/2` — the blade's base-row centre column,
+to the bit. Counted: **0 shared vertices at azimuth 0, exactly 2 at 120, exactly 2 at
+240.** **IT IS THE NORM AND NOT A COINCIDENCE — swept over 360 azimuths at one degree,
+325 WELD and 35 do not**; `alternate` (0, 180) and `opposite` (0, 90, 180, 270) sit
+entirely on the clear 9.7% at every node and `whorled` does not. **So an XFAIL ENTRY WAS
+DECLINED**: its count would be a function of which azimuths a phyllotaxy happens to land
+on, and #213 does not gate MAGNITUDE, so it would absorb a real fold in silence — an
+xfail is a declaration somebody can check, and that one would not have been. The fix
+REMOVES THE VERTEX rather than declaring the pairs (session 43's stem cap verbatim, a
+centre fan sharing the hub's apex made a rim fan), and it is `NV = 10`'s reasoning one
+solid later: **the binormal axis is exactly where the rod is TANGENT to the blade's
+skin, so the lattice straddles it instead of putting a vertex on it.** Half a step of the
+ring's OWN step, derived, never typed. After: 0 of 360 weld, all twelve block-33 rows
+read 0 within-shell pairs and `directedMismatch` 0, shells are exactly 2 a leaf (3 leaves
+16, 24 leaves 58, no leaf 10), and TRIANGLE COUNTS ARE UNCHANGED TO THE INTEGER — a ring
+rotation is not a lattice change.
+**AND THE DEFECT WAS MODE-DEPENDENT, WHICH IS WORSE THAN ARBITRARY** (the sweep names its
+MODE and its SAMPLING because the answer MOVES: every azimuth of a 1-degree sweep, 360
+states, one whorl node). At the shipping sheet 1.20 both modes read **325 of 360** welded,
+because `floorThickness` returns 1.20 unchanged. **At sheet 0.60 they DISAGREE — 340 LIVE
+against 324 EXPORT** — because the export floor takes `t` to 1.000 and `petioleR` with it, so
+on the pre-fix tree WHETHER A LEAF WAS ONE SHELL OR TWO differed between the modes on 16 of
+360 azimuths. Which shells a solid has is TOPOLOGY, refused as mode-dependent four times
+before (session 32's ladder, 38's seam step, the fringe's count threshold, 42's lamina). The
+half step reads **0 in both modes at both sheets** — measured, not argued from the fact that
+both quantities come from one `floorThickness` call.
+**THE WITNESS IS THE ROW THAT FOUND IT** — X2 on `LEAVES: whorled x 8 nodes`, which
+rides in the EXPORT gate and in the SMOKE SUBSET both, so the fix gets no clause of its
+own (a shell count in the harness would be a second producer of the vertex weld, which
+the census owns). **And the subset caught it only because that row is in it for a
+DIFFERENT REASON**: block 33's anchor is the `alternate` row, whose azimuths (0, 180) sit
+on the clear 9.7%, so an anchor-only subset would have been silent — the whorled row is
+there for LF5's per-node SPACING claim and found a defect nobody was looking for. A
+subset earns its keep by covering the axes a feature HAS, not the failures somebody
+predicted.
+**AND R1 FIRED ON FIVE LEAF ROWS, EXACTLY AS ITS OWN COMMENT PREDICTED** ("a NEW part
+that emits and is absent here makes R1 fire at once, which is what it did the first time
+a stem was built, on this exact clause"). The leaves are the SECOND time that clause has
+caught a new part; both coverage instruments build them from `leafPlan`'s own record now.
+**A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S GUARDS ARE TRUTHINESS TESTS ON
+NUMBERS** — `!'0'` is FALSE. The page never hits it (`readUI` hands back numbers) and the
+registry predicates are number-safe, so LF0's two-statement clause is what would catch
+it there; a NODE-side tool must coerce, as `verify-bloom-seam-bytes.mjs` does. This cost
+a byte-partition run, and the tool's own ONE-SIDED guard is what found it: a row that
+throws on BOTH trees carries no information and is excluded and counted, a row that
+throws on ONE is a regression.
+**2,548 triangles a leaf, FIXED** — the lattice does not vary with size. Worst reachable
+is 24 leaves (whorled x 8) = 61,152, and leaves are NOT per-petal, so `ALL MAX` never
+reaches them (the whole family is hidden at DEFAULTS, so the blanket sweep does not
+touch it — measured, not assumed). **`frozen/phase31` is the 746 rows at `1fd0af5`**;
+block 33 takes the live matrix to 758 and the smoke census from 28 to 29 blocks.
+**THE CANTILEVER IS REPORTED AND NOT SOLVED**: the worst lever is a 120 mm leaf on the
+derived 1.2 mm petiole, **L/d = 100**, printed on every leafed build and joining the
+stamens' and style's line verbatim — `UNMEASURED — no coupon has been printed`.
+
+**AND ST9 IS THE FOURTH THING THE LEAVES BROKE, IN ANOTHER FAMILY'S CLAUSE — THE PETIOLES
+ARE EXCUSED AND THE BLADES ARE NOT** (read §"And CI named a FOURTH" of
+`docs/bloom-leaves-outcome.md` before touching `stemChannelAssertions` or `petioleAxis`).
+`bloom-connectedness` went RED in CI with **0 rows not one piece**: the flood fill was clean
+on all 756 rows that reached the results, every leaf row read `components=1 stray=0`, and ONE
+row was DROPPED by a validity assertion — `LEAVES: x a SPHERE with a stem`, on **ST9: 198
+exported vertices inside the free stem's 1 mm printable gap, nearest 0.0000 mm**. Two
+assertions, one root: ST9 fired and #220's row census reported the drop, which is the only
+reason it was diagnosable from the summary rather than from a hunt.
+**A LEAF IS THE THIRD PART EVER TO LIVE BELOW THE HUB AND IT IS THERE BY DESIGN** — the
+petiole is rooted THROUGH the wall, ST9's distance is to the SOLID cylinder, so every embedded
+vertex reads exactly 0; the nearest is at radius **1.652 mm = `rootR − petioleR` to the bit**.
+**Attributed by part: 198 of 198 are a petiole's own and 0 are anything else**, so the channel
+was clear of petals on the row it dropped — and a clearance criterion means nothing between two
+solids that are FUSED, which is what ST9's own scope already says about the root band and what
+this project measured on a flat head (all 8 feet at 0.000 mm). It is the R1 lesson in a clause
+nobody thought to check: both coverage instruments were taught the leaves, **ST9 was not,
+because nobody looks for a clause in another family that reasons about a region.**
+**THE FIX NAMES THE PETIOLE AND DOES NOT WIDEN THE REGION** — the fifth durable rule, because
+a region wide enough to hold a petiole is wide enough to hold a petal. It is the rod's own axis
+SEGMENT, one petiole radius wide, read from `petioleAxis` — **the two rings' own centroids the
+BUILDER emitted**, beside `emittedRootR` and for its reason (re-deriving from `leafPlan`'s
+`rootR` and `angleDeg` is a second producer; session 43's ST2). Its owner is the LEAF builder,
+not the quantity under test, so ST9 still reads none of the channel's report. Three
+measurements: the row is **silent** (198 excused, 0 intruders); **with the rods emptied ST9
+reports 198 again** (1584 on a 24-leaf whorl), so the exemption is what moved the answer; and
+a synthetic vertex 0.4 mm outside the wall at an azimuth no rod occupies **still FIRES**. Every
+sphere-stem row that shipped before is silent, unchanged.
+**AND THE BLADE IS A REAL PRINTABILITY FINDING THAT IS NOT THE CHANNEL'S.** ST9's `other`
+count — neither stem, hub, nor petiole — is **0 on all 35 swept states**, so the omission mask
+is clear everywhere on that grid. What appears above 60° is the BLADE, measured as a pure
+geometric quantity with no ST9 in it (nearest approach of any blade vertex to the free stem's
+solid): **1.853 / 4.356 / 5.492 / 4.910 / 4.019 / 2.804 / 1.853 / 0.824 / 0.289 / 0.000 mm at
+`leafAngle` −60 / −30 / 0 / 20 / 35 / 50 / 60 / 70 / 75 / 80–90** — **identical on a CAP and a
+SPHERE to four decimals and identical in LIVE and EXPORT**, so it is the leaf against the stem
+and has nothing to do with spheres or the channel. **From 70° up it is under
+`MIN_FEATURE_MM`**, the top fifth of a −60…90 range; **Eva's ruled 35° reads 4.019 mm, four
+times the gap.** REPORTED, NOT GATED — §18a's `cup × petalTipShape` treatment, and the matrix
+varies one control at a time so it is invisible to it by construction. The one thing done is
+that **ST9's message now says what it cannot tell apart**, so "the channel is not clear" does
+not send a reader looking for a petal that is not there.
+**AND THE SUBSET WAS BLIND TO IT: `bloom-smoke --conn` was CLEAN LOCALLY on all seven of its
+leaf rows.** It covered phyllotaxy, the bore, the angle, the inset, the serration and both
+guards — every axis the feature has — and NOT the one axis that reaches another family's
+clause, because block 33's anchor is the `alternate` row on a CAP head where ST9 returns before
+claiming anything. The sphere row is in the subset now (85 rows, 29 blocks, 90 families).
+**A SUBSET EARNS ITS KEEP BY COVERING THE AXES A FEATURE HAS — INCLUDING THE AXIS THAT IS
+ANOTHER FAMILY'S REGION.** Session's own X2 defect was caught by a subset row that was there
+for a DIFFERENT reason; this one was missed because no row was there for this reason at all.
+
+**THE LEAF HAS A TIP SHAPE CONTROL, ITS END IS 1.60 mm ACROSS AT EVERY VALUE, AND THE STUB'S
+SHARE IS A WIDTH QUESTION** (the leaf tip-shape session — read
+`docs/bloom-leaf-tip-shape-outcome.md` before touching `leafBladeState`, the leaf's
+`tipClamp` record or LF9). `leafTipShape` (Leaves, 0.60–3.00, default 1.30 = the constant it
+replaced, so 0 moved by construction) is `petalTipShape`'s superellipse on the LEAF's own
+control. **THE BRIEF'S PREMISE WAS WRONG IN A WAY THAT MATTERS**: it read `2 x TIP_HALF_MM` as a
+fraction of LENGTH; the outline meets the floor where `(W/2) f(u) = 0.8 mm`, a WIDTH equation, so
+the stub's share of the length is invariant in the length (21.28% at 12, 52 and 120 mm alike at
+0.60 on a 17 mm blade) and *"at what length does the clamp stop dominating"* has no answer —
+width is the lever, and the exponent. **AND A POINTIER EXPONENT LENGTHENS THE STUB**: 21.3% of
+the length at 0.60, 2.1% at 1.30, 0.02% at 3.00; the control moves the SHOULDER and the end is
+1.60 mm whatever is asked. Both modes agree exactly because `buildLeafInto` floors at the
+CONSTANT, not the mode floor. Clamped and told: the builder reports `tipClamp` and the read-out
+prints it, with the direction of both levers once the stub passes 5% of the length. **LF9 is the
+family**, and its load-bearing clause reads the exponent BACK off the half-widths the blade was
+built from (the law restated in the gate; the clean tree reproduces it to 3.9e-10 worst) — a plan
+reporting the control while the blade is built from the constant is what clause (a) cannot see.
+**THE PANEL IS EVA'S LIST VERBATIM**: Arrangement / Petal (> shape, form, curl, roles) / Head /
+Center / Stem (> Leaves (> Serration)) / Part thickness — a `petal` container on the Center shape
+and `leaves` under `stem`; Stem > Leaves > Serration is the second third level and costs nothing
+(session 27's bound is gone, session 29's CSS is paid). **Petal roles as Petal's fourth child and
+the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
+`frozen/phase32` is the 758 rows at `3f664be`.
+
+**THE VORONOI INFILL IS A PROTOTYPE, ITS BASAL BOUNDARY NOW HAS ITS OWN OWNER, AND THE FLOOR IS
+THE BLADE'S OWN WAIST** (the lamina-floor session — read `docs/bloom-infill-lamina-floor.md` §0
+FIRST, then `docs/bloom-infill-base-panel.md` for the sweep it continues). **THERE IS NO INFILL IN
+THE GENERATOR**: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and `bloom.html` hold 0
+occurrences of the word, no control and no matrix row — it is `tools/bloom-voronoi-proto.mjs`, and
+petal infill is on the charter's standing board. A session briefed to "ship the boundary" is
+briefed one stage early, and this is where that is written down so it is not re-derived.
+**THE BOUNDARY WAS `export const U0 = G.ROOT_BLEND_END` — A DERIVED VALUE ALIASED ONTO A CONSTANT
+THAT BELONGS TO SOMETHING ELSE.** `ROOT_BLEND_END` is a station on the OUTLINE with seven other
+readers (the root blend's own decay, the lobes' `laminaStart`, A5, `bloom-sagitta.mjs`'s base
+bucket, and #243's four sepal row filters) and it says where the foot's width FLOOR decays to
+nothing: 0.30. **The outline stops being the root blend's FIVE TIMES LOWER, at u 0.0579388**, so
+the prototype's own sentence — "the solid basal zone, u <= ROOT_BLEND_END" — named a region five
+times longer than the one it described, and the panel Eva was objecting to is the difference.
+`U0` is kept exported (#250/#251/#252 quote it) and **defaults to nothing**; the three tools whose
+published figures are pinned to it pass it EXPLICITLY now, proved by their own controls
+(`bloom-basal-grading --inert`: 0 of 394,848 floats; `bloom-infill-base-panel --control`: PASS,
+C2 at its published 112 of 560 and C3 reproducing #250's seven rows).
+**THE FLOOR IS `max(waist, wall floor)` — TWO LENGTHS, EACH WITH ITS OWN OWNER, NEITHER A ROW
+COUNT.** The WAIST is where `halfWidthAt`'s `max` hands the outline from the foot's floor to the
+core: the blade is **5.164 mm across** there against 6.400 at the foot and 16.000 at its widest —
+**the narrowest section it has between the foot and the tip, 6.20 mm² on the shipping sheet** — and
+below it the outline TURNS AND WIDENS AGAIN. **Below the floor the answer REVERSES: the bottom 45 %
+of the blade goes 49.6 % solid at row 7 to 62.0 % at row 6**, more solid rather than less, on 292
+fewer triangles, with cells carrying no hole at all going 1 -> 3 of 17. Three confirmations that it
+is the waist and not the row index — a CONTROL (a petal with no waist), a MOVER (`petalWidth` 30
+puts the waist a row lower and the step follows it), and the same reversal at four gradings
+INCLUDING NO GRADING AT ALL. And it buys nothing where it extends: **open area below the waist is
+0.000 mm² at every boundary from row 19 to row 6.**
+**AND THE ROOT_BLEND TERM DOES NOT ALWAYS HAND OVER TO THE CORE.** On `footDelicacy` 0.25 —
+whose `footHalf` is exactly `TIP_HALF_MM` — it hands to TIP_FLOOR at u 1.67e-17 and the outline is
+NON-DECREASING over the basal stretch: there is no waist at all. The floor reads ~0 there and the
+WALL floor is what binds, which is right; what would have been wrong is the sentence. K1 asserts
+BOTH shapes, and found this by re-reading the declaration against the clause rather than by a
+failure.
+**THE SECOND FLOOR WAS FOUND BY THE MUST-FAIL AND NOT BY A READING OF THE CODE.** `--control`'s K2
+was written with `footDelicacy` 0.25 as the control for "no waist, therefore no reversal"; it
+FIRED. That petal's foot is 1.600 mm across — narrower than two 1.0 mm wall insets — so no hole can
+exist at the region's base edge until u 0.0322266. It binds on thin-footed states and nowhere else
+(measured over eighteen). **On that petal the floor is NOT the optimum**, costing 4.9 points of
+bottom-45 solid against row 7 — reported, not tuned, and the argmin alternative is refused on the
+`headRise` ruling (a metric consumed as a geometric input becomes a target).
+**THE SPLIT IS NOT A NEAREST-SNAP, MEASURED:** the region starts one row BELOW the split, so the
+row that must clear the floor is the OVERLAP row, and a nearest-snap to the waist lands on row 5
+whose cells start 0.022 below it. `floorRow` is the LOWEST row whose own overlap row clears the
+floor, itself floored one row past the feet — at row 3 the panel is the three feet alone, the
+vertex-welded shell count goes 1 -> 2 on every state and the overlap weld's two non-manifold edges
+disappear (the voxel fill still reads one piece and never binds anywhere on the sweep).
+**`HELD_ROWS` / A7 DOES NOT BIND AT ANY BOUNDARY AND #252's RECOMMENDED OPTION 2 IS REFUTED BY
+EVA'S OWN RULING.** The infill places no station, and the only route it could take is MUTATING the
+rows it was handed: the field was run at all 17 boundaries and the builder's stations compared
+afterwards against a FRESH build — **0 of 59 moved under `Object.is`**. The clause says that rather
+than "it does not call `bladeStations`", which is a claim about code where this is one about the
+artefact. Option 2 — "the boundary is the last held
+station" — lands on **row 18, panel 25.49 %, eight rows ABOVE the cell Eva approved at 8.83 %**, so
+it cannot answer a ruling that asked for LOWER. It was right about the DEFECT (a boundary snapped
+against a fixed 0.30 whatever `seamStep` is) and wrong about the REMEDY; what replaces it is a
+THIRD owner, which is only available because this session measured the waist. **Option 1 is
+untouched and is still the ladder's.**
+**`profile.laminaSlopeBreaks()` IS THE ONE GENERATOR CHANGE AND IT EXISTS SO NOBODY RE-DERIVES THE
+HANDOVER.** `slopeBreaks` floors on the accumulator's own `tipFloor` and **disagrees live/export on
+a reachable state** (`footDelicacy` 0.25: u 0.015720245 live, 0 export) — correct for a list
+reporting the seams of the outline a MODE draws, and the wrong list for anything deciding
+TOPOLOGY. `laminaWinner` already existed (session 42 built it for the lobe arc table); this exposes
+the same expression under a name an outside reader can ask for. Measured **0 of 19 states differ
+live/export against `slopeBreaks`'s 1**. **0 BYTES MOVE** — `verify-bloom-surface-bytes --base
+<worktree>`, the full 852-row matrix in both modes, positionally under `Object.is`: **832,328,424
+export floats over 92,480,936 triangles and 76,842,842 captured-grid values, 0 moved** — and **NO
+FROZEN PHASE IS OWED**: no matrix row is added or removed, so `frozen/phase34` stays the newest
+baseline and no tag's bytes stop reproducing.
+**AND THAT TOOL HAD NOT COMPLETED A FULL-MATRIX RUN SINCE THE SPHERE-STEM SESSION, ON ANY TREE —
+FIXED HERE, AND THE CRASH IS THE SLOT-OMISSION CLASS THIS FILE ALREADY NAMES.** `gridFloatsOf`
+read `petals[p].grid` unguarded and `built.petals` carries a NULL wherever a slot is DECLARED and
+NOT BUILT, which the sphere stem's omission mask is the first thing here ever to produce. It threw
+on **eleven rows — the ten `SPHERE STEM:` rows that build a stem (every one but `GATED`, which
+builds none) plus `LEAVES: x a SPHERE with a stem`** — and the sets are **IDENTICAL on both trees,
+22 findings each**, so it is pre-existing and not the change's. **NO SHIPPED CLAIM RESTED ON IT** — the
+last full-matrix citation is session 42's, which predates the omission mask; every one since is a
+`--movers` or `--rows` run. **THE FIX IS NOT A `continue`**: a
+skip defines the subject so as to exclude the thing the clause doubts (a petal built on one tree
+and omitted on the other contributes nothing to either side), so the BUILT-NESS goes into the
+compared stream as `p<N>.built:0|1`. Shown able to fire — a copy that nulls one BUILT slot on one
+tree alone reports `grid shape moved — 1 captured values against 4430` on the default — and the
+tool's own `--control` still fires both clauses. **THE ELEVEN PASS**: 14,610,816 export floats and
+2,702,390 captured values, 0 moved. **THE TEST, restated because it cost a run to find: for ANY
+instrument keyed on a slot index, ask what it reads when that slot is not built.**
+**THE PORT IS NOT BLOCKED BY THE TRIANGLE BUDGET AND IS BLOCKED BY THE EMITTER.** CLAUDE.md's
+37,830-a-petal figure is the FLOWER's emitter; construction B is **2,496 a petal at the floor
+against a plain 2,356**, and the whole bloom **20,016 against 19,040 (+5.1 %)**. What disqualifies
+it is that `cutThrough` fans a solid cell FLAT — a chord across a surface that wraps — so under
+`petalRoll` 330, a shipped matrix row, a cell's own facet cuts through the tube and self-approach
+reads **0.0009 mm**. A shipping emitter must subdivide. The plan is also flat-computed (3.0x cell
+stretch at cup 1.2), fringe and cleft are excluded by ruling and lobes are not exercised.
+**A CONTROL IS COSTED AND CANNOT SHIP BEFORE THE INFILL DOES** (§8 of the doc): a FRACTION of the
+travel between the floor and `ROOT_BLEND_END` rather than a `u` station, because the floor is
+state-dependent; one registry row, two matrix rows from the blanket sweep, one panel-gate route,
+`stamenSpread`'s dead-travel treatment, and a frozen phase. The instrument is `node
+tools/bloom-infill-lamina-floor.mjs` (`--control` required — four clauses, every one seen to fire,
+and K2c's subject NAMED as a set because on a monotone petal no row is distinguishable by it); the
+sheet is `node tools/shot-bloom-lamina-floor.mjs <dir>`, **with F as the reference cell and one row
+PAST the floor on it** so the floor reads as a reason rather than a rule.
+
+**THE UNIFORM ARC IS SINC-STABLE NOW, AND A CLOSED FORM KEPT VERBATIM FOR BYTE IDENTITY IS A
+LIABILITY THE DAY A NEW PRODUCER REACHES ITS SINGULAR BRANCH** (the arc-stability session —
+read `docs/bloom-organic-variance-discovery.md` §4 and §9.6 for the ruling, then
+`docs/bloom-arc-stability-outcome.md`, before touching `arcStep`, `sinc`, `spineLaw`'s
+integrator or `buildPetalInto`'s `spineAt`). Discharges Eva's ruling 6: **the near-zero curl
+branch is fixed BEFORE any variance field lands.** `buildPetalInto`'s uniform spine was the
+phase-1 closed form `(sin p1 − sin p0) / k`, character for character since phase 1 — exact in
+real arithmetic and CANCELLING as `k → 0`, because the numerator is a difference of two nearly
+equal sines whose own rounding is one ulp of a number near 1 while the true difference is of
+order `k·s`. `sinc` and `arcStep` are lifted to module scope as **the ONE OWNER of a circular
+arc's own displacement**, read by `spineLaw`'s integrator (which has carried the remedy since
+session 16, for its own reason) AND by the uniform arc. The product form is the same arc —
+`sin p1 − sin p0` IS `2 cos((p0+p1)/2) sin((p1−p0)/2)` — and it is not a guard and has no
+threshold: at `k = 0` it returns `ds·cos(p0)`, the `kC === 0` branch's own expression, so the
+two arms meet continuously.
+**`petalFormIsFlat` GUARDS ON EXACT ZEROS, WHICH IS WHAT PUTS A FIELD INTO THE SINGULAR
+BRANCH**: at 8 petals a wave `180 cos(θ)` hands the slots at 90° and 270° `180 × cos(π/2)` =
+**1.1e-14, not 0** — and at the shipping tilt the true `dZ` increment there is 8.1e-17, LESS
+than one ulp of the `cos(tilt)` it is subtracted from, so it rounds to zero and **the blade is
+laid onto the hub plane**: 14.79 mm of vertex displacement, 8,806 within-shell pairs at
++1e-14 and 11,027 at −1e-14.
+**THE DEFECT REACHED TO ABOUT CURL 1e-6, NOT ONLY TO 1e-14, AND THAT CORRECTS THE DISCOVERY'S
+OWN TABLE** — §4 read *"from 1e-9 up, clean"*, which was clean **as the census measures it**,
+and the census is blind here by construction. Measured against the build's own flat twin,
+EXPORT and LIVE reading identically: **1.8e-4 mm at curl 1e-9 (89,000× the most a curl that
+size can move anything) and 2.0e-6 mm at 1e-7 (9.7×)** — neither displaces enough to fold
+anything, so no pair count can see either. **A DISCOVERY'S READING IS BOUNDED BY ITS
+INSTRUMENT, and an arithmetic defect needs an arithmetic instrument.**
+**THE BOUND IS GEOMETRY, NOT A TUNED NUMBER**: bending a blade by a total turn of `curlRad`
+about a pivot inside the model cannot move any vertex further than `|curlRad| × (the model's
+own bounding diagonal)`, plus 16 ulp of the largest coordinate as the float floor. Measured,
+the two populations do not touch — **0.045 to 0.165 on every value the arithmetic gets right,
+9.7 to 2.2e14 on every value it gets wrong** — so nothing in it is fitted to the data in hand.
+On the fixed tree the ratio is **0.138 at every magnitude over ten decades**, bottoming out at
+7.1054e-15 mm (0.78 ulp of a 40.819 mm coordinate).
+**THE EXACT-ZERO RESOLVER RULE WAS CONSIDERED AND REJECTED** (Eva, ruling 6), and the rejection
+is recorded in `arcStep`'s own header because it is the obvious saving and will be re-proposed
+otherwise: it is a FIFTH typed threshold on a project that has found four typed constants
+standing in for physical quantities, and it fixes the FIELD rather than the ARITHMETIC — the
+arc would still return a displacement of arbitrary size for any `k` the resolver let through.
+**`spineLaw` IS BYTE-IDENTICAL, MEASURED RATHER THAN ARGUED**: 1,536 laws × 9,216 stations plus
+all seven reported scalars per law, `Object.is`, **0 values moved, worst |d| exactly 0**.
+**AND THE DEFECT IS TILT-DEPENDENT — AT `petalTilt` 0 THE OLD FORM IS ACCIDENTALLY CORRECT,
+which the NEGATIVE CONTROL found and a reading of the code had not.** `dR`'s numerator loses
+an ulp of `sin(tilt)` against a true increment of `cos(tilt)·k·s`, so its relative error runs
+away toward tilt 90; `dZ`'s does the mirror image and runs away at tilt 0 — and at tilt
+exactly 0 `dR` is `sin(phi)/kC` with nothing to cancel against while `dZ`'s numerator rounds
+to 0 where the true value is 1.5e-36 mm, **so 0 is the right answer and the restored closed
+form produces NO finding there** (26 findings at the shipping tilt, 13 at tilt 75, **0 at tilt
+0**). Two consequences: **a variance field on a bloom at zero tilt would never have shown
+this**, and AS1's tilt-0 rungs are a clause whose subject this mutation is not in — so the
+witness DECLARES that (`CONTROL_REACHES`) and asserts the per-tilt coverage BOTH ways instead
+of leaving a silence a later reader would mistake for a hole.
+**AS0–AS4 IS THE NEW FAMILY AND `node tools/verify-bloom-arc-stability.mjs` IS THE ONLY WITNESS
+FOR ANY OF IT — IT CANNOT BE A MATRIX ROW, AND A ROW THAT TRIED WOULD BE SILENTLY GREEN
+RATHER THAN REFUSED.** That is a correction this session made to its own first draft, by
+measuring instead of reasoning: `petalSpineCurl` is `step: 5` and a stepped range input SNAPS,
+so setting 1e-14 / 1e-9 / 1e-6 / 1e-3 on the real `#petalSpineCurl` all read back **0**
+(measured on the page) — and `applyConfig`'s slider read-back band is `|set − got| < 1e-9`, so
+**a row at 1e-14 passes the read-back while the page holds curl 0 and builds the flat
+default**, which is the harness measuring a design other than the one it names. (1e-6 and 1e-3
+ARE refused; the band and the defect's band overlap rather than nest.) So the witness calls the
+geometry DIRECTLY. It rides in `bloom-export-watertight.yml` beside the wall
+instrument, BEFORE the npm install, because it imports playwright not at all. AS0 the default
+reaches no arc · AS1 the ladder is bounded on every rung in both modes · AS2 the census at
+±1e-14 is the flat build's, an integer with no tolerance · AS3 no triangle moved · AS4 the
+curl-graded 8-petal whorl (the shape the field will build, its near-zero values produced by
+`180 cos(θ)` rather than chosen) is clean and BOTH near-zero slots land where the same petal at
+curl exactly 0 does, **per petal, so one slot landing right cannot cover for another**.
+`--negative-control` restores the old closed form in a copy of the module and REFUSES on an
+anchor that does not match exactly once; **AS0 and AS3 are DECLARED SILENT with their reasons
+rather than demanded**, because a cancelling arc moves vertices and never a triangle count, and
+the default is at curl exactly 0 on both trees.
+**THE PARTITION: 116 MOVED / 736 HELD of the 852-row live matrix, and the MOVER SET IS
+PREDECLARED FROM THE BUILDER'S OWN RECORD RATHER THAN COUNTED.** A row moves iff some BUILT
+petal takes the uniform closed-form arc — `spine.curlRad !== 0 && spine.uniform`, read on
+`petalsAll` AND on `sepals.built`, because a sepal is the petal builder on a second ring and
+reaches the same branch through its `sepalSpineCurl` twin (leaves cannot — `leafBladeState`
+pins the curl to 0; stamens and the style cannot — `rodInto` calls `spineLaw` directly).
+**Read from the BASE tree**, so the prediction's owner is not the quantity under test. `node
+tools/verify-bloom-seam-bytes.mjs --base <worktree> --change arc --matrix live --control
+--control-mode` reads **PASS over 832,328,424 floats positionally under `Object.is`**: the
+set is EXACTLY as predeclared in both directions, the shipping DEFAULT is HELD (by branch —
+at curl 0 there is no form, so `spineAt` takes the straight arm), **triangle counts are
+unchanged on every row with 0 declared exceptions**, the FOOT is identical on every row
+(6,480,054 captured values — `footRowsAt()` never reads `spineAt`), and the two modes agree
+everywhere. **`arc` is the THIRD change to ride in that tool and the first that is not
+ladder-side**; it is also the first to predeclare the SET where `seam` and `widest`
+predeclare counts, which is the difference between a partition and a number.
+**FIVE XFAIL ENTRIES MOVED AND ONE CAME OFF, ALL OF THEM ROWS THAT BUILD A UNIFORM CURLED
+ARC** — `FRINGE: x spine curl 180` 9218/1.2703 → **9219/1.3256**, `FRINGE: x ALL FORM MAX`
+12586 → **12351** (IMPROVED), `ORCHID x the IRIS` 55 → **57**, `DOME: rise 1 x ORCHID at two
+whorls in step` 351 → **352**, and `FAN x PER-PETAL: a MIDDLE group only` **2 → 0, entry
+REMOVED**. Re-recorded with the previous figure kept in each note, never a widened band
+(#213); they move in BOTH directions and the list does not gate magnitude, so all of it would
+have passed silently. **`ALL MAX` is unmoved** (129,803 / 3.1556) and its export-refusal
+triangle count is untouched, because the arc moves no triangle. **THE REMOVAL IS A SPAN-0
+KNIFE EDGE AND CAN COME BACK** — two pairs at worst span 0.0000 are a tangency against a
+crease, session 42's `LOBES: x cup 0.40` verbatim, and correcting the last bits moved where
+the stations land. **ALL FIVE WERE RE-CHECKED IN THE BROWSER** (`verify-bloom-export.mjs
+--only`), not only in Node, because X1/X2 run on a Chromium build and a span-0 count is
+decided by last bits the two V8s need not agree on: 5 of 5 watertight, the four declared rows
+each still failing at their NEW magnitude, and the removed row reported FREE.
+**NO FROZEN PHASE IS OWED AND 31 OF THE 33 BASELINES' BYTES STOP REPRODUCING — the two
+halves of the same rule.** The row set cannot change here (the failing values are unreachable
+through the registry, so the witness is not a matrix row), and the charter is explicit that a
+phase is owed when the ROW SET changes and **never for a byte move the outcome doc names**
+(session 24) — measured, the live matrix is **852 rows on both trees, 0 rows differing in
+definition**, so `frozen/phase34` stays the newest baseline. What IS owed is the naming, and
+it is in §6 of the outcome doc: **31 of 33 tags move, 2,785 of 16,229 frozen rows**, phase34
+itself **112 of 778**, and the only two that hold entirely are `frozen/phase2` and
+`frozen/phase3` — the matrix carried no curled row until phase4. Every one of those tags'
+DEFINITIONS is untouched and `--verify-frozen` is green on all 33. **`node
+tools/verify-bloom-seam-bytes.mjs --change arc --frozen-sweep` is what answers that question
+now, and it is a CONSEQUENCE of the byte partition rather than a substitute for it**: it
+applies the change's own mover predicate, which the full byte comparison proves exact in both
+directions on the live matrix and on phase34 first; memoised on (control set, capability), so
+16,229 rows cost 999 builds. A change with no entry in `MOVER_BY_CHANGE` cannot use it.
+**THE NOISY BAND IS A DIFFERENT MECHANISM AND THIS FIX COVERS NONE OF IT — MEASURED PER PATH,
+AND THE TWO HALVES OF THE ANSWER DIFFER.** Cup, twist, roll, cup gradient and buckle at 1e-6 are
+**exactly inert — the same count to the integer** (10/10, 129/129, 1,264/1,264, 820/820,
+696/696): they are separate code paths and the arc cannot reach them. On the ARC's own path the
+counts MOVE IN BOTH DIRECTIONS WITHOUT GOING AWAY — 925 → 0 at curl 1e-6 and 200 → 17 at 1e-5,
+against 456 → 461 at 1e-3 and 495 → 572 at −1e-3 — and **every one is at worst span 0.0000 mm**,
+session 42's knife-edge class: a sheet grazing itself at a crease, decided by where the stations
+land, so correcting the last bits moves the landing and therefore the count. **It is a second
+finding and a second PR**, and a real one, because the same field that hands a slot 1e-14 hands
+its neighbours everything up through 1e-6.
+
+**THE CARNATION FRINGE AND ITS SQUARED TERMINAL ARE ONE FEATURE** (Eva's ruling, Sep 13 —
+read `docs/bloom-carnation-fringe-picture.md` for the measurement that closed the question,
+then `docs/bloom-carnation-fringe-outcome.md`, before touching `widthProfile`'s TERMINAL
+term, `fringePlan`, `trimPanels`' fringe arm or the FR family). `petalTipEnd` (PETAL SHAPE,
+0–1 of the peak half-width, default 0), `fringeCount` (Fringe, 0–10, default 0) and
+`fringeDepth` (Fringe, 0.05–0.50 of the petal's own length, default 0.20).
+**NEITHER SHIPS ALONE AND THE GEOMETRY SAYS SO WITH A BRANCH:** every tooth of a panel
+fringe runs to `u` = 1 and `TIP_HALF_MM` is ABSOLUTE, so without a terminal the blade is
+**1.600 mm across at the apex at EVERY petal size** — ten teeth read as a carnation over most
+of their length and then converge into one shared spike. A fringe asked where the end does not
+clear the print floor is **NOT CUT** (NO ROOM, told), and that row is bit-identical to the same
+state with no fringe. **The threshold is `TIP_HALF_MM`, never `tipFloor`** — whether PANELS
+EXIST is topology and the export floor may not decide it; session 32's mode-dependence defect
+declining a fourth time, and the ceiling is measured identical in live and export on all 35
+cells of the size sweep.
+**THE TERMINAL IS A TERM WITH ITS OWN DOMAIN `[uPk, 1]`, not a fold into `tipFloor`** — so
+`shapeWinner` NAMES it, `slopeBreaks` finds its crossover, `lawIsActiveAt` stops claiming the
+superellipse where it has taken over, and `shapeBaseAt` carries it so every form law reads the
+squared outline. **Its domain edge costs nothing**: the ceiling `t <= 1` means it ARRIVES
+BELOW the CORE at `uPk` (the core's maximum), measured TERMINAL-wins-below-uPk on **0 of 7143**
+samples and **0 of 7143** moved at the ceiling. It reproduces §6e's own recorded table exactly
+(1.600 / 2.400 / 5.600 / 8.000 / 16.000 mm) — **the anchor for a patch that no longer exists**,
+since `terminal-control.patch` lived in a session scratchpad and `997c556` is docs-only.
+**THE SPLIT IS OWNED IN PHYSICAL UNITS** — a fraction of the petal's OWN length, so the target
+station is `1 - depth` exactly. A panel boundary IS a row, so `trimPanels` takes the **NEAREST**
+station (not the first past it, which is biased by a whole gap; the cleft arm keeps `first past`
+because its nine xfail entries are pinned to the rows it picks) and FR3 bounds the residual at
+half a gap — measured 0.003 mm inside a 0.875 mm row.
+**THE TAPER IS A LAW ABOUT AN INTERVAL, AND THE FIRST VERSION WAS RIGHT AT TWO STATIONS AND
+WRONG BETWEEN THEM.** It set the tooth from the width at the PLANNED split and interpolated;
+the landed row sits up to half a gap higher where the blade is narrower, so under the buckle
+the emitted gap came out **0.9910 mm against a 1.0 mm floor** — exporting watertight, one
+piece, identical triangle count, and **FR4 was the only thing that saw it**. What ships:
+teeth and gaps tile the lamina, so given `W >= (2N-1)F` the admissible gap is exactly
+`[F, (W - N*F)/(N-1)]` and a linear ramp across it clears both floors at EVERY station.
+**THAT MAKES THE POINTEDNESS AN IDENTITY OF THE FLOOR**: a count ON its own ceiling has every
+tooth and gap already at `MIN_FEATURE_MM`, so the teeth are SQUARE by necessity; below it they
+point (4 teeth on the ceiling terminal run 3.250 -> 1.000 mm).
+**THE COUNT CEILING IS THE TERMINAL'S WIDTH** — `W >= (2N-1) * MIN_FEATURE_MM` at the fringe
+region's NARROWEST station, both binding constraints reducing to one inequality. Across the
+size range at the full terminal: **4 / 6 / 8 / 11 / 15 at `petalWidth` 8 / 12 / 16 / 22 / 30**
+(`node tools/bloom-fringe-ceiling.mjs`), **`petalLength` does not move it at all** (8 at 20, 35,
+45 and 60 mm — width is the only lever, the picture session's finding from the other side), and
+**above 16 mm THE RANGE binds before the geometry does** (10 against 11 and 15) — the inverse of
+`stamenSpread`'s dead travel, taking the same ruling, with the geometry's own ceiling printed
+beside the count so the headroom is visible. CLAMPED AND TOLD.
+**LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE AND THE FRINGE WINS.** Both own the apex, and
+composing them was MEASURED to narrow EVERY tooth including interior ones nowhere near the rim
+(middle finger **0.5873 -> 0.4599 mm at coverage 0.40**) because a v-span is a fraction of the
+CUT half-width. Two statements (`lobesEligible` in both files, `perPetalEligible`'s shape), and
+**the proof it is really inert is an IDENTITY**: the lobes-at-maximum row reads exactly the same
+census as the same state with none (7288 pairs, identical worst span).
+**FR0–FR5 IS THE NEW FAMILY AND BOTH STL GATES ARE BLIND WITHOUT IT** — each tooth is its own
+closed panel overlapping the base, so the wrong count, the wrong taper, the wrong split row,
+teeth under the floor and a terminal that is not the control's ALL export watertight AND as one
+connected piece. **A4 IS RE-DERIVED, NOT RELAXED** (it read "the apex has no control"; at
+`petalTipEnd` 0 the new clause is the old one term for term).
+**THE VERTEX-WELD SHELL COUNT IS NOT THE CONNECTEDNESS TEST, and the picture session cited it
+as one** — it reads 9 on the 4- and 7-tooth rows and **57** on the 8-tooth ones, the gate labels
+the column `(unrated)`, and the voxel flood fill is the authority: ONE CONNECTED PIECE at the
+maximum count on the maximum terminal. **NO LOW-END HATCH IS DRAWN** for the squared end's dead
+travel: `applyCaps` marks the travel ABOVE a cap, and this one's dead stretch is at the BOTTOM,
+so declaring it would hatch 90% of the track — told in the read-out instead.
+**30 MOVERS / 706 HOLDERS of 736 rows**, predeclared from the BUILDER'S OWN RECORD; movers
+outside block 31 are exactly `petalTipEnd max (1)` and **`ALL MAX`** (session 38's lesson again),
+and the matrix grew 699 -> 736 because the blanket sweep adds SIX rows of its own for three new
+sliders. `frozen/phase28` is the 699 rows at `994aea4`, registered in BOTH maps. **`ALL MAX`
+re-measured and IMPROVED** (135969 / 4.7312 -> 130004 / 3.1556) because it now sweeps the fringe
+and the lobe cut it used to carry is no longer built — that entry went stale once already and
+#213 still does not gate magnitude. The sheet is `node tools/shot-bloom-fringe.mjs <dir>` ->
+**`docs/img/carnation-fringe-shipped.png`**, driving the shipped controls (the picture session's
+`docs/img/carnation-fringe.png` stays put — it records the state before the feature existed).
+
+**THE GENERATOR REFUSES TO EXPORT `ALL MAX`, AND THAT REFUSAL IS NOW A DECLARED,
+ASSERTED OUTCOME — XR1/XR2** (Eva's ruling, Sep 13, on the fringe's own CI failure).
+`bloom.js`'s `EXPORT_TRI_BUDGET` (1,500,000) refuses the export above its bar, and its own
+comment said the budget *"exists so the refusal path is real before it is ever needed"* —
+**the fringe is the first configuration ever to reach it**, so the first thing to need it is
+also the thing that proves the path works. `ALL MAX` builds **2,412,512 tris (export), a
+115.0 MiB file**, and the app refuses. The gate used to read that as `no STL download` — a
+BROKEN export — and dropped the row: 735 of 736 reached the results, `connectedness: FAILED`.
+**A REFUSAL IS NOT A BROKEN EXPORT**, and `exportRefusalAssertion()` is the one place that
+distinction is drawn, in both STL gates. Three clauses, and **failing if a declared row ever
+EXPORTS matters exactly as much as failing if it refuses wrongly**, because either is a change
+nobody asked for. The reference has a different owner from the quantity (the fourth durable
+rule): the refusal is read off the APP's own read-out, the count is cross-checked against the
+BUILDER's tally through `__bloomMetrics()`, and neither the budget nor the count is restated
+in the harness. `EXPORT_REFUSED_XFAIL` carries one entry, one row, one number, the
+`SELF_INTERSECTION_XFAIL` shape; like that list it does not gate MAGNITUDE, and for the same
+reason. **THE THREE OBVIOUS ANSWERS WERE ALL REFUSED AND EACH IS WORTH NOT RE-PROPOSING:**
+raising the budget is a guard tuned to the thing it guards against (and 115 MiB is a file no
+slicer opens); trimming `ALL MAX` makes a row stop meaning its own label, when "everything at
+maximum" genuinely IS a state this generator refuses to export; and a SKIP loses the coverage,
+which is the repo's own `MAX_VOXELS` note. The row RUNS, the geometry BUILDS, and the refusal
+is the assertion. Every clause was fired on a must-fail before it was believed — an undeclared
+refusal, a declared row that exports, a declared row that fails for some other reason, and a
+declaration naming a row the matrix never ran.
+
+**`ALL MAX` IS NOW THE BINDING CONSTRAINT ON ANY FUTURE PER-PETAL FEATURE, AND THE NEXT ONE
+SHOULD CHECK THAT CORNER FIRST RATHER THAN LAST.** Measured, same control set, one tree, only
+the three new controls moved: **636,672 tris at their shipped defaults (42% of budget, headroom
+2.36x) against 2,412,512 with the fringe at maximum — 3.79x**, which is what breached. The
+blanket sweep hands every new slider its maximum onto a **240-petal head (40 x 6)**, so a
+per-petal feature's cost is multiplied by 240 there and by 8 anywhere else in the matrix. The
+envelope on that row, measured: **three teeth export (1,267,392, 84.5% of budget) and the
+fourth misses by 19,392 — 1.3%**. Note the marginal cost per tooth FALLS as the count rises
+(+306,240 for the 2nd and 3rd, ~+99,000 for the 9th and 10th) because the count ceiling clamps
+the inner whorls' narrower petals — the feature is already self-limiting at scale, just not
+enough for this row.
+
+**AND THE REFUSAL COSTS A FULL BUILD BEFORE IT RETURNS NOTHING — 120.4 s on that row, filed as
+#231, pre-existing and not the fringe's.** The handler builds the export mesh and THEN checks
+`acc.triangleCount`. It also made a gate CRASH rather than assert: `exportStl()` waited 120 s
+for the download while giving `page.click('#exportStl')` only the page default of 30 s, and the
+click does not resolve until that synchronous build finishes — so on any runner slower than CI
+the gate threw an unhandled TimeoutError on exactly the rows XR1 exists to assert. The click
+budget now matches the download budget; the underlying cost is #231.
+
+**MEASURE THE CORNER, NOT THE REPRESENTATIVE CASE** (this session's own reporting failure,
+recorded as the class it belongs to). The fringe's cost was reported at **173,792 triangles for
+`FRINGE: x 40 petals`** — a real number, honestly measured, and the WRONG ONE: it is 40 petals
+in ONE whorl, where the matrix's blanket row is 40 x 6. The corner was never checked, so a
+breach of a shipped guard reached CI as a red gate rather than a sentence in a report. The
+working agreement says to estimate cost BEFORE building; a representative row satisfies the
+letter of that and not its purpose. **The number that matters is the one at the worst corner the
+matrix can reach, and on this generator that corner is `ALL MAX`.**
+
+
+**`petalTilt` IS 0..120 NOW, 120 IS DERIVED, AND THE FLOOR STAYS AT 0** (Eva's re-issued ruling,
+Sep 19 — read `docs/bloom-tilt-range-shipped.md`, then §1 of `docs/bloom-tilt-range-outcome.md`
+before re-opening the floor, and `docs/bloom-bell-corolla-discovery.md` §4 for the derivation and
+§9 item 2 for the ruling). The default stays 25, the FOOT does not move, and **`seamClearanceMm`
+is character for character what it was** — the saturation past 90° stays, so 120 is a ceiling on
+the RANGE and not a change of regime; the window-lower-bound extension is costed and REJECTED in
+the discovery doc and must not be re-proposed. **120 IS WHERE THE SEAM WINDOW CLOSES, NOT A ROUND
+NUMBER**: past a right angle the clearance is a WINDOW, `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|`,
+non-empty iff `|cos θ| ≤ ½` — **θ ≤ 120° EXACTLY**, one point at 120 — and PR #210's measured
+115–123° crossover is that window closing. Do not round it later.
+**THE −30 FLOOR OF Sep 17 IS WITHDRAWN AND ITS REASON IS THE HALF THAT MUST NOT BE RE-OPENED**:
+swept at one degree over 22 states the within-shell census leaves zero at **−8°** on six whorls at
+the thickest sheet, −16° on six whorls at the SHIPPING sheet, and at −9 / −10 / −17 / −22 / −23 /
+−28 / −29 on the rest; every worst site is at exactly `z = −t/2` (the foot slab's UNDERSIDE) and
+the same `|θ|` read UP is **0 pairs on 13 of 13** — the DESCENDING seam case, which is the seam
+owner's work and is unscheduled. A shallower floor is not the answer: the shallowest onset is −8,
+so a clean floor is −7. The discovery doc's own "tilt −30 … 0 pairs" cell reproduces and is true
+of the DEFAULTS petal alone.
+**THE RANGE AND THE ROLE-OVERRIDE ENVELOPE ARE ONE NUMBER IN TWO FILES** — `ROLE_OVERRIDES`
+restates `petalTilt`'s bounds for `labellumTilt`, `hoodTilt` and the nine `petalNTilt` rows and the
+harness THROWS at module load if they disagree; holding it narrower is wrong, not merely refused
+(a +5° delta on a base of 120 would compose to 125 and clamp back to 75, dropping that petal 45°
+below its whorl). **The delta CONTROLS stayed at −75..75** — the dead-zone check refuses a delta
+WIDER than the clamp's reach, never a narrower one.
+**THE PARTITION: 28 MOVED / 822 HELD / 2 REDEFINED of the 852-row live matrix, +8 ADDED** —
+predeclared from the BASE tree's own `overrideClamped` record by DIRECTION (`asked > got` is the
+ceiling; `asked < got` is the floor and does not move). **#259 measured 43 rows with the clamp
+biting and this ruling reaches 28 of them; the other 15 are floor-only and are named in the
+shipped doc** — #259 §4(iii)'s own prediction, measured. Census: **17 WORSE / 10 better / 1 same
+count**, **eleven rows go clean → folded at exactly #259's own magnitudes**, sixteen declared
+magnitudes re-recorded, and **triangle counts unchanged on all 28**. The two REDEFINED rows are
+`petalTilt max (75)` → `petalTilt max (120)` and `ALL MAX` (one label, two states) — declared in
+`ROW_DEF_MOVED_BY_CHANGE`, which REFUSES an undeclared redefinition and a declared one that did
+not happen.
+**`ALL MAX` GETS SUBSTANTIALLY WORSE AND IT IS REPORTED, NOT TUNED AROUND: 129,803 → 192,270
+pairs (+48%) at an UNMOVED 3.1556 mm worst span**, its deepest ring going 165° → 210°. More
+contacts, none deeper. Its triangle count is unmoved at 2,506,652, so its declared export
+refusal is untouched. Trimming the row would make it stop meaning its own label.
+**BLOCK 36 IS THE PAST-90 REGIME THE BASE CONTROL NOW REACHES** (8 rows, both STL gates, 3 smoke
+rows). **TWO OF THEM READ EXACTLY 0 PAIRS AND ARE HELD THERE BY X2** — `TILT: 76` (the first
+newly reachable value, still under the right angle) and `TILT: 90` (where the law saturates) —
+so the block is not a set of rows that all happen to be declared. **`TILT: 105` reads 336 /
+0.4016, reproducing the discovery doc's own T1 cell** — measured there on a scratch tree with a
+LIFTED clamp, here through the shipped slider.
+**AND `verify-bloom-grid.mjs`'s clause 4b GAINED 120** — its "the seam frame step IS `petalTilt`"
+probe was written down at 0 / 25 / 75, all under a right angle, so the case where the two normals'
+dot goes NEGATIVE had never been handed to it. Reads exactly 120.000000.
+**`frozen/phase35` IS THE 852 ROWS AT `0db9969`** and a phase IS owed: the row set changed
+(two definitions moved, block 36 appended eight, 852 → 860). Every one of the 33 older frozen
+matrices deep-compares IDENTICAL between the trees — they pin the literal 75, which is what a
+verbatim snapshot is for.
+**THE SWEEP READS 722 OF 17,081 FROZEN ROWS OVER 28 OF THE 34 BASELINES**, against #259's
+predicted **1,072 over 27** for the withdrawn `-30..120` — and the two agree with the live
+partition to within a row: **722 - 28 (phase35, which did not exist then) = 694, and 694 / 1,072
+= 0.647 against the live matrix's own 28 / 43 = 0.651.** phase2..phase7 read EXACTLY 0 (no role
+override block yet), the count climbs 2 / 2 / 20 / 27 / 27 as the SLOT, per-petal and ORCHID rows
+arrive, and **saturates at 28 from phase13 on and never moves again** — the live mover count
+reached by an instrument that shares no code with the partition. A phase whose row count FELL
+(phase16, phase22) still reads 28: the retirements took no tilt row with them.
+**AND A MOVER PREDICATE THAT READS WHAT ITS OWN CHANGE WRITES CANNOT BE EVALUATED ON THE CHANGED
+TREE.** `verify-bloom-seam-bytes.mjs --frozen-sweep` read THIS tree's builder record — true of
+`seam`, `widest` and `arc`, none of which writes `spine`, and FALSE of `tilt`, whose predicate
+reads `overrideClamped`: on the head a composed 100 is not clamped at all, so **every mover would
+have reported as a holder and the sweep would have answered 0 in silence.** It builds on the BASE
+tree for a declared set of changes now and REFUSES without one. Fourth durable rule, applied to a
+sweep rather than to an assertion.
 
 **THE FOOT-TO-BLADE SEAM HAS A DERIVED CLEARANCE, AND THE "ROOT BLEND" DIAGNOSIS IS
 SUPERSEDED** (session 38, Eva's ruling — read `docs/bloom-foot-to-blade-seam-outcome.md` before
@@ -2241,6 +3562,82 @@ better one, because there is no stable one to have: the point of the measurement
 and it is wide enough that no single number — this paragraph's included — can size a wait. It is
 here as evidence that the rule above is load-bearing, and a session that quotes it instead of
 reading `actions_list` at the time has made exactly the mistake it documents.
+**AND THE SPHERE-STEM SESSION SET A NEW MAXIMUM: 214.8 min, so the measured spread is now
+151.8 to 214.8** (`bloom-export-watertight`, run 34854690257, matrix step 14:19:32 -> 17:52:34
+= 213.0 min, job total 214.8). It exceeded the old ceiling by 11 minutes while
+`bloom-connectedness` on the same head ran an ordinary 123.9. **This is the third widening and
+it is the point of the rule, not an exception to it** — the spread is now a factor of 1.41
+between fastest and slowest of one workflow, so no figure in this file can size a wait and the
+only correct move is still to read `actions_list` at the time.
+**AND THE LEAF SESSION WIDENED IT TWICE MORE, WHICH MAKES SIX — 219.5 AND 221.4 min**
+(`bloom-export-watertight`, runs 34908046877 and 35003665560; the first cross-checked against
+`get_workflow_run_usage`'s `run_duration_ms` 13,169,000, the second being that PR's own gate,
+17:50:13 -> 21:31:39). Both are past the 214.8 ceiling above, and `bloom-connectedness` on the
+same head ran an ordinary 119.1. **THE SHAPE OF THE SPREAD HAS CHANGED AND THAT IS THE ONLY
+THING WORTH READING OFF IT: the five most recent successes at the time read 214.8 / 215.0 /
+215.1 / 216.5 / 219.5 — TIGHT AT THE TOP — so the 151.8 min FLOOR recorded above is no longer
+representative of anything**, and a wait sized from the bottom of the written range would come
+up an hour and a quarter short. **Do not update this paragraph with a seventh number and do
+not quote any figure in it.** Six widenings in, the only thing that has held is the rule
+itself: size every CI wait off `actions_list`'s own recent completed runs, read at the time.
+Every constant here has been superseded; the instruction has not.
+
+**AND `get_job_logs` RETURNS HTTP 404 WHILE A JOB IS STILL RUNNING, so NOTHING HERE CAN SEE
+INSIDE A GATE MID-RUN** (measured, the sphere-stem session, on job 104011064304 at 207 minutes).
+**That is a DIFFERENT failure from the blob-URL policy denial recorded above**, which applies to
+a COMPLETED run's log: the 404 is GitHub declining to serve an archive that does not exist yet.
+Combined with the fact that a matrix gate is ONE long step, the consequence is worth stating
+because it decides what to do when a gate runs long: **step granularity says nothing, the log
+says nothing, and there is therefore no instrument that can distinguish SLOW from HUNG.** So
+exceeding the measured spread is not evidence of a hang. **Do not cancel and re-run on
+suspicion** — that spends three hours to learn nothing, and this file's own rule is that a
+re-run is only for a failure demonstrably not the PR's. Wait, and let the 6-hour job timeout be
+the thing that declares a real hang. The sphere-stem session waited and the gate passed.
+
+**AND WHEN A GATE GOES RED, THE LOG IS NOT DOWNLOADABLE FROM HERE — REPRODUCE LOCALLY**
+(Sep 13, hit twice in one session). `get_job_logs` hands back a
+`productionresultssa2.blob.core.windows.net` URL and **the agent proxy denies it on
+organization policy** (`connect_rejected`, a flat 403) — that is a policy denial to report,
+never to engineer around. What is left is `return_content: true`, which only takes a
+`tail_lines`, so **the end of the log is reachable and the beginning is not**.
+**THAT MATTERS BECAUSE THE `HARNESS INVALID` BLOCK IS ON STDERR AND STDOUT IS BUFFERED TO
+EXIT**: every per-row line arrives in one flush at the end with a single timestamp, so the
+stderr block — written moments earlier — sits ABOVE roughly two thousand lines of stdout,
+i.e. near the START of the file, where no tail can reach it. The summary's own pointer says
+so in as many words ("it may appear ABOVE this line in a combined log"). **So the route is a
+LOCAL REPRODUCTION, and the cheap version of it is the gate's own per-row PREFIX**: the
+assertion families run before the STL export, so a script that replays openBloom / applyConfig
+/ fullStateDrift / shownMode / capability and then the SHIPPED assertion functions sweeps all
+736 rows in ~38 minutes with no exports at all. **Its premise has one hole, which is how this
+session used it and got 0 findings on a red matrix: there are validity assertions AFTER the
+export too** (`no STL download`, the export floor, orientation, crowding), so a clean prefix
+sweep narrows the search to the post-export half rather than clearing the tree.
+**AND DO NOT PIPE THE RUN THROUGH `tail`** — `node tools/bloom-smoke.mjs --conn 2>&1 | tail -40`
+keeps the last forty lines of the COMBINED stream, which is the tail of the stdout dump, and
+throws away the stderr block for the same reason the CI log does. Write the whole run to a file
+and grep it. This session recorded that lesson and then repeated it within the hour.
+
+**AND BACKGROUND WORK DOES NOT SURVIVE THE END OF A TURN IN THIS CONTAINER — SO A LONG
+CAPTURE RUNS IN THE FOREGROUND, IN `timeout`-BOUNDED CHUNKS, WITH `--resume`** (the
+ROOT-BLEND-line session, measured twice; it cost ~51 minutes). The obvious move — launch the
+byte capture with `nohup`, end the turn, read it back at a check-in — CANNOT WORK, and the
+first reading of why was WRONG and is recorded here corrected. It was called "a container
+restarted", which is what `uptime` looks like; the arithmetic says otherwise. Resumed at
+139/137 rows and read back 51 minutes later at 181/180: **42 rows, which at the measured
+3.6 s/row is ~2.5 minutes of actual running.** The process runs while the turn is live and is
+killed the moment the session goes idle. No OOM, no disk pressure (29 G free), no in-process
+error, and **no `EXIT=` marker from the wrapper** — the whole process group is killed, never
+exited, which is the tell that separates this from a crash.
+**WHAT MAKES IT SURVIVABLE IS SESSION 20'S CHECKPOINT, AND IT IS WHY THAT MECHANISM EXISTS**
+(`--resume` in `tools/diff-bloom-bytes.mjs`, built after that session lost three captures to
+the same thing): the out file is rewritten after EVERY row with `complete:false`, `--compare`
+refuses a partial, and an interruption costs ONE ROW rather than a run. A 860-row capture
+then closes in six `timeout 555` chunks inside single Bash calls — the tool's ceiling is
+600 s, and foreground `sleep` is blocked, so the chunking is the whole answer rather than
+waiting in-turn. **A `send_later` check-in is NOT the thing that fails** — it wakes the
+session reliably; what does not survive is the PROCESS, so a check-in that expects to read a
+finished background run reads a dead one. Do not re-derive this by backgrounding a sweep and
+coming back to it.
 
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
@@ -2354,6 +3751,297 @@ split is CONDITIONAL and why Z5 asserts that collapse in both directions.
 until Z4 (the assignment is mirror-symmetric) and Z5 existed, and a third was
 silent above one whorl until Z6 (a role differentiates the BLADE, never the
 foot). Do not read a green run as endorsing any of it.
+
+**TWO CONTROLS AT ONCE — THE COMBINATION GATE, AND THE MATRIX IS BLIND TO THIS BY
+CONSTRUCTION** (#263, expanded by #265 to every pair #263 proposed — read
+`docs/bloom-combination-gate.md` before adding, moving or retiring a pair, and before
+quoting any figure from it). `buildMatrix()` VARIES ONE CONTROL AT A TIME, which is what
+makes a row attributable and is exactly why a hazard living only in the PRODUCT of two
+settings cannot be seen by any gate here. `node tools/bloom-combination-gate.mjs` is the
+instrument: **one number — the NEAREST APPROACH IN MILLIMETRES between two surfaces that
+must not meet** — on a predeclared product grid, against `MIN_FEATURE_MM` (imported, never
+restated). It rides in `bloom-export-watertight.yml` BEFORE the browser install, beside the
+wall instrument, for that step's own three reasons; the bloom gate count stays at FIVE.
+**TWO MEASURES, EACH WITH ONE OWNER, NAMED PER PAIR:** `self` is `measureWall(grid).self`
+IMPORTED from `tools/bloom-wall-thickness.mjs` (V5's own quantity through V5's own function
+— a second implementation would agree with a broken one by being broken alongside it), and
+`leaf-stem` is every LEAF BLADE vertex against the free stem through the geometry's own
+`freeStemDistanceMm`, with the petiole rod excluded by the leaf builder's OWN reported
+`petioleAxis` (ST9's remedy: name the rod, never widen the region).
+**EVERY AXIS'S FIRST VALUE IS THAT CONTROL'S OWN REGISTRY DEFAULT**, asserted by CG0 — which
+is what makes the grid CONTAIN its two single-axis columns, so the product-only claim costs
+no extra builds and a moved default reddens the gate rather than silently re-pointing it.
+**AND THE LADDERS ARE SHARED BETWEEN PAIRS ON PURPOSE** — `petalCup` is `[0, 0.6, 0.9, 1.2]`
+and `petalSpineCurl` `[0, 180, 270, 360]` wherever either appears — so a cell turning up in
+two grids is the same state read twice and its two records cannot disagree.
+**ALL FIFTEEN BOUGHT PAIRS SHIP (Eva's ruling, #265), TAKING THE GATE TO TWENTY: 5 tier-1
+(#263's) · 9 tier-2 · 6 tier-3, 262 cells, 78 declared cells across SIXTEEN pairs** — the
+gate prints both totals on every run, and quote them from a run rather than from here, since
+#265 itself shipped "eleven pairs" in four places against a real sixteen and no clause could
+have said so. Her reasoning: at
+25.9 s and 19.1 s against a ~250-minute export gate, runtime is not the cost — **the
+recurring cost is declared magnitudes, which is proportional to findings, which is what the
+gate is for.** Every `worst` and every declared-cell count in #263's tier-2 and tier-3
+tables reproduces EXACTLY on the shipped grids, which is what says the grids are the ones
+ruled on (#263 measured its candidates through `run()` and committed none of them).
+**THE TIER IS A FIELD THE GATE READS (CG6), NOT A COMMENT**: tier 1 is a cited defect,
+tier 2 a shared mechanism argued from `bloom-geometry.js`, tier 3 a GUESS that must declare
+`guess: true` — and a pair's `cite` must name at least one file THAT EXISTS in the tree,
+resolved against the gate's own tree and never against `--root` (which is where the
+GEOMETRY comes from). A citation pointing at a doc that is not there reads as evidence to
+the next reader.
+**`verdict` IS THREE-VALUED AND THAT IS THE CLAUSE THE EXPANSION FORCED.** #263's
+`productOnly: true|false` had NO TRUE VALUE for a pair that clears entirely — no single-axis
+failure and no interior one — and **four of the fifteen clear**. CG4 is now a three-way
+biconditional over `product-only` / `single-reaches` / `clears`, which PARTITION the
+possibilities so no declaration is unfalsifiable; `clears` is what makes keeping a clearing
+pair worth its builds, because it fails loudly the day a pair nobody was watching stops
+clearing. The split is **12 product-only · 4 single-reaches · 4 clears**, and all four
+clearing pairs are ones #265 bought — #263's own five all reach the bar. CG0 the grid · CG1 per-axis reachability · CG2 the bar both ways · CG3 the
+magnitude both ways (#213) · CG4 the verdict three ways · CG5 a stray declaration · CG6
+provenance · CG7 the inert record both ways.
+**WHAT THE EXPANSION FOUND THAT NOTHING HAD MEASURED.** `petalSpineCurl × petalTwist`
+reaches **0.012 mm with BOTH singles clear** (twist 180 reads 1.163, curl 360 reads 1.245) —
+the same twelve microns TIER 1's worst cell reads, on a pair no doc cites. **`petalCup ×
+petalRoll` is the widest failing region in the gate**, eleven cells taking `roll-max`'s
+0.659 mm down to **0.010**. **THE MEASURE DEPENDS ON THE SUM OF THE CUP AND ITS GRADIENT** —
+read `cup-x-gradient`'s eight declared cells as `cup + gradient` and every anti-diagonal is
+one number to the third decimal (1.5 → 0.938 twice, 1.8 → 0.862 three times, 2.1 → 0.801
+twice, 2.4 → 0.754), which is `cAt(u, r)` composing the two into one coefficient showing up
+as a measured symmetry. **THE GRADIENT REPRODUCES §18a ALMOST EXACTLY**: five cells within
+0.004 mm of the plain cup's at the same numbers, and the SAME five fail. **AND `roll-max`'s
+0.659 IS NOW DECLARED THREE TIMES IN THIS FILE AND ONCE IN THE WALL INSTRUMENT, ALL FOUR
+AGREEING** — two instruments, one state, the third decimal.
+**TWO PAIRS ARE NOT MONOTONE IN THEIR SECOND CONTROL, WHICH A PAIR COUNT COULD NOT SAY:**
+`buckle-x-tipshape` reads 0.914 at amplitude 0.2 and **0.925 at 0.4** (the amplitude CLAMP
+binding — the deeper ruffle is a different wave, not a bigger one), and `curl-x-twist` reads
+0.012 at 120° of twist and 0.025 at 180°.
+**`leafToothDepth` IS BIT-IDENTICALLY INERT FOR THE LEAF-STEM MEASURE, AND THAT IS WHAT CG7
+EXISTS FOR.** The teeth are cut into the leaf's MARGIN and the nearest blade point to the
+stem is at its BASE, so the serration moves the approach by **exactly 0.000e+0 at all four
+angles** — not "under the band", bit-identical — while the leaf's own emitted vertex stream
+DOES move with it. **CG1 refuses that pair, correctly**, and #263 could not have known: its
+tier tables came from `run()`, which measures, and never from `verify()`, which runs the
+clauses, **so CG1 and CG4 had never been evaluated on any tier-2 or tier-3 candidate.**
+`COMBINATION_INERT` is the honest form of the exemption — a number failing in BOTH
+directions, so the day that control starts reaching the measure the gate says the pair has
+become a real product pair — and the must-fail's leg 3 removes the declaration and requires
+CG1 to take the axis straight back. **Six of that pair's twelve cells are declared
+duplicates of states `leafangle-x-stem` already gates; whether it is worth twelve builds a
+run is Eva's, and it is the ONE part of her ruling that could not be executed as written.**
+**SATURATION IS NOT INERTNESS AND THE TWO LOOK IDENTICAL IN A TABLE:** `cup-x-thinning`
+reads the same number at `tipThinning` 0.4 and 0.8 because in EXPORT mode 0.4 has already
+taken the tip to the 1.00 mm print floor — but the axis moves the measure by 0.191 mm from
+its own default column, so it reaches it and CG1 is satisfied. `COMBINATION_INERT` is for a
+control that never reaches the measure at all.
+**`self` IS NOT THE CENSUS AND A CLEARING CELL IS NEVER A CLAIM THAT THE PETAL DOES NOT
+FOLD**: `petalCup max (1.2)` is a declared census xfail (752 pairs / 0.1268 mm) while its
+`self` reads 1.031 and clears. X1/X2 own the census; this owns the approach. It is also blind
+to a TOP-to-TOP fold, reads ONE petal, and **its own floor SCALES WITH THE SHEET** — which is
+why every `sheetThickness` pair is REJECTED rather than declared (measured: `petalCup ×
+sheetThickness` has its worst cell at the DEFAULT thickness, so a thicker sheet reads BETTER
+while the geometry gets worse). The REJECTIONS are as much the finding as the list.
+**THE LEAF-AGAINST-STEM APPROACH IS A MEASUREMENT GAP, NOT A COMBINATION ONE — MEASURED.**
+Swept over six partners, the second control moves it by at most **0.002 mm**: the hazard is
+`leafAngle`'s alone, `LEAVES: the STEEP angle (85 deg)` is ALREADY a matrix row, and what was
+missing is that nothing in the repo measured blade-to-stem approach at all. That pair ships
+with `verdict: single-reaches` so CG4 ASSERTS the finding rather than leaving it in prose.
+**THE MUST-FAIL IS NINETEEN LEGS AND EVERY ONE OF THE EIGHT CLAUSES** (`--control`): each
+plants into a COPY of the real `PAIRS` / `COMBINATION_XFAIL` / `COMBINATION_INERT`, runs the
+SHIPPED `verify`, refuses a vacuous plant (now including "no pair on each of the three
+verdict arms" and "no declared inert axis"), and re-runs the last plant NOT quiet so the red
+is printed through the gate's own path. **Legs 8-11 cover all four arms of CG4's switch**,
+which is what a three-valued biconditional costs and is why nine legs became nineteen. **The
+two GRID-CHANGING legs are scoped with `--only` to the pair they plant into** — they cannot
+reuse the baseline and rebuilding all 262 cells for each would cost minutes to re-measure
+states already measured — which is why the control costs about one baseline rather than
+#263's projected three.
+**#263's control found a defect in CG1 on its first sweep** — written as "some cell differs
+from the default cell", the clause stayed GREEN on a collapsed second axis because the FIRST
+axis still moved plenty; it is PER AXIS now and its plant is `stamenCount`, which is
+measurably inert for `self` (bit-identical at 0, 60 and 120). **AND RE-READING THE FIXED
+CLAUSE FOUND THE SECOND HALF: per-axis under `Object.is` is satisfied by ONE ULP, and a real
+control does exactly that** — `lobeDepth` moves the cup column by 2e-16 mm. CG1's bar is
+`COMBINATION_TOLERANCE_MM`, derived rather than typed.
+**ALL 262 CELLS ARE BIT-IDENTICAL BETWEEN NODE 20 (CI's) AND NODE 22** — `Object.is` over
+every cell of all twenty pairs, worst |delta| exactly 0, and the gate itself runs green
+under both. #263 measured that over TIER 1's 64; #265 extends it to the whole grid, which
+was owed rather than optional: `bladeStations`' gap-bound blend BINDS on several of these
+cells (0.656 on `cup 1.2 × tipShape 3`, 0.920 on the buckled ones) and a bisection on a
+transcendental cumulative measure is exactly where session 38 §B10.7 found two engines
+disagreeing. They do not disagree here, so the ±5e-4 mm band is not absorbing engine noise
+on ONE cell of the 262 — and a CG3 red in CI cannot be an engine artefact.
+**`--combination` ADDS A SECTION RATHER THAN SCOPING THE RUN, so the re-measurement
+invocation is `node tools/bloom-xfail-magnitudes.mjs --combination --only '^$'`** — without
+the `--only` the tool sweeps all 261 self-intersection rows first. #263's doc said "in
+seconds" and that was the section's cost, not the invocation's.
+**THE RUNTIME IS TWO RATIOS AND ONLY ONE IS ABOUT SIZE; #263's 1.3x DOES NOT TRANSFER AND
+WAS RE-DERIVED RATHER THAN CARRIED.** That figure is runner / *#263's* box, and #265 ran on
+a different machine — the SAME tier-1 code #263 timed at 13.1-14.3 s takes **20.14 s**
+here, so quoting 1.3x would have been two halves from two machines, which is the error the
+charter's own rule names. Idle box, two passes each: **the gate 87.97 s** (88.10 / 87.83),
+**`--control` 95.34 s** (95.94 / 94.75), **tier-1 alone 20.14 s** (20.06 / 20.22).
+**The gate is 4.37x its tier-1 subset against 4.09x the cells** — near-linear, the excess
+being module load. **The control is 1.08 BASELINES where #263's was 2.9** (53/18 on the
+runner), which is a change of STRUCTURE and the independent corroboration that the two
+grid-changing legs are `--only`-scoped: seventeen of nineteen reuse the baseline.
+**`--control` does NOT honour `--only`** (it calls `control({})` unscoped), so a "tier-1
+control" is not measurable through the shipped CLI and is not well defined anyway — the
+nineteen legs plant across all three tiers — which is why the carried-forward ratio is the
+BASELINE MULTIPLE and not a cell count. Projected onto the runner's OWN tier-1 figures
+(18 s / 53 s): **~79 s + ~85 s = ~164 s, about 1.1% of a ~250-minute run against 0.5%
+before.** **Read the actual step timings off the PR's own gate run rather than quoting the
+projection** — a projection never checked against what it predicts is how a constant becomes
+folklore here.
+**ZERO GEOMETRY, PREDECLARED THEN MEASURED.** `bloom-geometry.js`, `bloom-registry.js`,
+`bloom.js`, `bloom.html` and `bloom.css` were named untouched before a line was written and
+are sha256-identical to a worktree of the base commit at close, so the exported stream is
+identical BY CONSTRUCTION — and measured anyway, because by-construction is an argument and
+this project prefers a number: `verify-bloom-surface-bytes --base <worktree>` reads **PASS,
+0 floats moved** over **836,485,992 export floats / 92,942,888 triangles and 77,135,222
+captured-grid values**, the whole 860-row matrix in both modes, positionally under
+`Object.is`. **NO FROZEN PHASE IS OWED** — no matrix row is added or removed, so
+`frozen/phase35` stays the newest baseline and no tag's bytes stop reproducing. Its
+`--control` fires BOTH clauses (export stream and captured grid) on a 1e-9 perturbation,
+which is what stops the second one being a log line.
+
+**A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
+RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
+`docs/bloom-inflorescence-discovery.md` and they govern — read them, then
+`docs/bloom-inflorescence-outcome.md`, before touching `inflorescencePlan`,
+`floretState`, `pedicelPlacement`, `buildInflorescenceInto`,
+`MeshBuilder.appendTransformed` or the ID family). Ruling 5 scopes the first session to
+INSTANCING PLUS ONE RACEME and nothing else: no presets (ruling 10), no compound levels,
+no cymes, no depth past 1, no maturation ramp or bud pose (ruling 6), no droop or axis
+curvature (ruling 8), and the capitulum is the HEAD's (ruling 1 — a mum is one flower with
+120 petals and one centre).
+**PHASE A'S STOP CONDITION WAS NOT MET AND THAT IS A MEASUREMENT:** `bloom-geometry.js`
+holds ZERO module-level mutable state (every module `let` is a `const`; the four `last*`
+variables are `bloom.js`'s and are written AFTER a build returns), so the head IS a pure
+function of `(state, acc)`. It IS origin-locked — the hub is centred on `[0,0,0]`, the
+stem runs down the world axis, `stemOmission` reasons about world z by name — which is
+what Route A handles BY CONSTRUCTION rather than by refactoring. **`below: 'branch'` is
+NOT needed**: `below` is validated by `buildBloomInto` and read nowhere else on this tree.
+**THE PEDICEL IS THE FLORET'S OWN STEM, WHICH IS THE ARCHITECTURAL FINDING.** A floret
+with its pedicel is ONE shipped `buildBloomInto` call — `floretState` sets `stemLength` to
+the pedicel's length and `stemDiameter` to twice its derived radius — so the ONLY new join
+in the whole feature is pedicel-tip-to-rachis-wall, which is the leaf PETIOLE's problem
+already solved, and `buildHubInto`'s hub-to-stem join generalises with nothing added
+because it runs in the floret's own frame at the floret's own origin. **ONE BUILD, N
+APPENDS**: build time is **O(1) in the node count**, which is ruling 5's "identical
+florets" cashed as a cost. Per-node deltas (ruling 10's second half) would make it a build
+per distinct state and are the next session.
+**A REDUCED FLORET IS NEEDED AND RULING 4 SUFFICES — MEASURED.** Heads alone against the
+1,500,000 budget: **DEFAULTS bites at 78 heads, a 5-petal floret at 125, a 3-petal floret
+at 206, and THE MUM AT FIVE.** A floret is 11,972 triangles at five petals and 7,260 at
+three with `NU` untouched; the ceiling this session ships is 12 nodes x 3 = 36 florets.
+**THE SEVEN CONTROLS**: `inflorescence` (NONE / RACEME, default NONE — the guard) in a new
+top-level Inflorescence section, with `floretNodes` (1-12, 5), `floretPhyllotaxy` (the
+LEAF's own three), `floretPetals` (3-12, 5), `floretScale` (0.20-1.00, 0.60),
+`pedicelLength` (5-60 mm, 20) and `pedicelAngle` (-60..90 deg, 35) in a nested Floret
+section, all hidden AND inert at NONE and on a bloom with no rachis. **NOTHING IS A SECOND
+OWNER**: nodes are `leafNodeDepthsMm`, azimuths are `leafAzimuths`, the rod's root and
+embed are `rodWallRootMm` / `rodWallEmbedMm`, the crossing is `rodWallCrossingMm`, the size
+clamp is `OVERRIDE_BOUNDS`, the gap is `MIN_FEATURE_MM`. **THE PEDICEL'S RADIUS IS DERIVED
+AND IS NOT A CONTROL** — the area rule read downward, `r_rachis / sqrt(N)`, floored at
+`STEM_DIAMETER_RANGE[0]/2` and TOLD; on the shipping 6 mm rachis the floor binds from five
+florets up and at two it is 4.24 mm.
+**AND IT READS THE *ASKED* COUNT, WHICH BREAKS A FIXED POINT RATHER THAN BEING A
+CONVENIENCE.** The pitch floor is `2 * pedicelR`, so a radius derived from the count that
+floor produces is count -> radius -> floor -> count: the `headRise` ruling's "a metric
+consumed as a geometric input becomes a target", and session 32's withdrawn per-state
+ladder gate. The asked count is also conservative in the right direction (fewer built than
+asked gives THINNER pedicels, never thicker), and ID2 rebuilds it from the CONTROLS.
+**A FLORET IS A BLOOM, SO EVERYTHING A HEAD CAN DO HAPPENS INSIDE IT — THREE CLAUSES
+LEARNED THAT THE HARD WAY, EACH SEEN RED.** (i) **The floret's OWN stem channel fires**:
+on a SPHERE head the floret is a SPHERE head too and its pedicel takes the petals it would
+pass through — **4 of 5 asked, measured** — so ID4's first clause demanded all five and
+went red; widening it to a `<=` is the vacuous repair, and the shipped clause predicts the
+asked count LESS the floret's own `stemOmission()` tally with the channel's EXISTENCE a
+biconditional against `sphereMode`. (ii) **O1's declared inward count is over the FILE**,
+so N florets multiply it: `INFLO: x a SPHERE head` read **6 of 47 inward against a declared
+1**, and the baseline is `inwardOf(head) + count * inwardOf(floret)` with `inwardOf`
+written once and applied twice; the cavity clause now asks whether *some* inward shell is
+the bore's prism rather than the NEAREST, because N florets add N candidates. (iii)
+**ST9 read 1554 intruding vertices**: a pedicel is rooted THROUGH the rachis wall by
+design exactly as a petiole is, so ONE list and ONE rod test now serve both families and
+that took it to 144.
+**THE REMAINING 144 ARE THE FLORET'S OWN BODY AT 0.8234 mm, AND THEY ARE REPORTED RATHER
+THAN GATED** — ST9's subject is the stem CHANNEL, a region the design says must be EMPTY,
+and a floret hangs BESIDE the rachis on its own pedicel; two parts of one solid fusing is
+OVER-connection, which is the crowding ruling's own grounds (Eva, Sep 3). The declared
+floret blocks are CHECKED where they are used — disjoint, in range, totalling the builder's
+own tally — so a block that swallowed the head cannot silence the clause, and a head petal
+driven into the channel is outside every block by construction. **Swept as a pure
+geometric quantity, EXPORT: SPHERE head 0.0000 / 1.1345 / 3.2733 / 1.4731 / 0.8234 /
+0.0544 / 0.0000 at pedicelAngle -60 / -30 / 0 / 25 / 35 / 45 / 60+, against a CAP head's
+0.0000 / 11.3906 / 18.5015 / 14.3624 / 8.2475 / — / 0.0000** — a factor of ten at the
+shipped angle, because a SPHERE floret's petals radiate back toward the rachis and a CAP's
+do not. The read-out carries it on every build.
+**AND THE MODE RULE CAUGHT A CLAUSE WRITTEN MINUTES EARLIER**: the first version of that
+report compared the BUILDER's flag against the FILE and read **0.9230 against 0.8234** —
+`__bloomMetrics()` is the LIVE build and the STL is the EXPORT one. The honest repair is
+not a tolerance (the difference is the TIP print floor, 0.15 live / 0.80 export, closing
+the gap by an amount no closed form in the sheet predicts) but to DROP the comparison and
+declare the blindness: the flag serves the read-out, ST9 serves the file.
+**`floretScale`'S DEAD TRAVEL IS TOLD AND THE RANGE IS NOT NARROWED** — on the shipping
+35 x 16 mm head the length stops moving below **0.571x** and the width below **0.500x**,
+about a third of the track. No static range is dead-free (the releasing scale is a property
+of the HEAD's two sliders) and an adaptive minimum would make one slider position mean
+different shapes on different heads: `stamenSpread`'s ruling, with the carnation terminal's
+low-end case — the dead stretch is at the BOTTOM, so NO HATCH is drawn and the number is
+printed on the control. ID4 pins `sizeDeadBelow` twice, against the ranges and as a
+biconditional against the clamp beside it.
+**A SECOND PRODUCER WAS FOUND BY THE MUTANT TABLE'S ANCHOR SCAN, NOT BY A FAILURE.**
+`const rootR = (stem.boreR + stem.outerR) / 2` lived in `leafPlan` and, the day the pedicel
+arrived, in `inflorescencePlan` — so ID2's mutant anchor **matched twice**, mutated the
+LEAF's and said nothing about the pedicel it named. §9b(i) of the seam session verbatim;
+fixed by giving the expression ONE owner, never by narrowing the string. **And
+`sepal-height-ignored` was disarmed on `main`** (`stemEnd.z + frac * extentMm` against the
+shipped `zStemEnd + frac * extentMm` — 0 matches on BOTH trees), re-anchored here.
+**R1 FIRED ON THE NEW PART FOR THE THIRD TIME** (after the stem and the leaves), exactly as
+its own comment predicts; both coverage instruments build the florets from
+`inflorescencePlan`'s own record now.
+**`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 export triangles of the 1,500,000 budget,
+74.3%, 54,435 KiB — SO THE ROW EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, WHICH
+IS A DISAGREEMENT WITH RULING 9 RATHER THAN A SHORTFALL.** That ruling asks for the
+sub-controls out of the blanket sweep "with one declared `INFLO: ALL MAX` refusal row"; the
+ROW is built and is in the matrix — 12 nodes x whorled x 12 petals x size 1.00 x a 60 mm
+pedicel straight up, the corner the sweep no longer reaches — and it simply does not breach
+(36 florets at 30,380 triangles each plus the head). Nothing was manufactured: widening a
+range until a row refuses would be tuning a control to exercise a gate. The headroom is
+REPORTED, and the day a node cap rises or a per-node delta lands that row is where it will
+breach.
+**THE COMBINATION GATE'S REJECTION OF ARRANGEMENT CONTROLS STILL HOLDS WITH HEADS
+INSTANCED, AND FOR A SECOND REASON — SWEPT, NOT ARGUED.** `self` is `measureWall` on ONE
+petal and cannot see where a whole HEAD stands, so CG1 would refuse an inflorescence pair as
+inert exactly as it refused `leafToothDepth`. And the measure such a pair WOULD want exists:
+the floret-against-rachis approach above, through `freeStemDistanceMm` — the same owner the
+gate's own `leaf-stem` measure calls — with the pedicel rod excluded. Swept on two candidate
+grids (`pedicelAngle` x `hubShape` and `pedicelAngle` x `pedicelLength`, EXPORT, 120 mm
+rachis) **both are `single-reaches` and 11 of 16 cells are UNDER THE BAR on each** — the
+hazard is `pedicelAngle` alone, and `pedicelLength` alone at 5 mm. Carrying either would
+declare eleven `COMBINATION_XFAIL` magnitudes (#265's own named recurring cost) **against a
+bar that does not apply**: `MIN_FEATURE_MM` is the minimum printable GAP and a floret
+touching its own rachis is OVER-connection, the crowding ruling's grounds. **So what would
+have to change is the BAR, not the row list**, and no pair is added.
+**THE GRID EXPORT WRITES THE HEAD AT THE ORIGIN ONLY** — a raceme's florets are not in the
+`.glb`, the read-out says so on every build with an inflorescence, and closing it is
+`bloom-grid-gltf.js`'s own change.
+**THE BYTE PARTITION IS 21 MOVED / 862 HELD OVER THE WHOLE 883-ROW MATRIX IN BOTH MODES,
+AND THE 862 ARE MAIN'S ENTIRE 860 PLUS THE TWO GATED ROWS** — `verify-bloom-surface-bytes
+--base <worktree of 3ed45df> --movers "^INFLO: (?!GATED)"` reads **PASS, 0 floats moved on
+the holders, positionally under `Object.is`, over 837,209,376 export floats / 93,023,264
+triangles and 77,409,888 captured-grid values**, with all 21 predeclared movers moving and
+`--control` firing BOTH clauses on a 1e-9 perturbation. **The mover set is predeclared from
+the GUARD PREDICATE, not from the labels** (a row moves iff `inflorescenceIsAbsent` is
+false), and the two agree in both directions; **no non-`INFLO:` row sets `inflorescence` at
+all** (0 of 883), so `ALL MAX` and `ALL MIN` are holders by construction and are measured
+as such. **`bloom.js` cannot move a float here and that is a reading of the diff**: every
+line it gains is `infloLine`'s text, the read-only metrics projection or a comment, and the
+only change on the export path is one name in an import list. `frozen/phase36` is the 860
+rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
+its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
 ## Flower generator — print-safety is a hard invariant
 
@@ -5308,6 +6996,43 @@ supplies `canvas2d()` (a DPR-correct canvas, mounted and auto-resized), live
 `width`/`height`, `reducedMotion` and `seed`. `dt` is CLAMPED at 1/20 s, so a
 tab switch cannot teleport a simulation.
 
+**A SCENE MAY HAVE SEVERAL PLANES, AND BOTH HALVES OF THAT WERE BROKEN UNTIL
+SOMEBODY CALLED `canvas2d()` TWICE** (session of Sep 14, answering scene 2's
+blocking question). The shell always looked ready for it — `canvases` is an
+array and `sizeCanvas` is per-entry — but **scene 1 is the only caller and it
+asks for one canvas, so the multiplane path had never once been exercised** and
+every claim about it was an inference. Measured, at an 800x600 viewport:
+* **THE PLANES STACKED INSTEAD OF OVERLAPPING.** `.scene-canvas` was in normal
+  flow, so the second canvas landed at **y = 600** — a full viewport below the
+  first, with the stage scrolling to **1200**. It is `position: absolute` now,
+  and DOM order is the depth order (later call = nearer the viewer).
+* **EVERY PLANE WAS OPAQUE.** `getContext('2d', { alpha: false })` was
+  hardcoded, and **on an opaque context even `clearRect()` yields opaque BLACK
+  rather than transparency** — the front plane read `[0,0,0,255]` where nothing
+  had been drawn, so it would have painted over everything behind it.
+**ALPHA IS NOT LEFT TO THE CALLER TO REMEMBER**, because only the BACKMOST plane
+can be opaque and that is a fact about compositing rather than a preference:
+`canvas2d()` defaults to *opaque iff I am the first layer*, which keeps a
+one-canvas scene exactly as it was and makes a stack composite correctly without
+the scene knowing any of this. `canvas2d({ alpha: true })` on the first call is
+there for a scene that wants the page ground showing through its own backmost
+plane. **SCENE 1 DID NOT MOVE, and a framebuffer equality is not the instrument
+for saying so** (this repo's own measured rule — the renderer is not
+deterministic between page sessions). What is compared against a worktree of the
+base commit is what IS exact, and all of it is identical: one canvas, one stage
+child, rect (0,0,900,640), backing store 1800x1280, `alpha: false`, stage
+scrollHeight 640.
+**THE GATE IS 79 CHECKS AND 22 MUTANTS.** The five `layers/*` checks are the only
+witnesses for any of it — **every other check in that file stays green on a shell
+that cannot layer at all** — and the composite one reads the RASTERISED
+framebuffer, because `getImageData` on each canvas says what that plane HOLDS and
+cannot say what survived compositing. Three mutants carry it:
+`the-planes-stack-instead-of-overlapping`, `every-plane-is-opaque` and
+`every-plane-is-transparent` — the last of which costs nothing visible, which is
+the point: only the alpha flag itself can see it.
+**WHAT IS STILL EVA'S:** scene 2's layer count and its palette, and the SVG
+assets themselves. Nothing about scene 2 is built.
+
 **THE LOAD TOKEN IS TAKEN BEFORE THE ALREADY-ACTIVE EARLY RETURN, AND THAT ORDER
 IS LOAD-BEARING.** Scene modules are imported dynamically, so a click on 2 while
 1 is showing leaves an import in flight; clicking 1 again must CANCEL it, or 2
@@ -5438,14 +7163,323 @@ CSS coordinates, not something a hardware notch does — so the gate scales what
 sends and asserts what the page actually RECEIVED before concluding anything
 about the wind.
 
-**Verify with `node tools/verify-scene.mjs`** (74 checks). Part one drives the
+**LILY PADS FLOAT ON THE WATER, AND THEY ARE THE FIRST THING IN THIS SCENE THAT
+OCCLUDES ANYTHING** (`scene/koi-pads.js`, and `drawPad`/`drawBloom`/`drawPads` in
+koi-draw.js — read that module's header before touching any of it). Loose clusters
+of pads with open water between them, two or three blooms rising among them, a pad
+rocking as a ripple's front passes under it, and koi swimming beneath them.
+
+**THE WATER IS A HEIGHT FIELD AND A FLOATING DISC READS IT TWICE — ONE LAW, NOT
+TWO MECHANISMS.** A leaf on water sits AT THE WATER'S HEIGHT and lies ALONG ITS
+LOCAL TANGENT PLANE, so `waveAt(ripples, x, y)` returns `{ h, gx, gy }` and the pad
+takes its BOB from the height and its ROCK from the gradient. Nothing in it knows a
+ripple is a ring: it asks the water where it is and which way it is leaning.
+**A PAD CANNOT TELL A CLICK FROM A RAINDROP, structurally** — `waveAt` reads x, y,
+r, age, life and strength and nothing else, which is the whole of `RIPPLE_FIELDS`,
+so there is no `source` to branch on. The same claim the fish carry, one module
+along, and the gate proves it the same way: two ponds whose ripples agree on every
+quantity a disturbance HAS and differ only in `rings` come out identical to the bit.
+
+**`surface.lift` IS DERIVED FROM THE SQUASH AND IS WHAT MAKES A ROCK SIGNED.** The
+view is an oblique orthographic with `sin(elevation) = squash`, so one plane unit of
+HEIGHT draws `sqrt(1 - squash^2) = 0.80` screen px UPWARD; `syAt(py, 0)` is exactly
+`sy(py)`, so nothing that floats is drawn by a second camera. **A FORESHORTENING
+ALONE CANNOT READ AS A ROCK** — a disc tilted by theta draws `cos(theta)` narrower
+along the tilt, and cos is EVEN, so a pure squash looks the same tilted either way
+and reads as a PULSE at twice the wave's frequency. The height term beside it is odd
+in theta, so one edge visibly lifts while the other drops. `padPoint` is the one
+place a local point becomes a place on the water and it carries both terms, so a
+pad's rim, its freckles and its vein cannot be drawn under three different tilts.
+
+**A FIRST-ORDER LAG, AND NO SPRING, BECAUSE THE FORCING ALREADY OSCILLATES.** As a
+front crosses a pad the slope under it runs 0 -> + -> 0 -> - -> 0, so a plain lag on
+that target IS a rock with a phase delay; a second-order response would add ringing
+after the wave has gone, which the water damps. The tilt is lagged as a VECTOR, so
+nothing wraps. **THE SATURATION IS SOFT AND THAT IS NOT A DETAIL:** a hard clamp
+respects the same ceiling and also pins every pad in the pond at it for the whole of
+a storm. Measured: tilt caps at 7.16 degrees, bob at 5 plane px.
+
+**FISH SWIM UNDER PADS AND NOTHING STEERS THEM ROUND ONE.** Occlusion rather than
+avoidance, for four reasons and the first is not a preference: koi-draw.js's own
+header says draw order is **the ONLY depth cue here**, so a koi drawn OVER a pad
+would read instantly as a pad painted on the pond floor — the pad has to come after
+the fish whatever else is decided. Avoidance would also be wrong about koi (they
+shelter under pads, which is what the reference photograph is a picture of), would
+need the school's already-ruled weights re-tuned, and would turn a mid-pond cluster
+into a hole the school never enters, which reads as a bug. **A PAD THEREFORE NEEDS
+AN OPAQUE RESET, because nothing in this scene occluded anything before it** — every
+other mark is translucent ink, so a koi would simply tint through. A pad fills
+`GROUND`, then re-fills the same path with the **vignette's own gradient**: filling
+the ground alone is right mid-frame and WRONG at the corners, where the vignette
+darkens the water and would not darken the pad, so a pad near an edge would be a
+bright patch. It also loses the water's GRAIN inside its rim, which is free and
+correct — a pad is not water, and its freckles are its texture in the grain's place.
+**Pads are drawn BACK TO FRONT and each one whole**, so a nearer pad covers a
+farther one's rim and the GAPS between overlapping pads stay water — which is what
+lets a koi under a cluster be glimpsed through it instead of vanishing under one mass.
+**Rain falls in FRONT of a pad and is supposed to** (it is in the air); it is the one
+thing that legitimately appears inside a rim, and it cost the occlusion check a cycle.
+
+**THE PADS DRAW FROM THEIR OWN FORKED STREAM, AND NOTHING ELSE WOULD HAVE NOTICED.**
+koi-ripples.js says it in as many words: every draw on the shared stream shifts every
+number taken after it for the rest of the run, and the fish share that stream. A pad
+field placed from `rand` hands the pond a DIFFERENT SET OF KOI — still seven, still
+distinct, still swimming, and no check in the file could see it. `padRand` is forked
+from the same seed so `?seed=` still reproduces everything, and
+`pads/wiring-in-the-pads-did-not-move-the-koi` is the witness: a school built from the
+seed ALONE, with no scene around it, against the school the wired scene actually has.
+
+**A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT.** `ensure(w, h)` tops the
+field up over water that has just come into view and NOTHING already placed ever moves
+or is removed — a fixed object that jumped when the window changed size would stop
+reading as fixed, and a re-generation is what makes every pad jump. The gate compares
+pads by OBJECT IDENTITY across a resize, because a field that replaced its pads with
+the same number of different ones passes a count. **The blooms are the PICTURE's, not
+the pond area's**: two or three, capped for the field, so a resize cannot breed a fourth.
+
+**THE SHAPE IS THREE NUMBERS AND THE FIRST TWO CUTS WERE BOTH WRONG BY EYE.** The
+notch's width was set at the RIM as a fraction of the pad's own DIAMETER, not as an
+angle: a half-angle of 0.19 rad opens a gap of 0.38 of the diameter, which draws as a
+slice out of a pie rather than a stem slit (`NOTCH_GAP` was 0.10 — **SUPERSEDED by the
+per-pad angle below, whose range reaches further than this paragraph warns against;
+the reasoning is right about one fixed width and is not an argument against a range**).
+And **the veins
+were five lines and are one** — a midrib with two pairs of laterals drew a palm frond,
+which is the most detailed thing in a frame whose koi have no eyes, no barbels and no
+gill line; it also **stops three quarters of the way out**, because a bright straight
+line run edge to edge over a filled convex shape reads as a CRACK rather than a vein.
+The interior fill went 0.055 -> 0.095 in the same pass: at the lower value the reset
+had made a pad DARKER than the water it displaced and it read as a hole rather than a
+leaf. All three were found by rendering, not by reasoning — the sheet is
+`node tools/shot-scene-pads.mjs <dir>`, and **it quotes no pixel delta anywhere**: a
+pond is never still, so there is no settled frame to compare against and every number
+on it is read off the page's own reported state.
+
+**THE PADS ARE 25 TO 145 PLANE PX ACROSS, AND `PAD_ACROSS` IS THE DECLARATION
+BECAUSE `PAD_R` WAS LYING** (Eva's ruling: "update the pad widths to range between
+25 - 145px across, increase the up-down px proportionally"). The ruled quantity is
+the DRAWN WIDTH, so that is the constant and the radius is derived from it —
+`PAD_R = [PAD_ACROSS[0] / (2 * CLUSTER_SIZE_K[0]), PAD_ACROSS[1] / 2]`, inverting
+the two things that actually decide the realized ends: the cluster multiplier at
+the floor and `ensure`'s own clamp at the ceiling.
+**THE OLD CONSTANT MISDESCRIBED THE FIELD IT PRODUCED, and only measuring found
+it:** `PAD_R` read `[15, 58]` while the realized floor was `15 x 0.55 = 8.25` —
+**half the smallest pad the constant named** — because `CLUSTER_SIZE_K` multiplies
+every pad in a clump and nothing inverted it. Measured on the base tree over seeds
+1-40 at 1280x800 (1,585 pads): nominal diameter **16.7 .. 116.0**, not the 30 .. 116
+the constant implied. `CLUSTER_SIZE_K` moved up beside the size law so the derivation
+can read it — a module-level `const` read before its own declaration is a temporal
+dead zone THROW at load, not a subtle bug.
+**THE UP-DOWN NEEDED NO SECOND NUMBER AND MUST NOT HAVE ONE.** A pad is a DISC in
+plane space and the viewpoint's 0.60 squash is applied to POINTS at draw time, so
+every pad's own disc is drawn 0.60 as tall as it is wide, at every size —
+"proportionally" is already an identity here rather than something to arrange. A
+separate vertical range would be a second viewpoint, and the squash is shell-level
+and fixed. Measured across the change, same seeds, as the bounding box of each
+pad's EMITTED outline through `padPoint`: **across 15.8-119.3 -> 24.6-149.2,
+up-down 10.0-71.7 -> 15.1-89.5**.
+**THE BOUNDING BOX'S OWN ASPECT IS NOT 0.60 AND NEVER WAS — SAY WHICH QUANTITY THE
+IDENTITY IS ABOUT.** Per pad it spreads **0.535 .. 0.670 on the base tree and
+0.535 .. 0.678 on the branch** — same floor to four figures, so the size change is not
+what puts it off 0.60 — because the rim is LOBED: its widest chord across and its tallest chord up-down sit at different rim
+angles, so their ratio carries the lobes rather than the squash. The squash is exact
+on every POINT and on the nominal disc; it is not exact on a lumpy outline's box, and
+a "0.60 on every row" reading is the nominal being reported as the drawn.
+**THE DRAWN CHORD IS WITHIN ±3% OF `PAD_ACROSS` AND NOT ON IT**, for the same reason
+— the lobes push the rim out as well as in: nominal `2R` hits **25.1 .. 145.0**
+exactly while the drawn box reads 24.6 (-1.6%) .. 149.2 (+2.9%). Per pad against its
+OWN disc the outline's box runs **0.911 .. 1.033, median 1.000, in both axes alike** —
+the lobes act isotropically in the plane, which is why the squash survives as a
+statistic and fails as a per-pad identity. That residue is the rim being organic and
+is REPORTED rather than tuned away; chasing it would mean flattening the thing the
+lobes exist for. **THE SHEET'S MACRO CAPTION SAID `drawn 145x87 CSS px` AND THAT WAS
+THE NOMINAL WEARING THE WORD `drawn`** — it is `2R` times the squash, which is the
+disc the pad is built on rather than the outline it emits. It names the disc now and
+prints the 0.91-1.03 spread beside it, which is the same correction as the paragraph
+above arriving in a caption instead of a constant.
+**WHAT IT COST ELSEWHERE, measured rather than assumed:** bigger pads fail
+`PAD_GAP` placement more often, so a field holds slightly fewer of them (**1,585 ->
+1,515 pads over seeds 1-40**; blooms 97 -> 98, still 2-3 per field) — clumping still
+passes on every gate seed, and the frame cost is **0.17-0.22 ms** over four runs for
+46 pads against the 600-ripple cap (it was 0.15-0.17 at 44; one 0.613 outlier on a busy
+box was noise, confirmed by three re-runs — quote the spread here, not one reading).
+**AND A MUTANT THAT DELETES A `rand` DRAW IS A MUTANT ABOUT THE WHOLE POND.**
+`every-wedge-is-cut-at-the-same-angle` replaced `rand.range(...)` with a constant,
+which deletes ONE DRAW PER PAD and shifts every number the shared pad stream hands
+out after it — so every pad's size and position moved and it reddened the CLUMPING
+check, which is not a statement about wedge angles. It went BAD only once the pads
+got bigger; on the smaller field the shifted layout happened to still pass. The
+mutation is a comma expression now — it takes the draw and throws it away — so the
+field is bit-identical and the only thing that moves is the angle. **A mutation
+must consume exactly what the line it replaces consumes, or it is not testing what
+it names.** This is `koi-ripples.js`'s own forked-stream lesson arriving inside the
+mutant table.
+
+**THE PADS ARE ROUNDER AND THE STEM CUT IS A PER-PAD ANGLE FROM 5 TO 65 DEGREES**
+(Eva's ruling, on the shipped pads). Two constants and one law. `LOBE_AMP` is halved
+to `[0.024, 0.017, 0.009]` with a tighter per-pad multiplier, measured through one
+instrument over 20 fields and 792 pads: **the worst rim in a field varies by
+0.093-0.106 of its own radius where the amplitudes it replaced gave 0.203-0.234**, so
+the two distributions do not touch and the roundness bar sits at **0.16**, a third of
+headroom either way and set from the two distributions rather than from the data in
+hand. `the-rim-is-as-lumpy-as-it-was` restores the old amplitudes and is what stops
+the ruling drifting back.
+**THE WEDGE'S WIDTH IS THE INCLUDED ANGLE, DRAWN UNIFORMLY PER PAD** (`NOTCH_DEG`,
+`NOTCH_GAP`/`NOTCH_HALF` retired): the old fixed 5.7 degrees is this range's own
+floor, and the gap a given angle opens across the rim is still `2 sin(half)` of the
+diameter — 0.09 at 5 degrees and **0.54 at 65**, so the top of the range IS the "slice
+out of a pie" the fixed width was chosen to avoid, deliberately, as the far end of a
+variety rather than as every pad.
+**THE WEDGE'S SAMPLE COUNT IS DERIVED FROM ITS OWN WIDTH, AND IT IS EVEN.** Eight
+samples is dense across a 5-degree slit and COARSER THAN THE RIM across a 65-degree
+one, which draws the flanks as a staircase — so the count is whatever puts them half a
+rim step apart, and it is rounded to an EVEN number because the ladder runs flank to
+flank and the APEX is a sample only then. An odd count leaves a small flat where the
+point should be, at the one place the pad's own midrib starts.
+**A RANK CANNOT FIND THE RIM ANY MORE, AND THAT IS THE SAME DEFECT THIS CHECK WAS
+FIXED FOR ONCE ALREADY.** The flank is a continuous ramp from apex to rim, so it lands
+samples at every radius in between; the top-70%-by-rank window worked while the wedge
+was one fixed narrow width and is wrong at 65 degrees, where the wedge carries a THIRD
+of the samples and its flank climbs back into the window. What locates it now is the
+pad's own DECLARATION (`notchAt` / `notchHalf` / `notchDeg`, written by the builder and
+read by nobody in the module) — pinned to the shape by four clauses, because a
+declaration can lie: the one stretch that dives lies inside the declared window, it
+reaches the declared apex depth, **the window's own two edges are back up at the rim**
+(which is what pins the declared width to the width actually cut), and the half-angle
+is inside the ruled range. What is left is an over-declared window hiding a mangled
+rim, BOUNDED rather than closed at 18% of the ring by the 65-degree ceiling.
+**AND THE VARIETY IS MEASURED OFF THE DRAWN OUTLINE, NEVER OFF THE RECORD** — a field
+whose pads all DECLARE a different angle and all DRAW the same wedge passes any check
+that reads the declaration. The flank is a linear ramp from `NOTCH_INNER` to the rim,
+so the stretch under half a radius is a fixed fraction of the half-width; read its
+angular extent off the outline and it hands back the angle the pad was actually cut
+with. `every-wedge-is-cut-at-the-same-angle` is its witness.
+**THE WIDE WEDGE QUIETLY GREW THE OCCLUSION CHECK'S SUBJECT TO INCLUDE OPEN WATER, AND
+IT WAS STILL GREEN.** `scene1/a-pad-hides-the-water-under-it` sampled a disc centred on
+the pad at 0.9 of its radius — which at 65 degrees takes in a sector of the WEDGE, and
+a wedge is water. Measured across the change: the pads' median variation went **0.044-
+0.067 (one fixed 5.7-degree slit) to 0.193, worst pad 0.234 against a bar of 0.35** —
+passing, and no longer measuring only what it names. The disc is offset along the axis
+AWAY from the wedge now and is the largest that fits there: the flanks are rays from
+the pad's centre, so a disc on the opposite axis clears both exactly when its radius
+does not exceed its offset, and 0.42/0.40 satisfies that AT EVERY ANGLE THE RULING
+ALLOWS rather than on one field's luck. **It is a fifth of the old disc's area**, which
+is the honest cost of a cut that reaches the centre — a smaller disc averages fewer
+pixels, so rain and the pad's own rock move its mean further — and both sides are
+sampled at that radius so the ratio stays fair. **The ratio to open water went 0.091 to
+0.048 against a bar of 0.35**; the pre-wedge tree read 0.024, so about half the lost
+margin is recovered and the rest is the smaller disc. Nothing but re-reading the check
+against the new law could have found this: it never went red.
+
+**TWELVE CHECKS, ELEVEN MUTANTS, AND THE TWO HALVES OF THE OCCLUSION CLAIM NEED TWO
+INSTRUMENTS BECAUSE ONE CANNOT SEE BOTH.** The koi half is
+`pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, which drives the shipped `draw()`
+through a recording context and asserts the op ORDER and that the pad's first PAINT is
+a ground fill. **That recorder's first cut tagged every path point with the fill style
+in effect at the time of the POINT** — a path is built first and painted after, so a
+pad's own outline came back wearing whatever the ripple pass had left set. Paints are
+their own events now.
+
+**AND THE PIXEL HALF IS A VARIANCE, NOT A BRIGHTNESS, WHICH TOOK TWO FAILED CUTS TO
+SEE.** A pad's freckles composite to ~71 over the ground, two overlapping reach ~103
+and three ~123 — **past a koi's own outline at ~97** — so there is no threshold that
+separates "something is showing through the pad" from "the pad has texture". Measured
+on an isolated pad at idle, interior against the water beside it: **3.135%/2.981% at
+level 70, 2.447%/1.599% at 90, 0.053%/0.446% at 110, 0.000%/0.210% at 120** — low
+enough to catch the rings and the pad's own marks match them; high enough to exclude
+the marks and the ambient rings barely clear it either (2 lit pixels over 30 frames).
+**What actually distinguishes a pad from water is MOTION**: a pad's interior is static
+apart from its own rock, while open water has rings sweeping through it continuously.
+So the check compares the VARIATION of each disc's mean brightness across frames, needs
+no threshold at all, and says exactly what the claim is — measured **0.026-0.199 levels
+inside against 2.158 on an equal patch of open water**, and the control is a patch of
+OPEN WATER rather than a ring around the pad's own rim, because the brief guarantees
+open water exists and a ring does not (the first cut demanded 1.9 radii of clearance
+and simply **failed to run** the day the field was reseeded and no pad had it).
+**AND IT IS A MEDIAN OVER FIVE PADS AGAINST A MEDIAN OVER FIVE PATCHES OF OPEN WATER,
+WHICH TOOK THREE FLAKES AND A MISS TO ARRIVE AT.** The noise source is RAIN, which is
+drawn in FRONT of a pad and is supposed to be: one streak crossing a disc of this size
+moves its mean by about a level, the same order as the whole signal open water carries.
+On a CLEAN tree that shows as a factor of EIGHT between the quietest and the noisiest of
+five equally-correct pads (0.026 against 0.199) — so a WORST-of-five reads the weather,
+and it went red three times on mutations that provably could not reach it, the last
+being a storm ramp that is inert until the first click, which this check runs before.
+A SINGLE control patch is exactly as luck-dependent on the other side: measured across
+two runs of an unchanged tree it read **3.041 and then 0.751**, a factor of four. Both
+sides are medians over five now — measured 1.828 and 2.291 for the water across runs,
+against pad medians of 0.067 and 0.044, ten to fifty times under the bar.
+**AND WATCHING FIVE PADS IS ALSO WHAT MAKES IT FIRE AT ALL.** Watching a single pad, whether any ring crosses ITS patch during
+the window is luck — the sweep caught that as a **MISSED**, the one failure direction
+that matters: the mutation which deletes the reset entirely left the check GREEN on a
+run where its one pad sat over quiet water, having reddened it on an earlier run. With
+the reset gone EVERY pad shows the water through it, so the MIDDLE one rises with the
+rest while a couple of unlucky drops move one or two and leave it alone. **EVERY DISC IS
+THE SAME SIZE**
+— variance scales with area, so a single ring moves a small disc's mean far more than a
+large one's and discs of different radii cannot be compared at all.
+
+**THREE MUTANT CLAIMS WERE WRONG AND THE SWEEP IS WHAT SAID SO, ALL THREE IN THE SAME
+DIRECTION — the check was fine and the claim was not.** `the-rock-is-clamped-rather-
+than-saturated` stayed GREEN because the check sampled twelve pads under a storm and
+asked whether their tilts still differed at the END, and they did under the clamp too:
+by then the ripples had aged and the clamp was no longer binding. **A pond does not
+hold still long enough to be a controlled experiment; the law does** — it sweeps
+`respond` over forty slopes and asserts the response is STRICTLY RISING at every step,
+which is what a clamp is not. `a-pad-is-drawn-under-the-fish` only PREPENDED a pad pass
+and left the real one in place, so the pads were drawn twice and the later pass still
+covered everything — the mutation applied, looked right, and changed nothing. And
+`the-pads-cannot-feel-the-water` kills the HEIGHT and leaves the gradient, so the pad
+still rocks: the browser check asserted only the tilt and stayed green until it asked
+about the bob as well. **The rock and the bob are the two halves of one law and a check
+that measures one of them measures half a feature.**
+
+**AMBIENT RAIN ROCKS A PAD AS HARD AS A CLICK DOES, SO A CLICK'S ROCK IS NOT
+SEPARABLE ON THE LIVE PAGE — AND ONLY THE SWEEP SAID SO.** The browser check
+first clicked beside a pad and asserted that pad rocked and then settled. It went
+red under `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+an outline is sampled, consumes no randomness and touches nothing the check
+reads: **flaky, not collateral**, and the same flake had already been booked once
+as collateral on a second mutant before a third made it undeniable. Measured on
+the shipped page: peaks at idle with no hand on the mouse run **1.07-3.77
+degrees** against **3.11-4.66** for a pad clicked beside, and on one run the
+settle reading four and a half seconds later was **3.98 degrees — HIGHER than
+that run's own click peak of 3.83**, because another drop happened to be
+crossing. A PAIRED CONTROL PAD 500-650 px away is no better (click-to-control
+ratios of **1.10x to 2.65x**), because the control is in the same rain. There is
+no bar there and no fixture on the page that removes the weather.
+**SO THE CLAIM MOVED TO WHERE THERE IS NO AMBIENT FIELD**: attributing a rock to
+one ripple, and watching it decay, are both Node checks driving one ripple over
+one pad. What is left for the page is the thing Node cannot say — that the wiring
+is LIVE: real pads advanced against the real ripple list every frame, each
+reading its own patch of water (35 distinct peaks over 36 pads), inside the ruled
+caps. **A BROWSER CHECK SHOULD CLAIM WHAT A BROWSER CAN SEE THAT NOTHING ELSE
+CAN, not restate a Node check on a noisier instrument.**
+
+**AND A CHECK THAT POLLS ON WALL TIME MEASURES THE MACHINE.** `ellipse-without-the-
+moveto` — a pre-existing mutation with nothing to do with pads — reddened the rocking
+check, because it drops the frame rate by a factor of three and the check sampled every
+70 ms of WALL time: three seconds of pond on a healthy page, one on a slow one, so the
+front had not yet reached the pad. Both browser pad checks poll `waitSceneSeconds` now.
+This file already records the rule; it was broken again the first time a new check was
+written.
+
+**THE COST IS MEASURED AND IT IS NOT THE PADS.** `waveAt` is one pass per pad over the
+ripple list with a squared-distance reject before the sqrt: **0.19 ms a frame for 50
+pads against the 600-ripple cap**, and the page reads 22 fps on headless software GL
+during a downpour against the gate's floor of 12. The pad field is placed once and only
+its transform moves per frame; the outline, the freckles and the vein are built at
+placement. **`koi-pads.js` HAD TO BE ADDED TO THE DISCIPLINE SCAN'S `SCENE_MODULES`**,
+which is a hand-written coverage list — a module missing from it passes every discipline
+check by not being read.
+
+**Verify with `node tools/verify-scene.mjs`** (97 checks). Part one drives the
 shipped modules in Node against numbers taken from the BRIEF — 0.2 a click, a 2 s
 ramp, a 3 s hold, a 10 s decay, 3 scroll actions, 6 s of wind decay, 3-7 koi —
 never imported from the module under test, because a clause that reads its
 expected value out of the thing it is checking measures its own consistency.
 Part two drives the real page and measures the DOM, the reported state and the
 rasterised pixels. **`--negative-control` is required before quoting a pass from
-a changed harness**: nineteen mutations, each naming the checks it must redden,
+a changed harness**: thirty-nine mutations, each naming the checks it must redden,
 with a stale-name guard and an anchor check that run for EVERY mutant before any
 of them runs. `--mutant=<id,...>` runs a subset; `--no-browser` runs part one
 alone in seconds, and the guard is SECTION-AWARE so that combination does not

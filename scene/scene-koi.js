@@ -25,6 +25,7 @@ import { createSurface } from './surface.js';
 import { createStorm } from './koi-storm.js';
 import { createWind, normalizeWheel } from './koi-wind.js';
 import { createRipples, rollRipple, CLICK_RIPPLE } from './koi-ripples.js';
+import { createPads, PAD_SEED_SALT } from './koi-pads.js';
 import { createRain } from './koi-rain.js';
 import { createSchool } from './koi-fish.js';
 import { createRenderer } from './koi-draw.js';
@@ -41,11 +42,20 @@ export default function createKoiScene(host) {
   const surface = createSurface();
   const rand = makeRandom(host.seed);
 
+  // THE PADS DRAW FROM THEIR OWN FORKED STREAM. Every draw on `rand` shifts
+  // every number taken after it for the rest of the run — koi-ripples.js says
+  // so, and the fish share that stream — so placing a pad field from it would
+  // hand the pond a different set of koi for a reason that has nothing to do
+  // with pads. Forked from the same seed, so `?seed=` still reproduces the
+  // whole scene and nothing that was already on the water has moved.
+  const padRand = makeRandom((host.seed ^ PAD_SEED_SALT) >>> 0);
+
   const storm = createStorm();
   const wind = createWind();
   const ripples = createRipples();
   const rain = createRain({ rand, ripples });
   const school = createSchool({ rand, surface, width: host.width, height: host.height });
+  const pads = createPads({ rand: padRand, surface, width: host.width, height: host.height });
   const renderer = createRenderer(ctx, surface);
 
   let width = host.width, height = host.height;
@@ -64,6 +74,9 @@ export default function createKoiScene(host) {
       const fallDir = wind.fallDir();
       rain.advance(dt, { width, height, intensity: storm.intensity, fallDir, surface });
       ripples.advance(dt);
+      // The pads read the SAME ripple list the fish do, through the same fields,
+      // and neither can tell what made any of it: see koi-pads.js's header.
+      pads.advance(dt, { ripples: ripples.list });
       school.advance(dt, { ripples: ripples.list, intensity: storm.intensity, width, height });
 
       renderer.draw({
@@ -71,6 +84,7 @@ export default function createKoiScene(host) {
         fish: school.fish,
         ripples: ripples.list,
         drops: rain.drops,
+        pads,
         fallDir,
         storm,
         reducedMotion: host.reducedMotion,
@@ -78,7 +92,11 @@ export default function createKoiScene(host) {
       });
     },
 
-    resize(w, h) { width = w; height = h; },
+    // A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT. Growing the
+    // window grows the field over the water that has just come into view;
+    // nothing already placed moves or is removed, because a fixed object that
+    // jumped when the window changed size would stop reading as fixed.
+    resize(w, h) { width = w; height = h; pads.ensure(w, h); },
 
     // x, y are CSS pixels inside the stage. `wallSeconds` is the hand's own
     // clock (see the header).
@@ -94,6 +112,7 @@ export default function createKoiScene(host) {
     dispose() {
       ripples.clear();
       rain.clear();
+      pads.clear();
       school.fish.length = 0;
     },
 
@@ -131,7 +150,20 @@ export default function createKoiScene(host) {
         arrivals: school.arrivals,
         departures: school.departures,
         recalls: school.recalls,
+        // The pad field: how many, where, how big, and what the water is
+        // currently doing to each one. `tilt` is the rock's magnitude in
+        // radians and `lift` the bob in plane px, both read off the shipped
+        // records rather than recomputed, so a gate can watch a real front
+        // cross a real pad.
+        pads: pads.pads.length,
+        blooms: pads.blooms.length,
+        clusters: pads.clusters.length,
+        padAt: pads.pads.map(p => [p.x, p.y, p.R, Math.hypot(p.tx, p.ty), p.lift, p.notchAt, p.notchDeg]),
+        bloomAt: pads.blooms.map(b => [b.x, b.y, b.R, Math.hypot(b.tx, b.ty), b.lift]),
+        padOrder: pads.drawOrder.map(i => i.y),
+        padCovered: pads.coveredBox(),
         squash: surface.squash,
+        lift: surface.lift,
         width, height, clock,
       };
     },

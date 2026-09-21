@@ -28,7 +28,7 @@
 // cause — is a defect, and the gate says so.
 export const RIPPLE_FIELDS = ['x', 'y', 'r', 'maxR', 'age', 'life', 'strength', 'rings'];
 
-export const MAX_RIPPLES = 340;    // a downpour is capped here, the one nearest its own end dropped
+export const MAX_RIPPLES = 600;    // a downpour is capped here, the one nearest its own end dropped
 export const RING_LAG = 0.13;      // each inner ring trails the front by this much of a life
 
 // The two callers' parameter sets, declared here rather than at the call sites,
@@ -41,7 +41,17 @@ export const RING_LAG = 0.13;      // each inner ring trails the front by this m
 // crowd of near-identical rings. rollRipple() below correlates `maxR` and
 // `life` from one shared draw so the two ends of that mix are "small and
 // fast" and "big and slow" — never "big and gone in a blink".
-export const DROP_RIPPLE = { maxR: [20, 66], life: [1.0, 2.9], strength: [0.24, 0.58], rings: 2 };
+//
+// WIDENED FURTHER, AND THE SIZE DRAW SKEWED SMALL. The rain-on-a-pond
+// photograph this scene is measured against is dense with tiny fresh pocks and
+// carries a handful of big slow rings over the top of them; a UNIFORM draw
+// over a narrow band gives neither, only a crowd of mid-sized rings. Measured
+// on the shipped grid at 1440x900: rate alone takes the surface from 4% to 42%
+// covered but puts 46 drops in the air, which is as many as the DOWNPOUR has —
+// so the storm stops being an escalation. Getting the density from LIFE and
+// SIZE as well reaches 92% covered on 23 drops in the air, half the rain for
+// twice the water. See rollRipple for the skew, which costs no extra draw.
+export const DROP_RIPPLE = { maxR: [10, 170], life: [3.0, 8.0], strength: [0.24, 0.58], rings: 2 };
 export const STORM_RIPPLE = { maxR: [14, 46], life: [0.6, 1.6], strength: [0.20, 0.44], rings: 2 };
 export const CLICK_RIPPLE = { maxR: [104, 132], life: [2.1, 2.5], strength: [0.95, 1.0], rings: 3 };
 
@@ -144,7 +154,12 @@ export function rollRipple(rand, table) {
   // real splash disperses its energy over more area AND more time together,
   // so `life` is then pulled toward what `maxR`'s own draw implies rather
   // than adding a fourth roll to correlate them.
-  const maxR = rand.range(table.maxR[0], table.maxR[1]);
+  // SKEWED SMALL, AND STILL EXACTLY ONE DRAW. `range` is one call on the shared
+  // stream, and so is this: squaring a unit sample biases it toward the low end
+  // without touching how many numbers the stream gives out, which is what keeps
+  // every downstream reader (the fish above all) on the sequence it had.
+  const sizeRoll = rand.range(0, 1);
+  const maxR = table.maxR[0] + (table.maxR[1] - table.maxR[0]) * sizeRoll * sizeRoll;
   const lifeRoll = rand.range(table.life[0], table.life[1]);
   const strength = rand.range(table.strength[0], table.strength[1]);
   const span = table.maxR[1] - table.maxR[0];

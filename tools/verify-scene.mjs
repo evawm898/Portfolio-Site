@@ -18,7 +18,7 @@
 // reported state actually say.
 //
 // --negative-control IS REQUIRED BEFORE QUOTING A PASS from a changed harness.
-// It applies eleven deliberate defects — each one a mistake that was either
+// It applies 22 deliberate defects — each one a mistake that was either
 // actually made while building this, or is the obvious way to break a claim —
 // and fails if a mutation does not apply, if a check the mutant NAMES stays
 // green, or if the base pass was not clean. A mutation that cannot be applied
@@ -106,6 +106,272 @@ const near = (a, b, tol, what) => {
 // Each names the checks it MUST redden. A check outside that list going red is
 // still a failure of the sweep — the mutation was not the defect it claims.
 const MUTANTS = [
+  // ----------------------------------------------------------- scene 3 ----
+  // Six of these are mistakes that were ACTUALLY MADE while building the beach
+  // and are marked; the rest are the obvious way to break a claim the brief
+  // makes in so many words.
+  {
+    id: 'the-high-water-mark-follows-the-swash',
+    file: 'scene/beach-swash.js',
+    from: '        if (wet[i] > sat[i]) wet[i] = Math.max(sat[i], wet[i] - dt / OVERRUN_DRY_S);\n        else wet[i] = sat[i];',
+    to: '        wet[i] = e;',
+    breaks: ['swash/wet-sand-persists-after-the-water-has-left-it',
+             'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+             'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
+              'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: 'ONE OSCILLATING WATERLINE — the failure mode the brief names by name',
+  },
+  {
+    id: 'one-drying-rate-for-the-whole-beach',
+    file: 'scene/beach-swash.js',
+    from: '        sat[i] = Math.max(WATERLINE_S, sat[i] - dt / SAT_DRY_S);',
+    to: '        sat[i] = Math.max(WATERLINE_S, sat[i] - dt / OVERRUN_DRY_S);',
+    breaks: ['swash/wet-sand-persists-after-the-water-has-left-it'],
+    mayAlso: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
+              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: '"do not use one rate for the whole beach" — the saturated zone dried at the overrun rate',
+  },
+  {
+    id: 'the-two-rates-are-declared-the-same',
+    file: 'scene/beach-swash.js',
+    from: 'export const SAT_DRY_S = 530;',
+    to: 'export const SAT_DRY_S = 20;',
+    breaks: ['swash/the-two-drying-rates-are-an-order-of-magnitude-apart'],
+    mayAlso: ['swash/wet-sand-persists-after-the-water-has-left-it',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: 'the separation is the feature; collapsing it is not a tuning change',
+  },
+  {
+    id: 'the-saturated-level-is-a-running-maximum',
+    file: 'scene/beach-swash.js',
+    from: '          sat[i] = Math.max(WATERLINE_S, sat[i] + (v - sat[i]) * SAT_ALPHA);',
+    to: '          sat[i] = Math.max(sat[i], v);',
+    breaks: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/wet-sand-persists-after-the-water-has-left-it',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: '"it must return, not ratchet" — a max never comes back',
+  },
+  {
+    id: 'a-running-swash-reads-the-set-energy',
+    file: 'scene/beach-swash.js',
+    from: '    advance(dt, { energy = 0, intervalScale = 1 } = {}) {\n      clock += dt;',
+    to: '    advance(dt, { energy = 0, intervalScale = 1 } = {}) {\n      clock += dt;\n      for (const w of waves) w.runup = WATERLINE_S + (w.runup - WATERLINE_S) * (1 + 0.4 * energy);',
+    breaks: ['swash/the-energy-reaches-the-next-wave-and-never-the-one-running'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
+              'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
+    why: '"a broken wave is committed" — deforming one mid-run reads as a slider on the water',
+  },
+  {
+    id: 'the-swash-record-carries-its-energy',
+    file: 'scene/beach-swash.js',
+    from: "export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];",
+    to: "export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked', 'energy'];",
+    breaks: ['swash/a-swash-carries-no-record-of-the-energy-that-chose-it'],
+    why: 'provenance in the record is what would let a later reader branch on the cause',
+  },
+  {
+    id: 'every-swash-reaches-the-same-distance',
+    file: 'scene/beach-swash.js',
+    from: 'export const RUNUP_VARY = [0.88, 1.12];',
+    to: 'export const RUNUP_VARY = [1, 1];',
+    breaks: ['swash/successive-swashes-do-not-reach-identical-distances'],
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    why: '"successive swashes must not reach identical distances"',
+  },
+  {
+    id: 'the-overrun-fires-on-every-wave',
+    file: 'scene/beach-swash.js',
+    from: 'export const OVERRUN_MARGIN_S = 0.12;',
+    to: 'export const OVERRUN_MARGIN_S = 0.0;',
+    breaks: ['swash/an-overrun-fires-with-the-extent-it-reached'],
+    why: 'an event that fires as often without a set as with one is no signal',
+  },
+  {
+    id: 'the-set-energy-is-signed',
+    file: 'scene/beach-sets.js',
+    from: '      st.scrolled = clamp01(st.scrolled + Math.abs(delta) / (ACTIONS_TO_MAX * ACTION_DELTA));',
+    to: '      st.scrolled = clamp01(st.scrolled + delta / (ACTIONS_TO_MAX * ACTION_DELTA));',
+    breaks: ['sets/either-scroll-direction-adds-energy'],
+    why: 'a set has no negative; scene 1\'s wind is signed for a reason that does not apply here',
+  },
+  {
+    id: 'no-set-arrives-on-its-own',
+    file: 'scene/beach-sets.js',
+    from: '        if (st._untilSet <= 0) {',
+    to: '        if (false && st._untilSet <= 0) {',
+    breaks: ['sets/large-sets-arrive-with-no-input-at-all'],
+    // AND IT DESTABILISES THE HIGH-WATER MARK, which was not predicted and is
+    // a real coupling rather than a nuisance: a set pulls the saturated level
+    // UP, and the ordinary waves that follow then sit below it and leave the
+    // mark alone. With no sets at all the level only ever decays, so every
+    // ordinary wave tops it and the mark sawtooths. Measured over three seeds:
+    // 9.0 px per 3.5 s becomes 24.2.
+    mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water'],
+    why: '"an untouched scene still gets overruns"',
+  },
+  {
+    id: 'the-streaks-are-rebuilt-every-frame',
+    file: 'scene/beach-water.js',
+    from: '      for (const f of streaks) {',
+    to: '      for (const f of streaks) { place(f, true); }\n      for (const f of streaks) {',
+    breaks: ['water/the-streaks-persist-and-drift-shoreward'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'a re-randomised surface reads as static rather than as water',
+  },
+  {
+    id: 'the-drift-phase-is-not-wrapped',
+    file: 'scene/beach-draw.js',
+    from: '        const phase = (drift * (0.4 + 0.6 * hash2(idx, 91))) % 1;',
+    to: '        const phase = drift * (0.4 + 0.6 * hash2(idx, 91));',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: drift is a distance, so after a minute the sea was not drawn at all',
+  },
+  {
+    id: 'the-renderer-sets-its-own-transform',
+    file: 'scene/beach-draw.js',
+    from: '      if (st.dpr !== undefined) ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);',
+    to: '      ctx.setTransform(st.dpr || 1, 0, 0, st.dpr || 1, 0, 0);',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: it overwrote the shell\'s dpr scale and drew the beach into one corner',
+  },
+  {
+    id: 'the-water-ramp-follows-the-moving-edge',
+    file: 'scene/beach-draw.js',
+    from: '  const u = clamp01(s / WATERLINE_S);',
+    to: '  const u = clamp01(s / Math.max(1e-4, edge));',
+    breaks: ['beach-tone/the-run-up-sheet-is-lighter-than-deep-water'],
+    why: 'THE REAL BUG: an overrun came out as four fifths of the frame in near-solid ink',
+  },
+  {
+    id: 'the-foam-band-is-a-ramp-not-a-plateau',
+    file: 'scene/beach-draw.js',
+    from: '  const into = clamp01((s - (edge - fw)) / fw) / FOAM_RAMP;',
+    to: '  const into = clamp01((s - (edge - fw)) / fw);',
+    // BOTH, and the second was short in the honest direction: the sweep reported
+    // it as UNCLAIMED. A band that ramps all the way to 1 instead of levelling
+    // off does not merely have the wrong SHAPE — it never reaches paper at all,
+    // which is precisely what the bare-run check is named for. The claim was
+    // wrong, not the check.
+    breaks: ['beach-tone/the-foam-band-is-a-plateau-of-paper-not-a-ramp-to-one',
+             'scene3/the-foam-band-reaches-bare-paper'],
+    why: 'THE REAL BUG: it put the foam DARKER than the wet sand and inverted the reference\'s ordering',
+  },
+  {
+    id: 'the-swell-bands-the-deep-water',
+    file: 'scene/beach-draw.js',
+    from: '  const fade = d * d * (3 - 2 * d);',
+    to: '  const fade = 1;',
+    breaks: ['beach-tone/the-swell-fades-out-in-the-deep-water'],
+    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL BUG: the rendered row profile oscillated 0.26 / 0.70 / 0.45 down a smooth sea',
+  },
+  {
+    id: 'the-dry-sand-is-blank-paper',
+    file: 'scene/beach-draw.js',
+    from: '      for (let ci = 0; ci < DRY_CELLS_U; ci++) {',
+    to: '      for (let ci = 0; ci < 0; ci++) {',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'THE REAL DEFECT: "the open white" read as empty, and every band-MEAN comparison passed it',
+  },
+  {
+    id: 'the-sand-texture-is-in-the-marks-register',
+    file: 'scene/beach-draw.js',
+    from: '      ctx.globalAlpha = DRY_MARK_ALPHA;',
+    to: '      ctx.globalAlpha = 0.72;',
+    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    why: 'the declaration and the drawing disagreeing — a base texture as dark as the marks that go on top of it',
+  },
+  {
+    id: 'the-register-headroom-is-given-away',
+    file: 'scene/beach-draw.js',
+    from: 'export const DRY_MARK_ALPHA = 0.26;',
+    to: 'export const DRY_MARK_ALPHA = 0.33;',
+    // THE MODULE REFUSES TO LOAD ON THIS ONE, which is why it names the load
+    // check rather than the register clause: giving the headroom away is an
+    // invariant the module asserts at module scope, and a refusal there is
+    // stronger than a red check because nothing can run on that tree at all.
+    //
+    // AND A MODULE THAT WILL NOT LOAD TAKES THE SCENE WITH IT. The sweep
+    // reported the mount as UNCLAIMED and it was right to: with beach-draw.js
+    // refusing, the page has no beach on it, which is not collateral but the
+    // same refusal seen from the browser. The claim was short, not the checks.
+    //
+    // THE TWO SWAP CHECKS ARE `mayAlso` BECAUSE THE BLAST RADIUS IS NOT
+    // DETERMINISTIC. The random button draws from the built scenes excluding
+    // the one showing, so whether any of its six picks lands on scene 3 — and
+    // therefore whether the failed import ever reaches the console — is down
+    // to that run. A single `breaks` list cannot be right about either of
+    // them; this is /plot's own a-handle-drag-also-orbits case in another
+    // gate.
+    breaks: ['load/every-scene-module-imports',
+             'scene3/the-beach-loads-draws-and-takes-over-the-nav'],
+    mayAlso: ['swap/the-random-button-never-picks-the-scene-that-is-showing',
+              'swap/the-swap-pass-reports-no-errors'],
+    why: 'the base texture creeping up to the reference\'s own footprint darkness, which a later session cannot draw over',
+  },
+  {
+    id: 'the-foam-band-is-narrower-than-a-row',
+    file: 'scene/beach-draw.js',
+    from: 'export const FOAM_BAND_S = 0.130;',
+    to: 'export const FOAM_BAND_S = 0.022;',
+    // IT NAMES THE RASTERISED CLAUSE, NOT THE PLATEAU ONE: a narrow band is
+    // still a plateau in SHAPE, so the plateau clause's subject does not
+    // contain this failure and it stays green on any width (measured).
+    //
+    // AND THE WIDTH HAD TO BE TAKEN THIS LOW TO FIRE, WHICH IS ITSELF THE
+    // FINDING. At half the shipped width the band still reads bare in a
+    // de-sheared strip — it is only the FULL-WIDTH mean that a narrow band
+    // fails, because one screen row spans more of the beach than the band is
+    // wide. So this clause asserts the band is genuinely bare SOMEWHERE, which
+    // needs a band narrower than the swell to break; the shipped width was set
+    // by the coverage comparison, and that is said in the outcome rather than
+    // implied by this mutant.
+    breaks: ['scene3/the-foam-band-reaches-bare-paper'],
+    why: 'a foam band narrower than the swell that displaces it never reads as bare paper at all',
+  },
+  {
+    id: 'the-shoreline-is-level',
+    file: 'scene/beach-shore.js',
+    from: 'export const SHORE_TILT_DEG = 3.0;',
+    to: 'export const SHORE_TILT_DEG = 0;',
+    breaks: ['shore/the-shoreline-is-oblique-and-runs-up-to-the-right',
+             'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: '"the shoreline sits oblique to the frame, not level"',
+  },
+  {
+    id: 'the-shoreline-runs-the-other-way',
+    file: 'scene/beach-shore.js',
+    from: '  const slope = -Math.tan(tiltDeg * Math.PI / 180);',
+    to: '  const slope = Math.tan(tiltDeg * Math.PI / 180);',
+    breaks: ['shore/the-shoreline-is-oblique-and-runs-up-to-the-right',
+             'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
+    why: 'every measurement on the three clips agrees about the SIGN; only the magnitude was noisy',
+  },
+  {
+    id: 'the-bands-are-not-the-briefs-proportions',
+    file: 'scene/beach-shore.js',
+    from: 'export const RUNUP_NOMINAL = 0.20;',
+    to: 'export const RUNUP_NOMINAL = 0.33;',
+    breaks: ['shore/the-bands-are-the-brief-s-forty-twenty-forty'],
+    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+              'swash/the-overrun-zone-dries-back-and-does-not-ratchet'],
+    why: 'the wet band is the swash\'s own travel, so the runup IS the 20%',
+  },
   {
     id: 'ellipse-without-the-moveto',
     file: 'scene/surface.js',
@@ -220,12 +486,62 @@ const MUTANTS = [
               'scene1/the-traits-are-per-fish-and-span-the-sliders',
               'fish/separation-is-a-body-not-a-personality',
               'fish/schooling-koi-end-up-nearer-each-other-than-solitary-ones',
+              // AND IT CHURNS, which is a true statement about this mutation
+              // rather than a check that needs loosening. A koi crossing the
+              // frame edge is ordinary swimming, so a manager counting only
+              // what is IN FRAME sees a population that oscillates on its own
+              // and spawns and departs against it — which is what the churn
+              // check measures. It went unnamed until the density work shifted
+              // the sequence enough to surface it; the mutation is more plainly
+              // broken now, not less.
+              'fish/the-population-does-not-churn-at-a-steady-intensity',
               // Measured on this mutation: a koi on its way out is counted as
               // present, so the manager stops recalling in time and the pond
               // reaches EIGHT on screen. The recall check's own count bar is
               // what sees it — not its recall bar, which still reads 9 of 10.
               'fish/a-koi-sent-away-is-called-back-rather-than-replaced'],
     why: 'the defect that filled the pond with sixteen koi to keep seven on screen',
+  },
+  {
+    id: 'the-drawn-placement-is-not-lagged',
+    file: 'scene/koi-fish.js',
+    from: '        const kDraw = Math.min(1, dt / DRAW_TAU);',
+    to: '        const kDraw = 1;',
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'the jitter itself: the koi drawn at the raw 60 Hz placement it swims',
+  },
+  {
+    id: 'the-bend-bias-snaps-to-the-turn-rate',
+    file: 'scene/koi-fish.js',
+    from: '        f.bend += (f.omega - f.bend) * Math.min(1, dt / BEND_TAU);',
+    to: '        f.bend = f.omega;',
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'a body that changes its curvature the instant the turn rate does',
+  },
+  {
+    id: 'the-drawn-heading-is-lagged-without-its-position',
+    file: 'scene/koi-fish.js',
+    from: `        f.drawX += (f.x - f.drawX) * kDraw;
+        f.drawY += (f.y - f.drawY) * kDraw;`,
+    to: `        f.drawX = f.x;
+        f.drawY = f.y;`,
+    breaks: ['fish/the-drawn-koi-is-smoother-than-the-one-it-follows'],
+    why: 'the two lags split apart, which aims the koi off its own travel',
+  },
+  {
+    // REPLACES `the-spine-is-pinned-at-the-nose`, whose anchor went with the
+    // curvature-bias drawing law it was written against. Same question — where
+    // is the drawing pinned to the chain — asked of the law that is there now.
+    // Forcing the station index to 0 makes every drawn point extrapolate along
+    // the FIRST segment, so the koi becomes a rigid straight fish hung off its
+    // head joint: it still translates with the chain and its nose is still at
+    // the head joint, and it stops bending at all.
+    id: 'the-drawing-hangs-off-one-joint',
+    file: 'scene/koi-draw.js',
+    from: '      let i = Math.floor(t);\n',
+    to: '      let i = 0;\n',
+    breaks: ['fish/the-drawn-koi-rides-the-chain-it-is-given'],
+    why: 'the drawing must be local to the chain, not a rigid body hung off one joint',
   },
   {
     id: 'a-departure-never-leaves',
@@ -313,6 +629,10 @@ const MUTANTS = [
               // vacuity guard. That breadth is the mutation being severe, not
               // the checks being fragile.
               'fish/any-ripple-gets-the-same-reaction',
+              // And the pad check that compares the wired scene's koi against a
+              // school built from the seed ALONE: with nothing seeded there is
+              // nothing to compare, so it refuses rather than passing vacuously.
+              'pads/wiring-in-the-pads-did-not-move-the-koi',
               'fish/some-koi-swim-to-a-ripple-and-some-flee-it',
               'fish/every-trait-is-a-slider-in-nought-to-one',
               'fish/koi-vary-mildly-in-size-around-an-inch',
@@ -354,6 +674,166 @@ const MUTANTS = [
     breaks: ['swap/the-last-scene-asked-for-is-the-one-that-mounts'],
     why: 'two dynamic imports in flight resolve in whatever order the network gives',
   },
+  {
+    // The shipped defect, before it was measured: canvases in normal flow.
+    id: 'the-planes-stack-instead-of-overlapping',
+    file: 'scene.css',
+    from: '.scene-canvas { display: block; position: absolute; top: 0; left: 0; width: 100%; height: 100%; }',
+    to: '.scene-canvas { display: block; width: 100%; height: 100%; }',
+    breaks: ['layers/two-planes-occupy-the-same-rect-rather-than-stacking',
+             'layers/the-back-plane-reaches-the-screen-through-the-front-one'],
+    why: 'in normal flow the second plane lands a full viewport below the first',
+  },
+  {
+    // The other half of the same defect, and the quieter one: the geometry is
+    // right and the front plane is opaque black everywhere it did not draw.
+    id: 'every-plane-is-opaque',
+    file: 'scene.js',
+    from: '      const alpha = opts.alpha !== undefined ? !!opts.alpha : canvases.length > 0;',
+    to: '      const alpha = false;',
+    breaks: ['layers/only-the-backmost-plane-is-opaque',
+             'layers/the-back-plane-reaches-the-screen-through-the-front-one'],
+    why: 'on an opaque context even clearRect yields black, so the front plane hides the back',
+  },
+  {
+    // The obvious "simplification" in the other direction. It costs nothing
+    // visible — which is the point: only the alpha flag itself can see it.
+    id: 'every-plane-is-transparent',
+    file: 'scene.js',
+    from: '      const alpha = opts.alpha !== undefined ? !!opts.alpha : canvases.length > 0;',
+    to: '      const alpha = true;',
+    breaks: ['layers/only-the-backmost-plane-is-opaque',
+             'layers/a-one-canvas-scene-is-still-a-single-opaque-plane'],
+    why: 'the backmost plane is the one that can be opaque, and scene 1 must stay that way',
+  },
+  // ------------------------------------------------------------------ pads --
+  {
+    id: 'a-pad-is-drawn-under-the-fish',
+    file: 'scene/koi-draw.js',
+    // IT HAS TO MOVE THE PASS, NOT ADD A SECOND ONE. The first version only
+    // prepended a call and left the real one in place, so the pads were drawn
+    // twice and the later pass still covered everything — the mutation applied,
+    // looked right, and changed nothing the checks could see. `pads` is a
+    // destructured parameter, so nulling it is what disarms the later call.
+    from: '    for (const f of fish) drawFish(f);\n',
+    to: '    drawPads(width, height, pads);\n    for (const f of fish) drawFish(f);\n    pads = null;\n',
+    breaks: ['pads/a-pad-is-drawn-over-the-fish-and-the-ripples',
+             'scene1/a-pad-hides-the-water-under-it'],
+    why: 'draw order is the only depth cue here; a pad under the koi reads as painted on the pond floor',
+  },
+  {
+    id: 'a-pad-does-not-reset-the-water-under-it',
+    file: 'scene/koi-draw.js',
+    from: '    ctx.fillStyle = GROUND;\n    ctx.fill();\n    ctx.fillStyle = groundFor(w, h);\n    ctx.fill();\n    ctx.fillStyle = rgba(INK, PAD_FILL_A);',
+    to: '    ctx.fillStyle = rgba(INK, PAD_FILL_A);',
+    breaks: ['pads/a-pad-is-drawn-over-the-fish-and-the-ripples',
+             'scene1/a-pad-hides-the-water-under-it'],
+    why: 'every other mark here is translucent ink, so without the opaque reset the order buys nothing',
+  },
+  {
+    id: 'a-pad-reads-the-cause-of-a-ripple',
+    file: 'scene/koi-pads.js',
+    from: '    const amp = WAVE_AMP * rip.strength * env;',
+    to: '    const amp = WAVE_AMP * rip.strength * env * (rip.rings >= 3 ? 2.5 : 1);',
+    breaks: ['pads/a-pad-answers-any-ripple-the-same-way'],
+    why: 'a pad may feel how big a splash was and must not be able to tell what made it',
+  },
+  {
+    id: 'the-pads-cannot-feel-the-water',
+    file: 'scene/koi-pads.js',
+    from: '    h += amp * g;',
+    to: '    h += 0;',
+    breaks: ['pads/a-passing-front-rocks-a-pad-and-lets-it-go',
+             'scene1/the-pads-on-the-real-page-are-riding-the-water'],
+    mayAlso: ['pads/the-rock-is-subtle-and-a-downpour-does-not-peg-it',
+              'pads/a-pad-answers-any-ripple-the-same-way'],
+    why: 'a pad that does not read the height field does not bob, and the gradient alone is half the law',
+  },
+  {
+    id: 'a-pad-only-foreshortens',
+    file: 'scene/koi-pads.js',
+    from: '  out.z = base + a * Math.sin(theta);',
+    to: '  out.z = base;',
+    breaks: ['pads/a-tilted-pad-is-foreshortened-one-way-and-lifted-the-other'],
+    why: 'cos is even, so a foreshortening alone reads as a pulse at twice the wave rather than a rock',
+  },
+  {
+    id: 'the-rock-is-clamped-rather-than-saturated',
+    file: 'scene/koi-pads.js',
+    from: '    const theta = TILT_MAX * k * Math.tanh(slope / TILT_REF);',
+    to: '    const theta = Math.min(TILT_MAX * k, slope);',
+    breaks: ['pads/the-rock-is-subtle-and-a-downpour-does-not-peg-it'],
+    why: 'a hard clamp puts every pad in the pond at the ceiling for the whole of a storm',
+  },
+  {
+    id: 'pads-scatter-instead-of-clumping',
+    file: 'scene/koi-pads.js',
+    from: '          const at = put || scatter(spot, spread, R);',
+    to: '          const at = put || scatter({ x: rand.range(want.x0, want.x1), y: rand.range(want.y0, want.y1) }, spread, R);',
+    breaks: ['pads/pads-clump-and-there-is-open-water-between-the-clumps'],
+    mayAlso: ['pads/blooms-rise-among-the-pads-and-there-are-two-or-three',
+              'scene1/the-pond-has-lily-pads-on-it-in-clumps-with-blooms-among-them'],
+    why: 'the brief asks for loose clusters with open water between them, which is what a scatter is not',
+  },
+  {
+    id: 'the-pad-field-is-regenerated-on-a-resize',
+    file: 'scene/koi-pads.js',
+    from: '      const newArea = (want.x1 - want.x0) * (want.y1 - want.y0)\n        - (covered ? overlapArea(want, covered) : 0);',
+    to: '      field.pads.length = 0; field.clusters.length = 0; covered = null;\n      const newArea = (want.x1 - want.x0) * (want.y1 - want.y0);',
+    breaks: ['pads/growing-the-frame-grows-the-field-and-moves-nothing'],
+    why: 'a pad is a thing in the pond, and a fixed object that jumps on a resize stops reading as fixed',
+  },
+  {
+    id: 'a-bloom-lands-anywhere-in-its-cluster',
+    file: 'scene/koi-pads.js',
+    from: '      if (ok && beside) return { x, y };',
+    to: '      if (ok) return { x, y };',
+    breaks: ['pads/blooms-rise-among-the-pads-and-there-are-two-or-three'],
+    why: '"rising among the pad clusters" needs a leaf beside it; otherwise it is a flower alone on a pond',
+  },
+  {
+    id: 'the-wedge-keeps-a-fixed-sample-count',
+    file: 'scene/koi-pads.js',
+    from: '  const notchPts = 2 * Math.max(NOTCH_PTS_MIN / 2, Math.ceil(2 * notchHalf / rimStep));',
+    to: '  const notchPts = NOTCH_PTS_MIN;',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: 'eight samples is dense across a five-degree slit and coarser than the rim across a sixty-five degree wedge, '
+       + 'which draws its flanks as a staircase — and nothing else in the check can see it',
+  },
+  {
+    id: 'every-wedge-is-cut-at-the-same-angle',
+    file: 'scene/koi-pads.js',
+    // IT STILL TAKES THE DRAW AND THROWS IT AWAY, and that is the whole
+    // difference between a mutation about wedges and a mutation about the
+    // pond. Deleting the `rand.range` deletes one draw PER PAD, which shifts
+    // every number the shared pad stream hands out after it — so every pad's
+    // size and position moves and the field is a different field. Measured:
+    // it reddened the CLUMPING check as well, which is not a statement about
+    // wedge angles and not something this mutant should be allowed to claim
+    // or to excuse. The comma expression consumes exactly what the shipped
+    // line consumes and yields the constant, so the field is bit-identical
+    // and the only thing that moved is the angle each wedge is cut at.
+    from: '  const notchDeg = rand.range(NOTCH_DEG[0], NOTCH_DEG[1]);',
+    to: '  const notchDeg = (rand.range(NOTCH_DEG[0], NOTCH_DEG[1]), NOTCH_DEG[0]);',
+    breaks: ['pads/the-stem-wedge-is-cut-at-a-different-angle-on-every-pad'],
+    why: 'the ruling is a variety of angles from 5 to 65, and a field cut at one width is what it replaced',
+  },
+  {
+    id: 'the-rim-is-as-lumpy-as-it-was',
+    file: 'scene/koi-pads.js',
+    from: 'export const LOBE_AMP = [0.024, 0.017, 0.009];\nexport const LOBE_VARY = [0.65, 1.30];',
+    to: 'export const LOBE_AMP = [0.048, 0.034, 0.018];\nexport const LOBE_VARY = [0.55, 1.45];',
+    breaks: ['pads/a-pad-is-a-near-circle-with-one-wedge-cut-out-of-it'],
+    why: '"make the lily pads rounder" is a ruling, and the amplitudes it replaced are the state it was ruled against',
+  },
+  {
+    id: 'the-pads-draw-from-the-shared-stream',
+    file: 'scene/scene-koi.js',
+    from: '  const padRand = makeRandom((host.seed ^ PAD_SEED_SALT) >>> 0);',
+    to: '  const padRand = rand;',
+    breaks: ['pads/wiring-in-the-pads-did-not-move-the-koi'],
+    why: 'a draw on the shared stream shifts every number taken after it, the koi included',
+  },
 ];
 
 function applyMutant(m) {
@@ -387,6 +867,11 @@ async function loadScene(mutant) {
       storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
       ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
       fish: await m('koi-fish.js'), registry: await m('registry.js'),
+      pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
+      sceneKoi: await m('scene-koi.js'),
+      shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
+      sets: await m('beach-sets.js'), water: await m('beach-water.js'),
+      beachDraw: await m('beach-draw.js'),
     };
   }
   const dir = path.join(SCENE, `${MUTANT_PREFIX}${++mutantSeq}`);
@@ -403,6 +888,11 @@ async function loadScene(mutant) {
     storm: await m('koi-storm.js'), wind: await m('koi-wind.js'),
     ripples: await m('koi-ripples.js'), rain: await m('koi-rain.js'),
     fish: await m('koi-fish.js'), registry: await m('registry.js'),
+    pads: await m('koi-pads.js'), draw: await m('koi-draw.js'),
+    sceneKoi: await m('scene-koi.js'),
+    shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
+    sets: await m('beach-sets.js'), water: await m('beach-water.js'),
+    beachDraw: await m('beach-draw.js'),
   };
 }
 
@@ -410,7 +900,22 @@ async function loadScene(mutant) {
 // The shipped modules, in Node, against numbers taken from the brief.
 
 async function partOne(mutant) {
-  const M = await loadScene(mutant);
+  // A MODULE THAT REFUSES TO LOAD IS A RED CHECK, NOT A DEAD SWEEP. Some of
+  // these modules assert their own invariants at module scope — the dry sand's
+  // register headroom is one — and a refusal there is STRONGER than a failed
+  // check, because nothing downstream can run on a tree that is wrong in that
+  // way. But an uncaught throw here takes the whole negative control down with
+  // it and reports nothing at all, so the refusal is caught and named.
+  let M;
+  setSection('load');
+  try {
+    M = await loadScene(mutant);
+    results.push({ name: 'load/every-scene-module-imports', ok: true, detail: `${Object.keys(M).length} modules` });
+  } catch (err) {
+    results.push({ name: 'load/every-scene-module-imports', ok: false,
+      detail: err && err.message ? err.message : String(err) });
+    return;
+  }
   const DT = 1 / 240;   // fine enough that a 2 s ramp is not a sampling claim
 
   // ---------------------------------------------------------------- surface
@@ -721,9 +1226,20 @@ async function partOne(mutant) {
       f.advance(0.001);
     }
     assert.strictEqual(f.list.length, M.ripples.MAX_RIPPLES, 'the cap did not hold');
-    const ages = f.list.map(r => r.age);
-    if (!(Math.max(...ages) < 0.35)) throw new Error('an old ripple survived the eviction');
-    return `capped at ${M.ripples.MAX_RIPPLES}, oldest evicted`;
+    // WHICH ONES SURVIVED, NOT HOW OLD THEY ARE. This asserted `max(age) < 0.35`,
+    // which reads as a statement about the eviction and is really a statement
+    // about the CAP: the fixture spawns one per millisecond, so the bar was just
+    // the old MAX_RIPPLES of 340 written as a time. Raising the cap took it red
+    // on an eviction that was working perfectly.
+    //
+    // Each ripple is spawned at x = its own index, so the survivors ARE the
+    // claim: with 40 spawned past the cap, the 40 oldest must be the 40 gone and
+    // the lowest surviving index must be exactly 40. That is stronger than the
+    // age bar it replaces and it does not move when the cap does.
+    const xs = f.list.map(r => r.x);
+    assert.strictEqual(Math.min(...xs), 40, 'the oldest 40 were not the ones evicted');
+    assert.strictEqual(Math.max(...xs), M.ripples.MAX_RIPPLES + 39, 'the newest did not survive');
+    return `capped at ${M.ripples.MAX_RIPPLES}, the 40 oldest evicted and the newest kept`;
   });
 
   // ------------------------------------------------------------------- rain
@@ -732,9 +1248,19 @@ async function partOne(mutant) {
     const r = M.rain.createRain({ rand: M.rng.makeRandom(1), ripples: M.ripples.createRipples() });
     const idle = r.rateFor(0, 1440, 900), storm = r.rateFor(1, 1440, 900);
     const big = r.rateFor(0, 2880, 1800);
-    if (!(storm > idle * 20)) throw new Error(`idle ${idle}, downpour ${storm}`);
+    // THE BAR WAS 20x AND IS 4x, AND THAT IS A WEAKENING WITH A REASON RATHER
+    // THAN A THRESHOLD TUNED UNTIL A RED WENT GREEN. It was written when idle
+    // was 2.0 drops/s; idle is 45 now, deliberately, so the surface is dense at
+    // rest (see koi-rain.js). The RATE ratio is therefore 5.3x where it was
+    // 120x — but the rate is no longer the whole of the escalation. Across the
+    // same step the fall SPEED goes 900 -> 1900 px/s, the streak alpha rises,
+    // the splash switches to the small sharp storm table, and the drops in the
+    // AIR roughly double (23 -> 40, measured at 1440x900). What this check can
+    // still catch is the thing it is named for — rain that does not respond to
+    // the storm at all — and a 4x bar catches that as decisively as 20x did.
+    if (!(storm > idle * 4)) throw new Error(`idle ${idle}, downpour ${storm}`);
     near(big / idle, 4, 1e-9, 'four times the area');
-    return `${idle.toFixed(1)}/s idle, ${storm.toFixed(0)}/s downpour, x4 on x4 area`;
+    return `${idle.toFixed(1)}/s idle, ${storm.toFixed(0)}/s downpour (${(storm/idle).toFixed(1)}x), x4 on x4 area`;
   });
 
   check('a drop that lands makes exactly one ripple, where it landed', () => {
@@ -1061,6 +1587,171 @@ async function partOne(mutant) {
     return `${recalls} recalled and ${spawnsInWindow} newly called in over six short storms, never more than ${worstVisible} on screen`;
   });
 
+  check('the drawn koi is smoother than the one it follows', () => {
+    // THE WITNESS FOR THE LAGS, AND ITS REFERENCE HAS A DIFFERENT OWNER. The
+    // expected values are f.heading and f.omega, which the steering writes and
+    // the lag never touches; the quantities under test are f.drawHeading and
+    // f.bend, which only the lag writes. DRAW_TAU and BEND_TAU are deliberately
+    // NOT imported — a bar read out of the constant under test would move with
+    // a defect in it and could not fail.
+    //
+    // THE STATISTIC IS THE JERK, NOT THE STEP, and that distinction is the
+    // whole reading. A drawn heading MUST track a sustained turn, so its
+    // per-frame step is about the same as the raw one at the maximum (measured,
+    // ratio 0.955) and a bar on the step would say nothing at all. What reads
+    // as sharp is the step CHANGING abruptly, which is the second difference.
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    let jRaw = 0, jDrawn = 0, sRaw = 0, sDrawn = 0, offMax = 0, n = 0;
+    for (const seed of [11, 37]) {
+      const surf = M.surface.createSurface();
+      const W = 1440, H = 900, dt = 1 / 60;
+      const rand = M.rng.makeRandom(seed);
+      const school = M.fish.createSchool({ rand, surface: surf, width: W, height: H });
+      const ripples = M.ripples.createRipples();
+      const rain = M.rain.createRain({ rand, ripples });
+      school.seed(W, H);
+      const prev = new Map();
+      for (let i = 0; i < 60 * 40; i++) {
+        // Both weathers: the reversals this exists for are worst in a crowded
+        // ripple field, and the plain pond is where a lag could hide.
+        const I = ((i / 60) % 40) < 20 ? 0 : 0.8;
+        rain.advance(dt, { width: W, height: H, intensity: I, fallDir: { x: 0, y: 1 }, surface: surf });
+        ripples.advance(dt);
+        school.advance(dt, { ripples: ripples.list, intensity: I, width: W, height: H });
+        for (const f of school.fish) {
+          const p = prev.get(f.id);
+          const stepH = p ? wrap(f.heading - p.h) : null;
+          const stepD = p ? wrap(f.drawHeading - p.dh) : null;
+          if (p) {
+            sRaw = Math.max(sRaw, Math.abs(f.omega - p.o));
+            sDrawn = Math.max(sDrawn, Math.abs(f.bend - p.b));
+            if (p.stepH !== null) {
+              jRaw = Math.max(jRaw, Math.abs(stepH - p.stepH));
+              jDrawn = Math.max(jDrawn, Math.abs(stepD - p.stepD));
+            }
+            // ...AND IT IS STILL A LAG RATHER THAN A DISCONNECT. Position and
+            // heading are lagged with ONE constant so the drawn koi is (near
+            // enough) the koi a tenth of a second ago: a coherent fish, whose
+            // nose points along the way its own drawn body is going. Without
+            // this clause a FROZEN drawn placement would pass the two above.
+            const ddx = f.drawX - p.dx, ddy = f.drawY - p.dy;
+            if (Math.hypot(ddx, ddy) > 1e-3) {
+              offMax = Math.max(offMax, Math.abs(wrap(Math.atan2(ddy, ddx) - f.drawHeading)));
+              n++;
+            }
+          }
+          prev.set(f.id, { h: f.heading, dh: f.drawHeading, o: f.omega, b: f.bend,
+                           dx: f.drawX, dy: f.drawY, stepH, stepD });
+        }
+      }
+    }
+    if (n < 5000) throw new Error(`only ${n} moving samples to measure`);
+    const jr = jDrawn / jRaw, sr = sDrawn / sRaw, offDeg = offMax * 180 / Math.PI;
+    // Bars with real headroom over the measured 0.132 / 0.323 / 5.2 deg: what
+    // is ruled out is a placement drawn RAW, not a particular time constant.
+    if (!(jr <= 0.40)) throw new Error(`drawn heading jerk is ${(jr * 100).toFixed(0)}% of the raw jerk`);
+    if (!(sr <= 0.60)) throw new Error(`drawn bend steps ${(sr * 100).toFixed(0)}% as hard as the turn rate`);
+    if (!(offDeg <= 15)) throw new Error(`the drawn koi points ${offDeg.toFixed(1)} deg off its own drawn travel`);
+    return `jerk ${(jr * 100).toFixed(0)}% of raw, bend steps ${(sr * 100).toFixed(0)}% of raw, `
+         + `points within ${offDeg.toFixed(1)} deg of its own travel over ${n} samples`;
+  });
+
+  check('the drawn koi rides the chain it is given', () => {
+    // WHERE THE DRAWING IS PINNED TO THE CHAIN, and nothing else here can see
+    // it: that is a rendering decision, so this drives the SHIPPED renderer
+    // through a recording context rather than restating the law.
+    //
+    // WHAT THIS REPLACED, AND WHY IT COULD NOT BE REPAIRED. It was
+    // `the bend moves the head too`, which swung `f.bend` from one saturated
+    // end to the other and asked how much of the excursion the head took. The
+    // chain rewrite deleted the mechanism underneath it: `drawFish` reads
+    // f.len, f.spine, f.seg, f.speed, f.phase, f.finPhase and f.patches, and
+    // `f.bend` is not among them — the body bends because it is physically
+    // behind the head, not because a curvature bias is applied to it. The check
+    // did not go quietly red on a stale claim, it THREW on a fixture with no
+    // `spine`, and its mutant's anchor had gone from the file at the same time.
+    // The two shielded each other: a dirty base pass stops the sweep before the
+    // anchor guard runs, so nothing reported the disarmed mutant either.
+    //
+    // THE CLAIM THAT SURVIVED THE REWRITE is the one worth keeping, and it is
+    // now three: the drawing is a function of the CHAIN (translate the chain and
+    // every vertex translates with it, exactly), it is LOCAL to the chain (bend
+    // the tail joints and the head end does not move), and its head end is at
+    // the chain's own head joint rather than somewhere along it.
+    const surf = M.surface.createSurface();
+    let pts = [];
+    const noop = () => {};
+    const rec = new Proxy({
+      moveTo: (x, y) => pts.push(x, y), lineTo: (x, y) => pts.push(x, y),
+      quadraticCurveTo: (a, b, x, y) => pts.push(a, b, x, y),
+      bezierCurveTo: (a, b, c, d, x, y) => pts.push(a, b, c, d, x, y),
+      ellipse: (x, y) => pts.push(x, y), arc: (x, y) => pts.push(x, y),
+      createRadialGradient: () => ({ addColorStop: noop }),
+      createLinearGradient: () => ({ addColorStop: noop }),
+    }, { get: (t, k) => (k in t ? t[k] : noop), set: () => true });
+    const rend = M.draw.createRenderer(rec, surf);
+    const L = 96, X = 400, Y = 300;
+    const N = M.fish.SPINE_JOINTS;
+    const seg = M.fish.CHAIN_SPAN_U * L / (N - 1);
+    // Straight, nose at (X, Y), running back along -x: the chain koi-fish.js
+    // lays down behind a head pointing at +x.
+    const chain = (edit) => {
+      const sp = [];
+      for (let i = 0; i < N; i++) sp.push({ x: X - seg * i, y: Y });
+      if (edit) edit(sp);
+      return sp;
+    };
+    const grab = (spine) => {
+      pts = [];
+      rend.drawFish({ id: 1, len: L, seg, spine, speed: 40, phase: 0.8, finPhase: 0.7,
+        patches: [{ s: 0.26, t: -0.10, rx: 0.08, ry: 0.6, rot: 0.2 }] });
+      return pts.slice();
+    };
+
+    const a = grab(chain());
+    const D = 30;
+    const moved = grab(chain(sp => sp.forEach(j => { j.y += D; })));
+    const bent = grab(chain(sp => { for (let i = 8; i < N; i++) sp[i].y += D; }));
+    if (a.length < 200) throw new Error(`only ${a.length / 2} vertices were emitted`);
+    if (moved.length !== a.length || bent.length !== a.length) {
+      throw new Error(`the three draws do not correspond (${a.length}/${moved.length}/${bent.length})`);
+    }
+
+    // (i) Translating the CHAIN translates the drawing, exactly. In screen space
+    // that is dy = D * squash and dx = 0, at every vertex — the drawing is a
+    // function of the chain and of no other position.
+    let worst = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      worst = Math.max(worst, Math.abs(moved[k] - a[k]),
+                              Math.abs((moved[k + 1] - a[k + 1]) - D * surf.squash));
+    }
+    if (!(worst < 1e-9)) throw new Error(`a translated chain moved a vertex by ${worst} off the translation`);
+
+    // (ii) LOCAL, not rigid: bending only the back half moves the tail a long
+    // way and leaves the head end exactly where it was. A koi hung off one joint
+    // passes (i) and (iii) and fails this.
+    let headMoved = 0, tailMoved = 0;
+    for (let k = 0; k < a.length; k += 2) {
+      const d = Math.hypot(a[k] - bent[k], a[k + 1] - bent[k + 1]);
+      // The head end, in the fish's own frame: within a third of a body length
+      // forward of the nose joint, which is the head and the shoulders.
+      if (a[k] > X - L * 0.33) headMoved = Math.max(headMoved, d);
+      else tailMoved = Math.max(tailMoved, d);
+    }
+    if (!(tailMoved > 8)) throw new Error(`bending the back half barely moved the tail (${tailMoved.toFixed(2)} px)`);
+    if (!(headMoved < 1e-9)) throw new Error(`bending the back half moved the head by ${headMoved.toFixed(3)} px`);
+
+    // (iii) The head end is AT the chain's head joint. The nose domes forward of
+    // it and the flanks stand off it, so this is a body width rather than zero —
+    // what it refuses is a drawing whose nose sits a joint or more back.
+    let nearest = Infinity;
+    for (let k = 0; k < a.length; k += 2) {
+      nearest = Math.min(nearest, Math.hypot(a[k] - X, a[k + 1] / surf.squash - Y));
+    }
+    if (!(nearest < L * 0.14)) throw new Error(`the nearest drawn vertex is ${nearest.toFixed(1)} px from the chain's head joint`);
+    return `translation exact to ${worst.toExponential(1)}, tail ${tailMoved.toFixed(1)} px against a head of 0, nose ${nearest.toFixed(1)} px off the joint`;
+  });
+
   check('any ripple gets the same reaction', () => {
     // THE BRIEF'S CENTRAL CLAIM. Two ponds, identical in every way, each given
     // one ripple. The ripples agree on every quantity a disturbance HAS —
@@ -1283,32 +1974,962 @@ async function partOne(mutant) {
     return `mean separation ${together.toFixed(0)} px schooling against ${apart.toFixed(0)} px solitary`;
   });
 
+  // ------------------------------------------------------------------- pads
+  setSection('pads');
+  const padField = (seed, w = 1280, h = 800) => M.pads.createPads({
+    rand: M.rng.makeRandom(seed), surface: M.surface.createSurface(), width: w, height: h,
+  });
+  // Signed angular distance, so a wedge straddling angle zero is one stretch
+  // rather than two — which is what a naive sort of raw atan2 produces, and is
+  // the shape of the "two notches" failure the silhouette check counts.
+  const wrapPi = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+
+  check('the height of a thing on the water is derived from the squash', () => {
+    // THE ONE NUMBER A FLOATING THING NEEDS, and it is not a free constant. The
+    // view is an oblique orthographic with sin(elevation) = squash, so
+    // cos(elevation) is what a unit of height draws as — and the two must
+    // satisfy the identity, or the pads are riding a second camera.
+    const surf = M.surface.createSurface();
+    const id = surf.squash * surf.squash + surf.lift * surf.lift;
+    near(id, 1, 1e-12, 'squash^2 + lift^2');
+    if (!(surf.lift > 0)) throw new Error('nothing above the water would move at all');
+    // At height 0 it is not merely close to the flat projection, it IS it.
+    for (const y of [0, 123.456, -900.5]) {
+      if (surf.syAt(y, 0) !== surf.sy(y)) throw new Error(`height 0 at y=${y} is not the flat projection`);
+    }
+    return `squash ${surf.squash}, lift ${surf.lift}, exact at height 0`;
+  });
+
+  check('pads clump, and there is open water between the clumps', () => {
+    // THE BRIEF'S OWN WORDS: loose clusters, not a uniform grid or scatter. The
+    // witness is a comparison against the scatter the brief rules out — the SAME
+    // number of pads spread uniformly over the same water — because "are these
+    // clumped" has no answer without something to be clumped against, and a
+    // threshold on a nearest-neighbour distance alone would be a number picked
+    // to pass. Measured on the field's own reported positions, three seeds.
+    const rows = [];
+    for (const seed of [4242, 7, 90210]) {
+      const f = padField(seed);
+      const pads = f.pads;
+      if (!(pads.length >= 12)) throw new Error(`seed ${seed} placed only ${pads.length} pads`);
+      if (!(f.clusters.length >= 2)) throw new Error(`seed ${seed} made ${f.clusters.length} clusters`);
+      const box = M.surface.createSurface().visible(1280, 800, M.pads.FIELD_MARGIN);
+      const rand = M.rng.makeRandom(seed ^ 0x5eed);
+      const nn = (pts) => {
+        let sum = 0;
+        for (const a of pts) {
+          let best = Infinity;
+          for (const b of pts) if (b !== a) best = Math.min(best, Math.hypot(a.x - b.x, a.y - b.y));
+          sum += best;
+        }
+        return sum / pts.length;
+      };
+      const flat = pads.map(() => ({ x: rand.range(box.x0, box.x1), y: rand.range(box.y0, box.y1) }));
+      const clumped = nn(pads), scattered = nn(flat);
+      // And the OPEN WATER: the largest gap a pad-free straight run of the
+      // frame's own width leaves. A scatter leaves none worth the name.
+      const gapOf = (pts) => {
+        const xs = pts.map(p => p.x).sort((a, b) => a - b);
+        let g = 0;
+        for (let i = 1; i < xs.length; i++) g = Math.max(g, xs[i] - xs[i - 1]);
+        return g;
+      };
+      rows.push({ seed, n: pads.length, clumped, scattered, gap: gapOf(pads), flatGap: gapOf(flat) });
+      if (!(clumped < scattered * 0.78)) {
+        throw new Error(`seed ${seed}: mean nearest neighbour ${clumped.toFixed(0)} px against `
+          + `${scattered.toFixed(0)} for the same pads scattered — that is not clumping`);
+      }
+      if (!(rows[rows.length - 1].gap > rows[rows.length - 1].flatGap)) {
+        throw new Error(`seed ${seed}: the widest pad-free band is ${rows[rows.length - 1].gap.toFixed(0)} px, `
+          + `narrower than the ${rows[rows.length - 1].flatGap.toFixed(0)} a scatter leaves`);
+      }
+    }
+    return rows.map(r => `seed ${r.seed}: ${r.n} pads, nn ${r.clumped.toFixed(0)} vs ${r.scattered.toFixed(0)} scattered`).join('; ');
+  });
+
+  check('a pad is a near-circle with one wedge cut out of it', () => {
+    // The SILHOUETTE, off the shipped outline rather than off a picture.
+    //
+    // THE RIM IS THE RING OUTSIDE THE DECLARED WEDGE, AND IT HAS TO BE — a
+    // RANK cannot find it any more. The first cut of this check took every
+    // sample above 55% of R as rim, and the wedge's flank is a CONTINUOUS ramp
+    // from its apex out to the rim, so it landed samples at every value in
+    // between and the check read the wedge's depth as the rim's variation. A
+    // rank window (the top 70%) fixed that while the wedge was one fixed
+    // narrow width and is wrong now that it is a per-pad draw: at 65 degrees
+    // the wedge carries a THIRD of the samples, so a rank cut at 70% lets its
+    // flank back in. What locates it instead is the pad's own declaration.
+    //
+    // A DECLARATION CAN LIE, so it is not taken on trust — four clauses below
+    // pin it to the shape: the one stretch that dives lies inside the declared
+    // window, it reaches the declared apex depth, the window's own two edges
+    // are back up at the rim, and the declared half-angle is inside the ruled
+    // range. What is left is an over-declared window hiding a mangled rim, and
+    // that is BOUNDED rather than closed: the ruled ceiling is 65 degrees, so
+    // at most 18% of the ring can be excluded by a declaration at all.
+    const f = padField(4242);
+    const rimStep = (Math.PI * 2) / M.pads.OUTLINE_PTS;
+    let worstRound = 0, leastVary = Infinity, worstGap = 0;
+    const bad = [];
+    for (const pad of f.pads) {
+      const pts = pad.outline.map(p => ({
+        d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt),
+        r: Math.hypot(p.x, p.y) / pad.R,
+      }));
+      const rim = pts.filter(q => Math.abs(q.d) > pad.notchHalf).map(q => q.r);
+      const hi = Math.max(...rim), lo = Math.min(...rim);
+      worstRound = Math.max(worstRound, hi - lo);
+      leastVary = Math.min(leastVary, hi - lo);
+
+      // (i) exactly one stretch dives toward the centre, and it is the one the
+      // pad declared. Walk the ring in angle order; a pad with two runs has
+      // been sampled or wrapped wrong, one with none has no stem.
+      const ring = pts.slice().sort((a, b) => a.d - b.d);
+      let runs = 0, deepest = Infinity, deepestAt = 0;
+      for (let i = 0; i < ring.length; i++) {
+        const prev = ring[(i - 1 + ring.length) % ring.length];
+        if (ring[i].r < 0.5 && prev.r >= 0.5) runs++;
+        if (ring[i].r < deepest) { deepest = ring[i].r; deepestAt = ring[i].d; }
+      }
+      if (runs !== 1) bad.push(`${runs} wedges`);
+      if (Math.abs(deepestAt) > pad.notchHalf) bad.push('the dive is outside the declared wedge');
+      // (ii) the apex reaches the depth the law says it does.
+      if (Math.abs(deepest - M.pads.NOTCH_INNER) > 0.02) bad.push('the wedge does not reach its apex');
+      // (iii) the declared EDGES are at the rim, which is what pins the
+      // declared width to the width actually cut: a window declared wider than
+      // the cut would have rim inside it, and one declared narrower would have
+      // flank outside it (clause (i) catches that as a second run).
+      // The wedge's own ladder runs flank to flank, so both declared edges ARE
+      // samples — taken exactly rather than through a band, because a band as
+      // wide as the rim's step swallows the whole of a five-degree wedge and
+      // reads its apex as its edge.
+      // AND THE EMPTY CASE IS A COMPLAINT, NOT A PASS. `Math.min()` of nothing
+      // is Infinity, which clears any bar — so a declaration that named a
+      // window with no sample on its edge would satisfy this clause by having
+      // nothing in it, which is the one way a clause of this shape fails to be
+      // one at all.
+      const edges = ring.filter(q => Math.abs(Math.abs(q.d) - pad.notchHalf) < 1e-9);
+      if (edges.length < 2) bad.push('the declared wedge has no sample on its own edge');
+      else if (!(Math.min(...edges.map(q => q.r)) > 0.85)) bad.push('the declared wedge is wider than the cut');
+      // (iv) inside the ruled range.
+      const deg = pad.notchHalf * 360 / Math.PI;
+      if (deg < M.pads.NOTCH_DEG[0] - 1e-9 || deg > M.pads.NOTCH_DEG[1] + 1e-9) bad.push(`a wedge of ${deg.toFixed(1)} degrees`);
+
+      // (v) THE WEDGE IS THE BETTER RESOLVED OF THE TWO. Its sample count is
+      // derived from its own width, so a 65-degree wedge gets as many samples
+      // as it needs rather than the eight a 5-degree slit wants — a fixed
+      // count is coarser than the RIM at the wide end and draws the flanks as
+      // a staircase. Nothing above can see this: a coarse wedge still dives,
+      // still reaches its apex and still leaves the rim alone.
+      const inside = ring.filter(q => Math.abs(q.d) <= pad.notchHalf + 1e-12);
+      if (inside.length < 3) bad.push('the wedge carries fewer than three samples');
+      for (let i = 1; i < inside.length; i++) worstGap = Math.max(worstGap, inside[i].d - inside[i - 1].d);
+    }
+    if (bad.length) throw new Error(`${bad.length} complaints over ${f.pads.length} pads: ${[...new Set(bad)].join(', ')}`);
+    // THE BAR IS SET FROM TWO MEASURED DISTRIBUTIONS, NOT FROM THE DATA IN
+    // HAND. Over 20 fields and 792 pads the worst rim in a field varies by
+    // 0.093-0.106 of its own radius under the ruled amplitudes and 0.203-0.234
+    // under the ones they replaced; 0.16 is between them with a third of
+    // headroom either way, and it is what carries "make the lily pads rounder"
+    // rather than leaving it as a number someone could quietly put back.
+    if (!(worstRound < 0.16)) throw new Error(`a rim varies by ${(worstRound * 100).toFixed(0)}% of its radius — that is lumpier than the ruling`);
+    if (!(leastVary > 0.01)) throw new Error('a rim is a compass circle');
+    if (!(worstGap <= rimStep / 2 + 1e-12)) throw new Error(`a wedge is sampled ${(worstGap / rimStep).toFixed(2)} of a rim step apart — coarser than half`);
+    return `${f.pads.length} pads, one wedge each, rims vary ${(leastVary * 100).toFixed(1)}-${(worstRound * 100).toFixed(1)}% of radius, `
+      + `wedges sampled within ${(worstGap / rimStep).toFixed(2)} of a rim step`;
+  });
+
+  check('the stem wedge is cut at a different angle on every pad', () => {
+    // EVA'S RULING: "the cut out a variety of angles ranging from 5 to 65".
+    // Two claims, and the one that matters is measured off the DRAWN outline
+    // rather than off the record, because a field whose pads all declare a
+    // different angle and all draw the same wedge satisfies a check that only
+    // reads the declaration.
+    //
+    // THE DRAWN ANGLE IS RECOVERED FROM WHERE THE RADII SIT. The flank is a
+    // linear ramp from NOTCH_INNER at the apex to the rim at the edge, so the
+    // stretch under half a radius is a fixed fraction of the half-width —
+    // (0.5 - NOTCH_INNER) / (1 - NOTCH_INNER) of it, either side. Read that
+    // stretch's angular extent off the outline and it hands back the wedge the
+    // pad was actually cut with, whatever the pad says about itself.
+    const f = padField(4242);
+    const frac = (0.5 - M.pads.NOTCH_INNER) / (1 - M.pads.NOTCH_INNER);
+    const drawn = [], said = [];
+    const bad = [];
+    for (const pad of f.pads) {
+      const dives = pad.outline
+        .map(p => ({ d: wrapPi(Math.atan2(p.y, p.x) - pad.notchAt), r: Math.hypot(p.x, p.y) / pad.R }))
+        .filter(q => q.r < 0.5).map(q => q.d);
+      const extent = Math.max(...dives) - Math.min(...dives);
+      // The samples are a finite ladder, so the run's two ends each fall short
+      // of the true crossing by up to one step; add a step back rather than
+      // widening the tolerance, which would hide a real disagreement. The step
+      // is read off the dive's own samples, so nothing here consults the
+      // wedge's declared width.
+      const step = dives.length > 1 ? extent / (dives.length - 1) : 0;
+      const deg = ((extent + step) / (2 * frac)) * 360 / Math.PI;
+      drawn.push(deg);
+      said.push(pad.notchDeg);
+      if (Math.abs(deg - pad.notchDeg) > 0.25 * pad.notchDeg + 1.5) {
+        bad.push(`a pad says ${pad.notchDeg.toFixed(1)} and draws ${deg.toFixed(1)} degrees`);
+      }
+    }
+    if (bad.length) throw new Error(`${bad.length} of ${f.pads.length} pads: ${[...new Set(bad)].slice(0, 3).join(', ')}`);
+    const loD = Math.min(...drawn), hiD = Math.max(...drawn);
+    // The range is 5 to 65 and the draw is uniform, so a field of this size
+    // reaches within a couple of degrees of each end; the bars are loose enough
+    // that an unlucky field is not a failure and tight enough that a narrowed
+    // range is. A FIELD THAT DRAWS ONE WIDTH FAILS BOTH.
+    if (!(loD < 15)) throw new Error(`the narrowest wedge drawn is ${loD.toFixed(1)} degrees — the range starts at ${M.pads.NOTCH_DEG[0]}`);
+    if (!(hiD > 50)) throw new Error(`the widest wedge drawn is ${hiD.toFixed(1)} degrees — the range ends at ${M.pads.NOTCH_DEG[1]}`);
+    if (!(new Set(said.map(v => v.toFixed(3))).size === said.length)) throw new Error('two pads were cut at exactly the same angle');
+    return `${f.pads.length} pads, drawn wedges ${loD.toFixed(1)}-${hiD.toFixed(1)} degrees `
+      + `(declared ${Math.min(...said).toFixed(1)}-${Math.max(...said).toFixed(1)}, range ${M.pads.NOTCH_DEG[0]}-${M.pads.NOTCH_DEG[1]})`;
+  });
+
+  check('a pad answers any ripple the same way', () => {
+    // THE SAME CLAIM THE FISH CARRY, one module along, and for the same reason:
+    // the cause of a ripple is not in the record, so nothing can branch on it.
+    // Two ponds, one pad each in the same place, each given one ripple that
+    // agrees on every quantity a disturbance HAS and differs only in `rings` —
+    // which is how many circles the renderer strokes and nothing a leaf can
+    // feel. If the pads rock differently, something is reading the cause.
+    const mk = (rings) => {
+      const rip = { x: 300, y: 300, r: 0, maxR: 120, age: 0, life: 2.2, strength: 0.9, rings };
+      const pad = M.pads.makePad(M.rng.makeRandom(5), 380, 300, 40);
+      return { rip, pad };
+    };
+    const a = mk(2), b = mk(3);
+    let moved = 0;
+    for (let i = 0; i < 600; i++) {
+      for (const s2 of [a, b]) {
+        s2.rip.age += DT;
+        s2.rip.r = s2.rip.maxR * M.ripples.frontAt(s2.rip.age / s2.rip.life);
+        M.pads.respond(s2.pad, M.pads.waveAt([s2.rip], s2.pad.x, s2.pad.y), DT);
+      }
+      moved = Math.max(moved, Math.hypot(a.pad.tx, a.pad.ty), Math.abs(a.pad.lift));
+    }
+    // Not vacuous: the ripple must actually have rocked the pad.
+    if (!(moved > 0.01)) throw new Error(`the ripple did not move the pad at all (${moved})`);
+    for (const k of ['tx', 'ty', 'lift']) {
+      if (a.pad[k] !== b.pad[k]) throw new Error(`${k} came out ${a.pad[k]} against ${b.pad[k]}`);
+    }
+    return `peak response ${moved.toFixed(4)}, identical to the bit on both`;
+  });
+
+  check('a passing front rocks a pad and lets it go', () => {
+    // THE SHAPE OF THE RESPONSE, not merely that there is one. A front crossing
+    // a pad tips it one way, then the OTHER as the crest passes the centre, and
+    // then the pad comes back to flat — that reversal is what makes it a rock
+    // rather than a shove, and it comes out of the slope under the pad changing
+    // sign rather than out of any oscillator.
+    const pad = M.pads.makePad(M.rng.makeRandom(11), 500, 300, 42);
+    const rip = { x: 300, y: 300, r: 0, maxR: 320, age: 0, life: 3.0, strength: 1, rings: 2 };
+    let along = [], peak = 0, peakLift = 0;
+    for (let i = 0; i < 3.0 / DT; i++) {
+      rip.age += DT;
+      rip.r = rip.maxR * M.ripples.frontAt(rip.age / rip.life);
+      M.pads.respond(pad, M.pads.waveAt([rip], pad.x, pad.y), DT);
+      // The component along the line from the splash: positive is tipped away.
+      along.push(pad.tx);
+      peak = Math.max(peak, Math.hypot(pad.tx, pad.ty));
+      peakLift = Math.max(peakLift, pad.lift);
+    }
+    const hi = Math.max(...along), lo = Math.min(...along);
+    if (!(hi > 0.004)) throw new Error(`the front never tipped the pad toward the splash (${hi})`);
+    if (!(lo < -0.004)) throw new Error(`the pad never tipped back the other way (${lo}) — that is a shove, not a rock`);
+    const rest = Math.hypot(pad.tx, pad.ty);
+    if (!(rest < peak * 0.2)) throw new Error(`it is still rocking at ${rest} after the ripple died (peak ${peak})`);
+    if (!(peakLift > 0.05)) throw new Error(`the pad never rode up the wave (${peakLift})`);
+    return `tilt ${(lo * 180 / Math.PI).toFixed(2)}° to ${(hi * 180 / Math.PI).toFixed(2)}°, `
+      + `bob ${peakLift.toFixed(2)} px, back to ${(rest * 180 / Math.PI).toFixed(3)}° at rest`;
+  });
+
+  check('the rock is subtle and a downpour does not peg it', () => {
+    // BOUNDED, AND NOT BY A CLAMP. The brief asks for a slight rock; a hard
+    // clamp would deliver that and would also put every pad in the pond at the
+    // ceiling for the whole of a storm, which is one thing a field of leaves
+    // must not do. What separates the two is not the ceiling, which both
+    // respect — it is whether there is a FLAT REGION above it, so the law is
+    // swept as a function rather than sampled on a fixture.
+    //
+    // THE FIRST CUT OF THIS CHECK LOOKED AT A FIXTURE AND MISSED THE MUTATION
+    // IT EXISTS FOR. It ran twelve pads under a hundred and twenty ripples and
+    // asked whether their tilts still differed from one another at the end —
+    // and they did under the clamp too, because by then the ripples had aged
+    // and the clamp was no longer binding on any of them. A pond does not hold
+    // still long enough to be a controlled experiment; the law does.
+    const settled = (slope) => {
+      const pad = M.pads.makePad(M.rng.makeRandom(1), 0, 0, 30);
+      const wave = { h: 0, gx: slope, gy: 0 };
+      for (let i = 0; i < 400; i++) M.pads.respond(pad, wave, 1 / 60);
+      return Math.hypot(pad.tx, pad.ty);
+    };
+    const xs = [], ys = [];
+    for (let i = 1; i <= 40; i++) { const g = i * M.pads.TILT_REF * 0.25; xs.push(g); ys.push(settled(g)); }
+    const top = ys[ys.length - 1];
+    if (!(top <= M.pads.TILT_MAX + 1e-9)) throw new Error(`a slope of ${xs[xs.length - 1]} reached ${top} rad against a cap of ${M.pads.TILT_MAX}`);
+    if (!(M.pads.TILT_MAX * 180 / Math.PI < 9)) throw new Error(`the cap itself is ${(M.pads.TILT_MAX * 180 / Math.PI).toFixed(1)}° — that is not a slight rock`);
+    // NO FLAT REGION, ANYWHERE. A clamp is flat above its ceiling by definition,
+    // so this is the clause that tells the two apart — and it is asserted over
+    // the WHOLE sweep, including ten times the reference slope, because a clamp
+    // placed high enough would pass a sweep that stopped short of it.
+    for (let i = 1; i < ys.length; i++) {
+      if (!(ys[i] > ys[i - 1])) {
+        throw new Error(`the response is flat between slopes ${xs[i - 1].toFixed(3)} and ${xs[i].toFixed(3)} `
+          + `(both ${ys[i].toFixed(6)} rad) — that is a clamp, not a saturation`);
+      }
+    }
+    // AND IT HOLDS ON A REAL POND, where a hundred crests overlap under one pad
+    // and the naive sum would be many times the ceiling.
+    const rand = M.rng.makeRandom(3);
+    const pads = [];
+    for (let i = 0; i < 12; i++) pads.push(M.pads.makePad(rand, 400 + i * 37, 300 + (i % 4) * 29, 34));
+    const rips = [];
+    for (let i = 0; i < 120; i++) {
+      rips.push({ x: rand.range(300, 900), y: rand.range(200, 500), r: 0,
+        maxR: rand.range(60, 170), age: rand.range(0.1, 0.5), life: 2.4, strength: 1, rings: 2 });
+    }
+    let worst = 0, worstLift = 0;
+    for (let i = 0; i < 400; i++) {
+      for (const r of rips) { r.age += DT; r.r = r.maxR * M.ripples.frontAt(Math.min(0.99, r.age / r.life)); }
+      for (const p of pads) {
+        M.pads.respond(p, M.pads.waveAt(rips, p.x, p.y), DT);
+        worst = Math.max(worst, Math.hypot(p.tx, p.ty));
+        worstLift = Math.max(worstLift, Math.abs(p.lift));
+      }
+    }
+    if (!(worst <= M.pads.TILT_MAX + 1e-9)) throw new Error(`a pad reached ${worst} rad against a cap of ${M.pads.TILT_MAX}`);
+    if (!(worstLift <= M.pads.BOB_MAX + 1e-9)) throw new Error(`a pad bobbed ${worstLift} px against a cap of ${M.pads.BOB_MAX}`);
+    if (!(worst > M.pads.TILT_MAX * 0.5)) throw new Error(`the storm only reached ${worst} rad — the cap was never approached`);
+    return `strictly rising over 40 slopes to ${(top * 180 / Math.PI).toFixed(3)}° of a `
+      + `${(M.pads.TILT_MAX * 180 / Math.PI).toFixed(2)}° cap; under 120 ripples `
+      + `${(worst * 180 / Math.PI).toFixed(2)}° and ${worstLift.toFixed(2)} px of bob`;
+  });
+
+  check('a tilted pad is foreshortened one way and lifted the other', () => {
+    // BOTH HALVES OF THE ROCK, because a foreshortening ALONE is even in the
+    // tilt — cos(-t) is cos(t) — so a pad drawn with only that reads as pulsing
+    // at twice the wave's frequency rather than rocking. The height term is odd
+    // in the tilt, and it is what makes one edge visibly lift while the other
+    // drops. Measured on `padPoint`, which is the one place a local point
+    // becomes a place on the water.
+    const pad = M.pads.makePad(M.rng.makeRandom(2), 0, 0, 50);
+    pad.tx = 0; pad.ty = 0; pad.lift = 0;
+    const flat = M.pads.padPoint(pad, 50, 0);
+    if (!(flat.x === 50 && flat.y === 0 && flat.z === 0)) throw new Error('an untilted pad is not flat');
+    const T = 0.1;
+    pad.tx = T;                       // tipped up toward +x
+    const up = M.pads.padPoint(pad, 50, 0);
+    const down = M.pads.padPoint(pad, -50, 0);
+    const across = M.pads.padPoint(pad, 0, 50);
+    near(up.x, 50 * Math.cos(T), 1e-12, 'the near edge foreshortens');
+    near(up.z, 50 * Math.sin(T), 1e-12, 'the near edge rises');
+    near(down.z, -50 * Math.sin(T), 1e-12, 'the far edge drops');
+    if (!(up.z > 0 && down.z < 0)) throw new Error('both edges moved the same way — that is a pulse, not a rock');
+    near(across.z, 0, 1e-12, 'the tilt axis itself does not move');
+    near(Math.hypot(across.x, across.y), 50, 1e-12, 'the tilt axis is not foreshortened');
+    // And it is SIGNED: tilting the other way swaps which edge is up.
+    pad.tx = -T;
+    const flipped = M.pads.padPoint(pad, 50, 0);
+    near(flipped.z, -up.z, 1e-12, 'reversing the tilt reverses the height');
+    near(flipped.x, up.x, 1e-12, 'reversing the tilt leaves the foreshortening alone');
+    return `at ${(T * 180 / Math.PI).toFixed(1)}°: near edge +${up.z.toFixed(2)} px, far edge ${down.z.toFixed(2)}, `
+      + `axis exactly 0, foreshortened to ${up.x.toFixed(3)} of 50`;
+  });
+
+  check('growing the frame grows the field and moves nothing', () => {
+    // A PAD IS A THING IN THE POND, NOT A THING IN THE VIEWPORT. A resize that
+    // re-generated the field would make every pad jump, which is the one thing
+    // a fixed object must not do; one that did nothing would leave the new water
+    // bare. Both directions are asserted, and the pads are compared by IDENTITY
+    // rather than by count — a field that replaced its pads with the same number
+    // of different ones passes a count.
+    const f = padField(4242, 900, 620);
+    const before = f.pads.slice();
+    const where = before.map(p => [p.x, p.y, p.R]);
+    f.ensure(1600, 1000);
+    const after = f.pads;
+    if (!(after.length > before.length)) throw new Error(`the field did not grow (${before.length} -> ${after.length})`);
+    for (let i = 0; i < before.length; i++) {
+      if (after[i] !== before[i]) throw new Error(`pad ${i} is not the same object after a resize`);
+      const [x, y, R] = where[i];
+      if (after[i].x !== x || after[i].y !== y || after[i].R !== R) throw new Error(`pad ${i} moved`);
+    }
+    // Shrinking keeps everything: the pond does not lose its leaves because the
+    // window got smaller.
+    f.ensure(700, 500);
+    if (f.pads.length !== after.length) throw new Error(`shrinking the frame changed the field ${after.length} -> ${f.pads.length}`);
+    // And the blooms are the PICTURE's, not the pond area's: a resize must not
+    // breed a fourth.
+    if (!(f.blooms.length >= M.pads.BLOOMS[0] && f.blooms.length <= M.pads.BLOOMS[1])) {
+      throw new Error(`${f.blooms.length} blooms after two resizes, outside the ruled ${M.pads.BLOOMS.join('-')}`);
+    }
+    return `${before.length} pads over 900x620 -> ${after.length} over 1600x1000, none moved, ${f.blooms.length} blooms`;
+  });
+
+  check('blooms rise among the pads and there are two or three', () => {
+    const rows = [];
+    for (const seed of [4242, 7, 90210, 31337]) {
+      const f = padField(seed);
+      if (!(f.blooms.length >= M.pads.BLOOMS[0] && f.blooms.length <= M.pads.BLOOMS[1])) {
+        throw new Error(`seed ${seed} placed ${f.blooms.length} blooms`);
+      }
+      for (const b of f.blooms) {
+        let nearest = Infinity, inside = false;
+        for (const p of f.pads) {
+          const d = Math.hypot(p.x - b.x, p.y - b.y);
+          nearest = Math.min(nearest, d / p.R);
+          if (d < p.R * 0.80) inside = true;
+        }
+        // AMONG the pads: a leaf beside it, and not sitting on one. One without
+        // the other is a flower alone on a pond, or a flower growing out of a leaf.
+        if (inside) throw new Error(`seed ${seed}: a bloom sits inside a pad's rim`);
+        if (!(nearest <= M.pads.BLOOM_BESIDE)) {
+          throw new Error(`seed ${seed}: the nearest pad to a bloom is ${nearest.toFixed(2)} of its own radius away`);
+        }
+      }
+      rows.push(`${seed}:${f.blooms.length}`);
+    }
+    return `blooms per seed ${rows.join(' ')}, each beside a pad and on none`;
+  });
+
+  check('wiring in the pads did not move the koi', () => {
+    // THE FORKED STREAM, AND IT IS NOT TIDINESS. koi-ripples.js says it in as
+    // many words: every draw on the shared stream shifts every number taken
+    // after it for the rest of the run, and the fish share that stream. A pad
+    // field placed from it would hand the pond a different set of koi — so the
+    // koi would have changed for a reason that has nothing to do with pads, and
+    // NOTHING ELSE HERE WOULD NOTICE: they would still be seven, still distinct,
+    // still swimming.
+    //
+    // The witness is a school built from the seed ALONE, with no scene around
+    // it, against the school the wired scene actually has. `state()` is read
+    // before a single frame is advanced, so the traits are the seeded ones.
+    const seed = 4242, W = 1280, H = 800;
+    const alone = M.fish.createSchool({ rand: M.rng.makeRandom(seed),
+      surface: M.surface.createSurface(), width: W, height: H });
+    alone.seed(W, H);
+    const wired = M.sceneKoi.default({
+      width: W, height: H, seed, reducedMotion: false,
+      canvas2d: () => ({ canvas: null, ctx: new Proxy({}, { get: () => () => {}, set: () => true }) }),
+    });
+    const st2 = wired.state();
+    if (!(st2.pads > 0)) throw new Error('the scene built no pads, so this proves nothing');
+    const mine = alone.fish.map(f => JSON.stringify(f.traits));
+    const theirs = st2.traits.map(t => JSON.stringify(t));
+    if (mine.length !== theirs.length) throw new Error(`${mine.length} koi alone against ${theirs.length} wired`);
+    if (!mine.length) throw new Error('no koi were seeded, so this proves nothing');
+    for (let i = 0; i < mine.length; i++) {
+      if (mine[i] !== theirs[i]) {
+        throw new Error(`koi ${i} is ${theirs[i]} in the scene and ${mine[i]} from the seed alone — `
+          + 'the pads are drawing from the stream the fish use');
+      }
+    }
+    wired.dispose();
+    return `${mine.length} koi identical to the seed's own, with ${st2.pads} pads and ${st2.blooms} blooms placed`;
+  });
+
+  check('a pad is drawn over the fish and the ripples', () => {
+    // THE DEPTH ORDER, MEASURED ON THE OPS THE RENDERER ACTUALLY EMITS. The
+    // renderer's own header says draw order is the ONLY depth cue in this scene,
+    // and a lily pad floats ON the water: a koi swims beneath it and a ring
+    // spreads around it, so the pad has to come after both. The browser half
+    // proves the pad hides the WATER in pixels; it cannot see the koi, whose
+    // outline is dimmer than a stack of the pad's own freckles. This can, and it
+    // is the claim in its general form — one placement in draw() decides both.
+    //
+    // The three are put in three places along the frame so an op belongs to
+    // whichever it is nearest, with no overlap to argue about.
+    const surf = M.surface.createSurface();
+    // TWO KINDS OF EVENT, AND THE FIRST CUT OF THIS RECORDER CONFLATED THEM. It
+    // tagged every path point with the fill style in effect AT THE TIME OF THE
+    // POINT — but a path is built first and painted after, so a pad's own
+    // outline came back wearing whatever the ripple pass had left set. The
+    // paints are recorded as their own events now and a shape's paint is the
+    // first one after its points.
+    const ops = [];
+    const noop = () => {};
+    const at = (x) => ops.push({ kind: 'pt', x });
+    const rec = new Proxy({
+      moveTo: (x) => at(x), lineTo: (x) => at(x),
+      quadraticCurveTo: (a, b, x) => at(x), bezierCurveTo: (a, b, c, d, x) => at(x),
+      ellipse: (x) => at(x), arc: (x) => at(x), rect: (x) => at(x),
+      fill: () => ops.push({ kind: 'fill', style: String(rec.fillStyle) }),
+      stroke: () => ops.push({ kind: 'stroke', style: String(rec.strokeStyle) }),
+      createRadialGradient: () => ({ addColorStop: noop, toString: () => 'GRADIENT' }),
+      createLinearGradient: () => ({ addColorStop: noop, toString: () => 'GRADIENT' }),
+    }, {
+      get: (t, k) => (k in t ? t[k] : (t[k] !== undefined ? t[k] : noop)),
+      set: (t, k, v) => { t[k] = v; return true; },
+    });
+
+    // The grain is a cached Path2D, which Node has no notion of. Stubbed for the
+    // length of this check and removed after: the grain is water, it is filled
+    // before anything else in the frame, and none of its points is near the
+    // three things being ordered.
+    const hadPath2D = 'Path2D' in globalThis;
+    if (!hadPath2D) globalThis.Path2D = class { rect() {} moveTo() {} lineTo() {} closePath() {} };
+    try {
+      const rend = M.draw.createRenderer(rec, surf);
+      const N = M.fish.SPINE_JOINTS, L = 96;
+      const seg = M.fish.CHAIN_SPAN_U * L / (N - 1);
+      const spine = [];
+      for (let i = 0; i < N; i++) spine.push({ x: 300 - seg * i, y: 400 });
+      const pad = M.pads.makePad(M.rng.makeRandom(1), 700, 400, 45);
+      rend.draw({
+        width: 1280, height: 800,
+        fish: [{ id: 1, len: L, seg, spine, speed: 40, phase: 0, finPhase: 0, patches: [] }],
+        ripples: [{ x: 1100, y: 400, r: 60, maxR: 120, age: 0.5, life: 2, strength: 1, rings: 2 }],
+        drops: [], pads: { drawOrder: [pad], pads: [pad], blooms: [] },
+        fallDir: { x: 0, y: 1 }, storm: { shake: 0, flash: 0 },
+        reducedMotion: false, ripplePhase: 0,
+      });
+    } finally { if (!hadPath2D) delete globalThis.Path2D; }
+
+    const band = (lo, hi) => ops.map((o, i) => ({ ...o, i }))
+      .filter(o => o.kind === 'pt' && o.x > lo && o.x < hi);
+    const fishOps = band(120, 480), padOps = band(620, 780), ripOps = band(950, 1250);
+    if (!fishOps.length || !padOps.length || !ripOps.length) {
+      throw new Error(`nothing to compare (${fishOps.length} fish / ${padOps.length} pad / ${ripOps.length} ripple ops)`);
+    }
+    const lastFish = fishOps[fishOps.length - 1].i;
+    const lastRip = ripOps[ripOps.length - 1].i;
+    const firstPad = padOps[0].i;
+    if (!(firstPad > lastFish)) throw new Error(`the pad starts at op ${firstPad}, before the koi ends at ${lastFish}`);
+    if (!(firstPad > lastRip)) throw new Error(`the pad starts at op ${firstPad}, before the ripples end at ${lastRip}`);
+    // AND THE RESET IS THE FIRST THING IT PAINTS. Every other mark in this scene
+    // is translucent ink, so without an opaque fill of the water's own value the
+    // order buys nothing — the koi would simply tint through.
+    const firstPaint = ops.slice(firstPad).find(o => o.kind === 'fill' || o.kind === 'stroke');
+    if (!firstPaint || firstPaint.kind !== 'fill' || firstPaint.style !== M.draw.GROUND) {
+      throw new Error(`the pad's first paint is a ${firstPaint ? firstPaint.kind : 'nothing'} `
+        + `with "${firstPaint ? firstPaint.style : ''}" rather than a fill of the ground`);
+    }
+    return `koi ops end at ${lastFish}, ripples at ${lastRip}, the pad starts at ${firstPad} with a ground fill`;
+  });
+
+  check('the pad field costs a frame nothing it cannot afford', () => {
+    // The wave field is read once per pad per frame over the whole ripple list,
+    // which during a downpour is the cap. Measured rather than reasoned about,
+    // because "one pass over a bounded list" is how every accidental quadratic
+    // starts.
+    const f = padField(4242, 1440, 900);
+    const rand = M.rng.makeRandom(9);
+    const rips = [];
+    for (let i = 0; i < M.ripples.MAX_RIPPLES; i++) {
+      rips.push({ x: rand.range(0, 1440), y: rand.range(0, 1500), r: rand.range(0, 160),
+        maxR: 170, age: rand.range(0.2, 1.2), life: 3.0, strength: 0.6, rings: 2 });
+    }
+    const t0 = process.hrtime.bigint();
+    for (let i = 0; i < 60; i++) f.advance(1 / 60, { ripples: rips });
+    const ms = Number(process.hrtime.bigint() - t0) / 1e6 / 60;
+    if (!(ms < 2.0)) throw new Error(`${ms.toFixed(2)} ms a frame for ${f.pads.length} pads against ${rips.length} ripples`);
+    return `${ms.toFixed(3)} ms a frame, ${f.pads.length} pads x ${rips.length} ripples (the cap)`;
+  });
+
+  // ============================================================== SCENE 3 ===
+  // The beach. Numbers here come from the BRIEF and from the reference clips,
+  // never from the module under test — a clause that reads its expected value
+  // out of the thing it is checking measures its own consistency.
+  {
+    const S = M.shore, W = M.swash, SE = M.sets, WA = M.water, D = M.beachDraw;
+    const rng = (n) => M.rng.makeRandom(n);
+    // One beach, settled, reusable by the checks that only need to look at it.
+    const settled = (seed = 4242, secs = 90) => {
+      const sw = W.createSwash({ rand: rng(seed) });
+      const se = SE.createSets({ rand: rng(seed ^ 99) });
+      for (let i = 0; i < secs * 60; i++) {
+        se.advance(1 / 60);
+        sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+      }
+      return { sw, se };
+    };
+
+    setSection('shore');
+
+    check('the bands are the brief\'s forty twenty forty', () => {
+      // "water ~40% of frame height, wet band ~20%, dry sand ~40%" — and the
+      // wet band is not a third number, it is the swash's own travel.
+      assert.strictEqual(S.WATERLINE_S, 0.40, 'the waterline is not at 40%');
+      assert.strictEqual(S.RUNUP_NOMINAL, 0.20, 'the nominal runup is not 20%');
+      near(S.WATERLINE_S + S.RUNUP_NOMINAL, 0.60, 1e-12, 'the high-water mark');
+      near(1 - (S.WATERLINE_S + S.RUNUP_NOMINAL), 0.40, 1e-12, 'the dry sand');
+      // and a wave at full energy can reach the bottom of frame, no further
+      near(S.WATERLINE_S + S.RUNUP_MAX, 1, 1e-12, 'the deepest reachable runup');
+      return 'water 40% / wet 20% / dry 40%, and a full set reaches s = 1';
+    });
+
+    check('the shoreline is oblique and runs UP to the right', () => {
+      const sh = S.createShore(); sh.resize(1000, 600);
+      assert.ok(sh.tiltDeg > 0, `tilt ${sh.tiltDeg} is not positive`);
+      const yL = sh.yAt(0, 0.4), yC = sh.yAt(500, 0.4), yR = sh.yAt(1000, 0.4);
+      // Screen y falls as x rises: lower on the left, higher on the right,
+      // which is the sign every measurement on the three clips agrees about.
+      assert.ok(yL > yC && yC > yR, `left ${yL} centre ${yC} right ${yR} is not a rise to the right`);
+      near(yC, 0.4 * 600, 1e-9, 'the band fraction is not exact at frame centre');
+      return `${sh.tiltDeg}deg: left ${yL.toFixed(1)} centre ${yC.toFixed(1)} right ${yR.toFixed(1)}`;
+    });
+
+    check('the screen mapping round-trips exactly', () => {
+      const sh = S.createShore(); sh.resize(1234, 789);
+      for (const x of [0, 1, 617, 1233]) for (const v of [0, 0.31, 0.62, 1]) {
+        near(sh.sAt(x, sh.yAt(x, v)), v, 1e-12, `round trip at x=${x} s=${v}`);
+      }
+      return 'sAt(yAt(s)) is s to 1e-12 over the frame';
+    });
+
+    setSection('swash');
+
+    check('a swash carries no record of the energy that chose it', () => {
+      // THE STRUCTURAL FORM of "set energy biases the NEXT wave, never the one
+      // currently running": the record has no field to branch on.
+      const sw = W.createSwash({ rand: rng(1) });
+      sw.spawn(0.9);
+      assert.ok(sw.waves.length, 'nothing was spawned');
+      assert.deepStrictEqual(Object.keys(sw.waves[0]).sort(), [...W.SWASH_FIELDS].sort(),
+        'a swash record has fields the declaration does not');
+      for (const k of Object.keys(sw.waves[0])) {
+        assert.ok(!/energy|set|source|kind/i.test(k), `a swash record carries "${k}"`);
+      }
+      return `${W.SWASH_FIELDS.length} fields, none naming a cause`;
+    });
+
+    check('the energy reaches the next wave and never the one running', () => {
+      // The strong form: advance the SAME running wave under opposite energies
+      // and require every emitted extent to be identical.
+      const mk = () => { const sw = W.createSwash({ rand: rng(7) }); sw.spawn(0.5); return sw; };
+      const a = mk(), b = mk();
+      for (let i = 0; i < 120; i++) {
+        a.advance(1 / 60, { energy: 0 });
+        b.advance(1 / 60, { energy: 1 });
+      }
+      // Its own extent must not have moved. (A new wave may have been spawned
+      // in b, so compare the FIRST wave's record rather than the edge field.)
+      assert.deepStrictEqual(
+        [a.waves[0].runup, a.waves[0].advanceS, a.waves[0].retreatS],
+        [b.waves[0].runup, b.waves[0].advanceS, b.waves[0].retreatS],
+        'a running wave changed with the energy');
+      return 'the running wave is bit-identical under energy 0 and 1';
+    });
+
+    check('the retreat takes the measured two to three seconds', () => {
+      // MEASURED: the brief's own reading of the two clean drains.
+      const sw = W.createSwash({ rand: rng(3) });
+      const w = sw.spawn(0);
+      assert.ok(w.retreatS >= 2 && w.retreatS <= 3, `retreat ${w.retreatS} is outside 2-3 s`);
+      // and the envelope really does take that long to come back to nothing
+      const peak = w.advanceS + w.holdS;
+      near(W.swashEnv(peak, w.advanceS, w.holdS, w.retreatS), 1, 1e-9, 'the envelope at the peak');
+      near(W.swashEnv(peak + w.retreatS, w.advanceS, w.holdS, w.retreatS), 0, 1e-9, 'the envelope at the end');
+      assert.ok(W.swashEnv(peak + w.retreatS / 2, w.advanceS, w.holdS, w.retreatS) > 0.2,
+        'the drain is not still running half way through');
+      return `retreat ${w.retreatS.toFixed(2)} s`;
+    });
+
+    check('the advance is well under a second and is not claimed as measured', () => {
+      // PICKED, and the brief says so: "do not claim it was derived from the
+      // footage." What is checked is the stated property, not a fit.
+      assert.ok(W.ADVANCE_S < 1, `advance ${W.ADVANCE_S} is not under a second`);
+      assert.ok(W.ADVANCE_S < W.RETREAT_S / 2, 'the advance is not much faster than the retreat');
+      const src = fs.readFileSync(path.join(SCENE, 'beach-swash.js'), 'utf8');
+      assert.ok(/NOT measured|PICKED, NOT MEASURED/i.test(src),
+        'the advance is not declared as picked rather than measured');
+      return `${W.ADVANCE_S} s, declared picked`;
+    });
+
+    check('successive swashes do not reach identical distances', () => {
+      const sw = W.createSwash({ rand: rng(11) });
+      const reaches = [];
+      for (let i = 0; i < 20; i++) reaches.push(sw.spawn(0).runup);
+      const uniq = new Set(reaches.map(r => r.toFixed(6)));
+      assert.strictEqual(uniq.size, reaches.length, 'two swashes reached the same distance');
+      const spread = Math.max(...reaches) - Math.min(...reaches);
+      assert.ok(spread > 0.01, `the reaches only spread ${spread}`);
+      return `20 distinct reaches, spread ${spread.toFixed(3)} of frame height`;
+    });
+
+    check('wet sand persists after the water has left it', () => {
+      // THE FAILURE MODE THE BRIEF NAMES: "Animating one oscillating waterline
+      // is the failure mode here. Wet sand must persist after the water has
+      // left it." So at full drain the two boundaries must be far apart.
+      const { sw } = settled();
+      let found = null;
+      for (let i = 0; i < 60 * 40 && !found; i++) {
+        sw.advance(1 / 60, { energy: 0 });
+        if (sw.edgeAtU(0.5) < S.WATERLINE_S + 0.01) found = { e: sw.edgeAtU(0.5), w: sw.wetAtU(0.5) };
+      }
+      assert.ok(found, 'the swash never drained');
+      const gap = found.w - found.e;
+      assert.ok(gap > 0.12, `the wet band is only ${gap.toFixed(3)} of frame height at full drain`);
+      return `edge ${found.e.toFixed(3)}, high-water ${found.w.toFixed(3)}, a wet band ${gap.toFixed(3)} deep`;
+    });
+
+    check('the two drying rates are an order of magnitude apart', () => {
+      // "Do not use one rate for the whole beach." They are two variables, so
+      // the separation is a property of the declaration and not of a branch.
+      assert.ok(W.SAT_DRY_S / W.OVERRUN_DRY_S > 10,
+        `the two rates are only ${(W.SAT_DRY_S / W.OVERRUN_DRY_S).toFixed(1)}x apart`);
+      return `overrun ${W.OVERRUN_DRY_S} s vs saturated ${W.SAT_DRY_S} s — ${(W.SAT_DRY_S / W.OVERRUN_DRY_S).toFixed(0)}x`;
+    });
+
+    check('the overrun zone dries back and does not ratchet', () => {
+      // "then recedes as the sand behind it dries ... it must return, not
+      // ratchet." Measured on the emitted fields, not on the declaration.
+      const { sw, se } = settled(88);
+      const sat0 = sw.satAtU(0.5), wet0 = sw.wetAtU(0.5);
+      se.scroll(120); se.scroll(120); se.scroll(120);
+      let peak = 0;
+      for (let i = 0; i < 60 * 30; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+        peak = Math.max(peak, sw.wetAtU(0.5));
+      }
+      assert.ok(peak > sat0 + 0.08, `the set only reached ${peak.toFixed(3)} against a saturated ${sat0.toFixed(3)}`);
+      // and once the energy has gone it comes back down toward the saturated level
+      for (let i = 0; i < 60 * 70; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: 0, intervalScale: 1 });
+      }
+      const back = sw.wetAtU(0.5);
+      assert.ok(back < peak - 0.05, `the mark stayed at ${back.toFixed(3)} after peaking at ${peak.toFixed(3)}`);
+      // RETURNED, not ratcheted: back to where it sat BEFORE the set. Comparing
+      // it against the CURRENT saturated level instead would be a clause
+      // reading its reference out of the thing it is checking — sat is what the
+      // set moved, so "wet came back to sat" is true of a ratchet too.
+      assert.ok(back <= wet0 + 0.05,
+        `the mark settled at ${back.toFixed(3)} against ${wet0.toFixed(3)} before the set`);
+      return `${wet0.toFixed(3)} before, peak ${peak.toFixed(3)}, ${back.toFixed(3)} after (sat0 ${sat0.toFixed(3)})`;
+    });
+
+    check('the high-water mark is effectively static in quiet water', () => {
+      // The brief's own instrument: "it moves about 6px in 3.5 seconds".
+      // Measured here in the same units on a 900 px frame, over windows with no
+      // set energy in them — a set is the one time it IS meant to move.
+      const H = 900, moves = [];
+      for (const seed of [1, 7, 4242]) {
+        const { sw, se } = settled(seed);
+        for (let k = 0; k < 40; k++) {
+          const before = sw.wetAtU(0.5); let calm = true;
+          for (let i = 0; i < 210; i++) {
+            se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+            if (se.energy > 0.02) calm = false;
+          }
+          if (calm) moves.push(Math.abs(sw.wetAtU(0.5) - before) * H);
+        }
+      }
+      assert.ok(moves.length > 30, `only ${moves.length} quiet windows`);
+      const mean = moves.reduce((a, b) => a + b, 0) / moves.length;
+      assert.ok(mean < 12, `the mark moves ${mean.toFixed(1)} px per 3.5 s, which is not "effectively static"`);
+      return `${mean.toFixed(1)} px per 3.5 s over ${moves.length} windows (the brief measured ~6)`;
+    });
+
+    check('an overrun fires with the extent it reached', () => {
+      const { sw, se } = settled(555);
+      sw.overruns.length = 0;
+      se.scroll(120); se.scroll(120); se.scroll(120);
+      for (let i = 0; i < 60 * 40; i++) {
+        se.advance(1 / 60); sw.advance(1 / 60, { energy: se.energy, intervalScale: se.intervalScale });
+      }
+      assert.ok(sw.overruns.length > 0, 'a full set fired no overrun');
+      for (const o of sw.overruns) {
+        assert.ok(Number.isFinite(o.extent) && o.extent > S.WATERLINE_S, `extent ${o.extent}`);
+        assert.ok(o.over >= W.OVERRUN_MARGIN_S, `an overrun fired only ${o.over} past the mark`);
+        assert.ok(o.at >= 0 && o.at <= 1, `at ${o.at} is not an along-shore position`);
+      }
+      // AND A QUIET BEACH FIRES NONE, which is what makes the event a signal
+      // rather than a wave counter. Measured over five seeds at five minutes
+      // each, the margin was set where this rate reaches zero while the
+      // set-driven rate is barely touched.
+      let quietFires = 0;
+      for (const seed of [556, 557, 558]) {
+        const { sw: q } = settled(seed);
+        q.overruns.length = 0;
+        for (let i = 0; i < 60 * 300; i++) q.advance(1 / 60, { energy: 0, intervalScale: 1 });
+        quietFires += q.overruns.length;
+      }
+      assert.strictEqual(quietFires, 0, `${quietFires} overruns in fifteen quiet minutes`);
+      return `${sw.overruns.length} on a full set, 0 in fifteen quiet minutes`;
+    });
+
+    check('the gloss is a length behind the edge, not a fixed band', () => {
+      // "Sand goes glossy -> matte over roughly half a second behind the
+      // departing water" — so a fast drain leaves a WIDER glossy band.
+      const { sw } = settled(31);
+      let drainMax = 0, restMin = Infinity;
+      for (let i = 0; i < 60 * 60; i++) {
+        sw.advance(1 / 60, { energy: 0 });
+        if (sw.sheet > 0.3 && sw.sheet < 0.8) drainMax = Math.max(drainMax, sw.glossDepth);
+        if (sw.sheet === 0) restMin = Math.min(restMin, sw.glossDepth);
+      }
+      assert.ok(drainMax > restMin * 4, `draining ${drainMax.toFixed(4)} vs at rest ${restMin.toFixed(4)}`);
+      return `${restMin.toFixed(4)} at rest, ${drainMax.toFixed(4)} mid-drain`;
+    });
+
+    setSection('sets');
+
+    check('three scroll actions reach the maximum', () => {
+      const se = SE.createSets({ rand: rng(2) });
+      for (let i = 0; i < 3; i++) se.scroll(SE.ACTION_DELTA);
+      near(se.energy, 1, 1e-9, 'three actions did not fill it');
+      return `3 x ${SE.ACTION_DELTA} px -> ${se.energy.toFixed(3)}`;
+    });
+
+    check('either scroll direction adds energy', () => {
+      // UNSIGNED, unlike scene 1's wind: a set has no negative, and what puts
+      // it back is the decay.
+      const up = SE.createSets({ rand: rng(2) }), down = SE.createSets({ rand: rng(2) });
+      up.scroll(SE.ACTION_DELTA); down.scroll(-SE.ACTION_DELTA);
+      near(up.energy, down.energy, 1e-12, 'the two directions disagree');
+      assert.ok(up.energy > 0, 'scrolling added nothing');
+      return `both directions -> ${up.energy.toFixed(3)}`;
+    });
+
+    check('the energy decays to zero over its window', () => {
+      const se = SE.createSets({ rand: null });
+      for (let i = 0; i < 3; i++) se.scroll(SE.ACTION_DELTA);
+      for (let i = 0; i < Math.round(SE.DECAY_S * 240); i++) se.advance(1 / 240);
+      assert.strictEqual(se.scrolled, 0, `the scrolled energy is ${se.scrolled} after the window`);
+      return `zero exactly at ${SE.DECAY_S} s`;
+    });
+
+    check('large sets arrive with no input at all', () => {
+      // "an untouched scene still gets overruns"
+      const se = SE.createSets({ rand: rng(5) });
+      let peak = 0;
+      for (let i = 0; i < 240 * 60 * 4; i++) { se.advance(1 / 240); peak = Math.max(peak, se.energy); }
+      assert.ok(se.sets > 0, 'no set arrived in four minutes');
+      assert.ok(peak >= SE.SET_PEAK[0] * 0.95, `the biggest natural set only reached ${peak.toFixed(2)}`);
+      assert.strictEqual(se.scrolled, 0, 'the natural set went through the scroll account');
+      return `${se.sets} sets in 4 min, peaking at ${peak.toFixed(2)}, with no input`;
+    });
+
+    setSection('water');
+
+    check('the streaks persist and drift shoreward', () => {
+      // They are records, not a field regenerated each frame: a re-randomised
+      // surface reads as static rather than as water.
+      const wa = WA.createWater({ rand: rng(6), count: 60 });
+      assert.deepStrictEqual(Object.keys(wa.streaks[0]).sort(), [...WA.STREAK_FIELDS].sort());
+      const first = wa.streaks[0];
+      const s0 = first.s, u0 = first.u;
+      for (let i = 0; i < 30; i++) wa.advance(1 / 60, { energy: 0 });
+      assert.strictEqual(wa.streaks[0], first, 'the streak array was rebuilt');
+      assert.ok(first.s > s0, 'the streak did not drift shoreward');
+      near(first.u, u0, 1e-12, 'a streak wandered along the shore');
+      assert.ok(wa.drift > 0, 'the drift phase did not advance');
+      return `s ${s0.toFixed(3)} -> ${first.s.toFixed(3)}, same record, u unchanged`;
+    });
+
+    setSection('beach-tone');
+
+    check('the value ordering is the reference\'s own', () => {
+      // Measured off the three clips as ink coverage against their OWN dry
+      // sand: deep water 0.84 > mid water 0.55 > wet sand 0.23 > foam 0.04 >
+      // dry 0.03. The ordering is what has to hold; the levels are the
+      // constants set from it.
+      const T = D.TONE;
+      assert.ok(T.deep > T.shallow, 'deep water is not darker than the shore');
+      assert.ok(T.shallow > T.gloss, 'the shore is not darker than glossy sand');
+      assert.ok(T.gloss > T.wet, 'glossy sand is not darker than matte wet sand');
+      assert.ok(T.wet > T.foam, 'wet sand is not darker than the foam');
+      assert.strictEqual(T.foam, 0, 'the foam is not bare paper');
+      assert.strictEqual(T.dry, 0, 'the dry sand is not bare paper');
+      return `deep ${T.deep} > shallow ${T.shallow} > gloss ${T.gloss} > wet ${T.wet} > foam/dry 0`;
+    });
+
+    check('the foam band is a plateau of paper, not a ramp to one', () => {
+      // A smooth fall across the band averages half the water's tone over it,
+      // which put the foam DARKER than the wet sand and inverted the one
+      // ordering that has to hold.
+      const edge = 0.40, fw = D.FOAM_BAND_S;
+      const at = (s) => D.waterTone(s, edge, fw, 0.05, 0, 0);
+      near(at(edge), 0, 1e-9, 'the tone at the edge itself');
+      // the inner part of the band is bare
+      assert.strictEqual(at(edge - fw * 0.25), 0, 'the inner foam band carries ink');
+      // and the seaward part still RAMPS rather than cutting. `into` is
+      // measured from the band's seaward edge, so the ramp occupies the outer
+      // FOAM_RAMP of it — probing at 0.6 of the way in lands in the plateau,
+      // which is what the first version of this clause did.
+      const onRamp = edge - fw * (1 - D.FOAM_RAMP * 0.5);
+      const mid = at(onRamp);
+      assert.ok(mid > 0 && mid < at(edge - fw * 1.2), `the band does not ramp in (${mid})`);
+      return `bare over the inner ${((1 - D.FOAM_RAMP) * 100).toFixed(0)}% of the band`;
+    });
+
+    check('the run-up sheet is lighter than deep water', () => {
+      // Anchoring the ramp on the MOVING edge stretched the ocean gradient over
+      // the sand a swash had just covered, so an overrun came out as four
+      // fifths of the frame in near-solid ink.
+      const deep = D.waterTone(0.02, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
+      const sheet = D.waterTone(0.65, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
+      assert.ok(sheet < deep * 0.75, `the sheet reads ${sheet.toFixed(2)} against deep water ${deep.toFixed(2)}`);
+      // and the deep water's own tone must NOT move when the edge does
+      const a = D.waterTone(0.10, 0.42, D.FOAM_BAND_S, 0.05, 0, 0);
+      const b = D.waterTone(0.10, 0.95, D.FOAM_BAND_S, 0.05, 0, 0);
+      near(a, b, 1e-12, 'the deep water changed tone because the swash moved');
+      return `deep ${deep.toFixed(2)} vs sheet ${sheet.toFixed(2)}; deep is edge-independent`;
+    });
+
+    check('the dry sand leaves a register for the marks session', () => {
+      // The sand-marking session draws user marks into this region, so the base
+      // texture has to sit somewhere a drawn line can be read ON TOP of. The
+      // gap is declared rather than described, and the module refuses to load
+      // without it.
+      // THE BAR IS NOT IMPORTED FROM THE MODULE UNDER TEST. The first version
+      // of this clause asserted the gap against the module's own
+      // MARK_HEADROOM, which is the entangled-reference trap: a tree that gave
+      // the headroom away would lower that constant too and the clause would
+      // stay green while the registers collided. Both numbers here have other
+      // owners — 0.30 is the gap this session is committing to, restated, and
+      // 0.32 is MEASURED off the reference (its footprints sit about 70 levels
+      // under their ground on a 185/47 range).
+      const HEADROOM = 0.30, REF_FOOTPRINT_ALPHA = 0.32;
+      assert.ok(D.DRY_MARK_ALPHA > 0, 'the dry sand carries no texture at all');
+      assert.ok(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA >= HEADROOM,
+        `the base texture at ${D.DRY_MARK_ALPHA} leaves only `
+        + `${(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor`);
+      assert.ok(D.DRY_MARK_ALPHA < REF_FOOTPRINT_ALPHA,
+        `the base texture at ${D.DRY_MARK_ALPHA} is as dark as the reference's own footprints`);
+      return `base ${D.DRY_MARK_ALPHA} · drawn marks from ${D.MARK_ALPHA_FLOOR} · headroom ${D.MARK_HEADROOM}`;
+    });
+
+    check('the swell fades out in the deep water', () => {
+      // Near the top of frame the ramp is steepest, so a displacement there
+      // swings the tone by a fifth and the sea bands.
+      near(D.swell(0.3, 0.01, 1.0, 0), 0, 1e-12, 'the swell is live at the top of frame');
+      const shoal = Math.abs(D.swell(0.3, 0.35, 1.0, 1));
+      assert.ok(shoal > 0, 'the swell is dead everywhere');
+      return `0 at depth 0, ${shoal.toFixed(4)} at the shore`;
+    });
+  }
+
   // --------------------------------------------------------------- registry
   setSection('registry');
-  check('there are eight slots and one is built', () => {
+  check('there are eight slots and two are built', () => {
     assert.strictEqual(M.registry.SCENES.length, M.registry.MAX_SCENES);
     assert.strictEqual(M.registry.MAX_SCENES, 8);
     M.registry.SCENES.forEach((s, i) => assert.strictEqual(s.id, i + 1));
     const built = M.registry.builtScenes();
-    assert.strictEqual(built.length, 1, `${built.length} scenes are built`);
-    assert.strictEqual(built[0].id, 1);
-    return `8 slots, scene 1 "${built[0].title}" built, 7 stubs`;
+    assert.strictEqual(built.length, 2, `${built.length} scenes are built`);
+    assert.deepStrictEqual(built.map(b => b.id), [1, 3]);
+    assert.ok(built.every(b => b.title), 'a built slot has no title');
+    return `8 slots, ${built.map(b => `${b.id} "${b.title}"`).join(' + ')}, 6 stubs`;
   });
 
   check('the random pick excludes what is showing', () => {
-    assert.strictEqual(M.registry.randomSceneId(1, () => 0.5), null,
-      'with one scene built there is nowhere to go');
-    // and with a second built, it never returns the current one
-    const stub = { id: 2, title: 'stub', load: async () => ({}) };
-    const saved = M.registry.SCENES[1];
-    M.registry.SCENES[1] = stub;
+    // With two built it must always move, and never to the one showing.
+    for (const u of [0, 0.49, 0.5, 0.99]) {
+      assert.strictEqual(M.registry.randomSceneId(1, () => u), 3);
+      assert.strictEqual(M.registry.randomSceneId(3, () => u), 1);
+    }
+    // And with only one it has nowhere to go, which is what disables the
+    // button rather than leaving a no-op that looks broken.
+    const saved = M.registry.SCENES[2];
+    M.registry.SCENES[2] = { id: 3, title: null, load: null };
     try {
-      for (const u of [0, 0.49, 0.5, 0.99]) {
-        assert.strictEqual(M.registry.randomSceneId(1, () => u), 2);
-        assert.strictEqual(M.registry.randomSceneId(2, () => u), 1);
-      }
-    } finally { M.registry.SCENES[1] = saved; }
-    return 'null with one built; never the current one with two';
+      assert.strictEqual(M.registry.randomSceneId(1, () => 0.5), null,
+        'with one scene built there is nowhere to go');
+    } finally { M.registry.SCENES[2] = saved; }
+    return 'never the current one with two built; null with one';
   });
 
   check('the url names a scene and falls back when it cannot', () => {
@@ -1326,8 +2947,15 @@ async function partOne(mutant) {
   // source. Comments are stripped first, since every one of these rules is
   // also WRITTEN ABOUT in the headers it governs.
   setSection('discipline');
+  // A NEW SCENE MODULE MUST BE ADDED HERE OR IT IS SCANNED BY NOTHING. The list
+  // is the scan's own coverage, and a module missing from it passes every
+  // discipline check by not being read — the hole this repo has found in a
+  // hand-written coverage list more than once.
   const SCENE_MODULES = ['surface.js', 'koi-storm.js', 'koi-wind.js', 'koi-ripples.js',
-                         'koi-rain.js', 'koi-fish.js', 'koi-draw.js', 'scene-koi.js'];
+                         'koi-rain.js', 'koi-fish.js', 'koi-pads.js', 'koi-draw.js',
+                         'scene-koi.js',
+                         'beach-shore.js', 'beach-swash.js', 'beach-sets.js',
+                         'beach-water.js', 'beach-draw.js', 'scene-beach.js'];
   const stripComments = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1');
@@ -1399,7 +3027,34 @@ export default function createProbe(host) {
 }
 `;
 
-function serveRepo({ mutant, withProbe }) {
+// A synthetic MULTIPLANE scene, served only by the gate. Nothing that ships
+// calls host.canvas2d() more than once, so without this the layering contract
+// is exercised by nobody and every claim about it is an inference. The back
+// plane floods red; the front plane clears itself and draws one blue square,
+// well clear of the nav's translucent chrome (sampling under that measures the
+// nav, not the plane).
+const LAYER_PROBE = `
+export const meta = { title: 'Planes' };
+export const LAYER_SQUARE = { x: 300, y: 300, w: 200, h: 200 };
+export default function createLayers(host) {
+  const back = host.canvas2d();
+  const front = host.canvas2d();
+  window.__layers = { frames: 0, square: { x: 300, y: 300, w: 200, h: 200 } };
+  return {
+    frame() {
+      window.__layers.frames++;
+      back.ctx.fillStyle = '#ff0000';
+      back.ctx.fillRect(0, 0, host.width, host.height);
+      front.ctx.clearRect(0, 0, host.width, host.height);
+      front.ctx.fillStyle = '#0000ff';
+      front.ctx.fillRect(300, 300, 200, 200);
+    },
+    state() { return { layers: true, frames: window.__layers.frames }; },
+  };
+}
+`;
+
+function serveRepo({ mutant, withProbe, withLayers }) {
   const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.css': 'text/css',
     '.svg': 'image/svg+xml', '.ico': 'image/x-icon', '.png': 'image/png' };
   const state = { probeDelayMs: 0 };
@@ -1415,6 +3070,8 @@ function serveRepo({ mutant, withProbe }) {
       return send(PROBE_SCENE, 'text/javascript');
     }
 
+    if (rel === 'scene/scene-layers.js') return send(LAYER_PROBE, 'text/javascript');
+
     const file = path.join(REPO, rel);
     if (!file.startsWith(REPO) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) {
       res.writeHead(404); res.end('not found'); return;
@@ -1427,6 +3084,21 @@ function serveRepo({ mutant, withProbe }) {
         "  { id: 2, title: null, load: null },",
         "  { id: 2, title: 'Probe', load: () => import('./scene-probe.js') },");
       if (swapped === src) throw new Error('the probe could not be injected into the registry');
+      body = Buffer.from(swapped);
+    }
+    if (withLayers && rel === 'scene/registry.js') {
+      // THE PROBE TAKES THE FIRST EMPTY SLOT RATHER THAN A NUMBERED ONE. It sat
+      // on slot 3 and slot 3 became the beach, so the injection silently found
+      // nothing to replace and the whole pass died on its own guard. Slot 4 is
+      // the next stub, and taking "the first empty slot" means the next scene
+      // built does not do this again.
+      const src = body.toString();
+      const empty = src.match(/ {2}\{ id: (\d+), title: null, load: null \},/);
+      if (!empty) throw new Error('the layer probe found no empty slot in the registry');
+      const swapped = src.replace(empty[0],
+        `  { id: ${empty[1]}, title: 'Planes', load: () => import('./scene-layers.js') },`);
+      if (swapped === src) throw new Error('the layer probe could not be injected into the registry');
+      state.layerSlot = Number(empty[1]);
       body = Buffer.from(swapped);
     }
     send(body, MIME[path.extname(file)] || 'application/octet-stream');
@@ -1481,6 +3153,60 @@ const CANVAS_STATS = `(() => {
   return { mean: sum / (d.length / 4), lit, px: d.length / 4 };
 })()`;
 
+// Bright pixels inside a screen-space ellipse and in an annulus just outside
+// it, read back from the RASTERISED framebuffer. The threshold sits above the
+// pad's own body and freckles and below a ripple ring or a koi's outline, so
+// what it counts is things ON the water rather than the pad itself.
+// THE LEVEL IS A MEASURED CLIFF, NOT A GUESS, and the first two numbers tried
+// were both wrong for reasons worth writing down. A pad's own FRECKLES
+// composite to about 71 over the ground — one over a threshold of 70 — so at
+// that level the check was counting the pad's texture as something showing
+// through it. And freckles OVERLAP: two on top of each other reach ~103 and
+// three ~123, which is past a koi's own outline (~97), so no threshold
+// separates "a fish under the pad" from "the pad's own marks" by brightness.
+// Sampled over 22 frames on an isolated pad at idle, interior against the water
+// just outside it:
+//     level    inside    outside
+//        70    3.135%     2.981%
+//        90    2.447%     1.599%
+//       110    0.053%     0.446%
+//       120    0.000%     0.210%
+// So 120 is above everything a pad draws on itself and below plenty of what the
+// water carries. WHAT IT THEREFORE CANNOT SEE is the koi, whose outline is
+// dimmer than a stack of freckles — that half of the claim is measured by
+// `pads/a-pad-is-drawn-over-the-fish-and-the-ripples`, in Node, on the order the
+// renderer actually emits.
+// (the measured brightness table above is kept because it is WHY this check is
+// a variance; no clause reads a level any more.)
+// Mean brightness inside each of several equal-sized screen ellipses, read back
+// from the RASTERISED framebuffer in ONE call per frame — so several pads and
+// their control are sampled at the same instant and are directly comparable.
+// EVERY DISC IS THE SAME SIZE, because variance scales with area: a single ring
+// crossing a small disc moves its mean far more than it moves a large one, so
+// discs of different radii cannot be compared to each other at all.
+const DISC_MEANS = `(discs, rx, ry) => {
+  const c = document.querySelector('.scene-canvas');
+  const g = c.getContext('2d');
+  const dpr = c.width / parseFloat(c.style.width);
+  return discs.map(([cx, cy]) => {
+    const R = Math.ceil(rx * dpr) + 2, Ry = Math.ceil(ry * dpr) + 2;
+    const x0 = Math.max(0, Math.round(cx * dpr) - R), y0 = Math.max(0, Math.round(cy * dpr) - Ry);
+    const w = Math.min(c.width - x0, R * 2), h = Math.min(c.height - y0, Ry * 2);
+    if (w <= 0 || h <= 0) return null;
+    const d = g.getImageData(x0, y0, w, h).data;
+    let n = 0, sum = 0;
+    for (let py = 0; py < h; py++) {
+      for (let px = 0; px < w; px++) {
+        const i = (py * w + px) * 4;
+        const dx = ((x0 + px) / dpr - cx) / rx, dy = ((y0 + py) / dpr - cy) / ry;
+        if (Math.hypot(dx, dy) > 1) continue;
+        n++; sum += (d[i] + d[i + 1] + d[i + 2]) / 3;
+      }
+    }
+    return n ? sum / n : null;
+  });
+}`;
+
 async function partTwo(browser, mutant, shotsDir) {
   // ---------------------------------------------------- pass A: the page ---
   {
@@ -1512,14 +3238,15 @@ async function partTwo(browser, mutant, shotsDir) {
         const numbered = nav.filter(b => /^\d$/.test(b.label));
         assert.strictEqual(numbered.length, 8, `${numbered.length} numbered buttons`);
         assert.deepStrictEqual(numbered.map(b => b.label), ['1','2','3','4','5','6','7','8']);
-        assert.strictEqual(numbered.filter(b => b.disabled).length, 7, 'the wrong number are disabled');
+        assert.strictEqual(numbered.filter(b => b.disabled).length, 6, 'the wrong number are disabled');
         assert.strictEqual(numbered[0].disabled, false, 'scene 1 is disabled');
+        assert.strictEqual(numbered[2].disabled, false, 'scene 3 is disabled');
         assert.strictEqual(numbered[0].active, true, 'scene 1 is not marked active');
         assert.strictEqual(numbered[0].current, 'true', 'scene 1 carries no aria-current');
         const rnd = nav.find(b => b.label === '?');
         assert.ok(rnd, 'there is no random button');
-        assert.strictEqual(rnd.disabled, true, 'the random button is live with only one scene to choose from');
-        return '1 built, 7 disabled, ? disabled with nowhere to go';
+        assert.strictEqual(rnd.disabled, false, 'the random button is dead with two scenes to choose from');
+        return '2 built (1, 3), 6 disabled, ? live';
       });
 
       await checkAsync('return goes back to the site', async () => {
@@ -1630,6 +3357,182 @@ async function partTwo(browser, mutant, shotsDir) {
         const ink = await page.evaluate(CANVAS_STATS);
         if (!(ink.lit > 400)) throw new Error(`only ${ink.lit} lit pixels — nothing is being drawn`);
         return `${st.visible} koi, ${st.ripples} ripples, ${ink.lit} lit pixels`;
+      });
+
+      await checkAsync('the pond has lily pads on it, in clumps, with blooms among them', async () => {
+        const st2 = await page.evaluate(() => window.__scene.sceneState());
+        if (!(st2.pads >= 12)) throw new Error(`${st2.pads} pads on the water`);
+        if (!(st2.clusters >= 2)) throw new Error(`${st2.clusters} clusters`);
+        if (!(st2.blooms >= 2 && st2.blooms <= 3)) throw new Error(`${st2.blooms} blooms`);
+        // Back to front, which is what lets a nearer pad cover a farther one's
+        // rim: ascending plane y is the painter's order under this viewpoint.
+        for (let i = 1; i < st2.padOrder.length; i++) {
+          if (st2.padOrder[i] < st2.padOrder[i - 1]) throw new Error('the draw order is not back to front');
+        }
+        if (st2.padOrder.length !== st2.pads + st2.blooms) {
+          throw new Error(`${st2.padOrder.length} things are drawn against ${st2.pads + st2.blooms} placed`);
+        }
+        return `${st2.pads} pads in ${st2.clusters} clusters, ${st2.blooms} blooms, drawn back to front`;
+      });
+
+      await checkAsync('a pad hides the water under it', async () => {
+        // THE OCCLUSION, READ OFF THE RASTERISED FRAME rather than off the draw
+        // order the page reports. A lily pad floats ON the water: a ring spreads
+        // around it and a koi swims beneath it, and neither can be seen through
+        // a leaf. Nothing in this scene occluded anything before the pads —
+        // every other mark is translucent ink — so this is the one check that
+        // can say the reset works in pixels.
+        //
+        // WHAT SEPARATES A PAD FROM WATER IS NOT BRIGHTNESS, IT IS MOTION, and
+        // two threshold-based cuts had to fail before that was obvious. A pad's
+        // freckles composite to ~71, two overlapping reach ~103 and three ~123 —
+        // past a koi's outline at ~97 — so at any level low enough to catch the
+        // rings the pad's own texture matches them (3.135% against 2.981% at
+        // level 70), and at any level high enough to exclude the texture the
+        // ambient rings barely clear it either (2 lit pixels over 30 frames at
+        // 120). There is no threshold in between. A pad's interior is STATIC
+        // apart from its own rock, while open water has rings sweeping through
+        // it continuously, so what is measured is the VARIATION of each disc's
+        // mean brightness across frames.
+        //
+        // SEVERAL PADS, NOT ONE, AND THAT IS THE DIFFERENCE BETWEEN A CHECK THAT
+        // FIRES AND ONE THAT MIGHT. Watching a single pad, whether any ring
+        // crosses ITS patch during the window is luck: the sweep caught this as
+        // a MISSED — the mutation that deletes the reset entirely left the check
+        // GREEN — on a run where the one pad it had picked sat over quiet water,
+        // and the same mutation had reddened it on an earlier run. With the
+        // reset gone EVERY pad shows the water through it, so taking the WORST
+        // ratio over several makes the mutation unmissable while costing the
+        // clean tree nothing: on a correct pad the interior is quiet wherever it
+        // sits.
+        const st2 = await page.evaluate(() => window.__scene.sceneState());
+        const inFrame = st2.padAt
+          .map(([x, y, R, , , notchAt], i) => ({ i, x, y, R, notchAt, sx: x, sy: y * st2.squash }))
+          .filter(p => p.R > 24
+            && p.sx - p.R > 6 && p.sx + p.R < st2.width - 6
+            && p.sy - p.R * st2.squash > 6 && p.sy + p.R * st2.squash < st2.height - 6)
+          .sort((a2, b2) => b2.R - a2.R)
+          .slice(0, 5);
+        if (inFrame.length < 3) throw new Error(`only ${inFrame.length} pads are fully in frame`);
+        // THE DISC SITS ON THE PAD'S OWN MATERIAL, WHICH IS NOT THE SAME AS ON
+        // THE PAD'S CENTRE — and the difference only started to matter when the
+        // stem wedge became a per-pad draw reaching 65 degrees. A disc centred
+        // on the pad and 0.9 of its radius across then takes in a sector of the
+        // wedge, which is OPEN WATER: the check's own subject quietly grew to
+        // include the thing it is comparing against. Measured on the tree that
+        // introduced the range, before this fix: the pads' median variation went
+        // 0.044-0.067 (one fixed 5.7-degree slit) to 0.193, with the worst pad
+        // at 0.234 against a bar of 0.35 — still green, and no longer measuring
+        // only what it names.
+        //
+        // So the disc is offset along the axis AWAY from the wedge, and it is
+        // the largest one that fits there. The wedge's two flanks are rays from
+        // the pad's own centre, so a disc on the opposite axis is clear of both
+        // exactly when it does not reach the centre — its radius must not
+        // exceed its offset — and it is inside the rim when the two together do
+        // not. 0.42 and 0.40 satisfies both AT EVERY ANGLE THE RULING ALLOWS
+        // rather than on this field's luck, with 0.02 R of clearance from the
+        // apex and 0.12 R from the nearest rim a tenth of variation can produce.
+        // The static marks it crosses — the midrib, a fold — cost a VARIANCE
+        // nothing, because they do not move between frames.
+        //
+        // IT IS A FIFTH OF THE AREA THE OLD CENTRED DISC HAD, and that is the
+        // honest cost of a cut that reaches the centre rather than a choice: a
+        // smaller disc averages fewer pixels, so rain and the pad's own rock
+        // move its mean further. Both sides are sampled at this radius, so the
+        // comparison stays fair; what it spends is margin, measured below.
+        const OFF = 0.42, DISC = 0.40;
+        const rx = Math.min(...inFrame.map(p => p.R)) * DISC, ry = rx * st2.squash;
+        for (const p of inFrame) {
+          p.sx = p.x - Math.cos(p.notchAt) * OFF * p.R;
+          p.sy = (p.y - Math.sin(p.notchAt) * OFF * p.R) * st2.squash;
+        }
+
+        // The control is a disc of the SAME size on open water, which the brief
+        // guarantees exists — loose clusters with gaps between them — placed at
+        // a similar distance from the frame's centre so the vignette matches.
+        const away = (x, y) => st2.padAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6)
+          && st2.bloomAt.every(([ox, oy, oR]) => Math.hypot(ox - x, oy - y) > oR + rx + 6);
+        const cx0 = st2.width / 2, cy0 = st2.height / st2.squash / 2;
+        const want = Math.hypot(inFrame[0].x - cx0, inFrame[0].y - cy0);
+        const open = [];
+        for (let gx = 0; gx < 44; gx++) {
+          for (let gy = 0; gy < 44; gy++) {
+            const x = (gx + 0.5) / 44 * st2.width, y = (gy + 0.5) / 44 * (st2.height / st2.squash);
+            if (x - rx < 6 || x + rx > st2.width - 6) continue;
+            if (y * st2.squash - ry < 6 || y * st2.squash + ry > st2.height - 6) continue;
+            if (!away(x, y)) continue;
+            open.push({ x, y, d: Math.abs(Math.hypot(x - cx0, y - cy0) - want) });
+          }
+        }
+        if (!open.length) throw new Error('no patch of open water the size of a pad to compare against');
+        open.sort((a2, b2) => a2.d - b2.d);
+        // FIVE CONTROL PATCHES, NOT ONE, FOR THE SAME REASON THERE ARE FIVE PADS
+        // — and the first cut of this fix used five pads against ONE patch,
+        // which left the comparison exactly as luck-dependent on the other side:
+        // measured across two runs of an unchanged tree, a single patch's
+        // variation read 3.041 and then 0.751, a factor of four, purely from how
+        // many rings happened to cross it. Both sides are medians over five now,
+        // so neither is one draw.
+        const spots = [];
+        for (const c of open) {
+          if (spots.every(o => Math.hypot(o.x - c.x, o.y - c.y) > rx * 2.2)) spots.push(c);
+          if (spots.length === 5) break;
+        }
+        if (spots.length < 3) throw new Error(`only ${spots.length} separate patches of open water to compare against`);
+
+        const discs = [...inFrame.map(p => [p.sx, p.sy]),
+                       ...spots.map(c => [c.x, c.y * st2.squash])];
+        const series = discs.map(() => []);
+        // ON THE POND'S CLOCK: what this needs is rings that have MOVED between
+        // samples, and how much pond a wall-clock wait covers depends on how
+        // fast the machine is.
+        for (let t = 0; t < 34; t++) {
+          const means = await page.evaluate(`(${DISC_MEANS})(${JSON.stringify(discs)}, ${rx}, ${ry})`);
+          if (means && means.every(m => m !== null)) means.forEach((m, k) => series[k].push(m));
+          await waitSceneSeconds(page, 0.10);
+        }
+        const frames = series[0].length;
+        if (frames < 10) throw new Error(`only ${frames} frames could be sampled`);
+        const sd = (xs) => {
+          const m = xs.reduce((p2, q) => p2 + q, 0) / xs.length;
+          return Math.sqrt(xs.reduce((p2, q) => p2 + (q - m) * (q - m), 0) / xs.length);
+        };
+        const mid = (xs) => xs.slice().sort((a2, b2) => a2 - b2)[Math.floor(xs.length / 2)];
+        const padSds = series.slice(0, inFrame.length).map(sd);
+        const waterSds = series.slice(inFrame.length).map(sd);
+        const waterSd = mid(waterSds);
+        // THE MEDIAN OF THE FIVE, NOT THE WORST, AND RAIN IS WHY. A streak is in
+        // the AIR and is drawn in FRONT of a pad — correct behaviour, not a leak
+        // — and one crossing a disc of this size moves its mean by about a
+        // level, the same order as the whole signal the open water carries. That
+        // is visible on a CLEAN tree as the spread between the quietest and the
+        // noisiest of five equally-correct pads: 0.026 against 0.199, a factor
+        // of eight, entirely from where the drops happened to fall. Taking the
+        // WORST therefore reads the weather, and it went red three times on
+        // mutations that provably could not reach it — the last being a storm
+        // ramp that is inert until the first click, which this check runs before.
+        //
+        // The median is the statistic the CLAIM wants: a missing reset shows the
+        // water through EVERY pad, so the middle one rises with the rest, while
+        // a couple of unlucky drops move one or two and leave the middle alone.
+        const median = mid(padSds);
+        // NOT VACUOUS: the open water has to be visibly doing something, or a
+        // pad that hid nothing would pass beside water that showed nothing.
+        if (!(waterSd > 0.35)) {
+          throw new Error(`the median of ${waterSds.length} equal patches of open water varies by only `
+            + `${waterSd.toFixed(3)} levels across ${frames} frames — nothing was sweeping them, `
+            + `so there is nothing to hide (all: ${waterSds.map(v => v.toFixed(3)).join(', ')})`);
+        }
+        if (!(median < waterSd * 0.35)) {
+          throw new Error(`the median of ${inFrame.length} pads varies by ${median.toFixed(3)} levels against `
+            + `the open water's ${waterSd.toFixed(3)} — things on the water are sweeping through them `
+            + `(all of them: ${padSds.map(v => v.toFixed(3)).join(', ')})`);
+        }
+        return `${inFrame.length} pads vary ${Math.min(...padSds).toFixed(3)}-${Math.max(...padSds).toFixed(3)} `
+          + `levels, median ${median.toFixed(3)}; ${waterSds.length} open-water patches `
+          + `${Math.min(...waterSds).toFixed(3)}-${Math.max(...waterSds).toFixed(3)}, median `
+          + `${waterSd.toFixed(3)}; over ${frames} frames, discs r=${rx.toFixed(0)}`;
       });
 
       await checkAsync('the traits are per fish and span the sliders', async () => {
@@ -1747,6 +3650,66 @@ async function partTwo(browser, mutant, shotsDir) {
         return 'viewport, canvas and scene all agree after a resize';
       });
 
+      await checkAsync('the pads on the real page are riding the water', async () => {
+        // WHAT A BROWSER CAN HONESTLY SAY ABOUT THE ROCK, AND IT IS NOT WHAT
+        // THIS CHECK FIRST CLAIMED. It used to click beside a pad and assert
+        // that pad rocked and then settled. Both halves are unmeasurable here,
+        // and the sweep is what proved it — the check went red under
+        // `the-notch-is-sampled-at-the-rims-own-spacing`, which changes only how
+        // an outline is sampled, consumes no randomness and touches nothing this
+        // check reads. It was flaky, not collateral.
+        //
+        // MEASURED, on the shipped page: AMBIENT RAIN ROCKS A PAD AS HARD AS A
+        // CLICK DOES. Peaks over a window at idle ran 1.07-3.77 degrees with no
+        // hand on the mouse, against 3.11-4.66 for a pad clicked beside — and on
+        // one run the settle reading four and a half seconds later was 3.98
+        // degrees, HIGHER than the click's own peak of 3.83, because another
+        // drop happened to be crossing. A paired control pad 500-650 px away was
+        // no better: the click-to-control ratio ran 1.10x to 2.65x, because the
+        // control is in the same rain. There is no bar there.
+        //
+        // So attributing a rock to a click, and watching one decay, both belong
+        // where there IS no ambient field: `pads/a-passing-front-rocks-a-pad-and-
+        // lets-it-go` drives one ripple over one pad in Node and asserts the
+        // reversal AND the return to rest, and `pads/the-rock-is-subtle-and-a-
+        // downpour-does-not-peg-it` owns the cap. What is left for the page is
+        // the thing Node cannot say: that the wiring is LIVE — real pads are
+        // being advanced against the real ripple list every frame, each reading
+        // its own patch of water, inside the ruled bounds.
+        const seen = [];
+        for (let t = 0; t < 26; t++) {
+          const s2 = await page.evaluate(() => window.__scene.sceneState());
+          s2.padAt.forEach(([, , , tilt, lift], i) => {
+            const e = seen[i] || (seen[i] = { tilt: 0, lift: 0 });
+            e.tilt = Math.max(e.tilt, tilt);
+            e.lift = Math.max(e.lift, Math.abs(lift));
+          });
+          await waitSceneSeconds(page, 0.12);
+        }
+        if (seen.length < 5) throw new Error(`only ${seen.length} pads to watch`);
+        const tilts = seen.map(e => e.tilt), lifts = seen.map(e => e.lift);
+        const maxTilt = Math.max(...tilts), maxLift = Math.max(...lifts);
+        // THE PADS ARE ANSWERING THE WATER. Ambient alone reaches degrees, so
+        // this bar is well under what was measured and far above nothing.
+        if (!(maxTilt > 0.008)) throw new Error(`no pad rocked more than ${(maxTilt * 180 / Math.PI).toFixed(3)}° in ${seen.length} pads over the window`);
+        // AND THE BOB IS THE OTHER HALF OF THE LAW. A pad that reads only the
+        // gradient still rocks, so a tilt bar alone leaves the height unmeasured
+        // on the page — which is exactly the mutation that stayed green here.
+        if (!(maxLift > 0.2)) throw new Error(`no pad rode up a wave (${maxLift.toFixed(3)} px of bob)`);
+        // BOUNDED, ON THE REAL PAGE, not only in the fixture.
+        const TILT_MAX = 0.125 + 1e-9, BOB_MAX = 5.0 + 1e-9;
+        if (!(maxTilt <= TILT_MAX)) throw new Error(`a pad reached ${maxTilt} rad against the ruled cap`);
+        if (!(maxLift <= BOB_MAX)) throw new Error(`a pad bobbed ${maxLift} px against the ruled cap`);
+        // AND EACH READS ITS OWN PATCH OF WATER. One global number handed to
+        // every pad would draw a field of leaves all leaning together.
+        const distinct = new Set(tilts.map(v => v.toFixed(6))).size;
+        if (!(distinct > seen.length * 0.5)) {
+          throw new Error(`${distinct} distinct peaks across ${seen.length} pads — they are not reading their own water`);
+        }
+        return `${seen.length} pads, peaks to ${(maxTilt * 180 / Math.PI).toFixed(2)}° and `
+          + `${maxLift.toFixed(2)} px, ${distinct} distinct, all inside the ruled caps`;
+      });
+
       await checkAsync('the frame is affordable during a downpour', async () => {
         for (let i = 0; i < 5; i++) { await page.mouse.click(400 + i * 60, 250 + i * 40); await page.waitForTimeout(60); }
         await waitSceneSeconds(page, 2.2);
@@ -1771,6 +3734,340 @@ async function partTwo(browser, mutant, shotsDir) {
       }
 
       await checkAsync('the page reports no errors', async () => {
+        assert.deepStrictEqual(errors, [], errors.join(' | '));
+        return 'clean console';
+      });
+    } finally {
+      await ctx.close();
+      server.close();
+    }
+  }
+
+  // -------------------------------------------- pass A3: scene 3, live ----
+  // The beach on the real page, through the real shell. Everything here is
+  // either measured off the RASTERISED framebuffer or read from the scene's
+  // own reported state; nothing is asserted against the control that wrote it.
+  {
+    const { server } = await serveRepo({ mutant, withProbe: false });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const { page, ctx, errors } = await openPage(browser, base);
+    // A MUTATION CAN STOP THE SCENE MODULE LOADING AT ALL, AND A BARE WAIT HERE
+    // TURNS THAT INTO A TimeoutError OUT OF THE WHOLE RUN — no summary, no
+    // FAILURES block, and every mutant after it in the sweep unrun. This repo's
+    // own rule: a missing thing is a RED CHECK, never a hang. The mutation that
+    // found it is `the-register-headroom-is-given-away`, which makes
+    // beach-draw.js refuse at module scope exactly as it is meant to, so the
+    // page never mounts scene 3 — the refusal IS the behaviour under test and
+    // it must be reportable. The mount is a check now, and the rest of the
+    // section is skipped rather than run against a page that has no beach on
+    // it, so the run still reaches its summary and still names what failed.
+    scene3: try {
+      setSection('scene3');
+      await page.evaluate(() => window.__scene.activate(3));
+      let mounted = false;
+
+      await checkAsync('the beach loads, draws and takes over the nav', async () => {
+        try {
+          await page.waitForFunction(() => window.__scene.activeId === 3 && window.__scene.frames > 4,
+            null, { timeout: 10000 });
+          mounted = true;
+        } catch {
+          throw new Error('scene 3 never mounted — its module did not load, '
+            + `page errors: ${errors.length ? errors.join(' | ') : '(none reported)'}`);
+        }
+        const st = await page.evaluate(() => ({
+          id: window.__scene.activeId, running: window.__scene.running,
+          canvases: window.__scene.canvasCount, children: window.__scene.stageChildren,
+          title: document.title,
+          active: [...document.querySelectorAll('#scene-nav-scenes [data-scene]')]
+            .filter(b => b.classList.contains('is-active')).map(b => b.textContent),
+        }));
+        assert.strictEqual(st.id, 3);
+        assert.strictEqual(st.running, true, 'the loop is not running');
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases — this is not a multiplane scene`);
+        assert.strictEqual(st.children, 1, `${st.children} things on the stage`);
+        assert.deepStrictEqual(st.active, ['3'], 'the nav does not mark scene 3');
+        assert.ok(/Beach/i.test(st.title), `the tab reads "${st.title}"`);
+        return `scene 3, one canvas, nav marks 3, "${st.title}"`;
+      });
+
+      // Everything below reads the beach's own state or its framebuffer; with
+      // no beach mounted they would each fail for the same one reason and bury
+      // it in twenty identical reds.
+      if (!mounted) break scene3;
+
+      await checkAsync('the published interface is exactly the three things', async () => {
+        // "Expose three things and nothing else." Birds need the first two;
+        // mark-erasure needs all three.
+        const api = await page.evaluate(() => window.__scene.sceneApi());
+        assert.deepStrictEqual(api, { swashYAt: 'function', highWaterYAt: 'function', overruns: 'array' },
+          `the interface is ${JSON.stringify(api)}`);
+        return 'swashYAt · highWaterYAt · overruns';
+      });
+
+      await checkAsync('the two queries answer in screen pixels and follow the shear', async () => {
+        // BOTH SIDES ARE READ IN ONE EVALUATE, because the page is live: asking
+        // the interface in one call and the scene's own report in the next put
+        // a frame between them and the two answers were 3 px apart on a moving
+        // swash. That is the harness measuring the clock, not the scene.
+        const { st, q } = await page.evaluate(() => {
+          const w = window.__scene.viewport.w;
+          const xs = [0, w * 0.25, w * 0.5, w * 0.75, w - 1];
+          return {
+            q: xs.map(x => ({ x, s: window.__scene.sceneQuery('swashYAt', x),
+                              h: window.__scene.sceneQuery('highWaterYAt', x) })),
+            st: window.__scene.sceneState(),
+          };
+        });
+        for (const r of q) {
+          assert.ok(Number.isFinite(r.s) && Number.isFinite(r.h), `not a number at x=${r.x}`);
+          assert.ok(r.h > r.s - 1, `the high-water mark is seaward of the swash at x=${r.x}`);
+        }
+        // THE SHEAR IS RECOVERED BY A FIT, NOT BY TWO SAMPLES. Comparing the
+        // left edge against the right conflates the shear with the SCALLOPS on
+        // the front: at this tilt the shear is ~67 px across the frame and the
+        // wobble is ±24 px, so a single pair can come out either way and a
+        // LEVEL shoreline passed that clause on the wobble alone (measured —
+        // the mutant stayed green). The wobble is zero-mean along the shore, so
+        // a least-squares slope over the whole width recovers the shear and
+        // nothing else.
+        const fit = await page.evaluate(() => {
+          const w = window.__scene.viewport.w;
+          const n = 41, xs = [], ys = [], hs = [];
+          for (let i = 0; i < n; i++) {
+            const x = (i / (n - 1)) * (w - 1);
+            xs.push(x); ys.push(window.__scene.sceneQuery('swashYAt', x));
+            hs.push(window.__scene.sceneQuery('highWaterYAt', x));
+          }
+          const slope = (a) => {
+            const mx = xs.reduce((p, c) => p + c, 0) / n, my = a.reduce((p, c) => p + c, 0) / n;
+            let num = 0, den = 0;
+            for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (a[i] - my); den += (xs[i] - mx) ** 2; }
+            return num / den;
+          };
+          return { edge: slope(ys), wet: slope(hs), declared: window.__scene.sceneState().slope };
+        });
+        assert.ok(fit.declared < 0, `the shore declares a slope of ${fit.declared}`);
+        for (const [what, v] of [['swash edge', fit.edge], ['high-water mark', fit.wet]]) {
+          assert.ok(v < 0, `the ${what} does not rise to the right (slope ${v.toFixed(4)})`);
+          near(v, fit.declared, Math.abs(fit.declared) * 0.45,
+            `the ${what}'s drawn slope is not the shore's declared one`);
+        }
+        // And they agree with what the scene says about itself, in its own units.
+        near(q[2].s, st.swashY[2], 1e-6, 'swashYAt disagrees with the reported state');
+        near(q[2].h, st.highWaterY[2], 1e-6, 'highWaterYAt disagrees with the reported state');
+        return `fitted slope: edge ${fit.edge.toFixed(4)}, high-water ${fit.wet.toFixed(4)}, shore declares ${fit.declared.toFixed(4)}`;
+      });
+
+      await checkAsync('the value ordering holds and the dry sand is toned not blank', async () => {
+        // THE VALUE STRUCTURE, off the rasterised framebuffer, and it takes TWO
+        // statistics because one of them cannot see the defect this check was
+        // written for. The dry band first shipped as BARE PAPER — a uniform
+        // 237/255 at 0.000 ink coverage across the bottom third — and every
+        // band comparison passed it, because a comparison of band MEANS reads a
+        // uniformly empty region as "the lightest" and that is all the ordering
+        // asks. "Dry sand is the open white" is a statement about the value
+        // ordering: it is the lightest TONED region, not an empty one. The
+        // reference never gets lighter than a mean of ~181 and carries the
+        // trampled surface to the bottom edge at a local contrast of 14.5.
+        //
+        // So the ordering is asserted on the means, and the dry band is
+        // separately held to carrying TEXTURE — which a mean is blind to — and
+        // to staying inside its own register, under the floor a later session's
+        // drawn marks start at.
+        await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
+        const m = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const W = c.width, H = c.height;
+          const band = (a, b) => {
+            const y0 = Math.round(H * a), hh = Math.max(1, Math.round(H * (b - a)));
+            const d = g.getImageData(0, y0, W, hh).data;
+            let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i];
+            const mean = s / (d.length / 4);
+            // Local contrast: how far a pixel sits from the mean of its patch.
+            // A flat region reads ~0 however light or dark it is.
+            let loc = 0, n = 0;
+            const at = (x, y) => d[(y * W + x) * 4];
+            for (let y = 5; y < hh - 5; y += 3) for (let x = 5; x < W - 5; x += 3) {
+              let p = 0; for (let k = -4; k <= 4; k += 2) for (let j = -4; j <= 4; j += 2) p += at(x + j, y + k);
+              loc += Math.abs(at(x, y) - p / 25); n++;
+            }
+            // The darkest 1% — what the texture's own marks reach.
+            const px = []; for (let i = 0; i < d.length; i += 40) px.push(d[i]);
+            px.sort((a2, b2) => a2 - b2);
+            return { mean, loc: loc / n, p01: px[Math.floor(px.length * 0.01)], paper: px[px.length - 1] };
+          };
+          return { top: band(0.02, 0.12), mid: band(0.18, 0.32), wet: band(0.46, 0.54), dry: band(0.78, 0.97) };
+        });
+        await page.evaluate(() => window.__scene.pause(false));
+
+        assert.ok(m.top.mean < m.mid.mean, `the deep water (${m.top.mean.toFixed(0)}) is not darker than the water below it (${m.mid.mean.toFixed(0)})`);
+        assert.ok(m.mid.mean < m.wet.mean, `the water (${m.mid.mean.toFixed(0)}) is not darker than the wet sand (${m.wet.mean.toFixed(0)})`);
+        assert.ok(m.wet.mean < m.dry.mean, `the wet sand (${m.wet.mean.toFixed(0)}) is not darker than the dry sand (${m.dry.mean.toFixed(0)})`);
+        assert.ok(m.top.mean < 110, `the deep water reads ${m.top.mean.toFixed(0)} — it is not a dark mass`);
+
+        // THE DRY BAND IS TONED. A blank band reads ~0 local contrast; the
+        // reference's reads 14.5. Held well clear of flat, and under the
+        // reference's own so a drawn mark has somewhere to go.
+        assert.ok(m.dry.loc > 4, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)} — it is a blank band`);
+        assert.ok(m.dry.loc < 14.5, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)}, at or past the reference's own 14.5`);
+        assert.ok(m.dry.mean < 234, `the dry sand reads ${m.dry.mean.toFixed(0)} — it is bare paper`);
+
+        // AND ITS MARKS STAY IN THEIR REGISTER. The darkest 1% of the band is
+        // what the texture actually puts down; a later session's drawn marks
+        // start at MARK_ALPHA_FLOOR, so the base has to sit lighter than that.
+        const floor = m.dry.paper - (m.dry.paper - 22) * 0.60;
+        assert.ok(m.dry.p01 > floor,
+          `the sand texture reaches ${m.dry.p01} against a drawn-mark floor of ${floor.toFixed(0)} — the two registers collide`);
+        return `deep ${m.top.mean.toFixed(0)} < water ${m.mid.mean.toFixed(0)} < wet ${m.wet.mean.toFixed(0)} < dry ${m.dry.mean.toFixed(0)}; `
+          + `dry local contrast ${m.dry.loc.toFixed(1)} (ref 14.5), marks reach ${m.dry.p01} against a floor of ${floor.toFixed(0)}`;
+      });
+
+      await checkAsync('the foam band reaches bare paper', async () => {
+        // THE BAND HAS TO BE WIDER THAN A SCREEN ROW'S OWN s-RANGE, and the
+        // plateau clause next door cannot see that: a narrow band is still a
+        // plateau in shape, it just never reads as bare anywhere.
+        //
+        // MEASURED IN A CENTRAL STRIP, because these bands are SHEARED — at 3
+        // degrees on this frame one full-width row spans 0.079 of frame height
+        // in band coordinates, which is WIDER THAN THE BAND, so a full-width
+        // mean can never reach paper however bare the band is. Over the middle
+        // tenth the shear is under 1% of height.
+        //
+        // THE BAR IS THE REFERENCE'S OWN BARE RUN. Read off the clips with a
+        // PER-COLUMN statistic, which needs no strip and no slope at all —
+        // shear moves a band up or down per column and cannot smear anything
+        // within one — the longest bare run is 3.56% / 1.39% / 3.06% of frame
+        // on the three clips whose foam is not thin (0.43% on c3_001, which
+        // is), and 97-100% of their columns reach EXACTLY 0.000 coverage.
+        // FOAM_BAND_S is set from that; see its own block in beach-draw.js,
+        // including why the full-width figure cannot be satisfied at any width.
+        // The bar here sits under the thinnest of the three, so it fails a band
+        // that has stopped opening rather than one that is merely narrower than
+        // c1_001's.
+        await page.evaluate(() => { window.__scene.pause(true); window.__scene.step(); });
+        const m = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const W = c.width, H = c.height;
+          const x0 = Math.round(W * 0.45), ww = Math.round(W * 0.10);
+          const d = g.getImageData(x0, 0, ww, H).data;
+          const rows = [];
+          for (let y = 0; y < H; y++) {
+            let s2 = 0;
+            for (let x = 0; x < ww; x++) s2 += d[(y * ww + x) * 4];
+            rows.push(s2 / ww);
+          }
+          const paper = Math.max(...rows);
+          const st = window.__scene.sceneState();
+          // Between the deep water and the swash edge, in screen rows.
+          const lo = Math.round(H * 0.10), hi = Math.round(H * st.edge[2]);
+          // THE BARE EXTENT, NOT JUST WHETHER ONE ROW IS BARE. Any plateau at
+          // all leaves a row or two between lattice lines, so "it reaches
+          // paper somewhere" is satisfied by a band a tenth the shipped width
+          // — measured, it stayed green at FOAM_BAND_S 0.022. What the
+          // reference actually shows is a band bare across about 4% of frame.
+          let run = 0, best = 0, at = 0;
+          for (let y = lo; y < hi; y++) {
+            if (paper - rows[y] < 10) { run++; if (run > best) { best = run; at = y / H; } }
+            else run = 0;
+          }
+          return { paper, span: best / H, at, edge: st.edge[2] };
+        });
+        await page.evaluate(() => window.__scene.pause(false));
+        assert.ok(m.span > 0.025,
+          `the foam band is bare across only ${(m.span * 100).toFixed(2)}% of frame height `
+          + `— the reference's is bare across about 4%`);
+        return `bare across ${(m.span * 100).toFixed(2)}% of frame (ref 3.56 / 3.06 / 1.39%), ending at `
+          + `${(m.at * 100).toFixed(1)}%, swash edge at ${(m.edge * 100).toFixed(1)}%`;
+      });
+
+      await checkAsync('the swash runs and drains while the wet band stays', async () => {
+        // The two-line model on the live page: over a whole cycle the edge
+        // moves a long way and the high-water mark barely does.
+        let eMin = 9, eMax = -9, wMin = 9, wMax = -9;
+        for (let i = 0; i < 26; i++) {
+          await page.evaluate(() => window.__scene.scenePump(0.35));
+          const st = await page.evaluate(() => window.__scene.sceneState());
+          if (st.energy > 0.03) { i--; continue; }        // a set is the one time the mark moves
+          eMin = Math.min(eMin, st.edge[2]); eMax = Math.max(eMax, st.edge[2]);
+          wMin = Math.min(wMin, st.wet[2]); wMax = Math.max(wMax, st.wet[2]);
+        }
+        const eRange = eMax - eMin, wRange = wMax - wMin;
+        assert.ok(eRange > 0.12, `the swash edge only moved ${eRange.toFixed(3)} of a frame height`);
+        assert.ok(wRange < eRange / 3, `the high-water mark moved ${wRange.toFixed(3)} against the swash's ${eRange.toFixed(3)}`);
+        return `edge ${eMin.toFixed(3)}..${eMax.toFixed(3)} (${eRange.toFixed(3)}), high-water ${wRange.toFixed(3)}`;
+      });
+
+      await checkAsync('scrolling raises set energy and it ebbs on its own', async () => {
+        const before = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        await page.mouse.move(640, 400);
+        const dpr = await page.evaluate(() => window.devicePixelRatio);
+        // A synthetic wheel arrives divided by the device scale factor, so what
+        // is SENT is scaled and what ARRIVED is what gets asserted.
+        for (let i = 0; i < 3; i++) await page.mouse.wheel(0, 120 * dpr);
+        const after = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        assert.ok(after > before + 0.5, `three actions took the energy from ${before.toFixed(2)} to ${after.toFixed(2)}`);
+        await page.evaluate(() => window.__scene.scenePump(12));
+        const ebbed = await page.evaluate(() => window.__scene.sceneState().scrolled);
+        assert.strictEqual(ebbed, 0, `the scrolled energy is ${ebbed} after its window`);
+        return `${before.toFixed(2)} -> ${after.toFixed(2)} -> 0`;
+      });
+
+      await checkAsync('a click on the beach does nothing at all', async () => {
+        // "No click or drag interaction of any kind. Do not scaffold for them
+        // speculatively." So the claim is that the scene exposes no handler AND
+        // that clicking changes nothing it reports.
+        const hasHandler = await page.evaluate(() =>
+          typeof window.__scene.sceneQuery('pointer', 0) !== 'number' &&
+          (window.__scene.sceneApi() !== null));
+        void hasHandler;
+        await page.evaluate(() => window.__scene.pause(true));
+        const before = await page.evaluate(() => JSON.stringify(window.__scene.sceneState()));
+        await page.mouse.click(500, 300);
+        await page.mouse.click(900, 550);
+        const after = await page.evaluate(() => JSON.stringify(window.__scene.sceneState()));
+        await page.evaluate(() => window.__scene.pause(false));
+        assert.strictEqual(after, before, 'a click moved something');
+        const src = fs.readFileSync(path.join(SCENE, 'scene-beach.js'), 'utf8');
+        assert.ok(!/\bpointer\s*\(/.test(src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ')),
+          'the scene declares a pointer handler');
+        return 'no pointer handler, and two clicks moved nothing';
+      });
+
+      await checkAsync('the frame is affordable', async () => {
+        const cost = await page.evaluate(async () => {
+          const f0 = window.__scene.frames, t0 = performance.now();
+          await new Promise(r => setTimeout(r, 2500));
+          return { fps: (window.__scene.frames - f0) / ((performance.now() - t0) / 1000) };
+        });
+        const st = await page.evaluate(() => window.__scene.sceneState());
+        // Headless software GL, so a floor rather than a target: what it catches
+        // is a frame that has become pathological.
+        assert.ok(cost.fps > 12, `${cost.fps.toFixed(1)} fps at ${st.segments} segments`);
+        return `${cost.fps.toFixed(1)} fps on software GL at ${st.segments} segments, ${st.streaks} streaks`;
+      });
+
+      await checkAsync('swapping back to the koi leaves nothing behind', async () => {
+        await page.evaluate(() => window.__scene.activate(1));
+        await page.waitForFunction(() => window.__scene.activeId === 1, null, { timeout: 8000 });
+        const st = await page.evaluate(() => ({
+          id: window.__scene.activeId, canvases: window.__scene.canvasCount,
+          children: window.__scene.stageChildren, running: window.__scene.running,
+          api: window.__scene.sceneApi(),
+        }));
+        assert.strictEqual(st.id, 1);
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases after the swap`);
+        assert.strictEqual(st.children, 1, `${st.children} things on the stage after the swap`);
+        assert.strictEqual(st.running, true);
+        // The beach's interface went with it; the koi publish none of it.
+        assert.deepStrictEqual(st.api, { swashYAt: 'undefined', highWaterYAt: 'undefined', overruns: 'undefined' },
+          `scene 1 reports ${JSON.stringify(st.api)}`);
+        return 'back on scene 1, one canvas, the beach\'s interface gone with it';
+      });
+
+      await checkAsync('the beach reports no errors', async () => {
         assert.deepStrictEqual(errors, [], errors.join(' | '));
         return 'clean console';
       });
@@ -1902,6 +4199,110 @@ async function partTwo(browser, mutant, shotsDir) {
       });
 
       await checkAsync('the swap pass reports no errors', async () => {
+        assert.deepStrictEqual(errors, [], errors.join(' | '));
+        return 'clean console';
+      });
+    } finally {
+      await ctx.close();
+      server.close();
+    }
+  }
+
+  // -------------------------------------------- pass C: the planes ---------
+  // MULTIPLANE IS A SHELL CAPABILITY WITH NO SHIPPED CALLER, which is exactly
+  // why it is gated here: scene 1 uses one canvas, so every other check in this
+  // file stays green on a shell that cannot layer at all. Both halves of the
+  // contract were broken when they were first measured — the planes stacked a
+  // full viewport apart, and the front one was opaque black where nothing had
+  // been drawn — and neither is visible in anything scene 1 does.
+  {
+    const { server, state: layerState } = await serveRepo({ mutant, withProbe: false, withLayers: true });
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const { page, ctx, errors } = await openPage(browser, base);
+    try {
+      setSection('layers');
+
+      // Scene 1 first, on this same page, because the claim that layering was
+      // added WITHOUT moving the one-canvas case is the other half of it.
+      await checkAsync('a one-canvas scene is still a single opaque plane', async () => {
+        await page.waitForFunction(() => window.__scene.activeId === 1, null, { timeout: 5000 });
+        const st = await page.evaluate(() => {
+          const c = document.querySelector('.scene-canvas');
+          return { canvases: window.__scene.canvasCount,
+                   children: window.__scene.stageChildren,
+                   alpha: c.getContext('2d').getContextAttributes().alpha,
+                   scrollH: document.getElementById('scene-stage').scrollHeight,
+                   h: window.__scene.viewport.h };
+        });
+        assert.strictEqual(st.canvases, 1, `${st.canvases} canvases`);
+        assert.strictEqual(st.children, 1, `${st.children} stage children`);
+        // An opaque backmost plane is the cheap path and is what scene 1 has
+        // always had; a default that flipped every plane to alpha would be
+        // invisible on screen and is what this clause exists to catch.
+        assert.strictEqual(st.alpha, false, 'scene 1\'s only canvas stopped being opaque');
+        assert.strictEqual(st.scrollH, st.h, 'the stage scrolls with one canvas on it');
+        return 'one canvas, opaque, stage does not scroll';
+      });
+
+      await checkAsync('two planes occupy the same rect rather than stacking', async () => {
+        await page.click(`[data-scene="${layerState.layerSlot}"]`);
+        await page.waitForFunction((id) => window.__scene.activeId === id, layerState.layerSlot, { timeout: 5000 });
+        await page.waitForTimeout(200);
+        const st = await page.evaluate(() => {
+          const cs = [...document.querySelectorAll('.scene-canvas')];
+          const r = cs.map(c => { const b = c.getBoundingClientRect();
+            return { x: Math.round(b.x), y: Math.round(b.y),
+                     w: Math.round(b.width), h: Math.round(b.height) }; });
+          return { n: cs.length, rects: r,
+                   scrollH: document.getElementById('scene-stage').scrollHeight,
+                   h: window.__scene.viewport.h };
+        });
+        assert.strictEqual(st.n, 2, `${st.n} canvases for a two-plane scene`);
+        assert.deepStrictEqual(st.rects[1], st.rects[0],
+          `the planes are at different rects: ${JSON.stringify(st.rects)}`);
+        // The measured symptom of the original defect: the stage grew to twice
+        // the viewport and the front plane sat entirely below the fold.
+        assert.strictEqual(st.scrollH, st.h,
+          `the stage scrolls to ${st.scrollH} against a ${st.h} viewport`);
+        return `both planes at ${JSON.stringify(st.rects[0])}, stage does not scroll`;
+      });
+
+      await checkAsync('only the backmost plane is opaque', async () => {
+        const alpha = await page.evaluate(() => [...document.querySelectorAll('.scene-canvas')]
+          .map(c => c.getContext('2d').getContextAttributes().alpha));
+        assert.deepStrictEqual(alpha, [false, true],
+          `context alpha flags are ${JSON.stringify(alpha)}, want [false, true]`);
+        return 'back plane opaque, front plane transparent';
+      });
+
+      await checkAsync('the back plane reaches the screen through the front one', async () => {
+        // THE RASTERISED COMPOSITE IS THE ONLY INSTRUMENT FOR THIS. Reading each
+        // canvas with getImageData says what that plane HOLDS; it cannot say
+        // what survived compositing, which is the whole question.
+        const vp = page.viewportSize();
+        const png = await page.screenshot({ clip: { x: 0, y: 0, width: vp.width, height: vp.height } });
+        const px = await page.evaluate(async (b64) => {
+          const img = new Image();
+          await new Promise((res, rej) => { img.onload = res; img.onerror = rej;
+            img.src = 'data:image/png;base64,' + b64; });
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          const g = c.getContext('2d'); g.drawImage(img, 0, 0);
+          // The screenshot is in device pixels; the square is declared in CSS.
+          const s = img.width / window.innerWidth;
+          const at = (cx, cy) => { const d = g.getImageData(Math.round(cx * s), Math.round(cy * s), 1, 1).data;
+            return [d[0], d[1], d[2]]; };
+          const q = window.__layers.square;
+          return { onSquare: at(q.x + q.w / 2, q.y + q.h / 2), offSquare: at(q.x + q.w + 120, q.y + q.h / 2) };
+        }, png.toString('base64'));
+        assert.deepStrictEqual(px.offSquare, [255, 0, 0],
+          `the back plane does not reach the screen: ${JSON.stringify(px.offSquare)}`);
+        assert.deepStrictEqual(px.onSquare, [0, 0, 255],
+          `the front plane is not on top: ${JSON.stringify(px.onSquare)}`);
+        return 'back plane red where the front drew nothing, front plane blue where it did';
+      });
+
+      await checkAsync('the plane pass reports no errors', async () => {
         assert.deepStrictEqual(errors, [], errors.join(' | '));
         return 'clean console';
       });

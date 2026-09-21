@@ -37,6 +37,9 @@
    drift. bloom-geometry.js imports nothing at all, so no cycle is possible
    in either direction.
    =================================================================== */
+import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
+  PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
+import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
          GOLDEN_ANGLE, FAN_ARC_LIMIT_DEG, MAX_FAN_GROUPS, MIRROR_THROUGH_SLOT, petalGroupCount, CURL_START_MIN,
@@ -46,7 +49,11 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_LUMPS_RANGE, TIP_SPREAD_DEG_RANGE, TIP_MIN_RADIUS_MM,
          LOBE_COUNT_RANGE, LOBE_DEPTH_RANGE, LOBE_COVERAGE_RANGE, LOBE_SHAPE_RANGE, LOBE_SHAPE_STEP,
          LOBE_COUNT_DEFAULT, LOBE_COVERAGE_DEFAULT, LOBE_SHAPE_DEFAULT, LOBE_SAMPLES_PER_LOBE,
-         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius } from './bloom-geometry.js';
+         STEM_LENGTH_RANGE, STEM_DIAMETER_RANGE, STEM_MIN_WALL_MM, stemBoreRadius,
+         HUB_STYLES, HUB_SHAPE_AMOUNT_RANGE, HUB_SHAPE_AMOUNT_DEFAULT, HUB_LENGTH_RANGE,
+         TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
+         LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
+         LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -247,6 +254,29 @@ export const PREDICATES = {
      state; the harness checks that at load and on every row (L0). */
   lobesEngaged: { id: 'lobeDepth', awayFrom: 0, by: 0.005 },
 
+  /* THE FRINGE ENGAGED (Eva's ruling, Sep 13) — the registry's statement of
+     the geometry's `fringeEngaged()`: the depth is hidden AND inert at count
+     0, the curl family's own rule. The slider's step is 1, so every reachable
+     non-zero count is at least 1 away from 0 and the two statements agree on
+     every reachable state; the harness checks that at load and on every row
+     (FR0). */
+  fringeEngaged: { id: 'fringeCount', min: 1 },
+  /* LOBES AND THE FRINGE ARE MUTUALLY EXCLUSIVE, AND THE FRINGE WINS (Eva's
+     ruling, Sep 13). Both own the apex — the coverage arc is centred on it
+     by construction — and composing them was MEASURED to narrow every finger
+     including interior ones nowhere near the rim (middle finger 0.5873 ->
+     0.4599 mm at coverage 0.40), because a v-span is a fraction of the CUT
+     half-width. So a rim treatment moved the petal's CENTRAL fingers, which
+     is a coupling no control could own honestly.
+
+     THE WHOLE LOBE FAMILY IS HIDDEN AND INERT under a live fringe, and the
+     geometry makes it inert through its own `lobesEligible()` — the same
+     two-statement shape `perPetalEligible` carries, for the same reason:
+     neither file can read the other's answer and both must act on it. The
+     read-out says which one is standing down. Recovery is one predicate in
+     two files. */
+  lobesEligible: { all: [{ id: 'fringeCount', oneOf: ['0'] }] },
+
   /* ===================================================================
      WHERE THE ANDROECIUM APPLIES (session 21, phase 2 B2) — everywhere but
      the FULL SPHERE (Eva, Sep 5: a full-sphere bloom is a flower head and
@@ -289,16 +319,50 @@ export const PREDICATES = {
   gynoeciumEligible: { not: { ref: 'sphereMode' } },
   gynoeciumPresent: { all: [{ ref: 'gynoeciumEligible' }, { id: 'gynoecium', oneOf: ['STYLE'] }] },
 
-  /* THE STEM'S TWO STATEMENTS (session 43). This is the twin of the geometry's
-     `stemEligible`: the registry HIDES the stem controls on this condition and
-     the geometry makes them INERT, and the harness asserts the two agree at
-     module load — the slotRolesEligible precedent, and the same relation
-     androeciumEligible and gynoeciumEligible already carry. SPHERE refuses a
-     stem in this PR; Eva's ruling for it is its own PR immediately after. */
-  stemEligible: { not: { ref: 'sphereMode' } },
-  /* The DIAMETER is hidden AND inert at length 0 — the curl family's own
+  /* THE INFLORESCENCE'S ONE STATEMENT (this session), and it is the twin of
+     the geometry's `inflorescenceIsAbsent`. TWO TERMS, the leaf's own shape:
+     the LAW enum must not be NONE, and there must be a RACHIS to hang the
+     florets on — you cannot carry flowers on a stem that is not there, which
+     is exactly why `leafIsAbsent` reads both lengths. ID0 asserts the two
+     statements agree per row, and the harness checks them at module load.
+     The enum ITSELF is gated on `stemPresent` alone, so a visitor who has a
+     stem sees the choice and a visitor who has none does not see a control
+     that could do nothing. */
+  inflorescencePresent: { all: [{ id: 'stemLength', min: 1 }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
+
+  /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
+     This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
+     diameter on this condition and the geometry makes it INERT, and ST0
+     asserts the two agree — the androeciumEligible / gynoeciumEligible
+     relation, one control down.
+     `stemEligible` IS RETIRED, not relaxed. SPHERE refused a stem when the
+     stem shipped; Eva's ruling that petals the stem would pass through are NOT
+     BUILT removed the last state that refuses one, and a predicate true
+     everywhere is a statement nobody can disagree with. Retiring it is not a
+     RETIRED_IDS event — it is a predicate, not a control id — and at
+     `stemLength` 0 what is left is the retired expression term for term.
+     The DIAMETER is hidden AND inert at length 0 — the curl family's own
      gating, and lobeDepth's: one control is the guard and the rest follow it. */
-  stemPresent: { all: [{ ref: 'stemEligible' }, { id: 'stemLength', min: 1 }] },
+  /* SEPALS (part 1). Two statements of one boundary, the geometry's
+     `sepalsEligible` being the other, checked against each other by SP0: no
+     underside ring exists on a closed SPHERE, so the whole family is hidden
+     AND inert there (the androecium's own shape). `sepalCount` 0 is the
+     GUARD — every other sepal control follows it, hidden and inert. */
+  sepalsEligible: { not: { ref: 'sphereMode' } },
+  sepalsPresent: { all: [{ ref: 'sepalsEligible' }, { id: 'sepalCount', min: 1 }] },
+  stemPresent: { id: 'stemLength', min: 1 },
+
+  /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
+     lobeDepth pattern, one control the guard and the rest following it, hidden
+     AND inert. NODE COUNT IS ITS OWN CONTROL, so a stem can carry nodes with no
+     leaves; what it cannot do is carry leaves with no stem, which is why the
+     geometry's `leafIsAbsent` reads BOTH lengths and LF0 compares the two
+     statements. The registry states the leaf's half; the geometry states its
+     own, and a green run must not endorse one without the other. */
+  leafPresent: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }] },
+  /* The serration follows the leaf AND its own depth guard — the curl family's
+     gating one level down, so the four shape rows are inert at depth 0. */
+  leafToothed: { all: [{ id: 'leafLength', min: 1 }, { id: 'stemLength', min: 1 }, { id: 'leafToothDepth', min: 0.01 }] },
 
   /* ===================================================================
      WHEN THE HOOD HAS NO MEMBERS — the fan's two-petal state, and the reason
@@ -530,107 +594,42 @@ const SLOT_ROLES_BEHIND_OFFSET = {
 const tipSection = (prefix) => { const t = TIP_INSTANCES.find((x) => x.prefix === prefix); return { id: t.section, label: t.sectionLabel, open: false, parent: t.parent }; };
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
-  /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
-     on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
-     A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
-     placement (Eva's ruling): Arrangement is how petals distribute in the
-     plane, Center is the ornament at the pole, and neither is "is the head
-     flat, domed or a sphere". `headRise` moved here from ARRANGEMENT —
-     presentation only, `section` is never persisted — as the cap's own
-     sub-control, on session 16's PETAL FORM / PETAL CURL precedent (a
-     registry-driven section move asserted 0 moved).
-
-     TWO VALUES, NOT THREE, and the reason is a measurement (Phase A, Q5):
-     a FLAT / DOMED / SPHERICAL enum with `headRise` as DOMED's sub-control
-     would resolve 35 phase13 rows and 42 live rows that pin `headRise`
-     above zero with no hub-shape value to a FLAT default and build them
-     flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
-     CAP carries `headRise` and is the default, so its predicate is TRUE on
-     every pre-existing row and the move is 0 moved by construction. Neither
-     value is called "dome", which is what dissolved the collision with the
-     since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
-  { id: 'head', label: 'Head', open: false },
   /* ===================================================================
-     CENTER — A CONTAINER, NOT A CONTROL (Eva, Sep 6, session 23). The
-     reproductive parts are parts of ONE thing, and until this session they
-     sat at top level beside PETAL SHAPE as though they were peers of the
-     petals. They are now two drop-downs inside "Center", directly below
-     HEAD — the shape "Petal roles" already has: a parent holding only child
-     sections, no sliders of its own.
+     PETAL — A CONTAINER, NOT A CONTROL (Eva's ruling, the leaf tip-shape
+     session): "the idea is to have an overarching petal drop down and then
+     within that have the three." Petal shape, Petal form and Petal curl were
+     three top-level sections standing beside Head and Stem as though a petal
+     were three organs; they are now three drop-downs inside one, on the
+     "Center" shape (session 23): a parent holding only child sections, with
+     no control, no predicate and no read-out of its own, HIDDEN when and only
+     when every child is — which for these children is never.
 
-     IT HAS NO VALUE AND NO `NONE`, on purpose. "No centre" is what a visitor
-     sees when both parts are off (stamens 0, style NONE), and that state is
-     already reachable through the parts themselves; a NONE on the container
-     would be a SECOND definition of the same state — the registration
-     failure this project has cleaned up twice (the receptacle condition, the
-     rim's two producers). So the container carries no control, no predicate
-     and no read-out of its own: it is HIDDEN when and only when both parts
-     are hidden (under SPHERE), by the one derived rule every section obeys —
-     applyVisibility() reads its children, adds no declaration, and the panel
-     gate asserts the derivation in both directions.
+     PETAL ROLES IS ITS FOURTH CHILD, AND THAT IS A PLACEMENT MADE WITHOUT A
+     RULING. Eva's structure names three children and does not mention Petal
+     roles at all; the alternatives were a fourth child here or a top-level
+     section her list does not contain. It is nested because a role is an
+     adjustment TO PETALS (that section's own label says so), and because
+     nesting it keeps the top level EXACTLY her seven. Its groups therefore
+     sit at the panel's third level, which session 27 made legal and session
+     29 gave its CSS. One `parent` field moves it back out.
 
-     WHY THE PARTS ARE DECLARED HERE, DIRECTLY AFTER THEIR PARENT (the
-     session-21 note, carried): the generator appends a nested drop-down
-     inside its parent's element, so the DOM's document order is parent then
-     children, and the panel gate's census compares that order against THIS
-     array. A child declared anywhere but immediately after its parent reads
-     as out of order there (measured, session 21).
+     THE CHILDREN KEEP THEIR FULL NAMES ("Petal shape" under "Petal"), which
+     reads redundantly and is left so ON PURPOSE: the panel gate keys on
+     section identity and every route names these ids, and Eva has not ruled
+     on the shorter "Shape / Form / Curl" — a rename is one label each and
+     her word, never a session's guess.
 
      PRESENTATION ONLY, 0 MOVED BY CONSTRUCTION: `section` and `parent` are
-     never persisted and no geometry reads either; every control id, law,
-     predicate and default is unchanged. The precedent is session 16's PETAL
-     FORM / PETAL CURL split and session 18's Head move, both proved
-     byte-identical across the frozen baseline — the same two guarantees are
-     stated apart in docs/bloom-session-23-outcome.md.
+     never persisted and no geometry reads either. The byte partition on the
+     commit that made this change is 0 movers / 758 holders against main, and
+     that is measured rather than argued — a section reorder that moved a
+     float would be something reading ORDER where it should read IDENTITY,
+     which would be a defect worth more than the feature.
 
-     WHAT "OFF" MEANS, said on the parts' own read-outs (Eva, Sep 6): setting
-     the count to 0 or the style to NONE HIDES the part's sub-controls and
-     makes them inert, and it KEEPS their values — turning the part back on
-     restores them. That behaviour already existed and nothing announced it,
-     so it read as destructive. The two read-outs now say so, with the kept
-     values, at the moment the visitor turns the part off. NOT a mute: a
-     control that is visible and not building is the mirror of the defect the
-     panel gate exists to catch, so the sub-controls stay hidden AND inert.
-
-     `open: false` — ARRANGEMENT holds the one first-load open. Inside the
-     container the accordion rule holds one level down: opening Gynoecium
-     closes Androecium and leaves Center open. */
-  /* STEM sits below HEAD because that is what it attaches to: the petals join
-     the hub, the hub joins the stem. It holds its two controls and no more. */
-  { id: 'stem', label: 'Stem', open: false },
-  { id: 'center', label: 'Center', open: false },
-  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
-     reproductive parts the retired CENTER section was standing in for
-     (session 20). Correct botanical naming (Eva): the androecium is the
-     filaments and anthers; the gynoecium (style and stigma) is B3 and its
-     own drop-down beside this one. Hidden whole under SPHERE by every
-     control's predicate. */
-  { id: 'androecium', label: 'Androecium', open: false, parent: 'center' },
-  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
-     second reproductive part and the last piece of the centre. Its own
-     drop-down, on the session-21 note above: each part independently present
-     or absent. Hidden whole under SPHERE by every control's predicate. */
-  /* THE TIP SECTIONS (session 29's Tip, session 30's pair) are declared
-     below Gynoecium — a drop-down INSIDE each part and therefore the panel's
-     third level, which session 27 made legal by lifting the nesting bound
-     and replacing it with the precedence check the declaration relies on.
-     WHY A SECTION RATHER THAN SEVEN MORE ROWS IN THE PART: the part's own
-     rows describe WHERE its rods are and how long; the seven describe the
-     shape of one small solid at the end of each — the "Petal roles" shape
-     one level further in. */
-  /* THE ANTHER'S TIP SECTION (session 30) — one statement per instance,
-     `tipSection()`, so a tip with controls and no drop-down cannot happen:
-     the Anther inside Androecium (session 29's `tip`, renamed — `section` is
-     never persisted, so the id is free). Two sections labelled "Tip" would
-     have shared a name on screen, which the panel gate refuses; each is named
-     for the part it shapes. DECLARED IN RENDER ORDER — directly after its
-     parent, as the DOM will nest it — because the panel gate's census
-     compares document order against this array. */
-  tipSection('anther'),
-  { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
-  /* THE STIGMA'S TIP SECTION — the same statement, inside Gynoecium. */
-  tipSection('stigma'),
-  { id: 'shape', label: 'Petal shape', open: false },
+     DECLARED DIRECTLY BEFORE ITS CHILDREN, which verifySections() requires
+     and the panel gate's census compares against document order. */
+  { id: 'petal', label: 'Petal', open: false },
+  { id: 'shape', label: 'Petal shape', open: false, parent: 'petal' },
   /* LOBES (session 38, PR 2) — a drop-down INSIDE Petal shape, declared in
      render order directly after its parent. A lobe is a cut in the OUTLINE
      (widthProfile's), so it belongs under the section that owns the outline
@@ -638,7 +637,11 @@ export const SECTIONS = [
      parent because three of the four are gated on the first, the "Petal
      roles" shape. */
   { id: 'lobes', label: 'Lobes', open: false, parent: 'shape' },
-  { id: 'form', label: 'Petal form', open: false },
+  /* A fringe is a change of TOPOLOGY at the petal's end, not another term in
+     the outline, so it gets its own drop-down rather than sitting beside the
+     shape sliders. Declared AFTER its parent, which verifySections() requires. */
+  { id: 'fringe', label: 'Fringe', open: false, parent: 'shape' },
+  { id: 'form', label: 'Petal form', open: false, parent: 'petal' },
   /* PETAL CURL — the spine's own controls (Eva's ruling, Sep 4, from the
      session-16 Phase A proposal): petal tilt, spine curl, curl bias, curl
      start, twist. Tilt moves WITH curl rather than to Arrangement, because
@@ -649,34 +652,7 @@ export const SECTIONS = [
      spine). PETAL FORM keeps the cross-width family: cup, cup gradient, roll,
      roll taper. Presentation only — `section` is never persisted, no role
      changed, zero geometry, asserted by the retention run. */
-  { id: 'curl', label: 'Petal curl', open: false },
-  /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
-     ruling Sep 5: the centre is the reproductive parts and nothing else) and
-     is BACK AS A CONTAINER for exactly those parts (session 23), declared
-     below HEAD above. `center` was never a control id and sections are not
-     persisted, so the section id was never in RETIRED_IDS; the five control
-     ids are, and the panel gate's retirement route now asserts that the
-     container holds NO control of its own. The junction still never gets a
-     section. */
-  /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
-     WITH THE LABEL on purpose. An id that contradicts its label is a stored
-     label-lie: it reads as a declaration, a later reader checks it and
-     believes it, and this project's most repeated defect is a name for a
-     thing that is not the thing. There is no saved-design debt to weigh
-     against that — `section` is panel presentation, never persisted, and it
-     is not a control id, so RETIRED_IDS does not apply and no migration is
-     owed. (Were a section id ever to reach a saved design, that calculus
-     inverts and the rename becomes a retirement.)
-
-     WHAT THE NAME IS SLIGHTLY WRONG ABOUT, stated rather than discovered:
-     this section also holds `footDelicacy`, which scales a WIDTH, not a
-     thickness. It sits here because the three controls are one layer — the
-     part's own material dimensions, the things that decide how delicate the
-     printed object is — and because delicacy's width is what the area rule
-     reads to size the ring. If the name ever reads wrong at the panel, the
-     LABEL moves on one ruling and the id moves with it, exactly as it did
-     here. Do not fix it by re-homing the control. */
-  { id: 'thickness', label: 'Part thickness', open: false },
+  { id: 'curl', label: 'Petal curl', open: false, parent: 'petal' },
   /* PETAL ROLES — which petals differ from the others, and how (Eva's name,
      Sep 2). It holds two independent axes: session A's LAYER roles (whorl vs
      whorl) and session B's SLOT roles (where a petal sits within its whorl).
@@ -692,7 +668,7 @@ export const SECTIONS = [
      already nine controls, and session A recorded that the pair wanted a home
      of its own once slot roles arrived. Moving `inner*` here is presentation
      only — `section` is never persisted and no geometry reads it. */
-  { id: 'roles', label: 'Petal roles', open: false },
+  { id: 'roles', label: 'Petal roles', open: false, parent: 'petal' },
 
   /* ===================================================================
      THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
@@ -805,6 +781,176 @@ export const SECTIONS = [
        avoid. */
     parent: 'roles',
   })),
+  /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
+     on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
+     A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
+     placement (Eva's ruling): Arrangement is how petals distribute in the
+     plane, Center is the ornament at the pole, and neither is "is the head
+     flat, domed or a sphere". `headRise` moved here from ARRANGEMENT —
+     presentation only, `section` is never persisted — as the cap's own
+     sub-control, on session 16's PETAL FORM / PETAL CURL precedent (a
+     registry-driven section move asserted 0 moved).
+
+     TWO VALUES, NOT THREE, and the reason is a measurement (Phase A, Q5):
+     a FLAT / DOMED / SPHERICAL enum with `headRise` as DOMED's sub-control
+     would resolve 35 phase13 rows and 42 live rows that pin `headRise`
+     above zero with no hub-shape value to a FLAT default and build them
+     flat — a predeclared partition of 35, or a hidden-and-not-inert slider.
+     CAP carries `headRise` and is the default, so its predicate is TRUE on
+     every pre-existing row and the move is 0 moved by construction. Neither
+     value is called "dome", which is what dissolved the collision with the
+     since-retired `centerStyle`'s DOME (the ornament, gone in session 20). */
+  { id: 'head', label: 'Head', open: false },
+  /* ===================================================================
+     CENTER — A CONTAINER, NOT A CONTROL (Eva, Sep 6, session 23). The
+     reproductive parts are parts of ONE thing, and until this session they
+     sat at top level beside PETAL SHAPE as though they were peers of the
+     petals. They are now two drop-downs inside "Center", directly below
+     HEAD — the shape "Petal roles" already has: a parent holding only child
+     sections, no sliders of its own.
+
+     IT HAS NO VALUE AND NO `NONE`, on purpose. "No centre" is what a visitor
+     sees when both parts are off (stamens 0, style NONE), and that state is
+     already reachable through the parts themselves; a NONE on the container
+     would be a SECOND definition of the same state — the registration
+     failure this project has cleaned up twice (the receptacle condition, the
+     rim's two producers). So the container carries no control, no predicate
+     and no read-out of its own: it is HIDDEN when and only when both parts
+     are hidden (under SPHERE), by the one derived rule every section obeys —
+     applyVisibility() reads its children, adds no declaration, and the panel
+     gate asserts the derivation in both directions.
+
+     WHY THE PARTS ARE DECLARED HERE, DIRECTLY AFTER THEIR PARENT (the
+     session-21 note, carried): the generator appends a nested drop-down
+     inside its parent's element, so the DOM's document order is parent then
+     children, and the panel gate's census compares that order against THIS
+     array. A child declared anywhere but immediately after its parent reads
+     as out of order there (measured, session 21).
+
+     PRESENTATION ONLY, 0 MOVED BY CONSTRUCTION: `section` and `parent` are
+     never persisted and no geometry reads either; every control id, law,
+     predicate and default is unchanged. The precedent is session 16's PETAL
+     FORM / PETAL CURL split and session 18's Head move, both proved
+     byte-identical across the frozen baseline — the same two guarantees are
+     stated apart in docs/bloom-session-23-outcome.md.
+
+     WHAT "OFF" MEANS, said on the parts' own read-outs (Eva, Sep 6): setting
+     the count to 0 or the style to NONE HIDES the part's sub-controls and
+     makes them inert, and it KEEPS their values — turning the part back on
+     restores them. That behaviour already existed and nothing announced it,
+     so it read as destructive. The two read-outs now say so, with the kept
+     values, at the moment the visitor turns the part off. NOT a mute: a
+     control that is visible and not building is the mirror of the defect the
+     panel gate exists to catch, so the sub-controls stay hidden AND inert.
+
+     `open: false` — ARRANGEMENT holds the one first-load open. Inside the
+     container the accordion rule holds one level down: opening Gynoecium
+     closes Androecium and leaves Center open. */
+  { id: 'center', label: 'Center', open: false },
+  /* ANDROECIUM (session 21, phase 2 B2) — the stamens: the first of the
+     reproductive parts the retired CENTER section was standing in for
+     (session 20). Correct botanical naming (Eva): the androecium is the
+     filaments and anthers; the gynoecium (style and stigma) is B3 and its
+     own drop-down beside this one. Hidden whole under SPHERE by every
+     control's predicate. */
+  { id: 'androecium', label: 'Androecium', open: false, parent: 'center' },
+  /* GYNOECIUM (session 22, phase 2 B3) — the style and its stigma, the
+     second reproductive part and the last piece of the centre. Its own
+     drop-down, on the session-21 note above: each part independently present
+     or absent. Hidden whole under SPHERE by every control's predicate. */
+  /* THE TIP SECTIONS (session 29's Tip, session 30's pair) are declared
+     below Gynoecium — a drop-down INSIDE each part and therefore the panel's
+     third level, which session 27 made legal by lifting the nesting bound
+     and replacing it with the precedence check the declaration relies on.
+     WHY A SECTION RATHER THAN SEVEN MORE ROWS IN THE PART: the part's own
+     rows describe WHERE its rods are and how long; the seven describe the
+     shape of one small solid at the end of each — the "Petal roles" shape
+     one level further in. */
+  /* THE ANTHER'S TIP SECTION (session 30) — one statement per instance,
+     `tipSection()`, so a tip with controls and no drop-down cannot happen:
+     the Anther inside Androecium (session 29's `tip`, renamed — `section` is
+     never persisted, so the id is free). Two sections labelled "Tip" would
+     have shared a name on screen, which the panel gate refuses; each is named
+     for the part it shapes. DECLARED IN RENDER ORDER — directly after its
+     parent, as the DOM will nest it — because the panel gate's census
+     compares document order against this array. */
+  tipSection('anther'),
+  { id: 'gynoecium', label: 'Gynoecium', open: false, parent: 'center' },
+  /* THE STIGMA'S TIP SECTION — the same statement, inside Gynoecium. */
+  tipSection('stigma'),
+  /* STEM sits below CENTER, and it did sit directly below HEAD before the
+     leaf tip-shape session: Eva's ruled top-level order is Arrangement,
+     Petal, Head, Center, Stem, Part thickness. What it attaches to is
+     unchanged — the petals join the hub, the hub joins the stem. It holds
+     its two controls, and since that session it also holds LEAVES as a
+     nested drop-down: a leaf exists only where a stem does, so the nesting
+     states a dependency that was already real (`leafPresent` reads
+     `stemLength`). Stem > Leaves > Serration is the panel's second third
+     level, beside Center > Androecium > Anther. */
+  /* SEPALS (part 1) — a TOP-LEVEL section after Center and before Stem (Eva's
+     order), with three children mirroring Petal's own: shape, form, curl. A
+     sepal is a petal, and its panel says so in the same three drop-downs. The
+     rim family (lobes, fringe, the squared end) is part 2 and is not here. */
+  { id: 'sepals', label: 'Sepals', open: false },
+  { id: 'sepalShape', label: 'Sepal shape', open: false, parent: 'sepals' },
+  { id: 'sepalForm', label: 'Sepal form', open: false, parent: 'sepals' },
+  { id: 'sepalCurl', label: 'Sepal curl', open: false, parent: 'sepals' },
+  { id: 'stem', label: 'Stem', open: false },
+  /* THE HUB is Eva's word for the head-to-stem connector (the code's join). It
+     sits under STEM, sibling to LEAVES, because its controls are inert without
+     a stem — a child of the thing they depend on, the LEAVES precedent. This
+     placement is a ruling made without Eva at the preview; she may move it. */
+  { id: 'hub', label: 'Hub', open: false, parent: 'stem' },
+  /* LEAVES sit below STEM because that is what they attach to — the petals
+     join the hub, the hub joins the stem, the leaves join the stem. SERRATION
+     is a drop-down INSIDE it, the antherTip / stigmaTip precedent: it is the
+     leaf's own edge treatment and not a second top-level family. */
+  { id: 'leaves', label: 'Leaves', open: false, parent: 'stem' },
+  { id: 'leafSerration', label: 'Serration', parent: 'leaves', open: false },
+  /* THE INFLORESCENCE — a NEW TOP-LEVEL SECTION AFTER STEM (Eva's ruling 2,
+     `docs/bloom-inflorescence-discovery.md`), holding the law enum and the
+     axis's own controls, with FLORET as a drop-down inside it for the two
+     that describe the flower rather than the arrangement. The Leaves >
+     Serration shape exactly: a part's own sub-family is a child, not a second
+     top-level section.
+
+     IT IS AUTHORED PLAINLY AND IS NOT GENERATED, and that is session 27's
+     finding applied rather than ignored. Ruling 2's "generated `Level k`
+     sections" is for the COMPOUND levels ruling 5 puts out of scope; at depth
+     ONE a generator has a single instance, so "the levels cannot drift" is
+     unobservable — which is precisely why session 27 deferred the tip's own
+     generator to the session where a second instance existed. The day a
+     second level lands, `TIP_DESCRIPTORS x TIP_INSTANCES` is the pattern and
+     the panel gate's one-spec clause is the witness. */
+  { id: 'inflorescence', label: 'Inflorescence', open: false },
+  { id: 'floret', label: 'Floret', open: false, parent: 'inflorescence' },
+  /* THE CENTER SECTION WAS RETIRED WITH THE A/B RIG (session 20, Eva's
+     ruling Sep 5: the centre is the reproductive parts and nothing else) and
+     is BACK AS A CONTAINER for exactly those parts (session 23), declared
+     below HEAD above. `center` was never a control id and sections are not
+     persisted, so the section id was never in RETIRED_IDS; the five control
+     ids are, and the panel gate's retirement route now asserts that the
+     container holds NO control of its own. The junction still never gets a
+     section. */
+  /* PART THICKNESS — renamed from "Material" (Eva, Sep 1), and THE ID MOVED
+     WITH THE LABEL on purpose. An id that contradicts its label is a stored
+     label-lie: it reads as a declaration, a later reader checks it and
+     believes it, and this project's most repeated defect is a name for a
+     thing that is not the thing. There is no saved-design debt to weigh
+     against that — `section` is panel presentation, never persisted, and it
+     is not a control id, so RETIRED_IDS does not apply and no migration is
+     owed. (Were a section id ever to reach a saved design, that calculus
+     inverts and the rename becomes a retirement.)
+
+     WHAT THE NAME IS SLIGHTLY WRONG ABOUT, stated rather than discovered:
+     this section also holds `footDelicacy`, which scales a WIDTH, not a
+     thickness. It sits here because the three controls are one layer — the
+     part's own material dimensions, the things that decide how delicate the
+     printed object is — and because delicacy's width is what the area rule
+     reads to size the ring. If the name ever reads wrong at the panel, the
+     LABEL moves on one ruling and the id moves with it, exactly as it did
+     here. Do not fix it by re-homing the control. */
+  { id: 'thickness', label: 'Part thickness', open: false },
   /* ANDROECIUM and GYNOECIUM stood here, LAST, as top-level sections
      (sessions 21 and 22); since session 23 they are declared directly after
      their parent, "Center", above — the same census rule that put them last
@@ -934,6 +1080,17 @@ export function verifySections(controls = CONTROLS, sections = SECTIONS) {
     if (!c.section) bad.push(`control "${c.id}" declares no section`);
     else if (!ids.has(c.section)) bad.push(`control "${c.id}" names section "${c.section}", which is not in SECTIONS`);
     else used.add(c.section);
+    /* EVERY CONTROL CARRIES A `visibleWhen`, and "never gated" is the explicit
+       `{ all: [] }` sentinel rather than an absent field (the sphere-channel
+       session, Sep 14, on its own defect). Retiring a predicate and simply
+       DROPPING the field left `stemLength` the one control in 112 without one;
+       evalPredicate and predicateDrivers both read `pred == null` as "shown,
+       no drivers" and were fine, but the panel gate reads the SHAPE directly
+       and died on `x.visibleWhen.id` — a TypeError two hours into CI where the
+       registry could have named it at module load. A missing element must be a
+       red check, never a crash. The sentinel also says the absence is
+       DELIBERATE, which an omitted field cannot. */
+    if (c.visibleWhen === undefined) bad.push(`control "${c.id}" declares no \`visibleWhen\` — a control that is never gated declares the \`{ all: [] }\` sentinel, which is what every other ungated control carries; an omitted field is indistinguishable from a forgotten one`);
   }
   /* An EMPTY section is a failure, not a tidy placeholder for later work: it
      renders as a header that opens onto nothing, and the reason it is empty is
@@ -1161,7 +1318,19 @@ export function tipControls(t) {
 
 export const CONTROLS = [
   { id: 'petalCount', section: 'arrangement', kind: 'slider', min: 3, max: 40, step: 1, default: 8,
-    label: 'Petals', fmt: (v) => `${v}`, tier: 'standard', role: 'petal',
+    /* CLAMPED AND TOLD, ON THE CONTROL (the sphere-stem session). On a SPHERE
+       with a stem, petals the stem would pass through are NOT BUILT — so this
+       slider's own number stops being the number of petals on the object, and
+       the first place anyone would notice is here. The count is the OWNER's
+       (`stemOmission`, the builder's own record); the reason is one line down
+       in the read-out's STEM CHANNEL line, which is where the slots and the
+       clearance are named. Absent wherever the question does not arise. */
+    label: 'Petals', tier: 'standard', role: 'petal',
+    fmt: (v, ui, shown) => {
+      const ch = shown && shown.stemChannel;
+      if (!ch || !ch.omitted.length) return `${v}`;
+      return `${v} asked — ${ch.built} BUILT, ${ch.omitted.length} not (the stem passes through them; see STEM CHANNEL)`;
+    },
     /* HIDDEN UNDER FAN, and it is the layerPhase treatment rather than a
        reinterpretation (Eva's ruling, Sep 2). A fan's petal count is DERIVED —
        2 * perSide + a mirror-line petal — so this slider has no job there.
@@ -1293,6 +1462,98 @@ export const CONTROLS = [
      the SHOWN build's record, so every number printed here is the builder's
      and none is re-derived from the sliders.
      =================================================================== */
+  /* ===================================================================
+     THE CARNATION FRINGE AND ITS SQUARED TERMINAL — ONE FEATURE (Eva's
+     ruling, Sep 13). Teeth across the petal's END, pointing along its
+     length. Read `docs/bloom-carnation-fringe-picture.md` before touching
+     any of it.
+
+     THEY SHIP TOGETHER BECAUSE NEITHER WORKS ALONE, and that is measured
+     rather than asserted: every finger of a panel fringe runs to u = 1, and
+     `TIP_HALF_MM` is an ABSOLUTE constant, so the blade is 1.600 mm across
+     at the apex at EVERY petal size. Ten fingers read as a carnation over
+     most of their length and then converge into one shared spike. The
+     terminal holds the end open; the fringe cuts it.
+
+     `petalTipEnd` sits in PETAL SHAPE beside `petalTipShape`, whose region
+     it shares: the terminal is a floor over [uPk, 1] and the apex law owns
+     exactly that interval. The fringe gets its own drop-down inside it,
+     because a fringe is a change of TOPOLOGY at the end and not another
+     term in the outline. =================================================================== */
+  { id: 'petalTipEnd', section: 'shape', kind: 'slider',
+    min: TIP_END_RANGE[0], max: TIP_END_RANGE[1], step: 0.05, default: 0,
+    label: 'Squared end', tier: 'standard', role: 'petal',
+    /* THE DEAD TRAVEL IS TOLD, NEVER TRIMMED — `stamenSpread`'s ruling.
+       Below `TIP_HALF_MM / peakHalf` the terminal sits under the print floor
+       and delivers nothing, and that fraction MOVES WITH THE PETAL'S WIDTH
+       (20.0% of the track at petalWidth 8, 5.3% at 30), so no static range
+       is dead-free and an adaptive maximum would make one slider position
+       mean different things on different petals. */
+    fmt: (v, ui, shown) => {
+      const t = Number(v);
+      const T = shown && shown.fringe;
+      if (t === 0) return 'converging — the apex law runs to its own point';
+      if (!T) return `${(t * 100).toFixed(0)}% of the widest half-width`;
+      const w = T.endWidthMm;
+      if (T.deadTravel) return `${(t * 100).toFixed(0)}% — DEAD: ${w.toFixed(2)} mm is under the ${T.floorMm.toFixed(2)} mm print floor, so the end is the floor's own ${(2 * T.tipHalfMm).toFixed(2)} mm; the hatched travel on the track`;
+      return `a ${w.toFixed(2)} mm flat end, ${(100 * w / (2 * T.peakHalfMm)).toFixed(0)}% of the petal's width`
+           + ` · it carries ${T.ceiling} ${T.ceiling === 1 ? 'tooth' : 'teeth'} at the ${T.floorMm.toFixed(2)} mm floor`
+           + ` · dead below ${(100 * T.deadBelow).toFixed(0)}% on this petal`;
+    },
+    /* NO `cap` ROW, DELIBERATELY, and the reason is which END the dead travel
+       is at. `applyCaps` marks the travel ABOVE its value — which is right for
+       `stamenSpread` and `lobeDepth`, whose dead and saturated stretches are at
+       the TOP — and this control's dead travel is at the BOTTOM. Declaring
+       `cap: deadBelow` would hatch 0.10 to 1.00 on the shipping petal: 90% of
+       the track marked dead when the dead 10% is underneath it, which is worse
+       than no mark at all. So the number is TOLD in the read-out above and the
+       track is left alone until there is a low-end hatch to draw it with —
+       one field and one CSS rule, mirroring `.bl-ctrl--capped`, the day it is
+       wanted. */
+    visibleWhen: { all: [] } },
+  { id: 'fringeCount', section: 'fringe', kind: 'slider',
+    min: FRINGE_COUNT_RANGE[0], max: FRINGE_COUNT_RANGE[1], step: 1, default: 0,
+    label: 'Teeth', tier: 'standard', role: 'petal',
+    /* CLAMPED AND TOLD, never refused. The ceiling is the TERMINAL's own
+       width — every tooth and every gap must clear `MIN_FEATURE_MM` at the
+       station where it is narrowest, and both reduce to the same
+       `W >= (2N - 1) x MIN_FEATURE_MM` at the fringe region's narrowest
+       station. Without a terminal that station carries exactly one tooth,
+       which is the whole reason the two controls ship together. */
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      if (n === 0) return 'plain — no fringe';
+      const F = shown && shown.fringe;
+      if (!F || !F.built) return `${n} ${n === 1 ? 'tooth' : 'teeth'} asked`;
+      const base = `${F.count} ${F.count === 1 ? 'tooth' : 'teeth'}`;
+      if (F.clamped) {
+        return `${n} asked, ${base} built — CLAMPED: the end is ${F.wMinMm.toFixed(2)} mm at its narrowest and ${n} teeth need `
+             + `${((2 * n - 1) * F.floorMm).toFixed(1)} mm at the ${F.floorMm.toFixed(2)} mm floor`
+             + (F.tipEnd === 0 ? ' — there is no squared end to carry them' : `, so the squared end would have to be ${(100 * ((2 * n - 1) * F.floorMm) / (2 * F.peakHalfMm)).toFixed(0)}% of the width`);
+      }
+      return `${base}, ${F.count === 1 ? '' : 'each '}${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+           + (F.count > 1 ? ` · the gaps run ${F.gapSplitMm.toFixed(2)} mm to ${F.gapTipMm.toFixed(2)} mm` : ' · no gaps — one tooth is the whole end')
+           + ` · the ceiling here is ${F.ceiling}`;
+    },
+    visibleWhen: { all: [] } },
+  { id: 'fringeDepth', section: 'fringe', kind: 'slider',
+    min: FRINGE_DEPTH_RANGE[0], max: FRINGE_DEPTH_RANGE[1], step: 0.01, default: FRINGE_DEPTH_DEFAULT,
+    label: 'Tooth depth', tier: 'standard', role: 'petal',
+    /* THE SPLIT IS OWNED IN PHYSICAL UNITS. A fraction of the petal's OWN
+       LENGTH from the tip, so the target station is `1 - depth` exactly and
+       the depth in millimetres is `depth x length` — one owner, and no row
+       count standing for a depth. A panel boundary IS a row, so the read-out
+       prints the station the builder landed on beside the one asked for. */
+    fmt: (v, ui, shown) => {
+      const d = Number(v);
+      const F = shown && shown.fringe;
+      if (!F || !F.built) return `${(d * 100).toFixed(0)}% of the petal's length`;
+      const land = `${F.depthMm.toFixed(2)} mm of teeth, split asked at u ${F.uAsked.toFixed(4)} and landed at u ${F.uSplitRow.toFixed(4)}`;
+      return F.peakClamped
+        ? `${land} — CLAMPED to the widest point (u ${F.uPk.toFixed(4)}); a tooth may not reach below it into the base taper`
+        : `${land} (${(F.residualMm).toFixed(3)} mm off, within the ${F.rowGapMm.toFixed(3)} mm row it landed on)`;
+    },
+    visibleWhen: { ref: 'fringeEngaged' } },
   { id: 'lobeDepth', section: 'lobes', kind: 'slider',
     min: LOBE_DEPTH_RANGE[0], max: LOBE_DEPTH_RANGE[1], step: 0.01, default: 0,
     label: 'Lobe depth', tier: 'standard', role: 'petal',
@@ -1320,7 +1581,7 @@ export const CONTROLS = [
            + apex;
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.depthCap : null),
-    visibleWhen: { all: [] } },
+    visibleWhen: { ref: 'lobesEligible' } },
   { id: 'lobeCount', section: 'lobes', kind: 'slider',
     min: LOBE_COUNT_RANGE[0], max: LOBE_COUNT_RANGE[1], step: 1, default: LOBE_COUNT_DEFAULT,
     label: 'Lobes', tier: 'standard', role: 'petal',
@@ -1357,7 +1618,7 @@ export const CONTROLS = [
            + (L.countCap < LOBE_COUNT_RANGE[1] ? ` · clamps at ${L.countCap}, the mark on the slider — ${caps}` : '');
     },
     cap: (shown) => (shown && shown.lobes ? shown.lobes.countCap : null),
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   { id: 'lobeCoverage', section: 'lobes', kind: 'slider',
     min: LOBE_COVERAGE_RANGE[0], max: LOBE_COVERAGE_RANGE[1], step: 0.05, default: LOBE_COVERAGE_DEFAULT,
     label: 'Coverage', tier: 'standard', role: 'petal',
@@ -1374,7 +1635,7 @@ export const CONTROLS = [
            + (L ? ` (${(2 * L.treatedHalfMm).toFixed(1)} mm of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back)` : '')
            + (L && !L.noRoom ? ` · the ladder holds ${L.countRowsCap} ${L.countRowsCap === 1 ? 'tooth' : 'teeth'} here (${L.rowsCapacity} free rows at ${L.samplesPerLobe} stations a period), the pitch floor ${L.countFloorCap}` : '');
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   /* THE TWO SHAPE EXPONENTS (session 41). Eva's model names the tooth's two
      features separately — "notch angle, the included angle of the valley
      between teeth" and "crest point, how pointed the tooth's own peak is" —
@@ -1409,7 +1670,7 @@ export const CONTROLS = [
         : L && !L.noRoom ? ' · one lobe, so the window carries no interior crest to measure' : '';
       return `${a.toFixed(2)} · ${name}${ang}`;
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
   { id: 'lobeNotchShape', section: 'lobes', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
     label: 'Notch', tier: 'standard', role: 'petal',
@@ -1429,7 +1690,7 @@ export const CONTROLS = [
         : '';
       return `${b.toFixed(2)} · ${name}${ang}`;
     },
-    visibleWhen: { ref: 'lobesEngaged' } },
+    visibleWhen: { all: [{ ref: 'lobesEligible' }, { ref: 'lobesEngaged' }] } },
 
   /* THE APEX HAS NO CONTROL, AND THAT IS A STATED INTERIM (Eva, session 32).
      `petalTipBreadth` is retired and nothing replaced it: the converging cap
@@ -1623,7 +1884,58 @@ export const CONTROLS = [
     fmt: () => 'the bowl carries around the tip',
     visibleWhen: { all: [] } },
 
-  { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 75, step: 1, default: 25,
+  /* THE CEILING IS 120 AND IT IS DERIVED, NOT TYPED — DO NOT ROUND IT LATER
+     (Eva's re-issued ruling, Sep 19; the derivation is §4 of
+     docs/bloom-bell-corolla-discovery.md and the ruling is its §9 item 2).
+
+     Past a right angle the foot-to-blade clearance is a WINDOW rather than a
+     wall. With the ring row at the origin, the foot along +r, the blade
+     leaving at the seam turn `th`, `a = t/2`, `c = cos th`, `s = sin th`:
+     the first blade row's +N skin must clear the foot's top plane, which
+     needs `s1 >= a (1 + |c|) / s`; and the seam panel's -N skin must not
+     pass through the foot's own slab, which needs `s1 <= a s / |c|`. The
+     window is non-empty iff `s^2 >= |c|(1 + |c|)`, i.e. `2c^2 + |c| - 1 <= 0`,
+     i.e. **|c| <= 1/2 — th <= 120 degrees EXACTLY**. At 120 it is a single
+     point; past it the fold is topological and no station spacing clears it.
+     PR #210's measured crossover of 115-123 degrees on the incurve target is
+     that window closing, and a 22-row scratch probe confirmed the closed form
+     row by row against a prediction written before the census ran.
+
+     THE SEAM LAW ITSELF IS UNCHANGED. `seamClearanceMm` still saturates at
+     its right-angle value past 90; replacing that with the window's lower
+     bound was costed and REJECTED (it clears the folds inside the window and
+     makes the CLOSED regime worse — 120 degrees goes 336 -> 576 pairs, 122
+     goes 336 -> 592 — and buys a second regime in a law that has one). So
+     this ceiling is where the window closes, not where the law changes.
+
+     THE FLOOR STAYS AT 0, AND THE -30 RULING OF Sep 17 IS WITHDRAWN. Opening
+     it was ruled and then measured: swept at one degree over 22 states, the
+     within-shell census leaves zero at **-8 degrees** on six whorls at the
+     thickest sheet, -9 on a six-turn continuous head, -16 on six whorls at
+     the SHIPPING sheet, and at -17 / -22 / -23 / -28 / -29 on five more. Every
+     worst site sits at exactly z = -t/2, the foot slab's UNDERSIDE, and the
+     same |theta| read UP is 0 pairs on 13 of 13 probes — so it is the
+     DESCENDING seam case (docs/bloom-sepals-outcome.md §8), which the
+     clearance law was never derived for: the clearance reads `Math.abs(tilt)`
+     and IS symmetric, and the fold is NOT, which is the whole of the claim.
+     A shallower floor is not the answer either: the shallowest
+     onset is -8, so a floor clean on all 22 is -7, a seventh of the ruled
+     travel and short of any reflexed form. Full numbers in
+     docs/bloom-tilt-range-outcome.md §1. Do not re-open the floor from the
+     discovery doc's own "tilt -30 ... 0 pairs" cell: that cell reproduces and
+     is true of the DEFAULTS petal alone.
+
+     AND THE RANGE IS THE ROLE-OVERRIDE ENVELOPE (one number, two files):
+     `ROLE_OVERRIDES` in bloom-geometry.js restates these bounds as the clamp
+     for `labellumTilt`, `hoodTilt` and the nine `petalNTilt` rows, and
+     tools/bloom-harness.mjs THROWS at module load if the two disagree.
+     Holding the envelope narrower is not merely refused, it is wrong: a +5
+     delta on a base of 120 would compose to 125 and clamp back to 75,
+     dropping that petal 45 degrees BELOW its own whorl. The delta CONTROLS
+     keep their own -75..75 ranges — a delta narrower than the clamp's reach
+     is a narrower delta, not a dead one, and widening them is a separate
+     ruling nobody has asked for. */
+  { id: 'petalTilt', section: 'curl', kind: 'slider', min: 0, max: 120, step: 1, default: 25,
     label: 'Petal tilt', fmt: (v) => `${v}°`, tier: 'standard', role: 'petal',
     visibleWhen: { all: [] } },
 
@@ -2696,6 +3008,95 @@ export const CONTROLS = [
     label: 'Style curl', fmt: (v) => (Number(v) === 0 ? 'straight, up the axis' : `${v}° — bends over the apex`),
     tier: 'standard', role: 'center', visibleWhen: { ref: 'gynoeciumPresent' } },
 
+  /* ===================================================================
+     SEPALS, PART 1 — THE WHORL (Eva's ruling: "a sepal is a petal"). Five
+     controls of its own, then one instanced copy of every petal shape, form
+     and curl control (`sepalTwinControls`, spliced in after this array from
+     the geometry's own SEPAL_TWINS table — see below). `sepalCount` is the
+     GUARD: 0 builds nothing and hides everything else, so the shipped default
+     is byte-identical by branch. Every range is IMPORTED from the geometry
+     (Q6). The COUNT's ceiling and the ANGLE's limit are DERIVED per build and
+     told on the control (the `stamenSpread` ruling: full range, clamped,
+     told, the dead travel hatched on the track).
+     =================================================================== */
+  { id: 'sepalCount', section: 'sepals', kind: 'slider',
+    min: SEPAL_COUNT_RANGE[0], max: SEPAL_COUNT_RANGE[1], step: 1, default: 0,
+    label: 'Sepals',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      if (n === 0) return 'none — no sepal whorl is built';
+      const S = shown && shown.sepals;
+      if (!S) return `${n} asked`;
+      if (S.unavailable) return `${n} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring (told, none built)`;
+      const A = S.attachment;
+      const where = A && A.mode === 'HUB' ? `on the hub's flare, ${A.frac.toFixed(2)} of the way up` : 'at the hub\'s rim';
+      return `${S.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count (${S.ceilingOf}); the travel above the mark is dead` : ` (the ceiling is ${S.ceiling}: ${S.ceilingOf})`);
+    },
+    cap: (shown) => (shown && shown.sepals && !shown.sepals.unavailable ? shown.sepals.ceiling : null),
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsEligible' } },
+  { id: 'sepalScale', section: 'sepals', kind: 'slider',
+    min: SEPAL_SCALE_RANGE[0], max: SEPAL_SCALE_RANGE[1], step: 0.05, default: SEPAL_SCALE_DEFAULT,
+    label: 'Sepal size',
+    fmt: (v, ui) => { const k = Number(v); return `${k.toFixed(2)}x the petal — ${(k * Number(ui.petalLength)).toFixed(1)} mm long, ${(k * Number(ui.petalWidth)).toFixed(1)} mm wide (the width follows the length)`; },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalHeight', section: 'sepals', kind: 'slider',
+    min: SEPAL_HEIGHT_RANGE[0], max: SEPAL_HEIGHT_RANGE[1], step: 0.05, default: SEPAL_HEIGHT_DEFAULT,
+    label: 'Sepal height',
+    /* THE ATTACHMENT IS TOLD FROM THE BUILDER'S OWN SOLVE: a fraction of the
+       hub's AXIAL extent from the stem end up to where the hub meets the head,
+       the point the foot landed on, and — where there is no hub below the head
+       to attach partway down — that the sepals sit at the rim and why. */
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const base = `${f.toFixed(2)} of the way up the hub from the stem end${f === 1 ? ' — at the head' : f === 0 ? ' — at the stem end' : ''}`;
+      const S = shown && shown.sepals, A = S && !S.unavailable && S.attachment;
+      if (!A) return base;
+      if (A.mode !== 'HUB') return `${base} — INERT here, the sepals sit at the rim: ${A.why}`;
+      return `${base}: the foot lands on the flare at r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside (the hub hangs ${A.extentMm.toFixed(2)} mm; the same fraction of its surface ARC would land ${A.arc.deltaMm.toFixed(2)} mm away — the AXIAL reading is built)`;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalPhase', section: 'sepals', kind: 'slider',
+    min: SEPAL_PHASE_RANGE[0], max: SEPAL_PHASE_RANGE[1], step: 0.01, default: SEPAL_PHASE_DEFAULT,
+    label: 'Sepal offset',
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const word = f === 0 ? 'ALIGNED with the petals' : f === 1 ? 'ALIGNED with the next petal' : Math.abs(f - 0.5) < 1e-9 ? 'INTERLEAVED — half a pitch' : f < 0.5 ? 'toward aligned' : 'past interleaved';
+      const S = shown && shown.sepals;
+      return `${f.toFixed(2)} of ${S ? S.phaseAgainst : 'the petal pitch'}` + (S && !S.unavailable ? ` = ${S.phaseDeg.toFixed(2)}° of a ${S.pitchDeg.toFixed(2)}° pitch` : '') + ` — ${word}`;
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalFootBreadth', section: 'sepals', kind: 'slider',
+    min: SEPAL_FOOT_BREADTH_RANGE[0], max: SEPAL_FOOT_BREADTH_RANGE[1], step: 0.05, default: SEPAL_FOOT_BREADTH_DEFAULT,
+    label: 'Foot breadth',
+    /* THE CLAMP IS TOLD FROM THE BUILDER'S OWN RECORD (the leaf tip's precedent),
+       never re-derived here from a constant. */
+    fmt: (v, ui, shown) => {
+      const k = Number(v).toFixed(2);
+      const S = shown && shown.sepals;
+      if (!S || S.unavailable) return `${k}x the sepal's share of the petal foot`;
+      return `${k}x — ${S.footMm.toFixed(2)} mm across where it meets the hub` + (S.footClamped ? ` (CLAMPED from ${S.footAskedMm.toFixed(2)}: the print floor is ${S.footFloorMm.toFixed(2)} mm, the ceiling ${S.footCeilingMm.toFixed(2)})` : ` (asked ${S.footAskedMm.toFixed(2)}, inside the ${S.footFloorMm.toFixed(2)}–${S.footCeilingMm.toFixed(2)} mm floors)`);
+    },
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+  { id: 'sepalAngle', section: 'sepalCurl', kind: 'slider',
+    min: SEPAL_ANGLE_RANGE[0], max: SEPAL_ANGLE_RANGE[1], step: SEPAL_ANGLE_STEP, default: SEPAL_ANGLE_DEFAULT,
+    label: 'Sepal angle',
+    /* THE LIMIT IS DRAWN PER BUILD AND TOLD, WITH ITS REASON — the first slider
+       position at which a sepal clips a petal, read from the builder's own
+       scan, never from a typed number. The travel above it is hatched. */
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const S = shown && shown.sepals, L = S && S.limit;
+      const base = `${a}° from the hub plane${a > 0 ? ', toward the petals' : a < 0 ? ', reflexed below' : ' — flat'}`;
+      if (!L) return base;
+      if (L.everywhere) return `${base} — CLAMPED to ${L.angleBuiltDeg}°: the sepals clip the petals at EVERY angle here (${L.kind} on petal ${L.petal}), so the range floor is built`;
+      const reason = L.contactDeg === null ? 'no contact anywhere in the range' : `at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`;
+      return L.clamped
+        ? `${base} — CLAMPED to ${L.angleBuiltDeg}°, the last angle clear of the petals (${reason}); the travel above the mark is dead`
+        : `${base} — clear of the petals up to ${L.limitDeg}° (${reason}; measured on the built rows in both modes)`;
+    },
+    cap: (shown) => (shown && shown.sepals && shown.sepals.limit && !shown.sepals.unavailable ? (shown.sepals.limit.limitDeg === null ? SEPAL_ANGLE_RANGE[0] : shown.sepals.limit.limitDeg) : null),
+    tier: 'standard', role: 'sepal', visibleWhen: { ref: 'sepalsPresent' } },
+
   /* THE STEM'S TWO CONTROLS (session 43). Length is the GUARD — 0 is no stem,
      and the diameter is hidden AND inert there — which is lobeDepth's shape and
      stamenCount's, and is what keeps every pre-stem row byte-identical by
@@ -2712,7 +3113,13 @@ export const CONTROLS = [
        read-out says both; the hidden part is DERIVED per build and printed
        there, never tabulated here. */
     fmt: (v) => (Number(v) === 0 ? 'none — no stem is built' : `${v} mm total, from the hub's underside (the read-out says how much of it the head hides)`),
-    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemEligible' } },
+    /* `{ all: [] }` is this registry's own "never gated" sentinel, carried by
+       every ungated control rather than left off: evalPredicate returns true
+       for it, predicateDrivers returns nothing for it, and the panel gate reads
+       the shape directly. The stem's length used to be gated on a placement
+       predicate; the sphere channel retired that, and the row takes the
+       sentinel rather than dropping the field. */
+    tier: 'standard', role: 'stem', visibleWhen: { all: [] } },
   { id: 'stemDiameter', section: 'stem', kind: 'slider',
     min: STEM_DIAMETER_RANGE[0], max: STEM_DIAMETER_RANGE[1], step: 0.5, default: 6,
     label: 'Stem diameter',
@@ -2724,7 +3131,380 @@ export const CONTROLS = [
       return bore === 0 ? `${v} mm across — SOLID (the bore closes at or under ${2 * STEM_MIN_WALL_MM} mm)`
                         : `${v} mm across, ${(2 * bore).toFixed(1)} mm bore — a ${STEM_MIN_WALL_MM} mm wall`; },
     tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+
+  /* ===================================================================
+     THE HUB — Eva's word for the head-to-stem connector, the code's hub-to-stem
+     JOIN (the hub-shape session). Three controls, all inert without a stem
+     (`stemPresent`), which is what makes the default state untouched by
+     construction: `stemLength` is 0 by default, so none of these can move a
+     byte of the shipped bloom. GOBLET at amount 1 / length auto reproduces
+     today; see `hubJoinThicknessAt` and `stemPlan` for the byte-exactness.
+     NB `hubShapeAmount` is NOT the head's `hubShape` control (CAP/SPHERE) — it
+     is the join's pronouncedness; the two are flagged in the PR as adjacent
+     names Eva may want to separate on the preview.
+     =================================================================== */
+  { id: 'hubStyle', section: 'hub', kind: 'choice', default: 'GOBLET',
+    options: [
+      { value: 'GOBLET', label: 'Goblet (rounded flare — ships today)' },
+      { value: 'ANGLED', label: 'Angled (straight cone, hard shoulders)' },
+      { value: 'CURVED', label: 'Curved (smooth into the stem, no shoulder)' },
+    ],
+    label: 'Hub style',
+    fmt: (v) => (v === 'ANGLED' ? 'a straight conical taper' : v === 'CURVED' ? 'a smooth continuous curve into the stem' : 'the rounded flare (today\'s shape at amount 1)'),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'hubShapeAmount', section: 'hub', kind: 'slider',
+    min: HUB_SHAPE_AMOUNT_RANGE[0], max: HUB_SHAPE_AMOUNT_RANGE[1], step: 0.05, default: HUB_SHAPE_AMOUNT_DEFAULT,
+    label: 'Hub amount',
+    /* THE UNUSUAL DEFAULT: 1.00 is mid-range, not an end. One style has to land
+       on today's shape at one slider value, and GOBLET does — at exactly 1.00,
+       where `x * 1 === x` reproduces today. 0 is a straight join (no flare) for
+       all three styles; above 1 exaggerates. One-sided by ruling — no waist. */
+    fmt: (v) => (Number(v) === 0 ? 'straight — no flare' : Number(v) === 1 ? '1.00x — today\'s shape (GOBLET)' : `${Number(v).toFixed(2)}x pronounced`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'hubLength', section: 'hub', kind: 'slider',
+    min: HUB_LENGTH_RANGE[0], max: HUB_LENGTH_RANGE[1], step: 0.5, default: 0,
+    label: 'Hub length',
+    /* 0 = AUTO, the derived join depth (today's `joinT`), which varies with the
+       stem's own diameter — the one honest default, since no fixed number could
+       reproduce today on every state. Above 0 it is that reach in millimetres,
+       floored at the sheet. hubLength ADDS to the object's height; the read-out
+       states the total (Eva's ruling). */
+    fmt: (v) => (Number(v) === 0 ? 'auto — the derived reach (the read-out says the mm)' : `${Number(v).toFixed(1)} mm below the head`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+
+  /* ===================================================================
+     LEAVES (Eva's rulings). SIMPLE leaves — one blade per node, no leaflets.
+     Nine controls: five for the arrangement and four for the edge.
+     =================================================================== */
+  { id: 'leafLength', section: 'leaves', kind: 'slider',
+    min: LEAF_LENGTH_RANGE[0], max: LEAF_LENGTH_RANGE[1], step: 1, default: 0,
+    label: 'Leaf length',
+    /* SIZE IS IN MILLIMETRES, NOT A MULTIPLIER (ruling 5). The flower's
+       `leafSize` multiplies only the length while the width is fixed in world
+       units, which is why three of its four leaf types come out wider than
+       long at the default — a length multiplier wearing a size control's name.
+       Both axes here are absolute. */
+    fmt: (v) => (Number(v) === 0 ? 'none — no leaves are built' : `${v} mm from the petiole to the tip`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'stemPresent' } },
+  { id: 'leafWidth', section: 'leaves', kind: 'slider',
+    min: LEAF_WIDTH_RANGE[0], max: LEAF_WIDTH_RANGE[1], step: 0.5, default: 17,
+    label: 'Leaf width',
+    fmt: (v, ui) => `${v} mm across at the widest point${Number(ui.leafLength) > 0 ? ` · ${(Number(ui.leafLength) / Number(v)).toFixed(1)}:1` : ''}`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafAngle', section: 'leaves', kind: 'slider',
+    min: LEAF_ANGLE_RANGE[0], max: LEAF_ANGLE_RANGE[1], step: 1, default: LEAF_ANGLE_DEFAULT,
+    label: 'Leaf angle',
+    /* EVA'S RULING, 35 degrees, from the angle row of the Phase A sheet. The
+       OVERHANG is printed beside it because ruling 7 made this partly a
+       printability question and the default is past the classic 45 line —
+       ruled with that figure in view, on a project that has never printed
+       anything. Told, never clamped. */
+    fmt: (v) => { const a = Number(v), over = 90 - Math.abs(a);
+      return `${a} deg from horizontal (${a < 0 ? 'drooping' : a === 0 ? 'level' : 'rising'}) · ${over} deg overhang from vertical${over > 45 ? ' — PAST the classic 45, supports likely' : ''}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafNodes', section: 'leaves', kind: 'slider',
+    min: LEAF_NODE_RANGE[0], max: LEAF_NODE_RANGE[1], step: 1, default: 3,
+    label: 'Nodes',
+    fmt: (v, ui) => { const n = Math.round(Number(v));
+      const per = ui.leafPhyllotaxy === 'opposite' ? 2 : ui.leafPhyllotaxy === 'whorled' ? 3 : 1;
+      return `${n} along the stem · ${n * per} leaves`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafPhyllotaxy', section: 'leaves', kind: 'choice', default: 'alternate',
+    options: [
+      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      { value: 'opposite', label: 'Opposite (two across, decussate)' },
+      { value: 'whorled', label: 'Whorled (three at 120)' },
+    ],
+    label: 'Arrangement',
+    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
+      return `${per} leaf${per > 1 ? 'ves' : ''} a node · ${Math.round(Number(ui.leafNodes)) * per} in all`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+
+  /* THE TIP SHAPE (Eva, the leaf tip-shape session: "it always shows as this
+     very thick tip when it should be coming to a point, or at least have the
+     option of coming to a point or being rounded"). The petal's superellipse
+     exponent on the LEAF's own control: same law, separate control, so neither
+     organ moves the other. The six named states are the petal ruling's and the
+     read-out speaks them; 1.30 is the constant that shipped and is the default.
+
+     AND THE READ-OUT TELLS THE TRUTH ABOUT THE LIMIT, which is the half of this
+     control that matters. The blade ENDS 2 x TIP_HALF_MM = 1.60 mm across at
+     every exponent, in both modes (the builder floors at the constant), so a
+     point is not printable and the control moves the SHOULDER. The clamp
+     clause prints the builder's own record: the last N mm (M% of the length)
+     is that stub, and the stub is P% of the width. It says which way the
+     levers run, because both are the opposite of what the label suggests: a
+     POINTIER exponent hugs the floor for LONGER (21.3% of a 17 mm blade at
+     0.60, 2.1% at 1.30, 0.02% at 3.00), and the share is set by the WIDTH and
+     never by the length. `fmt`'s third argument is the SHOWN build's record
+     (the stamen spread's precedent), so the figure is the builder's and not a
+     second producer of the clamp. Clamped and told, never refused. */
+  { id: 'leafTipShape', section: 'leaves', kind: 'slider',
+    min: LEAF_TIP_SHAPE_RANGE[0], max: LEAF_TIP_SHAPE_RANGE[1], step: 0.05, default: LEAF_TIP_SHAPE,
+    label: 'Tip shape',
+    fmt: (v, ui, shown) => {
+      const n = Number(v);
+      const name = n <= 0.70 ? 'acute'
+        : n < 1.05 ? 'a straight point'
+        : n < 1.45 ? 'pointed (the shipped leaf)'
+        : n < 1.90 ? 'between pointed and the true ellipse'
+        : n < 2.25 ? 'the true ellipse'
+        : n < 2.80 ? 'width held, then turning'
+        : 'the held-width round tip';
+      const cl = shown && shown.leaf && shown.leaf.tipClamp && shown.leaf.tipClamp[0];
+      if (!cl) return `${n.toFixed(2)} · ${name}`;
+      return `${n.toFixed(2)} · ${name} · ends ${cl.terminalMm.toFixed(2)} mm across, the print terminal, in both modes`
+        + ` — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
+        + (cl.fraction > 0.05 ? ` — CLAMPED: a point below ${cl.terminalMm.toFixed(2)} mm cannot be printed, and a pointier shape only LENGTHENS the stub; a WIDER leaf shortens it (the share is set by the width, never the length)` : '');
+    },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+
+  /* THE EDGE. Serration is botanically a LEAF feature, which is what Eva ruled
+     in September, and this applies it to the organ it belongs on. It shares the
+     petal's CUT MACHINERY — the same `g(r)` two-exponent law, the same crest
+     and notch powers — and NOT the petal's VALUES: a leaf reading `lobeDepth`
+     would serrate every time petal lobes came on and vice versa, the
+     organ-to-organ coupling session 22 ruled against when it refused to let a
+     style's presence move every stamen. LF7 is the witness for the split. */
+  { id: 'leafToothDepth', section: 'leafSerration', kind: 'slider',
+    min: 0, max: 1, step: 0.01, default: 0.26,
+    label: 'Tooth depth',
+    fmt: (v) => (Number(v) === 0 ? 'none — an entire margin' : `${Number(v).toFixed(2)}x the blade's own half-width`),
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafPresent' } },
+  { id: 'leafToothCount', section: 'leafSerration', kind: 'slider',
+    min: LEAF_TOOTH_RANGE[0], max: LEAF_TOOTH_RANGE[1], step: 1, default: 9,
+    label: 'Teeth',
+    fmt: (v) => `${Math.round(Number(v))} along each margin`,
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+  { id: 'leafCrestShape', section: 'leafSerration', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Tooth tip',
+    /* THE LOCAL POWER of the cut at its own feature (session 41): 1.00 a
+       corner, 2.00 parabolic, 3.00 flat, below 1.00 a cusp. Rising = blunter,
+       the antherPinch ruling. */
+    fmt: (v) => { const k = Number(v);
+      return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-topped'}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+  { id: 'leafNotchShape', section: 'leafSerration', kind: 'slider',
+    min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
+    label: 'Notch',
+    fmt: (v) => { const k = Number(v);
+      return `${k.toFixed(2)} — ${k < 1 ? 'a cusp' : k === 1 ? 'a corner' : k < 2.5 ? 'rounded' : 'flat-bottomed'}`; },
+    tier: 'standard', role: 'stem', visibleWhen: { ref: 'leafToothed' } },
+
+  /* ===================================================================
+     THE INFLORESCENCE — the law enum and the axis's five, plus the floret's
+     two in the drop-down below it. Eva's twelve rulings of Sep 17 are in
+     `docs/bloom-inflorescence-discovery.md`; `bloom-geometry.js`'s
+     inflorescence block is the geometry's own header.
+
+     EVERY RANGE IS IMPORTED, never a literal (Q6's discipline, session 29):
+     the geometry is the one owner of what a floret can be, and the harness
+     fails at module load if one of these became a number typed here.
+
+     `role: 'inflorescence'` IS ITS OWN ROLE, not the stem's, on the sepals'
+     precedent one part later: `role` says which part of the MODEL a control
+     owns, and the inflorescence is a part — it hangs off the stem the way the
+     leaves do, but a leaf is not a flower and its controls are not these. */
+  { id: 'inflorescence', section: 'inflorescence', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None (one flower)' },
+      { value: 'RACEME', label: 'Raceme (flowers on pedicels down the stem)' },
+    ],
+    label: 'Type',
+    fmt: (v, ui, shown) => {
+      if (String(v) === 'NONE') return 'one flower — the head and nothing else';
+      const b = shown && shown.inflorescenceBuilt;
+      const p = shown && shown.inflorescence;
+      if (!p || !p.present) return 'a raceme — but there is no stem to carry it, so nothing is built';
+      const per = p.perNode;
+      return `a raceme · ${p.nodes} node${p.nodes === 1 ? '' : 's'} x ${per} = ${b ? b.count : p.built} floret${(b ? b.count : p.built) === 1 ? '' : 's'}`
+        + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each, ${b.tris.toLocaleString('en-US')} in all` : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'stemPresent' } },
+
+  { id: 'floretNodes', section: 'inflorescence', kind: 'slider',
+    min: FLORET_NODE_RANGE[0], max: FLORET_NODE_RANGE[1], step: 1, default: 5,
+    label: 'Nodes',
+    /* The CLAMP is the node law's own — the span divided at the pitch floor
+       (two pedicel radii), the COUNT giving. The figure comes from the
+       BUILDER's plan, never re-derived here (the stamen spread's precedent). */
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const per = ui.floretPhyllotaxy === 'opposite' ? 2 : ui.floretPhyllotaxy === 'whorled' ? 3 : 1;
+      const p = shown && shown.inflorescence;
+      const base = `${n} along the stem · ${n * per} floret${n * per === 1 ? '' : 's'}`;
+      if (!p || !p.present || !p.nodesClamped) return base;
+      return `${base} — CLAMPED to ${p.nodesBuilt}: the span between the head and the stem's end holds no more at a ${(2 * p.pedicelR).toFixed(2)} mm pitch floor`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE PHYLLOTAXIS READS `leafAzimuths` — the SAME three laws on the SAME
+     stem, and the geometry calls that one function rather than restating it.
+     There are already exactly two owners of "azimuth of the i-th organ" in
+     this project (`buildWhorlInto` and `leafAzimuths`) and a third would be
+     the registration rule's own failure. */
+  { id: 'floretPhyllotaxy', section: 'inflorescence', kind: 'choice', default: 'alternate',
+    options: [
+      { value: 'alternate', label: 'Alternate (one a node, turning 180)' },
+      { value: 'opposite', label: 'Opposite (two across, decussate)' },
+      { value: 'whorled', label: 'Whorled (three at 120)' },
+    ],
+    label: 'Arrangement',
+    fmt: (v, ui) => { const per = v === 'opposite' ? 2 : v === 'whorled' ? 3 : 1;
+      return `${per} floret${per > 1 ? 's' : ''} a node · ${Math.round(Number(ui.floretNodes)) * per} in all`; },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE PEDICEL IS THE FLORET'S OWN STEM, so this is the floret's
+     `stemLength` and its range sits inside `STEM_LENGTH_RANGE`. The DIAMETER
+     is NOT a control: it is the area rule read downward from the rachis
+     (`r_rachis / sqrt(N)`), floored at the stem control's own minimum and
+     TOLD — the discovery's Q10 names that exact number as "the number to
+     design against, not a control". */
+  { id: 'pedicelLength', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_LENGTH_RANGE[0], max: PEDICEL_LENGTH_RANGE[1], step: 1, default: 20,
+    label: 'Pedicel',
+    fmt: (v, ui, shown) => {
+      const p = shown && shown.inflorescence;
+      const base = `${Number(v).toFixed(0)} mm from the stem to each floret`;
+      if (!p || !p.present) return base;
+      return `${base} · ${(2 * p.pedicelR).toFixed(2)} mm across`
+        + (p.pedicelRClamped ? ` — FLOORED: the area rule asks ${(2 * p.areaRuleR).toFixed(2)} mm for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem, and no rod here prints thinner than ${(2 * p.pedicelRFloor).toFixed(2)} mm`
+          : ` — the area rule's own answer for ${p.built} pedicels off a ${(2 * p.outerR).toFixed(2)} mm stem`)
+        + ` · crosses ${p.crossesSolidMm.toFixed(2)} mm of the stem's wall`;
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE ANGLE IS THE LEAF'S OWN RANGE AND THE LEAF'S OWN DEFAULT (Eva ruled
+     35 deg for leaves): the quantity is the same quantity — a rod's angle
+     from horizontal at a node on this same stem — and a second range for it
+     would be two answers to one question. Its extremes are photographed
+     rather than refused, the standing pattern for extremes. */
+  { id: 'pedicelAngle', section: 'inflorescence', kind: 'slider',
+    min: PEDICEL_ANGLE_RANGE[0], max: PEDICEL_ANGLE_RANGE[1], step: 1, default: 35,
+    label: 'Angle',
+    fmt: (v, ui, shown) => {
+      const a = Number(v);
+      const p = shown && shown.inflorescence;
+      const base = `${a.toFixed(0)} deg from horizontal · ${a > 0 ? 'ascending' : a < 0 ? 'descending' : 'level'}`;
+      if (!p || !p.present) return base;
+      return `${base} · the top node sits ${p.insetMm.toFixed(1)} mm below the head`
+        + (p.insetClamped ? ` — PUSHED DOWN from ${p.insetAskedMm.toFixed(1)} mm to clear it` : '')
+        + (p.insetSatisfied ? '' : ' — and it still does not clear the head: the florets rise further than the stem is long, so they stand among the petals (told, never refused)');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  /* THE FLORET'S TWO. Ruling 4: a floret is a PETAL-COUNT REDUCTION with `NU`
+     untouched — there is no second ruled exception to "derive, don't expose",
+     so a floret costs `petals x 2,356` triangles like every other head and
+     the count is the only lever on that. SIZE is a multiplier on the head's
+     own two length controls (ruling 3: size through PARAMETERS, never through
+     the placement matrix), clamped into each base's own range and told. */
+  { id: 'floretPetals', section: 'floret', kind: 'slider',
+    min: FLORET_PETAL_RANGE[0], max: FLORET_PETAL_RANGE[1], step: 1, default: 5,
+    label: 'Petals',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const b = shown && shown.inflorescenceBuilt;
+      return `${n} a floret` + (b ? ` · ${b.unitTris.toLocaleString('en-US')} tris each (pedicel included)` : '');
+    },
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
+
+  { id: 'floretScale', section: 'floret', kind: 'slider',
+    min: FLORET_SCALE_RANGE[0], max: FLORET_SCALE_RANGE[1], step: 0.05, default: 0.60,
+    label: 'Size',
+    fmt: (v, ui, shown) => {
+      const k = Number(v);
+      const p = shown && shown.inflorescence;
+      const base = `${k.toFixed(2)}x the head's own petal`;
+      if (!p || !p.present) return base;
+      /* THE DEAD TRAVEL IS TOLD WITH ITS NUMBER AND THE RANGE IS NOT
+         NARROWED (`stamenSpread`'s ruling); no hatch is drawn because the
+         dead stretch is at the BOTTOM of the track (the carnation terminal's
+         own case). `sizeDeadBelow` is the PLAN's, derived from the HEAD's two
+         sliders, so this reads it and computes nothing. */
+      const dead = p.sizeDeadBelow > FLORET_SCALE_RANGE[0]
+        ? ` — below ${Math.min(p.sizeDeadBelow, FLORET_SCALE_RANGE[1]).toFixed(2)}x this slider draws the same floret (the petal sliders' own floors)`
+        : '';
+      return `${base} · ${p.petalLength.toFixed(1)} x ${p.petalWidth.toFixed(1)} mm`
+        + (p.sizeClamped ? ` — CLAMPED: ${p.lengthAsked.toFixed(1)} x ${p.widthAsked.toFixed(1)} mm asked, and a petal here is never smaller than the petal slider's own floor` : '')
+        + dead;
+    },
+    /* NO `cap` ROW, DELIBERATELY — `lobeCoverage`'s own reasoning, one
+       feature later, and for the same reason: `applyCaps` marks the travel
+       ABOVE its value, which is right where the dead stretch is at the TOP
+       (`stamenSpread`, `lobeDepth`) and wrong here, where it is at the
+       BOTTOM. On the shipping 35 x 16 mm head the size stops moving below
+       0.571x, so `cap: sizeDeadBelow` would hatch 0.571 to 1.00: nearly
+       half the track marked dead when the dead part is underneath it. The
+       number is TOLD above and the track is left alone until there is a
+       low-end hatch to draw it with. */
+    tier: 'standard', role: 'inflorescence', visibleWhen: { ref: 'inflorescencePresent' } },
 ];
+
+/* ===================================================================
+   THE SEPAL TWINS — every petal shape, form and curl control instanced ONCE
+   for the sepals, from the geometry's own SEPAL_TWINS table (the same table
+   `sepalBladeState` maps the values back through, so the two cannot name
+   different sets). Each twin shares its petal's kind, bounds, step, default
+   and tier — the panel gate's one-spec clause asserts that — and differs in
+   exactly what is per-instance by design: its id, its section (Sepal shape /
+   form / curl for Petal shape / form / curl), its role, its label ("Petal
+   cup" reads "Cup"), its read-out (the petal's own `fmt`, handed a VIEW of
+   the state in which the petal names carry the sepal's values and the length
+   is the sepal's), and its guard (the petal's own predicate re-pointed
+   through the table — a sepal's buckle frequency hides at the SEPAL's
+   amplitude 0 — under `sepalsPresent`).
+
+   SPLICED IN BEFORE THE STEM'S ROWS rather than written inside the literal,
+   because the twins READ the petal rows and an array literal cannot read
+   itself. Order within a section is registry order, and the sepal sections
+   sit between Center and Stem, so the rows go there. */
+function twinPredicate(pred, map) {
+  if (Array.isArray(pred)) return pred.map((p) => twinPredicate(p, map));
+  if (pred && typeof pred === 'object') {
+    const out = {};
+    for (const [k, val] of Object.entries(pred)) {
+      if (k === 'id') { if (!map.has(val)) throw new Error(`a sepal twin's guard reaches ${val}, which has no sepal twin`); out.id = map.get(val); }
+      else out[k] = twinPredicate(val, map);
+    }
+    return out;
+  }
+  return pred;
+}
+/* THE VIEW a twin's read-out sees: the petal's names carrying the sepal's
+   values, the length and width scaled by the sepal's own size, and the
+   SEPAL's own form record where the petal's fmt reads `shown.buckle`. */
+function sepalView(ui) {
+  const v = { ...ui, petalLength: Number(ui.petalLength) * Number(ui.sepalScale), petalWidth: Number(ui.petalWidth) * Number(ui.sepalScale) };
+  for (const [petalId, sepalId] of SEPAL_TWINS) v[petalId] = ui[sepalId];
+  return v;
+}
+const sepalShown = (shown) => (shown ? { ...shown, buckle: shown.sepals && !shown.sepals.unavailable ? shown.sepals.buckle : null } : shown);
+export function sepalTwinControls(rows) {
+  const map = new Map(SEPAL_TWINS);
+  const sectionOf = { shape: 'sepalShape', form: 'sepalForm', curl: 'sepalCurl' };
+  return SEPAL_TWINS.map(([petalId, sepalId]) => {
+    const p = rows.find((c) => c.id === petalId);
+    if (!p) throw new Error(`SEPAL_TWINS names ${petalId}, which is not a control`);
+    if (!sectionOf[p.section]) throw new Error(`SEPAL_TWINS names ${petalId} in section ${p.section}, which has no sepal twin section`);
+    const own = twinPredicate(p.visibleWhen, map);
+    const guarded = own && own.all && own.all.length === 0;
+    return {
+      id: sepalId, section: sectionOf[p.section], kind: p.kind, min: p.min, max: p.max, step: p.step, default: p.default,
+      label: p.label.startsWith('Petal ') ? p.label.slice(6, 7).toUpperCase() + p.label.slice(7) : p.label,
+      fmt: (v, ui, shown) => p.fmt(v, sepalView(ui), sepalShown(shown)),
+      ...(typeof p.cap === 'function' ? { cap: (shown) => p.cap(sepalShown(shown)) } : {}),
+      tier: p.tier, role: 'sepal',
+      visibleWhen: guarded ? { ref: 'sepalsPresent' } : { all: [{ ref: 'sepalsPresent' }, own] },
+    };
+  });
+}
+{
+  const at = CONTROLS.findIndex((c) => c.section === 'stem');
+  if (at < 0) throw new Error('the stem rows are not where the sepal twins expect them');
+  CONTROLS.splice(at, 0, ...sepalTwinControls(CONTROLS));
+}
 
 export const DEFAULTS = Object.fromEntries(CONTROLS.map((c) => [c.id, c.default]));
 

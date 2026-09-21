@@ -27,6 +27,9 @@
         and it carries quantities the STL never sees (the mid-surface itself,
         the per-column normal), so a change that cancelled in the two skins
         would still show here. Session 28's own numbers came from this path.
+        IT ALSO CARRIES WHETHER EACH SLOT WAS BUILT AT ALL, because the sphere
+        stem's omission mask can leave `built.petals[slot]` NULL — see
+        `gridFloatsOf`'s own header for why that is a value and not a skip.
 
    CAPABILITY ROWS ARE PASSED, and that is deliberate rather than inherited:
    the matrix's CLAW and CLEFT rows are the only ones with a non-rectangular
@@ -105,11 +108,28 @@ let controlFired = 0;
 
 /* Walk a captured grid into a flat list of [label, value] so the comparison is
    one loop and a shape change (a panel that appeared or vanished) is a failure
-   rather than a silently shorter walk. */
+   rather than a silently shorter walk.
+
+   A SLOT THAT WAS NOT BUILT IS A VALUE IN THE STREAM, NEVER A SKIP. This loop
+   read `petals[p].grid` unguarded, and `built.petals` carries a NULL wherever a
+   slot was declared and not built — which the sphere stem's omission mask is the
+   first thing in this project ever to produce. So the tool THREW on eleven rows
+   of the live matrix (the ten `SPHERE STEM:` rows that actually build a stem,
+   plus `LEAVES: x a SPHERE with a stem`) and could not complete a full-matrix
+   run at all; CLAUDE.md names that class in as many words — an instrument that
+   indexes by slot and never asks whether the slot was built.
+   A BARE `continue` WOULD BE THE OTHER DEFECT: it defines the subject so as to
+   exclude the thing this clause doubts, because a petal built on one tree and
+   omitted on the other would then contribute nothing to either side and the
+   comparison would be silent about the one difference that matters most. The
+   built-ness goes into the stream instead, so an omission that MOVED is a
+   string mismatch (and, since a built petal also contributes its panel walk, a
+   length mismatch too — which this tool already reports as a shape change). */
 function gridFloatsOf(petals) {
   const out = [];
   for (let p = 0; p < petals.length; p++) {
-    const g = petals[p].grid;
+    out.push(`p${p}.built:${petals[p] ? 1 : 0}`);
+    const g = petals[p] && petals[p].grid;
     if (!g) continue;
     for (let q = 0; q < g.length; q++) {
       const pan = g[q];

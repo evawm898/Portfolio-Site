@@ -20,9 +20,16 @@ import { rollRipple, lerpRippleTable, DROP_RIPPLE, STORM_RIPPLE } from './koi-ri
 
 // Drops per second at the reference viewport, scaled by area so a large screen
 // gets a proportionally heavier fall rather than a sparser-looking one.
-// IDLE WAS 2.0 — a lone ring every second or so, gone before the next arrived.
-// Raised so several ripples overlap at idle rather than the pond reading as
-// flat between them. STORM IS UNCHANGED, DELIBERATELY: `rain.advance()` spawns
+// IDLE WAS 2.0, THEN 5.0, AND IS 45 NOW — and the rate is only a third of what
+// made the surface dense. At 5.0 the pond carried 8-12 live ripples covering 4%
+// of the frame, with the largest patch of undisturbed water 480 plane px across
+// (a whole koi is 154). The reference photograph has no undisturbed water in it
+// at all. The other two thirds are the ripple LIFE and the widened, skewed size
+// range in koi-ripples.js: rate alone would have had to reach 90/s to cover
+// even 43%, and would have put as much rain in the AIR at idle as the downpour
+// has, which is the one thing that cannot be paid for here.
+//
+// STORM IS UNCHANGED, DELIBERATELY: `rain.advance()` spawns
 // drops on a fixed accumulator, not a random draw, so the exact NUMBER spawned
 // each frame is deterministic in the rate — and rain and the fish share one
 // seeded stream (see rng.js), so a changed storm rate shifts every random
@@ -31,7 +38,7 @@ import { rollRipple, lerpRippleTable, DROP_RIPPLE, STORM_RIPPLE } from './koi-ri
 // margin as the population manager's storm floor, so raising it is safe;
 // raising the storm rate measurably was not (see koi-fish.js's population
 // check, which this was tuned against directly).
-export const RAIN_IDLE_RATE = 5.0;
+export const RAIN_IDLE_RATE = 45;
 export const RAIN_STORM_RATE = 240;
 export const REF_AREA = 1440 * 900;
 export const MAX_DROPS = 900;
