@@ -183,8 +183,15 @@ const MUTANTS = [
     // and the claim was widened rather than any check loosened. A swash that
     // keeps growing under a live set moves BOTH published boundaries, so the
     // screen-mapping clause and the value ordering both read it.
+    // AND THE EDGE INVARIANT GOES RED BECAUSE THERE IS NO FRONT LEFT TO READ,
+    // which is worth stating rather than listing: a swash that grows by 40% of
+    // the energy every frame is a geometric series, and measured it takes the
+    // edge to s = 3.4e63 inside ninety seconds. The water has left the beach,
+    // so no moment puts a front on the canvas and that clause fails by saying
+    // exactly that.
     breaks: ['swash/the-energy-reaches-the-next-wave-and-never-the-one-running'],
-    mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
+    mayAlso: ['draw/the-drawn-foam-edge-is-the-published-swash-edge',
+              'swash/an-overrun-fires-with-the-extent-it-reached',
               'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
@@ -4323,7 +4330,29 @@ async function partTwo(browser, mutant, shotsDir) {
         // what makes the comparison worth making.
         const m = await page.evaluate(async () => {
           window.__scene.pause(true);
-          window.__scene.scenePump(2.2); window.__scene.step();
+          // A MOMENT WITH THE FRONT ON THE CANVAS, found rather than assumed.
+          // A fixed pump takes whatever moment it lands on, and about 2% of
+          // them have the swash at the very bottom of the frame where the grey
+          // band is squeezed against the sand marks and no column reads. That
+          // is not a property of the invariant, it is a property of WHEN you
+          // look — measured, `the-seaward-life-is-per-wave` scrambles the
+          // arrivals without moving the edge's range at all (max s 1.028 on
+          // both trees, 2.1% of frames past 0.97 against 1.9%) and reddened
+          // this check purely by moving which moment the pump reached.
+          //
+          // IT DOES NOT EXCLUDE WHAT THIS CHECK DOUBTS. A front drawn from a
+          // separately generated curve still draws a grey band with an ink
+          // edge under it; it is in the WRONG PLACE, not absent. And a tree
+          // where no moment at all puts the front on the canvas FAILS here
+          // rather than skipping — that is what a swash which has left the
+          // beach looks like.
+          let placed = -1;
+          for (let i = 0; i < 40; i++) {
+            const st = window.__scene.sceneState();
+            if (st.edgeMax < 0.92 && st.edgeMax > 0.40) { window.__scene.step(); placed = i; break; }
+            window.__scene.scenePump(0.4);
+          }
+          if (placed < 0) { window.__scene.pause(false); return { placed }; }
           const c = document.querySelector('.scene-canvas');
           const g = c.getContext('2d');
           const rect = c.getBoundingClientRect();
@@ -4374,8 +4403,9 @@ async function partTwo(browser, mutant, shotsDir) {
           }
           const pub = out.map(o => o && window.__scene.sceneQuery('swashYAt', o.xCss));
           window.__scene.pause(false);
-          return { out, pub, dpr };
+          return { out, pub, dpr, placed };
         });
+        assert.ok(m.placed >= 0, 'no moment in forty pumps left the swash front on the canvas at all');
         const pairs = m.out.map((o, i) => o && ({ x: o.xCss, drawn: o.yCss, pub: m.pub[i] })).filter(Boolean);
         assert.ok(pairs.length >= 9, `only ${pairs.length} of 12 columns had a readable front`);
         let worst = 0, at = 0;
