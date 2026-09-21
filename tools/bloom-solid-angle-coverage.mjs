@@ -418,6 +418,13 @@ export async function measure(page, { capability = null, wantMask = false, mutat
     /* ---------------- THE CAPTURE (plan-coverage's wiring, verbatim) ---------------- */
     const petalAccs = [], petalSites = [];
     let petalsBuilt = 0;
+    /* THE SIZE FIELD (organic variance, build 1), asked of its one owner and
+       handed to every petal whorl below exactly as buildBloomInto hands it —
+       this census EMITS the petals a second time, so a whorl walked without
+       the field would re-emit every slot at its descriptor's size and R3
+       would fire on the first varied row (it did). Null at amount 0, where
+       every call below is the expression it was. */
+    const sizeField = mod.sizeVarianceField(ui, fr);
     const rot = (p, dth) => { const c = Math.cos(dth), s = Math.sin(dth); return [p[0] * c - p[1] * s, p[0] * s + p[1] * c, p[2]]; };
     const near = (a, b, tol) => Math.abs(a[0] - b[0]) <= tol && Math.abs(a[1] - b[1]) <= tol && Math.abs(a[2] - b[2]) <= tol;
     const omittedHere = new Set((builtFull.stemOmission && builtFull.stemOmission.omitted) || []);
@@ -430,6 +437,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         angleRamp: (i) => fr.rings[i].tiltExtra,
         phase: fr.rings[0].phase,
         placement: ui.placement,
+        sizeField,
         blade: (slot) => {
           /* A SLOT THE STEM CHANNEL DID NOT BUILD IS NOT PART OF THE
              ORCHESTRATION (the sphere-stem session). R1 exists because this
@@ -457,7 +465,7 @@ export async function measure(page, { capability = null, wantMask = false, mutat
         mod.buildWhorlInto({
           count: fr.slotCount, radius: ring.radius, height: 0,
           sizeRamp: () => ring.scale, angleRamp: () => ring.tiltExtra, phase: ring.phase,
-          placement: ui.placement, fan: fr.fan,
+          placement: ui.placement, fan: fr.fan, sizeField,
           blade: (slot) => {
             petalsBuilt++;
             const d = slotsFor[slot.index];
@@ -469,6 +477,12 @@ export async function measure(page, { capability = null, wantMask = false, mutat
               const idx = fr.rings.indexOf(d);
               const ref = builtFull.petals[idx];
               if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: layer ${L} slot 0's captured petal does not bit-match builtFull.petals[${idx}]`);
+            } else if (sizeField) {
+              /* under the size field a slot is its own size, not slot 0 rotated:
+                 bit-match the builder's own record for it instead (plan-coverage's
+                 arm, verbatim) */
+              const ref = builtFull.petalsAll[petalsBuilt - 1];
+              if (!ref || !near(ref.mid, p.mid, 0) || !near(ref.tip, p.tip, 0)) bad.push(`solid R3: layer ${L} slot ${slot.index}'s captured petal does not bit-match builtFull.petalsAll[${petalsBuilt - 1}] (under the size field every slot is its own size)`);
             } else {
               const dth = slot.azimuth - az0;
               const wantMid = rot(slot0Mid, dth), wantTip = rot(slot0Tip, dth);

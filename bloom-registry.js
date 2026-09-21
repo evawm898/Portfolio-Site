@@ -54,6 +54,7 @@ import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAU
          TIP_END_RANGE, FRINGE_COUNT_RANGE, FRINGE_DEPTH_RANGE, FRINGE_DEPTH_DEFAULT,
          LEAF_LENGTH_RANGE, LEAF_WIDTH_RANGE, LEAF_ANGLE_RANGE, LEAF_ANGLE_DEFAULT, LEAF_TIP_SHAPE, LEAF_TIP_SHAPE_RANGE,
          LEAF_NODE_RANGE, LEAF_TOOTH_RANGE, LEAF_PHYLLOTAXY } from './bloom-geometry.js';
+import { VARIANCE_SIZE_RANGE, VARIANCE_FREQUENCY_RANGE, VARIANCE_PHASE_RANGE } from './bloom-geometry.js';
 
 /* ===================================================================
    THE TIP INSTANCES (session 30, Eva's Q7 — seven descriptors authored ONCE
@@ -351,6 +352,12 @@ export const PREDICATES = {
   sepalsEligible: { not: { ref: 'sphereMode' } },
   sepalsPresent: { all: [{ ref: 'sepalsEligible' }, { id: 'sepalCount', min: 1 }] },
   stemPresent: { id: 'stemLength', min: 1 },
+  /* ORGANIC VARIANCE (build 1, size). The registry's statement of the
+     geometry's `varianceIsAbsent` guard: the field exists iff the size amount
+     is off zero — half of the slider's own 0.01 step, so it admits exactly the
+     reachable value 0 and nothing else. The harness checks the two statements
+     against each other at load (VS0), the `inflorescencePresent` discipline. */
+  variancePresent: { id: 'varianceSize', awayFrom: 0, by: 0.005 },
 
   /* LEAVES. `leafLength` 0 is the GUARD (ruling 6) — the stemLength and
      lobeDepth pattern, one control the guard and the rest following it, hidden
@@ -594,6 +601,16 @@ const SLOT_ROLES_BEHIND_OFFSET = {
 const tipSection = (prefix) => { const t = TIP_INSTANCES.find((x) => x.prefix === prefix); return { id: t.section, label: t.sectionLabel, open: false, parent: t.parent }; };
 export const SECTIONS = [
   { id: 'arrangement', label: 'Arrangement', open: true },
+  /* VARIANCE — a drop-down INSIDE Arrangement (organic variance, build 1 of 3;
+     docs/bloom-organic-variance-discovery.md). The field is indexed on the
+     EMITTED AZIMUTH — "one side of the flower" is an arrangement statement —
+     and its three controls (the size amount; the shared frequency and phase
+     that builds 2 and 3 will read too) sit under the section that owns where
+     petals are. A PLACEMENT MADE WITHOUT A RULING: the discovery doc names
+     the controls and not their section; nesting keeps the top level Eva's
+     own and one `parent` field moves it. Declared directly after its parent,
+     as verifySections() requires. */
+  { id: 'variance', label: 'Variance', open: false, parent: 'arrangement' },
   /* ===================================================================
      PETAL — A CONTAINER, NOT A CONTROL (Eva's ruling, the leaf tip-shape
      session): "the idea is to have an overarching petal drop down and then
@@ -2593,6 +2610,63 @@ export const CONTROLS = [
   { id: 'layerTilt', section: 'arrangement', kind: 'slider', min: 0, max: 30, step: 1, default: 12,
     label: 'Tilt step', fmt: (v, ui) => `+${v}° per ${perDepth(ui)}`, tier: 'standard', role: 'arrangement',
     visibleWhen: { id: 'layerCount', min: 2 } },
+
+  /* ===================================================================
+     ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (Eva's rulings, §9 of
+     docs/bloom-organic-variance-discovery.md). THREE CONTROLS, NOT FIVE
+     (ruling 2): the size amount, plus the frequency and the phase that the
+     form and spacing amounts of builds 2 and 3 will SHARE. `varianceSize` 0
+     is the GUARD — the geometry's `sizeVarianceField` returns null there and
+     the whorl primitive branches on it, so the shipping default is
+     byte-identical by branch; frequency and phase are hidden AND inert at 0
+     (the curl family's own gating), and the blanket sweep leaves them out
+     through the harness's derived `VARIANCE_SUBS`. The ranges are IMPORTED
+     from the geometry (Q6). Nothing here clamps against a neighbour: ruling
+     1 makes the neighbour approach a TOLD flag, on the read-out's NEIGHBOURS
+     line, on every build. */
+  { id: 'varianceSize', section: 'variance', kind: 'slider',
+    min: VARIANCE_SIZE_RANGE[0], max: VARIANCE_SIZE_RANGE[1], step: 0.01, default: 0,
+    label: 'Size variance', tier: 'standard', role: 'arrangement',
+    /* ±50 % (ruling 3): a petal runs from (1 - A) to (1 + A) of the control's
+       own length and width, per slot, by where it stands round the axis. */
+    fmt: (v) => {
+      const a = Number(v);
+      if (!(a > 0)) return 'off — every petal at its nominal size';
+      return `±${(a * 100).toFixed(0)}% — petals from ${(1 - a).toFixed(2)}x to ${(1 + a).toFixed(2)}x of nominal, by azimuth`;
+    },
+    visibleWhen: { all: [] } },
+  { id: 'varianceFrequency', section: 'variance', kind: 'slider',
+    min: VARIANCE_FREQUENCY_RANGE[0], max: VARIANCE_FREQUENCY_RANGE[1], step: 1, default: 1,
+    label: 'Variance frequency', tier: 'standard', role: 'arrangement',
+    /* TOLD, NOT CAPPED (ruling 4): a wave needs more than two slots a cycle
+       to draw as a wave; above that it ALIASES into scatter, a wanted look.
+       The threshold is the builder's own (`shown.variance.nyquist`, the slot
+       count over two on a ring, the fan's own pitch on a fan), so the read-out
+       prints the OWNER's number rather than re-deriving one from the sliders. */
+    fmt: (v, ui, shown) => {
+      const f = Number(v);
+      const rec = shown && shown.variance ? shown.variance : null;
+      const fan = rec ? rec.fan : ui.placement === 'FAN';
+      if (f === 0) return fan ? 'a ramp — smallest on the mirror line, largest at the edges of the fan' : 'a ramp — one side of the flower to the other, its seam at the phase';
+      return `${f} cycle${f === 1 ? '' : 's'} ${fan ? 'across the fan (even about the mirror line)' : 'round the flower'}`
+           + (rec && rec.aliased ? ` — ALIASED: more than ${Number.isInteger(rec.nyquist) ? rec.nyquist : rec.nyquist.toFixed(1)} cycles cannot be drawn on ${rec.n} slots and read as SCATTER` : '');
+    },
+    visibleWhen: { ref: 'variancePresent' } },
+  { id: 'variancePhase', section: 'variance', kind: 'slider',
+    min: VARIANCE_PHASE_RANGE[0], max: VARIANCE_PHASE_RANGE[1], step: 5, default: 0,
+    label: 'Variance phase', tier: 'standard', role: 'arrangement',
+    /* INERT ON A FAN, and said on the control: the fan's field is even about
+       the mirror plane (§5 of the discovery doc), so a phase there would
+       break the one plane the arrangement is about. The wave's largest petal
+       stands where `f * azimuth + phase` is a whole turn; the ramp's SEAM
+       (smallest beside largest) stands at the phase itself. */
+    fmt: (v, ui, shown) => {
+      const rec = shown && shown.variance ? shown.variance : null;
+      const fan = rec ? rec.fan : ui.placement === 'FAN';
+      if (fan) return `${Number(v).toFixed(0)}° — INERT on a fan: the field is even about the mirror line`;
+      return `${Number(v).toFixed(0)}° — turns the wave round the axis (the ramp's seam sits here)`;
+    },
+    visibleWhen: { ref: 'variancePresent' } },
 
   /* ===================================================================
      ZYGOMORPHY — THE INNER WHORLS' OWN FORM. Session A of two: per-LAYER

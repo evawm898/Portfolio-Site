@@ -4052,6 +4052,66 @@ only change on the export path is one name in an import list. `frozen/phase36` i
 rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
 its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
+**ORGANIC VARIANCE, BUILD 1 OF 3 — THE SIZE FIELD IS A PER-SLOT FACTOR ON THE EMITTED AZIMUTH,
+AMOUNT 0 IS A NULL RECORD, AND THE TOLD FLAG SHIPS ON EVERY BUILD** (Eva's rulings §9 of
+`docs/bloom-organic-variance-discovery.md`; read `docs/bloom-organic-variance-size-outcome.md`
+before touching `sizeVarianceField`, `buildWhorlInto`'s `sizeField`, `neighbourFlag`, the VS
+family or block 38). `varianceSize` (Variance, a drop-down inside Arrangement — a placement made
+without a ruling, one `parent` field to move; 0–0.50, default 0) with the SHARED `varianceFrequency`
+(0–20, default 1; 0 is the RAMP) and `variancePhase` (0–360°), both hidden AND inert at amount 0
+and out of the blanket sweep through the derived `VARIANCE_SUBS`. **THREE CONTROLS, NOT FIVE**
+(ruling 2): builds 2 and 3 add the form and spacing amounts and read the same two. The law is
+`1 + A·cos(fθ + φ)` (a ramp at f 0) on the slot's EMITTED azimuth, multiplied into the slot's
+`scale` INSIDE the whorl primitive as a BRANCH — `sizeVarianceField` returns null at amount 0 and
+no product is formed, so the shipping default is byte-identical by construction; the factor rides
+the slot payload as `sizeFactor` so the builder's record reads it back rather than dividing it out.
+`stemOmission` is handed the same field, so a sphere's channel probes each slot at the size it
+will have. **ON A FAN THE FIELD IS EVEN ABOUT THE MIRROR PLANE** (the unsigned angle from it, the
+phase INERT and told on the control, the ramp plane-outward) and mirror pairs carry equal factors
+TO THE BIT — VS3, never vacuous. **FREQUENCY IS TOLD, NOT CAPPED** (ruling 4): the bar is the
+arrangement's own sampling — `n/2` on a ring (the whole sequence under CONTINUOUS, said to be a
+MEAN on a golden-angle spiral), `π/step` on a fan — `aliased` is exactly `f > nyquist`, the read-out
+and the frequency control both print `ALIASED … reads as SCATTER`, and 20 cycles on 3 petals builds.
+**THE TOLD FLAG (ruling 1's condition) IS `neighbourFlag`, AFTER EVERY SOLID, ON EVERY BUILD**: the
+tightest pitch off the emitted azimuths (1.000x on every row this build makes — spacing is build 3),
+the nearest feet through `nearestFeet` (MOVED into the geometry so the page and the crowding tool
+read one function), and the nearest petal approach — ALL PAIRS on the builder's own lamina above
+`ROOT_BLEND_END`, less the sheet, through the geometry's `closestOnTriangle` with a row-strip
+prune (4 ms on the default, 215 ms on the 120-petal mum; adjacent-by-azimuth is the WRONG sampling,
+4.42 mm against 0.56 on the mum between TURNS). **The shipping default reads `-1.170 mm skin to
+skin — SKINS PASS THROUGH EACH OTHER`**, the discovery doc's own figure, an accepted look (ruling
+1), and VS5 pins it to `tools/bloom-neighbour-gap.mjs`'s -1.1701 so the restatement cannot drift.
+The lamina is captured on every petal build now, under the builder's own name: `p.lamina`, beside
+`p.grid`, which keeps meaning "captured iff the accumulator was asked to" (verify-bloom-grid's
+clause 1b went red on the first cut, which had put every build's panels on `grid`).
+**C1/J8 GAINED A PER-SLOT OWNER AND WENT RED ON EVERY VARIANCE ROW UNTIL THEY READ IT**: the
+representative petal's length was `control × descriptor scale`, a claim about the ring and not
+the petal; `sizeFactorRestated` (the law from the controls and the ROOT ROW's emitted azimuth,
+never the builder's factor record) is the ONE statement C1, J8 and VS1 read. Z2 and Z6 are
+untouched and were checked (overrides and descriptor scales, which the field never writes).
+**THE COVERAGE INSTRUMENTS RE-EMIT THE WHORL AND HAD TO BE HANDED THE FIELD** (R3 fired on the
+first varied row), and under a field a slot is no longer slot 0 rigidly rotated, so R3 bit-matches
+each slot against `petalsAll` instead. **AND THE ACCORDION CLAUSE MET ITS FIRST START-OPEN SECTION
+WITH A CHILD**: Arrangement is walked last, its remembered child was reachable on the re-open, and
+A2 now admits a descendant that was raw-open before the click (siblings stay exclusive).
+**PARTITION, PREDECLARED FROM THE GUARD** (a row moves iff `varianceIsAbsent` is false, and the
+label regex `^VARIANCE: (?!GATED)|^varianceSize max|^ALL MAX$` reproduces that set both ways):
+**24 MOVED / 885 HELD over the 909-row live matrix in both modes** — `verify-bloom-surface-bytes --base <worktree of f1fbdf9>` reads PASS over 863,686,368 export floats / 95,965,152 triangles and 77,685,464 captured-grid values (the 908 rows before the fringe row, plus that row in a two-row run), all predeclared movers moving, 0 floats on any holder, `--control` firing both clauses on a 1e-9 perturbation; the shipping default holds by branch and the two GATED rows are measured holders. `ALL MAX` moves and its census entry is RE-RECORDED, 192,270 / 3.1556 →
+**196,142 / 5.7609** (a 1.5x petal at the deepest ring), and its refusal entry too, 2,506,652 → **2,354,268 triangles — the FRINGE's tooth ceiling is a rule about the terminal's WIDTH, so the half-size petals cut fewer teeth**: the one way this field moves TOPOLOGY, through another feature's own law, mode-free as that law is;
+three block-38 rows are declared where their base rows are clean or lighter (cup 1.2 → 794 /
+0.3210, the buckle → 4 / 0.0188, the IRIS a span-0 knife edge of 3). **UNDER INSTANCING every
+floret carries the SAME factor set on its own azimuths — its largest petal at azimuth 0 IN THE
+FLORET'S OWN FRAME, which the phyllotaxy rotates per node, so "the same direction" is true in the
+floret frame and false in the world frame** (measured, not changed; a per-floret phase is ruling
+10's second half). **SEPAL SIZE VARIANCE IS COSTED AND DEFERRED TO ITS OWN PR** (§9 of the doc):
+ruling 5's "defaulting to the petals'" is a registry mechanism that does not exist, and a sepal
+frequency defaulting to a petal frequency whose meaning build 3 is still settling would be ruled
+twice. **THE COMBINATION GATE'S REJECTION OF ARRANGEMENT CONTROLS STILL HOLDS** for a per-slot
+size field (`self` is one petal's wall; CG1 would refuse the axis as inert); what a size pair
+would need is the neighbour measure with a bar that is NOT `MIN_FEATURE_MM`, since ruling 1
+declares the default's own crossing an accepted look. `frozen/phase37` is the 883 rows at
+`f1fbdf9`, registered in BOTH maps and proved deep-equal; the live matrix is 908.
+
 ## Flower generator — print-safety is a hard invariant
 
 The Flower Bloom generator (`flower.html`, `flower.js`, `flower-geometry.js`) is a

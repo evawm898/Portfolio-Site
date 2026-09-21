@@ -93,7 +93,7 @@ function densePetals(built, state, mode) {
   const acc = new G.MeshBuilder({ exportMode: mode });
   return built.petalSites.map((site) => {
     const surface = G.petalSurface(state, site.ring, site.slot, site.cap, acc);
-    return G.laminaFromPanels(site.p.grid.map((panel) => ({ rows: denseRows(surface, panel.rows) })));
+    return G.laminaFromPanels(site.p.lamina.map((panel) => ({ rows: denseRows(surface, panel.rows) })));
   });
 }
 function denseSepal(state, sepals, deg, mode, panelRows) {

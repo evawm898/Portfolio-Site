@@ -126,7 +126,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, sepalAssertions, inflorescenceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, orientationLine, ORIENTATION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 
@@ -384,6 +384,15 @@ for (const row of rows) {
      header for what each of the seven sees. */
   const inflo = await inflorescenceAssertions(page, row);
   if (inflo.length) { validity.push(`${row.label}: ${inflo.join('; ')}`); continue; }
+  /* ORGANIC VARIANCE, BUILD 1 — THE SIZE FIELD AND THE TOLD FLAG (VS0-VS5).
+     Both STL gates are blind to the whole family by construction: a per-slot
+     size factor moves vertices on a fixed lattice, so a field that never
+     reaches the blade, a wrong law, a fan field that is not even and an
+     aliasing flag that never fires all export watertight and as one piece at
+     the identical triangle count. VS5 also holds the told flag to the
+     builder's own record on EVERY row. See varianceAssertions()'s header. */
+  const vs = await varianceAssertions(page, row);
+  if (vs.length) { validity.push(`${row.label}: ${vs.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z6) — see zygoAssertions()'s header. This gate is as blind
      to the layer as the export gate is: the foot is never written by anything
      a role may override, and the hub disc spans every ring, so no reachable

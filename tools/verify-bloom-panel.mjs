@@ -242,6 +242,22 @@
          1.50" of a 2.20 mm stem are two true clauses adding to a false
          picture), and length 0 (no STEM line at all). The numbers are read
          back against `__bloomMetrics`, never against each other.
+
+     (y) THE SIZE FIELD'S TWO LINES AND ITS TWO GATED CONTROLS (organic
+         variance, build 1). Two read-out lines with two owners: SIZE VARIANCE
+         (the field's record — present iff the amount is on, its range and its
+         law the record's own, the ALIASED clause iff the record says so, "a
+         ramp" iff the frequency is 0, "phase inert" iff the arrangement is a
+         fan) and NEIGHBOURS (the told flag, ruling 1's condition — on EVERY
+         build, its three numbers read back against `__bloomMetrics().neighbour`
+         to the decimals it prints, never against each other). And the two
+         gated controls' own value read-outs: the frequency's ALIASED clause
+         and the phase's INERT-on-a-fan clause, each against the builder's
+         record. Six states on one page, both directions: the default (no
+         field line, the flag line, both sub-controls hidden), ±50 % at 1
+         cycle, 20 cycles (aliased), the ramp, a FAN at phase 90, and back to
+         0. `(y)` follows `(x)`; adding a route is THREE edits — this entry,
+         the block, and the negative control's flag list.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -330,6 +346,16 @@ const WITNESS = {
      node the rule is 3.0000 and clears the floor, so both halves move —
      `built` 5 -> 1 and `pedicelR` 1.5 -> 3.0. It needs a RACHIS to hang off,
      which is why the driver sets the stem and the law. */
+  /* VARIANCE (organic variance, build 1) — a drop-down inside Arrangement,
+     collapsed at first load, holding the size amount and its two gated
+     sub-controls. Witnessed by the AMOUNT through two numbers the slider cannot
+     write directly: the first emitted petal's slot scale as the BUILDER's own
+     product (1 at the guard, 1.5 at ±50% on slot 0 of a 1-cycle wave), and the
+     told flag's blade approach, which the field moves as a consequence
+     (-1.170 -> -1.134 mm on the shipping whorl) and which is read off the
+     emitted laminae rather than off any control. */
+  variance: { id: 'varianceSize', value: '0.5',
+              read: (m) => `${m.petalSlotSizes && m.petalSlotSizes[0] && m.petalSlotSizes[0].scale}/${m.neighbour && m.neighbour.blade && m.neighbour.blade.skinGapMm}`, what: 'petalSlotSizes[0].scale/neighbour.blade.skinGapMm' },
   inflorescence: { id: 'floretNodes', value: '1',
                    pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
                    read: (m) => `${m.inflorescence && m.inflorescence.built}/${m.inflorescence && m.inflorescence.pedicelR}`,
@@ -1000,11 +1026,12 @@ const accordion = await page.evaluate(async ({ ids, declared, breakIt }) => {
   out.order = order;
   for (const id of order) {
     const det = document.getElementById(`sec-${id}`);
+    const before = openNow();
     if (!det.open) {
       document.querySelector(`#sec-${id} > summary`).click();
       await frame();
     }
-    out.steps.push({ opened: id, open: openNow(), clicked: true });
+    out.steps.push({ opened: id, before, open: openNow(), clicked: true });
     snap();
   }
   /* A3 — close the section the walk ended on; nothing may spring open in its
@@ -1059,8 +1086,20 @@ const effectivelyOpen = (open) => open.filter((id) => ancestorsOf(id).every((a) 
 let exclusive = true;
 for (const st of accordion.steps) {
   /* What should be REACHABLY open after opening `id`: the section itself plus
-     every ancestor, and nothing else. */
-  const want = new Set([st.opened, ...ancestorsOf(st.opened)]);
+     every ancestor, and nothing else — EXCEPT what the section itself REMEMBERS.
+     A `<details>` left open inside a parent that was then shut stays open, and
+     the paragraph above accepts that as the panel remembering where you were;
+     re-opening the parent makes that child reachable again, which is the SAME
+     memory seen from the other side. So a DESCENDANT of the opened section that
+     was already raw-open before this click is expected, not extra. It first
+     arose here when Arrangement — the one section that ships open, and is
+     therefore walked LAST — gained a child (Variance, organic variance build
+     1): the walk had opened Variance inside it, a sibling's click shut
+     Arrangement with Variance remembered, and the final re-open showed both.
+     Siblings stay exclusive: nothing outside the opened section's own subtree
+     is admitted, and the `before` set is the page's own, read before the click. */
+  const descendantsRemembered = st.before.filter((id) => id !== st.opened && ancestorsOf(id).includes(st.opened) && ancestorsOf(id).every((a) => a === st.opened || st.before.includes(a) || ancestorsOf(st.opened).includes(a)));
+  const want = new Set([st.opened, ...ancestorsOf(st.opened), ...descendantsRemembered]);
   const seen = effectivelyOpen(st.open);
   const extra = seen.filter((id) => !want.has(id));
   const missing = [...want].filter((id) => !seen.includes(id));
@@ -2888,6 +2927,75 @@ for (const [label, sets, wantDome, wantClamp] of [
 
 if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees with the one-ancestor expression it replaced on every section, in all ${screenAgreed} states route (d) drives — the generalisation changes no answer this tree can produce`);
 
+/* ===================================================================
+   ROUTE (y) — THE SIZE FIELD'S TWO LINES (organic variance, build 1). See the
+   header. Every number is read back against `__bloomMetrics`: the field's
+   record owns the amount, the law and the aliasing; the told flag's record
+   owns the pitch, the feet and the approach. This route owns only whether
+   the panel agrees. */
+{
+  const tag = '[variance]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
+      return {
+        V: m.variance, N: m.neighbour, fan: !!m.fan,
+        line: /SIZE VARIANCE ±(\d+)%: petals from ([\d.]+)x to ([\d.]+)x of nominal — ([^\n]*)/.exec(txt),
+        aliasedSaid: /ALIASED: above ([\d.]+) cycles/.test(txt),
+        rampSaid: /— a ramp /.test(txt),
+        inertSaid: /\(phase inert\)/.test(txt),
+        flag: /NEIGHBOURS \((live|export), told, never clamped\): tightest pitch ([\d.]+)° = ([\d.]+)x the nominal ([\d.]+)° · nearest feet ([\d.]+) mm centre to centre = ([\d.]+) foot widths[^·]*· nearest petal approach (-?[\d.]+) mm skin to skin — ([^(]+)\(laminae ([\d.]+) mm apart/.exec(txt),
+        freqHidden: wrap('varianceFrequency').hidden, phaseHidden: wrap('variancePhase').hidden,
+        freqSaid: wrap('varianceFrequency').querySelector('.bl-val').textContent,
+        phaseSaid: wrap('variancePhase').querySelector('.bl-val').textContent,
+      };
+    });
+    const p = [];
+    const V = res.V, N = res.N;
+    /* THE FIELD LINE, iff the record */
+    if (!!res.line !== !!V) p.push(`the SIZE VARIANCE line is ${res.line ? 'shown' : 'absent'} while the builder reports ${V ? 'a field' : 'no field'}`);
+    if (res.freqHidden !== !V || res.phaseHidden !== !V) p.push(`the frequency/phase controls are ${res.freqHidden ? 'hidden' : 'shown'}/${res.phaseHidden ? 'hidden' : 'shown'} while the builder reports ${V ? 'a field' : 'no field'}`);
+    if (V && res.line) {
+      if (Number(res.line[1]) !== Math.round(V.amount * 100)) p.push(`the line says ±${res.line[1]}%, the record ${V.amount}`);
+      if (Math.abs(Number(res.line[2]) - V.lo) > 0.005 || Math.abs(Number(res.line[3]) - V.hi) > 0.005) p.push(`the line says ${res.line[2]}x..${res.line[3]}x, the record ${V.lo}..${V.hi}`);
+      if (res.aliasedSaid !== V.aliased) p.push(`the ALIASED clause is ${res.aliasedSaid ? 'shown' : 'absent'} while the record says aliased=${V.aliased}`);
+      if (/ALIASED/.test(res.freqSaid) !== V.aliased) p.push(`the frequency control's read-out ${/ALIASED/.test(res.freqSaid) ? 'says' : 'does not say'} ALIASED while the record says aliased=${V.aliased}`);
+      if (res.rampSaid !== (V.frequency === 0)) p.push(`the line ${res.rampSaid ? 'says' : 'does not say'} "a ramp" at frequency ${V.frequency}`);
+      if (res.inertSaid !== (V.phaseInert && V.frequency !== 0)) p.push(`the line ${res.inertSaid ? 'says' : 'does not say'} "phase inert" while the record says phaseInert=${V.phaseInert} at frequency ${V.frequency}`);
+      if (/INERT on a fan/.test(res.phaseSaid) !== res.fan) p.push(`the phase control's read-out ${/INERT on a fan/.test(res.phaseSaid) ? 'says' : 'does not say'} INERT on a ${res.fan ? 'fan' : 'non-fan'}`);
+    }
+    /* THE TOLD FLAG, on every state */
+    if (!N) p.push('the builder reports no neighbour record');
+    else if (!res.flag) p.push('the NEIGHBOURS line is absent while the builder reports a neighbour record');
+    else {
+      const F = res.flag;
+      if (Math.abs(Number(F[2]) - N.pitch.tightDeg) > 0.005 || Math.abs(Number(F[3]) - N.pitch.ratio) > 0.0005) p.push(`the NEIGHBOURS line says pitch ${F[2]}° = ${F[3]}x while the builder reports ${N.pitch.tightDeg} = ${N.pitch.ratio}x`);
+      if (Math.abs(Number(F[5]) - N.feet.d) > 0.005 || Math.abs(Number(F[6]) - N.feet.q) > 0.0005) p.push(`the NEIGHBOURS line says feet ${F[5]} mm = ${F[6]} while the builder reports ${N.feet.d} = ${N.feet.q}`);
+      if (N.blade) {
+        if (Math.abs(Number(F[7]) - N.blade.skinGapMm) > 0.0005) p.push(`the NEIGHBOURS line says a skin gap of ${F[7]} mm while the builder reports ${N.blade.skinGapMm}`);
+        if (Math.abs(Number(F[9]) - N.blade.laminaMm) > 0.0005) p.push(`the NEIGHBOURS line says laminae ${F[9]} mm apart while the builder reports ${N.blade.laminaMm}`);
+        const verdictWant = N.blade.crossing ? 'SKINS PASS THROUGH EACH OTHER' : N.blade.underFeature ? 'UNDER THE' : 'clear of the printable gap';
+        if (!F[8].includes(verdictWant)) p.push(`the NEIGHBOURS verdict reads "${F[8].trim()}" while the builder reports crossing=${N.blade.crossing} underFeature=${N.blade.underFeature}`);
+      }
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${V ? `±${V.amount * 100}% f ${V.frequency} phase ${V.phaseDeg}${V.aliased ? ' ALIASED' : ''}${V.phaseInert ? ' (phase inert)' : ''}` : 'no field'}, flag skin gap ${N && N.blade ? N.blade.skinGapMm.toFixed(3) : '—'}`);
+  };
+  await step('the shipping default — no field line, the flag line, both sub-controls hidden', []);
+  await step('±50% at 1 cycle — the line, both sub-controls shown, not aliased', [{ id: 'varianceSize', value: '0.5' }]);
+  await step('20 cycles on 8 slots — ALIASED on the line and on the frequency control, told not capped', [{ id: 'varianceFrequency', value: '20' }]);
+  await step('the RAMP — "a ramp" on the line', [{ id: 'varianceFrequency', value: '0' }]);
+  await step('a FAN at 2 cycles, phase 90 — "phase inert" on the line and INERT on the phase control', [{ id: 'placement', value: 'FAN' }, { id: 'varianceFrequency', value: '2' }, { id: 'variancePhase', value: '90' }]);
+  await step('back to 0 on a RADIAL whorl — no field line, the sub-controls hidden, the flag line at the default\'s own numbers', [{ id: 'placement', value: 'RADIAL' }, { id: 'varianceSize', value: '0' }]);
+}
+
 await browser.close();
 server.close();
 
@@ -2941,13 +3049,19 @@ if (NEGATIVE_CONTROL) {
        still happened to satisfy one would otherwise print a pass. */
     const sawPlug = fail.some((f) => /^\[stem closures\] .*tip-plug clause is (shown|absent)/.test(f));
     const sawThrough = fail.some((f) => /^\[stem closures\] .*SOLID THROUGHOUT clause is (shown|absent)/.test(f));
+    /* ROUTE (y), THE SIZE FIELD'S TWO LINES, required for the same reason
+       one more session on: two flags for two lines with two owners — the
+       field's line stuck absent, and the told flag's numbers stuck at the
+       default's while the builder's moved. */
+    const sawVariance = fail.some((f) => /^\[variance\] .*SIZE VARIANCE line is (shown|absent)/.test(f));
+    const sawNeighbour = fail.some((f) => /^\[variance\] .*NEIGHBOURS line says/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
-        && sawPlug && sawThrough
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL SEVENTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL EIGHTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, neighbours line fired: ${sawNeighbour}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
-  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause and a flag rewritten away. It is not measuring anything.');
+  console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');
   process.exit(1);
 }
 
