@@ -308,11 +308,69 @@ alive against the module's fixed two.
 **A reproducible ~1.2 s stall exists and it is NOT the wiring's.** Every ~160
 frames the live scene spends 1.15–1.24 s on one frame; redrawing the identical
 state costs 3–5 ms, so it is not the geometry. **The module standalone does the
-same thing** — 3 stalls of ~1.0 s over 700 frames, one every ~217 — so it is a
-property of the drawing's per-frame allocation (a fresh set of arrays per wave
-per frame) and not of anything this session did. Wiring raises the frequency
-about 1.35x, which is the extra waves. The mechanism is not established beyond
-"not the state"; the remedy would be reusing buffers, which is a drawing change.
+same thing** — 3 stalls of ~1.0 s over 700 frames, one every ~217 — and that
+measurement still reproduces exactly today (215 / 434 / 649, max 1026 ms, on the
+module's own probe run unmodified).
+
+> **THE ATTRIBUTION IN THIS PARAGRAPH WAS WRONG AND IS REFUTED BY MEASUREMENT —
+> see section 7b.** It read: *"so it is a property of the drawing's per-frame
+> allocation (a fresh set of arrays per wave per frame) … the remedy would be
+> reusing buffers, which is a drawing change."* The buffers **were** reused, the
+> heap **is** flat, and **the stall did not move by a single draw.** It is not JS
+> garbage. The observation above stands; the cause named for it does not.
+
+## 7b. The stall is NOT the allocation, and the allocation pass did not fix it
+
+**Measured on the shipped file, after the pass, at Eva's request.** The
+acceptance criterion was ZERO frames over 40 ms in 600 consecutive draws at
+1920x1080. **It FAILS.**
+
+| Eva's ask | shipped file |
+|---|---|
+| 600 draws @ 1920x1080, frames over 40 ms | **2** (5 in 1200) |
+| 1x / 2x / 3x draws-per-iteration, first spike | **draw 216 / 216 / 216** |
+| standalone median / p95 — 960x720 | 2.10 / 3.30 ms |
+| standalone median / p95 — 1920x1080 | 2.10 / 3.20 ms |
+| standalone median / p95 — 2560x1440 | 2.10 / 3.60 ms |
+| wired median / p95 — 960x720 | 2.90 / 4.70 ms |
+| wired median / p95 — 1920x1080 | 2.90 / 4.70 ms |
+| wired median / p95 — 2560x1440 | 2.90 / 6.10 ms |
+
+**The first spike is at draw 216 whatever the multiplier**, which is the
+signature the brief described — a fixed draw count, independent of iteration
+count — still present.
+
+**IT IS NOT JS GARBAGE, and five measurements say so:**
+
+1. **The pre-fix tree is identical.** The same harness against a worktree of
+   `34938cb`, before the allocation pass: first spike at draw **216**, max
+   ~1000 ms, 2 in 600. The pass moved it by nothing.
+2. **The JS heap is flat** — 9.5 MB before and after 600 draws, unchanged.
+3. **It is exactly periodic.** With the draw state held CONSTANT the spikes land
+   every **229 draws** — gaps of 229, 229, 229, 229 — so it is not a
+   configuration the sweep passes through.
+4. **The controls are clean.** The same 600-iteration loop with one `fillRect`,
+   or with an empty body, produces **no spike at all** (max 0.1 ms). So it is
+   the drawing's load, not the page's or the harness's.
+5. **Its magnitude scales with canvas area** — 643 / 1020 / 1380 ms at the three
+   sizes. GC scales with heap, not with pixels.
+
+**What it is instead is NOT established.** A plain loop of canvas strokes with
+none of this module in it also produces 700–850 ms pauses on this box, so the
+phenomenon belongs to Chromium's software 2D canvas here rather than to
+`beach-brush.js` — but the periodicity does not match (every ~44,000 plain ops
+against every ~3.9 million of the module's), so the two are not demonstrably the
+same event and no mechanism is claimed. `beach-brush.js` issues **17,602 canvas
+calls per draw** at 1920x1080, which is the lever if one is wanted.
+
+**ALL OF THIS IS HEADLESS SOFTWARE GL.** Whether this periodic ~1 s canvas event
+is the same thing seen in a real browser is not established; the magnitudes are
+close (~1.0 s here against the reported ~1.2 s) and that is all.
+
+**What the pass DID buy, measured the same way:** steady-state cost. Standalone
+median **2.6 → 2.1 ms**, wired median **4.2–4.3 → 2.9 ms**, wired p95
+**7.3–9.1 → 4.7–6.1 ms**, and a flat heap where there was 36.9 KiB of garbage a
+draw. Those gains are real and they are not what the pass was for.
 
 ## 8. The five I reported, and what became of them
 
