@@ -89,7 +89,6 @@ export default function createBeachScene(host) {
         // objects and draws them, and what the energy decided about each one
         // was frozen into its record at birth.
         waves: sortWaves(swash.waves),
-        waterline: WATERLINE_S,
         frontSeed: 7,
         drift: water.drift,
       });

@@ -363,7 +363,7 @@ const MUTANTS = [
   {
     id: 'a-spent-wave-is-still-drawn',
     file: 'scene/beach-render.js',
-    from: '      const list = (st.waves || []).filter(wv => waveStage(wv, st.waterline) !== SWASH);',
+    from: '      const list = (st.waves || []).filter(wv => waveStage(wv, WATERLINE_S) !== SWASH);',
     to: '      const list = (st.waves || []);',
     breaks: ['draw/no-wave-is-drawn-once-it-is-spent'],
     mayAlso: ['draw/every-wave-is-drawn-once-with-its-own-record'],

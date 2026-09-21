@@ -34,6 +34,7 @@
 
 import { draw as drawFrame } from './beach-brush.js';
 import { crestAt, drawPhaseAt, waveStage, SWASH, BIG_HEIGHT } from './beach-wave.js';
+import { WATERLINE_S } from './beach-shore.js';
 
 export function createRenderer(ctx, shore) {
   const r = {
@@ -62,7 +63,11 @@ export function createRenderer(ctx, shore) {
       // phase reaches its spent end and where the swash front takes over the
       // same stretch of beach — so the wave is dropped at the one moment it has
       // nothing left to show. The label has one owner and it is not this file.
-      const list = (st.waves || []).filter(wv => waveStage(wv, st.waterline) !== SWASH);
+      // THE WATERLINE IS READ FROM THE SHORE rather than taken as an argument.
+      // `stageAt` skips its SWASH branch when it is handed nothing, so a
+      // caller that forgot to pass one would silently never drop a wave —
+      // a hazard with no symptom, which is the kind this file should not have.
+      const list = (st.waves || []).filter(wv => waveStage(wv, WATERLINE_S) !== SWASH);
       const specs = new Array(list.length);
       for (let i = 0; i < list.length; i++) {
         const wv = list[i];
