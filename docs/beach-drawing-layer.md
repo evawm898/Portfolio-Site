@@ -577,6 +577,30 @@ drawn from the high-water mark.*
 
 ---
 
+### A red on an unchanged tree, recorded and NOT tuned
+
+`scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear` went red
+**once** on the merge of #271 — `2.86 px against a bar of exactly 2.86 px` — and
+did not reproduce on two immediate re-runs of the same tree.
+
+**It was investigated and deliberately left alone.** The obvious reading is that
+the two sides are equal by construction: the clause asserts `h > s - lagPx`
+strictly, while its own comment says the mark is *allowed to sit exactly one step
+of overrun drying below it*, and a strict `>` on two values equal by construction
+is decided by the last bit — a class this project has named four times. **That
+reading is wrong here, measured:** over **2,000 live samples** (the scene
+unpaused and unpumped, which is how the gate reads it) **0 land on the bar, 0
+fail the clause, and the worst sample is 1.90 px clear of it**. The "2.86 against
+2.86" in the failure text is both values rounding to two decimals for display,
+not an exact tie.
+
+So the bar was **not widened**. There is no reproduction, the headroom on this
+box is two thirds of the bar, and loosening a bound to chase a red nobody can
+reproduce is how a gate stops meaning anything. What is left is a rare state —
+most likely an overrun firing at the sampled instant on a slower runner — and
+this paragraph exists so the next session that meets it starts from the
+measurement rather than from the temptation.
+
 ## 10. The mutant sweep — the WIRING pass
 
 The record of the pass that wired the drawing, at 141 checks and 66 mutants.
