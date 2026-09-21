@@ -305,12 +305,14 @@ median, <12 ms p95), which is what makes the two comparable. **The wired median
 is 4.0–4.7 ms, under the ~8 ms the brief names**, with an average of 3.7 waves
 alive against the module's fixed two.
 
-**A reproducible ~1.2 s stall exists and it is NOT the wiring's.** Every ~160
-frames the live scene spends 1.15–1.24 s on one frame; redrawing the identical
-state costs 3–5 ms, so it is not the geometry. **The module standalone does the
-same thing** — 3 stalls of ~1.0 s over 700 frames, one every ~217 — and that
-measurement still reproduces exactly today (215 / 434 / 649, max 1026 ms, on the
-module's own probe run unmodified).
+**A reproducible ~1.2 s stall exists ON THIS BOX and it is NOT the wiring's —
+and it does not exist in a real browser at all, which is section 7c and is the
+end of this thread.** Every ~160 frames the live scene spends 1.15–1.24 s on one
+frame; redrawing the identical state costs 3–5 ms, so it is not the geometry.
+**The module standalone does the same thing** — 3 stalls of ~1.0 s over 700
+frames, one every ~217 — and that measurement still reproduces exactly today
+(215 / 434 / 649, max 1026 ms, on the module's own probe run unmodified). Every
+figure in this paragraph is a reading of the container's software rasteriser.
 
 > **THE ATTRIBUTION IN THIS PARAGRAPH WAS WRONG AND IS REFUTED BY MEASUREMENT —
 > see section 7b.** It read: *"so it is a property of the drawing's per-frame
@@ -361,16 +363,76 @@ phenomenon belongs to Chromium's software 2D canvas here rather than to
 `beach-brush.js` — but the periodicity does not match (every ~44,000 plain ops
 against every ~3.9 million of the module's), so the two are not demonstrably the
 same event and no mechanism is claimed. `beach-brush.js` issues **17,602 canvas
-calls per draw** at 1920x1080, which is the lever if one is wanted.
+calls per draw** at 1920x1080, which was offered as the lever if one were wanted.
+**EVA RULED AGAINST PULLING IT** (section 7c): there is nothing to optimise, and
+reducing that count would be optimising against a phantom.
 
-**ALL OF THIS IS HEADLESS SOFTWARE GL.** Whether this periodic ~1 s canvas event
-is the same thing seen in a real browser is not established; the magnitudes are
-close (~1.0 s here against the reported ~1.2 s) and that is all.
+**ALL OF THIS IS HEADLESS SOFTWARE GL, AND THAT TURNED OUT TO BE THE WHOLE
+ANSWER.** This section closed with the open question *“whether this periodic ~1 s
+canvas event is the same thing seen in a real browser is not established; the
+magnitudes are close (~1.0 s here against the reported ~1.2 s) and that is
+all.”* **It is established now and the answer is that there is no such event in a
+real browser** — section 7c has the hardware measurement. The two magnitudes were
+close because both were readings of the same artifact, not because one confirmed
+the other.
 
 **What the pass DID buy, measured the same way:** steady-state cost. Standalone
 median **2.6 → 2.1 ms**, wired median **4.2–4.3 → 2.9 ms**, wired p95
 **7.3–9.1 → 4.7–6.1 ms**, and a flat heap where there was 36.9 KiB of garbage a
 draw. Those gains are real and they are not what the pass was for.
+
+## 7c. RESOLVED — it is an environment artifact and there is nothing to fix
+
+**Eva measured it on real hardware and it is not there.** Chrome, a 120 Hz
+display, the live deploy preview, 900 consecutive rAF frames:
+
+| | hardware (Eva) | this container |
+|---|---|---|
+| median frame | **8.3 ms** | — |
+| p95 | **9.2 ms** | — |
+| max | **10.6 ms** | **~1000–1380 ms** |
+| frames over 40 ms | **0 of 900** | 2 of 600 |
+| frames over 200 ms | **0 of 900** | 2 of 600 |
+
+*“Not one missed frame in fifteen seconds.”* — 900 frames over fifteen seconds
+is 60 Hz of delivered rAF, so the 8.3 ms median is half a 16.7 ms budget and the
+10.6 ms max is still inside it. **The worst frame on hardware is a hundredth of
+the best stall on this box.**
+
+**THE RULING: the periodic ~1 s pause reproduces only under this container's
+headless software rasterisation and does not exist in a real browser.** No
+further work is owed on it, and specifically **the 17,602 canvas calls per draw
+are NOT to be attacked** — that would be optimising against a phantom. A future
+session should meet this resolution rather than the open thread that preceded
+it, which is why it is recorded here beside the measurements it overturns rather
+than left in a report.
+
+**DO NOT READ 8.3 ms AGAINST SECTION 7b's 2.90 ms AS A REGRESSION — THEY ARE
+DIFFERENT QUANTITIES, and naming the mode and the sampling is the point.** 7b's
+figure times `draw()` alone in a loop on a software rasteriser; Eva's times a
+whole rAF frame of the real page — the sim advance, every layer, the composite,
+the browser's own work — on a GPU. Neither number bounds the other, and only
+the hardware one describes what a visitor experiences.
+
+**WHAT THIS SAYS ABOUT THE BRIEF THAT COMMISSIONED THE PASS.** The brief cited,
+as its evidence, a stall landing *“at a fixed ~214 DRAWS every time, independent
+of iteration count.”* That is this container's signature exactly — 216 at every
+multiplier, periodic at 229 with the state held constant — and hardware shows no
+such event. So the allocation pass was commissioned against a measurement of the
+rasteriser rather than of the drawing, which is why the pass could not move it
+and why no amount of further drawing work would have. **The pass is not wasted:**
+its real gains stand (standalone median 2.6 → 2.1 ms, wired 4.2–4.3 → 2.9 ms,
+wired p95 7.3–9.1 → 4.7–6.1 ms, 36.9 KiB → 0.6 KiB of garbage a draw), and the
+scratch pools are the shipped code.
+
+**AND THE GENERAL LESSON IS ONE THIS REPO ALREADY STATES ELSEWHERE, ARRIVING IN
+A NEW PLACE: a reading is bounded by its instrument.** Six independent
+measurements agreed with each other here — the pre-fix worktree, the flat heap,
+the 229-draw periodicity, the two clean controls, the area scaling — and every
+one of them was taken on the same rasteriser, so their agreement said nothing
+about a real browser. What settled it was one measurement on a different
+instrument. **A cluster of consistent readings is not corroboration when they
+share an instrument.**
 
 ## 8. The five I reported, and what became of them
 
