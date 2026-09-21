@@ -8132,6 +8132,13 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     const n = (k + 1) % loop.length;
     const [i2, j2] = loop[n];
     const sk2 = Math.min(i2, skinTo) - rowFrom;
+    /* A PIVOT ONLY WHERE THE TREATMENT IS. At a buried end the profile is the
+       flat wall and its apex IS its skin point, so an interpolated apex would
+       point along the margin from a skin point that has no bead — a flap main
+       does not have, in the one place that must emit what main emits.
+       Measured: with the pivots ungated, `layerCount 6` read 800 census pairs
+       against main's 0, and 0 with them gated. */
+    if (rimSameP(oP[i - rowFrom][j], skinP[sk][j])) continue;
     /* A PIVOT IS EITHER OF TWO THINGS, and both are the same corner seen from
        two sides. The first is a pair that already shares its skin point, which
        is what the dropped tip rows produce along the margin. The second is a
@@ -8166,8 +8173,39 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   const profs = entries.map(({ apex, sk, j }) => {
     const C = skinP[sk][j], n = skinN[sk][j], b = skinB[sk][j];
     const pts = new Array(K + 1);
-    pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = apex;
+    pts[0] = top[sk][j]; pts[K] = bot[sk][j];
     const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
+    /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
+       THIS IS THE MOST EXPENSIVE THING THIS SESSION LEARNED. The buried
+       perimeter — the foot under the hub slab, a cleft's or a fringe's base
+       panel under what overlaps it — must emit what main emits. Laying K
+       collinear points along the wall looked like exactly that: the same two
+       planes, the same corner vertices, more triangles. IT IS NOT THE SAME
+       SURFACE. The wall between two consecutive rows is a ruled surface
+       between two segments that are NOT parallel wherever the frame turns —
+       at the foot-to-blade seam most of all — so main's single quad and a
+       K-strip subdivision of it are two different interpolations of the same
+       four corners, and the subdivision BULGES.
+
+       Measured by ablation, census pairs on the branch against main's 0:
+       turning the bead off, the corner pivots off and the tip drop off ALL
+       changed nothing (32 / 226 / 520 on layerCount 3, headRise 0.5 and
+       layerCount 6), while the subdivision alone still read 34 / 228 / 1228.
+       The bulge was the whole of it, and it poked the inner whorls' feet
+       through their neighbours at the hub's own top face (z = 0.600, radius
+       7.03 mm, every site on the innermost layer).
+
+       Repeating each end point instead makes the strip's quads degenerate
+       everywhere but the middle, where the ONE surviving quad is main's wall
+       quad on main's four corners — and the emission loop needs no case for
+       it, because it already skips a triangle with a repeated vertex. A
+       treated profile beside an untreated one becomes a fan by the same
+       arithmetic. */
+    if (wx === 0 && wy === 0 && wz === 0) {
+      for (let m = 1; m < K; m++) pts[m] = m <= APEX ? pts[0] : pts[K];
+      return pts;
+    }
+    pts[APEX] = apex;
     /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
        cosine. At a full bead `a` equals `b` and the cosine is the half round,
        which is what the shape has to be. Where the treatment has ramped to
@@ -8181,10 +8219,32 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        cosine is untouched, and the bead is still a true half round) and makes
        the wall's own subdivision uniform, which is what it always should have
        been. Continuous in `a`, so there is no threshold. */
-    const ratio = b > 0 ? Math.min(1, Math.hypot(wx, wy, wz) / b) : 0;
+    const aLen = Math.hypot(wx, wy, wz);
+    const ratio = b > 0 ? Math.min(1, aLen / b) : 0;
     for (let m = 1; m < K; m++) {
       if (m === APEX) continue;
-      const th = (Math.PI * m) / K, sn = Math.sin(th);
+      /* SAMPLED UNIFORMLY IN TANGENT ANGLE, NOT IN THE ELLIPSE'S PARAMETER,
+         and that is what bounds the turn between facets at 180/K whatever the
+         bead's aspect. For a half ellipse (a sin t, b cos t) the tangent
+         direction is (a cos t, -b sin t), so a tangent angle psi corresponds to
+         `t = atan2(a sin psi, b cos psi)` — a closed form, no search. At a = b
+         it is the identity (`atan2(a sin psi, a cos psi)` IS psi), so a true
+         half round is sampled exactly as before.
+
+         IT MATTERS WHERE THE BEAD IS ELONGATED. The tip bead's semi-axis along
+         the length is the ladder's own last gaps, and on a SQUARED terminal
+         the ladder puts few rows near an outline that has stopped converging:
+         measured there at `a` around 2 mm against `b` of 0.5, the parameter-
+         uniform sampling piles most of the turn into the last facet before the
+         apex and the surface turned 63.17 degrees where the outline turns
+         nothing at all. In tangent angle the same bead turns 180/K a facet.
+
+         The linear blend below is the other end of the same problem: where the
+         treatment has ramped to nothing the profile is the flat WALL, and a
+         cosine lays its points out clustered at the middle of it. */
+      const psi = (Math.PI * m) / K;
+      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;
+      const sn = aLen > 0 ? Math.sin(th) : 0;
       const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
       pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
     }
@@ -8219,6 +8279,30 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       /* The apexes the treatment REACHED. `a > 0` is exact: the ramp returns
          a hard zero at a buried end (rimEase clamps at 0), so this is a
          branch and not a threshold on a continuous quantity. */
+      /* THE OUTLINE'S OWN TURN AT EVERY PERIMETER VERTEX, measured on the
+         apex polyline itself — which IS the original outline, because that is
+         where every apex is placed. It is recorded so the gate can state the
+         only honest form of "no hard edge": the treatment must not ADD a turn
+         the outline did not already have. A growing list of exempt places —
+         the four apex corners, then a squared terminal's two, then every lobe
+         sinus (`LOBE_SINUS` is a declared tangent break at notch powers at or
+         below 1) — is a subject being carved down until it cannot fail. This
+         is one derived quantity that covers all of them and any future rim
+         law, and it is measured on the emitted points rather than read from
+         any law's declaration. */
+      const turnAt = (k) => {
+        const [ip, jp] = loop[(k - 1 + loop.length) % loop.length];
+        const [ic, jc] = loop[k];
+        const [iN, jN] = loop[(k + 1) % loop.length];
+        const A = oP[ip - rowFrom][jp], B = oP[ic - rowFrom][jc], C = oP[iN - rowFrom][jN];
+        const ux = B[0] - A[0], uy = B[1] - A[1], uz = B[2] - A[2];
+        const vx = C[0] - B[0], vy = C[1] - B[1], vz = C[2] - B[2];
+        const lu = Math.hypot(ux, uy, uz), lv = Math.hypot(vx, vy, vz);
+        if (!(lu > 0 && lv > 0)) return 0;
+        let d = (ux * vx + uy * vy + uz * vz) / (lu * lv);
+        d = d > 1 ? 1 : d < -1 ? -1 : d;
+        return (Math.acos(d) * 180) / Math.PI;
+      };
       for (let k = 0; k < loop.length; k++) {
         const [i, j] = loop[k], sk = Math.min(i, skinTo) - rowFrom;
         const apex = oP[i - rowFrom][j];
@@ -8228,7 +8312,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
            before it measures anything with them, so this points at the
            artefact rather than standing in for it: the rim's thickness is
            |top - bot| between two vertices the mesh demonstrably has. */
-        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j] });
+        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j], outlineTurnDeg: turnAt(k) });
         /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
            which is a flat wall at ninety degrees BY DESIGN on this tree and on
            main. The dihedral clause needs it so it can attribute an edge to

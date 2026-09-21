@@ -212,11 +212,11 @@ function meshOf(pos) {
     const arr = Array.from(order).sort((x, y) => und[x] - und[y]);
     for (let i = 0; i < m;) {
       let j = i; while (j < m && und[arr[j]] === und[arr[i]]) j++;
-      if (j - i === 2) pairs.push([Math.floor(arr[i] / 3), Math.floor(arr[i + 1] / 3)]);
+      if (j - i === 2) pairs.push([Math.floor(arr[i] / 3), Math.floor(arr[i + 1] / 3), und[arr[i]]]);
       i = j;
     }
   }
-  return { vertIds: id, edges: pairs, degen, boundary, nonManifold, dirUnmatched, volume, N, tris: T };
+  return { vertIds: id, edges: pairs, degen, boundary, nonManifold, dirUnmatched, volume, N, tris: T, SH };
 }
 
 /* A bucket grid over a point set, answering "how far to the nearest of these"
@@ -247,6 +247,23 @@ function nearestWithin(points, cell) {
   };
 }
 
+/* The sharpest OUTLINE turn among the recorded apexes within `near` of a
+   point. Same bucket grid; returns 0 where nothing is in reach. */
+function nearestTurn(apexes, cell) {
+  const grid = new Map();
+  const ck = (p) => `${Math.floor(p[0] / cell)},${Math.floor(p[1] / cell)},${Math.floor(p[2] / cell)}`;
+  for (const a of apexes) { const k = ck(a.p); let g = grid.get(k); if (!g) { g = []; grid.set(k, g); } g.push(a); }
+  return (p) => {
+    const bx = Math.floor(p[0] / cell), by = Math.floor(p[1] / cell), bz = Math.floor(p[2] / cell);
+    let t = 0;
+    for (let dx = -1; dx <= 1; dx++) for (let dy = -1; dy <= 1; dy++) for (let dz = -1; dz <= 1; dz++) {
+      const g = grid.get(`${bx + dx},${by + dy},${bz + dz}`); if (!g) continue;
+      for (const a of g) if (dist(a.p, p) <= cell && a.outlineTurnDeg > t) t = a.outlineTurnDeg;
+    }
+    return t;
+  };
+}
+
 /* THE LARGEST TURN OVER THE TREATED RIM, and the subject is stated rather than
    assumed. An edge counts when it lies within `near` of a TREATED apex AND is
    closer to one than to any perimeter vertex the treatment did not reach.
@@ -257,16 +274,38 @@ function nearestWithin(points, cell) {
    apex sits 0.65 mm above the foot's own wall, well inside a 2 mm window. The
    excluded count is REPORTED, and the two sets come from the builder's own
    `rim.apex` / `rim.flat` so neither can be silently widened. */
-function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm) {
-  if (!apexes.length) return { deg: 0, at: null, edges: 0, skipped: 0, corner: 0, cornerDeg: 0, rampDeg: 0 };
-  const dT = nearestWithin(apexes, near);
+/* THE SUBJECT IS THE RIM'S OWN EDGES, AND IT IS A MEMBERSHIP TEST RATHER THAN
+   A DISTANCE ONE. "Within 2 mm of a rim" is the ruling's window and it is the
+   right window for a petal on its own; on a bloom it is not a subject. A
+   floret's petal rim sits millimetres from the RACHIS, a sepal's from the HUB,
+   a leaf's from the STEM — and those are flat walls at ninety degrees by
+   design, on this tree and on main. Measured before this was scoped: `INFLO:
+   pedicels STRAIGHT UP` reported an 84.47 degree "rim" turn where the outline
+   turns 1.01, and the faces involved were the stem's.
+
+   An edge qualifies when BOTH its endpoints are vertices the builder declared
+   on a treated profile — the apex and the two points where the bead meets the
+   skins. That is exactly the rim strip plus the skin's outermost row, it comes
+   from the builder's own record rather than from a radius, and no other part
+   can share those vertices. The distance window still applies on top, so the
+   ruling's 2 mm is kept rather than replaced. */
+function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm, rimVerts) {  // apexes: {p, outlineTurnDeg}
+  if (!apexes.length) return { deg: 0, at: null, edges: 0, skipped: 0, corner: 0, cornerDeg: 0, rampDeg: 0, raw: 0, outline: 0 };
+  const pts = apexes.map((a) => a.p);
+  const dT = nearestWithin(pts, near);
+  /* THE OUTLINE'S OWN TURN NEAR AN EDGE — the largest of it over the apexes
+     within reach, because an edge sits between vertices and inherits the
+     sharper of them. */
+  const turnNear = nearestTurn(apexes, near);
   const dF = flats.length ? nearestWithin(flats, near) : () => Infinity;
   const dC = corners.length ? nearestWithin(corners, Math.max(cornerR, 1e-6)) : () => Infinity;
-  let worst = -1, at = null, n = 0, skipped = 0, nCorner = 0, cornerDeg = 0, rampDeg = 0;
+  let worst = -1, at = null, n = 0, skipped = 0, nCorner = 0, cornerDeg = 0, rampDeg = 0, worstRaw = 0, worstOutline = 0;
   const deg0 = (A, B) => { let d = A[0] * B[0] + A[1] * B[1] + A[2] * B[2]; d = d > 1 ? 1 : d < -1 ? -1 : d; return (Math.acos(d) * 180) / Math.PI; };
   for (const f of mesh.edges) {
     const A = mesh.N[f[0]], B = mesh.N[f[1]];
     if (!A || !B) continue;
+    const va = Math.floor(f[2] / mesh.SH), vb = f[2] - va * mesh.SH;
+    if (!rimVerts.has(va) || !rimVerts.has(vb)) continue;
     const mid = [(A[3] + B[3]) / 2, (A[4] + B[4]) / 2, (A[5] + B[5]) / 2];
     const t = dT(mid);
     if (!(t <= near)) continue;
@@ -286,16 +325,21 @@ function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm) {
     let d = A[0] * B[0] + A[1] * B[1] + A[2] * B[2];
     d = d > 1 ? 1 : d < -1 ? -1 : d;
     const deg = (Math.acos(d) * 180) / Math.PI;
-    /* AN OUTLINE CORNER IS NOT A RIM EDGE. See the block at `rim.corner` in
-       bloom-geometry.js: the apex path must pass through every original
-       boundary vertex, so where the outline turns the drawn surface turns with
-       it. Reported, never counted against the bar — and reported as a NUMBER
-       so a corner that got worse is visible rather than absorbed. */
-    if (dC(mid) <= cornerR) { nCorner++; if (deg > cornerDeg) cornerDeg = deg; continue; }
+    /* THE BAR IS THE OUTLINE'S OWN TURN PLUS THE ALLOWANCE, not the allowance
+       alone. Where the OUTLINE turns — the four apex corners, a squared
+       terminal's two, every lobe sinus at a cusped notch power — the drawn
+       surface must turn with it, because the apex is placed on every original
+       boundary vertex and that is the silhouette ruling. What this asserts is
+       that the treatment ADDS no more than the allowance on top. Where the
+       outline is straight the two are the same statement and the bar is 30
+       degrees flat. */
+    const ot = turnNear(mid);
+    if (ot >= RIM_DIHEDRAL_MAX_DEG) { nCorner++; if (deg - ot > cornerDeg) cornerDeg = deg - ot; }
     n++;
-    if (deg > worst) { worst = deg; at = mid; }
+    const excess = deg - Math.max(0, ot);
+    if (excess > worst) { worst = excess; at = mid; worstRaw = deg; worstOutline = ot; }
   }
-  return { deg: worst < 0 ? 0 : worst, at, edges: n, skipped, corner: nCorner, cornerDeg, rampDeg };
+  return { deg: worst < 0 ? 0 : worst, at, edges: n, skipped, corner: nCorner, cornerDeg, rampDeg, raw: worstRaw, outline: worstOutline };
 }
 
 async function runRows(G, rows, fails, notes) {
@@ -374,7 +418,13 @@ async function runRows(G, rows, fails, notes) {
         const bar = Math.min(G.RIM_FLOOR_MM, r.bodyMm) - RIM_FLOOR_BAND_MM;
         const under = t < bar;
         if (under && !r.clamped) { thin++; if (!thinWorst || t < thinWorst.t) thinWorst = { t, r, bar }; }
-        if (r.clamped && !(t < G.RIM_FLOOR_MM - RIM_FLOOR_BAND_MM)) wrongClamp++;
+        /* THE OTHER DIRECTION USES THE FLOOR ITSELF, NOT THE BANDED BAR. The
+           band is slack for the MEASUREMENT of a rim that should clear the
+           floor; applying it here would call a rim at 0.995 mm an unjustified
+           declaration when it is under the floor by exactly the amount the
+           clamp says. Measured: 64 false findings on the carnation before this
+           was separated. */
+        if (r.clamped && !(t < G.RIM_FLOOR_MM)) wrongClamp++;
       }
       check('E1', thin === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${thin} rim profiles are under ${G.RIM_FLOOR_MM} mm and are NOT declared clamps (worst ${thinWorst && thinWorst.t.toFixed(4)} mm against a bar of ${thinWorst && thinWorst.bar.toFixed(4)} at panel ${thinWorst && thinWorst.r.panel} row ${thinWorst && thinWorst.r.row})`);
       /* THE OTHER DIRECTION, and it is the one that stops the exclusion
@@ -383,13 +433,18 @@ async function runRows(G, rows, fails, notes) {
       check('E1', wrongClamp === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${wrongClamp} declared clamp locations are NOT under the floor — the declaration is excluding rows it has no business excluding`);
 
       /* ---- E2: no hard edge within RIM_NEAR_MM of a treated apex ---- */
+      const rimVertIds = new Set();
+      for (const r of apexRecs) for (const P of [r.apex, r.top, r.bot]) {
+        const v = mesh.vertIds.get(key3(P[0], P[1], P[2]));
+        if (v !== undefined) rimVertIds.add(v);
+      }
       if (exportMode && !FOLDS.has(row.label)) {
-        const turn = worstTurnNearRim(mesh, apexRecs.map((r) => r.apex), rim.flatMap((r) => r.flat || []), rim.flatMap((r) => r.corner || []), RIM_NEAR_MM, RIM_CORNER_R * G.RIM_BEAD_RADIUS_MM, G.RIM_TAPER_MM);
+        const turn = worstTurnNearRim(mesh, apexRecs.map((r) => ({ p: r.apex, outlineTurnDeg: r.outlineTurnDeg || 0 })), rim.flatMap((r) => r.flat || []), rim.flatMap((r) => r.corner || []), RIM_NEAR_MM, RIM_CORNER_R * G.RIM_BEAD_RADIUS_MM, G.RIM_TAPER_MM, rimVertIds);
         if (turn.cornerDeg > worstCorner) worstCorner = turn.cornerDeg;
         if (turn.rampDeg > worstRamp) worstRamp = turn.rampDeg;
         if (turn.deg > worstTurn) worstTurn = turn.deg;
         check('E2', turn.edges > 0, `${row.label}: no edge lies within ${RIM_NEAR_MM} mm of a treated apex — the window found nothing to measure`);
-        check('E2', turn.deg < RIM_DIHEDRAL_MAX_DEG, `${row.label}: the largest turn within ${RIM_NEAR_MM} mm of a rim is ${turn.deg.toFixed(2)} deg, at or over the ${RIM_DIHEDRAL_MAX_DEG} deg bar`);
+        check('E2', turn.deg < RIM_DIHEDRAL_MAX_DEG, `${row.label}: the treatment adds ${turn.deg.toFixed(2)} deg of turn within ${RIM_NEAR_MM} mm of a rim, at or over the ${RIM_DIHEDRAL_MAX_DEG} deg allowance (the face-to-face turn there is ${turn.raw.toFixed(2)} deg and the OUTLINE's own turn is ${turn.outline.toFixed(2)})`);
       }
     }
     /* ---- E5: the topology is the same in both modes ---- */
@@ -399,7 +454,7 @@ async function runRows(G, rows, fails, notes) {
     }
   }
   check('E0', profiles > 0, `no treated rim profile was found on any row — the run is vacuous`);
-  notes.push(`rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn ALONG a rim ${worstTurn.toFixed(2)} deg (bar ${RIM_DIHEDRAL_MAX_DEG}) · worst turn AT an outline corner ${worstCorner.toFixed(2)} deg (exempt, the outline's own — see rim.corner) · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default)`);
+  notes.push(`rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${RIM_DIHEDRAL_MAX_DEG}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default)`);
   return { profiles, worstTurn, worstCorner, minRim, clamps };
 }
 
