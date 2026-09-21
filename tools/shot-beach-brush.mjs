@@ -88,7 +88,15 @@ for (const [name, st, note] of [
   cells.push({ file: `${name}.png`, title: `STANDALONE · peel ${st.peel.toFixed(2)}`, note });
 }
 
-// ---- ROW TWO: the live scene, at the six stages --------------------------
+// ---- ROW TWO: the live scene, at the five stages -------------------------
+// READ FROM THE MODULE, not written down here: the stages were renumbered when
+// STEEPEN was removed and a hard-coded list would have gone on labelling the
+// cells with a model the scene no longer has.
+const STAGE = await page.evaluate(async () => {
+  const V = await import('/scene/beach-wave.js');
+  return ['', ...Object.keys(V.STAGE_NAMES).sort((a, b) => a - b).map(k => V.STAGE_NAMES[k])];
+});
+
 async function live(name, wantStage, note) {
   const got = await page.evaluate(async (want) => {
     // A CELL IS ITS OWN MOMENT. Several stages are live at once — that is the
@@ -98,11 +106,10 @@ async function live(name, wantStage, note) {
     window.__scene.scenePump(3.1);
     for (let i = 0; i < 1400; i++) {
       const st = window.__scene.sceneState();
-      // THE WAVE'S STAGE OR A COLUMN'S. `waveStage` can never report STEEPEN
-      // on a peeling wave and that is not a defect: it returns PEEL the moment
-      // its columns disagree across the break, and the steepening window is
-      // 0.35 s against a peel of 0.8-1.9, so the two ends of the crest are
-      // never both inside it. The column report is where the stage lives.
+      // THE WAVE'S STAGE OR A COLUMN'S. A wave reports PEEL the moment its
+      // columns disagree across the break, so the per-column report is where
+      // the other stages live. (STEEPEN used to sit between SWELL and PEEL and
+      // could never be reported at all; it was removed, and the model is five.)
       if ((st.waveStages || []).some(w => w.stage === want || (w.at || []).includes(want))) {
         window.__scene.step(); return { ok: true, st };
       }
@@ -114,18 +121,17 @@ async function live(name, wantStage, note) {
   await page.screenshot({ path: path.join(OUT, `${name}.png`) });
   const s = got.st;
   const ws = (s.waveStages || []).map(w =>
-    `${['', 'swell', 'steepen', 'peel', 'collapse', 'foam band', 'swash'][w.stage]} @ s ${w.crest.toFixed(3)} (h ${w.height.toFixed(3)})`).join(' · ');
+    `${STAGE[w.stage]} @ s ${w.crest.toFixed(3)} (h ${w.height.toFixed(3)})`).join(' · ');
   cells.push({ file: `${name}.png`,
-    title: `LIVE · a wave in ${['', 'SWELL', 'STEEPEN', 'PEEL', 'COLLAPSE', 'FOAM BAND', 'SWASH'][wantStage]}`,
+    title: `LIVE · a wave in ${STAGE[wantStage].toUpperCase()}`,
     note: `${note}<br>${s.waves} alive, ${s.drawnWaves} drawn — ${ws}<br>`
       + `edge ${s.edge[2].toFixed(3)} · high water ${s.wet[2].toFixed(3)} · set energy ${s.energy.toFixed(2)}` });
 }
-await live('live-1-swell', 1, 'the seaward end of the sea: a ridge with no foam');
-await live('live-2-steepen', 2, 'the lip opening, before any column has broken');
-await live('live-3-peel', 3, 'columns disagreeing — broken at one end of the crest and not the other');
-await live('live-4-collapse', 4, 'broken, and the wave still has a face');
-await live('live-5-foam-band', 5, 'the face gone, a band travelling shoreward');
-await live('live-6-swash', 6, 'stage six: the swash, drawn by the published edge rather than as a wave');
+await live('live-1-swell', 1, 'the seaward end of the sea: a ridge with no foam, and the lip opening at the end of it');
+await live('live-2-peel', 2, 'columns disagreeing — broken at one end of the crest and not the other');
+await live('live-3-collapse', 3, 'broken, and the wave still has a face');
+await live('live-4-foam-band', 4, 'the face gone, a band travelling shoreward');
+await live('live-5-swash', 5, 'the last stage: the swash, drawn by the published edge rather than as a wave');
 
 // ---- the frame cost, live ------------------------------------------------
 await page.evaluate(() => window.__scene.pause(false));

@@ -326,6 +326,49 @@ predicted.
    `wave/the-break-leaves-a-wave-room-to-show-the-band-it-committed-to` holds it
    from four owners that are not `BREAK_S`.
 
+   **AND IT COSTS THE SEA, WHICH IS A FINDING RATHER THAN A SIDE NOTE.** The
+   drawing's foam exists only where `b` is past `FOAM_ONSET_B`, and `b` is
+   linear in s between the break and the waterline — so **the foam region IS
+   `[breakS, WATERLINE_S]`**. Moving the break shoreside shortens it in exactly
+   the same proportion as it lowers the curl: the two are one dial, not two.
+   Measured over 24 pumped moments at 960x720, of the WAVE ZONE (top of frame
+   down to the waterline):
+
+   | `BREAK_S` | curl at s | ink % | paper % | waves broken, of ~3.9 drawn |
+   |---|---|---|---|---|
+   | `[0.115, 0.020]` (as it shipped) | 0.202 | 44.7 | 47.7 | 3.3 |
+   | `[0.180, 0.085]` | 0.247 | 48.5 | 37.4 | 2.8 |
+   | `[0.230, 0.135]` | 0.297 | 62.4 | 30.3 | 2.6 |
+   | **`[0.300, 0.205]` (ships)** | **0.331** | **67.8** | **16.4** | **1.4** |
+
+   A wave is unbroken for **77% of its seaward life** now, against 35% before —
+   13.6 s of approach against 4.0 s of foam, where it was 6.2 s against 11.4 s.
+   On screen that is a much blacker sea: the dark face is drawn for every wave
+   whether it has broken or not, and the foam band is what used to whiten it.
+
+   **SO THE RULING'S TWO CRITERIA PULL AGAINST EACH OTHER** — "the curl reading
+   at size" wants the break shoreside, "the foam having room to run" wants it
+   out — and the measurement above is what the choice between them costs. It
+   ships at the shoreward end because that is what was ruled, bounded by the
+   band's own life; `[0.230, 0.135]` is where both are met (curl 0.297, paper
+   30.3%) and is one constant away.
+
+   ![as it shipped](img/beach-break-as-shipped.png)
+   *`[0.115, 0.020]` — the composition Eva objected to. Three separate events
+   down the frame, and the curl at s 0.202 is the top one.*
+
+   ![balanced](img/beach-break-balanced.png)
+   *`[0.230, 0.135]` — the curl mid-frame with open water above it. Not what
+   ships; it is here because it is what "both criteria met" looks like.*
+
+   ![shoreside](img/beach-break-shoreside.png)
+   *`[0.300, 0.205]`, which ships. The curl is where it was asked for and the
+   sea above it is a black mass: 16.4% paper against 47.7%.*
+
+   **WHAT WOULD DECOUPLE THEM** is drawing a wave PAST the waterline so its
+   foam runs up the beach — which is the hand-over to the swash, and that is
+   settled model this session was told not to touch. Recorded, not attempted.
+
 2. **A wave arriving at the shore was progressively covered by the swash sheet.**
    The report called it "physically right, visually odd". **RULED: a bug**, and
    on measurement it is one. `sheetTop` was `front - 0.085`, a fixed band hung
