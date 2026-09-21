@@ -1,0 +1,368 @@
+/* ===================================================================
+   shot-bloom-apex.mjs — contact sheet for PETAL TIP SHAPE, the whole-petal
+   apex. Canvas only. Session 32.
+
+   THE RULING IT CARRIES. Phase A costed seven mechanisms for a round-to-
+   pointed apex and two survived, so it stopped and put both to Eva with a
+   sheet. She ruled `blunt` (session 32): the converging tip cap becomes
+   UNCONDITIONAL and owns its own terminal, `petalTipBreadth` and its three
+   role twins are retired, and the spatulate silhouette moves to its proper
+   owner — the two taper exponents, whose widest point a/(a+b) reaches 0.833.
+   Her reason was not the row count: `cap`, the cheaper survivor, could not
+   deliver a round apex at all. Six rows in the cap is a shoulder turning
+   through 0.15 mm, and the phase-A sheet reads it as a faceted gable — a
+   control that appears to do a thing and does not, which is the dead
+   sharpness slider again.
+
+   THIS TOOL NO LONGER PATCHES ANYTHING. In phase A the candidate laws were
+   rewritten into bloom-geometry.js in flight through page.route(), because
+   the geometry did not exist yet; the winner shipped, the loser was deleted
+   with its candidate table, and every cell below is now the real control set
+   driven through the real UI.
+
+   WHAT THE SHEET IS FOR. The space at the size petals actually ship
+   (35 x 16 mm, the default), corners and middle on both axes, the states the
+   retired control could not reach, and the shipping default rendered on BOTH
+   trees — this one and a git worktree of the base commit — because "0 moved"
+   is a claim that should be photographed and not only measured.
+
+   FRAMING IS THE APP'S OWN CAMERA (__bloomFrame at the petal's own midpoint
+   and tip, down the petal's own normal), never a crop and never re-derived
+   projection maths — shot-bloom-silhouette.mjs's discipline.
+
+   EVERY ROW CARRIES ITS OWN SAME-TREE CONTROL, and this sheet is the reason
+   that rule now has its sharpest evidence: in phase A the IDENTITY
+   comparison, between two builds proved bit-identical to the float in Node
+   before any browser opened, read 0 px on one run and 7,036 px on the next.
+   The whole-blade framing is bimodal; the TIP CROP read 0 px on all fourteen
+   observations. So pixel claims here belong to the tip crop, the run's whole
+   control distribution is printed, and no bound comes from one sample.
+
+   RUN:  node tools/shot-bloom-apex.mjs <out-dir> [base-tree] [--rows a,b] [--quick]
+         base-tree  a `git worktree` of the base commit; adds the BEFORE cells
+                    (the retired control's own states) and the identity pair
+         --rows     render only the named rows (prove the rig before the grid)
+         --quick    drops the tip crop, keeping the face-on view
+   =================================================================== */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, stillFrame, kindsOf,
+         CONTROLS, DEFAULTS, modeTag } from './bloom-harness.mjs';
+import { decodePNG } from './pngdec.mjs';
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const argv = process.argv.slice(2);
+const positional = argv.filter((a) => !a.startsWith('--'));
+const outDir = positional[0] || '/tmp/bloom-apex';
+const baseTree = positional[1] || null;
+const QUICK = argv.includes('--quick');
+const ONLY = (argv.find((a) => a.startsWith('--rows=')) || '').slice(7).split(',').filter(Boolean);
+const VIEW = 900, DPR = 2;
+const byId = Object.fromEntries(CONTROLS.map((c) => [c.id, c]));
+fs.mkdirSync(outDir, { recursive: true });
+
+/* ===================================================================
+   THE RIG
+   =================================================================== */
+const { server, port } = await serveRepo();
+/* THE BASE TREE IS SERVED FROM A `git worktree`, never from a mutated working
+   tree — `git checkout <sha> -- <files>` stages the revert, so a stray commit
+   pushes the un-fixed code and a container restart leaves the branch reverted. */
+const base = baseTree ? await serveRepo(path.resolve(baseTree)) : null;
+if (baseTree) console.log(`base tree served from ${path.resolve(baseTree)}`);
+const { browser, page } = await launchPage({ viewport: { width: VIEW, height: VIEW }, deviceScaleFactor: DPR });
+/* The base tree predates this session's two apex controls and still declares
+   the four retired ids, so its OWN control set is what a BASE cell must be
+   driven and drift-checked against — read from that tree's registry by the
+   harness's one owner, never guessed. */
+const baseKinds = base ? await kindsOf(path.resolve(baseTree)) : null;
+if (baseTree && !base) { console.error('HARNESS INVALID: a base tree was named and there is no bloom.html there. A missing base is not a cell to skip.'); process.exit(2); }
+
+function die(msg) { console.error('HARNESS INVALID: ' + msg); return browser.close().then(() => { server.close(); if (base) base.server.close(); process.exit(2); }); }
+
+function pixelDiff(fa, fb) {
+  const A = decodePNG(fs.readFileSync(fa)), B = decodePNG(fs.readFileSync(fb));
+  if (A.width !== B.width || A.height !== B.height) return null;
+  let n = 0, worst = 0;
+  for (let o = 0; o < A.data.length; o += 4) {
+    const d = Math.max(Math.abs(A.data[o] - B.data[o]), Math.abs(A.data[o + 1] - B.data[o + 1]), Math.abs(A.data[o + 2] - B.data[o + 2]));
+    if (d > 0) { n++; if (d > worst) worst = d; }
+  }
+  return { pixels: n, frac: n / (A.width * A.height), worst };
+}
+
+/* Settle on the real signal — screenshot until two consecutive frames are
+   byte-identical. A fixed wait samples an arbitrary point on the damping
+   curve and is what put a several-thousand-pixel floor under every sheet in
+   this repo before session 26. */
+async function shoot(file, frame) {
+  await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir), frame);
+  const clip = { x: 0, y: 0, width: VIEW, height: VIEW };
+  /* THREE consecutive byte-identical frames, not two. Measured on this very
+     sheet: with two, the face-on view's own same-tree control read 7,034 and
+     7,122 px — OrbitControls' damping can produce two identical frames while
+     the camera is still easing below the per-frame threshold, and the run
+     then settles at an arbitrary point on the curve. The tight tip crop read
+     0 px under the same rule, which is exactly how a residue this size hides
+     from a crop and not from a whole-blade frame. */
+  let p1 = null, p2 = null, buf = null, settledAt = -1;
+  for (let k = 0; k < 90; k++) {
+    await page.waitForTimeout(100);
+    buf = await page.screenshot({ clip, timeout: 180000 });
+    if (p1 && p2 && buf.equals(p1) && p1.equals(p2)) { settledAt = k; break; }
+    p2 = p1; p1 = buf;
+  }
+  if (settledAt < 0) await die(`${path.basename(file)}: the view never settled — 60 frames and consecutive screenshots still differ`);
+  fs.writeFileSync(file, buf);
+  const { width, height, data } = decodePNG(buf);
+  let content = 0;
+  for (let o = 0; o < data.length; o += 4) if (Math.abs(data[o] - 0x0c) > 10 || Math.abs(data[o + 1] - 0x0f) > 10 || Math.abs(data[o + 2] - 0x0e) > 10) content++;
+  const frac = content / (width * height);
+  if (frac < 0.005) await die(`${path.basename(file)}: the frame is ${(frac * 100).toFixed(2)}% content — not a picture anyone should rule from`);
+  return { file: path.basename(file), mmPerPx: (2 * frame.r) / (VIEW * DPR), settledAt };
+}
+
+const VIEWS = QUICK ? ['petal'] : ['petal', 'tip'];
+let shotN = 0;
+
+/* One cell: fresh page, the chosen module, real controls, every assertion,
+   then the shots. Returns the row's measured profile as well as its pixels —
+   an apex ruling wants the millimetres beside the picture. */
+async function cell({ label, set = [], tag = '', onBase = false }) {
+  await openBloom(page, onBase ? base.port : port);
+  const bad0 = await stillFrame(page);
+  if (bad0.length) await die(`${label}: ${bad0.join('; ')}`);
+  const bad = await applyConfig(page, set, onBase ? baseKinds : null);
+  if (bad.length) await die(`${label}: ${bad.join('; ')}`);
+  /* THE DRIFT CHECK IS AGAINST THE TREE BEING DRIVEN. The base commit predates
+     this session's two apex controls and still declares the four retired ids,
+     so a straight comparison against HEAD's DEFAULTS reports drift on a page
+     behaving perfectly. The drop is CHECKED: exactly the ids the base tree does
+     not declare may be dropped, and nothing else, so a real drift on a control
+     both trees share still fails the run. */
+  /* THE DRIFT SET IS FILTERED TO IDS THIS TREE DECLARES, and only for a BASE
+     row. `fullStateDrift` validates the set against the CURRENT registry and
+     THROWS on an unknown id — correct for a live row, and wrong for a base row,
+     which deliberately sets `petalTipBreadth`, a control that exists on the old
+     tree and nowhere else. Those ids are not going unchecked: `applyConfig`
+     above ran against the base tree's own control set and READ THEM BACK, which
+     is the assertion that the value took. What is dropped here is only the
+     "state is DEFAULTS + set" comparison, which this tree's DEFAULTS cannot
+     express for a control it does not have. */
+  const byIdHere = Object.fromEntries(CONTROLS.map((c) => [c.id, true]));
+  const driftSet = onBase ? set.filter((x) => byIdHere[x.id]) : set;
+  const baseOnly = set.filter((x) => !byIdHere[x.id]).map((x) => x.id);
+  if (!onBase && baseOnly.length) await die(`${label}: a LIVE row sets ${baseOnly.join(', ')}, which this tree does not declare`);
+  const drift0 = await fullStateDrift(page, driftSet);
+  const drift = onBase ? drift0.filter((d) => baseKinds[d.split(':')[0]] !== undefined) : drift0;
+  if (onBase) {
+    const dropped = drift0.filter((d) => baseKinds[d.split(':')[0]] === undefined).map((d) => d.split(':')[0]).sort();
+    const want = CONTROLS.filter((c) => baseKinds[c.id] === undefined).map((c) => c.id).sort();
+    if (dropped.join(',') !== want.join(',')) await die(`${label}: the base tree's missing-control set is ${want.join(', ') || '(none)'} and the drift report dropped ${dropped.join(', ') || '(none)'}`);
+    /* AND THE OTHER DIRECTION, which this session is the first to need: the ids
+       the BASE tree has and this one does not are exactly the four retired in
+       session 32, and a base row may set them. Asserted rather than assumed, so
+       a typo in a base row's id fails the run instead of being filtered away. */
+    const onlyThere = Object.keys(baseKinds).filter((id) => !byIdHere[id]).sort();
+    const stray = baseOnly.filter((id) => !onlyThere.includes(id));
+    if (stray.length) await die(`${label}: sets ${stray.join(', ')}, which neither tree declares`);
+  }
+  if (drift.length) await die(`${label}: state is not DEFAULTS+set: ${drift.join('; ')}`);
+  await page.waitForTimeout(400);
+
+  const want = { ...DEFAULTS };
+  for (const s2 of set) want[s2.id] = s2.value;
+  const readout = (await page.evaluate(() => document.getElementById('readout')?.textContent || '')).replace(/\s+/g, ' ').trim();
+  if (!new RegExp(`petals ${Number(want.petalCount)}\\b`).test(readout))
+    await die(`${label}: the readout says "${readout.slice(0, 120)}" — the app did not react through the real UI route`);
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  if (!m.petalMid || !m.petalNormal) await die(`${label}: metrics report no petal midpoint/normal — framing would be a guess`);
+  const prof = m.petalProfile;
+  if (!Array.isArray(prof) || prof.length < 6) await die(`${label}: no petal profile reported`);
+
+  const shots = {};
+  for (const v of VIEWS) {
+    const frame = v === 'petal'
+      ? { r: Number(want.petalLength) * 0.62, at: m.petalMid, dir: m.petalNormal }
+      : { r: Number(want.petalLength) * 0.17, at: m.petalTip, dir: m.petalNormal };
+    shots[v] = await shoot(path.join(outDir, `cell-${String(++shotN).padStart(3, '0')}-${v}.png`), frame);
+  }
+  /* THE APEX IN MILLIMETRES, from the app's own emitted rows. `rises` asks the
+     question A5 asks — does the blade widen anywhere near the tip — because
+     that is what the retired term did on every value above zero and what this
+     construction cannot do. */
+  const tipHalf = prof[prof.length - 1];
+  const nearTip = prof.slice(-7);
+  const span = nearTip[0] - tipHalf;
+  const rises = nearTip.slice(1).reduce((mx, h, i) => Math.max(mx, h - nearTip[i]), 0);
+  const narrows = span > 1e-9 && rises <= 1e-9;
+  const dropLast = narrows ? (nearTip[nearTip.length - 2] - tipHalf) / span : null;
+  const gapTxt = narrows
+    ? `${(dropLast * 100).toFixed(0)}% of the narrowing is in the FINAL row gap`
+    : `THE BLADE WIDENS by ${Math.max(rises, -span).toFixed(3)} mm inside these rows — it does not narrow monotonically`;
+  const mm = `apex: terminal half-width ${tipHalf.toFixed(3)} mm · last six rows ${nearTip.slice(1).map((h) => h.toFixed(2)).join(' → ')} mm · ${gapTxt}`;
+  const shown = ['petalBaseTaper', 'petalTipTaper'].map((id) => `${id === 'petalBaseTaper' ? 'base taper' : 'tip taper'} ${Number(want[id])}`)
+    .concat(onBase ? [`tip breadth ${Number(want['petalTipBreadth'] ?? 0)}  (RETIRED)`]
+                   : ['the apex has no control']).join(' · ');
+  console.log(`  ${label.padEnd(52)} tip ${tipHalf.toFixed(3)} mm · ${narrows ? `last-gap ${(dropLast * 100).toFixed(0)}%` : `WIDENS ${Math.max(rises, -span).toFixed(2)} mm`} · tris(live) ${m.liveTris}`);
+  return { label, tag, shots, mm, prof,
+    caption: `${shown}${onBase ? ' · <b>THE BASE TREE (b323268)</b>' : ''}<br>${mm}<br>tris (live) ${m.liveTris.toLocaleString('en-US')} · ${modeTag(m)}` };
+}
+
+const set = (o) => Object.entries(o).map(([id, value]) => ({ id, value: String(value) }));
+
+/* ===================================================================
+   THE ROWS. Each is rendered TWICE (the same-tree control) and the run's
+   whole control distribution decides what a pixel number here is worth.
+   =================================================================== */
+const ROWS = [
+  { key: 'today', label: 'THE SHIPPING DEFAULT — the unconditional cap', set: {},
+    note: 'Unchanged from the tree before this session: the shipping petal was already the pointed family, and the pointed family\'s cap is what became unconditional. Measured against a worktree of b323268 — every drawn row, both modes, 0 differ under <code>Object.is</code>.' },
+  { key: 'taper-06', label: 'TIP TAPER 0.60 — the cap entry at the 0.80 clamp', set: { petalTipTaper: 0.6 },
+    note: 'The widest cap this matrix reaches. <code>uCap = min(1 - TIP_CAP_FRACTION, crossing)</code>, and here the FRACTION rule picks it, so the cap owns exactly the last fifth.' },
+  { key: 'taper-4', label: 'TIP TAPER 4.00 — the cap entry from the crossing', set: { petalTipTaper: 4 },
+    note: 'The other entry rule: the crossing at twice the print floor picks u 0.59, so the cap owns the last 41%. The two rules are why the apex cannot be judged from one row.' },
+  { key: 'narrow', label: 'THE NARROWEST PETAL — width 8, taper 4', set: { petalWidth: 8, petalTipTaper: 4 },
+    note: 'Where the mode floor is the largest fraction of the blade, so live and export diverge most at the tip.' },
+];
+
+/* THE BASE-TREE CELLS — what the retirement removed, rendered from a git
+   worktree of b323268 by the same browser and the same camera rather than
+   remembered. The retired id is QUOTED in these rows: it names a control that
+   exists on the OLD tree and nowhere else, so it is row DATA, which is what
+   the panel gate's retired-id scanner exempts. */
+const BASE_ROWS = [
+  { key: 'base-today', label: 'BASE TREE — the shipping default', set: {}, onBase: true,
+    note: 'The identity pair with the first cell. Any difference on the TIP CROP is a difference in the geometry, because that framing\'s same-tree control read 0 px on every observation of this rig.' },
+  { key: 'base-01', label: 'BASE TREE — the retired control at 0.01', set: { 'petalTipBreadth': 0.01 }, onBase: true,
+    note: 'The first step off zero on the retired control: the live terminal jumped 0.150 &rarr; 0.800 mm, a 5.3x discontinuity, and then ten of sixty steps drew this same tip.' },
+  { key: 'base-30', label: 'BASE TREE — the retired control at 0.30', set: { 'petalTipBreadth': 0.3 }, onBase: true,
+    note: 'Waist 1.753 mm at u = 0.83 flaring 37% to a 2.400 mm tip, with a 6.7&deg; corner at the crossing. This is the shape A5 exists to catch, and both STL gates are blind to it.' },
+  { key: 'base-60', label: 'BASE TREE — the retired control at 0.60 (maximum)', set: { 'petalTipBreadth': 0.6 }, onBase: true,
+    note: 'The extreme: waist 2.974 mm at u = 0.76 flaring 61% to 4.800 mm, worst outline corner 16.4&deg;. The state the silhouette sheet photographed as THE KINK.' },
+];
+
+const ALL = baseTree ? ROWS.concat(BASE_ROWS) : ROWS;
+const rows = ONLY.length ? ALL.filter((r) => ONLY.includes(r.key)) : ALL;
+if (ONLY.length && rows.length !== ONLY.length) { console.error(`--rows named ${ONLY.length} row(s), matched ${rows.length}`); process.exit(2); }
+console.log(`\nrendering ${rows.length} row(s) x 2 (each row carries its own same-tree control) x ${VIEWS.length} view(s)\n`);
+
+const out = [];
+for (const r of rows) {
+  const a = await cell({ label: r.label, set: set(r.set), tag: r.key, onBase: !!r.onBase });
+  const b = await cell({ label: `  (same-tree control)`, set: set(r.set), tag: r.key, onBase: !!r.onBase });
+  const ctrl = Object.fromEntries(VIEWS.map((v) => [v, pixelDiff(path.join(outDir, a.shots[v].file), path.join(outDir, b.shots[v].file))]));
+  console.log(`    control: ${VIEWS.map((v) => `${v} ${ctrl[v].pixels} px`).join(' · ')}`);
+  out.push({ ...r, ...a, ctrl });
+}
+
+/* THE RUN'S CONTROL DISTRIBUTION — printed, and the only thing a pixel
+   number on this sheet may be read against. One sample is never a floor. */
+const dist = Object.fromEntries(VIEWS.map((v) => {
+  const xs = out.map((o) => o.ctrl[v].pixels).sort((x, y) => x - y);
+  return [v, { n: xs.length, min: xs[0], max: xs[xs.length - 1], median: xs[Math.floor(xs.length / 2)], all: xs }];
+}));
+console.log('\nSAME-TREE CONTROL DISTRIBUTION (px differing, this run):');
+for (const v of VIEWS) console.log(`  ${v.padEnd(6)} n=${dist[v].n} min ${dist[v].min} · median ${dist[v].median} · max ${dist[v].max}   [${dist[v].all.join(', ')}]`);
+
+/* THE IDENTITY PAIR — the shipping default on THIS tree against the SAME
+   default on a worktree of the base commit, judged against the run's own
+   control distribution. It is the picture of the claim Node already measured
+   to the bit. */
+const today = out.find((o) => o.tag === 'today'), baseToday = out.find((o) => o.tag === 'base-today');
+const idLines = [];
+if (today && baseToday) for (const v of VIEWS) {
+  const d = pixelDiff(path.join(outDir, today.shots[v].file), path.join(outDir, baseToday.shots[v].file));
+  idLines.push(`the shipping default, this tree vs b323268 (${v}): ${d.pixels} px differ, worst channel step ${d.worst} — the run's ${v} control ranged ${dist[v].min}..${dist[v].max} px`);
+  console.log(`  IDENTITY  ${idLines[idLines.length - 1]}`);
+}
+if (!baseToday) console.log('  IDENTITY  (no base tree given — pass one as the second argument to render the pair)');
+
+/* ===================================================================
+   THE DEAD-CONTROL SWEEP, on the SHIPPED ranges, every step, measured on the
+   DRAWN rows rather than on the continuous law — a curve the 28-row sampling
+   cannot resolve is a control that has stopped responding whatever the
+   arithmetic says. Both directions of the question Eva set: does each control
+   move the shape across its WHOLE declared range, and does its default sit
+   anywhere the OTHER control goes inert.
+   =================================================================== */
+/* THE DEAD-CONTROL SWEEP IS EMPTY, AND SAYING SO IS THE POINT. The apex has
+   no control on this tree, so there is no travel to sweep — the sweep block
+   is kept rather than deleted because a later session adding the superellipse
+   inherits the place it goes, and Eva's standing instruction is that every
+   control added or changed gets one. */
+const sweep = ['  the apex has NO CONTROL on this tree, so there is no travel to sweep.',
+  '  The two that were built for it (a terminal width and a shape exponent) were',
+  '  DROPPED on Eva\'s ruling; the superellipse that replaces them is a',
+  '  reparameterisation of the tip taper and lands with the row redistribution',
+  '  its round end needs. This block is where its sweep goes.'];
+console.log('\nDEAD-CONTROL SWEEP:');
+for (const l of sweep) console.log(l);
+
+/* ===================================================================
+   THE SHEET
+   =================================================================== */
+const esc = (s) => String(s).replace(/&(?![a-z]+;|#)/g, '&amp;').replace(/</g, '&lt;');
+const cellHtml = (o) => `<figure class="cell">
+  <figcaption><b>${esc(o.label)}</b><br>${o.caption}<br><span class="note">${o.note}</span>
+  <br><span class="ctrl">same-tree control: ${VIEWS.map((v) => `${v} ${o.ctrl[v].pixels} px`).join(' · ')}</span></figcaption>
+  <div class="shots">${VIEWS.map((v) => `<div><img src="${o.shots[v].file}"><div class="lab">${v} &middot; ${o.shots[v].mmPerPx.toFixed(4)} mm/px</div></div>`).join('')}</div>
+</figure>`;
+const group = (title, blurb, keys) => `<section><h2>${title}</h2><p>${blurb}</p>
+  <div class="grid">${out.filter((o) => keys.includes(o.tag)).map(cellHtml).join('')}</div></section>`;
+
+fs.writeFileSync(path.join(outDir, 'index.html'), `<!doctype html><meta charset="utf-8">
+<title>Bloom — PETAL TIP SHAPE, the apex (session 32)</title>
+<style>
+ body{background:#0c0f0e;color:#dfe7e3;font:14px/1.55 system-ui,sans-serif;margin:0;padding:28px 32px;max-width:1500px}
+ h1{font-size:22px;margin:0 0 4px} h2{font-size:17px;margin:34px 0 6px;color:#9fd6c4}
+ p{max-width:105ch;color:#b8c4bf} .grid{display:flex;flex-wrap:wrap;gap:22px;margin-top:14px}
+ .cell{margin:0;width:${QUICK ? 470 : 940}px;background:#121614;border:1px solid #1e2724;border-radius:8px;padding:12px}
+ .shots{display:flex;gap:10px} .shots img{width:450px;height:450px;display:block;border-radius:4px;background:#000}
+ .lab{color:#6f8079;font-size:11px;padding-top:3px}
+ figcaption{font-size:12px;color:#9fb0a9;padding-bottom:9px}
+ .note{color:#c9b98a} .ctrl{color:#6f8079}
+ pre{background:#121614;border:1px solid #1e2724;border-radius:8px;padding:12px;overflow-x:auto;color:#b8c4bf;font-size:12px}
+ b{color:#e8f2ee}
+</style>
+<h1>PETAL TIP SHAPE — the whole-petal apex</h1>
+<p>Session 32, <b>phase B</b>: Eva ruled <code>blunt</code> and this is the build. The converging tip cap
+is now <b>unconditional</b> and owns its own terminal; <code>petalTipBreadth</code> and its three role twins
+are retired; the spatulate silhouette moved to its proper owner, the two taper exponents, whose widest point
+<code>a/(a+b)</code> reaches 0.833.</p>
+<p><b>Two controls, two quantities.</b> <code>Tip end</code> is how BROAD the blade ends; <code>Tip shape</code>
+is HOW it gets there &mdash; 1.00 the straight cone, below it rounded, above it drawn out. They are separate
+rows rather than one dial because the ruling rests on the combination: a rounded shoulder is only legible at a
+broad end, so &ldquo;round&rdquo; and &ldquo;broad&rdquo; have to be reachable together and apart.</p>
+<p><b>The shipping default is byte-identical to the tree before this session</b>, by construction rather than
+tolerance: <code>Math.max(0 &times; halfW, tipFloor)</code> IS the floor and the interpolant&rsquo;s
+<code>m === 1</code> arm returns <code>s</code> itself. Measured in Node against a worktree of b323268:
+12,180 half-widths and every cap field, 0 differ under <code>Object.is</code>.</p>
+<h2>The same-tree control distribution for this run</h2>
+<p>The renderer is not deterministic between page sessions and a single control sample is never a floor, so
+every row here was rendered twice on the same tree at the same camera and the whole distribution is printed.
+Read every pixel number on this page against it &mdash; and note that the whole-blade framing is bimodal
+(in phase A the identity comparison, between builds proved bit-identical to the float, read 0 px on one run
+and 7,036 px on the next), so the pixel claim belongs to the <b>tip crop</b>. No cell here is a whole-bloom
+framing.</p>
+<pre>${VIEWS.map((v) => `${v.padEnd(6)} n=${dist[v].n}  min ${dist[v].min}  median ${dist[v].median}  max ${dist[v].max}   [${dist[v].all.join(', ')}]`).join('\n')}
+
+${idLines.join('\n')}</pre>
+${group('1 &middot; The unconditional cap, on this tree',
+  'The shipping default and the two cap-entry rules. The apex has no control, so what varies here is what actually reaches it: the tip taper (which decides where the cap enters and how wide it starts) and the petal width (which decides how much of the tip the mode floor is).',
+  ['today', 'taper-06', 'taper-4', 'narrow'])}
+${group('2 &middot; The base tree — what the retirement removed',
+  'Rendered from a git worktree of b323268 by the same browser and the same camera, so this is a real render of the old code rather than a remembered one. The first cell is the identity pair with section 1; the rest are the retired control\'s own states.',
+  ['base-today', 'base-01', 'base-30', 'base-60'])}
+<h2>Dead-control sweep</h2>
+<p>Every step of both shipped ranges, at five petal-width &times; mode combinations, measured on the
+<b>drawn rows</b> rather than on the continuous law &mdash; a curve the 28-row sampling cannot resolve is a
+control that has stopped responding whatever the arithmetic says. Both directions of the question: does each
+control move the shape across its whole declared range, and does its default sit anywhere the other control
+goes inert.</p>
+<pre>${esc(sweep.join('\n'))}</pre>
+`);
+
+await browser.close(); server.close(); if (base) base.server.close();
+console.log(`\nwrote ${out.length} cell(s) -> ${path.join(outDir, 'index.html')}`);

@@ -1,0 +1,12 @@
+<!-- Deliberately no width/height attributes — only viewBox — to test the
+     upload path against an SVG exported the way many vector tools default
+     to (intrinsic size left for the consumer to infer from viewBox). Wide
+     (300x180) aspect ratio, grouped multi-path, each path pre-set to a
+     different original fill to confirm canvas tinting overrides all of
+     them uniformly. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 180">
+  <g>
+    <path fill="#3355ff" d="M150 170 C40 100 10 50 60 20 C100 -2 140 20 150 45 C160 20 200 -2 240 20 C290 50 260 100 150 170 Z"/>
+    <path fill="#ff3355" d="M150 60 C146 50 138 44 130 46 C140 55 146 62 150 72 C154 62 160 55 170 46 C162 44 154 50 150 60 Z"/>
+  </g>
+</svg>

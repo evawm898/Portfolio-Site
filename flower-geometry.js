@@ -101,19 +101,12 @@ const PETAL_CUP_AMP = 0.5;   // max extra across-width cup/reflex from the Petal
 // over-curve one side of the tube past its own seam.
 const CROSS_SECTION_MAX_ANGLE = 2 * Math.PI * 0.975;   // ~351 deg turn at |crossSection| = 1
 const CROSS_SECTION_CUP_DAMP = 0.85;   // fraction of petalCup's lift removed at |crossSection| = 1
-// SURFACE RELIEF: out-of-plane corrugation (plicate / rugose / bullate). Amplitude
-// is a world-unit lift on the same axis as the cup; rib count spans a broad pleat
-// to a fine crepe. Corrugating a thin sheet raises its bending stiffness ~ (depth/
-// thickness)^2, so this buys stiffness (delicacy) more than it costs material.
-const RELIEF_AMP_MAX  = 0.22;   // max normal lift at reliefAmp = 1 (world units)
-const RELIEF_RIBS_MIN = 3;      // pleat count at reliefFreq = 0
-const RELIEF_RIBS_MAX = 22;     // crepe count at reliefFreq = 1
 // TWIST + SKEW: contorted aestivation (bud spiral) + lateral midrib bend. Twist is
 // a progressive rotation of the cross-section about the midrib tangent; skew swings
 // the midrib sideways. Both intentionally break bilateral symmetry (chirality).
 const TWIST_MAX = 1.15;         // max cross-section rotation at |twist| = 1 (radians, tip)
 const SKEW_MAX  = 0.7;          // max lateral midrib swing at |skew| = 1 (fraction of W, tip)
-const RELIEF_SIDE_PHASE = 13.7; // edge-noise phase offset applied to the -v side when asymmetric
+const EDGE_NOISE_SIDE_PHASE = 13.7; // edge-noise phase offset applied to the -v side when asymmetric
 // TIP FINENESS: how far the P.tip=1 exponent ceiling can be pushed past 1.0
 // (a genuinely fine needle point), and the P.W band over which "how narrow is
 // this petal already" ramps from 0 (broad paddle) to 1 (quilled strap). A
@@ -512,41 +505,9 @@ function edgeNoiseDisplace(u, v, P) {
   // has made the petal asymmetric, a perfectly mirrored crinkle reads as a render
   // bug, so we desync the two margins: the -v side gets a phase offset. Gated on
   // asymmetry so symmetric petals stay byte-identical.
-  const asym = (P.petalTwist || P.petalSkew) ? (v < 0 ? RELIEF_SIDE_PHASE : 0) : 0;
+  const asym = (P.petalTwist || P.petalSkew) ? (v < 0 ? EDGE_NOISE_SIDE_PHASE : 0) : 0;
   const n = fbm1D(u * freq + asym) * 0.8 + fbm1D(av * freq * 1.7 + 5 + asym) * 0.4;
   return amt * EDGE_NOISE_AMP * band * n;
-}
-
-/* SURFACE RELIEF displacement at (u, v): a scalar out-of-plane lift, added to the
-   cup lift along the spine normal (like edge noise), faded to 0 at the base and
-   tip so the ends stay anchored and the apex — where halfWidth -> 0 — never pinches.
-     RADIAL     ribs aligned to the flow field T (getPetalFields): the phase runs
-                ACROSS T, so crest lines follow T and converge at the base — genuine
-                radial ribs from the base (iris / gentian). Uses a local linearisation
-                of T (exact where T is locally straight; bends with the fan elsewhere).
-     TRANSVERSE crests across the width, spaced along the length (u).
-     IRREGULAR  fbm lumps in both directions (bullate / rugose).
-   All three add ZERO triangles — they only displace existing vertices. */
-function reliefDisplace(u, v, P, hw) {
-  const amp = P.reliefAmp || 0;
-  if (amp <= 1e-4) return 0;
-  const uu = clamp(u, 0, 1);
-  const fade = Math.sin(Math.PI * uu);            // 0 at base & tip, 1 mid-blade
-  if (fade <= 1e-6) return 0;
-  const ribs = lerp(RELIEF_RIBS_MIN, RELIEF_RIBS_MAX, clamp(P.reliefFreq != null ? P.reliefFreq : 0.5, 0, 1));
-  const mode = P.reliefMode || 'radial';
-  let wave;
-  if (mode === 'transverse') {
-    wave = Math.sin(uu * ribs * Math.PI);
-  } else if (mode === 'irregular') {
-    const f = ribs * 0.6;
-    wave = fbm1D(uu * f) + fbm1D((v * 0.5 + 0.5) * f * 1.3 + 11);   // ~[-1.2, 1.2] bullate
-  } else { // radial — aligned to T
-    const s = getPetalFields(P).sample(P.L * uu, v * hw);
-    const perp = (-s.Ty * (P.L * uu) + s.Tx * (v * hw)) / P.L;      // coordinate ACROSS T
-    wave = Math.sin(perp * ribs * Math.PI);
-  }
-  return amp * RELIEF_AMP_MAX * fade * wave;
 }
 
 // How much of the roll angle applies at u, so CROSS-SECTION TAPER can open the
@@ -618,8 +579,6 @@ export function surfacePoint(u, v, P, spine) {
   // EDGE NOISE: organic crinkle on top of ANY tip style (adds to the ruffle when
   // both are on). 0 leaves the surface untouched.
   if (P.edgeNoise) normalLift += edgeNoiseDisplace(u, v, P);
-  // SURFACE RELIEF: corrugation on the same axis as the cup lift.
-  if (P.reliefAmp) normalLift += reliefDisplace(u, v, P, hw);
   // The cross-section spans two axes: `lift` along the spine normal (nx, ny) and
   // `across` along the width (world z). TWIST rotates that section about the midrib
   // tangent, progressively from base to tip; SKEW swings the whole section sideways
@@ -736,6 +695,17 @@ export function marginFlareFactor(u, bundleTight, flareRate) {
 // strand's base/tip radii. Canonical here; flower.js imports these instead
 // of keeping its own copies, so the render and the boundary check can never
 // drift apart by editing one and forgetting the other.
+// A Voronoi cell below this area (world units squared) is geometrically DEGENERATE, not
+// merely small: a ring with perimeter and no interior. The smallest LEGITIMATE cell the
+// geometry-quality matrix produces is 0.069 mm^2 (chrysanthemum, dense by design) — about
+// 1.0e-4 u^2 at 26 mm/unit — so this sits five orders of magnitude below it and can only
+// ever catch a collapse, never a real cell.
+// (An earlier draft of this comment cited 14.9 mm^2, taken from a run where the minCellSize
+// floor was temporarily un-gated and had already removed every small cell. Measuring the
+// wrong configuration and quoting it as the shipping one is the mistake this file keeps
+// finding elsewhere; recorded here rather than silently corrected.)
+export const DEGENERATE_CELL_AREA = 1e-9;
+
 export const RIM_WIDTH = 0.34;      // constant hoop radius, relative to tubeRadius
 export const MARGIN_W_BASE = 0.62;  // continuous-margin strand radius at the foot
 export const MARGIN_W_TIP = 0.12;   // continuous-margin strand radius at the tip
@@ -790,6 +760,251 @@ export function ribMarginPolyline(P, n = 56) {
   for (let i = 0; i < right.length; i++) outline.push(right[i]);
   for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
   return dedupePolygon(outline);
+}
+
+// The same curve as ribMarginPolyline, TRIMMED to where it actually has width.
+//
+// ribInnerEdge is floored at 0 (see above), and under continuous margin that floor
+// engages over a run at the foot and, on clefted petals, a second run at the tip: the
+// bundled strand is wider there than the petal, so the rib owns the full width and the
+// "inner edge" is the axis on both sides. ribMarginPolyline emits those runs faithfully
+// — as a zero-width neck where the +Y and -Y walls lie on top of each other.
+//
+// That is correct as a TERMINATION TARGET (an infill strand at u = 0.05 should stop at
+// y = 0; there is no room), and wrong as a CLIP POLYGON. Sutherland-Hodgman clipping a
+// cell against a polygon that doubles back on itself yields a cell that doubles back on
+// itself, and no amount of seed culling fixes it: remove the seed owning the neck and its
+// region passes to a neighbour, which inherits the same spike. Measured over the six
+// voronoi configs: the neck spans 12.5-18.1% of the petal at the foot and up to 22.2% at
+// the tip, 1-2 folds in the bound, 1-4 escaping cells (#74, #77).
+//
+// So Voronoi clips against the positive-width span only. Nothing is lost: the trimmed
+// runs have zero material width by construction, so no cell belongs there. The endpoints
+// are placed at the true crossings by bisection rather than snapped to a station, so the
+// bound closes to a point at each end instead of a short zero-width stub.
+export function ribClipPolygon(P, n = 72) {
+  const positive = (u) => ribInnerEdge(clamp(u, 0, 1), P) > 1e-9;
+  // The LONGEST run of positive-width stations, not merely the first-to-last: measured,
+  // the zero runs are always one at the foot and one at the tip, but taking the outermost
+  // pair would silently span an interior neck if one ever appeared, which is the exact
+  // defect this function exists to remove. (The gate's clipFolds census is the backstop
+  // for a neck narrower than one station.)
+  let bestA = -1, bestB = -1, runA = -1;
+  for (let i = 0; i <= n; i++) {
+    const p = positive(i / n);
+    if (p && runA < 0) runA = i;
+    if ((!p || i === n) && runA >= 0) {
+      const end = p ? i : i - 1;
+      if (end - runA > bestB - bestA) { bestA = runA; bestB = end; }
+      runA = -1;
+    }
+  }
+  if (bestA < 0) return null;
+  const crossing = (uIn, uOut) => {          // uIn has width, uOut does not
+    let a = uIn, b = uOut;
+    for (let k = 0; k < 40; k++) { const m = (a + b) / 2; if (positive(m)) a = m; else b = m; }
+    return b;                                 // the zero side, so the bound closes to a point
+  };
+  const u0 = bestA === 0 ? 0 : crossing(bestA / n, (bestA - 1) / n);
+  const u1 = bestB === n ? 1 : crossing(bestB / n, (bestB + 1) / n);
+  if (!(u1 > u0)) return null;
+  const right = [], left = [];
+  for (let i = 0; i <= n; i++) {
+    const u = u0 + (u1 - u0) * (i / n), X = P.L * u, r = ribInnerEdge(u, P);
+    right.push({ x: X, y: r });
+    left.push({ x: X, y: -r });
+  }
+  const outline = [];
+  for (let i = 0; i < right.length; i++) outline.push(right[i]);
+  for (let i = left.length - 1; i >= 0; i--) outline.push(left[i]);
+  return dedupePolygon(outline);
+}
+
+
+/* -------------------------------------------------------------------
+   4a-iii. ribInsetBound(P) — THE PETAL'S MATERIAL BOUNDARY, INSET BY THE RIB.
+
+   The third boundary, and the one that did not exist. The other two each answer
+   half the question:
+
+     buildSilhouette  the material outline — cleft-aware, no rib inset
+     ribClipPolygon   the rib's inner edge — inset, no cleft awareness
+
+   Voronoi needs BOTH at once: the material, inside the rib. Clipping cells to
+   ribClipPolygon lets them span every sinus (the void-crossing defect); clipping
+   them to buildSilhouette instead lets them run out past the margin rib (measured
+   at 13.643 mm of overshoot against a threshold of 3). Intersecting the two
+   polygons is a non-convex-against-non-convex clip, which is the general clipper
+   this file has deliberately never acquired.
+
+   So it is not built by intersecting them. It is traced, the way buildSilhouette
+   is traced, as the zero contour of a scalar field — SECOND USE of contourField
+   above, not a second copy of it:
+
+     m(x, y) = petalMask(x, y / f(x)) * f(x) - ribRadius(u)
+
+   where f = marginFlareFactor is the y-SCALE continuous margin applies to the
+   boundary (ribCenterline = outerAt * f), so scaling the mask's y by it puts the
+   zero contour of the first two terms exactly on the rib's centreline; subtracting
+   the rib's own radius insets to its inner edge. With continuous margin off f = 1
+   and the field is plainly petalMask - ribRadius. On the axis it reduces to
+   w(u)*f - r(u), which IS ribInnerEdge(u) — so this is the pointwise scalar
+   boundary generalised to two dimensions, not a parallel construction.
+
+   TWO EVALUATION STRATEGIES FOR ONE CURVE, exactly as ribPath does it: with no
+   clefts the analytic answer is exact and ribClipPolygon is returned VERBATIM,
+   so every non-clefted design is byte-identical and pays nothing. The level set
+   runs only where no analytic answer exists.
+
+   WHAT THIS IS NOT, stated because it would otherwise be assumed: petalMask is
+   NOT a signed distance field. |grad| over the material runs 0.04 to 1.68, so a
+   level set of it is not an exact offset, and this bound is not an exact inset.
+   Measured against ribClipPolygon on SMOOTH petals — where the two describe the
+   same curve and any disagreement is purely this approximation — the error is
+   mean 0.105 mm, max 0.298 mm (37% of the 0.8 mm minimum feature). That is the
+   reason the smooth path returns the analytic polygon instead of the level set:
+   the approximation is confined to clefted petals, where the alternative is not
+   a more accurate bound but no bound at all. The gate asserts the smooth-petal
+   agreement so the error cannot grow unnoticed.
+   ------------------------------------------------------------------- */
+
+// Douglas-Peucker tolerance for the traced bound, in world units. A marching-squares
+// contour carries ~1.3-1.9k vertices where the analytic band carries 480, and cells
+// INHERIT boundary vertices (cellAnnulus emits SUB samples per cell edge), so the
+// triangle cost of not simplifying lands on every cell. Set at a quarter of the
+// printable minimum feature — 0.8 mm at the file's 26 mm/unit convention — so
+// simplification cannot move the boundary by a printable amount.
+const RIB_BOUND_SIMPLIFY_TOL = (0.8 / 26) * 0.25;
+
+// Douglas-Peucker, then REPAIRED so no chord leaves the material. Plain DP bounds the
+// perpendicular distance from the ORIGINAL POLYLINE, which is not the same as staying
+// inside the shape: around the rounded sinus floor the inset contour is a tight convex
+// arc, and a chord across it cuts the corner OUTWARD, into the slot. Measured with plain
+// DP at the same tolerance: 0.447 mm of the bound sitting in removed material on 5 lobes
+// at cleftDepth 0.6, which the cells then inherited and doubled to 0.878 mm.
+//
+// The repair is not a smaller tolerance — that pays vertices everywhere for a problem
+// that occurs at a few corners. Each retained chord is sampled, and any chord that leaves
+// the material gives its span's original vertices back. Simplification is therefore free
+// where the contour is straight (which is most of it) and absent where it would cost
+// correctness.
+function simplifyMaterialSafe(pts, tol, mask) {
+  const simp = simplifyPath(pts, tol);
+  if (simp.length < 2) return simp;
+  // index of each retained point in the original, so a bad span can be restored verbatim
+  const idx = [];
+  for (let i = 0, k = 0; i < pts.length && k < simp.length; i++) {
+    if (pts[i] === simp[k]) { idx.push(i); k++; }
+  }
+  if (idx.length !== simp.length) return simp;      // identity-matching failed; leave as-is
+  const SAMPLES = 8;
+  const out = [];
+  for (let k = 0; k < simp.length; k++) {
+    out.push(simp[k]);
+    const kn = (k + 1) % simp.length;
+    const a = simp[k], b = simp[kn];
+    let bad = false;
+    for (let t = 1; t < SAMPLES; t++) {
+      const f = t / SAMPLES;
+      if (mask(a.x + (b.x - a.x) * f, a.y + (b.y - a.y) * f) <= 0) { bad = true; break; }
+    }
+    if (!bad) continue;
+    const i0 = idx[k], i1 = k + 1 < simp.length ? idx[kn] : pts.length;
+    for (let i = i0 + 1; i < i1; i++) out.push(pts[i]);
+  }
+  return out;
+}
+
+const _ribInsetCache = new Map();
+
+// Returns the bound's CONNECTED PIECES, largest first — always an array, one element in
+// every ordinary case. It is not always one: measured over 192 clefted configs, six trace
+// as two or three separate islands, all of them continuous margin with cleftDepth >= 0.55
+// AND cleftWidth >= 0.7, where the slots are wide enough at the sinus floor that the rib
+// inset pinches through and each lobe's interior stands alone. The MATERIAL is still one
+// piece there (maskContours returns a single loop on every one of them) — it is the INSET
+// that separates, which is real geometry and not a tracing failure. Returning only the
+// largest would silently drop up to 50% of the petal's interior on those designs, so the
+// contract is the list and every consumer clips against each piece.
+//
+// opts.trace forces the traced path on a petal that has no clefts, where ribClipPolygon
+// is exact. That is the ONLY way to measure this producer's approximation error against a
+// known-correct reference — on a clefted petal there is nothing to compare it to — so the
+// positive control in verify-geometry-quality.mjs is its one caller. Nothing in the render
+// or export path passes it.
+export function ribInsetBound(P, opts = {}) {
+  const cfg = cleftConfig(P);
+  // No clefts: the analytic inner edge IS the material's inner edge, exactly. Returned
+  // verbatim so smooth designs are untouched by this producer existing.
+  if (!cfg && !opts.trace) { const cp = ribClipPolygon(P, 72); return cp ? [cp] : []; }
+
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  const k = [P.L, P.W, P.taper, P.tip, P.edgeCurve, P.clawLength || 0, P.clawWidth || 0, P.shoulder || 0,
+    P.cleftDepth || 0, P.cleftLobes || 0, P.cleftWidth || 0,
+    contMargin ? 1 : 0, P.tubeRadius, P.thickScale || 1, P.bundleTightness, P.flareRate,
+    opts.trace ? 'T' : '', opts.simplifyTol != null ? opts.simplifyTol : ''].join('|');
+  const hit = _ribInsetCache.get(k);
+  if (hit !== undefined) return hit;
+
+  const L = Math.max(P.L, 1e-4);
+  const uAt = (x) => clamp(x / L, 0, 1);
+  const rAt = (x) => ribRadius(uAt(x), P, contMargin);
+  // Floored away from 0: under continuous margin the flare vanishes at the foot, and
+  // dividing y by it there would send every off-axis sample to -Infinity rather than
+  // simply leaving the field negative (which the -rAt term already guarantees).
+  const flareAt = (x) => (contMargin
+    ? Math.max(1e-3, marginFlareFactor(uAt(x), P.bundleTightness, P.flareRate))
+    : 1);
+  // TWO constraints, not one. petalMask(x, y/f)*f is where the RIB is: the boundary with
+  // continuous margin's y-scale applied, which is exactly what cleftStrands lofts. But the
+  // flare pulls the whole contour toward the axis, INCLUDING the cleft walls, and a slot is
+  // a fixed hole that does not move with it — so near the foot that curve passes over
+  // removed material. (That is the shipped rib's own behaviour, not something introduced
+  // here; the rib strand really does bundle across the sinus down at the bundle.) Reading
+  // it alone as the bound let the contour sit 0.720 mm inside a slot on 5 lobes at
+  // cleftDepth 0.6, and the cells inherited it — the exact defect this whole change exists
+  // to remove. So the bound is inside the flared curve AND inside the MATERIAL, inset by
+  // the rib in both. Where f = 1 the two terms are identical and this costs nothing; on a
+  // petal with no clefts the flared term is the smaller one everywhere, so the smooth
+  // positive control is untouched.
+  const field = (x, y) => {
+    const f = flareAt(x);
+    return Math.min(petalMask(x, y / f, P, cfg) * f, petalMask(x, y, P, cfg)) - rAt(x);
+  };
+
+  // 240, against maskContours' 200: this contour is an INSET one, so it runs through the
+  // narrow material between a slot wall and the rib where the coarser lattice loses the
+  // gap entirely. The cost is paid once per shape (cached) and simplified away below.
+  //
+  // Marching squares also emits a handful of 3-5 vertex loops wherever the field grazes
+  // the lattice tangentially. Those are not islands, and counting them as such would
+  // misreport the inset's topology. The floor separating them from real islands is not a
+  // tuned threshold: measured, noise loops come to <= 0.0027 mm^2 and the smallest genuine
+  // island to 11.44 mm^2, so anything narrower than the printable minimum feature square
+  // (0.8 mm)^2 = 0.64 mm^2 sits four orders of magnitude clear of both. An island that
+  // small could not hold one printable strut in any case.
+  const NOISE_AREA = (0.8 / 26) * (0.8 / 26);
+  let loops = contourField(field, flatContourBox(P, 240), 240)
+    .filter((l) => l.length >= 3 && Math.abs(polyArea(l)) > NOISE_AREA);
+
+  // opts.simplifyTol is the positive control's second knob: measuring at tol 0 separates
+  // this producer's LEVEL-SET approximation from the deliberate simplification on top of
+  // it, so a change in either is attributable. Shipped callers pass neither.
+  const tol = opts.simplifyTol != null ? opts.simplifyTol : RIB_BOUND_SIMPLIFY_TOL;
+  const out = [];
+  for (let piece of loops) {
+    if (tol > 0) piece = simplifyMaterialSafe(piece, tol, (x, y) => petalMask(x, y, P, cfg));
+    if (piece.length < 3) continue;
+    // Match ribClipPolygon's winding (clockwise / negative shoelace), which every
+    // downstream orientation convention — cell rings, slab faces — is built on.
+    if (polyArea(piece) > 0) piece = piece.slice().reverse();
+    piece = dedupePolygon(piece);
+    if (piece.length >= 3) out.push(piece);
+  }
+  out.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
+  if (_ribInsetCache.size > 24) _ribInsetCache.delete(_ribInsetCache.keys().next().value);
+  _ribInsetCache.set(k, out);
+  return out;
 }
 
 /* -------------------------------------------------------------------
@@ -1161,20 +1376,32 @@ export function petalMask(x, y, P, cfg) {
 // m = 0 contour. Returns loops as arrays of {x, y}. For cleft petals (one
 // connected region) this is a single re-entrant loop; the generic multi-loop
 // return is what the fused-corolla work will use.
-export function maskContours(P, cfg, nu = 160) {
+// The bbox every flattened-space contour is traced over: the petal's envelope plus a
+// pad, so no contour touches the grid edge. Shared by every caller so two contours of
+// the same petal are sampled on the SAME lattice (and therefore agree vertex-for-vertex
+// where their fields agree), rather than on two independently-derived boxes.
+function flatContourBox(P, nu) {
   const L = Math.max(P.L, 1e-4);
   let Wmax = 1e-4;
   for (let i = 0; i <= 64; i++) { const w = petalHalfWidth(i / 64, P); if (w > Wmax) Wmax = w; }
   const padY = Wmax * 0.08 + L / nu;
-  const y0 = -Wmax - padY, y1 = Wmax + padY;
-  const x0 = -L / nu, x1 = L + L / nu;
+  return { x0: -L / nu, x1: L + L / nu, y0: -Wmax - padY, y1: Wmax + padY, L, Wmax };
+}
+
+// Marching squares over ANY scalar field on a flattened bbox -> ordered closed loop(s)
+// of its zero contour, largest first. This is the file's one contourer: maskContours
+// passes petalMask (the material outline) and ribInsetBound passes the rib-inset level
+// set (section 4a-iii). Adding a THIRD contour means passing a third field here, not
+// writing a third marching-squares loop beside this one.
+function contourField(field, box, nu) {
+  const { x0, x1, y0, y1 } = box;
   const dx = (x1 - x0) / nu;
   const nv = Math.max(8, Math.round((y1 - y0) / dx));
   const dy = (y1 - y0) / nv;
   const gx = (i) => x0 + i * dx, gy = (j) => y0 + j * dy;
-  // sample m on the (nu+1) x (nv+1) lattice
+  // sample the field on the (nu+1) x (nv+1) lattice
   const val = new Float64Array((nu + 1) * (nv + 1));
-  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = petalMask(gx(i), gy(j), P, cfg);
+  for (let j = 0; j <= nv; j++) for (let i = 0; i <= nu; i++) val[j * (nu + 1) + i] = field(gx(i), gy(j));
   const V = (i, j) => val[j * (nu + 1) + i];
   // interpolated zero-crossing on a cell edge between corners a (va) and b (vb)
   const lerpEdge = (xa, ya, va, xb, yb, vb) => {
@@ -1232,6 +1459,10 @@ export function maskContours(P, cfg, nu = 160) {
   }
   loops.sort((a, b) => Math.abs(polyArea(b)) - Math.abs(polyArea(a)));
   return loops;
+}
+
+export function maskContours(P, cfg, nu = 160) {
+  return contourField((x, y) => petalMask(x, y, P, cfg), flatContourBox(P, nu), nu);
 }
 
 // Memoized contour + config accessor, so a multi-petal whorl of the same shape
@@ -2487,11 +2718,198 @@ function spineScore(poly, c, T, L) {
   return elong * longEnough;
 }
 
+
+/* -------------------------------------------------------------------
+   VORONOI'S PARTITION — one diagram per lobe, over the material inside the rib.
+
+   On a smooth petal the cells are one Voronoi diagram over one bound and this
+   whole section is inert: buildPartition returns a single region whose subject is
+   ribClipPolygon, which is what buildVoronoi clipped against before it existed.
+
+   On a CLEFTED petal one diagram over one bound is the defect. The bound Voronoi
+   used spans every sinus, so a cell reaches across a slot and the printed blade
+   carries a strut through the gap between two lobes (17 such cells on `lobed`).
+   Clipping harder does not fix it — the cell is legitimately the nearest region to
+   its seed; it is the DIAGRAM that has to stop at the lobe.
+
+   THE DIVIDERS RUN WITH THE STRUCTURE, NOT ACROSS IT. Each divider follows its
+   cleft slot down to that slot's own sinus floor, then continues as a ray from the
+   petal's foot through the floor point:
+
+     y_k(x) = centers[k]                     for x >= xFloor   (along the slot)
+            = centers[k] * x / xFloor        for x <  xFloor   (ray from the foot)
+
+   Continuous at xFloor by construction, and radial everywhere — so there is no
+   separate basal region to invent: each lobe owns its own wedge of the base. A
+   straight cut was measured first and rejected (18 crossings against today's 17);
+   it runs across a radial structure.
+
+   EXACTLY TWO CONVEX PIECES PER REGION, and this is derived rather than chosen.
+   y_k is min(c*x/xFloor, c), a min of two linear functions, hence CONCAVE. Keeping
+   BELOW one is `y <= L1 AND y <= L2` — an intersection of half-planes, convex.
+   Keeping ABOVE one is `y >= L1 OR y >= L2` — a union, with exactly ONE reflex
+   corner, at x = xFloor. Splitting there yields two pieces that are pure half-plane
+   intersections, so clipHalfPlane — already in this file, and exact — suffices and
+   no bisecting divider-clip is needed. An earlier attempt wrote one; it was not
+   merely unnecessary but wrong, because it assumes a subject edge crosses the
+   divider once and a straight edge can cross a piecewise-linear divider twice.
+
+   This is also why NO GENERAL POLYGON CLIPPER is pulled in. Sutherland-Hodgman
+   constrains the CLIP, not the SUBJECT — voronoiCell already relies on that, since
+   every clip it applies is a half-plane — so the subject may be as concave as the
+   traced bound is.
+
+   HALF-SPACE MIRRORING. The partition is built on the +Y half and mirrored. This
+   is not an optimisation: it is what makes the result bilaterally symmetric. For an
+   EVEN lobe count cleftConfig places a cleft centre at exactly y = 0, and a strict
+   `p.y > dividerY(...)` test drops every axis seed (pinned to y = 0) to one side —
+   measured on the prototype as 13 seeds against 7 on the shipped default, a visibly
+   denser pattern on one half of a petal whose own relaxation block promises
+   symmetry. Mirroring does not HANDLE that case; the y = 0 divider becomes the
+   half-space boundary and the case stops existing. Measured skew: exactly 0.
+
+   Its cost, which is a LOOK question and not a correctness one: a cell that used to
+   straddle y = 0 as one cell becomes two cells meeting at the midline, so each axis
+   seed gains a short wall down the blade's midline. Off-axis cells already met their
+   mirrors there, so nothing else changes.
+   ------------------------------------------------------------------- */
+
+// Rejoin one cell's two convex pieces across the split line x = xSplit. They are not
+// arbitrary polygons: both are Sutherland-Hodgman outputs of the SAME subject under the
+// SAME half-planes, and the two regions' constraints coincide exactly on the line
+// (c * xFloor / xFloor = c), so the pieces share an identical edge there by construction.
+// That is what makes this a splice rather than a union: walk one from just past the shared
+// edge all the way round, then the other likewise. Returns null when the pieces do not
+// present exactly one matching edge each — the caller counts that and keeps both pieces
+// rather than dropping either, so a fallback costs a seam, never material.
+function touchesSplit(poly, xSplit, eps) {
+  for (const p of poly) if (Math.abs(p.x - xSplit) < eps) return true;
+  return false;
+}
+
+function rejoinAtSplit(A, B, xSplit, eps) {
+  const edgesOn = (poly) => {
+    const hits = [];
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i], b = poly[(i + 1) % poly.length];
+      if (Math.abs(a.x - xSplit) < eps && Math.abs(b.x - xSplit) < eps
+          && Math.abs(a.y - b.y) > eps) hits.push(i);
+    }
+    return hits;
+  };
+  const ea = edgesOn(A), eb = edgesOn(B);
+  if (ea.length !== 1 || eb.length !== 1) return null;
+  const ia = ea[0], ib = eb[0];
+  const a0 = A[ia], a1 = A[(ia + 1) % A.length];
+  let Bw = B, jb = ib;
+  let b0 = Bw[jb], b1 = Bw[(jb + 1) % Bw.length];
+  // The shared edge is traversed in OPPOSITE directions when both pieces carry the same
+  // winding. If it is traversed the same way the pieces wind oppositely, so reverse one.
+  if (!(Math.abs(a0.y - b1.y) < eps && Math.abs(a1.y - b0.y) < eps)) {
+    if (Math.abs(a0.y - b0.y) < eps && Math.abs(a1.y - b1.y) < eps) {
+      Bw = B.slice().reverse();
+      const eb2 = edgesOn(Bw);
+      if (eb2.length !== 1) return null;
+      jb = eb2[0]; b0 = Bw[jb]; b1 = Bw[(jb + 1) % Bw.length];
+      if (!(Math.abs(a0.y - b1.y) < eps && Math.abs(a1.y - b0.y) < eps)) return null;
+    } else return null;
+  }
+  const out = [];
+  for (let k = 1; k <= A.length; k++) out.push(A[(ia + k) % A.length]);
+  for (let k = 1; k <= Bw.length; k++) out.push(Bw[(jb + k) % Bw.length]);
+  const joined = dedupePolygon(out);
+  return joined.length >= 3 ? joined : null;
+}
+
+// Resolve the partition for one petal: which region each seed belongs to, and the convex
+// subject pieces each region is clipped against. ONE definition of "this seed's cell",
+// read by relaxation, both culls and emission alike — those were three near-copies of the
+// same voronoiCell call, and a partition that only the emission step knew about would
+// relax seeds across dividers it was built to respect.
+function buildPartition(P, cfg) {
+  const islands = ribInsetBound(P);
+  // ribClipPolygon returns null when the rib covers the entire petal; the untrimmed
+  // polyline is the same fallback buildVoronoi used before, and every cell is culled as
+  // zero-area there either way.
+  const bounds = islands.length ? islands
+    : (() => { const f = ribMarginPolyline(P, 72); return f ? [f] : []; })();
+
+  if (!cfg) {
+    return {
+      clefted: false, mirrorAll: false, regionCount: 1, bounds,
+      regionOf: () => 0,
+      pieces: () => bounds.map((b) => [b, null]),
+      diag: { regions: 1, islands: bounds.length, fallbacks: 0, skew: 0 },
+    };
+  }
+
+  const xFloor = cfg.uFloor * cfg.L;
+  // Only the +Y dividers exist in the half-space build; the y = 0 one (even lobe counts)
+  // IS the half-space boundary. Ascending, so region j sits between div j-1 and div j.
+  const pos = cfg.centers.filter((c) => c > 1e-12).sort((a, b) => a - b);
+  const regionCount = pos.length + 1;
+  const dividerY = (c, x) => (x >= xFloor ? c : c * x / Math.max(xFloor, 1e-9));
+  const regionOf = (p) => {
+    let k = 0;
+    for (const c of pos) if (p.y > dividerY(c, p.x)) k++;
+    return k;
+  };
+  // Region j clipped to the +Y half and split at x = xFloor into its two convex pieces.
+  //   piece A (x <= xFloor): between two rays through the foot — both linear
+  //   piece B (x >= xFloor): between two horizontals            — both linear
+  //
+  // CLIP ORDER IS LOAD-BEARING, and it is the one thing about this route that reading
+  // could not settle. THE WHOLE SENTENCE, because the half of it that circulates is the
+  // half that misleads: "Sutherland-Hodgman constrains the CLIP, not the SUBJECT" is true
+  // of the clip's convexity — a concave subject really is fine — and NOT of the result: SH returns a single vertex ring, so
+  // when the intersection is genuinely DISCONNECTED it comes back with the components
+  // joined by degenerate bridge edges running along the clip line. `bound ∩ {x >= xFloor}`
+  // is exactly that case — it is the n lobes, n separate pieces — and clipping in that
+  // order laid a bridge along x = xFloor straight across every slot. Measured before the
+  // reorder: region polygons reaching 1.716 mm into removed material, every offending
+  // vertex at exactly u = uFloor, while the bound itself measured 0.000 mm.
+  //
+  // So each piece applies the constraint that ISOLATES ONE LOBE first, and only then the
+  // split. A takes x <= xFloor first (the base, one piece) and then its rays; B takes its
+  // horizontal band first (lobe j plus the base below it, one piece) and then x >= xFloor.
+  // Both intersections are connected at every step, so no bridge is ever created.
+  const pieces = (j) => bounds.map((b) => {
+    const lo = j > 0 ? pos[j - 1] : 0;                 // lower divider (0 = the midline)
+    const hi = j < pos.length ? pos[j] : null;         // upper divider, or the outer edge
+    let A = clipHalfPlane(b, 1, 0, -xFloor);           // x <= xFloor  (the base: connected)
+    if (lo > 0) A = clipHalfPlane(A, lo / xFloor, -1, 0); else A = clipHalfPlane(A, 0, -1, 0);
+    if (hi != null) A = clipHalfPlane(A, -hi / xFloor, 1, 0);
+    let B = clipHalfPlane(b, 0, -1, lo);               // y >= lo  (the band: connected)
+    if (hi != null) B = clipHalfPlane(B, 0, 1, -hi);   // y <= hi
+    B = clipHalfPlane(B, -1, 0, xFloor);               // x >= xFloor, last
+    return [A && A.length >= 3 ? A : null, B && B.length >= 3 ? B : null];
+  });
+
+  return {
+    clefted: true, mirrorAll: true, regionCount, bounds, xFloor,
+    regionOf, pieces,
+    diag: { regions: regionCount, islands: bounds.length, fallbacks: 0, skew: 0 },
+  };
+}
+
 export function buildVoronoi(P, rng, opts = {}) {
   const density = clamp(Math.round(opts.density || 7), 3, 12);
   const perHalf = Math.round(lerp(9, 34, (density - 3) / 9));   // off-axis seeds in the +Y half
   const sil = buildSilhouette(P, 72);
   const margin = (u) => petalHalfWidth(clamp(u, 0, 1), P);
+  // ONE definition of "is this point in the material", read by BOTH seed samplers.
+  //
+  // They used to disagree. The off-axis sampler tested this silhouette, which is
+  // cleft-aware; the axis sampler tested `margin(x/P.L)` — petalHalfWidth, the ENVELOPE,
+  // which has no cleft term and spans every sinus. For an EVEN lobe count cleftConfig
+  // places a cleft centre at exactly y = 0, a slot down the midline, and the axis seeds
+  // are pinned to y = 0 — straight down the middle of it. Measured before this fix:
+  // 5 of 8 axis seeds inside removed material on both LOBED 2 and LOBED 4 (the shipped
+  // default), masks reaching -0.398; LOBED 7, odd, had none.
+  //
+  // `margin(...) < minHW` stays in both samplers, but it is a WIDTH FLOOR, not a material
+  // test, and it was never able to answer the question the axis sampler was asking it.
+  const inMaterial = (x, y) => pointInPoly(x, y, sil);
   const xLo = P.L * 0.05, xHi = P.L * 0.96;
   const minHW = 0.06;
   const axisGap = 0.05 * P.W;                       // min |y| for an off-axis seed
@@ -2530,6 +2948,7 @@ export function buildVoronoi(P, rng, opts = {}) {
         guard++;
         const x = lerp(xLo, xHi, rng());
         if (margin(x / P.L) < minHW) continue;
+        if (!inMaterial(x, 0)) continue;                 // the cleft slot, on an even lobe count
         let d = 1e9;
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2);
         const score = d / (spaceW(x) ** 2);          // width-scaled spacing (law=0: constant -> same pick)
@@ -2550,7 +2969,7 @@ export function buildVoronoi(P, rng, opts = {}) {
         const hw = margin(x / P.L);
         if (hw < minHW) continue;
         const y = lerp(Math.max(axisGap, 0.02 * hw + 0.015), hw * 0.95, rng());
-        if (!pointInPoly(x, y, sil)) continue;
+        if (!inMaterial(x, y)) continue;
         let d = 1e9;
         for (const s of half) d = Math.min(d, (s.x - x) ** 2 + (s.y - y) ** 2);
         for (const s of axis) d = Math.min(d, (s.x - x) ** 2 + y * y);
@@ -2583,35 +3002,133 @@ export function buildVoronoi(P, rng, opts = {}) {
   //     pinned to y = 0, +Y seeds stay off-axis, -Y twins rebuilt from the +Y set each
   //     pass. ---
   const lloyd = clamp(Math.round(opts.lloyd != null ? opts.lloyd : 0), 0, 20);
-  const clipPoly = ribMarginPolyline(P, 72);
+  // THE PARTITION (see buildPartition above). On a smooth petal this is one region whose
+  // subject is ribClipPolygon — exactly what this line used to read — so nothing below
+  // changes for a design without clefts. On a clefted one it is a diagram per lobe over
+  // the material INSIDE the rib, built on the +Y half and mirrored.
+  const part = buildPartition(P, cleftCfg);
+  let rejoinFallbacks = 0, disjointPieces = 0;
+  // Seeds grouped by region: a cell's neighbours are its own region's seeds, which is
+  // what makes this a partition rather than a harder clip. Rebuilt each time the seed set
+  // moves, so relaxation and the culls read the same grouping emission does.
+  const groupSeeds = () => {
+    const g = new Map();
+    for (const s of axis) { const r = part.regionOf(s); if (!g.has(r)) g.set(r, []); g.get(r).push(s); }
+    for (const s of half) { const r = part.regionOf(s); if (!g.has(r)) g.set(r, []); g.get(r).push(s); }
+    return g;
+  };
+  // ONE definition of this seed's cell(s). Returns a list because a region can be clipped
+  // against more than one island (a deeply-lobed petal's rib-inset material separates —
+  // see ribInsetBound) and because a rejoin fallback keeps both pieces rather than losing
+  // material. On a smooth petal it is a single voronoiCell call against a single polygon,
+  // byte-identical to what the three call sites below each did separately.
+  const SPLIT_EPS = 1e-9;
+  const cellsFor = (s, peers) => {
+    const M = metricFor(s);
+    const out = [];
+    for (const [A, B] of part.pieces(part.regionOf(s))) {
+      if (!part.clefted) { const c = A ? voronoiCell(s, peers, A, M) : null; if (c) out.push(c); continue; }
+      const cA = A ? voronoiCell(s, peers, A, M) : null;
+      const cB = B ? voronoiCell(s, peers, B, M) : null;
+      if (cA && cB) {
+        const j = rejoinAtSplit(cA, cB, part.xFloor, SPLIT_EPS);
+        if (j) out.push(j);
+        else {
+          // A cell that touches the split line on BOTH sides and still would not splice is
+          // a real failure. One that does not touch it on both sides is two genuinely
+          // disjoint parts of one cell — the traced bound is concave, so a cell can be
+          // disconnected — and keeping both is correct, not a fallback.
+          if (touchesSplit(cA, part.xFloor, SPLIT_EPS) && touchesSplit(cB, part.xFloor, SPLIT_EPS)) rejoinFallbacks++;
+          else disjointPieces++;
+          out.push(cA); out.push(cB);
+        }
+      } else if (cA) out.push(cA);
+      else if (cB) out.push(cB);
+    }
+    return out;
+  };
+  // The cell used where a single polygon is wanted (relaxation's centroid, the area
+  // culls): the largest piece, which on every non-fallback config IS the whole cell.
+  const cellOf = (s, peers) => {
+    const cs = cellsFor(s, peers);
+    if (!cs.length) return null;
+    let best = cs[0], bestA = Math.abs(polyArea(cs[0]));
+    for (let i = 1; i < cs.length; i++) { const a = Math.abs(polyArea(cs[i])); if (a > bestA) { bestA = a; best = cs[i]; } }
+    return best;
+  };
   const passes = lloyd === 0 ? 1 : lloyd;
+  //     CONSTRAINED TO THE MATERIAL, not merely to the bound. The clip polygon is the
+  //     rib's inner edge, an envelope band that spans every sinus, so a cell's centroid can
+  //     sit in REMOVED material and relaxation would move the seed there. That is a second,
+  //     independent route to the same defect as the axis sampler's envelope test, and it
+  //     reaches configs the sampler fix cannot: LOBED 7 is odd, has no slot on the axis, and
+  //     placed no seed in the void — yet ended with 6 there, all of them relaxed in. It
+  //     applies at lloyd = 0 too, because that is still one relaxation pass. A move that
+  //     leaves the material is refused and the seed stays where it was. ---
   for (let iter = 0; iter < passes; iter++) {
-    const seeds = fullSeeds();
+    // ONE snapshot per pass, not one per seed. fullSeeds() rebuilds each -Y twin as a
+    // fresh object from its +Y seed's CURRENT position, so calling it per seed would let a
+    // twin see moves made earlier in the same pass while the +Y seeds (live references)
+    // always did — turning a Jacobi pass into a half-Gauss-Seidel one. Measured as a
+    // 1.1e-14 vertex drift on 10 of 96 smooth configs, which is small and is still a
+    // change to relaxation that nothing asked for.
+    const G = groupSeeds();
+    const snapshot = fullSeeds();
+    const peers = (s) => (part.clefted ? (G.get(part.regionOf(s)) || [s]) : snapshot);
     for (const s of axis) {
-      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
-      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = 0; }
+      const cell = cellOf(s, peers(s));
+      if (!cell) continue;
+      const c = polyCentroid(cell), nx = clamp(c.x, xLo, xHi);
+      if (inMaterial(nx, 0)) { s.x = nx; s.y = 0; }
     }
     for (const s of half) {
-      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
-      if (cell) { const c = polyCentroid(cell); s.x = clamp(c.x, xLo, xHi); s.y = Math.max(axisGap, c.y); }
+      const cell = cellOf(s, peers(s));
+      if (!cell) continue;
+      const c = polyCentroid(cell), nx = clamp(c.x, xLo, xHi), ny = Math.max(axisGap, c.y);
+      if (inMaterial(nx, ny)) { s.x = nx; s.y = ny; }
     }
   }
 
-  // --- MINIMUM CELL SIZE floor: cull seeds whose cell is thinner than a few rib
-  //     widths (equivalent-circle diameter < minCellSize), so the density law /
-  //     anisotropy can't emit fragile slivers — the region is absorbed by neighbours
-  //     when the final cells re-solve. Off unless one of those features is on, so the
-  //     default look is untouched. Mirrored seeds are culled with their +Y twin. ---
-  let culled = 0;
+  // --- TWO CULLS, DELIBERATELY SEPARATE. Conflating them destroys designs.
+  //
+  //     (a) DEGENERATE CELLS — unconditional, and the actual defect. buildVoronoi emits
+  //     cells whose ring has signedArea EXACTLY 0: on a plain ROUNDED petal at defaults, a
+  //     21-edge polyline collapsed onto y = 0. cellAnnulus lofts each into zero-area
+  //     triangles and its hole cannot be inside a cell with no inside. Whatever produces
+  //     one (an axis-seed artifact, here) is a separate question from whether zero-area
+  //     geometry should reach the exporter. It should not, under any cause, so this floor
+  //     is not conditional on anything. The threshold is geometric degeneracy, not a
+  //     printability judgement: the smallest legitimate cell in the matrix is 0.069 mm^2
+  //     and these are exactly 0, so there is no boundary to tune.
+  //
+  //     (b) THE MINIMUM CELL SIZE floor — a printability feature for the density law and
+  //     anisotropy, which can drive cells thin enough to be fragile. It stays gated on
+  //     those two, and here is why, measured rather than assumed: un-gating it takes
+  //     `chrysanthemum__voronoi` from 42 cells to 4, culling 24. That is not a floor
+  //     catching noise (every other config culls 1-5), it is the floor eating the design —
+  //     a dense bloom's cells are legitimately small, and `minCellSize` is sized for
+  //     struts, not for them. Un-gating this was the obvious reading of "the guard is off
+  //     where it is needed" and it is the wrong one; only (a) was ever the defect.
+  //
+  //     `culled` is returned and reported per config by the gate, so both stay visible as
+  //     numbers rather than as a claim in a comment.
+  //     Mirrored seeds are culled with their +Y twin. ---
+  let culled = 0, culledDegenerate = 0;
   const minCell = opts.minCellSize || 0;
+  const peersOf = (s) => (part.clefted ? (groupSeeds().get(part.regionOf(s)) || [s]) : fullSeeds());
+  // A partitioned cell's area is its pieces summed: a cell split across two islands, or
+  // kept as two on a rejoin fallback, is not a small cell and must not be culled as one.
+  const cellAreaOf = (s) => { let a = 0; for (const c of cellsFor(s, peersOf(s))) a += Math.abs(polyArea(c)); return a; };
+  for (let i = half.length - 1; i >= 0; i--) if (cellAreaOf(half[i]) < DEGENERATE_CELL_AREA) { half.splice(i, 1); culledDegenerate++; }
+  for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && cellAreaOf(axis[i]) < DEGENERATE_CELL_AREA) { axis.splice(i, 1); culledDegenerate++; }
   if (minCell > 0 && (cellLaw > 0 || aniso > 1)) {
-    const tooSmall = (s, seeds) => {
-      const cell = voronoiCell(s, seeds, clipPoly, metricFor(s));
-      if (!cell) return true;
-      return 2 * Math.sqrt(Math.abs(polyArea(cell)) / Math.PI) < minCell;
+    const tooSmall = (s) => {
+      const a = cellAreaOf(s);
+      if (!(a > 0)) return true;
+      return 2 * Math.sqrt(a / Math.PI) < minCell;
     };
-    for (let i = half.length - 1; i >= 0; i--) if (tooSmall(half[i], fullSeeds())) { half.splice(i, 1); culled++; }
-    for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && tooSmall(axis[i], fullSeeds())) { axis.splice(i, 1); culled++; }
+    for (let i = half.length - 1; i >= 0; i--) if (tooSmall(half[i])) { half.splice(i, 1); culled++; }
+    for (let i = axis.length - 1; i >= 0; i--) if (axis.length > 1 && tooSmall(axis[i])) { axis.splice(i, 1); culled++; }
   }
 
   // --- SOLVE + BUILD ANNULI with the shared WEIGHT grammar. Each cell earns a wall
@@ -2638,9 +3155,38 @@ export function buildVoronoi(P, rng, opts = {}) {
       slabs.push({ outer: ann.outer.map(mirrorY).reverse(), inner: ann.inner.map(mirrorY).reverse(), thickMul });
     }
   };
-  for (const s of axis) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, false); }
-  for (const s of half) { const cell = voronoiCell(s, seeds, clipPoly, metricFor(s)); if (cell) emit(cell, true); }
-  return { veins: [], nodes: [], slabs, culled };
+  // Under the partition every cell is a +Y half-cell and gets its -Y mirror, AXIS SEEDS
+  // INCLUDED — their cells no longer straddle y = 0, which is exactly what makes the
+  // result symmetric and is where the midline wall comes from. Without the partition an
+  // axis cell is self-symmetric and is emitted once, as before.
+  const groups = groupSeeds();
+  const peersFor = (s) => (part.clefted ? (groups.get(part.regionOf(s)) || [s]) : seeds);
+  for (const s of axis) for (const cell of cellsFor(s, peersFor(s))) emit(cell, part.mirrorAll);
+  for (const s of half) for (const cell of cellsFor(s, peersFor(s))) emit(cell, true);
+  // SEEDS ARE RETURNED, so a diagnostic never has to reimplement the sampler. The
+  // measurement harness used to carry its own copy of this placement logic, and when the
+  // axis sampler's material test was fixed here the copy silently kept the old behaviour —
+  // it went on reporting 5 seeds in the cleft void that the shipped builder no longer
+  // places. Its replica-vs-real assertion caught the divergence, but the right repair is
+  // to remove the second derivation rather than to keep two in step. The post-cull set, in
+  // the same order cells were emitted.
+  // REGIONS ARE RETURNED so the gate can measure the partition rather than infer it —
+  // tile's denominator is the union of these (#80), and voidCrossing is measured against
+  // them. Empty on a smooth petal, where the bound path is the right denominator.
+  const regions = [];
+  if (part.clefted) {
+    for (let r = 0; r < part.regionCount; r++) {
+      for (const [A, B] of part.pieces(r)) {
+        // The +Y HALF ONLY. The diagram is mirrored, so a consumer measuring coverage
+        // doubles this rather than being handed the mirrors — the convention tile's
+        // denominator already landed on (#80).
+        if (A && A.length >= 3) regions.push(A);
+        if (B && B.length >= 3) regions.push(B);
+      }
+    }
+  }
+  return { veins: [], nodes: [], slabs, culled, culledDegenerate, seeds: fullSeeds(),
+           regions, rejoinFallbacks, disjointPieces, partitionRegions: part.regionCount };
 }
 
 // Build one cell's ANNULUS for the perforated sheet. The OUTER loop walks the cell
@@ -2653,6 +3199,15 @@ export function buildVoronoi(P, rng, opts = {}) {
 // pairs outer[k] with inner[k] on the same ray from the centroid, so both are
 // built radially from it.
 function cellAnnulus(poly, softness, wallMul = 1) {
+  // A clipped cell can carry COINCIDENT vertices — Sutherland-Hodgman emits one wherever
+  // the clip boundary passes exactly through a vertex of the cell. Each zero-length edge
+  // between them would then be subdivided into SUB coincident ring samples below, and a
+  // ring with a dozen identical points doubles back on itself by construction: the
+  // duplicates lie on their own non-adjacent edges. Measured on chrysanthemum__voronoi,
+  // where two such corners on the axis put 22 of 55 ring points on top of each other
+  // (#74). Zero-length edges carry no shape, so dropping them changes nothing else.
+  poly = dedupePolygon(poly);
+  if (poly.length < 3) return null;
   const c = polyCentroid(poly);
   const cx = c.x, cy = c.y;
   const SUB = 5;                                    // samples per cell edge
@@ -2992,7 +3547,11 @@ export function placeDir(d, az, tilt = 0) {
 
    buildJaggedEdge returns LOCAL-frame geometry (or null when not jagged):
      rim        : ordered [{x,y,z}] closed outline, weaving through the teeth
-     teethVeins : [ [{x,y,z}...] ]  one small mid-vein polyline per tooth
+     teethVeins : [ { points: [{x,y,z}...], u } ]  one mid-vein per tooth, TAGGED with
+                  the station its tooth sits at. The tag is not decoration: the mid-vein
+                  only belongs in the model where its TOOTH does, and under continuous
+                  margin that is decided by rimCoversStation(). A vein whose tooth the rim
+                  discarded is a free-standing spike — see rimCoversStation's own note.
    The render layer places these into the bloom exactly like every other point.
    ------------------------------------------------------------------- */
 
@@ -3172,9 +3731,17 @@ export function buildJaggedEdge(P, spine, rng) {
   half['-1'].reverse();                           // -Y was walked tip -> base; store base -> tip
 
   // ---- a fine mid-vein running from inside the petal into each tooth's peak --
+  // TAGGED with its tooth's station. The vein exists to fill a tooth, so it belongs in the
+  // model exactly where the tooth does and nowhere else; the consumer decides that by
+  // asking rimCoversStation(u), the same function the rim itself asks. The tag is taken
+  // from the tooth that was actually built (t.uc) rather than re-derived from
+  // tipRegionRange + TIP FREQUENCY, so it cannot drift from where the tooth is.
   const teethVeins = [];
-  for (const t of [...plus, ...minus]) teethVeins.push([t.footInner, t.peak]);
-  teethVeins.push([surfacePoint(0.9, 0, P, spine), apexPeak]);  // into the apex tooth
+  for (const t of [...plus, ...minus]) teethVeins.push({ points: [t.footInner, t.peak], u: t.uc });
+  // The apex tooth wraps the very tip at uEnd — always the tip-most station on the rim, so
+  // it survives any splice. Its vein is tagged uEnd for the same reason the others are:
+  // so the consumer never has to special-case it.
+  teethVeins.push({ points: [surfacePoint(0.9, 0, P, spine), apexPeak], u: uEnd });
 
   return { rim, teethVeins, half, uStart };
 }
@@ -3202,14 +3769,47 @@ export function rimSpliceU(P, treat) {
   return (treat && treat.half) ? Math.max(u, treat.uStart) : u;
 }
 
+/* IS THE TREATED RIM PRESENT AT STATION u? — ONE OWNER, every consumer reads it.
+
+   A rim treatment has more than one consumer: the margin itself (the hoop, or the two
+   strands under continuous margin) and the geometry that FILLS the treatment — today the
+   tooth mid-veins, tomorrow whatever a scallop or a fringe gets. Those consumers have to
+   agree about which stations carry the treatment, and for months they did not: the strand
+   applied `q.u >= rimSpliceU` and the mid-vein loop applied nothing, so every tooth the
+   splice discarded left its mid-vein behind — a Ø1.0 mm needle up to 16 mm long with a
+   free end, pointing at a tooth that was never built. Reachable from the panel, and the
+   export gate cannot see it: the tube is capped, so `boundary === 0` throughout. The
+   project's own connectedness gate reads 19 and 37 detached components on it.
+
+   That is the registration rule pointed at a FILTER rather than at a boundary. The answer
+   lives here once; `treatedStrandPoints` and the mid-vein consumer in flower.js both ask,
+   and neither re-derives it. Adding the same `>= rimSpliceU` test at the second call site
+   would have fixed today's symptom and left two consumers each deciding for themselves
+   what the splice means — which is the defect in miniature.
+
+   Under a closed hoop (continuous margin OFF, or no treatment at all) every station is on
+   the treated rim, so the answer is unconditionally true and every tooth keeps its vein.
+   That asymmetry is a gate row in verify-connectedness.mjs, not just this note.
+
+   NOTE this says where the rim IS, not where teeth SHOULD reach. Below the splice the
+   margin is deliberately the bundled strands — that is what continuous margin is for —
+   so teeth do not exist down there and their veins must not either. Wanting teeth all the
+   way to the base is a margin-design change with a contact sheet, not a change here.  */
+export function rimCoversStation(u, P, treat) {
+  const contMargin = !!P.continuousMargin && !P.solidBlade;
+  if (!contMargin || !treat || !treat.half) return true;
+  return u >= rimSpliceU(P, treat);
+}
+
 // Ordered LOCAL-frame points for one treated strand: the bundled stretch of the strand
-// (mapped through `mapFlat`), then the treatment's own half above the splice.
+// (the stations the treated rim does NOT cover, mapped through `mapFlat`), then the
+// treatment's own half over the stations it does. The two halves are complementary by
+// construction because they ask rimCoversStation the same question.
 export function treatedStrandPoints(strandPoints, side, treat, P, mapFlat) {
   if (!treat || !treat.half) return strandPoints.map(mapFlat);
-  const uS = rimSpliceU(P, treat);
   const out = [];
-  for (const p of strandPoints) if ((p.x / Math.max(P.L, 1e-6)) < uS) out.push(mapFlat(p));
-  for (const q of treat.half[String(side)]) if (q.u >= uS) out.push(q.p);
+  for (const p of strandPoints) if (!rimCoversStation(p.x / Math.max(P.L, 1e-6), P, treat)) out.push(mapFlat(p));
+  for (const q of treat.half[String(side)]) if (rimCoversStation(q.u, P, treat)) out.push(q.p);
   return out;
 }
 

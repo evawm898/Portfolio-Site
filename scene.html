@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Scene — Eva Maskalenko</title>
+<meta name="description" content="Ambient interactive scenes. Scene 1: a koi pond in the rain.">
+<!-- noindex for now, like every other in-progress page here: this is one scene
+     of a section built to hold eight, and the other seven are empty slots. One
+     line to flip when the section is worth indexing. -->
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#08090b">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="scene.css">
+</head>
+<body>
+
+<!-- THE STAGE IS THE WHOLE VIEWPORT AND IT IS EMPTY IN THE MARKUP. Whatever a
+     scene mounts, it mounts here, and the shell empties it on the way out — so
+     a scene's canvas cannot outlive the scene. NOTHING ELSE IS EVER PUT INSIDE
+     IT, and nothing is put beside it either: "no chrome besides the nav" is
+     literal, so there is no instructional text on this page, not even a
+     transient one. -->
+<div id="scene-stage" role="img" aria-label="Scene"></div>
+
+<nav class="scene-nav" aria-label="Scene navigation">
+  <a class="scene-nav__return" href="index.html">
+    <span class="scene-nav__arrow" aria-hidden="true">&larr;</span>Return
+  </a>
+  <div class="scene-nav__scenes" id="scene-nav-scenes" role="group" aria-label="Choose a scene"></div>
+</nav>
+
+<noscript>
+  <p class="scene-noscript">This section is a live simulation and needs JavaScript.
+    <a href="index.html">Return to the site</a>.</p>
+</noscript>
+
+<script type="module" src="scene.js"></script>
+</body>
+</html>

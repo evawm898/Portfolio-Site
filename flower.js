@@ -27,10 +27,10 @@ import {
   mapPointToSurface, surfaceNormalAt, placePoint, placeDir, densifyByStep,
   getPetalFields, terminateEdges, getSpaceColonization, petalHalfWidth,
   cleftConfig, petalMask, clipVeinsToMask,
-  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints,
+  ribRadius, ribCenterline, ribMarginPolyline, ribPath, treatedStrandPoints, rimCoversStation,
 } from './flower-geometry.js';
 import { buildReceptacleField } from './flower-sdf.js';
-import { CONTROLS } from './flower-registry.js';
+import { CONTROLS, evalPredicate, predicateDrivers } from './flower-registry.js';
 import { PRESETS, PRESET_SCHEMA } from './flower-presets.js';
 import { VIEW_PRESETS } from './flower-view-presets.js';
 import { SHAPES as SHAPE_BUNDLES, SHAPE_PARAMS, PICKER_SHAPE_NAMES } from './flower-shapes.js';
@@ -121,12 +121,24 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    readout (tools/probe-presets, see PR for #44):
      Daisy 103,656   Rose 286,378   Lily 68,352   Poppy 234,480
      Dahlia 330,500 (heaviest)   Thistle 257,280   Carnation 154,650
-   500,000 clears Dahlia by 1.51x, Thistle by 1.94x. Measured warm full-rebuild
-   time at that scale (pure slider drag, JIT already hot, no preset-switch
-   overhead): 505,596 tris -> 2.7s. Chromium's own "Page Unresponsive" hang
-   detector fires at roughly 5s of continuously blocked main thread, so that's
-   ~1.85x headroom before a maxed-out (500k) custom design risks the hang
-   dialog; a Dahlia-weight design keeps ~2.8x. gen-preset-thumbs.mjs asserts
+   500,000 cleared Dahlia by 1.51x, Thistle by 1.94x AT THAT TIME. Measured warm
+   full-rebuild time at that scale (pure slider drag, JIT already hot, no
+   preset-switch overhead): 505,596 tris -> 2.7s. Chromium's own "Page
+   Unresponsive" hang detector fires at roughly 5s of continuously blocked main
+   thread, so that's ~1.85x headroom before a maxed-out (500k) custom design
+   risks the hang dialog.
+
+   THOSE PER-PRESET FIGURES ARE HISTORY, NOT THE CURRENT STATE (#89). Preset
+   geometry has grown since, and the margins with it. Re-measured the same way:
+     Daisy 162,340   Rose 418,810   Lily 79,392   Poppy 237,488
+     Dahlia 437,828 (heaviest)   Thistle 364,592   Carnation 211,282
+   Dahlia now clears by 1.14x, not 1.51x — and it had already fallen to 1.23x
+   before the unconditional junction (#84) took the rest. The "a Dahlia-weight
+   design keeps ~2.8x" reasoning that used to sit here was measured against a
+   Dahlia that no longer exists, so it has been removed rather than left to be
+   believed. What refusal actually costs a visitor is measured in
+   docs/tools/diag-preset-headroom.mjs: Rose refuses on the SECOND notch of lace
+   density, Dahlia on the fifth of petal count. gen-preset-thumbs.mjs asserts
    every preset stays under this budget, in CI, with a stated margin — a
    preset drifting over it (e.g. once petal cross-sections roll a sheet into a
    tube and add geometry) fails the build instead of surfacing on a visitor's
@@ -165,6 +177,11 @@ const VARIANCE_ROLL_MAX   = 0.15;   // +/- 15% of the cross-section roll amount 
    these sliders to clamp, the dangerous region is in the middle. This is the
    clearest evidence yet for capping the output.
    --------------------------------------------------------------------- */
+// LIVE and EXPORT triangle counts are DIFFERENT NUMBERS for the same design — export mode
+// floors feature sizes, which measured 1.09x to 1.44x more triangles across the 7 presets,
+// varying per design rather than by a fixed factor. A budget only ever applies to its own
+// mode: comparing an export count against LIVE_TRI_BUDGET reads as over budget when the
+// design is comfortably under it. Every tool that prints a count now names the mode.
 const LIVE_TRI_BUDGET   = 500000;    // refuse over this, live — keep the last-good mesh on screen
 const EXPORT_INFO_TRIS  = 1000000;   // plain on-screen line above this (never a modal)
 const EXPORT_TRI_BUDGET = 3000000;   // refuse over this, export — no override
@@ -278,6 +295,38 @@ const MM_PER_UNIT = 26;   // millimetres per Three.js world unit (single scale k
 // MIN_RADIUS_UNITS are read at BUILD time (new accumulator per build), so updating the
 // floor before an export build is enough — no accumulator caches a stale value.
 const MIN_FEATURE_MM    = 0.8;                          // fallback floor if no process set
+
+// TRUNK DESCENT RANGE (#84). `receptacleDepth` maps onto depthW, the trunk's descent below
+// the petal attachment ring. The TOP of that map is derived from what is underneath the
+// bloom, so the junction's size follows from what is present exactly as its existence does.
+//   DEPTH_TOP_SUPPORTED     something below receives the descent (a stem, or a side bud's
+//                           offshoot branch) — the full range, unchanged from before.
+//   DEPTH_CAP_UNSUPPORTED   nothing below: the descent is an underside, so the ceiling is
+//                           the old slider's 0.3, written as the fraction it is rather than
+//                           as 0.471, so the two cannot drift apart.
+// APPROACH-LAW SWITCH + FIELD PROBE — the A/B rig the junction work runs on.
+// Three candidate approach laws were built behind this switch, measured, and rejected by eye;
+// the laws are gone and the rig is kept, because the next candidate needs exactly this: a law
+// reachable from the same tree as the shipped one, so both can be rendered, exported and
+// measured side by side without a second checkout.
+//   ?junctionLaw=<name>   pick an approach law   (see flower-sdf.js; 'current' is the only one)
+//   ?junctionProbe=1      publish the junction field mesh on window.__junctionField
+// Neither is a control and neither is in the registry. The probe is off unless asked for, and
+// publishes geometry the app already built — it changes nothing. It exists because the junction
+// is fused into one accumulator with the petals, so there is otherwise no way to measure the
+// junction ALONE, and every junction number this project has ever quoted needed that isolation.
+// Consumed by docs/tools/measure-junction-rim.mjs.
+const _JQ = new URLSearchParams(location.search);
+let JUNCTION_LAW = _JQ.get('junctionLaw') || 'current';
+const JUNCTION_PROBE = _JQ.has('junctionProbe');
+Object.defineProperty(window, '__junctionLaw', {
+  get: () => JUNCTION_LAW,
+  set: (v) => { JUNCTION_LAW = v || 'current'; if (typeof scheduleRegen === 'function') scheduleRegen(); },
+});
+
+const DEPTH_BOTTOM          = 0.18;
+const DEPTH_TOP_SUPPORTED   = 1.15;
+const DEPTH_CAP_UNSUPPORTED = 0.3;
 const PROCESS_FLOOR_MM  = { sls: 1.0, sla: 0.4, fdm: 0.8 };
 const PROCESS_LABEL     = { sls: 'SLS nylon', sla: 'resin SLA', fdm: 'FDM 0.4 mm' };
 let   activeFloorMM     = MIN_FEATURE_MM;
@@ -1054,9 +1103,6 @@ function resolveParams(ui) {
     petalCup: ui.petalCup,                       // across-width bowl: cupped (+) / flat (0) / reflexed (-)
     crossSection: ui.crossSection,               // CROSS-SECTION: flat (0) -> channelled -> quilled (|1|); sign picks roll direction
     crossSectionTaper: ui.crossSectionTaper,     // CROSS-SECTION TAPER: 0 uniform -> +1 opens to a spoon at the tip, -1 opens at the base
-    reliefAmp: ui.reliefAmp,                      // SURFACE RELIEF amplitude (0 = smooth, exact no-op)
-    reliefFreq: ui.reliefFreq,                    // RELIEF rib count: broad pleats -> fine crepe
-    reliefMode: ui.reliefMode,                    // RELIEF pattern: radial (T-aligned) | transverse | irregular
     petalTwist: ui.petalTwist,                    // TWIST: cross-section rotation about the midrib (chirality)
     petalSkew: ui.petalSkew,                      // SKEW: lateral midrib bend
     thickTaper: ui.thickTaper,                    // THICKNESS (a): base-to-tip gradient (0 = uniform)
@@ -1444,9 +1490,14 @@ function buildPetalInto(acc, P, az, baseHeight, radialOffset, tilt, seed) {
   // the outline is turned off).
   // The tooth mid-veins follow the teeth, so they are drawn whenever the teeth are —
   // under continuous margin too. Only BONE-with-the-outline-off has no rim to carry them.
+  // PER TOOTH, not per petal: under continuous margin the rim keeps only the teeth above
+  // the splice, so a vein for a tooth below it would stand in open air with a free end.
+  // rimCoversStation is the SAME function treatedStrandPoints asks — one owner for "is the
+  // treated rim here", so this loop and the strand cannot disagree about which teeth exist.
   if (jag && (drawRim || (contMargin && jag.half))) {
     for (const v of jag.teethVeins) {
-      acc.addTube(v.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
+      if (!rimCoversStation(v.u, P, jag)) continue;
+      acc.addTube(v.points.map(place), [P.tubeRadius * 0.30 * gThick, P.tubeRadius * 0.10 * gThick], 0, 6);
     }
   }
   // Welded caps seal the open tube ends (free vein tips, and the T-junctions
@@ -1778,21 +1829,6 @@ function stemRadiusFn(P, opts) {
   };
 }
 
-// Build the main stem into `acc` and return its centreline (so a side bud can
-// branch off it). Returns null for a degenerate length. The node markers are the
-// tube's own local swellings (stemRadiusFn) plus the kinks in the centreline, so
-// the stem stays one continuous watertight solid — no separate beads to read as a
-// string of balls. cl.nodes carries each junction's world position + direction for
-// the leaf geometry that attaches there in a later pass.
-function buildStemInto(acc, P, cx, cy, cz, opts) {
-  const length = clamp(opts.length, 0, 10);
-  if (length < 0.2) return null;                 // slider at/near its 0 minimum => no stem
-  const o = { ...opts, length };
-  const cl = stemCenterline(cx, cy, cz, o);
-  acc.addTube(cl.pts, stemRadiusFn(P, o), 0, CENTER_TUBE_SEGS);   // thick at the flower, slender below
-  return cl;
-}
-
 /* SIDE BUD — an optional secondary offshoot that branches partway down the main
    stem and ends in a smaller bud of the SAME bloom. Kept isolated from the petal
    builders: it reuses buildBloomInto to grow a simplified, more-closed bloom into
@@ -1832,15 +1868,10 @@ function buildBudBranchInto(acc, P, ui, cl, stemOpts) {
 // is no visitor control; it appears because of course it does. `receptacleType
 // === 'on'` survives only as a migration override, so an old design that set it
 // explicitly keeps its receptacle even with no stem/sepals.
-// The single source of truth for "does this design need a junction below the
-// bloom" — every call site reads this, none re-derives it.
-// JUNCTION vs ORNAMENT: everything under this presence check is one flat
-// "Receptacle" control block, but only some of it IS the junction — the rest is
-// decoration riding on top of it. flower-registry.js's acc-base entries carry a
-// role:"junction" / role:"ornament" tag marking which is which.
-function hasReceptacle(ui) {
-  return ui.stemType !== 'none' || ui.sepalsType !== 'none' || ui.receptacleType === 'on';
-}
+// JUNCTION vs ORNAMENT: the "Receptacle" control block is one flat list, but only some of
+// it IS the junction — the rest is decoration riding on top of it. flower-registry.js's
+// acc-base entries carry a role:"junction" / role:"ornament" tag marking which is which.
+// There is no longer a presence check to sit under: every design builds a junction (#84).
 
 // Grow the simplified bud bloom into its own accumulator and merge it onto the
 // offshoot tip (position `tipPos`, axis `tipDir`). `rTip` is the offshoot's tip
@@ -1882,14 +1913,22 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
   // feet and merged into budAcc; the single appendTransformed below then scales + seats
   // it with the bloom, so it's automatically sized to the bud. It reads the MAIN ui's
   // receptacle sliders (blend / depth / tightness) so its flutes match the big one.
-  // This runs only when a side bud exists (buildBudInto's only caller gates on that), so
-  // the bud's receptacle follows the same derived rule as the main bloom's (stem/sepals
-  // present, or the migration override), so a budded plant with a stem grows a bud base too.
-  if (hasReceptacle(ui)) {
+  // Unconditional, like the main bloom's (#84): the bud is a bloom, so its petal feet and
+  // its core need joining for exactly the same reason. It was gated on hasReceptacle(ui)
+  // until that predicate was retired; since a side bud only exists on a stemmed plant, that
+  // gate was already true at every call, so this is not a behaviour change.
+  {
     const attach = [];
     for (const pl of budPlacements) if (pl.foot) attach.push({ az: pl.footAz, r: pl.r, foot: pl.foot });
     buildTrunkInto(budAcc, budP, 0, centerHeight, 0, attach, budRingR, {
       receptacle: true, stem: false,               // the offshoot branch is the bud's stem
+      below: 'branch',                             // ...and it receives the descent, so the
+                                                   // full depth range applies here exactly as
+                                                   // it does under a stem. `stem: false` says
+                                                   // "build no stem ZONE", which is a
+                                                   // different question — keying the range off
+                                                   // that would silently shallow every side
+                                                   // bud on a stemmed plant.
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
@@ -1911,7 +1950,8 @@ function buildBudInto(acc, P, ui, tipPos, tipDir, mode, rTip) {
 }
 
 /* ===================================================================
-   LEAVES — a leaf at each stem node, built on buildStemInto's node structure.
+   LEAVES — a leaf at each stem node, built on the node structure buildTrunkInto
+   returns (its `cl`, from stemCenterline).
    Reuses the petal machinery wholesale: every leaf blade is a watertight SOLID
    blade grown through buildPetalInto (the same primitive the SOLID sepals use), so
    none of the curve / taper / jag / edge math is re-implemented here. The current
@@ -2107,11 +2147,10 @@ function petalBaseFootprint(Pp, az, baseHeight, radialOffset, tilt) {
    the caps / neighbouring rings, so there are ZERO boundary edges. Every emitted
    radius honours the export feature-floor exactly like addTube.
 
-   LEAVES + SIDE BUD are unaffected: the stem zone's centreline is built by the
-   SAME stemCenterline() as before, and this returns `cl` in the identical shape
-   buildStemInto returned ({ pts, nodes, N, length }), so buildLeafInto /
-   buildBudBranchInto consume it unchanged. Returns { depth, cl } (cl is null when
-   no stem zone is built). */
+   LEAVES + SIDE BUD read the stem zone's centreline from here: this is the only
+   producer, and it returns stemCenterline()'s own object ({ pts, nodes, N, length })
+   unchanged, so buildLeafInto / buildBudBranchInto consume it directly. Returns
+   { depth, cl } (cl is null when no stem zone is built). */
 function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
   const wantRecept = !!opts.receptacle;
   const wantStem   = !!opts.stem;
@@ -2153,7 +2192,19 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
 
   // ---------- RECEPTACLE ZONE ----------
   if (wantRecept) {
-    const depthW = lerp(0.18, 1.15, clamp(opts.depth, 0, 1));  // descent below the ring
+    // DESCENT BELOW THE RING — the range is DERIVED from what is underneath, the same way
+    // the junction's existence is (#84). With something below to receive it — a stem, or the
+    // offshoot branch under a side bud — the descent is part of the silhouette and keeps its
+    // full range; that look ships today and does not move. With nothing below, the descent
+    // is an UNDERSIDE, and its ceiling is capped so a stemless bloom cannot grow a spike at
+    // ANY slider position, not merely at the default: a safe default is one drag away from
+    // the thing being avoided.
+    // The cap is today's 0.3 written as what it is, so the relationship cannot drift. The
+    // sweep in docs/tools/diag-junction-depth-sweep.mjs measured tailXZ as IDENTICAL at
+    // 0, 0.1, 0.2 and 0.3 on every design, so nothing expressive lives in the range this
+    // removes — the cliff is at 0.5.
+    const depthTop = opts.below ? DEPTH_TOP_SUPPORTED : lerp(DEPTH_BOTTOM, DEPTH_TOP_SUPPORTED, DEPTH_CAP_UNSUPPORTED);
+    const depthW = lerp(DEPTH_BOTTOM, depthTop, clamp(opts.depth, 0, 1));
     const tight  = clamp(opts.tightness, 0, 1);
     const overlap = blend * 0.16 * Math.max(depthW, 0.3);      // relief pokes up among the petals
     const dipMax  = depthW * lerp(0.55, 0.10, blend);          // dip between bases (fades as it smooths)
@@ -2352,9 +2403,12 @@ function buildTrunkInto(acc, P, cx, cy, cz, attachments, ringR, opts) {
             // Floor radii even live: at the coarse live cell a sub-cell strand would drop out,
             // so the preview reads as the same solid mass it prints as (export floors anyway).
             profile, collar, exportMode, floorR: acc.floorR,
+            approachLaw: JUNCTION_LAW,   // see the switch above; not a control
             cell: exportMode ? (opts.sdfCell || 0.011) : (opts.sdfCellLive || 0.02),
             smoothIters: exportMode ? 2 : 0 });
         acc.addMesh(field.positions, field.normals, field.indices);
+        // ?junctionProbe=1 — the junction field ALONE, before it is fused with the petals.
+        if (JUNCTION_PROBE) window.__junctionField = { positions: field.positions, indices: field.indices, meta: field.meta, stats: field.stats, exportMode, feet: sdfFeet.length };
         if (exportMode && acc.floorR < acc.minRadius) acc.minRadius = acc.floorR;   // keep min-feature telemetry honest
         RECEPT_FIELD_STATS = field.stats;
       }
@@ -2700,11 +2754,19 @@ function buildInto(petalAcc, coreAcc, ui, P) {
   // BASE — the RECEPTACLE and STEM grow as ONE continuous, watertight lofted TRUNK
   // (buildTrunkInto): the receptacle owns it, and when a stem is present the body
   // flows straight from the petal/sepal attachment ring down through the neck into
-  // the stem and its tip — no seam. SEPALS remain an independent whorl. A stem
-  // WITHOUT a receptacle has no junction to seam, so it keeps the standalone stem
-  // tube (buildStemInto). Everything builds into the petal mesh, same teal tubes.
-  // DERIVED junction — see hasReceptacle() for the rule.
-  const hasRecept = hasReceptacle(ui);
+  // the stem and its tip — no seam. SEPALS remain an independent whorl. Everything
+  // builds into the petal mesh, same teal tubes.
+  //
+  // THE JUNCTION IS UNCONDITIONAL (#84). It used to be built only when something below
+  // the bloom needed joining — a stem, sepals, or the migration override. That read as a
+  // saving and was a defect: a bare bloom's petal feet start at a radius (measured: 20.7 mm
+  // on Daisy, 23.6 on Poppy) and its centre only reaches ~10 mm, so the annulus between
+  // them held nothing and the model exported in pieces — the centre always, plus every
+  // petal not touching a neighbour. 8 of 9 bare configurations and 4 of 7 shipped presets.
+  // The trunk already gathers its attachment ring from every layer-0 foot and fills the
+  // space between the axis and ringR, which is exactly that annulus, so the fix is to stop
+  // making it conditional rather than to build anything new.
+  // The stem zone is still conditional: `stem: hasStem` below.
   const hasStem = ui.stemType !== 'none';
   const stemOpts = hasStem ? {
     length: clamp(ui.stemLength, 0, 10),
@@ -2714,8 +2776,8 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     nodeProminence: clamp(ui.stemNodeProminence, 0, 1),
   } : null;
 
-  let cl = null;   // stem centreline for the leaves + side bud (same shape either path)
-  if (hasRecept) {
+  let cl = null;   // stem centreline for the leaves + side bud, from the trunk
+  {
     // The trunk's receptacle flutes are grown from the OUTER whorl's REAL petal
     // outlines: each layer-0 placement carries `foot`, world-polar samples of that
     // petal's actual visible edge (see petalBaseFootprint). Sepal bases are added
@@ -2736,7 +2798,7 @@ function buildInto(petalAcc, coreAcc, ui, P) {
     // t=0), so the trunk flows straight into the stem at any thickness. No stem -> 4x.
     const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
     const trunk = buildTrunkInto(petalAcc, P, 0, centerHeight, 0, attach, ringR, {
-      receptacle: true, stem: hasStem,
+      receptacle: true, stem: hasStem, below: hasStem ? 'stem' : null,
       blend: ui.blendSmoothness, depth: ui.receptacleDepth, tightness: ui.convergenceTightness,
       profile: ui.receptProfile, construction: ui.receptConstruction, collar: ui.receptCollar,
       reach: ui.receptReach, solidity: ui.receptSolidity, ribMult: ui.ribMultiplier,
@@ -2747,24 +2809,15 @@ function buildInto(petalAcc, coreAcc, ui, P) {
       neckR: P.tubeRadius * 4.0 * stemThick, stemOpts,
     });
     cl = trunk.cl;
-  } else if (hasStem) {
-    cl = buildStemInto(petalAcc, P, 0, centerHeight, 0, stemOpts);
   }
-  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + receptacle/trunk or stem
+  checkTriBudget(petalAcc, coreAcc);   // TRIANGLE BUDGET (#44): + the trunk
 
   if (ui.sepalsType !== 'none') {
-    // Sepal base attachment radius. WITH a receptacle, the fluted funnel fills the
-    // space between the axis and ringR, so the old ring (ringR*0.85) embeds in it —
-    // no gap. WITHOUT a receptacle the sepals otherwise float in a wide ring around
-    // the thin stem, leaving a visible gap; anchor their bases at the stem-top
-    // surface (neckR = tubeRadius*4*thickness) instead so they emerge flush from the
-    // stem, matching how petals attach to the receptacle. Slightly inset (*0.9) so
-    // the blade base overlaps the stem wall for a watertight union.
-    const stemThick = hasStem ? clamp(ui.stemThickness, 0.3, 4) : 1;
-    const stemTopR = P.tubeRadius * 4.0 * stemThick;
-    const sepalAttachR = hasRecept ? Math.max(ringR * 0.85, 0.16)
-                       : hasStem   ? stemTopR * 0.9
-                       :             Math.max(ringR * 0.85, 0.16);
+    // Sepal base attachment radius. The fluted funnel is always built now (#84), so it
+    // always fills the space between the axis and ringR and this ring embeds in it with
+    // no gap. It used to depend on sepals implying a junction; it no longer depends on
+    // anything.
+    const sepalAttachR = Math.max(ringR * 0.85, 0.16);
     buildSepalsInto(petalAcc, P, 0, centerHeight, 0, {
       count: ui.sepalCount,
       size: ui.sepalSize,
@@ -3376,6 +3429,15 @@ function readUI() {
   ui.spaceSeed = parseInt(inputs.spaceSeed.value, 10) || 0;
   return ui;
 }
+// Test hook for the headless gates. verify-tier-visibility derives its EXPECTED visibility
+// by evaluating each control's registry predicate itself — but it must evaluate it against
+// the SAME state snapshot applyVisibility() decided from, or the two disagree about the
+// design rather than about the rule. Reading the DOM independently in the gate would be a
+// second copy of readUI() with its own coercion rules, i.e. exactly the drift this project
+// keeps paying for. State only: the gate never borrows controlVisible(), because a gate
+// that calls the function under test asserts nothing.
+window.__flowerUIState = () => readUI();
+window.__flowerStandardMode = () => standardMode;
 
 // live numeric read-outs next to each slider — one per slider, formatted by the
 // registry `fmt` token. LABEL_FMT reproduces the former hand-written formatting.
@@ -3418,7 +3480,11 @@ function updateReadout(petalAcc, ui, petalCount = ui.petalCount) {
     : 'leaf venation';
   // SDF receptacle telemetry (continuous margin on): report the field's own triangle
   // count so its contribution to the budget stays visible on every geometry change.
-  const recept = (ui.continuousMargin === 'on' && ui.receptacleType === 'on' && RECEPT_FIELD_STATS)
+  // Every design has a junction now (#84), so the only condition left is whether the SDF
+  // field is the one building it. This read the raw `receptacleType` toggle once, which
+  // suppressed the clause on every design that grew a junction from a stem or sepals — the
+  // field was being built and measured, and not reported.
+  const recept = (ui.continuousMargin === 'on' && RECEPT_FIELD_STATS)
     ? ` · sdf receptacle ~${RECEPT_FIELD_STATS.tris.toLocaleString()} tris (abs ${(+ui.absorption).toFixed(2)})`
     : '';
   el.textContent = `${arrange} · ${petals} · ${infill} · ~${tris.toLocaleString()} tris${recept}`;
@@ -3452,12 +3518,29 @@ function setBuilding(on) {
 WIRED.filter((c) => c.kind === 'slider' && c.id !== 'layerCount' && c.id !== 'heightMM').forEach((c) => {
   inputs[c.id].addEventListener('input', () => { refreshLabels(); scheduleRegen(); });
 });
-// ---- Standard / Advanced tier filter -------------------------------------------
-// The registry marks a curated set of controls tier:'standard'; everything else is
-// Advanced. Standard mode (the default) force-hides Advanced controls on top of the
-// contextual gating, and collapses any accordion section left with nothing visible.
-// Each gating sweep (updateXOptions) calls applyTier() at its end, so a contextual
-// change never reveals an Advanced control while Standard is active.
+// ---- VISIBILITY: one registry-driven pass ---------------------------------------
+// Every reason a control can be hidden is a declaration in flower-registry.js, and this
+// function is the only place that acts on them. It replaced eight bespoke `updateXOptions`
+// sweeps plus two flags (`permanentHidden`, `imperativeGate`) and one hardcoded id list
+// (`LEGACY_RECEPT`), which between them could hide a control four different ways — three
+// of which left a partial trace in the registry and one of which left none.
+//
+// The rule, whole:
+//
+//     visible  <=>  (Advanced OR tier:"standard")  AND  predicate holds
+//
+// where `predicate` is the control's `standardVisibleWhen` while Standard is active and
+// its `visibleWhen` otherwise, and an absent predicate is TRUE (no condition). Tier is an
+// INPUT to that expression, never a filter on which controls the expression is computed
+// for — the distinction that let the old gate report PASS while edgeNoise was invisible at
+// the default state.
+//
+// WHY ONE PASS RATHER THAN PER-ATTRIBUTE SWEEPS: the old sweeps each owned a subset of
+// wrappers and ran in a chain, so a control's final state depended on which sweeps had run
+// and in what order — which is how `updateEdgeAmount()` could set a wrapper visible and
+// `applyTier()` could hide it again two lines later, giving Standard an "Amount" slot that
+// works for one of its three edge styles. Recomputing every control from its declaration,
+// from scratch, on every change removes ordering from the problem entirely.
 let standardMode = true;
 const STANDARD_IDS = new Set(WIRED.filter((c) => c.tier === 'standard').map((c) => c.id));
 const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ctrl') : null; };
@@ -3469,39 +3552,33 @@ const ctrlWrap = (id) => { const el = inputs[id]; return el ? el.closest('.fl-ct
 // value, reopened in Standard, has that value silently replaced rather than kept and
 // shown as CUSTOM (the convention every other Standard control follows). Confirmed live
 // for bloomType/bilateral while FAN was quarantined (#54 investigation); lifting that
-// quarantine below removes today's only instance, but the MECHANISM still does this to
-// any future advancedOnly option — no option in the registry carries `advancedOnly` as
-// of this comment. Tracked on its own, not fixed here.
+// quarantine removed today's only instance, but the MECHANISM still does this to any
+// future advancedOnly option — no option in the registry carries `advancedOnly` as of
+// this comment. Tracked on its own, not fixed here.
 //
 // DECLARED IN THE REGISTRY, not here. This used to be a hand-written literal — a third
 // list beside the registry and the markup, with no gate tying it to either, holding
 // reasons that quietly stopped being true. An option now carries `advancedOnly: true`
 // and its control carries `standardFallback`, and verify-tier-visibility asserts both
-// directions at the option level: an advancedOnly option is hidden in Standard and
-// visible in Advanced, and every other option is visible in both.
-//
-// TOOTHED / SCALLOPED were quarantined here because the teeth reshape the rim polyline
-// and the Standard-default continuous margin discarded it, so they rendered identically
-// to CLEAN. PR #58 put the treatments on the marginal strands, so the condition that
-// quarantined them no longer holds and they are Standard again.
-//
-// Arrangement FAN (bilateral) was quarantined here (#54) on the claim that it "renders
-// as scattered debris in both tiers" — never re-rendered to check. Investigation (#54,
-// closed) found bilateral placement geometry sound at every config tried, including
-// claw + cleft + cross-section roll + spine curl together: 0 boundary edges, exact
-// mirror symmetry, no stray geometry. The claim traces to this exact fallback: FAN
-// selected in Standard silently reverts to COILED (the bug this comment now documents
-// above), and COILED at the ambient default petal count (4) is a genuinely irregular,
-// asymmetric golden-angle pinwheel that reads as broken to the eye — see
-// tools/verify-geometry-quality.mjs's ARRANGEMENT configs, which now cover all three
-// bloom types including a bilateral mirror-symmetry check with a proven positive
-// control. FAN is Standard again; the quarantine's own citation (#68) never resolved to
-// a real tracker issue.
+// directions at the option level.
 const ADV_OPTIONS = Object.fromEntries(
   PANEL.filter((c) => c.kind === 'select' && (c.options || []).some((o) => o.advancedOnly))
        .map((c) => [c.id, { advanced: c.options.filter((o) => o.advancedOnly).map((o) => o.value),
                             fallback: c.standardFallback }]));
-function applyTier() {
+
+// The predicate that decides `id` right now — the single expression every consumer reads,
+// so the gate never re-derives it. NOTE this pair is deliberately NOT exposed to the gates:
+// verify-tier-visibility evaluates the registry declaration itself (via the registry's own
+// evalPredicate) and compares against the DOM, because a gate that called controlVisible()
+// would be asserting that a function agrees with itself. What the gates DO borrow is the
+// state snapshot (window.__flowerUIState, beside readUI above).
+function controlPredicate(c) { return (standardMode && c.standardVisibleWhen) ? c.standardVisibleWhen : c.visibleWhen; }
+function controlVisible(c, ui) {
+  if (standardMode && !STANDARD_IDS.has(c.id)) return false;
+  return evalPredicate(controlPredicate(c), ui);
+}
+
+function applyVisibility() {
   let fellBack = false;
   for (const [id, spec] of Object.entries(ADV_OPTIONS)) {
     const sel = inputs[id];
@@ -3512,50 +3589,72 @@ function applyTier() {
     }
     if (standardMode && spec.advanced.includes(sel.value)) { sel.value = spec.fallback; fellBack = true; }
   }
-  if (standardMode) {
-    for (const c of WIRED) if (!STANDARD_IDS.has(c.id)) { const w = ctrlWrap(c.id); if (w) w.hidden = true; }
-  } else {
-    // ADVANCED — the mirror image of the block above, and for a long time the missing
-    // half of it: entering Standard force-hides every non-standard control, but nothing
-    // ever force-SHOWED them back on leaving Standard. A control with a contextual
-    // data-* gating attribute got un-hidden anyway, as a side effect of that attribute's
-    // own sweep (e.g. data-hide-bilateral) recomputing its hidden state unconditionally
-    // every time it runs — but any Advanced control with NO gating attribute had nothing
-    // to reverse the Standard-mode hide, and stayed stuck hidden in Advanced forever
-    // (confirmed for curlBias, petalCup, crossSection, layerCount, continuousMargin, and
-    // ~20 others — see tools/verify-tier-visibility.mjs). Fix: on leaving Standard,
-    // un-hide every WIRED control that has no CONTEXTUAL reason to stay hidden —
-    // excluding the three carve-outs below, none of which a blind unhide can safely
-    // touch:
-    //   - c.gating: already owned by that attribute's own sweep, called in the same
-    //     chain (this function is itself called at the end of every updateXOptions()),
-    //     so it always ends up correct regardless of what order the calls run in — but
-    //     THIS loop must never touch it, or it could show a contextually-wrong control
-    //     for one frame, or (worse) permanently if that control's sweep already ran
-    //     earlier in the same chain.
-    //   - c.permanentHidden: migration-only / dev-only controls (divergenceAngle's
-    //     legacy slot, receptacleType, stemCurve, tube) that must never surface in any
-    //     tier.
-    //   - c.imperativeGate: a control shown/hidden by bespoke JS rather than a data-*
-    //     sweep (captureDist, via updateTerminationOptions()) — a blind unhide here
-    //     would fight that logic rather than reproduce it.
-    for (const c of WIRED) {
-      if (c.gating || c.permanentHidden || c.imperativeGate) continue;
-      const w = ctrlWrap(c.id);
-      if (w) w.hidden = false;
-    }
+  // ONE state read, so every control is decided against the same snapshot. readUI() is the
+  // same shape the geometry consumes, so a predicate cannot disagree with what gets built.
+  const ui = readUI();
+  for (const c of WIRED) {
+    const w = ctrlWrap(c.id);
+    if (w) w.hidden = !controlVisible(c, ui);
   }
+  // ANNOTATION elements — hints and section notes — are not controls and have no registry
+  // row, so they keep the data-* attribute sweep. Their attributes are the ONLY ones left
+  // in flower.html; verify-registry-sync asserts no .fl-ctrl wrapper ever carries one again.
+  applyAnnotationVisibility(ui);
   // Collapse an accordion section (Standard only) when none of its controls show.
   document.querySelectorAll('.fl-acc[data-acc]').forEach((sec) => {
     const anyVisible = [...sec.querySelectorAll('.fl-ctrl')].some((d) => !d.hidden);
     sec.hidden = standardMode && !anyVisible;
   });
-  // A fallback rewrote a picker value (e.g. a shared design's FAN arrangement in
-  // Standard); the geometry must follow, so rebuild. Debounced + deferred, so this is
-  // a no-op duplicate when a build is already pending. Only fires when an advanced
-  // value was actually selected — never on a default-value boot.
+  // A fallback rewrote a picker value; the geometry must follow, so rebuild. Debounced +
+  // deferred, so this is a no-op duplicate when a build is already pending.
   if (fellBack) scheduleRegen();
 }
+
+// EVERY control a predicate reads gets a listener that re-runs the pass — DERIVED from the
+// declarations, not hand-written. The registry has claimed this since the predicates landed
+// ("Derived, so adding a predicate never means remembering to add a listener"), and
+// `predicateDrivers` was imported here to do it and then never called: the drivers were
+// wired one at a time (petalCount, bilPerSide, layerCount, and each select's own handler).
+// That is fine until a predicate names a driver nobody remembered, which is exactly what
+// happened the first time one did — clawLength moved and the controls it gates did not
+// re-evaluate. Caught by the two matrix rows added for these predicates, which is what a
+// both-polarities row is for.
+//
+// Both events: `input` for a slider dragging, `change` for a select or checkbox. Selects that
+// already call applyVisibility() from their own handler now call it twice per change, which
+// is a no-op — the pass recomputes every control from scratch and holds no state.
+const PREDICATE_DRIVERS = new Set();
+for (const c of WIRED) {
+  predicateDrivers(c.visibleWhen, PREDICATE_DRIVERS);
+  predicateDrivers(c.standardVisibleWhen, PREDICATE_DRIVERS);
+}
+for (const id of PREDICATE_DRIVERS) {
+  const el = inputs[id];
+  if (!el) continue;      // a predicate naming a control that is not in the panel is a bug, but not this line's to report
+  el.addEventListener('input', applyVisibility);
+  el.addEventListener('change', applyVisibility);
+}
+
+// Hints / notes / per-petal headings: non-control elements whose visibility follows the
+// same conditions. Each attribute's predicate is written once, here, in terms of the SAME
+// registry vocabulary — an element's attribute value is the `oneOf` list.
+const ANNOTATION_GATES = {
+  'data-bloom-styles': (v, ui) => v.split(/\s+/).includes(ui.bloomType),
+  'data-tip-styles': (v, ui) => v.split(/\s+/).includes(ui.tipStyle),
+  'data-infill-styles': (v, ui) => v.split(/\s+/).includes(ui.infillType),
+  'data-center-arch': (v, ui) => v.split(/\s+/).includes(ui.centerArch),
+  'data-bil-petal': (v, ui) => ui.bloomType === 'bilateral' && Number(v) <= clamp(ui.bilPerSide, 1, 3),
+};
+function applyAnnotationVisibility(ui) {
+  for (const [attr, test] of Object.entries(ANNOTATION_GATES)) {
+    document.querySelectorAll(`[${attr}]:not(.fl-ctrl)`).forEach((el) => { el.hidden = !test(el.getAttribute(attr), ui); });
+  }
+  // The low-petal-count divergence hint: coiled blooms under 8 petals, where the golden
+  // spiral reads as irregular rather than phyllotactic.
+  const hint = document.getElementById('divLowCountHint');
+  if (hint) hint.hidden = !(ui.bloomType === 'coiled' && (ui.petalCount || 0) < 8);
+}
+
 // Standard-tier controls currently visible — used by the headless tier probe.
 function standardVisibleCount() {
   return WIRED.filter((c) => STANDARD_IDS.has(c.id)).filter((c) => { const w = ctrlWrap(c.id); return w && !w.hidden; }).length;
@@ -3564,10 +3663,10 @@ const advancedToggle = document.getElementById('advancedToggle');
 if (advancedToggle) advancedToggle.addEventListener('change', () => {
   standardMode = !advancedToggle.checked;
   document.body.classList.toggle('fl-advanced', !standardMode);
-  // Re-run every gating sweep so wrappers reflect the contextual state, then the
-  // sweeps' own applyTier() re-imposes the filter (a no-op in Advanced mode).
-  updateTipOptions(); updateInfillOptions(); updateBloomOptions();
-  updateLayerOptions(); updateCenterOptions(); updateBaseOptions();
+  // One pass recomputes every control from its declaration; the Edge picker's Standard
+  // relabel ("Amount") is presentation, not visibility, so it is refreshed alongside.
+  updateEdgeAmount();
+  applyVisibility();
 });
 
 // ---- Petal shape picker (Standard) ---------------------------------------------
@@ -3589,6 +3688,12 @@ function applyShape(name) {
   for (const id of SHAPE_PARAMS) inputs[id].value = b[id];
   refreshLabels();
   detectShape();
+  // The bundle is written by assigning .value, which fires no events — so the derived
+  // driver listeners never see it. Two of these params (clawLength, cleftDepth) gate the
+  // rest of the shape family, so without this line picking CLAWED sets a claw the visitor
+  // cannot then adjust: exactly the "choose the shape, cannot tune it" failure the gating
+  // exists to remove, reintroduced at the macro. A silent write needs an explicit pass.
+  applyVisibility();
   scheduleRegen();
 }
 // Show the shape whose bundle the params exactly match, else CUSTOM.
@@ -3606,12 +3711,8 @@ SHAPE_PARAMS.forEach((id) => inputs[id].addEventListener('input', detectShape));
 // Tip: like Infill, only the selected style's options are shown. Each option's
 // data-tip-styles lists the styles it belongs to; hide the rest.
 function updateTipOptions() {
-  const style = inputs.tipStyle.value;
-  document.querySelectorAll('[data-tip-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-tip-styles').split(/\s+/).includes(style);
-  });
-  updateEdgeAmount();
-  applyTier();
+  updateEdgeAmount();       // relabel only — the three sliders' visibility is declared
+  applyVisibility();
 }
 // The EDGE picker's contextual "Amount": in STANDARD each edge exposes exactly one
 // amount control (1:1, a pure relabel — no proxy state): Toothed -> tipLength,
@@ -3622,17 +3723,8 @@ const EDGE_AMOUNT = { jagged: 'tipLength', scallop: 'scallopHeight', ruffled: 'e
 const EDGE_NATIVE = { tipLength: 'Tip length', scallopHeight: 'Scallop height', edgeNoise: 'Edge noise' };
 function setCtrlLabel(id, text) { const l = document.querySelector(`label[for="${id}"]`); if (l) l.textContent = text; }
 function updateEdgeAmount() {
-  if (standardMode) {
-    const amt = EDGE_AMOUNT[inputs.tipStyle.value];       // undefined for CLEAN
-    for (const id of Object.keys(EDGE_NATIVE)) {
-      const w = ctrlWrap(id);
-      if (w) w.hidden = (id !== amt);
-      setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
-    }
-  } else {
-    for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, EDGE_NATIVE[id]);
-    const en = ctrlWrap('edgeNoise'); if (en) en.hidden = false;   // edgeNoise: any style in Advanced
-  }
+  const amt = standardMode ? EDGE_AMOUNT[inputs.tipStyle.value] : undefined;   // undefined for CLEAN
+  for (const id of Object.keys(EDGE_NATIVE)) setCtrlLabel(id, id === amt ? 'Amount' : EDGE_NATIVE[id]);
 }
 // tip style is a <select>; swap the visible options and regenerate on change
 inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleRegen(); });
@@ -3642,9 +3734,6 @@ inputs.tipStyle.addEventListener('change', () => { updateTipOptions(); scheduleR
 // spread across the whole track.
 function updateInfillOptions() {
   const type = inputs.infillType.value;
-  document.querySelectorAll('[data-infill-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-infill-styles').split(/\s+/).includes(type);
-  });
   inputs.softness.max = type === 'voronoi' ? '5' : '1';
   inputs.softness.step = type === 'voronoi' ? '0.05' : '0.01';
   if (+inputs.softness.value > +inputs.softness.max) inputs.softness.value = inputs.softness.max;
@@ -3655,26 +3744,21 @@ function updateInfillOptions() {
   if (softLabel) softLabel.textContent = type === 'veins' ? 'Detail' : 'Roundness';
   // The junction-cluster controls (data-cont-margin) are gated in updateBaseOptions — they
   // shape the SDF receptacle, so they need BOTH continuous margin ON and the Receptacle on.
-  updateTerminationOptions();   // capture-distance visibility depends on infill type too
-  applyTier();
+  applyVisibility();            // capture-distance visibility depends on infill type too
 }
 inputs.infillType.addEventListener('change', () => { updateInfillOptions(); refreshLabels(); scheduleRegen(); });
 // Continuous margin drives both the infill edge AND the junction gating (updateBaseOptions).
 inputs.continuousMargin.addEventListener('change', () => { updateInfillOptions(); updateBaseOptions(); scheduleRegen(); });
-// EDGE TERMINATION: the capture-distance slider only applies to a tube infill
-// (veins / bone) with an active mode, so hide it for FADE and for slab infills.
-function updateTerminationOptions() {
-  const el = document.getElementById('captureDistCtrl');
-  if (!el) return;
-  const tubeInfill = inputs.infillType.value === 'veins' || inputs.infillType.value === 'bone' || inputs.infillType.value === 'spacecol';
-  el.hidden = !(tubeInfill && inputs.edgeTermination.value !== 'fade');
-}
-inputs.edgeTermination.addEventListener('change', () => { updateTerminationOptions(); scheduleRegen(); });
+// EDGE TERMINATION: captureDist only applies to a tube infill (veins / bone / spacecol)
+// with an active mode. That was the ONE control the old single-attribute `gating` could not
+// express (a compound AND across two selects), so it was hand-gated here and flagged
+// `imperativeGate` — a flag that said "bespoke JS decides this" without saying what the
+// condition was. It is now `visibleWhen` like everything else, and the flag is gone.
+inputs.edgeTermination.addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
 // SPACE COLONIZATION: the two selects regenerate; the re-roll button draws a fresh
 // integer seed (stored in the design so the new network is saved and reproducible).
 inputs.spaceMode.addEventListener('change', scheduleRegen);
 inputs.spacePattern.addEventListener('change', scheduleRegen);
-inputs.reliefMode.addEventListener('change', scheduleRegen);
 const spaceReroll = document.getElementById('spaceReroll');
 if (spaceReroll) spaceReroll.addEventListener('click', () => {
   inputs.spaceSeed.value = String((Math.floor(Math.random() * 0x7fffffff)) >>> 0);
@@ -3682,52 +3766,23 @@ if (spaceReroll) spaceReroll.addEventListener('click', () => {
 });
 // Bloom type is a <select>; like Tip/Infill, only the chosen arrangement's hints
 // are shown (data-bloom-styles), and changing it re-lays out the whole bloom.
-function updateBloomOptions() {
-  const type = inputs.bloomType.value;
-  document.querySelectorAll('[data-bloom-styles]').forEach((el) => {
-    el.hidden = !el.getAttribute('data-bloom-styles').split(/\s+/).includes(type);
-  });
-  updateBilateralPetals();
-  updateDivergenceOptions();
-  applyTier();
-}
-// COILED divergence: the CUSTOM angle slider shows only for CUSTOM, and the
-// low-petal-count hint shows only when a coiled bloom has fewer than 8 petals
-// (where the golden spiral reads as irregular rather than phyllotactic).
-function updateDivergenceOptions() {
-  const coiled = inputs.bloomType.value === 'coiled';
-  const custom = inputs.divergenceMode.value === 'custom';
-  const angleCtrl = document.getElementById('divergenceAngleCtrl');
-  if (angleCtrl) angleCtrl.hidden = !(coiled && custom);
-  const hint = document.getElementById('divLowCountHint');
-  if (hint) hint.hidden = !(coiled && (parseInt(inputs.petalCount.value, 10) || 0) < 8);
-  applyTier();
-}
-inputs.divergenceMode.addEventListener('change', () => { updateDivergenceOptions(); scheduleRegen(); });
-// keep the low-petal-count hint in sync as the petal slider moves
-inputs.petalCount.addEventListener('input', updateDivergenceOptions);
+function updateBloomOptions() { applyVisibility(); }
+// COILED divergence: divergenceAngle showed only for coiled + CUSTOM — and carried
+// `permanentHidden: true`, a flag asserting it is shown in no tier ever, while this
+// function showed it. Three of that flag's four users were honest and the fourth was not,
+// for as long as nothing could check it. The condition is now declared (`visibleWhen`) and
+// the flag is deleted. The low-count hint moved to applyAnnotationVisibility().
+inputs.divergenceMode.addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
+// (petalCount's own applyVisibility listener used to live here; it is now covered by the
+// derived PREDICATE_DRIVERS wiring above, which reaches every driver rather than the three
+// somebody remembered.)
 // The per-petal edge dropdowns (bilateral only) show one per petal position, up to
 // the current PETALS PER SIDE — so they appear/disappear as that slider moves.
-function updateBilateralPetals() {
-  const on = inputs.bloomType.value === 'bilateral';
-  const perSide = clamp(parseInt(inputs.bilPerSide.value, 10) || 1, 1, 3);
-  document.querySelectorAll('[data-bil-petal]').forEach((el) => {
-    const k = parseInt(el.getAttribute('data-bil-petal'), 10);
-    el.hidden = !(on && k <= perSide);
-  });
-  // Global width / centre curve / edge curve are replaced by the per-petal
-  // versions when bilateral, so hide them there.
-  document.querySelectorAll('[data-hide-bilateral]').forEach((el) => { el.hidden = on; });
-  applyTier();
-}
+function updateBilateralPetals() { applyVisibility(); }
 inputs.bloomType.addEventListener('change', () => { updateBloomOptions(); scheduleRegen(); });
 // LAYERS: the per-layer controls only matter with more than one whorl, so hide
 // them (data-layers-multi) when Layer count is 1.
-function updateLayerOptions() {
-  const multi = (parseInt(inputs.layerCount.value, 10) || 1) > 1;
-  document.querySelectorAll('[data-layers-multi]').forEach((el) => { el.hidden = !multi; });
-  applyTier();
-}
+function updateLayerOptions() { applyVisibility(); }
 inputs.layerCount.addEventListener('input', () => { refreshLabels(); updateLayerOptions(); scheduleRegen(); });
 // per-layer petal count is a free-text list; rebuild on edit (parsing is tolerant)
 inputs.petalsPerLayer.addEventListener('input', () => { scheduleRegen(); });
@@ -3740,67 +3795,46 @@ inputs.bilCenterPetal.addEventListener('change', () => { scheduleRegen(); });
 // CENTER visibility: the architecture selector (data-center-arch) shows one type's
 // controls; within CLASSIC, the stamens/pistil/none sub-select (data-center-styles)
 // further hides the amount/length/tip sliders when NONE is chosen.
-function updateCenterOptions() {
-  const arch = inputs.centerArch.value;
-  const style = inputs.centerType.value;
-  document.querySelectorAll('#acc-base [data-center-arch]').forEach((el) => {
-    let show = el.getAttribute('data-center-arch').split(/\s+/).includes(arch);
-    if (show && arch === 'classic' && el.hasAttribute('data-center-styles')) {
-      show = el.getAttribute('data-center-styles').split(/\s+/).includes(style);
-    }
-    el.hidden = !show;
-  });
-  applyTier();
-}
+function updateCenterOptions() { applyVisibility(); }
 inputs.centerArch.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
 inputs.centerType.addEventListener('change', () => { updateCenterOptions(); scheduleRegen(); });
-// Base parts are independent: each part's sliders show only when it's not NONE.
-function updateBaseOptions() {
-  // The junction is DERIVED (stem or sepals present), not a control — so the Advanced
-  // sculpting controls (data-recept + the junction cluster) appear exactly when the
-  // derived receptacle is active. receptacleType is a hidden migration override only.
-  const on = hasReceptacle({
-    stemType: inputs.stemType.value, sepalsType: inputs.sepalsType.value, receptacleType: inputs.receptacleType.value,
-  });
-  const prof = inputs.receptProfile.value, con = inputs.receptConstruction.value;
-  document.querySelectorAll('[data-recept]').forEach((el) => { el.hidden = !on; });
-  // JUNCTION cluster (absorption / neck swell / gather height / bundle tightness / flare
-  // rate): these shape the SDF receptacle, which only exists when continuous margin is ON
-  // AND the Receptacle is on. Gating on continuous margin alone left them inert in the
-  // default config (Receptacle off) — so require both, or they do nothing when shown.
-  const contMarginOnJ = inputs.continuousMargin.value === 'on';
-  document.querySelectorAll('[data-cont-margin]').forEach((el) => { el.hidden = !(contMarginOnJ && on); });
-  // Per-axis sub-controls: only shown when the receptacle is on AND that axis is selected.
-  document.querySelectorAll('[data-recept-dome]').forEach((el) => { el.hidden = !on || prof !== 'dome'; });
-  document.querySelectorAll('[data-recept-open]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'gathered' && con !== 'cored'); });
-  document.querySelectorAll('[data-recept-ribbed]').forEach((el) => { el.hidden = !on || (con !== 'ribbed' && con !== 'cored'); });
-  // The SDF junction (continuous margin ON) supersedes the legacy lathe receptacle's
-  // construction controls, so hide them there. The legacy path still runs when
-  // continuous margin is OFF, so these stay wired — hidden, not deleted.
-  // BACKLOG (trigger): retire the legacy receptacle entirely — delete these controls
-  // and the continuous-margin-OFF receptacle path, making continuous margin implicit —
-  // once the SDF junction is signed off. Until then the working fallback stays.
-  const contMarginOn = inputs.continuousMargin.value === 'on';
-  const LEGACY_RECEPT = ['receptConstruction', 'receptCollar', 'receptReach', 'receptSolidity', 'ribMultiplier', 'spiralTightness', 'spiralThickness', 'bulbSize', 'bulbHeight'];
-  if (on && contMarginOn) for (const id of LEGACY_RECEPT) { const w = ctrlWrap(id); if (w) w.hidden = true; }
-  // Sepal controls hide when sepals are off; the serration sub-controls
-  // (data-sepal-tip) hide further unless SEPAL TIP STYLE matches, mirroring the
-  // petal tip panel's data-tip-styles gating.
-  const sepalsOff = inputs.sepalsType.value === 'none';
-  const sepalTip = inputs.sepalTipStyle.value;
-  document.querySelectorAll('[data-sepal]').forEach((el) => {
-    let show = !sepalsOff;
-    if (show && el.hasAttribute('data-sepal-tip')) {
-      show = el.getAttribute('data-sepal-tip').split(/\s+/).includes(sepalTip);
-    }
-    el.hidden = !show;
-  });
-  document.querySelectorAll('[data-stem]').forEach((el) => { el.hidden = inputs.stemType.value === 'none'; });
-  // leaf sub-controls (arrangement / size) show only when a stem AND a leaf type are on
-  document.querySelectorAll('[data-leaf]').forEach((el) => { el.hidden = inputs.stemType.value === 'none' || inputs.leafType.value === 'none'; });
-  applyTier();
-}
-inputs.receptacleType.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
+// Base parts are independent: each part's sliders show only when it's not NONE. Every
+// condition this function used to enforce imperatively is now a `visibleWhen` declaration:
+//
+//   data-recept          -> (no gate at all now — see #84 below)
+//   data-cont-margin     -> continuousMargin = on                          <- SEE BELOW
+//   data-recept-dome     -> receptProfile = dome
+//   data-recept-open  }  -> receptConstruction in {ribbed, cored}
+//   data-recept-ribbed}     (two attributes for one set: the `open` sweep also listed the
+//                            retired 'gathered' construction, which is no longer an option
+//                            value and so could never match)
+//   LEGACY_RECEPT        -> ...plus continuousMargin = off, on the nine controls the SDF
+//                            junction supersedes. This was a hardcoded id list living in
+//                            this file, invisible to the registry: the nine were correctly
+//                            gated for "receptacle on" and then silently force-hidden again
+//                            by an undeclared second condition.
+//
+// The `data-cont-margin` five are the sharpest case in the whole change and worth naming.
+// The registry declared ONE condition; the code required that condition AND a second,
+// undeclared one. A wholly undeclared condition is at least honestly absent — a reader
+// checks the registry, finds nothing, and knows to look further. A HALF-declared one reads
+// as complete: the reader finds a condition, believes it, and is wrong. That is the argument
+// for predicates over labels in one example. (The undeclared half was `hasReceptacle`, now
+// retired: since #84 every design builds a junction, so the condition became vacuous and was
+// deleted rather than left evaluating to true — see flower-registry.js's PREDICATES.)
+//
+// BACKLOG (trigger): retire the legacy receptacle entirely — delete those nine controls and
+// the continuous-margin-OFF receptacle path, making continuous margin implicit — once the
+// SDF junction is signed off. Until then the working fallback stays, now declared.
+//
+// NO LISTENER ON `receptacleType`. It is permanently hidden (registry `visibleWhen:
+// {any: []}`) — a migration override for designs saved before the junction became
+// derived — so nothing can emit a `change` on it from the panel. The one that used to
+// be here did two things and needed neither: `applyVisibility()` is already wired for
+// it by PREDICATE_DRIVERS if any predicate still named it, and the rebuild it also asked for
+// is the caller's job — applyDesign() schedules its own, and exportSTL() rebuilds from
+// readUI() regardless of what the live scene holds.
+function updateBaseOptions() { applyVisibility(); }
 inputs.receptProfile.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptConstruction.addEventListener('change', () => { updateBaseOptions(); scheduleRegen(); });
 inputs.receptCollar.addEventListener('change', scheduleRegen);
@@ -3933,7 +3967,7 @@ DEFAULTS.spaceSeed = 1;
 
    MIGRATIONS[v] upgrades a design from schema v to v+1 (pure: takes a params
    object, returns a new one). Keep them append-only and never mutate input. */
-const CURRENT_SCHEMA = 18;
+const CURRENT_SCHEMA = 19;
 
 // v0 -> v1: the first versioned schema. A v0 design predates edge termination,
 // the constrained-Lloyd Voronoi, and the divergence-angle control. Make it fully
@@ -3985,9 +4019,19 @@ function migrateV3toV4(p) {
 // key's legacy value IS its DEFAULTS value (relief/twist/skew 0, thickTaper/thickEdge
 // 0, thickScale 1, reliefMode 'radial' — all no-ops), so filling from DEFAULTS leaves
 // every prior design byte-identical.
+//
+// The three RELIEF keys this migration introduced are dropped from the backfill list: they
+// are retired at v19 and no longer have DEFAULTS entries, so the loop would have written
+// `undefined` for them, leaving a live code reference to a retired id in the one file where
+// that matters most. Append-only protects a migration's SEMANTICS, and there are none to
+// protect here — proven, not assumed: (a) where a saved design already carries the key the
+// `!(k in out)` guard never touched it, (b) no migration from v5 to v18 reads any of the
+// three in executable code, and (c) v18 -> v19 deletes all three unconditionally. So the
+// end state is key-absent either way, for every design at every starting version.
+// verify-registry-sync.mjs check 6 now fails the build if one comes back.
 function migrateV4toV5(p) {
   const out = { ...p };
-  for (const k of ['reliefAmp', 'reliefFreq', 'reliefMode', 'petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
+  for (const k of ['petalTwist', 'petalSkew', 'thickTaper', 'thickEdge', 'thickScale']) {
     if (!(k in out)) out[k] = DEFAULTS[k];
   }
   return out;
@@ -4168,7 +4212,37 @@ function migrateV17toV18(p) {
   if (out.curlBias == null) out.curlBias = DEFAULTS.curlBias;
   return out;
 }
-const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18];
+// v18 -> v19: the control named SURFACE RELIEF deleted whole — reliefAmp / reliefFreq /
+// reliefMode, controls and effect both. What it actually did was RIB JITTER: it displaced the
+// rib network rather than texturing a face, destroying the flowing rib fan instead of
+// ornamenting it, and the wobble it produced is already reachable through edge noise (which
+// adds to the same normalLift accumulator, flower-geometry.js) and tip irregularity. It was
+// named and documented for something the geometry does not do. The earlier claim that it
+// "reads as doing so little" is FALSE and was struck rather than softened: measured at
+// 2.4-12.6% of canvas pixels, and plainly visible at amplitude 0.16. See
+// docs/img/relief-retirement-contact-sheet.png. Its three
+// ids are RESERVED PERMANENTLY in RETIRED_IDS (flower-registry.js) and enforced by
+// verify-registry-sync.mjs, because the stored value stops mattering the moment the control
+// is gone and the NAME starts: a design saved today carries reliefAmp forever, and anything
+// that later reclaimed the name would silently inherit a stale number.
+//
+// The keys are DELETED, not left to fall through. migrateDesign() gathers keys with no
+// control into `extras` and preserves them verbatim on re-save, so without this delete a
+// retired id would be carried forward indefinitely by the very mechanism that exists to
+// protect forward compatibility — stale, invisible, and permanent.
+//
+// This is a deliberate, versioned VISUAL change, not a byte-identical migration (per
+// CLAUDE.md, "never a silent shift"). A design saved with reliefAmp > 0 loses its rib
+// jitter and its exported mesh moves. It is not pinned: a migration pin protects an
+// aesthetic choice a visitor deliberately made and could perceive, and #86 established that
+// an export nobody can see is not such a choice. The accompanying PR carries the per-design
+// change report measuring exactly how far each one moved.
+function migrateV18toV19(p) {
+  const out = { ...p };
+  delete out.reliefAmp; delete out.reliefFreq; delete out.reliefMode;
+  return out;
+}
+const MIGRATIONS = [migrateV0toV1, migrateV1toV2, migrateV2toV3, migrateV3toV4, migrateV4toV5, migrateV5toV6, migrateV6toV7, migrateV7toV8, migrateV8toV9, migrateV9toV10, migrateV10toV11, migrateV11toV12, migrateV12toV13, migrateV13toV14, migrateV14toV15, migrateV15toV16, migrateV16toV17, migrateV17toV18, migrateV18toV19];
 
 // Migrate a raw saved design up to CURRENT_SCHEMA. Returns the migrated params
 // (schemaVersion stripped — it is meta, tracked separately), the keys this build
@@ -4408,7 +4482,7 @@ updateLayerOptions();
 updateCenterOptions();
 updateBaseOptions();
 refreshLabels();
-applyTier();
+applyVisibility();
 detectShape();   // seed the petal-shape picker from the initial params (default = Rounded)
 
 // MAKE wiring: Size + Process feed the printability badge only (export-only, no rebuild);

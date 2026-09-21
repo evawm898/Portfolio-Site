@@ -1,0 +1,65 @@
+# Build gate: the exported model must be ONE printed piece (issue #43).
+#
+# The export gate next door measures MANIFOLDNESS — boundary edges = 0 — and two entirely
+# separate closed solids also have zero boundary edges. "Watertight" and "connected" are
+# different properties, and only one of them had a gate. This one voxelises the export below
+# the minimum printable feature and flood-fills; more than one region means the print
+# arrives in parts. See the header of tools/verify-connectedness.mjs for what it does NOT
+# yet prove — it is a surface-occupancy test over a hand-picked set of junction corners, not
+# the export matrix.
+#
+# It now also covers the BARE BLOOM — no stem, no sepals, no receptacle override, which is
+# what the shipped defaults and all seven presets are — and every preset by name. Rows with
+# a KNOWN, TRACKED defect carry an `xfail` issue number: the gate stays green for those and
+# fails hard if one starts passing, because that means the fix landed and the marker is now
+# a hole. See the tool's header.
+name: flower-connectedness
+
+on:
+  pull_request:
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-connectedness.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/flower-connectedness.yml
+  push:
+    branches: [main]
+    paths:
+      - flower.js
+      - flower-geometry.js
+      - flower-sdf.js
+      - flower-registry.js
+      - flower-presets.js
+      - flower.html
+      - tools/verify-connectedness.mjs
+      - tools/chromium-harness.mjs
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # playwright alone, at an exact version. It pins the exact playwright-core it
+      # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
+      # browser that `npx playwright install` downloads can never disagree. Both
+      # unpinned raced npm on Sep 4: playwright-core 1.63.0 published nineteen
+      # seconds before a run while the playwright CLI was still 1.62.1, and every job
+      # that launches a browser died at launch (build 1243 wanted, 1234 installed);
+      # two minutes later the registry listed playwright 1.63.0 as latest with its
+      # tarball still 404, and an unpinned install could not fetch it at all. Bump
+      # the pin by hand, in every workflow at once, with playwright-core's twin in
+      # bloom-frozen-matrices.yml.
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every junction config must export as a single connected body
+        run: node tools/verify-connectedness.mjs

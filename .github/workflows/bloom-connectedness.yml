@@ -1,0 +1,73 @@
+# Build gate: the exported bloom must be ONE printed piece, at every slider
+# position (the charter's invariant, docs/bloom-charter.md). The export gate
+# next door measures manifoldness only — two separate closed solids also have
+# zero boundary edges — so this one voxelises the export below the (assumed)
+# minimum printable feature and flood-fills; more than one region means the
+# print arrives in parts. See tools/verify-bloom-connectedness.mjs's header
+# for what it does NOT cover (free ends, sub-cell gaps, configs outside the
+# matrix) and why shell counts and AABB overlap can never be the measure.
+name: bloom-connectedness
+
+on:
+  pull_request:
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-connectedness.mjs
+      - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
+      - tools/chromium-harness.mjs
+      - .github/workflows/bloom-connectedness.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-connectedness.mjs
+      - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
+      - tools/chromium-harness.mjs
+  workflow_dispatch: {}
+
+# A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
+# session 17). Two runs of this workflow on PR #149 started two minutes
+# apart and both ran to completion on a four-CPU runner; the older one was
+# already answering a question nobody was asking. The group is keyed to the
+# workflow AND the ref so it can never cancel across PRs, and the final head
+# always runs to completion — safe by construction. It also enforces a
+# discipline already agreed: a run on a commit that has been superseded is
+# not evidence about the head.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # playwright alone, at an exact version. It pins the exact playwright-core it
+      # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
+      # browser that `npx playwright install` downloads can never disagree. Both
+      # unpinned raced npm on Sep 4: playwright-core 1.63.0 published nineteen
+      # seconds before a run while the playwright CLI was still 1.62.1, and every job
+      # that launches a browser died at launch (build 1243 wanted, 1234 installed);
+      # two minutes later the registry listed playwright 1.63.0 as latest with its
+      # tarball still 404, and an unpinned install could not fetch it at all. Bump
+      # the pin by hand, in every workflow at once, with playwright-core's twin in
+      # bloom-frozen-matrices.yml.
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every row must export as a single connected body
+        run: node tools/verify-bloom-connectedness.mjs

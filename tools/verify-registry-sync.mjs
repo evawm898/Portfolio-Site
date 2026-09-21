@@ -24,7 +24,10 @@ import { readFileSync } from 'node:fs';
 
 const REPO = new URL('..', import.meta.url).pathname;
 const H = readFileSync(REPO + 'flower.html', 'utf8');
-const { CONTROLS } = await import(REPO + 'flower-registry.js');
+const { CONTROLS, evalPredicate, predicateDrivers } = await import(REPO + 'flower-registry.js');
+
+// Gating attributes that must NO LONGER appear on any control wrapper.
+const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
 
 // Chrome controls live in the HTML but intentionally not in the registry (handled
 // directly in flower.js). They are exempt from the "HTML has, registry lacks" check.
@@ -75,10 +78,13 @@ function divInfo(idx) {
   const before = H.slice(0, idx);
   const divAt = before.lastIndexOf('<div class="fl-ctrl"');
   const divTag = H.slice(divAt, H.indexOf('>', divAt) + 1);
-  const gating = {};
-  const GATES = ['data-bloom-styles', 'data-tip-styles', 'data-infill-styles', 'data-cont-margin', 'data-center-arch', 'data-center-styles', 'data-recept', 'data-recept-dome', 'data-recept-open', 'data-recept-ribbed', 'data-sepal', 'data-sepal-tip', 'data-stem', 'data-leaf', 'data-layers-multi', 'data-bil-petal', 'data-hide-bilateral'];
-  for (const g of GATES) { const v = attr(divTag, g); if (v !== null) gating[g] = v; }
-  return { gating, divId: attr(divTag, 'id') || null, permanentHidden: attr(divTag, 'hidden') === true };
+  // A control wrapper must carry NO gating attribute. Visibility conditions live in the
+  // registry as `visibleWhen` predicates now, and a data-* attribute on a wrapper would be
+  // a second, unevaluatable declaration of the same thing — the exact drift this change
+  // removed. (The attributes remain on HINT and NOTE elements, which have no registry row;
+  // those are swept by applyAnnotationVisibility in flower.js.)
+  const strays = GATES.filter((g) => attr(divTag, g) !== null);
+  return { strays, divId: attr(divTag, 'id') || null, staticHidden: attr(divTag, 'hidden') === true };
 }
 
 // ---- compare parsed HTML controls against the registry ---------------------------
@@ -90,12 +96,12 @@ for (const p of parsed) if (!regById.has(p.id) && !CHROME.has(p.id)) err(`HTML c
 for (const c of CONTROLS) if (!htmlById.has(c.id)) err(`registry control "${c.id}" is missing from flower.html`);
 
 const numEq = (a, b) => (a == null && b == null) || (+a === +b);
-const gatingEq = (a = {}, b = {}) => {
-  const ak = Object.keys(a).sort(), bk = Object.keys(b).sort();
-  if (ak.join(',') !== bk.join(',')) return false;
-  for (const k of ak) { const av = a[k] === true ? true : a[k]; const bv = b[k] === true ? true : b[k]; if (String(av) !== String(bv)) return false; }
-  return true;
-};
+// A control is statically `hidden` in the markup IFF its registry predicate can never be
+// satisfied. `{any: []}` is the honest expression of "never shown" — unlike the deleted
+// `permanentHidden` flag, it can be evaluated by the same evaluator as every other
+// predicate, and it sits beside a `hiddenReason` saying WHY. That flag was wrong on one of
+// its four users for as long as nothing could check it.
+const neverVisible = (c) => !!(c.visibleWhen && Array.isArray(c.visibleWhen.any) && c.visibleWhen.any.length === 0);
 
 for (const c of CONTROLS) {
   const p = htmlById.get(c.id);
@@ -120,9 +126,10 @@ for (const c of CONTROLS) {
   } else { // text
     if (String(p.default) !== String(c.default)) err(`${c.id}: default HTML=${JSON.stringify(p.default)} registry=${JSON.stringify(c.default)}`);
   }
-  if (!gatingEq(p.gating, c.gating)) err(`${c.id}: gating HTML=${JSON.stringify(p.gating)} registry=${JSON.stringify(c.gating || {})}`);
+  if (p.strays.length) err(`${c.id}: wrapper still carries gating attribute(s) ${p.strays.join(', ')} — visibility is declared in the registry (visibleWhen), not in the markup`);
   if ((p.divId || null) !== (c.divId || null)) err(`${c.id}: divId HTML=${p.divId} registry=${c.divId || null}`);
-  if (!!p.permanentHidden !== !!c.permanentHidden) err(`${c.id}: permanentHidden HTML=${!!p.permanentHidden} registry=${!!c.permanentHidden}`);
+  if (p.staticHidden !== neverVisible(c)) err(`${c.id}: static hidden HTML=${p.staticHidden} but registry visibleWhen is ${neverVisible(c) ? 'unsatisfiable ({any:[]})' : 'satisfiable'} — a wrapper is statically hidden iff its predicate can never be true`);
+  if (neverVisible(c) && !c.hiddenReason) err(`${c.id}: visibleWhen is unsatisfiable but no hiddenReason says why — "never shown" without a reason is the permanentHidden flag again`);
 }
 
 // DOM order within each section (registry order must equal HTML source order)
@@ -148,16 +155,62 @@ for (const c of CONTROLS) if (c.kind === 'slider' && c.fmt) {
   if (n !== 1) err(`${c.id}: declares fmt "${c.fmt}" but has ${n} data-value span(s) (expected exactly 1)`);
 }
 
-// ---- imperative-gate exception: capped + self-policing ---------------------------
-// captureDist's visibility is a compound AND across two selects (infill type AND
-// edge-termination != fade), which the single-attribute declarative gating cannot
-// express. It is gated imperatively (updateTerminationOptions) as a documented, single
-// exception. Assert EXACTLY ONE control carries the flag — a second one must not slip
-// in undocumented; it forces the conversation about extending the gating vocabulary.
-const imperative = CONTROLS.filter((c) => c.imperativeGate);
-if (imperative.length !== 1) {
-  err(`imperativeGate exception must be EXACTLY ONE control; found ${imperative.length} (${imperative.map((c) => c.id).join(', ') || 'none'}). ` +
-      `Either restore the single allowed exception or extend the declarative gating vocabulary instead of adding another hand-gated control.`);
+// ---- the retired flags must not come back ----------------------------------------
+// `permanentHidden` and `imperativeGate` were both flags that ASSERTED something about
+// visibility without stating the condition. captureDist carried `imperativeGate` because
+// its condition is a compound AND across two selects, which the old single-attribute
+// gating could not express — this file used to cap that exception at exactly one control
+// and tell whoever hit it to "extend the declarative gating vocabulary instead". That is
+// what happened: the vocabulary is `visibleWhen`, it expresses compound conditions, and
+// neither flag has an honest use left.
+for (const c of CONTROLS) {
+  if (c.permanentHidden) err(`${c.id}: carries the retired permanentHidden flag — use visibleWhen {any: []} plus a hiddenReason, which is checkable`);
+  if (c.imperativeGate) err(`${c.id}: carries the retired imperativeGate flag — state the condition as a visibleWhen predicate instead`);
+  if (c.gating) err(`${c.id}: carries the retired gating field (an attribute NAME, not a condition) — use visibleWhen`);
+}
+
+// ---- every predicate must be evaluable and reference real controls ----------------
+// A predicate naming a control that does not exist would silently... not silently do
+// anything: evalPredicate reads undefined and returns false, hiding the control forever.
+// That is the shipped-and-unreachable failure this project has produced four times.
+const allIds = new Set(CONTROLS.map((c) => c.id));
+for (const c of CONTROLS) {
+  for (const field of ['visibleWhen', 'standardVisibleWhen']) {
+    if (!c[field]) continue;
+    let drivers;
+    try { drivers = predicateDrivers(c[field]); }
+    catch (e) { err(`${c.id}: ${field} is not a valid predicate — ${e.message}`); continue; }
+    for (const d of drivers) if (!allIds.has(d)) err(`${c.id}: ${field} reads control "${d}", which is not in the registry`);
+    try { evalPredicate(c[field], Object.fromEntries([...allIds].map((k) => [k, '']))); }
+    catch (e) { err(`${c.id}: ${field} does not evaluate — ${e.message}`); }
+  }
+}
+
+// ---- the declarations must actually be WIRED -------------------------------------
+// A predicate is two properties, and until this check only one of them was gated: the
+// declaration can be correct AND the app can fail to react to it. `predicateDrivers` was
+// imported into flower.js and never called for the whole life of the predicates — every
+// one of them worked by coincidence, because each happened to name a driver that was
+// already hand-wired for some other reason. The first predicate to name an unwired driver
+// (clawLength) silently did nothing, and every gate stayed green: verify-tier-visibility
+// snapshots a config and evaluates predicates, so it never goes through the UI and never
+// exercises a listener.
+//
+// SCOPE, STATED PLAINLY: this is a TRIPWIRE for that exact regression — the import going
+// unused again — not proof of the general property. Listeners are derived from
+// predicateDrivers(), so "every driver is wired" holds BY CONSTRUCTION while that call is
+// there, and this asserts the call is there. It would not catch someone replacing the
+// derived loop with a hand-written list that calls predicateDrivers elsewhere. The real
+// property — every driver, driven through the UI, updates the DOM without a reload —
+// needs a runtime gate: issue #70.
+{
+  const JS = readFileSync(REPO + 'flower.js', 'utf8');
+  const uses = (JS.match(/predicateDrivers\s*\(/g) || []).length;
+  if (uses < 1) {
+    err('flower.js imports predicateDrivers but never CALLS it — the driver listeners are not derived from '
+      + 'the declarations, so a predicate naming a driver nothing listens to will silently never fire. '
+      + 'This is the failure that made every predicate work by coincidence until one did not.');
+  }
 }
 
 // ---- THIRD list: the petal-shape picker ------------------------------------------
@@ -184,6 +237,127 @@ if (imperative.length !== 1) {
   }
 }
 
+// ---- RETIRED_IDS: a reservation with a gate behind it -----------------------------
+// Deleting a control makes its VALUE irrelevant and its NAME dangerous. Saved designs and
+// shared links carry the old key forever, so reclaiming the name later feeds a stale number
+// into a control that means something else — no error, no warning, the design just quietly
+// is not what it was. "Reserved permanently" in a comment cannot stop that; this can.
+//
+// Three collisions are checked, and each is a route by which a retired name could come back:
+//   1. a live control id           — the direct reuse
+//   2. a live select option value  — a retired id reappearing as a VALUE is the same
+//                                    corruption wearing a different hat
+//   3. a DEFAULTS key              — DEFAULTS is derived from the registry, but flower.js
+//                                    also assigns a few keys directly (autoRotate,
+//                                    spaceSeed); those are parsed out rather than assumed
+//
+// SCOPE, STATED PLAINLY — because a check that reads broader than it is, is how this
+// codebase has been misled before. Checks 5 and 6 are TEXTUAL scans over a HARDCODED file
+// list (DRIVER_FILES, SOURCE_FILES). They are not a reference analysis: a retired id
+// reached by computed access (`p[k]`, `state['relief' + x]`), or living in a file absent
+// from both lists, is NOT caught. The lists are the coverage, so a new tool that sets
+// controls by id, or a new app source file, must be added to one of them or it is unchecked.
+// What the two scans DO cover is the split that actually bit: check 5 sees files that SET
+// controls by id and cannot see the app's own source; check 6 sees the app's own source and
+// is the one that caught migrateV4toV5 still carrying all three ids in a plain string list.
+// Plus two structural checks, because a malformed reservation is not a reservation: every
+// entry needs an id, a retiredAt version and a why; and the retirement must be BACKED BY A
+// MIGRATION THAT DELETES THE KEY. That last one is not pedantry — migrateDesign() sweeps
+// keys with no control into `extras` and preserves them verbatim on re-save, so a retired
+// id with no delete is carried forward indefinitely by the mechanism meant to protect
+// forward compatibility. The reservation would be documented and simultaneously defeated.
+{
+  // Files that DRIVE the panel by control id: gate matrices, authored presets, shot
+  // helpers. flower.js is deliberately absent — its migration notes name retired ids in
+  // prose, and its two real risks (a DEFAULTS assignment, a missing delete) are checked
+  // directly above. Add a file here when a new tool starts setting controls by id.
+  const DRIVER_FILES = [
+    'tools/verify-flower-export.mjs', 'tools/verify-geometry-quality.mjs',
+    'tools/verify-connectedness.mjs', 'tools/visibility-matrix.mjs',
+    'tools/gen-preset-thumbs.mjs', 'docs/tools/diff-export-bytes.mjs',
+    'docs/tools/measure-junction-rim.mjs',
+    'flower-presets.js', 'flower-view-presets.js', 'flower-shapes.js',
+  ];
+  // The app's own source, scanned for surviving code references (check 6).
+  const SOURCE_FILES = ['flower.js', 'flower-geometry.js', 'flower-registry.js', 'flower-sdf.js', 'flower-shapes.js', 'flower-chrome.js', 'flower-saved.js'];
+  const { RETIRED_IDS } = await import(REPO + 'flower-registry.js');
+  if (!Array.isArray(RETIRED_IDS)) {
+    err('flower-registry.js does not export RETIRED_IDS — the permanent-reservation list is how a '
+      + 'deleted control\'s name is kept out of circulation; without it this gate checks nothing');
+  } else {
+    const JS = readFileSync(REPO + 'flower.js', 'utf8');
+    const seen = new Set();
+    for (const r of RETIRED_IDS) {
+      if (!r || typeof r.id !== 'string' || !r.id) { err(`RETIRED_IDS entry ${JSON.stringify(r)} has no id`); continue; }
+      if (seen.has(r.id)) err(`RETIRED_IDS lists "${r.id}" more than once`);
+      seen.add(r.id);
+      if (!Number.isInteger(r.retiredAt)) err(`RETIRED_IDS "${r.id}": retiredAt must be the integer schema version it was retired at (it names the migration that deletes the key)`);
+      if (!r.why || String(r.why).trim().length < 20) err(`RETIRED_IDS "${r.id}": needs a why. A reservation nobody can evaluate is the permanentHidden flag again — a claim with no grounds.`);
+
+      // 1. live control id
+      if (regById.has(r.id)) err(`RETIRED_IDS "${r.id}" is ALSO a live control in the registry — a retired id may never be reused. Every design saved before it was retired still carries a value under this name, and that value would now be fed to this control.`);
+      // 1b. live markup id (clearer message than the generic existence check)
+      if (htmlById.has(r.id)) err(`RETIRED_IDS "${r.id}" still exists as a control in flower.html — retiring an id means deleting the markup too`);
+      // 2. live select option value
+      for (const c of CONTROLS) for (const o of (c.options || [])) {
+        if (String(o.value) === r.id) err(`RETIRED_IDS "${r.id}" collides with option value "${o.value}" on live control "${c.id}" — a retired name reused as a value is the same silent corruption`);
+      }
+      // 3. DEFAULTS key assigned directly in flower.js (outside the registry-derived loop)
+      if (new RegExp('DEFAULTS\\.' + r.id + '\\s*=').test(JS)) {
+        err(`RETIRED_IDS "${r.id}" is assigned directly as a DEFAULTS key in flower.js — a retired id must have no DEFAULTS entry`);
+      }
+      // 4. a migration must DELETE the key, or the value rides along forever in `extras`
+      if (!new RegExp('delete\\s+\\w+\\.' + r.id + '\\b').test(JS)) {
+        err(`RETIRED_IDS "${r.id}": no migration in flower.js deletes this key. migrateDesign() preserves keys with no control verbatim in \`extras\` on re-save, so without a \`delete out.${r.id}\` the retired value is carried forward indefinitely — reserved on paper and alive in every saved design.`);
+      }
+      // 6. nothing may still REFERENCE the id in executable code. Check 5 covers files that
+      // SET controls by id; this covers the app's own source, where a retired id can survive
+      // as a plain string in a list — which is exactly what happened: migrateV4toV5's backfill
+      // array still carried all three ids after the controls were deleted, and check 5 could
+      // not see it because flower.js is not a driver file. Comments are stripped first (the
+      // migration notes name retired ids in prose, legitimately); string literals are NOT
+      // stripped, because the backfill names them as strings and that is the case worth
+      // catching. Two allowances: the `delete <obj>.<id>` that check 4 REQUIRES, and the
+      // RETIRED_IDS declaration itself, which has to name them.
+      for (const f of SOURCE_FILES) {
+        let src;
+        try { src = readFileSync(REPO + f, 'utf8'); } catch { continue; }
+        src = src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/^\s*\/\/.*$/gm, ' ');
+        src = src.replace(/export const RETIRED_IDS = \[[\s\S]*?\n\];/, ' ');
+        src = src.replace(new RegExp('delete\\s+\\w+\\.' + r.id + '\\b', 'g'), ' ');
+        if (new RegExp('\\b' + r.id + '\\b').test(src)) {
+          const line = (src.split('\n').findIndex((l) => new RegExp('\\b' + r.id + '\\b').test(l)) + 1);
+          err(`RETIRED_IDS "${r.id}" is still REFERENCED in executable code: ${f}:${line}. A retired id `
+            + `surviving in a list or an expression is the reservation defeated in the one file that matters most.`);
+        }
+      }
+      // 5. nothing may still DRIVE the id — a gate matrix, a preset, a shot config.
+      // Deleting reliefAmp's control while four export configs still said
+      // `{ id: 'reliefAmp', value: '0.7' }` was caught only by the export gate's read-back
+      // assertion, nine minutes into a full matrix run, as 26 failures. Every one of the
+      // six queued retirements can make the same mistake, so it is caught here in under a
+      // second instead. Two forms are searched: the `{ id: 'x' }` a config/matrix row uses,
+      // and the `x:` an authored preset uses. Comments are free to name a retired id (the
+      // migration notes do); only a driving reference fails.
+      //
+      // THIS CHECK COVERS DRIVER_FILES ONLY — files that set controls by id. It says nothing
+      // about the app's own source, where flower.js is deliberately absent from the list;
+      // code references are check 6's job, and the two are separate because the first
+      // version of this shipped with only check 5 and read as though it covered both.
+      for (const f of DRIVER_FILES) {
+        let src;
+        try { src = readFileSync(REPO + f, 'utf8'); } catch { continue; }
+        const asConfig = new RegExp(`\\bid:\\s*['"]${r.id}['"]`).test(src);
+        const asKey = new RegExp(`(^|[{,\\s])${r.id}\\s*:`, 'm').test(src);
+        if (asConfig || asKey) {
+          err(`RETIRED_IDS "${r.id}" is still DRIVEN by ${f} (${asConfig ? "a { id: '...' } config row" : 'an object key'}). `
+            + `The control is gone, so this sets nothing — a matrix row that silently no-ops measures a different design from the one it names.`);
+        }
+      }
+    }
+  }
+}
+
 // ---- report ----------------------------------------------------------------------
 if (fail.length) {
   console.error(`registry-sync: FAIL — ${fail.length} disagreement(s) between flower-registry.js and flower.html:\n`);
@@ -191,4 +365,6 @@ if (fail.length) {
   console.error('\nThe registry is the single source of truth; reconcile it with the markup (or vice versa) before merging.');
   process.exit(1);
 }
-console.log(`registry-sync: OK — ${CONTROLS.length} controls agree with flower.html (fields, options, gating, order, no duplicate/orphan spans).`);
+const { RETIRED_IDS: RET } = await import(REPO + 'flower-registry.js');
+console.log(`registry-sync: OK — ${CONTROLS.length} controls agree with flower.html (fields, options, gating, order, no duplicate/orphan spans); `
+  + `${(RET || []).length} retired id(s) reserved and uncollided: ${(RET || []).map((r) => r.id).join(', ') || '(none)'}.`);

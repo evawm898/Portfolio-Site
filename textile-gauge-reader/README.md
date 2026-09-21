@@ -734,6 +734,303 @@ Fixing the loop-lattice path safely needs its own targeted evidence — not
 a copy of finding 1's fix, which was checked here and shown not to
 generalize — and is real work still ahead.
 
+### The density cross-check's blind spot: a real secondary peak, not just a bad override
+
+*(One instance of the broader period-selection ambiguity quantified in
+"How ROI-dependent is this, really?" below — see its "central finding"
+subsection for how this connects to ply-twist, color pooling, and the
+position-dependent coin-flips found by the mechanical ROI sweep.)*
+
+`_cross_check_density` (the wale-only loop-density override described
+above) was found overriding a wale pick the v0.3 evidence scorer had
+already gotten right, and decisively — on a real photo
+(`tests/fixtures/knit_sample_01.jpg`, see `tests/knit_sample_ground_
+truth.py`), evidence scored the correct 85.0px candidate at 0.650
+against the wrong 0.5x-harmonic candidate's 0.553, a 0.097 margin, and
+the density check still substituted the wrong one. Fixed by
+`DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN`: the override may now only fire
+when wale's own top-2 evidence scores are within `UNCERTAIN_SCORE_MARGIN`
+(0.08) of each other — a genuine near-tie — never when the scorer has
+already separated them decisively. Chosen from the margin distribution
+across all 9 fixtures with recorded ground truth, not the one failing
+case: 8 of 9 margins (0.097–0.324) sit comfortably above the threshold;
+only one (0.063, a case whose pick was already correct and never reached
+the density check regardless) sits below it.
+
+That fix closes the override, but doesn't explain why the density check
+had anything to disagree with in the first place — on this photo, `_
+detect_loop_centers` (the DoG blob detector feeding both `_cross_check_
+density` and `_analyze_direction`'s center-pitch correction) really is
+finding roughly twice as many loop centers as there are loops. Measured
+directly: the median nearest-neighbor spacing among detected centers
+(34.5px) is almost exactly half the true loop pitch (70.2px, the
+geometric mean of the true 85×58px wale/course spacing) — not a
+harmonic-selection error downstream, a genuine secondary local maximum
+in the detector's own response map, most likely from adjacent stitches'
+diagonal legs crossing near the midpoint between true loop centers and
+producing a compact-enough blob to pass the DoG blob test.
+
+This is the same *shape* of problem `fold_consistency` already solves
+for the periodicity path — a real, periodic sub-feature (there, one leg
+of a V; here, a leg-crossing between two loops) that's genuinely regular
+enough to be mistaken for the thing actually being measured — but the
+spatial loop-center detector has no equivalent structural defense: DoG
+blob detection has no notion of "is this compact bright spot actually a
+complete loop head, or the crossing point between two legs of adjacent
+loops." `min_separation_px`'s non-max-suppression radius (`0.3 *
+min(p0_wale, p0_course)`) is the only thing currently keeping detections
+apart, and it isn't derived from anything that distinguishes a leg
+crossing from a loop head — simply raising that fraction would risk
+being a fix fitted to this one photo's geometry rather than a
+structurally-grounded one. Root-caused, not fixed here: a real defense
+would need something like a shape check on the blob's local gradient
+structure (does it look like two converging legs, not just "compact and
+bright") the way `_fold_consistency` checks structural resemblance
+between repeats, rather than a threshold tweak on the existing response
+map.
+
+### Course selection: why v0.3-authoritative was tested and rejected
+
+Jersey's course reading (`real_jersey_sample.jpg`, at the crop that
+reproduces its failure) can be off by as much as -53% — a doubled period,
+the largest error found in a 9-fixture accuracy pass. Since course
+selection deliberately uses the older `_analyze_direction` pipeline
+rather than the v0.3 evidence scorer (see "A real-photo regression, and
+phase consistency as its fix" above), the obvious question was whether
+that decision has simply gone stale: would making v0.3 authoritative for
+course fix this?
+
+**Tested directly against all 9 fixtures with recorded ground truth, and
+rejected — the answer is genuinely mixed, not a clean win:**
+
+- On the synthetic fabric grid (12 clean/degraded cases, exact known
+  ground truth), switching to v0.3's own top-evidence pick would **fix 3
+  cases that are currently strict-xfailed as broken** (jersey 5×7
+  degraded, jersey 8×10 degraded, rib1×1 8×10 clean — all currently flip
+  to a half-period harmonic under the old pipeline, and v0.3 gets all
+  three right) **and break 1 currently-good case** (rib1×1 8×10
+  degraded: old pipeline correct at 18.0px, v0.3 flips it to 36.0px).
+- On the real jersey photo itself, at a crop that reproduces the -53%
+  failure, v0.3's own top pick is the *same* wrong 49.0px candidate as
+  the old pipeline's, by a hair (evidence 0.424 vs. 0.418, margin
+  0.006). This is not an authority problem on this photo — both
+  mechanisms are wrong, in a near-tie.
+- On `knit_sample_08.jpg` (a real photo with recorded course ground
+  truth), the old pipeline is currently decent (-7.1%); v0.3's own pick
+  would badly regress it (-53.6%) — the identical doubled-period
+  failure, freshly introduced on a fixture that isn't currently broken.
+
+Net: switching course to v0.3-authoritative would trade one class of bug
+for another, and wouldn't even fix the case that prompted the question.
+**Rejected, not attempted.**
+
+**What actually distinguishes the two near-tied course candidates?**
+Dumped the full per-term evidence breakdown for jersey's 24.5px (correct)
+vs. 49.0px (wrong, selected) candidates: `patch_consensus` is the
+dominant term and it's badly wrong-direction (0.435 vs. 0.953 — 2.2x in
+favor of the wrong candidate) — the same failure mode already diagnosed
+and partially fixed for **wale** (see "A real second photo..." above:
+"patch_consensus favored the WRONG half-period candidate... phase_
+consistency favored the CORRECT candidate"). `phase_consistency` does
+lean correctly here (0.661 vs. 0.630), but far too weakly to overcome
+patch_consensus.
+
+That wale-side fix does **not** transfer to course. Checked on
+`knit_sample_08.jpg` (the same doubled-period failure shape):
+`phase_consistency` there favors the *wrong* candidate (0.588 vs.
+0.318) — backwards relative to jersey. `patch_consensus`, by contrast,
+favors the wrong (coarser) candidate on every real-photo case checked
+(jersey, knit_05, knit_08) — the one signal that's consistent, but it
+points the wrong way everywhere, so it's not a fix source either.
+`structural` (fold + loop-center-pitch agreement) is uninformative for
+course in these cases (~0): `fold_consistency` is deliberately never
+computed for course (rows don't have the V-leg bilateral-symmetry
+failure mode it targets), and loop-center pitch agreement isn't reliably
+trusted at these crop sizes.
+
+**No existing per-candidate signal in this codebase reliably separates
+the true course period from its harmonic.** This is parked, not
+in-progress: it needs its own investigation (a course-specific structural
+signal, most likely — not a reweighting of terms built for wale), rather
+than reuse of a fix that was checked here and does not generalize.
+
+### How ROI-dependent is this, really?
+
+Two accuracy passes over the same 8 fixtures (real_jersey_sample.jpg,
+sarahmaker-knitting-gauge.jpg, and the knit_sample fixtures — see
+`tests/knit_sample_ground_truth.py`), run in the same session against
+**unchanged detector code**, disagreed by tens of percentage points per
+fixture — including one fixture (jersey course) that looked "fixed"
+between the two passes purely because the second pass's hand-picked crop
+happened to exclude a few rows of ruler ticks the first pass's crop had
+included. That contradicted a finding from the same session (jersey's
+course near-tie has no available fix — see "Course selection" above),
+which is what caught the problem: the two "accuracy" numbers weren't
+measuring the same thing at all.
+
+**Confirmed directly, not assumed.** Re-deriving ROIs that approximate
+the first pass's crops (a natural, non-adversarial choice per fixture —
+e.g. knit_sample_01's whole gauge-tool window, real_jersey_sample's full
+frame minus its ruler strip) reproduced that pass's numbers almost
+exactly on every fixture checked (knit_01 wale +4.6% vs. reported +4.3%;
+knit_01 course +0.72% vs. reported +0.7%; jersey course -52.1% vs.
+reported -53.1%; knit_02 wale +0.6% vs. reported +1.1%; knit_06 wale
+-1.3% vs. reported -0.8%). The code did not move between passes; only
+the crop did. ROI choice is the entire explanation.
+
+**Quantified with a systematic grid, not more hand-picked crops.** For
+each of the 8 fixtures, 15 crops were generated mechanically — 3 sizes
+(30%/50%/70% of the image's shorter dimension, as a centered square) ×
+5 positions (the 4 corners + center) — with no visual inspection of any
+kind, and `analyze_gauge` run on each:
+
+| fixture | wale median err | wale err range | wale harmonic-lock rate | course median err | course err range | course harmonic-lock rate |
+|---|---|---|---|---|---|---|
+| real_jersey_sample | -7.2% | -54% to +90% | 6/15 | -6.9% | -70% to +65% | 7/15 |
+| sarahmaker (teal) | **+68.7%** | -14% to +89% | 5/15 | n/a | n/a | n/a |
+| knit_01 | +6.3% | +2.7% to +109% | 3/15 | **+367%** | -66% to +554% | 3/15 |
+| knit_02 | **+121%** | -5% to +7356% | 7/15 | n/a | n/a | n/a |
+| knit_05 | +5.2% | -33% to +109% | 6/15 | +0.7% | -88% to +402% | 4/15 |
+| knit_06 | **-69.1%** | -85% to -67% | 10/15 | -3.4% | -26% to +6% | 1/15 |
+| knit_08 | +5.5% | -52% to +105% | 6/15 | +1.0% | -69% to +414% | 3/15 |
+| knit_09 | -1.6% | -44% to +8% | 0/15 | **-67.2%** | -86% to +9% | 9/15 |
+
+("harmonic-lock rate" = crops landing within 12% of a 0.5×/1.5×/2×/3×
+multiple of the true value, out of 15.)
+
+**This is a large, plain finding, not a footnote: an error range spanning
+several hundred percentage points from crop choice alone, on more than
+half the fixtures checked, on either axis.** The median across most
+individual fixtures looks reasonable (many sit within ~10% of true) —
+but that's the sweep's *center*, not its *worst case*, and a mechanically
+generated grid hits genuinely bad crops (a harmonic lock, or a scale so
+small the ROI is mostly background/table) often enough that "roughly
+right on a typical crop" is not the same claim as "accurate." Two
+findings stand out:
+
+- **The teal fixture's wale median across the grid (+68.7%) is far worse
+  than the ~correct numbers reported elsewhere in this README** for the
+  same fixture (`test_wale_scoring_weights.py`'s 5 specifically-chosen
+  ~1in² windows). Those windows were chosen *because* earlier debugging
+  found they avoid this fixture's known half-period ambiguity — they are
+  not representative of what an unbiased crop gives on this photo, they
+  were selected against exactly the failure this table now shows is
+  common. Every accuracy figure anywhere in this README computed from a
+  hand-picked "clean" ROI should be read with that in mind.
+- **Harmonic lock is not rare** — it's the modal failure, not a tail
+  event, on several fixtures (knit_06 wale 10/15, knit_09 course 9/15,
+  knit_02 wale 7/15).
+
+**The fix for the harness, not (yet) the detector: pin one ROI per
+fixture, chosen by a stated rule, applied uniformly, with no visual
+judgment and no re-picking.** `tests/knit_sample_ground_truth.py`'s
+`pinned_roi()` and its `ROI_01`/`ROI_02`/`ROI_05`/`ROI_06`/`ROI_08`/
+`ROI_09` constants (see its "FOURTH PASS" docstring section) implement:
+the central square crop at 50% of the image's shorter dimension, computed
+mechanically from image dimensions — no attempt to dodge a ruler, pin, or
+marker that happens to land inside it. Any future accuracy claim against
+these fixtures must use these exact ROIs (verbatim, not "close to") to
+be comparable to any other. This does not make the detector more
+accurate — it makes the next accuracy number about the detector, not
+about who picked the crop.
+
+#### The central finding: two layered problems, not one
+
+The sweep above shows a large spread but doesn't say what's driving it.
+A follow-up pass tagged all 210 axis-observations from the same 15-crop
+mechanical grid with three more facts per crop — does it overlap a ruler,
+pin, or foreign object (a fixed bounding box per fixture, defined once,
+not re-picked); how many true stitch/row repeats fit in it (crop size ÷
+ground-truth period); and the pipeline's own status/confidence — and
+separated their effects instead of reporting one blended spread.
+
+**Contamination is the dominant real-photo error source, by a wide
+margin:**
+
+| | median \|err\| | harmonic-lock rate |
+|---|---|---|
+| crop overlaps a ruler/pin/marker | 65.8% | 40% |
+| clean fabric only | 7.2% | 23% |
+
+**Crop size is a second-order effect, and naive analysis makes it look
+backwards.** Raw (uncontrolled) data shows error getting *worse* at
+larger crop sizes — but that's confounded: bigger crops mechanically
+overlap more of a fixture's (fixed-size) contamination zone, so larger
+crops are also *more likely to be contaminated* (51%→60%→73% of crops as
+size grows 30%→50%→70%). Controlling for that, within clean crops only,
+size shows the trend you'd actually expect, just a mild one: median
+\|err\| 8.2% → 7.2% → 5.6% as crops grow from ~6 to ~15 stitch repeats.
+No sharp "minimum viable ROI" threshold — just a gentle improvement with
+more fabric in frame.
+
+**Removing both confounds — clean fabric AND ≥6 repeats (n=69, 11
+fixture/axis pairs) — does not reveal a small, uniform residual. It
+reveals a bimodal split:**
+- **4 of 11 pairs are reliably accurate** regardless of exact position
+  (jersey course, knit_06 course, knit_08 course, knit_09 wale — every
+  clean/large crop on these reads within single-digit % error).
+- **1 of 11 is reliably, systematically wrong** (knit_06 wale: all 9
+  clean/large crops read -67% to -85% — not a coin flip, this scale is
+  simply wrong on this fixture no matter where the crop sits).
+- **6 of 11 are a genuine coin flip**, correct on some clean/adequately-
+  sized crops and badly wrong (a harmonic multiple) on others, with
+  nothing about cleanliness or size predicting which: jersey wale, teal
+  wale, knit_05 wale, knit_05 course, knit_08 wale, knit_09 course. The
+  starkest example — knit_05's course axis across its six clean, ≥6-
+  repeat crops reads **+1%, +87%, +1%, -52%, -1%, -75%** — alternating
+  between correct and badly wrong purely from where an otherwise-clean,
+  adequately-sized crop happens to land. "Use a bigger, cleaner crop"
+  has no answer for this class: bigger, cleaner crops disagree with each
+  other.
+
+**Confidence tracks part of this, imperfectly.** The coarse `status`
+flag (confident/uncertain) carries real signal — confident observations
+have median \|err\| 5.8% vs. uncertain's 67.0% — worth keeping. But it's
+a partial gate, not a solution: 29% of "confident" results are still
+wrong by >15% (one reads +100.6% error at confidence 0.83), and 39% of
+"uncertain" results are actually fine (≤15% error) — false confidence
+and over-caution both happen often enough to matter. The **numeric**
+confidence score, separately, carries essentially no information at all:
+Pearson correlation between confidence and absolute error across all 210
+observations is **-0.028** — indistinguishable from zero. Only the
+binary status split is informative; the number attached to it isn't.
+
+**Acted on, not just noted: the numeric score is gone from the API and
+UI.** `AxisOut` (backend/schemas.py) no longer has a `confidence` field
+at all — `/analyze` and `/analyze-multi`'s primary `wale`/`course`
+responses don't send it, and the frontend shows only Confident/Uncertain
+(plus `uncertain_reason`) anywhere a user looks. A number that doesn't
+track error is worse than no number: it invites more trust in one wrong
+result over another equally wrong one just because it carries a higher
+digit. The raw score still exists internally (`AxisResult.confidence` in
+`analysis/gauge_analysis.py`, used computationally — e.g. the
+`UNCERTAIN_CONFIDENCE_THRESHOLD` floor) and is still surfaced in
+`AxisDebugOut`, used only by the per-region detail nested under
+`/analyze-multi`'s `multi_roi` (Developer diagnostics), explicitly
+labeled internal/uncalibrated there. Restoring a real, calibrated
+confidence number is future work that depends on first understanding the
+position-dependent coin-flip documented above — a score fit to today's
+8-9 fixtures without that would very likely just be fit to their
+particular coin-flips, the same "threshold fitted to two photos" trap
+already rejected once in this project (see "Investigated and rejected:
+user-anchored template matching").
+
+**This reframes several mechanism writeups already in this README as the
+same underlying problem, not separate bugs.** Yarn ply-twist on the teal
+fixture (see "Investigated and rejected" below), color pooling on
+variegated yarn (same section), and the density-cross-check override
+that fires on a decisive-but-wrong pick (see "The density cross-check's
+blind spot" above) are three different *mechanisms* for arriving at the
+same *symptom*: a genuinely periodic sub-feature — a half-stitch texture,
+a color-transition rhythm, a leg-crossing blob — sits close enough to the
+true stitch period that something in the pipeline locks onto it instead,
+and which one wins is sensitive to exactly where the analysis window
+sits. The coin-flip pairs found here (jersey wale, teal wale, knit_05,
+knit_08 wale, knit_09 course) are that same ambiguity showing up as
+*position*-dependence rather than a named texture cause — the common
+thread is one underlying period-selection ambiguity with several
+different triggers, not an unrelated bug per fixture.
+
 ### Verify by counting a repeat: user-anchored template matching
 
 Every detection path above — raw autocorrelation, the v0.3 candidate
@@ -1366,6 +1663,11 @@ pip install pytest
 pytest tests/
 ```
 
+CI runs this suite on every pull request and push to `main` that touches
+`textile-gauge-reader/` (`.github/workflows/textile-gauge-tests.yml`).
+The strict xfails are part of the contract: an unexpected pass fails
+the run, so a fix cannot land without its documentation catching up.
+
 ### Test harness: synthetic ground truth + metamorphic invariants
 
 Two complementary additions that test the detector in ways hand-labeled
@@ -1423,7 +1725,13 @@ legitimately unstable, and either pass or fail would be a lie); a
 quality-60 JPEG round-trip moves the result <5%. Outcomes are
 classified, not just pass/failed: `harmonic_flip` (ratio near 0.5×/2×)
 is its own status regardless of tolerance, and `lost` another, because
-a 6% drift and a 2× flip are different bugs. Runnable on any photo
+a 6% drift and a 2× flip are different bugs. `lost` covers two cases:
+detection vanished under the transform, or the ratio is beyond 2.5× /
+below 0.4× — at that distance the reading is a different structure
+(a ruler edge, a stray sub-feature), not a drifted version of the
+baseline, and calling an 80× ratio "drift" buried it behind the same
+word as a 4% wobble (it did, until the baseline tables below were
+recorded). `drift` is the band in between. Runnable on any photo
 without writing a test:
 
 ```bash
@@ -1552,6 +1860,211 @@ showed half-period flips under rotation on five (ratios pinned at
    selection confidently took the 2× family at this large pitch —
    reserved for its own PR.
 
+**The two doubled course periods at native scale (05/08) were the
+descent's own gate, not a missing evidence stream — measured before
+anything changed.** The scorecard below recorded knit_05 course at
+98.9px (−51.7%) and knit_08 at 96.0px (−47.8%), both ~2× the true row
+pitch, unrotated, unresized. The premise going in was that the course
+axis had no structural test to correct a doubled seed. It did:
+`_prefer_fundamental_seed`'s descent already resolved T-vs-2T with the
+template walk at the half-lag — but only inside a ≥ 0.95 near-tie,
+because that is what the resize coin-flip (0.977–0.996) and the jersey
+(0.96) looked like. Both course signals carry the true pitch as a real
+autocorrelation peak: on 05, 50px at 0.449 beside 100px at 0.486
+(ratio 0.92); on 08, 48px at 0.437 beside 105px at 0.532 (0.82; 51px at
+0.448 vs 102px at 0.500 unrotated). A doubled seed on real fabric is
+therefore *not* a near-tie — alternate rows genuinely differ a little
+(rowing-out), so the exact two-row repeat correlates a shade better
+than the one-row one, and the gate never opened. A second, independent
+failure sat behind it: with the walk's default band (1.6 course
+pitches wide, barely one wale) the adjacent-row correlation on 05
+measured 0.24–0.31, just under the 0.35 match floor, so the walk at
+the TRUE pitch failed outright (0.0) while the doubled pitch walked at
+0.71 — exactly backwards. Widening the band to 3–8 pitches lifted the
+true-pitch walk to 0.67–0.70 on every fixture with a course truth
+(jersey, teal, 05/06/08/09), and the crisp leg lattices a rotated
+course axis sees (jersey, 01/05/08/09) still failed at 0.00 at every
+width.
+
+The landed change is the **sub-repeat test** (`_subrepeat_walk_score`):
+a course candidate is a doubled period whenever its *half-lag* is
+itself a genuine repeat by 2D evidence. The true pitch is rewarded
+because nothing below it walks — its half is anti-correlated (every 1×
+course signal here reads ac ≤ −0.15 at T/2, no peak at all); the
+doubled pitch scores zero because its half is T, which walks. The walk
+itself cannot see doubling from the candidate (a true T is also a
+repeat at 2T; both walk at 0.68–0.71), which is why the wale's leg
+test — a half that *fails* — is the mirror image of this one. The
+descent's gate became a real-peak floor (`SEED_HALF_MIN_STRENGTH_RATIO`
+= 0.75, between the calibrated non-ties at ≤ 0.64 and the doubled seeds
+at ≥ 0.82) with the wide-band walk (`SUBREPEAT_TEMPLATE_HEIGHT_FRACTION`
+= 4.0) as the decider; the ascent is untouched, and the descent is
+still a single step. Result: 05 course 98.9 → 51.2px (−6.7%), 08 course
+96.0 → 51.3px (−2.2%), every other scorecard row byte-identical, both
+former strict xfails flipped green and re-pinned. Mechanism pinned on
+the real signals in `tests/test_course_subrepeat.py`.
+
+**Checked and left alone: knit_05's wale (+103%, 33.5px legs vs ~68px)
+is a different mechanism.** The wale never uses the seed rule; its v0.3
+scorer sees the same template-walk verdict (legs 0.000, true pitch
+0.699) but at weight 0.10, and picks the legs on phase consistency
+(0.606 vs 0.175 at weight 0.378), regional consensus (0.96 vs 0.43,
+the term already documented as untrustworthy for exactly this) and
+fold consistency (0.86 vs 0.84 — fooled too). A scorer-weighting
+failure, not the descent gate from the other side; reserved for its
+own pass. knit_02's wale is ruler contamination in the pinned ROI,
+also untouched.
+
+### Recorded baselines — what to diff the next run against
+
+Both tables below are the detector's actual output on 2026-09-03 against
+`main` at `7974ad9` (detector code unchanged since PR #109), recorded so
+a future run has a number to diff against instead of prose to reinterpret.
+Neither is a target. Regenerate with the commands shown and paste the new
+table next to the old one, never over it.
+
+**Ground-truth scorecard** — signed % error at native scale,
+`(predicted − true) / true`, positive = reads too fine (half-period
+lock-on lands near +100%), negative = reads too coarse (a doubled period
+lands near −50%). Pinned as a regression baseline in
+`tests/test_ground_truth_scorecard.py`: a row inside 20% fails the suite
+if its absolute error worsens by more than 2 points; a row beyond 20% is
+a strict xfail asserting the 20% bar, so a fix shows up as a green flip.
+ROIs are the `ROI_XX` constants pinned in `knit_sample_ground_truth.py`
+(central square, 50% of the shorter side, one mechanical rule, never
+nudged); the jersey and teal fixtures have no pinned ROI of their own,
+so the same rule is applied to them. Truths: jersey 5.0 WPI / 7.2 CPI and
+teal 4.0 WPI / 5.0 CPI are hand counts (the "teal 3.8 WPI" quoted once
+in the harness write-up above has no derivation anywhere in the repo;
+the direct hand count under "A real second photo" and every existing
+test say 4.0, which is what is used); the knit samples are AI-estimated,
+human-verified, a step below. 03/04/07 have no usable truth and are absent.
+
+```bash
+python tests/test_ground_truth_scorecard.py
+```
+
+| fixture | axis | ROI (x,y,w,h) | true /in | predicted /in | spacing px | signed error | baseline | status |
+|---|---|---|---|---|---|---|---|---|
+| jersey | wale | (241, 121, 242, 242) | 5.0 | 4.72 | 35.2 | -5.5% | -5.5% | ok |
+| jersey | course | (241, 121, 242, 242) | 7.2 | 6.86 | 24.222 | -4.7% | -4.7% | ok |
+| teal | wale | (300, 450, 600, 600) | 4.0 | 3.50 | 77.833 | -12.4% | -12.4% | ok |
+| teal | course | (300, 450, 600, 600) | 5.0 | 5.14 | 53.111 | +2.7% | +2.7% | ok |
+| knit_01 | wale | (550, 431, 862, 862) | 3.8 | 3.97 | 83.875 | +4.5% | +4.5% | ok |
+| knit_01 | course | (550, 431, 862, 862) | 5.7 | 5.60 | 59.5 | -1.8% | -1.8% | ok |
+| knit_02 | wale | (1308, 654, 1308, 1308) | 4.0 | 8.81 | 134.667 | +120.4% | +120.4% | xfail (>20%) |
+| knit_05 | wale | (469, 504, 937, 937) | 4.7 | 9.56 | 33.481 | +103.4% | +103.4% | xfail (>20%) |
+| knit_05 | course | (469, 504, 937, 937) | 6.7 | 3.24 | 98.857 | -51.7% | -51.7% | xfail (>20%) |
+| knit_06 | wale | (609, 328, 656, 656) | 3.8 | 3.67 | 127.5 | -3.3% | -3.3% | ok |
+| knit_06 | course | (609, 328, 656, 656) | 5.2 | 5.22 | 83.0 | +0.4% | +0.4% | ok |
+| knit_08 | wale | (502, 252, 504, 504) | 4.5 | 4.59 | 75.4 | +2.0% | +2.0% | ok |
+| knit_08 | course | (502, 252, 504, 504) | 6.9 | 3.60 | 96.0 | -47.8% | -47.8% | xfail (>20%) |
+| knit_09 | wale | (374, 270, 539, 539) | 5.1 | 4.95 | 37.75 | -2.9% | -2.9% | ok |
+| knit_09 | course | (374, 270, 539, 539) | 7.6 | 8.18 | 22.867 | +7.6% | +7.6% | ok |
+
+Two things the table says that the prose above did not: the four rows
+beyond the bar are two half-period wale lock-ons (02 on its ruler, 05
+on its legs) and two doubled course periods (05, 08 — the course path's
+seed-as-is family), and knit_08's **wale** reads +2.0% at the pinned
+ROI — the confidently-reported ~2× wale harmonic recorded earlier came
+from a different, hand-picked crop, which is the ROI-dependence finding
+again, not a contradiction.
+
+**Re-run after the sub-repeat test landed** (same day, same ROIs, same
+command; the two course rows are the only cells that moved, and the
+baseline column now carries their re-pinned values):
+
+| fixture | axis | ROI (x,y,w,h) | true /in | predicted /in | spacing px | signed error | baseline | status |
+|---|---|---|---|---|---|---|---|---|
+| jersey | wale | (241, 121, 242, 242) | 5.0 | 4.72 | 35.2 | -5.5% | -5.5% | ok |
+| jersey | course | (241, 121, 242, 242) | 7.2 | 6.86 | 24.222 | -4.7% | -4.7% | ok |
+| teal | wale | (300, 450, 600, 600) | 4.0 | 3.50 | 77.833 | -12.4% | -12.4% | ok |
+| teal | course | (300, 450, 600, 600) | 5.0 | 5.14 | 53.111 | +2.7% | +2.7% | ok |
+| knit_01 | wale | (550, 431, 862, 862) | 3.8 | 3.97 | 83.875 | +4.5% | +4.5% | ok |
+| knit_01 | course | (550, 431, 862, 862) | 5.7 | 5.60 | 59.5 | -1.8% | -1.8% | ok |
+| knit_02 | wale | (1308, 654, 1308, 1308) | 4.0 | 8.81 | 134.667 | +120.4% | +120.4% | xfail (>20%) |
+| knit_05 | wale | (469, 504, 937, 937) | 4.7 | 9.56 | 33.481 | +103.4% | +103.4% | xfail (>20%) |
+| knit_05 | course | (469, 504, 937, 937) | 6.7 | 6.25 | 51.214 | -6.7% | -6.7% | ok |
+| knit_06 | wale | (609, 328, 656, 656) | 3.8 | 3.67 | 127.5 | -3.3% | -3.3% | ok |
+| knit_06 | course | (609, 328, 656, 656) | 5.2 | 5.22 | 83.0 | +0.4% | +0.4% | ok |
+| knit_08 | wale | (502, 252, 504, 504) | 4.5 | 4.59 | 75.4 | +2.0% | +2.0% | ok |
+| knit_08 | course | (502, 252, 504, 504) | 6.9 | 6.75 | 51.25 | -2.2% | -2.2% | ok |
+| knit_09 | wale | (374, 270, 539, 539) | 5.1 | 4.95 | 37.75 | -2.9% | -2.9% | ok |
+| knit_09 | course | (374, 270, 539, 539) | 7.6 | 8.18 | 22.867 | +7.6% | +7.6% | ok |
+
+**Metamorphic invariants, every real fixture** — the CLI's default ROI
+(centred 70% box), orientation `vertical`, 10 outcomes per photo, with
+`lost` as redefined above (ratio beyond 2.5× / below 0.4×). Before that
+redefinition every `lost` cell here read `drift`.
+
+```bash
+for f in tests/fixtures/*.jpg; do python tests/metamorphic.py "$f"; done
+```
+
+| fixture | ROI (x,y,w,h) | ok | drift | harmonic_flip | lost | skipped |
+|---|---|---|---|---|---|---|
+| knit_sample_01 | (294, 259, 1373, 1207) | 7 | 1 | 1 (rotate90 wale) | 1 (half_roi course) | 0 |
+| knit_sample_02 | (589, 393, 2747, 1831) | 8 | 0 | 0 | 2 (resize wale, half_roi course) | 0 |
+| knit_sample_03 | (570, 462, 2660, 2158) | 4 | 1 | 1 (rotate90 wale) | 3 (resize wale, resize course, half_roi course) | 1 |
+| knit_sample_04 | (287, 221, 1338, 1029) | 9 | 0 | 1 (rotate90 wale) | 0 | 0 |
+| knit_sample_05 | (281, 292, 1312, 1362) | 8 | 0 | 1 (half_roi wale) | 0 | 1 |
+| knit_sample_06 | (281, 197, 1312, 918) | 6 | 3 | 1 (rotate90 course) | 0 | 0 |
+| knit_sample_07 | (278, 162, 1297, 755) | 6 | 1 | 0 | 3 (resize course, rotate90 wale, jpeg60 course) | 0 |
+| knit_sample_08 | (226, 151, 1055, 705) | 5 | 1 | 2 (resize wale, rotate90 course) | 0 | 2 |
+| knit_sample_09 | (193, 162, 901, 755) | 10 | 0 | 0 | 0 | 0 |
+| real_jersey_sample | (109, 73, 506, 338) | 9 | 0 | 0 | 0 | 1 |
+| sarahmaker-knitting-gauge | (180, 225, 840, 1050) | 9 | 0 | 1 (resize wale) | 0 | 0 |
+
+The rotate90 flips (01/03/04 wale, 06/08 course, 05 fixed) are exactly
+the five the mechanism write-up above records, so nothing moved between
+that run and this one. The `lost` column is new information: nine
+outcomes across 01/02/03/07 that previously hid inside `drift` are
+readings of something else entirely — 03's resize pair (ratios 0.014 and
+0.134) and 02's half_roi course (80×) among them. Note the jersey
+fixture's pytest pin uses a different, ruler-free ROI
+(`JERSEY_ROI` in `test_metamorphic_fixtures.py`) and reads 9/10 there
+with resize/course as its strict xfail; the 9/10 here is a different
+skip (half_roi course, too few periods) with resize/course passing at
+the 70% crop.
+
+**Re-run after the sub-repeat test landed** (same command). Nine of the
+eleven photos are cell-for-cell identical; two moved, and in both the
+cell that turned red is the OTHER axis's known-wrong reading being
+compared against a course reading that moved toward the truth — the
+invariants measure co-variance, not correctness, and a pair of paths
+that agreed on the wrong answer counted as `ok`:
+
+| fixture | ROI (x,y,w,h) | ok | drift | harmonic_flip | lost | skipped |
+|---|---|---|---|---|---|---|
+| knit_sample_03 | (570, 462, 2660, 2158) | 3 | 1 | 2 (rotate90 wale, rotate90 course) | 3 (resize wale, resize course, half_roi course) | 1 |
+| knit_sample_05 | (281, 292, 1312, 1362) | 7 | 0 | 2 (rotate90 wale, half_roi wale) | 1 (half_roi course) | 0 |
+
+* **03, rotate90 course** (was `ok` at 287.3 vs 287.3; now 145.0 vs
+  287.3, ratio 0.505): the rotated course path sees the wale structure,
+  and the sub-repeat test descends its 2× seed (287px, peak 0.48) to
+  the fundamental (145px, peak 0.40, ratio 0.83, walks at 0.69) — the
+  ~142px the photo's own tape measure supports, per mechanism 3 above.
+  The unrotated wale path still reads 287 (its own open item), so the
+  two now disagree. This cell was green only because both were wrong
+  together.
+* **05, the 70% box** (not the pinned ROI): the course seed there sat at
+  4× the true row pitch (193.2px vs ~47.8 true), agreeing with the
+  rotated wale path's equally-wrong 193.2, which counted as `ok`. The
+  single-step descent takes it to 2× (98.3px: peak ratio above the
+  floor, walks) — closer, still doubled. rotate90/wale therefore reads
+  1.966× the new baseline (the rotated wale path is unchanged at 4×),
+  and half_roi/course is now evaluated (7 periods, no longer skipped
+  at 3.5) and reads the 25.5px sub-feature it always did. Measured, not
+  shipped: letting the descent CHAIN (re-test the half of the half)
+  lands this box on 49.2px, the true pitch — and leaves the invariants
+  at the same 7/10, because the comparators are still the rotated wale
+  path at 4× and the half-box sub-feature. A correct course reading
+  cannot turn those two cells green; only the wale path can.
+
+Every other fixture — 01, 02, 04, 06, 07, 08, 09, jersey, teal — is
+unchanged to the pixel, including 06/08's documented rotate90 course
+flips and the jersey's pytest pins.
+
 ## Deploying the backend to Render
 
 The backend is a standard ASGI app with no persistent storage, so it fits
@@ -1592,6 +2105,12 @@ the duration of a single request.
 
 - Test it directly: `https://<your-service>.onrender.com/health` should
   return `{"status": "ok"}`.
+- Also check `https://<your-service>.onrender.com/version` and confirm
+  `commit` matches `git log -1 --format=%H origin/main` — see "How to
+  tell what's actually deployed" below. `/health` only proves *a*
+  process is answering; `/version` proves it's answering with *current*
+  code, which is the thing that actually matters after every future
+  push.
 - Open `../textile-gauge-reader.js`, find the `CONFIG` object near the
   top, and set:
   ```js
@@ -1610,13 +2129,255 @@ the duration of a single request.
   request after a period of idleness can take 30-60 seconds ("cold
   start"). The frontend's health check and Analyze error handling both
   account for this with a generous timeout and a clear retry message
-  rather than treating a slow cold start as a crash.
+  rather than treating a slow cold start as a crash — see "Why the
+  health banner can lie" below for what that actually took.
 - Nothing from `/analyze` is written to disk on the server — uploaded
   images exist only as in-memory arrays for the duration of the request.
   The one place anything touches disk is the opt-in ground-truth
   correction system — see
   [Ground Truth / Correction System](#ground-truth--correction-system),
   including the important caveat about Render's ephemeral disk.
+
+### Why the health banner can lie (and the cold-start-aware retry this led to)
+
+Reported symptom: the status banner said "Analysis service is online"
+while the Analyze step failed, repeatedly, with a generic "Could not
+reach the analysis service. It may be offline, waking up from a cold
+start, or blocking requests from this page (CORS)" — three
+undifferentiated causes, none actionable.
+
+**No Render dashboard/log access was available to diagnose this from
+live data** (this environment's outbound network access to `onrender.com`
+is blocked by policy) — the investigation instead profiled the exact
+production code locally and read the request/response handling directly.
+Three things came out of it:
+
+1. **`/health` proves liveness, not capacity.** It's a bare
+   `def health(): return {"status": "ok"}` — no image decode, no CV
+   work, no memory pressure, doesn't even touch the `analysis` package
+   at request time. "Online" was true and also **misleading**: it
+   proved the process could answer a GET, not that it could complete an
+   analysis. That gap, not a bug, is what let the banner and the Analyze
+   failure coexist.
+2. **Analyze had no retry; `/health` already did.** `/health` retries
+   with backoff (5 attempts, cumulative worst case ~90+s) specifically
+   because Render's free tier can take up to ~60s to wake a sleeping
+   instance. `/analyze-multi` was a single `fetch()` with one 75s
+   timeout and no retry at all. A user spending real time in
+   Upload → Calibrate → ROI → Orientation between the initial health
+   check and clicking Analyze can easily cross the free tier's 15-minute
+   idle window — the instance spins back down, and the one-shot Analyze
+   request had no mechanism to recover the way health did.
+3. **Every route ran its CV work directly on the event loop.** All
+   `/analyze*` routes are `async def`, but called `analyze_gauge` /
+   `analyze_multi_roi` / etc. synchronously, inline — with Render's
+   default single uvicorn worker (no `--workers` in render.yaml), that
+   blocks the ENTIRE process for the whole request, including its
+   ability to serve another `/health` check concurrently. Doesn't
+   directly cause a connection failure, but it's a real gap, fixed
+   alongside this (`backend/main.py` now runs all of it via
+   `run_in_threadpool`).
+4. **Memory is a real, checkable risk for large photos, not just a
+   theory.** Profiled the real `/analyze-multi` path locally: a
+   1508×1008 photo stays comfortably under the free tier's 512 MB
+   ceiling (~160-265 MB peak), but a 3925×2617 photo (a real phone-
+   camera-scale image already in this repo's fixtures) hit **368 MB from
+   region-proposal alone** — 72% of the ceiling, before uvicorn's own
+   overhead. There is no image downscaling anywhere in this codebase,
+   client or server — a full-resolution upload goes straight to
+   `cv2.imdecode`. Not fixed here (a real downscaling pass is its own,
+   separate piece of work); flagged as a live risk worth its own pass.
+   Side finding from that same profiling run, unrelated to this bug: on
+   that 3925×2617 image, `propose_measurement_rois` returned **zero**
+   candidate regions — its window-size heuristic is likely tuned for
+   smaller images. Also flagged, not fixed here.
+
+CORS was checked and ruled out directly: `CORSMiddleware` applies one
+identical wildcard policy (`allow_origins=["*"]`, `allow_methods=["*"]`,
+`allow_headers=["*"]`) to every route, and a GET to `/health` and a
+`multipart/form-data` POST with no custom headers are both CORS "simple
+requests" (the POST never triggers a preflight) — nothing in the code
+treats them differently.
+
+**What changed, given all of that:**
+
+- **Backend**: every CV-bound route now runs its work via
+  `run_in_threadpool` instead of blocking the event loop directly (see
+  the module comment at the top of `backend/main.py`).
+- **Frontend Analyze flow**: a transport-level failure (a bare
+  `TypeError` from `fetch()` — no HTTP response reached us at all — or
+  our own request timeout) is no longer immediately shown as a dead-end
+  error. It's treated as a possible cold start: the same retry/backoff
+  `/health` already used (now shared as `waitForServiceToWake`) runs
+  first, with the status line reading "Waking up the analysis service —
+  this can take about a minute…", and once `/health` confirms the
+  service is back, the ORIGINAL request is retried automatically, once.
+  Only a failure *after* that recovery attempt — or `/health` never
+  coming back — is shown as a real failure, with wording that says so
+  explicitly, distinct from the cold-start message.
+- **The banner no longer says "online".** It says "Analysis service is
+  reachable" — accurate to what a GET /health actually proves, no more.
+  A real (post-recovery) Analyze failure now also flips the banner to a
+  visibly degraded state itself (`markServiceDegradedAfterAnalyzeFailure`),
+  rather than leaving stale "reachable" text sitting next to a failure
+  the user can see happening.
+- An HTTP-level failure (the server DID answer, just with an error) is
+  never treated as a cold start — only genuine transport failures are.
+
+**Follow-up bug this same instinct almost missed.** After the fix above
+shipped, two live-site reports came in that looked unrelated at first: a
+raw JS crash ("Cannot read properties of undefined (reading 'length')")
+on Analyze, and "Accepted wale columns: 43 of undefined" in Developer
+diagnostics. Reproducing against the real backend locally (`pytest`
+`TestClient`, not a hand-built response) showed the CURRENT code returns
+every field the frontend reads — so the live Render deployment was
+almost certainly running older backend code, missing `no_measurement_
+labels` / `columns_considered` (both added together by the same earlier
+PR). That explained both symptoms directly: `no_measurement_labels`
+being absent throws exactly that "reading 'length' of undefined" error
+in `renderMeasurementConsistency`; `columns_considered` being absent
+just interpolates as the literal string "undefined".
+
+The real, separate bug this surfaced: **`err instanceof TypeError`, the
+check this section's own cold-start recovery is built on, cannot tell
+"the network failed" apart from "a JS bug threw a TypeError after a
+successful response"** — both are `TypeError`s. Every fetch handler in
+this file used to run its whole success path (parsing, rendering, state
+updates) inside the SAME try block being classified this way, so a crash
+like the one above was reported as "Could not reach the analysis
+service" — which is exactly what sent the original cold-start
+investigation chasing a connectivity problem that didn't exist. Fixed by
+restructuring every fetch call site so `isTransportFailure` (the shared,
+renamed version of this check) is applied ONLY to the fetch+parse+HTTP-
+status step itself — never to anything that runs after a response was
+already successfully received. Also hardened directly: `renderMeasurement
+Consistency` and the loop-lattice comparison card now default missing
+array fields to `[]` and missing `columns_considered` to a `"?"` display
+rather than crashing or showing "undefined", so a genuine schema drift
+degrades instead of breaking the page.
+
+`tests/test_frontend_response_contract.py` is the backend-side guard
+against this recurring: it drives the real `/propose-rois` → `/analyze-
+multi` flow through a real fixture image and asserts that every field
+the frontend reads *without* a defensive guard is actually present in
+the response, so a schema change that would break the UI fails a test
+before it ships, rather than surfacing as a live-site report again.
+
+**A third symptom of the same stale-deployment root cause, confirmed
+directly.** "Mark one repeat" failed with "Counting repeats failed (HTTP
+405)" on both axes on the deploy preview — apparently never having
+worked in production. Root cause: this app's local-dev-only catch-all
+(`app.mount("/", StaticFiles(...))`, bottom of `backend/main.py`) only
+accepts GET/HEAD, so ANY POST to a path with no matching route gets
+exactly 405 from it — confirmed directly (`curl -X POST` to a made-up
+path on this exact app returns 405; GET to the same path correctly
+404s). That's the precise signature this bug showed. Reproduced the
+real `/count-repeats` request against this repo's current backend code
+three separate ways — a direct HTTP client, and an actual headless-
+browser `fetch()` from the page as served locally — and all three
+returned real match counts, not just a bare 200. The route is correct
+and functional in the code this repo ships; the 405 on the live site
+points at the same stale/older deployed backend as the two symptoms
+above, not a bug fixable here. Cross-checked every other frontend→
+backend call (`/health`, `/detect-ruler`, `/corrections`,
+`/propose-rois`, `/analyze-multi`, `/corrections/export.{csv,json}`) the
+same way — all dispatch correctly; nothing else shows this pattern in
+the current code. `tests/test_frontend_route_contract.py` makes this an
+ongoing, automated check rather than a one-time manual audit: every
+frontend API call is asserted to dispatch to a real backend route
+(never 404/405), so a route rename, a changed method, or a dropped
+endpoint is caught by name before it ships — verified directly that it
+fails with the exact "HTTP 405" signature when the route is renamed.
+
+### How to tell what's actually deployed
+
+All three symptoms above were diagnosed as "the live backend is running
+older code than `main`" by ruling everything else out — never confirmed
+directly, because this environment has no Render dashboard or log access
+(outbound network to `onrender.com` is blocked by this session's egress
+policy; every attempt to `curl` the live service from here fails at the
+network layer, not with an HTTP error). That meant the actual fix —
+getting Render to deploy current `main` — was something no session could
+verify from in here, only reason about from the outside.
+
+**`GET /version`** closes that gap: it reports exactly what commit the
+running process was built from, so this stops being a guess.
+
+```json
+{
+  "commit": "26f0577eadeccabe16eb5538fba05e3276b689f6",
+  "commit_short": "26f0577",
+  "branch": "main",
+  "source": "render_env",
+  "algorithm_version": "cv-v0.3",
+  "app_version": "0.1.0"
+}
+```
+
+- `source: "render_env"` means `commit`/`branch` came from Render's own
+  `RENDER_GIT_COMMIT` / `RENDER_GIT_BRANCH` environment variables, which
+  Render sets automatically on every service at deploy time — this is
+  the authoritative case, and what you'll see on the real deployment.
+- `source: "git_fallback"` means those env vars weren't set (a local
+  `uvicorn` run, not Render) and `commit`/`branch` came from `git
+  rev-parse` against the checkout instead.
+- `source: "unavailable"` means neither worked — shouldn't happen on
+  Render; would mean something unusual about how the instance was built.
+
+**To check the live site:** open
+`https://textile-gauge-reader-api.onrender.com/version` directly in a
+browser (or `curl` it — from a machine that isn't this sandboxed
+session). Compare `commit` against `git log -1 --format=%H origin/main`
+in this repo. If they differ, the live site is stale, full stop — no
+more inferring it from symptoms.
+
+**Why it wasn't updating (three possible causes, in the order to check
+them) and what fixes each:**
+
+1. **Auto-Deploy is off for this service.** Render dashboard → the
+   `textile-gauge-reader-api` service → **Settings** → **Build & Deploy**
+   → **Auto-Deploy**. If it's off, pushes to `main` never trigger a
+   redeploy at all — the fix is flipping it on (or clicking **Manual
+   Deploy** → **Deploy latest commit** once, immediately).
+2. **The service is tracking the wrong branch.** Same **Settings** →
+   **Build & Deploy** page has a **Branch** field. This is a *dashboard*
+   setting — a manually-created "Web Service" (README's Option B) has no
+   connection to `render.yaml` at all, so nothing in this repo could ever
+   have set it. If it's pointed at anything other than `main` (an old
+   feature branch from before this repo settled on trunk-based `main`
+   deploys, for instance), that fully explains months of "pushed to
+   `main`, live site never changes" with zero errors anywhere — the
+   deploy pipeline would be working exactly as configured, just against
+   the wrong branch. Fix: change it to `main`.
+
+   This repo's `render.yaml` now pins `branch: main` and
+   `autoDeploy: true` explicitly, so a **fresh** Blueprint-created
+   service reads the right branch from the repo instead of whatever was
+   clicked by hand — but it does **not** retroactively fix an
+   already-existing service. Blueprint settings apply on creation and on
+   an explicit **Sync** from the Blueprint page in the dashboard (Render
+   dashboard → the Blueprint, if this service was created as one → **Manual
+   Sync**); a manually-created Web Service (Option B) never reads
+   `render.yaml` at all, and its Branch field has to be changed by hand
+   regardless. Check `/version`'s `branch` field to know which situation
+   you're in.
+3. **A build failed silently and Render kept serving the last good
+   deploy.** Render dashboard → the service → **Events** (or **Logs**)
+   tab shows every deploy attempt and its outcome. A failed build on
+   `pip install -r requirements.txt` or the `uvicorn` start command would
+   show as a red/failed event there, with the old deploy still live and
+   answering `/health` normally the whole time — which is exactly
+   consistent with "the banner says online but nothing changed." Fix
+   depends on what the log says; if it's a dependency resolution failure
+   or similar, that's a `requirements.txt` problem to fix and re-push.
+
+None of this can be done from a repo change alone if the cause is (1) or
+(3) — those are dashboard/account actions only reachable by logging into
+Render directly. (2) is now partially addressed in-repo (see above) but
+still needs the dashboard checked to know whether it actually applied.
+**After making any of these changes, hit `/version` again to confirm the
+`commit` field moved** — that's the only way to know the fix actually
+took effect, rather than assuming it did because a button was clicked.
 
 ## Ground Truth / Correction System
 
@@ -1692,6 +2453,103 @@ Locally, you can also just open the SQLite file directly:
 ```bash
 sqlite3 textile-gauge-reader/data/corrections.db "select * from corrections;"
 ```
+
+## Investigated and rejected: user-anchored template matching
+
+Standalone scratch experiment, never wired into `analysis/gauge_analysis.py`
+or the app — recorded here so the negative result isn't relearned later.
+Motivation: this project's single best real-photo result ever
+(`count_repeats_by_template_match`, 5.04 WPI against a true 5.0) came from
+template matching, not the periodicity pipeline. The question was whether
+that generalizes into something worth shipping. Tested against the two real
+fixtures (`real_jersey_sample.jpg`, true 5.0 WPI/7.2 CPI; `sarahmaker-
+knitting-gauge.jpg`, true 4.0 WPI/5.0 CPI). It didn't clear the bar, on
+either axis, for reasons worth keeping on record.
+
+**Wale: the headline number was one lucky anchor, not a real effect.**
+Four hand-picked anchors on jersey looked good (0.8%–14.7% error). A dense
+grid of 72 anchors across the same photo told a different story: the
+**median** anchor gave 14.7% error — *worse* than the current pipeline's
+‑5.6%. The 5.04/0.8% result that motivated this whole investigation was the
+best of a small, eye-picked sample, not representative of a typical click.
+Refining the template by averaging the top-K matches (as originally
+specified) made things worse in most cases, not better — it blurs in
+false-positive phase/texture and broadens the match. On teal, anchor
+placement alone swung wale from ‑13% to +55–66% error (an ~80%-of-true
+spread across 4 anchors) purely by which stitch got clicked.
+
+**A real correlate of the wale drift exists, but it's weak and doesn't
+transfer.** An anchor's half-pitch self-similarity (normalized
+cross-correlation between its template and a copy of itself shifted by half
+a wale-pitch) predicts drift direction: an anchor that resembles its own
+half-pitch neighbor over-counts. At 4 anchors this looked like a clean
+monotonic ranking; at 72 anchors the real relationship is r=0.338 (p=0.004),
+r²≈0.11 — real and worth knowing, but explaining ~10% of the variance is not
+"reliable enough to threshold on." It filters out the *worst* overcounts
+(almost nothing scores >20% error at strongly negative NCC) without
+separating good from bad in the middle of the distribution. Tested against
+teal's failure specifically (the hypothesis being that a 2x sub-lattice
+lock-on looks like high self-similarity in general): r=0.065 (p=0.65),
+indistinguishable from no relationship. The two fabrics' overcounting
+mechanisms are not the same thing, and one diagnostic doesn't catch both.
+
+**Course looked robust to anchor placement — until the test stopped
+cheating.** A dense-grid course readout on jersey (72 anchors) gave a
+median 7.5% error against the current pipeline's ‑53.1% harmonic lock-on,
+with 99% of anchors under 20% error — a dramatic, reproducible-looking win.
+It did not survive an honest re-test. The good numbers depended on sizing
+the match template from the *true, known* gauge (`px_per_inch / true_wpi`)
+to decide how fine a feature to search for — information a deployed
+feature does not have; all it has is the *existing* (possibly already
+wrong) automatic estimate. Re-run using only that: reusing the shipped
+walking-match core (`_walk_template_matches`), seeded and step-sized from
+the existing course reading, just reproduces the same wrong answer, because
+the walk's own search window is derived from the number it's supposed to
+correct. Switching to a free, unseeded whole-ROI scan doesn't fix this
+either — the result becomes acutely sensitive to template size, and there
+is no single default size that works on both fixtures without peeking at
+ground truth: a small template (~13px) recovers jersey's true course
+period, but on teal it locks onto the same yarn ply-twist sub-texture
+described below (65–127% error on 3 of 4 anchors); a larger template
+(~27px) is fine on teal but reproduces jersey's original failure. A
+multi-scale, self-consistency-based scale picker was considered and
+explicitly not built, because validating a scale-selection heuristic
+against the same two photos used to discover the problem is the identical
+trap one level down.
+
+**Two independent, real mechanisms came out of this that are worth keeping
+regardless of the template-matching verdict:**
+- **Yarn ply-twist on the teal fixture.** A direct intensity-profile
+  measurement across the fabric shows a genuine, clean periodic feature at
+  roughly double the true stitch frequency (~7.2 peaks/inch vs. the
+  hand-counted 4 wales/inch) — this is *not* rib structure (there's no
+  visible knit/purl alternation in a gridded zoom of the photo; it's
+  continuous rope/braid-like texture), and it's the same trap that once
+  fooled a careful direct pixel measurement on this exact photo (see
+  "A real second photo..." above). It's what both the wale-axis anchor
+  sensitivity and the course-axis template-size sensitivity above are
+  actually running into on this fixture.
+- **Color pooling on variegated yarn** (see "the column count is
+  region-dependent by 5x" investigation elsewhere in this history):
+  variegated-yarn color transitions that are coherent across multiple
+  rows defeat multi-row consensus defenses, because the noise isn't
+  independent row-to-row the way the consensus math assumes.
+
+*(Both of these, plus the density-cross-check override, are instances of
+the same underlying period-selection ambiguity — see "How ROI-dependent
+is this, really?"'s "central finding" subsection, earlier in this
+document, for the mechanical-sweep data tying them together.)*
+
+**Bar for revisiting.** Not "a better anchor" and not "a smarter refinement
+step" — both were tried and both are secondary to the real blocker, which
+is template *scale* selection. Worth reopening only with: (1) a
+ground-truth-free way to pick or validate template scale at runtime — some
+measurable self-consistency property of the matches themselves (never
+accuracy, which isn't available outside a test), and (2) validation against
+more than two photos, so a scale heuristic can't just be a threshold fitted
+to jersey and teal the way the wale/course numbers above almost were.
+Nothing from this investigation is in the codebase; it lives only in this
+writeup.
 
 ## Known V0 limitations
 

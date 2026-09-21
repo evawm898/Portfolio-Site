@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Textile Stretch Simulator — Field Notes — Eva Maskalenko</title>
+<meta name="description" content="Field Notes: Textile Stretch Simulator — an interactive, yarn-level model of how knit and woven fabrics stretch. Drag a swatch and watch loops open or threads shift as fabric type, spandex, stitch density and yarn elasticity change.">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="textile-stretch-simulator.css">
+</head>
+<body id="top">
+
+<nav class="site-nav">
+  <a href="index.html" class="site-nav__link">Work</a>
+  <a href="about.html" class="site-nav__link">About</a>
+  <a href="field-notes.html" class="site-nav__link is-active">Field Notes</a>
+</nav>
+
+<header class="project-header">
+  <a href="field-notes.html" class="project-header__back">&larr; Field Notes</a>
+  <div class="project-header__index">No. 05 / 07</div>
+</header>
+
+<main>
+  <div class="project__hero">
+    <div class="project__tag">
+      <span class="project__year">Field Notes</span>
+      <span>Interactive</span>
+    </div>
+    <h1 class="project__title">Textile Stretch Simulator</h1>
+    <p class="project__lede">Drag the swatch. A knit stretches because its loops rearrange; a woven barely stretches on grain and trellises open on the bias. Change the fabric, the spandex, the density and the yarn, and watch the structure &mdash; not just the outline &mdash; respond.</p>
+  </div>
+
+  <section class="sim" aria-label="Stretch simulator">
+    <div class="sim__grid">
+
+      <aside class="sim__controls">
+        <p class="sim__eyebrow">Variables</p>
+
+        <div class="sim__block">
+          <div class="sim__label"><span>Fabric structure</span></div>
+          <div class="sim__segment" role="group" aria-label="Fabric structure">
+            <button type="button" class="sim__segbtn" data-fabric="knit" aria-pressed="true">Knit</button>
+            <button type="button" class="sim__segbtn" data-fabric="woven" aria-pressed="false">Woven</button>
+          </div>
+          <p class="sim__hint"><span class="sim-axis" data-knit="Weft-knit jersey, technical face. Wales run vertically, courses horizontally." data-woven="Plain weave. Warp runs vertically, weft horizontally; every yarn goes over one, under one."></span></p>
+        </div>
+
+        <div class="sim__block">
+          <label class="sim__label" for="ctlSpandex"><span>Spandex</span><span class="sim__value" id="valSpandex">0%</span></label>
+          <input class="sim__range" type="range" id="ctlSpandex" min="0" max="30" step="1" value="0">
+          <div class="sim__ticks"><span>0</span><span>15</span><span>30%</span></div>
+        </div>
+
+        <div class="sim__block">
+          <label class="sim__label" for="ctlDensity"><span id="lblDensity">Stitch density</span><span class="sim__value" id="valDensity"></span></label>
+          <input class="sim__range" type="range" id="ctlDensity" min="3.5" max="8" step="0.1" value="6">
+          <div class="sim__ticks"><span>Loose</span><span>Tight</span></div>
+        </div>
+
+        <div class="sim__block">
+          <label class="sim__label" for="ctlElastic"><span>Yarn elasticity</span><span class="sim__value" id="valElastic"></span></label>
+          <input class="sim__range" type="range" id="ctlElastic" min="0" max="100" step="1" value="30">
+          <div class="sim__ticks"><span>Rigid</span><span>Elastic</span></div>
+        </div>
+
+        <p class="sim__eyebrow">Presets</p>
+        <div class="sim__block">
+          <div class="sim__presets">
+            <button type="button" class="sim__chip" data-preset="cotton-jersey">Cotton jersey</button>
+            <button type="button" class="sim__chip" data-preset="spandex-jersey">Spandex jersey</button>
+            <button type="button" class="sim__chip" data-preset="wool-knit">Wool knit</button>
+            <button type="button" class="sim__chip" data-preset="cotton-poplin">Cotton poplin</button>
+            <button type="button" class="sim__chip" data-preset="stretch-denim">Stretch denim</button>
+          </div>
+        </div>
+
+        <div class="sim__block">
+          <button type="button" class="sim__btn sim__btn--wide" id="ctlReset">Relax swatch</button>
+          <p class="sim__hint">Clears any set the swatch is holding after a pull.</p>
+        </div>
+      </aside>
+
+      <div class="sim__stage">
+        <canvas class="sim__canvas" id="swatchCanvas" tabindex="0" aria-label="Fabric swatch. Click and drag in any direction to stretch it; use the pull buttons below for a keyboard alternative."></canvas>
+        <div class="sim__stagebar">
+          <p class="sim__stagebar-hint"><strong>Drag</strong> anywhere on the swatch, in any direction. Let go to see it recover. The dashed box is the swatch at rest.</p>
+          <div class="sim__pulls" role="group" aria-label="Pull the swatch (press and hold)">
+            <button type="button" class="sim__pull" data-pull="0">Pull &rarr; <span class="sim-axis" data-knit="course" data-woven="weft"></span></button>
+            <button type="button" class="sim__pull" data-pull="90">Pull &uarr; <span class="sim-axis" data-knit="wale" data-woven="warp"></span></button>
+            <button type="button" class="sim__pull" data-pull="45">Pull &nearr; bias</button>
+          </div>
+        </div>
+      </div>
+
+      <aside class="sim__readouts">
+        <p class="sim__eyebrow">Readouts</p>
+        <div class="sim__figures">
+          <div><div class="sim__figure-label">Load</div><div class="sim__figure-value" id="ro-load">0.0 N</div></div>
+          <div><div class="sim__figure-label">Extension</div><div class="sim__figure-value" id="ro-ext">+0%</div></div>
+          <div><div class="sim__figure-label">Lateral</div><div class="sim__figure-value" id="ro-lat">0%</div></div>
+          <div><div class="sim__figure-label">Break at</div><div class="sim__figure-value" id="ro-cap">&mdash;</div><div class="sim__figure-sub" id="ro-capN"></div></div>
+        </div>
+        <div class="sim__line" id="ro-regime-line"><span class="sim__k">Regime</span><strong id="ro-regime">at rest</strong></div>
+        <div class="sim__line"><span class="sim__k">Pull direction</span><span id="ro-dir">&mdash;</span></div>
+        <div class="sim__line"><span class="sim__k">Yarn strain</span><span id="ro-yarn">0%</span>
+          <div class="sim__bar"><div class="sim__bar-fill" id="ro-yarnBar"></div></div>
+        </div>
+        <div class="sim__line"><span class="sim__k">Recovery on release</span><span id="ro-recovery"></span></div>
+        <div class="sim__line"><span class="sim__k">Structure</span><span id="ro-structure"></span></div>
+
+        <p class="sim__eyebrow">Mechanism</p>
+        <p class="sim__caption" id="ro-insetTitle">One loop</p>
+        <canvas class="sim__inset" id="insetCanvas" aria-label="Mechanism detail: one loop of the knit, or a cross-section of the woven yarns"></canvas>
+        <p class="sim__caption">Load&ndash;extension &middot; this pull direction &middot; N per 50 mm</p>
+        <canvas class="sim__chart" id="chartCanvas" aria-label="Load-extension curve for the current pull direction, with the current state marked"></canvas>
+        <div class="sim__legend">
+          <span>structure carrying the load</span>
+          <span class="is-rust">yarn itself stretching</span>
+          <span class="is-ghost">swatch at rest</span>
+        </div>
+      </aside>
+
+    </div>
+  </section>
+
+  <div class="project__body">
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>01</span>How to read it</h2>
+      <div class="project__section-body">
+        <p>The swatch is 20&nbsp;mm square at rest and is drawn at the yarn level: every loop or every crossing you see is the same unit cell, repeated. Your drag is a <em>force</em>, not a position. The cursor pulls the fabric through a compliant grip, the fabric extends along its own load&ndash;extension curve, and the gap between the cursor and the swatch edge is what stiffness feels like. A jersey follows your hand; a poplin pulled on grain hardly moves while the load climbs.</p>
+        <p>Yarn colour is the second channel. <span class="sim-key"></span>Teal means the structure is carrying the load and the yarn itself is slack. <span class="sim-key sim-key--rust"></span>Rust means the geometry has jammed and the yarn is now being strained. The bar under &ldquo;yarn strain&rdquo; runs to that yarn&rsquo;s break elongation; when it fills, the model stops extending and reports that the grip is slipping, not the fabric.</p>
+        <p>Let go to see recovery. A knit with no spandex snaps back only part way and then creeps, holding some permanent set; a few percent of spandex returns it to rest.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>02</span>Why knits stretch</h2>
+      <div class="project__section-body">
+        <p>A weft-knit loop is an inextensible curve that changes shape. Pull along the courses and each loop flattens: the head widens, the legs rotate toward horizontal, and yarn migrates from the legs into the width of the loop. Pull along the wales and the opposite happens: the loop grows tall and narrow, and the fabric narrows with it. In both cases the yarn length per loop is constant &mdash; the &ldquo;one loop&rdquo; panel reports it &mdash; which is why a cotton jersey extends 50&ndash;100% at a load that would barely register on a woven.</p>
+        <p>The soft regime ends when the loops jam: legs of neighbouring wales touch, or the head of one loop hooks the feet of the loop above. From there the only way to extend is to stretch the yarn, and the curve turns stiff. Stitch density moves that limit. A tighter knit has less room inside each loop, so it jams sooner and resists more from the start.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>03</span>Why wovens don&rsquo;t &mdash; except on the bias</h2>
+      <div class="project__section-body">
+        <p>In a plain weave every yarn undulates over and under the yarns crossing it. That undulation is <em>crimp</em>, and it is the only structural stretch a woven has on grain. Pull along the weft and the weft yarns straighten while the warp yarns, which have to go around them, crimp more and pull the width in. That is crimp interchange, and it is worth a few percent. Once the pulled yarns are straight the yarn itself takes the load and the fabric is, for practical purposes, rigid. The cross-section panel shows exactly this.</p>
+        <p>Pull at 45&deg; and the picture changes. The load now has a shear component, the yarns rotate about their crossings like a garden trellis, and the swatch extends along the pull while contracting sharply across it. This is free until the locking angle, where adjacent yarns jam against one another. A tighter weave locks sooner. Bias-cut garments drape and cling for this reason, and it is the reason a woven stretch fabric needs spandex in the yarn to stretch on grain at all.</p>
+      </div>
+    </section>
+
+    <section class="project__section">
+      <h2 class="project__section-title"><span>04</span>What spandex actually does</h2>
+      <div class="project__section-body">
+        <p>Spandex is not primarily about how far a fabric stretches. A plain cotton jersey already extends a long way; what it lacks is recovery. Elastane fibres return the structure to rest, so the same jersey with a few percent of spandex snaps back fully and holds no set. In the model, spandex raises the immediate recovery and shrinks the permanent set, and it also lets the yarn regime extend much further before the break elongation &mdash; the core-spun yarn in a stretch denim is what gives a woven its 20&ndash;30% weft stretch.</p>
+        <p>Yarn elasticity is the fibre&rsquo;s own extensibility with no elastane present. Cotton and linen give up after 5&ndash;8%; wool and textured synthetics are springy and extend several times that. It only matters once the structure has jammed, which is why it changes the woven curve immediately and the knit curve only past the knee.</p>
+      </div>
+    </section>
+
+    <section class="project__section project__section--disclaimer">
+      <h2 class="project__section-title"><span>05</span>What the model is, and isn&rsquo;t</h2>
+      <div class="project__section-body">
+        <p>This is a geometric, quasi-static, homogeneous model built for teaching, not a finite-element simulation. The knit loop is a two-dimensional yarn-length-conserving curve with an interlock floor; the woven is a crimp-interchange curve on grain and a trellis with a locking angle off grain; the two are combined through the pull direction. Stiffness constants, crimp percentages, recovery fractions and break elongations are calibrated to be plausible for the fabrics named in the presets, not measured from them. Loads are per 50&nbsp;mm strip. Loading hysteresis, friction during loading, out-of-plane loop curvature and time-dependent yarn behaviour are not modelled.</p>
+      </div>
+    </section>
+
+  </div>
+
+  <nav class="project__nav">
+    <a href="functional-fibers-e-textiles-wearables.html" class="project__nav-link">&larr; Previous note</a>
+    <a href="conductive-trace-resistance.html" class="project__nav-link">Next note &rarr;</a>
+  </nav>
+</main>
+
+<footer class="footer">
+  <div class="footer__rule"></div>
+  <div class="footer__grid">
+    <div class="footer__block">
+      <span class="footer__label">Contact</span>
+      <a href="mailto:ewmaskalenko@gmail.com" class="footer__link">ewmaskalenko@gmail.com</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">Elsewhere</span>
+      <a href="https://www.linkedin.com/in/eva-maskalenko-91a99113a/" class="footer__link" target="_blank" rel="noopener">LinkedIn</a>
+    </div>
+    <div class="footer__block">
+      <span class="footer__label">&nbsp;</span>
+      <span class="footer__link footer__link--muted">&copy; 2026 Eva Maskalenko</span>
+    </div>
+  </div>
+</footer>
+
+<a href="#top" class="back-to-top"><span class="back-to-top__arrow">&uarr;</span>Top</a>
+
+<script src="textile-stretch-simulator.js"></script>
+</body>
+</html>

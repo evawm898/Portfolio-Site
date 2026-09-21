@@ -84,11 +84,22 @@ class CandidateOut(BaseModel):
 
 
 class AxisOut(BaseModel):
+    """
+    NOTE: deliberately has no numeric confidence field. A systematic
+    accuracy sweep (README.md's "How ROI-dependent is this, really?")
+    found the per-axis confidence score has ~zero correlation with actual
+    error (Pearson r = -0.028 across 210 observations) -- only the
+    confident/uncertain `status` below carries real signal (5.8% vs.
+    67.0% median error). Showing a specific, precise-looking number that
+    tracks nothing is worse than showing nothing: it invites more trust
+    in one wrong result over another equally wrong one. See
+    `AxisDebugOut` for where the raw score still lives, internally.
+    """
+
     spacing_px: Optional[float] = None
     spacing_mm: Optional[float] = None
     per_inch: Optional[float] = None
     positions_px: List[float] = Field(default_factory=list)
-    confidence: float = 0.0
     message: str = ""
     # Detection-details diagnostics: every harmonic period candidate
     # considered (typically 0.5x/1x/2x of the coarse autocorrelation
@@ -106,6 +117,21 @@ class AxisOut(BaseModel):
     # hiding it (see uncertain_reason).
     status: str = "confident"
     uncertain_reason: Optional[str] = None
+
+
+class AxisDebugOut(AxisOut):
+    """
+    AxisOut plus the raw, UNCALIBRATED numeric confidence score --
+    internal/development use only. See AxisOut's own docstring for why
+    the number is absent there: it does not track measurement error
+    (r = -0.028). Used exclusively for RoiMeasurementOut below (per-
+    region detail nested under MultiRoiDebugOut.multi_roi, which the
+    frontend only renders in Developer diagnostics) -- never for the
+    primary AnalyzeResponse.wale/course that a normal user's result
+    actually reads from.
+    """
+
+    confidence: float = 0.0
 
 
 class LoopLatticeDebugOut(BaseModel):
@@ -133,6 +159,10 @@ class LoopLatticeDebugOut(BaseModel):
     direct_center_count: int = 0
     row_count: int = 0
     column_count: int = 0
+    # How many candidate column groups were considered before the
+    # row-support filter -- column_count is the accepted subset. Lets
+    # diagnostics show "accepted N of M candidates" instead of just N.
+    columns_considered: int = 0
     lattice_consistency: float = 0.0
     wale_spacing_px: Optional[float] = None
     course_spacing_px: Optional[float] = None
@@ -166,8 +196,19 @@ class AxisConsensusOut(BaseModel):
     """
 
     included_labels: List[str] = Field(default_factory=list)
+    # Every region NOT in included_labels, whatever the reason -- a
+    # statistical outlier (also itemized in `outliers` below) or a region
+    # with no usable measurement at all (also itemized in
+    # `no_measurement_labels`). included_labels + excluded_labels always
+    # accounts for every region considered for this axis, so "2 of 4
+    # contributed" is never indistinguishable from "2 of 2" the way it
+    # used to be when a no-measurement region silently vanished from both.
     excluded_labels: List[str] = Field(default_factory=list)
     outliers: List[OutlierOut] = Field(default_factory=list)
+    # Subset of excluded_labels dropped for having no usable measurement
+    # on this axis at all, as opposed to having one and losing the
+    # cross-region vote (see `outliers` for those).
+    no_measurement_labels: List[str] = Field(default_factory=list)
     regional_median_px: Optional[float] = None
     regional_median_per_inch: Optional[float] = None
     regional_spread_px: Optional[float] = None
@@ -185,8 +226,12 @@ class RoiMeasurementOut(BaseModel):
     source: str  # "auto" | "manual"
     success: bool
     message: str
-    wale: AxisOut = Field(default_factory=AxisOut)
-    course: AxisOut = Field(default_factory=AxisOut)
+    # AxisDebugOut, not AxisOut: this whole struct is nested under
+    # MultiRoiDebugOut.multi_roi, which the frontend renders only in
+    # Developer diagnostics -- the one place the raw, uncalibrated
+    # confidence score is still shown (see AxisDebugOut's docstring).
+    wale: AxisDebugOut = Field(default_factory=AxisDebugOut)
+    course: AxisDebugOut = Field(default_factory=AxisDebugOut)
     # Generic image-quality score (sharpness/contrast/texture-consistency/
     # periodicity/brightness) -- the SAME heuristic used to propose
     # candidates in Stage 1, reused here on the region's final approved
