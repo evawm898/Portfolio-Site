@@ -13,8 +13,13 @@
        numbers can never be quoted from a broken export)
      - the DIHEDRAL between every pair of adjacent faces, as a histogram, and
        the count landing in the CLIFF BAND [80, 100] degrees
-     - the sheet's local THICKNESS at the rim, as the distance between the two
-       skin vertices that share a rim column
+
+   WHAT IT DOES NOT MEASURE, and this line exists because the first draft of
+   this header claimed it did: the sheet's local THICKNESS at the rim. There is
+   no thickness probe here. The rim floor is asserted by `edgeThickness`'s own
+   constants and by nothing in this file — a label naming a computation nobody
+   performed is this codebase's most repeated defect, and a gate's own header is
+   the worst place to put one.
 
    WHAT IT IS BLIND TO, stated here because a gate's own header is the worst
    place for a label naming a computation nobody performed:
