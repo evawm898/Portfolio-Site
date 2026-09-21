@@ -55,11 +55,22 @@
  * growing the pool there would REALLOCATE the very buffers its caller passed
  * in as `xs` and `ys`, which is a use-after-free with extra steps.
  *
+ * A SHARED POOL MAKES `draw()` NON-REENTRANT, which is true and is fine: it is
+ * synchronous, and a second call cannot begin before the first returns. Two
+ * canvases are drawn one after the other, never at once. Said rather than
+ * assumed, because the pool is the thing that would make an interleaved call
+ * silently wrong rather than merely slow.
+ *
  * AND THE `r()` CALL ORDER IS UNTOUCHED, WHICH IS WHAT MAKES THIS MECHANICAL.
  * Every draw off the stream happens in the same place, the same number of
  * times, in the same order; the only thing that moved is where the result is
- * written. The control is that the standalone picture does not move a single
- * pixel — if it moves, the consumption order changed and the change is wrong.
+ * written. The control is that the picture does not move a single pixel — if it
+ * moves, the consumption order changed and the change is wrong. BOTH BRANCHES
+ * have one: the standalone path over ten frozen states at three resolutions
+ * (0 of 64,512,000), and the WIRED path — which shares almost no code with it,
+ * reading the caller's per-column crest and break phase and each wave's stored
+ * lobes — over 27 cells and 135 wave draws (0 of 58,060,800). The second was
+ * missing at first and came out of re-reading the diff, not out of a failure.
  * ---------------------------------------------------------------------------
  */
 

@@ -35,6 +35,21 @@ every later draw on the frame's shared stream shifted. The standalone branch
 keeps the original loop draw for draw; only the wired branch reads stored
 parameters.
 
+### And the WIRED path needed its own, which re-reading the diff found
+
+The section above is about `draw()` called with **no wave list** — the
+standalone path. The scratch-pool refactor touched both branches, and they
+share almost no code: the wired one reads the caller's per-column crest and
+break phase, each wave's lobes and bubbles stored at birth, and the published
+front and high-water queries. A control on one of them is a control on half
+the change.
+
+Closed the same way, in one page session: both modules loaded, handed the SAME
+specs built from real `makeWave` records, `waterlineS` deliberately not passed
+so the sheet clamp (a later, intentional change) is inert and only the refactor
+is under test. **0 of 58,060,800 pixels** over 27 cells — three resolutions x
+three record sets x three drifts, 135 wave draws.
+
 ## 1. The four edits to the drawing layer
 
 Each one is a number moving from the module to a caller that owns it. Nothing
