@@ -53,7 +53,7 @@ import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCap
          thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
-         leafAssertions, sepalAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
+         leafAssertions, sepalAssertions, inflorescenceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
 import { footCrowding, crowdingLine, crowdingCoverage, CROWDING_SCOPE } from './bloom-crowding.mjs';
 import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIntersectionCoverage, selfIntersectionRefusedNote, selfIntersectionLine, orientationLine, SELF_INTERSECTION_XFAIL_HAS, SELF_INTERSECTION_XFAIL, SELF_INTERSECTION_TOLERANCE, ORIENTATION_SCOPE, SELF_INTERSECTION_SCOPE, stemChannelAssertions, STEM_CHANNEL_SCOPE } from './bloom-harness.mjs';
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
@@ -215,6 +215,16 @@ for (const row of rows) {
      overlap). See sepalAssertions()'s own header. */
   const sep = await sepalAssertions(page, row);
   if (sep.length) { validity.push(`${row.label}: ${sep.join('; ')}`); continue; }
+  /* THE INFLORESCENCE (ID0-ID6, this session). BOTH STL GATES ARE BLIND TO
+     PLACEMENT BY CONSTRUCTION, and it is measured rather than argued: a
+     raceme whose every floret is left at the ORIGIN is one closed watertight
+     solid with the identical triangle count and the identical STL byte
+     length, and the flood fill reads N heads piled on the rachis as one piece
+     more readily than as the right ones. A rigid transform changes no edge
+     census and splits no region. See inflorescenceAssertions()'s own
+     header for what each of the seven sees. */
+  const inflo = await inflorescenceAssertions(page, row);
+  if (inflo.length) { validity.push(`${row.label}: ${inflo.join('; ')}`); continue; }
   /* ZYGOMORPHY (Z1-Z3). Both STL gates are structurally blind to the whole
      layer — measured on three worktrees before these assertions existed, not
      derived: the wrong role, a record that never reaches the blade, and the
@@ -265,6 +275,21 @@ for (const row of rows) {
          mouth; this is about what the exported MESH's shells are.) */
       cavity: S && S.voidMm > 0 && S.solidBandMm > 0 && S.tipPlugMm > 0
         ? { boreR: S.boreR, voidMm: S.voidMm, sides: S.sides } : null,
+      /* THE FLORETS' OWN INNER FACES. A floret IS a bloom, so it declares
+         them by the same two conditions the head does, read off the floret's
+         own build record — and O1's baseline is a count over the FILE, so N
+         florets multiply it. Every floret on a build is the same unit under a
+         different matrix (ID5 measures that as an exact zero), which is why
+         one record describes all of them. */
+      florets: (() => {
+        const B = m.inflorescenceBuilt, U = B && B.unit;
+        if (!B || !U) return null;
+        return {
+          count: B.count,
+          sphere: U.sphereMode === true,
+          cavity: U.stemVoidMm > 0 && U.stemSolidBandMm > 0 && U.stemTipPlugMm > 0,
+        };
+      })(),
     };
   }));
   if (ori.bad.length) { validity.push(`${row.label}: ${ori.bad.join('; ')}`); continue; }
@@ -437,7 +462,7 @@ console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
 console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
 {
   const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL (each still failing at its RECORDED magnitude — the pair count exactly, the worst span within ±${SELF_INTERSECTION_TOLERANCE.worstMm} mm — asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face and the stem bore's own sealed cavity where each exists)`);
+  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL (each still failing at its RECORDED magnitude — the pair count exactly, the worst span within ±${SELF_INTERSECTION_TOLERANCE.worstMm} mm — asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face, the stem bore's own sealed cavity, and every FLORET's own two where each exists)`);
 }
 console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
 console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);

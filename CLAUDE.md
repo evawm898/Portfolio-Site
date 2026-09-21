@@ -19,6 +19,15 @@ Guidance for Claude Code sessions working in this repository.
 - Never delete old branches without explicit approval.
 - Before making branch-history changes, rebases, force pushes, or destructive Git operations, stop and ask first.
 
+## Operational gotchas
+
+- `update_trigger` on a **spent one-shot** edits a corpse. A `send_later` Routine fires
+  once and is then done; updating its prompt afterwards changes text that will never be
+  delivered, and the returned `next_run_at` can look plausible (a day out) while
+  `ended_reason: run_once_fired` sits in the same response. To reschedule, call
+  `send_later` again — do not edit the spent one. Cost of getting this wrong is an hour of
+  silent nothing.
+
 ## Bloom generator — pointer only
 
 **NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH** (Eva, session
@@ -112,8 +121,10 @@ hook measures the cleft rows without their cleft, which the smoke gate caught.) 
 MEASURED rather than as the ruling phrased it**: one or two layers export free of
 self-intersection at any petal count AT THE DEFAULT FORM (the petalCount sweep reads 0 on
 every row); cup beyond about −0.2..0.3, buckle from 0.3×, roll from 270° and curl 360° fold
-a single petal at ANY depth — the read-out's `ROOT BLEND AT N LAYERS` line says exactly
-that, at three layers and up, and the panel gate's route (v) asserts it both ways.
+a single petal at ANY depth. **That was printed by the read-out's `ROOT BLEND AT N LAYERS`
+line at three layers and up, with the panel gate's route (v) asserting it both ways — BOTH
+ARE RETIRED (Eva, Sep 20), and no line replaced them.** The form half of the sentence above
+is still true and is now carried here and in the outcome docs rather than on the page.
 
 **EVERY PETAL SHELL IS EMITTED INSIDE-OUT, AND SIX GATES PASS ON IT** (session 35,
 corroborated independently against an exported STL). Per-shell signed volume: the hub
@@ -149,15 +160,22 @@ first-station spacing in mm) and stacked tilt (a sharper kink); the derived
 `seamClearanceMm` is the fix and it is the SEAM owner's, not `footRing()`'s. **The
 instruction that followed — "do not judge a deformation feature's printability on a
 multi-layer build until this is fixed" — is DISCHARGED and must not be re-inherited.**
-**WHAT STILL SHIPS SAYING OTHERWISE, and it is Eva's ruling rather than a cleanup:**
-`bloom.js`'s `rootBlendLine()` prints at 3+ layers that *"the inner layers' short petals
-fold through themselves at the root (a measured self-intersection at the defaults, session
-35)"* — its leading clause is now false, its trailing clause (one or two layers are clean
-at the default form; what folds a single petal is its own FORM, not the depth) is still
-exactly true — and the panel gate's **route (v)** asserts that sentence APPEARS, on a row
-labelled *"3 layers (the first depth that folds)"*. The line exists by session 36's ruling,
-so retiring or re-pointing it is a ruling; the three options and the gate cost are §7 of
-the superseded doc.
+**AND THE READ-OUT LINE THAT SAID OTHERWISE IS DELETED — CREATED BY SESSION 36's RULING,
+RETIRED BY EVA'S ON Sep 20.** `bloom.js`'s `rootBlendLine()` printed at 3+ layers that *"the
+inner layers' short petals fold through themselves at the root (a measured self-intersection
+at the defaults, session 35)"*; its leading clause was false on this tree and its trailing
+clause (one or two layers clean at the default form; what folds a single petal is its own
+FORM, not the depth) was still true. Eva's ruling: **delete it — no line rather than one to
+maintain.** The panel gate's **route (v)**, which asserted the sentence appeared on five rows
+including one labelled *"3 layers (the first depth that folds)"*, went with it; those rows
+existed only to carry it. **A REPLACEMENT WARNING FOR THE EFFECTIVE-TILT FOLD WAS OFFERED AND
+DECLINED — do not add one**, and do not re-point or reword the old one.
+**AND ROUTE (v) WAS IN NONE OF THE PANEL GATE'S THREE ROUTE MECHANISMS**, which is a finding
+rather than a convenience: no entry in the header's enumeration, no flag in
+`--negative-control`'s completeness list, and not counted in its "SEVENTEEN ROUTES" banner.
+That is exactly the shape the sphere-stem session named — **a route that fires and is not
+required is a route that can go silent without the gate noticing** — so its removal moved no
+count and no list, and the letter (v) is not reused.
 
 **A READING TAKEN OUTSIDE THE REGION A FEATURE ACTS IN IS NOT EVIDENCE ABOUT THAT
 FEATURE, HOWEVER WELL CALIBRATED IT IS ELSEWHERE** (Eva, session 35 — the third durable
@@ -3608,6 +3626,28 @@ keeps the last forty lines of the COMBINED stream, which is the tail of the stdo
 throws away the stderr block for the same reason the CI log does. Write the whole run to a file
 and grep it. This session recorded that lesson and then repeated it within the hour.
 
+**AND BACKGROUND WORK DOES NOT SURVIVE THE END OF A TURN IN THIS CONTAINER — SO A LONG
+CAPTURE RUNS IN THE FOREGROUND, IN `timeout`-BOUNDED CHUNKS, WITH `--resume`** (the
+ROOT-BLEND-line session, measured twice; it cost ~51 minutes). The obvious move — launch the
+byte capture with `nohup`, end the turn, read it back at a check-in — CANNOT WORK, and the
+first reading of why was WRONG and is recorded here corrected. It was called "a container
+restarted", which is what `uptime` looks like; the arithmetic says otherwise. Resumed at
+139/137 rows and read back 51 minutes later at 181/180: **42 rows, which at the measured
+3.6 s/row is ~2.5 minutes of actual running.** The process runs while the turn is live and is
+killed the moment the session goes idle. No OOM, no disk pressure (29 G free), no in-process
+error, and **no `EXIT=` marker from the wrapper** — the whole process group is killed, never
+exited, which is the tell that separates this from a crash.
+**WHAT MAKES IT SURVIVABLE IS SESSION 20'S CHECKPOINT, AND IT IS WHY THAT MECHANISM EXISTS**
+(`--resume` in `tools/diff-bloom-bytes.mjs`, built after that session lost three captures to
+the same thing): the out file is rewritten after EVERY row with `complete:false`, `--compare`
+refuses a partial, and an interruption costs ONE ROW rather than a run. A 860-row capture
+then closes in six `timeout 555` chunks inside single Bash calls — the tool's ceiling is
+600 s, and foreground `sleep` is blocked, so the chunking is the whole answer rather than
+waiting in-turn. **A `send_later` check-in is NOT the thing that fails** — it wakes the
+session reliably; what does not survive is the PROCESS, so a check-in that expects to read a
+finished background run reads a dead one. Do not re-derive this by backgrounding a sweep and
+coming back to it.
+
 **A green connectedness run does NOT endorse the junction under layers** —
 measured, not cautious: building the hub at the wrong layer's radius leaves a
 whorl joined to nothing and that gate still reports ONE piece, because
@@ -3873,6 +3913,144 @@ captured-grid values**, the whole 860-row matrix in both modes, positionally und
 `frozen/phase35` stays the newest baseline and no tag's bytes stop reproducing. Its
 `--control` fires BOTH clauses (export stream and captured grid) on a 1e-9 perturbation,
 which is what stops the second one being a log line.
+
+**A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
+RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
+`docs/bloom-inflorescence-discovery.md` and they govern — read them, then
+`docs/bloom-inflorescence-outcome.md`, before touching `inflorescencePlan`,
+`floretState`, `pedicelPlacement`, `buildInflorescenceInto`,
+`MeshBuilder.appendTransformed` or the ID family). Ruling 5 scopes the first session to
+INSTANCING PLUS ONE RACEME and nothing else: no presets (ruling 10), no compound levels,
+no cymes, no depth past 1, no maturation ramp or bud pose (ruling 6), no droop or axis
+curvature (ruling 8), and the capitulum is the HEAD's (ruling 1 — a mum is one flower with
+120 petals and one centre).
+**PHASE A'S STOP CONDITION WAS NOT MET AND THAT IS A MEASUREMENT:** `bloom-geometry.js`
+holds ZERO module-level mutable state (every module `let` is a `const`; the four `last*`
+variables are `bloom.js`'s and are written AFTER a build returns), so the head IS a pure
+function of `(state, acc)`. It IS origin-locked — the hub is centred on `[0,0,0]`, the
+stem runs down the world axis, `stemOmission` reasons about world z by name — which is
+what Route A handles BY CONSTRUCTION rather than by refactoring. **`below: 'branch'` is
+NOT needed**: `below` is validated by `buildBloomInto` and read nowhere else on this tree.
+**THE PEDICEL IS THE FLORET'S OWN STEM, WHICH IS THE ARCHITECTURAL FINDING.** A floret
+with its pedicel is ONE shipped `buildBloomInto` call — `floretState` sets `stemLength` to
+the pedicel's length and `stemDiameter` to twice its derived radius — so the ONLY new join
+in the whole feature is pedicel-tip-to-rachis-wall, which is the leaf PETIOLE's problem
+already solved, and `buildHubInto`'s hub-to-stem join generalises with nothing added
+because it runs in the floret's own frame at the floret's own origin. **ONE BUILD, N
+APPENDS**: build time is **O(1) in the node count**, which is ruling 5's "identical
+florets" cashed as a cost. Per-node deltas (ruling 10's second half) would make it a build
+per distinct state and are the next session.
+**A REDUCED FLORET IS NEEDED AND RULING 4 SUFFICES — MEASURED.** Heads alone against the
+1,500,000 budget: **DEFAULTS bites at 78 heads, a 5-petal floret at 125, a 3-petal floret
+at 206, and THE MUM AT FIVE.** A floret is 11,972 triangles at five petals and 7,260 at
+three with `NU` untouched; the ceiling this session ships is 12 nodes x 3 = 36 florets.
+**THE SEVEN CONTROLS**: `inflorescence` (NONE / RACEME, default NONE — the guard) in a new
+top-level Inflorescence section, with `floretNodes` (1-12, 5), `floretPhyllotaxy` (the
+LEAF's own three), `floretPetals` (3-12, 5), `floretScale` (0.20-1.00, 0.60),
+`pedicelLength` (5-60 mm, 20) and `pedicelAngle` (-60..90 deg, 35) in a nested Floret
+section, all hidden AND inert at NONE and on a bloom with no rachis. **NOTHING IS A SECOND
+OWNER**: nodes are `leafNodeDepthsMm`, azimuths are `leafAzimuths`, the rod's root and
+embed are `rodWallRootMm` / `rodWallEmbedMm`, the crossing is `rodWallCrossingMm`, the size
+clamp is `OVERRIDE_BOUNDS`, the gap is `MIN_FEATURE_MM`. **THE PEDICEL'S RADIUS IS DERIVED
+AND IS NOT A CONTROL** — the area rule read downward, `r_rachis / sqrt(N)`, floored at
+`STEM_DIAMETER_RANGE[0]/2` and TOLD; on the shipping 6 mm rachis the floor binds from five
+florets up and at two it is 4.24 mm.
+**AND IT READS THE *ASKED* COUNT, WHICH BREAKS A FIXED POINT RATHER THAN BEING A
+CONVENIENCE.** The pitch floor is `2 * pedicelR`, so a radius derived from the count that
+floor produces is count -> radius -> floor -> count: the `headRise` ruling's "a metric
+consumed as a geometric input becomes a target", and session 32's withdrawn per-state
+ladder gate. The asked count is also conservative in the right direction (fewer built than
+asked gives THINNER pedicels, never thicker), and ID2 rebuilds it from the CONTROLS.
+**A FLORET IS A BLOOM, SO EVERYTHING A HEAD CAN DO HAPPENS INSIDE IT — THREE CLAUSES
+LEARNED THAT THE HARD WAY, EACH SEEN RED.** (i) **The floret's OWN stem channel fires**:
+on a SPHERE head the floret is a SPHERE head too and its pedicel takes the petals it would
+pass through — **4 of 5 asked, measured** — so ID4's first clause demanded all five and
+went red; widening it to a `<=` is the vacuous repair, and the shipped clause predicts the
+asked count LESS the floret's own `stemOmission()` tally with the channel's EXISTENCE a
+biconditional against `sphereMode`. (ii) **O1's declared inward count is over the FILE**,
+so N florets multiply it: `INFLO: x a SPHERE head` read **6 of 47 inward against a declared
+1**, and the baseline is `inwardOf(head) + count * inwardOf(floret)` with `inwardOf`
+written once and applied twice; the cavity clause now asks whether *some* inward shell is
+the bore's prism rather than the NEAREST, because N florets add N candidates. (iii)
+**ST9 read 1554 intruding vertices**: a pedicel is rooted THROUGH the rachis wall by
+design exactly as a petiole is, so ONE list and ONE rod test now serve both families and
+that took it to 144.
+**THE REMAINING 144 ARE THE FLORET'S OWN BODY AT 0.8234 mm, AND THEY ARE REPORTED RATHER
+THAN GATED** — ST9's subject is the stem CHANNEL, a region the design says must be EMPTY,
+and a floret hangs BESIDE the rachis on its own pedicel; two parts of one solid fusing is
+OVER-connection, which is the crowding ruling's own grounds (Eva, Sep 3). The declared
+floret blocks are CHECKED where they are used — disjoint, in range, totalling the builder's
+own tally — so a block that swallowed the head cannot silence the clause, and a head petal
+driven into the channel is outside every block by construction. **Swept as a pure
+geometric quantity, EXPORT: SPHERE head 0.0000 / 1.1345 / 3.2733 / 1.4731 / 0.8234 /
+0.0544 / 0.0000 at pedicelAngle -60 / -30 / 0 / 25 / 35 / 45 / 60+, against a CAP head's
+0.0000 / 11.3906 / 18.5015 / 14.3624 / 8.2475 / — / 0.0000** — a factor of ten at the
+shipped angle, because a SPHERE floret's petals radiate back toward the rachis and a CAP's
+do not. The read-out carries it on every build.
+**AND THE MODE RULE CAUGHT A CLAUSE WRITTEN MINUTES EARLIER**: the first version of that
+report compared the BUILDER's flag against the FILE and read **0.9230 against 0.8234** —
+`__bloomMetrics()` is the LIVE build and the STL is the EXPORT one. The honest repair is
+not a tolerance (the difference is the TIP print floor, 0.15 live / 0.80 export, closing
+the gap by an amount no closed form in the sheet predicts) but to DROP the comparison and
+declare the blindness: the flag serves the read-out, ST9 serves the file.
+**`floretScale`'S DEAD TRAVEL IS TOLD AND THE RANGE IS NOT NARROWED** — on the shipping
+35 x 16 mm head the length stops moving below **0.571x** and the width below **0.500x**,
+about a third of the track. No static range is dead-free (the releasing scale is a property
+of the HEAD's two sliders) and an adaptive minimum would make one slider position mean
+different shapes on different heads: `stamenSpread`'s ruling, with the carnation terminal's
+low-end case — the dead stretch is at the BOTTOM, so NO HATCH is drawn and the number is
+printed on the control. ID4 pins `sizeDeadBelow` twice, against the ranges and as a
+biconditional against the clamp beside it.
+**A SECOND PRODUCER WAS FOUND BY THE MUTANT TABLE'S ANCHOR SCAN, NOT BY A FAILURE.**
+`const rootR = (stem.boreR + stem.outerR) / 2` lived in `leafPlan` and, the day the pedicel
+arrived, in `inflorescencePlan` — so ID2's mutant anchor **matched twice**, mutated the
+LEAF's and said nothing about the pedicel it named. §9b(i) of the seam session verbatim;
+fixed by giving the expression ONE owner, never by narrowing the string. **And
+`sepal-height-ignored` was disarmed on `main`** (`stemEnd.z + frac * extentMm` against the
+shipped `zStemEnd + frac * extentMm` — 0 matches on BOTH trees), re-anchored here.
+**R1 FIRED ON THE NEW PART FOR THE THIRD TIME** (after the stem and the leaves), exactly as
+its own comment predicts; both coverage instruments build the florets from
+`inflorescencePlan`'s own record now.
+**`INFLO: ALL MAX` DOES NOT REFUSE — 1,114,828 export triangles of the 1,500,000 budget,
+74.3%, 54,435 KiB — SO THE ROW EXISTS AND THE `EXPORT_REFUSED_XFAIL` ENTRY DOES NOT, WHICH
+IS A DISAGREEMENT WITH RULING 9 RATHER THAN A SHORTFALL.** That ruling asks for the
+sub-controls out of the blanket sweep "with one declared `INFLO: ALL MAX` refusal row"; the
+ROW is built and is in the matrix — 12 nodes x whorled x 12 petals x size 1.00 x a 60 mm
+pedicel straight up, the corner the sweep no longer reaches — and it simply does not breach
+(36 florets at 30,380 triangles each plus the head). Nothing was manufactured: widening a
+range until a row refuses would be tuning a control to exercise a gate. The headroom is
+REPORTED, and the day a node cap rises or a per-node delta lands that row is where it will
+breach.
+**THE COMBINATION GATE'S REJECTION OF ARRANGEMENT CONTROLS STILL HOLDS WITH HEADS
+INSTANCED, AND FOR A SECOND REASON — SWEPT, NOT ARGUED.** `self` is `measureWall` on ONE
+petal and cannot see where a whole HEAD stands, so CG1 would refuse an inflorescence pair as
+inert exactly as it refused `leafToothDepth`. And the measure such a pair WOULD want exists:
+the floret-against-rachis approach above, through `freeStemDistanceMm` — the same owner the
+gate's own `leaf-stem` measure calls — with the pedicel rod excluded. Swept on two candidate
+grids (`pedicelAngle` x `hubShape` and `pedicelAngle` x `pedicelLength`, EXPORT, 120 mm
+rachis) **both are `single-reaches` and 11 of 16 cells are UNDER THE BAR on each** — the
+hazard is `pedicelAngle` alone, and `pedicelLength` alone at 5 mm. Carrying either would
+declare eleven `COMBINATION_XFAIL` magnitudes (#265's own named recurring cost) **against a
+bar that does not apply**: `MIN_FEATURE_MM` is the minimum printable GAP and a floret
+touching its own rachis is OVER-connection, the crowding ruling's grounds. **So what would
+have to change is the BAR, not the row list**, and no pair is added.
+**THE GRID EXPORT WRITES THE HEAD AT THE ORIGIN ONLY** — a raceme's florets are not in the
+`.glb`, the read-out says so on every build with an inflorescence, and closing it is
+`bloom-grid-gltf.js`'s own change.
+**THE BYTE PARTITION IS 21 MOVED / 862 HELD OVER THE WHOLE 883-ROW MATRIX IN BOTH MODES,
+AND THE 862 ARE MAIN'S ENTIRE 860 PLUS THE TWO GATED ROWS** — `verify-bloom-surface-bytes
+--base <worktree of 3ed45df> --movers "^INFLO: (?!GATED)"` reads **PASS, 0 floats moved on
+the holders, positionally under `Object.is`, over 837,209,376 export floats / 93,023,264
+triangles and 77,409,888 captured-grid values**, with all 21 predeclared movers moving and
+`--control` firing BOTH clauses on a 1e-9 perturbation. **The mover set is predeclared from
+the GUARD PREDICATE, not from the labels** (a row moves iff `inflorescenceIsAbsent` is
+false), and the two agree in both directions; **no non-`INFLO:` row sets `inflorescence` at
+all** (0 of 883), so `ALL MAX` and `ALL MIN` are holders by construction and are measured
+as such. **`bloom.js` cannot move a float here and that is a reading of the diff**: every
+line it gains is `infloLine`'s text, the read-only metrics projection or a comment, and the
+only change on the export path is one name in an import list. `frozen/phase36` is the 860
+rows at `3ed45df`, registered in BOTH maps and proved deep-equal. The PANEL gate passes and
+its `--negative-control` closes with ALL SEVENTEEN ROUTES observing the failure.
 
 ## Flower generator — print-safety is a hard invariant
 

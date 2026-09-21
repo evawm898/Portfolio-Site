@@ -1768,6 +1768,26 @@ any of them.
       session A recorded and rejected, since a group per petal is a registry row per petal
       rather than one control id holding several values.
 
+- **THE INFLORESCENCE IS SCHEDULED IN SESSIONS AND THE FIRST ONE SHIPPED INSTANCING PLUS
+  ONE RACEME** (Eva's twelve rulings, `docs/bloom-inflorescence-discovery.md`; the first
+  session's measurements, `docs/bloom-inflorescence-outcome.md`). **What is PARKED by the
+  rulings rather than by time, so nobody re-proposes it as easy:** presets (ruling 10 — a
+  preset is a BUTTON that writes slider values, never a registry row), per-node deltas
+  (ruling 10's second half), compound levels and cymes and any depth past 1, the
+  maturation ramp and the bud pose (ruling 6, both deferred into the bell/corolla
+  session), droop and axis curvature (ruling 8), and the capitulum, which is the HEAD's
+  and not an arrangement (ruling 1 — a mum is ONE flower with 120 petals and one centre).
+  **PER-NODE DELTAS ARE THE ONE WITH A COST ALREADY MEASURED:** the first session builds
+  the floret unit ONCE and appends it under N rigid transforms, so build time is O(1) in
+  the node count; a per-node delta makes it a build per DISTINCT STATE, which is O(N) and
+  is why it is its own session rather than a slider added to this one.
+  **AND THE TRIANGLE BUDGET IS WHAT DECIDES HOW MANY HEADS A LATER LEVEL CAN HAVE** —
+  measured, heads alone against 1,500,000: the DEFAULT head bites at **78**, a 5-petal
+  floret at **125**, a 3-petal floret at **206**, and THE MUM AT **FIVE**. A compound
+  inflorescence multiplies node counts, so the session that opens one owes that
+  arithmetic BEFORE it builds, at the corner `ALL MAX` reaches and not at a
+  representative row.
+
 ## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
 
 **Eva's ruling, session 29, and it is a convention rather than a note because it has cost time

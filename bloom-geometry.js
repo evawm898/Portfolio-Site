@@ -788,6 +788,49 @@ export class MeshBuilder {
   }
   /* Quad a-b-c-d (counter-clockwise seen from outside) as two triangles. */
   quad(a, b, c, d) { this.tri(a, b, c); this.tri(a, c, d); }
+  /* APPEND ANOTHER ACCUMULATOR'S TRIANGLES UNDER A RIGID TRANSFORM — the
+     inflorescence's one new emission primitive, and the whole of Route A
+     (Eva's ruling 3, the inflorescence discovery): a head is built AT THE
+     ORIGIN by the shipped `buildBloomInto` and placed afterwards, rather than
+     a frame being threaded through ten builders that each put a literal
+     `[0, 0, z]` on the world axis.
+
+     `M` IS A 3x4 RIGID MATRIX, row-major, 12 numbers — rotation and
+     translation and NOTHING ELSE. THAT IS A CONTRACT, NOT A CONVENIENCE, and
+     the reason is `minThickness`: the export floor is applied AT BUILD
+     (`floorThickness`), so a head scaled by the matrix would carry a sheet
+     that was floored at 1.00 mm and then taken below it, and this method's
+     own `minThickness` fold would report the pre-scale number. The flower
+     needed `floorScale` for exactly this. A floret is smaller by its
+     PARAMETERS — petal count, length, width — never by the matrix. ID3
+     asserts the matrix is a rotation (orthonormal, det +1) on every instance,
+     so "rigid" is measured rather than promised.
+
+     `minThickness` FOLDS IN UNCHANGED because a rigid map preserves lengths;
+     that is only true under the contract above, which is the second reason
+     for it. The bounding box is re-accumulated from the TRANSFORMED points
+     (a transformed box is not the box of the transformed points), and the
+     captured grid is deliberately NOT folded in: `captureGrid` is the mid-
+     surface of ONE head's petals and an instanced copy of it would be a
+     second answer to "which petal is this", which `verify-bloom-grid`'s
+     clause 9 counts. The grid export writes the head at the origin; an
+     inflorescence's florets are absent from it, and that is stated in the
+     read-out rather than half-solved here. */
+  appendTransformed(other, M) {
+    const p = other.positions, n = p.length, out = this.positions;
+    for (let i = 0; i < n; i += 3) {
+      const x = p[i], y = p[i + 1], z = p[i + 2];
+      const X = M[0] * x + M[1] * y + M[2] * z + M[3];
+      const Y = M[4] * x + M[5] * y + M[6] * z + M[7];
+      const Z = M[8] * x + M[9] * y + M[10] * z + M[11];
+      out.push(X, Y, Z);
+      if (X < this.lo[0]) this.lo[0] = X; if (X > this.hi[0]) this.hi[0] = X;
+      if (Y < this.lo[1]) this.lo[1] = Y; if (Y > this.hi[1]) this.hi[1] = Y;
+      if (Z < this.lo[2]) this.lo[2] = Z; if (Z > this.hi[2]) this.hi[2] = Z;
+    }
+    if (other.minThickness < this.minThickness) this.minThickness = other.minThickness;
+    return n / 9;
+  }
   get triangleCount() { return this.positions.length / 9; }
 }
 
@@ -8627,6 +8670,43 @@ export function leafIsAbsent(state) { return !state.leafLength || !state.stemLen
    `k * GOLDEN_ANGLE` while these flip 180, so its leaves and its bends
    disagree. It is moot while this stem is straight (`stemStations` returns two
    ends) and it must not be reproduced when curvature arrives. */
+/* HOW MUCH SOLID A ROD ROOTED IN THE RACHIS WALL ACTUALLY CROSSES — ONE
+   OWNER, read by the leaf's petiole and by the inflorescence's pedicel.
+
+   Extracted VERBATIM from `buildLeafInto` (the `rodInto`/`pillInto` precedent,
+   session 22) when the pedicel needed the same answer: the alternative was two
+   copies of one formula in two features that are supposed to agree about where
+   a wall is, which is the registration rule's oldest failure here. It is pure
+   TELEMETRY — nothing downstream of it emits a triangle — so the extraction
+   cannot move a byte, and `verify-bloom-surface-bytes` measures that rather
+   than the sentence carrying it.
+
+   THE LAW. The rod's axis stands at radius `rootR + s*cos(th)`, so the span
+   inside the wall annulus [boreR, outerR] is `wall / cos(th)`, saturating at
+   the rod's own length when the angle takes it parallel to the wall. `lenIn`
+   is how far the rod reaches INWARD from its root point (the petiole's
+   `embedMm`, the pedicel's own embed). A rod crossing nothing is a detached
+   shell that exports watertight, which is why this is reported at all. */
+/* rodWallRootMm / rodWallEmbedMm — THE ONE OWNER of where a rod rooted
+   through a hollow wall stands, and how far it reaches back into that wall.
+   Both are Phase A's ruling for the LEAF's petiole and are read unchanged by
+   the floret's PEDICEL; a second copy of either is what this file's own
+   §9b(i) finding is about, and the mutant table is where it hurts — an
+   anchored mutation on `const rootR = (stem.boreR + stem.outerR) / 2` matched
+   TWICE the day the pedicel arrived, mutating the leaf's and saying nothing
+   about the pedicel it named. Caught by the anchor scan rather than by a
+   failure, which is what that scan exists for. */
+export function rodWallRootMm(wall) { return (wall.boreR + wall.outerR) / 2; }
+export function rodWallEmbedMm(wall) { return (wall.outerR - wall.boreR) / 2; }
+
+export function rodWallCrossingMm(wall, th, lenOut, lenIn) {
+  const c = Math.cos(th);
+  if (Math.abs(c) < 1e-9) return lenOut + lenIn;
+  const sLo = (wall.boreR - wall.rootR) / c, sHi = (wall.outerR - wall.rootR) / c;
+  const lo = Math.max(Math.min(sLo, sHi), -lenIn), hi = Math.min(Math.max(sLo, sHi), lenOut);
+  return Math.max(0, hi - lo);
+}
+
 export function leafAzimuths(phyllo, i) {
   if (phyllo === 'opposite') { const b = i * Math.PI / 2; return [b, b + Math.PI]; }
   if (phyllo === 'whorled') { const b = i * (Math.PI / 4); return [b, b + 2 * Math.PI / 3, b + 4 * Math.PI / 3]; }
@@ -8692,11 +8772,11 @@ export function leafPlan(state, stem, acc) {
   /* THE PETIOLE. Its root radius is the WALL'S MID-THICKNESS — Phase A's
      ruling — and its radius is `partRadius`'s own rule, the one every rod in
      this file already uses (the filament's and the style's). */
-  const rootR = (stem.boreR + stem.outerR) / 2;
+  const rootR = rodWallRootMm(stem);
   const petioleR = petioleR0;
   const clearMm = (stem.outerR - rootR) + 2 * acc.floorFeature(state.sheetThickness);
   const petioleLenMm = Math.max(LEAF_PETIOLE_FRACTION * lengthMm, clearMm);
-  const embedMm = (stem.outerR - stem.boreR) / 2;
+  const embedMm = rodWallEmbedMm(stem);
   return {
     present: true, lengthMm, widthMm, angleDeg, nodes: nodeDepthsMm.length, phyllotaxy: phyllo,
     nodeDepthsMm, azimuths, rootR, petioleR, petioleLenMm, embedMm,
@@ -8824,14 +8904,7 @@ export function buildLeafInto(acc, plan, state, nodeIndex, az) {
      `wall / cos(th)`, saturating at the rod's own length when the angle takes
      it parallel to the wall. A leaf crossing nothing is a detached shell that
      exports watertight, which is why this is reported at all. */
-  const c = Math.cos(th);
-  let crossesSolidMm;
-  if (Math.abs(c) < 1e-9) crossesSolidMm = plan.petioleLenMm + plan.embedMm;
-  else {
-    const sLo = (plan.boreR - plan.rootR) / c, sHi = (plan.outerR - plan.rootR) / c;
-    const lo = Math.max(Math.min(sLo, sHi), -plan.embedMm), hi = Math.min(Math.max(sLo, sHi), plan.petioleLenMm);
-    crossesSolidMm = Math.max(0, hi - lo);
-  }
+  const crossesSolidMm = rodWallCrossingMm(plan, th, plan.petioleLenMm, plan.embedMm);
   /* ---- the blade, UNIFORM stations: no ladder, no seam, no foot rows ---- */
   const bb = [base[0] + D0[0] * plan.petioleLenMm, base[1] + D0[1] * plan.petioleLenMm, base[2] + D0[2] * plan.petioleLenMm];
   const rows = [], rowHalfBaseMm = [];
@@ -9765,6 +9838,498 @@ function petalLaminaInMode(site, state, exportMode) {
   return laminaFromPanels(panels);
 }
 /* ===================================================================
+   THE INFLORESCENCE — MANY HEADS ON ONE AXIS (Eva's twelve rulings of
+   Sep 17, `docs/bloom-inflorescence-discovery.md`; read that doc's rulings
+   section before touching anything here).
+
+   WHAT THIS SESSION BUILDS, and the scope is a ruling rather than a stopping
+   point somebody chose: INSTANCING, PLUS ONE RACEME OF IDENTICAL FLORETS
+   (ruling 5). No presets (ruling 2's second half, held), no compound levels,
+   no cymes, no maturation ramp, no bud pose (ruling 6 — the bell/corolla
+   session's), no droop or axis curvature (ruling 8), and the capitulum is the
+   HEAD'S and is not touched (ruling 1: a mum is ONE flower with 120 petals
+   and one centre; an inflorescence is not how you make a daisy).
+
+   THE ONE STRUCTURAL IDEA, and everything else follows from it:
+
+     A FLORET IS A WHOLE BLOOM, PEDICEL AND ALL, BUILT AT THE ORIGIN BY THE
+     SHIPPED `buildBloomInto` AND PLACED BY A RIGID MATRIX.
+
+   THE PEDICEL IS THE FLORET'S OWN STEM. That is what makes this feature small
+   instead of large, and it was not the discovery's expectation. A pedicel is
+   "a rod with a head on the end rooted in the rachis wall"; the bloom already
+   has "a rod with a head on the end" — it is the STEM, which roots THROUGH a
+   hub slab to its top face, carries a derived hub-to-stem join, a bore above
+   the 3 mm floor, a solid root band and a tip plug, and is policed by ST0-ST11.
+   Handing a floret `stemLength: pedicelLength` gets all of it for nothing, and
+   the ONLY new join in the whole feature is the pedicel's far end against the
+   RACHIS wall — which is the LEAF's petiole problem exactly, with the same
+   root radius, the same embed and the same crossing law (`rodWallCrossingMm`,
+   now one owner read by both).
+
+   SO THE CHAIN OF CONNECTEDNESS IS THREE LINKS AND TWO OF THEM ARE SHIPPED:
+     (1) floret petals -> floret hub          J1-J4, unchanged, in the unit's
+                                              own frame
+     (2) floret hub -> pedicel                ST1-ST6, unchanged, ditto
+     (3) pedicel tip -> rachis wall           NEW — ID2, the petiole's own
+                                              measure with the rachis as the
+                                              wall
+   A rigid transform maps a connected solid to a connected solid, so (1) and
+   (2) survive placement as a property of the map rather than as a claim.
+
+   `below` WAS NOT NEEDED, AND THAT IS A FINDING AGAINST THE DISCOVERY.
+   Q1 recorded `below: 'branch'` as "the reserved seam" and predicted "one line
+   stops throwing". Measured: `below` is VALIDATED at the top of
+   `buildBloomInto` and READ NOWHERE ELSE — it drives no geometry at all, and
+   the stem is built from `stemLength` regardless. A floret on a pedicel is an
+   ordinary bloom with a stem, so it is built with `below: null` like every
+   other bloom here, and the throw is left exactly as it was. Un-throwing it
+   would have added a value that names a computation nobody performs, which is
+   this project's most repeated defect.
+
+   ABSENT BY BRANCH, AND THAT IS THE GUARD THE WHOLE FEATURE RESTS ON.
+   `inflorescenceIsAbsent` is `type === NONE || no rachis` — the leaf's own
+   two-part guard (`leafIsAbsent` reads BOTH lengths for the same reason: you
+   cannot hang leaves on a stem that is not there). At the shipping default the
+   plan returns `present: false` before a number is computed and
+   `buildInflorescenceInto` returns before touching the accumulator, so every
+   pre-inflorescence export is bit-identical BY BRANCH rather than by an
+   arithmetic identity. `verify-bloom-surface-bytes.mjs` measures it.
+
+   WHAT IS INHERITED AND WHAT IS OVERRIDDEN (ruling 10: all flowers share the
+   head's controls; per-node deltas are a later session's). `floretState`
+   overrides exactly six things and inherits everything else — the sheet, the
+   form family, the apex law, the sepals, the androecium, the gynoecium, the
+   hub's shape. Two of the six are the RECURSION CAP and are not controls:
+   `inflorescence: NONE` (the flower's bud forces its own bud to 'none' for the
+   same reason — depth is capped at ONE and a compound level is ruling 5's
+   explicit out-of-scope) and `leafLength: 0` (a leaf at a pedicel's node is a
+   BRACT, which is row 13 of the discovery's table and out of scope; inheriting
+   would have put the whole plant's leaves on every 20 mm pedicel).
+   =================================================================== */
+
+/* The law enum's values. NONE is the default and is the guard. */
+export const INFLORESCENCE_TYPES = Object.freeze(['NONE', 'RACEME']);
+/* THE RANGES, exported so the registry IMPORTS them rather than restating
+   them (Q6's discipline, session 29: a slider wider than the law was proved on
+   makes a ruling false with nothing failing, and the harness fails at module
+   load if one of these became a literal).
+
+   `FLORET_PETAL_RANGE` IS 3..12 AND THAT IS A DECISION WITH A REASON.
+   Ruling 4 makes the floret a PETAL-COUNT REDUCTION with `NU` untouched, and
+   the acceptance picture is 3-5 petals. Twelve is generous headroom for a
+   double floret; above it you are building heads rather than florets, and the
+   head's own `petalCount` (3..40) is where that is done. A range is the one
+   place a claim about what a floret IS can be made checkable.
+
+   `FLORET_NODE_RANGE` IS 1..12 where the LEAF's is 1..8 — the discovery's
+   "extend its ceiling (8 is a leaf count)". The node law is shared
+   (`leafNodeDepthsMm`), the ceiling is not.
+
+   `PEDICEL_ANGLE_RANGE` IS THE LEAF'S OWN -60..90 WITH THE LEAF'S OWN DEFAULT
+   OF 35 (Eva ruled 35 for leaves): the quantity is the same quantity — a rod's
+   angle from horizontal at a node on this same stem — and giving it a second
+   range would be two answers to one question. Its extremes are photographed
+   rather than refused, the standing pattern. */
+export const FLORET_NODE_RANGE = Object.freeze([1, 12]);
+export const FLORET_PETAL_RANGE = Object.freeze([3, 12]);
+export const FLORET_SCALE_RANGE = Object.freeze([0.20, 1.00]);
+export const PEDICEL_LENGTH_RANGE = Object.freeze([5, 60]);
+export const PEDICEL_ANGLE_RANGE = Object.freeze([-60, 90]);
+
+/* THE TWO STATEMENTS, and this is the geometry's half. The registry's twin is
+   `PREDICATES.inflorescencePresent`; ID0 checks they agree per row and the
+   harness checks them at module load, the `stemIsAbsent` / `leafIsAbsent`
+   pattern exactly. */
+export function inflorescenceIsAbsent(state) {
+  return String(state.inflorescence ?? 'NONE') === 'NONE' || !Number(state.stemLength);
+}
+
+/* inflorescencePlan — THE ONE OWNER of where the florets are and what they
+   are made of. Reads the RACHIS's plan for the four lengths it needs
+   (`boreR`, `outerR`, `rootZ`, `lengthMm`) and computes nothing the stem
+   already owns; reads `leafNodeDepthsMm` and `leafAzimuths` for the node law
+   and the phyllotaxis rather than restating either, because there are already
+   exactly two owners of "azimuth of the i-th organ" in this file and a third
+   would be the registration rule's own failure. */
+export function inflorescencePlan(state, stem, acc) {
+  if (inflorescenceIsAbsent(state) || !stem || !stem.present) {
+    return { present: false, type: String(state.inflorescence ?? 'NONE'), nodes: 0, azimuths: [], nodeDepthsMm: [], built: 0 };
+  }
+  const type = String(state.inflorescence);
+  const nodesAsked = Math.round(Number(state.floretNodes));
+  const angleDeg = Number(state.pedicelAngle);
+  const phyllo = String(state.floretPhyllotaxy);
+  const pedicelLenMm = Number(state.pedicelLength);
+  const perNode = phyllo === 'opposite' ? 2 : phyllo === 'whorled' ? 3 : 1;
+
+  /* THE PEDICEL'S RADIUS IS DERIVED BY THE AREA RULE AND IS NOT A CONTROL.
+     `r_parent^2 = SUM r_child^2` is this project's own junction law and the
+     discovery's Q10 names this exact application as "the number to design
+     against, not a control": a rachis feeding N pedicels wants `r*sqrt(N)`, so
+     read downward a pedicel is `r_rachis / sqrt(N)`. FLOORED at the stem
+     control's own minimum radius, because every rod here is bounded below by
+     the same print floor and no taper below it is possible — Q10's "a panicle
+     prints as a uniform 3 mm scaffold", arriving as a clamp that is TOLD
+     rather than as a slider nobody could set correctly. On the shipping 6 mm
+     rachis the floor binds from five florets up; at two it is 4.24 mm.
+     IT READS THE **ASKED** COUNT, NEVER THE BUILT ONE, AND THAT IS WHAT
+     BREAKS A FIXED POINT RATHER THAN A CONVENIENCE. The pitch floor below is
+     `2 * pedicelR`, so a radius derived from the count the floor produces is
+     count -> radius -> floor -> count: a metric consumed as a geometric input
+     becomes a target (the `headRise` ruling, and session 32's per-state ladder
+     gate withdrawn for exactly this — a measure fed back into the thing it
+     measures measures its own fixed point). The asked count is also the
+     CONSERVATIVE direction: fewer built than asked means thinner pedicels off
+     the same rachis, never thicker, so the area rule is never overspent. ID2
+     rebuilds it from the CONTROLS for the same reason. */
+  const total = Math.max(1, nodesAsked * perNode);
+  const areaRuleR = stem.outerR / Math.sqrt(total);
+  const pedicelRFloor = STEM_DIAMETER_RANGE[0] / 2;
+  const pedicelR = Math.max(pedicelRFloor, areaRuleR);
+  const pedicelRClamped = areaRuleR < pedicelRFloor;
+
+  /* THE INSET IS DERIVED FROM THE PEDICEL, NOT FROM THE STEM — the leaf's own
+     ruling and its own law, for the reason the leaf measured (the flower's
+     stem-fraction inset fouled the head on 30 of 30 sampled states, because
+     the inset scales with the STEM while the rise scales with what hangs off
+     it). CLAMPED AND TOLD, both directions, and `insetSatisfied` is the
+     biconditional ID1 asserts against rather than asserting clearance outright
+     — a floret through the head is legal geometry (overlapping closed shells)
+     and an aesthetic fact, not an invariant violation. */
+  const rise = pedicelLenMm * Math.sin((angleDeg * Math.PI) / 180);
+  const insetAskedMm = LEAF_NODE_TOP * stem.lengthMm;
+  const insetNeededMm = Math.max(0, rise);
+  const insetMm = Math.max(insetAskedMm, insetNeededMm);
+  const insetClamped = insetNeededMm > insetAskedMm;
+  const insetSatisfied = insetNeededMm <= LEAF_NODE_BOTTOM * stem.lengthMm;
+  /* THE PITCH FLOOR IS TWO PEDICEL RADII — the leaf's own rule with the
+     pedicel's own radius, so adjacent pedicels cannot merge. The COUNT is what
+     gives when the span is short: clamped, told, never refused. */
+  const nodeDepthsMm = leafNodeDepthsMm(nodesAsked, stem.lengthMm, insetMm, 2 * pedicelR);
+  const nodesClamped = nodeDepthsMm.length < nodesAsked;
+  const azimuths = nodeDepthsMm.map((_, i) => leafAzimuths(phyllo, i));
+
+  /* THE ROOT RADIUS IS THE WALL'S MID-THICKNESS — the leaf's Phase A ruling,
+     and it is load-bearing rather than tidy: a rod rooted ON THE AXIS detaches
+     above about 75 degrees because its escape length runs away as
+     `outerR / cos(th)`, while a rod rooted at mid-thickness gets MORE embedded
+     as the angle steepens. Measured there, reused here unchanged. */
+  const rootR = rodWallRootMm(stem);
+  const embedMm = rodWallEmbedMm(stem);
+
+  /* THE FLORET'S OWN PETAL SIZE — a MULTIPLIER on the head's two, clamped into
+     each base control's OWN range and TOLD (the `labellumSize` precedent:
+     "SIZE x SATURATES, AND IT IS TOLD"). Size comes from PARAMETERS and never
+     from the matrix (ruling 3); `MeshBuilder.appendTransformed`'s own header
+     says why that is a contract rather than a preference. */
+  const scale = Number(state.floretScale);
+  const lengthAsked = Number(state.petalLength) * scale;
+  const widthAsked = Number(state.petalWidth) * scale;
+  /* THE CLAMP READS `OVERRIDE_BOUNDS`, which is already the ONE OWNER of "the
+     base control's own range" for exactly this multiplication — `labellumSize`
+     and the nine per-petal `Size` rows are `mul` laws on these two bases, and
+     that table's load-time guard refuses one base declaring two ranges. A pair
+     of new constants here would be a second owner of the petal's range in the
+     file that states the registration rule. */
+  const LB = OVERRIDE_BOUNDS.get('petalLength'), WB = OVERRIDE_BOUNDS.get('petalWidth');
+  const petalLength = clamp(lengthAsked, LB.min, LB.max);
+  const petalWidth = clamp(widthAsked, WB.min, WB.max);
+  const sizeClamped = petalLength !== lengthAsked || petalWidth !== widthAsked;
+  /* THE DEAD TRAVEL IS A NUMBER THE READ-OUT PRINTS, AND THE RANGE IS NOT
+     NARROWED — `stamenSpread`'s ruling, and the floor binds on a HEAD-SIZED
+     head: at the shipping 35 x 16 mm petal the length stops moving below
+     0.571x and the width below 0.500x, so a third of this slider's travel
+     draws one floret. No static range is dead-free (the releasing scale is a
+     property of the HEAD's own two sliders, not of this one) and an adaptive
+     minimum would make one slider position mean different shapes on different
+     heads. The dead stretch is at the BOTTOM, so NO HATCH IS DRAWN — the
+     carnation terminal's own ruling, where `applyCaps` marks travel ABOVE a
+     cap and a low-end mark would hatch most of the track. Only the FLOOR can
+     bind: the scale is capped at 1.00 and the head's own two values are
+     already inside their ranges, so the ceiling is unreachable by
+     construction. ID4 asserts the biconditional in both directions. */
+  const sizeDeadBelow = Math.max(
+    Number(state.petalLength) > 0 ? LB.min / Number(state.petalLength) : 0,
+    Number(state.petalWidth) > 0 ? WB.min / Number(state.petalWidth) : 0);
+
+  const crossesSolidMm = rodWallCrossingMm({ boreR: stem.boreR, outerR: stem.outerR, rootR },
+    (angleDeg * Math.PI) / 180, pedicelLenMm, embedMm);
+
+  return {
+    present: true, type, phyllotaxy: phyllo, perNode,
+    nodes: nodeDepthsMm.length, nodesAsked, nodesBuilt: nodeDepthsMm.length, nodesClamped,
+    nodeDepthsMm, azimuths, angleDeg, pedicelLenMm, pedicelR, pedicelRClamped, areaRuleR, pedicelRFloor,
+    rootR, embedMm, crossesSolidMm,
+    insetAskedMm, insetNeededMm, insetMm, insetClamped, insetSatisfied,
+    boreR: stem.boreR, outerR: stem.outerR, rootZ: stem.rootZ, stemTipZ: stem.tipZ, rachisLengthMm: stem.lengthMm,
+    floretPetals: Math.round(Number(state.floretPetals)), scale,
+    petalLength, petalWidth, lengthAsked, widthAsked, sizeClamped, sizeDeadBelow,
+    built: azimuths.reduce((n, a) => n + a.length, 0),
+  };
+}
+
+/* floretState — THE FLORET'S OWN STATE, and the six overrides are the whole
+   of it. Everything not named here is INHERITED, which is ruling 10 ("all
+   flowers share the head's controls") stated as code rather than as prose.
+
+   TWO OF THE SIX ARE THE RECURSION CAP AND ARE NOT CONTROLS. `inflorescence:
+   NONE` is what makes the depth exactly one — the flower's `buildBudInto`
+   forces its own bud to 'none' for the same reason, and a compound level is
+   ruling 5's explicit out-of-scope. `leafLength: 0` is out-of-scope of a
+   different kind: a leaf at a pedicel's node is a BRACT (row 13 of the
+   discovery's parameter table), and inheriting would hang the whole plant's
+   leaves off every pedicel.
+
+   `stemLength` AND `stemDiameter` ARE THE PEDICEL. The floret's own stem IS
+   its pedicel — see this block's header — so the two stem controls are where
+   the pedicel's two numbers go, and every clause ST0-ST11 already holds about
+   them. `stemDiameter` is the DERIVED area-rule radius doubled, never a
+   control. */
+export function floretState(state, plan) {
+  return {
+    ...state,
+    inflorescence: 'NONE',
+    leafLength: 0,
+    petalCount: plan.floretPetals,
+    petalLength: plan.petalLength,
+    petalWidth: plan.petalWidth,
+    stemLength: plan.pedicelLenMm,
+    stemDiameter: 2 * plan.pedicelR,
+  };
+}
+
+/* THE PLACEMENT MATRIX for one floret — a 3x4 RIGID transform, row-major.
+
+   WHERE THE UNIT GOES. The unit is built at the origin with its head at
+   z ~ 0 and its pedicel hanging down `-z` to the stem's own `tipZ`. The
+   pedicel's TIP has to land embedded in the rachis wall, at the node's depth
+   and azimuth; the head then stands `|tipZ|` mm along the pedicel's direction
+   from there. So: rotate the unit's `+z` onto the pedicel's direction `D`,
+   then translate so the local tip point `[0, 0, tipZ]` lands on the embedded
+   root point.
+
+   THE ROTATION IS PARAMETERISED BY THE ANGLE, NOT BY A CROSS PRODUCT, and
+   that is session 26's measured lesson rather than a style choice: at `phi`
+   exactly 0 `Math.cos(0)` is exactly 1 and `1 - cos(0)` exactly 0, so
+   Rodrigues returns the IDENTITY term for term whatever axis it is handed,
+   and no guard and no epsilon is needed at the one place the axis degenerates.
+   The fallback axis is taken on an EXACT zero (`|z x D| === 0`), never on a
+   threshold — a threshold there would be a discrete decision on a continuous
+   quantity, which this project has now refused six times.
+
+   THE ROLL ABOUT THE PEDICEL IS THE MINIMAL ONE, DERIVED, AND WILL NEVER BE A
+   CONTROL. A roll of a radially-symmetric head is an invisible rigid rotation,
+   and a control for one is `layerPhase`'s recorded trap — a slider that moves
+   nothing on the shipping bloom and moves a zygomorphic one under a label
+   naming something else. The minimal rotation (about `z x D`) is the one
+   answer that needs no second number. At `D = -z` — unreachable through
+   `PEDICEL_ANGLE_RANGE`, whose floor is -60 — the minimal rotation is not
+   unique and the fallback picks the half-turn about `+x`; said rather than
+   hidden. */
+export function pedicelPlacement(plan, nodeIndex, az, tipZLocal) {
+  const th = (plan.angleDeg * Math.PI) / 180;
+  const R = [Math.cos(az), Math.sin(az), 0];
+  const D = [R[0] * Math.cos(th), R[1] * Math.cos(th), Math.sin(th)];
+  const z = plan.rootZ - plan.nodeDepthsMm[nodeIndex];
+  const base = [plan.rootR * R[0], plan.rootR * R[1], z];
+  /* The pedicel's tip sits `embedMm` INSIDE the wall along `-D`, which is
+     where the leaf's own petiole ring starts (`pring(-plan.embedMm)`). */
+  const root = [base[0] - D[0] * plan.embedMm, base[1] - D[1] * plan.embedMm, base[2] - D[2] * plan.embedMm];
+  const kx = -D[1], ky = D[0], kz = 0;                 // z x D
+  const kl = Math.hypot(kx, ky, kz);
+  const k = kl === 0 ? [1, 0, 0] : [kx / kl, ky / kl, kz / kl];
+  const phi = Math.acos(clamp(D[2], -1, 1));
+  const c = Math.cos(phi), s = Math.sin(phi), v = 1 - c;
+  /* Rodrigues, written out so the identity at phi = 0 is visible. */
+  const r = [
+    c + k[0] * k[0] * v, k[0] * k[1] * v - k[2] * s, k[0] * k[2] * v + k[1] * s,
+    k[1] * k[0] * v + k[2] * s, c + k[1] * k[1] * v, k[1] * k[2] * v - k[0] * s,
+    k[2] * k[0] * v - k[1] * s, k[2] * k[1] * v + k[0] * s, c + k[2] * k[2] * v,
+  ];
+  /* t = root - Rot * [0, 0, tipZLocal] */
+  const tx = root[0] - r[2] * tipZLocal, ty = root[1] - r[5] * tipZLocal, tz = root[2] - r[8] * tipZLocal;
+  return { M: [r[0], r[1], r[2], tx, r[3], r[4], r[5], ty, r[6], r[7], r[8], tz], D, root, base, phi, axis: k, az, nodeIndex };
+}
+
+/* buildInflorescenceInto — the ONE new orchestrator, and it emits nothing of
+   its own: it builds the floret unit ONCE at the origin through the shipped
+   `buildBloomInto` and appends that one stream under N rigid transforms.
+
+   ONE BUILD, N APPENDS, and that is ruling 5's "identical florets" cashed as
+   a cost rather than only as a look: build time is O(1) in the node count,
+   not O(N). Per-node deltas (ruling 10's second half) are a later session and
+   would make this a build per distinct state, which is why the loop is
+   written over PLACEMENTS rather than over states.
+
+   IT IS APPENDED LAST, after the sepals, so a bloom without an inflorescence
+   has a stream that is a PREFIX of the same bloom with one — the sepal
+   session's own construction, and what lets the byte partition state its
+   claim as "prefix plus a tail of exactly the declared instances". */
+export function buildInflorescenceInto(acc, state, plan) {
+  if (!plan.present) return null;
+  const tris0 = acc.triangleCount;
+  const sub = new MeshBuilder({ exportMode: acc.exportMode });
+  const fs = floretState(state, plan);
+  const unit = buildBloomInto(sub, fs, { below: null });
+  const unitTris = sub.triangleCount;
+  const tipZLocal = unit.stem && unit.stem.present ? unit.stem.tipZ : 0;
+  const placed = [];
+  /* THE PLACEMENT RESIDUAL — the ONLY witness for `appendTransformed`, and it
+     is a SECOND EXPRESSION for the same arithmetic on purpose.
+
+     WHY IT EXISTS AT ALL. Both STL gates are blind to where a placed head
+     stands: a raceme whose every floret landed at the origin is one closed
+     watertight solid with the identical triangle count and the identical STL
+     byte length, and the flood fill reads N heads piled on the rachis as ONE
+     piece more readily than as the right ones. Nothing else in this project
+     measures a rigid transform. ID5 is the clause and this is its measured
+     side.
+
+     WHY IT IS NOT VACUOUS. The loop below re-derives each emitted float from
+     the SOURCE stream and the declared matrix, written out here rather than
+     by calling the method under test — so a mutation of `appendTransformed`
+     (a row/column swap, a dropped offset, a skipped triangle) moves one side
+     and not the other. It is the seam gate's "restate the one-line law"
+     applied to twelve numbers, and the mutant table is what says so rather
+     than this paragraph.
+
+     THE CLAIM IS AN EXACT ZERO, never a tolerance: both sides are the SAME
+     three multiply-adds on the same doubles in the same order, so any
+     difference at all is an arithmetic difference and not a rounding one.
+
+     COST: one extra pass over the appended stream, 9 multiply-adds a vertex
+     against the push loop's 9 — so about double a method that is a few
+     percent of a build. Measured in the outcome doc rather than estimated. */
+  let residual = 0, compared = 0;
+  /* THE RACHIS, read from the PLAN (which read it from `stemPlan`), and the
+     ROD test written once here so the builder and ST9 ask the same question
+     of the same population. `pl.root` is where this pedicel meets the wall
+     and `pl.D` its direction, but the SEGMENT used is the one the floret
+     BUILDER emitted, carried through this placement — never re-derived from
+     the plan's length and angle, which is session 43's ST2. */
+  let rachisApproach = Infinity;
+  /* THE DISTANCE IS `freeStemDistanceMm`'s, NOT A SECOND COPY OF IT. The
+     first cut wrote `hypot(max(0, r - outerR), max(0, tipZ - z, z - rootZ))`
+     out again here — which is that function term for term, i.e. exactly the
+     duplicate-expression defect `rodWallRootMm` had just been extracted to
+     fix, in the same file on the same day. Found by reading the diff against
+     the combination gate's own `leaf-stem` measure, which calls the owner.
+     The plan carries `stemTipZ` so this needs no third derivation of where
+     the rachis ends. */
+  const rachis = { outerR: plan.outerR, rootZ: plan.rootZ, tipZ: plan.stemTipZ };
+  const onPedicelRod = (x, y, z, pl) => {
+    const a = pl.axis3;
+    if (!a) return false;
+    const ax = a.outer[0] - a.inner[0], ay = a.outer[1] - a.inner[1], az = a.outer[2] - a.inner[2];
+    const L2 = ax * ax + ay * ay + az * az;
+    let t = L2 > 0 ? ((x - a.inner[0]) * ax + (y - a.inner[1]) * ay + (z - a.inner[2]) * az) / L2 : 0;
+    t = t < 0 ? 0 : t > 1 ? 1 : t;
+    return Math.hypot(x - (a.inner[0] + ax * t), y - (a.inner[1] + ay * t), z - (a.inner[2] + az * t)) <= a.radiusMm + 1e-3;
+  };
+  for (let i = 0; i < plan.nodes; i++) {
+    for (const az of plan.azimuths[i]) {
+      const pl = pedicelPlacement(plan, i, az, tipZLocal);
+      /* THE PEDICEL'S OWN AXIS IN WORLD SPACE, from the floret BUILDER's own
+         emitted rod ends through THIS placement's matrix — computed once, so
+         the flag below and ST9's excusal read one segment rather than two. */
+      {
+        const sb = unit.stemBuilt;
+        const at3 = (z) => [pl.M[2] * z + pl.M[3], pl.M[6] * z + pl.M[7], pl.M[10] * z + pl.M[11]];
+        pl.axis3 = sb && Number.isFinite(sb.emittedTopZ) && Number.isFinite(sb.emittedTipZ) && sb.emittedMaxR > 0
+          ? { inner: at3(sb.emittedTopZ), outer: at3(sb.emittedTipZ), radiusMm: sb.emittedMaxR }
+          : null;
+      }
+      const at = acc.positions.length;
+      const n = acc.appendTransformed(sub, pl.M);
+      const M = pl.M, src = sub.positions;
+      for (let k = 0; k < src.length; k += 3) {
+        const x = src[k], y = src[k + 1], z = src[k + 2];
+        const dx = acc.positions[at + k] - (M[0] * x + M[1] * y + M[2] * z + M[3]);
+        const dy = acc.positions[at + k + 1] - (M[4] * x + M[5] * y + M[6] * z + M[7]);
+        const dz = acc.positions[at + k + 2] - (M[8] * x + M[9] * y + M[10] * z + M[11]);
+        if (Math.abs(dx) > residual) residual = Math.abs(dx);
+        if (Math.abs(dy) > residual) residual = Math.abs(dy);
+        if (Math.abs(dz) > residual) residual = Math.abs(dz);
+        compared += 3;
+        /* THE FLORET AGAINST ITS OWN RACHIS — a FLAG with a number, measured
+           in the pass that is already walking every appended float, never a
+           second sweep. It is the nearest approach of any floret vertex that
+           is NOT on its own pedicel rod to the free rachis's solid, which is
+           the quantity ST9 would otherwise attribute to the stem channel and
+           cannot tell from a head petal driven into it.
+
+           IT IS A FLAG AND NOT A BAR, on the CROWDING ruling's own grounds
+           (Eva, Sep 3): two parts of one solid fusing is OVER-connection, it
+           adds no boundary edge and splits no flood fill, and in a raceme the
+           florets belong to the rachis anyway. Measured on the SPHERE row it
+           reads 0.8234 mm in export at the shipped 35 deg and goes to exact
+           contact at +-60 and beyond; on a CAP head the same state reads
+           8.2475 mm, because a sphere floret's petals radiate back toward the
+           rachis and a cap's do not. Reported, not clamped — the range Eva
+           ruled stays reachable. */
+        const X = acc.positions[at + k], Y = acc.positions[at + k + 1], Z = acc.positions[at + k + 2];
+        if (!onPedicelRod(X, Y, Z, pl)) {
+          const dd = freeStemDistanceMm(rachis, X, Y, Z);
+          if (dd < rachisApproach) rachisApproach = dd;
+        }
+      }
+      /* THE PEDICEL'S OWN AXIS, IN WORLD SPACE — ST9's excusal, and it is the
+         PETIOLE'S rule with the pedicel's own rod rather than a second one.
+         A pedicel is rooted THROUGH the rachis wall by design (ID2 asserts it
+         crosses solid, and a clearance criterion means nothing between two
+         solids that are fused), so it stands inside the free stem's own
+         cylinder and reads distance 0 from it. Without this ST9 cannot tell a
+         pedicel from the petal it exists to doubt, and the answer is to NAME
+         the rod rather than to widen the region — the fifth durable rule, and
+         the leaves' own measured precedent one part later. MEASURED RED
+         first: 1554 vertices on `INFLO: x a SPHERE head`.
+
+         THE ENDS AND THE RADIUS ARE THE FLORET BUILDER'S OWN EMITTED ONES
+         (`emittedTopZ` / `emittedTipZ` / `emittedMaxR`, which session 43 added
+         to `stemBuilt` for exactly ST2's reason), carried through THIS
+         placement's own matrix. Re-deriving the segment from the plan's
+         `pedicelLenMm` and `angleDeg` would be a second producer of where the
+         rod is, and a rod emitted somewhere other than where the plan says is
+         the defect the naming exists to keep visible. */
+      placed.push({ nodeIndex: i, az, M: pl.M, D: pl.D, root: pl.root, tris: n, at,
+        headAt: [pl.M[3], pl.M[7], pl.M[11]], pedicelAxis: pl.axis3 });
+    }
+  }
+  return {
+    present: true, unitTris, tipZLocal, count: placed.length, placed,
+    tris: acc.triangleCount - tris0, placementResidual: residual, placementCompared: compared,
+    /* THE FLAG: how near any floret's own body (never its pedicel rod) comes
+       to the free rachis. Infinity where nothing was appended. */
+    rachisApproachMm: Number.isFinite(rachisApproach) ? rachisApproach : null,
+    /* THE UNIT'S OWN RECORD — the floret is a whole bloom and this is the
+       record `buildBloomInto` returned for it, so every question the harness
+       asks about a head can be asked about the floret through its own owner
+       rather than through a second description of it. `positions` is the
+       SOURCE stream ID5 compares each placed block against. */
+    /* THE FLORET'S OWN STEM CHANNEL. A floret IS a bloom and its pedicel IS
+       its stem, so on a SPHERE floret the omission mask fires inside the
+       floret exactly as it fires on a head — measured, `x a SPHERE head`
+       builds 4 petals of 5 asked. Carried here because ID4 predicts the
+       floret's petal count and an instrument that never asks whether a slot
+       was built is the class the sphere-stem session named; it reads
+       `stemOmission()`'s own record, which is not this plan's. */
+    unit: { petalsBuilt: unit.petalsBuilt, hub: unit.hub, stem: unit.stem, stemBuilt: unit.stemBuilt,
+      ring: unit.ring, maxDimensionMm: sub.maxDimensionMm, minThickness: sub.minThickness,
+      sphereMode: unit.foot.sphereMode === true,
+      omissionAsked: unit.stemOmission ? unit.stemOmission.asked : null,
+      omissionBuilt: unit.stemOmission ? unit.stemOmission.built : null,
+      omitted: unit.stemOmission ? unit.stemOmission.omitted.slice() : null },
+    unitPositions: sub.positions,
+    /* THE STATE THE FLORET WAS ACTUALLY BUILT FROM — six keys, the ones
+       `floretState` overrides. ID4 compares these against the plan and the
+       page's own read-back, which is an owner this record does not write. */
+    floretState: { inflorescence: fs.inflorescence, leafLength: fs.leafLength, petalCount: fs.petalCount,
+      petalLength: fs.petalLength, petalWidth: fs.petalWidth, stemLength: fs.stemLength, stemDiameter: fs.stemDiameter },
+  };
+}
+
+/* ===================================================================
    THE ATTACHMENT HEIGHT (Eva's ruling, sepals part 1, second round): the
    sepals attach PARTWAY DOWN THE HUB, not at its rim — a little below the
    petals rather than tucked under them. `sepalHeight` is a FRACTION ALONG
@@ -10202,6 +10767,12 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      arise (no stem, or not a sphere), and every consumer branches on that
      rather than on a passing 0. */
   const stemPlanned = stemPlan(state, fr.hub, acc);
+  /* THE INFLORESCENCE'S PLAN, asked beside the stem's because the RACHIS is
+     the stem and every length this needs is the stem plan's. It EMITS NOTHING
+     here — `buildInflorescenceInto` runs after the sepals, last — so no byte
+     moves by asking early, and the read-out can name the florets even on a
+     row whose geometry is absent. */
+  const infloPlanned = inflorescencePlan(state, stemPlanned, acc);
   const omission = stemOmission(state, fr, capability, stemPlanned);
   /* THE PETALS' LAMINAE ARE CAPTURED WHEN A SEPAL WHORL IS ASKED FOR — the
      sepal angle limit is drawn against the petals the builder emits, and the
@@ -10365,6 +10936,13 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      stream of a bloom without them is a prefix of the stream with them.
      Null by branch at sepalCount 0 and under SPHERE. */
   const sepalsBuilt = buildSepalsInto(acc, state, fr, sites, stemPlanned, capability);
+  /* THE INFLORESCENCE (this session) — N copies of ONE floret unit, each a
+     whole bloom with its own pedicel built at the origin by this very
+     function, appended under a rigid transform. EMITTED LAST, after the
+     sepals, so the stream of a bloom without an inflorescence is a PREFIX of
+     the stream with one. Null by branch at type NONE and where there is no
+     rachis to hang it on. */
+  const inflorescenceBuilt = buildInflorescenceInto(acc, state, infloPlanned);
   /* THE FILAMENT-AGAINST-STYLE FLAG (session 23; B2b's family, built on
      Eva's ruling of Sep 6 on the ±180 curl range: the crossing is not a
      property of the range's ends, so what closes the question is an
@@ -10430,7 +11008,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      WITH NO PETAL AT ALL (the bare corner, where the stem takes every one) both
      stay at descriptor 0 and `petal` is null, which is the truth. */
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
-  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt,
+  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
        so `tools/bloom-sepal-contact.mjs` can draw the same petals densely
