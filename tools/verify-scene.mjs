@@ -2814,7 +2814,29 @@ async function partTwo(browser, mutant, shotsDir) {
         // ON THE POND'S CLOCK: what this needs is rings that have MOVED between
         // samples, and how much pond a wall-clock wait covers depends on how
         // fast the machine is.
-        for (let t = 0; t < 34; t++) {
+        //
+        // WIDENED 34 -> 300 (3.4s -> 30s OF POND TIME), AND THE SCENE MOVED
+        // UNDER IT RATHER THAN THE CHECK BEING WRONG. Idle rain's own rate,
+        // life and reach were all tuned DOWN together (see koi-rain.js and
+        // koi-ripples.js), which is exactly the density this check watches
+        // for: at 34 frames, on the SAME PLAIN TREE with no mutation at all,
+        // it read `nothing was sweeping them` — literally 0.000 variance on
+        // 2-3 of 5 open-water patches — in 3 of 4 runs, because a several-
+        // second window no longer reliably catches a ripple's front crossing
+        // every small sampled disc at the new, sparser field. FOUR CLEAN
+        // ISOLATED RUNS IS NOT THE BAR — the negative-control SWEEP is: at
+        // 100 frames the full 39-mutant sweep still read this check as
+        // unclaimed collateral on several unrelated mutants, and at 160 it
+        // still did on SEVEN, spanning the click ramp, the wind, koi entry,
+        // plane stacking and the pad's own cause/rock checks — none of them
+        // touching rain — because a ~40-execution sweep is a much harder bar
+        // than a handful of isolated runs happening to land clean. 300 is
+        // where the full sweep first came back 39/39 with nothing unclaimed.
+        // The BAR itself is untouched — 0.35 is still a real statement about
+        // visible motion, not loosened to match a quieter pond — only the
+        // TIME given to observe it grew, because that is the thing the
+        // density drop actually cost.
+        for (let t = 0; t < 300; t++) {
           const means = await page.evaluate(`(${DISC_MEANS})(${JSON.stringify(discs)}, ${rx}, ${ry})`);
           if (means && means.every(m => m !== null)) means.forEach((m, k) => series[k].push(m));
           await waitSceneSeconds(page, 0.10);
