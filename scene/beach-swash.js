@@ -54,10 +54,11 @@
 // continuation of. `WAVE_FIELDS` plus these is the whole record, and the claim
 // the two lists make together is the one this file already made about energy:
 // there is no `energy` field in either.
-export const SWASH_FIELDS = ['life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];
+export const SWASH_FIELDS = ['life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'scallop', 'peaked'];
 
 import { WATERLINE_S, RUNUP_NOMINAL, RUNUP_MAX, SAMPLES } from './beach-shore.js';
 import { makeWave } from './beach-wave.js';
+import { rng, lobeParams, lobesFrom } from './beach-brush.js';
 
 // --- TIMING -----------------------------------------------------------------
 // MEASURED, from the brief's own reading of the two clean drains in the
@@ -160,10 +161,28 @@ export const SAT_ALPHA = 0.14;       // per wave — a horizon of about 5.5 wave
 //   quiet     6.40   6.40   3.44   0.00   0.00   overruns per minute
 //   w/ sets   5.68   4.28   3.52   3.24   3.00
 //
-// 0.12 is where the two populations separate: nothing at all on a quiet beach,
-// and the set-driven rate barely touched. Below it the event fires as often
-// without a set as with one, which is the definition of no signal.
-export const OVERRUN_MARGIN_S = 0.12;
+// 0.12 was where the two populations separated: nothing at all on a quiet
+// beach, and the set-driven rate barely touched. Below it the event fires as
+// often without a set as with one, which is the definition of no signal.
+//
+// RE-DERIVED WHEN THE FRONT'S SHAPE CHANGED, and it had to be: this is a
+// MEASURED separation between two populations, and the quantity it separates
+// them by — how far the furthest point of a wave gets past the standing mark —
+// moved when the drawing's scallops became the published edge (see makeScallop
+// below). The same sweep, the same five seeds and five minutes each, on the
+// front as it is now:
+//
+//   margin   0.035  0.060  0.090  0.120  0.150  0.180
+//   quiet    12.32  12.32   7.24   0.36   0.00   0.00   overruns per minute
+//   w/ sets   8.24   5.60   3.48   3.04   2.80   2.64
+//
+// 0.150 reads exactly what 0.120 used to: nothing on a quiet beach, and the
+// set-driven rate down 8% (3.04 -> 2.80). Holding 0.120 would have left the
+// event firing about once every three and a half minutes with no input at all,
+// which is the no-signal state this constant exists to avoid — and the only
+// other lever was to make the drawn scallops shallower than the drawing draws
+// them, which is tuning a picture to satisfy a simulation constant.
+export const OVERRUN_MARGIN_S = 0.150;
 
 const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
 const smooth = (v) => v * v * (3 - 2 * v);
@@ -218,6 +237,47 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     return w;
   }
 
+  // THE SCALLOPS, AND THE POINT IS WHOSE THEY ARE. A drawn foam edge and a
+  // published swash edge that are generated separately WILL diverge, and the
+  // failure is not cosmetic: a bird stands where `swashYAt(x)` says the water
+  // is, and a mark is erased where it says the water reached. So the union of
+  // half-discs every cartoon foam line has is drawn HERE, from the wave's own
+  // seed, once, and it is `edgeAtU` that carries it to the renderer. The
+  // renderer generates nothing.
+  //
+  // `lobeParams` and `lobesFrom` are beach-brush.js's own — imported rather
+  // than reimplemented, so there is one answer to what a scallop is, and the
+  // parameters are fractions of the width so a stored set survives a resize.
+  // The counts, the radii and the squash are the drawing's, unchanged.
+  //
+  // IT IS ZERO-MEANED, and that is what keeps `runup` meaning the wave's reach.
+  // A union of half-discs is one-sided — it only ever pushes the edge further
+  // up the beach — so folded in raw it would add half its own depth to every
+  // wave's reach and quietly move the saturated level, the overrun margin and
+  // the high-water mark with it. Subtracting its mean changes no shape at all:
+  // it is a constant offset on a curve.
+  //
+  // AND THE DEPTH IS IN FRAME HEIGHTS, WHICH THE DRAWING'S WAS NOT. The
+  // module's lobe radii are fractions of the WIDTH and its depth falls out of
+  // them, so the scallops it drew were a third deeper on a 16:9 frame than on a
+  // 4:3 one. The simulation has no canvas and cannot have an aspect, so the
+  // conversion is fixed here at the aspect two of the three frames the drawing
+  // was verified at actually are.
+  const SCALLOP_ASPECT = 16 / 9;
+  function makeScallop(seed) {
+    const r = rng(seed);
+    const us = new Array(samples);
+    for (let i = 0; i < samples; i++) us[i] = i / (samples - 1);
+    const a = lobesFrom(us, lobeParams(r, 11, 0.025, 0.069), 1, null, 0.32);
+    const b = lobesFrom(us, lobeParams(r, 26, 0.008, 0.025), 1, null, 0.5);
+    const f = new Float64Array(samples);
+    let mean = 0;
+    for (let i = 0; i < samples; i++) { f[i] = (a[i] + b[i]) * SCALLOP_ASPECT; mean += f[i]; }
+    mean /= samples;
+    for (let i = 0; i < samples; i++) f[i] -= mean;
+    return f;
+  }
+
   // THE ONE PLACE SET ENERGY IS READ. Everything the energy decides about a
   // wave is decided here and frozen into the record.
   function spawn(energy) {
@@ -236,6 +296,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     w.holdS = HOLD_S * rand.range(0.6, 1.5);
     w.retreatS = RETREAT_S * rand.range(0.85, 1.18);
     w.wob = makeWob();
+    w.scallop = makeScallop(w.seed);
     w.peaked = false;
     w.life = w.preS + w.advanceS + w.holdS + w.retreatS;
     waves.push(w);
@@ -248,13 +309,29 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
   // is untouched by the wave arriving earlier — it simply starts later.
   const swashAge = (w) => w.age - w.preS;
 
-  const WOB_S = 0.020;   // how deep the scallops on a front run, in frame heights
+  // HOW FAR A FRONT WANDERS, in frame heights — and it is no longer how deep
+  // the SCALLOPS run, which is what it used to be and what its old value of
+  // 0.020 was set for. The scallops are the drawing's now (see makeScallop
+  // above) and this is only the long wander beneath them, so its value is the
+  // drawing's own wander, read off it rather than kept: beach-brush.js wanders
+  // its front with `bumps(..., 0.007 * H, 3, ...)`, whose three harmonics sum
+  // to 0.007 * (1/1.5 + 1/2.5 + 1/3.5) = 0.00947 of a frame height at their
+  // peak, and `wob` below is two sines whose amplitudes sum to at most 1.5.
+  //
+  // MEASURED, five seeds x five minutes, because it moves an event the brief
+  // calls settled. Holding 0.020 and adding the scallops puts the live front's
+  // peak-to-trough at 0.0496 against the drawing's own 0.0344 — a third deeper
+  // than the picture that was verified — and takes the OVERRUN rate on a QUIET
+  // beach from 0.04 to 1.96 a minute, against 3.16 with sets running: the two
+  // populations OVERRUN_MARGIN_S was set to separate stop being separated. At
+  // the derived value the front reads 0.0344 and the quiet rate is 0.28.
+  const WOB_S = 0.00631;
 
   function extentOf(w, i) {
     const env = swashEnv(swashAge(w), w.advanceS, w.holdS, w.retreatS);
     if (env <= 0) return WATERLINE_S;
     const reach = (w.runup - WATERLINE_S) * env;
-    return WATERLINE_S + reach + WOB_S * w.wob[i] * env;
+    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i]) * env;
   }
 
   const sw = {

@@ -1,5 +1,16 @@
 # Scene 3 — the wave as an object
 
+> **THE DRAWING THIS DOCUMENT WAS MEASURED ON NO LONGER EXISTS.** The halftone
+> lattice in `scene/beach-draw.js` was replaced wholesale, inside this same
+> unmerged PR, by `scene/beach-brush.js` — see `docs/beach-drawing-layer.md`.
+> What stays is everything below about the SIX STAGES and what the reference
+> footage says: the measurements, `tools/beach-reference.mjs`, and the model in
+> `beach-wave.js`. What is superseded is every figure expressed as a TONE or as
+> ink coverage, and the two contact-sheet images (`beach-wave-stages.png`,
+> `beach-wave-vs-reference.png`) which are pictures of that lattice. They are
+> kept because they are the evidence the stage model was ruled on, not because
+> they show what the scene draws.
+
 The merged scene (`71b73c1`) draws the water as a **tone field with a swash edge**.
 It has no wave in it: the break at the back of frame is one clause inside
 `waterTone` — a fixed dip whose depth and width scale with set energy — and the

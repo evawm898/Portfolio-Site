@@ -9,6 +9,20 @@
 // missing. `beach-swash.js` keeps the two-line model unchanged and is STAGE
 // SIX of what is described here.
 //
+// AND IT IS THE MODEL, NOT THE PICTURE. It shipped with a second half that
+// turned a wave into TONE for a halftone lattice — `waveToneAt`, `waveField`,
+// `swellDepthAt`, `faceCentreOf` and the five constants they pulled toward —
+// and the drawing layer that consumed them has been replaced wholesale by
+// beach-brush.js, which draws with fills and brush strokes and has no notion
+// of a tone at all. That half is RETIRED rather than left standing: the
+// measurements it was set from are in docs/beach-wave-object.md and in this
+// file's own reference block below, which is the record of what the footage
+// says; what is gone is the machinery for painting it as ink density. What
+// stays is what a wave IS — where it is, when each column of it breaks, how
+// wide its band runs, how long its face lasts and which of six stages it is
+// in — and `drawPhaseAt` is the one place that becomes a number the drawing
+// reads.
+//
 // IT HOLDS NO STATE. Every export is a function over a record and a position,
 // the way `swashEnv` is a function over a record and a clock — so the gate
 // drives every law in Node with no browser and no canvas, and a stage cannot
@@ -32,7 +46,9 @@
 //                0.09 frame heights a second.
 //   6 SWASH      beach-swash.js, unchanged.
 //
-// THE DARK FACE IS THE FINDING AND IT IS NOT "THE WATER UNDER THE FOAM".
+// THE DARK FACE IS THE FINDING AND IT IS NOT "THE WATER UNDER THE FOAM". (The
+// tone figures below are the FOOTAGE's, and they are kept because they are
+// measurements; the drawing that turned them into ink density is gone.)
 // Measured against the ambient water IMMEDIATELY SHOREWARD of it, it sits 11
 // to 46 levels BELOW it — darker than the sea around it — which in the
 // drawing's own tone units is +0.07 to +0.31 of tone. At its deepest it reads
@@ -54,22 +70,31 @@
 //
 // AND THERE IS NO `stage` FIELD FOR THE SAME REASON ONE LEVEL UP: a stored
 // stage is a second owner of something the geometry already says. `stageAt()`
-// reads the same `broken` the tone does, so a wave whose picture says COLLAPSE
-// cannot report FOAM BAND.
+// reads the same `broken` `drawPhaseAt` does, so a wave whose picture says
+// COLLAPSE cannot report FOAM BAND.
+import { FOAM_ONSET_B, rng, lobeParams, bubbleParams } from './beach-brush.js';
+
 export const WAVE_FIELDS = [
   // the clock and the travel
   'age', 'crest0', 'breakS', 'speedS', 'crestWob',
   // the break
   'breakAge', 'peelS', 'peelFrom', 'steepS',
   // what the energy sized, frozen at birth
-  'bandMax', 'bandFadeS', 'faceDepth', 'swellDepth', 'swellLeadS',
+  'bandMax', 'bandFadeS', 'swellLeadS', 'height',
+  // the wave's own stream, so every mark it makes is a property of WHICH wave
+  // this is and of nothing that was drawn before it, and the marks that stream
+  // was spent on — DRAWN ONCE, HERE, because a foam scallop re-drawn per frame
+  // boils and because the brush and the bubbles take a variable number off any
+  // stream they share
+  'seed', 'drawA', 'drawB', 'drawBubbles',
   // and the hand-over to stage six
   'preS',
 ];
 
 // --- STAGES ----------------------------------------------------------------
-// Names for regions of one law. `stageAt` NEVER decides geometry — the tone is
-// a continuous function of the same `broken` these boundaries are read off —
+// Names for regions of one law. `stageAt` NEVER decides geometry — the phase
+// the drawing reads is a continuous function of the same `broken` these
+// boundaries are read off —
 // so the labels are for the gate, the read-out and a reader, and moving one
 // cannot move a pixel. That is deliberate: the previous session's break was a
 // branch, and a branch is exactly what makes a wave pop into existence.
@@ -160,74 +185,51 @@ export const SWELL_LEAD_S = 2.4;
 // draws from a band that straddles them.
 export const PEEL_RANGE = [0.8, 1.9];
 
-// MEASURED as tone, which is the unit the drawing works in — AND AS AN
-// ABSOLUTE TARGET RATHER THAN AN OFFSET, which is a correction the first
-// mockup forced.
+// THE DRAWN HEIGHT OF A WAVE, IN FRAME HEIGHTS, AND THE RANGE'S ENDS ARE THE
+// DRAWING'S OWN TWO NUMBERS. beach-brush.js was written with two waves in it,
+// at 0.048 and 0.082, and generalising it to a list needs a law for a height
+// the module had no reason to have. These are those two numbers, become the
+// ends of the range the set energy picks from — the least invention available,
+// and it is the shape every other energy-sized field in this file already has.
+// PICKED, not measured: nothing in the reference measures a wave's height
+// against the size of the set that made it.
+export const HEIGHT = [0.048, 0.082];
+
+// Above this the drawing uses its heavier brush widths and its fuller bubble
+// count — the module's own `big` flag, which was a per-call boolean and is a
+// threshold on the range now.
+export const BIG_HEIGHT = (HEIGHT[0] + HEIGHT[1]) / 2;
+
+// --- THE BREAK PHASE THE DRAWING READS --------------------------------------
+// beach-brush.js parameterises a wave by ONE number per column: `b`, running 0
+// at the unbroken end to 1 at the spent end, off which its height envelope, its
+// curl, its foam width and its fade all hang. This is the map from this file's
+// clock to that number, and it lives HERE because `brokenAt` is this file's and
+// because a second owner of "has this column broken" is exactly what lets a
+// stage label and a picture disagree.
 //
-// The face was first written as an EXCESS over whatever the field already
-// said, because +0.07..+0.31 over the ambient water is how the reference
-// measurement reports it. Rendered, that is wrong wherever this drawing's
-// ambient differs from the footage's — and it does, by the §4 finding: the
-// water at the shore reads 5-9 levels darker in the reference than the shipped
-// ramp draws it. So a face built as an offset came out at tone 0.72 where the
-// reference's reads 0.81, and the strongest edge in the frame was not the
-// strongest edge in the drawing.
-//
-// The reference's face is an ABSOLUTE darkness: L 58-91 across both
-// recordings, wherever it happens to sit, which is tone 0.70-0.93 — AT ITS
-// DEEPEST IT IS THE DARKEST THING IN THE FRAME, below `TONE.deep`. The
-// +0.07..+0.31 contrast is then a CONSEQUENCE of the water it sits over, not
-// the law. The swell reads the same way: L 41-43 at its deepest, tone
-// 1.02-1.04, against the 0.90 of the same water before it arrives.
-//
-// So both are targets the field is pulled TOWARD, which is also why a swell in
-// water that is already at its darkest costs almost nothing and a face over
-// the pale water near the shore costs a great deal — exactly the asymmetry the
-// footage shows.
-//
-// ENERGY PICKS A POINT IN EACH BAND AT BIRTH AND NOTHING MOVES IT AFTER.
-// AND BOTH TARGETS SIT IN THE PART OF THE LADDER THAT STILL MOVES. The
-// shipped lattice's delivered coverage saturates at about tone 0.70 (the table
-// is in beach-draw.js beside TONE), so a target above 0.90 buys nothing a
-// target of 0.80 does not. `TONE.deep` came down to 0.60 in the same change;
-// these two are what spend the stretch that opened up.
-// AND THEY ARE SET THROUGH THE WHOLE CHAIN — REFERENCE LUMINANCE, TO THE INK
-// COVERAGE THAT DELIVERS IT, TO THE TONE THAT DELIVERS THAT — rather than by
-// reading a normalised darkness as if it were a tone. Those are two different
-// scales and mistaking one for the other is what put the first mockup's face
-// at L 24 where the reference's is 64. The drawing's ground is #f1ede6 (L 241)
-// and its ink #16181c (L 23), so
-//
-//     coverage = (241 - L) / 218,   and TONE -> coverage is the table
-//     in beach-draw.js measured through `__flatTone`.
-//
-// Run over the reference's own bands it re-derives the shipped ladder rather
-// than contradicting it, which is the check that the chain is right:
-//
-//   reference band            L        coverage    tone     shipped
-//   deep water, no wave       62         0.82      0.58      —
-//   deep water, swell in it   41         0.92      0.68      0.78 (deep)
-//   water beside a wave      100         0.65      0.52      —
-//   water at the shore       109-118     0.57      0.48      0.45 (shallow)
-//   THE DARK FACE             58-91      0.69-0.84 0.53-0.66 — nothing
-//   foam                     213-230     0.05-0.13 0.05      0.00 (foam)
-//
-// TWO THINGS FALL OUT AND BOTH ARE WORTH STATING. `TONE.deep` 0.70 is what
-// the chain asks for; and THE FACE IS NOT DRAMATICALLY DARK IN TONE — it sits
-// only 0.03 to 0.09 above the water beside it, and the 153-level crest-to-face
-// gap the reference measures is mostly the CREST being bare paper. A face
-// pushed to 0.90 is not more faithful, it is black.
-//
-// So the targets are a little above the reference's own, which is deliberate:
-// the drawing's water beside a wave sits at 0.575 where the footage's sits at
-// 0.52, so the same absolute tone would read as less of a step here.
-export const FACE_TONE = [0.62, 0.74];
-// The swell: the reference takes its deep water 0.58 -> 0.68 of tone. The
-// resting value this drawing can afford is 0.70 (see beach-draw.js), so the
-// swell's own travel is the stretch above that — AND IT IS THE WEAKEST OF THE
-// SIX STAGES IN THIS MEDIUM, said rather than hidden. The lattice saturates,
-// the alternative costs the sea's solidity, and the trade is Eva's.
-export const SWELL_TONE = [0.78, 0.86];
+// The anchor is the drawing's OWN foam onset, imported rather than restated:
+// the moment this file says a column has broken is the moment that drawing
+// first puts foam on it. Either side of it the scale is the record's own — the
+// swell's lead in, the band's growth plus its fade out — so nothing here is a
+// duration somebody chose.
+export function drawPhaseAt(w, u) {
+  const b = brokenAt(w, u);
+  // BOTH SCALES ARE THE RECORD'S OWN DERIVED LENGTHS — a time from a distance
+  // and a speed, never a duration anyone picked. `breakAge` is birth to break;
+  // `preS - breakAge` is break to the waterline, where the wave stops being a
+  // wave and becomes the swash.
+  //
+  // SO `b` SPANS THE WHOLE SEAWARD LIFE, and that is what makes the drawing's
+  // spent end line up with this file's stage six instead of arriving eight
+  // seconds early. The drawing has no fade: its foam band GROWS with `b` and
+  // never thins, so a wave that reached `b = 1` while still half a frame from
+  // the shore would sit there drawing a full white band until it died. With
+  // the span set here a wave is fully spent exactly as its crest crosses the
+  // waterline and the swash front takes over the same stretch of beach.
+  if (b < 0) return FOAM_ONSET_B * clamp01(1 + b / w.breakAge);
+  return FOAM_ONSET_B + (1 - FOAM_ONSET_B) * clamp01(b / (w.preS - w.breakAge));
+}
 
 // MEASURED: the band reaches 0.095 in sequence A and 0.135 in sequence C.
 export const BAND_MAX = [0.055, 0.135];
@@ -239,30 +241,8 @@ export const BAND_MAX = [0.055, 0.135];
 // larger number first.
 export const BREAK_S = [0.115, 0.020];
 
-// The face's centre sits about 0.020 of frame height past the band's shoreward
-// edge (sequence A: band ends 0.065, face at 0.085; band ends 0.105, face at
-// 0.120), and reads about 0.05 wide.
-export const FACE_GAP = 0.020;
-export const FACE_W = 0.050;
-
-// How far the swell's dark ridge reaches either side of the crest. Sequence A:
-// the darkening is at its strongest at s 0.03-0.08 and is gone by s 0.20, so
-// about 0.07 of frame height on the shoreward side of a crest at 0.05.
-export const SWELL_W = 0.075;
-
-// The seaward fraction of the foam band that ramps in. FOAM_RAMP's own
-// reasoning in beach-draw.js, restated for the band this file owns: the
-// reference's band is a PLATEAU of paper with a soft outer edge, not a ramp to
-// one. The shoreward edge is the sharper of the two, because that is where the
-// foam piles up against the face.
-export const BAND_RAMP_IN = 0.28;
-export const BAND_RAMP_OUT = 0.12;
-
 const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
 const smooth = (v) => v * v * (3 - 2 * v);
-// One bump shape, reused — `waterTone`'s own dip profile, so the swell, the
-// face and the old break cannot disagree about what a soft lobe looks like.
-const lobe = (x) => { const a = Math.abs(x); if (a >= 1) return 0; const k = 1 - a * a; return k * k; };
 
 // --- THE PEEL ---------------------------------------------------------------
 // THE ONE PLACE THE PEEL EXISTS, and the reason every law below takes a `u`.
@@ -350,54 +330,6 @@ export function faceAmountOf(w) {
   const d = (a - w.peelS) / FACE_DECAY_S;
   return d >= 1 ? 0 : 1 - smooth(d);
 }
-
-// Where it sits: below the WIDEST band the wave has anywhere, so it is clear
-// of the foam at every column rather than being erased by it at the ones that
-// broke first. `bandWidthAt` is monotone in `b`, so the first column to break
-// is the widest.
-//
-// A DECLARED SIMPLIFICATION, AND IT IS NOT WHAT THE REFERENCE DOES. There, the
-// face DIPS progressively under the peel — at the unbroken end it is the
-// wave's own front, right at the crest, and it slides under the foam as each
-// column breaks. Held at one depth the way it is here, the not-yet-broken end
-// of the wave carries a face further below its crest than it should. It is
-// held anyway because the alternative was measured and is worse in this
-// medium: per column the depth runs over 0.09 of frame height, and a row of a
-// bilevel lattice averaged across that reads L 117 where the reference's face
-// is 60. One depth reads as a band; the true law reads as nothing. Recorded
-// so a later session can reach for a ramped depth rather than rediscovering
-// the choice.
-export function faceCentreOf(w) {
-  return bandWidthAt(w, w.age - w.breakAge) + FACE_GAP;
-}
-
-// The swell. It rises over the wave's whole approach and is spent by the time
-// the band has grown, because by then the ridge IS the band.
-// Likewise an amount in 0..1.
-//
-// AND IT IS SPENT SHORTLY AFTER THE COLUMN BREAKS, NOT OVER THE BAND'S WHOLE
-// GROWTH. The ridge does not persist behind the break as a separate dark body;
-// it BECOMES the foam and the face, which is what the reference shows — once a
-// column has broken, the dark thing under its crest is the face.
-//
-// The first cut spent it over BAND_GROW_S (1.4 s), and because the swell's
-// target is darker than the face's — correctly, since the reference's swelling
-// water reaches L 41 against the face's 58-91 — a freshly broken column had
-// its swell OUT-DARKENING its own face. Measured on the clean tree: at 0.2 s
-// past the break the darkest emitted tone sat at d = 0.014 reading 0.806,
-// where the face is 0.697 at d = 0.076. The face stopped being the darkest
-// thing under the foam, which is the one property it has.
-// It is spent AT the break, not over some window after it: a column that has
-// broken has no swell left, it has foam and a face. Written as an early return
-// rather than a fast decay because a decay is a number somebody would tune,
-// and there is nothing to tune — the ridge is either still standing or it is
-// not. The discontinuity is invisible: at b = 0 the lobe's centre is under the
-// opening lip, which the foam term multiplies away.
-export function swellDepthAt(w, b) {
-  if (b >= 0 || b < -w.swellLeadS) return 0;
-  return smooth(1 + b / w.swellLeadS);
-}
-
 // --- THE STAGE, WHICH IS A LABEL ON THE ABOVE -------------------------------
 // A COLUMN'S OWN STAGE. It never returns PEEL, and that is not an omission:
 // a single column does not peel, it simply breaks. See `waveStage` below.
@@ -408,7 +340,7 @@ export function stageAt(w, u, waterline) {
   if (b < 0) return STEEPEN;
   // COLLAPSE is "this column has broken AND the wave still has a face";
   // FOAM_BAND is what is left when the face has gone. Read off the same
-  // `faceAmountOf` the tone uses, so the label cannot drift from the picture.
+  // `faceAmountOf` the record reports, so the label cannot drift from it.
   return faceAmountOf(w) > 0 ? COLLAPSE : FOAM_BAND;
 }
 
@@ -437,64 +369,19 @@ export function waveStage(w, waterline, samples = 24) {
   return lo;
 }
 
-// --- ONE WAVE'S CONTRIBUTION TO THE TONE ------------------------------------
-// `base` is whatever the field already says at (u, s) — the shipped ramp, or
-// a wave further out that has already been laid down. The THREE terms compose
-// in a fixed order and the order is the physics: the swell and the face both
-// ADD ink, and the foam then TAKES IT AWAY, because foam floating on water
-// hides whatever is under it. A face cannot show through its own band.
-export function waveToneAt(w, u, s, base) {
-  const c = crestAt(w, u);
-  const b = brokenAt(w, u);
-  const d = s - c;
-
-  const bw = bandWidthAt(w, b);
-  const fd = faceAmountOf(w);          // the WAVE's, not this column's — see above
-  const fc = faceCentreOf(w);
-  const sd = swellDepthAt(w, b);
-  const fa = foamAlphaAt(w, b);
-
-  let t = base;
-  // Both are pulled TOWARD a target rather than added to the field — see
-  // FACE_TONE above. `lobe` keeps the pull local; the time law keeps it on the
-  // wave's own schedule.
-  if (sd > 0) { const k = sd * lobe(d / SWELL_W); if (k > 0) t += (w.swellDepth - t) * k; }
-  if (fd > 0) { const k = fd * lobe((d - fc) / FACE_W); if (k > 0) t += (w.faceDepth - t) * k; }
-  if (bw > 0 && fa > 0) {
-    // The band runs from the crest shoreward, with a soft seaward edge and a
-    // harder shoreward one — the way round a real foam edge reads, and the
-    // same asymmetry beach-draw.js already draws at the shore.
-    let k = 0;
-    if (d >= -bw * BAND_RAMP_IN && d <= bw * (1 + BAND_RAMP_OUT)) {
-      if (d < 0) k = smooth(1 + d / (bw * BAND_RAMP_IN));
-      else if (d > bw) k = 1 - smooth((d - bw) / (bw * BAND_RAMP_OUT));
-      else k = 1;
-    }
-    t *= 1 - fa * k;
-  }
-  return clamp01(t);
-}
-
 // --- SEVERAL WAVES AT ONCE --------------------------------------------------
-// THE ONE PLACE A WAVE BECOMES TONE. Walked SEAWARD FIRST, each wave laid over
-// what is already there, so the most shoreward wave wins where two overlap —
-// a painter's order, which is what "a nearer band of foam hides the water
-// behind it" means in a plan view. Several waves alive at once is the NORMAL
+// THE ORDER WAVES ARE DRAWN IN. Walked SEAWARD FIRST, each wave laid over what
+// is already there, so the most shoreward wave wins where two overlap — a
+// painter's order, which is what "a nearer band of foam hides the water behind
+// it" means in a plan view. Several waves alive at once is the NORMAL
 // state and not an edge case: measured per column, the reference carries a
 // mean of 1.3 to 3.4 separate bright bands with 33-96% of columns carrying two
 // or more.
 //
-// SORTING IS THE CALLER'S, ONCE PER FRAME, NOT ONCE PER SAMPLE. `waves` must
-// already be in seaward-first order; `sortWaves` is the one owner of what that
-// means and the renderer calls it once.
+// SORTING IS THE CALLER'S, ONCE PER FRAME. `sortWaves` is the one owner of what
+// seaward-first means and the scene calls it once before handing the list over.
 export function sortWaves(waves) {
   return waves.slice().sort((a, b) => (a.crest0 + a.speedS * a.age) - (b.crest0 + b.speedS * b.age));
-}
-
-export function waveField(waves, u, s, base) {
-  let t = base;
-  for (let i = 0; i < waves.length; i++) t = waveToneAt(waves[i], u, s, t);
-  return t;
 }
 
 // --- THE RECORD -------------------------------------------------------------
@@ -504,9 +391,22 @@ export function waveField(waves, u, s, base) {
 export function makeWave({ rand, energy = 0, waterline = 0.40, samples = 160 }) {
   const e = clamp01(energy);
   const breakS = BREAK_S[0] + (BREAK_S[1] - BREAK_S[0]) * e;
-  const peelS = rand.range(PEEL_RANGE[0], PEEL_RANGE[1]);
+  // THE PEEL RATE IS SIZED BY THE ENERGY AT BIRTH, AND THE DIRECTION IS PICKED.
+  // Nothing in the reference measures a peel's duration against the size of the
+  // set that made it; a bigger, longer wave taking longer to run its break
+  // across the frame is the assumption, stated. The energy shifts WHERE in the
+  // range the draw lands and the jitter keeps the wave-to-wave variation the
+  // whole range was there for — a plain `LO + (HI-LO) * e` would make every
+  // wave on a quiet beach peel for the same 0.8 s.
+  const peelS = PEEL_RANGE[0] + (PEEL_RANGE[1] - PEEL_RANGE[0])
+    * clamp01(0.35 + 0.65 * e + rand.range(-0.35, 0.35));
   const speedS = TRAVEL_S * rand.range(0.85, 1.20);
   const swellLeadS = SWELL_LEAD_S * rand.range(0.8, 1.15);
+
+  // THE WAVE'S OWN STREAM. Every mark this wave will ever make comes off it,
+  // so nothing a wave draws depends on what was drawn before it.
+  const seed = rand.int(1, 0x7ffffffe);
+  const mark = rng(seed);
 
   // A PER-WAVE ALONG-SHORE SHAPE FOR THE CREST, so no two fronts are the same
   // and none of them is a straight line — makeWob()'s own reasoning in
@@ -537,9 +437,19 @@ export function makeWave({ rand, energy = 0, waterline = 0.40, samples = 160 }) 
     steepS: 0.35 * rand.range(0.8, 1.3),
     bandMax: BAND_MAX[0] + (BAND_MAX[1] - BAND_MAX[0]) * e * rand.range(0.85, 1.15),
     bandFadeS: rand.range(1.2, 2.4),
-    faceDepth: FACE_TONE[0] + (FACE_TONE[1] - FACE_TONE[0]) * e * rand.range(0.8, 1.15),
-    swellDepth: SWELL_TONE[0] + (SWELL_TONE[1] - SWELL_TONE[0]) * e,
     swellLeadS,
+    // HOW BIG IT DRAWS, and its own stream. Both frozen here for the reason
+    // everything else in this record is: `spawn()` is the one place the energy
+    // is read, and a seed drawn per frame is a wave whose foam boils.
+    height: HEIGHT[0] + (HEIGHT[1] - HEIGHT[0]) * e * rand.range(0.85, 1.15),
+    seed,
+    // THE WAVE'S OWN FOAM, DRAWN ONCE. The counts, the radii and the bubble
+    // count are beach-brush.js's own, unchanged; what moved is WHEN they are
+    // drawn. Off the wave's own stream rather than the spawner's, so two waves
+    // born in either order carry the same foam.
+    drawA: lobeParams(mark, 9, 0.035, 0.096),
+    drawB: lobeParams(mark, 22, 0.010, 0.031),
+    drawBubbles: bubbleParams(mark, 16),
     // AND THE SWASH HAND-OVER: the wave reaches the waterline at this age, and
     // because `crest0` was derived from it, it is PRE_S for every wave — which
     // is what keeps the arrivals as regular as the spawns. Written as the

@@ -3,7 +3,7 @@
 // This file is WIRING. Every rule lives in a module beside it — the geometry in
 // beach-shore.js, the two boundaries in beach-swash.js, the set energy in
 // beach-sets.js, the drifting surface in beach-water.js, every mark in
-// beach-draw.js — and all of those are DOM-free so the gate runs them without a
+// beach-brush.js — and all of those are DOM-free so the gate runs them without a
 // browser. What is here is the order things happen in, the one place the
 // outside world gets in, and the interface later sessions read.
 //
@@ -32,8 +32,8 @@ import { createShore } from './beach-shore.js';
 import { createSwash } from './beach-swash.js';
 import { createSets, normalizeWheel } from './beach-sets.js';
 import { createWater } from './beach-water.js';
-import { createRenderer } from './beach-draw.js';
-import { stageAt, waveStage, crestAt, brokenAt, bandWidthAt, faceAmountOf } from './beach-wave.js';
+import { createRenderer } from './beach-render.js';
+import { stageAt, waveStage, crestAt, brokenAt, bandWidthAt, faceAmountOf, drawPhaseAt, sortWaves } from './beach-wave.js';
 import { WATERLINE_S } from './beach-shore.js';
 
 // A seed salt, for koi-pads.js's reason: every draw on a stream shifts every
@@ -80,18 +80,18 @@ export default function createBeachScene(host) {
 
       renderer.draw({
         width, height,
+        // THE PUBLISHED EDGE, and the renderer draws THIS. It is the same
+        // function `swashYAt(x)` answers with, scallops included, so the line
+        // a bird stands on is the line on the screen.
         swashAt: (u) => swash.edgeAtU(u),
         wetAt: (u) => swash.wetAtU(u),
-        glossDepth: swash.glossDepth,
-        frontFoam: swash.sheet,
-        // EVERY LIVE WAVE, not a break energy. `breakEnergy` is gone with the
-        // fixed dip it drove: the renderer is handed the objects and draws
-        // them, and what the energy decided about each one was frozen into its
-        // record at birth.
-        waves: swash.waves,
+        // EVERY LIVE WAVE, not a break energy. The renderer is handed the
+        // objects and draws them, and what the energy decided about each one
+        // was frozen into its record at birth.
+        waves: sortWaves(swash.waves),
+        waterline: WATERLINE_S,
         frontSeed: 7,
         drift: water.drift,
-        streaks: water.streaks,
       });
     },
 
@@ -148,6 +148,13 @@ export default function createBeachScene(host) {
           stage: waveStage(w, WATERLINE_S),
           at: [0, 0.25, 0.5, 0.75, 1].map(u => stageAt(w, u, WATERLINE_S)),
           band: bandWidthAt(w, brokenAt(w, 0.5)), face: faceAmountOf(w),
+          // What the DRAWING is handed for this wave, so a gate can hold the
+          // picture to the record without re-deriving either.
+          height: w.height, seed: w.seed,
+          phase: [0, 0.25, 0.5, 0.75, 1].map(u => drawPhaseAt(w, u)),
+          lobes: w.drawA.cen.length + w.drawB.cen.length,
+          lobeSum: w.drawA.cen.reduce((a, b) => a + b, 0) + w.drawA.rad.reduce((a, b) => a + b, 0)
+            + w.drawB.cen.reduce((a, b) => a + b, 0) + w.drawB.rad.reduce((a, b) => a + b, 0),
         })),
         // Every wave's committed record, so a gate can watch a real wave run
         // rather than only that one exists.
@@ -169,8 +176,8 @@ export default function createBeachScene(host) {
         streaks: water.streaks.length,
         streakFields: water.streaks.length ? Object.keys(water.streaks[0]) : [],
         drift: water.drift,
-        rows: renderer.rows,
-        segments: renderer.segments,
+        drawnWaves: renderer.waves,
+        shear: shore.slope * width / height,
         // The published interface, sampled, so the gate can check the screen
         // mapping without reimplementing it.
         swashY: us.map(u => scene.swashYAt(u * width)),

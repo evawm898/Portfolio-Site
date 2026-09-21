@@ -130,7 +130,6 @@ const MUTANTS = [
     mayAlso: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'swash/an-overrun-fires-with-the-extent-it-reached',
-              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
               'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
     why: 'ONE OSCILLATING WATERLINE — the failure mode the brief names by name',
   },
@@ -143,8 +142,7 @@ const MUTANTS = [
     mayAlso: ['swash/the-overrun-zone-dries-back-and-does-not-ratchet',
               'swash/an-overrun-fires-with-the-extent-it-reached',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
-              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
-              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
     why: '"do not use one rate for the whole beach" — the saturated zone dried at the overrun rate',
   },
   {
@@ -173,8 +171,7 @@ const MUTANTS = [
     mayAlso: ['swash/an-overrun-fires-with-the-extent-it-reached',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'swash/wet-sand-persists-after-the-water-has-left-it',
-              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
-              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+              'scene3/the-swash-runs-and-drains-while-the-wet-band-stays'],
     why: '"it must return, not ratchet" — a max never comes back',
   },
   {
@@ -191,8 +188,7 @@ const MUTANTS = [
               'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
-              'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear',
-              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+              'scene3/the-two-queries-answer-in-screen-pixels-and-follow-the-shear'],
     why: '"a broken wave is committed" — deforming one mid-run reads as a slider on the water',
   },
   {
@@ -202,8 +198,8 @@ const MUTANTS = [
     // swash is stage six of a wave. The anchor pre-check caught the old one as
     // disarmed the first time it ran after the split, which is that mechanism
     // doing its job.
-    from: "  'bandMax', 'bandFadeS', 'faceDepth', 'swellDepth', 'swellLeadS',",
-    to: "  'bandMax', 'bandFadeS', 'faceDepth', 'swellDepth', 'swellLeadS', 'energy',",
+    from: "  'bandMax', 'bandFadeS', 'swellLeadS', 'height',",
+    to: "  'bandMax', 'bandFadeS', 'swellLeadS', 'height', 'energy',",
     breaks: ['swash/a-swash-carries-no-record-of-the-energy-that-chose-it'],
     why: 'provenance in the record is what would let a later reader branch on the cause',
   },
@@ -221,7 +217,7 @@ const MUTANTS = [
   {
     id: 'the-overrun-fires-on-every-wave',
     file: 'scene/beach-swash.js',
-    from: 'export const OVERRUN_MARGIN_S = 0.12;',
+    from: 'export const OVERRUN_MARGIN_S = 0.150;',
     to: 'export const OVERRUN_MARGIN_S = 0.0;',
     breaks: ['swash/an-overrun-fires-with-the-extent-it-reached'],
     why: 'an event that fires as often without a set as with one is no signal',
@@ -232,7 +228,7 @@ const MUTANTS = [
     from: '    peelS,\n    peelFrom: rand.unit(),',
     to: '    peelS: 1e-6,\n    peelFrom: rand.unit(),',
     breaks: ['wave/the-break-runs-along-the-crest-rather-than-all-at-once',
-             'wave/the-face-is-one-band-across-the-wave-while-the-foam-is-not'],
+             'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame'],
     mayAlso: ['scene3/several-waves-are-alive-at-once-at-different-stages',
               'wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each'],
     why: '"it does not go white all at once" — the brief\'s own sentence, and 1.87 s of it is measured',
@@ -242,23 +238,15 @@ const MUTANTS = [
     file: 'scene/beach-wave.js',
     from: 'export function faceAmountOf(w) {\n  const a = w.age - w.breakAge;',
     to: 'export function faceAmountOf(w) {\n  if (w) return 0;\n  const a = w.age - w.breakAge;',
-    breaks: ['wave/the-dark-face-is-darker-than-the-water-on-both-sides-of-it',
-             'wave/the-face-is-one-band-across-the-wave-while-the-foam-is-not',
-             'wave/the-stage-a-wave-reports-is-the-stage-it-is-drawing',
-             'wave/a-nearer-wave-covers-the-one-behind-it'],
+    // ITS BLAST RADIUS SHRANK WITH THE TONE FIELD, and that is worth saying
+    // rather than quietly re-listing: it used to redden four checks, two of
+    // which measured the face as emitted TONE. What is left is the stage
+    // label, because COLLAPSE is defined as "this column has broken and the
+    // wave still has a face" and a tree with no face never reaches it.
+    breaks: ['wave/the-stage-a-wave-reports-is-the-stage-it-is-drawing'],
     mayAlso: ['wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each',
               'scene3/several-waves-are-alive-at-once-at-different-stages'],
     why: 'THE FAILURE MODE THE BRIEF NAMES: what is left without it is a white stripe',
-  },
-  {
-    id: 'the-face-follows-each-column',
-    file: 'scene/beach-wave.js',
-    from: '  const fd = faceAmountOf(w);          // the WAVE\'s, not this column\'s — see above\n  const fc = faceCentreOf(w);',
-    to: '  const fd = faceAmountOf(w);\n  const fc = bandWidthAt(w, b) + FACE_GAP;',
-    breaks: ['wave/the-face-is-one-band-across-the-wave-while-the-foam-is-not'],
-    mayAlso: ['wave/the-dark-face-is-darker-than-the-water-on-both-sides-of-it',
-              'wave/a-nearer-wave-covers-the-one-behind-it'],
-    why: 'MEASURED: tied to the column it smears over 0.09 of frame height and averages to nothing',
   },
   {
     id: 'the-seaward-life-is-per-wave',
@@ -274,8 +262,8 @@ const MUTANTS = [
               'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
               'scene3/several-waves-are-alive-at-once-at-different-stages',
               'scene3/the-break-travels-shoreward-instead-of-sitting-at-one-station',
-              'scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
-              'scene3/the-foam-band-reaches-bare-paper'],
+              'draw/no-wave-is-drawn-once-it-is-spent',
+              'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame'],
     why: 'THE REAL BUG: arrivals scrambled, and the high-water mark went from 5.9 px per 3.5 s to 54.5',
   },
   {
@@ -283,7 +271,8 @@ const MUTANTS = [
     file: 'scene/beach-wave.js',
     from: '  return waves.slice().sort((a, b) => (a.crest0 + a.speedS * a.age) - (b.crest0 + b.speedS * b.age));',
     to: '  return waves.slice().sort((a, b) => (b.crest0 + b.speedS * b.age) - (a.crest0 + a.speedS * a.age));',
-    breaks: ['wave/a-nearer-wave-covers-the-one-behind-it'],
+    breaks: ['wave/a-nearer-wave-covers-the-one-behind-it',
+             'draw/the-nearer-wave-is-painted-last'],
     why: 'a nearer band of foam has to hide the water behind it, which is what the order IS',
   },
   {
@@ -292,12 +281,6 @@ const MUTANTS = [
     from: '    bandMax: BAND_MAX[0] + (BAND_MAX[1] - BAND_MAX[0]) * e * rand.range(0.85, 1.15),',
     to: '    bandMax: BAND_MAX[0] + (BAND_MAX[1] - BAND_MAX[0]) * 0.5 * rand.range(0.85, 1.15),',
     breaks: ['wave/the-energy-sizes-the-wave-at-every-stage-and-only-at-birth'],
-    // The face check probes at the face's centre, which is measured DOWN FROM
-    // THE BAND'S shoreward edge — so a band that has stopped growing with the
-    // energy moves the probe. True about the mutation, and the honest place
-    // for it is this list rather than a loosened clause.
-    mayAlso: ['wave/the-dark-face-is-darker-than-the-water-on-both-sides-of-it',
-              'wave/the-face-is-one-band-across-the-wave-while-the-foam-is-not'],
     why: '"it should now size the wave at EVERY stage" — how wide the foam band is one of the three named',
   },
   {
@@ -309,30 +292,6 @@ const MUTANTS = [
              'wave/the-stage-a-wave-reports-is-the-stage-it-is-drawing'],
     mayAlso: ['scene3/several-waves-are-alive-at-once-at-different-stages'],
     why: 'a stage label that has drifted from the geometry it is read off',
-  },
-  {
-    id: 'the-deep-water-keeps-the-old-saturated-tone',
-    file: 'scene/beach-draw.js',
-    from: '  deep: 0.70,',
-    to: '  deep: 0.78,',
-    // IT NAMED NOTHING AT FIRST AND WAS THEREFORE *SKIPPED* — which is worse
-    // than blind, because a mutant the sweep never runs is not in the sweep at
-    // all. At 0.78 the lattice is 97% inked and a swell buys half a percent of
-    // coverage: the value ordering still holds, the deep water is still a
-    // mass, every wave law is untouched, and the stage is DEAD. So a clause
-    // that measures the swell's own DELIVERED TRAVEL was written for it, which
-    // is what closes the hole rather than declaring it.
-    breaks: ['scene3/the-swell-has-somewhere-to-go'],
-    // AND IT TAKES THE FACE WITH IT, WHICH WAS NOT PREDICTED. Pushing the
-    // resting water back to saturation does not merely kill the swell: the
-    // whole ramp darkens with it, so the face's absolute target (0.62-0.74)
-    // stops being darker than the water it sits in and the strongest edge in
-    // the frame INVERTS. Two stages die from one constant, which is the
-    // clearest statement there is of why this value is not a preference.
-    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank',
-              'wave/the-dark-face-is-darker-than-the-water-on-both-sides-of-it',
-              'wave/the-face-is-one-band-across-the-wave-while-the-foam-is-not'],
-    why: 'the swell has no travel at 0.78 — a control at the flat end of its own ladder',
   },
   {
     id: 'the-set-energy-is-signed',
@@ -364,109 +323,103 @@ const MUTANTS = [
     from: '      for (const f of streaks) {',
     to: '      for (const f of streaks) { place(f, true); }\n      for (const f of streaks) {',
     breaks: ['water/the-streaks-persist-and-drift-shoreward'],
-    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
+    // AND IT NOW REDDENS NOTHING ELSE, which is a finding rather than a
+    // tidy-up: with the halftone lattice gone, NOTHING DRAWS THE STREAK
+    // RECORDS. beach-brush.js marks the open water with two paper brush lines
+    // of its own, driven by `phase` — which this module's `drift` supplies, so
+    // half of it is live and half of it is a field no frame reads. The law is
+    // still worth testing and the check still tests it; whether the records
+    // should be drawn in the new idiom or the module should lose its streak
+    // half is a ruling, not a cleanup, and it is named in the outcome doc.
     why: 'a re-randomised surface reads as static rather than as water',
   },
+  // --- THE DRAWING LAYER ----------------------------------------------------
   {
-    id: 'the-drift-phase-is-not-wrapped',
-    file: 'scene/beach-draw.js',
-    from: '        const phase = (drift * (0.4 + 0.6 * hash2(idx, 91))) % 1;',
-    to: '        const phase = drift * (0.4 + 0.6 * hash2(idx, 91));',
-    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
-    why: 'THE REAL BUG: drift is a distance, so after a minute the sea was not drawn at all',
+    id: 'the-renderer-generates-its-own-foam-edge',
+    file: 'scene/beach-render.js',
+    from: '        frontAt: st.swashAt,',
+    to: '        frontAt: undefined,',
+    // THE INVARIANT THAT MATTERS MOST, AND THE MUTATION IS NOT SYNTHETIC: it
+    // is the state the drawing layer ARRIVED IN. beach-brush.js generated its
+    // own scallops from `lobes()` while the simulation published its own edge,
+    // and the two curves are close enough that the picture looks perfectly
+    // fine — which is exactly why it needs a check. A bird stands where
+    // `swashYAt(x)` says the water is.
+    breaks: ['draw/the-drawn-foam-edge-is-the-published-swash-edge'],
+    why: 'a drawn edge generated beside the published one puts birds on dry sand',
   },
   {
-    id: 'the-renderer-sets-its-own-transform',
-    file: 'scene/beach-draw.js',
-    from: '      if (st.dpr !== undefined) ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0);',
-    to: '      ctx.setTransform(st.dpr || 1, 0, 0, st.dpr || 1, 0, 0);',
-    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
-    why: 'THE REAL BUG: it overwrote the shell\'s dpr scale and drew the beach into one corner',
+    id: 'the-drawing-keeps-its-own-shear',
+    file: 'scene/beach-render.js',
+    from: '        shear: shore.slope * w / h,',
+    to: '        shear: undefined,',
+    breaks: ['draw/the-drawing-takes-its-shear-from-the-shore',
+             'draw/the-drawn-foam-edge-is-the-published-swash-edge'],
+    // The two published queries are read through the SHORE, so their fitted
+    // slope is unchanged and that clause stays green — which is the point of
+    // having the edge invariant read the canvas.
+    why: 'the module draws 5.0 degrees on a 4:3 frame against the shore\'s 3.0',
   },
   {
-    id: 'the-water-ramp-follows-the-moving-edge',
-    file: 'scene/beach-draw.js',
-    from: '  const u = clamp01(s / WATERLINE_S);',
-    to: '  const u = clamp01(s / Math.max(1e-4, edge));',
-    breaks: ['beach-tone/the-run-up-sheet-is-lighter-than-deep-water'],
-    why: 'THE REAL BUG: an overrun came out as four fifths of the frame in near-solid ink',
+    id: 'a-spent-wave-is-still-drawn',
+    file: 'scene/beach-render.js',
+    from: '      const list = (st.waves || []).filter(wv => waveStage(wv, st.waterline) !== SWASH);',
+    to: '      const list = (st.waves || []);',
+    breaks: ['draw/no-wave-is-drawn-once-it-is-spent'],
+    mayAlso: ['draw/every-wave-is-drawn-once-with-its-own-record'],
+    why: 'the drawing has no fade, so a wave left in the list sits on the sand drawing a full white band',
   },
   {
-    id: 'the-foam-band-is-a-ramp-not-a-plateau',
-    file: 'scene/beach-draw.js',
-    from: '  const into = clamp01((s - (edge - fw)) / fw) / FOAM_RAMP;',
-    to: '  const into = clamp01((s - (edge - fw)) / fw);',
-    // BOTH, and the second was short in the honest direction: the sweep reported
-    // it as UNCLAIMED. A band that ramps all the way to 1 instead of levelling
-    // off does not merely have the wrong SHAPE — it never reaches paper at all,
-    // which is precisely what the bare-run check is named for. The claim was
-    // wrong, not the check.
-    breaks: ['beach-tone/the-foam-band-is-a-plateau-of-paper-not-a-ramp-to-one',
-             'scene3/the-foam-band-reaches-bare-paper'],
-    why: 'THE REAL BUG: it put the foam DARKER than the wet sand and inverted the reference\'s ordering',
+    id: 'every-wave-draws-the-first-waves-record',
+    file: 'scene/beach-render.js',
+    from: '        const wv = list[i];',
+    to: '        const wv = list[0];',
+    // TWO CHECKS, AND THE SECOND IS TRUE ABOUT IT RATHER THAN COLLATERAL.
+    // Both recorder clauses pull a wave's op BLOCK out of the frame's stream
+    // by its length, so a frame that draws one record twice puts the wrong
+    // block in both of them. The three drawing mutants here redden this pair
+    // between them, which is what one instrument carrying two claims costs —
+    // named rather than loosened out of either check.
+    breaks: ['draw/the-nearer-wave-is-painted-last',
+             'draw/a-wave-s-foam-holds-still-between-frames'],
+    mayAlso: ['draw/every-wave-is-drawn-once-with-its-own-record',
+              'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame'],
+    why: 'one record drawn N times is a sea of identical waves, and every count-based clause passes it',
   },
   {
-    id: 'the-swell-bands-the-deep-water',
-    file: 'scene/beach-draw.js',
-    from: '  const fade = d * d * (3 - 2 * d);',
-    to: '  const fade = 1;',
-    breaks: ['beach-tone/the-swell-fades-out-in-the-deep-water'],
-    mayAlso: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
-    why: 'THE REAL BUG: the rendered row profile oscillated 0.26 / 0.70 / 0.45 down a smooth sea',
+    id: 'the-renderer-sorts-behind-the-callers-back',
+    file: 'scene/beach-render.js',
+    from: '      r.waves = specs.length;',
+    to: '      specs.reverse();\n      r.waves = specs.length;',
+    breaks: ['draw/the-nearer-wave-is-painted-last',
+             'draw/a-wave-s-foam-holds-still-between-frames'],
+    why: 'the order IS the model, and a renderer that re-decides it makes sortWaves decorative',
   },
   {
-    id: 'the-dry-sand-is-blank-paper',
-    file: 'scene/beach-draw.js',
-    from: '      for (let ci = 0; ci < DRY_CELLS_U; ci++) {',
-    to: '      for (let ci = 0; ci < 0; ci++) {',
-    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
-    why: 'THE REAL DEFECT: "the open white" read as empty, and every band-MEAN comparison passed it',
+    id: 'the-lobes-are-drawn-per-frame',
+    file: 'scene/beach-render.js',
+    from: '          scalA: wv.drawA,\n          scalB: wv.drawB,\n          bubbles: wv.drawBubbles,',
+    to: '          scalA: null,\n          scalB: null,\n          bubbles: null,',
+    // "Do not regenerate lobes per frame — the foam will boil." It reddens the
+    // ARTEFACT clause and not the record one, which is the whole reason that
+    // second clause was written: the stored parameters are still on the record
+    // and still unchanged, so the half that reads them passes perfectly.
+    // AND IT REDDENS THE ORDER CHECK TOO, which is the same property read
+    // from the other side: with the lobes back on the shared stream a wave's
+    // ops depend on what was drawn before it, so that pair's "back's block
+    // verbatim" clause stops holding as well.
+    breaks: ['draw/a-wave-s-foam-holds-still-between-frames',
+             'draw/the-nearer-wave-is-painted-last'],
+    why: 'the foam boils, and the record-reading half of its own check cannot see it',
   },
   {
-    id: 'the-sand-texture-is-in-the-marks-register',
-    file: 'scene/beach-draw.js',
-    from: '      ctx.globalAlpha = DRY_MARK_ALPHA;',
-    to: '      ctx.globalAlpha = 0.72;',
-    breaks: ['scene3/the-value-ordering-holds-and-the-dry-sand-is-toned-not-blank'],
-    why: 'the declaration and the drawing disagreeing — a base texture as dark as the marks that go on top of it',
-  },
-  {
-    id: 'the-register-headroom-is-given-away',
-    file: 'scene/beach-draw.js',
-    from: 'export const DRY_MARK_ALPHA = 0.26;',
-    to: 'export const DRY_MARK_ALPHA = 0.33;',
-    // IT NAMES THE REGISTER CLAUSE NOW, AND THE WHOLE OF ITS OLD CLAIM LIST
-    // WENT WITH THE MODULE-LOAD THROW. Until this session beach-draw.js
-    // REFUSED TO LOAD on a collapsed headroom, so this mutation took the
-    // module out and the sweep read it on `load/every-scene-module-imports`,
-    // on the mount, and — non-deterministically, through the random button —
-    // on two swap checks. With the assertion moved into the gate the module
-    // loads, the scene mounts, and the one thing that goes red is the clause
-    // that is about the headroom. A smaller blast radius is the point: the
-    // old list could not distinguish this defect from any other reason
-    // beach-draw.js might fail to parse.
-    breaks: ['beach-tone/the-dry-sand-leaves-a-register-for-the-marks-session'],
-    why: 'the base texture creeping up to the reference\'s own footprint darkness, which a later session cannot draw over',
-  },
-  {
-    id: 'the-foam-band-is-narrower-than-a-row',
-    file: 'scene/beach-draw.js',
-    from: 'export const FOAM_BAND_S = 0.130;',
-    to: 'export const FOAM_BAND_S = 0.022;',
-    // IT NAMES THE RASTERISED CLAUSE, NOT THE PLATEAU ONE: a narrow band is
-    // still a plateau in SHAPE, so the plateau clause's subject does not
-    // contain this failure and it stays green on any width (measured).
-    //
-    // AND THE WIDTH HAD TO BE TAKEN THIS LOW TO FIRE, WHICH IS ITSELF THE
-    // FINDING. At half the shipped width the band still reads bare in a
-    // de-sheared strip — it is only the FULL-WIDTH mean that a narrow band
-    // fails, because one screen row spans more of the beach than the band is
-    // wide. So this clause asserts the band is genuinely bare SOMEWHERE, which
-    // needs a band narrower than the swell to break; the shipped width was set
-    // by the coverage comparison, and that is said in the outcome rather than
-    // implied by this mutant.
-    breaks: ['scene3/the-foam-band-reaches-bare-paper'],
-    why: 'a foam band narrower than the swell that displaces it never reads as bare paper at all',
+    id: 'the-break-phase-runs-backwards',
+    file: 'scene/beach-wave.js',
+    from: '  return FOAM_ONSET_B + (1 - FOAM_ONSET_B) * clamp01(b / (w.preS - w.breakAge));',
+    to: '  return FOAM_ONSET_B + (1 - FOAM_ONSET_B) * clamp01(1 - b / (w.preS - w.breakAge));',
+    breaks: ['draw/the-peel-is-monotone-in-time-and-runs-across-the-frame'],
+    mayAlso: ['draw/no-wave-is-drawn-once-it-is-spent'],
+    why: 'a wave that un-breaks as it travels shoreward',
   },
   {
     id: 'the-shoreline-is-level',
@@ -995,7 +948,8 @@ async function loadScene(mutant) {
       sceneKoi: await m('scene-koi.js'),
       shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
       sets: await m('beach-sets.js'), water: await m('beach-water.js'),
-      beachDraw: await m('beach-draw.js'), beachWave: await m('beach-wave.js'),
+      beachBrush: await m('beach-brush.js'), beachWave: await m('beach-wave.js'),
+      beachRender: await m('beach-render.js'),
     };
   }
   const dir = path.join(SCENE, `${MUTANT_PREFIX}${++mutantSeq}`);
@@ -1016,7 +970,8 @@ async function loadScene(mutant) {
     sceneKoi: await m('scene-koi.js'),
     shore: await m('beach-shore.js'), swash: await m('beach-swash.js'),
     sets: await m('beach-sets.js'), water: await m('beach-water.js'),
-    beachDraw: await m('beach-draw.js'), beachWave: await m('beach-wave.js'),
+    beachBrush: await m('beach-brush.js'), beachWave: await m('beach-wave.js'),
+    beachRender: await m('beach-render.js'),
   };
 }
 
@@ -2657,7 +2612,8 @@ async function partOne(mutant) {
   // never from the module under test — a clause that reads its expected value
   // out of the thing it is checking measures its own consistency.
   {
-    const S = M.shore, W = M.swash, SE = M.sets, WA = M.water, D = M.beachDraw, WV = M.beachWave;
+    const S = M.shore, W = M.swash, SE = M.sets, WA = M.water, B = M.beachBrush, WV = M.beachWave;
+    const R = M.beachRender;
     const rng = (n) => M.rng.makeRandom(n);
     // One beach, settled, reusable by the checks that only need to look at it.
     // The same, with no set energy at any point — see the ratchet check.
@@ -3092,105 +3048,63 @@ async function partOne(mutant) {
       return `${Math.abs(rise).toFixed(2)} s from end to end, ${up ? 'left to right' : 'right to left'}`;
     });
 
-    check('the dark face is darker than the water on both sides of it', () => {
-      // THE FINDING THE MERGED SCENE HAD NO OBJECT FOR, and the failure mode
-      // the brief names: losing it leaves a white stripe. Measured on the
-      // EMITTED TONE, not on the record — `waveToneAt` is what gets drawn, and
-      // a record that declares a face it does not draw passes any check that
-      // reads `faceDepth`.
-      const w = mkWave(0.7);
-      w.age = w.breakAge + w.peelS + 0.2;
-      const u = 0.5;
-      const base = (x) => D.waterTone(x, 0.42, 0.10);
-      const at = (x) => WV.waveToneAt(w, u, x, base(x));
-      const c = WV.crestAt(w, u), fc = c + WV.faceCentreOf(w);
-      const face = at(fc);
-      const sea = at(fc + WV.FACE_W * 1.8);          // shoreward of it
-      assert.ok(fc + WV.FACE_W * 1.8 < 0.40, 'the probe fell outside the water');
-      assert.ok(face > sea + 0.05, `the face reads ${face.toFixed(3)} against ${sea.toFixed(3)} shoreward of it`);
-      // and it is the darkest thing in the wave's own stretch
-      let worst = 0, worstAt = 0;
-      for (let x = c - 0.02; x < c + 0.30; x += 0.002) if (at(x) > worst) { worst = at(x); worstAt = x; }
-      assert.ok(Math.abs(worstAt - fc) < WV.FACE_W,
-        `the darkest tone in the wave sits at ${worstAt.toFixed(3)}, not at the face (${fc.toFixed(3)})`);
-      // AND THE FOAM IS BARE PAPER, so the edge between them is the whole of it
-      assert.ok(at(c + WV.bandWidthAt(w, WV.brokenAt(w, u)) * 0.5) < 0.02, 'the foam band is not bare paper');
-      return `face ${face.toFixed(3)} at s ${fc.toFixed(3)} against ${sea.toFixed(3)} beside it, foam at 0`;
-    });
-
-    check('the face is one band across the wave while the foam is not', () => {
-      // A peel makes the BAND per column by definition. The face is the
-      // unbroken wall under the crest, which is one surface — tied to the
-      // column it smears over 0.09 of frame height and averages to nothing.
-      const w = mkWave(0.6);
-      w.age = w.breakAge + w.peelS * 0.6;
-      // MEASURED AS A DEPTH BELOW THE CREST, not as an absolute station. The
-      // crest WOBBLES — every front here does, by up to 0.022 of frame height
-      // — and the face is parallel to it, so its absolute s varies by exactly
-      // that much and should. What has to be constant is the OFFSET, which is
-      // the thing that makes it one surface rather than a per-column artefact.
-      // MEASURED OFF THE EMITTED TONE, NOT OFF `faceCentreOf`. The first cut
-      // called that helper directly — and the way this gets broken is by the
-      // DRAWING reading the column's band while the helper still returns the
-      // wave's, so the clause read the one thing the defect leaves alone.
-      // Session 41's L7 lesson: name the owner of the MEASURED side too, and
-      // check it is the artefact. Measured: `the-face-follows-each-column`
-      // reported MISSED until this scanned the tone.
-      // OVER THE COLUMNS THAT HAVE BROKEN, and below the foam. Ahead of the
-      // break the darkest thing at a column is its SWELL, which is a correct
-      // and different feature — scanning from the crest over every column
-      // reported a 0.096 spread on a clean tree because half of it was the
-      // swell's own minimum at d = 0. The claim is about the face under the
-      // foam, so the subject is the columns that have one.
-      const base = (x) => D.waterTone(x, 0.42, 0.10);
-      const bands = [], faces = [];
-      for (let i = 0; i <= 8; i++) {
-        const u = i / 8;
-        if (WV.brokenAt(w, u) < 0) continue;
-        const c = WV.crestAt(w, u), bw = WV.bandWidthAt(w, WV.brokenAt(w, u));
-        bands.push(bw);
-        let worst = -1, at = 0;
-        for (let x = c + bw; x < c + 0.30; x += 0.001) {
-          const t = WV.waveToneAt(w, u, x, base(x));
-          if (t > worst) { worst = t; at = x; }
-        }
-        faces.push(at - c);           // the darkest emitted tone, as a depth below the crest
-      }
-      assert.ok(bands.length >= 3 && bands.length < 9,
-        `${bands.length} of 9 columns had broken — this is not a wave mid-peel`);
-      const spread = (a) => Math.max(...a) - Math.min(...a);
-      assert.ok(spread(bands) > 0.01, `the band is the same width at every column (spread ${spread(bands).toFixed(4)}) — nothing is peeling`);
-      assert.ok(spread(faces) < 0.012,
-        `the darkest tone sits at depths spanning ${spread(faces).toFixed(4)} below the crest — the face is not one surface`);
-      assert.ok(spread(faces) < spread(bands) * 0.5,
-        'the face\'s depth is tracking each column\'s own band width, which is what smears it');
-      return `band spread ${spread(bands).toFixed(3)}, emitted face depth spread ${spread(faces).toFixed(4)}`;
-    });
-
+    // TWO MORE RETIRED WITH THE TONE FIELD, and they are this PR's own rather
+    // than the merged scene's — which is the reason to name them carefully:
+    //
+    //   the dark face is darker than the water on both sides of it
+    //       measured on the EMITTED TONE through `waveToneAt`, which was the
+    //       wave's contribution to a lattice's ink density. The finding it
+    //       carried is not lost — it is what beach-brush.js DRAWS, as a
+    //       `PALETTE.ink` fill from the crest down to `faceBot`, against a
+    //       paper lip — but "darker than the water either side" is not a
+    //       question a flat fill answers, and the machinery that made it one
+    //       is gone. `draw/every-wave-is-drawn-once-with-its-own-record` is
+    //       what now says the face is put on the paper at all.
+    //   the face is one band across the wave while the foam is not
+    //       it asserted the face sits at one DEPTH below the crest at every
+    //       column while the band varies. THAT IS FALSE OF THE NEW DRAWING ON
+    //       PURPOSE: its `faceBot` is `(0.040 + 0.030 * (1 - b)) * H + 0.22 h`,
+    //       which is per column by construction — the face deepens toward the
+    //       unbroken end. beach-wave.js held one depth because a bilevel row
+    //       averaged across a varying one read as nothing; a fill has no such
+    //       problem. Keeping the check would have meant tuning the drawing to
+    //       satisfy it, which is the one thing the brief rules out.
     check('the energy sizes the wave at every stage and only at birth', () => {
       // "Set energy should now size the wave at EVERY stage — how far out it
-      // breaks, how deep the dark face, how wide the foam band." Both halves:
-      // the numbers MOVE with the energy at birth, and NOTHING moves after.
+      // breaks, how deep the dark face, how wide the foam band", and the
+      // drawing layer adds "feed it to the wave's height and peel rate there,
+      // not per frame". Both halves: the numbers MOVE with the energy at
+      // birth, and NOTHING moves after.
+      //
+      // THE FOUR IT NOW READS ARE THE FOUR THE DRAWING CONSUMES. `faceDepth`
+      // and `swellDepth` were tone targets and went with the tone field;
+      // `height` and `peelS` arrived with the drawing that needs them.
       const lo = WV.makeWave({ rand: rng(11), energy: 0.05 });
       const hi = WV.makeWave({ rand: rng(11), energy: 0.95 });
       assert.ok(hi.breakS < lo.breakS, `a bigger set breaks at ${hi.breakS.toFixed(3)}, not further out than ${lo.breakS.toFixed(3)}`);
       assert.ok(hi.bandMax > lo.bandMax * 1.2, 'the band does not grow with the set');
-      assert.ok(hi.faceDepth > lo.faceDepth, 'the face does not deepen with the set');
-      assert.ok(hi.swellDepth > lo.swellDepth, 'the swell does not deepen with the set');
+      assert.ok(hi.height > lo.height * 1.2, `the wave is ${lo.height.toFixed(3)} tall at rest and ${hi.height.toFixed(3)} at full set`);
+      assert.ok(hi.peelS > lo.peelS, `the peel runs ${lo.peelS.toFixed(2)} s at rest and ${hi.peelS.toFixed(2)} s at full set`);
+      // and every one of them stays inside the range it was drawn from
+      assert.ok(lo.height >= WV.HEIGHT[0] * 0.84 && hi.height <= WV.HEIGHT[1] * 1.16, 'a height left its own range');
+      assert.ok(lo.peelS >= WV.PEEL_RANGE[0] - 1e-12 && hi.peelS <= WV.PEEL_RANGE[1] + 1e-12, 'a peel left its own range');
       // AND THE RUNNING WAVE CANNOT BE REACHED. Two copies of one wave driven
-      // under opposite energies must emit identical tone at every station —
-      // the structural form, since no law here takes an energy at all.
-      const a = mkWave(0.5), b = mkWave(0.5);
-      for (let t = 0; t < 12; t += 1 / 60) {
-        a.age = t; b.age = t;
-        for (const u of [0.1, 0.5, 0.9]) for (let x = 0; x < 0.45; x += 0.01) {
-          const base = D.waterTone(x, 0.42, 0.10);
-          assert.strictEqual(WV.waveToneAt(a, u, x, base), WV.waveToneAt(b, u, x, base),
-            'two identical waves emitted different tone');
+      // under opposite energies must put the drawing in the same place at
+      // every station — the structural form, since no law here takes an
+      // energy at all. Read on the two quantities the drawing actually asks a
+      // record for: where its crest is, and how far through the break each
+      // column of it has got.
+      const a2 = mkWave(0.5), b2 = mkWave(0.5);
+      for (let t = 0; t < 18; t += 1 / 60) {
+        a2.age = t; b2.age = t;
+        for (const u of [0, 0.1, 0.5, 0.9, 1]) {
+          assert.strictEqual(WV.crestAt(a2, u), WV.crestAt(b2, u), 'two identical waves put their crests in different places');
+          assert.strictEqual(WV.drawPhaseAt(a2, u), WV.drawPhaseAt(b2, u), 'two identical waves are drawn at different break phases');
         }
       }
       for (const k of Object.keys(lo)) assert.ok(!/energy/i.test(k), `the record carries "${k}"`);
-      return `break ${lo.breakS.toFixed(3)} -> ${hi.breakS.toFixed(3)}, band ${lo.bandMax.toFixed(3)} -> ${hi.bandMax.toFixed(3)}, face ${lo.faceDepth.toFixed(2)} -> ${hi.faceDepth.toFixed(2)}`;
+      return `break ${lo.breakS.toFixed(3)} -> ${hi.breakS.toFixed(3)}, band ${lo.bandMax.toFixed(3)} -> ${hi.bandMax.toFixed(3)}, `
+        + `height ${lo.height.toFixed(3)} -> ${hi.height.toFixed(3)}, peel ${lo.peelS.toFixed(2)} -> ${hi.peelS.toFixed(2)} s`;
     });
 
     check('every wave takes the same time to reach the shore', () => {
@@ -3213,36 +3127,31 @@ async function partOne(mutant) {
     });
 
     check('a nearer wave covers the one behind it', () => {
-      // The compositing order IS the model: seaward first, so the most
-      // shoreward wave wins where two overlap — which is what "a nearer band
-      // of foam hides the water behind it" means in a plan view.
+      // The ORDER IS THE MODEL: seaward first, so the most shoreward wave is
+      // drawn last and its foam covers the water behind it — which is what "a
+      // nearer band of foam hides the water behind it" means in a plan view.
+      // It used to be measured on the composited TONE; with a drawing that
+      // paints rather than accumulates, the claim is the order itself, and the
+      // half that says the drawing HONOURS that order is in the browser, off
+      // the canvas ops (`draw/the-nearer-wave-is-painted-last`).
       const back = mkWave(0.6, 3), front = mkWave(0.6, 3);
       back.age = back.breakAge + back.peelS + 0.2;
       front.age = front.breakAge + front.peelS + 0.2;
-      // put the front wave's crest exactly where the back one's face is
-      const shift = WV.crestAt(back, 0.5) + WV.faceCentreOf(back) - WV.crestAt(front, 0.5);
-      front.crest0 += shift;
-      const sorted = WV.sortWaves([front, back]);
-      assert.strictEqual(sorted[0], back, 'sortWaves did not put the seaward wave first');
-      // PROBED AT THE BACK WAVE'S FACE CENTRE, which is where the front
-      // wave's crest was placed — so the foam is at full strength there and
-      // the face is at its deepest, which is the one station where the two
-      // orders can differ by everything. Half a band further on, the face's
-      // lobe has already fallen away and the difference is 0.09 rather than
-      // 0.7: a true claim measured at a station that barely tests it.
-      const x = WV.crestAt(back, 0.5) + WV.faceCentreOf(back);
-      const base = D.waterTone(x, 0.42, 0.10);
-      const alone = WV.waveToneAt(back, 0.5, x, base);
-      const both = WV.waveField(sorted, 0.5, x, base);
-      assert.ok(alone > 0.4, `the back wave's face only reads ${alone.toFixed(3)} there`);
-      assert.ok(both < 0.05, `the front wave's foam left ${both.toFixed(3)} of the face showing through it`);
-      // AND THE ORDER IS WHAT DOES IT, which needs the wrong order run to
-      // say so: laid shoreward-first the SEAWARD wave is applied last, so its
-      // face is painted back over the nearer wave's foam and shows through.
-      const wrong = WV.waveField([front, back], 0.5, x, base);
-      assert.ok(wrong > both + 0.3,
-        `laid in the wrong order the face reads ${wrong.toFixed(3)} against ${both.toFixed(3)} — the order is doing nothing`);
-      return `face ${alone.toFixed(3)} alone, ${both.toFixed(3)} under the nearer band, ${wrong.toFixed(3)} if laid the wrong way round`;
+      front.crest0 += 0.12;                        // stand it nearer the shore
+      assert.ok(WV.crestAt(front, 0.5) > WV.crestAt(back, 0.5), 'the fixture did not put one wave in front of the other');
+      // BOTH INPUT ORDERS, because a sort that ignored its input would pass
+      // one of them by luck.
+      for (const list of [[front, back], [back, front]]) {
+        const sorted = WV.sortWaves(list);
+        assert.strictEqual(sorted[0], back, 'sortWaves did not put the seaward wave first');
+        assert.strictEqual(sorted[1], front, 'sortWaves did not put the shoreward wave last');
+        assert.strictEqual(list.length, 2, 'sortWaves mutated the list it was given');
+      }
+      // and it orders by where a crest IS, not by when it was born: age the
+      // seaward wave past the other and the order has to swap.
+      back.crest0 += 0.30;
+      assert.strictEqual(WV.sortWaves([front, back])[1], back, 'the order is not read off the live crests');
+      return `the seaward wave first and the shoreward one last on both input orders, and the order follows the live crests`;
     });
 
     check('the stage a wave reports is the stage it is drawing', () => {
@@ -3278,87 +3187,41 @@ async function partOne(mutant) {
 
     setSection('beach-tone');
 
-    check('the value ordering is the reference\'s own', () => {
-      // Measured off the three clips as ink coverage against their OWN dry
-      // sand: deep water 0.84 > mid water 0.55 > wet sand 0.23 > foam 0.04 >
-      // dry 0.03. The ordering is what has to hold; the levels are the
-      // constants set from it.
-      const T = D.TONE;
-      assert.ok(T.deep > T.shallow, 'deep water is not darker than the shore');
-      assert.ok(T.shallow > T.gloss, 'the shore is not darker than glossy sand');
-      assert.ok(T.gloss > T.wet, 'glossy sand is not darker than matte wet sand');
-      assert.ok(T.wet > T.foam, 'wet sand is not darker than the foam');
-      assert.strictEqual(T.foam, 0, 'the foam is not bare paper');
-      assert.strictEqual(T.dry, 0, 'the dry sand is not bare paper');
-      return `deep ${T.deep} > shallow ${T.shallow} > gloss ${T.gloss} > wet ${T.wet} > foam/dry 0`;
-    });
-
-    check('the foam band is a plateau of paper, not a ramp to one', () => {
-      // A smooth fall across the band averages half the water's tone over it,
-      // which put the foam DARKER than the wet sand and inverted the one
-      // ordering that has to hold.
-      const edge = 0.40, fw = D.FOAM_BAND_S;
-      const at = (s) => D.waterTone(s, edge, fw, 0.05, 0, 0);
-      near(at(edge), 0, 1e-9, 'the tone at the edge itself');
-      // the inner part of the band is bare
-      assert.strictEqual(at(edge - fw * 0.25), 0, 'the inner foam band carries ink');
-      // and the seaward part still RAMPS rather than cutting. `into` is
-      // measured from the band's seaward edge, so the ramp occupies the outer
-      // FOAM_RAMP of it — probing at 0.6 of the way in lands in the plateau,
-      // which is what the first version of this clause did.
-      const onRamp = edge - fw * (1 - D.FOAM_RAMP * 0.5);
-      const mid = at(onRamp);
-      assert.ok(mid > 0 && mid < at(edge - fw * 1.2), `the band does not ramp in (${mid})`);
-      return `bare over the inner ${((1 - D.FOAM_RAMP) * 100).toFixed(0)}% of the band`;
-    });
-
-    check('the run-up sheet is lighter than deep water', () => {
-      // Anchoring the ramp on the MOVING edge stretched the ocean gradient over
-      // the sand a swash had just covered, so an overrun came out as four
-      // fifths of the frame in near-solid ink.
-      const deep = D.waterTone(0.02, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
-      const sheet = D.waterTone(0.65, 0.80, D.FOAM_BAND_S, 0.05, 0, 0);
-      assert.ok(sheet < deep * 0.75, `the sheet reads ${sheet.toFixed(2)} against deep water ${deep.toFixed(2)}`);
-      // and the deep water's own tone must NOT move when the edge does
-      const a = D.waterTone(0.10, 0.42, D.FOAM_BAND_S, 0.05, 0, 0);
-      const b = D.waterTone(0.10, 0.95, D.FOAM_BAND_S, 0.05, 0, 0);
-      near(a, b, 1e-12, 'the deep water changed tone because the swash moved');
-      return `deep ${deep.toFixed(2)} vs sheet ${sheet.toFixed(2)}; deep is edge-independent`;
-    });
-
-    check('the dry sand leaves a register for the marks session', () => {
-      // The sand-marking session draws user marks into this region, so the base
-      // texture has to sit somewhere a drawn line can be read ON TOP of. The
-      // gap is declared rather than described, and THIS is where it is
-      // enforced — beach-draw.js used to throw at module load instead, which
-      // put a mistake made in this repository in front of a visitor. See that
-      // file's own note beside MARK_HEADROOM.
-      // THE BAR IS NOT IMPORTED FROM THE MODULE UNDER TEST. The first version
-      // of this clause asserted the gap against the module's own
-      // MARK_HEADROOM, which is the entangled-reference trap: a tree that gave
-      // the headroom away would lower that constant too and the clause would
-      // stay green while the registers collided. Both numbers here have other
-      // owners — 0.30 is the gap this session is committing to, restated, and
-      // 0.32 is MEASURED off the reference (its footprints sit about 70 levels
-      // under their ground on a 185/47 range).
-      const HEADROOM = 0.30, REF_FOOTPRINT_ALPHA = 0.32;
-      assert.ok(D.DRY_MARK_ALPHA > 0, 'the dry sand carries no texture at all');
-      assert.ok(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA >= HEADROOM,
-        `the base texture at ${D.DRY_MARK_ALPHA} leaves only `
-        + `${(D.MARK_ALPHA_FLOOR - D.DRY_MARK_ALPHA).toFixed(2)} under the drawn-mark floor`);
-      assert.ok(D.DRY_MARK_ALPHA < REF_FOOTPRINT_ALPHA,
-        `the base texture at ${D.DRY_MARK_ALPHA} is as dark as the reference's own footprints`);
-      return `base ${D.DRY_MARK_ALPHA} · drawn marks from ${D.MARK_ALPHA_FLOOR} · headroom ${D.MARK_HEADROOM}`;
-    });
-
-    check('the swell fades out in the deep water', () => {
-      // Near the top of frame the ramp is steepest, so a displacement there
-      // swings the tone by a fifth and the sea bands.
-      near(D.swell(0.3, 0.01, 1.0, 0), 0, 1e-12, 'the swell is live at the top of frame');
-      const shoal = Math.abs(D.swell(0.3, 0.35, 1.0, 1));
-      assert.ok(shoal > 0, 'the swell is dead everywhere');
-      return `0 at depth 0, ${shoal.toFixed(4)} at the shore`;
-    });
+    // ---------------------------------------------------------------------
+    // RETIRED WITH THE HALFTONE LATTICE. Five checks stood here and all five
+    // were about ink DENSITY on a bilevel lattice measured against a
+    // photograph. beach-draw.js is gone and beach-brush.js draws with flat
+    // fills and brush strokes — a mid-grey sea, a near-black wave face, bare
+    // paper sand — so every one of them is a question about a module that no
+    // longer exists. Named here rather than deleted quietly, because what a
+    // check stops covering is worth more than the fact that it went:
+    //
+    //   the value ordering is the reference's own
+    //       `TONE.deep > shallow > gloss > wet > foam == dry == 0`. THE NEW
+    //       DRAWING BREAKS THIS ORDERING ON PURPOSE: its shallows are bare
+    //       paper, LIGHTER than the wet-sand grey behind the swash front, so
+    //       the sea is no longer monotone from deep water to dry sand. What
+    //       replaces it is not another ordering — it is that there is no tone
+    //       ladder left to order.
+    //   the foam band is a plateau of paper, not a ramp to one
+    //       about `waterTone`'s band profile. The foam is a paper FILL now,
+    //       bounded by a scalloped path; a plateau is what a fill is.
+    //   the run-up sheet is lighter than deep water
+    //       about the ocean gradient being anchored off the moving edge. There
+    //       is no gradient: the sheet is one flat `PALETTE.wet`.
+    //   the dry sand leaves a register for the marks session
+    //       THE ONE REAL LOSS, and it is a loss rather than an obsolescence.
+    //       The lattice drew its sand texture at a declared alpha with 0.30 of
+    //       headroom under the floor a later session's drawn marks would start
+    //       at, so the two could not collide. Every mark in the new drawing is
+    //       full-strength ink, so that separation does not exist and cannot be
+    //       asserted. The marks session will have to separate its register some
+    //       other way — by density, by shape or by weight — and this paragraph
+    //       is the whole of the warning it gets.
+    //   the swell fades out in the deep water
+    //       about `swell()`, the lattice's along-shore displacement. Gone with
+    //       it; the surface's own wander is beach-brush.js's `bumps` now.
+    // ---------------------------------------------------------------------
   }
 
   // --------------------------------------------------------------- registry
@@ -3414,7 +3277,7 @@ async function partOne(mutant) {
                          'koi-rain.js', 'koi-fish.js', 'koi-pads.js', 'koi-draw.js',
                          'scene-koi.js',
                          'beach-shore.js', 'beach-swash.js', 'beach-sets.js',
-                         'beach-water.js', 'beach-wave.js', 'beach-draw.js',
+                         'beach-water.js', 'beach-wave.js', 'beach-brush.js', 'beach-render.js',
                          'scene-beach.js'];
   const stripComments = (src) => src
     .replace(/\/\*[\s\S]*?\*\//g, ' ')
@@ -4279,9 +4142,19 @@ async function partTwo(browser, mutant, shotsDir) {
             st: window.__scene.sceneState(),
           };
         });
+        const DRY_S = await page.evaluate(async () => (await import('/scene/beach-swash.js')).OVERRUN_DRY_S);
+        const lagPx = st.height / 20 / DRY_S;
         for (const r of q) {
           assert.ok(Number.isFinite(r.s) && Number.isFinite(r.h), `not a number at x=${r.x}`);
-          assert.ok(r.h > r.s - 1, `the high-water mark is seaward of the swash at x=${r.x}`);
+          // THE TOLERANCE IS THE MODEL'S OWN, not a pixel picked by hand.
+          // Within one step `wet` is raised to the edge and THEN dried, so it
+          // is allowed to sit exactly one step of overrun drying below it:
+          // `dt / OVERRUN_DRY_S` of a frame height, with `dt` clamped at 1/20
+          // by the shell. Two owners, neither of them this clause. A real
+          // inversion is tens of pixels; this is under three.
+          assert.ok(r.h > r.s - lagPx,
+            `the high-water mark is ${(r.s - r.h).toFixed(2)} px seaward of the swash at x=${r.x}, `
+            + `against one step of drying at ${lagPx.toFixed(2)} px`);
         }
         // THE SHEAR IS RECOVERED BY A FIT, NOT BY TWO SAMPLES. Comparing the
         // left edge against the right conflates the shear with the SCALLOPS on
@@ -4319,192 +4192,26 @@ async function partTwo(browser, mutant, shotsDir) {
         return `fitted slope: edge ${fit.edge.toFixed(4)}, high-water ${fit.wet.toFixed(4)}, shore declares ${fit.declared.toFixed(4)}`;
       });
 
-      await checkAsync('the value ordering holds and the dry sand is toned not blank', async () => {
-        // THE VALUE STRUCTURE, off the rasterised framebuffer, and it takes TWO
-        // statistics because one of them cannot see the defect this check was
-        // written for. The dry band first shipped as BARE PAPER — a uniform
-        // 237/255 at 0.000 ink coverage across the bottom third — and every
-        // band comparison passed it, because a comparison of band MEANS reads a
-        // uniformly empty region as "the lightest" and that is all the ordering
-        // asks. "Dry sand is the open white" is a statement about the value
-        // ordering: it is the lightest TONED region, not an empty one. The
-        // reference never gets lighter than a mean of ~181 and carries the
-        // trampled surface to the bottom edge at a local contrast of 14.5.
-        //
-        // So the ordering is asserted on the means, and the dry band is
-        // separately held to carrying TEXTURE — which a mean is blind to — and
-        // to staying inside its own register, under the floor a later session's
-        // drawn marks start at.
-        // THE DEEP WATER IS MEASURED AT A MOMENT WITH NO BAND IN IT, and the
-        // moment is FOUND rather than assumed. The scene has waves in it now,
-        // travelling from the top of frame to the shore, so a fixed window in
-        // the deep water reads a foam band whenever one is passing through —
-        // and a check that simply raised its threshold to allow that would have
-        // stopped being about the sea at all.
-        //
-        // The scene's own record says where every band is; the PIXELS still
-        // say what is there. And it FAILS rather than loops if no such moment
-        // arrives within a wave's whole life, because "the deep water is never
-        // clear" is itself a defect and must not read as a skip.
-        // AND IT UNPAUSES ON EVERY PATH. The first cut returned early without
-        // stepping when it found no clear moment, leaving the scene PAUSED for
-        // every check after it — which failed three of them for a reason that
-        // had nothing to do with what they were about. A check that changes
-        // page state owns putting it back.
-        const found = await page.evaluate(async () => {
-          window.__scene.pause(true);
-          try {
-            for (let i = 0; i < 40; i++) {
-              const st = window.__scene.sceneState();
-              const clear = (st.waveStages || []).every(w =>
-                w.crest > 0.13 || w.crest + w.band < 0.02);
-              if (clear) { window.__scene.step(); return i; }
-              window.__scene.scenePump(0.6);
-            }
-            return -1;
-          } finally { if (window.__lastFound === undefined) window.__lastFound = 1; }
-        });
-        if (found < 0) await page.evaluate(() => window.__scene.pause(false));
-        assert.ok(found >= 0, 'no moment in a whole wave cycle leaves the deep water clear of a band');
-        const m = await page.evaluate(() => {
-          const c = document.querySelector('.scene-canvas');
-          const g = c.getContext('2d');
-          const W = c.width, H = c.height;
-          const band = (a, b) => {
-            const y0 = Math.round(H * a), hh = Math.max(1, Math.round(H * (b - a)));
-            const d = g.getImageData(0, y0, W, hh).data;
-            let s = 0; for (let i = 0; i < d.length; i += 4) s += d[i];
-            const mean = s / (d.length / 4);
-            // Local contrast: how far a pixel sits from the mean of its patch.
-            // A flat region reads ~0 however light or dark it is.
-            let loc = 0, n = 0;
-            const at = (x, y) => d[(y * W + x) * 4];
-            for (let y = 5; y < hh - 5; y += 3) for (let x = 5; x < W - 5; x += 3) {
-              let p = 0; for (let k = -4; k <= 4; k += 2) for (let j = -4; j <= 4; j += 2) p += at(x + j, y + k);
-              loc += Math.abs(at(x, y) - p / 25); n++;
-            }
-            // The darkest 1% — what the texture's own marks reach.
-            const px = []; for (let i = 0; i < d.length; i += 40) px.push(d[i]);
-            px.sort((a2, b2) => a2 - b2);
-            return { mean, loc: loc / n, p01: px[Math.floor(px.length * 0.01)], paper: px[px.length - 1] };
-          };
-          return { top: band(0.02, 0.12), mid: band(0.18, 0.32), wet: band(0.46, 0.54), dry: band(0.78, 0.97) };
-        });
-        await page.evaluate(() => window.__scene.pause(false));
-
-        assert.ok(m.top.mean < m.mid.mean, `the deep water (${m.top.mean.toFixed(0)}) is not darker than the water below it (${m.mid.mean.toFixed(0)})`);
-        assert.ok(m.mid.mean < m.wet.mean, `the water (${m.mid.mean.toFixed(0)}) is not darker than the wet sand (${m.wet.mean.toFixed(0)})`);
-        assert.ok(m.wet.mean < m.dry.mean, `the wet sand (${m.wet.mean.toFixed(0)}) is not darker than the dry sand (${m.dry.mean.toFixed(0)})`);
-        assert.ok(m.top.mean < 110, `the deep water reads ${m.top.mean.toFixed(0)} — it is not a dark mass`
-          + ` (measured ${found} pumps in, with no band in the window)`);
-
-        // THE DRY BAND IS TONED. A blank band reads ~0 local contrast; the
-        // reference's reads 14.5. Held well clear of flat, and under the
-        // reference's own so a drawn mark has somewhere to go.
-        assert.ok(m.dry.loc > 4, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)} — it is a blank band`);
-        assert.ok(m.dry.loc < 14.5, `the dry sand's local contrast is ${m.dry.loc.toFixed(1)}, at or past the reference's own 14.5`);
-        assert.ok(m.dry.mean < 234, `the dry sand reads ${m.dry.mean.toFixed(0)} — it is bare paper`);
-
-        // AND ITS MARKS STAY IN THEIR REGISTER. The darkest 1% of the band is
-        // what the texture actually puts down; a later session's drawn marks
-        // start at MARK_ALPHA_FLOOR, so the base has to sit lighter than that.
-        const floor = m.dry.paper - (m.dry.paper - 22) * 0.60;
-        assert.ok(m.dry.p01 > floor,
-          `the sand texture reaches ${m.dry.p01} against a drawn-mark floor of ${floor.toFixed(0)} — the two registers collide`);
-        return `deep ${m.top.mean.toFixed(0)} < water ${m.mid.mean.toFixed(0)} < wet ${m.wet.mean.toFixed(0)} < dry ${m.dry.mean.toFixed(0)}; `
-          + `dry local contrast ${m.dry.loc.toFixed(1)} (ref 14.5), marks reach ${m.dry.p01} against a floor of ${floor.toFixed(0)}`;
-      });
-
-      await checkAsync('the foam band reaches bare paper', async () => {
-        // THE BAND HAS TO BE WIDER THAN A SCREEN ROW'S OWN s-RANGE, and the
-        // plateau clause next door cannot see that: a narrow band is still a
-        // plateau in shape, it just never reads as bare anywhere.
-        //
-        // MEASURED IN A CENTRAL STRIP, because these bands are SHEARED — at 3
-        // degrees on this frame one full-width row spans 0.079 of frame height
-        // in band coordinates, which is WIDER THAN THE BAND, so a full-width
-        // mean can never reach paper however bare the band is. Over the middle
-        // tenth the shear is under 1% of height.
-        //
-        // THE BAR IS THE REFERENCE'S OWN BARE RUN. Read off the clips with a
-        // PER-COLUMN statistic, which needs no strip and no slope at all —
-        // shear moves a band up or down per column and cannot smear anything
-        // within one — the longest bare run is 3.56% / 1.39% / 3.06% of frame
-        // on the three clips whose foam is not thin (0.43% on c3_001, which
-        // is), and 97-100% of their columns reach EXACTLY 0.000 coverage.
-        // FOAM_BAND_S is set from that; see its own block in beach-draw.js,
-        // including why the full-width figure cannot be satisfied at any width.
-        // The bar here sits under the thinnest of the three, so it fails a band
-        // that has stopped opening rather than one that is merely narrower than
-        // c1_001's.
-        // THE DEEP WATER IS MEASURED AT A MOMENT WITH NO BAND IN IT, and the
-        // moment is FOUND rather than assumed. The scene has waves in it now,
-        // travelling from the top of frame to the shore, so a fixed window in
-        // the deep water reads a foam band whenever one is passing through —
-        // and a check that simply raised its threshold to allow that would have
-        // stopped being about the sea at all.
-        //
-        // The scene's own record says where every band is; the PIXELS still
-        // say what is there. And it FAILS rather than loops if no such moment
-        // arrives within a wave's whole life, because "the deep water is never
-        // clear" is itself a defect and must not read as a skip.
-        // AND IT UNPAUSES ON EVERY PATH. The first cut returned early without
-        // stepping when it found no clear moment, leaving the scene PAUSED for
-        // every check after it — which failed three of them for a reason that
-        // had nothing to do with what they were about. A check that changes
-        // page state owns putting it back.
-        const found = await page.evaluate(async () => {
-          window.__scene.pause(true);
-          try {
-            for (let i = 0; i < 40; i++) {
-              const st = window.__scene.sceneState();
-              const clear = (st.waveStages || []).every(w =>
-                w.crest > 0.13 || w.crest + w.band < 0.02);
-              if (clear) { window.__scene.step(); return i; }
-              window.__scene.scenePump(0.6);
-            }
-            return -1;
-          } finally { if (window.__lastFound === undefined) window.__lastFound = 1; }
-        });
-        if (found < 0) await page.evaluate(() => window.__scene.pause(false));
-        assert.ok(found >= 0, 'no moment in a whole wave cycle leaves the deep water clear of a band');
-        const m = await page.evaluate(() => {
-          const c = document.querySelector('.scene-canvas');
-          const g = c.getContext('2d');
-          const W = c.width, H = c.height;
-          const x0 = Math.round(W * 0.45), ww = Math.round(W * 0.10);
-          const d = g.getImageData(x0, 0, ww, H).data;
-          const rows = [];
-          for (let y = 0; y < H; y++) {
-            let s2 = 0;
-            for (let x = 0; x < ww; x++) s2 += d[(y * ww + x) * 4];
-            rows.push(s2 / ww);
-          }
-          const paper = Math.max(...rows);
-          const st = window.__scene.sceneState();
-          // Between the deep water and the swash edge, in screen rows.
-          const lo = Math.round(H * 0.10), hi = Math.round(H * st.edge[2]);
-          // THE BARE EXTENT, NOT JUST WHETHER ONE ROW IS BARE. Any plateau at
-          // all leaves a row or two between lattice lines, so "it reaches
-          // paper somewhere" is satisfied by a band a tenth the shipped width
-          // — measured, it stayed green at FOAM_BAND_S 0.022. What the
-          // reference actually shows is a band bare across about 4% of frame.
-          let run = 0, best = 0, at = 0;
-          for (let y = lo; y < hi; y++) {
-            if (paper - rows[y] < 10) { run++; if (run > best) { best = run; at = y / H; } }
-            else run = 0;
-          }
-          return { paper, span: best / H, at, edge: st.edge[2] };
-        });
-        await page.evaluate(() => window.__scene.pause(false));
-        assert.ok(m.span > 0.025,
-          `the foam band is bare across only ${(m.span * 100).toFixed(2)}% of frame height `
-          + `— the reference's is bare across about 4%`);
-        return `bare across ${(m.span * 100).toFixed(2)}% of frame (ref 3.56 / 3.06 / 1.39%), ending at `
-          + `${(m.at * 100).toFixed(1)}%, swash edge at ${(m.edge * 100).toFixed(1)}%`;
-      });
-
-      const PRE_S_PAGE = await page.evaluate(async () => (await import('/scene/beach-wave.js')).PRE_S);
+      // TWO MORE PHOTOGRAPHIC CHECKS RETIRED HERE, and they are the pair the
+      // brief names. Both read the rasterised framebuffer and compared BAND
+      // MEANS and INK COVERAGE against figures measured off the reference
+      // footage, which is the right question to ask of a halftone lattice and
+      // the wrong one to ask of a cartoon:
+      //
+      //   the value ordering holds and the dry sand is toned not blank
+      //       the five-band comparison — deep < mid < wet < dry as means, plus
+      //       a local-contrast floor on the dry band and a darkest-1% ceiling
+      //       holding its texture inside the marks register. The new drawing
+      //       fails it by design (its shallows are bare paper) and its sand
+      //       texture is full-strength ink, so neither half survives.
+      //   the foam band reaches bare paper
+      //       the band's longest bare run against the reference's own 0.43-3.56
+      //       per cent of frame. The foam is a fill; it is bare everywhere
+      //       inside its own path, so the question is vacuous.
+      //
+      // What replaces them is the `draw/*` section below: the edge invariant,
+      // one wave per record, the peel monotone in time, the lobes stable, and
+      // no wave drawn once it is spent. Structure rather than tone.
       await checkAsync('the swash runs and drains while the wet band stays', async () => {
         // The two-line model on the live page: over a whole cycle the edge
         // moves a long way and the high-water mark barely does.
@@ -4512,6 +4219,7 @@ async function partTwo(browser, mutant, shotsDir) {
         // arrive PRE_S seconds after it, so "the energy reads zero now" is not
         // the same statement as "no set is on this beach". Same correction as
         // the quiet-window one in the swash section, on the live page.
+        const PRE_S_PAGE = await page.evaluate(async () => (await import('/scene/beach-wave.js')).PRE_S);
         let eMin = 9, eMax = -9, wMin = 9, wMax = -9, lastHot = -1e9, taken = 0, spins = 0;
         while (taken < 26 && spins++ < 400) {
           await page.evaluate(() => window.__scene.scenePump(0.35));
@@ -4529,71 +4237,14 @@ async function partTwo(browser, mutant, shotsDir) {
         return `edge ${eMin.toFixed(3)}..${eMax.toFixed(3)} (${eRange.toFixed(3)}), high-water ${wRange.toFixed(3)}`;
       });
 
-      await checkAsync('the swell has somewhere to go', async () => {
-        // A TONE IS NOT INK. The row walk's weight buckets, duty law and pitch
-        // compose, so what a tone of T actually puts on the paper cannot be
-        // read off the code — and measured through the shipped draw path this
-        // lattice SATURATES at about 0.70. From there to 1.00, thirty percent
-        // of the control's travel, the ink moves under three points.
-        //
-        // That is not a detail: the swell is the one stage whose whole
-        // vocabulary is "darker than the water around it", and at the tone
-        // this scene shipped with (0.78) it bought half a percentage point of
-        // coverage. NOTHING ELSE IN THIS GATE CAN SEE THAT. The value ordering
-        // holds, the deep water is still a mass, every law in beach-wave.js is
-        // untouched, and the stage is dead.
-        //
-        // Measured through beach-draw.js's own `__flatTone` hook, which is the
-        // only thing that can answer it.
-        // AND IT IS THE REAL COMPARISON, NOT A FLAT FIELD. The first cut asked
-        // `__flatTone` what a tone of 0.70 delivers and compared it with what
-        // the swell's target delivers — which reads 97.1% against 99.2% and
-        // makes the shipped tone look as dead as the one it replaced. A flat
-        // frame is not the question: the swell is a LOBE over a RAMP, so what
-        // matters is the ink it adds to THE DEEP WATER THIS SCENE DRAWS. The
-        // same wave over the same band, with the field alone as its control.
-        const cov = await page.evaluate(async () => {
-          const cv = document.createElement('canvas');
-          cv.width = 900; cv.height = 600; document.body.appendChild(cv);
-          const ctx = cv.getContext('2d', { alpha: false });
-          const S = await import('/scene/beach-shore.js');
-          const D = await import('/scene/beach-draw.js');
-          const V = await import('/scene/beach-wave.js');
-          const sh = S.createShore(); sh.resize(900, 600);
-          const r = D.createRenderer(ctx, sh);
-          let k = 0;
-          const seq = [0.31, 0.77, 0.12, 0.58, 0.93, 0.40, 0.66, 0.05, 0.84, 0.23, 0.51, 0.71];
-          const rand = { unit: () => seq[k++ % seq.length], range: (a, b) => a + (b - a) * seq[k++ % seq.length] };
-          const ink = (waves) => {
-            k = 0;
-            r.draw({ width: 900, height: 600, swashAt: () => 0.42, wetAt: () => 0.60, glossDepth: 0.03,
-                     frontFoam: 0.35, frontSeed: 11, drift: 0, streaks: [], waves });
-            const d = ctx.getImageData(0, 0, 900, Math.floor(600 * 0.13)).data;
-            let n = 0, on = 0;
-            for (let i = 0; i < d.length; i += 4) { n++; if (d[i] < 170) on++; }
-            return on / n;
-          };
-          const mk = (depth) => { const w = V.makeWave({ rand, energy: 0.9 }); w.swellDepth = depth; w.age = w.breakAge - w.steepS - 0.6; return w; };
-          const rest = ink([]);
-          const lo = ink([mk(V.SWELL_TONE[0])]);
-          const hi = ink([mk(V.SWELL_TONE[1])]);
-          cv.remove();
-          return [rest, lo, hi];
-        });
-        const [rest, lo, hi] = cov;
-        // THE BAR HAS A DIFFERENT OWNER FROM THE QUANTITY: the swell's own
-        // declared range against the field's resting tone, judged in INK. A
-        // tree that pushes the resting tone back to saturation moves `rest`
-        // and not the bar. Measured across the resting tone: 0.78 buys +0.005,
-        // 0.74 +0.004, the shipped 0.70 +0.016, 0.62 +0.035 — so 0.010
-        // separates a live stage from a dead one with room either side.
-        assert.ok(hi > rest, 'a full swell does not darken the water at all');
-        assert.ok(hi - rest > 0.010,
-          `a full swell moves the deep water's ink by ${(100 * (hi - rest)).toFixed(1)} points — the stage is dead`);
-        assert.ok(lo > rest, 'even the smallest swell must darken the water it stands in');
-        return `deep water ${(100 * rest).toFixed(1)}% ink at rest, ${(100 * lo).toFixed(1)}% under an ordinary swell, ${(100 * hi).toFixed(1)}% under a full one (+${(100 * (hi - rest)).toFixed(1)} points)`;
-      });
-
+      //   the swell has somewhere to go
+      //       RETIRED WITH THEM. It measured the swell's DELIVERED INK against
+      //       the resting water's through beach-draw.js's `__flatTone` hook —
+      //       the only instrument that could say a stage was dead because the
+      //       lattice had saturated. There is no lattice, no `__flatTone` and
+      //       no tone target: the swell is an ink FACE band in the new drawing
+      //       and its presence is structural, which `draw/every-wave-is-drawn-
+      //       once-with-its-own-record` and the stage checks cover.
       await checkAsync('several waves are alive at once, at different stages', async () => {
         // THE NORMAL STATE, NOT AN EDGE CASE. Measured per column, the
         // reference carries a mean of 1.3 to 3.4 separate bright bands with
@@ -4637,6 +4288,440 @@ async function partTwo(browser, mutant, shotsDir) {
         assert.ok(hi - lo > 0.20, `every crest sat between ${lo.toFixed(3)} and ${hi.toFixed(3)} of frame height`);
         return `crests observed from ${lo.toFixed(3)} to ${hi.toFixed(3)} of frame height over ${crests.length} observations`;
       });
+
+      // ----------------------------------------------------------- drawing --
+      // THE DRAWING LAYER, CHECKED AS STRUCTURE. These replace the band-mean
+      // and ink-coverage comparisons retired above. None of them asks what
+      // TONE anything is: they ask whether the line that is drawn is the line
+      // that is published, whether one record makes one wave, whether the peel
+      // runs one way in time, whether a wave's foam holds still between
+      // frames, and whether a spent wave is still being drawn.
+      setSection('draw');
+
+      await checkAsync('the drawn foam edge IS the published swash edge', async () => {
+        // THE ONE INVARIANT THAT MATTERS MOST, and the failure it prevents is
+        // not cosmetic: a bird stands at `swashYAt(x)` and a mark is erased
+        // where the water reached, so a drawn edge generated separately from
+        // the published one puts birds on dry sand.
+        //
+        // READ BACK OFF THE CANVAS, which is the only owner that cannot lie
+        // about what was drawn. The published side is the scene's own
+        // `swashYAt`; the drawn side is found by walking each column of the
+        // framebuffer for the swash front's own stroke. They have different
+        // owners — one is the simulation, one is the rasteriser — which is
+        // what makes the comparison worth making.
+        const m = await page.evaluate(async () => {
+          window.__scene.pause(true);
+          window.__scene.scenePump(2.2); window.__scene.step();
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const rect = c.getBoundingClientRect();
+          const dpr = c.width / rect.width;
+          const d = g.getImageData(0, 0, c.width, c.height).data;
+          const W = c.width, H = c.height;
+          const at = (x, y) => d[(y * W + x) * 4];
+          // THE FRONT IS THE BOUNDARY OF THE WET BAND, which is the one thing
+          // in this drawing with `PALETTE.wet` above it and paper below: find
+          // the LAST row in each column that is wet-grey, then take the centre
+          // of the ink stroke that follows it. Anything else in the frame is
+          // ink-on-paper or paper-on-grey and cannot be confused with it.
+          // A RUN, NOT A PIXEL. Ink (22) over paper (243) antialiases THROUGH
+          // the wet grey (198), so a bare "is this pixel grey" test finds a
+          // single blended pixel UNDER the stroke and then looks for the
+          // stroke below it and finds nothing. Measured: that found 4 columns
+          // of 8. The band is tens of pixels deep, so requiring a run of six
+          // separates it from any edge the rasteriser can manufacture.
+          const out = [];
+          for (const fx of [0.06, 0.14, 0.22, 0.3, 0.38, 0.46, 0.54, 0.62, 0.7, 0.78, 0.86, 0.94]) {
+            const x = Math.round(fx * W);
+            let run = 0, bandEnd = -1;
+            for (let y = 1; y < H; y++) {
+              const v = at(x, y);
+              if (v > 180 && v < 215) { run++; if (run >= 6) bandEnd = y; }
+              else run = 0;
+            }
+            if (bandEnd < 0) { out.push(null); continue; }
+            // the stroke: the first run of ink at or below the band's floor
+            let y0 = -1, y1 = -1;
+            for (let y = bandEnd; y < Math.min(H, bandEnd + 16); y++) {
+              if (at(x, y) < 90) { if (y0 < 0) y0 = y; y1 = y; }
+              else if (y0 >= 0) break;
+            }
+            // A COLUMN WITH A BUBBLE ON IT IS NOT READABLE, AND THAT CARVE-OUT
+            // DOES NOT EXCLUDE THE FAILURE THIS CHECK DOUBTS. Eleven bubbles
+            // are drawn along the front after it, each a PAPER disc with an
+            // ink outline: where one lands it punches the last rows out of the
+            // grey band and leaves two one-pixel outline runs either side of
+            // the stroke, so the first ink below the band is the bubble's rim
+            // and reads seven pixels off. The front itself is brushed at
+            // `3.8 * H / 720` CSS px, so it is never one pixel — measured, the
+            // eleven readable columns of a twelve-column sweep give runs of
+            // two to four pixels and the bubble column gives one. An edge
+            // generated separately from the published one would put a
+            // full-width stroke in the WRONG PLACE, which stays in the subject.
+            out.push(y0 < 0 || (y1 - y0) < 1 ? null : { xCss: x / dpr, yCss: ((y0 + y1) / 2) / dpr });
+          }
+          const pub = out.map(o => o && window.__scene.sceneQuery('swashYAt', o.xCss));
+          window.__scene.pause(false);
+          return { out, pub, dpr };
+        });
+        const pairs = m.out.map((o, i) => o && ({ x: o.xCss, drawn: o.yCss, pub: m.pub[i] })).filter(Boolean);
+        assert.ok(pairs.length >= 9, `only ${pairs.length} of 12 columns had a readable front`);
+        let worst = 0, at = 0;
+        for (const q of pairs) { const e = Math.abs(q.drawn - q.pub); if (e > worst) { worst = e; at = q.x; } }
+        // THE BAR IS THE STROKE'S OWN HALF-WIDTH PLUS A PIXEL, not a number
+        // picked to pass. The front is brushed at `3.8 * H / 720` CSS px wide,
+        // so at 720 the centre of the laid stroke can only be located to
+        // within about 1.9 px however exact the geometry is, and the
+        // anti-aliased shoulders and the row quantisation add the rest. The
+        // brief's own bar is "within a pixel or two".
+        assert.ok(worst <= 2.5,
+          `the drawn front is ${worst.toFixed(2)} CSS px from the published edge at x=${at.toFixed(0)}`);
+        const mean = pairs.reduce((a2, q) => a2 + Math.abs(q.drawn - q.pub), 0) / pairs.length;
+        return `${pairs.length} of 12 columns, worst ${worst.toFixed(2)} and mean ${mean.toFixed(2)} CSS px between the drawn front and swashYAt`;
+      });
+
+      await checkAsync('the drawing takes its shear from the shore', async () => {
+        // THE OTHER HALF OF ONE CURVE. beach-brush.js declares its own SHEAR
+        // as a fraction of HEIGHT dropped across the WIDTH; beach-shore.js
+        // declares an ANGLE, and every published query goes through it. Left
+        // to its own the drawing runs 5.0 degrees on a 4:3 frame and 3.8 on
+        // 16:9 against the shore's 3.0, so the drawn edge and the published
+        // one would diverge by seventeen pixels at the frame's edges however
+        // exactly they agreed about `s`.
+        //
+        // MEASURED OFF THE PIXELS, AND THE FIRST CUT WAS NOT. It read
+        // `state().shear` — which is `scene-beach.js`'s own restatement of the
+        // shore's slope, not the number the renderer hands over — so the
+        // mutant that makes the drawing keep its own SHEAR left it GREEN.
+        // Session 41's mirror rule: name the owner of the MEASURED side too,
+        // and check it is the artefact.
+        //
+        // DRAWN INTO A SCRATCH CANVAS WITH NO WAVES, through the SHIPPED
+        // adapter, which is what makes the horizon readable at all. On the
+        // live page a wave's ink face is over part of that boundary at every
+        // moment — waves are born above the top of frame and take thirteen
+        // seconds to pass it while one arrives every three to six — and the
+        // best frame in thirty left nine columns of twenty-five. The adapter
+        // is the thing under test and it takes its wave list as an argument,
+        // so handing it none costs the claim nothing.
+        const m = await page.evaluate(async () => {
+          const R = await import('/scene/beach-render.js');
+          const S = await import('/scene/beach-shore.js');
+          const B = await import('/scene/beach-brush.js');
+          const W = 900, H = 600;
+          const cv = document.createElement('canvas');
+          cv.width = W; cv.height = H; document.body.appendChild(cv);
+          const ctx = cv.getContext('2d', { alpha: false });
+          const sh = S.createShore(); sh.resize(W, H);
+          R.createRenderer(ctx, sh).draw({ width: W, height: H, waves: [], waterline: S.WATERLINE_S,
+            swashAt: () => 0.42, wetAt: () => 0.60, drift: 0, frontSeed: 7 });
+          const d = ctx.getImageData(0, 0, W, H).data;
+          const at = (x, y) => d[(y * W + x) * 4];
+          // seaDeep is 62 and sea is 86: the first row in each column that
+          // leaves the dark band, with a run either side so an antialiased
+          // edge cannot manufacture it.
+          const xs = [], ys = [];
+          for (let k = 0; k <= 24; k++) {
+            const x = Math.round((0.02 + 0.96 * k / 24) * (W - 1));
+            const deep = (y) => at(x, y) > 55 && at(x, y) < 72;
+            const mid = (y) => at(x, y) > 78 && at(x, y) < 100;
+            for (let y = 6; y < H * 0.45; y++) {
+              if (deep(y) && deep(y - 2) && deep(y - 4) && mid(y + 2) && mid(y + 4) && mid(y + 6)) { xs.push(x); ys.push(y); break; }
+            }
+          }
+          cv.remove();
+          const n = xs.length;
+          if (n < 20) return { n, declared: sh.slope, own: B.SHEAR, w: W, h: H };
+          const mx = xs.reduce((a2, b2) => a2 + b2, 0) / n, my = ys.reduce((a2, b2) => a2 + b2, 0) / n;
+          let num = 0, den = 0;
+          for (let i = 0; i < n; i++) { num += (xs[i] - mx) * (ys[i] - my); den += (xs[i] - mx) ** 2; }
+          return { n, fitted: num / den, declared: sh.slope, own: B.SHEAR, w: W, h: H };
+        });
+        assert.ok(m.fitted !== undefined, `the horizon was readable in only ${m.n} of 25 columns`);
+        const ownSlope = m.own * m.w / m.h;
+        assert.ok(Math.abs(ownSlope - m.declared) > 0.02,
+          'the module\'s own SHEAR happens to draw the shore\'s slope here, so this check proves nothing');
+        // THE BAR IS A QUARTER OF THE WAY BETWEEN THE TWO ANSWERS, which is
+        // what makes it a measurement rather than a tolerance: the fit carries
+        // the horizon's own wander (0.005 of frame height over three
+        // harmonics) and cannot be exact, while the two candidate slopes are
+        // 0.13 apart on this frame.
+        const err = Math.abs(m.fitted - m.declared);
+        assert.ok(err < Math.abs(ownSlope - m.declared) / 4,
+          `the drawn horizon fits a slope of ${m.fitted.toFixed(4)}: the shore declares ${m.declared.toFixed(4)} `
+          + `and the module's own SHEAR would draw ${ownSlope.toFixed(4)}`);
+        return `horizon fitted at ${m.fitted.toFixed(4)} over ${m.n} columns against the shore's ${m.declared.toFixed(4)}, `
+          + `where the module's own SHEAR draws ${ownSlope.toFixed(4)}`;
+      });
+
+      await checkAsync('every wave is drawn once, with its own record', async () => {
+        // ONE WAVE PER RECORD. The drawing used to hold two hardcoded waves;
+        // the claim now is that it holds exactly the live ones, and that each
+        // one is drawn from ITS OWN record rather than from a shared spec.
+        //
+        // The count is compared against the SIMULATION's list less the waves
+        // that have become the swash, which is a different owner from the
+        // renderer's own tally.
+        const m = await page.evaluate(async () => {
+          window.__scene.pause(true);
+          const rows = [];
+          for (let i = 0; i < 12; i++) {
+            window.__scene.scenePump(1.1); window.__scene.step();
+            const st = window.__scene.sceneState();
+            rows.push({ alive: st.waves, drawn: st.drawnWaves,
+              notSwash: (st.waveStages || []).filter(w => w.stage !== 6).length,
+              seeds: (st.waveStages || []).map(w => w.seed),
+              heights: (st.waveStages || []).map(w => w.height) });
+          }
+          window.__scene.pause(false);
+          return rows;
+        });
+        let seen = 0, multi = 0;
+        for (const r of m) {
+          assert.strictEqual(r.drawn, r.notSwash,
+            `${r.drawn} waves drawn against ${r.notSwash} alive and not yet the swash (of ${r.alive})`);
+          if (r.drawn >= 2) multi++;
+          seen = Math.max(seen, r.drawn);
+          const uniq = new Set(r.seeds);
+          assert.strictEqual(uniq.size, r.seeds.length, 'two live waves share a seed, so they draw the same foam');
+        }
+        assert.ok(multi >= 8, `only ${multi} of ${m.length} samples had two or more waves drawn at once`);
+        assert.ok(seen >= 3, `at most ${seen} waves were ever drawn at once`);
+        return `up to ${seen} drawn at once, ${multi}/${m.length} samples with two or more, every seed distinct`;
+      });
+
+      await checkAsync('no wave is drawn once it is spent', async () => {
+        // The drawing has no fade: its foam band grows with the break phase
+        // and never thins, so a wave left in the list after it has arrived
+        // would sit on the sand drawing a full white band. The boundary is the
+        // simulation's own SWASH label — the moment the crest has crossed the
+        // waterline everywhere and the swash front owns that stretch of beach.
+        //
+        // BOTH DIRECTIONS. A renderer that drew nothing at all would satisfy
+        // "no spent wave is drawn" perfectly, so the clause that matters is
+        // that an UNSPENT wave IS drawn.
+        const m = await page.evaluate(async () => {
+          window.__scene.pause(true);
+          let spentDrawn = 0, liveDrawn = 0, samples = 0, everSpent = 0;
+          for (let i = 0; i < 40; i++) {
+            window.__scene.scenePump(0.7); window.__scene.step();
+            const st = window.__scene.sceneState();
+            const ws = st.waveStages || [];
+            const spent = ws.filter(w => w.stage === 6).length;
+            everSpent += spent;
+            if (st.drawnWaves > ws.length - spent) spentDrawn++;
+            if (st.drawnWaves === ws.length - spent && st.drawnWaves > 0) liveDrawn++;
+            samples++;
+          }
+          window.__scene.pause(false);
+          return { spentDrawn, liveDrawn, samples, everSpent };
+        });
+        assert.ok(m.everSpent > 0, 'no wave ever reached the swash, so the subject of this check was empty');
+        assert.strictEqual(m.spentDrawn, 0, `${m.spentDrawn} of ${m.samples} frames drew a wave that had already arrived`);
+        assert.ok(m.liveDrawn > m.samples * 0.7, `only ${m.liveDrawn} of ${m.samples} frames drew the waves that were live`);
+        return `${m.samples} frames, ${m.everSpent} spent-wave observations, none drawn; ${m.liveDrawn} frames drew every live wave`;
+      });
+
+      await checkAsync('the peel is monotone in time and runs across the frame', async () => {
+        // A PEEL IS ONE DIRECTION. The drawing reads ONE number per column —
+        // how far through the break it is — and two things have to hold of it:
+        // at a fixed column it only ever goes forward, and at a fixed moment
+        // it differs from one end of the frame to the other, which is what
+        // makes a break run along a crest rather than happen all at once.
+        const m = await page.evaluate(async () => {
+          window.__scene.pause(true);
+          const tracks = new Map();
+          for (let i = 0; i < 90; i++) {
+            window.__scene.scenePump(0.22);
+            for (const w of (window.__scene.sceneState().waveStages || [])) {
+              if (!tracks.has(w.seed)) tracks.set(w.seed, []);
+              tracks.get(w.seed).push(w.phase);
+            }
+          }
+          window.__scene.pause(false);
+          return [...tracks.values()].filter(t => t.length >= 6).map(t => ({
+            n: t.length,
+            back: t.some((p, i) => i && p.some((v, k) => v < t[i - 1][k] - 1e-12)),
+            spread: Math.max(...t.map(p => Math.max(...p) - Math.min(...p))),
+            span: Math.max(...t.map(p => Math.max(...p))) - Math.min(...t.map(p => Math.min(...p))),
+          }));
+        });
+        assert.ok(m.length >= 4, `only ${m.length} waves were tracked for long enough`);
+        const backwards = m.filter(t => t.back);
+        assert.strictEqual(backwards.length, 0, `${backwards.length} of ${m.length} waves ran their break backwards at some column`);
+        const peeled = m.filter(t => t.spread > 0.02);
+        assert.ok(peeled.length >= m.length * 0.75,
+          `only ${peeled.length} of ${m.length} waves ever had two ends of the frame at different break phases`);
+        const worst = Math.max(...m.map(t => t.spread));
+        return `${m.length} waves tracked, none ran backwards, ${peeled.length} peeled across the frame (widest spread ${worst.toFixed(3)})`;
+      });
+
+      await checkAsync('a wave\'s foam holds still between frames', async () => {
+        // "Do not regenerate lobes per frame — the foam will boil." The
+        // scallops on a wave's own band, and its bubbles, are drawn ONCE at
+        // birth off the wave's own stream and stored on its record. Left on
+        // the frame's stream they would move every frame, because the bubble
+        // loop and the brush's pass cuts each take a VARIABLE number of draws
+        // and shift everything after them.
+        //
+        // READ AS A CHECKSUM OF THE STORED PARAMETERS rather than as pixels:
+        // the picture legitimately changes every frame (the wave moves), so a
+        // pixel comparison cannot separate boiling foam from a travelling one.
+        const m = await page.evaluate(async () => {
+          window.__scene.pause(true);
+          const seen = new Map(); let moved = 0, checked = 0;
+          for (let i = 0; i < 60; i++) {
+            window.__scene.scenePump(0.12); window.__scene.step();
+            for (const w of (window.__scene.sceneState().waveStages || [])) {
+              if (seen.has(w.seed)) {
+                checked++;
+                const p = seen.get(w.seed);
+                if (p.lobes !== w.lobes || Math.abs(p.lobeSum - w.lobeSum) > 0) moved++;
+              } else seen.set(w.seed, { lobes: w.lobes, lobeSum: w.lobeSum });
+            }
+          }
+          window.__scene.pause(false);
+          return { waves: seen.size, checked, moved };
+        });
+        assert.ok(m.checked > 200, `only ${m.checked} frame-to-frame comparisons`);
+        assert.ok(m.waves >= 4, `only ${m.waves} distinct waves were seen`);
+        assert.strictEqual(m.moved, 0, `${m.moved} of ${m.checked} observations found a wave's lobes had been re-drawn`);
+
+        // AND THE CLAUSE THAT READS THE ARTEFACT RATHER THAN THE RECORD. The
+        // one above asks the RECORD whether its stored parameters moved, and a
+        // renderer that ignored them and generated its own per frame would
+        // leave the record untouched and pass it — session 41's mirror rule,
+        // in the family it keeps happening to. So the second clause is about
+        // the marks: A WAVE'S OP BLOCK MUST NOT DEPEND ON WHAT WAS DRAWN
+        // BEFORE IT. Drawn off the frame's shared stream the lobes and the
+        // bubbles move whenever an earlier wave's gate changes how many draws
+        // it takes, which is the whole of how foam boils.
+        const q = await page.evaluate(async () => {
+          const V = await import('/scene/beach-wave.js');
+          const R = await import('/scene/beach-render.js');
+          const S = await import('/scene/beach-shore.js');
+          let k = 0;
+          const seq = [0.31, 0.77, 0.12, 0.58, 0.93, 0.40, 0.66, 0.05, 0.84, 0.23, 0.51, 0.71];
+          const rand = { unit: () => seq[k++ % seq.length], range: (a, b) => a + (b - a) * seq[k++ % seq.length],
+                         int: (a, b) => a + Math.floor((b - a + 1) * seq[k++ % seq.length]) };
+          const first = V.makeWave({ rand, energy: 0.6 });
+          const second = V.makeWave({ rand, energy: 0.6 });
+          second.crest0 += 0.12; second.age = second.breakAge + 1.1;
+          const sh = S.createShore(); sh.resize(900, 600);
+          const run = (list) => {
+            const ops = []; const noop = () => {};
+            const push = (t) => (...v) => ops.push(t + ':' + v.map(n => (typeof n === 'number' ? n.toFixed(4) : n)).join(','));
+            const rec = new Proxy({ moveTo: push('M'), lineTo: push('L'), ellipse: push('E'), arc: push('A'),
+              fill: () => ops.push('F'), stroke: () => ops.push('S'), fillRect: push('R'),
+              beginPath: noop, closePath: noop, save: noop, restore: noop, setTransform: noop,
+            }, { get: (t, kk) => (kk in t ? t[kk] : noop), set: (t, kk, v) => { t[kk] = v; return true; } });
+            R.createRenderer(rec, sh).draw({ width: 900, height: 600, waves: list, waterline: S.WATERLINE_S,
+              swashAt: () => 0.42, wetAt: () => 0.60, drift: 0, frontSeed: 7 });
+            return ops;
+          };
+          // the SECOND wave's block, with the first wave at two different ages
+          const empty = run([]).length;
+          const blockOf = (age) => {
+            first.age = age;
+            const one = run([first]).length;
+            const two = run([first, second]);
+            const na = one - empty;
+            let k0 = 0; const P = run([]);
+            while (k0 < P.length && P[k0] === two[k0]) k0++;
+            return { block: two.slice(k0 + na, k0 + na + (run([second]).length - empty)), na };
+          };
+          const A = blockOf(first.breakAge + 0.4);
+          const B = blockOf(first.breakAge + 1.9);
+          return { same: A.block.length === B.block.length && A.block.every((v, i) => v === B.block[i]),
+                   n: A.block.length, gateMoved: A.na !== B.na, na: [A.na, B.na] };
+        });
+        assert.ok(q.n > 300, `the second wave's block is only ${q.n} ops`);
+        assert.ok(q.gateMoved, `the wave in front of it drew the same ${q.na[0]} ops at both ages, so nothing upstream moved`);
+        assert.ok(q.same, 'a wave\'s own marks changed when the wave drawn before it did — its foam is coming off the shared stream');
+        return `${m.waves} waves over ${m.checked} comparisons, 0 re-drawn; and a wave's ${q.n}-op block is unmoved `
+          + `by the wave in front of it going from ${q.na[0]} to ${q.na[1]} ops`;
+      });
+
+      await checkAsync('the nearer wave is painted last', async () => {
+        // THE ORDER THE DRAWING HONOURS, which `wave/a-nearer-wave-covers-the-
+        // one-behind-it` cannot see — that one checks `sortWaves`, and a
+        // renderer that ignored the order it was handed would pass it. Driven
+        // through a RECORDING CONTEXT, so the claim is about the ops that were
+        // issued rather than about anything measured afterwards: the same
+        // trick scene 1 uses to say a pad is drawn over a fish.
+        //
+        // AND IT IS AN EXACT CLAIM ABOUT THE STREAM, not a comparison of where
+        // marks landed. The first cut attributed ops to a wave by how near
+        // their y was to that wave's crest, and a wave's own foam band reaches
+        // 0.12 of frame height past its crest — so the seaward wave's marks
+        // landed inside the shoreward wave's window and it failed on a clean
+        // tree. A wired wave draws NOTHING off the frame's shared stream (its
+        // lobes, its bubbles and every brush pass come from its own seed), so
+        // its op block is identical whoever it is drawn beside: the stream for
+        // [back, front] must be the background, then back's block verbatim,
+        // then front's, then the shore.
+        const m = await page.evaluate(async () => {
+          const V = await import('/scene/beach-wave.js');
+          const R = await import('/scene/beach-render.js');
+          const S = await import('/scene/beach-shore.js');
+          let k = 0;
+          const seq = [0.31, 0.77, 0.12, 0.58, 0.93, 0.40, 0.66, 0.05, 0.84, 0.23, 0.51, 0.71];
+          const rand = { unit: () => seq[k++ % seq.length], range: (a, b) => a + (b - a) * seq[k++ % seq.length],
+                         int: (a, b) => a + Math.floor((b - a + 1) * seq[k++ % seq.length]) };
+          const back = V.makeWave({ rand, energy: 0.6 });
+          const front = V.makeWave({ rand, energy: 0.6 });
+          back.age = back.breakAge + 1.2; front.age = front.breakAge + 1.2;
+          front.crest0 += 0.12;
+          const sh = S.createShore(); sh.resize(900, 600);
+          const run = (list) => {
+            const ops = [];
+            const noop = () => {};
+            const push = (t) => (...v) => ops.push(t + ':' + v.map(n => (typeof n === 'number' ? n.toFixed(3) : n)).join(','));
+            const rec = new Proxy({
+              moveTo: push('M'), lineTo: push('L'), ellipse: push('E'), arc: push('A'),
+              fill: () => ops.push('F:' + rec.fillStyle), stroke: () => ops.push('S:' + rec.strokeStyle),
+              fillRect: push('R'), beginPath: noop, closePath: noop, save: noop, restore: noop, setTransform: noop,
+            }, { get: (t, kk) => (kk in t ? t[kk] : noop), set: (t, kk, v) => { t[kk] = v; return true; } });
+            const r = R.createRenderer(rec, sh);
+            r.draw({ width: 900, height: 600, waves: list, waterline: S.WATERLINE_S,
+                     swashAt: () => 0.42, wetAt: () => 0.60, drift: 0, frontSeed: 7 });
+            return { ops, drawn: r.waves };
+          };
+          const P = run([]), A = run([back]), B = run([front]), AB = run([back, front]), BA = run([front, back]);
+          // where the wave block starts: the first op the empty frame and the
+          // one-wave frame disagree about
+          let k0 = 0;
+          while (k0 < P.ops.length && P.ops[k0] === A.ops[k0]) k0++;
+          const na = A.ops.length - P.ops.length, nb = B.ops.length - P.ops.length;
+          const eq = (x, y) => x.length === y.length && x.every((v, i) => v === y[i]);
+          return {
+            drawn: [P.drawn, A.drawn, B.drawn, AB.drawn, BA.drawn],
+            k0, na, nb, total: AB.ops.length - P.ops.length,
+            prefixOk: eq(AB.ops.slice(0, k0), P.ops.slice(0, k0)),
+            backFirst: eq(AB.ops.slice(k0, k0 + na), A.ops.slice(k0, k0 + na)),
+            frontSecond: eq(AB.ops.slice(k0 + na, k0 + na + nb), B.ops.slice(k0, k0 + nb)),
+            reversedIsDifferent: !eq(AB.ops, BA.ops),
+            reversedFrontFirst: eq(BA.ops.slice(k0, k0 + nb), B.ops.slice(k0, k0 + nb)),
+            // AND THE TWO BLOCKS DIFFER, which is what stops every clause
+            // above being satisfied by a renderer that drew ONE record twice.
+            blocksDiffer: !eq(A.ops.slice(k0, k0 + na), B.ops.slice(k0, k0 + nb)),
+            crests: [V.crestAt(back, 0.5), V.crestAt(front, 0.5)],
+          };
+        });
+        assert.deepStrictEqual(m.drawn, [0, 1, 1, 2, 2], `the renderer drew ${JSON.stringify(m.drawn)} waves`);
+        assert.ok(m.crests[0] < m.crests[1], 'the fixture did not put one wave nearer the shore than the other');
+        assert.ok(m.na > 400 && m.nb > 400, `a wave's block is only ${m.na}/${m.nb} ops — this fixture draws almost nothing`);
+        assert.ok(m.prefixOk, 'the background ops moved when waves were added, so the block boundary is not where it is taken to be');
+        assert.ok(m.backFirst, 'the seaward wave\'s ops are not the first block in the frame');
+        assert.ok(m.frontSecond, 'the shoreward wave\'s ops are not the second block in the frame');
+        assert.ok(m.reversedIsDifferent, 'reversing the list changed nothing, so the order reaches no mark');
+        assert.ok(m.blocksDiffer, 'the two waves drew the same marks, so every clause here would hold for one record drawn twice');
+        assert.ok(m.reversedFrontFirst, 'reversed, the shoreward wave is still not drawn first — the renderer is sorting behind the caller\'s back');
+        return `${m.na} + ${m.nb} ops, seaward block first and verbatim, and reversing the list swaps them`;
+      });
+
+      setSection('scene3');
 
       await checkAsync('scrolling raises set energy and it ebbs on its own', async () => {
         const before = await page.evaluate(() => window.__scene.sceneState().scrolled);
@@ -4683,8 +4768,8 @@ async function partTwo(browser, mutant, shotsDir) {
         const st = await page.evaluate(() => window.__scene.sceneState());
         // Headless software GL, so a floor rather than a target: what it catches
         // is a frame that has become pathological.
-        assert.ok(cost.fps > 12, `${cost.fps.toFixed(1)} fps at ${st.segments} segments`);
-        return `${cost.fps.toFixed(1)} fps on software GL at ${st.segments} segments, ${st.streaks} streaks`;
+        assert.ok(cost.fps > 12, `${cost.fps.toFixed(1)} fps with ${st.drawnWaves} waves drawn`);
+        return `${cost.fps.toFixed(1)} fps on software GL, ${st.waves} waves alive and ${st.drawnWaves} drawn`;
       });
 
       await checkAsync('swapping back to the koi leaves nothing behind', async () => {

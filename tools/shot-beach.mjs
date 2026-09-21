@@ -95,7 +95,7 @@ async function cell(id, title, note, prep) {
   shot.push({ id, title, note, file: path.basename(file),
     line: `edge ${s.edge[2].toFixed(3)} · high-water ${s.wet[2].toFixed(3)} · saturated ${s.sat[2].toFixed(3)} · `
         + `gloss ${s.glossDepth.toFixed(3)} · sheet ${s.sheet.toFixed(2)} · set energy ${s.energy.toFixed(2)} · `
-        + `${s.waves} wave(s) · ${s.overruns} overrun(s) · ${s.segments} segments` });
+        + `${s.waves} wave(s), ${s.drawnWaves} drawn · ${s.overruns} overrun(s)` });
   console.log(`  ${id}`);
 }
 
