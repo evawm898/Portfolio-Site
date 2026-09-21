@@ -19,6 +19,15 @@ Guidance for Claude Code sessions working in this repository.
 - Never delete old branches without explicit approval.
 - Before making branch-history changes, rebases, force pushes, or destructive Git operations, stop and ask first.
 
+## Operational gotchas
+
+- `update_trigger` on a **spent one-shot** edits a corpse. A `send_later` Routine fires
+  once and is then done; updating its prompt afterwards changes text that will never be
+  delivered, and the returned `next_run_at` can look plausible (a day out) while
+  `ended_reason: run_once_fired` sits in the same response. To reschedule, call
+  `send_later` again — do not edit the spent one. Cost of getting this wrong is an hour of
+  silent nothing.
+
 ## Bloom generator — pointer only
 
 **NAME THE MODE AND THE SAMPLING; DERIVE A LENGTH FROM A LENGTH** (Eva, session
