@@ -332,7 +332,7 @@ variation. Five more, all reported rather than acted on:
 
 ## 9. Gate
 
-`node tools/verify-scene.mjs` — **141/141**, 66 mutants declared.
+`node tools/verify-scene.mjs` — **141/141**, 66 mutants declared, 25 run and all 25 behaving (section 10).
 `node tools/shot-beach-brush.mjs <dir>` is the sheet: the module standalone at
 five frozen states as the control, then the live scene at each of the six stages.
 
@@ -344,3 +344,58 @@ This is the picture the drawing layer arrived with, and it is unchanged to the p
 *The same module drawing the simulation's own records: five waves alive at four
 different stages, the swash front drawn from the published edge, the strand line
 drawn from the high-water mark.*
+
+---
+
+## 10. The mutant sweep
+
+**25 mutants run, 25 behave.** The seven new drawing mutants, plus every
+pre-existing one over code this session touched (`beach-swash.js`,
+`beach-wave.js`, `beach-shore.js`, `beach-water.js`). The other 41 in the file
+were not run and are not claimed.
+
+The first pass reported **five BAD**, and they split three ways — which is the
+useful part, because only one of them was a defect in a check:
+
+**One real defect, in a check written this session.**
+`draw/the-drawing-takes-its-shear-from-the-shore` reported MISSED. The module's
+`SHEAR` is a fraction of HEIGHT dropped across the WIDTH, so the screen slope it
+draws is `SHEAR * H / W`, and the check had that ratio inverted. It did not move
+the fitted value — only the BAR derived from it, and it made the bar four times
+too generous: on the 3:2 scratch canvas the mutant draws −0.0778 against the
+shore's −0.0524, an error of 0.0254, against an inverted bar of 0.0307. **Missed
+by a hair, and nothing but the sweep could have said so.** Corrected the bar is
+0.0063 with the clean tree's error at 0.0008 — eight times the headroom. The
+degrees quoted throughout this document were computed correctly and stand.
+
+**One claim that was simply wrong.**
+`the-waves-composite-shoreward-first` was listed as breaking
+`draw/the-nearer-wave-is-painted-last`. It cannot: that check hands the renderer
+its two waves in an order it writes down itself, because what it is about is the
+renderer HONOURING the order it is given. A reversed sort cannot reach it, and a
+renderer that re-sorts has its own mutant. **The claim came off rather than
+either check being loosened** — the two are complementary and neither
+substitutes for the other.
+
+**Three lists short in the honest direction**, each widening verified rather than
+assumed:
+
+* `the-break-goes-white-all-at-once` also reddens the energy check, and that is
+  true about it: `peelS` is one of the four quantities the set energy sizes at
+  birth, and a peel pinned at 1e-6 is outside its declared range at every energy.
+* `a-running-swash-reads-the-set-energy` also reddens the edge invariant —
+  because there is no front left to read. It grows the runup by 40% of the energy
+  every frame, a geometric series: **measured, the edge reaches s = 3.4e63 inside
+  ninety seconds.**
+* `the-seaward-life-is-per-wave` reddened the edge invariant too, and **that one
+  was the fixture rather than the mutation.** Measured, it leaves the edge's
+  range untouched — max s 1.028 on both trees, 2.1% of frames past 0.97 against
+  1.9% — and reddened the check purely by moving which moment a fixed pump landed
+  on. About 2% of moments have the swash at the bottom of the frame where the
+  grey band is squeezed against the sand marks and no column reads. The check
+  FINDS a moment with the front on the canvas now, and fails loudly if none does.
+  That carve-out does not exclude what the check doubts: a front drawn from a
+  separately generated curve still draws a grey band with an ink edge under it,
+  in the wrong place rather than absent.
+
+After the corrections: **5 of 5 on the re-run, 25 of 25 overall.**
