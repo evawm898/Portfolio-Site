@@ -227,8 +227,13 @@ const MUTANTS = [
     file: 'scene/beach-wave.js',
     from: '    peelS,\n    peelFrom: rand.unit(),',
     to: '    peelS: 1e-6,\n    peelFrom: rand.unit(),',
+    // AND IT REDDENS THE ENERGY CHECK TOO, which is true about it rather than
+    // collateral: `peelS` is one of the four quantities the set energy sizes at
+    // birth, and a peel pinned at 1e-6 is outside its own declared range at
+    // every energy.
     breaks: ['wave/the-break-runs-along-the-crest-rather-than-all-at-once',
-             'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame'],
+             'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame',
+             'wave/the-energy-sizes-the-wave-at-every-stage-and-only-at-birth'],
     mayAlso: ['scene3/several-waves-are-alive-at-once-at-different-stages',
               'wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each'],
     why: '"it does not go white all at once" — the brief\'s own sentence, and 1.87 s of it is measured',
@@ -271,8 +276,14 @@ const MUTANTS = [
     file: 'scene/beach-wave.js',
     from: '  return waves.slice().sort((a, b) => (a.crest0 + a.speedS * a.age) - (b.crest0 + b.speedS * b.age));',
     to: '  return waves.slice().sort((a, b) => (b.crest0 + b.speedS * b.age) - (a.crest0 + a.speedS * a.age));',
-    breaks: ['wave/a-nearer-wave-covers-the-one-behind-it',
-             'draw/the-nearer-wave-is-painted-last'],
+    // ONE CHECK, AND THE CLAIM THAT IT WAS TWO WAS WRONG RATHER THAN THE
+    // CHECK BEING BLIND. `draw/the-nearer-wave-is-painted-last` hands the
+    // renderer its two waves in an order it writes down itself, because what
+    // it is about is the renderer HONOURING the order it is given — a sort
+    // that has been reversed cannot reach it, and a renderer that re-sorts has
+    // its own mutant. The two are complementary rather than overlapping and
+    // neither substitutes for the other.
+    breaks: ['wave/a-nearer-wave-covers-the-one-behind-it'],
     why: 'a nearer band of foam has to hide the water behind it, which is what the order IS',
   },
   {
@@ -4439,14 +4450,23 @@ async function partTwo(browser, mutant, shotsDir) {
           return { n, fitted: num / den, declared: sh.slope, own: B.SHEAR, w: W, h: H };
         });
         assert.ok(m.fitted !== undefined, `the horizon was readable in only ${m.n} of 25 columns`);
-        const ownSlope = m.own * m.w / m.h;
+        // THE MODULE'S SHEAR IS A FRACTION OF *HEIGHT* DROPPED ACROSS THE
+        // *WIDTH*, so the screen slope it draws is `SHEAR * H / W` — and the
+        // first cut of this line had that ratio upside down. It did not change
+        // the fitted value, only the BAR derived from it, and it made the bar
+        // four times too generous: on the 3:2 scratch canvas the mutant draws
+        // -0.0778 against the shore's -0.0524, an error of 0.0254, and the
+        // inverted bar sat at 0.0307. `the-drawing-keeps-its-own-shear`
+        // reported MISSED by a hair, and only the sweep said so.
+        const ownSlope = m.own * m.h / m.w;
         assert.ok(Math.abs(ownSlope - m.declared) > 0.02,
           'the module\'s own SHEAR happens to draw the shore\'s slope here, so this check proves nothing');
         // THE BAR IS A QUARTER OF THE WAY BETWEEN THE TWO ANSWERS, which is
         // what makes it a measurement rather than a tolerance: the fit carries
         // the horizon's own wander (0.005 of frame height over three
-        // harmonics) and cannot be exact, while the two candidate slopes are
-        // 0.13 apart on this frame.
+        // harmonics) and cannot be exact. Measured on this frame, the clean
+        // tree's error is 0.0008 against a bar of 0.0063 — eight times the
+        // headroom — and the mutant's is 0.0254.
         const err = Math.abs(m.fitted - m.declared);
         assert.ok(err < Math.abs(ownSlope - m.declared) / 4,
           `the drawn horizon fits a slope of ${m.fitted.toFixed(4)}: the shore declares ${m.declared.toFixed(4)} `
