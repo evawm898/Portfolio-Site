@@ -189,8 +189,17 @@ const MUTANTS = [
     // edge to s = 3.4e63 inside ninety seconds. The water has left the beach,
     // so no moment puts a front on the canvas and that clause fails by saying
     // exactly that.
+    // AND THE SCALLOP CLAUSE READS IT TOO — worth stating rather than listing,
+    // because it is the sharpest witness in the file for what this mutation
+    // actually is. The inserted line does not use `dt`, so a ZERO-LENGTH
+    // advance still multiplies every runup. That clause refreshes the edge
+    // with `advance(0)` in order to read ONE state at three aspects, and here
+    // each read is a different beach: measured, the first aspect re-read last
+    // differs by 3.2e+86 of frame height where the clean tree is equal to the
+    // bit. Its premise clause says exactly that, so the red is legible.
     breaks: ['swash/the-energy-reaches-the-next-wave-and-never-the-one-running'],
-    mayAlso: ['draw/the-drawn-foam-edge-is-the-published-swash-edge',
+    mayAlso: ['swash/the-scallops-are-as-deep-in-widths-on-any-shape-of-frame',
+              'draw/the-drawn-foam-edge-is-the-published-swash-edge',
               'swash/an-overrun-fires-with-the-extent-it-reached',
               'swash/the-overrun-zone-dries-back-and-does-not-ratchet',
               'swash/the-high-water-mark-is-effectively-static-in-quiet-water',
@@ -269,8 +278,21 @@ const MUTANTS = [
     // THE REAL DEFECT, and its blast radius is the finding rather than a
     // nuisance: the spawner's interval is a claim about ARRIVALS, and a
     // per-wave seaward life silently turns it into a claim about BIRTHS.
+    // AND IT REACHES TWO MORE POPULATION GUARDS, which is the same statement
+    // as `several-waves-are-alive-at-once` one file along and is why they are
+    // listed rather than the checks being loosened: this mutation is ABOUT how
+    // many waves are alive and when. `every-wave-is-drawn-once` wants two or
+    // more drawn in 8 of 12 samples and three at once at some point; the foam
+    // clause wants 200 frame-to-frame comparisons over at least 4 distinct
+    // waves. Neither core claim moves — the renderer still draws exactly the
+    // non-swash waves and no wave's lobes are re-drawn — what fails is the
+    // fixture's ability to gather a sample from a beach whose arrivals have
+    // been scrambled. Its blast radius GREW this pass because the replacement
+    // reads `breakS`, and BREAK_S moved 0.115 -> 0.300.
     mayAlso: ['swash/the-high-water-mark-is-effectively-static-in-quiet-water',
               'swash/an-overrun-fires-with-the-extent-it-reached',
+              'draw/every-wave-is-drawn-once-with-its-own-record',
+              'draw/a-wave-s-foam-holds-still-between-frames',
               'scene3/the-swash-runs-and-drains-while-the-wet-band-stays',
               'scene3/several-waves-are-alive-at-once-at-different-stages',
               'scene3/the-break-travels-shoreward-instead-of-sitting-at-one-station',
@@ -2979,18 +3001,49 @@ async function partOne(mutant) {
         for (let i = 0; i <= 200; i++) out[i] = q.edgeAtU(i / 200);
         return out;
       };
-      const A = readAt(4 / 3), B = readAt(16 / 9), C = readAt(21 / 9);
+      // FIND A MOMENT WITH A SCALLOP ON THE WATER rather than trusting a
+      // fixed pump to land on one. Whether any live wave is carrying scallops
+      // at a chosen instant is a property of the WAVE SCHEDULE, not of the
+      // aspect law: measured, a tree with a different seaward life has two
+      // waves alive where this one has four and the aspect reaches exactly
+      // zero of them. That is the fixture, not the geometry, and the edge
+      // invariant already learned it under the same mutation (section 10 of
+      // docs/beach-drawing-layer.md).
+      //
+      // THE SEARCH DOES NOT CARVE OUT WHAT THE CLAUSE DOUBTS. A depth baked
+      // at one aspect reads zero at EVERY moment, so the search finds none
+      // and the clause fails loudly — measured on that mutant, which is the
+      // one this clause exists for.
+      let A, B, C, A2, peak = 0, found = -1;
+      for (let k = 0; k < 40 && found < 0; k++) {
+        A = readAt(4 / 3); B = readAt(16 / 9); C = readAt(21 / 9);
+        peak = 0;
+        for (let i = 0; i <= 200; i++) peak = Math.max(peak, Math.abs((B[i] - A[i]) / (16 / 9 - 4 / 3)));
+        if (peak > 0.01) { A2 = readAt(4 / 3); found = k; break; }
+        for (let i = 0; i < 30; i++) q.advance(1 / 60, { energy: 0.5, intervalScale: 1 });
+      }
+      assert.ok(found >= 0,
+        `no moment in 40 tries had a scallop on the water — the aspect moved the edge by at most `
+        + `${peak.toFixed(5)} of the width, so this says nothing`);
+      // THE PREMISE IS ASSERTED RATHER THAN ASSUMED, and re-reading the FIRST
+      // aspect LAST is what asserts it. `advance(0, ...)` is what refreshes
+      // the published edge — `setAspect` alone does not, measured: without it
+      // all three reads come back identical and the search above finds
+      // nothing — and a zero-length step must age nothing, or the differences
+      // below are taken across three different beaches. It is an IDENTITY,
+      // not a bound: on this tree the two reads of 4:3 are equal to the bit.
+      let drift = 0;
+      for (let i = 0; i <= 200; i++) drift = Math.max(drift, Math.abs(A2[i] - A[i]));
+      assert.ok(drift < 1e-9,
+        `a zero-length advance moved the edge by ${drift.toExponential(2)} of frame height, `
+        + 'so the three reads below are three different beaches rather than one');
       // the same shape recovered from two independent pairs
-      let peak = 0, worst = 0;
+      let worst = 0;
       for (let i = 0; i <= 200; i++) {
         const s1 = (B[i] - A[i]) / (16 / 9 - 4 / 3);
         const s2 = (C[i] - B[i]) / (21 / 9 - 16 / 9);
-        peak = Math.max(peak, Math.abs(s1));
         worst = Math.max(worst, Math.abs(s1 - s2));
       }
-      // NOT VACUOUS: a tree that had removed the scallops entirely, or one
-      // where the aspect reached nothing, would agree perfectly at zero.
-      assert.ok(peak > 0.01, `the aspect moves the edge by at most ${peak.toFixed(5)} of the width, so this says nothing`);
       assert.ok(worst < 1e-9,
         `the scallop recovered from two aspect pairs differs by ${worst.toExponential(2)} of the width, `
         + 'so the depth is not simply the stored shape times the aspect');
@@ -2999,8 +3052,11 @@ async function partOne(mutant) {
       let moved = 0;
       for (let i = 0; i <= 200; i++) moved = Math.max(moved, Math.abs(C[i] - A[i]));
       assert.ok(moved > 0.004, `the edge moved ${moved.toFixed(5)} of frame height between 4:3 and 21:9`);
-      return `scallop ${peak.toFixed(4)} of the width, recovered identically from two aspect pairs `
-        + `(worst ${worst.toExponential(1)}); the edge moves ${moved.toFixed(4)} of frame height across 4:3 -> 21:9`;
+      // the moment it used is REPORTED, so a tree that started having to hunt
+      // for a scallop would be visible on a green run rather than silent
+      return `scallop ${peak.toFixed(4)} of the width at moment ${found}, recovered identically from `
+        + `two aspect pairs (worst ${worst.toExponential(1)}); the edge moves ${moved.toFixed(4)} `
+        + `of frame height across 4:3 -> 21:9`;
     });
 
     check('an overrun fires with the extent it reached', () => {

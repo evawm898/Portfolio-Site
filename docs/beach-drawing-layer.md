@@ -1,6 +1,6 @@
 # Scene 3 — the drawing layer replaced
 
-The wave object, its six stages, the reference tooling and the gate work from
+The wave object, its five stages, the reference tooling and the gate work from
 #271 stay. What is replaced is the layer that turned all of it into marks.
 
 `scene/beach-draw.js` — a halftone lattice that carried tone as stroke weight
@@ -501,9 +501,12 @@ mark.
 
 ## 9. Gate
 
-`node tools/verify-scene.mjs` — **141/141**, 66 mutants declared, 25 run and all 25 behaving (section 10).
+`node tools/verify-scene.mjs` — **145/145**, 72 mutants declared. Section 10 is
+the WIRING pass's sweep and is kept as the record of that pass; **section 10b is
+this pass's**, and it is the current one.
 `node tools/shot-beach-brush.mjs <dir>` is the sheet: the module standalone at
-five frozen states as the control, then the live scene at each of the six stages.
+five frozen states as the control, then the live scene at each of the five
+stages — five, because STEEPEN was removed (section 8).
 
 ![the module standalone, mid-peel — the control](img/beach-drawing-standalone.png)
 *`beach-brush.js` drawn on its own at `peel` 0.35: two waves, one of them mid-peel.
@@ -516,7 +519,10 @@ drawn from the high-water mark.*
 
 ---
 
-## 10. The mutant sweep
+## 10. The mutant sweep — the WIRING pass
+
+The record of the pass that wired the drawing, at 141 checks and 66 mutants.
+Superseded as a count by section 10b; every finding below still stands.
 
 **25 mutants run, 25 behave.** The seven new drawing mutants, plus every
 pre-existing one over code this session touched (`beach-swash.js`,
@@ -568,3 +574,78 @@ assumed:
   in the wrong place rather than absent.
 
 After the corrections: **5 of 5 on the re-run, 25 of 25 overall.**
+
+---
+
+## 10b. The mutant sweep — THIS pass
+
+**14 mutants run over the files this pass changed; 12 behaved and 2 did not, and
+both were diagnosed rather than waived.** The other 40 were not run and are not
+claimed. The 72-mutant full sweep is *not* what ran — it died on a Chromium
+protocol error after one mutant, reported here rather than rounded up to a sweep.
+
+Both BADs landed on the same new clause,
+`swash/the-scallops-are-as-deep-in-widths-on-any-shape-of-frame`, for two
+different reasons — which is what made them worth measuring instead of widening a
+list twice.
+
+**`a-running-swash-reads-the-set-energy` — the clause was right and its message
+was not.** The first guess was that the edge goes non-finite and the vacuity guard
+fires. Measured, it does not: the edge reaches **4.4e+86 and stays finite**, and
+what fails is the *recovery* clause. The real reason is sharper — **the inserted
+line never reads `dt`**, so a zero-length advance still multiplies every runup,
+and `advance(0, …)` is exactly how the clause refreshes the published edge in
+order to read ONE state at three aspects. Each read was a different beach. The
+clause asserts that premise first now, by re-reading the FIRST aspect LAST: an
+identity, not a bound — **0.000e+0 on this tree, 3.2e+86 mutated**. The mutant
+keeps its red; what changed is that the red says what is actually wrong.
+
+**`the-seaward-life-is-per-wave` — three unclaimed reds, and its blast radius grew
+because THIS pass moved a constant its replacement reads.** It substitutes
+`breakS - speedS * swellLeadS`, and `BREAK_S` went 0.115 → 0.300, so its waves are
+born 0.185 of a frame nearer the shore than when the mutant was written.
+
+* **The scallop clause was the FIXTURE.** At its fixed pump the mutated tree has
+  **two live waves against this tree's four, and the aspect reaches exactly zero
+  of them** — `peak` 0.000e+0, so the clause declined. It searches for a moment
+  with a scallop on the water now. **That figure and the try-5 recovery below are
+  a STANDALONE PROBE's, running the clause's own arithmetic against that
+  mutant's tree — not the gate's, which prints no detail for a mutant that
+  passes.** At try 5 the recovery is still exact (7.0e-16); the clause reports
+  its own moment on every run, so a clean tree that started having to hunt
+  would be visible rather than silent. **The search does not carve out what the clause doubts**:
+  a depth baked at one aspect reads zero at EVERY moment, so the search finds none
+  and the clause fails loudly — measured on that mutant, which is the one it
+  exists for.
+* **The two draw checks are POPULATION guards, and that is MEASURED rather than
+  read off the source.** The gate collects each failure's message but prints none
+  for a mutant, so a probe copy that does was run against this one. It reports
+  `every-wave-is-drawn-once` failing on **"at most 2 waves were ever drawn at
+  once"** — its guard wants three — and the foam clause on **"only 126
+  frame-to-frame comparisons"**, where its guard wants 200. **Neither core claim
+  fired**: not the renderer-draws-exactly-the-non-swash-waves equality, not
+  `moved === 0`. What fails is the fixture's ability to gather a sample from a
+  beach whose arrivals have been scrambled, which is the same statement the mutant
+  already makes by claiming `several-waves-are-alive-at-once`. They are listed and
+  the checks are not loosened. **Listing them on the reasoning alone was the risk
+  worth six minutes to remove:** had a core claim been what fired, the entry would
+  have hidden a real defect behind a green run.
+
+**After the fixes: 3 of 3 on the re-run** — both BADs, plus
+`the-scallop-depth-is-baked-at-one-aspect`, the mutant the changed clause exists
+for, which still reddens it. That last one is what makes the fix a fix rather than
+a loosening.
+
+That is the second time this one mutant has exposed a fixture rather than a defect
+— section 10 records the first, on the edge invariant — and the pattern is worth
+naming: **a check that picks its moment by a fixed pump is quietly asserting
+something about the wave schedule it never meant to.**
+
+**And one hazard was recorded rather than built.** `ensureField` *replaces*
+`P.runs` where `ensureStroke` *grows* it, and the two pools share that one buffer,
+so a larger stroke pool followed by a growing field pool would shrink it under a
+live consumer. It is **structurally unreachable** — `ensureField` has exactly one
+call site and its argument is `const n = NCOL`, so `FIELD_CAP` is set once and
+cannot grow, and nothing outside the module calls the exported `wave` or `brush`.
+No branch was added for an impossible case; the condition and its remedy are a
+comment beside the function.

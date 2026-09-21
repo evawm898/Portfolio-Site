@@ -148,6 +148,17 @@ let STROKE_CAP = 0;
 /** invalidated whenever the pool moves, so a cached `xs` can never be stale */
 let xsW = -1;
 
+// THE POOL'S CAPACITY RESTS ON ONE CALL SITE WITH A CONSTANT. `ensureField`
+// is reached only from `draw`, only at `NCOL`, so FIELD_CAP is set once and
+// cannot grow; `wave` and the private `*Into` helpers write into buffers
+// `draw` has already sized, which is why none of them carries a growth path.
+// IF THAT STOPS BEING TRUE — a varying column count, or an outside caller of
+// the exported `wave` — then `ensureField` belongs at that entry too, and the
+// `P.runs` line below must GROW rather than replace (`ensureStroke`'s form),
+// because the two pools share that one buffer and only `ensureStroke` sizes
+// it conditionally. Nothing outside this module calls `wave` or `brush`, so
+// none of that is reachable today; it is written down so the next session
+// inherits a decision rather than a rediscovery.
 function ensureField(n) {
   if (n <= FIELD_CAP) return;
   FIELD_CAP = Math.max(n, NCOL);
