@@ -47,14 +47,16 @@ const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/jav
    sepals, by leaves and by petaloid-fill centres, and by nothing else. */
 const FIXTURES = {
   'solid-sepals': [
-    { id: 'sepalsType', value: 'solid', evt: 'change' },
     { id: 'petalCount', value: '5' },
     { id: 'layerCount', value: '1' },
+    { id: 'sepalsType', value: 'sepals', evt: 'change' },
+    { id: 'sepalStyle', value: 'solid', evt: 'change' },
+    { id: 'sepalSize', value: '1' },
+    { id: 'leafType', value: 'none', evt: 'change' },
   ],
-  'no-sepals': [
+  'leaf-oval': [
     { id: 'sepalsType', value: 'none', evt: 'change' },
-    { id: 'petalCount', value: '5' },
-    { id: 'layerCount', value: '1' },
+    { id: 'leafType', value: 'oval', evt: 'change' },
   ],
 };
 
