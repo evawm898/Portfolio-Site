@@ -346,15 +346,24 @@ predicted.
    linear in s between the break and the waterline — so **the foam region IS
    `[breakS, WATERLINE_S]`**. Moving the break shoreside shortens it in exactly
    the same proportion as it lowers the curl: the two are one dial, not two.
-   Measured over 24 pumped moments at 960x720, of the WAVE ZONE (top of frame
-   down to the waterline):
+   `node tools/shot-beach-break.mjs <dir>` is the instrument and it prints this
+   table. **SAMPLING: three seeds x 24 pumped moments each, at 960x720**, of
+   the WAVE ZONE (top of frame down to the waterline); the bracket is the
+   range across seeds.
 
-   | `BREAK_S` | curl at s | ink % | paper % | waves broken, of ~3.9 drawn |
+   | `BREAK_S` | curl at s | ink % | paper % | broken, of 3.8 drawn |
    |---|---|---|---|---|
-   | `[0.115, 0.020]` (as it shipped) | 0.202 | 44.7 | 47.7 | 3.3 |
-   | `[0.180, 0.085]` | 0.247 | 48.5 | 37.4 | 2.8 |
-   | `[0.230, 0.135]` | 0.297 | 62.4 | 30.3 | 2.6 |
-   | **`[0.300, 0.205]` (ships)** | **0.331** | **67.8** | **16.4** | **1.4** |
+   | `[0.115, 0.020]` (as it shipped) | 0.202 | 38.6 [37.5–39.8] | 49.0 [44.8–53.4] | 3.3 |
+   | `[0.180, 0.085]` | 0.247 | 49.5 [48.5–50.8] | 38.9 [34.6–42.3] | 2.8 |
+   | `[0.230, 0.135]` | 0.297 | 58.3 [56.9–59.4] | 30.2 [26.1–33.1] | 2.4 |
+   | **`[0.300, 0.205]` (ships)** | **0.331** | **70.6 [69.5–72.3]** | **17.8 [15.2–19.5]** | **1.8** |
+
+   **THE SPREAD IS WHY IT IS THERE.** A first cut of this table quoted single
+   figures — 44.7% ink against 67.8% — from a run with no `?seed=`, and
+   `scene.html` seeds from `Date.now()` when it is given none, so every run is
+   a different sea and those numbers did not reproduce (the next run read 39.4
+   against 72.7). The trend is far outside the spread; the individual figures
+   were not reproducible and are corrected here.
 
    A wave is unbroken for **77% of its seaward life** now, against 35% before —
    13.6 s of approach against 4.0 s of foam, where it was 6.2 s against 11.4 s.
@@ -370,7 +379,8 @@ predicted.
 
    ![as it shipped](img/beach-break-as-shipped.png)
    *`[0.115, 0.020]` — the composition Eva objected to. Three separate events
-   down the frame, and the curl at s 0.202 is the top one.*
+   down the frame, and the curl at s 0.202 is the top one. Seed 7, the first
+   of the three the table averages.*
 
    ![balanced](img/beach-break-balanced.png)
    *`[0.230, 0.135]` — the curl mid-frame with open water above it. Not what
@@ -378,7 +388,7 @@ predicted.
 
    ![shoreside](img/beach-break-shoreside.png)
    *`[0.300, 0.205]`, which ships. The curl is where it was asked for and the
-   sea above it is a black mass: 16.4% paper against 47.7%.*
+   sea above it is a black mass: 17.8% paper against 49.0%.*
 
    **WHAT WOULD DECOUPLE THEM** is drawing a wave PAST the waterline so its
    foam runs up the beach — which is the hand-over to the swash, and that is
