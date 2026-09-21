@@ -63,7 +63,14 @@ export const RING_LAG = 0.13;      // each inner ring trails the front by this m
 // already an order of magnitude shorter-lived by construction, and
 // `lerpRippleTable` reads DROP_RIPPLE only at intensity 0, so nothing here
 // reaches a storm or downpour ripple at all.
-export const DROP_RIPPLE = { maxR: [10, 170], life: [1.8, 4.5], strength: [0.24, 0.58], rings: 2 };
+//
+// TUNED FURTHER, DIALLED LIVE RATHER THAN GUESSED-AND-CHECKED: life to
+// [1.8, 3.2] and the reach to [10, 104] (from [10, 170]), against a
+// standalone sandbox that runs this same table with sliders instead of a
+// screenshot-and-gate round trip per tweak (not part of this repo — see the
+// PR for the tool). Same construction as the paragraph above: idle only,
+// STORM_RIPPLE untouched, nothing here reaches a storm or click ripple.
+export const DROP_RIPPLE = { maxR: [10, 104], life: [1.8, 3.2], strength: [0.24, 0.58], rings: 2 };
 export const STORM_RIPPLE = { maxR: [14, 46], life: [0.6, 1.6], strength: [0.20, 0.44], rings: 2 };
 export const CLICK_RIPPLE = { maxR: [104, 132], life: [2.1, 2.5], strength: [0.95, 1.0], rings: 3 };
 

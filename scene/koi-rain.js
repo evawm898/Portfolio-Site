@@ -29,17 +29,25 @@ import { rollRipple, lerpRippleTable, DROP_RIPPLE, STORM_RIPPLE } from './koi-ri
 // even 43%, and would have put as much rain in the AIR at idle as the downpour
 // has, which is the one thing that cannot be paid for here.
 //
-// STORM IS UNCHANGED, DELIBERATELY: `rain.advance()` spawns
-// drops on a fixed accumulator, not a random draw, so the exact NUMBER spawned
-// each frame is deterministic in the rate — and rain and the fish share one
-// seeded stream (see rng.js), so a changed storm rate shifts every random
-// number the fish read for the rest of a run. The idle rate has the same
-// property, but nothing here reacts to idle rain at anywhere near as tight a
-// margin as the population manager's storm floor, so raising it is safe;
-// raising the storm rate measurably was not (see koi-fish.js's population
-// check, which this was tuned against directly).
+// `rain.advance()` spawns drops on a fixed accumulator, not a random draw,
+// so the exact NUMBER spawned each frame is deterministic in the rate — and
+// rain and the fish share one seeded stream (see rng.js), so a changed rate
+// (idle or storm) shifts every random number the fish read for the rest of
+// a run. That is a property of the mechanism, not a defect: it is why a
+// side-by-side comparison at one seed does not hold when either rate moves,
+// never a reason on its own not to move one.
+//
+// STORM WAS ONCE HELD AT 240 ON THE STRENGTH OF AN EARLIER SESSION'S
+// "raising it measurably was not [safe]" — that finding traced to
+// koi-fish.js's alarm computation once SUMMING every ripple's pull on a
+// koi rather than taking the single strongest front, which pinned alarm at
+// its ceiling under a dense shower and dropped the on-screen population
+// below its floor (see the comment on `alarmHit` in koi-fish.js). That sum
+// is gone; the max it was replaced with is density-invariant by
+// construction. Retested at 500/s against the full gate — the population
+// checks are the ones this history is about — before raising it here.
 export const RAIN_IDLE_RATE = 45;
-export const RAIN_STORM_RATE = 240;
+export const RAIN_STORM_RATE = 500;
 export const REF_AREA = 1440 * 900;
 export const MAX_DROPS = 900;
 
