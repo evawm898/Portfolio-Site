@@ -390,6 +390,91 @@ function thickMul(u, v, P) {
 
 
 /* ===================================================================
+   THE EDGE PROFILE — ONE OWNER FOR EVERY FREE BOUNDARY OF A SOLID SHEET.
+
+   A solidified sheet is two offset surfaces; where it ENDS, something has to
+   close the gap between them. `addBladeSolid` closed it with a single flat
+   wall quad per perimeter edge, which meets both faces at exactly 90 degrees
+   — the cliff this section exists to remove. `addSlab`'s hole rim already
+   closed it with a bullnose (SLAB_FILLET = 1.0, a full half-round); what it
+   lacked was segments, not a shape.
+
+   TWO TERMS, and only the first is new as an idea:
+
+     (a) a THICKNESS TAPER easing the body down to a rim floor over
+         EDGE_TAPER_MM of SURFACE distance, and
+     (b) a half-round BEAD of radius = half the floored edge thickness,
+         INSET so the bead's apex lands on the original boundary.
+
+   WHY THE BEAD IS INSET RATHER THAN ADDED ON. The apex sits exactly where the
+   un-beaded wall stood, so the SILHOUETTE and every aperture are preserved to
+   the vertex — a bead that bulged outward would widen every petal and narrow
+   every lace hole by its own diameter, which on a cell wall at the printable
+   floor closes the hole. This is `addSlab.holeColumn`'s construction, which
+   has read that way since it was written; this section gives it a name and a
+   second consumer.
+
+   WHY SMOOTHERSTEP AND NOT A LINEAR RAMP. A linear taper creases the face
+   where it STARTS (a slope discontinuity a grazing light finds instantly) and
+   arrives at the rim with slope, so the bead meets the face at an angle.
+   Smootherstep is zero-slope at BOTH ends: the taper begins invisibly and
+   arrives flat, which is what makes the bead tangent to the face it closes
+   rather than merely adjacent to it. That tangency is the whole point, and it
+   is what the no-hard-edge gate measures.
+
+   THE DISTANCE IS SURFACE DISTANCE IN MILLIMETRES, NEVER A GRID PARAMETER.
+   A blade grid is 26x12 in (u, v) and its cells are nothing like square — they
+   converge hard at a POINTED apex, where a taper measured in v would act over
+   a vanishing physical distance and read as a crease exactly where the petal
+   is most delicate. `bladeEdgeDistance` accumulates |dP| along the lattice, so
+   the number the taper consumes is a length on the surface. (The pre-existing
+   `thickEdge` knife does measure its band in |v| — see THICK_EDGE_BAND — and
+   is steep at apexes for precisely this reason. Not changed here: it is a
+   different control with a shipped look, and moving it is a partition event.)
+
+   =================================================================== */
+
+/* The rim's total thickness where the sheet ends. Above MIN_FEATURE_MM (0.8)
+   deliberately: the printable-feature floor is a bound on what SURVIVES the
+   process, and a free edge is the most exposed material on the model — SLS
+   PA12 walls at or under 0.6 mm warp and wire-like features under 0.8 mm
+   break in depowdering, so the boundary is given headroom the interior is
+   not. An ASSUMPTION with a number attached, like every floor in this
+   project: nothing here has been printed. */
+const EDGE_FLOOR_MM   = 1.0;
+
+/* How far in from the boundary the taper acts, as SURFACE distance. A fixed
+   constant with no control, by ruling. TUNABLE — this is the one number in
+   the section chosen by judgement rather than derived, and the shape it draws
+   is a direct function of it: shorter reads as a chamfer, longer as a swell
+   running into the body. */
+const EDGE_TAPER_MM   = 3.0;
+
+/* Segments around the half-round. The dihedral between adjacent bead facets
+   is 180/BEAD_SEGMENTS degrees, so this is the constant the no-hard-edge gate
+   is really about: 8 gives 22.5 and clears a 30-degree bar with a quarter of
+   it to spare, 6 lands exactly ON 30 and 4 (the count addSlab's hole rim
+   shipped with) reads 45 — which is the facet-back-into-a-corner the ruling
+   names. A FLOOR, not a target. */
+const BEAD_SEGMENTS   = 8;
+
+/* THE TAPER. `d` and the two thicknesses are all in the SAME unit; the caller
+   picks it (world units at the call sites, millimetres in the gate) and the
+   function never converts, so it cannot be handed a mixed pair.
+
+   Where the body is already at or under the rim floor there is NO taper and
+   the body thickness is returned unchanged — the sheet is thinner than the
+   edge treatment would make it, and thickening a sheet to round it off would
+   be the edge profile overruling the thickness field. The bead still runs, at
+   whatever radius that thickness affords. */
+function edgeThickness(d, tBody, floor, taper) {
+  if (!(tBody > floor)) return tBody;
+  if (!(d < taper)) return tBody;
+  return floor + (tBody - floor) * smootherstep(d <= 0 ? 0 : d / taper);
+}
+
+
+/* ===================================================================
    1. GEOMETRY ACCUMULATOR
    Appends tubes and beads directly into flat position/normal/index arrays,
    so an entire material group becomes a single BufferGeometry with no
@@ -422,6 +507,13 @@ class MeshAccumulator {
     this.floorScale = opts.floorScale || 1;
     this.floorR = MIN_RADIUS_UNITS / this.floorScale;    // tube / bead radius floor
     this.floorF = MIN_FEATURE_UNITS / this.floorScale;   // slab / blade / ribbon thickness floor
+    /* THE EDGE PROFILE'S TWO LENGTHS, converted out of millimetres ONCE, here,
+       so no emitter converts and none can disagree about the scale. Both take
+       `floorScale` exactly as the feature floor does: it exists so a part that
+       will be SHRUNK after export still lands above the real minimum, and a
+       rim floor that ignored it would be scaled below the floor it names. */
+    this.edgeFloorF = (EDGE_FLOOR_MM / activeMMPerUnit) / this.floorScale;
+    this.edgeTaperU = (EDGE_TAPER_MM / activeMMPerUnit) / this.floorScale;
   }
 
   // Lift a radius to the export floor, preserving its form (constant number,
@@ -746,26 +838,111 @@ class MeshAccumulator {
     // vertices one-to-one, so a varying (floored) thickness stays watertight. A
     // scalar reproduces the original blade exactly.
     const fn = typeof thick === 'function';
+    const P = (i, j) => grid[i][j].p;
+
+    /* ---- (1) SURFACE DISTANCE TO THE NEAREST FREE BOUNDARY -----------------
+       Accumulated as |dP| ALONG THE LATTICE, so what the taper consumes is a
+       LENGTH ON THE SURFACE and not a grid parameter. That distinction is the
+       whole reason this is a field and not a function of v: a blade grid
+       converges hard at a POINTED apex, where the last cells are a fraction of
+       a millimetre wide, and a taper measured in (u, v) would compress its
+       entire travel into them — steepest exactly where the petal is thinnest.
+
+       WHAT IT IS AND IS NOT. Three monotone sweeps (in from each side, down
+       from the tip) and a min — an along-lattice distance, not a true geodesic.
+       It is exact on the two axes it sweeps and over-estimates diagonally, which
+       is the conservative direction: a corner reads FARTHER from the boundary
+       than it is, so the taper there is shallower, never steeper.
+
+       ROW 0 IS THE BASE AND IS NOT SEEDED. buildBlade lays rows base -> tip, so
+       row 0 is where the petal meets the receptacle — a join, not a free edge.
+       Tapering into it would thin the petal exactly where it is carrying the
+       whole blade, and the fillet that belongs there is its own piece of work. */
+    const dist = new Float64Array(rows * cols).fill(Infinity);
+    const at = (i, j) => dist[i * cols + j];
+    const put = (i, j, v) => { const k = i * cols + j; if (v < dist[k]) dist[k] = v; };
+    const step = (a, b) => { const dx = a.x - b.x, dy = a.y - b.y, dz = a.z - b.z; return Math.hypot(dx, dy, dz); };
+    for (let i = 0; i < rows; i++) {                       // in from the two margins
+      put(i, 0, 0); put(i, cols - 1, 0);
+      for (let j = 1; j < cols; j++) put(i, j, at(i, j - 1) + step(P(i, j), P(i, j - 1)));
+      for (let j = cols - 2; j >= 0; j--) put(i, j, at(i, j + 1) + step(P(i, j), P(i, j + 1)));
+    }
+    for (let j = 0; j < cols; j++) {                       // down from the tip
+      put(rows - 1, j, 0);
+      for (let i = rows - 2; i >= 1; i--) put(i, j, at(i + 1, j) + step(P(i, j), P(i + 1, j)));
+    }
+
+    /* ---- (2) THE TAPER ----------------------------------------------------
+       The body thickness the caller asked for, eased down to the rim floor over
+       EDGE_TAPER_MM of that distance. Applied in BOTH modes — the taper is the
+       shape, and a live view that did not show it would be a picture of a
+       different object — and the export feature floor is applied after it, as
+       before, so the floor is still the last word on what gets printed. */
     const Hs = new Array(rows * cols);
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
         let t = fn ? thick(i, j) : thick;
+        t = edgeThickness(at(i, j), t, this.edgeFloorF, this.edgeTaperU);
         if (this.exportMode) { t = Math.max(this.floorF, t); if (t < this.minThick) this.minThick = t; }
         Hs[i * cols + j] = t * 0.5;
       }
 
-    // Two vertex layers: top (offset +n) then bottom (offset -n).
+    /* ---- (3) THE PERIMETER, AND WHICH OF IT IS FREE -----------------------
+       One closed loop, exactly as before. A vertex on row 0 is on the base and
+       carries NO bead (radius 0), which this emitter handles without a branch:
+       at r = 0 the column below is today's flat wall, vertex for vertex. */
+    const loop = [];
+    for (let j = 0; j < cols; j++) loop.push([0, j]);
+    for (let i = 1; i < rows; i++) loop.push([i, cols - 1]);
+    for (let j = cols - 2; j >= 0; j--) loop.push([rows - 1, j]);
+    for (let i = rows - 2; i >= 1; i--) loop.push([i, 0]);
+
+    /* The bead's radius and its inward direction, per perimeter vertex.
+
+       INSET, NEVER ADDED ON: the apex lands on the original boundary vertex, so
+       the blade's silhouette is preserved to the vertex and the rim tube that
+       traces the same outline still sits flush. What moves inward is the FACE,
+       by r — which is why the radius is clamped against the distance to the
+       interior neighbour: 0.45 of the available room, `addSlab.holeColumn`'s own
+       rule, so the inset can never reach the next lattice column and invert a
+       cell. Where it binds, the bead flattens in-plane and keeps its full
+       thickness — the floor is the ruled invariant, the roundness is not. */
+    const bead = new Map();
+    for (const [i, j] of loop) {
+      const ii = i === 0 ? 1 : (i === rows - 1 ? rows - 2 : i);
+      const jj = j === 0 ? 1 : (j === cols - 1 ? cols - 2 : j);
+      const pv = P(i, j), q = P(ii, jj), n = grid[i][j].n;
+      const inward = projPerpUnit(q.x - pv.x, q.y - pv.y, q.z - pv.z, n);
+      const room = step(q, pv);
+      const H = Hs[i * cols + j];
+      const free = i !== 0;                       // the base is the receptacle's join
+      const r = free ? Math.min(H, 0.45 * room) : 0;
+      bead.set(i * cols + j, { r, ex: -inward[0], ey: -inward[1], ez: -inward[2] });
+    }
+
+    /* ---- (4) THE TWO FACES ------------------------------------------------
+       Interior vertices sit at p +/- n*H exactly as before. A perimeter vertex
+       is additionally pulled IN by its own bead radius, so the face's boundary
+       ring IS the bead column's first and last sample and there is no seam to
+       close between them. */
+    const off = (i, j, sgn) => {
+      const { p, n } = grid[i][j], H = Hs[i * cols + j], b = bead.get(i * cols + j);
+      const e = b ? -b.r : 0;                     // <= 0: in from the boundary
+      return [p.x + n.x * H * sgn + (b ? b.ex : 0) * e,
+              p.y + n.y * H * sgn + (b ? b.ey : 0) * e,
+              p.z + n.z * H * sgn + (b ? b.ez : 0) * e];
+    };
     const tBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
-        this._vertex(p.x + n.x * H, p.y + n.y * H, p.z + n.z * H, n.x, n.y, n.z);
+        const { n } = grid[i][j], v = off(i, j, 1);
+        this._vertex(v[0], v[1], v[2], n.x, n.y, n.z);
       }
     const bBase = this.vcount;
     for (let i = 0; i < rows; i++)
       for (let j = 0; j < cols; j++) {
-        const { p, n } = grid[i][j]; const H = Hs[i * cols + j];
-        this._vertex(p.x - n.x * H, p.y - n.y * H, p.z - n.z * H, -n.x, -n.y, -n.z);
+        const { n } = grid[i][j], v = off(i, j, -1);
+        this._vertex(v[0], v[1], v[2], -n.x, -n.y, -n.z);
       }
     const T = (i, j) => tBase + i * cols + j;
     const B = (i, j) => bBase + i * cols + j;
@@ -779,19 +956,49 @@ class MeshAccumulator {
         this.idx.push(e, g, f, f, g, h);
       }
 
-    // Seal the perimeter: walk the grid boundary as one closed loop and bridge
-    // the top layer to the bottom layer, so every rim edge is shared by exactly
-    // two triangles (watertight).
-    const loop = [];
-    for (let j = 0; j < cols; j++) loop.push([0, j]);
-    for (let i = 1; i < rows; i++) loop.push([i, cols - 1]);
-    for (let j = cols - 2; j >= 0; j--) loop.push([rows - 1, j]);
-    for (let i = rows - 2; i >= 1; i--) loop.push([i, 0]);
+    /* ---- (5) THE BEAD -----------------------------------------------------
+       One column per perimeter vertex, BEAD_SEGMENTS + 1 samples from the top
+       face round to the bottom:
+
+           ne = H sin(phi)          along the surface normal
+           ee = -r + r cos(phi)     in-plane, <= 0, so phi = 0 lands ON the
+                                    original boundary vertex
+
+       This is the union of the two laws `addSlab` already carries: at r = H it
+       is `holeColumn`'s half-round, at r = 0 it is `wallColumn`'s straight drop.
+       IT IS ALSO A STRICT GENERALISATION OF THE WALL IT REPLACES — at
+       BEAD_SEGMENTS = 1 and r = 0 the samples are exactly (top, bottom) and the
+       loft below emits `push(t0, b0, t1, t1, b0, b1)`, the previous emitter's
+       quad, triangle for triangle. That identity is what says the base stretch
+       is untouched rather than merely similar.
+
+       There is no doubled zero and so no straight wall between two arcs: where
+       the clamp binds, the profile is an ELLIPSE (full thickness, flattened
+       in-plane) rather than a bullnose meeting a wall. That keeps one law, and
+       it keeps the sample count fixed around the loop, which is what lets
+       neighbouring columns loft without a special case. */
+    const MH = BEAD_SEGMENTS + 1;
+    const col = new Array(loop.length);
     for (let k = 0; k < loop.length; k++) {
-      const [i0, j0] = loop[k];
-      const [i1, j1] = loop[(k + 1) % loop.length];
-      const t0 = T(i0, j0), t1 = T(i1, j1), b0 = B(i0, j0), b1 = B(i1, j1);
-      this.idx.push(t0, b0, t1, t1, b0, b1);                            // wall quad
+      const [i, j] = loop[k], key = i * cols + j;
+      const { p, n } = grid[i][j], H = Hs[key], b = bead.get(key);
+      const c = new Array(MH);
+      c[0] = T(i, j); c[MH - 1] = B(i, j);          // the faces' own boundary ring
+      for (let m = 1; m < MH - 1; m++) {
+        const phi = Math.PI / 2 - (Math.PI * m) / BEAD_SEGMENTS;
+        const sn = Math.sin(phi), cs = Math.cos(phi);
+        const ne = H * sn, ee = -b.r + b.r * cs;
+        c[m] = this._vertex(
+          p.x + n.x * ne + b.ex * ee, p.y + n.y * ne + b.ey * ee, p.z + n.z * ne + b.ez * ee,
+          n.x * sn + b.ex * cs, n.y * sn + b.ey * cs, n.z * sn + b.ez * cs);
+      }
+      col[k] = c;
+    }
+    for (let k = 0; k < loop.length; k++) {
+      const A = col[k], C = col[(k + 1) % loop.length];
+      for (let m = 0; m < MH - 1; m++) {
+        this.idx.push(A[m], A[m + 1], C[m], C[m], A[m + 1], C[m + 1]);
+      }
     }
   }
 
