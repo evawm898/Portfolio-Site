@@ -70,7 +70,15 @@ export const RING_LAG = 0.13;      // each inner ring trails the front by this m
 // screenshot-and-gate round trip per tweak (not part of this repo — see the
 // PR for the tool). Same construction as the paragraph above: idle only,
 // STORM_RIPPLE untouched, nothing here reaches a storm or click ripple.
-export const DROP_RIPPLE = { maxR: [10, 104], life: [1.8, 3.2], strength: [0.24, 0.58], rings: 2 };
+//
+// AND ONE MORE PASS ON THE SAME SANDBOX: life to [0.8, 2.1] and reach to
+// [10, 74], both tightened further still, alongside RAIN_IDLE_RATE dropping
+// to 21 in koi-rain.js — a shorter-lived, shorter-reaching ripple at a
+// lower rate read as the better-balanced idle surface than the wider,
+// slower one this file had been carrying. Same construction, still idle
+// only: STORM_RIPPLE and CLICK_RIPPLE below are untouched, and
+// `lerpRippleTable` reads DROP_RIPPLE only at storm intensity 0.
+export const DROP_RIPPLE = { maxR: [10, 74], life: [0.8, 2.1], strength: [0.24, 0.58], rings: 2 };
 export const STORM_RIPPLE = { maxR: [14, 46], life: [0.6, 1.6], strength: [0.20, 0.44], rings: 2 };
 export const CLICK_RIPPLE = { maxR: [104, 132], life: [2.1, 2.5], strength: [0.95, 1.0], rings: 3 };
 
