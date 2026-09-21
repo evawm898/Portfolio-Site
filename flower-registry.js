@@ -359,6 +359,22 @@ export const CONTROLS = [
   {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
   {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
   {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  // ---- BLOOM BASE — the petal-origin surface (docs/flower-petal-origin-surface.md, Phase A) ----
+  // NONE is byte-identical to pre-bloomBase behaviour (the whole construction is inert);
+  // DOME originates every petal on a surface of revolution and PRINTS that surface as a
+  // real closed body. The sliders are ratios of the arrangement-owned ring radius (Eva's
+  // Q3 ruling): RADIUS multiplies it, HEIGHT/EXTENT are fractions of the resulting
+  // equator radius, START is the fraction of the curve (measured from the pole) where the
+  // innermost ORDERED petal begins — hard-capped at 0.5 (Q2: under the lowest derived
+  // apex-coverage crossing, rose ≈0.51). START is a deliberate no-op for no-radial-order
+  // arrangements (RADIAL / BILATERAL / coiled EVEN): their petals anchor at the equator
+  // and do not distribute along the curve. Tier per Q8: the select is Standard (a
+  // silhouette choice), the four sliders start Advanced until the preset rebuild.
+  {"id":"bloomBase","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"dome","text":"DOME"}],"default":"none","label":"Bloom base","tier":"standard"},
+  {"id":"bloomBaseRadius","section":"acc-base","kind":"slider","min":0.6,"max":1.4,"step":0.01,"default":1,"label":"Base radius","fmt":"f2","visibleWhen":{"not":{"id":"bloomBase","oneOf":["none"]}}},
+  {"id":"bloomBaseHeight","section":"acc-base","kind":"slider","min":0.05,"max":1.2,"step":0.01,"default":0.5,"label":"Base height","fmt":"f2","visibleWhen":{"not":{"id":"bloomBase","oneOf":["none"]}}},
+  {"id":"bloomBaseExtent","section":"acc-base","kind":"slider","min":0,"max":1.2,"step":0.01,"default":0,"label":"Base extent","fmt":"f2","visibleWhen":{"not":{"id":"bloomBase","oneOf":["none"]}}},
+  {"id":"bloomBaseStart","section":"acc-base","kind":"slider","min":0,"max":0.5,"step":0.01,"default":0,"label":"Base start","fmt":"f2","visibleWhen":{"not":{"id":"bloomBase","oneOf":["none"]}}},
   {"id":"sepalsType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"sepals","text":"SEPALS"}],"default":"none","label":"Sepals","tier":"standard"},
   {"id":"sepalSize","section":"acc-base","kind":"slider","min":0.1,"max":1.5,"step":0.05,"default":0.6,"label":"Sepal size","fmt":"f2","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},
   {"id":"sepalCount","section":"acc-base","kind":"slider","min":3,"max":24,"step":1,"default":5,"label":"Sepal count","fmt":"int","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},

@@ -469,6 +469,49 @@ CONFIGS.push({ label: 'cont-margin TOOTHED tipRegion 1.0 + bundle 1 / flare 0 (d
 CONFIGS.push({ label: 'cont-margin reset after the splice rows', cm: true, set: [{ id: 'tipRegion', value: '0.25' }, { id: 'bundleTightness', value: '0.5' }, { id: 'flareRate', value: '0.5' }] });
 CONFIGS.push({ label: 'cont-margin reset after rim treatments', cm: true, set: [{ id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'cleftDepth', value: '0' }, { id: 'tipLength', value: '0.3' }, { id: 'tipFrequency', value: '14' }, { id: 'tipRegion', value: '0.25' }, { id: 'scallopCount', value: '9' }, { id: 'scallopHeight', value: '0.4' }] });
 
+// ===== BLOOM BASE (dome) — the petal-origin surface, Phase A =====================
+// docs/flower-petal-origin-surface.md. Every petal ORIGIN moves onto a printed closed
+// surface of revolution; direction stays with the bloom-angle chain; the body itself
+// is a lathe + two caps that must export watertight while OVERLAPPING the trunk,
+// centre, and every petal base embedded in it. Rows sit at the shipped slider
+// extremes — RADIUS 0.6/1.4, HEIGHT 0.05/1.2, EXTENT 1.2 (tuck-under), START 0.5
+// (ordered spiral only) — crossed with stem/sepals and every centre builder, per the
+// change-report rule: a matrix with no rows in the affected region reports a clean
+// sheet. The first row is a self-contained reset so nothing leaks in or out.
+CONFIGS.push({ label: 'DOME reset: radial 9 veins + dome on (self-contained)', smoke: true, set: [
+  { id: 'bloomType', value: 'radial', evt: 'change' }, { id: 'petalCount', value: '9' },
+  { id: 'layerCount', value: '1' }, { id: 'petalsPerLayer', value: '' },
+  { id: 'cleftDepth', value: '0' }, { id: 'clawLength', value: '0' }, { id: 'crossSection', value: '0' },
+  { id: 'crossSectionTaper', value: '0' }, { id: 'petalCup', value: '0' }, { id: 'curlAmount', value: '0.3' },
+  { id: 'curlBias', value: '0' }, { id: 'curlStart', value: '0' }, { id: 'curlGradient', value: '0' },
+  { id: 'sizeGradient', value: '0' }, { id: 'variance', value: '0' },
+  { id: 'tipStyle', value: 'clean', evt: 'change' }, { id: 'infillType', value: 'veins', evt: 'change' },
+  { id: 'edgeTermination', value: 'loop', evt: 'change' }, { id: 'continuousMargin', value: 'on', evt: 'change' },
+  { id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'centerType', value: 'stamens', evt: 'change' },
+  { id: 'sepalsType', value: 'none', evt: 'change' }, { id: 'leafType', value: 'none', evt: 'change' },
+  { id: 'stemType', value: 'none', evt: 'change' }, { id: 'stemBudMode', value: 'none', evt: 'change' },
+  { id: 'receptacleType', value: 'none', evt: 'change' },
+  { id: 'bloomBase', value: 'dome', evt: 'change' },
+] });
+CONFIGS.push({ label: 'DOME radius 0.6 + height 0.05 (smallest, flattest body)', set: [{ id: 'bloomBaseRadius', value: '0.6' }, { id: 'bloomBaseHeight', value: '0.05' }] });
+CONFIGS.push({ label: 'DOME radius 1.4 + height 1.2 (widest, tallest body)', smoke: true, set: [{ id: 'bloomBaseRadius', value: '1.4' }, { id: 'bloomBaseHeight', value: '1.2' }] });
+CONFIGS.push({ label: 'DOME extent 1.2 + stem + sepals (tuck-under under a full plant)', smoke: true, set: [
+  { id: 'bloomBaseRadius', value: '1' }, { id: 'bloomBaseHeight', value: '0.5' }, { id: 'bloomBaseExtent', value: '1.2' },
+  { id: 'stemType', value: 'stem', evt: 'change' }, { id: 'sepalsType', value: 'sepals', evt: 'change' }] });
+CONFIGS.push({ label: 'DOME coiled 12 + START 0.5 (bare centre) + stem', smoke: true, set: [
+  { id: 'bloomBaseExtent', value: '0' }, { id: 'sepalsType', value: 'none', evt: 'change' },
+  { id: 'bloomType', value: 'coiled', evt: 'change' }, { id: 'petalCount', value: '12' },
+  { id: 'bloomBaseStart', value: '0.5' }] });
+CONFIGS.push({ label: 'DOME + DENSE CLUSTER centre', set: [{ id: 'bloomBaseStart', value: '0' }, { id: 'stemType', value: 'none', evt: 'change' }, { id: 'centerArch', value: 'dense', evt: 'change' }] });
+CONFIGS.push({ label: 'DOME + DISC centre', set: [{ id: 'centerArch', value: 'disc', evt: 'change' }] });
+CONFIGS.push({ label: 'DOME + PETALOID FILL centre', set: [{ id: 'centerArch', value: 'petaloid', evt: 'change' }] });
+CONFIGS.push({ label: 'DOME 3 layers + stem (inner whorls over one body)', set: [
+  { id: 'centerArch', value: 'classic', evt: 'change' }, { id: 'layerCount', value: '3' },
+  { id: 'stemType', value: 'stem', evt: 'change' }] });
+CONFIGS.push({ label: 'DOME reset off (leak guard for the preset rows)', set: [
+  { id: 'bloomBase', value: 'none', evt: 'change' }, { id: 'layerCount', value: '1' },
+  { id: 'stemType', value: 'none', evt: 'change' }] });
+
 // ===== SHIPPED PRESETS: every curated preset (flower-presets.js) is a permanent
 // regression fixture — named, so a failure reads "Thistle broke", not "config N". Each
 // is loaded the way a visitor loads it: by clicking its gallery cell (the real

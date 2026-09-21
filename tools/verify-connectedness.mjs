@@ -347,6 +347,44 @@ const CONFIGS = [
   { label: 'PAIR CONTROL: same design + sepals (validates sepal absence above)', stem: false,
     moreTrisThan: 'BARE bloom, classic + stamens (SHIPPED DEFAULT centre)',
     set: [{ id: 'stemType', value: 'none', evt: 'change' }, { id: 'receptacleType', value: 'none', evt: 'change' }] },
+
+  // ===== BLOOM BASE (dome) — the petal-origin surface, Phase A ====================
+  // docs/flower-petal-origin-surface.md. `bloomBase: dome` moves every petal ORIGIN onto
+  // a surface of revolution and prints that surface as a real closed body; direction
+  // stays with the bloom-angle chain. These rows exist because of the blindness rule:
+  // the state most able to hide a detachment is the DOME-ON BARE bloom — petals
+  // re-anchored on/along the surface with nothing but the body and the unconditional
+  // junction beneath them — and no pre-existing row can enter that state. Extremes
+  // per the shipped slider ranges: RADIUS 0.6/1.4, HEIGHT 0.05/1.2, EXTENT 1.2 (the
+  // tuck-under: outermost petal origins point down), START 0.5 (ordered arrangements
+  // only — a deliberate no-op for radial, so the START row is coiled).
+  // GATES-FIRST RECORD: before the construction existed these rows failed the run as
+  // HARNESS INVALID ("bloomBase: not in the DOM") — the recorded red of the Phase A
+  // build; they are ordinary hard rows now.
+  { label: 'DOME bare bloom (radial 9, defaults + dome)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }] },
+  { label: 'DOME bare + EXTENT 1.2 (full tuck-under)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'bloomBaseExtent', value: '1.2' }] },
+  { label: 'DOME bare coiled 12 + START 0.5 (bare centre, ordered spiral)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'bloomType', value: 'coiled', evt: 'change' },
+          { id: 'petalCount', value: '12' }, { id: 'bloomBaseStart', value: '0.5' }] },
+  { label: 'DOME bare + RADIUS 0.6 / HEIGHT 0.05 (smallest, flattest body)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'bloomBaseRadius', value: '0.6' },
+          { id: 'bloomBaseHeight', value: '0.05' }] },
+  { label: 'DOME bare + RADIUS 1.4 / HEIGHT 1.2 (widest, tallest body)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'bloomBaseRadius', value: '1.4' },
+          { id: 'bloomBaseHeight', value: '1.2' }] },
+  { label: 'DOME + stem + sepals (full plant over the body)', stem: true,
+    set: [{ id: 'bloomBase', value: 'dome', evt: 'change' }] },
+  // tightness 0 collapses the radial ring to the axis, so the arrangement-owned equator
+  // radius is ~0 and the body is deliberately SKIPPED (nothing to print) — the petals
+  // then sit where the flat placement puts them and the unconditional junction is what
+  // holds the bloom together, exactly as at bloomBase none. The row pins that outcome.
+  { label: 'DOME bare + tightness 0 (ring on the axis — body skipped)', stem: false,
+    set: [...BARE, { id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'tightness', value: '0' }] },
+  { label: 'DOME coiled 12, 3 layers + stem (inner whorls over one body)', stem: true,
+    set: [{ id: 'bloomBase', value: 'dome', evt: 'change' }, { id: 'bloomType', value: 'coiled', evt: 'change' },
+          { id: 'petalCount', value: '12' }, { id: 'layerCount', value: '3' }] },
 ];
 
 // ===== SHIPPED PRESETS — what a visitor actually clicks ==========================
