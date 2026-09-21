@@ -1,0 +1,148 @@
+# Print-safety gate for the Parametric Bloom (docs/bloom-charter.md): every
+# config in the matrix must export as a watertight STL — the pass criterion is
+# boundary edges === 0 and nothing else (nonManifold / shells are unrated
+# diagnostics; see the tool's header). tools/verify-bloom-export.mjs does the
+# actual check: headless Chromium, the real Get STL click, a real STL parse.
+name: bloom-export-watertight
+
+on:
+  pull_request:
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-export.mjs
+      - tools/bloom-wall-thickness.mjs
+      - tools/bloom-combination-gate.mjs
+      - tools/verify-bloom-arc-stability.mjs
+      - tools/verify-bloom-stem-channel.mjs
+      - tools/bloom-sagitta.mjs
+      - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
+      - tools/chromium-harness.mjs
+      # NOT tools/verify-bloom-apex-mutants.mjs, deliberately, even though the
+      # step below PARSES it for its two mutations: a stale anchor there is a
+      # REFUSAL at run time, so it is caught whenever this gate runs for any
+      # other reason — and a session that edits that table has essentially
+      # always edited the geometry or the harness too, both of which are above.
+      # Listing it would put a three-hour gate behind every mutant-table edit
+      # for coverage that is already there.
+      - .github/workflows/bloom-export-watertight.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom.html
+      - bloom.css
+      - bloom.js
+      - bloom-geometry.js
+      - bloom-registry.js
+      - tools/verify-bloom-export.mjs
+      - tools/bloom-wall-thickness.mjs
+      - tools/bloom-combination-gate.mjs
+      - tools/verify-bloom-arc-stability.mjs
+      - tools/verify-bloom-stem-channel.mjs
+      - tools/bloom-sagitta.mjs
+      - tools/bloom-harness.mjs
+      - tools/bloom-self-intersection.mjs
+      - tools/chromium-harness.mjs
+  workflow_dispatch: {}
+
+# A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
+# session 17). Two runs of this workflow on PR #149 started two minutes
+# apart and both ran to completion on a four-CPU runner; the older one was
+# already answering a question nobody was asking. The group is keyed to the
+# workflow AND the ref so it can never cancel across PRs, and the final head
+# always runs to completion — safe by construction. It also enforces a
+# discipline already agreed: a run on a commit that has been superseded is
+# not evidence about the head.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The wall instrument rides in this workflow rather than in a sixth of its
+      # own: it is the same question (print safety), it is Node-only and takes
+      # seconds, and a gate a developer has to remember to run is not a safety
+      # net. It runs FIRST because it needs no browser — a red here is worth
+      # knowing before spending four minutes on Chromium.
+      - name: The emitted sheet must be as thick as it says (V1-V4)
+        run: node tools/bloom-wall-thickness.mjs
+      - name: ... and those four assertions must be able to fail
+        run: node tools/bloom-wall-thickness.mjs --negative-control
+      # THE COMBINATION GATE rides here for the wall instrument's own three
+      # reasons — the same question (print safety), Node-only, seconds — and
+      # it rides in THIS workflow rather than a sixth of its own because a
+      # separate workflow would buy a faster GREEN and cost a slower RED: a
+      # step in this job fails the job in under a minute, before the four
+      # minutes of Chromium, whereas its own workflow would run in parallel
+      # with a three-hour matrix that nothing would then stop. It goes AFTER
+      # the wall instrument because it IMPORTS `measureWall` from it: a red
+      # there is a red about the measure itself, and reading that first is
+      # what keeps this gate's red about the geometry.
+      #
+      # IT DOES NOT NEED THE HARNESS and so it does not need playwright —
+      # `tools/bloom-harness.mjs` imports `playwright-core` at MODULE LOAD,
+      # which is what pins ST9's witness after the npm install; this gate
+      # imports the geometry, the registry and the wall instrument and
+      # nothing else, so it can run before it.
+      - name: No PRODUCT of two controls may close the printable gap (CG0-CG7)
+        run: node tools/bloom-combination-gate.mjs
+      - name: ... and every one of those eight clauses must be able to fail
+        run: node tools/bloom-combination-gate.mjs --control
+      # THE ARC'S NEAR-ZERO BRANCH cannot be a matrix row: no slider reaches the
+      # band (spine curl steps by 5 degrees) and `applyConfig`'s read-back would
+      # refuse one if a row tried. So the witness calls the geometry directly,
+      # and it rides HERE for the wall instrument's own two reasons — the same
+      # question (a blade folded through itself is not printable), Node-only,
+      # under a minute — and before the npm install because it imports
+      # playwright not at all: `bloom-self-intersection.mjs` and the geometry,
+      # and nothing else.
+      - name: The uniform arc must be stable as its curvature goes to zero (AS0-AS4)
+        run: node tools/verify-bloom-arc-stability.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-arc-stability.mjs --negative-control
+      # playwright alone, at an exact version. It pins the exact playwright-core it
+      # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
+      # browser that `npx playwright install` downloads can never disagree. Both
+      # unpinned raced npm on Sep 4: playwright-core 1.63.0 published nineteen
+      # seconds before a run while the playwright CLI was still 1.62.1, and every job
+      # that launches a browser died at launch (build 1243 wanted, 1234 installed);
+      # two minutes later the registry listed playwright 1.63.0 as latest with its
+      # tarball still 404, and an unpinned install could not fetch it at all. Bump
+      # the pin by hand, in every workflow at once, with playwright-core's twin in
+      # bloom-frozen-matrices.yml.
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      # ST9 reads the EXPORTED FILE and rides in this gate on every sphere-stem
+      # row, and the mutant table cannot fire it at all (it calls
+      # `stemAssertions`, never `stemChannelAssertions`). So its witness rides
+      # here for the wall instrument's own reasons — the same question, Node-only,
+      # fifteen seconds — because a clause that has silently stopped being able to
+      # fire makes THIS GATE green on a broken channel.
+      #
+      # IT SITS AFTER THE npm INSTALL AND BEFORE THE BROWSER, not beside the wall
+      # instrument, and that is not a preference: it imports
+      # `stemChannelAssertions` from tools/bloom-harness.mjs, which imports
+      # `playwright-core` at MODULE LOAD. Run any earlier and it dies on a missing
+      # module, red for a reason that has nothing to do with the channel. The wall
+      # instrument can go first because it imports the harness not at all — that is
+      # what buys it the position, not the fact that it needs no browser.
+      # Duplicating ST9 here to avoid the import is the one thing it must not do:
+      # the clause under test would stop being the clause that ships.
+      - name: ST9 must be able to fire on the channel's two defects
+        run: node tools/verify-bloom-stem-channel.mjs
+      - name: ... and it must be able to fail
+        run: node tools/verify-bloom-stem-channel.mjs --control
+      - name: Install headless Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Every config must export watertight (boundary edges = 0)
+        run: node tools/verify-bloom-export.mjs

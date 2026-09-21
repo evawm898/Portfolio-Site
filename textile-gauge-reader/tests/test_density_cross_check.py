@@ -257,6 +257,83 @@ def test_does_not_revert_a_fold_consistency_validated_wale_pick():
     assert new_wale.spacing_px == pytest.approx(14.0)
 
 
+def test_does_not_override_a_decisive_evidence_scorer_pick():
+    # Real bug, traced directly on knit_sample_01.jpg (see
+    # knit_sample_ground_truth.py): the v0.3 evidence scorer had already
+    # ranked the correct 85.0px candidate over the wrong 0.5x-harmonic
+    # 42.5px candidate at 0.650 vs 0.553 -- a 0.097 margin, comfortably
+    # above DENSITY_OVERRIDE_MAX_EVIDENCE_MARGIN (0.08) and therefore
+    # decisive, not a near-tie -- and this override still replaced the
+    # correct pick with the wrong one anyway. Loop-center density is set
+    # to imply the (wrong) 42.5px pitch, exactly as it did on the real
+    # photo, so before the gate this would have "corrected" wale away
+    # from its own already-right answer.
+    wale = _axis(
+        85.0,
+        [42.5, 85.0, 170.0],
+        confidence=0.65,
+        candidate_details=[
+            CandidateInfo(42.5, "0.5x", None, False, evidence_score=0.553),
+            CandidateInfo(85.0, "1x", None, True, evidence_score=0.650),
+            CandidateInfo(170.0, "2x", None, False, evidence_score=0.2),
+        ],
+    )
+    course = _axis(24.2, [12.1, 24.2, 48.4], confidence=0.8)
+    roi_area = 163.0 * 163.0
+    # Density implied by the WRONG 42.5px wale pitch -- what tempted the
+    # override on the real photo.
+    n_centers = round(roi_area / (42.5 * 24.2))
+    loop_centers = np.zeros((n_centers, 2))
+
+    new_wale, new_course = _cross_check_density(
+        wale, course,
+        loop_centers=loop_centers,
+        wale_center_axis=0, course_center_axis=1,
+        wale_p_centers=None, course_p_centers=None,
+        wale_signal=_dummy_signal(), course_signal=_dummy_signal(),
+        roi_area=roi_area,
+    )
+
+    # Gated: wale's decisive evidence-scorer pick is left alone.
+    assert new_wale.spacing_px == pytest.approx(85.0)
+    assert new_wale.selected_reason == "test fixture"
+    assert new_course.spacing_px == pytest.approx(24.2)
+    assert new_course.selected_reason == "test fixture"
+
+
+def test_still_overrides_a_genuinely_ambiguous_evidence_scorer_pick():
+    # Mirror of the case above with the margin narrowed under the gate
+    # threshold (0.06 < 0.08): the density check must still be free to
+    # fire when the scorer itself was a near-tie -- the gate closes the
+    # decisive-pick bug without disabling the mechanism entirely.
+    wale = _axis(
+        17.4,
+        [8.7, 17.4, 34.8],
+        confidence=0.6,
+        candidate_details=[
+            CandidateInfo(8.7, "0.5x", None, True, evidence_score=0.60),
+            CandidateInfo(17.4, "1x", None, False, evidence_score=0.54),
+            CandidateInfo(34.8, "2x", None, False, evidence_score=0.2),
+        ],
+    )
+    course = _axis(24.2, [12.1, 24.2, 48.4], confidence=0.8)
+    roi_area = 163.0 * 163.0
+    n_centers = round(roi_area / (34.8 * 24.2))  # true density
+    loop_centers = np.zeros((n_centers, 2))
+
+    new_wale, new_course = _cross_check_density(
+        wale, course,
+        loop_centers=loop_centers,
+        wale_center_axis=0, course_center_axis=1,
+        wale_p_centers=None, course_p_centers=None,
+        wale_signal=_dummy_signal(), course_signal=_dummy_signal(),
+        roi_area=roi_area,
+    )
+
+    assert new_wale.spacing_px == pytest.approx(34.8, abs=0.1)
+    assert "Density cross-check" in new_wale.selected_reason
+
+
 def test_course_never_adjusted_even_when_wale_fold_consistency_blocks_wale_fix():
     # If wale's own leg-scale candidate is excluded by fold-consistency
     # and its remaining candidates don't close the density gap, nothing

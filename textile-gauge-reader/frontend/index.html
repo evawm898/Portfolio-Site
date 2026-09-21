@@ -67,24 +67,12 @@
     <!-- Step 2: Calibrate -->
     <section class="tgr-step-panel" data-panel="calibrate" hidden>
       <h2>Calibrate scale</h2>
-      <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler).</p>
+      <p class="tgr-hint">Click two points on the image that span a <strong>known physical distance</strong> (e.g. two marks on a ruler). Once placed, drag either point to adjust it, and enter the distance and confirm in the popup that appears by the points.</p>
       <p class="tgr-status" id="calStatus">Click the first point.</p>
       <p class="tgr-hint" id="calAutoHint" hidden></p>
-      <div class="tgr-field-row">
-        <label for="knownDistance">Known distance</label>
-        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 50">
-        <select id="unitSelect">
-          <option value="mm">mm</option>
-          <option value="cm" selected>cm</option>
-          <option value="in">in</option>
-        </select>
-      </div>
-      <p class="tgr-hint" id="ppmPreview"></p>
       <div class="tgr-button-row">
         <button id="calRedo" class="tgr-btn tgr-btn--secondary" type="button">Redo Points</button>
-        <button id="calConfirm" class="tgr-btn" type="button" disabled>Confirm Calibration</button>
       </div>
-      <p class="tgr-error" id="calError" hidden></p>
     </section>
 
     <!-- Step 3: Review Measurement Areas -->
@@ -289,7 +277,7 @@
           </label>
           <label class="tgr-checkbox-option">
             <input type="checkbox" id="saveImageCheck">
-            <span>Save image for algorithm development</span>
+            <span>Save the full photo (not just these numbers) for algorithm development</span>
           </label>
         </div>
 
@@ -317,21 +305,65 @@
       <img id="sourceImage" alt="Uploaded textile" draggable="false">
       <canvas id="overlay"></canvas>
     </div>
-    <div class="tgr-zoom-controls" id="zoomControls" hidden title="Drag to reposition &middot; scroll to pan &middot; Ctrl/pinch-scroll or +/&minus; to zoom">
+    <div class="tgr-zoom-controls" id="zoomControls" hidden title="Drag, or trackpad two-finger scroll, to pan &middot; mouse wheel, Ctrl/pinch-scroll, or +/&minus; to zoom &middot; Shift+scroll to force-pan">
       <button type="button" id="zoomOutBtn" class="tgr-zoom-controls__btn" aria-label="Zoom out">&minus;</button>
       <span class="tgr-zoom-controls__level" id="zoomLevel">100%</span>
       <button type="button" id="zoomInBtn" class="tgr-zoom-controls__btn" aria-label="Zoom in">+</button>
       <button type="button" id="zoomResetBtn" class="tgr-zoom-controls__reset" aria-label="Reset zoom and position">Reset</button>
     </div>
-    <div class="tgr-ruler-controls" id="rulerControls" hidden title="Show a ruler scaled to your calibration, to check against the fabric -- drag it anywhere on the image">
-      <button type="button" id="rulerToggleBtn" class="tgr-ruler-controls__btn" aria-pressed="false">Ruler</button>
+    <!-- Grid box: a draggable, to-scale (1in or 1cm square, from your
+         calibration) overlay for counting stitches by eye and checking the
+         tool's answer -- see #gridBoxPanel below for recording that count
+         as a ground-truth observation. Available anywhere calibration is
+         set, and deliberately BEFORE analysis too (see #gridBoxPanel) so
+         a count isn't anchored to a prediction you've already seen. -->
+    <div class="tgr-gridbox-controls" id="gridBoxControls" hidden title="Show a to-scale square for counting stitches by eye -- drag it anywhere on the image">
+      <button type="button" id="gridBoxToggleBtn" class="tgr-gridbox-controls__btn" aria-pressed="false">Grid</button>
+      <button type="button" id="gridBoxUnitBtn" class="tgr-gridbox-controls__unit" hidden>1 in</button>
+    </div>
+    <div class="tgr-gridbox-panel" id="gridBoxPanel" hidden>
+      <p class="tgr-gridbox-panel__title">Count inside the box</p>
+      <div class="tgr-cal-popup__row">
+        <label for="gridWaleCount">Wales</label>
+        <input type="number" id="gridWaleCount" min="0" step="1" placeholder="e.g. 8">
+      </div>
+      <div class="tgr-cal-popup__row">
+        <label for="gridCourseCount">Rows</label>
+        <input type="number" id="gridCourseCount" min="0" step="1" placeholder="e.g. 10">
+      </div>
+      <div class="tgr-button-row">
+        <button type="button" id="gridBoxSaveBtn" class="tgr-btn" disabled>Record ground truth</button>
+      </div>
+      <p class="tgr-status" id="gridBoxStatus" hidden></p>
+      <p class="tgr-error" id="gridBoxError" hidden></p>
+    </div>
+
+    <!-- Calibration popup: appears anchored near the two calibration points
+         once both are placed (see positionCalPopup in the JS) -- distance/
+         unit entry and the live px/inch readout live here, next to the
+         points themselves, rather than in the always-visible left panel. -->
+    <div class="tgr-cal-popup" id="calPopup" hidden>
+      <div class="tgr-cal-popup__row">
+        <label for="knownDistance">Distance</label>
+        <input type="number" id="knownDistance" min="0" step="any" placeholder="e.g. 10">
+        <select id="unitSelect">
+          <option value="cm" selected>cm</option>
+          <option value="in">in</option>
+        </select>
+      </div>
+      <p class="tgr-cal-popup__ppm" id="ppmPreview"></p>
+      <p class="tgr-cal-popup__spanhint" id="calSpanHint" hidden></p>
+      <div class="tgr-button-row">
+        <button id="calConfirm" class="tgr-btn" type="button" disabled>Confirm Calibration</button>
+      </div>
+      <p class="tgr-error" id="calError" hidden></p>
     </div>
   </section>
 
 </main>
 
 <footer class="tgr-footer">
-  <p>V0 &middot; traditional computer vision only, no AI/ML model &middot; images are processed in memory and never stored &middot; local dev build</p>
+  <p>V0 &middot; traditional computer vision only, no AI/ML model &middot; images are processed in memory and never stored unless you explicitly opt in when saving a correction &middot; local dev build</p>
   <p id="correctionExportRow" class="tgr-footer__export" hidden>
     Ground-truth correction data:
     <a id="exportCsvLink" href="#" target="_blank" rel="noopener">Export CSV</a>

@@ -1,0 +1,2477 @@
+/* ===================================================================
+   bloom.js — Parametric Bloom app. Charter: docs/bloom-charter.md.
+
+   The registry (bloom-registry.js) is the single source of truth: this file
+   GENERATES the panel DOM from it and derives inputs, readUI, DEFAULTS,
+   reset, labels, listeners and visibility from the same rows. There is no
+   second list of controls anywhere, and applyVisibility() is the only thing
+   that hides a control wrapper.
+   =================================================================== */
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent } from './bloom-geometry.js';
+import { VIEW_PRESETS } from './bloom-view-presets.js';
+import { buildGridGltf } from './bloom-grid-gltf.js';
+
+/* Cap the OUTPUT, never an input proxy (flower lesson: the parameter space
+   has genuine cliffs no input-space guard can see). Measured against the
+   export triangle count; export refuses above this. Phase-1 geometry peaks
+   near 60k export tris at petalCount 40, so the cap is slack by design —
+   it exists so the refusal path is real before it is ever needed. */
+const EXPORT_TRI_BUDGET = 1_500_000;
+
+/* ---------------- panel: generated from the registry ---------------- */
+const panelRoot = document.getElementById('panelControls');
+const inputs = {};   // id -> input element
+const valSpans = {}; // id -> read-out span
+const wrappers = {}; // id -> control wrapper div
+const sectionEls = {}; // section id -> <details>
+const summaryEls = {}; // section id -> its <summary>, for the derived labels refreshLabels() rewrites
+/* hiddenReason captions: ONE element per distinct reason object per parent —
+   the registry declares the reason once and references it from every section
+   that hides for it, so identity is what makes the caption single. */
+const whyEls = new Map(); // reason object -> { el, parent, sections: [ids] }
+
+function makeInput(c) {
+  if (c.kind === 'slider') {
+    const input = document.createElement('input');
+    input.type = 'range';
+    input.min = c.min; input.max = c.max; input.step = c.step;
+    return input;
+  }
+  if (c.kind === 'choice') {
+    const sel = document.createElement('select');
+    for (const o of c.options) {
+      const opt = document.createElement('option');
+      opt.value = o.value; opt.textContent = o.label;
+      sel.append(opt);
+    }
+    return sel;
+  }
+  throw new Error(`unhandled control kind "${c.kind}" for ${c.id}`);
+}
+
+/* SECTIONS FIRST, in the registry's order, then each control into the section
+   IT declares. Two loops rather than one, because the section order and the
+   within-section order are different questions with different owners: the
+   SECTIONS array answers the first, the CONTROLS array's own order answers the
+   second. A control is appended to a section that must already exist —
+   verifySections() has thrown at module load if any control names one that
+   does not, so there is no silent-drop path to guard against here.
+
+   <details>/<summary> IS THE MECHANISM, and it is chosen for a property
+   rather than for being native: a control inside a CLOSED <details> keeps its
+   value, its listeners and its read-out span, answers getElementById, and
+   accepts a programmatic `.value` plus real input/change events — so collapse
+   cannot reach readUI, the gates' read-back, or the harness, which set values
+   exactly that way and never by clicking. Measured before it was built on,
+   and asserted every run by tools/verify-bloom-panel.mjs; the browser also
+   gives keyboard operation and open/close state for free, with no JS to hold
+   it and nothing to desync. */
+for (const s of SECTIONS) {
+  const det = document.createElement('details');
+  det.className = s.parent ? 'bl-sec bl-sec--sub' : 'bl-sec';
+  det.id = `sec-${s.id}`;
+  det.dataset.section = s.id;
+  if (s.parent) det.dataset.parent = s.parent;
+  /* The FIRST-LOAD state, from the registry's literal. Never written again by
+     this file: once the page is up, open/close belongs to the visitor. */
+  det.open = s.open;
+  const sum = document.createElement('summary');
+  /* Through the registry's one owner of the summary text, at the DEFAULTS the
+     page loads with — a derived label (the rosette's hood group, whose petal
+     number moves with petalCount) is right from the first paint rather than
+     after the first rebuild corrects it. */
+  sum.textContent = sectionLabel(s, DEFAULTS);
+  det.append(sum);
+  summaryEls[s.id] = sum;
+  /* A NESTED SECTION GOES INSIDE ITS PARENT'S ELEMENT, which the registry
+     guarantees already exists: verifySections() has thrown at module load if
+     a parent is missing, is the section itself, or is declared AFTER it. So
+     there is no ordering to get wrong here and no silent-drop path to guard
+     against — and that sentence is true for the first time as of session 3a.
+     It used to cite "SECTIONS is authored parents-first", which was a
+     convention nothing checked: a child declared before its parent passed
+     verifySections() and threw HERE, on `sectionEls[s.parent]` being
+     undefined. The precedence clause is now in the registry, where the
+     literals are, so this line states a checked fact rather than a habit.
+
+     ANY DEPTH. The two-level bound was lifted with that check (Eva's Q7);
+     this loop never knew about depth — it appends into whatever the parent's
+     element is. `bl-sec--sub` below is still "nested at all", not "nested at
+     depth k": session 29 declared the first third level (Tip, inside
+     Androecium) and paid the rule session 27 said was owed, as a DESCENDANT
+     selector in bloom.css, so this line stays one class and a fourth level
+     would cost nothing here either. */
+  /* THE CAPTION GOES WHERE THE FIRST DROP-DOWN THAT HIDES FOR THIS REASON
+     WOULD BE — appended before that section's own element, once. It is text,
+     never a control: applyVisibility() is still the only thing that decides
+     whether it shows, and refreshLabels() the only thing that writes it. */
+  if (s.hiddenReason) {
+    let w = whyEls.get(s.hiddenReason);
+    if (!w) {
+      const el = document.createElement('p');
+      el.className = 'bl-why';
+      el.hidden = true;
+      sectionEls[s.parent].append(el);
+      w = { el, parent: s.parent, sections: [] };
+      whyEls.set(s.hiddenReason, w);
+    }
+    w.sections.push(s.id);
+    w.el.dataset.why = w.sections.join(' ');
+  }
+  (s.parent ? sectionEls[s.parent] : panelRoot).append(det);
+  sectionEls[s.id] = det;
+}
+
+/* THE ACCORDION — opening a section closes the others (Eva's ruling, Sep 1,
+   with the tradeoff stated and accepted: tweaking across two sections costs a
+   reopen click, and the layers-are-sections structure makes single-focus the
+   normal case).
+
+   ONE LISTENER, ONE OWNER. `toggle` does NOT bubble, so this is registered in
+   the CAPTURE phase on the panel root — capture descends from the document
+   through every ancestor regardless of bubbling, so one listener here sees
+   every section's toggle. The alternative, a listener per <details>, is N
+   copies of one rule and the thing that drifts; measured before it was built
+   on rather than assumed from the spec.
+
+   `toggle` IS QUEUED, NOT SYNCHRONOUS — measured, and it is the reason this
+   is written as a correction rather than a veto. Two programmatic opens in one
+   tick BOTH land, and this handler then runs twice and settles on the last
+   one. So exclusivity is eventually-consistent within a tick, which is
+   invisible to a visitor (one click is one toggle) and is exactly what a test
+   asserting exclusivity synchronously would fail on. tools/verify-bloom-panel
+   awaits a frame before every accordion assertion for that reason.
+
+   It cannot recurse: closing the others fires their toggles, and a toggle
+   whose target is now CLOSED returns immediately. Closing the open section is
+   left alone — zero sections open is a state the visitor can reach and the
+   registry may declare. This never touches `hidden`; applyVisibility() owns
+   that, and open/closed and shown/hidden are different questions. */
+panelRoot.addEventListener('toggle', (e) => {
+  const det = e.target;
+  if (!(det instanceof HTMLDetailsElement) || !panelRoot.contains(det)) return;
+  if (!det.open) return;
+  /* OPENING A DROP-DOWN CLOSES ITS SIBLINGS — the same rule this listener has
+     always applied, stated one level more generally so nesting falls out of it
+     (Eva, Sep 3). At the top level a section's siblings ARE the other
+     sections, so the shipped behaviour is unchanged; inside "Petal roles",
+     opening Petal 2 closes Petal 1 and leaves the parent open, because the
+     parent is not a sibling. A second listener for the nested set would have
+     been N copies of one rule, which is the thing that drifts — and it is why
+     the guard is "inside the panel" rather than "a direct child of it". */
+  for (const other of det.parentElement.children) {
+    if (other !== det && other instanceof HTMLDetailsElement) other.open = false;
+  }
+}, true);
+
+for (const c of CONTROLS) {
+  const wrap = document.createElement('div');
+  wrap.className = 'bl-ctrl';
+  const label = document.createElement('label');
+  label.htmlFor = c.id;
+  label.append(c.label);
+  const val = document.createElement('span');
+  val.className = 'bl-val';
+  label.append(val);
+  const input = makeInput(c);
+  input.id = c.id;
+  input.value = c.default;
+  wrap.append(label, input);
+  sectionEls[c.section].append(wrap);
+  inputs[c.id] = input; valSpans[c.id] = val; wrappers[c.id] = wrap;
+}
+
+/* Coercion is the REGISTRY's rule, imported — not re-decided here. A slider
+   is a number and a choice is a string; a local `Number(...)` would turn
+   `placement` into NaN, which reads back as a legitimate-looking value and is
+   how a gate ends up measuring a design other than the one it names. */
+function readUI() {
+  const out = {};
+  for (const c of CONTROLS) out[c.id] = coerceValue(c, inputs[c.id].value);
+  return out;
+}
+/* Harness hook: gates read the app's own state snapshot rather than keeping a
+   second copy of readUI's coercion rules. */
+window.__bloomUIState = () => readUI();
+
+/* Harness hooks for the contact sheet, same doctrine as body.bl-preview: the
+   tool ASKS THE APP rather than recomputing. __bloomMetrics reports the live
+   build's own numbers so a caption can never disagree with the model in the
+   frame; __bloomFrame drives the app's own fitCamera so the centre zoom is
+   the real camera at a different radius, not a crop guessing at projection.
+   Assigned after the scene exists — see below. */
+
+/* fmt receives the control's own value AND the whole state snapshot: Tip
+   taper prints the DERIVED widest point a/(a+b), which needs the other
+   taper. Every other fmt ignores the second argument. A control for the
+   widest point would be a second owner of a derived quantity. */
+/* `shown` (session 23) is the THIRD argument fmt may read: the build on
+   screen, as footRing()'s own descriptors plus the mode — `{ mode,
+   androecium, gynoecium }` — so a read-out can print an OWNER'S number (the
+   stamen spread's cap) rather than re-derive it. It is the record regenerate()
+   just built, never the export handler's, so a span can never carry an
+   export number under a live label. null at module load, before any build. */
+function refreshLabels(ui, shown = null) {
+  for (const c of CONTROLS) valSpans[c.id].textContent = c.fmt(ui[c.id], ui, shown);
+  /* A SECTION'S SUMMARY CAN BE DERIVED TOO (Eva's ruling A, Sep 3): the
+     rosette's hood group is "Petal N" where N is the last orbit's number,
+     which moves with petalCount. Same snapshot, same pass, same owner
+     (sectionLabel) as the generator used — a static label is rewritten with
+     itself, which is cheaper than a second list of which sections vary. */
+  for (const s of SECTIONS) summaryEls[s.id].textContent = sectionLabel(s, ui);
+  for (const [reason, w] of whyEls) w.el.textContent = reason.text(ui);
+}
+
+/* THE CAP MARK (Eva, Sep 6, session 23) — where a slider's travel goes DEAD
+   on THIS bloom, drawn on the control itself. The registry row declares
+   `cap(shown)`, which names the owner's number (the stamen spread reads
+   footRing()'s `saturation`); this is the ONLY writer of the mark, and it
+   writes three things on the wrapper from that one number: the class that
+   turns the CSS overlay on, `data-cap` (the number, for the read-out's
+   twin and the gate), and `--bl-cap` (the number as a fraction of the
+   slider's own range, for the overlay's position). No mark when the row
+   declares no cap, when the owner has no number (the part is absent), or
+   when the cap is at or past the range's top — no dead travel there, and a
+   mark at the far end would say there was. The range itself is never
+   touched: not narrowed, not adaptive. */
+function applyCaps(shown) {
+  for (const c of CONTROLS) {
+    if (typeof c.cap !== 'function') continue;
+    const wrap = wrappers[c.id];
+    const at = c.cap(shown);
+    if (at === null || at === undefined || !(at < c.max)) {
+      wrap.classList.remove('bl-ctrl--capped');
+      delete wrap.dataset.cap;
+      wrap.style.removeProperty('--bl-cap');
+      continue;
+    }
+    const frac = Math.min(1, Math.max(0, (at - c.min) / (c.max - c.min)));
+    wrap.classList.add('bl-ctrl--capped');
+    wrap.dataset.cap = at.toFixed(2);
+    wrap.style.setProperty('--bl-cap', frac.toFixed(4));
+  }
+}
+
+/* The ONLY setter of a control wrapper's hidden — evaluates the registry's
+   predicate against one state snapshot, so every control is decided against
+   the same state.
+
+   A SECTION'S visibility is DERIVED here from the controls it holds, never
+   declared: a section is hidden when, and only when, every control in it is
+   hidden. That adds no second gating mechanism — the decision is made from
+   the same `ui` snapshot that decided those controls, so it cannot disagree
+   with one — and it means a section can never render as a header opening onto
+   nothing. The per-petal drop-downs reach that state under every placement
+   but FAN, which is the rule working rather than a claim about today's
+   registry. Hiding a section is NOT collapsing it — `hidden` removes it; the
+   `open` attribute is the visitor's, and this function never touches it. */
+function applyVisibility() {
+  const ui = readUI();
+  for (const c of CONTROLS) wrappers[c.id].hidden = !evalPredicate(c.visibleWhen, ui);
+  /* CHILDREN BEFORE PARENTS — ONE PASS, AT ANY DEPTH. A section's answer
+     READS its children's, so every child must have settled before its parent
+     is reached. verifySections() refuses a section declared before its parent,
+     so SECTIONS is a topological order of the tree and walking it BACKWARDS
+     settles every descendant before every ancestor — one level or five, with
+     no recursion and no second pass. That precedence check is what carries
+     this claim (session 3a); before it existed the ordering was a convention
+     and this walk was correct by luck.
+
+     A parent holding only child sections has no controls of its own, and
+     `every` over an empty set is true, so without the second term it would
+     hide itself while its children were on screen. */
+  const childrenOf = new Map();
+  for (const s of SECTIONS) {
+    if (!s.parent) continue;
+    if (!childrenOf.has(s.parent)) childrenOf.set(s.parent, []);
+    childrenOf.get(s.parent).push(s.id);
+  }
+  for (let i = SECTIONS.length - 1; i >= 0; i--) {
+    const s = SECTIONS[i];
+    const noControls = CONTROLS.every((c) => c.section !== s.id || wrappers[c.id].hidden);
+    const kids = childrenOf.get(s.id) || [];
+    const noKids = kids.every((id) => sectionEls[id].hidden);
+    /* A CAPTION SHOWS EXACTLY WHEN ITS REASON HOLDS AND EVERY SECTION THAT
+       NAMES IT IS HIDDEN — decided here, once, on the way up: this parent's
+       children have already settled (they come later in SECTIONS, so earlier
+       in this walk — the precedence check, at any depth), so the caption can
+       read them, and a visible caption is content that keeps its parent on
+       screen. */
+    let noWhy = true;
+    for (const [reason, w] of whyEls) {
+      if (w.parent !== s.id) continue;
+      w.el.hidden = !(evalPredicate(reason.when, ui) && w.sections.every((id) => sectionEls[id].hidden));
+      if (!w.el.hidden) noWhy = false;
+    }
+    sectionEls[s.id].hidden = noControls && noKids && noWhy;
+  }
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  for (const c of CONTROLS) {
+    inputs[c.id].value = DEFAULTS[c.id];
+    inputs[c.id].dispatchEvent(new Event('input', { bubbles: true }));
+    inputs[c.id].dispatchEvent(new Event('change', { bubbles: true }));
+  }
+});
+
+/* ---------------- scene ---------------- */
+const canvas = document.getElementById('bloom-canvas');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0c0f0e);
+const camera = new THREE.PerspectiveCamera(40, 1, 0.1, 2000);
+/* THE ORBIT AXIS BUG (Eva, Sep 2 — "feels really difficult... like it's
+   fighting against me"), root-caused rather than guessed at. OrbitControls
+   captures its orbit-math pole from `object.up` ONCE, inside an IIFE at
+   construction time (three.js's own OrbitControls.js: `this.update =
+   (function () { const quat = Quaternion().setFromUnitVectors(object.up,
+   Vector3(0,1,0)); ...; return function update() {...}; })()`) — it is NOT
+   re-read on later frames even though `camera.up` itself can still be
+   reassigned afterward for rendering. `camera.up` defaults to three.js's
+   own (0,1,0) until fitCamera() first runs and sets it to (0,0,1) — but
+   fitCamera only runs inside regenerate(), AFTER `new OrbitControls(...)`
+   below had already captured the WRONG pole (Y) as this app's model is
+   Z-up throughout (buildPetalInto's own R/T/Z frame). Measured directly
+   (a probe exposing camera/controls to a headless page): a purely
+   horizontal drag moved Y not at all and rotated X/Z instead of X/Y, and a
+   vertical drag drove the camera toward alignment with the Y axis rather
+   than tilting over the bloom — orbiting a pole that has nothing to do
+   with what is on screen, which is exactly what reads as fighting/hitting
+   a wall. The fix is ORDER: set camera.up to this app's real vertical
+   BEFORE OrbitControls captures it, not after. */
+camera.up.set(0, 0, 1);
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.autoRotate = document.getElementById('autoRotate').checked;
+controls.autoRotateSpeed = 1.2;
+document.getElementById('autoRotate').addEventListener('change', (e) => {
+  controls.autoRotate = e.target.checked;
+});
+let userMoved = false;
+/* True only between a FAN placement-snap and whatever ends it — a manual
+   orbit, a manual VIEW-dropdown pick, or leaving FAN. While true, every
+   rebuild re-centres the (already top-down) camera on the model's fresh
+   bounding-sphere centre — see recenterFanView(). It is a NARROWER flag
+   than `userMoved`: `userMoved` means "the automatic default fit is the
+   user's to drive now" and is permanent once set (existing behaviour,
+   unchanged); this one means "still actively holding the FAN's own snap",
+   and either a drag or a fresh preset pick ends it without touching
+   `userMoved`. */
+let fanViewLocked = false;
+controls.addEventListener('start', () => {
+  userMoved = true;
+  fanViewLocked = false;
+  if (viewTween) { controls.autoRotate = document.getElementById('autoRotate').checked; viewTween = null; }
+});
+
+scene.add(new THREE.HemisphereLight(0xdfefe6, 0x1a221e, 1.1));
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(60, 40, 90);
+scene.add(key);
+
+const material = new THREE.MeshStandardMaterial({ color: 0xc9dfd2, roughness: 0.62, metalness: 0.05 });
+let mesh = null;
+
+const DEG = Math.PI / 180;   // VIEW_PRESETS' distances are fov-aware (radius/tan(fov/2)), not a bare radius*k
+
+/* THE ONE OWNER of "frame a sphere of this radius". The automatic fit and the
+   contact sheet's centre zoom are the same operation at two radii, so they are
+   the same function; a screenshot tool re-deriving the projection would be a
+   second copy of the camera rule, which is this project's most repeated
+   defect wearing a lens. `lift` raises the orbit target off the origin — the
+   whole-bloom view looks slightly up into the whorl, a centre crop looks
+   straight at the hub plane. */
+/* `up` IS EXPLICIT NOW, AND DEFAULTED SO NOTHING MOVES (session B, Sep 2).
+   Every existing caller omits it and gets [0,0,1] — the value this function
+   has always hardcoded — so every sheet taken before today frames identically.
+
+   WHY IT WAS WORTH ADDING. Looking straight down the axis passes
+   dir = [0,0,1] with up = [0,0,1], which are PARALLEL: the camera's roll is
+   then whatever three.js's degenerate fallback picks, so "face-on" has never
+   had a defined orientation in this codebase. That did not matter while every
+   bloom was radially symmetric — one roll is as good as another. It matters
+   the moment the flower has a FACE: a zygomorphic bloom read face-on has an
+   up and a down, and the sheet that shows the labellum below and the hood
+   above must be able to say so rather than hope. */
+function fitCamera(radius, lift = 0.15, at = null, dir = null, up = null) {
+  /* The axis-framing path is byte-for-byte the original: a single-petal crop
+     is a NEW capability, and widening a signature must never move the shot
+     every existing sheet was taken with. The 40 mm distance floor belongs to
+     that path only — it keeps a tiny bloom from being framed absurdly close,
+     and it would otherwise stop a petal crop ever getting close enough to
+     read an outline. */
+  if (!at) {
+    const d = Math.max(40, radius * 2.6);
+    camera.position.set(d * 0.75, -d * 0.75, d * 0.6);
+    camera.up.set(0, 0, 1);
+    controls.target.set(0, 0, radius * lift);
+    return;
+  }
+  /* Targeted framing, optionally along a given view direction. A SILHOUETTE
+     is an outline, and an outline seen at three-quarters is foreshortened —
+     so the silhouette sheet asks to look down the petal's own normal, which
+     the builder reports. The direction is normalised here so `radius` means
+     the same distance whichever way the camera is pointing. */
+  const d = radius * 2.6;
+  const v = dir || [0.75, -0.75, 0.6];
+  const n = Math.hypot(v[0], v[1], v[2]) || 1;
+  camera.position.set(at[0] + (v[0] / n) * d, at[1] + (v[1] / n) * d, at[2] + (v[2] / n) * d);
+  camera.up.set(...(up || [0, 0, 1]));
+  controls.target.set(at[0], at[1], at[2]);
+}
+
+function resize() {
+  const w = window.innerWidth, h = window.innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ---------------- build ---------------- */
+const readout = document.getElementById('readout');
+let shownSummary = '';   // the read-out for whatever geometry is on screen, in that geometry's mode
+
+/* ===================================================================
+   THE PRINT-PREVIEW TOGGLE (Eva, Sep 3 — unparked from the charter, where it
+   sat since the thickness layer), and `shownMode()` is THE ONE OWNER of
+   "which geometry is on screen".
+
+   A VIEW CONTROL, NEVER A GEOMETRY CONTROL. It is a raw DOM reference in the
+   VIEW box exactly like `autoRotate` and `viewPreset`: not in `inputs`, not a
+   CONTROLS row, invisible to readUI(), DEFAULTS, reset, fullStateDrift and
+   every gate that reads UI state. Checked, regenerate() builds the viewport
+   from an EXPORT-mode accumulator — the sheet, tip and foot floored at
+   MIN_FEATURE_MM and the ring re-derived by the area rule from the floored
+   feet — which is the object the printer will make. At three-figure petal
+   counts that is the difference between a render with visible gaps and a
+   print with none (Eva's mum run: 120 feet at 1.60 mm on a 3.63 mm ring live
+   against 4.69 mm printed).
+
+   THE EXPORT BYTES CANNOT MOVE WITH IT, and the argument is structural rather
+   than a measurement that happened to come out clean: the Get STL handler
+   builds `buildGeometry({ exportMode: true })` from readUI(), and this box is
+   not in readUI(). There is no branch in the export path that can observe
+   it. What the toggle DOES change is the telemetry cache — see
+   buildGeometry's `record` — so an export click can never overwrite what is
+   on screen and the export build can never be mistaken for the live one.
+   Both STL gates assert the shown mode is LIVE on every row (every "(live)"
+   label they print depends on it), and the panel gate flips the real box and
+   requires the exports on either side of it byte-identical.
+
+   EVERY CONSUMER READS THIS FUNCTION: regenerate(), the read-out's first
+   line, the print-truth pair's on-screen marker, and __bloomMetrics()'s
+   `shownMode`. A second reading of the checkbox anywhere would be a second
+   owner of the one boundary this control is about. */
+const printPreviewInput = document.getElementById('printPreview');
+function shownMode() { return printPreviewInput && printPreviewInput.checked ? 'export' : 'live'; }
+let lastShownMode = 'live';
+
+let lastRing = { radius: 0, derivedRadius: 0 };   // ring 0 — what every pre-layer consumer read
+let lastRings = [];                               // every ring, in build order
+let lastHub = { radius: 0, thickness: 0 };
+let lastFoot = { guardResidual: null, layerCount: 1, continuousMode: false, sequenceLength: 0, quantizerResiduals: null, slotRolesEligible: false, slotRolesSplit: false, fan: null, mirror: null, slotCount: 0, slotRoleCensus: null, perPetalEligible: false, petalRoleCensus: null, petalGroupCount: null, allPetalsEligible: false, sphereMode: false };
+let lastHubBuilt = { dome: null, tris: 0 };            // what buildHubInto actually built — J3 reads it against the feet
+/* THE STEM (session 43) — the plan its ONE owner made and what the builder
+   emitted from it. ST0-ST6 read these; the read-out prints the two lengths. */
+let lastStem = null, lastStemTris = 0, lastFootDigest = 0, lastStemBuilt = null, lastStemAbsent = true;
+let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris = 0;
+/* THE SEPALS (part 1) — footRing()'s descriptor (the ring, the count and its
+   ceiling, the phase, the foot), the builder's own emitted whorl and the angle
+   limit it drew. SP0-SP9 read these; the read-out prints them. */
+let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepalTris = 0, lastSepalsAskedUnderSphere = 0;
+/* THE INFLORESCENCE (this session) — the PLAN and what the BUILDER emitted,
+   the leaf's own pairing. `inflorescence` is NULL and not absent where there
+   is none: ID1 distinguishes "the builder says there are none" from "the
+   builder says nothing", and a missing key is the second. The builder's
+   record carries `unitPositions` (the floret unit's own triangle stream) and
+   the hook deliberately does NOT — see the projection below, where the reason
+   is written down: the claim it would serve is already a MEASURED zero the
+   builder reports as `placementResidual`, by a second expression beside the
+   method under test. */
+let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0;
+/* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
+   built, and how near the stem every one of them came. Null wherever the
+   question does not arise (no stem, or not a sphere), never a passing 0. */
+let lastStemOmission = null;
+let lastFootBySlot = [];
+/* THE FOOT FRAMES' DIGEST — ST6's measured side. A stemmed and a stemless build
+   of the SAME state must agree here exactly, which is the whole of "the
+   hub-to-stem join does not change the petal-to-hub junction". One function
+   makes both numbers, which is right: the digest is a MEASUREMENT METHOD and
+   the two sides are two different BUILDS, so the owners that differ are the
+   ones that matter. */
+function footFramesDigest(built) {
+  let h = 0;
+  /* A DESCRIPTOR WHOSE PETAL WAS NOT BUILT HAS NO FOOT FRAME, and `petals`
+     carries a null there so the array stays index-matched to `fr.rings`. ST6
+     compares this against a STEMLESS build, where nothing is omitted, so a
+     stemmed sphere and its stemless twin legitimately have different
+     POPULATIONS — which is why the per-slot list below exists and why ST6 and
+     ST8 read that instead of this scalar wherever any slot was omitted. */
+  for (const p of (built.petals || [])) for (const f of ((p && p.footFrames) || [])) {
+    for (const v of [...f.C, ...f.N, ...f.T, f.h, f.t]) { h = (h * 31 + (Number.isFinite(v) ? v : 0)) % 1e15; }
+  }
+  return h;
+}
+/* THE SAME DIGEST, ONE PER SLOT — null where no petal was built. This is what
+   makes "the omission does not renumber" checkable: slot 4's foot frame must be
+   the SAME NUMBER with the stem and without it, whatever happened to slot 3.
+   One function for both builds again, for footFramesDigest's own reason: the
+   digest is a measurement METHOD and the two sides are two different BUILDS. */
+function footFramesBySlot(built) {
+  return (built.petals || []).map((p) => {
+    if (!p || !p.footFrames) return null;
+    let h = 0;
+    for (const f of p.footFrames) for (const v of [...f.C, ...f.N, ...f.T, f.h, f.t]) {
+      h = (h * 31 + (Number.isFinite(v) ? v : 0)) % 1e15;
+    }
+    return h;
+  });
+}
+let lastPetal = null;                             // layer 0's petal — likewise
+let lastPetals = [];
+/* THE BUILDER'S OWN TALLY of buildPetalInto calls — Z1's independent
+   quantity, so the role partition is checked against what was BUILT rather
+   than against another number the same owner produced. */
+let lastPetalsBuilt = 0;
+/* EVERY SLOT'S AZIMUTH, one row per whorl — the input to J7 and Z4b, and new
+   in the fan session because nothing here had ever recorded a position around
+   the axis. See buildBloomInto's own note: before this existed, both STL
+   gates, every J-assertion and every Z-assertion were azimuth-blind, so a fan
+   that silently built a full ring would have passed all of them at an
+   identical triangle count and STL byte length. */
+let lastSlotAzimuths = [];
+/* THE ANDROECIUM (session 21): footRing()'s descriptor, the builder's own
+   per-stamen emission records, its free-end tally and the two distance
+   flags — the inputs of JS1-JS4 and of the read-out's STAMENS line. */
+let lastAndroecium = null, lastStamens = [], lastFreeEnds = 0, lastStamenNearest = null;
+/* THE GYNOECIUM (session 22): footRing()'s third descriptor and the
+   builder's own style record (root axis, root rings, tip, the three lobes)
+   — the inputs of JG1-JG4 and of the read-out's STYLE line. */
+let lastGynoecium = null, lastStyles = [];
+/* THE FILAMENT-AGAINST-STYLE RECORD (session 23) — buildBloomInto's own
+   nearest approach of a filament station to the style's centreline, null
+   unless both parts are built; the STAMENS line's flag reads it. */
+let lastFilamentStyle = null;
+/* THE PLACEMENT THE BUILD WAS MADE FROM — the registry control's value, kept
+   beside footRing()'s own `fan` record so J7 can cross-check the two. They
+   are genuinely two owners of one boundary (the registry owns the option
+   list; footRing() branches on it), which is the same relation Z5 already
+   checks for slot-role eligibility, and the same remedy: assert they agree on
+   every row rather than comment that they do. */
+let lastPlacement = 'RADIAL';
+let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
+let lastFitCenter = [0, 0, 0];
+
+/* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
+   there is no registry row, no DOM input, and no listener that writes it —
+   window.__bloomCapability (below) is the only writer, and only the gates
+   and the contact sheet call it. It exists so "architected for claw and
+   cleft" is a thing the gates BUILD and MEASURE rather than a sentence in a
+   header. Because it is not a control, the gates' whole-state read-back is
+   unaffected: their fullStateDrift still compares every registry control
+   against DEFAULTS + set, and this is invisible to it — which is why the
+   capability rows carry their OWN read-back assertion. */
+let capability = null;
+
+/* `record` — whether this build is THE ONE ON SCREEN, and therefore the one
+   the telemetry cache, the read-out and __bloomMetrics() describe. Until the
+   print-preview toggle this was `!exportMode`, which was the same thing while
+   only regenerate() built live and only the export handler built floored.
+   It is not the same thing any more: a previewed build is export-mode AND on
+   screen, and an export click during a preview is export-mode and NOT. Keying
+   the cache off the mode would let the Get STL build overwrite what the
+   viewport shows — the mislabelled-telemetry mutant (T2) the crowding
+   instrument's R2 catches on every floor-binding row — so the caller says
+   which build it is making, and only regenerate() says `record: true`. */
+/* `captureGrid` (session 28) is OFF for every existing caller and is read by
+   nothing that decides geometry — see MeshBuilder's own note. It is threaded
+   through here rather than given its own build function so that the grid
+   export and the STL export are the same build, made the same way, from the
+   same readUI() snapshot; a second builder would be a second owner of "what
+   the app is showing". */
+function buildGeometry({ exportMode, record = false, captureGrid = false }) {
+  const acc = new MeshBuilder({ exportMode, captureGrid });
+  const uiForBuild = readUI();
+  const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
+  if (record) {
+    lastShownMode = exportMode ? 'export' : 'live';
+    lastPlacement = uiForBuild.placement;
+    lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
+    lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
+    lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
+    lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
+    lastGynoecium = built.gynoecium; lastStyles = built.styles;
+    lastFilamentStyle = built.filamentStyle;
+    lastStem = built.stem && built.stem.present ? built.stem : null;
+    lastStemTris = built.stemBuilt ? built.stemBuilt.tris : 0;
+    lastStemBuilt = built.stemBuilt || null;
+    lastStemOmission = built.stemOmission || null;
+    /* THE GEOMETRY'S OWN ANSWER TO "IS A STEM ABSENT HERE", on the state this
+       build was made from. ST0 needs the answer the RUNNING module gave; see
+       __bloomMetrics. */
+    lastStemAbsent = stemIsAbsent(uiForBuild);
+    /* LEAVES — LF0-LF7's measured side. `leaf` is NULL and not absent where
+       there are none: LF1 distinguishes "the builder says there are none" from
+       "the builder says nothing", and a missing key is the second. The
+       per-leaf records come from the BUILDER, never from the plan beside it —
+       LF2 and LF3 ask what came OUT, and a mutation that offsets what it emits
+       leaves the plan saying the right thing (session 43's ST2). */
+    lastLeaf = built.leaf && built.leaf.present ? built.leaf : null;
+    lastLeavesBuilt = built.leavesBuilt || null;
+    lastLeafTris = (built.leavesBuilt || []).reduce((n, r) => n + r.tris, 0);
+    lastLeafAbsent = leafIsAbsent(uiForBuild);
+    lastSepals = built.foot.sepals || null;
+    lastSepalsBuilt = built.sepals || null;
+    lastSepalTris = built.sepals ? built.sepals.tris : 0;
+    lastSepalsAbsent = sepalsAbsent(uiForBuild);
+    lastSepalsAskedUnderSphere = built.foot.sphereMode ? Math.round(Number(uiForBuild.sepalCount) || 0) : 0;
+    lastInflo = built.inflorescence && built.inflorescence.present ? built.inflorescence : null;
+    lastInfloBuilt = built.inflorescenceBuilt || null;
+    lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
+    lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
+    lastFootDigest = footFramesDigest(built);
+    lastFootBySlot = footFramesBySlot(built);
+    lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
+  geo.computeVertexNormals();
+  /* `built` is returned as well as cached, so the export path can summarise
+     the geometry IT built rather than reading the live cache — the two are
+     different geometry whenever a floor binds, and a summary that mixes them
+     is the unlabelled-mode defect this file's every other number avoids.
+
+     `ui` for the same reason one step further out: the grid export records
+     the state its geometry came from, and re-reading readUI() to get it
+     would be a second snapshot that a slider moved between the two calls
+     could make disagree with the geometry in the file. */
+  return { geo, acc, built, ui: uiForBuild };
+}
+
+/* The readout's one-line summary. Every number carries its MODE, because live
+   and export are different geometry and not convertible.
+
+   MAX DIM is reported, never enforced. Reachable states cross process caps —
+   dyed PA12 tops out near 180 mm on the shortest axis, standard white goes
+   much larger, and SLS nests in any orientation so the only question is
+   whether the box fits. Which cap applies is the user's call at order time,
+   so this is a number at the slider, not a clamp and not a refusal. (The one
+   thing this generator DOES refuse is triangle count, because that is a
+   property of the file rather than of somebody's process.) */
+/* THE PRINT-TRUTH LINE — what the object will actually be made of, and where
+   that differs from what is on screen.
+
+   Until the thickness layer live and export geometry were the same thing:
+   SHEET_THICKNESS_MM (1.2) sat above MIN_FEATURE_MM (1.0), so the export
+   floor never bound and the preview was the print. The thickness controls end
+   that. Below 1.00 mm the exported sheet is floored, and because footRing()'s
+   AREA RULE reads the thickness the solids are actually built at, the floor
+   moves the RING RADIUS too — at a 0.60 mm sheet the ring is 6.25 mm live and
+   8.07 mm printed, a 29% difference in the whole arrangement, not a wall.
+
+   EVA'S RULING (Aug 31): no geometry change in either mode — the one-owner
+   rule is working exactly as footRing()'s header says it should, and live
+   mode stays authoring-true — but the divergence must be TOLD. A preview that
+   silently shows an arrangement the print will not produce is the same lie as
+   an unlabelled triangle count; a labelled one is honest. So both numbers
+   appear, labelled, whenever they differ, and the second line is absent when
+   they do not. A "print preview" toggle that renders the floored geometry
+   live is PARKED in the charter and deliberately not built here.
+
+   footRing() is asked the same question twice rather than anything
+   re-deriving a radius: two throwaway accumulators differing only in mode,
+   emitting no triangles. The one owner answers both.
+
+   THE TOGGLE IS BUILT NOW (Sep 3) AND THIS PAIR STAYS: the two lines are the
+   two geometries and the toggle only decides which one the viewport renders.
+   So the marker moves rather than the lines duplicating — `← on screen`
+   lands on whichever line `shownMode()` names, and the other keeps its own
+   label. One owner for the choice, two labelled numbers as before. */
+function materialLines(ui, mode) {
+  /* Ring 0 — the outermost, which is the ring this line has always reported
+     and the one the hub is built on (hub.radius IS rings[0].radius in every
+     placement). The inner rings' radii are on the arrangement line, where the
+     depth that produced them is also visible. */
+  const live = footRing(ui, new MeshBuilder({ exportMode: false })).rings[0];
+  const printed = footRing(ui, new MeshBuilder({ exportMode: true })).rings[0];
+  const say = (r) => {
+    const tip = thicknessProfile(r, ui).at(1);
+    const tipShown = r === printed ? Math.max(tip, MIN_FEATURE_MM) : tip;
+    return `sheet ${r.thickness.toFixed(2)} mm · tip ${tipShown.toFixed(2)} mm`
+         + ` · foot ${r.width.toFixed(2)} × ${r.thickness.toFixed(2)} mm${r.widthClamped ? ' (CLAMPED)' : ''}`
+         + ` · ring ${r.radius.toFixed(2)} mm`;
+  };
+  const a = say(live), b = say(printed);
+  return a === b ? a
+    : `${a}   ← live${mode === 'live' ? ', on screen' : ''}\nPRINTED (export floor ${MIN_FEATURE_MM.toFixed(2)} mm): ${b}${mode === 'export' ? '   ← on screen' : ''}`;
+}
+
+/* THE FIRST LINE OF THE READ-OUT names the geometry on screen, always — in
+   live mode too, because a state that is only ever implied is a state the
+   reader has to infer, and the toggle's whole reason to exist is that live
+   and printed are different objects now. Reads shownMode(); owns nothing. */
+function showingLine(mode) {
+  return mode === 'export'
+    ? `on screen: PRINT PREVIEW — export floor ${MIN_FEATURE_MM.toFixed(2)} mm applied to sheet, tip and foot, ring re-derived from the floored feet\n`
+    : 'on screen: LIVE geometry, as authored (the print-truth line below says where the print differs)\n';
+}
+
+/* THE LOW-COUNT SPIRAL FLAG — the whole of how phyllotaxis below eight petals
+   is handled, and it is a LABEL rather than a gate on purpose.
+
+   The charter used to say "gate or flag golden-angle placement at low counts".
+   Measured Sep 1 (see GOLDEN_ANGLE in bloom-geometry.js): the obvious
+   statistic, the ratio of largest to smallest angular gap, oscillates between
+   1.62 and 2.62 at EVERY count and has no discontinuity at 8 or anywhere
+   else. There is no geometric threshold to gate on. The rule is a real
+   AESTHETIC claim — below roughly eight petals the golden angle reads as an
+   irregular whorl rather than as a spiral — and the honest handling of an
+   aesthetic claim is to say so where the user is looking.
+
+   Gating was considered and rejected on two further grounds, recorded so it
+   is not re-proposed: hiding the option would leave the model IN the spiral
+   state with the control unreachable ("shipped means reachable", violated for
+   the state the model is in), and auto-resetting to RADIAL would move
+   geometry as a side effect of a hidden rule. Same discipline as the roll
+   clamp's "(clamped)" and the print-truth line: an unlabelled state is the
+   lie, a labelled one is honest.
+
+   ASSERTED IN BOTH DIRECTIONS by the panel gate — it must appear when the
+   condition holds and must be absent when it does not. A flag nothing checks
+   for absence is a flag that can be stuck on. */
+/* WHAT IT COUNTS IS THE SEQUENCE, and `petalCount` stopped being that number
+   when CONTINUOUS arrived. The aesthetic claim is about how many elements the
+   golden angle has to work with before parastichies read: under SPIRAL each
+   whorl runs its own sequence, so that is `petalCount`; under CONTINUOUS the
+   whole bloom is one sequence of `petalCount * layerCount`. footRing() owns
+   the number and this reads it, so SPIRAL's behaviour is unchanged to the
+   character (sequenceLength IS petalCount there) while the claim stays true
+   in the new mode. */
+function spiralLowCount(ui, fr) {
+  return (ui.placement === 'SPIRAL' || ui.placement === 'CONTINUOUS')
+    && fr.sequenceLength < SPIRAL_LEGIBLE_COUNT;
+}
+
+/* THE FOOT-FLOOR RANGE, and why it is a RANGE now. Under the ringed arm
+   `widthClamped` was a per-layer flag and there were at most three of them.
+   A continuous bloom has up to 120 feet and the floor binds from some
+   crossing index onward — so "which slots" became a real question, and a bare
+   "(CLAMPED)" would answer it with a word where the honest answer is two
+   numbers. Same discipline as the roll clamp and the print-truth line: a
+   slider that has gone quiet must say where. Returns '' when nothing is
+   floored, so the line simply is not there rather than saying "none". */
+/* WHICH RINGS A FOOT CLAMP TOOK OVER ON — one owner for the phrasing, because
+   the floor and the ceiling ask the same question at opposite ends of one
+   clamp and two copies of it would drift in wording alone. */
+function clampedRingsPhrase(rings, hit) {
+  /* COUNTED IN WHORLS, NOT DESCRIPTORS (session B). A split whorl is three
+     descriptors of ONE ring, and they share a foot by construction (Z6), so
+     counting descriptors would report "rings 0-2 (3 of 3)" for a single-whorl
+     bloom whose foot clamped once — three answers to one question, and a
+     number naming a thing that is not the thing. `lambda` is the whorl. */
+  const whorls = [...new Set(rings.map((r) => r.lambda))].sort((a, b) => a - b);
+  const idx = whorls.filter((L) => rings.some((r) => r.lambda === L && hit(r)));
+  if (!idx.length) return null;
+  const first = idx[0], last = idx[idx.length - 1];
+  const which = whorls.length === 1 ? 'the foot' : (first === last ? `ring ${first}` : `rings ${first}–${last}`);
+  return `${which} (${idx.length} of ${whorls.length})`;
+}
+
+/* BOTH CLAMPS, BOTH REPORTED. The floor has said so since the thickness
+   layer; the CEILING never did, and it binds from petalWidth 25 upward — six
+   of that slider's 23 reachable values — where the blade keeps widening and
+   the area-ruled ring does not move at all (measured: 10.8324 mm at 24,
+   11.0558 mm at 25 and still 11.0558 mm at 30). A slider that has stopped
+   moving must say so: the same (CLAMPED) discipline the roll floor, the tip
+   floor and the foot floor already carry, arriving where it was always
+   missing (Eva, Sep 1 — found by discovery, not by a visitor wondering why
+   the ring stopped growing). No geometry moves; this is telemetry. */
+function footFloorLine(rings) {
+  const lo = clampedRingsPhrase(rings, (r) => r.widthClamped);
+  const hi = clampedRingsPhrase(rings, (r) => r.widthClampedHigh);
+  return (lo ? `FOOT WIDTH FLOORED at ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm on ${lo} — the blade keeps shrinking, the root does not\n` : '')
+       + (hi ? `FOOT WIDTH CAPPED at ${FOOT_MAX_WIDTH_MM.toFixed(2)} mm on ${hi} — the blade keeps widening, the ring does not\n` : '');
+}
+
+/* THE INNER-RING LINE (Eva, Sep 3) — the read-out that stands where a derived
+   depth clamp was proposed and rejected. The depth slider reaches six now and
+   nothing caps it against the foot floor, because the "collision" a clamp
+   would have enforced is not a buildability limit (every depth to eight
+   exports watertight and as one piece) and because it is already reachable
+   at depth 1..3 on shipped rows — so a clamp could not be byte-identical and
+   would gate a state ruled reachable on purpose. What a visitor needs instead
+   is to be TOLD, in the FOOT WIDTH FLOORED discipline: WHICH rings are
+   narrower than one foot (the feet on them overlap each other), and which
+   are inside their own overhang (the feet cross the axis). Both flags are
+   footRing()'s own telemetry; this only names them. Absent when no ring is
+   under the floor, so the line simply is not there rather than saying
+   "none". The panel gate asserts it in both directions. */
+function innerRingLine(rings, fr) {
+  const under = clampedRingsPhrase(rings, (r) => r.underFootFloor);
+  if (!under) return '';
+  const cross = clampedRingsPhrase(rings, (r) => r.crossesAxis);
+  /* On the dome the foot runs along the ARC and the thing it crosses is the
+     apex — footRing() decides that (the flag is arc-based there); this only
+     names it. */
+  return `RINGS NARROWER THAN A FOOT on ${under} — under ${FOOT_MIN_WIDTH_MM.toFixed(2)} mm, so the feet on them overlap each other`
+       + (cross ? `; on ${cross} they cross the ${fr && fr.dome ? (fr.dome.closed ? 'face pole' : 'apex') : 'axis'}` : '') + `\n`;
+}
+
+/* THE DOME LINE (Sep 4) — the head rise, told in the numbers a visitor cannot
+   set: the cap's radius and apex height in the shown mode, the surface-to-plan
+   ratio over the feet, and THE LOCAL RELIEF at the rim and at the innermost
+   ring. That last pair carries the finding this session would otherwise lose
+   by session 16: the dome's extra area sits at the RIM where the slope is
+   steep, while a tight bloom's feet stack at the INNER rings where the cap is
+   nearly flat — so the relief is greatest where the crowding is least (the
+   mum's peak is at r 2.1–2.8 mm on a 4.69 mm hub, local relief 1.1–1.2x under a
+   whole-annulus 2.0x; a hemisphere takes it from D_max 11 to 9, not to 5).
+   Both numbers are footRing()'s own per-ring `relief`; this only prints them.
+   "(CLAMPED)" is the apex floor binding, the roll floor's own discipline:
+   the rise asked and the rise built are both printed, from the owner. Absent
+   when flat, so the line simply is not there. */
+/* THE SPHERE LINE (session 18) — the same line's other arm, for the closed
+   head: the sphere's radius, the sequence pole to pole, THE RESERVED POLE's
+   clearance (the arc from the far pole to the nearest foot, and the
+   equal-area step it sits inside — a future stem attaches there, and S3
+   asserts it in both directions), how near the feet come to the FACE pole
+   (negative: they cross it), and the apex floor's clamp on the same
+   "(CLAMPED)" discipline. Absent unless the head is a sphere; the panel gate
+   asserts the line and its clauses against the owner's own flags. */
+function sphereLine(rings, fr, mode) {
+  const d = fr.dome;
+  if (!d || !d.closed) return '';
+  const near = rings[d.reserved.ring];
+  return `HEAD: FULL SPHERE · radius ${d.Rd.toFixed(2)} mm (${mode}) · ${d.K} petals pole to pole, equal-area step ${(Math.acos(1 - d.stepCos) * 180 / Math.PI).toFixed(2)}° at the equator`
+       + ` · RESERVED POLE clear: nearest foot ${d.reserved.mm.toFixed(2)} mm (${d.reserved.deg.toFixed(2)}°) from it, ring ${d.reserved.ring} at ${(near.slope * 180 / Math.PI).toFixed(2)}° — blades converge over it, feet run the other way`
+       + ` · face pole: nearest foot end ${d.faceReach.mm.toFixed(2)} mm along the meridian${d.faceReach.crossing ? ` (${d.faceReach.crossing} of ${rings.length} feet cross it)` : ''}`
+       + (d.clamped ? ` · (CLAMPED: the area rule's ${fr.derivedRadius.toFixed(2)} mm ring is under one sheet, the sphere is held at ${d.floorRadius.toFixed(2)} mm — the shell's inner face would invert)` : '') + `\n`;
+}
+
+function domeLine(rings, fr, mode) {
+  const d = fr.dome;
+  if (!d || d.closed) return '';
+  const rim = rings[0], inner = rings.reduce((a, r) => (r.radius < a.radius ? r : a), rings[0]);
+  const rel = (x) => (isFinite(x) ? `${x.toFixed(2)}x` : 'vertical');
+  return `HEAD RISE ${d.rise.toFixed(2)}x · dome radius ${d.Rd.toFixed(2)} mm, apex ${d.H.toFixed(2)} mm above the rim (${mode})`
+       + ` · surface ${d.surfaceToPlan.toFixed(2)}x plan over the feet · local relief ${rel(rim.relief)} at the rim, ${rel(inner.relief)} at the innermost ring — the dome relieves radial stacking most where the slope is steepest, least near the apex`
+       + (d.clamped ? ` · (CLAMPED: rise ${d.rise.toFixed(2)} asked, ${d.riseBuilt.toFixed(2)} built — the shell's inner face would invert under a ${d.floorRadius.toFixed(2)} mm dome radius)` : '') + `\n`;
+}
+
+/* THE SPINE LINE (session 16, the curl family) — what the spine curvature
+   floor did and how near the blade came to itself, in numbers a visitor
+   cannot set. Two facts, one line, from slot 0's own spine record:
+     (CLAMPED)      the tightest spine radius the law asked for fell under one
+                    sheet thickness (the roll floor's own constant), the
+                    curvature was held there, and the turn that BUILT is
+                    printed beside the turn ASKED — Eva's ruling (Sep 4):
+                    full ranges, clamped, told; never an input trimmed to
+                    hide a cliff.
+     SELF-CONTACT   the blade comes within one sheet thickness of itself
+                    (blade rows three thicknesses apart along the spine, or
+                    the blade against its own foot). A FLAG, never a gate:
+                    it fires on the shipped, photographed hoop.
+   Absent when spine curl is 0, so the line simply is not there. The panel
+   gate asserts both clauses in both directions against the builder's own
+   flags (route l). */
+/* THE SEAM CLEARANCE (session 38) — TOLD, never silent. The floor moves the
+   blade's first row outward when the foot-to-blade kink would otherwise fold
+   the offset surface, and a geometry change nobody is told about is exactly
+   what this project's "full ranges, clamped, told" convention exists against.
+   It is NOT a control and never becomes one: the clearance is derived from
+   the turn and the sheet, and a slider for it would be a second owner of a
+   printability condition. Absent when it binds on no ring — the shipping
+   default among them — so the line simply is not there.
+
+   The number that matters is per RING, because the clearance is a function of
+   the ring's own effective tilt: on six whorls at the defaults the turns run
+   25 to 85 degrees and the steps 1 to 5. Both STL gates assert all of it per
+   ring (A7), which is a stronger read-back than the panel could give. */
+function seamLine(petals) {
+  const ls = (petals || []).map((p) => p && p.bladeLadder).filter((l) => l && l.seamStep > 1);
+  if (!ls.length) return '';
+  const all = (petals || []).map((p) => p && p.bladeLadder).filter(Boolean);
+  const worst = ls.reduce((a, l) => (l.seamStep > a.seamStep ? l : a), ls[0]);
+  return `SEAM CLEARANCE binds on ${ls.length} of ${all.length} ring${all.length === 1 ? '' : 's'}`
+       + ` · worst ${worst.seamClearMm.toFixed(3)} mm at a ${worst.seamTurnDeg.toFixed(1)}° foot-to-blade kink`
+       + ` · that ring's first blade row starts ${worst.seamStep} row${worst.seamStep === 1 ? '' : 's'} out`
+       + (ls.some((l) => l.seamClamped)
+          ? ` · CLAMPED on ${ls.filter((l) => l.seamClamped).length} ring${ls.filter((l) => l.seamClamped).length === 1 ? '' : 's'} — the blade there is SHORTER than the fold it has to clear (${Math.max(...ls.filter((l) => l.seamClamped).map((l) => l.seamClearU)).toFixed(3)}x its own length asked), so the block starts as far out as it can and the sheet still passes through itself`
+          : '')
+       + ` — nearer and the sheet's own top skin would fold back into the foot\n`;
+}
+
+function spineLine(petals) {
+  const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && sp.curlRad !== 0);
+  if (!sps.length) return '';
+  /* EVERY RING'S PETAL, because the floor binds and the flags fire on the
+     SHRUNK inner whorls first: the line names the worst ring, not slot 0's. */
+  const sp0 = sps[0];
+  const tight = sps.reduce((a, s) => (s.peakRadiusMm < a.peakRadiusMm ? s : a), sp0);
+  const clamped = sps.filter((s) => s.clamped), under = sps.filter((s) => s.underFloor), contact = sps.filter((s) => s.clearance.selfContact);
+  const near = sps.reduce((a, s) => Math.min(a, s.clearance.minMm, s.clearance.minToFootMm), Infinity);
+  const of = (arr) => `${arr.length} of ${sps.length} ring${sps.length === 1 ? '' : 's'}`;
+  return `SPINE CURL ${sp0.turnAskedDeg}° · bias ${Number(sp0.bias).toFixed(2)} · start ${Number(sp0.start).toFixed(2)}${sp0.startFloored !== sp0.start ? ` (floored to the first blade row, ${sp0.startFloored.toFixed(3)})` : ''}`
+       + ` · tightest spine radius ${tight.peakRadiusMm.toFixed(2)} mm`
+       + (clamped.length ? ` (CLAMPED at one sheet thickness, ${tight.floorRadius.toFixed(2)} mm, on ${of(clamped)}: ${tight.turnAskedDeg}° asked, ${clamped.reduce((a, s) => Math.min(a, Math.abs(s.turnBuiltDeg)), Infinity).toFixed(1)}° built at the tightest — the sheet's inner face would invert under a tighter spine)` : '')
+       + (under.length ? ` · UNDER ONE SHEET THICKNESS (${tight.floorRadius.toFixed(2)} mm) on ${of(under)} — the shipped uniform arc on a shrunk whorl, told, not clamped` : '')
+       + ` · nearest self-approach ${isFinite(near) ? near.toFixed(2) + ' mm' : 'n/a'} against a ${sp0.clearance.sheetT.toFixed(2)} mm sheet`
+       + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
+}
+
+/* THE FRINGE LINE (Eva's ruling, Sep 13) — the squared end and the teeth,
+   read from ring 0's petal record and never re-derived from the sliders.
+   Asked beside built for the count, the clamp and WHY it bound, the tooth and
+   gap at the two stations where each is narrowest, the split asked beside the
+   station it landed on, and — when a fringe is live — the fact that the lobe
+   family is standing down. Absent when neither control is off its default. */
+function fringeLine(petals) {
+  const F = petals && petals[0] && petals[0].fringe;
+  if (!F) return '';
+  const end = F.tipEnd === 0
+    ? 'CONVERGING END — the apex law runs to its own point'
+    : F.deadTravel
+      ? `SQUARED END ${(F.tipEnd * 100).toFixed(0)}% — DEAD: ${F.endWidthMm.toFixed(2)} mm is under the ${F.floorMm.toFixed(2)} mm print floor, so the petal still ends on the floor's own ${(2 * F.tipHalfMm).toFixed(2)} mm (dead below ${(100 * F.deadBelow).toFixed(0)}% on this petal — told, never trimmed)`
+      : `SQUARED END ${F.endWidthMm.toFixed(2)} mm across, ${(100 * F.endWidthMm / (2 * F.peakHalfMm)).toFixed(0)}% of the petal's width · it carries ${F.ceiling} ${F.ceiling === 1 ? 'tooth' : 'teeth'} at the ${F.floorMm.toFixed(2)} mm floor`;
+  if (F.noRoom) return `FRINGE NO ROOM — ${F.asked} teeth asked and ${F.noRoomWhy}, so none are cut: the petal converges to `
+    + `${(2 * F.tipHalfMm).toFixed(2)} mm, which carries one tooth at the ${F.floorMm.toFixed(2)} mm floor, and one tooth is the petal. `
+    + `Told, never refused — raise the squared end above ${(100 * F.deadBelow).toFixed(0)}% and the teeth appear.\n`;
+  if (!F.built) return `${end}\n`;
+  /* CLAMPED AND TOLD. The ceiling is the END's width and nothing else, so the
+     reason names the width that bound and what the end would have to be. */
+  const count = F.clamped
+    ? `${F.asked} asked → ${F.count} built (CLAMPED: the end is ${F.wMinMm.toFixed(2)} mm at its narrowest and ${F.asked} teeth need ${((2 * F.asked - 1) * F.floorMm).toFixed(1)} mm`
+      + (F.tipEnd === 0 ? ' — there is no squared end to carry them)' : `, so the squared end would have to be ${(100 * ((2 * F.asked - 1) * F.floorMm) / (2 * F.peakHalfMm)).toFixed(0)}% of the width)`)
+    : `${F.count} teeth`;
+  const split = F.peakClamped
+    ? `split CLAMPED to the widest point (u ${F.uPk.toFixed(4)}) — a tooth may not reach below it into the base taper`
+    : `${F.depthMm.toFixed(2)} mm deep, asked at u ${F.uAsked.toFixed(4)} and landed on the row at u ${F.uSplitRow.toFixed(4)} (${F.residualMm.toFixed(3)} mm off, inside the ${F.rowGapMm.toFixed(3)} mm row)`;
+  /* THE MUTUAL EXCLUSION IS SAID OUT LOUD. A family that went quiet without
+     saying so is a control that stopped working as far as anyone can tell. */
+  const lobes = ' · LOBES stand down — both treat the apex, and a rim cut narrows every tooth including the middle ones (measured)';
+  return `FRINGE ${count} · ${end} · ${F.count === 1 ? 'the tooth is' : 'teeth'} ${F.toothBaseMm.toFixed(2)} mm at the split tapering to ${F.toothTipMm.toFixed(2)} mm`
+       + (F.count > 1 ? `, gaps ${F.gapSplitMm.toFixed(2)} → ${F.gapTipMm.toFixed(2)} mm` : '')
+       + ` · ${split}${lobes}\n`;
+}
+
+/* THE LOBES LINE (session 38, PR 2) — read from ring 0's petal record, never
+   re-derived from the sliders: asked beside built for the count and the depth,
+   each cap and whether it bound, the pitch against its floor, and the rows the
+   ladder gave each lobe (a ROW COUNT, measured on the emitted stations, said
+   as such). Absent on a plain petal. */
+function lobeLine(petals) {
+  const L = petals && petals[0] && petals[0].lobes;
+  if (!L) return '';
+  if (L.noRoom) return `LOBES NO ROOM — ${L.noRoomWhy === 'region' ? 'the margin has no arc at all' : L.noRoomWhy === 'rows' ? `the ladder can place ${L.rowsCapacity} rows in this window and one period needs ${L.samplesPerLobe}` : L.noRoomWhy === 'relief' ? `every period's sinus sits where the outline has already converged to the print floor (the asked relief was ${L.reliefAskedMm.toFixed(2)} mm) — there is nothing to remove anywhere in the arc` : `${(2 * L.treatedHalfMm).toFixed(1)} mm of treated rim is under the ${L.pitchFloorMm.toFixed(2)} mm pitch floor`}; nothing cut, told\n`;
+  const count = L.countClamped
+    ? `${L.countAsked} asked → ${L.countBuilt} built (CLAMPED by ${L.clampedBy === 'pitch' ? 'the pitch floor' : `the rows the ladder has — ${L.rowsCapacity} free in this window at ${L.samplesPerLobe} a period`})`
+    : `${L.countBuilt} teeth`;
+  /* THE APEX IS A POINT ON THE RIM NOW, so the first thing this line says is
+     what is AT it — the parity fact, which is a printability statement and
+     not a look: an even count's apex sinus lands on the terminal mini-face,
+     which is already at the print floor in both modes, so it is flattened
+     rather than cut. Derived from the law, never asserted (session 42). */
+  const apex = L.apexIsCrest
+    ? 'a CREST at twelve'
+    : `a NOTCH at twelve — on the terminal face, already at the print floor, so it cuts ${L.apexReliefMm.toFixed(2)} mm and reads as ONE wide tooth`;
+  /* THE RELIEF, AND THE RESIDUAL FADE. Every period that has room gets the
+     asked relief exactly; the ones that do not are named with what they got,
+     which is the honest statement of what is left of session 40's fade. */
+  const margin = L.reliefMm.filter((r, i) => L.apexIsCrest || i !== (L.periods - 1) / 2);
+  const relief = L.reliefLimited === 0
+    ? `relief ${L.reliefAskedMm.toFixed(2)} mm on every tooth on the margin (depth ${L.depthBuilt.toFixed(2)}x the widest half-width ${L.peakHalfMm.toFixed(2)} mm; the first saturates at ${L.depthCap.toFixed(2)}x)`
+    : `relief ${L.reliefAskedMm.toFixed(2)} mm asked, ${Math.min(...margin).toFixed(2)}–${Math.max(...margin).toFixed(2)} mm built — ${L.reliefLimited} of the margin's teeth are limited by the material at their own sinus (every period saturates above ${L.depthCap.toFixed(2)}x)`;
+  return `LOBES ${count} · ${apex} · ${relief} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% = ${(L.coverage * 12).toFixed(1)} hours of the clock (${(2 * L.treatedHalfMm).toFixed(1)} of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back) · crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)}${L.crestAngleDeg === null ? '' : ` (crest ${L.crestAngleDeg.toFixed(1)}\u00b0`}${L.notchAngleDeg === null ? (L.crestAngleDeg === null ? '' : ')') : `${L.crestAngleDeg === null ? ' (' : ', '}notch ${L.notchAngleDeg.toFixed(1)}\u00b0 included on a ${L.angleChordMm.toFixed(2)} mm chord)`} · ${L.samplesPerLobe} stations a period demanded by this shape · ${L.rowsPerPeriod.join('/')} placed base to apex · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
+}
+
+/* THE ROOT-BLEND LINE IS RETIRED (created by session 36's ruling, retired by
+   Eva's on Sep 20). It printed at three or more layers that the inner whorls'
+   short petals fold through themselves at the root. THE DEFECT IT DESCRIBED
+   DOES NOT EXIST: the foot-to-blade seam clearance (#210, a24ed69) fixed it,
+   and the census reads 0 within-shell pairs at every depth 1..6 at the
+   defaults — docs/bloom-root-blend-superseded.md has the measurements.
+   NO REPLACEMENT WARNING. Re-pointing the line at the EFFECTIVE TILT PAST 90
+   fold that IS still there was offered and DECLINED: no line rather than one
+   to maintain. Do not re-add either. The panel gate's route (v), which
+   asserted this line in both directions, went with it. */
+
+/* THE SLOT-ROLE LINE — what the mirror plane actually did, and where the
+   envelope clamp bit. Two things a visitor cannot otherwise see: WHICH slots
+   the labellum and hood came out as (the derivation is exact but it is not
+   obvious that an odd count gives a hood PAIR), and that a size multiplier has
+   SATURATED. The second is the "(CLAMPED)" discipline the roll floor, the tip
+   floor and both foot clamps already carry: a slider that has stopped moving
+   must say so rather than read as broken.
+
+   The asked-for values come from footRing()'s own out-parameter, never
+   recomputed here — a read-out re-deriving "what was asked for" would be a
+   second copy of the composition law, and the second copy is the one that
+   drifts. Returns '' when no whorl split, so the line is simply absent rather
+   than saying "none". */
+/* WHICH PLANE, IN WORDS — one owner for the phrasing, because the fan gave
+   the bloom a SECOND mirror and a line that says "through slot 0" on an
+   arrangement whose plane runs through a GAP is a label naming something that
+   is not the thing. The involution is footRing()'s answer; this only names
+   it. */
+function mirrorPhrase(mirror) {
+  return mirror === MIRROR_THROUGH_GAP
+    ? 'mirror plane through the gap between slots 0 and n-1 (pairs i with n-1-i)'
+    : 'mirror plane through slot 0 (pairs i with n-i)';
+}
+
+/* ONE LINE FOR BOTH POSITION AXES (session 11), because the thing a visitor
+   needs to see is the same in both: WHICH slots each group came out as. The
+   axes are mutually exclusive by placement — slot roles under RADIAL,
+   per-petal under FAN (Eva's ruling 4) — so this reads whichever one split
+   rather than printing two lines that can never both apply. Naming the group
+   from the descriptor's own `slotRole ?? petalRole` keeps footRing() the one
+   owner of which axis this bloom has; a line deriving it from `placement`
+   would be a second copy of that branch.
+
+   PER-PETAL GROUPS PRINT AS "petal 3", not "PETAL_3": the role id is an
+   internal key and the visitor's word for it is the panel's own. */
+/* THE ALL-PETALS LINE — what the one-whorl group was actually BUILT with,
+   printed from the descriptor's own record (base + delta, clamped once) so a
+   visitor reads the number the blade got rather than the delta the slider
+   shows. Absent when the group is not engaged, absent above one whorl. */
+function allPetalsLine(rings, fr) {
+  if (!fr.allPetalsEligible) return '';
+  const r = rings.find((x) => x.allRole !== null && x.allRole !== undefined && x.overrides);
+  if (!r) return '';
+  const said = [];
+  if ('petalSpineCurl' in r.overrides) said.push(`spine curl ${r.overrides.petalSpineCurl.toFixed(0)}°`);
+  if ('petalCup' in r.overrides) said.push(`cup ${r.overrides.petalCup.toFixed(2)}`);
+  return said.length ? `all petals as a group · ${said.join(' · ')}\n` : '';
+}
+
+function slotRoleLine(rings, fr) {
+  const split = rings.filter((r) => r.slotRole !== null || r.petalRole !== null);
+  if (!split.length) return '';
+  const said = (r) => (r.slotRole !== null ? r.slotRole.toLowerCase() : r.petalRole.replace('PETAL_', 'petal '));
+  const seen = new Map();
+  for (const r of split) if (!seen.has(said(r))) seen.set(said(r), r.slots);
+  const groups = [...seen].map(([role, slots]) =>
+    `${role} ${slots.length === 1 ? `slot ${slots[0]}` : `slots ${slots.join('+')}`}`).join(' · ');
+  const clamps = new Map();
+  for (const r of split) for (const c of r.overrideClamped || []) clamps.set(c.base, c);
+  const clampLine = [...clamps.values()]
+    .map((c) => `${c.base} asked ${c.asked.toFixed(2)}, CLAMPED to ${c.got.toFixed(2)}`).join(' · ');
+  return `${mirrorPhrase(fr.mirror)} — ${groups}\n`
+       + (clampLine ? `ROLE VALUE CLAMPED to the base control's own range: ${clampLine}\n` : '');
+}
+
+/* ===================================================================
+   THE FAN LINE — the arrangement's derived shape, and the arc limit's
+   "(CAPPED)".
+
+   THREE THINGS A VISITOR CANNOT OTHERWISE SEE. The TOTAL petal count, because
+   `petalCount` is hidden under FAN and this is the number it used to show.
+   The ARC and the NOTCH, because both are derived from two controls and
+   neither is at a slider. And whether the arc limit BIT — the step saturates
+   before the spacing slider ends, and a slider that has stopped moving must
+   say so rather than read as broken. That is the same "(CLAMPED)" discipline
+   the roll floor, the tip floor and both foot clamps carry, arriving on the
+   fourth placement.
+
+   The asked-for and built steps both come from footRing()'s own `fan` record
+   rather than being recomputed here — a read-out that re-derived the cap
+   would be a second copy of the clamp law, and the second copy is the one
+   that drifts. Returns '' under every other placement, so the line is simply
+   absent rather than saying "not a fan". */
+function fanLine(fr) {
+  const f = fr.fan;
+  if (!f) return '';
+  return `fan ${f.spanDeg.toFixed(1)}° arc · ${f.gapDeg.toFixed(1)}° gap at the back`
+       + ` · step ${f.stepDeg.toFixed(2)}°`
+       + (f.capped ? ` (CAPPED from ${f.askedDeg.toFixed(0)}° — the ${f.limitDeg}° arc limit keeps the two sides apart)` : '')
+       + `\n`;
+}
+
+/* THE STAMENS LINE (session 21) — the androecium told in the numbers a
+   visitor cannot set, all of them footRing()'s own or the builder's own,
+   never re-derived here: the layout, the disc radius beside the reference it
+   multiplies (and "(CLAMPED at the hub radius)" when the range ran out —
+   the roll floor's discipline), the filament and the pill, the petal-root
+   annulus FLAG with the clear disc beside it, the two distance flags, and the
+   spine floor told (never clamped). Then the SLENDERNESS line (Q7), verbatim
+   tagged: telemetry, never a gate, until a coupon is printed. Absent when the
+   androecium is absent, so the lines simply are not there. */
+/* THE INNER-LIMIT CLAUSE (session 24) rides on the same line and is DISC-ONLY,
+   because the limit is only a thing the disc's law does — the ring puts every
+   stamen at R and cannot start inside the style, so a clause there would be a
+   claim nothing can make. Two arms, both footRing()'s own numbers: where the
+   annulus starts and what the limit is made of, or NO ROOM when the disc is
+   inside the limit and every stamen stands on the rim (told, never refused —
+   the crosses-axis precedent). JS5 asserts both arms against the owner, in
+   both directions. */
+/* THE FILAMENT-AGAINST-STYLE CLAUSE (session 23) rides on the same line, on
+   the ROOTS FUSE pattern: present exactly when both parts are built, the
+   builder's own nearest approach and the height it happens at, and the flag
+   when that distance is under one filament radius plus one style radius —
+   the two tubes intersect there. A FLAG, never a gate (Eva, Sep 6): the
+   crossing exports watertight and one piece, which is the invariant working. */
+function stamenLine(fr, stamens, near, mode, fs = null) {
+  const A = fr.androecium;
+  if (!A) return '';
+  const under = stamens.filter((s) => s.law.underFloor).length;
+  return `STAMENS ${A.count} on ${A.layout === 'DISC' ? 'a Vogel disc' : 'one ring'} · radius ${A.radius.toFixed(2)} mm (${mode}) = ${A.spread.toFixed(2)}x the reference ${A.derivedRadius.toFixed(2)} mm (the filaments' own area rule)`
+       + (A.onAxis ? ` (ON THE AXIS: the hub, ${A.hubRadius.toFixed(2)} mm, is narrower than a filament radius — ${A.asked.toFixed(2)} mm asked)` : A.clamped ? ` (CLAMPED at the hub radius ${A.hubRadius.toFixed(2)} mm less a filament radius — ${A.asked.toFixed(2)} mm asked; ${A.saturation.toFixed(2)}x is as far as this hub goes, the slider above it is dead here)` : '')
+       + (A.layout === 'DISC'
+         ? (A.noRoom
+           ? ` · NO ROOM FOR THE INNER LIMIT: the disc, ${A.radius.toFixed(2)} mm, is inside the ${A.innerLimit.toFixed(2)} mm limit, so every stamen stands on the rim (told, never refused)`
+           : ` · the disc runs from ${A.innerUsed.toFixed(2)} mm out — a filament radius plus a style radius, where a filament's tube clears a style's — in equal-area annuli`)
+         : '')
+       + ` · filament ${A.diameter.toFixed(2)} × ${A.length} mm${A.curlDeg !== 0 ? `, curl ${A.curlDeg}°` : ', straight'} · anther ${A.anther.lumps === 1 ? 'PILL' : `${A.anther.lumps} LOBES`} ${A.anther.diameter.toFixed(2)} × ${A.anther.length.toFixed(2)} mm`
+       + (A.inPetalRootAnnulus ? ` · ${A.inPetalRootAnnulus} of ${A.count} STAND INSIDE THE PETAL-ROOT ANNULUS (clear disc ${A.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · all inside the clear disc (${A.clearRadius.toFixed(2)} mm)`)
+       + (near ? ` · nearest roots ${near.root.mm.toFixed(2)} mm${near.root.mm < A.diameter ? ' (ROOTS FUSE)' : ''}, nearest anthers ${near.apex.mm.toFixed(2)} mm${near.apex.mm < A.anther.diameter ? ' (ANTHERS TOUCH)' : ''}${A.anther.lumps > 1 ? ', on each anther\'s first lobe' : ''}` : '')
+       + (under ? ` · bend radius UNDER ONE FILAMENT DIAMETER on ${under} of ${A.count} (told, not clamped)` : '')
+       + (fs ? ` · nearest filament to the style ${fs.mm.toFixed(2)} mm at ${fs.z.toFixed(1)} mm up${fs.crossing ? ` (FILAMENT AGAINST STYLE: under ${fs.threshold.toFixed(2)} mm, the two tubes cross — a flag, never a refusal)` : ` (clear of it by more than ${fs.threshold.toFixed(2)} mm)`}` : '')
+       + `\n`;
+}
+
+/* THE TIP LINE (session 29's ANTHER line, ONE function for both tips since
+   session 30) — the seven told in the owner's own numbers, none re-derived
+   here: the two proportions with the millimetres they resolve to, the
+   OUTLINE (and, at a roundedness of exactly 1, that the two controls below
+   it are inert rather than merely hidden), the LATTICE the point count
+   derived, the WAIST against the print floor with `UNMEASURED — no coupon
+   has been printed` verbatim, and the two flags — the band floored at a
+   sphere, coincident lobes at a spread of 0. `name` is ANTHER or STIGMA and
+   `rod` the filament or the style; the ANTHER line's text is character for
+   character what session 29 shipped (the panel gate's route (t) reads it).
+   Absent when the part is absent. Every number is footRing()'s own record. */
+function tipLine(name, rod, a) {
+  if (!a) return '';
+  const sh = a.shape, circle = sh.roundedness === 1;
+  return `${name} ${a.sizeFactor.toFixed(2)}x ${rod} = ${a.diameter.toFixed(2)} mm across (${a.mode}) · ${a.elongation.toFixed(2)}x its own diameter = ${a.length.toFixed(2)} mm long${a.bandFloored ? ' (A SPHERE — the band FLOORED so no triangle has zero area)' : ''}`
+       + ` · outline ${circle ? 'a CIRCLE (roundedness 1 — the points and the pinch are INERT here, exactly, not merely hidden)' : `roundedness ${sh.roundedness.toFixed(2)}, ${sh.lobes}-fold, pinch ${sh.pinch.toFixed(2)}`}`
+       + ` · revolved through ${a.sides} sides`
+       + ` · waist ${a.waistMm.toFixed(2)} mm against the ${a.minRadiusMm.toFixed(2)} mm floor`
+       + (a.underFloor ? ' — THE WHOLE TIP IS UNDER IT (told, never refused)'
+         : a.pinchFloored ? ` — PINCH CLAMPED to ${sh.pinch.toFixed(2)} from ${a.pinchAsked.toFixed(2)}` : '')
+       + ' (UNMEASURED — no coupon has been printed)'
+       + ` · ${a.lumps === 1 ? 'one lobe' : `${a.lumps} lobes`} at ${a.spreadDeg}° off ${rod}${a.lumpsCoincident ? ' — COINCIDENT: duplicate geometry, told, never refused' : ''}`
+       + `\n`;
+}
+function antherLine(fr, mode) { return fr && fr.androecium ? tipLine('ANTHER', 'the filament', { ...fr.androecium.anther, mode }) : ''; }
+function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 'the style', { ...fr.gynoecium.lobe, mode }) : ''; }
+
+/* THE STYLE LINE (session 22) — the gynoecium told in the owner's and the
+   builder's own numbers: the rod, the stigma's count and aim (its seven have
+   their own STIGMA line below, session 30), where the
+   stigma's top stands (and, with an androecium, how far ABOVE or BELOW the
+   highest anther — the pair on the sheet, said in millimetres), the
+   wider-than-the-hub corner and the petal-root annulus as FLAGS, the spine
+   floor told. Absent when the gynoecium is absent. */
+/* THE STEM LINE (session 43). TOTAL AND VISIBLE ARE TWO NUMBERS, and the read-out
+   says both (Eva, Sep 13): on a domed head the attachment face is high inside the
+   bowl, so the head swallows part of the stem, and a user asking for 30 mm and
+   being shown only "30" while 22 is visible would think it was broken. The hidden
+   part is DERIVED per build by the plan's one owner — never tabulated — and is 0
+   on a flat head by the same construction.
+   THE JOIN IS TOLD, NOT TUNED: it has no control, so the only way anyone can see
+   what it did is for this line to say it. CLAMPED AND TOLD is the project's own
+   form, and the bore's closing at Eva's floor is exactly that. */
+/* THE LEAVES LINE. Everything this feature clamps, it TELLS — the top inset
+   raised off the flower's stem-fraction to what the leaf itself needs, the node
+   count giving way at the pitch floor where the span cannot hold it, the head
+   that cannot be cleared at all on a leaf longer than its stem, and the
+   OVERHANG, which ruling 7 made a printability question and which the ruled
+   default sits on the wrong side of. SLENDERNESS joins the stamens' and the
+   style's line verbatim: nothing here has ever been printed. */
+/* THE INFLORESCENCE LINE. Everything this feature clamps, it TELLS from the
+   OWNER's own record: the node count giving at the pitch floor, the pedicel's
+   DERIVED diameter and whether the print floor took it off the area rule, how
+   much of the stem's wall it crosses (which is what makes the raceme ONE
+   piece rather than N+1), the top inset raised to clear the head and whether
+   it managed to, and the floret's size clamped into the petal slider's own
+   range. And the one thing that is not a clamp but is an absence: the GRID
+   export writes the head at the origin only, so a raceme's florets are not in
+   it — said here rather than discovered by a reader of a nearly-empty .glb. */
+function infloLine(plan, builtInflo) {
+  const per = plan.perNode;
+  const n = builtInflo ? builtInflo.count : plan.built;
+  return `\n     INFLORESCENCE ${plan.type} · ${n} floret${n === 1 ? '' : 's'} on ${plan.nodes} node${plan.nodes === 1 ? '' : 's'} · ${plan.phyllotaxy} (${per} a node)`
+    + (plan.nodesClamped ? ` — NODE COUNT CLAMPED ${plan.nodesAsked} -> ${plan.nodesBuilt}: the span left cannot hold them a pedicel apart` : '')
+    + `\n     FLORET ${plan.floretPetals} petals at ${plan.petalLength.toFixed(1)} x ${plan.petalWidth.toFixed(1)} mm (${plan.scale.toFixed(2)}x the head's own)`
+    + (plan.sizeClamped ? ` — CLAMPED from ${plan.lengthAsked.toFixed(1)} x ${plan.widthAsked.toFixed(1)} mm at the petal sliders' own floors` : '')
+    + (builtInflo ? ` · ${builtInflo.unitTris.toLocaleString('en-US')} tris each, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
+    + `\n     PEDICEL ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg · ${(2 * plan.pedicelR).toFixed(2)} mm across`
+    + (plan.pedicelRClamped
+        ? ` — FLOORED: the area rule asks ${(2 * plan.areaRuleR).toFixed(2)} mm for ${plan.built} off a ${(2 * plan.outerR).toFixed(2)} mm stem and nothing here prints thinner than ${(2 * plan.pedicelRFloor).toFixed(2)} mm`
+        : ` — the area rule's own (r_stem / sqrt(${plan.built}))`)
+    + `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
+    + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)')
+    + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    + (plan.insetClamped
+        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm this pedicel needs to clear the head`
+        : ` (the stem's own inset; the pedicel needs ${plan.insetNeededMm.toFixed(1)} mm and has it)`)
+    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the florets rise further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+    /* THE FLORET AGAINST THE RACHIS — a FLAG with a number, never a refusal.
+       Two parts of one solid fusing is OVER-connection (the crowding
+       ruling's own grounds, Eva Sep 3): no boundary edge, no split in the
+       flood fill, and in a raceme the florets belong to the rachis anyway.
+       Told because it is reachable at the SHIPPED angle on a SPHERE head
+       (0.82 mm) and goes to contact past +-60 deg, while the same state on a
+       CAP head reads 8.25 mm — a sphere floret's petals radiate back toward
+       the rachis and a cap's do not. */
+    + (builtInflo && builtInflo.rachisApproachMm !== null
+        ? `\n     FLORET AGAINST THE RACHIS ${builtInflo.rachisApproachMm.toFixed(2)} mm at the nearest (the floret's own body, never its pedicel)`
+          + (builtInflo.rachisApproachMm < MIN_FEATURE_MM
+              ? ` — UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm printable gap: the florets will fuse to the rachis in a print (told, never refused — they are one solid either way)`
+              : '')
+        : '')
+    + `\n     GRID EXPORT writes the head at the origin ONLY — a raceme's florets are not in the .glb\n`;
+}
+function leafLine(leaf, leavesBuilt) {
+  const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
+  const over = 90 - Math.abs(leaf.angleDeg);
+  /* THE TIP, CLAMPED AND TOLD — the BUILDER's own clamp record (every leaf on
+     a build shares one profile, so the first built leaf's is every leaf's). */
+  const cl = leavesBuilt && leavesBuilt[0] && leavesBuilt[0].tipClamp;
+  const tipLine = cl
+    ? `\n     TIP shape ${Number(leaf.tipShape).toFixed(2)} · ends ${cl.terminalMm.toFixed(2)} mm across (the print terminal, both modes) — the last ${cl.mm.toFixed(2)} mm (${(100 * cl.fraction).toFixed(1)}% of the length) is that stub, ${(100 * cl.ofWidth).toFixed(1)}% of the width`
+      + (cl.fraction > 0.05 ? ` — CLAMPED: a pointier shape LENGTHENS the stub and a wider leaf shortens it; the share is set by the width, never the length` : '')
+    : '';
+  return `\n     LEAVES ${leaf.built} on ${leaf.nodesBuilt} node${leaf.nodesBuilt === 1 ? '' : 's'} · ${leaf.phyllotaxy} (${per} a node)`
+    + ` · ${leaf.lengthMm} x ${leaf.widthMm} mm at ${leaf.angleDeg} deg`
+    + ` · ${over} deg OVERHANG from vertical${over > 45 ? ' — PAST the classic 45, supports likely (a declared guess: nothing here has been printed)' : ''}`
+    + `\n     PETIOLE rooted at r = ${leaf.rootR.toFixed(2)} mm, the WALL's mid-thickness — embedded at every angle, and more so as the angle steepens`
+    + ` · ${(2 * leaf.petioleR).toFixed(2)} mm across x ${leaf.petioleLenMm.toFixed(2)} mm`
+    + `\n     NODES top ${leaf.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    + (leaf.insetClamped
+        ? ` — RAISED from the stem's own ${leaf.insetAskedMm.toFixed(1)} mm to the ${leaf.insetNeededMm.toFixed(1)} mm this leaf needs to clear the head`
+        : ` (the stem's own inset; the leaf needs ${leaf.insetNeededMm.toFixed(1)} mm and has it)`)
+    + (leaf.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: a ${leaf.lengthMm} mm leaf rises further than this stem's node span is long, so the top leaf stands inside the head (told, not refused)`)
+    + (leaf.nodesClamped ? `\n     NODE COUNT CLAMPED ${leaf.nodesAsked} -> ${leaf.nodesBuilt} — the span left cannot hold them a petiole apart` : '')
+    + (leaf.teethAsked !== undefined && leaf.teethBuilt !== undefined && leaf.teethBuilt < leaf.teethAsked
+        ? `\n     TEETH CLAMPED ${leaf.teethAsked} -> ${leaf.teethBuilt} a margin — the cut law's own ceiling on a blade this size (told, never refused)` : '')
+    + tipLine
+    + `\n     SLENDERNESS leaf ${leaf.slenderness.toFixed(1)} (length over petiole diameter) — UNMEASURED — no coupon has been printed\n`;
+}
+
+/* THE SEPALS LINE (part 1). Everything the whorl clamps, it TELLS from the
+   OWNER's own record: the count against the petal count (and what "the petal
+   count" means in this placement), the phase in degrees and in fractions of
+   the pitch, the foot against its floor, and the ANGLE against the drawn
+   limit with the reason (which sepal met which petal, how, at what angle),
+   the mode it was measured in and what the scan cost. Under SPHERE with
+   sepals asked the line says UNAVAILABLE rather than nothing. */
+function sepalLine(ui, built, mode) {
+  const asked = Math.round(Number(ui.sepalCount) || 0);
+  if (built.foot.sphereMode && asked >= 1) return `     SEPALS ${asked} asked — UNAVAILABLE under SPHERE: a closed head has no underside ring to place them on (told, none built)\n`;
+  const S = built.foot.sepals, B = built.sepals;
+  if (!S || !B) return '';
+  const L = B.limit;
+  const first = B.built[0];
+  const angleWord = L.unclamped ? `${L.angleBuiltDeg}° — UNCLAMPED by the capability hook past the drawn limit of ${L.limitDeg}° (at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}; no control reaches this)`
+    : L.everywhere ? `CLAMPED to ${L.angleBuiltDeg}° — the sepals clip the petals at every angle in the range (${L.kind} on petal ${L.petal})`
+    : L.clamped ? `${L.askedDeg}° asked, CLAMPED to ${L.angleBuiltDeg}°: at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`
+    : `${L.angleBuiltDeg}° (clear up to ${L.limitDeg}°${L.contactDeg === null ? ', no contact in the range' : `; at ${L.contactDeg}° sepal ${L.sepal} ${L.kind === 'crossing' ? 'crosses' : L.kind === 'coincident' ? 'lies in' : 'stands on top of'} petal ${L.petal}`})`;
+  /* WHERE THE FOOT IS, from the descriptor's own attachment record: on the
+     hub's flare at the height asked, or at the rim with the reason. THE FOOT
+     LINE LEADS WITH THE CHORD AND KEEPS THE TANGENT BESIDE IT, LABELLED
+     (Eva's ruling, second round): a tangent that reads 0.00° on GOBLET and
+     CURVED while the underside falls 49° and 81° over the first millimetre is
+     a number that is always right and never useful — the chord one printable
+     feature along the blade's way is the honest measurement, so it goes
+     first. */
+  const A = S.attachment;
+  const onHub = A && A.mode === 'HUB';
+  const where = onHub
+    ? `on the hub's flare — ${A.frac.toFixed(2)} of the way up from the stem end (r ${A.rAttach.toFixed(2)} mm, ${A.belowHeadMm.toFixed(2)} mm below the head's underside; the hub hangs ${A.extentMm.toFixed(2)} mm; AXIAL reading built, the surface-arc reading lands ${A.arc.deltaMm.toFixed(2)} mm away)`
+    : `at the hub's rim (height ${A ? A.frac.toFixed(2) : '?'} asked, INERT: ${A ? A.why : 'no attachment record'})`;
+  const footSurface = onHub
+    ? `foot on the flare, bottom skin through the attachment point (mid-surface ${(S.height).toFixed(2)} mm) · the underside RISES ${A.undersideChordDeg.toFixed(2)}° over the first ${A.undersideChordMm.toFixed(2)} mm outward from the foot (the chord a print meets; tangent there ${A.undersideTangentDeg.toFixed(2)}°${A.onCone ? " — ANGLED's straight face, the chord IS the tangent and the shoulder is not under the foot" : ''})` + (A.footBuriedMm < 0 ? ` · the foot's inner rows POKE OUT ${(-A.footBuriedMm).toFixed(2)} mm below the flare (told)` : ` · inner rows buried ${A.footBuriedMm.toFixed(2)} mm`)
+    : `buried in the rim on the same footing as the petal foot · the underside FALLS ${B.undersideChordDeg.toFixed(2)}° over the first ${B.undersideChordMm.toFixed(2)} mm in from the rim (the chord a print meets; tangent at the rim ${B.footTangentDeg.toFixed(2)}°)`;
+  return `     SEPALS ${B.count} ${where}` + (S.countClamped ? ` — CLAMPED from ${S.asked} at the petal count` : '') + ` (ceiling ${S.ceiling}: ${S.ceilingOf})`
+    + ` · offset ${S.phaseFrac.toFixed(2)} of ${S.phaseAgainst} = ${S.phaseDeg.toFixed(2)}° of ${S.pitchDeg.toFixed(2)}°` + (S.mirrorSymmetric === false ? ' — NOT mirror-symmetric on this fan (told)' : '')
+    + ` · size ${S.scale.toFixed(2)}x` + (first ? ` (${first.length.toFixed(1)} mm)` : '')
+    + `\n     SEPAL FOOT ${S.footMm.toFixed(2)} mm across` + (S.footClamped ? ` — CLAMPED from ${S.footAskedMm.toFixed(2)} (floor ${S.footFloorMm.toFixed(2)}, ceiling ${S.footCeilingMm.toFixed(2)} mm)` : ` (asked ${S.footAskedMm.toFixed(2)})`)
+    + ` · ${footSurface}`
+    + `\n     SEPAL ANGLE ${angleWord} — drawn on the built rows in both modes (bound by ${L.boundBy}: live ${L.perMode.live.limitDeg === null ? 'floor' : L.perMode.live.limitDeg}° / export ${L.perMode.export.limitDeg === null ? 'floor' : L.perMode.export.limitDeg}°), ${L.scanned} angles over ${L.configs} distinct neighbourhood(s), ${L.costMs.toFixed(0)} ms (${mode})\n`;
+}
+
+function stemLine(stem, joinActive, joinT, joinBlend, hubR, mode, omission) {
+  if (!stem) return '';
+  const hollow = stem.boreR > 0;
+  /* THE JOIN NAMES ITS OWN REASON FOR DOING NOTHING. "A 12 mm stem asks for no
+     more than the hub's own 1.20 mm" is FALSE of a 12 mm stem and would be the
+     read-out repeating an arithmetic nobody performed: on a closed SPHERE the
+     plan declares the join inert because a plate's section modulus does not
+     describe a shell, which is a different sentence and is the one that is
+     true there. `joinReason` is the plan's own word. */
+  const inertBecause = stem.joinReason === 'shell'
+    ? `INERT — the head is a closed SPHERE, whose wall is ${stem.hubT.toFixed(2)} mm all the way round; the join is DERIVED for a PLATE and a shell carries a root hole differently, so it is not applied here (told, not silent)`
+    : `INERT — a ${(stem.outerR * 2).toFixed(1)} mm stem asks for no more than the hub's own ${stem.hubT.toFixed(2)} mm, so the hub is untouched`;
+  return `STEM ${stem.lengthMm} mm total`
+    + (stem.hiddenMm > 1e-9 ? ` · ${stem.visibleMm.toFixed(1)} mm VISIBLE (${stem.hiddenMm.toFixed(1)} mm of it is inside the head's own bowl)` : ' · all of it visible (a flat head hides none)')
+    + ` · ${(stem.outerR * 2).toFixed(1)} mm across, `
+    + (hollow ? `${(stem.boreR * 2).toFixed(1)} mm bore, a ${stem.wallMm.toFixed(2)} mm wall` : `SOLID — the bore CLOSES at this diameter (told, not refused)`)
+    /* THE BORE'S TWO CLOSURES ARE TOLD, because without them the clause above
+       claims a bore that runs the length of the stem when it does not. Same
+       "clamped and told" form as the bore closing at Eva's own floor, and each
+       is ABSENT wherever it does not apply — a passing "0 mm solid" would be a
+       number nobody measured.
+
+       AND WHERE THEY MEET, ONE SENTENCE REPLACES BOTH. Both closures are
+       derived from lengths, so across a short enough stem they overlap and no
+       bore survives; printing "solid for the first 1.20" and "solid for the
+       last 1.50" of a 2.20 mm stem would be two true clauses adding up to a
+       false picture. The crossover is the plan's own `solidThrough`, so this
+       line cannot disagree with the geometry about which case it is in. */
+    + (stem.solidThrough
+        ? ` · SOLID THROUGHOUT — a ${stem.solidBandMm.toFixed(2)} mm root band and a ${stem.tipPlugMm.toFixed(2)} mm tip plug MEET across a ${(stem.topZ - stem.tipZ).toFixed(2)} mm stem, so no bore is left between them (told, not refused)`
+        : (stem.solidBandMm > 0
+            ? ` · SOLID for the first ${stem.solidBandMm.toFixed(2)} mm — the head is ${(stem.headOuterMm * 2).toFixed(1)} mm across against a ${(stem.boreR * 2).toFixed(1)} mm bore, so it would otherwise stand INSIDE the pipe with nothing bridging the two (told, not refused)`
+            : '')
+          + (stem.tipPlugMm > 0
+              ? ` · SOLID for the last ${stem.tipPlugMm.toFixed(2)} mm — the bore is CLOSED at the TIP, as thick as the ${stem.wallMm.toFixed(2)} mm wall it closes, so the bottom reads as a stem end and not a cut pipe; ${stem.voidMm.toFixed(2)} mm of SEALED bore between the two`
+              : ''))
+    + `\n     HUB ${stem.hubStyle}`
+    + (stem.swellActive
+        ? ` · ${stem.hubAmount.toFixed(2)}x pronounced · reaches ${stem.axisDepth.toFixed(2)} mm below the head`
+          + (stem.hubLengthAuto ? ' (auto — the derived join depth)' : ' (Hub length)')
+        : stem.joinReason === 'shell' ? ' · INERT on a sphere — the shell wall IS the join, so style, amount and length do nothing here (told)'
+          : Number(stem.hubAmount) === 0 ? ' · STRAIGHT — amount 0, no flare'
+          : ' · STRAIGHT — the head is not wider than the stem, so there is no room for a flare (the stem\'s solid root band joins them)')
+    + ` · TOTAL ${stem.belowHeadMm.toFixed(1)} mm below the head\'s top face (hub ${stem.axisDepth.toFixed(2)} + stem ${stem.lengthMm} — Hub length ADDS to the height, stem length unchanged)`
+    + `\n     HUB-TO-STEM JOIN ${joinActive ? `${joinT.toFixed(2)} mm thick at the axis, blending back to the hub's own ${stem.hubT.toFixed(2)} mm by r = ${joinBlend.toFixed(2)} of ${hubR.toFixed(2)} mm — thickness DERIVED from the stem's own section, no control` : inertBecause}\n`
+    + stemChannelLine(omission);
+}
+
+/* THE STEM CHANNEL (the sphere-stem session) — CLAMPED AND TOLD. A user asking
+   for 40 petals and being shown 33 must be told which seven are missing and
+   why, in the form every other clamp in this panel takes. Absent wherever the
+   question does not arise, never a passing "0 omitted". */
+function stemChannelLine(omission) {
+  if (!omission) return '';
+  const o = omission;
+  if (!o.omitted.length) {
+    return `     STEM CHANNEL every one of the ${o.asked} petals clears the stem`
+      + ` — nearest ${Math.min(o.nearestKeptMm.live, o.nearestKeptMm.export).toFixed(2)} mm against the ${o.clearanceMm.toFixed(2)} mm printable gap\n`;
+  }
+  const runs = [];
+  for (const k of o.omitted) {
+    const last = runs[runs.length - 1];
+    if (last && last[1] === k - 1) last[1] = k; else runs.push([k, k]);
+  }
+  const said = runs.map(([a, b]) => (a === b ? `${a}` : `${a}–${b}`)).join(', ');
+  const kept = Math.min(o.nearestKeptMm.live, o.nearestKeptMm.export);
+  return `     STEM CHANNEL ${o.built} of ${o.asked} petals BUILT — ${o.omitted.length} NOT BUILT (slot${o.omitted.length === 1 ? '' : 's'} ${said}),`
+    + ` because the stem passes within the ${o.clearanceMm.toFixed(2)} mm printable gap of them.`
+    + ` The sequence, the equal-area law and the golden angle are untouched: this is a mask over the slots, so no surviving petal moved.`
+    + (o.built === 0
+        ? ` NOTHING IS LEFT — this stem is wider than the head has room for, told rather than refused.\n`
+        : ` Nearest petal that was kept: ${Number.isFinite(kept) ? kept.toFixed(2) : '—'} mm.\n`)
+    + meridianPackingLine(o.meridian);
+}
+
+/* THE MERIDIAN PACKING MARGIN — TOLD, never clamped, and told on EVERY sphere
+   that has a stem rather than only where it is tight, because a number that
+   appears only at its own limit reads as an error rather than as a measurement.
+   It is EXACTLY EXHAUSTED (1.00) at one reachable corner — 8 petals at the
+   widest stem — which is why it may not pass silently. The clause names its
+   own units: a clear meridian arc, in that foot's OWN lengths along the same
+   meridian. */
+function meridianPackingLine(m) {
+  if (!m) return '';
+  if (m.margin === null) return `     MERIDIAN PACKING n/a — ${m.why}\n`;
+  /* THREE DECIMALS, not two, and the reason is this tree's own corner: the
+     margin reads 1.003 at 8 petals on the widest stem, which two decimals
+     round to "1.00" — indistinguishable from exhausted on the one row where
+     the distinction is the whole point. No band and no second threshold: the
+     only word here is EXHAUSTED, at the only place the quantity has a
+     meaning of its own. */
+  return `     MERIDIAN PACKING ${m.margin.toFixed(3)}x — the stem's own footprint leaves ${m.clearMm.toFixed(2)} mm of clear meridian arc above it,`
+    + ` against the ${m.overhangMm.toFixed(2)} mm the pole-most petal it kept (slot ${m.slot}) occupies along that same meridian`
+    + (m.exhausted
+        ? `. EXHAUSTED — the arc the stem leaves is SHORTER than the one foot standing next to it; no petal could be put back there whatever the placement did. Told, never refused.\n`
+        : `.\n`);
+}
+
+function styleLine(fr, styles, stamens, mode) {
+  const G = fr.gynoecium;
+  if (!G || !styles.length) return '';
+  const s = styles[0];
+  const stigmaTop = Math.max(...s.lobes.map((l) => l.apex[2]));
+  /* EVERY LOBE, not the first (session 29): with the anther's lobe count a
+     control, `the highest anther` has to mean the highest tip actually
+     emitted or the line names a computation nobody performed. */
+  const antherTop = stamens.length ? Math.max(...stamens.map((a) => Math.max(...a.lumps.map((l) => l.apex[2])))) : null;
+  return `STYLE on the axis · ${G.diameter.toFixed(2)} × ${G.length} mm${G.curlDeg !== 0 ? `, curl ${G.curlDeg}°` : ', straight'} · stigma ${G.lobe.lumps === 3 && G.lobe.spreadDeg === 40 ? 'TRIFID' : G.lobe.lumps === 1 ? 'ONE LOBE' : `${G.lobe.lumps} LOBES`}: ${G.lobe.lumps} lobe${G.lobe.lumps === 1 ? '' : 's'} ${G.lobe.diameter.toFixed(2)} × ${G.lobe.length.toFixed(2)} mm at ${G.lobe.spreadDeg}° (its own line below)`
+       + ` · stigma top ${stigmaTop.toFixed(2)} mm (${mode})`
+       + (antherTop !== null ? `, ${Math.abs(stigmaTop - antherTop).toFixed(2)} mm ${stigmaTop >= antherTop ? 'ABOVE' : 'BELOW'} the highest anther` : '')
+       + (G.widerThanHub ? ` · WIDER THAN THE HUB (${G.hubRadius.toFixed(2)} mm — a flag, never a refusal)` : G.inPetalRootAnnulus ? ` · the root STANDS INSIDE THE PETAL-ROOT ANNULUS (clear disc ${G.clearRadius.toFixed(2)} mm — a flag, never a refusal)` : ` · inside the clear disc (${G.clearRadius.toFixed(2)} mm)`)
+       + (s.law.underFloor ? ' · bend radius UNDER ONE STYLE DIAMETER (told, not clamped)' : '')
+       + `\n`;
+}
+
+/* THE SLENDERNESS LINE (Q7) — ONE line for every rod the centre carries,
+   the filament's L/d and the style's, each over its FLOORED diameter,
+   verbatim tagged: telemetry, never a gate, until a coupon is printed.
+   Absent when neither part is. */
+function slendernessLine(fr, mode) {
+  const parts = [];
+  if (fr.androecium) parts.push(`filament ${fr.androecium.slenderness.toFixed(1)}`);
+  if (fr.gynoecium) parts.push(`style ${fr.gynoecium.slenderness.toFixed(1)}`);
+  return parts.length ? `SLENDERNESS L/d ${parts.join(' · ')} (${mode}) — UNMEASURED — no coupon has been printed\n` : '';
+}
+
+function summarise(ui, acc, mode, rings, fr, petals, built = null) {
+  const tris = acc.triangleCount.toLocaleString('en-US');
+  const dim = acc.maxDimensionMm.toFixed(1);
+  const layers = Number(ui.layerCount);
+  /* The capability appears in the readout for the same reason every other
+     value does: the contact sheet and the gates assert the app REACTED
+     through the real UI route, and a state they cannot see in the readout is
+     a state they cannot confirm was built. Layers and placement are here for
+     that same reason, and the layer RADII are printed because they are
+     derived — a number the user cannot set is a number the user should be
+     able to read. */
+  /* THE DEPTH AXIS IN ITS OWN UNITS, matching the panel's read-outs rather
+     than restating the slider: a continuous bloom winds `layerCount` TURNS
+     and carries `petalCount * layerCount` petals, so printing "petals 40" and
+     "layers 3" beside a 120-petal object would be two true numbers adding up
+     to a false picture. */
+  const cont = fr.continuousMode;
+  const depth = `${layers} ${cont ? 'turn' : 'layer'}${layers === 1 ? '' : 's'}`;
+  /* UNDER FAN THE COUNT IS DERIVED AND `petalCount` IS HIDDEN, so printing
+     the slider would be printing a number nothing read. `fr.slotCount` is
+     footRing()'s own answer, which is what the builder actually placed. */
+  /* AND WHEN THE STEM TAKES SOME OF THEM, THIS LINE SAYS SO TOO — the headline
+     count is the first place a reader looks, and a bloom reporting "petals 240"
+     while 218 are on it would be the panel's own number lying. The reason lives
+     on the STEM CHANNEL line below; this one carries the two counts. */
+  const omitted = built && built.stemOmission ? built.stemOmission.omitted.length : 0;
+  const short = omitted ? ` — ${fr.sequenceLength - omitted} BUILT, ${omitted} not (the stem, see below)` : '';
+  const petalsSaid = cont ? `petals ${fr.sequenceLength} (${ui.petalCount}/turn)${short}`
+    : fr.fan ? `petals ${fr.slotCount} (${fr.fan.perSide}/side${fr.fan.centre ? ' + one on the line' : ''})`
+    : `petals ${ui.petalCount}`;
+  /* EVERY RING'S RADIUS is what this line has always printed, and at up to
+     120 of them that stops being readable — so the continuous arm prints the
+     SPAN and the step instead. Both are derived quantities the user cannot
+     set, which is the reason the line exists at all. */
+  const ringLine = cont
+    ? `rings (${mode}) ${rings.length} from ${rings[0].radius.toFixed(2)} to ${rings[rings.length - 1].radius.toFixed(2)} mm`
+      + `, step ${(rings[0].radius - rings[1].radius).toFixed(3)}–${(rings[rings.length - 2].radius - rings[rings.length - 1].radius).toFixed(3)} mm\n`
+    /* ONE RADIUS PER WHORL, not per descriptor — same reason as
+       clampedRingsPhrase above: a split whorl's descriptors share a radius,
+       so listing them would print the same number three times. */
+    : (layers > 1 ? `layer rings (${mode}) ${[...new Map(rings.map((r) => [r.lambda, r])).values()].map((r) => r.radius.toFixed(2)).join(' / ')} mm\n` : '');
+  /* NO CENTRE WORD ON THIS LINE (session 20): the summary printed
+     `center disc` on the shipping default while the A/B rig existed; the
+     rig is retired and the apex is bare until the androecium lands, and a
+     line naming a centre that does not exist is the label-lie this project
+     retires ids over. The panel gate's retirement route asserts the word is
+     ABSENT here. */
+  return `${petalsSaid} · ${ui.placement.toLowerCase()} · ${depth} · spread ${Number(ui.spread).toFixed(2)}x`
+       + (capability ? ` · capability ${capability.label}` : '') + `\n`
+       + (rings.length > 1 ? ringLine : '')
+       + fanLine(fr)
+       + footFloorLine(rings)
+       + innerRingLine(rings, fr)
+       + domeLine(rings, fr, mode)
+       + sphereLine(rings, fr, mode)
+       + seamLine(petals)
+       + spineLine(petals)
+       + lobeLine(petals)
+       + fringeLine(petals)
+       + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
+       + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
+       + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
+       + (built && built.inflorescence && built.inflorescence.present ? infloLine(built.inflorescence, built.inflorescenceBuilt) : '')
+       + (built ? sepalLine(ui, built, mode) : '')
+       + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
+       + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
+       + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
+}
+
+/* HOW MANY TIMES THE MODEL HAS BEEN BUILT — the REAL SIGNAL a harness waits
+   on, and it exists because a fixed sleep races the async rebuild (the flower
+   project's rule, and it fired here).
+
+   THE DEFECT IT CLOSES, found by this session and PRESENT SINCE THE FIRST
+   GATE. `regenerate()` is rAF-coalesced through scheduleRegen(), so when
+   applyConfig() returns — having set every value and fired every real event —
+   the model has NOT necessarily been rebuilt yet. Every assertion that then
+   reads __bloomMetrics() can be reading the PREVIOUS build: on a fresh page
+   that is the default bloom, so a row setting all four curves can report
+   `petalForm: null` and fail its own form assertion under a label naming a
+   design it never measured. It is rare because a Playwright evaluate
+   round-trip usually outlasts a frame — 0 of 40 unloaded on both trees, and
+   it fired once in a 205-row gate run competing for four CPUs.
+
+   Rare and silent is the worst combination this project knows: it is the
+   "73 of 185 configs measuring the wrong design" defect with a timer instead
+   of a read-back. settleBuild() in the harness waits on this counter. */
+let buildCount = 0;
+/* `pending` IS CLEARED AFTER THE BUILD, IN A `finally`, and both halves of
+   that matter. After it, so `pending === false` unambiguously means no build
+   is outstanding — cleared first, a waiter could observe false in the instant
+   before regenerate() ran. In a `finally`, so a throwing build cannot leave
+   the flag stuck true and silently stop the app rebuilding for the rest of
+   the session, which is what clearing it first was defending against. */
+window.__bloomBuildState = () => ({ count: buildCount, pending: regenQueued });
+
+function regenerate() {
+  buildCount++;
+  const ui = readUI();
+  const wasPlacement = lastPlacement;   // captured before buildGeometry() below overwrites it
+  /* THE MODE ON SCREEN, decided once per build by the one owner. `record`
+     marks this as the build the telemetry describes; the export handler's
+     build never carries it. */
+  const mode = shownMode();
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true });
+  /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
+     used to be refreshed before it, which was the same thing while no span
+     read a built number. One of them does now (the stamen spread's cap, an
+     owner's number), so both read the record THIS build produced; the span
+     is still written only from here, which is what the panel gate's path
+     route relies on (a changed span is proof a rebuild happened). */
+  /* MARGIN BUCKLING's clamp joins the record for the same reason the
+     androecium's saturation did: `buckleAmp`'s read-out and its slider MARK
+     must print the OWNER's cap rather than re-derive it from the sliders.
+     The petal's own form telemetry is where it lives; null on a flat build. */
+  const shown = { mode, androecium: built.androecium, gynoecium: built.gynoecium,
+                  buckle: (built.petal && built.petal.form && built.petal.form.buckle) || null,
+                  /* THE LOBES' two caps join the record for the same reason (session
+                     38): the count's and the depth's marks print the OWNER's numbers. */
+                  lobes: (built.petal && built.petal.lobes) || null,
+                  /* THE FRINGE's record joins for the same reason: the squared end's
+                     dead travel and the tooth count's ceiling are the OWNER's numbers,
+                     and both print on the track as well as in the read-out. */
+                  fringe: (built.petal && built.petal.fringe) || null,
+                  /* THE SPHERE'S STEM CHANNEL joins the record for the same reason
+                     again: a user asking for 40 petals and being handed 33 must
+                     read it ON THE CONTROL they set, not only three lines down in
+                     the read-out. It is the OWNER's number — how many of this
+                     slider's own petals the stem took — and nothing here derives
+                     it. Null wherever the question does not arise. */
+                  stemChannel: built.stemOmission || null,
+                  /* THE SEPALS' record: the count ceiling and the angle limit are
+                     the OWNER's numbers (footRing's and the builder's own scan),
+                     printed on the two controls and hatched on their tracks; the
+                     sepal's own buckle record is what the sepal twins' read-outs
+                     see where the petal's fmt reads `shown.buckle`. Under SPHERE
+                     with sepals asked the record says UNAVAILABLE rather than
+                     going silent. */
+                  sepals: built.sepals ? { ...built.foot.sepals, limit: built.sepals.limit, buckle: (built.sepals.built[0] && built.sepals.built[0].form && built.sepals.built[0].form.buckle) || null, unavailable: false }
+                    : (built.foot.sphereMode && Math.round(Number(ui.sepalCount) || 0) >= 1 ? { unavailable: true, asked: Math.round(Number(ui.sepalCount)) } : null) };
+  refreshLabels(ui, shown);
+  applyCaps(shown);
+  if (mesh) { mesh.geometry.dispose(); mesh.geometry = geo; }
+  else { mesh = new THREE.Mesh(geo, material); scene.add(mesh); }
+  /* The bounding SPHERE is the framing quantity (the accumulator's bounding
+     BOX is the print-size quantity — two different jobs, kept apart). It is
+     computed on every rebuild, not only when the camera is free, so a shot
+     tool can ASK the app for the radius its own automatic fit would use
+     instead of inventing a proxy from the bounding box. */
+  geo.computeBoundingSphere();
+  lastFitRadius = geo.boundingSphere.radius;
+  /* THE SPHERE'S CENTRE, not just its radius — and the fan is what made it
+     matter. Every arrangement before this one was radially symmetric, so the
+     bounding sphere sat on the axis and framing at the origin with a radius
+     was enough. A FAN puts all its mass on one side: at 3 per side x 15 deg
+     its centre is metres from the origin in model terms, and a shot framed at
+     the origin crops it. `fitCamera` already accepts a target; it had nothing
+     truthful to point at until now. Telemetry only — no geometry reads it. */
+  lastFitCenter = [geo.boundingSphere.center.x, geo.boundingSphere.center.y, geo.boundingSphere.center.z];
+  /* THE FAN SNAP, keyed off a PLACEMENT TRANSITION rather than "is FAN" on
+     every rebuild — it fires once on entry and never re-fights a manual
+     orbit or a fresh dropdown pick taken since (both clear fanViewLocked).
+     Leaving FAN does nothing here on purpose (Eva's ruling: stay in place,
+     no snap back) — `userMoved` is already true from the entry snap, so the
+     plain `!userMoved` branch below stays silent too. */
+  if (ui.placement === 'FAN' && wasPlacement !== 'FAN') {
+    snapToFan();
+  } else if (ui.placement === 'FAN' && fanViewLocked) {
+    recenterFanView();
+  } else if (!userMoved) {
+    fitCamera(lastFitRadius);
+  }
+  shownSummary = showingLine(mode) + summarise(ui, acc, mode, built.rings, built.foot, built.petals, built) + `\n${materialLines(ui, mode)}`;
+  readout.textContent = shownSummary;
+}
+
+/* rAF-coalesced rebuild: many input events per frame, one build. */
+let regenQueued = false;
+function scheduleRegen() {
+  if (regenQueued) return;
+  regenQueued = true;
+  requestAnimationFrame(() => { try { regenerate(); } finally { regenQueued = false; } });
+}
+
+for (const c of CONTROLS) {
+  inputs[c.id].addEventListener('input', () => { applyVisibility(); scheduleRegen(); });
+  inputs[c.id].addEventListener('change', () => { applyVisibility(); scheduleRegen(); });
+}
+/* The print-preview box rebuilds through the same rAF coalescer every
+   registry control uses — no visibility pass, because it is not a control
+   and no predicate reads it. */
+if (printPreviewInput) printPreviewInput.addEventListener('change', scheduleRegen);
+
+/* ---------------------------------------------------
+   VIEW PRESETS — the VIEW box's dropdown. Pure camera chrome: reads
+   lastFitRadius/lastFitCenter (the #129 bounding-sphere machinery — one
+   owner, read here rather than recomputed) and drives the same
+   camera/controls fitCamera() does, but never touches geometry, the
+   registry, or readUI(). `viewPresetSelect` is a raw DOM reference exactly
+   like the `autoRotate` checkbox above: not in `inputs`, not a CONTROLS
+   row, invisible to readUI(), DEFAULTS, reset, export and every gate that
+   reads UI state.
+
+   A DROPDOWN PICK ANIMATES (a 650 ms ease, ported from the flower's own
+   applyViewPreset/stepViewTween); THE FAN SNAP DOES NOT — Eva's ruling was
+   specifically "immediate snap without rotation", so snapToFan() below sets
+   the camera directly and shares no code path with the tween. */
+const viewPresetSelect = document.getElementById('viewPreset');
+let viewTween = null;
+const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+// One formula, every preset and the fan re-centre alike — the frustum-aware
+// distance the flower's own applyViewPreset uses, so `fit` means the same
+// thing here it does in bloom-view-presets.js's own header.
+function presetDistance(radius, fit) {
+  return (radius / Math.tan((camera.fov * DEG) / 2)) * fit;
+}
+
+function applyViewPreset(name) {
+  const p = VIEW_PRESETS[name] || VIEW_PRESETS.default;
+  if (!(lastFitRadius > 0)) return;   // nothing built yet
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  const dist = presetDistance(lastFitRadius, p.fit);
+  const dn = Math.hypot(p.dir[0], p.dir[1], p.dir[2]) || 1;
+  const endPos = c.clone().add(new THREE.Vector3(p.dir[0] / dn, p.dir[1] / dn, p.dir[2] / dn).multiplyScalar(dist));
+  const endUp = new THREE.Vector3(p.up[0], p.up[1], p.up[2]).normalize();
+  camera.far = Math.max(camera.far, dist * 20);   // widen up front so nothing clips mid-flight; tightened on arrival
+  camera.updateProjectionMatrix();
+  viewTween = {
+    startPos: camera.position.clone(), endPos,
+    startTarget: controls.target.clone(), endTarget: c,
+    startUp: camera.up.clone(), endUp,
+    endNear: Math.max(0.05, dist * 0.02), endFar: dist * 20,
+    t0: performance.now(), dur: 650,
+  };
+  controls.autoRotate = false;   // paused during the flight; resumed per the checkbox on arrival
+  /* A chosen preset is a deliberate camera placement, same standing as a
+     manual drag: without this, the next slider tweak's `!userMoved` branch
+     (or, mid-FAN, the re-centre branch) would silently undo it. */
+  userMoved = true;
+  fanViewLocked = false;
+}
+
+function stepViewTween() {
+  const e = easeInOutCubic(Math.min(1, (performance.now() - viewTween.t0) / viewTween.dur));
+  camera.position.lerpVectors(viewTween.startPos, viewTween.endPos, e);
+  controls.target.lerpVectors(viewTween.startTarget, viewTween.endTarget, e);
+  camera.up.copy(viewTween.startUp).lerp(viewTween.endUp, e).normalize();
+  camera.lookAt(controls.target);
+  if (e >= 1) {
+    camera.up.copy(viewTween.endUp);
+    camera.near = viewTween.endNear; camera.far = viewTween.endFar;
+    camera.updateProjectionMatrix();
+    controls.update();
+    controls.autoRotate = document.getElementById('autoRotate').checked;
+    viewTween = null;
+  }
+}
+if (viewPresetSelect) viewPresetSelect.addEventListener('change', () => applyViewPreset(viewPresetSelect.value));
+
+/* THE FAN SNAP (Eva's ruling). Selecting FAN placement moves the camera to
+   TOP-DOWN, centred on the model's own bounding-sphere centre, immediately
+   and without an animation — no button, unlike the flower's manual
+   "Auto-center (top-down)". Shares VIEW_PRESETS.top with the dropdown's own
+   TOP-DOWN entry (one owner for that framing, however it's reached) but
+   sets the camera directly rather than through the tween. */
+function snapToFan() {
+  const p = VIEW_PRESETS.top;
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  const dist = presetDistance(lastFitRadius, p.fit);
+  const dn = Math.hypot(p.dir[0], p.dir[1], p.dir[2]) || 1;
+  camera.up.set(p.up[0], p.up[1], p.up[2]);
+  controls.target.copy(c);
+  camera.position.set(c.x + (p.dir[0] / dn) * dist, c.y + (p.dir[1] / dn) * dist, c.z + (p.dir[2] / dn) * dist);
+  camera.near = Math.max(0.05, dist * 0.02);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
+  controls.autoRotate = false;
+  document.getElementById('autoRotate').checked = false;   // OFF, and nothing resumes it silently — Eva's ruling
+  userMoved = true;
+  fanViewLocked = true;
+  if (viewPresetSelect) viewPresetSelect.value = 'top';   // keep the dropdown honest about the framing it now shows
+}
+
+/* Re-centre only, same direction/distance ratio — a fan control tweaked
+   after the snap (spacing, per-side count, the mirror toggle) can shift the
+   bounding-sphere centre without the user having touched the camera since.
+   Same correction principle as the flower's refitCamera when a stem grows
+   the plant past its initial framing: keep the view direction, recentre and
+   redistance to the fresh bounds. Runs only while fanViewLocked — a manual
+   orbit or a fresh dropdown pick already cleared it, and holds the camera
+   wherever the user left it instead. */
+function recenterFanView() {
+  const c = new THREE.Vector3(lastFitCenter[0], lastFitCenter[1], lastFitCenter[2]);
+  let dx = camera.position.x - controls.target.x, dy = camera.position.y - controls.target.y, dz = camera.position.z - controls.target.z;
+  const dl = Math.hypot(dx, dy, dz) || 1; dx /= dl; dy /= dl; dz /= dl;
+  const dist = presetDistance(lastFitRadius, VIEW_PRESETS.top.fit);
+  controls.target.copy(c);
+  camera.position.set(c.x + dx * dist, c.y + dy * dist, c.z + dz * dist);
+  camera.near = Math.max(0.05, dist * 0.02);
+  camera.far = dist * 20;
+  camera.updateProjectionMatrix();
+  controls.update();
+}
+
+/* ---------------- STL export ---------------- */
+document.getElementById('exportStl').addEventListener('click', () => {
+  const ui = readUI();
+  /* ALWAYS EXPORT MODE, NEVER RECORDED, AND shownMode() IS NOT READ HERE —
+     the three clauses the print-preview toggle's byte argument rests on
+     (see shownMode's note). The panel gate flips the box and requires the
+     STL on either side of it byte-identical. */
+  const { geo, acc, built } = buildGeometry({ exportMode: true });
+  const exportTris = acc.triangleCount;   // the accumulator owns the count, in both modes
+  if (exportTris > EXPORT_TRI_BUDGET) {
+    geo.dispose();
+    readout.innerHTML = `<span class="bl-err">export refused: ${exportTris.toLocaleString('en-US')} tris (export) exceeds the ${EXPORT_TRI_BUDGET.toLocaleString('en-US')} budget</span>`;
+    return;
+  }
+  const stl = new STLExporter().parse(new THREE.Mesh(geo, material), { binary: true });
+  geo.dispose();
+  const blob = new Blob([stl], { type: 'model/stl' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'bloom.stl';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+  /* Both counts, both LABELLED — live and export modes are not convertible
+     (the export floor changes geometry), so one word never covers both.
+
+     THE LAST LINE, not line [1]. summarise() emits a variable number of lines
+     now (the layer radii and the low-count spiral flag are conditional), and
+     an index into a variable-length list is a bug waiting for the first
+     multi-layer export — it would have printed the ring radii under the word
+     "exported". The tris/max-dim line is always last, so ask for that. */
+  const exportLines = summarise(ui, acc, 'export', built.rings, built.foot, built.petals, built).split('\n');
+  readout.textContent = `${shownSummary}\n`
+    + `exported bloom.stl · ${exportLines[exportLines.length - 1]} · min sheet ${acc.minThickness.toFixed(2)} mm`;
+});
+
+/* THE GRID EXPORT (session 28) — the per-petal mid-surface, not the object.
+
+   IT FOLLOWS shownMode(), AND THE STL DELIBERATELY DOES NOT. That is not an
+   inconsistency: the STL is the thing being made, so it is always the export
+   geometry and the toggle must not be able to change a printed part. The
+   grid is a DESCRIPTION of what is on screen, so the honest thing is to
+   describe what is on screen and label which it was — the mode label rides
+   in `asset.extras.mode`, in the filename and in the read-out, so the two
+   can never be confused for each other.
+
+   NO TRIANGLE BUDGET CHECK, because there are no triangles: the budget
+   refuses an STL nobody could slice, and a line-strip file's size is bounded
+   by petals x rows x columns, which is bounded by MAX_LAYERS and the petal
+   count. The largest reachable file is on the order of a megabyte. The
+   POINT count is reported instead, in the read-out and in the file. */
+document.getElementById('exportGrid').addEventListener('click', () => {
+  const mode = shownMode();
+  const { geo, built, ui: builtUi } = buildGeometry({ exportMode: mode === 'export', captureGrid: true });
+  geo.dispose();   // the grid export never renders; the BufferGeometry is buildGeometry's, not ours
+  let glb;
+  try {
+    glb = buildGridGltf(built, { mode, state: builtUi, generator: 'Parametric Bloom — bloom-grid-gltf' });
+  } catch (err) {
+    readout.innerHTML = `<span class="bl-err">grid export failed: ${err.message}</span>`;
+    return;
+  }
+  const blob = new Blob([glb], { type: 'model/gltf-binary' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `bloom-grid-${mode}.glb`;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+
+  /* WHAT WENT INTO THE FILE IS SAID AT THE BUTTON, not only inside the
+     extras. It used to have a standing gap to report — a RADIAL bloom of
+     eight petals exported ONE — and does not any more; the line stays,
+     because a petal whose own grid was not capturable would still be absent
+     and a reader who does not open the extras would have no way to know. */
+  const emitted = (built.petalsAll || built.petals).filter((p) => p && p.grid).length;
+  const gap = emitted < built.petalsBuilt
+    ? ` · ${emitted} of ${built.petalsBuilt} petals (the rest carry no capturable grid)`
+    : ` · all ${emitted} petals`;
+  readout.textContent = `${shownSummary}\n`
+    + `exported bloom-grid-${mode}.glb · ${mode} geometry${gap} · ${(glb.byteLength / 1024).toFixed(0)} KB`;
+});
+
+/* Contact-sheet hooks (see the note beside __bloomUIState). __bloomFrame sets
+   userMoved so the next rebuild's automatic refit does not silently undo the
+   framing the tool just asked for — a screenshot of a camera that moved back
+   is exactly the class of instrument error that padded the flower's pixel
+   diffs for months. */
+window.__bloomMetrics = () => ({
+  ringRadius: lastRing.radius,
+  derivedRadius: lastRing.derivedRadius,
+  /* NO centerStyle / centerTris / centerSeat (session 20): the designed
+     centre is retired, and a metric that reported 'NONE' / 0 / null for a
+     thing that no longer exists would be a number under a label naming a
+     computation nobody performs. Tools that read them died with the rig. */
+  /* WHICH GEOMETRY EVERY NUMBER BELOW DESCRIBES (Sep 3, the print-preview
+     toggle). `shownTris` is the count of the build on screen in whatever
+     mode it was built. `liveTris` keeps its name and its meaning — the LIVE
+     build's count — and is therefore NULL while the preview is on, never the
+     export count wearing a live label: a caption that prints it then prints
+     "null" loudly rather than a number that is not the number. Both STL
+     gates assert `shownMode === 'live'` on every row; a sheet that toggles
+     captions from `shownTris` and `shownMode`. */
+  shownMode: lastShownMode,
+  shownTris: lastTris,
+  liveTris: lastShownMode === 'live' ? lastTris : null,
+  maxDimMm: lastMaxDim,
+  fitRadius: lastFitRadius,
+  fitCenter: [...lastFitCenter],
+  capability: capability ? capability.label : null,
+  /* THE PETAL'S OWN MEASUREMENTS, from the builder that made it. The
+     capability assertions and the single-petal framing read these rather
+     than re-deriving a profile or a projection — a consumer inventing its
+     own copy of a boundary is this project's most repeated defect.
+
+     SCOPE, stated here and repeated in the gates' own output: `profile` and
+     `tipSpans` are the APP'S evaluation of the width profile and the trim
+     domain, not a measurement of the exported STL. Watertightness and
+     connectedness are measured on the export; the structural claims are
+     measured here. */
+  petalProfile: lastPetal ? lastPetal.profile : null,
+  /* EACH ROW'S OWN STATION, beside its half-width. A5 and A6 both need to know
+     WHERE a row is, and both were wrong reconstructing it from the array index
+     — `profile` leads with the foot rows, so the offset is however many of
+     those there are. The builder already knows; this passes it through. */
+  petalProfileU: lastPetal ? lastPetal.profileU : null,
+  /* AND THE BASE HALF-WIDTH AT EACH ROW — the outline before the lobe cut.
+     A6 fits PETAL TIP SHAPE's own curve, and under MODEL B the cut reaches
+     the apex, so the emitted half-width is no longer that curve. */
+  petalProfileBase: lastPetal ? lastPetal.profileBase : null,
+  petalFootRows: lastPetal ? lastPetal.footRows : null,
+  petalPanels: lastPetal ? lastPetal.panels : null,
+  petalTipSpans: lastPetal ? lastPetal.tipSpans : null,
+  petalMid: lastPetal ? lastPetal.mid : null,
+  petalTip: lastPetal ? lastPetal.tip : null,
+  /* The converging tip cap's own numbers (Eva's ruling, Sep 1). Named
+     `petalTipCap` and never `petalTip`, which is the tip's POSITION. */
+  petalTipCap: lastPetal ? lastPetal.tipCap : null,
+  petalBladeLadder: lastPetal ? lastPetal.bladeLadder : null,
+  petalNormal: lastPetal ? lastPetal.normal : null,
+  /* The blade's WIDTH direction at the midpoint — a profile view looks down
+     this. It is reported rather than recomputed because under twist it is
+     no longer the ring tangent, so a shot tool deriving it from azimuth
+     would not merely be a second owner, it would be wrong. */
+  petalTangent: lastPetal ? lastPetal.tangent : null,
+  petalAxis: lastPetal ? lastPetal.axis : null,
+  /* FORM TELEMETRY, and the scope is the point. Both shipped gates are
+     structurally BLIND to this session's failure modes: the export gate
+     counts boundary edges on a fixed-topology grid, which pure displacement
+     cannot change, and connectedness cannot fire because the foot is never
+     written and the hub spans it. So the properties that CAN break — the
+     foot staying put, the roll staying isometric, the curvature floor
+     holding, and the all-zero guard not hiding a wrong form path — are
+     measured here, from the builder that made the geometry, and asserted by
+     both gates on every row. */
+  petalForm: lastPetal ? lastPetal.form : null,
+  /* LOBE TELEMETRY (session 38, PR 2) — the builder's own record of the cut:
+     what was asked, what was built, both caps and which one bound, the pitch
+     against its floor, the window in u and in mm, the sinus stations, and
+     the rows the ladder gave each lobe. Null on a plain petal. Both STL gates
+     are structurally blind to a wrong cut (a petal cut in the wrong place is
+     watertight and one piece), so the L family reads this. */
+  petalLobes: lastPetal ? (lastPetal.lobes ?? null) : null,
+  petalFringe: lastPetal ? (lastPetal.fringe ?? null) : null,
+  petalFootFrames: lastPetal ? lastPetal.footFrames : null,
+  petalGuardResidual: lastPetal ? lastPetal.guardResidual : null,
+  /* THE FOOT RING'S OWN CROSS-SECTION, exposed so the reworked foot
+     assertion can compare the EMITTED foot against footRing()'s answer
+     rather than against a fixed expectation. Before the thickness layer the
+     expectation could be fixed, because the foot was; with foot controls it
+     derives from state, and a gate keeping its own copy of that derivation
+     would be this project's most repeated defect arriving in the instrument
+     built to catch it. `derivedRadius`, `authoredWidth` and the clamp flags
+     stay telemetry — nothing geometric reads them. */
+  ringWidth: lastRing.width,
+  ringThickness: lastRing.thickness,
+  ringOverhang: lastRing.overhang,
+  ringAuthoredWidth: lastRing.authoredWidth,
+  ringWidthClamped: lastRing.widthClamped,
+  ringThicknessFloorBinds: lastRing.thicknessFloorBinds,
+  /* THE ARRANGEMENT, PER LAYER — what junctionAssertions() reads. Every one
+     of these is footRing()'s OWN answer, exposed rather than re-derived, for
+     the same reason ringWidth/ringThickness were: a gate keeping its own copy
+     of a boundary is this project's most repeated defect, and it would arrive
+     here inside the instrument built to catch it.
+
+     WHY THIS EXISTS AT ALL — and it is a derivation, not a hedge. The voxel
+     gate CANNOT police the junction under layers, measured Sep 1: building
+     the hub at the WRONG layer's radius (min instead of max) leaves the outer
+     whorl's feet ending 7.94 mm out against a hub that stops at 6.86 mm —
+     detached from the hub by construction — and the gate reports ONE region,
+     0% detached. Consecutive foot annuli overlap each other, so the outer
+     whorl is held on by a CHAIN through the inner layers. Connectedness at
+     multi-layer is over-determined and the gate cannot tell a correct hub
+     from an incorrect one. J3 below is the assertion that can. */
+  hubRadius: lastHub.radius,
+  hubThickness: lastHub.thickness,
+  /* THE STEM AND THE HUB-TO-STEM JOIN (session 43) — ST0-ST6's measured side.
+     `stem` is NULL and not absent when there is no stem: ST1 distinguishes "the
+     builder says there is none" from "the builder says nothing", and a missing
+     key is the second. The root and tip are built here from the plan's own two
+     heights rather than stored twice. */
+  stem: lastStem ? {
+    lengthMm: lastStem.lengthMm, outerR: lastStem.outerR, boreR: lastStem.boreR, wallMm: lastStem.wallMm,
+    root: [0, 0, lastStem.rootZ], tip: [0, 0, lastStem.tipZ],
+    /* MEASURED FROM WHAT THE BUILDER EMITTED, not from the plan's own two
+       heights: ST4 asks whether the root really runs THROUGH the slab, and a
+       builder that started at the underside would leave the plan saying it
+       did. See buildStemInto's own note. */
+    rootSpanMm: (lastStemBuilt && lastStemBuilt.emittedTopZ !== undefined ? lastStemBuilt.emittedTopZ : lastStem.topZ) - lastStem.rootZ,
+    stations: lastStem.stations.slice(), sides: lastStem.sides,
+    hiddenMm: lastStem.hiddenMm, visibleMm: lastStem.visibleMm,
+    /* THE HUB SHAPE (the hub-shape session) — style, pronouncedness and reach,
+       plus the reach-below-the-head and the total-below-the-head the read-out
+       and the gates read. `swellActive` is the plan's own inert flag (a styled
+       swell is built iff true); `hubLengthAuto` says the reach is the derived
+       joinT rather than an asked length. */
+    hubStyle: lastStem.hubStyle, hubAmount: lastStem.hubAmount, hubR: lastStem.hubR, hubT: lastStem.hubT,
+    hubLengthAsked: lastStem.hubLengthAsked, hubLengthAuto: lastStem.hubLengthAuto, hubReachClamped: lastStem.hubReachClamped,
+    axisDepth: lastStem.axisDepth, swellActive: lastStem.swellActive,
+    belowHeadMm: lastStem.belowHeadMm, joinReason: lastStem.joinReason,
+    /* THE SOLID ROOT BAND (Eva's ruling). The PLAN's own answer, which is what
+       ST1 predicts the triangle count from — the builder owns the count and the
+       plan owns the shape it was asked for, and those two owners are the whole
+       point of that clause. `headOuterMm` rides with it because the READ-OUT
+       wants the length the condition was decided on and not just the verdict.
+       (An earlier draft of this comment also named an `ST10`. There is no ST10:
+       the band's EXTENT is asserted by nothing, which is stated as a declared
+       blindness in §8 of the outcome doc rather than left to be discovered — a
+       comment naming a clause that does not exist is this project's own
+       recorded defect, and it is not going to ship from here.) */
+    headOuterMm: lastStem.headOuterMm, headInsideBore: lastStem.headInsideBore,
+    solidBandMm: lastStem.solidBandMm,
+    /* THE BORE AS AN INTERVAL (the tip-plug session). The root band shuts it
+       where the head would otherwise stand inside it and the TIP PLUG shuts it
+       where a viewer would otherwise look up it, so what the plan declares is
+       the bore that SURVIVES the two — and where they meet, none does. ST1
+       predicts the triangle count from these and ST10 checks the plug against
+       Eva's own wall thickness, which is why both the ASKED-FOR shape and the
+       EMITTED rings are here: the plan owns the first and the builder the
+       second, and a clause holding both would be checking a record against
+       itself. `solidBandZ` is gone with them — it was `voidTopZ` under an older
+       name, and two names for one number is a second producer. */
+    tipPlugMm: lastStem.tipPlugMm, voidMm: lastStem.voidMm,
+    voidTopZ: lastStem.voidTopZ, voidBottomZ: lastStem.voidBottomZ,
+    solidThrough: lastStem.solidThrough,
+    emittedTopZ: lastStemBuilt ? lastStemBuilt.emittedTopZ : undefined,
+    emittedVoid: lastStemBuilt ? lastStemBuilt.emittedVoid : undefined,
+    emittedVoidTopZ: lastStemBuilt ? lastStemBuilt.emittedVoidTopZ : undefined,
+    emittedVoidBottomZ: lastStemBuilt ? lastStemBuilt.emittedVoidBottomZ : undefined,
+    directedMismatch: lastStemBuilt ? lastStemBuilt.directedMismatch : undefined,
+    emittedBottomAreaMm2: lastStemBuilt ? lastStemBuilt.emittedBottomAreaMm2 : undefined,
+    /* THE EMITTED RINGS THEMSELVES — ST2's axis and length and ST3's radii read
+       these, never the plan beside them. Same reason as rootSpanMm above: the
+       plan is what was ASKED FOR and these are what came out. */
+    emittedMaxR: lastStemBuilt ? lastStemBuilt.emittedMaxR : undefined,
+    emittedMinR: lastStemBuilt ? lastStemBuilt.emittedMinR : undefined,
+    emittedAxisOffset: lastStemBuilt ? lastStemBuilt.emittedAxisOffset : undefined,
+    emittedTipZ: lastStemBuilt ? lastStemBuilt.emittedTipZ : undefined,
+  } : null,
+  stemTris: lastStemTris,
+  /* THE LEAVES (LF0-LF7). The PLAN's own declarations beside the BUILDER's own
+     emitted records, which is the split every clause here rests on: LF1
+     predicts the count from the plan's azimuth list and compares it against the
+     tally, LF2 reads the emitted root radii, LF3 the emitted solid crossing.
+     Two owners, and the arithmetic between them is stated in the clause. */
+  leaf: lastLeaf ? {
+    lengthMm: lastLeaf.lengthMm, widthMm: lastLeaf.widthMm, angleDeg: lastLeaf.angleDeg,
+    nodes: lastLeaf.nodes, phyllotaxy: lastLeaf.phyllotaxy,
+    nodeDepthsMm: lastLeaf.nodeDepthsMm.slice(),
+    azimuths: lastLeaf.azimuths.map((a) => a.slice()),
+    rootR: lastLeaf.rootR, petioleR: lastLeaf.petioleR, petioleLenMm: lastLeaf.petioleLenMm,
+    insetAskedMm: lastLeaf.insetAskedMm, insetNeededMm: lastLeaf.insetNeededMm,
+    insetMm: lastLeaf.insetMm, insetClamped: lastLeaf.insetClamped,
+    insetSatisfied: lastLeaf.insetSatisfied,
+    nodesAsked: lastLeaf.nodesAsked, nodesBuilt: lastLeaf.nodesBuilt, nodesClamped: lastLeaf.nodesClamped,
+    slenderness: lastLeaf.slenderness,
+    /* THE TIP (LF9): the exponent the PLAN declares, the half-widths the BLADE
+       was built from, and the terminal-clamp record the read-out prints. */
+    tipShape: lastLeaf.tipShape,
+    rowHalfBaseMm: (lastLeavesBuilt || []).map((r) => r.rowHalfBaseMm),
+    tipClamp: (lastLeavesBuilt || []).map((r) => r.tipClamp),
+    built: (lastLeavesBuilt || []).length,
+    emittedRootR: (lastLeavesBuilt || []).map((r) => r.emittedRootR),
+    crossesSolidMm: (lastLeavesBuilt || []).map((r) => r.crossesSolidMm),
+    /* ST9's measured side — the axis of the rod each leaf's builder actually
+       emitted. A petiole is rooted THROUGH the stem's wall, so it stands
+       inside the free stem's own cylinder by design; ST9 reads these to tell
+       that third part from the petal it exists to doubt. */
+    petioleAxes: (lastLeavesBuilt || []).map((r) => r.petioleAxis),
+    /* LF8's measured side — the builder's own DIRECTED-edge census, which both
+       STL gates are blind to because theirs keys on a sorted pair. */
+    directedMismatch: (lastLeavesBuilt || []).map((r) => r.directedMismatch),
+    /* THE BLADE CARRIES NO FOOT — read off the EMITTED outline by the builder
+       rather than from the flag that set it, so a leaf quietly keeping the
+       petal's foot-continuity floor is visible as geometry (LF6). */
+    rootBlendDown: (lastLeavesBuilt || []).every((r) => r.rootBlendDown),
+    /* THE SERRATION IS THE LEAF'S OWN (LF7) — the values the BLADE was built
+       from, so a leaf reading the petal's `lobe*` controls shows as these
+       disagreeing with the leaf's own read-back state. */
+    serration: {
+      depth: lastLeaf.toothDepth, count: (lastLeavesBuilt || []).reduce((n, r) => Math.max(n, r.serrationBuilt), 0),
+      crest: lastLeaf.crestShape, notch: lastLeaf.notchShape,
+    },
+    /* THE TOOTH COUNT IS THE CUT LAW'S TO CLAMP, and on a short or narrow
+       blade it does: an asked 12 comes back as 10 at the shipped leaf size.
+       Told on the read-out; LF7 asserts only that a positive depth cuts
+       SOMETHING, because the ceiling is the lobe machinery's own and this
+       family does not restate it. */
+    teethAsked: lastLeaf.toothCount,
+    teethBuilt: (lastLeavesBuilt || []).reduce((n, r) => Math.max(n, r.serrationBuilt), 0),
+  } : null,
+  leafTris: lastLeafTris,
+  leafAbsent: lastLeafAbsent,
+  /* THE INFLORESCENCE (ID0-ID6). THE PLAN'S own declarations beside the
+     BUILDER's own record, the leaf's pairing exactly: ID1 predicts the floret
+     count from the plan's azimuth list and compares it against the tally, ID2
+     reads the crossing the plan solved against the RACHIS the stem plan
+     declares, ID5 reads the residual the builder measured.
+
+     `inflorescence` IS NULL AND NOT ABSENT WHERE THERE IS NONE: ID1
+     distinguishes "the builder says there are none" from "the builder says
+     nothing", and a missing key is the second. */
+  inflorescence: lastInflo ? {
+    type: lastInflo.type, phyllotaxy: lastInflo.phyllotaxy, perNode: lastInflo.perNode,
+    nodes: lastInflo.nodes, nodesAsked: lastInflo.nodesAsked, nodesBuilt: lastInflo.nodesBuilt,
+    nodesClamped: lastInflo.nodesClamped, built: lastInflo.built,
+    nodeDepthsMm: lastInflo.nodeDepthsMm.slice(),
+    azimuths: lastInflo.azimuths.map((a) => a.slice()),
+    angleDeg: lastInflo.angleDeg, pedicelLenMm: lastInflo.pedicelLenMm,
+    pedicelR: lastInflo.pedicelR, areaRuleR: lastInflo.areaRuleR,
+    pedicelRFloor: lastInflo.pedicelRFloor, pedicelRClamped: lastInflo.pedicelRClamped,
+    rootR: lastInflo.rootR, embedMm: lastInflo.embedMm, crossesSolidMm: lastInflo.crossesSolidMm,
+    boreR: lastInflo.boreR, outerR: lastInflo.outerR, rootZ: lastInflo.rootZ,
+    rachisLengthMm: lastInflo.rachisLengthMm,
+    insetAskedMm: lastInflo.insetAskedMm, insetNeededMm: lastInflo.insetNeededMm,
+    insetMm: lastInflo.insetMm, insetClamped: lastInflo.insetClamped,
+    insetSatisfied: lastInflo.insetSatisfied,
+    floretPetals: lastInflo.floretPetals, scale: lastInflo.scale,
+    petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
+    lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
+    sizeClamped: lastInflo.sizeClamped, sizeDeadBelow: lastInflo.sizeDeadBelow,
+  } : null,
+  /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
+     floret unit's whole triangle stream is up to 270k floats and the claim it
+     would serve (every placed head IS that stream under its matrix) is
+     already a MEASURED zero the builder reports as `placementResidual`, by a
+     second expression beside the method under test. A gate that shipped the
+     stream across the bridge to redo the multiply itself would be a third
+     copy of a three-line map, and it would cost a megabyte a row. */
+  inflorescenceBuilt: lastInfloBuilt ? {
+    count: lastInfloBuilt.count, unitTris: lastInfloBuilt.unitTris, tris: lastInfloBuilt.tris,
+    tipZLocal: lastInfloBuilt.tipZLocal,
+    placementResidual: lastInfloBuilt.placementResidual,
+    placementCompared: lastInfloBuilt.placementCompared,
+    rachisApproachMm: lastInfloBuilt.rachisApproachMm,
+    floretState: { ...lastInfloBuilt.floretState },
+    unit: {
+      petalsBuilt: lastInfloBuilt.unit.petalsBuilt,
+      hubRadius: lastInfloBuilt.unit.hub.radius, hubThickness: lastInfloBuilt.unit.hub.thickness,
+      stemPresent: !!(lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.present),
+      stemOuterR: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.outerR : null,
+      stemBoreR: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.boreR : null,
+      stemLengthMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.lengthMm : null,
+      stemRootZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.rootZ : null,
+      stemTipZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.tipZ : null,
+      /* THE PEDICEL'S OWN VOID, for O1's declared inward count. A floret is a
+         bloom and its pedicel is a stem, so its bore becomes a sealed CAVITY
+         under exactly the condition the rachis's does — and O1's baseline is
+         a COUNT over the whole file, so five florets each with an inner face
+         are five more inward shells the gate must expect. Measured red first
+         on `x a SPHERE head`: 6 of 47 against a declared 1. */
+      stemVoidMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.voidMm : null,
+      stemSolidBandMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.solidBandMm : null,
+      stemTipPlugMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.tipPlugMm : null,
+      stemSides: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.sides : null,
+      sphereMode: lastInfloBuilt.unit.sphereMode === true,
+      maxDimensionMm: lastInfloBuilt.unit.maxDimensionMm,
+      minThickness: lastInfloBuilt.unit.minThickness,
+      omissionAsked: lastInfloBuilt.unit.omissionAsked,
+      omissionBuilt: lastInfloBuilt.unit.omissionBuilt,
+      omitted: lastInfloBuilt.unit.omitted ? lastInfloBuilt.unit.omitted.slice() : null,
+    },
+    placed: lastInfloBuilt.placed.map((q) => ({
+      nodeIndex: q.nodeIndex, az: q.az, M: q.M.slice(), D: q.D.slice(), root: q.root.slice(),
+      /* `at` IS THE BLOCK'S OFFSET IN THE EXPORTED STREAM and ST9 needs it:
+         the STL is written from these very positions in order, so `at` and
+         `tris` name this floret's own floats in the FILE. */
+      at: q.at, tris: q.tris, headAt: q.headAt.slice(),
+      /* ST9's excusal reads this, the PETIOLE's own shape — the builder's
+         emitted rod ends through this placement's own matrix. */
+      pedicelAxis: q.pedicelAxis
+        ? { inner: q.pedicelAxis.inner.slice(), outer: q.pedicelAxis.outer.slice(), radiusMm: q.pedicelAxis.radiusMm }
+        : null,
+    })),
+  } : null,
+  inflorescenceTris: lastInfloTris,
+  /* THE GEOMETRY'S OWN ANSWER TO "IS AN INFLORESCENCE ABSENT HERE", read from
+     the module that is actually running — ST0's own reason: a gate calling the
+     geometry's predicate in Node compares one unmutated module against another
+     and can never disagree (session 41's L7). ID0 compares it against the
+     REGISTRY's declaration. */
+  inflorescenceAbsent: lastInfloAbsent,
+  /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
+     module that is actually running. ST0 compares it against the REGISTRY's
+     declaration, and it has to arrive through the page: a gate calling the
+     geometry's predicate in Node compares one unmutated module against another
+     and can never disagree — session 41's L7, measured again here, where
+     `stem-eligible-disagrees-with-the-registry` fired nothing until this key
+     existed. */
+  stemAbsent: lastStemAbsent,
+  /* THE SEPALS (SP0-SP9). The RING's own declarations (footRing's descriptor)
+     beside the BUILDER's own emitted records: the count it built, each sepal's
+     azimuth as the whorl primitive placed it, its foot frames and length as
+     emitted, the effective state each blade was BUILT FROM, and the angle
+     limit as the scan drew it. Null when absent; `sepalsAbsent` is the
+     geometry's own predicate through the page, SP0's other statement. */
+  sepal: lastSepals ? {
+    asked: lastSepals.asked, count: lastSepals.count, ceiling: lastSepals.ceiling, ceilingOf: lastSepals.ceilingOf, countClamped: lastSepals.countClamped,
+    scale: lastSepals.scale, breadth: lastSepals.breadth, phaseFrac: lastSepals.phaseFrac, pitchRad: lastSepals.pitchRad, phaseRad: lastSepals.phaseRad, phaseDeg: lastSepals.phaseDeg, pitchDeg: lastSepals.pitchDeg,
+    startAzimuth: lastSepals.startAzimuth, azimuths: lastSepals.azimuths.slice(), placement: lastSepals.placement, mirrorSymmetric: lastSepals.mirrorSymmetric,
+    footAskedMm: lastSepals.footAskedMm, footMm: lastSepals.footMm, footClamped: lastSepals.footClamped, footFloorMm: lastSepals.footFloorMm, footCeilingMm: lastSepals.footCeilingMm,
+    ring: { radius: lastSepals.ring.radius, width: lastSepals.ring.width, thickness: lastSepals.ring.thickness, overhang: lastSepals.ring.overhang, z: lastSepals.ring.z, slope: lastSepals.ring.slope, domeLean: lastSepals.ring.domeLean, onDome: lastSepals.ring.dome !== null },
+    /* THE ATTACHMENT (SP3): the whorl's height and the descriptor's own solve —
+       mode, the extent's two ends, the point the foot landed on, the arc
+       reading beside it, and the surface figures where the foot meets. */
+    height: lastSepals.height,
+    attachment: JSON.parse(JSON.stringify(lastSepals.attachment)),
+    built: lastSepalsBuilt ? lastSepalsBuilt.count : 0,
+    builtAzimuths: lastSepalsBuilt ? lastSepalsBuilt.azimuths.slice() : [],
+    tris: lastSepalTris,
+    limit: lastSepalsBuilt ? JSON.parse(JSON.stringify(lastSepalsBuilt.limit)) : null,
+    footTangentDeg: lastSepalsBuilt ? lastSepalsBuilt.footTangentDeg : undefined,
+    undersideSlopeDeg: lastSepalsBuilt ? lastSepalsBuilt.undersideSlopeDeg : undefined,
+    shoulderDeg: lastSepalsBuilt ? lastSepalsBuilt.shoulderDeg : undefined,
+    undersideChordDeg: lastSepalsBuilt ? lastSepalsBuilt.undersideChordDeg : undefined,
+    blendReachesRim: lastSepalsBuilt ? lastSepalsBuilt.blendReachesRim : undefined,
+    footBuriedMm: lastSepalsBuilt ? lastSepalsBuilt.footBuriedMm : undefined,
+    petals: lastSepalsBuilt ? lastSepalsBuilt.built.map((p) => ({
+      length: p.length, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris,
+      footFrames: p.footFrames, rootRow: p.rootRow, tip: p.tip, applied: p.applied, overridden: p.overridden,
+      profile: p.profile, profileU: p.profileU, tipCap: p.tipCap, form: p.form, seamStep: p.seamStep,
+      /* THE STATE THE BLADE WAS BUILT FROM, keyed by the PETAL name the law
+         reads (SP6 compares it against the page's own sepal* read-back, an
+         owner the builder does not write) */
+      builtFrom: p.builtFrom,
+    })) : [],
+  } : null,
+  sepalTris: lastSepalTris,
+  sepalsAbsent: lastSepalsAbsent,
+  sepalsAskedUnderSphere: lastSepalsAskedUnderSphere,
+  /* THE SPHERE'S STEM CHANNEL — ST7's and ST8's measured side, and the
+     read-out's. The per-mode approach arrays ride too, because "the two modes
+     omit the same set" is a claim about both of them and a gate sees one build
+     at a time; the builder computes both to form the union, so reporting them
+     costs nothing and makes the union checkable rather than believed. */
+  stemOmission: lastStemOmission ? {
+    clearanceMm: lastStemOmission.clearanceMm,
+    asked: lastStemOmission.asked, built: lastStemOmission.built,
+    omitted: lastStemOmission.omitted.slice(),
+    byMode: { live: lastStemOmission.byMode.live.slice(), export: lastStemOmission.byMode.export.slice() },
+    approach: { live: lastStemOmission.approach.live.slice(), export: lastStemOmission.approach.export.slice() },
+    nearestKeptMm: { ...lastStemOmission.nearestKeptMm },
+    /* THE MERIDIAN PACKING MARGIN — the base's own number, beside the blades'.
+       ST7 reads it here and rebuilds the expectation from `footRing()`'s and
+       `stemPlan`'s own fields rather than from this record. */
+    meridian: lastStemOmission.meridian ? { ...lastStemOmission.meridian } : null,
+  } : null,
+  hubJoinActive: !!lastHubBuilt.joinActive,
+  hubJoinThickness: lastHubBuilt.joinThickness,
+  hubJoinBlendRadius: lastHubBuilt.joinBlendRadius,
+  hubJoinUndersideMagnitude: lastHubBuilt.undersideMagnitude,
+  hubUnderside: (lastHubBuilt.underside || []).map((p) => p.slice()),
+  hubTopFaceZ: lastHubBuilt.topFaceZ,
+  footFramesDigest: lastFootDigest,
+  /* ONE FOOT-FRAME DIGEST PER SLOT, null where no petal was built — ST8's
+     measured side. The scalar above cannot answer "did slot 4 move" on a build
+     where slot 3 is missing, which is exactly the question the stem channel
+     makes askable. */
+  footFramesBySlot: lastFootBySlot.slice(),
+  /* THE DOME (Sep 4) — footRing()'s own cap, null under the guard: the rise
+     asked and built, the cap's radius and centre, the apex floor's clamp, and
+     the surface-to-plan ratio over the feet's annulus. J1 places every foot
+     against this sphere; the read-out names it. */
+  hubDome: lastHub.dome ? { ...lastHub.dome } : null,
+  /* WHAT THE HUB BUILDER ACTUALLY BUILT — reported by buildHubInto from the
+     sphere it used, never copied from footRing(). J3 compares the feet
+     against THIS: a hub that ignored the owner and stayed flat under lifted
+     feet (the wrong-hub mutation under a dome, measured Sep 4: watertight,
+     one voxel piece on every row tried, J1 indiscriminate) is caught only by
+     the feet not lying on the sphere the hub says it built. */
+  hubBuilt: { dome: lastHubBuilt.dome ? { ...lastHubBuilt.dome } : null, tris: lastHubBuilt.tris },
+  /* THE DOME GUARD'S RESIDUAL — exactly 0 on every flat build, null on a
+     domed one; both gates assert it. */
+  petalDomeGuardResidual: lastPetal ? lastPetal.domeGuardResidual : null,
+  /* THE SPINE per descriptor's representative petal (session 16) — every
+     blade row's centre AS EMITTED, plus the law's inputs and what the floor
+     did. The gate's C1 rebuilds the law from OTHER owners and compares
+     against `rows`; a spine that kept the arc while the controls were wired
+     is bit-identical to the un-biased bloom and this is its only witness. */
+  petalSpine: lastPetal ? lastPetal.spine : null,
+  petalRingSpine: lastPetals.map((p) => (p ? p.spine : null)),
+  /* THE ROOT ROW per descriptor's representative petal — the first BLADE row
+     as emitted, J8's input against the rigid tilt of the foot's own frame. */
+  petalRingRootRows: lastPetals.map((p) => (p ? { C: p.rootRow.C, N: p.rootRow.N, flat: p.rootRow.flat, tiltRad: p.rootRow.tiltRad, u: p.rootRow.u, curlRad: p.rootRow.curlRad, ringC: p.rootRow.ringC, azimuth: p.azimuth,
+    /* THE EFFECTIVE petalTilt this petal was actually built from (Sep 4,
+       J9's own input) — read from `p.applied`, never the base UI control:
+       petalTilt is itself overridable per role (labellumTilt/hoodTilt) and
+       per petal (petalNTilt), so a check reconstructing "expected tilt" from
+       the raw slider would false-fire on any orchid or fan-per-petal row. */
+    petalTiltApplied: p.applied.petalTilt } : null)),
+  /* RENAMED FROM `ringLayers` WITH THE CONTINUOUS ARM, because under it a
+     descriptor is not a layer — it is a ring carrying exactly one petal, and
+     there are up to 120 of them. A key naming a thing that is not the thing
+     is what a later reader checks and believes. Nothing persists this (it is
+     a diagnostic hook, not a design), so the rename is free and no
+     retirement is owed; the gates and shot tools moved with it in the same
+     commit. */
+  rings: lastRings.map((r) => ({
+    index: r.index, radius: r.radius, derivedRadius: r.derivedRadius,
+    width: r.width, thickness: r.thickness,
+    overhang: r.overhang, scale: r.scale, phase: r.phase, tiltExtra: r.tiltExtra,
+    /* DOME LEAN (Sep 4) — footRing()'s own per-ring cap correction, a
+       SEPARATE addend from tiltExtra above, never folded into it (see
+       footRing()'s own note on this field: folding it in broke tiltExtra's
+       own monotonicity and quantizer-identity claims under CONTINUOUS).
+       buildPetalInto sums petalTilt + tiltExtra + domeLean at the one place
+       the angle is used; this is that third term, reported on the same
+       doctrine as every other telemetry field here (widthClamped,
+       underFootFloor, …): the owner's own answer, never a second
+       derivation. */
+    domeLean: r.domeLean,
+    authoredWidth: r.authoredWidth, widthClamped: r.widthClamped,
+    /* THE CEILING TWIN of widthClamped (Eva, Sep 1). The foot's UPPER clamp
+       has always been able to bind - from petalWidth 25, a quarter of that
+       slider - with the blade widening and the area-ruled ring standing
+       still, and nothing reported it. See FOOT_MAX_WIDTH_MM. */
+    widthClampedHigh: r.widthClampedHigh,
+    /* THE DEPTH TELEMETRY (Sep 3) — footRing()'s own two flags behind the
+       read-out's RINGS NARROWER THAN A FOOT line, exposed so the panel gate
+       asserts that line against the owner in both directions. */
+    underFootFloor: r.underFootFloor,
+    crossesAxis: r.crossesAxis,
+    /* WHERE ON THE DOME THIS RING LANDS (Sep 4) — height, slope, arc from the
+       apex and the local relief factor, footRing()'s own. 0 / 0 / radius / 1
+       when flat. */
+    z: r.z, slope: r.slope, arc: r.arc, relief: r.relief,
+    /* THE ROLE AND ITS RECORD, footRing()'s OWN answer. Z1 reads roleCount to
+       check the partition; Z2 reads role and overrides against what the
+       builder reported it actually used. A gate deriving either from
+       layerCount would be a second copy of the derivation it exists to
+       police. */
+    role: r.role, roleCount: r.roleCount,
+    /* THE LAYER, SEPARATELY FROM THE DESCRIPTOR INDEX (session B). `index` is
+       the position in `rings`, which stopped being the layer the moment a
+       whorl could split into LABELLUM / HOOD / LATERAL descriptors. */
+    lambda: r.lambda,
+    /* THE SLOT ROLE AND ITS SLOTS. `slotRole` is null on an UNSPLIT
+       descriptor and never LATERAL there — "this whorl was not split" and
+       "this group is the laterals" are different claims. Z4 reads `slots` to
+       assert the assignment is mirror-symmetric. */
+    slotRole: r.slotRole,
+    allRole: r.allRole ?? null,
+    /* THE PER-PETAL ROLE (session 11) — the descriptor's mirror ORBIT counted
+       outward from the plane, or null. Z8 compares these against the emitted
+       azimuths; Z9 asserts this and `slotRole` are never both non-null. */
+    petalRole: r.petalRole,
+    slots: r.slots ? [...r.slots] : null,
+    overrideClamped: (r.overrideClamped || []).map((c) => ({ ...c })),
+    overrides: r.overrides ? { ...r.overrides } : null,
+  })),
+  /* Every ring's foot rows as EMITTED — J1's input. The pre-layer hook
+     exposed slot 0 of the one whorl; reporting only that would have silently
+     meant "layer 0" and left every inner whorl's feet unasserted. Under
+     CONTINUOUS a ring IS one petal, so this becomes every foot in the bloom
+     — 3 x petalCount x layerCount frames instead of 3 x layerCount — and J1
+     gets that coverage from the same expression. */
+  petalRingFootFrames: lastPetals.map((p) => (p ? p.footFrames : null)),
+  /* THE LADDER PER RING, because the seam clearance is a function of the
+     ring's OWN effective tilt: on a layered bloom the outer whorl usually
+     does not bind while the inner ones do, so A7 reading layer 0 alone
+     would never see the case the floor exists for. */
+  petalRingBladeLadder: lastPetals.map((p) => (p ? p.bladeLadder : null)),
+  petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
+  /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
+     `continuousMode` is what every assertion branches on, `sequenceLength` is
+     what the legibility flag counts, and each descriptor's own `roleCount`
+     sums to the bloom's petal count in both modes. A gate deriving any of these from
+     `placement` would be a second copy of the branch. */
+  continuousMode: lastFoot.continuousMode,
+  sequenceLength: lastFoot.sequenceLength,
+  /* ===================================================================
+     THE ARRANGEMENT'S POSITION AROUND THE AXIS — J7's and Z4b's only input,
+     and the reason this session had to ship an instrument at all.
+
+     MEASURED, NOT ASSUMED: before these four keys existed, `azimuth` appeared
+     in this repository only inside buildWhorlInto (where it is computed) and
+     buildPetalInto (where it is consumed). Nothing recorded one, so nothing
+     could assert one. Both STL gates are azimuth-blind BY CONSTRUCTION — an
+     edge census over a topology no control moves, and a flood fill over a hub
+     disc that spans every ring at every azimuth — and so is everything built
+     on them: J1 reads foot FRAMES, J2/J3 read RADII, J4 reads the overlap
+     box's three dimensions, J5/J6 read the depth sequence, and Z1-Z6 read
+     role membership and the effective state. A FAN that silently fell through
+     to the RADIAL arm would therefore export watertight, export as ONE piece,
+     carry the identical triangle count and the identical STL byte length, and
+     pass every assertion this project owns. J7 exists because of that grep.
+
+     `slotAzimuths` IS THE BUILDER'S OWN RECORD, one row per whorl indexed by
+     slot, taken from the slot payload the whorl primitive emitted — never
+     re-derived from `placement` and the controls, because an instrument that
+     recomputed the law would agree with a mutated law by mutating alongside
+     it. `fan` is footRing()'s derived law (null elsewhere, so a claim nothing
+     can make reads as absent rather than as a passing zero); `mirror` is
+     which involution this arrangement has; `slotRoleCensus` is how many slots
+     each role got, which is what Z1's amended clause checks the hood's
+     visibility against. */
+  slotAzimuths: lastSlotAzimuths.map((row) => [...row]),
+  placement: lastPlacement,
+  fan: lastFoot.fan ? { ...lastFoot.fan } : null,
+  mirror: lastFoot.mirror,
+  slotCount: lastFoot.slotCount,
+  slotRoleCensus: lastFoot.slotRoleCensus ? { ...lastFoot.slotRoleCensus } : null,
+  /* WHETHER SLOT ROLES APPLY, AND WHETHER A WHORL ACTUALLY SPLIT — two
+     different claims, so two flags. The first is the gating (placement and
+     depth) and is cross-checked against the registry's own
+     `slotRolesEligible` predicate by both gates; the second additionally
+     needs a control off its identity, and Z5 asserts it in both directions
+     against the descriptor count. `slotsPerRing` was RETIRED here (Sep 2):
+     it answered "how many petals does a ring carry" with one number, which a
+     split whorl does not have. */
+  slotRolesEligible: lastFoot.slotRolesEligible,
+  /* THE FULL SPHERE (session 18) — footRing()'s own answer, cross-checked
+     against the registry's `sphereMode` predicate by both gates on every
+     row, exactly as the two eligibility flags beside it are. */
+  sphereMode: lastFoot.sphereMode === true,
+  /* THE FAN'S OWN POSITION AXIS (session 11). Cross-checked against the
+     registry's `perPetalEligible` predicate by both gates, exactly as its
+     slot-role twin is: bloom-geometry.js makes the controls INERT and the
+     registry makes them HIDDEN, neither file can read the other, so the
+     relation is measured rather than commented. */
+  perPetalEligible: lastFoot.perPetalEligible,
+  allPetalsEligible: lastFoot.allPetalsEligible,
+  petalRoleCensus: lastFoot.petalRoleCensus ? { ...lastFoot.petalRoleCensus } : null,
+  petalGroupCount: lastFoot.petalGroupCount,
+  slotRolesSplit: lastFoot.slotRolesSplit,
+  /* THE QUANTIZER IDENTITY'S RESIDUALS — the continuous arm's answer to
+     `ringGuardResidual`, and an EQUALITY rather than a bound (footRing's
+     header says why). null under the ringed arm: there is no second law
+     there to agree with, and a claim nothing can make is reported absent. */
+  quantizerResiduals: lastFoot.quantizerResiduals,
+  /* The guard's cross-validation residual (footRing's header): the layered
+     area-rule law measured against the pre-layer expression on every
+     single-layer build. null above one layer, where there is no guard law to
+     compare against — a claim nothing can make is reported absent, never as a
+     passing 0. */
+  ringGuardResidual: lastFoot.guardResidual,
+  /* THE ROLE-GROUPING RESIDUAL - an EQUALITY, not a bound, and footRing()'s
+     header says why: grouping by ROLE preserves the pre-role loop shape,
+     while grouping by SLOT would have moved every 40-petal export by 6 ULP.
+     null once a whorl carries more than one role, which is session B - a
+     claim nothing can make must read as absent, never as a passing 0. */
+  zygoGuardResidual: lastFoot.zygoGuardResidual,
+  petalsBuilt: lastPetalsBuilt,
+  /* WHAT EACH RING'S PETAL WAS ACTUALLY BUILT WITH, read from the builder's
+     own effective state and never from the resolver. This is the only thing
+     in the codebase that can see an override record that never reached the
+     blade - a failure invisible to both STL gates, to the triangle count and
+     to J1-J6 alike. Z2's third clause. */
+  petalRingApplied: lastPetals.map((p) => (p ? { role: p.role, slotRole: p.slotRole, petalRole: p.petalRole, allRole: p.allRole ?? null, slotIndex: p.slotIndex, overridden: p.overridden, applied: p.applied } : null)),
+  layerCount: lastFoot.layerCount,
+  /* THICKNESS TELEMETRY and its guard residual — the properties both STL
+     gates are structurally blind to, for the same reason they are blind to
+     the form layer: thickness is pure vertex offset on a fixed-topology
+     grid, so no edge census moves, and a thinner sheet is still spanned by
+     the hub, so no flood fill splits. */
+  petalThickness: lastPetal ? lastPetal.thickness : null,
+  petalThicknessGuardResidual: lastPetal ? lastPetal.thicknessGuardResidual : null,
+  /* THE ANDROECIUM (session 21) — footRing()'s descriptor (null when absent
+     or under SPHERE), every stamen the builder EMITTED (root axis, surface
+     point, the two root rings, the apex — JS1-JS4's inputs, read from the
+     emission and never from the descriptor alone), the builder's free-end
+     tally and the two distance flags. The descriptor's `dome` is the same
+     object as `hubDome` and is dropped here to keep the hook one owner. */
+  androecium: lastAndroecium ? { ...lastAndroecium, dome: undefined, stamens: lastAndroecium.stamens.map((s) => ({ ...s })) } : null,
+  stamens: lastStamens.map((s) => ({ ...s })),
+  freeEnds: lastFreeEnds,
+  stamenNearest: lastStamenNearest,
+  /* THE GYNOECIUM (session 22) — the third descriptor (null when absent or
+     under SPHERE) and the style the builder EMITTED (root axis, root rings,
+     tip, the three lobes' axes and apexes — JG1-JG4's inputs). `dome`
+     dropped for the same reason as the androecium's. */
+  gynoecium: lastGynoecium ? { ...lastGynoecium, dome: undefined } : null,
+  styles: lastStyles.map((s) => ({ ...s, lobes: s.lobes.map((l) => ({ ...l })) })),
+  /* THE FILAMENT-AGAINST-STYLE RECORD (session 23) — the builder's own
+     nearest approach, threshold and flag; null unless both parts are built.
+     The panel gate reads the STAMENS line's clause against it. */
+  filamentStyle: lastFilamentStyle ? { ...lastFilamentStyle } : null,
+});
+window.__bloomFrame = (radius, lift = 0.15, at = null, dir = null, up = null) => { userMoved = true; fitCamera(radius, lift, at, dir, up); };
+
+/* THE ONLY WRITER of `capability`. Rebuilds synchronously rather than
+   through the rAF coalescer so a caller can read __bloomMetrics back on the
+   next line and get the design it just asked for. Pass null to clear. */
+window.__bloomCapability = (spec) => { capability = spec || null; regenerate(); return capability; };
+/* ST6'S REFERENCE — A STEMLESS BUILD OF THE SAME STATE, made here on the same
+   page and thrown away (session 43). It is the only owner in this file that the
+   stem code does not write at all, which is exactly what Eva's fourth durable
+   rule asks of a clause's expected value: if the hub-to-stem join moved a foot
+   frame, resized the hub or grew UPWARD into the face the feet sit on, this is
+   the only thing that could see it. Not a control, invisible to every gate's
+   whole-state read-back, and called by the gates alone. */
+window.__bloomStemlessHub = () => {
+  const ui = { ...readUI(), stemLength: 0 };
+  const acc = new MeshBuilder({ exportMode: shownMode() === 'export' });
+  const built = buildBloomInto(acc, ui, { below: null, capability });
+  return {
+    hubRadius: built.hub.radius,
+    hubThickness: built.hub.thickness,
+    topFaceZ: built.hubBuilt.topFaceZ,
+    footFrames: footFramesDigest(built),
+    /* ST8's REFERENCE — the same state with no stem, so nothing is omitted and
+       every slot carries a petal. The stem code writes none of this, which is
+       what makes it an owner the omission cannot move: if a surviving petal's
+       foot moved, or the sequence renumbered, or the hub resized, this is the
+       only thing on the page that can say so. */
+    footFramesBySlot: footFramesBySlot(built),
+    petalsBuilt: built.petalsBuilt,
+    slotAzimuths: built.slotAzimuths.map((row) => [...row]),
+    ringCount: built.rings.length,
+  };
+};
+
+/* ---------------- go ---------------- */
+applyVisibility();
+regenerate();
+renderer.setAnimationLoop(() => {
+  if (viewTween) stepViewTween(); else controls.update();
+  renderer.render(scene, camera);
+});

@@ -15,6 +15,13 @@
 <link rel="stylesheet" href="styles.css">
 <link rel="stylesheet" href="flower.css">
 
+<!-- Collapsing the panel is a stated intent, so it persists between loads (P4). Restored
+     here, before first paint, so a returning visitor never sees the panel flash open and
+     snap shut; flower.js owns the toggle from that point on. Private-mode throws. -->
+<script>
+try { if (localStorage.getItem('flowerPanelCollapsed') === '1') document.documentElement.classList.add('fl-collapsed'); } catch (e) {}
+</script>
+
 <!-- Three.js is loaded client-side via an ES-module import map. This is the
      first Three.js page on the site; the map keeps the version in one place. -->
 <script type="importmap">
@@ -32,7 +39,7 @@
 
 <!-- VIEW panel — top-left, mirroring the controls panel on the right. Preset
      camera angles (framed to the current plant) plus the Auto-rotate toggle. -->
-<aside class="fl-viewpanel" aria-label="View controls">
+<aside class="fl-viewpanel" id="viewPanel" aria-label="View controls">
   <div class="fl-eyebrow">View</div>
   <div class="fl-ctrl">
     <select class="fl-select" id="viewPreset" aria-label="Camera preset">
@@ -54,7 +61,10 @@
   <span class="fl-tag">Flower &mdash; unlisted</span>
 </header>
 
-<aside class="fl-panel" aria-label="Bloom controls">
+<aside class="fl-panel" id="controlPanel" aria-label="Bloom controls">
+  <!-- The only scrolling element in the panel. Its scrollbar is styled down to a hairline
+       (P1) and the tick rail beside it carries the section position instead (P2). -->
+  <div class="fl-panel__inner" id="panelScroll">
   <div class="fl-panel__head">
     <div class="fl-eyebrow">Generative &middot; v1</div>
     <h1 class="fl-title">Flower Bloom</h1>
@@ -475,36 +485,6 @@
 
         <div class="fl-ctrl">
           <div class="fl-ctrl__row">
-            <label for="reliefAmp">Surface relief</label>
-            <span class="fl-ctrl__val" data-value="reliefAmp"></span>
-          </div>
-          <input type="range" id="reliefAmp" min="0" max="1" step="0.01" value="0">
-          <span class="fl-ctrl__hint">out-of-plane corrugation: smooth &rarr; plicate/rugose</span>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="reliefFreq">Relief frequency</label>
-            <span class="fl-ctrl__val" data-value="reliefFreq"></span>
-          </div>
-          <input type="range" id="reliefFreq" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">broad pleats &rarr; fine crepe</span>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
-            <label for="reliefMode">Relief pattern</label>
-          </div>
-          <select id="reliefMode">
-            <option value="radial">Radial (ribs from base)</option>
-            <option value="transverse">Transverse</option>
-            <option value="irregular">Irregular (bullate)</option>
-          </select>
-          <span class="fl-ctrl__hint">rib direction (radial follows the vein flow)</span>
-        </div>
-
-        <div class="fl-ctrl">
-          <div class="fl-ctrl__row">
             <label for="petalTwist">Twist</label>
             <span class="fl-ctrl__val" data-value="petalTwist"></span>
           </div>
@@ -921,7 +901,17 @@
           <select class="fl-select" id="tipStyle">
             <option value="clean">CLEAN</option>
             <option value="jagged">TOOTHED</option>
-            <option value="scallop">SCALLOPED</option>
+            <!-- UNLISTED BUT LIVE: the value is reserved and still builds, so a saved
+                 design that chose it keeps rendering exactly as it did. Delisted, not
+                 deleted — removing the element would make applyDesign's `el.value = v`
+                 silently fall back to CLEAN, i.e. a migration nobody asked for. It
+                 returns by dropping hidden/disabled once the empty-lens defect is fixed.
+                 See docs/flower-rim-treatment-registration.md.
+                 (Do not write a literal option tag in a comment inside a select here:
+                 verify-registry-sync.mjs tokenises options with a regex over the raw
+                 markup and matched the one in this comment as a real option. It failed
+                 loudly rather than silently, but it cost a CI cycle.) -->
+            <option value="scallop" disabled hidden>SCALLOPED</option>
             <option value="ruffled">RUFFLED</option>
           </select>
         </div>
@@ -1306,7 +1296,7 @@
             <option value="urn">URN</option>
             <option value="gentle">GENTLE</option>
           </select>
-          <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or a subtle solid swell (with continuous margin on, this becomes a radius multiplier along the receptacle's height)</span>
+          <span class="fl-ctrl__hint">the silhouette &mdash; flared trumpet, round dome, straight taper, waisted urn, or GENTLE, which is the SHORTEST junction rather than the smoothest: same maximum width, roughly half the depth and two thirds the height of the others (with continuous margin on, this shapes the neck's radius along its height)</span>
         </div>
 
         <div class="fl-ctrl">
@@ -1348,7 +1338,7 @@
             <span class="fl-ctrl__val" data-value="blendSmoothness"></span>
           </div>
           <input type="range" id="blendSmoothness" min="0" max="1" step="0.01" value="0.5">
-          <span class="fl-ctrl__hint">hugs each base tightly &rarr; flows smoothly between them</span>
+          <span class="fl-ctrl__hint">hugs each base tightly &rarr; flows smoothly between them &mdash; the fluted receptacle only, so with continuous margin ON (the default) all it still changes is the stem's facet count, and the depth of a GENTLE profile</span>
         </div>
 
         <div class="fl-ctrl">
@@ -1713,7 +1703,25 @@
   <div class="fl-panel__links">
     <a href="flower-saved.html">Saved designs &rarr;</a>
   </div>
+  </div><!-- /.fl-panel__inner -->
 </aside>
+
+<!-- SECTION TICK RAIL (P2) — one tick per panel section, down the right edge, in place of
+     the browser scrollbar. Grey by default, petrol + bold for the section you are in, the
+     same highlight language .fl-acc__head already uses. Ticks are BUILT BY flower.js FROM
+     flower-registry.js's SECTIONS list, never hand-written here: a hand-written copy would
+     drift the first time a section is added, and the registry is already the one place a
+     section is declared. Empty in the markup on purpose. -->
+<nav class="fl-rail" id="sectionRail" aria-label="Panel sections"></nav>
+
+<!-- COLLAPSE ARROWS (P4) — the only thing that survives a collapse. Everything else in the
+     panel chrome, the rail included, is display:none in that state. -->
+<button class="fl-panel__toggle" id="panelToggle" type="button"
+        aria-expanded="true" aria-controls="controlPanel"
+        title="Collapse the controls panel">
+  <span class="fl-panel__toggle-arrows" aria-hidden="true"></span>
+  <span class="fl-sr" id="panelToggleLabel">Collapse the controls panel</span>
+</button>
 
 <!-- SAVE modal — names a design before writing it to the shared gallery. -->
 <div id="saveModal" class="fl-modal" hidden>
@@ -1734,5 +1742,8 @@
 <div class="fl-hint">Drag to orbit <span class="dot">&middot;</span> Scroll to zoom <span class="dot">&middot;</span> Right-drag to pan</div>
 
 <script type="module" src="flower.js"></script>
+<!-- Panel chrome — tick rail, collapse, draggable VIEW box. A separate module from
+     flower.js on purpose: zero geometry, and nothing in flower.js changes for it. -->
+<script type="module" src="flower-chrome.js"></script>
 </body>
 </html>

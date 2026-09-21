@@ -1,0 +1,6300 @@
+# Parametric Bloom — founding charter
+
+*Aug 31, 2026. Successor project to the parametric flower. This doc records the founding
+decisions and how the flower project's learnings map onto the new scope. The
+`flower-project` skill remains the procedural source of truth — this doc states only
+deltas and scope adaptations, deliberately, so the two never drift into stating the same
+rule twice (that drift already bit the flower project once). Once the bloom code exists in
+the repo, the repo's copy of this file is canonical.*
+
+## What this is
+
+A new generator, new codebase, new page: **eva-maskalenko.com/bloom**. The bloom and
+nothing else.
+
+## Scope
+
+In, in build order:
+
+1. **Petal arrangement** — with the petal's *rough* silhouette and its **foot** (where it
+   meets the center) settled early, since the center joins onto the feet.
+2. **Bloom center** — the mass at the heart and how the petals join it.
+3. **Petal shape** — the detailed silhouette work.
+
+Explicitly out, for now: petal infill, stem, leaves, sepals, base ornament, edge
+treatments, per-slot overrides.
+
+## Founding decisions (Eva, Aug 31)
+
+- **Fresh codebase; port the machinery, not the geometry.** The registry-as-single-source
+  pattern, the connectedness voxel gate, the export gate (`boundary === 0`), the
+  harness read-back assertion, and CI come over from day one. No geometry code is copied
+  blindly — the flower repo carries known open defects (#87, #93, #97, #98, GROWTH export
+  non-reproducibility) and none of them should immigrate.
+- **Sequencing:** arrangement first with the rough silhouette and foot fixed early; the
+  center is tuned against the real foot, not a placeholder; detail shape work third.
+  Center-first was considered and rejected: a center can't be judged in isolation, and
+  its mass *derives* from what feeds it (area rule) — designing it first inverts its own
+  sizing rule. The part of center-first that survives: the **foot ring gets its single
+  owner in phase 1**, before either consumer exists.
+- **Petals are thin solid sheets** until infill work begins. Watertight by construction,
+  with a thickness floor. Infill later replaces the interior without changing the outline
+  or the foot.
+
+## The invariant, adapted
+
+**The model is always ONE connected watertight solid.** With no stem and no sepals, that
+means: every petal connects to the center, always, at every slider position. There is
+never a state where a petal is a separate body — including in phase 1, before the
+designed center exists: a minimal derived junction joins the feet from the first commit.
+
+What changes from the flower project:
+
+- **The junction is petal-feet-into-center now.** Same doctrine as flower PR #86/#102:
+  unconditional, derived from what's present, never a control, as quiet as possible.
+  The petal's own material continues into the center — no lathe, no loft, no skin of
+  revolution (all three were built, measured, and rejected on sight in the flower).
+- **Junction ≠ center ornament.** The flower's junction/base-ornament split recurs here
+  one level up: the invisible plumbing that makes it one piece is a different thing from
+  the *designed, visible* center (disc, dome, boss — whatever phase 2 decides it is).
+  Conflating them cost the flower project several cycles.
+- **`below: null` is the only state** for now — but keep the `below` parameter shape
+  (`'stem' | 'branch' | null`, never a boolean) so a stem later is a value, not a rewrite.
+- **Gate coverage starts where the flower's gate was blind** — and a DEFAULT IS NOT
+  COVERAGE. The bare bloom was the shipping default for phases 1–3, so it was exercised
+  by the default row and the whole arrangement sweep for free. The archetype ruling made
+  DISC the default and deleted that coverage in one character: NONE went from "most rows"
+  to zero. It now has EXPLICIT rows — its own named spread sweep and the two pinned
+  "(centre off)" corners — because the flower shipped a 7-piece bare bloom for months
+  precisely because every gate row enabled the thing that hid the defect. Whenever a
+  default moves, check what it stopped covering.
+- Sheets change the failure modes: fewer free-wire hazards, more thin-wall ones. The
+  connectedness gate still can't see a free end — carry that limitation forward in its
+  header.
+- **Overlapping closed solids are THE CONSTRUCTION, not an accident — and petals already
+  interpenetrate their neighbours at every setting that ships (measured Aug 31).** This is
+  recorded so a later session finds it here instead of discovering it and filing it as a
+  defect. Half the angular gap between adjacent petals at the foot ring is 4.69 mm at
+  petalCount 3 and 1.55 mm at petalCount 40, against a default petal half-width of
+  8.00 mm — so blades overlap at the ring in **every** reachable arrangement, flat, with no
+  form applied. That is fine and it is deliberate: every primitive is an individually
+  closed solid, the slicer unions them, and interpenetration adds no boundary edges and can
+  only ever read as MORE connected, never less. The consequence for form work is that
+  bending a blade toward a neighbour, toward the hub, or into the designed centre changes
+  nothing about either gate's verdict — spine curl at 180° or more sweeps the blade back
+  inside the hub rim and reaches r = 0.92 mm at 360°, and that is a shape decision, not a
+  hazard. What is NOT covered by this: a single petal self-intersecting, which is a
+  different property with its own guard (the roll curvature floor) and is invisible to both
+  gates.
+
+- **A coincident face reads as connected, and that bounds what this gate can endorse
+  (measured Aug 31).** The cleft's panel overlap was expected to be the thing holding
+  the lobes on; dropping it to zero left the panels sharing one cross-section exactly
+  and the gate still reported ONE piece — correctly, per its own "two solids that
+  merely graze within one cell read as connected" limit. Only a real gap (lobes
+  starting a row ABOVE the base) turned it red, at five components with boundary edges
+  still zero. So the gate distinguishes touching from separated, NOT overlapping from
+  touching; any preference for real shared volume over a coincident touch is a
+  slicer-robustness argument, and like every structural argument in this project family
+  it is untested until something prints.
+
+## Carried over wholesale (see the flower-project skill for full text)
+
+- **Verification:** numbers, not summaries. A gate must measure the property that can
+  fail, in both directions. Harnesses read back what they set (this caught 73/185 configs
+  measuring the wrong design) and assert their own validity with a hard abort, verified
+  by positive controls that can actually observe the failure. Gates run in CI. xfail rows
+  cite issues and fail loud when they start passing. Run the same tree twice before
+  concluding a config moved. Envelope deltas are meaningless for interior-aesthetic work —
+  use triangle deltas or fixed-camera pixel diffs, chrome hidden, no autoRotate.
+- **A TOOL THAT CANNOT DO ITS JOB REFUSES; IT NEVER SKIPS AND REPORTS SUCCESS ON WHAT
+  REMAINS** (Eva, Sep 6, session 20 — a verification convention, ruled from the close that
+  proved it). A read-back that cannot honour a row, a capture that cannot serve a tree, a
+  compare that cannot pair a label: each ABORTS the run and names the row, never drops it
+  and prints PASS over the survivors. The case: session 20's harness validated every
+  base-tree row against the HEAD's registry and REFUSED the 509 rows naming a retired
+  control, so the captures could not be made at all until `kindsOf(root)` existed — loud,
+  and the reason the bug was found the same hour. A skipping version would have compared
+  the 18 NONE rows of 527, reported 18/18 bit-identical, and the retirement's whole claim
+  would have rested on the rows the retirement did not touch. Corollary for anyone writing
+  a `--only`, a filter or a catch: what was NOT run is printed with the count, matrix-level
+  claims are not made on a filtered run (session 18's rule), and a vacuity guard
+  (session 20's V1–V5) is owed wherever a comparison can pass by comparing nothing.
+- **Registration rule:** every boundary has exactly one definition; one owner, everyone
+  else reads it. Check producers as well as consumers, and filters as well as boundaries
+  (the E3 defect was one producer, two consumers, different filters). Registry predicates
+  are evaluated, never merely named. Applies at option granularity. Prefer a never-true
+  predicate with a `hiddenReason` over a boolean flag.
+- **Registry:** one registry drives DOM, inputs, defaults, reset, labels, listeners,
+  gating, and option tiers. `enabledWhen` gates dependents on the choice that enables
+  them (the Lace pattern — Eva's panel ruling). Tier is an input, never a filter.
+  Standard is a curated view; edited via Advanced it shows CUSTOM. Shipped means
+  reachable. Geometry and silhouette controls are Standard, not Advanced.
+- **Conventions:** discovery before writing. New controls default to current behavior,
+  verified by byte diff; anything else gets a schema bump and migration. A migration pin
+  protects an aesthetic choice, not a defect. Prompt premises are hypotheses — check them;
+  instructions bind. One registry PR in flight at a time (squash conflicts are not
+  resolvable by preference). Contact sheet before committing anything visual. Batch
+  questions.
+- **Aesthetics:** loudness budget (~2.0 total, one element ≥0.7). Hierarchy at a measured
+  step-down ratio (~0.6). Generated by the shape, never clipped to it. Derive, don't
+  expose. Cap the output (measure triangles and refuse), never an input proxy — the
+  parameter space has genuine cliffs.
+- **Vocabulary:** the four curve terms — cross-section roll, spine curl, petal cup,
+  twist — govern the petal-shape phase directly. Never accept "curly" without asking
+  which one.
+- **Arrangement facts worth having on day one:** ~~phyllotaxis reads as intentional only
+  above roughly n≥8 — gate or flag golden-angle placement at low counts.~~ **CORRECTED
+  Sep 1, when the arrangement was built: the aesthetic claim stands, "gate or flag" does
+  not, and there is no threshold to gate on.** The obvious statistic — the ratio of the
+  largest angular gap to the smallest — was measured across the whole count range and
+  OSCILLATES between 1.62 and 2.62 at *every* n, driven by which Fibonacci number the
+  count sits between: n=3 → 1.62, n=4 → 2.62, n=5 → 1.62, n=6,7 → 2.62, **n=8 → 1.62**,
+  n=13,21 → 1.62, n=40 → 2.62. It is scale-free. There is no discontinuity at 8 or
+  anywhere else, so a gate would have to invent its boundary. The claim that low-count
+  golden angle reads as an irregular whorl rather than as phyllotaxis is REAL and it is
+  AESTHETIC, so it ships as a **labelled read-out flag**, asserted in both directions by
+  the panel gate (present when it should be, ABSENT when it should not — a flag only ever
+  checked present is a flag that can be stuck on). Gating was rejected on two further
+  grounds, recorded so it is not re-proposed: hiding the option strands the model IN the
+  spiral state with the control unreachable ("shipped means reachable", violated for the
+  state the model is in), and auto-resetting to RADIAL moves geometry as a side effect of
+  a hidden rule. Same discipline as the roll clamp's "(clamped)" and the print-truth
+  line. The sub-8 state is on `tools/shot-bloom-arrangement.mjs`'s placement sheet beside
+  the same count in RADIAL, so the aesthetic claim gets ruled on from a picture.
+  Arrangement is a whorl — `(count, radius, height, sizeRamp, angleRamp, phase, blade)` —
+  and building it as that primitive from the start makes sepals, epicalyx, and involucre
+  free later instead of a refactor (the flower learned this the expensive way, as a
+  position paper it never got to build). **That prediction paid out in full: layers
+  needed NOTHING new in the primitive — every per-layer quantity is one of its existing
+  arguments.**
+
+## Deliberately left behind
+
+- **Relief / rib jitter** — retired in the flower for good reasons (the stated rationale
+  was wrong; the deletion stood on better grounds). Do not rebuild it here.
+- **The edge-treatment machinery** (TOOTHED/SCALLOPED and their defects) — edge is a
+  later layer; only its *lesson* (one owner for "is this station covered") comes over.
+- **All open flower defects** — they stay in the flower's tracker. Nothing here inherits
+  a quarantine or a defect claim without re-verifying it; a defect report is a claim with
+  an expiry date.
+
+## Standing gaps that follow the project family
+
+**Nothing in either project has ever been printed.** Every thickness floor and
+slenderness argument is theory. The coupon plan (cantilevers at stepped diameters and
+free lengths) still converts guesses into measurements the first time anything goes to a
+printer — and sheet petals add a min-wall coupon to that list.
+
+**Aug 31: a floor is now CAPPING something Eva asked for by eye, and that changes what the
+coupon is worth.** Until the thickness layer every floor was a guess that never bound —
+`SHEET_THICKNESS_MM` sat above `MIN_FEATURE_MM`, so nothing was ever clamped and the
+assumptions cost nothing. Eva ruled the petal tip too thick; **while the 1.0 mm
+minimum-feature assumption stands, the PRINTED tip can only thin from 1.20 mm to 1.00 mm —
+17% — however far the slider goes.** The live view shows the full authored thinning and the
+print will not have it. Real printed tip delicacy needs either a thicker base sheet
+(2.40 mm tapering to 1.00 mm is a genuine 2.4:1 wedge, and it ships) or a coupon showing
+1.0 mm is conservative.
+
+Five numbers in this family are now load-bearing guesses that a single coupon print would
+turn into measurements — and since the tip ruling, `TIP_HALF_MM` is no longer merely
+reported: it is the floor that decides how pointed the PRINTED tip can be, on a shape Eva
+ruled by eye. `MIN_FEATURE_MM` 1.0 (which caps the tip's thickness and the foot),
+`FOOT_MIN_WIDTH_MM` 1.6 (the most delicate reachable connection), `TIP_CAP_HALF_MM` 0.15 (a
+mesh floor, not a print one) and `ROLL_MIN_RADIUS_FACTOR` 1.0 (one sheet thickness, and it
+now moves with the sheet).
+
+**`TIP_HALF_MM` 0.8 CHANGED STATUS on Sep 1 and belongs at the top of that list.** For four
+sessions it was a quiet constant that blunted a tip nobody had ruled on. It is now the number
+that DECIDES HOW POINTED THE PRINTED TIP CAN BE, on a shape Eva ruled by eye and approved
+from a picture: live converges to a 0.30 mm terminal face and the print floors it at 1.60 mm,
+so the tip she approved is finer than the tip that would come out of a machine. **It has
+never been verified by a printer.** That is the sharpest form the standing gap has taken —
+an aesthetic decision, made on evidence, whose realisation is capped by a guess. A
+coupon print is cheap, converts all four at once, and would retroactively improve every
+clamp the thickness layer ships. It is the strongest candidate for the next session — a
+better one than arrangement, which can be designed against assumptions but cannot resolve
+any of them.
+
+## Rulings to park for phase boundaries
+
+- **SCHEDULED FIX — `frozen/phase19` AND `frozen/phase20` CAN NO LONGER BE
+  BYTE-RE-EXPORTED FROM `main` AT ALL** (found session 32, Eva ruled it recorded rather
+  than acted on). Both were frozen BEFORE session 31 retired `antherSharpness` /
+  `stigmaSharpness`, so every row of theirs that names one is refused by design
+  (`config did not take: antherSharpness: not in the DOM`) and a plain capture from any
+  later tree collects nothing for it. Session 31 could close on phase20 because it WAS
+  that retirement and could pin the ids with `--override`; **nobody after it can**.
+  `--verify-frozen` is unaffected — it deep-compares row DEFINITIONS and still proves
+  every matrix on every push; what is gone is the byte half.
+  **THE FIX, when it is scheduled:** add a VALUE MAP for the retired ids to those two
+  matrices, using session 31's own rename-with-value-map construction (`--override`
+  taking a list, the INERT class predeclared, V3 requiring exactly the retired ids the
+  matrix names, V5 one frozen matrix for all three captures) — the ids resolve to their
+  replacements' images rather than being refused. Until then the replayable baseline is
+  the newest matrix that names no retired id, and a session that needs one **must check
+  that before choosing a baseline** rather than reaching for the newest.
+  **THE GENERAL REMEDY, recorded and not built:** freeze a phase at every retirement, so
+  a replayable baseline newer than the last retired id always exists.
+  **Session 32 hit this and worked around it** by freezing `frozen/phase21` (the 572 rows
+  at `b323268`) as its baseline — which it owed anyway, and which is fully replayable on
+  the tree it was frozen from. That is the pattern, not a one-off.
+
+- **THE A/B CENTRE RIG BELOW IS RETIRED (session 20, Sep 5) — see the session-20 entry at the
+  end of this document. Both archetype entries are kept as written, because the reversal has
+  to be legible: DISC was ruled the default on Aug 31 against real petals, and on Sep 5 Eva
+  ruled that DISC and DOME were placeholders doing two jobs that belong elsewhere and RING
+  was a torus standing in for a corona.**
+
+- ~~Phase 2 entry: what *is* the bloom center, visually?~~ **Built as an A/B rig, Aug 31;
+  the ruling itself is still open.** Eva's ruling at phase-2 entry was that the question is
+  not answered by argument: three archetypes ship behind one `centerStyle` choice —
+  DOME (rounded boss), DISC (flat/dished button), RING (open torus collar) — plus NONE,
+  which remained the default until she ruled from the contact sheet. **She has: DISC,
+  Aug 31, after the form phase — see the archetype entry below.** The centre is DESIGNED and user-chosen;
+  the junction stays derived and control-free beneath it, and the registry's `role` field
+  now carries that split (`center` vs. the deliberate absence of any `junction` row).
+
+- ~~The archetype ruling itself — DEFERRED until after the petal-shape phase~~
+  **SETTLED Aug 31, after the form phase: DISC is the shipping default.** The deferral
+  did exactly the job it was parked for, and BOTH halves are recorded here so the
+  reversal is legible rather than mysterious:
+
+    - **What session 2 said, and why it was right to wait.** `centerStyle` stayed NONE,
+      nothing was deleted, no style promoted — on a finding from the sheet rather than
+      indecision: the petals were still placeholder ovate sheets, and a dome or a ring
+      should be ruled on against the real silhouettes it will sit among, not against
+      stand-ins. That note also observed the four styles were **"visually
+      indistinguishable"** at the spreads then in use, and that observation was true of
+      what it was looking at.
+    - **What supersedes it.** Ruled against petals with REAL FORM — cup, spine curl,
+      cross-section roll and twist all reachable — the styles are no longer
+      undifferentiated, and DISC is the one that reads. The session-2 "least
+      differentiated" observation is therefore SUPERSEDED, not contradicted: it was a
+      measurement of the archetypes against flat placeholder blades, and the thing it
+      measured no longer exists. A reader who finds only the newer note and wonders why
+      an earlier session called these interchangeable has the answer here.
+
+  Sub-control defaults are UNCHANGED. This is the deliberate SECOND EVENT under the
+  spread precedent: the rig landed byte-identical in phase 2, and the default moves now,
+  as a design ruling, on evidence — which is expected to move exports and did, with the
+  partition asserted both ways below.
+
+- **Spread default 1.00 → 2.00 — settled Aug 31, on evidence from the same sheet.** At
+  1.00 the foot ring is 4.42 mm against a 35 mm petal and eight 6.4 mm feet tile straight
+  over it, so *any* centre is buried under the petal bases; below roughly 2× the four
+  styles are visually indistinguishable. A default that hides the thing the panel just
+  exposed is the wrong default. Recorded as two separate events, deliberately: the control
+  LANDED at 1.00 with every pre-existing export bit-identical (0 of 47 moved — the
+  new-control convention, satisfied), and the default THEN moved as a design ruling, which
+  is expected to move exports and did: exactly the 57 of 76 matrix rows that inherit the
+  default, with all 19 that pin `spread` bit-identical. No schema bump or migration: the
+  bloom persists no designs yet, so no saved value can be misread.
+- ~~Foot ownership~~ **Settled Aug 31:** the foot ring — where feet land, and the foot
+  cross-section — gets one named owner function in **phase 1**; the petal builder and the
+  phase-2 center builder both read it. No second definition, ever.
+- ~~Phase 3 entry: which of the flower's six absences the petal model should avoid
+  inheriting~~ **Settled Aug 31: BOTH, architected from day one, neither shipped.**
+  The placeholder ovate is replaced by a width PROFILE over a trimmable DOMAIN.
+  Width is a term list with per-term domains combined by plain `Math.max` (Eva's
+  ruling: one combinator, trivially bit-exact; the worst reachable kink is
+  photographed rather than pre-engineered away). The boundary is a list of spans per
+  row, meshed as single-span PANELS, so a cleft is a base panel plus two lobe panels
+  rather than one grid with a hole — closed by construction instead of by argument
+  about the sinus.
+
+  **Neither claw nor cleft is a control, and both are PROVEN rather than claimed.**
+  Two non-shipping capability rows, reachable only through `window.__bloomCapability`
+  (no registry row, no DOM input), run in both gates: CLAW asserts a strict interior
+  local minimum in the row half-widths — narrower than both its foot and its blade —
+  and CLEFT asserts two spans at the tip. Both export watertight and as ONE connected
+  piece, so no xfail was needed. The structural assertions read the app's own
+  profile/trim evaluation, not the STL; that scope is printed beside each capability
+  row's result, not only in a header.
+
+  **Shipped: three Standard controls, all `role: 'petal'`** — Base taper and Tip taper
+  (the CORE term's exponents, defaults exactly the placeholder's 1.0 and 1.8) and Tip
+  breadth (default exactly 0). The widest point `a/(a+b)` is DERIVED and printed in
+  Tip taper's read-out; a control for it would be a second owner. Tip breadth exists
+  for a measured reason: `w(0) = w(1) = 0` for every `a,b > 0`, so the exponent family
+  is pinched to a point at BOTH ends and cannot reach a truncate or rounded tip — the
+  placeholder's tip was never a shape, it was the 0.8 mm blunt-tip floor governing the
+  last 4 of 28 blade rows.
+
+  **The engine landed BYTE-IDENTICAL: 0 of 76 configs moved** on `phase2Matrix()`, the
+  76 rows frozen at 21d4602 (proved deep-equal to that commit's own `buildMatrix()`
+  rather than transcribed and hoped for). The three controls add ZERO triangles at
+  every shipped setting — the grid stays 31x10 — so the default bloom is 10,080 tris
+  live and export alike, unchanged.
+
+  **The foot is untouched, and it is MEASURED, not asserted.**
+  `diff-bloom-bytes.mjs --region foot` hashes the export triangles all of whose
+  vertices lie in the hub slab (|z| <= t/2), which at any tilt > 0 is exactly the foot
+  rows plus the hub disc: bit-identical on all 71 in-scope rows. The 5 rows at
+  petalTilt 0 are reported OUT OF SCOPE — with no tilt the blade lies in the same
+  plane and the criterion cannot separate them — never as passes.
+
+- ~~The default silhouette — open, and deliberately separated from the engine~~
+  **Settled Aug 31 from the candidate sheet: the POINTED OVATE STAYS.** Eva ruled
+  against both candidates; no close-out commit was made and no default moved. So the
+  silhouette engine landed as ONE event, not two: the engine is byte-identical (0 of 76)
+  and the shipping default is the value the placeholder had.
+
+  This is a decision, NOT an absence of one, and the difference matters to whoever picks
+  this up next. ROSE-ish and POPPY-ish were built, rendered face-on beside the ovate with
+  their control values in the cell, and rejected on sight. They remain as named rows in
+  the gate matrix and as cells on `tools/shot-bloom-silhouette.mjs`'s candidate sheet —
+  they are gate coverage of the region the controls are FOR, and they must not be deleted
+  as "unused presets". Reopening the default is a fresh ruling needing fresh evidence;
+  do not treat the ovate as a placeholder still awaiting replacement, because it is not
+  one any more. Were the default ever to move, it would still be its own event with a
+  partition report — the spread precedent — since every export inheriting it moves.
+
+- ~~The max-combinator kink — a hypothesis on the sheet~~ **Settled Aug 31: PLAIN
+  `Math.max` STAYS, and the kink reads fine.** Eva ruled from the tip-cropped sheet, at
+  the worst case the shipped ranges reach (tip breadth 0.60 against the steepest falling
+  core, 60 mm petals). No p-norm blend is queued and none should be written.
+
+  The saving is the point, and it is the reason this was photographed rather than
+  engineered around: a smooth blend would have needed term-count switching to stay
+  bit-exact, plus an epsilon story about the moment a term appears — complexity bought
+  against a corner nobody could object to once they saw it. ONE combinator now governs
+  the shape terms and the floors alike, which is also what makes the byte argument short
+  enough to check by eye. Do not reopen this on the strength of reading the code and
+  imagining the corner; the picture exists, and a fresh ruling needs a fresh picture.
+- ~~Phase 3, the petal's 3D form: the four curves~~ **Built Aug 31, all four shipped, all
+  flat by default.** `petalCup`, `petalSpineCurl`, `petalRoll` and `petalTwist` — Standard,
+  `role: 'petal'`, signed, defaulting to exactly 0. Ordering is not free and the argument is
+  in `petalForm`'s header: curl builds the centreline and base frame, twist rotates that
+  frame about the curled length direction, roll maps the width to an arc in the resulting
+  plane, cup lifts along that plane's normal. Curl before twist because curl's bend axis IS
+  the width direction — twisting first would make the spine writhe into a helix instead of
+  curling in a plane.
+
+  **Petal tilt is not spine curl, and the code says so in one line:** `phi(u) = petalTilt +
+  curl*u`. Tilt is the CONSTANT OF INTEGRATION (the frame at u = 0, zero derivative, the
+  whole blade rotating rigidly); curl is the RATE. They rotate about the same axis, which is
+  exactly why they get conflated, and being the two terms of one affine angle function is
+  what makes them unambiguous. Curl's read-out prints the DERIVED spine radius; tilt has
+  none, because a rigid rotation has none.
+
+  **Byte-identity is a GUARD, not an IEEE-754 argument, and that was a deliberate
+  downgrade.** Cup would have survived one and twist very nearly would; roll and curl carry
+  a `1/kappa` that is a genuine 0/0 limit at zero and could not. Resting the whole layer on
+  a case analysis about signed zero (`T` is `-0` in its first component at azimuth 0, and
+  `-0 + 0` is `+0`) was the wrong trade, so `petalFormIsFlat()` short-circuits to the
+  pre-form expression verbatim. The guard is not allowed to be somewhere a bug sits
+  unexercised: `formGuardResidual` evaluates the ZERO-form law against the flat law at every
+  emitted point and frame, and both gates assert it. It measures **exactly 0**.
+
+- **BOTH SHIPPED GATES ARE STRUCTURALLY BLIND TO PURE DISPLACEMENT (derived and confirmed,
+  Aug 31), which is why the form layer had to ship its own instrument.** The export gate's
+  criterion is boundary edges on a mesh whose topology is fixed — `NU`, `NV` and the panel
+  count depend on no form control — and displacement cannot change an edge census. The
+  connectedness gate cannot fire either: the foot is never written by the form layer and the
+  hub disc spans it, so no reachable curl / cup / roll / twist detaches a petal. The
+  tempting positive controls were checked and rejected for exactly this reason — a roll
+  radius below t/2 self-intersects while staying watertight and one piece; interpenetration
+  is not a failure at all and only helps connectedness; a skewed sheet leaves topology
+  untouched. So `formAssertions()` runs in BOTH gates on EVERY row and asserts what the STL
+  cannot show: foot invariance in exact arithmetic, roll isometry, the curvature floor, and
+  the guard residual. **And a frozen matrix cannot substitute for it:**
+  `--region foot` proves whatever its matrix exercises, and every row of a frozen matrix
+  sits at the defaults of every later control — which for the form layer is exactly flat.
+  A mutant that deforms the feet on purpose reads `81/81 BIT-IDENTICAL` on the frozen 86
+  and `21 of 98 moved` on the live 103. "The foot did not move at defaults" and "the foot
+  is invariant under form" are two claims, and only the second is the invariant. **Do not read a green export or connectedness run as endorsing any
+  form property.**
+
+- **The roll curvature floor — cap the output, never the input.** A rolled sheet's inner
+  offset surface sits at `radius - t/2` and INVERTS below that. At `petalWidth` 8 a full turn
+  asks for a 0.637 mm radius against a 0.6 mm half-thickness. The floor is one full sheet
+  thickness, applied inside `petalForm` and nowhere else, and the control SATURATES rather
+  than degenerating; the read-out says "(clamped)" so a slider that has stopped moving does
+  not read as broken. Like every structural number in this project family this is an
+  assumption with a number attached, not a printed result.
+
+- **Roll is isometric here too — but the flower's premise needed restating before it could
+  be checked, and that restatement is the finding.** "|dP/dv| = 1" is a statement about a
+  UNIT-SPEED cross-width parameter. This model's `v` is normalised and scaled by the row
+  half-width, so the FLAT sheet already has `|dP/dv| = h(u)`, ranging 0.8–8.0 mm. The
+  comparable quantity is the RATIO to flat, which is what the flower's numbers actually are.
+  Measured on this model: roll holds the ratio at **1.000000 at every sample and every
+  value**; cup is the only one of the four that moves it, at **1.0925 at 0.22 and 1.7532 at
+  0.72** — reproducing the flower's 1.09 and 1.75 to three decimals, which is independent
+  confirmation that the same parabolic law transfers. At the shipped maximum of 1.20 it is
+  **2.600**: kept (Eva, Aug 31) and photographed, because the closed tulip is a real form and
+  the flower's 0.72 was a range choice rather than a safety rule.
+
+- **The emitted polyline is not the curve, and no other gate here can see the difference.**
+  Roll is isometric as a MAP and NOT as emitted geometry: the panel emits `NV = 10` columns,
+  so the cross-section is a 9-segment chord path inscribed in the arc and carries up to
+  **7.9% less material** than the flat row at maximum roll (0.9207 at the widest row, 0.9992
+  at the tip). `NV` stays 10 (Eva, Aug 31): constant topology is what makes the form layer
+  cost exactly zero triangles, and the faceting is photographed with the measured ratio
+  printed in the cell rather than bought with triangles. Raising `NV` under roll is later,
+  separately-evidenced work with its own triangle-count story — it would also be the first
+  thing in this codebase to make triangle count depend on a slider. Do not start it on the
+  strength of this note alone.
+
+- **The export feature-size floor cannot move TRIANGLE COUNTS here — but it now moves
+  GEOMETRY, and the half of this note that said otherwise has EXPIRED (rewritten Aug 31,
+  the thickness layer).** The flower measured a pure-displacement effect changing export
+  counts because its floor is evaluated per feature and displacement moved features across
+  it, adding or removing tube segments. **The surviving reason** that cannot happen in the
+  bloom: every primitive is a fixed-topology grid — `NU`, `NV`, the panel count and every
+  centre segment count depend on no control — so the floor changes geometry but never
+  triangle count. Re-measured across the thickness layer's own 120-row matrix, ALL-THIN
+  corners included: **delta 0 on every row, live against export.**
+
+  **The EXPIRED half, recorded rather than deleted.** This note also said
+  `SHEET_THICKNESS_MM` (1.2) is above `MIN_FEATURE_MM` (1.0) so `floorThickness` never
+  binds, and concluded "if live and export ever disagree on a bloom row, it is a bug, not
+  the floor". That was true of the CONSTANTS and is false of the CONTROLS: `sheetThickness`
+  reaches 0.60 mm, and the tip gradient crosses the floor from thinning 0.17 upward at the
+  shipping 1.20 mm sheet. Live and export geometry now legitimately differ. Session 4 called
+  this "a property of the constants, not a rule" and was exactly right; the claim expired
+  where it said it would.
+
+  **The divergence is not confined to a wall, which is the part to carry forward.**
+  `footRing()`'s area rule reads the thickness the solids are ACTUALLY built at, so flooring
+  the sheet moves the RING RADIUS: at a 0.60 mm sheet the ring is 6.25 mm live against
+  8.07 mm printed — a 29% difference in the whole arrangement, not a wall. **Eva's ruling
+  (Aug 31): no geometry change in either mode** — the one-owner rule is doing exactly what
+  footRing()'s header says it should, and live mode stays authoring-true — **but the
+  divergence must be TOLD.** The read-out prints both radii, labelled, whenever they differ,
+  on the same discipline the triangle counts have carried since the counts stopped being
+  convertible; and the state has its own cell on `tools/shot-bloom-thickness.mjs`'s
+  divergence sheet.
+
+- ~~**PARKED, and deliberately not built: a "print preview" toggle**~~ **BUILT Sep 3
+  (Eva's ruling: the parking is spent at three-figure petal counts) — see the session-13
+  entry at the end of this document. The parking note is kept below as written.** It
+  proposed rendering the export-floored geometry live. The reasoning that parks it is the same reasoning that
+  would eventually build it: a preview that silently shows an arrangement the print will not
+  produce is the same lie as an unlabelled triangle count — a labelled one is honest, and a
+  second, rendered one would be better still. It is a second rendering path with its own
+  camera, read-out and gate story, and the labelling is what makes today's state honest
+  without it. Do not start it on the strength of this note alone.
+
+- **The form sheet — RULED Aug 31, all three questions closed.** The teaching sheet
+  holds: swept alone, each in the view its own curve is visible in, the four read as
+  four different things and the controls ship as authored. Both extreme cells are
+  ACCEPTED as shipped extremes rather than tolerated defects, photographed and numbered:
+
+    - **Max-roll faceting stays, and `NV` stays 10.** The emitted cross-section is a
+      9-segment chord path inscribed in the arc and carries up to 7.9% less material
+      than the flat row (0.9207 at the widest row, 0.9992 at the tip). Constant topology
+      is what makes the whole form layer cost exactly zero triangles, and that is worth
+      more than the facets cost. **NO NV-under-roll work is queued and none should be
+      written.** Reopening needs FRESH EVIDENCE — a new picture, not a fresh reading of
+      this number.
+    - **The ROLL CLAMP look stays.** The only reachable state where the curvature floor
+      binds (roll max × petalWidth 8, radius held at 1.20 mm, printed "(clamped)").
+      Saturating is the intended behaviour, not a bug to design around.
+
+  Both cells are on `tools/shot-bloom-form.mjs`'s sheets with their measured numbers in
+  the caption. Same standing as the max-combinator kink: the ruling was made on a
+  picture, and a fresh ruling needs a fresh picture.
+
+- ~~The thickness layer — a single constant everywhere~~ **BUILT Aug 31, on Eva's ruling
+  from the live page: the petal-to-centre connection is too thick, and the petal tip is too
+  thick.** Both were one absence: `SHEET_THICKNESS_MM` was read at both call sites, so foot,
+  blade and tip were the same number by construction and neither complaint had a slider.
+
+  **Three Standard controls, all `role: 'petal'`, all byte-identical at their defaults:**
+  `sheetThickness` (0.60–2.40 mm, default 1.20 — the double the constant held, asserted
+  equal to it at harness load so the two cannot drift), `tipThinning` (0–0.80, default 0 —
+  the law `base * (1 - thin*u)` is `base * 1` is `base`), and `footDelicacy` (0.25–1.00,
+  default 1.00 — `x * 1.0 === x`, the spread precedent). Zero triangles at every setting:
+  the default bloom is 11,136 tris live and export alike, unchanged.
+
+  **Delicacy scales the foot's WIDTH, and the argument is a measurement.** A
+  thickness-scaling delicacy is INERT IN EXPORT below 0.833 at the default sheet — the
+  1.0 mm floor eats 83% of its range — so it would move the live page and nothing that
+  prints. Width survives the floor across its whole range, and because the area rule reads
+  it, the ring and the hub plate close with the foot. It is NOT the claw: the claw is a
+  silhouette term producing a strict interior local minimum; this scales the foot and
+  everything that reads it, monotonically, so Eva's rounded/ovate ruling stands untouched.
+
+  **`footRing()` remains the sole owner and gained no second copy.** The new controls FEED
+  it; `buildPetalInto` now READS `ring.thickness` instead of computing its own
+  `floorThickness()` of the same constant (a harmless second producer until thickness became
+  a control). The junction still derives everything from the petal's foot — the hub slab is
+  built at `ring.thickness`, so a delicate foot gives a thin hub with no code mentioning
+  either control.
+
+  **Foot invariance is STRUCTURAL, not guarded.** The profile is evaluated at the row's own
+  `u`, and the three foot rows carry `u = 0`, so `1 - thin*0` is exactly 1 at every thinning
+  value. Using the row INDEX instead is a one-character bug that moves the junction, and it
+  is this session's positive control — invisible to both STL gates and to every frozen
+  matrix, caught only by the reworked foot assertion.
+
+- **The foot–hub overlap at minimum foot dimensions — re-derived Aug 31, still holds by
+  construction.** The overlap is a solid box: radial depth `overhang = max(1.5, 0.4·r)`,
+  circumferential extent `ring.width`, vertical extent `min(footT, hubT)` — and those two
+  are EQUAL by construction, since the hub is built at `ring.thickness`. At the worst
+  reachable corner every dimension is bounded below independently of the new controls:
+  **≥ 1.5 mm × ≥ 1.6 mm × ≥ 1.0 mm** (the export floor), every edge above the 0.6 mm voxel.
+  Delicacy shrinks the radius, but `overhang` is a FRACTION of it with a 1.5 mm absolute
+  floor, so it cannot shrink proportionally away. The ALL-THIN corner rows were added
+  anyway, in both gates: a default is not coverage, by-construction is an argument rather
+  than a measurement, and the thin extreme is precisely the region this change affects.
+
+- ~~The tip's squared-off end~~ **RULED Sep 1, from the tip sheet: THE TIP COMES TO A
+  POINT — and the CONSTRUCTION was approved by eye on the before/after sheet, not only the
+  intent.** What Eva approved is specifically: the DERIVED cap entry, the TRUNCATED MINI-FACE
+  apex, and the partition on `petalTipBreadth === 0`. Three sheets' worth of alternatives
+  were not on the table — this is the shape that was seen and accepted, so reopening any of
+  the three is a fresh ruling needing a fresh picture, on the max-combinator precedent. The squared end was never the profile. `TIP_HALF_MM` floored EVERY row in BOTH
+  modes, so at the shipping defaults four of the 28 blade rows — profile 0.795, 0.398,
+  0.119, 0.000 — all clamped to 0.800 and ran PARALLEL, and a flat face square to the blade
+  capped that stub. The exponent family already reaches zero; the floor truncated it and
+  then capped the truncation.
+
+  **THE POINTED FAMILY ONLY, and that is what makes the partition sharp.**
+  `petalTipBreadth === 0` converges; above zero the flat end is an AUTHORED TRUNCATE (rose,
+  poppy) and is untouched. Measured both ways on the 125-row live matrix: **117 rows have
+  breadth 0 and all 117 moved; 8 do not and all 8 are bit-identical.** This needed a new
+  instrument — `--partition-value` — because "pins the control" and "resolves to this value"
+  are different axes and they disagree on real rows here (`petalTipBreadth min` pins and
+  MOVES; `ALL MAX` pins 0.6 and HOLDS), so the existing `--partition` would have produced a
+  confident wrong report.
+
+  **THE CAP ENTRY IS DERIVED, not a fixed length**: `min(1 - TIP_CAP_FRACTION, crossing of
+  CAP_ENTRY_FACTOR x TIP_HALF_MM)`. Each rule fails alone — a fixed final fifth covers the
+  stub at the defaults, but at `petalTipTaper` 4 the floor flattens TEN rows and the profile
+  is 0.125 mm by u = 0.80, so a cap starting there would have to WIDEN toward the tip to
+  reach the export floor. Measured: the crossing rule takes over at uCap 0.592 on that row.
+  Taking the later start guarantees an entry of at least twice the print floor, so export
+  converges at least 2:1 instead of degenerating back into the stub it replaces.
+
+  **THE APEX IS AN EXPLICITLY TRUNCATED MINI-FACE, NOT A TRUE APEX VERTEX**, and the choice
+  is forced rather than preferred. (1) Topology must not depend on mode: the export gate now
+  rates live-vs-export triangle counts, and a true apex in live with a floored face in export
+  is two different meshes. (2) It is the DOME's bug — and this was MEASURED, not argued: a
+  true-apex build exports **288 degenerate triangles and 168 non-manifold edges per bloom
+  with boundary edges still 0**, watertight and wrong, exactly 36 per petal (the terminal
+  face's 9 quads top and bottom collapsing). `analyzeStl` now counts zero-area triangles from
+  the raw floats before quantisation, and the export gate FAILS on any.
+
+  **TRIANGLE COST IS STILL ZERO, which was not the prediction.** The cap re-uses the grid it
+  already had — same NU, NV, panel count and end face — and moves only where vertices sit. A
+  cap built as new geometry beyond the last row would have moved the count for the first time
+  in three sessions; this one does not, so the zero-cost claim above stands unamended. The
+  default bloom is 11,136 tris, live and export, before and after.
+
+  **WHAT THE FLOOR STILL DOES TO THE PRINTED TIP.** Live converges to a 0.30 mm terminal
+  face; export floors it at 1.60 mm. So the point on screen is finer than the point that
+  prints — the same live-vs-printed divergence as the sheet thickness, now in the outline as
+  well, and one more assumption riding on a coupon nobody has run.
+
+  **PARKED, deliberately, as a FUTURE RULING: the tiny-breadth floor artifact.** The
+  partition branches on `petalTipBreadth === 0` EXACTLY, which is what makes it sharp and is
+  what was ruled. But at a very small breadth — 0.01 gives a 0.08 mm tip that the print floor
+  lifts to 0.80 — the end is still a floor artifact wearing an "authored truncate" label, and
+  the sharp rule is what puts it there. The honest alternative is to converge whenever the
+  floor binds at the tip, which describes the geometry better and blurs the partition into
+  "rows where a floor happened to bind", so it could not have been asserted the way this one
+  was. NOT a defect and not open work: it is a ruling Eva has not been asked for, on a region
+  of the range nobody has yet had a reason to visit. Raise it with a picture of a
+  small-breadth tip beside a pointed one; do not change the branch on the strength of this
+  note.
+
+- Presets: Eva authors them herself once the panel is settled (standing ruling from the
+  flower panel audit).
+- ~~Ring radius / spread exposure — re-decide at phase 2 entry~~ **Settled Aug 31, at
+  phase-2 entry: EXPOSED.** The phase-1 grounds for hiding it — that a spread-out ring
+  would have nothing in its middle but plumbing — expired the moment the designed centre
+  existed to occupy that middle, exactly as parked. **AMENDED Sep 5 (Eva, Phase A Q5,
+  recorded session 20): the designed centre that occupied the middle is retired (session
+  20) and the androecium that will occupy it does NOT enter this ring's area rule — stamen
+  roots are placed by their own law inside the clear disc, at a radius derived by their own
+  reference rule with their own exposed control (B2). `spread` keeps scaling the PETAL ring
+  and nothing else.** `spread` is a Standard slider,
+  0.60–6.00, **default 2.00 (Eva, Aug 31)**, applied inside `footRing()` and nowhere else:
+  the area rule still *derives* the radius and spread only scales it. Eva's ruling on the
+  lower bound: **the area rule is a reference, not a cage** — below 1.00 the ring is
+  tighter than the derived radius, feet crowd and at the extreme cross the axis, and that
+  state is reachable on purpose. The
+  junction reaches every foot by construction at every spread, because `overhang` is
+  expressed in the same units as the radius (max(1.5, 0.4·r)), making the foot–hub overlap
+  a fixed *fraction* of the ring rather than a tuned length.
+
+- **The hub disc at high spread — a flagged candidate, NOT open work (Aug 31).** The
+  junction is a full disc of the foot-ring radius, so its extent tracks spread: at the
+  defaults × spread 6.00 with `centerStyle: NONE` it is a 53 mm plate 1.2 mm thick, and
+  the plumbing becomes the loudest thing in the frame. This is precisely the state this
+  charter predicted when it parked the spread question. Eva's ruling: ship the disc,
+  photograph the state honestly, and let the sheet decide — the alternative (rebuilding
+  the hub as an area-ruled annular band, extent = ring radius but mass = area rule) is a
+  separate piece of work needing its own before/after evidence, and it only becomes real
+  work if the plate turns out to be objectionable at spreads anyone would actually use.
+  Do not start it on the strength of this note alone.
+
+- ~~The control panel as one flat column~~ **GROUPED INTO SECTIONS Sep 1, on Eva's
+  ruling: "the panel is a lot to scroll through and it's only going to become more —
+  group it into sections before the arrangement work adds its controls."** Twenty
+  controls in one column, with layer and spiral controls still to come. **Zero geometry
+  change, and that is the whole acceptance bar:** 0 of 47, 0 of 76, 0 of 86, 0 of 106
+  frozen rows and 0 of 125 live rows moved — 440 rows, every exported byte untouched,
+  against a worktree at a5cac8b with zero tracked modifications. Both geometry gates
+  125/125 in CI on the same head. The default bloom is 11,136 tris live and export alike
+  and 543.8 KiB of STL, before and after.
+
+    - **THE GROUPING IS REGISTRY DATA AT SECTION GRANULARITY, and the split of ownership
+      is the design.** Membership is a field on the CONTROL (`section: 'form'`);
+      identity, order and first-load openness are the `SECTIONS` array; order WITHIN a
+      section is the `CONTROLS` array's own order, filtered. No list of ids lives in
+      `SECTIONS` — a section naming its members would be two lists to keep in sync in
+      the file that exists to state the registration rule, and the panel would silently
+      drop whichever an edit missed. `verifySections()` runs at module load and throws,
+      so the app, both gates and every shot tool get the relation checked for free.
+
+    - **SECTION IS NOT ROLE, and refusing to conflate them was the first design
+      decision.** `role` says which part of the MODEL a control owns and is load-bearing
+      in `buildMatrix()`; `section` says where it sits in the panel. They genuinely
+      disagree — `sheetThickness` is `role: 'petal'` because the junction derives from
+      the petal, and sits in PART THICKNESS because it also governs the hub slab
+      and the centre floors. Deriving sections from roles would have forced the re-role this
+      registry's own header calls a stop-and-raise, and produced one 14-control "Petal"
+      section, which is the problem rather than the fix. **No role changed. Two
+      mismatches are FLAGGED and deliberately not acted on:** `petalCount` is
+      `role: 'petal'` while being the whorl's own count — literally the first parameter
+      of the whorl primitive — and `petalTilt` likewise while being a per-slot rigid
+      orientation. Both are reasonable readings awaiting a ruling; neither is a defect.
+
+    - **THE PANEL IS AN ACCORDION — opening a section closes the others (Eva,
+      Sep 1, from the panel sheet), WITH THE TRADEOFF STATED AND ACCEPTED:**
+      tweaking across two sections costs a reopen click, and the
+      layers-are-sections structure makes single-focus the normal case. First
+      load is ARRANGEMENT ALONE. Exclusive-open has ONE owner in the panel
+      generator — a single capture-phase listener on the panel root, never a
+      listener per section, because N copies of one rule is the thing that
+      drifts.
+
+    - **THE SUPERSEDED TWO-OPEN RULING, BOTH HALVES, so the reversal is
+      legible.** Earlier the same day Eva ruled Arrangement AND Petal shape
+      open at first load with the other three collapsed, and that was right
+      for what it was ruling on — sections that opened and closed
+      independently. The accordion makes any two-open state UNREACHABLE, so
+      the earlier ruling was not overridden by preference; its subject stopped
+      existing. `open` in `SECTIONS` therefore stopped meaning "which sections
+      start open" and now means THE ONE SECTION OPEN AT FIRST LOAD, with
+      `verifySections()` enforcing at most one `true` — zero is legal, since
+      every section shut is a state a visitor reaches by closing the open one.
+
+    - **`open` IS AN AUTHORED LITERAL, AND THE RULE THAT WOULD HAVE DERIVED IT
+      IS DEAD — the second rationale on this one field to die while its
+      instruction stood, which is worth a reader's attention.** The proposal
+      was "collapse a section iff every control in it is at an identity
+      default", exactly true of Petal form's four curves (all 0, the flat
+      short-circuit) and Part thickness's three (all reproducing the old
+      constant). It was already false of the panel that shipped — CENTER's
+      DISC / 0.75 / 0.35 are authored aesthetic defaults, not identities, and
+      Petal tilt (default 25°) moved into Petal form — and the accordion makes
+      it incoherent as well, since at most one section can be open whatever
+      its contents are at. Do not reintroduce it, and do not make `open` a
+      predicate: that would put collapse under `visibleWhen` as a second
+      hiding mechanism and make the panel rearrange itself under the user
+      mid-drag.
+
+    - **"MATERIAL" IS NOW "PART THICKNESS", AND THE ID MOVED WITH THE LABEL**
+      (Eva, Sep 1). An id that contradicts its label is a stored label-lie: it
+      reads as a declaration, a later reader checks it and believes it, and a
+      name for a thing that is not the thing is this project family's most
+      repeated defect. Nothing weighed against the rename — `section` is panel
+      presentation, never persisted, and it is not a control id, so
+      `RETIRED_IDS` does not apply and no migration is owed. **Were a section
+      id ever to reach a saved design, that calculus inverts and a rename
+      becomes a retirement.** What the name is slightly wrong about is stated
+      in the registry rather than left to be discovered: the section also
+      holds `footDelicacy`, which scales a WIDTH. It belongs there because the
+      three are one layer — the part's own material dimensions, which decide
+      how delicate the printed object is — and because delicacy's width is
+      what the area rule reads to size the ring. If the name ever reads wrong,
+      the LABEL moves on one ruling and the id moves with it, exactly as here.
+      Do not fix it by re-homing the control.
+
+    - **`toggle` IS QUEUED, NOT SYNCHRONOUS, and it does NOT BUBBLE — measured
+      before the accordion was built on it, and both facts are load-bearing.**
+      Capture descends from the document through every ancestor regardless of
+      bubbling, which is what makes one listener on the panel root possible at
+      all. And because the event is queued, two programmatic opens in one tick
+      BOTH land and the handler settles afterwards — so exclusivity is
+      eventually-consistent within a tick. It is invisible to a visitor (one
+      click is one toggle) and it is exactly what a gate reading exclusivity
+      synchronously would fail on, which is the shape of a check that then
+      gets "fixed" by weakening the app. Every accordion assertion in
+      `verify-bloom-panel.mjs` awaits a frame for that reason. A third fact
+      came from the same probe and is the negative control: a capture listener
+      added later on the DOCUMENT still runs EARLIER than the panel's, so
+      `stopPropagation()` there makes the accordion handler unreachable
+      without touching it.
+
+- ~~The arrangement grows up: layers and spiral~~ **BUILT Sep 1. Five Standard controls,
+  all `role: 'arrangement'`, all in ARRANGEMENT — `placement` (RADIAL/SPIRAL),
+  `layerCount` (1–3, default 1), and three sub-controls gated on it by `visibleWhen`:
+  `layerSize` (0.35–0.90, default 0.72), `layerPhase` (0–1 slot, default 0.50),
+  `layerTilt` (0–30°, default +12).** Exactly the shape this charter's ROOM TO GROW note
+  predicted — a layer-count control in that section with per-layer sub-controls gated on
+  it, the `centerStyle` pattern one level up, not a section per layer. **Mirrored was
+  explicitly deferred and NOTHING was half-wired for it.**
+
+    - **LAYERS NEEDED NOTHING NEW IN THE WHORL PRIMITIVE, and that is the session's
+      cleanest finding.** Every per-layer quantity is one of `buildWhorlInto`'s existing
+      arguments: count (shared, derived), radius (derived), height (derived 0), sizeRamp
+      (`layerSize`), angleRamp (`layerTilt`), phase (`layerPhase`). The full signature
+      carried since session 1 is exactly what this needed. `placement` is the one thing
+      the primitive genuinely computes and is the only argument added.
+
+    - **HEIGHT IS NOT A CONTROL AND NEVER WILL BE — the trap this session owned, ruled on
+      a measurement.** A foot at z = h spans [h−t/2, h+t/2] against a hub slab spanning
+      [−t/2, +t/2], so solid overlap requires |h| < t: **1.20 mm at the shipping sheet,
+      0.60 ALL-THIN, against a 35 mm petal.** A height control constrained to keep feet in
+      the slab has a range nobody can see, and it CANNOT BE WIDENED because the bound is
+      the sheet itself — DEAD ≠ INVISIBLE says delete it, and "widen and re-test" is
+      unavailable. **Depth comes from TILT instead: inner whorls tilted steeper raise
+      their tips 6.60 mm above the outer whorl (layerSize 0.90 × layerTilt +12) with every
+      foot still flat at z = 0 — 5.5× what any safe height control could give.**
+      THE COSTED FALLBACK, recorded rather than re-derived: extending the junction to
+      REACH lifted feet (a derived collar spanning [0, h] under each inner ring), a second
+      junction primitive with its own watertightness argument and gate rows. It is NOT
+      built and there is NO STUB. **The only evidence that reopens it is Eva finding the
+      tilt-driven layering flat on `tools/shot-bloom-arrangement.mjs`'s layers sheet** —
+      which is why that sheet exists and why the ruling was made conditional on it.
+
+    - **BOTH SHIPPED GATES ARE BLIND TO THE JUNCTION UNDER LAYERS, and this is MEASURED,
+      not cautious. A GREEN CONNECTEDNESS RUN DOES NOT ENDORSE IT.** Two mutations were
+      run against the gate before the instrument was written:
+        * **THE WRONG HUB** — building the junction slab at the wrong layer's radius (min
+          over layers instead of the owner's R0). At the defaults with three layers the
+          outer whorl's feet end 7.94 mm out against a hub stopping at 6.86 mm: joined to
+          nothing. **The gate reports ONE region, 0.00% detached — it PASSES**, on all
+          five configurations tried. Consecutive foot annuli overlap EACH OTHER (layer 0's
+          feet span [7.94, 13.23], layer 1's [5.72, 9.53]), so the outer whorl hangs on by
+          a CHAIN through the inner layers, with blade interpenetration on top.
+          Connectedness under layers is OVER-DETERMINED and the flood fill cannot separate
+          a correct hub from an incorrect one.
+        * **THE LIFTED LAYER** — the junction derivation dies at |h| ≥ t = 1.20 mm and the
+          gate does not split until h ≥ 2.5 mm. **The band between is detached by
+          derivation and reads as one piece**, confirmed across eight scenarios; none
+          split before 2.0 mm.
+      So the arrangement layer shipped its own instrument, exactly as the form and
+      thickness layers each had to: **`junctionAssertions()` (J1–J4), in BOTH gates, on
+      EVERY row**, in exact arithmetic from the app's own metrics — J1 every layer's feet
+      in the hub plane carrying the ring's own cross-section, J2 containment, **J3 the
+      foot REACHES the hub disc (the wrong-hub mutation's only witness)**, J4 the overlap
+      box against its own floors plus hub thickness = foot thickness. The foot-frame
+      assertion MOVED here out of `formAssertions()`, where it only ever saw layer 0.
+
+    - **THE OVERLAP BOX DOES NOT DEGRADE WITH LAYERS.** None of `overhang` (1.5 mm
+      absolute floor), `width` (FOOT_MIN_WIDTH_MM) or `thickness` (MIN_FEATURE_MM in
+      export) is a function of the layer index, so the standing worst case — ≥1.5 × ≥1.6 ×
+      ≥1.0 mm — is the SAME bound per layer at any layerCount. Measured at ALL THIN ×
+      spread min × 3 layers: **2.40 mm³ on every layer**, exactly the single-ring number.
+      Containment is a CONSEQUENCE, not a clamp: `layerSize` maxes below 1, so
+      radius_L ≤ R0 and each foot's whole footprint lies inside the hub disc — strictly
+      stronger than the single-ring argument, where only layer 0's feet overlapped the rim.
+
+    - **`footRing()` RETURNS N RINGS PLUS THE HUB, and the layered return is the design.**
+      One call, one owner. A per-layer call satisfies "one owner" on its face and FAILS
+      "no per-layer consumer arithmetic": the hub radius and the area-rule total are
+      functions of every layer at once, so a consumer would have to sum them. R0 is now
+      the area rule over EVERY foot; radius_L = R0 · layerSize^L; hub.radius = R0, which
+      IS layers[0].radius rather than a `Math.max` that merely agrees with it.
+
+    - **THE 1-ULP TRAP FIRED ON A REAL ROW, so the guard is LOAD-BEARING rather than
+      insurance.** `Math.sqrt(count · rFoot²)` and `rFoot · Math.sqrt(count)` are the same
+      number in algebra and not the same double — the flower's `a*(b+c)` vs `a*b + a*c`
+      lesson, measured here before the guard was written: **8.88e-16 apart at the shipping
+      defaults (0.90 ULP, 4.4223251132330947 against …39) and 1.78e-15 at petalCount 40**,
+      exact at count 3, count 7, ALL THIN and sheet 2.40. So the guard is scoped to
+      exactly that one expression — everything else is identical without one (`scale` is
+      exactly 1, `x * 1 === x`, `radius_L` is `R0 * 1`), and a wider guard would be a
+      second copy of the layered law with a bug-shaped place to hide. **`guardResidual`
+      cannot be exactly 0 and both gates assert a BOUND (4 ULP relative), NOT a zero** —
+      unlike `formGuardResidual`, and stated so nobody "fixes" it to an equality. The
+      three components that ARE exact identity at one layer (scale, tiltExtra, phase) are
+      asserted separately as equalities, so the tolerance cannot cover a real leak in them.
+
+    - **`layerSize` CAPS AT 0.90, AND THE CAP IS MEASURED.** At 1.00 with `layerPhase` 0
+      two whorls are exactly coincident and the export carries **14,832 non-manifold
+      edges** — duplicate geometry, this family's known cause, the same defect that made
+      the centre's flush base worth dropping. At 0.95 and 0.90 it is **0**. The cap makes
+      exact coincidence unreachable rather than merely unlikely, and `LAYERS: 2 ×
+      layerSize max × layerPhase 0` is a named gate row that says the cap works.
+
+    - **MAX_LAYERS IS 3, AND THE BINDING CONSTRAINT IS THE PETAL, NOT TRIANGLES** — which
+      was not the prediction. Three layers at petalCount 40 is 149,568 export triangles,
+      **10% of the 1.5 M budget**, so a cap justified by triangle count would have been a
+      made-up number. What binds is the blade shrinking by `layerSize` per layer: the
+      third is an 18.1 mm blade at the shipping ratio, a fourth would be 13.0 mm, and at
+      `layerSize` ≤ 0.50 the deepest foot hits FOOT_MIN_WIDTH_MM and becomes a floored
+      stub narrower than its own root. Raising it is a range change plus gate rows.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS: 0 of 47, 0 of 76, 0 of 86, 0 of 106 and 0 of 125
+      frozen rows moved** — 440 rows across four baselines plus the new fifth. Both
+      geometry gates 158/158. The default bloom is **11,136 tris live and export alike**,
+      unchanged, and the five new controls add ZERO triangles at layerCount 1.
+      **`phase5Matrix()` — the 125 rows frozen at deacded — is the new baseline and now
+      the strongest of the five**, on the same reasoning that made phase4 strongest of
+      three: it is the only one carrying the thickness layer's own corners and the tip
+      cap's partition. It was GENERATED from deacded's own `buildMatrix()` rather than
+      transcribed, and `--verify-frozen --phase5` proves it deep-equal, in CI.
+
+    - **ONE ROW-SET CHANGE WAS DECLARED BEFORE THE RUN, AND THE RUN SHOWED IT WAS NOT A
+      BYTE MOVE AT ALL — recorded because the prediction was wrong and the correction is
+      the useful part.** `ALL MAX` sweeps every non-centre slider to its maximum, which
+      now means three layers, so it was declared in advance that those four rows would
+      move, to be reported by `--partition-value` on the resolved `layerCount`. What
+      actually happens is cleaner: the FROZEN phase5 rows keep deacded's definition and
+      pin no `layerCount`, so they inherit the default 1 and are **bit-identical**; only
+      the LIVE matrix's row DEFINITION grew, which is added coverage with no `before` to
+      compare against. So the honest total is 0 moved everywhere, and "ALL MAX now means
+      three layers" is a coverage note, not a partition. The general lesson stands and is
+      why the declaration was made anyway: a frozen matrix pins only what existed at its
+      commit, so a corner row's MEANING can grow in the live matrix while its frozen twin
+      stays fixed — the two are different rows sharing a label.
+      The layer SUB-controls are excluded from that sweep and from the blanket min/max
+      sweep, under the centre rig's rule one level up: a `layerSize` row at layerCount 1
+      builds the default and measures nothing while printing a label saying it did.
+
+    - **THE MATRIX GREW 125 → 158**, including twelve named layered corners: max layers
+      against spread min, ALL THIN, petalCount 3 and 40, `layerSize` min, ALL FORM MAX,
+      SPIRAL, the coincidence corner, the 135°-effective corner, ALL MIN, and — on the
+      lesson that cost the flower a seven-piece bloom — **the layered BARE bloom**, since
+      DISC is the default and a layered centre-off state is exercised by nothing unless it
+      is written down.
+
+    - **`MAX_VOXELS` RAISED 90M → 160M, because this change made it bind.** `ALL MAX ×
+      DOME max` went from 403×403×239 (38.8 M, measured) to 605×605×360 (131.8 M,
+      SKIPPED). A row that used to be measured and is now skipped is coverage lost to a
+      change, and a skip is never a pass — so the ceiling moved rather than the row going
+      quiet. Sized against the matrix, not picked: 131.8 M is the largest of all 158 rows
+      and the next largest is 32.9 M. Cost, measured: 8.6 s and 397 MB RSS on that row
+      against a 345 s whole-gate run.
+
+    - **THE PANEL GATE GAINED A FOURTH ROUTE, and it closes a gap that predates this
+      work.** The census evaluates every predicate at DEFAULTS only — ONE DIRECTION — so a
+      control gated on `layerCount >= 2` would pass while never appearing at all, and so
+      would `centerRise`, gated on DOME since the centre rig shipped and never once
+      asserted to APPEAR. The visibility-transition route drives each driver (derived from
+      the registry, never listed) through the real UI to every value that changes the
+      dependent set and re-checks EVERY control's `hidden` against its own predicate at
+      the new state. It covers the centre's four sub-controls for free. A fifth route
+      asserts the low-count spiral flag in both directions. `--negative-control` now
+      requires all four routes to fire and does.
+
+    - **THE POSITIVE CONTROL, red then green.** The mutation is the height control this
+      session ruled out — `height: 0` → `index * 3.0 mm`, in a throwaway worktree, never a
+      switch that ships (the `PANEL_OVERLAP_ROWS` precedent). Mutated: 3 layers exports in
+      **2 components**, petalCount 3 in **7 components**, with boundary edges **0
+      throughout** — watertight and in pieces at the same time, which is exactly why
+      connectedness is a separate gate — and `junctionAssertions()` fires 6 times. Shipped
+      tree: one component, clean, on the same rows. **J1 fires at the first millimetre;
+      the voxel gate only at 2.5 mm**, which is the blind band above, made concrete.
+
+    - **PARKED, recorded with their reasons, deliberately not built and not stubbed:** a
+      per-layer COUNT RATIO (quantises — `round(n·r^L)` makes the slider jump; makes "half
+      a slot" ambiguous; reads almost exactly like `layerSize`); a CONTINUOUS CROSS-LAYER
+      spiral sequence (`index = L·count + i`, the more phyllotactic reading — each layer
+      runs its own sequence today); and a VOGEL RADIUS RAMP (`r ∝ √i`, a spiral *disc*
+      rather than a spiral whorl, with its own evidence needs). **MIRRORED remains
+      deferred to its own design conversation and nothing here anticipates it.**
+
+    - **THE 135°-EFFECTIVE TILT SHIPS PHOTOGRAPHED, NOT CAPPED (Eva, Sep 1).** petalTilt
+      75 × layerTilt 30 puts the third whorl past vertical, leaning back in over the
+      centre — a state `petalTilt` (max 75) cannot reach alone. Ruled on Eva's own
+      standing pattern for extremes (max-roll faceting, the spread-6 plate, the ROLL CLAMP
+      look): ship it and photograph it. It is a named row in both gates, exports
+      watertight and as one piece, and has its own cell on the extremes sheet. Capping
+      `layerTilt` is one range change **with that cell as its evidence**; do not cap it on
+      the strength of this note.
+
+    - **PARKED, and deliberately not work: if the sections outgrow the
+      accordion, the flower's VERTICAL TAB RAIL is the form Eva likes.** A
+      note about direction, not a queued task. Do not start it on the strength
+      of this note; it needs a panel that has actually outgrown five sections,
+      and a fresh ruling with a picture.
+
+    - **PETAL TILT SITS BESIDE SPINE CURL** (Eva), because `phi(u) = petalTilt + curl*u`
+      and the panel is where that adjacency is visible. One row moved in the `CONTROLS`
+      array and nothing else changed. The consequence was MEASURED rather than argued:
+      the live matrix's row SET is identical (125 = 125) and 10 rows change position,
+      which is inert because both runs of a byte report import the same matrix module
+      and `--compare` hard-fails on any label-sequence mismatch.
+
+    - **COLLAPSE IS PRESENTATION, ASSERTED RATHER THAN BELIEVED.** A control inside a
+      closed `<details>` keeps its value, listeners and read-out span, answers
+      `getElementById`, and takes a programmatic `.value` plus real input/change events —
+      which is exactly how every gate and the harness set controls, and never by
+      clicking. The whole-state snapshot is identical all-collapsed and all-expanded, and
+      toggling every section moves no geometry. **Sections carry no predicate of their
+      own:** `applyVisibility()` stays the only thing that hides a control and derives a
+      section's hidden state from the same snapshot — hidden iff every control in it is
+      hidden. A section needing its own condition is a stop-and-raise.
+
+    - **THE NEW GATE HAS THREE ROUTES because they catch different failures** —
+      `tools/verify-bloom-panel.mjs`, CI as `bloom-panel`. The DECLARATION route is a
+      render census (every non-retired control exactly once, in its declared section, in
+      registry order, one label and one read-out span, nothing in the panel the registry
+      does not declare, each wrapper's `hidden` agreeing with its own predicate). The
+      PATH route drives a control inside each collapsed section with real events and
+      requires the app to react. **Triangle count is deliberately NOT the path route's
+      witness:** the four form curves cost zero triangles by construction, so it would
+      have made that section's assertion a passing no-op. Each collapsed section names
+      its own witness instead — cup moves the metric ratio, the style moves the centre's
+      triangle count, the sheet moves the ring radius through the area rule — and the
+      witness table is checked against the registry so a later range change cannot leave
+      it quietly measuring nothing. The ACCORDION route asserts the panel holds
+      at most one open section: the declared one at first load, exactly the
+      clicked one after a real summary click, and none after the open one is
+      closed. A fourth assertion sits beside them and is the one the whole
+      grouping rests on, made BEHAVIOURALLY rather than by scanning source for
+      `.click(`: with EVERY section shut, the harness's own `applyConfig` sets
+      one control from every section and both its read-back and the
+      full-registry `fullStateDrift` must come back clean, with every section
+      still shut. `--negative-control` deletes a control's wrapper, replaces
+      another control with a listener-less clone (the flower's
+      declarations-right / app-doesn't-react defect, reproduced), and
+      suppresses the accordion's toggle before the panel's listener sees it —
+      and requires ALL THREE routes to observe their own failure; it runs as
+      its own CI step and caught 19 breaks on the run that shipped.
+
+      **THE GATE EARNED ITS KEEP ON THIS VERY CHANGE**, which is worth
+      recording because a gate that has never caught anything is a hope. The
+      accordion made Petal shape collapsed for the first time and the rename
+      moved a section id; the gate failed the run immediately with "section
+      shape ships collapsed but names no geometry witness" and the same for
+      "thickness" — two consequences of the rulings, caught before they could
+      ship as a pair of silently vacuous assertions.
+
+    - **MEASURED EFFECT: 2 control rows and a 431 px panel at first load; the
+      WORST CASE a visitor can reach is 584 px, the tallest single section
+      (Petal shape).** The flat panel this replaces was 18 rows and 1,241 px.
+      Worst case is the honest number under an accordion — the tallest the
+      panel can ever be is its tallest section — and it replaces the
+      "all expanded" figure, which stopped being a reachable state.
+      `tools/shot-bloom-panel.mjs` is the sheet: the panel, not the canvas, so
+      it never sets `body.bl-preview` (which hides it); every section cell is
+      opened by a REAL summary click so no frame shows a state the UI cannot
+      reach; and every frame asserts it is not cropped, because a cropped
+      panel is the one picture that could carry a grouping ruling with the
+      bottom of the list missing.
+
+    - **ROOM TO GROW, so the next session does not reorganise this one.** ARRANGEMENT is
+      the home for the arrangement work and ships with two controls precisely so it has
+      room: of the whorl primitive `(count, radius, height, sizeRamp, angleRamp, phase,
+      blade)`, `petalCount` and `spread` are count and radius, and the other four are
+      still derived — all of them land there, as do phyllotaxis and spiral placement. If
+      multi-whorl arrives, the shape that fits is a layer-count control in that section
+      with per-layer sub-controls gated on it by `visibleWhen` — the `centerStyle`
+      pattern one level up — not a section per layer. A stem, leaves or a base ornament
+      would be a NEW section, being new parts. **The junction never gets a section, for
+      the same reason it never gets a role.**
+
+- ~~A continuous cross-layer spiral sequence, and a Vogel radius ramp — parked~~
+  **THE CONTINUOUS SPIRAL WAS BUILT Sep 1; VOGEL WAS NOT, and the two were never the
+  same proposal.** Eva's brief, verbatim: *"spiral is still very distinct layers, and I
+  don't know if it should be."* Her screenshot — 40 petals × 3 layers × spiral,
+  tilt-stepped — reads as three stacked rings wearing spiral azimuths, and what she was
+  reaching for is the sunflower / succulent construction: no rings, one sequence winding
+  inward, every petal at its own radius, size and tilt.
+
+    - **THE WHOLE LAW IS THAT THE LAYER INDEX STOPS BEING AN INTEGER.** Every per-layer
+      quantity in `footRing()` already IS a function of a layer index, so continuous mode
+      evaluates the same functions at a non-integer one:
+
+          RINGED      lambda_k = floor(k / petalCount)
+          CONTINUOUS  lambda_k = k / petalCount            k = 0 .. petalCount*layerCount - 1
+
+      **NOTHING REINTERPRETS AND NO LABEL LIES**, which was the constraint the design had
+      to satisfy before it was worth building. `petalCount` is petals per turn in both
+      modes (a ring IS a turn under the ringed arm), `layerCount` is how many turns,
+      `layerSize` is the shrink per turn, `layerTilt` the tilt gain per turn. So
+      continuous mode ships **no sub-controls of its own** — there is nothing left for
+      them to control — and that is the panel story, not an economy.
+
+    - **A THIRD VALUE, NOT A REPLACEMENT (Eva's ruling, Sep 1), and the deciding
+      measurement is that SPIRAL IS NOT A SUBSET OF CONTINUOUS AT ANY DEPTH.** At one
+      layer SPIRAL is n petals on ONE ring with uneven angular gaps — the state the
+      low-count legibility flag exists for — while CONTINUOUS winds 0.875 of a turn
+      inward on n rings. Replacing SPIRAL would have deleted a reachable, flagged,
+      11-gate-row state rather than upgrading one. The cost comparison was made with
+      numbers on the table: a third value lands as **ONE byte event** (nothing selects it,
+      so every pre-existing export is bit-identical), replacement as **two**, moving
+      exactly the 11 of 158 live rows that pin SPIRAL with all 440 older frozen rows
+      holding. And the calculus is asymmetric in TIME: retiring the SPIRAL *option value*
+      is free while nothing persists a design and becomes a schema bump plus a migration
+      the moment something does — so the ruling that stays available is the cheap one.
+      Eva can still kill the layered spiral from the sheet; she cannot un-kill it.
+
+    - **THE DEPTH IS EXTRAPOLATION, NOT INTERPOLATION (Eva, Sep 1, ruled from the
+      numbers), and it has a visible consequence recorded rather than discovered later.**
+      lambda runs to `layerCount - 1/petalCount`, so a continuous bloom winds a full
+      `layerCount` TURNS and reaches deeper than the innermost of `layerCount` stacked
+      rings, which are only `layerCount-1` turns apart. At her config the innermost blade
+      is **13.17 mm against the ringed 18.14 mm** and R0 is **7.5% smaller**. The
+      alternative — `lambda = k(L-1)/(K-1)`, matching ringed's extremes exactly and merely
+      dissolving between them — was costed and rejected because it breaks the label story:
+      `petalCount` would stop being petals-per-turn (59.5 per turn at that config) and
+      CONTINUOUS would collapse onto SPIRAL at layerCount 1. **Recorded, not stubbed.**
+
+    - **THE DISSOLUTION IS A NUMBER, and it is the acceptance evidence.** At Eva's config
+      the ringed radius is a STEP FUNCTION over the build order: **117 of the 119 steps
+      between consecutive petals are exactly 0.0000 mm and 2 are 6.4209 mm — 28.0% of the
+      hub radius in one jump.** Continuous: **every one of the 119 steps is between 0.0658
+      and 0.1735 mm**, 0.82% of R0 and about **one percent of a petal width**. Same 120
+      petals, same **149,568 export triangles**, same 7,303.2 KiB — the comparison is not
+      bought with geometry.
+
+    - **`footRing()` RETURNS `rings`, AND THE TWO ARMS ARE A BRANCH RATHER THAN A
+      REFORMULATION** — the precedent `buildWhorlInto`'s RADIAL arm set, applied one level
+      up. One descriptor per layer under the ringed arm, one per PETAL under the
+      continuous one. The ringed loop is untouched character for character, because
+      `SUM_L count*rFoot_L^2` and `SUM_k rFoot_k^2` are the same number in algebra and
+      **not the same double** — the `a*(b+c)` vs `a*b + a*c` trap that already fired on a
+      real row when layers were written. Rewriting the ringed sum "because it is the same
+      rule" would have moved every layered export for nothing. **What the area rule sums
+      is unchanged in DEFINITION**; only the grouping of equal terms differs.
+
+    - **CONTAINMENT AND THE OVERLAP BOX BOTH SURVIVE BY CONSTRUCTION, AND CONTAINMENT
+      GETS STRONGER.** `layerSize` maxes at 0.90 < 1 and lambda >= 0, so
+      `layerSize^lambda <= 1` for every REAL lambda rather than only for integers —
+      radius_k <= R0 at every slot, strictly decreasing, with `Math.pow(s, 0)` exactly 1
+      keeping `rings[0].radius === hub.radius` an EQUALITY. The overlap box does not
+      degrade for exactly the reason it did not degrade under layers: none of `overhang`
+      (1.5 mm absolute floor), `width` (`FOOT_MIN_WIDTH_MM`) or `thickness`
+      (`MIN_FEATURE_MM` in export) is a function of the slot index. **Measured at the
+      deepest reachable foot — 3 turns × ALL THIN × spread min × petalCount 40 ×
+      layerSize min, where the innermost ring radius is 0.206 mm — the box is
+      1.500 × 1.600 × 1.000 = 2.400 mm³, the SAME number as the single-ring and layered
+      corners.**
+
+    - **THE VOXEL GATE IS BLINDER HERE THAN IT WAS UNDER LAYERS — measured, and worse
+      than that, SO ARE J1–J4.** Consecutive foot annuli overlap by **3.154 mm** at Eva's
+      config (a 0.1735 mm radius step against an 8.486 mm overhang) against 1.981 mm at
+      three layers; a wrong hub leaves **57 of 120 slots** joined to nothing and the flood
+      fill still reports one region, chained through the 119 feet in between.
+      **AND THE MUTATION THIS SESSION IS ACTUALLY ABOUT PASSED EVERYTHING THAT EXISTED.**
+      The quantizer mutation — continuous mode silently building rings — exports
+      watertight, exports as ONE piece, has the IDENTICAL triangle count, and **passes
+      J1, J2, J3 and J4 on every row.** It even passes the multiples-of-*n* identity,
+      because `floor(m*n/n)` is `m`. The instrument as it stood could not observe the
+      thing the session was for, and that hole was found by checking the positive control
+      against the assertions BEFORE writing them rather than after.
+
+    - **SO THE LAYER SHIPPED TWO NEW ASSERTIONS, each catching what the other misses.**
+      **J5 — THERE ARE NO LAYERS:** under CONTINUOUS, radius and scale are strictly
+      decreasing across the whole sequence (no two consecutive slots share a ring) and
+      tiltExtra is non-decreasing, strictly increasing whenever it ends above 0. A
+      property of the arrangement, never a second copy of its law. **J6 — THE QUANTIZER
+      IDENTITY:** the continuous sequence passes EXACTLY through every ringed layer — at
+      `k = m*petalCount`, scale and tiltExtra equal ringed layer *m*'s to the bit.
+      Computed in `footRing()` on the `guardResidual` precedent (a gate restating
+      `Math.pow(layerSize, m)` would be a second copy of the ringed law inside the
+      instrument built to police it) and asserted as an **EQUALITY, not a bound**, because
+      `(m*n)/n` is exactly `m` in IEEE-754. A wrong-exponent law passes J5 and fires J6.
+      **The single-layer GUARD is now scoped to the ringed arm** — the pre-layer
+      expression describes no continuous design, since even a one-turn sequence has
+      `petalCount` different feet — and reports `null` there, never a passing 0.
+
+    - **J1 GAINED 40× THE COVERAGE FROM THE SAME EXPRESSION.** `petals` is one entry per
+      RING in both modes, and under CONTINUOUS a ring carries exactly one petal — so the
+      foot assertion goes from 3 frames per layer to 3 × petalCount × layerCount of them
+      (360 at Eva's config). Under the ringed arm slot 0 is representative because the
+      whorl shares a ring; under the continuous arm every foot is checked because every
+      foot is its own.
+
+    - **WHERE THE FLOORS BIND, AND WHAT BREAKS THERE IS TASTE, NOT TOPOLOGY.** The
+      foot-width floor now binds from a CROSSING INDEX onward rather than per layer, so
+      "which slots" became a real question and the read-out answers it with two numbers
+      (`FOOT WIDTH FLOORED at 1.60 mm on rings 53–119 (67 of 120)`) instead of a bare
+      "(CLAMPED)". **At the shipping defaults and at Eva's own config nothing is floored
+      at all** — the deepest foot is 2.409 mm. The extreme is `layerSize` min at three
+      turns: the deepest reachable scale is `0.35^2.975 = 0.0440`, **a 1.54 mm blade on a
+      1.60 mm floored foot — a blade narrower than its own root**, which is the same
+      condition that caps `MAX_LAYERS` at three. It stays watertight and one connected
+      piece. It is a tab, not a petal; photographed rather than capped, on the standing
+      pattern for extremes.
+
+    - **A NEW EXTREME THAT IS GENUINELY NEW: 161.25° EFFECTIVE TILT.** Continuous
+      accumulates the tilt gain over 2.975 turns rather than 2 layer steps, so
+      `petalTilt` 75 × `layerTilt` 30 reaches **86.25° of gain against the layered arm's
+      60** — past the 135° state the charter photographed, and unreachable by any
+      combination of the layered controls. Same standing pattern: ship it, photograph it,
+      name it in both gates. Capping `layerTilt` is one range change **with that cell as
+      its evidence**; do not cap it on the strength of this note.
+
+    - **`layerPhase` IS THE ONE CONTROL THE NEW MODE LEAVES WITHOUT A JOB, AND IT HIDES
+      RATHER THAN BEING REINTERPRETED.** It offsets successive whorls by a fraction of a
+      slot; a continuous bloom has one whorl, so `rings[k].phase` is exactly 0 at every
+      slot. Giving it a second meaning there — a global start azimuth, say — would be an
+      invisible rigid rotation under a label naming something else. Its `visibleWhen`
+      gains the term; nothing imperative. **PARKED, and deliberately not built on this
+      id: a DIVERGENCE ANGLE control** (golden angle against 1/3, 2/5, or free) is the
+      genuinely interesting phyllotaxis parameter this mode opens up, and `layerPhase` is
+      the worst available id to put it on — a saved slot fraction would feed straight
+      into an angle. It gets its own id and its own ruling.
+
+    - **"DEPTH", "SHRINK", "TILT STEP", AND "SPIRAL, LAYERED" (Eva, Sep 1).** A label
+      naming one of the two units lies in the other mode, so the LABEL names the axis and
+      the READ-OUT names the unit — the same split `placement` has carried since it
+      shipped. `layerPhase` KEEPS the word "layer" precisely because it only exists in the
+      mode where layers do. **No id moved**: an id is the expensive half of a rename (see
+      `RETIRED_IDS`), nothing persists a design yet, and `layerCount` is what the quantity
+      IS under both readings. One owner for the unit word — a `perDepth(ui)` helper — so
+      three read-outs cannot drift into three wordings.
+
+    - **A LATENT TRAP WAS CLOSED ON THE WAY PAST, and it is the more useful half of this
+      entry.** `LAYER_SUBS` matched `c.visibleWhen.id === 'layerCount'` — a SHAPE SNIFF,
+      correct only while every layer sub-control's predicate happened to be a bare leaf.
+      Giving `layerPhase` its second condition turned its predicate into an `all` node
+      with no `.id` at all, so the sniff would have silently stopped matching it, dropping
+      it OUT of the excluded set and INTO the blanket sweep — where a `layerPhase` row at
+      layerCount 1 builds the shipping default and reports a pass under a label naming a
+      control that did nothing. Exactly the defect the exclusion exists to prevent,
+      reintroduced by a registry edit two files away. It now derives from
+      `predicateDrivers`, which is the registry's own answer and cannot drift.
+
+    - **THE MATRIX GREW 158 → 180**, and `phase6Matrix()` — the 158 rows frozen at
+      c1886d0 — is the new baseline and now the strongest of the six, on the reasoning
+      that promoted phase5 and phase4 before it: it is the only one carrying the LAYER
+      corners and the SPIRAL count sweep, which is the region a placement change is most
+      likely to disturb. `--full` could not do the job at all here, since all 22 new rows
+      select an option value the old registry does not have.
+
+    - **THE POSITIVE CONTROL, RED THEN GREEN, in throwaway worktrees** (`git worktree add`,
+      never mutate-and-restore). Three mutations, the shipped instrument run against each,
+      with what the STL gates saw recorded beside what the assertions saw:
+
+      | mutation | fired | boundary edges | export tris | seen by |
+      |---|---|---|---|---|
+      | shipped tree | **0 of 7 rows** | 0 | unchanged | — (green) |
+      | M1 quantizer (`lambda = floor(k/n)`) | 8 across 5 rows | **0** | **identical** | **J5 only** |
+      | M2 wrong exponent (`k/(K-1) · L`) | 23 across 5 rows | **0** | **identical** | **J6 only** |
+      | M3 floor once per sequence | 67 on the one row where it binds | **0** | **identical** | **J4b only** |
+
+      Every mutation leaves both ringed control rows clean, so all three are scoped to the
+      continuous arm. **M1 was then run through the connectedness gate with J5 silenced, to
+      measure what the flood fill actually says: 22 of 22 continuous rows report ONE
+      CONNECTED PIECE.** (That run self-reports HARNESS INVALID, because scoping its matrix
+      to continuous rows removes the rows its own pairwise and response assertions need —
+      so it is a measurement of the voxel verdict, never a gate pass. A failing validity
+      assertion is not a known-red.)
+
+    - **M2 EXPOSED A BLIND SPOT IN J6 ITSELF, AT THE SHIPPING DEPTH, and closing it is the
+      most useful thing the control did.** In its first run M2 fired on every three-turn
+      row and NOT on the one-turn row: `quantizerResiduals` carried entries only for
+      `m < layerCount`, so at layerCount 1 the single entry was `m = 0`, where every law
+      agrees trivially — the sequence stops at `k = n-1`, before its first multiple. The
+      law is defined for every k, so the check now also evaluates it ONE TURN PAST THE END
+      ("one more turn would land exactly on the next ringed layer"), and the law became a
+      closure both the ring loop and the cross-validation call so the two cannot drift into
+      two copies. M2 then fired on 5 of 7 rows instead of 4. **The gate that has never
+      caught anything is a hope; this one caught a hole in itself before shipping.**
+
+    - **AN UNEXPLAINED INSTRUMENT ANOMALY — OPEN, and it cannot be closed by repetition.**
+      M3 reported 67 failures on its first batch run, **0 on the second batch run**, and 67
+      on three subsequent runs (two isolated, one batch). The mutation was present in the
+      worktree throughout, verified after the fact. No cause was found — Chromium's HTTP
+      cache was ruled out (a fresh browser and ephemeral context per process, a random port
+      per run) and so was a write race (the mutation was applied minutes before that loop
+      iteration). It is recorded because "run the same tree twice" cuts both ways: a
+      control that reports NOT FIRED once in five runs would, on a single run, have read as
+      a passing instrument.
+
+      **THIS IS THE FLOWER'S #88 SHAPE AND IT INHERITS #88'S RULE: ACCUMULATING CLEAN RUNS
+      CANNOT RETIRE IT.** Four agreeing runs are exactly what #88 had, and they are evidence
+      about the runs that agreed, not about the one that did not. Any number of further
+      green runs leaves this exactly where it is. **What would settle it is a DIFF OF A
+      DISAGREEING PAIR** — capture the app's own `rings` array (or the whole
+      `__bloomMetrics()` snapshot) on every run of the same seed and tree, keep them, and
+      when a pair disagrees compare them field by field to find whether the divergence is
+      in the geometry, in the metrics hook, or in the harness's read of it. Until such a
+      pair is captured and diffed, treat this as an open question about the INSTRUMENT, not
+      as a settled flake and not as a defect in the law: the shipped tree is green on every
+      run, and M1 and M2 have never once failed to fire.
+
+      **IT NOW HAS A NAMED SUSPECT (the zygomorphy session, Sep 1), AND THE SETTLING
+      STANDARD IS UNCHANGED.** `applyConfig()` did not wait for the rAF-coalesced rebuild
+      — see the zygomorphy entry below for the finding and the fix — so any assertion
+      reading `__bloomMetrics()` could be reading the PREVIOUS build. **A stale-build read
+      produces exactly M3's symptom: NOT FIRED.** M3 mutates the foot-width floor, which
+      binds on one row; a read that arrives before the rebuild sees the prior row's or the
+      default page's metrics, where the floor does not bind, and the mutation reads as
+      absent. That matches every feature of the anomaly — a mutation present in the
+      worktree throughout, firing on four runs of five, with no HTTP cache and no write
+      race to blame, and 67-versus-0 rather than a partial count (one stale read at the
+      wrong moment costs the whole row's assertions at once).
+
+      **THIS IS A SUSPECT, NOT A DIAGNOSIS, and it does not retire the anomaly.** The
+      settling standard stated above stands exactly as written: a DIFF OF A DISAGREEING
+      PAIR. Nothing here was reproduced, M3's run happened on a tree that has since
+      changed, and "a mechanism that could produce the symptom" is not "the mechanism that
+      did" — which is the same distinction #88 turns on. What changes is only the ORDER OF
+      INVESTIGATION: **any future M3-style flake is checked against build-counter
+      telemetry FIRST** (`__bloomBuildState()` — was the build that the assertion read the
+      build the row asked for?), because that is now cheap, and it separates "the
+      instrument read the wrong model" from "the model differed" before anyone reaches for
+      a harder explanation. If the counter is clean on a disagreeing pair, this suspect is
+      eliminated and the anomaly is exactly where it was.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 1): THE CONTINUOUS SPIRAL IS WHAT SHE WAS
+      REACHING FOR. MERGED.** This closes the brief the session was opened on —
+      *"spiral is still very distinct layers, and I don't know if it should be"* — and it
+      closes it with a measurement rather than with an impression, which is why the
+      headline pair was built the way it was: the same 40 petals × 3 deep at spread 1.55,
+      the same 120 petals and the same 149,568 export triangles on both sides, so the only
+      thing that could differ was the arrangement. **The evidence is that the radius stops
+      being a step function: 117 of 119 steps at exactly 0.0000 mm and two at 6.4209 mm
+      (28.0% of the hub radius in one jump) become 119 steps between 0.0658 and 0.1735 mm,
+      about one percent of a petal width.** The second half of her brief — "I don't know if
+      it should be" — was answered separately and deliberately NOT by this ruling: the
+      layered spiral survives as its own placement value, so ruling it out later remains a
+      fresh ruling needing fresh evidence rather than something this merge decided for her.
+
+    - **THE 161.25° EFFECTIVE TILT SHIPS AS PHOTOGRAPHED (Eva, Sep 1).** Ruled from the
+      extremes sheet on the same standing pattern as the 135° cell it supersedes in reach,
+      the max-roll faceting, the ROLL CLAMP look and the spread-6 plate: ship it,
+      photograph it, name it in both gates. **Capping `layerTilt` remains one range change
+      with that cell as its evidence** — available if it ever offends, and not to be
+      started on the strength of the number alone. Reopening it is a fresh ruling needing a
+      fresh picture, exactly as the max-combinator kink and the tip cap are.
+
+- ~~Per-slot petal overrides — the only route to zygomorphy, and one of the two
+  capabilities the flower-project skill says nothing else unlocks~~ **OPENED Sep 1, AND
+  DELIBERATELY SPLIT IN TWO. SESSION A BUILT: the override architecture plus PER-LAYER
+  roles — the iris. Session B is the mirror plane, slot roles, and the orchid.** Eva's
+  ruling was full per-slot differentiation, not placement mirroring and not
+  modulation-only; this is the first half of that, and the seam is recorded below rather
+  than left to be re-derived.
+
+    - **A ROLE IS A GROUP OF SLOTS THAT SHARE ONE OVERRIDE RECORD — not a slot, and not a
+      layer. THAT THE GROUP IS THE UNIT IS THE WHOLE DESIGN, AND IT IS LOAD-BEARING
+      RATHER THAN STYLISTIC.** Measured before anything was written: the ringed area rule
+      accumulates `petalCount * rFoot²` once per whorl, and the obvious reading of
+      "per-slot overrides" — regrouping it per FOOT — is the same number in algebra and
+      **not the same double**. `n = 8` agrees exactly; **`n = 40` differs by 8.53e-14,
+      6.00 ULP**; petalWidth 30 × sheet 2.40 by 2.00 ULP; n = 13 by 1.00. So per-slot
+      grouping would have moved **every 40-petal export** for nothing. That is the
+      flower's `a*(b+c)` vs `a*b + a*c` trap, **now fired twice in this project family**
+      (it fired on a real row when layers were written, and it would have fired here).
+      Grouping by ROLE keeps the loop shape: `roleCount` is `state.petalCount` at one role
+      per whorl, the same double the pre-role expression multiplied by, so the sum is
+      bit-identical by construction. **Do not regroup it.**
+
+    - **SO `zygoGuardResidual` IS AN EQUALITY, NOT A BOUND** — unlike `guardResidual`
+      beside it, and stated here so nobody later loosens it. `footRing()` carries the
+      pre-role expression verbatim alongside the role-grouped one and compares the two on
+      every build where the claim is available; it measures **exactly 0** on every row,
+      the continuous arm included (where `roleCount` is 1 and `1 * x * x` is `x * x`
+      exactly). It reports **null** once a whorl carries more than one role — which is
+      session B — because there is then no pre-role grouping to compare against, and a
+      claim nothing can make must read as absent, never as a passing 0.
+
+    - **THE GUARD IS OBJECT IDENTITY, which is the cheapest one available and the
+      strongest.** `resolveRoleOverrides()` SKIPS a zero delta outright, so an OUTER ring
+      — or an INNER ring with every delta at 0 — carries no record at all, and
+      `petalStateFor(state, ring)` then returns **the caller's own `state` object**. Every
+      consumer (`widthProfile`, `petalForm`, `thicknessProfile` and the three inline reads
+      in `buildPetalInto`) therefore takes the pre-zygomorphy call on the pre-zygomorphy
+      object. There is no expression to have got subtly wrong and no `-0 + 0` case
+      analysis to rest on — the downgrade the form layer deliberately made is not needed
+      here. Z2(ii) asserts in BOTH directions that a record exists exactly when a delta is
+      non-zero, so the guard cannot quietly stop being one.
+
+    - **SESSION A'S ROLE DERIVATION IS DELIBERATELY COARSE: OUTER (the outermost whorl)
+      and INNER (every whorl above it).** At layerCount 2 that is exactly the iris. At 3
+      the second and third whorls are identical to each other, which is visible on the
+      sheet and is the evidence — the only evidence — that would refine INNER into
+      INNER/INNERMOST. That refinement is a **design ruling with its own partition
+      report**, not a rewrite: it changes the derivation and nothing else.
+
+    - **WHAT IS DELIBERATELY NOT OVERRIDABLE, each argued rather than listed.**
+      `sheetThickness` — **never**: J4a asserts `hub.thickness === ring.thickness`, and
+      one hub has one thickness, so a per-role sheet turns the overlap box's vertical
+      extent from *equal by construction* into a genuine `min(footT, hubT)`. That is a
+      structural guarantee traded for a control nobody asked for. `footDelicacy` —
+      **never**: it scales foot width and so does a per-role width override; two owners of
+      one quantity. `petalCount` — **never**: it is the whorl's count and the set the
+      partition is defined OVER. `petalWidth` is overridable but must be applied ONCE, in
+      `footRing()`, and read back by the builder. **`layerSize` and `layerTilt` are
+      absent from the role overrides on Eva's Q5 ruling**: they are λ-ramps that already
+      own per-layer size and tilt, and they are the only depth controls that survive
+      CONTINUOUS. Two prefixes, two laws — `layer*` is a ramp, `inner*` is a role
+      override.
+
+    - **THE OVERRIDE SET SHIPS TRIMMED, AND THE ASYMMETRY DECIDED IT (Eva, Sep 1).**
+      Three deltas: `innerCurl`, `innerCup`, `innerTipBreadth`, all Standard,
+      `role: 'petal'`, all in ARRANGEMENT, all default 0. Adding a control later is one
+      registry row plus one row in `ROLE_OVERRIDES`, forever; retiring one becomes a
+      schema bump plus a migration the day anything persists a design. So: minimal, and
+      grow on evidence from real use. **RECORDED, NOT BUILT:** `innerRoll`, `innerTwist`,
+      per-layer taper deltas, a per-layer `tipThinning` delta. All mechanically identical;
+      none needed by the iris.
+
+    - **THEY LIVE IN ARRANGEMENT, WHICH IS THE CHARTER'S OWN PREDICTION** — "a layer-count
+      control in that section with per-layer sub-controls gated on it by `visibleWhen`,
+      the `centerStyle` pattern one level up, not a section per layer". It also keeps the
+      panel gate honest: ARRANGEMENT ships OPEN, so the path route needs no WITNESS for a
+      section whose every control is hidden at the shipping default — **a witness that has
+      to set up its own precondition before it can move anything is a witness that can
+      quietly measure nothing.** When session B's slot roles arrive, a "Whorl differences"
+      SECTION is the right home for the pair, and it will need that precondition
+      mechanism. Recorded so it is designed rather than discovered.
+
+    - **THE GATING IS A RULING WITH A MEASUREMENT BEHIND IT, AND IT IS NOT THE
+      SHIP-THE-EXTREMES PATTERN (Eva, Sep 1 — the distinction is the entry).** Eva's
+      standing pattern covers honest extremes of honest controls: the max-roll faceting,
+      the ROLL CLAMP look, the spread-6 plate, the 135° and 161.25° tilts. A bilateral
+      control under SPIRAL is a different category. Reflecting a golden-angle arrangement
+      about any plane leaves the best mirror pairing off by **32.461° at n=5, 20.062° at
+      n=8 (45% of a slot gap), 12.399° at n=13 and 4.736° at n=40**, against **0.000° at
+      every count under RADIAL**. A "mirror" control there would be a symmetry label
+      sitting on a measured asymmetry — a label lying about a computation, which is this
+      project's oldest enemy and the one thing it never ships. So: **slot roles (session
+      B) are RADIAL-only; layer roles are hidden under CONTINUOUS**, where there are no
+      layers to differentiate and J5 asserts exactly that. Both are `visibleWhen`
+      predicates, nothing imperative. **Two named rows assert the CONTINUOUS state is
+      hidden AND bit-identical with all three deltas at MAXIMUM** — a gated state is
+      coverage, and a gated state nobody exercises is a claim nobody checked.
+
+    - **BOTH SHIPPED GATES ARE STRUCTURALLY BLIND TO THIS LAYER, AND THIS TIME THAT WAS
+      MEASURED BEFORE THE ASSERTIONS WERE WRITTEN rather than derived and hoped for** —
+      which is what found the hole in the first draft. The derivation: topology is fixed
+      (no edge census can move), the foot is never written by anything a role may override
+      (the three foot rows come from `footRing()`'s own quantities before any curve
+      exists, and every profile is evaluated at `u`, where the foot rows carry u = 0), and
+      the hub disc spans every ring (no flood fill can split). Then the measurement, on
+      three throwaway worktrees:
+
+      | mutation | boundary | degenerate | tris live/export | STL bytes | fired |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | identical | — | **0 of 7 rows** |
+      | M1 wrong role (override lands on layer 0) | **0** | 0 | **identical** | **same length** | Z1 on 6 rows (+ Z2(v)) |
+      | M2 record never reaches the blade | **0** | 0 | **identical** | **same length** | **Z2(iii) ONLY**, 4 rows |
+      | M3 area rule regrouped per foot | **0** | 0 | **identical** | **same length** | **Z3 ONLY**, 5 rows |
+
+      **M2 IS THE ONE THAT MATTERS.** Every existing instrument passes it on every row:
+      J1–J6 clean, `formAssertions` clean, `thicknessAssertions` clean, `guardResidual` and
+      `zygoGuardResidual` both clean, ring radii identical to the bit, read-out identical.
+      The ring even reports a perfectly correct override record. **Only comparing that
+      record against what the BUILDER said it used can see it** — which is why
+      `petalRingApplied` reports the effective state the builder actually read, and never
+      the resolver's answer.
+
+      **M3 IS WHY Z3 IS AN EQUALITY.** It measures 8.88e-16 at two layers, 3.55e-15 at
+      three and 5.33e-15 at petalCount 40 — **0.9 ULP on an 11.6 mm radius** — so the
+      4-ULP tolerance `guardResidual` legitimately needs would have passed it in silence.
+      It also reports **exactly 0 on the shipping default**, so a control that only looked
+      at the default row would have called the mutation clean.
+
+      **M1 WAS PARTIALLY CAUGHT BY AN EXISTING INSTRUMENT, and the shape of that is worth
+      more than the catch.** `formAssertions` and `thicknessAssertions` read RING 0's
+      petal while evaluating their predicates against the ROW's (base) state — so under M1
+      they fire on rows whose base state is flat, and see **nothing at all** on the iris
+      row itself, where the base curl is already −90. That soundness rests on ring 0
+      carrying no override, which is a property of session A's derivation and **not of the
+      architecture**. **Z2(v) asserts it**, so session B fails loudly at the boundary
+      instead of quietly measuring a petal built from a state it is not checking against.
+
+    - **THE POSITIVE CONTROL FOUND TWO BUGS IN THE ASSERTIONS, WHICH IS THE POINT OF
+      RUNNING IT FIRST.** Z1's first draft compared the role groups against
+      `m.sequenceLength` — which is `petalCount` under the RINGED arm and
+      `petalCount * layerCount` under the continuous one, so it is not the bloom's petal
+      count in both modes at all — and **the shipped tree failed on 5 of 7 rows**. It now
+      compares against `petalsBuilt`, a tally counted at the whorl loops themselves, so
+      the partition is checked against what was BUILT rather than against another number
+      the same owner produced. (The second was in the probe, not the tree:
+      `formAssertions` derives flatness from `row.set`, and a probe passing no set makes
+      it fire spuriously — worth knowing before reading any future run of it.)
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike at 543.8 KiB**, unchanged. The three deltas add ZERO triangles at every
+      setting — topology is fixed, so an override moves vertices and nothing else, the
+      pointed/truncate tip partition included. **`--full` cannot compare across the two
+      trees here**: 19 of the new rows set controls the old registry does not have, so the
+      frozen matrices are the like-for-like comparison, exactly as they were for the
+      continuous spiral.
+
+    - **THE MATRIX GREW 180 → 205** — six rows from the registry-derived layer-sub sweep
+      (which picked the three deltas up automatically, through `predicateDrivers` rather
+      than a shape sniff, exactly as the latent trap closed in #124 intended), plus
+      eighteen named corners and one capability row. The corners are the region this
+      change affects: the IRIS by name, the zygomorphic BARE bloom, ALL INNER MAX against
+      ALL THIN / spread min / petalCount 3 and 40 / ALL FORM MAX, all three clamp corners,
+      the tip partition both ways in one bloom, the SPIRAL row, the two GATED CONTINUOUS
+      rows, and the foot's upper clamp.
+
+    - **A PRE-EXISTING DEFECT FOUND BY DISCOVERY: THE FOOT'S UPPER CLAMP HAS BEEN SILENT
+      SINCE SESSION 5 (Eva's ruling, Sep 1 — option b, telemetry only).**
+      `clamp(authoredWidth, FOOT_MIN_WIDTH_MM, 10)` has always had an upper bound and
+      `widthClamped` reported only the lower one. So from `petalWidth` 25 upward — **six
+      of that slider's 23 reachable values, 26% of its range** — the blade keeps widening
+      and the area-ruled ring does not move at all: **10.8324 mm at 24, 11.0558 mm at 25,
+      still 11.0558 mm at 30**. The bare `10` is now `FOOT_MAX_WIDTH_MM`, `widthClampedHigh`
+      sits beside `widthClamped`, and the read-out gained a ceiling twin of its floor line
+      through one owner for the phrasing. **No geometry moves** — the constant is the same
+      double the literal was. This is the "(CLAMPED)" discipline the roll floor, the tip
+      floor and the foot floor already carry, arriving where it was always missing. It
+      predates the zygomorphy work by four sessions; a per-role size multiplier is simply
+      the fastest route to it, which is why it surfaced here rather than in a bug report.
+
+    - **THE SEAM, so session B starts from a stated boundary rather than re-deriving one.**
+      Session A built the override PLUMBING on the descriptor that already exists: the
+      role-grouped area rule (`roleCount` on every descriptor), `ROLE_OVERRIDES` as the one
+      table of what may be overridden and by what law, `resolveRoleOverrides()` and the
+      object-identity guard, the per-ring `role` / `overrides` telemetry, the builder's own
+      `applied` record, and Z1–Z3. **Session B changes exactly two things: the role
+      DERIVATION (from a mirror plane, giving LABELLUM / HOOD / LATERAL) and WHICH
+      DESCRIPTORS EXIST (one per (layer × role) instead of one per layer).** The override
+      mechanism is not rewritten — it is multiplied. Concretely, session B must:
+      `footRing()` returns per-(layer, role) descriptors with `roleCount` the role's own
+      group size (the sum stays grouped — **never** regroup it per foot);
+      `buildBloomInto` looks a descriptor up by slot index and computes nothing;
+      `zygoGuardResidual` goes null on those rows and Z3's `multiRole` branch covers it;
+      **Z2(v) fires the moment a record lands on ring 0**, so `formAssertions` and
+      `thicknessAssertions` must take the effective state before a slot role may reach it;
+      and the mirror-plane control is RADIAL-only on the measurement above. `slotsPerRing`
+      becomes per-descriptor and J1's accounting check generalises with it.
+
+    - **RECORDED, REJECTED, so it is not re-proposed: a role SELECTOR** ("editing:
+      Labellum / Hood") driving one shared override block. The registry cannot express it
+      — one control id is one value, so the per-role values would have to live outside the
+      registry. It is the second-source-of-truth defect wearing a UI convenience.
+
+    - **A SECOND PRE-EXISTING DEFECT, IN THE HARNESS ITSELF, AND IT IS THE MORE SERIOUS OF
+      THE TWO: `applyConfig()` DID NOT WAIT FOR THE MODEL TO BE BUILT.** `regenerate()` is
+      rAF-coalesced through `scheduleRegen()`, so when `applyConfig()` returned — every
+      value set, every real event fired, every read-back clean — the model had not
+      necessarily been rebuilt. Every assertion that then read `__bloomMetrics()` could be
+      reading the PREVIOUS build, which on a fresh page is the DEFAULT bloom. **This is
+      the flower's "73 of 185 configs measuring the wrong design" defect with a timer in
+      place of a read-back**, and it has been present since the first gate.
+
+      **HOW IT SURFACED, and it is the ugly way rather than the clean one.** The export
+      gate's first full run on this branch failed ONE validity assertion —
+      `ALL MIN × RING min: form row reports NO form telemetry — the guard short-circuited
+      a row that sets a curve` — on a row this session does not touch. That run was
+      competing for four CPUs with the byte baseline. The row then passed 3 of 3 in
+      isolation, which is precisely the shape that gets written off as a flake.
+
+      **WHAT IS MEASURED AND WHAT IS NOT, stated separately because they differ.** The
+      MECHANISM is certain and is a fact about the code, not a statistic: `applyConfig`
+      queued a rebuild and returned without waiting for it. The RATE is not: immediate
+      reads raced 0 of 40 on an idle machine on BOTH the pre-change and post-change trees;
+      a symptom probe under artificial load saw 1 null in 40 on this tree and 0 in 40 on
+      `e77bf67`, which is one event and decides nothing; and a direct counter probe under
+      load saw 0 of 60. **So this is NOT claimed as a regression and NOT claimed as
+      reproducible** — it is claimed as a window whose width no gate should depend on
+      (headless Chromium throttles rAF under load), and it was closed on the mechanism
+      rather than on the statistic. Accumulating clean runs could not have retired it, on
+      #88's rule.
+
+      **THE FIX IS THE REAL SIGNAL, FOLDED INTO `applyConfig` SO NOBODY HAS TO REMEMBER
+      IT.** The app exposes `__bloomBuildState() -> { count, pending }`; `settleBuild()`
+      waits for `pending === false` and `applyConfig` calls it. `pending` is now cleared
+      AFTER the build and in a `finally` — after it, so `false` unambiguously means no
+      build is outstanding rather than "the callback started"; in a `finally`, so a
+      throwing build cannot leave the flag stuck and silently stop the app rebuilding,
+      which is what clearing it first had been defending against. A tree without the hook
+      (the byte diff's `--root` before-tree) returns true and the caller proceeds exactly
+      as before, rather than a wait quietly claiming to have happened.
+
+      **THE BYTE BASELINE IS UNAFFECTED and that is a property of the export path, not
+      luck:** the STL comes from the export handler, which calls `readUI()` and builds
+      fresh in export mode, so exported bytes never depend on the coalesced LIVE rebuild.
+      The `--region foot` slab likewise reads `sheetThickness` from `__bloomUIState()`,
+      not from a build. Half the before-tree baseline ran on the pre-fix harness and half
+      on the post-fix one; that is recorded rather than hidden, and it cannot matter for
+      the reason just given.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 1): THE IRIS SHIPS. MERGED.** This closes the
+      first half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and it closes the IRIS
+      half specifically, on a picture rather than an impression. The headline pair is what
+      it was ruled from and it was built to make the comparison unfalsifiable: the same
+      arrangement, the same 8 petals, the same 21,024 triangles on both sides, so the only
+      thing that could differ is which state each whorl was built from. The outer whorl
+      curls −90° and hangs; the inner composes −90 + 180 = +90° and cups.
+
+    - **BOTH TASTE OBSERVATIONS WERE RAISED AND BOTH WERE RULED FINE AS-IS, and recording
+      the RULING rather than only the observation is the point — an unresolved-looking
+      note in a charter gets re-litigated by the next session that finds it.**
+
+        * **The clustered standards are A SLIDER POSITION, not a defect and not a range
+          problem.** On the headline cell the inner whorl reads as a tight central crown
+          rather than three distinct upright petals; that is `layerSize` 0.62 against
+          curl +90, and every one of those numbers is reachable and adjustable. Nothing
+          is queued. Do not "fix" the default, widen a range, or add a control on the
+          strength of this note.
+
+        * **INNER COVERING EVERY WHORL ABOVE THE OUTERMOST IS ACCEPTED FOR NOW.** At three
+          layers the second and third whorls are identical to each other, which is visible
+          on the extremes sheet and was ruled acceptable. **The INNER/INNERMOST SPLIT
+          STAYS A RECORDED CANDIDATE, and its reopening evidence is named so it cannot be
+          reopened on the strength of reading the code: the three-whorl cell READING WRONG
+          TO EVA LATER.** Not this look — she has seen this look and accepted it. A fresh
+          ruling needs a fresh picture, exactly as the max-combinator kink, the tip cap and
+          the parked tilt extremes do. When it comes, it is a design ruling with its own
+          partition report — it changes the DERIVATION and nothing else — never a rewrite.
+
+- ~~Session B: the mirror plane, slot roles, and the orchid~~ **BUILT Sep 2. The seam
+  held: the override MECHANISM was not rewritten, it was MULTIPLIED.** Session A's
+  `ROLE_OVERRIDES`, `resolveRoleOverrides()`, the object-identity guard and the builder's
+  own `applied` record all survive; what changed is the role DERIVATION (a mirror plane
+  giving LABELLUM / HOOD / LATERAL) and WHICH DESCRIPTORS EXIST (one per (layer × role)).
+
+    - **THE MIRROR PLANE IS DERIVED AND WILL NEVER BE A CONTROL.** It contains the axis and
+      slot 0's radial direction. An orientation slider would rotate which slots are the
+      labellum on an arrangement that is otherwise radially symmetric — an invisible rigid
+      rotation of the whole bloom under a label naming a symmetry, which is `layerPhase`'s
+      recorded trap exactly. Putting the labellum at the bottom of a picture is the shot
+      tool's CAMERA, not the geometry's azimuths, so it moves no bytes.
+
+    - **THE ASSIGNMENT IS EXACT INTEGER ARITHMETIC — no angle, no tie tolerance, no
+      epsilon**, which is what lets Z4 be a property rather than a bound. The plane pairs
+      slot *i* with slot *n−i*, and the roles that can be SINGULAR are exactly that
+      involution's FIXED POINTS: slot 0 always, and slot *n/2* when *n* is even. One owner,
+      `roleForSlot(i, n)`, called by `footRing()`; `buildBloomInto` looks a descriptor up by
+      slot index and computes nothing.
+
+    - **AT ODD COUNTS THE ANTIPODE FALLS IN A GAP, so the HOOD IS THE STRADDLING PAIR
+      (Eva, Sep 2)** — a mirror pair, so no symmetry claim weakens, and the ordinary
+      two-lobed upper lip. **THE EMPTY GROUP IS PUSHED ONTO LATERAL DELIBERATELY, and that
+      is the deciding argument rather than a detail:** LATERAL is the role with NO controls,
+      so an empty LATERAL strands nothing, whereas an empty HOOD would leave three hood
+      sliders naming a group with no members — which is what Z1 already fails INNER on. At
+      `petalCount` 3 that is LABELLUM {0}, HOOD {1,2}, LATERAL {} — one of three IS the
+      labellum, and it is the orchid.
+
+    - **A CHARTER PREMISE WAS MEASURED AND CORRECTED, AND THE RULING IT SUPPORTED SURVIVED
+      ON BETTER GROUND. This is the rationale-is-a-premise doctrine working across sessions,
+      on this document itself — which is the failure mode it was written to catch.**
+      Session A's four numbers are REAL and reproduce EXACTLY — 32.461° at n=5, 20.062° at
+      n=8, 12.399° at n=13, 4.736° at n=40 — but they measure ONE rule: reflect about the
+      plane through SLOT 0 and ask how far each image lands from the nearest slot. The
+      charter states them as *"reflecting a golden-angle arrangement about **any** plane"*,
+      and **that quantifier is FALSE.** A golden-angle whorl is an arithmetic progression on
+      a circle, so reversing it gives the same set: it IS exactly mirror-symmetric, about
+      the plane at `(n−1)·g/2`, pairing `i ↔ n−1−i`, measured at **≤ 8.14e-13°** at every
+      count, with the best free plane at 0.000° everywhere.
+      **SLOT ROLES STAY RADIAL-ONLY**, on the corrected and stronger ground: under SPIRAL
+      the plane is elsewhere and the pairing is a DIFFERENT involution, so sharing one
+      derivation across placements produces precisely session A's measured asymmetry. A
+      correct-for-SPIRAL derivation is **RECORDED, NOT BUILT** — it is a second derivation
+      needing its own evidence and its own ruling. Do not reopen the gating from the old
+      number; the old number was never about "any plane".
+      *(The first instrument written for this reported 0.000° for SPIRAL under a
+      many-to-one pairing and was caught by its own control — a bijection is required, and
+      the control existed because session A's published numbers were there to reproduce.)*
+
+    - **AND SLOT ROLES NEED `layerPhase` 0 ABOVE ONE WHORL (Eva, Sep 2), which is a second
+      measurement rather than caution.** The plane is the BLOOM's, so every whorl's slots
+      must be symmetric about it; ring L is offset by `L·layerPhase` slots and the
+      assignment is by index, so all whorls share the plane only at phase 0. Worst pairing
+      error over the best SHARED plane: **2 layers × phase 0.25 → 30.000° at n=3, 11.250° at
+      n=8, 2.250° at n=40; 3 layers × phase 0.33 → 39.600° / 14.850° / 2.970°; phase 0 →
+      0.000° at every count and depth.** **RECORDED, NOT BUILT:** at phase 0.50 the
+      ARRANGEMENT is exactly symmetric (0.000°, measured) because two slots TIE for the
+      plane — but expressing that costs a float tie-comparison inside a derivation that is
+      otherwise exact integer arithmetic, so it is a refinement with its own ruling.
+
+    - **THE COLLAPSE GUARD IS LOAD-BEARING, AND THE REGROUPING TRAP HAS NOW FIRED A FOURTH
+      TIME — prevented at design time again, by measurement.** Splitting a whorl's
+      `n · rFoot²` into `1·r² + h·r² + l·r²` **moves the derived ring radius on 46 of 264
+      measured (config × mode) rows**, worst **0.99 ULP** (3.553e-15 on a 17.26 mm radius at
+      n=39 × petalWidth 30 × sheet 2.40), and it moves at n=3 as readily as at n=40. So the
+      split is CONDITIONAL: unless a slot role actually resolves a record, `footRing()`
+      returns session A's descriptor list on session A's arithmetic, character for
+      character. The gating needs no second mechanism — an ineligible state makes every slot
+      LATERAL, LATERAL carries no rows in `ROLE_OVERRIDES`, so nothing resolves and the list
+      collapses on its own. **Z5 asserts the collapse in BOTH directions**, so the guard is
+      never somewhere a bug sits unexercised.
+
+    - **TWO LAWS NOW — `delta` and `mul` — AND THE TABLE'S KEY MOVED WITH THEM.** Session A
+      carried the control id under a key called `delta`, honest while every row was one; a
+      multiplier under that key is a stored label-lie. The id lives under `control` and the
+      law under `law`, with `LAW_IDENTITY` the one owner of "what is this law's identity".
+      **Both identities are SKIPPED rather than applied**, so neither `x + 0` nor `x * 1` is
+      evaluated on the shipped path — the guard is still object identity, re-pointed rather
+      than extended.
+
+    - **SIZE × NEVER REACHES THE RING, and the ruling's own stated guarantee turned out to
+      be the WRONG one — found by measuring the positive control before writing the
+      assertion.** J2's containment equality was expected to catch a size override plumbed
+      into `footRing()`. **It does not:** every descriptor still takes `radius = R0 · scale`,
+      so containment holds and J2 stays silent. What fired on the measured mutation was the
+      single-layer guard residual, and **only at layerCount 1**; on the three-layer row the
+      mutation fired **NOTHING AT ALL**. **Z6 is the only witness above one whorl** — every
+      descriptor of a whorl must report the same foot (`width`, `authoredWidth`, `radius`,
+      `overhang`, `thickness`, `scale`, `phase`, `tiltExtra`). A role differentiates the
+      BLADE and nothing else.
+
+    - **SIZE × SATURATES, AND IT IS TOLD.** A composed value is clamped into the base
+      control's own range, so ×2.00 on a 35 mm petal asks 70 × 32 and gets 60 × 30 — the
+      multiplier stops moving before its slider does. The read-out prints what was asked and
+      what was built, from `footRing()`'s own out-parameter rather than re-derived (a
+      read-out recomputing "what was asked for" would be a second copy of the composition
+      law). Same "(CLAMPED)" discipline as the roll floor, the tip floor and both foot
+      clamps.
+
+    - **A SESSION-A CHECK WAS MADE MORE GENERAL, NOT WEAKENED.** Its ROLE_OVERRIDES
+      load-time guard asserted `delta range === base range` under a header naming the
+      property "no dead zone at the end of a shipped slider". That equality is a PROXY that
+      holds only while the base's range straddles the delta's useful span — true of all
+      three session-A rows, so proxy and property agreed and nothing distinguished them.
+      `petalTilt` runs 0..75 and contains no negative part, so a labellum that tilts DOWN
+      needs a delta below zero; the genuinely usable reach is `baseMin − baseMax ..
+      baseMax − baseMin`. All three of session A's rows satisfy the corrected form
+      unchanged, and it still rejects everything the proxy rejected.
+
+    - **Z2(v) WAS DISCHARGED BEFORE THE BOUNDARY WAS CROSSED, not after.** Session A made it
+      fire the moment a record lands on ring 0; slot 0 IS the labellum, so it fires
+      immediately. **Keeping descriptor 0 clean was NOT available** — at `petalCount` 3 the
+      whorl splits into LABELLUM and HOOD with no laterals, so every descriptor carries a
+      record and there is no base-state petal to point at. `formAssertions` and
+      `thicknessAssertions` now take the effective state the BUILDER reported using, which
+      is what the seam named. The tip-partition check moved with them and it MATTERS there:
+      `petalTipBreadth` is overridable and the cap partitions on `=== 0` exactly, so reading
+      the row would have checked a converging cap against an authored truncate.
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument before
+      Z4–Z6 were written and again after:
+
+      | mutation | boundary | degen | STL bytes | before Z4–Z6 | after |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | — | **0 of 7 rows** | **0 of 7 rows** |
+      | M1 off-by-one hood index | 0 | 0 | same length | **NOTHING** | **Z4 only**, 6 across 4 rows |
+      | M2 slot record never reaches the blade | 0 | 0 | same length | Z2(iii) only | Z2(iii) only, 48 across 4 rows |
+      | M3 collapse guard removed | 0 | 0 | same length | **NOTHING** | **Z5 only**, on the DEFAULT row |
+      | M4 size × plumbed into `footRing()` | 0 | 0 | same length | guard only, and **silent at 3 layers** | **Z6**, 22 across 4 rows |
+
+      **M1 AND M3 ARE THE ENTRY THAT MATTERS.** Both are invisible to the entire shipped
+      instrument — both STL gates, the triangle count, the byte length, J1–J6,
+      `formAssertions`, `thicknessAssertions` and Z1–Z3 alike. M1 keeps the partition total,
+      disjoint and identically SIZED, so the area-rule sum is bit-identical; M3 silently
+      splits the DEFAULT bloom into three descriptors. Every mutation leaves session A's
+      IRIS row and the GATED rows clean, so all four are scoped to the new arm.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike**, unchanged. The eight new controls add **ZERO triangles at every
+      setting** — topology is fixed, so an override moves vertices and nothing else — which
+      the ORCHID row confirms directly: 11,136 tris and the same STL byte length as the
+      undifferentiated control beside it, with R0 identical to the bit.
+
+    - **THE PANEL: A NEW SECTION, "Petal roles" (Eva, Sep 2)**, holding session A's three
+      `inner*` deltas (moved from ARRANGEMENT — presentation only, nothing persisted) and
+      the eight new ones. Session A predicted the name "Whorl differences"; it was passed
+      over because slot roles differentiate WITHIN a whorl, so that name would be wrong for
+      eight of eleven controls, and "Zygomorphy" was passed over as jargon on a
+      visitor-facing panel.
+
+    - **AND IT NEEDED NO PRECONDITION MECHANISM, which session A predicted it would.**
+      Session A reasoned the section would ship with every control hidden and warned that a
+      witness arranging its own preconditions is a witness that can quietly measure nothing.
+      The `layerPhase` gating ruling changed that before it was built: slot roles apply at
+      `layerCount` 1, so the predicate is TRUE at the shipping default and the section
+      RENDERS at first load — collapsed, with its eight slot controls visible and session
+      A's three hidden. **A session-B design report managed to state this BOTH WAYS in one
+      document.** It was settled by EVALUATING the predicate, and the panel gate now asserts
+      that exact first-load state in both directions on the DOM, so it can never again be
+      settled by reading two paragraphs.
+
+    - **THE MATRIX GREW 205 → 246**, and **`phase7Matrix()` — the 205 rows frozen at
+      f626828 — is the sixth baseline and now the strongest**, on the reasoning that
+      promoted each of its predecessors: it is the only one carrying session A's zygomorphy
+      corners, which is the region a second role axis is most likely to disturb. Generated
+      from f626828's own `buildMatrix()`, proved deep-equal in CI. `--full` cannot compare
+      across the trees for the third time running: 33 new rows set controls the old registry
+      does not declare. **The slot controls are excluded from the layer-sub sweep by
+      derivation** — their predicate reads `layerCount`, so `predicateDrivers` correctly
+      puts them there, where at three layers and the default phase they are HIDDEN and every
+      row would build the shipping default under a label naming a control that did nothing.
+      That is the latent trap #124 closed, arriving from the other direction.
+
+    - **`slotsPerRing` WAS RETIRED.** It answered "how many petals does a ring carry" with
+      one number, which a split whorl does not have. Its one real consumer was J1's
+      accounting, which now sums each descriptor's own `roleCount`. Nothing persists it, so
+      no `RETIRED_IDS` entry is owed — that list is for CONTROL ids, which reach saved
+      designs.
+
+    - **`fitCamera` GAINED AN EXPLICIT, DEFAULTED `up`.** Looking down the axis passed
+      `dir = [0,0,1]` with `up = [0,0,1]`, which are PARALLEL — so "face-on" has never had a
+      defined roll in this codebase, and got whatever three.js's degenerate fallback picked.
+      That did not matter while every bloom was radially symmetric and it matters completely
+      for a bloom with a face. Every existing caller omits the argument and frames
+      identically.
+
+    - **A TRAP IN `diff-bloom-bytes.mjs` FIRED EXACTLY AS ITS OWN HEADER PREDICTED.** Adding
+      `--phase7` to `MATRIX_FN` without adding it to `MATRIX_FLAGS` made the flag be
+      ACCEPTED and `legacyMatrix()` run — a 47-row report under a 205-row label. The header
+      records this happening to `--phase3` and again to `--phase4`; it has now happened a
+      third time. The one-list fix is in place and worked (the run said 47), but the flag
+      constant is a second place to remember.
+
+    - **EVA'S RULING FROM THE SHEETS (Sep 2): THE ORCHID SHIPS. MERGED.** This closes the
+      SECOND half of the brief the zygomorphy work was opened on — full per-slot
+      differentiation, with orchid and iris as the target forms — and with it the whole
+      brief: **the bloom can now face you.** She ruled from **the `petalCount` 3 cell**,
+      which is the one that answers the question without needing its caption: one big lip
+      below, two raised tepals above, no laterals at all, and it reads as an orchid on
+      sight. The headline pair is what makes it unfalsifiable — the same arrangement, the
+      same eight petals, **the same 11,136 triangles on both sides**, so the only thing
+      that could differ between the control and the orchid is which state each SLOT was
+      built from.
+
+    - **THE BROAD FACE-ON READ IS A SLIDER POSITION, NOT A RANGE PROBLEM (Eva, Sep 2), and
+      recording the RULING rather than only the observation is the point** — an
+      unresolved-looking note in a charter gets re-litigated by the next session that finds
+      it. At the headline settings the labellum and hood read as broad rounded masses
+      face-on rather than as distinctly petal-shaped: that is `labellumTilt` clamping to
+      horizontal plus `labellumCurl` −60 bringing the blade toward the camera, and every one
+      of those numbers is reachable and adjustable. Same standing as session A's clustered
+      standards. **Nothing is queued. Do not "fix" a default, widen a range, or add a
+      control on the strength of this note.**
+
+    - **THE FAN LINEAGE, NAMED (Eva, Sep 2): THE LABELLUM SATISFIES HER ORIGINAL FAN
+      PRINCIPLE.** The principle is that *the petal on the mirror line is petal number one,
+      and it has its own sliders* — which is exactly what slot 0 became. So the orchid is
+      not a detour from the fan idea; it is the fan idea's first half, arriving through the
+      role mechanism rather than through an arrangement. **THE FLOWER'S OWN FAN UI IS THE
+      RECORDED PATTERN FOR PER-PETAL GRANULARITY** whenever it arrives here: per-petal
+      control GROUPS, labelled in the flower's own style (`PETAL 1 — INNER`). It is a
+      pattern to borrow, not queued work — and it is the answer to the SELECTOR that
+      session A recorded and rejected, since a group per petal is a registry row per petal
+      rather than one control id holding several values.
+
+- **THE INFLORESCENCE IS SCHEDULED IN SESSIONS AND THE FIRST ONE SHIPPED INSTANCING PLUS
+  ONE RACEME** (Eva's twelve rulings, `docs/bloom-inflorescence-discovery.md`; the first
+  session's measurements, `docs/bloom-inflorescence-outcome.md`). **What is PARKED by the
+  rulings rather than by time, so nobody re-proposes it as easy:** presets (ruling 10 — a
+  preset is a BUTTON that writes slider values, never a registry row), per-node deltas
+  (ruling 10's second half), compound levels and cymes and any depth past 1, the
+  maturation ramp and the bud pose (ruling 6, both deferred into the bell/corolla
+  session), droop and axis curvature (ruling 8), and the capitulum, which is the HEAD's
+  and not an arrangement (ruling 1 — a mum is ONE flower with 120 petals and one centre).
+  **PER-NODE DELTAS ARE THE ONE WITH A COST ALREADY MEASURED:** the first session builds
+  the floret unit ONCE and appends it under N rigid transforms, so build time is O(1) in
+  the node count; a per-node delta makes it a build per DISTINCT STATE, which is O(N) and
+  is why it is its own session rather than a slider added to this one.
+  **AND THE TRIANGLE BUDGET IS WHAT DECIDES HOW MANY HEADS A LATER LEVEL CAN HAVE** —
+  measured, heads alone against 1,500,000: the DEFAULT head bites at **78**, a 5-petal
+  floret at **125**, a 3-petal floret at **206**, and THE MUM AT **FIVE**. A compound
+  inflorescence multiplies node counts, so the session that opens one owes that
+  arithmetic BEFORE it builds, at the corner `ALL MAX` reaches and not at a
+  representative row.
+
+## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
+
+**Eva's ruling, session 29, and it is a convention rather than a note because it has cost time
+in every sheet session, not just that one.**
+
+A contact sheet is two things at once: a TOOL and an ARTEFACT. Debugging the tool by running
+the artefact is the expensive way round, and it is the way this project keeps reaching for.
+Session 29 spent **five full-sheet runs** — roughly fifty minutes each — finding bugs in
+`shot-bloom-anther.mjs`, and the geometry passed all sixteen rows on every one of them. The
+failures were: an assertion stated against zero where the renderer is noisy; the same assertion
+restated against a bimodal control; a Playwright screenshot timeout on the heaviest cell; a
+drift check run against the wrong tree's control set; and two temporal-dead-zone slips in the
+page writer. **Not one of them was about the bloom.** The method that worked arrived at attempt
+five: cut the shape and count arrays down to two cells, run that in four minutes, confirm the
+tail, then run the grid once.
+
+**SO THE RULE.** When a sheet tool is new or has been edited:
+
+1. **PROVE THE TOOL ON TWO ROWS.** Copy it, cut its row arrays to a reference cell and one
+   other, and run that. It exercises every code path the full grid does — the cell loop, the
+   controls, the comparisons, every assertion branch, the page writer and the optional
+   before/after pair — in a few minutes rather than an hour. Delete the copy afterwards; it is
+   scaffolding, not an instrument.
+2. **THEN RUN THE FULL GRID ONCE**, to produce the sheet.
+3. **WRITE THE PAGE BEFORE THE OPTIONAL TAIL.** A sheet that spends fifty minutes gathering
+   evidence should not end with no page because a nice-to-have cell at the end threw. The
+   assertions still `die()`; what changes is that the evidence already gathered survives them.
+4. **THE HEAVIEST CELL IS WHERE THE HARNESS BREAKS, not the geometry.** Playwright's 30-second
+   screenshot default is not enough for a fill-rate-bound frame on software GL — measured: 120
+   stamens at size 6.00, macro-framed, killed a run at cell 44 of 49 on 77,280 triangles. Raise
+   it in the tool, and expect the largest cell to be the one that fails.
+
+The same shape applies to any instrument with a long input: **the matrix gates have `--only`
+and `--smoke` for exactly this reason**, and session 29's own JS4 defect was found by
+`node tools/verify-bloom-export.mjs --only "^ANTHER:"` in two minutes rather than by a full
+matrix run. Reach for the narrow run first, every time.
+
+## The working loop — who holds the ball
+
+**RULED Sep 2 (Eva). EVERY SESSION REPORT, AT EVERY STOP, ENDS WITH EXACTLY ONE
+BALL-HOLDER LINE.** Not a summary sentence, not a status paragraph — one line, in one of
+these three forms, as the last thing in the message:
+
+    WAITING ON EVA: <the single question>
+    WAITING ON MEASUREMENT/CI: nothing needed from Eva
+    DONE — merged as <sha>. Safe to archive this session.
+
+**A REPORT WITHOUT THE LINE IS INCOMPLETE.** It applies to every stop, including the
+final one, and including stops where the answer is obviously "nothing" — an obvious state
+that is never written down is a state the reader has to infer from prose, which is the
+whole problem this fixes.
+
+**EVA NEVER MERGES A PULL REQUEST HERSELF.** The merge is always the session's own final
+step, released by her ruling. Her only two recurring actions in this project are RULING ON
+SHEETS and CLICKING BRANCH DELETES; a session is archivable the moment its last message
+reports a merge sha.
+
+**WHY IT IS A RULE AND NOT A HABIT.** A close-out generates a lot of true sentences —
+gate results, row counts, partition tables — and every one of them competes with the only
+question the reader actually has: *is this mine now?* The line answers that before the
+prose is read, in a fixed place, in fixed words. `WAITING ON EVA` carries exactly ONE
+question, because two questions in a ball-holder line is a report that has not decided
+what it needs.
+
+**AN AMENDMENT IS PASTED ONLY INTO THE SESSION WHOSE REPORT IT ANSWERS** (Eva, Sep 2, the
+second duplicate-session occurrence). Ruling on a report and pasting the ruling back are
+two different actions separated in time, and the second one is where a stale tab or a
+copied brief can hand the answer to the wrong session — Eva's own amendment for #133 once
+reached a fresh, unrelated session instead, which opened on it as if it were a new kickoff.
+Verify the branch name in the session's LAST report before pasting; if it does not match
+the session in front of you, it is not this session's amendment to answer.
+
+## Incident, Sep 7 — TWO PARALLEL SESSIONS AGAIN, AND THIS TIME BOTH SHIPPED
+
+**A RECURRENCE OF THE Sep 2 INCIDENT BELOW, with a different ending and a measured cost.** Two
+sessions were open against `cb798f6` at once and both numbered themselves 28: one built the
+per-petal mid-surface grid and its glTF export (merged as `2efea32`, closed by `e7d8992`), the
+other the anther's seven tip controls. Unlike Sep 2, neither was redundant — they built
+different things — so nothing was thrown away. What was paid instead:
+
+- **THE CODE MERGED CLEANLY.** Seven hunks each in `bloom-geometry.js`, disjoint regions; `bloom.js`,
+  `bloom-registry.js`, `bloom.css` and every tool merged with no conflict at all. That is luck,
+  not design: both sessions were adding to the same three files at the same time.
+- **TWO DOCUMENTATION CONFLICTS**, one hunk each: a `CLAUDE.md` pointer both sessions appended in
+  the same place (resolved as a union — no preference involved), and an ADD/ADD collision on
+  `docs/bloom-session-28-outcome.md`, because both sessions had written their outcome doc under
+  the same name.
+- **A RENUMBER.** Eva's ruling: the one that merged first keeps 28, because `main` already refers
+  to it that way; the unmerged one becomes 29, and the stigma's session becomes 30. Every
+  reference moved — `frozen/phase18`'s provenance, the charter entry, the outcome doc's filename
+  and the stigma's brief. The replacement was applied ONLY to lines the unmerged session had
+  added (computed from its own diff against `cb798f6`), so session 26's historical
+  "sessions 3 and 4" — the tip plan's internal numbering, not the global one — was left alone.
+  81 lines across 13 files.
+- **A FULL RE-VERIFICATION, because the merged tree had never been built.** All four bloom gates
+  had gone green on the unmerged head, and every one of those results was void the moment `main`
+  moved: `bloom-geometry.js` had gained 110 lines and `bloom.js` 67 underneath them. **~95
+  minutes**, and `main` had also gained a FIFTH bloom gate (`bloom-grid.yml`), so certifying on
+  the old set of four would have been certifying this tree with the gates of a different one.
+
+**THE RULE THIS PRODUCES: ONE REGISTRY PR IN FLIGHT AT A TIME.** Both sessions touched
+`bloom-registry.js` and `bloom-geometry.js`, which are the two files every gate, every frozen
+matrix and every byte claim is anchored to. A second session against them does not merely risk a
+conflict — it invalidates the first session's entire verification the instant it merges, and the
+cost is the full gate suite, not the diff. The Sep 2 incident's remedy was "check for an open PR
+on the same brief before starting"; this one widens it: **check for an open PR touching the
+registry or the geometry at all, whatever the brief.**
+
+**AND A SMALLER ONE, worth stating because it nearly went unnoticed:** the manifest claim after
+a merge is narrower than it looks. `bloom.html` was on session 29's predeclared untouched list
+and *the other session changed it*. The claim "this session moved none of those 46 files" stays
+true; "those 46 files are unchanged on the merged tree" would not be. Write the first sentence,
+never the second.
+
+## Incident, Sep 2 — one feature, two parallel sessions
+
+**A DUPLICATED KICKOFF PRODUCED TWO SESSIONS BUILDING THE FAN AT THE SAME TIME.** Both
+opened on the same brief against the same `main` (`7877bdf`, #128). One landed as #129 and
+is what ships; the other reached the point of an open PR (#130) before discovering the
+first had merged underneath it. #130 was closed unmerged and nothing from it reached
+`main`.
+
+**THE STALE-PREMISE CHECK IS WHAT CAUGHT IT, and it caught it late rather than early.**
+The charter's own rule — *every factual claim in a prompt is a hypothesis, and the
+snapshot goes stale the moment you commit* — was applied to the brief's opening line
+("`main` carries #128 merged"), which was TRUE at kickoff and FALSE by the time the
+second session pushed. The signal was a routine `git fetch` in the close-out, not
+anything clever. **A session that never re-fetches `main` before opening its PR would
+have proposed a merge of a duplicate and found out in the conflict.**
+
+**WHAT THE DUPLICATE COST, AND WHAT IT WAS WORTH.** It cost an afternoon of compute and
+produced nothing that shipped. What it produced instead is a genuine independent
+replication: two sessions, working separately, ruled the SAME way on every design
+question that had a ruling — full disc at the junction, a two-option choice rather than a
+new checkbox kind, `petalCount` HIDDEN rather than relabelled, the flower's 15–60/default-45
+spacing, and both involutions already written down. Where they differed, #129 was
+better on all three points, which is recorded here because "the duplicate was wasted" and
+"the duplicate agreed" are different facts and only the second is evidence about the
+design:
+
+  * **Z1's clause is stronger than a geometric assertion.** #130 was going to propose
+    "the labellum is the slot nearest the plane, the hood the slot furthest along the
+    arc". Measured against #129's shipped instrument — a `LABELLUM`/`HOOD` swap on the
+    mirror-through-gap arm, with a clean control run on the same tree (282/282, PASS, 0
+    assertions) — **Z1 fired 8 times across 4 rows**, catching it COMBINATORIALLY through
+    "a role's controls are visible IFF the role is non-empty" rather than geometrically.
+    At one per side with the mirror through the gap the tie-break gives both petals to
+    LABELLUM, so the swap empties it while its five sliders stay on screen. Tying
+    membership to visibility with ONE owner fires in both directions and is cheaper than
+    the assertion it made unnecessary.
+  * **`hoodEmpty` beats a minimum-count constant.** #130 gated slot roles below three
+    slots with a `MIN_SLOT_ROLE_COUNT`; #129 states the same boundary as a predicate about
+    the group itself, which is the condition rather than a proxy for it.
+  * **Keeping slot 0 in the labellum AVOIDS a coupling rather than fixing one.** #130
+    numbered slots azimuthally across the arc, which put slot 0 at an arc END — and both
+    guard residuals are computed for `slot.index === 0` while the metrics hook reports
+    DESCRIPTOR 0's petal. Those had been the same petal since the day they were written.
+    #130 had to fix it; #129's ordering never separates them.
+
+**THE COUPLING IS LATENT IN `main` AND IS NOT A DEFECT — recorded so it is not
+rediscovered as one.** `slot.index === 0` still selects the representative petal at both
+sites. It is unreachable today because the shipped derivation always keeps slot 0 in the
+labellum, and the swap mutation is the only thing that exposed it (two of its failing rows
+also read `guard residual null — not measured`). **A future session that changes the slot
+ORDERING re-opens it, and Z1 is not what would catch it** — Z1 saw the role swap, not the
+null residuals. The remedy, if that day comes, is to select the representative petal by
+"the first slot of THIS descriptor" rather than by index 0.
+
+**THE PREVENTION IS PROCESS, NOT AN INSTRUMENT: ONE KICKOFF, ONE SESSION.** No gate can
+see a second session; nothing in this repository can. What makes a duplicate cheap to
+detect is the ball-holder line above — a finished session's last message says `DONE —
+merged as <sha>`, so "is this already built?" is answerable by reading the previous
+session's last line instead of by reading `main`'s diff. **Re-fetch `main` before opening
+a PR, and read the ball-holder line of any session covering the same brief, before
+building rather than after.**
+
+**SECOND OCCURRENCE, SEP 2, A DIFFERENT SHAPE OF THE SAME FAILURE.** The first
+duplicate was two sessions kicked off on the same brief; this one was ONE session that
+never should have been kicked off at all. Eva's amendment to the view-system session's
+report (four rulings on an already-built, already-green PR #133) reached a fresh,
+unrelated session instead — which had no report of its own to check against, so it read
+the amendment as a new brief, opened Phase A discovery, then found #133 already built and
+matching, and adopted its implementation by cherry-pick rather than re-deriving it. It
+added the one thing genuinely missing — the orientation ruling, made from the rendered
+preview rather than the numbers — as PR #135, and closed #133 as "superseded." It was not:
+#133 was the amendment's actual target and, by the time #135 opened, already carried all
+four ruled items (orientation included) plus a fully verified evidence bar #135 never
+built. #133 was reopened, reconfirmed green on its unchanged head, and merged; #135 was
+closed unmerged by its own session once it re-checked and found the duplication.
+
+**"ONE KICKOFF, ONE SESSION" DID NOT COVER THIS FAILURE, because nothing was kicked off
+twice.** The first incident's prevention is about STARTING work; this one is about
+ROUTING an answer to work already in flight. The remedy recorded in this charter's working
+loop above — verify the branch name in a session's own last report before pasting an
+amendment into it — is the corresponding rule for this half of the loop, the same way the
+first incident's remedy (re-fetch, read the ball-holder line) covers the kickoff half.
+
+**RULED Sep 2, from this session's own close-out. FROM SESSION 11 ONWARD a session's
+close runs the NEWEST baseline plus the LIVE-MATRIX partition; the FULL historical suite
+runs only at MILESTONES.** The historical baselines are RETAINED, never deleted — only
+their routine byte-comparison is demoted.
+
+**THE REASONING, AND IT IS A MEASUREMENT RATHER THAN AN IMPRESSION.** The suite is
+1,049 rows and it grows by the whole live matrix every session — 47, then 76, 86, 106,
+125, 158, 205, 246. That is **quadratic in project age**: each session adds a baseline
+whose size is the current matrix, and every later close re-runs all of them, on two trees
+each. This close-out spent an afternoon on it. Session 11's would spend longer, for
+strictly less new information than the same minutes spent anywhere else.
+
+**WHAT A CLOSE RUNS, and why each piece is the right one:**
+
+  * **THE NEWEST BASELINE, on both trees.** It is the parent tree's own matrix, so it
+    carries every corner every earlier baseline carries PLUS the ones the last session
+    added — which is exactly the reasoning that has promoted each baseline to "strongest"
+    in turn since phase4. **This is the load-bearing byte-identity claim**: "nothing that
+    shipped before this change moved."
+  * **THE LIVE-MATRIX PARTITION.** The new rows cannot appear in any frozen matrix — for
+    the fourth session running, `--full` could not compare across the two trees at all
+    because the new rows set controls the old registry does not declare. The live
+    partition is the only instrument for the region a change actually affects.
+  * **CI's `--verify-frozen` IS UNCHANGED AND RUNS ON EVERY PUSH**, proving every frozen
+    matrix deep-equal to its own base commit's `buildMatrix()`. So the baselines keep
+    being checked for what they ARE; what is demoted is only re-exporting their bytes.
+
+**WHAT A MILESTONE IS, stated so it is not decided by mood:** before any production
+publish, or when a change touches the AREA RULE or the EXPORT PATH directly. Both are the
+places a byte can move on a row nobody thought to look at — the area rule because every
+foot feeds it and the trap has now fired five times, and the export path because the
+floor is evaluated there and live/export geometry legitimately differ.
+
+**WHAT THIS GIVES UP, said plainly rather than discovered later.** A defect that moves a
+row present in phase2 but absent from the newest baseline would now be caught at the next
+milestone instead of the next close. That row set shrinks every session (the newest
+baseline is a superset in coverage of nearly everything older) and no such defect has ever
+been observed in ten sessions — but "never observed" is not "impossible", and this is the
+exposure the ruling accepts in exchange for the minutes.
+
+**RULED Sep 5 (session 17). THE ITERATION LOOP IS THE SMOKE SUBSET; THE FULL MATRIX IS
+CI's JOB AND NOT ALSO THE SESSION'S.** This extends the retention ruling above rather
+than replacing it: retention decided WHICH BASELINES a close re-exports, this decides
+WHERE THE FULL MATRIX RUNS. Everything built for it is ADDITIVE — the full 499 rows on
+both STL gates, in CI, on the merge commit, remains the merge criterion, unchanged and
+byte-identical in what it checks.
+
+  * **ITERATE ON `node tools/bloom-smoke.mjs`.** 28 of 499 rows through the real export
+    gate's own `--only` flag. Measured on one machine in one session: the subset **134 s**
+    (three runs, 4.2% spread) against the full export gate's **2,621 s** and the full
+    connectedness gate's **2,600 s** — **about 20x against one gate, 40x against both**.
+    The subset, its derivation, its path -> row table and the five things it is BLIND to
+    are in the tool's own header, which is where a reader needs them at the moment they
+    read a green run.
+
+    **THE FIRST RATIO REPORTED FOR THIS WAS 31x AND IT WAS WRONG, in exactly the way this
+    session's own brief warned about — recorded because the correction is the useful
+    part.** An earlier 23-row version of the subset measured 85 s; the five rows that
+    close the block-coverage gap were added; the 28-row set measured 134 s. The 49 s gap
+    did not reconcile with those five rows' own timings (30 s including five browser
+    starts), so the 23-row set was RE-RUN in the later machine state rather than the
+    arithmetic being explained away: **99.8 s, against 84.4 s for the same 23 rows
+    earlier — this box drifted about 17% slower across the session.** The only pair
+    measured in one state is 23-vs-28 rows (1.34x), which is what pins the added rows at
+    ~34 s. The full-gate numbers were taken in the FAST state and the shipped subset in
+    the SLOW one, so 2621/134 understates and 2621/113 (the fast-state 28-row estimate)
+    overstates; **about 20x is the honest floor**. Runner variance is not a measurement,
+    on a laptop as much as on a CI runner — the same workflow on two heads of PR #149
+    measured 2,579 s and 4,170 s, a 62% spread.
+  * **`--conn` IS REQUIRED, NOT OPTIONAL, WHEN A SESSION INTRODUCES A NEW GEOMETRY MODE.**
+    Export-only is right for the modes that exist — the flood fill catches nothing because
+    J1-J9 fire first — but it is a BACKSTOP for failures the assertions do not model, and a
+    brand-new mode is exactly where they may not. Run `--conn` until the new mode's junction
+    assertions are established AND have been shown to fire on a mutant; then drop back.
+  * **PUSH, AND LET CI RUN THE FULL MATRIX. DO NOT ALSO RUN IT LOCALLY.** Run it locally at
+    a MILESTONE only, on the definition already above: before a production publish, or when
+    a change touches the area rule or the export path.
+  * **AND THE ARGUMENT IS NOT ONLY MINUTES — IT IS WHAT GETS CERTIFIED, verified from this
+    repo's own CI log rather than assumed.** `actions/checkout@v4` on a `pull_request`
+    event checks out the MERGE COMMIT: run 33927836353's own log reads
+    `git checkout --progress --force refs/remotes/pull/149/merge` /
+    `HEAD is now at c1cfd5a Merge 848ae962... into 6b8e94b...`. So CI certifies head-merged-
+    into-base — what actually merges. A local run certifies the working tree, which is
+    neither that nor the head, and on this repo reads `+dirty` from the gitignored
+    node_modules symlink. If `main` moves under a PR, CI covers it and a local run cannot.
+  * **WHAT THIS GIVES UP, said plainly.** A session loses its pre-push signal, and a red run
+    is now public on the PR where a red local run was not. The smoke subset is the
+    replacement for the iterating half of that and is 31x cheaper than what it replaces.
+  * **ONE CLOSE-OUT STEP DEPENDS ON A LOCAL FULL-MATRIX RUN AND IS NOT FOLDED IN: THE BYTE
+    PARTITION.** `tools/diff-bloom-bytes.mjs` exports the matrix on two trees and diffs
+    them; **CI does no byte diffs at all.** That stays local and this ruling does not touch
+    it. Everything else a close-out quotes from a gate run — row counts, CROWDED tallies,
+    coverage skips, self-contact counts — is in the CI log verbatim.
+
+**AND "SIX VERIFY JOBS GREEN" OVERSTATES THE BLOOM EVIDENCE — one line, so the sentence
+stops being misread.** Of the six jobs a bloom PR runs, **two are FLOWER gates**:
+`flower-export-watertight.yml` and `flower-geometry-quality.yml` are path-filtered on
+`'tools/**'`, so any bloom PR touching a tool runs them, and they test flower geometry. The
+bloom evidence is four jobs. **The filter is deliberately NOT changed** — it is a flower
+gate's trigger and belongs to that project.
+
+**RULED Sep 5 (session 17). NO DOCS-ONLY COMMITS ON A GATED PR HEAD — a convention,
+because the filter that would do it cannot be made to fail safe.**
+
+GitHub evaluates a workflow's `paths` filter on a `pull_request` event against the WHOLE PR
+DIFF, never the pushed commit. So once a PR's cumulative diff touches a gated file, every
+later commit re-runs everything, whatever it changed. Measured from the Actions API:
+
+| session | commit | files | export gate | connectedness gate |
+|---|---|---|---|---|
+| 14 (#146) | `5fe2656` outcome doc | 1 file, `docs/` only | 2,767 s | 2,456 s |
+| 16 (#149) | `848ae96` outcome doc | 1 file, `docs/` only | 4,170 s | 3,911 s |
+
+**13,304 s — 3 h 42 m of runner time on two commits that changed no gated byte**, and that
+is the two bloom gates alone. Session 13 (#145) is worse and was outside the window looked
+at: five charter-only commits (`5fa1bc9`, `0af7d4c`, `9ce49be`, `85fda0d`, `538b2f7`) each
+ran both gates, roughly another 13,500 s.
+
+**THE MACHINERY WAS COSTED AND DECLINED (Eva, Sep 5), and the reasoning is recorded so it is
+not re-proposed.** The risk is a commit that LOOKS docs-only landing on a head whose code has
+never been gated — which happens routinely here, since a session pushes code and docs as
+separate commits. `[skip ci]` skips the whole run and leaves the head with NO gate result:
+fails unsafe. `dorny/paths-filter` against `github.event.before` answers "did this push touch
+a gated path", which is not the question — the question is "has this exact gated content
+already passed", and a push range says nothing about whether the parent's run was green. The
+rule that WOULD fail safe is: skip only when the TREE HASH OF THE GATED PATHS equals that at
+a commit whose gate run concluded `success` — both halves, which needs a Checks-API lookup
+inside the workflow defaulting to RUN on any error, missing run or ambiguity. That is real
+machinery guarding a repo where a wrong skip merges ungated geometry, in a project whose
+oldest enemy is a label naming a computation nobody performed. **A convention that works
+beats a filter that might skip a gate.**
+
+So: **fold the charter and outcome-doc changes into the code commit, or push them BEFORE the
+code.** A close-out doc written after the gates are green is the common case, and the fix is
+to amend rather than to append.
+
+**EXCEPTION, RULED Sep 5 (Eva, session 19): A RULING MADE FROM A SHEET AFTER THE CODE HAS RUN
+ITS GATES IS RECORDED IN A DOCS-ONLY PR OF ITS OWN, OPENED AND MERGED BY THE SAME SESSION
+BEFORE IT REPORTS DONE — never as a docs commit on the gated head.** The collision the rule
+above could not hold against: Eva's ruling on a sheet arrives after the code is pushed and
+gated, always; session 18 recorded three rulings as a docs-only commit on a gated head and
+paid two cancelled full-matrix runs for it. A docs-only PR touches no gated path, so no bloom
+gate runs (the filters read the PR diff) — it is free; its commit message names the code PR
+it rules on; the session's `DONE` line carries BOTH shas. The outcome doc and the charter
+entry still go in the CODE commit, written to the point of "held for Eva's ruling", so the
+docs-only PR is the ruling and nothing else. **The condition is the point: a ruling that
+depends on a future session to record it is not recorded.** The alternatives weighed — a
+docs commit that deliberately re-triggers the gates (~1 h of runner time per session to
+certify the same bytes twice), or leaving the ruling to the next kickoff prompt (a
+session-long window in which `main` does not carry it, which has already bitten twice) — are
+in `docs/bloom-session-19-outcome.md`. First use: session 19's own docs-only PR, this one.
+
+**AND `concurrency: cancel-in-progress` IS ON ALL FOUR BLOOM WORKFLOWS (Eva, Sep 5), keyed
+to `${{ github.workflow }}-${{ github.ref }}` so it can never cancel across PRs.** Safe by
+construction — it only ever cancels a run on a commit that has been SUPERSEDED, and the
+final head always runs to completion. It also enforces a discipline already agreed:
+**a superseded commit's green run should never have been quotable, and session 16 quoted
+one** (runs 84 and 85 started two minutes apart and both ran to completion on a four-CPU
+runner).
+
+**AND IT DESTROYS EVIDENCE IN EQUAL MEASURE, WHICH IS THE HALF NOBODY EXPECTS.** A cancelled
+run is not a cheaper run; it is NO run. **Three of this PR's own full-gate runs were
+superseded before finishing** — the STL gates on `46a72b4`, `550b793` and `8524109` were all
+cancelled by the next push, so a PR that had been open for half an hour had no completed gate
+result at all. **So: on a gated PR, push once and let it run.** That is the same discipline as
+"no docs-only commits on a gated PR head" arriving from the other side — the docs rule says
+do not make the gates run again for nothing, and this one says do not stop them proving the
+head you have. Batch the close-out into ONE commit; a series of small pushes leaves the final
+head unproven and every earlier one abandoned.
+
+**AMENDED Sep 7 (Eva, session 26): PUSH ONCE APPLIES WHEN VERIFICATION IS COMPLETE BEFORE THE
+FIRST PUSH.** The rule above and the stop hook that requires committing and pushing as work
+lands are in direct conflict, and it has now cancelled full-matrix runs twice — session 18's
+two, and session 26's five pushes, each superseding the previous run. Session 26 named the
+conflict rather than letting it pass, which is the right handling and is why this amendment
+exists.
+
+**The amendment:** a session that must ITERATE ON AN INSTRUMENT — a gate, a sheet, a rig whose
+own defects only appear by running it — **declares that up front and reserves its FINAL push as
+the one allowed to run to completion.** The earlier pushes are then expected and their
+cancellations are not evidence lost, because the head they abandoned was never the head being
+certified. What remains forbidden is the unplanned drip: a series of small pushes with no
+declared final one, which is how a PR ends up open for half an hour with no completed gate
+result at all.
+
+Session 26 is the worked case: five pushes, the last (`2c5fd95`) declared in the PR body as the
+head that should be allowed to finish, and it is the head all four bloom gates ran on.
+
+**AMENDED AGAIN Sep 7 (Eva, session 29): WHILE A RULING IS OUTSTANDING, COMMIT LOCALLY AND DO
+NOT PUSH.** The session-26 amendment was written for INSTRUMENT ITERATION and does not cover the
+other state that has uncommitted work by construction — **a session waiting on a ruling.** Such
+a session will meet the stop hook every time: the tree is dirty because the answer has not
+arrived, and no declaration of a "final push" can be made, because whether there is more code to
+write depends on the ruling. Committing locally satisfies everything the hook exists for (the
+work is durable, nothing is lost to an ephemeral container) and costs nothing; pushing is what
+costs. Earlier sessions did exactly this and said so.
+
+**Session 29 is the worked case, and it is a case of getting it wrong.** Holding for Eva's
+ruling on the sheet, it pushed a docs-only commit (`bef415f`) to satisfy the hook. All four
+bloom gates re-triggered on the new head despite the commit touching no `bloom*` path — GitHub
+evaluates `paths` filters against the whole PR diff, which is the "no docs-only commits on a
+gated PR head" rule firing exactly as documented — and `cancel-in-progress` then killed the two
+long runs mid-flight, **losing 23 minutes of `bloom-export-watertight` and `bloom-connectedness`
+and restarting both from zero.**
+
+**THE PART WORTH KEEPING IS THE RETRACTION, NOT THE MISTAKE** (Eva's emphasis). The session
+first reported those runs as *still running and duplicating roughly two hours of runner time* —
+read from a run listing fetched seconds before the cancellation landed — and then, on checking
+the runs directly, found `conclusion: "cancelled"` timestamped at the push moment and corrected
+it in the next message, unprompted, naming which half of the claim had been wrong and which
+conclusion survived. **A status read from a listing is a snapshot that can be stale by seconds;
+a run's own conclusion is the primary source.** That is the same lesson as session 27's
+twenty-minute stale run-level `status`, arriving from a different direction, and it is why the
+correction is recorded here beside the error.
+
+**THE 600-LINE STOPPING RULE STAYS AS WRITTEN, AND ITS TRIGGER IS NOT SIZE** (Eva, Sep 7,
+session 26). Session 26 ran to roughly 1,600 insertions and the rule never fired, correctly:
+its trigger is **"if the diff passes roughly 600 lines BEFORE THE ASSERTIONS ARE GREEN"** —
+unverified surface, not volume. The assertions went green early there and everything after was
+measurement, mutants and prose, which is exactly the work the rule is not aimed at.
+
+**Eva's note, on the record because it cuts the other way: the INTENT behind the number was
+wrong, the rule was not.** A future session must not tighten this into a size cap. A 1,600-line
+session whose assertions were green at line 400 is a well-run session; a 300-line session with
+nothing green is the one the rule is for.
+
+**"SHIPPED MEANS REACHABLE" FIRED ON A WORKFLOW, AND THE CASE IS WORTH THE NAME (session 17).**
+`bloom-frozen-tags.yml` was written as a `workflow_dispatch` job so the tags could be published
+despite the proxy's 403, reported as ready to click, and it could not be clicked: **a
+`workflow_dispatch` workflow is only dispatchable once its file is on the DEFAULT branch.**
+GitHub registers workflows from `main`, so on a PR branch it did not appear in the Actions UI —
+`GET /actions/workflows/bloom-frozen-tags.yml/runs` returned 404 and `list_workflows` returned
+sixteen workflows without it. The file parsed, the YAML validated, the job was correct, and the
+route was unreachable. **It was caught only because the OUTCOME was checked directly rather
+than inferred from the mechanism's own success** (`git ls-remote --tags origin` → zero tags),
+which is the flower project's rule about a label naming a computation nobody performed, arriving
+in CI configuration. Verify a route by reaching it, never by reading it.
+
+**`bloom-frozen-tags` IS RED BY DESIGN ON EVERY DISPATCH UNTIL `frozen/phase5` IS PUBLISHED
+FROM A USER'S CLONE — a red run of it is NOT new information (session 19, from the log).**
+Run 33983799670, dispatched from `main` at `dddd934` after #155 merged, was read through the
+GitHub API rather than inferred: it pushed `frozen/phase14`, read back twelve tags PUBLISHED,
+and failed on exactly one thing — `! [remote rejected] frozen/phase5 (refusing to allow a
+GitHub App to create or update workflow .github/workflows/bloom-frozen-matrices.yml without
+workflows permission)`, the phase5 refusal session 17 diagnosed and session 18 inferred. The
+only other content is a runner deprecation warning (the v4 actions target Node 20 and are
+forced onto Node 24), not an error. So: the job exits 1 by construction while phase5 is
+unpublishable from a workflow, the remote carries twelve of thirteen `frozen/*` tags, and
+the remedy stays what session 17 ruled — protect `main`; publish phase5 from a user's clone
+when convenient; no PAT. A future session that sees this workflow red checks the read-back
+list in its log for anything OTHER than phase5 before treating the run as a signal.
+
+**AND A RESTARTED BRANCH HAS A TRAP OF ITS OWN: A SQUASH-MERGED HEAD IS NEVER AN ANCESTOR OF
+`main` (session 17).** `main` squashes, so the merge creates a NEW commit and the branch head
+that merged cleanly is not in `main`'s history at all. The obvious safety check before
+restarting a branch — `git merge-base --is-ancestor <old head> origin/main`, "is the work I am
+about to discard already merged?" — therefore answers **NO on a branch that merged perfectly**,
+and answers it every single time, on every restarted branch. Read literally it says "stop"
+exactly when it is safe to proceed, which is the worst direction for a safety check to fail
+in. **Check the PR's MERGE STATE, not ancestry** (and note the branch is usually gone from the
+remote after a merge anyway, so no force-push is needed — a plain push recreates it). Recorded
+because it will recur on every restarted branch, and the next session should not have to
+work out why its own guard is shouting at it.
+
+**RULED Sep 5 (session 17). A FROZEN BASELINE IS TAKEN AT A COMMIT ON `main`, NEVER AT A
+BRANCH HEAD, AND IS TAGGED AT FREEZE TIME. phase10 is the case that produced the rule.**
+
+**HOW IT SURFACED.** `bloom-frozen-matrices` went red on a PR that touches no geometry,
+at `fatal: invalid reference: 4f39118` — phase10's declared base. The same workflow had
+passed on `main` three hours earlier. Of the TWELVE entries in `FROZEN_BASE_COMMITS`
+(`legacyMatrix()` declares none), **phase10's is the only one that is not a commit on
+`main`**: it is a mid-PR commit of #140, and `fetch-depth: 0` fetches BRANCHES, so it was
+reachable only while `claude/fan-per-petal-sliders-iwbkb6` existed. Branch deletes are one
+of Eva's two recurring actions. Everything else about the incident follows from that one
+fact, which is why the rule is about WHERE a baseline is frozen and not about the gate.
+
+**THE BASELINE WAS RECOVERED, AND A PREMISE ABOUT HOW WAS CORRECTED ON THE WAY.**
+`refs/pull/<N>/head` is a permanent ref on GitHub and survives branch deletion. The
+obvious test — "is `refs/pull/140/head` equal to the frozen sha?" — FAILS here: #140 kept
+committing afterwards, so its head is `2ea3e19`. **The conclusion that would follow from
+that ("the head ref points elsewhere, so this does not recover it") is FALSE, and the
+correction is the useful part: fetching a ref brings its HISTORY.** `4f39118` is the sixth
+commit back from `refs/pull/140/head`, and fetching that ref restores the object. The
+commit immediately AFTER it is `805a191` ("the all-petals group at one whorl; Petal 1 /
+Petal N hidden and inert there") — exactly what phase10 is documented as being frozen
+BEFORE, so it is the right object and not one that merely resolves. **Proven rather than
+asserted: `--verify-frozen --phase10` against a worktree of the recovered commit PASSES,
+376 rows deep-equal.** phase10 is intact; nothing was retired and nothing demoted.
+
+**THE FIX IS A PERMANENT REF, NOT A FETCH TWEAK, AND NOT A LOOSER GATE.** Twelve
+lightweight tags (`frozen/phase2` .. `frozen/phase13`) pin every declared base. A tag
+survives branch deletion AND a force-push to `main` — and `main` is not protected here, so
+a force-push would orphan every base that lives only in its history. Tagging converts
+twelve implicit dependencies on branch reachability into twelve explicit permanent refs,
+which closes the CLASS rather than the instance. **The sha in `FROZEN_BASE_COMMITS` stays
+the one owner of WHICH commit a baseline is**; the tag exists only to keep the object
+alive, so no second identifier for one thing is introduced and `--verify-frozen` needs no
+change — `actions/checkout@v4` at `fetch-depth: 0` fetches tags, so the existing
+`git worktree add "$sha"` resolves unchanged.
+
+**AND `--verify-frozen` MUST NEVER SKIP AN UNRESOLVABLE BASE.** The tempting repair — treat
+a missing base as a skip — turns a lost proof into a silent pass, which is the one thing
+this project never ships. A baseline whose base cannot be resolved is UNVERIFIABLE and must
+say so loudly; if that ever becomes the real state, the honest move is a labelled
+unverifiable tier and a correction to the claim that CI "proves every one deep-equal on
+every push", never a quiet green.
+
+**RULED Sep 6 (session 24). A FROZEN TAG PINS ROW DEFINITIONS, NOT BYTES — AND A SESSION
+THAT MOVES FROZEN BYTES MUST NAME THE TAG WHOSE BYTES NO LONGER REPRODUCE.**
+
+**THE GAP, AND HOW IT SURFACED.** Session 24's inner limit moves 8 of phase17's 507 rows.
+The freeze rule as sessions 20–23 applied it — a phase is owed when the ROW SET changes,
+and is not owed when nothing moved — has no arm for that: every prior byte event either
+ADDED rows (21, 22) or RETIRED a control (20), so a change that moves frozen bytes with the
+row set unchanged is a shape the rule had never met. Asking "does CI go red?" answers
+nothing, because it cannot: **`--verify-frozen` imports the base tree's own `buildMatrix()`
+and deep-compares row order, labels and set lists against the named frozen function. It has
+never compared a byte, and it was never meant to.** Its own header says so; the risk is that
+a reader takes "CI proves every baseline deep-equal on every push" as a byte claim, which is
+exactly the label-naming-a-computation-nobody-performed defect this project has cleaned up
+four times.
+
+**SO THE TWO PROOFS ARE SEPARATE, AND THEY ALWAYS WERE.** A `frozen/*` tag keeps its base
+commit's OBJECT alive so `--verify-frozen` can resolve it; the tag proves that *these rows
+are those rows*, forever. **Byte identity is proved per session by the retention close** —
+the newest baseline plus the live partition, captured on a worktree of the base commit and
+on the head, in one run on one box — and by nothing else. A tag is not a byte baseline and
+must never be read as one.
+
+**THE PROTECTION THAT MAKES THE CHAIN SAFE, and it is an obligation on the outcome doc
+rather than a gate: WHEN A SESSION MOVES FROZEN BYTES, ITS OUTCOME DOC MUST NAME WHICH TAG'S
+BYTES NO LONGER REPRODUCE, with the row count, even though that tag's definitions still do.**
+Without it a later session re-exports phase17 on a new tree, finds 8 rows different from a
+number written down two sessions ago, and cannot tell a regression from a ruled change. With
+it the chain is readable: the tag stays the definition baseline it always was, and the doc
+carries the byte history the tag cannot. **Session 24 is the first entry: `frozen/phase17`,
+8 of 507 rows, the Vogel disc's inner limit, ruled by Eva on Sep 6.**
+
+**NO NEW PHASE IS OWED FOR A BYTE MOVE ALONE** (Eva, Sep 6). Freezing a phase every time
+bytes move would freeze one per session and put the suite back on the quadratic path the
+retention ruling closed; the row set is what a baseline is FOR. A phase is still owed when
+the row set changes, and never for a move the outcome doc names.
+
+**BLOCKED, AND RECORDED AS AN ENVIRONMENT LIMIT RATHER THAN A REPO ONE:** this session
+created all twelve tags locally and could not publish them. The agent proxy returns
+**HTTP 403 on a tag ref push** — both as `git push --tags` and as a single explicit
+`refs/tags/...` refspec — while ordinary branch pushes to `refs/heads/...` succeed from the
+same session, the same 403 that already refuses branch deletes here. No create-ref API is
+exposed either. **The tags are still owed**, and until they exist `bloom-frozen-matrices`
+is red on every bloom PR.
+
+**A GATE RUN NAMES THE FIRST FAMILY THAT FIRED, NEVER THE ONLY WITNESS (session 17, and it
+is a correction to how every prior outcome doc must be read).** Both STL gates abandon a row
+at the first failing assertion family, in the order form -> curl -> thickness -> junction ->
+zygo -> export floor -> crowding -> coverage. So session 14's P3 (a blade that did not rotate
+with its foot) and session 15's Q1 (a `domeLean` computed but never summed) BOTH report
+**C1** on today's head, not the J8 and J9 their own sessions record: session 16's C1
+reconstructs the whole spine — including `petalTilt + tiltExtra + domeLean` — from other
+owners, and silently became a SECOND witness for two mutations from earlier sessions.
+
+**J8 AND J9 DO DISCRIMINATE INDEPENDENTLY — measured, not assumed, because the alternative
+would have been a real finding.** With the curl family suppressed in a throwaway worktree and
+nothing else changed, P3 fires **J8 alone** (4 times across the two domed smoke rows) and Q1
+fires **J9 alone** (twice), each with the message it was written for. So the earlier records
+are IMPRECISE, not wrong, and neither assertion is being carried by C1.
+
+**The working rule that follows: establishing that a SPECIFIC assertion discriminates
+requires suppressing the families ahead of it.** A green-then-red positive control proves a
+witness EXISTS; it cannot name which one, and neither can any gate run. Attributions in prior
+outcome docs are to be read as "the first family that fired", and any new attribution that
+matters should be measured this way.
+
+
+- ~~Session 10 — the fan arrangement~~ **BUILT Sep 2. The fourth `placement` value ships:
+  a symmetric arc across one axis, in the flower's own control vocabulary, with the
+  zygomorphy roles composing onto it rather than being redone.** The ruling that queued it
+  is kept below the build notes, unchanged, because every one of its predictions is
+  answerable now and three of them were wrong in instructive ways.
+
+    - **THE HUB STAYS A FULL DISC, AND THE LOUD-PLUMBING QUESTION ANSWERED ITSELF IN mm².**
+      The sector was analysed and rejected from four directions at once, each measured
+      rather than argued. (1) **A sector is not a sector.** A foot is a box of `ring.width`
+      across, so it subtends an ANGLE that grows as it runs inward: 13.94° at the ring and
+      22.47° at the foot's inner edge at 17 petals, 35.89°/50.33° at two, and **52.20° at
+      the ring at spread 0.60**. A sector derived from the occupied span would have to be
+      padded by that on both sides — at the tight corner (2 petals × 15° spacing) the
+      arrangement spans 15° and the sector needs 15 + 2×50.33 = **115.7°, 7.7× the fan's
+      own span**. (2) **It must contain the axis, where its width vanishes.** At spread
+      0.60 the feet CROSS the axis — inner edge **−0.894 mm** at two petals ALL THIN — so a
+      sector apexed at the axis has vanishing width exactly where J4's overlap box must be
+      ≥ 1.5 × 1.6 × 1.0 mm. (3) It breaks `buildCenterInto`'s connectedness clause, which
+      is *"centre ∩ hub is a solid region of the centre's FULL footprint — not a band whose
+      width has to be argued about"*; over a sector it becomes exactly such a band. (4) It
+      **does not reliably save triangles**: 28 at a 30° span but **274 against the disc's
+      192 at 340°**, so the state where a sector would matter most is the one where it
+      costs more.
+
+      **AND THE DECIDING NUMBER IS THAT THE FAN CANNOT MAKE A PLATE ANYONE HAS NOT ALREADY
+      RULED ON.** The fan's worst hub is 17 petals × spread 6.00 → **77.4 mm diameter,
+      3,013 mm² of bare plate**, against the RADIAL 40 × spread 6.00 plate that already
+      ships at **118.7 mm and 5,064 mm²**. Even by FRACTION the fan's least-covered state
+      (2 petals × 15°, **8.7%** under feet) has less bare plate in absolute terms —
+      **505 mm² against the shipping RADIAL 3 × spread 6.00's 706 mm²**. The disc was the
+      right answer because spread, not the fan, is what makes plumbing loud, and spread was
+      ruled Aug 31. **The area-ruled annular band stays parked, now with this evidence
+      attached** — and the area rule itself is untouched, because it sums `rFoot²` over
+      feet and is blind to where they sit around the axis.
+
+      **J1–J4 SURVIVE THE FAN VERBATIM, and that is a property of how they were written:**
+      every clause is stated over radii, thicknesses and foot FRAMES, and not one of them
+      mentions an azimuth. The overlap box measures **2.400 mm³ per whorl** at the fan's
+      worst corner — the SAME number as the single-ring, layered and continuous corners,
+      because none of `overhang`, `width` or `thickness` is a function of azimuth either.
+
+    - **THE COUNT IS DERIVED AND `petalCount` IS HIDDEN — the `layerPhase` treatment
+      (Eva, Sep 2).** A fan's count is `2 × perSide + (a mirror-line petal ? 1 : 0)`.
+      Reusing `petalCount` was costed and rejected on a sharper ground than a read-out
+      lie: a stored 8 would render as 8 petals under RADIAL and **17 under FAN**, which is
+      a label lie on a **PERSISTED key** — the thing `RETIRED_IDS` exists for — and
+      switching RADIAL → FAN at 40 would silently ask for 81 petals, past every measured
+      extreme. Making `petalCount` the TOTAL instead was also rejected: the toggle fixes
+      the count's PARITY, so the two controls would fight. The read-out prints the derived
+      total, so the number the visitor loses is still on screen, and **three named rows
+      assert `petalCount` is hidden AND inert** (3, 8 and 40 under FAN must be
+      bit-identical). `layerPhase` hides too, for a reason of its own: offsetting a whorl
+      would rotate the inner fan OFF the mirror line — which is also **why the fan is the
+      first placement where slot roles reach three whorls**, since `phase` is 0 on every
+      descriptor by construction rather than by a value the visitor happened to leave alone.
+
+    - **BOTH INVOLUTIONS WERE ALREADY WRITTEN DOWN, and the fan needed the one derived for
+      a different reason.** Toggle ON uses session B's shipped `i ↔ n−i`, whose FIXED POINT
+      is slot 0 — so the labellum is the mirror-line petal, which is Eva's original fan
+      principle arriving through the role mechanism. Toggle OFF uses the fixed-point-free
+      `i ↔ n−1−i` that session B derived while correcting session A's SPIRAL premise, so
+      every role is a PAIR: the labellum is the INNER pair, the hood the outer one. The
+      arrangement's slot ORDER was built to fit the pairings, not the other way round.
+      **That is the third time this project has derived a piece of mathematics before
+      discovering its purpose, and the first time the earlier session's spare half was
+      picked up unchanged.**
+
+    - **THE TWO-PETAL COLLISION BECAME A STRUCTURAL IMPROVEMENT, which is the entry worth
+      keeping.** One per side with the toggle off is `n = 2`, where the inner pair and the
+      outer pair are the SAME pair. A slot cannot carry two slot roles, so the tie breaks
+      toward the LABELLUM (the fan's defining petal) and the **HOOD comes out EMPTY**.
+      Session B's remedy — push the empty group onto LATERAL, which has no controls — is
+      unavailable, because here the collision is between two CONTROL-BEARING roles. So the
+      other half of that argument was discharged instead: **the hood's controls hide when
+      the hood is empty, and Z1's clause was amended from "every control-bearing role is
+      non-empty at every reachable count" to "a role's controls are VISIBLE if and only if
+      the role is NON-EMPTY", asserted in both directions against `footRing()`'s own
+      census.** Membership and visibility became ONE statement with one owner instead of
+      two rules that could drift, and the amended form catches a converse the old one could
+      not: a role that HAS members while its controls are hidden is "shipped means
+      reachable" violated silently. The panel gate's transition route covers the new hide
+      for free.
+
+    - **THE HEADLINE FINDING: NOTHING IN TEN SESSIONS OF INSTRUMENTS HAD EVER MEASURED AN
+      AZIMUTH — established by grep, not by assumption.** Before this session `azimuth`
+      appeared in this repository only inside `buildWhorlInto`, where it is computed, and
+      `buildPetalInto`, where it is consumed. Nothing recorded one, so nothing could assert
+      one. Both STL gates are azimuth-blind BY CONSTRUCTION — an edge census over a
+      topology no control moves, and a flood fill over a hub disc that spans every ring at
+      every azimuth — and so is everything built on them: J1 reads foot FRAMES, J2/J3 read
+      RADII, J4 reads the overlap box's three dimensions, J5/J6 read the depth sequence,
+      and Z1–Z6 read role membership and the effective state. **A FAN that silently built a
+      full ring would have passed the export gate, the connectedness gate, the triangle
+      count, the STL byte LENGTH, J1–J6 and Z1–Z6 alike.** It was measured on a throwaway
+      worktree and it did exactly that. Azimuth telemetry entered `__bloomMetrics` with the
+      BUILDER as its owner — the slot payload the whorl primitive emitted, never re-derived
+      from `placement` and the controls, because an instrument that recomputed the law
+      would agree with a mutated law by mutating alongside it.
+
+    - **J7 — THERE IS AN ARC, AND THERE IS A GAP.** Three clauses, all properties of the
+      emitted azimuths: (a) the petals span, about the mirror line, exactly what
+      `footRing()` derived; (b) the notch behind them is its complement — which is the
+      whole of what the word "fan" claims; (c) the minimum angular separation is bounded
+      below, because coincident petals are duplicate geometry (this family's known cause of
+      non-manifold edges, measured at 14,832 when two whorls coincided, which is why
+      `layerSize` caps at 0.90). A fourth clause asserts the arrangement is CENTRED on its
+      own plane, and the "(CAPPED)" flag is asserted in both directions.
+
+      **J7's FIRST DRAFT WAS WRONG AND ITS OWN CONTROL SAID SO, at the corner it exists
+      for.** It measured the span as *"360 minus the LARGEST gap"* — the smallest arc
+      containing every petal, which is right everywhere except where the arc limit bites
+      hard. At 8 per side with a mirror-line petal the step caps to **21.25°** and the
+      notch is **20°**, so **the notch is SMALLER than the spacing** and the largest gap is
+      an ordinary inter-petal one: the shipped tree failed its own new assertion on that
+      row, reporting a 338.82° span against the derived 340°. The span is the extent about
+      the PLANE, which is twice the furthest petal from it. A gate that had only ever been
+      run on the easy rows would have shipped saying something false about the one state it
+      was written for.
+
+    - **Z4 SPLIT INTO Z4a AND Z4b, and the split is what catches a wrong DECLARATION.**
+      Z4a is session B's clause with the involution read from one owner rather than
+      restated: the ROLE assignment must be symmetric under the pairing this bloom
+      declares. It catches an off-by-one in `roleForSlot` — and it cannot catch a wrong
+      declaration, because it compares the roles against the very pairing that is wrong and
+      agrees with itself. **Z4b reads the GEOMETRY instead**, in two clauses: (i) the
+      pairing is a BIJECTION — a permanent clause, because a many-to-one "pairing" reports
+      a perfect symmetry for an arrangement that has none, which is the trap the first
+      instrument written for session B's SPIRAL measurement fell into; and (ii) there is
+      ONE plane — for every slot, the midpoint of its azimuth and its partner's is the same
+      angle modulo π. **The FIXED-POINT slots are what make (ii) bite:** a self-paired slot
+      must lie ON the plane, and a pairing borrowed from the wrong arm puts it where the
+      other pairs' midpoint is not.
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument BEFORE
+      the new assertions were written and again after. Every mutation exports watertight,
+      with zero degenerate triangles, at an identical live and export triangle count and an
+      identical STL byte LENGTH, and every one leaves the RADIAL and SPIRAL control rows
+      clean — so all five are scoped to the new arm.
+
+      | mutation | boundary | degen | STL bytes | before J7/Z4b | after |
+      |---|---|---|---|---|---|
+      | shipped tree | 0 | 0 | — | (see below) | **0 of 8 rows** |
+      | F1 the fan silently builds a RING | 0 | 0 | same length, different bytes | **NOTHING** | **J7 only**, 15 across 6 rows |
+      | F2 the toggle is inverted | 0 | 0 | same length | **NOTHING** | **Z4b + Z1 only**, 8 across 6 rows |
+      | F3 the arc limit never applied | 0 | 0 | same length | **NOTHING** | **J7 only**, 5 on the one row where it binds |
+      | F4 the derived count never reaches the area rule | 0 | 0 | same length | J1 accounting + guard | J1 + guard + Z1, 12 across 4 rows |
+      | F5 the WRONG INVOLUTION | 0 | 0 | **BIT-IDENTICAL** | **NOTHING** | **Z4b + Z1 only**, 4 across 3 rows |
+
+      **F5 IS THE ONE THAT MATTERS.** On the fan's default row it is bit-identical to the
+      shipped tree — `sha c623982e` on both — because with no slot override engaged the
+      role assignment moves no vertex at all. There is no byte to diff, no triangle to
+      count and no STL property to measure; **only comparing the declared pairing against
+      the emitted azimuths can see it.** F1 is the second: same byte LENGTH, different
+      bytes, and invisible to every instrument that existed.
+
+    - **AND THE CONTROLS FOUND A REAL DEFECT IN THE SHIPPED INSTRUMENT BEFORE ANY MUTATION
+      DID — six of eight probe rows fired on the SHIPPED tree.** `zygoAssertions` derived
+      the slot count as `Math.round(Number(ui.petalCount))`, which was correct while every
+      placement's count WAS that slider. The fan makes it inert, so on every FAN row the
+      gate compared a 6- or 7- or 17-slot whorl against the slider's 8: Z3 read `multiRole`
+      TRUE on an unsplit whorl and demanded an absent residual, Z1 reported *"claims 7 of
+      its 8 slots"* on a correct partition, and Z4 read a role for a slot that does not
+      exist and got `undefined`. **A gate deriving a boundary from a control instead of
+      from the owner is this project's most repeated defect, and it had been sitting inside
+      the instrument built to police exactly that.** It reads `m.slotCount` now —
+      `footRing()`'s own answer. This is session A's "Z1's first draft failed the shipped
+      tree on 5 of 7 rows" repeating, and it is the entire argument for running the control
+      before writing the assertion.
+
+    - **BYTE-IDENTITY IS A CONSTRUCTION, AND THE REGROUPING TRAP WAS PREVENTED A FIFTH
+      TIME.** The fan is a BRANCH everywhere — `footRing()`, `buildWhorlInto`,
+      `roleForSlot` — and never a reformulation, so every pre-existing expression is
+      character-for-character what it was. The one thing that had to change shape is the
+      effective count, and it is carried in a variable holding **the same double** the
+      pre-fan expressions held. Measured on 396 (count × width × sheet × delicacy × mode)
+      rows before it was written: substituting that variable is **bit-identical on all
+      396**, while REGROUPING the area-rule sum per foot — the tempting "it is the same
+      rule" rewrite — moves the derived radius on **124 of 396 at up to 4.00 ULP**.
+
+    - **`--phase8` LANDED IN ONE LIST, because the fall-through trap had fired three
+      times.** `diff-bloom-bytes.mjs` carried FOUR places a phase name had to be written —
+      the flag constants, `MATRIX_FN`, `--verify-frozen`'s name list and its own function
+      map — and the charter records the trap firing once per matrix added: `--phase3`
+      recorded `matrix:"legacy"` while running `phase3Matrix()`; `--phase4` was accepted
+      while `legacyMatrix()` ran; `--phase7` was added to `MATRIX_FN` and not to
+      `MATRIX_FLAGS`, giving a 47-row report under a 205-row label. Each fix removed one
+      copy and left the next standing, **which is what a fix to a duplication problem does
+      when it does not remove the duplication.** There is one `FROZEN` map now, and adding
+      a matrix is one entry in it.
+
+    - **THE MATRIX GREW 246 → 281**, and **`phase8Matrix()` — the 246 rows frozen at
+      7877bdf — is the seventh baseline and now the strongest**, on the reasoning that
+      promoted each of its predecessors: it is the only one carrying session B's SLOT-ROLE
+      corners, which is the region a fourth placement with its OWN involution is most
+      likely to disturb. The 35 new rows are the region this change affects, named rather
+      than numbered: both toggle positions, the four corners of (perSide × spacing), the
+      arc limit binding both ways, the BARE fan, ALL THIN × spread min (with and without
+      feet crossing the axis), nested fans at three layers, the roles on both involutions,
+      slot roles at depth (which only the fan reaches), the empty-hood gated state, and the
+      hidden-and-inert rows for `petalCount` and `layerPhase`. The three fan controls are
+      kept out of the blanket sweep by a **derived** `PLACEMENT_SUBS` exclusion — a control
+      whose predicate reads `placement` and which is hidden at the shipping defaults —
+      which is the latent trap #124 closed arriving from a third direction. Both clauses of
+      that predicate are load-bearing: without the second it would also exclude the eight
+      slot-role controls, which read `placement` and are deliberately swept at the defaults.
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **281/281** watertight, 0 degenerate, no
+      validity failures. Connectedness gate **281/281 one connected piece**, 0 strays, in
+      632 s — including the corner the whole junction analysis turned on, two petals at a
+      15 deg arc with 345 deg of empty circle behind them. Panel gate PASS, with
+      `--negative-control` firing all four routes; its visibility-transition route picked
+      up `placement -> FAN`, `fanPerSide` and `fanCenterPetal` from the registry with no
+      new code, so the hood's empty-group hide is covered for free. **BYTE-IDENTICAL ON
+      1,049 FROZEN ROWS, 0 MOVED**: legacy 47, phase2 76, phase3 86, phase4 106, phase5
+      125, phase6 158, phase7 205 and phase8 246, each compared against a worktree at its
+      own base commit. All four CI gates green on the head.
+
+    - **A CI FAILURE THIS SESSION CAUSED, AND IT WAS CAUSED BY THE FIX FOR ANOTHER
+      DEFECT — which is the part worth carrying.** Collapsing `diff-bloom-bytes.mjs`'s
+      four phase-name lists into one `FROZEN` map is the right change and it is what the
+      fall-through trap had been asking for since `--phase3`. It also put the list 240
+      lines BELOW the `--verify-frozen` block that now reads it, and `const` hoists
+      without initialising: every `--verify-frozen` run died with "Cannot access
+      'PHASE_NAMES' before initialization". **The four separate lists had been HIDING that
+      hazard rather than being free of it** — each sat beside its own reader, so no
+      ordering dependency existed to get wrong. Unifying duplicated constants creates one.
+      CI caught it on the first run; running `--verify-frozen` once locally would have
+      caught it sooner, and the gate that WAS run exercised the other code path.
+
+    - **AND A CAPTION ASSERTED A BYTE TOTAL NOBODY HAD MEASURED.** The sheet's control
+      cell read "(0 of 803 frozen rows moved)" as established fact while 293 of those rows
+      had actually been compared and the rest were still running. That is the
+      label-naming-a-computation-nobody-performed defect **inside the tool built to
+      photograph evidence** — and worse than a stale number, because a caption is where a
+      figure outlives its run: the total would have sat in that cell across every later
+      session whose matrix grew. The caption states the PROPERTY now and names the one
+      owner of the number; the frozen matrices measure it and the shot tool does not.
+
+    - **EVA'S RULINGS FROM THE SHEET (Sep 2). THE FAN SHIPS.** Four rulings, and only
+      one of them moved anything:
+
+        * **THE TOGGLE DEFAULTS TO ON, DELIBERATELY DIVERGING FROM THE FLOWER'S OWN
+          DEFAULT — and both halves are recorded so the divergence reads as chosen.** The
+          flower ships `bilCenterPetal` FALSE, and every other thing about this control —
+          its range, its labels, its hint text, its spacing law — is the flower's exactly.
+          Matching it was the obvious call. What outranked it is Eva's own founding fan
+          principle, *the petal on the mirror line is petal number one, and it has its own
+          sliders*: with the toggle ON, slot 0 IS that petal and IS the labellum, because
+          slot 0 is the through-slot involution's fixed point. A fresh fan should open
+          showing the principle it was built on rather than the state where that principle
+          has no single petal to point at. **Consistency with the older page lost to the
+          idea the newer one is for**, and that is the ruling, not an oversight.
+        * **THE SPACING RANGE SHIPS AS-IS** — 15–60°, the flower's own, unchanged.
+        * **THE PAIRED LABELLUM ON TOGGLE-OFF IS FINE.** Ruled from the cell where one
+          control drives two petals and the area rule multiplies that group by 2.
+        * **THE 340° EXTREME KEEPS ITS 170° LIMIT, PHOTOGRAPHED** — the standing pattern
+          for extremes, joining the max-roll faceting, the ROLL CLAMP look, the spread-6
+          plate and the 135°/161.25° tilts. **Tightening the limit remains one constant
+          change with that cell as its evidence; do not tighten it on the strength of the
+          number alone.**
+
+    - **THE DEFAULT CHANGE IS ITS OWN EVENT, WITH THE PARTITION ASSERTED IN THREE
+      DIRECTIONS** — the `spread` 1.00 → 2.00 and `centerStyle` NONE → DISC precedent,
+      which this session followed rather than folding the ruling into the feature commit.
+      The third direction is the one worth naming, because it is a claim about the
+      GEOMETRY rather than about the rows: **`fanCenterPetal` is INERT outside FAN**, so
+      every non-FAN row must be bit-identical no matter what the default is. Measured on
+      the live matrix, before and after:
+
+      | partition | rows | expected | measured |
+      |---|---|---|---|
+      | non-FAN (the control is inert) | 246 | bit-identical | **246, 0 moved** |
+      | FAN, PINS the toggle | 10 | bit-identical | **10, 0 moved** |
+      | FAN, INHERITS the default | 25 | all move | **25, all 25 moved** |
+
+      **And the 1,049 frozen rows are the same claim at its strongest**: not one of them
+      can select FAN, so the whole historical suite is the non-FAN partition. Measured on phase8's 246 rows across both trees:
+      **0 moved.** Checked in BOTH directions rather than by counting: **no moved row is
+      anything but fan-inheriting, and no fan-inheriting row failed to move.**
+
+      **AND THE DEFAULT CHANGE COST EIGHT ROWS THEIR COVERAGE ON THE WAY THROUGH, which
+      is the charter's own "A DEFAULT IS NOT COVERAGE" rule firing on a default this
+      session moved.** Eight FAN rows named a toggle position in their LABEL and inherited
+      it rather than pinning it — including the two-petal corner and the GATED empty-hood
+      row, which is the state this session's one design ruling is about. The moment the
+      default moved they all began building the ON arrangement while every label still
+      said OFF, **the toggle-OFF region went to zero coverage, and every one of them still
+      passed** — on a design nobody had asked them to check. A row that NAMES a state now
+      SETS it (`FAN_OFF` / `FAN_ON` beside the inheriting `FAN`), which is the centre
+      rig's own rule arriving one level up. Matrix 281 -> 282.
+
+    - **THE FAN SHEET, and the mirror line is drawn from a measurement.**
+      `node tools/shot-bloom-fan.mjs <dir>` — the flower-fan composition Eva liked: face-on
+      as the headline with the plane running vertically down every frame, the toggle pair
+      side by side, a spacing sweep, fan × labellum on both involutions, the two-petal
+      corner, the capped extreme, and one RADIAL bloom unchanged as the control. The
+      vertical line is legitimate because the face-on camera is rolled so the plane's trace
+      is vertical — but a line drawn at a fixed place is exactly the kind of label that
+      stops matching its computation, so **every cell measures the plane from the emitted
+      azimuths and the sheet aborts if it is not where the line is.**
+
+      **BOTH OF THE SHEET'S OWN CHECKS FIRED BEFORE IT COULD BE PUBLISHED, and neither
+      defect was visible by eye.** (1) THE FIRST RENDER CROPPED THE TIGHT FANS. Every
+      arrangement before this one was radially symmetric, so its bounding sphere sat on the
+      axis and framing at the ORIGIN with a radius was correct; a fan puts all its mass on
+      one side, and the `Spacing 15°` cell — the one meant to show the fan at its most
+      closed — showed the top third of itself. It targets the model's own bounding-sphere
+      centre now (the app reports the sphere it already computes) and DECODES THE PNG to
+      require a 12 px clear margin on all four edges, widening in bounded steps and dying
+      rather than writing a picture nobody should rule from. (2) THE PLANE MEASUREMENT WAS
+      WRONG, and the radial CONTROL cell is what caught it: taking the plane as the
+      midpoint of the arrangement's angular EXTENT is right for an arc and meaningless for
+      a full circle, where +180 and −180 are the same direction and the normalisation
+      decides the answer. It measured 22.500° for a bloom whose plane is plainly at 0. It
+      uses the mirror-PAIR midpoints now — the same property Z4b asserts — which gives 0
+      for the ring and 0 for both fan arms, because it asks the question the plane
+      actually answers.
+
+    - **TWO CLAIMS IN THE QUEUING RULING WERE MEASURED AND CORRECTED — the
+      rationale-is-a-premise doctrine again, on this document, which is the failure mode it
+      was written to catch.** The ruling below says *"for the first time the hub's job
+      changes SHAPE"*: it does not. The feet do occupy an arc, and the hub's job — span
+      every foot with a solid overlap — is stated over RADII and is unchanged by where the
+      feet sit around the axis. And it says *"every junction assertion J1–J4 is written per
+      RING and will need re-reading against an arc: containment, the foot reaching the hub,
+      and the overlap box are all stated over a full circle today."* **They are not stated
+      over a circle at all** — J1 reads foot frames, J2/J3 read radii, J4 reads three
+      lengths, and not one clause mentions an azimuth. None of them needed a character
+      changed. That is the same property that made them useless against the fan's own
+      failure mode, which is why J7 exists: **the reason J1–J4 survived the fan untouched
+      and the reason they could not police it are one reason.**
+
+  **THE RULING THAT QUEUED THIS SESSION, kept verbatim below.**
+
+- ~~Session 10~~ **RULED AND QUEUED (Eva, Sep 2): SESSION 10 IS THE FAN ARRANGEMENT — a
+  FOURTH `placement` value.** Not a role, not an override: an arrangement, so it belongs to
+  `buildWhorlInto` and `footRing()` beside RADIAL / SPIRAL / CONTINUOUS. Its controls, as
+  ruled: **petals per side, petal spacing, and a petal-on-mirror-line toggle** — the
+  vocabulary is the flower's own fan implementation, which the session should READ as the
+  reference rather than re-invent (control names, the spacing law, the toggle Eva
+  screenshotted). The bloom's disciplines stay the bloom's.
+
+    - **THE TOGGLE'S OFF-POSITION ALREADY HAS ITS MATHEMATICS, DERIVED AND RECORDED HERE
+      BEFORE ANYONE KNEW WHAT IT WAS FOR.** A symmetric arc with no petal on the mirror line
+      is a MIRROR THROUGH THE GAP, whose pairing is **fixed-point-free: `i <-> n-1-i`** —
+      the same involution session B measured while correcting session A's SPIRAL premise
+      (a golden-angle whorl is exactly mirror-symmetric about `(n-1)*g/2` under precisely
+      that pairing, at <= 8.14e-13 deg). Session B's shipped derivation is the OTHER
+      involution, `i <-> n-i`, which has fixed points and is why LABELLUM and HOOD can be
+      singular at all. **Both are now written down, with their fixed-point structure stated,
+      and the fan needs exactly the one that was built for a different reason.** That is the
+      THIRD time this project has derived a piece of mathematics before discovering its
+      purpose.
+
+    - **THE ZYGOMORPHY ROLES COMPOSE ONTO IT rather than being redone (Eva's ruling).**
+      LABELLUM is the mirror-line petal when the toggle is ON, and the INNER PAIR when it is
+      OFF; HOOD and LATERAL follow from the same pairing. So the fan changes the ARRANGEMENT
+      and the role DERIVATION reads it — the seam session A wrote and session B kept.
+
+    - **THE GENUINELY NEW PROBLEM IS AT THE JUNCTION, and it is the loud-plumbing question
+      from session 2 finally coming home.** A fan's feet occupy an ARC of the ring, not the
+      circle, so for the first time the hub's job changes SHAPE: a full disc spans feet that
+      are no longer all round it, and most of that disc would be plumbing with nothing on
+      it. **Full disc versus a derived SECTOR is the Phase A analysis** — with the
+      spread-6.00 plate note as its precedent (ship the disc, photograph it, let the sheet
+      decide) and the area-ruled annular band as the costed alternative that was parked
+      there. Every junction assertion J1–J4 is written per RING and will need re-reading
+      against an arc: containment, the foot reaching the hub, and the overlap box are all
+      stated over a full circle today.
+
+    - **AFTER THE FAN, THE STANDING BOARD (Eva, Sep 2):** edge treatments, infill, per-petal
+      sliders in the flower's fan UI pattern, and Eva's own presets. Recorded as direction,
+      not as queued work; each needs its own ruling and its own evidence.
+      **PER-PETAL SLIDERS CAME OFF THIS BOARD ON Sep 3 — see the session 11 entry below.
+      Edge treatments, infill and Eva's own presets remain on it, unchanged.**
+
+- ~~Session 11 — per-petal sliders for the fan~~ **BUILT Sep 3. Every petal in the fan
+  gets its own control group, the mirror-line petal is petal one, and per-petal roles
+  SUPERSEDE slot roles there on Eva's ruling — against the session's own recommendation,
+  with the cost stated to her and accepted.**
+
+    - **THE HEADLINE FINDING: THE PER-PETAL GROUPS ALREADY EXISTED, UNNAMED — measured
+      from the emitted azimuths before anything was written, never from the derivation.**
+      The orbits of the involution this bloom declares ARE the mirror pairs, ordered by
+      distance from the plane: at 3 per side with the toggle ON, `P1{0}@0.0` `P2{1,6}@45.0`
+      `P3{2,5}@90.0` `P4{3,4}@135.0`; with it OFF, `P1{0,5}@22.5` `P2{1,4}@67.5`
+      `P3{2,3}@112.5`; at 8 per side ON, nine groups ending `P9{8,9}@170.0`. **So P1 with
+      the toggle on IS the singleton mirror-line petal at 0.0 deg — Eva's founding fan
+      principle, measured rather than asserted.** And in EVERY arm `LABELLUM = P1`,
+      `HOOD = P_last`, `LATERAL = everything between`: per-petal roles are session B's
+      slot-role partition REFINED, from three coarse groups to
+      `perSide + (a mirror-line petal ? 1 : 0)` fine ones. Every group is a mirror orbit by
+      construction, which is why Z4a needed no new clause and why per-PAIR was structural
+      rather than a preference.
+
+    - **THE SEAM HELD FOR THE SECOND TIME, AND THE MECHANISM WAS NOT REWRITTEN.** Session A
+      wrote "adding a third axis later is a longer list, not a rewritten resolver"; that is
+      exactly what this was. `resolveRoleOverrides()` is untouched; `petalStateFor()`'s
+      object-identity guard is untouched CHARACTER FOR CHARACTER; the builder computes
+      nothing new, because `slotRings` simply became finer. **`buildBloomInto` needed no
+      change at all.**
+
+    - **THE BRIEF'S "OBVIOUS CANDIDATE" WAS THE WRONG OWNER, and naming the real one
+      matters.** The kickoff proposed `petalStateFor()` as the one owner of the resolution
+      order. It is not: it owns exactly one question — *does a record exist* — and is three
+      lines. **The resolution ORDER is `ROLE_OVERRIDES`'s own array order**, walked by the
+      resolver's single loop, which iterates the TABLE and tests membership in the roles
+      list. Precedence is therefore declared by where a row sits in one table and by nothing
+      else; per-petal rows sit last, so per-petal has the last word, clamped once at the end
+      into the base's own range.
+
+    - **EVA'S FOUR RULINGS (Sep 3).**
+        * **PANEL: ONE SECTION PER GROUP**, in the existing accordion, static labels
+          ("Petal 1") with the read-out naming what the group currently is. **Ruled from
+          measured heights, with real control rows cloned into the real page** — the
+          alternative was the flower's own form, sub-headings inside one section, which is
+          what she likes and what the brief pointed at:
+
+          | | 4 groups (the shipping fan) | 9 groups |
+          |---|---|---|
+          | one section, sub-headings | section **904 px**, panel **1,314 px** | 2,001 / **2,411 px** |
+          | one section per group | section 216 px, panel **719 px** | 216 / **874 px** |
+          | (today, for scale) | tallest section 417 px, panel 788 px | |
+
+          The sub-heading form is already past the **1,241 px flat panel the accordion was
+          built to replace**, at the shipping default. One section per group is BELOW
+          today's worst case at the default and 86 px above it at the extreme, needs no cap,
+          and needs no new mechanism: a section is hidden when and only when every control
+          in it is hidden, which `applyVisibility()` already derives, so groups beyond
+          `fanPerSide` and every group under a non-FAN placement disappear for free.
+        * **CONTROL SET: size x / tilt / cup / CURL** — the labellum's five minus tip
+          breadth, argued rather than inherited: at fan scale the tip silhouette is the
+          least legible per-petal difference, while spine curl is what makes a petal hang
+          and reflex and is the one control that can. **TIP BREADTH IS DELIBERATELY ABSENT
+          per-petal and is ONE ROW IN TWO TABLES the day she wants it.**
+        * **NUMBERING: SEQUENTIAL FROM THE PLANE.** Group one is the mirror-line petal with
+          the toggle on and the inner PAIR with it off. **The ruled cost, measured:** turning
+          the toggle off drops the group count by one and moves "the inner pair" from slider
+          group 2 to group 1. Nothing persists a design yet, so no migration is owed — **the
+          day something does, this is RETIRED_IDS material**, because a saved `petal2Cup`
+          names a different petal on either side of a toggle.
+        * **PRECEDENCE: PER-PETAL SUPERSEDES SLOT ROLES ON THE FAN** — see below.
+
+    - **RULING 4 WENT AGAINST THE RECOMMENDATION, AND BOTH HALVES ARE RECORDED SO THE
+      DECISION READS AS ONE.** The session proposed COMPOSITION: per-petal as a third axis,
+      with `labellumCup` and `petal1Cup` both reaching slot 0 through the one resolver, on
+      the grounds that supersession retires a shipped, photographed, ruled behaviour. Eva
+      ruled the other way: on a fan there is exactly one per-position axis, and it is the one
+      that says which petal it is.
+        * **NOTHING IS RETIRED, which is the shape of the ruling.** Slot roles stay FULLY
+          live under RADIAL — same controls, same ids, same laws, same gate rows. It is a
+          VISIBILITY plus APPLICABILITY change, so `RETIRED_IDS` does not apply and no
+          migration is owed.
+        * **WHAT IT COSTS, ruled and accepted rather than overlooked: the fan loses labellum
+          TIP BREADTH outright**, because the per-petal set ships without a tip-breadth row.
+          Nothing else — size, tilt, cup and curl all exist per group. Stated at both ends,
+          in `ROLE_OVERRIDES` and at `slotRolesEligible`.
+        * **COMPOSITION REMAINS THE RECOVERABLE ALTERNATIVE** (Eva's instruction): it is one
+          arm of `slotRolesEligible()` in `bloom-geometry.js` plus its twin in the registry's
+          predicate, and nothing was written to depend on their absence.
+        * **LAYER ROLES ARE A DIFFERENT AXIS AND COMPOSE EVERYWHERE — reading confirmed
+          before building, as Eva asked.** `inner*` is DEPTH (`roleForLayer`), per-petal is
+          POSITION (mirror orbits); they are orthogonal, a three-layer nested fan genuinely
+          has both, and under FAN a descriptor is one per (layer x orbit).
+
+    - **TWO CODE PATHS BECAME UNREACHABLE AND ARE KEPT — ASSERTED UNREACHABLE, NEVER
+      CLAIMED.** `roleForSlot`'s THROUGH_GAP arm and `PREDICATES.hoodEmpty` were both
+      written for the fan with the toggle off, which no longer has slot roles. Deleting them
+      would make recovery a rewrite instead of a predicate arm, which is what Eva ruled
+      against; leaving them SILENT would be the dead-label defect this project retires ids
+      over. **Z9 measures both on every row, in both directions** — the "never-true predicate
+      with a reason, over a boolean flag" pattern arriving on a pair of never-true code paths.
+
+    - **THE REGROUPING TRAP WOULD HAVE FIRED A SIXTH TIME, and it was prevented at design
+      time again by measurement.** Every foot in a whorl shares one `rFoot`, so each grouping
+      is a different PARTITION OF n multiplying the same `r^2`. Measured across **6,912**
+      (centre x perSide x width x sheet x delicacy x layerSize x depth x mode) rows before a
+      line was written: **per-ORBIT against the whole whorl moves the derived radius on
+      1,119 of 6,912 rows at up to 2.00 ULP** (8.882e-16 on R = 3.2422007466), and against
+      session B's three-role split on **889 of 6,912**. So the split is CONDITIONAL on a
+      per-petal control being off its identity and NESTS — with only slot roles engaged the
+      partition stays session B's three groups character for character. **Z7 asserts the
+      partition is the COARSEST that serves the engaged axis**, checked as a relation between
+      two separately-computed things (an unconditional census loop against the conditional,
+      filtered partition) rather than footRing() against itself.
+
+    - **A CHARTER-ADJACENT PREMISE IN THE BRIEF WAS MEASURED AND IS FALSE: "per-petal size
+      means per-petal feet".** `footRing()` reads `state.petalWidth`; only `buildPetalInto`
+      reads `ps.petalWidth`. Measured with `labellumSize` x2 against the same row without it:
+      **R0 = 5.41622000205846 both times, identical to the bit, and every foot quantity
+      identical.** So the area rule sums exactly what it summed —
+      `SUM_groups roleCount * rFoot_L^2`, with `rFoot` per LAYER — and **J1-J7 generalise
+      without a character changed**, because not one of their clauses mentions an azimuth or
+      a group count. Z6 is what holds a size multiplier out of the ring, and it is still the
+      only witness above one whorl.
+
+    - **THE CORNER, measured through `footRing()` itself.** Largest single petal x widest
+      spacing x fewest petals — 1/side x 170 deg, a 340 deg arc with a 20 deg notch: overlap
+      box **2.166 x 6.400 x 1.200 = 16.639 mm3** live. At ALL THIN x spread min, and at the
+      deepest reachable foot (8/side x 3 layers x layerSize min), **1.500 x 1.600 x 1.000 =
+      2.400 mm3 in export — the SAME standing number as the single-ring, layered, continuous
+      and fan corners**, because none of `overhang`, `width` or `thickness` is a function of
+      the group index either. Containment holds at every corner; Z6 equal-foot holds at every
+      corner.
+
+    - **TWO INSTRUMENTS WOULD HAVE GONE SILENT ON THE FAN BECAUSE A PREDICATE MOVED UNDER
+      THEM, and that is the entry worth carrying.** `Z4b` (the pairing is a bijection about
+      ONE plane) ran wherever SLOT roles were eligible — which included every fan. The
+      supersession makes `slotRolesEligible` FALSE there, so the clause written to check the
+      fan's own mirror would have stopped running on exactly the placement it was written
+      for, **while every row still passed**. The fan SHEET had the same shape: its drawn
+      mirror line is licensed by a per-cell measurement gated on the same flag, so the line
+      would have kept being drawn with nothing checking it. Both were widened. **This is "a
+      default is not coverage" arriving through a RULING rather than through a default, and
+      nothing in the repository would have reported it.**
+
+    - **THE POSITIVE CONTROLS, RED THEN GREEN, in six throwaway worktrees** (`git worktree
+      add`, never mutate-and-restore), each run against the FULL shipped instrument BEFORE
+      Z7/Z8/Z9 were written and again after. **Every one exports watertight, with zero
+      degenerate triangles, at an identical live and export triangle count and an identical
+      STL byte LENGTH**, and every one leaves the RADIAL, SPIRAL and CONTINUOUS control rows
+      clean:
+
+      | mutation | before Z7/Z8/Z9 | after | bit-identical rows |
+      |---|---|---|---|
+      | shipped tree | **0 of 11** | **0 of 11** | — |
+      | PP1 the per-petal split made unconditional | Z5, 2 rows | Z5, 2 rows | **11 of 11** |
+      | PP2 off-by-one orbit index (groups 2/3 swapped) | **NOTHING** | **Z8 only**, 14 across 5 | 10 of 11 |
+      | PP3 the per-petal record never reaches the blade | Z2 only, 27 across 5 | Z2 only, 27 across 5 | 6 of 11 |
+      | PP4 the numbering does not follow the toggle | Z1 + Z5, 3 on 1 row | Z1 + Z5, 3 on 1 row | 10 of 11 |
+      | PP5 the group ORDER reversed | 2 per row (see below) | **+ Z7**, 20 across 6 | **11 of 11** |
+      | PP6 the supersession quietly comes undone | **NOTHING** | **Z9 only**, 12 across 7 | 5 of 11 |
+
+      **PP2 AND PP6 ARE THE ONES THAT MATTER.** Both fire NOTHING in the entire shipped
+      instrument — both STL gates, the triangle count, the byte length, J1-J7, Z1-Z6,
+      `formAssertions` and `thicknessAssertions` alike. **PP1 AND PP5 ARE BIT-IDENTICAL ON
+      EVERY PROBE ROW**, so for those two there is not even a byte to diff: the assertion is
+      the only instrument there is.
+
+      **PP1 CORRECTED A PREDICTION, which is why the control is run rather than reasoned
+      about.** Z7 was written expecting to be PP1's witness; it is not — **Z5's generalised
+      `wantSplit` clause catches it and Z7 fires nothing.** Z7 earns its place on PP5
+      instead, and the division of labour is now stated in its header: Z5 owns "the split
+      happens exactly when a control is engaged", Z7 owns "and it splits into exactly these
+      groups, in this order".
+
+      **PP5 ALSO REACHED THE CHARTER'S OWN LATENT COUPLING, exactly where it was predicted.**
+      The Sep 2 incident note records that `slot.index === 0` selects the representative
+      petal at two sites, that it is unreachable today, and that "a future session that
+      changes the slot ORDERING re-opens it". A reversed group order IS such a change, and
+      the two assertions that fired on PP5 before Z7 existed are `formAssertions` and
+      `thicknessAssertions` reporting *"guard residual null — not measured"* — the coupling,
+      firing as predicted, under a message that would have sent a reader to the wrong place.
+      **It is still latent and still not a defect; Z7 is now a second, correctly-named
+      witness for the class.**
+
+    - **A PRE-EXISTING LABEL-LIE WAS FOUND IN THE RESOLVER AND CORRECTED.** `// identity and
+      NaN alike take the shipped path` sat on the guard's own skip since session A. It is
+      FALSE: `!(NaN !== 0)` is `false`, so a NaN never skipped — it composed to NaN and the
+      clamp carried it through. **The expression is left exactly as it was** (nothing
+      reachable behaves differently, and changing a guard on the strength of an unreachable
+      case is how a byte moves for nothing); only the claim is corrected, to the reachability
+      argument that IS true: every control here is a slider, `coerceValue` reads it with
+      `Number(...)` from an `<input type="range">`, and a range input's value is always
+      numeric, so NaN cannot arrive through the registry at all.
+
+    - **THE `const`-HOISTING TRAP FIRED AGAIN AND WAS CAUGHT LOCALLY THIS TIME.**
+      `ROLE_OVERRIDES` spreads `PETAL_ROLE_ORDER` at module load, and the first draft declared
+      it 250 lines below — "Cannot access 'PETAL_ROLE_ORDER' before initialization", the same
+      failure the charter records from collapsing `diff-bloom-bytes.mjs`'s four phase lists
+      into one. **The charter's own remedy is what shortened it**: that entry says running the
+      check once locally would have caught it sooner, and this one was caught by importing the
+      module rather than by CI. The derived constants now sit beside `MAX_FAN_PER_SIDE`, which
+      is where that constant's own note already pointed.
+
+    - **A RATIONALE EXPIRED EXACTLY WHERE IT SAID IT WOULD.** `MAX_FAN_PER_SIDE`'s header
+      justified 8 partly by "the flower caps ITS fan at 3 per side because it carries a
+      per-petal control GROUP for each one; the bloom has no per-petal controls, so that bound
+      does not transfer." The bloom has them now. **The conclusion survives on a different
+      measurement** and both halves are recorded: the flower's cap is a PANEL bound because
+      its groups are headings in one scrolling column, while the bloom's are SECTIONS, so an
+      unopened group costs one 29 px summary — nine groups leave the panel at 874 px where the
+      same nine as headings reach 2,411 px.
+
+    - **BYTE-IDENTICAL AT THE DEFAULTS**, and the default bloom is **11,136 tris live and
+      export alike at 543.8 KiB**, unchanged; the shipping FAN is **9,900 tris at 483.5 KiB**,
+      unchanged. The 36 new controls add **ZERO triangles at every setting** — topology is
+      fixed, so an override moves vertices and nothing else.
+
+    - **THE MATRIX GREW 287 -> 376**, and **`phase9Matrix()` — the 287 rows frozen at
+      98dcdbe — is the eighth baseline and now the strongest**, on the reasoning that promoted
+      each of its predecessors: it is the only one carrying the FAN's own corners, which is
+      the region a ruling that takes an axis AWAY from the fan is most likely to disturb.
+      Generated from 98dcdbe's own `buildMatrix()`, proved deep-equal by `--verify-frozen` in
+      CI. The 89 new rows are 17 named per-petal corners plus a 72-row registry-derived sweep
+      — **and the sweep is pinned at the SMALLEST arrangement in which each group has members
+      (`perSide = k - 1`) rather than at 8 per side**, which is both cheaper and a better
+      state, since there group k is the outermost orbit. `PLACEMENT_SUB_IDS` kept all 36 out
+      of the blanket sweep automatically (they read `placement` and are hidden at the RADIAL
+      defaults) — the trap #124 closed, arriving from a FIFTH direction — but "excluded from
+      the blanket sweep" is not "covered", which is why the derived sweep exists.
+
+    - **NINE MATRIX ROWS CHANGED MEANING RATHER THAN GOING AWAY.** Every row that drove
+      `labellum*` or `hood*` under FAN now asserts the opposite claim — hidden and inert — and
+      its LABEL says so, because a row whose claim has inverted keeps passing under a sentence
+      that is no longer true. That is the "eight FAN rows still said OFF" defect the toggle
+      default already taught this matrix once. Keeping their SETS is the point: they are now
+      the strongest inertness rows in the matrix, since every one drives controls that used to
+      move geometry.
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **376/376** watertight, 0 degenerate, identical
+      live and export triangle counts, 1,087 s. Connectedness **376/376 one connected piece**,
+      828 s in CI. Panel gate PASS on all four routes, with `--negative-control` making all
+      four observe their own failure. `--verify-frozen` PASS on all nine frozen matrices,
+      phase9 included, in CI on every push.
+
+      **THE CLOSE IS AN EXACT PARTITION, NOT 0-MOVED — because this is a ruled behaviour
+      change, and the prediction was written down before the run.** phase9 (287 rows) on both
+      trees:
+
+      | partition | rows | predicted | measured |
+      |---|---|---|---|
+      | non-FAN, and FAN without slot-role controls | 278 | bit-identical | **278, 0 moved** |
+      | FAN **with** slot-role controls engaged | 9 | all move | **9, all 9 moved** |
+      | legacy + phase2..phase8 | 1,049 | cannot select FAN at all | **verified, 0 FAN rows** |
+
+      **"phase8 and earlier predate the fan" WAS VERIFIED RATHER THAN ASSUMED**, as the
+      ruling's own instruction required: every baseline before phase9 carries ZERO rows that
+      select FAN, and phase9 carries 41, of which exactly 9 engage a slot-role control. So the
+      whole historical suite IS the non-FAN partition and this change cannot reach it.
+
+      **AND EVERY MOVED ROW LANDS ON ITS NO-OVERRIDE COUNTERPART, which is the stronger
+      claim.** Seven of the nine are bit-identical to a plain fan row already in phase9; the
+      other two had no counterpart in the matrix at all, so it was BUILT FRESH — a 1/side
+      toggle-OFF fan with the ORCHID sets, with ALL SLOT MAX, and with nothing set export the
+      same sha. **None of the nine were equal before**; the ruling is what made them so.
+
+    - **THE FIRST FULL GATE RUN FAILED SEVEN ROWS, AND BOTH BUGS WERE IN THE NEW ASSERTIONS.**
+      This is session A's "Z1's first draft failed the shipped tree on 5 of 7 rows" and session
+      10's "six of eight probe rows fired on the SHIPPED tree", for the third time, and it is
+      the entire argument for running a control before trusting an assertion.
+        * **Z9 ASSERTED THE WRONG PROPERTY.** It said `hoodEmpty` is NEVER TRUE. It is not: the
+          predicate is a statement about STATE — a fan, toggle off, one per side — and that
+          state is the two-petal corner the whole junction analysis turned on. What the ruling
+          makes unreachable is its EFFECT. It now asserts the inertness itself: every control
+          mentioning the term must be visible exactly when slot roles are eligible, so removing
+          the term would change no outcome. That cannot be satisfied vacuously.
+        * **Z5 DID NOT ACCOUNT FOR EMPTY GROUPS.** `petal7Cup` at its maximum with one per side
+          is a control off its identity whose ROLE HAS NO MEMBERS — nothing resolves, no whorl
+          splits, and that is correct. `wantSplit` counts only roles the census says are
+          peopled. The GATED row for exactly that state is what failed the draft.
+        * **NEITHER FIX WEAKENED ANYTHING, and that was checked rather than assumed**: PP1, PP4
+          and PP6 were re-run against the corrected assertions and all three still fire. PP4's
+          witness SHARPENED to Z1 alone — its old Z5 firing was the bug.
+
+    - **AND CI FOUND A THIRD STALE EXPECTATION, IN THE PANEL GATE'S OWN TABLE.** Its
+      `ROLES_COMBOS` route declared FAN eligible for slot roles at every depth. On the first
+      push the DOM, the registry predicate AND the geometry all agreed on `false` and only the
+      table disagreed — the nine-matrix-rows defect, a third time, in a third file. It was not
+      merely flipped: each combo now declares BOTH axes, each is checked in all three of its
+      statements, and the route asserts that never both report eligible — so the supersession
+      is a measurement on states `buildMatrix()` does not cover rather than a sentence here.
+
+    - **THE PANEL GATE GAINED THE PRECONDITION MECHANISM SESSION A PREDICTED IT WOULD NEED.**
+      Session A warned that "a witness that has to set up its own precondition before it can
+      move anything is a witness that can quietly measure nothing", expecting a section that
+      ships with every control hidden; the `layerPhase` ruling spared session B. Per-petal
+      roles are FAN-only and the shipping placement is RADIAL, so all nine sections ship BOTH
+      collapsed and HIDDEN and this is the case that arrived. `pre` is applied through the same
+      real-events path, the `before` metrics are read AFTER it so the delta belongs to the
+      witness, and **the gate refuses a witness whose control is still hidden once the
+      precondition has run** — which is what stops the mechanism becoming the thing session A
+      warned about.
+
+    - **A SHEET HAD BEEN CARRYING THREE CAPTIONS THAT STOPPED MATCHING THEIR CELLS, and it was
+      found by reading the tool's own OUTPUT rather than by looking at the pictures.**
+      `tools/shot-bloom-fan.mjs`'s three "toggle OFF" cells INHERITED `fanCenterPetal` rather
+      than pinning it, so from the moment Eva moved that default to ON (Sep 2) they rendered a
+      seven-petal toggle-ON fan under captions describing a six-petal through-the-gap one, and
+      "fewest x widest" showed THREE petals under a caption about the two-petal empty-hood
+      corner. **The MATRIX was corrected for exactly this at the time and the SHEET was not**;
+      nothing reported it because every cell still rendered and every assertion still passed.
+      The `Spacing 60` caption expired the same day for the same reason. All four fixed.
+      **A cell that NAMES a state must SET it — the rule now exists in both places.**
+
+    - **THE PANEL WAS RE-SHAPED TWICE MORE FROM THE DEPLOY PREVIEW, BOTH TIMES BY GENERALISING
+      A RULE THAT EXISTED RATHER THAN ADDING ONE.** Eva, from the preview at `fe730c8`, with two
+      screenshots: *"have the roles be its own drop down which then enables all the other petals
+      and their roles to be drop downs / also the names like petal 1 -2 -3 etc should apply to
+      the radial option as well."* Two requests; two commits.
+
+        * **NESTING (`5c0b719`).** The nine per-petal sections moved INSIDE "Petal roles" as
+          drop-downs of it. Membership is a `parent` field on the CHILD, exactly as a
+          control's `section` sits on the control — a parent naming its children would be two
+          lists in the file that exists to state the registration rule — and `verifySections()`
+          checks the relation at module load (parent exists, nesting is ONE level deep, at most
+          one `open: true` PER SIBLING GROUP rather than in the whole array, and a section
+          satisfies the non-empty check with child sections as well as controls). **The
+          accordion needed no second mechanism**: its one capture listener used to close every
+          OTHER top-level section; it now closes a drop-down's SIBLINGS, which is the same rule
+          stated one level more generally — at the top level the siblings ARE the sections, so
+          the shipped behaviour is unchanged and nesting falls out of it. `applyVisibility()`
+          derives a parent's hidden from its controls AND its children, walking `SECTIONS`
+          backwards so children settle first. The indent is the ONLY structural signal
+          (`.bl-sec--sub`): a second border colour would read as "a different kind of thing",
+          and these are sections with sections' behaviour. **WHAT NESTING COSTS AND BUYS, measured
+          like for like** (fe730c8 flat against HEAD nested, one fresh page per row, open
+          states set directly, 1100 x 1600 viewport): nine groups with petal 1 open, 920 px
+          flat against 890 px nested; the shipping fan's four groups with petal 1 open, 741
+          against 746; nine groups with no group open, 672 against 640. So nesting is a WASH
+          at the shipping fan and 30 px smaller at the extreme — the "652 px against 874 px
+          flat" quoted when the nesting commit was reported does not reproduce under this
+          measurement and is withdrawn; what nesting actually buys is the SHUT-PARENT state,
+          where nine summaries collapse to one and the panel is the pre-fan panel again. The
+          ruling was made from the preview's own screenshots, not from a height. The panel gate's
+          accordion assertions A2/A3 had to generalise with it — they said "exactly one open in
+          the whole panel", and closing "Petal roles" does NOT reset a child (that is what
+          `<details>` does, and it is why the panel remembers where you were), so they now
+          assert over the REACHABLE open set (a section counts as open only if every ancestor
+          is). Asserting over the raw set would have made the assertion dictate behaviour.
+
+        * **RULING A — THE ROSETTE'S GROUPS NUMBERED THE FAN'S WAY (this commit).** Two options
+          were put to Eva: **A**, rename the existing labellum/hood groups by orbit number,
+          leaving gaps like "Petal 1, Petal 5"; **B**, extend the fan's full per-orbit set to
+          RADIAL, which would have retired the labellum and hood NAMES, retired the labellum's
+          tip breadth with them (the per-petal set has no tip-breadth row), and put nineteen
+          empty-by-default groups under a forty-petal rosette. **Eva chose A.** So the
+          labellum's five sliders and the hood's three moved into two drop-downs inside "Petal
+          roles" — `labellumGroup`, `hoodGroup`; the ids name the ROLE because that is what the
+          code's vocabulary is for, the labels carry the NUMBER because that is the visitor's —
+          with the fan's labels ("Size", "Tip", "Tilt", "Cup", "Spine curl") and read-outs that
+          name the group on the fan's `said(ui)` pattern ("same as the rest — the labellum, on
+          the line"; "the hood pair, opposite the line" at an odd count). The word "labellum"
+          left the label and lives in the read-out, on the split every static label here keeps.
+          **Control ids are unchanged, `section` is never persisted, nothing is retired.**
+
+          **THE NUMBERS ARE THE ORBITS', NOT A SECOND NUMBERING — verified before it was
+          built.** Under RADIAL the plane is the through-slot involution, whose orbits are the
+          per-petal groups ordered by distance from it: slot 0 is orbit 0, so the labellum is
+          PETAL 1 at every count; the hood is the orbit farthest from the plane, the LAST
+          group, `petalGroupCount(n, THROUGH_SLOT)` — 2 at three petals, 5 at eight, 21 at
+          forty. Probed through `petalRoleForSlot` at nine counts (3, 4, 5, 7, 8, 13, 20, 39,
+          40): the hood's orbit index equalled `petalGroupCount` at every one. It is the same
+          `HOOD = P_last` relation the fan already carried, so the rosette got no rule of its
+          own — which is what let A be a rename rather than a mechanism.
+
+          **ONE LABEL IS A LITERAL AND THE OTHER IS THE PANEL'S FIRST DERIVED SECTION LABEL,
+          and the asymmetry is the relation itself.** "Petal 1" is a constant because orbit 0
+          exists at every reachable count and is always the labellum; a `labelFrom` there would
+          tell a reader it might vary. The hood's number moves with `petalCount`, so
+          `SECTIONS` gained an optional `labelFrom(ui)`, `refreshLabels()` rewrites every
+          summary from the same snapshot the read-outs use, the generator paints the first
+          label from DEFAULTS through the same function so nothing flashes wrong before the
+          first rebuild, and **`sectionLabel(section, state)` is the ONE owner** for the app,
+          the panel gate and the panel sheet. `verifySections()` requires EXACTLY ONE of
+          `label` / `labelFrom` — a literal beside a derivation is a stored label-lie waiting
+          for a reader to believe it, which is this project's most repeated defect.
+
+          **THE GATE READS THE NUMBER FROM WHAT THE BUILDER EMITTED, never from the function
+          that wrote the label** (the Z8 doctrine one level up). Route (g) drives `petalCount`
+          to 3 / 8 / 13 / 40 with `hoodSize` off identity so the whorl splits, reads the HOOD
+          petals' slot indices from `petalRingApplied`, folds each through `mirrorPartner`
+          into its orbit, requires all hood slots to agree on ONE orbit (the odd-count hood is
+          a pair) and requires the label's number to equal it — `sectionLabel()` and this check
+          share nothing but the state, so a label that hard-codes the wrong plane, or a count
+          that is not the count the geometry built, is a red row rather than a matching pair
+          of wrong answers. Measured: `[1] of 3 -> Petal 2`, `[4] of 8 -> Petal 5`,
+          `[6] of 13 -> Petal 7`, `[20] of 40 -> Petal 21`. **And no two sections on screen may
+          share a name**: the fan's `petal1` and the rosette's `labellumGroup` are both
+          "Petal 1" by design and never share a screen — the visibility route now reads the
+          visible summaries back on every state it drives and refuses a duplicate (RADIAL
+          shows 8 sections, FAN 10, SPIRAL and CONTINUOUS 5). The section-hidden rule in the
+          gate became parent-aware in both places it is stated (a section is hidden iff every
+          control AND every child section is — "Petal roles" now holds only session A's three
+          layer deltas as controls of its own and is on screen because its two rosette groups
+          are), "Petal roles" got the witness with a precondition session A predicted for it
+          (`innerCup` at two whorls, the anti-vacuity clause refusing a still-hidden control),
+          and the negative control freezes the hood summary's `textContent` so a generator
+          that writes the label once and never refreshes it — exactly the static-label
+          generator this replaced — is a failure the gate has been SEEN to catch. **Five
+          routes, all five required to fire.**
+
+          **THE PANEL SHEET HAD BEEN BROKEN SINCE THE PER-PETAL SECTIONS EXISTED, AND NOBODY
+          HAD RUN IT.** `tools/shot-bloom-panel.mjs` walked every section clicking its summary;
+          a hidden section's summary cannot be clicked, and neither can a nested one's while
+          its parent is shut, so from the moment nine hidden sections appeared the tool would
+          have died on `petal1` — and it was not run for the nesting commit, whose ruling was
+          made from the deploy preview's own screenshots. Fixed on the gate's pattern: a
+          declared `REACH` precondition per hidden section (FAN, mirror-line petal ON, eight
+          per side — the one arrangement in which all nine groups have members), applied
+          through real events, with the run DYING if the section is still hidden afterwards;
+          a nested section opened by first opening its parent with the same real click; a
+          fresh page per cell so a precondition cannot leak into the cells after it; and a new
+          NUMBERING row — the rosette at 3 / 8 / 40 petals with its last drop-down open, and
+          the fan beside it for the comparison the ruling was made from. Measured heights from
+          the sheet's own captions: 569 px at first load; 730 px with Petal roles and the
+          rosette's Petal 1 open (five sliders); 592 px with its Petal 5 open (three); 894 px
+          under FAN at eight per side with Petal roles and the fan's Petal 1 open, and 933 px
+          with its Petal 3 open — the sheet's worst case, the nine-summary extreme, taller
+          than Petal 1's cell because "the pair 2 out from the line" wraps one line more in
+          each of four read-outs (these are the re-render's numbers, after the gap below).
+          **And the first render of the fixed sheet showed a defect this branch had made**:
+          "Sizesame as the rest — the hood pair, opposite the line" — a control's label and
+          its read-out flush against each other, because the label row is `space-between`
+          with no `gap` and had nothing to stand apart on once read-outs grew long enough to
+          wrap, which they did the day they began naming their group. One line of CSS
+          (`gap: 10px` on `.bl-ctrl label`), every control row in the panel, no geometry,
+          no visibility — and the sheet re-rendered after it: the gap moved Petal shape from 615
+          to 628 px and the fan's Petal 3–8 cells from 907 to 933 px, because a read-out that
+          now stands 10 px further from its label wraps a line sooner. The heights above are
+          the re-render's.
+
+          **WHAT THIS DID NOT TOUCH, measured rather than asserted.** No `visibleWhen` changed
+          (deep-equal on all 75 controls across the two trees), `DEFAULTS` is deep-equal, the
+          control id list is identical, and no geometry file changed. The full live-matrix byte
+          diff against `5c0b719` (376 rows, both trees, `tools/diff-bloom-bytes.mjs --full`,
+          22 min 36 s for the base tree and 17 min 16 s for the head while the panel sheet
+          rendered beside it): **376/376 byte-identical, 0 moved, defaults bit-identical** —
+          the panel commits from `8931206` through the gap fix moved nothing a slicer can see.
+          Every frozen baseline is a subset of the same untouched geometry and is proved
+          deep-equal by CI's `--verify-frozen` on every push, so under the retention policy
+          this is the whole close for a presentation-only change.
+
+          **RECORDED, NOT BUILT.** A per-petal set on the rosette (option B) remains one
+          `perPetalEligible` arm in two files plus the retirement it implies — the reason it
+          was declined is the reason it is written down. And the day anything persists a
+          design, `labellumGroup` / `hoodGroup` are section ids, never persisted, so the
+          rename costs nothing then either; what a persisted design would owe is the fan's
+          own note above (`petal2Cup` meaning a different petal across the toggle).
+
+    - **EVA OVERRULED THE (b) ANSWER AFTER SEEING THE PANEL, AND THE RULING RESHAPED "PETAL
+      ROLES" AT EVERY DEPTH (Sep 3, from the deploy preview, three screenshots).** Her words:
+      *"petal roles for depth 1 of Radial (even) can match depth 2 options meaning that the
+      petal adjustments for all petals when there is only depth 1."* The session read it two
+      ways, said that the whorl-wide sliders already existed under Petal form / Petal shape,
+      and asked which was the ask. Eva's design, hers:
+
+        * **PETAL ROLES IS THE "ADJUST PETALS AS A GROUP" SECTION AT EVERY DEPTH.** At two or
+          more whorls the group is the inner whorl — session A's Inner trio, unchanged. At one
+          whorl the group is ALL PETALS: `allCurl` / `allCup` / `allTipBreadth`, implemented
+          THE WAY THE INNER TRIO ALREADY WORKS — deltas riding on the base sliders, defaulting
+          to zero, NOT a second copy of the base sliders. That is her answer to the session's
+          two-owners objection, and it is the right one: the base slider owns the number, the
+          delta owns a change to it, one composition law at every depth. In code it is
+          `ROLE_ALL`, stamped by `footRing()` on every descriptor of a one-whorl bloom and on
+          none of a layered one (`allPetalsEligible(state)`, twin `PREDICATES.allPetalsEligible`,
+          Z5 checking the two agree), and the FIRST three rows of `ROLE_OVERRIDES` so a petal
+          that is also a fan group reads base, then the whole-whorl delta, then its own — "the
+          group, then the petal". The labels, proposed as "All-petals curl / cup / tip" and RULED
+          to the short set **"All curl" / "All cup" / "All tip"** beside "Inner curl / cup /
+          tip" — Eva's reason being panel height, not aesthetics: the long form wraps to two
+          lines in a 250 px panel, this PR already grows the worst case 933 → 1,113 px, and the
+          delta semantics are carried by the read-outs, so the label need not do that work
+          twice. Read-outs at identity naming the slider that owns the number (*"as Petal form sets it"*, *"as
+          Petal shape sets it"*) and off identity naming the delta and its base (*"+50° on
+          Spine curl"*, *"+0.30 on Cup"*, *"+0.20 on Tip breadth"*); the app's readout prints
+          what the whorl was BUILT with (*"all petals as a group · spine curl 50° · cup 0.30"*).
+          No label claims to be the curl; the base slider is.
+
+        * **PETAL 1 / PETAL N ARE HIDDEN AT ONE WHORL — RETIRED THERE BY EVA'S EXPLICIT RULING,
+          WITH THE COST STATED TO HER AND ACCEPTED: THE SINGLE-LAYER RADIAL ORCHID IS
+          DELIBERATELY GIVEN UP.** Session B built the labellum and hood on the one-whorl
+          rosette; from Sep 3 slot roles need TWO OR MORE WHORLS IN STEP —
+          `slotRolesEligible`'s RADIAL arm went from `layerCount === 1 || layerPhase === 0` to
+          `layerCount >= 2 && layerPhase === 0`, and the registry's predicate with it. Hidden
+          means INERT, per the standing doctrine: a labellum/hood record must not reach the
+          geometry at one whorl, and that is what the byte partition below measures. What
+          survives: the orchid on RADIAL at two or more whorls with Layer offset 0, and the
+          fan's per-petal groups at every depth. NOT `RETIRED_IDS`: ids, laws, ranges and gate
+          rows are unchanged and fully live above one whorl; recovery is that one arm in two
+          files. **The retirement is photographed, not only recorded** — the orchid sheet now
+          carries a BEFORE/AFTER pair of the one-whorl orchid rendered from a worktree of the
+          base commit and from this tree, the same eight sliders at the same values, a face on
+          one and an undifferentiated rosette on the other; every other cell on that sheet,
+          the CONTROL included, moved up to two whorls in step, because a control that is not
+          the same arrangement is not a control.
+
+        * **THE PANEL SAYS WHY TWO DROP-DOWNS ARE MISSING — `hiddenReason` (item 1 of Eva's
+          earlier wording instruction, which STANDS; item 2, pointing one-whorl visitors to
+          Petal form / Petal shape, is moot now that the all-petals sliders live in Petal
+          roles).** A nested section may declare `hiddenReason: { when, text(ui) }`; the
+          registry declares ONE reason object (`SLOT_ROLES_BEHIND_OFFSET`) and both rosette
+          groups reference it, the app renders one caption per DISTINCT reason object inside
+          the parent — identity is what makes the caption single — `applyVisibility()` is the
+          only thing that shows it (exactly when the reason holds and every section naming it
+          is hidden), and `refreshLabels()` writes its derived text, which reads the Layer
+          offset control's OWN label so a rename cannot leave it naming a slider that no
+          longer exists: *"Petal 1 and Petal 5 need the whorls in step — set Layer offset to
+          0.00 to bring them back."* Not said at one whorl: there the groups are retired by
+          ruling, not hidden behind a slider, and the section holds the all-petals group
+          instead. The earlier wording instruction itself was not in this session's context
+          after the compaction, so the caption's mechanism and sentence are this session's
+          reconstruction of it, offered for Eva's eye with the labels.
+
+        * **THE EVIDENCE, PREDICTED BEFORE IT WAS MEASURED, and it is an EXACT PARTITION.**
+          A script over every matrix — live and all nine frozen — enumerated the rows with a
+          labellum or hood control engaged at one whorl on RADIAL before a byte was hashed:
+          **33 in the live matrix, 33 in phase8, 33 in phase9 (the same 33 definitions), and
+          NONE in legacy or phase2–phase7** — Eva's "verify which baselines contain depth-1
+          labellum rows rather than assuming", answered by enumeration. Predicted moved: exactly
+          those 33 × 3, each bit-identical to its no-override counterpart on the new tree.
+          Predicted unmoved: every other row of every matrix. The live matrix as it stood at
+          `4f39118` was frozen as **`phase10Matrix()`** (376 rows, `--verify-frozen --phase10`
+          deep-equal to that commit's own `buildMatrix()`, base `4f39118`), because the live
+          matrix itself changed shape: the 33 one-whorl slot rows moved to two whorls in step
+          (the extremes are measured where the feature LIVES), five GATED one-whorl rows were
+          added to police the inertness (the ORCHID, the one-slot hood at four petals, ALL SLOT
+          MAX, ALL SLOT MAX at three petals, and the corner the OLD rule admitted by phase
+          alone), and the newly reachable all-petals region got its named corners — the
+          extremes together at the bare bloom, both count extremes at ALL THIN × spread min,
+          the negative corner where every petal folds under, every clamp binding, the
+          composition with a per-petal fan group, the other one-whorl placements, and GATED
+          rows above one whorl. The blanket sweep picked the three new controls up at min and
+          max on its own. **Matrix 376 → 401.**
+
+          **MEASURED: 30 MOVED, 3 UNMOVED, 0 OUTSIDE — ON ALL THREE MATRICES, IDENTICALLY**
+          (`tools/diff-bloom-bytes.mjs --compare` of `4f39118` against this tree: phase10
+          346/376 identical, phase9 257/287, phase8 216/246; every moved row in the predicted
+          set, and the 30 moved rows bit-identical to their no-override counterparts on this
+          tree — 33 of 33 predicted rows equal on this tree, plus the live matrix's five
+          GATED one-whorl rows, 5 of 5). **The prediction was three rows too wide, and the
+          three are the same three on every matrix**: `SLOT: size x2.00 saturating`, `SLOT:
+          the tip partition inverted`, and `SLOT: curl clamp binds downward`. Each is a row
+          whose override CLAMPS BACK TO THE BASE'S OWN VALUE (x2.00 on a 60 mm petal asks 120
+          and gets 60; 0.6 + 0.6 breadth clamps to 0.6; −180 + −180 curl clamps to −180), so
+          the labellum was built from the base numbers even on the old tree. Measured rather
+          than argued: on the BASE worktree those three rows were ALREADY bit-identical to
+          their no-override counterparts and the other 30 were not — the retirement moved
+          exactly the rows whose override changed the built geometry, and the three had
+          nothing to lose. Eva ruled thirty the honest set and asked two things of the
+          close-out: that phase8 come back 30 / 3 / 0 (it did), and whether the "engaged"
+          predicate that over-predicted has any consumer besides the prediction.
+
+          **FOOTNOTE, NOT DEFECT — the predicate had one consumer, and it was the prediction
+          script.** Established by grep, not assumed: the off-identity filter
+          (`control !== LAW_IDENTITY[law]`) has six readers — the resolver itself, the
+          harness's load-time default check, Z2's `wantsRecord`, Z5's `wantSplit`, the orchid
+          sheet's `anySlot` and the zygomorphy sheet's `anyDelta` — and every one of them
+          states what the producer states: a control off its identity yields a RECORD and the
+          whorl SPLITS. None of them claims the built value differs from the base, none selects
+          gate rows and none drives panel visibility, so producer and consumers share one
+          filter and there is no E3 shape. The claim "engaged ⇒ moved" existed only in the
+          session's enumeration script (`enum-orchid-rows.mjs`, scratch) and in this
+          prediction table.
+
+          **RECORDED, NOT BUILT — what the three rows do point at.** A record that clamps to
+          the base value still SPLITS the whorl, and the split serves nothing: the same
+          regrouping the sixth prevention above guards against, on rows where the override is
+          engaged and inert at once. It was byte-identical on all three rows on both trees
+          (the regrouped sum happened to be exact), so it is not a defect today; a value-aware
+          guard — the resolver returning null when every composed value equals its base —
+          is one line, but it changes which whorls split and must be measured before it is
+          written. Z7 reads "the engaged axis" as the producer does, so it would move with the
+          guard rather than against it.
+
+        * **TWO POSITIVE CONTROLS, RED THEN GREEN, in throwaway copies of the tree.** PP7 —
+          the geometry keeps the old one-whorl arm while the registry hides — was caught at
+          HARNESS LOAD by the two-statement guard on six states before any row ran, which is
+          the earliest an instrument here has ever fired. PP8 — the all-petals group never
+          inert above one whorl — fired Z1 + Z5 on every GATED row above one whorl and Z9
+          beside a live orchid, and stayed silent on every one-whorl row: exactly the partition
+          the mutation touches. And the FIRST probe of the shipped tree found the session's
+          own bug: `footRing()`'s descriptor mapping enumerates its fields, so the `allRole`
+          stamp never reached the metrics and Z1/Z2 fired on every one-whorl row — fixed by
+          carrying the stamp through the mapping, which is the reason Z1 reads it back from
+          the metrics rather than trusting the resolver's list. **The panel gate** gained a
+          depth route (one page, real events, one whorl → two out of step → in step → three →
+          out of step → one; the ruling's own statements asserted by name at every step, every
+          wrapper against its predicate, the caption shown exactly twice with the registry's
+          text), a third axis in `ROLES_COMBOS` (never slot AND all; all iff one whorl), the
+          two rosette witnesses now carrying the two-whorls-in-step precondition, and a sixth
+          negative-control route that freezes the caption — **949 breaks caught, all six
+          routes fired**, the panel gate itself PASSING on the new panel with the depth route
+          reading the caption's text back exactly and every wrapper agreeing with its
+          predicate at all six steps.
+
+        * **WHAT THE SHEETS SHOW.** The orchid sheet: the CONTROL and every orchid cell at two
+          whorls in step (21,024 live tris at eight petals, six descriptors split three ways
+          per whorl; the three-petal cell 8,664 with the hood a straddling pair; forty petals
+          100,128 with the hood one slot), the ORCHID x IRIS product at nine descriptors, and
+          session A's iris unmoved — plus the pair: **BEFORE, the one-whorl orchid on the base
+          tree, three descriptors, split, a face; AFTER, the same eight sliders at one whorl on
+          this tree, ONE descriptor, no split, an undifferentiated rosette, at the same 11,136
+          triangles.** The panel sheet: "Petal roles" at one whorl is 544 px holding the three
+          all-petals rows and no drop-down; the rosette's numbering cells at two whorls in step
+          read Petal 1 / Petal 2, Petal 1 / Petal 5, Petal 1 / Petal 21 beside the Inner trio
+          at 755–794 px; the caption cell at two whorls with the offset at its default reads
+          the registry's own sentence; and the fan's per-petal cells grew from 933 px to
+          **1,113 px worst case** (Petal 3 open at eight per side), because at one whorl the
+          all-petals trio sits under the nine drop-downs — the ruling's "at every depth" means
+          every one-whorl placement, the fan included, and that is the honest cost of it on the
+          tallest panel there is. **The short labels Eva then ruled took 39 px of that back**:
+          "All curl / All cup / All tip" put "Petal roles" at one whorl at 505 px (from 544)
+          and the worst case at **1,074 px** (from 1,113), re-rendered and re-gated before the
+          merge — her reason for the ruling, measured.
+
+- ~~Foot crowding — the instrument nobody had~~ **BUILT Sep 3, as a FLAG (Eva's ruling).
+  Nothing this project owned could report a bloom whose feet fuse into one mass at the
+  base: both STL gates are green on it and stay green, because over-connection adds no
+  boundary edge and splits no flood fill. Eva found it by looking at a render. The
+  instrument is `tools/bloom-crowding.mjs`, wired into both gates on every row, with its
+  own sheet.**
+
+    - **THE RUN THAT OPENED IT, reproduced from her readout to the last digit.** 120
+      continuous petals (40 per turn, 3 turns), spread 0.60, an 8 mm blade 60 mm long,
+      shrink 0.80, tilt step +11°, sheet 0.60, delicacy 0.25 — so every foot is floored at
+      1.60 mm and all 120 rings span 1.76 mm of radius live. Ring 3.633 mm live against
+      4.691 mm printed: **+29%**, not the +27% the brief quoted, and the reason the metric
+      reads the EXPORT.
+
+    - **WHAT IT MEASURES: STACK DEPTH.** Every foot is a rectangle `footRing()` already
+      specifies — landing on `ring.radius` at the builder's emitted azimuth, running inward
+      by `ring.overhang`, `ring.width` across. The base plane is rasterised and each cell
+      counts the feet that contain it. **`D_max`** is the depth at the worst point (an
+      integer); **`D_mean`** is Σ foot area ÷ the area of their union. Three candidates were
+      costed on twelve configurations before one was chosen, and the two rejected ones are
+      recorded so they are not re-proposed: **all-pairs nearest-neighbour ÷ width** reads
+      the 8-petal spread-0.60 bloom (D_max 3) as WORSE than the mum, because two feet are
+      close while only eight exist — it measures pairwise proximity and is blind to how
+      many feet stack; **Σ foot area ÷ hub disc area** is dominated by overhang ÷ hub radius,
+      so at a small hub it measures the 1.5 mm overhang floor and reads that same bloom near
+      the mum. Both survive as unrated diagnostics beside D_max.
+
+    - **IT IS FINISHED BECAUSE IT SEPARATES RULINGS, NOT BECAUSE IT IS PRECISE — the `A_k`
+      trap, named.** Export numbers, against pictures Eva had already ruled on:
+
+      | configuration | ruling | D_max | D_mean |
+      |---|---|---|---|
+      | the mum run | bad | **11** (live 17) | 4.97 |
+      | shipping defaults | clean | 2 | 1.12 |
+      | the layers sheet's depth cell, 3 × 0.90 × tilt 12 | clean, "reads as depth" | 3 | 1.62 |
+      | the session-7 continuous headline, 40/turn × 3, spread 1.55 | clean, merged | 5 | 2.53 |
+      | RADIAL × 40 — predicted **4 / ≈2.6** before the raster ran | unruled | **4** | **2.52** |
+
+      The prediction held. The separation is one measured interval, not five: the highest
+      ruled-clean reading is 5 and the ruled-bad is 11, with unruled states at 9 (the mum at
+      spread 1.00) and 10 (RADIAL × 40 × spread 0.60) beside them. The raster is CONVERGED —
+      on the mum, D_max 11 at every cell from 0.04 mm to 0.0025 mm and D_mean 4.969 to three
+      decimals from 0.02 mm down — and convergence is asserted on every gate row (R5), never
+      assumed.
+
+    - **NEIGHBOURS: NONE ARE CHOSEN, and the mum is the evidence.** The golden angle puts
+      the tightest approaches at FIBONACCI index gaps: the mum's closest pair of feet is
+      slots 98 and 119 — gap **21** — at 0.385 mm, 0.24 widths, while an index-adjacent
+      metric reads **1.95 widths** on the same bloom and calls it clean. The depth field is
+      exhaustive over every foot at every cell, so no neighbour set has to be justified; the
+      all-pairs and index-adjacent figures are both printed so the blind reading is visible.
+
+    - **FLAG, NOT GATE (Eva, Sep 3), AND THE THRESHOLD IS HERS.** Her Aug 31 ruling that
+      spread below 1.00 is reachable on purpose settles it: a gate would forbid a design she
+      approved, and over-connection is not a print defect. **`CROWDED_DMAX` is 11**, not
+      the 8 the session proposed: the only evidence is that 5 and below reads clean and 11
+      reads bad, 6..10 are UNRULED, and she would rather see them in the printout than have
+      them marked before she has looked at one. The number prints on every row either way,
+      so the printout carries the sensitivity and the threshold carries only the claim. **RE-
+      DERIVE IT WHEN THE DEPTH CAP IS RAISED** — depth 6 adds rings at small radii and lifts
+      every reading, so an inherited threshold would be wrong in both directions. **RE-DERIVED
+      Sep 3 with the raise to six and HELD AT 11 (Eva's second ruling), pending the depth
+      sheet — the numbers are in the session-13 entry at the end of this document.** The flag
+      is asserted in BOTH directions at matrix level (the sub-8 spiral precedent): the mum
+      is a named row so the raised state is exercised by a ruling rather than by a corner.
+
+    - **WHAT IT IS BLIND TO — RECORDED PROMINENTLY, ON EVA'S INSTRUCTION, because a clean
+      D_max will be mistaken for a clean bloom.** In the artefact the feet are not
+      separately visible at all: each lies inside the hub disc, at the hub's own thickness,
+      in the hub's own slab. What the eye sees fusing is the blade ROOTS leaving the ring —
+      and the root's exit half-width IS `ring.width / 2` by construction, so foot stacking
+      at the base is exactly root-exit stacking. Above that exit the blade widens to
+      `petalWidth`, tilts, and curls, and none of it moves this number. **Short, wide blades
+      at high tilt crowd above the base with a clean D_max. BLADE-TO-BLADE CROWDING ABOVE
+      THE ROOT IS A SECOND INSTRUMENT NOBODY HAS — RECORDED, NOT BUILT — and it is the one
+      the mum work will need.** A collar session, or any session reading a green D_max, must
+      not take it as a clean bloom; it is a clean BASE.
+
+    - **READING `footRing()`, NOT DUPLICATING IT, and this is what makes it survive #140 for
+      free.** The module imports the app's own geometry module INSIDE THE PAGE — the same
+      module instance the app built from — calls `buildBloomInto()` with an export-mode
+      accumulator, and reads `foot.slotRings[L][i]` and the builder's own `slotAzimuths`.
+      No area rule, clamp, overhang law or azimuth law is restated. Five validity assertions
+      make that a measurement rather than a claim, all fatal for the run and none a row
+      result: **R1** the in-page export build's triangle count equals the exported STL's
+      header (the geometry read is the geometry shipped); **R2** the in-page live build
+      equals the app's own `liveTris` and hub radius; **R3** feet === `petalsBuilt`; **R4**
+      every emitted foot frame sits exactly where the rectangle built from its descriptor's
+      numbers puts it — SIGNED along the slot's radial direction, because a foot that crosses
+      the axis has an inner row on the far side of the origin, where `hypot()` reads the
+      distance unsigned and `atan2()` the azimuth 180° out; the first draft did exactly that
+      and fired on every axis-crossing foot of the positive control; **R5** convergence at
+      twice the cell. A per-petal descriptor still arrives through `slotRings`, and Z6
+      already asserts a role never differentiates the foot.
+
+    - **THE POSITIVE CONTROL, in a throwaway worktree: the overhang law doubled**
+      (`max(1.5, 0.4r)` → `max(3.0, 0.8r)`). Predicted before measuring: every reading
+      rises and nothing shipped sees it, since J4 bounds overhang only from below. Measured:
+      mum **11 → 42**, default **2 → 3**, depth cell **3 → 7**, continuous headline
+      **5 → 20** (it would flag), RADIAL × 40 **4 → 9**, RADIAL × 40 × spread 0.60
+      **10 → 16** — with the export gate and the connectedness gate BOTH GREEN on the
+      mutant across the whole matrix (the export gate 287/287 watertight, 0 degenerate, identical live and export triangle counts, every J and Z assertion clean; the connectedness gate 287/287 ONE piece). The instrument moves; the gates do
+      not; the tool was not changed.
+
+    - **THE SHEET, and it is the validation rather than decoration:**
+      `node tools/shot-bloom-crowding.mjs <dir>` — the base cropped at a magnification set by
+      each bloom's own hub radius, with that configuration's export number in the caption,
+      for the four ruled configurations plus the two unruled ones nearest the line. **From
+      BELOW the hub plane, and that was forced by the sheet's own frame check:** a camera
+      close enough to read the base stands inside the canopy of a 60 mm blade from every
+      other side (the first mum frame came back 99.8% content), and every blade rises from
+      the plane, so beneath it is the one place the roots are unoccluded. The picture is the
+      LIVE render and the caption is the EXPORT number, stated on every cell.
+
+    - **THE GATES: in CI on the head that wired them, the export gate **402/402 watertight**, 402/402 identical live and export triangle counts, 0 degenerate, and the connectedness gate **402/402 ONE piece** — with **8 of 402 rows FLAGGED CROWDED in each**, the mum row among them (it exports 149,568 triangles, boundary 0, one component: over-connection, exactly as claimed), and 394 unflagged, so the flag is exercised in both directions; the live matrix's D_max histogram on the shipped tree peaks at 2 (171 of 287 rows before the matrix grew) with 22 at 1, 60 at 3, and a tail from 4 to 32 at the ALL THIN × spread min corners where feet cross the axis.** Byte identity is A PRIORI here — no geometry file is touched,
+      so the export handler builds the same bytes — and it was measured anyway on the
+      charter's retention ruling (newest baseline on both trees plus the live partition, not
+      the whole suite; the brief said "every frozen baseline" and was corrected to the
+      ruling): **phase10 (376 rows frozen at 4f39118, the newest baseline) 376/376 bit-identical, 0 moved, and the live matrix (402 rows, the mum row included) 402/402 bit-identical, 0 moved**, each against a worktree at 09c395b, defaults bit-identical on both. Cost: under a second per row, dominated by the two in-page builds
+      rather than the raster (a fixed grid of ~2,400 cells across the hub, floored at 5 µm;
+      the first draft capped the pitch instead, which made the LARGEST blooms the finest
+      sampled at 37 million cells for no gain).
+
+- ~~Session 13 — the three preconditions for a domed hub~~ **BUILT Sep 3: the print-preview
+  toggle (unparked), the depth cap raised to SIX with a read-out line and NO derived clamp,
+  and the crowding threshold re-derived and HELD at 11. No collar, no dome, no junction edit.**
+
+    - **WHAT WAS ON `main` WHEN THE SESSION OPENED, and the brief was stale on it.** The
+      brief's item 3 — the foot-crowding instrument, its four-config separation, its
+      Fibonacci-gap neighbour argument and the flag-versus-gate ruling — had already shipped
+      as #144 the same afternoon. Nothing of it was rebuilt; the one line that entry left open
+      (re-derive `CROWDED_DMAX` when the depth cap is raised) is answered below. Items 1 and 2
+      were open, exactly as the brief said.
+
+    - **THE TOGGLE, and its one owner.** `#printPreview` sits in the VIEW box beside
+      Auto-rotate and is view chrome in every sense `viewPreset` is: not a registry row,
+      invisible to `readUI()`, DEFAULTS, reset and `fullStateDrift`. `shownMode()` in bloom.js
+      is the ONE OWNER of "which geometry is on screen": `regenerate()` builds the viewport
+      in that mode, the read-out's first line names it (`on screen: LIVE geometry, as
+      authored` / `on screen: PRINT PREVIEW — export floor 1.00 mm applied …`), the
+      print-truth pair keeps BOTH its lines and only its `← on screen` marker moves, and
+      `__bloomMetrics()` reports `shownMode` and `shownTris` while `liveTris` reads NULL
+      whenever the preview is on — never an export count under a live label, on the
+      `f3(undefined)` doctrine that a wrong number must be loud.
+
+    - **THE BYTES CANNOT MOVE, AND THE ARGUMENT IS STRUCTURAL.** The Get STL handler builds
+      `buildGeometry({ exportMode: true })` from `readUI()`, and the box is not in `readUI()`;
+      there is no branch in the export path that can observe it. What the toggle changes is
+      the telemetry cache, and that needed a real change: `buildGeometry` used to cache
+      `lastRings`/`lastTris` on `!exportMode`, which was the same as "the build on screen"
+      only while nothing but regenerate() built live. Now the CALLER says which build is on
+      screen (`record: true`, only from regenerate()), so an export click during a preview
+      can never overwrite the viewport's numbers. Measured anyway, on the retention ruling: **phase11 (402 rows, the newest baseline) on a
+      worktree at 174cc2f and on the branch head: 402/402 bit-identical, 0 moved, defaults
+      bit-identical** — with the depth raise in the same tree, so this one run carries both
+      changes' byte claims.
+
+    - **THE POSITIVE CONTROL, run against the shipped instruments BEFORE a new assertion was
+      written, with `autoRotate` standing in for the not-yet-existing box.** T1, an export
+      path that reads view chrome: in the gates' own state (chrome untouched) **8 of 8 rows
+      byte-identical to the base tree, every shipped check green** — so a toggle-dependent
+      export was invisible to everything the project owned, because no gate ever flips view
+      chrome. T2, an export build whose telemetry is cached as if live: the crowding
+      instrument's R2 fires on **5 of 8 rows** (every row where the floor binds — mum hub
+      3.633 vs 4.691) and is blind on the rest, where live and export share every double.
+      So the new coverage is aimed at T1's hole: the panel gate's route (i) flips the REAL
+      box on ALL THIN, requires a counted rebuild, `shownMode` export, `liveTris` null, the
+      hub radius equal to `footRing()`'s own export answer, the read-out naming the mode, the
+      PRINTED line marked, zero registry drift, and **the STL exported with the box ON
+      byte-identical to the one exported with it OFF on the same page**; then OFF restoring
+      live. Its negative control is the listener-less clone. And BOTH STL gates now assert
+      `shownMode === 'live'` on every row as a validity failure, because every "(live)" label
+      they print depends on it. Re-run with the real box on a mutant copy (`exportMode:
+      shownMode() === 'live'`, correct with the box OFF and wrong with it ON): the gate fails on exactly one clause, `the STL exported with the box ON
+      differs from the one with it OFF (556884 vs 556884 bytes) — the toggle reached the
+      export path`, with every other assertion in the run green; the same gate passes on the
+      real tree, and its negative control (the listener-less clone) fires on the rebuild
+      clause. Red on the mutant, green on the fix: the route measures the property.
+
+    - **THE CAPTION CONVENTION: every contact-sheet cell states its mode, from the app.**
+      `modeTag(m)` in the harness reads `__bloomMetrics().shownMode` and returns
+      `shown: LIVE (as authored)` or `shown: PRINT PREVIEW (export floor 1.00 mm applied)`;
+      a tree that predates the toggle says so rather than defaulting to LIVE (the before/after
+      sheets render base worktrees). Every canvas sheet appends it to its `<small>` line — one
+      helper, no second code path, and a caption that can only ever disagree with its frame
+      if the app disagrees with itself. The panel sheet photographs the panel, whose read-out
+      now carries the mode on its own first line.
+
+    - **THE DEPTH CAP: THE FORMULA WAS CHECKED AND DOES NOT HOLD, for a structural reason.**
+      The brief's hypothesis, `L_max = floor(ln(footFloor / ring0) / ln(shrink))`, predicted
+      6 for the shipping defaults and 3 for the mum. Measured on a worktree with the cap at 8,
+      8 configurations × RADIAL/CONTINUOUS × depths 1..8 (128 rows): **ring0 is not a property
+      of the configuration — the area rule sums every foot, so R0 grows with depth**, 8.85 mm
+      at one layer, 13.23 at three, 15.65 at six on the defaults, and the defaults' innermost
+      ring is still 1.69 mm at depth 8. The brief's 13.23 was the three-layer figure.
+
+      | configuration | formula, R0 at depth 3 | formula, R0 at depth 1 | measured: deepest depth whose innermost EXPORT ring is ≥ 1.60 mm |
+      |---|---|---|---|
+      | defaults, RADIAL | 6.43 → 6 | 5.20 → 5 | 8 |
+      | defaults, CONTINUOUS | 6.22 → 6 | 4.99 → 4 | 7 |
+      | the mum | 4.82 → 4 | 2.36 → 2 | 6 |
+      | the depth cell, 3 × 0.90 | 20.96 | 16.23 | beyond 8 |
+
+    - **AND THE COLLISION IT NAMES IS NOT A BUILDABILITY LIMIT.** All 128 rows export
+      watertight, as ONE piece, with 0 degenerate and 0 non-manifold triangles, and every
+      J1–J6, Z, form and thickness assertion clean — a 0.01 mm blade at depth 8 × shrink
+      0.35 included. Nothing collides. What deepens with depth is crowding, which the
+      instrument from #144 already flags.
+
+    - **A DERIVED CLAMP WAS PROPOSED BY THE BRIEF AND REJECTED (Eva, Sep 3), on two
+      measurements.** First, it could not be byte-identical at depth ≤ 3: eleven reachable
+      depth-2/3 states already have an innermost ring under 1.60 mm. **THREE OF THEM ARE
+      SHIPPED GATE ROWS, AND THEY ARE A PRE-EXISTING FACT DISCOVERED BY THIS SESSION, NOT
+      DAMAGE IT CAUSED** (recorded on Eva's instruction so a later session does not read them
+      as new): `LAYERS: 3 x ALL THIN x spread min` (innermost export ring 1.087 mm), `3 layers
+      x layerSize min (0.35)` (1.370 mm) and `CONT: 3 turns x layerSize min x petalCount 40`
+      (0.470 mm at eight petals; the forty-petal row is the same region). They have exported
+      watertight and as one piece since they were written; a ring narrower than a foot is
+      feet overlapping each other, which is the state the Aug 31 spread ruling made reachable
+      on purpose. Second, a clamp would be a GATE on exactly the property #144 ruled a FLAG
+      the same day. So the slider reaches six and nothing caps it against the floor; the
+      read-out SAYS instead, in the FOOT WIDTH FLOORED discipline: `RINGS NARROWER THAN A
+      FOOT on rings 4–5 (2 of 6) — under 1.60 mm, so the feet on them overlap each other; on
+      rings 4–5 (2 of 6) they cross the axis`, from two telemetry flags footRing() stamps on
+      every ring (`underFootFloor`, `crossesAxis`), asserted in both directions by the panel
+      gate's route (j) against the owner's own flags.
+
+    - **WHY SIX AND NOT EIGHT.** At the shipping defaults six is the last depth at which the
+      deepest blade is still wider than its own root in BOTH placements (3.10 mm RADIAL,
+      2.32 mm CONTINUOUS against the 1.60 mm foot; at eight it is 1.60 and 1.20 — the
+      "blade narrower than its root" the old MAX_LAYERS note named as the binding constraint)
+      and the last at which the default base still reads D_max 2 (3 and 5 at seven and
+      eight). Export cost at 6 × 40 petals: 297,888 triangles, 20% of the budget. Byte
+      identity at depth ≤ 3 is by construction — the layer loop is unchanged and the constant
+      is a validation bound and a slider range.
+
+    - **WHAT MOVED IN THE LIVE MATRIX, predicted before the raise: exactly 23 rows**, all
+      resolving `layerCount` to the slider's maximum (`layerCount max`, the four ALL MAX rows,
+      and block 7's eighteen `N layers × sub-control` rows) — the same predeclared consequence
+      as when ALL MAX first meant three. Every frozen matrix pins the literal 3. **phase11 is
+      frozen at 174cc2f (402 rows, the crowding instrument's own head and the first baseline
+      that carries the mum as a named row)**; the retention close ran it on both trees plus
+      the live matrix (434 rows on the branch head, compared by label against the parent
+      tree's phase11 export): **379 shared rows bit-identical; exactly 4 MOVED — `ALL MAX
+      (centre off)` and `ALL MAX x DOME/DISC/RING max`, the rows that resolve `layerCount` to
+      the slider's maximum; 19 block-7 rows relabelled from "3 layers x …" to "6 layers x …"
+      (new states, no counterpart on the parent); 32 DEPTH rows new. 4 + 19 = the 23 movers
+      predicted before the raise, and nothing outside them.**
+
+    - **THE NEW ROWS: 32** — depth 4/5/6 × spread min/default/max × RADIAL/CONTINUOUS
+      (18), then the corners: the mum at six turns (D_max 19), 6 × ALL THIN × spread min (28),
+      6 × shrink min (the 0.18 mm blade, 24), 6 turns × shrink min × 40 (a 240-foot base at
+      D_max 130, every foot across the axis), the coincidence corner six deep, 6 × 40 × spread
+      min in both placements (15 / 25), 6 × ALL FORM MAX, the six-deep BARE bloom, 6 × SPIRAL,
+      the 225° effective tilt, ZYGO 6 × ALL INNER MAX, the depth cell taken to six, and a
+      clefted petal six whorls deep. Gates, in CI on the first push and again locally: **the export gate 434/434 watertight,
+      434/434 identical live and export triangle counts, 0 degenerate, 19 of 434 flagged
+      CROWDED (the mum, its six-turn state, and the deep spread-min and shrink-min corners),
+      932 s; the panel gate PASS and its negative control firing on all eight routes; the
+      frozen-matrices job proving phase11 deep-equal to 174cc2f.** The connectedness gate
+      came back **433/434 ONE piece with ONE ROW SKIPPED — `ALL MAX x DOME max`, whose grid
+      grew from 605x605x421 (131.8M) to 706x706x421 (209.8M) because ALL MAX now means six
+      layers of forty petals, the area rule sums 240 feet, and the DOME scales with the hub to
+      a 234 mm centre.** A row that used to be measured and is now skipped is coverage lost to
+      a change, so the gate's ceiling moved as its own note prescribes: `MAX_VOXELS` 160M →
+      256M (~22% over the new worst case; the next largest row is 50.3M), and that row
+      flood-fills to ONE component in 14.5 s at 629 MB peak RSS. With the ceiling raised the
+      gate reads 434/434.
+
+    - **SHRINK 1.00 IN CONTINUOUS — MEASURED, NOT CHANGED (the brief asked).** Not
+      degenerate: 0 non-manifold, 0 boundary, 0 degenerate at 8 and 40 per turn, with and
+      without tilt step, while RADIAL and SPIRAL at 1.00 × offset 0 × tilt 0 reproduce the
+      14,832 exactly (and RADIAL at 1.00 with the default offset 0.5 and tilt 12 reads 0 —
+      the coincidence needs the offset too). But **J5 fires on every continuous row at 1.00**
+      ("rings 0 and 1 do not step"): a zero-step continuum is indistinguishable from the
+      ring-building mutation J5 exists to catch. The 0.90 cap is load-bearing for an
+      instrument, not for the mesh. It stays; anyone raising it owes J5 a new witness.
+
+    - **THE CROWDING THRESHOLD, RE-DERIVED AND HELD.** D_max in export mode across the raise:
+
+      | configuration | d3 | d4 | d5 | d6 |
+      |---|---|---|---|---|
+      | the mum (ruled bad) | 11 | 13 | 15 | 19 |
+      | defaults (ruled clean) | 2 | 2 | 2 | 2 |
+      | the depth cell, 3 × 0.90 (ruled clean at 3) | 3 | 4 | 5 | 4 |
+      | RADIAL × 40 × spread 0.60 (unruled) | 13 | 12 | 11 | 15 |
+
+      The ruled-clean maximum is still 5 and the ruled-bad minimum still 11, so the numbers
+      do not move the line; the depth cell at 4/5/6 sat unruled at 4–5 just under it, which
+      is why those three went on the sheet. **RULED FROM THE SHEET (Eva, Sep 4): the depth cell
+      at 4 / 5 / 6 reads CLEAN, the mum stays BAD, the defaults and the three-deep cell stay
+      clean, and the threshold HOLDS at 11.** The ruled-clean set now reaches 5 at depth (the
+      five-layer cell), which is exactly where it already stood; nothing moves.
+
+    - **THE INSTRUMENT FAILED ITS OWN VALIDITY ON TINY RINGS, AND THE FIX SHIPS IN THE SAME
+      PR AS THE ROWS THAT NEED IT (Eva's instruction).** R5 refused six deep rows whose
+      innermost ring is a few hundredths of a millimetre — D_max 29 vs 28 on the mum at seven
+      turns, 40 vs 38 at depth 8 × shrink 0.35 — because the raster pitch is set from the
+      HUB radius and the deepest stack there is a sliver narrower than a hub-scale cell. None
+      of the 402 shipped rows hit it; `DEPTH: 6 layers x layerSize min` would have, and a row
+      the instrument cannot converge on is a row that gets quietly dropped. So `refineDepth()`
+      re-rasters windows of three hub cells around every hub cell within two of the maximum
+      at 1/8 and 1/16 of the hub pitch, R5 requires THOSE two to agree, and the reading is the
+      resolved one (the line says `resolved locally` when the hub pass had not). Every
+      previously failing row converges; **every one of the six ruled configurations reads
+      exactly what it read before** (11 / 2 / 3 / 5 / 4 / 10); one row moved by one where
+      the hub pass had under-resolved a sliver (shrink min × CONTINUOUS × depth 5, 24 → 25).
+
+    - **THE SHEET:** `node tools/shot-bloom-depth.mjs <dir>` — the mum live beside print
+      preview, same page, same camera, same base crop from below; the depth cell at 4 / 5 / 6
+      with its numbers; the mum at six turns; the defaults and the three-deep cell as
+      controls; every caption carrying the app's own mode tag and the export's crowding
+      number registered against a real STL. **The pair does not look the same, and the first render said it did — an instrument
+      error caught by looking:** the base crop had been framed from each mode's own hub
+      radius, so the 29% larger printed hub was pulled back by 29% and the two cells came out
+      the same apparent size. Framed once from the LIVE hub, the print preview shows the hub
+      disc visibly larger in the same frame, the rim band taller (1.00 mm against 0.60) and
+      every root leaving it thicker; the caption carries hub 3.63 → 4.69 mm, the same 120
+      feet, D_max 17 live against 11 printed. **Eva looked at the pair directly (Sep 4): the
+      print-preview hub is visibly bigger with a taller rim band, so the toggle earns its
+      place. Merged on that ruling.**.
+
+- ~~The domed hub~~ **BUILT Sep 4 (session 14): `headRise`, the whorl primitive's
+  `height` argument completed — the junction slab bent into a spherical cap through
+  the rim, every foot landing ON it at its own height with its normal, the shell
+  following the feet, and the designed centre seated on the apex. For the INCURVE
+  MUM (Eva's ruling: the class this serves), not a prettier spider.**
+
+    - **WHAT WAS ON `main` WHEN THE SESSION OPENED, and the brief's account was
+      right.** 7ffcbff, #145: the print-preview toggle, `MAX_LAYERS` six with no
+      clamp and the two read-out flags, the crowding instrument as a flag at D_max
+      11 with the local fine pass; its neighbour set is NONE by design (an
+      exhaustive depth field, all-pairs NN as a diagnostic). The shipping default
+      read D_max 2 / D_mean 1.12 and the mum 11 / 4.97 printed, 17 / 7.49 live,
+      reproduced on the standalone run before anything was touched. The one thing
+      the brief's first version had wrong and its amendment fixed: `centerStyle`
+      already had a DOME value — the designed ornament on the flat hub, untouched.
+
+    - **THE BRIEF'S 4.75x DID NOT RECONCILE WITH THE METRIC, and the disagreement
+      was in the brief's inputs, resolved before anything was built.** 192 mm² of
+      foot over a 40.4 mm² annulus multiplies the export THICKNESS floor (1.00 mm)
+      as the foot's plan depth; the plan depth is the overhang, 1.50 mm live and
+      1.50–1.88 mm printed. The 0.55 mm inner radius matches neither mode, and the
+      3.63 mm ring is the LIVE hub while the metric reads the printed one at
+      4.69 mm. Redone with the owner's numbers: live 288 mm² over 41.0 mm², 7.02x
+      (the metric's live D_mean 7.49); printed 299.9 mm² over 66.5 mm², 4.51x
+      (the metric's 4.97). The brief landed within five percent of the printed
+      metric by two errors cancelling. The metric stands on its own validity
+      assertions; neither number was adopted.
+
+    - **THE DOCTRINE (Eva, Sep 4). A JUNCTION CHANGE, NEVER A CENTRE OPTION; AN
+      EXPOSED CONTROL, NOT A CURVATURE DERIVED FROM CROWDING OR DEPTH.** The
+      deciding reason was the third of the session's four: a metric consumed as a
+      geometric input becomes a target — the A_k lesson made structural. The
+      crowding instrument stays an OBSERVER of the geometry, never an input to it.
+      The other reasons, measured: a crowding-keyed rule gives no dome on the
+      incurve target (D_max 5–6, in the clean band) and none in the brief's own
+      spread-2.5 neighbourhood (3–4); a depth-keyed one moves the session-7
+      layered control (5 → 4 at a hemisphere); and the byte-identity argument is
+      the SAME mechanism either way (a guard plus a residual), so "derived holds
+      structurally, a control by a flag" was not a difference. `headRise` is
+      `role: 'arrangement'`, because what it owns is where the FEET sit in z —
+      the whorl primitive's `height` argument, handed the literal 0 since session
+      1 because a foot lifted off a FLAT slab is joined to nothing at |h| ≥ t. The
+      "height is not a control" ruling was a measurement about the slab, not
+      about height; with the slab following the feet the whole range is usable,
+      and the registry comment says so, so the next session reads a completed
+      primitive rather than a new axis. The junction itself stays control-free,
+      which keeps the registry header's "no junction role, ever" literally true.
+      **Ring-radius / spread exposure was NOT reopened**: its phase-2 parking was
+      conditioned on a new designed centre, and this session introduced none.
+
+    - **THE FOOT ON THE DOME, and the seam measured three ways before one was
+      chosen.** A single flat box tangent at the ring reaches 0.70 mm off the cap
+      at the default and 1.07 mm at ALL MIN — past t/2 at every corner. Rows
+      along the meridian with straight chords across leave the row ENDS floating
+      by hw²/2Rd, 0.58 mm on a default-width foot at a hemisphere. Rows built as
+      GREAT-CIRCLE ARCS across (radius Rd about the cap's centre — the roll law's
+      own cross-section, with the apex floor as the roll floor) lie IN the cap,
+      and the only seam left is the mesh's NV = 10 faceting, 0.007 mm worst case.
+      That is what shipped: the ring row placed from `ring.radius` and `ring.z`
+      directly (so J1's equality is exact), the two inner rows from the arc law,
+      the overhang an ARC length — the same foot laid on a curved surface. What
+      remains is a CREASE where the straight first blade row meets the curved last
+      foot row, hw²/2Rd: 0.03 mm on the incurve target, 0.06 on the mum, 0.46 on a
+      domed default. Blending it is petal-form work; it is photographed, not built.
+      **The blade frame rotates rigidly with the foot**: the tilt is measured from
+      the tangent plane's outward direction, which points DOWN the slope, so an
+      outer floret on a steep cap leans out and an inner one stands at its authored
+      tilt — the ball. `petalForm.frameAt` gained an optional `up` (a BRANCH, not
+      `up = Z` with a general expression: `-R[0]*sin(phi) + 0*cos(phi)` turns a -0
+      into a +0 at petalTilt 0, and that is a byte); the curl arc lives in the
+      foot's own (Rs, Up) plane.
+
+    - **THE HUB IS THE FLAT SLAB BENT — A SHELL, NOT A SOLID BOSS** (Eva's ruling
+      from the recommendation). Concentric spheres Rd ± t/2 about the cap's centre,
+      the rim a band at the rim's polar angle, an explicit apex fan (the centre
+      DOME's own construction, which found 48 degenerate triangles per dome when
+      a ring was shrunk to zero). Thickness t everywhere, so J4a stays an EQUALITY;
+      the feet sit inside it with their faces coincident with its faces exactly as
+      in the slab; from below it reads as a bowl, which is what lets the sheet tell
+      a domed base from a flat one — a solid dome's underside is the flat disc's.
+      **The hub's triangle count is the FIRST in this codebase that depends on a
+      slider: 3,456 at any rise above 0 against 192 flat** — a branch, not a ramp;
+      the panel gate asserts exactly those two numbers, and the export gate's
+      live-equals-export count still holds on every row.
+
+    - **THE APEX: capped by the OUTPUT.** The shell's inner face inverts under
+      half a thickness of radius — the roll floor's own failure, watertight and
+      connected and invisible to both STL gates — so the cap's radius is floored
+      at one sheet thickness (`HEAD_RISE_MIN_RADIUS_FACTOR`, asserted equal to
+      `ROLL_MIN_RADIUS_FACTOR` at module load, BELOW both definitions on the
+      hoisting-trap rule). Since Rd ≥ R0 always, it binds only where the hub is
+      narrower than the sheet: ONE reachable corner, ALL MIN × sheet 2.40 × spread
+      min (a 1.149 mm hub), where the rise saturates at 0.25 and the read-out
+      says "(CLAMPED: rise 1.00 asked, 0.25 built)". Measured across the domed
+      matrix rows: 0 degenerate, 0 non-manifold, boundary 0.
+
+    - **THE DEPTH CEILING ON THE DOME — re-derived, not inherited, and there was
+      no clamp to inherit.** Session 13 rejected the derived clamp and shipped two
+      flags; those flags are PRODUCERS of a boundary and moved with the owner:
+      `underFootFloor` is a circumference claim and needs no second arm;
+      `crossesAxis` becomes arc distance from the apex against the overhang.
+      Measured across 24 (depth × spread × placement) states: no ring is under
+      the floor at spread 2.00 to depth six in either placement, flat or domed, so
+      the ceiling stays six; at spread 0.60 the flagged counts are unchanged
+      except continuous × depth 4, 8 flat against 7 on the dome — because the arc
+      to plan ratio is 1.2–2.9 over the whole ring span and nearly 1 at the
+      innermost rings, where the apex is flat.
+
+    - **PRE-REGISTERED CROWDING, AND THE PREDICTION WAS WRONG IN A WAY WORTH
+      MORE THAN A CLEAN NUMBER.** Predictions were written to a file from the
+      area-ratio rule before the surface raster ran; the raster was validated
+      first (at rise 0 it equals the shipped flat raster to the bit on five
+      configurations, D_max and D_mean alike). Printed mode:
+
+      | config | flat | predicted at rise 0.5 / 1.0 | measured at rise 0.5 / 1.0 |
+      |---|---|---|---|
+      | Eva's mum | 11 / 4.97 | 9 / 3.94 and 5 / 2.44 | **10 / 4.11 and 9 / 3.14** |
+      | shipping default | 2 / 1.12 | 1 / 0.82 and 1 / 0.45 | 2 / 1.11 and 1 / 1.01 |
+      | session-7 bloom | 5 / 2.53 | 4 / 2.01 and 2 / 1.23 | 5 / 2.10 and 4 / 1.69 |
+      | depth cell | 3 / 1.62 | 2 / 1.23 and 1 / 0.71 | 3 / 1.38 and 2 / 1.06 |
+      | the incurve target (pre-registered after the four above, before the instrument ran) | 6 / 2.47 | 5 / 1.89 | **5 / 2.06** |
+
+      **THE DOME RELIEVES THE MUM'S CROWDING; IT DOES NOT FIX IT, AND THAT IS THE
+      RESULT, NOT A FAILURE.** The area-ratio rule over-stated the relief every
+      time, for one reason: the cap's extra surface sits at the RIM where the
+      slope is steep, while a tight bloom's feet stack at the INNER rings where
+      the cap is nearly flat. The mum's peak sits at r 2.1–2.8 mm on a 4.69 mm hub,
+      where a hemisphere's local relief is 1.1–1.2x under a whole-annulus 2.0x;
+      it takes the mum from D_max 11 to 9, not to 5. Still over-subscribed at 120 florets. The
+      incurve target's D_max landed exactly (5) and its D_mean missed by 8% in
+      the same direction (local relief 1.24x at its peak against 1.67x at the
+      rim) — a second data point on the same finding. **Carried into the
+      read-out** (Eva's instruction): the HEAD RISE line prints the surface-to-
+      plan ratio over the feet AND the local relief at the rim and at the
+      innermost ring, from `footRing()`'s own per-ring `relief`; the crowding
+      line prints the relief at the D_max point beside the rim's. Where the
+      flags live, because it is the same kind of fact: a number a visitor cannot
+      set that decides what the dome did.
+
+    - **THE INCURVE TARGET.** The brief's 15 mm is below the petal-length
+      slider's floor of 20 (kept for this session, Eva's ruling); its spread-2.5
+      neighbourhood gives a 20–28 mm hub around 20 mm florets, ratio 0.4–0.8, a
+      daisy. The class ratio (floret length ÷ head radius 1.0–1.5) is reached
+      only with the existing spine-curl control engaged: continuous 40/turn × 3,
+      spread 1.60, length 20, width 8, shrink 0.90, tilt 75, tilt step 5, curl
+      150, sheet 0.60, delicacy 0.25, rise 0.50 — ratio 1.36 by length over the
+      larger of plan reach and height reach. Its flat twin at the same sliders
+      folds into a closed bud with its tips 2.8 mm off the plate, so the pair is
+      the argument.
+
+    - **THE CENTRE SEAT — PHOTOGRAPHED, NOT FIXED (Eva, Sep 4).** Left at the
+      flat seat the designed centre DETACHES under a domed hub: two voxel
+      components on the session-7 bloom at rise 0.5, the second being the DISC
+      button, surviving at a 0.3 mm cell (its sibling mutant stayed one piece only
+      because a horizontal foot happened to brush the button's top). Re-seated on
+      the apex slab — the same eighth below the same underside, measured from the
+      cap's apex — the overlap is a central PATCH of the footprint and the rim
+      HOVERS: on the incurve target, printed, a 5.92 mm patch of a 9.38 mm
+      footprint and 1.88 mm of hover; on the mum the whole footprint. RING lifts
+      its tube onto the cap and is intersected all round. `buildCenterInto`
+      reports the patch and the hover, the read-out prints them, and the sheet
+      has a low three-quarter and a profile of the button at readable
+      magnification for Eva's eye. A button that follows the cap's curvature is a
+      phase-2 centre question, not a junction one.
+
+    - **THE POSITIVE CONTROLS, RUN AGAINST THE SHIPPED INSTRUMENTS FIRST, in
+      throwaway worktrees.** Three mutants at a hard-coded rise 0.5: D1 feet on a
+      cap over a hub left flat; D2 a shell under feet kept horizontal; D3 correct
+      feet under a blade that did not rotate. Every one exported watertight at
+      identical live and export triangle counts. The voxel gate read ONE piece on
+      every row of D1 and D2 — the mum included, whose inner feet sit 1.8 mm above
+      a flat hub — and on D3 two pieces only where the centre detached. **The
+      shipped J1 fired on all three, and that is the finding: it was
+      INDISCRIMINATE, not blind.** It asserted the flat ruling itself (z = 0
+      exactly, the hub plane's own normal), so it rejected a correct dome and a
+      wrong one alike and could police nothing once the right build shipped. That
+      distinction is in the gate's header.
+
+    - **SO THE JUNCTION ASSERTIONS WERE RE-DERIVED, red then green on the same
+      mutants rebuilt on the new tree.** J1: each foot row lies on the cap the
+      owner declares (its centre at the cap's radius from the cap's centre,
+      within 1e-9) with the cap's normal there, the ring row at the owner's
+      radius and height EXACTLY; flat rows keep the pre-dome clauses verbatim.
+      J3: the hub BUILDER's own sphere — reported by `buildHubInto` from what it
+      built, never copied from `footRing()` — is the owner's to the bit, and
+      exists iff the owner declares a dome. J8: the spine's first chord leaves the
+      ring row in the foot's own meridian plane at tilt plus half that row's curl
+      (every row; exact for a circular arc, and the centreline is curl's alone),
+      and on flat-form rows the first blade row's normal is the rigid tilt of the
+      foot's frame. Plus the dome guard (exactly 0 on flat builds, absent on domed
+      ones) and the guard-versus-control biconditional.
+
+      | mutant | boundary / degen | voxel pieces | after the re-derivation |
+      |---|---|---|---|
+      | shipped tree | 0 / 0 | 1 | **0 of 13 rows** |
+      | P1 hub ignores the owner's dome | 0 / 0 | 1 on every row | **J3 only**, every domed row, flat rows clean |
+      | P2 feet lifted but horizontal | 0 / 0 | 1 on every row | **J1 + crowding R4**, every domed row |
+      | P3 blade not rotated with its foot | 0 / 0 | 1 | **J8 only** — and its first probe was SILENT on the curled incurve target |
+      | P4 the flat path is the general law at zero curvature | 0 / 0 | 1 | bit-identical (0 positions moved), residual 0 |
+
+      **P3's first silence is the entry that matters.** J8's first draft compared
+      the root NORMAL on flat-form rows only, and the acceptance config is curled,
+      so the mutation this session is most likely to ship passed the row the
+      session is for. The chord clause exists because a positive control was run
+      before the assertion was trusted — session A's "Z1 failed the shipped tree
+      on 5 of 7 rows", the fan's "six of eight probe rows fired on the shipped
+      tree", again. **P4 corrected a premise the other way:** the general dome
+      law at zero curvature reproduces the flat foot BIT FOR BIT on the default,
+      at petalTilt 0 and on the mum, so the guard is a construction on top of an
+      identity rather than a cover for a difference. It stays, because a branch is
+      a construction and an identity is an argument; the residual is what polices
+      the law.
+
+    - **THE CROWDING INSTRUMENT READS ON THE CAP.** Membership in the cap's own
+      geometry (a geodesic strip about the foot's meridian), the union a SURFACE
+      area, R4 placing every emitted row on the owner's cap at the strip model's
+      arc position. Its first draft weighted each occupied cell by the relief at
+      its centre and R5 refused every hemisphere row at 0.5%: the sampling was
+      measuring the 1/cos singularity at a vertical rim, not the surface. Each
+      cell now carries the cap's exact area between its inner and outer plan
+      radii, and the hemisphere rows converge. The relief at a vertical rim
+      prints as "vertical", never as 1.3e151x — which the first draft printed.
+
+    - **THE MATRIX GREW 434 → 466**, and **`phase12Matrix()` — the 434 rows
+      frozen at 7ffcbff — is the twelfth baseline and now the strongest**, proved
+      deep-equal to that commit's own `buildMatrix()`. The 32 new rows: the
+      blanket sweep's `headRise min` (0, the default, pinned) and `max` (1); the
+      dome crossed with spread min / default / max in both placements; rise 0.5
+      at petal counts 3 / 8 / 40; the mum at 0.5 and at a hemisphere; the incurve
+      target flat and domed; six deep at spread min in both placements (the arc
+      flag); the APEX CORNER; a hemisphere under every centre style; ALL FORM
+      MAX, petalTilt 0 and the 135°-effective tilt on a hemisphere; FAN, SPIRAL,
+      the two-whorl ORCHID and a per-petal fan on a dome; ALL THIN × spread min ×
+      3 layers (feet across the apex); the 0.18 mm blade six deep on a
+      hemisphere; and a pinned rise-0 row. **Predicted before the run: exactly the
+      four ALL MAX rows move**, because `SWEEPABLE()` now resolves `headRise` to
+      1 there (its only consumer is block 4), and every frozen matrix pins
+      nothing about it. The connectedness ceiling moved 256M → 448M because
+      `ALL MAX × DOME max` is now a hemisphere of the 118 mm hub under a 142 mm
+      boss, 700×700×743 cells, 364.1M — measured in Node before the gate ran.
+
+    - **THE PANEL GATE'S ROUTE (k)** asserts the HEAD RISE line, the "(CLAMPED"
+      clause and the seat line in both directions against the owner's flags on
+      five states, plus the hub's triangle count as the two-valued branch it is;
+      the negative control freezes the read-out and requires all NINE routes to
+      fire, and does.
+
+    - **THE SHEET: `node tools/shot-bloom-dome.mjs <dir>`** — every cell PRINT
+      PREVIEW ON, read back from the app's own `shownMode`; the incurve target
+      flat beside domed with one camera sized from the flat twin; the base of
+      each from a LOW PROFILE at the rim (Eva, Sep 4 — a domed shell hides the
+      inner roots from below, and the flat disc and the shell are
+      indistinguishable from there) and from below; the mum flat / 0.50 /
+      hemisphere; the two controls at rise 0; the centre seat, low three-quarter
+      and profile. The profile camera WIDENS in bounded steps when the decoded
+      frame comes back all content (the mum's canopy swallowed the first one at
+      hub magnification) and says so in the caption.
+
+    - **THE CLOSE-OUT, on the retention ruling (the newest baseline on both
+      trees plus the live partition, not the whole suite).**
+        * **phase12 (434 rows frozen at 7ffcbff) on a worktree at 7ffcbff and on
+          the branch head: 434/434 bit-identical, 0 moved, defaults bit-identical.**
+          The live matrix (466 rows) against the base tree's phase12 export by
+          label: **430 shared rows bit-identical, exactly the 4 predicted ALL MAX
+          rows moved, 32 rows new; the pinned rise-0 row and `headRise min` are
+          bit-identical to the default on the new tree.** The prediction held in
+          both directions. Runtimes: ~20 min per byte export of 434–466 rows.
+        * Export gate **466/466 watertight, 466/466 identical live and export
+          triangle counts, 0 degenerate, 23 rows flagged CROWDED, no validity
+          failure, 1,579 s** — after two runs that were NOT clean, recorded
+          because each found a real defect in the new instruments: the first
+          (12 validity failures) was the plan raster's D_mean refusing every
+          hemisphere row and R4's tolerance at a rim whose radius was a rounding
+          residue above the hub's; the second (1) was J8's chord clause comparing
+          angles without a wrap, on the 225°-effective sixth whorl. Both fixed
+          on the mechanism, not the tolerance.
+        * Connectedness gate **466/466 ONE connected piece, no row skipped at the
+          raised 448M ceiling, 1,345 s.**
+        * Panel gate PASS with route (k); the negative control fired on all nine
+          routes. `--verify-frozen --phase12` PASS against a worktree at 7ffcbff.
+        * The shipped tree on the thirteen probe rows: 0 of 13 fired; P3 rebuilt
+          on the final tree fires J8 on all 7 domed rows and none of the 6 flat.
+        * The default bloom is **11,136 tris live and export alike, unchanged**;
+          the incurve target is 152,832 at rise 0.5 (149,568 flat, the shell's
+          3,264 on top); the mum at rise 0.5 the same 152,832.
+
+
+- ~~The petal curl family~~ **BUILT Sep 4 (session 16): curl bias, curl start,
+  cross-section taper and — renamed — cup gradient, as sheet geometry on the
+  domed hub. The flower's PARAMETERISATION came over; its geometry code and
+  its constants' reasons did not. Full numbers in
+  `docs/bloom-session-16-outcome.md`.**
+
+    - **THE ACCEPTANCE CRITERION WAS WITHDRAWN BY EVA, AND WHY IS THE ENTRY.**
+      The brief demanded the incurve target read 0.0% uncovered and bald-cap
+      ≤ 0.08 mm at every new control's min, default and max. Phase A measured
+      that curl bias and curl start preserve the total TURN and move the TIP
+      — bias 0.5 puts the incurve tips 3–8 mm from the axis and re-opens 5.4%
+      of the disc, start 0.95 puts them 9–17 mm out and re-opens 23.1% — and
+      coverage is a tip-position property. Eva's ruling: the criterion demanded
+      that controls which relocate the tip not relocate the tip; a non-default
+      bias or start opening the crown is the controls WORKING, documented, not
+      a gate failure. **Crown closure on the incurve target is an EMERGENT
+      property of curl 150 × tilt × `domeLean` landing tips within 0.3–1.3 mm
+      of the axis. It was never designed and has no margin. A future session
+      changing tilt, curl or `domeLean` re-opens it silently unless coverage is
+      asserted on the pinned rows** — so the two DOME rows naming the incurve
+      target now PIN the four new controls at identity and carry a `coverage`
+      assertion, and `tools/bloom-plan-coverage.mjs` is WIRED INTO THE EXPORT
+      GATE: its line on every row, its numbers asserted on those two rows only
+      (0.0%, ≤ 0.09 mm — the measured 0.08 plus one part in ten), a split whorl
+      reported as a LABELLED, LOUD skip and a coverage-asserting row that is
+      skipped a validity failure. Cost measured before the ruling: 0.2–1.2 s a
+      row in-page.
+
+    - **THE FLOWER'S CONSTANTS ARE LACE CONSTANTS WITH NO THICKNESS BEHIND
+      THEM, and the ranges ship FULL, CLAMPED, TOLD (Eva).** Bias power 4 and
+      start to 0.95 concentrate curvature past the roll floor's reach by 5× and
+      20×; the sheet's inner face inverts under half a thickness of SPINE
+      radius exactly as it does under roll, so the spine curvature is floored
+      pointwise at one sheet thickness (`ROLL_MIN_RADIUS_FACTOR * t`, the same
+      constant), the control saturates, and the read-out's SPINE CURL line
+      prints the tightest spine radius, "(CLAMPED at one sheet thickness …)"
+      and the turn asked beside the turn built (150° asks 96° at start 0.95 on
+      the incurve target, 50° at bias 1 × start 0.95). At curl 150 on a 20 mm
+      blade the floor binds from start 0.87 in export and, at bias 1, from
+      start 0.35. Trimming the input to hide that cliff is an input proxy; the
+      roll floor and FOOT WIDTH FLOORED are the precedents. **The floor is the
+      MODIFIERS' floor: a uniform curl is the shipped arc and is never clamped
+      — and the first full gate run found it already UNDER one sheet thickness
+      on three shipped rows** (six deep × curl 360: the innermost whorl's
+      6.8 mm blade has a 1.08 mm spine radius against 1.20), a pre-existing
+      state on the session-13 precedent: told by `underFloor` and the read-out's
+      UNDER ONE SHEET THICKNESS clause, never clamped, C3 asserting the flag
+      against the law both ways. The claim that the uniform arc never reaches
+      the floor was true of one whorl and false of six. The flower's bias
+      also doubles the total turn (360° → 720° at bias 1): NOT reproduced —
+      the total is spine curl's alone, one owner. **Curl start is floored at
+      one blade row** (1/NU, told), so the root chord is straight wherever
+      start is engaged and J8's normal clause applies there.
+
+    - **RENAMED AND DECLINED, on measurement, so neither is re-proposed.** The
+      flower's "Edge curve — profile" is the SAME v² lift along the row normal
+      that cup is, with a linear-to-the-tip envelope where cup carries the
+      onset ramp; the best-fitting cup leaves a 28% RMS residual at every
+      amplitude (0.91 mm max on a 16 mm petal at +1), so it ships as **Cup
+      gradient**, the name the geometry earns, and the flower's label is now
+      known to be wrong there too. "Edge curve — top-down" is a width
+      MULTIPLIER reproducible by petal width × base taper × tip taper to
+      0.32 mm max billow and 0.59 mm max pinch on an 8 mm half-width: shipping
+      it makes a second producer of the width profile and breaks the
+      registration rule — DECLINED. The flower's cup-damping-under-roll is
+      declined on the isometry measurement (roll holds |dP/dv| at exactly 1;
+      cup composes onto it). The flower's ungated dead sliders are declined:
+      bias and start are `visibleWhen: { id: 'petalSpineCurl', awayFrom: 0,
+      by: 2.5 }`, taper likewise on roll, hidden AND inert.
+
+    - **MUTANT A IS THE ONE THAT MATTERS, AND ITS WITNESS WAS BUILT FIRST, RED
+      THEN GREEN (Eva's instruction).** A build with the controls wired —
+      registry rows, telemetry, read-out — and the spine still on the arc is
+      BIT-IDENTICAL to the un-biased bloom (same sha on every probe row): it
+      exports watertight, as one piece, at the identical triangle count and
+      byte length, and passes J1–J9, formAssertions, thicknessAssertions and
+      Z1–Z9. Four dead sliders through every gate. `spineLaw()` in
+      bloom-geometry.js is the ONE owner of the curled centreline, read by
+      `buildPetalInto` and by the gate; **C1** rebuilds it in the gate from
+      OTHER owners (bias/start from the registry, the applied curl and length,
+      J9's three tilt terms, the ring's thickness) and compares against the
+      EMITTED blade-row centres, requiring the builder's own spine record to
+      agree with the reconstruction. With `SPINE_WIRED = false` C1 fired on
+      every ring of every bias/start row (120 on the incurve target) and was
+      silent on the control, flat and hoop rows; wiring the spine turned it
+      green with nothing else changing. **C2** is the integrator's own validity
+      (the table against the closed-form arc on uniform rows, 1e-14 measured,
+      1e-9 asserted; an Euler integrator at the row pitch reads 5e-3); **C3**
+      the spine floor in both directions (a floorless spine builds a 0.03 mm
+      radius, watertight, and nothing else sees it). Both in both gates on
+      every row.
+
+    - **TWO SHIPPED INSTRUMENTS WERE INDISCRIMINATE, session 15's class again,
+      and one was blind.** J8's chord clause ("tilt plus half this row's
+      curl") is the chord of a CIRCULAR arc: it fired on all 120 rings of every
+      CORRECT bias/start build and did not separate the correct build from the
+      un-integrated mutant beside it. Re-derived: the expectation is the law's
+      own first-row direction from C1's inputs, the closed form kept verbatim
+      as a second clause on uniform rows, and the normal clause extended to
+      every untwisted row whose start is engaged (the root is straight there
+      by construction). formAssertions' isometry clause scoped on `cup === 0`
+      fired on a correct cup-gradient build; it scopes on cup OR gradient now.
+      And **J1 is blind to a foot SHORTENED by a modifier, flat and domed**
+      (Mutant B): the foot rows still lie on the plane or the cap, and J1 reads
+      that, not the overhang length; the crowding instrument's R4 is the
+      witness, a validity assertion in both gates. Recorded, not fixed.
+
+    - **A NUMERICAL FINDING ON THE WAY TO GREEN, worth more than the clean
+      run.** At the tiny curvature a tip-loaded law has near the root, the
+      exact-arc substep `(sin p1 − sin p0) / k` cancels catastrophically, and a
+      one-ULP difference in `Math.sin` between Node's V8 and Chromium's V8
+      became 1.4e-3 mm of spine on the incurve target's ring 0 — the gate and
+      the page disagreeing about the same law with the same inputs. The
+      substep is the same arc in its product form, `ds · cos(pm) ·
+      sinc((p1 − p0)/2)`, portable; and the cumulative turn is taken from the
+      closed-form `Phi(u)` so the unclamped total is exact — the first draft's
+      midpoint quadrature built 149.9998 of 150 degrees, which C3 read as a
+      clamp that was not there.
+
+    - **SELF-INTERSECTION IS A PROPERTY OF THE PETAL ALONE — measured on 243
+      combinations, not derived.** The spine self-contact reading was identical
+      across all nine rise × shrink states of every (curl, bias, start): the
+      brief's corner "curl max × rise max × the innermost rings" does not
+      enter it, and what rise and shrink change is blade-into-shell
+      interpenetration, allowed since Aug 31. The only single-petal contacts
+      are the shipped hoop (curl 360, tip on root) and curl 360 × start 0.5
+      (the tip landing on its own mid-blade at 0.000 mm); bias winds the
+      spiral inside itself and never touches. **SELF-CONTACT is a FLAG, never
+      a gate (Eva)** — it fires on the shipped, photographed hoop — from the
+      builder's own rows: the nearest approach between blade rows at least
+      three sheet thicknesses apart ALONG THE SPINE, or the blade against its
+      own foot, within one thickness. The first draft compared rows three
+      apart by INDEX and read every 0.88 mm shrink-0.35 blade as touching —
+      row pitch, not contact. Exercised in both directions at matrix level
+      (`curlCoverage()`), the crowding flag's own precedent.
+
+    - **THE PANEL: PETAL CURL (Eva's ruling, the session's version over her
+      own).** Petal tilt, spine curl, curl bias, curl start, twist. Tilt moves
+      WITH curl rather than to Arrangement, because the Sep 1 ruling put it
+      beside spine curl and considered and rejected exactly the Arrangement
+      alternative; twist is in on `petalForm`'s ordering law. PETAL FORM keeps
+      cup, cup gradient, roll, roll taper. Zero geometry. The panel gate's
+      route (l) drives curl 0 → 150 → 0 and roll 0 → 90 → 0 on ONE page — route
+      (d) drives a slider driver to its two ends only, and both ends of spine
+      curl are away from 0, so it could assert that bias and start APPEAR and
+      never that they DISAPPEAR — and asserts the SPINE CURL line, "(CLAMPED"
+      and SELF-CONTACT in both directions against the builder's record; the
+      negative control freezes the read-out and requires all TEN routes to
+      fire, and does. `tools/shot-bloom-panel.mjs` gained the two cells.
+
+    - **THE MATRIX GREW 469 → 499, and `phase13Matrix()` — the 469 rows frozen
+      at 6b8e94b — is the thirteenth baseline. THE DEBT SESSION 15 LEFT, called
+      out on Eva's instruction:** it grew the live matrix 466 → 469 and froze
+      nothing, so the newest baseline stayed phase12 at 434 while 35 live rows
+      — the domed corners and the crown-coverage rows, exactly the region this
+      family disturbs — had no baseline. Paid; proved deep-equal in CI. The
+      three gated controls are excluded from block 1's sweep as hidden-at-
+      defaults (`CURL_SUBS`, derived from `predicateDrivers` and
+      `evalPredicate` at DEFAULTS — the latent trap #124 closed, from a SIXTH
+      direction) and swept in block 21 at a curl or roll that shows them; they
+      JOIN `SWEEPABLE`, so **the eight ALL rows move, predeclared** (ALL MAX by
+      bias 1 / start 0.95 / taper +1 / gradient 1.2; ALL MIN by taper −1 under
+      roll −330 and gradient −0.8). Block 1 sweeps cup gradient on its own. The
+      two pinned incurve rows are relabelled and gain four identity sets, which
+      move no byte. Both STL gates gained `--only <regex>` for a smoke pass
+      on a wiring change; the summary counts what ran and matrix-level claims
+      are not made on a filtered run.
+
+    - **THE CENTRE RIM HOVER HAS ONE OWNER NOW.** Session 14's 1.88 mm and
+      Phase A's 1.67 mm on the incurve target are the same configuration in
+      two MODES — printed (the export floor moves the hub from 9.69 to 12.51 mm
+      and the button with it) and live; the read-out prints the seat line in
+      whichever mode is on screen. No configuration reads 1.2 mm. The hover is
+      a centre-versus-shell number and no curl control moves it. **(Historical from session
+      20: the centre rig and its seat line are retired; the number describes a tree that no
+      longer ships. B2's stamens sit inside the clear disc by their own law — Q5 amended.)**
+
+    - **FIELDS: nothing folded.** `domeLean` and `tiltExtra` are untouched;
+      the four new controls are separate ids; `spineLaw()` is a separate owner
+      handed the three-term tilt the builder always summed.
+
+    - **THE SHEET: `node tools/shot-bloom-curl.mjs <dir> [base-tree]`** — every
+      cell PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted; each
+      control swept alone at min/default/max on one camera per sweep; the spine
+      floor and the self-contact flag both sides; the incurve target at every
+      new control's extremes with coverage and crowding in the caption, bias 1
+      beside start 0.95 as the honest picture; a crown crop of the pinned row;
+      the foot from a low profile at start 0 and 0.50; and the two controls
+      exported from a worktree of the base commit with their sha REQUIRED
+      equal on the sheet itself.
+
+    - **THE EVIDENCE — filled at the close-out below this line.**
+
+    - **THE EVIDENCE, COMPLETE.** Export gate **499/499** watertight, 0 degenerate,
+      identical live and export triangle counts on every row, 1961 s; plan
+      coverage measured on 372 rows, **127 SKIPPED** as split whorls (labelled,
+      never silent), **2 ASSERTED** (the pinned incurve rows: 0.0% uncovered,
+      bald cap 0.08 mm against a 0.09 mm bound); 56 rows flag SELF-CONTACT, 3
+      rows carry the shipped uniform arc under one sheet thickness on the
+      innermost of six whorls (told, not clamped), 24 CROWDED. Connectedness
+      **499/499** one piece, 1977 s. Panel gate PASS on all ten routes with the
+      curl route's under-floor step on the shipping blade and sheet set
+      explicitly; the negative control fires on **ALL TEN ROUTES**.
+      `--verify-frozen --phase13` PASS. CI on af2cd99: six verify jobs green.
+    - **THE RETENTION CLOSE — the newest baseline plus the live partition,
+      EXACT.** `phase13Matrix()` exported from a worktree of 6b8e94b and from
+      head: **469/469 bit-identical** (the base tree reads "6b8e94b+dirty" from
+      the gitignored node_modules symlink, nothing else). Head's live matrix
+      against that export by label: 467 shared, **459 bit-identical, 8 moved =
+      exactly the eight predeclared ALL MIN / ALL MAX rows, 0 outside the
+      prediction**, 32 new (block 21's 28 plus block 1's cup-gradient sweep and
+      the relabelled pair), 2 labels absent because they were relabelled — the
+      two pinned incurve rows at 4b250b664500 (flat) and cd46ad682fd3 (rise
+      0.50) bit-identical under their new labels and their four identity sets.
+      The moved ALL rows keep their byte lengths and triangle counts and change
+      shape only.
+    - **THE POSITIVE CONTROLS ON THE FINAL TREE — four full-tree copies, seven
+      rows each, every row watertight, 0 degenerate, identical live and export
+      counts on every tree; the STL gates see none of it.** Read as: what the
+      curl instruments fire, and where each mutant is bit-identical to a
+      correct build so that NOTHING ELSE could:
+      A (bias/start read, spine keeps the arc) — bit-identical to the PINNED
+      CONTROL on bias 1 and start 0.95 (sha cd46ad682f, the mutant that leaves
+      no byte to diff); **C1 fires on every ring** of every bias/start row and
+      the re-derived J8 with it; silent on the control, the hoop and the flat
+      default. B (start reaches the foot rows) — crowding R4 fires on every
+      start row (x480 on the incurve target), silent where start is 0. C
+      (Euler integrator at the row pitch) — **C2 fires on the uniform rows**
+      (the pinned control and the fiddlehead, where the bytes are identical to
+      a correct build) and C1 at 1e-2 mm on the bias/start rows. D (no spine
+      floor) — bit-identical to the correct build on every row the floor does
+      not bind, and on start 0.95 **C3 fires both ways** (a 0.38 mm spine
+      radius told as under the floor while the owners' inputs say clamped) with
+      C1 at 3.7e-1 mm. Every tree is silent and bit-identical on DEFAULT (flat).
+    - **THE SHEET, RENDERED AND HELD FOR EVA'S EYE:** 33 cells across 26 rows,
+      every one PRINT PREVIEW ON, chrome hidden, auto-rotate off, asserted; the
+      two BEFORE cells exported from the 6b8e94b worktree with their sha
+      required equal to the head's controls (0c377b21350d, cd46ad682fd3) and
+      the taper-under-roll-0 cell required equal to the pinned control. Each
+      sweep shares one camera framed from its widest cell with a 12 px clear
+      margin asserted, so a canopy at start 0.95 no longer crops. The honest
+      pair: the incurve target at bias 1 (crown re-opened) and at start 0.95
+      (23.1% uncovered, bald cap 5.78 mm, CLAMPED on 120 of 120 rings, 25.6°
+      built of 150° asked), with the seat line reading 1.88 mm printed.
+
+- ~~The full sphere — "what if I wanted the bottom half of the sphere as well?"~~ **BUILT
+  Sep 5 (session 18): the CAP / SPHERE head. `hubShape` (Head section, CAP default) with
+  `headRise` as the cap's own sub-control; SPHERE is the CONTINUOUS spiral RE-KEYED ON
+  POLAR ANGLE — one equal-area sequence pole to pole on a closed shell, lean 0, the far pole
+  reserved. Numbers and the mutant table in `docs/bloom-session-18-outcome.md`.**
+
+    - **THE RULINGS (Eva, Sep 5), all three from Phase A's ranked list.** Q1: candidate (a),
+      which turned out to be (c) built through the existing primitive — the descriptor's
+      KEY moves from plan radius (not injective past the equator) to polar angle; no second
+      whorl, no reflection, no latitude bands (rejected: rings wearing spiral azimuths, the
+      look ruled out Sep 1). Q5: TWO values, not three — a FLAT / DOMED / SPHERICAL enum with
+      `headRise` as DOMED's sub-control would have resolved 35 phase13 and 42 live rows to a
+      FLAT default and built them flat; CAP carries the rise, so the move is 0 moved. The
+      two guarantees are stated APART in the outcome doc: the geometry one (SPHERE is a value
+      nothing pre-existing selects) and the UI one (`headRise`'s predicate true on every
+      existing row). Q1b: LEAN 0 is the baseline — the cap's restore-the-flat-aim lean
+      continued past the equator aims every far-side petal back into the bloom; the faded
+      lean is costed, not built, and the sheet decides. Q4: the reserved pole is the pole
+      opposite the arc origin, clear of feet by construction, covered by converging blade
+      tips, a stem exiting through that canopy later — asserted as S3 in arc, both directions.
+      Q6: #106 and #108 are FLOWER issues; the kickoff prompt was wrong about them; neither
+      was touched.
+
+    - **SPHERE IS CONTINUOUS-ONLY, HIDDEN AND INERT ELSEWHERE — the `layerPhase` treatment.**
+      Under RADIAL / SPIRAL / FAN a sphere would be latitude bands, so the enum shows under
+      CONTINUOUS only, a stored SPHERE builds the cap there, and `headRise` stays live (its
+      predicate is `not sphereMode`, not `hubShape oneOf CAP`, on purpose). The registry's
+      `PREDICATES.sphereMode` and the geometry's `sphereMode()` are the two statements; the
+      harness checks them at module load over every placement × shape × rise and per row.
+
+    - **THE SPHERE IS THE RISE-1 CAP CONTINUED PAST ITS OWN RIM.** Rd = R0, the equator on
+      the flat hub's plane, `H` still the face pole's height so the centre's apex seat reads
+      it unchanged; the apex floor binds on the same one corner and holds the SPHERE at one
+      sheet (told). The sequence runs from the RESERVED pole (k = 0, the largest petal, scale
+      1) to the face pole, so `layerSize`, `layerTilt` and `layerCount` keep their meanings
+      over the whole sphere. Feet run toward the face pole, blades leave toward the reserved
+      one. The hub is two concentric spheres closed by an explicit apex fan at each pole —
+      the cap arm at 180° collapses its rim band onto 48 coincident points, the DOME centre's
+      own defect — so the hub count is a THREE-VALUED branch, 192 / 3,456 / 6,720.
+
+    - **WHAT THE INSTRUMENTS COULD AND COULD NOT SEE, measured before the assertions were
+      written and again after.** Everything written in slope terms held for slope in
+      [0°, 180°] untouched: the arc-law foot rows, the great-circle cross-sections, the rigid
+      frame, J1, J3, C1 — and crowding's R4 (its `atan2(proj, dz)` is signed) needed ONE
+      clause, not the rewrite Phase A expected. What could not: the crowding raster's
+      membership went through a plan point lifted onto the UPPER sheet, so every far-side
+      cell would have been tested against the wrong hemisphere — it evaluates in (s, θ) now,
+      over the full arc, the cap path a verbatim branch; the plan-coverage raster cannot
+      read a sphere at all (the far hemisphere projects into the disc from below: a FALSE
+      CLEAN), so SPHERE rows are a LABELLED, LOUD skip and the export gate FAILS THE RUN if
+      one ever emits a number, decided against the app's own `sphereMode` and asserted in
+      both directions at matrix level; J5's "radius strictly decreasing" is false on a sphere
+      (it rises to the equator and falls) and steps in polar angle there; J6 is NULLED (no
+      ringed twin exists for a spherical sequence; a claim nothing can make reads as absent).
+      S1 (equal-area, pole to pole, mirror-symmetric, the sphere's own functions of φ), S2
+      (the hub is CLOSED iff declared, from the builder's own report), S3 (the reserved pole,
+      both directions) and S4 (the rise inert under SPHERE — GATED rows for the bit-identity,
+      a per-row owner check for the mechanism) carry the rest. The mutant table is in the
+      outcome doc: five mutants, each caught by the family written for it (S1, S2, S3 with S1 suppressed, J9, the loud skip) on all four sphere smoke rows, every one silent on the RADIAL control and watertight with identical counts — and M-COV's emitted number on the incurve sphere was 0.0% uncovered, bald cap 0.08 mm, the false clean exactly as predicted.
+
+    - **THE SPHERE SPREADS THE FEET.** The incurve sliders read D_max 5 / D_mean 2.06 on the
+      cap at rise 0.5 and **2 / 1.00 on the sphere**, depth 1 within one equal-area step of
+      either pole; 240 feet on a 32.72 mm sphere read 2 / 1.01. Four times the surface of the
+      equatorial disc, and every foot owns the same patch. The instrument's blind spot is
+      unchanged and is exactly the face pole's question: root-exit stacking, never the blades.
+
+    - **BYTE-IDENTICAL ON THE RETENTION RULING'S TERMS**: phase14 (499 rows frozen at
+      5312845, a commit on `main`, the strongest baseline — the only one carrying the curl
+      family's rows) **499/499 bit-identical, 0 moved**; the live partition **499 shared rows bit-identical, 0 moved, 28 new (all SPHERE), 0 absent; every GATED inertness pair equal by sha256** (S4 measured, not asserted). The predeclared must-not-touch
+      list (every flower file and tool, `chromium-harness`, cards, the tracker, the twelve
+      older frozen functions) verified by `sha1sum -c` at close; eleven `frozen/*` tags on the
+      remote as session 17 left them; `frozen/phase14` is OWED from `main` after the merge.
+
+    - **THE SHEET: `node tools/shot-bloom-sphere.mjs <dir>`** — the incurve sliders on a
+      sphere beside the same sliders on a cap at a hemisphere, one camera; the FACE-POLE crop
+      (for Q1b) and the RESERVED pole from below; the 240-foot row, the sparse and mum cases;
+      and the byte claim on the sheet itself (two GATED pairs REQUIRED equal by sha). Held for
+      Eva's ruling.
+
+    - **WHAT THE SHEET SHOWS (findings, not patches).** The RESERVED pole is COVERED on
+      every sphere cell — roofed by the overlapping bases of the first rings' blades on the
+      incurve sphere, a starburst on the mum, forty closing blades on the 240-foot row — no
+      bald spot, nothing patched. The FACE pole carries the centre question: the designed
+      centre seats at 75% of the hub radius, and on a sphere the hub radius IS the sphere
+      radius, so the DISC becomes a lid over the whole face pole (a 24.5 mm RADIUS — 49 mm across — on the 240-foot
+      row); on the incurve sphere the tips close it as a tight crown with a few-millimetre
+      eye. A centre that follows the sphere, or is sized from a foot, is the phase-2 centre
+      question the dome session recorded — on the sheet for Eva, not shrunk quietly.
+
+    - **THE SHEET RULING (Eva, Sep 5).** Approved. Q1b CLOSED at lean 0 — the crown with
+      its eye is not reflexed and not bald, so the faded lean does not carry into session
+      two; **lean 0 is the SPHERE law**, not a baseline awaiting a picture. The DISC
+      face-pole plate is DEFERRED to the phase-2 centre work explicitly — the centre is not
+      constrained under SPHERE here; the phase-2 centre question is now the dome session's
+      button-that-follows-the-cap PLUS the sphere's plate, **a 24.5 mm RADIUS (49 mm across) on the 240-foot row**,
+      recorded so it is found rather than rediscovered. The mum as a dandelion clock is
+      noted, not a defect. Close-out: the four bloom gates green on the head, merged by the
+      session, `frozen/phase14` tagged from `main`.
+
+- ~~The solid-angle coverage instrument — "session two"~~ **BUILT Sep 5 (session 19) as
+  `tools/bloom-solid-angle-coverage.mjs`, a SIBLING of the plan raster, validated,
+  CALIBRATED in closed form, and WIRED into the export gate on Eva's ruling with four
+  pins in block 22 — every reading, threshold and headroom in
+  `docs/bloom-session-19-outcome.md`. The plan raster's own SPHERE skip stays (a plan
+  raster cannot read a sphere); what is lifted is that a sphere row had no coverage
+  instrument. The rulings themselves (R5 as the validity standard, the mapped check
+  ill-posed, the pins, the docs-only-PR amendment) are recorded by this session's
+  docs-only PR, the amendment's first use — see the entry that follows this one.** Covered iff a ray from `footRing()`'s own sphere
+  centre in direction (φ, θ) hits any petal triangle; a (φ, θ)-binned triangle index; 0.5°
+  refined to 0.25°, sin φ weighted so the sums are steradians; the hub and the designed
+  centre never in the soup, as the plan raster leaves them out. A FLAT hub is its labelled
+  skip (no centre — the plan raster is this instrument's parallel-ray limit), the mirror of
+  the plan raster's sphere skip.
+
+    - **THE VALIDITY CHECK THAT IS EXACT BY CONSTRUCTION IS R5, THE PARALLEL-RAY IDENTITY:**
+      the same 3D kernel fed one vertical ray per cell of the plan raster's OWN grid must
+      reproduce its flag on EVERY cell, against a verbatim copy of its 2D test and against
+      the shipped tool's RETURNED numbers to the bit. Measured: 0 of 38,024 cells on all
+      eight rows with a centre, bit-equal on the four cap rows. Plus R0 (a kernel self-test
+      through the real binning, before a petal is built), R1–R3 (the capture, plan-coverage's
+      verbatim) and R4 (converged). Negative control PASS: antipode / inward / seam-lost,
+      each caught by R0. **A finding on the way: the (φ, θ) bins already encode direction,
+      so the kernel's t > 0 clause is REDUNDANT for central rays** — a planar triangle not
+      containing the centre subtends less than a hemisphere and its bins never hold its
+      antipode; the false-clean mutation had to break the binning too.
+
+    - **THE BRIEF'S NAMED VALIDITY CHECK WAS MEASURED EXACTLY AS ASKED AND DISAGREES, AND THE
+      SESSION STOPPED ON IT AS INSTRUCTED.** "On the rise-1 hemisphere the solid-angle
+      reading must agree with the plan raster mapped through the sphere": on the incurve
+      hemisphere they agree on 75.54% of the cap's solid angle (central 24.46% open, plan
+      0.00%), on the mum 74.02%, on the default 86.51%. **Banded by polar angle, the two
+      agree at 100% wherever the crown is (0–60° on the incurve target) and part company
+      only at the rim (75–90°: central 84.2% open, plan 0.0%).** The reason is the RAY: a
+      vertical line through a rim point runs up through the blades; the radial ray through
+      the same point is horizontal and leaves under the canopy between the roots. The
+      premise "there both instruments see the same surface" is true of the surface and
+      false of the rays through it. No tolerance was widened; the numbers are in the outcome
+      doc; whether R5 or the mapped check is load-bearing is the ruling the pinning proposal
+      waits on.
+
+    - **THE FACE-POLE NUMBER FOR PHASE 2, measured and not acted on:** on the 240-foot row
+      the petals leave a CONNECTED open region of **2.58 sr** around the face pole (bald
+      cone only 2.63°, a 1.50 mm chord — it is a network of gaps, not a cap). The DISC's
+      footprint from the builder's own report is **rC 24.54 mm = 0.75 × the sphere radius,
+      a 48.6° cone, 2.12 sr; 63.75% of it (1.35 sr) is open, and 1.79 sr of open sphere lies
+      outside it** — so session 18's "24.5 mm" is a RADIUS (a 49 mm lid). On the incurve
+      sphere the face pole is CLOSED (0.13°, one cell) — the cap rows' emergent crown, on
+      the ball — with 4.20% of 4π open in total; the mum sphere reads 0.00%.
+
+    - **A FINDING THE SHEET DID NOT HAVE: the incurve sphere's RESERVED pole is NOT closed
+      from the centre** — directions within 4.38° of it hit no petal, a 0.95 mm-radius bald
+      spot inside a 0.22 sr open region (the vertex bound agrees: no petal vertex within
+      1.05 mm of that half of the axis). Session 18 read it covered by eye from below; the
+      blades close over it in an off-axis projection without crossing the axis. Not a defect
+      (a stem exits there); on the table for Eva's eye before any reserved-pole claim is
+      pinned. The other three sphere rows read it closed (0.12°).
+
+    - **THE POSITIVE CONTROL, in a throwaway worktree:** blade rows narrowed to 15% of their
+      half-width for 0.05 < u < 0.6 (W2; a first mutant on the last row was caught by the
+      tip-cap validity, so the cap was left alone). On the incurve SPHERE row the export gate
+      is entirely green — watertight, every family, a labelled coverage skip — while the
+      instrument moves 4.20% → 27.23%; on the two pinned cap rows only the plan raster's own
+      assertion fires (4.34% / 4.22% against 0.05%). Cost, real: 666 lines against Phase A's
+      ~250; 2.5–3.7 s a sphere row and 2–8 s a cap row (the mapped comparison the expensive
+      half) against the estimated 1–3 s.
+
+    - **R6 — THE MEASURE CALIBRATED IN CLOSED FORM (Eva's condition before any pin):** the
+      sample cells sum to 4π (3.2e-6 and 7.9e-7 relative on the two grids, tolerance
+      1e-5), a closed synthetic sphere reads EXACTLY 0 sr open (tolerance 0), and three
+      known cones — at the pole, centred on the θ seam, and 45° off-axis — read their
+      exact Van Oosterom–Strackee solid angle to 0.005% / 0.369% / 0.058% (tolerance
+      0.5%), each with its axis covered and its antipode open. Once per process, before
+      any row; a failure fails the RUN. **Its first run FAILED, in the FIXTURE:** the
+      synthetic sphere had both 7.5° polar caps missing and the measure read them at
+      0.107507 sr against an analytic 0.107507 sr — recorded rather than repaired
+      quietly, because a fixture is a claim too. And the negative control now has
+      WITNESSES, not failures: with R0 suppressed each kernel mutation is silent on a
+      real row (it changes the READING, not a check) and each names its own R6c clause.
+
+    - **THE PINS, wired (Eva, Sep 5):** the incurve sphere's face pole CLOSED (bald ≤ 0.3°,
+      region ≤ 0.001 sr) and its total ≤ 4.6% of 4π; the reserved pole CLOSED (≤ 0.3°) on
+      the defaults, the mum and the 240-foot row; and — Eva's one change to the proposal
+      — **the incurve sphere's reserved-pole hole PINNED AT ITS MEASURED VALUE with
+      headroom, not closed and not left unpinned** (bald ≤ 5.0° against 4.375°, region
+      ≤ 0.25 sr against 0.2205): 0.95 mm is the known value, recorded with the phase-2
+      stem work, and the bound trips on growth. The 240-foot face pole is not pinned —
+      open by design, phase 2's number. R5 runs on flat rows too, so it has no scope
+      limit on rows without a centre. **No new frozen tag is owed**: no row's set moved,
+      no byte moved; phase14 remains the newest baseline.
+
+    - **THE TWO PIECES OF SESSION-18 DEBT:** the frozen-tags run is recorded above, in the
+      CI conventions, as red by design until phase5; and the docs-only collision's
+      amendment — rulings recorded in a docs-only PR of the session's own, opened and
+      merged by the same session before it reports DONE — was APPROVED and is recorded at
+      the Sep 5 session-17 ruling by this session's docs-only PR.
+
+- **SESSION 19'S RULINGS (Eva, Sep 5), recorded by the docs-only PR after the code merged —
+  the amendment's first use.**
+
+    - **R5 IS THE VALIDITY STANDARD FOR THE SOLID-ANGLE INSTRUMENT, AND THE "MAPPED THROUGH
+      THE SPHERE" CHECK IS ILL-POSED. Do not re-propose it as a bug.** Eva's brief asked that
+      on a rise-1 hemisphere the solid-angle reading agree with the plan raster mapped through
+      the sphere, because "there both instruments see the same surface". Measured (outcome
+      doc): they agree at 100% wherever the crown is and part company only at the rim — on
+      the incurve hemisphere 75–90° reads 84.2% open from the centre and 0.0% from above. The
+      reason is the RAY, not either instrument: a vertical line through a rim point runs up
+      through the blades; the radial ray from the centre through the same point is horizontal
+      and leaves under the canopy between the roots. The two ray families coincide only on
+      the axis, so the premise was true of the surface and false of the rays through it, and
+      the divergence is both instruments being correct. **Ruled: R5 — the same rays through
+      both formulations, the shipped plan raster's own grid, no tolerance — is the standard;
+      the mapped comparison stays a reported number of the standalone tool and is never a
+      check.** Two conditions were set before any pin, both met: a closed-form calibration of
+      the MEASURE (R6: cells to 4π, a closed sphere at 0 sr, three known cones at 0.005% /
+      0.369% / 0.058% of their exact solid angle, tolerances stated) and a negative control
+      with WITNESSES (each kernel mutation naming its own clause with R0 suppressed, the way
+      session 18 suppressed S1 for S3). R5 has no scope limit on rows without a centre: it
+      runs on flat rows too.
+
+    - **THE PINS, as ruled:** the incurve sphere's face pole closed (bald ≤ 0.3°, region
+      ≤ 0.001 sr) and total ≤ 4.6% of 4π; the reserved pole closed (≤ 0.3°) on the defaults,
+      the mum and the 240-foot row; the 240-foot face pole NOT pinned (open by design; phase
+      2's number: 2.58 sr connected open region, the DISC's 48.6° cone covering 0.77 sr of
+      it); and — the one change to the proposal — **the incurve sphere's reserved-pole hole
+      PINNED AT ITS MEASURED VALUE with headroom (bald ≤ 5.0° against 4.375°, region ≤ 0.25 sr
+      against 0.2205), not closed and not left unpinned:** "a 0.95 mm hole at the point
+      reserved for a stem is the least consequential hole on the object, but an unpinned
+      measured hole is one that can grow silently." 0.95 mm is the known value, recorded with
+      the phase-2 stem work. Every pin's reading, bound and headroom is printed by the gate on
+      every run and tabulated in the outcome doc.
+
+    - **CORRECTIONS CARRIED:** session 18's "24.5 mm" DISC footprint is a RADIUS (49 mm
+      across), fixed where recorded; the sibling's Phase A estimate of ~250 lines came in at
+      666 before the ruling and ~900 after it — noted for sizing.
+
+    - **CLOSE-OUT.** The four bloom gates green on `163a8ad`'s head; the retention close
+      phase14 499/499 bit-identical, 0 moved; the 51 predeclared files and all fourteen
+      frozen matrix functions byte-identical to `dddd934`, re-verified against `main` after
+      the merge. **No new frozen tag is owed** — no row's set and no byte moved; phase14 stays
+      the newest baseline. Merged by the session as `163a8ad` (#158); the rulings as
+      `this docs-only PR (its own squash sha is in session 19's final report)` (the docs-only PR).
+
+- ~~Phase 2, B1 — the centre retirement~~ **BUILT Sep 5 (session 20): `centerStyle`'s four
+  values, its four sub-sliders, the CENTER section and the three centre builders retired; the
+  shipping default is the bare hub apex; `RETIRED_IDS` first used; `phase15Matrix()` (527 rows
+  at 8524318) frozen. Numbers, the comparison shape and the partition in
+  `docs/bloom-session-20-outcome.md`. **SHEET APPROVED (Eva, Sep 6): THE BARE APEX SHIPS
+  AS THE DEFAULT.** Merged by the session as `258c2ea` (#161); `frozen/phase15` published
+  from `main` at `8524318`; the rulings as this docs-only PR (its own squash sha is in session
+  20's final report).**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, Sep 5, from Phase A's report and sheet).** The centre
+      is the REPRODUCTIVE PARTS and nothing else: an androecium (filaments and anthers) and a
+      gynoecium (style and stigma), each independently present or absent — four states
+      including none; correct botanical naming throughout, and "pistil" is the whole female
+      unit, not what the panel controls. DISC and DOME were placeholders doing two jobs that
+      belong elsewhere: a surface, which is HEAD's, and covering the junction, which is the
+      junction's and is never a control — Eva looked at the bare apex and it needs no lid.
+      **RING goes with them, and the reason is the entry:** she held it because a ring at the
+      centre is a corona; Phase A's finding was that what shipped is `torusInto` with a bore
+      slider, a placeholder. **A CORONA is a flared collar between the petals and the stamens
+      and will be its own group with its own controls — it does not grow out of a torus. The
+      NAME is reserved here so the idea survives without the object.** That makes
+      `centerStyle` single-valued, so the SECTION is retired, not only its values. SPHERE
+      means no centre: a full-sphere bloom is a flower head, and its reproductive parts belong
+      to its florets — CENTER is hidden AND INERT under SPHERE when it returns (B2), proved by
+      GATED rows on S4's pattern. The fused staminal column is parked; free stamens first.
+
+    - **B1 IS THE RETIREMENT ALONE, by ruling.** The androecium is B2 (its anthers and stigmas
+      are ruled from Phase A's sheet before B2 opens), the gynoecium and the default B3. Three
+      sessions in that order, the retirement first; if B2 grows past its estimate it is split
+      and said, on session 19's 2.7x sizing miss.
+
+    - **THE DEFAULT MOVES, AND IT IS AN EXACT PARTITION PREDECLARED, NOT A 0-MOVED CLAIM.** DISC
+      was the shipping default, so this is far larger than two non-default values, and it was
+      COUNTED before a byte was hashed by enumerating every matrix function: on the 527 live
+      rows at 8524318 (now `phase15Matrix()`), 487 resolve DISC (15 pin it, 472 inherit it), 11
+      DOME, 11 RING, 18 NONE — **509 move, 18 hold**; the whole frozen suite is 3,516 rows of
+      which 3,268 resolve a centre. The stronger claim, asserted ROW BY ROW rather than argued:
+      every moved row's export on the new tree is bit-identical to the same row's export on the
+      OLD tree with `centerStyle` forced to NONE, because the centre was one closed solid
+      appended after the hub, touching neither `footRing()` nor a petal nor the hub.
+
+    - **THE COMPARISON SHAPE WAS WRITTEN DOWN BEFORE IT RAN, WITH WHAT WOULD MAKE IT VACUOUS**
+      (Eva's condition). A moved row cannot be re-exported on the new tree — its set names a
+      control the registry no longer declares and read-back refuses it by design — so the close
+      is THREE captures of the same 527 rows: the old tree plain; the old tree with
+      `--override centerStyle=NONE` (the centre-off twin, built by the OLD code); the new tree
+      with the retired ids `--strip`ped from every set. `tools/diff-bloom-bytes.mjs --compare
+      <twin> <new> --retirement <plain> --expect 509/18` asserts twin === new on every row and
+      carries five vacuity guards: V1 on every mover the twin DIFFERS from the plain export with
+      fewer triangles (the override reached the geometry — otherwise old-versus-old); V2 on every
+      NONE row the twin equals the plain export; V3 the strip list is exactly `RETIRED_IDS` and
+      names no live control, with rows whose set became empty reported by name; V4 the counts are
+      the predeclared ones and the tool REFUSES to pass without them on the command line; V5 the
+      three captures cover the same labels in order, share a head where they should and differ
+      where they must. A comparison that passes because it compared nothing passes silently;
+      these are what stop it.
+
+    - **`RETIRED_IDS` IS USED FOR THE FIRST TIME, and the port from the flower is two parts of
+      three.** Five entries (`centerStyle`, `centerSize`, `centerRise`, `centerDish`,
+      `centerBore`), each with the SESSION it retired in and a why; `schema: null` states that
+      no persisting feature exists yet, rather than borrowing the flower's schema-version field
+      for a number that would mean something else — the first feature that persists a design
+      owes every entry a migration that DELETES the key. The load-time check grew to the
+      flower's set that can run at module load (a live control id, a live option value, a
+      DEFAULTS key, a section id), and the executable-reference scan — comments and string
+      literals stripped, so the frozen matrices may name the ids as ROW DATA — lives in the panel
+      gate's new route (n), which also asserts no retired id renders, no `#sec-center` exists,
+      the read-out's summary line names no centre, and `__bloomMetrics()` carries no centre key.
+      The option values DOME / DISC / RING are NOT reserved, on the flower's own `reliefMode`
+      precedent. **The panel gate's CENTER witness was REPLACED by that route, not deleted
+      silently**; its negative control resurrects a `#sec-center` with a `centerStyle` input and
+      writes `center disc` onto the read-out, and all TWELVE routes must fire.
+
+    - **WHAT WENT AND WHAT WAS RELABELLED.** `buildCenterInto` with `domeInto` / `discInto` /
+      `torusInto`; `seatLine` and the seat metrics; the summary line's `center <style>` word;
+      matrix blocks 2 and 3 and block 4's `× STYLE` corners (the block numbers keep their gap,
+      as 14, 15 and 22 already do); every "(centre off)" row — relabelled where it was the only
+      row carrying its state, dropped where the retirement made it a duplicate of a plain row
+      (the live matrix is 481 rows, 46 fewer); the dome and sphere sheets' centre-seat cells;
+      the panel sheet's gated-centre row; the original A/B sheet (`shot-bloom.mjs`) reduced to
+      spread × count on the bare apex. `bloom-plan-coverage` and the solid-angle instrument no
+      longer build a centre into their hub-only accumulator, and the DISC plate line is absent
+      rather than a number under a label naming nothing — the 240-foot sphere's face-pole open
+      region (2.58 sr) is B2's number.
+
+    - **THE SHEET: `node tools/shot-bloom-centre-retirement.mjs <dir> [base-tree]`** — the bare
+      apex beside today's DISC on the shipping default and on the incurve target at head rise
+      0.50, the DISC cells rendered from a git worktree of the base commit on the per-petal
+      sheet's pattern (a retired look is photographed, not only recorded), print preview ON,
+      chrome hidden, whole bloom and a hub crop. Merge is released by Eva's ruling on it.
+
+    - **THE EVIDENCE.** The retention close is the three-capture comparison and it is EXACT:
+      `phase15Matrix()` captured plain and twinned on a worktree of 8524318 and stripped on
+      the head, 527 rows each, **509 MOVERS every one BIT-IDENTICAL to its centre-off twin,
+      18 HOLDERS bit-identical outright, V1–V5 held** (12 rows' sets emptied by the strip,
+      named). Its positive control, a closed 12-triangle lid on the apex, FAILS the claim on
+      6 of 6 probe rows while both STL gates would see nothing of it. Route (n) fires on a
+      mutant that reads `ui.centerSize` in the app (one assertion, file and line) and is
+      silent on the head; the registry's load-time check catches a retired id as a control,
+      an option value and a section id at module load. Panel gate PASS, its negative control
+      PASS with all twelve routes fired; the smoke subset clean (31 of 481, export gate
+      PASS); `--verify-frozen --phase15` PASS against 8524318 and `--phase14` against
+      5312845; 68 predeclared files byte-identical by sha1 at close. The default bloom is
+      10,080 triangles live and export alike (192 hub), from 11,136. **Two bugs the close
+      found are in the outcome doc with what each would have let through**: the harness
+      validating a base-tree row against the HEAD registry (the captures could not be made
+      at all; a tool that skipped instead of refusing would have compared 18 of 527 rows),
+      and route (n)'s read-out clause reading the mode line rather than the summary line (a
+      `center disc` left on the summary line would have passed forever). The capture is
+      row-checkpointed now (`--resume`), because three background captures died to
+      container restarts before the foreground ones ran. The full matrix on both STL gates
+      is CI's on the merge commit.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** Sheet approved; the bare apex ships as the
+      default. **The MIDDLE pair — the shipping default at head rise 0.50, the sparse dome row
+      — is what she ruled on.** The incurve pair showing no visible difference is a FINDING,
+      not a gap in the sheet: **the DISC was invisible on the incurve target from every camera,
+      which is part of why it deserved retiring** — a designed centre the crown hides from
+      every camera was never a centre on that head, only 1,056 triangles. All four bloom
+      gates green on the PR head `963d8eb` (both STL gates on the full 481-row matrix, the
+      panel gate, the frozen gate); the two flower gates ran too (`tools/**` filter) and are
+      not bloom evidence. The
+      68-file predeclared manifest re-verified by sha1 against `main` after the merge.
+
+    - **THE PHASE A RULINGS THAT B2 AND B3 INHERIT (Eva, Sep 5), recorded here so no kickoff
+      prompt has to carry them.** **Q1** — the androecium gets its OWN placement law and its
+      own count, and its radial extent is a RANGE: a derived default from its own reference
+      area rule plus an exposed control, out to the hub radius; a stamen ring that overlaps
+      the petal roots is FLAGGED, never refused; whether the control is a multiplier or
+      millimetres, and whether `headRise` relieves the packing, are B2's questions to
+      answer with a picture. **Q2** — the anther and stigma looks are ruled from Phase A's
+      candidate sheet BEFORE B2 opens, never inside it. **Q3** — filaments are curved, and
+      the curve is `spineLaw()` (the one owner, bloom-geometry.js) at a curl of 0 as the
+      identity, so a straight rod is a value and not a second code path; B2. **Q5,
+      AMENDED** — stamen roots do NOT enter the petal ring's area rule: the androecium's
+      radius is derived from the clear disc inside the ring by its own reference rule with
+      its own exposed control (the Aug 31 spread entry carries the amendment). **Q7** — the
+      read-out gets a slenderness line, L/d per filament, tagged `UNMEASURED — no coupon has
+      been printed`, telemetry only: the six-stamen candidate reads L/d 18.3 against the
+      16 the flower's #97 already carries as an open thin-feature question, so the first
+      stamen is past anything this family has printed. **Q8** — the crowding instrument's
+      extensions (stamen feet on the base, filaments against petal roots) and a tip
+      instrument (anther against anther, anther against blade) are FLAGS on the pattern of
+      `D_max`, never gates. **Q10** — three sessions: B1 the retirement alone (this one),
+      B2 the androecium, B3 the gynoecium and the shipping default; B2 is split and SAID if
+      it grows past its estimate, on session 19's 2.7x miss. The CORONA stays reserved as a
+      name (the session-20 ruling above); nothing here builds it.
+
+- ~~Phase 2, B2 — the androecium~~ **BUILT Sep 6 (session 21): filaments one sheet thick
+  rooted THROUGH the hub slab on the owner's surface normal, curved by `spineLaw()` at a curl
+  of 0 as the identity, tipped with the PILL (A1, FIXED); `fr.androecium` as `footRing()`'s
+  second descriptor kind, sharing the dome object and a surface law extracted into one helper
+  both maps call (the petal rings byte-identical on the newest baseline by construction and
+  by diff); two layouts — RING (the shipped RADIAL law) and the VOGEL DISC (the equal-area
+  seed-head law the charter parked for petals, which shrink; stamens are constant-size, so
+  the objection does not apply); JS1–JS4 in both STL gates and fired on mutants; the
+  two-statement SPHERE guard with GATED rows; the slenderness line tagged verbatim; the
+  sheet with the pill at both count extremes and the six-filament curl range. SHIPS ABSENT
+  (`stamenCount` 0), 0 moved. Numbers, the mutant table, the rise measurement and the
+  recommendation in `docs/bloom-session-21-outcome.md`. Merged Sep 6 as `d1931b2` on Eva's
+  ruling (the entry below); `frozen/phase16` published at `a65d16d`.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, Phase A, carried).** A1 PILL fixed — one shape, no
+      enum, no sub-controls; **A2 BILOBED is retired from the candidate set permanently**;
+      A3 T-BAR is a later value addition once six curved filaments have been seen (this sheet
+      shows them); A4 CLUB dropped. The radius is a RANGE: the filaments' OWN area rule
+      (R² = Σ r_filament² — the disc their cross-sections would tile) times an exposed
+      multiplier, out to the hub radius, where it is CLAMPED and told; stamen roots inside the
+      petal-root annulus are FLAGGED, never refused. Stamen roots do NOT enter the petal
+      ring's area rule (Q5 amended): `spread` scales the petal ring and nothing else.
+
+    - **"OUT TO THE HUB RADIUS" MEANS THE FOOTPRINT REACHES THE RIM — measured, not
+      assumed.** The first smoke run clamped the disc's CENTRE at the hub radius and JS2
+      fired: 16 of 120 roots stood half over the slab's edge on the defaults. The limit is
+      the hub radius LESS ONE FILAMENT RADIUS. Its one reachable corner — a hub narrower than
+      a filament radius (ALL MIN × spread min × sheet 2.40, the apex floor's own corner) —
+      collapses the androecium onto the axis: told (`onAxis`, the read-out's ON THE AXIS
+      clause), never refused, on the crosses-axis precedent, with a matrix row.
+
+    - **THE FILAMENT IS ONE SHEET THICK.** Its diameter is `sheetThickness`, floored at export
+      exactly as the sheet is — Part thickness owns the material dimension, and nothing here
+      has been printed. The pill is 1.6 filaments across and 2.5 of its own diameters long:
+      two constants (`ANTHER_DIAMETER_FACTOR`, `ANTHER_LENGTH_FACTOR`) for Eva's eye on the
+      sheet, never controls. Tilt is 0 with the axes mapped (dR along the normal, dZ inward),
+      not π/2 on the petal's axes, because cos(π/2) is 6e-17 and not 0 — at curl 0 the rod is
+      EXACTLY the normal, the law's own zero-curvature branch (Q3).
+
+    - **HEAD RISE DOES NOT RELIEVE THE ROOT PACKING AND DOES UNFUSE THE ANTHERS — by
+      splaying the filaments, not by adding surface.** Measured from the built owner on the
+      120-stamen disc at the shipping spread: the nearest roots' surface chord moves 1.164 →
+      1.168 mm from flat to hemisphere (0.3%), the same finding the dome made for the petal
+      feet; the nearest ANTHERS go 1.16 → 3.74 mm at rise 0.50 → 4.39 mm at a hemisphere,
+      because a filament leaves along the surface normal and the cap's normals fan out.
+      **Said plainly: on a bloom with an androecium, Head rise is the stamen splay** — that is
+      what the control means now, and the sheet's third row is that picture.
+
+    - **THE RECOMMENDATION ON THE RADIUS CONTROL: A MULTIPLIER, not millimetres** — it is
+      scale-free across count and filament diameter (the count is the control a visitor
+      actually turns); the range's far end is the hub radius, itself derived and moving under
+      nine controls, so a millimetre slider would clamp anyway and a clamp on the thing the
+      slider NAMES is worse than one on a ratio the read-out already tells in millimetres;
+      and the panel already teaches the reading. Its cost, told: on the shipping hub with 120
+      stamens the multiplier saturates at 1.37, so 4.6 of 6.0 sits above the clamp. Default
+      2.00 on the spread precedent (the Vogel disc's nearest pair is 1.547·m·(d/2): the
+      filaments clear at 1.29, the anthers at 2.07). Eva's ruling.
+
+    - **THE STOPPING RULE FIRED AT THE LINE AND THE SPLIT IS SAID.** 666 insertions on the
+      eight code files when JS1–JS4 were written and not yet green (~40% comment); nothing was
+      added past that point that a green run did not need. **B2b:** the crowding RASTER
+      extensions (stamen feet in `D_max`, the exact stamen-on-foot rectangle test — the
+      read-out's petal-root ANNULUS count is the radial stand-in) and the anther-against-BLADE
+      instrument (the anther-against-anther half ships as the nearest-apex flag). The curved
+      filaments were built before the check fired and are kept: one code path, and the sheet
+      Eva asked for shows the range.
+
+    - **THE INSTRUMENTS.** `stamenAssertions()` — JS0 (the two statements per row, present iff
+      eligible and count ≥ 1, nothing emitted when absent), JS1 (the root axis inner→outer is
+      exactly t along the cap's normal at the owner's surface point; flat: [0,0,1] and z = 0
+      exactly), JS2 (the limit, the clamp, every footprint inside the hub disc, the layout law
+      as a PROPERTY — one radius and even azimuths, or equal-area steps at the golden angle),
+      JS3 (both root rings as EMITTED: every point exactly one filament radius from its centre
+      in the face plane — a cylinder of diameter d through the full t, never a hairline), JS4
+      (emitted = tallied = declared; every stamen at the fixed 560 triangles from the
+      accumulator's own delta, so a dropped pill or a doubled tube moves it; apexes distinct).
+      **Both STL gates are blind to all of it** — each tube and pill is its own closed solid.
+      Six mutants, each fired first on the assertion that names it (the table in the outcome
+      doc); the sphere mutant dies at HARNESS LOAD. A JS4 clause that required the apex beyond
+      the outer face was WRONG and is gone: at curl 180 the anther comes back below the hub
+      plane on purpose — "free" is the census's word for the un-rooted end, never a position.
+      The plan and solid-angle coverage instruments count the stamens in R1 and never
+      rasterise them: an anther over the disc is not crown closure.
+
+    - **THE SHEET: `node tools/shot-bloom-androecium.mjs <dir>`** — six on a ring and a
+      hundred and twenty on the disc (the pill at both count extremes), the six-filament curl
+      range, the 120-disc flat / rise 0.50 / hemisphere on one camera, the multiplier at its
+      ends, one stamen, six on the disc, the absent default, and the byte claim on the sheet
+      (the androecium at maximum under SPHERE exporting the bare sphere's own sha — required
+      equal, or no sheet). Merge is released by Eva's ruling on it.
+
+    - **EVA'S TWO QUESTIONS BEFORE THE MERGE (Sep 6), ANSWERED BY MEASUREMENT.** (1) R1 CAN
+      still fail on stamens, and did: the third accumulator EMITS (it calls the same builder
+      through the same orchestration), so a stamen emitted twice and recorded once — JS1–JS4
+      silent, boundary 0 — goes RED on plan R1 through the real export gate (13,440 against
+      16,800) and on both plan and solid R1 driven directly on a cap (16,704 against 20,064),
+      green on the real tree; what R1 cannot see is a defect INSIDE the builder, which moves
+      both sides and is JS3/JS4's (measured). (2) The multiplier's saturation is
+      `(hub − r) / (r √N)`, a function of the count AND the hub — 1.25 at 120 stamens on the
+      shipping hub, 13.7 at one, 123 on the largest, 0.03 on the smallest — so NO static range
+      is dead-free and narrowing the top would delete live travel on every large hub. Not
+      narrowed, on the curl and foot-ceiling precedent: full range, clamped, TOLD — the clamp
+      clause prints where the multiplier runs out on this bloom and route (o) asserts the
+      number against the owner's `saturation`. The full table is in the outcome doc; 4.00 is
+      the value that would keep 1–12 stamens live on the shipping hub if a narrowing is ruled.
+
+    - **phase16 IS OWED AND FROZEN** — the row set changed (481 → 507), a different case from
+      session 19: `phase16Matrix()` is the 481 rows at `a65d16d` (the head of `main` when the
+      session opened), generated from that commit's own `buildMatrix()`, `--verify-frozen
+      --phase16` PASS, `FROZEN_BASE_COMMITS.phase16 = 'a65d16d'`. The first post-retirement
+      baseline: every row applies as written on any tree from `a65d16d` on, so the next
+      session closes with one plain capture per tree and the tool's own `--compare` (phase15's
+      55 retired-id rows needed the split shape in `tools/compare-bloom-captures.mjs`).
+      `frozen/phase16` is published from `main` after the merge (the bloom-frozen-tags
+      dispatch, red by design on phase5).
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The pill at six and at a hundred and twenty
+      — approved, as chosen. The radius control as a MULTIPLIER, not millimetres — approved.
+      The curl range's placeholder (`<<±180 or ±120>>`) was left unfilled, so ±180 ships as
+      built and photographed; a narrowing to ±120 is one number in the registry plus the two
+      curl-extreme row labels and two sheet cells, and moves no byte (the default is 0) — it
+      is OPEN, not decided. NOTED FOR B2b, not built: Head rise is today the only stamen
+      splay, so HEAD does two jobs; an independent aim on the androecium's own whorl is
+      proposed and costed in the outcome doc (about 40 lines, 0 triangles, 0 moved by
+      construction). Her two questions before the merge are answered above, by measurement.
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `eaa8b83` (both STL
+      gates on the full 507-row matrix, the panel gate, the frozen gate; the two flower gates
+      ran too, `tools/**` filter, and are not bloom evidence). #164 merged by the session as
+      `d1931b2`, the head sha read from the remote. `frozen/phase16` published from `main`
+      at `a65d16d` by the bloom-frozen-tags dispatch (run 34012640385): phase5 the ONLY
+      refusal, the diagnosed cause (a GitHub App token cannot push a ref whose workflow
+      files differ from `main`'s) verbatim in its log, fourteen published, read back with
+      `git ls-remote --tags`. **The predeclared manifest, re-verified against `main` after
+      the merge, and CORRECTED:** 67 of 74 held. FOUR of this session's own moved, not the
+      three the outcome doc first said — `tools/bloom-plan-coverage.mjs` and
+      `tools/bloom-solid-angle-coverage.mjs` (R1 counts a third part),
+      `tools/verify-bloom-connectedness.mjs` (the assertions wire into BOTH gates), and
+      `tools/diff-bloom-bytes.mjs`, which moved in the close-out commit when phase16 was
+      wired and was missed because the manifest paragraph was written at the first commit
+      and not re-run at the second — the re-verify found it, which is what it is for. The
+      other three movers are `print-infill.js`, `print.html` and `print.js`, moved on `main`
+      by #163 between the manifest's base and the merge; #164 touched none of them (the
+      squash's diff against its base is empty on all three).
+
+- ~~Phase 2, B3 — the gynoecium~~ **BUILT Sep 6 (session 22): one style, one sheet thick,
+  rooted THROUGH the hub slab ON THE AXIS (count 1, radius 0 — the apex, where every cap's
+  normal is exactly +z), curved by `spineLaw()` at a curl of 0 as the identity through the
+  SAME rod the filament uses (`rodInto()` / `pillInto()`, extracted VERBATIM from the stamen
+  builder and measured byte-identical on block 23), tipped with the TRIFID (S2, FIXED — three
+  pills of the anther's own proportion sharing the tip at 40°); `fr.gynoecium` as
+  `footRing()`'s third descriptor kind; JG1–JG4 in both STL gates and fired on mutants; the
+  two-statement SPHERE guard with GATED rows for the style AND for the whole centre; the
+  style on the SLENDERNESS line beside the filament, tagged verbatim; block 24 with the
+  four-state matrix as its first rows; the sheet with all four centre states on one row, the
+  pill and the trifid TOGETHER at six and at a hundred and twenty, and the filament curl at
+  ±180 again. SHIPS ABSENT (`gynoecium` NONE), 0 moved. Numbers, the mutant table and the
+  present-centre default PROPOSAL (not done — her ruling) in
+  `docs/bloom-session-22-outcome.md`. `phase17Matrix()` is the 507 rows at `6335ac4`.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, the B3 brief, carried).** S2 TRIFID fixed — one
+      shape, no enum, no sub-controls, on the pill's own argument (a fixed shape removes a
+      control, its sub-controls, its matrix rows and a panel route); **S4 BILOBED is retired
+      from the candidate set permanently**; S3 PAD is a later value addition; S1 KNOB is
+      dropped (easy to lose against 120 pills). Structure: the third descriptor kind from the
+      same owner, count 1, radius 0, the same surface law — the androecium's pattern and not a
+      second one. Curl: `spineLaw()` at curl 0 as the identity, reused. SPHERE: hidden and
+      inert, two statements, GATED rows. Telemetry: the style joins the slenderness line.
+      Default: ABSENT; the present centre proposed as its own partition event and stopped for
+      her ruling. Scope: the gynoecium and nothing else — B2b untouched.
+
+    - **THE TRIFID IS THREE PILLS SHARING THE TIP, and that is the whole of its geometry.**
+      Each lobe is the anther's own solid of revolution (one emitter, `pillInto`) whose lower
+      hemisphere is centred ON the style's tip — so the rod's last ring is inside every lobe
+      exactly as it is inside an anther — aimed `STIGMA_LOBE_SPREAD_DEG` (40°) off the tip
+      direction toward three azimuths a third of a turn apart; a lobe is
+      `ANTHER_DIAMETER_FACTOR` across the style and `ANTHER_LENGTH_FACTOR` of its own
+      diameter long, so the pill and the trifid read on ONE scale beside each other (1.92 ×
+      4.80 mm at the shipping sheet). Two constants of its own (`STIGMA_LOBES`, the spread),
+      never controls. A style is 960 triangles, fixed: the rod's 360 plus three lobes at 200.
+
+    - **THE CONTROL IS A CHOICE, NOT A COUNT.** `gynoecium` NONE / STYLE (default NONE) with
+      `styleLength` (5–40, default 25) and `styleCurl` (±180, default 0) hidden AND inert at
+      NONE. One style or none is the ruling; a 0..1 slider would have read as a count that
+      could grow, and a choice sweeps nothing in block 1, so ALL MAX carries no style and is
+      unmoved. Its own presence predicate (`gynoeciumPresent`), not one shared with the
+      androecium: each part is INDEPENDENTLY present or absent (Sep 5). "Pistil" names the
+      whole female unit and nothing in the panel.
+
+    - **THE STYLE IS ONE SHEET THICK, LIKE THE FILAMENT, AND THE ONE REACHABLE CORNER IS
+      TOLD.** Part thickness owns the material dimension, so on the apex corner where the
+      androecium goes on-axis (ALL MIN × sheet 2.40 × spread min) the style's root ring is
+      WIDER THAN THE HUB (1.20 mm against a 1.15 mm hub, live): a flag on the read-out and
+      JG2's own clause, never a refusal — the root still crosses the whole slab, so the
+      invariant holds and the row exports watertight and one piece.
+
+    - **THE INSTRUMENTS.** `gynoeciumAssertions()` — JG0 (the two statements per row; present
+      iff eligible and STYLE; nothing emitted when absent), JG1 (the root axis inner→outer
+      exactly t along the normal at the apex, EXACTLY on the axis with the normal EXACTLY
+      [0,0,1] flat and cap alike, on the owner's sphere at the owner's z on a cap, z = 0 flat),
+      JG2 (one style; the footprint inside the hub or WIDER THAN THE HUB said), JG3 (both root
+      rings as EMITTED, every point exactly one style radius from its centre in the face
+      plane), JG4 (emitted = declared = 1; the fixed 960; the TRIFID as a PROPERTY of the
+      emitted lobes — three unit axes exactly 40° off the tip direction and 120° apart, every
+      apex one lobe length along its axis, apexes distinct). Eight mutants, each fired first
+      on the assertion that names it (the table in the outcome doc), including the one that
+      keeps the triangle count (the lobes at twice the spread — only the law clause sees it)
+      and the sphere mutant that dies at HARNESS LOAD. **Doctrine 2 applied:** the coverage
+      instruments count the style in the centre's accumulator, and R1's blindness — it sees
+      the ORCHESTRATION of parts and never a defect inside a builder, because the check
+      shares the builder — is now declared in BOTH instruments' own headers, on the
+      connectedness gate's free-end convention; it had lived only in session 21's outcome
+      doc. Measured again: the style emitted twice and recorded once is silent on JG1–JG4
+      and RED on R1 (14,400 against 15,360).
+
+    - **THE SLENDERNESS LINE IS ONE LINE FOR EVERY ROD THE CENTRE CARRIES** — `SLENDERNESS
+      L/d filament 16.7 · style 20.8 (live) — UNMEASURED — no coupon has been printed` —
+      each over its floored diameter. What it reads now: the style at 20.8 (25 mm on a 1.20
+      sheet), 33.3 at the slider's top, 25.0 on the mum at export (the floor fattens it).
+      Phase A's "L/d above the six / above the cushion" (14.4 / 6.7) was a height over the
+      anthers wearing a slenderness's name; that height is now printed as what it is, on the
+      STYLE line, in millimetres, ABOVE or BELOW the highest anther.
+
+    - **THE STOPPING RULE.** 649 insertions on the eleven code files (the 507 generated
+      phase17 rows excluded; ~40% comment) when JG1–JG4 first ran — green on the first row
+      and on all 39 smoke rows on both gates. Nothing added past that point that a green run
+      did not need; no split owed; B2b stays parked.
+
+    - **phase17 IS OWED AND FROZEN** — the row set changed (507 → 528, block 24), the case
+      that made phase16 owed: `phase17Matrix()` is the 507 rows at `6335ac4` (the head of
+      `main` when the session opened), generated from that commit's own `buildMatrix()` in a
+      worktree, `--verify-frozen --phase17` PASS, `FROZEN_BASE_COMMITS.phase17 = '6335ac4'`,
+      the diff tool wired. The first baseline carrying the androecium's own rows, so the
+      first that can witness the rod helper's extraction on every future tree.
+      `frozen/phase17` is published from `main` after the merge (the bloom-frozen-tags
+      dispatch, red by design on phase5).
+
+    - **THE PRESENT-CENTRE DEFAULT, PROPOSED AND NOT DONE (her ruling).** Counted before a
+      byte is hashed: on the 528 live rows, 486 move and 42 hold (the 21 block-24 rows that
+      pin `gynoecium`, the 24 SPHERE rows where the centre is inert, 3 overlapping); on the
+      4,984-row frozen suite, 4,921 move and 63 hold — no frozen row pins `gynoecium`. The
+      close would be the retirement mode's three-capture shape with `--override
+      gynoecium=STYLE` on the old tree, predeclared with its vacuity guards. +960 triangles
+      on every default export (+3,360 with six stamens), and the bare apex loses its
+      default-is-coverage status and needs explicit rows by name.
+
+    - **THE SHEET: `node tools/shot-bloom-gynoecium.mjs <dir>`** — the four centre states on
+      one camera; the pill and the trifid together at six and at a hundred and twenty; the
+      filament curl at ±180 alone and beside the style (at +180 the filaments cross the axis
+      the style stands on — the cells are in front of her to close the range this time); the
+      style's own range; and the byte claims on the sheet (the style at maximum under SPHERE,
+      the WHOLE centre at maximum under SPHERE, under the incurve sphere, and the sub-controls
+      at maximum with NONE — required equal to the bare sphere's / the incurve sphere's / the
+      default's own sha, or no sheet). Merge is released by Eva's ruling on it.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The sheet approved; #167 merged as built —
+      the gynoecium ABSENT by default. **The present-centre default is NOT approved as part
+      of this:** 486 of 528 live rows and 4,921 of 4,984 frozen rows is a larger byte event
+      than the retirement was, and it gets its own session on the B1 pattern — the default
+      change alone, nothing else in the commit — if she decides she wants it at all.
+
+    - **THE FILAMENT CURL RANGE — ±180 STANDS, RULED FROM THE CELLS BESIDE THE STYLE, AND
+      NOT LEFT OPEN A SECOND TIME.** Her ground for narrowing was that at +180 the arcs pass
+      through the axis the style occupies and nothing in the gates can see a filament passing
+      through it. Both halves are true and the second is the point: **the crossing is not a
+      property of the range's ends, so ±120 would not remove it.** Measured from
+      `spineLaw()` itself (20 mm filaments, tilt 0, the style 25 mm on the axis): on the
+      shipping six-stamen ring (2.94 mm) a filament's nearest approach to the axis falls
+      inside one filament plus one style radius from **15° of curl** (0.34 mm at 20.4 mm up),
+      is 0.00 mm at 20°, and stays under 0.11 mm at every step to 180 — at 120° it crosses at
+      7.6 mm up, at 180° at 5.9 mm; with the ring clamped out at the hub (8.24 mm) the crossing
+      starts at 45° (0.78 mm at 18.6 mm up) and is 0.06 mm at 120°. A 20 mm filament on a
+      3 mm ring reaches the axis under almost any curl, so the narrowing would have deleted
+      two thirds of the range and kept the crossing. **What closes it is an instrument, and it
+      is B2b's**: a FILAMENT-AGAINST-STYLE flag on the STAMENS line (the nearest approach of
+      any filament station to the style's axis below the stigma, against one filament plus one
+      style radius — read from the builder's own stations, on the pattern of ROOTS FUSE), the
+      same family as the anther-against-blade instrument already parked there. Flag, never
+      gate: the crossing exports watertight and one piece, which is the invariant working.
+
+    - **ADDED TO THE FLOWER-PROJECT SKILL'S TRAP LIST (Eva's instruction):** the panel gate's
+      retirement scanner mis-pairs backticks when a template literal carries an odd number of
+      apostrophes and then blames the wrong file and line — the symptom (`bloom-harness.mjs:599
+      centerSize`, repeated, on a line number computed in the stripped text, in code the
+      session did not touch), the bisect, and the workaround (no apostrophes in assertion
+      messages until the regex is fixed; replicate the six `.replace` calls to confirm a
+      suspect). The regex fix is its own change to a shipped gate with a negative control.
+      **CLOSED IN SESSION 25 (Sep 6-7, #173).** The regex chain is a character walk, the
+      thirteen messages are restored verbatim, and the trap-list entry no longer applies:
+      apostrophes in assertion messages are ordinary English again. What the session added to
+      the picture is that the scanner was also BLIND — the template pass hid 45% of the
+      executable source it scanned, missed a genuine `${centerSize}` outright, and reported the
+      one reference it did find 2,095 lines from where it lives.
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `173d1ae`
+      (bloom-export-watertight and bloom-connectedness on the full 528-row matrix, bloom-panel,
+      bloom-frozen-matrices; the two flower gates ran too, `tools/**` filter, and are not bloom
+      evidence). #167 undrafted and merged by the session (squash) as **`a8a22f2`**, the head
+      sha read from the remote. `frozen/phase17` published from `main` at `6335ac4` by the
+      bloom-frozen-tags dispatch (red by design: phase5 the only refusal, the workflow-file
+      token rule), read back with `git ls-remote --tags`. The predeclared manifest re-verified
+      against `main` after the merge: 99 of 102 held; the three that moved are `print-infill.js`, `print.html` and `print.js`, moved on `main` by #166 between the manifest's base and the merge (#167's own squash touched exactly the fifteen predeclared movers and none of the 102). `main` had moved once since
+      `6335ac4` (#166, `/print` only; the overlap with this branch was CLAUDE.md, in different
+      sections, no conflict).
+
+- **Session 23 (Sep 6): the centre panel reorganisation — CENTER as a CONTAINER below HEAD
+  holding ANDROECIUM and GYNOECIUM as drop-downs; the parts' read-outs saying OFF KEEPS
+  the settings; the stamen spread's dead travel shown ON the control; the
+  FILAMENT-AGAINST-STYLE flag on the STAMENS line. No geometry; 0 moved by construction and
+  measured on phase17 and the live matrix; NO new frozen phase owed. Numbers in
+  `docs/bloom-session-23-outcome.md`.**
+
+    - **THE RULINGS THIS IMPLEMENTS (Eva, the session-23 brief, carried).** (1) A CENTER
+      section directly below HEAD with the two parts nested — they were peers of the petals
+      and are parts of one thing. (2) A CONTAINER, NOT A CONTROL: no value, no NONE. "No
+      centre" is both parts off, already reachable; a NONE on the container would be a second
+      definition of one state, the registration failure cleaned up twice before. (3) The
+      read-out says plainly that turning a part off preserves its settings; NOT a mute
+      mechanism — a visible control that does not build is the mirror of the defect the panel
+      gate catches. (4) The radius slider's dead travel SHOWN, its meaning unchanged: the range
+      is not narrowed (configuration-dependent dead zone; 13.7x at one stamen, 123x on the
+      largest hub) and the max is not adaptive (a stored value meaning a different radius on
+      a different hub breaks saved designs). (5) The filament-against-style flag, B2b's family,
+      never a gate. (6) 0 moved, provable by construction, the two guarantees stated apart the
+      way the Head move did; the untouched list predeclared and verified on the FINAL tree;
+      smoke subset export-only; one push; stop at the sheet.
+
+    - **THE CONTAINER NEEDED NO NEW MECHANISM, re-established from source rather than
+      assumed.** `applyVisibility()` derives a section's hidden state from its controls AND its
+      child sections, children first; a parent holding only drop-downs (the "Petal roles"
+      shape) is hidden exactly when every child is. So "if the nested-section logic cannot hide
+      an empty parent, say so and propose" is answered: it can, by the rule that already
+      existed, and the gate asserts it in both directions (hidden under SPHERE, shown at every
+      cap state). The two parts are declared IMMEDIATELY after their parent in `SECTIONS`,
+      the session-21 census rule carried; `section` and `parent` are never persisted, no
+      geometry reads either, every id / law / predicate / default is unchanged — session 16's
+      PETAL FORM / PETAL CURL precedent and session 18's Head move, cited, not re-derived.
+
+    - **THREE THINGS THE GATE HAD TO LEARN, each a real bound met.** The path route required
+      a collapsed section's witness control to declare THAT section — which a container
+      with no control of its own cannot satisfy; it now admits a CHILD'S control for a section
+      holding none of its own, and only then, so `center` is witnessed by `stamenCount`
+      driven through the shut container and the shut drop-down. Route (n)(i) asserted "there
+      is no `#sec-center`" since session 20; what it guards is a resurrected RIG, and a rig is
+      a control INSIDE the section, so the clause now reads "the container holds no control
+      of its own" and its negative control injects `centerStyle` INTO the real container. And
+      the flag's own assertion could not fire under route (o)'s frozen read-out (the clause is
+      absent there, so the flag test is never reached — measured: the negative control came
+      back INCOMPLETE on exactly that witness), so route (r) exists: a fresh page whose
+      negative control rewrites ONLY the flag away and keeps every other character.
+
+    - **THE KEPT CLAUSE PRINTS THE STATE'S OWN VALUES**, because hidden sliders are sliders the
+      visitor cannot read: `none — its settings are kept (disc, spread 6.00x, 40 mm, curl 180°)
+      and return with the count`, the layout as the stored value's own word (no second owner
+      of a name). Asserted equal to the state at count 0 / NONE and absent otherwise; the
+      negative control's frozen span fires on both directions.
+
+    - **THE CAP IS THE OWNER'S NUMBER, DRAWN.** The `stamenSpread` row declares `cap(shown)`
+      — WHERE the number lives (footRing()'s `saturation`, (hub − r)/(r √N)); `applyCaps()` in
+      bloom.js is the one writer of the mark (class, `data-cap`, `--bl-cap` as a fraction of
+      the row's own range), removed when the part is off or the cap is at or past the range
+      top; `fmt(v, ui, shown)` gained a third argument — the SHOWN build's record — for the
+      one read-out that must print an owner's number, and `refreshLabels()` moved AFTER the
+      build in `regenerate()` to read it. On the shipping hub: six on a ring 5.61x (marked),
+      120 on the disc 1.25x (marked, CLAMPED), one stamen 13.74x (past the range, no mark).
+      **The brief's "1.77x on the shipping hub" was NOT reproduced** at any shipping-default
+      state and is in no record — a premise, not a specification; the instrument prints the
+      owner's number on whatever hub is in front of it. **THE CORRECTION (Eva, Sep 6, at the
+      close):** the 1.77x came from a read-out in a screenshot of ONE configuration and was
+      wrongly described as the shipping hub's; the real readings are the session's — 5.61x at
+      six on a ring, 1.25x at 120 on the disc, 13.74x at one stamen — recorded so nobody
+      inherits the wrong number.
+
+    - **THE FLAG READS THE BUILDER'S STATIONS, AFTER EMISSION.** `buildStamenInto` and
+      `buildStyleInto` return `stations` (the ring centres the rod was revolved through);
+      `buildBloomInto` computes the nearest approach of any filament's FREE station to the
+      style's centreline BELOW THE STIGMA against one filament plus one style radius, null
+      unless both parts are built. It reproduces session 22's law table from the emitted
+      stations (six on the shipping ring: 2.94 mm straight and clear; 0.10 mm at curl 20; 0.05
+      mm at 8.7 mm up at curl 90 — the flag) and sees one thing the table did not ask: a
+      VOGEL DISC's innermost stamen stands at R √(0.5/N) — 0.53 mm at 120, 0.85 at one — so
+      with a style present the flag fires at the root, straight, a true intersection of two
+      closed tubes. Told, not tuned around. FLAG, NEVER GATE: both STL gates stay blind to it
+      by design, and the harness, both gates, both coverage instruments and the smoke tool are
+      on the untouched list. **RULED AN OPEN PLACEMENT QUESTION, NOT A DEFECT (Eva, Sep 6):**
+      the disc law has no inner limit, so its innermost stamen is inside the style whenever
+      one is present; the candidates are starting the spiral's index past zero or flooring
+      the radius, and that is the NEXT session's question, not this one's.
+
+    - **NO NEW FROZEN PHASE**, stated explicitly as the brief asked: the row set is the same
+      528 (no matrix row was added — the flag is asserted on one page in both directions, the
+      ROOTS FUSE pattern), and no byte moved, so this is the session 18/19 case ("phase14 stays
+      the newest baseline"), not the last three sessions' (each changed the row set). phase17
+      stays the newest baseline.
+
+    - **AT THE PUSH (Sep 6), STOPPED AT THE SHEET.** Panel gate PASS (159 assertions, on the
+      exact tree), negative control PASS (1,500 breaks; all fifteen routes and the four
+      clauses fired); smoke subset export-only clean (39/39); phase17 507/507 and the live
+      matrix 528/528 bit-identical, 0 moved, defaults bit-identical, a worktree of fd291b4
+      against the head on one box in one run; the predeclared manifest 375/375 held on the
+      final tree, the movers exactly the nine declared. One push, docs folded in; the draft PR
+      on `claude/panel-centre-reorganisation-mk89d0` targets `main`. Merge is released by
+      Eva's ruling on `panel-centre.png` and is the session's own final step; the merge sha
+      and the ruling are recorded here by the close-out.
+
+    - **THE RULING (Eva, Sep 6, from the sheet).** The sheet approved; #169 merged as built.
+      Two records are hers, written down at the close: the 1.77x correction (above) and the
+      disc's innermost stamen as an open placement question (above).
+
+    - **THE CLOSE (Sep 6).** The four bloom gates confirmed green on the PR head `73b4fea` by
+      the session before the merge (bloom-export-watertight and bloom-connectedness on the full
+      528-row matrix, bloom-panel, bloom-frozen-matrices; the two flower gates ran on the
+      `tools/**` filter and are not bloom evidence). #169 undrafted, then merged by the session
+      (squash) with the head sha read from the remote, as **`00dc4b2`**, read back
+      from `main`. **No frozen tag is owed and none was published** — no row added, no byte
+      moved; phase17 stays the newest baseline. The predeclared manifest re-verified against
+      merged `main`: **375 of 375 held** (`sha1sum -c` on a worktree of `00dc4b2`); the nine files `main` moved since fd291b4 are exactly this session's nine predeclared movers, and no print file landed from another PR — `main` had not moved between fd291b4 and this merge. The ruling and this close recorded in the
+      docs-only PR, opened from a fresh branch off `main` and merged by the session before
+      reporting DONE.
+
+- **Session 24 (Sep 6): THE VOGEL DISC'S INNER LIMIT — the equal-area law re-based on the
+  annulus `[rFil + rSty, R]`, applied ALWAYS; `partRadius` as the one owner of the parts'
+  radius; JS5 in both STL gates. 11 live and 8 phase17 rows moved, none added, NO new frozen
+  phase. Numbers in `docs/bloom-session-24-outcome.md`.**
+
+    - **WHAT DECIDED IT (Eva, Sep 6, from the sheet — and it is a better reason than the one
+      in her own brief, which is why it is written here rather than paraphrased).** `R = rFil
+      sqrt(N) spread` and `r_0 = R sqrt(0.5/N)`, so **the N cancels: `r_0 = rFil * spread /
+      sqrt(2)`, 0.8485 mm on every unclamped disc at EVERY count since the disc was built.**
+      Not a dense-head problem and not a tuning for the 120 case: **the disc has started 0.85
+      mm from the axis at every count it has ever had, so this is a CORRECTION.** The brief
+      framed it from the clamped 120 (0.5322 mm); that framing is superseded.
+
+    - **THE LAW.** `innerLimit = partRadius + partRadius` — a filament radius plus a style
+      radius, where a filament's tube clears a style's, and EXACTLY the filament-against-style
+      flag's own threshold, which now READS it instead of re-deriving it. `r_i = sqrt(inner^2
+      + (i + 0.5)(R^2 - inner^2)/N)`: "start the spiral's index past zero" with the integer
+      rounded away, so every annulus keeps exactly the same area (measured spread 3.6e-14 mm^2
+      across 120) and, unlike an integer offset, it is CONTINUOUS in R and the spread slider
+      never jumps. **Flooring each radius was measured and REJECTED**: it takes the 120-disc's
+      closest pair of roots from 1.164 mm to 0.991 mm, deeper into the ROOTS FUSE flag it was
+      meant to relieve, where the annulus law takes it to 1.233 mm and CLEARS it. ALWAYS, not
+      only with a style: a limit that existed only with a style would make turning the style on
+      move every stamen, the coupling session 22 ruled against. NO ROOM is told, never refused;
+      `innerUsed` and `noRoom` are NULL under RING, and JS5 asserts that in both directions.
+
+    - **THE EIGHT RULINGS FOR THE PARAMETRIC TIP (Eva, Sep 6, from the discovery sheet), the
+      brief for sessions 2, 3 and 4. Recorded here so they are inherited, not re-derived.**
+
+        - **Q1 — THE ONE-EXPONENT OUTLINE LAW.** `h(u) = (|cos(nu/4)|^s + |sin(nu/4)|^s)^(-1/s)`,
+          blended by roundedness. One number sweeps star -> polygon -> circle -> rounded n-gon
+          and reaches all five named targets; the simpler lobe law reaches four and makes a
+          TREFOIL where a triangle was asked for. Roundedness is the ONLY producer of the
+          circle and sharpness is inert there — the curl-bias precedent, hidden AND inert.
+        - **Q2 — RODRIGUES, AND NO GUARD.** The anther migrates byte-identically under it (0 of
+          1,800 floats) and the trifid does not (17 live rows, 0 frozen — phase17 contains no
+          style at all). **Eva's reason, on the record because it cuts against this project's
+          habits: 17 moving rows is better than a guard that gives 0 moved and buys a
+          discontinuity the moment roundedness leaves 1. A slider that jumps is a defect a user
+          meets; a predeclared partition is an accounting entry.**
+        - **Q3 — THE ANNULUS FORM, ALWAYS.** Session 24, above.
+        - **Q4 — NO NEW FROZEN PHASE FOR A BYTE MOVE, AND THE RULE WRITTEN DOWN.** A frozen tag
+          pins ROW DEFINITIONS, not bytes; the session that moves frozen bytes names the tag.
+          Ruled and applied in session 24 — see "A FROZEN TAG PINS ROW DEFINITIONS" above.
+        - **Q5 — FLOOR THE ELONGATION.** A floor keeps the pill byte-identical; the ellipsoid
+          is more correct, moves the pill, and the difference between a 0.01 mm band and none
+          is invisible. No second partition for something nobody can see.
+        - **Q6 — NO SELF-INTERSECTION INSTRUMENT.** The gate is blind to it and always will be
+          (measured: an outline turned inside out through its own axis exports boundary 0,
+          non-manifold 0, one shell — a clean pass), and that goes in the instrument's own
+          header as a stated blind spot. **What is wanted instead is cheaper: BOUND THE
+          PARAMETER RANGES SO THE OUTLINE CANNOT INVERT. A law that cannot turn inside out
+          needs no check that it hasn't.** If the ranges cannot be bounded without losing
+          shapes Eva wants, say so and take it back to her.
+        - **Q7 — LIFT THE NESTING BOUND, AND GENERATE THE ROWS FROM ONE TABLE — both, not
+          either.** The panel was reorganised one session earlier to get that grouping and is
+          not to be flattened. Seven descriptors authored ONCE and instanced TWICE, the
+          `ROLE_OVERRIDES` pattern, so the two tips cannot drift.
+        - **Q8 — `size` BECOMES A REAL SLIDER,** superseding `ANTHER_DIAMETER_FACTOR`: the
+          point-radius floor (0.50 mm, UNMEASURED) makes points unreachable on a 1.92 mm
+          anther, so without a size control the sharp end of the range is decorative.
+
+    - **SIZING, APPROVED (Eva, Sep 6):** four sessions — session 24 (this one), then the
+      primitive and the migration ALONE (zero new controls, 17 movers in their own commit),
+      then the anther's seven controls, then the stigma's. **Session 2 is not to be
+      compressed: a ruled byte event gets its own commit.**
+
+    - **THE PANEL GATE'S RETIRED-ID SCANNER: FIX IT, IN ITS OWN SESSION, AND BEFORE SESSION 2**
+      (Eva, Sep 6). **Not left recorded — it has now cost two sessions.** Session 22 hit it and
+      reworded thirteen assertion messages; session 24 hit the identical symptom
+      (`bloom-harness.mjs:599 centerSize`, repeated, at a line number computed in the STRIPPED
+      text, naming a file the session did not touch) and reworded nine. **The workaround relies
+      on everyone remembering never to type an apostrophe, and a gate that reports 48 false
+      hits against the wrong file is how a real hit gets waved through later.** Session 2 writes
+      more new assertion messages than anything so far, so fixing it after would be a session
+      too late.
+      **THE SESSION IS SMALL AND SELF-CONTAINED: the regex in route (n)(iv)'s scanner, nothing
+      else.** Its positive control is already written for it — apostrophes inside template
+      literals scan clean, AND a genuinely retired id is still caught. **It restores the nine
+      messages session 24 reworded and session 22's thirteen as part of the same change.**
+      Measured on both trees at session 24's close: the base at `b847f81` scans 0 hits over 34
+      files; nine possessives took the head to 48, every one of them a frozen-matrix label
+      about 2,000 lines from the reported location; removing them took it back to 0. The em
+      dash in the same literals is harmless — the apostrophes alone are the trigger.
+      **DONE — session 25, `928e13e`, before session 2 as ruled.** One correction from doing
+      it: the nine session-24 possessives restored ALONE do not reproduce the 48, because they
+      come to fourteen apostrophes and parity is preserved. It took all twenty-two. The count
+      matters, not the location — which is the same parity finding session 22 reached from the
+      other end, and the reason no small fixture can replay the bug.
+
+    - **THE READ-OUT'S STAMENS LINE IS GETTING CROWDED, and it is noted rather than acted on**
+      (Eva, Sep 6). The inner-limit clause is long, and the line has gained a clause most
+      sessions for a while (the annulus flag, the two distance flags, the spine floor, the cap,
+      the filament-against-style flag, now this). **Look at it when it is next touched for
+      another reason; it is not worth its own work now.**
+
+    - **THE CLOSE (Sep 6).** All four bloom gates green on the PR head `9e2784e`
+      (bloom-export-watertight and bloom-connectedness on the full 528-row matrix,
+      bloom-panel, bloom-frozen-matrices; the two flower gates ran too, `tools/**` filter, and
+      are not bloom evidence). **The export gate took 88 minutes and was checked against its
+      own history before it was waited on rather than assumed hung: its last five runs on the
+      528-row matrix took 83 / 90 / 87 / 88 / 85 minutes.** #171 undrafted and merged by the
+      session (squash) as **`a8c479d`**, the head sha read from the remote with
+      `git ls-remote` and passed as `expectedHeadSha`. **No frozen tag is owed and none was
+      published** — rows moved, none were added; phase17 stays the newest baseline and the
+      outcome doc names it as the tag whose bytes no longer reproduce. The predeclared
+      manifest re-verified against `main` after the merge: **376 of 376 held**; `main` had not
+      moved between `b847f81` and this merge, so the ten files it moved are exactly this
+      session's ten predeclared movers and no other PR's. This entry and the rulings above
+      are the docs-only PR that follows the merge, on the session-22/23 rhythm.
+
+- **Session 25 (Sep 6-7): THE PANEL GATE'S RETIRED-ID SCANNER — a character walk in place of
+  five regexes; the twenty-two reworded assertion messages restored. Gate only: 0 rows added,
+  0 of 528 bytes moved, NO frozen phase. Numbers in
+  `docs/bloom-session-25-outcome.md`.**
+
+    - **WHY IT WAS ITS OWN SESSION, and it was the right call.** Eva ruled it on Sep 6, before
+      session 2 of the parametric tip, on the grounds that the workaround was "never type an
+      apostrophe" and that session 2 writes more new assertion messages than anything so far.
+      Doing it turned up a second reason nobody had measured: **the scanner was BLIND as well
+      as loud.** At `888a506` its template pass deleted 58,522 of the panel gate's own 98,906
+      post-comment characters and hid **45% of the executable source it was meant to scan**
+      (332,888 non-whitespace characters surviving, against 605,687 under the walk); on a
+      PRISTINE tree with two genuine references spliced in, it missed `${centerSize}` entirely
+      and reported `row.centerDish` **2,095 lines** from where it lives. A scanner that misses
+      real references and misreports the ones it finds is how a real hit gets waved through —
+      that, not the noise, is what made it worth a session.
+
+    - **THE MECHANISM, FOUND RATHER THAN GUESSED.** `\$\{[^}]*\}` stops at the FIRST `}`, so
+      an interpolation holding a nested template that itself interpolates ends the outer match
+      at the INNER literal's closing backtick and every backtick after it pairs off by one —
+      the pass then matches the GAPS BETWEEN literals rather than the literals. The first
+      out-of-phase match in `tools/bloom-harness.mjs` is at **line 571**, the SPINE read-out's
+      floored-start clause, where `[^}]*` stops at the `}` of `${sp.startFloored.toFixed(3)}`.
+      20 of the 35 scanned files left a stray backtick behind.
+
+    - **THE PARITY EFFECT IS A WHOLE-FILE PROPERTY, AND NO SMALL FIXTURE CAN REPLAY IT** —
+      measured, not assumed. Four hand-built candidates and the real `:571` construct all
+      re-align within a few lines and the old chain passes every one of them; session 22
+      reached the same conclusion from the other end when removing any ONE of its thirteen
+      messages cleared the failure. **Session 24's nine possessives restored alone also do not
+      reproduce it** (fourteen apostrophes — an even count). It took all twenty-two to reach
+      48. So the gate's new case table pins the PROPERTIES that make the bug impossible rather
+      than pretending to reproduce it, and its own comment says so.
+
+    - **A CASE TABLE EVERY IMPLEMENTATION PASSES IS DECORATION.** Route (n)(iv) now drives the
+      walk over twenty sources whose answer is written down — necessary because on 35 real
+      files a walk that blanked EVERYTHING would also report 0 hits, and the per-file validity
+      check only knows the text still lines up. The table was checked against **seven
+      mutations of the walk itself**, each turning at least one case red; **two of the twenty
+      cases exist because two mutants survived the first draft** (a string running past its
+      newline, and a regex spanning one). Write the mutants before trusting the table.
+
+    - **WHAT THE WALK IS AND IS NOT.** It blanks comments, strings, template TEXT and regex
+      bodies to spaces IN PLACE keeping every newline, so `file:line` names the real line and a
+      hit quotes its own source line; a `${…}` is left as CODE, because it is; a mis-read costs
+      one line, never the file. **It is a lexer, not a JavaScript parser, and does not claim to
+      be** — its per-file validity assertion (same length, same line count, nothing left open)
+      FAILS THE GATE rather than scanning in an unknown state. A regex literal's body is exempt
+      as literal text, which it had to be: this gate's own negative control names `centerStyle`
+      inside one.
+
+    - **THE CLOSE (Sep 6-7).** All four bloom gates green on the PR head `e94ffce`
+      (bloom-export-watertight 87.5 min and bloom-connectedness 57 min on the full 528-row
+      matrix, bloom-panel, bloom-frozen-matrices; the two flower gates ran on the `tools/**`
+      filter and are not bloom evidence). Both controls fired before the fix was trusted: the
+      old chain at **48 hits** with the possessives back, every one at
+      `tools/bloom-harness.mjs:599`, against **0** for the walk; and nine mutations at real
+      executable positions each caught at exactly the spliced file and line, with four exempt
+      positions silent. **0 of 528 configs moved** on the full live matrix, a plain capture per
+      tree — true by construction (assertion strings are not geometry, and every file the
+      export path reads was predeclared untouched and byte-identical) and asserted anyway,
+      since CI does no byte diffs. #173 undrafted and merged by the session (squash) as
+      **`928e13e`**, the head sha read from the remote with `git ls-remote` and passed as
+      `expectedHeadSha`. **No frozen tag is owed and none was published** — no row added, no
+      byte moved; `buildMatrix()` is deep-equal between base and head at 528 rows, phase17
+      stays the newest baseline, and session 24's note that phase17's BYTES no longer reproduce
+      is untouched. The predeclared manifest re-verified against merged `main`: **384 of 384
+      held**, `bloom-geometry.js`, `bloom-registry.js` and `bloom.js` among them on Eva's
+      instruction, so "gate only" is a construction rather than a claim; `main` had not moved
+      between `888a506` and this merge, so its two moved files are exactly this session's two
+      predeclared movers. **No sheet is owed — nothing visual changes.** This entry is the
+      docs-only PR that follows the merge, on the session-22/23/24 rhythm.
+
+- **Session 26 (Sep 7): THE TIP PRIMITIVE AND THE MIGRATION — `tipInto` as the one owner, the
+  one-exponent outline law hard-wired at today's circle, the Rodrigues frame with no guard, the
+  elongation floor. ZERO NEW CONTROLS. 17 live rows moved, 0 frozen, NO new frozen phase, and
+  NO tag's bytes stop reproducing. Numbers in `docs/bloom-session-26-outcome.md`.**
+
+    - **THE PARTITION WAS RE-MEASURED, NOT INHERITED.** The discovery's 17 was measured on a
+      tree that no longer exists and before the annulus law landed, so it was re-derived from
+      the rule — a row moves iff its resolved state has `gynoecium: STYLE` AND the gynoecium is
+      eligible — and enumerated from `buildMatrix()` + `DEFAULTS` + `gynoeciumEligible()` before
+      any capture ran: **17 of 528 live, 0 of 507 phase17.** It comes back 17 again, and that is
+      a coincidence worth naming rather than a confirmation: session 24's annulus law moved DISC
+      radii, which cannot add or remove a style row, so the count could not have changed — an
+      argument made AFTER re-deriving it, never a reason to have skipped the derivation. **The
+      other direction is in the 511:** three rows name `gynoecium: STYLE` and must NOT move, the
+      GATED rows where the whole centre is at maximum under SPHERE, hidden AND inert. A tip
+      primitive that leaked past the eligibility guard would move exactly those three.
+
+    - **WHICH FROZEN TAG'S BYTES NO LONGER REPRODUCE: NONE** (the session-24 rule, applied). The
+      change is reachable only through `gynoecium: STYLE`, and **no frozen matrix names a
+      gynoecium control** — the gynoecium landed in session 22 and phase17 was frozen at
+      `6335ac4`, the head of `main` when session 22 opened. Every frozen baseline therefore
+      holds by construction and `--phase17` measures it. Session 24's note that phase17's bytes
+      no longer reproduce (8 of 507) is untouched and remains the only such entry.
+
+    - **THE ANTHER IS BYTE-IDENTICAL, AND IT WAS PROVED RATHER THAN ASSERTED: 0 of 3,183,552
+      floats** over seven corners in live and export, compared with `Object.is` so `+0` and
+      `-0` are different — they are different float32 bit patterns in the STL, and `===` would
+      have reported a clean sheet over a real move. The base side is the WHOLE SHIPPED MODULE
+      imported from a `git worktree` of `2fee2c2`, never a function re-typed into a harness.
+      `tools/verify-bloom-tip-bytes.mjs` REFUSES a vacuous run two ways: V0 fails if the base
+      tree carries the same `bloom-geometry.js`, and every trifid row is PREDECLARED TO MOVE, so
+      a migration that never reached the lobes fails rather than passing beautifully.
+
+    - **WHY IT HOLDS IS A CONSTRUCTION, AND BOTH HALVES ARE IN THE CODE.** At roundedness
+      exactly 1 the blend is `1 + 0 * h`, exactly `1` in IEEE-754 for any finite `h`, so
+      `r * f === r`. And **the Rodrigues rotation is parameterised by the ANGLES, not by two
+      vectors** — at spread 0, `cos 0` is exactly 1 and `1 − cos 0` exactly 0, so the rod frame
+      comes back term for term. A `k = D × L` formulation would normalise a zero vector at the
+      identity and put `D · L` — which is 1 only to rounding — on the frame's own coefficient.
+      That is the version that needs the guard Eva ruled against; this is the version that does
+      not.
+
+    - **THE -0 HAZARD IS REAL AND IS MEASURED ON BOTH HALVES.** No arrangement of `x + 0`
+      preserves a negative zero and the no-guard formula adds two zero terms, so the anther's
+      ring vector at azimuth 0 flips `[-0,1,0]` to `[+0,1,0]`, and at a filament curl of exactly
+      180 the tip AXIS flips a zero the same way. **It reaches no emitted position** — `-0 among
+      the compared floats: 0` on every row of both trees. A first draft of JS6 asserted
+      bit-identity of the axis and turned two smoke rows red; the clause was wrong, not the
+      code, and it now compares by VALUE with the reason in its own comment so a later session
+      does not "strengthen" it back.
+
+    - **HOW FAR THE TRIFID MOVED — two numbers, and they are not the same claim.** The old lobe
+      frame was `D × P`, which IS the rotation axis and is left fixed by the rotation; the new
+      one is `Rot(T)`, so the two differ by a turn about the lobe's own axis of `acos(−sin ψ)` —
+      **90°, 150° and 30°** on the three lobes. Measured in export mode: **600 triangles, 5,220
+      of 5,400 floats** (the 180 that hold are the pole vertices, which lie on the axis of the
+      rotation), **max VERTEX displacement 1.8546 mm, max SURFACE deviation 0.0470 mm.** The
+      closed form for a regular n-gon rotated on its own axis is the sagitta at the widest ring,
+      `a(1 − cos π/n)` = 0.046986 mm at the shipping 1.20 mm sheet; the measurement agrees and
+      the closed form was a prediction the run could have contradicted. **It scales with the
+      sheet** — 0.094 mm at `sheetThickness` 2.40.
+
+    - **`STAMEN_TRIS` AND `STYLE_TRIS` ARE RETIRED INTO `tippedRodTris(lumps)`.**
+      `tippedRodTris(1)` is 560 and `(3)` is 960, exactly the retired constants, so the census
+      did not change — what changed is that the number is derived from a count the OWNER
+      declares. Session 4 makes the stigma's lobe count a control; a constant would be a number
+      that quietly stops being true with nothing failing. JS4 calls it with 1 (an anther is one
+      tip, A1, fixed) and pins the emitted lump list at 1 beside it; JG4 calls it with
+      `G.lobe.count` and pins the emitted lobe list against the same number.
+
+    - **JS6 AND JG5 ARE THE ONLY WITNESSES FOR ANY OF IT, and that is measured.** A tip rolled
+      on its own axis exports watertight, one piece, at an identical triangle count and an
+      identical STL byte length — nothing in this project looks at a ring vector. The two
+      families share `tipClauses()` so the anther and a stigma lobe are held to one statement:
+      the ring vector is unit, perpendicular to its own axis, and the Rodrigues image rebuilt
+      from OTHER owners (C1's discipline); and the outline factors are the law on the shape the
+      owner declares AND exactly 1. **Those last two are two directions and only the second
+      does this session's work** — the first compares the shipped function against itself and is
+      vacuous under a mutation of the law, while "exactly 1" is how *session 26 ships zero tip
+      controls* becomes a measurement. Stated in the harness's own header: clause 3 RESTATES the
+      formula, so a law wrong the same way in both places passes; clauses 1 and 2 hold for no
+      restatement reason and are the guard against that.
+
+    - **Q6 IS DISCHARGED BY A BOUND, NOT AN INSTRUMENT.** `f(u)` is a radial graph about the
+      tip's axis, so it is simple iff it is strictly positive. `f` is a convex combination of
+      1 and `h`, and `h ≥ 2^(1/2 − 1/s)` for s ≤ 2 (the worst azimuth is 45°), `≥ 1` above it —
+      so at the range floor s = 0.25 the bound is `2^(−3.5) = 0.08838834764831843`, which is
+      the measured minimum over the WHOLE bounded space (every lobe count 2..12 crossed with
+      sharpness 0.25..8, at the shipped ten sides): `0.0883883476483184`, at n = 5. `tipOutline()` CLAMPS rather than trusting
+      its caller, so no session-3 registry range can reach an inverted outline. **Nothing was
+      lost to the bound** — no shape on the discovery's list needs sharpness below 0.25.
+
+    - **THE SHEET IS `node tools/shot-bloom-tip.mjs <dir> [base-tree]`** and it exists because
+      "is 0.047 mm visible" is Eva's ruling and should be made in front of a number. Every cell
+      carries its own **mm per pixel** and every pair a measured **pixel difference**; the
+      anther and bare-bloom pairs are asserted PIXEL-IDENTICAL, the trifid pairs asserted NOT
+      (the vacuity guard — a sheet whose before and after agree everywhere is a sheet
+      photographing one tree twice), and row (A) is additionally shot twice on the base tree as
+      a RENDERER control, because `0 pixels differ` is worth nothing if the renderer is not
+      deterministic to begin with.
+
+- **Session 26's ruling (Eva, Sep 7): Q2 STANDS — RODRIGUES, NO GUARD.**
+
+    **RODRIGUES, NO GUARD. The trifid's 0.047 mm is acceptable.**
+
+    **THE REASON, and it is not the pixel counts.** 0.047 mm is the sagitta of the TEN-SIDED
+    TESSELLATION — **a facet phase rather than a change of form.** The solid is the same solid;
+    what moved is where the ten-gon's corners fall around its own axis. And sessions 3 and 4 make
+    the segment count variable, **at which point every tip moves regardless** — so a guard would
+    buy a permanent discontinuity in a shipped slider to preserve a property that expires in two
+    sessions.
+
+    **The pixel measurements corroborate; they do not decide.** They are recorded because a
+    ruling should be made in front of numbers, not because 4,800-against-6,868 is the argument.
+    Do not carry the pixel figures forward as the grounds — the grounds are the facet phase and
+    the expiry.
+
+    **⛔ THE WHOLE-BLOOM PIXEL PAIR IS RETRACTED (Eva, session 29), AND THE RULING STANDS.**
+    `4,800 px against a 6,868 px floor` was a single control sample of a TWO-MODE distribution,
+    not a floor: session 29 measured the same-tree whole-bloom control at **0, 51, 50, 10,486,
+    0, 52, 10,635 px** across sixteen rows of one sheet, reaching **15,885 px** across runs, with
+    the same row landing in either mode on different runs. Settling on byte-identical FRAMES
+    removes the orbit DAMPING and does not remove this. So "below the noise at whole-bloom
+    scale" cannot be said, and every whole-bloom control in that table is withdrawn — marked
+    RETRACTED in `docs/bloom-session-26-outcome.md` rather than left to be re-cited. **What is
+    NOT retracted:** the centre and stigma framings (controls 0-25 px in every observation
+    across two sessions, differences four to six orders above), the 120-stamen row's EXACT
+    whole-bloom equality (an identity, not a comparison against a floor), and **Q2 itself** —
+    whose grounds were always the facet phase and the two-session expiry, which is exactly why
+    withdrawing the corroboration does not move it. **A pixel figure from a bloom sheet's
+    whole-bloom view is not evidence unless its own control was taken in the same page session
+    AND came back low.**
+
+    **AND THE RETRACTION BREAKS THRESHOLDS, NOT EXACT ZEROS** (Eva, session 29). A bimodal
+    control destroys any claim of the form *"X px is below the floor"* — there is no floor to be
+    below. It touches nothing of the form *"the difference is exactly 0"*: an exact zero is not a
+    comparison against a noise estimate, it is an IDENTITY, and no distribution of renderer noise
+    manufactures one. So the 120-stamen row's exact equality here, and session 29's migration
+    pair (0 px on all three views), its INERT row (0 px against the pill on all three views while
+    its own whole-view control read 10,492 px ON THE SAME RUN) and its eight cross-config pairs
+    (0 px over states proved bit-identical at 0 of 120,960 floats) all STAND, unhedged. **A
+    threshold needs a floor and therefore a distribution; an identity needs neither.**
+
+    **THE BIMODALITY IS NOT CONFINED TO THE WHOLE-BLOOM FRAMING** (Eva, session 29). The MACRO
+    view threw a **38,057 px** one-off between two states later proved bit-identical TO THE FLOAT
+    (0 of 120,960, live and export, `Object.is`), and it did not reproduce — five interleaved
+    page loads, eight pairs, all 0 px, including the comparison that had read 38,057. So
+    **"the macro control read 0 px on every row" is an OBSERVATION and never a guarantee.** A
+    macro-framed pixel bound is sound in the direction that matters (a real change on these
+    sheets is 800,000+ px, three orders above any observed event) and fragile in the direction
+    that costs a run. This belongs beside the retraction, not in a sheet's own header.
+
+    **A SINGLE SAME-TREE CONTROL IS NEVER A FLOOR** (Eva, session 30 — the rule, after three
+    sessions found it independently). Session 26 at whole-bloom framing (the bimodal control);
+    session 28 with the 38,057 px one-off between bit-identical states; session 30 with 15 px
+    on the macro view against a 0 px control while the SAME RUN's other macro controls read 12
+    to 30 px — twice, on the before/after pair and on the INERT row. **A pixel BOUND is set from
+    the run's OBSERVED CONTROL DISTRIBUTION and both sides' own controls, never from one
+    sample**: take every same-tree control the run produced on that framing, use its largest
+    (or a stated quantile) plus the two rows' own, and say so in the caption. An IDENTITY still
+    needs neither — a triangle count, a read-out line character for character, `0 of N floats`
+    — which is why the exact-zero claims stand unhedged and are what carry a row. Write the
+    rule into a sheet tool's header, not the workaround.
+
+    - **AND THREE THINGS CAME OUT OF THE SHEET RATHER THAN THE CODE.** The renderer noise
+      floor is a PROJECT-WIDE note and lives in `CLAUDE.md` (`Contact sheets — a pixel number
+      is only a measurement with its own control`): same tree, same camera, twice, at the
+      fixed 260 ms wait every sheet tool here uses — **4,925 to 7,426 px**, all of it orbit
+      damping. Every sheet this project has shot used a fixed wait, so any pixel figure quoted
+      from a sheet before session 26 has that floor underneath it; most were ruled BY EYE, so
+      the exposure is small. The push-once amendment and the 600-line note are above, at the
+      session-17 CI ruling.
+
+- **Session 27 (tip plan 3a, Sep 7): THE TWO-LEVEL NESTING BOUND IS LIFTED, THE SMOKE GATE'S
+  FAMILY LIST IS DERIVED, AND THE GENERATED DESCRIPTOR TABLE IS DEFERRED TO 3b.** Structure
+  only — zero controls, zero geometry, no sheet, 0 moved by construction.
+  `docs/bloom-session-27-outcome.md` has the numbers.
+
+    **Q7's first half is done and its second half is not, deliberately.** The nesting bound is
+    gone from `verifySections()`. The generated table is NOT built here, on three findings: the
+    mechanism ALREADY SHIPS and is exercised by 36 controls (the per-petal block — 4 descriptors
+    × 9 instances, one distinct spec per suffix, measured); "instanced TWICE" is not reachable
+    until **session 4**, because session 3 is the anther's seven controls and session 4 the
+    stigma's, so the property the ruling names is unobservable in 3b whoever builds it; and
+    there is no honest existing pair to migrate through it (`labellum*`/`hood*` are 5 against 3;
+    `all*`/`inner*` share only the bounds while label, `fmt` and `visibleWhen` are all
+    per-instance, so they exercise a WEAKER mechanism than the tip needs). What 3a shipped
+    instead is the guard that sentence needs and that today has an instance to run on:
+    **instanced descriptor families share one spec**, in the panel gate. 3b adds one row to it.
+
+    **THE REFUSAL'S STATED REASON WAS WRONG ABOUT THE CENSUS AND RIGHT ABOUT TWO OTHER
+    EXPRESSIONS** — re-read from source rather than inherited. `applyVisibility()`'s backwards
+    walk, its `childrenOf` map, the gate's `ancestorsOf` while loop, the census (document order,
+    a pre-order walk at any depth, against the SECTIONS array) and `wantSectionHidden()` (which
+    reads each child's OWN answer rather than re-deriving it) are all depth-general already.
+    The two that were not: the panel gate's **witness-through-a-child** test (`x.parent === s.id`
+    — a container whose only content is a container would have had its only honest witness
+    refused) and its **on-screen filter** (`!d.parentElement.closest('details')?.hidden` — ONE
+    ancestor, so at three levels a drop-down inside a shown parent inside a HIDDEN grandparent
+    read as on screen). Both are now depth-general and both are PINNED to the answers they
+    replace on this tree — 22 states, 0 disagreements.
+
+    **AND A CHECK WAS OWED, WHICH IS WHERE THE COST ESTIMATE MISSED.** `verifySections()` never
+    checked that a parent is DECLARED BEFORE its child, and every instrument above is correct
+    exactly when it is — the backwards walk settles children first only if children come later,
+    and `bloom.js` appends into `sectionEls[s.parent]`, which must already exist. `bloom.js`'s
+    own comment said *"so there is no ordering to get wrong here"* and cited the function that
+    never looked: a child declared before its parent PASSED `verifySections()` and threw at
+    panel build. The label-naming-a-computation-nobody-performed defect, in a comment, pointing
+    at the function meant to perform it. The precedence check replaces the depth refusal and is
+    strictly stronger — a parent cycle and a self-parent are now unreachable too. **Route (s)**
+    in the panel gate carries it on WRITTEN-DOWN section arrays (three levels accepted;
+    child-before-parent, a cycle, a self-parent and a missing parent each refused), four
+    must-fails that run on EVERY invocation rather than only under `--negative-control`, because
+    the live tree is two levels and a wrong answer about depth 3 is unobservable on it. A third
+    level is legal and has **no CSS**: `bl-sec--sub` is "nested at all", not "nested at depth k".
+    One duplicate fell out of the audit: the accordion route had built its own `parentOf` map
+    and its own ancestor while-loop beside route (s)'s — two computations of one relation, in
+    the file that asserts the registration rule. Declared once now.
+
+    **THE FAMILY LIST WAS SHORT BY FIVE, NOT TWO.** `bloom-smoke.mjs` reads its roster out of
+    the assertion SITES (`bad.push(\`J2: …\`)` plus `tipClauses('JG5', …)`, session 26's shared
+    clauses, which push under a tag their caller names) and CLAUSE C checks a BICONDITIONAL
+    against what the rows' `path` fields claim. It fired on **JS0, JG0, C3, J2 and Z2** — three
+    of which nobody had ever reported, and **Z2 because a path wrote `Z1-Z3`: a range names its
+    ends and hides its middle.** 39 families, all 39 now claimed; the negative control renames
+    JS5 to JS99 in a copy of the harness source and requires both directions to fire; it runs in
+    CI. **The `R` namespace is OUT by name, for correctness not scope** — three instruments each
+    own an R1 (`crowding R1:` / `coverage R1:` / `solid R1:`) and the paths cite a bare `R1`;
+    and `R0` in a path is usually the geometry's own ring-zero notation, not an assertion.
+    **Hole 5 is narrowed, not closed:** citation is a claim about the PATH a row engages, never
+    evidence the assertion can FIRE on it. Re-run the mutant table when a family is added.
+
+    **`tools/verify-bloom-presentation-only.mjs` — "0 moved" as a construction, re-runnable.**
+    Predeclared files by sha256 (`bloom-geometry.js` first), all 528 matrix rows deep-equal,
+    the registry's data deep-equal with **functions serialised to their source** (JSON.stringify
+    drops them silently, which would have made the strongest-looking clause the emptiest), and
+    every `fmt` EVALUATED over its whole range — 1,734 values — because a function closing over
+    a moved constant has identical source. Its positive control: run against `2fee2c2` it FAILS
+    naming `bloom-geometry.js` and the harness while passing clauses 2–4, which is the correct
+    reading of session 26. **It is not a byte diff and never replaces one** — a session that
+    moves bytes on purpose still owes `diff-bloom-bytes.mjs` and a predeclared partition.
+    **No frozen phase owed:** no row added, no row definition moved. `frozen/phase17` stays the
+    newest baseline and session 24 stays the only "these bytes no longer reproduce" entry.
+
+    **CLOSED — merged as `b021f1c` (PR #177), all six CI jobs green on `bacb232`.** Four of the
+    six are bloom (`bloom-export-watertight` 73 min on the full 528 rows, `bloom-connectedness`
+    48 min on the flood fill, `bloom-panel`, `bloom-frozen-matrices` — which carries the new
+    family census and its negative control alongside `--verify-frozen` on all sixteen
+    baselines); the two flower gates ran only on the `tools/**` filter and are not bloom
+    evidence, per the standing note. **One process finding worth carrying:** the GitHub
+    run-level `status` read STALE for twenty minutes after a job finished — read
+    `list_workflow_jobs`, not the run, and it is far leaner besides.
+
+- **Session 29 (tip plan 3b, Sep 7): THE ANTHER'S SEVEN CONTROLS SHIP, THE TIP'S LATTICE STOPS
+  BEING A CONSTANT, AND 0 MOVED IS A CONSTRUCTION.** Full account:
+  `docs/bloom-session-29-outcome.md`. Seven sliders under `Androecium ▸ Tip` — size,
+  elongation, roundedness, points, sharpness, lobes, lobe spread — **authored plainly, no
+  generator**: Q7's one-table instancing waits for session 30, where a second instance makes
+  "they cannot drift" observable, and carrying it here would be debt this session could not
+  verify.
+
+  **THE DEFAULTS REPRODUCE TODAY'S PILL EXACTLY AND THAT IS A CONSTRUCTION, NOT A CLAIM.** Size
+  and elongation default to `ANTHER_DIAMETER_FACTOR` and `ANTHER_LENGTH_FACTOR` themselves —
+  imported by the registry, asserted equal at harness load — and the two products are written in
+  the constants' own ORDER, because `(e * s) * d` is not `e * (s * d)`. Roundedness 1 makes the
+  blend exactly 1 and the lattice the rod's own; one lobe at a spread of 0 is the Rodrigues
+  identity. Every earlier export is bit-identical by the same argument the androecium shipping
+  absent made.
+
+  **THE TIP'S SEGMENT COUNT IS NOW DERIVED FROM THE OUTLINE, AND THAT WAS FORCED, NOT CHOSEN.**
+  The law's extrema sit at 2n azimuths and ten samples hit all of them **for n = 5 and no other
+  point count in the range** — so `antherPoints` on a fixed 10-gon would be a control that tells
+  the truth at one of its eleven values. `tipSides(shape)` is `n * 2 * ceil(STAMEN_SIDES / 2n)`,
+  and `STAMEN_SIDES` for a circle; `revolveInto` reads the lattice off the outline ARRAY'S OWN
+  LENGTH (the rod's arm still passes `null` and does no arithmetic). The circle arm is not a
+  bytes hack — it is what makes the two hidden controls **inert rather than merely invisible**,
+  and JS7 measures that at the opposite corner of both rather than arguing it. **Cost, from
+  `tippedRodTris()`: 560 triangles per stamen today, 3,240 at six lobes on a 24-side lattice;
+  the worst reachable androecium is 388,800 against today's 67,200. Reported, not clamped.**
+
+  **THE SHARPNESS FLOOR BOUNDS THE WAIST AND NOT THE POINT'S ANGLE**, said rather than implied.
+  `R_min = MIN_FEATURE_MM / 2 = 0.50 mm`, carried with `UNMEASURED — no coupon has been printed`
+  VERBATIM; closed form (`s ≥ 1 / (1/2 − log₂ m)`), full range, clamped, told; three corners,
+  none refused — `rho ≥ need` (the default's arm, no arithmetic runs), `need > 1` (the whole tip
+  under the floor), and the clamp between, whose result is `≤ 2` by construction so it can never
+  push a shape past the circle. **Q6 is discharged by the BOUND, never by an instrument:** the
+  registry IMPORTS `TIP_SHARPNESS_RANGE` and the rest, and the harness fails at module load if
+  that import became a literal — a wider slider than the law was proved on would make the ruling
+  false with nothing failing, because both STL gates are blind to a self-intersection by design.
+
+  **TWO CORNERS ARE TOLD RATHER THAN REFUSED**, on the crosses-axis precedent: two lobes at a
+  spread of 0 are COINCIDENT (duplicate geometry, the family's known cause of non-manifold
+  edges), and one lobe at a spread above 0 LEANS — a shape, not a dead slider, so the spread is
+  NOT gated on the count.
+
+  **JS7 IS THE NEW FAMILY AND THE CENSUS CAUGHT ITS ABSENCE BEFORE A HUMAN DID.** JS4 and JS6
+  ask what was emitted; **a tip built perfectly from the wrong seven passes both.** JS7 rebuilds
+  the two proportions from the SLAB, restates the floor in closed form (never calling the
+  shipped function), asserts the lattice as a PROPERTY (a multiple of 2n, at least
+  `STAMEN_SIDES`) beside the law, measures the inertness, and carries `floored` / `underFloor` /
+  `bandFloored` / `lumpsCoincident` in both directions. The shared `tipClauses` gained the axis
+  rebuild and traded `must be exactly 1` for the **roundedness biconditional** (exactly 1 at
+  roundedness 1, *not* all 1 below — because the first clause compares a mutated law against
+  itself: session 26's M2a). JG5 keeps the hard-wired-`TIP_SHAPE` clause; the stigma is session
+  4's. `node tools/bloom-smoke.mjs --check` reported *block 25 has no smoke row* and *JS7 is
+  claimed by NO smoke row* on the first run — session 27's biconditional firing in both
+  directions the first time it was needed.
+
+  **PANEL ROUTE (t), AND WHY ROUTE (d) COULD NOT DO IT.** Route (d) drives from the DEFAULTS,
+  where the androecium is absent, so `antherPoints` is hidden at both ends of the roundedness
+  slider and its pass there is VACUOUS. Route (t) drives the transition with six stamens
+  present, asserts the third level as a NUMBER of enclosing `<details>` (2), drives the two
+  hidden controls to their extremes at roundedness 1 and requires the triangle count not to
+  move, and holds the read-out's ANTHER line to the owner's own record with four flags in both
+  directions. Eleven assertions fire under `--negative-control`. **The third level's CSS is
+  paid** — a descendant selector in `bloom.css`, so `bloom.js` keeps one class and a fourth
+  level costs nothing there.
+
+  **`frozen/phase18` — 528 rows at `cb798f6`, and a phase IS owed.** Q4's rule: a tag pins ROW
+  DEFINITIONS, not bytes. Block 25 takes the live matrix 528 → 549, and no byte moves — the
+  phase16/phase17 case, and the exact mirror of session 24 (eight bytes moved, no row added, no
+  phase owed). It must be published from `main` after the merge, per session 17's rule.
+
+  **AND THE SHEET TOOL COST FIVE FULL RUNS TO DEBUG, WHICH IS NOW ITS OWN CONVENTION** — see
+  *Debugging an instrument — two rows to prove the tool, the full grid once to produce the
+  sheet*, above. The geometry passed all sixteen rows on every one of those runs; none of the
+  five failures was about the bloom.
+
+  **THE SHEET IS `node tools/shot-bloom-anther.mjs <dir> [base-tree]`** and it is what the merge
+  waits on. The corners and the middle — a sphere, the shipping pill, a triangle, a rounded star
+  — plus the waist floor binding, a trifid anther, Q8's 7.20 mm size and the INERT corner, each
+  at six stamens AND at 120, at three scales with mm-per-pixel on every cell. **Every row carries
+  its own same-tree renderer control** (Eva, Sep 7) and every frame settles until two consecutive
+  screenshots are byte-identical. Two pixel assertions with vacuity guards: every shape differs
+  from the pill by more than ten times its own control, and the INERT row is **pixel-identical**
+  to the pill on all three views.
+
+  **TWO THINGS FOUND BY RUNNING RATHER THAN BY READING, both worth carrying.** *(1)* Session
+  21's `not the fixed proportion` clause in JS4 pinned the anther to `ANTHER_DIAMETER_FACTOR * t`
+  and made **every non-default size or elongation a HARNESS-INVALID row** — four of them —
+  while every smoke row stayed green, because block 25's first four smoke rows all sat at the
+  two shipping proportions. It is retired into JS7 (which rebuilds both from the slab and the
+  controls, and is strictly stronger) and a fifth smoke row was added for that path. **Found by
+  `node tools/verify-bloom-export.mjs --only "^ANTHER:"`, not by reading the diff.** *(2)*
+  **THE WHOLE-BLOOM VIEW'S SAME-TREE CONTROL IS BIMODAL, and it took two failed sheet runs to
+  establish it.** `PIXEL-IDENTICAL` was tried first for the INERT row and came back 51 px on
+  `whole` / 45 px on `lens` against controls of 50 px / 8 px on the very rows being compared. The
+  claim was weakened to *within the two rows' own measured controls* and failed AGAIN, at 10,491
+  px against a floor of 51. The `whole` control across seven rows of one run reads **0, 51, 50,
+  10,486, 0, 52, 10,635 px** — two of eight in the high mode. That is an INTERMITTENT RENDERER
+  STATE catching some page sessions and not others, and **settling on byte-identical FRAMES does
+  not remove it** (settling removes the DAMPING, which is a different thing — the Sep 7 entry
+  above records 0 px at 13,440 triangles and 13 px at 80,544 after settling; this is ~10,500 px on
+  a 13,440-triangle bloom). **So a pixel figure from a bloom sheet's whole-bloom view is not
+  evidence unless its own control was taken in the same page session and came back low.** The
+  sheet now asserts on `macro` alone (control 0 px on every row of both runs) and reports `whole`
+  and `lens` beside their controls with no claim attached; the INERT row's weight is carried by
+  two EXACT, noise-free claims — its triangle count and its whole ANTHER read-out line, character
+  for character. And the floor is itself a finding about the anther: a shape difference of that
+  order at whole-bloom scale is NOT visible, which is Q8's argument for the size slider arriving
+  as a measurement.
+
+  **THE CLOSE.** `diff-bloom-bytes --compare` on `phase18` across both trees: **528/528
+  byte-identical, 0 moved**; `--verify-frozen --phase18` deep-equal to `cb798f6`'s own
+  `buildMatrix()`. Smoke 44/44 watertight with identical live/export counts and no degenerates;
+  `--conn` 43/43 one piece; the whole of block 25 through the export gate **21/21 watertight**;
+  the panel gate PASS with **1,806 assertions firing under `--negative-control`**, eleven of
+  them route (t)'s. Triangle counts (live = export): default **10,080**, six stamens at the pill
+  **13,440**, a triangle **13,680**, a 24-side star **15,120**, three lobes **15,840**, six lobes
+  at 90° **19,440**, the 120-stamen cost corner **110,880**, the mum with a shaped tip
+  **152,112**. Two rows carry an expected, unrated nonManifold count — **1,800** on COINCIDENT
+  (the duplicate geometry the flag tells) and **60** on six lobes at 90° — with boundary edges 0
+  on both, which is the only pass criterion. **Predeclared untouched: 46 files, 0 moved**,
+  including both STL gates, the connectedness gate and every pre-existing bloom sheet.
+
+  **THE SHEET, on its final run: 49 cells, 148 frames, every assertion passed.** Every shape is
+  850,000-2,560,000 px from the shipping pill on the macro view, at both stamen counts; the
+  macro control was **0 px on every row**, which is why the assertion lives there. **The INERT
+  row measured 0 px against the pill on all three views while its own whole-view control read
+  10,492 px on the same run** — the clearest statement available that the control measures the
+  renderer and not the geometry. **The migration pair HELD at 0 px on all three views against
+  controls of 0 px:** the shipping pill on `cb798f6` and on this tree are the same picture.
+
+- **Session 29's CLOSE (Sep 7) — merged as `96f2d40` (PR #179), `frozen/phase18` published.**
+
+  **THE SHEET RULING (Eva, from `tools/shot-bloom-anther.mjs`): APPROVED WITH ONE CHANGE.** The
+  anther's seven ship as built except `antherSharpness`, which defaults to **1.00** rather than
+  the circle's 2.00. Her grounds, from the measurement she asked for before ruling: at `s = 2`
+  the exponent is the circle's own, so `h = (cos² + sin²)^(−1/2)` computes to EXACTLY 1.0 at
+  every sampled azimuth and the blend is exactly 1 for every roundedness — `max|f − 1| =
+  0.000e+0`, and `ρ 0.50 → 0.00` renders **0 px** with the lattice held constant. **The
+  roundedness slider's only motion was a one-off faceting jump at the top of its travel, which
+  is worse than an inert control because the jump reads as the control working.** 1.00 is the
+  largest deviation that never meets the waist floor at any point count (0.679 mm at ρ 0 against
+  0.50 mm), a named value rather than a tuned one, and at four points it pinches at the
+  diagonals — the tetrasporangiate anther. It cost nothing: **0 of 120,960 floats** moved live
+  and export, and 0 px across four cross-config render pairs.
+
+  **THE PARKED ITEM, ruled into session 30's brief:** the lattice still jumps 10 → 16 whenever
+  roundedness leaves 1 at ANY sharpness. At the new default that jump is swallowed by the form
+  change, so the only state where roundedness does nothing but re-facet is sharpness EXACTLY
+  2.00 — a reachable corner, not the default. The one-line fix (`tipSides()` keying on "the
+  emitted factors are all exactly 1" rather than on roundedness) and its cost at that corner
+  (60% more triangles per tip for a provably identical shape) go beside the stigma's seven,
+  because it changes a ruled law.
+
+  **VERIFIED ON THE MERGED HEAD `2cfd35b`, not on the pre-merge one.** All FIVE bloom gates —
+  `bloom-export-watertight`, `bloom-connectedness`, `bloom-panel`, `bloom-frozen-matrices` and
+  `bloom-grid` (which `main` gained mid-session) — green, each read from its own run's
+  conclusion. `bloom-export-watertight` 90 min, `bloom-connectedness` 78 min on 549 rows. The
+  two flower gates ran on the `tools/**` filter and are NOT bloom evidence. **And the byte proof
+  was re-run on the merged tree specifically: 528/528 byte-identical, 0 moved on
+  `frozen/phase18` against `cb798f6`** — because the merged tree is a THIRD tree, and two
+  separate proofs of two separate trees do not compose. CI does no byte diffs; that one is the
+  session's to run.
+
+  **`frozen/phase18` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `cb798f6`, matching what
+  `FROZEN_BASE_COMMITS` declares. The `bloom-frozen-tags` workflow went red as designed: of the
+  seventeen baselines it declares, sixteen are tagged and **`phase5` is the only refusal**,
+  which is the `GITHUB_TOKEN`-cannot-push-a-differing-workflow-tree limit recorded in that
+  script's own header. Confirmed twice: from the job log, and by differencing
+  `FROZEN_BASE_COMMITS` against `git ls-remote --tags`.
+
+  **THE MANIFEST, PHRASED FOR A MERGE.** The claim is that **THIS SESSION moved none of its 46
+  predeclared files**, and that stays true. `bloom.html` is on the list and the *other* session
+  changed it, so **on the merged tree that file is not the one this session certified.** A bare
+  "46 files, 0 moved" would imply more than it says after a merge — write the first sentence.
+
+  **THE COLLISION** with the parallel session 28 is its own entry above (*Incident, Sep 7*),
+  with the rule it produced: **one registry PR in flight at a time.**
+
+- **Session 30 (tip plan 4, Sep 7): THE STIGMA'S SEVEN SHIP FROM ONE TABLE, THE GENERATOR IS
+  THE POINT, AND THE ANTI-DRIFT WITNESS CAN FIRE.** Full account:
+  `docs/bloom-session-30-outcome.md`. Seven descriptors authored once (`TIP_DESCRIPTORS`),
+  instanced twice (`TIP_INSTANCES`: `anther*` in `Androecium ▸ Anther`, `stigma*` in
+  `Gynoecium ▸ Stigma`), with `Lumps` and `Spread` the ONLY per-instance defaults (1 / 0 on the
+  anther, `STIGMA_LOBES` 3 / `STIGMA_LOBE_SPREAD_DEG` 40 on the stigma). Three owners, one per
+  layer: `tipDescriptor()` in the geometry (called twice by `footRing()`; `TIP_SHAPE` and
+  `TIP_SHARPNESS` retired), the table in the registry, `tipSevenClauses()` in the harness
+  (JS7 on the anther, **JG6** — the new family, 41 in the census — on the stigma's lobe). The
+  witness Eva asked for is the panel gate's one-spec clause on the tip family, partition stated
+  in the gate, whose negative control drifts `stigmaSize.max` in a copy and requires it to fire
+  — it does.
+
+  **THE SHARPNESS DEFAULT WAS RE-DERIVED AND THE BRIEF'S PREMISE FAILED THE CHECK.** A stigma
+  lobe is NOT a different size from the anther: both are `ANTHER_DIAMETER_FACTOR × one sheet`
+  (`partRadius` owns both rods), 0.96 mm of radius on the default sheet in both modes, so the
+  waist floor binds below 0.694 at roundedness 0 on either tip. 1.00 stands for both — one
+  constant, `TIP_SHARPNESS_DEFAULT` — with a reason the session-29 ruling did not print: on any
+  sheet the export floors to 1.00 mm the bound is 0.849, where 0.75 clamps and 1.00 keeps 13%.
+  The sheet (`tools/shot-bloom-stigma.mjs`) shows 0.50 (clamped), 0.75, 1.00, 1.25, 1.50 and
+  the thin-sheet 0.75 at roundedness 0 for the ruling. **A first draft of that derivation applied
+  the export floor to the default 1.20 mm sheet and said 0.75 clamps in export; the sheet's quick
+  run refused it (waist 0.54 mm, clear).** Scope corrected, conclusion unchanged, recorded.
+
+  **0 MOVED ON BOTH TIPS IS A CONSTRUCTION** (the constants' own expressions term for term; the
+  blend exactly 1 at roundedness 1, so the stigma's sharpness going 2.00 → 1.00 reaches
+  nothing) and is measured on `frozen/phase19` — the 549 rows at `eb3543f`, the first baseline
+  carrying the anther's seven as controls — on both trees. Block 26 (22 rows, including THE
+  FAMILY row: the same seven on both tips at once) takes the live matrix to 571, so a phase IS
+  owed. JG4 reads the descriptor rather than constants; its shared-apex clause is a
+  biconditional with `lumpsCoincident`, because three lobes at a spread of 0 share an apex by
+  the law.
+
+  **THE IDS ARE `anther*` / `stigma*`, NOT `antherTip*` / `stigmaTip*`** as the brief wrote:
+  renaming the anther's seven a session after they shipped would retire seven ids and move
+  phase18's 21 anther-row definitions. The SECTIONS carry the Tip word. **Two sections cannot
+  both be labelled "Tip"** — the panel gate refuses a shared on-screen name — so they are
+  "Anther" and "Stigma", each declared in RENDER ORDER after its parent (the gate's census
+  compares document order to the array; declaring both after Gynoecium failed it, and took the
+  accordion route down with it).
+
+  **SHARPNESS 2.00 IS A SINGULARITY, NOT THREE BUGS** (Eva, session 30). It has been handled
+  separately at three sites: the roundedness slider dead through its whole travel at s = 2
+  (session 29, moved the default to 1.00); the lattice jumping 10 → 16 for no form change
+  (parked to session 31); and JG5/JS6's "not all 1 below roundedness 1" firing on a
+  legitimate row (this session's exemption). One finding: at s = 2 the law is the circle for
+  every roundedness, so every instrument that assumes "roundedness below 1 shapes the outline"
+  is wrong at exactly that point. **Session 31's brief carries the design question, costed,
+  for Eva to decide — whether the control should carry a value that maps to s with the
+  singular point at an END of the travel or UNREACHABLE — rather than a fourth patch.**
+  _(Corrected in session 31, by Eva: TWO sites, not three. The lattice arm in `tipSides()` is
+  keyed on roundedness 1, not on s = 2 — the circle's own lattice law, which only looked broken
+  in the singular state. See session 31 below.)_
+
+  **THE BRIEF'S PREMISE WAS WRONG, SAID BY ITS AUTHOR** (Eva, session 30): "I told you not to
+  copy 1.00 because a trifid lobe is a different size, and it is not — it is the anther's
+  proportion exactly, so the floor binds at the same sharpness. The value is right and now it
+  has a derivation attached rather than an inheritance, which is the part worth keeping."
+
+  **THE DIFF PASSED THE STOPPING RULE'S LINE WITH THE ASSERTIONS GREEN**: ~900 changed lines
+  outside phase19's 549 generated rows, a third of it comment prose moved with its code. The
+  rule's trigger (over ~600 before the assertions are green) did not fire; the number is
+  recorded because it is over. The lattice-jump fix stays session 31's.
+
+- **Session 30's CLOSE (Sep 8) — merged as `f8f621d` (PR #185), `frozen/phase19` published.**
+
+  **THE SHEET RULING (Eva, from `tools/shot-bloom-stigma.mjs`): APPROVED AS BUILT.** The stigma
+  keeps the family's 1.00 — her grounds are the session's own measurement: a lobe is exactly the
+  anther's size, so the floor binds at the same sharpness, and making the two instances differ
+  for no measured reason would be the first thing to undo the generator's own point. A
+  per-instance value stays one table entry for the day a picture asks for it. All three
+  deviations stand as recorded; the id naming (`anther*` / `stigma*`, the sections carrying the
+  Tip word) she called a better call than her brief.
+
+  **VERIFIED ON THE HEAD `e559943` BEFORE THE MERGE, each gate from its own run's conclusion:**
+  all FIVE bloom gates green — `bloom-grid`, `bloom-frozen-matrices`, `bloom-panel`,
+  `bloom-connectedness` (85 min on 571 rows), `bloom-export-watertight` (86 min). The two
+  flower gates ran on the `tools/**` filter and are NOT bloom evidence. Mergeable state clean;
+  merged by the session with the head sha read from the remote, squash, as the session's own
+  final step. **The merged tree is byte-identical to `e559943`'s** (`main` had not moved since
+  `eb3543f`), so the byte proof on the branch head IS the proof of the merged tree this time —
+  unlike session 29, where a parallel merge made a third tree.
+
+  **`frozen/phase19` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `eb3543f`, matching
+  `FROZEN_BASE_COMMITS`. Predicted before the dispatch and confirmed twice: the
+  `bloom-frozen-tags` workflow went red as designed, `phase5` the only refusal (the
+  `GITHUB_TOKEN`-cannot-push-a-differing-workflow-tree limit in that script's header), and
+  differencing the nineteen declared baselines against `git ls-remote --tags` reads eighteen
+  published at their declared shas and `phase5` absent. Without this, phase19's base would
+  depend on branch reachability.
+
+  **THE MANIFEST, RE-VERIFIED ON MERGED `main`:** eleven files changed since `eb3543f` — the
+  seven code files, the new sheet tool, the outcome doc, `CLAUDE.md` and this charter — and
+  nothing else; 220 tracked files under the bloom, flower, print, plot, cards, tracker,
+  `tools/` and workflow trees untouched.
+
+- **Session 31 (Sep 8): THE PINCH REPLACES THE SHARPNESS, THE SINGULAR EXPONENT IS OFF THE
+  TRAVEL, AND THE TWO PATCHES COME OUT.** Full account: `docs/bloom-session-31-outcome.md`. One
+  stop, before the build, for the mapping; Eva's ruling, in full: `s = 2 / (1 + k)`, the slider
+  carries k (0.05–7.00, step 0.05, default 1.00), UNREACHABLE rather than at an end (at an end
+  the exemption and its pinned row survive and the class is not solved); the linear alternative
+  rejected because a default at 0.7071 sits on no grid the slider returns to.
+
+  **HER THREE-SITE COUNT WAS WRONG, AND SHE SAID SO.** `tipSides()`'s roundedness-1 arm is keyed
+  on roundedness, not on the exponent; it is the circle's own lattice law that only looked broken
+  in the singular state, and with the singular exponent off the travel every departure from
+  roundedness 1 earns its sides. Deleting it was costed (79 live rows and 59 of phase19 moved,
+  +60% triangles per tip) and refused. **Two sites, then: the default (session 29) and the
+  JS6/JG5 exemption (session 30).** Both patches are DELETED — the exemption in `tipClauses`,
+  the registry's "circle's own exponent" read-out branch, and the pinned block-26 row that
+  existed to hold the exemption — and the gates are green without them. Nothing else in the
+  tip's path special-cases a value.
+
+  **`s > 2` IS GIVEN UP, WITH THE SHAPE NAMED.** It pinched at the OTHER azimuth — at three or
+  four points a half-step ROTATION of the polygon, a visibly different shape, not only a second
+  path to the rounded polygon. A rotation living inside a sharpness dial is two things in one
+  control, the muddle this project has unpicked twice; if wanted later it returns as its own
+  PHASE control, never as the far half of this one.
+
+  **THE RENAME EARNS ITS LINE.** `sharpness` ran backwards from its label (8 was the bulge, 0.25
+  the star); `pinch` reads the way it behaves — the same defect class as a comment naming a check
+  nobody performs. `antherSharpness` / `stigmaSharpness` are in `RETIRED_IDS`; `antherPinch` /
+  `stigmaPinch` come from one row of `TIP_DESCRIPTORS`; `tipExponent()` is the one owner of the
+  exponent; the floor is a CAP, `k ≤ −2 log2 m`, bit-identical to the old closed form on a
+  1,528-point sweep.
+
+  **THE PARTITION IS PREDECLARED AND MEASURED WITH THE SESSION-20 CONSTRUCTION, GENERALISED.**
+  Defaults hold by construction (pinch 1.00 is exponent 1.00, the same double); the movers are
+  the shaped rows whose old exponent has no exact image on the grid. `frozen/phase20` is the 571
+  rows at `8b4c671` (a phase IS owed: block 26 loses the singular row and both blocks gain a
+  NEAREST REACHABLE row, 571 → 572). `diff-bloom-bytes` gains `--phase20`, a list-valued
+  `--override`, a predeclared INERT class (`--expect m/i/h`) for rows that name the control and
+  cannot reach the geometry, a V3 that requires exactly the retired ids the matrix NAMES, and a V5
+  that refuses `--full` on any of the three captures. **`frozen/phase19` joins `frozen/phase17`
+  on the list of tags whose definitions reproduce and whose bytes do not fully** (8 of 549), per
+  the session-24 ruling. Numbers, each from its own run, in the outcome doc's close.
+
+- **Session 31's CLOSE (Sep 8) — merged as `552bbcc` (PR #187), `frozen/phase20` published.**
+
+  **VERIFIED ON THE HEAD `0c990ed` BEFORE THE MERGE, each gate from its own run's conclusion:**
+  all FIVE bloom gates green — `bloom-grid`, `bloom-frozen-matrices` (phase20 deep-equal in CI,
+  the smoke census 41/41), `bloom-panel`, `bloom-connectedness` (64 min on 572 rows),
+  `bloom-export-watertight` (91 min) — with JS6/JG5 running on every row WITHOUT the singular
+  exemption. The two flower gates ran on the `tools/**` filter and are NOT bloom evidence.
+  Mergeable state clean; undrafted and merged by the session with the head sha read from the
+  remote, squash, as the session's own final step.
+
+  **`main` HAD MOVED BY ONE COMMIT** — `7011e88`, the `/plot` stem PR (#184): plot files, its two
+  tools and `CLAUDE.md`, no bloom source. So the merged tree is a third tree, as in session 29,
+  and the manifest was re-verified ON IT: `git diff --name-only 8b4c671..552bbcc` is exactly this
+  session's twelve files plus #184's nine with `CLAUDE.md` shared (twenty), and **no bloom-tree
+  file differs between the certified head `0c990ed` and merged `main`** — the byte proof on the
+  head IS the proof of the merged tree's bloom. CI ran on the head merged into that base, which
+  is what merged.
+
+  **`frozen/phase20` IS PUBLISHED AND VERIFIED FROM THE REMOTE** — `8b4c671`, matching
+  `FROZEN_BASE_COMMITS`. Predicted before the dispatch and confirmed from the log and from
+  `git ls-remote --tags`: the `bloom-frozen-tags` workflow went red as designed (run
+  34189380854, the `GITHUB_TOKEN` refusal its script's header describes), `phase5` the only
+  baseline absent, eighteen published at their declared shas. **One count in the prediction
+  was wrong and is corrected here:** nineteen baselines are declared (phase2 through phase20),
+  not twenty, so eighteen published rather than nineteen. The outcome doc carries the same
+  correction beside its prediction.
+
+  **THE PARTITION, MEASURED** (the outcome doc's close has the tables): phase20 16 movers / 6
+  inert / 549 holders and phase19 8 / 3 / 538, both EXACTLY as predeclared, twin === new on every
+  row of both; the base captured twice 571/571. Every mover moved at an identical triangle count
+  and byte length. `frozen/phase19`'s bytes no longer fully reproduce (8 of 549); its definitions
+  do. Both sheets proved on two rows, then the grid; both before/after pairs HELD.
+
+- **Session 33 (margin buckling, part 1 of two — Sep 8): THE FIELD AND ITS NORMAL SHIP WITH NO
+  CONTROLS.** Full detail in `docs/bloom-session-33-outcome.md`; read it before touching
+  `buckleIsFlat`, `buckleLaw`, `trueNormalRows` in `buildPetalInto`, or
+  `tools/bloom-wall-thickness.mjs`.
+
+  **THE DISCOVERY PREMISE HELD ON THE HALF THAT WAS LOAD-BEARING AND WAS INCOMPLETE ON ONE
+  OTHER.** Margin buckling IS a displacement field of the same family as cup and cross-section
+  roll — it adds a term to `aN`, `widthProfile` is untouched, `h(u)` is unchanged and the plan
+  outline is byte for byte what it was — so it never competes with the tip work for ownership
+  of the outline and the two lines can be sequenced in either order. **What it is NOT like is
+  the NORMAL.** Cup and roll are functions of `v` alone at a row, so the cross-section's own
+  normal (`dP/dv` rotated a quarter turn in the row's plane) is the surface normal to the
+  accuracy a SLOW along-`u` variation allows — and every deformation before this one is slow
+  along `u`. A buckle is fast by definition: measured **29 degrees off at a moderate setting
+  and 71 at the corner**, which offsets the two skins into a WEDGE rather than a sheet. The
+  buckled branch takes `normalise(dP/du × dP/dv)`, ORIENTED ONTO the cross-section normal
+  because `emitPanel` winds its quads off `n` and a sign flip there is a boundary-edge failure,
+  not a shading one. Blade rows only; the foot is a different surface and differencing across
+  the seam is a derivative of nothing.
+
+  **THE GUARD HAD TO JOIN `petalFormIsFlat`, AND THE RIG FOUND THAT BY FAILING.** That
+  predicate decides whether `petalForm()` is CONSTRUCTED AT ALL, and at the shipping default it
+  is true — so a field wired only inside `sectAt` builds nothing, reports an identical triangle
+  count and an identical byte, and is a DEAD SLIDER. Session 16's `cupGradient` move,
+  re-learned by measurement rather than by reading.
+
+  **EVA'S SIX RULINGS, each recorded with its reason in the outcome doc so none becomes
+  precedent by accident.** Two are worth carrying here. **Amplitude is a FRACTION OF THE LOCAL
+  HALF-WIDTH, not mm** — absolute mm is applied unchanged where the blade has tapered to its
+  tip floor, so the tip crumples. And **`NU = 56` fixed rather than derived from the buckle
+  frequency is a RULED EXCEPTION to "derive, don't expose", with its reason attached**:
+  `CURL_START_MIN = 1 / NU` and the registry IMPORTS it as a curl control's bound, so a derived
+  row count would be one control reaching into an unrelated control's declared range.
+  Likewise **Q6's "bound the ranges so the shape cannot invert" DOES NOT APPLY** to this
+  feature and the outcome doc says why: the cap `A·f² ≤ L²/(4π²t)` moves by a factor of 22
+  across the reachable `L × t` box, so no static rectangle is dead-free. Q6's tip bound holds
+  because one number covers the whole space; this one has no such number.
+
+  **0 MOVED, AND IT IS A CONSTRUCTION.** 0 of **207,385,920** floats over the live matrix's 572
+  rows plus `phase20`'s 571, both modes, against a worktree of `b323268` (current `main`),
+  compared with `Object.is`, with a 1e-9 positive control proving the comparison can fail. No
+  row added, no byte moved: **`frozen/phase20` stays the newest baseline and NO phase is owed** — the session
+  18/19 and 23 case. Zero triangles added; the field is pure vertex displacement. Honest
+  footnote in the doc: this run met 0 signed zeros in `positions`, so `Object.is` is present and
+  is not what carries the result.
+
+  **THE FIRST INSTRUMENT HERE EVER TO MEASURE THE EMITTED WALL** —
+  `node tools/bloom-wall-thickness.mjs`, built BEFORE the controls because it is the INPUT to
+  part 2's ranges rather than a completeness exercise (Eva's own distinction, and the reason
+  she took an instrument-first split she has argued against). The roll floor was a CURVATURE
+  argument never checked against the mesh, and `thicknessProfile` reports the thickness a row
+  was BUILT AT — the number handed to the offset, not the distance between the two skins that
+  were offset. V1 calibration / V2 reachability / V3 guard / V4 normal all ABORT the run;
+  five mutants in `--negative-control`, all behaving. It rides in `bloom-export-watertight.yml`
+  ahead of the browser install, so the bloom gate count stays at FIVE.
+
+  **WALL AND SELF ARE TWO NUMBERS, and conflating them reports a fold as a thinning** (the
+  discovery pass did, for an afternoon). **A deficit at one grid is not a thinning: refine and
+  see — recovery is the MESH, divergence is GEOMETRY.** That test is what separated the
+  session's three cases and it is the method to reuse.
+
+  **TWO PRE-EXISTING DEFECTS FOUND IN PASSING, SCHEDULED RATHER THAN LEFT AS FOLKLORE** (the
+  character-walk scanner sat unscheduled for three sessions because it lived only in an outcome
+  doc): **`petalRoll` 330 emits a 0.587 mm wall against a declared 1.200** at the shipped
+  28 × 10 grid, recovering to 1.177 at 168 × 60 — so the roll floor works and the deficit is the
+  mesh, but the FACETED mesh is what a slicer receives and no gate measures it; and **all-form
+  at maximum DIVERGES** under refinement, 0.282 → 0.014 mm, a genuine near-self-contact on a
+  reachable shipped state. Neither is this feature's; each gets its own session.
+
+  **THE COMPOSITION FINDING IS PART 2'S REAL PROBLEM, and it ships as an XFAIL with a
+  number.** The buckle over cup 1.2 + curl 180 diverges under refinement — its own contribution
+  0.438 mm at 28 × 10 to **0.635 mm at 84 × 30** — while `f = 7`, the other suspicious row,
+  RECOVERS (0.903 → 1.114, own contribution 0.086) and is therefore `report`ed with its numbers
+  rather than asserted. So **discovery's closed-form `A·f² ≤ L²/(4π²t)` is NECESSARY AND NOT
+  SUFFICIENT**: the buckle composes with the curvature cup and curl have already spent, and the
+  composition reaches inversion where neither does alone. The xfail **fails hard when it starts
+  passing**, which is the clamp landing.
+
+  **A REFACTOR SILENTLY DISARMS A MUTANT — AND IT DID, IN THIS SESSION.** Naming the block
+  `trueNormalRows` (so the header, the outcome doc and this entry could point at something
+  greppable) moved `cross-section-normal`'s anchor, and the sweep reported *"the mutation did
+  not apply"* rather than a false pass. `/plot` recorded that lesson in session 28; this is the
+  first time it fired here, and the apply-check is what made it survivable.
+
+  **THE NEGATIVE CONTROL FOUND TWO FURTHER DEFECTS IN ITSELF, both general.** **Node's ESM loader caches
+  by resolved URL**, so writing every mutant to one path and importing them in turn serves the
+  FIRST mutant's module to all of them — three mutants reported identical numbers and two
+  "passed" on mutant one's behaviour. Each mutant now gets its own directory. A mutation that
+  did not APPLY is survivable and is checked for; one that silently did not RUN is not. And
+  **two mutants named the wrong assertion**: dropping the buckle clause from `petalFormIsFlat`
+  makes the field a dead slider (V2's witness), it does not move the default's bytes — V3's real
+  witness is a guard that tests whether the keys EXIST rather than whether they are zero, and it
+  was written only after the sweep said so.
+
+  **THE SESSION NUMBER WAS WRONG AND IT COST THE WHOLE CI SIGNAL.** The brief called this
+  session 31; `main` already carried a different session 31 (the pinch, #187) and a session 32
+  was in flight (#190). The outcome doc's FILENAME collided with one already on `main`, the PR
+  came back `mergeable_state: dirty`, and **a conflicted PR has no merge ref — so not one of
+  the five bloom gates ran on it. Zero workflow runs, no red, no signal at all.** A session
+  number is an identifier in four places and one of them is a path: **check `main` for it
+  before writing it down, and read a silent CI as an unmergeable head rather than as
+  patience.** Renumbered to 33; forward references to this feature's second half carry no
+  number, because the next free one cannot be known while another session is in flight.
+
+  **AND THE TREE WAS NOT FREE, THOUGH THE BRIEF SAID IT WAS** — the Sep 2 and Sep 7 incidents
+  arriving a third time. The instruction was *"the tip-shape session is stopped and
+  re-scoping, and it writes nothing while it does … do not open a second writer beside it."*
+  Measured against the remote: #190 pushed at 16:11, 16:23 and **17:27** UTC with a gate run
+  in progress at 17:27:53Z, **four minutes before this PR was created at 17:31:14Z.** So this
+  branch is the second writer the brief forbade, opened on a premise that was already false —
+  which is the premises-are-hypotheses rule pointed at a claim about the WORKING STATE rather
+  than about the code. The diffs do not overlap textually and `bloom-geometry.js` auto-merged
+  clean, but "they did not conflict today" is not the property the one-PR-at-a-time rule
+  protects. Left to Eva as the session's ball-holder question rather than resolved by the
+  session.
+
+  **PART 2** is the four controls, the clamp, `NU = 56` and the sheet, argued in front of
+  this instrument, and it STOPS for Eva's ruling. **Her amendment, from the reference
+  photographs**: the falloff exponent `p` is promoted from a constant to the fourth exposed
+  control (floor **2** — `p = 1` is C⁰ at the midrib and creases the blade, so it is out of
+  range rather than discouraged — ceiling 6, default 3), reading as *how far the ruffle reaches
+  in from the edge*, because **an iris ruffles at high amplitude AND wide while a rose undulates
+  at low amplitude AND narrow, and one fixed exponent cannot draw both**. Two things that
+  session must MEASURE AND REPORT rather than decide: whether the clamp's cap has to be a
+  function of `p` (this instrument already reads 0.048 mm at p=2 and p=3 against **0.108 mm at
+  p=6** on identical amplitude and frequency, so an independent cap is already doubtful), and
+  the dead-control sweep over `p`'s whole range. The sheet must vary `p` as its own axis and
+  carry an IRIS row and a ROSE row against the references that motivated the control.
+
+- **Session 34 (margin buckling, part 2 of two — Sep 8): THE THREE CONTROLS, THE CLAMP, AND
+  NU 56.** `docs/bloom-session-34-outcome.md` has the numbers; this is what carries forward.
+
+  **THE BYTE STORY IS A THREE-CAPTURE ATTRIBUTION, and it had to be.** Two changes landed
+  together — three controls and NU 28 -> 56 — and one "everything moved" number cannot say
+  which did it. Main / this head with NU reverted / this head as it ships: **the controls
+  alone moved 0 of 101,969,280 floats; the row count alone moved 1124 of 1124 row-modes.**
+  Predeclared before measuring, both held. **A LENGTH CHANGE AND A VALUE CHANGE MUST NOT
+  SHARE ONE WORD** — the first draft printed "0 floats differ" for the row-count move,
+  which was true and meaningless, because the arrays cannot line up. `frozen/phase22` (562
+  rows at `2a97e96`) is owed and shipped, verified deep-equal to that commit's own
+  `buildMatrix()`.
+
+  **NU IS FIXED AT 56, NOT DERIVED, AND THE REASON IS A REGISTRY IMPORT.**
+  `CURL_START_MIN = 1/NU` is a bound the registry imports for a CURL slider, so a row count
+  derived from the buckle's frequency would be one control silently moving another's
+  declared range. The frequency ceiling is `NU / 8` exactly instead. Cost: default 19,040
+  triangles, worst reachable 565,632 = 37.7% of budget, as part 1 costed it.
+
+  **THE CLAMP IS NECESSARY AND NOT SUFFICIENT, AND THE REASON IS NOT CURVATURE — which is
+  the session's real finding and it overturned its own expectation.** Part 1 recorded the
+  composition as a curvature problem the clamp could not see. Measured with a
+  principal-curvature instrument validated against closed-form cup and roll BEFORE use (and
+  biased to read curvature HIGH past ~50 degrees of stencil arc — the conservative
+  direction, which is what lets its conclusions stand): **the composed surface is LESS
+  curved than its base** (1.0625 against 1.1149) while its wall collapses from 0.912 to
+  0.310, and `SELF ~ WALL`. **The hazard is SELF-APPROACH — a GLOBAL property of a folded
+  sheet that no local curvature bound can express** — and neither cup nor curl alone
+  produces it. So a sufficient condition cannot be a closed form in the field's own
+  parameters; it is a MEASURED minimum separation. Three options costed, none taken without
+  a ruling.
+
+  **THE CAP IS p-DEPENDENT BUT CONSERVATIVE RATHER THAN UNSAFE.** `|v|^p` is exactly 1 at
+  the margin, so p is invisible to the along-margin bound by construction: the clamp radius
+  reads 1.437 mm at every p while the true one moves 3.449 -> 1.456. Yet EVERY clamped
+  build clears the floor at every p, the tightest corner reading 1.227 against 1.200. At
+  p = 2 the geometry would carry 2.4x the amplitude the cap allows, so making the cap
+  p-dependent is a CAPABILITY change and not a safety fix — reported, not decided.
+
+  **PART 1'S PREMISE IS SUPERSEDED AND SO IS THE RULING THAT RESTED ON IT** (Eva, session
+  34). Part 1 recorded the composition as a CURVATURE problem the clamp could not see. The
+  measurement says otherwise: **the composed surface is LESS curved than its base — 1.0625
+  against 1.1149 — while its wall collapses 0.912 to 0.310**, with SELF ~ WALL. **A
+  SUFFICIENT CONDITION CANNOT BE A CLOSED FORM IN (A, f, p, L, t)**: self-approach is a
+  distance between two parts of a folded sheet, and no function of a field's parameters can
+  express where that sheet ends up relative to itself. Do not re-derive the closed form and
+  try to extend it.
+
+  **SO `SELF` IS GATED, WITH THE KNOWN FAILURES DECLARED** (Eva's ruling one). V5 in the wall
+  instrument, barred at `MIN_FEATURE_MM` — the minimum printable GAP, the project's own
+  constant applied to a gap rather than a wall. Iterative clamping was REJECTED (it silently
+  overrides the amplitude a visitor set and its correctness cannot be established), and a
+  reported-but-unenforced measurement was rejected because **an unenforced number becomes
+  folklore within two sessions.** The xfail list is measured on `main` AT 2a97e96, NOT on the
+  branch, so it is provably pre-existing, and it names its three states INDIVIDUALLY — never
+  a range, never a wildcard — so a new self-approach reddens at once while these do not, and
+  one that starts passing TRIPS the gate. No state that passes on main fails on the branch,
+  which is what makes the list honest rather than convenient.
+
+  **AND THE CLAMP'S OWN MUTANT PROVED THE POINT.** `no-amplitude-clamp` was written naming
+  V5, on the assumption that an unclamped wave folds the sheet onto itself. Measured, it
+  reddens the WALL and leaves self-approach clear on every state — independent evidence that
+  the clamp bounds offset inversion and does NOT bound self-approach. It names V4 now and V5
+  got its own mutant.
+
+  **THE CAP STAYS A CONSTANT** (Eva's ruling two): safe at every p, and the 2.4x conservatism
+  at p = 2 is a CAPABILITY limit rather than a defect. The rest is being ruled BY EYE from
+  the sheet's iris row against the reference photograph — shallow beside it and the cap
+  becomes p-dependent in its own session; deep enough and the constant stands. Neither
+  outcome pre-built; the 2.4x figure and the `A*p*(p-1)/h` law are recorded so that session
+  starts from the measurement.
+
+  **AND NU BEING 56 IS A DECISION WITH THE CAP, NOT BESIDE IT.** Eva's ruling said "fixed at
+  56" believing that was the current value; it was 28, so the ruling changed it. It is right
+  anyway: **a frequency cap of 7 at 28 rows is four samples per cycle, which resolves as
+  noise rather than a ruffle**, so the cap and the row count are ONE decision — asserted at
+  module load rather than left a coincidence. It roughly doubles full-matrix gate runtime
+  (the long STL gates ran 78 and 92 minutes at 28) and takes the default model to 930 KiB.
+
+  **A SHEET'S SETTLE CRITERION CAN FIRE SPURIOUSLY, AND "TWO IDENTICAL FRAMES" DOES.**
+  Measured here: on a page just loaded and configured, the settle declared itself done
+  after 27 iterations and its frame sat **27,982 px** from where the same cell rests, while
+  every capture after that is 1 px. A WARM-UP settle before the first capture, plus THREE
+  consecutive identical frames, took the same-tree controls from 28,893 and 64,621 px to
+  **0**. This is /plot's own recorded lesson — a hash equality across two captures is not
+  proof the view stopped — arriving in the bloom's sheets, and every sheet tool here still
+  settles on two.
+
+  **AND THE IDENTITY CLAIM BELONGS ON THE GEOMETRY, NOT THE PIXELS.** An exact-zero PIXEL
+  identity is not available on this renderer — two draws of one cell at one camera settle
+  1 px apart — so a sheet asserting `0 px` would be asserting its own noise. The GATED
+  state's identity is `Object.is` over the emitted positions (0 of 171,360) and the pixel
+  figure is reported beside the row's control. The distinction the contact-sheet section
+  already draws (an identity needs no floor, a threshold does) has a second half: **an
+  identity is only exact in the quantity that can be exact, and pixels are not it.**
+
+  **A CHECK CAN GO VACUOUS WHEN THE THING IT GUARDS SHIPS, AND ONLY THE NEGATIVE CONTROL
+  NOTICES.** V3 asked whether the buckle's keys "present at zero" matched "absent" — a real
+  distinction while the keys were undeclared, and a state compared with itself the moment
+  they became registry rows. Re-pointing it at the gated claim was still not enough: a guard
+  that engages at amplitude 0 moves the default AND the gated state equally, so a same-tree
+  comparison is blind to it (/print's `global/is-unchanged-by-the-new-mode` lesson). **The
+  fix is to assert the PREDICATE as a biconditional, not only its geometric consequence.**
+
+  **AND TWO MORE LABELS NAMING COMPUTATIONS NOBODY PERFORMED, both found here.** The grid
+  gate carried `NU_EXPECTED = 28` under the comment "read back from the emitted rows below,
+  never assumed" — it was a literal, and it went red on 76 of 528 checks the moment NU
+  moved; fixed by importing `BLADE_ROWS`, not by editing the number, because editing it
+  would have left the false comment. And three comments in this session's own new code
+  claimed a module-load check on the registry's imported ranges that did not exist until it
+  was written and its four clauses fired on mutated registries.
+
+  **THE FALLOFF EXPONENT SHIPS BECAUSE ONE CONSTANT CANNOT DRAW BOTH REFERENCES** (Eva's
+  amendment, from the photographs): an iris ruffles at high amplitude AND wide, a rose at
+  low amplitude AND narrow. p = 1 is out of range rather than discouraged — |v| is not
+  differentiable at 0, so it creases the midrib to C0. Amplitude's dead travel runs 0% at
+  f 1-2 to **88% at f 7**, told and marked, range not narrowed (`stamenSpread`'s ruling).
+
+- **The tilt range (Sep 19): `petalTilt` OPENS TO `0..120`, THE `−30` FLOOR IS WITHDRAWN, AND
+  THE RANGE IS THE ROLE-OVERRIDE ENVELOPE.** Eva's ruling of Sep 17 was `−30..120`; #259
+  measured it, did not ship it, and put two stop conditions back to her; she re-issued it as
+  `0..120`. Full account: `docs/bloom-tilt-range-shipped.md`, with `docs/bloom-tilt-range-outcome.md`
+  as the measurement record that stopped the first form and `docs/bloom-bell-corolla-discovery.md`
+  §4 and §9 item 2 as the derivation and the ruling. Two literals and their restatement; the
+  seam law is untouched.
+
+    - **120 IS DERIVED AND MUST NOT BE ROUNDED.** Past a right angle the foot-to-blade
+      clearance is a WINDOW rather than a wall — `a(1+|cos θ|)/sin θ ≤ s₁ ≤ a·sin θ/|cos θ|` —
+      non-empty iff `2cos²θ + |cos θ| − 1 ≤ 0`, i.e. **|cos θ| ≤ ½, θ ≤ 120° exactly**, a single
+      point at 120. PR #210's measured 115–123° crossover is that window closing, and a 22-row
+      scratch probe confirmed the closed form row by row against a prediction written first.
+      **The seam-law extension to the window's lower bound stays REJECTED** (it clears the folds
+      inside the window and makes the closed regime worse: 120° goes 336 → 576 pairs, 122° goes
+      336 → 592) — the derivation bounds the RANGE, it does not change the LAW.
+
+    - **THE FLOOR STAYS AT 0, AND THAT IS A MEASUREMENT RATHER THAN CAUTION.** Swept at one
+      degree over 22 states, the within-shell census leaves zero at **−8°** on six whorls at the
+      thickest sheet and −16° on six whorls at the SHIPPING sheet, with seven more onsets
+      between; every worst site is at exactly `z = −t/2`, the foot slab's UNDERSIDE, and the
+      same `|θ|` read UP is **0 pairs on 13 of 13**. It is the DESCENDING seam case the sepal
+      session handed to the seam owner, and the clearance law — symmetric in the tilt by
+      `Math.abs` — was never derived for it. A shallower floor buys nothing: the shallowest
+      onset is −8, so a clean floor is −7, a seventh of the ruled travel. **Do not re-open it
+      from the discovery doc's own "tilt −30 … 0 pairs" cell**: that cell reproduces and is true
+      of the DEFAULTS petal alone, which is the rationale-is-a-premise rule firing on a table row.
+
+    - **THE RANGE AND THE ENVELOPE ARE ONE NUMBER IN TWO FILES, AND HOLDING THEM APART IS WRONG
+      RATHER THAN MERELY REFUSED.** A +5° delta on a base of 120 would compose to 125 and clamp
+      back to 75 — a petal 45° BELOW its own whorl, which is a discontinuity in a shipped slider
+      and not the saturation this project ships elsewhere. The delta CONTROLS stayed at −75..75:
+      the harness's dead-zone check refuses a delta WIDER than the clamp's usable reach and says
+      nothing about a narrower one.
+
+    - **THE PARTITION IS 28 MOVED / 822 HELD / 2 REDEFINED / 8 ADDED, AND THE 28 ARE A SUBSET
+      #259 PREDICTED.** The mover set is predeclared from the BASE tree's own `overrideClamped`
+      record by DIRECTION — `asked > got` is the ceiling and moves, `asked < got` is the floor
+      and does not, because the floor did not move. #259 measured 43 rows with the clamp biting;
+      28 are ceiling, 15 are floor, 0 are both, and the 15 are named. **The eleven clean-to-folded
+      rows reproduce #259's magnitudes to the pair and to four decimals of the span**, through a
+      different instrument (#259 mutated `OVERRIDE_BOUNDS` in process; this session changed the
+      shipped literals and compared two trees). Triangle counts unchanged on all 28.
+
+    - **`ALL MAX` GETS 48% WORSE AND IS REPORTED RATHER THAN TUNED AROUND**: 129,803 → 192,270
+      pairs at an UNMOVED 3.1556 mm worst span, its deepest ring 165° → 210°. More contacts,
+      none deeper. Triangle count unmoved at 2,506,652, so its declared export refusal stands.
+      Trimming the row would make it stop meaning its own label — the session-13 ruling.
+
+    - **BLOCK 36 IS THE REGIME THE BASE CONTROL NOW REACHES, AND TWO OF ITS EIGHT ROWS READ
+      EXACTLY ZERO.** `TILT: 76` is the first newly reachable value and is still under the right
+      angle; `TILT: 90` is where `seamClearanceMm` stops following `sin` and holds at `t/2`. Both
+      are held to zero by X2, so the block is not a set of rows that all happen to be declared.
+      **`TILT: 105` reads 336 / 0.4016 — the discovery doc's own T1 cell, measured there on a
+      scratch tree with a LIFTED clamp and here through the shipped slider.**
+
+    - **`verify-bloom-grid.mjs`'s CLAUSE 4b GAINED THE NEW CEILING, one literal.** It pins *the
+      frame step across the seam IS `petalTilt`* at written-down tilts, and all three were under
+      a right angle — so the case where the two normals' dot product goes NEGATIVE had never been
+      exercised. Measured exactly 120.000000 (as 90 and 105 also are) before the literal was
+      added. The values are written down rather than read off the control's `max`, which is why
+      the range change did not move the clause on its own: extending it is a deliberate act, and
+      a probe list that tracked the control would have widened itself and proved nothing new.
+
+    - **`frozen/phase35` IS THE 852 ROWS AT `0db9969` AND A PHASE IS OWED** — the ROW SET
+      changed (`petalTilt max (75)` → `(120)`, `ALL MAX` over a different state, block 36's eight
+      appended), which is the session-13 and session-31 case rather than session-23's. All 33
+      older frozen matrices deep-compare IDENTICAL between the trees; they pin the literal 75,
+      which is what a verbatim snapshot is for.
+
+    - **THE FROZEN SWEEP: 722 OF 17,081 ROWS OVER 28 OF THE 34 BASELINES, against #259's
+      predicted 1,072 over 27 for the withdrawn `-30..120`** — and it agrees with the live
+      partition to within a row. `722 - 28` (phase35, which did not exist when #259 measured)
+      `= 694`, and `694 / 1,072 = 0.647` against the live matrix's own `28 / 43 = 0.651`.
+      phase2..phase7 read EXACTLY 0, because those matrices predate the role-override block and
+      carry no row whose composed tilt reaches the ceiling; the count then climbs 2 / 2 / 20 /
+      27 / 27 as the SLOT, per-petal and ORCHID rows arrive and **saturates at 28 from phase13
+      onward, never moving again** — the live matrix's own mover count reached by an instrument
+      sharing no code with the partition, which is the useful half of the reading. Two phases
+      whose row count FELL (phase16's 481, phase22's 562) still read 28: the retirements that
+      shrank them took no tilt row with them.
+
+    - **A MOVER PREDICATE THAT READS WHAT ITS OWN CHANGE WRITES CANNOT BE EVALUATED ON THE
+      CHANGED TREE, AND THE FAILURE IS SILENT.** `verify-bloom-seam-bytes.mjs --frozen-sweep`
+      read THIS tree's builder record — correct for `seam`, `widest` and `arc`, none of which
+      writes `spine`; FALSE for `tilt`, whose predicate reads `overrideClamped`. On the head a
+      composed tilt of 100 is not clamped at all, so `asked > got` is false and **every mover
+      would have reported as a holder: a sweep answering 0 on a change that moves a thousand
+      rows, with nothing failing.** It builds on the BASE tree for a DECLARED set of changes now
+      and REFUSES without one. That is the fourth durable rule applied to a sweep rather than to
+      an assertion, and it was found by naming the owner of each side before running it — which
+      is the only thing that finds this class.
+
+    - **AND THE TOOL GAINED A THIRD AND FOURTH ROW CLASS, because a range change redefines
+      rows rather than only moving bytes.** `ROW_DEF_MOVED_BY_CHANGE` declares the rows whose
+      DEFINITION differs between the trees (label and/or set), which are compared not at all and
+      reported as REDEFINED; `--added <n>` declares rows the head APPENDED. Both REFUSE an
+      undeclared instance and a declared one that did not happen. A redefinition the tool
+      discovers is a redefinition nobody reviewed, and comparing two different states under one
+      label would report a byte move that is a matrix edit.
+
+- **The combination gate, all fifteen bought pairs (#265, Sep 19): TIER 2 AND TIER 3 BOUGHT
+  IN FULL — the gate goes 5 pairs to 20 — `verdict` BECOMES THREE-VALUED, AND TWO CLAUSES
+  THE EXPANSION FORCED.** Eva's
+  ruling on #263's §10, verbatim in its reasoning: at 25.9 s and 19.1 s against a
+  ~250-minute export gate, **runtime is not the cost — the recurring cost is DECLARED
+  MAGNITUDES, which is proportional to findings, which is what the gate is for.** Full
+  account: `docs/bloom-combination-gate.md`. ZERO GEOMETRY: the five bloom source files are
+  predeclared untouched and sha256-identical to a worktree of the base commit, so no frozen
+  phase is owed and no tag's bytes stop reproducing.
+
+    - **THE GRIDS WERE REBUILT AND THEY REPRODUCE #263's TABLES CELL FOR CELL, WHICH IS THE
+      ONLY THING THAT SAYS THEY ARE THE GRIDS EVA RULED ON.** #263 costed its tier-2 and
+      tier-3 candidates by running them through the gate's own `run()` and committed none of
+      them, so the axis ladders had to be reconstructed. Every `worst` figure and every
+      failing-cell count in both tier tables comes back identical — 0.914 / 2 cells,
+      1.194 / clears, 0.659, 0.818 / 3, 0.828 / 5, 0.477 / 4, 0.010, 0.012 / 7, 0.754 / 8,
+      0.000, 1.200, 0.932 / 2, 0.924 / 4, 1.012, 1.226 — against a table written by a
+      different session on a different box. **The reconstruction rule is now in the source:
+      a control's ladder is SHARED between every pair it appears in** (`petalCup` is
+      `[0, 0.6, 0.9, 1.2]` and `petalSpineCurl` `[0, 180, 270, 360]` everywhere), so a cell
+      turning up in two grids is one state read twice and its two records cannot disagree; a
+      rotation in degrees is laddered by its own landmarks rather than by even fractions,
+      which is why `petalRoll` is `[0, 180, 270, 330]` and 330 is both that slider's maximum
+      and `SELF_XFAIL['roll-max']`'s own state.
+
+    - **`productOnly` HAD NO TRUE VALUE FOR A PAIR THAT CLEARS, AND FOUR OF THE TWENTY DO** —
+      all four among the fifteen bought; #263's own five all reach the bar.
+      #263 shipped a boolean: TRUE requires a failing interior cell, FALSE requires a failing
+      single. A pair with no failing cell anywhere fails BOTH arms. `verdict` is
+      `product-only` / `single-reaches` / `clears` now — three values that PARTITION the
+      possibilities, so no declaration is unfalsifiable — and `clears` is what makes keeping a
+      clearing pair worth its builds: it is a claim that fails loudly the day a pair nobody
+      was watching stops clearing. **This was invisible to #263 for a structural reason worth
+      carrying: its tier tables came from `run()`, which MEASURES, and never from `verify()`,
+      which runs the clauses — so CG1 and CG4 had never been evaluated on a single tier-2 or
+      tier-3 candidate.** A costing pass that exercises the measurement and not the assertions
+      is a costing pass, not a dry run.
+
+    - **`leafToothDepth` IS BIT-IDENTICALLY INERT FOR THE LEAF-STEM MEASURE, AND IT IS THE ONE
+      PART OF THE RULING THAT COULD NOT BE EXECUTED AS WRITTEN.** Measured at full precision:
+      the serration moves the approach by **exactly 0.000e+0 at all four leaf angles** — not
+      under the band, bit-identical — because the teeth are cut into the leaf's MARGIN and the
+      nearest blade point to the stem is at its BASE. The control is wired and reaching the
+      leaf (its emitted vertex stream differs at every tooth depth, checksum −249516.867
+      against −245875.089), it just does not reach this measure. **CG1 refuses that pair,
+      correctly**, and `docs/bloom-combination-gate.md` §5's own rejection rule — "`leafAngle`
+      × a second leaf or stem control beyond `stemDiameter`" — already covered it at a weaker
+      figure. It ships anyway, because Eva ruled tier 3 in full, with the inertness declared in
+      `COMBINATION_INERT` and held by **CG7 in BOTH directions**: the day that control starts
+      reaching the measure the gate says the pair has become a real product pair and hands the
+      axis back to CG1. **The honest form of an exemption is a number that fails both ways, not
+      a quiet carve-out** — and the must-fail's leg 3 removes the declaration and requires CG1
+      to take it straight back, which is what says the carve-out is load-bearing rather than a
+      hole. Six of that pair's twelve cells are declared duplicates of states
+      `leafangle-x-stem` already gates; whether that is worth twelve builds a run is Eva's, and
+      the alternative is one line moving it to §5.
+
+    - **CG6 IS PROVENANCE, AND THE HALF WITH TEETH IS THAT A CITATION MUST NAME A FILE THAT
+      EXISTS.** Fifteen pairs across three evidence classes need the class to be checkable, or
+      `tier` is a comment: tier 1 is a cited defect, tier 2 a shared mechanism argued from
+      `bloom-geometry.js`, tier 3 a GUESS that must declare `guess: true` so it cannot be read
+      back as evidence. **It resolves against the gate's own tree and never against `root`** —
+      `bloom-xfail-magnitudes.mjs --root <worktree>` measures another tree's GEOMETRY against
+      THIS tree's list, and a citation is part of the list, so checking it against `root` would
+      fire on an older worktree for the entirely uninteresting reason that the doc had not been
+      written yet.
+
+    - **FOUR MEASUREMENTS THE EXPANSION MADE THAT NOTHING HAD.** (i) **The measure depends on
+      the SUM of the cup and its gradient**: read `cup-x-gradient`'s eight declared cells as
+      `cup + gradient` and every anti-diagonal is one number to the third decimal (1.5 → 0.938
+      twice, 1.8 → 0.862 three times, 2.1 → 0.801 twice, 2.4 → 0.754) — `cAt(u, r)` composing
+      the two into one coefficient, showing up as a measured symmetry rather than as a reading
+      of the source. (ii) **The gradient reproduces §18a almost exactly**: five cells within
+      0.004 mm of the plain cup's at the same numbers, and the SAME five fail. (iii) **Two
+      pairs are NOT MONOTONE in their second control** — `buckle-x-tipshape` reads 0.914 at
+      amplitude 0.2 and **0.925 at 0.4**, the amplitude CLAMP binding so the deeper ruffle is a
+      different wave rather than a bigger one; `curl-x-twist` reads 0.012 at 120° and 0.025 at
+      180°. A pair count cannot express either; a distance can. (iv) **`petalSpineCurl ×
+      petalTwist` reaches the same twelve microns TIER 1's worst cell does, with BOTH singles
+      clear** (twist 180 reads 1.163, curl 360 reads 1.245), on a pair no doc cites.
+
+    - **SATURATION IS NOT INERTNESS AND THE TWO LOOK IDENTICAL IN A TABLE.** `cup-x-thinning`
+      reads the same number at `tipThinning` 0.4 and 0.8 at every cup, because in EXPORT mode
+      0.4 has already taken the tip to the 1.00 mm print floor. But the axis moves the measure
+      by 0.191 mm from its own default column, so it reaches it and CG1 is satisfied.
+      `COMBINATION_INERT` is for a control that never reaches the measure at all; a saturating
+      control is an ordinary one whose top end is covered by the cell below it — the same
+      argument that stops `buckleAmp` at 0.4.
+
+    - **`roll-max`'s 0.659 mm IS NOW DECLARED THREE TIMES IN THE GATE AND ONCE IN THE WALL
+      INSTRUMENT, AND ALL FOUR AGREE.** `petalRoll` 330 with nothing else engaged is
+      `SELF_XFAIL['roll-max']`, and it is a single-axis cell of both `roll-x-rolltaper` and
+      `cup-x-roll`. Four records of one state by two instruments, to the third decimal. Not a
+      duplication to clean up — it is the strongest cross-check either list has.
+
+    - **THE MUST-FAIL IS NINETEEN LEGS AND EVERY ONE OF THE EIGHT CLAUSES.** Legs 8-11 cover
+      all four arms of CG4's switch, which is what a three-valued biconditional costs and is
+      why nine legs became nineteen; the vacuity refusal grew to "no pair on each of the three
+      verdict arms" and "no declared inert axis". **The two GRID-CHANGING legs are scoped with
+      `--only` to the pair they plant into** — they cannot reuse the baseline and rebuilding
+      all 262 cells for each would cost minutes to re-measure states already measured — which
+      is why the control costs about one baseline rather than #263's projected three.
+
+    - **A COUNT RESTATED IN FOUR DOCUMENTS AND OWNED BY NO CODE HAD DRIFTED, AND NOTHING IN
+      THE SUITE COULD HAVE SAID SO.** #265 wrote "78 declared cells across ELEVEN pairs" into
+      `CLAUDE.md`, this entry's own doc, the state-of-play and the PR body; the shipped list
+      declares across **sixteen**. No clause was wrong — CG2, CG3 and CG5 each hold every
+      individual declaration in both directions, and none of them has an opinion about how
+      many pairs carry one. What found it was **counting the shipped list**, and the remedy
+      is this project's own rule from `/plot`: *a number nobody prints is a number nobody
+      watches.* The gate prints `N cell(s) under the bar, M of them declared, across K
+      pair(s)` on every run, **counted from the cells THAT RUN measured** rather than from
+      `Object.keys(xfail).length` — so a `--only` subset reports its own subset and cannot
+      quietly claim the whole list. Two further restatements went the same way and were
+      caught by the same method: "262 cells over all FIFTEEN pairs" (it is twenty — the
+      sentence contradicted itself) and a per-pair breakdown written in the wrong row order.
+      **Before quoting a count that lives in prose, count the thing.**
+
+    - **THE RUNTIME RATIO WAS RE-DERIVED, NOT CARRIED, AND THE CONTROL'S COST CHANGED
+      STRUCTURE RATHER THAN MAGNITUDE.** #263's 1.3x is runner / *that* box and #265 ran on a
+      different machine (its tier-1 code: 13.1-14.3 s there, **20.14 s** here), so the
+      projection was built from ratios whose two halves come from ONE machine and then applied
+      to the runner's own measured tier-1 figures. Idle box, two passes each: gate **87.97 s**,
+      `--control` **95.34 s**, tier-1 alone **20.14 s**. The gate is **4.37x** its tier-1
+      subset against 4.09x the cells; the control is **1.08 baselines** where #263's was
+      **2.9** — which is the independent corroboration that the two grid-changing legs are
+      `--only`-scoped. Projected: ~164 s of step time, about 1.1% of a ~250-minute run.
+      **`--control` does not honour `--only`**, so a "tier-1 control" is not measurable through
+      the shipped CLI and is not well defined — the nineteen legs plant across all three tiers.
+
+    - **THE BYTE PARTITION: PASS, 0 FLOATS MOVED** over 836,485,992 export floats /
+      92,942,888 triangles and 77,135,222 captured-grid values, the whole 860-row matrix in
+      both modes, positionally under `Object.is`, against a worktree of `c29a8b5`. The five
+      bloom source files were predeclared untouched before a line was written and are
+      sha256-identical to that worktree, so the stream is identical BY CONSTRUCTION and the
+      measurement sits beside the construction rather than instead of it. **No frozen phase is
+      owed** — no row added or removed, `frozen/phase35` stays the newest baseline, no tag's
+      bytes stop reproducing. **Both clauses are shown able to fail**: `--control --rows 6`
+      exits 1 with TWO findings, one per clause, which is what stops the captured-grid clause
+      being a log line.
+
+    - **`--combination` ADDS A SECTION RATHER THAN SCOPING THE RUN.** `bloom-xfail-magnitudes`
+      still sweeps all 261 self-intersection rows first, so the re-measurement invocation is
+      `--combination --only '^$'`. #263's doc called it re-measurable "in seconds"; that was the
+      SECTION's cost and not the invocation's, and the tool's own header says so now.

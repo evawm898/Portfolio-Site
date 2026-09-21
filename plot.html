@@ -1,0 +1,482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Grid Plot — Eva Maskalenko</title>
+<meta name="description" content="Curve viewer for the parametric bloom's grid export: the petal's own construction curves drawn white on black.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<!-- Three.js via ES-module import map, pinned to the SAME version bloom.html
+     and print.html already pin (0.161.0), so all three pages share one cached
+     copy and a headless CDN intercept has one URL to fulfil. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+
+<link rel="stylesheet" href="plot.css">
+</head>
+<body>
+
+<canvas id="plot-canvas"></canvas>
+<div id="plot-dropzone-hint" hidden>drop a grid .glb to add it</div>
+
+<div id="plot-left">
+
+<!-- ADD A GRID. Loading a grid ADDS a bloom to the composition rather than
+     replacing the one on screen, so this is how a composition of several blooms
+     is built up; the BLOOM panel is where one is selected, placed and removed.
+     Its own panel rather than a row above a wall of diagnostics. -->
+<details id="plot-bundle-load" class="panel" open>
+  <summary>ADD GRID</summary>
+  <label for="gridFile">add grid
+    <input type="file" id="gridFile" accept=".glb,model/gltf-binary">
+  </label>
+  <span class="hint">or drop a grid .glb anywhere on the page — it is ADDED, beside what is already there</span>
+</details>
+
+<!-- COMPOSITION. Save the whole page as a project file and load one back.
+     The grid .glb is NOT in it — it is ~1.9 MB and it is already on disk — so
+     what is stored is enough identity to notice a mismatch and say what
+     differs, field by field. plot-file.js owns the format; read its header
+     before changing anything about what is written. It sits here rather than
+     in the right-hand column because this column is the one that reads and
+     writes files. -->
+<details id="plot-composition" class="panel" open>
+  <summary>COMPOSITION</summary>
+  <div class="plot-file-row">
+    <button type="button" id="saveComposition">save composition</button>
+    <label class="plot-file-load" for="compositionFile">load composition
+      <input type="file" id="compositionFile" accept=".json,application/json">
+    </label>
+  </div>
+  <span class="hint">or drop a .json composition anywhere on the page</span>
+  <pre id="plot-compstate"></pre>
+</details>
+
+<!-- GRID. What the file turned out to be. `mode` comes from the export's own
+     asset.extras and is surfaced because every other number in this project is
+     labelled live/export and this one should be too. -->
+<details id="plot-grid" class="panel" open>
+  <summary>GRID</summary>
+  <pre id="plot-log">loading…</pre>
+</details>
+
+</div>
+
+<div id="plot-side">
+
+<!-- FRAME. Where the picture ends: a crop region in the VIEWPORT's own pixel
+     space, because an aspect ratio is a property of an output image and a
+     boundary defined in grid millimetres would change shape every time the
+     camera turned. plot-frame.js is its one geometry owner — the overlay's
+     vertices, the camera fit, the numbers below and the saved file all read it.
+
+     TWO SHAPES AND A SEPARATE RATIO, so a square is a rectangle at 1:1 and a
+     circle is an ellipse at 1:1 — reachable exactly, rather than as two more
+     named types that could disagree with the ratio control about what they mean.
+
+     THE BOUNDARY IS A DRAWN LINE AND THE EXTERIOR IS NOT VEILED. On a black
+     ground under additive white ink, a dimmed exterior dims only the INK (the
+     ground is already black either way) and a letterbox is indistinguishable
+     from the ground entirely — so wherever the drawing does not reach the edge,
+     which is most of it, neither treatment states where the frame is at all.
+     A line does, everywhere, and it is drawn in the panel's teal so it reads as
+     chrome rather than as ink. Ink outside it is still drawn: this is an
+     indication of the crop, not the crop.
+
+     Note `#plot-framestate` in the DRAW panel below is an unrelated sense of the
+     word — it is the frame TIME. -->
+<details id="plot-frame" class="panel" open>
+  <summary>FRAME</summary>
+
+  <div class="plot-row">
+    <label for="frame">frame</label>
+    <select id="frame">
+      <option value="on" selected>on</option>
+      <option value="off">off</option>
+    </select>
+    <output id="frameOut"></output>
+  </div>
+  <div class="plot-row">
+    <label for="frameShape">shape</label>
+    <select id="frameShape">
+      <option value="rect" selected>rectangle</option>
+      <option value="ellipse">ellipse</option>
+    </select>
+    <output id="frameShapeOut"></output>
+  </div>
+  <!-- The options are written from FRAME_RATIOS at load, not listed here: the
+       ratio a saved file may carry is checked against that same array, and two
+       lists of ratios is one of them being wrong. -->
+  <div class="plot-row">
+    <label for="frameRatio">ratio</label>
+    <select id="frameRatio"></select>
+    <output id="frameRatioOut"></output>
+  </div>
+  <!-- MARGIN INSETS FROM THE SHORTER SIDE, so one number means the same visual
+       gap on a wide window and a tall one, and 0 puts the boundary on the
+       viewport edge at every ratio. -->
+  <div class="plot-row">
+    <label for="frameMargin">margin</label>
+    <input type="range" id="frameMargin" min="0" max="40" step="1" value="6">
+    <output id="frameMarginOut">6%</output>
+  </div>
+
+  <div class="plot-hint">reset view fits the frame &middot; a frame control never moves the camera</div>
+
+  <!-- EXPORT LIVES HERE BECAUSE THE FRAME DEFINES THE OUTPUT BOUNDS. It is not
+       a global action: what comes out is what is inside the boundary above, at
+       the boundary's own shape and ratio.
+
+       TWO ARTEFACTS, AND THEY ARE HONESTLY DIFFERENT. The PNG is the picture
+       exactly as rendered, at a multiple of the display resolution, so the
+       additive or multiply result survives because it IS the framebuffer. The
+       SVG cannot be that picture — SVG has neither additive nor multiply
+       blending, so the crossings that carry the screen image do not survive as
+       vector. That is not engineered around: a plotter draws uniform strokes
+       and takes its depth from line DENSITY, which is exactly what this
+       geometry produces. One path per line STRIP rather than per segment, real
+       millimetres from the grid's own units, and a real clipPath. -->
+  <div class="plot-file-row">
+    <button type="button" id="exportPng">export PNG</button>
+    <button type="button" id="exportSvg">export SVG</button>
+  </div>
+
+  <pre id="plot-frameinfo"></pre>
+</details>
+
+<!-- DRAW. Every control is live — nothing here is a re-export. The two density
+     sliders run the same way round (right = every line) and thin the grid out
+     as they travel left; `densityToEvery()` in plot-grid.js is their one owner
+     and the read-out below prints the stride it lands on. -->
+<details id="plot-draw" class="panel" open>
+  <summary>DRAW</summary>
+
+  <div class="plot-row">
+    <label for="families">lines</label>
+    <select id="families">
+      <option value="both" selected>u + v</option>
+      <option value="u">u only</option>
+      <option value="v">v only</option>
+    </select>
+    <output id="familiesOut"></output>
+  </div>
+
+  <div class="plot-row">
+    <label for="uDensity">u density</label>
+    <span class="plot-track" id="uDensityTrack">
+      <input type="range" id="uDensity" min="1" max="12" step="1" value="12">
+    </span>
+    <output id="uDensityOut">every line</output>
+  </div>
+  <div class="plot-row">
+    <label for="vDensity">v density</label>
+    <span class="plot-track" id="vDensityTrack">
+      <input type="range" id="vDensity" min="1" max="12" step="1" value="12">
+    </span>
+    <output id="vDensityOut">every line</output>
+  </div>
+  <div class="plot-row">
+    <label for="weight">weight</label>
+    <input type="range" id="weight" min="0.3" max="5" step="0.1" value="1.1">
+    <output id="weightOut">1.1 px</output>
+  </div>
+  <!-- POLARITY IS NOT A COLOUR SWAP. The screen is white ink on black under
+       ADDITIVE blending, so crossings brighten toward white; inverting the
+       colours alone gives a white rectangle, because additive ink on a white
+       ground saturates on the first line. The symmetric operation is MULTIPLY,
+       so crossings darken toward black the way they currently brighten toward
+       white — which means this control reaches the render path, not a
+       stylesheet. plot-polarity.js is the law; read its header.
+
+       THE TWO REGIMES ARE NOT EQUIVALENT AT THE SAME SLIDER VALUE — measured,
+       not assumed: at the shipped 30% a single line is 149 of 255 on screen and
+       would be 37 in print, and the screen clips after two crossings where
+       multiply never does. So the polarity applies a TRANSFER and the slider
+       keeps ONE meaning ("a single line's ink"): the two framebuffer values sum
+       to exactly 255 at every position of it. What is left asymmetric is the
+       crossings, which is irreducible and in the good direction, and the
+       read-out below prints the ladder rather than describing it. -->
+  <div class="plot-row">
+    <label for="polarity">polarity</label>
+    <select id="polarity">
+      <option value="screen" selected>screen &mdash; white on black</option>
+      <option value="print">print &mdash; black on white</option>
+    </select>
+    <output id="polarityOut"></output>
+  </div>
+  <!-- BRIGHTNESS is the glow control, and it is the one addition to the four
+       controls the brief lists. Under additive blending a line already drawn at
+       full white cannot brighten where a second line crosses it, so the
+       single-line level IS how much crossings can add. Its LABEL follows the
+       polarity — the same number is an amount of light on black and an amount
+       of ink on white — while its ID does not, because that is what every saved
+       composition names. -->
+  <div class="plot-row">
+    <label for="brightness">brightness</label>
+    <input type="range" id="brightness" min="5" max="100" step="1" value="30">
+    <output id="brightnessOut">30%</output>
+  </div>
+  <div class="plot-row">
+    <label for="depthDim">depth dim</label>
+    <input type="range" id="depthDim" min="0" max="100" step="1" value="55">
+    <output id="depthDimOut">55%</output>
+  </div>
+
+  <div class="plot-hint">drag to orbit · scroll to zoom</div>
+  <button type="button" id="resetView">reset view</button>
+
+  <pre id="plot-drawstate"></pre>
+  <pre id="plot-framestate"></pre>
+</details>
+
+<!-- BLOOM. A composition holds several blooms at different scales, so the
+     selection is TWO levels — which bloom, then which petal within it — and this
+     panel is the first of them. It sits above PETAL and STEM because both of
+     those are about the bloom this one names: a 28-entry petal list is one
+     bloom's, and would be 84 for three if the two levels were collapsed into
+     one.
+
+     LOADING A GRID ADDS A BLOOM. `remove` is its own button because "look at a
+     different grid" and "throw this bloom away" are two intentions, and the last
+     bloom cannot be removed — an empty viewport is indistinguishable from a page
+     that broke.
+
+     THE TRANSFORM IS IN THE GRID'S OWN Z-UP MILLIMETRES, before the page's one
+     Z-up correction, so a saved position means the same thing whatever the
+     viewer does with the container. Scale is ONE control and writes all three
+     axes: "size this bloom against that one" is the operation, and a file
+     carrying a non-uniform scale is still applied exactly as written and said
+     so on the panel. -->
+<details id="plot-bloom" class="panel" open>
+  <summary>BLOOM</summary>
+
+  <div class="plot-row">
+    <label for="bloomPick">bloom</label>
+    <span class="plot-pick">
+      <button type="button" id="bloomPrev" title="the bloom before this one">&#9664;</button>
+      <select id="bloomPick"></select>
+      <button type="button" id="bloomNext" title="the bloom after this one">&#9654;</button>
+    </span>
+    <output id="bloomPickOut">1 of 1</output>
+  </div>
+
+  <div class="plot-file-row">
+    <label class="plot-file-load" for="gridAdd">add a bloom
+      <input type="file" id="gridAdd" accept=".glb,model/gltf-binary">
+    </label>
+    <button type="button" id="bloomRemove" title="remove this bloom from the composition">remove</button>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomX">x</label>
+    <input type="range" id="bloomX" min="-800" max="800" step="1" value="0">
+    <output id="bloomXOut">0 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomY">y</label>
+    <input type="range" id="bloomY" min="-800" max="800" step="1" value="0">
+    <output id="bloomYOut">0 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomZ">z</label>
+    <input type="range" id="bloomZ" min="-800" max="800" step="1" value="0">
+    <output id="bloomZOut">0 mm</output>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomRotX">turn x</label>
+    <input type="range" id="bloomRotX" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotXOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomRotY">turn y</label>
+    <input type="range" id="bloomRotY" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotYOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="bloomRotZ">turn z</label>
+    <input type="range" id="bloomRotZ" min="-180" max="180" step="1" value="0">
+    <output id="bloomRotZOut">0&deg;</output>
+  </div>
+
+  <div class="plot-row">
+    <label for="bloomScale">scale</label>
+    <input type="range" id="bloomScale" min="0.1" max="4" step="0.05" value="1">
+    <output id="bloomScaleOut">1.00&times;</output>
+  </div>
+  <div class="plot-hint">drag a bloom&rsquo;s rose anchor to move it &middot; grabbing an anchor
+    selects that bloom &middot; the sliders are the same numbers at 1 mm</div>
+
+  <pre id="plot-bloomstate"></pre>
+</details>
+
+<!-- PETAL. One petal out of the file's own set, picked and deformed while the
+     rest of the bloom stays where it is. The station a bend rides on is ARC
+     LENGTH along that petal's own measured centre line, not `u` — see
+     plot-petal.js's header — and the whole law is gated to be exactly the
+     identity at the base, because every u-line starts on the attachment ring
+     and the inferred stem continues from precisely those points.
+
+     PICKING IS A CYCLE FIRST AND A CLICK SECOND, and that order is MEASURED
+     rather than assumed — `tools/shot-plot-petal.mjs` sweeps the canvas and
+     prints it, so the numbers below come out of a tool rather than out of a
+     comment. On this bloom with the shipped 8 px tolerance: at the home framing
+     only 15.8% of pixels have any line within reach of a click at all, 62.5% of
+     the clicks that DO hit have two or more petals within tolerance, and 39.5%
+     of them are ones where the nearest line on screen and the nearest line to
+     the camera belong to DIFFERENT petals; at a low angle, where the whorls
+     overlap most, it is 10.6% / 75.6% / 49.6%. Widening the tolerance is not
+     the lever — the hit rate runs 14.3% at 4 px to 18.0% at 14 px — because
+     what is scarce is INK, not reach. So the dropdown is the control you can
+     rely on and the click is the convenience; the click takes the front-most
+     line within tolerance, because with depth testing off everything is drawn
+     and the front petal is the one the eye means. -->
+<details id="plot-petal" class="panel" open>
+  <summary>PETAL</summary>
+
+  <div class="plot-row">
+    <label for="petalPick">petal</label>
+    <span class="plot-pick">
+      <button type="button" id="petalPrev" title="the petal before this one">&#9664;</button>
+      <select id="petalPick"><option value="-1">none</option></select>
+      <button type="button" id="petalNext" title="the petal after this one">&#9654;</button>
+    </span>
+    <output id="petalPickOut">none</output>
+  </div>
+
+  <!-- THE WARP BELONGS TO THE PETAL, AND THESE TWO ARE ITS EDITOR. Picking a
+       petal LOADS that petal's own values here; it never applies these values
+       to the petal. So selecting deforms nothing, a warp outlives the selection
+       that made it, and any number of petals can carry different warps at once.
+       With nothing picked they are disabled, because there is no page-wide
+       shape for them to hold.
+
+       ALONG scales the petal's own centre line about its base; ACROSS scales
+       each point's offset from that centre line. They are independent because
+       they act on different halves of one decomposition, so both at k is a
+       similarity and either alone is not. ACROSS is held at the foot: 28 petals
+       share one ring, and a petal whose own attachment widened would overrun
+       its neighbours' and move the feet the stem is built from. -->
+  <div class="plot-row">
+    <label for="petalAlong">along</label>
+    <input type="range" id="petalAlong" min="0.25" max="2.5" step="0.05" value="1">
+    <output id="petalAlongOut">1.00&times;</output>
+  </div>
+  <div class="plot-row">
+    <label for="petalAcross">across</label>
+    <input type="range" id="petalAcross" min="0.25" max="2.5" step="0.05" value="1">
+    <output id="petalAcrossOut">1.00&times;</output>
+  </div>
+
+  <!-- The same control points, the same gaussian, the same width law the stem
+       bends by — plot-warp.js, pointed at a different axis. Its handles are
+       AMBER here and teal on the stem, so which set is which is legible when
+       both are on screen. -->
+  <div class="plot-row">
+    <label for="petalBendAdd">bends</label>
+    <span class="plot-bends">
+      <button type="button" id="petalBendRemove" title="remove a bend point">&minus;</button>
+      <span id="petalBendCount">2</span>
+      <button type="button" id="petalBendAdd" title="add a bend point">+</button>
+      <button type="button" id="petalBendReset" title="return every bend point to rest">reset</button>
+    </span>
+    <output id="petalBendOut"></output>
+  </div>
+  <label class="plot-check" for="petalHandles">
+    <input type="checkbox" id="petalHandles" checked> show bend handles
+  </label>
+  <div class="plot-hint">click a line to pick its petal &middot; drag a handle to bend it<br>
+    warps stay on their petal &mdash; picking another leaves this one as it is</div>
+
+  <pre id="plot-petalstate"></pre>
+</details>
+
+<!-- STEM. The bloom has no stem geometry — `below` throws in the generator, and
+     that is phase-2 work there. This one is INFERRED: every u-line already
+     starts on the attachment ring at z = 0, so the stem is those same lines
+     continued downward and pulled in toward a bundle. It is therefore made of
+     the u-lines that are actually drawn, and thins with the u density slider
+     and disappears under "v only" — the read-out says so rather than quietly
+     drawing a stem for lines that are not on screen. -->
+<details id="plot-stem" class="panel" open>
+  <summary>STEM</summary>
+
+  <div class="plot-row">
+    <label for="stem">stem</label>
+    <select id="stem">
+      <option value="on" selected>inferred</option>
+      <option value="off">off</option>
+    </select>
+    <output id="stemOut"></output>
+  </div>
+
+  <!-- BUNDLE and JOIN are the funnel. `join` does two jobs with one number on
+       purpose: how gradually the lines gather IS the head-to-stem taper, so a
+       separate taper control would be a second owner of one shape. -->
+  <div class="plot-row">
+    <label for="stemBundle">bundle</label>
+    <input type="range" id="stemBundle" min="0" max="5" step="0.05" value="0.35">
+    <output id="stemBundleOut">0.35 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemJoin">join</label>
+    <input type="range" id="stemJoin" min="0.5" max="80" step="0.5" value="12">
+    <output id="stemJoinOut">12 mm</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemLength">length</label>
+    <input type="range" id="stemLength" min="10" max="500" step="1" value="170">
+    <output id="stemLengthOut">170 mm</output>
+  </div>
+  <!-- NECK is not derivable from DROOP: it is how far down the tilt washes
+       out, which is the difference between a stiff stalk and a heavy nodding
+       bloom. The head takes the full angle; the stem takes it decayed. -->
+  <div class="plot-row">
+    <label for="stemDroop">droop</label>
+    <input type="range" id="stemDroop" min="-120" max="120" step="1" value="0">
+    <output id="stemDroopOut">0&deg;</output>
+  </div>
+  <div class="plot-row">
+    <label for="stemNeck">neck</label>
+    <input type="range" id="stemNeck" min="1" max="300" step="1" value="45">
+    <output id="stemNeckOut">45 mm</output>
+  </div>
+
+  <!-- BEND POINTS. Control points along the stem with a gaussian influence, so
+       neighbours blend rather than kink. The ROOT is one of them: a locked root
+       only makes sense for a plant in the ground, and this is a picture. -->
+  <div class="plot-row">
+    <label for="bendAdd">bends</label>
+    <span class="plot-bends">
+      <button type="button" id="bendRemove" title="remove a bend point">&minus;</button>
+      <span id="bendCount">3</span>
+      <button type="button" id="bendAdd" title="add a bend point">+</button>
+      <button type="button" id="bendReset" title="return every bend point to rest">reset</button>
+    </span>
+    <output id="bendOut"></output>
+  </div>
+  <label class="plot-check" for="stemHandles">
+    <input type="checkbox" id="stemHandles" checked> show bend handles
+  </label>
+  <div class="plot-hint">drag a handle to bend the stem</div>
+
+  <pre id="plot-stemstate"></pre>
+</details>
+</div>
+
+<script type="module" src="plot.js"></script>
+</body>
+</html>

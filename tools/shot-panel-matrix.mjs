@@ -12,7 +12,7 @@
  * sheet that fails on renderer noise is a sheet nobody reads. This measures the PANEL.
  *
  * Dev-only (not a CI gate): the byte-exact assertion lives in tools/dump-visibility.mjs,
- * which compares 166 controls x 33 configs x 2 tiers as data. This is the human-eye
+ * which compares every control x every config x both tiers as data. This is the human-eye
  * companion to it — the metric screens, eyes decide.
  *
  * RUN:  node tools/shot-panel-matrix.mjs <outDir>

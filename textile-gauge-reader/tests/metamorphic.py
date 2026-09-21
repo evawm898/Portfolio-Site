@@ -29,8 +29,11 @@ knobs — see the table in tests/test_metamorphic_fixtures.py and README):
 
 Every outcome is CLASSIFIED, not just pass/failed: a 6% drift and a 2x
 flip are different bugs, so "harmonic_flip" (ratio near 0.5x or 2x) is
-its own status regardless of tolerance, and "lost" (detection vanished
-under the transform) is another.
+its own status regardless of tolerance, and "lost" is another: detection
+vanished under the transform, OR the ratio is beyond 2.5x / below 0.4x,
+where the reading is a different structure entirely (a ruler edge, a
+stray sub-feature) rather than a drifted version of the baseline.
+"drift" is reserved for the band in between.
 
 Usage as a CLI, on any photo, no test-writing required:
 
@@ -63,6 +66,10 @@ TOLERANCES = {
     "jpeg60": 0.05,
 }
 MIN_PERIODS_FOR_HALF_ROI = 5.0
+# Ratio bounds beyond which an outcome is "lost" rather than "drift": the
+# measured spacing no longer describes the same structure as the baseline.
+LOST_RATIO_HIGH = 2.5
+LOST_RATIO_LOW = 0.4
 
 
 @dataclass
@@ -89,6 +96,14 @@ def _classify(measured: Optional[float], expected: float, tol: float) -> Tuple[s
     # it as generic "drift" would bury the single most important signal.
     if abs(ratio - 0.5) <= 0.06 or abs(ratio - 2.0) <= 0.2:
         return "harmonic_flip", ratio
+    # Beyond 2.5x / 0.4x the reading is not a drifted version of the
+    # baseline at all -- it is a different structure (a ruler, a stray
+    # sub-feature, a period the baseline never saw), which is the same
+    # failure as detection vanishing: the transform LOST the thing being
+    # measured. Calling a 6x or 80x ratio "drift" (as this used to)
+    # buried that behind the same word as a 6% wobble.
+    if ratio > LOST_RATIO_HIGH or ratio < LOST_RATIO_LOW:
+        return "lost", ratio
     return "drift", ratio
 
 

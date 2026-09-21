@@ -549,9 +549,13 @@
 }
 .tgr-result-card--primary .tgr-result-card__block { flex: 1; }
 
-/* Simplified Results: one Confidence word (High/Medium/Low) instead of
-   per-axis percentages/bars/uncertain-reason text -- those move to
-   Developer diagnostics (axisDiagnosticsCard). */
+/* Simplified Results: one Confident/Uncertain word instead of per-axis
+   percentages/uncertain-reason text -- those move to Developer
+   diagnostics (axisDiagnosticsCard). Deliberately two states, not three:
+   see AxisOut's docstring (backend/schemas.py) -- the numeric confidence
+   score behind an old three-way High/Medium/Low split didn't track
+   error at all (r = -0.028), so it was removed rather than kept as a
+   finer-grained word. */
 .tgr-confidence-card {
   display: flex;
   flex-direction: column;
@@ -564,9 +568,8 @@
   font-weight: 700;
   margin-top: 0.15rem;
 }
-.tgr-confidence-word--high { color: var(--tgr-ok-dot); }
-.tgr-confidence-word--medium { color: var(--tgr-course); }
-.tgr-confidence-word--low { color: var(--tgr-error); }
+.tgr-confidence-word--confident { color: var(--tgr-ok-dot); }
+.tgr-confidence-word--uncertain { color: var(--tgr-error); }
 
 .tgr-secondary-card {
   display: flex;
@@ -604,20 +607,6 @@
   color: var(--ink-faint);
   margin-top: 0.25rem;
 }
-.tgr-confidence-bar {
-  height: 4px;
-  background: var(--line);
-  border-radius: 2px;
-  margin-top: 0.45rem;
-  overflow: hidden;
-}
-.tgr-confidence-bar__fill {
-  height: 100%;
-  background: var(--tgr-ok-dot);
-}
-.tgr-confidence-bar__fill.is-low { background: var(--tgr-error); }
-.tgr-confidence-bar__fill.is-mid { background: var(--tgr-course); }
-
 .tgr-repeat-result-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -1082,13 +1071,16 @@
 }
 .tgr-zoom-controls__reset:hover { color: var(--petrol-bright); }
 
-.tgr-ruler-controls {
+.tgr-gridbox-controls {
   position: absolute;
   left: 1rem;
   bottom: 1rem;
   z-index: 4;
+  display: flex;
+  gap: 0.35rem;
 }
-.tgr-ruler-controls__btn {
+.tgr-gridbox-controls__btn,
+.tgr-gridbox-controls__unit {
   height: 30px;
   padding: 0 0.65rem;
   border-radius: 6px;
@@ -1102,12 +1094,84 @@
   cursor: pointer;
   backdrop-filter: blur(2px);
 }
-.tgr-ruler-controls__btn:hover { background: rgba(255, 255, 255, 0.16); }
-.tgr-ruler-controls__btn.is-active {
-  background: var(--petrol-bright);
-  border-color: var(--petrol-bright);
+.tgr-gridbox-controls__btn:hover,
+.tgr-gridbox-controls__unit:hover { background: rgba(255, 255, 255, 0.16); }
+.tgr-gridbox-controls__btn.is-active {
+  background: var(--tgr-course);
+  border-color: var(--tgr-course);
   color: #060707;
 }
+
+.tgr-gridbox-panel {
+  position: fixed;
+  z-index: 6;
+  transform: translate(-50%, 12px);
+  background: rgba(15, 15, 15, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  min-width: 190px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.tgr-gridbox-panel__title {
+  margin: 0 0 0.4rem;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+}
+.tgr-gridbox-panel .tgr-cal-popup__row { margin-bottom: 0.35rem; }
+.tgr-gridbox-panel .tgr-cal-popup__row input[type="number"] { width: 4.5rem; }
+.tgr-gridbox-panel .tgr-button-row { margin: 0.3rem 0 0; }
+.tgr-gridbox-panel .tgr-status,
+.tgr-gridbox-panel .tgr-error { margin: 0.35rem 0 0; font-size: 11px; }
+
+/* Calibration popup -- position:fixed so it floats over the whole
+   viewport regardless of #viewer's own overflow:hidden clipping (fixed
+   descendants aren't clipped by an ancestor's overflow unless that
+   ancestor also establishes a transform/filter containing block, which
+   #viewer doesn't); JS sets left/top per-frame in positionCalPopup() to
+   track the two calibration points under pan/zoom. */
+.tgr-cal-popup {
+  position: fixed;
+  z-index: 6;
+  transform: translate(-50%, 12px); /* horizontally centered under the anchor point, offset below it */
+  background: rgba(15, 15, 15, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  padding: 0.6rem 0.7rem;
+  min-width: 190px;
+  backdrop-filter: blur(3px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+}
+.tgr-cal-popup__row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.tgr-cal-popup__row label {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-dim);
+  white-space: nowrap;
+}
+.tgr-cal-popup__row input[type="number"] {
+  width: 5.5rem;
+}
+.tgr-cal-popup__ppm {
+  margin: 0.4rem 0 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--petrol-bright);
+}
+.tgr-cal-popup__spanhint {
+  margin: 0.35rem 0 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: #e0b830; /* matches the warning tone used elsewhere (e.g. inferred-loop markers), not an error */
+}
+.tgr-cal-popup .tgr-button-row { margin: 0.5rem 0 0; }
+.tgr-cal-popup .tgr-error { margin: 0.4rem 0 0; font-size: 11px; padding: 0.4rem 0.5rem; }
 
 @media (max-width: 600px) {
   .tgr-topbar,

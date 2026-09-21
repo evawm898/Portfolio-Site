@@ -144,6 +144,29 @@ function buildGatherSkeleton(feet, neck, opts) {
     prev = { p, r };
   }
 
+  // ===================== THE APPROACH =====================
+  // The run from each foot to the neck. The junction diagnosis established that the area rule
+  // sizes the HUB (Rtrunk = sqrt(sum r_child^2)) and nothing governs this JOURNEY, which is the
+  // entire visible extent: on an 18-petal Daisy the 54 feet run inward from radius 1.017 to
+  // 0.098 while descending 0.024, a 38:1 run, as parallel capsules that never merge.
+  //
+  // Three candidate laws that governed it — an area rule applied at every station, a
+  // spacing-scaled smooth union, and a single lofted skirt — were built here, measured, and
+  // REJECTED BY EYE. They are gone; three rejected laws behind a switch is dead code. What is
+  // kept is the SEAM, because the next attempt needs exactly this A/B: a candidate law reachable
+  // from the same tree as the shipped one, so the two can be rendered and measured side by side
+  // without a second checkout. `approachLaw` is an experiment switch, NOT a control and NOT in
+  // the registry; 'current' is the only law today.
+  //
+  // What the rejection established, for whoever adds the next one: the junction is not a surface
+  // to shape. It is the petal's material continuing down to the stem at the petal's own
+  // thickness. So petal-frequency variation is the POINT, not the defect, and the rim harmonic
+  // A_k is the wrong objective — driving it to zero drives toward the smooth skin that is the
+  // actual defect. `docs/tools/measure-junction-rim.mjs` still reports A_k because it is a real
+  // description of the surface; it is a measurement, not a target.
+  const law = opts.approachLaw || 'current';
+  if (law !== 'current') throw new Error(`unknown approachLaw "${law}" — 'current' is the only law; add yours here beside it`);
+
   // STRANDS: each foot -> a cubic bezier arriving TANGENTIALLY at the neck surface at the
   // common arrival height. Radius = the true foot radius (grammar preserved), so a strand
   // matches the local surface where it joins and blends in via the field's smooth union.
@@ -189,7 +212,7 @@ function buildGatherSkeleton(feet, neck, opts) {
   }
 
   const maxWidth = Math.max(swell, neckR(_lerp(yArrival, yStem, 0.5))) * 2;   // widest junction diameter
-  return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR } };
+  return { caps, buttons: [], meta: { Rring, yFeet, yStem, yArrival, Rtrunk, swell, stemR, maxEntryDeg, maxWidth, leafCount: feet.length, neckR, approachLaw: law } };
 }
 
 /* Narrow-band surface nets over a capsule list. Rasterizes each capsule into

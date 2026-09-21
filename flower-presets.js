@@ -65,8 +65,12 @@ export const PRESETS = [
       tipStyle: 'clean', infillType: 'spacecol', spaceMode: 'open', softness: 0.3,
       centerArch: 'classic', centerType: 'stamens', sepalsType: 'none', stemType: 'none' } },
 
-  // 4 — broad papery petals, cellular Voronoi. (Ships smooth: scallop is inert under
-  //     the Standard continuous margin; that edge lives in Advanced.)
+  // 4 — broad papery petals, cellular Voronoi. Ships SMOOTH (tipStyle 'clean') because a
+  //     scalloped margin is not fixed yet, not because it would be inert. Both halves of
+  //     the note that used to sit here were false: #53 made the scallop live under
+  //     continuous margin (measured excursion 6.63 mm on, 7.13 mm off), and it was never
+  //     in Advanced — `advancedOnly` appears nowhere in flower-registry.js, so it sat in
+  //     the Standard picker until it was delisted. See docs/flower-rim-treatment-registration.md.
   { name: 'Poppy', note: 'broad cellular petals', slug: 'poppy',
     ui: { bloomType: 'radial', petalCount: 6, bloom: 82, elevation: 0.02,
       width: 1.15, taper: 0.28, tip: 0.6, petalCup: 0.1, centerCurve: 0.35, shoulder: 0.55,

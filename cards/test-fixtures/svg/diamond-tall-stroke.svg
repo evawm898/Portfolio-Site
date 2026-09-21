@@ -1,0 +1,6 @@
+<!-- Tall (60x140), stroke-only outline (fill:none) — tests that canvas
+     tinting recolors stroked artwork, not just filled shapes. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 60 140" width="60" height="140">
+  <path fill="none" stroke="#0000ff" stroke-width="6" stroke-linejoin="round"
+        d="M30 6 L54 70 L30 134 L6 70 Z"/>
+</svg>
