@@ -3,7 +3,7 @@
 // This file is WIRING. Every rule lives in a module beside it — the geometry in
 // beach-shore.js, the two boundaries in beach-swash.js, the set energy in
 // beach-sets.js, the drifting surface in beach-water.js, every mark in
-// beach-draw.js — and all of those are DOM-free so the gate runs them without a
+// beach-brush.js — and all of those are DOM-free so the gate runs them without a
 // browser. What is here is the order things happen in, the one place the
 // outside world gets in, and the interface later sessions read.
 //
@@ -32,13 +32,9 @@ import { createShore } from './beach-shore.js';
 import { createSwash } from './beach-swash.js';
 import { createSets, normalizeWheel } from './beach-sets.js';
 import { createWater } from './beach-water.js';
-import { createRenderer } from './beach-draw.js';
-
-// A seed salt, for koi-pads.js's reason: every draw on a stream shifts every
-// number taken after it, so the streak field and the waves are forked from the
-// same seed rather than sharing one stream. Adding a streak would otherwise
-// hand the beach a different set of waves.
-export const WATER_SEED_SALT = 0x5eabeac4;
+import { createRenderer } from './beach-render.js';
+import { stageAt, waveStage, crestAt, brokenAt, bandWidthAt, faceAmountOf, drawPhaseAt, sortWaves } from './beach-wave.js';
+import { WATERLINE_S } from './beach-shore.js';
 
 export const meta = {
   title: 'Beach swash line',
@@ -48,15 +44,18 @@ export default function createBeachScene(host) {
   const { ctx } = host.canvas2d();
   const shore = createShore();
   const rand = makeRandom(host.seed);
-  const waterRand = makeRandom((host.seed ^ WATER_SEED_SALT) >>> 0);
 
   const swash = createSwash({ rand });
   const sets = createSets({ rand });
-  const water = createWater({ rand: waterRand });
+  const water = createWater();
   const renderer = createRenderer(ctx, shore);
 
   let width = host.width, height = host.height;
   shore.resize(width, height);
+  // THE SCALLOPS ARE STORED IN WIDTHS AND THE EDGE IS IN HEIGHTS, so the swash
+  // is told the shape of the frame. It is the only thing in that file that
+  // depends on a canvas, and this is the one place a canvas exists.
+  swash.setAspect(width / height);
 
   // THE BEACH OPENS WITH A SEA ALREADY RUNNING. Starting from a flat waterline
   // and a saturated level at its initial guess would show the first minute of
@@ -78,18 +77,21 @@ export default function createBeachScene(host) {
 
       renderer.draw({
         width, height,
+        // THE PUBLISHED EDGE, and the renderer draws THIS. It is the same
+        // function `swashYAt(x)` answers with, scallops included, so the line
+        // a bird stands on is the line on the screen.
         swashAt: (u) => swash.edgeAtU(u),
         wetAt: (u) => swash.wetAtU(u),
-        glossDepth: swash.glossDepth,
-        frontFoam: swash.sheet,
-        breakEnergy: sets.energy,
+        // EVERY LIVE WAVE, not a break energy. The renderer is handed the
+        // objects and draws them, and what the energy decided about each one
+        // was frozen into its record at birth.
+        waves: sortWaves(swash.waves),
         frontSeed: 7,
         drift: water.drift,
-        streaks: water.streaks,
       });
     },
 
-    resize(w, h) { width = w; height = h; shore.resize(w, h); },
+    resize(w, h) { width = w; height = h; shore.resize(w, h); swash.setAspect(w / h); },
 
     wheel(deltaY, deltaMode) {
       sets.scroll(normalizeWheel(deltaY, deltaMode, height));
@@ -134,6 +136,22 @@ export default function createBeachScene(host) {
         waves: swash.waves.length,
         spawned: swash.spawned,
         waveFields: swash.waves.length ? Object.keys(swash.waves[0]) : [],
+        // The five stages, per live wave, at five along-shore positions — so a
+        // gate can watch a peel run across the frame rather than only that a
+        // wave exists. Test chrome; nothing in the scene reads it.
+        waveStages: swash.waves.map(w => ({
+          age: w.age, preS: w.preS, crest: crestAt(w, 0.5),
+          stage: waveStage(w, WATERLINE_S),
+          at: [0, 0.25, 0.5, 0.75, 1].map(u => stageAt(w, u, WATERLINE_S)),
+          band: bandWidthAt(w, brokenAt(w, 0.5)), face: faceAmountOf(w),
+          // What the DRAWING is handed for this wave, so a gate can hold the
+          // picture to the record without re-deriving either.
+          height: w.height, seed: w.seed,
+          phase: [0, 0.25, 0.5, 0.75, 1].map(u => drawPhaseAt(w, u)),
+          lobes: w.drawA.cen.length + w.drawB.cen.length,
+          lobeSum: w.drawA.cen.reduce((a, b) => a + b, 0) + w.drawA.rad.reduce((a, b) => a + b, 0)
+            + w.drawB.cen.reduce((a, b) => a + b, 0) + w.drawB.rad.reduce((a, b) => a + b, 0),
+        })),
         // Every wave's committed record, so a gate can watch a real wave run
         // rather than only that one exists.
         waveAt: swash.waves.map(w => [w.age, w.runup, w.advanceS, w.holdS, w.retreatS, w.peaked ? 1 : 0]),
@@ -151,11 +169,9 @@ export default function createBeachScene(host) {
         sets: sets.sets,
         overruns: swash.overruns.length,
         overrunAt: swash.overruns.map(o => [o.t, o.extent, o.over, o.at]),
-        streaks: water.streaks.length,
-        streakFields: water.streaks.length ? Object.keys(water.streaks[0]) : [],
         drift: water.drift,
-        rows: renderer.rows,
-        segments: renderer.segments,
+        drawnWaves: renderer.waves,
+        shear: shore.slope * width / height,
         // The published interface, sampled, so the gate can check the screen
         // mapping without reimplementing it.
         swashY: us.map(u => scene.swashYAt(u * width)),

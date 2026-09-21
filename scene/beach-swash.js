@@ -47,9 +47,25 @@
 // `spawn()`. Deforming a running swash is unreachable rather than merely
 // avoided, which is koi-ripples.js's discipline applied to the quantity this
 // scene's brief actually cares about.
-export const SWASH_FIELDS = ['age', 'life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'peaked'];
+//
+// AND THE RECORD IS A WAVE'S NOW, NOT A SWASH'S. Everything below is stage
+// SIX of a life that starts `preS` seconds earlier, out at sea — see
+// beach-wave.js, which owns stages one to five and which this list is the
+// continuation of. `WAVE_FIELDS` plus these is the whole record, and the claim
+// the two lists make together is the one this file already made about energy:
+// there is no `energy` field in either.
+export const SWASH_FIELDS = ['life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'scallop', 'peaked'];
 
 import { WATERLINE_S, RUNUP_NOMINAL, RUNUP_MAX, SAMPLES } from './beach-shore.js';
+
+/**
+ * The aspect a swash assumes until it is told one. 16/9 is what the scallop
+ * depth shipped hard-wired at, so a caller that never calls `setAspect` gets
+ * exactly the beach it used to.
+ */
+export const DEFAULT_ASPECT = 16 / 9;
+import { makeWave } from './beach-wave.js';
+import { rng, lobeParams, lobesFrom } from './beach-brush.js';
 
 // --- TIMING -----------------------------------------------------------------
 // MEASURED, from the brief's own reading of the two clean drains in the
@@ -152,10 +168,28 @@ export const SAT_ALPHA = 0.14;       // per wave — a horizon of about 5.5 wave
 //   quiet     6.40   6.40   3.44   0.00   0.00   overruns per minute
 //   w/ sets   5.68   4.28   3.52   3.24   3.00
 //
-// 0.12 is where the two populations separate: nothing at all on a quiet beach,
-// and the set-driven rate barely touched. Below it the event fires as often
-// without a set as with one, which is the definition of no signal.
-export const OVERRUN_MARGIN_S = 0.12;
+// 0.12 was where the two populations separated: nothing at all on a quiet
+// beach, and the set-driven rate barely touched. Below it the event fires as
+// often without a set as with one, which is the definition of no signal.
+//
+// RE-DERIVED WHEN THE FRONT'S SHAPE CHANGED, and it had to be: this is a
+// MEASURED separation between two populations, and the quantity it separates
+// them by — how far the furthest point of a wave gets past the standing mark —
+// moved when the drawing's scallops became the published edge (see makeScallop
+// below). The same sweep, the same five seeds and five minutes each, on the
+// front as it is now:
+//
+//   margin   0.035  0.060  0.090  0.120  0.150  0.180
+//   quiet    12.32  12.32   7.24   0.36   0.00   0.00   overruns per minute
+//   w/ sets   8.24   5.60   3.48   3.04   2.80   2.64
+//
+// 0.150 reads exactly what 0.120 used to: nothing on a quiet beach, and the
+// set-driven rate down 8% (3.04 -> 2.80). Holding 0.120 would have left the
+// event firing about once every three and a half minutes with no input at all,
+// which is the no-signal state this constant exists to avoid — and the only
+// other lever was to make the drawn scallops shallower than the drawing draws
+// them, which is tuning a picture to satisfy a simulation constant.
+export const OVERRUN_MARGIN_S = 0.150;
 
 const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
 const smooth = (v) => v * v * (3 - 2 * v);
@@ -183,7 +217,12 @@ export function sheetAt(age, a, hold, ret) {
   return clamp01(1 - (age - a - hold) / ret);
 }
 
-export function createSwash({ rand, samples = SAMPLES } = {}) {
+export function createSwash({ rand, samples = SAMPLES, aspect: aspect0 = DEFAULT_ASPECT } = {}) {
+  // THE SHAPE OF THE FRAME, AND THE ONLY THING IN THIS FILE THAT KNOWS IT.
+  // The scallops are stored in widths and the edge is in heights, so the one
+  // number that converts them is the aspect — told by whoever owns a canvas,
+  // and defaulted so a Node-side caller with no viewport still gets a beach.
+  let aspect = aspect0;
   const sat = new Float64Array(samples).fill(WATERLINE_S + RUNUP_NOMINAL);
   const wet = new Float64Array(samples).fill(WATERLINE_S + RUNUP_NOMINAL);
   const edge = new Float64Array(samples).fill(WATERLINE_S);
@@ -210,35 +249,109 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     return w;
   }
 
+  // THE SCALLOPS, AND THE POINT IS WHOSE THEY ARE. A drawn foam edge and a
+  // published swash edge that are generated separately WILL diverge, and the
+  // failure is not cosmetic: a bird stands where `swashYAt(x)` says the water
+  // is, and a mark is erased where it says the water reached. So the union of
+  // half-discs every cartoon foam line has is drawn HERE, from the wave's own
+  // seed, once, and it is `edgeAtU` that carries it to the renderer. The
+  // renderer generates nothing.
+  //
+  // `lobeParams` and `lobesFrom` are beach-brush.js's own — imported rather
+  // than reimplemented, so there is one answer to what a scallop is, and the
+  // parameters are fractions of the width so a stored set survives a resize.
+  // The counts, the radii and the squash are the drawing's, unchanged.
+  //
+  // IT IS ZERO-MEANED, and that is what keeps `runup` meaning the wave's reach.
+  // A union of half-discs is one-sided — it only ever pushes the edge further
+  // up the beach — so folded in raw it would add half its own depth to every
+  // wave's reach and quietly move the saturated level, the overrun margin and
+  // the high-water mark with it. Subtracting its mean changes no shape at all:
+  // it is a constant offset on a curve.
+  //
+  // AND THE DEPTH IS STORED IN WIDTHS AND READ IN HEIGHTS, which is what makes
+  // it aspect-independent. The module's lobe radii are fractions of the WIDTH
+  // and its depth falls out of them, while the edge is in frame HEIGHTS — so
+  // the two differ by the aspect ratio, and a scallop baked at one aspect is a
+  // third too deep on a 4:3 frame and too shallow on a 21:9 one.
+  //
+  // IT SHIPPED FIXED AT 16/9 because the simulation has no canvas, and that is
+  // still true: what changed is that it no longer has to. The record keeps the
+  // raw width-unit shape, `aspect` is told to the swash by whoever does own a
+  // canvas, and `extentOf` converts at the point of use. /scene is
+  // full-viewport and people have wide monitors, so "two of the three frames
+  // it was verified at" was never a good enough reason.
+  function makeScallop(seed) {
+    const r = rng(seed);
+    const us = new Array(samples);
+    for (let i = 0; i < samples; i++) us[i] = i / (samples - 1);
+    const a = lobesFrom(us, lobeParams(r, 11, 0.025, 0.069), 1, null, 0.32);
+    const b = lobesFrom(us, lobeParams(r, 26, 0.008, 0.025), 1, null, 0.5);
+    const f = new Float64Array(samples);
+    let mean = 0;
+    for (let i = 0; i < samples; i++) { f[i] = a[i] + b[i]; mean += f[i]; }
+    mean /= samples;
+    // ZERO-MEANED IN WIDTHS, WHICH IS THE SAME CURVE ZERO-MEANED IN HEIGHTS:
+    // the conversion is a single positive factor, so it commutes with taking
+    // the mean and `runup` still means the wave's reach at every aspect.
+    for (let i = 0; i < samples; i++) f[i] -= mean;
+    return f;
+  }
+
   // THE ONE PLACE SET ENERGY IS READ. Everything the energy decides about a
   // wave is decided here and frozen into the record.
   function spawn(energy) {
     const e = clamp01(energy || 0);
     const target = RUNUP_NOMINAL + e * (RUNUP_MAX - RUNUP_NOMINAL);
     const reach = target * rand.range(RUNUP_VARY[0], RUNUP_VARY[1]);
-    const w = {
-      age: 0,
-      runup: Math.min(1, WATERLINE_S + reach),
-      advanceS: ADVANCE_S * rand.range(0.82, 1.20),
-      holdS: HOLD_S * rand.range(0.6, 1.5),
-      retreatS: RETREAT_S * rand.range(0.85, 1.18),
-      wob: makeWob(),
-      peaked: false,
-      life: 0,
-    };
-    w.life = w.advanceS + w.holdS + w.retreatS;
+    // ONE RECORD, BORN AT SEA. `makeWave` freezes everything stages one to
+    // four need; the fields below are the SWASH stage's, and `preS` — which
+    // `makeWave` derives from the wave's own travel — is when the one hands
+    // over to the other. So a swash no longer begins out of nothing at the
+    // waterline: it is the arrival of a thing that has been in the frame,
+    // visibly, for the whole of its approach.
+    const w = makeWave({ rand, energy: e, waterline: WATERLINE_S, samples });
+    w.runup = Math.min(1, WATERLINE_S + reach);
+    w.advanceS = ADVANCE_S * rand.range(0.82, 1.20);
+    w.holdS = HOLD_S * rand.range(0.6, 1.5);
+    w.retreatS = RETREAT_S * rand.range(0.85, 1.18);
+    w.wob = makeWob();
+    w.scallop = makeScallop(w.seed);
+    w.peaked = false;
+    w.life = w.preS + w.advanceS + w.holdS + w.retreatS;
     waves.push(w);
     spawned++;
     return w;
   }
 
-  const WOB_S = 0.020;   // how deep the scallops on a front run, in frame heights
+  // THE SWASH'S OWN CLOCK, which is the wave's less its seaward life. Every
+  // stage-six law below reads THIS and never `w.age`, so the shipped envelope
+  // is untouched by the wave arriving earlier — it simply starts later.
+  const swashAge = (w) => w.age - w.preS;
+
+  // HOW FAR A FRONT WANDERS, in frame heights — and it is no longer how deep
+  // the SCALLOPS run, which is what it used to be and what its old value of
+  // 0.020 was set for. The scallops are the drawing's now (see makeScallop
+  // above) and this is only the long wander beneath them, so its value is the
+  // drawing's own wander, read off it rather than kept: beach-brush.js wanders
+  // its front with `bumps(..., 0.007 * H, 3, ...)`, whose three harmonics sum
+  // to 0.007 * (1/1.5 + 1/2.5 + 1/3.5) = 0.00947 of a frame height at their
+  // peak, and `wob` below is two sines whose amplitudes sum to at most 1.5.
+  //
+  // MEASURED, five seeds x five minutes, because it moves an event the brief
+  // calls settled. Holding 0.020 and adding the scallops puts the live front's
+  // peak-to-trough at 0.0496 against the drawing's own 0.0344 — a third deeper
+  // than the picture that was verified — and takes the OVERRUN rate on a QUIET
+  // beach from 0.04 to 1.96 a minute, against 3.16 with sets running: the two
+  // populations OVERRUN_MARGIN_S was set to separate stop being separated. At
+  // the derived value the front reads 0.0344 and the quiet rate is 0.28.
+  const WOB_S = 0.00631;
 
   function extentOf(w, i) {
-    const env = swashEnv(w.age, w.advanceS, w.holdS, w.retreatS);
+    const env = swashEnv(swashAge(w), w.advanceS, w.holdS, w.retreatS);
     if (env <= 0) return WATERLINE_S;
     const reach = (w.runup - WATERLINE_S) * env;
-    return WATERLINE_S + reach + WOB_S * w.wob[i] * env;
+    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i] * aspect) * env;
   }
 
   const sw = {
@@ -250,7 +363,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
       // The thickest sheet on the beach right now, which is what the foam band
       // is drawn from. Zero when nothing is running.
       let m = 0;
-      for (const w of waves) m = Math.max(m, sheetAt(w.age, w.advanceS, w.holdS, w.retreatS));
+      for (const w of waves) m = Math.max(m, sheetAt(swashAge(w), w.advanceS, w.holdS, w.retreatS));
       return m;
     },
 
@@ -295,7 +408,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
       // extent" a literal statement rather than a prediction: at the end of a
       // wave's advance it has reached as far as it is going to.
       for (const w of waves) {
-        if (w.peaked || w.age < w.advanceS) continue;
+        if (w.peaked || swashAge(w) < w.advanceS) continue;
         w.peaked = true;
         let reached = WATERLINE_S, at = 0, over = -1;
         for (let i = 0; i < samples; i++) {
@@ -338,6 +451,10 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     //
     // They are bound onto the scene in scene-beach.js, which owns the shore
     // and therefore the x -> y mapping; here they are in beach coordinates.
+    /** the frame's width over its height; the scallops' depth follows it */
+    setAspect(a) { if (a > 0 && Number.isFinite(a)) aspect = a; },
+    get aspect() { return aspect; },
+
     edgeAtU(u) { return sampleAt(edge, u); },
     wetAtU(u) { return sampleAt(wet, u); },
     satAtU(u) { return sampleAt(sat, u); },
