@@ -8312,7 +8312,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
            before it measures anything with them, so this points at the
            artefact rather than standing in for it: the rim's thickness is
            |top - bot| between two vertices the mesh demonstrably has. */
-        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j], outlineTurnDeg: turnAt(k) });
+        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j], roomMm: roomMm[sk], outlineTurnDeg: turnAt(k) });
         /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
            which is a flat wall at ninety degrees BY DESIGN on this tree and on
            main. The dihedral clause needs it so it can attribute an edge to

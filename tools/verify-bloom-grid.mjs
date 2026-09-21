@@ -292,7 +292,22 @@ function walkGrid(built, emitted, lastRow) {
           if (isMargin || isFirst || isLast) {
             o.apexProbed++;
             if (isMargin) o.marginProbed++;
-            if (!emitted.has(key3(P[0], P[1], P[2]))) {
+            /* EITHER AN APEX OR A WALL, and the disjunction is exhaustive
+               rather than a softening. A perimeter point the treatment
+               REACHED is the bead's apex and is emitted as the same double; a
+               point at a BURIED end — the foot under the hub, a cleft's or a
+               fringe's base panel under what overlaps it — is still the flat
+               wall, where the point is the mid-surface and what is emitted is
+               the two skins offset from it. Those are the only two cases the
+               emitter has, they are mutually exclusive on any one point (an
+               inset skin cannot reconstruct), and 2e pins the treated set
+               non-vacuously from the builder's own rim record. Asserting the
+               apex alone was right until the untreated profile stopped being
+               a subdivided wall and became the wall itself. */
+            const isApex = emitted.has(key3(P[0], P[1], P[2]));
+            const isWall = emitted.has(key3(P[0] + n[0] * t / 2, P[1] + n[1] * t / 2, P[2] + n[2] * t / 2))
+                        && emitted.has(key3(P[0] - n[0] * t / 2, P[1] - n[1] * t / 2, P[2] - n[2] * t / 2));
+            if (!isApex && !isWall) {
               o.apexMissing++;
               if (isMargin) o.marginMissing++;
               if (!o.apexFirst) o.apexFirst = `${where} col ${j} (${isMargin ? 'margin' : isFirst ? 'inner end cap' : 'tip'})`;

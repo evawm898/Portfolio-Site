@@ -411,7 +411,7 @@ async function runRows(G, rows, fails, notes) {
          on `ALL MAX` before this was fixed. The flag travels WITH the profile
          it is about. */
       clamps += clampRecs.length;
-      let thin = 0, thinWorst = null, wrongClamp = 0;
+      let thin = 0, thinWorst = null, wrongClamp = 0, unjustified = 0;
       for (const r of apexRecs) {
         const t = dist(r.top, r.bot);
         if (t < minRim) minRim = t;
@@ -425,11 +425,23 @@ async function runRows(G, rows, fails, notes) {
            clamp says. Measured: 64 false findings on the carnation before this
            was separated. */
         if (r.clamped && !(t < G.RIM_FLOOR_MM)) wrongClamp++;
+        /* AND THE CLAMP MUST BE JUSTIFIED BY THE ROOM, which is the clause the
+           must-fail found missing. Without it a builder that simply LOWERED
+           the floor would mark every profile clamped and E1 would excuse the
+           lot — the ST9 trap (a guard that reads the record it checks) getting
+           in through the exclusion rather than the guard. Measured: the
+           `the-rim-floor-is-lowered-to-0.4` mutation fired NOTHING until this
+           existed. The room arm must be the one that BOUND: a clamp is only a
+           clamp where `RIM_ROOM_FRACTION * room` is what took the radius
+           below the other two arms, restated here from Eva's fraction and the
+           builder's measured room rather than read from the clamp record. */
+        if (r.clamped && !(G.RIM_ROOM_FRACTION * r.roomMm < Math.min(G.RIM_BEAD_RADIUS_MM, r.bodyMm / 2) - 1e-12)) unjustified++;
       }
       check('E1', thin === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${thin} rim profiles are under ${G.RIM_FLOOR_MM} mm and are NOT declared clamps (worst ${thinWorst && thinWorst.t.toFixed(4)} mm against a bar of ${thinWorst && thinWorst.bar.toFixed(4)} at panel ${thinWorst && thinWorst.r.panel} row ${thinWorst && thinWorst.r.row})`);
       /* THE OTHER DIRECTION, and it is the one that stops the exclusion
          emptying the clause: a location declared clamped must actually BE
          under the floor. A builder that logged everything would fail here. */
+      check('E1', unjustified === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${unjustified} declared clamps are not justified by the span's room — the radius was taken below the floor by something other than the narrow-span rule`);
       check('E1', wrongClamp === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${wrongClamp} declared clamp locations are NOT under the floor — the declaration is excluding rows it has no business excluding`);
 
       /* ---- E2: no hard edge within RIM_NEAR_MM of a treated apex ---- */
@@ -464,18 +476,27 @@ async function runRows(G, rows, fails, notes) {
    red are all failures — the last is how a mutation that merely breaks the
    build gets caught pretending to be a negative control. */
 const MUTATIONS = [
-  { id: 'the-flat-wall-is-restored', breaks: ['E2'],
-    from: '      const th = (Math.PI * m) / K, cs = Math.cos(th), sn = Math.sin(th);',
-    to:   '      const th = (Math.PI * m) / K, cs = Math.cos(th), sn = 0;' },
+  /* RESTORING THE WALL REDDENS THREE CLAUSES AND ALL THREE ARE TRUE OF IT,
+     which is a statement about the geometry rather than a loosened claim. The
+     skin is INSET by the bead's own radius, so a profile collapsed onto the
+     straight wall (a) puts a hard edge back where the bead was — E2; (b)
+     stops emitting the original boundary point, because a wall has no apex —
+     E4; and (c) leaves the solid's own surface inconsistent at the two
+     corners where a pivot's profiles become identical — E3. A wall and an
+     apex are the same surface here, so there is no surgical form of this
+     mutation, and saying so is better than pretending one clause owns it. */
+  { id: 'the-flat-wall-is-restored', breaks: ['E2', 'E3', 'E4'],
+    from: '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;',
+    to:   '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi; const FLATWALL = 1;' },
   { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
   { id: 'the-bead-apex-is-recomputed', breaks: ['E4'],
-    from: '    pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = apex;',
-    to:   '    pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
+    from: '    pts[APEX] = apex;',
+    to:   '    pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
   { id: 'every-clamp-is-logged', breaks: ['E1'],
-    from: '      if (rim && 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9) {',
-    to:   '      if (rim) {' },
+    from: '      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;',
+    to:   '      const wasClamped = true;' },
   { id: 'the-segment-count-reads-the-live-sheet', breaks: ['E5'],
     from: '  const r = Math.min(RIM_BEAD_RADIUS_MM, Math.max(sheetMm, MIN_FEATURE_MM) / 2);',
     to:   '  const r = Math.min(RIM_BEAD_RADIUS_MM, sheetMm / 2);' },
@@ -485,6 +506,17 @@ const MUTATIONS = [
    with the geometry and check nothing (the `seam-floor-removed` trap). What
    moves instead is the value the BUILDER applies. */
 const EXTRA = {
+  /* THE FLAT WALL IS RESTORED BY ZEROING THE OUTWARD TERM, which is what the
+     bead IS: `w` is the vector from the skin's edge to the original boundary
+     point, so a profile built with it dropped is the straight segment from
+     `C + n*b` to `C - n*b` — the wall this change replaced, on the same
+     corners. The apex still lands on the boundary (E4 stays green), so this
+     mutation is about the SURFACE BETWEEN the corners and nothing else. */
+  'the-flat-wall-is-restored': [
+    ['      pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];',
+     '      pts[m] = [C[0] + n[0] * b * cs, C[1] + n[1] * b * cs, C[2] + n[2] * b * cs];'],
+    ['    pts[APEX] = apex;', '    pts[APEX] = C;'],
+  ],
   'the-rim-floor-is-lowered-to-0.4': [
     ['    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);',
      '    const r = Math.min(RIM_FLOOR_APPLIED / 2, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);'],
@@ -508,7 +540,14 @@ async function control() {
   }
   if (bad.length) { console.error('edge-profile control: ANCHORS STALE\n  ' + bad.join('\n  ')); process.exit(1); }
 
-  const rows = pickRows().slice(0, 12);
+  /* A SMALL, LIGHT, RIM-DIVERSE SET. The control runs every mutation over
+     every row, so it must not carry `ALL MAX` (4.6 million triangles and a
+     three-minute census) to say what a 30-thousand-triangle petal already
+     says. These five reach the plain span, a cleft's sinus, a fringe's teeth,
+     a lobed margin and a thin sheet — every arm of the rim law. */
+  const CONTROL_ROWS = /^DEFAULT|^FRINGE: THE CARNATION|^LOBES: the shipped|^THIN: ALL THIN|^CAPABILITY: cleft \(/;
+  const rows = MATRIX.filter((r) => CONTROL_ROWS.test(r.label)).slice(0, 5);
+  if (rows.length < 3) { console.error('edge-profile control: the control row set did not resolve — ' + rows.length + ' rows'); process.exit(1); }
   let failures = 0;
   for (const m of MUTATIONS) {
     let mutated = src.replace(m.from, m.to);

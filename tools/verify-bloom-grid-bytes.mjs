@@ -70,10 +70,22 @@ const gltfOf = (T, row, exportMode, perturb) => {
   const acc = new T.G.MeshBuilder({ exportMode, captureGrid: true });
   const built = T.G.buildBloomInto(acc, stateFor(T.R.DEFAULTS, row), { below: null, capability: row.capability || null });
   if (perturb) {
-    /* ONE captured mid-surface value, by 1e-9 mm — a change no eye and no
-       triangle count can see, and the smallest thing this tool must catch. */
+    /* ONE captured mid-surface value, by 1e-3 mm, AND THE SIZE IS THE FILE'S
+       OWN RESOLUTION RATHER THAN A CHOICE. The .glb stores positions as
+       FLOAT32 and its JSON through `toFixed(6)`, so a micron is about the
+       smallest move that can reach the bytes at a 40 mm coordinate; a 1e-9
+       perturbation — this tool's first version — is invisible by construction
+       and the control reported 0 of 242 while claiming the comparison worked.
+       So the claim this gate makes is bounded: it sees the grid move by a
+       micron, not by an ulp. Said here rather than implied. */
+    /* THE LAST ROW, NOT THE FIRST — and the control found that for itself.
+       `bloom-grid-gltf.js` drops every captured row below `footRows - 1`, so a
+       perturbation planted on row 0 never reaches the file and the control
+       reported 0 of 242 while claiming the comparison worked. A control that
+       has not been seen to fire is a log line; this one fired at itself. */
     for (const p of (built.petalsAll || [])) {
-      if (p && p.grid && p.grid[0] && p.grid[0].rows[0]) { p.grid[0].rows[0].mid[0][0] += 1e-9; break; }
+      const g = p && p.grid && p.grid[0];
+      if (g && g.rows && g.rows.length) { g.rows[g.rows.length - 1].mid[0][0] += 1e-3; break; }
     }
   }
   return new Uint8Array(T.X.buildGridGltf(built, { mode: exportMode ? 'export' : 'live', state: stateFor(T.R.DEFAULTS, row) }));
@@ -101,7 +113,7 @@ for (const row of ROWS) {
 
 console.log(`grid-bytes: ${compared} builds compared over ${ROWS.length} rows, both modes` + (threwBoth ? ` (${threwBoth} threw on BOTH trees and carry no information)` : ''));
 if (CONTROL) {
-  if (moved === compared && compared > 0) { console.log(`grid-bytes control: PASS — the 1e-9 perturbation was found on all ${moved} of ${compared} builds.`); }
+  if (moved === compared && compared > 0) { console.log(`grid-bytes control: PASS — the 1e-3 mm perturbation (the file's own float32 resolution) was found on all ${moved} of ${compared} builds.`); }
   else { console.error(`grid-bytes control: FAILED — the perturbation was found on ${moved} of ${compared} builds; the comparison cannot see what it claims to see.`); process.exit(1); }
 } else if (moved) {
   console.error(`grid-bytes: FAILED — the /plot grid export moved on ${moved} of ${compared} builds.`);
