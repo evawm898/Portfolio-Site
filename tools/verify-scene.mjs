@@ -242,7 +242,7 @@ const MUTANTS = [
              'draw/the-peel-is-monotone-in-time-and-runs-across-the-frame',
              'wave/the-energy-sizes-the-wave-at-every-stage-and-only-at-birth'],
     mayAlso: ['scene3/several-waves-are-alive-at-once-at-different-stages',
-              'wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each'],
+              'wave/a-wave-passes-through-all-five-stages-in-order-exactly-once-each'],
     why: '"it does not go white all at once" — the brief\'s own sentence, and 1.87 s of it is measured',
   },
   {
@@ -256,7 +256,7 @@ const MUTANTS = [
     // label, because COLLAPSE is defined as "this column has broken and the
     // wave still has a face" and a tree with no face never reaches it.
     breaks: ['wave/the-stage-a-wave-reports-is-the-stage-it-is-drawing'],
-    mayAlso: ['wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each',
+    mayAlso: ['wave/a-wave-passes-through-all-five-stages-in-order-exactly-once-each',
               'scene3/several-waves-are-alive-at-once-at-different-stages'],
     why: 'THE FAILURE MODE THE BRIEF NAMES: what is left without it is a white stripe',
   },
@@ -304,9 +304,9 @@ const MUTANTS = [
   {
     id: 'the-wave-never-leaves-the-swell',
     file: 'scene/beach-wave.js',
-    from: '  if (b < -w.steepS) return SWELL;\n  if (b < 0) return STEEPEN;',
-    to: '  if (b < w.peelS) return SWELL;\n  if (b < 0) return STEEPEN;',
-    breaks: ['wave/a-wave-passes-through-all-six-stages-in-order-exactly-once-each',
+    from: '  if (b < 0) return SWELL;',
+    to: '  if (b < w.peelS) return SWELL;',
+    breaks: ['wave/a-wave-passes-through-all-five-stages-in-order-exactly-once-each',
              'wave/the-stage-a-wave-reports-is-the-stage-it-is-drawing'],
     mayAlso: ['scene3/several-waves-are-alive-at-once-at-different-stages'],
     why: 'a stage label that has drifted from the geometry it is read off',
@@ -336,20 +336,29 @@ const MUTANTS = [
     why: '"an untouched scene still gets overruns"',
   },
   {
-    id: 'the-streaks-are-rebuilt-every-frame',
+    id: 'the-scallop-depth-is-baked-at-one-aspect',
+    file: 'scene/beach-swash.js',
+    from: '    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i] * aspect) * env;',
+    to: '    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i] * DEFAULT_ASPECT) * env;',
+    // THE STATE THIS PR SHIPPED IN. The scallops were converted to frame
+    // heights at 16/9 once, at birth, so they were a third too deep on a 4:3
+    // frame and too shallow on a wide one — and /scene is full-viewport.
+    breaks: ['swash/the-scallops-are-as-deep-in-widths-on-any-shape-of-frame'],
+    why: 'a depth baked at one aspect is a different drawing on every other monitor',
+  },
+  {
+    id: 'the-drift-does-not-move',
     file: 'scene/beach-water.js',
-    from: '      for (const f of streaks) {',
-    to: '      for (const f of streaks) { place(f, true); }\n      for (const f of streaks) {',
-    breaks: ['water/the-streaks-persist-and-drift-shoreward'],
-    // AND IT NOW REDDENS NOTHING ELSE, which is a finding rather than a
-    // tidy-up: with the halftone lattice gone, NOTHING DRAWS THE STREAK
-    // RECORDS. beach-brush.js marks the open water with two paper brush lines
-    // of its own, driven by `phase` — which this module's `drift` supplies, so
-    // half of it is live and half of it is a field no frame reads. The law is
-    // still worth testing and the check still tests it; whether the records
-    // should be drawn in the new idiom or the module should lose its streak
-    // half is a ruling, not a cleanup, and it is named in the outcome doc.
-    why: 'a re-randomised surface reads as static rather than as water',
+    from: '      drift += dt * speed;',
+    to: '      drift += 0;',
+    // WHAT IS LEFT OF beach-water.js AFTER THE STREAKS WENT. The streak
+    // records were deleted on Eva's ruling because nothing drew them; the
+    // drift is the half that is live, and it is the drawing's `phase`, so a
+    // drift that does not move is a sea whose surface, horizon and bands all
+    // stand still. `the-streaks-are-rebuilt-every-frame` went with the law it
+    // exercised.
+    breaks: ['water/the-drift-advances-and-a-bigger-sea-moves-faster'],
+    why: 'the drawing wanders on this number, so a frozen drift is a frozen sea',
   },
   // --- THE DRAWING LAYER ----------------------------------------------------
   {
@@ -2944,6 +2953,56 @@ async function partOne(mutant) {
       return `${mean.toFixed(1)} px per 3.5 s over ${moves.length} windows (the brief measured ~6)`;
     });
 
+    check('the scallops are as deep in widths on any shape of frame', () => {
+      // /scene IS FULL-VIEWPORT AND PEOPLE HAVE WIDE MONITORS. The scallops
+      // are a union of half-discs whose radii are fractions of the WIDTH,
+      // while the edge they are folded into is in frame HEIGHTS — so the two
+      // differ by exactly the aspect ratio. The depth shipped baked at 16/9
+      // because the simulation has no canvas; it still has none, and is TOLD
+      // by the one thing that owns one.
+      //
+      // MEASURED AS A DIFFERENCE, ON ONE STATE, because the edge's own range
+      // is dominated by the run-up and the wobble rather than by the scallops
+      // — the first cut of this clause read peak-to-trough across three
+      // separately simulated beaches and was measuring which waves happened
+      // to be alive. The aspect enters `extentOf` exactly once, linearly, so
+      // two reads of the SAME state at two aspects differ by
+      // `scallop[i] * (a - b) * env` and nothing else. Divide that out and
+      // what is left is the scallop in WIDTHS — the quantity that must not
+      // move.
+      const q = W.createSwash({ rand: rng(31) });
+      for (let i = 0; i < Math.ceil(WV.PRE_S * 60) + 90; i++) q.advance(1 / 60, { energy: 0.5, intervalScale: 1 });
+      const readAt = (a) => {
+        q.setAspect(a);
+        q.advance(0, { energy: 0.5, intervalScale: 1 });   // recompute the edge, age nothing
+        const out = new Float64Array(201);
+        for (let i = 0; i <= 200; i++) out[i] = q.edgeAtU(i / 200);
+        return out;
+      };
+      const A = readAt(4 / 3), B = readAt(16 / 9), C = readAt(21 / 9);
+      // the same shape recovered from two independent pairs
+      let peak = 0, worst = 0;
+      for (let i = 0; i <= 200; i++) {
+        const s1 = (B[i] - A[i]) / (16 / 9 - 4 / 3);
+        const s2 = (C[i] - B[i]) / (21 / 9 - 16 / 9);
+        peak = Math.max(peak, Math.abs(s1));
+        worst = Math.max(worst, Math.abs(s1 - s2));
+      }
+      // NOT VACUOUS: a tree that had removed the scallops entirely, or one
+      // where the aspect reached nothing, would agree perfectly at zero.
+      assert.ok(peak > 0.01, `the aspect moves the edge by at most ${peak.toFixed(5)} of the width, so this says nothing`);
+      assert.ok(worst < 1e-9,
+        `the scallop recovered from two aspect pairs differs by ${worst.toExponential(2)} of the width, `
+        + 'so the depth is not simply the stored shape times the aspect');
+      // and the edge really does move in HEIGHTS, which is what a baked depth
+      // would not do
+      let moved = 0;
+      for (let i = 0; i <= 200; i++) moved = Math.max(moved, Math.abs(C[i] - A[i]));
+      assert.ok(moved > 0.004, `the edge moved ${moved.toFixed(5)} of frame height between 4:3 and 21:9`);
+      return `scallop ${peak.toFixed(4)} of the width, recovered identically from two aspect pairs `
+        + `(worst ${worst.toExponential(1)}); the edge moves ${moved.toFixed(4)} of frame height across 4:3 -> 21:9`;
+    });
+
     check('an overrun fires with the extent it reached', () => {
       const { sw, se } = settled(555);
       sw.overruns.length = 0;
@@ -3035,19 +3094,30 @@ async function partOne(mutant) {
 
     setSection('water');
 
-    check('the streaks persist and drift shoreward', () => {
-      // They are records, not a field regenerated each frame: a re-randomised
-      // surface reads as static rather than as water.
-      const wa = WA.createWater({ rand: rng(6), count: 60 });
-      assert.deepStrictEqual(Object.keys(wa.streaks[0]).sort(), [...WA.STREAK_FIELDS].sort());
-      const first = wa.streaks[0];
-      const s0 = first.s, u0 = first.u;
+    check('the drift advances, and a bigger sea moves faster', () => {
+      // THE STREAK RECORDS ARE GONE AND SO IS THE CHECK THAT HELD THEM.
+      // `water/the-streaks-persist-and-drift-shoreward` asserted that the
+      // field was records rather than a per-frame re-randomisation — a sound
+      // law, correctly implemented, and DRAWN BY NOTHING once the halftone
+      // lattice was deleted. A green check on a feature no frame renders is
+      // worse than no check, so both went, by Eva's ruling.
+      //
+      // What is left is the half the drawing reads: `drift` IS the drawing's
+      // `phase`, so the surface wander, the horizon and the sea bands travel
+      // on one clock.
+      const wa = WA.createWater();
+      assert.strictEqual(wa.drift, 0, 'the drift did not start at zero');
       for (let i = 0; i < 30; i++) wa.advance(1 / 60, { energy: 0 });
-      assert.strictEqual(wa.streaks[0], first, 'the streak array was rebuilt');
-      assert.ok(first.s > s0, 'the streak did not drift shoreward');
-      near(first.u, u0, 1e-12, 'a streak wandered along the shore');
-      assert.ok(wa.drift > 0, 'the drift phase did not advance');
-      return `s ${s0.toFixed(3)} -> ${first.s.toFixed(3)}, same record, u unchanged`;
+      const calm = wa.drift;
+      assert.ok(calm > 0, 'the drift phase did not advance');
+      const wb = WA.createWater();
+      for (let i = 0; i < 30; i++) wb.advance(1 / 60, { energy: 1 });
+      assert.ok(wb.drift > calm * 1.5, `a full sea drifted ${wb.drift.toFixed(4)} against a calm ${calm.toFixed(4)}`);
+      // the rate is the module's own declared one, read at the calm end where
+      // the energy term is exactly 1
+      near(calm, WA.DRIFT_S * 0.5, 1e-12, 'the calm drift is not DRIFT_S');
+      assert.ok(!('streaks' in wa), 'the streak field came back without a drawing that reads it');
+      return `drift ${calm.toFixed(4)} calm, ${wb.drift.toFixed(4)} at full set, over half a second`;
     });
 
     // ======================================================== the wave ====
@@ -3059,7 +3129,7 @@ async function partOne(mutant) {
 
     const mkWave = (e = 0.5, seed = 3) => WV.makeWave({ rand: rng(seed), energy: e });
 
-    check('a wave passes through all six stages, in order, exactly once each', () => {
+    check('a wave passes through all five stages, in order, exactly once each', () => {
       // THE WHOLE CLAIM OF THE FEATURE, and the one a tone field cannot
       // satisfy however it is tuned. Walked at the median column over a whole
       // life, the stage must be non-decreasing and must visit every value.
@@ -3079,14 +3149,43 @@ async function partOne(mutant) {
         if (WV.waveStage(w, S.WATERLINE_S) === WV.PEEL) sawPeel = true;
       }
       assert.ok(sawPeel, 'the wave is never in PEEL at any moment of its life');
-      for (const st of [WV.SWELL, WV.STEEPEN, WV.COLLAPSE, WV.FOAM_BAND, WV.SWASH]) {
+      // STEEPEN IS GONE AND THE MODEL IS FIVE. It named the window between the
+      // lip opening and the first column breaking, and `waveStage` could never
+      // report it: a wave whose columns disagree across the break is PEEL by
+      // definition, and every column steepening at once would need the whole
+      // peel to fit inside one `steepS` (0.28-0.455 s against 0.8-1.9 s). A
+      // stage nobody can be in reads as covered while nothing covers it.
+      for (const st of [WV.SWELL, WV.COLLAPSE, WV.FOAM_BAND, WV.SWASH]) {
         assert.ok(seen.includes(st), `a column never reaches ${WV.STAGE_NAMES[st]}`);
       }
+      assert.ok(WV.STEEPEN === undefined, 'STEEPEN is back, and nothing can be in it');
+      assert.strictEqual(Object.keys(WV.STAGE_NAMES).length, 5, 'the stage model is not five stages');
       for (let i = 1; i < order.length; i++) {
         assert.ok(order[i] > order[i - 1], `the stage went ${WV.STAGE_NAMES[order[i - 1]]} -> ${WV.STAGE_NAMES[order[i]]}`);
       }
-      assert.strictEqual(order.length, 5, `a column visited ${order.length} stages, not five`);
-      return `column: ${order.map(x => WV.STAGE_NAMES[x]).join(' -> ')}, and the wave peels`;
+      assert.strictEqual(order.length, 4, `a column visited ${order.length} stages, not four`);
+      // AND IT LEAVES SWELL AT THE MOMENT IT BREAKS, WHICH IS THE CLAUSE
+      // STEEPEN'S REMOVAL MADE AVAILABLE. With the lip labelled separately the
+      // boundary between "not broken" and "broken" had a two-stage-wide blur
+      // in it and nothing could hold the label to it; SWELL now means exactly
+      // "this column has not broken", so the transition has a time.
+      //
+      // THE REFERENCE IS THE RECORD'S OWN `breakAge`, written by `makeWave`
+      // from two lengths and a speed — a different owner from `stageAt`, which
+      // reads `brokenAt`. The column walked is the one the peel starts at,
+      // where the along-shore offset is zero by construction, so its break
+      // time IS `breakAge` with nothing re-derived here.
+      const uFirst = w.peelFrom > 0.5 ? 1 : 0;
+      let left = -1;
+      for (let t = 0; t <= w.preS; t += 1 / 240) {
+        w.age = t;
+        if (WV.stageAt(w, uFirst, S.WATERLINE_S) !== WV.SWELL) { left = t; break; }
+      }
+      assert.ok(left >= 0, 'the first-breaking column never left SWELL at all');
+      assert.ok(Math.abs(left - w.breakAge) <= 1 / 120,
+        `the first column left SWELL at ${left.toFixed(3)} s, against a declared break at ${w.breakAge.toFixed(3)} s`);
+      return `column: ${order.map(x => WV.STAGE_NAMES[x]).join(' -> ')}, leaving swell at `
+        + `${left.toFixed(2)} s against a declared ${w.breakAge.toFixed(2)}, and the wave peels`;
     });
 
     check('the break runs along the crest rather than all at once', () => {
@@ -3276,7 +3375,7 @@ async function partOne(mutant) {
       // `broken` the tone is, so a label cannot drift from the picture — and
       // this is what says so rather than the absence of a field.
       const w = mkWave(0.6);
-      let checked = 0;
+      let checked = 0, lipSeen = 0;
       const hit = new Map();
       for (let t = 0; t < w.preS; t += 0.2) {
         w.age = t;
@@ -3284,10 +3383,16 @@ async function partOne(mutant) {
         const st = WV.stageAt(w, u, S.WATERLINE_S);
         hit.set(st, (hit.get(st) || 0) + 1);
         const band = WV.bandWidthAt(w, b), face = WV.faceAmountOf(w);
-        if (st === WV.SWELL) assert.strictEqual(band, 0, 'a column in SWELL is drawing foam');
-        if (st === WV.STEEPEN) assert.ok(band <= WV.LIP_W + 1e-9, `a column in STEEPEN is drawing a band of ${band.toFixed(3)}`);
+        // SWELL NOW COVERS THE LIP, so its clause is "no band, or at most the
+        // lip's own width" — which is the two old clauses joined at the seam
+        // STEEPEN used to sit on rather than either of them loosened. A
+        // column that has not broken can be drawing the lip opening and
+        // nothing wider.
+        if (st === WV.SWELL) assert.ok(band <= WV.LIP_W + 1e-9, `a column in SWELL is drawing a band of ${band.toFixed(3)}`);
+        if (st === WV.SWELL && b < -w.steepS) assert.strictEqual(band, 0, 'a column well before its lip is drawing foam');
         if (st === WV.COLLAPSE) assert.ok(face > 0, 'a column in COLLAPSE is drawing no face');
         if (st === WV.FOAM_BAND) assert.strictEqual(face, 0, 'a column in FOAM BAND is still drawing a face');
+        if (b >= -w.steepS && b < 0) lipSeen++;
         checked++;
       }
       // AND EVERY LABEL HAS TO BE REACHED, which is the clause that stops the
@@ -3296,9 +3401,12 @@ async function partOne(mutant) {
       // SCOPE AND EMPTY, which is Eva's fifth durable rule exactly. Measured:
       // `the-wave-has-no-dark-face` reported MISSED on this check until this
       // clause existed.
-      for (const st of [WV.SWELL, WV.STEEPEN, WV.COLLAPSE, WV.FOAM_BAND]) {
+      for (const st of [WV.SWELL, WV.COLLAPSE, WV.FOAM_BAND]) {
         assert.ok((hit.get(st) || 0) > 0, `no station was ever in ${WV.STAGE_NAMES[st]}, so its clause claimed nothing`);
       }
+      // and the lip half of SWELL's clause needs a station inside the lip, or
+      // it is the same empty clause one level down
+      assert.ok(lipSeen > 0, 'no station was ever inside its own lip, so the SWELL band clause claimed nothing');
       return `${checked} stations over ${hit.size} stages, every label agreeing with what is drawn`;
     });
 
@@ -4852,13 +4960,18 @@ async function partTwo(browser, mutant, shotsDir) {
         // that have become the swash, which is a different owner from the
         // renderer's own tally.
         const m = await page.evaluate(async () => {
+          // THE SWASH STAGE'S NUMBER COMES FROM THE MODULE, not from a literal
+          // here: STEEPEN was removed and every stage below SWASH renumbered,
+          // and a `!== 6` written down in the gate would have gone on passing
+          // while meaning something else.
+          const V = await import('/scene/beach-wave.js');
           window.__scene.pause(true);
           const rows = [];
           for (let i = 0; i < 12; i++) {
             window.__scene.scenePump(1.1); window.__scene.step();
             const st = window.__scene.sceneState();
             rows.push({ alive: st.waves, drawn: st.drawnWaves,
-              notSwash: (st.waveStages || []).filter(w => w.stage !== 6).length,
+              notSwash: (st.waveStages || []).filter(w => w.stage !== V.SWASH).length,
               seeds: (st.waveStages || []).map(w => w.seed),
               heights: (st.waveStages || []).map(w => w.height) });
           }
@@ -4890,13 +5003,14 @@ async function partTwo(browser, mutant, shotsDir) {
         // "no spent wave is drawn" perfectly, so the clause that matters is
         // that an UNSPENT wave IS drawn.
         const m = await page.evaluate(async () => {
+          const V = await import('/scene/beach-wave.js');
           window.__scene.pause(true);
           let spentDrawn = 0, liveDrawn = 0, samples = 0, everSpent = 0;
           for (let i = 0; i < 40; i++) {
             window.__scene.scenePump(0.7); window.__scene.step();
             const st = window.__scene.sceneState();
             const ws = st.waveStages || [];
-            const spent = ws.filter(w => w.stage === 6).length;
+            const spent = ws.filter(w => w.stage === V.SWASH).length;
             everSpent += spent;
             if (st.drawnWaves > ws.length - spent) spentDrawn++;
             if (st.drawnWaves === ws.length - spent && st.drawnWaves > 0) liveDrawn++;

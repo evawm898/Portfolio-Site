@@ -19,7 +19,7 @@
 // file's own reference block below, which is the record of what the footage
 // says; what is gone is the machinery for painting it as ink density. What
 // stays is what a wave IS — where it is, when each column of it breaks, how
-// wide its band runs, how long its face lasts and which of six stages it is
+// wide its band runs, how long its face lasts and which of five stages it is
 // in — and `drawPhaseAt` is the one place that becomes a number the drawing
 // reads.
 //
@@ -29,22 +29,37 @@
 // disagree with the geometry that gets drawn because it is READ OFF it.
 //
 // ---------------------------------------------------------------------------
-// THE SIX STAGES, MEASURED. Sequence A of the reference (IMG_3911 ∪ IMG_3912 —
+// THE FIVE STAGES, MEASURED. Sequence A of the reference (IMG_3911 ∪ IMG_3912 —
 // which are ONE RECORDING, see docs/beach-wave-object.md §0), caught from the
 // swell on. `node tools/beach-reference.mjs <frames>` reproduces all of it.
 //
 //   1 SWELL      a dark tonal ridge, NO FOAM ANYWHERE. The water darkened 36
 //                levels over 2.4 s ahead of the lip, leaving a local minimum
-//                6-8 levels under the water either side of it.
-//   2 STEEPEN    a bright lip 0.010 of frame height. Crest 183, face 56.
-//   3 PEEL       the break runs ALONG the crest: 64 of 64 column blocks over
+//                6-8 levels under the water either side of it. The lip opens
+//                over the last `steepS` of it — a bright line 0.010 of frame
+//                height, crest 183 against a face of 56.
+//   2 PEEL       the break runs ALONG the crest: 64 of 64 column blocks over
 //                1.87 s, onset slope -1.34 s across the frame.
-//   4 COLLAPSE   band 0.025 -> 0.040, and the crest-to-face contrast PEAKS —
+//   3 COLLAPSE   band 0.025 -> 0.040, and the crest-to-face contrast PEAKS —
 //                153 in sequence A, 157 in sequence C.
-//   5 FOAM BAND  band 0.060 -> 0.135 while the face fades (-46 -> -11 levels
+//   4 FOAM BAND  band 0.060 -> 0.135 while the face fades (-46 -> -11 levels
 //                against the ambient water over 0.8 s); travels shoreward at
 //                0.09 frame heights a second.
-//   6 SWASH      beach-swash.js, unchanged.
+//   5 SWASH      beach-swash.js, unchanged.
+//
+// IT WAS SIX AND STEEPEN WAS THE ONE THAT WENT (Eva's ruling). It sat between
+// SWELL and PEEL and named the window in which the lip is open and no column
+// has broken — and `waveStage` COULD NEVER REPORT IT. The moment a wave's
+// columns disagree across the break it is PEEL by definition, and for every
+// column to be steepening at once the whole peel would have to fit inside one
+// `steepS`: measured, steepS is 0.28-0.455 s against a peel of 0.8-1.9 s, so
+// the window is empty at every reachable setting. A stage nobody can be in is
+// a stage that reads as covered while nothing covers it.
+//
+// THE LIP DID NOT GO WITH IT. `bandWidthAt` and `foamAlphaAt` still open it
+// over `steepS` and `faceAmountOf` still rises through it; what was deleted is
+// the LABEL, and a column in that window now reports SWELL, which is what it
+// is — a wave that has not broken.
 //
 // THE DARK FACE IS THE FINDING AND IT IS NOT "THE WATER UNDER THE FOAM". (The
 // tone figures below are the FOOTAGE's, and they are kept because they are
@@ -87,7 +102,7 @@ export const WAVE_FIELDS = [
   // boils and because the brush and the bubbles take a variable number off any
   // stream they share
   'seed', 'drawA', 'drawB', 'drawBubbles',
-  // and the hand-over to stage six
+  // and the hand-over to the swash
   'preS',
 ];
 
@@ -98,8 +113,8 @@ export const WAVE_FIELDS = [
 // so the labels are for the gate, the read-out and a reader, and moving one
 // cannot move a pixel. That is deliberate: the previous session's break was a
 // branch, and a branch is exactly what makes a wave pop into existence.
-export const SWELL = 1, STEEPEN = 2, PEEL = 3, COLLAPSE = 4, FOAM_BAND = 5, SWASH = 6;
-export const STAGE_NAMES = { 1: 'swell', 2: 'steepen', 3: 'peel', 4: 'collapse', 5: 'foam band', 6: 'swash' };
+export const SWELL = 1, PEEL = 2, COLLAPSE = 3, FOAM_BAND = 4, SWASH = 5;
+export const STAGE_NAMES = { 1: 'swell', 2: 'peel', 3: 'collapse', 4: 'foam band', 5: 'swash' };
 
 // --- TIMING, and which figures are measured ---------------------------------
 // MEASURED: the band grows to its widest in about 1.4 s (sequence A reached
@@ -227,7 +242,7 @@ export function drawPhaseAt(w, u) {
   // wave and becomes the swash.
   //
   // SO `b` SPANS THE WHOLE SEAWARD LIFE, and that is what makes the drawing's
-  // spent end line up with this file's stage six instead of arriving eight
+  // spent end line up with this file's SWASH stage instead of arriving eight
   // seconds early. The drawing has no fade: its foam band GROWS with `b` and
   // never thins, so a wave that reached `b = 1` while still half a frame from
   // the shore would sit there drawing a full white band until it died. With
@@ -306,7 +321,7 @@ function sampleWob(f, u) {
 
 // --- THE FOUR CONTINUOUS LAWS ----------------------------------------------
 // Each is a function of ONE number — how long ago this column broke — so the
-// six stages are regions of them rather than branches inside them.
+// five stages are regions of them rather than branches inside them.
 
 // The foam band's width. Zero until the lip, then the lip, then growth to the
 // wave's own committed maximum over BAND_GROW_S.
@@ -367,8 +382,10 @@ export function faceAmountOf(w) {
 export function stageAt(w, u, waterline) {
   const b = brokenAt(w, u);
   if (waterline !== undefined && crestAt(w, u) >= waterline) return SWASH;
-  if (b < -w.steepS) return SWELL;
-  if (b < 0) return STEEPEN;
+  // A COLUMN THAT HAS NOT BROKEN IS SWELL, lip or no lip. STEEPEN used to
+  // split this in two at `-steepS`; the lip is still opened there by
+  // `bandWidthAt` and `foamAlphaAt`, and the label is gone.
+  if (b < 0) return SWELL;
   // COLLAPSE is "this column has broken AND the wave still has a face";
   // FOAM_BAND is what is left when the face has gone. Read off the same
   // `faceAmountOf` the record reports, so the label cannot drift from it.

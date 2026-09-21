@@ -3,19 +3,32 @@
 > **THE DRAWING THIS DOCUMENT WAS MEASURED ON NO LONGER EXISTS.** The halftone
 > lattice in `scene/beach-draw.js` was replaced wholesale, inside this same
 > unmerged PR, by `scene/beach-brush.js` — see `docs/beach-drawing-layer.md`.
-> What stays is everything below about the SIX STAGES and what the reference
-> footage says: the measurements, `tools/beach-reference.mjs`, and the model in
-> `beach-wave.js`. What is superseded is every figure expressed as a TONE or as
-> ink coverage, and the two contact-sheet images (`beach-wave-stages.png`,
+> What stays is what the reference footage says: the measurements,
+> `tools/beach-reference.mjs`, and the model in `beach-wave.js`. What is
+> superseded is every figure expressed as a TONE or as ink coverage, and the
+> two contact-sheet images (`beach-wave-stages.png`,
 > `beach-wave-vs-reference.png`) which are pictures of that lattice. They are
 > kept because they are the evidence the stage model was ruled on, not because
 > they show what the scene draws.
+>
+> **AND THE MODEL IS FIVE STAGES, NOT SIX — STEEPEN WAS REMOVED** (Eva's
+> ruling, the same PR). It named the window in which the lip is open and no
+> column has broken, and `waveStage` COULD NEVER REPORT IT: a wave whose
+> columns disagree across the break is PEEL by definition, and for every column
+> to be steepening at once the whole peel would have to fit inside one
+> `steepS` — 0.28–0.455 s against a peel of 0.8–1.9 s. It is kept in the table
+> below because it is a real thing the FOOTAGE shows and the measurement stands;
+> what it stopped being is a state of the model. The lip itself did not go with
+> it: `bandWidthAt` and `foamAlphaAt` still open it over `steepS` and
+> `faceAmountOf` still rises through it. A column in that window reports SWELL,
+> which is what it is — a wave that has not broken. Stage numbers below 6
+> therefore renumbered; SWASH is 5.
 
 The merged scene (`71b73c1`) draws the water as a **tone field with a swash edge**.
 It has no wave in it: the break at the back of frame is one clause inside
 `waterTone` — a fixed dip whose depth and width scale with set energy — and the
 swash is a full life cycle. That is the gap this session closes. The swash is
-**stage six of a wave's life**, not a separate system.
+**the last stage of a wave's life**, not a separate system.
 
 Everything below is measured off the two reference recordings unless it says
 PICKED. `tools/beach-reference.mjs` reproduces every figure from a directory of
@@ -46,7 +59,10 @@ shot. The width is not re-derived here (see §4), but the four readings are two.
 
 ---
 
-## 1. The six stages, measured
+## 1. The stages, measured
+
+(Six as the footage shows them; **STEEPEN is no longer a state of the model** —
+see the banner. The measurement is unchanged and is why the lip exists at all.)
 
 Sequence A, `t` from frame 61 (the sheet is `docs/img/beach-reference-break.png`,
 top 34% of frame, every third frame):
@@ -54,11 +70,11 @@ top 34% of frame, every third frame):
 | stage | t | measured |
 |---|---|---|
 | **1 SWELL** | 0.0 – 0.6 | a dark band, **no foam anywhere in the frame**. The water at s 0.01–0.11 darkened **36 levels** over the preceding 2.4 s (L 79 → 43 at s = 0.05), leaving a local dark minimum at s ≈ 0.04 sitting 6–8 levels under the water either side of it. |
-| **2 STEEPEN** | 0.6 – 1.0 | a bright lip **0.010 of frame height** appears along the top of the ridge. Crest 183, face 56, **Δ 127**. |
-| **3 PEEL** | 1.0 – 1.7 | the bright run spreads **along** the crest. 64 of 64 column blocks break over **1.77 s**, onset slope **−1.35 s across the frame** — right to left. |
-| **4 COLLAPSE** | 1.3 – 1.6 | band 0.025 → 0.040, crest 201 → 217, face 61 → 65. **Δ peaks at 161.** |
-| **5 FOAM BAND** | 1.7 – 2.1+ | band 0.060 → 0.095 and still widening; face lightens 80 → 84; the band travels shoreward at **0.09 frame heights per second**. |
-| **6 SWASH** | — | the shipped model, unchanged. |
+| **STEEPEN** (retired as a stage; the lip is drawn inside SWELL) | 0.6 – 1.0 | a bright lip **0.010 of frame height** appears along the top of the ridge. Crest 183, face 56, **Δ 127**. |
+| **2 PEEL** | 1.0 – 1.7 | the bright run spreads **along** the crest. 64 of 64 column blocks break over **1.77 s**, onset slope **−1.35 s across the frame** — right to left. |
+| **3 COLLAPSE** | 1.3 – 1.6 | band 0.025 → 0.040, crest 201 → 217, face 61 → 65. **Δ peaks at 161.** |
+| **4 FOAM BAND** | 1.7 – 2.1+ | band 0.060 → 0.095 and still widening; face lightens 80 → 84; the band travels shoreward at **0.09 frame heights per second**. |
+| **5 SWASH** | — | the shipped model, unchanged. |
 
 Sequence C, independently: **32.8% → 100% of columns over 1.0 s**, onset slope
 **−0.80 s**, right to left again. Band **0.020 → 0.130 over 1.5 s** then fading;
@@ -155,7 +171,7 @@ crest0  breakS     where it is born, and where it breaks
 bandMax            the foam band's widest, in frame heights
 faceDepth          the dark face's tone excess over the local water
 swellDepth         the swell's, likewise
-runup advanceS holdS retreatS wob peaked life      — stage six, unchanged
+runup advanceS holdS retreatS wob scallop peaked life  — the SWASH stage's
 ```
 
 ### Stages advance by derivation, and they are a function of u
@@ -192,7 +208,8 @@ peel duration, and the runup it already sized.
 ### What is kept
 
 Commit-at-birth; the two-line model and both drying rates; `sat` / `wet` /
-`edge`; the overrun feed; the published three-thing interface; the streaks; the
+`edge`; the overrun feed; the published three-thing interface; the streaks (since
+DELETED — nothing drew them, see `docs/beach-drawing-layer.md` §8); the
 dry sand and its register; the shear; the foam speckle and the front line.
 
 ### Module layout
@@ -218,7 +235,7 @@ this rests on **two** observed breaks.
 
 ## 7. What the build cost, and the four things that are Eva's
 
-### The swell is the weakest of the six stages in this medium, and it is a trade
+### The swell is the weakest of the stages in this medium, and it is a trade
 
 The lattice **saturates**. Measured through `beach-draw.js`'s own `__flatTone`
 hook — the delivered ink coverage of the shipped row walk:

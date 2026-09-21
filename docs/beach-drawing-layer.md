@@ -299,36 +299,137 @@ per frame) and not of anything this session did. Wiring raises the frequency
 about 1.35x, which is the extra waves. The mechanism is not established beyond
 "not the state"; the remedy would be reusing buffers, which is a drawing change.
 
-## 8. What I noticed and did not change
+## 8. The five I reported, and what became of them
 
-The brief's four known-imperfect items are hers and are untouched: the hero wave
-still reads band-like across the frame, the small artifact at the left edge early
-in the peel, the hard parallel edges on the grey sea bands, the brush width
-variation. Five more, all reported rather than acted on:
+The brief's four known-imperfect items are Eva's and remain untouched: the hero
+wave still reads band-like across the frame, the small artifact at the left edge
+early in the peel, the hard parallel edges on the grey sea bands, the brush width
+variation.
 
-1. **The composition assumes a hero wave near the shore and the simulation breaks
-   far out.** `BREAK_S` is `[0.115, 0.020]` — at rest a wave breaks at 11.5% of
-   frame height and then travels to 0.40. The module's hero sits at 0.375. So the
-   drama sits higher in the frame than the module's default and the middle of the
-   frame carries spent bands. One constant, and it is the settled stage model's.
-2. **A wave arriving at the shore is progressively covered by the swash sheet**,
-   which is drawn after the waves. Its face survives as small black teeth above
-   the sheet's top edge for a second or two. Physically right, visually odd; it is
-   the hand-over region.
-3. **Nothing draws the streak records any more.** `beach-water.js` publishes
-   `drift` (consumed, as the drawing's `phase`) and `streaks` (consumed by
-   nothing — the new drawing marks the open water with two paper brush lines of
-   its own). The law is still tested and the check still tests it. Whether the
-   records should be drawn in the new idiom or the module should lose its streak
-   half is a ruling.
-4. **The drawing's scallop depth was aspect-dependent** and could not stay so once
-   it lived in the simulation, which has no canvas. Fixed at 16:9 — two of the
-   three frames it was verified at — so the scallops are a third deeper on a 4:3
-   frame than the module drew them there, and identical on 16:9.
-5. **`waveStage` can never report STEEPEN on a peeling wave**, and that is not a
-   defect: it returns PEEL the moment its columns disagree across the break, and
-   the steepening window is 0.35 s against a peel of 0.8–1.9 s. The stage lives in
-   the per-column report, which is where the six-stages check already reads it.
+Five more were reported rather than acted on when the wiring shipped. **Eva ruled
+on four of them in the pass after**, and they are recorded here with what the
+ruling turned out to cost, because in two cases that was not what the report
+predicted.
+
+1. **The composition assumed a hero wave near the shore and the simulation broke
+   far out** — `BREAK_S` `[0.115, 0.020]`, the curl peaking at s 0.202 and the
+   whole lower wave zone carrying nothing but spent bands. **RULED: the break
+   moves shoreside.** It is `[0.300, 0.205]` now, the curl peaks at s 0.331 and
+   the foam band reaches 0.386–0.466.
+
+   The report called this "one constant". It is not: `b` is linear in s between
+   the break and the waterline, so a wave that breaks nearer the shore has less
+   TIME before the hand-over, and its own foam band takes up to
+   `BAND_GROW_S + bandFadeS` = 3.8 s to grow and fade. Breaking nearer than
+   s 0.305 hands a wave to the swash with its band still growing. That bound is
+   what sets the value, and
+   `wave/the-break-leaves-a-wave-room-to-show-the-band-it-committed-to` holds it
+   from four owners that are not `BREAK_S`.
+
+2. **A wave arriving at the shore was progressively covered by the swash sheet.**
+   The report called it "physically right, visually odd". **RULED: a bug**, and
+   on measurement it is one. `sheetTop` was `front - 0.085`, a fixed band hung
+   off the swash front — so whenever the swash came within that depth of the
+   waterline the wet grey was drawn ON THE SEA: **52% of frames over 30 s of
+   beach**, by up to the full 0.085 of frame height. A wave was eaten from the
+   bottom up while it was still a twelfth of the frame from the shore.
+
+   The sheet's seaward end is the waterline now, which is the same number that
+   decides a wave has become the swash — so it cannot cover a wave that is still
+   arriving. The depth is unchanged and is a maximum. What it costs is a thinner
+   sheet while the swash is drained, which is what drained means: 39% of frames
+   have the front within 0.02 of the waterline.
+
+3. **Nothing drew the streak records.** **RULED: deleted.** `beach-water.js` kept
+   a field of persistent foam streaks — a sound law, correctly implemented, and
+   rendered by nothing once the halftone lattice went. A green check on a feature
+   no frame draws is worse than no check, so the records, the check that held
+   them and the mutant that exercised them all went together. What is left is the
+   `drift`, which is live: it is the drawing's `phase`.
+
+4. **The scallop depth was fixed at one aspect.** **RULED: make it scale**, and
+   the reason is that /scene is full-viewport and people have wide monitors. The
+   record keeps the shape in WIDTHS (which is what the drawing's lobe radii are),
+   the swash is told the aspect by the one thing that owns a canvas, and
+   `extentOf` converts at the point of use. The simulation still has no canvas;
+   it no longer needs one.
+
+5. **`waveStage` could never report STEEPEN on a peeling wave.** The report
+   called this "not a defect". **RULED: remove the stage.** A state nobody can be
+   in reads as covered while nothing covers it, and it was in the required list
+   of the stage walk, so the model claimed six and exercised five. The model is
+   five stages now and SWASH is 5. The LIP did not go with it — `bandWidthAt`,
+   `foamAlphaAt` and `faceAmountOf` all still open it over `steepS`; what went is
+   the label, and a column in that window reports SWELL, which is what it is.
+
+   Removing it cost one mutant its witness and bought a better one:
+   `the-wave-never-leaves-the-swell` used to be caught by STEEPEN becoming
+   unreachable, and with SWELL meaning exactly "has not broken" the transition
+   now has a TIME, held against the record's own `breakAge`.
+
+### And one thing the ruling pass found that no report had
+
+**`draw/the-drawn-foam-edge-is-the-published-swash-edge` was flaky, and it
+shipped that way.** A mutation proved PIXEL-IDENTICAL over 64,512,000 pixels
+reddened it on one run of three. Its search accepted a moment on `edgeMax` alone
+and then asserted nine of twelve columns were readable — two different questions.
+And its reader took the centre of the first ink run below the wet band, which a
+bubble drawn ON the front merges with: measured on a failing column, the stroke's
+own top sat at y 354.1 where the published edge predicts 354.1, and the run ran
+on to y 368. The drawing was right and the reader was wrong.
+
+Both are fixed. The search asks the real question; columns whose ink run exceeds
+1.8× the COLUMNS' OWN MEDIAN are dropped (the front is one stroke of one width,
+so that median IS the width, measured rather than imported from the thing under
+test); and the claim moved onto the median column, with the worst kept as a
+looser second bound. A separately generated front moves every column together, so
+the median is the sensitive statistic and the worst is the one the drawing's own
+marks contaminate.
+
+## 8b. The marks register — a note for the sand-marking session
+
+Not built, and deliberately not. What follows is a decision handed forward so
+that session inherits one instead of rediscovering a problem.
+
+**What was lost.** The halftone lattice drew the dry sand's texture at a declared
+alpha with 0.30 of headroom under the floor a later session's drawn marks would
+start at, and a gate clause held that gap. In this idiom there is no such gap:
+every mark in `beach-brush.js` is full-strength `PALETTE.ink` on `PALETTE.paper`,
+because that is what a cartoon on paper is. **There is no ink strength left to
+spend, so the register cannot be a tonal one and no amount of tuning will make it
+one.**
+
+**Where the separation has to come from instead: WEIGHT and LENGTH.** The sand's
+own marks are already a family with measurable bounds — thirty strokes, each
+`1.9 * H / 720` CSS px wide and `(16 + 34·r) * W / 960` long, laid at ±0.15 rad
+of the shear, with `passes: false` and `vary: 0.3`. A user's mark should be
+legibly outside that family in BOTH of those, not in one:
+
+* **weight** — at or above roughly twice the sand's, which puts it at or above
+  the swash front's own `3.8 * H / 720` and therefore among the picture's
+  structural lines rather than its texture;
+* **length** — beyond the sand's upper bound, so a mark reads as a gesture
+  rather than as another grain of the field it sits on.
+
+**Why both.** Weight alone collides with the strand line and the foam edge, which
+are the same weight and are also long; length alone collides with the sand, which
+is the same weight. The pair is what is free, and it is free precisely because
+the sand field is narrow in both.
+
+**What to assert, and what not to.** The retired clause was a tonal gap and is
+not recoverable. Its replacement is a two-dimensional one — the drawn stroke
+width and the drawn length of a user mark are each outside the sand family's
+measured range — and it wants reading off the EMITTED stroke rather than off the
+constants, for the reason the register existed in the first place: a mark that
+declares itself heavy and draws thin is exactly the failure. `brush()`'s own
+`width` argument is not the drawn width; the profile term `sin(πt)^0.30` and the
+three-frequency wobble both move it, so the measurement is of ink, on a canvas.
+
+**One thing NOT to do.** Do not give a user mark its own darker ink. The palette
+is five colours and the drawing's whole legibility rests on ink-or-paper; a sixth
+value to mean "the user drew this" is the tonal register coming back under
+another name, and on a printed-looking page it reads as a smudge rather than as a
+mark.
 
 ## 9. Gate
 

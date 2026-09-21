@@ -57,6 +57,13 @@
 export const SWASH_FIELDS = ['life', 'runup', 'advanceS', 'holdS', 'retreatS', 'wob', 'scallop', 'peaked'];
 
 import { WATERLINE_S, RUNUP_NOMINAL, RUNUP_MAX, SAMPLES } from './beach-shore.js';
+
+/**
+ * The aspect a swash assumes until it is told one. 16/9 is what the scallop
+ * depth shipped hard-wired at, so a caller that never calls `setAspect` gets
+ * exactly the beach it used to.
+ */
+export const DEFAULT_ASPECT = 16 / 9;
 import { makeWave } from './beach-wave.js';
 import { rng, lobeParams, lobesFrom } from './beach-brush.js';
 
@@ -210,7 +217,12 @@ export function sheetAt(age, a, hold, ret) {
   return clamp01(1 - (age - a - hold) / ret);
 }
 
-export function createSwash({ rand, samples = SAMPLES } = {}) {
+export function createSwash({ rand, samples = SAMPLES, aspect: aspect0 = DEFAULT_ASPECT } = {}) {
+  // THE SHAPE OF THE FRAME, AND THE ONLY THING IN THIS FILE THAT KNOWS IT.
+  // The scallops are stored in widths and the edge is in heights, so the one
+  // number that converts them is the aspect — told by whoever owns a canvas,
+  // and defaulted so a Node-side caller with no viewport still gets a beach.
+  let aspect = aspect0;
   const sat = new Float64Array(samples).fill(WATERLINE_S + RUNUP_NOMINAL);
   const wet = new Float64Array(samples).fill(WATERLINE_S + RUNUP_NOMINAL);
   const edge = new Float64Array(samples).fill(WATERLINE_S);
@@ -257,13 +269,18 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
   // the high-water mark with it. Subtracting its mean changes no shape at all:
   // it is a constant offset on a curve.
   //
-  // AND THE DEPTH IS IN FRAME HEIGHTS, WHICH THE DRAWING'S WAS NOT. The
-  // module's lobe radii are fractions of the WIDTH and its depth falls out of
-  // them, so the scallops it drew were a third deeper on a 16:9 frame than on a
-  // 4:3 one. The simulation has no canvas and cannot have an aspect, so the
-  // conversion is fixed here at the aspect two of the three frames the drawing
-  // was verified at actually are.
-  const SCALLOP_ASPECT = 16 / 9;
+  // AND THE DEPTH IS STORED IN WIDTHS AND READ IN HEIGHTS, which is what makes
+  // it aspect-independent. The module's lobe radii are fractions of the WIDTH
+  // and its depth falls out of them, while the edge is in frame HEIGHTS — so
+  // the two differ by the aspect ratio, and a scallop baked at one aspect is a
+  // third too deep on a 4:3 frame and too shallow on a 21:9 one.
+  //
+  // IT SHIPPED FIXED AT 16/9 because the simulation has no canvas, and that is
+  // still true: what changed is that it no longer has to. The record keeps the
+  // raw width-unit shape, `aspect` is told to the swash by whoever does own a
+  // canvas, and `extentOf` converts at the point of use. /scene is
+  // full-viewport and people have wide monitors, so "two of the three frames
+  // it was verified at" was never a good enough reason.
   function makeScallop(seed) {
     const r = rng(seed);
     const us = new Array(samples);
@@ -272,8 +289,11 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     const b = lobesFrom(us, lobeParams(r, 26, 0.008, 0.025), 1, null, 0.5);
     const f = new Float64Array(samples);
     let mean = 0;
-    for (let i = 0; i < samples; i++) { f[i] = (a[i] + b[i]) * SCALLOP_ASPECT; mean += f[i]; }
+    for (let i = 0; i < samples; i++) { f[i] = a[i] + b[i]; mean += f[i]; }
     mean /= samples;
+    // ZERO-MEANED IN WIDTHS, WHICH IS THE SAME CURVE ZERO-MEANED IN HEIGHTS:
+    // the conversion is a single positive factor, so it commutes with taking
+    // the mean and `runup` still means the wave's reach at every aspect.
     for (let i = 0; i < samples; i++) f[i] -= mean;
     return f;
   }
@@ -285,7 +305,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     const target = RUNUP_NOMINAL + e * (RUNUP_MAX - RUNUP_NOMINAL);
     const reach = target * rand.range(RUNUP_VARY[0], RUNUP_VARY[1]);
     // ONE RECORD, BORN AT SEA. `makeWave` freezes everything stages one to
-    // five need; the fields below are stage six's, and `preS` — which
+    // four need; the fields below are the SWASH stage's, and `preS` — which
     // `makeWave` derives from the wave's own travel — is when the one hands
     // over to the other. So a swash no longer begins out of nothing at the
     // waterline: it is the arrival of a thing that has been in the frame,
@@ -331,7 +351,7 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     const env = swashEnv(swashAge(w), w.advanceS, w.holdS, w.retreatS);
     if (env <= 0) return WATERLINE_S;
     const reach = (w.runup - WATERLINE_S) * env;
-    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i]) * env;
+    return WATERLINE_S + reach + (WOB_S * w.wob[i] + w.scallop[i] * aspect) * env;
   }
 
   const sw = {
@@ -431,6 +451,10 @@ export function createSwash({ rand, samples = SAMPLES } = {}) {
     //
     // They are bound onto the scene in scene-beach.js, which owns the shore
     // and therefore the x -> y mapping; here they are in beach coordinates.
+    /** the frame's width over its height; the scallops' depth follows it */
+    setAspect(a) { if (a > 0 && Number.isFinite(a)) aspect = a; },
+    get aspect() { return aspect; },
+
     edgeAtU(u) { return sampleAt(edge, u); },
     wetAtU(u) { return sampleAt(wet, u); },
     satAtU(u) { return sampleAt(sat, u); },
