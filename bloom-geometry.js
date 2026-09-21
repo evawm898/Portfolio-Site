@@ -2906,6 +2906,285 @@ export function footRing(state, acc) {
 }
 
 /* ===================================================================
+   ORGANIC VARIANCE, BUILD 1 OF 3 — SIZE (docs/bloom-organic-variance-discovery.md,
+   Eva's rulings §9; docs/bloom-organic-variance-size-outcome.md). A per-slot
+   SIZE FACTOR indexed on the EMITTED AZIMUTH, multiplied into the slot's
+   `scale` inside the whorl primitive — route (a) of the discovery's §1, "a
+   per-slot size ramp handed to the primitive", the CONTINUOUS arm's own shape.
+   `slot.scale` already reaches `petalSurface` as `length = petalLength *
+   slot.scale` and `halfW = petalWidth * slot.scale / 2` (the inner whorls'
+   own route), so nothing new touches the blade: the field changes ONE double
+   per slot before the builder is called.
+
+   THE LAW is `factor = 1 + A * g(theta)`, one expression for every placement:
+     f >= 1   g = cos(f * theta + phi)             a WAVE, f cycles per turn
+     f  = 0   g = -1 + 2 * wrap(theta - phi) / TAU  a RAMP, its seam at the phase
+   with `theta` the slot's emitted azimuth — RADIAL and SPIRAL immediately, and
+   CONTINUOUS / SPHERE through the golden-angle azimuth the sequence already
+   hands each slot, so the polar sequence, the equal-area law and the stem
+   channel are untouched (the omission mask re-measures each slot's REAL
+   petal, through this same field — see stemOmission's whorl call).
+   ON A FAN THE FIELD IS EVEN ABOUT THE MIRROR PLANE or the fan stops being a
+   fan (§5): `theta` is the UNSIGNED angle from the plane (a fan ring's phase
+   is exactly 0, so the emitted azimuth IS that angle, signed), the wave is
+   `cos(f * |theta|)` with the phase INERT, and the ramp runs PLANE-OUTWARD,
+   `-1 + 2 * |theta| / halfSpan`, over the fan's own derived half-span. Mirror
+   pairs are built as `+m` and `-m` from one magnitude, `Math.abs` of an exact
+   negation is the same double, so a pair's two factors are EQUAL TO THE BIT —
+   which is what keeps Z4a / Z4b / Z8 / J7 true as they stand.
+
+   AMOUNT 0 IS A NULL RECORD, NOT A FACTOR OF 1. `sizeVarianceField` returns
+   null at the default and the primitive BRANCHES on it — the slot's scale is
+   then the very expression it was, no multiplication performed — so the
+   shipping default is byte-identical BY BRANCH (the `domeIsFlat` / `petalStateFor`
+   discipline), and the byte partition is predeclared from this predicate
+   rather than from row labels: a row moves iff `varianceIsAbsent` is false.
+
+   FREQUENCY IS TOLD, NOT CAPPED (ruling 4). A wave needs more than two slots
+   a cycle to draw as a wave; past that it ALIASES into scatter, which is a
+   wanted look. The threshold is the arrangement's own sampling: `n / 2` cycles
+   on a ring of n slots (the golden-angle sequence has no uniform pitch, and
+   its mean density is n a turn, so the same bar is used and said to be the
+   mean), and `pi / step` on a fan, whose pitch is its own derived step. The
+   record carries `aliased`, `nyquist` and the count it was judged against; the
+   read-out says it; the range is not narrowed.
+
+   THE RANGE IS ±50 % (ruling 3): a factor from 0.5 to 1.5 of the nominal, so
+   the smallest petal a slot can carry is half the control's own length and
+   width and the largest one and a half times. Nothing here clamps against a
+   neighbour — the neighbour approach is TOLD by `neighbourFlag` below, never
+   enforced (ruling 1, the condition of the ruling).
+
+   SEPALS ARE UNTOUCHED IN THIS BUILD: `buildSepalsInto`'s whorl is handed no
+   field. Ruling 5 gives them their own amounts, frequency and phase; costed in
+   the outcome doc, not built here. */
+export const VARIANCE_SIZE_RANGE = Object.freeze([0, 0.5]);
+export const VARIANCE_FREQUENCY_RANGE = Object.freeze([0, 20]);
+export const VARIANCE_PHASE_RANGE = Object.freeze([0, 360]);
+/* THE GUARD, stated once and read by the registry's predicate twin, the
+   builder, the byte partition's mover rule and the harness's VS0. A string
+   '0' from a matrix row is coerced (the leaf session's own lesson). */
+export function varianceIsAbsent(state) {
+  return !(Number(state.varianceSize) > 0);
+}
+export function sizeVarianceField(state, fr) {
+  if (varianceIsAbsent(state)) return null;
+  const amount = Number(state.varianceSize);
+  const frequency = Math.round(Number(state.varianceFrequency));
+  const phaseDeg = Number(state.variancePhase);
+  const phi = (phaseDeg * Math.PI) / 180;
+  const fan = fr.fan;
+  /* the slots the wave is sampled on: one whorl's worth on a ring, the whole
+     sequence under CONTINUOUS (one whorl of layerCount * n slots) */
+  const n = fr.continuousMode ? fr.sequenceLength : fr.slotCount;
+  const halfSpan = fan ? (fan.spanDeg * Math.PI) / 360 : null;
+  const nyquist = fan ? Math.PI / fan.step : n / 2;
+  const aliased = frequency > 0 && frequency > nyquist;
+  const g = fan
+    ? (frequency === 0
+      ? (az) => (halfSpan > 0 ? -1 + (2 * Math.abs(az)) / halfSpan : -1)
+      : (az) => Math.cos(frequency * Math.abs(az)))
+    : (frequency === 0
+      ? (az) => { let w = (az - phi) % TAU; if (w < 0) w += TAU; return -1 + (2 * w) / TAU; }
+      : (az) => Math.cos(frequency * az + phi));
+  return {
+    amount, frequency, phaseDeg, phaseInert: !!fan, fan: !!fan, n, nyquist, aliased,
+    halfSpanDeg: fan ? fan.spanDeg / 2 : null,
+    lo: 1 - amount, hi: 1 + amount,
+    at: (azimuth) => 1 + amount * g(azimuth),
+  };
+}
+
+/* ===================================================================
+   THE TOLD FLAG (ruling 1's condition — "the told flag ships with the FIRST
+   variance PR"): the generator REPORTS how close the petals stand, it never
+   clamps. Three numbers, each with its own owner and its own sampling, on
+   EVERY recorded build whatever the amount, so the shipping default has a
+   reading before any field is turned on:
+
+     TIGHTEST PITCH — the smallest azimuth gap between neighbouring slots of
+       one whorl, read off the EMITTED azimuths the primitive placed, against
+       the whorl's nominal pitch (a whole turn over its slot count; on a fan the
+       notch is not a pitch and is left out). Size variance moves no azimuth,
+       so on this build it reads 1.000x nominal on every row; it is here because
+       the flag is the family's and build 3 is what moves it.
+     NEAREST FEET — the crowding instrument's own `nearestFeet` (moved here from
+       tools/bloom-crowding.mjs so the page and the gate read ONE function):
+       centre to centre over ALL pairs of feet, in mean foot widths, from
+       footRing()'s own ring records and the builder's own azimuths.
+     NEAREST NEIGHBOUR APPROACH — the smallest distance between any two petals'
+       mid-surfaces over ALL pairs, on the builder's own 56 x 10 lamina above
+       ROOT_BLEND_END (the root exit is the crowding instrument's region, and
+       the neighbour-gap tool draws the same line), less the sheet, so a
+       negative number is skins passing through each other. It is the
+       instrument `tools/bloom-neighbour-gap.mjs` reads (`minGaps`' `blade`),
+       restated here with the geometry's own `closestOnTriangle` and a
+       row-strip prune that makes it affordable on every build: 4 ms on the
+       default, ~0.2 s on the 120-petal mum, all pairs (measured, Node). ALL
+       PAIRS AND NOT AZIMUTH-ADJACENT ONES, because on a continuous mum the
+       nearest approach is between TURNS — adjacent-by-azimuth read 4.42 mm
+       where all-pairs reads 0.56 on the same build. The reading is the
+       LAMINA's, so the two skins' faceting is under it (session 33's finding
+       that a faceted roll reads 0.587 mm against a declared 1.200); it names
+       its sampling so it cannot be quoted as a wall.
+
+   The crowding RASTER (D_max, `stackDepth`) stays the gates' instrument — it
+   imports the harness and is printed on every gate row already; the page
+   carries the two neighbour figures the discovery's §2b tabulates beside it.
+   Nothing here is a gate, nothing here is read by the geometry: `neighbourFlag`
+   runs AFTER every solid is emitted and can move no byte, which
+   `verify-bloom-surface-bytes` measures rather than argues. */
+export function footList(built) {
+  const fr = built.foot;
+  const feet = [];
+  const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
+  /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the sphere-stem
+     session): the omitted set is the BUILDER's own record; with no channel it
+     is empty and the filter keeps every foot. */
+  const omitted = new Set((built.stemOmission && built.stemOmission.omitted) || []);
+  if (fr.continuousMode) {
+    fr.rings.forEach((r, k) => { if (!omitted.has(k)) feet.push(rec(r, built.slotAzimuths[0][k], 0, k)); });
+  } else {
+    for (let L = 0; L < fr.layerCount; L++) {
+      const row = fr.slotRings[L];
+      for (let i = 0; i < row.length; i++) feet.push(rec(row[i], built.slotAzimuths[L][i], L, i));
+    }
+  }
+  /* THE SEPAL FEET (sepals, part 1) stack on the same base as the petal feet —
+     counted from the descriptor's ring and the azimuths the builder's own
+     whorl placed. */
+  if (built.sepals) built.sepals.azimuths.forEach((az, k) => feet.push(rec({ ...fr.sepals.ring, index: -1 }, az, 'sepal', k)));
+  return feet;
+}
+/* All-pairs nearest neighbour — centre to centre, in mean foot widths — and
+   the same statistic restricted to index-adjacent slots of one whorl, which
+   is what a neighbour-picking metric would have read. Diagnostics. (Moved
+   verbatim from tools/bloom-crowding.mjs, which imports it from here now.) */
+export function nearestFeet(feet, dome = null) {
+  /* ON THE CLOSED SPHERE the foot's centre is a point ON the sphere (the
+     meridian at arc minus half the overhang) and the distance is the chord —
+     a plan centre would fold the far side onto the near side. Cap and flat:
+     the plan centre, verbatim. */
+  const closed = dome && dome.closed === true;
+  const centre = closed
+    ? (f) => { const ph = (f.arc - f.overhang / 2) / dome.Rd; const rr = dome.Rd * Math.sin(ph); return [rr * Math.cos(f.az), rr * Math.sin(f.az), dome.Rd * Math.cos(ph)]; }
+    : (f) => { const rc = f.radius - f.overhang / 2; return [rc * Math.cos(f.az), rc * Math.sin(f.az), 0]; };
+  const C = feet.map(centre);
+  let all = { q: Infinity, d: Infinity, a: null, b: null, gap: null };
+  let adj = { q: Infinity, d: Infinity, a: null, b: null, gap: 1 };
+  for (let i = 0; i < feet.length; i++) {
+    for (let j = i + 1; j < feet.length; j++) {
+      const d = Math.hypot(C[i][0] - C[j][0], C[i][1] - C[j][1], C[i][2] - C[j][2]);
+      const q = d / ((feet[i].width + feet[j].width) / 2);
+      if (q < all.q) all = { q, d, a: feet[i], b: feet[j], gap: Math.abs(feet[i].slot - feet[j].slot) };
+      if (feet[i].layer === feet[j].layer && Math.abs(feet[i].slot - feet[j].slot) === 1 && q < adj.q) adj = { q, d, a: feet[i], b: feet[j], gap: 1 };
+    }
+  }
+  return { all, adjacent: adj };
+}
+/* The tightest azimuth gap between neighbouring slots, per whorl, against the
+   whorl's nominal pitch. Emitted azimuths, sorted on the circle; on a FAN the
+   largest gap is the notch and is dropped, so only pitches within the arc are
+   compared. Returns the worst whorl. */
+export function tightestPitch(slotAzimuths, fr) {
+  let worst = null;
+  slotAzimuths.forEach((row, L) => {
+    const n = row.length;
+    if (n < 2) return;
+    const az = row.map((a) => ((a % TAU) + TAU) % TAU).sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 0; i < n; i++) gaps.push(i + 1 < n ? az[i + 1] - az[i] : az[0] + TAU - az[i]);
+    if (fr.fan) { gaps.sort((a, b) => a - b); gaps.pop(); }
+    const nominal = fr.fan ? fr.fan.step : TAU / n;
+    const tight = Math.min(...gaps);
+    const rec = { whorl: L, n, tightDeg: (tight * 180) / Math.PI, nominalDeg: (nominal * 180) / Math.PI, ratio: tight / nominal };
+    if (worst === null || rec.ratio < worst.ratio) worst = rec;
+  });
+  return worst;
+}
+/* A petal's lamina above `uMin` as ROW STRIPS, each with its box: the prune
+   the all-pairs query needs. `rows` are the captured grid's own rows. */
+function laminaStrips(grid, uMin) {
+  const strips = [];
+  const pts = [];
+  const lo = [Infinity, Infinity, Infinity], hi = [-Infinity, -Infinity, -Infinity];
+  for (const panel of grid) {
+    const rows = panel.rows.filter((r) => r.u > 0 && r.u >= uMin);
+    for (let i = 0; i < rows.length; i++) {
+      for (const P of rows[i].mid) { pts.push(P); for (let k = 0; k < 3; k++) { if (P[k] < lo[k]) lo[k] = P[k]; if (P[k] > hi[k]) hi[k] = P[k]; } }
+      if (i + 1 >= rows.length) continue;
+      const a = rows[i].mid, b = rows[i + 1].mid;
+      const slo = [Infinity, Infinity, Infinity], shi = [-Infinity, -Infinity, -Infinity];
+      for (const P of a) for (let k = 0; k < 3; k++) { if (P[k] < slo[k]) slo[k] = P[k]; if (P[k] > shi[k]) shi[k] = P[k]; }
+      for (const P of b) for (let k = 0; k < 3; k++) { if (P[k] < slo[k]) slo[k] = P[k]; if (P[k] > shi[k]) shi[k] = P[k]; }
+      const tris = [];
+      for (let j = 0; j + 1 < a.length; j++) { tris.push([a[j], a[j + 1], b[j]]); tris.push([a[j + 1], b[j + 1], b[j]]); }
+      strips.push({ lo: slo, hi: shi, tris });
+    }
+  }
+  return { strips, pts, lo, hi };
+}
+const boxDistance = (p, lo, hi) => { let s = 0; for (let k = 0; k < 3; k++) { const d = Math.max(0, lo[k] - p[k], p[k] - hi[k]); s += d * d; } return Math.sqrt(s); };
+const boxGapOf = (A, B) => { let s = 0; for (let k = 0; k < 3; k++) { const d = Math.max(0, A.lo[k] - B.hi[k], B.lo[k] - A.hi[k]); s += d * d; } return Math.sqrt(s); };
+/* Nearest approach of A's lattice points to B's lamina, never past `bound`:
+   strips visited in ascending box distance and abandoned the moment a box is
+   further than the best so far. */
+function pointsToLamina(A, B, bound) {
+  let best = bound, at = null;
+  const dist = new Float64Array(B.strips.length);
+  const idx = [];
+  for (const p of A.pts) {
+    if (boxDistance(p, B.lo, B.hi) >= best) continue;
+    idx.length = 0;
+    for (let s = 0; s < B.strips.length; s++) { const d = boxDistance(p, B.strips[s].lo, B.strips[s].hi); if (d < best) { dist[s] = d; idx.push(s); } }
+    idx.sort((x, y) => dist[x] - dist[y]);
+    for (const s of idx) {
+      if (dist[s] >= best) break;
+      for (const t of B.strips[s].tris) {
+        const { q } = closestOnTriangle(p, t[0], t[1], t[2]);
+        const d = Math.hypot(p[0] - q[0], p[1] - q[1], p[2] - q[2]);
+        if (d < best) { best = d; at = p; }
+      }
+    }
+  }
+  return { best, at };
+}
+/* The smallest mid-surface distance between any two of `petals` (the builder's
+   records, each with its captured `grid`), above `uMin`. Pairs are visited in
+   ascending box gap so the bound tightens early. */
+export function neighbourApproach(petals, uMin = ROOT_BLEND_END) {
+  const lam = petals.map((p) => laminaStrips(p.lamina, uMin));
+  const pairs = [];
+  for (let i = 0; i < lam.length; i++) for (let j = i + 1; j < lam.length; j++) pairs.push([boxGapOf(lam[i], lam[j]), i, j]);
+  pairs.sort((a, b) => a[0] - b[0]);
+  let best = Infinity, pair = null, at = null;
+  for (const [gap, i, j] of pairs) {
+    if (gap >= best) break;
+    const ab = pointsToLamina(lam[i], lam[j], best);
+    if (ab.best < best) { best = ab.best; pair = [i, j]; at = ab.at; }
+    const ba = pointsToLamina(lam[j], lam[i], best);
+    if (ba.best < best) { best = ba.best; pair = [i, j]; at = ba.at; }
+  }
+  return { mm: best, pair, at: at ? { r: Math.hypot(at[0], at[1]), z: at[2] } : null, pairs: pairs.length, petals: petals.length, uMin };
+}
+export function neighbourFlag(built) {
+  const fr = built.foot;
+  const feet = footList(built);
+  const nn = nearestFeet(feet, fr.hub.dome);
+  const pitch = tightestPitch(built.slotAzimuths, fr);
+  const petals = built.petalsAll.filter((p) => p && p.lamina);
+  const lamina = petals.length >= 2 ? neighbourApproach(petals) : null;
+  const t = fr.rings.length ? fr.rings[0].thickness : null;
+  return {
+    pitch,
+    feet: { n: feet.length, q: nn.all.q, d: nn.all.d, gap: nn.all.gap, a: nn.all.a && `${nn.all.a.layer}/${nn.all.a.slot}`, b: nn.all.b && `${nn.all.b.layer}/${nn.all.b.slot}`, qAdjacent: nn.adjacent.q, dAdjacent: nn.adjacent.d },
+    /* the lamina reading and the SKIN GAP it implies (less one sheet, the
+       two skins' offsets), on the builder's own lattice above ROOT_BLEND_END */
+    blade: lamina ? { laminaMm: lamina.mm, skinGapMm: lamina.mm - t, sheetMm: t, pair: lamina.pair, at: lamina.at, pairs: lamina.pairs, petals: lamina.petals, uMin: lamina.uMin, crossing: lamina.mm - t < 0, underFeature: lamina.mm - t < MIN_FEATURE_MM } : null,
+  };
+}
+
+/* ===================================================================
    buildWhorlInto — the arrangement primitive, built as a whorl from day one
    (charter: "Arrangement facts worth having on day one"). Full signature
    (count, radius, height, sizeRamp, angleRamp, phase, blade) even though
@@ -2988,7 +3267,7 @@ function fanAzimuth(i, { perSide, centre, step }) {
   return i < perSide ? (i + 0.5) * step : -((2 * perSide - 0.5 - i) * step);
 }
 
-export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null }) {
+export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, phase, blade, placement = 'RADIAL', fan = null, azimuths = null, sizeField = null }) {
   /* LIST (sepals, part 1): explicit azimuths, one per slot — the arm a fan's
      sepals take, because their positions are footRing()'s own answer (the
      fan's lattice shifted by the phase, the `count` nearest the mirror line)
@@ -2997,7 +3276,12 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
   if (placement === 'LIST') {
     if (!Array.isArray(azimuths) || azimuths.length !== count) throw new Error(`placement LIST needs ${count} azimuths, was handed ${azimuths ? azimuths.length : 'none'}`);
     const radiusAt = typeof radius === 'function' ? radius : () => radius;
-    for (let i = 0; i < count; i++) blade({ index: i, azimuth: azimuths[i], radius: radiusAt(i, count), z: height, scale: sizeRamp(i, count), tiltExtra: angleRamp(i, count) });
+    for (let i = 0; i < count; i++) {
+      const azimuth = azimuths[i];
+      const sizeFactor = sizeField === null ? null : sizeField.at(azimuth);
+      const scale = sizeFactor === null ? sizeRamp(i, count) : sizeRamp(i, count) * sizeFactor;
+      blade({ index: i, azimuth, radius: radiusAt(i, count), z: height, scale, tiltExtra: angleRamp(i, count), sizeFactor });
+    }
     return;
   }
   if (placement !== 'RADIAL' && placement !== 'SPIRAL' && placement !== 'CONTINUOUS' && placement !== 'FAN') {
@@ -3011,16 +3295,30 @@ export function buildWhorlInto({ count, radius, height, sizeRamp, angleRamp, pha
     throw new Error(`placement "${placement}" ${fan ? 'was handed' : 'was handed no'} fan law — the two must arrive together`);
   }
   const radiusAt = typeof radius === 'function' ? radius : () => radius;
+  /* THE SIZE FIELD (organic variance, build 1) multiplies the slot's scale by
+     a factor of its EMITTED azimuth, and it is a BRANCH: with no field the
+     scale is `sizeRamp(i, count)` exactly as it was, no product formed, so
+     the slot payload at the shipping default is the same doubles in the same
+     order. The azimuth is the primitive's own — never a second copy of the
+     placement law — which is what makes "indexed on the emitted azimuth" a
+     property of the code rather than a claim. */
   for (let i = 0; i < count; i++) {
+    const azimuth = placement === 'FAN'
+      ? phase + fanAzimuth(i, fan)
+      : (placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE);
+    const sizeFactor = sizeField === null ? null : sizeField.at(azimuth);
+    const scale = sizeFactor === null ? sizeRamp(i, count) : sizeRamp(i, count) * sizeFactor;
     blade({
       index: i,
-      azimuth: placement === 'FAN'
-        ? phase + fanAzimuth(i, fan)
-        : (placement === 'RADIAL' ? phase + (i * TAU) / count : phase + i * GOLDEN_ANGLE),
+      azimuth,
       radius: radiusAt(i, count),
       z: height,
-      scale: sizeRamp(i, count),
+      scale,
       tiltExtra: angleRamp(i, count),
+      /* the factor the field handed this slot, null with no field — the
+         builder's per-slot record reads it here rather than dividing it back
+         out of `scale`, which would not reproduce it to the bit */
+      sizeFactor,
     });
   }
 }
@@ -7313,6 +7611,14 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        layer size). Telemetry: the read-out and the SP family print it rather
        than re-multiplying two controls. */
     length,
+    /* THE NOMINAL LENGTH THE BLADE WAS SCALED FROM, the descriptor's own scale
+       and the whorl this petal stands in (organic variance, build 1): VS2 asks
+       whether a slot's size FACTOR reached the blade — `length` must be the
+       nominal times the slot's scale, and the slot's scale the ring's times
+       the factor, both the builder's own products so the equalities are exact.
+       A factor recorded and a blade built at nominal size is what no STL
+       property can see. */
+    nominalLength: ps.petalLength, ringScale: ring.scale, whorl: ring.lambda,
     /* WHERE THIS PETAL SITS AROUND THE AXIS, from the slot payload the whorl
        primitive produced. Reported for the same reason `tangent` is: a shot
        tool or an assertion deriving it from the controls would be a second
@@ -7381,7 +7687,14 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        are, and the export path does exactly that. See
        docs/bloom-session-28-outcome.md for the measured step at that seam —
        it is the TILT, not a change of cross-section law. */
-    grid: capturedPanels,
+    grid: acc.captureGrid ? capturedPanels : null,
+    /* THE SAME PANELS UNDER THE BUILDER'S OWN NAME (organic variance, build 1):
+       `grid` keeps meaning "captured iff the accumulator was asked to capture a
+       grid" — verify-bloom-grid's clause 1b, the .glb export's contract — and
+       `lamina` is what the builder's OWN consumers read (the told flag's
+       neighbour approach, the sepal angle scan), present whenever either
+       capture is on. The same array object when both are. */
+    lamina: capturedPanels,
     /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
        precedent) — SP1 sums the sepals' own against the whorl's. */
     tris: acc.triangleCount - tris0,
@@ -7391,7 +7704,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        the other-mode lamina evaluation, which needs the slot payload to call
        the surface's front door on the same lattice. Telemetry; nothing here
        moves a byte. */
-    base, seamStep, slot: { index: slot.index, azimuth: slot.azimuth, radius: slot.radius, z: slot.z, scale: slot.scale, tiltExtra: slot.tiltExtra },
+    base, seamStep, slot: { index: slot.index, azimuth: slot.azimuth, radius: slot.radius, z: slot.z, scale: slot.scale, tiltExtra: slot.tiltExtra, sizeFactor: slot.sizeFactor ?? null },
     /* WHERE THIS PETAL MEETS THE HUB — the quantity a downstream consumer
        cannot recover from the grid without knowing the foot's layout: the
        grid's own first row is the INNERMOST foot row, the one that runs
@@ -8189,7 +8502,7 @@ export function petalFreeStemApproachMm(state, ring, slot, cap, plan, exportMode
    the matching-mode probe into the real accumulator, and a cheap reach envelope
    that skips petals nowhere near the pole) are costed in the outcome doc and
    deliberately not built in a PR this size. */
-export function stemOmission(state, fr, cap, plan) {
+export function stemOmission(state, fr, cap, plan, sizeField = null) {
   if (!plan || !plan.present || !fr.sphereMode) return null;
   const clearanceMm = STEM_PETAL_CLEARANCE_MM;
   const K = fr.rings.length;
@@ -8209,6 +8522,9 @@ export function stemOmission(state, fr, cap, plan) {
     angleRamp: (i) => fr.rings[i].tiltExtra,
     phase: fr.rings[0].phase,
     placement: state.placement,
+    /* THE PETAL MEASURED IS THE PETAL BUILT: the size field is handed over so
+       a slot the field shrinks or grows is probed at the size it will have. */
+    sizeField,
     blade: (slot) => {
       const ring = fr.rings[slot.index];
       let hit = false;
@@ -9812,7 +10128,7 @@ export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
   const acc = new MeshBuilder({ exportMode, captureLamina: true });
   const slot = { index: 0, azimuth: 0, radius: sepals.ring.radius, z: sepals.height, scale: sepals.scale, tiltExtra: 0 };
   const p = buildPetalInto(acc, sepalBladeState(state, angleDeg), sepals.ring, slot, null, false);
-  return { lamina: laminaFromPanels(p.grid), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
+  return { lamina: laminaFromPanels(p.lamina), base: p.base, seamStep: p.seamStep, tilt: angleDeg };
 }
 /* THE PETALS' LAMINAE IN THE OTHER MODE, on the same (u, v) lattice the built
    mode emitted, through the surface's own front door. The ladder is mode-free
@@ -9832,7 +10148,7 @@ export function sepalTrialLamina(state, sepals, angleDeg, exportMode) {
 function petalLaminaInMode(site, state, exportMode) {
   const acc = new MeshBuilder({ exportMode });
   const surface = petalSurface(state, site.ring, site.slot, site.cap, acc);
-  const panels = site.p.grid.map((panel) => ({
+  const panels = site.p.lamina.map((panel) => ({
     rows: panel.rows.filter((r) => r.u >= ROOT_BLEND_END).map((r) => { const row = surface.rowAt(r.u); const q = r.v.map((v) => row.sect(v)); return { u: r.u, mid: q.map((x) => x.P), normal: q.map((x) => x.n) }; }),
   }));
   return laminaFromPanels(panels);
@@ -10314,7 +10630,7 @@ export function buildInflorescenceInto(acc, state, plan) {
        floret's petal count and an instrument that never asks whether a slot
        was built is the class the sphere-stem session named; it reads
        `stemOmission()`'s own record, which is not this plan's. */
-    unit: { petalsBuilt: unit.petalsBuilt, hub: unit.hub, stem: unit.stem, stemBuilt: unit.stemBuilt,
+    unit: { petalsBuilt: unit.petalsBuilt, hub: unit.hub, stem: unit.stem, stemBuilt: unit.stemBuilt, variance: unit.variance, neighbour: unit.neighbour,
       ring: unit.ring, maxDimensionMm: sub.maxDimensionMm, minThickness: sub.minThickness,
       sphereMode: unit.foot.sphereMode === true,
       omissionAsked: unit.stemOmission ? unit.stemOmission.asked : null,
@@ -10566,7 +10882,7 @@ export function sepalAngleLimit(state, fr, acc, sites) {
     const name = exportMode ? 'export' : 'live';
     const t = acc.exportMode === exportMode ? acc.floorThickness(state.sheetThickness) : new MeshBuilder({ exportMode }).floorThickness(state.sheetThickness);
     /* the petals in this mode */
-    const petals = sites.map((s) => (exportMode === acc.exportMode ? laminaFromPanels(s.p.grid) : petalLaminaInMode(s, state, exportMode)));
+    const petals = sites.map((s) => (exportMode === acc.exportMode ? laminaFromPanels(s.p.lamina) : petalLaminaInMode(s, state, exportMode)));
     if (!petals.length) { perMode[name] = { limitDeg: hi, contactDeg: null, kind: null, petal: null, sepal: null, at: null }; continue; }
     const G = laminaGrid(petals, t);
     /* the distinct sepal configurations: a slot's neighbourhood is the set of
@@ -10773,7 +11089,17 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      moves by asking early, and the read-out can name the florets even on a
      row whose geometry is absent. */
   const infloPlanned = inflorescencePlan(state, stemPlanned, acc);
-  const omission = stemOmission(state, fr, capability, stemPlanned);
+  /* THE SIZE FIELD (organic variance, build 1): null at amount 0, the guard
+     every consumer branches on. Asked once, before the omission mask, because
+     the mask probes each slot's petal at the size this field gives it. */
+  const sizeField = sizeVarianceField(state, fr);
+  const omission = stemOmission(state, fr, capability, stemPlanned, sizeField);
+  /* ONE FACTOR ROW PER WHORL, parallel to `slotAzimuths` (the same shape, the
+     same indexing, one entry per SLOT whether or not a petal was built on it),
+     null when the field is — the metrics hook's per-slot applied record, which
+     is what lets VS1 restate the law from the controls and the emitted
+     azimuths and compare it against what the builder actually multiplied in. */
+  const varianceFactors = sizeField ? [] : null;
   /* THE PETALS' LAMINAE ARE CAPTURED WHEN A SEPAL WHORL IS ASKED FOR — the
      sepal angle limit is drawn against the petals the builder emits, and the
      capture is the emitted mid-surface itself (emitPanel's own vectors), so no
@@ -10782,10 +11108,15 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      ring and slot it was built on, for the other-mode lamina evaluation. */
   const sites = [];
   const laminaWas = acc.captureLamina;
-  if (fr.sepals) acc.captureLamina = true;
+  /* ON EVERY BUILD NOW (organic variance, build 1): the told flag's neighbour
+     approach reads the same captured mid-surface, so the capture is no longer
+     conditional on a sepal whorl. The capture moves no byte — verify-bloom-grid's
+     clause 1 — and costs the row arrays alone. */
+  acc.captureLamina = true;
   if (fr.continuousMode) {
     /* ONE WHORL, so one azimuth row — the continuous sequence's own. */
     const azOf = new Array(fr.rings.length);
+    const fOf = varianceFactors ? new Array(fr.rings.length) : null;
     buildWhorlInto({
       count: fr.rings.length,
       radius: (i) => fr.rings[i].radius,
@@ -10798,6 +11129,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          a thing. */
       phase: fr.rings[0].phase,
       placement: state.placement,
+      sizeField,
       /* THE OMISSION IS A MASK AND NOT A RENUMBERING, and this is where that is
          true or false. The whorl primitive still runs every slot 0..K-1 and
          still hands each one the azimuth its own index earns, so dropping slot
@@ -10811,6 +11143,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
          own inputs). `petalsAll` and `petalsBuilt` count what was EMITTED. */
       blade: (slot) => {
         azOf[slot.index] = slot.azimuth;
+        if (fOf) fOf[slot.index] = slot.sizeFactor;
         if (omission && omission.omittedSet.has(slot.index)) { petals.push(null); return; }
         /* THE REPRESENTATIVE IS THE FIRST SLOT ACTUALLY BUILT. On every row
            that has ever shipped that is slot 0, so this is the shipped
@@ -10823,6 +11156,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
       },
     });
     slotAzimuths.push(azOf);
+    if (fOf) varianceFactors.push(fOf);
   } else {
   /* ONE WHORL PER LAYER STILL — a split whorl is several DESCRIPTORS, never
      several whorls. Every per-slot quantity is read off the descriptor
@@ -10841,6 +11175,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
     const ring = slotsFor[0];
     const perDescriptor = new Map();
     const azOf = new Array(slotsFor.length);
+    const fOf = varianceFactors ? new Array(slotsFor.length) : null;
     buildWhorlInto({
       /* footRing() OWNS THE SLOT COUNT NOW, because under FAN it is derived
          (2 * perSide + a mirror-line petal) rather than a control. On every
@@ -10855,10 +11190,12 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
       phase: ring.phase,
       placement: state.placement,
       fan: fr.fan,
+      sizeField,
       blade: (slot) => {
         petalsBuilt++;
         azOf[slot.index] = slot.azimuth;
         const d = slotsFor[slot.index];
+        if (fOf) fOf[slot.index] = slot.sizeFactor;
         const p = buildPetalInto(acc, state, d, slot, capability);
         petalsAll.push(p);
         sites.push({ p, ring: d, slot, cap: capability });
@@ -10872,6 +11209,7 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
       },
     });
     slotAzimuths.push(azOf);
+    if (fOf) varianceFactors.push(fOf);
     for (const d of fr.rings) if (d.lambda === L) petals.push(perDescriptor.get(d) ?? null);
   }
   }
@@ -11008,7 +11346,19 @@ export function buildBloomInto(acc, state, { below = null, capability = null } =
      WITH NO PETAL AT ALL (the bare corner, where the stem takes every one) both
      stay at descriptor 0 and `petal` is null, which is the truth. */
   const at = Math.max(0, petals.findIndex((p) => p !== null && p !== undefined));
-  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
+  /* THE TOLD FLAG, after every solid is emitted (it reads records and moves
+     no byte): assembled here so its feet list can carry the sepals'. */
+  const neighbour = neighbourFlag({ foot: fr, slotAzimuths, petalsAll, stemOmission: omission, sepals: sepalsBuilt });
+  return { ring: fr.rings[at], rings: fr.rings, hub: fr.hub, hubBuilt, foot: fr, petal: petals[at] ?? null, petals, petalsAll, petalsBuilt, slotAzimuths,
+    /* THE SIZE FIELD'S OWN RECORD (organic variance, build 1) — null at amount
+       0, which is the guard every consumer of it branches on. The closure is
+       left off (a function does not survive the metrics hook's clone); what a
+       reader gets is the law's parameters, the sampling it was judged against
+       and one factor row per whorl, parallel to `slotAzimuths`. */
+    variance: sizeField ? { amount: sizeField.amount, frequency: sizeField.frequency, phaseDeg: sizeField.phaseDeg, phaseInert: sizeField.phaseInert,
+      fan: sizeField.fan, n: sizeField.n, nyquist: sizeField.nyquist, aliased: sizeField.aliased, halfSpanDeg: sizeField.halfSpanDeg,
+      lo: sizeField.lo, hi: sizeField.hi, factors: varianceFactors } : null,
+    neighbour, androecium: fr.androecium, stamens, freeEnds, stamenNearest, gynoecium: fr.gynoecium, styles, filamentStyle, stem: stemPlanned, stemBuilt, stemOmission: omission, leaf: leafPlanned, leavesBuilt, sepals: sepalsBuilt, inflorescence: infloPlanned, inflorescenceBuilt,
     /* THE PETAL SITES the sepal limit was drawn against ({ p, ring, slot, cap },
        with `p.grid` captured whenever a whorl of sepals exists) — telemetry,
        so `tools/bloom-sepal-contact.mjs` can draw the same petals densely

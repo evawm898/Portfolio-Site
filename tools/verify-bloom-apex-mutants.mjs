@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -228,6 +228,20 @@ function infloFacts(M, over = {}) {
     };
   } catch (e) { return { threw: String(e && e.message || e) }; }
 }
+/* THE SIZE FIELD'S FACTS (organic variance, build 1), read off a build of the
+   MUTATED module — the slot payloads the whorl primitive emitted and the
+   builder's own per-petal record, never the assertion that names them. */
+const VAR_STATE = (over = {}) => ({ ...REGISTRY_DEFAULTS, varianceSize: 0.5, varianceFrequency: 1, variancePhase: 0, ...over });
+function varFacts(M, over = {}) {
+  try {
+    const st = VAR_STATE(over);
+    const acc = new M.MeshBuilder({ exportMode: true });
+    const b = M.buildBloomInto(acc, st);
+    const petals = b.petalsAll.map((p) => ({ index: p.slotIndex, azimuth: p.azimuth, scale: p.slot.scale, factor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, nominal: p.nominalLength }));
+    return { petals, variance: b.variance, neighbour: b.neighbour, absent: M.varianceIsAbsent(st), tris: acc.triangleCount, az: b.slotAzimuths };
+  } catch (e) { return { threw: e.message }; }
+}
+const varPair = (M, C, over = {}) => [varFacts(M, over), varFacts(C, over)];
 const infloPair = (M, C, over = {}) => [infloFacts(M, over), infloFacts(C, over)];
 const bothBuilt = (m, c) => (m.threw || c.threw) ? `the witness threw: ${m.threw || c.threw}` : null;
 
@@ -856,6 +870,107 @@ const MUTANTS = [
         : `the builder placed ${m.count} of a declared ${m.declared} on the mutant against ${c.count} of ${c.declared} clean — the drop did not happen`;
     } },
 
+  /* ===================================================================
+     ORGANIC VARIANCE, BUILD 1 — THE SIZE FIELD (VS0-VS5). Six mutations, each
+     the shape of a defect both STL gates pass by construction (a size factor
+     moves vertices on a fixed lattice), each witnessed on the MUTATED
+     MODULE's own slot payloads and builder record at a state where the
+     mutation MUST separate the two trees — never on the clause it names. */
+  { id: 'size-field-never-reaches-the-blade',
+    why: "the whorl primitive records the field's factor on the slot and hands the blade the descriptor's own scale — a control that draws its wave on the read-out and moves no petal; watertight, one piece, the identical triangle count, and every family but VS2 silent",
+    /* the RING arm's line (the LIST arm's is on one line with its blade()
+       call, so this anchor is unique) */
+    find: '    const scale = sizeFactor === null ? sizeRamp(i, count) : sizeRamp(i, count) * sizeFactor;\n    blade({',
+    into: '    const scale = sizeRamp(i, count);\n    blade({', names: ['VS2'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C);
+      const t = bothBuilt(m, c); if (t) return t;
+      /* EVERY slot at its descriptor's scale while SOME slot's factor is not 1
+         — not every slot's, because a 1-cycle wave at phase 0 hands the slot at
+         90 degrees `1 + 0.5 * cos(pi/2)`, which rounds to EXACTLY 1 (6e-17 of
+         amplitude is under an ulp of 1), and a witness demanding every factor
+         off 1 reported "the behaviour did not move" on a mutant that had. */
+      const stuck = m.petals.every((p) => p.scale === p.ringScale && p.factor !== null) && m.petals.some((p) => p.factor !== 1);
+      const moved = c.petals.some((p) => p.scale !== p.ringScale);
+      return (stuck && moved) ? null
+        : `the mutant's slots read scale ${m.petals.map((p) => p.scale.toFixed(3)).join('/')} against factors ${m.petals.map((p) => p.factor && p.factor.toFixed(3)).join('/')}; the clean tree's ${c.petals.map((p) => p.scale.toFixed(3)).join('/')} — the factor still reached the blade`;
+    } },
+
+  { id: 'amount-0-is-not-the-identity',
+    why: "the guard is bypassed: at amount 0 the field returns a record with a hair of amplitude instead of null, so the shipping default is no longer byte-identical by branch — every petal's scale moves by ~1e-9, invisible to the eye, the census, both STL gates and the triangle count, and the whole '0 moved' partition is false",
+    find: '  if (varianceIsAbsent(state)) return null;\n  const amount = Number(state.varianceSize);',
+    into: '  const amount = varianceIsAbsent(state) ? 1e-9 : Number(state.varianceSize);', names: ['VS1'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C, { varianceSize: 0 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const mutMoved = m.petals.some((p) => p.scale !== p.ringScale) && m.variance !== null;
+      const cleanHeld = c.petals.every((p) => p.scale === p.ringScale) && c.variance === null;
+      return (mutMoved && cleanHeld) ? null
+        : `at amount 0 the mutant reports ${m.variance ? 'a record' : 'no record'} with slot scales ${m.petals.map((p) => p.scale).join('/')} against descriptor scales ${m.petals.map((p) => p.ringScale).join('/')}; the clean tree ${c.variance ? 'a record' : 'no record'} — the identity did not break`;
+    } },
+
+  { id: 'fan-field-is-not-even',
+    why: "the fan takes the ring's own wave, `cos(f theta + phi)` on the SIGNED azimuth, so with any phase the two sides of the mirror plane carry different sizes and the fan stops being a fan — Z4a/Z4b/Z8 still pass (the roles and the azimuths are untouched), the export is watertight and one piece, and only VS3 (and VS1's restatement, which reads |theta| with the phase inert) can see it",
+    find: '      : (az) => Math.cos(frequency * Math.abs(az)))',
+    into: '      : (az) => Math.cos(frequency * az + phi))', names: ['VS1', 'VS3'],
+    witness: (M, C) => {
+      /* phase 90: cos is even at phase 0, so a witness there would separate
+         nothing (`bore-is-not-evas-rule`'s lesson — the probe is part of the
+         claim). */
+      const [m, c] = varPair(M, C, { placement: 'FAN', variancePhase: 90 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const uneven = (f) => { const az = f.az[0]; let bad = 0, pairs = 0; for (let i = 0; i < az.length; i++) for (let j = i + 1; j < az.length; j++) if (az[i] === -az[j]) { pairs++; if (f.variance.factors[0][i] !== f.variance.factors[0][j]) bad++; } return { bad, pairs }; };
+      const um = uneven(m), uc = uneven(c);
+      return (um.pairs > 0 && um.bad > 0 && uc.bad === 0) ? null
+        : `mirror pairs unequal on ${um.bad} of ${um.pairs} on the mutant and ${uc.bad} of ${uc.pairs} on the clean tree — the fan's field did not become uneven`;
+    } },
+
+  { id: 'aliasing-is-never-told',
+    why: "ruling 4's flag is deleted: a wave above n/2 aliases into scatter and the record says nothing, so the read-out's ALIASED clause never prints and the frequency slider silently draws noise past the bar — no byte differs from the honest tree, and VS4 is the only witness",
+    find: '  const aliased = frequency > 0 && frequency > nyquist;',
+    into: '  const aliased = false;', names: ['VS4'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C, { varianceFrequency: 20 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.variance.aliased === false && c.variance.aliased === true) ? null
+        : `at 20 cycles on 8 slots the mutant says aliased=${m.variance.aliased} and the clean tree ${c.variance.aliased} — the flag did not go quiet`;
+    } },
+
+  { id: 'the-told-flag-forgets-the-sheet',
+    why: "the neighbour approach reports the LAMINA distance as the skin gap — a mid-surface reading wearing the name of a wall-to-wall one, so the shipping default's -1.170 mm crossing prints as +0.030 mm of clearance and the told flag tells the opposite of the truth; nothing geometric moves",
+    find: 'skinGapMm: lamina.mm - t, sheetMm: t,',
+    into: 'skinGapMm: lamina.mm, sheetMm: t,', names: ['VS5'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C, { varianceSize: 0 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const dm = m.neighbour.blade, dc = c.neighbour.blade;
+      return (dm.skinGapMm === dm.laminaMm && dc.skinGapMm === dc.laminaMm - dc.sheetMm && dm.laminaMm === dc.laminaMm) ? null
+        : `the mutant's skin gap reads ${dm.skinGapMm} against a lamina of ${dm.laminaMm}; the clean tree's ${dc.skinGapMm} — the sheet was not forgotten`;
+    } },
+
+  { id: 'the-told-flag-skips-half-the-pairs',
+    why: "the all-pairs approach visits index-adjacent pairs only — the azimuth-adjacent reading the discovery doc measured as WRONG on a continuous mum (4.42 mm adjacent where all pairs read 0.56, between TURNS) — so the flag reports a clearance the object does not have on exactly the arrangements that crowd; the shipping default's own pair (0, 7) is index-adjacent by luck and still reads right",
+    find: '  for (let i = 0; i < lam.length; i++) for (let j = i + 1; j < lam.length; j++) pairs.push([boxGapOf(lam[i], lam[j]), i, j]);',
+    into: '  for (let i = 0; i + 1 < lam.length; i++) pairs.push([boxGapOf(lam[i], lam[i + 1]), i, i + 1]);', names: ['VS5'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C, { placement: 'CONTINUOUS', petalCount: 40, layerCount: 3, varianceSize: 0 });
+      const t = bothBuilt(m, c); if (t) return t;
+      const dm = m.neighbour.blade, dc = c.neighbour.blade;
+      return (dm.pairs < dc.pairs && dm.skinGapMm > dc.skinGapMm) ? null
+        : `the mutant read ${dm.pairs} pairs and a gap of ${dm.skinGapMm}; the clean tree ${dc.pairs} pairs and ${dc.skinGapMm} — the reading did not lose the cross-turn pair`;
+    } },
+
+  { id: 'the-guard-moves-off-zero',
+    why: "the geometry's guard becomes `amount > 0.1` while the registry's `variancePresent` still says `> 0`: between 0.01 and 0.10 the two sub-controls are SHOWN and INERT — the defect PP7, JS0, ST0 and ID0 were each written for, arriving in a new family; the load-time twin check cannot see it because it runs on the unmutated Node import, so VS0 through the page is the only witness",
+    find: '  return !(Number(state.varianceSize) > 0);\n}',
+    into: '  return !(Number(state.varianceSize) > 0.1);\n}', names: ['VS0', 'VS1'],
+    witness: (M, C) => {
+      const [m, c] = varPair(M, C, { varianceSize: 0.05 });
+      const t = bothBuilt(m, c); if (t) return t;
+      return (m.absent === true && c.absent === false && m.variance === null && c.variance !== null) ? null
+        : `at amount 0.05 the mutant's guard says absent=${m.absent} (${m.variance ? 'a record' : 'no record'}) and the clean tree's absent=${c.absent} — the guard did not move`;
+    } },
+
   { id: 'the-pedicel-roots-on-the-axis',
     why: "the pedicel is rooted on the rachis's AXIS instead of its wall mid-thickness — the leaf's own LF2 trap one part later: on a HOLLOW rachis the root sits in the VOID, so the pedicel crosses no solid and is a detached shell, and both STL gates read it as one piece because the floret above it overlaps everything else",
     /* THE ANCHOR IS THE PEDICEL'S OWN CALL, NOT THE BARE EXPRESSION. Its
@@ -1465,6 +1580,24 @@ const ROWS = [
      and the only state where O1's declared inward count is not the head's
      alone. Measured: 4 petals of 5 built on every floret, and six inward
      shells against a pre-session baseline of one. */
+  /* THE SIZE FIELD ROWS (organic variance, build 1). Five, each for a clause
+     the others cannot reach: the shipping wave (VS1/VS2/VS4/VS5 on their
+     unaliased arms); the FIRST STEP above the guard (0.05 — the only row on
+     which `the-guard-moves-off-zero` separates the registry from the
+     geometry); the FAN at a NON-ZERO phase (cos is even at phase 0, so an
+     uneven fan field is invisible there); the ALIASED corner (VS4's other
+     arm); and a continuous MUM at amount 0 (the told flag's all-pairs claim,
+     whose adjacent-only mutant reads right on every 8-petal row). */
+  { label: 'the size field: ±50% at 1 cycle on the shipping whorl',
+    set: [{ id: 'varianceSize', value: '0.5' }] },
+  { label: 'the size field: ±5%, the first step above the guard',
+    set: [{ id: 'varianceSize', value: '0.05' }] },
+  { label: 'the size field on a FAN at phase 90 (the phase must be inert; the field even)',
+    set: [{ id: 'placement', value: 'FAN' }, { id: 'varianceSize', value: '0.5' }, { id: 'variancePhase', value: '90' }] },
+  { label: 'the size field at 20 cycles on 8 slots (ALIASED — told, not capped)',
+    set: [{ id: 'varianceSize', value: '0.5' }, { id: 'varianceFrequency', value: '20' }] },
+  { label: 'the told flag on the continuous mum (40 x 3, amount 0 — the all-pairs approach between turns)',
+    set: [{ id: 'placement', value: 'CONTINUOUS' }, { id: 'petalCount', value: '40' }, { id: 'layerCount', value: '3' }] },
   { label: 'a raceme, nothing clamped (5 nodes x 1, 5-petal florets on 20 mm pedicels at 35 deg)',
     set: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }] },
   { label: 'a raceme with every clamp biting (12 nodes on a 20 mm rachis, 0.20x florets, 60 mm straight up)',
@@ -1545,6 +1678,12 @@ async function famsOn(rows) {
        other row this table drives. */
     for (const msg of await inflorescenceAssertions(page, row)) {
       const mm = /^(ID\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE SIZE FIELD (organic variance, build 1) — the rule once more, and the
+       first family whose subject is a per-SLOT quantity: every clause is
+       silent on a bloom whose amount is 0, which is every other row here. */
+    for (const msg of await varianceAssertions(page, row)) {
+      const mm = /^(VS\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

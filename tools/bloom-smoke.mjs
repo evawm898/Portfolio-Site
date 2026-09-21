@@ -822,6 +822,34 @@ export const SMOKE_BLOCKS = [
         path: "the DENSEST placement — ID1's per-node count against the phyllotaxy law, ID2's pitch floor (two pedicel radii) and the area rule binding together at three pedicels a node, ID6 on three azimuths that share one node depth" },
     ],
   },
+  {
+    n: 38, title: 'organic variance, build 1 — the size field and the told flag',
+    anchor: 'VARIANCE: size ±50% (1 cycle round the shipping whorl, phase 0)',
+    /* FIVE ROWS, ON THE AXES THE FEATURE HAS. The shipping wave (the anchor,
+       where VS0-VS5 all run on a state anyone would build, and VS5's told
+       flag reads the default's own crossing at a new number); the GATED row,
+       because hidden-and-not-inert is invisible to every STL property and the
+       guard's other arm is what the whole byte claim rests on; the FAN,
+       because evenness about the mirror plane is the one property that keeps
+       Z4a/Z4b/Z8/J7 true and VS3 is its only witness; the SPHERE with a stem,
+       because that is the cross-family axis — the stem channel probes each
+       slot at the size the field gave it, and ST7/ST8/ST9 reason about petals
+       whose sizes now differ; and the ALIASED corner, because ruling 4 is a
+       flag that must fire rather than a cap, and VS4's biconditional needs a
+       row on its other arm. */
+    rows: [
+      { label: "VARIANCE: size ±50% (1 cycle round the shipping whorl, phase 0)",
+        path: "the shipping wave — VS0 (the registry's variancePresent against the geometry's guard, through the page), VS1 (the record is the controls' own and every factor is the law restated from the controls and the EMITTED azimuths), VS2 (the factor reached the blade: slot scale = ring scale x factor and length = nominal x scale, exact), VS4 (not aliased at 1 cycle on 8 slots), VS5 (the told flag: pitch exactly 1.000x on a RADIAL whorl, feet, the all-pairs blade approach)" },
+      { label: "VARIANCE: GATED — frequency and phase at MAXIMUM with the amount 0 (hidden AND inert)",
+        path: "the GUARD's other arm — VS0 and VS1's inertness clauses (no record, no factor on any slot, every slot's scale its descriptor's own) with the frequency and phase at their extremes, which is the only thing that can see a hidden control that still moves a petal" },
+      { label: "VARIANCE: x FAN, phase 90 (even about the mirror line — the phase is INERT)",
+        path: "the FAN — VS3 (every mirror pair carries the same factor to the bit, not vacuously) and VS1's phaseInert arm, beside Z4a/Z4b/Z8 and J7 which an uneven field would break" },
+      { label: "VARIANCE: x a SPHERE with a stem (the channel probes each slot at its OWN size)",
+        path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build, the exported file's own clearance) on petals whose sizes the field moved, beside S1-S4 and VS1's golden-angle azimuth on the sphere's sequence" },
+      { label: "VARIANCE: 20 cycles on 8 slots (ALIASED — scatter, told and not capped)",
+        path: "the TOLD frequency — VS4's aliased arm (f above n/2 must be flagged, never capped) and VS1's law on a wave the lattice cannot draw" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

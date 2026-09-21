@@ -1788,6 +1788,22 @@ any of them.
   arithmetic BEFORE it builds, at the corner `ALL MAX` reaches and not at a
   representative row.
 
+- **ORGANIC VARIANCE IS SCHEDULED IN THREE BUILDS AND THE FIRST SHIPPED THE SIZE FIELD WITH THE
+  TOLD FLAG** (Eva's rulings, `docs/bloom-organic-variance-discovery.md` §9; the build's
+  measurements, `docs/bloom-organic-variance-size-outcome.md`). Size → form → spacing, in that
+  order (ruling 7); the shared frequency and phase shipped with the first amount and the next two
+  builds READ them rather than adding their own. **What the first build settled that the next two
+  inherit:** the field is a per-slot factor on the EMITTED azimuth handed to the whorl primitive
+  as a null-default branch (route (a) of the discovery, not the override table); a FAN's field is
+  even about the mirror plane with the phase inert; the aliasing bar is the arrangement's own
+  sampling and is told, never capped; the told flag — tightest pitch, nearest feet, the all-pairs
+  neighbour approach — is on every build and is the family's flag, so build 3 (the only one that
+  moves an azimuth) owes no new instrument for it, only its numbers. **What is PARKED by the
+  rulings:** sepal variance (ruling 5 — its own PR, after build 3 has settled what the shared
+  frequency means for spacing), per-floret phase under instancing (ruling 10's second half), and
+  any clamp on the neighbour approach (ruling 1 — revisitable on a printed crossing collar and on
+  nothing else).
+
 ## Debugging an instrument — TWO ROWS TO PROVE THE TOOL, THE FULL GRID ONCE TO PRODUCE THE SHEET
 
 **Eva's ruling, session 29, and it is a convention rather than a note because it has cost time

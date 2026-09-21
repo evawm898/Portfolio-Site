@@ -167,6 +167,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, exportStl, analyzeStl } from './bloom-harness.mjs';
+import { nearestFeet } from '../bloom-geometry.js';
 
 /* THE FLAG'S THRESHOLD — Eva, Sep 3. See the header: 5 and below is ruled
    clean, 11 is ruled bad, 6..10 are unruled and print unmarked. Re-derive
@@ -465,31 +466,12 @@ export function refineDepth(feet, base, pitch, dome = null) {
   return { dmax, dmaxAt, pitch };
 }
 
-/* All-pairs nearest neighbour — centre to centre, in mean foot widths — and
-   the same statistic restricted to index-adjacent slots of one whorl, which
-   is what a neighbour-picking metric would have read. Diagnostics. */
-export function nearestFeet(feet, dome = null) {
-  /* ON THE CLOSED SPHERE the foot's centre is a point ON the sphere (the
-     meridian at arc minus half the overhang) and the distance is the chord —
-     a plan centre would fold the far side onto the near side. Cap and flat:
-     the plan centre, verbatim. */
-  const closed = dome && dome.closed === true;
-  const centre = closed
-    ? (f) => { const ph = (f.arc - f.overhang / 2) / dome.Rd; const rr = dome.Rd * Math.sin(ph); return [rr * Math.cos(f.az), rr * Math.sin(f.az), dome.Rd * Math.cos(ph)]; }
-    : (f) => { const rc = f.radius - f.overhang / 2; return [rc * Math.cos(f.az), rc * Math.sin(f.az), 0]; };
-  const C = feet.map(centre);
-  let all = { q: Infinity, d: Infinity, a: null, b: null, gap: null };
-  let adj = { q: Infinity, d: Infinity, a: null, b: null, gap: 1 };
-  for (let i = 0; i < feet.length; i++) {
-    for (let j = i + 1; j < feet.length; j++) {
-      const d = Math.hypot(C[i][0] - C[j][0], C[i][1] - C[j][1], C[i][2] - C[j][2]);
-      const q = d / ((feet[i].width + feet[j].width) / 2);
-      if (q < all.q) all = { q, d, a: feet[i], b: feet[j], gap: Math.abs(feet[i].slot - feet[j].slot) };
-      if (feet[i].layer === feet[j].layer && Math.abs(feet[i].slot - feet[j].slot) === 1 && q < adj.q) adj = { q, d, a: feet[i], b: feet[j], gap: 1 };
-    }
-  }
-  return { all, adjacent: adj };
-}
+/* All-pairs nearest neighbour — centre to centre, in mean foot widths. ONE
+   OWNER: it lives in bloom-geometry.js now (the page's told flag reads it on
+   every build — organic variance, build 1) and is re-exported here so §4 of
+   tools/bloom-neighbour-gap.mjs and every reader of this module keep their
+   import. */
+export { nearestFeet };
 
 /* The raster pitch: a FIXED GRID of about 2,400 cells across the hub's
    diameter, floored at 5 microns — so a spread-6 plate (R 59 mm) samples at
@@ -515,30 +497,12 @@ export async function readFeet(page, capability = null) {
       const acc = new mod.MeshBuilder({ exportMode: mode === 'export' });
       const built = mod.buildBloomInto(acc, ui, { below: null, capability: cap });
       const fr = built.foot;
-      const feet = [];
-      const rec = (d, az, layer, slot) => ({ radius: d.radius, overhang: d.overhang, width: d.width, az, ring: d.index, layer, slot, z: d.z, slope: d.slope, arc: d.arc });
-      /* A FOOT THE STEM CHANNEL DID NOT BUILD IS NOT ON THE BASE (the
-         sphere-stem session). This raster counts how many feet STACK on the
-         most crowded point, so counting a descriptor whose petal was never
-         built would report crowding that is not there — and R3 compares this
-         list against the builder's own `petalsBuilt`, so it would fire on
-         every sphere with a stem. The omitted set is the BUILDER's own record;
-         with no channel it is empty and the `filter` keeps every foot, which
-         is this line unchanged. */
+      /* THE FEET FROM THE OWNER — `footList` in bloom-geometry.js (moved there
+         with `nearestFeet` for the page's told flag, organic variance build 1):
+         petal feet from the descriptor and the builder's own azimuths, the
+         stem channel's omitted set filtered out, the sepal feet appended. */
+      const feet = mod.footList(built);
       const omitted = new Set((built.stemOmission && built.stemOmission.omitted) || []);
-      if (fr.continuousMode) {
-        fr.rings.forEach((r, k) => { if (!omitted.has(k)) feet.push(rec(r, built.slotAzimuths[0][k], 0, k)); });
-      } else {
-        for (let L = 0; L < fr.layerCount; L++) {
-          const row = fr.slotRings[L];
-          for (let i = 0; i < row.length; i++) feet.push(rec(row[i], built.slotAzimuths[L][i], L, i));
-        }
-      }
-      /* THE SEPAL FEET (sepals, part 1) stack on the same base as the petal
-         feet — the whorl is on the hub's rim, its feet in the same slab — so
-         they are counted here from the descriptor's ring and the azimuths the
-         builder's own whorl placed. R3's expected count carries them. */
-      if (built.sepals) built.sepals.azimuths.forEach((az, k) => feet.push(rec({ ...fr.sepals.ring, index: -1 }, az, 'sepal', k)));
       out[mode] = {
         feet,
         hub: { radius: fr.hub.radius, thickness: fr.hub.thickness, dome: fr.hub.dome ? { rise: fr.hub.dome.rise, riseBuilt: fr.hub.dome.riseBuilt, Rd: fr.hub.dome.Rd, H: fr.hub.dome.H, centreZ: fr.hub.dome.centreZ, clamped: fr.hub.dome.clamped,

@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -570,6 +570,10 @@ let lastFilamentStyle = null;
 let lastPlacement = 'RADIAL';
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
 let lastFitCenter = [0, 0, 0];
+/* ORGANIC VARIANCE (build 1, size): the builder's own field record (null at
+   amount 0, the guard) and the TOLD FLAG — the neighbour figures every
+   recorded build carries (ruling 1: reported, never clamped). */
+let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPetalsAll = [];
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
    there is no registry row, no DOM input, and no listener that writes it —
@@ -608,6 +612,12 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastRing = built.ring; lastRings = built.rings; lastHub = built.hub; lastFoot = built.foot;
     lastPetal = built.petal; lastPetals = built.petals; lastHubBuilt = built.hubBuilt;
     lastPetalsBuilt = built.petalsBuilt; lastSlotAzimuths = built.slotAzimuths;
+    lastVariance = built.variance || null; lastNeighbour = built.neighbour || null;
+    /* THE GEOMETRY'S OWN ANSWER TO "IS THE SIZE FIELD ABSENT HERE", on the
+       state this build was made from — VS0's half, through the page (ST0's
+       and ID0's route). And every EMITTED petal, for VS2's per-slot record. */
+    lastVarianceAbsent = varianceIsAbsent(uiForBuild);
+    lastPetalsAll = built.petalsAll || [];
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
     lastFilamentStyle = built.filamentStyle;
@@ -1087,6 +1097,45 @@ function slotRoleLine(rings, fr) {
    would be a second copy of the clamp law, and the second copy is the one
    that drifts. Returns '' under every other placement, so the line is simply
    absent rather than saying "not a fan". */
+/* THE SIZE VARIANCE LINE (organic variance, build 1) — the field's law told
+   in the builder's own numbers: the amount as the range of sizes it reaches,
+   the wave or the ramp, the slot count the wave is sampled on, and the
+   ALIASED clause (ruling 4: told, never capped) from the record's own
+   threshold. Absent at amount 0, where the record is null. */
+function varianceLine(v) {
+  if (!v) return '';
+  const cyc = `${v.frequency} cycle${v.frequency === 1 ? '' : 's'}`;
+  const law = v.frequency === 0
+    ? (v.fan ? 'a ramp outward from the mirror line' : `a ramp round the flower with its seam at ${v.phaseDeg.toFixed(0)}°`)
+    : (v.fan ? `${cyc} per turn, even about the mirror line (phase inert)` : `${cyc} round the flower, phase ${v.phaseDeg.toFixed(0)}°`);
+  const nyq = Number.isInteger(v.nyquist) ? `${v.nyquist}` : v.nyquist.toFixed(1);
+  return `SIZE VARIANCE ±${(v.amount * 100).toFixed(0)}%: petals from ${v.lo.toFixed(2)}x to ${v.hi.toFixed(2)}x of nominal — ${law}, on ${v.n} slots${v.fan ? ` over a ${(2 * v.halfSpanDeg).toFixed(0)}° fan` : ''}`
+       + (v.aliased ? ` — ALIASED: above ${nyq} cycles the wave cannot be drawn on ${v.n} slots and reads as SCATTER (told, not capped)` : '')
+       + `\n`;
+}
+/* THE NEIGHBOURS LINE — THE TOLD FLAG (Eva's ruling 1, the condition of the
+   variance family: the generator REPORTS the tightest pitch, the nearest feet
+   and the nearest petal approach, and clamps nothing). Every number is the
+   builder's own `neighbour` record, on every build whatever the amount, and
+   every one names its sampling: the pitch is read off the emitted azimuths,
+   the feet are centre to centre in foot widths (the crowding instrument's own
+   `nearestFeet`), and the approach is the mid-surface distance over ALL pairs
+   on the builder's lattice above u = ROOT_BLEND_END, less one sheet — a
+   negative number is the skins passing through each other, which the shipping
+   default does (an ACCEPTED LOOK, ruling 1). The crowding raster's D_max is
+   the gates' instrument and is not printed here. */
+function neighbourLine(nb, mode) {
+  const parts = [];
+  if (nb.pitch) parts.push(`tightest pitch ${nb.pitch.tightDeg.toFixed(2)}° = ${nb.pitch.ratio.toFixed(3)}x the nominal ${nb.pitch.nominalDeg.toFixed(2)}°`);
+  if (Number.isFinite(nb.feet.q)) parts.push(`nearest feet ${nb.feet.d.toFixed(2)} mm centre to centre = ${nb.feet.q.toFixed(3)} foot widths (${nb.feet.a} ~ ${nb.feet.b})`);
+  if (nb.blade) {
+    const b = nb.blade;
+    const verdict = b.crossing ? `SKINS PASS THROUGH EACH OTHER by ${(-b.skinGapMm).toFixed(3)} mm` : b.underFeature ? `UNDER THE ${MIN_FEATURE_MM.toFixed(2)} mm PRINTABLE GAP` : 'clear of the printable gap';
+    parts.push(`nearest petal approach ${b.skinGapMm.toFixed(3)} mm skin to skin — ${verdict} (laminae ${b.laminaMm.toFixed(3)} mm apart less the ${b.sheetMm.toFixed(2)} mm sheet, petals ${b.pair[0]} and ${b.pair[1]} at r ${b.at.r.toFixed(1)} z ${b.at.z.toFixed(1)}; all ${b.pairs} pairs of ${b.petals} on the builder's lattice above u ${b.uMin.toFixed(2)})`);
+  }
+  if (!parts.length) return '';
+  return `NEIGHBOURS (${mode}, told, never clamped): ${parts.join(' · ')}\n`;
+}
 function fanLine(fr) {
   const f = fr.fan;
   if (!f) return '';
@@ -1478,6 +1527,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (capability ? ` · capability ${capability.label}` : '') + `\n`
        + (rings.length > 1 ? ringLine : '')
        + fanLine(fr)
+       + (built ? varianceLine(built.variance) : '')
        + footFloorLine(rings)
        + innerRingLine(rings, fr)
        + domeLine(rings, fr, mode)
@@ -1493,6 +1543,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? sepalLine(ui, built, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
+       + (built && built.neighbour ? neighbourLine(built.neighbour, mode) : '')
        + `tris (${mode}) ${tris} · max dim (${mode}) ${dim} mm`;
 }
 
@@ -1558,6 +1609,10 @@ function regenerate() {
                      slider's own petals the stem took — and nothing here derives
                      it. Null wherever the question does not arise. */
                   stemChannel: built.stemOmission || null,
+                  /* THE SIZE FIELD's record joins for the same reason: the frequency
+                     control's ALIASED clause prints the builder's own threshold, and the
+                     phase control says it is inert on a fan from the builder's own word. */
+                  variance: built.variance || null,
                   /* THE SEPALS' record: the count ceiling and the angle limit are
                      the OWNER's numbers (footRing's and the builder's own scan),
                      printed on the two controls and hatched on their tracks; the
@@ -2138,6 +2193,23 @@ window.__bloomMetrics = () => ({
      and can never disagree (session 41's L7). ID0 compares it against the
      REGISTRY's declaration. */
   inflorescenceAbsent: lastInfloAbsent,
+  /* ORGANIC VARIANCE (build 1, size): the builder's own field record — null
+     at amount 0, which VS0 reads as the guard's own answer — with one factor
+     row per whorl parallel to `slotAzimuths`, so VS1 can restate the law from
+     the controls and the emitted azimuths and compare it against what the
+     whorl primitive actually multiplied in. And the TOLD FLAG's record, the
+     neighbour figures the NEIGHBOURS line prints, so a gate can hold the line
+     to the number rather than to the sentence. */
+  variance: lastVariance ? { ...lastVariance, factors: lastVariance.factors.map((row) => [...row]) } : null,
+  varianceAbsent: lastVarianceAbsent,
+  /* EVERY PETAL THE BUILDER EMITTED, in slot order: the slot's scale and the
+     factor the primitive handed it, the descriptor's own scale, the blade's
+     built length and the nominal it was scaled from. VS2 reads the two
+     products off this, exactly, and VS1 matches each factor to its whorl's
+     row of `variance.factors`. */
+  petalSlotSizes: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
+    scale: p.slot.scale, sizeFactor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, nominalLength: p.nominalLength })),
+  neighbour: lastNeighbour ? structuredClone(lastNeighbour) : null,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the
