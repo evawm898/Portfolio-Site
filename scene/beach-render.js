@@ -65,6 +65,11 @@ export function createRenderer(ctx, shore) {
   const specs = [];
   const opts = {
     phase: 0, seed: 6, shear: 0, waves: specs, frontAt: null, wetAt: null,
+    // THE SHEET'S SEAWARD LIMIT, and it is the shore's own waterline — the
+    // same number `stageAt` uses to decide a wave has become the swash. One
+    // owner, so the moment a wave stops being drawn is the moment the sheet
+    // is allowed to reach where it was.
+    waterlineS: WATERLINE_S,
   };
 
   const r = {

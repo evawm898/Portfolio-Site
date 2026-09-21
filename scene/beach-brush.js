@@ -502,6 +502,13 @@ export function wave(ctx, xs, n, r, {
 const WATER_LINES = [0.06, 0.105];
 
 /**
+ * How deep the wet sheet is drawn behind the swash front. Named rather than
+ * written twice, because its SEAWARD end is now clamped and a second copy
+ * would let the two branches disagree about where the sheet starts.
+ */
+const SHEET_DEPTH_S = 0.085;
+
+/**
  * The options one live record is drawn with, reused across waves and frames.
  * A `{ ...w, phase, W, H, shear }` spread is one object per wave per frame;
  * every field `wave()` destructures is written here instead. `big` carries
@@ -527,6 +534,7 @@ export function draw(ctx, W, H, state) {
   const {
     peel = 0.5, phase = 0, heroS = 0.375, swashS = 0.60, farS = 0.20, seed = 6,
     shear = SHEAR, waves = null, frontAt = null, wetAt = null, hwS = 0.755,
+    waterlineS = null,
   } = state || {};
   const r = rng(seed);
   const n = NCOL;
@@ -590,7 +598,22 @@ export function draw(ctx, W, H, state) {
     // two passes rather than one, because the two used to be two separate
     // maps and a query with any state of its own would notice the difference
     for (let i = 0; i < n; i++) front[i] = yOf(xs[i], frontAt(xs[i] / W), W, H, shear);
-    for (let i = 0; i < n; i++) sheetTop[i] = yOf(xs[i], frontAt(xs[i] / W) - 0.085, W, H, shear);
+    // THE SHEET'S SEAWARD END IS THE WATERLINE, AND THAT IS WHAT STOPS IT
+    // SWALLOWING AN ARRIVING WAVE. `front - SHEET_DEPTH_S` is a fixed band
+    // hung off the front, so whenever the swash is within that depth of the
+    // waterline the band is drawn ON THE SEA — measured, 52% of frames, and
+    // up to the full 0.085 of frame height. A wave is handed to the swash
+    // exactly when its crest crosses the waterline, so a sheet that stops
+    // there cannot cover a wave that is still arriving: it ate one from the
+    // bottom up while it was still 0.08 of the frame from the shore.
+    //
+    // The DEPTH is unchanged and is now a maximum. With no waterline — the
+    // standalone path, which has no simulation behind it — nothing clamps and
+    // the picture is the one the module was verified at.
+    for (let i = 0; i < n; i++) {
+      const top = frontAt(xs[i] / W) - SHEET_DEPTH_S;
+      sheetTop[i] = yOf(xs[i], waterlineS === null ? top : Math.max(waterlineS, top), W, H, shear);
+    }
   } else {
     const la = P.la, lb = P.lb;
     bumpsInto(front, xs, n, r, 0.007 * H, 3, phase * 1.6, 1.3, W);
@@ -601,7 +624,7 @@ export function draw(ctx, W, H, state) {
     lobesInto(lb, xs, n, P.cenB, P.radB, 26, W, null, 0.5);
     for (let i = 0; i < n; i++) {
       front[i] = front[i] + la[i] + lb[i];
-      sheetTop[i] = yOf(xs[i], swashS - 0.085, W, H, shear);
+      sheetTop[i] = yOf(xs[i], swashS - SHEET_DEPTH_S, W, H, shear);
     }
   }
   fillBand(ctx, xs, n, sheetTop, front, PALETTE.wet);

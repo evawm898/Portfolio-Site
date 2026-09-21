@@ -414,6 +414,57 @@ const MUTANTS = [
     why: 'the order IS the model, and a renderer that re-decides it makes sortWaves decorative',
   },
   {
+    id: 'the-break-goes-back-out-to-sea',
+    file: 'scene/beach-wave.js',
+    from: 'export const BREAK_S = [0.300, 0.205];',
+    to: 'export const BREAK_S = [0.115, 0.020];',
+    // THE COMPOSITION EVA RULED AGAINST, put back — and it is the position
+    // this PR shipped with, not a synthetic value. It satisfies the band's own
+    // room bound with plenty to spare, which is why that clause needed its
+    // second half: breaking far out is the EASY way to pass a check about
+    // having room, and it is the thing being ruled out.
+    breaks: ['wave/the-break-leaves-a-wave-room-to-show-the-band-it-committed-to'],
+    why: 'the curl peaks at s 0.202 and the whole lower wave zone carries nothing but spent bands',
+  },
+  {
+    id: 'the-break-comes-all-the-way-in',
+    file: 'scene/beach-wave.js',
+    from: 'export const BREAK_S = [0.300, 0.205];',
+    to: 'export const BREAK_S = [0.360, 0.265];',
+    // THE OTHER SIDE OF THE SAME BOUND. A break at s 0.360 puts the curl
+    // exactly where the drawing's own hero wave sits and is the first thing
+    // anyone reaching for "nearer the shore" would try — it leaves 1.6 s
+    // before the waterline against a band that takes up to 3.8 s, so the wave
+    // is handed over with its band still growing.
+    breaks: ['wave/the-break-leaves-a-wave-room-to-show-the-band-it-committed-to'],
+    why: 'a wave handed to the swash mid-band never shows the band it committed to at birth',
+  },
+  {
+    id: 'the-sheet-reaches-into-the-sea',
+    file: 'scene/beach-brush.js',
+    from: '      sheetTop[i] = yOf(xs[i], waterlineS === null ? top : Math.max(waterlineS, top), W, H, shear);',
+    to: '      sheetTop[i] = yOf(xs[i], top, W, H, shear);',
+    // THE STATE THIS PR SHIPPED IN, and it is the bug Eva named: a fixed band
+    // hung off the front, so whenever the swash is within its own depth of
+    // the waterline the wet grey is drawn on the SEA and eats an arriving
+    // wave from the bottom up. Measured, 52% of frames.
+    breaks: ['draw/the-swash-sheet-never-reaches-seaward-of-the-waterline'],
+    why: 'a wet band drawn on the sea swallows a wave that is still arriving',
+  },
+  {
+    id: 'the-renderer-forgets-the-waterline',
+    file: 'scene/beach-render.js',
+    from: '    waterlineS: WATERLINE_S,',
+    to: '    waterlineS: null,',
+    // THE OTHER HALF, AND IT IS THE HAZARD WITH NO SYMPTOM. The drawing's
+    // clamp is opt-in so the standalone picture keeps its own composition; a
+    // caller that never passes a waterline gets the unclamped sheet back and
+    // nothing throws, nothing is drawn wrong enough to notice, and the wave
+    // is quietly eaten again.
+    breaks: ['draw/the-swash-sheet-never-reaches-seaward-of-the-waterline'],
+    why: 'an opt-in clamp that nobody opts into is a comment',
+  },
+  {
     id: 'the-frame-allocates-again',
     file: 'scene/beach-brush.js',
     from: '  const b = P.b;\n  if (bAt) for (let i = 0; i < n; i++) b[i] = bAt(xs[i] / W);',
@@ -3138,6 +3189,41 @@ async function partOne(mutant) {
         + `height ${lo.height.toFixed(3)} -> ${hi.height.toFixed(3)}, peel ${lo.peelS.toFixed(2)} -> ${hi.peelS.toFixed(2)} s`;
     });
 
+    check('the break leaves a wave room to show the band it committed to', () => {
+      // EVA'S RULING MOVED THE BREAK SHORESIDE and this is the limit that
+      // stopped it moving further. `b` is linear in s between the break and
+      // the waterline, so the curl sits wherever the break puts it — but a
+      // wave that breaks too near the shore is handed to the swash with its
+      // own foam band still growing, and never shows the band it committed to
+      // at birth.
+      //
+      // THE REFERENCE HAS FOUR OWNERS AND NONE OF THEM IS THE QUANTITY UNDER
+      // TEST. The band's schedule is BAND_GROW_S and BAND_FADE_RANGE, the
+      // speed is TRAVEL_S and the hand-over is the shore's WATERLINE_S;
+      // BREAK_S is what they bound. Reading the bound off `makeWave`'s own
+      // record instead would be asking the constant whether it likes itself.
+      const bandLife = WV.BAND_GROW_S + WV.BAND_FADE_RANGE[1];
+      const limit = S.WATERLINE_S - WV.TRAVEL_S * bandLife;
+      assert.ok(WV.BREAK_S[0] <= limit + 1e-12,
+        `the quiet break is at s ${WV.BREAK_S[0].toFixed(3)}, past the s ${limit.toFixed(3)} that leaves `
+        + `${bandLife.toFixed(1)} s for the band before the waterline`);
+      // AND IT IS NOT VACUOUSLY SATISFIED BY BREAKING FAR OUT, which is the
+      // composition Eva ruled against: the curl must land in the lower half of
+      // the wave zone. `b` reaches 0.50 a fixed fraction of the way from the
+      // break to the waterline, that fraction being where the drawing's own
+      // FOAM_ONSET_B leaves it.
+      const f = B.FOAM_ONSET_B;
+      const curlAt = (brk) => brk + (0.50 - f) / (1 - f) * (S.WATERLINE_S - brk);
+      const curl = curlAt(WV.BREAK_S[0]);
+      assert.ok(curl > S.WATERLINE_S * 0.75,
+        `at rest the curl peaks at s ${curl.toFixed(3)}, in the top quarter of the wave zone rather than near the shore`);
+      // the ordering the spread encodes, read from the constant rather than a record
+      assert.ok(WV.BREAK_S[1] < WV.BREAK_S[0], 'a bigger set does not break further out');
+      return `quiet break s ${WV.BREAK_S[0].toFixed(3)} against a limit of ${limit.toFixed(3)}, `
+        + `curl at s ${curl.toFixed(3)} of a ${S.WATERLINE_S} wave zone, `
+        + `${((S.WATERLINE_S - WV.BREAK_S[0]) / WV.TRAVEL_S).toFixed(1)} s for a ${bandLife.toFixed(1)} s band`;
+    });
+
     check('every wave takes the same time to reach the shore', () => {
       // THE SPAWNER'S INTERVAL IS A CLAIM ABOUT ARRIVALS. The first cut derived
       // each wave's birth position from its own swell lead, so `preS` ranged
@@ -4417,8 +4503,31 @@ async function partTwo(browser, mutant, shotsDir) {
             // two to four pixels and the bubble column gives one. An edge
             // generated separately from the published one would put a
             // full-width stroke in the WRONG PLACE, which stays in the subject.
-            out.push(y0 < 0 || (y1 - y0) < 1 ? null : { xCss: x / dpr, yCss: ((y0 + y1) / 2) / dpr });
+            out.push(y0 < 0 || (y1 - y0) < 1 ? null : { xCss: x / dpr, run: y1 - y0, y0, y1 });
           }
+          // AND A RUN MUCH LONGER THAN THE STROKE HAS SOMETHING MERGED INTO
+          // IT, WHICH THE ONE-PIXEL RULE ABOVE CANNOT SEE. A bubble that lands
+          // just below the front does not leave two thin outline runs — its
+          // rim TOUCHES the stroke and the two become one continuous run, and
+          // the run's centre is then somewhere between the front and the
+          // bubble. Measured on a failing column: the stroke's top sat at
+          // y 354.1 where the published edge predicts 354.1, and the run went
+          // on to y 368 — so the drawing was exactly right and the READER was
+          // reporting the bubble.
+          //
+          // THE BAR IS THE COLUMNS' OWN MEDIAN RUN, NOT THE DRAWING'S STROKE
+          // CONSTANT. The front is one stroke of one width across the whole
+          // frame, so the median of twelve columns IS that width, measured
+          // here rather than imported from the thing under test. It does not
+          // exclude what this check doubts: a front drawn from a separately
+          // generated curve is still one stroke of the same width, in the
+          // wrong place, and every column moves together.
+          const runs = out.filter(Boolean).map(o => o.run).sort((a, b) => a - b);
+          const med = runs.length ? runs[runs.length >> 1] : 0;
+          for (let i = 0; i < out.length; i++) {
+            if (out[i] && out[i].run > Math.max(3, med * 1.8)) out[i] = null;
+          }
+          for (const o of out) if (o) o.yCss = ((o.y0 + o.y1) / 2) / dpr;
           return out;
           };
           let placed = -1, out = null;
@@ -4441,16 +4550,40 @@ async function partTwo(browser, mutant, shotsDir) {
         assert.ok(pairs.length >= 9, `only ${pairs.length} of 12 columns had a readable front`);
         let worst = 0, at = 0;
         for (const q of pairs) { const e = Math.abs(q.drawn - q.pub); if (e > worst) { worst = e; at = q.x; } }
-        // THE BAR IS THE STROKE'S OWN HALF-WIDTH PLUS A PIXEL, not a number
-        // picked to pass. The front is brushed at `3.8 * H / 720` CSS px wide,
-        // so at 720 the centre of the laid stroke can only be located to
-        // within about 1.9 px however exact the geometry is, and the
-        // anti-aliased shoulders and the row quantisation add the rest. The
-        // brief's own bar is "within a pixel or two".
-        assert.ok(worst <= 2.5,
-          `the drawn front is ${worst.toFixed(2)} CSS px from the published edge at x=${at.toFixed(0)}`);
+        const errs = pairs.map(q => Math.abs(q.drawn - q.pub)).sort((a2, b2) => a2 - b2);
+        const med = errs[errs.length >> 1];
+        // THE CLAIM IS ON THE MEDIAN COLUMN AND THE WORST IS A SECOND, LOOSER
+        // BOUND — because the defect this check exists for moves EVERY column
+        // and a bubble moves one.
+        //
+        // The drawing puts eleven bubbles ON the front, deliberately, each a
+        // paper disc with an ink rim. Where one lands near the stroke the two
+        // merge and the column reads a few pixels off; the run-length filter
+        // above removes the gross cases and a small bubble can still bias one
+        // column by 2-4 px. Measured over 36-37 readable moments on two runs:
+        // the per-moment MEDIAN column error is 0.58-0.86 px and stays there,
+        // while the per-moment worst is 1.4 px on one run and 3.8 on the other
+        // — the same drawing, different bubbles.
+        //
+        // A FRONT GENERATED BESIDE THE PUBLISHED ONE IS NOT A ONE-COLUMN
+        // EFFECT: it is a different curve, so every column moves together and
+        // the median moves with them. Measured, that mutant puts the drawn
+        // front on the module's own default band and misses by more than a
+        // hundred pixels. So the median is the sensitive statistic here and
+        // the worst is the one contaminated by the drawing's own marks.
+        //
+        // THE MEDIAN'S BAR IS THE STROKE'S OWN HALF-WIDTH PLUS A PIXEL, not a
+        // number picked to pass: the front is brushed at `3.8 * H / 720` CSS
+        // px, so the centre of the laid stroke can only be located to within
+        // about 1.9 px however exact the geometry is. The brief's own bar is
+        // "within a pixel or two".
+        assert.ok(med <= 1.6,
+          `the drawn front's median column is ${med.toFixed(2)} CSS px from the published edge`);
+        assert.ok(worst <= 6,
+          `the drawn front is ${worst.toFixed(2)} CSS px from the published edge at x=${at.toFixed(0)}, `
+          + 'which is further than a bubble on the stroke can account for');
         const mean = pairs.reduce((a2, q) => a2 + Math.abs(q.drawn - q.pub), 0) / pairs.length;
-        return `${pairs.length} of 12 columns, worst ${worst.toFixed(2)} and mean ${mean.toFixed(2)} CSS px between the drawn front and swashYAt`;
+        return `${pairs.length} of 12 columns, median ${med.toFixed(2)}, mean ${mean.toFixed(2)}, worst ${worst.toFixed(2)} CSS px between the drawn front and swashYAt`;
       });
 
       await checkAsync('the drawing takes its shear from the shore', async () => {
@@ -4534,6 +4667,79 @@ async function partTwo(browser, mutant, shotsDir) {
           + `and the module's own SHEAR would draw ${ownSlope.toFixed(4)}`);
         return `horizon fitted at ${m.fitted.toFixed(4)} over ${m.n} columns against the shore's ${m.declared.toFixed(4)}, `
           + `where the module's own SHEAR draws ${ownSlope.toFixed(4)}`;
+      });
+
+      await checkAsync('the swash sheet never reaches seaward of the waterline', async () => {
+        // "The sheet must not composite over a wave that is still arriving."
+        //
+        // A wave is handed to the swash EXACTLY when its crest crosses the
+        // waterline — that is what `waveStage` says and it is why a spent wave
+        // stops being drawn there — so a sheet that stops at the waterline
+        // cannot cover a wave that is still arriving. The two halves are one
+        // number, and this is the clause that ties them together.
+        //
+        // IT WAS A BUG WITH A MEASURED SIZE. The sheet was a fixed 0.085-deep
+        // band hung off the front, so whenever the swash came within that of
+        // the waterline the band was drawn ON THE SEA: 52% of frames over 30 s
+        // of beach, by up to the full 0.085 of frame height. A wave was eaten
+        // from the bottom up while it was still a twelfth of the frame from
+        // the shore.
+        //
+        // READ OFF THE CANVAS, and the wet grey is unambiguous: `PALETTE.wet`
+        // is the sheet and nothing else in the drawing uses it — the foam is
+        // paper, the face is ink, the sea is its own two greys. The reference
+        // is the SHORE's own `yAt(x, WATERLINE_S)`, which the drawing does not
+        // write.
+        const m = await page.evaluate(async () => {
+          const S = await import('/scene/beach-shore.js');
+          window.__scene.pause(true);
+          const c = document.querySelector('.scene-canvas');
+          const g = c.getContext('2d');
+          const rect = c.getBoundingClientRect();
+          const dpr = c.width / rect.width, W = c.width, H = c.height;
+          // THE WATERLINE'S SCREEN ROW IS THE SHORE'S OWN ANSWER. Writing
+          // `s * height + (x/width - 0.5) * slope * height` here would be a
+          // second copy of the mapping the shear check exists to keep single.
+          const sh = S.createShore(); sh.resize(rect.width, rect.height);
+          let worst = -1e9, worstAt = 0, seen = 0, moments = 0, drained = 0;
+          for (let k = 0; k < 26; k++) {
+            window.__scene.scenePump(0.7);
+            window.__scene.step();
+            const st = window.__scene.sceneState();
+            if (st.edgeMax - S.WATERLINE_S < 0.02) drained++;
+            const d = g.getImageData(0, 0, W, H).data;
+            const at = (x, y) => d[(y * W + x) * 4];
+            let any = false;
+            for (const fx of [0.08, 0.2, 0.32, 0.44, 0.56, 0.68, 0.8, 0.92]) {
+              const x = Math.round(fx * W);
+              // the FIRST run of six wet rows: the top of the sheet
+              let run = 0, top = -1;
+              for (let y = 1; y < H; y++) {
+                const v = at(x, y);
+                if (v > 180 && v < 215) { run++; if (run >= 6) { top = y - 5; break; } } else run = 0;
+              }
+              if (top < 0) continue;
+              any = true; seen++;
+              // positive means the sheet reached SEAWARD of the waterline
+              const over = sh.yAt(x / dpr, S.WATERLINE_S) - top / dpr;
+              if (over > worst) { worst = over; worstAt = x / dpr; }
+            }
+            if (any) moments++;
+          }
+          window.__scene.pause(false);
+          return { worst, worstAt, seen, moments, drained };
+        });
+        assert.ok(m.moments >= 8, `only ${m.moments} of 26 moments showed any sheet at all`);
+        // NOT VACUOUS: the clamp only does anything while the swash is within
+        // the sheet's own depth of the waterline, so a run that never saw a
+        // drained moment would pass for the wrong reason.
+        assert.ok(m.drained >= 1, 'no moment in the run had the swash near the waterline, where the clamp binds');
+        // one pixel of slack for the antialiased top edge and the row the run
+        // detector reports, which is the first of six rather than the boundary
+        assert.ok(m.worst <= 1.5,
+          `the wet sheet reaches ${m.worst.toFixed(1)} px seaward of the waterline at x=${m.worstAt.toFixed(0)}`);
+        return `${m.seen} readable columns over ${m.moments} moments (${m.drained} with the swash at the waterline), `
+          + `sheet top at worst ${m.worst.toFixed(1)} px seaward of the waterline`;
       });
 
       await checkAsync('a frame allocates no arrays', async () => {

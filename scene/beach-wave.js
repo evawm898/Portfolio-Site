@@ -106,6 +106,12 @@ export const STAGE_NAMES = { 1: 'swell', 2: 'steepen', 3: 'peel', 4: 'collapse',
 // 0.095 and was still growing at 1.0 s; sequence C reached 0.130 at 1.3 s).
 export const BAND_GROW_S = 1.4;
 
+// How long a band takes to fade once it has grown, drawn per wave. NAMED
+// because BREAK_S's shoreward limit is derived from its upper end: a wave that
+// breaks too near the shore is handed to the swash with its band still
+// growing. Two copies of 2.4 would let that derivation drift from the law.
+export const BAND_FADE_RANGE = [1.2, 2.4];
+
 // MEASURED, AND THE FIRST READING OF IT WAS OF THE WRONG QUANTITY. The face
 // AGAINST THE AMBIENT WATER runs -46, -42, -38, -30, -13, -11 over 0.83 s in
 // sequence A, which looks like a face gone in under a second — and sequence C
@@ -243,12 +249,28 @@ export function drawPhaseAt(w, u) {
 // MEASURED: the band reaches 0.095 in sequence A and 0.135 in sequence C.
 export const BAND_MAX = [0.055, 0.135];
 
-// MEASURED: the crest sits at s 0.04-0.06 in sequence A and 0.00-0.09 in
-// sequence C. A BIGGER SET BREAKS FURTHER OUT, so energy runs the range
-// DOWNWARD — which is the one part of the energy coupling that is a physical
-// claim rather than a dial, and it is the reason the range is written with its
-// larger number first.
-export const BREAK_S = [0.115, 0.020];
+// A BIGGER SET BREAKS FURTHER OUT, so energy runs the range DOWNWARD — which
+// is the one part of the energy coupling that is a physical claim rather than
+// a dial, and it is the reason the range is written with its larger number
+// first. The SPREAD (0.095) is that claim and is unchanged.
+//
+// WHERE THE RANGE SITS IS EVA'S RULING AND THE QUIET END IS DERIVED FROM IT.
+// It read [0.115, 0.020] — measured off sequences A and C, where the crest
+// sits at s 0.04-0.09 — and the composition that produced is the one she
+// objected to: `b` is linear in s between the break and the waterline, so the
+// curl (b = 0.50) peaked at s 0.202 and the whole lower half of the wave zone
+// carried nothing but spent bands.
+//
+// THE SHOREWARD LIMIT IS NOT TASTE. A wave's own foam band takes
+// BAND_GROW_S + bandFadeS to grow and fade — at most 1.4 + 2.4 = 3.8 s — and
+// it has only `(WATERLINE_S - breakS) / TRAVEL_S` seconds before the swash
+// takes it over. Breaking any nearer than s 0.305 hands a wave to the shore
+// with its band still growing, so it never shows the band it committed to at
+// birth. 0.300 is that bound at this constant's own precision, with 0.2 s of
+// headroom: the curl peaks at s 0.331 and the foam band reaches 0.386-0.466,
+// which is the middle of the frame and roughly where the drawing's own
+// default hero wave sits (0.375).
+export const BREAK_S = [0.300, 0.205];
 
 const clamp01 = (v) => v < 0 ? 0 : v > 1 ? 1 : v;
 const smooth = (v) => v * v * (3 - 2 * v);
@@ -445,7 +467,7 @@ export function makeWave({ rand, energy = 0, waterline = 0.40, samples = 160 }) 
     // The steepening lead: the lip opens over the last stretch of the approach.
     steepS: 0.35 * rand.range(0.8, 1.3),
     bandMax: BAND_MAX[0] + (BAND_MAX[1] - BAND_MAX[0]) * e * rand.range(0.85, 1.15),
-    bandFadeS: rand.range(1.2, 2.4),
+    bandFadeS: rand.range(BAND_FADE_RANGE[0], BAND_FADE_RANGE[1]),
     swellLeadS,
     // HOW BIG IT DRAWS, and its own stream. Both frozen here for the reason
     // everything else in this record is: `spawn()` is the one place the energy
