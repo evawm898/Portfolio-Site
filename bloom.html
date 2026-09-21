@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Parametric Bloom — Eva Maskalenko</title>
+<meta name="description" content="Parametric Bloom — a whorl of solid-sheet petals joined into one printable solid, rendered live in the browser.">
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="alternate icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,500;9..144,600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="bloom.css">
+
+<!-- Three.js via ES-module import map, pinned to the same version as the
+     flower page so the headless gates' CDN intercept serves one local copy
+     for both (tools/verify-bloom-*.mjs fulfil this URL from node_modules). -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+
+<canvas id="bloom-canvas"></canvas>
+
+<!-- VIEW box — the flower's own vocabulary (DEFAULT/FRONT/SIDE/TOP-DOWN/
+     ISOMETRIC), framed to whatever is currently built. Selecting FAN
+     placement snaps this to TOP-DOWN itself (bloom.js, on the placement
+     transition) — no button, unlike the flower's manual "Auto-center
+     (top-down)". Pure view chrome: `viewPreset` is a raw DOM reference in
+     bloom.js, exactly like `autoRotate` below — neither is a registry
+     control, so neither is visible to readUI(), DEFAULTS, export, or any
+     gate that reads UI state. -->
+<aside class="bl-viewpanel" aria-label="View controls">
+  <div class="bl-eyebrow">View</div>
+  <div class="bl-ctrl">
+    <select id="viewPreset" aria-label="Camera preset">
+      <option value="default">DEFAULT (3/4)</option>
+      <option value="front">FRONT</option>
+      <option value="side">SIDE</option>
+      <option value="top">TOP-DOWN</option>
+      <option value="iso">ISOMETRIC</option>
+    </select>
+  </div>
+  <div class="bl-toggle">
+    <label for="autoRotate">Auto-rotate</label>
+    <input type="checkbox" id="autoRotate" checked>
+  </div>
+  <!-- PRINT PREVIEW (Eva, Sep 3 — unparked from the charter). A VIEW
+       control, never a geometry control: checked, the viewport renders the
+       EXPORT-FLOORED geometry (sheet, tip and foot floored at 1.00 mm, and
+       the ring the area rule derives from those floored feet) — the object
+       the printer will make, at three-figure petal counts the difference
+       between a render with visible gaps and a print with none. The Get STL
+       button never reads it: the export builds from readUI() alone, so the
+       bytes cannot move with this box. `shownMode()` in bloom.js is the ONE
+       owner of which geometry is on screen; the read-out names it. -->
+  <div class="bl-toggle">
+    <label for="printPreview" title="Render the geometry as it will PRINT: the 1.00 mm export floor applied to the sheet, tip and foot, and the ring re-derived from the floored feet. Never changes the STL.">Print preview</label>
+    <input type="checkbox" id="printPreview">
+  </div>
+</aside>
+
+<header class="bl-header">
+  <a href="index.html" class="bl-back">&larr; Index</a>
+  <h1>Parametric Bloom</h1>
+  <p class="bl-sub">Phase 1 — the whorl. Placeholder petals; the designed center is phase&nbsp;2.</p>
+</header>
+
+<aside class="bl-panel" aria-label="Bloom controls">
+  <div class="bl-eyebrow">Bloom</div>
+  <!-- The panel is GENERATED from bloom-registry.js by bloom.js. No control
+       markup lives in this file, ever — the registry is the only list. -->
+  <div id="panelControls"></div>
+  <div class="bl-actions">
+    <button id="resetBtn" class="bl-btn" type="button">Reset</button>
+    <button id="exportStl" class="bl-btn bl-btn--primary" type="button"
+            title="Download a 3D-printable STL (millimetres)">Get STL &darr;</button>
+    <!-- NOT A SECOND WAY TO GET THE OBJECT. This downloads the per-petal
+         mid-surface as line strips — the surface structure the solid was
+         built from, with no thickness and nothing printable in it. It is
+         beside Get STL rather than in a section because it is an export,
+         not a control; it is deliberately the non-primary button. -->
+    <button id="exportGrid" class="bl-btn" type="button"
+            title="Download the per-petal surface grid as glTF (.glb, millimetres) — line strips along and across each petal, plus each petal's attachment point. Not printable geometry.">Get grid &darr;</button>
+  </div>
+  <div id="readout" class="bl-readout" aria-live="polite"></div>
+</aside>
+
+<script type="module" src="bloom.js"></script>
+</body>
+</html>

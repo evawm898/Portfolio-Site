@@ -60,6 +60,51 @@ await page.route('**cdn.jsdelivr.net/**', (route) => {
 await page.goto(`http://localhost:${port}/flower.html`, { waitUntil: 'load', timeout: 60000 });
 await page.waitForFunction(() => { const el = document.getElementById('readout'); return el && /tris/.test(el.textContent); }, { timeout: 60000 });
 
+// PREVIEW MODE + STILL CAMERA, before anything is measured from this frame.
+//
+// Two defects this tool shipped with, both of which silently produce a frame that does not
+// show what the caller asked for:
+//
+//   CHROME. #flower-canvas spans the whole page and the panel is drawn OVER it, so
+//   `locator('#flower-canvas').screenshot()` does NOT crop the panel out — it composites it
+//   in. Frames taken with this tool had the control panel across ~40% of the image. The
+//   working agreements list "the visual audit measured a frame with the control panel drawn
+//   over it" as one of the gates that measured the wrong thing; this was another instance.
+//   `body.fl-preview` is the ONE owner of chrome-hiding (flower.css), already used by
+//   gen-preset-thumbs.mjs and audit-hires.mjs — used here rather than a fourth copy of the
+//   selector list, which would drift the way every duplicated derivation in this repo has.
+//
+//   AUTO-ROTATE. #autoRotate is `checked` in the markup, and this tool never turned it off,
+//   so the camera angle was a function of elapsed wall-clock time. Any before/after pair
+//   rendered by two runs of different duration differed by ROTATION, and a pixel diff over
+//   such a pair measures the camera, not the geometry. This invalidated a relief contact
+//   sheet before it was caught.
+//
+// Both are asserted below, not merely set: a harness that sets state without reading it back
+// reports whatever it happens to compute.
+await page.evaluate(() => {
+  document.body.classList.add('fl-preview');
+  const ar = document.getElementById('autoRotate');
+  if (ar && ar.checked) { ar.checked = false; ar.dispatchEvent(new Event('change', { bubbles: true })); }
+});
+await page.waitForTimeout(120);
+{
+  const bad = await page.evaluate(() => {
+    const out = [];
+    const ar = document.getElementById('autoRotate');
+    if (!ar) out.push('#autoRotate missing'); else if (ar.checked) out.push('autoRotate still on');
+    for (const sel of ['.fl-panel', '.fl-viewpanel', '.fl-header', '.fl-rail', '.fl-panel__toggle', '.fl-hint']) {
+      const el = document.querySelector(sel);
+      if (el && getComputedStyle(el).display !== 'none') out.push(sel + ' still visible');
+    }
+    return out;
+  });
+  if (bad.length) {
+    console.error('HARNESS INVALID: ' + bad.join('; '));
+    await browser.close(); server.close(); process.exit(2);
+  }
+}
+
 // Apply the config. Selects need a 'change' event; ranges take 'input'.
 for (const [id, value] of Object.entries(cfg)) {
   await page.evaluate(({ id, value }) => {

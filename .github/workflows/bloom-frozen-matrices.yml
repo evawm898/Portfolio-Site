@@ -1,0 +1,101 @@
+# A frozen matrix is a record of ONE COMMIT — the like-for-like row set a byte
+# report is run against, transcribed as literals so a later range change cannot
+# silently rewrite what the baseline means. Transcribing a hundred rows by hand
+# is exactly the sort of thing that looks right and is not, which is why
+# phase3Matrix's header has cited `--verify-frozen` since #114 as the remedy.
+#
+# THAT CHECK DID NOT EXIST UNTIL Aug 31 — a label naming a computation nobody
+# performed, in the tool built to prevent that defect, load-bearing for two
+# frozen matrices. It exists now, and a check a developer has to remember to
+# run is not a safety net, so it runs here: each frozen matrix is proved
+# deep-equal to its base commit's own buildMatrix(), row for row.
+#
+# No browser and no gate matrix — this imports two module graphs and compares
+# arrays, so it is seconds rather than minutes. It needs full history to make a
+# worktree at each pinned commit, and node_modules only because the harness
+# imports playwright-core at module load.
+name: bloom-frozen-matrices
+
+on:
+  pull_request:
+    paths:
+      - bloom-registry.js
+      - bloom-geometry.js
+      - tools/bloom-harness.mjs
+      - tools/diff-bloom-bytes.mjs
+      - tools/bloom-smoke.mjs
+      - .github/workflows/bloom-frozen-matrices.yml
+  push:
+    branches: [main]
+    paths:
+      - bloom-registry.js
+      - bloom-geometry.js
+      - tools/bloom-harness.mjs
+      - tools/diff-bloom-bytes.mjs
+      - tools/bloom-smoke.mjs
+  workflow_dispatch: {}
+
+# A SUPERSEDED COMMIT'S GREEN RUN SHOULD NEVER HAVE BEEN QUOTABLE (Eva,
+# session 17). Two runs of this workflow on PR #149 started two minutes
+# apart and both ran to completion on a four-CPU runner; the older one was
+# already answering a question nobody was asking. The group is keyed to the
+# workflow AND the ref so it can never cancel across PRs, and the final head
+# always runs to completion — safe by construction. It also enforces a
+# discipline already agreed: a run on a commit that has been superseded is
+# not evidence about the head.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # worktrees at the pinned base commits need real history
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install the harness's own deps (no browser download)
+        run: npm i --no-save three@0.161.0 playwright-core@1.62.1
+      # THE SMOKE SUBSET MUST STILL COVER THE MATRIX (session 17). Adding a
+      # matrix block without a smoke row silently narrows the iteration
+      # instrument while every run stays green — the flower's edge-treatment
+      # lesson, one owner for "is this station covered". The check LIVES IN
+      # tools/bloom-smoke.mjs and is called here; it is not restated, because
+      # two definitions of one predicate is the registration-rule violation
+      # this project keeps catching. Browser-free and seconds, like the rest
+      # of this workflow.
+      # --negative-control renames an assertion family in a COPY of the harness
+      # source and requires the family census to name it in both directions.
+      # A census nobody has seen fire is a census nobody should trust, and this
+      # one replaced a hand-written sentence that had been wrong twice.
+      - name: The smoke subset must still cover every matrix block and every assertion family
+        run: node tools/bloom-smoke.mjs --check --negative-control
+      - name: Every frozen matrix must equal its base commit's buildMatrix()
+        run: |
+          set -euo pipefail
+          # The commit each matrix claims to snapshot is read from the harness,
+          # never restated here — one owner, and a workflow is the last place a
+          # second copy should live.
+          PAIRS=$(node -e "import('./tools/bloom-harness.mjs').then(h=>console.log(Object.entries(h.FROZEN_BASE_COMMITS).map(([k,v])=>k+':'+v).join(' ')))")
+          for pair in $PAIRS; do
+            name="${pair%%:*}"; sha="${pair##*:}"
+            # A BASE COMMIT THAT CANNOT BE RESOLVED IS AN UNREACHABLE OBJECT,
+            # NOT A MATRIX MISMATCH, and the two need telling apart by whoever
+            # reads this log. `fatal: invalid reference` alone does not say
+            # what to do about it. The message lives HERE rather than in
+            # diff-bloom-bytes.mjs on purpose: that file is what certifies the
+            # baselines, and the fix for this is a ref, never a looser check.
+            if ! git worktree add -f "/tmp/base-$sha" "$sha" 2>/dev/null; then
+              echo "::error::frozen baseline $name: its base commit $sha is UNREACHABLE in this clone."
+              echo "::error::That means nothing points at the object any more — a deleted branch or a force-push."
+              echo "::error::FIX THE REF, NOT THE CHECK: dispatch the 'bloom-frozen-tags' workflow (Actions -> bloom-frozen-tags -> Run workflow),"
+              echo "::error::which publishes the frozen/* tags that keep every base commit alive. Never make --verify-frozen skip"
+              echo "::error::an unresolvable base: that turns a lost proof into a silent pass."
+              exit 1
+            fi
+            ln -sfn "$PWD/node_modules" "/tmp/base-$sha/node_modules"
+            node tools/diff-bloom-bytes.mjs --verify-frozen "--$name" --base "/tmp/base-$sha"
+          done

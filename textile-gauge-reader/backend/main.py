@@ -12,6 +12,21 @@ see the module-level comment below.
 
 Uploaded images are processed entirely in memory and are never written
 to disk.
+
+Every route below is `async def`, but the actual CV work (image decode,
+analyze_gauge, analyze_multi_roi, propose_measurement_rois,
+detect_ruler_calibration, count_repeats_by_template_match,
+analyze_loop_lattice_experiment) is synchronous and CPU-bound -- it is
+always run via `await run_in_threadpool(...)`, never called directly.
+Calling it directly would block this process's single asyncio event
+loop for the entire request: on Render's free tier (the default
+`uvicorn backend.main:app` in render.yaml runs one worker, no
+`--workers`), that means NOTHING else -- not even a `/health` check --
+can be served while one analysis is in flight, which is exactly the
+kind of thing that makes a slow request look like a dead service from
+the frontend's side. Diagnosed directly against a real "health check
+says online, analyze fails" report; see README.md's "Why the health
+banner can lie" section for the full investigation.
 """
 from __future__ import annotations
 
@@ -26,6 +41,7 @@ from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.concurrency import run_in_threadpool
 
 from analysis import ALGORITHM_VERSION, analyze_gauge, analyze_multi_roi, propose_measurement_rois
 from analysis.gauge_analysis import Orientation as AnalysisOrientation
@@ -44,6 +60,7 @@ from .schemas import (
     AnalyzeResponse,
     AreaMm,
     AxisConsensusOut,
+    AxisDebugOut,
     AxisOut,
     CandidateOut,
     LoopLatticeDebugOut,
@@ -142,6 +159,90 @@ def health_legacy() -> dict:
     return {"status": "ok"}
 
 
+def _detect_deployed_commit() -> dict:
+    """
+    Best-effort identification of exactly what code this running process
+    is built from -- see README's "How to tell what's actually deployed"
+    section, written after a live-site investigation where three separate
+    bug reports (a frontend crash, a missing field, a 405 on a route that
+    exists in the repo) all traced back to the same unprovable suspicion:
+    the deployed backend was running older code than `main`, with no way
+    to confirm it from outside.
+
+    Render sets RENDER_GIT_COMMIT and RENDER_GIT_BRANCH automatically on
+    every service at deploy time (undocumented in render.yaml because
+    they're not something you set -- Render provides them; see
+    https://render.com/docs/environment-variables#all-runtimes). Trust
+    those first: they're what Render itself recorded when it built this
+    exact instance, so they can't be stale the way a `git` call against
+    this checkout could be if the runtime filesystem ever diverged from
+    what was actually deployed. Fall back to asking git directly only
+    when those aren't set -- i.e. a local `uvicorn` run, not Render.
+    """
+    commit = os.environ.get("RENDER_GIT_COMMIT")
+    branch = os.environ.get("RENDER_GIT_BRANCH")
+    source = "render_env"
+    if not commit:
+        source = "git_fallback"
+        try:
+            import subprocess
+
+            repo_root = Path(__file__).resolve().parent.parent
+            commit = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "HEAD"], cwd=repo_root, stderr=subprocess.DEVNULL, timeout=5
+                )
+                .decode()
+                .strip()
+            )
+            branch = (
+                subprocess.check_output(
+                    ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=repo_root, stderr=subprocess.DEVNULL, timeout=5
+                )
+                .decode()
+                .strip()
+            )
+        except Exception:
+            commit, branch, source = None, None, "unavailable"
+    return {
+        "commit": commit,
+        "commit_short": commit[:7] if commit else None,
+        "branch": branch,
+        "source": source,
+    }
+
+
+# Computed once at process startup, not per-request -- it can't change
+# without a new deploy (a new process), and the git fallback path spawns
+# a subprocess that has no business running on every request.
+_DEPLOYED_COMMIT_INFO = _detect_deployed_commit()
+
+
+@app.get("/version")
+def version() -> dict:
+    """
+    What commit this running process was actually built from, so
+    "is the live site current" is a GET request instead of a guess. See
+    README's "How to tell what's actually deployed" section.
+
+    `source` tells you how much to trust `commit`/`branch`:
+      - "render_env": read from Render's own RENDER_GIT_COMMIT /
+        RENDER_GIT_BRANCH env vars, set automatically at deploy time --
+        authoritative on Render.
+      - "git_fallback": no Render env vars present, so this is a local
+        dev run; `git rev-parse` against this checkout instead.
+      - "unavailable": neither worked (shouldn't happen on Render).
+    """
+    return {
+        "commit": _DEPLOYED_COMMIT_INFO["commit"],
+        "commit_short": _DEPLOYED_COMMIT_INFO["commit_short"],
+        "branch": _DEPLOYED_COMMIT_INFO["branch"],
+        "source": _DEPLOYED_COMMIT_INFO["source"],
+        "algorithm_version": ALGORITHM_VERSION,
+        "app_version": app.version,
+    }
+
+
 def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[float]:
     if pixels_per_mm <= 0:
         return None
@@ -152,6 +253,14 @@ def _period_px_to_per_inch(period_px: float, pixels_per_mm: float) -> Optional[f
 
 
 def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
+    """
+    Builds the user-facing AxisOut -- deliberately WITHOUT axis.confidence
+    (see AxisOut's own docstring for why: it doesn't track error). Used
+    for the primary AnalyzeResponse.wale/course on both /analyze and
+    /analyze-multi. For the per-region debug detail nested under
+    /analyze-multi's multi_roi (Developer diagnostics only), see
+    _axis_to_debug_out below instead.
+    """
     spacing_mm = None
     per_inch = None
     if axis.spacing_px is not None and pixels_per_mm > 0:
@@ -163,7 +272,6 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
         spacing_mm=round(spacing_mm, 4) if spacing_mm is not None else None,
         per_inch=round(per_inch, 3) if per_inch is not None else None,
         positions_px=axis.positions_px,
-        confidence=axis.confidence,
         message=axis.message,
         candidates_px=axis.candidates_px,
         selected_reason=axis.selected_reason,
@@ -192,6 +300,15 @@ def _axis_to_out(axis, pixels_per_mm: float) -> AxisOut:
     )
 
 
+def _axis_to_debug_out(axis, pixels_per_mm: float) -> AxisDebugOut:
+    """
+    _axis_to_out plus the raw, uncalibrated confidence score -- for
+    RoiMeasurementOut (per-region detail nested under /analyze-multi's
+    multi_roi) only. See AxisDebugOut's docstring.
+    """
+    return AxisDebugOut(**_axis_to_out(axis, pixels_per_mm).model_dump(), confidence=axis.confidence)
+
+
 def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
     """Shared by /analyze and /analyze-multi (once per region, in the latter)."""
     return LoopLatticeDebugOut(
@@ -202,6 +319,7 @@ def _loop_lattice_to_out(lattice, pixels_per_mm: float) -> LoopLatticeDebugOut:
         direct_center_count=lattice.direct_center_count,
         row_count=lattice.row_count,
         column_count=lattice.column_count,
+        columns_considered=lattice.columns_considered,
         lattice_consistency=lattice.lattice_consistency,
         wale_spacing_px=lattice.wale_spacing_px,
         course_spacing_px=lattice.course_spacing_px,
@@ -230,6 +348,7 @@ def _axis_consensus_to_out(consensus, pixels_per_mm: float) -> AxisConsensusOut:
             )
             for o in consensus.outliers
         ],
+        no_measurement_labels=consensus.no_measurement_labels,
         regional_median_px=consensus.regional_median_px,
         regional_median_per_inch=(
             _period_px_to_per_inch(consensus.regional_median_px, pixels_per_mm)
@@ -260,7 +379,10 @@ async def analyze(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        # decode_image (JPEG/PNG decode) and everything CPU-bound below is
+        # run off the event loop -- see the module comment above
+        # run_in_threadpool's other call sites for why.
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -318,7 +440,8 @@ async def analyze(
 
     # --- Run analysis --------------------------------------------------
     try:
-        result = analyze_gauge(
+        result = await run_in_threadpool(
+            analyze_gauge,
             image_bgr=image,
             roi=roi,
             orientation=orientation,  # type: ignore[arg-type]  # Literal-compatible str
@@ -350,7 +473,8 @@ async def analyze(
         # EXISTING, frozen course detector's own row positions straight
         # through -- this experiment only ever reads them, never adjusts
         # course detection itself.
-        lattice = analyze_loop_lattice_experiment(
+        lattice = await run_in_threadpool(
+            analyze_loop_lattice_experiment,
             image, roi=roi, orientation=orientation,  # type: ignore[arg-type]
             course_rows_px=result.course.positions_px or None,
         )
@@ -403,7 +527,7 @@ async def propose_rois(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -439,7 +563,9 @@ async def propose_rois(
         )
 
     try:
-        proposal = propose_measurement_rois(image_bgr=image, pixels_per_mm=pixels_per_mm)
+        proposal = await run_in_threadpool(
+            propose_measurement_rois, image_bgr=image, pixels_per_mm=pixels_per_mm
+        )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("ROI proposal raised an unexpected exception")
         return JSONResponse(
@@ -486,12 +612,12 @@ async def detect_ruler(file: UploadFile = File(...)) -> JSONResponse:
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(status_code=400, content=RulerCalibrationOut(success=False, message=str(exc)).model_dump())
 
     try:
-        result = detect_ruler_calibration(image)
+        result = await run_in_threadpool(detect_ruler_calibration, image)
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Ruler calibration detection raised an unexpected exception")
         return JSONResponse(
@@ -549,7 +675,7 @@ async def analyze_multi(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(
             status_code=400,
@@ -624,10 +750,12 @@ async def analyze_multi(
 
     # --- Run independent-per-region analysis + consensus -----------------
     try:
-        result = analyze_multi_roi(
+        result = await run_in_threadpool(
+            analyze_multi_roi,
             image_bgr=image, rois=rois,
             orientation=orientation,  # type: ignore[arg-type]
             structure=structure,  # type: ignore[arg-type]
+            pixels_per_mm=pixels_per_mm,
         )
     except Exception:  # pragma: no cover - defensive: never fabricate a result
         logger.exception("Multi-ROI analysis raised an unexpected exception")
@@ -653,8 +781,8 @@ async def analyze_multi(
         RoiMeasurementOut(
             label=m.label, x=m.x, y=m.y, width=m.width, height=m.height, source=m.source,
             success=m.success, message=m.message,
-            wale=_axis_to_out(m.wale, pixels_per_mm),
-            course=_axis_to_out(m.course, pixels_per_mm),
+            wale=_axis_to_debug_out(m.wale, pixels_per_mm),
+            course=_axis_to_debug_out(m.course, pixels_per_mm),
             quality_score=m.quality_score,
             sharpness=m.quality_parts.get("sharpness"),
             contrast=m.quality_parts.get("contrast"),
@@ -731,7 +859,7 @@ async def count_repeats(
     try:
         data = await file.read()
         validate_upload(file.content_type, len(data))
-        image = decode_image(data)
+        image = await run_in_threadpool(decode_image, data)
     except ImageValidationError as exc:
         return JSONResponse(status_code=400, content=RepeatMatchOut(success=False, message=str(exc)).model_dump())
 
@@ -747,7 +875,8 @@ async def count_repeats(
         )
 
     try:
-        result = count_repeats_by_template_match(
+        result = await run_in_threadpool(
+            count_repeats_by_template_match,
             image_bgr=image,
             roi=(roi_x, roi_y, roi_width, roi_height),
             anchor_start=(anchor_start_x, anchor_start_y),

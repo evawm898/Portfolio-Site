@@ -1,0 +1,39 @@
+# Test gate for the Automatic Textile Gauge Reader (textile-gauge-reader/):
+# the pytest suite -- detector unit tests, the synthetic-fabric ground-truth
+# grid with its strict xfails, the metamorphic invariants pinned on the real
+# jersey fixture, the ground-truth scorecard (tests/test_ground_truth_scorecard.py),
+# and the API contract tests. Until this workflow existed nothing in CI ran
+# any of it; every other gate in this repo is path-filtered to flower*/bloom*.
+# Pure Python -- no browser, no GPU; opencv-python-headless needs no libGL.
+name: textile-gauge-tests
+
+on:
+  pull_request:
+    paths:
+      - textile-gauge-reader/**
+      - .github/workflows/textile-gauge-tests.yml
+  push:
+    branches: [main]
+    paths:
+      - textile-gauge-reader/**
+      - .github/workflows/textile-gauge-tests.yml
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: textile-gauge-reader
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: textile-gauge-reader/requirements.txt
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest httpx
+      - name: pytest (strict xfails included -- an unexpected pass is a failure)
+        run: python -m pytest tests -q -rxXfs -p no:cacheprovider

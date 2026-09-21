@@ -1,0 +1,11 @@
+<!-- Non-zero viewBox origin (-40,-60) and a transformed group — the shape
+     some export tools produce when artwork was drawn off-origin in the
+     source canvas. Mixed fill + stroke preset on the same paths. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-40 -60 80 120" width="80" height="120">
+  <g transform="translate(0,10) scale(1.05)">
+    <circle cx="0" cy="-24" r="16" fill="#33cc66" stroke="#111111" stroke-width="3"/>
+    <circle cx="-15" cy="4" r="16" fill="#33cc66" stroke="#111111" stroke-width="3"/>
+    <circle cx="15" cy="4" r="16" fill="#33cc66" stroke="#111111" stroke-width="3"/>
+    <rect x="-6" y="10" width="12" height="34" fill="#33cc66" stroke="#111111" stroke-width="3"/>
+  </g>
+</svg>

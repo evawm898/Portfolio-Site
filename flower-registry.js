@@ -14,6 +14,42 @@
    =================================================================== */
 
 /* ===================================================================
+   RETIRED_IDS — names that may never be used again.
+
+   When a control is deleted, its VALUE stops mattering and its NAME starts. Saved
+   designs and shared links carry `{"reliefAmp": 0.16, ...}` forever; nothing rewrites
+   a design already in someone's browser or in a URL. If `reliefAmp` were later
+   reclaimed for an unrelated parameter, every design saved before the deletion would
+   quietly feed a stale 0.16 into a control that means something different. No error,
+   no warning — the design simply is not what it was, and nobody can tell.
+
+   A comment saying "reserved, do not reuse" is a claim with nothing behind it, and
+   this repository has produced that failure repeatedly: `permanentHidden` was wrong
+   on one of its four users for as long as nothing could check it, `gating` named a
+   condition without stating one for three quarters of the panel, and the export gate's
+   own header claimed a non-manifold check that did not exist. So the reservation is
+   a structure with a gate, not a sentence: tools/verify-registry-sync.mjs FAILS THE
+   BUILD if any live control id, any select option value, or any DEFAULTS key collides
+   with a name listed here.
+
+   Each entry: the id, the schema version it was retired at, and one line on why. The
+   version matters because it names the migration that deletes the key — without that
+   deletion the value is not merely stale, it RIDES ALONG: migrateDesign() collects
+   keys with no control into `extras` and preserves them verbatim on re-save, so a
+   retired id with no migration is carried forward indefinitely by the very mechanism
+   meant to protect forward compatibility.
+
+   TO RETIRE A CONTROL: delete its registry row and its markup, add the entry here,
+   bump CURRENT_SCHEMA, and add a migration that DELETES the key. The gate does the
+   rest. Do not remove an entry — that is the whole point.
+   =================================================================== */
+export const RETIRED_IDS = [
+  { id: "reliefAmp",  retiredAt: 19, why: "Named SURFACE RELIEF; what it actually did was RIB JITTER. It displaced the rib network rather than texturing a face, so it destroyed the flowing rib fan instead of ornamenting it — and the wobble it produced is already reachable through edge noise (which adds to the same normalLift accumulator) and tip irregularity. A control named and documented for something the geometry does not do. NOTE: the original ruling argued it 'reads as doing so little'; that was measured and is FALSE (2.4-12.6% of pixels, visible at amplitude 0.16). It goes because it is misnamed and redundant, not because it is subtle." },
+  { id: "reliefFreq", retiredAt: 19, why: "Jitter frequency for reliefAmp (documented as broad pleats -> fine crepe; actually the wavelength of the rib disturbance). Inert once reliefAmp is gone; retired with it rather than left as a live value nobody can reach." },
+  { id: "reliefMode", retiredAt: 19, why: "Jitter pattern (radial / transverse / irregular). Retired with reliefAmp. Its three option values are not separately reserved: they were only ever meaningful as values OF this id, and reserving them would burn three common words on a control that no longer exists." },
+];
+
+/* ===================================================================
    VISIBILITY PREDICATES — the condition itself, not a name for it.
 
    Until this change the registry stored `gating: {"data-recept": true}` — the NAME of a
@@ -101,17 +137,19 @@
 */
 
 // Named predicates: a condition used by more than one control is defined ONCE here and
-// referenced, never restated. `hasReceptacle` had four hand-written copies across flower.js
-// before the drift-collapse pass and is the reason this indirection exists.
-export const PREDICATES = {
-  // The junction is DERIVED, never a control: it exists because something below the bloom
-  // needs joining. flower.js's hasReceptacle() evaluates THIS — it is not a second copy.
-  hasReceptacle: { any: [
-    { not: { id: "stemType", oneOf: ["none"] } },
-    { not: { id: "sepalsType", oneOf: ["none"] } },
-    { id: "receptacleType", oneOf: ["on"] },
-  ] },
-};
+// referenced, never restated. This indirection exists because `hasReceptacle` once had four
+// hand-written copies across flower.js — that predicate is gone now (see below), but the
+// mechanism it motivated stays, for the next condition two controls need to share.
+//
+// RETIRED — `hasReceptacle` (#84). It asked "does this design need a junction below the
+// bloom", and eighteen controls were gated on it. The junction is now built for EVERY
+// design, so the predicate was true for every design that can exist: a condition that
+// cannot be false is not a condition, and leaving it in place would have hidden the
+// junction's own shaping controls from exactly the designs that had just gained a junction.
+// It was deleted rather than left evaluating to true, because a vacuous gate reads like a
+// real one to whoever checks next. The eighteen controls now carry either no gate or the
+// remaining half of what used to be an `all[...]` beside it.
+export const PREDICATES = {};
 
 /* Evaluate a predicate against a state object keyed by control id (the same shape readUI()
    produces, so geometry code and panel code evaluate against the same values). An absent
@@ -206,9 +244,6 @@ export const CONTROLS = [
   {"id":"petalCup","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Petal cup","fmt":"signed2"},
   {"id":"crossSection","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section roll","fmt":"signed2"},
   {"id":"crossSectionTaper","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Cross-section taper","fmt":"signed2"},
-  {"id":"reliefAmp","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Surface relief","fmt":"f2"},
-  {"id":"reliefFreq","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Relief frequency","fmt":"f2"},
-  {"id":"reliefMode","section":"acc-form","kind":"select","options":[{"value":"radial","text":"Radial (ribs from base)"},{"value":"transverse","text":"Transverse"},{"value":"irregular","text":"Irregular (bullate)"}],"default":"radial","label":"Relief pattern"},
   {"id":"petalTwist","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Twist","fmt":"signed2"},
   {"id":"petalSkew","section":"acc-form","kind":"slider","min":-1,"max":1,"step":0.01,"default":0,"label":"Skew","fmt":"signed2"},
   {"id":"thickTaper","section":"acc-form","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Thickness taper","fmt":"f2"},
@@ -249,7 +284,15 @@ export const CONTROLS = [
   {"id":"boneCurve","section":"acc-lace","kind":"slider","min":-1,"max":1,"step":0.01,"default":0.55,"label":"Bone curve","fmt":"signed2","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
   {"id":"boneSpread","section":"acc-lace","kind":"slider","min":0,"max":1,"step":0.01,"default":0.85,"label":"Bone spread","fmt":"f2","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
   {"id":"boneOutline","section":"acc-lace","kind":"checkbox","default":true,"label":"Petal outline","visibleWhen":{"id":"infillType","oneOf":["bone"]}},
-  {"id":"tipStyle","section":"acc-edge","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"TOOTHED"},{"value":"scallop","text":"SCALLOPED"},{"value":"ruffled","text":"RUFFLED"}],"default":"clean","label":"Edge","tier":"standard"},
+  // SCALLOPED is UNLISTED BUT LIVE: hidden + disabled, so it cannot be picked, while the
+  // value stays reserved and still builds. Each scallop arc bulges off a treatment-blind
+  // material boundary with nothing filling it — an empty lens ~6.7 mm deep at the default
+  // height, ~11.0 mm at height 1.0 (measured). It was NOT hard to reach: `advancedOnly`
+  // appears nowhere in this file, so ADV_OPTIONS is {} and this control is tier "standard"
+  // — it was two clicks from the default landing state. Delisted rather than deleted so a
+  // saved design keeps rendering byte-identically (no migration, no geometry movement);
+  // it returns by removing these two flags. See docs/flower-rim-treatment-registration.md.
+  {"id":"tipStyle","section":"acc-edge","kind":"select","options":[{"value":"clean","text":"CLEAN"},{"value":"jagged","text":"TOOTHED"},{"value":"scallop","text":"SCALLOPED","hidden":true,"disabled":true},{"value":"ruffled","text":"RUFFLED"}],"default":"clean","label":"Edge","tier":"standard"},
   {"id":"tip","section":"acc-edge","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Tip shape","fmt":"f2","tier":"standard"},
   {"id":"tipFineness","section":"acc-edge","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Tip fineness","fmt":"f2","tier":"standard"},
   {"id":"tipFrequency","section":"acc-edge","kind":"slider","min":1,"max":40,"step":1,"default":14,"label":"Tip frequency","fmt":"int","visibleWhen":{"id":"tipStyle","oneOf":["jagged","ruffled"]}},
@@ -285,10 +328,11 @@ export const CONTROLS = [
   // The controls below (through bulbHeight) all sit under one flat "Receptacle"
   // block, but they are two different things wearing one name:
   //   role:"junction"  — shapes the minimal connective geometry that makes the
-  //     model one watertight solid. Its PRESENCE is never a control (see
-  //     hasReceptacle() in flower.js — stem/sepals present, or the receptacleType
-  //     migration override, decides that); these tags only shape how that
-  //     necessarily-existing connective mass blends and tapers.
+  //     model one watertight solid. Its PRESENCE is not a control and no longer a
+  //     condition either: since #84 every design builds one, so these tags only
+  //     shape how that always-present connective mass blends and tapers. Its SIZE
+  //     is derived too — the descent range depends on whether a stem or a side
+  //     bud's branch is underneath to receive it (DEPTH_* in flower.js).
   //   role:"ornament"  — decorative choices about what the base LOOKS like
   //     (profile silhouette, wall construction, collar, rib styling). Optional in
   //     spirit even though today's gating ties their visibility to the derived
@@ -296,25 +340,25 @@ export const CONTROLS = [
   //     "decorative structure below the bloom" family as sepals.
   // No ids, defaults, gating, or behaviour change here — annotation only, so the
   // future base-ornament work extends this block instead of untangling it first.
-  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["on"]}]},"role":"junction"},
-  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","role":"junction","visibleWhen":{"any":[]},"hiddenReason":"Migration override only: forces hasReceptacle() true for designs saved before the junction became derived. PR 3 unhides it into Advanced."},
-  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","visibleWhen":{"ref":"hasReceptacle"},"role":"ornament"},
-  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","visibleWhen":{"ref":"hasReceptacle"},"role":"junction"},
-  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
-  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","visibleWhen":{"all":[{"ref":"hasReceptacle"},{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bundleTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bundle tightness","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"flareRate","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Flare rate","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"absorption","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.6,"label":"Absorption","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"buttonSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.05,"label":"Neck swell","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"gatherHeight","section":"acc-base","kind":"slider","min":0.05,"max":0.6,"step":0.01,"default":0.15,"label":"Gather height","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["on"]},"role":"junction"},
+  {"id":"receptacleType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"on","text":"ON"}],"default":"none","label":"Receptacle","divId":"receptacleTypeCtrl","role":"junction","visibleWhen":{"any":[]},"hiddenReason":"INERT since #84. It used to force the junction on for designs saved before the junction became derived; the junction is now built for every design, so this control changes nothing whatever its value. The id stays because it is persisted in saved designs and in every preset — removing it is a migration, and that belongs with the base-ornament work that will replace this block. Do not unhide it: it would be a control that does nothing."},
+  {"id":"receptProfile","section":"acc-base","kind":"select","options":[{"value":"flare","text":"FLARE"},{"value":"dome","text":"DOME"},{"value":"cone","text":"CONE"},{"value":"urn","text":"URN"},{"value":"gentle","text":"GENTLE"}],"default":"flare","label":"Profile","role":"ornament"},
+  {"id":"receptConstruction","section":"acc-base","kind":"select","options":[{"value":"solid","text":"SOLID"},{"value":"ribbed","text":"RIBBED"},{"value":"cored","text":"CORED"}],"default":"solid","label":"Construction","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"receptCollar","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"band","text":"BAND"},{"value":"ferrule","text":"FERRULE"}],"default":"none","label":"Collar","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"receptReach","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0,"label":"Reach","fmt":"f2","visibleWhen":{"id":"continuousMargin","oneOf":["off"]},"role":"ornament"},
+  {"id":"blendSmoothness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Blend smoothness","fmt":"f2","role":"junction"},
+  {"id":"receptacleDepth","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Receptacle depth","fmt":"f2","role":"junction"},
+  {"id":"convergenceTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Convergence tightness","fmt":"f2","role":"junction","visibleWhen":{"id":"continuousMargin","oneOf":["off"]}},
+  {"id":"receptSolidity","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":1,"label":"Solidity","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"ribMultiplier","section":"acc-base","kind":"slider","min":0.5,"max":3,"step":0.05,"default":1,"label":"Rib multiplier","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"spiralTightness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.12,"label":"Rib tightness","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"spiralThickness","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Rib thickness","fmt":"f2","visibleWhen":{"all":[{"id":"receptConstruction","oneOf":["ribbed","cored"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bulbSize","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb size","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
+  {"id":"bulbHeight","section":"acc-base","kind":"slider","min":0,"max":1,"step":0.01,"default":0.5,"label":"Bulb height","fmt":"f2","visibleWhen":{"all":[{"id":"receptProfile","oneOf":["dome"]},{"id":"continuousMargin","oneOf":["off"]}]},"role":"ornament"},
   {"id":"sepalsType","section":"acc-base","kind":"select","options":[{"value":"none","text":"NONE"},{"value":"sepals","text":"SEPALS"}],"default":"none","label":"Sepals","tier":"standard"},
   {"id":"sepalSize","section":"acc-base","kind":"slider","min":0.1,"max":1.5,"step":0.05,"default":0.6,"label":"Sepal size","fmt":"f2","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},
   {"id":"sepalCount","section":"acc-base","kind":"slider","min":3,"max":24,"step":1,"default":5,"label":"Sepal count","fmt":"int","visibleWhen":{"not":{"id":"sepalsType","oneOf":["none"]}}},

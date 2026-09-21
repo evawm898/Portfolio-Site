@@ -1,0 +1,258 @@
+/* ---------------------------------------------------
+   Color Change — Field Notes No. 07
+   Loads after styles.css and only adds the mechanism blocks; the page
+   chrome (nav, header, hero, sections, footer) is the shared Field
+   Notes layout. Its own stylesheet, cc- prefixed, like the other two
+   interactive notes, so none of them can restyle another.
+--------------------------------------------------- */
+
+:root {
+  --rust:        #a56b2e;
+  --rust-bright: #e8b06e;
+}
+
+/* ---------- principle bands: the site's section label, full width */
+
+.cc__principle {
+  border-bottom: 1px solid var(--line);
+}
+
+.cc__principle-head {
+  display: grid;
+  grid-template-columns: minmax(0, 22rem) minmax(0, 46rem);
+  gap: 4vw;
+  align-items: baseline;
+  padding: 3.5rem 6vw 2.25rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.cc__principle-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.4rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.cc__principle-title span {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.14em;
+  color: var(--petrol-bright);
+  margin-right: 1rem;
+}
+
+.cc__principle-lede {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink-dim);
+}
+
+/* ---------- a mechanism: illustration left, explanation right */
+
+.cc__mech {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 26rem);
+  border-bottom: 1px solid var(--line);
+}
+
+.cc__mech:last-child { border-bottom: 0; }
+
+.cc__stage {
+  padding: 0 0 0 6vw;
+  border-right: 1px solid var(--line);
+  min-width: 0;
+}
+
+.cc__mech-head {
+  display: flex;
+  align-items: baseline;
+  gap: 1rem;
+  padding: 1.5rem 0 1rem;
+}
+
+.cc__mech-index {
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--petrol-bright);
+}
+
+.cc__mech-title {
+  font-family: var(--serif);
+  font-weight: 500;
+  font-size: 1.35rem;
+  color: var(--ink);
+}
+
+.cc__mech-sub {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  color: var(--ink-faint);
+}
+
+.cc__canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: var(--black-raised);
+  border: 1px solid var(--line);
+  outline: none;
+}
+
+.cc__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.6rem;
+  padding: 0.9rem 0 1.75rem;
+}
+
+.cc__controls-label {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-right: 0.25rem;
+}
+
+.cc__btn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transition: color 0.15s ease, border-color 0.15s ease, background-color 0.15s ease;
+}
+.cc__btn:hover { color: var(--petrol-bright); border-color: var(--petrol-bright); }
+.cc__btn.is-active { background: var(--petrol-bright); color: var(--black); border-color: var(--petrol-bright); }
+.cc__btn:focus-visible { outline: 1px solid var(--petrol-bright); outline-offset: 2px; }
+
+.cc__slider {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-dim);
+}
+.cc__slider output { color: var(--ink); min-width: 2.5em; }
+
+.cc__range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 9rem;
+  height: 22px;
+  background: transparent;
+  margin: 0;
+  cursor: pointer;
+}
+.cc__range::-webkit-slider-runnable-track { height: 1px; background: var(--line-strong); }
+.cc__range::-moz-range-track { height: 1px; background: var(--line-strong); }
+.cc__range::-webkit-slider-thumb { -webkit-appearance: none; width: 12px; height: 12px; margin-top: -5.5px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+.cc__range::-moz-range-thumb { width: 12px; height: 12px; background: var(--black); border: 1px solid var(--petrol-bright); border-radius: 0; }
+.cc__range:hover::-webkit-slider-thumb, .cc__range:focus-visible::-webkit-slider-thumb { background: var(--petrol-bright); }
+.cc__range:focus-visible { outline: none; }
+
+.cc__text {
+  padding: 1.75rem 6vw 1.75rem 2rem;
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink-dim);
+}
+
+.cc__text p + p { margin-top: 1rem; }
+.cc__text strong { color: var(--ink); font-weight: 500; }
+
+.cc__ro {
+  margin-top: 1.5rem;
+  border-top: 1px solid var(--line);
+}
+
+.cc__ro div {
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: 1rem;
+  padding: 0.55rem 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.cc__ro dt {
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  font-size: 10px;
+  padding-top: 0.1em;
+}
+
+.cc__ro dd { color: var(--ink); }
+
+/* ---------- the three-principle index in the intro */
+
+.cc__index {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--line);
+}
+
+.cc__index a {
+  padding: 1.75rem 2rem 1.75rem 6vw;
+  border-right: 1px solid var(--line);
+  transition: background-color 0.15s ease;
+}
+.cc__index a:nth-child(n+2) { padding-left: 2rem; }
+.cc__index a:last-child { border-right: 0; }
+.cc__index a:hover { background: var(--black-raised); }
+.cc__index a:hover .cc__index-title { color: var(--petrol-bright); }
+
+.cc__index-num {
+  display: block;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  color: var(--petrol-bright);
+  margin-bottom: 0.6rem;
+}
+.cc__index-title {
+  display: block;
+  font-family: var(--serif);
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--ink);
+  transition: color 0.15s ease;
+}
+.cc__index-desc {
+  display: block;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--ink-faint);
+  margin-top: 0.4rem;
+}
+
+/* ---------- responsive */
+
+@media (max-width: 1000px) {
+  .cc__mech { grid-template-columns: 1fr; }
+  .cc__stage { border-right: 0; padding: 0 6vw; }
+  .cc__text { padding: 0 6vw 2rem; }
+  .cc__principle-head { grid-template-columns: 1fr; gap: 0.75rem; }
+}
+
+@media (max-width: 700px) {
+  .cc__index { grid-template-columns: 1fr; }
+  .cc__index a { border-right: 0; border-bottom: 1px solid var(--line); padding: 1.25rem 6vw; }
+  .cc__index a:nth-child(n+2) { padding-left: 6vw; }
+  .cc__index a:last-child { border-bottom: 0; }
+  .cc__canvas { aspect-ratio: 4 / 3; }
+  .cc__mech-head { flex-wrap: wrap; gap: 0.4rem 0.8rem; }
+}
