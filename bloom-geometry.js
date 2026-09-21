@@ -711,7 +711,7 @@ export const PETAL_ROLE_ORDER =
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
 export class MeshBuilder {
-  constructor({ exportMode = false, captureGrid = false, captureLamina = false } = {}) {
+  constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false } = {}) {
     this.exportMode = !!exportMode;
     /* THE LAMINA CAPTURE (sepals, part 1) — the same `if` in emitPanel as the
        grid capture, and the same contract (it decides nothing about what is
@@ -738,6 +738,15 @@ export class MeshBuilder {
        identical with it on and off — asserted by tools/verify-bloom-grid.mjs
        clause 1 rather than argued here. */
     this.captureGrid = !!captureGrid;
+    /* THE TREATED RIM, for the edge-profile gate and for nothing else. The
+       dihedral bar is about the EXPOSED rim — the inner end cap is a flat
+       wall at ninety degrees by design, on this tree and on main — so the
+       gate needs to know which perimeter vertices the treatment actually
+       reached. That is `emitPanel`'s own answer (its ramp is the one owner),
+       recorded rather than re-derived: a gate that rebuilt the ramp would
+       move with a defect in it and could not fail. Off by default, so no
+       shipped path pays for the array. */
+    this.captureRim = !!captureRim;
     this.positions = [];          // 9 floats per triangle
     this.minThickness = Infinity; // telemetry: thinnest floored sheet emitted
     /* Bounding box of everything emitted, accumulated as triangles arrive.
@@ -7221,8 +7230,17 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      default `panels` is the single 'full' span and this is a one-element
      list, which is the case the export path draws. */
   const capturedPanels = (acc.captureGrid || acc.captureLamina) ? [] : null;
+  /* THE EDGE PROFILE'S OWN RECORD. Eva asked for every location where the
+     narrow-span clamp takes the rim below RIM_FLOOR_MM to be reported with
+     its measured thickness, so the builder collects them rather than a gate
+     re-deriving them — the clamp's one owner is `emitPanel` and a second
+     derivation of it is the defect this project repeats most. The segment
+     count and the drawn radius ride here for the same reason: they are what
+     the cost is a function of, and a number nobody prints is a number nobody
+     watches. */
+  const rim = { clamps: [], apex: [], flat: [], corner: [], segments: 0, drawnMaxMm: 0, tipAxisMm: null };
   for (const panel of panels) {
-    const g = emitPanel(acc, rows, panel, tAt);
+    const g = emitPanel(acc, rows, panel, tAt, rim);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
   }
 
@@ -7759,120 +7777,490 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       uniform: uniformThickness,
     },
     thicknessGuardResidual,
+    /* THE EDGE PROFILE, as the builder measured it rather than as the
+       constants predict it: the widest bead this petal actually drew, the
+       segment count that radius bought, the bead's semi-axis along the LENGTH
+       at the tip (the ladder's own last gap, which is not the ruled radius
+       and varies with the petal's length and the tip law), and every row
+       where the narrow-span clamp took the rim below RIM_FLOOR_MM. */
+    rim,
   };
 }
 
-/* One panel: a single-span quad grid, individually closed. Emission order
-   is the placeholder's exactly — all face quads, then both side rims, then
-   the two end caps — because at the default there is exactly ONE panel and
-   the byte report is a two-sided assertion that nothing moved.
+/* ===================================================================
+   THE PETAL'S EDGE PROFILE — THE THICKNESS TAPER AND THE ROUND BEAD
+   (Eva's ruling, the edge-profile session).
+
+   WHAT WAS THERE. `emitPanel` offset two skins by +/- t/2 and stitched them
+   at the boundary with a FLAT WALL — `quad(top, bot, bot', top')` — so every
+   petal ended in a 90 degree cliff one sheet thickness tall, 42 mm of it down
+   each margin of the shipping default. Watertight, connected, manifold,
+   orientation-clean; and a printed sheet does not end like that.
+
+   WHAT REPLACES IT, as ONE construction rather than two features bolted
+   together. Every perimeter vertex of the panel carries a PROFILE: a half
+   ellipse swept from the top skin's edge, out through a point, and back to
+   the bottom skin's edge. Two lengths decide it and both are measured in
+   MILLIMETRES OF SURFACE, never in grid parameter units (this project's own
+   mode-and-sampling rule — a column index is a length only under uniform
+   spacing, and `v` has never been uniform in arc length here: `metricMax`
+   reaches 4.12 under cup with a gradient):
+
+       b   the half thickness at the rim, eased from the body's own half
+           thickness toward RIM_FLOOR_MM / 2 over RIM_TAPER_MM of surface
+           distance to the nearest EXPOSED boundary, by smootherstep — which
+           is what makes the taper start without a crease and arrive flat.
+       a   the INSET: how far in from the original boundary the skin now
+           stops. The profile's apex is placed at the ORIGINAL boundary point
+           itself, so the silhouette does not move.
+
+   THE APEX IS THE ORIGINAL BOUNDARY POINT, LITERALLY. `prof[K/2]` is the
+   captured mid-surface point pushed onto the profile as itself, not
+   reconstructed as `C + w*a` — `(p - c) + c` is not `p` in IEEE-754, and
+   "the silhouette is unchanged" is an identity this project can assert only
+   if the vertex is the same double. That is what clause 2b of
+   tools/verify-bloom-grid.mjs reads, and it is why the segment count is
+   forced EVEN: at an odd count there is no vertex at theta = pi/2 at all,
+   the widest point of the bead falls mid-edge, and the silhouette pulls in
+   by r*(1 - cos(pi/2K)) instead of not moving. Eva's ruling sets a FLOOR of
+   three segments; four is the smallest even count at or above it, so the
+   floor is honoured and the identity is available. The measured cost of
+   three would have been 0.021 mm of pull-in at the radius where three is
+   reached, which is a real number and not the reason — the reason is that an
+   identity is worth more than an approximation.
+
+   ONE CLOSED LOOP, NOT FOUR SIDES. The perimeter is walked once — the inner
+   end cap, up one margin, across the tip, back down the other — and
+   consecutive profiles are joined by K quads. At a = 0 the profile collapses
+   onto the straight segment from `C + n*b` to `C - n*b`, which is the flat
+   wall this replaced, subdivided: the SAME two planes through the SAME
+   corner vertices. So the foot needs no special case and gets none. It also
+   means the corners cost nothing to get right: where the margin run meets
+   the tip run the two loop vertices share their skin point `C` and differ
+   only in their apex, so the quads between them collapse to a fan and the
+   corner rounds itself.
+
+   WHICH SIDES ARE RIM IS DERIVED, NEVER DECLARED. `tipExposed` is
+   `panel.rowTo === rows.length - 1` — true of the plain span, of a cleft's
+   lobes and of a fringe tooth, false of the base panel a cleft or a fringe
+   sits ON TOP OF, whose tip cap is buried under the panels that overlap it.
+   The treatment ramps to nothing over RIM_TAPER_MM at every buried end, so
+   a buried cap keeps the flat wall it needs and there is no cliff where the
+   two meet. The inner end cap is buried on EVERY panel — the foot under the
+   hub slab on the base panel, the shared slab under a lobe or a tooth — so
+   it is never beaded, which is the "the base stretch emits what it emits
+   today" half of the ruling, satisfied by construction rather than by a flag.
+
+   AND THE BASE PANEL'S LAST ROW IS NOT DROPPED WHERE THE TIP IS BURIED,
+   which is load-bearing and was measured rather than assumed:
+   PANEL_OVERLAP_ROWS is 1, so the shared slab that welds a cleft's lobes or
+   a fringe's teeth to their base is exactly ONE row deep, and dropping it
+   would take the overlap to zero and the bloom to several pieces.
+
+   THE BEAD SHRINKS TO FIT, and one expression carries all three of Eva's
+   rulings at once:
+
+       r = min( RIM_BEAD_RADIUS_MM , tBody/2 , RIM_ROOM_FRACTION * room )
+
+   The first arm is the ruled radius. The second is "where body thickness is
+   at or below the rim floor there is no taper, bead only" — at tBody <= 1.0
+   the second arm binds, r is tBody/2, the rim thickness it implies IS the
+   body thickness and the taper has nothing to do. The third is the flower's
+   own `addSlab` clamp against the available room, which is what lets the
+   narrowest reachable panel — a fringe tooth at 1.0000 mm, exactly twice the
+   ruled radius — carry two beads with room to spare instead of inverting.
+   Where that arm binds the rim goes BELOW the 1.0 mm floor, which Eva ruled
+   acceptable and asked to be told: every such row is recorded on
+   `rim.clamps` and printed.
+   =================================================================== */
+export const RIM_FLOOR_MM = 1.0;
+export const RIM_BEAD_RADIUS_MM = 0.5;
+export const RIM_TAPER_MM = 3.0;
+export const RIM_BEAD_SEGMENTS = 8;
+export const RIM_BEAD_SEGMENTS_MIN = 3;
+export const RIM_ROOM_FRACTION = 0.45;
+/* How many steps the profile pivots through at an apex corner. Three takes the
+   default's worst corner turn from 65.63 degrees to under the bar; it is a
+   MESH resolution, not a shape parameter — every inserted apex lies on the
+   segment the two real ones already span. */
+export const RIM_CORNER_STEPS = 3;
+/* HOW MANY LADDER ROWS THE TIP BEAD SPANS. A FIXED count, never a threshold on
+   a measured gap: which rows exist is TOPOLOGY, the ladder's spacing near the
+   apex is mode-dependent (the tip floor is 0.15 mm live against 0.80 export),
+   and a "drop rows until the gap clears the radius" rule would be this
+   project's sixth discrete decision on a continuous quantity. Two, because one
+   is not enough and the measurement says so: the blade is 1.600 mm across at
+   u = 1 at every petal size while the skin's last row is inset by the margin
+   bead on both sides, so the tip bead has to flare outward to reach the
+   original outline. Over ONE ladder gap (0.39 mm at the default) that flare is
+   0.344 mm at each corner and the profile turns 65.63 degrees between adjacent
+   columns; over TWO it is 0.11 mm over 0.676 mm. */
+export const RIM_TIP_ROWS = 2;
+
+/* Smootherstep, clamped. Its first AND second derivatives vanish at both
+   ends, which is the whole reason it is this and not smoothstep: the taper
+   has to leave the body without a crease and arrive at the rim flat. */
+const rimEase = (x) => { const t = x <= 0 ? 0 : x >= 1 ? 1 : x; return t * t * t * (t * (t * 6 - 15) + 10); };
+const rimSameP = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
+const rimDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/* THE SEGMENT COUNT, from the radius the bead would be drawn at — Eva's
+   ruling, and its reason is cost: an unscaled eight-segment bead measured
+   +73.5% triangles on the default, and a bead far below the print floor
+   cannot show eight facets to anyone. Rounded UP to even for the apex
+   identity above; the ruled minimum of three is a floor and four is the
+   smallest even count that clears it.
+
+   IT READS THE SHEET AND NOTHING ELSE, AND IT READS IT THROUGH A MODE-FREE
+   FLOOR. How many triangles a rim carries is TOPOLOGY, and this project has
+   refused a mode-dependent topology five times — the ladder (session 32), the
+   seam step (38), the fringe's count threshold, the lamina (42) and the
+   sphere stem's omission mask. Measured here before it was fixed: at
+   `sheetThickness` 0.60 the live build floored nothing and took six segments
+   while the export build floored the sheet to MIN_FEATURE_MM and took eight,
+   so one control set built two different meshes. `Math.max(t,
+   MIN_FEATURE_MM)` is the fringe's own remedy — the CONSTANT, never
+   `acc.floorThickness` — and the two modes then agree by construction rather
+   than by an assertion that can fail.
+
+   THE ROOM CLAMP IS DELIBERATELY NOT AN INPUT HERE, for the same reason: the
+   room is measured on the emitted mid-surface, whose half-width carries the
+   TIP FLOOR, which IS mode-dependent (0.15 mm live against 0.80 export,
+   session 38 §A). It still sets the DRAWN radius — a narrow span really does
+   get a smaller bead — it just does not get to decide how many triangles that
+   bead is made of. Measured cost of leaving it out: the ten-tooth fringe. */
+const rimSegments = (sheetMm) => {
+  const r = Math.min(RIM_BEAD_RADIUS_MM, Math.max(sheetMm, MIN_FEATURE_MM) / 2);
+  const raw = Math.round(RIM_BEAD_SEGMENTS * (r / RIM_BEAD_RADIUS_MM));
+  const k = Math.min(RIM_BEAD_SEGMENTS, Math.max(RIM_BEAD_SEGMENTS_MIN, raw));
+  return k % 2 === 0 ? k : k + 1;
+};
+
+/* WHERE THE SKIN NOW STOPS. Solve, on the row's own cross-section, for the v
+   whose CHORD to the boundary is the inset. The chord and not the arc, and
+   that is deliberate rather than lazy: the apex is placed at the boundary
+   point and the profile's half-width is |apex - C|, so a chord-based solve is
+   the quantity the geometry actually uses and the two cannot disagree. Over
+   0.5 mm against the tightest curvature this generator can build (the roll
+   floor, one sheet thickness of radius) chord and arc differ by 0.6%.
+
+   Bisection rather than Newton because the metric is whatever `sect` is, and
+   a bracket cannot diverge. Twelve halvings of a span put the answer inside
+   a thousandth of a millimetre on the widest petal reachable. */
+const rimInsetV = (sect, vEdge, vIn, want) => {
+  const Pe = sect(vEdge).P;
+  let lo = vEdge, hi = vIn;
+  for (let it = 0; it < 12; it++) {
+    const mid = (lo + hi) / 2;
+    if (rimDist(sect(mid).P, Pe) < want) lo = mid; else hi = mid;
+  }
+  return (lo + hi) / 2;
+};
+
+/* One panel: a single-span quad grid, individually closed. Face quads first,
+   then the rim loop — the placeholder's order, kept because at the default
+   there is exactly ONE panel and the byte report is a two-sided assertion.
 
    THE ROW OWNS ITS CROSS-SECTION. This asks each row for the mid-surface
    point and the unit normal AT that point, rather than adding a per-row
    constant normal itself: a curved cross-section has a normal that varies
    across the width, and offsetting it by one constant would build a wedge
-   instead of a sheet. For a flat row the closure returns the row's own
-   constant normal and the same expression as before, so the shipped default
-   is unmoved — which the byte report measures rather than assumes. */
-/* THE MID-SURFACE CAPTURE (session 28) rides in this function and nowhere
-   else, for the reason the header above already gives: `row.sect(v)` is
-   evaluated HERE, once per grid point, and the mid-surface `P` it returns is
-   the thing the two skins are offset from. A capture that re-evaluated the
-   cross-section somewhere else would be a second reader of the row's closure
-   and could disagree with the emitted mesh — the one defect this project
-   repeats most. What is stored is the SAME object the offsets were taken
-   from, so "the grid" and "what was emitted" are the same numbers by
-   construction rather than by comparison.
+   instead of a sheet.
 
-   IT ADDS NO ARITHMETIC. `P` and `n` are already computed and already
-   consumed; the capture pushes references. Nothing is recomputed, nothing is
-   reordered, and no float is touched — so the emitted bytes cannot move,
-   which clause 1 of tools/verify-bloom-grid.mjs measures rather than assumes.
+   THE MID-SURFACE CAPTURE (session 28) rides in this function and nowhere
+   else: `row.sect(v)` is evaluated HERE and the mid-surface `P` it returns is
+   the thing the skins are offset from. IT STILL IS — but the capture and the
+   skin are now two samplings of that one surface rather than one. The capture
+   keeps the ORIGINAL span and the ORIGINAL per-row thickness, because the
+   mid-surface did not move when the edge got a bead (the apex is ON it) and
+   /plot's construction curves must not move for a reason that is not about
+   them; the skin samples the INSET span at the tapered thickness. They are
+   tied at the one place they must agree and clause 2 of
+   tools/verify-bloom-grid.mjs asserts it: every captured MARGIN mid point is
+   the emitted bead APEX, as the same double.
 
    RETURNS null when the accumulator was not asked to capture. */
-function emitPanel(acc, rows, panel, tAt) {
+function emitPanel(acc, rows, panel, tAt, rim) {
   const grid = (acc.captureGrid || acc.captureLamina) ? [] : null;
-  const top = [], bot = [];
-  for (let i = panel.rowFrom; i <= panel.rowTo; i++) {
+  const rowFrom = panel.rowFrom, rowTo = panel.rowTo;
+  const tipExposed = rowTo === rows.length - 1;
+  /* The buried stretch at the panel's start: the foot's rows all carry
+     u === 0 (clause 3 of the grid gate asserts that), and a lobe or a tooth
+     starts PANEL_OVERLAP_ROWS inside the panel below it. Both are ends the
+     treatment must fade to nothing at, and one expression finds both. */
+  let baseEnd = rowFrom;
+  while (baseEnd < rowTo && rows[baseEnd + 1].u === 0) baseEnd++;
+  /* WHERE THE TIP IS EXPOSED THE LAST ROW BECOMES THE APEX RING rather than a
+     skin row: it is the only way to round the end without moving the ladder,
+     which owns A7, A8, HELD_ROWS, CURL_START_MIN, the buckle's rows-per-cycle
+     bar and the lobe demand. The bead's semi-axis along the length is then
+     the ladder's own last gap rather than the ruled radius — reported, per
+     state, on `rim.tipAxis`. */
+  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;
+
+  /* ---- the original boundary: the apexes, the room, and the arc measure ---- */
+  const NROW = rowTo - rowFrom + 1;
+  const oV = [], oP = [], oN = [], sMargin = [], roomMm = [], tBodyOf = [];
+  let sAcc = 0;
+  for (let i = rowFrom; i <= rowTo; i++) {
     const row = rows[i];
-    /* THE ROW OWNS ITS THICKNESS as well as its cross-section, and it asks
-       thicknessProfile through the same closure the builder made. A panel
-       computing its own thickness would be a second owner of the quantity
-       whose single ownership this whole layer is about. At a uniform
-       profile this returns the identical scalar for every row. */
-    const t = tAt(row.u);
-    /* RECORDED ON THE ROW, so every consumer of "how thick was this row"
-       reads the number that was EMITTED rather than re-asking the profile.
-       The foot assertion compares this against footRing()'s own answer; if
-       it re-asked the profile it would agree with the profile by
-       construction and could never catch an emission that disagreed with
-       it — which is exactly the leak it exists to catch. */
-    row.tUsed = t;
-    acc.noteSheet(t);
-    const span = panel.spanAt(i);
-    const vLo = span[0], vHi = span[1];
-    const ht = [], hb = [];
-    /* THE ROW'S CAPTURED COLUMNS. Built beside ht/hb and pushed with them, so
-       a row that reached the mesh reached the grid — there is no path that
-       emits one and not the other. */
-    const gm = grid ? { row: i, u: row.u, halfWidth: row.h, thickness: t, v: [], mid: [], normal: [] } : null;
+    const sp = panel.spanAt(i);
+    const vs = [], Ps = [], Ns = [];
     for (let j = 0; j < NV; j++) {
-      /* The span-form column map. A trimmed panel evaluates the row's
-         cross-section at ITS OWN v values, and the cross-section is a
-         function of the GLOBAL v — so a cleft's two lobes stay on the one
-         arc their base panel is on instead of drifting onto two of their
-         own. That is what keeps a rolled cleft one connected body. */
-      const v = vLo + ((vHi - vLo) * j) / (NV - 1);
+      const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1);
       const { P, n } = row.sect(v);
-      ht.push([P[0] + n[0] * t / 2, P[1] + n[1] * t / 2, P[2] + n[2] * t / 2]);
-      hb.push([P[0] - n[0] * t / 2, P[1] - n[1] * t / 2, P[2] - n[2] * t / 2]);
-      /* THE GLOBAL v IS STORED, not the column index. On a trimmed panel the
-         columns run over [vLo, vHi] rather than [-1, 1], so a consumer that
-         reconstructed v from j would be right on the shipping default and
-         wrong on every cleft — and it is exactly the quantity a downstream
-         drawing needs, since v is uniform in PARAMETER and not in arc length
-         (see metricMin/metricMax on the form telemetry). */
-      gm && (gm.v.push(v), gm.mid.push(P), gm.normal.push(n));
+      vs.push(v); Ps.push(P); Ns.push(n);
     }
-    top.push(ht); bot.push(hb);
-    if (gm) grid.push(gm);
+    let w = 0;
+    for (let j = 1; j < NV; j++) w += rimDist(Ps[j - 1], Ps[j]);
+    const k = i - rowFrom;
+    if (k > 0) sAcc += rimDist(oP[k - 1][0], Ps[0]);
+    oV.push(vs); oP.push(Ps); oN.push(Ns); sMargin.push(sAcc); roomMm.push(w);
+    const t = tAt(row.u);
+    row.tUsed = t; acc.noteSheet(t);
+    tBodyOf.push(t);
   }
+
+  /* ---- per row: the drawn radius, the ramp, the inset, the skin ---- */
+  const sBase = sMargin[baseEnd - rowFrom], sTip = sMargin[NROW - 1];
+  const top = [], bot = [], skinV = [], skinP = [], skinN = [], skinB = [];
+  const rimClamped = [];
+  let drawnMax = 0, sheetMax = 0;
+  for (let i = rowFrom; i <= skinTo; i++) {
+    const k = i - rowFrom, row = rows[i], tBody = tBodyOf[k];
+    const r = Math.min(RIM_BEAD_RADIUS_MM, tBody / 2, RIM_ROOM_FRACTION * roomMm[k]);
+    /* THE RAMP. Zero at every buried end and full RIM_TAPER_MM of surface
+       away from it, by the same smootherstep the taper uses. It scales the
+       inset AND the taper's depth together, so at a buried end the panel
+       emits the flat wall at the body's own thickness — which is the whole
+       of "the base stretch must emit exactly what it emits today". */
+    const gBase = rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
+    const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - sMargin[k]) / RIM_TAPER_MM));
+    const a = g * r;
+    if (a > drawnMax) drawnMax = a;
+    if (tBody > sheetMax) sheetMax = tBody;
+    const vLo = oV[k][0], vHi = oV[k][NV - 1], vMid = (vLo + vHi) / 2;
+    const inLo = a > 0 ? rimInsetV(row.sect, vLo, vMid, a) : vLo;
+    const inHi = a > 0 ? rimInsetV(row.sect, vHi, vMid, a) : vHi;
+    const vs = [], Ps = [], Ns = [], Bs = [], ht = [], hb = [], Cl = [];
+    for (let j = 0; j < NV; j++) {
+      const v = a > 0 ? inLo + ((inHi - inLo) * j) / (NV - 1) : oV[k][j];
+      const q = a > 0 ? row.sect(v) : { P: oP[k][j], n: oN[k][j] };
+      vs.push(v); Ps.push(q.P); Ns.push(q.n);
+    }
+    /* THE DISTANCE FIELD, along the row's own emitted polyline rather than as
+       a chord to the margin: on a rolled row the chord under-reads the
+       surface distance badly, and the taper would then fire further in than
+       3 mm. The two inset stretches are added at the ends because they are
+       surface too — the bead's own footprint. */
+    const arc = [0];
+    for (let j = 1; j < NV; j++) arc.push(arc[j - 1] + rimDist(Ps[j - 1], Ps[j]));
+    const dEdge = a;
+    const dTipRow = tipExposed ? (sTip - sMargin[k]) : Infinity;
+    for (let j = 0; j < NV; j++) {
+      const d = Math.min(dEdge + arc[j], dEdge + (arc[NV - 1] - arc[j]), dTipRow);
+      const b = tBody / 2 + g * (r - tBody / 2) * (1 - rimEase(d / RIM_TAPER_MM));
+      Bs.push(b);
+      const P = Ps[j], n = Ns[j];
+      ht.push([P[0] + n[0] * b, P[1] + n[1] * b, P[2] + n[2] * b]);
+      hb.push([P[0] - n[0] * b, P[1] - n[1] * b, P[2] - n[2] * b]);
+      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;
+      Cl.push(wasClamped);
+      if (rim && wasClamped) {
+        rim.clamps.push({ panel: panel.label, row: i, u: row.u, col: j, thicknessMm: 2 * b, bodyMm: tBody, roomMm: roomMm[k] });
+      }
+    }
+    top.push(ht); bot.push(hb); skinV.push(vs); skinP.push(Ps); skinN.push(Ns); skinB.push(Bs); rimClamped.push(Cl);
+  }
+
+  /* ---- the captured grid: the ORIGINAL span, the BODY thickness ---- */
+  if (grid) {
+    for (let i = rowFrom; i <= rowTo; i++) {
+      const k = i - rowFrom;
+      grid.push({ row: i, u: rows[i].u, halfWidth: rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k] });
+    }
+  }
+
   const NR = top.length;
   /* THE WINDING IS OUTWARD, AND THAT IS MEASURED RATHER THAN ASSERTED
-     (session 36, fixing session 35's finding). The top skin is offset along
-     +n, so its triangles must be wound counter-clockwise SEEN FROM +n — the
-     convention MeshBuilder.quad documents and buildHubInto follows. From the
-     day this emitter was written until session 35 the comment here read
-     "Top face (outward = +N side)" while every quad below was wound the OTHER
-     way: all six triangles touching a top-skin point pointed INTO the sheet,
-     every petal shell had NEGATIVE signed volume (−515.19 mm³ each on the
-     shipping default against the hub's +294.07), and six gates passed on it,
-     because watertight, connected, manifold, winding-consistent,
-     degenerate-free and Euler all hold on an inside-out solid. It mattered
-     because the export contract leans on a slicer UNIONING overlapping closed
-     shells, and a union handed a negative-volume shell can SUBTRACT it.
-     Each quad is now emitted as (a, d, c, b) where it was (a, b, c, d): the
-     same two triangles as vertex SETS, each with its winding reversed. The
-     witness is the O family in both STL gates (per-shell signed volume by the
-     divergence theorem AND a ray-parity test, agreeing), calibrated on a unit
-     cube in `node tools/bloom-self-intersection.mjs --orientation`. */
+     (session 36). The top skin is offset along +n, so its triangles are wound
+     counter-clockwise SEEN FROM +n. The witness is the O family in both STL
+     gates — per-shell signed volume by the divergence theorem AND a ray-parity
+     test, agreeing — calibrated on a unit cube in
+     `node tools/bloom-self-intersection.mjs --orientation`. */
   for (let i = 0; i < NR - 1; i++) {
     for (let j = 0; j < NV - 1; j++) {
       acc.quad(top[i][j], top[i + 1][j], top[i + 1][j + 1], top[i][j + 1]);   // top skin: normal +n
       acc.quad(bot[i][j], bot[i][j + 1], bot[i + 1][j + 1], bot[i + 1][j]);   // bottom skin: normal -n
     }
   }
-  /* Rim: both side edges along every row pair, plus the two end caps. Every
-     perimeter edge of the grid gets exactly one rim quad, which is what makes
-     each edge of the closed solid shared by exactly two triangles. Wound to
-     match the skins above, so the shell is one consistent outward surface. */
-  for (let i = 0; i < NR - 1; i++) {
-    acc.quad(top[i][0], bot[i][0], bot[i + 1][0], top[i + 1][0]);                         // v = -1 side
-    acc.quad(top[i][NV - 1], top[i + 1][NV - 1], bot[i + 1][NV - 1], bot[i][NV - 1]);     // v = +1 side
+
+  /* ---- the rim: ONE closed loop of profiles ---- */
+  const K = rimSegments(sheetMax);
+  const APEX = K / 2;
+  /* The loop, as (row, column) pairs on the ORIGINAL boundary. Its direction
+     is the one that leaves the rim wound with the two skins; the witness is
+     `boundaryEdges === 0` plus O1/O2, not this comment. */
+  const loop = [];
+  const RUN = [];                                                        // index of each run's first entry
+  RUN.push(loop.length);
+  for (let j = 0; j < NV; j++) loop.push([rowFrom, j]);                  // inner end cap
+  RUN.push(loop.length);
+  for (let i = rowFrom + 1; i <= rowTo; i++) loop.push([i, NV - 1]);     // the +v margin
+  RUN.push(loop.length);
+  for (let j = NV - 2; j >= 0; j--) loop.push([rowTo, j]);               // the tip
+  RUN.push(loop.length);
+  for (let i = rowTo - 1; i > rowFrom; i--) loop.push([i, 0]);           // the -v margin
+  const isRunStart = new Set(RUN);
+
+  /* THE CORNER IS SUBDIVIDED, AND THE REASON IS A MEASUREMENT. Where the
+     margin run hands over to the tip run the two loop vertices share their
+     skin point `C` and differ only in their apex, so the profile pivots about
+     C — the fan that rounds the corner. In ONE step that pivot is most of a
+     right angle: measured on the shipping default, 24 edges over the 30 degree
+     bar and a worst turn of 65.63 degrees, all four of the petal's apex
+     corners and nothing else. The apex is walked along the ORIGINAL BOUNDARY
+     POLYLINE between the two real apexes, which is the straight lattice edge
+     they already span, so the silhouette gains nothing and loses nothing — the
+     inserted apexes lie ON the segment the rim already had. Only the two real
+     apexes are captured points, and E4 asks about those. */
+  const entries = [];
+  for (let k = 0; k < loop.length; k++) {
+    const [i, j] = loop[k];
+    const sk = Math.min(i, skinTo) - rowFrom;
+    entries.push({ apex: oP[i - rowFrom][j], sk, j });
+    const n = (k + 1) % loop.length;
+    const [i2, j2] = loop[n];
+    const sk2 = Math.min(i2, skinTo) - rowFrom;
+    /* A PIVOT IS EITHER OF TWO THINGS, and both are the same corner seen from
+       two sides. The first is a pair that already shares its skin point, which
+       is what the dropped tip rows produce along the margin. The second is a
+       RUN BOUNDARY — where the margin hands over to the tip — and it is the
+       one the first cut missed: there BOTH the apex and the skin point change,
+       so the profile's own direction swings through the whole of the outline's
+       corner in a single step. Measured on the shipping default before this
+       was added: 65.72 degrees, at exactly the four apex corners and nowhere
+       else, which is the OUTLINE's own turn there (the margin converges at
+       21.8 degrees to the axis and the tip edge is square to it) rather than
+       anything the bead does. Sweeping the apex with the skin point HELD puts
+       that turn through RIM_CORNER_STEPS instead of one.
+
+       At a buried end the profile is the flat wall and `w` is the zero vector,
+       so every inserted profile is IDENTICAL to the one before it and its
+       whole strip is skipped as degenerate — the foot costs nothing and needs
+       no special case. */
+    if (sk2 === sk && j2 === j) {
+      const a0 = oP[i - rowFrom][j], a1 = oP[i2 - rowFrom][j2];
+      for (let q = 1; q < RIM_CORNER_STEPS; q++) {
+        const f = q / RIM_CORNER_STEPS;
+        entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
+      }
+    } else if (isRunStart.has(n)) {
+      const a0 = oP[i - rowFrom][j], a1 = oP[i2 - rowFrom][j2];
+      for (let q = 1; q <= RIM_CORNER_STEPS; q++) {
+        const f = q / (RIM_CORNER_STEPS + 1);
+        entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
+      }
+    }
   }
-  for (let j = 0; j < NV - 1; j++) {
-    acc.quad(top[0][j], top[0][j + 1], bot[0][j + 1], bot[0][j]);                         // inner end cap
-    acc.quad(top[NR - 1][j], bot[NR - 1][j], bot[NR - 1][j + 1], top[NR - 1][j + 1]);     // tip cap
+  const profs = entries.map(({ apex, sk, j }) => {
+    const C = skinP[sk][j], n = skinN[sk][j], b = skinB[sk][j];
+    const pts = new Array(K + 1);
+    pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = apex;
+    const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
+    /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
+       cosine. At a full bead `a` equals `b` and the cosine is the half round,
+       which is what the shape has to be. Where the treatment has ramped to
+       nothing the profile is the flat WALL, and a cosine lays its points out
+       clustered at the middle of that wall — so the strip between two such
+       walls is a fan of slivers whose normals are ill-conditioned, and the
+       measured turn between two facets that are geometrically COPLANAR came
+       out at 108.21 degrees on the shipping default, at the foot-to-blade
+       seam, where main reads 93.92. Blending toward an even spacing as the
+       bead goes away costs nothing at the rim (the ratio is 1 there, the
+       cosine is untouched, and the bead is still a true half round) and makes
+       the wall's own subdivision uniform, which is what it always should have
+       been. Continuous in `a`, so there is no threshold. */
+    const ratio = b > 0 ? Math.min(1, Math.hypot(wx, wy, wz) / b) : 0;
+    for (let m = 1; m < K; m++) {
+      if (m === APEX) continue;
+      const th = (Math.PI * m) / K, sn = Math.sin(th);
+      const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
+      pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
+    }
+    return pts;
+  });
+  /* A profile pair that shares its skin point — the two corners, where the
+     margin run hands over to the tip run — collapses its end quads to
+     triangles. Skipping a triangle with a repeated vertex is not a hole: the
+     quad's own boundary edges are exactly the surviving triangle's. */
+  /* THE SWEEP'S WINDING IS OUTWARD, AND IT WAS WRONG FIRST TIME — recorded
+     because the way it was found is the point. The first cut walked the strip
+     (A[m], A[m+1], B[m+1], B[m]) and produced a mesh with ZERO boundary edges
+     and ZERO non-manifold edges that was nonetheless inside-out on every rim
+     triangle: 2,112 DIRECTED edges on the default had no reverse partner and
+     the solid's signed volume came out −455.58 mm³ against main's +4,415.57.
+     The undirected census cannot see it — it keys on a SORTED pair, so two
+     triangles crossing one edge the SAME way count as a matched pair — which
+     is ST10's own finding on the stem tube's annuli, one solid later. The
+     strip is walked (A[m], B[m], B[m+1], A[m+1]) now, and E3 of
+     tools/verify-bloom-edge-profile.mjs runs a DIRECTED census so a fix
+     without a witness does not become folklore. */
+  for (let k = 0; k < profs.length; k++) {
+    const A = profs[k], B = profs[(k + 1) % profs.length];
+    for (let m = 0; m < K; m++) {
+      const p = A[m], q = B[m], s = B[m + 1], u = A[m + 1];
+      if (!rimSameP(p, q) && !rimSameP(q, s) && !rimSameP(s, p)) acc.tri(p, q, s);
+      if (!rimSameP(p, s) && !rimSameP(s, u) && !rimSameP(u, p)) acc.tri(p, s, u);
+    }
+  }
+  if (rim) {
+    if (acc.captureRim) {
+      /* The apexes the treatment REACHED. `a > 0` is exact: the ramp returns
+         a hard zero at a buried end (rimEase clamps at 0), so this is a
+         branch and not a threshold on a continuous quantity. */
+      for (let k = 0; k < loop.length; k++) {
+        const [i, j] = loop[k], sk = Math.min(i, skinTo) - rowFrom;
+        const apex = oP[i - rowFrom][j];
+        /* THE THREE EMITTED VERTICES OF A TREATED PROFILE, as the SAME arrays
+           the mesh got — the apex and the two points where the bead meets the
+           skins. The gate proves all three are in the emitted vertex set
+           before it measures anything with them, so this points at the
+           artefact rather than standing in for it: the rim's thickness is
+           |top - bot| between two vertices the mesh demonstrably has. */
+        if (!rimSameP(apex, skinP[sk][j])) rim.apex.push({ apex, top: top[sk][j], bot: bot[sk][j], panel: panel.label, row: i, col: j, bodyMm: tBodyOf[sk], clamped: rimClamped[sk][j] });
+        /* AND THE PERIMETER THE TREATMENT DID NOT REACH — the buried stretch,
+           which is a flat wall at ninety degrees BY DESIGN on this tree and on
+           main. The dihedral clause needs it so it can attribute an edge to
+           the nearer stretch instead of measuring the foot's own corner and
+           calling it a rim defect; recording it is also what stops that
+           attribution being a carve-out nobody can check. */
+        else rim.flat.push(apex);
+      }
+      /* THE OUTLINE'S OWN CORNERS, which are NOT rim edges and which the
+         ruling requires to survive. Eva asked for two things that meet here:
+         the apex lands on the ORIGINAL boundary vertex, and there is no hard
+         edge within 2 mm of a rim. At the four points where the margin hands
+         over to the tip the OUTLINE itself turns — measured 65.72 degrees on
+         the shipping default, which is the margin converging at 21.8 degrees
+         to the axis against a tip edge square to it — and the apex path has to
+         pass through that vertex because it IS an original boundary vertex.
+         Rounding it would round the silhouette, which the first ruling
+         forbids. So the corner survives, it is RECORDED here rather than
+         quietly excluded, and E2 reports its turn beside the bar it is exempt
+         from. On main the same corner is part of a 90 degree wall. */
+      for (const r of RUN) {
+        const [i, j] = loop[r === 0 ? loop.length - 1 : r - 1];
+        const sk = Math.min(i, skinTo) - rowFrom;
+        if (!rimSameP(oP[i - rowFrom][j], skinP[sk][j])) rim.corner.push(oP[i - rowFrom][j]);
+      }
+    }
+    rim.segments = Math.max(rim.segments, K);
+    rim.drawnMaxMm = Math.max(rim.drawnMaxMm, drawnMax);
+    if (skinTo < rowTo) {
+      const gap = rimDist(oP[NROW - 1][0], skinP[skinTo - rowFrom][0]);
+      rim.tipAxisMm = rim.tipAxisMm === null ? gap : Math.min(rim.tipAxisMm, gap);
+    }
   }
   return grid;
 }
