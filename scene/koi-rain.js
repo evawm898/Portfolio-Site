@@ -46,7 +46,16 @@ import { rollRipple, lerpRippleTable, DROP_RIPPLE, STORM_RIPPLE } from './koi-ri
 // is gone; the max it was replaced with is density-invariant by
 // construction. Retested at 500/s against the full gate — the population
 // checks are the ones this history is about — before raising it here.
-export const RAIN_IDLE_RATE = 45;
+//
+// IDLE WAS RETUNED DOWN AGAIN, 45 -> 21, DIALLED LIVE against the same
+// standalone sandbox: with the shortened, tighter-reaching idle ripples in
+// koi-ripples.js the coverage this constant was chasing at 45 is reached at
+// a lower rate, and 45 read as too much rain in the air for how little each
+// drop now disturbs. Not a reversal of the 5 -> 45 reasoning above — the
+// density target is the same, only the OTHER two levers (life and reach)
+// are doing more of the work now, so the rate needed to hit it moved with
+// them.
+export const RAIN_IDLE_RATE = 21;
 export const RAIN_STORM_RATE = 500;
 export const REF_AREA = 1440 * 900;
 export const MAX_DROPS = 900;
