@@ -78,7 +78,11 @@ import { createSurface } from './surface.js';
 // pad and at every size. Widening this range widens both in step, which is what
 // "increase the up-down proportionally" already means here; a separate vertical
 // range would be a second viewpoint and the squash is shell-level and fixed.
-export const PAD_ACROSS = [25, 145];  // plane px, the DRAWN width — the ruling
+// THE CEILING WAS RE-RULED, [25, 145] -> [25, 122], DIALLED LIVE against a
+// standalone sandbox rather than a screenshot-and-gate round trip: the
+// floor and the derivation above are untouched, only the top of the range
+// moved.
+export const PAD_ACROSS = [25, 122];  // plane px, the DRAWN width — the ruling
 // A CLUSTER HAS A SIZE CHARACTER: each one draws this multiplier once and every
 // pad in it is measured against it, so the pond has big-pad clumps and small-pad
 // clumps rather than every clump being the same mixture. It lives HERE, beside
