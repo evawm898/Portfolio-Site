@@ -789,6 +789,39 @@ export const SMOKE_BLOCKS = [
         path: "the DEPTH arm — J1/J8 (every foot still in the hub plane with the ring's own cross-section, and the spine's first chord leaving at tilt plus half the row's curl) on three whorls all past 90, the shape a tilt STEP on an inner whorl cannot make; X1/X2 the verdict on the folds the ruling accepts" },
     ],
   },
+  {
+    n: 37, title: 'the inflorescence — one raceme of identical florets',
+    anchor: 'INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)',
+    /* FOUR ROWS, AND THE AXES ARE THE ONES THE FEATURE HAS — not the failures
+       anybody predicted. The leaf session's own lesson, paid for twice: its
+       subset covered phyllotaxy, the bore, the angle, the inset, the serration
+       and both guards and STILL missed the one axis that reaches another
+       family's clause, because no row was there for that reason.
+
+       So: the SHIPPING raceme (the anchor, and the only row where all seven
+       ID clauses run on a state anyone would build); the GATED row, because
+       hidden-and-not-inert is invisible to every STL property and the two-arm
+       guard is what the whole byte claim rests on; the SPHERE, because that is
+       this feature's cross-family axis — the main head's stem channel and the
+       florets share one rachis, and ST7/ST8/ST9 reason about a region the
+       pedicels now live in; and the WHORLED corner, because three pedicels at
+       one node is the densest placement and the only one where the pitch floor
+       and the area rule bind together.
+
+       WHAT IS NOT HERE AND WHY: the clamps (size, count, inset) are one-line
+       biconditionals that fire in Node on any row, and the full matrix carries
+       them by name; ALL MAX is 1.1 M triangles and is the full gate's. */
+    rows: [
+      { label: "INFLO: the raceme (5 nodes x 1, 5-petal florets on 20 mm pedicels)",
+        path: "the shipping raceme — ID0 (the registry's predicate against the geometry's guard), ID1 (the plan's azimuth list against the builder's tally and the triangle delta), ID2 (every pedicel rooted in the rachis WALL and crossing solid, with the area-rule diameter rebuilt from the stem's own radius), ID3 (every placement matrix orthonormal with determinant +1), ID4 (the six keys floretState overrides, the recursion capped at inflorescence NONE), ID5 (every placed head is the unit under its own matrix, residual exactly 0), ID6 (each head's axis IS its pedicel's direction and it stands at the rod's far end)" },
+      { label: "INFLO: GATED — every control at MAXIMUM with the type NONE (hidden AND inert)",
+        path: "the GUARD, in the arm the byte claim rests on — ID0 and ID1's inertness clauses in both directions (no record, no triangles, with every inflorescence control at its maximum), which is the only thing that can see a hidden control that still builds" },
+      { label: "INFLO: x a SPHERE head (the stem channel and the florets on one rachis)",
+        path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build, and the exported file's own clearance) on a rachis that now also carries pedicels, beside ID2's crossing and S1-S4 on the main head; the leaf session's ST9 defect is exactly this shape and was found by a row that was there for a different reason" },
+      { label: "INFLO: WHORLED (three at 120 deg a node)",
+        path: "the DENSEST placement — ID1's per-node count against the phyllotaxy law, ID2's pitch floor (two pedicel radii) and the area rule binding together at three pedicels a node, ID6 on three azimuths that share one node depth" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

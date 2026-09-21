@@ -192,6 +192,19 @@ export async function measure(page, { capability = null, wantMask = false } = {}
         for (const az of lfPlan.azimuths[i]) mod.buildLeafInto(accST, lfPlan, ui, i, az);
       }
     }
+    /* THE INFLORESCENCE joins the same third accumulator, and this is the
+       THIRD new part R1 has caught: it fired on this exact clause the first
+       time a stem was built, again the first time a leaf was, and again here
+       the first time a floret was — the clause's own comment predicting it
+       each time. The plan is asked of its ONE owner and the florets are
+       placed by the ONE builder; nothing here re-derives a transform.
+
+       NOTE WHAT THIS DOES *NOT* DO: the florets are counted, never
+       rasterised. Crown closure is a property of the HEAD's own petals over
+       the head's own disc, and a floret 20 mm out on a pedicel is no more
+       "covering the crown" than a stamen over the centre is. */
+    const inPlan = mod.inflorescencePlan(ui, stPlan, accST);
+    mod.buildInflorescenceInto(accST, ui, inPlan);
 
     const fr = mod.footRing(ui, accFull);
     /* THE SPHERE IS A LABELLED, LOUD SKIP (session 18, Eva's hard

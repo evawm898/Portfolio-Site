@@ -314,6 +314,36 @@ const WITNESS = {
      metric ratio (the four curves cost no triangles), curl through the ANGLE
      the clamp built — a number the control cannot write directly. */
   sepals: { id: 'sepalCount', value: '5', read: (m) => `${m.sepal && m.sepal.built}`, what: 'sepal.built' },
+  /* THE INFLORESCENCE (the raceme session) — a top-level section after Stem,
+     collapsed at first load, holding the law enum and the axis's own controls.
+     Witnessed by the NODE COUNT through the BUILDER's own tally, which reaches
+     PAST the slider twice over: `built` is how many FLORETS were emitted (the
+     node count times the phyllotaxy's per-node count, both derived) and
+     `pedicelR` is the AREA RULE's answer floored at the print minimum — a
+     number `floretNodes` cannot write directly.
+
+     THE VALUE IS THE FLOOR, 1, AND THAT IS MEASURED RATHER THAN CHOSEN FOR
+     TIDINESS. Going UP moves `built` and leaves `pedicelR` alone: the area
+     rule is already below its floor at the shipping five (6 mm / 2 / sqrt(5)
+     = 1.34 against a 1.50 minimum), so eight nodes reads 1.5000 exactly as
+     five does and half the witness would be a number printed twice. At ONE
+     node the rule is 3.0000 and clears the floor, so both halves move —
+     `built` 5 -> 1 and `pedicelR` 1.5 -> 3.0. It needs a RACHIS to hang off,
+     which is why the driver sets the stem and the law. */
+  inflorescence: { id: 'floretNodes', value: '1',
+                   pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
+                   read: (m) => `${m.inflorescence && m.inflorescence.built}/${m.inflorescence && m.inflorescence.pedicelR}`,
+                   what: 'inflorescence.built/inflorescence.pedicelR' },
+  /* THE FLORET — a drop-down inside Inflorescence, collapsed at first load,
+     holding the two controls that describe the FLOWER rather than the
+     arrangement. Witnessed by the PETAL COUNT through the floret UNIT's own
+     triangle count, which no control writes: the unit is a whole
+     `buildBloomInto` and its tally is the builder's answer to what a floret
+     costs. It moves 13,888 -> 9,176 between five petals and three. */
+  floret: { id: 'floretPetals', value: '3',
+            pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
+            read: (m) => `${m.inflorescenceBuilt && m.inflorescenceBuilt.unitTris}`,
+            what: 'inflorescenceBuilt.unitTris (the floret unit the builder emitted)' },
   sepalShape: { id: 'sepalTipShape', value: '3', pre: [{ id: 'sepalCount', value: '5' }],
                 read: (m) => `${m.sepal && m.sepal.petals[0] && m.sepal.petals[0].tipCap && m.sepal.petals[0].tipCap.shapeN}`, what: 'sepal.petals[0].tipCap.shapeN' },
   sepalForm: { id: 'sepalCup', value: '0.6', pre: [{ id: 'sepalCount', value: '5' }],

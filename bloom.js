@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -487,6 +487,16 @@ let lastLeaf = null, lastLeavesBuilt = null, lastLeafAbsent = true, lastLeafTris
    ceiling, the phase, the foot), the builder's own emitted whorl and the angle
    limit it drew. SP0-SP9 read these; the read-out prints them. */
 let lastSepals = null, lastSepalsBuilt = null, lastSepalsAbsent = true, lastSepalTris = 0, lastSepalsAskedUnderSphere = 0;
+/* THE INFLORESCENCE (this session) — the PLAN and what the BUILDER emitted,
+   the leaf's own pairing. `inflorescence` is NULL and not absent where there
+   is none: ID1 distinguishes "the builder says there are none" from "the
+   builder says nothing", and a missing key is the second. The builder's
+   record carries `unitPositions` (the floret unit's own triangle stream) and
+   the hook deliberately does NOT — see the projection below, where the reason
+   is written down: the claim it would serve is already a MEASURED zero the
+   builder reports as `placementResidual`, by a second expression beside the
+   method under test. */
+let lastInflo = null, lastInfloBuilt = null, lastInfloAbsent = true, lastInfloTris = 0;
 /* THE SPHERE'S STEM CHANNEL (the sphere-stem session) — which slots were NOT
    built, and how near the stem every one of them came. Null wherever the
    question does not arise (no stem, or not a sphere), never a passing 0. */
@@ -624,6 +634,10 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
     lastSepalTris = built.sepals ? built.sepals.tris : 0;
     lastSepalsAbsent = sepalsAbsent(uiForBuild);
     lastSepalsAskedUnderSphere = built.foot.sphereMode ? Math.round(Number(uiForBuild.sepalCount) || 0) : 0;
+    lastInflo = built.inflorescence && built.inflorescence.present ? built.inflorescence : null;
+    lastInfloBuilt = built.inflorescenceBuilt || null;
+    lastInfloTris = built.inflorescenceBuilt ? built.inflorescenceBuilt.tris : 0;
+    lastInfloAbsent = inflorescenceIsAbsent(uiForBuild);
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
@@ -1174,6 +1188,50 @@ function stigmaLine(fr, mode) { return fr && fr.gynoecium ? tipLine('STIGMA', 't
    OVERHANG, which ruling 7 made a printability question and which the ruled
    default sits on the wrong side of. SLENDERNESS joins the stamens' and the
    style's line verbatim: nothing here has ever been printed. */
+/* THE INFLORESCENCE LINE. Everything this feature clamps, it TELLS from the
+   OWNER's own record: the node count giving at the pitch floor, the pedicel's
+   DERIVED diameter and whether the print floor took it off the area rule, how
+   much of the stem's wall it crosses (which is what makes the raceme ONE
+   piece rather than N+1), the top inset raised to clear the head and whether
+   it managed to, and the floret's size clamped into the petal slider's own
+   range. And the one thing that is not a clamp but is an absence: the GRID
+   export writes the head at the origin only, so a raceme's florets are not in
+   it — said here rather than discovered by a reader of a nearly-empty .glb. */
+function infloLine(plan, builtInflo) {
+  const per = plan.perNode;
+  const n = builtInflo ? builtInflo.count : plan.built;
+  return `\n     INFLORESCENCE ${plan.type} · ${n} floret${n === 1 ? '' : 's'} on ${plan.nodes} node${plan.nodes === 1 ? '' : 's'} · ${plan.phyllotaxy} (${per} a node)`
+    + (plan.nodesClamped ? ` — NODE COUNT CLAMPED ${plan.nodesAsked} -> ${plan.nodesBuilt}: the span left cannot hold them a pedicel apart` : '')
+    + `\n     FLORET ${plan.floretPetals} petals at ${plan.petalLength.toFixed(1)} x ${plan.petalWidth.toFixed(1)} mm (${plan.scale.toFixed(2)}x the head's own)`
+    + (plan.sizeClamped ? ` — CLAMPED from ${plan.lengthAsked.toFixed(1)} x ${plan.widthAsked.toFixed(1)} mm at the petal sliders' own floors` : '')
+    + (builtInflo ? ` · ${builtInflo.unitTris.toLocaleString('en-US')} tris each, ${builtInflo.tris.toLocaleString('en-US')} in all` : '')
+    + `\n     PEDICEL ${plan.pedicelLenMm.toFixed(0)} mm at ${plan.angleDeg} deg · ${(2 * plan.pedicelR).toFixed(2)} mm across`
+    + (plan.pedicelRClamped
+        ? ` — FLOORED: the area rule asks ${(2 * plan.areaRuleR).toFixed(2)} mm for ${plan.built} off a ${(2 * plan.outerR).toFixed(2)} mm stem and nothing here prints thinner than ${(2 * plan.pedicelRFloor).toFixed(2)} mm`
+        : ` — the area rule's own (r_stem / sqrt(${plan.built}))`)
+    + `\n     ROOTED at r = ${plan.rootR.toFixed(2)} mm, the stem WALL's mid-thickness · crosses ${plan.crossesSolidMm.toFixed(2)} mm of solid`
+    + (plan.crossesSolidMm > 0 ? '' : ' — CROSSES NOTHING: this pedicel is a detached shell that still exports watertight (told, never refused)')
+    + `\n     NODES top ${plan.nodeDepthsMm[0].toFixed(1)} mm below the hub`
+    + (plan.insetClamped
+        ? ` — RAISED from the stem's own ${plan.insetAskedMm.toFixed(1)} mm to the ${plan.insetNeededMm.toFixed(1)} mm this pedicel needs to clear the head`
+        : ` (the stem's own inset; the pedicel needs ${plan.insetNeededMm.toFixed(1)} mm and has it)`)
+    + (plan.insetSatisfied ? '' : ` — AND IT STILL DOES NOT CLEAR: the florets rise further than this stem's node span is long, so the top one stands among the petals (told, not refused)`)
+    /* THE FLORET AGAINST THE RACHIS — a FLAG with a number, never a refusal.
+       Two parts of one solid fusing is OVER-connection (the crowding
+       ruling's own grounds, Eva Sep 3): no boundary edge, no split in the
+       flood fill, and in a raceme the florets belong to the rachis anyway.
+       Told because it is reachable at the SHIPPED angle on a SPHERE head
+       (0.82 mm) and goes to contact past +-60 deg, while the same state on a
+       CAP head reads 8.25 mm — a sphere floret's petals radiate back toward
+       the rachis and a cap's do not. */
+    + (builtInflo && builtInflo.rachisApproachMm !== null
+        ? `\n     FLORET AGAINST THE RACHIS ${builtInflo.rachisApproachMm.toFixed(2)} mm at the nearest (the floret's own body, never its pedicel)`
+          + (builtInflo.rachisApproachMm < MIN_FEATURE_MM
+              ? ` — UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm printable gap: the florets will fuse to the rachis in a print (told, never refused — they are one solid either way)`
+              : '')
+        : '')
+    + `\n     GRID EXPORT writes the head at the origin ONLY — a raceme's florets are not in the .glb\n`;
+}
 function leafLine(leaf, leavesBuilt) {
   const per = leaf.phyllotaxy === 'opposite' ? 2 : leaf.phyllotaxy === 'whorled' ? 3 : 1;
   const over = 90 - Math.abs(leaf.angleDeg);
@@ -1431,6 +1489,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
        + (built && built.leaf && built.leaf.present ? leafLine(built.leaf, built.leavesBuilt) : '')
+       + (built && built.inflorescence && built.inflorescence.present ? infloLine(built.inflorescence, built.inflorescenceBuilt) : '')
        + (built ? sepalLine(ui, built, mode) : '')
        + allPetalsLine(rings, fr) + slotRoleLine(rings, fr)
        + (spiralLowCount(ui, fr) ? `SPIRAL BELOW ${SPIRAL_LEGIBLE_COUNT} IN THE SEQUENCE: the golden angle reads as an irregular whorl, not as phyllotaxis\n` : '')
@@ -1990,6 +2049,95 @@ window.__bloomMetrics = () => ({
   } : null,
   leafTris: lastLeafTris,
   leafAbsent: lastLeafAbsent,
+  /* THE INFLORESCENCE (ID0-ID6). THE PLAN'S own declarations beside the
+     BUILDER's own record, the leaf's pairing exactly: ID1 predicts the floret
+     count from the plan's azimuth list and compares it against the tally, ID2
+     reads the crossing the plan solved against the RACHIS the stem plan
+     declares, ID5 reads the residual the builder measured.
+
+     `inflorescence` IS NULL AND NOT ABSENT WHERE THERE IS NONE: ID1
+     distinguishes "the builder says there are none" from "the builder says
+     nothing", and a missing key is the second. */
+  inflorescence: lastInflo ? {
+    type: lastInflo.type, phyllotaxy: lastInflo.phyllotaxy, perNode: lastInflo.perNode,
+    nodes: lastInflo.nodes, nodesAsked: lastInflo.nodesAsked, nodesBuilt: lastInflo.nodesBuilt,
+    nodesClamped: lastInflo.nodesClamped, built: lastInflo.built,
+    nodeDepthsMm: lastInflo.nodeDepthsMm.slice(),
+    azimuths: lastInflo.azimuths.map((a) => a.slice()),
+    angleDeg: lastInflo.angleDeg, pedicelLenMm: lastInflo.pedicelLenMm,
+    pedicelR: lastInflo.pedicelR, areaRuleR: lastInflo.areaRuleR,
+    pedicelRFloor: lastInflo.pedicelRFloor, pedicelRClamped: lastInflo.pedicelRClamped,
+    rootR: lastInflo.rootR, embedMm: lastInflo.embedMm, crossesSolidMm: lastInflo.crossesSolidMm,
+    boreR: lastInflo.boreR, outerR: lastInflo.outerR, rootZ: lastInflo.rootZ,
+    rachisLengthMm: lastInflo.rachisLengthMm,
+    insetAskedMm: lastInflo.insetAskedMm, insetNeededMm: lastInflo.insetNeededMm,
+    insetMm: lastInflo.insetMm, insetClamped: lastInflo.insetClamped,
+    insetSatisfied: lastInflo.insetSatisfied,
+    floretPetals: lastInflo.floretPetals, scale: lastInflo.scale,
+    petalLength: lastInflo.petalLength, petalWidth: lastInflo.petalWidth,
+    lengthAsked: lastInflo.lengthAsked, widthAsked: lastInflo.widthAsked,
+    sizeClamped: lastInflo.sizeClamped, sizeDeadBelow: lastInflo.sizeDeadBelow,
+  } : null,
+  /* WHAT THE BUILDER EMITTED. `unitPositions` is deliberately NOT here — the
+     floret unit's whole triangle stream is up to 270k floats and the claim it
+     would serve (every placed head IS that stream under its matrix) is
+     already a MEASURED zero the builder reports as `placementResidual`, by a
+     second expression beside the method under test. A gate that shipped the
+     stream across the bridge to redo the multiply itself would be a third
+     copy of a three-line map, and it would cost a megabyte a row. */
+  inflorescenceBuilt: lastInfloBuilt ? {
+    count: lastInfloBuilt.count, unitTris: lastInfloBuilt.unitTris, tris: lastInfloBuilt.tris,
+    tipZLocal: lastInfloBuilt.tipZLocal,
+    placementResidual: lastInfloBuilt.placementResidual,
+    placementCompared: lastInfloBuilt.placementCompared,
+    rachisApproachMm: lastInfloBuilt.rachisApproachMm,
+    floretState: { ...lastInfloBuilt.floretState },
+    unit: {
+      petalsBuilt: lastInfloBuilt.unit.petalsBuilt,
+      hubRadius: lastInfloBuilt.unit.hub.radius, hubThickness: lastInfloBuilt.unit.hub.thickness,
+      stemPresent: !!(lastInfloBuilt.unit.stem && lastInfloBuilt.unit.stem.present),
+      stemOuterR: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.outerR : null,
+      stemBoreR: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.boreR : null,
+      stemLengthMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.lengthMm : null,
+      stemRootZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.rootZ : null,
+      stemTipZ: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.tipZ : null,
+      /* THE PEDICEL'S OWN VOID, for O1's declared inward count. A floret is a
+         bloom and its pedicel is a stem, so its bore becomes a sealed CAVITY
+         under exactly the condition the rachis's does — and O1's baseline is
+         a COUNT over the whole file, so five florets each with an inner face
+         are five more inward shells the gate must expect. Measured red first
+         on `x a SPHERE head`: 6 of 47 against a declared 1. */
+      stemVoidMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.voidMm : null,
+      stemSolidBandMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.solidBandMm : null,
+      stemTipPlugMm: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.tipPlugMm : null,
+      stemSides: lastInfloBuilt.unit.stem ? lastInfloBuilt.unit.stem.sides : null,
+      sphereMode: lastInfloBuilt.unit.sphereMode === true,
+      maxDimensionMm: lastInfloBuilt.unit.maxDimensionMm,
+      minThickness: lastInfloBuilt.unit.minThickness,
+      omissionAsked: lastInfloBuilt.unit.omissionAsked,
+      omissionBuilt: lastInfloBuilt.unit.omissionBuilt,
+      omitted: lastInfloBuilt.unit.omitted ? lastInfloBuilt.unit.omitted.slice() : null,
+    },
+    placed: lastInfloBuilt.placed.map((q) => ({
+      nodeIndex: q.nodeIndex, az: q.az, M: q.M.slice(), D: q.D.slice(), root: q.root.slice(),
+      /* `at` IS THE BLOCK'S OFFSET IN THE EXPORTED STREAM and ST9 needs it:
+         the STL is written from these very positions in order, so `at` and
+         `tris` name this floret's own floats in the FILE. */
+      at: q.at, tris: q.tris, headAt: q.headAt.slice(),
+      /* ST9's excusal reads this, the PETIOLE's own shape — the builder's
+         emitted rod ends through this placement's own matrix. */
+      pedicelAxis: q.pedicelAxis
+        ? { inner: q.pedicelAxis.inner.slice(), outer: q.pedicelAxis.outer.slice(), radiusMm: q.pedicelAxis.radiusMm }
+        : null,
+    })),
+  } : null,
+  inflorescenceTris: lastInfloTris,
+  /* THE GEOMETRY'S OWN ANSWER TO "IS AN INFLORESCENCE ABSENT HERE", read from
+     the module that is actually running — ST0's own reason: a gate calling the
+     geometry's predicate in Node compares one unmutated module against another
+     and can never disagree (session 41's L7). ID0 compares it against the
+     REGISTRY's declaration. */
+  inflorescenceAbsent: lastInfloAbsent,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the
