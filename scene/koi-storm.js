@@ -8,7 +8,14 @@
 //   "Escalation from a click ramps up over 2 seconds" -> RAMP_S      = 2
 //   "Full downpour ... holds for 3 seconds"           -> HOLD_S      = 3
 //   "Full decay ... takes 10 seconds total"           -> DECAY_S     = 10
-//   "5 rapid clicks"                                  -> BURST_N     = 5
+//   "5 rapid clicks"                                  -> BURST_N     = 5, RETUNED TO 4
+//
+// BURST_N MOVED OFF THE BRIEF'S OWN NUMBER, DIALLED LIVE: a burst that took
+// five clicks to earn its lightning read as one click too patient against
+// the escalation ramp it sits on top of — tuned in a standalone sandbox
+// against a live preview rather than by guessing at a number. It changes
+// only the burst-count THRESHOLD, not the ramp: "5 clicks reaches full
+// downpour" below is CLICK_STEP arithmetic (5 x 0.2 = 1.0) and is untouched.
 //
 // THE RAMP IS A FIXED DURATION, NOT A FIXED RATE, and the difference is the
 // whole reading of the spec. A fixed rate of CLICK_STEP/RAMP_S would take ten
@@ -30,7 +37,7 @@ export const CLICK_STEP = 0.2;     // 1/5 of the way to a downpour
 export const RAMP_S = 2;           // a click's escalation ramps in over this
 export const HOLD_S = 3;           // a reached plateau holds for this
 export const DECAY_S = 10;         // full downpour -> idle, at this rate
-export const BURST_N = 5;          // clicks that make a "burst"
+export const BURST_N = 4;          // clicks that make a "burst" — see the note above
 export const RAPID_GAP_S = 0.7;    // consecutive clicks closer than this extend a burst
 export const FULL = 1;
 // Reaching FULL through floating-point addition of 0.2 five times lands on
@@ -79,9 +86,10 @@ export function createStorm() {
       st._lastClickT = now;
 
       // LIGHTNING IS A SECOND BURST AT FULL DOWNPOUR. The first burst cannot
-      // fire one by construction: its fifth click lands while the intensity is
-      // still two seconds from the top, so the bar below is not met. Nothing
-      // special-cases "the first burst" — the timing does it.
+      // fire one by construction: its BURST_N-th click (the fourth, now) lands
+      // while the intensity is still well short of the top, so the bar below
+      // is not met. Nothing special-cases "the first burst" — the timing does
+      // it, at BURST_N = 4 as it did at 5.
       let fired = false;
       if (st.burst >= BURST_N && st.intensity >= FULL_BAR) {
         st.burst = 0;
