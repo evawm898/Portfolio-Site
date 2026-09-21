@@ -355,8 +355,8 @@ const MUTANTS = [
   {
     id: 'the-renderer-generates-its-own-foam-edge',
     file: 'scene/beach-render.js',
-    from: '        frontAt: st.swashAt,',
-    to: '        frontAt: undefined,',
+    from: '      opts.frontAt = st.swashAt;',
+    to: '      opts.frontAt = undefined;',
     // THE INVARIANT THAT MATTERS MOST, AND THE MUTATION IS NOT SYNTHETIC: it
     // is the state the drawing layer ARRIVED IN. beach-brush.js generated its
     // own scallops from `lobes()` while the simulation published its own edge,
@@ -369,8 +369,8 @@ const MUTANTS = [
   {
     id: 'the-drawing-keeps-its-own-shear',
     file: 'scene/beach-render.js',
-    from: '        shear: shore.slope * w / h,',
-    to: '        shear: undefined,',
+    from: '      opts.shear = shore.slope * w / h;',
+    to: '      opts.shear = undefined;',
     breaks: ['draw/the-drawing-takes-its-shear-from-the-shore',
              'draw/the-drawn-foam-edge-is-the-published-swash-edge'],
     // The two published queries are read through the SHORE, so their fitted
@@ -381,8 +381,8 @@ const MUTANTS = [
   {
     id: 'a-spent-wave-is-still-drawn',
     file: 'scene/beach-render.js',
-    from: '      const list = (st.waves || []).filter(wv => waveStage(wv, WATERLINE_S) !== SWASH);',
-    to: '      const list = (st.waves || []);',
+    from: '        if (waveStage(src[i], WATERLINE_S) === SWASH) continue;',
+    to: '        if (false) continue;',
     breaks: ['draw/no-wave-is-drawn-once-it-is-spent'],
     mayAlso: ['draw/every-wave-is-drawn-once-with-its-own-record'],
     why: 'the drawing has no fade, so a wave left in the list sits on the sand drawing a full white band',
@@ -390,8 +390,8 @@ const MUTANTS = [
   {
     id: 'every-wave-draws-the-first-waves-record',
     file: 'scene/beach-render.js',
-    from: '        const wv = list[i];',
-    to: '        const wv = list[0];',
+    from: '        const wv = src[i];',
+    to: '        const wv = src[0];',
     // TWO CHECKS, AND THE SECOND IS TRUE ABOUT IT RATHER THAN COLLATERAL.
     // Both recorder clauses pull a wave's op BLOCK out of the frame's stream
     // by its length, so a frame that draws one record twice puts the wrong
@@ -414,10 +414,23 @@ const MUTANTS = [
     why: 'the order IS the model, and a renderer that re-decides it makes sortWaves decorative',
   },
   {
+    id: 'the-frame-allocates-again',
+    file: 'scene/beach-brush.js',
+    from: '  const b = P.b;\n  if (bAt) for (let i = 0; i < n; i++) b[i] = bAt(xs[i] / W);',
+    to: '  const b = bAt ? xs.slice(0, n).map((x) => bAt(x / W)) : P.b;\n  if (bAt) for (let i = 0; i < n; i++) b[i] = b[i];',
+    // THE PRE-FIX EXPRESSION, PUT BACK. `b` was `xs.map(...)` and that is one
+    // of the six sites the stall was attributed to; it reddens the allocation
+    // clause and NOTHING ELSE, because the numbers it produces are the same
+    // numbers. That is the whole point of the check: a tree that has quietly
+    // started allocating again draws a perfectly correct picture.
+    breaks: ['draw/a-frame-allocates-no-arrays'],
+    why: 'a fixed volume of garbage per draw is a collection at a fixed draw count, and the picture never says so',
+  },
+  {
     id: 'the-lobes-are-drawn-per-frame',
     file: 'scene/beach-render.js',
-    from: '          scalA: wv.drawA,\n          scalB: wv.drawB,\n          bubbles: wv.drawBubbles,',
-    to: '          scalA: null,\n          scalB: null,\n          bubbles: null,',
+    from: '        sp.scalA = wv.drawA;\n        sp.scalB = wv.drawB;\n        sp.bubbles = wv.drawBubbles;',
+    to: '        sp.scalA = null;\n        sp.scalB = null;\n        sp.bubbles = null;',
     // "Do not regenerate lobes per frame — the foam will boil." It reddens the
     // ARTEFACT clause and not the record one, which is the whole reason that
     // second clause was written: the stored parameters are still on the record
@@ -4346,19 +4359,24 @@ async function partTwo(browser, mutant, shotsDir) {
           // where no moment at all puts the front on the canvas FAILS here
           // rather than skipping — that is what a swash which has left the
           // beach looks like.
-          let placed = -1;
-          for (let i = 0; i < 40; i++) {
-            const st = window.__scene.sceneState();
-            if (st.edgeMax < 0.92 && st.edgeMax > 0.40) { window.__scene.step(); placed = i; break; }
-            window.__scene.scenePump(0.4);
-          }
-          if (placed < 0) { window.__scene.pause(false); return { placed }; }
+          //
+          // AND THE MOMENT IS ACCEPTED ON WHETHER THE FRONT IS ACTUALLY
+          // READABLE, not on `edgeMax` alone. The first cut took the first
+          // moment in the band and then asserted nine of twelve columns read;
+          // those are two different questions, and a moment can satisfy the
+          // first and fail the second — a wave's own foam band lying over the
+          // front, or bubbles clustering on the sampled columns. Measured: a
+          // mutation proved PIXEL-IDENTICAL over 64,512,000 pixels reddened
+          // this check on one run of three, which is a clause going red on a
+          // tree whose picture has not moved. Asking the real question in the
+          // search costs nothing and removes it.
           const c = document.querySelector('.scene-canvas');
           const g = c.getContext('2d');
           const rect = c.getBoundingClientRect();
           const dpr = c.width / rect.width;
-          const d = g.getImageData(0, 0, c.width, c.height).data;
           const W = c.width, H = c.height;
+          const readFront = () => {
+          const d = g.getImageData(0, 0, W, H).data;
           const at = (x, y) => d[(y * W + x) * 4];
           // THE FRONT IS THE BOUNDARY OF THE WET BAND, which is the one thing
           // in this drawing with `PALETTE.wet` above it and paper below: find
@@ -4401,11 +4419,24 @@ async function partTwo(browser, mutant, shotsDir) {
             // full-width stroke in the WRONG PLACE, which stays in the subject.
             out.push(y0 < 0 || (y1 - y0) < 1 ? null : { xCss: x / dpr, yCss: ((y0 + y1) / 2) / dpr });
           }
+          return out;
+          };
+          let placed = -1, out = null;
+          for (let i = 0; i < 40; i++) {
+            const st = window.__scene.sceneState();
+            if (st.edgeMax < 0.92 && st.edgeMax > 0.40) {
+              window.__scene.step();
+              const r = readFront();
+              if (r.filter(Boolean).length >= 9) { placed = i; out = r; break; }
+            }
+            window.__scene.scenePump(0.4);
+          }
+          if (placed < 0) { window.__scene.pause(false); return { placed }; }
           const pub = out.map(o => o && window.__scene.sceneQuery('swashYAt', o.xCss));
           window.__scene.pause(false);
           return { out, pub, dpr, placed };
         });
-        assert.ok(m.placed >= 0, 'no moment in forty pumps left the swash front on the canvas at all');
+        assert.ok(m.placed >= 0, 'no moment in forty pumps left the swash front readable on the canvas at all');
         const pairs = m.out.map((o, i) => o && ({ x: o.xCss, drawn: o.yCss, pub: m.pub[i] })).filter(Boolean);
         assert.ok(pairs.length >= 9, `only ${pairs.length} of 12 columns had a readable front`);
         let worst = 0, at = 0;
@@ -4503,6 +4534,107 @@ async function partTwo(browser, mutant, shotsDir) {
           + `and the module's own SHEAR would draw ${ownSlope.toFixed(4)}`);
         return `horizon fitted at ${m.fitted.toFixed(4)} over ${m.n} columns against the shore's ${m.declared.toFixed(4)}, `
           + `where the module's own SHEAR draws ${ownSlope.toFixed(4)}`;
+      });
+
+      await checkAsync('a frame allocates no arrays', async () => {
+        // THE STALL WAS A FIXED VOLUME OF GARBAGE PER DRAW — a collection at a
+        // fixed DRAW COUNT — so what has to hold is that a frame makes none.
+        //
+        // AND THE INSTRUMENT IS NOT A WALL CLOCK, BECAUSE A STALL IS A
+        // MACHINE-DEPENDENT SYMPTOM. Measured on the box this was fixed on,
+        // the PRE-FIX tree already showed zero frames over 40 ms in 600 draws
+        // at 1920x1080, so a timing bar here would have been green on the
+        // defect it exists for. What is a property of the CODE rather than of
+        // the machine is the allocation itself, and the array methods that
+        // allocate are countable EXACTLY, with no GC noise in the answer.
+        //
+        // COUNTED ON THE RUNNING FRAME RATHER THAN SCANNED IN THE SOURCE. A
+        // source scan would have to define "the per-frame path" and would then
+        // be exempting the three birth-time functions (`lobeParams`,
+        // `lobesFrom`, `bubbleParams`) BY NAME — a clause carving its subject
+        // around the thing it doubts. Wrapping the prototype asks the frame
+        // instead, so a re-spelled or renamed `.map` is still a `.map` to it.
+        //
+        // BOTH BRANCHES, because they share almost no code: the wired one
+        // reads the caller's per-column queries and each wave's stored lobes,
+        // the standalone one generates its own. A check on either alone would
+        // leave half the drawing unheld.
+        //
+        // WHAT IT DOES NOT SEE, said rather than implied: object and closure
+        // allocation, and `new Array` / `new Float64Array`, which cannot be
+        // intercepted without replacing the global. The six sites this is
+        // about are all array METHODS, and the first cut of this clause
+        // watched Array.prototype alone — which is blind to the pool, because
+        // a Float64Array's `.map` is %TypedArray%'s. Only the mutant said so.
+        const m = await page.evaluate(async () => {
+          const B = await import('/scene/beach-brush.js');
+          const R = await import('/scene/beach-render.js');
+          const S = await import('/scene/beach-shore.js');
+          const V = await import('/scene/beach-wave.js');
+          const { makeRandom } = await import('/scene/rng.js');
+          const W = 900, H = 600;
+          const cv = document.createElement('canvas');
+          cv.width = W; cv.height = H;
+          const ctx = cv.getContext('2d', { alpha: false });
+          const shore = S.createShore(); shore.resize(W, H);
+          const rnd = makeRandom(20260921);
+          const waves = [];
+          for (let i = 0; i < 4; i++) {
+            const w = V.makeWave({ rand: rnd, energy: 0.2 + 0.25 * i, waterline: S.WATERLINE_S });
+            w.age = 1.5 + 2.2 * i;
+            waves.push(w);
+          }
+          const st = { width: W, height: H, dpr: 1, waves, drift: 3.4, frontSeed: 7,
+                       swashAt: (u) => 0.52 + 0.01 * Math.sin(u * 9),
+                       wetAt: (u) => 0.70 + 0.01 * Math.cos(u * 7) };
+          const rr = R.createRenderer(ctx, shore);
+          // warm both paths first, so a first-call cache is not counted
+          rr.draw(st);
+          B.draw(ctx, W, H, { peel: 0.4 });
+
+          // BOTH PROTOTYPES. The pool is Float64Arrays, so `xs.map(...)` in
+          // this file is %TypedArray%.prototype.map and NOT Array's — wrapping
+          // Array alone left the check blind to allocation on exactly the
+          // arrays the fix is made of, and the mutant is what said so.
+          const counts = { map: 0, slice: 0, filter: 0, concat: 0, from: 0 };
+          const AP = Array.prototype;
+          const TP = Object.getPrototypeOf(Float64Array.prototype);
+          const ON = [[AP, ['map', 'slice', 'filter', 'concat']], [TP, ['map', 'slice', 'filter']]];
+          const keep = new Map();
+          for (const [proto, ks] of ON) for (const k of ks) keep.set(proto === AP ? 'A' + k : 'T' + k, proto[k]);
+          const fromKeep = Array.from;
+          const wrap = () => {
+            for (const [proto, ks] of ON) for (const k of ks) {
+              const orig = keep.get((proto === AP ? 'A' : 'T') + k);
+              proto[k] = function (...a) { counts[k]++; return orig.apply(this, a); };
+            }
+            Array.from = function (...a) { counts.from++; return fromKeep.apply(Array, a); };
+          };
+          const unwrap = () => {
+            for (const [proto, ks] of ON) for (const k of ks) proto[k] = keep.get((proto === AP ? 'A' : 'T') + k);
+            Array.from = fromKeep;
+          };
+          let wired = null, plain = null, drawn = 0;
+          try {
+            wrap();
+            for (let i = 0; i < 3; i++) { st.drift = 3.4 + i * 0.05; rr.draw(st); }
+            wired = { ...counts };
+            for (const k of Object.keys(counts)) counts[k] = 0;
+            for (let i = 0; i < 3; i++) B.draw(ctx, W, H, { peel: 0.4 + i * 0.05 });
+            plain = { ...counts };
+          } finally { unwrap(); }
+          drawn = rr.waves;
+          return { wired, plain, drawn };
+        });
+        // NOT VACUOUS: a run where the adapter drew nothing would report zero
+        // allocations for the best possible reason and the worst.
+        assert.ok(m.drawn >= 2, `the wired branch drew only ${m.drawn} waves, so it says nothing`);
+        const sum = (o) => Object.values(o).reduce((a, b) => a + b, 0);
+        const fmt = (o) => Object.entries(o).filter(([, v]) => v).map(([k, v]) => `${k} x${v}`).join(', ') || 'none';
+        assert.equal(sum(m.wired), 0, `the wired branch allocated arrays over 3 frames: ${fmt(m.wired)}`);
+        assert.equal(sum(m.plain), 0, `the standalone branch allocated arrays over 3 frames: ${fmt(m.plain)}`);
+        return `0 arrays over 3 wired frames (${m.drawn} waves) and 3 standalone frames, `
+          + 'counted through Array.prototype AND %TypedArray%.prototype map/slice/filter, plus concat and Array.from';
       });
 
       await checkAsync('every wave is drawn once, with its own record', async () => {

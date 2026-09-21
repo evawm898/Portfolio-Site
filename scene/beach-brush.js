@@ -38,6 +38,29 @@
  *
  * Nothing here holds state, reads a clock or knows what a wave record is.
  * ---------------------------------------------------------------------------
+ * EVERY PER-FRAME ARRAY IS A VIEW INTO A SCRATCH POOL, AND THAT IS THE WHOLE
+ * OF THE SECOND CHANGE. This file used to allocate its way through a frame —
+ * `bumps` returned a fresh array seven times over, `lobesFrom` twice a wave,
+ * `wave` built fifteen arrays of N, `brush` sliced its run and built two
+ * arrays of two-element arrays per stroke, and `draw` rebuilt `xs` though it
+ * depends only on W. A fixed volume of garbage per draw means a collection at
+ * a fixed DRAW COUNT, and on an ambient scene that pause is the whole defect.
+ * The pool below is allocated once at the largest count any caller asks for
+ * and reused across calls and across frames.
+ *
+ * TWO POOLS, NOT ONE, AND THE SPLIT IS LOAD-BEARING. `ensureField` grows the
+ * N-length buffers the frame's curves live in; `ensureStroke` grows only the
+ * four a single stroke needs. They are separate because `brush` is exported
+ * and may be handed a plain array longer than anything `draw` has asked for —
+ * growing the pool there would REALLOCATE the very buffers its caller passed
+ * in as `xs` and `ys`, which is a use-after-free with extra steps.
+ *
+ * AND THE `r()` CALL ORDER IS UNTOUCHED, WHICH IS WHAT MAKES THIS MECHANICAL.
+ * Every draw off the stream happens in the same place, the same number of
+ * times, in the same order; the only thing that moved is where the result is
+ * written. The control is that the standalone picture does not move a single
+ * pixel — if it moves, the consumption order changed and the change is wrong.
+ * ---------------------------------------------------------------------------
  */
 
 export const PALETTE = {
@@ -77,6 +100,59 @@ const smoothstep = (t) => {
 };
 const clamp = (v, lo, hi) => (v < lo ? lo : v > hi ? hi : v);
 
+/* ------------------------------------------------------------------------ *
+ * THE SCRATCH POOL
+ *
+ * One buffer per role rather than a heap of anonymous temporaries, because a
+ * shared temporary is only safe while nobody reads it across a call, and the
+ * lip, the crest and the hook all do exactly that. Named, the lifetimes are
+ * readable; anonymous, they are a bug waiting for a reordering.
+ * ------------------------------------------------------------------------ */
+
+/** `draw()`'s own column count. The pool is sized from this on first use. */
+const NCOL = 520;
+
+/** The per-frame curves, all of them N long. */
+const FIELD = [
+  'xs', 'base', 'b', 'crest', 'h', 'curl', 'foamw', 'g', 'spent',
+  'lobeA', 'lobeB', 'faceBot', 'lipTop', 'lipBot', 'fbTop', 'fbBot',
+  'lipGate', 'crestGate', 'hookGate', 'tmpA', 'tmpB',
+  'horizon', 'mid', 'flatTop', 'sy', 'front', 'sheetTop', 'wy', 'la', 'lb',
+  'mx', 'my',
+];
+
+const P = {
+  /** the standalone path's own lobe parameters, at most 26 of each */
+  cenA: new Float64Array(32), radA: new Float64Array(32),
+  cenB: new Float64Array(32), radB: new Float64Array(32),
+  /** a brush pass's three phase offsets, and its at-most-two cut positions */
+  ph: new Float64Array(4),
+  cuts: new Float64Array(4),
+  idx: new Int32Array(8),
+  segs: new Int32Array(16),
+};
+
+let FIELD_CAP = 0;
+let STROKE_CAP = 0;
+/** invalidated whenever the pool moves, so a cached `xs` can never be stale */
+let xsW = -1;
+
+function ensureField(n) {
+  if (n <= FIELD_CAP) return;
+  FIELD_CAP = Math.max(n, NCOL);
+  for (const k of FIELD) P[k] = new Float64Array(FIELD_CAP);
+  P.runs = new Int32Array(FIELD_CAP + 2);
+  xsW = -1;
+}
+
+function ensureStroke(n) {
+  if (n <= STROKE_CAP) return;
+  STROKE_CAP = Math.max(n, NCOL);
+  P.upx = new Float64Array(STROKE_CAP); P.upy = new Float64Array(STROKE_CAP);
+  P.dnx = new Float64Array(STROKE_CAP); P.dny = new Float64Array(STROKE_CAP);
+  if (!P.runs || P.runs.length < STROKE_CAP + 2) P.runs = new Int32Array(STROKE_CAP + 2);
+}
+
 /**
  * Screen y for band position s (0 = far water, 1 = bottom of dry sand).
  *
@@ -91,18 +167,24 @@ function yOf(x, s, W, H, shear = SHEAR) {
   return s * H + (x / W - 0.5) * shear * H;
 }
 
-/** Low-frequency wander. Never a single sine — that reads as machinery. */
-function bumps(xs, r, amp, k, phase, scale = 1.3, W = 1) {
-  const ph = [];
-  for (let i = 0; i < k; i++) ph.push(r() * 6.283);
-  return xs.map((x) => {
+/**
+ * Low-frequency wander. Never a single sine — that reads as machinery.
+ *
+ * Writes into `out` and takes an explicit count, because a pooled buffer's
+ * `length` is the pool's capacity rather than the frame's column count.
+ */
+function bumpsInto(out, xs, n, r, amp, k, phase, scale = 1.3, W = 1) {
+  const ph = P.ph;
+  for (let i = 0; i < k; i++) ph[i] = r() * 6.283;
+  for (let j = 0; j < n; j++) {
     let y = 0;
     for (let i = 0; i < k; i++) {
       y += (amp / (i + 1.5)) *
-        Math.sin((2 * Math.PI * (i + 1) * scale * x) / W + phase * (i + 1) + ph[i]);
+        Math.sin((2 * Math.PI * (i + 1) * scale * xs[j]) / W + phase * (i + 1) + ph[i]);
     }
-    return y;
-  });
+    out[j] = y;
+  }
+  return out;
 }
 
 /**
@@ -110,13 +192,22 @@ function bumps(xs, r, amp, k, phase, scale = 1.3, W = 1) {
  * Irregular spacing and a centre-weighted radius are what stop it reading
  * as a row of identical bumps.
  */
-export function lobeParams(r, n, rlo, rhi, jitter = 0.85) {
+function lobeParamsInto(cen, rad, r, n, rlo, rhi, jitter = 0.85) {
   const step = 1.17 / n;
-  const cen = [], rad = [];
   for (let i = 0; i < n; i++) {
-    cen.push(-0.083 + step * (i + (r() * 2 - 1) * jitter));
-    rad.push(rlo + (rhi - rlo) * ((r() + r()) / 2));   // centre-weighted
+    cen[i] = -0.083 + step * (i + (r() * 2 - 1) * jitter);
+    rad[i] = rlo + (rhi - rlo) * ((r() + r()) / 2);   // centre-weighted
   }
+}
+
+/**
+ * The allocating form, kept exactly as it was because beach-wave.js and
+ * beach-swash.js call it AT BIRTH and STORE the result — the one place in
+ * this file where a fresh array is the point rather than the cost.
+ */
+export function lobeParams(r, n, rlo, rhi, jitter = 0.85) {
+  const cen = new Array(n), rad = new Array(n);
+  lobeParamsInto(cen, rad, r, n, rlo, rhi, jitter);
   return { cen, rad };
 }
 
@@ -129,92 +220,125 @@ export function lobeParams(r, n, rlo, rhi, jitter = 0.85) {
  * `cen` and `rad` are fractions of the width, so a stored set survives a
  * resize.
  */
-export function lobesFrom(xs, p, W, gate = null, squash = 0.45) {
-  const n = p.cen.length;
-  return xs.map((x, i) => {
+function lobesInto(out, xs, n, cen, rad, m, W, gate, squash) {
+  for (let i = 0; i < n; i++) {
+    const x = xs[i];
     let b = 0;
-    for (let j = 0; j < n; j++) {
-      const c = p.cen[j] * W, rr = p.rad[j] * W;
+    for (let j = 0; j < m; j++) {
+      const c = cen[j] * W, rr = rad[j] * W;
       const d = rr * rr - (x - c) * (x - c);
-      if (d > 0) b = Math.max(b, Math.sqrt(d) * squash);
+      if (d > 0) {
+        const v = Math.sqrt(d) * squash;
+        if (v > b) b = v;
+      }
     }
-    return gate ? b * gate[i] : b;
-  });
+    out[i] = gate ? b * gate[i] : b;
+  }
+  return out;
 }
 
-function lobes(xs, r, n, rlo, rhi, W, gate = null, squash = 0.45, jitter = 0.85) {
-  return lobesFrom(xs, lobeParams(r, n, rlo / W, rhi / W, jitter), W, gate, squash);
+/**
+ * The allocating form. beach-swash.js calls this once per wave at birth to
+ * build the scallop it will publish, so the array it returns is kept.
+ */
+export function lobesFrom(xs, p, W, gate = null, squash = 0.45) {
+  const n = xs.length;
+  return lobesInto(new Array(n), xs, n, p.cen, p.rad, p.cen.length, W, gate, squash);
 }
 
-function fillBand(ctx, xs, top, bot, colour) {
+function fillBand(ctx, xs, n, top, bot, colour) {
   ctx.beginPath();
   ctx.moveTo(xs[0], top[0]);
-  for (let i = 1; i < xs.length; i++) ctx.lineTo(xs[i], top[i]);
-  for (let i = xs.length - 1; i >= 0; i--) ctx.lineTo(xs[i], bot[i]);
+  for (let i = 1; i < n; i++) ctx.lineTo(xs[i], top[i]);
+  for (let i = n - 1; i >= 0; i--) ctx.lineTo(xs[i], bot[i]);
   ctx.closePath();
   ctx.fillStyle = colour;
   ctx.fill();
 }
 
+/** A brush pass's three width frequencies and their weights, flat and fixed. */
+const BRUSH_FS = new Float64Array([1.7, 0.55, 3.3, 0.30, 6.1, 0.15]);
+
 /**
  * A stroke laid down the way a brush lays one down: width swells at three
  * frequencies along the length, the ends lift, and a long stroke is laid
  * in two or three overlapping passes rather than one continuous line.
+ *
+ * A RUN AND A SEGMENT ARE BOTH CONTIGUOUS, so each is two integers rather
+ * than an array of indices. The run loop only ever pushes consecutive `i`
+ * and resets on a gap, and `Array.slice` of a contiguous range is contiguous
+ * — so nothing is given up by carrying (start, length) instead.
  */
 export function brush(ctx, xs, ys, width, r, {
-  colour = PALETTE.ink, gate = null, passes = true, vary = 0.42,
+  n = xs.length, colour = PALETTE.ink, gate = null, passes = true, vary = 0.42,
 } = {}) {
-  let runs = [];
-  if (gate) {
-    let cur = [];
-    for (let i = 0; i < xs.length; i++) {
-      if (gate[i] > 0.03) cur.push(i);
-      else { if (cur.length > 3) runs.push(cur); cur = []; }
-    }
-    if (cur.length > 3) runs.push(cur);
-  } else {
-    runs = [xs.map((_, i) => i)];
-  }
+  ensureStroke(n);
+  const runs = P.runs, segs = P.segs, cuts = P.cuts, idx = P.idx, ph = P.ph;
+  const upx = P.upx, upy = P.upy, dnx = P.dnx, dny = P.dny;
 
-  for (const run of runs) {
-    if (run.length < 4) continue;
-    let segs = [run];
-    if (passes && run.length > 90) {
-      const k = 2 + Math.floor(r() * 2);
-      const cuts = [];
-      for (let i = 0; i < k - 1; i++) cuts.push(0.2 + r() * 0.6);
-      cuts.sort((a, b) => a - b);
-      const idx = [0, ...cuts.map((c) => Math.floor(c * run.length)), run.length];
-      segs = [];
-      for (let j = 0; j < idx.length - 1; j++) {
-        segs.push(run.slice(Math.max(0, idx[j] - 6), idx[j + 1]));
+  let nruns = 0;
+  if (gate) {
+    let st = -1;
+    for (let i = 0; i < n; i++) {
+      if (gate[i] > 0.03) { if (st < 0) st = i; }
+      else {
+        if (st >= 0 && i - st > 3) { runs[nruns * 2] = st; runs[nruns * 2 + 1] = i - st; nruns++; }
+        st = -1;
       }
     }
-    for (const seg of segs) {
-      const m = seg.length;
+    if (st >= 0 && n - st > 3) { runs[nruns * 2] = st; runs[nruns * 2 + 1] = n - st; nruns++; }
+  } else { runs[0] = 0; runs[1] = n; nruns = 1; }
+
+  for (let ri = 0; ri < nruns; ri++) {
+    const runStart = runs[ri * 2], runLen = runs[ri * 2 + 1];
+    if (runLen < 4) continue;
+    let nsegs = 0;
+    if (passes && runLen > 90) {
+      const k = 2 + Math.floor(r() * 2);
+      for (let i = 0; i < k - 1; i++) cuts[i] = 0.2 + r() * 0.6;
+      // at most two entries, so an insertion sort is the same answer as
+      // `.sort((a, b) => a - b)` without the comparator closure
+      for (let i = 1; i < k - 1; i++) {
+        const v = cuts[i]; let j = i - 1;
+        while (j >= 0 && cuts[j] > v) { cuts[j + 1] = cuts[j]; j--; }
+        cuts[j + 1] = v;
+      }
+      idx[0] = 0;
+      for (let i = 0; i < k - 1; i++) idx[i + 1] = Math.floor(cuts[i] * runLen);
+      idx[k] = runLen;
+      for (let j = 0; j < k; j++) {
+        const a = idx[j] - 6 < 0 ? 0 : idx[j] - 6;
+        const e = idx[j + 1];
+        segs[nsegs * 2] = runStart + a;
+        segs[nsegs * 2 + 1] = e - a < 0 ? 0 : e - a;
+        nsegs++;
+      }
+    } else { segs[0] = runStart; segs[1] = runLen; nsegs = 1; }
+
+    for (let si = 0; si < nsegs; si++) {
+      const segStart = segs[si * 2], m = segs[si * 2 + 1];
       if (m < 4) continue;
-      const fs = [[1.7, 0.55], [3.3, 0.30], [6.1, 0.15]];
-      const ph = fs.map(() => r() * 6.283);
-      const up = [], dn = [];
+      for (let f = 0; f < 3; f++) ph[f] = r() * 6.283;
       for (let i = 0; i < m; i++) {
         const t = i / (m - 1);
         let wob = 1;
-        for (let f = 0; f < fs.length; f++) {
-          wob += vary * fs[f][1] * Math.sin(2 * Math.PI * fs[f][0] * t + ph[f]);
+        for (let f = 0; f < 3; f++) {
+          wob += vary * BRUSH_FS[f * 2 + 1] * Math.sin(2 * Math.PI * BRUSH_FS[f * 2] * t + ph[f]);
         }
         const prof = Math.pow(Math.sin(Math.PI * t), 0.30); // full most of the way
         const w = Math.max(0.35, (width * prof * wob) / 2);
-        const a = seg[Math.max(0, i - 1)], b = seg[Math.min(m - 1, i + 1)];
-        const dx = xs[b] - xs[a], dy = ys[b] - ys[a];
+        const a = segStart + (i - 1 < 0 ? 0 : i - 1);
+        const bi = segStart + (i + 1 > m - 1 ? m - 1 : i + 1);
+        const dx = xs[bi] - xs[a], dy = ys[bi] - ys[a];
         const L = Math.hypot(dx, dy) || 1e-6;
         const nx = -dy / L * w, ny = dx / L * w;
-        up.push([xs[seg[i]] + nx, ys[seg[i]] + ny]);
-        dn.push([xs[seg[i]] - nx, ys[seg[i]] - ny]);
+        upx[i] = xs[segStart + i] + nx; upy[i] = ys[segStart + i] + ny;
+        dnx[i] = xs[segStart + i] - nx; dny[i] = ys[segStart + i] - ny;
       }
       ctx.beginPath();
-      ctx.moveTo(up[0][0], up[0][1]);
-      for (let i = 1; i < up.length; i++) ctx.lineTo(up[i][0], up[i][1]);
-      for (let i = dn.length - 1; i >= 0; i--) ctx.lineTo(dn[i][0], dn[i][1]);
+      ctx.moveTo(upx[0], upy[0]);
+      for (let i = 1; i < m; i++) ctx.lineTo(upx[i], upy[i]);
+      for (let i = m - 1; i >= 0; i--) ctx.lineTo(dnx[i], dny[i]);
       ctx.closePath();
       ctx.fillStyle = colour;
       ctx.fill();
@@ -247,12 +371,14 @@ function bubble(ctx, x, y, rad) {
  * curl and spent foam at once — which is both what the footage shows and how
  * a cartoon wave is built. A wave is never drawn breaking all at once along
  * its length.
+ *
+ * `n` is explicit because `xs` is a pooled buffer whose length is the pool's
+ * capacity. Nothing outside this file calls it.
  */
-export function wave(ctx, xs, r, {
+export function wave(ctx, xs, n, r, {
   s, peel, height, phase, W, H, big = true, shear = SHEAR,
   sAt = null, bAt = null, seed, scalA = null, scalB = null, bubbles = null,
 }) {
-  const n = xs.length;
   // A PER-CALL STREAM PER MARK, so a stroke's own width wobble is a property of
   // WHICH WAVE this is and not of how many bubbles the wave before it happened
   // to draw. Without it every `r()` a frame takes shifts everything after it,
@@ -263,10 +389,13 @@ export function wave(ctx, xs, r, {
   // WHERE THE WAVE IS: the caller's per-column band position when it has one
   // (the live record's own crest, carrying its own along-shore wobble), the
   // module's own wander when it does not.
-  const base = sAt
-    ? xs.map((x) => yOf(x, sAt(x / W), W, H, shear))
-    : bumps(xs, r, 0.009 * H, 3, phase, 1.3, W)
-      .map((d, i) => yOf(xs[i], s, W, H, shear) + d);
+  const base = P.base;
+  if (sAt) {
+    for (let i = 0; i < n; i++) base[i] = yOf(xs[i], sAt(xs[i] / W), W, H, shear);
+  } else {
+    bumpsInto(base, xs, n, r, 0.009 * H, 3, phase, 1.3, W);
+    for (let i = 0; i < n; i++) base[i] = yOf(xs[i], s, W, H, shear) + base[i];
+  }
 
   // HOW FAR THROUGH THE BREAK EACH COLUMN IS. `b` runs 0 at the unbroken end to
   // 1 at the spent end and everything below is a function of it, so this is the
@@ -274,10 +403,12 @@ export function wave(ctx, xs, r, {
   // own clock (beach-wave.js's drawPhaseAt, which reads the same `brokenAt` the
   // stage labels do, so the picture and the label cannot disagree); standalone
   // it is the module's own sweep across the frame.
-  const b = bAt ? xs.map((x) => bAt(x / W)) : xs.map((x) => smoothstep((x / W - (peel - 0.34)) / 0.50));
+  const b = P.b;
+  if (bAt) for (let i = 0; i < n; i++) b[i] = bAt(xs[i] / W);
+  else for (let i = 0; i < n; i++) b[i] = smoothstep((xs[i] / W - (peel - 0.34)) / 0.50);
 
-  const crest = new Array(n), h = new Array(n), curl = new Array(n);
-  const foamw = new Array(n), g = new Array(n), spent = new Array(n);
+  const crest = P.crest, h = P.h, curl = P.curl;
+  const foamw = P.foamw, g = P.g, spent = P.spent;
   for (let i = 0; i < n; i++) {
     const rise = Math.pow(Math.sin(Math.PI * Math.pow(clamp(b[i], 0, 1), 0.8)), 0.7);
     let along = 1
@@ -293,36 +424,63 @@ export function wave(ctx, xs, r, {
     spent[i] = 1 - smoothstep((b[i] - 0.72) / 0.28);
   }
 
-  const lobeA = scalA ? lobesFrom(xs, scalA, W, g, 0.44) : lobes(xs, r, 9, 0.035 * W, 0.096 * W, W, g, 0.44);
-  const lobeB = scalB ? lobesFrom(xs, scalB, W, g, 0.55) : lobes(xs, r, 22, 0.010 * W, 0.031 * W, W, g, 0.55);
-
-  const faceBot = base.map((v, i) =>
-    v + (0.040 + 0.030 * (1 - b[i])) * H + 0.22 * h[i]);
-  fillBand(ctx, xs, crest, faceBot, PALETTE.ink);
-
-  const lipTop = crest.map((v, i) => v - 0.30 * h[i] * curl[i] * spent[i]);
-  const lipBot = crest.map((v, i) => v + (0.42 * h[i] + 0.5 * foamw[i])
-    * Math.max(curl[i], 0.30 * smoothstep((b[i] - 0.28) / 0.3)) * spent[i]);
-  fillBand(ctx, xs, lipTop, lipBot, PALETTE.paper);
-
-  const lipGate = spent.map((v, i) => v * (curl[i] + 0.25 * g[i]));
-  brush(ctx, xs, lipBot, (big ? 3.4 : 2.4) * H / 720, sub(1), { gate: lipGate });
-  brush(ctx, xs, crest, (big ? 3.2 : 2.2) * H / 720, sub(2),
-    { gate: spent.map((v) => 0.15 + v) });
-
-  // the hook: the lip thrown forward, heavy and short
-  const hookGate = curl.map((v) => (v > 0.42 ? 1 : 0));
-  if (hookGate.some(Boolean)) {
-    brush(ctx, xs, lipBot.map((v, i) => v + 0.30 * h[i]),
-      (big ? 4.6 : 3.0) * H / 720, sub(3), { gate: hookGate, passes: false, vary: 0.55 });
-    brush(ctx, xs, lipTop.map((v, i) => v - 0.10 * h[i]),
-      2.4 * H / 720, sub(4), { gate: hookGate, passes: false });
+  const lobeA = P.lobeA, lobeB = P.lobeB;
+  if (scalA) lobesInto(lobeA, xs, n, scalA.cen, scalA.rad, scalA.cen.length, W, g, 0.44);
+  else {
+    lobeParamsInto(P.cenA, P.radA, r, 9, 0.035, 0.096);
+    lobesInto(lobeA, xs, n, P.cenA, P.radA, 9, W, g, 0.44);
+  }
+  if (scalB) lobesInto(lobeB, xs, n, scalB.cen, scalB.rad, scalB.cen.length, W, g, 0.55);
+  else {
+    lobeParamsInto(P.cenB, P.radB, r, 22, 0.010, 0.031);
+    lobesInto(lobeB, xs, n, P.cenB, P.radB, 22, W, g, 0.55);
   }
 
-  const fbTop = crest.map((v, i) => v + 0.26 * h[i]);
-  const fbBot = fbTop.map((v, i) => v + foamw[i] + lobeA[i] + lobeB[i]);
-  fillBand(ctx, xs, fbTop, fbBot, PALETTE.paper);
-  brush(ctx, xs, fbBot, (big ? 3.6 : 2.6) * H / 720, sub(5), { gate: g });
+  const faceBot = P.faceBot;
+  for (let i = 0; i < n; i++) {
+    faceBot[i] = base[i] + (0.040 + 0.030 * (1 - b[i])) * H + 0.22 * h[i];
+  }
+  fillBand(ctx, xs, n, crest, faceBot, PALETTE.ink);
+
+  const lipTop = P.lipTop, lipBot = P.lipBot;
+  for (let i = 0; i < n; i++) {
+    lipTop[i] = crest[i] - 0.30 * h[i] * curl[i] * spent[i];
+    lipBot[i] = crest[i] + (0.42 * h[i] + 0.5 * foamw[i])
+      * Math.max(curl[i], 0.30 * smoothstep((b[i] - 0.28) / 0.3)) * spent[i];
+  }
+  fillBand(ctx, xs, n, lipTop, lipBot, PALETTE.paper);
+
+  const lipGate = P.lipGate, crestGate = P.crestGate;
+  for (let i = 0; i < n; i++) {
+    lipGate[i] = spent[i] * (curl[i] + 0.25 * g[i]);
+    crestGate[i] = 0.15 + spent[i];
+  }
+  brush(ctx, xs, lipBot, (big ? 3.4 : 2.4) * H / 720, sub(1), { n, gate: lipGate });
+  brush(ctx, xs, crest, (big ? 3.2 : 2.2) * H / 720, sub(2), { n, gate: crestGate });
+
+  // the hook: the lip thrown forward, heavy and short
+  const hookGate = P.hookGate;
+  let anyHook = false;
+  for (let i = 0; i < n; i++) {
+    hookGate[i] = curl[i] > 0.42 ? 1 : 0;
+    if (hookGate[i]) anyHook = true;
+  }
+  if (anyHook) {
+    const tmpA = P.tmpA, tmpB = P.tmpB;
+    for (let i = 0; i < n; i++) tmpA[i] = lipBot[i] + 0.30 * h[i];
+    brush(ctx, xs, tmpA, (big ? 4.6 : 3.0) * H / 720, sub(3),
+      { n, gate: hookGate, passes: false, vary: 0.55 });
+    for (let i = 0; i < n; i++) tmpB[i] = lipTop[i] - 0.10 * h[i];
+    brush(ctx, xs, tmpB, 2.4 * H / 720, sub(4), { n, gate: hookGate, passes: false });
+  }
+
+  const fbTop = P.fbTop, fbBot = P.fbBot;
+  for (let i = 0; i < n; i++) {
+    fbTop[i] = crest[i] + 0.26 * h[i];
+    fbBot[i] = fbTop[i] + foamw[i] + lobeA[i] + lobeB[i];
+  }
+  fillBand(ctx, xs, n, fbTop, fbBot, PALETTE.paper);
+  brush(ctx, xs, fbBot, (big ? 3.6 : 2.6) * H / 720, sub(5), { n, gate: g });
 
   // The bubbles are DRAWN ONCE AT BIRTH too, for the same reason the lobes are
   // — and it is the `continue` that makes it necessary rather than tidy: it
@@ -340,6 +498,21 @@ export function wave(ctx, xs, r, {
   }
 }
 
+/** The two open-water brush lines' band positions, hoisted out of the frame. */
+const WATER_LINES = [0.06, 0.105];
+
+/**
+ * The options one live record is drawn with, reused across waves and frames.
+ * A `{ ...w, phase, W, H, shear }` spread is one object per wave per frame;
+ * every field `wave()` destructures is written here instead. `big` carries
+ * its own default rather than leaning on the destructure, because a record
+ * that omits it must still read `true` the way the spread made it.
+ */
+const WOPTS = {
+  s: 0, peel: 0, height: 0, big: true, shear: 0, phase: 0, W: 0, H: 0,
+  sAt: null, bAt: null, seed: undefined, scalA: null, scalB: null, bubbles: null,
+};
+
 /**
  * Draw one frame.
  *
@@ -356,34 +529,55 @@ export function draw(ctx, W, H, state) {
     shear = SHEAR, waves = null, frontAt = null, wetAt = null, hwS = 0.755,
   } = state || {};
   const r = rng(seed);
-  const N = 520;
-  const xs = [];
-  for (let i = 0; i < N; i++) xs.push(-0.042 * W + (1.084 * W * i) / (N - 1));
+  const n = NCOL;
+  ensureField(n);
+  ensureStroke(n);
+  const xs = P.xs;
+  // THE COLUMNS DEPEND ONLY ON W, so they are laid out once and kept. The
+  // guard is on W rather than on "have we run before", because a resize is
+  // the one thing that moves them.
+  if (xsW !== W) {
+    for (let i = 0; i < n; i++) xs[i] = -0.042 * W + (1.084 * W * i) / (n - 1);
+    xsW = W;
+  }
 
   ctx.fillStyle = PALETTE.paper;
   ctx.fillRect(0, 0, W, H);
 
-  const horizon = bumps(xs, r, 0.005 * H, 2, phase, 1.3, W)
-    .map((d, i) => yOf(xs[i], 0.155, W, H, shear) + d);
-  fillBand(ctx, xs, xs.map(() => -0.08 * H), horizon, PALETTE.seaDeep);
-  const mid = bumps(xs, r, 0.006 * H, 2, phase * 0.8, 1.3, W)
-    .map((d, i) => yOf(xs[i], farS + 0.10, W, H, shear) + d);
-  fillBand(ctx, xs, horizon, mid, PALETTE.sea);
+  const horizon = P.horizon, mid = P.mid, flatTop = P.flatTop;
+  bumpsInto(horizon, xs, n, r, 0.005 * H, 2, phase, 1.3, W);
+  for (let i = 0; i < n; i++) {
+    horizon[i] = yOf(xs[i], 0.155, W, H, shear) + horizon[i];
+    flatTop[i] = -0.08 * H;
+  }
+  fillBand(ctx, xs, n, flatTop, horizon, PALETTE.seaDeep);
+  bumpsInto(mid, xs, n, r, 0.006 * H, 2, phase * 0.8, 1.3, W);
+  for (let i = 0; i < n; i++) mid[i] = yOf(xs[i], farS + 0.10, W, H, shear) + mid[i];
+  fillBand(ctx, xs, n, horizon, mid, PALETTE.sea);
 
-  for (const s of [0.06, 0.105]) {
-    const sy = bumps(xs, r, 0.007 * H, 3, phase * 0.6, 1.3, W)
-      .map((d, i) => yOf(xs[i], s, W, H, shear) + d);
-    brush(ctx, xs, sy, 2.6 * H / 720, r, { colour: PALETTE.paper });
+  const sy = P.sy;
+  for (const s of WATER_LINES) {
+    bumpsInto(sy, xs, n, r, 0.007 * H, 3, phase * 0.6, 1.3, W);
+    for (let i = 0; i < n; i++) sy[i] = yOf(xs[i], s, W, H, shear) + sy[i];
+    brush(ctx, xs, sy, 2.6 * H / 720, r, { n, colour: PALETTE.paper });
   }
 
   // THE WAVES. One call per live record, in the order the caller hands them —
   // which is seaward first, so a nearer band of foam covers the water behind
   // it. With no list, the two the module was written with, unchanged, so the
   // standalone picture is the control for the wiring.
-  if (waves) for (const w of waves) wave(ctx, xs, r, { ...w, phase, W, H, shear });
-  else {
-    wave(ctx, xs, r, { s: farS, peel: peel + 0.80, height: 0.048, phase: phase * 1.1, W, H, big: false, shear });
-    wave(ctx, xs, r, { s: heroS, peel, height: 0.082, phase, W, H, big: true, shear });
+  if (waves) {
+    for (const w of waves) {
+      WOPTS.s = w.s; WOPTS.peel = w.peel; WOPTS.height = w.height;
+      WOPTS.big = w.big === undefined ? true : w.big;
+      WOPTS.sAt = w.sAt; WOPTS.bAt = w.bAt; WOPTS.seed = w.seed;
+      WOPTS.scalA = w.scalA; WOPTS.scalB = w.scalB; WOPTS.bubbles = w.bubbles;
+      WOPTS.phase = phase; WOPTS.W = W; WOPTS.H = H; WOPTS.shear = shear;
+      wave(ctx, xs, n, r, WOPTS);
+    }
+  } else {
+    wave(ctx, xs, n, r, { s: farS, peel: peel + 0.80, height: 0.048, phase: phase * 1.1, W, H, big: false, shear });
+    wave(ctx, xs, n, r, { s: heroS, peel, height: 0.082, phase, W, H, big: true, shear });
   }
 
   // THE SWASH FRONT, AND IT IS THE ONE CURVE. `frontAt` is the PUBLISHED swash
@@ -391,49 +585,58 @@ export function draw(ctx, W, H, state) {
   // seed at birth. Generating them here as well is what would put a bird on a
   // line that is not the line that is drawn, so the fallback below exists only
   // for a standalone call with no simulation behind it.
-  let front;
+  const front = P.front, sheetTop = P.sheetTop;
   if (frontAt) {
-    front = xs.map((x) => yOf(x, frontAt(x / W), W, H, shear));
+    // two passes rather than one, because the two used to be two separate
+    // maps and a query with any state of its own would notice the difference
+    for (let i = 0; i < n; i++) front[i] = yOf(xs[i], frontAt(xs[i] / W), W, H, shear);
+    for (let i = 0; i < n; i++) sheetTop[i] = yOf(xs[i], frontAt(xs[i] / W) - 0.085, W, H, shear);
   } else {
-    const sy = bumps(xs, r, 0.007 * H, 3, phase * 1.6, 1.3, W)
-      .map((d, i) => yOf(xs[i], swashS, W, H, shear) + d);
-    const la = lobes(xs, r, 11, 0.025 * W, 0.069 * W, W, null, 0.32);
-    const lb = lobes(xs, r, 26, 0.008 * W, 0.025 * W, W, null, 0.5);
-    front = sy.map((v, i) => v + la[i] + lb[i]);
+    const la = P.la, lb = P.lb;
+    bumpsInto(front, xs, n, r, 0.007 * H, 3, phase * 1.6, 1.3, W);
+    for (let i = 0; i < n; i++) front[i] = yOf(xs[i], swashS, W, H, shear) + front[i];
+    lobeParamsInto(P.cenA, P.radA, r, 11, 0.025, 0.069, 0.85);
+    lobesInto(la, xs, n, P.cenA, P.radA, 11, W, null, 0.32);
+    lobeParamsInto(P.cenB, P.radB, r, 26, 0.008, 0.025, 0.85);
+    lobesInto(lb, xs, n, P.cenB, P.radB, 26, W, null, 0.5);
+    for (let i = 0; i < n; i++) {
+      front[i] = front[i] + la[i] + lb[i];
+      sheetTop[i] = yOf(xs[i], swashS - 0.085, W, H, shear);
+    }
   }
-  const sheetTop = frontAt
-    ? xs.map((x) => yOf(x, frontAt(x / W) - 0.085, W, H, shear))
-    : xs.map((x) => yOf(x, swashS - 0.085, W, H, shear));
-  fillBand(ctx, xs, sheetTop, front, PALETTE.wet);
-  brush(ctx, xs, front, 3.8 * H / 720, r);
+  fillBand(ctx, xs, n, sheetTop, front, PALETTE.wet);
+  brush(ctx, xs, front, 3.8 * H / 720, r, { n });
   for (let k = 0; k < 11; k++) {
     const x = r() * W;
-    const i = Math.round(((x - xs[0]) / (xs[N - 1] - xs[0])) * (N - 1));
+    const i = Math.round(((x - xs[0]) / (xs[n - 1] - xs[0])) * (n - 1));
     bubble(ctx, x, front[i] + (r() * 16 - 3) * H / 720, (2 + r() * 4) * H / 720);
   }
 
   // The strand line: the HIGH-WATER MARK, the second of the two lines the
   // simulation keeps, when the caller publishes one.
-  const wy = wetAt
-    ? xs.map((x) => yOf(x, wetAt(x / W), W, H, shear))
-    : bumps(xs, r, 0.004 * H, 2, phase * 0.3, 1.3, W)
-      .map((d, i) => yOf(xs[i], hwS, W, H, shear) + d);
-  brush(ctx, xs, wy, 2.0 * H / 720, r);
+  const wy = P.wy;
+  if (wetAt) {
+    for (let i = 0; i < n; i++) wy[i] = yOf(xs[i], wetAt(xs[i] / W), W, H, shear);
+  } else {
+    bumpsInto(wy, xs, n, r, 0.004 * H, 2, phase * 0.3, 1.3, W);
+    for (let i = 0; i < n; i++) wy[i] = yOf(xs[i], hwS, W, H, shear) + wy[i];
+  }
+  brush(ctx, xs, wy, 2.0 * H / 720, r, { n });
 
   // sand marks are fixed in screen space, not regenerated per frame
   const sr = rng(99);
+  const mx = P.mx, my = P.my;
   for (let k = 0; k < 30; k++) {
     const x = -0.02 * W + sr() * 1.04 * W;
     const s = 0.80 + sr() * 0.23;
     const y = yOf(x, s, W, H, shear);
     const L = (16 + sr() * 34) * W / 960;
     const a = (sr() * 0.30 - 0.15);
-    const mx = [], my = [];
     for (let j = 0; j < 14; j++) {
       const px = x - L / 2 + (L * j) / 13;
-      mx.push(px);
-      my.push(y + (px - x) * (a + shear * H / W) + (sr() * 2 - 1) * 0.7);
+      mx[j] = px;
+      my[j] = y + (px - x) * (a + shear * H / W) + (sr() * 2 - 1) * 0.7;
     }
-    brush(ctx, mx, my, 1.9 * H / 720, sr, { passes: false, vary: 0.3 });
+    brush(ctx, mx, my, 1.9 * H / 720, sr, { n: 14, passes: false, vary: 0.3 });
   }
 }

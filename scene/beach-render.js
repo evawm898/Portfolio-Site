@@ -36,7 +36,37 @@ import { draw as drawFrame } from './beach-brush.js';
 import { crestAt, drawPhaseAt, waveStage, SWASH, BIG_HEIGHT } from './beach-wave.js';
 import { WATERLINE_S } from './beach-shore.js';
 
+/** so a state with no wave list costs no allocation either */
+const EMPTY = [];
+
 export function createRenderer(ctx, shore) {
+  // THE SPECS ARE A POOL, NOT A FRESH LIST EVERY FRAME. A filter, an array, a
+  // spec object and TWO CLOSURES per wave per frame is a fixed volume of
+  // garbage on the per-frame path, which is the same defect the drawing layer
+  // had and is fixed the same way. Each pooled spec carries its own pair of
+  // closures, created once and reading `sp.wv` at call time, so the record a
+  // spec speaks for can be swapped without building a new closure for it.
+  const pool = [];
+  const specFor = (i) => {
+    if (!pool[i]) {
+      const sp = {
+        wv: null, seed: 0, height: 0, big: false,
+        scalA: null, scalB: null, bubbles: null,
+        sAt: null, bAt: null,
+      };
+      sp.sAt = (u) => crestAt(sp.wv, u);
+      sp.bAt = (u) => drawPhaseAt(sp.wv, u);
+      pool[i] = sp;
+    }
+    return pool[i];
+  };
+  // Emptied and refilled rather than rebuilt: `length = 0` then `push` keeps
+  // the array's own capacity, so the list costs nothing after the first frame.
+  const specs = [];
+  const opts = {
+    phase: 0, seed: 6, shear: 0, waves: specs, frontAt: null, wetAt: null,
+  };
+
   const r = {
     // Telemetry, in the shape the scene's `state()` already publishes. `waves`
     // is the count actually handed to the drawing, which is what a gate needs
@@ -67,34 +97,32 @@ export function createRenderer(ctx, shore) {
       // `stageAt` skips its SWASH branch when it is handed nothing, so a
       // caller that forgot to pass one would silently never drop a wave —
       // a hazard with no symptom, which is the kind this file should not have.
-      const list = (st.waves || []).filter(wv => waveStage(wv, WATERLINE_S) !== SWASH);
-      const specs = new Array(list.length);
-      for (let i = 0; i < list.length; i++) {
-        const wv = list[i];
-        specs[i] = {
-          seed: wv.seed,
-          height: wv.height,
-          big: wv.height >= BIG_HEIGHT,
-          sAt: (u) => crestAt(wv, u),
-          bAt: (u) => drawPhaseAt(wv, u),
-          scalA: wv.drawA,
-          scalB: wv.drawB,
-          bubbles: wv.drawBubbles,
-        };
+      const src = st.waves || EMPTY;
+      specs.length = 0;
+      for (let i = 0; i < src.length; i++) {
+        if (waveStage(src[i], WATERLINE_S) === SWASH) continue;
+        const wv = src[i];
+        const sp = specFor(specs.length);
+        sp.wv = wv;
+        sp.seed = wv.seed;
+        sp.height = wv.height;
+        sp.big = wv.height >= BIG_HEIGHT;
+        sp.scalA = wv.drawA;
+        sp.scalB = wv.drawB;
+        sp.bubbles = wv.drawBubbles;
+        specs.push(sp);
       }
       r.waves = specs.length;
 
-      drawFrame(ctx, w, h, {
-        // A slowly increasing number, and it is the water's own drift so the
-        // surface wander and everything else that moves are on one clock.
-        phase: st.drift || 0,
-        seed: st.frontSeed !== undefined ? st.frontSeed : 6,
-        // The shore's angle, expressed the way the drawing wants it.
-        shear: shore.slope * w / h,
-        waves: specs,
-        frontAt: st.swashAt,
-        wetAt: st.wetAt,
-      });
+      // A slowly increasing number, and it is the water's own drift so the
+      // surface wander and everything else that moves are on one clock.
+      opts.phase = st.drift || 0;
+      opts.seed = st.frontSeed !== undefined ? st.frontSeed : 6;
+      // The shore's angle, expressed the way the drawing wants it.
+      opts.shear = shore.slope * w / h;
+      opts.frontAt = st.swashAt;
+      opts.wetAt = st.wetAt;
+      drawFrame(ctx, w, h, opts);
       ctx.restore();
     },
   };
