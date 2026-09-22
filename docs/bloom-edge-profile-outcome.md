@@ -412,14 +412,29 @@ is 45 degrees, so **a typed 30 forbids the count Eva ruled**; the two rulings
 cannot both be satisfied by a constant. The later one, which states its reason,
 governs.
 
-The bar is now the bead's own resolution, read through `RIM_BEAD_SEGMENTS`. **It
-is STRICTER than the number it replaces wherever the old one applied** — at
-K = 8 it is 22.5 against 30, and the shipped tree measured 21.50 there — so the
-derivation would have held on the geometry it replaces as well as on this one.
-That is the test that says it is a re-derivation rather than a bar fitted to the
-data in hand. The SHADING half of the old bar's job is answered by the other
-half of the same ruling: the bead now carries its own smooth normal, so a facet
-edge is no longer something the eye can find.
+The bar is now the bead's own resolution, read through `RIM_BEAD_SEGMENTS`.
+**ACCEPTED BY EVA AS `180/K`, AND ON THE SHIPPING TREE THAT IS 45° — A
+RELAXATION FROM THE TYPED 30°, SAID PLAINLY BECAUSE IT IS THE THING A READER
+WILL WANT TO KNOW.** The tree ships at K = 4, so the allowance E2 actually
+enforces is fifteen degrees looser than the number it replaces, and no amount of
+saying it is stricter at K = 8 changes what runs.
+
+**WHAT STILL GUARDS IT IS `the-flat-wall-is-restored`** — the negative control
+mutation that takes the treatment away entirely and leaves main's own 90° cliff
+at the rim. At the 45° bar it fires E2 with room to spare: the declared buckle
+row's excess moves from 6.236137 to **53.591109 deg**, an order of magnitude
+past the band. So the clause is not close to vacuous at the looser number, and
+that is a measurement rather than a reassurance. It is the only thing standing
+between E2 and a bar wide enough to admit a cut edge, which is why it is named
+here rather than left in the control's output.
+
+The secondary point, kept because it is the test that says this is a
+re-derivation and not a bar fitted to the data in hand: at K = 8 the same
+formula gives 22.5 against the typed 30, and the shipped tree measured 21.50
+there — so it would have held on the geometry it replaces as well as on this
+one. And the SHADING half of the old bar's job is answered by the other half of
+the same ruling: the bead now carries its own smooth normal, so a facet edge is
+no longer something the eye can find.
 
 **Four rows exceed it and are DECLARED with their magnitudes** (#213's idiom, in
 degrees), because the SURFACE itself turns faster than the outline's PLAN turn
@@ -506,18 +521,38 @@ there is no defect to fix.** That is the finding, not an omission.
 ## 12. What is deliberately NOT done here
 
 **`SELF_INTERSECTION_XFAIL` is not re-measured.** The tessellation moved with
-the segment count, so declared magnitudes have moved: a nine-row subset run
-already reads three rows with new pairs, all at **worst span 0.0000 mm** — the
-knife-edge class this project documents, where a census triangle grazes a crease
-and the count is decided by where the stations land (`TIP SHAPE: 0.60 x a far-out
-widest point` 14 pairs, `TIP SHAPE: 0.60 x the thickest sheet` 2, `SPHERE STEM:
-the default sphere at the shipped stem` 2).
+the segment count, so declared magnitudes have moved. Eva's ruling 2: *"do NOT
+declare the 108 rows here. A separate session is fixing the census instrument as
+its own PR. Do not touch the census code in this branch."* So the list is
+re-measured **once**, at rebase time, against the instrument that will actually
+run it — re-recording now would bake in numbers the census fix changes again.
 
-Eva's ruling 2: *"do NOT declare the 108 rows here. A separate session is fixing
-the census instrument as its own PR. Do not touch the census code in this
-branch."* So the list is re-measured **once**, at rebase time, against the
-instrument that will actually run it — re-recording now would bake in numbers
-the census fix changes again.
+### 12a. The three rows X2 flags, and what is owed on each
+
+A nine-row subset run on this tree reads three rows with pairs that are not on
+the declared list. Measured at full precision in Node, EXPORT mode:
+
+| row | pairs | worst span | site(s), 2 dp |
+|---|---|---|---|
+| `TIP SHAPE: 0.60 x a far-out widest point` | 14 | **0.000000e+0 mm** | five distinct, incl. (1.87, 34.24, 12.50) and (−33.87, −2.50, 12.33) |
+| `TIP SHAPE: 0.60 x the thickest sheet (2.40 …)` | 2 | **0.000000e+0 mm** | one, (19.14, 16.50, 4.60) |
+| `SPHERE STEM: the default sphere at the shipped stem` | 2 | **0.000000e+0 mm** | one, (5.37, 10.07, −6.94) |
+
+**EVA'S INSTRUCTION, AND IT OVERRIDES THE REFLEX THIS PROJECT HAS BUILT UP:**
+*"For each one, report which two pieces touch, where, and whether they are meant
+to be connected. Do not declare them as artefacts; bring them to me as WAITING
+ON EVA if they're real contacts."* The span-0 knife-edge reading is the
+available explanation and it is **not** a verdict — it is a hypothesis that has
+to be tested by naming the two pieces, and a tangency between two parts that are
+NOT meant to touch is a real contact whatever its span reads.
+
+**ONE DISCREPANCY TO CARRY FORWARD RATHER THAN RESOLVE HERE.** Eva expects
+*"span-0 tangencies and one 8.9 µm contact"*. On this tree, at full precision,
+**all three rows read exactly 0.000000e+0** — there is no 8.9 µm contact among
+them. That may be the fixed instrument reporting something the current one
+rounds away, or it may be a row outside this three. It is recorded rather than
+argued: the measurement is re-taken after the rebase, against the instrument
+that will run it, and the report names whichever it turns out to be.
 
 ## 13. The negative control found two holes, and neither was visible on a green run
 
