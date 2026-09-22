@@ -405,7 +405,7 @@ function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm, r
   return { deg: worst < 0 ? 0 : worst, at, edges: n, skipped, corner: nCorner, cornerDeg, rampDeg, raw: worstRaw, outline: worstOutline };
 }
 
-async function runRows(G, rows, fails, notes) {
+async function runRows(G, rows, fails, notes, fullSet = false) {
   const check = (clause, ok, msg) => { if (!ok) fails.push(`${clause}: ${msg}`); return ok; };
   let profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0;
   let done = 0;
@@ -542,9 +542,13 @@ async function runRows(G, rows, fails, notes) {
   }
   check('E0', profiles > 0, `no treated rim profile was found on any row — the run is vacuous`);
   /* A DECLARATION NAMING A ROW THE GATE NEVER RAN IS A DECLARATION NOBODY CAN
-     CHECK — the combination gate's CG5, one instrument later. Only on a FULL
-     run: under --only the unseen entries are the ones --only excluded. */
-  if (!ONLY) {
+     CHECK — the combination gate's CG5, one instrument later. ONLY on a run
+     over the FULL row set, and the caller says so rather than this reading
+     `ONLY`: the negative control runs five hand-picked rows with no `--only`
+     flag in sight, so keying off the flag made every mutation fire this on
+     the four rows the subset does not carry. The control caught it, which is
+     what a control is for. */
+  if (fullSet) {
     for (const label of Object.keys(E2_TURN_XFAIL)) {
       check('E2', declaredSeen.has(label), `E2_TURN_XFAIL declares "${label}" and no row of this gate carries that label — a declaration nothing evaluates`);
     }
@@ -571,7 +575,11 @@ const MUTATIONS = [
   { id: 'the-flat-wall-is-restored', breaks: ['E2', 'E3', 'E4'],
     from: '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;',
     to:   '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi; const FLATWALL = 1;' },
-  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1'],
+  /* E2 as well as E1, and it is TRUE of this mutation rather than a
+     loosening: a smaller bead radius is a different surface, so the buckle
+     row's declared excess moves 6.236137 -> 6.526126 deg. Named as collateral,
+     because the honest remedy for an unclaimed red that is real is to name it. */
+  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
   { id: 'the-bead-apex-is-recomputed', breaks: ['E4'],
@@ -580,9 +588,30 @@ const MUTATIONS = [
   { id: 'every-clamp-is-logged', breaks: ['E1'],
     from: '      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;',
     to:   '      const wasClamped = true;' },
-  { id: 'the-segment-count-reads-the-live-sheet', breaks: ['E5'],
-    from: '  const r = Math.min(RIM_BEAD_RADIUS_MM, Math.max(sheetMm, MIN_FEATURE_MM) / 2);',
-    to:   '  const r = Math.min(RIM_BEAD_RADIUS_MM, sheetMm / 2);' },
+  /* E5'S MUTANT, REPLACED BECAUSE THE RULED SEGMENT COUNT MADE THE OLD ONE
+     UNREACHABLE — session 32's three retired lerp mutations, one gate later.
+     It was `the-segment-count-reads-the-live-sheet`: strip the mode-free floor
+     out of `rimSegments` so the live build reads the unfloored sheet, which at
+     EIGHT segments took `sheetThickness` 0.60 to six live against eight
+     export and fired E5. At FOUR it fires nothing, and that is arithmetic
+     rather than luck: with a cap of 4, a minimum of 3 and the round-up to
+     even, `min(4, max(3, raw))` rounded even is 4 for EVERY raw, so no input
+     to that function can move K at all. The mutation still applies, still
+     changes the radius, and changes no count — `bore-is-not-evas-rule`'s
+     lesson (a mutation is invisible wherever the law it replaces happens to
+     agree with it), arriving because a later ruling collapsed the law's range
+     to a point.
+
+     WHAT REPLACES IT IS THE DEFECT `RIM_TIP_ROWS`' OWN HEADER WARNS ABOUT, in
+     so many words: "a `drop rows until the gap clears the radius` rule would
+     be this project's sixth discrete decision on a continuous quantity". That
+     rule reads the emitted half-width, which carries the TIP FLOOR — 0.15 mm
+     live against 0.80 mm export — so the two modes drop different numbers of
+     rows and E5's two clauses both have something to say. A plausible defect
+     rather than an injected one. */
+  { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5'],
+    from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
+    to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
 ];
 /* The floor mutation needs a second edit: the constant is exported and read
    by the gate as the BAR, so lowering the export alone would move the bar
@@ -630,6 +659,15 @@ async function control() {
      a lobed margin and a thin sheet — every arm of the rim law. */
   const CONTROL_ROWS = /^DEFAULT|^FRINGE: THE CARNATION|^LOBES: the shipped|^THIN: ALL THIN|^CAPABILITY: cleft \(/;
   const rows = MATRIX.filter((r) => CONTROL_ROWS.test(r.label)).slice(0, 5);
+  /* AND AT LEAST ONE DECLARED ROW, OR E2's MAGNITUDE CLAUSE HAS NO MUTANT.
+     It did not, and only asking which messages the control actually printed
+     found it: the regex names the carnation, `.slice(0, 5)` took five earlier
+     matches, and the two clauses that hold a declared row to its recorded
+     excess were exercised by nothing while the run reported 5 of 5. A clause
+     nobody has shown can fire is the thing this whole file exists to avoid. */
+  const declaredRow = MATRIX.find((r) => Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, r.label));
+  if (!declaredRow) { console.error('edge-profile control: no matrix row carries an E2_TURN_XFAIL label — the declaration cannot be exercised'); process.exit(1); }
+  if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);
   if (rows.length < 3) { console.error('edge-profile control: the control row set did not resolve — ' + rows.length + ' rows'); process.exit(1); }
   let failures = 0;
   for (const m of MUTATIONS) {
@@ -649,6 +687,7 @@ async function control() {
     if (!ok) failures++;
     console.log(`  ${ok ? 'OK  ' : 'FAIL'} ${m.id.padEnd(42)} claims ${m.breaks.join(',').padEnd(6)} fired ${[...fired].join(',') || '(nothing)'}`
       + (missed.length ? `  MISSED ${missed.join(',')}` : '') + (extra.length ? `  UNCLAIMED ${extra.join(',')}` : ''));
+    if (process.argv.includes('--why')) for (const x of f) console.log(`        ${x.slice(0, 200)}`);
   }
   fs.rmSync(dir, { recursive: true, force: true });
   if (failures) { console.error(`\nedge-profile control: FAILED — ${failures} of ${MUTATIONS.length} mutations did not behave.`); process.exit(1); }
@@ -660,7 +699,7 @@ else {
   const rows = pickRows();
   const fails = [], notes = [];
   const t0 = Date.now();
-  await runRows(G0, rows, fails, notes);
+  await runRows(G0, rows, fails, notes, !ONLY);
   for (const n of notes) console.log('edge-profile: ' + n);
   console.log(`edge-profile: ${((Date.now() - t0) / 1000).toFixed(1)} s`);
   if (fails.length) {
