@@ -163,6 +163,10 @@ pattern that runs from a short solid cap to a tapering base; the three-quarter v
 holes as see-through against the far petals. The first prototype beside it is the doily: round
 cells, every one touching the margin, floating mid-petal.
 
+**THE WALL HALF OF THIS PARAGRAPH IS RULED: 1.0 mm** (Eva, Sep 22), and 16 cells is the default.
+The other two are still open and are carried in `docs/bloom-infill-port-plan.md` §7. The original
+sentence is kept below so what was asked stays readable.
+
 Eva must rule on: whether the salvaged 16-cell petal at a 1.0 mm wall (60 % wall, median hole
 2.1 mm) is the look, or the 0.8 mm wall (53 %, 2.3 mm) is worth its thinner rib on an unprinted
 floor; whether the basal V (0.10 of the length at the margins) converges enough or should
@@ -210,7 +214,12 @@ which the sheet shows and which a higher `ANISO` or fewer passes would raise.
 ## 7. Recorded, not built
 
 - The arc-length-metric plan (one line in the plan mapping) — the build's, so a cupped petal's
-  cells are not stretched 3× across.
+  cells are not stretched 3× across. **RULED REQUIRED, AND THE REASON IS NOT THE ONE THIS LINE
+  GIVES** (Eva, Sep 22): it was recorded here as a LOOK problem, and
+  `docs/bloom-infill-port-plan.md` §1 measures it as a PRINT-SAFETY one — on `petalCup` 1.2 ×
+  `petalSpineCurl` 360 the flat plan emits a **0.118 mm wall where it asks for 0.500**, which is
+  below the 0.3 mm horizontal wall floor. Each of cup, curl, roll and twist reads 1.000 alone, so
+  only a PRODUCT does it and the matrix cannot see it.
 - A per-cell wall-width taper (thinner walls toward the tip, the rib-hierarchy rule) — the
   wall is one number here.
 - The lobed-outline row — compatible by construction and not rendered.
