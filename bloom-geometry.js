@@ -7947,12 +7947,39 @@ const rimSegments = (sheetMm) => {
    Bisection rather than Newton because the metric is whatever `sect` is, and
    a bracket cannot diverge. Twelve halvings of a span put the answer inside
    a thousandth of a millimetre on the widest petal reachable. */
+/* A DISCRETE DECISION ON A CONTINUOUS QUANTITY, AND THE TIE IS NOT RARE — IT
+   IS THE COMMON CASE. This walks in from the margin to where the chord from
+   the edge point is `want`. On a flat cross-section `rimDist` is LINEAR in v,
+   and `want` is `g * r` with `r` usually exactly RIM_BEAD_RADIUS_MM — so the
+   target lands on a DYADIC point of a linear function and the comparison is an
+   EXACT tie at halving 2 or 3, where the bracket is still a quarter or an
+   eighth of the span. Measured over the matrix: 102 of 909 rows carry a
+   comparison with `d === want` to the bit.
+   A tie decided by `<` is decided by the last bit, and the last bit of
+   `sect(mid).P` is not the same in every engine — the frame runs
+   transcendentals, and this project has measured V8 versions disagreeing there
+   (session 38 §B10.7). The page's Chromium and Node then take different
+   branches and the inset moves by a quarter of the bracket, which is ~1e-4 mm
+   of vertex: X0 red on `CROWDING: the mum run` and `DOME LEAN: EVA_CONFIG
+   flat`, and invisible to every Node-only instrument because there both sides
+   share one call chain.
+   SO THE BAR CARRIES A SLACK DERIVED FROM THE QUANTITY'S OWN CONDITIONING, in
+   the unit the quantity has: `d` is a hypot of coordinate differences, so its
+   error is a few ulp of the coordinate magnitude, not of `want`. The slack
+   RESOLVES THE TIE THE WAY THE UNSLACKED FORM ALREADY DID — at `d === want`,
+   `d < want` is false and so is `d < want - tol`, both taking `hi = mid` — so
+   the 102 tie rows keep their bytes by construction and only a comparison that
+   was ALREADY within a few ulp of the bar can move. Seventh instance of this
+   class here; do not write an eighth. */
+export const RIM_INSET_TOL_ULPS = 8;
 const rimInsetV = (sect, vEdge, vIn, want) => {
   const Pe = sect(vEdge).P;
+  const scale = Math.abs(Pe[0]) + Math.abs(Pe[1]) + Math.abs(Pe[2]) + want;
+  const tol = RIM_INSET_TOL_ULPS * Number.EPSILON * scale;
   let lo = vEdge, hi = vIn;
   for (let it = 0; it < 12; it++) {
     const mid = (lo + hi) / 2;
-    if (rimDist(sect(mid).P, Pe) < want) lo = mid; else hi = mid;
+    if (rimDist(sect(mid).P, Pe) < want - tol) lo = mid; else hi = mid;
   }
   return (lo + hi) / 2;
 };

@@ -7419,8 +7419,8 @@ export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnPro
    WHAT IT COSTS, SAID PLAINLY: a tooth folding through its own BASE panel
    would now be cross-shell and invisible to this census. A panel folding
    through ITSELF is still caught, because each panel is still a shell.
-   AND 114 UNDECLARED ROWS READ NON-ZERO HERE THAT READ 0 ON `main`, AT A
-   WORST SPAN OF 2.558e-9 mm, WHICH IS THE CENSUS AND NOT THE GEOMETRY — they
+   AND 108 UNDECLARED ROWS READ NON-ZERO HERE THAT READ 0 ON `main`, AT A
+   WORST SPAN OF 2.5583e-9 mm, WHICH IS THE CENSUS AND NOT THE GEOMETRY — they
    are NOT declared, and this is why. Measured on every one of them: the pair
    shares EXACTLY ONE VERTEX, and the point the census reports as an
    intersection sits 1.04e-9 to 3.07e-9 mm from that shared vertex. The
@@ -7434,12 +7434,12 @@ export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnPro
    one comparison in two units is Eva's fourth durable rule.
    THE OBVIOUS FIX IS A WEAKENING AND WAS MEASURED TO BE ONE — do not reach for
    it. Scaling that bar by the coordinate magnitude takes 113 of the 117 to
-   zero, and it also takes `VARIANCE: size ±50% x 40 petals` to zero, whose
-   0.8187 mm fold is REAL and is declared above. It moves 7 of 40 of main's own
+   zero (measured before the inset-tie fix), and it also takes `VARIANCE: size
+   ±50% x 40 petals` to zero, whose 0.8187 mm fold is REAL and is declared above. It moves 7 of 40 of main's own
    declared rows as well. The remedy is the one the census's SECOND epsilon
    defect already took — verify the point rather than widen a tolerance — and
    it is its own piece of work with its own calibration, not a line in a
-   geometry PR. Until it lands, X2 reddens those 114 rows. */
+   geometry PR. Until it lands, X2 reddens those 108 rows. */
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
   /* ============================================================  /* ORGANIC VARIANCE, BUILD 1 (the size field) — three block-38 rows fold where
      their base row does not, or folds more: the field composes with the form
@@ -7676,7 +7676,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'GYNOECIUM: style curl max (180) — bent over the apex': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': { pairs: 366, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
-  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': { pairs: 275, worstMm: 0.0664 },
+  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664 },
   'GYNOECIUM: style x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'GYNOECIUM: style x ALL THIN x spread min (the thinnest slab)': { pairs: 272, worstMm: 0.0664 },
   'GYNOECIUM: style x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than the style: WIDER THAN THE HUB, told)': { pairs: 300, worstMm: 1.6149 },
@@ -7701,7 +7701,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)': { pairs: 272, worstMm: 0.0796 },
-  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': { pairs: 275, worstMm: 0.0664 },
+  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664 },
   'STIGMA: a shaped stigma x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)': { pairs: 272, worstMm: 0.0796 },

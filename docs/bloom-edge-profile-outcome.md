@@ -121,7 +121,7 @@ this census. A panel folding through ITSELF is still caught.
 ## 7. Three rows the edge profile genuinely folds — and 114 that it does not
 
 Every undeclared row was censused on both trees (604 built, 3 over the tool's
-triangle cap). **117 read 0 on main and non-zero here**, and they separate
+triangle cap). **111 read 0 on main and non-zero here**, and they separate
 cleanly by the one quantity that is physical, the worst span:
 
 **Three carry real depth and are declared:**
@@ -129,15 +129,17 @@ cleanly by the one quantity that is physical, the worst span:
 | row | pairs | worst span |
 |---|---|---|
 | `VARIANCE: size ±50% x 40 petals` | 66 | **0.8187 mm** |
-| `DOME: the mum x rise 1 — a hemisphere` | 210 | 0.1658 mm |
+| `DOME: the mum x rise 1 — a hemisphere` | 208 | 0.1658 mm |
 | `BUCKLE: THE IRIS look` | 8 | 0.0554 mm |
 
 All three hold the same shell count on both trees, so none is a
 re-categorisation. That is the feature's real printability cost: three rows of
 604.
 
-**The other 114 are the census, not the geometry, and they are NOT declared.**
-Worst span over all of them **2.558e-9 mm**; 106 read exactly 0. Measured on
+**The other 108 are the census, not the geometry, and they are NOT declared.**
+Worst span over all of them **2.5583e-9 mm**; 100 read exactly 0, and
+**not one is above 1e-6 mm** — measured AFTER the X0 fix of §7b, which took six
+rows off this list and left no undeclared row with any real depth at all. Measured on
 every sampled pair: the two triangles **share exactly one vertex**, and the
 point the census reports as an intersection sits **1.04e-9 to 3.07e-9 mm** from
 that shared vertex. `isSharedFeature` discards a point that IS the shared
@@ -150,15 +152,62 @@ HIT test uses a RELATIVE epsilon; the DISCARD test does not.
 
 **THE OBVIOUS FIX IS A WEAKENING, AND THAT WAS MEASURED RATHER THAN ASSUMED.**
 Scaling the discard bar by the coordinate magnitude takes 113 of the 117 to zero
-— **and it takes `VARIANCE: size ±50% x 40 petals` with them, whose 0.8187 mm
-fold is real.** It also moves **7 of 40** of main's own declared rows
+(measured before the X0 fix) — **and it takes `VARIANCE: size ±50% x 40 petals`
+with them, whose 0.8187 mm fold is real.** It also moves **7 of 40** of main's own declared rows
 (`petalCup min (-0.8)` 384 → 360, `petalCup max (1.2)` 752 → 720). So it is not
 a correction; do not reach for it. The remedy is the one the census's SECOND
 epsilon defect already took — **verify the point rather than widen a
 tolerance** — and it is its own piece of work with its own calibration.
 
-**Until that lands, X2 reddens those 114 rows and this PR cannot be green.**
+**Until that lands, X2 reddens those 108 rows and this PR cannot be green.**
 That is the one thing outstanding.
+
+## 7b. X0: the inset bisection's tie was decided by the last bit
+
+**Found by running the browser smoke subset, and invisible to every Node-only
+instrument by construction** — in Node the page's build and the rebuild share
+one call chain and the difference is exactly 0. CI reported X0 on two rows;
+the local `bloom-smoke --conn` reproduced both, at **1.87e-4 mm** and
+**9.06e-6 mm** between the exported STL and the builder's own doubles. Those
+are not last-bit differences.
+
+`rimInsetV` walks in from the margin to where the chord from the edge point is
+`want`, by twelve halvings. **On a flat cross-section `rimDist` is LINEAR in
+`v`, and `want` is `g * r` with `r` usually exactly `RIM_BEAD_RADIUS_MM`** — so
+the target lands on a DYADIC point of a linear function and the comparison is
+an **exact tie**. Measured over the matrix: **102 of 909 rows carry a
+comparison with `d === want` to the bit**, at halving 2 or 3, where the bracket
+is still a quarter or an eighth of the span. Both rows CI named are in that
+set. A tie decided by `<` is decided by the last bit of `sect(mid).P`, the
+frame runs transcendentals, and V8 versions disagree there — so the page's
+Chromium and Node take different branches and the inset moves by a quarter
+bracket.
+
+**The first instrument conflated two things and had to be corrected**: it
+counted the buried case, where `want` is 0, `d < 0` is false at every halving
+and both engines return the same thing. Excluding it left the real population.
+
+The bar now carries a slack **derived from the quantity's own conditioning, in
+the unit the quantity has** — `d` is a hypot of coordinate differences, so its
+error is a few ulp of the COORDINATE magnitude (~30 mm), not of `want`
+(~0.5 mm). `RIM_INSET_TOL_ULPS = 8`. **Verified in the browser: both rows now
+read `X0-identical to the STL` and the export gate passes on them**, and the
+declared one still meets its recorded magnitude.
+
+**It moves bytes and the partition is declared: 105 of 909 rows move, 804 hold
+bit-identical, 0 triangle counts move, worst 1.953e-3 mm** over 776,623,698
+floats compared positionally under `Object.is`. Two microns. The movement is
+inherent rather than a badly-sized slack: after an exact tie on a linear `d`,
+the later halvings land on dyadic points too, so several comparisons per row
+sit within a few ulp of the bar and any slack robust to an engine ulp flips
+some of them. **Seventh instance of the discrete-decision-on-a-continuous-
+quantity class in this project; do not write an eighth.**
+
+**It also moved the census, which is why it had to land before the list was
+final**: six rows came off the new-fold list, and three declared magnitudes
+improved — `DOME: the mum x rise 1` 210 -> 208, `GYNOECIUM: style x the mum`
+and `STIGMA: a shaped stigma x the mum` 275 -> 272 each. Re-recorded, and the
+tool's verdict on the whole list is that every declared magnitude reproduces.
 
 ## 8. Gates
 
