@@ -264,3 +264,264 @@ clause was not loosened.
 both trees), so `frozen/phase37` stays the newest baseline. Every frozen tag's
 BYTES stop reproducing on every row with a petal, which is expected of a change
 that re-triangulates every perimeter and is named here rather than in the list.
+
+---
+
+# Eva's three rulings on the shipped branch
+
+## 10. Ruling 1 — the bead is four segments, with its own normal
+
+> *"cap at 4 at full radius (0.5 mm), scaling down with drawn radius to a
+> minimum of 3, with smooth (averaged) normals across the bead. Reason: 8
+> segments puts facets at about 0.2 mm, below Nylon 12 White's ~0.35–0.4 mm
+> resolvable detail."*
+
+**The cap ships and it is the whole of the saving. The other two clauses are
+unreachable, and each is blocked by something this project has already ruled
+on** — reported rather than quietly implemented or quietly dropped.
+
+**(i) The scaling never fires, because the only radius `rimSegments` is allowed
+to read is a constant.** The DRAWN radius is
+`min(RIM_BEAD_RADIUS_MM, tBody/2, RIM_ROOM_FRACTION * room)`, and every arm past
+the first is MODE-DEPENDENT: `tBody` carries the export sheet floor and `room`
+carries the tip floor (0.15 mm live against 0.80 mm export). A segment count
+read off it would make the TRIANGLE COUNT mode-dependent, which both STL gates
+assert against by name and which this project has refused six times. What is
+left to read is the sheet through `max(t, MIN_FEATURE_MM)` — and that makes the
+cap an **identity**, not a measurement: `max(t, MIN_FEATURE_MM) / 2 >=
+MIN_FEATURE_MM / 2`, which *is* `RIM_BEAD_RADIUS_MM` on this tree (1.0/2 = 0.5),
+so the first arm binds for every finite input and the ratio is exactly 1.
+Checked over 100,001 sheet values from 0 to 10 mm plus the extremes: **K = 4 on
+every one.**
+
+**(ii) Three is not an available count at all**, and that is structural rather
+than a rounding preference. The apex must be an EMITTED vertex at the profile's
+own midpoint — `pts[APEX] = apex` with `APEX = K/2`, which E4 and
+`verify-bloom-grid`'s clause 2a both read as an IEEE-754 identity — so K is even
+or the apex is not on the profile at all. At K = 3 the tangent-angle samples sit
+at 0, 60, 120 and 180 degrees and 90 is not among them, so the bead would stop
+being symmetric about the mid-surface. **Four is the smallest even count at or
+above the ruled minimum, and it is also the cap, so the two ends of the ruled
+range meet.**
+
+The min and the ratio are KEPT rather than deleted: they are the ruled law, they
+cost nothing, and they become live the day `MIN_FEATURE_MM` drops below the
+bead's diameter.
+
+### 10a. The normals are a CHANNEL, because the viewer cannot smooth anything
+
+`bloom.js` builds a **non-indexed** `BufferGeometry`, and `computeVertexNormals()`
+on one of those is a FLAT normal per triangle — it cannot average. The three.js
+remedy (`mergeVertices` then recompute) averages across EVERY shared edge, which
+would round off the foot-to-blade seam and the hub and make the solid read as
+wax; smoothing under a crease angle instead needs a position search over up to
+four million triangles on every slider drag.
+
+So the bead's normal is emitted where it is known, in closed form. In the
+`(n̂, ŵ)` plane the profile is the ellipse `(b cos θ along n̂, aLen sin θ along ŵ)`,
+whose outward normal is `(aLen cos θ, b sin θ)` — **the semi-axes swapped, and
+that is the whole of it.** Two ends fall out rather than being special-cased: at
+θ = 0 it is `+n̂`, which is the top skin's own normal (the bead leaves the skin
+tangentially, so the two agree), and at θ = π it is `−n̂`.
+
+**What it leaves out, said rather than hidden:** the term along the SWEEP, which
+is non-zero wherever the profile's size changes from one column to the next. It
+is a shading approximation and it decides no geometry.
+
+`MeshBuilder({ captureNormals })` is OFF by default and set by the **viewport's
+build alone** — the STL writes its own per-facet normal and the grid export
+writes line strips, so neither pays for the array.
+
+Measured, rather than argued:
+
+* **0 positions moved** with the channel on, over five states in both modes
+  under `Object.is` (DEFAULTS, `petalTipShape` 0.60, the cleft at six whorls, an
+  inflorescence, a sphere head with a stem).
+* every emitted normal is unit to **4.4e-16**.
+* across every bead-to-bead edge the two triangles' own emitted normals agree to
+  within **2.1e-6 degrees** — 53% of them to the bit, the residue being the
+  probe's own `fround`-keyed vertex lookup. **And that classification had to be
+  PER VERTEX**: the first cut of the probe called a triangle "bead" if its three
+  normals were not all equal, which catches every triangle straddling the end of
+  the treatment and reported half the bead as discontinuous at 21.3 degrees.
+
+### 10b. The cost
+
+Whole live matrix, **909 rows, EXPORT mode, three trees**:
+
+| | main | K = 8 | K = 4 (ships) |
+|---|---|---|---|
+| matrix total | 50,377,084 | 86,291,522 (+71.3%) | **64,789,898 (+28.6%)** |
+| `DEFAULT` | 19,040 | 33,072 | **24,688** (+29.7% / −25.4%) |
+| `ALL MIN` | 7,260 | 12,522 | **9,378** (+29.2% / −25.1%) |
+| `ALL MAX` | 2,354,268 | 4,239,920 | **3,090,816** (+31.3% / −27.1%) |
+| `INFLO: ALL MAX` | 1,114,828 | 1,886,588 | **1,425,468** (+27.9% / −24.4%) |
+
+**The bead's own added triangles fall from 35.9M to 14.4M — a 60% reduction**,
+more than the naive halving of K would give, because the corner fans and the
+degenerate-skipping scale with it too.
+
+**THE BLOOM HAS NO PRESETS, and that is a fact about this generator rather than
+a step skipped.** `bloom-view-presets.js` is the VIEW box's dropdown — camera
+position and fov, read by `presetDistance`, building no geometry and carrying no
+triangle count; `flower-presets.js` belongs to the other generator, which has its
+own three gates. The named matrix corners above are what stands in their place,
+and `ALL MAX` is the corner this project's own rule says to measure.
+
+**0 of 909 rows differ between live and export.**
+
+### 10c. `INFLO: ALL MAX` is no longer a refusal
+
+At eight segments it was a NEW refusal and was declared. At four it builds
+**1,425,468 — 95.0% of the 1,500,000 budget, under it** — so it exports, and XR2
+would fail on a declaration that stayed. Its entry is **withdrawn**, and the
+withdrawal is recorded in the block's own header rather than leaving the list
+one row shorter with no explanation. It is now the closest any row comes to the
+bar; the re-swept matrix puts the next highest at 46%.
+
+### 10d. The gate runtime, projected
+
+Measured on this branch at K = 8: `bloom-export-watertight` **5 h 32 m** (matrix
+step 5 h 26 m) and `bloom-connectedness` **3 h 20 m** — **27.7 minutes of
+headroom under the 6-hour job timeout**, which was the real risk.
+
+Fitting `t = a + b·T` through main's recent cluster (CLAUDE.md's own last five
+successes, 214.8–221.4 min, median 218 at T = 50.38M) and this branch's measured
+332 min at T = 86.29M gives b = 3.18 min per million triangles and a = 58 min,
+so at T = 64.79M:
+
+| | K = 8, measured | K = 4, projected |
+|---|---|---|
+| `bloom-export-watertight` | 332 min | **~264 min (4 h 24 m)** |
+| `bloom-connectedness` | 200 min | **~153 min (2 h 33 m)** |
+| headroom under the 6 h timeout | 27.7 min | **~96 min** |
+
+**The projection carries the spread of the number it is fitted through**, and
+that spread is wide by this project's own record: at main's historic low of
+151.8 min the same fit gives 225 min instead of 264. So read it as *roughly four
+and a quarter hours, with the timeout no longer close* — and **size the actual
+wait off `actions_list`'s own recent completed runs at the time**, which is the
+rule CLAUDE.md states and which no figure here replaces.
+
+### 10e. E2's typed 30-degree bar was in conflict with this ruling
+
+A half round sampled at K segments turns **180/K** between adjacent facets BY
+CONSTRUCTION — that is exactly what the tangent-angle sampling buys, and it is
+the bead drawing itself rather than an edge the treatment added. At K = 4 that
+is 45 degrees, so **a typed 30 forbids the count Eva ruled**; the two rulings
+cannot both be satisfied by a constant. The later one, which states its reason,
+governs.
+
+The bar is now the bead's own resolution, read through `RIM_BEAD_SEGMENTS`. **It
+is STRICTER than the number it replaces wherever the old one applied** — at
+K = 8 it is 22.5 against 30, and the shipped tree measured 21.50 there — so the
+derivation would have held on the geometry it replaces as well as on this one.
+That is the test that says it is a re-derivation rather than a bar fitted to the
+data in hand. The SHADING half of the old bar's job is answered by the other
+half of the same ruling: the bead now carries its own smooth normal, so a facet
+edge is no longer something the eye can find.
+
+**Four rows exceed it and are DECLARED with their magnitudes** (#213's idiom, in
+degrees), because the SURFACE itself turns faster than the outline's PLAN turn
+can see:
+
+| row | excess over 45° | why |
+|---|---|---|
+| `BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)` | **6.236137** | the wave curves the margin OUT OF PLANE; raw 60.05°, outline 8.81° |
+| `TIP SHAPE: 0.60 x the thickest sheet (2.40 …)` | **0.005430** | the taper runs 2.40 → 1.00 mm over `RIM_TAPER_MM`, so the profile's own half-thickness changes along the sweep and the quad is not planar |
+| `FRINGE: THE CARNATION — 7 teeth …` | **0.000168** | a tooth's terminal; the frame rotates a hair between adjacent columns |
+| `FRINGE: GATED — LOBES asked for under a fringe …` | **0.000168** | the same fringe |
+
+Both directions, band 5e-5 deg (#213's own 5e-5, in the unit this quantity
+carries, eight orders above the float floor of an angle taken from two unit
+normals and well inside the smallest excess declared). Plus a clause that fails
+on a declaration naming a row the gate never ran — the combination gate's CG5,
+one instrument later.
+
+## 11. Ruling 3 — the bead does not fold at a pointed apex
+
+> *"the after-render shows a dark notch at the tip of a torpedo-shaped petal
+> (lower ring) and a sliver near an upper-right pointed tip. Determine whether
+> the bead folds or self-intersects at pointed apexes. Measure it from the
+> exported mesh; don't judge it from shading."*
+
+**Measured from the emitted mesh on BOTH trees, and the answer is no on every
+instrument.** Every site is located against the petal's own TIP read off the
+builder's captured mid-surface, so "at the apex" is the builder's answer and not
+the session's.
+
+| | `petalTipShape` 0.60 | cleft × 6 whorls | DEFAULTS | `petalTipShape` 3.00 |
+|---|---|---|---|---|
+| within-shell census sites within 2 mm of a tip | **0** | **0** | **0** | **0** |
+| unmatched DIRECTED edges (an inside-out facet) | **0** | **0** | **0** | **0** |
+| triangles at or under the gate's own degeneracy bar (1e-9 mm²) | **0** | **0** | **0** | **0** |
+| hairpins (> 150°) within 2 mm of a tip | **0** | **0** | **0** | **0** |
+
+The census was also run on `petalTipShape` 0.60 × the thinnest sheet, × 60 mm
+long, and on the cleft at one whorl: **0 sites near a tip on all seven states.**
+
+**The one thing that looked like a finding was the probe's own bar.** At a
+threshold of 5e-5 mm² the cleft-at-six-whorls state showed 64 near-tip "slivers"
+where main showed none — but the gate's own `DEGENERATE_AREA_MM2` is **1e-9**,
+four orders below that, and at the project's own bar the count is **0**. The
+smallest facet there is 3.99e-5 mm²: a small triangle on a finely subdivided
+bead, not a degenerate one.
+
+**The 174.27° hairpin on the cleft state is MAIN'S OWN** — the identical value
+at the identical distance on both trees, 3.20 mm from a tip, with main carrying
+72 of them and the branch 88. Pre-existing, and not at an apex.
+
+**And near-tip facet turns are strictly BETTER than main's**, which is the
+measurement that settles it (turns over 60°, within 2 mm of a tip, export):
+
+| | main | K = 8 | K = 4 |
+|---|---|---|---|
+| `petalTipShape` 0.60 | 224 (150 of them 90–120°) | 96 | **32** |
+| DEFAULTS | 344 (168 at 90–120°) | 72 | **32** |
+| `petalTipShape` 3.00 | 184 (96 at 90–120°) | 16 | **0** |
+| cleft × 6 whorls | 12,800 (7,216 at 90–120°) | 7,368 | **6,736** |
+
+Main's worst near-tip turn is **exactly 90.00°** — the flat wall meeting the
+skin, which is what the treatment exists to remove.
+
+### 11a. So what was in the render
+
+**Shading, and the ruling's own other half fixes it.** `bloom.js` builds a
+non-indexed buffer, so every triangle rendered with its own FLAT normal: an
+8-segment bead steps 22.5° a facet at about 0.2 mm, which is a rosette of
+discrete shading bands wrapping a pointed tip over roughly a millimetre of
+screen. Measured as the Lambert jump across each near-tip edge under one fixed
+light, `petalTipShape` 0.60: main 154 edges over a 0.20 jump at a 0.963 mm mean
+facet; K = 8 **490 edges at 0.464 mm**; K = 4 367 at 0.770 mm. Three times
+main's count at half its facet size is what reads as stippling — and **on the
+bead those edges now carry no jump at all**, because the normal is continuous
+across them (§10a's 2.1e-6 degrees).
+
+The images are re-rendered at four segments with the bead's own normals:
+`docs/img/edge-profile/`.
+
+**No geometry change was made for this ruling, because the measurements say
+there is no defect to fix.** That is the finding, not an omission.
+
+## 12. What is deliberately NOT done here
+
+**`SELF_INTERSECTION_XFAIL` is not re-measured.** The tessellation moved with
+the segment count, so declared magnitudes have moved: a nine-row subset run
+already reads three rows with new pairs, all at **worst span 0.0000 mm** — the
+knife-edge class this project documents, where a census triangle grazes a crease
+and the count is decided by where the stations land (`TIP SHAPE: 0.60 x a far-out
+widest point` 14 pairs, `TIP SHAPE: 0.60 x the thickest sheet` 2, `SPHERE STEM:
+the default sphere at the shipped stem` 2).
+
+Eva's ruling 2: *"do NOT declare the 108 rows here. A separate session is fixing
+the census instrument as its own PR. Do not touch the census code in this
+branch."* So the list is re-measured **once**, at rebase time, against the
+instrument that will actually run it — re-recording now would bake in numbers
+the census fix changes again.
+
+## 13. Local gates on this tree
+
+* `node tools/verify-bloom-edge-profile.mjs` — **PASS**, 110 rows, 645,428
+  treated profiles, 4 of 4 declared surface-turn rows seen.
+* `node tools/verify-bloom-grid.mjs` — **PASS**, 736 checks over 19 rows.
+* `node tools/verify-bloom-panel.mjs` — **PASS**.
