@@ -209,6 +209,36 @@ improved — `DOME: the mum x rise 1` 210 -> 208, `GYNOECIUM: style x the mum`
 and `STIGMA: a shaped stigma x the mum` 275 -> 272 each. Re-recorded, and the
 tool's verdict on the whole list is that every declared magnitude reproduces.
 
+## 7c. The renders
+
+`node tools/shot-bloom-edge-profile.mjs <dir> --base <worktree>` —
+`docs/img/edge-profile/`. The three cells the brief named, each a pair:
+
+| | before | after |
+|---|---|---|
+| **a wide petal**, the margin at half length (`petalWidth` 30) | ![](img/edge-profile/wide-before.png) | ![](img/edge-profile/wide-after.png) |
+| **a pointed apex** (`petalTipShape` 0.60, the acute floor) | ![](img/edge-profile/apex-before.png) | ![](img/edge-profile/apex-after.png) |
+| **the narrowest span** (a cleft at six whorls, the bead shrunk to fit) | ![](img/edge-profile/narrow-before.png) | ![](img/edge-profile/narrow-after.png) |
+
+**The pair shares ONE camera and that is an identity, not a promise.** The
+target is a point of the captured MID-SURFACE, computed on the base tree — and
+the mid-surface is byte-identical between the trees, which is exactly what
+`verify-bloom-grid-bytes.mjs` proves over 242 builds. So the base tree owns a
+number this session's geometry writes, and neither cell is told a camera by
+the sheet. Print preview is ON in every cell, with the app's own `shownMode`
+asserted `export`.
+
+**No pixel delta is quoted for any pair** — two trees, two servers, two page
+sessions. The one pixel number is the same-tree control: the wide cell on this
+tree, one camera, shot twice, **1 px of 384,400**. Reported, never a bar; a
+single control draw is not a floor.
+
+**THE CAMERA DIRECTION WAS BACKWARDS IN THE FIRST DRAFT AND THE SHEET RENDERED
+BLACK.** `__bloomFrame`'s `dir` is the vector FROM the target TO the camera
+(the stem-plug sheet's "from below" is a negative z), so the first version put
+the eye inside the solid. Recorded because a black cell is the loud failure;
+the quiet one would have been a camera slightly inside a petal.
+
 ## 8. Gates
 
 New: `tools/verify-bloom-edge-profile.mjs` (E0–E5, five must-fails) and
