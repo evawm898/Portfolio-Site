@@ -26,7 +26,11 @@ for a narrow span.
 
 ## 2. Cost, measured at the corner and not at the default
 
-| row | main | branch | delta |
+**SUPERSEDED BY §10b — this table is the EIGHT-segment bead, which Eva ruled
+down to four. It is kept because the corner-not-the-default method is the point
+and because §10b's saving is measured against it.**
+
+| row | main | branch at K = 8 | delta |
 |---|---|---|---|
 | shipping default (export) | 19,040 | 33,072 | +73.7% |
 | `ALL MIN` | 7,260 | 12,522 | +72.5% |
@@ -45,8 +49,9 @@ marginal, which is the useful half of that sweep.
 * boundary edges **0**, degenerate triangles **0**, **directed**-edge census
   **0 unmatched** on every smoke row; signed volume positive (+4,188.53 mm³
   against main's +4,415.57 — the bead removes material at the rim).
-* the worst turn the treatment **adds** near a rim is **21.50°** against a 30°
-  allowance.
+* the worst turn the treatment **adds** near a rim is **21.50°** against the
+  then-typed 30° allowance — **at K = 8; see §10e, where the count and the
+  allowance both move.**
 * the `/plot` grid glTF is **byte-identical to main over 242 builds**.
 * `git diff origin/main --stat -- 'flower*'` is empty.
 
@@ -84,7 +89,14 @@ off the BUILDER's own clamp record over the whole matrix:
 3. **"The narrowest reachable panel span is 1.0000 mm."** Measured **0.660 mm**
    in export and 0.124 mm live — a cleft lobe tip.
 
-## 6. The self-intersection census, re-baselined
+## 6. The self-intersection census, re-baselined — SUPERSEDED, MEASURED TWICE OVER
+
+**EVERY NUMBER IN THIS SECTION WAS MEASURED ON THE OLD CENSUS AND ON THE
+EIGHT-SEGMENT BEAD, AND BOTH HAVE SINCE MOVED** — the census by #279's
+adjacency rule, the bead by Eva's ruling to four segments. §15 carries the
+re-measurement against the tree that ships. This section is kept for the ONE
+finding in it that is a property of the geometry rather than of the instrument,
+and which survives both: the shell re-categorisation below.
 
 `node tools/bloom-xfail-magnitudes.mjs --emit` on the branch, against a worktree
 of `main`. Of the 302 entries the list carried:
@@ -531,29 +543,86 @@ its own PR. Do not touch the census code in this branch."* So the list is
 re-measured **once**, at rebase time, against the instrument that will actually
 run it — re-recording now would bake in numbers the census fix changes again.
 
-### 12a. The three rows X2 flags, and what is owed on each
+### 12a. The three rows X2 flagged read ZERO under the fixed census
 
-A nine-row subset run on this tree reads three rows with pairs that are not on
-the declared list. Measured at full precision in Node, EXPORT mode:
+Before the rebase, a nine-row subset run on this tree read three rows with
+pairs that were not on the declared list — 14, 2 and 2, every span measured at
+full precision as exactly `0.000000e+0`. Eva's instruction was to attribute
+them rather than dismiss them: *"report which two pieces touch, where, and
+whether they are meant to be connected. Do not declare them as artefacts;
+bring them to me as WAITING ON EVA if they're real contacts."*
 
-| row | pairs | worst span | site(s), 2 dp |
-|---|---|---|---|
-| `TIP SHAPE: 0.60 x a far-out widest point` | 14 | **0.000000e+0 mm** | five distinct, incl. (1.87, 34.24, 12.50) and (−33.87, −2.50, 12.33) |
-| `TIP SHAPE: 0.60 x the thickest sheet (2.40 …)` | 2 | **0.000000e+0 mm** | one, (19.14, 16.50, 4.60) |
-| `SPHERE STEM: the default sphere at the shipped stem` | 2 | **0.000000e+0 mm** | one, (5.37, 10.07, −6.94) |
+**There is nothing to attribute: under #279's census all three read 0
+within-shell pairs.** Measured on this tree by `tools/bloom-census-sweep.mjs`,
+EXPORT mode, the row built once and handed to the census:
 
-**EVA'S INSTRUCTION, AND IT OVERRIDES THE REFLEX THIS PROJECT HAS BUILT UP:**
-*"For each one, report which two pieces touch, where, and whether they are meant
-to be connected. Do not declare them as artefacts; bring them to me as WAITING
-ON EVA if they're real contacts."* The span-0 knife-edge reading is the
-available explanation and it is **not** a verdict — it is a hypothesis that has
-to be tested by naming the two pieces, and a tangency between two parts that are
-NOT meant to touch is a real contact whatever its span reads.
+| row | within | cross | worst | shells |
+|---|---|---|---|---|
+| `TIP SHAPE: 0.60 x a far-out widest point` | **0** | 3,216 | 0 | 9 |
+| `TIP SHAPE: 0.60 x the thickest sheet (2.40 …)` | **0** | 2,272 | 0 | 9 |
+| `SPHERE STEM: the default sphere at the shipped stem (60 mm x 6 mm)` | **0** | 2,793 | 0 | 9 |
 
-**RESOLVED.** An expectation of *"span-0 tangencies and one 8.9 µm contact"*
-came from a partial report covering 133 of 191 rows; the census session's full
-run confirms all three residual rows are the span-0 tangency class, which is
-what the measurement above reads. No 8.9 µm contact exists.
+All three were the shared-corner class #279 was built to remove: a hit produced
+by an edge one of whose endpoints the other triangle also carries, which is the
+mesh's own topology rather than a fold. The cross-shell counts are the export
+contract's own overlapping closed solids and are reported, never gated.
+
+**So no contact needed a ruling, and the exact-zero spans measured before the
+rebase were the honest signal they looked like.** What would have been wrong is
+concluding *from that zero* that they were artefacts — the span was not evidence
+either way, as §7 above now records at length.
+
+## 12b. CA5's scope step fails this PR, and it will fail every geometry PR
+
+**NOT FIXED HERE — it changes a gate `main` acquired hours ago and that is
+Eva's call.** Reported with the measurement so the ruling is one line.
+
+#279 added three steps to `bloom-export-watertight.yml`. Two (CA0–CA3 and its
+negative control) are instrument checks and are fine on any PR. The third is
+
+    - name: ... and only census and instrument files moved
+      if: github.event_name == 'pull_request'
+      run: node tools/verify-bloom-census-adjacency.mjs --scope --base origin/${{ github.base_ref || 'main' }}
+
+which asserts the PR's diff against its base names only files on a predeclared
+census/instrument allowlist. **That is a claim about #279's own scope**, and it
+was true of #279. On any later PR it diffs *that* PR's whole change against the
+same allowlist. Run on this branch:
+
+    CA5 scope — 17 file(s) changed against origin/main:
+      STRAY bloom-geometry.js
+      STRAY bloom.js
+      ... 14 more ...
+      ok   tools/bloom-harness.mjs
+    CA5 FAIL — 16 file(s) outside the predeclared census/instrument allowlist.
+
+The allowlist's own comment says the scope it holds is GEOMETRY: *"no
+`bloom-geometry.js`, no `bloom.js`, no `bloom-registry.js`, no `flower.*`"* — so
+as a standing gate it says no bloom PR may ever change geometry, which is not a
+property any future PR can have.
+
+**THE COST IS MINUTES, NOT A GATE CYCLE, and that is worth saying plainly
+because it changes how urgent this is.** The step sits at line 151, *before* the
+npm install of playwright (164), the browser install (187) and the matrix (189),
+so it reddens in the first couple of minutes. It does not burn four hours. What
+it does do is make the export gate unable to go green on this PR, or on any
+later one that touches geometry.
+
+**THE FIX THAT LOOKS RIGHT, offered rather than applied:** gate the step on the
+census rule itself having moved —
+
+    if: github.event_name == 'pull_request' && contains(github.event.pull_request.changed_files, 'tools/bloom-self-intersection.mjs')
+
+or, more simply and without the fragile `contains`, add a `paths` condition or
+drop the step and keep `--scope` as the hand-run tool #279's outcome doc already
+documents. A census-rule PR is still checked; a geometry PR is not, and a
+geometry PR was never its subject. Nothing gets through that the check was
+catching: the only PR it could ever have caught is one that smuggles geometry
+*while changing the census rule*, and that case stays covered.
+
+**What must NOT happen is the two obvious shortcuts**: adding this branch's
+files to `SCOPE_ALLOW` would empty the check of the thing it exists to prove,
+and deleting the step without saying so would lose #279's reasoning.
 
 ## 13. The negative control found two holes, and neither was visible on a green run
 
