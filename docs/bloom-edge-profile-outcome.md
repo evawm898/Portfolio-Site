@@ -802,9 +802,20 @@ Against the list as `main` left it (291 entries, #279's own re-baseline):
 
 **291 → 231 entries.** Verified after the rewrite by re-importing the list and
 comparing every entry against the sweep: **230 of 231 agree exactly, 0
-disagree.** The 231st is `ALL MAX`, which the generator refuses to export, so
-X1 cannot gate it while the refusal stands (XR1) and the gate says so on every
-run; it is measured separately with `--include-refused`.
+disagree.** The 231st is `ALL MAX`, which the generator refuses to export
+(3,090,816 triangles against a 1,500,000 budget), so no STL exists to census
+and X1 cannot gate it while that refusal stands (XR1) — the gate says so on
+every run. It is measured in Node instead, `--include-refused`, and re-recorded
+with the rest: **195,996 → 107,485 pairs and 5.7609 → 10.1332 mm**, on 2,048
+shells.
+
+**The count falls while the span rises, and both are one cause.** The bead
+closes every tooth and cleft panel with its own boundary, so the vertex-welded
+decomposition splits them — 2,048 shells on this row — and much of what was
+WITHIN-shell moves into the CROSS column (1,143,351 there). What remains inside
+one shell is the deeper folding a 240-petal head with every control at maximum
+has always had. Leaving `main`'s figure would have been the stale record #213
+exists to prevent, on the one row no gate can check.
 
 **The one finding of §6 that survived both the census fix and the segment
 change is the shell re-categorisation**, re-measured here at four segments under
