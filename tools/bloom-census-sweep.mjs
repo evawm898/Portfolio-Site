@@ -51,7 +51,14 @@ const REPORT = arg('--report');
    self-check that does not abort. */
 const EXPECT_WORST_MOVES = Number(arg('--expect-worst-moves', '0'));
 
-function report(file) {
+/* COVERAGE IS PART OF THE REPORT, AND IT WAS NOT AT FIRST. The out file is
+   appended by several shards; a shard that dies leaves its rows simply absent,
+   and every population below is then computed over the rows that SURVIVED. It
+   happened here twice — 58 of 909 rows missing from one pass and 42 from another
+   — and nothing said so, because the report only ever counted what it was given.
+   That is #220's own defect (both STL gates divided by `results.length`) in a new
+   place. So the report is handed the matrix and REFUSES a short run. */
+async function report(file) {
   const raw = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
   /* DEDUPE BY LABEL, and say how many. The out file is appended and resumable,
      so two shards racing the same file — or a resume overlapping a run that had
@@ -96,10 +103,22 @@ function report(file) {
   if (errs.length) bad.push(`${errs.length} row(s) failed to build or census`);
   if (disagree.length) bad.push(`${disagree.length} row(s) were censused twice and DISAGREED — the census must be deterministic: ${disagree.slice(0, 3).join(', ')}`);
   if (moved.some((r) => !r.declared)) bad.push(`${moved.filter((r) => !r.declared).length} UNDECLARED row(s) moved their count — that is a finding, not a re-record`);
-  console.log(bad.length ? `\nFAIL — ${bad.join('; ')}.` : '\nPASS — no verdict moved, no cross-shell pair moved, no undeclared row moved, and the worst spans moved exactly as predeclared.');
+  const HARN_R = arg('--harness');
+  if (!HARN_R) {
+    bad.push('coverage is UNCHECKED — pass --harness <tree> so the report can compare what it was given against the matrix; a report over the rows that survived is not a report over the matrix');
+  } else {
+    const HR = await import(pathToFileURL(path.join(path.resolve(HARN_R), 'tools/bloom-harness.mjs')).href);
+    const all = HR.buildMatrix().map((r) => r.label);
+    const have = new Set(recs.map((r) => r.label));
+    const missing = all.filter((l) => !have.has(l));
+    console.log(`coverage: ${all.length - missing.length} of ${all.length} matrix rows present`);
+    for (const m of missing.slice(0, 10)) console.log(`    MISSING ${m}`);
+    if (missing.length) bad.push(`${missing.length} matrix row(s) are absent from the sweep — every population above was computed over the rows that survived`);
+  }
+  console.log(bad.length ? `\nFAIL — ${bad.join('; ')}.` : '\nPASS — the matrix is covered, no verdict moved, no cross-shell pair moved, no undeclared row moved, and the worst spans moved exactly as predeclared.');
   process.exit(bad.length ? 1 : 0);
 }
-if (REPORT) report(REPORT);
+if (REPORT) await report(REPORT);
 
 const GEOM = path.resolve(arg('--geom')), HARN = path.resolve(arg('--harness'));
 const A = path.resolve(arg('--a')), B = path.resolve(arg('--b'));
