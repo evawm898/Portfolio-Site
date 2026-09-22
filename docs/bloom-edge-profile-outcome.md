@@ -572,6 +572,61 @@ rebase were the honest signal they looked like.** What would have been wrong is
 concluding *from that zero* that they were artefacts — the span was not evidence
 either way, as §7 above now records at length.
 
+## 12c. THE FULL SWEEP: five undeclared rows read non-zero, and three are real contacts
+
+**AND THE 8.9 µm CONTACT EXISTS AFTER ALL — the concession in §12a was accepted
+too readily and is withdrawn.** §12a measured the *three rows the OLD census
+flagged on a nine-row subset* and found every span exactly `0.000000e+0`. That
+was true of those three and says nothing about the other 906. The full sweep of
+all 909 rows under #279's census finds a fifth row at **8.8707e-3 mm**, which is
+the figure to four significant places. **Eva's expectation was right and the
+correction was mine to make, not hers.**
+
+`tools/bloom-census-sweep.mjs`, this tree, EXPORT mode, **909 of 909 rows, 0
+missing, 628 deduplicated shard overlaps, 0 disagreeing**:
+
+| declared rows | |
+|---|---|
+| held exactly (pairs and span within ±5e-5 mm) | 40 |
+| pair count UP | 94 |
+| pair count DOWN | 91 |
+| read ZERO — entry must go | 65 |
+
+**Five UNDECLARED rows read non-zero, every one of them 0 on `main`** (measured
+on a worktree of `8f5e209`, same tool, same mode — so all five are this PR's):
+
+| row | pairs | worst span | what touches what |
+|---|---|---|---|
+| `DOME: the mum x rise 1 — a hemisphere` | 168 | **0.2424 mm** | **one petal against ITSELF at its own root blend** (u 0.000–0.018), 0.500–0.505 mm off the mid-surface, on 120 petals over a hemisphere |
+| `BUCKLE: THE IRIS look` | 8 | **9.63e-3 mm** | **one petal against ITSELF at its own TIP** (u 0.982–1.000), 0.314–0.521 mm off mid |
+| `DEPTH: the mum at 6 turns (D_max 19, CROWDED)` | 27 | **8.87e-3 mm** | **one petal against ITSELF at its own foot-to-blade seam** — corners at u 0.000 and u 0.036, r ≈ 1.92 mm, z ≈ 0.49 just under the hub's top face, on the innermost petals of a 240-petal head |
+| `DOME: rise 1 x petalTilt 0` | 32 | 2.70e-17 mm | same petal, root blend — a tangency at the float floor |
+| `TILT: 90 (the right angle)` | 32 | 2.00e-15 mm | same petal, root blend — a tangency at the float floor |
+
+**ARE THEY MEANT TO BE CONNECTED? No.** In all five the two triangles belong to
+**the same petal**, and a petal's two skins are meant to be one sheet closed by
+the bead at its rim. A sheet passing through itself is not a designed
+connection — unlike a tooth panel overlapping its base panel, or a sepal foot
+sharing the petal foot's rim, both of which this list declares by name. So the
+top three are genuine self-intersections of the class X2 exists to catch, and
+the bottom two are tangencies at 1e-15 and 1e-17 mm, which is the float floor
+on coordinates of this size.
+
+**Two of the three were already known to be real**: #279's own fixtures
+re-measured `DOME: the mum x rise 1` and `BUCKLE: THE IRIS look` on this
+branch's pairs and found 84 and 4 genuine (0 artefact) at eight segments; at
+four they read 168 and 8. `DEPTH: the mum at 6 turns` is new to this
+measurement and is the deepest-crowding row the matrix builds.
+
+**The attribution took two passes and the first one misnamed a piece.** It
+required a triangle's three corners to sit within 1.2 sheets of ONE petal's
+captured mid-surface, and on the 240-petal mum the feet are so crowded that a
+neighbouring petal's lamina sits **0.093 mm** away — so one corner matched
+petal 210 while the other two matched 239, and the triangle came back as "not a
+petal lamina". Named per CORNER instead, it is petal 239 throughout. A
+classifier that reports an unknown when the answer is "crowded" is the kind of
+result to re-read rather than publish.
+
 ## 12b. CA5's scope step fails this PR, and it will fail every geometry PR
 
 **NOT FIXED HERE — it changes a gate `main` acquired hours ago and that is
