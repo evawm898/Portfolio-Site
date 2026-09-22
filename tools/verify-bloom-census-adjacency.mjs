@@ -46,11 +46,14 @@
           second class is what makes the set evidence rather than a tautology.
           Every within-shell pair the census counted is replayed as a standalone
           two-triangle mesh: an ARTEFACT pair must read 0 and a GENUINE one must
-          still read 1. A set of only the pairs that must CLEAR cannot tell this
-          rule from the epsilon-widening #278 measured and rejected, because that
-          one clears them too. Only pairs sharing at least one corner can be
-          replayed this way — two triangles with nothing in common are two
-          shells — so a genuine crossing between strangers is CA1's fixture.
+          still read 1. BOTH classes are load-bearing and each caught a different
+          mutation: the genuine pairs are what a rule discarding on incidence
+          alone loses (13 of them, on six main rows), and the artefact pairs are
+          what the epsilon-widening #278 measured and rejected fails to clear
+          (651 of 2196, on fourteen main rows — see the note on that mutation
+          below). Only pairs sharing at least one corner can be replayed this
+          way — two triangles with nothing in common are two shells — so a
+          genuine crossing between strangers is CA1's fixture.
           (tools/fixtures/bloom-census-adjacency-pr278.jsonl, exported read-only
           from 17cff3a and from origin/main; none of #278's geometry is merged.)
      CA4  THE THEOREM AGAINST INDEPENDENT GROUND TRUTH — thousands of seeded
@@ -129,8 +132,14 @@ const SCOPE_ALLOW = [
   'tools/verify-bloom-census-adjacency.mjs',
   'tools/bloom-census-sweep.mjs',
   'tools/fixtures/bloom-census-adjacency-pr278.jsonl',
-  'tools/fixtures/bloom-census-adjacency-main-baseline.jsonl',
   'docs/bloom-census-adjacency-outcome.md',
+  /* AND THE PROJECT'S OWN POINTER FILE. A rule that changes what the census
+     COUNTS, and re-records 67 entries of `SELF_INTERSECTION_XFAIL` while doing
+     it, is exactly the kind of thing a later session must not have to rediscover
+     — so it is named here rather than quietly permitted, on the same grounds as
+     the workflow below. The scope this gate exists to hold is GEOMETRY: no
+     `bloom-geometry.js`, no `bloom.js`, no `bloom-registry.js`, no `flower.*`. */
+  'CLAUDE.md',
   /* THE ONE FILE BEYOND THE CENSUS ITSELF, AND IT IS DELIBERATE. This repo's
      standing rule is that a gate a developer has to remember to run is not a
      safety net, so the two steps below ride in the export gate beside
@@ -546,13 +555,27 @@ if (!NEG) {
   }
 
   if (DRIFT_FROM) {
-    const recs = fs.readFileSync(DRIFT_FROM, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+    const raw = fs.readFileSync(DRIFT_FROM, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
+    /* DEDUPE BY LABEL AND REFUSE A DISAGREEMENT. The sweep's out file is
+       appended and resumable, so two shards can write one row twice; counting
+       it twice inflates every population below, and a duplicate that DISAGREES
+       is a hard failure because the census is deterministic. The sweep's own
+       report does this; a replay that did not would report a different number
+       for the same file. */
+    const byLabel = new Map(); const disagreed = [];
+    for (const r of raw) {
+      const was = byLabel.get(r.label);
+      if (was === undefined) { byLabel.set(r.label, r); continue; }
+      if (JSON.stringify(was) !== JSON.stringify(r)) disagreed.push(r.label);
+    }
+    const recs = [...byLabel.values()];
+    const dupes = raw.length - recs.length;
     const cen = recs.filter((r) => r.a && r.b);
     const verdict = (r, side) => r[side].within > 0 && !r.declared;
     const flipped = cen.filter((r) => verdict(r, 'a') !== verdict(r, 'b'));
     const moved = cen.filter((r) => r.a.within !== r.b.within);
     const crossMoved = cen.filter((r) => r.a.cross !== r.b.cross);
-    console.log(`\nCA6 drift, replayed from ${path.basename(DRIFT_FROM)} — ${recs.length} row(s), ${cen.length} censused`);
+    console.log(`\nCA6 drift, replayed from ${path.basename(DRIFT_FROM)} — ${recs.length} row(s) (${dupes} repeated line(s) deduped, ${disagreed.length} disagreeing), ${cen.length} censused`);
     console.log(`    X2 VERDICT changed on : ${flipped.length}`);
     for (const r of flipped.slice(0, 20)) console.log(`      ${verdict(r, 'a') ? 'fired' : 'silent'} -> ${verdict(r, 'b') ? 'fires' : 'silent'}  ${r.label}`);
     console.log(`    CROSS-shell count moved on : ${crossMoved.length}`);
@@ -561,6 +584,7 @@ if (!NEG) {
        line, and this repo's own rule is that a self-check which does not abort
        is not a self-check. */
     if (!cen.length) bad.push(`CA6: ${path.basename(DRIFT_FROM)} holds no censused row — a replay over nothing is not a replay`);
+    if (disagreed.length) bad.push(`CA6: ${disagreed.length} row(s) appear twice in the sweep and DISAGREE — the census is deterministic, so that is a defect in the reading: ${disagreed.slice(0, 3).join(', ')}`);
     if (flipped.length) bad.push(`CA6: ${flipped.length} row(s) changed their X2 verdict in the replayed sweep`);
     if (crossMoved.length) bad.push(`CA6: ${crossMoved.length} row(s) moved their cross-shell count, which this rule cannot reach`);
     if (moved.some((r) => !r.declared)) bad.push(`CA6: ${moved.filter((r) => !r.declared).length} UNDECLARED row(s) moved their count — a finding, not a re-record`);
@@ -596,7 +620,13 @@ const MUTANTS = [
     from: `        const sa = sharedIdx.has(a.v), sb = sharedIdx.has(b.v);`,
     to: `        const sa = sharedIdx.has(a.v), sb = false;` },
 
-  { id: 'the-discard-ignores-transversality', breaks: ['CA2'],
+  /* CA3 is collateral it is ALLOWED and REQUIRED to cause, and it is the
+     measurement that says the fixture set is evidence: with main's own moved
+     rows stored, this mutation silently loses 13 genuine pairs across six of
+     them (five FRINGE rows and the stamens' apex corner). The mutation is not
+     subtle on a span and is invisible on a count, which is why CA2 carries a
+     SPAN fixture for it and CA3 carries real rows. */
+  { id: 'the-discard-ignores-transversality', breaks: ['CA2', 'CA3'],
     why: 'discarding on incidence ALONE throws away a real segment of contact, because an incident edge that lies along the two planes\' meeting line does not meet the other triangle at the corner — it meets it all the way along',
     from: `        return offPlane(sa ? b.p : a.p, T);`,
     to: `        return true;` },
@@ -614,12 +644,22 @@ const MUTANTS = [
     ] },
 
   /* THE ROUTE #278 MEASURED AND REJECTED, kept here as a mutation so the
-     difference between the two is a red line rather than a paragraph. It
-     CLEARS every stored artefact pair and keeps every stored genuine one — so
-     CA3 stays green under it, which is the finding — and it fails CA2 on the
-     one shape that is 30 mm from the origin. */
-  { id: 'the-discard-bar-is-widened-instead', breaks: ['CA2'],
-    why: 'scaling the metric bar by coordinate magnitude clears the same artefacts, and also swallows a real crossing that lands near a shared corner — by an amount that depends on where the object stands',
+     difference between the two is a red line rather than a paragraph. AN
+     EARLIER VERSION OF THIS COMMENT CLAIMED IT CLEARS EVERY STORED ARTEFACT
+     PAIR AND THAT CA3 STAYS GREEN UNDER IT, and that was true of #278's rows
+     alone and is FALSE once main's own moved rows are stored: it leaves 651 of
+     2196 artefact pairs still reading as a fold, on fourteen rows, 572 of them
+     on `DEPTH: 6 turns x layerSize min x petalCount 40`. The mechanism is
+     measured and is why no bar can do this job — the ill-conditioned solve does
+     not place its phantom point NEAR the shared corner, it places it anywhere
+     along the incident edge: over the 666 surviving hits the distance from the
+     nearest shared corner runs 1.0e-9 mm to 2.0933 mm, median 1.3e-8, with 80
+     past 1e-5 mm and 40 past 0.1 mm. A bar wide enough to clear the worst of
+     them would bar every real crossing within two millimetres of a corner. So
+     this mutation reddens CA2 (translation dependence, the discriminator that
+     holds even on #278's own rows) AND CA3 (it does not do the job). */
+  { id: 'the-discard-bar-is-widened-instead', breaks: ['CA2', 'CA3'],
+    why: 'scaling the metric bar by coordinate magnitude answers about where the object stands, and does not clear the artefact anyway: the phantom point sits anywhere along the incident edge, up to 2.09 mm from the shared corner',
     edits: [
       ...RULE_EDITS,
       { from: `  for (const S of shared) if (Math.hypot(P[0] - S[0], P[1] - S[1], P[2] - S[2]) <= PT_EPS) return true;`,

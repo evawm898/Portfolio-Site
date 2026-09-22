@@ -32,7 +32,7 @@
    RUN:
      node tools/bloom-census-sweep.mjs --geom <tree> --harness <tree> \
           --a <tree> --b <tree> [--shard i/n] [--only <regex>] \
-          [--maxtri <n>] --out <file.jsonl>
+          [--maxtri <n>] [--include-refused] --out <file.jsonl>
      node tools/bloom-census-sweep.mjs ... --report <file.jsonl>   read a sweep back
    The out file is JSONL appended a row at a time and RESUMABLE — a run
    interrupted by a container bound costs one row, never the sweep.
@@ -57,7 +57,13 @@ const EXPECT_WORST_MOVES = Number(arg('--expect-worst-moves', '0'));
    happened here twice — 58 of 909 rows missing from one pass and 42 from another
    — and nothing said so, because the report only ever counted what it was given.
    That is #220's own defect (both STL gates divided by `results.length`) in a new
-   place. So the report is handed the matrix and REFUSES a short run. */
+   place. So the report is handed the matrix and REFUSES a short run.
+   AND THE SAME HOLE HAS A SECOND MOUTH: a row skipped BY DESIGN. Export-refused
+   rows are skipped for cost (`ALL MAX` is 2.35M triangles) and `ALL MAX` is also
+   a DECLARED self-intersector, so a census change can move its recorded pair
+   count with nothing here to see it — it moved 146 the day this clause was
+   written. The report therefore fails on any skipped row that carries a
+   `SELF_INTERSECTION_XFAIL` entry; `--include-refused` is how a run covers it. */
 async function report(file) {
   const raw = fs.readFileSync(file, 'utf8').split('\n').filter((l) => l.trim()).map((l) => JSON.parse(l));
   /* DEDUPE BY LABEL, and say how many. The out file is appended and resumable,
@@ -114,6 +120,17 @@ async function report(file) {
     console.log(`coverage: ${all.length - missing.length} of ${all.length} matrix rows present`);
     for (const m of missing.slice(0, 10)) console.log(`    MISSING ${m}`);
     if (missing.length) bad.push(`${missing.length} matrix row(s) are absent from the sweep — every population above was computed over the rows that survived`);
+    /* A SKIPPED ROW THAT IS DECLARED IS A HOLE IN EXACTLY THE PLACE THIS SWEEP
+       EXISTS TO LOOK. `ALL MAX` is export-refused and is nevertheless a declared
+       self-intersector, so a census change can move its recorded pair count with
+       nothing here to see it — #213's own re-record obligation, silently unmet.
+       Cover it with `--include-refused`. */
+    const selfDeclared = new Set(Object.keys(HR.SELF_INTERSECTION_XFAIL));
+    const skippedDeclared = recs.filter((r) => r.skipped && selfDeclared.has(r.label));
+    if (skippedDeclared.length) {
+      for (const r of skippedDeclared) console.log(`    SKIPPED BUT DECLARED  ${r.label}  (${r.skipped})`);
+      bad.push(`${skippedDeclared.length} row(s) were skipped and carry a SELF_INTERSECTION_XFAIL entry a census change can move — re-run with --include-refused`);
+    }
   }
   console.log(bad.length ? `\nFAIL — ${bad.join('; ')}.` : '\nPASS — the matrix is covered, no verdict moved, no cross-shell pair moved, no undeclared row moved, and the worst spans moved exactly as predeclared.');
   process.exit(bad.length ? 1 : 0);
@@ -125,6 +142,7 @@ const A = path.resolve(arg('--a')), B = path.resolve(arg('--b'));
 const ONLY = arg('--only') ? new RegExp(arg('--only')) : null;
 const SHARD = arg('--shard'), OUT = arg('--out');
 const MAXTRI = Number(arg('--maxtri', 'Infinity'));
+const INCLUDE_REFUSED = argv.includes('--include-refused');
 
 const load = (root, f) => import(pathToFileURL(path.join(root, f)).href);
 const [H, SA, SB, G, R] = await Promise.all([
@@ -158,7 +176,13 @@ const emit = (rec) => { if (OUT) fs.appendFileSync(OUT, JSON.stringify(rec) + '\
 
 for (const row of rows) {
   if (done.has(row.label)) continue;
-  if (refused.has(row.label)) { emit({ label: row.label, skipped: 'export-refused' }); continue; }
+  /* A ROW THE GENERATOR REFUSES TO EXPORT STILL HAS A CENSUS READING, AND IT
+     STILL CARRIES A `SELF_INTERSECTION_XFAIL` ENTRY THAT A CENSUS CHANGE CAN
+     MOVE. Skipping it by default is a cost decision (`ALL MAX` is 2.35M
+     triangles), never a statement that it does not matter — so the REPORT
+     fails on a skipped row that is declared, and `--include-refused` is how
+     the run covers it. */
+  if (!INCLUDE_REFUSED && refused.has(row.label)) { emit({ label: row.label, skipped: 'export-refused' }); continue; }
   let rec;
   try {
     const acc = new G.MeshBuilder({ exportMode: true });

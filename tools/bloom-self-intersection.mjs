@@ -214,13 +214,25 @@ function inTriangle(P, A, B, C) {
    that edge's two ENDS, so the "depth" is the distance between the ends. A worst
    SPAN is the largest chord between surviving points; it is not a fold depth,
    and it cannot separate an artefact from a fold.
-   THE REAL OBJECTION TO A SCALED BAR IS THAT IT DEPENDS ON WHERE THE OBJECT
-   STANDS. The same needle-shaped pair — a free edge crossing 1.4e-8 mm from the
-   corner it shares — is reported at the origin and LOST 30 mm out, because the
-   bar grew with the coordinates. Connectivity does not move when the object
-   does. Both shapes are fixtures in `verify-bloom-census-adjacency.mjs` (CA2)
-   and `the-discard-bar-is-widened-instead` is the mutation that must redden
-   them.
+   THE REAL OBJECTION IS THAT NO BAR CAN DO THIS, AND THE PREMISE BEHIND ONE IS
+   FALSE. An epsilon assumes the ill-conditioned solve puts its phantom point
+   NEAR the shared corner. It does not: an incident edge that GRAZES the other
+   plane passes the relative parallel guard and the solve then places `t`
+   anywhere along that edge. Measured over the 666 hits a magnitude-scaled bar
+   leaves standing on the stored pairs, the distance from the nearest shared
+   corner runs 1.0009e-9 mm to 2.0933 mm, median 1.3309e-8, with 80 past 1e-5 mm
+   and 40 past 0.1 mm — so it leaves 651 of 2196 artefact pairs still reading as
+   a fold, on fourteen rows, where this rule leaves 0. A bar wide enough to clear
+   the worst of them would discard every real crossing within two millimetres of
+   a corner. The error is not bounded by a tolerance; it is bounded by the length
+   of an edge.
+   AND A SCALED BAR ALSO DEPENDS ON WHERE THE OBJECT STANDS. The same
+   needle-shaped pair — a free edge crossing 1.4e-8 mm from the corner it shares
+   — is reported at the origin and LOST 30 mm out, because the bar grew with the
+   coordinates. Connectivity does not move when the object does. Both shapes are
+   fixtures in `verify-bloom-census-adjacency.mjs` (CA2) and
+   `the-discard-bar-is-widened-instead` is the mutation that must redden them,
+   and CA3 as well.
 
    THE FILE'S STANDING GUARANTEE IS UNCHANGED AND IS WHAT BOUNDS THE RULE. It
    discards the hits an INCIDENT edge produces, never a pair. The edge OPPOSITE
@@ -473,9 +485,6 @@ export function census(positions, { verbose = false, collect = false } = {}) {
       for (let c = 0; c < 3; c++) for (let d = 0; d < 3; d++)
         if (C1[c].v === C2[d].v) sharedIdx.add(C1[c].v);
       const shared = sharedIdx.size ? C1.filter((c) => sharedIdx.has(c.v)).map((c) => c.p) : [];
-      /* The `size` test changes no answer — an empty Set fails both `has` calls
-         anyway — and is kept as the short circuit for the common case, which is
-         a pair that shares nothing. */
       /* An edge is the shared feature's when BOTH its endpoints are shared (it
          IS that feature), or when one is and the edge leaves the other plane at
          the far end — see `offPlane`. Where the far end stays in the plane the
