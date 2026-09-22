@@ -21,6 +21,7 @@ on:
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
       # NOT tools/verify-bloom-apex-mutants.mjs, deliberately, even though the
       # step below PARSES it for its two mutations: a stale anchor there is a
@@ -46,6 +47,7 @@ on:
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 
@@ -110,6 +112,25 @@ jobs:
         run: node tools/verify-bloom-arc-stability.mjs
       - name: ... and those clauses must be able to fail
         run: node tools/verify-bloom-arc-stability.mjs --negative-control
+      # A SHARED CORNER MUST READ AS TOPOLOGY AND A REAL FOLD MUST STILL READ AS
+      # A FOLD (CA0-CA3). X2 in this gate turns the census's count into a verdict,
+      # and a count that is too LOW looks exactly like a clean solid — so the
+      # adjacency rule the census decides that with is owed a witness that can
+      # see it, and nothing in the matrix can. It rides here for arc-stability's
+      # own three reasons: the same question, Node-only, seconds, and it imports
+      # playwright not at all — `bloom-self-intersection.mjs` and the geometry,
+      # and nothing else. The stored pairs are PR #278's, read-only; none of that
+      # geometry is merged.
+      - name: A shared corner is not a fold (CA0-CA3)
+        run: node tools/verify-bloom-census-adjacency.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-census-adjacency.mjs --negative-control
+      # AND THE SCOPE IS CHECKED HERE RATHER THAN BY HAND. A predeclared
+      # allowlist asserted afterwards by the only party who could have broken it
+      # is a claim; asserted by the gate on every run it is evidence. It refuses
+      # an empty diff, so it cannot pass by having no subject.
+      - name: ... and only census and instrument files moved
+        run: node tools/verify-bloom-census-adjacency.mjs --scope --base origin/${{ github.base_ref || 'main' }}
       # playwright alone, at an exact version. It pins the exact playwright-core it
       # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
       # browser that `npx playwright install` downloads can never disagree. Both
