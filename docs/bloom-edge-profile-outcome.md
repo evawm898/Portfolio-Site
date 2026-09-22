@@ -534,14 +534,14 @@ The images are re-rendered at four segments with the bead's own normals:
 **No geometry change was made for this ruling, because the measurements say
 there is no defect to fix.** That is the finding, not an omission.
 
-## 12. What is deliberately NOT done here
+## 12. The census, after the rebase onto #279
 
-**`SELF_INTERSECTION_XFAIL` is not re-measured.** The tessellation moved with
-the segment count, so declared magnitudes have moved. Eva's ruling 2: *"do NOT
-declare the 108 rows here. A separate session is fixing the census instrument as
-its own PR. Do not touch the census code in this branch."* So the list is
-re-measured **once**, at rebase time, against the instrument that will actually
-run it — re-recording now would bake in numbers the census fix changes again.
+`SELF_INTERSECTION_XFAIL` was deliberately NOT re-measured before the rebase.
+Eva's ruling 2: *"do NOT declare the 108 rows here. A separate session is fixing
+the census instrument as its own PR. Do not touch the census code in this
+branch."* Re-recording then would have baked in numbers the census fix changes
+again, so the list was measured **once**, after the rebase, against the
+instrument that actually runs it. **§15 is that measurement.**
 
 ### 12a. The three rows X2 flagged read ZERO under the fixed census
 
@@ -567,12 +567,20 @@ by an edge one of whose endpoints the other triangle also carries, which is the
 mesh's own topology rather than a fold. The cross-shell counts are the export
 contract's own overlapping closed solids and are reported, never gated.
 
-**So no contact needed a ruling, and the exact-zero spans measured before the
-rebase were the honest signal they looked like.** What would have been wrong is
+**So no contact needed a ruling on THESE THREE.** What would have been wrong is
 concluding *from that zero* that they were artefacts — the span was not evidence
 either way, as §7 above now records at length.
 
-## 12c. THE FULL SWEEP: five undeclared rows read non-zero, and three are real contacts
+**AND THE GENERALISATION FROM THESE THREE TO THE MATRIX WAS THE SESSION'S OWN
+ERROR — see §12b.** This section originally closed by reporting that no 8.9 µm
+contact existed. That was measured over *these three rows* and said nothing
+about the other 906; the full 909-row sweep finds one at **8.8707e-3 mm**.
+Eva had meanwhile relayed a partial 133-row report as the full picture and
+withdrawn her own figure, so the error ran in both directions at once. **It
+resolves in favour of the original measurement: the 8.9 µm contact is real.**
+A subset is evidence about the subset.
+
+### 12b. THE FULL SWEEP: five undeclared rows read non-zero, and three are real contacts
 
 **AND THE 8.9 µm CONTACT EXISTS AFTER ALL — the concession in §12a was accepted
 too readily and is withdrawn.** §12a measured the *three rows the OLD census
@@ -627,10 +635,51 @@ petal lamina". Named per CORNER instead, it is petal 239 throughout. A
 classifier that reports an unknown when the answer is "crowded" is the kind of
 result to re-read rather than publish.
 
-## 12b. CA5's scope step fails this PR, and it will fail every geometry PR
+### 12c. Eva's ruling: DECLARE, don't fix — and the mechanism, named
 
-**NOT FIXED HERE — it changes a gate `main` acquired hours ago and that is
-Eva's call.** Reported with the measurement so the ruling is one line.
+**All five are declared with their magnitudes, locations and petal counts, and
+`SELF_INTERSECTION_XFAIL` is re-recorded from this tree's own sweep.** The
+tessellation is not moving, so this is not work that will be done twice.
+
+**THE MECHANISM.** A sheet offset by half its thickness self-intersects wherever
+the surface curves tighter than that half-thickness — the offset surface folds
+through itself, which is the same class session 38 named at the foot-to-blade
+kink. The bead **adds material at exactly those places**: it is a half-round of
+radius 0.5 mm swept around the rim, and the rim is where the surface's own
+curvature is highest. **The root blend and the foot-to-blade seam are the
+tightest curves a petal has**, and that is where four of the five sites sit; the
+fifth is the buckled tip, where a wide ruffle reaching in from the margin puts
+its crests inside the 3 mm taper band.
+
+| row | pairs | worst | where | petals |
+|---|---|---|---|---|
+| `DOME: the mum x rise 1 — a hemisphere` | 168 | **0.2424 mm** | own root blend, u 0.000–0.018, 0.500–0.505 mm off mid | 120 |
+| `BUCKLE: THE IRIS look` | 8 | **0.0096 mm** | own tip, u 0.982–1.000, 0.314–0.521 mm off mid | 8 |
+| `DEPTH: the mum at 6 turns` (D_max 19) | 27 | **0.0089 mm** | own foot-to-blade seam, u 0.000 and 0.036, r 1.92 mm, z 0.491 | 240 |
+| `DOME: rise 1 x petalTilt 0` | 32 | 2.70e-17 mm | own root blend, 0.600 mm off mid — **NOISE**, the float floor | 8 |
+| `TILT: 90 (the right angle)` | 32 | 2.00e-15 mm | own root blend, 0.594–0.600 mm off mid — **NOISE**, the float floor | 8 |
+
+The bottom two are recorded as noise and say so in their own entries: 2.70e-17
+and 2.00e-15 mm are the float floor on coordinates of 20–40 mm, eleven or more
+orders under the printable gap, and both sit at **0.600 mm off the mid-surface
+— exactly half the sheet**, so the two skins are TANGENT rather than crossing.
+They are declared only because X2 gates the COUNT and a tangency still produces
+one.
+
+**THE FIX IS A CLAMP ON THE BEAD RADIUS AT TIGHT CURVATURE, AND IT IS DEFERRED
+TO ITS OWN SESSION** (Eva's ruling on the rebase). **Deferring it means a
+tighter state reached later will fold the same way** — that is the accepted cost
+and it is written here and in all five entries rather than left to be
+rediscovered. What the clamp would read is the local curvature of the
+mid-surface at each perimeter vertex and take `r` below `RIM_BEAD_RADIUS_MM`
+where the offset would fold; the ingredients are already in `emitPanel` (the row
+frames and the emitted polyline), and it composes with the three arms the radius
+already has.
+
+### 12d. CA5's scope step failed this PR, and would have failed every geometry PR
+
+**RULED AND FIXED — see §16.** Left here as the finding and the measurement
+that produced it; Eva's ruling was to apply the gating proposed at the end.
 
 #279 added three steps to `bloom-export-watertight.yml`. Two (CA0–CA3 and its
 negative control) are instrument checks and are fine on any PR. The third is
@@ -733,3 +782,55 @@ bead radius is a different surface, so that row's excess moves 6.236137 →
 Not run locally and not claimed: the full matrix on either STL gate, and
 `bloom-smoke --conn`, which exceeds the foreground budget this container
 allows. The merge criterion is the full matrix in CI, after the rebase.
+
+## 15. The re-record, and what the list reads now
+
+`node tools/bloom-census-sweep.mjs --geom . --harness . --a . --b .`, EXPORT
+mode, sharded three ways over the same resumable JSONL: **909 of 909 rows, 0
+missing, 628 deduplicated shard overlaps, 0 disagreeing.** A row is built once
+and handed to the census, so nothing on the build side can account for a reading.
+
+Against the list as `main` left it (291 entries, #279's own re-baseline):
+
+| | rows |
+|---|---|
+| held exactly — pair count and span within ±5e-5 mm | 40 |
+| **re-recorded**, pair count UP | 94 |
+| **re-recorded**, pair count DOWN | 91 |
+| read ZERO — entry removed | 65 |
+| **added** (§12c) | 5 |
+
+**291 → 231 entries.** Verified after the rewrite by re-importing the list and
+comparing every entry against the sweep: **230 of 231 agree exactly, 0
+disagree.** The 231st is `ALL MAX`, which the generator refuses to export, so
+X1 cannot gate it while the refusal stands (XR1) and the gate says so on every
+run; it is measured separately with `--include-refused`.
+
+**The one finding of §6 that survived both the census fix and the segment
+change is the shell re-categorisation**, re-measured here at four segments under
+#279's census:
+
+    CAPABILITY: cleft x 6 layers   shells  49 -> 145   within 27,990 -> 0   cross 29,872 -> 60,696
+    FRINGE: THE CARNATION          shells  13 ->  41   within  7,286 -> 0   cross  5,992 -> 13,728
+
+The census finds shells by VERTEX WELDING and the bead closes each panel with
+its own boundary, so a tooth panel and the base panel it overlaps BY DESIGN are
+two shells here where they were one on `main`. Their overlap moves into the
+CROSS-shell column, which the export contract permits. **What it costs, said
+plainly: a tooth folding through its own BASE panel would now be cross-shell and
+invisible to this census. A panel folding through ITSELF is still caught.**
+
+## 16. CA5's scope step, fixed
+
+Eva's ruling: gate it on the census rule having moved. Applied — the step now
+runs `git diff --name-only origin/<base>...HEAD` (the same form
+`verify-bloom-census-adjacency.mjs` uses for its own subject, so the predicate
+and the tool cannot disagree) and runs `--scope` only when
+`tools/bloom-self-intersection.mjs` is in that diff.
+
+Verified both ways on this branch: with the real diff it **skips** (17 files, no
+census rule); with `tools/bloom-self-intersection.mjs` planted in the list it
+**runs and FAILS with 16 strays**, which is correct — a PR changing the census
+rule *and* geometry is exactly what the allowlist exists to catch. The only PR
+the step could ever have caught is still caught, and `--scope` remains a
+hand-run tool.
