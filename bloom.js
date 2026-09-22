@@ -602,8 +602,14 @@ let capability = null;
    export and the STL export are the same build, made the same way, from the
    same readUI() snapshot; a second builder would be a second owner of "what
    the app is showing". */
-function buildGeometry({ exportMode, record = false, captureGrid = false }) {
-  const acc = new MeshBuilder({ exportMode, captureGrid });
+/* `captureNormals` — Eva's ruling on the bead's shading, and it is ON for the
+   VIEWPORT'S OWN BUILD and off for both export paths. The STL writes its own
+   per-facet normal and the grid export writes line strips, so neither reads
+   this; what it would cost them is an array the size of the positions on a
+   build that can reach millions of triangles. It moves no position — asserted
+   by E7 of tools/verify-bloom-edge-profile.mjs, not argued here. */
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false }) {
+  const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
   const uiForBuild = readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
@@ -654,7 +660,19 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
-  geo.computeVertexNormals();
+  /* THE BUILDER'S NORMALS WHERE IT HAS THEM, AND computeVertexNormals() WHERE
+     IT DOES NOT. The buffer is NON-INDEXED, so computeVertexNormals() is a
+     FLAT normal per triangle — which is right for every hard edge this solid
+     has and wrong for the rim bead, whose facets then read as discrete
+     shading bands at about a fifth of a millimetre. The builder emits the
+     bead's own normal in closed form (see MeshBuilder's captureNormals note);
+     every other triangle carries the same flat normal this line computed
+     before, so nothing else on the model changes appearance. */
+  if (acc.normals && acc.normals.length === acc.positions.length) {
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
+  } else {
+    geo.computeVertexNormals();
+  }
   /* `built` is returned as well as cached, so the export path can summarise
      the geometry IT built rather than reading the live cache — the two are
      different geometry whenever a floor binds, and a summary that mixes them
@@ -1614,7 +1632,7 @@ function regenerate() {
      marks this as the build the telemetry describes; the export handler's
      build never carries it. */
   const mode = shownMode();
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true });
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true });
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
      used to be refreshed before it, which was the same thing while no span
      read a built number. One of them does now (the stamen spread's cap, an

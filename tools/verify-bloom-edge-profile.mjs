@@ -35,7 +35,7 @@
          the law restated here, so a builder that logged every location (the
          ST9 trap: a guard that reads the record it checks) empties nothing.
      E2  NO HARD EDGE. The largest turn between adjacent faces within
-         RIM_NEAR_MM of a treated apex is under RIM_DIHEDRAL_MAX_DEG.
+         RIM_NEAR_MM of a treated apex is under DIH_BAR.
      E3  the mesh is still closed and degenerate-free.
      E4  THE SILHOUETTE. Every vertex the builder says it emitted at a treated
          profile IS in the emitted stream, as the same double.
@@ -71,12 +71,37 @@ const PROGRESS = argv.includes('--progress');
 const ONLY = (() => { const i = argv.indexOf('--only'); return i >= 0 ? new RegExp(argv[i + 1]) : null; })();
 
 /* EVA'S NUMBERS, declared here because they are hers and not the geometry's.
-   The band on the floor is her own "-0.01"; the 2 mm window and the 30 degree
-   turn are the ruling's. RIM_FLOOR_MM itself is IMPORTED, never restated. */
+   The band on the floor is her own "-0.01" and the 2 mm window is the
+   ruling's. RIM_FLOOR_MM itself is IMPORTED, never restated. */
 const RIM_FLOOR_BAND_MM = 0.01;
 const RIM_NEAR_MM = 2.0;
 
-const RIM_DIHEDRAL_MAX_DEG = 30;
+/* THE TURN ALLOWANCE IS DERIVED FROM THE SEGMENT COUNT, AND THE TYPED 30 IT
+   REPLACES WAS IN DIRECT CONFLICT WITH EVA'S LATER RULING — said here rather
+   than left as a number that moved.
+
+   The first ruling set this at 30 degrees when the bead carried EIGHT
+   segments. The second ruled the count down to FOUR, because eight puts
+   facets at about 0.2 mm, under Nylon 12 White's ~0.35-0.4 mm resolvable
+   detail. A half round sampled at K segments turns `180 / K` between adjacent
+   facets BY CONSTRUCTION — that is what the tangent-angle sampling buys and
+   it is the bead drawing itself, not an edge the treatment added — so at
+   K = 4 the bead turns 45 degrees and a typed 30 forbids the count Eva ruled.
+   The two rulings cannot both be satisfied by a constant.
+
+   So the bar is the bead's OWN resolution, `180 / K`, imported through
+   `rimSegmentsOf` rather than restated: a turn at or under it is the facet
+   count, and anything above it is a hard edge that has to be explained. IT IS
+   STRICTER THAN THE NUMBER IT REPLACES WHEREVER THE OLD ONE APPLIED — at
+   K = 8 it is 22.5 against 30, and the shipped tree measured 21.50 there, so
+   the derivation would have held on the geometry it replaces as well as on
+   this one. That is the test that says it is a re-derivation and not a bar
+   fitted to the data in hand.
+
+   The SHADING half of the old bar's job is answered by the other half of the
+   same ruling: the bead now carries its own smooth normal, so a facet edge is
+   no longer something the eye can find. */
+
 /* THE OUTLINE CORNER'S OWN NEIGHBOURHOOD, in bead radii. The profile pivots
    about ONE skin vertex there and its reach is |apex - C| at the corner, which
    is the two insets in quadrature — 0.84 mm at the shipping default against a
@@ -89,6 +114,44 @@ const RIM_CORNER_R = 2;
 
 const loadGeom = async (file) => import(pathToFileURL(file).href);
 const G0 = await loadGeom(path.join(HERE, 'bloom-geometry.js'));
+/* K IS THE CAP, and the cap is what every reachable row takes: `rimSegments`
+   reads the sheet through `max(t, MIN_FEATURE_MM)` and MIN_FEATURE_MM is 1.0,
+   so its radius arm is 0.5 mm at every state and the ratio is exactly 1 —
+   measured over the whole live matrix in both modes. A tree on which that
+   stopped being true would take a SMALLER K, turn MORE per facet, and go RED
+   here against a bar computed from the cap, which is the safe direction: the
+   allowance is named in the message, so the red says what it is. */
+const DIH_BAR = 180 / G0.RIM_BEAD_SEGMENTS;
+
+/* WHERE THE SURFACE ITSELF TURNS FASTER THAN THE OUTLINE SAYS, DECLARED WITH
+   ITS MAGNITUDE — this project's own xfail idiom (#213), applied to an angle
+   instead of a span.
+
+   E2 subtracts the OUTLINE's own turn, which is a PLAN quantity: it is the
+   angle the boundary polyline turns through as seen from above. Three things
+   turn the SURFACE at a rim without turning that polyline at all — a buckle
+   wave (out of plane by construction), a steep taper on a thick sheet (the
+   profile's own half-thickness changing along the sweep), and a fringe tooth's
+   terminal. The bead has to follow the surface it rides, so the residual is
+   not an edge the treatment invented; it is the surface's, arriving at a rim.
+
+   EACH ENTRY CARRIES THE EXCESS OVER THE BAR AS A NUMBER THE GATE READS, IN
+   BOTH DIRECTIONS. A row that grows is a finding for whatever moved it; a row
+   that stops exceeding is a stale record and says so. The band is 5e-5 deg —
+   #213's own 5e-5, in the unit this quantity carries — which is eight orders
+   above the float floor of an angle taken from two unit normals, and well
+   inside the smallest excess declared here (1.68e-4). */
+const E2_TURN_BAND_DEG = 5e-5;
+const E2_TURN_XFAIL = {
+  'BUCKLE: the default frequency at a strong amplitude (0.30 x, f 3)':
+    { excessDeg: 6.236137, note: 'the buckle wave curves the margin OUT OF PLANE, which the outline\'s plan turn cannot see; raw 60.05 deg, outline 8.81' },
+  'TIP SHAPE: 0.60 x the thickest sheet (2.40 — the floor doubles and binds early)':
+    { excessDeg: 0.005430, note: 'the taper runs 2.40 -> 1.00 mm over RIM_TAPER_MM, so the profile\'s own half-thickness changes along the sweep and the quad is not planar; raw 45.01 deg, outline 0.00' },
+  'FRINGE: THE CARNATION — 7 teeth on a 0.50 terminal at the shipped depth':
+    { excessDeg: 0.000168, note: 'a tooth\'s terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00' },
+  'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)':
+    { excessDeg: 0.000168, note: 'the carnation row again — this row carries the same fringe, and the lobes are inert by ruling' },
+};
 const { DEFAULTS } = await import(pathToFileURL(path.join(HERE, 'bloom-registry.js')).href);
 const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs')).href);
 
@@ -334,7 +397,7 @@ function worstTurnNearRim(mesh, apexes, flats, corners, near, cornerR, rampMm, r
        outline is straight the two are the same statement and the bar is 30
        degrees flat. */
     const ot = turnNear(mid);
-    if (ot >= RIM_DIHEDRAL_MAX_DEG) { nCorner++; if (deg - ot > cornerDeg) cornerDeg = deg - ot; }
+    if (ot >= DIH_BAR) { nCorner++; if (deg - ot > cornerDeg) cornerDeg = deg - ot; }
     n++;
     const excess = deg - Math.max(0, ot);
     if (excess > worst) { worst = excess; at = mid; worstRaw = deg; worstOutline = ot; }
@@ -346,6 +409,7 @@ async function runRows(G, rows, fails, notes) {
   const check = (clause, ok, msg) => { if (!ok) fails.push(`${clause}: ${msg}`); return ok; };
   let profiles = 0, worstTurn = 0, worstCorner = 0, worstRamp = 0, minRim = Infinity, clamps = 0;
   let done = 0;
+  const declaredSeen = new Set();
   for (const row of rows) {
     if (PROGRESS) process.stderr.write(`  [${++done}/${rows.length}] ${row.label.slice(0, 70)}\n`);
     const st = stateFor(row);
@@ -456,7 +520,18 @@ async function runRows(G, rows, fails, notes) {
         if (turn.rampDeg > worstRamp) worstRamp = turn.rampDeg;
         if (turn.deg > worstTurn) worstTurn = turn.deg;
         check('E2', turn.edges > 0, `${row.label}: no edge lies within ${RIM_NEAR_MM} mm of a treated apex — the window found nothing to measure`);
-        check('E2', turn.deg < RIM_DIHEDRAL_MAX_DEG, `${row.label}: the treatment adds ${turn.deg.toFixed(2)} deg of turn within ${RIM_NEAR_MM} mm of a rim, at or over the ${RIM_DIHEDRAL_MAX_DEG} deg allowance (the face-to-face turn there is ${turn.raw.toFixed(2)} deg and the OUTLINE's own turn is ${turn.outline.toFixed(2)})`);
+        const declared = E2_TURN_XFAIL[row.label];
+        if (!declared) {
+          check('E2', turn.deg < DIH_BAR, `${row.label}: the treatment adds ${turn.deg.toFixed(6)} deg of turn within ${RIM_NEAR_MM} mm of a rim, at or over the ${DIH_BAR} deg allowance (the face-to-face turn there is ${turn.raw.toFixed(2)} deg and the OUTLINE's own turn is ${turn.outline.toFixed(2)})`);
+        } else {
+          /* BOTH DIRECTIONS. A declaration is a record of the tree, and a
+             record that stops reproducing is stale whether the row got worse
+             or better — the message says which. */
+          const excess = turn.deg - DIH_BAR;
+          declaredSeen.add(row.label);
+          check('E2', excess > 0, `${row.label}: declared as exceeding the ${DIH_BAR} deg allowance by ${declared.excessDeg} deg and it no longer does (${turn.deg.toFixed(6)} deg) — the declaration is STALE, take it off`);
+          check('E2', Math.abs(excess - declared.excessDeg) <= E2_TURN_BAND_DEG, `${row.label}: the excess over the ${DIH_BAR} deg allowance is ${excess.toFixed(6)} deg against a declared ${declared.excessDeg} (band ${E2_TURN_BAND_DEG}) — re-record it in the same commit as whatever moved it`);
+        }
       }
     }
     /* ---- E5: the topology is the same in both modes ---- */
@@ -466,7 +541,15 @@ async function runRows(G, rows, fails, notes) {
     }
   }
   check('E0', profiles > 0, `no treated rim profile was found on any row — the run is vacuous`);
-  notes.push(`rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${RIM_DIHEDRAL_MAX_DEG}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default)`);
+  /* A DECLARATION NAMING A ROW THE GATE NEVER RAN IS A DECLARATION NOBODY CAN
+     CHECK — the combination gate's CG5, one instrument later. Only on a FULL
+     run: under --only the unseen entries are the ones --only excluded. */
+  if (!ONLY) {
+    for (const label of Object.keys(E2_TURN_XFAIL)) {
+      check('E2', declaredSeen.has(label), `E2_TURN_XFAIL declares "${label}" and no row of this gate carries that label — a declaration nothing evaluates`);
+    }
+  }
+  notes.push(`declared surface-turn rows ${declaredSeen.size} of ${Object.keys(E2_TURN_XFAIL).length} · rows ${rows.length} (${rows.filter((r) => FOLDS.has(r.label)).length} exempt from E2 as declared self-intersectors) · treated profiles ${profiles} · declared clamps ${clamps} · thinnest rim ${Number.isFinite(minRim) ? minRim.toFixed(4) : 'n/a'} mm · worst turn the treatment ADDS ${worstTurn.toFixed(2)} deg (allowance ${DIH_BAR}, over and above the outline's own) · worst EXCESS at an outline corner ${worstCorner.toFixed(2)} deg · worst turn in the RAMP to the receptacle join ${worstRamp.toFixed(2)} deg (exempt, out of scope; main reads 93.92 at the default)`);
   return { profiles, worstTurn, worstCorner, minRim, clamps };
 }
 

@@ -711,8 +711,28 @@ export const PETAL_ROLE_ORDER =
    from the flower's MeshAccumulator idea: the one behavior that matters here
    is the export-mode thickness floor. */
 export class MeshBuilder {
-  constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false } = {}) {
+  constructor({ exportMode = false, captureGrid = false, captureLamina = false, captureRim = false, captureNormals = false } = {}) {
     this.exportMode = !!exportMode;
+    /* SHADING NORMALS, AND THEY REACH NO BYTE OF THE EXPORT — Eva's ruling
+       (the edge-profile session): "smooth (averaged) normals across the
+       bead". OFF by default, set by the VIEWER's live build alone. An STL
+       stores its own per-facet normal and every slicer here recomputes it, so
+       this channel is a RENDER property and nothing else; E7 of
+       tools/verify-bloom-edge-profile.mjs asserts the positions are identical
+       with it on and off rather than arguing it.
+
+       WHY A CHANNEL RATHER THAN SMOOTHING IN THE VIEWER. bloom.js builds a
+       NON-INDEXED BufferGeometry, and `computeVertexNormals()` on one of
+       those is a FLAT normal per triangle — it cannot smooth anything. The
+       three.js remedy (`mergeVertices` then recompute) averages across EVERY
+       shared edge, which would round off the foot-to-blade seam and the hub
+       and make the whole solid read as wax; smoothing under a crease angle
+       instead needs a position search over up to four million triangles on
+       every slider drag. The bead's own normal is a CLOSED FORM the profile
+       already has every term of, so it is emitted where it is known and
+       nothing is searched for. */
+    this.captureNormals = !!captureNormals;
+    this.normals = this.captureNormals ? [] : null;
     /* THE LAMINA CAPTURE (sepals, part 1) — the same `if` in emitPanel as the
        grid capture, and the same contract (it decides nothing about what is
        BUILT): buildBloomInto sets it for the petal loop when a sepal whorl is
@@ -794,6 +814,35 @@ export class MeshBuilder {
     for (const p of [a, b, c]) {
       for (let k = 0; k < 3; k++) { if (p[k] < this.lo[k]) this.lo[k] = p[k]; if (p[k] > this.hi[k]) this.hi[k] = p[k]; }
     }
+    /* The FLAT normal, which is what every surface here but the bead wants:
+       a hard edge is a hard edge and averaging one away is the failure this
+       channel exists to avoid on the other side. */
+    if (this.normals) {
+      const ux = b[0] - a[0], uy = b[1] - a[1], uz = b[2] - a[2];
+      const vx = c[0] - a[0], vy = c[1] - a[1], vz = c[2] - a[2];
+      let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+      const L = Math.hypot(nx, ny, nz);
+      if (L > 0) { nx /= L; ny /= L; nz /= L; }
+      this.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+    }
+  }
+  /* THE SAME TRIANGLE WITH ITS OWN THREE NORMALS. Only the rim sweep calls it,
+     and only because the bead is the one surface here whose smooth normal is
+     known in closed form at the moment its points are made. With the channel
+     off it IS `tri` — same positions, same order, same bytes. */
+  triN(a, b, c, na, nb, nc) {
+    this.tri(a, b, c);
+    if (!this.normals) return;
+    const at = this.normals.length - 9;
+    const src = [na, nb, nc];
+    for (let i = 0; i < 3; i++) {
+      const v = src[i];
+      /* A profile that the treatment did not reach has no bead and hands over
+         a null; the flat normal `tri` just pushed is the right answer there
+         and is left alone. */
+      if (!v) continue;
+      this.normals[at + i * 3] = v[0]; this.normals[at + i * 3 + 1] = v[1]; this.normals[at + i * 3 + 2] = v[2];
+    }
   }
   /* Quad a-b-c-d (counter-clockwise seen from outside) as two triangles. */
   quad(a, b, c, d) { this.tri(a, b, c); this.tri(a, c, d); }
@@ -836,6 +885,34 @@ export class MeshBuilder {
       if (X < this.lo[0]) this.lo[0] = X; if (X > this.hi[0]) this.hi[0] = X;
       if (Y < this.lo[1]) this.lo[1] = Y; if (Y > this.hi[1]) this.hi[1] = Y;
       if (Z < this.lo[2]) this.lo[2] = Z; if (Z > this.hi[2]) this.hi[2] = Z;
+    }
+    /* THE NORMALS RIDE THE ROTATION AND NOT THE TRANSLATION — M is rigid by
+       this method's own contract (rotation and translation, never scale), so
+       the 3x3 block is orthonormal and is its own inverse-transpose. A floret
+       whose normals were left in the head's frame would shade as though lit
+       from somewhere else, which is invisible on the head at the origin and
+       wrong on every other node. If the source accumulator carried no
+       normals, the flat ones are recomputed from the placed positions rather
+       than left short — an attribute the wrong length is a render that throws
+       instead of one that looks odd. */
+    if (this.normals) {
+      const q = other.normals;
+      if (q && q.length === n) {
+        for (let i = 0; i < n; i += 3) {
+          const x = q[i], y = q[i + 1], z = q[i + 2];
+          this.normals.push(M[0] * x + M[1] * y + M[2] * z, M[4] * x + M[5] * y + M[6] * z, M[8] * x + M[9] * y + M[10] * z);
+        }
+      } else {
+        const base = out.length - n;
+        for (let t = base; t < out.length; t += 9) {
+          const ux = out[t + 3] - out[t], uy = out[t + 4] - out[t + 1], uz = out[t + 5] - out[t + 2];
+          const vx = out[t + 6] - out[t], vy = out[t + 7] - out[t + 1], vz = out[t + 8] - out[t + 2];
+          let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+          const L = Math.hypot(nx, ny, nz);
+          if (L > 0) { nx /= L; ny /= L; nz /= L; }
+          this.normals.push(nx, ny, nz, nx, ny, nz, nx, ny, nz);
+        }
+      }
     }
     if (other.minThickness < this.minThickness) this.minThickness = other.minThickness;
     return n / 9;
@@ -7876,7 +7953,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
 export const RIM_FLOOR_MM = 1.0;
 export const RIM_BEAD_RADIUS_MM = 0.5;
 export const RIM_TAPER_MM = 3.0;
-export const RIM_BEAD_SEGMENTS = 8;
+export const RIM_BEAD_SEGMENTS = 4;
 export const RIM_BEAD_SEGMENTS_MIN = 3;
 export const RIM_ROOM_FRACTION = 0.45;
 /* How many steps the profile pivots through at an apex corner. Three takes the
@@ -7904,12 +7981,44 @@ const rimEase = (x) => { const t = x <= 0 ? 0 : x >= 1 ? 1 : x; return t * t * t
 const rimSameP = (a, b) => a[0] === b[0] && a[1] === b[1] && a[2] === b[2];
 const rimDist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
 
-/* THE SEGMENT COUNT, from the radius the bead would be drawn at — Eva's
-   ruling, and its reason is cost: an unscaled eight-segment bead measured
-   +73.5% triangles on the default, and a bead far below the print floor
-   cannot show eight facets to anyone. Rounded UP to even for the apex
-   identity above; the ruled minimum of three is a floor and four is the
-   smallest even count that clears it.
+/* THE SEGMENT COUNT IS FOUR, AND BOTH OF THE RULING'S OTHER TWO CLAUSES ARE
+   UNREACHABLE ON THIS TREE — reported rather than implemented, because each
+   is blocked by something the project has already ruled on. Eva's ruling:
+   "cap at 4 at full radius (0.5 mm), scaling down with drawn radius to a
+   minimum of 3", on the ground that eight segments puts facets at about
+   0.2 mm, under Nylon 12 White's ~0.35–0.4 mm resolvable detail. The CAP is
+   what ships and it is the whole of the cost saving.
+
+   (i) THE SCALING NEVER FIRES, because the only radius this function is
+   allowed to read is a constant. The DRAWN radius is
+   `min(RIM_BEAD_RADIUS_MM, tBody/2, RIM_ROOM_FRACTION * room)` and EVERY arm
+   of it past the first is mode-dependent — `tBody` carries the export sheet
+   floor and `room` carries the tip floor (0.15 mm live against 0.80 export).
+   A count read off it would make the TRIANGLE COUNT mode-dependent, which
+   both STL gates assert against by name. What is left to read is the sheet
+   through `max(t, MIN_FEATURE_MM)`, and that makes the cap an IDENTITY rather
+   than a measurement: `max(t, MIN_FEATURE_MM) / 2 >= MIN_FEATURE_MM / 2`,
+   which IS `RIM_BEAD_RADIUS_MM` on this tree (1.0 / 2 = 0.5), so the first arm
+   binds for EVERY finite input, the ratio below is exactly 1 and the count is
+   the cap. Not "measured over the matrix and it happened to hold" — there is
+   no reachable sheet thickness that takes it anywhere else, and the day
+   MIN_FEATURE_MM drops under the bead's diameter the scaling becomes live on
+   its own.
+
+   (ii) THREE IS NOT AN AVAILABLE COUNT AT ALL, and that is structural rather
+   than a rounding preference. The apex must be an EMITTED vertex at the
+   profile's own midpoint — `pts[APEX] = apex` with `APEX = K/2`, which E4 and
+   `verify-bloom-grid`'s clause 2a both read as an IEEE-754 identity — so K is
+   even or the apex is not on the profile. At K = 3 the samples sit at 0, 60,
+   120 and 180 degrees of tangent angle and 90 is not among them, so the bead
+   would stop being symmetric about the mid-surface. Four is the smallest even
+   count at or above the ruled minimum, and it is the cap, so the two ends of
+   the ruled range meet.
+
+   The min and the ratio are KEPT rather than deleted: they are the ruled law,
+   they cost nothing, and they become live the day `MIN_FEATURE_MM` drops
+   below the bead's diameter. Their inertness today is the measurement above,
+   not an assumption.
 
    IT READS THE SHEET AND NOTHING ELSE, AND IT READS IT THROUGH A MODE-FREE
    FLOOR. How many triangles a rim carries is TOPOLOGY, and this project has
@@ -8200,6 +8309,7 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   const profs = entries.map(({ apex, sk, j }) => {
     const C = skinP[sk][j], n = skinN[sk][j], b = skinB[sk][j];
     const pts = new Array(K + 1);
+    const ns = acc.captureNormals ? new Array(K + 1) : null;
     pts[0] = top[sk][j]; pts[K] = bot[sk][j];
     const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
     /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
@@ -8230,7 +8340,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        arithmetic. */
     if (wx === 0 && wy === 0 && wz === 0) {
       for (let m = 1; m < K; m++) pts[m] = m <= APEX ? pts[0] : pts[K];
-      return pts;
+      /* No bead, so no smooth normal to offer: `null` leaves the sweep's own
+         FLAT normal in place, which is the right answer for a wall. */
+      return { pts, ns: null };
     }
     pts[APEX] = apex;
     /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
@@ -8274,8 +8386,34 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       const sn = aLen > 0 ? Math.sin(th) : 0;
       const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
       pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
+      /* THE BEAD'S OWN NORMAL, IN CLOSED FORM, AND IT IS THE CROSS-SECTION'S.
+         In the (n, w-hat) plane the profile is the ellipse
+         (b cos th along n, aLen sin th along w-hat), whose outward normal is
+         (aLen cos th, b sin th) — the semi-axes swapped, which is the whole
+         of it. Two ends fall out rather than being special-cased: at th = 0
+         it is +n (the top skin's own normal, and the bead leaves the skin
+         tangentially, so the two agree there) and at th = pi it is -n.
+
+         WHAT IT LEAVES OUT, said rather than hidden: the term along the SWEEP,
+         which is non-zero wherever the profile's size changes from one column
+         to the next — the taper's ramp, and the tip. It is a shading
+         approximation and it decides no geometry; the alternative is a
+         position search over every triangle on every rebuild, for a
+         second-order correction to a normal. */
+      if (ns) {
+        let px = n[0] * aLen * Math.cos(th) + (wx / aLen) * b * sn;
+        let py = n[1] * aLen * Math.cos(th) + (wy / aLen) * b * sn;
+        let pz = n[2] * aLen * Math.cos(th) + (wz / aLen) * b * sn;
+        const L = Math.hypot(px, py, pz);
+        ns[m] = L > 0 ? [px / L, py / L, pz / L] : [n[0], n[1], n[2]];
+      }
     }
-    return pts;
+    if (ns) {
+      ns[0] = [n[0], n[1], n[2]];
+      ns[K] = [-n[0], -n[1], -n[2]];
+      ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
+    }
+    return { pts, ns };
   });
   /* A profile pair that shares its skin point — the two corners, where the
      margin run hands over to the tip run — collapses its end quads to
@@ -8294,11 +8432,12 @@ function emitPanel(acc, rows, panel, tAt, rim) {
      tools/verify-bloom-edge-profile.mjs runs a DIRECTED census so a fix
      without a witness does not become folklore. */
   for (let k = 0; k < profs.length; k++) {
-    const A = profs[k], B = profs[(k + 1) % profs.length];
+    const A = profs[k].pts, B = profs[(k + 1) % profs.length].pts;
+    const An = profs[k].ns, Bn = profs[(k + 1) % profs.length].ns;
     for (let m = 0; m < K; m++) {
       const p = A[m], q = B[m], s = B[m + 1], u = A[m + 1];
-      if (!rimSameP(p, q) && !rimSameP(q, s) && !rimSameP(s, p)) acc.tri(p, q, s);
-      if (!rimSameP(p, s) && !rimSameP(s, u) && !rimSameP(u, p)) acc.tri(p, s, u);
+      if (!rimSameP(p, q) && !rimSameP(q, s) && !rimSameP(s, p)) acc.triN(p, q, s, An && An[m], Bn && Bn[m], Bn && Bn[m + 1]);
+      if (!rimSameP(p, s) && !rimSameP(s, u) && !rimSameP(u, p)) acc.triN(p, s, u, An && An[m], Bn && Bn[m + 1], An && An[m + 1]);
     }
   }
   if (rim) {
