@@ -118,49 +118,53 @@ re-categorisation and not a repair.** What it costs, said plainly: a tooth
 folding through its own BASE panel would now be cross-shell and invisible to
 this census. A panel folding through ITSELF is still caught.
 
-## 7. Three rows the edge profile genuinely folds — and 114 that it does not
+## 7. WITHDRAWN AND SUPERSEDED — two rows fold, not three, and the grounds were wrong
 
-Every undeclared row was censused on both trees (604 built, 3 over the tool's
-triangle cap). **111 read 0 on main and non-zero here**, and they separate
-cleanly by the one quantity that is physical, the worst span:
+**THIS SECTION SAID THREE ROWS GENUINELY FOLD AND SEPARATED THEM FROM 108
+ARTEFACTS "BY THE ONE QUANTITY THAT IS PHYSICAL, THE WORST SPAN". The
+separation was sound in outline and wrong in one row, and the quantity it
+leaned on is not what it was taken to be.** PR #279 (`8f5e209`) measured it
+three ways that share no code, on this branch's own stored pairs:
 
-**Three carry real depth and are declared:**
+* **`VARIANCE: size ±50% x 40 petals` is NOT a fold.** All 66 pairs are
+  adjacency artefacts — every surviving point came from an edge incident to a
+  shared corner, 0 of 66 has a free-edge point, none overlaps in plane, and
+  every point sits 1.16e-9 to 2.41e-9 mm from a shared corner. **The pair that
+  set the row's "0.8187 mm" shares an EDGE, and its two surviving points sit
+  1.2168e-9 mm and 1.3312e-9 mm from that edge's two ENDS. 0.818700 mm is the
+  length of the shared edge.** The span was reporting the mesh's own topology,
+  at full scale, which is exactly why it looked like most of a sheet.
+* **The other two are real and stand**: `DOME: the mum x rise 1 — a hemisphere`
+  reads 0 artefact / 84 genuine, and `BUCKLE: THE IRIS look` 0 artefact / 4
+  genuine. Both are MUST-STILL-FOLD fixtures in #279's own gate now. Note the
+  counts this section published for them (208 and 8) were the artefact-inflated
+  ones; the genuine halves are 84 and 4.
 
-| row | pairs | worst span |
-|---|---|---|
-| `VARIANCE: size ±50% x 40 petals` | 66 | **0.8187 mm** |
-| `DOME: the mum x rise 1 — a hemisphere` | 208 | 0.1658 mm |
-| `BUCKLE: THE IRIS look` | 8 | 0.0554 mm |
+**AND THE GROUNDS FOR REJECTING THE EPSILON ROUTE DO NOT HOLD.** This section
+argued that scaling the discard bar by coordinate magnitude "takes
+`VARIANCE: size ±50% x 40 petals` with them, whose 0.8187 mm fold is real" —
+the damage it did to that row was damage to an **artefact**. The conclusion
+(don't reach for a relative epsilon) survives; the reason given for it does
+not, and it was the load-bearing one. The route #279 took is neither that nor
+the "verify the point" this section proposed: it is **connectivity plus one
+scale-free angle** — a hit produced by an edge one of whose endpoints the other
+triangle also carries is discarded, licensed by transversality, with
+`offPlane()` as the other half (without which the rule loses 89 real pairs on
+18 main rows).
 
-All three hold the same shell count on both trees, so none is a
-re-categorisation. That is the feature's real printability cost: three rows of
-604.
+**WHAT THIS SECTION GOT RIGHT, kept because it is the half that generalises:**
+that the 108 rows were the *instrument* rather than the geometry, that an
+absolute `PT_EPS` of 1e-9 mm on coordinates of 20–40 mm is the solve's own
+conditioning rather than a tolerance, and that the bead makes many more
+near-tangent facets meet at one vertex than the flat wall did — which is why
+this branch surfaced a defect that had been latent on `main`.
 
-**The other 108 are the census, not the geometry, and they are NOT declared.**
-Worst span over all of them **2.5583e-9 mm**; 100 read exactly 0, and
-**not one is above 1e-6 mm** — measured AFTER the X0 fix of §7b, which took six
-rows off this list and left no undeclared row with any real depth at all. Measured on
-every sampled pair: the two triangles **share exactly one vertex**, and the
-point the census reports as an intersection sits **1.04e-9 to 3.07e-9 mm** from
-that shared vertex. `isSharedFeature` discards a point that IS the shared
-feature using an **absolute `PT_EPS` of 1e-9 mm** — on coordinates of 20–40 mm,
-where one ulp is 6e-15 and the segment-triangle solve's own conditioning
-delivers about 1e-9. The bar is the solve's error, and the bead decides which
-side of it a vertex falls on, because the treatment puts many more near-tangent
-facets around one vertex than the flat wall did. The file's own header says the
-HIT test uses a RELATIVE epsilon; the DISCARD test does not.
-
-**THE OBVIOUS FIX IS A WEAKENING, AND THAT WAS MEASURED RATHER THAN ASSUMED.**
-Scaling the discard bar by the coordinate magnitude takes 113 of the 117 to zero
-(measured before the X0 fix) — **and it takes `VARIANCE: size ±50% x 40 petals`
-with them, whose 0.8187 mm fold is real.** It also moves **7 of 40** of main's own declared rows
-(`petalCup min (-0.8)` 384 → 360, `petalCup max (1.2)` 752 → 720). So it is not
-a correction; do not reach for it. The remedy is the one the census's SECOND
-epsilon defect already took — **verify the point rather than widen a
-tolerance** — and it is its own piece of work with its own calibration.
-
-**Until that lands, X2 reddens those 108 rows and this PR cannot be green.**
-That is the one thing outstanding.
+**A SPAN IS NOT A DEPTH, and that is the durable lesson.** The worst span is
+the largest chord an intersecting pair carries; where both reported points are
+adjacency artefacts sitting at the two ends of one shared edge, it is that
+edge's length and nothing about the geometry. This section used it as the
+physical discriminator and it is not one. `tools/bloom-census-sweep.mjs`'s own
+header now carries the same sentence, with this row as its example.
 
 ## 7b. X0: the inset bisection's tie was decided by the last bit
 
@@ -546,13 +550,10 @@ available explanation and it is **not** a verdict — it is a hypothesis that ha
 to be tested by naming the two pieces, and a tangency between two parts that are
 NOT meant to touch is a real contact whatever its span reads.
 
-**ONE DISCREPANCY TO CARRY FORWARD RATHER THAN RESOLVE HERE.** Eva expects
-*"span-0 tangencies and one 8.9 µm contact"*. On this tree, at full precision,
-**all three rows read exactly 0.000000e+0** — there is no 8.9 µm contact among
-them. That may be the fixed instrument reporting something the current one
-rounds away, or it may be a row outside this three. It is recorded rather than
-argued: the measurement is re-taken after the rebase, against the instrument
-that will run it, and the report names whichever it turns out to be.
+**RESOLVED.** An expectation of *"span-0 tangencies and one 8.9 µm contact"*
+came from a partial report covering 133 of 191 rows; the census session's full
+run confirms all three residual rows are the span-0 tangency class, which is
+what the measurement above reads. No 8.9 µm contact exists.
 
 ## 13. The negative control found two holes, and neither was visible on a green run
 
