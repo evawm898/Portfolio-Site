@@ -519,9 +519,57 @@ branch."* So the list is re-measured **once**, at rebase time, against the
 instrument that will actually run it — re-recording now would bake in numbers
 the census fix changes again.
 
-## 13. Local gates on this tree
+## 13. The negative control found two holes, and neither was visible on a green run
+
+`node tools/verify-bloom-edge-profile.mjs --control` is required before quoting
+a pass from a changed harness, and it earned its keep twice here.
+
+**(i) The new stray-declaration clause misfired in the control itself.** It was
+keyed on `!ONLY`, and the control runs five hand-picked rows with no `--only`
+flag in sight — so every mutation reported E2 on the four declared rows the
+subset does not carry, and four of five mutations read FAIL for a reason that
+had nothing to do with the mutation. `runRows` takes a `fullSet` argument now
+and the caller says which run it is.
+
+**(ii) E5's only mutant went UNREACHABLE, and that is arithmetic rather than
+luck.** `the-segment-count-reads-the-live-sheet` strips the mode-free floor out
+of `rimSegments`; at eight segments that took `sheetThickness` 0.60 to six live
+against eight export and fired E5. At four, `min(4, max(3, raw))` rounded up to
+even is **4 for every raw**, so no input to that function can move K at all —
+the mutation still applies, still changes the radius, and changes no count.
+`bore-is-not-evas-rule`'s lesson (a mutation is invisible wherever the law it
+replaces happens to agree with it), arriving because a later ruling collapsed
+the law's range to a point; session 32's retired lerp mutations, one gate later.
+
+It is replaced by the defect `RIM_TIP_ROWS`' own header warns about in so many
+words — *"a `drop rows until the gap clears the radius` rule would be this
+project's sixth discrete decision on a continuous quantity"* — which reads the
+emitted half-width, which carries the TIP FLOOR (0.15 mm live against 0.80 mm
+export), so the two modes drop different numbers of rows. A plausible defect
+rather than an injected one, and it fires E5.
+
+**And E2's new magnitude clause had no mutant at all.** The control's regex
+names `FRINGE: THE CARNATION` and `.slice(0, 5)` took five earlier matches, so
+the two clauses holding a declared row to its recorded excess were exercised by
+nothing while the run reported 5 of 5. **Found by asking which messages the
+control actually printed, not by a failure.** The control now REFUSES unless a
+row carrying an `E2_TURN_XFAIL` label is in its set, and appends one if not;
+with `BUCKLE: 0.30 x, f 3` present, `the-flat-wall-is-restored` moves its excess
+to 53.591109 deg and the clause fires.
+
+`the-rim-floor-is-lowered-to-0.4` legitimately reddens E2 as well — a smaller
+bead radius is a different surface, so that row's excess moves 6.236137 →
+6.526126 deg. **Named as collateral rather than loosening the clause.**
+
+## 14. Local gates on this tree
 
 * `node tools/verify-bloom-edge-profile.mjs` — **PASS**, 110 rows, 645,428
   treated profiles, 4 of 4 declared surface-turn rows seen.
+* `node tools/verify-bloom-edge-profile.mjs --control` — **PASS**, 5 of 5
+  mutations redden exactly the clauses they name.
 * `node tools/verify-bloom-grid.mjs` — **PASS**, 736 checks over 19 rows.
 * `node tools/verify-bloom-panel.mjs` — **PASS**.
+
+Not run locally and not claimed: the full matrix on either STL gate, and
+`bloom-smoke --conn`, which exceeds the foreground budget this container
+allows. The merge criterion is the full matrix in CI, after the rebase.
