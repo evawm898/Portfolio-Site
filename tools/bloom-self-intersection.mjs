@@ -150,9 +150,183 @@ function inTriangle(P, A, B, C) {
   return (a0 + a1 + a2) / nl <= 1 + 1e-9;
 }
 
-/* THE SHARED-FEATURE RULE. `shared` is the list of positions the two triangles
-   have in common (by exact index after welding). A point is the shared feature
-   iff it equals one of them, or lies on the segment joining two of them. */
+/* THE SHARED-FEATURE RULE, IN TWO PARTS — ONE TOPOLOGICAL, ONE METRIC.
+
+   PART ONE, AND IT NEEDS NO TOLERANCE ON ANY DISTANCE (the adjacency rule
+   below, applied in census() before a hit is ever recorded). An edge whose OWN
+   ENDPOINT is a vertex the other triangle also carries meets that triangle in
+   one of exactly two ways, and this is a theorem rather than an estimate:
+
+     - the weld is by EXACT position, so a shared endpoint `p` is bit-identical
+       to one of the other triangle's corners and therefore lies EXACTLY in its
+       plane — not nearly;
+     - a line through a point of a plane either meets that plane ONLY at that
+       point, or lies IN it. There is no third case.
+
+   IN THE FIRST CASE the meeting IS `p`, whatever the barycentric solve reports
+   for `t`, and the hit is the shared feature. IN THE SECOND the meeting is a
+   SEGMENT and the hit is real; discarding it would lose a genuine contact.
+   SO THE DISCARD IS LICENSED BY TRANSVERSALITY, NOT BY INCIDENCE, and the two
+   are not the same thing — which is the one real defect the first draft of this
+   rule shipped, and it was found by an adversarial read rather than by a gate.
+   THE SECOND CASE IS NOT THE COPLANAR ARM'S, which is what makes it easy to
+   miss: the arm asks whether the two TRIANGLES are coplanar, and a pair can be
+   thoroughly transverse while one triangle has an edge running along the line
+   where the planes meet. Measured on main's own `FRINGE: x the buckle at
+   0.30 f 3`: n1.n2 = -0.9200, and both triangles carry an INCIDENT edge whose
+   sine to the other plane is 2.95e-15 and 3.10e-15 over 1.5315 mm. Their
+   intersection really is a 1.5315 mm segment.
+   BECAUSE `p` IS EXACTLY IN THE OTHER PLANE, THE EDGE LIES IN THAT PLANE IFF
+   ITS FAR ENDPOINT DOES — one test, at one point, on data the rule already has.
+   `offPlane()` is it: |sin| of the edge to the plane, against `segTri`'s own
+   relative bar so the two agree about what parallel means. AND THE POLARITY IS
+   DELIBERATE — where the test cannot say the edge is transverse, the hit is
+   KEPT. The rule discards only what it can PROVE is the shared feature, which
+   makes "it can never lose a fold" a construction rather than a sweep result.
+   What is consulted is CONNECTIVITY — which welded indices the two triangles
+   have in common — plus that one scale-free angle. No distance from the reported
+   point to anything is ever measured.
+
+   THE ARGUMENT DELIBERATELY DOES NOT REST ON `segTri`'s PARALLEL GUARD, and
+   that is worth saying because the first draft of it did. That guard is
+   relative — `|det| > 1e-12 * |e1| * |p|` — but `p` is `D x e2`, whose own
+   length collapses as `D` approaches parallel to the plane, so the bar sinks
+   with the quantity it is bounding and a nearly-coplanar edge can pass it. A
+   theorem resting on that guard would be a theorem resting on a threshold. The
+   endpoint argument needs no guard at all: it is true of a coplanar edge too,
+   and simply hands that case to the arm that owns it.
+
+   WHY THAT MATTERS: the solve's own conditioning near a shared corner delivers
+   about 1e-9 mm of positional error on coordinates of 20-40 mm, which is the
+   same order as the metric bar below. PR #278 measured rows whose ONLY reported
+   intersections were exactly this — pairs sharing a corner, with the reported
+   point 1.04e-9 to 3.07e-9 mm away from it. The bar IS the solve's error, so the
+   remedy is not to raise it but to stop asking it a question topology already
+   answers — the same move this file's `segTri` made when it replaced an
+   ill-conditioned barycentric verdict with a verification of the point.
+
+   AND THE REASON RECORDED IN #278 FOR NOT WIDENING THE BAR IS WITHDRAWN HERE,
+   because it was wrong and a later session would otherwise inherit it. That doc
+   says a bar scaled by coordinate magnitude "takes `VARIANCE: size +-50% x 40
+   petals` with them, whose 0.8187 mm fold is real". It is not real: all 66 of
+   that row's pairs are this artefact, and the 0.8187 mm is THE LENGTH OF A
+   SHARED EDGE — its two surviving points sit 1.2168e-9 mm and 1.3312e-9 mm from
+   that edge's two ENDS, so the "depth" is the distance between the ends. A worst
+   SPAN is the largest chord between surviving points; it is not a fold depth,
+   and it cannot separate an artefact from a fold.
+   THE REAL OBJECTION IS THAT NO BAR CAN DO THIS, AND THE PREMISE BEHIND ONE IS
+   FALSE. An epsilon assumes the ill-conditioned solve puts its phantom point
+   NEAR the shared corner. It does not: an incident edge that GRAZES the other
+   plane passes the relative parallel guard and the solve then places `t`
+   anywhere along that edge. Measured over the 666 hits a magnitude-scaled bar
+   leaves standing on the stored pairs, the distance from the nearest shared
+   corner runs 1.0009e-9 mm to 2.0933 mm, median 1.3309e-8, with 80 past 1e-5 mm
+   and 40 past 0.1 mm — so it leaves 651 of 2196 artefact pairs still reading as
+   a fold, on fourteen rows, where this rule leaves 0. A bar wide enough to clear
+   the worst of them would discard every real crossing within two millimetres of
+   a corner. The error is not bounded by a tolerance; it is bounded by the length
+   of an edge.
+   AND A SCALED BAR ALSO DEPENDS ON WHERE THE OBJECT STANDS. The same
+   needle-shaped pair — a free edge crossing 1.4e-8 mm from the corner it shares
+   — is reported at the origin and LOST 30 mm out, because the bar grew with the
+   coordinates. Connectivity does not move when the object does. Both shapes are
+   fixtures in `verify-bloom-census-adjacency.mjs` (CA2) and
+   `the-discard-bar-is-widened-instead` is the mutation that must redden them,
+   and CA3 as well.
+
+   THE FILE'S STANDING GUARANTEE IS UNCHANGED AND IS WHAT BOUNDS THE RULE. It
+   discards the hits an INCIDENT edge produces, never a pair. The edge OPPOSITE
+   a shared vertex is free in both triangles, so a pair that shares a vertex AND
+   crosses somewhere else is still reported by that free edge — which is what a
+   blanket "skip a pair that shares a vertex" would destroy.
+
+   THAT HALF IS PROVED RATHER THAN ASSERTED, and it needs one premise the
+   discard half does not: `p` is a CORNER of each triangle, hence an EXTREME
+   point of it. Take the two planes' intersection line L (they are not parallel,
+   or the pair is coplanar and the arm owns it). `T n L` is a chord of T, and
+   because `p` is extreme it is an ENDPOINT of that chord rather than an interior
+   point. So `T1 n T2 = [p, m]` for some `m`, and if the pair meets anywhere but
+   `p` then `m != p` and `m` lies on the boundary of T1 or of T2, away from `p` —
+   that is, on an edge not incident to `p`. A free edge. The free edge is
+   therefore not merely one route to a real crossing; it is the only place the
+   far end of one can be, and testing it is complete.
+
+   `--prove-exclusion` IS NOT THE WITNESS FOR THAT, and saying so matters because
+   the obvious move is to cite it. Its crossing is on a free edge, so it passes
+   character-for-character with this rule and without it: it demonstrates the
+   pair-level guarantee it was written for in session 35 and is insensitive to
+   this change. The witness is `tools/verify-bloom-census-adjacency.mjs`, whose
+   CA2 carries the guarantee and whose mutant `adjacency-rule-is-per-pair` is the
+   must-fail. For a shared EDGE every edge of both triangles
+   is incident, and that is correct rather than convenient: two non-coplanar
+   triangles glued along an edge have planes meeting in that edge's own line, so
+   their intersection IS the shared edge and there is nothing else to find.
+
+   WHAT IT IS BLIND TO, said here rather than discovered later, in the two cases
+   the theorem's own premises leave open:
+     - A COPLANAR pair sharing an EDGE that really folds back on itself. The
+       coplanar arm is gated on fewer than two shared vertices, so it never asks,
+       and the rule above stops the ill-conditioned hits that used to answer by
+       accident. The hole is PRE-EXISTING and MEASURED: opening that gate reports
+       +56 pairs on `petalCup max (1.2)` alone and moves 13 of the first 163 main
+       rows swept, so it is reachable and closing it is a real strengthening with
+       its own calibration to do — `coplanarOverlap` opens with an ABSOLUTE 1e-9
+       mm planarity test on the same 20-40 mm coordinates this file has just been
+       burned by. Named in the outcome doc; its own piece of work.
+     - A weld that is not exact. The premise is that a shared corner is
+       bit-identical, which is what `census()`'s exact-position weld guarantees
+       and what a distance-based weld would take away.
+   Outside those two, a crossing only an incident edge could have found does not
+   exist, so the blindness is bounded by the premises and by nothing else.
+
+   PART TWO, the metric rule, UNCHANGED at 1e-9 AND MEASURED INERT. `shared` is
+   the list of positions the two triangles have in common (by exact index after
+   welding). A surviving point is the shared feature iff it equals one of them,
+   or lies on the segment joining two of them. It still runs, on the points the
+   adjacency rule left, and its bar is exactly what it was — and it no longer
+   fires: instrumented over five representative main rows it was called 111,195
+   times and returned true 0 times, because only a FREE edge's hit can reach it
+   now and a free edge is the one OPPOSITE the shared corner.
+
+   IT IS RETAINED, AND NOT AS A SECOND LINE OF DEFENCE — that framing would be
+   wrong and is worth denying explicitly. The only point that can still reach it
+   is a FREE edge's hit that happens to land within 1e-9 mm of a shared corner,
+   and discarding one of those would be discarding a real crossing, which is the
+   single thing this rule is built not to do. So the day it fires is a FINDING,
+   not a save. It is kept because deleting it is a behaviour change with no
+   witness on this tree (it is measured inert, so nothing would go red either
+   way) and this PR does not need to make it; removing it is schedulable and
+   named in the outcome doc. */
+/* THE DISCARD'S REAL PREMISE IS TRANSVERSALITY, AND THE WELD MAKES IT
+   DECIDABLE AT ONE POINT. The theorem's disjunction is "the edge meets the other
+   triangle only at the shared endpoint, OR the edge lies IN that triangle's
+   plane", and only the first branch makes the hit an artefact. The second is a
+   real meeting along a segment, and it is NOT the coplanar arm's case: the arm
+   asks whether the two TRIANGLES are coplanar, and a pair can be transverse
+   (measured n1.n2 = -0.9200) while one triangle has an edge running along the
+   two planes' intersection line. Measured on `FRINGE: x the buckle at 0.30 f 3`:
+   both triangles have an INCIDENT edge whose sine to the other plane is 2.95e-15
+   and 3.10e-15 over 1.5315 mm, so T1 n T2 really is a 1.5315 mm segment and its
+   far end is a genuine intersection point. Discarding on incidence alone throws
+   it away.
+   Because the shared endpoint lies EXACTLY in the other plane, the edge lies in
+   that plane iff its FAR endpoint does too — one test, at one point, on data the
+   rule already has. It is scale-free: the quantity is |sin| of the edge to the
+   plane, and the bar is `segTri`'s own relative one, so the two agree about what
+   "parallel" means. AND THE POLARITY IS DELIBERATE — where the test cannot say
+   the edge is transverse, the hit is KEPT. The rule discards only what it can
+   prove is the shared feature, so it can never lose a fold, which makes the
+   no-weakening property a construction rather than a sweep result. */
+const TRANSVERSE_EPS = 1e-12;
+function offPlane(P, T) {
+  const n = cross(sub(T[1], T[0]), sub(T[2], T[0]));
+  const nl = len(n);
+  const d = sub(P, T[0]);
+  const dl = len(d);
+  if (!(nl > 0) || !(dl > 0)) return false;
+  return Math.abs(dot(d, n)) > TRANSVERSE_EPS * nl * dl;
+}
+
 const PT_EPS = 1e-9;
 function isSharedFeature(P, shared) {
   for (const S of shared) if (Math.hypot(P[0] - S[0], P[1] - S[1], P[2] - S[2]) <= PT_EPS) return true;
@@ -262,9 +436,18 @@ export function census(positions, { verbose = false, collect = false } = {}) {
     /* by COORDINATE, lexicographically — not by welded index, which is a
        first-occurrence number and therefore itself a function of stream
        order (measured: sorting by index left 29 of 113 rows differing
-       between the two windings). */
-    const cs = [0, 1, 2].map((k) => [positions[t*9+k*3], positions[t*9+k*3+1], positions[t*9+k*3+2]]);
-    return cs.sort((a, b) => a[0] - b[0] || a[1] - b[1] || a[2] - b[2]);
+       between the two windings).
+
+       THE WELDED INDEX RIDES ALONG rather than being looked up afterwards.
+       The adjacency rule needs to know which of the SORTED corners is shared,
+       and re-deriving that by matching coordinates would put a distance (or a
+       string key) back into a rule whose whole point is that it is decided by
+       connectivity. Sorting the pair keeps the corner and its index together,
+       so the order stays the coordinate order — winding-invariant, as above —
+       and the index stays the corner's own. */
+    const cs = [0, 1, 2].map((k) => ({ p: [positions[t*9+k*3], positions[t*9+k*3+1], positions[t*9+k*3+2]], v: vidx[t*3+k] }));
+    cs.sort((a, b) => a.p[0] - b.p[0] || a.p[1] - b.p[1] || a.p[2] - b.p[2]);
+    return cs;
   };
   let within = 0, cross = 0, worst = 0, worstAt = null, worstPair = null, tested = 0;
   const sites = [];
@@ -287,20 +470,70 @@ export function census(positions, { verbose = false, collect = false } = {}) {
       if (sep) continue;
       if (gi(Math.max(lo[i*3], lo[j*3]), 0) !== cx || gi(Math.max(lo[i*3+1], lo[j*3+1]), 1) !== cy || gi(Math.max(lo[i*3+2], lo[j*3+2]), 2) !== cz) continue;
       tested++;
-      const T1 = tri(i), T2 = tri(j);
-      const shared = [];
+      const C1 = tri(i), C2 = tri(j);
+      const T1 = [C1[0].p, C1[1].p, C1[2].p], T2 = [C2[0].p, C2[1].p, C2[2].p];
+      /* WHICH WELDED INDICES THE TWO TRIANGLES SHARE — ONE OWNER, read twice.
+         The adjacency rule needs the indices and the metric rule needs their
+         POSITIONS, and deriving the second from the first is the difference
+         between one statement and two. Two 3x3 loops over the same predicate,
+         five lines apart, is the duplicate-expression trap the seam session's
+         §9b(i) records: it also mutates as two things, which is exactly why this
+         file's first attempt at a mutant for it was a no-op. Empty for a pair
+         that shares nothing, so a non-adjacent pair takes the path it always
+         took. */
+      const sharedIdx = new Set();
       for (let c = 0; c < 3; c++) for (let d = 0; d < 3; d++)
-        if (vidx[i*3+c] === vidx[j*3+d]) shared.push([positions[i*9+c*3], positions[i*9+c*3+1], positions[i*9+c*3+2]]);
+        if (C1[c].v === C2[d].v) sharedIdx.add(C1[c].v);
+      const shared = sharedIdx.size ? C1.filter((c) => sharedIdx.has(c.v)).map((c) => c.p) : [];
+      /* An edge is the shared feature's when BOTH its endpoints are shared (it
+         IS that feature), or when one is and the edge leaves the other plane at
+         the far end — see `offPlane`. Where the far end stays in the plane the
+         meeting is a segment and the hit stands. The `size` test changes no
+         answer — an empty Set fails both `has` calls anyway — and is kept as the
+         short circuit for the common case, a pair that shares nothing. */
+      const isFeature = (a, b, T) => {
+        if (sharedIdx.size === 0) return false;
+        const sa = sharedIdx.has(a.v), sb = sharedIdx.has(b.v);
+        if (!sa && !sb) return false;
+        if (sa && sb) return true;
+        return offPlane(sa ? b.p : a.p, T);
+      };
       const pts = [];
       for (let c = 0; c < 3; c++) {
-        const P = segTri(T1[c], sub(T1[(c+1)%3], T1[c]), T2[0], T2[1], T2[2]);
-        if (P) pts.push(P);
-        const Q = segTri(T2[c], sub(T2[(c+1)%3], T2[c]), T1[0], T1[1], T1[2]);
-        if (Q) pts.push(Q);
+        const d = (c + 1) % 3;
+        /* An edge that IS the shared feature — both endpoints shared — or that
+           has one shared endpoint and LEAVES the other plane at its far end,
+           meets that triangle only at the shared endpoint (the theorem above),
+           so its hit is the feature and is not computed into a point at all.
+           An edge that stays IN the other plane meets it along a segment and
+           keeps its hit. The free edge — the one opposite a shared corner — is
+           what still finds an ordinary fold. */
+        if (!isFeature(C1[c], C1[d], T2)) {
+          const P = segTri(T1[c], sub(T1[d], T1[c]), T2[0], T2[1], T2[2]);
+          if (P) pts.push(P);
+        }
+        if (!isFeature(C2[c], C2[d], T1)) {
+          const Q = segTri(T2[c], sub(T2[d], T2[c]), T1[0], T1[1], T1[2]);
+          if (Q) pts.push(Q);
+        }
       }
       let real = pts.filter((P) => !isSharedFeature(P, shared));
       let hit = real.length > 0;
-      /* the coplanar arm — only where no shared feature could explain it */
+      /* THE COPLANAR ARM IS UNCHANGED, AND THE HOLE IT LEAVES IS PRE-EXISTING
+         AND DECLARED. Its gate is "fewer than two shared vertices", so a pair
+         sharing an EDGE and lying EXACTLY in one plane is never asked whether it
+         overlaps: such a pair produces no hit at all (every edge is parallel to
+         the other plane, so `segTri` returns null), and nothing else looks. That
+         is true of `main` too and the adjacency rule does not widen it — the
+         transversality test above KEEPS the hits of a NEARLY coplanar pair, which
+         is the whole population `main` ever counted here.
+         OPENING THE GATE WAS BUILT AND REVERTED. Gating it on fewer than THREE
+         shared vertices reports pairs nothing ever counted — +56 on
+         `petalCup max (1.2)` alone — which is a real strengthening and a real
+         re-record, with its own calibration to do first: `coplanarOverlap` opens
+         with an ABSOLUTE 1e-9 mm planarity test on the same 20-40 mm coordinates
+         this file has just been burned by. A finding with a number, named in the
+         outcome doc, and its own piece of work. */
       if (!hit && shared.length < 2 && coplanarOverlap(T1, T2)) { hit = true; real = [T1[0]]; }
       if (!hit) continue;
       if (shell[i] === shell[j]) {

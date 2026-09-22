@@ -321,6 +321,65 @@ solid self-intersects from cup 0.60 up** — 750 pairs at the shipped `petalTipS
 an over-strict proxy; it is blind to this. Sheet thickness and petal scale do not fix
 it. Cost is 387 ms at 19,040 triangles, so the exact census needs no bound.
 
+**A SHARED CORNER IS TOPOLOGY, NOT A FOLD, AND THE CENSUS DECIDES THAT FROM
+CONNECTIVITY NOW RATHER THAN FROM A DISTANCE** (read `docs/bloom-census-adjacency-outcome.md`
+before touching `tools/bloom-self-intersection.mjs`'s pair loop, `offPlane`, `isSharedFeature`
+or the CA family). Two triangles sharing a vertex or an edge MEET there by construction, and
+the census discarded such a meeting by measuring the hit against an ABSOLUTE 1e-9 mm bar on
+20–40 mm coordinates — **which is the segment-triangle solve's own conditioning near a shared
+corner, so the bar was the solve's noise and the verdict sat on whichever side of it a vertex
+happened to fall.** PR #278 measured 108 matrix rows whose only reported intersections were
+that. The rule is now: **a hit produced by an edge one of whose endpoints the other triangle
+also carries is discarded**, because a line not parallel to a plane meets it in exactly one
+point and the shared endpoint already is such a point. **`offPlane()` IS THE OTHER HALF AND IT
+IS NOT A REFINEMENT — WITHOUT IT THE RULE IS UNSOUND**: an incident edge lying ALONG the two
+planes' meeting line meets the other triangle all the way along, so discarding on incidence
+alone loses a real segment of contact — measured, **89 pairs on 18 `main` rows**, and the first
+draft did exactly that. The discard is licensed by TRANSVERSALITY, never by incidence; where
+transversality cannot be proved the hit is KEPT.
+**THE EPSILON ROUTE IS REFUTED BY MEASUREMENT, NOT BY PREFERENCE, AND #278's OWN GROUND FOR
+REJECTING IT RESTED ON A FALSE PREMISE** (its "real 0.8187 mm fold" is the LENGTH OF A SHARED
+EDGE — two phantom points 1.2e-9 mm from that edge's two ends; all 66 pairs on that row are the
+artefact). The real ground is that **the phantom point is not near the shared corner at all**:
+over the 666 hits a magnitude-scaled bar leaves standing, the distance from the nearest shared
+corner runs **1.0e-9 mm to 2.0933 mm, median 1.3e-8**, 80 past 1e-5 and 40 past 0.1. A bar wide
+enough to clear the worst would discard every real crossing within two millimetres of a corner.
+Measured on the stored pairs, the widened bar leaves **651 of 2196 artefact pairs still reading
+as a fold** where the shipped rule leaves 0 — and it answers differently for the same shape at
+the origin and 30 mm out, which connectivity cannot.
+**THE PARTITION: 68 ROWS MOVE AND 881 PAIRS STOP BEING COUNTED, ALL DECLARED.** Over the
+909-row live matrix in EXPORT mode (`node tools/bloom-census-sweep.mjs`, which builds each row
+ONCE and hands the same `Float64Array` to both censuses): **X2 fires on 0 rows under either
+census, 0 verdict flips, 0 cross-shell moves, 1 predeclared worst-span move, 67 within-shell
+count moves — every one DECLARED, 0 undeclared.** 57 entries re-recorded and **11 removed**
+(named in the block at the head of `SELF_INTERSECTION_XFAIL`); **734 of the 735 removed from the
+67 STORED rows read span exactly 0.0000 mm, largest anywhere 1.8e-14**, and the 68th is `ALL MAX`
+(196,142 -> 195,996, worst span unmoved). **AND TWO ROWS THIS FILE CALLED SPAN-0
+TANGENCIES WERE PHANTOMS ALL ALONG** — `VARIANCE: x the IRIS at 2 whorls` and session 42's
+`LOBES: x cup 0.40` both read 0 now; the class is real and its surviving members are `TILT: 90`,
+`DOME: rise 1 x petalTilt 0` and `DEPTH: the mum at 6 turns`, where half the pairs share no
+corner at all.
+**THE WITNESS IS `node tools/verify-bloom-census-adjacency.mjs` (CA0–CA7), WITH
+`--negative-control` REQUIRED** — six mutations, every anchor checked before any of them runs —
+and it rides in `bloom-export-watertight.yml` beside arc-stability for arc-stability's own three
+reasons. It is owed because **a census count that is too LOW looks exactly like a clean solid**
+and nothing in the matrix can see it. CA3 stores 2196 artefact pairs and 1997 genuine ones from
+#278's head AND from `main`, in two per-pair classes, because a set of only the pairs that must
+CLEAR is a tautology; CA7 replays every stored pair against the SAME census with the rule removed
+and requires that the rule only ever DISCARDS. **A SWEEP THAT SKIPS A ROW REPORTS OVER THE ROWS
+THAT SURVIVED**: the report now checks coverage against `buildMatrix()` and FAILS on a short run,
+and **on any row skipped as export-refused that carries a `SELF_INTERSECTION_XFAIL` entry** —
+`ALL MAX` is both, and `--include-refused` is what covers it — **it moved 146 pairs, so without
+that clause this change would have shipped a declared row adrift from the tree, invisible to CI
+because a refused row produces no STL for X1 to read.**
+**AND A RE-RECORD MEASURED IN NODE IS NOT CONFIRMED UNTIL THE BROWSER AGREES** — X1's band on
+pairs is EXACTLY 0 and the gate's census runs on the doubles CHROMIUM's V8 computes, which this
+repo has measured diverging from Node's in the last bits (session 38 §B10.7). All 68 moved rows
+were re-run through the real gate (`node tools/verify-bloom-export.mjs --only <the moved labels>`):
+**PASS, 67 of 68 reaching the results and exporting watertight, the 68th the declared refusal,
+every X1 line reading "still failing at that magnitude"**. The arc-stability session's precedent,
+at 68 rows instead of 5.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom
