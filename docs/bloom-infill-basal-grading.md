@@ -310,7 +310,12 @@ would have to move.
 2. **The base's cell size.** Whether three larger basal holes (`baseNarrow` 1.50) read better than
    five middling ones (1.00) or the shipped narrowed five (0.75). 1.50 costs the petal's smallest
    hole at a 1.0 mm wall and costs nothing at 0.8.
-3. **The wall.** 0.8 mm against 1.0 mm, on an unprinted floor.
+3. ~~**The wall.** 0.8 mm against 1.0 mm, on an unprinted floor.~~ **CLOSED — 1.0 mm**
+   (Eva, Sep 22). Recorded struck through rather than deleted so the question this session
+   actually asked stays legible.
+
+**ITEMS 1 AND 2 ARE STILL OPEN AND ARE CARRIED IN `docs/bloom-infill-port-plan.md` §7**, which is
+the port's own ruling ledger. Nothing in this section's measurements is superseded; only item 3 is.
 
 ---
 

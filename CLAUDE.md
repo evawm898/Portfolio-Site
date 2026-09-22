@@ -1494,9 +1494,15 @@ not port). The discovery's estimate assumed 30 ring points per cell; real cells 
 **43** (44 cells, 1,890 points at density 7), so a ported petal is **37,830 triangles —
 16.1× today's 2,356 — and the 1,500,000 budget holds at most 39 petals with Voronoi on
 every one** (27 at density 12, 59 at density 3). Above the shipped 8, under one whorl of
-40, 6× short of the 240-foot head. A fact about the feature for Eva to rule on before the
-port is scheduled. Two consumers were already waiting in writing: the port, and
-`bloom-sagitta.mjs`'s 3D margin. No frozen phase owed; nothing moved.
+40, 6× short of the 240-foot head. **THAT FIGURE IS THE FLOWER'S EMITTER AND IT IS NOT WHAT THE
+PORT COSTS — SAID HERE BECAUSE THE CORRECTION USED TO LIVE 1,500 LINES FURTHER DOWN AND A READER
+MET THIS HALF FIRST** (this file's own root-blend lesson, in a second place). The bloom's own
+construction B is **2,496 triangles a petal against a plain 2,356**, and at the ruled defaults an
+infilled bloom is **19,496 against 19,040** on `main` and **~41,000** once #278's bead lands —
+`docs/bloom-infill-port-plan.md` §2, and the measurement is in `docs/bloom-infill-lamina-floor.md`
+§7c. The sentence above is still TRUE of the flower's emitter and is kept for that reason; **the
+budget is not the port's blocker and never was.** Two consumers were already waiting in writing:
+the port, and `bloom-sagitta.mjs`'s 3D margin. No frozen phase owed; nothing moved.
 
 **THE RIM HAS AN ARC LENGTH, THE SURFACE DECLARES ITS OWN TANGENT BREAKS, AND THE FORM
 ONSET IS ONE OF THEM** (session 38, PR 1 — read `docs/bloom-session-38-outcome.md` §A before
@@ -2944,9 +2950,33 @@ and `leaves` under `stem`; Stem > Leaves > Serration is the second third level a
 the children's full names are BOTH placements made without a ruling** and are Eva's to rule on.
 `frozen/phase32` is the 758 rows at `3f664be`.
 
-**THE VORONOI INFILL IS A PROTOTYPE, ITS BASAL BOUNDARY NOW HAS ITS OWN OWNER, AND THE FLOOR IS
-THE BLADE'S OWN WAIST** (the lamina-floor session — read `docs/bloom-infill-lamina-floor.md` §0
-FIRST, then `docs/bloom-infill-base-panel.md` for the sweep it continues). **THERE IS NO INFILL IN
+**THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
+CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
+then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SIX RULINGS, FIXED:** it ships
+**OFF** by default at density **16** (the `lobeDepth` 0 / `inflorescence` NONE shape); the
+**ARC-LENGTH METRIC IS REQUIRED**; sub-bar cells are dropped **all in one pass, recomputed,
+repeated to a small cap**, then the **ACHIEVED COUNT IS REPORTED** (a request, not a guarantee);
+**SEPALS ARE PINNED OFF** — no inheritance through `sepalBladeState`; the **WALL IS 1.0 mm**
+(closed); and the bead on a 1.0 mm wall is #278's existing narrow-span clamp, not a new decision.
+**THE METRIC IS REQUIRED FOR PRINT SAFETY AND NOT FOR THE LOOK, WHICH IS WHAT EVERY EARLIER DOC
+SAID** — on `petalCup` 1.2 × `petalSpineCurl` 360 the flat plan emits a **0.118 mm wall where it
+asks for 0.500** (0.237×), and ALL FORM MAX reads 0.172; **each of cup, curl, roll and twist reads
+exactly 1.000 ALONE**, so only a PRODUCT does it and `buildMatrix()` cannot see it by
+construction. Measured on the EMITTED geometry, and it is a **THIN WALL, NOT A FOLD** — the closest
+pair's own PLAN distance is 0.624 mm, i.e. the locally adjacent wall — which is what says an
+arc-length plan fixes it and V5 does not. **ORDER: S1 the conforming emitter (nothing gates it,
+and `cutThrough`'s flat fan self-intersects at 0.0009 mm on the shipped `petalRoll` 330 row), S2
+the metric, S3 the builder — gated on #278.** S1 is first because every number moves when the
+tessellation changes, so anything measured before it is measured on a state that will not ship.
+**AND THE COST FIGURE IN AN EARLIER DRAFT WAS WRONG BY A FACTOR OF TWO**: it derived the bead's
+per-quad rim cost from `RIM_BEAD_SEGMENTS = 8` and #278's published 33,072, giving ~15.1
+tris/quad and a ~73,000-triangle bloom. The constant was **capped at 4** and the shipped default
+is **24,688**, so it is **~7.27 tris/quad** and the infilled bloom is **~41,000** — 2.7 % of
+budget, a 1.67× multiplier rather than 2.22×. The CI projection moves with it: the export gate
+lands near **293 min against the 360-minute job limit** rather than the withdrawn ~340-345.
+**Both figures are kept in the doc so the correction is legible, and the projection is a two-point
+extrapolation whose own connectedness fit returns an implausible 3.3 min of per-row overhead —
+size a real wait off `actions_list`, never off that table.** **THERE IS STILL NO INFILL IN
 THE GENERATOR**: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and `bloom.html` hold 0
 occurrences of the word, no control and no matrix row — it is `tools/bloom-voronoi-proto.mjs`, and
 petal infill is on the charter's standing board. A session briefed to "ship the boundary" is

@@ -466,6 +466,10 @@ own blend station, the shipped default **0** (Eva ruled for as low as it goes). 
 
 ## 9. Recorded, not built
 
+* **THE PORT IS RULED AND PLANNED — `docs/bloom-infill-port-plan.md`** (Eva, Sep 22). It ships
+  OFF by default at density 16, the arc-length metric is required, and §7c's "the blocker is the
+  emitter" is the first session of six. The boundary control costed in §8 above is unchanged by
+  those rulings: it still cannot ship before the infill does.
 * **`bloom-wall-thickness.mjs` STILL CARRIES NO INFILLED STATE.** #250 recorded it, #252 measured
   around it, and this session measured further around it. V5 is the only gate on self-approach and
   the state itself is the build's.
