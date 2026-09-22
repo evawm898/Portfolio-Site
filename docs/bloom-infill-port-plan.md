@@ -14,21 +14,33 @@ on: the flat plan does not merely draw stretched cells under curvature — on a 
 
 ## 0. Eva's rulings (Sep 22)
 
-Carried in from the brief and from the ruling that closed this pass. Treat 1-6 as fixed.
+Carried in from the brief and from the two rulings that closed this pass. Treat 1-7 as fixed.
 
 | # | ruling |
 |---|---|
-| **1** | **THE INFILL SHIPS OFF**, density **16** when switched on. The same shape as `lobeDepth` 0 / `fringeCount` 0 / `inflorescence` NONE. |
+| **1** | **THE INFILL SHIPS OFF**, density **16** when switched on. Named against `lobeDepth` 0 / `fringeCount` 0 / `inflorescence` NONE; **ruling 7 picks which of those two shapes it is.** |
 | **2** | **THE ARC-LENGTH METRIC IS REQUIRED.** S2 stands. **0.118 mm on `cup 1.2 x curl 360` is below the 0.3 mm horizontal wall floor — it does not print.** |
 | **3** | **SUB-BAR CELLS**: drop *all* sub-bar seeds in ONE pass, recompute, repeat to a small cap, then stop and **report the achieved count**. The cap is a constant to be chosen at build time. |
 | **4** | **SEPALS ARE PINNED OFF.** The infill does not inherit through `sepalBladeState`. Turning it on for sepals is a later ruling. |
 | **5** | **THE WALL IS 1.0 mm** — already ruled, closed here. |
 | **6** | **THE BEAD ON A 1.0 mm WALL** is handled by #278's existing narrow-span clamp (shrink to fit, log the location). Not a new decision. |
+| **7** | **THE GUARD IS A CHOICE, NOT A SLIDER** — the `inflorescence` NONE shape, **not** the `lobeDepth` 0 shape. The blanket sweep must not reach it, so **`ALL MAX` stays uninfilled**. |
 
 Carried from earlier passes and unchanged: default **16 cells**; cells always round, the fillet a
 proportion of cell scale with the short-edge clamp as a ceiling only; **every cell must retain a
 hole >= 1.5 mm across after wall inset**; hole rims take the edge profile, **gated on #278**; the
 controls the port carries are **density, cell relaxation, cell density law, anisotropy**.
+
+**RULING 7'S MECHANISM IS STRUCTURAL AND NEEDS NO EXCLUSION OF ITS OWN.** `SWEEPABLE` filters
+`SLIDERS()` (`tools/bloom-harness.mjs:8213`), so a CHOICE is out of the blanket sweep **by
+construction** — which is exactly why CLAUDE.md can record that no non-`INFLO:` row sets
+`inflorescence` at all (0 of 883) and that `ALL MAX` and `ALL MIN` are holders. The guard therefore
+needs no `INFILL_GUARD` entry in that filter chain. **The four sub-sliders still do**: density,
+relaxation, density law and anisotropy are sliders, hidden at the defaults because their guard is
+off, which is the `CURL_SUBS` / `INFLO_SUB_IDS` shape — so `INFILL_SUB_IDS` is owed in
+`SWEEPABLE`'s chain, derived from the guard rather than hand-listed. Consequence, stated so it is
+checkable at S3: `ALL MAX` is a **HOLDER**, its declared 2,354,268-triangle export refusal is
+untouched, and §2d's ~9.4M / ~5.5M projections are **unreachable**.
 
 **STILL OPEN, PENDING RENDERS:** `converge`, anisotropy, and the relaxation slider's range and
 default. §7 carries them with the measurements each one needs.
@@ -166,8 +178,12 @@ table should be re-derived against whatever tree actually merges.
 **Under ruling 1 plus `INFILL_SUBS`: none.** The only infilled rows are block 39's, all at small
 petal counts, and the highest lands well under 100,000 triangles.
 
-`ALL MAX` is the corner to watch and it is unmoved *only if the guard is kept out of the blanket
-sweep* — see §7's question 1, which is the one thing ruling 1 does not settle.
+`ALL MAX` is the corner to watch and **ruling 7 keeps it uninfilled**: the guard is a CHOICE, which
+`SWEEPABLE` cannot reach because it filters `SLIDERS()`. So the two projections above are
+unreachable through the matrix, `ALL MAX` is a HOLDER in the byte partition, and its declared
+2,354,268-triangle export refusal does not move. **It is a construction, not an assertion** — the
+thing to check at S3 is that the four sub-sliders are in `INFILL_SUB_IDS`, since those *are*
+sliders and the sweep does reach a slider that is merely hidden.
 
 ---
 
@@ -390,36 +406,30 @@ waits for S4 is rendering the thing that ships.*
 
 ## 7. STILL OPEN
 
-**1. IS THE GUARD A SLIDER OR A CHOICE? — the one thing ruling 1 does not settle, and it has a
-measured consequence.** Ruling 1 names three precedents and they are two different shapes:
-`lobeDepth` 0 and `fringeCount` 0 are **sliders at zero**, which the blanket sweep reaches — CLAUDE.md
-records `lobeDepth max (1)` **and `ALL MAX`** as movers — while `inflorescence` NONE is a **CHOICE**,
-which it does not, and CLAUDE.md records that "no non-`INFLO:` row sets `inflorescence` at all
-(0 of 883), so `ALL MAX` and `ALL MIN` are holders by construction". The ruled control list names
-density, relaxation, density law and anisotropy — **no on/off** — so "off by default, 16 when
-switched on" implies a switch that is not the density slider. If the guard is a choice, `ALL MAX` is
-unmoved; if it is a slider at zero, `ALL MAX` gains the infill at maximum density on a 240-petal
-head. `INFILL_SUBS` keeps the *sub*-controls out either way; it cannot keep the guard out.
+**CLOSED SINCE THIS SECTION WAS WRITTEN:** this pass's question 1 asked whether the guard is a
+slider or a choice, on the ground that ruling 1's three precedents are two different shapes. **Eva
+ruled it a CHOICE** — see ruling 7 and the mechanism note in §0. The remaining items are unchanged;
+1-3 are the ones pending renders.
 
-**2. `converge` — the basal V.** *Pending renders.* 0.025 keeps almost all of 0.000's lightness with
+**1. `converge` — the basal V.** *Pending renders.* 0.025 keeps almost all of 0.000's lightness with
 a real stagger; 0.050 buys a millimetre of stagger for five points of basal wall; the prototype's
 0.100 is the heaviest of the three and the only one with two millimetres of taper
 (`docs/bloom-infill-basal-grading.md` §2, §6).
 
-**3. Anisotropy — default and range.** *Pending renders.* 2.2 asked, **2.03 achieved** at four passes
+**2. Anisotropy — default and range.** *Pending renders.* 2.2 asked, **2.03 achieved** at four passes
 on this tree; the flower's control is 1-4, default 1.
 
-**4. The relaxation slider — range and default.** *Pending renders.* The flower's is 0-20 default 8;
+**3. The relaxation slider — range and default.** *Pending renders.* The flower's is 0-20 default 8;
 the prototype is fixed at 4. Coupled to (3) by §4's table, so both want ruling from one sheet.
 
-**5. Ruling 3's cap** — a constant to be chosen at build time, from a sweep of where the achieved
+**4. Ruling 3's cap** — a constant to be chosen at build time, from a sweep of where the achieved
 count stops moving. Recorded here so it is not typed.
 
-**6. Carried, not re-opened:** the base's cell size (`baseNarrow` 0.75 / 1.00 / 1.50,
+**5. Carried, not re-opened:** the base's cell size (`baseNarrow` 0.75 / 1.00 / 1.50,
 `docs/bloom-infill-basal-grading.md` §6 item 2); `baseReach` and `tipGamma`, never swept; fringe and
 cleft, excluded by earlier ruling; lobes, compatible by construction and never rendered with cells.
 
-**7. Pre-existing and not this plan's to fix, but it makes it more expensive:** #231 — the export
+**6. Pre-existing and not this plan's to fix, but it makes it more expensive:** #231 — the export
 refusal costs a **full build** before it returns nothing (120.4 s on `ALL MAX` before #278). Worth
 its own PR before S3 if the CI headroom in §5c matters.
 

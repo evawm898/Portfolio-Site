@@ -3011,12 +3011,20 @@ the children's full names are BOTH placements made without a ruling** and are Ev
 
 **THE VORONOI INFILL IS RULED AND PLANNED, AND THE PLAN'S FIRST SESSION IS THE EMITTER — NOT A
 CONTROL** (Eva, Sep 22 — read `docs/bloom-infill-port-plan.md` before proposing any infill work,
-then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SIX RULINGS, FIXED:** it ships
-**OFF** by default at density **16** (the `lobeDepth` 0 / `inflorescence` NONE shape); the
-**ARC-LENGTH METRIC IS REQUIRED**; sub-bar cells are dropped **all in one pass, recomputed,
-repeated to a small cap**, then the **ACHIEVED COUNT IS REPORTED** (a request, not a guarantee);
-**SEPALS ARE PINNED OFF** — no inheritance through `sepalBladeState`; the **WALL IS 1.0 mm**
-(closed); and the bead on a 1.0 mm wall is #278's existing narrow-span clamp, not a new decision.
+then `docs/bloom-infill-lamina-floor.md` §0 for the boundary). **SEVEN RULINGS, FIXED:** it ships
+**OFF** by default at density **16**; the **ARC-LENGTH METRIC IS REQUIRED**; sub-bar cells are
+dropped **all in one pass, recomputed, repeated to a small cap**, then the **ACHIEVED COUNT IS
+REPORTED** (a request, not a guarantee); **SEPALS ARE PINNED OFF** — no inheritance through
+`sepalBladeState`; the **WALL IS 1.0 mm** (closed); the bead on a 1.0 mm wall is #278's existing
+narrow-span clamp, not a new decision; and **THE GUARD IS A CHOICE, NOT A SLIDER — THE
+`inflorescence` NONE SHAPE, NOT THE `lobeDepth` 0 SHAPE, SO `ALL MAX` STAYS UNINFILLED.** That last
+one needs no exclusion of its own and the reason is structural: `SWEEPABLE` filters `SLIDERS()`, so
+a CHOICE is out of the blanket sweep by construction — which is why this file can already record
+that no non-`INFLO:` row sets `inflorescence` at all. **The four SUB-sliders still owe an
+`INFILL_SUB_IDS` entry in that chain** (density, relaxation, density law, anisotropy — sliders
+hidden behind a guard, the `CURL_SUBS` / `INFLO_SUB_IDS` shape), and the consequence to check at
+build time is that `ALL MAX` is a HOLDER whose declared 2,354,268-triangle export refusal does not
+move.
 **THE METRIC IS REQUIRED FOR PRINT SAFETY AND NOT FOR THE LOOK, WHICH IS WHAT EVERY EARLIER DOC
 SAID** — on `petalCup` 1.2 × `petalSpineCurl` 360 the flat plan emits a **0.118 mm wall where it
 asks for 0.500** (0.237×), and ALL FORM MAX reads 0.172; **each of cup, curl, roll and twist reads
