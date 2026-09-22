@@ -438,7 +438,18 @@ function runRowFixtures(SI, rows) {
 if (ONLY_SCOPE) {
   let out = '';
   try { out = execSync(`git diff --name-only ${BASE}...HEAD`, { cwd: HERE, encoding: 'utf8' }); }
-  catch (e) { console.log(`CA5 scope: could not diff against ${BASE} — ${e.message}`); process.exit(1); }
+  catch (e) {
+    /* THE BASE MUST BE REACHABLE, AND ON A RUNNER IT USUALLY IS NOT BY DEFAULT.
+       `${BASE}...HEAD` is a MERGE-BASE diff, so it needs a common ancestor in
+       the clone — and `actions/checkout` takes a PR's merge ref at depth 1,
+       where there is neither an origin/<base> ref nor any ancestry. That is a
+       REFUSAL rather than a skip on purpose (a scope check that quietly opts
+       out is the clause-with-no-subject failure), so the message names the
+       remedy instead: fetch-depth 0. */
+    console.log(`CA5 scope: could not diff against ${BASE} — ${e.message}`);
+    console.log(`CA5 scope: the base has to be IN the clone and share an ancestor with HEAD — on a runner that means fetch-depth: 0, since a PR checkout is the merge ref at depth 1. Refusing rather than skipping: a scope check with no subject would pass on anything.`);
+    process.exit(1);
+  }
   const files = out.split('\n').map((s) => s.trim()).filter(Boolean);
   const stray = files.filter((f) => !SCOPE_ALLOW.includes(f));
   /* A SCOPE CHECK OVER NOTHING PASSES TRIVIALLY, which is the shape of a clause
