@@ -21,6 +21,7 @@ on:
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
       # NOT tools/verify-bloom-apex-mutants.mjs, deliberately, even though the
       # step below PARSES it for its two mutations: a stale anchor there is a
@@ -46,6 +47,7 @@ on:
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
       - tools/bloom-self-intersection.mjs
+      - tools/verify-bloom-census-adjacency.mjs
       - tools/chromium-harness.mjs
   workflow_dispatch: {}
 
@@ -65,7 +67,18 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     steps:
+      # fetch-depth 0 IS FOR CA5 AND NOTHING ELSE, AND A SHALLOW FETCH CANNOT
+      # REPLACE IT. On a pull_request `actions/checkout` takes refs/pull/N/merge
+      # at depth 1, so there is no origin/<base> ref and no common ancestor —
+      # `git diff origin/main...HEAD` is a merge-base diff and fails outright
+      # (measured: run 35743356440, "ambiguous argument 'origin/main...HEAD'").
+      # Deepening to a fixed depth would work until a branch forked further back
+      # and then go red for a reason that has nothing to do with the geometry,
+      # so it is the whole history: 62 MB and 54 commits against a job that runs
+      # for hours. Every other step here reads the working tree and no git.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -110,6 +123,34 @@ jobs:
         run: node tools/verify-bloom-arc-stability.mjs
       - name: ... and those clauses must be able to fail
         run: node tools/verify-bloom-arc-stability.mjs --negative-control
+      # A SHARED CORNER MUST READ AS TOPOLOGY AND A REAL FOLD MUST STILL READ AS
+      # A FOLD (CA0-CA3). X2 in this gate turns the census's count into a verdict,
+      # and a count that is too LOW looks exactly like a clean solid — so the
+      # adjacency rule the census decides that with is owed a witness that can
+      # see it, and nothing in the matrix can. It rides here for arc-stability's
+      # own three reasons: the same question, Node-only, seconds, and it imports
+      # playwright not at all — `bloom-self-intersection.mjs` and the geometry,
+      # and nothing else. The stored pairs are PR #278's, read-only; none of that
+      # geometry is merged.
+      - name: A shared corner is not a fold (CA0-CA3)
+        run: node tools/verify-bloom-census-adjacency.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-census-adjacency.mjs --negative-control
+      # AND THE SCOPE IS CHECKED HERE RATHER THAN BY HAND. A predeclared
+      # allowlist asserted afterwards by the only party who could have broken it
+      # is a claim; asserted by the gate on every run it is evidence. It refuses
+      # an empty diff, so it cannot pass by having no subject.
+      #
+      # IT IS A CLAIM ABOUT A PR'S DIFF AGAINST ITS BASE, so it runs on a
+      # pull_request and on nothing else. This workflow also fires on a push to
+      # main and on a dispatch, where `github.base_ref` is empty: the base would
+      # resolve to origin/main, HEAD would BE origin/main, and the diff would be
+      # empty — which CA5 refuses as vacuous, correctly, and which would have
+      # reddened every post-merge run of this gate. Caught by reading the step's
+      # other triggers rather than by a failure; it has never run on main.
+      - name: ... and only census and instrument files moved
+        if: github.event_name == 'pull_request'
+        run: node tools/verify-bloom-census-adjacency.mjs --scope --base origin/${{ github.base_ref || 'main' }}
       # playwright alone, at an exact version. It pins the exact playwright-core it
       # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
       # browser that `npx playwright install` downloads can never disagree. Both
