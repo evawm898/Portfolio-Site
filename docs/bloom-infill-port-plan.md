@@ -333,8 +333,15 @@ cut 5.5 ms), 18.8 ms at N40. Even a 240-petal head is ~4 s of CPU per build. The
 
 ## 6. THE SESSION PLAN (accepted, Sep 22)
 
-Each session is one mechanism. The real dependency chain is **#279 -> #278 -> S3**, because #278 is
-blocked on X2 and #279 fixes it.
+Each session is one mechanism. The dependency chain was **#279 -> #278 -> S3**, because #278 was
+blocked on X2 and #279 fixes it. **#279 MERGED AS `8f5e209` WHILE THIS DOC WAS BEING WRITTEN**, so
+the first link is closed: by its own measurement, #278's head goes from **109 of 191 covered rows
+firing X2 to 3**, and those three are the span-0 tangency class it already declares as real folds.
+**The live chain is therefore #278 -> S3**, and #278 needs a base merge to pick the fix up.
+Neither that change nor the census rule it carries moves any figure here: the prototype and
+`bloom-infill-lamina-floor.mjs` import `bloom-self-intersection.mjs` **not at all** — the
+0.0009 mm below is a self-APPROACH through the wall instrument's own measure and the prototype's
+scratch census, checked rather than assumed.
 
 **S1 · THE CONFORMING EMITTER.** *Prototype only. No gate dependency.* **FIRST.**
 `cutThrough` tessellates a solid cell as a **flat fan** over the whole cell polygon, and a flat fan
