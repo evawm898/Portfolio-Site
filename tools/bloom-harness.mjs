@@ -7330,7 +7330,8 @@ export function orientationAssertions(positions, row, head) {
    EITHER direction is a record that stopped reproducing, and the commit that
    moved it re-records it (`node tools/bloom-xfail-magnitudes.mjs`).  */
 export const EXPORT_REFUSED_XFAIL = Object.freeze({
-  'ALL MAX': { tris: 2354268, note: '2,354,268 tris (export) against the 1,500,000 budget (ORGANIC VARIANCE build 1 — docs/bloom-organic-variance-size-outcome.md §6: the blanket sweep hands `varianceSize` its 0.50, and the FRINGE\'s tooth ceiling is a rule about the terminal\'s WIDTH, `W >= (2N-1) * MIN_FEATURE_MM`, so the 0.5x petals of the wave cut fewer teeth — per petal 10/9/8/…/1 where the unvaried row cut 10/8/6/4/3 per whorl — and the row lost 152,384 triangles: 2,506,652 -> 2,354,268, measured in Node on both amounts. A topology move by the fringe\'s own width rule, mode-free as that rule is; XR1\'s builder tally agrees with the refused count.) Before that: 2,506,652 tris, a 119.5 MiB file (sepals part 1: the blanket sweep now also hands `sepalCount` its maximum, 40 sepals at the shipped sub-control defaults on the 40-petal rim, +94,240 tris over the 2,412,412 the row read on main after the stem tip plug (the sepal session first quoted +94,140, computed against the stale 2,412,512; the count itself was measured); the sepal sub-controls are hidden at DEFAULTS and stay out of the sweep; the count is re-measured on the merged tree by `node tools/bloom-xfail-magnitudes.mjs --include-refused`). Before that, the fringe: the blanket sweep hands the three fringe controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
+  'ALL MAX': { tris: 4239920, note: 'THE PETAL EDGE PROFILE (the rim taper and bead) takes this row 2,354,268 -> 4,239,920 tris (export), 157.0%% -> 282.7%% of the 1,500,000 budget and a ~202 MiB file. The treatment closes every petal\'s perimeter with a swept profile, so the cost is per PERIMETER VERTEX and this row carries a 240-petal head with the fringe at its maximum: measured +80.1%% here against +73.7%% on the shipping default. Measured in Node on both trees by `node tools/bloom-xfail-magnitudes.mjs --include-refused`; XR1\'s builder tally agrees with the refused count. Before that: 2,354,268 tris (export) against the 1,500,000 budget (ORGANIC VARIANCE build 1 — docs/bloom-organic-variance-size-outcome.md §6: the blanket sweep hands `varianceSize` its 0.50, and the FRINGE\'s tooth ceiling is a rule about the terminal\'s WIDTH, `W >= (2N-1) * MIN_FEATURE_MM`, so the 0.5x petals of the wave cut fewer teeth — per petal 10/9/8/…/1 where the unvaried row cut 10/8/6/4/3 per whorl — and the row lost 152,384 triangles: 2,506,652 -> 2,354,268, measured in Node on both amounts. A topology move by the fringe\'s own width rule, mode-free as that rule is; XR1\'s builder tally agrees with the refused count.) Before that: 2,506,652 tris, a 119.5 MiB file (sepals part 1: the blanket sweep now also hands `sepalCount` its maximum, 40 sepals at the shipped sub-control defaults on the 40-petal rim, +94,240 tris over the 2,412,412 the row read on main after the stem tip plug (the sepal session first quoted +94,140, computed against the stale 2,412,512; the count itself was measured); the sepal sub-controls are hidden at DEFAULTS and stay out of the sweep; the count is re-measured on the merged tree by `node tools/bloom-xfail-magnitudes.mjs --include-refused`). Before that, the fringe: the blanket sweep hands the three fringe controls their maxima (petalTipEnd 1, fringeCount 10, fringeDepth 0.50) on a 240-petal head (40 petals x 6 layers). The fringe is 3.79x this row on its own: the identical control set with those three at their SHIPPED DEFAULTS builds 636,672 tris and exports fine. THREE teeth is the most that exports here (1,267,392, 84.5% of budget); the fourth misses by 19,392, which is 1.3%.' },
+  'INFLO: ALL MAX — every inflorescence control at its maximum (36 florets)': { tris: 1886588, note: 'A NEW REFUSAL, and the only one the edge profile creates: this row EXPORTED on main at 1,114,828 tris (74.3%% of the 1,500,000 budget) and the rim treatment takes it to 1,886,588 (125.8%%, ~90 MiB), so the generator refuses it. Thirty-six florets are thirty-six heads, and the treatment is per perimeter vertex of every petal of every one of them. THE WHOLE MATRIX WAS SWEPT FOR THIS rather than the plausible candidates checked: 909 rows built in EXPORT mode, exactly two over the budget, and NOT ONE other row within 20%% of it (the next highest exports at under 80%%) — so the risk set is these two and the headroom elsewhere is not marginal. `INFLO: ALL MAX` is the row the inflorescence session\'s ruling 9 asked for by name and which did not then breach; its own outcome doc says the day a node cap rises or a per-node delta lands is where it would, and a per-perimeter-vertex rim treatment is the third way.' },
 });
 for (const [label, e] of Object.entries(EXPORT_REFUSED_XFAIL)) {
   if (!e || !Number.isInteger(e.tris) || e.tris < 1) throw new Error(`EXPORT_REFUSED_XFAIL: "${label}" declares no triangle count (${JSON.stringify(e)}) — an entry is {tris[, note]}, and a declaration without a number is a label`);
@@ -7394,58 +7395,53 @@ export function exportRefusedCoverage(attemptedLabels) {
 }
 
 export const SELF_INTERSECTION_XFAIL_HAS = (label) => Object.prototype.hasOwnProperty.call(SELF_INTERSECTION_XFAIL, label);
+/* RE-BASELINED BY THE PETAL EDGE PROFILE (the rim taper and bead), and the
+   whole list moved because the treatment re-triangulates every petal's
+   perimeter. Measured with `node tools/bloom-xfail-magnitudes.mjs --emit` on
+   the branch and against a worktree of `main`; the row-by-row before/after is
+   in docs/bloom-edge-profile-outcome.md, which is where #213 says the
+   attribution lives. Of the 302 entries this list carried: 38 HELD exactly,
+   134 read a larger pair count, 73 a smaller one, and 56 read ZERO and are
+   gone from the list — 302 -> 246.
+   THE 56 SPLIT IN TWO, AND THE SPLIT IS MEASURED RATHER THAN ASSUMED. 37 are
+   ordinary rows whose shell decomposition is unchanged (same shell count on
+   both trees) and whose within-shell pairs genuinely went; the largest was 724.
+   The other 19 are EVERY multi-panel row — every FRINGE row, every CLEFT row,
+   and `TIP SHAPE: 3.00 x a cleft margin` — and they did NOT stop overlapping:
+   the census finds shells by VERTEX WELDING, and the bead closes each panel
+   with its own boundary, so a tooth panel and the base panel it overlaps BY
+   DESIGN are two shells here where they were one on main. Their overlap moved
+   into the CROSS-shell column, which the export contract permits and the
+   census counts separately: `FRINGE: THE CARNATION` goes shells 13 -> 41,
+   within 7,288 -> 0, cross 5,992 -> 15,464; `FRINGE: x 40 petals` goes 45 ->
+   201 shells and 40,759 -> 0 within. 205,930 of the 312,934 within-shell pairs
+   this list loses are that re-categorisation and not a repair.
+   WHAT IT COSTS, SAID PLAINLY: a tooth folding through its own BASE panel
+   would now be cross-shell and invisible to this census. A panel folding
+   through ITSELF is still caught, because each panel is still a shell.
+   AND 114 UNDECLARED ROWS READ NON-ZERO HERE THAT READ 0 ON `main`, AT A
+   WORST SPAN OF 2.558e-9 mm, WHICH IS THE CENSUS AND NOT THE GEOMETRY — they
+   are NOT declared, and this is why. Measured on every one of them: the pair
+   shares EXACTLY ONE VERTEX, and the point the census reports as an
+   intersection sits 1.04e-9 to 3.07e-9 mm from that shared vertex. The
+   shared-feature rule discards a point that IS the shared feature, with an
+   ABSOLUTE `PT_EPS` of 1e-9 mm — on coordinates of 20 to 40 mm, where one ulp
+   is 6e-15 and the segment-triangle solve's own conditioning delivers about
+   1e-9. So the bar is the solve's error, and the bead decides which side of it
+   a given vertex lands on: the treatment puts many more near-tangent facets
+   around one vertex than the flat wall did. The file's own header says the HIT
+   test uses a RELATIVE epsilon; the DISCARD test does not, and two halves of
+   one comparison in two units is Eva's fourth durable rule.
+   THE OBVIOUS FIX IS A WEAKENING AND WAS MEASURED TO BE ONE — do not reach for
+   it. Scaling that bar by the coordinate magnitude takes 113 of the 117 to
+   zero, and it also takes `VARIANCE: size ±50% x 40 petals` to zero, whose
+   0.8187 mm fold is REAL and is declared above. It moves 7 of 40 of main's own
+   declared rows as well. The remedy is the one the census's SECOND epsilon
+   defect already took — verify the point rather than widen a tolerance — and
+   it is its own piece of work with its own calibration, not a line in a
+   geometry PR. Until it lands, X2 reddens those 114 rows. */
 export const SELF_INTERSECTION_XFAIL = Object.freeze({
-  /* ===================================================================
-     RE-RECORDED, 68 ROWS, BY THE CENSUS'S ADJACENCY RULE (#213's procedure —
-     a session that moves a declared row's reading re-records it in the same
-     commit and names it in its outcome doc). Nothing about any bloom moved:
-     `tools/bloom-self-intersection.mjs` stopped counting a hit produced by an
-     edge INCIDENT to a corner the two triangles already share, which is the
-     topology of the mesh rather than a fold in it, and the bar it used to
-     decide that by — an absolute 1e-9 mm — was the segment-triangle solve's
-     own noise. Every entry the change touched carries the previous figure.
-
-     THE WHOLE MOVE, measured over the 909-row live matrix in EXPORT mode:
-     881 pairs stop being counted, across 68 rows; 11 of those rows drop to
-     zero and their entries are GONE from this list; the other 57 keep theirs
-     at the new count. Of the 735 removed from the 67 rows whose pairs are
-     stored as fixtures, 734 read a span of exactly 0.0000 mm and the largest
-     anywhere is 1.8e-14 mm; the 68th row is `ALL MAX`, whose 146 are not
-     stored (2.35M triangles) and whose worst span is unmoved. So no row's
-     recorded depth is affected by the removal itself — the ONE worst-span move on the
-     matrix is `SEPALS: sepalBuckleFreq min (1)`, and it is a pair that is NOT
-     removed (its own entry says why). X2 fires on no row either way, and no
-     UNDECLARED row moved at all; the sweep is `tools/bloom-census-sweep.mjs`
-     and the gate for the rule is `tools/verify-bloom-census-adjacency.mjs`.
-
-     THE ELEVEN ROWS WHOSE ENTRIES ARE GONE, with what each read before — every
-     one of them span 0.0000 mm, so each was a count of phantoms and nothing
-     else. They are named here because a later session greps this list for a row
-     it expects to find, and an absence with no reason beside it reads as a row
-     somebody forgot. Any of them can come back the next time a ladder or an arc
-     moves a station: that is a knife edge returning, not a regression.
-         5  ALL PETALS: GATED — max x 3 layers x phase 0 x ORCHID (inert beside a live orchid)
-         1  LOBES: x cup 0.40 (the cup alone carries 2 span-0 touches at the form-onset crease; the lobed ladder lands 3 — a sampling coincidence of the stations against the crease, never a fold)
-         5  ORCHID x 3 layers x phase 0 (slot roles x layer roles)
-         4  ORCHID x ALL THIN x spread min (the junction at its thinnest) x 2 whorls in step
-         3  ORCHID x petalCount 3 (one of three is the labellum, no laterals) x 2 whorls in step
-         1  ORCHID x petalCount 39 (odd at scale — hood is a straddling pair) x 2 whorls in step
-         3  ORCHID x petalCount 4 (smallest even — hood is one slot) x 2 whorls in step
-        46  ORCHID x the foot UPPER clamp (petalWidth 30) x 2 whorls in step
-         2  ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step
-         6  SEPALS: angle 90 asked on a CUPPED corolla (cup 0.6 — an interleaved sepal tilts further than an aligned one)
-         3  VARIANCE: x the IRIS at 2 whorls (a role override composed with the slot field)
-     =================================================================== */
-  'petalCup min (-0.8)': { pairs: 360, worstMm: 0.2104, note: 'RE-RECORDED: was 384 pairs, 24 removed by the census adjacency rule (see the block at the head of this list)' },
-  'petalCup max (1.2)': { pairs: 720, worstMm: 0.1268, note: 'RE-RECORDED: was 752 pairs, 32 removed by the census adjacency rule (see the block at the head of this list)' },
-  'petalCupGradient min (-0.8)': { pairs: 360, worstMm: 0.1930 },
-  'petalCupGradient max (1.2)': { pairs: 720, worstMm: 0.1179 },
-  'buckleAmp max (0.6)': { pairs: 8, worstMm: 0.0179 },
-  'petalSpineCurl max (360)': { pairs: 1008, worstMm: 0.5233 },
-  'petalRoll min (-330)': { pairs: 18776, worstMm: 1.3837 },
-  'petalRoll max (330)': { pairs: 18776, worstMm: 1.3837 },
-  'headRise max (1)': { pairs: 216, worstMm: 0.4176, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
-  /* ORGANIC VARIANCE, BUILD 1 (the size field) — three block-38 rows fold where
+  /* ============================================================  /* ORGANIC VARIANCE, BUILD 1 (the size field) — three block-38 rows fold where
      their base row does not, or folds more: the field composes with the form
      the petal already carries, and a 1.5x petal at cup 1.2 or under the buckle
      reaches its neighbour and itself sooner. Measured by the export gate's own
@@ -7679,15 +7675,15 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'GYNOECIUM: style curl min (-180) x 6 stamens': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style curl max (180) — bent over the apex': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x 6 x filament curl max (180) — the filaments cross the axis the style stands on': { pairs: 272, worstMm: 0.0796 },
-  'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': { pairs: 286, worstMm: 0.4176, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
-  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664 },
+  'GYNOECIUM: style x Head rise 1 (rooted at the cap\'s apex)': { pairs: 366, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it)' },
+  'GYNOECIUM: style x the mum (the 4.69 mm printed hub)': { pairs: 275, worstMm: 0.0664 },
   'GYNOECIUM: style x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'GYNOECIUM: style x ALL THIN x spread min (the thinnest slab)': { pairs: 272, worstMm: 0.0664 },
   'GYNOECIUM: style x the APEX CORNER — ALL MIN x sheet 2.40 x spread min (a hub narrower than the style: WIDER THAN THE HUB, told)': { pairs: 300, worstMm: 1.6149 },
   'GYNOECIUM: style x 3 layers (deeper petal roots)': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x CONTINUOUS x 3 turns x 120 DISC': { pairs: 272, worstMm: 0.0796 },
   'GYNOECIUM: style x FAN (the fan\'s full-disc hub)': { pairs: 272, worstMm: 0.0796 },
-  'GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': { pairs: 67, worstMm: 0.2109 },
+  'GYNOECIUM: GATED — every control at MAXIMUM under the INCURVE sphere (bit-identical to the incurve sphere)': { pairs: 151, worstMm: 0.2109 },
   'ANTHER: 6 lobes at 90° — the widest fan': { pairs: 619, worstMm: 0.5933 },
   'ANTHER: a shaped tip x a style (the trifid beside a triangle, on one scale)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: a style at the shipped trifid x 6 stamens (the tip block\'s own control row)': { pairs: 272, worstMm: 0.0796 },
@@ -7705,7 +7701,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'STIGMA: COINCIDENT — 3 lobes at a spread of 0 (duplicate geometry, told, never refused)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: one lobe LEANING (spread 45 at a count of 1 — not a dead slider)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: a shaped stigma x 120 on the DISC (the cushion around a 12-point star)': { pairs: 272, worstMm: 0.0796 },
-  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': { pairs: 272, worstMm: 0.0664 },
+  'STIGMA: a shaped stigma x the mum (the 4.69 mm printed hub)': { pairs: 275, worstMm: 0.0664 },
   'STIGMA: a shaped stigma x sheet 2.40 (the fat style)': { pairs: 272, worstMm: 0.1593 },
   'STIGMA: the NEAREST REACHABLE TO THE CIRCLE (pinch min 0.05 at roundedness 0 — every factor 0.983, none exactly 1, on the 16-side lattice; the singular exponent sits one step below)': { pairs: 272, worstMm: 0.0796 },
   'STIGMA: THE FAMILY — the same seven on both tips (3-point polygons at pinch 1, roundedness 0, on six anthers and the trifid)': { pairs: 272, worstMm: 0.0796 },
@@ -7729,12 +7725,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'BUCKLE: x ZYGO 2 whorls x ALL INNER MAX (the buckle is not role-differentiated)': { pairs: 22657, worstMm: 2.1213 },
   'TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once)': { pairs: 10760, worstMm: 1.0968 },
   'TIP SHAPE: x the whole centre (stamens and a style under a round tip)': { pairs: 272, worstMm: 0.0796 },
-  'TIP SHAPE: x ZYGO 2 whorls x ALL INNER MAX': { pairs: 4584, worstMm: 0.5275 },
-  'LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform': { pairs: 12, worstMm: 0.8685 },
-  'LADDER x BUCKLE: f 5 — the ladder is bounded but still redistributes': { pairs: 37, worstMm: 0.1931 },
-  'LADDER x BUCKLE: f 1 — one cycle, the ladder is unbounded by the buckle': { pairs: 254, worstMm: 0.6514 },
-  'LADDER x BUCKLE: the clamp binding under a round tip': { pairs: 10, worstMm: 0.1778 },
-  'TIP SHAPE: 3.00 x a cleft margin': { pairs: 4647, worstMm: 0.8550, note: '(CLEFT — the lobe panels reach PANEL_OVERLAP_ROWS into the base panel by design and share its vertices, so one shell)' },
+  'TIP SHAPE: x ZYGO 2 whorls x ALL INNER MAX': { pairs: 5611, worstMm: 0.5375 },
   /* LOBES (session 38, PR 2) — RE-MEASURED ON THE MERGED TREE. These rows did
      not exist on the main this session branched from, and each is a lobed cut
      over a fold that is declared here in its own right. `node
@@ -7779,8 +7770,8 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'LOBES: x roll 330 (over the quill, declared on main)': { pairs: 16360, worstMm: 1.6103, note: '(IMPROVED since the magnitude gate landed: this entry read 16360 / 1.6115 until 2026-09-17, re-measured on main at 7ebfb7f — docs/bloom-xfail-magnitudes.md) (session 42 re-baselined on the branch: 18712 on main at the same control set, so MODEL B takes 2,352 pairs OFF the quill; over "petalRoll max (330)", which reads 18776 pairs / 1.3837 mm)' },
   'LOBES: x curl 360 (over the fiddlehead, declared on main)': { pairs: 864, worstMm: 0.5070, note: '(IMPROVED since the magnitude gate landed: this entry read 864 / 0.8971 until 2026-09-17, re-measured on main at 7ebfb7f — docs/bloom-xfail-magnitudes.md) (session 42 re-baselined on the branch: 784 on main at the same control set; over "petalSpineCurl max (360)", which reads 1008 pairs / 0.5233 mm)' },
   'LOBES: x the whole centre (stamens and a style under a lobed whorl)': { pairs: 272, worstMm: 0.0796 },
-  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': { pairs: 6176, worstMm: 0.4481, note: '(session 42 re-baselined on the branch: main reads 11824 / 0.7468 at the same control set, so MODEL B takes 5648 pairs OFF this row and nearly halves the worst span; was 12264 / 0.7032 before session 41)' },
-  'LOBES: x the domed hub (head rise 1.00)': { pairs: 216, worstMm: 0.4176, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)' },
+  'LOBES: x ZYGO 2 whorls x ALL INNER MAX (the cut is not role-differentiated)': { pairs: 4672, worstMm: 0.3969, note: '(session 42 re-baselined on the branch: main reads 11824 / 0.7468 at the same control set, so MODEL B takes 5648 pairs OFF this row and nearly halves the worst span; was 12264 / 0.7032 before session 41)' },
+  'LOBES: x the domed hub (head rise 1.00)': { pairs: 296, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — 115.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it; over "headRise max (1)", which reads 216 pairs / 0.4176 mm on THIS tree)' },
   /* THE STEM'S HEMISPHERE ROW IS THE HEAD'S FOLD, NOT THE STEM'S, and that is
      a two-sided measurement rather than a reading of the label: the SAME state
      built WITHOUT a stem reads 216 pairs, worst span 0.4176 mm, at the SAME
@@ -7789,7 +7780,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      the lobe session's own 20 mm/2.40 mm sheet row: a pre-existing fold that no
      row on main names because the matrix varies one control at a time, found
      the moment a new block put two controls together. */
-  'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': { pairs: 216, worstMm: 0.4176, note: '(EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)")' },
+  'STEM: x a hemisphere (rise 1.00 — the deepest bowl, the most hidden length)': { pairs: 296, worstMm: 0.4262, note: '(EFFECTIVE TILT PAST 90 — the HEAD\'s, not the stem\'s: the identical state with stemLength 0 reads the same 216 pairs at the same point, and so does "headRise max (1)")' },
   /* AND THE SAME SHAPE ONE BLOCK ON (the sphere-stem session), measured the
      same two-sided way rather than read off the label: the identical state with
      `stemLength` 0 reads the SAME 199 pairs at the SAME point, and so does a
@@ -7799,7 +7790,7 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      face pole and has since session 18; no row on main names it because the
      matrix varies one control at a time. The stem adds nothing to it, and the
      channel REMOVED 44,188 triangles from this row without touching the count. */
-  'SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)': { pairs: 199, worstMm: 0.2394, note: 'at (0.13, 2.72, 33.21) — the HEAD\'s fold at the FACE pole, not the stem\'s: the identical state with stemLength 0 reads the same 199 pairs at the same point on this tree AND on a worktree of main' },
+  'SPHERE STEM: x 40 petals x 6 turns (240 feet — the most the channel ever sorts)': { pairs: 320, worstMm: 0.1331, note: 'at (0.13, 2.72, 33.21) — the HEAD\'s fold at the FACE pole, not the stem\'s: the identical state with stemLength 0 reads the same 199 pairs at the same point on this tree AND on a worktree of main' },
   /* SEPALS, PART 1 (block 35) — every figure measured in Node on the export
      build (`census(meshFor(set))`), each row also built with `sepalCount` 0 so
      the attribution is a MEASUREMENT: a count that survives the sepals' removal
@@ -7848,13 +7839,13 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      EXACTLY 0 pairs — the clearance law is doing its job right up to the
      right angle where it saturates — so X2 holds them to zero and the block
      is not a set of rows that all happen to be declared. */
-  'petalTilt max (120)': { pairs: 336, worstMm: 0.4095, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the blanket sweep\'s own endpoint. It read 0 pairs at the old maximum of 75 and folds at 120, where the seam window closes to a single point. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 105 (inside the seam window the ceiling is derived from)': { pairs: 336, worstMm: 0.4016, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; inside the window, and the figure the discovery doc\'s own scratch probe read under the shipped law (docs/bloom-bell-corolla-discovery.md §4, "tilt 105 | 336") — reproduced here through the shipped census on the shipped tree. EFFECTIVE TILT PAST 90 — 105.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 120 x sheet 2.40 (the thickest sheet — the clearance is t/2 there)': { pairs: 368, worstMm: 0.7434, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the SHEET arm: the clearance is (t/2) sin(turn), so the thickest sheet carries the largest offset and the largest span. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 120 x 20 x 8 mm (the shortest blade — the coarsest lattice station)': { pairs: 336, worstMm: 0.4326, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the LENGTH arm: one lattice station is 0.36 mm on a 20 mm blade against 0.62 on the shipping 35 mm one, so the first blade row lands differently for the same clearance. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)': { pairs: 1008, worstMm: 0.4406, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the DEPTH arm, and the shape the pre-ruling matrix could not build from the base control: three whorls ALL past the right angle rather than an inner one carried there by a tilt step. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 120 x CONTINUOUS x 3 turns (the other placement whose rings each carry their own turn)': { pairs: 2824, worstMm: 0.4820, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the continuous arm accumulates the tilt gain over 2.975 turns, so the deepest ring reaches 154.5 degrees from a 120-degree base. EFFECTIVE TILT PAST 90 — 154.5 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
-  'TILT: 120 x headRise 0.5 (domeLean on top of the ceiling — past the window\'s own edge)': { pairs: 1112, worstMm: 0.6428, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; domeLean adds to the base tilt, so this is the one row here whose deepest ring is past the window\'s own edge as well as past the right angle. EFFECTIVE TILT PAST 90 — 173.1 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'petalTilt max (120)': { pairs: 546, worstMm: 0.3632, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the blanket sweep\'s own endpoint. It read 0 pairs at the old maximum of 75 and folds at 120, where the seam window closes to a single point. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 105 (inside the seam window the ceiling is derived from)': { pairs: 450, worstMm: 0.4022, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; inside the window, and the figure the discovery doc\'s own scratch probe read under the shipped law (docs/bloom-bell-corolla-discovery.md §4, "tilt 105 | 336") — reproduced here through the shipped census on the shipped tree. EFFECTIVE TILT PAST 90 — 105.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 120 x sheet 2.40 (the thickest sheet — the clearance is t/2 there)': { pairs: 560, worstMm: 0.3964, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the SHEET arm: the clearance is (t/2) sin(turn), so the thickest sheet carries the largest offset and the largest span. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 120 x 20 x 8 mm (the shortest blade — the coarsest lattice station)': { pairs: 528, worstMm: 0.2232, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the LENGTH arm: one lattice station is 0.36 mm on a 20 mm blade against 0.62 on the shipping 35 mm one, so the first blade row lands differently for the same clearance. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)': { pairs: 1600, worstMm: 0.3816, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the DEPTH arm, and the shape the pre-ruling matrix could not build from the base control: three whorls ALL past the right angle rather than an inner one carried there by a tilt step. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 120 x CONTINUOUS x 3 turns (the other placement whose rings each carry their own turn)': { pairs: 3383, worstMm: 0.4032, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the continuous arm accumulates the tilt gain over 2.975 turns, so the deepest ring reaches 154.5 degrees from a 120-degree base. EFFECTIVE TILT PAST 90 — 154.5 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
+  'TILT: 120 x headRise 0.5 (domeLean on top of the ceiling — past the window\'s own edge)': { pairs: 1266, worstMm: 0.6020, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; domeLean adds to the base tilt, so this is the one row here whose deepest ring is past the window\'s own edge as well as past the right angle. EFFECTIVE TILT PAST 90 — 173.1 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s)' },
 });
 
 /* THE MAGNITUDE IS GATED (#213, closed — docs/bloom-xfail-magnitudes.md has

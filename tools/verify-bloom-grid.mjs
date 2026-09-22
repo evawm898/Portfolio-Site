@@ -933,7 +933,19 @@ const MUTANTS = [
        caught on the foot: at u = 0 `sectAt` IS `flatSect` (clause 4 measures
        that deviation as exactly 0), so the per-point normal and the row's own
        already agree there and the mutation moves nothing. */
-    id: 'grid-stores-the-row-normal', clause: ['2b', '2c', '2d'], file: 'bloom-geometry.js',
+    /* 2a IS CLAIMED HERE BECAUSE 2a's SUBJECT GREW, NOT BECAUSE THE MUTATION
+       BROKE THE PAGE. 2a became an exhaustive disjunction when the edge
+       profile landed — a captured boundary point is an emitted BEAD APEX, or
+       (where the treatment never reached it) its two SKIN points are emitted —
+       and that second half reconstructs `P +/- n * t / 2`, so it reads the
+       stored normal. The apex half reads `P` alone and cannot be touched by a
+       normal mutation, so every point this reddens is one that was passing on
+       the wall half. Measured: 112 of 1072 per bloom, all at `row 0 u = 0` (the
+       buried foot), and ONLY on `headRise 1.0`, `headRise 0.5 + form` and
+       `SPHERE` — the rows where the row's normal and the per-column
+       mid-surface normal actually differ. On a flat hub they agree and 2a stays
+       silent. A true statement about the mutation, so it is declared. */
+    id: 'grid-stores-the-row-normal', clause: ['2a', '2b', '2c', '2d'], file: 'bloom-geometry.js',
     from: 'mid: oP[k], normal: oN[k] });',
     to: 'mid: oP[k], normal: oN[k].map(() => rows[i].N) });',
   },
@@ -965,8 +977,12 @@ const MUTANTS = [
        is not allowed is a clause nobody claimed, which is why the run said so
        instead of passing. */
     id: 'the-bead-apex-is-recomputed', clause: ['2a', '2e'], file: 'bloom-geometry.js',
-    from: 'pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = apex;',
-    to: 'pts[0] = top[sk][j]; pts[K] = bot[sk][j]; pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];',
+    /* RE-ANCHORED after the flat-profile branch landed between the two
+       statements this used to match as one line. The anchor pre-check is what
+       said so — it refused the whole run before any mutant executed, which is
+       the survivable half of a refactor disarming a mutant. */
+    from: 'pts[APEX] = apex;',
+    to: 'pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];',
   },
   {
     id: 'drops-all-three-foot-rows', clause: '3', file: 'bloom-grid-gltf.js',
