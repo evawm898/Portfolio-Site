@@ -27,13 +27,18 @@
 
    NO PIXEL DELTA IS QUOTED ANYWHERE — two trees, two servers, two page
    sessions, and this renderer is not deterministic between them (the
-   contact-sheet rule). The one pixel number is a SAME-TREE control per row,
-   reported and never a bar.
+   contact-sheet rule), and there is no same-tree control here to calibrate
+   one against. Every number on the sheet is GEOMETRIC and read off the
+   builder's own emitted outline: the face, the parallel run, the corner over
+   the last half-millimetre of arc, the drawn length against the asked one.
+   Each cell SETTLES on the real signal — screenshot until three consecutive
+   frames are byte-identical — and REFUSES rather than shooting a moving
+   frame.
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, shownModeOf } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, settleBuild, stillFrame, shownModeOf } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const outDir = process.argv[2];
@@ -166,6 +171,22 @@ async function serverFor(t) {
 
 const results = [];
 const { browser, page } = await launchPage({ viewport: { width: VIEW, height: VIEW }, deviceScaleFactor: DPR });
+function die(msg) { console.error('HARNESS INVALID: ' + msg); browser.close().then(() => { for (const s of Object.values(servers)) s.server.close(); process.exit(2); }); throw new Error(msg); }
+/* SETTLE ON THE REAL SIGNAL — three consecutive byte-identical frames, never
+   a fixed wait. Two is not enough: the first capture after a page load fires
+   spuriously (session 34 measured a settle declaring itself done 27,982 px
+   from the same cell at rest). */
+async function settleFrames() {
+  const clip = { x: 0, y: 0, width: VIEW, height: VIEW };
+  let a = null, b = null;
+  for (let k = 0; k < 90; k++) {
+    await page.waitForTimeout(100);
+    const c = await page.screenshot({ clip, timeout: 180000 });
+    if (a && b && c.equals(b) && b.equals(a)) return k;
+    a = b; b = c;
+  }
+  return -1;
+}
 for (const c of chosen) {
   const file = path.join(outDir, `${c.id}.png`);
   const { f, cam } = await planFor(c);
@@ -173,17 +194,24 @@ for (const c of chosen) {
   const srv = await serverFor(c.tree);
   await openBloom(page, srv.port);
   const bad = await applyConfig(page, Object.entries({ ...c.state.set }).map(([id, value]) => ({ id, value: String(value) })));
-  if (bad.length) { console.error(`REFUSED ${c.id}: ${bad[0]}`); process.exit(1); }
-  await page.evaluate(() => { const b = document.querySelector('#printPreview'); if (b && !b.checked) b.click(); });
+  if (bad.length) die(`${c.id}: ${bad[0]}`);
+  /* PRINT PREVIEW, through the control's own change event and READ BACK from
+     the app's `shownMode` — never from what this tool believes it set. */
+  await page.evaluate(() => { const el = document.getElementById('printPreview'); el.checked = true; el.dispatchEvent(new Event('change', { bubbles: true })); });
+  await settleBuild(page);
   const shown = await shownModeOf(page);
-  if (shown !== 'export') { console.error(`REFUSED ${c.id}: print preview reads ${shown}`); process.exit(1); }
-  await page.evaluate(([at, dir, radius]) => {
-    const s = window.__bloomScaffold || window.__bloomView;
-    if (s && s.setView) s.setView(at, dir, radius);
-    else if (window.__bloomCamera) window.__bloomCamera(at, dir, radius);
-  }, [cam.at, cam.dir, cam.radius]);
-  await stillFrame(page);
-  await page.screenshot({ path: file });
+  if (shown !== 'export') die(`${c.id}: print preview ON asked for, the app reports shownMode "${shown}"`);
+  /* CHROME OFF AND AUTO-ROTATE OFF, and its own diagnosis is CHECKED: a sheet
+     that photographed the panel would be reporting on the panel. */
+  const chrome = await stillFrame(page);
+  if (chrome.length) die(`${c.id}: ${chrome.join('; ')}`);
+  /* THE APP'S OWN CAMERA. `__bloomFrame(radius, lift, at, dir, up)` is the one
+     hook every sheet here uses, and it exists on both trees. */
+  await page.evaluate((a) => window.__bloomFrame(a.r, 0, a.at, a.dir, null), { r: cam.radius, at: cam.at, dir: cam.dir });
+  const settled = await settleFrames();
+  const buf = await page.screenshot({ clip: { x: 0, y: 0, width: VIEW, height: VIEW }, timeout: 180000 });
+  if (settled < 0) die(`${c.id}: never settled in 90 frames`);
+  fs.writeFileSync(file, buf);
   results.push({ c, f, cam, reused: false });
   console.log(`  ${c.id.padEnd(10)} face ${f.num.faceMm.toFixed(4)} mm · run ${f.num.runMm.toFixed(3)} mm · corner ${f.num.cornerDeg.toFixed(1)}° · drawn ${f.len.toFixed(3)}/${f.asked.toFixed(2)} · tris ${f.tris}`);
 }
