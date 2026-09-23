@@ -88,12 +88,26 @@ function caption(b, label) {
     + `Holes ${span}; wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm. ${num(b.tris)} triangles.`;
 }
 
+/* THE COMPOSITE'S OWN SECOND LINE — the brief asks for the ACHIEVED COUNT in
+   the caption, and the composite's captions are BAKED INTO THE PIXELS because
+   a doc that points at a sheet in a scratchpad points at nothing once the
+   container is reclaimed. The HTML sheet beside it carries the full sentence;
+   this is the same three numbers in the 5x7 font's own alphabet, read from the
+   SAME record rather than restated, so the two cannot drift. */
+function shortCounts(b, whole) {
+  const F = b.F;
+  if (!F) return 'NO PATTERN CUT - THE CONTROL';
+  if (F.refused) return `NOT CUT (${String(F.refused).toUpperCase()})`;
+  if (whole) return `${F.achieved} HOLES A PETAL, ${num(b.tris)} TRIANGLES`;
+  return `${F.density} ASKED, ${F.cells} CELLS, ${F.achieved} WITH A HOLE, ${F.solid} SOLID`;
+}
+
 const cells = [];
 function shot(name, b, label, cam, opts = {}) {
   const rgb = render(b.pos, W, H, cam, { light1: [0.55, -0.55, 0.62], light2: [-0.5, 0.4, 0.3], ...opts });
   const png = path.join(DIR, `${name}.png`);
   writePng(png, W, H, rgb);
-  cells.push({ caption: caption(b, label), png: fs.readFileSync(png).toString('base64'), rgb });
+  cells.push({ caption: caption(b, label), png: fs.readFileSync(png).toString('base64'), rgb, b });
   console.log(`rendered ${name.padEnd(22)} ${caption(b, label).replace(/<\/?b>/g, '')}`);
 }
 
@@ -155,13 +169,14 @@ if (PNG) {
      that points only at a sheet in a scratchpad points at nothing once the
      container is reclaimed. Labelled IN the image for the same reason. */
   const pick = ['01-petal', '02-petal-solid', '04-bloom'].map((n, i) => cells[[0, 1, 3][i]]);
-  const LBL = 22, CW = W, CH = H + LBL;
+  const LBL = 40, CW = W, CH = H + LBL;
   const cw = CW * pick.length, ch = CH;
   const out = Buffer.alloc(cw * ch * 3, 0x14);
   pick.forEach((c, i) => {
     const strip = Buffer.alloc(CW * CH * 3, 0x14);
     c.rgb.copy(strip, CW * LBL * 3);
-    text(strip, CW, CH, 8, 6, ['THE SHIPPING DEFAULT, INFILLED', 'THE SAME PETAL, GUARD OFF', 'THE WHOLE BLOOM, INFILLED'][i]);
+    text(strip, CW, CH, 8, 4, ['THE SHIPPING DEFAULT, INFILLED', 'THE SAME PETAL, GUARD OFF', 'THE WHOLE BLOOM, INFILLED'][i]);
+    text(strip, CW, CH, 8, 22, shortCounts(c.b, i === 2), [184, 180, 172]);
     blit(out, cw, ch, strip, CW, CH, i * CW, 0);
   });
   fs.mkdirSync(path.dirname(PNG), { recursive: true });
