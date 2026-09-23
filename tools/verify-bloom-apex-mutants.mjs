@@ -1412,13 +1412,33 @@ const MUTANTS = [
   { id: 'the-squared-terminal-no-longer-stands-the-nib-down', why: 'the nib is cut even where a squared terminal holds the outline above the print floor, so petalTipEnd stops deciding how wide the petal ends — the guard’s other arm, and #229’s fringe terminal with it',
     find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };",
     into: '  /* the squared terminal no longer stands the nib down */', names: ['AN0'],
+    /* THE WITNESS ASKS WHICH GUARD REFUSED, NOT WHETHER ONE DID — and the
+       first version asking the latter reported "the behaviour did not move"
+       on a live mutation, which is a finding about the GEOMETRY worth keeping.
+       On a 0.30 squared terminal at the default width the terminal is 2.40 mm
+       and the outline is CONSTANT over [uPk, 1], so with the squared-terminal
+       guard removed the bisection finds no crossing, `uLaw` lands on 1, the
+       one-sided tangent there is 0 and the NEXT guard refuses — for the wrong
+       reason. So that guard is load-bearing for the REASON rather than for the
+       outcome on this row, which is exactly what AN0 checks: a ring reporting
+       "the law arrives with no slope to carry on" is a FINDING, because that
+       guard fires on no row of the shipped matrix. The plan moving observably
+       is the claim; `active` alone is a narrower question than the mutation. */
     witness: (M, C) => { const m = nibPlan(M, { petalTipEnd: 0.3 }), c = nibPlan(C, { petalTipEnd: 0.3 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
-      return (m.active && !c.active) ? null
-        : `on a 0.30 squared terminal the mutant's plan is ${m.active ? 'ACTIVE' : 'inert'} and the clean tree's is ${c.active ? 'ACTIVE' : 'inert'} — the terminal still stands the nib down`; } },
+      const moved = m.active !== c.active || m.why !== c.why;
+      return moved ? null
+        : `on a 0.30 squared terminal the mutant's plan is ${m.active ? 'ACTIVE' : 'inert (' + m.why + ')'} and the clean tree's is ${c.active ? 'ACTIVE' : 'inert (' + c.why + ')'} — the terminal still stands the nib down, by the same guard`; } },
   { id: 'the-flank-is-not-the-laws-tangent', why: 'the flank is carried on at the ONE-STEP difference quotient instead of the two-step Richardson one, so the apex is drawn at a tangent the law does not have',
-    find: '  const slope = Math.abs(2 * s2 - s1);',
-    into: '  const slope = Math.abs(s1);', names: ['AN1'],
+    /* RE-ANCHORED ONTO THE QUANTISED FORM (§6c added `gridFloor` after this
+       mutant was written, and the anchor pre-check reported it disarmed at
+       0 matches before any mutant ran — which is the whole reason that check
+       runs for EVERY mutant rather than the selected ones). The grid is KEPT
+       on both sides on purpose: what this mutation is about is the TANGENT
+       LAW, and dropping the quantisation with it would make the mutant test
+       two things and AN1 unable to say which. */
+    find: '  const slope = gridFloor(Math.abs(2 * s2 - s1));',
+    into: '  const slope = gridFloor(Math.abs(s1));', names: ['AN1'],
     witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       const d = Math.abs(m.slope - c.slope);

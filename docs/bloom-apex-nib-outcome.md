@@ -513,6 +513,37 @@ A row was added for the guard's other arm (`petalTipEnd 0.30`) — without it th
 squared-terminal mutation is a no-op on every row in the file, which is
 `seam-reads-the-live-sheet`'s lesson and `bore-is-not-evas-rule`'s.
 
+**RUN, AND ALL SIX BEHAVE**: *"each selected family fires on a mutation that
+names it, and is silent on the clean tree"* — AN0 on `the-nib-is-never-cut`
+(which also reddens A4, L3-L6, L8 and SP8) and on
+`the-squared-terminal-no-longer-stands-the-nib-down` (AN0 alone), AN1 on
+`the-flank-is-not-the-laws-tangent` and `the-arc-is-not-tangent-to-the-flank`,
+AN1+AN2 on `the-law-is-cut-above-its-own-crossing`, AN3 on
+`the-nib-ends-on-the-print-floor`. Reported as a SUBSET (6 of 72), never as a
+sweep.
+
+**THE ANCHOR PRE-CHECK EARNED ITS KEEP IMMEDIATELY**: `§6c` added `gridFloor`
+to `slope` AFTER `the-flank-is-not-the-laws-tangent` was written, so its
+`find` matched **0 times** and the pre-check refused the run before any mutant
+executed — which is exactly why it runs over ALL 72 rather than the selected
+ones. Re-anchored onto the quantised form, with the grid KEPT on both sides,
+because a mutation that dropped the quantisation too would be testing two
+things and AN1 could not say which.
+
+**AND ONE WITNESS WAS ASKING A NARROWER QUESTION THAN ITS MUTATION, WHICH IS A
+FINDING ABOUT THE GEOMETRY.** `the-squared-terminal-no-longer-stands-the-nib-down`
+reported *"the edit applied but the BEHAVIOUR did not move"* on a live
+mutation. It had asked whether the nib becomes ACTIVE; it does not. On a 0.30
+squared terminal at the default width the terminal is 2.40 mm and the outline
+is CONSTANT over `[uPk, 1]`, so with that guard removed the bisection finds no
+crossing, `uLaw` lands on 1, the one-sided tangent there is 0 and **the NEXT
+guard refuses — for the wrong reason.** So the squared-terminal guard is
+load-bearing for the REASON rather than for the outcome on that row, and what
+catches its removal is AN0's clause that a ring reporting *"the law arrives
+with no slope to carry on"* is a FINDING (§4: that guard fires on no row of
+the shipped matrix). The witness compares the plan's `why` as well as its
+`active` now.
+
 ---
 
 ## 9. The matrix, the census and the two declared rows
