@@ -183,6 +183,19 @@ const load = async (root) => ({
 });
 const A = await load(HERE), B = BASE ? await load(BASE) : null;
 
+/* THE PRINT FLOOR, IMPORTED AND NOT TYPED — the first durable rule, and the
+   `nib` mover predicate is the only thing here that needs a length. It is
+   `TIP_HALF_MM`, which Eva's ruling holds fixed across this change, so it has
+   ONE owner on both trees and the predicate reads the same number whichever
+   tree it is evaluated on. That is CHECKED rather than assumed: a change that
+   moved the floor would make the predicate mean two things at once and the
+   partition would be a comparison of two questions. */
+const PRINT_FLOOR_HALF = A.G.TIP_HALF_MM;
+if (B && !Object.is(B.G.TIP_HALF_MM, PRINT_FLOOR_HALF)) {
+  console.error(`REFUSED: the print floor is ${PRINT_FLOOR_HALF} mm here and ${B.G.TIP_HALF_MM} on the base tree. A mover predicate written against it would ask a different question of each tree.`);
+  process.exit(2);
+}
+
 const stateFor = (D, row) => {
   const st = { ...D };
   for (const { id, value } of (row.set || [])) {
@@ -322,7 +335,7 @@ const MOVER_BY_CHANGE = {
      reads the same in live and in export. SEPALS ARE IN IT: a sepal is the
      petal builder on a second ring and cuts its own nib from its own law. */
   nib: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
-    .some((p) => p && p.tipCap && p.tipCap.peakHalf > 0.8 && !(p.tipCap.terminalHalf > 0.8)),
+    .some((p) => p && p.tipCap && p.tipCap.peakHalf > PRINT_FLOOR_HALF && !(p.tipCap.terminalHalf > PRINT_FLOOR_HALF)),
 };
 if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared triangle-count table. Add one (even an empty {}) rather than running without a declaration.`);
