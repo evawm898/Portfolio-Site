@@ -285,7 +285,7 @@ close it and did not: the plain sheet's own approach there is already 0.00253 mm
 
 ---
 
-## 6. WHAT MOVED IN THE FOUR COMPANION TOOLS: THE TRIANGLE COUNT, AND NOTHING ELSE
+## 6. WHAT MOVED IN THE THREE COMPANION TOOLS: THE TRIANGLE COUNT, AND NOTHING ELSE
 
 Predeclared before the runs, then measured. `bloom-basal-grading.mjs`,
 `bloom-infill-base-panel.mjs` and `bloom-infill-lamina-floor.mjs` were run at `--quick` on a

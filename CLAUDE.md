@@ -3338,7 +3338,7 @@ a span is a property of the tessellation, so roll 330 going 1.3837 -> 6.0344 whi
 deviation goes 2.4990 -> 0.4317 is the mesh drawing the tube instead of a shortcut across it.
 **COST: the shipping default petal 2,392 -> 2,744 (+14.7 %) and the whole bloom 19,496 -> 22,124
 (+13.5 %)**, under the +25 % the brief asks to be flagged; curved states pay more (curl 360
-+78.6 %, cup x curl +88.3 %) and that is what conforming costs.
++78.6 %, cup x curl +90.1 %) and that is what conforming costs.
 **AND THE THREE COMPANION TOOLS MOVE THE TRIANGLE COUNT AND NOTHING ELSE** — `bloom-basal-grading`,
 `bloom-infill-base-panel` and `bloom-infill-lamina-floor` are IDENTICAL at `--quick` against a
 worktree of the base commit with the count columns masked, because every figure they publish is a
