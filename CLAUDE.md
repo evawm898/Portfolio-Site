@@ -380,6 +380,132 @@ were re-run through the real gate (`node tools/verify-bloom-export.mjs --only <t
 every X1 line reading "still failing at that magnitude"**. The arc-stability session's precedent,
 at 68 rows instead of 5.
 
+**THE PETAL'S RIM IS A THICKNESS TAPER AND A HALF-ROUND BEAD, AND `emitPanel`'s FLAT WALL IS
+GONE** (Eva's rulings, the edge-profile session — read `docs/bloom-edge-profile-outcome.md`
+before touching `emitPanel`'s rim block, `rimInsetV`, any `RIM_*` constant or the E family).
+Every petal used to close with a 90-degree cliff one sheet thick — 42 mm of it down each
+margin on the shipping default. The sheet now eases toward `RIM_FLOOR_MM` over `RIM_TAPER_MM`
+of SURFACE DISTANCE IN MILLIMETRES and closes with a half-round bead whose apex sits AT the
+original boundary point, **so the silhouette does not move**. **ONE CONSTRUCTION, NOT TWO
+FEATURES:** every perimeter vertex carries a profile (a half ellipse from the top skin's edge
+through the apex to the bottom skin's), two lengths decide it — the eased half-thickness `b`
+and the inset `a` — and the perimeter is walked ONCE as a closed loop, so the corners cost
+nothing to get right and the buried ends need no special case (at `a = 0` the profile
+collapses onto the flat wall's own segment, which is why `{a === 0}` is a STRUCTURAL branch
+and not a tolerance). `r = min(RIM_BEAD_RADIUS_MM, tBody/2, RIM_ROOM_FRACTION * room)` carries
+all three of Eva's first-round rulings in one expression.
+**THE BEAD IS FOUR SEGMENTS WITH ITS OWN AVERAGED NORMAL** (ruling 1, on Nylon 12 White's
+~0.35-0.4 mm resolvable detail against eight segments' ~0.2 mm facets). **The cap is the whole
+of the saving and the ruling's other two clauses are UNREACHABLE, reported rather than quietly
+implemented** — the scaling cannot fire because the only radius `rimSegments` may read is a
+constant. Cost over the 909-row matrix in EXPORT: **50,377,084 -> 64,789,898 triangles
+(+28.6%)**, the default 19,040 -> **24,688**, and the bead's own added triangles fall 35.9M ->
+14.4M against eight segments, more than halving because the corner fans and the degenerate
+skipping scale with K too. **`INFLO: ALL MAX` was a NEW refusal at eight segments and is NOT
+one at four** (1,425,468 of the 1,500,000 budget, 95.0% — the closest any row comes to the
+bar, the next highest at 46%), so its declaration was WITHDRAWN rather than left standing.
+**0 of 909 rows differ live/export.**
+**THE APEX DOES NOT FOLD** (ruling 3, measured over the tip-shape range rather than argued).
+**THE RIM MAY DIP BELOW THE FLOOR ON A NARROW SPAN AND EVERY SUCH LOCATION IS REPORTED**
+(ruling 2): 21 rows of 909, 39,308 locations, thinnest **0.5990 mm** on `CAPABILITY: cleft x 6
+layers` against a 0.660 mm span; three rows under 0.8 mm, all cleft, none under 0.5.
+**E0-E6 IS THE NEW FAMILY AND BOTH STL GATES ARE BLIND TO ALL OF IT** — a bead at the wrong
+radius, an apex off the original boundary, a rim that never tapers and a fan that subdivides
+nothing all export watertight and as one connected piece. `node
+tools/verify-bloom-edge-profile.mjs` (+ `--negative-control`, six must-fails) is the witness,
+and `tools/verify-bloom-grid-bytes.mjs` is the second. **Four existing gates were RE-DERIVED
+onto the new offset law rather than loosened**: `verify-bloom-grid` clause 2 (now 2a-2e), the
+stem channel's ST9 witness, `verify-bloom-surface-offstation`'s clause A and
+`verify-bloom-rim-arc`'s R1.
+**THE RIM WAS WOUND INSIDE-OUT AND ONLY A DIRECTED-EDGE CENSUS SAW IT** — 2,112 unmatched
+directed edges and a signed volume of −455.58 mm³ while boundary edges and non-manifold edges
+both read 0, because `analyzeStl`'s census keys on a SORTED pair and is undirected by
+construction. ST10's stem-plug finding, one solid later, in a family written the same week.
+**THE INSET BISECTION'S TIE WAS DECIDED BY THE LAST BIT — SEVENTH INSTANCE OF THIS CLASS**
+(X0, found by running the browser smoke subset and INVISIBLE to every Node-only instrument by
+construction, since in Node the page's build and the rebuild share one call chain and the
+difference is exactly 0). `rimInsetV` walks in by twelve halvings to where the chord is
+`want`; on a FLAT cross-section `rimDist` is LINEAR in `v` and `want` is `g * r` with `r`
+usually exactly `RIM_BEAD_RADIUS_MM`, so the target lands on a DYADIC point of a linear
+function and `d === want` is an EXACT TIE — **102 of 909 rows carry one, at halving 2 or 3,
+where the bracket is still a quarter or an eighth of the span**. The two V8s take different
+branches and the inset moves by a quarter bracket. `RIM_INSET_TOL_ULPS = 8`, the slack DERIVED
+FROM THE QUANTITY'S OWN CONDITIONING and in the unit the quantity has (`d` is a hypot of
+coordinate differences, so its error is a few ulp of the ~30 mm COORDINATE, never of the
+~0.5 mm `want`). Partition: **105 of 909 rows move, 804 hold bit-identical, 0 triangle counts
+move, worst 1.953e-3 mm** over 776,623,698 floats.
+**THE CENSUS WAS RE-BASELINED 291 -> 231 ENTRIES AND MOST OF WHAT IT LOST IS A
+RE-CATEGORISATION, NOT A REPAIR** — **the bead CLOSES each tooth and cleft panel with its own
+boundary, so the vertex-welded shell decomposition SPLITS them** and a tooth's by-design
+overlap with its base panel moves from the WITHIN column to the CROSS one: 205,930 of the
+312,934 pairs the list loses are that, and all 19 multi-panel rows (every FRINGE, every CLEFT)
+are in it. **`ALL MAX` reads 107,485 pairs · 10.1332 mm on 3,090,816 triangles and 2,048
+shells** — the count FALLS and the span RISES for that one reason.
+**AND `process.exit()` DOES NOT FLUSH A PIPED STDOUT, WHICH MADE A FAILING GATE READ AS A
+CRASH.** Both STL gates destroyed their own diagnosis on exactly the runs where it mattered: a
+CI log is a pipe, so the report was CUT MID-BLOCK and the run looked like it had died rather
+than failed. Written-down control: **3,796 of 200,001 lines survive `exit(1)` through a pipe;
+200,001 survive the drain.** `flushAndExit()` awaits a zero-length write on both streams first.
+**A truncated report is not a crash, and the tell is a cut in the middle of a block.**
+**AND DEGENERACY IS MEASURED ON FLOAT32, NOT ON DOUBLES AND NOT AT EXACT ZERO** — three wrong
+questions, two of which returned a clean-looking answer. `analyzeStl` (what both STL gates fail
+on) counts `area <= DEGENERATE_AREA_MM2` after rounding to the floats the STL stores: asking
+for exact zero on doubles reads **0**, the bar on doubles reads **858**, the bar on float32
+reads **169** — CI's own number to the integer. `DEGENERATE_AREA_MM2` is EXPORTED from the
+harness now so the bar has one owner, and **E6 exists because E3 asks the other question**
+(welded-index collisions and exactly-zero cross products, on doubles): the mutant that ungates
+the corner fan fired NOTHING in the edge-profile gate until E6 existed.
+**THE CORNER FAN IS GATED ON THE OUTLINE, `RIM_CORNER_MIN_MM = 0.0013` IS ITS OWN CONSTANT,
+AND THE MODE-INDEPENDENCE PREMISE THE RULING RESTED ON IS WRONG** (Eva's ruling on §18; §19 of
+the outcome doc). Consecutive profiles inserted by the fan are BIT-IDENTICAL except at the
+apex, so every strip triangle away from it is already skipped by `rimSameP` and the two that
+touch it are slivers of height `segment / RIM_CORNER_STEPS`; on a cramped petal that is
+microns. The gate skips the subdivision where there is no turn to spread. **It is deliberately
+NOT a fraction of `RIM_BEAD_RADIUS_MM`** (Eva's note): the threshold is a property of the
+OUTLINE and of the degeneracy bar, and deriving it from the bead would let a future bead change
+silently move this gate. **THERE IS NO EMPTY BAND IN THE VALUES and the comment says so** —
+1,905 distinct segment lengths running continuously from 2.9487e-5 to 1.4817 mm, the nearest
+real corner 2.01e-4 below and 2.04e-4 above (15% of the constant). **WHAT IS WIDE IS THE
+VERDICT:** over every one of those values as a candidate threshold the answer — which rows are
+gated, and do live and export agree — is constant at **TEN ROWS WITH ZERO MODE-DISAGREEMENTS
+over 7.6893e-4 .. 1.4442e-2, a factor of 18.8**, so the constant can be cut by 41% or
+multiplied by 11.1 before anything it decides moves. **THE PREDICATE IS NOT MODE-INDEPENDENT**
+— it reads `oP`, which inherits the TIP FLOOR, and the largest corner segment is **0.8823 mm
+live against 0.4397 export** on the same row — so the count equality both STL gates require is
+ESTABLISHED BY THE 909-ROW TWO-MODE SWEEP at this value and NOT by the predicate's form.
+Measured there: 163,120 fan corners, **1,376 gated (0.844%), the gated count identical in live
+and export on all 909 rows**. Its complementary half is a FLOOR on the drawn bead radius where
+it is already non-zero (`RIM_BEAD_RADIUS_MM / 512`), count-safe by branch, which clears the 23
+ordinary rim strips the fan gate alone leaves; it lifts 3,057 of 2,197,434 non-zero radii
+(0.139%). **289 degenerate triangles across three rows become 2**, and the two survivors are
+NOT the fan's — two real adjacent corner points 6.23e-7 mm apart, 8.88e-8 mm² on doubles and
+zero on float32 — declared as `E6_XFAIL` in both directions.
+**A ROW WHOSE COUNT DOES NOT MOVE CAN STILL MOVE BYTES, AND THE PARTITION HAS TO BE
+PREDECLARED FROM THE BASE TREE'S OWN RECORD**: the fan gate moves 10 rows' triangle counts and
+the floor moves 3 more rows' COORDINATES with their counts unmoved to the integer, so the byte
+partition is **13 moved / 896 held — MEASURED, PASS, 0 floats moved on the holders
+positionally under `Object.is` over 1,133,544,024 export floats and 77,966,806 captured-grid
+values, every predeclared mover moving** — where the count partition is 10 / 899. Seven declared
+census magnitudes moved with it and ALL SEVEN IMPROVED (`DEPTH: 6 turns x layerSize min x
+petalCount 40` 73,265 -> 65,822 pairs at 0.2984 -> 0.2900 mm is the largest), re-recorded in
+the same commit because #213's list does not gate MAGNITUDE and every one of them would have
+passed silently — and **BROWSER-CONFIRMED, because a re-record measured in Node is not
+confirmed until Chromium's V8 agrees**: all thirteen movers through `node
+tools/verify-bloom-export.mjs --only <the 13 labels>` read **PASS, 12 of 13 reaching the
+results and exporting watertight with `degenerate=0` and `tris(live) === tris(export)` on
+every one, the 13th the declared refusal, and every X1 line still failing at its RECORDED
+magnitude**. **`ALL MAX` is a floor mover whose census is UNMOVED at 107,485 / 10.1332** —
+a negative result, measured rather than assumed. **No frozen phase is owed** (909 rows on both
+trees), and every frozen tag's bytes stop reproducing on every row with a petal, which is what
+a change that re-triangulates every perimeter is expected to do.
+**AND THE SMOKE SUBSET HAD NO CRAMPED PETAL, WHICH IS WHY A THREE-AND-A-HALF-HOUR GATE WAS THE
+ONLY THING THAT COULD SEE THIS.** `SPHERE: 6 turns x layerSize min` is a block-22 smoke row
+now (111 rows over 34 blocks, 115 families both ways), and `pickRows()` in the edge-profile
+gate draws from `SMOKE_LABELS`, so the row reaches that gate too and its control set REFUSES
+the run if it is absent. **A subset earns its keep by covering the axes a feature has** — the
+leaf session's lesson, arriving from the other direction: there the missing axis was another
+family's region, here it was the corner of the feature's own.
+
 The Parametric Bloom (`bloom.html`, `bloom.js`, `bloom-geometry.js`,
 `bloom-registry.js`) is a separate generator from the flower. Its governing
 document is **`docs/bloom-charter.md`** — read it before touching any bloom

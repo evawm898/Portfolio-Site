@@ -958,3 +958,260 @@ predicate fires identically in both modes, which needs a 909-row two-mode sweep 
 establish, plus a byte partition and possibly census re-records. It also trades against a
 constant whose value was itself set by measurement. **Recorded and put to Eva rather than
 chosen unilaterally.**
+
+## 19. THE RULING, IMPLEMENTED — THE FAN IS GATED ON THE OUTLINE, AND THE BEAD HAS A FLOOR
+
+Eva's ruling on §18: *"gate the corner fan. Don't subdivide where the outline segment
+between the two real corner points is too short for the subdivision to mean anything."*
+
+Two changes ship together and they are complementary rather than alternative. Each was
+measured on its own before the pair was measured together, because §18 had already shown
+that the bead floor alone makes the SPHERE row **worse**.
+
+* **`RIM_CORNER_MIN_MM = 0.0013`** — the fan is skipped where the outline segment between
+  the two real corner points is under it. This is the ruling.
+* **`a = g * r > 0 ? max(g * r, RIM_BEAD_RADIUS_MM / 512) : 0`** — a floor on the DRAWN bead
+  radius where it is already non-zero. It is the complementary half, not an alternative.
+
+The floor is count-safe **by branch, not by tolerance**: `rimEase` clamps to a hard zero at
+a buried end, so the set that `a > 0` selects is structural, and lifting a value that is
+already inside it cannot move a row's topology. Measured — every one of the 909 rows keeps
+its triangle count identical in both modes under the floor alone.
+
+**BOTH HALVES ARE LOAD-BEARING AND EACH WAS MEASURED WITH THE OTHER REMOVED**, on the shipped
+tree, EXPORT mode, the gate's own bar on float32:
+
+| | DEPTH: 6 turns x layerSize min x petalCount 40 | SPHERE: 6 turns x layerSize min |
+|---|---|---|
+| neither (`facb5c8`) | 169 export · 0 live | 56 export · 118 live |
+| floor alone, at `/512` | 0 | **64 export — WORSE, and it goes 80 then 138 as the floor rises** |
+| **fan gate alone** | **23 export** · 0 live | 0 export · **2 live** |
+| both (ships) | **0** · 0 | **0 export** · 2 live |
+
+The 23 the fan gate leaves are not fan insertions at all: they are ordinary rim strips whose
+consecutive profiles are separated only by a bead radius of order 1e-4 mm. Neither change
+subsumes the other, which is why both ship.
+
+### 19a. THE CONSTANT IS ITS OWN, AND EVA'S NOTE 1 IS WHY
+
+It was first written as `RIM_BEAD_RADIUS_MM / 256`. It is now an independent
+`export const`, on Eva's note: *"the threshold is a property of the outline and the
+degeneracy bar, not of the bead — deriving it from bead radius means a future bead change
+silently moves the corner-fan gate."* The value did not change for that; only its
+derivation did.
+
+### 19b. THE MARGIN — THERE IS NO EMPTY BAND IN THE VALUES, AND THE VERDICT IS WIDE ANYWAY
+
+Eva asked for the distance from the chosen threshold to the nearest pivot on either side,
+in both modes, on the worst row, and for a plain statement if there is no wide band.
+Swept over all 909 rows in both modes:
+
+**There is no empty band in the values.** The 1,905 distinct segment lengths run
+CONTINUOUSLY from **2.9487e-5 mm** to **1.4817 mm**. The nearest real corner either side of
+1.3e-3 sits **2.01e-4 below and 2.04e-4 above** — about **15%** of the constant — on
+`DEPTH: 6 turns x layerSize min x petalCount 40` in LIVE, and 1.3e-3 is the midpoint of that
+gap (1.099e-3 .. 1.504e-3). Said plainly rather than dressed up.
+
+**What IS wide is the verdict, which is what the constant actually decides.** Taking every
+one of those 1,905 values in turn as a candidate threshold and asking the question the gates
+ask — *which rows are gated, and do live and export agree on the answer* — the reply is
+constant at **TEN ROWS, ZERO MODE-DISAGREEMENTS, over the whole interval 7.6893e-4 ..
+1.4442e-2**, a factor of **18.8**. Below the lower edge two rows gate in one mode and not the
+other; at the upper edge an eleventh row joins and disagrees. **The constant can be cut by
+41% or multiplied by 11.1 before anything it decides moves.**
+
+A margin measured on the raw values alone would have read 15% and hidden that. Both figures
+are here because they answer two different questions, and the second is the one Eva's
+constraint was really about.
+
+### 19c. EVA'S MODE-INDEPENDENCE PREMISE IS WRONG, AND THE EQUALITY IS MEASURED, NOT CONSTRUCTIONAL
+
+The ruling's one constraint was: *"the predicate must read only mode-independent geometry …
+Then the count equality holds by construction and the sweep confirms it rather than being
+the only thing standing behind it."*
+
+**It does not hold by construction, and saying so is the point.** Half the premise is right:
+the segment is read off the ORIGINAL boundary `oP`, so it carries none of the drawn bead
+radius, which is the ~200x mode difference the constraint names. But `oP` inherits the
+**TIP FLOOR**, 0.15 mm live against 0.80 mm export — measured, the LARGEST corner segment on
+the cramped rows reads **0.8823 mm live against 0.4397 mm export**, a factor of two on the
+same row, and **0.8823 against 0.3917 on the shipping default**. A predicate reading that
+quantity can fire differently per mode at some threshold, and nothing about its form
+forbids it.
+
+**At this threshold it does not, and that is a measurement over all 909 rows in both modes.**
+Of **163,120** fan corners, **1,376 are gated (0.844%)**; the number gated is **identical in
+live and export on every one of the 909 rows**, and so is the total number of corners — the
+fan's STRUCTURE is mode-free and only its segment LENGTHS are not. On the deepest row that is
+388 gated of 960 in both modes; on the SPHERE row 76 of 192 in both.
+
+So the count equality both STL gates require is **established by the sweep at this value**.
+What makes that a reasonable thing to rest on rather than a coincidence is §19b: the verdict
+is invariant over a factor of 18.8 in the threshold, and the nearest value at which any row
+gates in one mode and not the other is **7.6893e-4 — 41% below the shipped constant**.
+
+### 19d. THE BYTE PARTITION — 13 ROWS MOVE, AND THREE OF THEM MOVE NO TRIANGLE
+
+Predeclared **from the BASE tree's own record**, per row per mode, before the comparison ran,
+because a predicate evaluated on the changed tree would be reading what its own change wrote:
+
+* **the fan gate** fires on a row iff the base's own `rim.pivots` telemetry — added by
+  `facb5c8`, which decides nothing — carries a segment under `RIM_CORNER_MIN_MM`;
+* **the bead floor** fires iff the base's `g * r` is non-zero and under
+  `RIM_BEAD_RADIUS_MM / 512`, read off an INSTRUMENTED COPY of the base geometry, since `a`
+  before the `Math.max` is a quantity the changed tree cannot show.
+
+The predicted set is **13 rows — 5 fan-only, 3 floor-only, 5 both — against 896 holders.**
+
+| | rows | triangle counts |
+|---|---|---|
+| fan gate (± floor) | 10 | **move**, live and export by the same amount |
+| floor only | 3 | **unmoved to the integer** |
+
+The three floor-only rows are `ALL MAX`, `CAPABILITY: cleft x 6 layers` and
+`SEPALS: size min (0.20)`.
+
+**MEASURED, PASS**, `node tools/verify-bloom-surface-bytes.mjs --base <worktree of facb5c8>
+--movers <the 13 labels>`:
+
+    partition     : 13 of 13 rows named by --movers MOVED (every one must),
+                    896 holders compared to the bit
+    export stream : 1,133,544,024 floats over 125,949,336 triangles, 909 rows x 2 modes
+    captured grid : 77,966,806 values over 9,013 panels (live)
+
+    PASS — 0 floats moved on the 896 holders, positionally, under Object.is;
+    all 13 predeclared movers moved.
+
+Exact in both directions: every predeclared mover moved, and no row outside the set moved a
+float. **THE TOOL'S POSITIVE CONTROL FIRES BOTH CLAUSES** — `--rows 24 --control` perturbs one
+export coordinate and one mid-surface coordinate by 1e-9 and reports TWO findings, which is
+what stops the captured-grid clause being a log line:
+
+    FAIL — 2 finding(s):
+      DEFAULT (live): 1 of 222192 floats moved, first at index 0 (tri 0)
+      DEFAULT (live): grid — 1 of 4430 values moved, first at 2: 1e-9 against 0 **Eva's note 2 predicted exactly this** — *"the byte partition will
+move more than the two failing rows … report it as such rather than as a surprise"* — and the
+margin is larger than the note assumed: it is not three rows but thirteen, because the floor
+is a coordinate change that no triangle count can see. Over the matrix the floor lifts
+**3,057 of 2,197,434 non-zero drawn bead radii (0.139%)**.
+
+### 19e. THE 909-ROW TWO-MODE SWEEP (owed item 1)
+
+`909 rows, 0 build errors, 0 rows where the live and export triangle counts differ, and the
+degenerate count is 0 in both modes on every row but one` — the declared survivor in §19g.
+Against the pre-gate tree the triangle-count partition is **10 moved / 899 held**, and on
+every mover live and export move by the SAME amount:
+
+| live | export | row |
+|---|---|---|
+| 147,168 → 146,400 | same | `6 layers x layerSize min (0.35)` |
+| 367,632 → 367,584 | same | `CONT: 3 turns x layerSize max x petalCount 40` |
+| 147,168 → 146,400 | same | `DEPTH: 6 layers x layerSize min` |
+| 735,072 → 730,416 | same | `DEPTH: 6 turns x layerSize min x petalCount 40` |
+| 150,432 → 149,664 | same | `DOME: rise 1 x 6 layers x layerSize min` |
+| 153,696 → 152,784 | same | `SPHERE: 6 turns x layerSize min` |
+| 24,688 → 24,640 | same | `BUCKLE: f min (1)` |
+| 24,688 → 24,640 | same | `BUCKLE: the clamp NOT binding` |
+| 24,688 → 24,496 | same | `FRINGE: the terminal alone, narrowest clear of the dead travel` |
+| 39,998 → 39,950 | same | `SEPALS: sepalBuckleFreq min (1)` |
+
+The degenerate figure is the one that matters: **289 degenerate triangles across three rows
+becomes 2**, and those two are a different mechanism (§19g).
+
+### 19f. THE CENSUS MOVED ON SEVEN DECLARED ROWS, ALL IN THE SAME DIRECTION
+
+A gated corner does not only lose its slivers — it loses the real rim strips the inserted
+profiles carried, so the row's tessellation genuinely changes near every gated corner and
+its census record moves with it. Re-measured with
+`node tools/bloom-xfail-magnitudes.mjs --only …` and **re-recorded in the same commit**,
+which is #213's own discipline:
+
+| row | pairs | worst span |
+|---|---|---|
+| `6 layers x layerSize min (0.35)` | 11,032 → **10,232** | 0.2831 → **0.2421 mm** |
+| `DEPTH: 6 layers x layerSize min` | 11,032 → **10,232** | 0.2831 → **0.2421 mm** |
+| `DEPTH: 6 turns x layerSize min x petalCount 40` | 73,265 → **65,822** | 0.2984 → **0.2900 mm** |
+| `DOME: rise 1 x 6 layers x layerSize min` | 7,032 → **6,712** | unmoved at 0.4661 mm |
+| `SPHERE: 6 turns x layerSize min` | 5,153 → **4,985** | unmoved at 0.1697 mm |
+| `BUCKLE: f min (1)` | 9 → **7** | unmoved at 0.0588 mm |
+| `BUCKLE: the clamp NOT binding` | 9 → **7** | unmoved at 0.0588 mm |
+
+**Every one improves, and all seven would have passed silently** — the list does not gate
+MAGNITUDE (#213), so only a deliberate re-measurement catches a move in either direction.
+
+**AND A RE-RECORD MEASURED IN NODE IS NOT CONFIRMED UNTIL THE BROWSER AGREES.** X1's band on
+pairs is EXACTLY 0 and the gate's census runs on the doubles CHROMIUM's V8 computes, which
+this PR has already measured diverging from Node's in the last bits (§7b). All thirteen
+byte-movers were re-run through the real gate —
+`node tools/verify-bloom-export.mjs --only <the 13 labels>`, 1,091 s:
+
+    export gate: PASS — 12 of 13 attempted configs reached the results and every one
+    exports watertight; 1 config the generator REFUSED on its own triangle budget,
+    declared and asserted by XR1
+    7 declared XFAIL (each still failing at its RECORDED magnitude — the pair count
+    exactly, the worst span within ±0.00005 mm — asserted by X1)
+
+**`degenerate=0` on all twelve**, `tris(live) === tris(export)` on all twelve, and X0 reports
+the builder's doubles identical to the STL on every one. The arc-stability session's
+precedent, at 13 rows instead of 68.
+
+**The three count-movers that are NOT declared read exactly 0** — `CONT: 3 turns x layerSize
+max x petalCount 40`, `FRINGE: the terminal alone …` and `SEPALS: sepalBuckleFreq min (1)`,
+which is what X2 asks of them — and so does the floor-only mover `CAPABILITY: cleft x 6
+layers`. `ALL MAX` is the remaining floor-only mover; it is EXPORT-REFUSED, so no STL gate
+ever censuses it and X1 cannot fire on it, and it was re-measured with `--include-refused`
+for the same reason #213 gives: the entry is a record of the tree whether or not a gate reads
+it.
+
+### 19g. WHAT SURVIVES: TWO TRIANGLES, IN LIVE, ON ONE ROW — AND THEY ARE NOT THE FAN'S
+
+`SPHERE: 6 turns x layerSize min` still reads **2** degenerate triangles in LIVE (0 in
+export) of 152,784. They are **two real adjacent corner points 6.23e-7 mm apart** — not
+inserted profiles, so no subdivision gate can reach them: the fan is already skipped there.
+On doubles they measure 8.88e-8 mm², comfortably above the bar; they fall under it only once
+the coordinates are rounded to float32, which is what the STL stores and what `analyzeStl`
+reads.
+
+It is declared as **`E6_XFAIL`** in `tools/verify-bloom-edge-profile.mjs`, holding the count
+in BOTH directions at the mode it occurs in — an entry that stops reproducing is stale
+whether the row got worse or better.
+
+**Put to Eva rather than chosen unilaterally:** the alternative is to merge corner points
+under a bar, which is safe here only because the fan fires exactly where the two entries
+share a skin point (`sk2 === sk && j2 === j`), so dropping one leaves the rim closed against
+the skins. That is a sixth discrete decision on a continuous quantity and it spends E4's
+apex contract; the declaration is reversible in one change if she wants it.
+
+### 19h. E6, AND THE SMOKE ROW THAT MAKES ANY OF IT REACHABLE (owed item 5)
+
+**Neither failing row was reachable by any local gate.** The smoke subset had no cramped
+petal, so the degeneracy that reddened CI could only ever appear after a three-and-a-half
+hour run. `SPHERE: 6 turns x layerSize min` is now a block-22 smoke row — census after:
+**111 smoke rows over 34 matrix blocks, 115 families asserted and 115 claimed, both
+directions.** `pickRows()` in the edge-profile gate draws from `SMOKE_LABELS`, so the row
+lands in that gate too, and the control set names it with a REFUSAL if it is absent.
+
+**E6 is the new clause and it exists because E3 measures a different quantity.** E3's
+`meshOf` counts welded-index collisions and exactly-zero cross products on DOUBLES;
+`analyzeStl` — what both STL gates actually fail on — counts `area <= DEGENERATE_AREA_MM2`
+after rounding to FLOAT32. The corner-fan slivers are above the bar on doubles and exactly
+zero on float32, so **the mutant that ungates the fan fired NOTHING in this gate until E6
+existed**, on the defect the gate was extended for. `DEGENERATE_AREA_MM2` is exported from
+the harness rather than restated, so the bar has one owner.
+
+The corner-gate mutant fires E6 alone; five pre-existing mutants redden it as real
+collateral and are named as such rather than the clause being loosened.
+`edge-profile: PASS — E0-E6 clean` and `--control: PASS, 6 of 6`.
+
+### 19i. `ALL MAX` IS A FLOOR MOVER AND ITS CENSUS IS UNMOVED
+
+The one floor-only mover with a declared magnitude. Its 47 floored bead radii shift
+coordinates by at most `RIM_BEAD_RADIUS_MM / 512` each and its census reads
+**107,485 pairs · 10.1332 mm — exactly its record**, measured with
+`node tools/bloom-xfail-magnitudes.mjs --include-refused --only '^ALL MAX$'` because the
+generator refuses to export the row and no STL exists for X1 to read. Its triangle count is
+unmoved to the integer, so `EXPORT_REFUSED_XFAIL` is untouched as well.
+
+A negative result, reported because the alternative is assuming it: a coordinate change of
+under a micron on 47 of 3,090,816 triangles' worth of rim could have moved a pair count at a
+tangency, and the only way to know is to measure.
