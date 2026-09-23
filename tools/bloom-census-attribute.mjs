@@ -106,6 +106,18 @@ const regionOf = (pt) => {
   if (pt.nibU !== null && pt.u >= pt.nibU) return 'NIB';
   return 'blade';
 };
+/* AND A BAND THAT MEANS THE SAME THING ON A TREE WITH NO NIB. The regions
+   above are the right names for one tree and are not COMPARABLE across two,
+   because `NIB` does not exist on the base and the drawn parameterisation
+   differs by the overshoot. A tenth of the blade is a tenth of the blade on
+   either tree, so the histogram below is what the two runs are diffed on and
+   the regions are what a single run is read by. */
+const bandOf = (pt) => {
+  if (pt.u <= 0) return 'u 0 (foot)';
+  if (pt.u < G.ROOT_BLEND_END) return 'u <0.30 (root blend)';
+  const k = Math.min(9, Math.floor(pt.u * 10));
+  return `u ${(k / 10).toFixed(1)}-${((k + 1) / 10).toFixed(1)}`;
+};
 
 const matrix = H.buildMatrix();
 const rows = matrix.filter((r) => ONLY.test(r.label));
@@ -173,13 +185,14 @@ for (const row of rows) {
 
   const sheet = Number(stateOf(row).sheetThickness) || 0;
   const offBar = Math.max(1.5, 3 * Math.max(sheet, 1));   /* a site on a skin sits ~t/2 out; 3x a floored sheet is generous */
-  const hist = new Map();
-  const bump = (k, span) => { const e = hist.get(k) || { n: 0, worst: 0 }; e.n++; if (span > e.worst) e.worst = span; hist.set(k, e); };
+  const hist = new Map(), bands = new Map();
+  const bumpInto = (M, k, span) => { const e = M.get(k) || { n: 0, worst: 0 }; e.n++; if (span > e.worst) e.worst = span; M.set(k, e); };
   let offLamina = 0;
   for (const s of r.sites) {
     const { p, mm } = nearest(s.at);
-    if (!p || mm > offBar) { offLamina++; bump('off-lamina', s.span); continue; }
-    bump(regionOf(p), s.span);
+    if (!p || mm > offBar) { offLamina++; bumpInto(hist, 'off-lamina', s.span); bumpInto(bands, 'off-lamina', s.span); continue; }
+    bumpInto(hist, regionOf(p), s.span);
+    bumpInto(bands, bandOf(p), s.span);
   }
   const w = r.worstAt ? nearest(r.worstAt) : null;
   const firstNib = pts.find((p) => p.nibU !== null);
@@ -191,6 +204,7 @@ for (const row of rows) {
     nibU: firstNib ? firstNib.nibU : null,
     omittedSlots: omitted, offLamina,
     regions: [...hist.entries()].sort((a, b) => b[1].n - a[1].n).map(([k, e]) => ({ region: k, pairs: e.n, worstMm: e.worst })),
+    bands: [...bands.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)).map(([k, e]) => ({ band: k, pairs: e.n, worstMm: e.worst })),
     ms: Date.now() - t0,
   };
   report.push(rec);
@@ -200,6 +214,8 @@ for (const row of rows) {
       + (rec.nibU !== null ? `   nib begins at drawn u ${rec.nibU.toFixed(4)}` : '   no nib on this row'));
     if (rec.worst) console.log(`  worst pair sits in the ${rec.worst.region} of ${rec.worst.kind} ${rec.worst.idx} panel ${rec.worst.panel}, at u ${rec.worst.u.toFixed(4)} v ${rec.worst.v.toFixed(3)} (${rec.worst.offMm.toFixed(3)} mm off the mid-surface)`);
     for (const g of rec.regions) console.log(`    ${String(g.pairs).padStart(7)} pairs   worst ${g.worstMm.toFixed(4)} mm   ${g.region}`);
+    console.log('  by band (comparable across trees):');
+    for (const g of rec.bands) console.log(`    ${String(g.pairs).padStart(7)} pairs   worst ${g.worstMm.toFixed(4)} mm   ${g.band}`);
   }
 }
 if (JSON_OUT) console.log(JSON.stringify(report, null, 1));
