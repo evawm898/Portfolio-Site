@@ -8281,16 +8281,26 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
      quarter of a live mesh floor and a fortieth of the print floor; both are
      at the tip, which is the stretch the nib replaces, and both are states
      where a petal already stands close to its neighbour's tip.
-     THE FIGURES ARE CHROMIUM'S, NOT NODE'S, and the difference is the point:
-     the gate's census runs on the doubles the browser's V8 computes, X1's
-     band on pairs is EXACTLY 0, and these two rows sit close enough to
-     tangency that the two engines disagree by one pair and by three (Node
-     reads 218 and 354 where the gate reads 219 and 351). Recorded at what
-     the gate reads, which is the only figure it can be held to. */
-  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step': { pairs: 351, worstMm: 0.0249,
-    note: 'NEW WITH THE APEX NIB. 0 pairs on a worktree of the base commit 2464d50 at the same 49,184 triangles. A tip fold at 0.0249 mm — a sixth of the LIVE mesh floor — on a row where a role override already brings two whorls\' tips together. A KNIFE EDGE: Node reads 354 pairs where Chromium reads 351, so the count is decided by the last bits of a near-tangency and the browser\'s is what X1 is held to.' },
-  'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)': { pairs: 219, worstMm: 0.0240,
-    note: 'NEW WITH THE APEX NIB. 0 pairs on a worktree of the base commit 2464d50 at the same 18,564 triangles. The same tip fold as the ORCHID row above, on the fan\'s own inner pair, at 0.0240 mm. A KNIFE EDGE: Node reads 218 pairs where Chromium reads 219.' },
+     THE TWO ENGINES AGREE, AND A CLAIM HERE THAT THEY DID NOT IS WITHDRAWN.
+     This block first read "THE FIGURES ARE CHROMIUM'S, NOT NODE'S ... the two
+     engines disagree by one pair and by three (Node reads 218 and 354 where
+     the gate reads 219 and 351)", and the entries were recorded at 219 and
+     351 on the strength of it. The browser confirmation this session owes —
+     `verify-bloom-export.mjs --only` over every moved row, 158 rows, 6,684 s
+     — read 354 and 218 in CHROMIUM, which is what Node reads, and X1 went RED
+     on exactly these two rows and on nothing else. Nothing in this session
+     recorded a measurement of 219 or 351; it was a reading with no run behind
+     it. The correction is kept visible rather than made quietly, because
+     X1's band on pairs is EXACTLY 0: a declared figure that is not the tree's
+     makes the gate red on a tree that is right, which is the same damage as a
+     stale record and harder to read. THIS IS WHY THE CONFIRMATION RUN IS
+     OWED — a re-record measured in Node is not confirmed until the browser
+     agrees, and here it was the RECORD rather than the engine that was
+     wrong. */
+  'ORCHID: the labellum and the hood (the flower has a face) x 2 whorls in step': { pairs: 354, worstMm: 0.0249,
+    note: 'NEW WITH THE APEX NIB. 0 pairs on a worktree of the base commit 2464d50 at the same 49,184 triangles. A tip fold at 0.0249 mm — a sixth of the LIVE mesh floor — on a row where a role override already brings two whorls\' tips together. Node and Chromium agree at 354; an earlier reading of 351 for Chromium had no run behind it and is withdrawn (see the block above).' },
+  'FAN x PER-PETAL: petal 1 extreme x toggle OFF (the same sliders now drive the INNER PAIR)': { pairs: 218, worstMm: 0.0240,
+    note: 'NEW WITH THE APEX NIB. 0 pairs on a worktree of the base commit 2464d50 at the same 18,564 triangles. The same tip fold as the ORCHID row above, on the fan\'s own inner pair, at 0.0240 mm. Node and Chromium agree at 218; an earlier reading of 219 for Chromium had no run behind it and is withdrawn (see the block above).' },
   /* ===== THE APEX NIB'S TWO ROWS (the apex-nib session) — AND NEITHER FOLD
      IS THE NIB'S, MEASURED ON BOTH TREES RATHER THAN ARGUED. Both are new
      matrix rows that compose TWO controls, which `buildMatrix()` does not do

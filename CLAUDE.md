@@ -1583,9 +1583,16 @@ whose blade clears the print floor. 74 read WORSE, 65 better, 17 moved their spa
 not move. **The three removals are a FIX and their own notes said so**: all three were the PETAL
 EDGE PROFILE's and all three folded *"at its own TIP — u 0.982..1.000"*, the stretch the nib
 replaces. **The two additions are the nib's own**, 0 pairs on the base tree at an identical
-triangle count against 0.024 mm of span here — and **both are KNIFE EDGES between the two
-engines** (Node 354 / 218, Chromium 351 / 219), so they are recorded at what the GATE reads,
-X1's band on pairs being exactly 0. **VS5's pin moved −1.1701 → −1.1944**, at u 0.323 on both
+triangle count against 0.024 mm of span here — **and the BROWSER CONFIRMATION FOUND BOTH OF
+THEM RECORDED WRONG, which is the whole reason that run is owed.** All 158 affected rows were
+re-run through `verify-bloom-export.mjs --only` (6,684 s): **156 reached the results and passed
+X1 at their re-recorded magnitudes and 2 were DROPPED** — exactly these two. The list had
+declared them at 219 and 351 on the strength of a sentence claiming the two engines disagreed;
+**Chromium reads 354 and 218, which is what Node reads**, no run measuring 219 or 351 was ever
+kept, and the claim is WITHDRAWN in the list's own block. Re-recorded and re-run: PASS, X1
+silent. **X1's band on pairs is EXACTLY 0, so a declared figure that is not the tree's reddens
+CI on a tree that is RIGHT** — the same damage as a stale record and harder to read, because
+the message says the geometry moved. **VS5's pin moved −1.1701 → −1.1944**, at u 0.323 on both
 trees — mid-blade, so it is where the stations land and not what the petals do to each other.
 **AND `bloom-xfail-magnitudes --emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS** — it swapped
 `JSON.stringify`'s double quotes for single ones, which is correct until a label holds an

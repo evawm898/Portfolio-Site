@@ -463,12 +463,28 @@ an identical triangle count**, and 0.024 mm of span here — a sixth of the live
 mesh floor, a fortieth of the print floor, both at the tip, both on states
 where a petal already stands close to its neighbour's.
 
-**AND BOTH ARE KNIFE EDGES BETWEEN THE TWO ENGINES**: Node reads 354 and 218
-where the gate's Chromium reads 351 and 219. They are recorded at what the
-GATE reads, because X1's band on pairs is EXACTLY 0 and the gate's census runs
-on the doubles the browser's V8 computes. This project's own rule — *a
-re-record measured in Node is not confirmed until the browser agrees* — is why
-all 158 affected rows were re-run through `verify-bloom-export.mjs --only`.
+**AND THE CONFIRMATION RUN FOUND THAT BOTH OF THEM WERE RECORDED WRONG, WHICH
+IS THE BEST THING IN THIS SECTION.** This project's own rule is that *a
+re-record measured in Node is not confirmed until the browser agrees*, so all
+158 affected rows were re-run through `verify-bloom-export.mjs --only`:
+**6,684 s, 158 attempted, 156 reaching the results and passing X1 at their
+re-recorded magnitudes, and 2 DROPPED** — exactly the two rows above.
+
+The block declaring them said *"THE FIGURES ARE CHROMIUM'S, NOT NODE'S ... the
+two engines disagree by one pair and by three (Node reads 218 and 354 where
+the gate reads 219 and 351)"*, and they were recorded at **219 and 351** on the
+strength of it. **Chromium reads 354 and 218 — which is what Node reads.** The
+two engines AGREE; nothing in this session ever recorded a run measuring 219 or
+351, so it was a reading with no measurement behind it, and it is WITHDRAWN in
+the list's own block rather than quietly corrected. Re-recorded at 354 and 218,
+re-checked in Node (2 of 2 at their records) and **re-run through the real gate:
+PASS, 2 of 2 watertight, X1 silent on both.**
+
+**WHY IT MATTERS THAT THIS WAS CAUGHT RATHER THAN SHIPPED:** X1's band on pairs
+is EXACTLY 0, so a declared figure that is not the tree's reddens CI on a tree
+that is RIGHT — the same damage as a stale record and harder to read, because
+the message says the geometry moved. The sepal session's withdrawn 104,563 is
+the same class: *a figure from a run nobody kept is not a measurement.*
 
 **`--emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS, and that is a defect
 in the tool rather than in the list.** It took `JSON.stringify`'s double
