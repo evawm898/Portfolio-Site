@@ -7315,7 +7315,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      count and the drawn radius ride here for the same reason: they are what
      the cost is a function of, and a number nobody prints is a number nobody
      watches. */
-  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], segments: 0, drawnMaxMm: 0, tipAxisMm: null };
+  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
   for (const panel of panels) {
     const g = emitPanel(acc, rows, panel, tAt, rim);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
@@ -7974,6 +7974,45 @@ export const RIM_CORNER_STEPS = 3;
    columns; over TWO it is 0.11 mm over 0.676 mm. */
 export const RIM_TIP_ROWS = 2;
 
+/* THE SHORTEST OUTLINE SEGMENT A CORNER IS SUBDIVIDED ACROSS — ITS OWN
+   CONSTANT, deliberately not a fraction of RIM_BEAD_RADIUS_MM. It answers
+   "is this corner long enough to be worth spreading a turn across", which is
+   a property of the OUTLINE and of the degeneracy bar; deriving it from the
+   bead would let a future bead change silently move this gate, which is the
+   two-owners failure this project keeps finding.
+
+   WHY IT EXISTS. The fan puts the outline's own turn through RIM_CORNER_STEPS
+   instead of one step. Where the two real corner points are microns apart
+   there is no turn to spread: the inserted profiles are bit-identical to their
+   neighbours EXCEPT at an apex that has barely moved, so every strip triangle
+   away from the apex is already skipped by `rimSameP` and the two that touch
+   it are slivers of height (segment / RIM_CORNER_STEPS). On a cramped petal
+   that falls under the export gate's own DEGENERATE_AREA_MM2. Measured before
+   the gate: 169 such triangles on `DEPTH: 6 turns x layerSize min x
+   petalCount 40` and 56 on `SPHERE: 6 turns x layerSize min` in EXPORT, 118
+   and 64 in LIVE on the SPHERE and `DOME: rise 1 x 6 layers x layerSize min`
+   rows; 0 on main, where the SPHERE row's smallest triangle is 2899x the bar.
+
+   A DECLARED GUESS, in the same family as MIN_FEATURE_MM and the sheet floor,
+   and NOT fitted to those rows. Swept over all 909 rows in BOTH modes
+   (163,120 fan corners): the segment distribution is CONTINUOUS from 2.5e-5
+   mm upward — THERE IS NO EMPTY BAND, and this comment must not pretend
+   otherwise. What there is: only 13 distinct values in [5e-4, 5e-3], and a
+   contiguous run of bin edges from 1.00e-3 to 3.16e-3 at which the gated SET
+   is identical in live and export on every row, bracketed by edges where it
+   is not. 1.3e-3 is the midpoint of the widest gap inside that run
+   (1.099e-3 .. 1.504e-3), leaving ~2.0e-4 mm — about 15% of itself — to the
+   nearest real corner on either side, worst row, either mode.
+
+   IT IS NOT MODE-INDEPENDENT AND THE COUNT EQUALITY IS NOT CONSTRUCTIONAL.
+   The segment is read off the ORIGINAL boundary `oP`, so it carries none of
+   the drawn bead radius (which differs ~200x between modes on a cramped
+   petal) — but `oP` inherits the TIP FLOOR, and the LARGEST segment differs
+   0.882 mm live against 0.440 export. The equality both STL gates require is
+   therefore ESTABLISHED BY THE SWEEP at this value, not guaranteed by the
+   predicate's form. */
+export const RIM_CORNER_MIN_MM = 0.0013;
+
 /* Smootherstep, clamped. Its first AND second derivatives vanish at both
    ends, which is the whole reason it is this and not smoothstep: the taper
    has to leave the body without a crease and arrive at the rim flat. */
@@ -8172,7 +8211,25 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        of "the base stretch must emit exactly what it emits today". */
     const gBase = rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
     const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - sMargin[k]) / RIM_TAPER_MM));
-    const a = g * r;
+    /* AND A FLOOR ON THE DRAWN RADIUS WHERE IT IS ALREADY NON-ZERO. The fan
+       gate above is the ruled fix and it does not finish the job: with the fan
+       disabled ENTIRELY, `DEPTH: 6 turns x layerSize min x petalCount 40`
+       still emits 23 degenerate triangles, so those 23 are ORDINARY rim strips
+       and no corner threshold can reach them. They are the other half of the
+       same story — a bead of ~5e-5 mm is numerically absent, so consecutive
+       profiles along the margin nearly coincide too.
+
+       IT IS COUNT-SAFE BY BRANCH, which is why it can be a threshold at all:
+       the set that is SKIPPED is still exactly {a === 0}, which `rimEase`
+       clamps to a hard zero at a buried end, so this changes the SHAPE of
+       strips that were already emitted and never WHICH strips exist. Measured
+       live and export triangle counts identical at every floor tried.
+
+       R/512 and not R/256: measured, /256 takes the SPHERE row's export
+       degenerates from 0 back to 4, because a larger inset fires the pivot
+       gate more often. Alone this floor cleared DEPTH and made SPHERE worse
+       (56 -> 138); with the fan gated, the two compose. */
+    const a = g * r > 0 ? Math.max(g * r, RIM_BEAD_RADIUS_MM / 512) : 0;
     if (a > drawnMax) drawnMax = a;
     if (tBody > sheetMax) sheetMax = tBody;
     const vLo = oV[k][0], vHi = oV[k][NV - 1], vMid = (vLo + vHi) / 2;
@@ -8303,7 +8360,10 @@ function emitPanel(acc, rows, panel, tAt, rim) {
          modes (0.882 live, 0.440 export). What IS mode-identical, measured, is
          the SMALL end, three to four decades below that — which is the only
          end a threshold acts on. Recorded so that stays a measurement. */
-      if (rim) rim.pivots.push(rimDist(a0, a1));
+      const seg = rimDist(a0, a1);
+      if (rim) rim.pivots.push(seg);
+      /* NO TURN TO SPREAD, SO NO SUBDIVISION. */
+      if (seg < RIM_CORNER_MIN_MM) { if (rim) rim.pivotsSkipped++; continue; }
       for (let q = 1; q < RIM_CORNER_STEPS; q++) {
         const f = q / RIM_CORNER_STEPS;
         entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
