@@ -602,8 +602,14 @@ let capability = null;
    export and the STL export are the same build, made the same way, from the
    same readUI() snapshot; a second builder would be a second owner of "what
    the app is showing". */
-function buildGeometry({ exportMode, record = false, captureGrid = false }) {
-  const acc = new MeshBuilder({ exportMode, captureGrid });
+/* `captureNormals` — Eva's ruling on the bead's shading, and it is ON for the
+   VIEWPORT'S OWN BUILD and off for both export paths. The STL writes its own
+   per-facet normal and the grid export writes line strips, so neither reads
+   this; what it would cost them is an array the size of the positions on a
+   build that can reach millions of triangles. It moves no position — asserted
+   by E7 of tools/verify-bloom-edge-profile.mjs, not argued here. */
+function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false }) {
+  const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
   const uiForBuild = readUI();
   const built = buildBloomInto(acc, uiForBuild, { below: null, capability });   // 'stem' | 'branch' | null — null is phase 1's only state
   if (record) {
@@ -654,7 +660,19 @@ function buildGeometry({ exportMode, record = false, captureGrid = false }) {
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
-  geo.computeVertexNormals();
+  /* THE BUILDER'S NORMALS WHERE IT HAS THEM, AND computeVertexNormals() WHERE
+     IT DOES NOT. The buffer is NON-INDEXED, so computeVertexNormals() is a
+     FLAT normal per triangle — which is right for every hard edge this solid
+     has and wrong for the rim bead, whose facets then read as discrete
+     shading bands at about a fifth of a millimetre. The builder emits the
+     bead's own normal in closed form (see MeshBuilder's captureNormals note);
+     every other triangle carries the same flat normal this line computed
+     before, so nothing else on the model changes appearance. */
+  if (acc.normals && acc.normals.length === acc.positions.length) {
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
+  } else {
+    geo.computeVertexNormals();
+  }
   /* `built` is returned as well as cached, so the export path can summarise
      the geometry IT built rather than reading the live cache — the two are
      different geometry whenever a floor binds, and a summary that mixes them
@@ -978,6 +996,37 @@ function fringeLine(petals) {
    each cap and whether it bound, the pitch against its floor, and the rows the
    ladder gave each lobe (a ROW COUNT, measured on the emitted stations, said
    as such). Absent on a plain petal. */
+/* THE EDGE PROFILE (the edge-profile session, Eva's ruling) — read from ring
+   0's petal record, never re-derived from the constants. Two things have to be
+   said on every build and one only sometimes.
+
+   WHAT IS ALWAYS SAID: the rim the petal actually drew. The floor and the
+   radius are constants and a reader can find them; what a reader cannot find
+   is the radius this petal REACHED, the segment count that bought, and the
+   bead's semi-axis along the LENGTH at the tip — which is the ladder's own
+   last gaps rather than the ruled radius, and moves with the petal's length
+   and its tip law. A number nobody prints is a number nobody watches.
+
+   WHAT IS SAID WHEN IT HAPPENS: Eva asked for every location where the
+   narrow-span clamp takes the rim BELOW the 1.0 mm floor to be reported with
+   its measured thickness. The builder collects them (`rim.clamps`), the gate
+   holds the declaration to a biconditional, and this prints the count, the
+   thinnest, and the room that caused it. A fringe tooth at the ceiling is
+   1.0000 mm wide — exactly twice the ruled radius — so this is a reachable
+   state and not a corner. */
+function edgeProfileLine(petals) {
+  const R = petals && petals[0] && petals[0].rim;
+  if (!R || !R.segments) return '';
+  const tip = R.tipAxisMm === null ? '' : ` · at the tip the bead is ${R.tipAxisMm.toFixed(3)} mm along the length against ${R.drawnMaxMm.toFixed(2)} across — the ladder's own last ${2} rows, not the ruled radius`;
+  let clamp = '';
+  if (R.clamps.length) {
+    let thin = Infinity, room = 0, body = 0;
+    for (const c of R.clamps) if (c.thicknessMm < thin) { thin = c.thicknessMm; room = c.roomMm; body = c.bodyMm; }
+    clamp = `\n  RIM CLAMPED at ${R.clamps.length} ${R.clamps.length === 1 ? 'location' : 'locations'} — the narrowest span leaves ${room.toFixed(2)} mm of room, so the bead shrinks to fit and the rim is ${thin.toFixed(3)} mm there against the ${1.0} mm floor (the body is ${body.toFixed(2)} mm). Told, never refused.`;
+  }
+  return `EDGE PROFILE the rim eases to ${(2 * R.drawnMaxMm).toFixed(2)} mm over 3.0 mm of surface and closes on a ${R.drawnMaxMm.toFixed(2)} mm half-round in ${R.segments} segments${tip}${clamp}\n`;
+}
+
 function lobeLine(petals) {
   const L = petals && petals[0] && petals[0].lobes;
   if (!L) return '';
@@ -1535,6 +1584,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + seamLine(petals)
        + spineLine(petals)
        + lobeLine(petals)
+       + edgeProfileLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
        + (built && built.stem && built.stem.present ? stemLine(built.stem, built.hubBuilt.joinActive, built.hubBuilt.joinThickness, built.hubBuilt.joinBlendRadius, built.hub.radius, mode, built.stemOmission || null) : '')
@@ -1582,7 +1632,7 @@ function regenerate() {
      marks this as the build the telemetry describes; the export handler's
      build never carries it. */
   const mode = shownMode();
-  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true });
+  const { geo, acc, built } = buildGeometry({ exportMode: mode === 'export', record: true, captureNormals: true });
   /* THE READ-OUT SPANS AND THE CAP MARK, AFTER THE BUILD (session 23) — they
      used to be refreshed before it, which was the same thing while no span
      read a built number. One of them does now (the stamen spread's cap, an

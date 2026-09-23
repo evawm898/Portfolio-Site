@@ -148,9 +148,31 @@ jobs:
       # empty — which CA5 refuses as vacuous, correctly, and which would have
       # reddened every post-merge run of this gate. Caught by reading the step's
       # other triggers rather than by a failure; it has never run on main.
+      #
+      # AND IT IS GATED ON THE CENSUS RULE ITSELF HAVING MOVED (the edge-profile
+      # PR, #278). As written above it fired on EVERY pull request, and its
+      # subject is the diff of THE PR IT IS RUNNING ON — so on #279 it asserted
+      # #279's own scope and passed, and on the next PR to touch geometry it
+      # asserted that no bloom PR may ever change `bloom-geometry.js`, which is
+      # not a property any future PR can have. Measured on #278: 16 strays,
+      # red at this step, before the browser install and the matrix. The
+      # allowlist's own comment says the scope it holds is GEOMETRY, which is
+      # exactly why it cannot be a standing gate over PRs that change geometry.
+      #
+      # The step keeps its subject by running when `bloom-self-intersection.mjs`
+      # is in the diff: a PR that changes what the census COUNTS is still held
+      # to the allowlist, and a PR that does not touch the census is not. The
+      # only PR it could ever catch — one smuggling geometry while changing the
+      # census rule — is still caught. `--scope` also remains a hand-run tool.
       - name: ... and only census and instrument files moved
         if: github.event_name == 'pull_request'
-        run: node tools/verify-bloom-census-adjacency.mjs --scope --base origin/${{ github.base_ref || 'main' }}
+        run: |
+          git diff --name-only origin/${{ github.base_ref || 'main' }}...HEAD > /tmp/ca5-files.txt
+          if grep -qx 'tools/bloom-self-intersection.mjs' /tmp/ca5-files.txt; then
+            node tools/verify-bloom-census-adjacency.mjs --scope --base origin/${{ github.base_ref || 'main' }}
+          else
+            echo "CA5 scope: this PR does not change tools/bloom-self-intersection.mjs, so the census rule is not its subject — skipped. (The allowlist is about a CENSUS PR's scope; see the note above.)"
+          fi
       # playwright alone, at an exact version. It pins the exact playwright-core it
       # needs and npm hoists it, so the harness's `import 'playwright-core'` and the
       # browser that `npx playwright install` downloads can never disagree. Both

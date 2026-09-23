@@ -356,6 +356,8 @@ export const SMOKE_BLOCKS = [
         path: 'a dense pole: the (s, theta) raster and its fine pass, R4 on 120 far-side feet, R5 convergence, C1 on the lean-0 frame under curl' },
       { label: 'SPHERE: the APEX CORNER — ALL MIN x sheet 2.40 x spread min (the sphere held at one sheet, CLAMPED)',
         path: 'the apex floor\'s sphere arm — Rd held above R0, CLAMPED, told; S4\'s clamp clause' },
+      { label: 'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)',
+        path: 'THE CRAMPED PETAL, and the only row in this subset whose corner-fan outline segments fall under RIM_CORNER_MIN_MM. Before that gate it emitted 56 degenerate triangles in EXPORT and 118 in LIVE, and the export gate RATES degenerate triangles — so this row is what makes a regression of the rim sliver defect visible to a local run instead of only to a three-hour matrix. It is here for coverage of an axis, not of a family: every family it touches is claimed by the rows above, and NO row in this subset carried a degenerate triangle before it' },
       { label: 'SPHERE: GATED — Head rise 1 under SPHERE (hidden and inert; bit-identical to the sphere at rise 0)',
         path: 'S4 — headRise hidden AND inert under SPHERE (the bit-identity itself is the byte diff\'s; this row proves the guard and the DOME clause on the state)' },
       { label: 'SPHERE: GATED — SPHERE stored under RADIAL (hidden and inert; bit-identical to the default)',

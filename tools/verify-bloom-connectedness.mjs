@@ -591,6 +591,27 @@ console.log(`${crowdedRows.length}/${results.length} rows FLAGGED CROWDED (a fla
 /* THE FLAG IN BOTH DIRECTIONS, at matrix level — validity, never a row result. */
 if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
 
+/* NODE DOES NOT FLUSH A PIPED stdout ON process.exit(), AND A CI LOG IS A PIPE.
+   Writes to a pipe are asynchronous, so the per-row dump sits in a buffer
+   until the process ends — and exit() does not wait for it. On a PASSING run
+   the module simply runs off its end and node drains normally, which is why
+   this has never been visible. On a FAILING one it discarded the diagnosis:
+   measured on bloom-export-watertight run 35778167004, 201 of 909 rows
+   reached the log, the last one cut BETWEEN its SAGITTA line and the coverage
+   line that follows it on every row, and the summary, the failure block and
+   the verdict #220 added were all lost. The run read as a crash at row 202.
+   A gate that goes silent exactly when it fails is worth nothing, and #220's
+   whole point was that a failing run must say so — so both streams are
+   drained first. Reproduced and fixed against a written-down control: 200,001
+   buffered lines through a pipe, 3,796 survive exit() and 200,001 survive
+   this, the summary line among them. */
+async function flushAndExit(code) {
+  for (const s of [process.stdout, process.stderr]) {
+    if (s.writableLength) await new Promise((res) => s.write('', res));
+  }
+  process.exit(code);
+}
+
 let bad = false;
 if (validity.length) {
   bad = true;
@@ -610,13 +631,13 @@ if (failures.length) {
   for (const f of failures) console.error(`  - ${f.label}: ${f.comps} components, ${(f.strayFraction * 100).toFixed(2)}% of surface detached`);
 }
 if (NEGATIVE_CONTROL) {
-  if (bad) { console.log('\nNEGATIVE CONTROL: PASS — the harness rejected the clamped value, as it must.'); process.exit(0); }
+  if (bad) { console.log('\nNEGATIVE CONTROL: PASS — the harness rejected the clamped value, as it must.'); await flushAndExit(0); }
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
-  process.exit(1);
+  await flushAndExit(1);
 }
 if (bad) {
   /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
   console.log(`\nconnectedness: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} row(s) not one piece. Nothing above is a pass.`);
-  process.exit(1);
+  await flushAndExit(1);
 }
 console.log(`\nconnectedness: PASS — ${results.length} of ${attempted.length} attempted rows reached the results and every one exports as a single connected body${refused.length ? `; ${refused.length} row(s) the generator REFUSED on its own triangle budget, declared and asserted by XR1 (named above) rather than skipped` : ''}.`);
