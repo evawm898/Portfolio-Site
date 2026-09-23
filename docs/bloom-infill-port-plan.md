@@ -359,7 +359,14 @@ Neither that change nor the census rule it carries moves any figure here: the pr
 0.0009 mm below is a self-APPROACH through the wall instrument's own measure and the prototype's
 scratch census, checked rather than assumed.
 
-**S1 · THE CONFORMING EMITTER.** *Prototype only. No gate dependency.* **FIRST.**
+**S1 · THE CONFORMING EMITTER.** *Prototype only. No gate dependency.* **FIRST.** **DONE —
+`docs/bloom-infill-conforming-emitter.md`.** The worst emitted facet on `petalRoll` 330 goes
+2.4990 -> 0.4317 mm against the shipped lattice's own 0.5730, and the baseline turned up a second
+defect this paragraph does not name: the merge-walk covered its own hole (822 within-shell pairs
+on the FLAT default, against the plain lamina's 0). The gate is
+`node tools/verify-bloom-infill-conform.mjs` (+ `--negative-control`). **S2's own question is
+answered there: subdivision moves the wall compression NEITHER WAY** — §1b's plan wall and the
+emitted rim-to-rim wall are identical on both emitters at every state, so ruling 2 stands.
 `cutThrough` tessellates a solid cell as a **flat fan** over the whole cell polygon, and a flat fan
 across a surface that wraps is a chord: under `petalRoll` 330 — a shipped matrix row — a cell's own
 facet cuts through the tube and self-approach reads **0.0009 mm**. A shipped solid that

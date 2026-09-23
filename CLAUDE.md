@@ -3295,6 +3295,70 @@ and K2c's subject NAMED as a set because on a monotone petal no row is distingui
 sheet is `node tools/shot-bloom-lamina-floor.mjs <dir>`, **with F as the reference cell and one row
 PAST the floor on it** so the floor reads as a reason rather than a rule.
 
+**S1 OF THE PORT IS DONE: THE EMITTER CONFORMS TO THE SURFACE, AND THE BASELINE TURNED UP A
+SECOND DEFECT THE BRIEF DID NOT NAME** (read `docs/bloom-infill-conforming-emitter.md` before
+touching `cutThrough`, `annulusSectors`, `earClip`, the refiner or the C family; the picture is
+`docs/img/infill-conforming-emitter.png`). `cutThrough` fanned a solid cell FLAT, and a flat
+facet across a surface that WRAPS is a chord: on `petalRoll` 330 the worst emitted facet stood
+**2.4990 mm** from the mid-surface it claims to draw, and **6.8717** on ALL FORM MAX, against the
+SHIPPED LATTICE's own 0.5730 and 0.6348 on the same states. It now reads **0.4317 and 0.4813**.
+**THE SECOND DEFECT IS THAT THE MERGE-WALK COVERED ITS OWN HOLE** — its `advA` arm spans two
+consecutive OUTER vertices, so on a wide angular sector the triangle reaches across the hole's
+tip: on the FLAT default, where no chord error is possible at all, the cells alone read **822
+within-shell pairs against the plain lamina's 0**. Both are one sentence (a facet drawn over a
+hole is a facet that should not exist) and both are fixed.
+**THE TOLERANCE IS THE SHIPPED LATTICE'S OWN CHORD ERROR ON THE SAME STATE**, so "conforming"
+means the cells follow the surface at least as closely as the mesh that already ships — a bar in
+millimetres with an owner the infill does not write, not a fraction of the sheet (`t/2` is
+0.600 mm on the default against the lattice's 0.1416). **The edge tolerance is 3/4 of it and the
+3/4 IS DERIVED**: for a locally quadratic surface the affine interpolant's interior maximum is
+`q/3` against an edge midpoint's `q/4`, so a facet exceeds its worst edge by at most 4/3;
+measured, the worst amplification over the sweep is 1.13.
+**CRACK-FREENESS IS A CONSTRUCTION AND THE GATE FOUND TWO HOLES IN IT.** The points on a plan
+edge are `splitPoints(A, B)`, a pure function of the unordered pair, so two cells sharing a wall
+edge agree whatever else they do; the floor is an EDGE LENGTH and not a recursion depth, because
+a depth is a property of the walk. What went wrong: splitting the WORST-deviating edge can pick
+a SHORT one for ever, so a sliver recursed without bound and the escape hatch emitted a triangle
+with an edge its neighbour had split (**6 unmatched edges on `buckle 0.6 f3`, 20 on
+`cup 1.2 x cupGradient 1`**) — fixed by splitting the LONGEST wanting edge, which halves the
+diameter; and a triangle with a repeated vertex cycled, so it is dropped. **THE DEPTH CAP IS
+LOUD NOW** — counted, reported and gated — because a cap that fires silently is how this one hid.
+**A CENTROID FAN IS WRONG AT THE BLADE'S WAIST AND ONLY THE PARTITION CHECK SAID SO**: the
+outline `{|y| <= h(x)}` is convex only where `h` is concave and `h` rises then falls about the
+waist, so a cell there is not star-shaped and the fan drew up to **4.16 mm2 MORE than the
+material**. Ear clipping is the one triangulator for both arms. Below the floor the field's own
+`cellsFor` (Sutherland-Hodgman on a non-convex subject) can hand over a polygon that is not
+simple; the emitter counts it, falls back to the legacy tessellation and says so, and **0 of
+those rows regress against the legacy**.
+**THE BRIEF'S ABSOLUTE SELF-APPROACH BAR IS NOT AVAILABLE AND THE REASON IS A MEASUREMENT: THE
+SHIPPED PETAL ITSELF FOLDS AT `petalRoll` 330.** The PLAIN lamina over the cell region's own rows
+reads **2,347 pairs / 1.3837 mm** with no infill in it, and a self-approach of 0.00000 mm. So C2
+is a two-sided build against the plain sheet, and **the worst span is REPORTED, never bounded** —
+a span is a property of the tessellation, so roll 330 going 1.3837 -> 6.0344 while its facet
+deviation goes 2.4990 -> 0.4317 is the mesh drawing the tube instead of a shortcut across it.
+**COST: the shipping default petal 2,392 -> 2,744 (+14.7 %) and the whole bloom 19,496 -> 22,124
+(+13.5 %)**, under the +25 % the brief asks to be flagged; curved states pay more (curl 360
++78.6 %, cup x curl +88.3 %) and that is what conforming costs.
+**AND THE THREE COMPANION TOOLS MOVE THE TRIANGLE COUNT AND NOTHING ELSE** — `bloom-basal-grading`,
+`bloom-infill-base-panel` and `bloom-infill-lamina-floor` are IDENTICAL at `--quick` against a
+worktree of the base commit with the count columns masked, because every figure they publish is a
+property of the PLAN. **`bloom-basal-grading --inert <base>` is the one invocation that cannot be
+run across this commit** (it would be comparing two emitters); its header says so.
+**S2 GETS A MEASURED ANSWER TO THE QUESTION IT ASKED: SUBDIVISION MOVES THE WALL COMPRESSION
+NEITHER WAY.** §1b's plan wall and the EMITTED rim-to-rim wall are identical to four decimals on
+both emitters at every state — `cup 1.2 x curl 360` reads 0.1074 plan / **0.2231 emitted on
+both** — because the rim's vertices are `pt()` of the hole's own plan points and the subdivision
+inserts points ON the same curve. Ruling 2 stands and S2 still has to fix it. Beside it: the
+emitted wall on ALL FORM MAX is **0.0191 mm**, an order of magnitude tighter than the plan
+measure, because the plan measure reads a hole against its OWN cell's outline and the emitted one
+reads two holes' rims against each other.
+**NO MUTATION NAMES C2a AND THAT IS RECORDED AS A GAP RATHER THAN CLOSED BY WIDENING A LIST** —
+`the-flat-fan-is-restored` was written claiming it and the control reported MISSED, because the
+self-approach measure's subject is parts of the sheet more than a printable feature apart IN
+PLAN and the fan's damage is elsewhere. What vouches for that measure is C0, which reads a
+written-down 0.30 mm and refuses a pair 0.2 mm apart in plan, and which ABORTS rather than
+reporting.
+
 **THE UNIFORM ARC IS SINC-STABLE NOW, AND A CLOSED FORM KEPT VERBATIM FOR BYTE IDENTITY IS A
 LIABILITY THE DAY A NEW PRODUCER REACHES ITS SINGULAR BRANCH** (the arc-stability session —
 read `docs/bloom-organic-variance-discovery.md` §4 and §9.6 for the ruling, then
