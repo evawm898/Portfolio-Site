@@ -223,7 +223,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
     b: { id: 'buckleAmp', values: [0, 0.2, 0.4] },
-    verdict: 'product-only',
+    /* VERDICT RE-DECLARED BY THE APEX NIB: was PRODUCT-ONLY and both of its declared interior cells now CLEAR (1.126 and 1.114 mm against 0.990 and 0.963 on the base tree) — the nib's converging cap replaces the parallel terminal strip the cup and the buckle were closing across. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
+    verdict: 'clears',
     cite: "SELF_XFAIL['buckle-on-form'] in tools/bloom-wall-thickness.mjs names this pair in its own note (`cup+buckle reads 1.052`) — as a CURVATURE reading; this gate measures the SELF-APPROACH on it for the first time",
     why: "two summands of one normal displacement: `aN` in `sectAt` (bloom-geometry.js) adds the cup's lift and the buckle's wave into the same offset along the same normal",
   },
@@ -276,7 +277,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'buckleAmp', values: [0, 0.2, 0.4] },
     b: { id: 'petalTipShape', values: [1.7, 2.5, 3.0] },
-    verdict: 'product-only',
+    /* VERDICT RE-DECLARED BY THE APEX NIB: was PRODUCT-ONLY and both declared interior cells now CLEAR (1.081 and 1.050 mm against 0.914 and 0.925 on the base tree) — the same mechanism as cup-x-buckle above. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
+    verdict: 'clears',
     cite: 'docs/bloom-combination-gate.md §3 — the mechanism, costed and measured before it shipped; §18a of docs/bloom-session-32-outcome.md is the same argument with the cup in the buckle\'s place',
     why: 'the wave and the apex taper both act where the blade has least width: the buckle spends margin clearance the superellipse has already taken away',
   },
@@ -446,7 +448,8 @@ export const PAIRS = [
     measure: 'self',
     a: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
     b: { id: 'petalLength', values: [35, 20, 60] },
-    verdict: 'clears',
+    /* VERDICT RE-DECLARED BY THE APEX NIB: was CLEARS, and #263's own citation for it predicted this in words: 'measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom'. The twelve microns are spent and one interior cell is now under the bar, with neither single reaching it. CG4 partitions the three arms so no declaration is unfalsifiable, and it fired on this pair rather than letting the change pass as a magnitude move. */
+    verdict: 'product-only',
     cite: 'docs/bloom-combination-gate.md §4 — a guess, measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom',
     why: 'a guess: that a short blade cups into a tighter tube. It does, and it stops just above the bar — which is why a measured clear is worth gating rather than dropping',
   },
@@ -475,17 +478,32 @@ export const PAIRS = [
 export const COMBINATION_XFAIL = Object.freeze({
   /* ================================================== TIER 1 (#263) */
 
+  /* ===== FIVE CELLS THE APEX NIB TAKES UNDER THE BAR, EVERY ONE OF THEM
+     WITHIN 0.026 mm OF IT ON THE BASE TREE. They are not a new hazard: they
+     are the §18a family reaching one step further down the cup column,
+     because the nib replaces the blade's parallel terminal strip with a
+     converging cap and the two margins come together sooner. Each carries
+     the base tree's own reading beside this tree's, measured through
+     `--root <worktree>` — which had to be FIXED to measure anything at all
+     (the CLI never parsed it; see the flag's own comment). */
+  'cup-x-tipshape @ petalCup=0.6 x petalTipShape=2.5': { mm: 0.97, note: 'NEW WITH THE APEX NIB, and it is the §18a family reaching ONE STEP FURTHER DOWN the cup column: 1.026 mm on a worktree of 2464d50, 0.970 here. The nib truncates the law at the print floor and closes it on a flank and an arc, so the last stretch of blade stops being a parallel strip and the two margins converge — the wall instrument excludes the nib itself and this is the geometry just below it. Measured on the apex-nib tree, Node 22.' },
+  'gradient-x-tipshape @ petalCupGradient=0.6 x petalTipShape=2.5': { mm: 0.971, note: 'NEW WITH THE APEX NIB — the cup gradient\'s mirror of the cell above, as this pair has been throughout (#265 measured it within 0.004 mm of the plain cup\'s at the same numbers). 1.024 mm on a worktree of 2464d50, 0.971 here.' },
+  'cup-x-thinning @ petalCup=0.6 x tipThinning=0.4': { mm: 0.96, note: 'NEW WITH THE APEX NIB: 1.023 mm on a worktree of 2464d50, 0.960 here. The same cup column one step down, on the thinned tip rather than the tip shape.' },
+  'cup-x-thinning @ petalCup=0.6 x tipThinning=0.8': { mm: 0.96, note: 'NEW WITH THE APEX NIB: 1.023 mm on a worktree of 2464d50, 0.960 here. Identical to the 0.4 cell because tipThinning SATURATES against the export print floor above 0.4 — #265\'s own note, unchanged by the nib.' },
+  'cup-x-length @ petalCup=1.2 x petalLength=20': { mm: 0.994, note: 'NEW WITH THE APEX NIB, AND #263 SAID SO IN ADVANCE: its own citation for this pair reads ‘measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve microns of headroom’. The twelve microns are spent — 1.012 mm on a worktree of 2464d50, 0.994 here. A shorter blade meets the print floor at a LOWER station, so the nib\'s cap is a larger fraction of it.' },
+
+
   /* THE §18a CELLS, AND THREE THE DOC DID NOT HAVE. §18a measured the
      hazard at `petalCup` 1.2 alone; the grid shows it reaching DOWN to
      cup 0.6 at the ceiling tip shape Eva ruled reachable. The shipped
      `petalTipShape` is 1.70, so the cup column at 1.70 IS "cup alone",
      clears at 1.031, and is also the bell/corolla question 5's own
      number. */
-  'cup-x-tipshape @ petalCup=0.6 x petalTipShape=3': { mm: 0.929, note: 'NEW — the §18a hazard is not confined to cup 1.2. Measured 2026-09-19 on 937263a; cup 0.6 alone reads 1.178 and n 3.00 alone 1.203, both clear.' },
-  'cup-x-tipshape @ petalCup=0.9 x petalTipShape=2.5': { mm: 0.988, note: 'NEW, and the shallowest failing cell in the gate. Measured 2026-09-19 on 937263a.' },
-  'cup-x-tipshape @ petalCup=0.9 x petalTipShape=3': { mm: 0.854, note: 'NEW. Measured 2026-09-19 on 937263a.' },
-  'cup-x-tipshape @ petalCup=1.2 x petalTipShape=2.5': { mm: 0.977, note: "session 32 §18a's own figure (0.977), reproduced exactly on 937263a. 2.50 is Eva's preferred LOOK, ruled reachable and not shipped as the default." },
-  'cup-x-tipshape @ petalCup=1.2 x petalTipShape=3': { mm: 0.832, note: "session 32 §18a's own figure (0.832), reproduced exactly on 937263a. Monotone in n and the worst cell of this pair." },
+  'cup-x-tipshape @ petalCup=0.6 x petalTipShape=3': { mm: 0.890, note: 'NEW — the §18a hazard is not confined to cup 1.2. Measured 2026-09-19 on 937263a; cup 0.6 alone reads 1.178 and n 3.00 alone 1.203, both clear. — RE-RECORDED BY THE APEX NIB: was 0.929 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-tipshape @ petalCup=0.9 x petalTipShape=2.5': { mm: 0.901, note: 'NEW, and the shallowest failing cell in the gate. Measured 2026-09-19 on 937263a. — RE-RECORDED BY THE APEX NIB: was 0.988 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-tipshape @ petalCup=0.9 x petalTipShape=3': { mm: 0.801, note: 'NEW. Measured 2026-09-19 on 937263a. — RE-RECORDED BY THE APEX NIB: was 0.854 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-tipshape @ petalCup=1.2 x petalTipShape=2.5': { mm: 0.864, note: "session 32 §18a's own figure (0.977), reproduced exactly on 937263a. 2.50 is Eva's preferred LOOK, ruled reachable and not shipped as the default. — RE-RECORDED BY THE APEX NIB: was 0.977 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'cup-x-tipshape @ petalCup=1.2 x petalTipShape=3': { mm: 0.754, note: "session 32 §18a's own figure (0.832), reproduced exactly on 937263a. Monotone in n and the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.832 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
 
   /* THE CUP-AND-CURL CELLS — SIX OF THEM, and this pair is the finding of
      #263. `petalCup` 1.2 x `petalSpineCurl` 180 is the state
@@ -493,21 +511,21 @@ export const COMBINATION_XFAIL = Object.freeze({
      `buckle-on-form`'s buckle-free control, reads the wall of, and
      discards the SELF of; its 0.945 mm has been available to that gate
      since session 34 and nothing looked at it. */
-  'cup-x-curl @ petalCup=0.6 x petalSpineCurl=360': { mm: 0.826, note: 'measured 2026-09-19 on 937263a. Neither alone: cup 0.6 reads 1.178, curl 360 reads 1.245.' },
-  'cup-x-curl @ petalCup=0.9 x petalSpineCurl=270': { mm: 0.881, note: 'measured 2026-09-19 on 937263a.' },
-  'cup-x-curl @ petalCup=0.9 x petalSpineCurl=360': { mm: 0.118, note: 'measured 2026-09-19 on 937263a.' },
-  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=180': { mm: 0.945, note: "measured 2026-09-19 on 937263a. THE CELL THE WALL INSTRUMENT ALREADY BUILDS every run — `buckle-on-form`'s own control — and whose SELF it throws away." },
-  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=270': { mm: 0.193, note: 'measured 2026-09-19 on 937263a.' },
-  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=360': { mm: 0.012, note: 'measured 2026-09-19 on 937263a — the worst cell in TIER 1: a sheet twelve microns from touching itself on two shipped sliders, with both singles clear (1.031 and 1.245).' },
+  /* REMOVED BY THE APEX NIB: 'cup-x-curl @ petalCup=0.6 x petalSpineCurl=360' was declared at 0.826 mm and now CLEARS at 1.024. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'cup-x-curl @ petalCup=0.9 x petalSpineCurl=270': { mm: 0.902, note: 'measured 2026-09-19 on 937263a. — RE-RECORDED BY THE APEX NIB: was 0.881 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-curl @ petalCup=0.9 x petalSpineCurl=360': { mm: 0.115, note: 'measured 2026-09-19 on 937263a. — RE-RECORDED BY THE APEX NIB: was 0.118 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=180': { mm: 0.980, note: "measured 2026-09-19 on 937263a. THE CELL THE WALL INSTRUMENT ALREADY BUILDS every run — `buckle-on-form`'s own control — and whose SELF it throws away. — RE-RECORDED BY THE APEX NIB: was 0.945 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=270': { mm: 0.182, note: 'measured 2026-09-19 on 937263a. — RE-RECORDED BY THE APEX NIB: was 0.193 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-curl @ petalCup=1.2 x petalSpineCurl=360': { mm: 0.000, note: 'measured 2026-09-19 on 937263a — the worst cell in TIER 1: a sheet twelve microns from touching itself on two shipped sliders, with both singles clear (1.031 and 1.245). — RE-RECORDED BY THE APEX NIB: was 0.012 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE BUCKLE CELLS. `buckleAmp` stops at 0.4 on these grids because the
      amplitude CLAMP makes 0.6 float-identical to 0.4 at the default
      frequency 3 — measured, on every cup and every curl of both grids —
      so the top of the slider is covered by the cell below it and a
      fourth column would cost two builds to re-measure one state. */
-  'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.2': { mm: 0.99, note: 'measured 2026-09-19 on 937263a.' },
-  'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.4': { mm: 0.963, note: "measured 2026-09-19 on 937263a. Session 34 named this pair in `buckle-on-form`'s note as a CURVATURE reading (1.052 /mm); this is its self-approach, measured for the first time." },
-  'curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0.4': { mm: 0.912, note: "measured 2026-09-19 on 937263a. Session 34 named this pair in `buckle-on-form`'s note as a CURVATURE reading (1.182 /mm); this is its self-approach, measured for the first time." },
+  /* REMOVED BY THE APEX NIB: 'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.2' was declared at 0.99 mm and now CLEARS at 1.126. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  /* REMOVED BY THE APEX NIB: 'cup-x-buckle @ petalCup=1.2 x buckleAmp=0.4' was declared at 0.963 mm and now CLEARS at 1.114. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'curl-x-buckle @ petalSpineCurl=360 x buckleAmp=0.4': { mm: 0.852, note: "measured 2026-09-19 on 937263a. Session 34 named this pair in `buckle-on-form`'s note as a CURVATURE reading (1.182 /mm); this is its self-approach, measured for the first time. — RE-RECORDED BY THE APEX NIB: was 0.912 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
 
   /* THE LEAF CELLS — `leafAngle`'s hazard, at every stem diameter, which
      is what CG4's `single-reaches` arm asserts about this pair. */
@@ -529,8 +547,8 @@ export const COMBINATION_XFAIL = Object.freeze({
      the built amplitude well below the asked one, and the wave the clamp
      leaves is a different wave rather than a shallower one. A pair count
      cannot express that; a distance can. */
-  'buckle-x-tipshape @ buckleAmp=0.2 x petalTipShape=3': { mm: 0.914, note: 'the worst cell of this pair; buckleAmp 0.4 reads 0.925, BETTER, because the amplitude clamp binds. Measured 2026-09-19 on c29a8b5; the singles read 1.203 (n 3.00) and 1.220 (amp 0.4), both clear.' },
-  'buckle-x-tipshape @ buckleAmp=0.4 x petalTipShape=3': { mm: 0.925, note: 'measured 2026-09-19 on c29a8b5.' },
+  /* REMOVED BY THE APEX NIB: 'buckle-x-tipshape @ buckleAmp=0.2 x petalTipShape=3' was declared at 0.914 mm and now CLEARS at 1.081. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  /* REMOVED BY THE APEX NIB: 'buckle-x-tipshape @ buckleAmp=0.4 x petalTipShape=3' was declared at 0.925 mm and now CLEARS at 1.050. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
 
   /* THE QUILL. `petalRoll` 330 alone is `SELF_XFAIL['roll-max']` and
      reads 0.659 there too — the SAME state declared in two lists by two
@@ -538,20 +556,20 @@ export const COMBINATION_XFAIL = Object.freeze({
      cross-check either record has. The taper only ever RELIEVES on this
      grid: every tapered cell clears more than the untapered roll beneath
      it, so the pair's worst cell is a single. */
-  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=0': { mm: 0.718, note: 'a SINGLE-axis cell (taper at its default 0) — the roll reaches this alone. Measured 2026-09-19 on c29a8b5.' },
-  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=0.5': { mm: 0.777, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES.' },
-  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=1': { mm: 0.836, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES.' },
-  'roll-x-rolltaper @ petalRoll=330 x petalRollTaper=0': { mm: 0.659, note: "a SINGLE-axis cell, and it is SELF_XFAIL['roll-max']'s own state and own number (0.659) reached through a second instrument. Measured 2026-09-19 on c29a8b5." },
+  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=0': { mm: 0.717, note: 'a SINGLE-axis cell (taper at its default 0) — the roll reaches this alone. Measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.718 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=0.5': { mm: 0.778, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES. — RE-RECORDED BY THE APEX NIB: was 0.777 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'roll-x-rolltaper @ petalRoll=270 x petalRollTaper=1': { mm: 0.835, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES. — RE-RECORDED BY THE APEX NIB: was 0.836 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'roll-x-rolltaper @ petalRoll=330 x petalRollTaper=0': { mm: 0.658, note: "a SINGLE-axis cell, and it is SELF_XFAIL['roll-max']'s own state and own number (0.659) reached through a second instrument. Measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.659 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
   'roll-x-rolltaper @ petalRoll=330 x petalRollTaper=0.5': { mm: 0.714, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES.' },
-  'roll-x-rolltaper @ petalRoll=330 x petalRollTaper=1': { mm: 0.771, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES.' },
+  'roll-x-rolltaper @ petalRoll=330 x petalRollTaper=1': { mm: 0.770, note: 'measured 2026-09-19 on c29a8b5 — the taper RELIEVES. — RE-RECORDED BY THE APEX NIB: was 0.771 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE CUP UNDER THE SWEEP — `kS` multiplying `cupLift` in `sectAt`,
      measured. Both singles clear (cup 1.2 reads 1.031, sweep 1 reads
      1.246 — the sweep alone moves this measure by nothing at all at
      cup 0). */
-  'cup-x-apexsweep @ petalCup=0.9 x petalApexSweep=1': { mm: 0.936, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-apexsweep @ petalCup=1.2 x petalApexSweep=0.5': { mm: 0.909, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-apexsweep @ petalCup=1.2 x petalApexSweep=1': { mm: 0.818, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair, 0.213 mm beyond what the cup reaches alone.' },
+  'cup-x-apexsweep @ petalCup=0.9 x petalApexSweep=1': { mm: 0.998, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.936 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  /* REMOVED BY THE APEX NIB: 'cup-x-apexsweep @ petalCup=1.2 x petalApexSweep=0.5' was declared at 0.909 mm and now CLEARS at 1.011. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'cup-x-apexsweep @ petalCup=1.2 x petalApexSweep=1': { mm: 0.967, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair, 0.213 mm beyond what the cup reaches alone. — RE-RECORDED BY THE APEX NIB: was 0.818 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE GRADIENT INTO THE APEX, AND THE FINDING IS HOW CLOSELY IT TRACKS
      §18a. Cell for cell against `cup-x-tipshape` at the same numbers:
@@ -560,36 +578,36 @@ export const COMBINATION_XFAIL = Object.freeze({
      cup and its along-blade ramp are interchangeable for this hazard at
      these amplitudes, which is a statement about the hazard rather than
      about either control. */
-  'gradient-x-tipshape @ petalCupGradient=0.6 x petalTipShape=3': { mm: 0.928, note: "measured 2026-09-19 on c29a8b5; `cup-x-tipshape`'s own cell at the same numbers reads 0.929." },
-  'gradient-x-tipshape @ petalCupGradient=0.9 x petalTipShape=2.5': { mm: 0.985, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.988 at the same numbers.' },
-  'gradient-x-tipshape @ petalCupGradient=0.9 x petalTipShape=3': { mm: 0.85, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.854.' },
-  'gradient-x-tipshape @ petalCupGradient=1.2 x petalTipShape=2.5': { mm: 0.974, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.977.' },
-  'gradient-x-tipshape @ petalCupGradient=1.2 x petalTipShape=3': { mm: 0.828, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair; the cup reads 0.832 at the same numbers.' },
+  'gradient-x-tipshape @ petalCupGradient=0.6 x petalTipShape=3': { mm: 0.892, note: "measured 2026-09-19 on c29a8b5; `cup-x-tipshape`'s own cell at the same numbers reads 0.929. — RE-RECORDED BY THE APEX NIB: was 0.928 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'gradient-x-tipshape @ petalCupGradient=0.9 x petalTipShape=2.5': { mm: 0.901, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.988 at the same numbers. — RE-RECORDED BY THE APEX NIB: was 0.985 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'gradient-x-tipshape @ petalCupGradient=0.9 x petalTipShape=3': { mm: 0.802, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.854. — RE-RECORDED BY THE APEX NIB: was 0.850 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'gradient-x-tipshape @ petalCupGradient=1.2 x petalTipShape=2.5': { mm: 0.864, note: 'measured 2026-09-19 on c29a8b5; the cup reads 0.977. — RE-RECORDED BY THE APEX NIB: was 0.974 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'gradient-x-tipshape @ petalCupGradient=1.2 x petalTipShape=3': { mm: 0.754, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair; the cup reads 0.832 at the same numbers. — RE-RECORDED BY THE APEX NIB: was 0.828 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE FIDDLEHEAD, TIP-LOADED. Worse than `cup-x-curl` at three of its
      four failing cells (0.818 against 0.826, 0.678 against 0.881 — the
      gradient loads the stations the curl brings together). */
-  'gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360': { mm: 0.818, note: 'measured 2026-09-19 on c29a8b5; the plain cup at the same numbers reads 0.826.' },
-  'gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360': { mm: 0.678, note: 'measured 2026-09-19 on c29a8b5; the plain cup reads 0.118 — this one the gradient is KINDER to.' },
-  'gradient-x-curl @ petalCupGradient=1.2 x petalSpineCurl=270': { mm: 0.994, note: 'measured 2026-09-19 on c29a8b5 — six microns under the bar.' },
-  'gradient-x-curl @ petalCupGradient=1.2 x petalSpineCurl=360': { mm: 0.477, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair.' },
+  /* REMOVED BY THE APEX NIB: 'gradient-x-curl @ petalCupGradient=0.6 x petalSpineCurl=360' was declared at 0.818 mm and now CLEARS at 1.056. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'gradient-x-curl @ petalCupGradient=0.9 x petalSpineCurl=360': { mm: 0.899, note: 'measured 2026-09-19 on c29a8b5; the plain cup reads 0.118 — this one the gradient is KINDER to. — RE-RECORDED BY THE APEX NIB: was 0.678 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  /* REMOVED BY THE APEX NIB: 'gradient-x-curl @ petalCupGradient=1.2 x petalSpineCurl=270' was declared at 0.994 mm and now CLEARS at 1.023. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'gradient-x-curl @ petalCupGradient=1.2 x petalSpineCurl=360': { mm: 0.499, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.477 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE CUPPED QUILL — ELEVEN CELLS, TWO OF THEM SINGLES, and the widest
      failing region in the gate. `petalRoll` 270 and 330 fail at cup 0,
      which is why the verdict is `single-reaches`: the matrix and V5 can
      both see the roll alone. What they cannot see is the interior — the
      cup takes 0.659 mm down to 0.010. */
-  'cup-x-roll @ petalCup=0 x petalRoll=270': { mm: 0.718, note: 'a SINGLE-axis cell (cup at its default 0). Measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=0 x petalRoll=330': { mm: 0.659, note: "a SINGLE-axis cell, and SELF_XFAIL['roll-max']'s own 0.659 for the third time in this file. Measured 2026-09-19 on c29a8b5." },
+  'cup-x-roll @ petalCup=0 x petalRoll=270': { mm: 0.717, note: 'a SINGLE-axis cell (cup at its default 0). Measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.718 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-roll @ petalCup=0 x petalRoll=330': { mm: 0.658, note: "a SINGLE-axis cell, and SELF_XFAIL['roll-max']'s own 0.659 for the third time in this file. Measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.659 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
   'cup-x-roll @ petalCup=0.6 x petalRoll=180': { mm: 0.424, note: 'measured 2026-09-19 on c29a8b5; roll 180 alone reads 1.128 and cup 0.6 alone 1.178 — both clear.' },
-  'cup-x-roll @ petalCup=0.6 x petalRoll=270': { mm: 0.034, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=0.6 x petalRoll=330': { mm: 0.032, note: 'measured 2026-09-19 on c29a8b5.' },
+  'cup-x-roll @ petalCup=0.6 x petalRoll=270': { mm: 0.002, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.034 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-roll @ petalCup=0.6 x petalRoll=330': { mm: 0.024, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.032 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
   'cup-x-roll @ petalCup=0.9 x petalRoll=180': { mm: 0.253, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=0.9 x petalRoll=270': { mm: 0.012, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=0.9 x petalRoll=330': { mm: 0.085, note: 'measured 2026-09-19 on c29a8b5 — NOT monotone in the roll: 270 reads nearer than 330 at this cup.' },
+  'cup-x-roll @ petalCup=0.9 x petalRoll=270': { mm: 0.023, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.012 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-roll @ petalCup=0.9 x petalRoll=330': { mm: 0.004, note: 'measured 2026-09-19 on c29a8b5 — NOT monotone in the roll: 270 reads nearer than 330 at this cup. — RE-RECORDED BY THE APEX NIB: was 0.085 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
   'cup-x-roll @ petalCup=1.2 x petalRoll=180': { mm: 0.164, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=1.2 x petalRoll=270': { mm: 0.072, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-roll @ petalCup=1.2 x petalRoll=330': { mm: 0.01, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair and the joint-worst in the gate, ten microns.' },
+  'cup-x-roll @ petalCup=1.2 x petalRoll=270': { mm: 0.023, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.072 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-roll @ petalCup=1.2 x petalRoll=330': { mm: 0.107, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair and the joint-worst in the gate, ten microns. — RE-RECORDED BY THE APEX NIB: was 0.010 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE HOOP, WRUNG — TIER 2'S HEADLINE. 0.012 mm with BOTH singles
      clear (twist 180 reads 1.163, curl 360 reads 1.245): the same
@@ -597,13 +615,13 @@ export const COMBINATION_XFAIL = Object.freeze({
      monotone in the twist at curl 360 — 120 deg reads nearer than 180 —
      because past a certain wring the blade passes THROUGH the region it
      was approaching rather than settling in it. */
-  'curl-x-twist @ petalSpineCurl=180 x petalTwist=120': { mm: 0.975, note: 'measured 2026-09-19 on c29a8b5.' },
-  'curl-x-twist @ petalSpineCurl=180 x petalTwist=180': { mm: 0.62, note: 'measured 2026-09-19 on c29a8b5.' },
-  'curl-x-twist @ petalSpineCurl=270 x petalTwist=120': { mm: 0.411, note: 'measured 2026-09-19 on c29a8b5.' },
-  'curl-x-twist @ petalSpineCurl=270 x petalTwist=180': { mm: 0.105, note: 'measured 2026-09-19 on c29a8b5.' },
-  'curl-x-twist @ petalSpineCurl=360 x petalTwist=60': { mm: 0.615, note: 'measured 2026-09-19 on c29a8b5.' },
-  'curl-x-twist @ petalSpineCurl=360 x petalTwist=120': { mm: 0.012, note: "measured 2026-09-19 on c29a8b5 — this tier's worst cell, and the same twelve microns TIER 1's `cup 1.2 x curl 360` reads. Both singles clear: twist 180 reads 1.163 and curl 360 reads 1.245." },
-  'curl-x-twist @ petalSpineCurl=360 x petalTwist=180': { mm: 0.025, note: 'measured 2026-09-19 on c29a8b5 — NOT monotone: 120 deg of twist reads nearer than 180.' },
+  /* REMOVED BY THE APEX NIB: 'curl-x-twist @ petalSpineCurl=180 x petalTwist=120' was declared at 0.975 mm and now CLEARS at 1.123. CG2 fails hard on a declared hazard that starts passing, which is what reported this. */
+  'curl-x-twist @ petalSpineCurl=180 x petalTwist=180': { mm: 0.811, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.620 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'curl-x-twist @ petalSpineCurl=270 x petalTwist=120': { mm: 0.448, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.411 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'curl-x-twist @ petalSpineCurl=270 x petalTwist=180': { mm: 0.275, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.105 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'curl-x-twist @ petalSpineCurl=360 x petalTwist=60': { mm: 0.933, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.615 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'curl-x-twist @ petalSpineCurl=360 x petalTwist=120': { mm: 0.053, note: "measured 2026-09-19 on c29a8b5 — this tier's worst cell, and the same twelve microns TIER 1's `cup 1.2 x curl 360` reads. Both singles clear: twist 180 reads 1.163 and curl 360 reads 1.245. — RE-RECORDED BY THE APEX NIB: was 0.012 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument's own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22." },
+  'curl-x-twist @ petalSpineCurl=360 x petalTwist=180': { mm: 0.007, note: 'measured 2026-09-19 on c29a8b5 — NOT monotone: 120 deg of twist reads nearer than 180. — RE-RECORDED BY THE APEX NIB: was 0.025 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* ONE LIFT, TWO CONTROLS — AND THE MEASURE DEPENDS ON THEIR SUM. Read
      the eight declared cells as (cup + gradient): 1.5 reads 0.938 twice,
@@ -612,14 +630,14 @@ export const COMBINATION_XFAIL = Object.freeze({
      decimal, which is `cAt(u, r)` composing the two into one coefficient
      showing up as a measured symmetry rather than as a reading of the
      source. */
-  'cup-x-gradient @ petalCup=0.6 x petalCupGradient=0.9': { mm: 0.938, note: 'measured 2026-09-19 on c29a8b5; the cup+gradient sum is 1.5, and the other 1.5 cell reads 0.938 too.' },
-  'cup-x-gradient @ petalCup=0.6 x petalCupGradient=1.2': { mm: 0.862, note: 'measured 2026-09-19 on c29a8b5; sum 1.8.' },
-  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=0.6': { mm: 0.938, note: 'measured 2026-09-19 on c29a8b5; sum 1.5.' },
-  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=0.9': { mm: 0.862, note: 'measured 2026-09-19 on c29a8b5; sum 1.8.' },
-  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=1.2': { mm: 0.801, note: 'measured 2026-09-19 on c29a8b5; sum 2.1.' },
-  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=0.6': { mm: 0.862, note: 'measured 2026-09-19 on c29a8b5; sum 1.8.' },
-  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=0.9': { mm: 0.801, note: 'measured 2026-09-19 on c29a8b5; sum 2.1.' },
-  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=1.2': { mm: 0.754, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair; sum 2.4, the only cell at it.' },
+  'cup-x-gradient @ petalCup=0.6 x petalCupGradient=0.9': { mm: 1.000, note: 'measured 2026-09-19 on c29a8b5; the cup+gradient sum is 1.5, and the other 1.5 cell reads 0.938 too. — RE-RECORDED BY THE APEX NIB: was 0.938 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=0.6 x petalCupGradient=1.2': { mm: 0.944, note: 'measured 2026-09-19 on c29a8b5; sum 1.8. — RE-RECORDED BY THE APEX NIB: was 0.862 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=0.6': { mm: 0.999, note: 'measured 2026-09-19 on c29a8b5; sum 1.5. — RE-RECORDED BY THE APEX NIB: was 0.938 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=0.9': { mm: 0.943, note: 'measured 2026-09-19 on c29a8b5; sum 1.8. — RE-RECORDED BY THE APEX NIB: was 0.862 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=0.9 x petalCupGradient=1.2': { mm: 0.897, note: 'measured 2026-09-19 on c29a8b5; sum 2.1. — RE-RECORDED BY THE APEX NIB: was 0.801 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=0.6': { mm: 0.943, note: 'measured 2026-09-19 on c29a8b5; sum 1.8. — RE-RECORDED BY THE APEX NIB: was 0.862 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=0.9': { mm: 0.897, note: 'measured 2026-09-19 on c29a8b5; sum 2.1. — RE-RECORDED BY THE APEX NIB: was 0.801 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-gradient @ petalCup=1.2 x petalCupGradient=1.2': { mm: 0.858, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair; sum 2.4, the only cell at it. — RE-RECORDED BY THE APEX NIB: was 0.754 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* ================================================== TIER 3 (#265) */
 
@@ -639,8 +657,8 @@ export const COMBINATION_XFAIL = Object.freeze({
   /* THE CUP ON A BROAD BLADE — a guess that paid. Both singles clear
      (width 30 alone reads 1.219), and the cup's own 1.031 at the default
      width falls to 0.932 at the widest. */
-  'cup-x-width @ petalCup=0.9 x petalWidth=30': { mm: 0.954, note: 'measured 2026-09-19 on c29a8b5; petalWidth 30 alone reads 1.219 and cup 0.9 alone 1.138, both clear.' },
-  'cup-x-width @ petalCup=1.2 x petalWidth=30': { mm: 0.932, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair.' },
+  'cup-x-width @ petalCup=0.9 x petalWidth=30': { mm: 0.947, note: 'measured 2026-09-19 on c29a8b5; petalWidth 30 alone reads 1.219 and cup 0.9 alone 1.138, both clear. — RE-RECORDED BY THE APEX NIB: was 0.954 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-width @ petalCup=1.2 x petalWidth=30': { mm: 0.916, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.932 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 
   /* THE CUP ON A THINNED TIP — a guess that paid, and the second control
      SATURATES AGAINST THE PRINT FLOOR: 0.4 and 0.8 read the same number
@@ -649,10 +667,10 @@ export const COMBINATION_XFAIL = Object.freeze({
      to take. The axis still reaches the measure (0.191 mm from its own
      default column), so this is saturation and not inertness — the
      distinction COMBINATION_INERT exists to keep. */
-  'cup-x-thinning @ petalCup=0.9 x tipThinning=0.4': { mm: 0.984, note: 'measured 2026-09-19 on c29a8b5.' },
-  'cup-x-thinning @ petalCup=0.9 x tipThinning=0.8': { mm: 0.984, note: 'measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound.' },
-  'cup-x-thinning @ petalCup=1.2 x tipThinning=0.4': { mm: 0.924, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair.' },
-  'cup-x-thinning @ petalCup=1.2 x tipThinning=0.8': { mm: 0.924, note: 'measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound.' },
+  'cup-x-thinning @ petalCup=0.9 x tipThinning=0.4': { mm: 0.938, note: 'measured 2026-09-19 on c29a8b5. — RE-RECORDED BY THE APEX NIB: was 0.984 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-thinning @ petalCup=0.9 x tipThinning=0.8': { mm: 0.938, note: 'measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound. — RE-RECORDED BY THE APEX NIB: was 0.984 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-thinning @ petalCup=1.2 x tipThinning=0.4': { mm: 0.931, note: 'measured 2026-09-19 on c29a8b5 — the worst cell of this pair. — RE-RECORDED BY THE APEX NIB: was 0.924 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
+  'cup-x-thinning @ petalCup=1.2 x tipThinning=0.8': { mm: 0.931, note: 'measured 2026-09-19 on c29a8b5 — identical to 0.4: the export floor has already bound. — RE-RECORDED BY THE APEX NIB: was 0.924 mm. The nib truncates the law at the print floor and closes it on a flank and an arc, so every station near the tip sits at a different physical place and the drawn blade is up to +0.124 mm longer; the wall instrument\'s own exclusion is the NIB and exactly the nib (see `nibFromU`), so this is the geometry outside it. Measured on the apex-nib tree, Node 22.' },
 });
 for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
   if (!e || !(Number.isFinite(e.mm) && e.mm >= 0)) {
@@ -777,8 +795,7 @@ function measureCell({ G, W }, DEFAULTS, pair, va, vb) {
      region is excluded and what owns it instead. */
   const ap = m.petal.tipCap && m.petal.tipCap.apex;
   const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
-  const wedgeLenMm = ap && ap.drawnLengthMm > 0 ? (m.petal.grid[0].rows[0].thickness || 0) / ap.drawnLengthMm : 0;
-  const r = W.measureWall(m.petal.grid, { nibFromU, wedgeLenMm });
+  const r = W.measureWall(m.petal.grid, { nibFromU });
   return { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1] }, rows: r.rows, columns: r.columns };
 }
 
@@ -1170,16 +1187,28 @@ if (IS_MAIN) {
   const argv = process.argv.slice(2);
   const arg = (k) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : null);
   const only = arg('--only') ? new RegExp(arg('--only')) : null;
+  /* `--root` IS READ HERE, AND IT WAS NOT (found by the apex-nib session).
+     `run()`, `verify()` and `control()` have all taken a `root` since #263 and
+     the doc describes the flag as the control on the MEASURED side — "measure
+     ANOTHER tree's geometry against THIS tree's list" — but the CLI never
+     parsed it, so `--root <worktree>` silently measured THIS tree and reported
+     it as the other one's. It is the worst shape an instrument defect can
+     take: a flag that answers plausibly and answers about the wrong thing.
+     Caught by disbelief rather than by a clause — a base-tree run came back
+     with the BRANCH's own figures to the third decimal (the flat default's
+     self at 1.238 where the base tree's own gate reads 1.246). */
+  const root = arg('--root') ? path.resolve(arg('--root')) : HERE;
+  if (root !== HERE) console.log(`geometry, registry and the wall instrument from ${root}; the list, the clauses and the grid are this tree's`);
   if (argv.includes('--control')) {
     console.log('combination gate — the must-fail. Each leg plants ONE condition into a copy of the');
     console.log('real PAIRS / COMBINATION_XFAIL / COMBINATION_INERT and requires the clause that names it to fire.\n');
-    const bad = await control({});
+    const bad = await control({ root });
     if (bad === 2) process.exit(2);
     console.log(bad ? `\ncontrol: FAIL — ${bad} leg(s) did not fire the clause they name`
                     : '\ncontrol: every clause fired on a plant that names it, and the tree is green without them.');
     process.exit(bad ? 1 : 0);
   } else if (argv.includes('--emit')) {
-    const { rows, bar } = await verify({ quiet: true, only });
+    const { rows, bar } = await verify({ root, quiet: true, only });
     console.log("/* the cells this tree measures under the bar — copy deliberately, name every mover in the outcome doc */");
     for (const { pair, grid } of rows) {
       for (const c of grid.flat()) {
@@ -1190,7 +1219,7 @@ if (IS_MAIN) {
     }
     process.exit(0);
   } else {
-    const { fails } = await verify({ only });
+    const { fails } = await verify({ root, only });
     process.exit(fails.length ? 1 : 0);
   }
 }

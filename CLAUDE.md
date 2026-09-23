@@ -1616,6 +1616,36 @@ below it**, and its worst pair sits at **u 0.6809 here against 0.6803 on the bas
 same margin** — the same fold RE-STATIONED by the drawn length, which is the outline moving in
 the second of the two ways this change moves it. **0 of the seven need a third explanation**, and
 `off-lamina` is 0 on all seven on both trees.
+**AND THE WALL INSTRUMENT'S EXCLUSION WAS 35x TOO WIDE AND HID §18a's OWN HAZARD — CI CAUGHT IT,
+AND IT IS THE FIFTH DURABLE RULE AT THE SCALE OF A WHOLE GATE** (§6d of the outcome doc). The
+carve-out was written as "the last SHEET THICKNESS of blade" — a length derived from a length,
+the right instinct and the WRONG length: on the shipped sheet over a 35 mm blade that is
+`u >= 0.9657` where the nib on `petalTipShape` 3.00 begins at **u 0.99943**. In the gap sat
+session 32 §18a's own finding: `petalCup 1.2 x petalTipShape 3.00` reads **0.8315 mm at u 0.9858
+on the base tree**, the wide exclusion reported **1.5999**, and excluding THE NIB ALONE reads
+**0.7543 at u 0.9850 — the same site, slightly WORSE.** Five declared `COMBINATION_XFAIL` cells
+came back CLEARED and the next step would have been to delete Eva's own §18a cells. **WHAT
+CAUGHT IT IS CG2's "a declared hazard that starts passing TRIPS the gate"** — #213's
+bidirectional rule, in CI, three minutes into the first run; no green local run could have said
+so. The region is `u >= nibFromU` now and `wedgeLenMm` is gone from the signature and both
+callers, so no typed length is left in it. **Cost, all declared: 53 magnitudes re-recorded, 9
+cells genuinely CLEAR (entries removed, two verdicts PRODUCT-ONLY -> CLEARS), 5 NEW under the
+bar — every one within 0.026 mm of it on the base tree, and #263 predicted the last in words
+("twelve microns of headroom") — and one verdict CLEARS -> PRODUCT-ONLY. 74 under the bar, 74
+declared, 15 pairs, `--control` green.** **AND A V4 XFAIL IS OWED**: `buckle A=0.30 f=3 p=6`
+goes 0.108 -> **0.142** against a 0.12 bar, same site, and the MECHANISM IS THE LADDER — the
+arc's six stations coarsen the rows just below the nib (**0.4191/0.3338 mm at u 0.98 on the base
+tree against 0.5715/0.5670 here**) and `trueNormalRows`' normal is a cross product against the
+NEIGHBOURING rows. Session 32's apex/buckle trade in a second instrument; bar not widened,
+`APEX_ARC_ROWS` not trimmed to make a gate green, refinement pair scheduled.
+**AND THE COMBINATION GATE'S `--root` WAS NEVER PARSED BY ITS CLI** — `run()`/`verify()`/
+`control()` have taken a `root` since #263 and the doc calls it the control on the MEASURED
+side, while `node tools/bloom-combination-gate.mjs --root <tree>` silently measured THIS tree
+and reported it as the other one's. **Caught by disbelief, not by a clause**: a base-tree run
+came back with the BRANCH's figures to the third decimal. Fixed; it prints which tree the
+geometry came from. **And the V4 RECORD CONTROL perturbed EVERY xfail row while asserting
+exactly one clause fires** — true while one row carried a V4 xfail, false the moment a second
+did, so it failed on a right tree; it names its row now, as its `selfXfail` sibling already did.
 **AND `bloom-xfail-magnitudes --emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS** — it swapped
 `JSON.stringify`'s double quotes for single ones, which is correct until a label holds an
 APOSTROPHE, and eight do; the one thing that flag exists for could silently not be done for those

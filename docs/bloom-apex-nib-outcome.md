@@ -277,6 +277,109 @@ drawn outline by ~3e-7 mm, four orders under the live mesh floor. `slope` and
 skipped it compares a quantised number against an unquantised one — which is
 what it did the first time it ran.
 
+## 6d. THE EXCLUSION WAS 35x TOO WIDE AND HID §18a's OWN HAZARD — CI caught it
+
+**This is the most important thing in this document.** §6b's exclusion was
+written as "the last SHEET THICKNESS of blade" — a length derived from a
+length, which is the right instinct and the wrong length. On the shipped
+1.2 mm sheet over a 35 mm blade that is **`u >= 0.9657`**, while the nib on
+`petalTipShape` 3.00 begins at **`u 0.99943`**. Thirty-five times too wide.
+
+**WHAT SAT IN THE GAP WAS SESSION 32 §18a's OWN RECORDED FINDING.** Measured,
+both trees, by an instrument that knows nothing about the nib:
+
+| | base tree `2464d50` | this tree, WIDE exclusion | this tree, NIB-ONLY |
+|---|---|---|---|
+| `petalCup 1.2 x petalTipShape 3.00` | **0.8315 at u 0.9858** | **1.5999** | **0.7543 at u 0.9850** |
+| `petalCup 1.2 x petalTipShape 2.50` | 0.9765 at u 0.9879 | 1.5848 | 0.8643 at u 0.9851 |
+| `petalCup 1.2` alone | 1.0310 at u 1.0000 | 1.3551 | 1.0662 at u 0.9830 |
+
+The hazard is at **the same site**, and under the nib it is slightly **WORSE**,
+not fixed. Under the wide exclusion the combination gate reported **five
+declared `COMBINATION_XFAIL` cells as CLEARED** and the natural next step
+would have been to delete their entries — shipping a PR that claimed to have
+fixed Eva's own §18a finding by not looking at it.
+
+**IT IS THE FIFTH DURABLE RULE AT THE SCALE OF A WHOLE GATE:** a clause that
+carves out a subject the failure it doubts is not in cannot fail. What caught
+it is **CG2's "a declared hazard that starts passing TRIPS the gate rather
+than passing silently"** — #213's own bidirectional rule, in CI, on the first
+run of this PR, three minutes in. No green local run would ever have said so.
+
+**THE REGION IS THE NIB AND EXACTLY THE NIB NOW** — `u >= nibFromU`, read off
+the builder's own `tipCap.apex`, with `wedgeLenMm` removed from the signature
+and from both callers so there is no typed length left in it at all. Above it
+the two margins converge to a 0.10 mm mini-face by design; below it the
+outline is the law and the two-skin model handles it as it always did.
+
+### What the narrowed measure then cost, all of it declared
+
+* **53 `COMBINATION_XFAIL` magnitudes re-recorded** (#213's ordinary
+  obligation), each entry keeping its previous figure in its own note.
+* **9 cells genuinely CLEAR and their entries are REMOVED** — `cup-x-buckle`
+  and `buckle-x-tipshape` clear entirely, and their CG4 verdicts are
+  re-declared PRODUCT-ONLY -> CLEARS. The nib replaces the parallel terminal
+  strip those products were closing across.
+* **5 cells are NEW under the bar and are declared with both trees' readings**:
+  `cup-x-tipshape @ 0.6 x 2.5` (1.026 -> 0.970), `gradient-x-tipshape @ 0.6 x
+  2.5` (1.024 -> 0.971), `cup-x-thinning @ 0.6 x 0.4` and `x 0.8` (1.023 ->
+  0.960), `cup-x-length @ 1.2 x 20` (1.012 -> 0.994). **Every one was within
+  0.026 mm of the bar on the base tree**, and they are the §18a family
+  reaching one step further down the cup column rather than a new hazard.
+  **#263 predicted the last of them in words**: its own citation reads
+  *"measured CLEAR and close: 1.012 mm at cup 1.2 x a 20 mm blade, twelve
+  microns of headroom."* The twelve microns are spent.
+* **`cup-x-length`'s verdict goes CLEARS -> PRODUCT-ONLY** for that reason.
+* The gate closes at **74 cells under the bar, 74 declared, across 15 pairs**,
+  and its `--control` passes: *every clause fired on a plant that names it.*
+
+### A V4 xfail, and its mechanism is the ladder rather than the sheet
+
+`buckle A=0.30 x f=3 x p=6` was **the worst asserted state before this change
+and already close: 0.108 mm of the buckle's own wall cost against a 0.12 mm
+bar** on the base tree. Here it reads **0.142** — same site (u 0.98, |v| 0.56),
+18% past a bar it had 10% of headroom under.
+
+**THE MECHANISM IS MEASURED, NOT INFERRED.** The nib asks `ladderDemand()` for
+six stations across an arc 0.05 mm long, so the stations just BELOW the nib
+move apart: the two gaps bracketing u 0.98 read **0.4191 and 0.3338 mm on the
+base tree and 0.5715 and 0.5670 mm here** — 1.4x and 1.7x coarser — while the
+arc's own six sit 0.0073 to 0.0088 mm apart. `trueNormalRows` builds the
+buckled normal as a cross product against the NEIGHBOURING ROWS, so it is a
+LATTICE quantity, and coarser rows give a worse normal. **It is session 32's
+own apex/buckle trade arriving in a second instrument.** Declared with its
+magnitude (#213), the bar not widened and `APEX_ARC_ROWS` not trimmed to make
+a gate green. **What would settle mesh against geometry is a refinement pair
+on this state**, which this instrument has no mode for and which
+`buckle-on-form` got by hand — scheduled, not taken.
+
+### And two instrument defects the re-record surfaced
+
+**(i) THE COMBINATION GATE'S `--root` WAS NEVER PARSED.** `run()`, `verify()`
+and `control()` have all taken a `root` since #263, and #265's doc describes
+the flag as the control on the MEASURED side — *"measure ANOTHER tree's
+geometry against THIS tree's list"* — but the CLI read `--only` and
+`--control` and nothing else, so **`--root <worktree>` silently measured THIS
+tree and reported it as the other one's.** That is the worst shape an
+instrument defect takes: it answers plausibly, about the wrong thing.
+**Caught by disbelief rather than by a clause** — a base-tree run came back
+with the BRANCH's own figures to the third decimal (the flat default's self at
+1.238 where the base tree's own gate reads 1.246). Fixed, and the run now
+prints which tree the geometry came from; with it working, `--root` reproduces
+the base tree's grid exactly (1.246 / 1.178 / 1.023 / 0.984 / 0.924 on
+`cup-x-thinning`, to the third decimal).
+
+**(ii) THE V4 RECORD CONTROL PERTURBED EVERY XFAIL ROW WHILE ASSERTING THAT
+EXACTLY ONE CLAUSE FIRES.** That was the same thing while exactly one row
+carried a V4 xfail; the moment this session declared a second it fired two and
+the control FAILED on a tree that is right. It names its row now, the way its
+`selfXfail` sibling already did, and refuses a name that carries no xfail.
+**A control whose expectation is hard-wired to a count the tree can change is
+the same shape as a clause whose subject silently moves** — and it is the
+third instance in this session, after AN0's guard and AN3's.
+
+---
+
 ## 7. The re-derivations
 
 Eva's ruling: *"C1/A2 re-derived onto the builder's reported length and

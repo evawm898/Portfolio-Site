@@ -182,7 +182,7 @@ function ptTri(p, a, b, c) {
    half-millimetre of blade; X1/X2 own that region, and `APEX NIB:` rows run
    in both STL gates. Null on a tree with no nib, where every line below is
    what it was, to the bit. */
-export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null, wedgeLenMm = 0 } = {}) {
+export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null } = {}) {
   const rows = grid.flatMap((pan) => pan.rows).filter((r) => r.row >= footRows);
   if (rows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
   const NVc = rows[0].v.length;
@@ -194,22 +194,34 @@ export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null, wed
   /* Bottom-skin triangles TAGGED with the cell they came from, which is what
      lets "the wall under this point" and "another part of this sheet" be told
      apart at all. */
-  /* THE REGION IS THE LAST SHEET THICKNESS OF BLADE, AND THAT LENGTH IS
-     DERIVED FROM A LENGTH rather than from a row count — this project's own
-     first durable rule. Two skins offset +-t/2 from a CONVERGING mid-surface
-     must approach each other within the last `t` of the blade, because that
-     is exactly where the outline's own width falls below the offset; the row
-     count over that stretch is a property of the ladder and moves with it.
-     MEASURED, on `buckle A=0.30 x half-width f=3`: the tip's top skin (row
-     55, u 1.0000) pairs with the bottom skin at row 48 (u 0.9824) — seven
-     lattice rows apart and 0.62 mm apart on the blade — so an exclusion that
-     stopped at the crossing, or at the crossing plus one row, did not reach
-     it, and both were tried and left the figures unmoved.
+  /* THE REGION IS THE NIB AND EXACTLY THE NIB — `u >= nibFromU`, the station
+     the BUILDER's own `tipCap.apex` says the law was cut at, and nothing
+     else. Above it the two margins of the blade converge to a 0.10 mm
+     mini-face BY DESIGN, so the two skins meet there because that is what a
+     tip is; below it the outline is the law and the two-skin model handles it
+     exactly as it always did. Both the POINT and its PARTNER are excluded,
+     because a point below the nib can pair with a skin point inside it.
+
+     IT WAS WIDER AND THAT WAS A DEFECT, CAUGHT BY CI AND WORTH THE WHOLE
+     COMMENT. The first cut excluded the last SHEET THICKNESS of blade — a
+     length derived from a length, which is the right instinct and the wrong
+     length: at the shipped 1.2 mm sheet on a 35 mm blade that is `u >=
+     0.9657`, while the nib on `petalTipShape 3.00` begins at **u 0.99943**.
+     Thirty-five times too wide, and what sat in the gap was §18a's own
+     recorded hazard: `petalCup 1.2 x petalTipShape 3.00` reads **0.8315 mm at
+     u 0.9858 on the base tree**, and under the wide exclusion this instrument
+     reported **1.5999 mm** — so five declared `COMBINATION_XFAIL` cells came
+     back CLEARED and the gate said the apex nib had FIXED them. It had not:
+     excluding the nib alone, the same state reads **0.7543 mm at u 0.9850**,
+     the same site, slightly WORSE. A clause that carves out a subject the
+     failure it doubts is not in cannot fail — the fifth durable rule — and
+     this is that at the scale of a whole gate. CG2's "a declared hazard that
+     starts passing TRIPS the gate rather than passing silently" is what
+     caught it.
      BOTH MEASURES: a converging tip's normals are not parallel, so the
      reconstructed WALL there is under `t` for the same reason, at the same
      stations. */
-  const bladeMm = nibFromU !== null && wedgeLenMm > 0 ? wedgeLenMm : null;
-  const onNib = (i) => bladeMm !== null && rows[i].u >= 1 - bladeMm;
+  const onNib = (i) => nibFromU !== null && rows[i].u >= nibFromU;
   const tris = [];
   for (let i = 0; i < B.length - 1; i++) {
     for (let j = 0; j < NVc - 1; j++) {
@@ -381,7 +393,42 @@ export const STATES = [
   { id: 'buckle-mid',      label: 'buckle A=0.20 x half-width · f=3', set: { buckleAmp: 0.20, buckleFreq: 3 }, buckled: true },
   { id: 'buckle-strong',   label: 'buckle A=0.30 x half-width · f=3', set: { buckleAmp: 0.30, buckleFreq: 3 }, buckled: true },
   { id: 'buckle-env2',     label: 'buckle A=0.30 · f=3 · p=2',        set: { buckleAmp: 0.30, buckleFreq: 3, buckleEnv: 2 }, buckled: true },
-  { id: 'buckle-env6',     label: 'buckle A=0.30 · f=3 · p=6',        set: { buckleAmp: 0.30, buckleFreq: 3, buckleEnv: 6 }, buckled: true },
+  { id: 'buckle-env6',     label: 'buckle A=0.30 · f=3 · p=6',        set: { buckleAmp: 0.30, buckleFreq: 3, buckleEnv: 6 }, buckled: true,
+    /* XFAIL SINCE THE APEX NIB, AND IT IS THE LATTICE RATHER THAN THE SHEET —
+       measured on both trees, at the SAME site (u 0.98, |v| 0.56), by an
+       instrument that knows nothing about the nib.
+
+       It was the worst asserted state before this change and already close:
+       **0.108 mm of the buckle's own wall cost against a 0.12 mm bar** on a
+       worktree of `2464d50`. Here it reads **0.142** — +0.034, 18% past the
+       bar, where it had 10% of headroom.
+
+       THE MECHANISM IS THE ARC'S SIX ROWS, MEASURED AND NOT INFERRED. The nib
+       asks `ladderDemand()` for `APEX_ARC_ROWS` stations across an arc that is
+       0.05 mm long, and the ladder has 56 rows to give, so the stations just
+       BELOW the nib move apart. On this exact state, the two gaps bracketing
+       u 0.98 read **0.4191 and 0.3338 mm on the base tree and 0.5715 and
+       0.5670 mm here** — 1.4x and 1.7x coarser — while the arc's own six sit
+       0.0073 to 0.0088 mm apart. `trueNormalRows` builds the buckled normal as
+       a cross product against the NEIGHBOURING ROWS, so it is a LATTICE
+       quantity (session 33 measured it 54.74 degrees off the cross-section
+       normal at amp 0.5 / freq 3, which is why it exists at all): coarser rows
+       give a worse normal and the reconstructed wall thins with it.
+
+       SO IT IS SESSION 32'S OWN APEX/BUCKLE TRADE ARRIVING IN A SECOND
+       INSTRUMENT, and it is REPORTED rather than tuned around either way —
+       the bar is not widened (#213: an unenforced number becomes folklore
+       within two sessions) and `APEX_ARC_ROWS` is not trimmed to make a gate
+       green, which would be tuning the geometry to the instrument. WHAT WOULD
+       SETTLE IT is a refinement pair on this state, which this instrument has
+       no mode for and which the `buckle-on-form` row above got by hand: if the
+       deficit RECOVERS at a denser lattice it is the mesh, as the row gaps
+       above say it should be, and if it DIVERGES it is geometry. Scheduled in
+       docs/bloom-apex-nib-outcome.md, not taken here.
+       THE RUN FAILS HARD IF IT STARTS PASSING, and its magnitude is gated
+       (#213) exactly as the composition row's is. */
+    xfail: { ownDeficitMm: 0.142,
+      note: 'the apex arc\'s six stations coarsen the rows just below the nib (0.4191/0.3338 mm on the base tree at u 0.98 against 0.5715/0.5670 here), and the buckled normal is a cross product against the NEIGHBOURING rows \u2014 so this is the lattice, at the state that was already the worst asserted one at 0.108 mm against a 0.12 bar. Site unmoved at (u 0.98, |v| 0.56). A refinement pair would settle mesh against geometry and is scheduled, not taken.' } },
   { id: 'buckle-f7',       label: 'buckle A=0.20 · f=7 (the frequency ceiling)', set: { buckleAmp: 0.20, buckleFreq: 7 }, buckled: true },
     /* ASSERTED SINCE SESSION 34, and the marker coming off is the point. At
        NU = 28 this row sat at 4.0 rows per cycle, was `report`ed with that as
@@ -443,8 +490,7 @@ async function run({ root = ROOT, defaults = null, label = 'head' } = {}) {
        this instrument runnable against an older worktree. */
     const ap = m.petal && m.petal.tipCap && m.petal.tipCap.apex;
     const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
-    const wedgeLenMm = ap && ap.drawnLengthMm > 0 ? (m.petal.grid[0].rows[0].thickness || 0) / ap.drawnLengthMm : 0;
-    return { ...measureWall(m.petal.grid, { nibFromU, wedgeLenMm }), tris: acc.positions.length / 9, positions: acc.positions };
+    return { ...measureWall(m.petal.grid, { nibFromU }), tris: acc.positions.length / 9, positions: acc.positions };
   };
   const out = [];
   for (const st of STATES) {
@@ -480,7 +526,17 @@ export async function verify({ root = ROOT, quiet = false, perturb = null } = {}
      negative control runs it after the geometry mutants. */
   const xf = perturb && perturb.selfXfail ? { ...SELF_XFAIL, [perturb.selfXfail.id]: { ...SELF_XFAIL[perturb.selfXfail.id], selfMm: perturb.selfXfail.selfMm } } : SELF_XFAIL;
   if (perturb && perturb.selfXfail && !SELF_XFAIL[perturb.selfXfail.id]) throw new Error(`perturb names "${perturb.selfXfail.id}", which SELF_XFAIL does not declare`);
-  for (const r of rows) if (perturb && perturb.v4 && r.xfail) r.xfail = { ...r.xfail, ownDeficitMm: perturb.v4.ownDeficitMm };
+  /* NAMED, THE WAY ITS `selfXfail` SIBLING ALREADY IS. This line perturbed
+     EVERY row carrying an xfail, which was the same thing while exactly one
+     did; the apex nib declares a second (`buckle-env6`), so the unnamed form
+     fired TWO clauses where its own leg asserts exactly one, and the control
+     failed on a tree that is right. A control whose expectation is hard-wired
+     to a count the tree can change is the same shape as a clause whose subject
+     silently moves. */
+  if (perturb && perturb.v4) {
+    if (!rows.some((r) => r.id === perturb.v4.id && r.xfail)) throw new Error(`perturb names "${perturb.v4.id}", which carries no V4 xfail`);
+    for (const r of rows) if (r.id === perturb.v4.id && r.xfail) r.xfail = { ...r.xfail, ownDeficitMm: perturb.v4.ownDeficitMm };
+  }
 
   say('bloom wall thickness — the distance between the two emitted skins.\n');
   say('  ' + 'state'.padEnd(42) + 'WALL'.padStart(8) + 'SELF'.padStart(8) + "  buckle's own".padStart(14) + '  rows/cyc  worst at (u, v)');
@@ -955,8 +1011,8 @@ if (IS_MAIN) {
       const legs = [
         ['V5 record stale, worse',  { selfXfail: { id: 'roll-max', selfMm: SELF_XFAIL['roll-max'].selfMm + 0.1 } }, 'V5 xfail magnitude'],
         ['V5 record stale, better', { selfXfail: { id: 'roll-max', selfMm: SELF_XFAIL['roll-max'].selfMm - 0.1 } }, 'V5 xfail magnitude'],
-        ['V4 record stale, worse',  { v4: { ownDeficitMm: 0.3 } }, 'V4 xfail magnitude'],
-        ['V4 record stale, better', { v4: { ownDeficitMm: 0.9 } }, 'V4 xfail magnitude'],
+        ['V4 record stale, worse',  { v4: { id: 'buckle-on-form', ownDeficitMm: 0.3 } }, 'V4 xfail magnitude'],
+        ['V4 record stale, better', { v4: { id: 'buckle-on-form', ownDeficitMm: 0.9 } }, 'V4 xfail magnitude'],
       ];
       for (const [name, perturb, want] of legs) {
         const { fails } = await verify({ quiet: true, perturb });
