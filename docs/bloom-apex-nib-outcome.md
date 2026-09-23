@@ -507,6 +507,18 @@ stations land, not what the petals do to each other.
   all. **The same line is checked on this PR's own run before merging.**
   Its `EXPORT_REFUSED_XFAIL` entry — 3,090,816 triangles — is unchanged, which
   is the count this tree builds to the integer: the nib adds no triangles.
+  **AND `ALL MAX` IS A DECLARED MOVER OF THIS CHANGE, THROUGH ITS SEPALS AND
+  NOT ITS PETALS — which is session 38's own lesson arriving by an unobvious
+  route.** Block 1 sweeps every `SWEEPABLE` slider to its maximum, so that row
+  carries `petalTipEnd` 1: a squared terminal at the full peak width, which is
+  precisely the nib's third guard, so **every PETAL on it is INERT** and the
+  read-out prints the inert arm. Its forty SEPALS are not: `sepalBladeState`
+  sets `petalTipEnd: 0` by declaration (the rim family is the sepal part 2's),
+  so each sepal's terminal is the mode floor and each cuts its own nib. The
+  byte partition's predicate catches it for that reason and not by luck — it
+  reads `petalsAll` AND `sepals.built`, and a row that sweeps every control is
+  a mover of any control a feature adds. **It is also why the census entry
+  could move**: what would move it is the sepals, not the petals.
   **Its `SELF_INTERSECTION_XFAIL` entry is carried forward UNMEASURED**, named
   here rather than silently kept: the census sweep skips an export-refused row
   because no STL exists for X1 to read, and re-measuring it needs
