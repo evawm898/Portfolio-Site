@@ -332,8 +332,11 @@ const MOVER_BY_CHANGE = {
      holds the outline above the print floor exactly when `terminalHalf`
      exceeds `TIP_HALF_MM` — the terminal is `max(petalTipEnd x peak, the mode
      floor)` and BOTH mode floors are at or under `TIP_HALF_MM`, so the test
-     reads the same in live and in export. SEPALS ARE IN IT: a sepal is the
-     petal builder on a second ring and cuts its own nib from its own law. */
+     reads the same in live and in export. The floor itself is IMPORTED
+     (`PRINT_FLOOR_HALF` above) and CHECKED equal on the two trees, because a
+     length typed into a predicate is this project's most-repeated mistake.
+     SEPALS ARE IN IT: a sepal is the petal builder on a second ring and cuts
+     its own nib from its own law. */
   nib: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
     .some((p) => p && p.tipCap && p.tipCap.peakHalf > PRINT_FLOOR_HALF && !(p.tipCap.terminalHalf > PRINT_FLOOR_HALF)),
 };
