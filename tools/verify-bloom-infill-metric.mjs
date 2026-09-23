@@ -25,6 +25,11 @@
    NOMINAL 1.0 mm ON EVERY PAIR, which is what makes ONE number the whole acceptance: a
    shared wall is inset w/2 from each side and an outline edge is inset by the full w.
 
+   AND THE MEASURE REFINES ITS OWN ANSWER, because a minimum sampled at `RIM_STEP_MM` reads
+   HIGH by about the step SQUARED — at most 1.57e-3 mm over this sweep, which is TEN TIMES
+   the headroom the tightest state has. See `REFINE_FACTOR` below; both readings are
+   returned and M2b prints the movement.
+
    M0 FIRST, AND IT ABORTS. The instruments vouch for themselves on SYNTHETIC surfaces
    whose answers are written down — a plane, a plane scaled 2x along the spine, and a
    SHEARED plane, which is the one that separates the shipped formula from the plausible
@@ -70,6 +75,13 @@
        the geodesic through the material. M2 reports the 3-space distance of the same pair
        beside it, and where the two agree the path is straight and the bound is tight; the
        largest disagreement over the sweep is printed.
+     - BOTH PASSES PRUNE CANDIDATE PAIRS BY PLAN DISTANCE (the nearest 40 in the coarse walk,
+       a bound in the refinement), and IN-SHEET LENGTH IS NOT MONOTONE IN PLAN DISTANCE where
+       the surface COMPRESSES — a pair far apart in plan can be close on the object. What
+       bounds it is the in-material clause, which refuses a path crossing a hole, and the
+       metric inset itself, which makes plan walls LARGE in exactly the compressed regions.
+       A declared blindness, not a measured failure: the shipped reading agrees with an
+       independent 64x local walk on the tightest state to 4e-5 mm.
      - S1's conforming-emitter claims are S1's gate's. This one does not re-assert them:
        run `node tools/verify-bloom-infill-conform.mjs` (+ `--negative-control`).
      - one seed (`SEED`), one petal, EXPORT mode, 16 cells, wall 1.0 mm. Naming the
@@ -88,7 +100,7 @@ const NEG = process.argv.includes('--negative-control');
 
 /* THE SWEEP IS S1'S, PLUS THE TWO COMBINED CORNERS BY NAME. §1b's `cup 1.2 x curl 180`
    joins it because it is the state where the flat plan is WRONG BUT NOT OBVIOUSLY SO
-   (0.8044 mm, above the 0.3 mm floor and below the ruled wall), which is the shape of
+   (0.8036 mm, above the 0.3 mm floor and below the ruled wall), which is the shape of
    defect a bar set at the floor would miss. */
 export const STATES = [
   ['default (flat)', {}],
@@ -121,6 +133,34 @@ export const IN_SHEET_STEPS = 32;             // subdivisions of a plan segment 
    has, it is 10^9 times smaller than the smallest shortfall any mutant here produces
    (0.0045 mm), and it is 10^11 under the 0.3 mm horizontal wall floor the ruling is about. */
 export const IN_SHEET_ULPS = 8;
+/* THE COARSE WALK IS OPTIMISTIC AND THE MEASURE REFINES ITS OWN ANSWER RATHER THAN
+   DECLARING THE BIAS. A minimum taken over rim points `RIM_STEP_MM` apart reads HIGH: the
+   true minimiser sits between two samples, and the distance function is locally quadratic
+   about it, so the error goes as the step squared. Measured over the sweep it is at most
+   **1.57e-3 mm** — and on the tightest state, ALL FORM MAX, the headroom over the ruled
+   wall is **1.6e-4 mm**, TEN TIMES SMALLER THAN THE BIAS. A clause that asserted the coarse
+   reading would be asserting a number an order of magnitude looser than the thing it is
+   about, which is the wrong direction: it passes a state that is genuinely under.
+
+   So the winning pair is RE-WALKED locally. The window is three coarse steps, which is
+   derived rather than typed — the sampled minimiser is within ONE coarse step of the true
+   one along each rim, or a nearer sample would have won it — and the step is
+   `REFINE_FACTOR` times finer, so the residual bias falls by its SQUARE: 1.57e-3 / 256 =
+   **6e-6 mm**, twenty-five times under that same headroom. Both readings are returned and
+   M2b prints the movement, so the refinement is visible rather than silent.
+
+   MEASURED AGAINST A 64x LOCAL WALK ON ALL FORM MAX: the coarse reading is 1.0017219, the
+   refined one 1.0001565, and the wall HOLDS.
+
+   AND THE REFINEMENT CAN ONLY LOWER THE READING, WHICH IS THE SAFE DIRECTION AND IS SAID
+   RATHER THAN LEFT TO BE WORKED OUT. It seeds itself with the coarse minimum and assigns only
+   on a strict decrease, so the worst it can do is a FALSE FAIL — never a false pass. That
+   matters because its window gathers from the holes AND the outline at BOTH ends, so an
+   outline-to-outline pair is expressible where the coarse pass could not form one; it does not
+   arise here (a hole is inset by the FULL wall from an outline edge, so no outline point lies
+   inside a window centred on a hole rim), and if it ever did the clause would go red and be
+   diagnosable rather than quietly passing. */
+export const REFINE_FACTOR = 16;
 
 /* ---------------- THE WALL, IN SURFACE MILLIMETRES ----------------
    It reads the EMITTED rim polygons and `petalSurface`, and no metric field. */
@@ -164,9 +204,21 @@ export function wallSurfaceMm(ctx, F, r, step = RIM_STEP_MM) {
     }
   }
   if (!pair) return null;
-  return { mm: best, threeMm: d3(pair[0].P, pair[1].P), planMm: hyp(pair[0].q, pair[1].q),
+  const coarse = best;
+  /* THE LOCAL RE-WALK. Both rims (and the outline) are re-sampled `REFINE_FACTOR` times
+     finer inside a window of three coarse steps about each end of the winning pair. */
+  const win = 3 * step, fine = step / REFINE_FACTOR;
+  const nearOf = (c) => { const o = []; for (const poly of r.holes.concat([F.outline])) for (const q of densify(poly, fine)) if (hyp(q, c) <= win) o.push(q); return o; };
+  const NA = nearOf(pair[0].q), NB = nearOf(pair[1].q);
+  for (const a of NA) for (const b of NB) {
+    if (hyp(a, b) > coarse + 2 * win) continue;
+    if (!inMaterial(a, b, r.holes)) continue;
+    const sLen = P.inSheetLenMm(ctx, a, b, IN_SHEET_STEPS);
+    if (sLen < best) { best = sLen; pair = [{ q: a, P: mid(a), h: pair[0].h }, { q: b, P: mid(b), h: pair[1].h }]; }
+  }
+  return { mm: best, coarseMm: coarse, threeMm: d3(pair[0].P, pair[1].P), planMm: hyp(pair[0].q, pair[1].q),
     u: pair[0].q.x / ctx.L, against: pair[1].h < 0 ? 'the outline' : `hole ${pair[1].h}`,
-    a: pair[0].q, b: pair[1].q, rimPoints: rim.length, crossed };
+    a: pair[0].q, b: pair[1].q, rimPoints: rim.length, refined: NA.length + NB.length, crossed };
 }
 
 /* §1b'S OWN MEASURE, REPRODUCED SO THE BEFORE/AFTER IS THE SAME QUANTITY AS THE PUBLISHED
@@ -288,7 +340,7 @@ function clauses(s) {
   out.push({ id: 'M2a', ok: !!w && P.pointInPoly((w.a.x + w.b.x) / 2, (w.a.y + w.b.y) / 2, s.F.outline),
     msg: w ? `the winning pair's path runs through the material (${w.crossed} candidate paths were refused for crossing a hole), 3-space ${w.threeMm.toFixed(4)} mm, plan ${w.planMm.toFixed(4)} mm, over ${w.rimPoints} rim points` : 'no pair' });
   out.push({ id: 'M2b', ok: true,
-    msg: w ? `REPORTED, not bounded: in-sheet ${w.mm.toFixed(4)} against 3-space ${w.threeMm.toFixed(4)} (ratio ${(w.threeMm / w.mm).toFixed(4)}) — the straight plan path is an upper bound on the geodesic and the two agreeing says it is tight` : 'no pair' });
+    msg: w ? `REPORTED, not bounded: in-sheet ${w.mm.toFixed(4)} against 3-space ${w.threeMm.toFixed(4)} (ratio ${(w.threeMm / w.mm).toFixed(4)}) — the straight plan path is an upper bound on the geodesic and the two agreeing says it is tight. The coarse walk read ${w.coarseMm.toFixed(6)} and the local re-walk at ${REFINE_FACTOR}x moved it by ${(w.coarseMm - w.mm).toExponential(2)} mm over ${w.refined} refined points` : 'no pair' });
   out.push({ id: 'M2c', ok: true,
     msg: `REPORTED, §1b's OWN measure (hole rim to its own cell's outer polygon, 3-D, nominal 0.5 mm): ${s.half === null ? 'n/a' : s.half.toFixed(4)} mm against the flat plan's ${s.halfFlat === null ? 'n/a' : s.halfFlat.toFixed(4)}` });
   /* M3 IS A REPORT AND ONE ASSERTION: a wall that held by cutting no hole at all would

@@ -391,7 +391,7 @@ fillet radius and the hole bar all asking it for their answer in surface millime
 **Acceptance, §1b's table re-run in §1b's own measure**: `cup 1.2 x curl 360` **0.1108 ->
 0.5050**, ALL FORM MAX **0.1879 -> 0.5037**, `cup 1.2 x curl 180` **0.3501 -> 0.5025**, against
 its nominal 0.5 — and in the session's own IN-SHEET wall (nominal 1.0, the material bridge
-between two holes) 0.3050 -> 1.0130, 0.7218 -> 1.0017 and 0.8097 -> 1.0133. **The ruled wall
+between two holes) 0.3050 -> 1.0119, 0.7043 -> 1.0002 and 0.8036 -> 1.0124. **The ruled wall
 HOLDS on all thirteen states and does not merely improve.** The gate is
 `node tools/verify-bloom-infill-metric.mjs` (+ `--negative-control`); the sheet is
 `node tools/shot-bloom-infill.mjs <dir>`. **Cost on the shipping default is ZERO BY BRANCH** —

@@ -30,9 +30,9 @@ published table is the same quantity as the published table.
 | `petalSpineCurl` 360 | 1.0000 | **1.0000** | 0.4998 → 0.4999 |
 | `petalRoll` 330 | 1.0000 | **1.0000** | **0.4308 → 0.4980** |
 | `petalTwist` 180 | 1.0000 | **1.0000** | 0.5000 → 0.5000 |
-| **`cup` 1.2 × `curl` 180** | **0.8097** | **1.0133** | **0.3501 → 0.5025** |
-| **`cup` 1.2 × `curl` 360** | **0.3050** | **1.0130** | **0.1108 → 0.5050** |
-| **ALL FORM MAX** | **0.7218** | **1.0017** | **0.1879 → 0.5037** |
+| **`cup` 1.2 × `curl` 180** | **0.8036** | **1.0124** | **0.3501 → 0.5025** |
+| **`cup` 1.2 × `curl` 360** | **0.3050** | **1.0119** | **0.1108 → 0.5050** |
+| **ALL FORM MAX** | **0.7043** | **1.0002** | **0.1879 → 0.5037** |
 | `buckle` 0.6 f3 | 1.0000 | **1.0000** | 0.5000 → 0.5000 |
 | `cup` 1.2 × `cupGradient` 1 | 1.0000 | **1.0000** | 0.5000 → 0.5000 |
 | `petalWidth` 30 / 8 | 1.0000 | **1.0000** | 0.5000 → 0.5000 |
@@ -52,8 +52,9 @@ metric plan improves it there too (0.4308 → 0.4980), which is the roll onset r
 non-isometric band being paid for.
 
 **THE WORST STATE AFTER THE FIX, ON EACH OF THE THREE AXES THE BRIEF ASKS ABOUT.** The
-tightest WALL is **ALL FORM MAX at 1.0017 mm** — 0.17 % of headroom over the ruled 1.0, on the
-state that carries cup, curl, roll and twist at once. The worst COST is
+tightest WALL is **ALL FORM MAX at 1.0002 mm** — **1.6e-4 mm of headroom** over the ruled 1.0,
+on the state that carries cup, curl, roll and twist at once. That is thin and it is said
+rather than rounded: §7 is how the measure was made tight enough to be allowed to say it. The worst COST is
 **`cup 1.2 × cupGradient 1` at +11.3 %**, and it is a stretch giving a cell back its hole (16
 holes → 17), not a compression. The worst ACHIEVED COUNT is **`cup 1.2 × curl 360`, 10 of 16**,
 which is the fix refusing to cut a hole where a 1.0 mm wall does not fit (§5).
@@ -345,7 +346,42 @@ state of the CLEAN tree, which is what the clause is for.
 
 ---
 
-## 7. AN EXACT `>=` ON A 32-CHORD SUM, WHICH IS THE FOURTH INSTANCE OF THAT CLASS HERE
+## 7. THE MEASURE WAS OPTIMISTIC BY TEN TIMES THE TIGHTEST STATE'S HEADROOM, AND IT REFINES ITSELF NOW
+
+**FOUND BY RE-READING THE CLAUSE AGAINST ITS OWN SAMPLING, NOT BY A FAILURE.** `wallSurfaceMm`
+walks each rim at `RIM_STEP_MM` = 0.15 mm and takes a minimum over the samples — and a sampled
+minimum reads **HIGH**: the true minimiser sits between two samples and the distance function
+is locally quadratic about it, so the bias goes as the step SQUARED. Measured by refining the
+whole walk:
+
+| rim step, COARSE WALK ONLY (the measure as it was) | `cup × curl 180` | `cup × curl 360` | **ALL FORM MAX** |
+|---|---|---|---|
+| 0.15 | 1.013268 | 1.013030 | **1.001722** |
+| 0.075 | 1.011805 | 1.012359 | 1.000528 |
+| 0.0375 | 1.011805 | 1.011876 | **1.000206** |
+
+The excess over the limit falls by ~3.5 per halving against a quadratic's 4, which is what
+says the bias is the sampling and not something else.
+
+**The bias is up to 1.57e-3 mm and ALL FORM MAX's headroom over the ruled wall is 1.6e-4 mm —
+ten times smaller.** A clause asserting the coarse reading is asserting a number an order of
+magnitude looser than the thing it is about, in the direction that passes a state which is
+genuinely under. The clause was green and worth less than it looked.
+
+**SO THE MEASURE REFINES ITS OWN ANSWER RATHER THAN DECLARING THE BIAS.** The winning pair is
+re-walked locally: a window of **three coarse steps** — derived, because the sampled minimiser
+is within ONE coarse step of the true one along each rim or a nearer sample would have won —
+at `REFINE_FACTOR` = 16 times the resolution, so the residual bias falls by its square to
+**6e-6 mm**, twenty-five times under that same headroom. Both readings are returned and M2b
+prints the movement, so the refinement is visible rather than silent.
+
+**CHECKED AGAINST AN INDEPENDENT 64× LOCAL WALK ON THE TIGHTEST STATE**: coarse 1.0017219,
+that walk 1.0001565, the shipped 16× refinement **1.0002** — and **the wall holds**. Cost: the
+quick sweep goes 14 s to 16 s.
+
+---
+
+## 8. AN EXACT `>=` ON A 32-CHORD SUM, WHICH IS THE FOURTH INSTANCE OF THAT CLASS HERE
 
 M1 shipped as `wall >= MIN_FEATURE_MM` and went RED on `petalWidth 8`, reporting
 *"1.0000 mm against the ruled 1 mm"*. `inSheetLenMm` sums `IN_SHEET_STEPS` chords, each a
@@ -358,7 +394,7 @@ about. Derived, in the unit the quantity has.
 
 ---
 
-## 8. THE SHEET
+## 9. THE SHEET
 
 `node tools/shot-bloom-infill.mjs <dir> [--quick] [--png <file>]`. It builds the meshes
 itself and renders them with `bloom-soft-render.mjs`, so it is ONE command and needs no
@@ -372,7 +408,7 @@ cameras and a tangent-plane cutaway were tried. At that state the petal is a coi
 within **0.0002 mm of ITSELF before a cell is cut** (S1's own reading of the PLAIN sheet), so
 every other turn is inside any slab drawn around the wall under discussion. The pair at
 `curl` 360 is on the sheet whole, carried by its numbers; **the macro is taken at
-`cup 1.2 × curl 180`**, where the flat plan fails the ruled wall by a fifth (0.8097) and the
+`cup 1.2 × curl 180`**, where the flat plan fails the ruled wall by a fifth (0.8036) and the
 petal is a half-coil that can be read. `docs/img/infill-metric-plan.png` is that pair.
 
 **AND THE TWO WHOLE-BLOOM COUNTS MUST NOT BE SUBTRACTED**, which the caption says rather than
@@ -383,7 +419,7 @@ they take it.
 
 ---
 
-## 9. WHAT MOVED BESIDE THE PLAN
+## 10. WHAT MOVED BESIDE THE PLAN
 
 **The 5×7 bitmap font and the blitter moved from `shot-bloom-conform.mjs` into
 `bloom-soft-render.mjs`**, which already owns rasterising and PNG writing, so two sheet tools
@@ -402,7 +438,7 @@ worst facet 0.4317 → 0.4318 mm. Its finding is unchanged; its bytes are not.
 
 ---
 
-## 10. FOR S3
+## 11. FOR S3
 
 * **`ruling 2` is discharged** and the acceptance is §1b's table re-run, above.
 * the METRIC is `planMetricField` / `kappaAt` / `surfaceOffsetPlanMm` in the prototype. The

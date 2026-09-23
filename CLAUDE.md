@@ -3366,8 +3366,20 @@ defect — the flat plan emitting a wall a QUARTER of what it asks for on `petal
 `petalSpineCurl` 360 — is fixed, and the ACCEPTANCE is §1b's table re-run in §1b's own measure:
 **0.1108 -> 0.5050** there, **0.1879 -> 0.5037** on ALL FORM MAX and **0.3501 -> 0.5025** on cup
 x curl 180, against its nominal 0.5; in the session's own IN-SHEET wall (the material bridge
-between two holes, nominal 1.0) **0.3050 -> 1.0130, 0.7218 -> 1.0017, 0.8097 -> 1.0133**. **The
+between two holes, nominal 1.0) **0.3050 -> 1.0119, 0.7043 -> 1.0002, 0.8036 -> 1.0124**. **The
 ruled wall HOLDS on all thirteen states, not merely improves.**
+**AND THE ACCEPTANCE MEASURE WAS OPTIMISTIC BY TEN TIMES THE TIGHTEST STATE'S HEADROOM, FOUND BY
+RE-READING THE CLAUSE AGAINST ITS OWN SAMPLING RATHER THAN BY A FAILURE.** A minimum taken over
+rim points 0.15 mm apart reads HIGH — the true minimiser sits between two samples and the
+distance function is locally quadratic about it, so the bias goes as the step SQUARED: measured,
+**up to 1.57e-3 mm, against ALL FORM MAX's 1.6e-4 mm of headroom**. The clause was green and
+worth less than it looked. `wallSurfaceMm` RE-WALKS the winning pair now, in a window of three
+coarse steps (derived: the sampled minimiser is within ONE coarse step of the true one or a
+nearer sample would have won) at 16x the resolution, so the residual falls by its square to
+**6e-6 mm**; both readings are returned and M2b prints the movement. Checked against an
+independent 64x local walk on that state: coarse 1.0017219, that walk 1.0001565, the shipped
+refinement 1.0002. **A SAMPLED MINIMUM IS A BIASED ESTIMATOR AND THE BIAS POINTS THE UNSAFE WAY
+— ASK ITS SIZE AGAINST THE MARGIN THE CLAUSE HAS, NOT AGAINST THE QUANTITY.**
 **IT IS A LOCAL METRIC AND NOT A REPARAMETERISATION, AND THAT IS A MEASUREMENT RATHER THAN A
 PREFERENCE.** The midrib is ALREADY arc-length — `|dP/dx|` reads **EXACTLY 1.0000 at v = 0 on
 every state** — so an arc-length plan would fix the one thing that was right. The cup lifts the
