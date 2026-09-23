@@ -9716,11 +9716,35 @@ function infillAnnulusSectors(outer, inner, cq) {
    import, the whole combination gate, plus `/plot`'s `bloom-grid-gltf.js` and
    `verify-bloom-grid.mjs`. An infilled blade has no rows to write, and the
    tempting fix — sweep the full NV columns and capture the rectangle as today
-   — is exactly the trap: `measureWall` would report a 1.20 mm sheet AT A HOLE
-   and V5 would be green on infilled rows because its subject excludes the
-   thing it doubts. So the lattice IS swept, at the same (row, column) stations
-   `emitPanel` would, and each sample carries whether the solid covers it.
-   A hole is then ABSENT from the measurement rather than measured as solid. */
+   — is exactly the trap: `measureWall` would report a 1.20 mm sheet AT A HOLE.
+   So the lattice IS swept, at the same (row, column) stations `emitPanel`
+   would, and each sample carries whether the solid covers it. A hole is then
+   ABSENT from the measurement rather than measured as solid.
+
+   AND THE DIRECTION OF THE DAMAGE IS THE OPPOSITE OF WHAT THE BRIEF ASSUMED,
+   WHICH IS MEASURED RATHER THAN REASONED. The brief's stated reason — and this
+   comment's own first draft — was that a full rectangle makes *V5 GREEN* on an
+   infilled row. It does not, and it cannot: both of `measureWall`'s numbers are
+   MINIMA over material query points against material target quads, so a full
+   rectangle only ADDS points and targets and a minimum can only FALL. A phantom
+   station inside a hole reads the sheet thickness, the largest reading there is,
+   so it can never become the `wall` minimum. Measured over ten states (the
+   default, three densities, cup x curl, ALL FORM MAX, roll, buckle, with and
+   without the guard): `wall` is IDENTICAL under both masks on all ten, and
+   `self` is identical on nine and TIGHTER on the tenth — `petalRoll` 330 reads
+   0.6586 mm with the rectangle against the truth's 0.6925, because the phantom
+   quads under a hole are a nearer surface than any real one.
+
+   SO THE MASK IS RIGHT FOR A DIFFERENT REASON, AND THE HAZARD IS A FALSE
+   POSITIVE. What a full rectangle costs is (i) V5's SUBJECT, which would assert
+   "the sheet is at least a millimetre here" over stations with no sheet, and
+   (ii) the `self` number, which would be an approach to skin that is not there
+   — wrong by 0.0339 mm on a row the matrix ships, in the strict direction, so a
+   future infilled row could be reddened by a fold that does not exist. The
+   direction that DOES make V5 green is the other one: a mask calling MATERIAL a
+   hole, which would make `measureWall` skip a wall that is really there. That
+   one is real, it is reachable through an untiled cell, and `plan.cellOpen` has
+   its own comment about it at the merge-walk's fallback below. */
 function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const mSplit = plan.mSplit;
   /* THE BASAL PANEL STOPS WHERE THE CELL REGION BEGINS — `mSplit - 1`, the

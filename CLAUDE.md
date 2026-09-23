@@ -4326,11 +4326,22 @@ MASK asserted in a clause of its own because it is a NEW channel the base tree d
 **THE MATERIAL MASK IS THE THIRD BUILD ITEM AND THE TEMPTING FIX WAS NOT TAKEN.** Every captured
 grid row carries `material[]` beside `mid` and `normal`; `measureWall` REFUSES a row without it,
 skips a non-material query point and builds a bottom-skin quad only where all four corners are
-material. Sweeping the full NV columns and capturing the rectangle as before would make V5 GREEN on
-an infilled row by defining its subject to exclude the thing it doubts — the fifth durable rule —
-because a hole measured as solid is a wall that is not there. `verify-bloom-grid`'s new **clause
-2f** holds the mask in both directions (excludes nothing on a plain row, something on an infilled
-one) on two new rows; `bloom-grid-gltf.js` still records BODY thickness, unchanged.
+material. Sweeping the full NV columns and capturing the rectangle as before would report a 1.20 mm
+wall AT A HOLE. **AND THE DIRECTION IS THE OPPOSITE OF WHAT THE BRIEF SAID — IT DOES NOT MAKE V5
+GREEN AND IT CANNOT, measured over ten states**: both of `measureWall`'s numbers are MINIMA over
+material points against material quads, so a full rectangle only ADDS points and targets and a
+minimum can only FALL — `wall` reads IDENTICAL on all ten and `self` identical on nine and TIGHTER
+on the tenth (`petalRoll` 330: **0.6586 mm against the truth's 0.6925**, the phantom quads under a
+hole being a nearer surface than any real one). So the mask removes a false POSITIVE, not a false
+pass: what the rectangle costs is V5's SUBJECT (a wall asserted over 188 of 372 stations with no
+sheet) and the `self` figure (an approach to skin that is not there, wrong by 0.0339 mm on a
+shipped row). **The direction that DOES make V5 green is the other one** — a mask calling MATERIAL
+a hole, so `measureWall` SKIPS a wall that is really there, reachable through an untiled cell,
+which is why `plan.cellOpen[ci] = false` is set in the merge-walk's fallback. The brief named a
+real hazard and attached it to the wrong half; both halves are stated where they live now.
+`verify-bloom-grid`'s new **clause 2f** holds the mask in both directions (excludes nothing on a
+plain row, something on an infilled one) on two new rows; `bloom-grid-gltf.js` still records BODY
+thickness, unchanged.
 **FOUR DEFECTS THE GATES FOUND, EACH A CLASS THIS FILE ALREADY NAMES.**
 **(i) THE SEAM WAS A WELDED OVERLAP:** the region started one row BELOW the split while the basal
 panel ran to it, so the two shells overlapped by a lattice strip AND welded (the outline's seam

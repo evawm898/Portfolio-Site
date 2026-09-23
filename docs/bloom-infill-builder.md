@@ -76,10 +76,50 @@ row with no mask, skips a non-material query point, and builds a bottom-skin
 quad only where all four corners are material.
 
 The brief names the fix not to take: sweep the full `NV` columns and capture the
-rectangle as today. It is tempting because it needs no new channel, and it makes
-**V5 green on an infilled row by defining its subject to exclude the thing it
-doubts** — a hole measured as solid is a wall that is not there. That is this
-project's fifth durable rule, and the mask is the answer to it.
+rectangle as today. It is tempting because it needs no new channel, and it would
+make `measureWall` report a **1.20 mm wall AT A HOLE**.
+
+**AND THE DIRECTION OF THE DAMAGE IS THE OPPOSITE OF WHAT THE BRIEF SAID, WHICH
+IS MEASURED RATHER THAN ARGUED.** The brief's reason — carried verbatim into
+this section's own first draft, into `emitInfillPanel`'s header and into
+`measureWall`'s refusal message — was that a full rectangle makes **V5 green**
+on an infilled row. *It does not, and it cannot.* Both of `measureWall`'s
+numbers are MINIMA over material query points against material target quads, so
+a full rectangle only ADDS points and targets, and a minimum can only fall; a
+phantom station inside a hole reads the sheet thickness, which is the largest
+reading available and can never become the `wall` minimum. Measured over ten
+states — the shipping default, densities 8 / 16 / 40, `cup 1.2 × curl 360`, ALL
+FORM MAX, `roll 330` and `buckle 0.6 f3`, with and without the guard:
+
+| | honest mask | full rectangle |
+|---|---|---|
+| `wall`, all ten states | — | **identical** |
+| `self`, nine of ten | — | **identical** |
+| `self` on `petalRoll` 330 | **0.6925 mm** | **0.6586 mm** — *tighter* |
+
+So the mask is right for a **different reason**, and the hazard it removes is a
+false POSITIVE rather than a false pass. What a full rectangle costs is (i)
+V5's SUBJECT, which would assert *"the sheet is at least a millimetre here"*
+over stations with no sheet at all — 188 of 372 cell-region stations on the
+shipping default — and (ii) the `self` figure, which would be an approach to
+skin that is not there, wrong by **0.0339 mm on a row the matrix ships**, in the
+strict direction, so a future infilled row could be reddened by a fold that does
+not exist. A recorded magnitude that is a phantom is folklore.
+
+**THE FIGURES ARE REPRODUCIBLE, NOT REMEMBERED**: `node
+tools/bloom-wall-thickness.mjs --mask-control` builds each state ONCE and
+measures it under both masks, prints the table above verbatim, REFUSES a
+vacuous run (no state carrying a hole means the two masks are one mask — 7 of
+10 do), and **exits 1 if `self` ever moves UP**, which is the direction the
+derivation says is unreachable. A committed instrument, because this project
+has already had a figure from an uncommitted script fail to reproduce.
+
+**THE DIRECTION THAT *DOES* MAKE V5 GREEN IS THE OTHER ONE**, and the geometry
+already has a comment about it: a mask calling MATERIAL a hole makes
+`measureWall` SKIP a wall that is really there, and that is reachable — through
+an untiled cell, which is why `plan.cellOpen[ci] = false` is set in the
+merge-walk's fallback (§8). The brief's instinct named a real hazard and
+attached it to the wrong half; both halves are now stated where they live.
 
 Three readers were taught it, and the third is the reason the second had to be:
 
