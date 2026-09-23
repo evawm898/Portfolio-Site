@@ -14,7 +14,10 @@
    straight outer polygon (the wall centrelines, shared with its neighbours exactly)
    and its hole outline; rims only along the outline and around each hole. The plan
    is computed FLAT (x along the spine in mm, y across in mm), clipped against the
-   petal's own `halfWidthAt`, and mapped through (u, v) onto the surface.
+   petal's own `halfWidthAt`, and mapped through (u, v) onto the surface. EVERY LENGTH
+   THE PLAN USES IS A SURFACE LENGTH (S2) — see THE SURFACE METRIC below; the plan's
+   COORDINATES are still flat, which no parameterisation can fix, and what moved is the
+   wall inset, the fillet radius and the hole bar, which now ask the surface.
 
    TWO FIELDS, so the second can be judged against the first:
      LEGACY   — isotropic metric, uniform spacing, plain Lloyd in the flat metric,
@@ -41,9 +44,15 @@
        overlap row are the panel weld's own signature, not a topology problem.
      - the census is a scratch one (sorted-pair edges, exact-position weld). It is
        not `analyzeStl` and quotes no gate.
-     - the plan is flat-computed. On the flat default that is exact (stretch 1.000);
-       under cup it stretches cells across the width (measured 3.0x at cup 1.2 in the
-       first discovery) — the arc-length-metric plan is the build's, not this tool's.
+     - the plan's COORDINATES are flat and always will be: the surface has Gaussian
+       curvature, so no (x, y) -> (u, v) makes the map an isometry (S2's own measurement —
+       the along-spine metric runs 0.55 at one margin and 1.45 at the other AT ONE
+       STATION under `petalCup` 1.2 x `petalSpineCurl` 360). What S2 fixed is every
+       LENGTH: the wall, the fillet and the hole bar are surface millimetres now. The
+       CELL SIZE is not — cells are still laid out in the flat plan, so on a compressed
+       state they are smaller on the object than on a stretched one, and a cell with no
+       room for a 1.0 mm wall around a printable hole comes back SOLID and is counted.
+       That is ruling 3's achieved count and it is reported, not hidden.
      - fringe and cleft are excluded by ruling; lobes clip by construction and are
        not exercised here.
      - it reads ONE ring (the first slot) for the single-petal cells, and every slot
@@ -144,6 +153,17 @@ export const BASE_REACH = 0.30;               // over this fraction of the lengt
 export const TIP_GAMMA = 1.0;                 // spacing follows halfWidth^gamma toward the tip
 export const AXIS_SHARE = 0.3;                // share of the seeds placed ON the midrib (the flower's own law), so the apex and the base get one axial cell each
 export const SEED = 7;
+/* WHAT COUNTS AS A HOLE AT ALL — the prototype's own two thresholds, named here because
+   the sheet and the gate both cite them and a literal in one expression is not something a
+   reader can cite. They are NOT Eva's ruled bar: `RULED_HOLE_MM` is, and it is not the
+   default. Ruling 3 ("drop all sub-bar seeds in ONE pass, recompute, repeat to a small
+   cap, then report the achieved count") is a BUILDER mechanism and is S3's; what S2 owes
+   is that the bar is asked in SURFACE millimetres, which is the change here — a hole
+   0.6 mm across in PLAN that maps to 0.02 mm of surface is not a hole, and the flat plan
+   called it one. `opts.holeBarMm` lets the sheet photograph the ruled bar without S2
+   moving a default, which is the capability-hook convention this project already uses. */
+export const HOLE_MIN_MM = 0.6, HOLE_MIN_AREA_MM2 = 0.25;
+export const RULED_HOLE_MM = 1.5;             // Eva's ruled bar; enforcing it is ruling 3's iteration and S3's
 
 /* ---------------- plan geometry ---------------- */
 export function mulberry32(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
@@ -195,8 +215,13 @@ export function inradiusConvex(poly) {
 /* Fillet every corner of a convex CCW polygon: an arc of radius r tangent to both edges,
    r limited so the tangent points stay within each edge. The result is the SMOOTH offset
    curve the salvage asks for — no hard vertex survives. */
+/* `r` MAY BE A FUNCTION OF THE CORNER (S2). A fillet radius is a LENGTH, so on a
+   compressed surface a constant plan radius draws a corner that is not round on the
+   object; the metric plan hands this a per-corner plan radius instead. A NUMBER is the
+   pre-S2 expression term for term, so `{ metricPlan: false }` takes the old arithmetic. */
 export function filletPolygon(poly, r, perArc = 5) {
   const P = ccw(dedupe(poly)); const n = P.length; if (n < 3) return P;
+  const rOf = typeof r === 'function' ? r : () => r;
   const out = [];
   for (let i = 0; i < n; i++) {
     const A = P[(i - 1 + n) % n], Q = P[i], B = P[(i + 1) % n];
@@ -204,7 +229,7 @@ export function filletPolygon(poly, r, perArc = 5) {
     const ua = [ax / la, ay / la], ub = [bx / lb, by / lb];
     const cosT = Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])); const theta = Math.acos(cosT);   // interior angle
     if (theta > Math.PI - 1e-3) { out.push(Q); continue; }
-    const tMax = 0.45 * Math.min(la, lb); let rr = r; let t = rr / Math.tan(theta / 2); if (t > tMax) { t = tMax; rr = t * Math.tan(theta / 2); }
+    const tMax = 0.45 * Math.min(la, lb); let rr = rOf(Q, A, B); let t = rr / Math.tan(theta / 2); if (t > tMax) { t = tMax; rr = t * Math.tan(theta / 2); }
     const T1 = { x: Q.x + ua[0] * t, y: Q.y + ua[1] * t }, T2 = { x: Q.x + ub[0] * t, y: Q.y + ub[1] * t };
     const bis = [ua[0] + ub[0], ua[1] + ub[1]]; const bl = Math.hypot(...bis) || 1e-9; const dC = rr / Math.sin(theta / 2);
     const C = { x: Q.x + (bis[0] / bl) * dC, y: Q.y + (bis[1] / bl) * dC };
@@ -289,6 +314,287 @@ export function basalSplit(ctx, opts = {}, wall = WALL_DEFAULT) {
 }
 function mapPt(ctx, x, y) { const u = Math.min(1, Math.max(0, x / ctx.L)); const hh = ctx.surface.profile.halfWidthAt(u); const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0)); return ctx.surface.at(u, v); }
 
+/* ---------------- THE SURFACE METRIC — S2 ----------------
+
+   WHAT S1 LEFT. The plan is (x along the spine in mm, y across in mm) and `mapPt`
+   sends it to the surface through u = x / L, v = y / h(u). On a FLAT petal that map
+   IS the identity, so a 1.0 mm plan wall is 1.0 mm of material. On a curved one it
+   is not — and the failure is not the stretch everybody expected. §1a of the port
+   plan measured every SINGLE-control state at >= 1.000 (cup makes walls THICKER, and
+   roll and twist are isometries across the width); only a PRODUCT compresses, which
+   is why `buildMatrix()` cannot see it.
+
+   THE MECHANISM, MEASURED RATHER THAN INFERRED, and it decides the remedy. The midrib
+   is arc-length BY CONSTRUCTION — the along-spine metric |dP/dx| reads EXACTLY 1.0000
+   at v = 0 on every state in the table — and the cup lifts the sheet off the midrib.
+   Under a spine curl the spine is a circle of radius R = L / (2 pi turns), so a point
+   lifted w toward its centre travels (R - w)/R of the arc the midrib does. At
+   `petalSpineCurl` 360 on the shipping 35 mm blade R is 5.5704 mm and `petalCup` 1.2
+   carries the margin past 5 mm of that, so the along-spine metric collapses: measured
+   over the blade, |dP/dx| runs 0.55 at one margin and 1.45 at the other AT ONE STATION,
+   and the worst emitted hole-rim point reads 0.0882.
+
+   SO NO REPARAMETERISATION FIXES IT, AND THAT IS WHY THIS IS A LOCAL METRIC AND NOT AN
+   ARC-LENGTH PLAN. The compression varies ACROSS the width at a single station, so
+   there is no x(u) — and no (x, y) -> (u, v) of any kind — that makes the map an
+   isometry: the surface has Gaussian curvature and Gauss's theorema egregium says a
+   flat plan cannot carry it. A global "arc-length plan" would fix the midrib, which is
+   already exact, and leave the margins where they are. What CAN be done exactly is to
+   read the LOCAL metric and make every LENGTH the plan uses ask it for its answer in
+   surface millimetres. That is what ships here.
+
+   THE MEASURE. At a plan point the map has a Jacobian J and a first fundamental form
+   M = J^T J. For a plan line with unit tangent t, a plan offset d across it delivers a
+   SURFACE distance d * kappa(t) where
+
+       kappa(t) = sqrt(det M) / sqrt(t^T M t),
+
+   which is the perpendicular distance IN THE SURFACE and not the length of the plan
+   perpendicular's image — the two differ by the shear, which reaches cos 0.87 on
+   `petalCup` 1.2 x `petalSpineCurl` 360, so taking |J n| instead would read the wall
+   HIGH, which is the unsafe direction. (For orthonormal plan {n, t},
+   (n^T M n)(t^T M t) - (n^T M t)^2 = det M, so kappa is that identity rearranged.)
+
+   THE METRIC VARIES OVER THE OFFSET, so the plan offset that delivers `want` mm of
+   surface is the d solving `integral_0^d kappa(tau) dtau = want` along the inward
+   normal ray — marched, not divided, because on the compressed states the offset runs
+   to several millimetres and kappa is not constant over it. */
+
+export const METRIC_NU = 256;        // rows in the metric lattice: 0.137 mm on the shipping 35 mm blade
+export const METRIC_NV = 96;         // columns: 0.167 mm at mid-blade — both an order under the 1.0 mm wall
+/* THE MARCH'S STEP AND THE EDGE'S SAMPLE SPACING ARE THE LATTICE'S OWN, HALVED, AND THAT
+   IS A DERIVATION RATHER THAN A CONSTANT TO BE WRONG. `kappaAt` is piecewise constant per
+   lattice cell, so marching finer buys nothing and sampling COARSER skips cells outright —
+   which is not hypothetical: the first cut sampled six fixed points along each edge, and on
+   `ALL FORM MAX` the tip face's six landed at v = {-1, -0.6, -0.2, 0.2, 0.6, 1} and MISSED
+   v = 0, where the metric is exactly the identity by construction (the midrib is arc-length
+   on every state). The band's true worst kappa was 0.9999 and the sampled minimum was
+   1.00728, so the wall came out 0.9955 mm where it had asked for 1.0000. A sample spacing
+   at the lattice's own resolution cannot skip a cell. */
+export const LATTICE_STEP_SHARE = 0.5;
+/* THE GUARD, AND IT IS THE SHIPPING DEFAULT'S WHOLE BYTE STORY. Where the petal has no
+   form and a straight spine the plan map is AFFINE — `flatSect` is `C + T h v` and `C` is
+   `base + dir * x` on a straight spine, so (x, y) goes to the surface by a rigid motion
+   and the metric is the identity exactly. The field is then not built at all and every
+   length the plan asks for comes back as itself, so `{ metricPlan: true }` and
+   `{ metricPlan: false }` are the SAME DOUBLES on those states: 0 floats moved at the
+   shipping default, by branch, which is a construction rather than a measurement.
+
+   IT IS TWO STATEMENTS, BOTH THE GEOMETRY'S, AND NEITHER IS A CONTROL LIST.
+   `surface.form` is `petalFormIsFlat`'s own answer (cup, cup gradient, roll, twist and
+   the buckle all build a `form`), and `surface.kC` is the spine law's own curvature.
+   Reading the controls instead would be a second producer of a predicate the geometry
+   already owns — this project's most repeated defect.
+
+   AND THE GUARD IS NOT TRUSTED, IT IS MEASURED. `flatGuardResidual` reports the worst
+   |E - 1|, |G - 1| and |F| the lattice carries, and the gate asserts it on every guarded
+   state against a bar DERIVED FROM THE FINITE DIFFERENCE'S OWN CONDITIONING rather than
+   typed: a central difference of coordinates of magnitude C over a plan step d carries
+   about ulp(C)/d of error, and E is a square so it carries twice that. Measured over the
+   guarded states the worst is 5.56e-14 against a predicted 5.2e-14 — and the nearest
+   reading from a state the guard REFUSES is `petalSpineCurl` 5, the smallest curl the
+   slider can reach, at 3.87e-8. The two populations are ninety-three thousand times
+   apart at the bar, so nothing in it is fitted to the data in hand. */
+export const FLAT_RESIDUAL_ULPS = 8;
+export function planIsFlat(ctx) { return ctx.surface.form === null && ctx.surface.kC === 0; }
+export function flatGuardResidual(ctx) {
+  const f = planMetricField(ctx);
+  let e = 0, g = 0, fr = 0;
+  for (let k = 0; k < f.E.length; k++) { e = Math.max(e, Math.abs(f.E[k] - 1)); g = Math.max(g, Math.abs(f.G[k] - 1)); fr = Math.max(fr, Math.abs(f.F[k])); }
+  let maxC = 0; for (const r of ctx.rows) for (const P of r.mid) for (let i = 0; i < 3; i++) maxC = Math.max(maxC, Math.abs(P[i]));
+  const ulp = Math.pow(2, Math.floor(Math.log2(Math.max(1, maxC))) - 52);
+  const bar = FLAT_RESIDUAL_ULPS * ulp / (ctx.L / METRIC_NU);
+  return { worst: Math.max(e, g, fr), E: e, G: g, F: fr, bar, maxCoordMm: maxC };
+}
+
+/* THE LATTICE IS IN (u, v) AND THE DERIVATIVES ARE TAKEN BY THE CHAIN RULE, WHICH IS
+   WHAT MAKES IT AFFORDABLE AND WHAT KEEPS IT OFF THE MARGINS. `surface.at(u, v)` costs
+   0.81 us and is dominated by `rowAt`; a lattice in (u, v) shares one `rowAt` across a
+   whole column of nodes and takes dP/du between ADJACENT ROWS, so a 256 x 96 field is
+   256 `rowAt` calls and ~74,000 `sect` calls — measured at 5 ms a petal against the
+   390 ms a direct 4-point stencil per node would cost.
+
+   AND IT IS THE ONLY FORM THAT DOES NOT READ OUTSIDE THE PETAL. `mapPt` CLAMPS v to
+   [-1, 1], so a central difference in PLAN y taken at the margin reads a step that was
+   silently truncated: measured on the flat default, a 0.05 mm plan stencil reports
+   |G - 1| up to 1.769e-1 near the tip where h falls fastest, which is the clamp and not
+   the surface. In (u, v) the ends are one-sided by construction.
+
+       dP/dx|_y = (1/L) [ dP/du|_v - (v h'(u) / h(u)) dP/dv ]
+       dP/dy|_x = (1/h(u)) dP/dv
+
+   A KINK READS AS A SHORTER CHORD, WHICH IS THE SAFE DIRECTION. Where the surface has a
+   declared tangent break (`tangentBreaks()` names the outline's own and the form onset)
+   the central difference reads the chord across it rather than either tangent. A chord is
+   shorter than the arc, so kappa reads LOW and the plan offset comes out LARGER — the
+   wall is over-built at a seam rather than under-built. */
+export function planMetricField(ctx) {
+  if (ctx.__metric) return ctx.__metric;
+  const NU = METRIC_NU, NV = METRIC_NV, L = ctx.L;
+  const prof = ctx.surface.profile;
+  const E = new Float64Array((NU + 1) * (NV + 1)), F = new Float64Array((NU + 1) * (NV + 1)), Gm = new Float64Array((NU + 1) * (NV + 1));
+  const rows = new Array(NU + 1), hs = new Float64Array(NU + 1);
+  for (let i = 0; i <= NU; i++) { const u = i / NU; rows[i] = ctx.surface.rowAt(u); hs[i] = prof.halfWidthAt(u); }
+  const Pat = (i, j) => rows[i].sect(-1 + (2 * j) / NV).P;
+  const sub = (a, b, s) => [(a[0] - b[0]) * s, (a[1] - b[1]) * s, (a[2] - b[2]) * s];
+  for (let i = 0; i <= NU; i++) {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(NU, i + 1);
+    const du = (i1 - i0) / NU, h = hs[i];
+    const hp = (hs[i1] - hs[i0]) / du;                                   // h'(u), the outline's own slope, by the same stencil
+    for (let j = 0; j <= NV; j++) {
+      const v = -1 + (2 * j) / NV;
+      const j0 = Math.max(0, j - 1), j1 = Math.min(NV, j + 1);
+      const dv = (2 * (j1 - j0)) / NV;
+      const Pu = sub(Pat(i1, j), Pat(i0, j), 1 / du);
+      const Pv = sub(rows[i].sect(-1 + (2 * j1) / NV).P, rows[i].sect(-1 + (2 * j0) / NV).P, 1 / dv);
+      const c = h > 1e-9 ? (v * hp) / h : 0;
+      const Px = [(Pu[0] - c * Pv[0]) / L, (Pu[1] - c * Pv[1]) / L, (Pu[2] - c * Pv[2]) / L];
+      const hh = h > 1e-9 ? h : 1e-9;
+      const Py = [Pv[0] / hh, Pv[1] / hh, Pv[2] / hh];
+      const k = i * (NV + 1) + j;
+      E[k] = Px[0] * Px[0] + Px[1] * Px[1] + Px[2] * Px[2];
+      F[k] = Px[0] * Py[0] + Px[1] * Py[1] + Px[2] * Py[2];
+      Gm[k] = Py[0] * Py[0] + Py[1] * Py[1] + Py[2] * Py[2];
+    }
+  }
+  const field = { E, F, G: Gm, NU, NV, L, hAt: (u) => prof.halfWidthAt(u) };
+  Object.defineProperty(ctx, '__metric', { value: field, enumerable: false });
+  return field;
+}
+/* THE LOOKUP IS THE WORST CORNER OF THE ENCLOSING LATTICE CELL, NOT AN INTERPOLATION,
+   and the direction is the reason. Interpolating M and then forming kappa smooths a
+   local MINIMUM of kappa away, which is the unsafe direction — a smoothed minimum
+   under-insets exactly where the surface is worst. Taking the smallest kappa the four
+   corners offer over-insets by at most one lattice cell's variation, which is bounded
+   by the lattice spacing above and is the safe direction. */
+export function latticeStepMm(field, x) {
+  const u = Math.min(1, Math.max(0, x / field.L));
+  return Math.min(field.L / field.NU, (2 * field.hAt(u)) / field.NV) * LATTICE_STEP_SHARE;
+}
+/* `mode` IS THE MUST-FAIL'S OWN LEVER AND NAMES THE PLAUSIBLE WRONG ANSWER: 'normal'
+   returns |J n|, the length of the plan perpendicular's IMAGE, which is what an
+   implementation that forgot the shear would compute. It is >= kappa always (equality
+   iff F = 0), so it reads the wall HIGH and under-insets — and on `petalCup` 1.2 x
+   `petalSpineCurl` 360 the shear cosine reaches 0.87, so it is not a rounding matter.
+   It runs through the shipped clause rather than a mutated copy of it. */
+export function kappaAt(field, x, y, tx, ty, mode) {
+  const { NU, NV, L } = field;
+  const u = Math.min(1, Math.max(0, x / L));
+  const h = field.hAt(u);
+  const v = Math.max(-1, Math.min(1, h > 1e-9 ? y / h : 0));
+  const fi = Math.min(NU - 1e-9, Math.max(0, u * NU)), fj = Math.min(NV - 1e-9, Math.max(0, ((v + 1) / 2) * NV));
+  const i0 = Math.min(NU - 1, Math.floor(fi)), j0 = Math.min(NV - 1, Math.floor(fj));
+  let best = Infinity;
+  for (let a = 0; a <= 1; a++) for (let b = 0; b <= 1; b++) {
+    const k = (i0 + a) * (NV + 1) + (j0 + b);
+    let kap;
+    if (mode === 'normal') { const nx = -ty, ny = tx; kap = Math.sqrt(Math.max(0, field.E[k] * nx * nx + 2 * field.F[k] * nx * ny + field.G[k] * ny * ny)); }
+    else {
+      const det = field.E[k] * field.G[k] - field.F[k] * field.F[k];
+      const tMt = field.E[k] * tx * tx + 2 * field.F[k] * tx * ty + field.G[k] * ty * ty;
+      kap = tMt > 1e-18 ? Math.sqrt(Math.max(0, det) / tMt) : 0;
+    }
+    if (kap < best) best = kap;
+  }
+  return best;
+}
+/* THE PLAN OFFSET ACROSS A PLAN EDGE THAT DELIVERS `want` MILLIMETRES OF SURFACE.
+   ONE OWNER — the wall inset, the fillet's radius and the hole bar all read it, so a
+   length asked for in surface millimetres is answered in one place.
+
+   IT IS SAMPLED ALONG THE EDGE AND THE WORST SAMPLE WINS, because the metric varies
+   over a cell: the offset that clears the wall at the edge's midpoint can be half what
+   its end needs. The corners themselves are excluded — there the NEIGHBOURING edge's
+   own inset is what decides the material, and including them made every edge in a
+   compressed corner ask for its neighbour's offset. */
+export function surfaceOffsetPlanMm(field, A, B, wantMm, opts = {}) {
+  const ex = B.x - A.x, ey = B.y - A.y, len = Math.hypot(ex, ey);
+  if (!(len > 1e-12) || !(wantMm > 0)) return wantMm;
+  const tx = ex / len, ty = ey / len;
+  const nx = -ey / len, ny = ex / len;                                   // INWARD on a CCW polygon (insetConvex's own outward is (ey, -ex))
+  const step = opts.step ?? latticeStepMm(field, (A.x + B.x) / 2);
+  const mode = opts.kappaMode;
+  /* THE CAP IS THE CALLER'S OWN POLYGON, NOT A PETAL LENGTH. A cell is at most a few
+     millimetres across, so once the offset passes its diameter the clip is empty whatever
+     else happens — and on the compressed states kappa reaches 0.024, where a cap in petal
+     lengths marches 20 mm to answer a question the polygon settled at 3. */
+  const cap = opts.cap ?? field.L;
+  /* `samples` IS THE MUST-FAIL'S SECOND LEVER: a FIXED count is the first cut, and it is
+     the one that missed the midrib on the tip face. */
+  const NS = opts.samples ?? Math.max(2, Math.ceil(len / step));
+  /* THE WORST SAMPLE WINS AT EVERY MARCH STEP, NOT AT THE END OF ITS OWN MARCH, and the
+     difference is not bookkeeping. Marching each sample separately answers "how far in
+     must THIS point go", and the wall's actual closest approach runs between two rim
+     points that need not sit on one normal ray; taking the minimum kappa across the whole
+     edge at each step insets the BAND rather than a ray, which is conservative for every
+     path through it. Measured: it is what took `petalCup` 1.2 from 0.9849 to 1.0000. */
+  let acc = 0, tau = 0;
+  while (tau < cap) {
+    const m = tau + step / 2;
+    let k = Infinity;
+    for (let s = 0; s <= NS; s++) {
+      const f = s / NS;                                                  // ENDPOINTS INCLUDED: the neighbouring edge covers the corner too, so including them can only over-inset
+      const kk = kappaAt(field, A.x + ex * f + nx * m, A.y + ey * f + ny * m, tx, ty, mode);
+      if (kk < k) k = kk;
+    }
+    const nxt = acc + k * step;
+    if (nxt >= wantMm) return tau + (k > 1e-12 ? (wantMm - acc) / k : step);
+    acc = nxt; tau += step;
+  }
+  return cap;                                                            // the surface never delivers `want` inside the polygon: there is no room here, and the clip says so by coming back empty
+}
+/* THE IN-SHEET LENGTH OF A PLAN SEGMENT, measured rather than integrated: the polyline
+   through `mapPt` at n subdivisions. It reads no metric field at all, which is what lets
+   the gate use it as a reference against an emitter that does. */
+export function inSheetLenMm(ctx, A, B, n = 24) {
+  let s = 0, prev = mapPt(ctx, A.x, A.y).P;
+  for (let k = 1; k <= n; k++) {
+    const p = mapPt(ctx, A.x + (B.x - A.x) * k / n, A.y + (B.y - A.y) * k / n).P;
+    s += Math.hypot(p[0] - prev[0], p[1] - prev[1], p[2] - prev[2]); prev = p;
+  }
+  return s;
+}
+/* THE SURFACE INRADIUS OF A CONVEX PLAN POLYGON — how far in from EVERY edge you can
+   push, in surface millimetres, which is "how wide is this hole" on the object. It is
+   the same inset the wall uses, bisected: one owner, so the bar and the wall cannot
+   disagree about what a surface millimetre is. */
+export function surfaceInradiusMm(field, poly, hi = 8, iters = 14) {
+  if (!poly || poly.length < 3) return 0;
+  const ok = (w) => !!insetConvex(poly, 0, (A, B) => surfaceOffsetPlanMm(field, A, B, w));
+  if (!ok(1e-4)) return 0;
+  let lo = 1e-4;
+  if (ok(hi)) return hi;
+  for (let i = 0; i < iters; i++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+  return lo;
+}
+/* THE SURFACE AREA OF A PLAN POLYGON: the plan area weighted by sqrt(det M), which is
+   the area element of the map. Read by the hole bar, so "is this a real hole" is asked
+   on the object rather than in the plan. */
+export function surfaceAreaMm2(ctx, field, poly, n = 12) {
+  if (!poly || poly.length < 3) return 0;
+  const c = polyCentroid(poly); let A = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const P = poly[i], Q = poly[(i + 1) % poly.length];
+    const a2 = Math.abs((P.x - c.x) * (Q.y - c.y) - (Q.x - c.x) * (P.y - c.y)) / 2;
+    if (!(a2 > 0)) continue;
+    let w = 0;
+    for (let k = 0; k < n; k++) {                                        // centroid-fan quadrature, one sample per sub-triangle third
+      const r1 = (k % 3) / 3 + 1 / 6, r2 = (Math.floor(k / 3) % 3) / 3 + 1 / 6;
+      const a = 1 - r1, b = r1 * (1 - r2), cc = r1 * r2;
+      const x = a * c.x + b * P.x + cc * Q.x, y = a * c.y + b * P.y + cc * Q.y;
+      const u = Math.min(1, Math.max(0, x / field.L)), h = field.hAt(u);
+      const v = Math.max(-1, Math.min(1, h > 1e-9 ? y / h : 0));
+      const NV = field.NV, NU = field.NU;
+      const i0 = Math.min(NU, Math.round(u * NU)), j0 = Math.min(NV, Math.round(((v + 1) / 2) * NV));
+      const kk = i0 * (NV + 1) + j0;
+      w += Math.sqrt(Math.max(0, field.E[kk] * field.G[kk] - field.F[kk] * field.F[kk]));
+    }
+    A += a2 * (w / n);
+  }
+  return A;
+}
+
+
 /* Shared: classify every cell edge as OUTLINE (in one cell) or WALL (in two), exactly, by key. */
 function classify(cells) {
   const ek = (a, b) => { const ka = `${f6(a.x)},${f6(a.y)}`, kb = `${f6(b.x)},${f6(b.y)}`; return ka < kb ? ka + '|' + kb : kb + '|' + ka; };
@@ -355,9 +661,35 @@ export function fieldSalvage(ctx, N, opts = {}) {
   /* OUTLINE EDGES ARE INSET BY THE FULL WALL (the established constraint: a half-wall lip along the margin is under the print floor); shared walls by half, from each side */
   /* the region's own base edge (x = xB) lies over the solid base panel's overlap row, so it is not a margin: half a wall there, and the V decides the rest */
   const onBaseEdge = (A, B) => Math.abs(A.x - xB) < 1e-6 && Math.abs(B.x - xB) < 1e-6;
-  const holeOf = (c, w) => { const inner = insetConvex(c, w / 2, (A, B) => (cls.isOutlineEdge(A, B) && !onBaseEdge(A, B) ? w : w / 2)); if (!inner) return null; const clipped = vClip(inner); return clipped ? filletPolygon(clipped, FILLET_MM) : null; };
+  /* THE METRIC PLAN (S2). EVERY LENGTH THE PLAN USES IS A SURFACE LENGTH NOW, and it is
+     ONE substitution rather than a rewrite: the wall inset already took a PER-EDGE
+     distance (`insetConvex`'s own `dOf`), so asking the surface for it is a change of
+     what that function returns and of nothing else. The seeding, the relaxation, the
+     Voronoi cut, the basal V and the outline are untouched — measured, not asserted, by
+     the byte partition, which reads 0 floats moved on every field record but the holes.
+
+     `{ metricPlan: false }` IS THE FLAT PLAN, TERM FOR TERM, and it is what the must-fail
+     runs through: a control that goes through the shipped function is worth more than a
+     mutated copy of it (S1's `{ conform: false }` precedent, and the same reason). */
+  const mfield = opts.metricPlan === false || (planIsFlat(ctx) && !opts.metricNoGuard) ? null : planMetricField(ctx);
+  const mOpts = { kappaMode: opts.kappaMode, samples: opts.metricSamples };
+  const diam = (poly) => { let d = 0; for (let i = 0; i < poly.length; i++) for (let j = i + 1; j < poly.length; j++) d = Math.max(d, Math.hypot(poly[i].x - poly[j].x, poly[i].y - poly[j].y)); return d; };
+  const acrossMm = mfield ? (A, B, want, cap) => surfaceOffsetPlanMm(mfield, A, B, want, cap ? { ...mOpts, cap } : mOpts) : (A, B, want) => want;
+  /* THE FILLET IS A LENGTH TOO, and a constant plan radius on a compressed surface draws
+     a corner that is not round on the object — which is the one thing Eva's "cells always
+     round" ruling forbids. It asks for FILLET_MM of surface across EACH of the two edges
+     that meet at the corner and takes the larger, so the arc clears the bar in both
+     directions; `tMax` is still the ceiling, so it cannot eat the hole. */
+  const holeOf = (c, w) => {
+    const cap = diam(c);
+    const inner = insetConvex(c, w / 2, (A, B) => acrossMm(A, B, cls.isOutlineEdge(A, B) && !onBaseEdge(A, B) ? w : w / 2, cap));
+    if (!inner) return null;
+    const clipped = vClip(inner); if (!clipped) return null;
+    const filletR = mfield ? (Q, A, B) => Math.max(acrossMm(A, Q, FILLET_MM, cap), acrossMm(Q, B, FILLET_MM, cap)) : FILLET_MM;
+    return filletPolygon(clipped, filletR);
+  };
   const holeMask = () => true;
-  return { kind: 'salvage', mSplit, uOv, xB, outline, cells, h, holeOf, holeMask, aniso: a, passes, metric: relaxMetric, cellMetric, vAt, spacing, converge, baseNarrow, baseReach, tipGamma, hB, ...cls };
+  return { kind: 'salvage', mSplit, uOv, xB, outline, cells, h, holeOf, holeMask, mfield, holeBarPlan: !!opts.metricHoleBarInPlan, holeBarMm: opts.holeBarMm, metricPlan: opts.metricPlan !== false, planFlat: planIsFlat(ctx), aniso: a, passes, metric: relaxMetric, cellMetric, vAt, spacing, converge, baseNarrow, baseReach, tipGamma, hB, ...cls };
 }
 
 /* ---------------- emission (construction B) ---------------- */
@@ -708,7 +1040,15 @@ export function cutThrough(ctx, F, wall = WALL_DEFAULT, opts = {}) {
     const c = conform ? cRaw.map(cq) : cRaw;
     const k = c.length; const O = c.map(pt); const rimOK = (i) => F.isOutlineEdge(c[i], c[(i + 1) % k]);
     const hole1 = F.holeOf(cRaw, wall); const hole0 = hole1 && conform ? hole1.map(cq) : hole1;
-    const open = hole0 && polyArea(hole0) > 0.25 && 2 * inradiusConvex(hole0) >= 0.6 && F.holeMask(c, hole0);
+    /* IS THIS A REAL HOLE — ASKED ON THE OBJECT (S2). The two bars are lengths and an
+       area, so under a metric plan they are surface lengths and a surface area: a hole
+       0.6 mm across in PLAN that maps to 0.02 mm of surface is not a hole, and a flat
+       plan called it one. `F.mfield` is the field's own metric, so the bar and the wall
+       inset cannot disagree about what a surface millimetre is. */
+    const barPlan = !F.mfield || F.holeBarPlan;                           // `holeBarPlan` is the must-fail's third lever: the inset in surface millimetres, the bar still in plan
+    const openArea = hole0 ? (barPlan ? polyArea(hole0) : surfaceAreaMm2(ctx, F.mfield, hole0)) : 0;
+    const openAcross = hole0 ? (barPlan ? 2 * inradiusConvex(hole0) : 2 * surfaceInradiusMm(F.mfield, hole0)) : 0;
+    const open = hole0 && openArea > HOLE_MIN_AREA_MM2 && openAcross >= (F.holeBarMm ?? HOLE_MIN_MM) && F.holeMask(c, hole0);
     cellOpen.push(!!open);                                                  // recorded BEFORE the early return, so the array is aligned with F.cells whatever the branch does
     planArea += polyArea(c) - (open ? polyArea(hole0) : 0);
     if (!open) {
