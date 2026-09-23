@@ -121,16 +121,126 @@ an untiled cell, which is why `plan.cellOpen[ci] = false` is set in the
 merge-walk's fallback (§8). The brief's instinct named a real hazard and
 attached it to the wrong half; both halves are now stated where they live.
 
-Three readers were taught it, and the third is the reason the second had to be:
+Four readers were taught it, and the second exists because of the third:
 
 * `tools/bloom-wall-thickness.mjs` — the wall instrument, and through it the
   whole combination gate.
 * `tools/verify-bloom-grid.mjs` — `walkGrid` skips masked-out columns and
   **clause 2f** is new: the mask is present on every captured row, excludes
   nothing on a row with no infill and something on a row with one. Two new
-  rows carry it. PASS, 851 checks over 21 rows.
+  rows carry it. **Clause 10** is new beside it and asks the same question of
+  the ARTEFACT — see below.
 * `bloom-grid-gltf.js` keeps recording **BODY** thickness, unchanged — the grid
-  describes the mid-surface, and a hole is not a change to it.
+  describes the mid-surface, and a hole is not a change to it — and now
+  **carries the mask**, one string per row and one character per column,
+  indexed exactly as the `u` / `halfWidthMm` / `thicknessMm` arrays beside it.
+  Absence is REFUSED rather than read as all-material, which is `measureWall`'s
+  own rule: measured, `emitPanel` writes a mask on **384 panels and 12,992 rows
+  over both modes** across the default, three densities, cleft, fringe, both
+  refusals, sepals, continuous and cup x curl — 0 missing, 0 ragged.
+* `/plot` — **NOT DONE HERE, and this is the one build item that leaves the
+  session incomplete.** See §3b.
+
+PASS, **915 checks over 21 rows** (851 before clause 10), 9 must-fails.
+
+### 3b. Why the mask rides as telemetry and the line-splitting is /plot's
+
+The brief asked that "/plot's exporter takes the same mask and stops drawing
+lines across holes". The mask is now in the file and the splitting is not done,
+deliberately, and both halves of that are worth stating.
+
+**THE MEASUREMENT FIRST, because it says the requirement is real.** On the
+shipping default with the guard on, **1,504 of 4,560 grid stations are holes**;
+**64 of 80 u-lines and 320 of 456 v-lines** run through one. With the guard off
+it is **0 and 0**. Live and export agree exactly. So `/plot` today would draw
+sixty-four lines the length of a petal that is not there.
+
+**THE OBVIOUS FIX IS WRONG FROM HERE, AND SILENTLY.** Cutting each `LINE_STRIP`
+into its runs of material would make a hole a gap in the file and need no new
+field. But `/plot` stations a u-line **positionally** — point *i* of a strip is
+row *i* of that panel's declared `u` ladder, matched by label (`plot-petal.js`'s
+own rule, and `verify-bloom-grid`'s clause 3 exists to pin it). A split run
+carries no way to say where it started, so every point past the first hole would
+come back mis-stationed, and `/plot` would not refuse it — its refusal path
+fires on a strip the file never PLACED, not on one placed wrongly. A bend
+dragged on such a petal would land in the wrong place, which is exactly the
+class of defect a line drawing is the worst place to notice.
+
+**SO THE PRIMITIVES ARE UNTOUCHED AND THE MASK RIDES BESIDE THEM.** Nothing
+`/plot` reads today moves: no primitive changes, no existing `extras` field
+changes, and the two families still count `cols` and `rows` per panel, which
+clause 5 pins. `/plot` is therefore provably unchanged by this PR, and the data
+it needs to stop drawing across holes is in the file.
+
+**AND THE SPLIT ITSELF IS A ONE-CONDITION EXTENSION IN /plot's OWN EXPORTER**,
+where there is already a split rule to extend — `plot-export.js`'s stated law is
+"A STRIP IS SPLIT ONLY WHERE THE PROJECTION HAS NOTHING TO SAY", splits are
+counted and reported, and "a run of ONE point is not a path" is already its
+convention. Adding "…or where the panel's mask says hole" is that rule gaining a
+second clause.
+
+**WHY IT IS NOT IN THIS PR.** `/plot` is covered by `tools/verify-plot.mjs`,
+which is **not in CI** (every workflow here is path-filtered to `flower*` /
+`bloom*`) and whose negative control is **51 mutants at roughly six minutes
+each** — over four hours, hand-run, and this repo's own rule is to run the
+mutants covering the code a session changed. That is a session, not a clause,
+and the brief's own gate list names five gates, none of them `/plot`'s. Doing it
+blind — changing `/plot` and quoting a base pass without the sweep — is the one
+move that would be worse than leaving it.
+
+**WHAT THE NEXT SESSION INHERITS:** the file carries `extras.panels[].material`;
+the split condition is one more arm of `plot-export.js`'s existing rule; the
+witness is `tools/verify-plot.mjs` plus a mutant that restores the unsplit
+strip; and the number to reproduce is 64 of 80 u-lines on the infilled default.
+**One thing it must do first:** `assets/plot-test/bloom-grid-live.glb`, the
+sample `/plot` and its gate load, was exported before the mask existed and
+carries none — so it needs re-exporting, or every `/plot` check would exercise
+the absent-mask path rather than the split.
+
+### 3c. The .glb moved on purpose, and the partition says exactly how
+
+`tools/verify-bloom-grid-bytes.mjs` exists to say "the /plot grid export does
+not move", byte for byte against another tree. This change moves it, so the
+tool learned the partition that change is entitled to and **nothing wider** —
+`--change mask`, on the `verify-bloom-seam-bytes.mjs` shape, with the default
+(no `--change`) still making the strict claim for every other change.
+
+Measured, `--base <worktree of 55ca84c> --change mask`, **244 builds over 122
+rows in both modes: PASS.**
+
+* **Clause 1 — the geometry did not move.** The BIN chunk is byte-identical on
+  **every one of the 244**. That is the half that matters to `/plot`: it draws
+  the mid-surface, and a telemetry key cannot reach a position.
+* **Clause 2 — the JSON moved only by the declared key.** Byte-identical once
+  the **6,938** `material` keys are stripped, both sides renormalised through
+  one parse/stringify — and the bound that introduces is turned into a measured
+  fact rather than left as prose: the run FAILS if the base tree's own JSON does
+  not round-trip to itself byte for byte, so on that side the normalisation is
+  provably the identity.
+* **Clause 2a — and the state echo grew by exactly the registry delta.** The
+  file echoes the whole control set at `asset.extras.state`, so ADDING a
+  registry key moves those bytes on every row for a reason that is not about the
+  grid. It is compared as an OBJECT — every shared key must carry an equal
+  value — and **the permitted additions are read out of the two trees'
+  `DEFAULTS`** rather than typed, so a control whose default moved, or a key
+  nobody declared, is a finding. Measured delta: **added `petalInfill`,
+  `infillDensity`; removed none.** This component is the PR's own control, not
+  the mask's, and it would have fired on any session that adds a slider.
+
+**BOTH CLAUSES ARE SHOWN ABLE TO FAIL, and the second control exists because
+the first cannot reach clause 2** — this repo's own `--control-mode` lesson, one
+tool later. `--control` perturbs a captured mid-surface value by 1e-3 mm, which
+lands in BIN and fires **clause 1 on 244 of 244**; `--control-only` perturbs
+`halfWidth`, which is carried in the JSON as `halfWidthMm` and nowhere else, so
+it fires **clause 2 on 244 of 244 while clause 1 sees 0** — which is the whole
+point, and is what says the two controls are two claims rather than one claim
+run twice. A `--change` run with nothing to strip REFUSES as vacuous,
+because there clause 2 is the unchanged whole-file comparison wearing a new name.
+
+**AND THE GATE'S HEADER NOW ENUMERATES CLAUSES 9 AND 10.** Clause 9 shipped with
+the retention change and was never added to the list of what the gate checks —
+the panel gate's route (t) hazard, in another file: a clause nobody has written
+down can go silent without the gate noticing. Both are listed now.
 
 ---
 

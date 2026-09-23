@@ -4341,7 +4341,23 @@ which is why `plan.cellOpen[ci] = false` is set in the merge-walk's fallback. Th
 real hazard and attached it to the wrong half; both halves are stated where they live now.
 `verify-bloom-grid`'s new **clause 2f** holds the mask in both directions (excludes nothing on a
 plain row, something on an infilled one) on two new rows; `bloom-grid-gltf.js` still records BODY
-thickness, unchanged.
+thickness, unchanged, and **now carries the mask into the .glb** — one string per row, one
+character per column, indexed as the `u` / `halfWidthMm` / `thicknessMm` arrays beside it, with
+absence REFUSED rather than read as all-material (measured universal: 384 panels / 12,992 rows over
+both modes, 0 missing, 0 ragged). **Clause 10** asks 2f's question of the ARTEFACT, which is a
+different owner — an exporter that dropped or flattened the mask passes 2f on every row — in both
+directions and with a vacuity guard, and its mutant writes all-material.
+**THE LINE-SPLITTING ITSELF IS `/plot`'s AND IS NOT DONE — the one build item this session leaves
+open, §3b of the outcome doc.** On the infilled default **64 of 80 u-lines and 320 of 456 v-lines
+cross a hole** (0 and 0 with the guard off, live and export identical), so the requirement is real.
+Splitting the primitives HERE would be wrong and silent: `/plot` stations a u-line POSITIONALLY
+(point *i* is row *i* of the panel's declared `u` ladder), a split run cannot say where it started,
+and `/plot`'s refusal path fires on a strip the file never PLACED rather than on one placed wrongly
+— so every point past the first hole would mis-station with no red. The primitives are therefore
+untouched (`/plot` is provably unchanged by this PR) and the split is a one-condition extension of
+`plot-export.js`'s OWN existing rule, "a strip is split only where the projection has nothing to
+say". It waits on a session because `tools/verify-plot.mjs` is **not in CI** and its negative
+control is **51 mutants at ~6 minutes each**.
 **FOUR DEFECTS THE GATES FOUND, EACH A CLASS THIS FILE ALREADY NAMES.**
 **(i) THE SEAM WAS A WELDED OVERLAP:** the region started one row BELOW the split while the basal
 panel ran to it, so the two shells overlapped by a lattice strip AND welded (the outline's seam

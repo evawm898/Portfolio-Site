@@ -121,6 +121,22 @@
      8  THE METRIC TELEMETRY TRAVELS, and is NULL on a flat build rather than
         a plausible 1.0. v is uniform in parameter and not in arc length, so
         this is the number a downstream drawing needs and cannot recompute.
+     9  EVERY PETAL THE BUILDER EMITTED IS IN THE FILE, anchored to
+        `petalsBuilt` — the BUILDER's own tally, reaching this module by a
+        different route from either petal array. A reader that went back to
+        the per-RING array writes a RADIAL bloom of eight petals as ONE, and
+        every other clause here passes on it. (LISTED LATE: clause 9 shipped
+        with the retention change and was never added to this enumeration,
+        which is the hazard this project names about the panel gate's route
+        (t) — a clause nobody has written down can go silent without the gate
+        noticing. Both it and 10 are here now.)
+    10  THE MATERIAL MASK IS IN THE FILE AND IT IS THE BUILDER'S OWN. Clause
+        2f asks this of the CAPTURE and cannot see the EXPORTER dropping,
+        truncating or flattening the mask on its way into the .glb — two
+        different owners, and the file is the artefact /plot reads. Both
+        directions (guard-off rows exclude nothing, infilled rows exclude
+        something) with a cross-row vacuity guard, because a mask of all '1'
+        satisfies "a mask exists" on every row and IS the failure.
 
    WHAT IT IS BLIND TO, stated here because a gate's own header is the worst
    place for a label naming a computation nobody performs:
@@ -469,6 +485,11 @@ async function run(geomUrl, gltfUrl, registryUrl) {
   if (typeof BLADE_ROWS !== 'number') throw new Error('the geometry does not export BLADE_ROWS — this gate cannot check the row count against a number it invented');
   const NU_EXPECTED = BLADE_ROWS;
 
+  /* CLAUSE 10's VACUITY GUARD. A row set with no infilled petal makes the
+     mask's two directions one direction, and the clause would pass on an
+     exporter that wrote all-material everywhere. */
+  let sawFileHoles = false;
+
   /* CLAUSE 2d's TWO POPULATIONS, accumulated across every row so the bar's
      own headroom is a number this run printed rather than a number somebody
      wrote down once. `BEND_REL_BAR` sits between them; if a future form ever
@@ -668,6 +689,66 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       `${row.label}: petalsRetained says ${json && json.asset.extras.petalsRetained}, `
       + `the builder emitted ${built.petalsBuilt}`);
 
+    /* ---- clause 10: THE MATERIAL MASK IS IN THE FILE, AND IT IS THE
+       BUILDER'S OWN ----
+       Clause 2f asserts the mask on the CAPTURE. This asserts it on the
+       ARTEFACT, and the two are different claims with different owners: the
+       capture is `emitPanel`'s and the file is `bloom-grid-gltf.js`'s, so an
+       exporter that dropped the mask, truncated it, or wrote all-material
+       would pass 2f on every row.
+         It matters because the file is what /plot reads, and a grid that says
+       "material everywhere" over an infilled petal is a drawing of lines
+       across holes that nothing downstream can know are holes. The mask rides
+       as telemetry rather than as split primitives for the reason in the
+       exporter's own header — /plot stations a u-line positionally, so a split
+       run would mis-station every point past the first hole.
+         BOTH DIRECTIONS, because a mask of all '1' satisfies "a mask exists"
+       on every row and is exactly the failure: the guard-off rows must exclude
+       NOTHING and the infilled rows must exclude SOMETHING, and the run refuses
+       as vacuous if the row set carries no infilled petal at all. */
+    let maskRows = 0, maskHoles = 0, maskBad = null;
+    if (json) {
+      for (const node of json.nodes) {
+        const mi = /^petal_(\d+)$/.exec(node.name || '');
+        if (!mi) continue;
+        const bp = built.petalsAll[+mi[1]];
+        if (!bp || !bp.grid) continue;
+        for (const fp of (node.extras.panels || [])) {
+          if (!fp.emitted) continue;
+          if (!Array.isArray(fp.material) || fp.material.length !== fp.rows) {
+            maskBad = maskBad || `${node.name} panel ${fp.label}: ${fp.material ? `${fp.material.length} mask rows` : 'no mask'} against ${fp.rows} rows`;
+            continue;
+          }
+          const bpan = bp.grid.find((x) => x.label === fp.label);
+          if (!bpan) { maskBad = maskBad || `${node.name}: the builder has no panel ${fp.label}`; continue; }
+          for (let i = 0; i < fp.material.length; i++) {
+            const str = fp.material[i];
+            if (typeof str !== 'string' || str.length !== fp.cols || /[^01]/.test(str)) {
+              maskBad = maskBad || `${node.name} panel ${fp.label} row ${i}: mask ${JSON.stringify(str)} is not ${fp.cols} characters of 0/1`;
+              continue;
+            }
+            /* Paired by the file's OWN declared station, never by re-deriving
+               the exporter's foot filter — a second copy of that rule here
+               would agree with a broken one. */
+            const br = bpan.rows.find((r) => Math.abs(r.u - fp.u[i]) < 1e-6);
+            if (!br) { maskBad = maskBad || `${node.name} panel ${fp.label} row ${i}: no builder row at u=${fp.u[i]}`; continue; }
+            const want = br.material.map((x) => (x ? '1' : '0')).join('');
+            if (want !== str) { maskBad = maskBad || `${node.name} panel ${fp.label} row ${i} (u=${fp.u[i]}): file says ${str}, the builder captured ${want}`; continue; }
+            maskRows++;
+            maskHoles += (str.match(/0/g) || []).length;
+          }
+        }
+      }
+    }
+    check('10', maskBad === null, `${row.label}: ${maskBad}`);
+    check('10', maskRows > 0, `${row.label}: the file carries no material mask at all`);
+    const wantsHoles = !!(built.petalsAll || []).some((p) => p && p.infill && p.infill.built);
+    check('10', wantsHoles ? maskHoles > 0 : maskHoles === 0,
+      `${row.label}: the file's mask excludes ${maskHoles} station(s) on a build whose infill `
+      + `${wantsHoles ? 'DID' : 'did NOT'} cut a pattern`);
+    if (wantsHoles) sawFileHoles = true;
+    notes.push(`${row.label}: clause 10 — ${maskRows} mask rows in the file, ${maskHoles} station(s) excluded`);
+
     const p0 = json && json.nodes.find((n) => n.name === 'petal_0');
     check('7', !!p0, `${row.label}: no petal_0 node`);
     if (p0) {
@@ -742,6 +823,10 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       check('5', uL === wantU && vL === wantV, `${row.label}: line counts ${uL}/${vL} != declared ${wantU}/${wantV}`);
     }
   }
+
+  check('10', sawFileHoles,
+    'no row in this gate emitted a file whose mask excludes anything — clause 10 cannot '
+    + 'tell a mask that works from one that excludes nothing');
 
   /* THE BAR'S HEADROOM, MEASURED, not recited — and asserted in BOTH
      directions, because a separator that has stopped separating is worth
@@ -1043,8 +1128,16 @@ const MUTANTS = [
        change, and what made a RADIAL bloom of eight petals export as one. The
        file is valid, the petal in it is correct, the census agrees with itself
        and the retention note explains the gap in prose. Only a count anchored
-       to the BUILDER's own tally can tell. */
-    id: 'the-exporter-keeps-one-petal-per-ring', clause: ['9', '7'], file: 'bloom-grid-gltf.js',
+       to the BUILDER's own tally can tell.
+         CLAUSE 10 IS NAMED HERE BECAUSE IT SHARES CLAUSE 9's PREMISE, not because
+       it is a second witness for retention: `petal_N` indexes `petalsAll`, and
+       once it does not, clause 10 pairs a file panel against the wrong petal's
+       ladder and reports `no builder row at u=...`. Measured — it fires on the
+       three MULTI-RING rows alone (`3 layers`, `+ zygomorphy`, `layerSize 0.90
+       x 6`), where ring 1's representative is not slot 1, and is silent on
+       every single-ring row, where the two arrays agree at index 0. A true
+       statement about the mutation, so it is claimed rather than tuned out. */
+    id: 'the-exporter-keeps-one-petal-per-ring', clause: ['9', '7', '10'], file: 'bloom-grid-gltf.js',
     from: '  const allPetals = built.petalsAll || built.petals;',
     to: '  const allPetals = built.petals;',
   },
@@ -1052,6 +1145,20 @@ const MUTANTS = [
     id: 'mode-defaults-to-live', clause: '6', file: 'bloom-grid-gltf.js',
     from: "  if (mode !== 'live' && mode !== 'export') {",
     to: "  if (mode === undefined) mode = 'live';\n  if (false) {",
+  },
+  {
+    /* THE FILE SAYS THE SHEET IS SOLID WHERE THE INFILL CUT IT. The mask is
+       still present, still one string per row, still the right length and
+       still nothing but 0s and 1s — it is simply all material, which is what
+       the file said before this change and what any consumer would believe.
+       Clause 2f stays green because the CAPTURE is untouched; every other
+       clause here stays green because the primitives, the ladders, the counts
+       and the telemetry are all exactly as they were. Only a clause that reads
+       the mask out of the ARTEFACT and compares it against the builder's own
+       can tell. */
+    id: 'the-file-says-every-station-is-material', clause: '10', file: 'bloom-grid-gltf.js',
+    from: "  for (let j = 0; j < nCols; j++) out += r.material[j] ? '1' : '0';",
+    to: "  for (let j = 0; j < nCols; j++) out += '1';",
   },
 ];
 
