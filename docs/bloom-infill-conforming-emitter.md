@@ -225,16 +225,16 @@ Conforming, all clauses green:
 | `petalRoll` 180 | 0.2772 | 0.2087 | 0.753 | 21 / 0.0145 | 0 / 0.0000 | 3236 (2392) | 0.75577 / 0.00253 |
 | `petalRoll` 330 | 0.5730 | 0.4317 | 0.753 | 1861 / 6.0344 | 2347 / 1.3837 | 3188 (2392) | 0.00000 / 0.00000 |
 | `petalRoll` -330 | 0.5730 | 0.4317 | 0.753 | 1836 / 6.2007 | 2347 / 1.3837 | 3188 (2392) | 0.00000 / 0.00000 |
-| `petalCup` 1.2 | 0.1680 | 0.1329 | 0.791 | 47 / 0.1872 | 90 / 0.1268 | 3776 (2392) | 0.23116 / 0.09779 |
+| `petalCup` 1.2 | 0.1680 | 0.1329 | 0.791 | 49 / 0.1279 | 90 / 0.1268 | 3776 (2392) | 0.10465 / 0.09779 |
 | `petalSpineCurl` 360 | 0.1419 | 0.1085 | 0.765 | 0 / 0.0000 | 0 / 0.0000 | 4272 (2392) | 0.89280 / 0.90119 |
 | `petalTwist` 180 | 0.1407 | 0.1071 | 0.761 | 11 / 0.0156 | 0 / 0.0000 | 3096 (2392) | 0.93229 / 0.97617 |
-| cup 1.2 x curl 360 | 0.1977 | 0.1509 | 0.763 | 841 / 0.8966 | 838 / 0.7606 | 4504 (2392) | 0.00063 / 0.00018 |
-| ALL FORM MAX | 0.6348 | 0.4813 | 0.758 | 1092 / 2.3789 | 1141 / 1.2616 | 3416 (2392) | 0.00015 / 0.00000 |
-| buckle 0.6 f3 | 0.1910 | 0.1427 | 0.747 | 0 / 0.0000 | 0 / 0.0000 | 3924 (2392) | 0.60948 / 0.55006 |
-| cup 1.2 x cupGradient 1 | 0.2500 | 0.2175 | 0.870 | 89 / 0.5092 | 100 / 0.3493 | 3708 (2392) | 0.09297 / 0.00000 |
+| cup 1.2 x curl 360 | 0.1977 | 0.1509 | 0.763 | 848 / 0.8966 | 838 / 0.7606 | 4548 (2392) | 0.00063 / 0.00018 |
+| ALL FORM MAX | 0.6348 | 0.4813 | 0.758 | 1097 / 2.3789 | 1141 / 1.2616 | 3444 (2392) | 0.00015 / 0.00000 |
+| buckle 0.6 f3 | 0.1910 | 0.1427 | 0.747 | 0 / 0.0000 | 0 / 0.0000 | 3928 (2392) | 0.62745 / 0.55006 |
+| cup 1.2 x cupGradient 1 | 0.2500 | 0.2175 | 0.870 | 86 / 0.5092 | 100 / 0.3493 | 3748 (2392) | 0.00209 / 0.00000 |
 | `petalWidth` 30 | 0.2711 | 0.1424 | 0.525 | 0 / 0.0000 | 0 / 0.0000 | 3140 (2756) | 1.00001 / 1.00014 |
-| `petalWidth` 8 | 0.0708 | 0.0230 | 0.325 | 0 / 0.0000 | 0 / 0.0000 | 1944 (1704) | 1.00003 / 1.00004 |
-| `footDelicacy` 0.25 | 0.1039 | 0.0234 | 0.225 | 0 / 0.0000 | 0 / 0.0000 | 2140 (1864) | 1.00014 / 1.00001 |
+| `petalWidth` 8 | 0.0708 | 0.0230 | 0.325 | 0 / 0.0000 | 0 / 0.0000 | 1916 (1704) | 1.00003 / 1.00004 |
+| `footDelicacy` 0.25 | 0.1039 | 0.0234 | 0.225 | 0 / 0.0000 | 0 / 0.0000 | 2120 (1864) | 1.00014 / 1.00001 |
 
 Every ratio is below 1, boundary edges are 0 everywhere, the shell count never exceeds the
 legacy's, and the voxel fill reads one piece at both cells on every row. The isometric rows
@@ -254,7 +254,7 @@ shipped tolerance, 7 / 2.502e-3 at half, 3 / 1.819e-3 at a quarter and **ZERO at
 but that eighth costs 3,096 -> 6,628 triangles on that state (+114 %). Reported, not tuned away.
 `petalRoll` 120 / 150 / 180 carry the same class at 3 / 9 / 21 pairs.
 
-**`cup 1.2 x curl 360` reads 841 pairs against the plain sheet's 838.** The petal's own form is
+**`cup 1.2 x curl 360` reads 848 pairs against the plain sheet's 838.** The petal's own form is
 folded there before a cell is cut (its plain self-approach is 0.00018 mm), so the comparison is
 between two fold tessellations and carries nothing.
 
@@ -262,11 +262,15 @@ between two fold tessellations and carries nothing.
 
 Three mutations, each running through the SHIPPED function rather than a mutated copy of it:
 
-| mutation | fires |
-|---|---|
-| `the-flat-fan-is-restored` (`{ conform: false }`) | C1a, C1b, C3a |
-| `the-subdivision-is-halved` (`{ levelBias: -1 }`) | C1a, C1b |
-| `a-sector-is-fanned-from-a-corner` (`{ sectorFan: true }`) | C3a, C3b |
+| mutation | claims | actually fired |
+|---|---|---|
+| `the-flat-fan-is-restored` (`{ conform: false }`) | C1a, C1b, C3a | C1a, C1b, C3a |
+| `the-subdivision-is-halved` (`{ levelBias: -1 }`) | C1a, C1b | C1a, C1b |
+| `a-sector-is-fanned-from-a-corner` (`{ sectorFan: true }`) | C3a, C3b | C1a, C1b, C3a, C3b, C4a |
+
+The third's extra three are collateral the mutation is allowed but not required to cause, and
+all three are true about it: fanning a sector from a corner covers the hole (C3a), leaves the
+covering triangles unrefined (C1) and mismatches a rim against a skin (C4a).
 
 **THE LISTS ARE MEASURED, NOT PREDICTED.** `the-flat-fan-is-restored` was written claiming C2a
 and the control reported it **MISSED** — which is the CLAIM being wrong rather than the clause.
