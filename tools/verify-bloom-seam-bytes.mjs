@@ -245,6 +245,13 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
      `widest`. FILLED FROM THE MEASUREMENT rather than predicted; an empty
      table here would have been a guess wearing a declaration's clothes. */
   tilt: {},
+  /* THE NIB PLACES NO STATION THE LADDER DID NOT PLACE — its resolution
+     demand goes through the ONE placer — but it DOES change the demand a
+     lobed window carries and the blend's own per-sub-region target, so a
+     CLEFT row's `trimPanels()` split can move exactly as it does for `seam`
+     and `widest`. FILLED FROM THE MEASUREMENT; an empty table here would be a
+     guess wearing a declaration's clothes. */
+  nib: {},
 };
 
 /* WHICH ROWS' DEFINITIONS MOVED — labels and/or set lists that differ between
@@ -255,7 +262,7 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
    partition; the run fails on an undeclared one AND on a declared one whose
    definition turns out identical. */
 const ROW_DEF_MOVED_BY_CHANGE = {
-  seam: {}, widest: {}, arc: {},
+  seam: {}, widest: {}, arc: {}, nib: {},
   tilt: {
     'petalTilt max (120)': "block 1 sweeps every SWEEPABLE slider to its own max, so this row's label and value ARE the range; the base tree calls it `petalTilt max (75)`",
     'ALL MAX': 'block 4 hands every SWEEPABLE slider its max at once, so this row carries petalTilt 120 here and 75 on the base — one label over two different states',
@@ -305,6 +312,17 @@ const MOVER_BY_CHANGE = {
     .some((c) => c.base === 'petalTilt' && c.asked > c.got)),
   arc: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
     .some((p) => p && p.spine && p.spine.curlRad !== 0 && p.spine.uniform),
+  /* THE APEX NIB. A row moves iff some BUILT blade takes a nib — which the
+     BASE tree cannot report directly, because it has no nib, so the predicate
+     is the nib's own guard RESTATED over two numbers the base does report:
+     the cap's declared peak, and its declared terminal. A squared terminal
+     holds the outline above the print floor exactly when `terminalHalf`
+     exceeds `TIP_HALF_MM` — the terminal is `max(petalTipEnd x peak, the mode
+     floor)` and BOTH mode floors are at or under `TIP_HALF_MM`, so the test
+     reads the same in live and in export. SEPALS ARE IN IT: a sepal is the
+     petal builder on a second ring and cuts its own nib from its own law. */
+  nib: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
+    .some((p) => p && p.tipCap && p.tipCap.peakHalf > 0.8 && !(p.tipCap.terminalHalf > 0.8)),
 };
 if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared triangle-count table. Add one (even an empty {}) rather than running without a declaration.`);
@@ -321,6 +339,8 @@ const MOVER_WHY = {
   arc: ['a petal takes the uniform arc there', 'no built petal takes the uniform arc there'],
   tilt: ["a built ring's composed petalTilt is clamped down by the base tree's envelope there",
          "no built ring's composed petalTilt is clamped down by the base tree's envelope there"],
+  nib: ['a built blade clears the print floor with no squared terminal holding it above, so the apex nib truncates its law there',
+        'no built blade takes an apex nib there — either its peak never clears the print floor, or a squared terminal holds the outline above it'],
 }[change] || ["the base tree's record predeclares it", "the base tree's record does not predeclare it"];
 if (!(change in ROW_DEF_MOVED_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared row-definition table. Add one (even an empty {}) rather than running without a declaration.`);
@@ -365,7 +385,14 @@ const predicted = new Map();      // label -> true (predeclared mover) | false
 /* CHANGES WHOSE MOVER PREDICATE READS WHAT THE CHANGE ITSELF WRITES. Declared,
    so a new change has to decide rather than inherit a default that is wrong
    half the time. */
-const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt']);
+/* `nib` IS DECLARED HERE EVEN THOUGH IT IS MEASURABLY INVARIANT, and that is
+   deliberate: the predicate reads `tipCap.terminalHalf`, which the change
+   writes. On this tree a nibbed row reports 0.05 mm where the base reports
+   the mode floor, and neither exceeds `TIP_HALF_MM`, so the answer happens to
+   be the same on both trees — but "it happens to agree" is the reasoning the
+   fourth durable rule exists to refuse, and requiring the base tree costs
+   nothing here because the byte comparison needs it anyway. */
+const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt', 'nib']);
 if (frozenSweep) {
   if (!MOVER_OF) { console.error(`REFUSED: --change ${change} declares no mover predicate, so there is nothing to sweep with.`); process.exit(2); }
   if (PREDICATE_READS_WHAT_THE_CHANGE_WRITES.has(change) && !B) {

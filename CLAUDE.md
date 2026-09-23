@@ -1469,6 +1469,107 @@ moved its find-string, and a mutation invisible because its row saturated only i
 is 23 and not 22 because phase22 is margin buckling's, and the FROZEN_MATRICES census caught
 the collision at module load, by name.**
 
+**AND THE PETAL NO LONGER ENDS ON A FLAT FACE — THE LAW IS TRUNCATED AT THE PRINT FLOOR AND
+CLOSED ON A ROUNDED NIB** (Eva's rulings over five sheets, the apex-nib session — read
+`docs/bloom-apex-nib-outcome.md` before touching `apexNibPlan`, `widthProfile`'s
+reparameterisation, `ladderDemand`, any `APEX_*` constant or the AN family). `halfWidthAt` is a
+`max` of the law, the root blend and the print floor, and the superellipse reaches EXACTLY 0 at
+u = 1 — so wherever the law fell under the floor the outline ran PARALLEL at it to the end and
+**every petal finished on a flat face two floors across, 1.6000 mm in EXPORT and 0.3000 mm live,
+whatever exponent `petalTipShape` was asked for.** NOT a regression: session 32's cap DEMOTION
+squared it and the demotion was right (through the old cap an asked 3.00 draws 2.0403, so three
+of the six named tip states were unreachable). **THE STUB'S SHARE IS A WIDTH QUESTION, NOT A
+LENGTH ONE** — the outline meets the floor where `(W/2)·f(u) = TIP_HALF_MM` — the leaf tip-shape
+session's finding from the other side.
+**WHAT SHIPS IS RED+ AT A 0.40 mm FACE WITH THE FULL ROUND NIB.** `apexNibPlan()` is the ONE
+owner: bisect for the law's own crossing of `TIP_HALF_MM`; read the flank's one-sided tangent
+there (Richardson, two steps); run a STRAIGHT FLANK on that tangent to `APEX_HALF_MM`; close
+with a CIRCULAR ARC centred ON THE AXIS tangent to both flanks (`r = APEX_HALF_MM·sqrt(1+m^2)`
+puts the tangent points exactly on the old face's corners), terminating on a mini-face
+`2 x APEX_END_HALF_MM` = **0.10 mm**. **`TIP_HALF_MM` AND `MIN_FEATURE_MM` DO NOT MOVE** — the
+0.40 mm face is an AUTHORED EXCEPTION below the minimum feature, ruled deliberately on a project
+where **nothing has ever been printed**. The mini-face is not a convenience: a true apex
+collapses NV columns onto one edge (session 5's `domeInto`, 48 degenerate triangles from a ring
+6.1e-17 across). **ZERO TRIANGLES ADDED — 24,688 and 1,205.55 KiB at the default in both modes,
+main's own counts.**
+**`petalLength` IS THE ASKED LENGTH AND THE OVERSHOOT IS REPORTED** (Eva's ruling). The blade is
+drawn to wherever the cap closes: **8.59 mm SHORTER at tip shape 0.60 on a 60 mm blade** and
+LONGER above about n 1.20 — the crossover is between 1.20 (−0.001 mm) and 1.40 (+0.122), the
+maximum is **+0.124 mm at the shipped 1.70**, and the flank's slope spans a factor of **204**
+over the range (0.1717 to 35.05 mm/mm). Everything downstream takes the DRAWN length; the cap is
+applied EARLY in `widthProfile` so the lobe and fringe blocks see the capped outline, and
+`toLaw(v) = v·drawn/asked` is the one place the two parameterisations meet.
+**THREE INERT CASES, DECLARED AND NAMED ON THE READ-OUT**, swept over **2,452 ring-modes** of the
+matrix in both modes: a squared terminal holding the outline above the floor (76 — #229's fringe
+terminal), an inner whorl whose blade never clears the floor (18), and a law arriving with no
+slope (**0 — unreachable**, so a ring reporting it is a FINDING and AN0 says so). **A LEAF IS
+EXCLUDED BY DECLARATION** (`cap.petiole`): `buildLeafInto` floors at `TIP_HALF_MM` in both modes
+so a leaf carries the identical 1.60 mm stub — 21.3% of the leaf at tip shape 0.60 — and that is
+a second partition and a second ruling. **Scheduled, not taken.**
+**THE ARC IS SMALLER THAN A ROW GAP (0.0496 mm against a 0.60 mm median), SO THE LADDER HAD TO BE
+TOLD** — `ladderDemand()` asks for `APEX_ARC_ROWS = 6` through session 38's own mechanism, and
+`ladderHalfAt` still floors on `TIP_HALF_MM` so the nib's constants never reach row placement.
+**THE ARC'S DEMAND IS MERGED INTO THE LOBES', NEVER CHOSEN BETWEEN** (MODEL B's window runs to
+u = 1, so the arc is its last sub-region) **and it takes the window's SPARE capacity and no
+more** — asking for six extra rows made the placer trim its largest sub-regions and the ladder
+put 7 stations in a period whose demand is 9, which **L6 caught**. **AND THE BLEND'S TARGET DID
+NOT KNOW ABOUT SUB-REGIONS**: it was three bands (stretch / WHOLE window / tip) while its own
+comment already stated the rule it was breaking, so on `lobeDepth 0.30 x 3` the ladder PLACED 6
+stations across the 0.0014-wide arc and the blend left **ONE**, spreading five back over half the
+blade. With no splits the new bands are the three they replace term for term. **AT THE BUCKLE'S
+FREQUENCY CEILING NO DEMAND IS PLACED AT ALL and the arc gets ONE row** — `ladderGapFactor(7)` is
+exactly 1, so any row handed to the arc comes off the wave's bar; session 32 ruled that trade and
+`APEX NIB: x the buckle at its frequency ceiling` is the matrix row that carries it. **AN3
+REPORTS the count and does not assert it.**
+**TWO DEFECTS IN THE LOBES BLOCK, BOTH FOUND BY THE GATE AND BOTH THIS PROJECT'S OWN CLASS.** A
+SECOND `laminaHalf` — the same expression as the shared one, which is why nobody noticed, until
+the nib owned its own floor and the local copy read **0.80 mm where the outline is 0.05**: the
+per-period relief guard then handed a tooth more material than the blade has (**L5: a relief of
+3.0775 mm against a headroom of 3.09e-3**, and the apex half-width went to **0.0000** on
+`lobeDepth 0.30 x 3`). And the ARC TABLE MIXED TWO PARAMETERISATIONS (`[u * length,
+laminaHalf(u)]`, one asked and one drawn) — **L4 re-measured the margin at 26.3258 mm against
+the record's 26.2440, the drawn/asked ratio to four figures.** L4's own lamina was a THIRD
+restatement and is the profile's `laminaHalfAt` now; what keeps L4 a measurement of the tree is
+its 65,536-sample chord integrator against the geometry's graded `rimArcTable`, untouched.
+**NINE CLAUSES RE-DERIVED, EACH SEEN RED FIRST** (Eva: *"C1/A2 re-derived onto the builder's
+reported length and terminal; A6 re-derived"*): C1 (the drawn length, **plus** a second clause
+that where the nib is INERT the drawn length is the asked one EXACTLY — the half with an owner
+the cap does not write; C1's own message says AN2 owns the rest), A4 and FR2 (a THIRD thing may
+set the terminal, with the guard RESTATED in the gate as `nibWantedFrom` and never read from the
+cap), **A6** (fitted in LAW space and STOPPED AT THE CROSSING — Eva's "only where the law is above
+the print floor"), VS2 and SP5 (the ASKED length, which is what the size field and `sepalScale`
+produce), L3/L4/L5 (the shared lamina) and L6 (the blade's own terminal). **A6 IS THE ONE THAT
+WOULD HAVE BEEN SILENTLY WRONG**: the flank and arc are strictly falling, so they sail through its
+"still falling" filter and fitting through them reads **1.7532 for an asked 1.70, 0.7358 for 0.60,
+0.9173 for 0.80** — A6 firing on a tree whose law is exactly right. **Fifth instance of that bug
+class here.**
+**AN0-AN3 IS THE NEW FAMILY AND BOTH STL GATES ARE BLIND TO ALL OF IT**, measured rather than
+cautioned: a nib at the wrong arc radius, joined at a CORNER rather than a tangent, carried on the
+wrong slope or run to a length that is not the law's crossing ALL leave a single-valued, strictly
+falling outline on a fixed lattice — watertight, one connected piece, no degenerate triangle, the
+SAME triangle count — and the census cannot see them either. **A6 cannot**, because its subject
+stops at the crossing by construction. AN0 the guard three ways (the restatement, the plan's flag,
+and the EMITTED last row, which is under the MODE's own flat face iff a nib closed the blade —
+reading `TIP_HALF_MM` for both modes was wrong in LIVE, where the flat face is 0.15); AN1 the
+flank IS the law's own tangent and the arc follows from it; AN2 the drawn length rebuilt end to
+end; AN3 the emitted rows on the declared curve. **DECLARED BLINDNESS: the three `APEX_*`
+constants are IMPORTED** (ST3's precedent) — they are the DECLARATION and what AN1/AN2 check is
+the five numbers the plan DERIVES, so a mutation of the constants moves both sides together and
+only the shipped picture can see it. Six mutants, each witnessed on the MUTATED module's own plan,
+plus a row for the guard's other arm without which the squared-terminal mutation is a no-op on
+every row in the file.
+**BLOCK 39 IS ELEVEN ROWS (909 -> 920), THE SMOKE SUBSET FIVE (111 -> 116, 34 -> 35 BLOCKS), AND
+TWO NEW ROWS ARE DECLARED SELF-INTERSECTORS WHOSE FOLDS ARE NOT THE NIB'S** — measured on both
+trees: `APEX NIB: MIXED — 6 layers x layerSize min` reads **10232 / 0.2421 mm identically** on a
+worktree of the base commit at an identical 146,400 triangles (and `layerCount 6` alone reads 0,
+`layerSize 0.35` alone reads 0 — a COMPOSITION the matrix cannot see by construction), and
+`APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 6616 / 0.7742 here**,
+so the nib moves an existing fold's magnitude by +272 pairs and +0.064 mm. `frozen/phase38` is the
+**909 rows at `2464d50`**, registered in BOTH maps and proved deep-equal.
+**AND `ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX** — it builds 3,090,816 triangles in **47.7 s**
+against the harness's 30 s settle timeout, and **46.3 s on a worktree of the base commit**, so it
+is the box and not this change. CI only. **The coupon plan gains a 0.40 mm tip.**
+
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
 registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen

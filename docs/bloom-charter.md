@@ -204,6 +204,16 @@ ruled by eye. `MIN_FEATURE_MM` 1.0 (which caps the tip's thickness and the foot)
 mesh floor, not a print one) and `ROLL_MIN_RADIUS_FACTOR` 1.0 (one sheet thickness, and it
 now moves with the sheet).
 
+**AND THE COUPON PLAN GAINS A 0.40 mm TIP** (Eva's ruling, the apex-nib session). The apex
+nib closes every petal on a flat the arc is tangent to at `2 x APEX_HALF_MM = 0.40 mm`, and
+terminates on a mini-face at **0.10 mm** — both UNDER `MIN_FEATURE_MM`, deliberately, as an
+authored exception. That makes the exception the sharpest single thing a coupon would settle:
+a stepped set of flats and half-round nibs at 1.00 / 0.60 / 0.40 / 0.20 / 0.10 mm, printed
+once, says whether the shape Eva ruled from a render is a shape a machine makes. **It is the
+FIRST number in this project deliberately placed below the floor rather than clamped up to
+it**, so unlike the four below it the coupon does not merely improve a clamp — it either
+ratifies a ruling or refutes it. `docs/bloom-apex-nib-outcome.md` has the construction.
+
 **`TIP_HALF_MM` 0.8 CHANGED STATUS on Sep 1 and belongs at the top of that list.** For four
 sessions it was a quiet constant that blunted a tip nobody had ruled on. It is now the number
 that DECIDES HOW POINTED THE PRINTED TIP CAN BE, on a shape Eva ruled by eye and approved
