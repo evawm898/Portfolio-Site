@@ -14,7 +14,13 @@
    claim to draw, and both STL gates are blind to the prototype entirely because it is
    not wired to them.
 
-   FOUR CLAUSES, AND EACH ONE'S REFERENCE HAS A DIFFERENT OWNER FROM ITS QUANTITY.
+   C0 FIRST, AND IT ABORTS. The instruments vouch for themselves on answers written down —
+   ear clipping tiles a non-convex C, the sectors tile an annulus and NOT its hole, and the
+   self-approach measure reads a written-down 0.30 mm and refuses a pair 0.2 mm apart in
+   plan. A harness that cannot vouch for its own measure reports whatever it happens to
+   compute and is believed because it produced numbers.
+
+   THEN FOUR CLAUSES, AND EACH ONE'S REFERENCE HAS A DIFFERENT OWNER FROM ITS QUANTITY.
 
    C1 SURFACE FIDELITY. Every emitted SKIN facet's deviation from `petalSurface`, read
    OFF THE EMITTED STREAM (the triangles are mapped back to their plan points through
@@ -26,6 +32,10 @@
    HALF THE SHEET, which is where a facet has left its own material: that one is absolute,
    so the pair is not purely self-referential and a state whose lattice is poor still
    cannot pass an arbitrarily bad infill.
+
+   C1c STATES C1'S OWN SUBJECT AS A SET AND CHECKS NOTHING ESCAPES IT: a triangle whose
+   vertices the plan canonicaliser does not know is silently skipped, so a path that stopped
+   going through `pt()` would shrink what C1 is about without moving what it reports.
 
    C2 SELF-APPROACH. The shipped census (`tools/bloom-self-intersection.mjs`, not the
    prototype's scratch one) over the CELL GEOMETRY ALONE — the base panel is excluded
@@ -54,7 +64,9 @@
    sector it reaches across the hole's tip. On the FLAT default, where no chord error is
    possible, the legacy cells read 822 within-shell pairs against the plain lamina's 0.
 
-   C4 SHELLS INTACT. Boundary edges 0, one vertex-welded shell, one voxel piece at the
+   C4 SHELLS INTACT. Boundary edges 0, the vertex-welded shell count NO WORSE THAN THE
+   LEGACY EMITTER'S on the same state (it is not the connectedness test, and `buckle 0.6 f3`
+   reads 2 on the legacy emitter too), one voxel piece at the
    0.6 mm and 0.3 mm cells — the prototype's own scratch census and flood fill, unchanged,
    so a crack introduced by the subdivision shows up as a boundary edge rather than as a
    picture nobody looked at.
