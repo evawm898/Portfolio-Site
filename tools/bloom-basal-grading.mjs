@@ -9,6 +9,15 @@
      node tools/bloom-basal-grading.mjs [--json <file>] [--quick]
      node tools/bloom-basal-grading.mjs --inert <base-tree>   (the must-run control)
 
+   `--inert` CANNOT BE RUN ACROSS THE CONFORMING-EMITTER COMMIT. It compares this tree's
+   `cutThrough` against a base tree's float for float, to prove that defaulting `u0`
+   changes nothing; S1 of the infill port plan replaced the tessellation, so pointed at a
+   base from before it the comparison is between two EMITTERS and every float differs by
+   construction. It remains exactly as valid between two trees that share the emitter.
+   `docs/bloom-infill-conforming-emitter.md` §6 measures what did move: the triangle count
+   in this tool's own table, and nothing else — every published figure here is a property
+   of the PLAN, and the two outputs are IDENTICAL with the count column masked.
+
    WHAT MOVES AND WHAT DOES NOT. The BASE BOUNDARY IS FIXED at `ROOT_BLEND_END`
    (Eva's ruling, Sep 18) — `docs/bloom-infill-base-boundary.md` measured it as
    already the floor, and this tool never moves it. What moves is the field's own

@@ -367,11 +367,314 @@ function emitLattice(acc, top, bot) {
   for (let i = 0; i < NR - 1; i++) { acc.quad(top[i][0], bot[i][0], bot[i + 1][0], top[i + 1][0]); acc.quad(top[i][NV - 1], top[i + 1][NV - 1], bot[i + 1][NV - 1], bot[i][NV - 1]); }
   for (let j = 0; j < NV - 1; j++) { acc.quad(top[0][j], top[0][j + 1], bot[0][j + 1], bot[0][j]); acc.quad(top[NR - 1][j], bot[NR - 1][j], bot[NR - 1][j + 1], top[NR - 1][j + 1]); }
 }
-export function emitBase(acc, ctx, rowTo) {
+/* `rowFrom` defaults to 0, so every existing caller is unchanged term for term. It is
+   there for ONE reader: the PLAIN-LAMINA CONTROL over the cell region alone, which is
+   what says whether a self-intersection the census finds on an infilled blade is the
+   infill's or the PETAL'S OWN — at `petalRoll` 330 the shipped petal already folds
+   (a declared census xfail), so an absolute bar there would be asking the emitter for
+   something the surface itself does not satisfy. */
+export function emitBase(acc, ctx, rowTo, rowFrom = 0) {
   const { rows, t } = ctx; const NV = rows[0].mid.length; const top = [], bot = [];
-  for (let i = 0; i <= rowTo; i++) { const r = rows[i]; const ht = [], hb = []; for (let j = 0; j < NV; j++) { const P = r.mid[j], n = r.normal[j]; ht.push(add(P, n, t / 2)); hb.push(add(P, n, -t / 2)); } top.push(ht); bot.push(hb); }
+  for (let i = rowFrom; i <= rowTo; i++) { const r = rows[i]; const ht = [], hb = []; for (let j = 0; j < NV; j++) { const P = r.mid[j], n = r.normal[j]; ht.push(add(P, n, t / 2)); hb.push(add(P, n, -t / 2)); } top.push(ht); bot.push(hb); }
   emitLattice(acc, top, bot);
 }
+/* ---------------- THE CONFORMING TESSELLATION ----------------
+
+   WHY IT EXISTS. `cutThrough` used to tessellate a solid cell as a FLAT FAN over
+   the whole cell polygon and an annular one as a single angular merge-walk between
+   the outer ring and the hole. A flat facet spanning several millimetres of a
+   surface that WRAPS is a chord, and under `petalRoll` 330 — a shipped matrix row —
+   the chord cuts through the tube: measured on the base tree, the worst emitted
+   facet stands 2.4990 mm from the mid-surface it is supposed to be drawing, against
+   0.5730 mm for the shipped lattice's own worst facet on the same state, and
+   6.8717 against 0.6348 on ALL FORM MAX. Session S1 of `docs/bloom-infill-port-plan.md`.
+
+   AND THE BASELINE FOUND A SECOND DEFECT THE BRIEF DOES NOT NAME: THE MERGE-WALK
+   COVERS ITS OWN HOLE. Its `advA` arm emits `(a_i, a_{i+1}, b_j)` — two consecutive
+   OUTER vertices and one inner one — so wherever an outer edge spans a wide angular
+   sector about the hole's centroid the triangle reaches across the hole's own tip.
+   Measured on the FLAT default, where no chord error is possible at all (the blade is
+   planar there, and a straight plan chord maps to a straight 3-space line: 0.00000 mm
+   over the probes), the cells alone still read 822 within-shell pairs against the
+   plain lamina's 0 — coplanar overlap of a hole rim against a skin triangle that
+   should not have been drawn over it. A facet covering the hole is a facet that
+   should not exist, so it is the same sentence as the chord and is fixed here.
+
+   THE CONSTRUCTION, in two independent halves.
+
+   (1) TOPOLOGY — a plan triangulation that cannot cover a hole. A solid cell is a
+   CENTROID fan (shorter spokes and better shapes than the old `O[0]` fan, and there
+   is no hole to cover). An annular cell is cut into SECTORS: the hole is densified
+   with the point where the ray from its own centroid through each outer vertex meets
+   it, and the region between one outer EDGE and the inner arc below it is EAR-CLIPPED.
+   Ear clipping triangulates a simple polygon using only that polygon's own vertices,
+   so no triangle can leave it — which a fan from an outer corner does not guarantee,
+   because a convex hole bulging into a wide sector can be cut by a chord whose two
+   ends are both outside it. **THE DENSIFICATION IS ON THE INNER RING ONLY**: the
+   outer ring is SHARED with the neighbouring cell and a point inserted there that the
+   neighbour does not also generate is a crack.
+
+   (2) GEOMETRY — deviation-driven subdivision, crack-free by construction. A plan
+   edge is split at its MIDPOINT when its own measured chord deviation exceeds the
+   tolerance, and each half is then asked the same question. So the points introduced
+   on any plan edge are `splitPoints(A, B)` — a PURE FUNCTION OF THE UNORDERED PAIR —
+   and two cells sharing a wall edge produce the same set on it whatever else they do.
+   A triangle splits the edge with the greatest deviation and recurses; it stops only
+   when all three of its edges are under the tolerance, so every edge is eventually
+   taken to its own `splitPoints`. That is the whole crack-freeness argument and it
+   does not depend on the order cells are visited in.
+
+   THE MIDPOINT IS SAFE TO SHARE AND THE FLOOR IS NOT A DEPTH. `(a + b) / 2` is
+   commutative in IEEE-754, so a midpoint is bit-identical from either side; and the
+   recursion is floored on EDGE LENGTH rather than on recursion depth, because a depth
+   is a property of the walk (two cells can reach one edge at different depths) while a
+   length is a property of the edge. Fifth instance here of a discrete decision being
+   taken from something that is not a property of the thing decided.
+
+   THE TOLERANCE IS THE SHIPPED LATTICE'S OWN CHORD ERROR ON THE SAME STATE —
+   `latticeChordDevMm`, measured on the rows `buildPetalInto` emitted, an owner the
+   infill does not write. "Conforming" therefore means *the cell tessellation follows
+   the surface at least as closely as the mesh that already ships*, which is a bar in
+   millimetres that moves with the state rather than a constant to be wrong. It is not
+   a fraction of the sheet: "the facet is still inside its own sheet" is t/2 = 0.600 mm
+   on the default, far looser than the 0.1416 mm the lattice actually draws.
+
+   `{ conform: false }` RESTORES THE LEGACY TESSELLATION BIT-IDENTICALLY. It is kept
+   because the must-fail for both gates is "put the flat fan back", and a control that
+   runs through the shipped function is worth more than a mutated copy of it; and
+   because every figure the four companion tools published was measured through it. */
+
+export const CONFORM_SAMPLES = 7;             // interior samples per plan edge when its chord deviation is measured
+export const CONFORM_FACET_SAMPLES = 6;       // barycentric steps per side when a FACET's deviation is measured
+/* THE EDGE TOLERANCE IS THREE QUARTERS OF THE FACET BAR, AND THE 3/4 IS DERIVED RATHER
+   THAN TUNED. The refiner's criterion is a chord along an EDGE; the bar is the deviation
+   over a FACET, and the two are not the same number. For a locally quadratic surface the
+   affine interpolant's error on a triangle is `-(l1 l2 q12 + l2 l3 q23 + l3 l1 q31)` in
+   barycentric coordinates, where `q_ij` is the second difference along edge ij; an edge
+   midpoint reads `q/4` and the interior maximum, at the centroid with all three equal, is
+   `q/3`. So a facet can exceed its worst edge by at most 4/3, and an edge tolerance of
+   3/4 of the bar makes the facet bound hold. MEASURED against it, the worst observed
+   amplification is 1.13 (`petalRoll` 330), 1.05 (`petalCup` 1.2 x curl 360) and 1.02
+   (ALL FORM MAX) — inside the bound on every state, which is what says the bound is the
+   right shape and not a coincidence of one petal. */
+export const CONFORM_EDGE_SHARE = 3 / 4;
+
+const v3 = (a, b, s) => [a[0] + (b[0] - a[0]) * s, a[1] + (b[1] - a[1]) * s, a[2] + (b[2] - a[2]) * s];
+const d3 = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+
+/* The plan -> skin map, which is the emitter's own: `mapPt` then the sheet offset.
+   ONE OWNER, read by the emitter, by the tolerance and by the gate. */
+export function planSkin(ctx, x, y, sign) {
+  const s = mapPt(ctx, x, y);
+  return [s.P[0] + s.n[0] * sign * ctx.t / 2, s.P[1] + s.n[1] * sign * ctx.t / 2, s.P[2] + s.n[2] * sign * ctx.t / 2];
+}
+/* How far the straight facet edge A->B stands from the surface it is drawing, worst
+   over both skins. Zero exactly when the map is affine along the segment, which is
+   what a planar blade gives — measured 0.00000 mm on three probes of the flat default. */
+export function chordDevMm(ctx, A, B, samples = CONFORM_SAMPLES) {
+  let w = 0;
+  for (const sg of [1, -1]) {
+    const PA = planSkin(ctx, A.x, A.y, sg), PB = planSkin(ctx, B.x, B.y, sg);
+    for (let k = 1; k < samples; k++) {
+      const t = k / samples;
+      const Q = planSkin(ctx, A.x + (B.x - A.x) * t, A.y + (B.y - A.y) * t, sg);
+      const d = d3(Q, v3(PA, PB, t));
+      if (d > w) w = d;
+    }
+  }
+  return w;
+}
+/* THE DEVIATION OF ONE EMITTED FACET from the surface it is drawing — sampled over the
+   triangle's INTERIOR, not along its edges, because that is the quantity a chord through
+   the tube actually is. ONE OWNER, read by the lattice reference, by the emitter's own
+   self-check and by the gate, so the two sides of every comparison are the same measure. */
+export function facetDevMm(ctx, T, samples = CONFORM_FACET_SAMPLES) {
+  let w = 0;
+  for (const sg of [1, -1]) {
+    const V = T.map((q) => planSkin(ctx, q.x, q.y, sg));
+    for (let i = 0; i <= samples; i++) for (let j = 0; j <= samples - i; j++) {
+      const a = i / samples, b = j / samples, c = 1 - a - b;
+      const Q = planSkin(ctx, a * T[0].x + b * T[1].x + c * T[2].x, a * T[0].y + b * T[1].y + c * T[2].y, sg);
+      const d = d3(Q, [a * V[0][0] + b * V[1][0] + c * V[2][0], a * V[0][1] + b * V[1][1] + c * V[2][1], a * V[0][2] + b * V[1][2] + c * V[2][2]]);
+      if (d > w) w = d;
+    }
+  }
+  return w;
+}
+/* THE SHIPPED LATTICE'S OWN WORST FACET, under the identical measure, over the same
+   region. Its inputs are `buildPetalInto`'s emitted rows and `petalSurface` — neither
+   of which the infill emitter writes, which is what makes it a reference rather than a
+   restatement. The FOOT rows are excluded by name: all three carry u = 0 and are laid
+   by `footRowsAt()`, not by `at()`, so the plan map does not describe them (it
+   reproduces every BLADE row's own emitted mid point to 0.00e+0 mm and misses a foot
+   by 3.54 mm, which is the ring's own overhang). It also returns the lattice's
+   SHORTEST emitted edge, which is the floor the subdivision stops at: the infill is
+   never refined finer than the mesh that ships. */
+export function latticeChordDevMm(ctx, fromU = 0) {
+  const rows = ctx.rows, NV = rows[0].mid.length;
+  let f0 = 0; while (f0 < rows.length && rows[f0].u === 0) f0++; f0--;          // the last foot row IS the blade's u = 0 row
+  const planOf = (i, j) => { const u = rows[i].u, hh = ctx.surface.profile.halfWidthAt(u); return { x: u * ctx.L, y: (-1 + (2 * j) / (NV - 1)) * hh }; };
+  let worst = 0, worstAt = null, minEdge = Infinity;
+  const seg = (a, b) => { const l = Math.hypot(b.x - a.x, b.y - a.y); if (l > 1e-9 && l < minEdge) minEdge = l; };
+  for (let i = Math.max(0, f0); i < rows.length - 1; i++) {
+    if (rows[i + 1].u < fromU) continue;
+    for (let j = 0; j < NV - 1; j++) {
+      const P00 = planOf(i, j), P10 = planOf(i + 1, j), P11 = planOf(i + 1, j + 1), P01 = planOf(i, j + 1);
+      seg(P00, P10); seg(P00, P01); seg(P00, P11);
+      for (const T of [[P00, P10, P11], [P00, P11, P01]]) { const d = facetDevMm(ctx, T); if (d > worst) { worst = d; worstAt = T[0]; } }
+    }
+  }
+  return { devMm: worst, minEdgeMm: minEdge === Infinity ? 0 : minEdge, at: worstAt };
+}
+
+/* Ear clipping — a triangulation of a SIMPLE polygon that uses only its own vertices,
+   so no triangle can leave it. The annulus sectors are the one place here that needs
+   it: a fan from a corner can be cut by a hole bulging into a wide sector. */
+function triArea2(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+function inTri2(p, a, b, c, eps) { const s1 = triArea2(a, b, p), s2 = triArea2(b, c, p), s3 = triArea2(c, a, p); return s1 > eps && s2 > eps && s3 > eps; }
+export function earClip(poly, eps = 1e-12) {
+  const P = ccw(dedupe(poly, 0)); const out = [];   /* NOT the 1e-6 default: a vertex dropped here is one the neighbouring cell keeps, which is a crack */
+  if (P.length < 3) return out;
+  const idx = P.map((_, i) => i);
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 8 * P.length) {
+    let cut = -1;
+    for (let i = 0; i < idx.length; i++) {
+      const a = P[idx[(i - 1 + idx.length) % idx.length]], b = P[idx[i]], c = P[idx[(i + 1) % idx.length]];
+      if (triArea2(a, b, c) <= eps) continue;                                   // reflex or degenerate on a CCW polygon
+      let ok = true;
+      for (const j of idx) { const p = P[j]; if (p === a || p === b || p === c) continue; if (inTri2(p, a, b, c, eps)) { ok = false; break; } }
+      if (ok) { out.push([a, b, c]); cut = i; break; }
+    }
+    if (cut < 0) return [];                                                     // no ear: the polygon is not simple. Return NOTHING rather than a partial cover — a caller that cannot tell success from failure will draw the failure
+    idx.splice(cut, 1);
+  }
+  if (idx.length === 3) out.push([P[idx[0]], P[idx[1]], P[idx[2]]]);
+  return out;
+}
+
+/* Where the ray from `c` at angle `th` leaves the convex polygon `poly`. */
+function rayHitConvex(c, th, poly) {
+  const dx = Math.cos(th), dy = Math.sin(th);
+  let best = null, bestT = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length];
+    const ex = B.x - A.x, ey = B.y - A.y;
+    const den = dx * ey - dy * ex; if (Math.abs(den) < 1e-14) continue;
+    const t = ((A.x - c.x) * ey - (A.y - c.y) * ex) / den;
+    const s = ((A.x - c.x) * dy - (A.y - c.y) * dx) / den;
+    if (t > 1e-12 && s >= -1e-9 && s <= 1 + 1e-9 && t < bestT) { bestT = t; best = { x: c.x + dx * t, y: c.y + dy * t }; }
+  }
+  return best;
+}
+/* THE ANNULUS, CUT INTO SECTORS. Returns the sector polygons and the DENSIFIED inner
+   loop, which the hole's rim quads must then walk — the rim and the skin have to agree
+   on where the hole's boundary points are or the shell opens. */
+export function annulusSectors(outer, inner, cq = null) {
+  const cc = polyCentroid(inner);
+  const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
+  const O = ccw(outer), I = ccw(inner);
+  const a0 = ang(O[0]);
+  const rel = (q) => { let a = ang(q) - a0; while (a < 0) a += 2 * Math.PI; while (a >= 2 * Math.PI) a -= 2 * Math.PI; return a; };
+  const nodes = I.map((q) => ({ q, a: rel(q), cut: -1 }));
+  for (let k = 0; k < O.length; k++) {
+    const p = rayHitConvex(cc, ang(O[k]), I);
+    if (!p) return null;                                                        // not star-shaped about the hole's centroid: caller falls back
+    nodes.push({ q: cq ? cq(p) : p, a: k === 0 ? 0 : rel(p), cut: k });
+  }
+  nodes.sort((x, y) => x.a - y.a || x.cut - y.cut);
+  /* drop an inner VERTEX that a cut has landed on, keeping the cut (it carries the index) */
+  const loop = []; for (const n of nodes) { const l = loop[loop.length - 1]; if (l && Math.hypot(l.q.x - n.q.x, l.q.y - n.q.y) < 1e-7) { if (n.cut >= 0 && l.cut < 0) loop[loop.length - 1] = n; continue; } loop.push(n); }
+  const at = new Array(O.length).fill(-1);
+  loop.forEach((n, i) => { if (n.cut >= 0) at[n.cut] = i; });
+  if (at.some((i) => i < 0)) return null;
+  const sectors = [];
+  for (let k = 0; k < O.length; k++) {
+    const k2 = (k + 1) % O.length;
+    const poly = [O[k], O[k2]];
+    for (let i = at[k2]; ; i = (i - 1 + loop.length) % loop.length) { poly.push(loop[i].q); if (i === at[k]) break; }
+    const p = dedupe(poly); if (p.length >= 3) sectors.push(p);
+  }
+  return { sectors, innerLoop: loop.map((n) => n.q) };
+}
+
+/* The refinement. `devOf` and `needsSplit` are memoised on the unordered plan pair, so
+   the answer for a shared wall edge is one answer and not two that happen to agree. */
+function refiner(ctx, tolMm, minEdgeMm, levelBias = 0, cq = (q) => q) {
+  const memo = new Map();
+  const key = (A, B) => { const ka = `${f6(A.x)},${f6(A.y)}`, kb = `${f6(B.x)},${f6(B.y)}`; return ka < kb ? ka + '|' + kb : kb + '|' + ka; };
+  /* EVERY DERIVED POINT GOES THROUGH THE PLAN CANONICALISER, AND THE GATE IS WHAT SAID
+     SO. A midpoint is bit-identical from either side only if its two ENDPOINTS are, and
+     two cells reach a shared wall edge through different half-plane clip sequences, so
+     their copies of it agree to about 1e-12 and not to the bit. `f6` then rounds them to
+     the same key for the WELD while `(a + b) / 2` gives two midpoints that can land on
+     opposite sides of a 1e-6 rounding boundary — one crack per straddle. Measured before
+     this line existed: 6 boundary edges on `buckle 0.6 f3` and 20 on
+     `cup 1.2 x cupGradient 1`, with the vertex-welded shell count going 1 -> 2.
+     Canonicalising the plan makes the endpoints one object and the midpoint one number. */
+  const mid = (A, B) => cq({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 });
+  let capped = 0, cappedTris = 0, maxDepthSeen = 0;
+  const split = (A, B) => {
+    const k = key(A, B); let v = memo.get(k);
+    if (v === undefined) {
+      const len = Math.hypot(B.x - A.x, B.y - A.y);
+      v = { dev: chordDevMm(ctx, A, B), len };
+      v.split = v.dev > tolMm && len > minEdgeMm;
+      if (v.dev > tolMm && len <= minEdgeMm) capped++;
+      memo.set(k, v);
+    }
+    return v;
+  };
+  /* THE BIAS IS THE MUST-FAIL'S OWN LEVER: -1 halves the subdivision by letting an edge
+     through unless BOTH it and its own halves are over the tolerance. It runs through the
+     shipped code, so the control exercises the clause that ships. */
+  const wants = (A, B) => {
+    if (!split(A, B).split) return false;
+    for (let i = 0; i < -levelBias; i++) { const M = mid(A, B); if (!split(A, M).split && !split(M, B).split) return false; A = M; }
+    return true;
+  };
+  /* A TRIANGLE WITH A REPEATED VERTEX DRAWS NOTHING AND IS DROPPED, AND WITHOUT THAT
+     LINE THE RECURSION CYCLES. Ear clipping legitimately emits the WEDGE between a chord
+     A-B and the polyline A-C-B when C lies on that chord (a plan sliver, zero area, real
+     in 3-space only as the sagitta between the two paths). Refining it splits A-B at its
+     midpoint, the canonicaliser lands that midpoint ON C, and the children are (A, C, C)
+     and (C, B, C) — which have the same shape as their parent, so the recursion returned
+     to the same triangle for ever and the depth escape emitted it UNSPLIT. That is the
+     crack: measured, 6 unmatched directed edges on `buckle 0.6 f3` and 20 on
+     `cup 1.2 x cupGradient 1`, with the vertex-welded shell count going 1 -> 2.
+     Dropping them is not a loss — the sliver's own material is zero in plan, and the
+     triangle across the chord A-B splits it at C by the same rule, so the mesh closes on
+     the fine path. THE DEPTH CAP STAYS AND IS NOW LOUD: it counts, the caller reports it,
+     and the gate fails on a non-zero count, because a cap that fires silently is exactly
+     how this one hid. */
+  const refine = (P0, P1, P2, out, depth = 0) => {
+    maxDepthSeen = Math.max(maxDepthSeen, depth);
+    if (P0 === P1 || P1 === P2 || P2 === P0) return;
+    const e = [[P0, P1, P2], [P1, P2, P0], [P2, P0, P1]];
+    /* THE LONGEST WANTING EDGE, NOT THE WORST ONE — Rivara's choice, and here it is what
+       makes the recursion TERMINATE rather than a preference about shape. Splitting the
+       worst-deviating edge can pick a SHORT one for ever: the children still carry the
+       long edge, which never shortens, so a sliver on a near-collinear chain recurses
+       without bound (measured, depth 65, and the escape hatch then emitted the triangle
+       with an edge its neighbour had split — 6 and 20 unmatched edges). The longest edge
+       halves whenever it is chosen, so the triangle's diameter strictly decreases and the
+       `minEdgeMm` floor is reached. WHICH wanting edge is chosen does not affect
+       crack-freeness: the recursion stops only when NO edge wants splitting, so every one
+       of them reaches its own `splitPoints` whatever the order. */
+    let m = -1, best = -1;
+    for (let i = 0; i < 3; i++) { const s = split(e[i][0], e[i][1]); if (s.len > best && wants(e[i][0], e[i][1])) { best = s.len; m = i; } }
+    if (m < 0) { out.push([P0, P1, P2]); return; }
+    if (depth > 64) { cappedTris++; out.push([P0, P1, P2]); return; }
+    const [A, B, C] = e[m];
+    const M = mid(A, B);
+    refine(A, M, C, out, depth + 1); refine(M, B, C, out, depth + 1);
+  };
+  /* the points a plan edge carries after refinement — the same recursion, so the rim
+     quads and the skin agree by construction rather than by a tolerance */
+  const points = (A, B) => { if (!wants(A, B)) return [A, B]; const M = mid(A, B); const l = points(A, M), r = points(M, B); return l.concat(r.slice(1)); };
+  return { refine, points, report: () => ({ cappedEdges: capped, cappedTris, maxDepth: maxDepthSeen, edges: memo.size }) };
+}
+
 /* `opts.capturePlan` returns `canon` — the plan-keyed map every emitted cell vertex
    came through, each entry carrying the plan (x, y) it was mapped FROM as well as the
    two skin points it was mapped TO. It is the only way a reader of the emitted stream
@@ -382,14 +685,64 @@ export function emitBase(acc, ctx, rowTo) {
 export function cutThrough(ctx, F, wall = WALL_DEFAULT, opts = {}) {
   const acc = new Acc(); const t = ctx.t; emitBase(acc, ctx, F.mSplit); const baseTris = acc.tris;
   const canon = new Map(); const pt = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let o = canon.get(k); if (!o) { const s = mapPt(ctx, q.x, q.y); o = { T: add(s.P, s.n, t / 2), B: add(s.P, s.n, -t / 2), x: q.x, y: q.y }; canon.set(k, o); } return o; };
+  /* ONE PLAN POINT PER f6 KEY, so a shared wall edge is the SAME two doubles in both of
+     the cells that carry it and every midpoint derived from it is one number. */
+  const planCanon = new Map(); const cq = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let v = planCanon.get(k); if (!v) { v = { x: q.x, y: q.y }; planCanon.set(k, v); } return v; };
+  const conform = opts.conform !== false;
+  const lat = conform ? latticeChordDevMm(ctx, F.uOv) : null;
+  const tolMm = conform ? (opts.tolMm ?? lat.devMm * CONFORM_EDGE_SHARE) : 0;
+  const minEdgeMm = conform ? (opts.minEdgeMm ?? lat.minEdgeMm) : 0;
+  const R = conform ? refiner(ctx, tolMm, minEdgeMm, opts.levelBias ?? 0, cq) : null;
   let solid = 0, annular = 0; const holes = []; const cellOpen = []; let holeArea = 0, apexX = -Infinity;
-  for (const c of F.cells) {
+  let planArea = 0, triArea = 0, tileFail = 0;                            // the partition self-check: the emitted plan triangles must tile the material and nothing else
+  const legacySolid = (O, k) => { for (let i = 1; i < k - 1; i++) { acc.tri(O[0].T, O[i].T, O[i + 1].T); acc.tri(O[0].B, O[i + 1].B, O[i].B); triArea += Math.abs(triArea2Plan(O[0], O[i], O[i + 1])) / 2; } };
+  const tiles = (tris, want) => { let a = 0; for (const T of tris) a += Math.abs(triArea2Plan(T[0], T[1], T[2])) / 2; return Math.abs(a - want) <= 1e-7 * Math.max(1, want); };
+  /* one plan triangle -> two skin facets, wound as the legacy path wound them (top in
+     plan order, bottom reversed), so a reader diffing the two paths sees subdivision
+     and not a flipped normal */
+  const emitPlanTri = (T) => { const a = pt(T[0]), b = pt(T[1]), c = pt(T[2]); acc.tri(a.T, b.T, c.T); acc.tri(a.B, c.B, b.B); triArea += Math.abs(triArea2Plan(T[0], T[1], T[2])) / 2; };
+  const emitSkin = (tris) => { if (!conform) { for (const T of tris) emitPlanTri(T); return; } const out = []; for (const T of tris) R.refine(T[0], T[1], T[2], out); for (const T of out) emitPlanTri(T); };
+  /* a rim runs along a plan edge and must be split exactly where the skin was */
+  const emitRim = (A, B) => { const ps = conform ? R.points(A, B) : [A, B]; for (let i = 0; i + 1 < ps.length; i++) { const p = pt(ps[i]), q = pt(ps[i + 1]); acc.quad(q.T, p.T, p.B, q.B); } };
+  for (const cRaw of F.cells) {
+    const c = conform ? cRaw.map(cq) : cRaw;
     const k = c.length; const O = c.map(pt); const rimOK = (i) => F.isOutlineEdge(c[i], c[(i + 1) % k]);
-    const hole0 = F.holeOf(c, wall);
+    const hole1 = F.holeOf(cRaw, wall); const hole0 = hole1 && conform ? hole1.map(cq) : hole1;
     const open = hole0 && polyArea(hole0) > 0.25 && 2 * inradiusConvex(hole0) >= 0.6 && F.holeMask(c, hole0);
     cellOpen.push(!!open);                                                  // recorded BEFORE the early return, so the array is aligned with F.cells whatever the branch does
-    if (!open) { solid++; for (let i = 1; i < k - 1; i++) { acc.tri(O[0].T, O[i].T, O[i + 1].T); acc.tri(O[0].B, O[i + 1].B, O[i].B); } for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); } continue; }
+    planArea += polyArea(c) - (open ? polyArea(hole0) : 0);
+    if (!open) {
+      solid++;
+      /* THE RIM AND THE SKIN MUST COME FROM THE SAME DECISION. Where the ear clip cannot
+         tile — the field handed over a polygon that is not simple — the skin falls back to
+         the legacy fan, and the RIM has to fall back with it: a subdivided rim beside an
+         unsubdivided fan is a crack, which is what re-reading this branch found. */
+      const tris = conform ? earClip(c) : null;
+      const legacy = !conform || !tiles(tris, polyArea(c));
+      if (legacy) { if (conform) tileFail++; legacySolid(O, k); } else emitSkin(tris);
+      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) { if (legacy) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); else emitRim(c[i], c[j]); } }
+      continue;
+    }
     annular++; holes.push(hole0); holeArea += polyArea(hole0); for (const q of hole0) apexX = Math.max(apexX, q.x);
+    const sec = conform ? annulusSectors(c, hole0, cq) : null;
+    if (conform && sec) {
+      let all = [];
+      for (const s of sec.sectors) { const tris = opts.sectorFan ? s.slice(1, -1).map((_, i) => [s[0], s[i + 1], s[i + 2]]) : earClip(s); if (!tiles(tris, polyArea(s))) tileFail++; all = all.concat(tris); }
+      /* AND THE SECTORS MUST TILE THE ANNULUS, not merely each tile its own sector — two
+         different claims, and only the second one was being checked. A cell at the blade's
+         WAIST is NOT convex (the outline `{|y| <= h(x)}` is convex only where h is concave,
+         and h rises then falls about the waist), and neither a centroid fan nor an angular
+         sector walk is valid on a polygon that is not star-shaped. Measured on the
+         below-floor rows `bloom-infill-lamina-floor.mjs` sweeps: the emitter drew up to
+         4.16 mm2 MORE than the material and the per-sector check saw none of it. */
+      if (tiles(all, polyArea(c) - polyArea(hole0))) {
+        emitSkin(all);
+        const IL = sec.innerLoop; for (let i = 0; i < IL.length; i++) emitRim(IL[(i + 1) % IL.length], IL[i]);
+        for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+        continue;
+      }
+      tileFail++;                                                               // fall through to the legacy walk, counted
+    } else if (conform) tileFail++;
     const inn = ccw(hole0); const cc = polyCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
     const I = inn.map((q) => ({ a: ang(q), s: pt(q) })); const Oa = c.map((q, i) => ({ a: ang(q), s: O[i] }));
     const rot = (arr) => { let m = 0; for (let i = 1; i < arr.length; i++) if (arr[i].a < arr[m].a) m = i; return arr.slice(m).concat(arr.slice(0, m)); };
@@ -397,14 +750,18 @@ export function cutThrough(ctx, F, wall = WALL_DEFAULT, opts = {}) {
     const nextA = (i) => A[(i + 1) % na].a + ((i + 1) >= na ? 2 * Math.PI : 0), nextB = (i) => Bq[(i + 1) % nb].a + ((i + 1) >= nb ? 2 * Math.PI : 0);
     while (ia < na || ib < nb) {
       const advA = ib >= nb || (ia < na && nextA(ia) <= nextB(ib));
-      if (advA) { const a0 = A[ia % na].s, a1 = A[(ia + 1) % na].s, b0 = Bq[ib % nb].s; acc.tri(a0.T, a1.T, b0.T); acc.tri(a0.B, b0.B, a1.B); ia++; }
-      else { const a0 = A[ia % na].s, b0 = Bq[ib % nb].s, b1 = Bq[(ib + 1) % nb].s; acc.tri(a0.T, b1.T, b0.T); acc.tri(a0.B, b0.B, b1.B); ib++; }
+      if (advA) { const a0 = A[ia % na].s, a1 = A[(ia + 1) % na].s, b0 = Bq[ib % nb].s; acc.tri(a0.T, a1.T, b0.T); acc.tri(a0.B, b0.B, a1.B); triArea += Math.abs(triArea2Plan(a0, a1, b0)) / 2; ia++; }
+      else { const a0 = A[ia % na].s, b0 = Bq[ib % nb].s, b1 = Bq[(ib + 1) % nb].s; acc.tri(a0.T, b1.T, b0.T); acc.tri(a0.B, b0.B, b1.B); triArea += Math.abs(triArea2Plan(a0, b1, b0)) / 2; ib++; }
     }
     for (let i = 0; i < nb; i++) { const j = (i + 1) % nb; acc.quad(Bq[i].s.T, Bq[j].s.T, Bq[j].s.B, Bq[i].s.B); }
     for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); }
   }
-  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, cellOpen, holeArea, apexX, ...(opts.capturePlan ? { canon } : {}) };
+  return { acc, tris: acc.tris, baseTris, cells: F.cells.length, solid, annular, holes, cellOpen, holeArea, apexX,
+    conform, tolMm, minEdgeMm, latticeDevMm: lat ? lat.devMm : null, tileFail,
+    planAreaMm2: planArea, triAreaMm2: triArea, refine: R ? R.report() : null,
+    ...(opts.capturePlan ? { canon } : {}) };
 }
+function triArea2Plan(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
 
 /* ---------------- measurements ---------------- */
 /* BANDS — the pattern's reach DOWN THE BLADE, which is what a grading change is about and what
@@ -490,7 +847,7 @@ export function wholeBloom(field, N, wall, st = { ...DEFAULTS }, opts = {}) {
   const accB = new G.MeshBuilder({ exportMode: true }); const fr = G.footRing(st, accB); const out = new Acc(); let petals = 0;
   const ring0 = fr.slotRings[0][0];
   G.buildWhorlInto({ count: fr.slotCount, radius: ring0.radius, height: 0, sizeRamp: () => ring0.scale, angleRamp: () => ring0.tiltExtra, phase: ring0.phase, placement: st.placement, fan: fr.fan,
-    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131, opts) : fieldSalvage(c2, N, { ...opts, seed: SEED + slot.index * 131 }); const r = cutThrough(c2, F, wall); out.pos.push(...r.acc.pos); petals++; } });
+    blade: (slot) => { const c2 = slotContext(st, fr.slotRings[0][slot.index], slot, accB); const F = field === 'legacy' ? fieldLegacy(c2, N, SEED + slot.index * 131, opts) : fieldSalvage(c2, N, { ...opts, seed: SEED + slot.index * 131 }); const r = cutThrough(c2, F, wall, opts); out.pos.push(...r.acc.pos); petals++; } });
   G.buildHubInto(accB, st, fr.hub); out.pos.push(...accB.positions);
   return { acc: out, tris: out.tris, petals, hubTris: accB.triangleCount };
 }
