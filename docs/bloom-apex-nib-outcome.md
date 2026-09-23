@@ -535,11 +535,15 @@ stations land, not what the petals do to each other.
   reads `petalsAll` AND `sepals.built`, and a row that sweeps every control is
   a mover of any control a feature adds. **It is also why the census entry
   could move**: what would move it is the sepals, not the petals.
-  **Its `SELF_INTERSECTION_XFAIL` entry is carried forward UNMEASURED**, named
-  here rather than silently kept: the census sweep skips an export-refused row
-  because no STL exists for X1 to read, and re-measuring it needs
-  `bloom-xfail-magnitudes --include-refused` on a 3.1-million-triangle build.
-  Nothing gates it either way.
+  **Its `SELF_INTERSECTION_XFAIL` entry IS MEASURED AND IS UNMOVED** —
+  `node tools/bloom-xfail-magnitudes.mjs --include-refused --only '^ALL MAX$'`
+  reads **107,485 pairs / 10.1332 mm against a declared 107,485 / 10.1332**, in
+  311 s on a 3.1-million-triangle build. It was going to be carried forward
+  unmeasured and that would have been wrong: the sweep skips an export-refused
+  row because no STL exists for X1 to read, so NOTHING would have caught a move
+  — and this row IS a mover of this change through its forty sepals. It reads
+  the same anyway, which is a negative result and is worth more than the
+  assumption it replaces.
 * **THE COUPON PLAN GAINS A 0.40 mm TIP.** Eva's ruling. The parked cantilever
   coupon is where every floor in this project stops being a line we drew
   ourselves; the nib's face is now one of them.

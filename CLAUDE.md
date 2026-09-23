@@ -1576,7 +1576,13 @@ so the nib moves an existing fold's magnitude by +272 pairs and +0.064 mm. `froz
 **909 rows at `2464d50`**, registered in BOTH maps and proved deep-equal.
 **AND `ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX** — it builds 3,090,816 triangles in **47.7 s**
 against the harness's 30 s settle timeout, and **46.3 s on a worktree of the base commit**, so it
-is the box and not this change. CI only. **The coupon plan gains a 0.40 mm tip.**
+is the box and not this change. CI only. **It IS a mover of this change, through its forty SEPALS
+and not its petals** (block 1 hands it `petalTipEnd` 1, which is the nib's third guard, while
+`sepalBladeState` zeroes that control by declaration), and its census entry was MEASURED rather
+than carried forward: **107,485 / 10.1332, unmoved**, in 311 s through
+`bloom-xfail-magnitudes --include-refused`. Nothing would have caught a move there, because the
+sweep skips an export-refused row — no STL exists for X1 to read.
+**The coupon plan gains a 0.40 mm tip.**
 **AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
 ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row
 whose blade clears the print floor. 74 read WORSE, 65 better, 17 moved their span alone, 76 did
