@@ -612,7 +612,7 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
    call whether two invisible triangles in the LIVE mesh are worth it. */
 const E6_XFAIL = {
   'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)': { live: 2, exp: 0,
-    note: 'two real adjacent corner points 6.23e-7 mm apart; 8.88e-8 mm2 on doubles, zero under float32. Before RIM_CORNER_MIN_MM this row read 118 live and 56 export' },
+    note: 'two real adjacent corner points 6.23e-7 mm apart; 8.88e-8 mm2 on doubles, zero under float32. NOT the corner fan\'s, measured both ways: the pair is present with the fan GATED and with the fan disabled entirely (RIM_CORNER_STEPS -> 1), so no subdivision threshold can reach it and neither can the bead floor. Before RIM_CORNER_MIN_MM this row read 118 live and 56 export' },
 };
 
 const MUTATIONS = [

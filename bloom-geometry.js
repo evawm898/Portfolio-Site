@@ -7994,23 +7994,33 @@ export const RIM_TIP_ROWS = 2;
    rows; 0 on main, where the SPHERE row's smallest triangle is 2899x the bar.
 
    A DECLARED GUESS, in the same family as MIN_FEATURE_MM and the sheet floor,
-   and NOT fitted to those rows. Swept over all 909 rows in BOTH modes
-   (163,120 fan corners): the segment distribution is CONTINUOUS from 2.5e-5
-   mm upward — THERE IS NO EMPTY BAND, and this comment must not pretend
-   otherwise. What there is: only 13 distinct values in [5e-4, 5e-3], and a
-   contiguous run of bin edges from 1.00e-3 to 3.16e-3 at which the gated SET
-   is identical in live and export on every row, bracketed by edges where it
-   is not. 1.3e-3 is the midpoint of the widest gap inside that run
-   (1.099e-3 .. 1.504e-3), leaving ~2.0e-4 mm — about 15% of itself — to the
-   nearest real corner on either side, worst row, either mode.
+   and NOT fitted to the rows that failed. Swept over all 909 rows in BOTH
+   modes: 1,905 distinct segment lengths running continuously from 2.9487e-5
+   to 1.4817 mm. THERE IS NO EMPTY BAND IN THE VALUES and this comment must
+   not pretend otherwise — the nearest real corner either side of 1.3e-3 sits
+   2.01e-4 below and 2.04e-4 above (worst row `DEPTH: 6 turns x layerSize min
+   x petalCount 40`, LIVE), about 15% of the constant itself, and 1.3e-3 is
+   the midpoint of that gap (1.099e-3 .. 1.504e-3).
+
+   WHAT IS WIDE IS THE VERDICT, WHICH IS THE THING THE CONSTANT DECIDES. Over
+   every one of those 1,905 values as a candidate threshold, the answer —
+   WHICH ROWS ARE GATED, AND DO LIVE AND EXPORT AGREE ON IT — is constant at
+   TEN ROWS WITH ZERO MODE-DISAGREEMENTS across the whole interval
+   7.6893e-4 .. 1.4442e-2, a factor of 18.8. Below the lower edge two rows
+   gate in one mode and not the other; at the upper edge an eleventh row joins
+   and disagrees. So the constant can be cut by 41% or multiplied by 11.1
+   before anything it decides moves. A margin measured on the values alone
+   would have read 15% and hidden that.
 
    IT IS NOT MODE-INDEPENDENT AND THE COUNT EQUALITY IS NOT CONSTRUCTIONAL.
    The segment is read off the ORIGINAL boundary `oP`, so it carries none of
    the drawn bead radius (which differs ~200x between modes on a cramped
-   petal) — but `oP` inherits the TIP FLOOR, and the LARGEST segment differs
-   0.882 mm live against 0.440 export. The equality both STL gates require is
-   therefore ESTABLISHED BY THE SWEEP at this value, not guaranteed by the
-   predicate's form. */
+   petal) — but `oP` inherits the TIP FLOOR, and the LARGEST segment reads
+   0.8823 mm live against 0.4397 export on the cramped rows (0.3917 on the
+   shipping default). The equality both STL gates require is therefore
+   ESTABLISHED BY THE SWEEP at this value, not guaranteed by the predicate's
+   form: measured over 163,120 fan corners, 1,376 are gated (0.844%) and the
+   gated count is identical in live and export on all 909 rows. */
 export const RIM_CORNER_MIN_MM = 0.0013;
 
 /* Smootherstep, clamped. Its first AND second derivatives vanish at both
@@ -8212,11 +8222,13 @@ function emitPanel(acc, rows, panel, tAt, rim) {
     const gBase = rimEase((sMargin[k] - sBase) / RIM_TAPER_MM);
     const g = tipExposed ? gBase : Math.min(gBase, rimEase((sTip - sMargin[k]) / RIM_TAPER_MM));
     /* AND A FLOOR ON THE DRAWN RADIUS WHERE IT IS ALREADY NON-ZERO. The fan
-       gate above is the ruled fix and it does not finish the job: with the fan
-       disabled ENTIRELY, `DEPTH: 6 turns x layerSize min x petalCount 40`
-       still emits 23 degenerate triangles, so those 23 are ORDINARY rim strips
-       and no corner threshold can reach them. They are the other half of the
-       same story — a bead of ~5e-5 mm is numerically absent, so consecutive
+       gate above is the ruled fix and it does not finish the job. Measured on
+       the shipped tree with THIS LINE REVERTED and the gate left in place,
+       `DEPTH: 6 turns x layerSize min x petalCount 40` still emits 23
+       degenerate triangles in EXPORT — and RIM_CORNER_STEPS -> 1, which
+       disables the fan entirely, leaves the same 23. So they are ORDINARY rim
+       strips and no corner threshold can reach them: the other half of the
+       same story, a bead of ~5e-5 mm being numerically absent, so consecutive
        profiles along the margin nearly coincide too.
 
        IT IS COUNT-SAFE BY BRANCH, which is why it can be a threshold at all:
