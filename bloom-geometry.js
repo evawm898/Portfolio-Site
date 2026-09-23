@@ -4189,6 +4189,12 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   return mix(lo);
 }
 const NV = 10;   // columns across one span
+/* ONE FROZEN ROW OF `true`, shared by every plain captured row — the mask is
+   per (row, column) and a plain panel's is constant, so this allocates once
+   for the whole build rather than NV booleans per row per petal. Frozen
+   because it is shared: a consumer that wrote through it would write through
+   every row of every petal. */
+const GRID_ALL_MATERIAL = Object.freeze(new Array(NV).fill(true));
 /* How many rows adjacent panels share. ONE gives a real overlapping VOLUME:
    both panels occupy the slab between these rows, so the slicer unions
    solid material rather than being asked to join two shells that merely
@@ -5198,6 +5204,25 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        both modes and `slopeBreaks` is not. The measurement is section 5 of
        `node tools/bloom-infill-lamina-floor.mjs`. */
     laminaSlopeBreaks(grid = 4096) { return breaksOf(laminaWinner, grid); },
+    /* THE LAMINA'S OWN HALF-WIDTH, MODE-FREE — `halfWidthAt` with TIP_HALF_MM
+       in place of the accumulator's `tipFloor`, and the CUT outline rather
+       than the base one, so it is the blade a consumer deciding TOPOLOGY must
+       read. It is `laminaSlopeBreaks`' own `max` under a name, and it exists
+       for the same reason: the infill's cells, its seeding and its hole bar
+       decide how many holes the solid has, and a hole count that differed
+       live from export would be a mode-dependent topology — refused here five
+       times (the ladder, the seam step, the fringe's count threshold, the
+       lobe lamina, the leaf's petiole ring).
+
+       WHERE THE FOOT AND THE TIP CLEAR THE PRINT FLOOR IT IS `halfWidthAt`
+       EXACTLY, and at EXPORT it is `halfWidthAt` on every petal by
+       construction (`tipFloor` IS TIP_HALF_MM there). What it changes is the
+       LIVE plan, which is what stops the preview cutting a different number
+       of holes from the object. It is a PLAN quantity: what is DRAWN is
+       still `row.sect(v)` on the mode's own cross-section, so a blade whose
+       tip the live floor narrows is drawn narrow and planned on the lamina —
+       the lobes' own division of labour, one feature later. */
+    laminaHalfAt(u) { return Math.max(shapeAt(u), rootBlend(u), TIP_HALF_MM); },
     /* THE LOBES' RECORD — what was asked, what was built, the two caps and
        which bound, the pitch against its floor, the window and every
        station; `sinusMinHalfMm` is the deepest sinus AS BUILT (the max with
@@ -7316,8 +7341,35 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      the cost is a function of, and a number nobody prints is a number nobody
      watches. */
   const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], pivotsSkipped: 0, segments: 0, drawnMaxMm: 0, tipAxisMm: null };
+  /* THE PANEL LOOP IS A TWO-ARM CHOICE (the Voronoi infill, S3). The infill
+     arm is taken only where the blade is ONE panel: a cleft or a fringe blade
+     is several panels with SUB-SPANS, and the plan's outline is the whole
+     width `{|y| <= h(x)}`, so those petals take today's path entirely — which
+     is the earlier ruling that excludes fringe and cleft, expressed as a
+     branch rather than as a sentence. Lobes are one panel and are infilled;
+     they move `halfWidthAt`, which the outline reads.
+
+     AT THE GUARD THE PETAL TAKES TODAY'S PATH BY BRANCH, which is what makes
+     "0 bytes moved" a construction rather than a measurement. */
+  let infill = null;
+  if (!infillIsAbsent(ps) && panels.length !== 1) {
+    /* SEVERAL PANELS — a cleft or a fringe owns the same region. The record is
+       produced anyway, because a refusal the read-out cannot name is a silence
+       and this project's own rule is that every reason is a word. */
+    infill = { density: ps.infillDensity, wall: INFILL_WALL_MM, bar: INFILL_HOLE_MM, floorU: 0, mSplit: -1, cells: [], holes: [], cellOpen: [], widthsMm: [], capacityMm: [], achieved: 0, solid: 0, passesUsed: 0, refused: 'panels' };
+  }
+  if (!infillIsAbsent(ps) && panels.length === 1) {
+    /* THE CAPABILITY HOOK carries the gate's must-fail levers (`infillOpts`)
+       and NOTHING a control can reach — the sepal angle's own precedent. A
+       control that goes through the shipped function is worth more than a
+       mutated copy of it, and every lever here is read by `petalInfillPlan`
+       and `emitInfillPanel` exactly as the shipped call reads its defaults. */
+    infill = petalInfillPlan(surface, rows, panels[0], { density: ps.infillDensity, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
+    if (infill.refused) infill = { ...infill, built: false };
+  }
   for (const panel of panels) {
-    const g = emitPanel(acc, rows, panel, tAt, rim);
+    const useInfill = infill && !infill.refused && panel === panels[0];
+    const g = useInfill ? emitInfillPanel(acc, rows, panel, tAt, rim, infill, cap) : emitPanel(acc, rows, panel, tAt, rim);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
   }
 
@@ -7790,6 +7842,30 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        neighbour approach, the sepal angle scan), present whenever either
        capture is on. The same array object when both are. */
     lamina: capturedPanels,
+    /* THE INFILL'S OWN RECORD (S3) — null where the guard is off, and where it
+       is on it says what was ASKED, what was BUILT and why anything is
+       missing. Ruling 3 makes density a request, so the achieved count is the
+       answer and the read-out speaks it; I4 asserts it against the holes the
+       emitter actually cut, which is the only thing that can say the record
+       describes the artefact. */
+    infill: infill ? {
+      density: infill.density, wall: infill.wall, bar: infill.bar,
+      cells: infill.cells ? infill.cells.length : 0,
+      achieved: infill.achieved, solid: infill.solid,
+      passesUsed: infill.passesUsed, passCap: INFILL_DROP_PASSES,
+      widthsMm: infill.widthsMm, refused: infill.refused ?? null,
+      /* THE LOOPS THE EMITTER WALKED — the artefact's own holes, which I5 needs
+         because the plan's polygons are the mask's own producer. */
+      emittedLoops: infill.emittedLoops || [],
+      /* AND WHERE THE CELLS' OWN TRIANGLES SIT IN THE STREAM — I4's subject.
+         The welded petal is a basal solid ABUTTING a cell solid along the
+         seam, which is not a manifold surface there, so its Euler
+         characteristic answers no question about how many holes were cut. */
+      emittedTriRange: infill.emittedTriRange || null,
+      metricPlan: !!infill.metricPlan, planFlat: !!infill.planFlat,
+      floorU: infill.floorU, mSplit: infill.mSplit,
+      built: !infill.refused,
+    } : null,
     /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
        precedent) — SP1 sums the sepals' own against the whorl's. */
     tris: acc.triangleCount - tris0,
@@ -8282,7 +8358,13 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   if (grid) {
     for (let i = rowFrom; i <= rowTo; i++) {
       const k = i - rowFrom;
-      grid.push({ row: i, u: rows[i].u, halfWidth: rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k] });
+      /* THE MATERIAL MASK. Every sample a plain panel captures is material by
+         construction, so this arm writes the shared frozen row; the INFILL arm
+         is the only thing that writes a false. It is present on EVERY captured
+         row so a reader can rely on it rather than test for it — an absent
+         mask read as "all material" is the same silent default the honest form
+         exists to avoid. */
+      grid.push({ row: i, u: rows[i].u, halfWidth: rows[i].h, thickness: tBodyOf[k], v: oV[k], mid: oP[k], normal: oN[k], material: GRID_ALL_MATERIAL });
     }
   }
 
@@ -8596,6 +8678,1441 @@ function emitPanel(acc, rows, panel, tAt, rim) {
   }
   return grid;
 }
+/* ===================================================================
+   THE VORONOI INFILL — S3 of docs/bloom-infill-port-plan.md.
+
+   WHAT SHIPS. A petal's blade is cut into Voronoi cells and each cell keeps a
+   rounded hole inside a wall of MIN_FEATURE_MM, so the lamina reads as a
+   network rather than a sheet. It is OFF by default (`petalInfill` NONE) and
+   the default bloom is bit-identical BY BRANCH.
+
+   THE THREE RULINGS THIS BLOCK CARRIES (Eva, Sep 22, `docs/bloom-infill-port-
+   plan.md` §0):
+     * ruling 1 — off by default, density 16 when switched on.
+     * ruling 2 — EVERY LENGTH THE PLAN USES IS A SURFACE LENGTH. The wall
+       inset, the fillet radius and the hole bar ask `infillOffsetPlanMm` for
+       their answer in millimetres OF MATERIAL, never of plan. S2 measured why:
+       on `petalCup` 1.2 x `petalSpineCurl` 360 a flat 1.0 mm plan wall comes
+       out 0.118 mm of material, which does not print, and only a PRODUCT of
+       two controls does it — so `buildMatrix()` cannot see it by construction.
+     * ruling 3 — EVERY CELL THAT KEEPS A HOLE KEEPS ONE AT LEAST
+       INFILL_HOLE_MM ACROSS. Sub-bar seeds are not created: all of them are
+       dropped in ONE pass, the diagram is recomputed, and that repeats to
+       INFILL_DROP_PASSES. Density is a REQUEST and the achieved count is
+       reported (`bloom.js`'s read-out line, and I4 asserts the agreement).
+
+   WHY A SIBLING EMITTER AND NOT A MODIFICATION. `emitPanel` writes a row
+   lattice; an infilled blade has no rows to write. `emitInfillPanel` is the
+   second arm: it calls `emitPanel` VERBATIM for the basal sub-panel below the
+   lamina floor — so the foot, the root blend and their bead are the shipped
+   path's own bytes — and emits the cells above it as a second closed shell
+   overlapping it by one row. Two overlapping closed shells is the export
+   contract's own case and needs no weld.
+
+   WHAT THE RIMS ARE, SAID PLAINLY BECAUSE IT IS VISIBLE. In the cell region
+   every rim — the holes' and the blade's own margin — is a FLAT WALL at the
+   body's thickness. #278's bead is S5 (`emitRimLoop` has to be extracted from
+   `emitPanel` before a hole can call it). The SILHOUETTE does not move: the
+   bead's apex sits AT the original boundary point, which is where this arm
+   puts its wall. What changes above the split is the cross-section of the
+   margin — round below, square above — and the hole outlines are kept as
+   explicit closed loops so S5 can attach to them.
+
+   WHAT IT DOES NOT COVER, in its own header:
+     * ONE PANEL ONLY. A cleft or a fringe blade is several panels with
+       sub-spans, and the plan's outline is `{|y| <= h(x)}` over the WHOLE
+       width; those petals take today's path entirely and the plan says so
+       (`refused: 'panels'`). That is the earlier ruling that excludes fringe
+       and cleft, expressed as a branch rather than as a sentence. Lobes are
+       compatible by construction — they move `halfWidthAt`, which the outline
+       reads — and are not excluded.
+     * SEPALS ARE PINNED OFF (ruling 4): `sepalBladeState` zeroes the guard.
+     * the CELL SIZE is still laid out in the flat plan (S2 §5). On a
+       compressed state a cell is smaller ON THE OBJECT, so it can lose its
+       hole; that is the achieved count, reported.
+     * the three remaining controls — relaxation, density law, anisotropy —
+       are S4's and are constants here.
+   =================================================================== */
+
+/* THE RANGE IS THE REGISTRY'S OWN BOUND AND IS IMPORTED THERE (Q6). */
+export const INFILL_DENSITY_RANGE = Object.freeze([8, 40]);
+export const INFILL_DENSITY_DEFAULT = 16;                 // Eva, ruling 1
+/* THE WALL IS READ, NEVER TYPED. Eva's ruling 5 is "the wall is 1.0 mm" and
+   this project already has one owner of the minimum printable feature. */
+export const INFILL_WALL_MM = MIN_FEATURE_MM;
+/* EVA'S RULED HOLE BAR. A cell keeps a hole only if the hole is at least this
+   wide ON THE OBJECT after the wall inset. */
+export const INFILL_HOLE_MM = 1.5;
+/* RULING 3'S CAP, AND IT IS A MEASUREMENT RATHER THAN A ROUND NUMBER. The
+   ruling asks for a cap and a report instead of a fixed point because the
+   iteration is not guaranteed monotone: dropping a seed recomputes the
+   diagram, so a cell that cleared the bar can fall under it on the next pass.
+
+   MEASURED: `node tools/verify-bloom-infill.mjs --cap-sweep` runs the drop
+   over TWENTY states (the form corners, both width and length ends, the tip
+   shapes, a thin foot, a thick sheet, a lobed blade, 40 petals) at NINE
+   densities from 8 to 40 — 180 pairs — and reads the achieved count at every
+   cap from 0 to 5. **It converges after ONE pass on all 180, and on none of
+   them does any pass LOSE a hole.** Two is that measurement plus one, so the
+   cap is not the thing that stops the iteration on any state anyone has
+   measured, and `passesUsed` is REPORTED (the read-out says when a state
+   reached the cap) so a state that is truncated is visible rather than
+   silent. I6 asserts termination inside it. */
+export const INFILL_DROP_PASSES = 2;
+/* THE THREE LOOK CONSTANTS ARE S4'S CONTROLS AND CONSTANTS HERE (ruling: the
+   relaxation and anisotropy sliders trade against each other and must be
+   ruled from one sheet, `docs/bloom-infill-port-plan.md` §4). The values are
+   the prototype's, unchanged, so the renders S4 rules from are this tree's. */
+export const INFILL_ANISO = 2.2;              // the metric's stretch along the midrib
+export const INFILL_LLOYD_PASSES = 4;
+export const INFILL_TIP_GAMMA = 1.0;          // spacing follows halfWidth^gamma toward the tip
+export const INFILL_BASE_NARROW = 0.75;       // cells at the base are this fraction of the mid-blade spacing
+export const INFILL_BASE_REACH = 0.30;        // over this fraction of the length the base narrowing relaxes back
+export const INFILL_CONVERGE = 0.10;          // the basal V reaches this fraction of the length up the margins
+export const INFILL_FILLET_MM = 0.8;          // target fillet radius on every hole corner, IN SURFACE MM
+export const INFILL_AXIS_SHARE = 0.3;         // share of the seeds placed ON the midrib
+export const INFILL_SEED = 7;                 // the field is deterministic; a seed control is not proposed
+
+/* THE GUARD, AND IT IS A CHOICE (Eva's ruling 7). `SWEEPABLE` filters
+   `SLIDERS()`, so a CHOICE is out of the blanket sweep BY CONSTRUCTION — which
+   is what keeps `ALL MAX` uninfilled and its declared export refusal unmoved.
+   TWO STATEMENTS, this one and `PREDICATES.infillPresent` in the registry;
+   the harness checks them against each other at load. */
+export function infillIsAbsent(state) { return String(state.petalInfill ?? 'NONE') === 'NONE'; }
+
+/* ---------------- plan geometry: convex polygons in (x, y) ---------------- */
+/* Ported from `tools/bloom-voronoi-proto.mjs` term for term. The prototype
+   stays as the instrument that ruled on the look; this is the shipping copy
+   and the two are not expected to remain byte-identical (the prototype has no
+   per-row thickness and no bead). */
+/* PLANAR LENGTH, AND `Math.hypot` IS NOT AVAILABLE FOR A DECISION. Every
+   discrete answer this file gives — which edge is subdivided, which seam
+   column a cell vertex snaps to, whether a cell's hole clears the ruled bar,
+   whether a set of triangles tiles its polygon — is a comparison on a LENGTH,
+   and `Math.hypot` is specified only as an implementation-approximated
+   function: it is NOT required to be correctly rounded and V8 has changed its
+   implementation. `Math.sqrt` IS correctly rounded by IEEE-754, so a length
+   built from it is the same double in every engine.
+   THE DEFECT IT CLOSES WAS MEASURED, not anticipated: X0 — the exported STL
+   against a rebuild of the page's own state in Node — read 39,328 triangles
+   against 36,064 on `INFILL: x density 8`, and 681,952 against 716,352 at
+   forty petals over three whorls. The plan's cells and holes are the same
+   arithmetic on both engines to the last bits; what differed was which side
+   of a comparison those last bits fell on. Sixth instance of a discrete
+   decision on a continuous quantity in this file, and the first where the
+   remedy is the FUNCTION rather than a grid.
+   It is used for PLAN lengths, where both coordinates are ordinary
+   millimetres and neither squaring nor the sum can reach a float's range;
+   the 3-space distances in the conformance measure keep `Math.hypot`, since
+   nothing discrete is decided on them. */
+function infillLen(dx, dy) { return Math.sqrt(dx * dx + dy * dy); }
+function infillRng(a) { return function () { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+function infillClipHalfPlane(poly, a, b, c) {             // keep a*x + b*y + c <= 0
+  const out = []; const n = poly.length;
+  for (let i = 0; i < n; i++) {
+    const P = poly[i], Q = poly[(i + 1) % n];
+    const dp = a * P.x + b * P.y + c, dq = a * Q.x + b * Q.y + c;
+    if (dp <= 0) out.push(P);
+    if ((dp < 0 && dq > 0) || (dp > 0 && dq < 0)) { const s = dp / (dp - dq); out.push({ x: P.x + (Q.x - P.x) * s, y: P.y + (Q.y - P.y) * s }); }
+  }
+  return out;
+}
+function infillPointInPoly(x, y, poly) { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside; } return inside; }
+function infillPolyArea(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; }
+function infillCentroid(p) { let A = 0, cx = 0, cy = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; const w = a.x * b.y - b.x * a.y; A += w; cx += (a.x + b.x) * w; cy += (a.y + b.y) * w; } A /= 2; if (Math.abs(A) < 1e-12) { let x = 0, y = 0; for (const q of p) { x += q.x; y += q.y; } return { x: x / p.length, y: y / p.length }; } return { x: cx / (6 * A), y: cy / (6 * A) }; }
+function infillCcw(poly) { let s = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; s += a.x * b.y - b.x * a.y; } return s < 0 ? poly.slice().reverse() : poly; }
+function infillDedupe(poly, eps = 1e-6) { const o = []; for (const p of poly) { const l = o[o.length - 1]; if (!l || infillLen(l.x - p.x, l.y - p.y) > eps) o.push(p); } if (o.length > 1 && infillLen(o[0].x - o[o.length - 1].x, o[0].y - o[o.length - 1].y) <= eps) o.pop(); return o; }
+/* Voronoi cells by half-plane clipping. `a` scales x before the bisectors are
+   formed: an anisotropic Voronoi is the isotropic one in scaled coordinates. */
+function infillCellsFor(seeds, outline, a = 1) {
+  const S = seeds.map((s) => ({ x: s.x / a, y: s.y })), O = outline.map((p) => ({ x: p.x / a, y: p.y }));
+  const out = [];
+  for (let i = 0; i < S.length; i++) {
+    let poly = O.slice(); const s = S[i];
+    for (let j = 0; j < S.length && poly.length >= 3; j++) { if (j === i) continue; const q = S[j]; const A = q.x - s.x, B = q.y - s.y; const C = -(A * (s.x + q.x) / 2 + B * (s.y + q.y) / 2); poly = infillClipHalfPlane(poly, A, B, C); }
+    out.push(poly.length >= 3 ? poly.map((p) => ({ x: p.x * a, y: p.y })) : null);
+  }
+  return out;
+}
+function infillInset(poly, d, dOf = null) {               // dOf(A, B) may give a per-edge distance
+  let out = poly.slice(); const n = poly.length; const P = infillCcw(poly);
+  for (let i = 0; i < n && out.length >= 3; i++) {
+    const A = P[i], B = P[(i + 1) % n]; const ex = B.x - A.x, ey = B.y - A.y, L = infillLen(ex, ey); if (L < 1e-9) continue;
+    const nx = ey / L, ny = -ex / L;                                        // outward normal of a CCW polygon
+    out = infillClipHalfPlane(out, nx, ny, -(nx * A.x + ny * A.y) + (dOf ? dOf(A, B) : d));
+  }
+  out = infillDedupe(out); return out.length >= 3 ? out : null;
+}
+/* HOW WIDE IS THIS POLYGON, IN SURFACE MILLIMETRES — AND IT IS A BISECTION
+   RATHER THAN A SAMPLED MAXIMUM, WHICH IS A CORRECTION TO THE PROTOTYPE AND
+   NOT A PORT OF IT. The prototype's `inradiusConvex` maximises over a fixed
+   list of candidate centres built from the polygon's own vertex ORDER; it is
+   biased LOW and is order-dependent, so it disagrees with itself across a
+   MIRROR PAIR of cells whose geometry is congruent — measured on the shipping
+   default at density 27, one pair read 0.416 and 0.466 mm where the true
+   answer is 0.547 for both. Ruling 3 makes this number decide TOPOLOGY (does
+   this cell keep a hole), and a discrete decision taken from a quantity with
+   0.05 mm of order-dependent noise is the knife-edge class this project has
+   refused five times. The bisection asks the inset — the same inset the wall
+   uses, so the bar and the wall cannot disagree about what a surface
+   millimetre is — and is order-independent because the inset is. */
+function infillWidthMm(poly, offsetOf, hi = null, iters = 20) {
+  if (!poly || poly.length < 3) return 0;
+  /* THE CEILING IS THE POLYGON'S OWN EXTENT, not a constant: no inscribed
+     circle can be wider than the shape, so a larger ceiling only asks the
+     march to walk somewhere the clip has already emptied. */
+  if (hi === null) { let lo0 = Infinity, hi0 = -Infinity, lo1 = Infinity, hi1 = -Infinity; for (const q of poly) { if (q.x < lo0) lo0 = q.x; if (q.x > hi0) hi0 = q.x; if (q.y < lo1) lo1 = q.y; if (q.y > hi1) hi1 = q.y; } hi = Math.max(1e-3, Math.min(hi0 - lo0, hi1 - lo1) / 2); }
+  const ok = (r) => !!infillInset(poly, r, offsetOf ? (A, B) => offsetOf(A, B, r) : null);
+  if (!ok(1e-6)) return 0;
+  if (ok(hi)) return 2 * hi;
+  let lo = 1e-6;
+  for (let i = 0; i < iters; i++) { const m = (lo + hi) / 2; if (ok(m)) lo = m; else hi = m; }
+  return 2 * lo;
+}
+/* Fillet every corner of a convex CCW polygon. `r` may be a function of the
+   corner: a fillet radius is a LENGTH, so on a compressed surface a constant
+   plan radius draws a corner that is not round on the object, which is the one
+   thing "cells always round" forbids. `tMax` is the ceiling, so it cannot eat
+   the hole — the short-edge clamp Eva ruled stays a ceiling only. */
+function infillFillet(poly, r, perArc = 5) {
+  const P = infillCcw(infillDedupe(poly)); const n = P.length; if (n < 3) return P;
+  const rOf = typeof r === 'function' ? r : () => r;
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const A = P[(i - 1 + n) % n], Q = P[i], B = P[(i + 1) % n];
+    const ax = A.x - Q.x, ay = A.y - Q.y, bx = B.x - Q.x, by = B.y - Q.y; const la = infillLen(ax, ay), lb = infillLen(bx, by);
+    if (!(la > 1e-12 && lb > 1e-12)) { out.push(Q); continue; }
+    const ua = [ax / la, ay / la], ub = [bx / lb, by / lb];
+    const cosT = Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])); const theta = Math.acos(cosT);
+    if (theta > Math.PI - 1e-3) { out.push(Q); continue; }
+    const tMax = 0.45 * Math.min(la, lb); let rr = rOf(Q, A, B); let t = rr / Math.tan(theta / 2); if (t > tMax) { t = tMax; rr = t * Math.tan(theta / 2); }
+    const T1 = { x: Q.x + ua[0] * t, y: Q.y + ua[1] * t }, T2 = { x: Q.x + ub[0] * t, y: Q.y + ub[1] * t };
+    const bis = [ua[0] + ub[0], ua[1] + ub[1]]; const bl = infillLen(bis[0], bis[1]) || 1e-9; const dC = rr / Math.sin(theta / 2);
+    const C = { x: Q.x + (bis[0] / bl) * dC, y: Q.y + (bis[1] / bl) * dC };
+    const a1 = Math.atan2(T1.y - C.y, T1.x - C.x), a2raw = Math.atan2(T2.y - C.y, T2.x - C.x);
+    let da = a2raw - a1; while (da <= 0) da += 2 * Math.PI; while (da > 2 * Math.PI) da -= 2 * Math.PI;
+    for (let k = 0; k <= perArc; k++) { const a = a1 + da * k / perArc; out.push({ x: C.x + rr * Math.cos(a), y: C.y + rr * Math.sin(a) }); }
+  }
+  return infillDedupe(out);
+}
+
+/* ---------------- THE SURFACE METRIC (ruling 2, ported from S2) ----------------
+
+   At a plan point the map (x, y) -> P has a Jacobian J and a first fundamental
+   form M = J^T J. For a plan line with unit tangent t, a plan offset d across
+   it delivers a SURFACE distance d * kappa(t) where
+
+       kappa(t) = sqrt(det M) / sqrt(t^T M t)
+
+   — the perpendicular distance IN THE SURFACE, not the length of the plan
+   perpendicular's image. The two differ by the shear, which reaches cos 0.87
+   on `petalCup` 1.2 x `petalSpineCurl` 360; taking |J n| instead reads the wall
+   HIGH, which is the unsafe direction.
+
+   THE LATTICE IS IN (u, v) AND THE DERIVATIVES ARE TAKEN BY THE CHAIN RULE.
+   That is what makes it affordable — one `rowAt` serves a whole column, ~5 ms
+   a petal against the ~390 ms a four-point stencil per node would cost — and
+   it is the only form that does not read outside the petal: a central
+   difference in PLAN y taken at the margin reads a step the v clamp silently
+   truncated (measured on the flat default, |G-1| up to 1.769e-1 near the tip,
+   which is the clamp and not the surface).
+
+       dP/dx|_y = (1/L) [ dP/du|_v - (v h'(u) / h(u)) dP/dv ]
+       dP/dy|_x = (1/h(u)) dP/dv
+
+   THE GUARD IS THE SHIPPING DEFAULT'S SECOND REASON FOR NOT MOVING. Where the
+   petal has no form and a straight spine the map is AFFINE and the metric is
+   the identity exactly, so the field is not built and every length comes back
+   as itself. Two statements, both the geometry's — `surface.form` is
+   `petalFormIsFlat`'s own answer and `surface.kC` is the spine law's own
+   curvature — and neither is a control list. */
+export const INFILL_METRIC_NU = 256;     // rows: 0.137 mm on the shipping 35 mm blade
+export const INFILL_METRIC_NV = 96;      // columns: 0.167 mm at mid-blade
+export const INFILL_LATTICE_STEP_SHARE = 0.5;
+export function infillPlanIsFlat(surface) { return surface.form === null && surface.kC === 0; }
+export function infillMetricField(surface) {
+  if (surface.__infillMetric) return surface.__infillMetric;
+  const NU = INFILL_METRIC_NU, NV2 = INFILL_METRIC_NV, L = surface.length;
+  const prof = surface.profile;
+  const n = (NU + 1) * (NV2 + 1);
+  const E = new Float64Array(n), F = new Float64Array(n), Gm = new Float64Array(n);
+  const rows = new Array(NU + 1), hs = new Float64Array(NU + 1);
+  for (let i = 0; i <= NU; i++) { const u = i / NU; rows[i] = surface.rowAt(u); hs[i] = prof.laminaHalfAt(u); }
+  const Pat = (i, j) => rows[i].sect(-1 + (2 * j) / NV2).P;
+  const sub = (a, b, s) => [(a[0] - b[0]) * s, (a[1] - b[1]) * s, (a[2] - b[2]) * s];
+  for (let i = 0; i <= NU; i++) {
+    const i0 = Math.max(0, i - 1), i1 = Math.min(NU, i + 1);
+    const du = (i1 - i0) / NU, h = hs[i];
+    const hp = (hs[i1] - hs[i0]) / du;                                     // h'(u), by the same stencil
+    for (let j = 0; j <= NV2; j++) {
+      const v = -1 + (2 * j) / NV2;
+      const j0 = Math.max(0, j - 1), j1 = Math.min(NV2, j + 1);
+      const dv = (2 * (j1 - j0)) / NV2;
+      const Pu = sub(Pat(i1, j), Pat(i0, j), 1 / du);
+      const Pv = sub(rows[i].sect(-1 + (2 * j1) / NV2).P, rows[i].sect(-1 + (2 * j0) / NV2).P, 1 / dv);
+      const c = h > 1e-9 ? (v * hp) / h : 0;
+      const Px = [(Pu[0] - c * Pv[0]) / L, (Pu[1] - c * Pv[1]) / L, (Pu[2] - c * Pv[2]) / L];
+      const hh = h > 1e-9 ? h : 1e-9;
+      const Py = [Pv[0] / hh, Pv[1] / hh, Pv[2] / hh];
+      const k = i * (NV2 + 1) + j;
+      E[k] = Px[0] * Px[0] + Px[1] * Px[1] + Px[2] * Px[2];
+      F[k] = Px[0] * Py[0] + Px[1] * Py[1] + Px[2] * Py[2];
+      Gm[k] = Py[0] * Py[0] + Py[1] * Py[1] + Py[2] * Py[2];
+    }
+  }
+  const field = { E, F, G: Gm, NU, NV: NV2, L, hAt: (u) => prof.laminaHalfAt(u) };
+  Object.defineProperty(surface, '__infillMetric', { value: field, enumerable: false });
+  return field;
+}
+function infillLatticeStep(field, x) {
+  const u = Math.min(1, Math.max(0, x / field.L));
+  return Math.min(field.L / field.NU, (2 * field.hAt(u)) / field.NV) * INFILL_LATTICE_STEP_SHARE;
+}
+/* THE LOOKUP IS THE WORST CORNER OF THE ENCLOSING LATTICE CELL, NOT AN
+   INTERPOLATION. Interpolating M and then forming kappa smooths a local
+   MINIMUM away, which under-insets exactly where the surface is worst; taking
+   the smallest of the four corners over-insets by at most one cell's
+   variation, which is the safe direction. `mode === 'normal'` returns |J n| —
+   the plausible wrong answer an implementation that forgot the shear would
+   compute — and is the must-fail's own lever. */
+export function infillKappaAt(field, x, y, tx, ty, mode) {
+  const { NU, NV: NV2, L } = field;
+  const u = Math.min(1, Math.max(0, x / L));
+  const h = field.hAt(u);
+  const v = Math.max(-1, Math.min(1, h > 1e-9 ? y / h : 0));
+  const fi = Math.min(NU - 1e-9, Math.max(0, u * NU)), fj = Math.min(NV2 - 1e-9, Math.max(0, ((v + 1) / 2) * NV2));
+  const i0 = Math.min(NU - 1, Math.floor(fi)), j0 = Math.min(NV2 - 1, Math.floor(fj));
+  let best = Infinity;
+  for (let a = 0; a <= 1; a++) for (let b = 0; b <= 1; b++) {
+    const k = (i0 + a) * (NV2 + 1) + (j0 + b);
+    let kap;
+    if (mode === 'normal') { const nx = -ty, ny = tx; kap = Math.sqrt(Math.max(0, field.E[k] * nx * nx + 2 * field.F[k] * nx * ny + field.G[k] * ny * ny)); }
+    else {
+      const det = field.E[k] * field.G[k] - field.F[k] * field.F[k];
+      const tMt = field.E[k] * tx * tx + 2 * field.F[k] * tx * ty + field.G[k] * ty * ty;
+      kap = tMt > 1e-18 ? Math.sqrt(Math.max(0, det) / tMt) : 0;
+    }
+    if (kap < best) best = kap;
+  }
+  return best;
+}
+/* THE PLAN OFFSET ACROSS A PLAN EDGE THAT DELIVERS `want` MILLIMETRES OF
+   SURFACE — ONE OWNER, read by the wall inset, the fillet radius and the hole
+   bar, so a length asked for in surface millimetres is answered in one place.
+   The metric varies over the offset, so it is MARCHED and not divided: on the
+   compressed states the offset runs to several millimetres and kappa changes
+   by a factor of ten over it. The worst sample along the edge wins AT EVERY
+   MARCH STEP, which insets the BAND rather than a ray and is conservative for
+   every path through it. The cap is the CALLER'S OWN POLYGON: once the offset
+   passes its diameter the clip is empty whatever else happens. */
+export function infillOffsetPlanMm(field, A, B, wantMm, opts = {}) {
+  const ex = B.x - A.x, ey = B.y - A.y, len = infillLen(ex, ey);
+  if (!(len > 1e-12) || !(wantMm > 0)) return wantMm;
+  /* THE MARCH IS A CUMULATIVE INTEGRAL AND IS THE SAME FOR EVERY `want` ON ONE
+     EDGE, so it is walked ONCE, LAZILY, and read many times. The hole-width
+     bisection asks one edge for two dozen different wants, and re-marching
+     each time was measured at 917 ms a petal on `petalCup` 1.2 x
+     `petalSpineCurl` 360. Lazily because the first `want` is usually answered
+     in the first few steps and the cap is the cell's own diameter: a table
+     built eagerly to the cap costs the whole march whatever is asked. THE
+     ARITHMETIC IS UNCHANGED — the same steps, the same partial sums and the
+     same comparison, so the answer is bit-identical and not merely close. */
+  return infillMarch(field, A, B, opts).ask(wantMm);
+}
+/* THE MARCH ITSELF, cached on the FIELD (which is one per petal, so the cache
+   cannot outlive the surface it describes) and keyed on the edge, the cap and
+   the two must-fail levers. */
+function infillMarch(field, A, B, opts) {
+  const ex = B.x - A.x, ey = B.y - A.y, len = infillLen(ex, ey);
+  const tx = ex / len, ty = ey / len;
+  const nx = -ey / len, ny = ex / len;                                     // INWARD on a CCW polygon
+  const step = opts.step ?? infillLatticeStep(field, (A.x + B.x) / 2);
+  const mode = opts.kappaMode;
+  const cap = opts.cap ?? field.L;
+  const NS = opts.samples ?? Math.max(2, Math.ceil(len / step));
+  if (!field.__march) Object.defineProperty(field, '__march', { value: new Map(), enumerable: false });
+  const key = `${A.x},${A.y},${B.x},${B.y},${cap},${mode ?? ''},${NS}`;
+  let rec = field.__march.get(key);
+  if (rec) return rec;
+  const tau = [], accs = [], ks = [];
+  const st = { acc: 0, t: 0 };
+  const extend = () => {                            // one more step of the same march
+    if (!(st.t < cap)) return false;
+    const mm = st.t + step / 2;
+    let k = Infinity;
+    for (let sI = 0; sI <= NS; sI++) {
+      const f = sI / NS;
+      const kk = infillKappaAt(field, A.x + ex * f + nx * mm, A.y + ey * f + ny * mm, tx, ty, mode);
+      if (kk < k) k = kk;
+    }
+    tau.push(st.t); accs.push(st.acc); ks.push(k);
+    st.acc += k * step; st.t += step;
+    return true;
+  };
+  rec = {
+    tau, acc: accs, k: ks, step, cap,
+    ask(wantMm) {
+      for (let i = 0; ; i++) {
+        while (i >= ks.length) { if (!extend()) return cap; }
+        const nxt = accs[i] + ks[i] * step;
+        if (nxt >= wantMm) return tau[i] + (ks[i] > 1e-12 ? (wantMm - accs[i]) / ks[i] : step);
+      }
+    },
+  };
+  field.__march.set(key, rec);
+  return rec;
+}
+
+/* ---------------- THE LAMINA FLOOR (ported from #252's ruling) ----------------
+
+   WHERE THE CELLS MAY START. TWO LENGTHS, each with its own owner, and neither
+   is a row count. `U0`/`ROOT_BLEND_END` is NOT it and never was: that is a
+   station on the OUTLINE with eight other readers and it says where the foot's
+   width FLOOR decays to nothing (0.30), where the outline stops being the root
+   blend's FIVE TIMES LOWER. See `docs/bloom-infill-lamina-floor.md`.
+
+     * `infillLaminaFloorU` — the profile's own MODE-FREE break for the station
+       where the ROOT_BLEND term stops owning the outline. Where the foot owns
+       the outline that is the blade's WAIST, the narrowest section it has
+       between the foot and the tip, and below it the outline turns and widens
+       again; where the foot is at or under the print floor there is no waist
+       and this reads ~0. MODE-FREE by construction (`laminaSlopeBreaks`, not
+       `slopeBreaks`) because which rows carry cells is TOPOLOGY.
+     * `infillWallFloorU` — where the blade is wide enough to hold two full
+       wall insets and a printable hole across the region's base edge. It binds
+       on a thin foot and nowhere else. Scanned UPWARD FROM THE WAIST because
+       `h` is not monotone below it. */
+export function infillLaminaFloorU(surface) {
+  const b = surface.profile.laminaSlopeBreaks().find((x) => x.from === 'ROOT_BLEND');
+  return b ? b.u : 0;
+}
+export function infillWallFloorU(surface, wall = INFILL_WALL_MM) {
+  const hAt = (u) => surface.profile.laminaHalfAt(u);
+  const need = wall + MIN_FEATURE_MM / 2;
+  const from = infillLaminaFloorU(surface);
+  const N = 4096;
+  for (let i = 0; i <= N; i++) { const u = from + (1 - from) * i / N; if (hAt(u) >= need) return u; }
+  return 1;
+}
+export function infillFloorU(surface, wall = INFILL_WALL_MM) { return Math.max(infillLaminaFloorU(surface), infillWallFloorU(surface, wall)); }
+/* THE FLOOR'S OWN ROW, AND IT IS NOT A NEAREST-SNAP. The cell region starts
+   ONE ROW BELOW the split (the overlap the two shells share), so the row that
+   has to clear the floor is the OVERLAP row and not the panel's top; a
+   nearest-snap lands on the wrong side of it. And it never eats the feet: a
+   sub-panel that is feet alone has no blade row to close against. */
+function infillFloorRow(rows, rowFrom, rowTo, floorU) {
+  let feet = rowFrom;
+  while (feet < rowTo && rows[feet + 1].u === 0) feet++;
+  const first = feet + 2;                                  // the feet, one blade row, and the split above it
+  for (let m = first; m <= rowTo; m++) if (rows[m - 1].u >= floorU - 1e-12) return m;
+  return -1;                                               // no room: the blade has no cell region
+}
+
+/* ---------------- THE FIELD: seeds, relaxation, cells ---------------- */
+/* Eva's three salvage changes, ported: rounded hole outlines; an ANISOTROPIC
+   metric stretched along the midrib with Lloyd run IN IT and weighted by the
+   density; GRADED density — cells shrink toward the tip with the local
+   half-width, and cells near the base narrow and lose their holes below a
+   converging V so the pattern tapers into the solid base instead of ending on
+   a line. The relaxation count, the anisotropy and the grading law are S4's
+   controls and constants here. */
+function infillSeedField(hAt, L, xB, N, seed, outline) {
+  const a = INFILL_ANISO;
+  let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, hAt(xB + (L - xB) * i / 200));
+  const spacing = (x) => {
+    /* `Math.pow` IS NOT CORRECTLY ROUNDED EITHER, and the spacing law feeds the
+       seed placement, which feeds every discrete answer downstream. At
+       `INFILL_TIP_GAMMA` 1 the law is the identity and `Math.pow` is skipped
+       outright, so the shipping value costs nothing and cannot differ between
+       engines; any other exponent goes through `Math.pow` and is told, because
+       a gamma that is not 1 IS a cross-engine exposure and pretending
+       otherwise is how this class keeps coming back. */
+    const tipBase = Math.max(0.05, hAt(x) / hMax);
+    const tip = INFILL_TIP_GAMMA === 1 ? tipBase : Math.pow(tipBase, INFILL_TIP_GAMMA);
+    const base = INFILL_BASE_NARROW + (1 - INFILL_BASE_NARROW) * Math.min(1, Math.max(0, (x - xB) / (INFILL_BASE_REACH * L)));
+    return tip * base;
+  };
+  const rng = infillRng(seed);
+  const d2 = (p, q) => ((p.x - q.x) / a) ** 2 + (p.y - q.y) ** 2;
+  const nAxis = Math.max(1, Math.round(N * INFILL_AXIS_SHARE));
+  const axis = []; let guard = 0;
+  while (axis.length < nAxis && guard < 8000) {
+    let best = null, bestD = -1;
+    for (let c = 0; c < 14; c++) { guard++; const x = xB + (L - xB) * rng(); if (hAt(x) < 0.3) continue; let d = 1e9; for (const s of axis) d = Math.min(d, d2(s, { x, y: 0 })); const score = d / (spacing(x) ** 2); if (score > bestD) { bestD = score; best = { x, y: 0 }; } }
+    if (best) axis.push(best); else break;
+  }
+  const pairs = []; const target = Math.ceil((N - nAxis) / 2); guard = 0;
+  while (pairs.length < target && guard < 8000) {
+    let best = null, bestD = -1;
+    for (let c = 0; c < 14; c++) {
+      guard++; const x = xB + (L - xB) * rng(); const hh = hAt(x); if (hh < 0.3) continue;
+      const y = hh * 0.95 * rng(); if (!infillPointInPoly(x, y, outline)) continue;
+      let d = 1e9;
+      for (const s of pairs) d = Math.min(d, d2(s, { x, y }), d2({ x: s.x, y: -s.y }, { x, y }));
+      for (const s of axis) d = Math.min(d, d2(s, { x, y }));
+      d = Math.min(d, (2 * y) ** 2);
+      const score = d / (spacing(x) ** 2);
+      if (score > bestD) { bestD = score; best = { x, y }; }
+    }
+    if (best) pairs.push(best); else break;
+  }
+  /* THE SEEDS CARRY A MIRROR GROUP, and ruling 3's drop reads it. The field is
+     mirror-symmetric by construction — the axis seeds sit on y = 0 and the
+     rest are pairs — so a pair's two cells are congruent and read the same
+     width; dropping one of a pair would break a symmetry the petal has and
+     the eye would find it. Dropping by GROUP keeps it an identity. */
+  const seeds = [];
+  axis.forEach((s, i) => seeds.push({ x: s.x, y: 0, group: `a${i}`, axis: true }));
+  pairs.forEach((s, i) => { seeds.push({ x: s.x, y: s.y, group: `p${i}`, axis: false }); seeds.push({ x: s.x, y: -s.y, group: `p${i}`, axis: false }); });
+  return { seeds, outline, spacing, nAxis };
+}
+function infillRelax(seeds, outline, spacing, passes) {
+  const a = INFILL_ANISO;
+  const rho = (x) => 1 / (spacing(x) ** 2);
+  const wCentroid = (c) => {
+    const g = infillCentroid(c); let W = 0, X = 0, Y = 0;
+    for (let i = 0; i < c.length; i++) {
+      const A = c[i], B = c[(i + 1) % c.length];
+      const area = Math.abs((A.x - g.x) * (B.y - g.y) - (B.x - g.x) * (A.y - g.y)) / 2;
+      for (const [wa, wb, wc] of [[2 / 3, 1 / 6, 1 / 6], [1 / 6, 2 / 3, 1 / 6], [1 / 6, 1 / 6, 2 / 3]]) {
+        const x = wa * g.x + wb * A.x + wc * B.x, y = wa * g.y + wb * A.y + wc * B.y;
+        const w = area / 3 * rho(x); W += w; X += w * x; Y += w * y;
+      }
+    }
+    return W > 0 ? { x: X / W, y: Y / W } : g;
+  };
+  let all = seeds.map((s) => ({ ...s }));
+  for (let p = 0; p < passes; p++) {
+    const cells = infillCellsFor(all, outline, a);
+    all = all.map((s, i) => (cells[i] ? { ...s, ...wCentroid(cells[i]) } : s));
+    /* THE MIRROR IS RE-IMPOSED AFTER EVERY PASS — the axis seeds back onto
+       y = 0 and each pair back onto its own average — so the relaxation cannot
+       walk the field off its own symmetry. */
+    for (let i = 0; i < all.length; i++) if (all[i].axis) all[i] = { ...all[i], y: 0 };
+    for (let i = 0; i + 1 < all.length; i++) {
+      if (all[i].axis || all[i].group !== all[i + 1].group) continue;
+      const A = all[i], B = all[i + 1]; const x = (A.x + B.x) / 2, y = (A.y - B.y) / 2;
+      all[i] = { ...A, x, y }; all[i + 1] = { ...B, x, y: -y }; i++;
+    }
+  }
+  return all;
+}
+/* Classify every cell edge as OUTLINE (in one cell) or WALL (in two), exactly,
+   by key — the outline edges take the FULL wall inset from their one side and
+   the shared walls half from each, so every wall on the object is one wall
+   thick whichever side it is read from. */
+function infillClassify(cells) {
+  const f6 = (x) => { const r = Math.round(x * 1e6) / 1e6; return (r === 0 ? 0 : r).toFixed(6); };
+  const ek = (a, b) => { const ka = `${f6(a.x)},${f6(a.y)}`, kb = `${f6(b.x)},${f6(b.y)}`; return ka < kb ? ka + '|' + kb : kb + '|' + ka; };
+  const count = new Map();
+  for (const c of cells) for (let i = 0; i < c.length; i++) { const k = ek(c[i], c[(i + 1) % c.length]); count.set(k, (count.get(k) || 0) + 1); }
+  return (a, b) => (count.get(ek(a, b)) || 0) < 2;
+}
+
+/* ===================================================================
+   petalInfillPlan — the field, the holes and RULING 3'S ITERATION.
+
+   DENSITY IS A REQUEST AND THE ACHIEVED COUNT IS THE ANSWER. Eva's ruling 3:
+   every cell that keeps a hole keeps one at least INFILL_HOLE_MM across ON THE
+   OBJECT after the wall inset, and sub-bar seeds are not created. So the pass
+   drops ALL sub-bar seeds at once, recomputes the diagram from the survivors,
+   and repeats to INFILL_DROP_PASSES; what is built is reported.
+
+   THE ITERATION IS NOT MONOTONE AND THAT IS WHY IT IS CAPPED RATHER THAN RUN
+   TO A FIXED POINT. Dropping a seed recomputes every neighbouring cell, so a
+   cell that cleared the bar can fall under it on the next pass. The cap plus
+   the report is the ruling; a fixed point is not available.
+
+   WHAT THE ITERATION IS FOR, MEASURED. The sub-bar cells are the TIP's: the
+   graded spacing law shrinks cells with the local half-width, so the seeder
+   packs the apex faster than the blade narrows there. Swept on the shipping
+   default before the iteration existed, EVERY cell whose centroid sits above
+   u 0.85 fails the bar at every density from 24 up — 4 of 4 at density 24,
+   7 of 7 at 32, 12 of 12 at 40 — and they are pure loss, because a cell
+   1.5 mm across cannot hold a 1.5 mm hole inside a 1.0 mm wall whatever else
+   is true. They are also what made the density control read BACKWARDS: at 24
+   asked, 24 cells keep a (sub-bar) hole and 9 clear the bar, while at 32 asked
+   nine cells lose their holes outright and 14 of the surviving 23 clear it, so
+   "more cells, bigger holes" was a SELECTION EFFECT over two different
+   populations. The iteration removes the apex slivers and hands their area to
+   the neighbours, which is what makes the achieved count a number worth
+   reporting.
+
+   `refused` IS A WORD AND NOT A SILENCE. A petal that is several panels (a
+   cleft or a fringe), one with no blade room above the floor, and one whose
+   every cell fails the bar each come back with the plan saying which, and the
+   read-out speaks it.
+   =================================================================== */
+export function petalInfillPlan(surface, rows, panel, opts = {}) {
+  const density = Math.max(INFILL_DENSITY_RANGE[0], Math.min(INFILL_DENSITY_RANGE[1], Math.round(opts.density ?? INFILL_DENSITY_DEFAULT)));
+  const wall = opts.wall ?? INFILL_WALL_MM;
+  const bar = opts.holeBarMm ?? INFILL_HOLE_MM;
+  const L = surface.length;
+  /* THE PLAN READS THE MODE-FREE LAMINA (see `laminaHalfAt`). Every decision
+     below — where the cells start, where the seeds go, which cells keep a
+     hole — is TOPOLOGY, and topology may not differ live from export. */
+  const hAt = (x) => surface.profile.laminaHalfAt(Math.min(1, Math.max(0, x / L)));
+  const floorU = infillFloorU(surface, wall);
+  const mSplit = infillFloorRow(rows, panel.rowFrom, panel.rowTo, floorU);
+  const base = { density, wall, bar, floorU, mSplit, cells: [], holes: [], cellOpen: [], achieved: 0, solid: 0, passesUsed: 0, widthsMm: [], capacityMm: [] };
+  /* A LOBED BLADE IS REFUSED, AND THE REASON IS A MEASUREMENT RATHER THAN A
+     PREFERENCE. The port plan recorded lobes as "compatible by construction —
+     they move `halfWidthAt`, which the outline reads". Measured, they are not:
+     the Voronoi cut is a sequence of half-plane clips and the ANNULUS SECTOR
+     walk is a ray cast about a hole's centroid, and both want a CONVEX cell.
+     A lobe's notches make the outline deeply non-convex, so the cells become
+     non-convex too — 10 of 15 at five lobes at depth 0.6 against 1 of 17 on
+     the shipping default — and the emitted solid then carries MORE HANDLES
+     THAN HOLES: the genus of the welded petal shell reads 9 where the builder
+     cut 4 holes (and 11 of 16 non-convex, genus 4 asked, at ten lobes at full
+     depth). Tunnels nobody asked for are a printability defect and the I
+     family's I4 is what found it.
+
+     IT IS A REFUSAL AND NOT A SILENT PASS: the read-out says so, the mesh is
+     bit-identical to the same state with the guard off, and making the two
+     compose is S4's — it wants a cell construction that does not assume a
+     convex region, which is a different tessellation and not a tolerance. */
+  if (surface.profile.lobes !== null && !surface.profile.lobes.noRoom && surface.profile.lobes.depthBuilt > 0) return { ...base, refused: 'outline' };
+  if (mSplit < 0 || mSplit >= panel.rowTo) return { ...base, refused: 'room', mSplit: -1 };
+  /* THE CELL REGION STARTS AT THE SPLIT ROW, AND THE BASAL PANEL IS EXACTLY
+     THE ONE `emitPanel` WOULD HAVE DRAWN. Two earlier cuts are recorded here
+     because each looked right and was measurably wrong. Starting the region
+     one row BELOW the split (`mSplit - 1`) while the basal panel ran to
+     `mSplit` made the two overlap by a whole lattice strip, and since the
+     outline's seam vertices are the lattice's own doubles the two shells WELD,
+     so the census read a by-design overlap as a within-shell fold: 346 pairs
+     on the shipping default. Shortening the basal panel to `mSplit - 1`
+     instead removed the overlap and made `emitPanel` draw a panel one row
+     shorter, which produced a collinear-on-float32 triangle per petal at its
+     own top edge — degenerate geometry in code this feature does not own.
+     Moving the REGION up instead leaves `emitPanel`'s argument untouched and
+     still has the two meet at a LINE. */
+  const xB = rows[mSplit].u * L;
+  if (!(L - xB > 2 * wall)) return { ...base, refused: 'room' };
+
+  /* THE METRIC, AND THE GUARD IS WHY THE SHIPPING DEFAULT COSTS NOTHING. */
+  const field = opts.metricPlan === false || (infillPlanIsFlat(surface) && !opts.metricNoGuard) ? null : infillMetricField(surface);
+  const mOpts = { kappaMode: opts.kappaMode, samples: opts.metricSamples };
+  const acrossMm = field ? (A, B, want, cap) => infillOffsetPlanMm(field, A, B, want, cap ? { ...mOpts, cap } : mOpts) : (A, B, want) => want;
+
+  /* THE BASAL V — the solid zone reaches higher at the margins, so the pattern
+     tapers into the solid base instead of ending on a line. */
+  const hB = hAt(xB); const Lc = INFILL_CONVERGE * L;
+  const vAt = (y) => xB + Lc * (() => { const t = Math.min(1, Math.abs(y) / Math.max(1e-9, hB)); return t * Math.sqrt(t); })();
+  const vClip = (poly) => {
+    let out = poly;
+    for (let k = -12; k <= 12 && out && out.length >= 3; k++) {
+      const y0 = (k / 12) * hB; const dy = 1e-4;
+      const slope = (vAt(y0 + dy) - vAt(y0 - dy)) / (2 * dy);
+      out = infillClipHalfPlane(out, -1, slope, vAt(y0) - slope * y0);
+    }
+    return out && out.length >= 3 ? infillDedupe(out) : null;
+  };
+
+  /* THE OUTLINE IS THE EMITTED LATTICE'S OWN POLYLINE, AND THE GRID GATE IS
+     WHAT SAID SO. The prototype sampled `h(x)` at 240 uniform x and simplified
+     the near-collinear runs away, which is right for an instrument and WRONG
+     for the shipping emitter: the petal's SILHOUETTE would then be the cells'
+     own polygon rather than the one `emitPanel` draws below the split, so
+     switching the interior on would move the outline. `verify-bloom-grid`'s
+     clause 2a is a membership claim over every captured boundary point and it
+     went red on 864 of 1072 the first time an infilled row reached it.
+
+     So the outline's vertices ARE the rows the builder emitted, at v = ±1,
+     each carrying the row it came from — and `emitInfillPanel` emits the
+     lattice's own skin points there rather than re-deriving them through the
+     plan. The round trip x -> u -> P is then never taken on a margin vertex,
+     which is what makes the identity exact rather than close. */
+  const outlineRows = [];
+  for (let i = mSplit; i <= panel.rowTo; i++) outlineRows.push(i);
+  const outline = [];
+  /* THE OUTLINE IS ON THE GRID TOO, and it has to be for the pre-registration
+     to survive. `infillQuant` rounds every cell vertex onto `INFILL_PLAN_GRID`
+     so the plan's discrete answers are the same in every engine; a cell
+     inherits its margin vertices from THIS array, so an outline point left off
+     the grid is moved by the quantiser and its `f6` key can round the other
+     way — `skinCanon` then misses and `pt()` re-derives the margin through
+     `mapPlan` instead of handing back the lattice's own doubles. Measured:
+     `verify-bloom-grid`'s clause 2a went red on 176 of 1072 captured boundary
+     points, 144 of them on a margin. The 3D point is still the LATTICE's
+     exactly — only the plan key moves, by at most half a grid step. */
+  const gq = (v) => Math.round(v / INFILL_PLAN_GRID) * INFILL_PLAN_GRID;
+  const spanOf = (i) => panel.spanAt(i);
+  /* UP ONE MARGIN, ACROSS THE TERMINAL FACE, DOWN THE OTHER — `emitPanel`'s
+     own loop, so the boundary the cells are clipped to is the boundary the
+     lattice draws. The terminal face's INTERIOR columns are in it because
+     `emitPanel` emits them and clause 2a asks about them: without them the
+     tip's mini-face is 64 captured points the mesh does not carry. */
+  for (const i of outlineRows) { const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[1] * surface.profile.laminaHalfAt(rows[i].u)), row: i, col: NV - 1, v: sp[1] }); }
+  {
+    const i = panel.rowTo, sp = spanOf(i), hh = surface.profile.laminaHalfAt(rows[i].u);
+    for (let j = NV - 2; j >= 1; j--) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * hh), row: i, col: j, v }); }
+  }
+  for (let k = outlineRows.length - 1; k >= 0; k--) { const i = outlineRows[k]; const sp = spanOf(i); outline.push({ x: gq(rows[i].u * L), y: gq(sp[0] * surface.profile.laminaHalfAt(rows[i].u)), row: i, col: 0, v: sp[0] }); }
+  /* AND BACK ACROSS THE SEAM, THROUGH THE LATTICE'S OWN COLUMNS — the same
+     clause the terminal face already has, at the other end, and it is what
+     stops the seam being a T-JUNCTION. The basal panel's top edge is NV
+     lattice points; a bottom boundary carrying only the two margins meets it
+     along a segment whose interior contains eight of them, so the census
+     reported 252 span-0.0000 tangencies at row mSplit-1 on the shipping
+     default, every one a lattice column sitting inside a cell's bottom edge.
+     `infillCellsFor` starts each cell AS this polygon and only ever clips it,
+     so a vertex put here survives into whichever cell reaches the seam, and
+     the two sides then meet corner to corner. */
+  {
+    const i = outlineRows[0], sp = spanOf(i), hh = surface.profile.laminaHalfAt(rows[i].u);
+    for (let j = 1; j <= NV - 2; j++) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * hh), row: i, col: j, v }); }
+  }
+  const { seeds, spacing } = infillSeedField(hAt, L, xB, density, opts.seed ?? INFILL_SEED, outline);
+  if (!seeds.length) return { ...base, refused: 'room' };
+  const diam = (poly) => { let d = 0; for (let i = 0; i < poly.length; i++) for (let j = i + 1; j < poly.length; j++) d = Math.max(d, infillLen(poly[i].x - poly[j].x, poly[i].y - poly[j].y)); return d; };
+
+  let live = infillRelax(seeds, outline, spacing, opts.passes ?? INFILL_LLOYD_PASSES);
+  let cells = null, holes = null, widths = null, caps = null, isOutlineEdge = null, passesUsed = 0;
+  const cap = opts.dropPasses ?? INFILL_DROP_PASSES;
+  /* THE SEAM IS THE LATTICE'S, AND A CELL VERTEX ON IT IS SNAPPED TO A LATTICE
+     COLUMN. The basal panel is `emitPanel`'s and its top edge is NV lattice
+     points; a Voronoi bisector crossing that line puts a cell vertex wherever
+     it likes, which lands INSIDE one of those edges and leaves a T-JUNCTION —
+     the census read 108 span-0.0000 tangencies at row mSplit-1 on the shipping
+     default, every one exactly that, after the outline's own seam columns had
+     already removed 144 more. One owner per boundary: the lattice draws the
+     seam, and the cells read it rather than each side drawing its own.
+     WHAT IT COSTS is at most half a column of the cell's own bottom edge, at
+     the base of the pattern, where the basal V has taken the holes anyway — so
+     it moves a SOLID cell's outline by a fraction of a millimetre and no hole
+     at all. A snap that collapses a cell's bottom edge to a point leaves a
+     repeated vertex, which `infillDedupe` drops and `triOK` refuses to emit. */
+  const seamY = outline.filter((q) => q.row === outlineRows[0]).map((q) => q.y).sort((a, b) => a - b);
+  const snapSeam = (poly) => {
+    let moved = false;
+    const out = poly.map((q) => {
+      if (Math.abs(q.x - xB) > 1e-9) return q;
+      let best = seamY[0];
+      for (const y of seamY) if (Math.abs(y - q.y) < Math.abs(best - q.y)) best = y;
+      if (best === q.y) return q;
+      moved = true; return { x: q.x, y: best };
+    });
+    return moved ? infillDedupe(out) : poly;
+  };
+  for (let pass = 0; ; pass++) {
+    const raw = infillCellsFor(live, outline, INFILL_ANISO);
+    const keptIdx = []; const kept = [];
+    for (let i = 0; i < raw.length; i++) if (raw[i] && raw[i].length >= 3) { const c = snapSeam(raw[i]); if (c && c.length >= 3) { keptIdx.push(i); kept.push(c); } }
+    if (!kept.length) return { ...base, refused: 'room', passesUsed: pass };
+    /* NO SIMPLIFICATION. `infillSimplifyRuns` collapsed near-collinear runs on
+       a 240-sample outline; on the lattice's own polyline every vertex is a
+       row the mesh emits, and dropping one moves the silhouette. */
+    cells = kept.map((c) => infillDedupe(infillQuant(infillCcw(c))));
+    isOutlineEdge = infillClassify(cells);
+    const onBaseEdge = (A, B) => Math.abs(A.x - xB) < 1e-6 && Math.abs(B.x - xB) < 1e-6;
+    /* THE HOLE — the inset clipped to the V and then filleted. The inset is a
+       SURFACE length on every edge (outline edges take the full wall, shared
+       walls half from each side); the fillet asks for INFILL_FILLET_MM of
+       surface across EACH of the two edges meeting at the corner and takes the
+       larger, so the arc clears the bar in both directions. */
+    /* CAPACITY AND WHAT IS DRAWN ARE TWO QUESTIONS, AND CONFLATING THEM MAKES
+       THE ITERATION ERODE INSTEAD OF CONVERGE — measured, and it is what the
+       first cut did. Ruling 3 drops a seed because its cell is TOO SMALL to
+       hold a printable hole. The BASAL V takes holes away from the cells at
+       the base ON PURPOSE (that is the whole of "the pattern tapers into the
+       solid base instead of ending on a line"), and those cells are not small:
+       read as sub-bar they were dropped, their neighbour became the base cell,
+       the V took ITS hole, and the drop walked up the blade — 16 asked came
+       out as 7 cells and it was still falling at the cap.
+
+       So the CAPACITY is the cell's own inset, before the designed clip, and
+       it is what decides the drop; what is DRAWN is that inset clipped to the
+       V and filleted, and it is what decides whether a hole is cut at all. A
+       cell whose capacity clears the bar and whose drawn hole does not is the
+       V's own: kept, solid, counted, never dropped. The ruled bar is still
+       ENFORCED on every hole that is cut — no hole under it is drawn — which
+       is the half of ruling 3 the prototype only photographed. */
+    const rawOf = (c) => {
+      const cp = diam(c);
+      const r = infillInset(c, wall / 2, (A, B) => acrossMm(A, B, isOutlineEdge(A, B) && !onBaseEdge(A, B) ? wall : wall / 2, cp));
+      if (!r) return null;
+      const q = infillDedupe(infillQuant(r));
+      return q && q.length >= 3 ? q : null;
+    };
+    const drawnOf = (c, inner) => {
+      if (!inner) return null;
+      const cp = diam(c);
+      const clipped = vClip(inner); if (!clipped) return null;
+      const fr = field ? (Q, A, B) => Math.max(acrossMm(A, Q, INFILL_FILLET_MM, cp), acrossMm(Q, B, INFILL_FILLET_MM, cp)) : INFILL_FILLET_MM;
+      const f = infillFillet(clipped, fr);
+      if (!(f && f.length >= 3)) return null;
+      const q = infillDedupe(infillQuant(f));
+      return q && q.length >= 3 ? q : null;
+    };
+    const widthOf = (poly, c) => { if (!poly) return 0; const cp = diam(c); return infillWidthMm(poly, field ? (A, B, r) => acrossMm(A, B, r, cp) : null); };
+    const raws = cells.map(rawOf);
+    const capacity = raws.map((r, i) => widthOf(r, cells[i]));
+    caps = capacity;
+    /* THE WIDTH IS MEASURED ON THE FILLETED HOLE — the artefact, not the plan
+       it came from — and in SURFACE millimetres through the same offset the
+       wall used. */
+    holes = cells.map((c, i) => drawnOf(c, raws[i]));
+    widths = holes.map((h, i) => widthOf(h, cells[i]));
+    passesUsed = pass;
+    /* A SEED IS DROPPED WHEN DROPPING IT CAN HELP, AND THE TEST IS STRUCTURAL.
+       Ruling 3's drop is a REDISTRIBUTION: a cell too small to carry a ruled
+       hole gives its area to neighbours that can use it. That works when the
+       cell is small because it is CROWDED — a cell bounded only by its
+       neighbours — and it is measurably destructive when the cell is small
+       because THE BLADE IS, which is what an OUTLINE edge says.
+
+       TWO MECHANISMS, BOTH MEASURED. A boundary cell's capacity is set by the
+       outline's own `h(x)` and dropping its seed cannot change that: the
+       region still has to be covered, and the successor inherits the same
+       limit. And the dropped cell's outline FRONTAGE passes to its
+       neighbours, which pay the FULL wall on it where they had been paying
+       half — so dropping a boundary cell takes 0.5 mm of inset away from
+       every neighbour that inherits frontage. Measured on the shipping
+       default with the restriction OFF, the drop walks the apex back one ring
+       of cells per pass and takes 13 achieved holes to 6 by the cap; on
+       `petalCup` 1.2 x `petalSpineCurl` 360 it collapses 16 cells to 1, and
+       over 28 (state, density) pairs it did not once ADD a hole.
+
+       With the restriction on it never loses a hole on any pair measured and
+       gains exactly where the crowding is real — the shipping default at
+       density 24 goes 12 achieved to 14, at 40 goes 12 to 14, and
+       `cup x curl 360` at 40 goes 8 to 10.
+
+       `dropRule: 'all'` IS THE MUST-FAIL'S OWN LEVER and runs through the
+       shipped clause rather than a mutated copy of it. */
+    const touchesOutline = (c) => { for (let i = 0; i < c.length; i++) if (isOutlineEdge(c[i], c[(i + 1) % c.length])) return true; return false; };
+    const dropAll = opts.dropRule === 'all';
+    const sub = [];
+    for (let i = 0; i < cells.length; i++) { if (capacity[i] >= bar) continue; if (!dropAll && touchesOutline(cells[i])) continue; sub.push(keptIdx[i]); }
+    if (!sub.length || pass >= cap) break;
+    /* DROP BY MIRROR GROUP, in ONE pass, and recompute. */
+    const doomed = new Set(); for (const i of sub) doomed.add(live[i].group);
+    const next = live.filter((s) => !doomed.has(s.group));
+    if (!next.length) break;                        // every seed is sub-bar: keep the last diagram and report 0 achieved
+    live = next;
+  }
+  const open = widths.map((w) => w >= bar);
+  const achieved = open.filter(Boolean).length;
+  return {
+    ...base, surface, mSplit, xB, outline, cells, holes, cellOpen: open, widthsMm: widths, capacityMm: caps,
+    isOutlineEdge, vAt, hB, field, metricPlan: !!field, planFlat: infillPlanIsFlat(surface),
+    achieved, solid: cells.length - achieved, passesUsed,
+    refused: achieved ? null : 'bar',
+  };
+}
+
+/* ---------------- THE CONFORMING TESSELLATION (ported from S1) ----------------
+
+   A flat facet spanning several millimetres of a surface that WRAPS is a
+   CHORD. Measured on the base tree, a flat fan over a cell stood 2.4990 mm
+   from the mid-surface it was drawing on `petalRoll` 330 — a shipped matrix
+   row — against 0.5730 mm for the shipped lattice's own worst facet on the
+   same state, and the chord cut through the tube. S1's construction, in two
+   independent halves:
+
+   (1) TOPOLOGY — a plan triangulation that cannot cover a hole. A solid cell
+   is EAR-CLIPPED (a centroid fan is invalid at the blade's waist, where the
+   outline is not convex). An annular cell is cut into SECTORS: the hole is
+   densified with the point where the ray from its own centroid through each
+   outer vertex meets it, and the region between one outer EDGE and the inner
+   arc below it is ear-clipped. THE DENSIFICATION IS ON THE INNER RING ONLY —
+   the outer ring is SHARED with the neighbouring cell and a point inserted
+   there that the neighbour does not also generate is a crack.
+
+   (2) GEOMETRY — deviation-driven subdivision, crack-free by construction. A
+   plan edge is split at its MIDPOINT when its own measured chord deviation
+   exceeds the tolerance, so the points introduced on any plan edge are a PURE
+   FUNCTION OF THE UNORDERED PAIR and two cells sharing a wall edge produce the
+   same set on it whatever else they do. `(a + b) / 2` is commutative in
+   IEEE-754, so a midpoint is bit-identical from either side; the recursion is
+   floored on EDGE LENGTH and not on depth, because a depth is a property of
+   the walk while a length is a property of the edge. The LONGEST wanting edge
+   is split, not the worst, so the triangle's diameter strictly decreases and
+   the floor is reached.
+
+   THE TOLERANCE IS THE SHIPPED LATTICE'S OWN CHORD ERROR ON THE SAME STATE, so
+   "conforming" means the cells follow the surface at least as closely as the
+   mesh that already ships — a bar in millimetres that moves with the state
+   rather than a constant to be wrong. The edge tolerance is three quarters of
+   it, which is derived: for a locally quadratic surface an edge midpoint reads
+   q/4 and the facet's interior maximum q/3, so a facet can exceed its worst
+   edge by at most 4/3. */
+export const INFILL_CONFORM_SAMPLES = 7;
+export const INFILL_FACET_SAMPLES = 6;
+export const INFILL_EDGE_SHARE = 3 / 4;
+/* THE EXPORTER'S OWN DEGENERACY BAR, RESTATED HERE ON PURPOSE AND SAID SO.
+   `analyzeStl` in tools/bloom-harness.mjs owns it for the GATE; the geometry
+   may not import from tools/, and a number this emitter must clear cannot be
+   read from the thing that checks it. So it is duplicated, with its owner
+   named, and it is the one duplication in this block — the alternative is an
+   emitter that produces triangles it cannot know are refused. */
+export const INFILL_DEGENERATE_AREA_MM2 = 1e-9;    // === DEGENERATE_AREA_MM2 in tools/bloom-harness.mjs
+export const INFILL_REFINE_DEPTH = 64;
+
+/* THE PLAN'S POLYGONS LIVE ON AN EXACT BINARY GRID, AND THAT IS WHAT MAKES THE
+   TOPOLOGY THE SAME IN EVERY ENGINE. The fillet is an ARC — `Math.sin`,
+   `Math.cos` and `Math.atan2`, none of them required to be correctly rounded,
+   and V8's implementations are not the same in Node's 12.4 and this gate's
+   Chromium — so two engines hand back arc points that differ in the last bits.
+   Nothing downstream is a tolerance: the hole's measured width is compared
+   against the RULED 1.50 mm bar, the edge length against the lattice's own
+   longest, and a bisector against a cell's wall. A last-bit difference on
+   either side of one of those is a DIFFERENT CELL, and the whole cascade
+   follows. Measured through X0, which compares the exported STL against a
+   rebuild of the page's own state in Node: `INFILL: x density 8` read 39,328
+   triangles against 36,064, forty petals over three whorls 681,952 against
+   716,352, and `footDelicacy` 0.25 held the same count with a vertex 0.93 mm
+   away. Replacing `Math.hypot` and `Math.pow` with correctly-rounded
+   arithmetic (which is right and is kept) moved NONE of those numbers, which
+   is what pointed at the trigonometry.
+   `INFILL_PLAN_GRID` IS A POWER OF TWO, so the quantisation is exact and
+   costs no second rounding, and it is ~9.5e-7 mm — three decimal orders under
+   the 1e-3 mm the census and the wall instrument resolve, and eight orders
+   over the ~1e-13 mm the two engines actually differ by, so a pair of values
+   straddling a grid line is a 1e-7 event per coordinate rather than the
+   certainty a bare comparison gives. Seventh instance of a discrete decision
+   on a continuous quantity here, and the second whose remedy is a grid. */
+const INFILL_PLAN_GRID = 1 / 1048576;              // 2^-20 mm
+function infillQuant(poly) {
+  if (!poly) return poly;
+  return poly.map((q) => ({ x: Math.round(q.x / INFILL_PLAN_GRID) * INFILL_PLAN_GRID, y: Math.round(q.y / INFILL_PLAN_GRID) * INFILL_PLAN_GRID }));
+}
+function infillTriArea2(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
+function infillInTri2(p, a, b, c, eps) { const s1 = infillTriArea2(a, b, p), s2 = infillTriArea2(b, c, p), s3 = infillTriArea2(c, a, p); return s1 > eps && s2 > eps && s3 > eps; }
+/* EAR CLIPPING, AND ITS LAST TRIANGLE IS NOT ALLOWED TO BE A FLAT ONE. The
+   loop already refuses a COLLINEAR ear; what it used to do unconditionally was
+   push the final three vertices, and on a cell whose seam edge carries the
+   lattice's own columns those three can be collinear themselves. That is a
+   triangle of exactly zero area with three DISTINCT corners, which is worse
+   than it sounds in both directions: `analyzeStl` counts it as degenerate and
+   the export gate fails on a non-zero count, while simply dropping it removes
+   three REAL edges from the census and opens the shell (measured: 8 and 48
+   boundary edges on two rows).
+   THE FIX IS TO TRIANGULATE DIFFERENTLY RATHER THAN TO EMIT OR DROP. Which
+   ear the scan reaches first is a function of where it STARTS, and a rotation
+   of the start index is a different triangulation of the same polygon with
+   the same area and the same boundary — so the clip is retried from each
+   starting vertex until one comes back with no flat triangle in it. Measured
+   on `INFILL: x density 40` and `x petalLength 60 x density 40`, the two rows
+   that produced them: the first rotation that clears is found within the
+   polygon's own vertex count on every cell of every state swept, and a
+   polygon for which none clears returns its first triangulation, where the
+   gate's degeneracy clause is what says so. */
+/* THE FAN FALLBACK PICKS AN APEX THAT PRODUCES NO FLAT TRIANGLE, for the same
+   reason `infillEarClip` retries its start: a fan from a vertex COLLINEAR with
+   two consecutive others emits a triangle of exactly zero area, which the
+   export gate fails on and which cannot simply be dropped (its three edges are
+   real and the census counts them). A fan from a different apex is a different
+   triangulation of the same polygon with the same area and the same boundary.
+   Where no apex clears, the first is returned and the gate's degeneracy clause
+   is what says so. */
+function infillFan(poly, flatOf = infillFlatTri) {
+  const k = poly.length; let first = null;
+  for (let a = 0; a < k; a++) {
+    const out = [];
+    for (let i = 1; i < k - 1; i++) out.push([poly[a], poly[(a + i) % k], poly[(a + i + 1) % k]]);
+    if (first === null) first = out;
+    if (!out.some(flatOf)) return out;
+  }
+  return first || [];
+}
+function infillEarClipFrom(P, from, eps) {
+  const out = [];
+  const idx = P.map((_, i) => i);
+  let guard = 0, scan = from;
+  while (idx.length > 3 && guard++ < 8 * P.length) {
+    let cut = -1;
+    for (let k = 0; k < idx.length; k++) {
+      const i = (scan + k) % idx.length;
+      const a = P[idx[(i - 1 + idx.length) % idx.length]], b = P[idx[i]], c = P[idx[(i + 1) % idx.length]];
+      if (infillTriArea2(a, b, c) <= eps) continue;
+      let ok = true;
+      for (const j of idx) { const p = P[j]; if (p === a || p === b || p === c) continue; if (infillInTri2(p, a, b, c, eps)) { ok = false; break; } }
+      if (ok) { out.push([a, b, c]); cut = i; break; }
+    }
+    if (cut < 0) return null;                    // no ear: not simple. Return NOTHING rather than a partial cover
+    idx.splice(cut, 1);
+    scan = cut % Math.max(1, idx.length);
+  }
+  if (idx.length === 3) out.push([P[idx[0]], P[idx[1]], P[idx[2]]]);
+  return out;
+}
+function infillFlatTri(T) { return Math.abs(infillTriArea2(T[0], T[1], T[2])) === 0; }
+function infillEarClip(poly, eps = 1e-12, flatOf = infillFlatTri) {
+  const P = infillCcw(infillDedupe(poly, 0));   // NOT the 1e-6 default: a vertex dropped here is one the neighbour keeps
+  if (P.length < 3) return [];
+  let first = null;
+  for (let from = 0; from < P.length; from++) {
+    const out = infillEarClipFrom(P, from, eps);
+    if (!out) return [];
+    if (first === null) first = out;
+    if (!out.some(flatOf)) return out;
+  }
+  return first;
+}
+function infillRayHit(c, th, poly) {
+  const dx = Math.cos(th), dy = Math.sin(th);
+  let best = null, bestT = Infinity;
+  for (let i = 0; i < poly.length; i++) {
+    const A = poly[i], B = poly[(i + 1) % poly.length];
+    const ex = B.x - A.x, ey = B.y - A.y;
+    const den = dx * ey - dy * ex; if (Math.abs(den) < 1e-14) continue;
+    const t = ((A.x - c.x) * ey - (A.y - c.y) * ex) / den;
+    const s = ((A.x - c.x) * dy - (A.y - c.y) * dx) / den;
+    if (t > 1e-12 && s >= -1e-9 && s <= 1 + 1e-9 && t < bestT) { bestT = t; best = { x: c.x + dx * t, y: c.y + dy * t }; }
+  }
+  return best;
+}
+function infillAnnulusSectors(outer, inner, cq) {
+  const cc = infillCentroid(inner);
+  const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
+  const O = infillCcw(outer), I = infillCcw(inner);
+  const a0 = ang(O[0]);
+  const rel = (q) => { let a = ang(q) - a0; while (a < 0) a += 2 * Math.PI; while (a >= 2 * Math.PI) a -= 2 * Math.PI; return a; };
+  const nodes = I.map((q) => ({ q, a: rel(q), cut: -1 }));
+  for (let k = 0; k < O.length; k++) {
+    const p = infillRayHit(cc, ang(O[k]), I);
+    if (!p) return null;                        // not star-shaped about the hole's centroid: caller falls back
+    nodes.push({ q: cq ? cq(p) : p, a: k === 0 ? 0 : rel(p), cut: k });
+  }
+  nodes.sort((x, y) => x.a - y.a || x.cut - y.cut);
+  const loop = [];
+  for (const n of nodes) { const l = loop[loop.length - 1]; if (l && infillLen(l.q.x - n.q.x, l.q.y - n.q.y) < 1e-7) { if (n.cut >= 0 && l.cut < 0) loop[loop.length - 1] = n; continue; } loop.push(n); }
+  const at = new Array(O.length).fill(-1);
+  loop.forEach((n, i) => { if (n.cut >= 0) at[n.cut] = i; });
+  if (at.some((i) => i < 0)) return null;
+  const sectors = [];
+  for (let k = 0; k < O.length; k++) {
+    const k2 = (k + 1) % O.length;
+    const poly = [O[k], O[k2]];
+    for (let i = at[k2]; ; i = (i - 1 + loop.length) % loop.length) { poly.push(loop[i].q); if (i === at[k]) break; }
+    const p = infillDedupe(poly); if (p.length >= 3) sectors.push(p);
+  }
+  return { sectors, innerLoop: loop.map((n) => n.q) };
+}
+
+/* ===================================================================
+   emitInfillPanel — the second arm of the panel loop.
+
+   TWO SHELLS, OVERLAPPING BY ONE ROW.
+     * rows [rowFrom .. mSplit] go through `emitPanel` VERBATIM, on a
+       sub-panel — so the foot, the root blend, the bead, the corner fan and
+       the captured grid there are the shipped path's own and not a copy.
+     * rows [mSplit-1 .. rowTo] are the CELL REGION: one closed shell whose
+       two skins are tiled by the cells' annuli, each cell contributing the
+       ring between its outer polygon (the wall centrelines, shared with its
+       neighbours EXACTLY) and its hole outline.
+   The two share a full row of material, which is the export contract's own
+   "overlapping closed shells are fine" and needs no weld.
+
+   THE SHEET IS `tAt(u)` PER POINT AND NOT ONE THICKNESS. The prototype took
+   `surface.t` for the whole blade; the shipped builder has `tipThinning`, so a
+   single thickness would draw a blade the profile does not describe. Every
+   emitted point asks `tAt` for its own u and `acc.noteSheet` sees it.
+
+   THE MATERIAL MASK IS THE LOAD-BEARING HALF. `captureGrid` has seven readers
+   and `captureLamina` four — among them `measureWall` (V1-V5) and, through its
+   import, the whole combination gate, plus `/plot`'s `bloom-grid-gltf.js` and
+   `verify-bloom-grid.mjs`. An infilled blade has no rows to write, and the
+   tempting fix — sweep the full NV columns and capture the rectangle as today
+   — is exactly the trap: `measureWall` would report a 1.20 mm sheet AT A HOLE
+   and V5 would be green on infilled rows because its subject excludes the
+   thing it doubts. So the lattice IS swept, at the same (row, column) stations
+   `emitPanel` would, and each sample carries whether the solid covers it.
+   A hole is then ABSENT from the measurement rather than measured as solid. */
+function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
+  const mSplit = plan.mSplit;
+  /* THE BASAL PANEL STOPS WHERE THE CELL REGION BEGINS — `mSplit - 1`, the
+     region's own first row — AND NOT AT `mSplit`. At `mSplit` the two solids
+     overlap by a whole lattice strip: the basal skin and the cell skin both
+     draw it, and because the outline's seam vertices are the lattice's own
+     doubles the two shells WELD, so the census reads a by-design overlap as a
+     within-shell fold. Measured on the shipping default, one petal: 346 pairs
+     at rows mSplit-1 and mSplit, 0 after. They meet at a LINE now, corner to
+     corner, which is what the seam columns and the snap above are for. */
+  const basal = { ...panel, rowTo: mSplit, spanAt: panel.spanAt, label: panel.label };
+  const grid = emitPanel(acc, rows, basal, tAt, rim);
+
+  const surface = plan.surface;
+  const Lm = surface.length;
+  const hAt = (x) => surface.profile.laminaHalfAt(Math.min(1, Math.max(0, x / Lm)));
+  /* THE PLAN -> SKIN MAP, one owner, read by the emitter, by the tolerance and
+     by the gate. `u = x / L` and `v = y / h(u)` is `mapPt`, which is
+     `surface.at` — the SAME front door `emitPanel`'s rows come through, so a
+     cell vertex and a lattice vertex at one (u, v) are the same double. */
+  const mapPlan = (x, y) => {
+    const u = Math.min(1, Math.max(0, x / Lm));
+    const hh = hAt(x);
+    const v = Math.max(-1, Math.min(1, hh > 1e-9 ? y / hh : 0));
+    const q = surface.at(u, v);
+    return { P: q.P, n: q.n, u };
+  };
+  const skinAt = (x, y, sign) => { const s = mapPlan(x, y); const tb = tAt(s.u); return [s.P[0] + s.n[0] * sign * tb / 2, s.P[1] + s.n[1] * sign * tb / 2, s.P[2] + s.n[2] * sign * tb / 2]; };
+  /* How far the straight facet edge A->B stands from the surface it draws,
+     worst over both skins. Exactly zero when the map is affine along it. */
+  const chordDev = (A, B) => {
+    let w = 0;
+    for (const sg of [1, -1]) {
+      const PA = skinAt(A.x, A.y, sg), PB = skinAt(B.x, B.y, sg);
+      for (let k = 1; k < INFILL_CONFORM_SAMPLES; k++) {
+        const f = k / INFILL_CONFORM_SAMPLES;
+        const Q = skinAt(A.x + (B.x - A.x) * f, A.y + (B.y - A.y) * f, sg);
+        const d = Math.hypot(Q[0] - (PA[0] + (PB[0] - PA[0]) * f), Q[1] - (PA[1] + (PB[1] - PA[1]) * f), Q[2] - (PA[2] + (PB[2] - PA[2]) * f));
+        if (d > w) w = d;
+      }
+    }
+    return w;
+  };
+  const facetDev = (T) => {
+    let w = 0;
+    for (const sg of [1, -1]) {
+      const V = T.map((q) => skinAt(q.x, q.y, sg));
+      for (let i = 0; i <= INFILL_FACET_SAMPLES; i++) for (let j = 0; j <= INFILL_FACET_SAMPLES - i; j++) {
+        const a = i / INFILL_FACET_SAMPLES, b = j / INFILL_FACET_SAMPLES, c = 1 - a - b;
+        const Q = skinAt(a * T[0].x + b * T[1].x + c * T[2].x, a * T[0].y + b * T[1].y + c * T[2].y, sg);
+        const d = Math.hypot(Q[0] - (a * V[0][0] + b * V[1][0] + c * V[2][0]), Q[1] - (a * V[0][1] + b * V[1][1] + c * V[2][1]), Q[2] - (a * V[0][2] + b * V[1][2] + c * V[2][2]));
+        if (d > w) w = d;
+      }
+    }
+    return w;
+  };
+  /* THE REFERENCE: the SHIPPED lattice's own worst facet over the same region,
+     under the identical measure, plus its shortest emitted edge — an owner the
+     infill does not write. The foot rows are excluded by name: all carry u = 0
+     and are laid by `footRowsAt`, not by `at`. */
+  let latDev = 0, latMinEdge = Infinity, latMaxEdge = 0;
+  {
+    const planOf = (i, j) => { const u = rows[i].u; const hh = surface.profile.laminaHalfAt(u); const sp = panel.spanAt(i); const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); return { x: u * Lm, y: v * hh }; };
+    const seg = (a, b) => { const l = infillLen(b.x - a.x, b.y - a.y); if (l > 1e-9 && l < latMinEdge) latMinEdge = l; if (l > latMaxEdge) latMaxEdge = l; };
+    for (let i = Math.max(panel.rowFrom, mSplit - 1); i < panel.rowTo; i++) {
+      for (let j = 0; j < NV - 1; j++) {
+        const P00 = planOf(i, j), P10 = planOf(i + 1, j), P11 = planOf(i + 1, j + 1), P01 = planOf(i, j + 1);
+        seg(P00, P10); seg(P00, P01); seg(P00, P11);
+        for (const T of [[P00, P10, P11], [P00, P11, P01]]) { const d = facetDev(T); if (d > latDev) latDev = d; }
+      }
+    }
+  }
+  const tolMm = latDev * INFILL_EDGE_SHARE;
+  const minEdgeMm = latMinEdge === Infinity ? 0 : latMinEdge;
+
+  /* ONE PLAN POINT PER KEY, so a shared wall edge is the SAME two doubles in
+     both cells that carry it and every midpoint derived from it is one number.
+     Without it two cells reach one edge through different clip sequences,
+     agree to about 1e-12, and their midpoints can land either side of a
+     rounding boundary — one crack per straddle. */
+  const f6 = (x) => { const r = Math.round(x * 1e6) / 1e6; return (r === 0 ? 0 : r).toFixed(6); };
+  const planCanon = new Map();
+  const cq = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let v = planCanon.get(k); if (!v) { v = { x: q.x, y: q.y }; planCanon.set(k, v); } return v; };
+  const skinCanon = new Map();
+  /* THE MARGIN'S VERTICES ARE THE LATTICE'S OWN POINTS, PRE-REGISTERED.
+     `plan.outline` carries, on every vertex, the ROW it came from and which
+     margin it is, so the two skin points emitted there are `rows[i].sect(±1)`
+     offset by that row's own thickness — the very doubles the captured grid
+     holds — rather than a re-derivation through x -> u -> `surface.at`, whose
+     round trip is not exact. That is what makes `verify-bloom-grid`'s 2a an
+     IDENTITY on an infilled row rather than a proximity claim, and it is what
+     keeps the silhouette the one `emitPanel` draws below the split. */
+  for (const q of plan.outline) {
+    if (q.row === undefined) continue;
+    const row = rows[q.row], tb = tAt(row.u);
+    const s2 = row.sect(q.v);
+    acc.noteSheet(tb);
+    skinCanon.set(`${f6(q.x)},${f6(q.y)}`, {
+      T: [s2.P[0] + s2.n[0] * tb / 2, s2.P[1] + s2.n[1] * tb / 2, s2.P[2] + s2.n[2] * tb / 2],
+      B: [s2.P[0] - s2.n[0] * tb / 2, s2.P[1] - s2.n[1] * tb / 2, s2.P[2] - s2.n[2] * tb / 2],
+    });
+    planCanon.set(`${f6(q.x)},${f6(q.y)}`, q);
+  }
+  const pt = (q) => {
+    const k = `${f6(q.x)},${f6(q.y)}`; let o = skinCanon.get(k);
+    if (!o) { const s = mapPlan(q.x, q.y); const tb = tAt(s.u); acc.noteSheet(tb); o = { T: [s.P[0] + s.n[0] * tb / 2, s.P[1] + s.n[1] * tb / 2, s.P[2] + s.n[2] * tb / 2], B: [s.P[0] - s.n[0] * tb / 2, s.P[1] - s.n[1] * tb / 2, s.P[2] - s.n[2] * tb / 2] }; skinCanon.set(k, o); }
+    return o;
+  };
+  /* The refinement. `dev` is memoised on the unordered plan pair, so the answer
+     for a shared wall edge is ONE answer and not two that happen to agree. */
+  const memo = new Map();
+  const key = (A, B) => { const ka = `${f6(A.x)},${f6(A.y)}`, kb = `${f6(B.x)},${f6(B.y)}`; return ka < kb ? ka + '|' + kb : kb + '|' + ka; };
+  const mid = (A, B) => cq({ x: (A.x + B.x) / 2, y: (A.y + B.y) / 2 });
+  let cappedTris = 0;
+  /* THE SEAM IS THE LATTICE'S AND THE CELLS READ IT. A segment both of whose
+     ends sit on the basal panel's top row is a LATTICE edge, drawn by
+     `emitPanel` on the other side at exactly those two points and not
+     subdivided there — so subdividing it here would put a vertex in the
+     interior of the basal panel's own edge and re-open the T-junction the
+     outline's seam columns just closed. One owner per boundary, and this one
+     is the lattice's; its chord error is the very quantity `tolMm` is
+     measured FROM, so refusing to split it is not a tolerance. */
+  const onSeam = (q) => Math.abs(q.x - plan.xB) < 1e-9;
+  /* THE SPLIT IS DECIDED IN THE PLAN, AND THAT IS A MODE-FREE LAW REPLACING A
+     MODE-DEPENDENT ONE. The first cut asked `chordDev(A, B) > tolMm` — how far
+     the facet edge stands from the SURFACE — and the surface is the MODE's:
+     `surface.at` places a point through the mode's own half-width, floored at
+     `TIP_HALF_MM` at 0.15 mm live and 0.80 mm export, and `skinAt` offsets it
+     by the mode's own floored sheet. So the emitted TRIANGLE COUNT moved
+     between the modes on 13 of 13 states measured (the shipping default by 40,
+     `petalWidth` 30 by 232, `petalCup` 1.2 by -764), and the export gate fails
+     that outright: the export floor is meant to change GEOMETRY and never
+     TOPOLOGY. Sixth refusal of a mode-dependent topology in this file.
+     WHAT REPLACES IT IS THE LATTICE'S OWN LONGEST PLAN EDGE over the same
+     region — `latMaxEdge`, built from `rows[i].u` and `laminaHalfAt`, both
+     mode-free — so every emitted edge is at most as long, IN THE PLAN, as the
+     coarsest edge the shipped mesh already draws there. The conformance
+     tolerance `tolMm` is no longer the decision; it is the CLAIM, asserted on
+     the artefact by the gate, which is the right place for it. */
+  const wants = (A, B) => {
+    const k = key(A, B); let v = memo.get(k);
+    if (v === undefined) {
+      const len = infillLen(B.x - A.x, B.y - A.y);
+      v = { split: !(onSeam(A) && onSeam(B)) && len > latMaxEdge && len > minEdgeMm, len };
+      memo.set(k, v);
+    }
+    return v.split;
+  };
+  const lenOf = (A, B) => { wants(A, B); return memo.get(key(A, B)).len; };
+  /* A TRIANGLE WITH A REPEATED VERTEX DRAWS NOTHING AND IS DROPPED, and without
+     that line the recursion cycles: ear clipping legitimately emits the wedge
+     between a chord and a polyline whose middle vertex lies on it, and its two
+     children have the same shape as their parent. */
+  const refine = (P0, P1, P2, out, depth = 0) => {
+    if (P0 === P1 || P1 === P2 || P2 === P0) return;
+    const e = [[P0, P1, P2], [P1, P2, P0], [P2, P0, P1]];
+    let m = -1, best = -1;
+    for (let i = 0; i < 3; i++) { const l = lenOf(e[i][0], e[i][1]); if (l > best && wants(e[i][0], e[i][1])) { best = l; m = i; } }
+    if (m < 0) { out.push([P0, P1, P2]); return; }
+    if (depth > INFILL_REFINE_DEPTH) { cappedTris++; out.push([P0, P1, P2]); return; }
+    const [A, B, C] = e[m];
+    const M = mid(A, B);
+    refine(A, M, C, out, depth + 1); refine(M, B, C, out, depth + 1);
+  };
+  const edgePoints = (A, B) => { if (!wants(A, B)) return [A, B]; const M = mid(A, B); const l = edgePoints(A, M), r = edgePoints(M, B); return l.concat(r.slice(1)); };
+
+  const tiles = (tris, want) => { let a = 0; for (const T of tris) a += Math.abs(infillTriArea2(T[0], T[1], T[2])) / 2; return Math.abs(a - want) <= 1e-7 * Math.max(1, want); };
+  /* A TRIANGLE WHOSE THREE CORNERS ARE NOT THREE POINTS DRAWS NOTHING AND IS
+     NOT EMITTED — `rimSameP`'s exact double equality, never a bar. Two things
+     make one here and both are the plan map being many-to-one: the SHEET can
+     reach zero thickness where `tipThinning` takes it there in LIVE mode (the
+     export floor is what stops it on the object), and two distinct plan points
+     can share a mapped point where the blade has converged. `analyzeStl` does
+     NOT skip such a triangle: it counts it as degenerate AND puts its edges in
+     the census, where the repeated corner leaves a self-loop that reads as a
+     BOUNDARY EDGE — so this is the watertight invariant and not tidiness.
+     Measured, at `DEGENERATE_AREA_MM2` on float32 over the whole bloom:
+     `tipThinning` 1 LIVE read 160 and `petalWidth` 8 read 16 before these two
+     lines, 0 after, against the plain petal's own 0 on the same states. */
+  /* A TRIANGLE WHOSE THREE CORNERS ARE NOT THREE POINTS IS NOT EMITTED, and
+     a COLLINEAR one still is. Dropping a collinear triangle was tried and
+     measured WRONG: its three corners are distinct, so its three EDGES are
+     real and `analyzeStl`'s census counts them — removing it left 8 and 48
+     BOUNDARY EDGES on two rows, which is the watertight invariant. A
+     zero-area triangle is not produced instead: `infillEarClip` refuses a
+     collinear ear and now also refuses to LEAVE one as its last triangle. */
+  const triOK = (a, b, c) => !rimSameP(a, b) && !rimSameP(b, c) && !rimSameP(c, a);
+  /* IS THIS PLAN TRIANGLE FLAT — MEASURED IN THE PLAN, ON FLOAT32, AND THE
+     PLAN IS WHY. The obvious test is the one `analyzeStl` itself runs: round
+     the EMITTED corners to the floats the file stores and take the area. It
+     was written that way first and the export gate refused it, correctly — the
+     emitted point goes through the MODE's own sheet and the MODE's own tip
+     floor, so the triangulation a cell got depended on which mode was
+     building and `INFILL: x CONTINUOUS x 3 turns` came out 131,692 triangles
+     live against 131,004 export. The export floor may change GEOMETRY and
+     never TOPOLOGY.
+     THE PLAN IS MODE-FREE by construction (`laminaHalfAt` and the stations,
+     never the mode's outline), so a decision taken there is the same decision
+     in both. What it gives up is stated rather than hidden: a plan triangle
+     that clears the bar can still draw a facet that does not, where the
+     surface compresses the plan into it. That is not a supposition — it is
+     what the gate's own degeneracy clause measures on every row of the matrix,
+     and it reads 0 on all twenty-two of this block's in both modes. The bar is
+     `INFILL_DEGENERATE_AREA_MM2`, and the plan carries millimetres, so the two
+     are the same unit. */
+  const f32 = Math.fround;
+  const flatDrawn = (T) => {
+    const ax = f32(T[0].x), ay = f32(T[0].y);
+    const ux = f32(T[1].x) - ax, uy = f32(T[1].y) - ay;
+    const vx = f32(T[2].x) - ax, vy = f32(T[2].y) - ay;
+    return 0.5 * Math.abs(ux * vy - uy * vx) <= INFILL_DEGENERATE_AREA_MM2;
+  };
+  let collapsed = 0;
+  const emitTri = (a, b, c) => { if (triOK(a, b, c)) acc.tri(a, b, c); else collapsed++; };
+  const emitPlanTri = (T) => { const a = pt(T[0]), b = pt(T[1]), c = pt(T[2]); emitTri(a.T, b.T, c.T); emitTri(a.B, c.B, b.B); };
+  const emitSkin = (tris) => { const out = []; for (const T of tris) refine(T[0], T[1], T[2], out); for (const T of out) emitPlanTri(T); };
+  /* A STRIP WHOSE TWO ENDS LAND ON THE SAME SKIN POINT DRAWS NOTHING AND IS
+     SKIPPED — `emitPanel`'s own `rimSameP` test, exact double equality and not
+     a threshold. It fires where the plan map is many-to-one: two distinct plan
+     points can share a mapped point where the blade has converged onto the tip
+     floor, and the quad between them is two triangles of exactly zero area.
+     Counted, so a tree that started producing them in quantity is visible.
+     Measured: `petalWidth` 8 read 16 zero-area triangles across the bloom
+     before this line and 0 after, at `DEGENERATE_AREA_MM2` on float32, which
+     is the bar both STL gates fail on. */
+  const emitRim = (A, B) => {
+    const ps = edgePoints(A, B);
+    for (let i = 0; i + 1 < ps.length; i++) {
+      const p = pt(ps[i]), q = pt(ps[i + 1]);
+      emitTri(q.T, p.T, p.B); emitTri(q.T, p.B, q.B);
+    }
+  };
+
+  /* ---- the cells ---- */
+  /* WHERE THE INFILL'S OWN TRIANGLES START. I4 asks for the GENUS of the sheet
+     the cells make, and the welded petal is the wrong subject for it: the
+     basal panel is a second closed solid abutting this one along the seam, so
+     the two share edges, the complex is not a manifold surface there, and its
+     Euler characteristic is not 2 - 2g for anything. Measured on the shipping
+     default: the welded petal reads genus 9 against 14 holes cut, and the
+     shortfall is exactly 5 at every density and every form — a constant,
+     which is the tell that it is the JUNCTION being counted and not the
+     holes. The cells alone are a closed manifold sheet (adjacent cells share
+     a wall and emit no rim between them) and read 2 - 2h exactly. */
+  const triFrom = acc.triangleCount;
+  let tileFail = 0, holesCut = 0, solid = 0, untiled = 0;
+  const holeLoops = [];                 // the hole outlines, kept as explicit closed loops for S5's `emitRimLoop`
+  for (let ci = 0; ci < plan.cells.length; ci++) {
+    const c = plan.cells[ci].map(cq);
+    const k = c.length; const O = c.map(pt);
+    const rimOK = (i) => plan.isOutlineEdge(c[i], c[(i + 1) % k]);
+    const hole = plan.cellOpen[ci] ? plan.holes[ci].map(cq) : null;
+    if (!hole) {
+      solid++;
+      /* THE RIM AND THE SKIN MUST COME FROM THE SAME DECISION. Where the ear
+         clip cannot tile, the skin falls back to the legacy fan and the RIM
+         has to fall back WITH it: a subdivided rim beside an unsubdivided fan
+         is a crack. */
+      let tris = infillEarClip(c, 1e-12, flatDrawn);
+      if (!tiles(tris, infillPolyArea(c))) { tileFail++; tris = infillFan(c, flatDrawn); }
+      emitSkin(tris);
+      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+      continue;
+    }
+    holesCut++;
+    const sec = infillAnnulusSectors(c, hole, cq);
+    let done = false;
+    if (sec) {
+      let all = [];
+      let ok = true;
+      for (const s of sec.sectors) { const tris = infillEarClip(s, 1e-12, flatDrawn); if (!tiles(tris, infillPolyArea(s))) { ok = false; break; } all = all.concat(tris); }
+      /* AND THE SECTORS MUST TILE THE ANNULUS, not merely each tile its own
+         sector — two different claims, and a cell at the blade's WAIST is not
+         convex, where neither a fan nor a sector walk is valid. */
+      if (ok && tiles(all, infillPolyArea(c) - infillPolyArea(hole)) && !all.some(flatDrawn)) {
+        emitSkin(all);
+        const IL = sec.innerLoop;
+        holeLoops.push(IL);
+        for (let i = 0; i < IL.length; i++) emitRim(IL[(i + 1) % IL.length], IL[i]);
+        for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+        done = true;
+      }
+    }
+    if (done) continue;
+    tileFail++;
+    /* THE FALLBACK IS THE ANGULAR MERGE-WALK, AND IT GOES THROUGH THE SAME
+       SUBDIVISION AS EVERYTHING ELSE. It emits PLAN triangles rather than skin
+       points, so `emitSkin` refines them and `emitRim` walks the rims at the
+       same `splitPoints` every other cell uses — which is the whole of
+       crack-freeness. Emitting this walk unsubdivided beside a conforming
+       neighbour is a crack along the wall they share: measured, `density 40`
+       LIVE read 80 boundary edges before this line, and 0 after. */
+    const inn = infillCcw(hole); const cc = infillCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
+    const I = inn.map((q) => ({ a: ang(q), q })); const Oa = c.map((q) => ({ a: ang(q), q }));
+    const rot = (arr) => { let m = 0; for (let i = 1; i < arr.length; i++) if (arr[i].a < arr[m].a) m = i; return arr.slice(m).concat(arr.slice(0, m)); };
+    const A = rot(Oa), Bq = rot(I); let ia = 0, ib = 0; const na = A.length, nb = Bq.length;
+    const nextA = (i) => A[(i + 1) % na].a + ((i + 1) >= na ? 2 * Math.PI : 0), nextB = (i) => Bq[(i + 1) % nb].a + ((i + 1) >= nb ? 2 * Math.PI : 0);
+    const walk = [];
+    while (ia < na || ib < nb) {
+      const advA = ib >= nb || (ia < na && nextA(ia) <= nextB(ib));
+      if (advA) { walk.push([A[ia % na].q, A[(ia + 1) % na].q, Bq[ib % nb].q]); ia++; }
+      else { walk.push([A[ia % na].q, Bq[(ib + 1) % nb].q, Bq[ib % nb].q]); ib++; }
+    }
+    /* AND THE MERGE-WALK IS HELD TO THE SAME AREA TEST AS EVERY OTHER ARM, which
+       is what it did not used to be. Its `advA` step spans two consecutive OUTER
+       vertices, so on a wide angular sector the triangle REACHES ACROSS THE
+       HOLE — S1's own second defect, in the shipping emitter's last resort. It
+       draws skin over material that is not there, which is a fold rather than a
+       crack, so no boundary-edge or degeneracy clause can see it: measured, the
+       census read 182 within-shell pairs at `infillDensity` 8 and 112 at
+       `petalWidth` 8, worst span 1.1374 mm, every one a cell skin crossing a
+       hole's own rim wall, on states whose PLAIN petal reads 0.
+       WHERE IT CANNOT TILE THE ANNULUS THE CELL KEEPS ITS MATERIAL. A solid
+       cell is an outcome this feature already has and already reports (ruling
+       3's own achieved count), and it is the only answer available here that
+       cannot draw a surface where there is none — bridging the hole to the
+       outer ring and ear-clipping the result is the tessellation that would
+       keep it, and it is S4's, beside the non-convex cell it shares a cause
+       with. The plan's own counts are corrected so `achieved` stays the number
+       of holes the ARTEFACT carries, which is what I4 reads it as. */
+    if (tiles(walk, infillPolyArea(c) - infillPolyArea(hole)) && !walk.some(flatDrawn)) {
+      emitSkin(walk);
+      holeLoops.push(inn);
+      for (let i = 0; i < nb; i++) emitRim(Bq[(i + 1) % nb].q, Bq[i % nb].q);
+    } else {
+      untiled++;
+      /* AND THE CELL STOPS BEING OPEN IN THE PLAN, so the MATERIAL MASK says
+         there is material where the emitter left material. The mask reads
+         `cellOpen` and the hole polygon; leaving it set would mark a solid
+         cell's stations ABSENT and `measureWall` would skip a wall that is
+         really there — the mask lying in the direction that makes V5 green,
+         which is the one thing the mask exists not to do. */
+      plan.cellOpen[ci] = false;
+      let tris = infillEarClip(c, 1e-12, flatDrawn);
+      if (!tiles(tris, infillPolyArea(c))) tris = infillFan(c, flatDrawn);
+      emitSkin(tris);
+      holesCut--; solid++;
+    }
+    for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+  }
+  /* THE PLAN'S COUNTS ARE THE ARTEFACT'S. A cell whose annulus no arm could
+     tile carries no hole, so `achieved` must say so — the read-out speaks it,
+     I4 compares it against the emitted genus, and the panel route holds both
+     tellings to it. The decision is made on PLAN polygons, which are mode-free
+     (`laminaHalfAt`, never the mode's own floor), so the count stays identical
+     live and export — which I7 asserts. */
+  if (untiled) { plan.achieved -= untiled; plan.solid += untiled; }
+
+  /* ---- the rows the cell region covers, and the captured grid WITH THE
+     MATERIAL MASK ----
+
+     `row.tUsed` IS SET HERE AND NOT ONLY WHEN CAPTURING. `buildPetalInto`
+     asserts that every row some panel covered carries the sheet it was
+     emitted at — a row no panel covered is a hole in the mesh and shows up
+     there as an undefined rather than as a plausible number — so the cell
+     region owes the same record the lattice does. */
+  for (let i = mSplit + 1; i <= panel.rowTo; i++) { const tb = tAt(rows[i].u); rows[i].tUsed = tb; acc.noteSheet(tb); }
+  if (grid) {
+    for (let i = mSplit + 1; i <= panel.rowTo; i++) {
+      const row = rows[i];
+      const sp = panel.spanAt(i);
+      const hh = surface.profile.laminaHalfAt(row.u);        // the mask's plan point is a PLAN point
+      const vs = [], Ps = [], Ns = [], mat = [];
+      const tb = row.tUsed;
+      for (let j = 0; j < NV; j++) {
+        const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1);
+        const q = row.sect(v);
+        vs.push(v); Ps.push(q.P); Ns.push(q.n);
+        /* IS THERE MATERIAL UNDER THIS SAMPLE? The lattice station's own plan
+           point, asked of the cells the emitter actually cut: inside the
+           region and not inside any hole. A sample the emitter drew no skin
+           for is ABSENT, which is what lets `measureWall` measure a wall
+           rather than a hole. */
+        const x = row.u * Lm, y = v * hh;
+        let inside = x >= plan.xB - 1e-9;
+        if (inside && !(cap && cap.infillMaskAllMaterial)) { for (let ci = 0; ci < plan.cells.length; ci++) { if (plan.cellOpen[ci] && infillPointInPoly(x, y, plan.holes[ci])) { inside = false; break; } } }
+        mat.push(inside);
+      }
+      grid.push({ row: i, u: row.u, halfWidth: row.h, thickness: tb, v: vs, mid: Ps, normal: Ns, material: mat });
+    }
+  }
+  plan.emittedTriRange = [triFrom, acc.triangleCount];
+  if (rim) { rim.infill = { cells: plan.cells.length, holes: holesCut, solid, tileFail, cappedTris, tolMm, latticeDevMm: latDev, minEdgeMm, holeLoops: holeLoops.length, collapsed }; }
+  /* THE LOOPS THE EMITTER ACTUALLY WALKED, kept on the plan for two readers:
+     I5's material-mask biconditional, which must ask about the artefact rather
+     than about the polygons the plan holds, and S5, which will hang
+     `emitRimLoop` on exactly these. They are the DENSIFIED loops the rim quads
+     were drawn along, not the plan's `holes`. */
+  plan.emittedLoops = holeLoops;
+  return grid;
+}
+
 
 /* ===================================================================
    THE STEM, AND THE HUB-TO-STEM JOIN (session 43, Eva's ruling Sep 13).
@@ -10612,7 +12129,14 @@ export const SEPAL_TWINS = Object.freeze([
 export function sepalsEligible(state) { return !sphereMode(state); }
 export function sepalsAbsent(state) { return !sepalsEligible(state) || !(Number(state.sepalCount) >= 1); }
 export function sepalBladeState(state, angleDeg) {
-  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0 };
+  /* THE INFILL IS PINNED OFF (Eva's ruling 4, the Voronoi port): a sepal is
+     the petal builder on a second ring, so a guard read through
+     `petalStateFor` would be inherited by every sepal for free. Turning it on
+     for sepals is a later ruling, and until then the pin is one value in the
+     list the rim family already carries. The witness is
+     `verify-bloom-sepal-decoupled.mjs`, which sweeps petal-side control values
+     and asserts 0 sepal floats move. */
+  const s = { ...state, petalTilt: angleDeg, petalTipEnd: 0, fringeCount: 0, lobeDepth: 0, petalInfill: 'NONE' };
   for (const [petalId, sepalId] of SEPAL_TWINS) s[petalId] = Number(state[sepalId]);
   return s;
 }

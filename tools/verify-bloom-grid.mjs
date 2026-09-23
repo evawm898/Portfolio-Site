@@ -183,6 +183,12 @@ const NEG = process.argv.includes('--negative-control');
 const ROWS = [
   { label: 'default', state: {} },
   { label: 'default (export)', state: {}, mode: 'export' },
+  /* TWO INFILLED ROWS — the mask's only exercise here, and clause 2f is the
+     reason: a gate whose every row is uninfilled cannot tell a mask that works
+     from a mask that excludes nothing. One flat (the guard refuses the metric
+     field), one curved (it does not), both modes covered by the pair. */
+  { label: 'infill 16 (export)', state: { petalInfill: 'VORONOI' }, mode: 'export' },
+  { label: 'infill 16 x cup + curl', state: { petalInfill: 'VORONOI', petalCup: 1.2, petalSpineCurl: 180 } },
   { label: 'roll 360', state: { petalRoll: 360 } },
   { label: 'cup 1.0 + gradient', state: { petalCup: 1.0, petalCupGradient: 1.0 } },
   { label: 'curl 360', state: { petalSpineCurl: 360 } },
@@ -263,6 +269,7 @@ function walkGrid(built, emitted, lastRow) {
     rows: 0, bentRows: 0, bentConstant: 0, bentFirst: null, flatRows: 0, flatVarying: 0,
     minBentRel: Infinity, maxFlatRel: 0, minSpread: Infinity,
     panelsBuried: 0, panelsExposed: 0, labels: new Set(),
+    maskedOut: 0, maskProbed: 0, maskMissing: 0,
   };
   for (const p of built.petalsAll) {
     if (!p || !p.grid) continue;
@@ -272,6 +279,7 @@ function walkGrid(built, emitted, lastRow) {
       tipBuried ? o.panelsBuried++ : o.panelsExposed++;
       for (let ri = 0; ri < pan.rows.length; ri++) {
         const r = pan.rows[ri];
+        if (!Array.isArray(r.material) || r.material.length !== r.mid.length) o.maskMissing++;
         const isFirst = ri === 0, isLast = ri === pan.rows.length - 1;
         /* WHERE THE RAMP IS EXACTLY ZERO, read off the capture. `emitPanel`
            fades the treatment to nothing at every BURIED end, and the ends it
@@ -282,6 +290,16 @@ function walkGrid(built, emitted, lastRow) {
         const zeroRamp = r.row === pan.rowFrom || r.u === 0 || (tipBuried && r.row === pan.rowTo);
         const where = `${pan.label} row ${r.row} u=${r.u}`;
         for (let j = 0; j < r.mid.length; j++) {
+          /* THE MATERIAL MASK (the Voronoi infill, S3). Clause 2 is a
+             MEMBERSHIP claim — every captured point's two skin vertices are in
+             the emitted stream — and on an infilled blade a station inside a
+             HOLE has no skin vertices by construction. Re-derived onto the
+             mask rather than loosened: a station the mask calls material is
+             asserted exactly as before, one the mask calls a hole is not
+             probed at all, and both counts are reported so a mask that
+             excluded everything would be visible rather than vacuous. */
+          if (r.material && !r.material[j]) { o.maskedOut++; continue; }
+          o.maskProbed++;
           const P = r.mid[j], n = r.normal[j], t = r.thickness;
           const isMargin = j === 0 || j === r.mid.length - 1;
           /* THE WHOLE PERIMETER, which is exactly the loop `emitPanel` walks:
@@ -494,6 +512,20 @@ async function run(geomUrl, gltfUrl, registryUrl) {
       `${row.label}: ${w.apexMissing} of ${w.apexProbed} captured boundary mid points are not emitted bead apexes `
       + `(${w.marginMissing} of ${w.marginProbed} of them on a margin; first: ${w.apexFirst})`);
     check('2a', w.apexProbed > 0, `${row.label}: nothing was probed — the capture produced no grid`);
+
+    /* ---- 2f: THE MATERIAL MASK IS PRESENT AND IS NOT THE WHOLE SUBJECT ----
+       Clause 2a is a membership claim and the mask decides its SUBJECT, so the
+       mask is asserted rather than trusted: every captured row carries one, and
+       on an uninfilled row it excludes nothing at all. Both directions, because
+       a mask that hid everything would make 2a vacuous and a mask that hid
+       nothing on an INFILLED row would make it fail for the wrong reason. */
+    check('2f', w.maskMissing === 0,
+      `${row.label}: ${w.maskMissing} captured rows carry no material mask — every row must, and reading absence as "all material" is the default the mask exists to avoid`);
+    const wantMasked = /infill/i.test(row.label);
+    check('2f', wantMasked ? w.maskedOut > 0 : w.maskedOut === 0,
+      wantMasked
+        ? `${row.label}: the mask excluded nothing on an INFILLED row — the holes are not in the capture`
+        : `${row.label}: the mask excluded ${w.maskedOut} of ${w.maskedOut + w.maskProbed} stations on a row with no infill`);
 
     check('2b', w.zeroMissing === 0,
       `${row.label}: ${w.zeroMissing} of ${w.zeroProbed} zero-ramp skin points are not among the emitted vertices `

@@ -149,11 +149,38 @@ function ptTri(p, a, b, c) {
 
 /* THE MEASUREMENT. `grid` is buildPetalInto's captured panels; `footRows` is
    how many rows at the head of each panel are the FOOT, which is flat and not
-   under test. Returns the two numbers and where each was found. */
+   under test. Returns the two numbers and where each was found.
+
+   IT READS THE MATERIAL MASK, AND THAT IS WHAT MAKES IT MEAN ANYTHING ON AN
+   INFILLED BLADE (the Voronoi infill, S3). A lattice sample the emitter drew
+   no skin for — a hole — carries `material[j] === false`, and it is ABSENT
+   from this measurement on BOTH sides: it is not asked "how thick is the wall
+   under me" (there is no wall under a hole, and the answer would be the
+   declared sheet, which is a 1.2 mm reading at a place with no material at
+   all) and it contributes no triangle for anything else to measure against.
+
+   WITHOUT THE MASK V5 WOULD BE GREEN ON EVERY INFILLED ROW FOR THE WRONG
+   REASON — the fifth durable rule, in the clause the whole feature turns on:
+   the subject would be "the rectangle of lattice stations", which the holes
+   are in, so the clause would report a perfect sheet across a hole and could
+   not fail. The mask is PRESENT ON EVERY CAPTURED ROW (`emitPanel` writes a
+   shared frozen all-true row), so a missing mask is a builder that did not
+   write one rather than a default this reads as solid — and it REFUSES rather
+   than assuming, because assuming is the trap.
+
+   A QUAD IS MATERIAL ONLY IF ALL FOUR OF ITS CORNERS ARE. A quad with one
+   corner in a hole straddles the rim and is not a piece of sheet; counting it
+   would put a triangle through the hole it is beside. */
 export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
   const rows = grid.flatMap((pan) => pan.rows).filter((r) => r.row >= footRows);
   if (rows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
+  for (const r of rows) {
+    if (!Array.isArray(r.material) || r.material.length !== r.v.length) {
+      throw new Error(`measureWall: row ${r.row} carries no material mask — the builder must write one on every captured row, and reading its absence as "all material" is exactly the reading that makes this measurement green on a hole`);
+    }
+  }
   const NVc = rows[0].v.length;
+  const mat = (i, j) => rows[i].material[j];
   const skin = (sign) => rows.map((r) => r.mid.map((P, j) => [
     P[0] + sign * r.normal[j][0] * r.thickness / 2,
     P[1] + sign * r.normal[j][1] * r.thickness / 2,
@@ -165,13 +192,18 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
   const tris = [];
   for (let i = 0; i < B.length - 1; i++) {
     for (let j = 0; j < NVc - 1; j++) {
+      if (!(mat(i, j) && mat(i, j + 1) && mat(i + 1, j) && mat(i + 1, j + 1))) continue;
       tris.push([B[i][j], B[i][j + 1], B[i + 1][j + 1], i, j]);
       tris.push([B[i][j], B[i + 1][j + 1], B[i + 1][j], i, j]);
     }
   }
+  if (!tris.length) throw new Error('measureWall: the material mask leaves no quad at all — there is nothing to measure against');
   let wall = Infinity, wallAt = null, self = Infinity, selfAt = null;
+  let skipped = 0, asked = 0;
   for (let i = 0; i < T.length; i++) {
     for (let j = 0; j < NVc; j++) {
+      if (!mat(i, j)) { skipped++; continue; }
+      asked++;
       let dn = Infinity, df = Infinity;
       for (const tr of tris) {
         const d = ptTri(T[i][j], tr[0], tr[1], tr[2]);
@@ -182,7 +214,7 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
       if (df < self) { self = df; selfAt = [rows[i].u, rows[i].v[j]]; }
     }
   }
-  return { wall, wallAt, self, selfAt, declared: rows[0].thickness, rows: rows.length, columns: NVc };
+  return { wall, wallAt, self, selfAt, declared: rows[0].thickness, rows: rows.length, columns: NVc, holes: skipped, samples: asked };
 }
 
 /* ------------------------------------------------------------ curvature */

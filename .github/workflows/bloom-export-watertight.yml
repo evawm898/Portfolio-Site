@@ -17,6 +17,7 @@ on:
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
+      - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -43,6 +44,7 @@ on:
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
+      - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -123,6 +125,20 @@ jobs:
         run: node tools/verify-bloom-arc-stability.mjs
       - name: ... and those clauses must be able to fail
         run: node tools/verify-bloom-arc-stability.mjs --negative-control
+      # THE INFILL (I0-I7) rides here for the same three reasons and is OWED for
+      # a fourth that the others are not: both STL gates are structurally blind
+      # to nearly all of it. A pattern cut at the wrong density, a hole under
+      # the ruled bar, a metric plan that fell back to the flat one, a cell
+      # whose hole was never cut and a MATERIAL MASK that calls a hole solid all
+      # export watertight, as one connected piece, with no degenerate triangle —
+      # the mask most of all, because a mask that lies in that direction makes
+      # V5 green on a row it should redden. It imports the geometry, the
+      # registry, `bloom-first-slot.mjs` and the self-intersection census and
+      # NOT the harness, so it runs before the npm install like the three above.
+      - name: The Voronoi infill must be the pattern it reports (I0-I7)
+        run: node tools/verify-bloom-infill.mjs
+      - name: ... and every one of those clauses must be able to fail
+        run: node tools/verify-bloom-infill.mjs --negative-control
       # A SHARED CORNER MUST READ AS TOPOLOGY AND A REAL FOLD MUST STILL READ AS
       # A FOLD (CA0-CA3). X2 in this gate turns the census's count into a verdict,
       # and a count that is too LOW looks exactly like a clean solid — so the
