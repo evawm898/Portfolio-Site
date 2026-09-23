@@ -326,6 +326,12 @@ function clauses(s) {
   const t2 = s.ctx.t / 2;
   out.push({ id: 'C1a', ok: s.dev.worst <= s.lat.devMm + 1e-12,
     msg: `worst emitted skin facet ${s.dev.worst.toFixed(4)} mm against the shipped lattice's own ${s.lat.devMm.toFixed(4)} mm (ratio ${(s.dev.worst / s.lat.devMm).toFixed(3)}), over ${s.dev.nFacets} facets` });
+  /* C1's SUBJECT, STATED AS A SET AND THEN CHECKED. A triangle whose vertices are not in
+     the canonicaliser is silently skipped, so a path that stopped going through `pt()`
+     would shrink what C1 is about without moving what it reports — the fifth durable rule,
+     asserted rather than trusted. */
+  out.push({ id: 'C1c', ok: s.dev.unknown === 0,
+    msg: `${s.dev.unknown} emitted cell triangles carry a vertex the plan canonicaliser does not know, so C1 cannot see them (${s.dev.nFacets} skin facets and ${s.dev.rims} rim triangles are its subject)` });
   out.push({ id: 'C1b', ok: s.dev.worst <= t2,
     msg: `worst emitted skin facet ${s.dev.worst.toFixed(4)} mm against half the sheet ${t2.toFixed(4)} mm — the facet is inside its own material` });
   /* THE CLAUSE APPLIES WHERE THE PETAL'S OWN FORM LEAVES IT SOMETHING TO SAY. Where the

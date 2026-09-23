@@ -713,13 +713,14 @@ export function cutThrough(ctx, F, wall = WALL_DEFAULT, opts = {}) {
     planArea += polyArea(c) - (open ? polyArea(hole0) : 0);
     if (!open) {
       solid++;
-      if (!conform) legacySolid(O, k);
-      else {
-        const tris = earClip(c);
-        if (tiles(tris, polyArea(c))) emitSkin(tris);
-        else { tileFail++; legacySolid(O, k); }                                 // the field handed over a polygon that is not simple: draw what the legacy drew, and SAY SO
-      }
-      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) { if (conform) emitRim(c[i], c[j]); else acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); } }
+      /* THE RIM AND THE SKIN MUST COME FROM THE SAME DECISION. Where the ear clip cannot
+         tile — the field handed over a polygon that is not simple — the skin falls back to
+         the legacy fan, and the RIM has to fall back with it: a subdivided rim beside an
+         unsubdivided fan is a crack, which is what re-reading this branch found. */
+      const tris = conform ? earClip(c) : null;
+      const legacy = !conform || !tiles(tris, polyArea(c));
+      if (legacy) { if (conform) tileFail++; legacySolid(O, k); } else emitSkin(tris);
+      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) { if (legacy) acc.quad(O[j].T, O[i].T, O[i].B, O[j].B); else emitRim(c[i], c[j]); } }
       continue;
     }
     annular++; holes.push(hole0); holeArea += polyArea(hole0); for (const q of hole0) apexX = Math.max(apexX, q.x);

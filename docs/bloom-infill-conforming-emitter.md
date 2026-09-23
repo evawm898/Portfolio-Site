@@ -300,6 +300,12 @@ the blade-open fraction, the apex cap, the boundary / non-manifold / shell / vox
 property of the PLAN, which this change does not touch. The triangle counts move because the
 tessellation is the thing that changed.
 
+**AND BOTH COMPANION MUST-FAILS STILL PASS ON THE NEW EMITTER**, with their published figures
+intact: `bloom-infill-base-panel.mjs --control` reads **C2 at 112 of 560** — the number
+CLAUDE.md records — and C3 reproduces #250's seven-row truncation table with a 0.00e+0
+residual on two of three boundaries; `bloom-infill-lamina-floor.mjs --control` passes K1–K4,
+with K2c still firing on 2 of 3 petals and explained by a measured monotone curve on the third.
+
 **`bloom-basal-grading --inert <base-tree>` IS THE ONE INVOCATION THAT CANNOT BE RUN ACROSS THIS
 COMMIT.** It compares the head's `cutThrough` against a base tree's float for float to prove the
 `u0` defaulting is inert; with the emitters differing, it is comparing two emitters. It remains
