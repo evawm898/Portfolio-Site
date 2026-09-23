@@ -113,7 +113,7 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
             mutation of the constants themselves moves both sides of every
             clause here together and is invisible to this family. The one
             thing that can see it is the shipped picture. */
-         APEX_HALF_MM, APEX_END_HALF_MM, APEX_ARC_ROWS,
+         APEX_HALF_MM, APEX_END_HALF_MM, APEX_ARC_ROWS, APEX_GRID,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
@@ -3099,7 +3099,14 @@ export async function apexNibAssertions(page, row) {
     const d1 = 1e-4, d2 = d1 / 2;
     const s1 = (law(uLaw) - law(uLaw - d1)) / (d1 * asked);
     const s2 = (law(uLaw) - law(uLaw - d2)) / (d2 * asked);
-    const slope = Math.abs(2 * s2 - s1);
+    /* QUANTISED THE SAME WAY THE GEOMETRY QUANTISES IT, and for the reason
+       its own header gives: `slope` is a double cancellation whose last bits
+       the two V8s this project runs on do not agree on, and the value feeds
+       DISCRETE decisions downstream. The grid is part of the LAW, so it is
+       restated here — a rebuild that skipped it would be comparing a
+       quantised number against an unquantised one and would fire on every
+       row, which is what it did the first time it was run. */
+    const slope = Math.floor(Math.abs(2 * s2 - s1) / APEX_GRID) * APEX_GRID;
     const xLaw = uLaw * asked;
     const xFace = xLaw + (TIP_HALF_MM - APEX_HALF_MM) / slope;
     const sec = Math.sqrt(1 + slope * slope);
@@ -3131,7 +3138,7 @@ export async function apexNibAssertions(page, row) {
       bad.push(`AN2: ${at}the nib terminates on a half-width of ${ap.endHalfMm} mm, not the declared ${APEX_END_HALF_MM}`);
     if (Math.abs(ap.capMm - (drawn - xLaw)) > 1e-9)
       bad.push(`AN2: ${at}the cap reports a length of ${ap.capMm} mm where the drawn length less the crossing is ${drawn - xLaw}`);
-    if (Math.abs(ap.arcU - xFace / drawn) > 1e-9)
+    if (Math.abs(ap.arcU - Math.floor((xFace / drawn) / APEX_GRID) * APEX_GRID) > 1e-9)
       bad.push(`AN2: ${at}the arc is declared to begin at u ${ap.arcU} where ${xFace} mm on a ${drawn} mm blade is u ${xFace / drawn}`);
   });
 

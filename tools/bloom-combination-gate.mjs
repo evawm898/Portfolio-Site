@@ -769,7 +769,16 @@ function measureCell({ G, W }, DEFAULTS, pair, va, vb) {
   if (!m.petal || !m.petal.grid) {
     throw new Error(`combination gate: "${pair.id}" at ${pair.a.id}=${num(va)} x ${pair.b.id}=${num(vb)} built NO retained petal, so the \`self\` measure has nothing to read. A pair whose grid can empty the petal needs a different measure, not a skip.`);
   }
-  const r = W.measureWall(m.petal.grid);
+  /* THE SAME NAMED EXCLUSION THE WALL INSTRUMENT PASSES (the apex-nib
+     session): `self` is ITS quantity through ITS function, so this must hand
+     it the same argument or the two owners of one measure would disagree —
+     which is the whole reason this gate imports `measureWall` rather than
+     carrying a second implementation. `measureWall`'s own header says why the
+     region is excluded and what owns it instead. */
+  const ap = m.petal.tipCap && m.petal.tipCap.apex;
+  const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+  const wedgeLenMm = ap && ap.drawnLengthMm > 0 ? (m.petal.grid[0].rows[0].thickness || 0) / ap.drawnLengthMm : 0;
+  const r = W.measureWall(m.petal.grid, { nibFromU, wedgeLenMm });
   return { mm: r.self, at: { u: r.selfAt[0], v: r.selfAt[1] }, rows: r.rows, columns: r.columns };
 }
 

@@ -212,6 +212,71 @@ the geometry's graded `rimArcTable`, and that is untouched.
 
 ---
 
+## 6b. The wall instrument's two-skin model is inadequate at a converging tip
+
+`measureWall` reconstructs two skins offset ±t/2 from the captured MID-SURFACE
+grid. That has been an approximation at every margin since the edge profile
+shipped (#278) — the emitted solid closes its rim with a half-round BEAD, not
+with two skins meeting at a cliff — and it costs nothing while the margins are
+far apart.
+
+**The nib converges the blade to a 0.10 mm mini-face, so the two reconstructed
+skins approach each other there BY CONSTRUCTION.** Measured before any
+exclusion existed: five states reported a NEW self-approach and four a
+normal-offset cost, and **every one of them sat at u = 1.00**.
+
+**WHAT SAYS IT IS THE MODEL AND NOT THE SOLID**: the census — which reads the
+REAL emitted triangles, bead and all — reads **exactly 0 within-shell pairs**
+on those same buckled states on this tree.
+
+So the exclusion is NAMED, not widened (ST9's remedy, one instrument later),
+and **its extent is the last SHEET THICKNESS of blade, derived from a length
+and not from a row count**: two skins offset ±t/2 from a converging
+mid-surface must approach within the last `t`, because that is exactly where
+the outline's own width falls below the offset. **Two narrower rules were
+tried and measured inadequate** — stopping at the law's crossing, and at the
+crossing plus one row — because the pair this exists for is the tip's top skin
+(row 55, u 1.0000) against the bottom skin at **row 48, u 0.9824**: seven
+lattice rows apart and 0.62 mm apart on the blade. The combination gate passes
+the same argument, because `self` is the wall instrument's quantity through
+its function.
+
+**FOUR DECLARED MAGNITUDES MOVED AND ARE RE-RECORDED** (#213's rule, both
+directions, previous figures kept in each note):
+
+| record | was | now | site | reading |
+|---|---|---|---|---|
+| V5 `roll-max` | 0.659 | 0.658 | u 0.21 | nowhere near the tip — the reparameterisation moving every station |
+| V5 `form-max` | 0.042 | **0.008** | u 0.11 | WORSE, at the base of the blade, same site; a near-contact this tight moves with the stations |
+| V5 `buckle-on-form` | 0.254 | 0.300 | u 0.29 | IMPROVED, same site, same cause |
+| V4 `buckle-on-form` | 0.607 | 0.565 | — | IMPROVED |
+
+V4 is fully clean after the exclusion (worst own contribution 0.090 mm against
+a 0.12 mm bar), and V5 reports **no NEW self-approach** — only the three
+declared ones at their new magnitudes. `--negative-control` passes: all
+mutants behave.
+
+## 6c. The tangent is a double cancellation, and it is quantised
+
+`slope` is `|2·s2 − s1|`: each `s` is a difference quotient of the lamina — a
+difference of two ~0.8 mm values agreeing to ~2e-4 mm — and then a difference
+of two ~1.77 mm/mm values agreeing to ~5e-3. Six digits gone, so the relative
+error is of order **1e-10**, and the lamina is transcendental, so **the two V8s
+this project runs on do not agree on it**.
+
+X0 caught it: **12 floats of `DOME LEAN: EVA_CONFIG flat` differing by
+2.98e-8 mm**, six orders above X0's own derived bar, on a row that passes on
+the base commit. **Sixth instance of the discrete-decision-on-a-continuous-
+quantity class here**, and the remedy is the one session 42 and session 38
+already used: a POWER-OF-TWO GRID, not a tolerance, because the noise feeds
+discrete decisions downstream (`cumAt`'s `Math.round` turns a last-bit
+difference in `arcU` into a whole ladder sample). `APEX_GRID = 2^-20` is
+3,600× the measured noise and 1e-6 of the quantities themselves; it moves the
+drawn outline by ~3e-7 mm, four orders under the live mesh floor. `slope` and
+`arcU` are floored onto it, and AN1 restates the grid because a rebuild that
+skipped it compares a quantised number against an unquantised one — which is
+what it did the first time it ran.
+
 ## 7. The re-derivations
 
 Eva's ruling: *"C1/A2 re-derived onto the builder's reported length and

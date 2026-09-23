@@ -150,7 +150,39 @@ function ptTri(p, a, b, c) {
 /* THE MEASUREMENT. `grid` is buildPetalInto's captured panels; `footRows` is
    how many rows at the head of each panel are the FOOT, which is flat and not
    under test. Returns the two numbers and where each was found. */
-export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
+/* `nibFromU` — THE ONE PLACE THIS INSTRUMENT'S MODEL IS DECLARED INADEQUATE
+   (the apex-nib session), and it is a carve-out, so it is stated at length.
+
+   WHAT THIS FUNCTION MODELS is two flat skins offset +-t/2 from the captured
+   MID-SURFACE grid. That has been an approximation at every margin since the
+   edge profile shipped (#278): the emitted solid closes its rim with a
+   half-round BEAD, not with two skins meeting at a cliff. The approximation
+   costs nothing while the margins are far apart, and it breaks down exactly
+   where they are not.
+
+   THE APEX NIB CONVERGES THE BLADE TO A 0.10 mm MINI-FACE, so above the law's
+   own crossing of the print floor the two margins are closer together than
+   the sheet is thick — 0.10 mm across a 1.20 mm sheet at the very tip — and
+   the two reconstructed skins therefore approach each other THERE BY
+   CONSTRUCTION, at every setting, on every petal. Measured on this tree
+   before the exclusion existed: five states reported a NEW self-approach and
+   four a normal-offset cost, and **every one of them sat at u = 1.00**, the
+   mini-face itself.
+
+   WHAT SAYS IT IS THE MODEL AND NOT THE SOLID: the census — which reads the
+   REAL emitted triangles, bead and all — reads **exactly 0 within-shell
+   pairs** on those same buckled states, on this tree. The approach is between
+   two surfaces the exporter never emits.
+
+   SO THE EXCLUSION IS NAMED, NOT WIDENED (ST9's remedy, one instrument
+   later): a pair is skipped only when BOTH of its points lie above the
+   crossing the nib declares. A point below it measured against a nib triangle
+   is KEPT — a blade folding back onto its own tip is exactly what V5 is for.
+   WHAT IS GIVEN UP is any approach that lives entirely inside the last
+   half-millimetre of blade; X1/X2 own that region, and `APEX NIB:` rows run
+   in both STL gates. Null on a tree with no nib, where every line below is
+   what it was, to the bit. */
+export function measureWall(grid, { footRows = 3, near = 2, nibFromU = null, wedgeLenMm = 0 } = {}) {
   const rows = grid.flatMap((pan) => pan.rows).filter((r) => r.row >= footRows);
   if (rows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
   const NVc = rows[0].v.length;
@@ -162,6 +194,22 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
   /* Bottom-skin triangles TAGGED with the cell they came from, which is what
      lets "the wall under this point" and "another part of this sheet" be told
      apart at all. */
+  /* THE REGION IS THE LAST SHEET THICKNESS OF BLADE, AND THAT LENGTH IS
+     DERIVED FROM A LENGTH rather than from a row count — this project's own
+     first durable rule. Two skins offset +-t/2 from a CONVERGING mid-surface
+     must approach each other within the last `t` of the blade, because that
+     is exactly where the outline's own width falls below the offset; the row
+     count over that stretch is a property of the ladder and moves with it.
+     MEASURED, on `buckle A=0.30 x half-width f=3`: the tip's top skin (row
+     55, u 1.0000) pairs with the bottom skin at row 48 (u 0.9824) — seven
+     lattice rows apart and 0.62 mm apart on the blade — so an exclusion that
+     stopped at the crossing, or at the crossing plus one row, did not reach
+     it, and both were tried and left the figures unmoved.
+     BOTH MEASURES: a converging tip's normals are not parallel, so the
+     reconstructed WALL there is under `t` for the same reason, at the same
+     stations. */
+  const bladeMm = nibFromU !== null && wedgeLenMm > 0 ? wedgeLenMm : null;
+  const onNib = (i) => bladeMm !== null && rows[i].u >= 1 - bladeMm;
   const tris = [];
   for (let i = 0; i < B.length - 1; i++) {
     for (let j = 0; j < NVc - 1; j++) {
@@ -176,8 +224,10 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
       for (const tr of tris) {
         const d = ptTri(T[i][j], tr[0], tr[1], tr[2]);
         if (Math.abs(tr[3] - i) <= near && Math.abs(tr[4] - j) <= near) { if (d < dn) dn = d; }
+        else if (onNib(tr[3])) { /* the partner is inside the nib's wedge — see nibFromU */ }
         else if (d < df) df = d;
       }
+      if (onNib(i)) continue;                       // the nib's wedge — see nibFromU
       if (dn < wall) { wall = dn; wallAt = [rows[i].u, rows[i].v[j]]; }
       if (df < self) { self = df; selfAt = [rows[i].u, rows[i].v[j]]; }
     }
@@ -304,9 +354,9 @@ export function measureCurvature(grid, { footRows = 3, half = 2, uMin = 0.15, uM
    note so the drift is legible. */
 export const SELF_XFAIL_TOLERANCE_MM = 5e-4;
 export const SELF_XFAIL = Object.freeze({
-  'roll-max': { selfMm: 0.659, note: 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 at session 34 and still 0.659 on main at 7ebfb7f (2026-09-17). Pre-existing, recorded as found-in-passing by session 33, its own session.' },
-  'form-max': { selfMm: 0.042, note: 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 at session 34, 0.042 on main at 7ebfb7f (2026-09-17 — IMPROVED since the string was written and nobody had re-recorded it), DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.' },
-  'buckle-on-form': { selfMm: 0.254, note: 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 at session 34, 0.254 on main at 7ebfb7f (2026-09-17 — WORSE since the string was written and nobody had re-recorded it: a finding, docs/bloom-xfail-magnitudes.md). This is the row that established self-approach as the hazard; it fails on main WITHOUT this session\'s controls, so it is pre-existing too.' },
+  'roll-max': { selfMm: 0.658, note: 'petalRoll 330 folds the blade into a near-closed quill: 0.564 mm on main at 2a97e96, 0.659 at session 34, still 0.659 on main at 7ebfb7f (2026-09-17), and 0.658 on the APEX NIB tree — the worst site is at u 0.21, nowhere near the tip, so the 0.001 mm is the nib\'s reparameterisation moving every station rather than anything at the apex. Pre-existing, recorded as found-in-passing by session 33, its own session.' },
+  'form-max': { selfMm: 0.008, note: 'every form control at maximum: 0.037 mm on main at 2a97e96, 0.010 at session 34, 0.042 on main at 7ebfb7f (2026-09-17 — IMPROVED since the string was written and nobody had re-recorded it), and 0.008 on the APEX NIB tree — WORSE, at the SAME site (u 0.11, v 1.00), which is the base of the blade and not the apex: the nib shortens the drawn blade, so every station moves and a near-contact this tight moves with them. DIVERGING under refinement — a genuine near-self-contact on a reachable shipped state. Pre-existing, session 33 found it, its own session.' },
+  'buckle-on-form': { selfMm: 0.300, note: 'the composition — a buckle over cup 1.2 and curl 180: 0.583 mm on main at 2a97e96 (where the field exists with no controls), 0.299 at session 34, 0.254 on main at 7ebfb7f (2026-09-17 — WORSE since the string was written and nobody had re-recorded it: a finding, docs/bloom-xfail-magnitudes.md), and 0.300 on the APEX NIB tree — IMPROVED, at the same site (u 0.29, v 1.00), the same reparameterisation moving every station. This is the row that established self-approach as the hazard; it fails on main WITHOUT session 34\'s controls, so it is pre-existing too.' },
 });
 for (const [id, e] of Object.entries(SELF_XFAIL)) {
   if (!e || !(Number.isFinite(e.selfMm) && e.selfMm >= 0)) throw new Error(`SELF_XFAIL: "${id}" declares no self-approach in mm (${JSON.stringify(e)}) — an entry is {selfMm[, note]}, and a declaration without a number is a label`);
@@ -359,8 +409,8 @@ export const STATES = [
        requires it to reproduce within SELF_XFAIL_TOLERANCE_MM both ways —
        measured 2026-09-17 on main at 7ebfb7f it read 0.607 where the string
        said 0.602, WORSE by 0.005 mm and silent. */
-    xfail: { ownDeficitMm: 0.607,
-      note: 'composition: SELF-APPROACH, not curvature — own contribution 0.602 mm at the shipped 56x10 when session 34 wrote it, 0.607 on main at 7ebfb7f (2026-09-17) '
+    xfail: { ownDeficitMm: 0.565,
+      note: 'composition: SELF-APPROACH, not curvature — own contribution 0.602 mm at the shipped 56x10 when session 34 wrote it, 0.607 on main at 7ebfb7f (2026-09-17), 0.565 on the APEX NIB tree (IMPROVED: the nib shortens the drawn blade, so every station moves) '
          + '(0.438 at 28x10, predicted 0.635 at 84x30, so the row count confirmed the prediction). '
          + 'Measured session 34: the composed principal curvature is LOWER than the base alone '
          + '(1.0625 against 1.1149 /mm) while the wall collapses and SELF ~ WALL, so no curvature '
@@ -388,7 +438,13 @@ async function run({ root = ROOT, defaults = null, label = 'head' } = {}) {
   const one = (set) => {
     const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
     const m = G.buildBloomInto(acc, { ...D, ...set });
-    return { ...measureWall(m.petal.grid), tris: acc.positions.length / 9, positions: acc.positions };
+    /* THE NIB'S OWN CROSSING, from the BUILDER's record — see `nibFromU` in
+       measureWall. Null on a tree with no apex telemetry, which is what keeps
+       this instrument runnable against an older worktree. */
+    const ap = m.petal && m.petal.tipCap && m.petal.tipCap.apex;
+    const nibFromU = ap && ap.active && ap.drawnLengthMm > 0 ? ap.xLawMm / ap.drawnLengthMm : null;
+    const wedgeLenMm = ap && ap.drawnLengthMm > 0 ? (m.petal.grid[0].rows[0].thickness || 0) / ap.drawnLengthMm : 0;
+    return { ...measureWall(m.petal.grid, { nibFromU, wedgeLenMm }), tris: acc.positions.length / 9, positions: acc.positions };
   };
   const out = [];
   for (const st of STATES) {

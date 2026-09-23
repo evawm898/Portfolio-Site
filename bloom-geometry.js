@@ -3603,6 +3603,30 @@ export const APEX_ARC_ROWS = 6;
 /* The one-sided difference the flank's tangent is read with, and the slope
    under which there is no tangent to carry on. Both are about the DERIVATIVE's
    own conditioning, not about the geometry. */
+/* THE TANGENT AND THE ARC'S OWN STATION ARE QUANTISED ONTO A POWER-OF-TWO
+   GRID, AND THAT IS THIS PROJECT'S SIXTH INSTANCE OF ONE BUG CLASS (session
+   38's §B10.7, session 42's `LOBE_RELIEF_GRID`, the ladder's
+   `LADDER_BLEND_GRID`, `RIM_INSET_TOL_ULPS`, `X0_TOL_ULPS`).
+
+   `slope` IS A DOUBLE CANCELLATION. It is `|2 s2 - s1|`, where each `s` is a
+   difference quotient of the lamina — a difference of two ~0.8 mm values that
+   agree to ~2e-4 mm (two digits gone), and then a difference of two ~1.77
+   mm/mm values that agree to ~5e-3 (four more). What is left carries a
+   relative error of order 1e-10, and the lamina is transcendental, so the two
+   V8s this project runs on do NOT agree on it: X0 measured **12 floats of
+   `DOME LEAN: EVA_CONFIG flat` differing by 2.98e-8 mm**, six orders above
+   its own derived bar, on a row that passes on the base commit.
+
+   A GRID, NOT A TOLERANCE, because the noise feeds DISCRETE decisions
+   downstream — `cumAt`'s `Math.round` turns a last-bit difference in `arcU`
+   into a whole ladder sample (~5.5e-4 of `u`), which is the defect session 38
+   found and session 42 found again. Flooring onto a power of two is EXACT in
+   IEEE-754, so the quantised value is the same double in every engine.
+   2^-20 is 3,600x the measured noise and 1e-6 of the quantities themselves:
+   it moves the drawn outline by ~3e-7 mm, which is four orders under the
+   0.15 mm live mesh floor and seven under a printer. */
+export const APEX_GRID = Math.pow(2, -20);
+const gridFloor = (x) => Math.floor(x / APEX_GRID) * APEX_GRID;
 const APEX_TANGENT_DU = 1e-4;
 const APEX_MIN_SLOPE = 1e-9;
 const APEX_FLOOR_EPS = 1e-12;
@@ -3639,7 +3663,7 @@ export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm, petiole = fal
   const d1 = APEX_TANGENT_DU, d2 = d1 / 2;
   const s1 = (lam(uLaw) - lam(uLaw - d1)) / (d1 * lengthMm);
   const s2 = (lam(uLaw) - lam(uLaw - d2)) / (d2 * lengthMm);
-  const slope = Math.abs(2 * s2 - s1);
+  const slope = gridFloor(Math.abs(2 * s2 - s1));
   if (!(slope > APEX_MIN_SLOPE)) return { ...inert, why: 'the law arrives with no slope to carry on' };
   const xFaceMm = xLawMm + (TIP_HALF_MM - APEX_HALF_MM) / slope;
   const sec = Math.sqrt(1 + slope * slope);
@@ -3661,7 +3685,7 @@ export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm, petiole = fal
     },
     /* WHERE THE ARC BEGINS, in the drawn parameterisation — the ladder's
        resolution demand is exactly this window and nothing else. */
-    arcU: drawnLength > 0 ? xFaceMm / drawnLength : 1,
+    arcU: drawnLength > 0 ? gridFloor(xFaceMm / drawnLength) : 1,
   };
 }
 /* Where the foot's width stops floor-ing the blade. Frozen at the
