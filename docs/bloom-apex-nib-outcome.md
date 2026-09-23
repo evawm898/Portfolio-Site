@@ -421,12 +421,109 @@ stations land, not what the petals do to each other.
 
 ## 10. What is NOT done, and is named rather than left to be found
 
-* **THE LEAF'S IDENTICAL STUB.** Excluded by declaration (§4); its own
-  partition and its own ruling.
-* **`ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX.** It builds 3,090,816
-  triangles in **47.7 s** here against the harness's 30 s settle timeout —
-  and **46.3 s on a worktree of the base commit**, so it is the box and not
-  this change. Verified in CI only.
+* **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**
+* **`ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX, AND IT RUNS TO COMPLETION IN
+  CI — CONFIRMED, NOT ASSUMED.** It builds 3,090,816 triangles in **47.7 s**
+  here against the harness's 30 s settle timeout, and **46.3 s on a worktree
+  of the base commit**, so it is the box and not this change.
+  **WHAT CI DOES WITH IT**, read off the base commit's own run of this gate
+  (`bloom-export-watertight` run 35833638574 on `2464d50`, 07:48 → 12:37,
+  289 min, conclusion success), verbatim from its last line:
+  > `export gate: PASS — 908 of 909 attempted configs reached the results and
+  > every one exports watertight; 1 config(s) the generator REFUSED on its own
+  > triangle budget, declared and asserted by XR1 (named above) rather than
+  > skipped.`
+  So the row is **attempted, built, and asserted**: the one config that does
+  not reach the results is `ALL MAX`, and it does not reach them because the
+  generator REFUSES to export it on the triangle budget — which XR1 asserts in
+  both directions (a declared row that started exporting fails as hard as one
+  that refuses wrongly). It is not dropped and it is not skipped; #220's
+  headline is what makes those three states distinguishable in the report at
+  all. **The same line is checked on this PR's own run before merging.**
+  Its `EXPORT_REFUSED_XFAIL` entry — 3,090,816 triangles — is unchanged, which
+  is the count this tree builds to the integer: the nib adds no triangles.
+  **Its `SELF_INTERSECTION_XFAIL` entry is carried forward UNMEASURED**, named
+  here rather than silently kept: the census sweep skips an export-refused row
+  because no STL exists for X1 to read, and re-measuring it needs
+  `bloom-xfail-magnitudes --include-refused` on a 3.1-million-triangle build.
+  Nothing gates it either way.
 * **THE COUPON PLAN GAINS A 0.40 mm TIP.** Eva's ruling. The parked cantilever
   coupon is where every floor in this project stops being a line we drew
   ourselves; the nib's face is now one of them.
+
+---
+
+## 11. BACKLOG: the leaf's tip carries the same stub, untouched
+
+`apexNibPlan` refuses a leaf by declaration — `cap.petiole` is the leaf's own
+flag and the only thing that sets it. This is what that costs, what held it,
+and what closing it would take.
+
+### What it looks like today
+
+`buildLeafInto` floors the blade at `TIP_HALF_MM` in BOTH modes (the constant,
+not the accumulator's floor — so live and export agree), and the leaf's tip law
+is the same superellipse. **Every leaf therefore ends on a flat face 1.60 mm
+across at every value of `leafTipShape`**, exactly as every petal did before
+this PR. The figures are already measured, in
+`docs/bloom-leaf-tip-shape-outcome.md`:
+
+| `leafTipShape` | share of the length that is the stub | mm at 12 / 52 / 120 mm long |
+|---|---|---|
+| 0.60 (acute) | **21.28%** | 2.55 / 11.07 / 25.54 |
+| 1.30 (the shipped leaf) | 2.06% | 0.25 / 1.07 / 2.47 |
+| 3.00 (flat) | 0.02% | 0.00 / 0.01 / 0.02 |
+
+**The share is invariant in the LENGTH** — the outline meets the floor where
+`(W/2)·f(u) = 0.8 mm`, a width equation — so a longer leaf does not dilute it;
+at width 3 mm an acute leaf spends **49.2%** of itself on the stub. **And a
+pointier exponent makes the stub LONGER, not sharper**: an acute superellipse
+hugs the axis over the last stretch, so `leafTipShape` moves the SHOULDER while
+the END stays 1.60 mm. That is the same sentence this PR's §1 writes about the
+petal, one control over.
+
+### Why it was held
+
+Not for effort — the refusal is one line. Three reasons, in order:
+
+1. **`leafLength` would stop meaning the drawn length, and that is a RULING.**
+   Eva ruled it for `petalLength` explicitly ("petalLength = asked length");
+   a leaf is a different control with its own read-out line, its own LF family
+   and its own declared magnitudes, and nobody has ruled the same thing for it.
+2. **The byte partition and the census re-record would span two features.**
+   This PR moved 153 declared magnitudes and every row whose blade clears the
+   print floor; adding the leaves would put block 33's rows in the same
+   partition with no way to attribute a mover to one change or the other.
+   A partition that cannot attribute is not a partition.
+3. **The leaf's own tip has a control this session did not rule on.** The
+   nib's flank is the law's tangent; on a leaf that law is `leafTipShape`'s,
+   and whether an acute leaf should come to a 0.10 mm point or keep a visible
+   terminal is an aesthetic question about a different organ.
+
+### What closing it would take
+
+* **Geometry**: remove the `petiole` guard; decide whether the leaf reads the
+  same `APEX_HALF_MM` / `APEX_END_HALF_MM` or gets its own pair. The nib's
+  plan is already mode-free and `buildLeafInto` already floors on the
+  constant, so the two agree on which mode decides nothing.
+* **LF9** needs A6's own re-derivation: its load-bearing clause reads the
+  exponent back off the emitted half-widths, and the nib's flank and arc are
+  strictly falling, so a fit that runs through them reads a different exponent
+  from the one asked. That is the defect this PR measured at **1.7532 for an
+  asked 1.70** on the petal, and it would read the same way on a leaf.
+* **LF4** is a biconditional against the plan's own `insetSatisfied`, which is
+  a function of the leaf's LENGTH: a truncated leaf clears the head at node
+  insets that do not clear one today, so the clause's two sides both move.
+* **The read-out**: the leaf's `tipClamp` line says the stub's share and which
+  lever moves it. With a nib there is no stub, so the line says something
+  else — an APEX NIB line of the leaf's own, or nothing.
+* **The cantilever figure**: the worst lever is a 120 mm leaf on the derived
+  1.2 mm petiole, `L/d = 100`, printed on every leafed build. A truncated leaf
+  is shorter, so that number moves. It is `UNMEASURED — no coupon has been
+  printed` either way.
+* **A partition and a frozen phase** if the row set moves, and a census
+  re-record for block 33's twelve rows.
+* **What it would NOT touch**, checked rather than assumed: the petiole's own
+  weld at the leaf's BASE (the half-step ring offset), ST9's petiole
+  exemption (the rod's axis, not the blade), and the combination gate's
+  `leaf-stem` measure, whose nearest blade point to the stem is at the base.
