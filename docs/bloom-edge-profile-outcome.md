@@ -845,3 +845,56 @@ census rule); with `tools/bloom-self-intersection.mjs` planted in the list it
 rule *and* geometry is exactly what the allowlist exists to catch. The only PR
 the step could ever have caught is still caught, and `--scope` remains a
 hand-run tool.
+
+## 17. THE EXPORT GATE DESTROYED ITS OWN DIAGNOSIS, AND THE RUN READ AS A CRASH
+
+`bloom-export-watertight` run 35778167004 on `6f95235` exited 1 after 3h37m in
+the matrix step, having printed **201 of the 909 rows, no summary and no failure
+block**. The last stdout line is a row's `SAGITTA`, and the last five gates in
+the tail all print `ok`. Read naively that is a crash at row 202 —
+`ZYGO: 3 layers x ALL INNER MAX x ALL FORM MAX (every clamp binds)`.
+
+**It is not. The output was TRUNCATED, and the tell is that the cut is
+MID-BLOCK.** Every row prints its `ok` line then a fixed run of annotations
+ending `feet/petals …` and `SOLID: …`; the last row printed stops after
+`SAGITTA` with those two missing. A process that died between rows would have
+emitted a complete block. Row 202 itself passes locally in 28 seconds with X1
+green at its recorded 28,016 pairs / 1.7947 mm.
+
+**THE MECHANISM: `process.exit()` DOES NOT FLUSH A PIPED stdout, AND A CI LOG IS
+A PIPE.** Writes to a pipe are asynchronous, and this gate prints every row only
+after the whole matrix has run, so the entire report is in flight when the
+verdict fires. On a PASSING run the module runs off its end and node drains
+normally — which is why the defect has never been visible. On a FAILING one
+`exit(1)` discards whatever has not reached the pipe: the rest of the rows, the
+`console.error` failure block, and the verdict `#220` added specifically so that
+"the last line can never read as a pass on a failing run".
+
+**Measured, against a written-down control rather than the idiom's reputation:**
+200,001 buffered lines through a pipe followed by `exit(1)` — **3,796 survive
+today and 200,001 survive with the streams drained first**, the summary line
+among them. On the gate itself, with one xfail record bent by a single pair, the
+fixed path gives exit 1, the verdict on stdout, and the X1 detail plus the row
+census on stderr.
+
+`flushAndExit()` drains both streams before exiting, in **both** STL gates —
+one defect in two copies of one instrument, and this project moves them
+together. The browser is closed well before the verdict in each, so nothing is
+waiting on the drain.
+
+**This is #220's own finding one layer down.** That session made a failing run
+say so; the exit call was throwing the sentence away. It also explains why the
+failure is diagnosable only by re-running: `get_job_logs` 404s while a job runs,
+the blob URL is proxy-denied, and the surviving tail is the part of the report
+that was *fine*.
+
+**AND IT NARROWS THE SUSPECT LIST BY ITSELF.** `bloom-connectedness` passed on
+the same tree and the same 909 rows, and `X0`/`X1`/`X2` ride in the **export
+gate only** (on cost — the charter's own note). The families unique to the
+failing gate are therefore the census ones, which is exactly the population this
+session re-recorded — **231 entries, measured in Node**, against the charter's
+standing rule that *a re-record measured in Node is not confirmed until the
+browser agrees*, because X1's band on pairs is exactly 0 and the gate's census
+reads the doubles Chromium's V8 computes. `X1 coverage` is not the failure: every
+one of the 231 declared labels exists in the 909-row matrix and the single
+`EXPORT_REFUSED_XFAIL` label does too, checked statically.
