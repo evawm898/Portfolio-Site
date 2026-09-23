@@ -500,6 +500,81 @@ same instrument on the same lattice. The closest approach is at **u 0.323 on
 both trees** — mid-blade, nowhere near the tip — so what moved is where the
 stations land, not what the petals do to each other.
 
+## 9c. The five worst movers: where each one sits, and why it moved (Eva's ask)
+
+Measured with `node tools/bloom-census-attribute.mjs`, which carries every
+within-shell pair the census collects back to the nearest point of the
+BUILDER'S OWN captured mid-surface and names the region of the blade it lands
+in — the nib's boundary read off each petal's own `tipCap.apex` rather than
+restated. Run on both trees. EXPORT mode, the builder's doubles, 56 × 10 per
+panel at NU 56; a pair count is a property of the tessellation.
+
+The five worst by ABSOLUTE pair increase, with the ratio and span leaders
+beside them because "worst" means three different things:
+
+| row | base | this tree | worst pair sits | in the nib |
+|---|---|---|---|---|
+| `6 layers x innerCup min (-0.8)` | 297 / 0.2054 | **6542 / 0.2917** | **NIB**, petal 23, u 0.9710, v −0.333 | **6479 of 6542** |
+| `6 layers x innerCup max (1.2)` | 3240 / 0.2835 | **8896 / 0.2967** | blade, petal 9, u 0.9776 | 5805 of 8896 |
+| `ALL PETALS: max x petalCount 40 x ALL THIN x spread min` | 37560 / 0.4428 | **40080 / 0.4392** | blade, petal 23, **u 0.6809** | 4317 of 40080 |
+| `GRADIENT: cup gradient max x cup max x widest petal` | 160 / 0.1371 | **2416 / 0.3788** | **NIB**, petal 7, u 0.9995 | **2394 of 2416** |
+| `ZYGO: cup clamp binds` | 160 / 0.1264 | **2144 / 0.3904** | blade, petal 6, u 0.9830 | 1565 of 2144 |
+| *(worst by RATIO)* `BUCKLE: over a cupped blade (cup 1.2)` | 48 / 0.1612 | **1887 / 0.4974** — **×39.3** | **NIB**, petal 6, u 0.9986 | **1771 of 1887** |
+| *(worst by SPAN)* `petalCup max (1.2)` | 80 / **0.0239** | 1088 / **0.3904** | blade, petal 6, u 0.9830 | 821 of 1088 |
+
+**EVERY ONE OF THE SEVEN IS A CUP ROW, AND THAT IS THE FINDING RATHER THAN A
+COINCIDENCE.** Four of the seven put EVERY pair they have, on both trees, in
+the top tenth of the blade; a fifth adds 793 pairs in u 0.8–0.9 and none below
+it. The band histograms are in the run's own output and the tool prints them
+precisely so the two trees can be diffed on a quantity that means the same
+thing on a tree with no nib.
+
+**THE MECHANISM IS ONE MECHANISM AND IT IS THE FEATURE DOING WHAT IT WAS BUILT
+TO DO.** Today the last stretch of every blade is a PARALLEL STRIP two print
+floors across — the two margins running side by side at a constant 1.60 mm.
+A cup curls those margins toward each other; over a constant-width strip they
+hold a constant separation, and on `petalCup max` they were only just clear
+(**80 pairs at 0.0239 mm**, a sixth of the live mesh floor). The nib CONVERGES
+that strip from 1.60 mm to 0.10 mm over 0.39 mm of cap, so it brings the two
+margins together BY CONSTRUCTION — and a cup already curling them inward now
+closes them. **That is the outline moving, at exactly the station the nib
+moved it**, and it is the same sentence for all seven.
+
+**NOTHING IS UNEXPLAINED BY THE OUTLINE MOVING — AND ONE ROW NEEDED TWO
+EXPLANATIONS, WHICH IS THE PART WORTH FLAGGING.** `ALL PETALS: max x
+petalCount 40 x ALL THIN x spread min` is the only one of the seven whose worst
+pair is not near the tip and the only one whose **span FELL** (0.4428 →
+0.4392). Its +2520 is a NET of two movements in opposite directions:
+
+| band | base | this tree | |
+|---|---|---|---|
+| u 0.9–1.0 | 4714 | **8331** | **+3617** — the mechanism above |
+| every band below it | 32846 | **31749** | **−1097** |
+
+The −1097 is the RE-PARAMETERISATION, which is the outline moving in the
+SECOND way this change moves it: `petalLength` is the ASKED length, the drawn
+blade is +0.124 mm longer at the shipped exponent, so every station sits at a
+slightly different physical place and a fold whose pair count is a property of
+the tessellation re-counts. The row's own worst pair says so plainly: **u
+0.6809 here against u 0.6803 on the base, same petal, same margin (v −1.000),
+0.0006 of `u` apart** — the same fold re-stationed, not a new one, which is
+also why its span fell rather than rose.
+
+**SO THE HONEST STATEMENT IS THAT THE OUTLINE MOVES IN TWO PLACES AND BOTH ARE
+THIS CHANGE'S**: the cap, at the tip, which accounts for every row above; and
+every station's physical place, through the drawn length, which accounts for
+the movements below the tip on the one row that has them. **0 of the seven need
+a third explanation.**
+
+**THE CARRY-BACK IS SOUND AND ITS OWN NUMBER SAYS SO:** `off-lamina` is 0 on
+all seven rows on both trees — every collected pair landed on a petal's
+mid-surface — and the reported distances run **0.077 to 0.527 mm**, which is
+half a sheet on the states whose sheet is 1.2 mm and half a thin one on
+`ALL THIN`. A site on an emitted skin sits `t/2` from the mid-surface by
+construction, so that is the healthy reading and not a tolerance.
+
+---
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**

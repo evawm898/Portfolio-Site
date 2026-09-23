@@ -1600,6 +1600,22 @@ silent. **X1's band on pairs is EXACTLY 0, so a declared figure that is not the 
 CI on a tree that is RIGHT** — the same damage as a stale record and harder to read, because
 the message says the geometry moved. **VS5's pin moved −1.1701 → −1.1944**, at u 0.323 on both
 trees — mid-blade, so it is where the stations land and not what the petals do to each other.
+**AND THE WORST MOVERS ARE ALL CUP ROWS, ALL AT THE TIP, AND ALL THE FEATURE ITSELF** (§9c,
+`node tools/bloom-census-attribute.mjs`, which carries every collected pair back to the nearest
+point of the BUILDER'S own captured mid-surface): `6 layers x innerCup min` 297 -> **6542** with
+6479 of them IN THE NIB, `innerCup max` 3240 -> 8896, `GRADIENT: cup gradient max x cup max`
+160 -> 2416 with 2394 in the nib, `ZYGO: cup clamp binds` 160 -> 2144, and by ratio
+`BUCKLE: over a cupped blade` 48 -> **1887 (x39.3)**. **The mechanism is one mechanism**: the
+last stretch of every blade used to be a PARALLEL STRIP two floors across, and a cup curls its
+two margins toward each other at a CONSTANT separation — on `petalCup max` only just clear, 80
+pairs at 0.0239 mm. The nib converges that strip from 1.60 mm to 0.10 mm, bringing the margins
+together BY CONSTRUCTION, so a cup already curling them inward closes them. **THE ONE ROW THAT
+NEEDED TWO EXPLANATIONS IS `ALL PETALS: max x 40 x ALL THIN x spread min`**, whose span FELL and
+whose worst pair is mid-blade: its +2520 is **+3617 in the top tenth against −1097 in every band
+below it**, and its worst pair sits at **u 0.6809 here against 0.6803 on the base, same petal,
+same margin** — the same fold RE-STATIONED by the drawn length, which is the outline moving in
+the second of the two ways this change moves it. **0 of the seven need a third explanation**, and
+`off-lamina` is 0 on all seven on both trees.
 **AND `bloom-xfail-magnitudes --emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS** — it swapped
 `JSON.stringify`'s double quotes for single ones, which is correct until a label holds an
 APOSTROPHE, and eight do; the one thing that flag exists for could silently not be done for those
