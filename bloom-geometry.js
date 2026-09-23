@@ -7315,7 +7315,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
      count and the drawn radius ride here for the same reason: they are what
      the cost is a function of, and a number nobody prints is a number nobody
      watches. */
-  const rim = { clamps: [], apex: [], flat: [], corner: [], segments: 0, drawnMaxMm: 0, tipAxisMm: null };
+  const rim = { clamps: [], apex: [], flat: [], corner: [], pivots: [], segments: 0, drawnMaxMm: 0, tipAxisMm: null };
   for (const panel of panels) {
     const g = emitPanel(acc, rows, panel, tAt, rim);
     if (capturedPanels) capturedPanels.push({ label: panel.label, rowFrom: panel.rowFrom, rowTo: panel.rowTo, rows: g });
@@ -8294,6 +8294,16 @@ function emitPanel(acc, rows, panel, tAt, rim) {
        no special case. */
     if (sk2 === sk && j2 === j) {
       const a0 = oP[i - rowFrom][j], a1 = oP[i2 - rowFrom][j2];
+      /* THE OUTLINE SEGMENT THIS CORNER SPANS, read off the ORIGINAL boundary
+         `oP` and never off the inset skin — so it carries none of the drawn
+         bead radius, which differs ~200x between the modes on a cramped petal.
+         IT IS NOT MODE-INDEPENDENT AND THE COMMENT MUST NOT SAY IT IS: `oP`
+         inherits the TIP FLOOR (0.15 mm live against 0.80 export), and the
+         largest segment on both affected rows differs by 0.44 mm between the
+         modes (0.882 live, 0.440 export). What IS mode-identical, measured, is
+         the SMALL end, three to four decades below that — which is the only
+         end a threshold acts on. Recorded so that stays a measurement. */
+      if (rim) rim.pivots.push(rimDist(a0, a1));
       for (let q = 1; q < RIM_CORNER_STEPS; q++) {
         const f = q / RIM_CORNER_STEPS;
         entries.push({ apex: [a0[0] + (a1[0] - a0[0]) * f, a0[1] + (a1[1] - a0[1]) * f, a0[2] + (a1[2] - a0[2]) * f], sk, j });
