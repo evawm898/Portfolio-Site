@@ -3542,6 +3542,128 @@ export const TIP_CAP_HALF_MM = 0.15;
    it is bit-reproducible. */
 export const TIP_CAP_FRACTION = 0.20;
 export const CAP_ENTRY_FACTOR = 2;
+
+/* ===================================================================
+   THE APEX NIB (Eva's rulings, the squared-apex sessions).
+
+   THE DEFECT. `halfWidthAt` is `max(shape, rootBlend, tipFloor)`, and the tip
+   law reaches 0 at u = 1 — so wherever the law falls under the print floor
+   the outline runs PARALLEL at that floor to the end. On the shipping default
+   that strip is 0.2652 mm; at `petalTipShape` 0.60 it is 8.6068 mm, a QUARTER
+   of the blade, and the petal ends in a 1.6000 mm flat face with two 90-degree
+   corners. It is not a regression and no commit widened it: the face is
+   2 x tipFloor and always was. What squared it was session 32 DEMOTING the
+   converging cap to a print-floor clamp, which was right — through the old cap
+   the drawn exponent SATURATES near 2.04 and the top third of
+   `petalTipShape`'s ruled range cannot be drawn at all (measured on this tree:
+   an asked 3.00 draws 2.0403).
+
+   WHAT SHIPS. The law is drawn IN FULL, in physical space, point for point, as
+   far as it stays above the print floor; the blade ENDS there; and from that
+   station the outline leaves on the law's OWN TANGENT, runs straight to the
+   width `2 * APEX_HALF_MM`, and closes on a circular arc TANGENT TO BOTH
+   FLANKS. So the drawn exponent equals the asked one EXACTLY (0.0000 mm off
+   the law on the emitted rows, every state, both modes), the parallel strip is
+   gone by construction rather than by tuning, and no point of the outline lies
+   outside the one it replaces.
+
+   THE ARC IS THE OUTLINE'S, NOT THE RIM BEAD'S, so the SILHOUETTE is round. A
+   circle centred on the axis touches a flank of slope m at half-width
+   `r / sqrt(1 + m^2)`, so `r = APEX_HALF_MM * sqrt(1 + m^2)` puts its two
+   tangent points EXACTLY on the corners of the face it replaces: nothing below
+   them moves, and the ruled 0.40 mm survives as the width at which the round
+   begins.
+
+   `APEX_HALF_MM` IS AN AUTHORED EXCEPTION BELOW `MIN_FEATURE_MM` (Eva's
+   ruling). It is 0.20, so the nib is 0.40 mm across where the arc starts,
+   against a declared printable minimum of 1.00 — and that minimum is itself an
+   unvalidated guess, since nothing in this project has ever been printed.
+   `TIP_HALF_MM` and `MIN_FEATURE_MM` DO NOT MOVE, and the LADDER DOES NOT READ
+   these constants: `ladderHalfAt` still floors on `TIP_HALF_MM`, so the nib
+   reads as flat to the turning measure and cannot reach row placement,
+   `CURL_START_MIN`, or the lobes' pitch through the floor.
+
+   IT DOES NOT END ON A TRUE APEX. Session 5's `domeInto` closed a cap on a
+   ring 6.1e-17 across and produced 48 degenerate triangles and 49 non-manifold
+   edges while passing everything else; NV columns collapsed onto one point is
+   that construction. The arc stops on `2 * APEX_END_HALF_MM` = 0.10 mm, the
+   face measured census-clean (boundary 0, non-manifold 0, degenerate 0) before
+   it was chosen. That number is TYPED and said to be: it is not derived from
+   anything, because the only thing it answers to is the lattice, and a length
+   derived from a row count is the mistake this project has made most.
+
+   AND THE ARC IS SMALLER THAN ONE ROW GAP — 0.0496 to 0.1686 mm against a
+   median gap of 0.53 to 0.63, measured before it was built — so the lattice
+   cannot draw it unless the ladder is told. It is told through
+   `ladderDemand()`, the resolution demand session 38's amendment added for the
+   lobes, and never by a second placer. =================================================================== */
+export const APEX_HALF_MM = 0.2;
+export const APEX_END_HALF_MM = 0.05;
+export const APEX_ARC_ROWS = 6;
+/* The one-sided difference the flank's tangent is read with, and the slope
+   under which there is no tangent to carry on. Both are about the DERIVATIVE's
+   own conditioning, not about the geometry. */
+const APEX_TANGENT_DU = 1e-4;
+const APEX_MIN_SLOPE = 1e-9;
+const APEX_FLOOR_EPS = 1e-12;
+
+/* THE NIB'S PLAN — the ONE owner of where the blade ends and what the cap is,
+   and it computes from the BASE outline (the law before any lobe cut) so the
+   station cannot wobble with a cut that is laid out on it.
+
+   INERT, BY BRANCH, in three declared cases, each measured rather than
+   asserted: a blade that never clears the print floor at its own peak; a
+   SQUARED TERMINAL holding the outline above the floor all the way to u = 1
+   (`petalTipEnd`, #229 — a fringe is only cut when its terminal clears the
+   floor, so a live fringe implies an inert nib and every fringe row is
+   bit-identical); and a law arriving with no slope to carry on. */
+export function apexNibPlan(shapeBaseAt, rootBlend, uPk, lengthMm, petiole = false) {
+  const inert = { active: false, uLaw: 1, xLawMm: lengthMm, drawnLength: lengthMm,
+                  slope: 0, radiusMm: 0, capMm: 0, arcMm: 0, endHalfMm: 0, why: null };
+  const lam = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
+  if (!(lengthMm > 0)) return { ...inert, why: 'no length' };
+  /* A LEAF IS EXCLUDED, DECLARED RATHER THAN OVERLOOKED. `cap.petiole` is the
+     leaf's own declaration and the only thing that sets it. A leaf's blade has
+     exactly the same squared stub — `buildLeafInto` floors at `TIP_HALF_MM` in
+     both modes, so a 0.60 tip shape spends 21.3% of the leaf on a 1.60 mm flat
+     — and the nib would fix it and shorten every leaf with it. `leafLength` is
+     a different control with its own read-out, its own LF family and its own
+     declared magnitudes, so that is a second partition and a second ruling;
+     it is scheduled in this session's outcome doc, not taken here. */
+  if (petiole) return { ...inert, why: 'a leaf — excluded by declaration, see the outcome doc' };
+  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };
+  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };
+  let lo = uPk, hi = 1;
+  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }
+  const uLaw = hi, xLawMm = uLaw * lengthMm;
+  const d1 = APEX_TANGENT_DU, d2 = d1 / 2;
+  const s1 = (lam(uLaw) - lam(uLaw - d1)) / (d1 * lengthMm);
+  const s2 = (lam(uLaw) - lam(uLaw - d2)) / (d2 * lengthMm);
+  const slope = Math.abs(2 * s2 - s1);
+  if (!(slope > APEX_MIN_SLOPE)) return { ...inert, why: 'the law arrives with no slope to carry on' };
+  const xFaceMm = xLawMm + (TIP_HALF_MM - APEX_HALF_MM) / slope;
+  const sec = Math.sqrt(1 + slope * slope);
+  const radiusMm = APEX_HALF_MM * sec;
+  const centreMm = xFaceMm - APEX_HALF_MM * slope;
+  const drawnLength = centreMm + Math.sqrt(Math.max(0, radiusMm * radiusMm - APEX_END_HALF_MM * APEX_END_HALF_MM));
+  return {
+    active: true, uLaw, xLawMm, xFaceMm, centreMm, radiusMm, slope, drawnLength,
+    capMm: drawnLength - xLawMm, arcMm: drawnLength - xFaceMm, endHalfMm: APEX_END_HALF_MM, why: null,
+    /* a station in the DRAWN parameterisation -> the same physical point's
+       station in the law's own. Below the join this is all the outline needs;
+       above it the law has no answer and `halfAt` gives the cap's. */
+    toLaw: (v) => (v * drawnLength) / lengthMm,
+    halfAt: (v) => {
+      const x = v * drawnLength;
+      if (x <= xLawMm) return null;
+      if (x <= xFaceMm) return TIP_HALF_MM - slope * (x - xLawMm);
+      return Math.max(APEX_END_HALF_MM, Math.sqrt(Math.max(0, radiusMm * radiusMm - (x - centreMm) * (x - centreMm))));
+    },
+    /* WHERE THE ARC BEGINS, in the drawn parameterisation — the ladder's
+       resolution demand is exactly this window and nothing else. */
+    arcU: drawnLength > 0 ? xFaceMm / drawnLength : 1,
+  };
+}
 /* Where the foot's width stops floor-ing the blade. Frozen at the
    placeholder's value — moving it moves every export. EXPORTED since session
    32 because the apex assertion A5 must not scan below it: the root blend
@@ -4163,9 +4285,30 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
     : (() => {
     const ref = heldRows.slice();
     const bandBase = seamBinds ? u0 : held / NU;
-    const bands = [[bandBase, Math.max(bandBase, demand.u0)], [Math.max(bandBase, demand.u0), demand.u1], [demand.u1, 1]];
-    const counts = [regions.S, regions.W, regions.T];
-    for (let b = 0; b < 3; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
+    const wLo = Math.max(bandBase, demand.u0);
+    /* AND THE WINDOW'S OWN SUB-REGIONS ARE BANDS TOO (the apex-nib session).
+       The target was three bands — the stretch, the WHOLE window, the tip —
+       so a window carrying sub-regions had its rows re-spread evenly across
+       all of it by the blend, whatever counts the demand had just been
+       solved for. That is harmless while every sub-region is a lobe period
+       of comparable width, and it is not harmless the moment one of them is
+       the apex arc: measured on `lobeDepth 0.30 x 3`, the ladder PLACED 6
+       stations across the 0.0014-wide arc and the blend left ONE of them
+       there, spreading the other five back over half the blade. The
+       comment above this expression already states the rule it now keeps —
+       "the target is uniform WITHIN EACH REGION ... so row i lies in the
+       same region in both lists and the mix cannot leave it"; the
+       sub-regions simply were not among the regions it was told about.
+       With no splits the bands below are the three it replaces, term for
+       term, so every unlobed row is bit-identical. */
+    const sub = regions.sub || null;
+    const winEdges = sub ? [wLo, ...(demand.splits || []), demand.u1] : [wLo, demand.u1];
+    const winCounts = sub ? sub : [regions.W];
+    const bands = [[bandBase, wLo]];
+    for (let i = 0; i < winCounts.length; i++) bands.push([winEdges[i], winEdges[i + 1]]);
+    bands.push([demand.u1, 1]);
+    const counts = [regions.S, ...winCounts, regions.T];
+    for (let b = 0; b < bands.length; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
     ref[NU - 1] = 1;
     return ref;
   })();
@@ -4276,8 +4419,8 @@ const PANEL_OVERLAP_ROWS = 1;
 export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   const a = state.petalBaseTaper;
   const b = state.petalTipTaper;
-  const uPk = a / (a + b);                                     // the derived widest point
-  const gPk = Math.pow(uPk, a) * Math.pow(1 - uPk, b);         // normalise the peak to 1
+  const uPkRaw = a / (a + b);                                     // the derived widest point
+  const gPk = Math.pow(uPkRaw, a) * Math.pow(1 - uPkRaw, b);         // normalise the peak to 1
   const core = (u) => (Math.pow(u, a) * Math.pow(1 - u, b)) / gPk;
   const footHalf = ring.width / 2;
   const stalk = (cap && cap.stalk) || null;
@@ -4287,7 +4430,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   const tipFloor = acc && acc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
 
   /* THE PETAL TIP LAW (Eva, session 32). Over [uPk, 1] the outline is the
-     SUPERELLIPSE `(1 - s^n)^(1/n)`, s = (u - uPk)/(1 - uPk), exposed as its
+     SUPERELLIPSE `(1 - s^n)^(1/n)`, s = (u - uPkRaw)/(1 - uPkRaw), exposed as its
      exponent directly: 0.60 acute, 1.00 a straight point, ~1.20 today's
      pointed petal, 2.00 the true ellipse, 2.50 the default, 3.00 the
      held-width round tip. It REPARAMETERISES the tip taper rather than
@@ -4295,13 +4438,13 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      so there is exactly one producer of the half-width above the peak and
      `widthProfile()` remains its one owner.
 
-     BELOW uPk THE CORE IS UNTOUCHED. The two limbs meet at the peak, where
-     the core's slope is exactly 0 (uPk is its maximum) and the superellipse's
+     BELOW uPkRaw THE CORE IS UNTOUCHED. The two limbs meet at the peak, where
+     the core's slope is exactly 0 (uPkRaw is its maximum) and the superellipse's
      tends to 0 for every n > 1. */
   const n = state.petalTipShape;
   const tipLaw = (u) => {
-    if (u <= uPk) return core(u);
-    const s = (u - uPk) / (1 - uPk);
+    if (u <= uPkRaw) return core(u);
+    const s = (u - uPkRaw) / (1 - uPkRaw);
     return Math.pow(Math.max(0, 1 - Math.pow(s, n)), 1 / n);
   };
 
@@ -4315,9 +4458,9 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      width" family, ruled and built with the fringe because neither is any
      use without the other (Eva, Sep 13).
 
-     WHAT IT IS: a FLOOR under the shape scoped to [uPk, 1], expressed as a
+     WHAT IT IS: a FLOOR under the shape scoped to [uPkRaw, 1], expressed as a
      fraction `t` of the petal's own PEAK half-width. `halfW` IS that peak —
-     the CORE term is `halfW * tipLaw(u)` and `tipLaw(uPk)` is exactly 1 —
+     the CORE term is `halfW * tipLaw(u)` and `tipLaw(uPkRaw)` is exactly 1 —
      so the terminal is DERIVED FROM A LENGTH rather than from a row count
      or a constant, and it scales with the petal by construction.
 
@@ -4333,7 +4476,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      terminal alone" stops being a statement of intent and becomes a
      property of the code.
 
-     WHY [uPk, 1] IS THE RIGHT DOMAIN, measured before it was chosen: a
+     WHY [uPkRaw, 1] IS THE RIGHT DOMAIN, measured before it was chosen: a
      GLOBAL floor at the ceiling binds over 100.0% of the blade — the petal
      becomes a full-width rectangle from the foot up and the BASE taper is
      destroyed, a region `petalBaseTaper` owns and this family must not
@@ -4341,7 +4484,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      squares the tip taper and leaves the base taper untouched.
 
      AND THE DOMAIN'S OWN EDGE COSTS NOTHING, which is why there is no new
-     seam at uPk: the ceiling is `t <= 1`, so `Wt <= halfW`, and at uPk the
+     seam at uPkRaw: the ceiling is `t <= 1`, so `Wt <= halfW`, and at uPkRaw the
      CORE is exactly `halfW` — its maximum. The terminal therefore ARRIVES
      BELOW THE INCUMBENT and can only start winning further along, where
      the core has already fallen past it. FR2 asserts that in both
@@ -4371,7 +4514,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      track. =================================================================== */
   const tipEnd = clamp(Number(state.petalTipEnd) || 0, TIP_END_RANGE[0], TIP_END_RANGE[1]);
   const terminalHalf = tipEnd * halfW;
-  if (terminalHalf > 0) terms.push({ name: 'TERMINAL', from: uPk, to: 1, at: () => terminalHalf });
+  if (terminalHalf > 0) terms.push({ name: 'TERMINAL', from: uPkRaw, to: 1, at: () => terminalHalf });
 
   /* The claw's shoulder: a stalk narrower than the foot is the whole point,
      so the foot-continuity floor stands down for it — and for the one other
@@ -4384,7 +4527,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      4001 emitted half-widths move between ring widths of 3 and 40 mm, both
      modes), which is what lets a leaf share this outline without a foot. */
   const petiole = !!(cap && cap.petiole);
-  const rootBlend = (stalk || petiole) ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
+  const rootBlendRaw = (stalk || petiole) ? () => 0 : (u) => footHalf * Math.max(0, 1 - u / ROOT_BLEND_END);
   /* WHERE THE LAMINA BEGINS. On a petal that is where the foot stops, which is
      `ROOT_BLEND_END`; on a leaf it is the petiole junction, u = 0. The lobe
      window's lower bound below is the one consumer, and `laminaStart` is the
@@ -4397,7 +4540,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      without a second walk over the same list with the same comparison.
      `shapeAt` is this loop's value, and its arithmetic is unchanged: the
      same `>` on the same terms in the same order. */
-  const shapeWinner = (u) => {
+  const shapeWinnerRaw = (u) => {
     let shape = 0, name = null;
     for (const t of terms) {
       if (u < t.from || u > t.to) continue;
@@ -4409,7 +4552,52 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
   /* THE BASE OUTLINE — the shape before any cut. The cap entry, the lobe
      stationing and the lobes' own depth cap all read THIS; the lobed shape
      (`shapeAt`, below the cap) is what the floors are max-ed against. */
+  const shapeBaseRaw = (u) => shapeWinnerRaw(u).shape;
+
+  /* ===================================================================
+     THE APEX NIB, APPLIED HERE AND NOWHERE LATER — the whole of the rest of
+     this function then sees the capped outline and the drawn length without
+     knowing the cap exists.
+
+     WHY IT IS EARLY. The lobes' coverage arc is measured from the RIM'S
+     MIDPOINT, which is the middle of the terminal mini-face (MODEL B, #224),
+     and their stations are laid on an arc table built over the blade's own
+     length. A cap bolted on AFTER that would centre the treatment on an apex
+     the cap has just cut off, and truncate the half of the window above it.
+     Applied here, the arc table, the depth cap's headroom, the fringe's
+     narrowest station and the ladder's own measure are all built on the
+     outline that actually ships.
+
+     THE REPARAMETERISATION IS THE WHOLE MECHANISM. Below the join every
+     station is the law's own, evaluated at the SAME PHYSICAL POINT — the
+     drawn curve is the shipped curve, not an approximation of it — and the
+     peak moves in `u` only because the blade it sits on is shorter.
+     =================================================================== */
+  const apex = apexNibPlan(shapeBaseRaw, rootBlendRaw, uPkRaw, length, petiole);
+  const toLaw = apex.active ? apex.toLaw : (v) => v;
+  const uPk = apex.active ? Math.min(1, (uPkRaw * length) / apex.drawnLength) : uPkRaw;
+  /* THE BLADE'S OWN PHYSICAL EXTENT, which is what every millimetre below is
+     a fraction OF: the lobes' arc table, their pitch floor and the fringe's
+     depth all mean millimetres along the blade that is drawn, not along the
+     one that was asked for. `length` keeps meaning the asked length and is
+     read by the nib's plan alone. */
+  const drawnLengthMm = apex.active ? apex.drawnLength : length;
+  const shapeWinner = apex.active
+    ? (v) => { const h = apex.halfAt(v); return h === null ? shapeWinnerRaw(toLaw(v)) : { shape: h, name: 'APEX_NIB' }; }
+    : shapeWinnerRaw;
+  const rootBlend = apex.active ? (v) => rootBlendRaw(toLaw(v)) : rootBlendRaw;
   const shapeBaseAt = (u) => shapeWinner(u).shape;
+  /* THE MODE-FREE LAMINA, ONE OWNER. `TIP_HALF_MM` and never the
+     accumulator's floor, because every consumer decides TOPOLOGY with it: the
+     lobes' arc table and per-period headroom, the fringe's narrowest station
+     and its NO ROOM branch, and `laminaWinner`. The NIB owns its own floor
+     here for the same reason it does in `halfWidthAt` — a headroom measured
+     against a 0.80 mm floor where the outline is 0.20 mm lets a tooth cut
+     away more material than the blade has, which is measured: with the lobes
+     reading the un-nibbed lamina the apex half-width went to 0.0000. */
+  const laminaHalf = (u) => (apex.active && apex.halfAt(u) !== null
+    ? Math.max(shapeBaseAt(u), rootBlend(u))
+    : Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM));
 
   /* ===================================================================
      THE CONVERGING TIP CAP — Eva's ruling, Sep 1, from the tip sheet.
@@ -4665,8 +4853,21 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
     /* THE LAMINA — the outline the teeth are stationed on. Mode-free by
        construction (TIP_HALF_MM, never the accumulator's floor), so live and
        export lay the SAME teeth; row positions are topology. */
-    const laminaHalf = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
-    const table = rimArcTable((u) => [u * length, laminaHalf(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
+    /* THE LAMINA IS THE ONE DECLARED ABOVE, NOT A SECOND COPY. This block
+       carried its own `max(shapeBaseAt, rootBlend, TIP_HALF_MM)` — the same
+       expression, which is exactly why it went unnoticed until the apex nib
+       made the two answers differ: the nib owns its own floor, so a local
+       restatement read 0.80 mm where the outline is 0.05, and the per-period
+       relief guard then handed a tooth more material than the blade has.
+       Measured on `lobeDepth 1.00 x 10`: L5 reported a period's relief at
+       3.0775 mm against a headroom of 3.09e-3, and the apex half-width went
+       to 0.0000 on `lobeDepth 0.30 x 3`.
+       AND THE TABLE IS STATIONED ON THE DRAWN LENGTH. `laminaHalf` is a
+       function of the DRAWN `u`; multiplying that same `u` by the ASKED
+       length mixes two parameterisations, which is measurable rather than
+       theoretical — L4 re-measured the margin at 26.3258 mm against the
+       record's 26.2440, the drawn/asked ratio to four figures. */
+    const table = rimArcTable((u) => [u * drawnLengthMm, laminaHalf(u), 0], breaksOf(laminaWinner), uPk, LOBE_ARC_SAMPLES);
     const sRB = table.sAt(laminaStart), sTip = table.sAt(1);
     const marginArcMm = sTip - sRB;
     const faceMm = 2 * laminaHalf(1);
@@ -4921,7 +5122,7 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
      The fringe wins: `lobesEligible` is false under a live fringe, the lobe
      family is hidden AND inert, and the read-out says so. Recovery is one
      predicate in two files. =================================================================== */
-  const laminaHalfAt = (u) => Math.max(shapeBaseAt(u), rootBlend(u), TIP_HALF_MM);
+  const laminaHalfAt = laminaHalf;
   const fringe = (() => {
     const asked = Math.round(clamp(Number(state.fringeCount) || 0, FRINGE_COUNT_RANGE[0], FRINGE_COUNT_RANGE[1]));
     if (asked < 1) return null;
@@ -5015,13 +5216,32 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
              toothBaseMm, toothTipMm, widthsAtU, spanOf, laminaHalfAt };
   })();
 
+  /* THE CUT, AND THE ONE PLACE THE NIB BOUNDS IT. Off the nib this is the
+     shipped expression term for term. ON the nib the cut is capped by the
+     material that is actually there: the per-period guard reads its headroom
+     at the SINUS (#224 ruled against a pointwise minimum, and that ruling is
+     about the FLANK and is untouched here), so a period whose sinus sits on
+     the law can carry a relief the nib has no room for — measured, the apex
+     half-width went NEGATIVE, -0.01318 mm at `lobeDepth` 0.30 x 3, which is
+     the session-5 true-apex failure arriving by another road. The cap is the
+     nib's own end half-width, so the outline can never collapse; where it
+     binds it leaves a flat INSIDE a 0.40 mm nib, which is told rather than
+     hidden. */
+  const cutNibFloor = (u, v) => (apex.active && apex.halfAt(u) !== null ? Math.max(APEX_END_HALF_MM, v) : v);
   const shapeAt = (lobes === null || lobes.noRoom)
     ? shapeBaseAt
-    : (u) => (u > lobes.u0 ? shapeBaseAt(u) - lobes.cutMm(u) : shapeBaseAt(u));
+    : (u) => (u > lobes.u0 ? cutNibFloor(u, shapeBaseAt(u) - lobes.cutMm(u)) : shapeBaseAt(u));
   const hEntry = Math.max(shapeAt(uCap), rootBlend(uCap), tipFloor);
 
   return {
     uPk, terms, footHalf, uCap, tipFloor,
+    /* THE NIB'S PLAN — the ONE owner of the drawn length and of the terminal
+       half-width, reported so C1 and A2 can read what the builder actually
+       drew instead of assuming it equals the control and the mode floor. */
+    apex,
+    askedLength: length,
+    drawnLength: drawnLengthMm,
+    terminalHalfMm: apex.active ? apex.endHalfMm : null,
     /* THE SQUARED TERMINAL AND THE FRINGE — the plan, not a second copy of
        it. `fringe` is null at the guard (count 0), which is what every
        consumer branches on. */
@@ -5039,8 +5259,16 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        below is `tipFloor` term for term in both modes. A4 no longer reads the
        mode floor alone — it rebuilds this product from the ROW's own declared
        `petalTipEnd` and the cap's declared peak, so the clause's reference
-       still has an owner the profile does not write. */
-    capTerminalHalf: Math.max(terminalHalf, tipFloor),
+       still has an owner the profile does not write.
+       AND THE NIB OWNS IT WHERE THE NIB IS ACTIVE (the apex-nib session): the
+       petal no longer ends on the print floor there, it ends on the arc's own
+       mini-face, so reporting `tipFloor` would be reporting a number the
+       builder does not draw. The two are mutually exclusive BY THE PLAN — a
+       squared terminal holds the outline above the floor to u = 1, which is
+       one of the nib's own declared inert cases (#229), so `apex.active`
+       implies `terminalHalf <= tipFloor` and this is not a precedence choice
+       between two live terms. A4 asserts that biconditional. */
+    capTerminalHalf: apex.active ? apex.endHalfMm : Math.max(terminalHalf, tipFloor),
     /* WHICH TERM WON, from the ONE expression that decides it. The turning
        ladder needs to know where the LAW is the active branch — a kink's
        turning is a delta function, so it must not integrate through the
@@ -5059,7 +5287,76 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        placer satisfies it — the lobes never place a station themselves.
        Null on a plain petal and under NO ROOM, so the ladder's path there is
        today's to the bit. */
-    ladderDemand() { return lobes !== null && !lobes.noRoom ? lobes.demand : null; },
+    /* THE RESOLUTION DEMAND. The arc is 0.05-0.17 mm long against a median
+       row gap of 0.53-0.63, so the ladder places nothing in it unless told —
+       the cap reads as FLAT to the turning measure by construction, which is
+       the same property that keeps APEX_HALF_MM out of row placement.
+       THE LOBES WIN WHERE BOTH ASK. Their window is a symmetric arc centred
+       on the apex (MODEL B, #224), so it already spans the nib, and two
+       windows cannot be served by one demand; what the arc then gets is
+       whatever the lobe sub-region covering it gives, measured and declared
+       rather than assumed. */
+    /* THE RESOLUTION DEMAND, AND THE NIB'S ARC IS A SUB-REGION OF IT RATHER
+       THAN A COMPETING DEMAND (session 38's amendment: the turning-rate
+       ladder stays the ONE place rows are placed, and a rim feature tells it
+       what its window needs).
+
+       THE ARC IS SMALLER THAN A ROW GAP — 0.0496 mm on the shipping default
+       against a 0.60 mm median gap, 0.084 of one — so the ladder's own
+       turning measure cannot find it: `ladderHalfAt` floors on TIP_HALF_MM
+       by construction, so the nib's constants never reach row placement and
+       the measure sees a flat floor where the arc is. Six stations across it
+       is what makes the nib read as ROUND rather than as a chamfer, which is
+       the ruling.
+
+       WHERE LOBES ARE LIVE THE TWO DEMANDS ARE MERGED, never chosen between:
+       MODEL B's window runs to u = 1, so the arc sits inside the last
+       period, and returning the lobes' demand alone left the nib ONE row —
+       measured, 1 of 6 on `lobeDepth 1.00 x 10` and on `0.30 x 3`. The arc
+       becomes the window's last sub-region, which is exactly what the
+       per-period split mechanism is for.
+
+       AT THE BUCKLE'S FREQUENCY CEILING NO DEMAND IS PLACED AT ALL and the
+       arc takes what uniform gives it, which is one row. That is not this
+       feature's to fix: `ladderGapFactor(7)` is exactly 1 because 56 rows
+       over 7 cycles is 8 per cycle with no slack, so any row handed to the
+       arc comes off the buckle's own bar. Session 32 ruled that trade
+       ("at the ceiling the apex keeps today's faceting") and it is a matrix
+       row rather than an argument. AN3 REPORTS the count and does not
+       assert it, for that reason. */
+    ladderDemand() {
+      const arcOnly = apex.active
+        ? { u0: apex.arcU, u1: 1, stations: APEX_ARC_ROWS, exact: true, splits: [], counts: [APEX_ARC_ROWS] }
+        : null;
+      if (lobes === null || lobes.noRoom) return arcOnly;
+      const d = lobes.demand;
+      if (!d || !apex.active) return d;
+      /* The split must lie strictly inside the window and above every split
+         already there. A lobe period shorter than the arc is not reachable
+         (periods are millimetres, the arc is microns) but the guard is the
+         statement of what would make the merge ill-formed. */
+      const last = d.splits && d.splits.length ? d.splits[d.splits.length - 1] : d.u0;
+      if (!(apex.arcU > last && apex.arcU < d.u1)) return d;
+      /* THE LOBES' FLOOR IS NOT STARVED TO FEED THE ARC. The window's row
+         capacity is fixed, and the lobe COUNT was itself derived against it
+         (session 38's ruled floor, session 41's per-shape table): asking for
+         six more rows than the window holds makes the placer trim its
+         LARGEST sub-regions, which are the lobe periods — measured on
+         `lobeDepth 1.00 x 10`, the ladder placed 7 stations in a period whose
+         demand is 9 and L6 caught it. So the arc takes the window's SPARE
+         capacity and no more, down to none, and the nib is then drawn by
+         whatever the last period's own stations put there (at least the row
+         at u = 1, which is on the arc by construction). Reported on the
+         read-out; not asserted, for the reason AN3's header gives. */
+      const bf = buckleIsFlat(state) ? 0 : Number(state.buckleFreq);
+      const spare = ((cap && cap.rowCapacity) ? Number(cap.rowCapacity) : ladderWindowCapacity(d.u0, d.u1, bf)) - d.stations;
+      const arcRows = Math.max(0, Math.min(APEX_ARC_ROWS, spare));
+      if (arcRows === 0) return d;
+      return { ...d,
+        stations: d.stations + arcRows,
+        splits: [...(d.splits || []), apex.arcU],
+        counts: [...(d.counts || []), arcRows] };
+    },
     /* THE LADDER'S OWN VIEW OF THE PROFILE, AT THE EXPORT FLOOR IN BOTH MODES.
        Row POSITIONS are topology and the export floor may not touch topology —
        it "is meant to change geometry and never topology", which is the export
@@ -5094,7 +5391,14 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        within-shell pairs (worst span 0.258 mm), every worst site at a sinus,
        because the ruffle's amplitude stepped with the cut and the true-normal
        offset turned each step into a wedge. */
+    /* THE NIB OWNS THE FLOOR IN ITS OWN REGION, and that is what makes it an
+       AUTHORED EXCEPTION rather than a number the print-floor clamp would put
+       straight back. Everywhere else the clamp is exactly what it was: the
+       `max` is untouched, `TIP_HALF_MM` has not moved, and a blade with no
+       nib takes the shipped expression term for term. */
+    onNib(u) { return apex.active && apex.halfAt(u) !== null; },
     halfWidthBaseAt(u) {
+      if (apex.active && apex.halfAt(u) !== null) return Math.max(shapeBaseAt(u), rootBlend(u));
       return Math.max(shapeBaseAt(u), rootBlend(u), tipFloor);
     },
     halfWidthAt(u) {
@@ -5107,7 +5411,9 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
          because the lerp overwrote exactly the region the law is about.
          Measured with it demoted, drawn n equals asked n to four decimals at
          every value on both tapers. `uCap` and the entry half-width are kept
-         as TELEMETRY for the gates and the sheet; nothing reads them to build. */
+         as TELEMETRY for the gates and the sheet; nothing reads them to build.
+         AND THE NIB OWNS THE FLOOR ABOVE `uLaw` — see `halfWidthBaseAt`. */
+      if (apex.active && apex.halfAt(u) !== null) return Math.max(shape, rootBlend(u));
       return Math.max(shape, rootBlend(u), tipFloor);
     },
     /* WHICH OF THE THREE WON, BY NAME — the same `max` as halfWidthAt, asked
@@ -5198,6 +5504,16 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
        both modes and `slopeBreaks` is not. The measurement is section 5 of
        `node tools/bloom-infill-lamina-floor.mjs`. */
     laminaSlopeBreaks(grid = 4096) { return breaksOf(laminaWinner, grid); },
+    /* THE MODE-FREE LAMINA, EXPOSED. `laminaHalf` is already the one owner
+       inside this function; L4 re-measures the rim's arc on it and had its
+       own `max(hb, TIP_HALF_MM)`, which is the same expression right up to
+       the moment the apex nib owns its own floor — the gate then read 1.60 mm
+       of terminal face where the builder draws 0.10, and L3's pitch-floor cap
+       came out one tooth short with it. What L4 keeps that makes it a
+       measurement of the tree is its OWN chord integrator over 65,536 samples
+       against this file's graded `rimArcTable`; the outline both read is one
+       function, and always was — `hb` is this profile's `halfWidthAt`. */
+    laminaHalfAt: laminaHalf,
     /* THE LOBES' RECORD — what was asked, what was built, the two caps and
        which bound, the pitch against its floor, the window and every
        station; `sinusMinHalfMm` is the deepest sinus AS BUILT (the max with
@@ -6697,7 +7013,14 @@ export function petalSurface(state, ring, slot, cap, acc) {
      petal quantities and `ps` for others would be two sources for one petal,
      which is the defect this project repeats most. One object, one petal. */
   const ps = petalStateFor(state, ring);
-  const length = ps.petalLength * slot.scale;
+  /* THE ASKED LENGTH AND THE DRAWN ONE ARE TWO QUANTITIES (Eva's ruling).
+     `petalLength` keeps meaning the length ASKED FOR; the apex nib ends the
+     blade where the law meets the print floor and carries a cap on from
+     there, so what is drawn is the profile's own `drawnLength`. The builder
+     REPORTS both and C1 reads the report rather than assuming they are equal.
+     The profile is built once at the asked length — the nib's plan is
+     computed inside it, from the law, and the drawn length comes back out. */
+  const askedLength = ps.petalLength * slot.scale;
   /* THE AFFINE ANGLE, PLUS THE DOME'S OWN LEAN (Sep 4) — three terms, read
      from three owners: `ps.petalTilt` the base control, `slot.tiltExtra` the
      layered ramp footRing() computed per this descriptor, `ring.domeLean`
@@ -6710,6 +7033,13 @@ export function petalSurface(state, ring, slot, cap, acc) {
   const tilt = ((ps.petalTilt + slot.tiltExtra + ring.domeLean) * Math.PI) / 180;
   const halfW = (ps.petalWidth * slot.scale) / 2;
   const footHalf = ring.width / 2;
+
+  const profile = widthProfile(ps, ring, halfW, cap, acc, askedLength);
+  /* EVERY DOWNSTREAM READER TAKES THE DRAWN LENGTH — the seam's lattice step,
+     the form's own frame, the spine and the stations alike. A seam clearance
+     is a length in millimetres, so a shorter blade legitimately spends a
+     larger fraction of itself on it; that is the clearance law working. */
+  const length = profile.drawnLength;
 
   /* THE SEAM (session 38) — the ONE owner of the foot-to-blade clearance and
      of where the blade's first row therefore sits. It is computed HERE, above
@@ -6741,7 +7071,6 @@ export function petalSurface(state, ring, slot, cap, acc) {
   const T = [-sinA, cosA, 0];
   const Z = [0, 0, 1];
 
-  const profile = widthProfile(ps, ring, halfW, cap, acc, length);
   /* THE GUARD. petalFormIsFlat() is the predicate; when it holds, `form`
      stays null and every row below takes the pre-form expression verbatim.
      That — not an IEEE-754 argument — is what makes the shipped default
@@ -7550,6 +7879,34 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
          the sampling as if it were the geometry — this project's own most
          repeated defect. */
       peakHalf: profile.halfWidthBaseAt(profile.uPk),
+      /* THE NIB'S OWN PLAN — scalars only, because this object crosses a
+         `page.evaluate` boundary and a function would be dropped in silence.
+         Reported so the AN family reads what the builder DECLARED and checks
+         it against what the builder EMITTED, rather than re-deriving the
+         crossing, the tangent or the arc: a second producer of any of the
+         three would agree with a broken first one by being broken alongside
+         it (session 43's ST2, session 41's L7). `why` is null iff `active`,
+         asserted both ways, so an inert row states its reason rather than
+         being indistinguishable from a row nobody looked at. */
+      apex: {
+        active: profile.apex.active,
+        why: profile.apex.why,
+        uLaw: profile.apex.uLaw,
+        xLawMm: profile.apex.xLawMm,
+        xFaceMm: profile.apex.active ? profile.apex.xFaceMm : null,
+        centreMm: profile.apex.active ? profile.apex.centreMm : null,
+        radiusMm: profile.apex.radiusMm,
+        slope: profile.apex.slope,
+        capMm: profile.apex.capMm,
+        arcMm: profile.apex.arcMm,
+        endHalfMm: profile.apex.endHalfMm,
+        arcU: profile.apex.active ? profile.apex.arcU : null,
+        /* THE LENGTH CLAIM, both halves. `petalLength` keeps meaning the
+           ASKED length (Eva's ruling); the petal is drawn shorter wherever
+           the nib is active, and C1 reads the drawn one. */
+        askedLengthMm: profile.askedLength,
+        drawnLengthMm: profile.drawnLength,
+      },
     },
     /* THE CARNATION FRINGE AND ITS SQUARED TERMINAL — the plan's own numbers
        plus what the EMITTED rows did with them. Everything derived is
@@ -7706,6 +8063,16 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        layer size). Telemetry: the read-out and the SP family print it rather
        than re-multiplying two controls. */
     length,
+    /* AND THE LENGTH THE BLADE WAS ASKED FOR, which since the apex-nib
+       session is a different number: `petalLength` keeps meaning the ASKED
+       length (Eva's ruling) and the nib truncates the law where it falls
+       under the print floor, so `length` above is where the cap actually
+       closed. VS2's claim is about the SIZE FIELD reaching the blade — a
+       factor recorded and a blade built at nominal size is what no STL
+       property can see — so it must read the length the field produced, not
+       the one the apex law then drew to. The two are the same double on
+       every row where the nib is inert. */
+    askedLength: profile.askedLength,
     /* THE NOMINAL LENGTH THE BLADE WAS SCALED FROM, the descriptor's own scale
        and the whorl this petal stands in (organic variance, build 1): VS2 asks
        whether a slot's size FACTOR reached the blade — `length` must be the

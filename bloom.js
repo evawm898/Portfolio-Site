@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -956,6 +956,65 @@ function spineLine(petals) {
        + (contact.length ? ` · SELF-CONTACT on ${of(contact)} (the blade touches itself — a flag, never a gate)` : '') + `\n`;
 }
 
+/* THE APEX LINE (Eva's option (c), approved the apex-nib session and shipped
+   in the same PR as the line it describes).
+
+   WHY IT EXISTS. Until this session every petal finished on a flat face two
+   print floors across — 1.6000 mm in EXPORT, 0.3000 mm live — whatever
+   exponent `petalTipShape` was asked for, because the tip law reaches zero at
+   u = 1 and `halfWidthAt` is a `max` against the floor. The nib truncates the
+   law at its own crossing of that floor, carries the flank on along its OWN
+   tangent, and closes with an arc tangent to both flanks. Three things follow
+   that a reader cannot see on screen and must be told:
+
+     (1) THE PETAL IS NOT DRAWN AT THE LENGTH THE SLIDER SAYS. `petalLength`
+         keeps meaning the ASKED length (Eva's ruling); the blade is drawn to
+         wherever the cap closes. At the shipping default that is 0.124 mm
+         PAST the slider, at `petalTipShape` 0.60 it is 4.95 mm SHORT of it.
+         Both are printed, with the sign, because a length that is silently
+         not the control's is the thing this generator has a rule about.
+     (2) THE FACE IS AN AUTHORED EXCEPTION. 0.40 mm across is UNDER
+         `MIN_FEATURE_MM`, ruled deliberately, on a project where nothing has
+         ever been printed. It says so in the verbatim words the slenderness
+         and cantilever lines already use.
+     (3) THE NIB CAN BE INERT, and then the petal still ends on a flat face —
+         which is the state this feature exists to remove, so it names the
+         guard that refused rather than going quiet.
+
+   It reads the BUILDER's own record and re-derives none of it; AN0-AN3 are
+   what say the record is right. Every ring, because an inner whorl's blade
+   can be too narrow to clear the floor at all and then only that ring is
+   inert. */
+function apexLine(petals) {
+  const ps = (petals || []).filter((p) => p && p.tipCap && p.tipCap.apex);
+  if (!ps.length) return '';
+  const aps = ps.map((p) => p.tipCap.apex);
+  const live = aps.filter((a) => a.active);
+  const of = (k) => `${k} of ${aps.length} ring${aps.length === 1 ? '' : 's'}`;
+  if (!live.length) {
+    const why = [...new Set(aps.map((a) => a.why))].join('; ');
+    return `APEX NIB INERT on every ring — ${why} — so the blade still ends on a flat face `
+         + `${(2 * ps[0].tipCap.terminalHalf).toFixed(2)} mm across\n`;
+  }
+  /* THE RING THE LINE NAMES IS THE ONE THAT MOVED ITS LENGTH FURTHEST, in
+     either direction: the reader wants the worst disagreement between the
+     slider and the object, not ring 0's. */
+  const w = live.reduce((a, b) => (Math.abs(b.drawnLengthMm - b.askedLengthMm) > Math.abs(a.drawnLengthMm - a.askedLengthMm) ? b : a), live[0]);
+  const d = w.drawnLengthMm - w.askedLengthMm;
+  /* HOW MANY ROWS THE LADDER ACTUALLY PUT ON THE NIB — measured off that
+     ring's own emitted stations, never the demand it was asked for. */
+  const wi = aps.indexOf(w), pu = ps[wi] && ps[wi].profileU;
+  const onNib = Array.isArray(pu) ? pu.filter((u) => u * w.drawnLengthMm > w.xLawMm + 1e-12).length : null;
+  return `APEX NIB — the law runs to the ${(2 * TIP_HALF_MM).toFixed(2)} mm print floor at u ${w.uLaw.toFixed(4)}, `
+       + `then the flank carries on at its own tangent (${w.slope.toFixed(3)} mm/mm) to a ${(2 * APEX_HALF_MM).toFixed(2)} mm face `
+       + `and closes on a ${w.radiusMm.toFixed(3)} mm arc, so the petal ends ${(2 * w.endHalfMm).toFixed(2)} mm across `
+       + `over ${w.capMm.toFixed(3)} mm of cap`
+       + (onNib !== null ? ` on ${onNib} row${onNib === 1 ? '' : 's'}` : '')
+       + ` · drawn ${w.drawnLengthMm.toFixed(3)} mm against the ${w.askedLengthMm.toFixed(3)} asked (${d >= 0 ? '+' : ''}${d.toFixed(3)} mm)`
+       + (live.length < aps.length ? ` · INERT on ${of(aps.length - live.length)} (${[...new Set(aps.filter((a) => !a.active).map((a) => a.why))].join('; ')})` : '')
+       + ` · the ${(2 * APEX_HALF_MM).toFixed(2)} mm face is UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm minimum feature — an authored exception; UNMEASURED — no coupon has been printed\n`;
+}
+
 /* THE FRINGE LINE (Eva's ruling, Sep 13) — the squared end and the teeth,
    read from ring 0's petal record and never re-derived from the sliders.
    Asked beside built for the count, the clamp and WHY it bound, the tooth and
@@ -965,15 +1024,26 @@ function spineLine(petals) {
 function fringeLine(petals) {
   const F = petals && petals[0] && petals[0].fringe;
   if (!F) return '';
+  /* THE CONVERGING ARM DEFERS TO THE APEX LINE (Eva's option (c), the
+     apex-nib session). It used to read "CONVERGING END — the apex law runs
+     to its own point", which was true of a law that reaches zero at u = 1
+     and FALSE of the petal, because the print floor then ran that law out
+     flat to a face two floors across. The nib makes the sentence true, and
+     `apexLine` above states it with the numbers — where the law was cut, at
+     what tangent the flank carries on, what the face and the arc are, and
+     what the blade's length came out at. So this arm names the end in three
+     words and does not restate any of it, and it is DROPPED entirely where
+     it would stand alone: a line whose whole content is one line above it is
+     a line nobody reads twice. */
   const end = F.tipEnd === 0
-    ? 'CONVERGING END — the apex law runs to its own point'
+    ? 'CONVERGING END (see APEX NIB above)'
     : F.deadTravel
       ? `SQUARED END ${(F.tipEnd * 100).toFixed(0)}% — DEAD: ${F.endWidthMm.toFixed(2)} mm is under the ${F.floorMm.toFixed(2)} mm print floor, so the petal still ends on the floor's own ${(2 * F.tipHalfMm).toFixed(2)} mm (dead below ${(100 * F.deadBelow).toFixed(0)}% on this petal — told, never trimmed)`
       : `SQUARED END ${F.endWidthMm.toFixed(2)} mm across, ${(100 * F.endWidthMm / (2 * F.peakHalfMm)).toFixed(0)}% of the petal's width · it carries ${F.ceiling} ${F.ceiling === 1 ? 'tooth' : 'teeth'} at the ${F.floorMm.toFixed(2)} mm floor`;
   if (F.noRoom) return `FRINGE NO ROOM — ${F.asked} teeth asked and ${F.noRoomWhy}, so none are cut: the petal converges to `
     + `${(2 * F.tipHalfMm).toFixed(2)} mm, which carries one tooth at the ${F.floorMm.toFixed(2)} mm floor, and one tooth is the petal. `
     + `Told, never refused — raise the squared end above ${(100 * F.deadBelow).toFixed(0)}% and the teeth appear.\n`;
-  if (!F.built) return `${end}\n`;
+  if (!F.built) return F.tipEnd === 0 ? '' : `${end}\n`;
   /* CLAMPED AND TOLD. The ceiling is the END's width and nothing else, so the
      reason names the width that bound and what the end would have to be. */
   const count = F.clamped
@@ -1584,6 +1654,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + seamLine(petals)
        + spineLine(petals)
        + lobeLine(petals)
+       + apexLine(petals)
        + edgeProfileLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
@@ -2258,7 +2329,7 @@ window.__bloomMetrics = () => ({
      products off this, exactly, and VS1 matches each factor to its whorl's
      row of `variance.factors`. */
   petalSlotSizes: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
-    scale: p.slot.scale, sizeFactor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, nominalLength: p.nominalLength })),
+    scale: p.slot.scale, sizeFactor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, askedLength: p.askedLength, nominalLength: p.nominalLength })),
   neighbour: lastNeighbour ? structuredClone(lastNeighbour) : null,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
@@ -2296,7 +2367,7 @@ window.__bloomMetrics = () => ({
     blendReachesRim: lastSepalsBuilt ? lastSepalsBuilt.blendReachesRim : undefined,
     footBuriedMm: lastSepalsBuilt ? lastSepalsBuilt.footBuriedMm : undefined,
     petals: lastSepalsBuilt ? lastSepalsBuilt.built.map((p) => ({
-      length: p.length, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris,
+      length: p.length, askedLength: p.askedLength, azimuth: p.azimuth, slotIndex: p.slotIndex, tris: p.tris,
       footFrames: p.footFrames, rootRow: p.rootRow, tip: p.tip, applied: p.applied, overridden: p.overridden,
       profile: p.profile, profileU: p.profileU, tipCap: p.tipCap, form: p.form, seamStep: p.seamStep,
       /* THE STATE THE BLADE WAS BUILT FROM, keyed by the PETAL name the law
@@ -2440,6 +2511,12 @@ window.__bloomMetrics = () => ({
      does not bind while the inner ones do, so A7 reading layer 0 alone
      would never see the case the floor exists for. */
   petalRingBladeLadder: lastPetals.map((p) => (p ? p.bladeLadder : null)),
+  /* THE TIP CAP PER RING, for the same reason the ladder is per ring: the
+     apex nib truncates the blade, so on a layered bloom every inner whorl has
+     its own drawn length, and C1's law rebuild is per ring. `petalTipCap`
+     below is the LAST petal's and stays — A2, A4, A5 and A6 read it — but a
+     clause that is about a RING may not read it. */
+  petalRingTipCap: lastPetals.map((p) => (p ? p.tipCap : null)),
   petalRingProfileU: lastPetals.map((p) => (p ? p.profileU : null)),
   /* THE PLACEMENT'S OWN SHAPE, from footRing() rather than from the control:
      `continuousMode` is what every assertion branches on, `sequenceLength` is

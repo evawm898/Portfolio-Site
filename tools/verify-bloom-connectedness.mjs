@@ -123,7 +123,7 @@ import path from 'node:path';
 import { serveRepo, launchPage, openBloom, applyConfig, fullStateDrift, applyCapability, exportStl, analyzeStl, buildMatrix, CAPABILITY_SCOPE, formAssertions, FORM_SCOPE,
          lobeAssertions, LOBE_SCOPE, lobeResultLine,
          fringeAssertions,
-         thicknessAssertions, THICKNESS_SCOPE, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
+         thicknessAssertions, THICKNESS_SCOPE, apexNibAssertions, junctionAssertions, JUNCTION_SCOPE, zygoAssertions, ZYGO_SCOPE, exportFloorAssertion, exportRefusalAssertion, exportRefusedLine, exportRefusedCoverage, shownModeAssertion, curlAssertions, CURL_SCOPE,
          stamenAssertions, STAMEN_SCOPE, gynoeciumAssertions, GYNOECIUM_SCOPE,
          stemAssertions, STEM_SCOPE,
          leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, LEAF_SCOPE } from './bloom-harness.mjs';
@@ -328,6 +328,12 @@ for (const row of rows) {
      sheet is still spanned by a hub built at the same thickness). */
   const thk = await thicknessAssertions(page, row);
   if (thk.length) { validity.push(`${row.label}: ${thk.join('; ')}`); continue; }
+  /* THE APEX NIB, on EVERY row, and this gate is blind to all of it: a nib
+     drawn at the wrong radius, joined at a corner rather than a tangent, or
+     carried on the wrong slope is still a single-valued, strictly falling
+     outline, so it exports watertight at an identical triangle count. */
+  const nib = await apexNibAssertions(page, row);
+  if (nib.length) { validity.push(`${row.label}: ${nib.join('; ')}`); continue; }
   /* THE JUNCTION ASSERTIONS, on EVERY row, and THIS GATE CANNOT SUBSTITUTE
      FOR THEM — measured, not supposed. Building the hub at the wrong layer's
      radius leaves the outer whorl joined to nothing and this gate reports ONE

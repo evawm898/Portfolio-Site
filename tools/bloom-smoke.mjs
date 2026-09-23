@@ -852,6 +852,37 @@ export const SMOKE_BLOCKS = [
         path: "the TOLD frequency — VS4's aliased arm (f above n/2 must be flagged, never capped) and VS1's law on a wave the lattice cannot draw" },
     ],
   },
+  {
+    n: 39, title: "the apex nib — the law's own tangent and a rounded point",
+    anchor: 'APEX NIB: tip shape 0.60 x 60 mm (the shallowest flank on the longest blade \u2014 8.59 mm of law given up)',
+    /* FIVE ROWS, ON THE AXES THE NIB HAS — and one of them is here because a
+       subset earns its keep by covering the axes a feature has, which is the
+       leaf session's lesson arriving in the block written the same week.
+       The SHALLOWEST flank (where the truncation is largest and the law gives
+       up 8.59 mm of blade); the STEEPEST (where the arc is three microns and
+       the cap is twenty, i.e. where an off-by-one in the ladder's demand
+       shows); BOTH inert arms, which is what makes AN0 a biconditional rather
+       than a one-sided claim — the squared terminal on one row and, on the
+       MIXED row, a single bloom carrying three nibbed rings and three whose
+       blade never clears the print floor at all; and the LOBE cut, whose
+       per-period relief guard reads at a sinus and would otherwise drive the
+       nib's own half-width through zero.
+       THE MIXED ROW IS THE ONE THAT COULD NOT BE LEFT OUT: every clause here
+       that reads ring 0 and stops, and the read-out line that names ring 0's
+       length as the bloom's, are correct on all four of the others. */
+    rows: [
+      { label: 'APEX NIB: tip shape 0.60 x 60 mm (the shallowest flank on the longest blade \u2014 8.59 mm of law given up)',
+        path: "the SHALLOWEST flank — AN0 (the restated guard against the plan's flag and the emitted last row), AN1 (the flank carried on at the law's own one-sided tangent at its print-floor crossing, and the arc's radius and centre from that tangent), AN2 (the drawn length rebuilt end to end from the crossing plus the cap the constants imply — here 8.59 mm SHORT of the slider), AN3 (every emitted row above the crossing on the declared flank-then-arc curve, the last one ON the mini-face)" },
+      { label: 'APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest \u2014 a 0.003 mm arc)',
+        path: "the STEEPEST flank — AN1 at a slope of 35 mm/mm against 0.17 at the other end, a factor of 204, where the cap is 0.020 mm and the arc 0.003; AN2's OVERSHOOT arm (the cap carries the blade PAST the slider, accepted and reported); AN3 where the ladder's resolution demand for the arc is the only thing putting rows on a feature three microns long" },
+      { label: 'APEX NIB: INERT \u2014 a squared terminal holds the outline above the print floor',
+        path: "the INERT arm — AN0's biconditional in its other direction, where the nib declares which guard refused and the blade must still end on petalTipEnd's own face, with the drawn length exactly the asked one (an inert cap may not move the length)" },
+      { label: 'APEX NIB: MIXED \u2014 6 layers x layerSize min (three rings nibbed, three whose blade never clears the floor)',
+        path: "the MIXED bloom — AN0's second inert reason (an inner whorl whose peak is at the print floor) on three rings of one bloom while three others carry a nib, which is the only row where a clause reading ring 0 and stopping says something false; AN1/AN2 per ring on three different crossings" },
+      { label: 'APEX NIB: x LOBES 1.00 x 10 (the per-period relief against the nib\u2019s own floor)',
+        path: "the LOBE cut composed with the nib — the per-period relief guard reads at a SINUS, so a period whose sinus sits on the law can carry a relief the nib has no room for; AN3 on an outline that is the cut one, beside L0-L8" },
+    ],
+  },
 ];
 
 /* ---------- THE GUARD ------------------------------------------------ */

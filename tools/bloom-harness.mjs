@@ -105,6 +105,15 @@ export const { ROLL_MIN_RADIUS_FACTOR, SHEET_THICKNESS_MM, MIN_FEATURE_MM, FOOT_
             rebuilds the cap's terminal from the state and must floor it at
             the number the builder actually floors at, in the mode it built. */
          TIP_HALF_MM, TIP_CAP_HALF_MM, ROOT_BLEND_END, LEAF_BASE_TAPER, LEAF_TIP_TAPER,
+         /* THE APEX NIB'S THREE AUTHORED NUMBERS. Imported for the reason
+            ST3 imports Eva's 1.5 mm stem wall: they are the DECLARATION, not
+            the quantity under test — what AN1 and AN2 check is the five
+            numbers the plan DERIVES from them and from the law. Declared
+            blindness, stated once rather than left to be discovered: a
+            mutation of the constants themselves moves both sides of every
+            clause here together and is invisible to this family. The one
+            thing that can see it is the shipped picture. */
+         APEX_HALF_MM, APEX_END_HALF_MM, APEX_ARC_ROWS,
          ROLE_OVERRIDES, ROLE_OUTER, ROLE_INNER, LAW_IDENTITY, OVERRIDE_BOUNDS,
          SLOT_LABELLUM, SLOT_HOOD, SLOT_LATERAL, SLOT_ROLE_ORDER, roleForSlot, slotRolesEligible,
          FAN_ARC_LIMIT_DEG, MAX_FAN_PER_SIDE, MIRROR_THROUGH_SLOT, MIRROR_THROUGH_GAP, mirrorPartner,
@@ -1410,9 +1419,17 @@ export async function fringeAssertions(page, row) {
   const tc = m.petalTipCap;
   if (!tc) bad.push('FR2: no tip-cap telemetry — the terminal cannot be checked');
   else {
-    const wantEnd = Math.max(askedEnd * tc.peakHalf, TIP_CAP_HALF_MM);
+    /* RE-DERIVED ONTO THE NIB (Eva's ruling, the apex-nib session). The
+       terminal is the squared end or the mode floor ONLY where the petal
+       still ends on a flat face; where the apex nib closes the blade it ends
+       on the nib's own mini-face instead, and the two are mutually exclusive
+       by the nib's own guard — a squared terminal above the print floor is
+       exactly what makes the nib inert. The guard is restated here, never
+       read from the cap. At `petalTipEnd` 0 with no nib this is the old
+       expression term for term. */
+    const wantEnd = nibWantedFrom(tc.peakHalf, askedEnd) ? APEX_END_HALF_MM : Math.max(askedEnd * tc.peakHalf, TIP_CAP_HALF_MM);
     if (Math.abs(tc.terminalHalf - wantEnd) > 1e-9)
-      bad.push(`FR2: the petal ends on ${tc.terminalHalf} mm, and petalTipEnd ${askedEnd} of a ${tc.peakHalf} mm peak asks for ${wantEnd} mm`);
+      bad.push(`FR2: the petal ends on ${tc.terminalHalf} mm, and ${nibWantedFrom(tc.peakHalf, askedEnd) ? `the apex nib's mini-face is ${APEX_END_HALF_MM} mm` : `petalTipEnd ${askedEnd} of a ${tc.peakHalf} mm peak asks for ${wantEnd} mm`}`);
     if (Math.abs(F.endWidthMm - 2 * askedEnd * tc.peakHalf) > 1e-9)
       bad.push(`FR2: the record's end width ${F.endWidthMm} mm is not 2 x petalTipEnd x peakHalf = ${2 * askedEnd * tc.peakHalf} mm`);
     if (askedEnd > 0) {
@@ -1641,7 +1658,17 @@ export async function lobeAssertions(page, row) {
      which is what makes this a measurement of the tree rather than of its
      own consistency. */
   const length = surf.length;
-  const hL = (u) => Math.max(hb(u), TIP_HALF_MM);
+  /* THE LAMINA IS THE PROFILE'S OWN, NOT A SECOND `max` HERE. It was
+     `max(hb(u), TIP_HALF_MM)` — the same expression, until the apex nib took
+     ownership of its own floor: on the nib the outline runs from 0.80 mm down
+     to 0.05, and the local restatement floored every one of those back to
+     0.80. Measured on `lobeDepth 1.00 x 10`: the terminal face re-measured as
+     1.6000 mm against the record's 0.1000, the margin was 0.46 mm out, and
+     L3's pitch-floor cap came back one tooth short with it. What makes this
+     clause a measurement of the TREE rather than of its own consistency is
+     the chord integrator below — 65,536 uniform samples against the
+     geometry's graded `rimArcTable` — and that is untouched. */
+  const hL = (u) => (typeof base.profile.laminaHalfAt === 'function' ? base.profile.laminaHalfAt(u) : Math.max(hb(u), TIP_HALF_MM));
   const arc = (a, b, n) => { let acc2 = 0, px = a * length, py = hL(a); for (let i = 1; i <= n; i++) { const u = a + (b - a) * i / n, x = u * length, y = hL(u); acc2 += Math.hypot(x - px, y - py); px = x; py = y; } return acc2; };
   const wantFace = 2 * hL(1);
   const wantMargin = arc(ROOT_BLEND_END, 1, 65536);
@@ -1789,7 +1816,17 @@ export async function lobeAssertions(page, row) {
   /* AND THE TERMINAL FACE IS NEVER COLLAPSED, at any depth or count: the
      u = 1 mini-face is the upstream contract's (session 32, §5) and the cut
      now reaches it. */
-  if (!(h(1) >= surf.profile.tipFloor - 1e-12)) bad.push(`L6: the terminal half-width is ${h(1)}, under the mode's own floor ${surf.profile.tipFloor} — the cut collapsed the u = 1 mini-face`);
+  /* THE FLOOR IS THE NIB'S WHERE THE NIB CLOSES THE BLADE (the apex-nib
+     session). The mini-face at u = 1 is still never collapsed — that is the
+     upstream contract and A3's true-apex failure — but which face it is has
+     one more owner: `APEX_END_HALF_MM` where the law was truncated, the
+     mode's own floor where it was not. Read from the PROFILE's declared
+     terminal rather than restated, because this clause is about the CUT
+     reaching zero and not about which terminal the apex law produced (AN0,
+     AN2 and A4 own that, each from a reference the cap does not write). */
+  const termFloor = surf.profile.terminalHalfMm !== null && surf.profile.terminalHalfMm !== undefined
+    ? surf.profile.terminalHalfMm : surf.profile.tipFloor;
+  if (!(h(1) >= termFloor - 1e-12)) bad.push(`L6: the terminal half-width is ${h(1)}, under the blade's own terminal ${termFloor} — the cut collapsed the u = 1 mini-face`);
   const stations = (m.petalProfileU || []).filter((u) => u >= u0 && u <= u1);
   if (stations.length !== L.rowsInWindow) bad.push(`L6: ${stations.length} emitted stations lie in the window and the record says ${L.rowsInWindow}`);
   if (Math.abs(L.rowsPerLobe - L.rowsInWindow / L.marginPeriods) > 1e-9) bad.push(`L6: rowsPerLobe ${L.rowsPerLobe} is not ${L.rowsInWindow} over the ${L.marginPeriods} periods on this margin`);
@@ -2179,6 +2216,56 @@ export function sizeFactorRestated(m, ui, azimuth) {
   return 1 + amount * Math.cos(f * azimuth + phi);
 }
 
+/* THE NIB'S OWN GUARD, RESTATED IN THE GATE (the apex-nib session). The one
+   place this file says when a petal ends on a nib rather than on a flat face,
+   read by A4, FR2 and AN0 — restated rather than imported, because a clause
+   that takes its reference from the function it is checking cannot fail
+   (session 38's `seam-floor-removed`, the fourth durable rule).
+
+   THE TWO CONDITIONS ARE THE GEOMETRY'S OWN, in its own order: the blade must
+   clear the print floor at its widest point, and no squared terminal may hold
+   the outline above that floor at u = 1. Both floors are `TIP_HALF_MM`, which
+   is MODE-FREE — whether a petal has a nib is TOPOLOGY, and the export floor
+   may not decide it.
+
+   MEASURED BEFORE IT WAS WRITTEN: over 2,452 ring-modes of the whole matrix
+   in both modes this and the geometry's own guard disagree on ZERO, with 76
+   ring-modes inert for a squared terminal and 18 for an inner whorl whose
+   blade never clears the floor. The geometry's third guard — a law arriving
+   with no slope to carry on — fires on no reachable row; AN0 says so and
+   treats a ring that reports it as a finding. */
+export function nibWantedFrom(peakHalfMm, askedTipEnd) {
+  return peakHalfMm > TIP_HALF_MM && !(askedTipEnd * peakHalfMm > TIP_HALF_MM);
+}
+
+/* IS THE APEX NIB DRAWN ON THIS RING — ANSWERED OFF THE EMITTED OUTLINE, NOT
+   OFF THE PLAN (the apex-nib session). A petal with no nib ends on
+   `max(squared terminal, the mode floor)`, and both floors are at least
+   `TIP_HALF_MM`; the nib ends on its own mini-face, which is
+   `APEX_END_HALF_MM` — sixteen times under it. So the last emitted row's own
+   half-width separates the two states exactly, with nothing of the cap's
+   record in it.
+
+   IT IS DELIBERATELY NOT THE RECORD'S `active` FLAG. A clause guarded on the
+   record it checks returns before claiming anything the day the record is
+   wrong — ST9's own defect, which only the mutant table said (the sphere-stem
+   session). AN0 asserts the biconditional between this reading and the
+   record, in both directions, so the record is pinned by the outline rather
+   than trusted. */
+export function nibActive(m, L) {
+  const tc = Array.isArray(m.petalRingTipCap) ? m.petalRingTipCap[L] : m.petalTipCap;
+  if (!tc || typeof tc.lastRowHalf !== 'number') return false;
+  /* THE FLAT FACE IS THE MODE'S OWN, and reading `TIP_HALF_MM` for both was
+     wrong in LIVE — measured on `APEX NIB: MIXED`, whose three floored inner
+     whorls end on 0.15 mm, which is under the export floor and IS the live
+     one. The nib's mini-face is `APEX_END_HALF_MM`, a third of the live floor
+     and a sixteenth of the export one, so the two states still separate
+     exactly in both. Whether the nib exists is mode-free; what its ABSENCE
+     leaves behind is not, which is the whole defect the nib removes. */
+  const floor = tc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
+  return tc.lastRowHalf < floor;
+}
+
 function spineInputsFor(m, ui, row, L) {
   const r = m.rings[L], q = m.petalRingRootRows[L];
   const dome = m.hubDome || null;
@@ -2188,7 +2275,18 @@ function spineInputsFor(m, ui, row, L) {
      scale, and the size field's factor at the petal's EMITTED azimuth (the
      root row's, which C1 already reads for the frame) — the field restated,
      never its record. Exactly the pre-variance product where the amount is 0. */
-  const length = effectiveFor(m, row, 'petalLength', L) * r.scale * sizeFactorRestated(m, ui, q.azimuth);
+  const askedLength = effectiveFor(m, row, 'petalLength', L) * r.scale * sizeFactorRestated(m, ui, q.azimuth);
+  /* AND THE LENGTH THE BLADE IS ACTUALLY DRAWN AT (the apex-nib session).
+     `petalLength` keeps meaning the ASKED length — Eva's ruling — and the nib
+     truncates the law where it falls under the print floor, so on most rows
+     the blade is drawn SHORTER than the control says (and at n >= 1.20 the
+     cap carries it slightly past). Every law below is a law about the blade,
+     so every one of them takes the drawn length; the clause that states the
+     relationship between the two is in `curlAssertions` beside its message.
+     Falls back to the asked length on a tree with no cap telemetry. */
+  const tcR = Array.isArray(m.petalRingTipCap) ? m.petalRingTipCap[L] : null;
+  const drawn = tcR && tcR.apex && typeof tcR.apex.drawnLengthMm === 'number' ? tcR.apex.drawnLengthMm : askedLength;
+  const length = drawn;
   const tilt = ((q.petalTiltApplied + r.tiltExtra + r.domeLean) * Math.PI) / 180;
   const floorRadius = ROLL_MIN_RADIUS_FACTOR * r.thickness;
   const cA = Math.cos(q.azimuth), sA = Math.sin(q.azimuth);
@@ -2205,7 +2303,7 @@ function spineInputsFor(m, ui, row, L) {
      constant when a tree predates the per-ring ladder telemetry. */
   const ldr = Array.isArray(m.petalRingBladeLadder) ? m.petalRingBladeLadder[L] : m.petalBladeLadder;
   const startFloor = ldr && typeof ldr.seamBaseU === 'number' ? ldr.seamBaseU : CURL_START_MIN;
-  return { bias, start, curlDeg, curlRad, length, tilt, floorRadius, startFloor, Rs, Up, base, uniform: curlIsUniform({ curlBias: bias, curlStart: start }) };
+  return { bias, start, curlDeg, curlRad, length, askedLength, tilt, floorRadius, startFloor, Rs, Up, base, uniform: curlIsUniform({ curlBias: bias, curlStart: start }) };
 }
 
 export async function curlAssertions(page, row) {
@@ -2226,7 +2324,30 @@ export async function curlAssertions(page, row) {
     if (sp.bias !== inp.bias || sp.start !== inp.start) bad.push(`C1: ring ${L}: the spine record reports bias ${sp.bias} / start ${sp.start}; the registry holds ${inp.bias} / ${inp.start}`);
     if (Math.abs(sp.curlRad - inp.curlRad) > 1e-12) bad.push(`C1: ring ${L}: the spine record reports curl ${sp.curlRad} rad; the applied control gives ${inp.curlRad}`);
     if (Math.abs(sp.tiltRad - inp.tilt) > 1e-9) bad.push(`C1: ring ${L}: the spine record reports tilt ${sp.tiltRad}; petalTilt + tiltExtra + domeLean gives ${inp.tilt}`);
-    if (Math.abs(sp.length - inp.length) > 1e-9) bad.push(`C1: ring ${L}: the spine record reports length ${sp.length}; the applied petalLength x scale gives ${inp.length}`);
+    /* THE LENGTH, RE-DERIVED ONTO THE BUILDER'S REPORTED ONE (Eva's ruling,
+       the apex-nib session) AND SPLIT IN TWO, because the two halves have
+       different strengths and pretending otherwise is how a clause stops
+       meaning anything.
+
+       (i) The spine is laid at the DRAWN length. Both numbers come from
+       `widthProfile` — one through the profile's record, one through the
+       spine's — so this is a consistency statement between two readers of one
+       producer, NOT a check on the length itself. It is here because a wrong
+       length makes the law rebuild below meaningless, and it says so in its
+       own message rather than in a header a reader will not reach.
+       THE CLAUSE THAT OWNS THE DRAWN LENGTH IS AN2, which rebuilds the nib
+       from the EMITTED outline and reads nothing of the plan.
+
+       (ii) WHERE THE NIB IS INERT, THE DRAWN LENGTH IS THE ASKED LENGTH,
+       EXACTLY. That half has an owner the cap does not write — the registry's
+       own `petalLength`, the ring's scale and the size field restated — and
+       it is the clause every row on `main` and every inert row here satisfies
+       term for term. A cap that truncated a petal it had declared inert would
+       fire it, which is the one silent failure the reparameterisation can
+       produce. */
+    if (Math.abs(sp.length - inp.length) > 1e-9) bad.push(`C1: ring ${L}: the spine record reports length ${sp.length}; the profile's own drawn length is ${inp.length} (asked ${inp.askedLength}) — two readers of one producer disagreeing; AN2 owns whether the drawn length is right`);
+    if (!nibActive(m, L) && Math.abs(inp.length - inp.askedLength) > 1e-9)
+      bad.push(`C1: ring ${L}: the apex nib is declared INERT, so the blade must be drawn at the asked length; the builder drew ${inp.length} mm where petalLength x scale x the size field gives ${inp.askedLength} mm`);
     if (sp.floorRadius !== inp.floorRadius) bad.push(`C1: ring ${L}: the spine record reports a floor of ${sp.floorRadius} mm; ${ROLL_MIN_RADIUS_FACTOR} x the ring's thickness ${r.thickness} is ${inp.floorRadius}`);
     /* THE LAW, evaluated HERE, against the EMITTED rows. */
     const law = spineLaw({ curlRad: inp.curlRad, bias: inp.bias, start: inp.start, length: inp.length, tilt: inp.tilt, floorRadius: inp.floorRadius, startFloor: inp.startFloor });
@@ -2451,9 +2572,19 @@ export async function thicknessAssertions(page, row) {
        read the number the cap itself reported. */
     const floor = tc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
     const askedEnd = Number(effectiveFor(m, row, 'petalTipEnd')) || 0;
-    const wantTerminal = Math.max(askedEnd * tc.peakHalf, floor);
+    /* AND THE NIB IS A THIRD THING THAT MAY SET IT (Eva's ruling, the
+       apex-nib session) — re-derived, not relaxed, the same move this clause
+       already made for the squared end. Where the law falls under the print
+       floor the blade no longer runs out flat to it: it is truncated at the
+       crossing and closed on the nib's own mini-face. The guard deciding
+       which of the two arms applies is RESTATED here (`nibWantedFrom`) and
+       never read from the cap, so a cap that declared itself inert while
+       still drawing a nib fires this. At the shipping default before this
+       session the nib arm did not exist and the expression below is that one
+       term for term. */
+    const wantTerminal = nibWantedFrom(tc.peakHalf, askedEnd) ? APEX_END_HALF_MM : Math.max(askedEnd * tc.peakHalf, floor);
     if (Math.abs(tc.terminalHalf - wantTerminal) > 1e-9)
-      bad.push(`A4: terminal ${tc.terminalHalf} mm is not max(petalTipEnd ${askedEnd} x peakHalf ${tc.peakHalf}, the ${tc.exportMode ? 'export' : 'live'} floor ${floor}) = ${wantTerminal} — the squared end and that floor are the only things that may set how wide a petal ends`);
+      bad.push(`A4: terminal ${tc.terminalHalf} mm is not ${nibWantedFrom(tc.peakHalf, askedEnd) ? `the apex nib's own mini-face ${APEX_END_HALF_MM}` : `max(petalTipEnd ${askedEnd} x peakHalf ${tc.peakHalf}, the ${tc.exportMode ? 'export' : 'live'} floor ${floor}) = ${wantTerminal}`} — the squared end, that floor and the nib are the only things that may set how wide a petal ends`);
     /* A5 — THE APEX NARROWS MONOTONICALLY. The retired plateau's signature was
        a rise after a fall above the widest point; nothing in the new law can
        produce one, and this is what says so on every row rather than in a
@@ -2539,8 +2670,41 @@ export async function thicknessAssertions(page, row) {
          which is exactly the region PETAL TIP SHAPE owns — the same curve
          from the same declared peak, over fewer rows. */
       const above = m.petalLobes && !m.petalLobes.noRoom ? Math.max(uPk, m.petalLobes.windowU[1]) : uPk;
+      /* THE REPARAMETERISATION, RE-DERIVED (Eva's ruling, the apex-nib
+         session): "drawn n = asked n should be checked only where the law is
+         above the print floor."
+
+         The nib TRUNCATES the law where it falls under `TIP_HALF_MM` and
+         draws its own flank and arc in the stretch that is left, so the
+         emitted `u` is a station on a SHORTER blade: law-space `u` is drawn
+         `u` times `K = drawn / asked`. Two things follow, and A6 needs both.
+         (i) THE FIT VARIABLE IS IN LAW SPACE. `(u - uPk) / (1 - uPk)` on
+         drawn stations is the law's own variable only when K is 1, and
+         nothing about the superellipse is invariant under a scale of `u`
+         alone. (ii) THE FIT STOPS AT THE CROSSING. Below it the outline is
+         the flank's and the arc's, which are strictly falling and therefore
+         sail straight through the "still falling" filter — measured, fitting
+         through them reads 1.7532 for an asked 1.70, 0.7358 for 0.60 and
+         0.9173 for 0.80, i.e. A6 fires on a tree whose law is exactly right.
+         That is the same bug class as integrating a turning measure through a
+         kink and as fitting through the print floor, which this clause's own
+         header already names; it is the FIFTH instance here.
+
+         THE TWO LENGTHS COME FROM THE CAP'S RECORD AND THE EXPONENT DOES
+         NOT. The reference this clause compares against is still the
+         REGISTRY's `petalTipShape` — an owner the profile does not write —
+         and a record reporting the wrong `K` moves the fitted exponent AWAY
+         from it, so a broken record makes A6 louder rather than quieter.
+         Whether the drawn length is itself right is AN2's, off the emitted
+         outline, with nothing of the record in it. K is exactly 1 on every
+         row where the nib is inert, so this is today's expression term for
+         term there. */
+      const ap = tc.apex || null;
+      const K = ap && ap.active && ap.askedLengthMm > 0 ? ap.drawnLengthMm / ap.askedLengthMm : 1;
+      const uPkLaw = uPk * K;
+      const uEndLaw = ap && ap.active ? ap.uLaw : 1;
       const past = [];
-      for (let i = 0; i < pr.length; i++) if (pu[i] > 0 && pu[i] > above + 1e-9) past.push(i);
+      for (let i = 0; i < pr.length; i++) if (pu[i] > 0 && pu[i] > above + 1e-9 && pu[i] * K < uEndLaw - 1e-9) past.push(i);
       const fit = [];
       for (let k = 0; k < past.length - 1; k++) {
         if (pr[past[k + 1]] < pr[past[k]] - 1e-12) fit.push(past[k]);
@@ -2552,7 +2716,7 @@ export async function thicknessAssertions(page, row) {
            the saturated ladder — and a fit that swallows that reads a
            different exponent from the one asked. */
         const peak = tc.peakHalf;
-        const pts = fit.map((i) => [(pu[i] - uPk) / (1 - uPk), pr[i]]);
+        const pts = fit.map((i) => [(pu[i] * K - uPkLaw) / (1 - uPkLaw), pr[i]]);
         const err = (n) => {
           let a = 0;
           for (const [x, h] of pts) {
@@ -2796,6 +2960,228 @@ export async function thicknessAssertions(page, row) {
      — so this holds structurally rather than by a guard, and asserting it
      here says the structure is still what the header claims. */
   if (th.base !== m.ringThickness) bad.push(`profile at u=0 is ${th.base}, not footRing()'s ring.thickness ${m.ringThickness} — the gradient does not start at the foot's own thickness`);
+  return bad;
+}
+
+/* ===================================================================
+   THE APEX NIB — AN0-AN3, AND BOTH STL GATES ARE BLIND TO ALL OF IT.
+
+   WHAT THE NIB IS. `halfWidthAt` is a `max` of the law, the root blend and
+   the print floor, and the superellipse tip law reaches exactly 0 at u = 1 —
+   so wherever the law falls under the floor the outline runs PARALLEL at that
+   floor to the end, and every petal used to finish on a flat face two floors
+   across (1.6000 mm in EXPORT, 0.3000 mm live) whatever exponent was asked.
+   The nib keeps the law to its crossing of `TIP_HALF_MM`, carries the flank
+   on along its OWN tangent to `APEX_HALF_MM`, and closes with a circular arc
+   tangent to both flanks and centred ON THE AXIS, terminating on a mini-face
+   `2 x APEX_END_HALF_MM` across.
+
+   WHY A FAMILY IS OWED. A nib drawn at the wrong radius, joined at a corner
+   instead of a tangent, carried on the WRONG slope, or run to a length that
+   is not the law's own crossing ALL export watertight, as one connected
+   piece, with no degenerate triangle and an identical triangle count — the
+   outline is single-valued and strictly falling in every one of those cases.
+   The census cannot see it either: none of them folds a sheet. A6 cannot:
+   it fits the LAW's region and stops at the crossing by construction (Eva's
+   ruling), so everything the nib draws is below its subject.
+
+   THE REFERENCES HAVE OWNERS THE CAP DOES NOT WRITE (the fourth durable
+   rule). The law is rebuilt here from the REGISTRY's `petalTipShape`, the
+   cap's declared peak — which A6 separately pins against the emitted rows —
+   and the asked length, which is `petalLength x the ring's scale x the size
+   field restated`, the same expression C1 uses for the spine. Not one of the
+   plan's own five numbers (`uLaw`, `slope`, `xFaceMm`, `radiusMm`,
+   `drawnLength`) is read as its own reference. AN3 then closes the loop on
+   the EMITTED rows, which no declaration can lie about.
+
+   AN0  THE NIB IS DRAWN EXACTLY WHERE THE LAW SAYS IT SHOULD BE, three ways
+        — the restated guard, the plan's own flag, and the emitted last row,
+        which is under `TIP_HALF_MM` if and only if a nib closed the blade.
+        Plus `why` is null iff active, so an inert ring states its reason.
+        MEASURED before it was written: over 2,452 ring-modes of the whole
+        matrix in both modes the restated guard and the geometry's own
+        disagree on ZERO, with 76 inert for a squared terminal and 18 for an
+        inner whorl whose blade never clears the floor. The geometry's third
+        inert case (a law arriving with no slope to carry on) fires on no
+        reachable row, so a ring reporting it is a FINDING and reads as one.
+   AN1  THE FLANK IS THE LAW'S OWN TANGENT. Rebuilt here from the law, at the
+        crossing this gate bisects for itself, by the same two-step Richardson
+        probe the geometry uses — and the bound is that probe's own truncation
+        error rather than a number that happens to pass.
+   AN2  THE DRAWN LENGTH IS THE LAW'S CROSSING PLUS THE CAP THE CONSTANTS
+        IMPLY, rebuilt end to end. This is the clause C1's length statement
+        defers to: C1 can only say the spine and the profile agree with each
+        other, because both read one producer.
+   AN3  THE EMITTED OUTLINE IS THE NIB THAT WAS DECLARED — every row above
+        the crossing on the flank-then-arc curve, the last row ON the
+        mini-face, strictly falling, and never zero (A3's true-apex failure,
+        which collapses NV columns onto one edge, is the thing the mini-face
+        exists to rule out).
+
+   THE CONSTANTS ARE AN AUTHORED EXCEPTION AND THE GATE SAYS SO. 0.40 mm is
+   below `MIN_FEATURE_MM`, ruled deliberately (Eva, the apex-nib session) on a
+   generator where NOTHING HAS EVER BEEN PRINTED — so the ordering
+   `APEX_END_HALF_MM < APEX_HALF_MM < TIP_HALF_MM` is asserted at the head of
+   the family, as the statement of what was authored rather than as a
+   discovered fact.
+   =================================================================== */
+export async function apexNibAssertions(page, row) {
+  const m = await page.evaluate(() => window.__bloomMetrics());
+  const ui = await page.evaluate(() => window.__bloomUIState());
+  const bad = [];
+  if (noPetalBuilt(m)) return bad;      // the stem channel took every slot; see noPetalBuilt()
+  /* THE AUTHORED EXCEPTION, STATED. Read from the geometry rather than typed
+     here, because these are its constants; what this asserts is the ORDER,
+     which is the thing a future edit could break without any gate noticing. */
+  if (!(APEX_END_HALF_MM > 0 && APEX_END_HALF_MM < APEX_HALF_MM && APEX_HALF_MM < TIP_HALF_MM))
+    bad.push(`AN0: the apex constants are ${APEX_END_HALF_MM} / ${APEX_HALF_MM} / ${TIP_HALF_MM} — the nib's mini-face must be inside its face, and its face inside the print floor it replaces`);
+  const caps = m.petalRingTipCap, rings = m.rings, roots = m.petalRingRootRows;
+  if (!Array.isArray(caps) || !Array.isArray(rings) || caps.length !== rings.length) {
+    bad.push(`AN0: expected tip-cap telemetry for ${rings && rings.length} rings, got ${JSON.stringify(caps && caps.length)}`);
+    return bad;
+  }
+  rings.forEach((r, L) => {
+    const tc = caps[L], q = roots && roots[L];
+    if (!tc || !tc.apex || !q) return;
+    const ap = tc.apex;
+    const at = rings.length > 1 ? `ring ${L}: ` : '';
+    /* THE ASKED LENGTH, from the registry and not from the cap — the same
+       product C1 lays the spine at. */
+    const asked = effectiveFor(m, row, 'petalLength', L) * r.scale * sizeFactorRestated(m, ui, q.azimuth);
+    const askedEnd = Number(effectiveFor(m, row, 'petalTipEnd', L)) || 0;
+    const peak = tc.peakHalf;
+
+    /* ---- AN0 ---------------------------------------------------------- */
+    const want = nibWantedFrom(peak, askedEnd);
+    if (ap.active !== want)
+      bad.push(`AN0: ${at}the cap reports the apex nib ${ap.active ? 'ACTIVE' : `INERT (${ap.why})`} where the law says ${want ? 'ACTIVE' : 'INERT'} — the blade's peak is ${peak} mm against a print floor of ${TIP_HALF_MM}, and petalTipEnd ${askedEnd} puts ${askedEnd * peak} mm at the terminal`);
+    if ((ap.why === null) !== ap.active)
+      bad.push(`AN0: ${at}the cap reports active ${ap.active} with reason ${JSON.stringify(ap.why)} — an inert nib states which of its guards refused, and an active one states none`);
+    if (!ap.active && ap.why === 'the law arrives with no slope to carry on')
+      bad.push(`AN0: ${at}the nib refused for want of a slope at the crossing — that guard fires on no row of the matrix, so this ring is a finding rather than a declared case`);
+    if (Math.abs(ap.askedLengthMm - asked) > 1e-9)
+      bad.push(`AN0: ${at}the cap reports an asked length of ${ap.askedLengthMm} mm; petalLength x the ring's scale x the size field gives ${asked} mm`);
+    const modeFloor = tc.exportMode ? TIP_HALF_MM : TIP_CAP_HALF_MM;
+    const lastUnderFloor = tc.lastRowHalf < modeFloor;
+    if (lastUnderFloor !== ap.active)
+      bad.push(`AN0: ${at}the last emitted row is ${tc.lastRowHalf} mm where this mode's flat face is ${modeFloor}, so the EMITTED blade says the nib is ${lastUnderFloor ? 'ACTIVE' : 'INERT'} while the plan says ${ap.active ? 'ACTIVE' : 'INERT'}`);
+    if (!ap.active) {
+      if (Math.abs(ap.drawnLengthMm - asked) > 1e-9)
+        bad.push(`AN0: ${at}the nib is INERT (${ap.why}) and the blade is drawn at ${ap.drawnLengthMm} mm where the asked length is ${asked} mm — an inert cap may not move the length`);
+      return;
+    }
+
+    /* ---- the law, rebuilt here ---------------------------------------- */
+    /* `tc.uPk` is the widest point in the DRAWN parameterisation; the law's
+       own is that times the scale the truncation applied. A6 pins `peakHalf`
+       at exactly this station, so the two clauses rest on one reading. */
+    const K = asked > 0 ? ap.drawnLengthMm / asked : 1;
+    const uPkLaw = tc.uPk * K;
+    const n = tc.shapeN;
+    if (!(n > 0) || !(peak > 0) || !(uPkLaw >= 0 && uPkLaw < 1)) {
+      bad.push(`AN1: ${at}the law cannot be rebuilt from exponent ${n}, peak ${peak}, widest point ${uPkLaw} — nothing below can be checked`);
+      return;
+    }
+    const law = (u) => (u <= uPkLaw ? peak : peak * Math.pow(Math.max(0, 1 - Math.pow((u - uPkLaw) / (1 - uPkLaw), n)), 1 / n));
+    /* THE CROSSING, bisected here. The law is strictly falling above the
+       widest point, so the crossing is unique and the bisection is exact to
+       the bit within 90 halvings. */
+    let lo = uPkLaw, hi = 1;
+    for (let i = 0; i < 90; i++) { const mid = (lo + hi) / 2; if (law(mid) > TIP_HALF_MM) lo = mid; else hi = mid; }
+    const uLaw = hi;
+    /* THE TANGENT, by the geometry's own two-step Richardson probe. Its
+       truncation error is O(h^2) on a smooth branch, so the bound is that
+       — the quantity's own conditioning, in the unit the slope carries
+       (mm of half-width per mm of station). A LOBED ring is excluded: the
+       cut is a separate term over the same region and the nib reads the
+       BASE outline, which this rebuild is, but the emitted rows AN3 reads
+       are the cut ones. */
+    const d1 = 1e-4, d2 = d1 / 2;
+    const s1 = (law(uLaw) - law(uLaw - d1)) / (d1 * asked);
+    const s2 = (law(uLaw) - law(uLaw - d2)) / (d2 * asked);
+    const slope = Math.abs(2 * s2 - s1);
+    const xLaw = uLaw * asked;
+    const xFace = xLaw + (TIP_HALF_MM - APEX_HALF_MM) / slope;
+    const sec = Math.sqrt(1 + slope * slope);
+    const radius = APEX_HALF_MM * sec;
+    const centre = xFace - APEX_HALF_MM * slope;
+    const drawn = centre + Math.sqrt(Math.max(0, radius * radius - APEX_END_HALF_MM * APEX_END_HALF_MM));
+
+    /* ---- AN1 ----------------------------------------------------------- */
+    /* THE BOUND IS THE PROBE'S OWN, NOT A NUMBER THAT PASSES. Two Richardson
+       probes of one smooth function differ only by their fourth-order tail,
+       and the two rebuilds here differ additionally by the bisection's last
+       bit; 1e-6 mm/mm is four orders above both and eleven below the slopes
+       this law actually produces (0.08 to 40 over the exponent range). */
+    if (Math.abs(ap.slope - slope) > 1e-6)
+      bad.push(`AN1: ${at}the flank is carried on at ${ap.slope} mm/mm where the law's own one-sided tangent at its ${TIP_HALF_MM} mm crossing is ${slope} — the nib is not the law's tangent, so the apex is not the shape petalTipShape ${n} names`);
+    if (Math.abs(ap.uLaw - uLaw) > 1e-9)
+      bad.push(`AN1: ${at}the cap truncates the law at u ${ap.uLaw} where the law meets the ${TIP_HALF_MM} mm floor at u ${uLaw} — the law is cut somewhere other than where the print floor takes it over`);
+    if (Math.abs(ap.radiusMm - radius) > 1e-9)
+      bad.push(`AN1: ${at}the nib's arc has radius ${ap.radiusMm} mm where a circle on the axis tangent to a flank of slope ${slope} through a half-width of ${APEX_HALF_MM} mm has radius ${radius}`);
+    if (Math.abs(ap.centreMm - centre) > 1e-9)
+      bad.push(`AN1: ${at}the arc is centred at ${ap.centreMm} mm where tangency at the ${2 * APEX_HALF_MM} mm face puts its centre at ${centre}`);
+    if (Math.abs(ap.xFaceMm - xFace) > 1e-9)
+      bad.push(`AN1: ${at}the flank runs to ${ap.xFaceMm} mm where carrying the law's tangent from ${xLaw} mm down to ${APEX_HALF_MM} mm of half-width reaches ${xFace}`);
+
+    /* ---- AN2 ----------------------------------------------------------- */
+    if (Math.abs(ap.drawnLengthMm - drawn) > 1e-9)
+      bad.push(`AN2: ${at}the blade is drawn at ${ap.drawnLengthMm} mm where the law's crossing plus the cap the constants imply is ${drawn} mm (asked ${asked}) — the petal's own length is not the one the apex law produces`);
+    if (Math.abs(ap.endHalfMm - APEX_END_HALF_MM) > 1e-12)
+      bad.push(`AN2: ${at}the nib terminates on a half-width of ${ap.endHalfMm} mm, not the declared ${APEX_END_HALF_MM}`);
+    if (Math.abs(ap.capMm - (drawn - xLaw)) > 1e-9)
+      bad.push(`AN2: ${at}the cap reports a length of ${ap.capMm} mm where the drawn length less the crossing is ${drawn - xLaw}`);
+    if (Math.abs(ap.arcU - xFace / drawn) > 1e-9)
+      bad.push(`AN2: ${at}the arc is declared to begin at u ${ap.arcU} where ${xFace} mm on a ${drawn} mm blade is u ${xFace / drawn}`);
+  });
+
+  /* ---- AN3 — the emitted outline is the nib that was declared ---------- */
+  /* The profile arrays are the LAST petal's, which is the one `petalTipCap`
+     describes, so this clause reads that cap and not a ring's. */
+  const tcL = m.petalTipCap, pr = m.petalProfileBase, pu = m.petalProfileU;
+  if (tcL && tcL.apex && tcL.apex.active && Array.isArray(pr) && Array.isArray(pu) && pr.length === pu.length) {
+    const ap = tcL.apex, D = ap.drawnLengthMm;
+    /* THE CURVE THE PLAN DECLARES, evaluated at the EMITTED stations. This is
+       the plan restated — its independent rebuild is AN1/AN2 above — and what
+       it adds is that the rows the builder put on the blade are ON it. */
+    const planAt = (x) => (x <= ap.xFaceMm
+      ? TIP_HALF_MM - ap.slope * (x - ap.xLawMm)
+      : Math.max(APEX_END_HALF_MM, Math.sqrt(Math.max(0, ap.radiusMm * ap.radiusMm - (x - ap.centreMm) * (x - ap.centreMm)))));
+    let worst = 0, worstU = -1, rowsOn = 0;
+    for (let i = 0; i < pr.length; i++) {
+      const x = pu[i] * D;
+      if (!(x > ap.xLawMm + 1e-12)) continue;
+      rowsOn++;
+      const d = Math.abs(pr[i] - planAt(x));
+      if (d > worst) { worst = d; worstU = pu[i]; }
+    }
+    /* THE BOUND IS THE OUTLINE'S OWN CONDITIONING: the arc's half-width is a
+       difference of squares of ~30 mm coordinates, so its error is a few ulp
+       of that magnitude, and 1e-9 mm is six orders above it. A row off the
+       declared curve by more than that is a row drawn by something else. */
+    if (worst > 1e-9)
+      bad.push(`AN3: an emitted row at u ${worstU} is ${worst} mm off the nib the cap declared — the outline above the law's crossing is not the flank and arc that were planned`);
+    /* HOW MANY ROWS THE NIB GOT IS NOT ASSERTED, AND THAT IS A RULING RATHER
+       THAN A GAP. The arc is 0.05 mm on the shipping default against a
+       0.60 mm median row gap, so it is drawn at all only because the ladder
+       accepts a resolution demand for it (`APEX_ARC_ROWS`). AT THE BUCKLE'S
+       FREQUENCY CEILING NO DEMAND IS PLACED: `ladderGapFactor(7)` is exactly
+       1 because 56 rows over 7 cycles is 8 per cycle with no slack, so every
+       row handed to the arc would come off the wave's own bar. Session 32
+       ruled that trade for the apex already — "at the ceiling the apex keeps
+       today's faceting" — and `APEX NIB: x the buckle at its frequency
+       ceiling` is the matrix row that carries it: measured, 1 row above the
+       crossing there against 6 everywhere else. A clause asserting a count
+       would redden a state the geometry is entitled to build, so the count is
+       REPORTED — on the read-out's own APEX NIB line, per build — and what is
+       asserted is that whatever rows are there lie on the declared curve. */
+    if (rowsOn < 1)
+      bad.push(`AN3: no emitted row sits above the law's crossing at all, so the blade's last row is the law's own and the nib was never drawn`);
+    if (Math.abs(tcL.lastRowHalf - APEX_END_HALF_MM) > 1e-9)
+      bad.push(`AN3: the last emitted row is ${tcL.lastRowHalf} mm where the nib's mini-face is ${APEX_END_HALF_MM} — the blade does not end on the face the arc was closed at`);
+    if (!(tcL.lastRowHalf > 0))
+      bad.push(`AN3: the nib closes to ${tcL.lastRowHalf} — a true apex, which collapses NV columns onto one edge (the retired DOME's own defect, and the reason the arc terminates on a mini-face at all)`);
+  }
   return bad;
 }
 
@@ -3761,9 +4147,16 @@ export async function varianceAssertions(page, row) {
       if (!pairs && az.some((r) => r.length >= 2)) bad.push('VS3: no mirror pair was found on a fan of two or more slots — the evenness clause has nothing to hold');
     }
   }
-  /* VS2, both arms: the blade's own length is the nominal times the slot's scale */
+  /* VS2, both arms: the blade's own length is the nominal times the slot's
+     scale. THE LENGTH READ IS THE ASKED ONE (the apex-nib session): the nib
+     truncates the law where it falls under the print floor, so the length the
+     blade is DRAWN at is the cap's and not the field's, and comparing it here
+     would make this clause fire on every row while saying nothing about the
+     size field. The two are the same double wherever the nib is inert, and
+     whether the DRAWN one is right is AN2's. */
   for (const s of sizes) {
-    if (s.length !== s.nominalLength * s.scale) bad.push(`VS2: petal ${s.whorl}/${s.index}'s built length ${s.length} is not its nominal ${s.nominalLength} times its slot scale ${s.scale}`);
+    const asked = typeof s.askedLength === 'number' ? s.askedLength : s.length;
+    if (asked !== s.nominalLength * s.scale) bad.push(`VS2: petal ${s.whorl}/${s.index}'s asked length ${asked} is not its nominal ${s.nominalLength} times its slot scale ${s.scale}`);
   }
 
   /* VS5 — the told flag */
@@ -6379,7 +6772,14 @@ export async function sepalAssertions(page, row) {
   const wantLen = Number(ui.petalLength) * Number(ui.sepalScale);
   const wantHalf = (Number(ui.petalWidth) * Number(ui.sepalScale)) / 2;
   for (const p of S.petals) {
-    if (Math.abs(p.length - wantLen) > 1e-9) bad.push(`SP5: sepal ${p.slotIndex} is ${p.length} mm long; petal length ${ui.petalLength} x size ${ui.sepalScale} is ${wantLen}`);
+    /* THE LENGTH READ IS THE ASKED ONE (the apex-nib session). A sepal is the
+       petal builder on a second ring, so it cuts its own apex nib from its
+       own law and is drawn to wherever that cap closes — which is a fact
+       about the APEX and not about `sepalScale`, the quantity this clause is
+       named for. The two are the same double wherever the nib is inert, and
+       whether the drawn length is right is AN2's. */
+    const askedLen = typeof p.askedLength === 'number' ? p.askedLength : p.length;
+    if (Math.abs(askedLen - wantLen) > 1e-9) bad.push(`SP5: sepal ${p.slotIndex} was asked for ${askedLen} mm; petal length ${ui.petalLength} x size ${ui.sepalScale} is ${wantLen}`);
     if (!p.tipCap || Math.abs(p.tipCap.peakHalf - wantHalf) > 1e-9) bad.push(`SP5: sepal ${p.slotIndex}'s peak half-width is ${p.tipCap && p.tipCap.peakHalf}; petal width ${ui.petalWidth} x size ${ui.sepalScale} / 2 is ${wantHalf}`);
   }
   if (Math.abs(S.scale - Number(ui.sepalScale)) > 1e-12) bad.push(`SP5: the descriptor's size ${S.scale} is not the control's ${ui.sepalScale}`);
@@ -7818,6 +8218,18 @@ export const SELF_INTERSECTION_XFAIL = Object.freeze({
   'TILT: 120 x 3 whorls x layerTilt 0 (every whorl past the right angle, not only the innermost)': { pairs: 1312, worstMm: 0.3816, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the DEPTH arm, and the shape the pre-ruling matrix could not build from the base control: three whorls ALL past the right angle rather than an inner one carried there by a tilt step. EFFECTIVE TILT PAST 90 — 120.0 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s) — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 1008 -> 1312 pairs, 0.4406 -> 0.3816 mm' },
   'TILT: 120 x CONTINUOUS x 3 turns (the other placement whose rings each carry their own turn)': { pairs: 3037, worstMm: 0.4454, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; the continuous arm accumulates the tilt gain over 2.975 turns, so the deepest ring reaches 154.5 degrees from a 120-degree base. EFFECTIVE TILT PAST 90 — 154.5 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s) — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 2824 -> 3037 pairs, 0.482 -> 0.4454 mm' },
   'TILT: 120 x headRise 0.5 (domeLean on top of the ceiling — past the window\'s own edge)': { pairs: 1168, worstMm: 0.6020, note: '(NEW with the TILT RANGE opening to 0..120, Sep 19 — docs/bloom-tilt-range-shipped.md; domeLean adds to the base tilt, so this is the one row here whose deepest ring is past the window\'s own edge as well as past the right angle. EFFECTIVE TILT PAST 90 — 173.1 degrees at the deepest ring, where the blade\'s own mid-surface lies back over its foot and no station spacing can clear it. ACCEPTED BY RULING and declared with a number: the row exports watertight and flood-fills as ONE connected piece, which is the invariant; a within-shell pair is the census\'s printability finding and never the export gate\'s) — RE-RECORDED BY THE PETAL EDGE PROFILE at four bead segments, measured by `node tools/bloom-census-sweep.mjs` over all 909 rows under the census #279 fixed: 1112 -> 1168 pairs, 0.6428 -> 0.6020 mm' },
+
+  /* ===== THE APEX NIB'S TWO ROWS (the apex-nib session) — AND NEITHER FOLD
+     IS THE NIB'S, MEASURED ON BOTH TREES RATHER THAN ARGUED. Both are new
+     matrix rows that compose TWO controls, which `buildMatrix()` does not do
+     anywhere else — it varies one control at a time, which is what makes a
+     row attributable — so neither state had ever been censused. The census
+     was run on the same two control sets against a worktree of the base
+     commit; what it found is below, beside each entry. */
+  'APEX NIB: MIXED — 6 layers x layerSize min (three rings nibbed, three whose blade never clears the floor)': { pairs: 10232, worstMm: 0.2421,
+    note: '(NEW ROW, and PRE-EXISTING: the census reads 10232 pairs / 0.2421 mm on this control set on a worktree of the base commit 2464d50 as well, to the pair and to four decimals, at an identical 146,400 triangles — so the apex nib moves nothing here and the fold is the six-deep whorl\'s own. It is a COMPOSITION: `layerCount 6` alone reads 0 and `layerSize 0.35` alone reads 0, and the matrix varies one control at a time, so no row on main could see it. The row is here for AN0\'s second inert arm — three of its six rings carry a nib and three have a blade that never clears the print floor — which is the only state where a clause reading ring 0 and stopping says something false)' },
+  'APEX NIB: x cup 1.2 x roll 330 (the nib under the form maximum)': { pairs: 6616, worstMm: 0.7742,
+    note: '(NEW ROW, and PRE-EXISTING IN KIND: the same control set on a worktree of the base commit 2464d50 reads 6344 pairs / 0.7107 mm, so the fold is the composition\'s and the nib moves its magnitude by +272 pairs and +0.064 mm. Both singles fold on their own — `petalRoll 330` reads 13584 / 1.3335 here and 15280 / 1.5539 on the base, `petalCup 1.2` reads 1088 / 0.3904 here and 80 / 0.0239 — and BOTH are already declared rows of this list, so this is a third reading of a hazard the combination gate names as the widest failing region it has (`petalCup x petalRoll`, eleven cells under the bar). Recorded at the branch\'s own figures because that is what this tree measures; the base\'s are here so the move is attributable rather than silent)' },
 });
 
 /* THE MAGNITUDE IS GATED (#213, closed — docs/bloom-xfail-magnitudes.md has
@@ -10304,6 +10716,61 @@ export function buildMatrix() {
     ['VARIANCE: x the FRINGE at 10 teeth (the tooth ceiling is per petal under the field)', { petalTipEnd: 1, fringeCount: 10, varianceSize: 0.5 }],
     ['VARIANCE: GATED — frequency and phase at MAXIMUM with the amount 0 (hidden AND inert)', { varianceSize: 0, varianceFrequency: 20, variancePhase: 360 }],
     ['VARIANCE: GATED — the ramp and phase 0 with the amount 0 (hidden AND inert)', { varianceSize: 0, varianceFrequency: 0, variancePhase: 0 }],
+  ]) {
+    rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
+  }
+
+
+
+  /* 39. THE APEX NIB — THE LAW'S OWN TANGENT AND A ROUNDED POINT (Eva's
+        ruling, the apex-nib session, from the rendered sheet: RED+ at a
+        0.40 mm face with the FULL ROUND nib).
+
+        WHAT THESE ROWS ARE FOR: both STL gates are BLIND to the whole
+        family, and that is a measurement rather than a caution. A nib drawn
+        at the wrong arc radius, joined at a corner instead of a tangent,
+        carried on a slope that is not the law's, or run to a length that is
+        not the law's crossing all leave a single-valued, strictly falling
+        outline on a fixed row-and-column lattice: watertight, one connected
+        piece, zero degenerate triangles, the same triangle count. The
+        census cannot see any of them either — none of them folds a sheet.
+        A6 cannot: Eva's ruling fits the law ABOVE the print floor and stops
+        at the crossing, so everything the nib draws is below its subject.
+        AN0-AN3 are the only witnesses, and these rows are what runs them on
+        every arm the nib has.
+
+        THE AXES: the flank's slope across the exponent range (0.1717 mm/mm
+        at 0.60, 35.05 at 3.00 — a factor of 204, and the arc's radius and
+        the cap's length both follow it); the LENGTH in both directions,
+        because the cap is a truncation at low exponents (8.588 mm given up
+        at 0.60 on a 60 mm blade) and an OVERSHOOT at high ones (+0.122 mm at
+        1.40, +0.007 at 3.00 — accepted and reported, Eva's ruling); BOTH
+        inert arms (a squared terminal holding the outline above the floor,
+        which is #229's fringe terminal, and an inner whorl whose blade never
+        clears the floor at all); the ladder, whose resolution demand for the
+        arc competes with the buckle's own at its frequency ceiling; the lobe
+        cut, whose per-period relief guard reads at a sinus and would
+        otherwise drive the nib's own half-width negative (#224's ruling
+        against a pointwise minimum is about the FLANK and is untouched); and
+        the sepals, which are the petal builder on a second ring and cut
+        their own nib from their own law.
+
+        THE MIXED ROW IS THE ONE TO KEEP. `6 layers x layerSize min` builds
+        three rings with a nib and three without, in one bloom — the state
+        where a clause that read ring 0 and stopped, or a read-out that named
+        ring 0's length as the bloom's, says something false. */
+  for (const [name, sets] of [
+    ['APEX NIB: tip shape 0.60 x 60 mm (the shallowest flank on the longest blade — 8.59 mm of law given up)', { petalTipShape: 0.60, petalLength: 60 }],
+    ['APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc)', { petalTipShape: 3.00, petalLength: 20 }],
+    ['APEX NIB: tip shape 1.40 (the OVERSHOOT — the cap carries the blade past the slider)', { petalTipShape: 1.40 }],
+    ['APEX NIB: INERT — a squared terminal holds the outline above the print floor', { petalTipEnd: 0.30 }],
+    ['APEX NIB: MIXED — 6 layers x layerSize min (three rings nibbed, three whose blade never clears the floor)', { layerCount: 6, layerSize: 0.35 }],
+    ['APEX NIB: x the buckle at its frequency ceiling (the arc asks the uniform ladder for its rows)', { buckleAmp: 0.60, buckleFreq: 7 }],
+    ['APEX NIB: x LOBES 1.00 x 10 (the per-period relief against the nib’s own floor)', { lobeDepth: 1.00, lobeCount: 10 }],
+    ['APEX NIB: x the FRINGE at 10 teeth on a squared end (the nib stands down, #229)', { petalTipEnd: 1, fringeCount: 10 }],
+    ['APEX NIB: x SEPALS (the petal builder on a second ring cuts its own nib)', { sepalCount: 8 }],
+    ['APEX NIB: x cup 1.2 x roll 330 (the nib under the form maximum)', { petalCup: 1.2, petalRoll: 330 }],
+    ['APEX NIB: x CONTINUOUS x 3 turns x 40 petals (every ring its own crossing)', { placement: 'CONTINUOUS', layerCount: 3, petalCount: 40 }],
   ]) {
     rows.push({ label: name, set: Object.entries(sets).map(([id, value]) => ({ id, value: String(value) })) });
   }
