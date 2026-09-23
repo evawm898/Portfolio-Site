@@ -8021,7 +8021,7 @@ export function selfIntersectionRefusedNote(refusedLabels) {
 }
 
 export function orientationLine(o) {
-  return `ORIENTATION (export STL): ${o.shells - o.inward} of ${o.shells} shells outward${o.inward ? ` (${o.inward} inward — the SPHERE hub's inner face)` : ''}, total ${o.totalVolumeMm3.toFixed(1)} mm^3, volume sign and ray parity ${o.disagreements ? 'DISAGREE on ' + o.disagreements + ' (reported: parity is undefined on a self-intersecting shell)' : 'agree'}${o.parityUndefined ? ` — parity UNDEFINED on ${o.parityUndefined} shell(s): the ray's own 1e-4 mm start step lands inside another sheet of the same shell, so the answer would be a fact about the step` : ''}`;
+  return `ORIENTATION (export STL): ${o.shells - o.inward} of ${o.shells} shells outward${o.inward ? ` (${o.inward} inward — the SPHERE hub's inner face)` : ''}, total ${o.totalVolumeMm3.toFixed(1)} mm^3, volume sign and ray parity ${o.disagreements ? 'DISAGREE on ' + o.disagreements + ' (reported: parity is undefined on a self-intersecting shell)' : 'agree'}`;
 }
 export function selfIntersectionLine(r) {
   return `SELF-INTERSECTION (the builder's doubles, X0-identical to the STL): ${r.within} within-shell pair(s)${r.within ? ` (worst span ${r.worstSpanMm.toFixed(4)} mm)` : ''} · ${r.cross} cross-shell (overlapping closed solids, by design)`;

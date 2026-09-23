@@ -572,28 +572,6 @@ export function census(positions, { verbose = false, collect = false } = {}) {
    They are reported together and a disagreement is itself a failure — that is
    what stops the check from being a restatement of one convention.
    =================================================================== */
-/* CLOSEST APPROACH OF A POINT TO A TRIANGLE — the standard region walk, used
-   only by the parity test's own validity check. It is exact on the plane and
-   on each edge and vertex, so "the start point is inside another sheet" is a
-   measurement rather than a sampled guess. */
-function pointTriDist(P, A, B, C) {
-  const ab = sub(B, A), ac = sub(C, A), ap = sub(P, A);
-  const d1 = dot(ab, ap), d2 = dot(ac, ap);
-  if (d1 <= 0 && d2 <= 0) return len(ap);
-  const bp = sub(P, B), d3 = dot(ab, bp), d4 = dot(ac, bp);
-  if (d3 >= 0 && d4 <= d3) return len(bp);
-  const vc = d1 * d4 - d3 * d2;
-  if (vc <= 0 && d1 >= 0 && d3 <= 0) { const v = d1 / (d1 - d3); return len(sub(P, [A[0]+ab[0]*v, A[1]+ab[1]*v, A[2]+ab[2]*v])); }
-  const cp = sub(P, C), d5 = dot(ab, cp), d6 = dot(ac, cp);
-  if (d6 >= 0 && d5 <= d6) return len(cp);
-  const vb = d5 * d2 - d1 * d6;
-  if (vb <= 0 && d2 >= 0 && d6 <= 0) { const w = d2 / (d2 - d6); return len(sub(P, [A[0]+ac[0]*w, A[1]+ac[1]*w, A[2]+ac[2]*w])); }
-  const va = d3 * d6 - d5 * d4;
-  if (va <= 0 && (d4 - d3) >= 0 && (d5 - d6) >= 0) { const w = (d4 - d3) / ((d4 - d3) + (d5 - d6)); return len(sub(P, [B[0]+(C[0]-B[0])*w, B[1]+(C[1]-B[1])*w, B[2]+(C[2]-B[2])*w])); }
-  const den = 1 / (va + vb + vc), v = vb * den, w = vc * den;
-  return len(sub(P, [A[0]+ab[0]*v+ac[0]*w, A[1]+ab[1]*v+ac[1]*w, A[2]+ab[2]*v+ac[2]*w]));
-}
-
 export function orientation(positions) {
   const nTri = positions.length / 9;
   const key = new Map(), vidx = new Int32Array(nTri * 3);
@@ -629,30 +607,7 @@ export function orientation(positions) {
     const [a,b,c] = tri(best);
     let N = cross(sub(b,a), sub(c,a)); const L = len(N); N = [N[0]/L, N[1]/L, N[2]/L];
     const ctr = [0,1,2].map((i) => (a[i]+b[i]+c[i])/3);
-    const RAY_OFFSET_MM = 1e-4;
-    const O = [0,1,2].map((i) => ctr[i] + N[i] * RAY_OFFSET_MM);
-    /* AND THE START POINT MUST ACTUALLY BE OUTSIDE. The ray is fired from one
-       facet's centroid stepped `RAY_OFFSET_MM` along its own normal, on the
-       premise that a step that small leaves the solid and enters free space.
-       On a sheet that COILS that premise fails: `petalCup` 1.2 x
-       `petalSpineCurl` 360 passes within 0.0002 mm of itself, so the step
-       lands INSIDE the neighbouring turn and the parity is counted from a
-       point in the material — the answer is then a fact about the offset and
-       not about the winding. Where the census reads pairs the row is already
-       exempt (parity has no meaning through a surface that crosses itself);
-       this is the other half, a row the census reads CLEAN whose sheets merely
-       come closer than the ray's own step. It is DECLARED UNDEFINED and
-       counted rather than silently excused, so a tree that started producing
-       them in quantity is visible. Found when the Voronoi infill's holes
-       removed the census pairs from that state and left O2 asserting on a
-       geometry it cannot measure — the clause's subject, not its strictness. */
-    let nearest = Infinity;
-    for (const t of ids) { if (t === best) continue;
-      const [A2,B2,C2] = tri(t);
-      const d = pointTriDist(O, A2, B2, C2);
-      if (d < nearest) nearest = d;
-    }
-    const parityUndefined = nearest <= RAY_OFFSET_MM;
+    const O = [0,1,2].map((i) => ctr[i] + N[i] * 1e-4);
     let hits = 0;
     for (const t of ids) { if (t === best) continue;
       const [A2,B2,C2] = tri(t);
@@ -664,13 +619,11 @@ export function orientation(positions) {
       if (dot(e2,q)*inv > 1e-7) hits++;
     }
     out.push({ tris: ids.length, volumeMm3: V, rayCrossings: hits,
-               outwardByVolume: V > 0, outwardByRay: hits % 2 === 0,
-               parityUndefined, parityClearanceMm: nearest });
+               outwardByVolume: V > 0, outwardByRay: hits % 2 === 0 });
   }
   out.sort((x, y) => y.tris - x.tris);
   return { shells: out.length, inward: out.filter((s) => !s.outwardByVolume).length,
-           disagreements: out.filter((s) => !s.parityUndefined && s.outwardByVolume !== s.outwardByRay).length,
-           parityUndefined: out.filter((s) => s.parityUndefined).length,
+           disagreements: out.filter((s) => s.outwardByVolume !== s.outwardByRay).length,
            totalVolumeMm3: out.reduce((a, s) => a + s.volumeMm3, 0), perShell: out };
 }
 

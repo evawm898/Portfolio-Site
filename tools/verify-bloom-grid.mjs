@@ -978,8 +978,14 @@ const MUTANTS = [
        mid-surface normal actually differ. On a flat hub they agree and 2a stays
        silent. A true statement about the mutation, so it is declared. */
     id: 'grid-stores-the-row-normal', clause: ['2a', '2b', '2c', '2d'], file: 'bloom-geometry.js',
-    from: 'mid: oP[k], normal: oN[k] });',
-    to: 'mid: oP[k], normal: oN[k].map(() => rows[i].N) });',
+    /* RE-ANCHORED by the VORONOI INFILL (S3), which added `material` to this
+       push — the second time this mutant has been disarmed by a change to the
+       line it edits, and the second time the anchor pre-check is what said so
+       rather than a green sweep. The anchor stops at `normal: oN[k]` now and
+       the replacement re-closes the object with the field that follows, so a
+       later addition AFTER `material` cannot disarm it a third time. */
+    from: 'mid: oP[k], normal: oN[k], material:',
+    to: 'mid: oP[k], normal: oN[k].map(() => rows[i].N), material:',
   },
   {
     /* THE APEX IS RECOMPUTED INSTEAD OF PUSHED. `emitPanel` places the

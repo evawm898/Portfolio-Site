@@ -244,21 +244,45 @@ which is a top skin meeting a bottom skin rather than a sheet folding.
 
 ---
 
-## 10. O2's parity ray had to declare itself undefined
+## 10. O2's parity ray needed no change, and the first cut of this PR made one
 
+**WITHDRAWN, and the withdrawn reading is kept here so the correction is
+checkable.** This PR first carried an edit to `tools/bloom-self-intersection.mjs`:
 `orientation()` fires its second-opinion ray from one facet's centroid stepped
-1e-4 mm along its own normal, on the premise that the step leaves the solid. On
-a sheet that COILS the premise fails — `petalCup` 1.2 × `petalSpineCurl` 360
-passes within 0.0002 mm of itself — so the step lands inside the neighbouring
-turn and the parity is counted from a point in the material.
+1e-4 mm along its own normal, on the premise that the step leaves the solid, and
+on a sheet that COILS the premise fails — `petalCup` 1.2 × `petalSpineCurl` 360
+passes within 0.0002 mm of itself, so the step lands inside the neighbouring turn
+and the parity is counted from a point in the material. The edit marked such a
+shell `parityUndefined` and took it out of `disagreements`.
 
-A shell whose nearest other triangle is within the ray's own step is now
-`parityUndefined`: **declared and counted, never silently excused**, and the
-read-out says so. Found when the infill's holes removed the census pairs from
-that state and left O2 asserting on a geometry it cannot measure — the clause's
-subject, not its strictness.
+**It was dead code by the time it shipped, and only `CA5` made anyone look.**
+`verify-bloom-census-adjacency.mjs --scope` refuses a PR that changes the census
+tool and also moves geometry — its allowlist says in as many words that *"the
+scope this gate exists to hold is GEOMETRY: no `bloom-geometry.js`, no
+`bloom.js`, no `bloom-registry.js`, no `flower.*`"* — and this PR moves all
+three. The honest move is not to widen the allowlist but to ask whether the
+census tool needs changing at all. **Measured, `orientation()` reverted to
+`main`'s, export mode, every one of block 39's 22 rows:**
 
----
+| | rows |
+|---|---|
+| `disagreements === 0` | 20 of 22 |
+| disagree, and DECLARED in `SELF_INTERSECTION_XFAIL` | 2 (`x cup 1.2 x spine curl 360` at 8 of 9 shells, `x ALL FORM MAX` at 8 of 9) |
+| disagree and NOT declared — what O2 fires on | **0** |
+
+O2's clause is already guarded on `SELF_INTERSECTION_XFAIL_HAS(row.label)`, and
+both disagreeing rows are in that list with their pair counts (§9), so the
+existing guard covers them and the new field excused nothing that was not already
+excused. What the edit would have shipped is a *standing* exemption for any future
+shell whose ray start happens to sit near another sheet — strictly weaker than a
+declaration with a number, on a clause nobody was asking to relax.
+
+**The order matters and is the lesson.** The edit was written while the infill's
+holes had removed those rows' census pairs, which is a state that existed for a
+few hours; once the two rows earned their `SELF_INTERSECTION_XFAIL` entries the
+edit had nothing left to do, and nothing went red to say so. A fix can stop being
+needed, and the thing that found this one was a scope guard firing for a
+completely different reason.
 
 ## 11. Cost
 
@@ -280,6 +304,44 @@ gate forced; the honest figure is 53,536 and the projection is superseded.
 **The corner that matters is `INFILL: x 40 petals x 3 whorls`, at 48.2 % of
 budget** — this feature's own `ALL MAX`, and the row a future per-petal feature
 should check first.
+
+---
+
+## 11b. The edge-profile gate — one declaration owed, three claims corrected
+
+`verify-bloom-edge-profile.mjs` is not in CI and was not in this session's
+brief; it was run because it draws its rows from `SMOKE_LABELS`, which block 39
+is now in. It found two things and they are different in kind.
+
+**OWED BY THIS PR — E2's subject is EMPTY on an infilled blade, and that is a
+regression against #278.** `emitInfillPanel` calls `emitPanel` on the BASAL
+sub-panel alone, so the thickness taper and the half-round bead run around that
+panel's own perimeter and nowhere else; above the split the cells close with
+`emitRim`, a flat wall from top skin to bottom skin. Eva's S3 ruling is that
+HOLE rims stay flat walls and the bead is S5's — this emitter extends that to
+the blade's OUTER margin, which the ruling did not name. So over the treated
+region an infilled blade gives back the 90-degree cliff one sheet thick that
+#278 exists to remove. Measured, the ruled defaults: `0` edges in E2's window
+and `144` skipped as the foot-to-blade seam's own ramp, because the basal
+panel's apexes all sit inside `RIM_TAPER_MM` of it.
+
+It is DECLARED, per PART and never per row. A row-level skip would have taken
+the SEPALS out with it on `INFILL: x sepals 8` — they are pinned uninfilled by
+ruling 4 and carry **2,192 edges** of real beaded subject, which the narrowed
+clause now measures and passes. `emitRimLoop` is the hook the brief already
+asks these loops to be kept for.
+
+**NOT THIS PR'S — the control was failing 3 of 6 on `main`, and the claim was
+what was wrong.** Three mutations name `E6` and do not fire it. Established
+two-sidedly: the same command on a worktree of `55ca84c` reports the same three
+with the same `MISSED E6`, and this branch's cramped row is byte-identical to
+main's by the byte partition. The header's blanket — *"EVERY rim mutation below
+also reddens E6"* — was asserted once over six mutations rather than measured on
+each, and `every-clamp-is-logged` sets a RECORD and moves no vertex, so that one
+could never have been true. The three claims are NARROWED, which is strictly
+stronger here: a clause a mutation does not name going red is still a failure,
+so the day one of them starts moving E6 the control says so by name. After:
+**6 of 6, each firing exactly what it claims.**
 
 ---
 
