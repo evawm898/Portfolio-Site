@@ -50,6 +50,7 @@ const arg = (k) => (argv.includes(k) ? argv[argv.indexOf(k) + 1] : null);
 const ROOT = arg('--root') ? path.resolve(arg('--root')) : HERE;
 const ONLY = arg('--only') ? new RegExp(arg('--only')) : null;
 const JSON_OUT = argv.includes('--json');
+const CHECK_INDEX = argv.includes('--check-index');
 if (!ONLY) { console.error('--only <regex> is required: this tool censuses whole rows and is minutes each.'); process.exit(2); }
 
 const load = (root, f) => import(pathToFileURL(path.join(root, f)).href);
@@ -119,8 +120,22 @@ for (const row of rows) {
   const r = SI.census(pos, { collect: true });
   const { pts, omitted } = laminaPoints(built);
 
-  /* the nearest captured mid-surface point to a site, and how far it is */
-  const nearest = (at) => {
+  /* THE NEAREST CAPTURED MID-SURFACE POINT TO A SITE, AND HOW FAR IT IS.
+     A uniform bucket grid over the lattice, widened one ring at a time until
+     the best distance found is inside the searched radius — so the answer is
+     the SAME nearest point a linear scan would give, never the nearest within
+     one cell. On `ALL PETALS: max x petalCount 40` a linear scan is 40,080
+     sites against 22,400 points and takes minutes; this takes seconds and is
+     checked against the linear answer by `--check-index`. */
+  const CELL = 2.0;
+  const bk = new Map();
+  const key = (a, b, c) => a + ',' + b + ',' + c;
+  const cellOf = (x) => Math.floor(x / CELL);
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i], k = key(cellOf(p.x), cellOf(p.y), cellOf(p.z));
+    const L = bk.get(k); if (L) L.push(i); else bk.set(k, [i]);
+  }
+  const nearestLinear = (at) => {
     let best = null, bd = Infinity;
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
@@ -129,6 +144,32 @@ for (const row of rows) {
     }
     return { p: best, mm: Math.sqrt(bd) };
   };
+  const nearest = (at) => {
+    const cx = cellOf(at[0]), cy = cellOf(at[1]), cz = cellOf(at[2]);
+    let best = null, bd = Infinity;
+    for (let ring = 0; ring < 64; ring++) {
+      for (let a = -ring; a <= ring; a++) for (let b = -ring; b <= ring; b++) for (let c = -ring; c <= ring; c++) {
+        if (ring > 0 && Math.max(Math.abs(a), Math.abs(b), Math.abs(c)) !== ring) continue;
+        const L = bk.get(key(cx + a, cy + b, cz + c)); if (!L) continue;
+        for (const i of L) {
+          const p = pts[i];
+          const d = (p.x - at[0]) ** 2 + (p.y - at[1]) ** 2 + (p.z - at[2]) ** 2;
+          if (d < bd) { bd = d; best = p; }
+        }
+      }
+      /* every point outside the searched box is at least `ring * CELL` away */
+      if (best && Math.sqrt(bd) <= ring * CELL) break;
+    }
+    return { p: best, mm: best ? Math.sqrt(bd) : Infinity };
+  };
+  if (CHECK_INDEX) {
+    let worstDelta = 0, n = 0;
+    for (const s of r.sites.slice(0, 200)) {
+      const a = nearest(s.at), b2 = nearestLinear(s.at); n++;
+      worstDelta = Math.max(worstDelta, Math.abs(a.mm - b2.mm));
+    }
+    console.log(`  index check: ${n} sites, worst |indexed - linear| = ${worstDelta.toExponential(2)} mm (must be 0)`);
+  }
 
   const sheet = Number(stateOf(row).sheetThickness) || 0;
   const offBar = Math.max(1.5, 3 * Math.max(sheet, 1));   /* a site on a skin sits ~t/2 out; 3x a floored sheet is generous */

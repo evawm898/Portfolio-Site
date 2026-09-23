@@ -3042,9 +3042,22 @@ export async function apexNibAssertions(page, row) {
   }
   rings.forEach((r, L) => {
     const tc = caps[L], q = roots && roots[L];
-    if (!tc || !tc.apex || !q) return;
-    const ap = tc.apex;
+    /* A RING WITH NO PETAL IS NOT THIS CLAUSE'S SUBJECT and a ring with a
+       petal but no apex record IS — the fifth durable rule, applied to this
+       family's own guard. ST9 shipped guarded on `if (!m.stemOmission)
+       return`, so the mutation that destroyed the channel made the clause
+       return before claiming anything; every clause below reads `tc.apex`,
+       so a cap that stopped declaring one would empty this family in
+       silence. The sphere stem's omission mask is the one thing here that
+       legitimately leaves a declared slot with no petal, and it leaves `tc`
+       itself null. */
+    if (!tc || !q) return;
     const at = rings.length > 1 ? `ring ${L}: ` : '';
+    if (!tc.apex) {
+      bad.push(`AN0: ${at}the ring built a petal and its tip cap declares no apex record — the nib's plan is what AN0-AN2 read, so a cap without one cannot be checked at all`);
+      return;
+    }
+    const ap = tc.apex;
     /* THE ASKED LENGTH, from the registry and not from the cap — the same
        product C1 lays the spine at. */
     const asked = effectiveFor(m, row, 'petalLength', L) * r.scale * sizeFactorRestated(m, ui, q.azimuth);
@@ -3146,6 +3159,15 @@ export async function apexNibAssertions(page, row) {
   /* The profile arrays are the LAST petal's, which is the one `petalTipCap`
      describes, so this clause reads that cap and not a ring's. */
   const tcL = m.petalTipCap, pr = m.petalProfileBase, pu = m.petalProfileU;
+  /* THE SUBJECT IS "A PETAL WHOSE NIB IS ACTIVE", AND A MISSING PROFILE IS
+     INSIDE IT, NOT OUTSIDE — the fifth durable rule again. Folding the array
+     shapes into the same condition would define the subject as "a petal whose
+     nib is active AND whose profile the page still reports", which the one
+     failure worth doubting here is never in. Whether the nib should be active
+     at all is AN0's, so an inert cap is genuinely not this clause's subject. */
+  if (tcL && tcL.apex && tcL.apex.active
+      && !(Array.isArray(pr) && Array.isArray(pu) && pr.length === pu.length))
+    bad.push(`AN3: the nib is ACTIVE and the emitted profile is ${Array.isArray(pr) ? pr.length : typeof pr} half-widths against ${Array.isArray(pu) ? pu.length : typeof pu} stations — the outline cannot be read, so nothing below it is checked`);
   if (tcL && tcL.apex && tcL.apex.active && Array.isArray(pr) && Array.isArray(pu) && pr.length === pu.length) {
     const ap = tcL.apex, D = ap.drawnLengthMm;
     /* THE CURVE THE PLAN DECLARES, evaluated at the EMITTED stations. This is
