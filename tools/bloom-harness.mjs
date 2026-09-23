@@ -7897,11 +7897,37 @@ export function selfIntersectionMagnitudeClauses(label, r, declared = SELF_INTER
    instrument's short history; instead the gate asks the calibrated question
    of the calibrated input. X0 rebuilds the row from the page's OWN read-back
    state (`__bloomUIState`, the same snapshot buildGeometry hands the builder)
-   with the row's own capability, and requires `Math.fround` of every double
-   to be Object.is-equal to the float the STL stores, at every index — so a
-   file the builder did not produce, or a state that did not take, fails here
-   before any census is read. Orientation stays on the STL's floats: it agrees
-   with the doubles to the bit on volume sign, parity and total (measured). */
+   with the row's own capability and compares every float against the one the
+   STL stores — so a file the builder did not produce, or a state that did not
+   take, fails here before any census is read. Orientation stays on the STL's
+   floats: it agrees with the doubles to the bit on volume sign, parity and
+   total (measured).
+
+   THE BAR IS DERIVED AND IT USED TO BE AN EXACT IDENTITY, WHICH IS A CLAIM
+   ABOUT FLOATING POINT RATHER THAN ABOUT GEOMETRY. The file is built by
+   CHROMIUM's V8 and the doubles by NODE's, and this repo has measured the two
+   diverging in the last bits since session 38. An `Object.is` bar on
+   `Math.fround` is therefore exact across two engines, and a COORDINATE THAT
+   IS THE RESIDUE OF CANCELLATION has no last bits to agree on: measured on
+   `VARIANCE: x CONTINUOUS x 3 turns`, SIX floats of 663,120 disagree, all of
+   them the same vertex's `y` at 1.8057e-10 mm — a ten-thousandth of a
+   nanometre, geometrically zero — where the two engines' doubles differ by
+   4.4409e-16 mm. That is 2 ULP of 1.0 and 0.03 ULP of the build's own 59.947
+   mm scale, while float32's ULP down at 1.8e-10 is 2e-17, so an exact bar
+   asks the file to carry twenty-one float32 steps of agreement the arithmetic
+   never earned. The build holds 16 vertices with 0 < |y| < 1e-6 mm.
+
+   So the bar is `X0_TOL_ULPS` ULP of the BUILD'S OWN LARGEST |COORDINATE|, in
+   the unit the quantity carries (millimetres) and at the magnitude the value
+   was differenced FROM rather than its own — session 38 §9b(ii)'s remedy, the
+   same shape as RIM_INSET_TOL_ULPS and SEAM_FRAME_RESIDUAL_ULP. It keeps its
+   teeth: the two X0 failures this same PR fixed for real measured 1.87e-4 and
+   9.06e-6 mm, which are 10^9 times the bar, and the float32 quantisation that
+   manufactures the 196 phantom touches above is 2e-6 mm — 10^7 times it. The
+   clause reports the WORST offender and the count rather than the first,
+   because a bar needs a distribution behind it. One consequence, stated: a
+   `-0` against a `+0` now passes, which is a non-difference in a length. */
+export const X0_TOL_ULPS = 8;
 export async function selfIntersectionAssertions(page, buf, row) {
   const bad = [];
   const ui = await page.evaluate(() => window.__bloomUIState());
@@ -7910,9 +7936,21 @@ export async function selfIntersectionAssertions(page, buf, row) {
   const positions = new Float64Array(acc.positions);
   const file = stlPositions(buf);
   if (file.length !== positions.length) { bad.push(`X0: the STL holds ${file.length / 9} triangles, the builder rebuilt from the page's own state holds ${positions.length / 9} — the census would read a different solid from the one exported`); return { bad, r: null }; }
-  let off = -1;
-  for (let i = 0; i < file.length; i++) if (!Object.is(Math.fround(positions[i]), file[i])) { off = i; break; }
-  if (off >= 0) { bad.push(`X0: float ${off} of the STL is ${file[off]} where the builder's own double rounds to ${Math.fround(positions[off])} — the exported file is not this state's build, so the census is not read`); return { bad, r: null }; }
+  /* THE SCALE HAS A DIFFERENT OWNER FROM THE COMPARISON: it is the largest
+     |coordinate| the BUILDER emitted, so the bar is the model's own size and
+     not a property of the pair being compared. A uniform scale error would
+     move every coordinate by its own magnitude, which is 10^15 times this. */
+  let scale = 0;
+  for (let i = 0; i < positions.length; i++) { const a = Math.abs(positions[i]); if (a > scale) scale = a; }
+  const tol = X0_TOL_ULPS * scale * Number.EPSILON;
+  let off = -1, worst = 0, n = 0;
+  for (let i = 0; i < file.length; i++) {
+    const mine = Math.fround(positions[i]);
+    if (Object.is(mine, file[i])) continue;
+    const d = Math.abs(mine - file[i]);
+    if (!(d <= tol)) { n++; if (d > worst) { worst = d; off = i; } }
+  }
+  if (off >= 0) { bad.push(`X0: ${n} float(s) of the STL differ from the builder's own doubles by more than ${tol.toExponential(3)} mm (${X0_TOL_ULPS} ULP of the build's own ${scale.toFixed(3)} mm scale) — worst is float ${off}, the file holds ${file[off]} where the builder rounds to ${Math.fround(positions[off])}, |d| ${worst.toExponential(4)} mm — the exported file is not this state's build, so the census is not read`); return { bad, r: null }; }
   const r = selfIntersectionCensus(positions);
   const known = Object.prototype.hasOwnProperty.call(SELF_INTERSECTION_XFAIL, row.label);
   if (r.within > 0 && !known) {

@@ -455,6 +455,32 @@ reads **169** — CI's own number to the integer. `DEGENERATE_AREA_MM2` is EXPOR
 harness now so the bar has one owner, and **E6 exists because E3 asks the other question**
 (welded-index collisions and exactly-zero cross products, on doubles): the mutant that ungates
 the corner fan fired NOTHING in the edge-profile gate until E6 existed.
+**AND X0's BAR IS DERIVED NOW — `X0_TOL_ULPS = 8` — BECAUSE AN EXACT `Object.is` ON
+`Math.fround` IS A CROSS-ENGINE IDENTITY AND A CANCELLATION RESIDUE HAS NO LAST BITS TO AGREE
+ON.** X0 compares the STL CHROMIUM's V8 wrote against a rebuild in NODE's, and on
+`VARIANCE: x CONTINUOUS x 3 turns` **6 floats of 663,120 disagree — all six the same vertex's
+`y` at 1.8057e-10 mm, a ten-thousandth of a nanometre, by 4.4409e-16 mm**: 2 ULP of 1.0 and
+**0.03 ULP of the build's own 59.947 mm scale**, while float32's ULP down at 1.8e-10 is 2e-17,
+so the exact bar asked for twenty-one float32 steps of agreement the arithmetic never earned.
+Nothing discrete to repair, unlike `RIM_INSET_TOL_ULPS`: the bar is now that many ULP of the
+BUILD'S OWN LARGEST |COORDINATE| — the magnitude the value was differenced FROM, never its
+own — 1.065e-13 mm there, against the 1.87e-4 and 9.06e-6 mm this PR's real X0 failures
+measured (10^9 times it) and the 2e-6 mm float32 grain that manufactures the census's phantom
+touches (10^7 times it). The clause reports the WORST offender and the count, not the first.
+**THE MUST-FAIL RUNS THROUGH THE SHIPPED CLAUSE** — the same page, one STL float moved:
+silent at 0.5x the bar, FIRES at 2x and at 10^6x. **No committed mutant names X0**, recorded
+as a gap rather than claimed closed.
+**AND IT WAS FOUND BY ABSENCE, WHICH IS THE PART WORTH KEEPING.** The failing CI run named it
+only in its `HARNESS INVALID` block on stderr, which sits ~200 rows into a dump written in one
+burst at exit — past the ~5,000-line cap `get_job_logs` serves of an ~8,900-line log — and the
+log ARCHIVE is denied by the agent proxy on policy at
+`results-receiver.actions.githubusercontent.com`, **a NEW domain beyond the blob one this file
+already records**, flat 403 CONNECT. What recovered it: the per-row `ok`/`FAIL` lines ARE in
+the tail and they are in MATRIX ORDER, so the window they cover can be computed and **the one
+row in it with no line at all is the dropped one**. A dropped row is never censused, so this
+is also the only hole in "the census is browser-confirmed over the matrix" — and
+`bloom-connectedness` PASSED 908 of 909 on the same commit, which is what says the drop was
+one clause rather than a row that cannot be built.
 **THE CORNER FAN IS GATED ON THE OUTLINE, `RIM_CORNER_MIN_MM = 0.0013` IS ITS OWN CONSTANT,
 AND THE MODE-INDEPENDENCE PREMISE THE RULING RESTED ON IS WRONG** (Eva's ruling on §18; §19 of
 the outcome doc). Consecutive profiles inserted by the fan are BIT-IDENTICAL except at the

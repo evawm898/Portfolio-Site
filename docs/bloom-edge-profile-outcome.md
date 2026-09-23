@@ -1215,3 +1215,114 @@ unmoved to the integer, so `EXPORT_REFUSED_XFAIL` is untouched as well.
 A negative result, reported because the alternative is assuming it: a coordinate change of
 under a micron on 47 of 3,090,816 triangles' worth of rim could have moved a pair count at a
 tangency, and the only way to know is to measure.
+
+## 20. OWED ITEMS 3 AND 4 — THE CI RUN NAMED A THIRD ROW, AND IT IS X0
+
+Eva's owed item 3: *"Confirm the CI run on 6e56bdc named no rows beyond the two you found."*
+Item 4: *"The census re-record still isn't browser-confirmed past 135 rows. The CI run covers
+the rest; confirm it did rather than assuming."*
+
+`bloom-export-watertight` run 35802088909 on `6e56bdc` completed in **3 h 42 m 45 s** and its
+verdict is readable in full, which is `#17`'s drain doing its job:
+
+    export gate: FAILED — 1 row(s) dropped of 909 attempted, 2 validity assertion(s),
+    0 not watertight, 2 with degenerate triangles, 0 whose triangle count moved between modes.
+
+**THE DEGENERATE HALF IS EXACTLY THE TWO ROWS.** `2 CONFIG(S) EMIT DEGENERATE TRIANGLES`, and
+they are `DEPTH: 6 turns x layerSize min x petalCount 40` and `SPHERE: 6 turns x layerSize
+min`. The predicate is derived from the whole of that population, so owed item 3 is closed
+for the class it is about.
+
+**BUT THE RUN ALSO DROPPED ONE ROW, AND A DROPPED ROW IS NEVER CENSUSED** — which is exactly
+the hole owed item 4 is about. The name is in the `HARNESS INVALID` block on stderr, and that
+block is unreachable from here: the API's `tail_lines` caps at ~5,000 lines of an ~8,900-line
+log and the block sits ~200 rows into a dump that is written in one burst at exit, while the
+log ARCHIVE is denied by the agent proxy on policy — `results-receiver.actions.
+githubusercontent.com`, a **NEW domain beyond the blob one CLAUDE.md already records**, flat
+`403 CONNECT`.
+
+**IT WAS RECOVERED BY ABSENCE INSTEAD.** The per-row `ok`/`FAIL` lines ARE in the 5,000-line
+tail, in matrix order; the tail covers matrix indices 388..908, and exactly one row in that
+window has no line at all:
+
+    VARIANCE: x CONTINUOUS x 3 turns (1 cycle over the whole 24-slot sequence)
+
+**It reproduces locally in 18 seconds and it is X0:**
+
+    X0: float 593626 of the STL is -1.805693927714458e-10 where the builder's own double
+    rounds to -1.8056894868223594e-10 — the exported file is not this state's build
+
+**It is this PR's: the same row PASSES on a worktree of `main` (8f5e209) and FAILS on this
+branch**, and it is NOT one of the 13 byte-movers, so the corner-fan gate neither caused nor
+fixes it.
+
+### 20a. WHAT IT IS — AN EXACT BAR ON A QUANTITY TWO ENGINES COMPUTE
+
+Measured over the whole row rather than at the first offender
+(`node tools/verify-bloom-export.mjs` reports one; the probe reports the spread):
+
+| | |
+|---|---|
+| disagreeing floats | **6 of 663,120** |
+| the value at all six | **−1.8057e-10 mm** — one vertex's `y`, shared by six triangles |
+| the disagreement | **4.4409e-16 mm**, identical on all six |
+| the build's own scale | **59.947 mm** |
+| as ULP of that scale | **0.03** |
+
+So it is 2 ULP of 1.0 mm on a coordinate that is geometrically zero — a ten-thousandth of a
+nanometre — at the vertex `(15.547770, −0.000000, 16.320105)` of a CONTINUOUS bloom whose
+size wave (`varianceFrequency` 1, `variancePhase` 0) puts a slot on the x–z plane. The build
+holds **16 vertices with 0 < |y| < 1e-6 mm**. Float32's ULP down at 1.8e-10 is **2e-17**, so
+an `Object.is` bar on `Math.fround` asks the file to carry **twenty-one float32 steps** of
+agreement between CHROMIUM's V8 and NODE's that the arithmetic never earned.
+
+**This project has already named the class twice this PR and three times before it:** an
+exact-equality bar on a quantity reached by two routes is a claim about floating point, not
+about geometry. There is nothing discrete to repair here — the earlier X0 fix found a
+bisection whose exact tie amplified one engine ULP into a quarter bracket, and this is the
+plain last-bit residue of cancellation with no amplification at all.
+
+### 20b. THE FIX — `X0_TOL_ULPS = 8`, IN THE UNIT THE QUANTITY CARRIES
+
+The bar is `X0_TOL_ULPS` ULP of the **BUILD'S OWN LARGEST |COORDINATE|** — the magnitude the
+value was differenced FROM, not its own — which is **1.065e-13 mm** on this row. The scale
+has a different owner from the comparison (the builder's emitted stream), and a uniform scale
+error would move every coordinate by its own magnitude, 10^15 times the bar.
+
+**IT KEEPS ITS TEETH, measured rather than argued.** The two X0 failures this same PR fixed
+for real read **1.87e-4 mm and 9.06e-6 mm** — 10^9 times the bar — and the float32
+quantisation that manufactures the 196 phantom census touches is **2e-6 mm**, 10^7 times it.
+The clause now reports the WORST offender and the count rather than the first, because a bar
+needs a distribution behind it. One consequence is stated in its header rather than left to be
+discovered: a `−0` against a `+0` now passes, which is a non-difference in a length.
+
+**THE MUST-FAIL RUNS THROUGH THE SHIPPED CLAUSE**, handing `selfIntersectionAssertions` the
+same page and a STL buffer with that one float moved by a multiple of the bar:
+
+    scale 59.947 mm · bar 1.065e-13 mm
+    CLEAN                          : silent (as it must be)
+    k=0.5   (0.50x the bar)        : silent
+    k=2     (2.00x the bar)        : X0 FIRED
+    k=1e6   (999999.98x the bar)   : X0 FIRED
+
+**No committed mutant names X0** — the export gate's `--negative-control` is about the
+read-back, not this clause — so that control is a scratch instrument quoted here, which is the
+same standard the `RIM_INSET_TOL_ULPS` fix shipped under earlier in this PR. Recorded as a
+gap rather than claimed closed.
+
+**AFTER THE FIX the row passes and its census reads 0 within-shell pairs**, so it is correctly
+undeclared and X2 is satisfied on it:
+
+    ^ SELF-INTERSECTION (the builder's doubles, X0-identical to the STL): 0 within-shell
+      pair(s) · 14056 cross-shell (overlapping closed solids, by design)
+    ROWS: 1 attempted · 1 reached the results · 1 watertight (boundary = 0); 27s
+    export gate: PASS
+
+### 20c. WHAT OWED ITEM 4 CAN AND CANNOT CLAIM
+
+The run censused **907 rows in the browser** — every row that reached the results — and
+reported **no X1 and no X2 failure among them**: the only two validity entries are this row's
+X0 and the `row census` entry it caused. So the census re-record IS browser-confirmed over the
+whole matrix except the one row that dropped, and that row now passes locally with a clean
+census. `bloom-connectedness` on the SAME commit **PASSED, 908 of 909 rows reaching its
+results**, which is what says the drop was one clause and not a row that cannot be built.
