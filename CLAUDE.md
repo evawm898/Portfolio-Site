@@ -1505,7 +1505,15 @@ terminal), an inner whorl whose blade never clears the floor (18), and a law arr
 slope (**0 — unreachable**, so a ring reporting it is a FINDING and AN0 says so). **A LEAF IS
 EXCLUDED BY DECLARATION** (`cap.petiole`): `buildLeafInto` floors at `TIP_HALF_MM` in both modes
 so a leaf carries the identical 1.60 mm stub — 21.3% of the leaf at tip shape 0.60 — and that is
-a second partition and a second ruling. **Scheduled, not taken.**
+a second partition and a second ruling. **Scheduled, not taken; §11 of the outcome doc is the
+backlog entry, with what it looks like today, why it was held and what closing it would take.**
+**A SEPAL IS NOT EXCLUDED AND GAINS PROPORTIONALLY MORE THAN A PETAL** (§7b): it is the petal
+builder on a second ring, so `apexNibPlan` runs on its own substate, and being scaled DOWN it
+meets the floor sooner — the shipped 0.60 sepal spent **1.82% of itself flat against the petal's
+0.76%, and a 0.20 sepal 12.5%.** At `sepalScale` 1.00 its nib is the petal's to every digit. **The
+DRAWN angle limit and the triangle count are unmoved on both trees over six states** — the phase,
+the whole scale range, a cupped corolla and the crowded corner, 0 of 6 disagreeing — so 0.177 mm
+on a 21 mm blade does not reach the scan's own 1-degree step.
 **THE ARC IS SMALLER THAN A ROW GAP (0.0496 mm against a 0.60 mm median), SO THE LADDER HAD TO BE
 TOLD** — `ladderDemand()` asks for `APEX_ARC_ROWS = 6` through session 38's own mechanism, and
 `ladderHalfAt` still floors on `TIP_HALF_MM` so the nib's constants never reach row placement.
