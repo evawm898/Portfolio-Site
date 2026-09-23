@@ -431,6 +431,35 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       /* ---- E3: still a closed, degenerate-free solid ---- */
       check('E3', mesh.boundary === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${mesh.boundary} boundary edges`);
       check('E3', mesh.degen === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${mesh.degen} degenerate triangles`);
+
+      /* ---- E6: and degenerate-free AS THE STL STORES IT ---- */
+      /* E3 IS NOT THIS CLAUSE AND THE TWO WERE ONE WORD APART. `meshOf`
+         counts a welded-index collision or an exactly-zero cross product on
+         DOUBLES; `analyzeStl`, which is what both STL gates rate, counts
+         area <= DEGENERATE_AREA_MM2 on the FLOAT32 the file actually holds.
+         The corner-fan slivers this gate now has a row for measure 8.88e-8
+         mm2 on doubles — comfortably ABOVE the bar — and collapse only under
+         rounding, so E3 answered "degenerate-free" about them truthfully and
+         said nothing. Measured: the mutant that removes the corner gate fires
+         E6 and not E3. The bar is READ FROM THE HARNESS rather than restated,
+         so this clause and the gates that rate it cannot drift apart. */
+      {
+        const f = Math.fround, P = acc.positions, BAR = H.DEGENERATE_AREA_MM2;
+        let bad = 0, worst = Infinity;
+        for (let t = 0; t < P.length / 9; t++) {
+          const o = t * 9;
+          const ax = f(P[o+3])-f(P[o]), ay = f(P[o+4])-f(P[o+1]), az = f(P[o+5])-f(P[o+2]);
+          const bx = f(P[o+6])-f(P[o]), by = f(P[o+7])-f(P[o+1]), bz = f(P[o+8])-f(P[o+2]);
+          const cx = ay*bz-az*by, cy = az*bx-ax*bz, cz = ax*by-ay*bx;
+          const area = 0.5 * Math.hypot(cx, cy, cz);
+          if (area <= BAR) { bad++; if (area < worst) worst = area; }
+        }
+        const declared = E6_XFAIL[row.label];
+        const want = declared ? (exportMode ? declared.exp : declared.live) : 0;
+        check('E6', bad === want, want === 0
+          ? `${row.label} [${exportMode ? 'export' : 'live'}]: ${bad} triangle(s) at or under ${BAR} mm2 once rounded to float32 (worst ${bad ? worst.toExponential(3) : '-'}) — what analyzeStl rates, which E3 does not measure`
+          : `${row.label} [${exportMode ? 'export' : 'live'}]: declared at ${want} and reads ${bad}${bad > want ? ' — WORSE, a regression for whatever moved it' : ' — FEWER than declared, so the record is stale: re-measure and re-record it in the commit that moved it'} (${declared.note})`);
+      }
       /* THE DIRECTED CENSUS, and it is the clause that would have caught this
          session's own worst defect. The first rim sweep walked its strip the
          wrong way round and produced a mesh with ZERO boundary edges and ZERO
@@ -562,7 +591,40 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
    apply, a named clause that stays green, or a clause it did not name going
    red are all failures — the last is how a mutation that merely breaks the
    build gets caught pretending to be a negative control. */
+/* THE ONE ROW E6 CANNOT CLEAR, DECLARED WITH ITS NUMBER — #213's idiom, and
+   the gate holds it in BOTH directions: a row that reads MORE is a
+   regression, a row that reads FEWER (or zero) is a stale record and says so,
+   because an entry is a measurement of the tree and not a licence.
+
+   WHAT IT IS, measured rather than characterised: two REAL adjacent corner
+   points 6.23e-7 mm apart at ~12 mm from the origin. Their triangle is
+   8.88e-8 mm2 on DOUBLES — eighty-eight times the bar — and collapses to
+   exactly zero only once rounded to float32, where one ulp at 12 mm is
+   9.5e-7. RIM_CORNER_MIN_MM removes the profiles the fan INSERTS between
+   them; it cannot remove the two genuine entries, so no corner threshold
+   reaches this. LIVE only: the same row's export reads 0.
+
+   IT IS NOT LEFT HERE FOR WANT OF A FIX. Merging two sub-micron corner points
+   would clear it, and is safe in exactly this case because the fan fires only
+   where both entries share a skin point (`sk2 === sk && j2 === j`), so
+   dropping one leaves the rim closed against the skins. That is a change to
+   the loop's construction with a watertightness failure mode, and it is Eva's
+   call whether two invisible triangles in the LIVE mesh are worth it. */
+const E6_XFAIL = {
+  'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)': { live: 2, exp: 0,
+    note: 'two real adjacent corner points 6.23e-7 mm apart; 8.88e-8 mm2 on doubles, zero under float32. Before RIM_CORNER_MIN_MM this row read 118 live and 56 export' },
+};
+
 const MUTATIONS = [
+  /* EVERY RIM MUTATION BELOW ALSO REDDENS E6, AND THAT IS A PROPERTY OF THE
+     CONTROL SET RATHER THAN A LOOSE CLAUSE. The set gained `SPHERE: 6 turns x
+     layerSize min` so the corner-gate mutant has a row it can fire on; on a
+     petal that cramped, ANY change to the rim surface moves profiles into the
+     band where a triangle survives in doubles and collapses under float32. So
+     E6 is named as collateral on all of them — measured, not assumed, and the
+     honest remedy for an unclaimed red that is real is to name it. The clause
+     still discriminates where it matters: `the-corner-fan-is-not-gated` fires
+     E6 and NOTHING ELSE. */
   /* RESTORING THE WALL REDDENS THREE CLAUSES AND ALL THREE ARE TRUE OF IT,
      which is a statement about the geometry rather than a loosened claim. The
      skin is INSET by the bead's own radius, so a profile collapsed onto the
@@ -572,20 +634,32 @@ const MUTATIONS = [
      corners where a pivot's profiles become identical — E3. A wall and an
      apex are the same surface here, so there is no surgical form of this
      mutation, and saying so is better than pretending one clause owns it. */
-  { id: 'the-flat-wall-is-restored', breaks: ['E2', 'E3', 'E4'],
+  { id: 'the-flat-wall-is-restored', breaks: ['E2', 'E3', 'E4', 'E6'],
     from: '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;',
     to:   '      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi; const FLATWALL = 1;' },
   /* E2 as well as E1, and it is TRUE of this mutation rather than a
      loosening: a smaller bead radius is a different surface, so the buckle
      row's declared excess moves 6.236137 -> 6.526126 deg. Named as collateral,
      because the honest remedy for an unclaimed red that is real is to name it. */
-  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
+  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2', 'E6'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
-  { id: 'the-bead-apex-is-recomputed', breaks: ['E4'],
+  /* THE CORNER GATE REMOVED — and the clause it reddens is E3, which ALREADY
+     EXISTED and could not fire. Nothing about E3 was wrong; its SUBJECT was.
+     `pickRows` draws the smoke subset, and no row in it carried a cramped
+     petal, so "the mesh is degenerate-free" was being asked only of rows that
+     could not be otherwise. The row that makes it answerable — `SPHERE: 6
+     turns x layerSize min`, 56 degenerate triangles in export and 118 in live
+     before the gate — is in that subset now, and this mutation is what proves
+     the pair works: remove the gate and E3 goes red on it. The fifth durable
+     rule, in a clause written long before the defect existed. */
+  { id: 'the-corner-fan-is-not-gated', breaks: ['E6'],
+    from: '      if (seg < RIM_CORNER_MIN_MM) { if (rim) rim.pivotsSkipped++; continue; }',
+    to:   '      if (seg < 0) { if (rim) rim.pivotsSkipped++; continue; }' },
+  { id: 'the-bead-apex-is-recomputed', breaks: ['E4', 'E6'],
     from: '    pts[APEX] = apex;',
     to:   '    pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
-  { id: 'every-clamp-is-logged', breaks: ['E1'],
+  { id: 'every-clamp-is-logged', breaks: ['E1', 'E6'],
     from: '      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;',
     to:   '      const wasClamped = true;' },
   /* E5'S MUTANT, REPLACED BECAUSE THE RULED SEGMENT COUNT MADE THE OLD ONE
@@ -609,7 +683,7 @@ const MUTATIONS = [
      live against 0.80 mm export — so the two modes drop different numbers of
      rows and E5's two clauses both have something to say. A plausible defect
      rather than an injected one. */
-  { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5'],
+  { id: 'the-tip-drop-is-a-threshold-on-the-emitted-width', breaks: ['E5', 'E6'],
     from: '  const skinTo = tipExposed ? Math.max(rowFrom, rowTo - RIM_TIP_ROWS) : rowTo;',
     to:   '  const skinTo = tipExposed ? (() => { let i = rowTo; while (i > rowFrom && rows[i].h < RIM_BEAD_RADIUS_MM) i--; return i; })() : rowTo;' },
 ];
@@ -668,6 +742,20 @@ async function control() {
   const declaredRow = MATRIX.find((r) => Object.prototype.hasOwnProperty.call(E2_TURN_XFAIL, r.label));
   if (!declaredRow) { console.error('edge-profile control: no matrix row carries an E2_TURN_XFAIL label — the declaration cannot be exercised'); process.exit(1); }
   if (!rows.some((r) => r.label === declaredRow.label)) rows.push(declaredRow);
+  /* AND THE CRAMPED PETAL, OR `the-corner-fan-is-not-gated` HAS NO MUTANT.
+     The same shape as the declared row above, and the same lesson one clause
+     later: E3 asks whether the mesh is degenerate-free, and on a rim whose
+     corners are all millimetres long the answer is yes however the corner
+     gate behaves. What makes this row a witness is a PROPERTY — it carries
+     corner-fan segments under RIM_CORNER_MIN_MM, 56 degenerate triangles in
+     export and 118 in live before the gate existed — and the mutant firing
+     E3 on it is the proof that the pair works. It is named rather than
+     detected because detecting it means building the row, and a name that
+     goes missing must fail LOUDLY rather than quietly empty the clause. */
+  const CRAMPED = 'SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)';
+  const crampedRow = MATRIX.find((r) => r.label === CRAMPED);
+  if (!crampedRow) { console.error(`edge-profile control: the matrix has no row "${CRAMPED}" — E3's corner-gate mutant would be exercised by nothing`); process.exit(1); }
+  if (!rows.some((r) => r.label === CRAMPED)) rows.push(crampedRow);
   if (rows.length < 3) { console.error('edge-profile control: the control row set did not resolve — ' + rows.length + ' rows'); process.exit(1); }
   let failures = 0;
   for (const m of MUTATIONS) {
@@ -708,5 +796,5 @@ else {
     if (fails.length > 40) console.log(`  ... and ${fails.length - 40} more`);
     process.exit(1);
   }
-  console.log('edge-profile: PASS — E0-E5 clean.');
+  console.log('edge-profile: PASS — E0-E6 clean.');
 }

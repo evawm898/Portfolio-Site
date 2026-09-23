@@ -923,7 +923,7 @@ export async function exportStl(page, tmpDir) {
    1e-9 mm^2 is a triangle a thousandth of a micron on a side, i.e. numerically
    zero rather than merely small. Measured at 0 across the whole matrix before
    the cap landed, which is what makes it safe to gate rather than report. */
-const DEGENERATE_AREA_MM2 = 1e-9;
+export const DEGENERATE_AREA_MM2 = 1e-9;
 export function analyzeStl(buf) {
   const tris = buf.readUInt32LE(80);
   const q = (x) => Math.round(x * 1e4) / 1e4;
