@@ -898,3 +898,63 @@ browser agrees*, because X1's band on pairs is exactly 0 and the gate's census
 reads the doubles Chromium's V8 computes. `X1 coverage` is not the failure: every
 one of the 231 declared labels exists in the 909-row matrix and the single
 `EXPORT_REFUSED_XFAIL` label does too, checked statically.
+
+## 18. THE RED IS DEGENERATE TRIANGLES, NOT THE CENSUS — TWO ROWS, ONE MECHANISM, AND IT IS THE CORNER FAN
+
+The failure `#17`'s truncation hid is not X1 and not X2. **It is `degenerate`, which this
+gate RATES** (the DOME's own defect, Sep 1), on two rows of 909:
+
+| degen (export) | tris | row |
+|---|---|---|
+| 169 | 735,072 | `DEPTH: 6 turns x layerSize min x petalCount 40 (the deepest continuous foot)` |
+| 56 (118 in LIVE) | 153,696 | `SPHERE: 6 turns x layerSize min (the 0.18 mm blade at the face pole)` |
+
+**IT IS THIS SESSION'S.** A worktree of `8f5e209` reads **0** on both, with a minimum
+triangle area of **2.899e-6 mm² — 2,899x the bar** — on the SPHERE row. The census is NOT
+implicated: the at-risk browser sweep cleared **135 declared rows with zero X0/X1/X2
+failures** before it was stopped, and `X1 coverage` is clean by static check.
+
+**THE INSTRUMENT, and it took three wrong questions to arrive at:** the gate reads the
+exported STL, so the quantity is `area <= DEGENERATE_AREA_MM2` (1e-9 mm²) computed on
+**float32**, not on doubles and not at exact zero. Asking for exact zero on doubles reads
+**0**; asking at the bar on doubles reads **858**; asking at the bar on float32 reads
+**169**, which is CI's own number to the integer. The two wrong readings each looked like a
+clean answer.
+
+**THE MECHANISM.** Consecutive profiles inserted by the corner fan are **bit-identical
+except at the apex** — same skin point, same normal, same half-thickness — so every strip
+triangle away from the apex is already skipped by `rimSameP`, and the two that touch the
+apex are slivers whose height is the outline segment between the two real apexes divided by
+`RIM_CORNER_STEPS`. On a cramped petal that segment is microns. Measured: the fan is the
+site on both rows — `RIM_CORNER_STEPS` 3 / 2 / 1 gives **56 / 22 / 0** on SPHERE (export)
+and takes DEPTH from **169 to 23**.
+
+The fan's own comment states the assumption that fails: *"At a buried end the profile is the
+flat wall and `w` is the zero vector, so every inserted profile is IDENTICAL to the one
+before it and its whole strip is skipped as degenerate."* That is true at the exact-zero
+branch and false in its neighbourhood — `rimSameP` is `===` on all three coordinates, so a
+profile pair that differs by a micron is not skipped. **This project's own recurring class:
+a discrete decision on a continuous quantity.**
+
+**THE CONSTRAINT THAT RULES OUT THE EASY FIXES: both STL gates fail a row whose LIVE and
+EXPORT triangle counts differ.** So nothing may be skipped in export alone. Measured
+candidates:
+
+* **A floor on the drawn bead radius where it is already non-zero** keeps the skip set at
+  `{a === 0}` — structural, hence mode-free — and triangle counts stay identical in both
+  modes at every floor tried. It clears DEPTH (`RIM_BEAD_RADIUS_MM/512` gives 0 at a x1.7
+  margin, `/256` at x3.9) and **makes SPHERE monotonically WORSE — 56 -> 64 -> 80 -> 138** —
+  because a larger inset makes `apex !== skin` more often, which is the pivot gate's own
+  condition, so more fan strips are inserted. **Incomplete.**
+* **Gating the fan on float32 distinguishability of the inserted apex** changes **nothing**
+  (169 / 56 / 118 unchanged): the apexes ARE distinguishable, so representability is not the
+  problem and this was the wrong reading of it.
+* **`RIM_CORNER_STEPS` -> 1** clears both and regresses what the fan was added for — the
+  default's worst corner turn returns to 65.63 degrees, over E2's bar.
+
+**WHAT IS OPEN.** The only complete fix is to not subdivide a corner whose subdivision is
+meaningless, and every form of that changes the triangle count — so it is safe only if the
+predicate fires identically in both modes, which needs a 909-row two-mode sweep to
+establish, plus a byte partition and possibly census re-records. It also trades against a
+constant whose value was itself set by measurement. **Recorded and put to Eva rather than
+chosen unilaterally.**
