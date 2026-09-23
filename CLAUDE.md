@@ -1574,6 +1574,24 @@ worktree of the base commit at an identical 146,400 triangles (and `layerCount 6
 `APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 6616 / 0.7742 here**,
 so the nib moves an existing fold's magnitude by +272 pairs and +0.064 mm. `frozen/phase38` is the
 **909 rows at `2464d50`**, registered in BOTH maps and proved deep-equal.
+**THE BYTE PARTITION IS 877 MOVED / 32 HELD OF 909 COMPARABLE ROWS, PASS** —
+`verify-bloom-seam-bytes --change nib --matrix live --added 11 --control --control-mode`, both
+modes, **1,145,824,416 floats positionally under `Object.is`**, the MOVER SET exactly as the
+BASE tree's builder record predeclares it IN BOTH DIRECTIONS, the FOOT identical on every row
+(6,580,602 captured values), triangle counts unchanged but for 12 declared. **The 32 holders are
+one class and a half**: 31 have a SQUARED TERMINAL above the floor (#229's guard — every
+`FRINGE:` row, `petalTipEnd max (1)`, `VARIANCE: x the FRINGE`), and 2 are the sphere-stem rows
+where a 12 mm stem takes EVERY petal so there is no blade to cut. **The 12 count movers are TWO
+mechanisms**: seven are `trimPanels()`'s cleft split (more rows than `seam`'s 1 or `widest`'s 3,
+because the arc's demand applies on every nibbed row), and **five are the RIM BEAD's own
+degeneracy skipping** — a bead pivot of **3.5e-4 mm** at the terminal corner on the base
+(0.00035 against the default's 0.28387) makes that strip degenerate and skipped, which is why
+those counts sit 48 UNDER the default there and ON it here; #278's "count-safe by branch" floor
+from the other side. **AND THE TOOL OWED A DECLARATION**: its shipping-default clause said
+"every ladder change here HOLDS it by construction", true of `seam`/`widest`/`arc`/`tilt` and
+false of a BOUNDARY change active at the defaults — it is `DEFAULT_HOLDS_BY_CHANGE` now, each
+change carrying the REASON, `nib` declaring "it moves by design", and the CONVERSE asserted so a
+nib run whose default did not move is a finding.
 **AND `ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX** — it builds 3,090,816 triangles in **47.7 s**
 against the harness's 30 s settle timeout, and **46.3 s on a worktree of the base commit**, so it
 is the box and not this change. CI only. **It IS a mover of this change, through its forty SEPALS

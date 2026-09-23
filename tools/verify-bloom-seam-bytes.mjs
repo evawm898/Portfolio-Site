@@ -259,12 +259,43 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
      table here would have been a guess wearing a declaration's clothes. */
   tilt: {},
   /* THE NIB PLACES NO STATION THE LADDER DID NOT PLACE — its resolution
-     demand goes through the ONE placer — but it DOES change the demand a
-     lobed window carries and the blend's own per-sub-region target, so a
-     CLEFT row's `trimPanels()` split can move exactly as it does for `seam`
-     and `widest`. FILLED FROM THE MEASUREMENT; an empty table here would be a
-     guess wearing a declaration's clothes. */
-  nib: {},
+     demand goes through the ONE placer — but it DOES change where the
+     stations sit, and TWO mechanisms turn that into a triangle count.
+     FILLED FROM THE MEASUREMENT, and the table is IDENTICAL in both modes on
+     every one of the twelve, which is the mode-free-topology claim showing up
+     where it would break first.
+
+     SEVEN ARE `trimPanels()`, exactly as for `seam` and `widest`: a cleft
+     splits the blade at a ROW INDEX, so any ladder change can move the split.
+     This change reaches more of them than either of those did because the
+     arc's resolution demand applies on EVERY nibbed row rather than only
+     where a seam floor or a gap bound binds.
+
+     FIVE ARE THE RIM BEAD'S OWN DEGENERACY SKIPPING, which is a different
+     mechanism and worth naming: those rows carry a bead PIVOT of ~3.5e-4 mm
+     at the blade's terminal corner on the base tree (measured on `BUCKLE:
+     f min (1)`: 0.00035 against the shipping default's 0.28387), so the rim
+     strip there is degenerate and `emitPanel` skips it — which is why their
+     counts sit 48 BELOW the default's 24,688 on the base and ON it here. The
+     nib's converging cap gives that corner a real width, the strip is drawn,
+     and the 48 come back. #278's own "count-safe by branch" floor, seen from
+     the other side. */
+  nib: {
+    /* the cleft split */
+    'CAPABILITY: cleft (two-span domain)': '37376 -> 38208',
+    'CAPABILITY: cleft x roll max': '37376 -> 38208',
+    'CAPABILITY: cleft x all thin': '37376 -> 38208',
+    'CAPABILITY: cleft x 3 layers': '111744 -> 114240',
+    'CAPABILITY: cleft x CONTINUOUS x 3 turns': '111848 -> 114240',
+    'CAPABILITY: cleft x 6 layers': '224544 -> 229120',
+    'CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX': '74560 -> 76224',
+    'CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX': '33092 -> 33456',
+    /* the rim strip that was degenerate at the terminal corner */
+    'BUCKLE: f min (1) — one cycle along the blade, the whole range live': '24640 -> 24688',
+    'BUCKLE: the clamp NOT binding (0.60 asked at f 1 — the cap is 3.23x)': '24640 -> 24688',
+    'CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)': '367584 -> 367632',
+    'SEPALS: sepalBuckleFreq min (1)': '39950 -> 39998',
+  },
 };
 
 /* WHICH ROWS' DEFINITIONS MOVED — labels and/or set lists that differ between
@@ -644,9 +675,35 @@ for (const [label, rec] of classes) {
 if (controlMode && modeFindings !== 1) bad.push(`CONTROL: the mode clause reported ${modeFindings} findings on a deliberately reclassified row, expected exactly 1 — the clause cannot produce a verdict`);
 if (controlMode && modeFindings === 1) { console.log('  the mode clause fired on the control, exactly once.'); }
 
+/* WHETHER THE SHIPPING DEFAULT MUST HOLD IS A PROPERTY OF THE CHANGE, AND IT
+   IS DECLARED RATHER THAN ASSUMED. Every change this tool carried before the
+   apex nib was a LADDER change — `seam`, `widest`, `arc`, `tilt` — and each
+   holds the shipping default by construction (a floor that does not bind, a
+   gap that was always the widest, a curl of exactly 0, a clamp that does not
+   bite), so the clause could be written as a law. The nib is not a ladder
+   change: it is a BOUNDARY change that is ACTIVE at the defaults, which is
+   the whole point of the feature, and the partition's own headline says so
+   (877 of 909 rows move, and the first mover is the default). A clause that
+   asserted otherwise would be asserting that no change may ever ship that
+   moves the shipping bloom — so it is a table now, with the reason in it. */
+const DEFAULT_HOLDS_BY_CHANGE = {
+  seam: 'the clearance floor does not bind at the defaults, so `m` is 1 and the ladder takes the same uniform slice',
+  widest: "the gap measure's leading term was always `r[0]`, which the blend cannot move, so the default's ladder is unchanged",
+  arc: 'the default is at curl exactly 0, where `spineAt` takes the straight arm and no arc is formed at all',
+  tilt: "the default's composed tilt is not clamped by the base tree's envelope",
+  nib: null,   // DOES move, by design: the nib is active at the defaults
+};
+if (!(change in DEFAULT_HOLDS_BY_CHANGE)) {
+  console.error(`REFUSED: --change ${change} does not declare whether the shipping default holds. Say so (a reason, or null for "it moves by design") rather than running without it.`);
+  process.exit(2);
+}
 const def = defBefore;
-if (which === 'live' && def && (def.export !== 'held' || def.live !== 'held')) {
-  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — every ladder change here holds it by construction and the stations must be bit-identical`);
+const mustHold = DEFAULT_HOLDS_BY_CHANGE[change];
+if (which === 'live' && mustHold && def && (def.export !== 'held' || def.live !== 'held')) {
+  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — ${change} declares it holds because ${mustHold}, and the stations must be bit-identical`);
+}
+if (which === 'live' && !mustHold && def && (def.export !== 'moved' || def.live !== 'moved')) {
+  bad.push(`THE SHIPPING DEFAULT HELD (${def.export} / ${def.live}) — ${change} declares that it MOVES by design, so a default that did not move means the change does not reach the shipping bloom at all`);
 }
 
 if (!rowsA.length || !floats) bad.push('VACUOUS: no rows or no floats were compared');

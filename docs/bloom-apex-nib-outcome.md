@@ -744,6 +744,72 @@ claim shown per row rather than stated once.
 
 ---
 
+## 9e. The byte partition — 877 moved / 32 held, PASS
+
+`node tools/verify-bloom-seam-bytes.mjs --base <worktree of 2464d50> --change
+nib --matrix live --added 11 --control --control-mode`:
+
+> **live matrix, change "nib": 909 comparable rows (+11 ADDED on the head,
+> outside the partition), both modes, 1,145,824,416 floats compared
+> positionally under `Object.is`**
+> **MOVED 877   HELD 32   REDEFINED 0**
+> the MOVER SET is exactly as the base tree's builder record predeclares it,
+> **in both directions**
+> triangle counts unchanged on every row but the 12 declared
+> the FOOT is identical on every row: **6,580,602 captured foot values**
+> **PASS**
+
+`nib` is the FOURTH change to ride in that tool and the first that is neither
+a ladder change nor inert at the defaults. The predicate is the nib's own
+guard restated over two numbers the BASE tree reports — a blade whose peak
+clears the print floor with no squared terminal holding it above — with the
+floor IMPORTED (`TIP_HALF_MM`) and checked equal on the two trees, and both
+`petalsAll` and `sepals.built` read, because a sepal cuts its own nib.
+
+**THE 32 HOLDERS ARE ONE CLASS AND A HALF, AND EVERY ONE IS EXPLAINED.**
+Thirty-one have a SQUARED TERMINAL holding the outline above the print floor
+— all 29 `FRINGE:` rows, `petalTipEnd max (1)` and `VARIANCE: x the FRINGE`
+— which is #229's guard and the inert-by-branch claim measured rather than
+argued. The other two are `SPHERE STEM: THE BARE CORNER` and `SPHERE STEM: THE
+TWO CLOSURES MEET`, where a 12 mm stem on the smallest sphere takes **every**
+petal, so there is no blade for a nib to cut. **`ALL MAX` is a MOVER** —
+through its forty sepals, never its petals (§10).
+
+**THE TWELVE TRIANGLE-COUNT MOVERS ARE DECLARED AND ARE TWO MECHANISMS**, and
+the table is IDENTICAL in both modes on every one of them, which is the
+mode-free-topology claim showing up where it would break first:
+
+* **Seven are `trimPanels()`** — a cleft splits the blade at a ROW INDEX, so
+  any ladder change moves the split. This change reaches more cleft rows than
+  `seam` (1) or `widest` (3) did, because the arc's resolution demand applies
+  on EVERY nibbed row rather than only where a floor or a bound binds.
+* **Five are the RIM BEAD'S OWN DEGENERACY SKIPPING**, which is worth naming
+  because it is not the ladder. Those rows carry a bead PIVOT of **3.5e-4 mm**
+  at the blade's terminal corner on the base tree — measured on `BUCKLE: f min
+  (1)`: **0.00035 against the shipping default's 0.28387** — so the rim strip
+  there is degenerate and `emitPanel` skips it, which is why their counts sit
+  **48 BELOW** the default's 24,688 on the base and ON it here. The nib's
+  converging cap gives that corner a real width, the strip is drawn, and the 48
+  come back. #278's own *"count-safe by branch"* floor, seen from the other
+  side.
+
+**AND THE TOOL OWED A DECLARATION IT DID NOT HAVE.** Its shipping-default
+clause read *"every ladder change here holds it by construction and the
+stations must be bit-identical"* — true of `seam`, `widest`, `arc` and `tilt`,
+and FALSE of this one, which is a BOUNDARY change that is ACTIVE at the
+defaults. A clause asserting otherwise asserts that nothing may ever ship that
+moves the shipping bloom. It is a table now (`DEFAULT_HOLDS_BY_CHANGE`), each
+change carrying the REASON its default holds, and `nib` declaring `null` for
+"it moves by design" — **with the converse asserted too**: a `nib` run whose
+default did NOT move is a finding, because it would mean the change does not
+reach the shipping bloom at all.
+
+**BOTH CONTROLS FIRED**: `--control` perturbs a HOLDER by 1e-9 and it is
+reported MOVED (*"the held class can fail"*), and `--control-mode` reclassifies
+the default and the mode clause reports it exactly once.
+
+---
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**
