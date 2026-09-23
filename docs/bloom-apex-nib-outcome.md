@@ -365,6 +365,60 @@ makes a row attributable — so neither state had ever been censused.
 
 ---
 
+## 9b. The declared census magnitudes, re-recorded
+
+The nib truncates the law at the print floor and closes it on a tangent flank
+and an arc, so the outline moves on **every row whose blade clears that
+floor** — which is nearly all of them. `node tools/bloom-xfail-magnitudes.mjs
+--emit` re-measured the list, and the result is the ordinary #213 obligation
+at an unusual scale:
+
+| | count |
+|---|---|
+| re-recorded, previous figures kept in each note | **153** |
+| — reading WORSE | 74 |
+| — reading better | 65 |
+| — span moved, pair count unchanged | 17 |
+| unmoved | 76 |
+| **removed** (now read ZERO) | **3** |
+| **added** (NEW with the nib) | **2** |
+| carried forward unmeasured (`ALL MAX`, export-refused) | 1 |
+
+**THE THREE REMOVALS ARE A FIX, AND THEIR OWN NOTES SAID SO.** All three were
+introduced by the PETAL EDGE PROFILE (#278) and all three folded *"ONE PETAL
+AGAINST ITSELF at its own TIP — u 0.982..1.000"*, which is precisely the
+stretch of blade the nib replaces. X1 fails hard on a declared row that starts
+passing, which is what distinguishes a fix landing from a record going quietly
+stale.
+
+**THE TWO ADDITIONS ARE THE NIB'S OWN, measured on both trees**: `ORCHID: the
+labellum and the hood x 2 whorls in step` and `FAN x PER-PETAL: petal 1
+extreme x toggle OFF` each read **0 pairs on a worktree of the base commit at
+an identical triangle count**, and 0.024 mm of span here — a sixth of the live
+mesh floor, a fortieth of the print floor, both at the tip, both on states
+where a petal already stands close to its neighbour's.
+
+**AND BOTH ARE KNIFE EDGES BETWEEN THE TWO ENGINES**: Node reads 354 and 218
+where the gate's Chromium reads 351 and 219. They are recorded at what the
+GATE reads, because X1's band on pairs is EXACTLY 0 and the gate's census runs
+on the doubles the browser's V8 computes. This project's own rule — *a
+re-record measured in Node is not confirmed until the browser agrees* — is why
+all 158 affected rows were re-run through `verify-bloom-export.mjs --only`.
+
+**`--emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS, and that is a defect
+in the tool rather than in the list.** It took `JSON.stringify`'s double
+quotes and swapped them for single ones, which is correct until a label
+contains an APOSTROPHE — and eight do (*"the sheet's headline"*, *"the fan's
+full-disc hub"*, *"the anther's own default shape"*). The one thing that flag
+exists for — *"copy deliberately"* — silently could not be done for those
+rows, and a session doing it would have pasted a syntax error into the
+harness. Fixed here.
+
+**VS5's CROSS-INSTRUMENT PIN MOVED**, −1.1701 → −1.1944 mm, measured by the
+same instrument on the same lattice. The closest approach is at **u 0.323 on
+both trees** — mid-blade, nowhere near the tip — so what moved is where the
+stations land, not what the petals do to each other.
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB.** Excluded by declaration (§4); its own

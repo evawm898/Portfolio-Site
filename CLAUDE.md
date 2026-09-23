@@ -1569,6 +1569,20 @@ so the nib moves an existing fold's magnitude by +272 pairs and +0.064 mm. `froz
 **AND `ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX** — it builds 3,090,816 triangles in **47.7 s**
 against the harness's 30 s settle timeout, and **46.3 s on a worktree of the base commit**, so it
 is the box and not this change. CI only. **The coupon plan gains a 0.40 mm tip.**
+**AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
+ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row
+whose blade clears the print floor. 74 read WORSE, 65 better, 17 moved their span alone, 76 did
+not move. **The three removals are a FIX and their own notes said so**: all three were the PETAL
+EDGE PROFILE's and all three folded *"at its own TIP — u 0.982..1.000"*, the stretch the nib
+replaces. **The two additions are the nib's own**, 0 pairs on the base tree at an identical
+triangle count against 0.024 mm of span here — and **both are KNIFE EDGES between the two
+engines** (Node 354 / 218, Chromium 351 / 219), so they are recorded at what the GATE reads,
+X1's band on pairs being exactly 0. **VS5's pin moved −1.1701 → −1.1944**, at u 0.323 on both
+trees — mid-blade, so it is where the stations land and not what the petals do to each other.
+**AND `bloom-xfail-magnitudes --emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS** — it swapped
+`JSON.stringify`'s double quotes for single ones, which is correct until a label holds an
+APOSTROPHE, and eight do; the one thing that flag exists for could silently not be done for those
+rows. Fixed.
 
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
