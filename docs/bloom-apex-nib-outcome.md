@@ -303,6 +303,71 @@ through the print floor; **the fifth instance here.**
 
 ---
 
+## 7b. What the nib did to the sepals (Eva's ask)
+
+**EVERY SEPAL GETS THE NIB, AND THERE IS NO SECOND OWNER.** A sepal is the
+petal builder on a second ring: `sepalBladeState` hands `buildPetalInto` the
+sepal's own substate and `widthProfile` calls `apexNibPlan` on it exactly as it
+does for a petal. Nothing about the sepal is exempted and nothing about the
+sepal is special-cased — which is the reason to measure it rather than to
+assert it, because a feature that reached the petal and not the sepal would
+draw a perfectly plausible flower with two different apexes on it.
+
+**IT GAINS PROPORTIONALLY MORE THAN THE PETAL, AND THAT IS THE WIDTH QUESTION
+AGAIN.** §1's finding is that the stub's share is decided by where
+`(W/2)·f(u)` meets `TIP_HALF_MM`, so a blade that is scaled DOWN meets the
+floor sooner and spends more of itself flat. `sepalScale` scales both the
+length and the width, so a sepal is exactly that blade. Measured, EXPORT, at
+the shipping defaults with `sepalCount` 8 (`sepalScale` 0.60 × `petalLength`
+35 = 21 mm asked):
+
+| | asked | `uLaw` | flat stub TODAY | slope | cap | arc | radius | drawn | overshoot |
+|---|---|---|---|---|---|---|---|---|---|
+| petal | 35.000 | 0.9924 | 0.266 mm (0.76%) | 1.7673 | 0.3891 mm | 0.0496 | 0.4061 | 35.124 | +0.124 (+0.35%) |
+| **sepal, shipped 0.60** | 21.000 | 0.9818 | 0.382 mm (1.82%) | 1.2215 | 0.5586 mm | 0.0674 | 0.3157 | 21.177 | **+0.177 (+0.84%)** |
+| sepal at scale 0.20 | 7.000 | 0.8749 | 0.876 mm (**12.5%**) | 0.4964 | 1.3270 mm | 0.1183 | 0.2233 | 7.451 | **+0.451 (+6.4%)** |
+| sepal at scale 1.00 | 35.000 | 0.9924 | 0.266 mm | 1.7673 | 0.3891 mm | 0.0496 | 0.4061 | 35.124 | +0.124 |
+
+Three things fall out and each is a check on the law rather than a
+coincidence. The cap is the stub PLUS the overshoot to the double (0.382 +
+0.177 = 0.559; 0.876 + 0.451 = 1.327; 0.266 + 0.124 = 0.390), which is what
+says the cap replaces the flat and does not sit beside it. **At `sepalScale`
+1.00 the sepal's nib is the petal's to every digit**, which is the
+"the sepal foot IS the petal foot" identity arriving at the other end of the
+blade. And the smallest sepal is where the feature is worth the most: 12.5% of
+a 7 mm blade was a 1.60 mm flat face, and the same shape now ends on 0.10 mm.
+
+**THE ANGLE LIMIT DOES NOT MOVE, AND NEITHER DOES A TRIANGLE COUNT.** The
+sepal's limit is DRAWN — a 1-degree scan of the sepal's own lamina against
+every petal's, in both modes — so a longer drawn blade could in principle
+reach a petal sooner. Measured on both trees over six states covering the
+phase, the whole scale range, a cupped corolla and the crowded corner:
+
+| state | limit, TODAY | limit, FULL ROUND | contact | triangles |
+|---|---|---|---|---|
+| `sepalCount` 8 (shipped) | 21° | 21° | 22° crossing | 49,184 both |
+| + `sepalPhase` 0 (aligned) | 24° | 24° | 25° coincident | 49,184 both |
+| + `sepalScale` 1.00 | 21° | 21° | 22° crossing | 49,184 both |
+| + `sepalScale` 0.20 | 90° | 90° | none | 49,184 both |
+| + `petalCup` 1.2 | 31° | 31° | 32° above | 49,184 both |
+| 40 × 40 × size 1 × ALIGNED × 90 asked | 22° clamped | 22° clamped | 23° crossing | 245,152 both |
+
+**0 of 6 disagree.** 0.177 mm on a 21 mm blade is not enough to move the
+scan's own 1-degree step, and the nib adds no lattice row to the sepal any
+more than it does to a petal — the cap re-parameterises the rows it already
+had, so the count is a re-triangulation of nothing. **SP5 is the one sepal
+clause that had to move**, and it moved for the same reason C1 did: it read a
+sepal's BUILT length against `petalLength × sepalScale`, which is the ASKED
+length, so it fired on every sepal row the moment the drawn length overshot.
+It reads `askedLength` now, which the builder reports beside the drawn one.
+
+**WHAT THIS IS BLIND TO, declared:** the limit table is a LIMIT comparison, not
+a census — it says the scan lands on the same degree, not that no pair moved.
+The census's own answer for the sepal rows is in §9b, where **nine of the
+thirteen `SEPALS:` entries** re-record with the rest and four hold.
+
+---
+
 ## 8. AN0–AN3, the new family
 
 Both STL gates are **blind to all of it**, and that is a measurement rather
