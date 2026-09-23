@@ -3359,6 +3359,70 @@ PLAN and the fan's damage is elsewhere. What vouches for that measure is C0, whi
 written-down 0.30 mm and refuses a pair 0.2 mm apart in plan, and which ABORTS rather than
 reporting.
 
+**AND S2 IS DONE: EVERY LENGTH THE PLAN USES IS A SURFACE LENGTH, AND "THE ARC-LENGTH PLAN" IS
+NOT WHAT IT TURNED OUT TO BE** (read `docs/bloom-infill-metric-plan.md` before touching
+`planMetricField`, `kappaAt`, `surfaceOffsetPlanMm`, `planIsFlat` or the M family). §1b's
+defect — the flat plan emitting a wall a QUARTER of what it asks for on `petalCup` 1.2 x
+`petalSpineCurl` 360 — is fixed, and the ACCEPTANCE is §1b's table re-run in §1b's own measure:
+**0.1108 -> 0.5050** there, **0.1879 -> 0.5037** on ALL FORM MAX and **0.3501 -> 0.5025** on cup
+x curl 180, against its nominal 0.5; in the session's own IN-SHEET wall (the material bridge
+between two holes, nominal 1.0) **0.3050 -> 1.0130, 0.7218 -> 1.0017, 0.8097 -> 1.0133**. **The
+ruled wall HOLDS on all thirteen states, not merely improves.**
+**IT IS A LOCAL METRIC AND NOT A REPARAMETERISATION, AND THAT IS A MEASUREMENT RATHER THAN A
+PREFERENCE.** The midrib is ALREADY arc-length — `|dP/dx|` reads **EXACTLY 1.0000 at v = 0 on
+every state** — so an arc-length plan would fix the one thing that was right. The cup lifts the
+sheet toward the curl's own centre of curvature (R = L/(2 pi turns) = **5.5704 mm** at curl 360
+on the shipping blade, with cup 1.2 carrying the margin past 5 mm of it), and the compression
+varies ACROSS the width at ONE station — **0.55 at one margin and 1.45 at the other** — so no
+`(x, y) -> (u, v)` of any kind makes the map an isometry. Gauss's theorema egregium, arriving as
+a print-safety bug. **§1a is not contradicted, it is narrower than it reads**: it measured the
+stretch ACROSS the width, and the compression is ALONG THE SPINE.
+**THE MEASURE IS `kappa(t) = sqrt(det M) / sqrt(t^T M t)` AND IT IS NOT `|J n|`** — the
+difference is the shear, which reaches cos **0.87** on that state, and `|J n|` reads the wall
+HIGH and under-insets. It is a mutant AND a written-down M0 fixture: on the sheared plane
+`P = (x + y, y, 0)` the shipped formula reads 1.000 and `|J n|` reads 1.41421, a wall 29 % thin
+silently. The plan offset is MARCHED (`integral kappa dtau = want`) and not divided, because on
+the compressed states it runs to several millimetres and kappa changes by a factor of ten over
+it; **its step and its edge-sample spacing are the LATTICE'S OWN, HALVED**, which is not
+bookkeeping — the first cut sampled six FIXED points along each edge, the tip face's six landed
+at v = {-1, -0.6, -0.2, 0.2, 0.6, 1} and MISSED v = 0 where the metric is exactly the identity
+by construction, and the wall came out **0.9955 where it asked for 1.0000**.
+**THE FLAT GUARD IS THE SHIPPING DEFAULT'S WHOLE BYTE STORY**: `planIsFlat` is
+`surface.form === null && surface.kC === 0` — two statements, both the geometry's — and where it
+holds the field is not built and the metric plan is the flat plan's OWN DOUBLES. **Cost on the
+shipping default is 2,744 tris and 22,124 for the bloom, S1's figures to the integer, +0.0 %.**
+The guard is MEASURED not trusted: the lattice residual reads **5.56e-14 against a predicted
+5.2e-14 and a derived bar of 4.16e-13**, while the nearest reading from a state it REFUSES
+(`petalSpineCurl` 5, the smallest the slider reaches) is **3.87e-8** — ninety-three thousand
+times apart. Without it the flat default moves 13,224 floats by 3.64e-14 mm and `petalWidth 8`'s
+hole count goes 10 -> 12 on that perturbation, which is the knife-edge class again.
+**THE PARTITION IS 9 MOVERS / 4 HOLDERS, predeclared from the guard predicate and 0 states
+disagreeing**, with `{ metricPlan: false }` **bit-identical to the base over 6,317,568 floats**.
+**THE WALL IS MEASURED IN-SHEET AND NOT IN 3-SPACE, AND THAT IS THE WHOLE SEPARATION §1b NAMES**
+— a 3-space minimum reads **0.0415 mm on `petalRoll` 330 on a pair 8.7 mm apart ALONG THE
+SHEET**, which is the petal's own declared fold and not a wall; in-sheet that state reads exactly
+1.0000. A fold is S1's C2's subject and stays there.
+**WHAT S2 DID NOT DO, AND IT IS RECORDED RATHER THAN HIDDEN: THE CELL SIZE IS STILL FLAT.** On a
+compressed state a cell is smaller ON THE OBJECT, so `cup 1.2 x curl 360` keeps **10 of 16**
+holes — the fix refusing to cut a hole where a 1.0 mm wall does not fit, which is ruling 3's
+achieved count and is reported on every row. Making the Voronoi itself metric is a look change
+and is S4's, beside the relaxation and anisotropy rulings. **Eva's ruled 1.5 mm hole bar is
+PHOTOGRAPHED, NOT ENFORCED** (`opts.holeBarMm`, a capability hook no control reaches): it
+reproduces §2b exactly at 13 of 16 on the same bimodal distribution, and enforcing it is
+ruling 3's drop-and-recompute, a BUILDER mechanism and S3's.
+**THE SHEET IS `node tools/shot-bloom-infill.mjs <dir> [--quick] [--png <file>]`** — the ruled
+defaults with the achieved count at both bars, a density sweep with it in every caption, the
+metric pair, and the whole bloom. It renders through `bloom-soft-render.mjs`, which is
+deterministic, so **no pixel delta is quoted and none is owed**. **THERE IS NO MACRO AT
+`curl` 360 AND THAT IS A MEASUREMENT**: the petal is a coil passing within 0.0002 mm of ITSELF
+before a cell is cut, so every other turn is inside any slab drawn around the wall — the macro
+is taken at `cup 1.2 x curl 180`, where the flat plan fails by a fifth and the petal can be
+read. `docs/img/infill-metric-plan.png`. **`docs/img/infill-conforming-emitter.png` NO LONGER
+REPRODUCES on this tree and STAYS PUT** (`serration-range.png`'s convention): `petalRoll` 330 is
+a mover, so S1's legacy cell goes 2,392 -> 2,344 tris. The 5x7 bitmap font moved from
+`shot-bloom-conform.mjs` into `bloom-soft-render.mjs` — **measured inert, byte-identical PNGs
+both ways** — and gained `J`, `K` and `Q`, which were missing and showed.
+
 **THE UNIFORM ARC IS SINC-STABLE NOW, AND A CLOSED FORM KEPT VERBATIM FOR BYTE IDENTITY IS A
 LIABILITY THE DAY A NEW PRODUCER REACHES ITS SINGULAR BRANCH** (the arc-stability session —
 read `docs/bloom-organic-variance-discovery.md` §4 and §9.6 for the ruling, then

@@ -379,11 +379,27 @@ are all properties of the tessellation, so measuring cost or ruling on a look be
 a state that will not ship. That is the `LADDER_ARC_SHARE` lesson, which cost a session's
 justification when live figures from a scratch tree were quoted as the shipped tree's.
 
-**S2 · THE ARC-LENGTH PLAN.** *Prototype only. Gated on S1.* Ruling 2.
-The plan built in surface distance rather than flat. **Acceptance is §1b's table re-run**:
-`cup 1.2 x curl 360` must come back from **0.1183 mm to >= 1.0 mm**, and ALL FORM MAX from 0.1722,
-with the census clean on both corners. This decides whether the infill is reachable on curved states
-at all.
+**S2 · THE ARC-LENGTH PLAN.** *Prototype only. Gated on S1.* Ruling 2. **DONE —
+`docs/bloom-infill-metric-plan.md`.** The plan built in surface distance rather than flat, and
+**it is a LOCAL METRIC and not an arc-length reparameterisation**: the midrib is already
+arc-length (|dP/dx| reads EXACTLY 1.0000 at v = 0 on every state), the cup lifts the sheet
+toward the curl's own centre of curvature (R = 5.5704 mm at curl 360 on the shipping blade),
+and the compression varies ACROSS the width at one station — 0.55 at one margin and 1.45 at the
+other — so no plan coordinate system can make the map an isometry. What ships is
+`kappa(t) = sqrt(det M) / sqrt(t^T M t)` read from a per-petal lattice, with the wall inset, the
+fillet radius and the hole bar all asking it for their answer in surface millimetres.
+**Acceptance, §1b's table re-run in §1b's own measure**: `cup 1.2 x curl 360` **0.1108 ->
+0.5050**, ALL FORM MAX **0.1879 -> 0.5037**, `cup 1.2 x curl 180` **0.3501 -> 0.5025**, against
+its nominal 0.5 — and in the session's own IN-SHEET wall (nominal 1.0, the material bridge
+between two holes) 0.3050 -> 1.0130, 0.7218 -> 1.0017 and 0.8097 -> 1.0133. **The ruled wall
+HOLDS on all thirteen states and does not merely improve.** The gate is
+`node tools/verify-bloom-infill-metric.mjs` (+ `--negative-control`); the sheet is
+`node tools/shot-bloom-infill.mjs <dir>`. **Cost on the shipping default is ZERO BY BRANCH** —
+`planIsFlat` (no form, straight spine) makes the map affine and the field is not built — and the
+worst state is +11.3 %, which is a STRETCH giving a cell back its hole. **What S2 did NOT do:
+the CELL SIZE is still laid out in the flat plan**, so on a compressed state a cell is smaller
+on the object and can lose its hole (`cup 1.2 x curl 360` keeps 10 of 16); that is ruling 3's
+achieved count, reported, and making the Voronoi itself metric is a look change and S4's.
 
 **S3 · THE BUILDER, THE GUARD AND THE MATERIAL MASK.** *Gated on #278 and S2.* The big one.
 The sibling emission arm; `petalInfillPlan` and `emitInfillPanel`; **one** control (density, guard at

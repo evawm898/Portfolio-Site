@@ -11,6 +11,56 @@
    =================================================================== */
 import zlib from 'node:zlib';
 import fs from 'node:fs';
+
+/* ---------------- LABELS ----------------
+   ONE OWNER of the 5x7 bitmap font and the blitter, because two sheet tools want to
+   label a composite and a picture that needs its caption to say which half is which is
+   half a picture. They were `shot-bloom-conform.mjs`'s; moving them here changed nothing
+   about what they do (that tool's committed image reproduces byte-identically) and means
+   the next tool that wants a label does not carry a third copy. */
+/* a 5x7 font, enough for the labels */
+export const FONT = {
+  A: '01110100011000111111100011000110001', B: '11110100011000111110100011000111110', C: '01110100011000010000100001000101110',
+  D: '11110100011000110001100011000111110', E: '11111100001000011110100001000011111', F: '11111100001000011110100001000010000',
+  G: '01110100011000010111100011000101111', H: '10001100011000111111100011000110001', I: '11111001000010000100001000010011111',
+  L: '10000100001000010000100001000011111', M: '10001110111010110001100011000110001', N: '10001110011010110011100011000110001',
+  O: '01110100011000110001100011000101110', P: '11110100011000111110100001000010000', R: '11110100011000111110101001001010001',
+  S: '01111100001000001110000011000101110', T: '11111001000010000100001000010000100', U: '10001100011000110001100011000101110',
+  V: '10001100011000110001100010101000100', W: '10001100011000110001101011101110001', X: '10001100010101000100010101000110001',
+  Y: '10001100010101000100001000010000100', Z: '11111000010001000100010001000011111',
+  /* J, K and Q were missing and it showed: the infill composite's own label read
+     "WALL AS ED 1 MM". Added here rather than worked around in a caption. */
+  J: '00111000100001000010000101001001100', K: '10001100101010011000101001001010001', Q: '01110100011000110001101011001001101',
+  '0': '01110100011001110101110011000101110', '1': '00100011000010000100001000010001110', '2': '01110100010000100010001000100011111',
+  '3': '11111000100010000010000011000101110', '4': '00010001100101010010111110001000010', '5': '11111100001111000001000011000101110',
+  '6': '00110010001000011110100011000101110', '7': '11111000010001000100010000100001000', '8': '01110100011000101110100011000101110',
+  '9': '01110100011000101111000010001001100',
+  ' ': '00000000000000000000000000000000000', '-': '00000000000000011111000000000000000', '.': '00000000000000000000000000110001100',
+  ':': '00000001100011000000001100011000000', '/': '00001000010001000100010001000010000', '%': '11001110010001000100010001001100111',
+  '(': '00010001000100001000010000100000010', ')': '01000001000001000010000100010001000', ',': '00000000000000000000000001100001000',
+  '+': '00000001000010011111001000010000000', '=': '00000000001111100000111110000000000', '<': '00010001000100010000010000010000010',
+};
+export function text(rgb, w, h, x0, y0, str, col = [250, 250, 248], sc = 2) {
+  for (let i = 0; i < str.length; i++) {
+    const g = FONT[str[i].toUpperCase()]; if (!g) continue;
+    for (let r = 0; r < 7; r++) for (let c = 0; c < 5; c++) {
+      if (g[r * 5 + c] !== '1') continue;
+      for (let dy = 0; dy < sc; dy++) for (let dx = 0; dx < sc; dx++) {
+        const x = x0 + (i * 6 + c) * sc + dx, y = y0 + r * sc + dy;
+        if (x < 0 || y < 0 || x >= w || y >= h) continue;
+        const o = (y * w + x) * 3; rgb[o] = col[0]; rgb[o + 1] = col[1]; rgb[o + 2] = col[2];
+      }
+    }
+  }
+}
+export function blit(dst, dw, dh, src, sw, sh, ox, oy) {
+  for (let y = 0; y < sh; y++) for (let x = 0; x < sw; x++) {
+    const X = ox + x, Y = oy + y; if (X < 0 || Y < 0 || X >= dw || Y >= dh) continue;
+    const s = (y * sw + x) * 3, d = (Y * dw + X) * 3;
+    dst[d] = src[s]; dst[d + 1] = src[s + 1]; dst[d + 2] = src[s + 2];
+  }
+}
+
 const crcTable = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
 function crc32(buf) { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = crcTable[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; }
 function chunk(type, data) { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const td = Buffer.concat([Buffer.from(type, 'ascii'), data]); const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(td)); return Buffer.concat([len, td, crc]); }
