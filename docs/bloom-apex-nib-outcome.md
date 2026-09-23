@@ -709,6 +709,41 @@ construction, so that is the healthy reading and not a tolerance.
 
 ---
 
+## 9d. The confirmation sheet, with the sepal cell (Eva's ask)
+
+`node tools/shot-bloom-apex-nib.mjs <dir> <base-tree>` — two columns, TODAY
+from a worktree of `2464d50` and FULL ROUND from this tree, five rows, every
+cell in PRINT PREVIEW, **one camera per row shared by both columns**, centred
+between the two tips and widened from the measured gap so the truncation (or
+the overshoot) is in the same frame as the shape. **No pixel delta is quoted
+anywhere** — two trees, two servers, two page sessions — and every number on
+the sheet is read off the builder's own emitted outline.
+
+| row | face TODAY → FULL ROUND | parallel run TODAY → | drawn / asked | triangles |
+|---|---|---|---|---|
+| **A** the shipping default | 1.6000 → **0.1000 mm** | 0.180 → 0.003 mm | 35.124 / 35.00 | 24,688 both |
+| **B** 35×16, tip shape **0.60** | 1.6000 → **0.1000** | **8.253** → 0.013 | **30.051** / 35.00 | 24,688 both |
+| **C** tip shape **3.00** | 1.6000 → **0.1000** | 0.121 → 0.000 | 35.012 / 35.00 | 24,688 both |
+| **D SEPALS**, the shipped whorl | 1.6000 → **0.1000** | 0.210 → 0.006 | 21.177 / 21.00 | 49,184 both |
+| **E** a lobed rim (0.30 × 3) | 1.6000 → **0.1000** | 0.272 → 0.003 | 35.124 / 35.00 | 24,688 both |
+
+**THE SEPAL CELL IS THE ONE THAT COULD NOT BE ARGUED, ONLY SHOWN**, and it is
+framed FROM ABOVE because `sepalAngle` 0 lays the blade in the hub's own plane
+and a face-on camera is straight down. TODAY the sepal converges and then
+sticks out a blunt rectangular stub with a flat end; FULL ROUND closes it on a
+point. Nothing about the sepal is special-cased to make that happen — it is
+the petal builder on a second ring reading its own substate.
+
+**ROW B IS THE DEFECT AT ITS WORST**: 8.253 mm of the blade — 23.6% of it — was
+outline running PARALLEL at the print floor, and the drawn blade is 4.95 mm
+shorter than the slider asks because the law's own crossing is that far in.
+**ROW C IS THE OTHER END**: at tip shape 3.00 the flank is so steep the whole
+cap is 0.02 mm and the arc 0.003, and the drawn length moves +0.012 mm.
+**THE TRIANGLE COUNT IS IDENTICAL ON EVERY PAIR**, which is the zero-triangle
+claim shown per row rather than stated once.
+
+---
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**
