@@ -311,8 +311,103 @@ Replacing `Math.hypot` with `Math.sqrt(dx*dx+dy*dy)` (`infillLen`) and skipping
 none of those numbers**, which is what pointed at the trigonometry.
 `INFILL_PLAN_GRID = 2^-20` mm quantises the cell polygons, the capacity insets
 and the filleted holes: three orders under what the census resolves, eight
-orders over what the engines differ by. **X0 is silent on all six rows, and
-Node and Chromium now agree to the digit on every declared pair count.**
+orders over what the engines differ by. **Node and Chromium agree to the digit
+on every declared pair count, and every triangle count above is fixed and stayed
+fixed.**
+
+**THE SENTENCE THAT STOOD HERE SAID "X0 IS SILENT ON ALL SIX ROWS" AND IT WAS
+TRUE OF SIX ROWS.** The full matrix has twenty-two, and on three of them X0 was
+not silent. See §6b — the grid moved the knife edge and did not remove it.
+
+---
+
+## 6b. A GRID DOES NOT REMOVE A KNIFE EDGE — IT MOVES IT, AND AMPLIFIES WHAT IS LEFT
+
+`bloom-export-watertight` run **107397090596** (head `cdccd6d`, 299.9 min)
+failed with **931 rows attempted, 927 reaching the results**. The four missing
+lines were three X0 drops and the X1 coverage clause naming two of them:
+
+| row | floats differing | worst \|d\| | X0's bar on that row |
+|---|---|---|---|
+| `INFILL: x density 40` | 80 | 9.5367e-7 mm | 7.251e-14 mm (8 ULP of 40.819) |
+| `INFILL: x CONTINUOUS x 3 turns` | 15 | 9.5367e-7 mm | 7.872e-14 mm (8 ULP of 44.317) |
+| `INFILL: x a SPHERE head with a stem` | 15 | 9.5367e-7 mm | 1.223e-13 mm (8 ULP of 68.850) |
+
+**9.5367e-7 mm is exactly 2^-20 — one step of `INFILL_PLAN_GRID`** — and it is
+the SAME ABSOLUTE quantum on all three rows while being 4 / 2 / 1 float32 ULP at
+their magnitudes 3.465 / 6.587 / 12.090. That is what says a grid step rather
+than float32 rounding, and it is 10^7 times the bar.
+
+**THE MECHANISM IS A TIE, AND THE TIES ARE SYSTEMATIC RATHER THAN RANDOM.**
+`Math.round(t)` decides at every half step. §6 predicted a straddle would be "a
+1e-7 event per coordinate", which is the right arithmetic for a value drawn at
+random and the wrong model for these: **the midpoint of two GRID values is an
+odd multiple of G/2 BY IDENTITY**, and a clip, a bisector and the refiner's own
+edge split all produce one. Measured by tapping the quantiser over every one of
+the twenty-two `INFILL:` rows in EXPORT mode — **994,532 quantised values, of
+which 923 sit EXACTLY on a tie and 1,670 within one ULP of the scale of one,
+0.168 %.** Four orders above chance.
+
+**THE REMEDY IS A SLACK DERIVED FROM THE QUANTITY'S OWN CONDITIONING, NOT A
+SECOND GRID.** A value within `slack` *below* a tie is treated as being AT it,
+so both engines round it up and neither reads the last bit. Two steps in the
+derivation, and neither is fitted:
+
+* `v / INFILL_PLAN_GRID` is an **exact** operation — the grid is a power of two
+  — so `t` carries exactly `v`'s own error and the slack can be quoted in steps.
+* `v` is a plan coordinate reached by **differencing** quantities of order `L`,
+  so its error is ULP OF THE SCALE and never of its own magnitude. That is X0's
+  own ruling (`X0_TOL_ULPS`: *"that many ULP of the BUILD'S OWN LARGEST
+  \|COORDINATE\| — the magnitude the value was differenced FROM, never its
+  own"*), applied one module over. `INFILL_TIE_ULPS` **is** X0's 8, and the
+  source says so beside it.
+
+`infillSnap(v, slack)` is the one owner; `gq` (the outline) and `infillQuant`
+(the cells, the capacity insets, the filleted holes) both call it. At slack 0 it
+is `Math.round` term for term, negatives included, and it reads `t - Math.floor(t)`
+rather than `t + slack` because at `t ~ 4e7` one ULP is 7.45e-9 and the slack
+would be quantised onto it before it was ever used.
+
+**IT SITS IN A MEASURED EMPTY BAND — the only thing that makes it a bar rather
+than a tuned constant.** Distance from a tie, in ULP of the scale, over the same
+994,532 values:
+
+| distance | count |
+|---|---|
+| 0 (exactly on a tie) | 923 |
+| < 1 ULP | 1,670 (cumulative) |
+| **1 .. 100 ULP** | **0** |
+| 100 .. 1,000 ULP | 16 |
+| > 1,000 ULP | 992,846 |
+
+The new boundary sits at 8 ULP, inside that empty band. **After the change, 0
+values of 994,532 lie within 1 ULP of the new boundary and the nearest is 7.600
+ULP away** — against a cross-engine divergence this repo has measured at **0.03
+ULP of the build's own scale** (`CLAUDE.md`, the X0 block), so the realised
+headroom is ~250x. `--quick` reproduces none of this; the tap is on the whole
+block.
+
+**WHAT IT COSTS, measured against `cdccd6d` over all twenty-two rows in EXPORT:
+8 rows move, 14 hold, and NO triangle count moves on any row.** The worst
+coordinate move is **9.6399e-7 mm** — one grid step plus the map's own slope —
+and the three REFUSED/GATED rows are bit-identical because the quantiser is
+never called there (q = 0), which is the guard partition measured rather than
+argued. `verify-bloom-infill-bytes.mjs --base <main>` still reads **0 floats and
+0 captured-grid values moved over 15 holders x 2 modes**.
+
+**EIGHTH INSTANCE OF A DISCRETE DECISION ON A CONTINUOUS QUANTITY IN THIS
+PROJECT, AND THE FIRST WHOSE SUBJECT IS THE SEVENTH'S OWN REMEDY.** The grid is
+right and it is not the whole move: it makes the TOPOLOGY agree and leaves the
+COORDINATE on a coin flip, which is a smaller failure wearing the same clothes.
+
+**AND IT IS NOT LOCALLY REPRODUCIBLE, WHICH IS WHY THE FIX HAD TO BE BY
+CONSTRUCTION.** `node tools/verify-bloom-export.mjs --only '<the three>'` reads
+**PASS, 3 of 3** on `cdccd6d` against this container's own Chromium: the
+divergence is between CI's V8 and Node's, and this box's browser is not CI's.
+So "the local run passes" is not evidence about this class in either direction,
+and what is offered instead is the population at risk going from 1,670 values
+within one ULP of a decision to **zero**, with the derivation above and the
+empty band underneath it.
 
 ---
 
@@ -444,16 +539,25 @@ Export mode, whole bloom, measured on this tree:
 | shipping default, guard ON | 53,536 | 3.6 % |
 | guard ON at density 40 | 46,848 | 3.1 % |
 | 40 petals × 3 whorls, guard OFF | 367,632 | 24.5 % |
-| **40 petals × 3 whorls, guard ON** | **723,520** | **48.2 %** |
+| **40 petals × 3 whorls, guard ON** | **726,752** | **48.5 %** |
 | `ALL MAX` (a CHOICE away, uninfilled) | 24,688 | unchanged |
 
 The infilled default is **2.17×** the plain one. `docs/bloom-infill-port-plan.md`
 projected ~41,000 triangles before S3 measured the mode-free subdivision the
 gate forced; the honest figure is 53,536 and the projection is superseded.
 
-**The corner that matters is `INFILL: x 40 petals x 3 whorls`, at 48.2 % of
+**The corner that matters is `INFILL: x 40 petals x 3 whorls`, at 48.5 % of
 budget** — this feature's own `ALL MAX`, and the row a future per-petal feature
 should check first.
+
+**AND THAT ROW'S FIGURE WENT STALE INSIDE THIS PR, WHICH IS WORTH RECORDING
+RATHER THAN QUIETLY CORRECTING.** It was published here and in `CLAUDE.md` as
+723,520 / 48.2 %; the mode-free subdivision landed after it was written and
+nothing re-measured. The figure above is measured on this tree AND on `cdccd6d`
+— identical on both, so it is not the tie fix's — and the other five rows of the
+table reproduce exactly. A count is a property of the tessellation and every
+change to the emitter moves it; this repo's own rule about a published figure
+that has stopped reproducing applies to a number inside one's own PR.
 
 ---
 

@@ -9336,7 +9336,8 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      `verify-bloom-grid`'s clause 2a went red on 176 of 1072 captured boundary
      points, 144 of them on a margin. The 3D point is still the LATTICE's
      exactly — only the plan key moves, by at most half a grid step. */
-  const gq = (v) => Math.round(v / INFILL_PLAN_GRID) * INFILL_PLAN_GRID;
+  const tieSlack = infillTieSlack(L);
+  const gq = (v) => infillSnap(v, tieSlack);
   const spanOf = (i) => panel.spanAt(i);
   /* UP ONE MARGIN, ACROSS THE TERMINAL FACE, DOWN THE OTHER — `emitPanel`'s
      own loop, so the boundary the cells are clipped to is the boundary the
@@ -9403,7 +9404,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
     /* NO SIMPLIFICATION. `infillSimplifyRuns` collapsed near-collinear runs on
        a 240-sample outline; on the lattice's own polyline every vertex is a
        row the mesh emits, and dropping one moves the silhouette. */
-    cells = kept.map((c) => infillDedupe(infillQuant(infillCcw(c))));
+    cells = kept.map((c) => infillDedupe(infillQuant(infillCcw(c), tieSlack)));
     isOutlineEdge = infillClassify(cells);
     const onBaseEdge = (A, B) => Math.abs(A.x - xB) < 1e-6 && Math.abs(B.x - xB) < 1e-6;
     /* THE HOLE — the inset clipped to the V and then filleted. The inset is a
@@ -9432,7 +9433,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
       const cp = diam(c);
       const r = infillInset(c, wall / 2, (A, B) => acrossMm(A, B, isOutlineEdge(A, B) && !onBaseEdge(A, B) ? wall : wall / 2, cp));
       if (!r) return null;
-      const q = infillDedupe(infillQuant(r));
+      const q = infillDedupe(infillQuant(r, tieSlack));
       return q && q.length >= 3 ? q : null;
     };
     const drawnOf = (c, inner) => {
@@ -9442,7 +9443,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
       const fr = field ? (Q, A, B) => Math.max(acrossMm(A, Q, INFILL_FILLET_MM, cp), acrossMm(Q, B, INFILL_FILLET_MM, cp)) : INFILL_FILLET_MM;
       const f = infillFillet(clipped, fr);
       if (!(f && f.length >= 3)) return null;
-      const q = infillDedupe(infillQuant(f));
+      const q = infillDedupe(infillQuant(f, tieSlack));
       return q && q.length >= 3 ? q : null;
     };
     const widthOf = (poly, c) => { if (!poly) return 0; const cp = diam(c); return infillWidthMm(poly, field ? (A, B, r) => acrossMm(A, B, r, cp) : null); };
@@ -9574,9 +9575,69 @@ export const INFILL_REFINE_DEPTH = 64;
    certainty a bare comparison gives. Seventh instance of a discrete decision
    on a continuous quantity here, and the second whose remedy is a grid. */
 const INFILL_PLAN_GRID = 1 / 1048576;              // 2^-20 mm
-function infillQuant(poly) {
+/* AND A GRID DOES NOT REMOVE A KNIFE EDGE, IT MOVES IT — AND AMPLIFIES WHAT IS
+   LEFT. `Math.round(t)` carries a TIE at every half step, and the paragraph
+   above predicted a straddle would be "a 1e-7 event per coordinate". Measured
+   over the two rows CI dropped, it is not: of 153,284 quantised values 265 sit
+   EXACTLY on a tie and 63 more within one ULP of their own `t` of one — 0.21%,
+   because the midpoint of two GRID values is an odd multiple of G/2 BY
+   IDENTITY, and a clip, a bisector and the refiner's own edge split all
+   produce one. On such a value the two engines take opposite branches and the
+   coordinate moves a FULL GRID STEP, 9.5367e-7 mm, where the unquantised pair
+   would have differed by ~1e-16 of its own magnitude. Measured,
+   `bloom-export-watertight` run 107397090596: X0 dropped `INFILL: x density
+   40` on 80 floats, `x CONTINUOUS x 3 turns` on 15 and `x a SPHERE head with a
+   stem` on 15, every one |d| exactly 9.5367e-7 mm — the SAME absolute quantum
+   at magnitudes 3.465, 6.587 and 12.090, which is what says a grid step rather
+   than float32 rounding, and 10^7 times X0's own 7.251e-14 mm bar.
+
+   SO THE TIE IS RESOLVED IN ONE DIRECTION, BY A SLACK DERIVED FROM THE
+   QUANTITY'S OWN CONDITIONING. A value within `slack` BELOW a tie is treated as
+   being AT it, so both engines round it up and neither reads the last bit.
+   `v / INFILL_PLAN_GRID` is an EXACT operation — the grid is a power of two —
+   so `t` carries exactly `v`'s own error; and `v` is a plan coordinate reached
+   by DIFFERENCING quantities of order `L`, so its error is ULP OF THE SCALE and
+   never of its own magnitude. That is X0's own ruling (`X0_TOL_ULPS`: "that
+   many ULP of the BUILD'S OWN LARGEST |COORDINATE| — the magnitude the value
+   was differenced FROM, never its own") applied one module over, and
+   `INFILL_TIE_ULPS` is X0's 8 transported through that exact scaling.
+
+   IT SITS IN A MEASURED EMPTY BAND, which is the only thing that makes it a
+   bar rather than a tuned constant. Over the same 153,284 values the distance
+   from a tie reads 0 (265 values), then 1e-11..1e-9 (63 — every one under one
+   ULP of its own `t`, i.e. a tie that cancellation has already blurred), then
+   NOTHING AT ALL until 1e-6, then the continuum. At the shipping L = 35 mm the
+   slack is 6.5e-8 of a step: 65x above that near-tie population's ceiling and
+   15x below the nearest value it would newly move. What it costs is that at
+   most those 328 values shift by one grid step, on rows that are this feature's
+   own and have no baseline to move; the guard never calls it at all.
+
+   EIGHTH INSTANCE OF A DISCRETE DECISION ON A CONTINUOUS QUANTITY HERE, AND THE
+   FIRST WHOSE SUBJECT IS THE SEVENTH'S OWN REMEDY. The grid is right and it is
+   not the whole move: it makes the TOPOLOGY agree — the triangle counts above
+   are fixed and stayed fixed — and leaves the COORDINATE on a coin flip, which
+   is a smaller failure wearing the same clothes. */
+const INFILL_TIE_ULPS = 8;                         // === X0_TOL_ULPS in tools/bloom-harness.mjs
+function infillTieSlack(scaleMm) {
+  /* One ULP at the scale is in (scale*2^-53, scale*2^-52]; `Number.EPSILON` is
+     2^-52, so this is between one and two of them — a bound, on the safe side,
+     with no exponent arithmetic to get wrong. Divided by the grid because the
+     slack is quoted in STEPS, which is the unit the comparison is made in. */
+  return (INFILL_TIE_ULPS * Math.abs(scaleMm) * Number.EPSILON) / INFILL_PLAN_GRID;
+}
+/* `t - Math.floor(t)` is EXACT for |t| < 2^52 (Sterbenz), so the comparison
+   reads the fractional part rather than a rounding of it — which `t + slack`
+   would not, since at t ~ 4e7 one ULP is 7.45e-9 and the slack would be
+   quantised onto it before it was ever used. At slack 0 this is `Math.round`
+   term for term, negatives included: floor(-2.5) is -3, f is 0.5, n+1 is -2. */
+function infillSnap(v, slack) {
+  const t = v / INFILL_PLAN_GRID;
+  const n = Math.floor(t);
+  return (t - n >= 0.5 - slack ? n + 1 : n) * INFILL_PLAN_GRID;
+}
+function infillQuant(poly, slack) {
   if (!poly) return poly;
-  return poly.map((q) => ({ x: Math.round(q.x / INFILL_PLAN_GRID) * INFILL_PLAN_GRID, y: Math.round(q.y / INFILL_PLAN_GRID) * INFILL_PLAN_GRID }));
+  return poly.map((q) => ({ x: infillSnap(q.x, slack), y: infillSnap(q.y, slack) }));
 }
 function infillTriArea2(a, b, c) { return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x); }
 function infillInTri2(p, a, b, c, eps) { const s1 = infillTriArea2(a, b, p), s2 = infillTriArea2(b, c, p), s3 = infillTriArea2(c, a, p); return s1 > eps && s2 > eps && s3 > eps; }

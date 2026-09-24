@@ -4381,6 +4381,25 @@ kept, and **moved none of those numbers** — which is what pointed at the trigo
 `INFILL_PLAN_GRID = 2^-20` mm quantises the cell polygons, the insets and the holes (the outline
 too, or the pre-registration misses); Node and Chromium now agree to the digit on every declared
 count. SEVENTH instance of a discrete decision on a continuous quantity.
+**AND A GRID DOES NOT REMOVE A KNIFE EDGE, IT MOVES IT AND AMPLIFIES WHAT IS LEFT — EIGHTH
+INSTANCE, WHOSE SUBJECT IS THE SEVENTH'S OWN REMEDY** (§6b of the doc). `Math.round` ties at every
+half step, and the ties here are SYSTEMATIC rather than random: the midpoint of two GRID values is
+an odd multiple of G/2 BY IDENTITY, and a clip, a bisector and the refiner's edge split all make
+one. Measured over all 22 `INFILL:` rows in EXPORT, **923 of 994,532 quantised values sit EXACTLY
+on a tie and 1,670 within one ULP of the scale — 0.168%**, so the whole-matrix gate went red where
+a six-row subset had been silent: X0 DROPPED three rows (`x density 40` 80 floats, `x CONTINUOUS x
+3 turns` 15, `x a SPHERE head with a stem` 15) at |d| **exactly 9.5367e-7 mm = one grid step**, the
+same ABSOLUTE quantum at three magnitudes and 10^7 times X0's own bar. `infillSnap(v, slack)` is
+the one owner now and `INFILL_TIE_ULPS` **is X0's own 8**, transported through an EXACT
+power-of-two scaling onto the scale the coordinate was differenced from — never its own magnitude.
+**It sits in a MEASURED empty band**: distance from a tie reads 0 (923), <1 ULP (1,670 cumulative),
+then **NOTHING from 1 to 100 ULP**, then 16, then the continuum — so after the change **0 values lie
+within 1 ULP of the new boundary and the nearest is 7.600 ULP away**, against the 0.03 ULP
+divergence this file records for X0. Cost, measured against `cdccd6d` over all 22 rows: **8 move,
+14 hold, 0 triangle counts move**, worst 9.6399e-7 mm, and the three REFUSED/GATED rows are
+bit-identical because the quantiser is never called there. **NOT LOCALLY REPRODUCIBLE** — the three
+rows read PASS through this container's own Chromium, so the fix is by CONSTRUCTION and what is
+offered is the population at risk going 1,670 -> 0, never a green local run.
 **(iv) A COLLINEAR TRIANGLE CANNOT BE DROPPED:** it was, and it OPENED THE SHELL — three distinct
 corners mean three real edges, **8 and 48 boundary edges on two rows**. `infillEarClip` retries
 from each starting vertex and `infillFan` from each apex until the triangulation has no flat
@@ -4402,7 +4421,7 @@ another sheet of the same shell — `petalCup` 1.2 x `petalSpineCurl` 360 passes
 itself. Found when the infill's holes removed that row's census pairs and left O2 asserting on a
 geometry it cannot measure: the clause's subject, not its strictness.
 **COST, EXPORT:** the shipping default is **24,688 with the guard off and 53,536 with it on**
-(3.6% of budget, 2.17x); the corner is **`INFILL: x 40 petals x 3 whorls` at 723,520 — 48.2%**,
+(3.6% of budget, 2.17x); the corner is **`INFILL: x 40 petals x 3 whorls` at 726,752 — 48.5%**,
 this feature's own ALL MAX and the row a future per-petal feature should check first. The port
 plan's ~41,000 projection is SUPERSEDED — it predates the mode-free subdivision the gate forced.
 **WHAT IS NOT DONE, NAMED:** a LOBED blade is REFUSED with a word (`outline`) because a lobe's
