@@ -39,6 +39,7 @@
    =================================================================== */
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
+import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -330,6 +331,14 @@ export const PREDICATES = {
      stem sees the choice and a visitor who has none does not see a control
      that could do nothing. */
   inflorescencePresent: { all: [{ id: 'stemLength', min: 1 }, { id: 'inflorescence', oneOf: ['RACEME'] }] },
+
+  /* THE INFILL'S ONE STATEMENT — the twin of the geometry's
+     `infillIsAbsent`, and the two are checked against each other at harness
+     load (I0's discipline, the androeciumEligible relation). ONE TERM: the
+     guard is a CHOICE whose off value is NONE, which is Eva's ruling 7 and is
+     the reason `ALL MAX` stays uninfilled — `SWEEPABLE` filters `SLIDERS()`,
+     so a choice is out of the blanket sweep BY CONSTRUCTION. */
+  infillPresent: { all: [{ id: 'petalInfill', oneOf: ['VORONOI'] }] },
 
   /* THE STEM'S ONE STATEMENT (session 43, narrowed by the sphere-stem session).
      This is the twin of the geometry's `stemIsAbsent`: the registry HIDES the
@@ -686,7 +695,6 @@ export const SECTIONS = [
      of its own once slot roles arrived. Moving `inner*` here is presentation
      only — `section` is never persisted and no geometry reads it. */
   { id: 'roles', label: 'Petal roles', open: false, parent: 'petal' },
-
   /* ===================================================================
      THE ROSETTE'S TWO GROUPS, NUMBERED THE FAN'S WAY (Eva's ruling A, Sep 3,
      from the deploy preview): "the names like petal 1 -2 -3 etc should apply
@@ -798,6 +806,22 @@ export const SECTIONS = [
        avoid. */
     parent: 'roles',
   })),
+  /* THE INFILL — a drop-down inside Petal, and the petal's INTERIOR, which is
+     the fourth layer of the order of operations and the one nothing in the
+     bloom had: shape, form and curl say what the sheet IS, and this says what
+     is inside it. Nested rather than a top-level section because it is a
+     treatment of the blade, the Lobes / Serration shape.
+
+     DECLARED HERE, AFTER "Petal roles" AND ALL NINE OF ITS CHILDREN, AND NOT
+     BESIDE `roles` WHERE IT READS AS BELONGING. The panel builds a section
+     INSIDE its parent's <details>, so a sibling declared between a parent and
+     that parent's children renders AFTER the whole subtree — route (a)'s
+     order clause caught exactly that (declared `...roles>infill>labellumGroup`
+     and built `...roles>labellumGroup>...>petal9>infill`), which is that
+     clause doing the job it exists for. The declaration order IS the render
+     order, so a nested section goes after its elder sibling's LAST
+     DESCENDANT, never after the sibling itself. */
+  { id: 'infill', label: 'Infill', open: false, parent: 'petal' },
   /* HEAD (session 18, Eva Sep 5) — the shape of the junction the feet sit
      on: a CAP (flat at Head rise 0, a hemisphere at 1) or a full SPHERE.
      A NEW SECTION rather than a slider bolted onto Arrangement or a fifth
@@ -1674,6 +1698,68 @@ export const CONTROLS = [
      else the moment any of the three moved. The DRAWN angle is measured on
      the build's own outline and printed in the read-out, beside the chord it
      was read through — which is where a degree figure can be true. */
+  /* ===================================================================
+     THE VORONOI INFILL (S3 of `docs/bloom-infill-port-plan.md`). The petal's
+     INTERIOR, which is the fourth layer of the order of operations and the one
+     the bloom has never had: the blade is cut into cells and each cell keeps a
+     rounded hole inside a printable wall.
+
+     THE GUARD IS A CHOICE AND NOT A SLIDER (Eva's ruling 7), and the mechanism
+     is structural rather than a list: `SWEEPABLE` filters `SLIDERS()`, so a
+     CHOICE is out of the blanket sweep BY CONSTRUCTION — which is exactly why
+     `ALL MAX` stays uninfilled and its declared export refusal does not move.
+     The four sub-sliders ruling 7 names still need `INFILL_SUB_IDS`; S3 ships
+     ONE of them (density) and S4 the other three.
+
+     EVERY RANGE AND BAR IS IMPORTED, never a literal (Q6): the geometry is the
+     one owner of what an infill can be, and the harness fails at module load
+     if one of these became a number typed here. */
+  { id: 'petalInfill', section: 'infill', kind: 'choice', default: 'NONE',
+    options: [
+      { value: 'NONE', label: 'None (a solid blade)' },
+      { value: 'VORONOI', label: 'Voronoi cells' },
+    ],
+    label: 'Infill',
+    fmt: (v, ui, shown) => {
+      if (String(v) === 'NONE') return 'a solid blade — the sheet, with nothing cut out of it';
+      const f = shown && shown.infill;
+      if (!f) return `cells with a ${INFILL_WALL_MM.toFixed(2)} mm wall — not built on this petal`;
+      if (f.refused === 'panels') return 'cells — NOT CUT: this blade is several panels (a cleft or a fringe owns the same region)';
+      if (f.refused === 'room') return 'cells — NOT CUT: the blade has no room above the solid base for a cell region';
+      if (f.refused === 'bar') return `cells — NOT CUT: no cell holds a ${f.bar.toFixed(2)} mm hole inside a ${f.wall.toFixed(2)} mm wall`;
+      return `cells · ${f.achieved} hole${f.achieved === 1 ? '' : 's'} in ${f.cells} cell${f.cells === 1 ? '' : 's'}, wall ${f.wall.toFixed(2)} mm`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { all: [] } },
+
+  /* DENSITY IS A REQUEST AND NOT A GUARANTEE (Eva's ruling 3), so the read-out
+     says the ACHIEVED count WHENEVER IT DIFFERS from the asked one. What the
+     iteration does to reach it: every cell that cannot hold a ruled hole
+     inside a printable wall has its SEED dropped, all of them in one pass, and
+     the diagram is recomputed — so the survivors take the area rather than the
+     petal keeping a cell that draws nothing.
+
+     THE DEAD TRAVEL IS AT THE TOP AND IS TOLD, NOT TRIMMED (`stamenSpread`'s
+     ruling, and the carnation terminal's low-end case for which end carries
+     it). Asking for more cells than the blade can hold raises the number of
+     seeds and not the number of holes — measured on the shipping default, the
+     achieved count saturates and the surplus is reported here rather than the
+     range being narrowed, because the releasing density is a property of the
+     PETAL's own size and an adaptive maximum would make one slider position
+     mean different things on different blades. */
+  { id: 'infillDensity', section: 'infill', kind: 'slider',
+    min: INFILL_DENSITY_RANGE[0], max: INFILL_DENSITY_RANGE[1], step: 1, default: INFILL_DENSITY_DEFAULT,
+    label: 'Cells',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const f = shown && shown.infill;
+      const base = `${n} cell${n === 1 ? '' : 's'} asked`;
+      if (!f || f.refused) return `${base} · nothing cut`;
+      const tail = `${f.achieved} hole${f.achieved === 1 ? '' : 's'} at or over ${f.bar.toFixed(2)} mm across`
+        + (f.solid ? `, ${f.solid} cell${f.solid === 1 ? '' : 's'} left solid` : '');
+      return f.achieved === n ? `${base} · ${tail}` : `${base} — BUILT ${f.cells} · ${tail}`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+
   { id: 'lobeCrestShape', section: 'lobes', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,
     label: 'Crest', tier: 'standard', role: 'petal',

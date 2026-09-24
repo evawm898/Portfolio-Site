@@ -149,11 +149,45 @@ function ptTri(p, a, b, c) {
 
 /* THE MEASUREMENT. `grid` is buildPetalInto's captured panels; `footRows` is
    how many rows at the head of each panel are the FOOT, which is flat and not
-   under test. Returns the two numbers and where each was found. */
+   under test. Returns the two numbers and where each was found.
+
+   IT READS THE MATERIAL MASK, AND THAT IS WHAT MAKES IT MEAN ANYTHING ON AN
+   INFILLED BLADE (the Voronoi infill, S3). A lattice sample the emitter drew
+   no skin for — a hole — carries `material[j] === false`, and it is ABSENT
+   from this measurement on BOTH sides: it is not asked "how thick is the wall
+   under me" (there is no wall under a hole, and the answer would be the
+   declared sheet, which is a 1.2 mm reading at a place with no material at
+   all) and it contributes no triangle for anything else to measure against.
+
+   WITHOUT THE MASK V5 WOULD BE GREEN ON EVERY INFILLED ROW FOR THE WRONG
+   REASON — the fifth durable rule, in the clause the whole feature turns on:
+   the subject would be "the rectangle of lattice stations", which the holes
+   are in, so the clause would report a perfect sheet across a hole and could
+   not fail. The mask is PRESENT ON EVERY CAPTURED ROW (`emitPanel` writes a
+   shared frozen all-true row), so a missing mask is a builder that did not
+   write one rather than a default this reads as solid — and it REFUSES rather
+   than assuming, because assuming is the trap.
+
+   A QUAD IS MATERIAL ONLY IF ALL FOUR OF ITS CORNERS ARE. A quad with one
+   corner in a hole straddles the rim and is not a piece of sheet; counting it
+   would put a triangle through the hole it is beside. */
 export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
   const rows = grid.flatMap((pan) => pan.rows).filter((r) => r.row >= footRows);
   if (rows.length < 2) throw new Error('measureWall: fewer than two blade rows captured — nothing to measure');
+  for (const r of rows) {
+    if (!Array.isArray(r.material) || r.material.length !== r.v.length) {
+      /* NOT "because it would go green" — measured, it would not: both numbers
+         below are minima over material points against material quads, so an
+         all-material mask only ADDS points and targets and a minimum can only
+         fall. What it destroys is the SUBJECT (a wall asserted where there is
+         no sheet) and the `self` figure (an approach to phantom skin: 0.6586
+         mm against the truth's 0.6925 on `petalRoll` 330). Refusing is right
+         either way; the message says which. */
+      throw new Error(`measureWall: row ${r.row} carries no material mask — the builder must write one on every captured row, and reading its absence as "all material" would measure a 1.20 mm wall AT A HOLE and take \`self\` against skin that is not there`);
+    }
+  }
   const NVc = rows[0].v.length;
+  const mat = (i, j) => rows[i].material[j];
   const skin = (sign) => rows.map((r) => r.mid.map((P, j) => [
     P[0] + sign * r.normal[j][0] * r.thickness / 2,
     P[1] + sign * r.normal[j][1] * r.thickness / 2,
@@ -165,13 +199,18 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
   const tris = [];
   for (let i = 0; i < B.length - 1; i++) {
     for (let j = 0; j < NVc - 1; j++) {
+      if (!(mat(i, j) && mat(i, j + 1) && mat(i + 1, j) && mat(i + 1, j + 1))) continue;
       tris.push([B[i][j], B[i][j + 1], B[i + 1][j + 1], i, j]);
       tris.push([B[i][j], B[i + 1][j + 1], B[i + 1][j], i, j]);
     }
   }
+  if (!tris.length) throw new Error('measureWall: the material mask leaves no quad at all — there is nothing to measure against');
   let wall = Infinity, wallAt = null, self = Infinity, selfAt = null;
+  let skipped = 0, asked = 0;
   for (let i = 0; i < T.length; i++) {
     for (let j = 0; j < NVc; j++) {
+      if (!mat(i, j)) { skipped++; continue; }
+      asked++;
       let dn = Infinity, df = Infinity;
       for (const tr of tris) {
         const d = ptTri(T[i][j], tr[0], tr[1], tr[2]);
@@ -182,7 +221,7 @@ export function measureWall(grid, { footRows = 3, near = 2 } = {}) {
       if (df < self) { self = df; selfAt = [rows[i].u, rows[i].v[j]]; }
     }
   }
-  return { wall, wallAt, self, selfAt, declared: rows[0].thickness, rows: rows.length, columns: NVc };
+  return { wall, wallAt, self, selfAt, declared: rows[0].thickness, rows: rows.length, columns: NVc, holes: skipped, samples: asked };
 }
 
 /* ------------------------------------------------------------ curvature */
@@ -879,8 +918,73 @@ async function negativeControl({ disarm = null, neuter = null } = {}) {
   return bad;
 }
 
+/* ============================ THE MASK CONTROL ==========================
+   `--mask-control` — the measurement behind the material mask's own reason, so
+   the figures in `docs/bloom-infill-builder.md` §3 are reproducible rather than
+   remembered. It builds each state TWICE THROUGH ONE BUILD: the honest mask the
+   emitter wrote, and the same grid with every station forced material — which
+   is the "sweep the full NV columns and capture the rectangle" fix the S3 brief
+   names as the one not to take.
+
+   WHAT IT SETTLES. The brief's stated reason was that the rectangle makes V5
+   GREEN. It does not and it cannot: `wall` and `self` are both MINIMA over
+   material query points against material target quads, so forcing the mask
+   material only ADDS points and targets and a minimum can only FALL. What the
+   rectangle really costs is the SUBJECT (a wall asserted where there is no
+   sheet) and the `self` FIGURE (an approach to phantom skin). This prints both
+   numbers under both masks and says which moved, in which direction.
+
+   IT IS A REPORT, NOT A GATE — it asserts only its own vacuity guard (some
+   state must actually carry holes, or the comparison compares nothing), because
+   what it measures is a property of the wall instrument rather than of the
+   tree, and a bar on it would be a bar on arithmetic. */
+async function maskControl() {
+  const G = await loadGeometry(ROOT);
+  const R = await import(pathToFileURL(path.join(ROOT, 'bloom-registry.js')).href);
+  const D = R.DEFAULTS;
+  const STATES_M = [
+    ['the shipping default, guard OFF', {}],
+    ['guard ON, density 16', { petalInfill: 'VORONOI', infillDensity: 16 }],
+    ['guard ON, density 8', { petalInfill: 'VORONOI', infillDensity: 8 }],
+    ['guard ON, density 40', { petalInfill: 'VORONOI', infillDensity: 40 }],
+    ['cup 1.2 x curl 360, guard OFF', { petalCup: 1.2, petalSpineCurl: 360 }],
+    ['cup 1.2 x curl 360, guard ON', { petalCup: 1.2, petalSpineCurl: 360, petalInfill: 'VORONOI' }],
+    ['ALL FORM MAX, guard OFF', { petalCup: 1.2, petalCupGradient: 1, petalRoll: 330, petalTwist: 180, petalSpineCurl: 360 }],
+    ['ALL FORM MAX, guard ON', { petalCup: 1.2, petalCupGradient: 1, petalRoll: 330, petalTwist: 180, petalSpineCurl: 360, petalInfill: 'VORONOI' }],
+    ['roll 330, guard ON', { petalRoll: 330, petalInfill: 'VORONOI' }],
+    ['buckle 0.6 f3, guard ON', { buckleAmp: 0.6, buckleFreq: 3, petalInfill: 'VORONOI' }],
+  ];
+  const force = (grid) => grid.map((pan) => ({ ...pan, rows: pan.rows.map((r) => ({ ...r, material: r.v.map(() => true) })) }));
+  const f = (x) => (Number.isFinite(x) ? Number(x).toFixed(4) : 'n/a');
+  console.log('THE MASK CONTROL — the honest mask against the full rectangle, one build each\n');
+  console.log('state                               holes/samples    wall honest  wall rect    self honest  self rect    moved');
+  let holed = 0, wallMoved = 0, selfMoved = 0, selfUp = 0;
+  for (const [name, set] of STATES_M) {
+    const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
+    const b = G.buildBloomInto(acc, { ...D, ...set });
+    const petal = (b.petalsAll || []).find((x) => x && x.grid);
+    if (!petal) { console.log(`${name.padEnd(35)} (no captured grid)`); continue; }
+    const honest = measureWall(petal.grid), rect = measureWall(force(petal.grid));
+    if (honest.holes > 0) holed++;
+    const dW = rect.wall - honest.wall, dS = rect.self - honest.self;
+    if (Math.abs(dW) > 0) wallMoved++;
+    if (Math.abs(dS) > 0) { selfMoved++; if (dS > 0) selfUp++; }
+    const moved = !Math.abs(dW) && !Math.abs(dS) ? '-'
+      : `${Math.abs(dW) ? `wall ${dW > 0 ? '+' : ''}${dW.toFixed(4)} ` : ''}${Math.abs(dS) ? `self ${dS > 0 ? '+' : ''}${dS.toFixed(4)}` : ''}`;
+    console.log(`${name.padEnd(35)} ${String(honest.holes).padStart(4)}/${String(honest.samples).padEnd(6)}  ${f(honest.wall).padEnd(12)} ${f(rect.wall).padEnd(12)} ${f(honest.self).padEnd(12)} ${f(rect.self).padEnd(12)} ${moved}`);
+  }
+  console.log(`\n${wallMoved} of ${STATES_M.length} states move WALL, ${selfMoved} move SELF, ${selfUp} of those move it UP (greener).`);
+  console.log('A minimum over a SUPERSET of points and targets can only fall, so `up` should always be 0 —');
+  console.log('the full rectangle cannot make V5 green. What it destroys is the SUBJECT and the `self` figure.');
+  if (!holed) { console.log('\nMASK CONTROL: VACUOUS — no state carried a hole, so the two masks are the same mask.'); return 1; }
+  console.log(`\nMASK CONTROL: ${holed} of ${STATES_M.length} states carry holes, so the comparison has a subject.`);
+  return selfUp ? 1 : 0;
+}
+
 if (IS_MAIN) {
-  if (process.argv.includes('--controls')) {
+  if (process.argv.includes('--mask-control')) {
+    process.exit(await maskControl());
+  } else if (process.argv.includes('--controls')) {
     const { fails } = await sweepControls({});
     process.exit(fails.length ? 1 : 0);
   } else if (process.argv.includes('--negative-control')) {

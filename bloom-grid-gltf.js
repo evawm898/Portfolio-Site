@@ -88,6 +88,42 @@ function usableRows(panel, footRows) {
   return rows.length >= 2 ? rows : null;
 }
 
+/* THE MATERIAL MASK, ONE STRING PER ROW, ONE CHARACTER PER COLUMN — '1' where
+   the sheet has material under that station and '0' where the infill cut it
+   away. Indexed exactly as every other per-row array beside it in `panelMeta`
+   (`u`, `halfWidthMm`, `thicknessMm`) and per-column as `v`, so a consumer
+   that can already read those needs no new indexing rule.
+
+   WHY IT IS HERE AND NOT EXPRESSED AS SPLIT PRIMITIVES. The obvious move is to
+   cut each LINE_STRIP into its runs of material, so a hole is simply a gap in
+   the file. That would be WRONG TO DO FROM HERE, and quietly: /plot stations a
+   u-line POSITIONALLY — point i of a strip is row i of that panel's declared
+   `u` ladder, matched by label — so every point past the first hole would come
+   back mis-stationed, with no refusal, because a split run carries no way to
+   say where it started. The primitives are therefore untouched and the mask
+   rides beside them; splitting on it is the SVG exporter's own change, where
+   there is already a split rule to extend ("a strip is split only where the
+   projection has nothing to say") and a gate that covers it.
+
+   ABSENCE IS REFUSED, NEVER READ AS MATERIAL. `emitPanel` writes a mask on
+   every captured row — measured, 384 panels and 12,992 rows over both modes
+   across the default, three densities, cleft, fringe, both refusals, sepals,
+   continuous and cup x curl: 0 missing and 0 whose length differs from `v`'s.
+   So a missing mask is a builder that has stopped writing one, and reading it
+   as all-material would put a solid sheet in the file exactly where the holes
+   are — `measureWall`'s own refusal, for the same reason. */
+function materialRow(r, nCols, label) {
+  if (!Array.isArray(r.material) || r.material.length !== nCols) {
+    throw new Error(`buildGridGltf: panel ${label} row ${r.row} carries no usable material mask `
+      + `(${r.material ? `length ${r.material.length}` : 'absent'} against ${nCols} columns) — the `
+      + `builder must write one on every captured row, and reading its absence as "all material" `
+      + `would put a solid sheet in the file exactly where the infill cut holes`);
+  }
+  let out = '';
+  for (let j = 0; j < nCols; j++) out += r.material[j] ? '1' : '0';
+  return out;
+}
+
 /* ===================================================================
    The buffer. One growing list of float triples; every accessor is a slice
    of it. Kept as a class so the min/max each accessor owes the spec is
@@ -221,6 +257,7 @@ export function buildGridGltf(built, { mode, state, generator = 'bloom-grid-gltf
         v: rows[0].v.map((v) => round(v)),
         halfWidthMm: rows.map((r) => round(r.halfWidth, 5)),
         thicknessMm: rows.map((r) => round(r.thickness, 5)),
+        material: rows.map((r) => materialRow(r, nCols, panel.label)),
       });
     }
 
