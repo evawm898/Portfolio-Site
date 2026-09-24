@@ -1105,6 +1105,44 @@ demand is not the cause.
   sepal equivalent — so that row's evidence is its census, not its picture,
   and the sheet says so on its own face.
 
+### The byte partition — RUN, AND IT DID NOT CLOSE; THE PREDICATE IS WRONG IN BOTH DIRECTIONS
+
+Predeclared from the BASE tree as *a row moves iff some built petal or sepal
+has a nib AND a non-zero cup coefficient on it*: **98 movers / 822 holders.**
+Run over a 190-row subset (all 98 movers plus every ninth holder, 92 of them,
+so the sample walks the whole matrix rather than one block of it):
+`verify-bloom-surface-bytes --base <worktree of the pre-fix head>` reads
+**204,206,148 export floats over 22,689,572 triangles and 15,175,518
+captured-grid values, and FAILS with 14 findings** — **96 of 98 declared
+movers moved.**
+
+**THE FAILURE IS THE PREDICATE'S, NOT THE FIX'S, AND IT BREAKS BOTH WAYS.**
+
+* **Three HOLDERS moved** — `SLOT: labellumCup min (-0.8) x 2 whorls in step`,
+  `SLOT: hoodCup max (1.2) x 2 whorls in step` and `SLOT: ALL MAX x 2 whorls
+  in step`, 6,732 / 6,846 / 13,788 floats of 442,656 in both modes. **Cause
+  established exactly**: on the first of those the per-petal `p.form.cup`
+  record reads **0 on all sixteen petals** although the labellum's own cup is
+  -0.8 — the SLOT ROLE OVERRIDE does not reach the record the predicate read.
+  The predicate asked a record that is not the quantity under test, which is
+  the fourth durable rule turning up in a predeclaration instead of in a
+  clause. Those three are legitimate movers wrongly called holders.
+* **Two declared MOVERS held to the bit** — `DOME: the INCURVE TARGET, flat`
+  and `x rise 0.5`. **Cause NOT established.** A probe says 120 of 120 petals
+  on that row carry both a nib and a non-zero cup, so "no nib" and "no cup"
+  are both ruled out; what is not ruled out is that `profileU` and the
+  parameterisation `onNib` takes are not the same `u` (`toLaw(v) = v * drawn /
+  asked` is where the two meet), so the probe's station count may not be
+  `onNib`'s question. Recorded as an open thread rather than guessed at.
+
+**So the partition is NOT closed and is not claimed to be.** What it does
+establish is that the fix moves the rows it is meant to move (96 of 98) and
+that 89 of 92 sampled holders are bit-identical. The predicate has to be
+rebuilt to read the EMITTED stations — whether any station of any built part
+has `cupScale !== 1` — rather than the plan, and re-run over the full 920
+rows, before this could merge.
+
+
 ### NOTHING IS DECLARED
 
 Per Eva's instruction, no `SELF_INTERSECTION_XFAIL` entry is added or moved by
