@@ -625,9 +625,13 @@ the shipped matrix). The witness compares the plan's `why` as well as its
 
 ## 9. The matrix, the census and the two declared rows
 
-Block 39 is eleven rows (matrix 909 → 920); the smoke subset gains five
-(111 → 116, 34 → 35 blocks), and the family census reads **119 families, all
+Block 40 is eleven rows (matrix 931 → 942); the smoke subset gains five
+(116 → 121, 35 → 36 blocks), and the family census reads **119 families, all
 119 claimed, both directions.**
+
+**IT IS BLOCK 40 AND NOT 39, AND `frozen/phase39` AND NOT 38** — see §12. Both
+numbers were 39 and 38 until this branch merged `main` in: PR #284 (the Voronoi
+infill) took the same two four hours earlier.
 
 **TWO NEW ROWS ARE DECLARED SELF-INTERSECTORS AND NEITHER FOLD IS THE NIB'S**,
 measured on both trees rather than argued. Both compose TWO controls, which
@@ -1430,3 +1434,132 @@ Not for effort — the refusal is one line. Three reasons, in order:
   weld at the leaf's BASE (the half-step ring offset), ST9's petiole
   exemption (the rod's axis, not the blade), and the combination gate's
   `leaf-stem` measure, whose nearest blade point to the stem is at the base.
+
+---
+
+## 12. THE MERGE WITH #284 (the Voronoi infill), and the eight rows the two features fold together
+
+**GITHUB RAN NO WORKFLOW AT ALL ON THE PUSHED HEAD, AND THAT IS HOW THE
+CONFLICT WAS FOUND.** The branch was pushed at 17:00:34 UTC and Netlify's three
+checks came back green nine seconds later; `actions_list` filtered to the branch
+showed the newest runs still on the PREVIOUS head, hours old, and
+`get_check_runs` reported the PR as three-for-three. PR #284 had merged into
+`main` at 09:05 that morning, and `pull_request_read` gave the reason in one
+field: **`mergeable_state: "dirty"`**. GitHub could not build `refs/pull/283/merge`,
+so every `pull_request` workflow was skipped; Netlify builds the HEAD ref, which
+is why it ran and nothing else did. **AN ABSENT RUN LOOKS NOTHING LIKE A FAILING
+ONE** — there is no red, no log and no job to read — so the rule is the one this
+file already carries about `672/672`, in a new place: *a PR whose Actions runs
+simply do not exist is a conflicted PR until proved otherwise.*
+
+**FIVE FILES CONFLICTED AND TWO NUMBERS COLLIDED.** `bloom-geometry.js`,
+`bloom.js`, `tools/bloom-harness.mjs`, `tools/bloom-smoke.mjs` and
+`tools/bloom-wall-thickness.mjs`; eight hunks. Both sessions had written **block
+39** and **`frozen/phase38`**, because both were in flight against the same base.
+The apex nib's are **block 40** and **`frozen/phase39` — the 931 rows at
+`8bb8685`** now, regenerated from that commit's own `buildMatrix()` rather than
+carried over (the old snapshot was 909 rows at `2464d50`, which is no longer a
+head `main` ever had a nib-free matrix at). The live matrix is **942 rows**, the
+smoke subset **121 rows over 36 blocks**, and the family census reads 119 of 119
+both ways.
+
+**THE TWO SUBSTANTIVE RESOLUTIONS, both in `bloom-geometry.js`:**
+
+* **`laminaHalfAt` was added by BOTH sides with different bodies, and the merged
+  one is neither.** The infill's reads the **CUT** outline (`shapeAt`, so a hole
+  is never planned into material a lobe removed); the nib's owns its own floor
+  (inside the nib the outline converges BELOW `TIP_HALF_MM` by design, and a
+  lamina floored at 0.80 mm reports 0.80 where the blade is 0.05 — which is what
+  took the lobes' apex half-width to 0.0000 when a local copy of the expression
+  did exactly that). The shipped method carries both: the cut outline, with the
+  nib's branch. Both halves are mode-free, so the live/export count equality the
+  method exists for is not weakened.
+* **`measureWall`'s two exclusions are orthogonal and both stay.** The infill's
+  material mask (a hole is absent from the measurement on both sides) and the
+  nib's `nibFromU` region (a pair is skipped only when BOTH of its points lie
+  above the crossing the nib declares). Neither widens the other.
+
+### The finding: eight INFILL rows fold that neither feature folds alone
+
+The census over all 22 `INFILL:` rows, EXPORT, through the committed
+`bloom-census-sweep.mjs`:
+
+| row | main's geometry | merged | guard OFF here | |
+|---|---|---|---|---|
+| `INFILL: the ruled defaults` | 0 | **4 / 0.0000** | 0 | NEW — tangency |
+| `INFILL: x density 40` | 0 | **2 / 0.0000** | 0 | NEW — tangency |
+| `INFILL: x petalWidth 8` | 0 | **384 / 0.1459** | 0 | NEW |
+| `INFILL: x petalWidth 30` | 0 | **1216 / 0.9650** | 0 | NEW |
+| `INFILL: x footDelicacy 0.25` | 0 | **736 / 0.4418** | 0 | NEW |
+| `INFILL: x tipThinning 0.80` | 0 | **4 / 0.0000** | 0 | NEW — tangency |
+| `INFILL: x petalTipShape 3.00` | 0 | **992 / 0.0000** | 0 | NEW — tangency |
+| `INFILL: x sepals 8` | 0 | **4 / 0.0000** | 0 | NEW — tangency |
+| `INFILL: x petalLength 20` | **1184 / 0.3639** | **0** | 0 | CLEARED — entry removed |
+
+**MEASURED THREE WAYS, NOT ARGUED.** Main's own geometry (`8bb8685`) through
+THIS tree's census reads 0 on all eight — and reproduces main's declared
+`x petalLength 20` at **1184 / 0.3639 to the pair and to four decimals**, which
+is what says the two trees are being read by one instrument. The same control
+sets with the guard OFF on this tree read 0 at 24,688 triangles. Only the two
+features together fold.
+
+**AND THE PAIRS ARE NOWHERE NEAR THE NIB.** `bloom-census-attribute.mjs` carries
+every collected pair back to the builder's own captured mid-surface:
+**every pair on every row sits in the ROOT BLEND, u < 0.30**, while the nib
+begins at drawn u 0.9889. The worst pair on `x petalWidth 30` is at u 0.0714,
+0.684 mm off the mid-surface.
+
+**THE MECHANISM IS THIRTEEN MICRONS OF OUTLINE.** `petalLength` is the ASKED
+length and the blade is drawn to wherever the cap closes, so with a nib
+`drawnLengthMm ≠ length` and `widthProfile` reparameterises the WHOLE outline
+through `toLaw(v) = v·drawn/asked` — the root blend included. Measured on the
+emitted profiles of both trees: the outline moves **0.0135 mm at u 0.1607** on
+the defaults and 0.0088 mm at `petalWidth` 30, against 0.7500 mm at u 1.0000,
+which is the nib itself. The root blend is the steepest stretch of the outline
+(it collapses the width over six rows), so that is where the largest basal shift
+lands — and it lands on a lattice station, 9/56 exactly.
+
+**THAT IS ENOUGH BECAUSE IT IS THE CONFORMANCE LIMIT #284 ALREADY DECLARES**, on
+three rows, in these words: *"Cell facets are sized from the LATTICE's own
+longest plan edge — the mode-free bar that makes the triangle count identical
+live and export — so where the lattice is coarse against the surface a facet can
+cross a neighbouring hole's rim wall."* At the base the rows are the HELD uniform
+ones and the surface turns fastest, so the facets there are the most nearly
+tangent the blade has; thirteen microns is what it takes to push a handful
+through. Four of the eight read a worst span of **exactly 0.0000 mm**, so they
+are tangencies rather than folds — this project's own knife-edge class, where
+the count is a property of where the stations land against a crease.
+
+**REPORTED, NOT TUNED AROUND**, which is the standing treatment for this list:
+each of the eight is declared with its number, its main-geometry control and its
+guard-off control in its own note, and every one of the 22 rows exports
+watertight and flood-fills as one connected piece. **Nothing was changed to make
+a number smaller.** The alternative — making the infill's conformance bar a
+function of the outline's local turn — is the infill's own change and is named
+here rather than taken.
+
+### What else moved
+
+**THE INFILL'S TRIANGLE COUNTS MOVE WITH THE NIB, on every infilled row**, because
+the cells are planned against the outline: the shipping infilled default goes
+**53,536 → 52,320**, `x petalTipShape 3.00` goes 62,240 → 46,752, and
+`x 40 petals x 3 whorls` — this feature's cost corner — goes 367,632 → 678,912 in
+the sweep's own EXPORT build. The plan itself is essentially unmoved: `cells`,
+`achieved`, `solid` and `mSplit` are identical on both trees for every state
+checked, and `floorU` moves in the sixth decimal (0.0579388 → 0.0577344 on the
+defaults) — the reparameterisation again.
+
+**`ALL MAX` IS UNTOUCHED BY THE MERGE AND THAT IS STRUCTURAL:** the infill's guard
+is a CHOICE, so `SWEEPABLE` never sees it and block 1 never sets it. Its
+`EXPORT_REFUSED_XFAIL` entry is **3,090,816 triangles on both trees**, to the
+integer.
+
+**THE BYTE PARTITION IS NOT RE-RUN AGAINST `8bb8685` AND THAT IS SAID RATHER THAN
+GLOSSED.** §9e closed it against `2464d50` (877 moved / 32 held of 909 comparable
+rows, 1,145,824,416 floats). Two facts carry it across the merge and neither is
+the measurement itself: `git diff 2464d50..55ca84c` touches **no shipped
+geometry file at all**, and #284's own byte gate proves its 15 holders
+bit-identical with the guard off. What is genuinely new is the 22 `INFILL:` rows,
+and those are measured above by census and triangle count rather than float for
+float. A full re-run is ~4 hours of wall clock on this box and is the one thing
+this section reports as owed rather than done.

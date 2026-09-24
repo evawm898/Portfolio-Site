@@ -11,7 +11,7 @@ import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -574,6 +574,7 @@ let lastFitCenter = [0, 0, 0];
    amount 0, the guard) and the TOLD FLAG — the neighbour figures every
    recorded build carries (ruling 1: reported, never clamped). */
 let lastVariance = null, lastNeighbour = null, lastVarianceAbsent = true, lastPetalsAll = [];
+let lastInfill = null, lastInfillAbsent = true;
 
 /* THE NON-SHIPPING PETAL-MODEL OVERRIDE. null in every reachable state:
    there is no registry row, no DOM input, and no listener that writes it —
@@ -623,6 +624,15 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
        state this build was made from — VS0's half, through the page (ST0's
        and ID0's route). And every EMITTED petal, for VS2's per-slot record. */
     lastVarianceAbsent = varianceIsAbsent(uiForBuild);
+    /* THE INFILL, from the FIRST BUILT PETAL's own plan record — the one the
+       read-out's INFILL line speaks and route (z) holds it to. Taken off a
+       petal rather than off `built` because the plan is a property of a BLADE
+       (a sepal is the petal builder on a second ring and is pinned off, and a
+       lobed blade refuses where a plain one does not), and `petalsAll` can be
+       EMPTY where every slot is omitted — the slot-omission class this project
+       already names, so the `?.` is load-bearing and not a tidiness. */
+    lastInfill = (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null;
+    lastInfillAbsent = infillIsAbsent(uiForBuild);
     lastPetalsAll = built.petalsAll || [];
     lastAndroecium = built.androecium; lastStamens = built.stamens; lastFreeEnds = built.freeEnds; lastStamenNearest = built.stamenNearest;
     lastGynoecium = built.gynoecium; lastStyles = built.styles;
@@ -1141,6 +1151,42 @@ function lobeLine(petals) {
     ? `relief ${L.reliefAskedMm.toFixed(2)} mm on every tooth on the margin (depth ${L.depthBuilt.toFixed(2)}x the widest half-width ${L.peakHalfMm.toFixed(2)} mm; the first saturates at ${L.depthCap.toFixed(2)}x)`
     : `relief ${L.reliefAskedMm.toFixed(2)} mm asked, ${Math.min(...margin).toFixed(2)}–${Math.max(...margin).toFixed(2)} mm built — ${L.reliefLimited} of the margin's teeth are limited by the material at their own sinus (every period saturates above ${L.depthCap.toFixed(2)}x)`;
   return `LOBES ${count} · ${apex} · ${relief} · pitch ${L.pitchMm.toFixed(2)} mm (floor ${L.pitchFloorMm.toFixed(2)} mm) · coverage ${(L.coverage * 100).toFixed(0)}% = ${(L.coverage * 12).toFixed(1)} hours of the clock (${(2 * L.treatedHalfMm).toFixed(1)} of ${(2 * L.halfRimMm).toFixed(1)} mm of rim, from u ${L.windowU[0].toFixed(3)} over the apex and back) · crest ${L.crestShape.toFixed(2)} / notch ${L.notchShape.toFixed(2)}${L.crestAngleDeg === null ? '' : ` (crest ${L.crestAngleDeg.toFixed(1)}\u00b0`}${L.notchAngleDeg === null ? (L.crestAngleDeg === null ? '' : ')') : `${L.crestAngleDeg === null ? ' (' : ', '}notch ${L.notchAngleDeg.toFixed(1)}\u00b0 included on a ${L.angleChordMm.toFixed(2)} mm chord)`} · ${L.samplesPerLobe} stations a period demanded by this shape · ${L.rowsPerPeriod.join('/')} placed base to apex · deepest sinus ${(2 * L.sinusMinHalfMm).toFixed(2)} mm across\n`;
+}
+
+/* THE INFILL'S LINE (S3 of the Voronoi port). RULING 3 REQUIRES THE ACHIEVED
+   COUNT ON SCREEN WHENEVER IT DIFFERS FROM THE ASKED ONE: density is a
+   REQUEST — the blade decides how many cells can hold a printable hole — so a
+   line that printed only the asked number would be naming a thing that is not
+   the thing. It reads the BUILDER's own record; nothing here re-derives a
+   count. Every reason the pattern is absent is a WORD, never a silence. */
+function infillLine(petals) {
+  const F = petals && petals[0] && petals[0].infill;
+  if (!F) return '';
+  if (F.refused === 'panels') return 'INFILL NOT CUT — this blade is several panels (a cleft or a fringe already owns the region the cells would take); told, not refused\n';
+  if (F.refused === 'room') return `INFILL NOT CUT — the blade has no room above the solid base: the cell region starts at u ${F.floorU.toFixed(4)}, where the outline hands over from the root blend or first clears two ${F.wall.toFixed(2)} mm walls\n`;
+  if (F.refused === 'bar') return `INFILL NOT CUT — no cell on this blade holds a ${F.bar.toFixed(2)} mm hole inside a ${F.wall.toFixed(2)} mm wall\n`;
+  if (F.refused === 'outline') return 'INFILL NOT CUT — this blade is LOBED, and a lobe\u2019s notches make the cells non-convex, which emits more handles than holes (tunnels nobody asked for); making the two compose wants a cell construction that does not assume a convex region\n';
+  /* AND A REFUSAL WORD THIS FUNCTION DOES NOT KNOW IS STILL A LINE. Falling
+     through to the count would print `0 built, 0 holding a hole · holes none`
+     — numbers describing a pattern that does not exist, which is the silence
+     this line was written to prevent wearing a number's clothes. A new word in
+     `petalInfillPlan` therefore SAYS ITSELF here until somebody writes its
+     sentence, and route (z)'s own NOT CUT clause holds it. */
+  if (F.refused) return `INFILL NOT CUT \u2014 the plan refused with "${F.refused}", which this read-out has no sentence for yet\n`;
+  const asked = F.density;
+  const count = F.achieved === asked
+    ? `${F.achieved} holes, as asked`
+    : `${asked} cells asked \u2192 ${F.cells} built, ${F.achieved} holding a hole`;
+  const w = F.widthsMm.filter((x) => x >= F.bar).sort((a, b) => a - b);
+  const span = w.length ? `${w[0].toFixed(2)}\u2013${w[w.length - 1].toFixed(2)} mm across, median ${w[w.length >> 1].toFixed(2)}` : 'none';
+  /* THE PASS COUNT IS TOLD BECAUSE THE CAP IS: a state that reaches it has
+     been truncated rather than converged, and that is a fact about the state
+     and not about the constant. */
+  const passes = F.passesUsed >= F.passCap
+    ? ` \u00b7 the drop reached its cap of ${F.passCap} passes and stopped there`
+    : F.passesUsed ? ` \u00b7 ${F.passesUsed} drop pass${F.passesUsed === 1 ? '' : 'es'}` : '';
+  const plan = F.metricPlan ? 'surface' : 'flat (the map is affine here, so a plan millimetre IS a millimetre of material)';
+  return `INFILL ${count} \u00b7 ${F.solid} cell${F.solid === 1 ? '' : 's'} left solid \u00b7 holes ${span} \u00b7 wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm, measured on the ${plan}${passes}\n`;
 }
 
 /* THE ROOT-BLEND LINE IS RETIRED (created by session 36's ruling, retired by
@@ -1677,6 +1723,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
        + apexLine(petals)
+       + infillLine(petals)
        + edgeProfileLine(petals)
        + fringeLine(petals)
        + (built ? stamenLine(fr, built.stamens, built.stamenNearest, mode, built.filamentStyle) + antherLine(fr, mode) + styleLine(fr, built.styles, built.stamens, mode) + stigmaLine(fr, mode) + slendernessLine(fr, mode) : '')
@@ -1756,6 +1803,14 @@ function regenerate() {
                      control's ALIASED clause prints the builder's own threshold, and the
                      phase control says it is inert on a fan from the builder's own word. */
                   variance: built.variance || null,
+                  /* THE INFILL's record joins for the same reason once more, and
+                     ruling 3 is why it MUST: density is a REQUEST, so a user who
+                     asks for 40 cells and is handed 16 holes has to read that on
+                     THE CONTROL THEY SET, not only in the read-out — the stem
+                     channel's own case, and `stamenSpread`'s before it. Taken off
+                     the first BUILT petal because the plan is a property of a
+                     blade; null where no blade carries one. */
+                  infill: (built.petalsAll && built.petalsAll[0] && built.petalsAll[0].infill) || null,
                   /* THE SEPALS' record: the count ceiling and the angle limit are
                      the OWNER's numbers (footRing's and the builder's own scan),
                      printed on the two controls and hatched on their tracks; the
@@ -2353,6 +2408,24 @@ window.__bloomMetrics = () => ({
   petalSlotSizes: lastPetalsAll.map((p) => ({ index: p.slotIndex, whorl: lastFoot.continuousMode ? 0 : Math.round(p.whorl), azimuth: p.azimuth,
     scale: p.slot.scale, sizeFactor: p.slot.sizeFactor ?? null, ringScale: p.ringScale, length: p.length, askedLength: p.askedLength, nominalLength: p.nominalLength })),
   neighbour: lastNeighbour ? structuredClone(lastNeighbour) : null,
+  /* THE VORONOI INFILL (I0-I7, and route (z)'s own subject): the BUILDER's own
+     plan record — the density asked, the count ACHIEVED, the refusal word if
+     there is one — so a gate holds the read-out's two tellings to the number
+     rather than to each other. Null where no blade carries a plan, which is
+     every state with the guard off; `infillAbsent` is the GEOMETRY's own
+     predicate through the page, ID0's and ST0's route again, because a gate
+     calling it in Node compares one unmutated module against another. */
+  infill: lastInfill ? { density: lastInfill.density, wall: lastInfill.wall, bar: lastInfill.bar, cells: lastInfill.cells,
+    achieved: lastInfill.achieved, solid: lastInfill.solid, passesUsed: lastInfill.passesUsed,
+    passCap: lastInfill.passCap, refused: lastInfill.refused || null, built: !!lastInfill.built,
+    planFlat: !!lastInfill.planFlat, floorU: lastInfill.floorU, mSplit: lastInfill.mSplit,
+    /* THE CELL POLYGONS ARE DELIBERATELY NOT HERE. I1-I7 read them off the
+       BUILDER in Node, where they are the artefact; projecting them through
+       the page would copy a few thousand points on every metrics call for a
+       question no panel route asks. What a route needs is the NUMBERS the
+       read-out speaks — and `widthsMm`, which is one scalar a cell. */
+    widthsMm: [...lastInfill.widthsMm] } : null,
+  infillAbsent: lastInfillAbsent,
   /* THE GEOMETRY'S OWN ANSWER TO "MAY THIS STATE HAVE A STEM", read from the
      module that is actually running. ST0 compares it against the REGISTRY's
      declaration, and it has to arrive through the page: a gate calling the

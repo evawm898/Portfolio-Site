@@ -258,6 +258,17 @@
          cycle, 20 cycles (aliased), the ramp, a FAN at phase 90, and back to
          0. `(y)` follows `(x)`; adding a route is THREE edits — this entry,
          the block, and the negative control's flag list.
+
+     (z) THE INFILL'S ACHIEVED COUNT IS TOLD, AND EVERY REFUSAL IS A WORD
+         (the Voronoi infill, S3). Ruling 3 makes density a REQUEST, so the
+         count the blade actually built must be on screen whenever it differs
+         from the asked one — in BOTH places this project tells a clamp, the
+         control's own value read-out and the read-out panel, each asserted
+         against the BUILDER's record rather than against the other. The route
+         also drives the REFUSALS (a fringe, a lobed blade, the guard off),
+         because a branch is not something a number can show. `(z)` and not a
+         reused `(y)`: that letter is the size field's, above, and this file's
+         own route (w) records what two routes under one letter cost.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -356,6 +367,27 @@ const WITNESS = {
      emitted laminae rather than off any control. */
   variance: { id: 'varianceSize', value: '0.5',
               read: (m) => `${m.petalSlotSizes && m.petalSlotSizes[0] && m.petalSlotSizes[0].scale}/${m.neighbour && m.neighbour.blade && m.neighbour.blade.skinGapMm}`, what: 'petalSlotSizes[0].scale/neighbour.blade.skinGapMm' },
+  /* THE INFILL (the Voronoi infill, S3) — a drop-down inside Petal, collapsed
+     at first load, holding the guard and its one gated slider. Witnessed by
+     the DENSITY through two numbers the slider cannot write: the count the
+     blade ACHIEVED, which is Eva's ruling 3 (density is a REQUEST — the plan
+     drops every cell that cannot hold a 1.5 mm hole after the 1.0 mm wall,
+     recomputes and repeats), and how many drop passes it took. The witness
+     reaches PAST the control's own value in the strongest form this map has:
+     an asked 24 achieves SIXTEEN, so the number on the slider and the number in
+     the blade are not even close, and a witness that read the control back
+     would have read 24 twice. Measured 14/0 at the ruled default against 16/1
+     at 24. It needs the GUARD, which is why the driver sets both.
+     THE VALUE IS 24 AND NOT THE MAXIMUM, and that is measured rather than
+     chosen for tidiness: the achieved count is NOT monotone in the request —
+     8/16/24/32/40 asked come out as 8/14/16/15/14 built, because past the point
+     where the blade is full the drop takes more cells than the extra seeds add.
+     At 40 the achieved count is 14, the SAME as the ruled default's, so half
+     this witness would have been a number printed twice — the `leafToothCount`
+     row's own finding, in the next entry but one. */
+  infill: { id: 'infillDensity', value: '24', pre: [{ id: 'petalInfill', value: 'VORONOI' }],
+            read: (m) => `${m.infill && m.infill.achieved}/${m.infill && m.infill.passesUsed}`,
+            what: 'infill.achieved/infill.passesUsed' },
   inflorescence: { id: 'floretNodes', value: '1',
                    pre: [{ id: 'stemLength', value: '120' }, { id: 'inflorescence', value: 'RACEME' }],
                    read: (m) => `${m.inflorescence && m.inflorescence.built}/${m.inflorescence && m.inflorescence.pedicelR}`,
@@ -2996,6 +3028,109 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('back to 0 on a RADIAL whorl — no field line, the sub-controls hidden, the flag line at the default\'s own numbers', [{ id: 'placement', value: 'RADIAL' }, { id: 'varianceSize', value: '0' }]);
 }
 
+/* ---------------- (z) THE ACHIEVED COUNT IS TOLD, BOTH DIRECTIONS ----------
+   (the Voronoi infill, S3). Eva's ruling 3 makes DENSITY A REQUEST: the blade
+   decides how many cells can hold a printable hole, and the achieved count
+   must be on screen whenever it differs from the asked one. This project's
+   clamped-and-told form is TWO places — the control's own value read-out and
+   the read-out panel — so both are asserted against the BUILDER's own record
+   rather than against each other (`stamenSpread`'s route, HEAD RISE's
+   discipline).
+
+   AND EVERY REFUSAL IS A WORD. A blade that is several panels, one with no
+   room above the floor and one whose outline is not convex each come back
+   with the plan naming which, and a refusal the panel cannot speak is a
+   silence — so the route drives a FRINGE (refused: panels) and a LOBED blade
+   (refused: outline) and requires the line to say so, and the two INERT
+   states (the guard off, with the density at its maximum) where the line must
+   be ABSENT and the density control HIDDEN.
+
+   `(z)` AND NOT A REUSED LETTER, AND THIS BLOCK SHIPPED AS `(y)` FOR AN HOUR:
+   that letter is the SIZE FIELD's, declared one session earlier and sitting
+   forty lines above this one, so "route (y) passed" would have said nothing
+   about which of the two — the exact finding the sphere-stem session paid for
+   and wrote into route (w)'s own entry. Caught by re-reading the header's
+   enumeration against the block rather than by any run: a collided letter
+   fires both routes' clauses and reddens nothing. Adding a route here is
+   THREE edits — the banner, the header entry and `--negative-control`'s flag
+   list — and a fourth, unwritten one: check the letter is free. */
+{
+  const tag = '[infill]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const step = async (label, sets, want) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate(() => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
+      return {
+        F: m.infill,
+        line: /INFILL ([^\n]*)/.exec(txt),
+        notCut: /INFILL NOT CUT — ([^\n]*)/.exec(txt),
+        densHidden: wrap('infillDensity').hidden,
+        densSaid: wrap('infillDensity').querySelector('.bl-val').textContent,
+        guardSaid: wrap('petalInfill').querySelector('.bl-val').textContent,
+      };
+    });
+    const p = [];
+    const F = res.F;
+    if (!!res.line !== !!F) p.push(`the INFILL line is ${res.line ? 'shown' : 'absent'} while the builder reports ${F ? 'a record' : 'no record'}`);
+    if (res.densHidden !== (want.guard === 'NONE')) p.push(`the density control is ${res.densHidden ? 'hidden' : 'shown'} with the guard ${want.guard}`);
+    /* THE LINE'S OWN CLAUSES ONLY RUN WHERE THERE IS A LINE. Under
+       `--negative-control` the read-out is FROZEN, so a record with no line is
+       exactly the state this route exists to catch — and a clause that then
+       reached into `res.line[1]` would THROW and take the whole sweep down
+       instead of reddening, which is the failure this gate's own history
+       records twice (a detail string assuming its own premise). */
+    /* THE BUILDER'S OWN ANSWER IS ASKED WHETHER OR NOT THERE IS A LINE — it is
+       a claim about the GEOMETRY and the row's expectation, with no read-out
+       in it, so freezing the panel must not make it go quiet. */
+    if (F && (F.refused || null) !== (want.refused ?? null)) p.push(`the builder says refused=${F.refused} and the row expects ${want.refused ?? 'nothing'}`);
+    if (F && res.line) {
+      if (want.refused) {
+        if (!res.notCut) p.push(`the read-out does not say NOT CUT while the builder refused with "${F.refused}"`);
+      } else {
+        if (res.notCut) p.push('the read-out says NOT CUT while the builder built a field');
+        /* BOTH PLACES, against the BUILDER's own record — and the LINE has two
+           wordings, one per case, so the clause asks for the RIGHT one rather
+           than for whichever happens to carry the number. Ruling 3's whole
+           point is the case where they differ ("N cells asked -> M built, K
+           holding a hole"); the equal case says "K holes, as asked" and must
+           NOT be reachable while they differ, or a line that lost its arrow
+           would still carry a number and pass. */
+        const equal = F.achieved === F.density;
+        const asAsked = new RegExp(`\\b${F.achieved} holes, as asked`).test(res.line[1]);
+        const differing = new RegExp(`\\b${F.density} cells asked \\u2192 \\d+ built, ${F.achieved} holding a hole`).test(res.line[1]);
+        if (equal ? !asAsked : !differing) p.push(`the INFILL line does not state the achieved count ${F.achieved} against the asked ${F.density} in the ${equal ? '"as asked"' : 'differing'} wording: "${res.line[1].slice(0, 100)}"`);
+        if (equal === differing && !equal) p.push('the INFILL line uses the "as asked" wording while the two counts differ');
+      }
+    }
+    /* THE SECOND TELLING HAS ITS OWN OWNER AND IS ASKED ON ITS OWN. The
+       control's value read-out is `fmt`'s, not the read-out panel's, so it is
+       outside the line's guard: the two places are two claims, and a route
+       that only looked at the density control when the panel also spoke would
+       be reporting on their agreement rather than on either. */
+    if (F && !want.refused) {
+      const askedShown = new RegExp(`\\b${F.density} cells asked`).test(res.densSaid);
+      if (!askedShown) p.push(`the density control does not say "${F.density} cells asked": "${res.densSaid}"`);
+      const differs = F.achieved !== F.density;
+      if (differs !== /BUILT /.test(res.densSaid)) p.push(`the density control ${/BUILT /.test(res.densSaid) ? 'says' : 'does not say'} BUILT while achieved=${F.achieved} and asked=${F.density}`);
+      if (!new RegExp(`\\b${F.achieved} hole`).test(res.densSaid)) p.push(`the density control does not carry the achieved count ${F.achieved}: "${res.densSaid}"`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${F ? (F.refused ? `refused ${F.refused}` : `${F.achieved} of ${F.density} asked, ${F.cells} cells`) : 'no record'}`);
+  };
+  await step('the shipping default — no line, the density hidden', [], { guard: 'NONE' });
+  await step('the guard ON at the ruled default — the line and the achieved count in BOTH places', [{ id: 'petalInfill', value: 'VORONOI' }], { guard: 'VORONOI' });
+  await step('density 40 — the achieved count differs from the asked one and BOTH places say so', [{ id: 'infillDensity', value: '40' }], { guard: 'VORONOI' });
+  await step('a FRINGE — NOT CUT, several panels', [{ id: 'infillDensity', value: '16' }, { id: 'petalTipEnd', value: '1' }, { id: 'fringeCount', value: '4' }], { guard: 'VORONOI', refused: 'panels' });
+  await step('a LOBED blade — NOT CUT, a non-convex outline', [{ id: 'petalTipEnd', value: '0' }, { id: 'fringeCount', value: '0' }, { id: 'lobeDepth', value: '0.6' }, { id: 'lobeCount', value: '5' }], { guard: 'VORONOI', refused: 'outline' });
+  await step('the guard OFF with the density at its MAXIMUM — no line, the density hidden (hidden AND inert)', [{ id: 'lobeDepth', value: '0' }, { id: 'petalInfill', value: 'NONE' }, { id: 'infillDensity', value: '40' }], { guard: 'NONE' });
+}
+
 await browser.close();
 server.close();
 
@@ -3054,11 +3189,16 @@ if (NEGATIVE_CONTROL) {
        field's line stuck absent, and the told flag's numbers stuck at the
        default's while the builder's moved. */
     const sawVariance = fail.some((f) => /^\[variance\] .*SIZE VARIANCE line is (shown|absent)/.test(f));
+    /* ROUTE (z), THE INFILL'S ACHIEVED COUNT, required for the same reason
+       again: the count is told in TWO places with two owners, and the refusals
+       are words rather than numbers, so a line stuck on or off is exactly what
+       its own biconditionals cannot report if the route never runs. */
+    const sawInfill = fail.some((f) => /^\[infill\] .*INFILL line is (shown|absent)/.test(f));
     const sawNeighbour = fail.some((f) => /^\[variance\] .*NEIGHBOURS line says/.test(f));
-    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking
+    if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL EIGHTEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, neighbours line fired: ${sawNeighbour}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL NINETEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

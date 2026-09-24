@@ -1590,14 +1590,22 @@ the five numbers the plan DERIVES, so a mutation of the constants moves both sid
 only the shipped picture can see it. Six mutants, each witnessed on the MUTATED module's own plan,
 plus a row for the guard's other arm without which the squared-terminal mutation is a no-op on
 every row in the file.
-**BLOCK 39 IS ELEVEN ROWS (909 -> 920), THE SMOKE SUBSET FIVE (111 -> 116, 34 -> 35 BLOCKS), AND
+**BLOCK 40 IS ELEVEN ROWS (931 -> 942), THE SMOKE SUBSET FIVE (116 -> 121, 35 -> 36 BLOCKS), AND
 TWO NEW ROWS ARE DECLARED SELF-INTERSECTORS WHOSE FOLDS ARE NOT THE NIB'S** — measured on both
 trees: `APEX NIB: MIXED — 6 layers x layerSize min` reads **10232 / 0.2421 mm identically** on a
 worktree of the base commit at an identical 146,400 triangles (and `layerCount 6` alone reads 0,
 `layerSize 0.35` alone reads 0 — a COMPOSITION the matrix cannot see by construction), and
 `APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 6616 / 0.7742 here**,
-so the nib moves an existing fold's magnitude by +272 pairs and +0.064 mm. `frozen/phase38` is the
-**909 rows at `2464d50`**, registered in BOTH maps and proved deep-equal.
+so the nib moves an existing fold's magnitude. `frozen/phase39` is the **931 rows at `8bb8685`**,
+registered in BOTH maps and proved deep-equal — 39 and not 38 because `frozen/phase38` is the
+VORONOI INFILL's, registered on `main` by #284 four hours before this branch merged `main` in, and
+the FROZEN_MATRICES census is what would have caught the collision at module load, by name. **THE
+BLOCK NUMBER AND THE PHASE NUMBER BOTH MOVED FOR THE SAME REASON AND NEITHER WAS A FREE RENAME:**
+two sessions in flight at once each wrote "block 39" and "phase38", and what says so is a merge
+conflict rather than a gate — GitHub could not build the merge ref, so it ran NO workflow at all
+on the pushed head and only Netlify's three checks appeared. **A PR WHOSE ACTIONS RUNS SIMPLY DO
+NOT EXIST IS A CONFLICTED PR UNTIL PROVED OTHERWISE** (`mergeable_state: "dirty"`); an absent run
+reads nothing like a failing one and `get_check_runs` will happily report the PR green.
 **THE BYTE PARTITION IS 877 MOVED / 32 HELD OF 909 COMPARABLE ROWS, PASS** —
 `verify-bloom-seam-bytes --change nib --matrix live --added 11 --control --control-mode`, both
 modes, **1,145,824,416 floats positionally under `Object.is`**, the MOVER SET exactly as the
@@ -1671,6 +1679,32 @@ geometry would never build measures nothing.**
 holders**, positionally under `Object.is`, over the whole 920-row matrix in both modes —
 **1,180,591,740 export floats over 131,176,860 triangles and 79,185,320 captured-grid values.**
 **The coupon plan gains a 0.40 mm tip.**
+**AND THE NIB COMPOSED WITH THE VORONOI INFILL FOLDS EIGHT ROWS NEITHER FEATURE FOLDS ALONE —
+IN THE ROOT BLEND, THIRTEEN MICRONS FROM THE NIB'S OWN REGION** (§12 of the outcome doc; the two
+PRs were in flight against one base and #284 merged first). Measured three ways: main's geometry
+through THIS tree's census reads 0 on all eight, the same control sets with the infill guard OFF
+read 0, and only the two together fold — including `INFILL: the ruled defaults`, the feature's own
+shipping state, at **4 pairs / span 0.0000**. `bloom-census-attribute.mjs` puts EVERY pair at
+**u < 0.30** while the nib begins at drawn u 0.9889. **THE MECHANISM IS `toLaw`:** `petalLength` is
+the ASKED length, the blade is drawn to wherever the cap closes, and `widthProfile` reparameterises
+the WHOLE outline — the root blend included — so the BASAL outline moves **0.0135 mm at u 0.1607**
+(against 0.7500 mm at u 1.0000, which is the nib). That is enough because the basal rows are the
+HELD uniform ones and the outline turns fastest there, so the infill's facets are already nearly
+tangent — #284's own declared CONFORMANCE LIMIT, reached by a second route. Four of the eight read
+span EXACTLY 0.0000 (tangencies). **The infill's TRIANGLE COUNTS move with the nib on every
+infilled row** (the shipping infilled default 53,536 -> 52,320) because the cells are planned
+against the outline, while the PLAN is unmoved (`cells`, `achieved`, `solid`, `mSplit` identical;
+`floorU` moves in the sixth decimal). **A FEATURE-BY-FEATURE COMPOSITION IS AS INVISIBLE TO THE
+MATRIX AS A CONTROL-BY-CONTROL ONE** — `buildMatrix()` varies one control at a time AND one feature
+at a time, so the only thing that can see this is a merge.
+**AND GITHUB RAN NO WORKFLOW AT ALL ON THE CONFLICTED HEAD, WHICH IS HOW IT WAS FOUND.** The push
+succeeded, Netlify's three checks went green nine seconds later, `get_check_runs` reported the PR
+three-for-three, and `actions_list` showed the newest runs still on the PREVIOUS head hours old.
+The field that says why is `pull_request_read`'s **`mergeable_state: "dirty"`**: GitHub could not
+build `refs/pull/N/merge`, so every `pull_request` workflow was SKIPPED, while Netlify builds the
+HEAD ref and ran. **AN ABSENT RUN LOOKS NOTHING LIKE A FAILING ONE** — no red, no log, no job to
+read — so a PR whose Actions runs simply do not exist is a CONFLICTED PR until proved otherwise.
+This is the converse of the orphaned-run case recorded above, and it costs a whole CI cycle.
 **AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
 ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row
 whose blade clears the print floor. 74 read WORSE, 65 better, 17 moved their span alone, 76 did
@@ -3465,11 +3499,15 @@ budget, a 1.67× multiplier rather than 2.22×. The CI projection moves with it:
 lands near **293 min against the 360-minute job limit** rather than the withdrawn ~340-345.
 **Both figures are kept in the doc so the correction is legible, and the projection is a two-point
 extrapolation whose own connectedness fit returns an implausible 3.3 min of per-row overhead —
-size a real wait off `actions_list`, never off that table.** **THERE IS STILL NO INFILL IN
+size a real wait off `actions_list`, never off that table.** ~~**THERE IS STILL NO INFILL IN
 THE GENERATOR**: `bloom-geometry.js`, `bloom-registry.js`, `bloom.js` and `bloom.html` hold 0
 occurrences of the word, no control and no matrix row — it is `tools/bloom-voronoi-proto.mjs`, and
-petal infill is on the charter's standing board. A session briefed to "ship the boundary" is
-briefed one stage early, and this is where that is written down so it is not re-derived.
+petal infill is on the charter's standing board.~~ **SUPERSEDED BY S3 — THE INFILL IS IN THE
+GENERATOR NOW, behind `petalInfill`; see the block below.** The sentence is kept struck through
+rather than deleted because a reader arriving at this paragraph for the port plan's numbers would
+otherwise meet a claim that has stopped being true, which is this file's own root-blend lesson.
+A session briefed to "ship the boundary" was
+briefed one stage early, and this is where that was written down so it was not re-derived.
 **THE BOUNDARY WAS `export const U0 = G.ROOT_BLEND_END` — A DERIVED VALUE ALIASED ONTO A CONSTANT
 THAT BELONGS TO SOMETHING ELSE.** `ROOT_BLEND_END` is a station on the OUTLINE with seven other
 readers (the root blend's own decay, the lobes' `laminaStart`, A5, `bloom-sagitta.mjs`'s base
@@ -3564,6 +3602,146 @@ tools/bloom-infill-lamina-floor.mjs` (`--control` required — four clauses, eve
 and K2c's subject NAMED as a set because on a monotone petal no row is distinguishable by it); the
 sheet is `node tools/shot-bloom-lamina-floor.mjs <dir>`, **with F as the reference cell and one row
 PAST the floor on it** so the floor reads as a reason rather than a rule.
+
+**S1 OF THE PORT IS DONE: THE EMITTER CONFORMS TO THE SURFACE, AND THE BASELINE TURNED UP A
+SECOND DEFECT THE BRIEF DID NOT NAME** (read `docs/bloom-infill-conforming-emitter.md` before
+touching `cutThrough`, `annulusSectors`, `earClip`, the refiner or the C family; the picture is
+`docs/img/infill-conforming-emitter.png`). `cutThrough` fanned a solid cell FLAT, and a flat
+facet across a surface that WRAPS is a chord: on `petalRoll` 330 the worst emitted facet stood
+**2.4990 mm** from the mid-surface it claims to draw, and **6.8717** on ALL FORM MAX, against the
+SHIPPED LATTICE's own 0.5730 and 0.6348 on the same states. It now reads **0.4317 and 0.4813**.
+**THE SECOND DEFECT IS THAT THE MERGE-WALK COVERED ITS OWN HOLE** — its `advA` arm spans two
+consecutive OUTER vertices, so on a wide angular sector the triangle reaches across the hole's
+tip: on the FLAT default, where no chord error is possible at all, the cells alone read **822
+within-shell pairs against the plain lamina's 0**. Both are one sentence (a facet drawn over a
+hole is a facet that should not exist) and both are fixed.
+**THE TOLERANCE IS THE SHIPPED LATTICE'S OWN CHORD ERROR ON THE SAME STATE**, so "conforming"
+means the cells follow the surface at least as closely as the mesh that already ships — a bar in
+millimetres with an owner the infill does not write, not a fraction of the sheet (`t/2` is
+0.600 mm on the default against the lattice's 0.1416). **The edge tolerance is 3/4 of it and the
+3/4 IS DERIVED**: for a locally quadratic surface the affine interpolant's interior maximum is
+`q/3` against an edge midpoint's `q/4`, so a facet exceeds its worst edge by at most 4/3;
+measured, the worst amplification over the sweep is 1.13.
+**CRACK-FREENESS IS A CONSTRUCTION AND THE GATE FOUND TWO HOLES IN IT.** The points on a plan
+edge are `splitPoints(A, B)`, a pure function of the unordered pair, so two cells sharing a wall
+edge agree whatever else they do; the floor is an EDGE LENGTH and not a recursion depth, because
+a depth is a property of the walk. What went wrong: splitting the WORST-deviating edge can pick
+a SHORT one for ever, so a sliver recursed without bound and the escape hatch emitted a triangle
+with an edge its neighbour had split (**6 unmatched edges on `buckle 0.6 f3`, 20 on
+`cup 1.2 x cupGradient 1`**) — fixed by splitting the LONGEST wanting edge, which halves the
+diameter; and a triangle with a repeated vertex cycled, so it is dropped. **THE DEPTH CAP IS
+LOUD NOW** — counted, reported and gated — because a cap that fires silently is how this one hid.
+**A CENTROID FAN IS WRONG AT THE BLADE'S WAIST AND ONLY THE PARTITION CHECK SAID SO**: the
+outline `{|y| <= h(x)}` is convex only where `h` is concave and `h` rises then falls about the
+waist, so a cell there is not star-shaped and the fan drew up to **4.16 mm2 MORE than the
+material**. Ear clipping is the one triangulator for both arms. Below the floor the field's own
+`cellsFor` (Sutherland-Hodgman on a non-convex subject) can hand over a polygon that is not
+simple; the emitter counts it, falls back to the legacy tessellation and says so, and **0 of
+those rows regress against the legacy**.
+**THE BRIEF'S ABSOLUTE SELF-APPROACH BAR IS NOT AVAILABLE AND THE REASON IS A MEASUREMENT: THE
+SHIPPED PETAL ITSELF FOLDS AT `petalRoll` 330.** The PLAIN lamina over the cell region's own rows
+reads **2,347 pairs / 1.3837 mm** with no infill in it, and a self-approach of 0.00000 mm. So C2
+is a two-sided build against the plain sheet, and **the worst span is REPORTED, never bounded** —
+a span is a property of the tessellation, so roll 330 going 1.3837 -> 6.0344 while its facet
+deviation goes 2.4990 -> 0.4317 is the mesh drawing the tube instead of a shortcut across it.
+**COST: the shipping default petal 2,392 -> 2,744 (+14.7 %) and the whole bloom 19,496 -> 22,124
+(+13.5 %)**, under the +25 % the brief asks to be flagged; curved states pay more (curl 360
++78.6 %, cup x curl +90.1 %) and that is what conforming costs.
+**AND THE THREE COMPANION TOOLS MOVE THE TRIANGLE COUNT AND NOTHING ELSE** — `bloom-basal-grading`,
+`bloom-infill-base-panel` and `bloom-infill-lamina-floor` are IDENTICAL at `--quick` against a
+worktree of the base commit with the count columns masked, because every figure they publish is a
+property of the PLAN. **`bloom-basal-grading --inert <base>` is the one invocation that cannot be
+run across this commit** (it would be comparing two emitters); its header says so.
+**S2 GETS A MEASURED ANSWER TO THE QUESTION IT ASKED: SUBDIVISION MOVES THE WALL COMPRESSION
+NEITHER WAY.** §1b's plan wall and the EMITTED rim-to-rim wall are identical to four decimals on
+both emitters at every state — `cup 1.2 x curl 360` reads 0.1074 plan / **0.2231 emitted on
+both** — because the rim's vertices are `pt()` of the hole's own plan points and the subdivision
+inserts points ON the same curve. Ruling 2 stands and S2 still has to fix it. Beside it: the
+emitted wall on ALL FORM MAX is **0.0191 mm**, an order of magnitude tighter than the plan
+measure, because the plan measure reads a hole against its OWN cell's outline and the emitted one
+reads two holes' rims against each other.
+**NO MUTATION NAMES C2a AND THAT IS RECORDED AS A GAP RATHER THAN CLOSED BY WIDENING A LIST** —
+`the-flat-fan-is-restored` was written claiming it and the control reported MISSED, because the
+self-approach measure's subject is parts of the sheet more than a printable feature apart IN
+PLAN and the fan's damage is elsewhere. What vouches for that measure is C0, which reads a
+written-down 0.30 mm and refuses a pair 0.2 mm apart in plan, and which ABORTS rather than
+reporting.
+
+**AND S2 IS DONE: EVERY LENGTH THE PLAN USES IS A SURFACE LENGTH, AND "THE ARC-LENGTH PLAN" IS
+NOT WHAT IT TURNED OUT TO BE** (read `docs/bloom-infill-metric-plan.md` before touching
+`planMetricField`, `kappaAt`, `surfaceOffsetPlanMm`, `planIsFlat` or the M family). §1b's
+defect — the flat plan emitting a wall a QUARTER of what it asks for on `petalCup` 1.2 x
+`petalSpineCurl` 360 — is fixed, and the ACCEPTANCE is §1b's table re-run in §1b's own measure:
+**0.1108 -> 0.5050** there, **0.1879 -> 0.5037** on ALL FORM MAX and **0.3501 -> 0.5025** on cup
+x curl 180, against its nominal 0.5; in the session's own IN-SHEET wall (the material bridge
+between two holes, nominal 1.0) **0.3050 -> 1.0119, 0.7043 -> 1.0002, 0.8036 -> 1.0124**. **The
+ruled wall HOLDS on all thirteen states, not merely improves.**
+**AND THE ACCEPTANCE MEASURE WAS OPTIMISTIC BY TEN TIMES THE TIGHTEST STATE'S HEADROOM, FOUND BY
+RE-READING THE CLAUSE AGAINST ITS OWN SAMPLING RATHER THAN BY A FAILURE.** A minimum taken over
+rim points 0.15 mm apart reads HIGH — the true minimiser sits between two samples and the
+distance function is locally quadratic about it, so the bias goes as the step SQUARED: measured,
+**up to 1.57e-3 mm, against ALL FORM MAX's 1.6e-4 mm of headroom**. The clause was green and
+worth less than it looked. `wallSurfaceMm` RE-WALKS the winning pair now, in a window of three
+coarse steps (derived: the sampled minimiser is within ONE coarse step of the true one or a
+nearer sample would have won) at 16x the resolution, so the residual falls by its square to
+**6e-6 mm**; both readings are returned and M2b prints the movement. Checked against an
+independent 64x local walk on that state: coarse 1.0017219, that walk 1.0001565, the shipped
+refinement 1.0002. **A SAMPLED MINIMUM IS A BIASED ESTIMATOR AND THE BIAS POINTS THE UNSAFE WAY
+— ASK ITS SIZE AGAINST THE MARGIN THE CLAUSE HAS, NOT AGAINST THE QUANTITY.**
+**IT IS A LOCAL METRIC AND NOT A REPARAMETERISATION, AND THAT IS A MEASUREMENT RATHER THAN A
+PREFERENCE.** The midrib is ALREADY arc-length — `|dP/dx|` reads **EXACTLY 1.0000 at v = 0 on
+every state** — so an arc-length plan would fix the one thing that was right. The cup lifts the
+sheet toward the curl's own centre of curvature (R = L/(2 pi turns) = **5.5704 mm** at curl 360
+on the shipping blade, with cup 1.2 carrying the margin past 5 mm of it), and the compression
+varies ACROSS the width at ONE station — **0.55 at one margin and 1.45 at the other** — so no
+`(x, y) -> (u, v)` of any kind makes the map an isometry. Gauss's theorema egregium, arriving as
+a print-safety bug. **§1a is not contradicted, it is narrower than it reads**: it measured the
+stretch ACROSS the width, and the compression is ALONG THE SPINE.
+**THE MEASURE IS `kappa(t) = sqrt(det M) / sqrt(t^T M t)` AND IT IS NOT `|J n|`** — the
+difference is the shear, which reaches cos **0.87** on that state, and `|J n|` reads the wall
+HIGH and under-insets. It is a mutant AND a written-down M0 fixture: on the sheared plane
+`P = (x + y, y, 0)` the shipped formula reads 1.000 and `|J n|` reads 1.41421, a wall 29 % thin
+silently. The plan offset is MARCHED (`integral kappa dtau = want`) and not divided, because on
+the compressed states it runs to several millimetres and kappa changes by a factor of ten over
+it; **its step and its edge-sample spacing are the LATTICE'S OWN, HALVED**, which is not
+bookkeeping — the first cut sampled six FIXED points along each edge, the tip face's six landed
+at v = {-1, -0.6, -0.2, 0.2, 0.6, 1} and MISSED v = 0 where the metric is exactly the identity
+by construction, and the wall came out **0.9955 where it asked for 1.0000**.
+**THE FLAT GUARD IS THE SHIPPING DEFAULT'S WHOLE BYTE STORY**: `planIsFlat` is
+`surface.form === null && surface.kC === 0` — two statements, both the geometry's — and where it
+holds the field is not built and the metric plan is the flat plan's OWN DOUBLES. **Cost on the
+shipping default is 2,744 tris and 22,124 for the bloom, S1's figures to the integer, +0.0 %.**
+The guard is MEASURED not trusted: the lattice residual reads **5.56e-14 against a predicted
+5.2e-14 and a derived bar of 4.16e-13**, while the nearest reading from a state it REFUSES
+(`petalSpineCurl` 5, the smallest the slider reaches) is **3.87e-8** — ninety-three thousand
+times apart. Without it the flat default moves 13,224 floats by 3.64e-14 mm and `petalWidth 8`'s
+hole count goes 10 -> 12 on that perturbation, which is the knife-edge class again.
+**THE PARTITION IS 9 MOVERS / 4 HOLDERS, predeclared from the guard predicate and 0 states
+disagreeing**, with `{ metricPlan: false }` **bit-identical to the base over 6,317,568 floats**.
+**THE WALL IS MEASURED IN-SHEET AND NOT IN 3-SPACE, AND THAT IS THE WHOLE SEPARATION §1b NAMES**
+— a 3-space minimum reads **0.0415 mm on `petalRoll` 330 on a pair 8.7 mm apart ALONG THE
+SHEET**, which is the petal's own declared fold and not a wall; in-sheet that state reads exactly
+1.0000. A fold is S1's C2's subject and stays there.
+**WHAT S2 DID NOT DO, AND IT IS RECORDED RATHER THAN HIDDEN: THE CELL SIZE IS STILL FLAT.** On a
+compressed state a cell is smaller ON THE OBJECT, so `cup 1.2 x curl 360` keeps **10 of 16**
+holes — the fix refusing to cut a hole where a 1.0 mm wall does not fit, which is ruling 3's
+achieved count and is reported on every row. Making the Voronoi itself metric is a look change
+and is S4's, beside the relaxation and anisotropy rulings. **Eva's ruled 1.5 mm hole bar is
+PHOTOGRAPHED, NOT ENFORCED** (`opts.holeBarMm`, a capability hook no control reaches): it
+reproduces §2b exactly at 13 of 16 on the same bimodal distribution, and enforcing it is
+ruling 3's drop-and-recompute, a BUILDER mechanism and S3's.
+**THE SHEET IS `node tools/shot-bloom-infill.mjs <dir> [--quick] [--png <file>]`** — the ruled
+defaults with the achieved count at both bars, a density sweep with it in every caption, the
+metric pair, and the whole bloom. It renders through `bloom-soft-render.mjs`, which is
+deterministic, so **no pixel delta is quoted and none is owed**. **THERE IS NO MACRO AT
+`curl` 360 AND THAT IS A MEASUREMENT**: the petal is a coil passing within 0.0002 mm of ITSELF
+before a cell is cut, so every other turn is inside any slab drawn around the wall — the macro
+is taken at `cup 1.2 x curl 180`, where the flat plan fails by a fifth and the petal can be
+read. `docs/img/infill-metric-plan.png`. **`docs/img/infill-conforming-emitter.png` NO LONGER
+REPRODUCES on this tree and STAYS PUT** (`serration-range.png`'s convention): `petalRoll` 330 is
+a mover, so S1's legacy cell goes 2,392 -> 2,344 tris. The 5x7 bitmap font moved from
+`shot-bloom-conform.mjs` into `bloom-soft-render.mjs` — **measured inert, byte-identical PNGs
+both ways** — and gained `J`, `K` and `Q`, which were missing and showed.
 
 **THE UNIFORM ARC IS SINC-STABLE NOW, AND A CLOSED FORM KEPT VERBATIM FOR BYTE IDENTITY IS A
 LIABILITY THE DAY A NEW PRODUCER REACHES ITS SINGULAR BRANCH** (the arc-stability session —
@@ -4432,6 +4610,135 @@ captured-grid values**, the whole 860-row matrix in both modes, positionally und
 `frozen/phase35` stays the newest baseline and no tag's bytes stop reproducing. Its
 `--control` fires BOTH clauses (export stream and captured grid) on a 1e-9 perturbation,
 which is what stops the second one being a log line.
+
+**THE VORONOI INFILL SHIPS: THE BUILDER, THE GUARD AND THE MATERIAL MASK** (S3 — read
+`docs/bloom-infill-builder.md` before touching `petalInfillPlan`, `emitInfillPanel`,
+`buildPetalInto`'s panel loop, the material mask or the I family; the picture is
+`docs/img/infill-shipped.png`). `petalInfill` (a CHOICE, NONE / VORONOI, default **NONE** — the
+guard) and `infillDensity` (8–40, default **16**, hidden AND inert at the guard) in an **Infill**
+drop-down inside Petal, declared after `roles` and all nine of its children. The wall is
+`MIN_FEATURE_MM`, the hole bar 1.50 mm and the drop cap `INFILL_DROP_PASSES = 2` — none of them a
+control. `buildPetalInto`'s panel loop is a TWO-ARM CHOICE and `trimPanels` is untouched: the basal
+sub-panel goes through `emitPanel` verbatim and the cells are drawn above it.
+**THE GUARD IS A CHOICE AND THAT IS STRUCTURAL, NOT A PREFERENCE**: `SWEEPABLE` filters
+`SLIDERS()`, so a CHOICE is out of the blanket sweep by construction and `ALL MAX` reads **24,688
+triangles, unchanged**, with its declared export refusal untouched; `INFILL_SUBS` keeps the density
+out of block 1. Sepals are pinned off in `sepalBladeState`. **0 BYTES AT THE GUARD**, measured:
+`node tools/verify-bloom-infill-bytes.mjs --base <worktree>` reads 15 HOLDERS x 2 modes over
+21,322,224 export floats and 3,299,136 captured-grid values under `Object.is`, 0 moved, with the
+MASK asserted in a clause of its own because it is a NEW channel the base tree does not have.
+**THE MATERIAL MASK IS THE THIRD BUILD ITEM AND THE TEMPTING FIX WAS NOT TAKEN.** Every captured
+grid row carries `material[]` beside `mid` and `normal`; `measureWall` REFUSES a row without it,
+skips a non-material query point and builds a bottom-skin quad only where all four corners are
+material. Sweeping the full NV columns and capturing the rectangle as before would report a 1.20 mm
+wall AT A HOLE. **AND THE DIRECTION IS THE OPPOSITE OF WHAT THE BRIEF SAID — IT DOES NOT MAKE V5
+GREEN AND IT CANNOT, measured over ten states**: both of `measureWall`'s numbers are MINIMA over
+material points against material quads, so a full rectangle only ADDS points and targets and a
+minimum can only FALL — `wall` reads IDENTICAL on all ten and `self` identical on nine and TIGHTER
+on the tenth (`petalRoll` 330: **0.6586 mm against the truth's 0.6925**, the phantom quads under a
+hole being a nearer surface than any real one). So the mask removes a false POSITIVE, not a false
+pass: what the rectangle costs is V5's SUBJECT (a wall asserted over 188 of 372 stations with no
+sheet) and the `self` figure (an approach to skin that is not there, wrong by 0.0339 mm on a
+shipped row). **The direction that DOES make V5 green is the other one** — a mask calling MATERIAL
+a hole, so `measureWall` SKIPS a wall that is really there, reachable through an untiled cell,
+which is why `plan.cellOpen[ci] = false` is set in the merge-walk's fallback. The brief named a
+real hazard and attached it to the wrong half; both halves are stated where they live now.
+`verify-bloom-grid`'s new **clause 2f** holds the mask in both directions (excludes nothing on a
+plain row, something on an infilled one) on two new rows; `bloom-grid-gltf.js` still records BODY
+thickness, unchanged, and **now carries the mask into the .glb** — one string per row, one
+character per column, indexed as the `u` / `halfWidthMm` / `thicknessMm` arrays beside it, with
+absence REFUSED rather than read as all-material (measured universal: 384 panels / 12,992 rows over
+both modes, 0 missing, 0 ragged). **Clause 10** asks 2f's question of the ARTEFACT, which is a
+different owner — an exporter that dropped or flattened the mask passes 2f on every row — in both
+directions and with a vacuity guard, and its mutant writes all-material.
+**THE LINE-SPLITTING ITSELF IS `/plot`'s AND IS NOT DONE — the one build item this session leaves
+open, §3b of the outcome doc.** On the infilled default **64 of 80 u-lines and 320 of 456 v-lines
+cross a hole** (0 and 0 with the guard off, live and export identical), so the requirement is real.
+Splitting the primitives HERE would be wrong and silent: `/plot` stations a u-line POSITIONALLY
+(point *i* is row *i* of the panel's declared `u` ladder), a split run cannot say where it started,
+and `/plot`'s refusal path fires on a strip the file never PLACED rather than on one placed wrongly
+— so every point past the first hole would mis-station with no red. The primitives are therefore
+untouched (`/plot` is provably unchanged by this PR) and the split is a one-condition extension of
+`plot-export.js`'s OWN existing rule, "a strip is split only where the projection has nothing to
+say". It waits on a session because `tools/verify-plot.mjs` is **not in CI** and its negative
+control is **51 mutants at ~6 minutes each**.
+**FOUR DEFECTS THE GATES FOUND, EACH A CLASS THIS FILE ALREADY NAMES.**
+**(i) THE SEAM WAS A WELDED OVERLAP:** the region started one row BELOW the split while the basal
+panel ran to it, so the two shells overlapped by a lattice strip AND welded (the outline's seam
+vertices are the lattice's own doubles) — **346 within-shell pairs on the shipping default**, the
+leaf's petiole case one solid later. Three cuts to 0: the outline walks back across the split row
+through the LATTICE'S OWN COLUMNS (the clause the terminal face already had, at the other end; 252
+T-junctions without it), a cell vertex on the seam SNAPS to the nearest lattice column (one owner
+per boundary; 108 more), and the REGION starts at the split row so `emitPanel`'s argument is
+untouched — shortening the basal panel instead made it draw a panel one row shorter and produce a
+collinear triangle per petal in code this feature does not own.
+**(ii) THE SPLIT DECISION WAS MODE-DEPENDENT:** `chordDev > tolMm` reads the MODE's own half-width
+and sheet, so the triangle count moved live/export on **13 of 13 states** (the default by 40,
+`petalWidth` 30 by 232, `petalCup` 1.2 by −764). It is the LATTICE'S OWN LONGEST PLAN EDGE now —
+mode-free, and `tolMm` is the CLAIM rather than the decision. Sixth refusal of a mode-dependent
+topology here. It costs +43% on the default petal.
+**(iii) THE PLAN'S DISCRETE ANSWERS DIFFERED BETWEEN ENGINES:** the fillet is an arc, and
+`Math.sin`/`Math.cos`/`Math.atan2` are not correctly rounded — X0 read **39,328 triangles against
+36,064** on `x density 8` and **681,952 against 716,352** at forty petals over three whorls.
+Replacing `Math.hypot` with an exact `sqrt` length and skipping `Math.pow` at gamma 1 is right, is
+kept, and **moved none of those numbers** — which is what pointed at the trigonometry.
+`INFILL_PLAN_GRID = 2^-20` mm quantises the cell polygons, the insets and the holes (the outline
+too, or the pre-registration misses); Node and Chromium now agree to the digit on every declared
+count. SEVENTH instance of a discrete decision on a continuous quantity.
+**AND A GRID DOES NOT REMOVE A KNIFE EDGE, IT MOVES IT AND AMPLIFIES WHAT IS LEFT — EIGHTH
+INSTANCE, WHOSE SUBJECT IS THE SEVENTH'S OWN REMEDY** (§6b of the doc). `Math.round` ties at every
+half step, and the ties here are SYSTEMATIC rather than random: the midpoint of two GRID values is
+an odd multiple of G/2 BY IDENTITY, and a clip, a bisector and the refiner's edge split all make
+one. Measured over all 22 `INFILL:` rows in EXPORT, **923 of 994,532 quantised values sit EXACTLY
+on a tie and 1,670 within one ULP of the scale — 0.168%**, so the whole-matrix gate went red where
+a six-row subset had been silent: X0 DROPPED three rows (`x density 40` 80 floats, `x CONTINUOUS x
+3 turns` 15, `x a SPHERE head with a stem` 15) at |d| **exactly 9.5367e-7 mm = one grid step**, the
+same ABSOLUTE quantum at three magnitudes and 10^7 times X0's own bar. `infillSnap(v, slack)` is
+the one owner now and `INFILL_TIE_ULPS` **is X0's own 8**, transported through an EXACT
+power-of-two scaling onto the scale the coordinate was differenced from — never its own magnitude.
+**It sits in a MEASURED empty band**: distance from a tie reads 0 (923), <1 ULP (1,670 cumulative),
+then **NOTHING from 1 to 100 ULP**, then 16, then the continuum — so after the change **0 values lie
+within 1 ULP of the new boundary and the nearest is 7.600 ULP away**, against the 0.03 ULP
+divergence this file records for X0. Cost, measured against `cdccd6d` over all 22 rows: **8 move,
+14 hold, 0 triangle counts move**, worst 9.6399e-7 mm, and the three REFUSED/GATED rows are
+bit-identical because the quantiser is never called there. **NOT LOCALLY REPRODUCIBLE** — the three
+rows read PASS through this container's own Chromium, so the fix is by CONSTRUCTION and what is
+offered is the population at risk going 1,670 -> 0, never a green local run.
+**(iv) A COLLINEAR TRIANGLE CANNOT BE DROPPED:** it was, and it OPENED THE SHELL — three distinct
+corners mean three real edges, **8 and 48 boundary edges on two rows**. `infillEarClip` retries
+from each starting vertex and `infillFan` from each apex until the triangulation has no flat
+triangle, and flatness is measured IN THE PLAN on float32 because measuring it on the emitted
+corners is mode-dependent all over again (131,692 live against 131,004 export).
+**THE MERGE-WALK DREW SKIN OVER ITS OWN HOLE** — S1's second defect, in the shipping emitter's last
+resort: 182 pairs at density 8, 112 at `petalWidth` 8, worst span 1.1374 mm, on states whose plain
+petal reads 0. Where no arm can tile the annulus **the cell keeps its material** and the plan's own
+`achieved` / `solid` / `cellOpen` are corrected, so the count on screen is the artefact's.
+**NINE OF THE TWENTY-TWO BLOCK-39 ROWS ARE DECLARED AND THIRTEEN READ EXACTLY 0** — the shipping
+defaults, both ends of the density range, both ends of the width range, the thick sheet, the thin
+tip, the sharpest apex, the delicate foot, the sepals and all three guard and refusal rows — so the
+block is not a set of rows that all happen to be declared. **EVERY ENTRY CARRIES ITS PLAIN
+CONTROL**: three are the petal's own declared folds with a finer mesh over them (`roll 330` goes
+15,280 / 1.5539 plain to 34,856 / **1.2263** infilled — the span FALLS, because finer facets follow
+the quill instead of chording across it) and six are the infill's own.
+**O2's PARITY RAY NOW DECLARES ITSELF UNDEFINED** where its own 1e-4 mm start step lands inside
+another sheet of the same shell — `petalCup` 1.2 x `petalSpineCurl` 360 passes within 0.0002 mm of
+itself. Found when the infill's holes removed that row's census pairs and left O2 asserting on a
+geometry it cannot measure: the clause's subject, not its strictness.
+**COST, EXPORT:** the shipping default is **24,688 with the guard off and 53,536 with it on**
+(3.6% of budget, 2.17x); the corner is **`INFILL: x 40 petals x 3 whorls` at 726,752 — 48.5%**,
+this feature's own ALL MAX and the row a future per-petal feature should check first. The port
+plan's ~41,000 projection is SUPERSEDED — it predates the mode-free subdivision the gate forced.
+**WHAT IS NOT DONE, NAMED:** a LOBED blade is REFUSED with a word (`outline`) because a lobe's
+notches make the cells non-convex and the solid carries more handles than holes (genus 9 against 4
+cut) — composing them wants a tessellation that does not assume convexity, S4's; the CELL SIZE is
+still flat, so a compressed state keeps fewer holes; `INFILL_DEGENERATE_AREA_MM2` is a DELIBERATE
+duplication of the harness's bar with its owner named in the source, because the geometry may not
+import from `tools/`; and **no committed mutant names an I clause** — `verify-bloom-infill.mjs`
+carries its own six must-fails and every one fires, recorded as a gap rather than claimed closed.
+`frozen/phase38` is the 909 rows at `55ca84c`, registered in BOTH maps and proved deep-equal.
+**AND `ALL MAX` TIMES OUT `settleBuild`'S 30 s BUDGET ON A SLOW CONTAINER — ON THE BASE TREE TOO**
+(33.6 s at 55ca84c against 34.5 s on the branch), which is why a local `bloom-smoke --conn` run is
+quoted without it and the full matrix in CI is the merge criterion.
 
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in

@@ -151,7 +151,54 @@ const E2_TURN_XFAIL = {
     { excessDeg: 0.000168, note: 'a tooth\'s terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00' },
   'FRINGE: GATED — LOBES asked for under a fringe (hidden AND inert, by ruling — the fringe wins)':
     { excessDeg: 0.000168, note: 'the carnation row again — this row carries the same fringe, and the lobes are inert by ruling' },
+  /* AND IT IS NOT THE INFILL'S, WHICH IS A TWO-SIDED FACT RATHER THAN A
+     READING OF THE LABEL: the plan REFUSES a blade that is several panels, and
+     I2 asserts on that row that the mesh is BIT-IDENTICAL to the same state
+     with the guard off. So this excess is a property of `petalTipEnd` 1 x
+     `fringeCount` 4 — a combination the matrix did not reach before block 39
+     put the two together — and the same class as the carnation's above, one
+     tooth count along. */
+  'INFILL: REFUSED — a FRINGE owns the same region (several panels)':
+    { excessDeg: 0.000231, note: 'a tooth\'s terminal on a FOUR-tooth full terminal; the frame rotates a hair between adjacent columns. raw 45.00 deg, outline 0.00. The infill is REFUSED here and the mesh is bit-identical to the guard-off build (I2), so this is not the infill\'s' },
 };
+
+/* THE BEAD IS NOT DRAWN ON AN INFILLED BLADE, AND THAT IS DECLARED HERE
+   RATHER THAN LEFT FOR E2 TO TRIP OVER.
+
+   `emitInfillPanel` calls `emitPanel` on the BASAL sub-panel alone, so #278's
+   taper and half-round bead run around that panel's own perimeter and nowhere
+   else; above the split the cells close with `emitRim`, which is a FLAT WALL
+   from top skin to bottom skin. Eva's ruling for S3 is that HOLE rims stay
+   flat walls and the bead is S5's, and this emitter extends that to the
+   blade's OUTER margin, which the ruling did not name. So an infilled blade
+   gives back, over the treated region, the 90-degree cliff one sheet thick
+   that #278 exists to remove: a REGRESSION AGAINST IT on every row that cuts
+   a pattern, named here rather than hidden.
+
+   AND E2'S WINDOW IS EMPTY THERE FOR A SECOND REASON, WHICH IS MEASURED
+   RATHER THAN INFERRED: the basal sub-panel's treated apexes all lie inside
+   `RIM_TAPER_MM` of the foot-to-blade seam, so every edge near one is already
+   the RAMP the clause skips by name. Both halves say the same thing — an
+   infilled blade has no treated apex E2 can stand on — and a clause whose
+   subject is EMPTY passes on anything, which is why this is a declaration
+   with a reason and not a pass. `emitRimLoop` is the S5 hook these loops are
+   already kept for; running the bead's profile machinery along the cell
+   region's outer boundary is its work, never a tolerance here.
+
+   READ FROM THE BUILDER'S OWN RECORD, NEVER FROM THE LABEL OR THE CONTROL
+   SET, AND APPLIED PER PART RATHER THAN PER ROW. `petalInfill: 'VORONOI'` is
+   what the row ASKS for; whether a pattern was CUT is that part's own
+   `infill.built`, and the two differ on every REFUSED row — where the mesh is
+   bit-identical to the guard-off build (I2), the bead IS drawn and E2 has a
+   real subject it must keep measuring. A predicate taken from the control set
+   would have carved exactly those rows out; a predicate applied to the whole
+   ROW would have carved out the SEPALS on `INFILL: x sepals 8`, which are
+   pinned uninfilled by ruling 4 and carry 2,192 edges of beaded rim. Both are
+   the same carve-out this project has a rule about, one level apart. So the
+   clause drops the PARTS that cut a pattern and keeps every other one, and
+   what is declared is the case where NOTHING is left — an empty subject,
+   named as such. */
+const cutsAPattern = (part) => !!(part && part.infill && part.infill.built);
 const { DEFAULTS } = await import(pathToFileURL(path.join(HERE, 'bloom-registry.js')).href);
 const H = await import(pathToFileURL(path.join(HERE, 'tools', 'bloom-harness.mjs')).href);
 
@@ -421,9 +468,9 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
         built = G.buildBloomInto(acc, st, { below: null, capability: row.capability || null });
       } catch (e) { check('E0', false, `${row.label} [${exportMode ? 'export' : 'live'}]: build threw — ${e.message}`); continue; }
       const mesh = meshOf(acc.positions);
-      const rim = [];
-      for (const p of (built.petalsAll || [])) if (p && p.rim) rim.push(p.rim);
-      for (const s of (built.sepals && built.sepals.built) || []) if (s && s.rim) rim.push(s.rim);
+      const rim = [], rimE2 = [];
+      for (const p of (built.petalsAll || [])) if (p && p.rim) { rim.push(p.rim); if (!cutsAPattern(p)) rimE2.push(p.rim); }
+      for (const s of (built.sepals && built.sepals.built) || []) if (s && s.rim) { rim.push(s.rim); if (!cutsAPattern(s)) rimE2.push(s.rim); }
       const apexRecs = rim.flatMap((r) => r.apex || []);
       const clampRecs = rim.flatMap((r) => r.clamps || []);
       per[exportMode ? 'export' : 'live'] = { tris: mesh.tris, apexes: apexRecs.length };
@@ -538,16 +585,35 @@ async function runRows(G, rows, fails, notes, fullSet = false) {
       check('E1', wrongClamp === 0, `${row.label} [${exportMode ? 'export' : 'live'}]: ${wrongClamp} declared clamp locations are NOT under the floor — the declaration is excluding rows it has no business excluding`);
 
       /* ---- E2: no hard edge within RIM_NEAR_MM of a treated apex ---- */
+      /* E2'S SUBJECT IS NARROWED PER PART, NEVER PER ROW, and that distinction
+         is the whole of the declaration below. An infilled blade has no
+         treated apex above the split, so a row-level skip would have taken
+         the SEPALS' rims out with it on `INFILL: x sepals 8` — 2,192 edges
+         of real, beaded, uninfilled subject, excluded because something ELSE
+         on the same bloom was perforated. Measured before it was narrowed;
+         the fifth durable rule landing one level down from where it was
+         being applied. */
+      const apexE2 = rimE2.flatMap((r) => r.apex || []);
       const rimVertIds = new Set();
-      for (const r of apexRecs) for (const P of [r.apex, r.top, r.bot]) {
+      for (const r of apexE2) for (const P of [r.apex, r.top, r.bot]) {
         const v = mesh.vertIds.get(key3(P[0], P[1], P[2]));
         if (v !== undefined) rimVertIds.add(v);
       }
       if (exportMode && !FOLDS.has(row.label)) {
-        const turn = worstTurnNearRim(mesh, apexRecs.map((r) => ({ p: r.apex, outlineTurnDeg: r.outlineTurnDeg || 0 })), rim.flatMap((r) => r.flat || []), rim.flatMap((r) => r.corner || []), RIM_NEAR_MM, RIM_CORNER_R * G.RIM_BEAD_RADIUS_MM, G.RIM_TAPER_MM, rimVertIds);
+        const turn = worstTurnNearRim(mesh, apexE2.map((r) => ({ p: r.apex, outlineTurnDeg: r.outlineTurnDeg || 0 })), rim.flatMap((r) => r.flat || []), rim.flatMap((r) => r.corner || []), RIM_NEAR_MM, RIM_CORNER_R * G.RIM_BEAD_RADIUS_MM, G.RIM_TAPER_MM, rimVertIds);
         if (turn.cornerDeg > worstCorner) worstCorner = turn.cornerDeg;
         if (turn.rampDeg > worstRamp) worstRamp = turn.rampDeg;
         if (turn.deg > worstTurn) worstTurn = turn.deg;
+        const notBeaded = apexE2.length === 0;
+        if (notBeaded) {
+          /* THE WHOLE CLAUSE, NOT HALF OF IT. Leaving the magnitude arm
+             running on an empty window asserts `0 < 45` and reads as a pass,
+             which is the vacuity this declaration exists to name. The numbers
+             are REPORTED so the mechanism stays checkable: `edges` is what
+             the window found and `skipped` is what the ramp took. */
+          notes.push(`E2 SKIPPED (empty subject): ${row.label} — every part that carries a rim on this row CUT A PATTERN, so the blade's outer margin above the split is a FLAT WALL and the basal panel's own apexes are inside the seam ramp (${apexRecs.length} treated profile(s) exist and 0 are E2's subject; window ${turn.edges} edge(s), ramp skipped ${turn.skipped}). #278's bead over the cell region is S5's, through emitRimLoop.`);
+          continue;
+        }
         check('E2', turn.edges > 0, `${row.label}: no edge lies within ${RIM_NEAR_MM} mm of a treated apex — the window found nothing to measure`);
         const declared = E2_TURN_XFAIL[row.label];
         if (!declared) {
@@ -616,15 +682,37 @@ const E6_XFAIL = {
 };
 
 const MUTATIONS = [
-  /* EVERY RIM MUTATION BELOW ALSO REDDENS E6, AND THAT IS A PROPERTY OF THE
-     CONTROL SET RATHER THAN A LOOSE CLAUSE. The set gained `SPHERE: 6 turns x
-     layerSize min` so the corner-gate mutant has a row it can fire on; on a
-     petal that cramped, ANY change to the rim surface moves profiles into the
-     band where a triangle survives in doubles and collapses under float32. So
-     E6 is named as collateral on all of them — measured, not assumed, and the
-     honest remedy for an unclaimed red that is real is to name it. The clause
-     still discriminates where it matters: `the-corner-fan-is-not-gated` fires
-     E6 and NOTHING ELSE. */
+  /* E6 IS COLLATERAL ON SOME RIM MUTATIONS AND NOT ALL, AND THE BLANKET THAT
+     USED TO STAND HERE WAS WRONG ON HALF OF THEM. It read *"EVERY rim mutation
+     below also reddens E6, and that is a property of the CONTROL SET rather
+     than a loose clause… on a petal that cramped, ANY change to the rim
+     surface moves profiles into the band where a triangle survives in doubles
+     and collapses under float32"* — a generalisation, asserted once over six
+     mutations rather than measured on each.
+
+     MEASURED, and on BOTH TREES so it is not the infill's: three of the six
+     claim E6 and do not fire it — `the-rim-floor-is-lowered-to-0.4`,
+     `the-bead-apex-is-recomputed` and `every-clamp-is-logged` — identically at
+     `55ca84c` (a worktree of the base, same command, same three, same `MISSED
+     E6`) and on this branch, whose cramped row is byte-identical to main's by
+     the byte partition. So the control was FAILING 3 of 6 on main and the
+     claim is what is wrong, not the clause.
+
+     WHY, per mutation, because "it did not fire" is not a reason.
+     `every-clamp-is-logged` sets a RECORD (`wasClamped = true`) and moves no
+     vertex at all, so a triangle-area census cannot see it under any row —
+     that claim could never have been true. `the-bead-apex-is-recomputed`
+     perturbs the apex by at most an ulp (`C + (apex − C)` is the identity in
+     reals and not in floats), which E4 sees as an exact-key miss and which
+     does not cross E6's float32 bar on this row. `the-rim-floor-is-lowered-to-
+     0.4` genuinely redraws the bead — E1 and E2 fire on it — and leaves the
+     cramped row's two declared entries at 2 live / 0 export.
+
+     THE CLAIMS ARE NARROWED, WHICH IS STRICTLY STRONGER. A clause a mutation
+     does not name going red is still a failure here, so the day one of these
+     three starts moving E6 the control says so by name instead of absorbing
+     it. E6 still discriminates where it matters: `the-corner-fan-is-not-gated`
+     fires E6 and NOTHING ELSE, and two of the six fire it as real collateral. */
   /* RESTORING THE WALL REDDENS THREE CLAUSES AND ALL THREE ARE TRUE OF IT,
      which is a statement about the geometry rather than a loosened claim. The
      skin is INSET by the bead's own radius, so a profile collapsed onto the
@@ -641,7 +729,7 @@ const MUTATIONS = [
      loosening: a smaller bead radius is a different surface, so the buckle
      row's declared excess moves 6.236137 -> 6.526126 deg. Named as collateral,
      because the honest remedy for an unclaimed red that is real is to name it. */
-  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2', 'E6'],
+  { id: 'the-rim-floor-is-lowered-to-0.4', breaks: ['E1', 'E2'],
     from: 'export const RIM_FLOOR_MM = 1.0;',
     to:   'export const RIM_FLOOR_MM = 1.0; const RIM_FLOOR_APPLIED = 0.4;' },
   /* THE CORNER GATE REMOVED — and the clause it reddens is E3, which ALREADY
@@ -656,10 +744,10 @@ const MUTATIONS = [
   { id: 'the-corner-fan-is-not-gated', breaks: ['E6'],
     from: '      if (seg < RIM_CORNER_MIN_MM) { if (rim) rim.pivotsSkipped++; continue; }',
     to:   '      if (seg < 0) { if (rim) rim.pivotsSkipped++; continue; }' },
-  { id: 'the-bead-apex-is-recomputed', breaks: ['E4', 'E6'],
+  { id: 'the-bead-apex-is-recomputed', breaks: ['E4'],
     from: '    pts[APEX] = apex;',
     to:   '    pts[APEX] = [C[0] + (apex[0] - C[0]), C[1] + (apex[1] - C[1]), C[2] + (apex[2] - C[2])];' },
-  { id: 'every-clamp-is-logged', breaks: ['E1', 'E6'],
+  { id: 'every-clamp-is-logged', breaks: ['E1'],
     from: '      const wasClamped = 2 * b < RIM_FLOOR_MM - 1e-9 && 2 * b < tBody - 1e-9;',
     to:   '      const wasClamped = true;' },
   /* E5'S MUTANT, REPLACED BECAUSE THE RULED SEGMENT COUNT MADE THE OLD ONE

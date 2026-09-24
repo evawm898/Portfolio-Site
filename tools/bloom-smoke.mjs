@@ -853,7 +853,36 @@ export const SMOKE_BLOCKS = [
     ],
   },
   {
-    n: 39, title: "the apex nib — the law's own tangent and a rounded point",
+    n: 39, title: 'the Voronoi infill — the builder, the guard and the material mask',
+    anchor: 'INFILL: the ruled defaults (16 cells, a 1.00 mm wall, a 1.50 mm hole bar)',
+    /* FIVE ROWS, ON THE AXES THE FEATURE HAS, AND THE LESSON THE LEAF SESSION
+       PAID FOR IS WHY THE LAST TWO ARE HERE. A subset earns its keep by
+       covering the axes a feature has — INCLUDING the axis that is another
+       family's region. The anchor is the ruled default, where the whole
+       construction runs on a state anyone would build; the GATED row is the
+       guard's other arm, and hidden-and-not-inert is invisible to every STL
+       property; the METRIC corner is the one state where a flat plan emits a
+       quarter of the wall it asks for, and it is also where six of sixteen
+       cells correctly LOSE their holes, so the achieved count is exercised
+       rather than assumed; the SPHERE WITH A STEM is the cross-family axis
+       (ST7/ST8/ST9 reason about a channel through a blade that now has holes
+       in it, and J1-J9 about a foot whose panel is a sub-panel); and the
+       FRINGE is the REFUSAL, which is a branch no number can show. */
+    rows: [
+      { label: "INFILL: the ruled defaults (16 cells, a 1.00 mm wall, a 1.50 mm hole bar)",
+        path: "the shipping state of the feature — the two-arm panel loop with `emitPanel` on the basal sub-panel and the cells above it, the material mask on every captured row (which `measureWall` and through it the whole combination gate read), and the watertight and connectedness invariants on a blade with fourteen holes in it" },
+      { label: "INFILL: GATED — the density at its MAXIMUM with the guard OFF (hidden AND inert)",
+        path: "the GUARD's other arm — the density at 40 with `petalInfill` NONE must build the SHIPPING DEFAULT bit for bit, which is the whole of ruling 1 and is the only thing that can see a hidden control that still cuts a hole" },
+      { label: "INFILL: x cup 1.2 x spine curl 360 (S2's metric corner — the wall a flat plan quartered)",
+        path: "the METRIC corner — the one reachable state where a flat plan emits 0.118 mm of material where it asked for 0.500, and where the achieved count is 10 of 16 rather than 16, so ruling 2 and ruling 3 are both exercised on one row" },
+      { label: "INFILL: x a SPHERE head with a stem",
+        path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build and the exported file's own clearance) on petals that are now perforated, beside S1-S4 and the junction families on a foot whose panel is a SUB-panel of the blade's" },
+      { label: "INFILL: REFUSED — a FRINGE owns the same region (several panels)",
+        path: "the REFUSAL — a blade that is several panels takes today's path entirely, and the mesh must be bit-identical to the same state with the guard off; a branch is not something a triangle count can show" },
+    ],
+  },
+  {
+    n: 40, title: "the apex nib — the law's own tangent and a rounded point",
     anchor: 'APEX NIB: tip shape 0.60 x 60 mm (the shallowest flank on the longest blade \u2014 8.59 mm of law given up)',
     /* FIVE ROWS, ON THE AXES THE NIB HAS — and one of them is here because a
        subset earns its keep by covering the axes a feature has, which is the
