@@ -3599,6 +3599,17 @@ export const CAP_ENTRY_FACTOR = 2;
    lobes, and never by a second placer. =================================================================== */
 export const APEX_HALF_MM = 0.2;
 export const APEX_END_HALF_MM = 0.05;
+/* THE FOLD CLAMP'S MARGIN — how much room the mid-surface's own radius of
+   curvature must keep above the sheet's half-thickness. A sheet is the
+   mid-surface offset by +/- t/2, and an offset surface INVERTS wherever the
+   offset exceeds the radius, so `R >= t/2` is the analytic threshold and a
+   margin of exactly 1 would leave the inner skin AT a cusp: at
+   `R = margin * t/2` the inner skin's own radius is `(margin - 1) * t/2`, so
+   it keeps `1 - 1/margin` of the mid-surface's spacing. At 1.25 that is a
+   fifth, which is a surface rather than a crease; the value is Eva's to rule
+   and the cost of each candidate is measured in the outcome doc. IT IS A
+   RATIO, not a length: the length it bounds is `t`, which it reads. */
+export const FOLD_CLAMP_MARGIN = 1.25;
 export const APEX_ARC_ROWS = 6;
 /* The one-sided difference the flank's tangent is read with, and the slope
    under which there is no tangent to carry on. Both are about the DERIVATIVE's
@@ -6885,6 +6896,11 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      constant per-row normal is a wedge of varying thickness, not a sheet;
      the unit normal here is dP/dv rotated a quarter turn in the same
      plane, which keeps the offset a true constant-thickness shell. */
+  /* WHERE THE FOLD CLAMP BOUND, if it did — the WORST station (the smallest
+     radius asked for), its own u, and how many rows it touched. Written by
+     sectAt, read by buildPetalInto, printed by the read-out. A clamp nobody
+     is told about is a control that silently means something else. */
+  const cupClamp = { u: null, askedRadiusMm: Infinity, drawnRadiusMm: Infinity, rows: 0 };
   const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1) => {
     const r = ramp(u);
     const k = kAt(u, r);
@@ -6896,7 +6912,30 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
        shipped expression term for term (x * 1 is exact in IEEE-754).
        Its owner is `rowAt`, which is where the profile lives; see the
        derivation there. */
-    const c = cAt(u, r) * cupScale;
+    /* THE FOLD CLAMP (Eva's ruling, the apex-nib session) — an OUTPUT clamp
+       in the charter's floors doctrine, not a change of law. The cup lift is
+       `c*a^2/hb`, so the section leaves the midrib with curvature `2c/hb`,
+       and that is the section's MAXIMUM (the parabola's curvature falls
+       monotonically with |a|), so bounding it here bounds the whole section.
+       Requiring `R = hb/(2|c|) >= FOLD_CLAMP_MARGIN * t/2` is one inequality
+       in the coefficient: `|c| <= hb / (margin * t)`.
+
+       IT IS A BRANCH, NOT AN ARITHMETIC MIN, and that is what makes the
+       untouched case bit-identical rather than merely equal: where the cap
+       does not bind the expression evaluates to `cRaw` ITSELF, the same
+       double, with no multiplication to round. Where it binds the curvature
+       is exactly `2/(margin*t)` whatever `hb` is — the radius is pinned at
+       `margin * t/2` and the clamp is TOLD, never silent. */
+    const cRaw = cAt(u, r) * cupScale;
+    const cCap = hb / (FOLD_CLAMP_MARGIN * t);
+    const c = Math.abs(cRaw) <= cCap ? cRaw : (cRaw < 0 ? -cCap : cCap);
+    if (c !== cRaw) {
+      const askedR = hb / (2 * Math.abs(cRaw)), drawnR = hb / (2 * Math.abs(c));
+      if (cupClamp.u === null || askedR < cupClamp.askedRadiusMm) {
+        cupClamp.u = u; cupClamp.askedRadiusMm = askedR; cupClamp.drawnRadiusMm = drawnR;
+      }
+      cupClamp.rows++;
+    }
     /* THE CUT LEAVES THE SURFACE ALONE (session 38). `h` is where the boundary
        is; `hb` is the BASE outline's half-width, the scale every law below
        reads. Where the two are the same double (every plain petal — the
@@ -6951,6 +6990,7 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
 
   return {
     curlRad, twistRad, kappa, frameAt, sectAt, curlUniform, buckle,
+    cupClamp,
     /* WHAT THE EXPORT CANNOT SHOW. Watertightness and connectedness are
        measured on the STL; these are the properties a pure-displacement
        change can break while leaving both of those green, so they are read
@@ -7014,6 +7054,13 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
       return {
         cup, curlDeg: state.petalSpineCurl, rollDeg: state.petalRoll, twistDeg: state.petalTwist,
         polylineMin: pMin, polylineMax: pMax,
+        /* THE FOLD CLAMP'S OWN REPORT — `null` where it never bound, so a
+           row that was not clamped reads as ABSENT rather than as a passing
+           zero, the same discipline the buckle's fields already follow. */
+        cupClamp: cupClamp.u === null ? null : {
+          u: cupClamp.u, rows: cupClamp.rows,
+          askedRadiusMm: cupClamp.askedRadiusMm, drawnRadiusMm: cupClamp.drawnRadiusMm,
+        },
         rollRadiusMm: kappa === 0 ? Infinity : 1 / Math.abs(kappa),
         rollClamped: clamped,
         /* MARGIN BUCKLING's numbers travel with the form telemetry for the

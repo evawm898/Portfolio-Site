@@ -938,6 +938,27 @@ function seamLine(petals) {
        + ` — nearer and the sheet's own top skin would fold back into the foot\n`;
 }
 
+/* THE FOLD CLAMP, TOLD (Eva's ruling, the apex-nib session: "Do not scale the
+   cup down silently"). The cup's section leaves the midrib with radius
+   `hb/(2c)`, and a sheet is that surface offset by +/- t/2, so a radius under
+   the half-thickness has no offset surface at all. The clamp pins the radius
+   at `FOLD_CLAMP_MARGIN * t/2` where it would have gone under; this names the
+   WORST station it bound on, in the (CLAMPED) discipline the roll floor, the
+   spine curl and the apex floor already use. Absent where it never bound — a
+   line that cannot fire reads as absent, never as a passing zero. Reads EVERY
+   built petal AND every built sepal, because a sepal is the petal builder on
+   a second ring and meets the floor sooner for being scaled down. */
+function cupClampLine(petals, sepals) {
+  const parts = [...(petals || []), ...(sepals || [])].filter(Boolean);
+  const cs = parts.map((p) => p && p.form && p.form.cupClamp).filter(Boolean);
+  if (!cs.length) return '';
+  const worst = cs.reduce((a, c) => (c.askedRadiusMm < a.askedRadiusMm ? c : a), cs[0]);
+  const rows = cs.reduce((a, c) => a + c.rows, 0);
+  return `CUP CLAMPED at u ${worst.u.toFixed(4)}, asked radius ${worst.askedRadiusMm.toFixed(3)} mm, drawn ${worst.drawnRadiusMm.toFixed(3)} mm`
+       + ` — the section's radius may not fall under ${worst.drawnRadiusMm.toFixed(3)} mm (the sheet has no offset surface below it);`
+       + ` ${rows} row${rows === 1 ? '' : 's'} on ${cs.length} of ${parts.length} part${parts.length === 1 ? '' : 's'}\n`;
+}
+
 function spineLine(petals) {
   const sps = (petals || []).map((p) => p && p.spine).filter((sp) => sp && sp.curlRad !== 0);
   if (!sps.length) return '';
@@ -1653,6 +1674,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + sphereLine(rings, fr, mode)
        + seamLine(petals)
        + spineLine(petals)
+       + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
        + apexLine(petals)
        + edgeProfileLine(petals)
