@@ -184,6 +184,83 @@ its frequency ceiling` is the matrix row that carries it.
 **AN3 REPORTS THE COUNT AND DOES NOT ASSERT IT**, for that reason; the
 read-out's APEX NIB line prints it per build.
 
+### AND "SPARE CAPACITY" COULD NOT BE MEASURED WHERE IT WAS BEING MEASURED — CI caught it, A8, on two rows
+
+The clamp above is the right idea against the wrong floor. `ladderDemand()`
+subtracted the LOBES' resolution floor from `ladderWindowCapacity`; the gap
+bound asks each BAND of the blend target for `width / cap` rows of its own,
+and that floor was not in the arithmetic. Nothing local can see the
+difference, because the two floors agree on almost every lobed row.
+
+**`bloom-connectedness` FAILED on `0606ace` with 0 rows not one piece** — the
+flood fill was clean on all 918 rows that reached the results, and #220's row
+census named the two that were DROPPED by a validity assertion:
+
+| row | widest gap | bound |
+|---|---|---|
+| `LOBES: x petalTipShape 0.60` | **1.5829 ×** uniform | 1.4000 |
+| `LOBES: x petalTipShape 3.00` | **1.4159 ×** | 1.4000 |
+
+Reproduced in Node to four decimals, **identical in both modes**, with
+`blend = 0.000000` on both. On a worktree of the base commit the same two rows
+read 1.4000 and 1.3999 at blends of 0.089 and 0.920 — **at** the bound. So it
+is this change's, and it is the arc.
+
+**The mechanism, on `petalTipShape 0.60`.** The window gets 27 rows for
+`u` 0.4289 → 1. The merged demand splits it three ways, and the third band is
+the arc — 0.0054 wide. The placer's largest-remainder pass hands out
+**14 / 7 / 6**, so the two lobe periods carry target gaps of
+
+* 0.3679 / 14 = 0.02628 → **1.471 ×** uniform
+* 0.1979 / 7  = 0.02898 → **1.623 ×** uniform
+
+against a cap of 0.025. The blend target is uniform WITHIN EACH BAND, so
+`mix(0)` IS that target: no blend is admissible, the bisection converges to 0,
+and **the emitted ladder is the over-cap target itself.**
+
+**THE CLAMP CANNOT BE FINISHED WHERE IT STARTS, and that is the finding rather
+than the bug.** What `ladderDemand()` can see is `ladderWindowCapacity` — the
+rows the window COULD hold, 34 here. What the window GETS is
+`max(baseW, the demand)` held at that capacity, and `baseW` is the base
+measure's own share of the blade: 27, and it does not exist until `cum` does.
+Measured against the capacity the spare read 20 and the clamp never bound.
+
+**What ships.** `bladeStations` now owns the region counts (`regionsFor`) and
+the blend target (`targetFor`) as two functions rather than two inline
+expressions, and finishes the clamp against the target the bound is actually
+decided on: *while the ladder would be inadmissible and the arc holds more
+than one row, the arc gives one back.* `ladderDemand()` keeps its own clamp and
+adds `yieldAt`, which names the band that may lose rows — nothing else yields,
+because the lobes' floor is session 38's ruled resolution floor read through
+session 41's per-shape table while the arc's count is reported and
+deliberately not asserted. It bottoms out at ONE row, which is what the
+buckle's frequency ceiling already hands it.
+
+**IT CANNOT FIRE ON A ROW THAT WAS GOING TO PASS, by an inequality rather than
+by observation.** Band *b* of the PLACED ladder spans the same `u`-interval
+with the same count as band *b* of the target, so its widest gap is at least
+the target's average: `widest(out) ≥ widest(target)`, and a placement inside
+the bound therefore has a target inside it too.
+
+**Measured over the live matrix — 920 rows, both modes, every layer, 2,484
+rings: 4 move, and they are the four that were red.**
+
+| ring | widest before | after | blend | sub-regions |
+|---|---|---|---|---|
+| `x petalTipShape 0.60` E / L | 1.5829 × | **1.4000 ×** | 0 → 0.1343 | 14/7/6 → **16/8/3** |
+| `x petalTipShape 3.00` E / L | 1.4159 × | **1.4000 ×** | 0 → 0.2180 | 17/9/6 → **18/9/5** |
+
+The two modes agree on both rows, which is the mode-free property row
+placement has to have. **Neither row's triangle count moves (24,688 on both
+trees) and neither row's census moves** — 0 within-shell pairs, 4,544 and
+4,144 cross-shell, worst span 0, measured on a worktree of `0606ace` and on
+this tree by `node tools/bloom-census-sweep.mjs --only`. Nothing is owed to
+`SELF_INTERSECTION_XFAIL`.
+
+**And the arc's own count is where it is told**: the read-out's APEX NIB line
+reads the rows past the law's crossing off the EMITTED stations, never off the
+demand, so a yield is already in the sentence it prints.
+
 ---
 
 ## 6. A SECOND `laminaHalf`, and an arc table stationed on the wrong length
@@ -759,6 +836,18 @@ nib --matrix live --added 11 --control --control-mode`:
 > the FOOT is identical on every row: **6,580,602 captured foot values**
 > **PASS**
 
+**MEASURED ON `0606ace`, AND THE ARC'S YIELD (§5) DOES NOT DISTURB IT.** That
+fix moves the stations on two rows which are already in the 877, and moves
+nothing anywhere else — 4 of 2,484 rings over the whole matrix in both modes —
+so the mover set, the holder set and the REDEFINED count are the same three
+answers. The float total is unchanged too, because it is a function of the
+triangle counts and neither row's moves (24,688 on both trees). Verified on
+this head as its own claim by
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 0606ace>
+--movers 'petalTipShape (0\.60|3\.00)' --control`, which is the tighter
+statement: those two rows move and **every other row in the matrix holds to
+the bit**.
+
 `nib` is the FOURTH change to ride in that tool and the first that is neither
 a ladder change nor inert at the defaults. The predicate is the nib's own
 guard restated over two numbers the BASE tree reports — a blade whose peak
@@ -807,6 +896,96 @@ reach the shipping bloom at all.
 **BOTH CONTROLS FIRED**: `--control` perturbs a HOLDER by 1e-9 and it is
 reported MOVED (*"the held class can fail"*), and `--control-mode` reclassifies
 the default and the mode clause reports it exactly once.
+
+---
+
+## 9f. THE 36 UNDECLARED ROWS — ONE MECHANISM, AND THEY AWAIT A RULING
+
+The export gate dropped **38 rows of 920**: 2 on A8 (§5, fixed) and **36 on X2,
+"a NEW self-intersection, not one of the 232 declared"**. X2 rides in the
+EXPORT gate only, which is why `bloom-connectedness` saw two drops and this
+saw thirty-eight.
+
+**WHY THE PR'S OWN RE-RECORD DID NOT CATCH THEM.** `bloom-xfail-magnitudes.mjs`
+sweeps the rows that are DECLARED and re-records what moved; a row with no
+entry is not in its subject. The instrument that answers "which rows are
+non-zero" is `bloom-census-sweep.mjs` over the whole matrix, and it had been
+run only over the moved subsets. **A magnitude re-record is not a census.**
+
+### Identified, and confirmed in the browser rather than inferred
+
+`node tools/bloom-census-sweep.mjs --shard i/4` over all 920 rows on THIS tree
+(after the A8 fix, because a ladder move moves the census) finds **exactly 36
+undeclared non-zero rows** — the same 36 the gate dropped, no more and no
+fewer. `node tools/verify-bloom-export.mjs --only <those 36>` then measured
+them in Chromium: **36 of 36 agree with Node on the pair count to the integer
+and on the worst span to four decimals.** Nothing here rests on a Node-only
+reading.
+
+### All 36 read EXACTLY ZERO on main's geometry, at an identical triangle count
+
+Measured with `--geom <worktree of 2464d50> --harness .`, so the matrix and the
+control sets are this branch's and only the geometry is main's: **36 of 36 read
+0 pairs / 0.0000 mm there, and every one has the same triangle count on both
+trees.** These are folds the nib introduces, not folds it made worse.
+
+### The mechanism is ONE mechanism and it is §9c's
+
+`node tools/bloom-census-attribute.mjs` carries every collected pair back to the
+nearest point of the builder's own captured mid-surface and names the region:
+
+> **17,908 of 18,497 pairs (96.8%) are IN THE NIB. 29 of the 36 rows are 100%
+> nib; the other 7 have a remainder in the blade immediately below its entry
+> (6 to 235 pairs). Every row's pairs lie in the band u 0.9–1.0, and the worst
+> pair sits at a MARGIN (v = ±1.000) on every row but two.**
+
+That is §9c's sentence, arriving on rows that had no entry: the last stretch of
+every blade used to be a PARALLEL STRIP two print floors across, the nib
+converges it from 1.60 mm to 0.10 mm, and a blade whose margins are already
+curling toward each other closes them. **What every one of the 36 has in common
+is a CUP** — `petalCup`, `petalCupGradient`, `allCup`, `labellumCup`,
+`hoodCup`, the nine `petalNCup`, `sepalCup`, `sepalCupGradient`, ORCHID (which
+is cup and curl deltas), `FORM: REFLEXED`, and the IRIS. There is no second
+class.
+
+**AND BOTH SIGNS OF CUP DO IT**, which the §9c note did not say: `petalCup min
+(-0.8)` (912 pairs) and `petalCupGradient min (-0.8)` (912) fold as readily as
+`petalCupGradient max (1.2)` (1,088). A reflexed blade curls its margins the
+other way and the converging nib closes them on the other side.
+
+### The worst ten, measured
+
+| row | main | branch | worst span | in the nib |
+|---|---|---|---|---|
+| `VARIANCE: x the IRIS at 2 whorls` | 0 | **1,522** | 0.4193 mm | 100% |
+| `petalCupGradient max (1.2)` | 0 | 1,088 | 0.3363 | 78.4% |
+| `LOBES: x cup 1.2` | 0 | 1,056 | 0.1610 | 78.7% |
+| `SEPALS: angle 90 on a CUPPED corolla` | 0 | 920 | 0.0267 | 100% |
+| `petalCup min (-0.8)` | 0 | 912 | 0.0505 | 100% |
+| `petalCupGradient min (-0.8)` | 0 | 912 | 0.0481 | 100% |
+| `FORM: REFLEXED` | 0 | 912 | 0.0490 | 100% |
+| `ALL PETALS: min` | 0 | 912 | 0.0490 | 100% |
+| `GRADIENT: cup gradient max x ALL THIN x spread min` | 0 | 904 | 0.4069 | 93.9% |
+| `SEPALS: sepalCup min (-0.8)` | 0 | 600 | 0.3699 | 92.7% |
+
+### NOTHING IS DECLARED, AND TWO OF EVA'S INSTRUCTIONS ARE WHY
+
+**`LOBES: x cup 1.2` is labelled *"over a fold declared on main — must not gain
+a new one"* and it gains one: 0 -> 1,056 pairs, 831 of them in the nib and 225
+in the blade just below, worst at u 0.9986 on a margin.** Eva's instruction is
+explicit — do NOT declare it, report it with its mechanism and stop. That is
+this section.
+
+**The three SEPALS cup rows ARE the §9c mechanism and not something else**, which
+was the other thing asked: `sepalCup min` is 556 nib + 44 blade with its worst
+pair at u 0.9968 v -1.000 on SEPAL 3 (a sepal is the petal builder on a second
+ring, so it cuts its own nib and meets its own converging tip);
+`sepalCupGradient min` is 560 + 15 at u 0.9968 v -1.000 on sepal 4; and
+`SEPALS: angle 90 on a CUPPED corolla` is 920 of 920 in the nib — that one is
+the COROLLA's own petals, not the sepals, and the sepal angle is not in it.
+
+The remaining 32 are the same class and are not declared either, because the
+class is one ruling rather than thirty-two.
 
 ---
 

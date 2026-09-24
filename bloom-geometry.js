@@ -4087,7 +4087,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
      exactly 1 and the blend below takes it there whatever the measure says),
      so a demand is not placed — it is SERVED by uniform's own rows, which is
      what ladderWindowCapacity counts there. */
-  const demand = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) === 1 ? null
+  let demand = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) === 1 ? null
     : profile.ladderDemand ? profile.ladderDemand() : null;
   const cum = [0];
   for (let i = 0; i < LADDER_SAMPLES; i++) cum.push(cum[i] + dT[i] + beta * (dA[i] / arc));
@@ -4152,48 +4152,82 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
     }
   };
   const cumAt = (u) => { const i = Math.min(LADDER_SAMPLES, Math.max(0, Math.round((u - u0) / (1 - u0) * LADDER_SAMPLES))); return cum[i]; };
-  const out = heldRows.slice();
-  let regions = null;
-  if (demand === null) {
-    placeInto(out, 0, total, want);
-  } else {
-    /* THE REGION COUNTS. The window gets what the base measure would give it,
-       raised to the demand and held at the capacity (or EXACTLY the demand
-       under a capability that asks for it — the floor demonstration's non-
-       shipping configuration); the rest is split between the stretch below
-       and the tip above by the base measure's own masses, each raised to the
-       minimum the gap bound needs of it. Feasible by construction: the
-       capacity is the free rows less those two minima. */
-    const { minStretch, minTip } = ladderOutsideMinima(demand.u0, demand.u1, buckle && buckle.A ? buckle.f : 0);
+  /* THE WIDEST GAP AND THE BOUND IT IS JUDGED AGAINST, hoisted above the
+     placement because the arc's yield below has to ask this question before
+     the ladder is final. The tail's own early return reads the same two
+     expressions it always did.
+
+     THE GAPS BETWEEN STATIONS, AND THE LEADING ONE IS A7'S (session 39, and
+     the reason that session exists). This measure opened with `r[0]` — the
+     offset from the seam to the FIRST BLADE ROW. Before session 38 that was
+     always exactly 1 / NU, so it could never be the widest gap and the term
+     was vacuous; with the seam floor it is `seamStep / NU`, and at a seam
+     step of 2 it already exceeds every cap this function is ever handed.
+     THE BLEND CANNOT MOVE IT — `mix()` keeps every held row by construction,
+     for the bit-identity reason below — so the cap was unsatisfiable for
+     every blend, the bisection converged to 0, and the whole turning-rate
+     ladder was DISCARDED: the blade placed EXACTLY uniformly wherever the
+     seam floor binds. Nothing could see it. A uniform ladder is watertight,
+     one piece, the right triangle count, inside every bound and past every
+     assertion; it is simply session 32's redistribution switched off, at 16x
+     the apex chord error in EXPORT on the incurve target (0.0660 mm against
+     0.0041 with the ladder).
+
+     A8 IN THE HARNESS ALREADY EXCLUDES THIS GAP BY NAME and says why — it is
+     "placed by the clearance law and PINNED by A7", where the ladder's own
+     question is whether its REDISTRIBUTION starved the wave. This is that
+     same clause, in the geometry, so the one rule stops having two owners
+     that disagree; it is deliberately not a second rule. A8 gained the
+     matching assertion on the same day, and it reads the gap off the EMITTED
+     stations rather than off anything reported from here: a measure that
+     handed the gate its own verdict would hand over the number that excuses
+     it. What IS reported is the blend alone — the one thing the emitted rows
+     cannot say. */
+  const widest = (r) => { let m = 0; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
+  const cap = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU;
+
+  /* THE REGION COUNTS — ONE OWNER, read by the placement below AND by the
+     yield above it, because a demand that has not been placed yet still has
+     a blend target and the target is what the bound is decided on. The
+     window gets what the base measure would give it, raised to the demand
+     and held at the capacity (or EXACTLY the demand under a capability that
+     asks for it — the floor demonstration's non-shipping configuration); the
+     rest is split between the stretch below and the tip above by the base
+     measure's own masses, each raised to the minimum the gap bound needs of
+     it. Feasible by construction: the capacity is the free rows less those
+     two minima.
+
+     THE WINDOW'S OWN SUB-REGIONS — ONE PER PERIOD (session 42). A window
+     TOTAL cannot express a PER-PERIOD criterion: the ladder spreads it by
+     its own turning measure, which is concentrated at the tip, so the
+     apex-most period reads under the floor while the window's total is met.
+     Measured under MODEL B at 7 teeth and coverage 1.00: 10 / 11 / 10 / 8
+     against a floor of 9, and raising the total changes nothing because the
+     window already holds every free row. So the demand names its splits and
+     its per-region floors; each region is then placed at equal increments of
+     the SAME measure, which is still the ladder's, and the SURPLUS above the
+     floors is handed out by the measure's own masses so the turning term
+     keeps what it earns. With no splits this is the single `placeInto` it
+     replaces, to the bit. */
+  const regionsFor = (dem) => {
+    if (dem === null) return null;
+    const { minStretch, minTip } = ladderOutsideMinima(dem.u0, dem.u1, buckle && buckle.A ? buckle.f : 0);
     const capRows = Math.max(0, want - minStretch - minTip);
-    const cS = cumAt(demand.u0), cW = cumAt(demand.u1);
+    const cS = cumAt(dem.u0), cW = cumAt(dem.u1);
     const mS = cS, mW = cW - cS, mT = total - cW;
     const baseW = Math.round(want * mW / total);
-    const W = demand.exact ? Math.min(demand.stations, capRows) : Math.min(Math.max(baseW, demand.stations), capRows);
+    const W = dem.exact ? Math.min(dem.stations, capRows) : Math.min(Math.max(baseW, dem.stations), capRows);
     const R = want - W;
     let S = mS + mT > 0 ? Math.round(R * mS / (mS + mT)) : 0;
     S = Math.max(minStretch, S);
     let T = R - S;
     if (T < minTip) { T = minTip; S = R - T; }
     if (S < 0) { S = 0; T = R; }
-    regions = { S, W, T };
-    placeInto(out, 0, cS, S);
-    /* THE WINDOW'S OWN SUB-REGIONS — ONE PER PERIOD (session 42). A window
-       TOTAL cannot express a PER-PERIOD criterion: the ladder spreads it by
-       its own turning measure, which is concentrated at the tip, so the
-       apex-most period reads under the floor while the window's total is
-       met. Measured under MODEL B at 7 teeth and coverage 1.00: 10 / 11 / 10
-       / 8 against a floor of 9, and raising the total changes nothing
-       because the window already holds every free row. So the demand names
-       its splits and its per-region floors; each region is then placed at
-       equal increments of the SAME measure, which is still the ladder's, and
-       the SURPLUS above the floors is handed out by the measure's own masses
-       so the turning term keeps what it earns. With no splits this is the
-       single `placeInto` it replaces, to the bit. */
-    if (demand.splits && demand.splits.length) {
-      const edges = [cS, ...demand.splits.map(cumAt), cW];
-      const n = demand.counts.length;
-      const ns = demand.counts.slice(0, n);
+    let sub = null, edges = null;
+    if (dem.splits && dem.splits.length) {
+      edges = [cS, ...dem.splits.map(cumAt), cW];
+      const n = dem.counts.length;
+      const ns = dem.counts.slice(0, n);
       let left = W - ns.reduce((a, b) => a + b, 0);
       if (left > 0) {
         /* LARGEST REMAINDER, so the sub-counts sum to W EXACTLY and nothing
@@ -4225,27 +4259,128 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
           ns[big]--;
         }
       }
-      for (let i = 0; i < n; i++) placeInto(out, edges[i], edges[i + 1], ns[i]);
-      regions = { S, W, T, sub: ns };
+      sub = ns;
+    }
+    return { S, W, T, cS, cW, sub, edges };
+  };
+
+  /* THE BLEND'S TARGET FOLLOWS THE SEAM SHIFT (session 38). The target is the
+     EVEN ladder over the domain the redistributed rows actually occupy, which
+     the seam floor moves: `u0` is the last HELD row, not `held / NU`, whenever
+     the floor binds. Kept as `uniform` / `held / NU` VERBATIM when it does not,
+     so a bounded ladder on an unshifted block stays bit-identical to main's.
+
+     AND THE WINDOW'S OWN SUB-REGIONS ARE BANDS TOO (the apex-nib session).
+     The target was three bands — the stretch, the WHOLE window, the tip —
+     so a window carrying sub-regions had its rows re-spread evenly across
+     all of it by the blend, whatever counts the demand had just been solved
+     for. That is harmless while every sub-region is a lobe period of
+     comparable width, and it is not harmless the moment one of them is the
+     apex arc: measured on `lobeDepth 0.30 x 3`, the ladder PLACED 6 stations
+     across the 0.0014-wide arc and the blend left ONE of them there,
+     spreading the other five back over half the blade. The comment below
+     this expression already states the rule it now keeps — "the target is
+     uniform WITHIN EACH REGION ... so row i lies in the same region in both
+     lists and the mix cannot leave it"; the sub-regions simply were not
+     among the regions it was told about. With no splits the bands below are
+     the three they replace, term for term, so every unlobed row is
+     bit-identical.
+
+     IT IS A FUNCTION BECAUSE THE YIELD BELOW ASKS FOR IT BEFORE ANYTHING IS
+     PLACED — the `placed` argument is read on the no-demand arm alone, and
+     that arm is unreachable from the yield (a demand is what carries the
+     yielding band), so passing null there is a statement rather than a
+     convenience. */
+  const targetFor = (dem, rg, placed) => dem === null
+    ? (seamBinds
+        ? placed.map((u, i) => (i < held ? u : u0 + (1 - u0) * (i + 1 - held) / want))
+        : uniform)
+    : (() => {
+      const ref = heldRows.slice();
+      const bandBase = seamBinds ? u0 : held / NU;
+      const wLo = Math.max(bandBase, dem.u0);
+      const sub = rg.sub || null;
+      const winEdges = sub ? [wLo, ...(dem.splits || []), dem.u1] : [wLo, dem.u1];
+      const winCounts = sub ? sub : [rg.W];
+      const bands = [[bandBase, wLo]];
+      for (let i = 0; i < winCounts.length; i++) bands.push([winEdges[i], winEdges[i + 1]]);
+      bands.push([dem.u1, 1]);
+      const counts = [rg.S, ...winCounts, rg.T];
+      for (let b = 0; b < bands.length; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
+      ref[NU - 1] = 1;
+      return ref;
+    })();
+
+  /* THE ARC YIELDS TO THE GAP BOUND, AND THIS IS WHERE ITS OWN "SPARE
+     CAPACITY" IS ACTUALLY KNOWN. `ladderDemand` clamps the arc's rows
+     against the window's capacity less the LOBES' resolution floor — the
+     right floor, and not the only one. The blend target is uniform WITHIN
+     EACH BAND, so a band ALSO needs `width / cap` rows of its own; short of
+     that no blend is admissible, the bisection lands on 0, `mix(0)` IS the
+     target, and the emitted ladder is over the bound. Measured on
+     `LOBES: x petalTipShape 0.60`: the window's 27 rows went 14 / 7 / 6
+     across two lobe periods and the 0.0054-wide arc, and the two periods'
+     target gaps read 1.471 and 1.623 x uniform against a bound of 1.400 —
+     A8, red in CI on that row and on `x petalTipShape 3.00`.
+     THE CLAMP CANNOT BE FINISHED WHERE IT STARTS: what `ladderDemand` can
+     see is `ladderWindowCapacity`, the rows the window COULD hold; what it
+     GETS is `max(baseW, the demand)` held at that capacity, and `baseW` is
+     the base measure's own share of the blade — which does not exist until
+     `cum` does. So the clamp is finished here, against the target the bound
+     is actually decided on: while the ladder would be inadmissible and the
+     arc holds more than one row, the arc gives one back.
+     NOTHING ELSE YIELDS, and that asymmetry is the ruling rather than a
+     convenience — the lobes' floor is session 38's ruled resolution floor
+     read through session 41's per-shape table, while the arc's count is
+     REPORTED and deliberately not asserted (AN3's own header says why), so
+     the arc is the party that can give. It bottoms out at ONE row, which is
+     what the buckle's frequency ceiling already hands it.
+     INERT WHERE THE LADDER IS ADMISSIBLE, and by an inequality rather than
+     by observation: band b of the PLACED ladder spans the same u-interval
+     with the same count as band b of the target, so its widest gap is at
+     least the target's average — `widest(out) >= widest(target)`, and a
+     placement inside the bound therefore has a target inside it too. The
+     loop cannot fire on a row that was going to pass. Measured over the live
+     matrix: 4 of 2,484 rings move, and they are the four that were red. */
+  let regions = regionsFor(demand);
+  while (demand !== null && demand.yieldAt != null && demand.counts[demand.yieldAt] > 1
+         && widest(targetFor(demand, regions, null)) > cap) {
+    const counts = demand.counts.slice();
+    counts[demand.yieldAt] -= 1;
+    demand = { ...demand, stations: demand.stations - 1, counts };
+    regions = regionsFor(demand);
+  }
+
+  const out = heldRows.slice();
+  if (demand === null) {
+    placeInto(out, 0, total, want);
+  } else {
+    placeInto(out, 0, regions.cS, regions.S);
+    if (regions.sub) {
+      for (let i = 0; i < regions.sub.length; i++) placeInto(out, regions.edges[i], regions.edges[i + 1], regions.sub[i]);
       /* WHAT WAS PLACED, PER SUB-REGION, BEFORE THE GAP-BOUND BLEND. The
          blend that follows pulls every station toward uniform and can carry
          one across a period boundary, so "the demand was served" and "the
          emitted stations are still distributed that way" are two different
          claims about two different moments. L6 asserts the first as an
          identity and reports the second. */
-      if (report) report.placedSub = ns.slice();
+      if (report) report.placedSub = regions.sub.slice();
     } else {
-      placeInto(out, cS, cW, W);
-      if (report) report.placedSub = [W];
+      placeInto(out, regions.cS, regions.cW, regions.W);
+      if (report) report.placedSub = [regions.W];
     }
-    placeInto(out, cW, total, T);
+    placeInto(out, regions.cW, total, regions.T);
   }
   /* THE REGIONS ARE DECIDED BEFORE THE BLEND AND DO NOT MOVE WITH IT, so
      they are reported HERE rather than at the end — the gap bound has an
      early return (the ladder already inside the cap) that the tail never
      reaches, and a report written only at the tail is absent on exactly the
-     rows where no blending was needed. */
-  if (report) report.regions = regions;
+     rows where no blending was needed. The reported shape is the region
+     COUNTS alone: the cumulative edges `regionsFor` carries for the placer
+     are this function's own working, not a claim about the geometry. */
+  if (report) report.regions = regions === null ? null
+    : (regions.sub ? { S: regions.S, W: regions.W, T: regions.T, sub: regions.sub }
+                   : { S: regions.S, W: regions.W, T: regions.T });
   out[NU - 1] = 1;
   /* Strictly increasing, always: two rows at one station is a zero-length
      panel, and the assertion families read `profileU` expecting an order. */
@@ -4254,34 +4389,8 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   /* Bound the widest gap by blending back toward uniform in u. Monotone in
      the blend, so a bisection finds the largest admissible ladder.
 
-     THE GAPS BETWEEN STATIONS, AND THE LEADING ONE IS A7'S (session 39, and
-     the reason that session exists). This measure opened with `r[0]` — the
-     offset from the seam to the FIRST BLADE ROW. Before session 38 that was
-     always exactly 1 / NU, so it could never be the widest gap and the term
-     was vacuous; with the seam floor it is `seamStep / NU`, and at a seam
-     step of 2 it already exceeds every cap this function is ever handed.
-     THE BLEND CANNOT MOVE IT — `mix()` keeps every held row by construction,
-     for the bit-identity reason below — so the cap was unsatisfiable for
-     every blend, the bisection converged to 0, and the whole turning-rate
-     ladder was DISCARDED: the blade placed EXACTLY uniformly wherever the
-     seam floor binds. Nothing could see it. A uniform ladder is watertight,
-     one piece, the right triangle count, inside every bound and past every
-     assertion; it is simply session 32's redistribution switched off, at 16x
-     the apex chord error in EXPORT on the incurve target (0.0660 mm against
-     0.0041 with the ladder).
-
-     A8 IN THE HARNESS ALREADY EXCLUDES THIS GAP BY NAME and says why — it is
-     "placed by the clearance law and PINNED by A7", where the ladder's own
-     question is whether its REDISTRIBUTION starved the wave. This is that
-     same clause, in the geometry, so the one rule stops having two owners
-     that disagree; it is deliberately not a second rule. A8 gained the
-     matching assertion on the same day, and it reads the gap off the EMITTED
-     stations rather than off anything reported from here: a measure that
-     handed the gate its own verdict would hand over the number that excuses
-     it. What IS reported is the blend alone — the one thing the emitted rows
-     cannot say. */
-  const widest = (r) => { let m = 0; for (let i = 1; i < NU; i++) m = Math.max(m, r[i] - r[i - 1]); return m; };
-  const cap = ladderGapFactor(buckle && buckle.A ? buckle.f : 0) / NU;
+     THE MEASURE AND THE BOUND ARE DEFINED ABOVE THE PLACEMENT — see the
+     paragraph there for why the leading gap is A7's and not this one's. */
   if (widest(out) <= cap) return out;
   /* The blend touches ONLY the redistributed rows. Running it over the held
      ones too would move them by an ulp (`l*u + (1-l)*u` is not `u` in
@@ -4297,45 +4406,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
      count is at most the capacity, which is what makes the target's outside
      gaps admissible. With no demand the target is the uniform ladder, as
      before. */
-  /* THE BLEND'S TARGET FOLLOWS THE SEAM SHIFT (session 38). The target is the
-     EVEN ladder over the domain the redistributed rows actually occupy, which
-     the seam floor moves: `u0` is the last HELD row, not `held / NU`, whenever
-     the floor binds. Kept as `uniform` / `held / NU` VERBATIM when it does not,
-     so a bounded ladder on an unshifted block stays bit-identical to main's. */
-  const target = demand === null
-    ? (seamBinds
-        ? out.map((u, i) => (i < held ? u : u0 + (1 - u0) * (i + 1 - held) / want))
-        : uniform)
-    : (() => {
-    const ref = heldRows.slice();
-    const bandBase = seamBinds ? u0 : held / NU;
-    const wLo = Math.max(bandBase, demand.u0);
-    /* AND THE WINDOW'S OWN SUB-REGIONS ARE BANDS TOO (the apex-nib session).
-       The target was three bands — the stretch, the WHOLE window, the tip —
-       so a window carrying sub-regions had its rows re-spread evenly across
-       all of it by the blend, whatever counts the demand had just been
-       solved for. That is harmless while every sub-region is a lobe period
-       of comparable width, and it is not harmless the moment one of them is
-       the apex arc: measured on `lobeDepth 0.30 x 3`, the ladder PLACED 6
-       stations across the 0.0014-wide arc and the blend left ONE of them
-       there, spreading the other five back over half the blade. The
-       comment above this expression already states the rule it now keeps —
-       "the target is uniform WITHIN EACH REGION ... so row i lies in the
-       same region in both lists and the mix cannot leave it"; the
-       sub-regions simply were not among the regions it was told about.
-       With no splits the bands below are the three it replaces, term for
-       term, so every unlobed row is bit-identical. */
-    const sub = regions.sub || null;
-    const winEdges = sub ? [wLo, ...(demand.splits || []), demand.u1] : [wLo, demand.u1];
-    const winCounts = sub ? sub : [regions.W];
-    const bands = [[bandBase, wLo]];
-    for (let i = 0; i < winCounts.length; i++) bands.push([winEdges[i], winEdges[i + 1]]);
-    bands.push([demand.u1, 1]);
-    const counts = [regions.S, ...winCounts, regions.T];
-    for (let b = 0; b < bands.length; b++) for (let k = 1; k <= counts[b]; k++) ref.push(bands[b][0] + (bands[b][1] - bands[b][0]) * k / counts[b]);
-    ref[NU - 1] = 1;
-    return ref;
-  })();
+  const target = targetFor(demand, regions, out);
   const mix = (l) => out.map((u, i) => (i < held ? u : l * u + (1 - l) * target[i]));
   let lo = 0, hi = 1;
   for (let i = 0; i < 60; i++) { const m = (lo + hi) / 2; if (widest(mix(m)) <= cap) lo = m; else hi = m; }
@@ -5376,10 +5447,23 @@ export function widthProfile(state, ring, halfW, cap, acc, length = null) {
       const spare = ((cap && cap.rowCapacity) ? Number(cap.rowCapacity) : ladderWindowCapacity(d.u0, d.u1, bf)) - d.stations;
       const arcRows = Math.max(0, Math.min(APEX_ARC_ROWS, spare));
       if (arcRows === 0) return d;
+      /* AND THIS CLAMP IS NOT THE WHOLE OF IT — `yieldAt` NAMES THE BAND THAT
+         GIVES ROWS BACK. The capacity above is what the window COULD hold;
+         what it gets is `max(baseW, this demand)` held at that capacity, and
+         `baseW` is the base measure's own share, which does not exist until
+         the ladder has built its cumulative measure. The gap bound also asks
+         each BAND for `width / cap` rows of its own, which this floor does
+         not know about either — measured, `LOBES: x petalTipShape 0.60` gave
+         the arc six rows the two lobe periods needed, their target gaps read
+         1.471 and 1.623 x uniform against 1.400, and A8 went red in CI. So
+         the clamp is FINISHED in `bladeStations`, where both are known, and
+         what this says is which band is allowed to lose: the lobes' floor is
+         ruled and the arc's count is reported rather than asserted. */
       return { ...d,
         stations: d.stations + arcRows,
         splits: [...(d.splits || []), apex.arcU],
-        counts: [...(d.counts || []), arcRows] };
+        counts: [...(d.counts || []), arcRows],
+        yieldAt: (d.counts || []).length };
     },
     /* THE LADDER'S OWN VIEW OF THE PROFILE, AT THE EXPORT FLOOR IN BOTH MODES.
        Row POSITIONS are topology and the export floor may not touch topology —

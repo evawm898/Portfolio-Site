@@ -1529,6 +1529,30 @@ FREQUENCY CEILING NO DEMAND IS PLACED AT ALL and the arc gets ONE row** — `lad
 exactly 1, so any row handed to the arc comes off the wave's bar; session 32 ruled that trade and
 `APEX NIB: x the buckle at its frequency ceiling` is the matrix row that carries it. **AN3
 REPORTS the count and does not assert it.**
+**AND "SPARE CAPACITY" WAS BEING MEASURED WHERE IT CANNOT BE — CI CAUGHT IT, A8, ON TWO ROWS.**
+`ladderDemand()` subtracted the LOBES' resolution floor from `ladderWindowCapacity`; the gap
+bound ALSO asks each BAND of the blend target for `width / cap` rows of its own, and that floor
+was in no arithmetic. **`bloom-connectedness` failed with 0 rows not one piece** — the flood fill
+clean on all 918 rows that reached the results and #220's row census naming the two DROPPED by a
+validity assertion: `LOBES: x petalTipShape 0.60` at **1.5829x** and `x petalTipShape 3.00` at
+**1.4159x** against the 1.4000 bound, `blend = 0` on both, where the base tree reads 1.4000 /
+1.3999 AT the bound. On the 0.60 row the window's 27 rows went **14 / 7 / 6** across two lobe
+periods and the 0.0054-wide arc, so the periods' target gaps read 1.471 and 1.623 — and the
+target IS `mix(0)`, so no blend is admissible and the emitted ladder is the over-cap target.
+**THE CLAMP CANNOT BE FINISHED WHERE IT STARTS**: what `ladderDemand` can see is
+`ladderWindowCapacity` (34 here), what the window GETS is `max(baseW, the demand)` (27), and
+`baseW` is the base measure's own share, which does not exist until `cum` does. So
+`bladeStations` owns the region counts (`regionsFor`) and the blend target (`targetFor`) as two
+functions now and finishes the clamp against the target the bound is decided on — **while the
+ladder would be inadmissible and the arc holds more than one row, the arc gives one back** —
+with `yieldAt` naming the band that may lose rows. **NOTHING ELSE YIELDS**: the lobes' floor is
+ruled and the arc's count is reported rather than asserted, which is what makes the arc the
+party that can give. **IT CANNOT FIRE ON A ROW THAT WAS GOING TO PASS, BY AN INEQUALITY RATHER
+THAN BY OBSERVATION** — band b of the PLACED ladder spans the same u-interval with the same count
+as band b of the target, so `widest(out) >= widest(target)`. Measured over 920 rows x both modes
+x every layer, **2,484 rings: 4 move and they are the four that were red** (6 arc rows -> 3 and
+-> 5, blend 0 -> 0.1343 and 0.2180, both modes agreeing), **triangle counts unmoved at 24,688 and
+the census unmoved at 0 within-shell pairs on both**.
 **TWO DEFECTS IN THE LOBES BLOCK, BOTH FOUND BY THE GATE AND BOTH THIS PROJECT'S OWN CLASS.** A
 SECOND `laminaHalf` — the same expression as the shared one, which is why nobody noticed, until
 the nib owned its own floor and the local copy read **0.80 mm where the outline is 0.05**: the
