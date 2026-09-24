@@ -1624,6 +1624,49 @@ and not its petals** (block 1 hands it `petalTipEnd` 1, which is the nib's third
 than carried forward: **107,485 / 10.1332, unmoved**, in 311 s through
 `bloom-xfail-magnitudes --include-refused`. Nothing would have caught a move there, because the
 sweep skips an export-refused row — no STL exists for X1 to read.
+**AND THE CUP FOLDS THE NIB, THE CLAMP IS AN OUTPUT CLAMP ON THE SECTION'S RADIUS, AND THE
+ONE ROW IT CANNOT REACH IS SPLIT TO #285** (Eva's four rulings, the apex-nib session — read
+§9g and §9h of `docs/bloom-apex-nib-outcome.md` before touching `cupScale`, `FOLD_CLAMP_MARGIN`
+or `cupClampLine`). `sectAt`'s cup lift is `c*a^2/hb`, so the section leaves the midrib with
+radius `hb/(2c)`; a sheet is that surface offset by +/- t/2 and **AN OFFSET SURFACE INVERTS
+WHERE THE OFFSET EXCEEDS THE RADIUS**, so the radius follows the half-width down and the nib
+draws it to 0.05 mm. Measured on `petalCup min (-0.8)`: **0.12544 mm at the nib's first row to
+0.03125 at its last, against a half-thickness of 0.6000** — five to nineteen times inside the
+fold. **MAIN NEVER REACHED IT BECAUSE MAIN'S OUTLINE STOPPED AT THE 0.80 mm FLOOR** (its own
+last rows read 0.9956 and 0.8333 and the census reads 0 there). **THE HYPOTHESIS THAT THE CUP
+READS A PRE-NIB WIDTH IS REFUTED AS AN IDENTITY** — `shapeAt` IS `shapeBaseAt` where there are
+no lobes, so `hb === h` is TRUE, the same double, on every row of the nib.
+**TWO OWNERS, AND THE SECOND SUBSUMES MOST OF THE FIRST**: `cupScale = onNib(u) ? hb /
+TIP_HALF_MM : 1` (exactly 1 at the entry BY CONSTRUCTION — the entry IS the law's crossing of
+`TIP_HALF_MM`), then `|c| <= hb / (FOLD_CLAMP_MARGIN * t)`. **MARGIN 1.25, ARGUED FROM THE
+INNER SKIN**: at `margin * t/2` the inner skin's own radius is `(margin-1) * t/2`, so it keeps
+`1 - 1/margin` of the mid-surface's spacing — a fifth at 1.25, a CUSP at 1.00, and at 2.00 it
+binds on six of main's own last eight stations. **BIT-IDENTITY IS BY BRANCH, NOT BY AN
+ARITHMETIC MIN**: where the cap does not bind the expression evaluates to `cRaw` ITSELF.
+**TOLD, NEVER SILENT** — `cupClampLine` prints `CUP CLAMPED at u ..., asked radius X, drawn Y`
+over every petal AND every sepal. **35 of the 36 undeclared rows clear to exactly 0** (18,497
+-> 1,104 pairs); the clamp touches **102 of 920 rows** and **24 of them read 0 on main**, an
+accepted cost. **ZERO TRIANGLES on every row in both modes.**
+**THE ONE ROW LEFT IS NOT THE CUP'S AND IS ISSUE #285.** `LOBES: x cup 1.2` is declared at
+**1,104 pairs / 0.1095 mm** as an AUTHORED EXCEPTION: the closing arc's **ALONG-u** radius falls
+to **0.216 / 0.178 / 0.638 of t/2** at the last station — the other principal curvature, which a
+clamp on the cross-section cannot reach — with the nib's last seven stations inside **0.05 mm**
+of blade at 0.007-0.009 mm gaps against main's 0.163-0.406. **THE PAIR COUNT IS NON-MONOTONE IN
+THE CUP'S NIB AMPLITUDE AND IS WORST WITH THE CUP REMOVED ENTIRELY** (0x reads 1,856 against the
+unscaled 1,056), and `APEX_ARC_ROWS` 6 -> 1 makes every affected row worse. **MAIN'S 0 THERE IS A
+TESSELLATION COINCIDENCE**: `petalCup max (1.2)` alone reads 80 / 0.0239 on main while the lobes
+alone read 0 on every tree. The hypothesis recorded for #285 to TEST rather than adopt is that
+**the nib is narrower in plan than the sheet is thick**, so the fix may be a tip THICKNESS taper.
+**AND A PREDECLARATION IS A MEASUREMENT: A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S
+GUARDS ARE TRUTHINESS TESTS ON NUMBERS** — this file has carried that trap since the leaf session
+and the byte partition walked into it anyway, failing in BOTH directions from ONE cause. With a
+STRING cup `petalFormIsFlat` holds and **no form is built at all**, so three SLOT role-override
+rows read `p.form` null on all sixteen petals and were called holders while the clamp genuinely
+binds on four of them; and `'0' !== 0` is **TRUE**, so every row whose cup was a string zero was
+falsely declared a mover — which is exactly the two `DOME: the INCURVE TARGET` rows that held.
+Coerced by each control's own kind (`bloom-census-sweep`'s own `stateOf`), the predicate reads
+**117 movers / 803 holders** against the broken 98 / 822. **A predicate built on a state the
+geometry would never build measures nothing.**
 **The coupon plan gains a 0.40 mm tip.**
 **AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
 ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row

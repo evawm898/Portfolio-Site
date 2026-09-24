@@ -1151,6 +1151,99 @@ one"* — is reported rather than declared. It gains one either way: 1,056
 pre-fix and 1,688 post-fix, against **0 on main's geometry at an identical
 triangle count**.
 
+## 9h. THE FOLD CLAMP, AND EVA'S FOUR RULINGS
+
+### The four rulings, in the order they were made
+
+1. **The arc's yield ships as measured** (§5's subsection) — the apex arc gives
+   a row back to the lobe periods while the ladder would be inadmissible.
+2. **The cup scale on the nib ships as prototyped** (§9g) — `cupScale =
+   onNib(u) ? hb / TIP_HALF_MM : 1`, exactly 1 at the nib's entry.
+3. **The fold clamp ships at margin 1.25**, with the 24 touched rows that read
+   0 on main an accepted cost, and the `CUP CLAMPED` read-out line part of it.
+4. **`LOBES: x cup 1.2` is split out** to issue #285 and declared as an
+   authored exception at 1,104 pairs / 0.1095 mm.
+
+### The clamp
+
+`|c| <= hb / (FOLD_CLAMP_MARGIN * t)`, so the mid-surface's radius of
+curvature never falls below `margin * t/2` and the sheet always has an offset
+surface. **The margin is 1.25 and the argument is the inner skin**: at
+`margin * t/2` the inner skin's own radius is `(margin - 1) * t/2`, so it
+keeps `1 - 1/margin` of the mid-surface's spacing — a fifth at 1.25, where a
+margin of exactly 1 leaves it at a cusp and a margin of 2 (`R >= t`) binds on
+six of main's own last eight stations.
+
+**BIT-IDENTITY IS BY BRANCH, NOT BY AN ARITHMETIC MIN**, which is the same
+kind of argument as the nib factor being exactly 1 at its entry: where the cap
+does not bind, `Math.abs(cRaw) <= cCap ? cRaw : ...` evaluates to `cRaw`
+ITSELF, the same double, with no multiplication to round. The shipping default
+and a gentle cup report `not clamped`.
+
+**IT IS TOLD.** `cupClampLine` prints `CUP CLAMPED at u ..., asked radius X,
+drawn Y` in the `(CLAMPED)` discipline the roll floor and the spine curl
+already use, over every built petal AND every built sepal.
+
+**FIVE OF THE SIX SURVIVORS CLEAR TO EXACTLY 0**, at every margin from 1.00 to
+1.50 (totals 1,360 / 1,288 / 1,104 / 1,024 — the residue is one row at every
+value). Triangle counts are identical on every row in both modes. The clamp
+touches **102 of 920 rows**, asked radii 0.167 to 1.394 mm; of the 91 of them
+measured on main's geometry, **67 already fold on main and 24 read 0** — those
+24 are the accepted cost.
+
+### AND THE THING THAT BLOCKED IT WAS MY OWN PROBE, IN BOTH DIRECTIONS, WITH ONE CAUSE
+
+The byte partition failed with three holders that moved and two declared
+movers that held, and §9g recorded the second as *not established*. Both are
+the same defect and it is not in the geometry:
+
+**A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S GUARDS ARE TRUTHINESS
+TESTS ON NUMBERS.** `bloom-census-sweep`'s `stateOf` coerces each value by its
+control's own kind; my predicate assigned `row.set`'s raw strings. This file
+has carried that trap since the leaf session and I walked into it anyway.
+
+* **The three SLOT holders that moved.** With a STRING cup,
+  `petalFormIsFlat` holds and **no form is built at all**, so `p.form` came
+  back null on all sixteen petals and the predicate saw nothing. Coerced, the
+  same row has **4 petals with a form, a nib, a non-zero cup, and the clamp
+  binding on all four** — a genuine mover of both changes.
+* **The two DOME INCURVE movers that held.** `(f.cup ?? 0) !== 0` against a
+  string `'0'` is **`'0' !== 0`, which is TRUE**, so every row whose cup was a
+  string zero was falsely declared a mover. Coerced, those rows have 120
+  petals with a form and a nib and `cup != 0` on **zero** of them. They were
+  never movers, and the tool was right to fail the run.
+
+**The lesson is not "coerce the state"** — it is that a predeclaration is a
+measurement like any other, and a predicate built on a state the geometry
+would never build measures nothing. The rebuilt predicate reads what the
+BUILDER reports on the state the SWEEP builds: **117 movers / 803 holders**
+against the broken 98 / 822, with 21 rows added and exactly the 2 DOME rows
+removed.
+
+### `LOBES: x cup 1.2` — split to #285
+
+Declared at **1,104 pairs / 0.1095 mm**. It is the one row the clamp cannot
+reach, and the measurements that say why are in the entry's own note and in
+the issue: the closing arc's ALONG-u radius falls to **0.216 / 0.178 / 0.638
+of t/2** at v −0.111 / −0.333 / −1.000 on the last station, which is the other
+principal curvature; the nib puts its last seven stations inside **0.05 mm** of
+blade at gaps of 0.007–0.009 mm against main's 0.163–0.406; the pair count is
+**non-monotone in the cup's nib amplitude** and is WORST with the cup removed
+entirely (1,856 against the unscaled 1,056); and `APEX_ARC_ROWS` 6 -> 1 makes
+every affected row worse. **Main's 0 on that row is a tessellation coincidence
+rather than health** — `petalCup max (1.2)` alone reads 80 pairs / 0.0239 mm on
+main, while the lobes alone read 0 on every tree.
+
+The hypothesis recorded for that session to TEST rather than adopt is Eva's:
+**the nib is narrower in plan than the sheet is thick**, so the fix may be a
+tip THICKNESS taper rather than a respacing of stations.
+
+The sheet is `node tools/shot-bloom-fold-clamp.mjs <dir> --cuponly <worktree>`
+-> `docs/img/fold-clamp.png`; §9g's is
+`node tools/shot-bloom-cup-nib.mjs <dir> --nofix <worktree>` ->
+`docs/img/cup-at-the-nib.png`.
+
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**
