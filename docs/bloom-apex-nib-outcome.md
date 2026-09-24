@@ -1238,6 +1238,20 @@ The hypothesis recorded for that session to TEST rather than adopt is Eva's:
 **the nib is narrower in plan than the sheet is thick**, so the fix may be a
 tip THICKNESS taper rather than a respacing of stations.
 
+### The byte partition, CLOSED
+
+With the rebuilt predicate, `verify-bloom-surface-bytes --base <worktree of
+the pre-cup head> --movers <the 117>` over the WHOLE 920-row matrix in both
+modes reads **PASS**:
+
+* **117 of 117 predeclared movers MOVED** — every one must, and every one did.
+* **0 floats moved on the 803 holders**, positionally, under `Object.is`.
+* **1,180,591,740 export floats over 131,176,860 triangles** plus
+  **79,185,320 captured-grid values**.
+
+That is the claim §9g could not make and the reason it could not: the
+partition was never failing about the geometry.
+
 The sheet is `node tools/shot-bloom-fold-clamp.mjs <dir> --cuponly <worktree>`
 -> `docs/img/fold-clamp.png`; §9g's is
 `node tools/shot-bloom-cup-nib.mjs <dir> --nofix <worktree>` ->

@@ -1667,6 +1667,9 @@ falsely declared a mover — which is exactly the two `DOME: the INCURVE TARGET`
 Coerced by each control's own kind (`bloom-census-sweep`'s own `stateOf`), the predicate reads
 **117 movers / 803 holders** against the broken 98 / 822. **A predicate built on a state the
 geometry would never build measures nothing.**
+**THE PARTITION THEN CLOSES: 117 of 117 predeclared movers MOVED and 0 floats moved on the 803
+holders**, positionally under `Object.is`, over the whole 920-row matrix in both modes —
+**1,180,591,740 export floats over 131,176,860 triangles and 79,185,320 captured-grid values.**
 **The coupon plan gains a 0.40 mm tip.**
 **AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
 ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row
