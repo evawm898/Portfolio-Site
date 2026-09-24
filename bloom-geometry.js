@@ -6885,10 +6885,18 @@ export function petalForm(state, halfW, t, buckleCtx = null) {
      constant per-row normal is a wedge of varying thickness, not a sheet;
      the unit normal here is dP/dv rotated a quarter turn in the same
      plane, which keeps the offset a true constant-thickness shell. */
-  const sectAt = (C, T1, N1, h, u, hb = h) => {
+  const sectAt = (C, T1, N1, h, u, hb = h, cupScale = 1) => {
     const r = ramp(u);
     const k = kAt(u, r);
-    const c = cAt(u, r);
+    /* THE CUP'S CURVATURE IS `2c/hb`, SO IT BLOWS UP AS THE NIB CONVERGES,
+       and a mid-surface whose radius of curvature falls under the sheet's
+       own half-thickness has no offset surface — the two skins invert.
+       `cupScale` is the nib's own answer to that and is EXACTLY the
+       double 1 everywhere else, so every row off the nib takes the
+       shipped expression term for term (x * 1 is exact in IEEE-754).
+       Its owner is `rowAt`, which is where the profile lives; see the
+       derivation there. */
+    const c = cAt(u, r) * cupScale;
     /* THE CUT LEAVES THE SURFACE ALONE (session 38). `h` is where the boundary
        is; `hb` is the BASE outline's half-width, the scale every law below
        reads. Where the two are the same double (every plain petal — the
@@ -7389,6 +7397,37 @@ export function petalSurface(state, ring, slot, cap, acc) {
        rotates about the CURRENT length direction; see the ordering
        argument in petalForm's header. */
     const f = form ? form.frameAt(Rs, T, phi, u, dome === null ? null : Up) : null;
+    /* THE CUP'S SCALE ON THE NIB, DERIVED FROM TWO LENGTHS AND NOT TYPED.
+       `sectAt`'s cup term is `c * a^2 / hb`, so the mid-surface cross-section
+       leaves the midrib with curvature `2c/hb` and radius `hb/(2c)`. A sheet
+       is that mid-surface offset by +/- t/2, and an offset surface INVERTS
+       wherever the offset exceeds the radius — so the section folds wherever
+       `hb < |c| * t`. Off the nib that never binds: the blade's own floor is
+       TIP_HALF_MM and the widest reachable |c| is a fraction of a millimetre
+       of it. ON the nib it binds everywhere, because the outline is drawn to
+       APEX_END_HALF_MM: measured on `petalCup min (-0.8)` the radius runs
+       0.12544 mm at the nib's entry row down to 0.03125 at its end, against
+       a half-thickness of 0.6000 — five to nineteen times inside the fold.
+       Main never reached it because main's outline STOPPED at the floor.
+
+       The scale is `h / TIP_HALF_MM`, which is not a fade with a shape of its
+       own: the nib's entry is BY CONSTRUCTION the station where the law
+       crosses TIP_HALF_MM, so the factor is exactly 1 there and the blade
+       below the entry is untouched to the bit; and above it `2*(c*h/T)/h` is
+       `2c/T`, so the section's curvature is CONSTANT across the whole nib at
+       the value it already had at the entry. The nib inherits the tip
+       curvature main drew at its flat face and never goes past it. */
+    /* IT READS `hb`, THE BASE OUTLINE, AND NOT THE DRAWN `h` — the same
+       rule every other law in `sectAt` obeys, and measured rather than
+       assumed. The first cut scaled by `h`, which on a LOBED row
+       oscillates with the lobe period, so the cup's amplitude stepped at
+       every sinus and the true-normal offset turned each step into a
+       wedge — session 38's own buckle finding, arriving in the cup one
+       feature later: `LOBES: x cup 1.2` went 1,056 -> 1,688 pairs on it.
+       Against `hb` the curvature is `2c/TIP_HALF_MM` whatever the cut
+       removes, and the entry is still exactly 1 because the nib's entry
+       IS where the BASE law crosses TIP_HALF_MM. */
+    const cupScale = profile.onNib(u) ? hb / TIP_HALF_MM : 1;
     /* `hb` RIDES ALONG (session 42). MODEL B's cut reaches the apex, so the
        apex clauses can no longer read `petalTipShape`'s own curve off the
        emitted half-widths — A6 used to fit ABOVE the lobe window and under
@@ -7397,7 +7436,7 @@ export function petalSurface(state, ring, slot, cap, acc) {
        it emits it rather than having a reader rebuild the profile. */
     return f === null
       ? { C, N: nrm, T, h, hb, u, sect: flatSect(C, nrm, h) }
-      : { C, N: f.N, T: f.T, D: f.D, h, hb, u, sect: form.sectAt(C, f.T, f.N, h, u, hb) };
+      : { C, N: f.N, T: f.T, D: f.D, h, hb, u, sect: form.sectAt(C, f.T, f.N, h, u, hb, cupScale) };
   };
 
   return {

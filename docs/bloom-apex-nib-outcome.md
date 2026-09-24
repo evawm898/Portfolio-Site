@@ -989,6 +989,130 @@ class is one ruling rather than thirty-two.
 
 ---
 
+## 9g. THE CUP AT THE NIB — the hypothesis is REFUTED, the mechanism is measured, and a fix is prototyped
+
+Eva's ruling on §9f named a hypothesis to test first: that the cup deformation
+reads `halfWidthBaseAt` — the PRE-NIB width — so that inside the nib it curls
+the margins as if the blade were still full width.
+
+**IT IS REFUTED, AND IT IS AN IDENTITY RATHER THAN A CLOSE CALL.** `shapeAt`
+IS `shapeBaseAt` whenever there are no lobes (`bloom-geometry.js`'s own
+`const shapeAt = (lobes === null || lobes.noRoom) ? shapeBaseAt : …`), and
+`halfWidthBaseAt` carries the nib's floor branch exactly as `halfWidthAt`
+does. Measured on the emitted rows of `petalCup min (-0.8)`, EXPORT:
+`hb === h` reads **true on every row of the blade including every row of the
+nib** — the same double, not merely the same value. **The cup reads the DRAWN
+half-width, which is what it should read.**
+
+**WHAT ACTUALLY FOLDS IS THE CURVATURE, AND IT IS THE SAME TERM.** `sectAt`'s
+cup lift is `c·a²/hb` with `a = h·v`, so the mid-surface cross-section leaves
+the midrib with curvature `2c/hb` and radius `hb/(2c)`. A sheet is that
+surface offset by ±t/2, and **an offset surface inverts wherever the offset
+exceeds the radius**. The radius is therefore proportional to the half-width,
+and the nib draws the half-width down to `APEX_END_HALF_MM` = 0.05 mm. So:
+
+| `petalCup min (-0.8)`, EXPORT | u | h (mm) | R = hb/2c (mm) | R / (t/2) |
+|---|---|---|---|---|
+| on the law | 0.982963 | 1.12434 | 0.70271 | 1.1712 |
+| nib, first row | 0.998577 | 0.20070 | 0.12544 | **0.2091** |
+| nib, last row | 1.000000 | 0.05000 | 0.03125 | **0.0521** |
+
+against a half-thickness of 0.6000 mm — **five to nineteen times inside the
+fold condition.** Main never reached it because main's outline STOPPED at the
+0.80 mm floor: the same row on a worktree of `2464d50` reads 0.9956 and 0.8333
+at its last two rows, i.e. only just inside, and reads **0 census pairs**.
+
+So Eva's conclusion was right and her mechanism was not: **the cup is the
+thing folding, and the lever she proposed is the correct one** — but "scaled
+by the drawn half-width" is a no-op, because that is already what happens.
+
+### The prototype
+
+`cupScale` in `rowAt`, passed to `sectAt` as a seventh argument defaulting to
+the exact double 1 (so every other caller and every row off the nib is
+bit-identical — `x * 1` is exact in IEEE-754):
+
+    const cupScale = profile.onNib(u) ? hb / TIP_HALF_MM : 1;
+
+**IT IS DERIVED FROM TWO LENGTHS AND HAS NO SHAPE OF ITS OWN.** The nib's
+entry is BY CONSTRUCTION the station where the law crosses `TIP_HALF_MM`, so
+the factor is exactly 1 there and the blade below the entry is untouched to
+the bit — Eva's constraint, met structurally rather than by a tolerance. Above
+it the curvature is `2·(c·hb/T)/hb` = `2c/T`, **constant across the whole
+nib at the value it already had at the entry**: measured, `petalCup min` reads
+R/(t/2) = 0.8333 on every nib row, which is main's own last-row figure to four
+decimals.
+
+**IT READS `hb`, NOT `h`, AND THE FIRST CUT READ `h`.** On a lobed row the
+drawn width oscillates with the lobe period, so a scale built on `h` would
+step the cup's amplitude at every sinus and the true-normal offset would turn
+each step into a wedge — session 38's own buckle finding arriving in the cup
+one feature later. Measured over all 36 rows the two forms are identical to
+the integer, so nothing on this matrix distinguishes them; `hb` is kept
+because it is the rule every other law in `sectAt` obeys, and that is stated
+rather than claimed to have been measured.
+
+### What it clears, and what it does not
+
+**30 of 36 clear to exactly 0 within-shell pairs; total 18,497 → 2,185 (−88%).**
+Six remain:
+
+| pre-fix | post-fix | worst span | row |
+|---|---|---|---|
+| 1,088 | 288 | 0.3363 → 0.5850 | `petalCupGradient max (1.2)` |
+| 904 | 80 | 0.4069 → 0.3699 | `GRADIENT: cup gradient max x ALL THIN x spread min` |
+| 600 | 71 | 0.3699 → 0.2060 | `SEPALS: sepalCup min (-0.8)` |
+| 592 | 44 | 0.3684 → 0.2385 | `SLOT: ALL MIN x 2 whorls in step` |
+| 343 | 14 | 0.2842 → 0.4649 | `FAN x PER-PETAL: petal 1 x 3 layers x inner*` |
+| **1,056** | **1,688** | 0.1610 → 0.1601 | **`LOBES: x cup 1.2`** — WORSE |
+
+**THE RESIDUE IS IN THE BLADE BELOW THE NIB ENTRY, WHICH THE FIX IS SCOPED
+NOT TO TOUCH.** Attributed on the fixed tree: `SEPALS: sepalCup min` is
+71 of 71 in the BLADE at u 0.9728 against a nib entry at 0.9889;
+`petalCupGradient max` is 220 blade / 68 nib; `FAN x PER-PETAL` is 9 / 5. And
+the reason is the same law read one station lower — on `petalCupGradient max`
+the row at u 0.982963 already reads **R/(t/2) = 0.7943 on the law itself**,
+with no nib involved, and on `LOBES: x cup 1.2` the rows at u 0.9784 and
+0.9863 read 0.9254 and 0.6634. Under Eva's constraint those are unreachable by
+construction.
+
+**AND IT IS NOT THE ARC'S SIX ROWS — that was tested and refuted.** The rows
+just below the nib ARE about twice as far apart on the branch as on main
+(0.5157 / 0.4706 / 0.4276 / 0.3867 mm against 0.2531 / 0.2062 / 0.1625 /
+0.3594), which is the V4 xfail's own mechanism and the obvious suspect. But
+cutting `APEX_ARC_ROWS` from 6 to 1 on a scratch tree makes every one of the
+six **worse**, not better — 288 → 1,720, 80 → 1,616, 71 → 1,055, 44 → 449,
+14 → 543 — so fewer rows near the tip is the wrong direction and the arc's
+demand is not the cause.
+
+### What the fix costs
+
+* **ZERO TRIANGLES**, measured on both trees in both modes: the shipping
+  default 24,688, row C 24,688, `petalCup min` 24,688, `SEPALS: sepalCup min`
+  39,998, `LOBES: x cup 1.2` 24,688 — identical to the integer either side.
+  It is a boundary-free surface change on a fixed lattice.
+* **THE EXPORT CENSUS IS CLEAN ON EVERY ROW THAT REACHES IT**: the gate run on
+  nine affected rows reads `boundary=0 degenerate=0 nonManifold=0` with
+  `tris(live) === tris(export)` on all three that pass, and drops exactly the
+  six survivors on X2.
+* **NOTHING VISIBLE.** `docs/img/cup-at-the-nib.png` (`node
+  tools/shot-bloom-cup-nib.mjs <dir> --nofix <worktree>`) is Eva's three rows
+  against two columns, print preview on, tip close-ups: the nib, the section
+  edge on, and the last quarter of the blade. The two columns are
+  indistinguishable at every cell, which is what a change confined to the last
+  1.1% of the blade should look like. **The sepal cell's frame is the
+  PETAL's** — the camera is aimed at the builder's `petalTip`, which has no
+  sepal equivalent — so that row's evidence is its census, not its picture,
+  and the sheet says so on its own face.
+
+### NOTHING IS DECLARED
+
+Per Eva's instruction, no `SELF_INTERSECTION_XFAIL` entry is added or moved by
+this section, and `LOBES: x cup 1.2` — the row labelled *"must not gain a new
+one"* — is reported rather than declared. It gains one either way: 1,056
+pre-fix and 1,688 post-fix, against **0 on main's geometry at an identical
+triangle count**.
+
 ## 10. What is NOT done, and is named rather than left to be found
 
 * **THE LEAF'S IDENTICAL STUB — a backlog entry, §11.**
