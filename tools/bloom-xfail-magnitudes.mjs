@@ -201,7 +201,16 @@ if (EMIT) {
   console.log('\n/* entries as THIS tree measures them (EXPORT mode, the builder\'s doubles) — copy deliberately, name every mover in the outcome doc */');
   for (const o of out) {
     const note = H.SELF_INTERSECTION_XFAIL[o.label].note;
-    console.log(`  ${JSON.stringify(o.label).replace(/^"|"$/g, "'")}: { pairs: ${o.within}, worstMm: ${o.worstSpanMm.toFixed(4)}${note ? `, note: ${JSON.stringify(note)}` : ''} },`);
+    /* THE KEY IS QUOTED BY `JSON.stringify` AND LEFT DOUBLE-QUOTED (the
+       apex-nib session). It used to swap the outer quotes for single ones,
+       which is correct until a label contains an APOSTROPHE — and eight of
+       them do ("the sheet's headline", "the fan's full-disc hub", "the
+       anther's own default shape"). The emitted line was then INVALID
+       JAVASCRIPT, so the one thing this flag exists for — "copy deliberately"
+       — silently could not be done for those eight rows, and a session doing
+       it would paste a syntax error into the harness. Double quotes need no
+       escaping decision at all, and the list already carries both forms. */
+    console.log(`  ${JSON.stringify(o.label)}: { pairs: ${o.within}, worstMm: ${o.worstSpanMm.toFixed(4)}${note ? `, note: ${JSON.stringify(note)}` : ''} },`);
   }
 }
 if (JSON_OUT) console.log(JSON.stringify({ root: ROOT, node: process.version, rows: out, bad }, null, 1));

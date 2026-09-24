@@ -39,7 +39,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions } from './bloom-harness.mjs';
+import { serveRepo, launchPage, openBloom, applyConfig, stillFrame, thicknessAssertions, lobeAssertions, stemAssertions, leafAssertions, sepalAssertions, inflorescenceAssertions, varianceAssertions, apexNibAssertions } from './bloom-harness.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
@@ -1390,6 +1390,80 @@ const MUTANTS = [
     witness: (M, C) => { const m = sepalFacts(M, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 }), c = sepalFacts(C, { placement: 'CONTINUOUS', hubShape: 'SPHERE', sepalCount: 8 });
       if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
       return (m.count === 8 && c.count === 0) ? null : `the mutant built ${m.count} sepals on a sphere against the clean tree's ${c.count} — the refusal still holds`; } },
+
+  /* ===== THE APEX NIB (AN0-AN3, the apex-nib session) ===============
+     Both STL gates are blind to every one of these: each leaves a
+     single-valued, strictly falling outline on a fixed row-and-column
+     lattice, so each exports watertight, as one connected piece, with no
+     degenerate triangle and the SAME triangle count. The census cannot see
+     them either — none of them folds a sheet — and A6 cannot, because Eva's
+     ruling fits the law only where it is above the print floor and stops at
+     the crossing, so everything the nib draws is below its subject.
+
+     EVERY WITNESS READS THE PLAN THE MUTATED MODULE DERIVES, never the
+     assertion the mutant names. */
+  { id: 'the-nib-is-never-cut', why: 'the blade never clears the print floor, always — the guard refuses every nib and the outline runs out FLAT to the mode floor as it did before this session',
+    find: "  if (!(lam(uPk) > TIP_HALF_MM + APEX_FLOOR_EPS)) return { ...inert, why: 'the blade never clears the print floor' };",
+    into: "  if (true) return { ...inert, why: 'the blade never clears the print floor' };", names: ['AN0'],
+    witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (!m.active && c.active && m.terminal > c.terminal) ? null
+        : `the mutant's plan is ${m.active ? 'ACTIVE' : 'inert'} ending on ${m.terminal} mm against the clean tree's ${c.active ? 'ACTIVE' : 'inert'} ${c.terminal} — the nib still closes the blade`; } },
+  { id: 'the-squared-terminal-no-longer-stands-the-nib-down', why: 'the nib is cut even where a squared terminal holds the outline above the print floor, so petalTipEnd stops deciding how wide the petal ends — the guard’s other arm, and #229’s fringe terminal with it',
+    find: "  if (lam(1) > TIP_HALF_MM + APEX_FLOOR_EPS) return { ...inert, why: 'a squared terminal holds the outline above the floor' };",
+    into: '  /* the squared terminal no longer stands the nib down */', names: ['AN0'],
+    /* THE WITNESS ASKS WHICH GUARD REFUSED, NOT WHETHER ONE DID — and the
+       first version asking the latter reported "the behaviour did not move"
+       on a live mutation, which is a finding about the GEOMETRY worth keeping.
+       On a 0.30 squared terminal at the default width the terminal is 2.40 mm
+       and the outline is CONSTANT over [uPk, 1], so with the squared-terminal
+       guard removed the bisection finds no crossing, `uLaw` lands on 1, the
+       one-sided tangent there is 0 and the NEXT guard refuses — for the wrong
+       reason. So that guard is load-bearing for the REASON rather than for the
+       outcome on this row, which is exactly what AN0 checks: a ring reporting
+       "the law arrives with no slope to carry on" is a FINDING, because that
+       guard fires on no row of the shipped matrix. The plan moving observably
+       is the claim; `active` alone is a narrower question than the mutation. */
+    witness: (M, C) => { const m = nibPlan(M, { petalTipEnd: 0.3 }), c = nibPlan(C, { petalTipEnd: 0.3 });
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const moved = m.active !== c.active || m.why !== c.why;
+      return moved ? null
+        : `on a 0.30 squared terminal the mutant's plan is ${m.active ? 'ACTIVE' : 'inert (' + m.why + ')'} and the clean tree's is ${c.active ? 'ACTIVE' : 'inert (' + c.why + ')'} — the terminal still stands the nib down, by the same guard`; } },
+  { id: 'the-flank-is-not-the-laws-tangent', why: 'the flank is carried on at the ONE-STEP difference quotient instead of the two-step Richardson one, so the apex is drawn at a tangent the law does not have',
+    /* RE-ANCHORED ONTO THE QUANTISED FORM (§6c added `gridFloor` after this
+       mutant was written, and the anchor pre-check reported it disarmed at
+       0 matches before any mutant ran — which is the whole reason that check
+       runs for EVERY mutant rather than the selected ones). The grid is KEPT
+       on both sides on purpose: what this mutation is about is the TANGENT
+       LAW, and dropping the quantisation with it would make the mutant test
+       two things and AN1 unable to say which. */
+    find: '  const slope = gridFloor(Math.abs(2 * s2 - s1));',
+    into: '  const slope = gridFloor(Math.abs(s1));', names: ['AN1'],
+    witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      const d = Math.abs(m.slope - c.slope);
+      return d > 1e-6 ? null : `the mutant's flank slope is ${m.slope} against the clean tree's ${c.slope} (${d.toExponential(2)} apart, under AN1's own bound)`; } },
+  { id: 'the-arc-is-not-tangent-to-the-flank', why: "the arc's radius drops the secant factor, so a circle on the axis meets the flank at a CORNER instead of tangentially — the FULL ROUND nib Eva ruled, drawn as a chamfer with a fillet",
+    find: '  const radiusMm = APEX_HALF_MM * sec;',
+    into: '  const radiusMm = APEX_HALF_MM;', names: ['AN1'],
+    witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return Math.abs(m.radius - c.radius) > 1e-9 ? null
+        : `the mutant's arc radius is ${m.radius} against the clean tree's ${c.radius}`; } },
+  { id: 'the-law-is-cut-above-its-own-crossing', why: 'the law is truncated where it falls under TWICE the print floor rather than at the floor itself, so the nib eats a stretch of blade the law still owns',
+    find: '  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > TIP_HALF_MM + APEX_FLOOR_EPS) lo = m; else hi = m; }',
+    into: '  for (let i = 0; i < 90; i++) { const m = (lo + hi) / 2; if (lam(m) > 2 * TIP_HALF_MM) lo = m; else hi = m; }', names: ['AN1', 'AN2'],
+    witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return Math.abs(m.uLaw - c.uLaw) > 1e-9 ? null
+        : `the mutant cuts the law at u ${m.uLaw} against the clean tree's ${c.uLaw}`; } },
+  { id: 'the-nib-ends-on-the-print-floor', why: "the arc is floored at the print floor instead of its own mini-face, so the blade stops on a 1.60 mm face while the plan still declares a 0.10 mm one — the defect this feature exists to remove, wearing the feature's own record",
+    find: '      return Math.max(APEX_END_HALF_MM, Math.sqrt(Math.max(0, radiusMm * radiusMm - (x - centreMm) * (x - centreMm))));',
+    into: '      return Math.max(TIP_HALF_MM, Math.sqrt(Math.max(0, radiusMm * radiusMm - (x - centreMm) * (x - centreMm))));', names: ['AN3'],
+    witness: (M, C) => { const m = nibPlan(M), c = nibPlan(C);
+      if (m.threw || c.threw) return `the witness threw: ${m.threw || c.threw}`;
+      return (m.last > c.last + 0.1) ? null
+        : `the mutant's last emitted half-width is ${m.last} against the clean tree's ${c.last}`; } },
 ];
 
 /* THE SEPAL WITNESS — one whorl from a module's own builder on the mutant
@@ -1421,6 +1495,31 @@ function leafFacts(MOD, n) {
     const rep = MOD.buildLeafInto(solo, plan, st, 0, 0);
     return { plan, rows: rep.rowHalfBaseMm, clamp: rep.tipClamp,
       rowsDiffer(other) { return this.rows.length !== other.rows.length || this.rows.some((h, i) => h !== other.rows[i]); } };
+  } catch (e) { return { threw: e.message }; }
+}
+
+/* THE APEX NIB'S WITNESS — the PLAN the mutated module produces for one
+   state, read off `petalSurface` rather than assembled here. Every number
+   below is one the nib DERIVES (the crossing, the tangent, the arc's radius
+   and centre, the drawn length); none of them is a constant, so a mutation
+   that moved only a constant would be reported as inert by this and is
+   declared blind in the AN family's own header. Returns the clean tree's
+   figures beside the mutant's so a witness can say WHICH number moved. */
+function nibPlan(MOD, set = {}) {
+  try {
+    const st = { ...REGISTRY_DEFAULTS, ...set };
+    const acc = new MOD.MeshBuilder({ exportMode: true });
+    const fr = MOD.footRing(st, acc);
+    const ring = fr.slotRings[0][0];
+    let slot = null;
+    MOD.buildWhorlInto({ count: fr.slotCount, radius: ring.radius, height: 0, sizeRamp: () => ring.scale,
+      angleRamp: () => ring.tiltExtra, phase: ring.phase, placement: st.placement, fan: fr.fan,
+      blade: (sl) => { if (!slot) slot = sl; } });
+    const prof = MOD.petalSurface(st, ring, slot, null, acc).profile;
+    const a = prof.apex;
+    return { active: a.active, why: a.why, uLaw: a.uLaw, slope: a.slope, radius: a.radiusMm,
+      centre: a.centreMm, xFace: a.xFaceMm, drawn: prof.drawnLength, terminal: prof.capTerminalHalf,
+      last: prof.halfWidthAt(1) };
   } catch (e) { return { threw: e.message }; }
 }
 
@@ -1479,6 +1578,14 @@ const ROWS = [
   { label: 'taper 0.60 — the cap entry at the 0.80 clamp', set: [{ id: 'petalTipTaper', value: '0.6' }] },
   { label: 'taper 4 — the cap entry from the crossing', set: [{ id: 'petalTipTaper', value: '4' }] },
   { label: 'the narrowest petal (width 8, taper 4)', set: [{ id: 'petalWidth', value: '8' }, { id: 'petalTipTaper', value: '4' }] },
+  /* A SQUARED TERMINAL ABOVE THE PRINT FLOOR (the apex-nib session), which is
+     the apex nib's OTHER inert arm and the only state where the guard's
+     second condition decides anything. Without it
+     `the-squared-terminal-no-longer-stands-the-nib-down` is a no-op on every
+     row in this file — `seam-reads-the-live-sheet`'s lesson, and
+     `bore-is-not-evas-rule`'s: a witness state is part of the claim. */
+  { label: 'a squared terminal above the print floor (petalTipEnd 0.30 — the nib stands down)',
+    set: [{ id: 'petalTipEnd', value: '0.3' }] },
   /* THE TWO LADDER ROWS (session 32). The taper rows above drive the OUTLINE;
      neither of the ladder's two arms is reachable from them. `A0.6 f1 n1.5`
      is the one state measured to saturate the station measure, so it is what
@@ -1684,6 +1791,14 @@ async function famsOn(rows) {
        silent on a bloom whose amount is 0, which is every other row here. */
     for (const msg of await varianceAssertions(page, row)) {
       const mm = /^(VS\d+):/.exec(msg); if (mm) seen.add(mm[1]);
+    }
+    /* THE APEX NIB (the apex-nib session) — the rule once more, and note the
+       code is `AN\d+` and NOT `A\d+`: the A family's own capture above is
+       anchored on a digit immediately after the letter, so `AN0:` matches
+       neither pattern by accident. That is the prefix hazard this file
+       already records, avoided by construction rather than by luck. */
+    for (const msg of await apexNibAssertions(page, row)) {
+      const mm = /^(AN\d+):/.exec(msg); if (mm) seen.add(mm[1]);
     }
   }
   return seen;

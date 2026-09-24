@@ -1469,6 +1469,348 @@ moved its find-string, and a mutation invisible because its row saturated only i
 is 23 and not 22 because phase22 is margin buckling's, and the FROZEN_MATRICES census caught
 the collision at module load, by name.**
 
+**AND THE PETAL NO LONGER ENDS ON A FLAT FACE — THE LAW IS TRUNCATED AT THE PRINT FLOOR AND
+CLOSED ON A ROUNDED NIB** (Eva's rulings over five sheets, the apex-nib session — read
+`docs/bloom-apex-nib-outcome.md` before touching `apexNibPlan`, `widthProfile`'s
+reparameterisation, `ladderDemand`, any `APEX_*` constant or the AN family). `halfWidthAt` is a
+`max` of the law, the root blend and the print floor, and the superellipse reaches EXACTLY 0 at
+u = 1 — so wherever the law fell under the floor the outline ran PARALLEL at it to the end and
+**every petal finished on a flat face two floors across, 1.6000 mm in EXPORT and 0.3000 mm live,
+whatever exponent `petalTipShape` was asked for.** NOT a regression: session 32's cap DEMOTION
+squared it and the demotion was right (through the old cap an asked 3.00 draws 2.0403, so three
+of the six named tip states were unreachable). **THE STUB'S SHARE IS A WIDTH QUESTION, NOT A
+LENGTH ONE** — the outline meets the floor where `(W/2)·f(u) = TIP_HALF_MM` — the leaf tip-shape
+session's finding from the other side.
+**WHAT SHIPS IS RED+ AT A 0.40 mm FACE WITH THE FULL ROUND NIB.** `apexNibPlan()` is the ONE
+owner: bisect for the law's own crossing of `TIP_HALF_MM`; read the flank's one-sided tangent
+there (Richardson, two steps); run a STRAIGHT FLANK on that tangent to `APEX_HALF_MM`; close
+with a CIRCULAR ARC centred ON THE AXIS tangent to both flanks (`r = APEX_HALF_MM·sqrt(1+m^2)`
+puts the tangent points exactly on the old face's corners), terminating on a mini-face
+`2 x APEX_END_HALF_MM` = **0.10 mm**. **`TIP_HALF_MM` AND `MIN_FEATURE_MM` DO NOT MOVE** — the
+0.40 mm face is an AUTHORED EXCEPTION below the minimum feature, ruled deliberately on a project
+where **nothing has ever been printed**. The mini-face is not a convenience: a true apex
+collapses NV columns onto one edge (session 5's `domeInto`, 48 degenerate triangles from a ring
+6.1e-17 across). **ZERO TRIANGLES ADDED — 24,688 and 1,205.55 KiB at the default in both modes,
+main's own counts.**
+**`petalLength` IS THE ASKED LENGTH AND THE OVERSHOOT IS REPORTED** (Eva's ruling). The blade is
+drawn to wherever the cap closes: **8.59 mm SHORTER at tip shape 0.60 on a 60 mm blade** and
+LONGER above about n 1.20 — the crossover is between 1.20 (−0.001 mm) and 1.40 (+0.122), the
+maximum is **+0.124 mm at the shipped 1.70**, and the flank's slope spans a factor of **204**
+over the range (0.1717 to 35.05 mm/mm). Everything downstream takes the DRAWN length; the cap is
+applied EARLY in `widthProfile` so the lobe and fringe blocks see the capped outline, and
+`toLaw(v) = v·drawn/asked` is the one place the two parameterisations meet.
+**THREE INERT CASES, DECLARED AND NAMED ON THE READ-OUT**, swept over **2,452 ring-modes** of the
+matrix in both modes: a squared terminal holding the outline above the floor (76 — #229's fringe
+terminal), an inner whorl whose blade never clears the floor (18), and a law arriving with no
+slope (**0 — unreachable**, so a ring reporting it is a FINDING and AN0 says so). **A LEAF IS
+EXCLUDED BY DECLARATION** (`cap.petiole`): `buildLeafInto` floors at `TIP_HALF_MM` in both modes
+so a leaf carries the identical 1.60 mm stub — 21.3% of the leaf at tip shape 0.60 — and that is
+a second partition and a second ruling. **Scheduled, not taken; §11 of the outcome doc is the
+backlog entry, with what it looks like today, why it was held and what closing it would take.**
+**A SEPAL IS NOT EXCLUDED AND GAINS PROPORTIONALLY MORE THAN A PETAL** (§7b): it is the petal
+builder on a second ring, so `apexNibPlan` runs on its own substate, and being scaled DOWN it
+meets the floor sooner — the shipped 0.60 sepal spent **1.82% of itself flat against the petal's
+0.76%, and a 0.20 sepal 12.5%.** At `sepalScale` 1.00 its nib is the petal's to every digit. **The
+DRAWN angle limit and the triangle count are unmoved on both trees over six states** — the phase,
+the whole scale range, a cupped corolla and the crowded corner, 0 of 6 disagreeing — so 0.177 mm
+on a 21 mm blade does not reach the scan's own 1-degree step.
+**THE ARC IS SMALLER THAN A ROW GAP (0.0496 mm against a 0.60 mm median), SO THE LADDER HAD TO BE
+TOLD** — `ladderDemand()` asks for `APEX_ARC_ROWS = 6` through session 38's own mechanism, and
+`ladderHalfAt` still floors on `TIP_HALF_MM` so the nib's constants never reach row placement.
+**THE ARC'S DEMAND IS MERGED INTO THE LOBES', NEVER CHOSEN BETWEEN** (MODEL B's window runs to
+u = 1, so the arc is its last sub-region) **and it takes the window's SPARE capacity and no
+more** — asking for six extra rows made the placer trim its largest sub-regions and the ladder
+put 7 stations in a period whose demand is 9, which **L6 caught**. **AND THE BLEND'S TARGET DID
+NOT KNOW ABOUT SUB-REGIONS**: it was three bands (stretch / WHOLE window / tip) while its own
+comment already stated the rule it was breaking, so on `lobeDepth 0.30 x 3` the ladder PLACED 6
+stations across the 0.0014-wide arc and the blend left **ONE**, spreading five back over half the
+blade. With no splits the new bands are the three they replace term for term. **AT THE BUCKLE'S
+FREQUENCY CEILING NO DEMAND IS PLACED AT ALL and the arc gets ONE row** — `ladderGapFactor(7)` is
+exactly 1, so any row handed to the arc comes off the wave's bar; session 32 ruled that trade and
+`APEX NIB: x the buckle at its frequency ceiling` is the matrix row that carries it. **AN3
+REPORTS the count and does not assert it.**
+**AND "SPARE CAPACITY" WAS BEING MEASURED WHERE IT CANNOT BE — CI CAUGHT IT, A8, ON TWO ROWS.**
+`ladderDemand()` subtracted the LOBES' resolution floor from `ladderWindowCapacity`; the gap
+bound ALSO asks each BAND of the blend target for `width / cap` rows of its own, and that floor
+was in no arithmetic. **`bloom-connectedness` failed with 0 rows not one piece** — the flood fill
+clean on all 918 rows that reached the results and #220's row census naming the two DROPPED by a
+validity assertion: `LOBES: x petalTipShape 0.60` at **1.5829x** and `x petalTipShape 3.00` at
+**1.4159x** against the 1.4000 bound, `blend = 0` on both, where the base tree reads 1.4000 /
+1.3999 AT the bound. On the 0.60 row the window's 27 rows went **14 / 7 / 6** across two lobe
+periods and the 0.0054-wide arc, so the periods' target gaps read 1.471 and 1.623 — and the
+target IS `mix(0)`, so no blend is admissible and the emitted ladder is the over-cap target.
+**THE CLAMP CANNOT BE FINISHED WHERE IT STARTS**: what `ladderDemand` can see is
+`ladderWindowCapacity` (34 here), what the window GETS is `max(baseW, the demand)` (27), and
+`baseW` is the base measure's own share, which does not exist until `cum` does. So
+`bladeStations` owns the region counts (`regionsFor`) and the blend target (`targetFor`) as two
+functions now and finishes the clamp against the target the bound is decided on — **while the
+ladder would be inadmissible and the arc holds more than one row, the arc gives one back** —
+with `yieldAt` naming the band that may lose rows. **NOTHING ELSE YIELDS**: the lobes' floor is
+ruled and the arc's count is reported rather than asserted, which is what makes the arc the
+party that can give. **IT CANNOT FIRE ON A ROW THAT WAS GOING TO PASS, BY AN INEQUALITY RATHER
+THAN BY OBSERVATION** — band b of the PLACED ladder spans the same u-interval with the same count
+as band b of the target, so `widest(out) >= widest(target)`. Measured over 920 rows x both modes
+x every layer, **2,484 rings: 4 move and they are the four that were red** (6 arc rows -> 3 and
+-> 5, blend 0 -> 0.1343 and 0.2180, both modes agreeing), **triangle counts unmoved at 24,688 and
+the census unmoved at 0 within-shell pairs on both**.
+**TWO DEFECTS IN THE LOBES BLOCK, BOTH FOUND BY THE GATE AND BOTH THIS PROJECT'S OWN CLASS.** A
+SECOND `laminaHalf` — the same expression as the shared one, which is why nobody noticed, until
+the nib owned its own floor and the local copy read **0.80 mm where the outline is 0.05**: the
+per-period relief guard then handed a tooth more material than the blade has (**L5: a relief of
+3.0775 mm against a headroom of 3.09e-3**, and the apex half-width went to **0.0000** on
+`lobeDepth 0.30 x 3`). And the ARC TABLE MIXED TWO PARAMETERISATIONS (`[u * length,
+laminaHalf(u)]`, one asked and one drawn) — **L4 re-measured the margin at 26.3258 mm against
+the record's 26.2440, the drawn/asked ratio to four figures.** L4's own lamina was a THIRD
+restatement and is the profile's `laminaHalfAt` now; what keeps L4 a measurement of the tree is
+its 65,536-sample chord integrator against the geometry's graded `rimArcTable`, untouched.
+**NINE CLAUSES RE-DERIVED, EACH SEEN RED FIRST** (Eva: *"C1/A2 re-derived onto the builder's
+reported length and terminal; A6 re-derived"*): C1 (the drawn length, **plus** a second clause
+that where the nib is INERT the drawn length is the asked one EXACTLY — the half with an owner
+the cap does not write; C1's own message says AN2 owns the rest), A4 and FR2 (a THIRD thing may
+set the terminal, with the guard RESTATED in the gate as `nibWantedFrom` and never read from the
+cap), **A6** (fitted in LAW space and STOPPED AT THE CROSSING — Eva's "only where the law is above
+the print floor"), VS2 and SP5 (the ASKED length, which is what the size field and `sepalScale`
+produce), L3/L4/L5 (the shared lamina) and L6 (the blade's own terminal). **A6 IS THE ONE THAT
+WOULD HAVE BEEN SILENTLY WRONG**: the flank and arc are strictly falling, so they sail through its
+"still falling" filter and fitting through them reads **1.7532 for an asked 1.70, 0.7358 for 0.60,
+0.9173 for 0.80** — A6 firing on a tree whose law is exactly right. **Fifth instance of that bug
+class here.**
+**AN0-AN3 IS THE NEW FAMILY AND BOTH STL GATES ARE BLIND TO ALL OF IT**, measured rather than
+cautioned: a nib at the wrong arc radius, joined at a CORNER rather than a tangent, carried on the
+wrong slope or run to a length that is not the law's crossing ALL leave a single-valued, strictly
+falling outline on a fixed lattice — watertight, one connected piece, no degenerate triangle, the
+SAME triangle count — and the census cannot see them either. **A6 cannot**, because its subject
+stops at the crossing by construction. AN0 the guard three ways (the restatement, the plan's flag,
+and the EMITTED last row, which is under the MODE's own flat face iff a nib closed the blade —
+reading `TIP_HALF_MM` for both modes was wrong in LIVE, where the flat face is 0.15); AN1 the
+flank IS the law's own tangent and the arc follows from it; AN2 the drawn length rebuilt end to
+end; AN3 the emitted rows on the declared curve. **DECLARED BLINDNESS: the three `APEX_*`
+constants are IMPORTED** (ST3's precedent) — they are the DECLARATION and what AN1/AN2 check is
+the five numbers the plan DERIVES, so a mutation of the constants moves both sides together and
+only the shipped picture can see it. Six mutants, each witnessed on the MUTATED module's own plan,
+plus a row for the guard's other arm without which the squared-terminal mutation is a no-op on
+every row in the file.
+**BLOCK 40 IS ELEVEN ROWS (931 -> 942), THE SMOKE SUBSET FIVE (116 -> 121, 35 -> 36 BLOCKS), AND
+TWO NEW ROWS ARE DECLARED SELF-INTERSECTORS WHOSE FOLDS ARE NOT THE NIB'S** — measured on both
+trees: `APEX NIB: MIXED — 6 layers x layerSize min` reads **10232 / 0.2421 mm identically** on a
+worktree of the base commit at an identical 146,400 triangles (and `layerCount 6` alone reads 0,
+`layerSize 0.35` alone reads 0 — a COMPOSITION the matrix cannot see by construction), and
+`APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 5776 / 0.7742 here**,
+so the nib moves an existing fold's magnitude — and the SPLIT is worth the words, because the two halves
+of this PR pull opposite ways: the nib alone read **6616 / 0.7742** at `84e641d` (+272 pairs), and the FOLD
+CLAMP then took 840 pairs back off while leaving the worst span unmoved to four decimals. A relief in the
+NUMBER of contacts, not in the depth of the deepest one. `frozen/phase39` is the **931 rows at `8bb8685`**,
+registered in BOTH maps and proved deep-equal — 39 and not 38 because `frozen/phase38` is the
+VORONOI INFILL's, registered on `main` by #284 four hours before this branch merged `main` in, and
+the FROZEN_MATRICES census is what would have caught the collision at module load, by name. **THE
+BLOCK NUMBER AND THE PHASE NUMBER BOTH MOVED FOR THE SAME REASON AND NEITHER WAS A FREE RENAME:**
+two sessions in flight at once each wrote "block 39" and "phase38", and what says so is a merge
+conflict rather than a gate — GitHub could not build the merge ref, so it ran NO workflow at all
+on the pushed head and only Netlify's three checks appeared. **A PR WHOSE ACTIONS RUNS SIMPLY DO
+NOT EXIST IS A CONFLICTED PR UNTIL PROVED OTHERWISE** (`mergeable_state: "dirty"`); an absent run
+reads nothing like a failing one and `get_check_runs` will happily report the PR green.
+**THE BYTE PARTITION IS 877 MOVED / 32 HELD OF 909 COMPARABLE ROWS, PASS** —
+`verify-bloom-seam-bytes --change nib --matrix live --added 11 --control --control-mode`, both
+modes, **1,145,824,416 floats positionally under `Object.is`**, the MOVER SET exactly as the
+BASE tree's builder record predeclares it IN BOTH DIRECTIONS, the FOOT identical on every row
+(6,580,602 captured values), triangle counts unchanged but for 12 declared. **The 32 holders are
+one class and a half**: 31 have a SQUARED TERMINAL above the floor (#229's guard — every
+`FRINGE:` row, `petalTipEnd max (1)`, `VARIANCE: x the FRINGE`), and 2 are the sphere-stem rows
+where a 12 mm stem takes EVERY petal so there is no blade to cut. **The 12 count movers are TWO
+mechanisms**: seven are `trimPanels()`'s cleft split (more rows than `seam`'s 1 or `widest`'s 3,
+because the arc's demand applies on every nibbed row), and **five are the RIM BEAD's own
+degeneracy skipping** — a bead pivot of **3.5e-4 mm** at the terminal corner on the base
+(0.00035 against the default's 0.28387) makes that strip degenerate and skipped, which is why
+those counts sit 48 UNDER the default there and ON it here; #278's "count-safe by branch" floor
+from the other side. **AND THE TOOL OWED A DECLARATION**: its shipping-default clause said
+"every ladder change here HOLDS it by construction", true of `seam`/`widest`/`arc`/`tilt` and
+false of a BOUNDARY change active at the defaults — it is `DEFAULT_HOLDS_BY_CHANGE` now, each
+change carrying the REASON, `nib` declaring "it moves by design", and the CONVERSE asserted so a
+nib run whose default did not move is a finding.
+**AND `ALL MAX` CANNOT BE RUN LOCALLY ON THIS BOX** — it builds 3,090,816 triangles in **47.7 s**
+against the harness's 30 s settle timeout, and **46.3 s on a worktree of the base commit**, so it
+is the box and not this change. CI only. **It IS a mover of this change, through its forty SEPALS
+and not its petals** (block 1 hands it `petalTipEnd` 1, which is the nib's third guard, while
+`sepalBladeState` zeroes that control by declaration), and its census entry was MEASURED rather
+than carried forward: **107,485 / 10.1332, unmoved**, in 311 s through
+`bloom-xfail-magnitudes --include-refused`. Nothing would have caught a move there, because the
+sweep skips an export-refused row — no STL exists for X1 to read.
+**AND THE CUP FOLDS THE NIB, THE CLAMP IS AN OUTPUT CLAMP ON THE SECTION'S RADIUS, AND THE
+ONE ROW IT CANNOT REACH IS SPLIT TO #285** (Eva's four rulings, the apex-nib session — read
+§9g and §9h of `docs/bloom-apex-nib-outcome.md` before touching `cupScale`, `FOLD_CLAMP_MARGIN`
+or `cupClampLine`). `sectAt`'s cup lift is `c*a^2/hb`, so the section leaves the midrib with
+radius `hb/(2c)`; a sheet is that surface offset by +/- t/2 and **AN OFFSET SURFACE INVERTS
+WHERE THE OFFSET EXCEEDS THE RADIUS**, so the radius follows the half-width down and the nib
+draws it to 0.05 mm. Measured on `petalCup min (-0.8)`: **0.12544 mm at the nib's first row to
+0.03125 at its last, against a half-thickness of 0.6000** — five to nineteen times inside the
+fold. **MAIN NEVER REACHED IT BECAUSE MAIN'S OUTLINE STOPPED AT THE 0.80 mm FLOOR** (its own
+last rows read 0.9956 and 0.8333 and the census reads 0 there). **THE HYPOTHESIS THAT THE CUP
+READS A PRE-NIB WIDTH IS REFUTED AS AN IDENTITY** — `shapeAt` IS `shapeBaseAt` where there are
+no lobes, so `hb === h` is TRUE, the same double, on every row of the nib.
+**TWO OWNERS, AND THE SECOND SUBSUMES MOST OF THE FIRST**: `cupScale = onNib(u) ? hb /
+TIP_HALF_MM : 1` (exactly 1 at the entry BY CONSTRUCTION — the entry IS the law's crossing of
+`TIP_HALF_MM`), then `|c| <= hb / (FOLD_CLAMP_MARGIN * t)`. **MARGIN 1.25, ARGUED FROM THE
+INNER SKIN**: at `margin * t/2` the inner skin's own radius is `(margin-1) * t/2`, so it keeps
+`1 - 1/margin` of the mid-surface's spacing — a fifth at 1.25, a CUSP at 1.00, and at 2.00 it
+binds on six of main's own last eight stations. **BIT-IDENTITY IS BY BRANCH, NOT BY AN
+ARITHMETIC MIN**: where the cap does not bind the expression evaluates to `cRaw` ITSELF.
+**TOLD, NEVER SILENT** — `cupClampLine` prints `CUP CLAMPED at u ..., asked radius X, drawn Y`
+over every petal AND every sepal. **35 of the 36 undeclared rows clear to exactly 0** (18,497
+-> 1,104 pairs); the clamp touches **102 of 920 rows** and **24 of them read 0 on main**, an
+accepted cost. **ZERO TRIANGLES on every row in both modes.**
+**AND THE CLAMP SENDS A SECOND BILL TO THE COMBINATION GATE — 32 CELLS, AND THE GATE WAS RED ON A
+PUSHED HEAD** (§13 of `docs/bloom-apex-nib-outcome.md`). The 53 combination magnitudes this PR
+re-records were emitted at `cf24b2e`; the clamp landed four commits later and the gate was not
+re-run, so `54009d1` went to the remote with `bloom-combination-gate` failing. **THE ATTRIBUTION IS
+ONE-SIDED AND EXACT: every declared figure reproduces to four decimals on a worktree of `84e641d`**
+(the commit before the clamp's first owner), and the ARC YIELD in that same window moved **0 cells**
+— checked by name, because a ladder change moves stations and stations move the wall measure. **12
+DECLARED CELLS NOW CLEAR** (both `cup-x-apexsweep` cells at 1.1198, all EIGHT `cup-x-gradient` cells
+at an IDENTICAL 1.0967 — the cap saturating, so cup 0.6/0.9/1.2 draw the same section near the tip
+and #265's measured sum rule stops separating them — plus `gradient-x-curl` and `cup-x-length`), **19
+RE-RECORD** (ten worse, nine better; worst either way −0.032 and +0.024), and **ONE IS A NEW HAZARD
+THE CLAMP CREATED**: `cup-x-width @ cup 1.2 x width 23` reads **1.0002 mm pre-clamp and 0.9814 here**.
+Declared 74 -> 63. **THREE PAIRS GO PRODUCT-ONLY -> CLEARS AND NO GRID IS WIDENED** — the gate offers
+"widen the grid inside the shipped ranges, or declare it CLEARS", and widening one to manufacture a
+failing cell is tuning a gate to keep a verdict; #265 built the third arm precisely so a clearing pair
+fails loudly the day it stops clearing. **THE MECHANISM IS THAT THE CLAMP BINDS BELOW THE NIB, WHERE
+`nibFromU` DOES NOT EXCLUDE**: the cap has no nib branch at all and binds on the whole converging
+stretch, and `cupScale` moves the nib rows whose neighbours set the last excluded row's normal
+(`trueNormalRows` crosses against NEIGHBOURS — §6d's own V4 mechanism, in a second instrument).
+Measured split on the worst mover: 0.9161 at `84e641d` -> 0.9298 (`cupScale`) -> **0.8840** (the cap).
+**AND A FALSE FINDING WAS WRITTEN INTO THIS FILE AND RETRACTED FOUR MINUTES LATER, WHICH IS THE
+PART WORTH KEEPING.** The first capture of that red gate held the header and **TWELVE** `FAIL` lines
+against a real **thirty-five**, and exit **0** against a real **1**, so I reached for #220
+(`process.exit()` does not flush a block-buffered stdout; both STL gates carry `flushAndExit` for
+it), added the drain, and wrote the diagnosis here and in the outcome doc. **MEASURED, IT IS NOT
+THAT:** the same red tree with a bare `process.exit()`, piped, prints all **280 lines / 39,837 bytes
+/ exit 1**, byte-identical to a file — and the twelve survivors were **lines 269-280, the LAST
+twelve**, which is a `tail`; a pipe that loses data loses the END, never the beginning. The
+truncation was in how that background run was CAPTURED, and its invocation is not recoverable, so no
+mechanism is offered for it. `flushAndExit()` stays with its comment rewritten to say exactly this —
+a defensive change is fine, a defensive change whose comment cites a REFUTED mechanism is the
+folklore this file exists to prevent, and the next session would have read it as evidence. **THE
+LESSON IS THE SHAPE: a truncated artifact is evidence about the CAPTURE before it is evidence about
+the thing captured, and the tell was in hand the whole time — a genuinely failing gate cannot report
+exit 0. BUILD THE CONTROL BEFORE THE CONCLUSION GOES INTO A DOCUMENT, not after.**
+**THE ONE ROW LEFT IS NOT THE CUP'S AND IS ISSUE #285.** `LOBES: x cup 1.2` is declared at
+**1,104 pairs / 0.1095 mm** as an AUTHORED EXCEPTION: the closing arc's **ALONG-u** radius falls
+to **0.216 / 0.178 / 0.638 of t/2** at the last station — the other principal curvature, which a
+clamp on the cross-section cannot reach — with the nib's last seven stations inside **0.05 mm**
+of blade at 0.007-0.009 mm gaps against main's 0.163-0.406. **THE PAIR COUNT IS NON-MONOTONE IN
+THE CUP'S NIB AMPLITUDE AND IS WORST WITH THE CUP REMOVED ENTIRELY** (0x reads 1,856 against the
+unscaled 1,056), and `APEX_ARC_ROWS` 6 -> 1 makes every affected row worse. **MAIN'S 0 THERE IS A
+TESSELLATION COINCIDENCE**: `petalCup max (1.2)` alone reads 80 / 0.0239 on main while the lobes
+alone read 0 on every tree. The hypothesis recorded for #285 to TEST rather than adopt is that
+**the nib is narrower in plan than the sheet is thick**, so the fix may be a tip THICKNESS taper.
+**AND A PREDECLARATION IS A MEASUREMENT: A MATRIX ROW'S VALUES ARE STRINGS AND THE GEOMETRY'S
+GUARDS ARE TRUTHINESS TESTS ON NUMBERS** — this file has carried that trap since the leaf session
+and the byte partition walked into it anyway, failing in BOTH directions from ONE cause. With a
+STRING cup `petalFormIsFlat` holds and **no form is built at all**, so three SLOT role-override
+rows read `p.form` null on all sixteen petals and were called holders while the clamp genuinely
+binds on four of them; and `'0' !== 0` is **TRUE**, so every row whose cup was a string zero was
+falsely declared a mover — which is exactly the two `DOME: the INCURVE TARGET` rows that held.
+Coerced by each control's own kind (`bloom-census-sweep`'s own `stateOf`), the predicate reads
+**117 movers / 803 holders** against the broken 98 / 822. **A predicate built on a state the
+geometry would never build measures nothing.**
+**THE PARTITION THEN CLOSES: 117 of 117 predeclared movers MOVED and 0 floats moved on the 803
+holders**, positionally under `Object.is`, over the whole 920-row matrix in both modes —
+**1,180,591,740 export floats over 131,176,860 triangles and 79,185,320 captured-grid values.**
+**The coupon plan gains a 0.40 mm tip.**
+**AND THE NIB COMPOSED WITH THE VORONOI INFILL FOLDS EIGHT ROWS NEITHER FEATURE FOLDS ALONE —
+IN THE ROOT BLEND, THIRTEEN MICRONS FROM THE NIB'S OWN REGION** (§12 of the outcome doc; the two
+PRs were in flight against one base and #284 merged first). Measured three ways: main's geometry
+through THIS tree's census reads 0 on all eight, the same control sets with the infill guard OFF
+read 0, and only the two together fold — including `INFILL: the ruled defaults`, the feature's own
+shipping state, at **4 pairs / span 0.0000**. `bloom-census-attribute.mjs` puts EVERY pair at
+**u < 0.30** while the nib begins at drawn u 0.9889. **THE MECHANISM IS `toLaw`:** `petalLength` is
+the ASKED length, the blade is drawn to wherever the cap closes, and `widthProfile` reparameterises
+the WHOLE outline — the root blend included — so the BASAL outline moves **0.0135 mm at u 0.1607**
+(against 0.7500 mm at u 1.0000, which is the nib). That is enough because the basal rows are the
+HELD uniform ones and the outline turns fastest there, so the infill's facets are already nearly
+tangent — #284's own declared CONFORMANCE LIMIT, reached by a second route. Four of the eight read
+span EXACTLY 0.0000 (tangencies). **The infill's TRIANGLE COUNTS move with the nib on every
+infilled row** (the shipping infilled default 53,536 -> 52,320) because the cells are planned
+against the outline, while the PLAN is unmoved (`cells`, `achieved`, `solid`, `mSplit` identical;
+`floorU` moves in the sixth decimal). **A FEATURE-BY-FEATURE COMPOSITION IS AS INVISIBLE TO THE
+MATRIX AS A CONTROL-BY-CONTROL ONE** — `buildMatrix()` varies one control at a time AND one feature
+at a time, so the only thing that can see this is a merge.
+**AND GITHUB RAN NO WORKFLOW AT ALL ON THE CONFLICTED HEAD, WHICH IS HOW IT WAS FOUND.** The push
+succeeded, Netlify's three checks went green nine seconds later, `get_check_runs` reported the PR
+three-for-three, and `actions_list` showed the newest runs still on the PREVIOUS head hours old.
+The field that says why is `pull_request_read`'s **`mergeable_state: "dirty"`**: GitHub could not
+build `refs/pull/N/merge`, so every `pull_request` workflow was SKIPPED, while Netlify builds the
+HEAD ref and ran. **AN ABSENT RUN LOOKS NOTHING LIKE A FAILING ONE** — no red, no log, no job to
+read — so a PR whose Actions runs simply do not exist is a CONFLICTED PR until proved otherwise.
+This is the converse of the orphaned-run case recorded above, and it costs a whole CI cycle.
+**AND 153 OF 232 DECLARED CENSUS MAGNITUDES WERE RE-RECORDED, 3 REMOVED AND 2 ADDED** — the
+ordinary #213 obligation at an unusual scale, because the nib moves the outline on every row
+whose blade clears the print floor. 74 read WORSE, 65 better, 17 moved their span alone, 76 did
+not move. **The three removals are a FIX and their own notes said so**: all three were the PETAL
+EDGE PROFILE's and all three folded *"at its own TIP — u 0.982..1.000"*, the stretch the nib
+replaces. **The two additions are the nib's own**, 0 pairs on the base tree at an identical
+triangle count against 0.024 mm of span here — **and the BROWSER CONFIRMATION FOUND BOTH OF
+THEM RECORDED WRONG, which is the whole reason that run is owed.** All 158 affected rows were
+re-run through `verify-bloom-export.mjs --only` (6,684 s): **156 reached the results and passed
+X1 at their re-recorded magnitudes and 2 were DROPPED** — exactly these two. The list had
+declared them at 219 and 351 on the strength of a sentence claiming the two engines disagreed;
+**Chromium reads 354 and 218, which is what Node reads**, no run measuring 219 or 351 was ever
+kept, and the claim is WITHDRAWN in the list's own block. Re-recorded and re-run: PASS, X1
+silent. **X1's band on pairs is EXACTLY 0, so a declared figure that is not the tree's reddens
+CI on a tree that is RIGHT** — the same damage as a stale record and harder to read, because
+the message says the geometry moved. **VS5's pin moved −1.1701 → −1.1944**, at u 0.323 on both
+trees — mid-blade, so it is where the stations land and not what the petals do to each other.
+**AND THE WORST MOVERS ARE ALL CUP ROWS, ALL AT THE TIP, AND ALL THE FEATURE ITSELF** (§9c,
+`node tools/bloom-census-attribute.mjs`, which carries every collected pair back to the nearest
+point of the BUILDER'S own captured mid-surface): `6 layers x innerCup min` 297 -> **6542** with
+6479 of them IN THE NIB, `innerCup max` 3240 -> 8896, `GRADIENT: cup gradient max x cup max`
+160 -> 2416 with 2394 in the nib, `ZYGO: cup clamp binds` 160 -> 2144, and by ratio
+`BUCKLE: over a cupped blade` 48 -> **1887 (x39.3)**. **The mechanism is one mechanism**: the
+last stretch of every blade used to be a PARALLEL STRIP two floors across, and a cup curls its
+two margins toward each other at a CONSTANT separation — on `petalCup max` only just clear, 80
+pairs at 0.0239 mm. The nib converges that strip from 1.60 mm to 0.10 mm, bringing the margins
+together BY CONSTRUCTION, so a cup already curling them inward closes them. **THE ONE ROW THAT
+NEEDED TWO EXPLANATIONS IS `ALL PETALS: max x 40 x ALL THIN x spread min`**, whose span FELL and
+whose worst pair is mid-blade: its +2520 is **+3617 in the top tenth against −1097 in every band
+below it**, and its worst pair sits at **u 0.6809 here against 0.6803 on the base, same petal,
+same margin** — the same fold RE-STATIONED by the drawn length, which is the outline moving in
+the second of the two ways this change moves it. **0 of the seven need a third explanation**, and
+`off-lamina` is 0 on all seven on both trees.
+**AND THE WALL INSTRUMENT'S EXCLUSION WAS 35x TOO WIDE AND HID §18a's OWN HAZARD — CI CAUGHT IT,
+AND IT IS THE FIFTH DURABLE RULE AT THE SCALE OF A WHOLE GATE** (§6d of the outcome doc). The
+carve-out was written as "the last SHEET THICKNESS of blade" — a length derived from a length,
+the right instinct and the WRONG length: on the shipped sheet over a 35 mm blade that is
+`u >= 0.9657` where the nib on `petalTipShape` 3.00 begins at **u 0.99943**. In the gap sat
+session 32 §18a's own finding: `petalCup 1.2 x petalTipShape 3.00` reads **0.8315 mm at u 0.9858
+on the base tree**, the wide exclusion reported **1.5999**, and excluding THE NIB ALONE reads
+**0.7543 at u 0.9850 — the same site, slightly WORSE.** Five declared `COMBINATION_XFAIL` cells
+came back CLEARED and the next step would have been to delete Eva's own §18a cells. **WHAT
+CAUGHT IT IS CG2's "a declared hazard that starts passing TRIPS the gate"** — #213's
+bidirectional rule, in CI, three minutes into the first run; no green local run could have said
+so. The region is `u >= nibFromU` now and `wedgeLenMm` is gone from the signature and both
+callers, so no typed length is left in it. **Cost, all declared: 53 magnitudes re-recorded, 9
+cells genuinely CLEAR (entries removed, two verdicts PRODUCT-ONLY -> CLEARS), 5 NEW under the
+bar — every one within 0.026 mm of it on the base tree, and #263 predicted the last in words
+("twelve microns of headroom") — and one verdict CLEARS -> PRODUCT-ONLY. 74 under the bar, 74
+declared, 15 pairs, `--control` green.** **AND A V4 XFAIL IS OWED**: `buckle A=0.30 f=3 p=6`
+goes 0.108 -> **0.142** against a 0.12 bar, same site, and the MECHANISM IS THE LADDER — the
+arc's six stations coarsen the rows just below the nib (**0.4191/0.3338 mm at u 0.98 on the base
+tree against 0.5715/0.5670 here**) and `trueNormalRows`' normal is a cross product against the
+NEIGHBOURING rows. Session 32's apex/buckle trade in a second instrument; bar not widened,
+`APEX_ARC_ROWS` not trimmed to make a gate green, refinement pair scheduled.
+**AND THE COMBINATION GATE'S `--root` WAS NEVER PARSED BY ITS CLI** — `run()`/`verify()`/
+`control()` have taken a `root` since #263 and the doc calls it the control on the MEASURED
+side, while `node tools/bloom-combination-gate.mjs --root <tree>` silently measured THIS tree
+and reported it as the other one's. **Caught by disbelief, not by a clause**: a base-tree run
+came back with the BRANCH's figures to the third decimal. Fixed; it prints which tree the
+geometry came from. **And the V4 RECORD CONTROL perturbed EVERY xfail row while asserting
+exactly one clause fires** — true while one row carried a V4 xfail, false the moment a second
+did, so it failed on a right tree; it names its row now, as its `selfXfail` sibling already did.
+**AND `bloom-xfail-magnitudes --emit` EMITTED INVALID JAVASCRIPT FOR EIGHT LABELS** — it swapped
+`JSON.stringify`'s double quotes for single ones, which is correct until a label holds an
+APOSTROPHE, and eight do; the one thing that flag exists for could silently not be done for those
+rows. Fixed.
+
 **A FROZEN MATRIX MUST BE REGISTERED IN `FROZEN_BASE_COMMITS`, AND ITS LABELS ARE DATA**
 (session 32, both learned the hard way in this session's own PR). **`phase21Matrix()` shipped
 registered in NOTHING** — it sat in `diff-bloom-bytes.mjs`'s own table, so `--verify-frozen

@@ -183,6 +183,19 @@ const load = async (root) => ({
 });
 const A = await load(HERE), B = BASE ? await load(BASE) : null;
 
+/* THE PRINT FLOOR, IMPORTED AND NOT TYPED — the first durable rule, and the
+   `nib` mover predicate is the only thing here that needs a length. It is
+   `TIP_HALF_MM`, which Eva's ruling holds fixed across this change, so it has
+   ONE owner on both trees and the predicate reads the same number whichever
+   tree it is evaluated on. That is CHECKED rather than assumed: a change that
+   moved the floor would make the predicate mean two things at once and the
+   partition would be a comparison of two questions. */
+const PRINT_FLOOR_HALF = A.G.TIP_HALF_MM;
+if (B && !Object.is(B.G.TIP_HALF_MM, PRINT_FLOOR_HALF)) {
+  console.error(`REFUSED: the print floor is ${PRINT_FLOOR_HALF} mm here and ${B.G.TIP_HALF_MM} on the base tree. A mover predicate written against it would ask a different question of each tree.`);
+  process.exit(2);
+}
+
 const stateFor = (D, row) => {
   const st = { ...D };
   for (const { id, value } of (row.set || [])) {
@@ -245,6 +258,44 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
      `widest`. FILLED FROM THE MEASUREMENT rather than predicted; an empty
      table here would have been a guess wearing a declaration's clothes. */
   tilt: {},
+  /* THE NIB PLACES NO STATION THE LADDER DID NOT PLACE — its resolution
+     demand goes through the ONE placer — but it DOES change where the
+     stations sit, and TWO mechanisms turn that into a triangle count.
+     FILLED FROM THE MEASUREMENT, and the table is IDENTICAL in both modes on
+     every one of the twelve, which is the mode-free-topology claim showing up
+     where it would break first.
+
+     SEVEN ARE `trimPanels()`, exactly as for `seam` and `widest`: a cleft
+     splits the blade at a ROW INDEX, so any ladder change can move the split.
+     This change reaches more of them than either of those did because the
+     arc's resolution demand applies on EVERY nibbed row rather than only
+     where a seam floor or a gap bound binds.
+
+     FIVE ARE THE RIM BEAD'S OWN DEGENERACY SKIPPING, which is a different
+     mechanism and worth naming: those rows carry a bead PIVOT of ~3.5e-4 mm
+     at the blade's terminal corner on the base tree (measured on `BUCKLE:
+     f min (1)`: 0.00035 against the shipping default's 0.28387), so the rim
+     strip there is degenerate and `emitPanel` skips it — which is why their
+     counts sit 48 BELOW the default's 24,688 on the base and ON it here. The
+     nib's converging cap gives that corner a real width, the strip is drawn,
+     and the 48 come back. #278's own "count-safe by branch" floor, seen from
+     the other side. */
+  nib: {
+    /* the cleft split */
+    'CAPABILITY: cleft (two-span domain)': '37376 -> 38208',
+    'CAPABILITY: cleft x roll max': '37376 -> 38208',
+    'CAPABILITY: cleft x all thin': '37376 -> 38208',
+    'CAPABILITY: cleft x 3 layers': '111744 -> 114240',
+    'CAPABILITY: cleft x CONTINUOUS x 3 turns': '111848 -> 114240',
+    'CAPABILITY: cleft x 6 layers': '224544 -> 229120',
+    'CAPABILITY: cleft x ZYGO 2 layers x ALL INNER MAX': '74560 -> 76224',
+    'CAPABILITY: cleft x FAN x toggle ON x ALL PER-PETAL MAX': '33092 -> 33456',
+    /* the rim strip that was degenerate at the terminal corner */
+    'BUCKLE: f min (1) — one cycle along the blade, the whole range live': '24640 -> 24688',
+    'BUCKLE: the clamp NOT binding (0.60 asked at f 1 — the cap is 3.23x)': '24640 -> 24688',
+    'CONT: 3 turns x layerSize max x petalCount 40 (the shallowest gradient)': '367584 -> 367632',
+    'SEPALS: sepalBuckleFreq min (1)': '39950 -> 39998',
+  },
 };
 
 /* WHICH ROWS' DEFINITIONS MOVED — labels and/or set lists that differ between
@@ -255,7 +306,7 @@ const TRI_COUNT_XFAIL_BY_CHANGE = {
    partition; the run fails on an undeclared one AND on a declared one whose
    definition turns out identical. */
 const ROW_DEF_MOVED_BY_CHANGE = {
-  seam: {}, widest: {}, arc: {},
+  seam: {}, widest: {}, arc: {}, nib: {},
   tilt: {
     'petalTilt max (120)': "block 1 sweeps every SWEEPABLE slider to its own max, so this row's label and value ARE the range; the base tree calls it `petalTilt max (75)`",
     'ALL MAX': 'block 4 hands every SWEEPABLE slider its max at once, so this row carries petalTilt 120 here and 75 on the base — one label over two different states',
@@ -305,6 +356,20 @@ const MOVER_BY_CHANGE = {
     .some((c) => c.base === 'petalTilt' && c.asked > c.got)),
   arc: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
     .some((p) => p && p.spine && p.spine.curlRad !== 0 && p.spine.uniform),
+  /* THE APEX NIB. A row moves iff some BUILT blade takes a nib — which the
+     BASE tree cannot report directly, because it has no nib, so the predicate
+     is the nib's own guard RESTATED over two numbers the base does report:
+     the cap's declared peak, and its declared terminal. A squared terminal
+     holds the outline above the print floor exactly when `terminalHalf`
+     exceeds `TIP_HALF_MM` — the terminal is `max(petalTipEnd x peak, the mode
+     floor)` and BOTH mode floors are at or under `TIP_HALF_MM`, so the test
+     reads the same in live and in export. The floor itself is IMPORTED
+     (`PRINT_FLOOR_HALF` above) and CHECKED equal on the two trees, because a
+     length typed into a predicate is this project's most-repeated mistake.
+     SEPALS ARE IN IT: a sepal is the petal builder on a second ring and cuts
+     its own nib from its own law. */
+  nib: (built) => [...(built.petalsAll || []), ...((built.sepals && built.sepals.built) || [])]
+    .some((p) => p && p.tipCap && p.tipCap.peakHalf > PRINT_FLOOR_HALF && !(p.tipCap.terminalHalf > PRINT_FLOOR_HALF)),
 };
 if (!(change in TRI_COUNT_XFAIL_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared triangle-count table. Add one (even an empty {}) rather than running without a declaration.`);
@@ -321,6 +386,8 @@ const MOVER_WHY = {
   arc: ['a petal takes the uniform arc there', 'no built petal takes the uniform arc there'],
   tilt: ["a built ring's composed petalTilt is clamped down by the base tree's envelope there",
          "no built ring's composed petalTilt is clamped down by the base tree's envelope there"],
+  nib: ['a built blade clears the print floor with no squared terminal holding it above, so the apex nib truncates its law there',
+        'no built blade takes an apex nib there — either its peak never clears the print floor, or a squared terminal holds the outline above it'],
 }[change] || ["the base tree's record predeclares it", "the base tree's record does not predeclare it"];
 if (!(change in ROW_DEF_MOVED_BY_CHANGE)) {
   console.error(`REFUSED: --change ${change} has no declared row-definition table. Add one (even an empty {}) rather than running without a declaration.`);
@@ -365,7 +432,14 @@ const predicted = new Map();      // label -> true (predeclared mover) | false
 /* CHANGES WHOSE MOVER PREDICATE READS WHAT THE CHANGE ITSELF WRITES. Declared,
    so a new change has to decide rather than inherit a default that is wrong
    half the time. */
-const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt']);
+/* `nib` IS DECLARED HERE EVEN THOUGH IT IS MEASURABLY INVARIANT, and that is
+   deliberate: the predicate reads `tipCap.terminalHalf`, which the change
+   writes. On this tree a nibbed row reports 0.05 mm where the base reports
+   the mode floor, and neither exceeds `TIP_HALF_MM`, so the answer happens to
+   be the same on both trees — but "it happens to agree" is the reasoning the
+   fourth durable rule exists to refuse, and requiring the base tree costs
+   nothing here because the byte comparison needs it anyway. */
+const PREDICATE_READS_WHAT_THE_CHANGE_WRITES = new Set(['tilt', 'nib']);
 if (frozenSweep) {
   if (!MOVER_OF) { console.error(`REFUSED: --change ${change} declares no mover predicate, so there is nothing to sweep with.`); process.exit(2); }
   if (PREDICATE_READS_WHAT_THE_CHANGE_WRITES.has(change) && !B) {
@@ -601,9 +675,35 @@ for (const [label, rec] of classes) {
 if (controlMode && modeFindings !== 1) bad.push(`CONTROL: the mode clause reported ${modeFindings} findings on a deliberately reclassified row, expected exactly 1 — the clause cannot produce a verdict`);
 if (controlMode && modeFindings === 1) { console.log('  the mode clause fired on the control, exactly once.'); }
 
+/* WHETHER THE SHIPPING DEFAULT MUST HOLD IS A PROPERTY OF THE CHANGE, AND IT
+   IS DECLARED RATHER THAN ASSUMED. Every change this tool carried before the
+   apex nib was a LADDER change — `seam`, `widest`, `arc`, `tilt` — and each
+   holds the shipping default by construction (a floor that does not bind, a
+   gap that was always the widest, a curl of exactly 0, a clamp that does not
+   bite), so the clause could be written as a law. The nib is not a ladder
+   change: it is a BOUNDARY change that is ACTIVE at the defaults, which is
+   the whole point of the feature, and the partition's own headline says so
+   (877 of 909 rows move, and the first mover is the default). A clause that
+   asserted otherwise would be asserting that no change may ever ship that
+   moves the shipping bloom — so it is a table now, with the reason in it. */
+const DEFAULT_HOLDS_BY_CHANGE = {
+  seam: 'the clearance floor does not bind at the defaults, so `m` is 1 and the ladder takes the same uniform slice',
+  widest: "the gap measure's leading term was always `r[0]`, which the blend cannot move, so the default's ladder is unchanged",
+  arc: 'the default is at curl exactly 0, where `spineAt` takes the straight arm and no arc is formed at all',
+  tilt: "the default's composed tilt is not clamped by the base tree's envelope",
+  nib: null,   // DOES move, by design: the nib is active at the defaults
+};
+if (!(change in DEFAULT_HOLDS_BY_CHANGE)) {
+  console.error(`REFUSED: --change ${change} does not declare whether the shipping default holds. Say so (a reason, or null for "it moves by design") rather than running without it.`);
+  process.exit(2);
+}
 const def = defBefore;
-if (which === 'live' && def && (def.export !== 'held' || def.live !== 'held')) {
-  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — every ladder change here holds it by construction and the stations must be bit-identical`);
+const mustHold = DEFAULT_HOLDS_BY_CHANGE[change];
+if (which === 'live' && mustHold && def && (def.export !== 'held' || def.live !== 'held')) {
+  bad.push(`THE SHIPPING DEFAULT MOVED (${def.export} / ${def.live}) — ${change} declares it holds because ${mustHold}, and the stations must be bit-identical`);
+}
+if (which === 'live' && !mustHold && def && (def.export !== 'moved' || def.live !== 'moved')) {
+  bad.push(`THE SHIPPING DEFAULT HELD (${def.export} / ${def.live}) — ${change} declares that it MOVES by design, so a default that did not move means the change does not reach the shipping bloom at all`);
 }
 
 if (!rowsA.length || !floats) bad.push('VACUOUS: no rows or no floats were compared');
