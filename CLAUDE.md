@@ -1595,8 +1595,11 @@ TWO NEW ROWS ARE DECLARED SELF-INTERSECTORS WHOSE FOLDS ARE NOT THE NIB'S** — 
 trees: `APEX NIB: MIXED — 6 layers x layerSize min` reads **10232 / 0.2421 mm identically** on a
 worktree of the base commit at an identical 146,400 triangles (and `layerCount 6` alone reads 0,
 `layerSize 0.35` alone reads 0 — a COMPOSITION the matrix cannot see by construction), and
-`APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 6616 / 0.7742 here**,
-so the nib moves an existing fold's magnitude. `frozen/phase39` is the **931 rows at `8bb8685`**,
+`APEX NIB: x cup 1.2 x roll 330` reads **6344 / 0.7107 on the base against 5776 / 0.7742 here**,
+so the nib moves an existing fold's magnitude — and the SPLIT is worth the words, because the two halves
+of this PR pull opposite ways: the nib alone read **6616 / 0.7742** at `84e641d` (+272 pairs), and the FOLD
+CLAMP then took 840 pairs back off while leaving the worst span unmoved to four decimals. A relief in the
+NUMBER of contacts, not in the depth of the deepest one. `frozen/phase39` is the **931 rows at `8bb8685`**,
 registered in BOTH maps and proved deep-equal — 39 and not 38 because `frozen/phase38` is the
 VORONOI INFILL's, registered on `main` by #284 four hours before this branch merged `main` in, and
 the FROZEN_MATRICES census is what would have caught the collision at module load, by name. **THE
@@ -1655,6 +1658,41 @@ ARITHMETIC MIN**: where the cap does not bind the expression evaluates to `cRaw`
 over every petal AND every sepal. **35 of the 36 undeclared rows clear to exactly 0** (18,497
 -> 1,104 pairs); the clamp touches **102 of 920 rows** and **24 of them read 0 on main**, an
 accepted cost. **ZERO TRIANGLES on every row in both modes.**
+**AND THE CLAMP SENDS A SECOND BILL TO THE COMBINATION GATE — 32 CELLS, AND THE GATE WAS RED ON A
+PUSHED HEAD** (§13 of `docs/bloom-apex-nib-outcome.md`). The 53 combination magnitudes this PR
+re-records were emitted at `cf24b2e`; the clamp landed four commits later and the gate was not
+re-run, so `54009d1` went to the remote with `bloom-combination-gate` failing. **THE ATTRIBUTION IS
+ONE-SIDED AND EXACT: every declared figure reproduces to four decimals on a worktree of `84e641d`**
+(the commit before the clamp's first owner), and the ARC YIELD in that same window moved **0 cells**
+— checked by name, because a ladder change moves stations and stations move the wall measure. **12
+DECLARED CELLS NOW CLEAR** (both `cup-x-apexsweep` cells at 1.1198, all EIGHT `cup-x-gradient` cells
+at an IDENTICAL 1.0967 — the cap saturating, so cup 0.6/0.9/1.2 draw the same section near the tip
+and #265's measured sum rule stops separating them — plus `gradient-x-curl` and `cup-x-length`), **19
+RE-RECORD** (ten worse, nine better; worst either way −0.032 and +0.024), and **ONE IS A NEW HAZARD
+THE CLAMP CREATED**: `cup-x-width @ cup 1.2 x width 23` reads **1.0002 mm pre-clamp and 0.9814 here**.
+Declared 74 -> 63. **THREE PAIRS GO PRODUCT-ONLY -> CLEARS AND NO GRID IS WIDENED** — the gate offers
+"widen the grid inside the shipped ranges, or declare it CLEARS", and widening one to manufacture a
+failing cell is tuning a gate to keep a verdict; #265 built the third arm precisely so a clearing pair
+fails loudly the day it stops clearing. **THE MECHANISM IS THAT THE CLAMP BINDS BELOW THE NIB, WHERE
+`nibFromU` DOES NOT EXCLUDE**: the cap has no nib branch at all and binds on the whole converging
+stretch, and `cupScale` moves the nib rows whose neighbours set the last excluded row's normal
+(`trueNormalRows` crosses against NEIGHBOURS — §6d's own V4 mechanism, in a second instrument).
+Measured split on the worst mover: 0.9161 at `84e641d` -> 0.9298 (`cupScale`) -> **0.8840** (the cap).
+**AND A FALSE FINDING WAS WRITTEN INTO THIS FILE AND RETRACTED FOUR MINUTES LATER, WHICH IS THE
+PART WORTH KEEPING.** The first capture of that red gate held the header and **TWELVE** `FAIL` lines
+against a real **thirty-five**, and exit **0** against a real **1**, so I reached for #220
+(`process.exit()` does not flush a block-buffered stdout; both STL gates carry `flushAndExit` for
+it), added the drain, and wrote the diagnosis here and in the outcome doc. **MEASURED, IT IS NOT
+THAT:** the same red tree with a bare `process.exit()`, piped, prints all **280 lines / 39,837 bytes
+/ exit 1**, byte-identical to a file — and the twelve survivors were **lines 269-280, the LAST
+twelve**, which is a `tail`; a pipe that loses data loses the END, never the beginning. The
+truncation was in how that background run was CAPTURED, and its invocation is not recoverable, so no
+mechanism is offered for it. `flushAndExit()` stays with its comment rewritten to say exactly this —
+a defensive change is fine, a defensive change whose comment cites a REFUTED mechanism is the
+folklore this file exists to prevent, and the next session would have read it as evidence. **THE
+LESSON IS THE SHAPE: a truncated artifact is evidence about the CAPTURE before it is evidence about
+the thing captured, and the tell was in hand the whole time — a genuinely failing gate cannot report
+exit 0. BUILD THE CONTROL BEFORE THE CONCLUSION GOES INTO A DOCUMENT, not after.**
 **THE ONE ROW LEFT IS NOT THE CUP'S AND IS ISSUE #285.** `LOBES: x cup 1.2` is declared at
 **1,104 pairs / 0.1095 mm** as an AUTHORED EXCEPTION: the closing arc's **ALONG-u** radius falls
 to **0.216 / 0.178 / 0.638 of t/2** at the last station — the other principal curvature, which a

@@ -641,7 +641,7 @@ makes a row attributable — so neither state had ever been censused.
 | row | branch | base (`2464d50`) | reading |
 |---|---|---|---|
 | `APEX NIB: MIXED — 6 layers x layerSize min` | 10232 / 0.2421 mm | **10232 / 0.2421 mm** | identical to the pair and to four decimals at an identical 146,400 triangles — the six-deep whorl's own fold, and a COMPOSITION (`layerCount 6` alone reads 0, `layerSize 0.35` alone reads 0) |
-| `APEX NIB: x cup 1.2 x roll 330` | 6616 / 0.7742 mm | 6344 / 0.7107 mm | pre-existing in kind; the nib moves the magnitude by +272 pairs and +0.064 mm. Both singles fold alone and both are already declared rows; the combination gate names `petalCup × petalRoll` as the widest failing region it has |
+| `APEX NIB: x cup 1.2 x roll 330` | 5776 / 0.7742 mm | 6344 / 0.7107 mm | pre-existing in kind. **These are the SHIPPED figures, re-measured after the fold clamp; the nib alone read 6616 / 0.7742 at `84e641d`** — so the nib adds +272 pairs and +0.064 mm of span, and the clamp then takes 840 pairs back off while leaving the worst span unmoved to four decimals. Both singles fold alone and both are already declared rows; the combination gate names `petalCup × petalRoll` as the widest failing region it has |
 
 ---
 
@@ -1563,3 +1563,147 @@ bit-identical with the guard off. What is genuinely new is the 22 `INFILL:` rows
 and those are measured above by census and triangle count rather than float for
 float. A full re-run is ~4 hours of wall clock on this box and is the one thing
 this section reports as owed rather than done.
+
+---
+
+## 13. THE FOLD CLAMP'S SECOND BILL — the combination gate, and a finding I retracted
+
+**THIS SECTION IS A SELF-REPORT BEFORE IT IS ANYTHING ELSE.** `54009d1` was pushed
+with `tools/bloom-combination-gate.mjs` RED. The 53 combination magnitudes this PR
+re-records were emitted at `cf24b2e` (the wall exclusion's own commit); the fold
+clamp landed four commits later, in `28e29f3` and `6259508`, and moved 32 of them.
+The gate was never re-run between. CI would have caught it — the gate rides in
+`bloom-export-watertight.yml` before the browser install — but it should not have
+had to, and the working agreement's own instruction is to run the full gate set
+before pushing.
+
+### The attribution is exact and one-sided: every declared figure reproduces on the pre-clamp tree
+
+Measured over the whole 262-cell grid, EXPORT, through the gate's own `--root`
+(geometry, registry and the wall instrument from that tree; the list, the clauses
+and the grid from this one), against a worktree of **`84e641d`** — the commit
+before the clamp's first owner:
+
+| | |
+|---|---|
+| cells whose declared figure reproduces on `84e641d` | **all of them, to four decimals** |
+| cells the arc yield (`84e641d`) moved | **0** — identical to `0606ace` on every cell |
+| cells the clamp moved past the ±5e-4 band | **32** |
+
+So the clamp is the mover and it is the only one. The arc yield was checked
+separately and by name because it is a LADDER change landing in the same window,
+and a ladder change moves stations, which moves the wall measure — it simply did
+not reach these states. That is a measurement, not an assumption.
+
+### What the 32 are: 12 CLEAR, 19 re-record, 1 NEW
+
+**TWELVE DECLARED CELLS NOW CLEAR, AND THAT IS THE CLAMP DOING ITS JOB.** The cap
+`|c| <= hb / (FOLD_CLAMP_MARGIN * t)` relieves the cup where the blade is
+narrowest, which is exactly where every one of these pairs was failing:
+
+| cell | declared | pre-clamp | now | move |
+|---|---|---|---|---|
+| `cup-x-apexsweep @ cup 0.9 x sweep 1` | 0.998 | 0.9980 | **1.1198** | +0.1218 |
+| `cup-x-apexsweep @ cup 1.2 x sweep 1` | 0.967 | 0.9674 | **1.1198** | +0.1524 |
+| `cup-x-gradient` — all EIGHT declared cells | 0.858–1.000 | same | **1.0967** | +0.097 … +0.239 |
+| `gradient-x-curl @ gradient 0.9 x curl 360` | 0.899 | 0.8987 | **1.0584** | +0.1597 |
+| `cup-x-length @ cup 1.2 x length 20` | 0.994 | 0.9945 | **1.0525** | +0.0580 |
+
+**THE EIGHT `cup-x-gradient` CELLS ALL READ THE IDENTICAL 1.0967, AND THAT IS THE
+CLAMP SATURATING RATHER THAN A COINCIDENCE.** Under the cap, cup 0.6 / 0.9 / 1.2
+draw the SAME section near the tip, so the sum rule #265 measured on this pair
+(every anti-diagonal of `cup + gradient` reading one number to the third decimal)
+no longer separates them — the whole block collapses onto one reading. The same
+1.0967 turns up as `cup-x-width @ cup 1.2 x width 16` and `cup-x-thinning @ cup 1.2
+x tipThinning 0`, which is what says it is a property of the clamped tip and not of
+this pair.
+
+**NINETEEN MOVE AND STAY UNDER THE BAR — TEN WORSE, NINE BETTER.** The largest
+either way: `cup-x-width @ cup 1.2 x width 30` 0.916 → **0.884** (−0.032) and
+`gradient-x-tipshape @ gradient 0.6 x n 3` 0.892 → **0.916** (+0.024). Re-recorded
+with the previous figure kept in each note (#213's idiom), never a widened band.
+
+**AND ONE CELL IS A NEW HAZARD THE CLAMP CREATED.** `cup-x-width @ petalCup=1.2 x
+petalWidth=23` reads **1.0002 mm on the pre-clamp tree and 0.9814 here** — two
+tenths of a micron of headroom, spent. It is declared with both figures. This is
+the third time in this PR that a cell sitting within a whisker of the bar has been
+pushed under it by a change nobody expected to reach it (#263 predicted the first
+in words; §9g's own table is the second), and it is the argument for the gate
+rather than against the clamp: the cost is one declared cell, measured, on a
+control combination the matrix cannot see by construction.
+
+### Three pairs go PRODUCT-ONLY -> CLEARS, and the grid is not widened
+
+`cup-x-apexsweep`, `cup-x-gradient` and `cup-x-length` have **no cell anywhere
+under the bar** now, so CG4's three-way biconditional fails them on the verdict
+they declare. The gate offers two remedies — *"widen the grid inside the shipped
+ranges, or declare it CLEARS and say so."* **The verdicts move; the grids do not.**
+Widening a grid to manufacture a failing cell would be tuning a gate to keep a
+verdict, which is the shape this project refuses everywhere else, and #265's own
+reason for building the third arm was that a clearing pair earns its builds by
+**failing loudly the day it stops clearing**. All three now do that.
+
+Declared cells go **74 -> 63** (74 − 12 + 1). The gate reads:
+`20 pair(s) (5 tier-1 · 9 tier-2 · 6 tier-3), 262 cells, 262 builds. 63 cell(s)
+under the bar, 63 of them declared, across 12 pair(s). CG0 grid · CG1 reachability
+· CG2 bar · CG3 magnitude · CG4 verdict · CG5 stray · CG6 provenance · CG7 inert —
+all clean.`
+
+### The mechanism, stated: the clamp binds BELOW the nib, where `nibFromU` does not exclude
+
+The wall instrument excludes `u >= nibFromU` — the nib and exactly the nib, which
+§6d of this document fixed from a 35×-too-wide exclusion. The clamp is NOT confined
+to that region:
+
+* `cupScale = onNib(u) ? hb / TIP_HALF_MM : 1` is exactly the double 1 off the nib,
+  so it cannot move an excluded row's own position — but it moves the NIB rows, and
+  `trueNormalRows` builds each row's normal as a cross product against its
+  **neighbours**. The last row below the entry has a neighbour inside the nib, so
+  its skin points move. That is the same mechanism §6d already records for the V4
+  xfail (`buckle A=0.30 f=3 p=6`), arriving in a second instrument.
+* The cap `|c| <= hb / (FOLD_CLAMP_MARGIN * t)` has **no nib branch at all**. It
+  binds wherever `hb` is small, which is the whole converging stretch below the
+  entry — 102 of 920 rows, as §9h records. Those rows are not excluded and are
+  where the measure lives.
+
+Measured split on the worst mover (`cup-x-width @ cup 1.2 x width 30`): `84e641d`
+0.9161 → `28e29f3` (cupScale alone) 0.9298 → `6259508` (the cap) **0.8840**. Both
+owners move it, and the cap moves it three times as far.
+
+### AND A FALSE FINDING WAS WRITTEN DOWN BEFORE IT WAS CONTROLLED — the retraction is the finding
+
+The first capture of this gate on the merged tree came back with the header and
+**TWELVE** `FAIL` lines and exit code **0**. Run to a file, the same tree on the
+same commit prints **280 lines and THIRTY-FIVE failures**, exit code **1**. I
+reached for #220 — `process.exit()` does not flush a block-buffered stdout, both
+STL gates carry `flushAndExit()` for exactly that, this one did not — added the
+drain, and wrote the diagnosis into this document and into `CLAUDE.md`.
+
+**IT IS NOT THAT, AND THE CONTROL TOOK FOUR MINUTES.** The same RED tree with a
+bare `process.exit()`, piped:
+
+| | lines | `FAIL` lines | exit |
+|---|---|---|---|
+| red tree, bare `process.exit()`, through a pipe | **280** | 35 | **1** |
+| red tree, bare `process.exit()`, to a file | **280** | 35 | **1** |
+
+Byte-identical, 39,837 bytes. Nothing is lost and the exit code is right. And the
+twelve lines that survived the original capture are **lines 269–280 of 280 — the
+LAST twelve**, which is what a `tail` does; a pipe that loses data loses the END,
+never the beginning. The truncation was in how that background run was captured.
+I no longer have its invocation and will not guess at it.
+
+**WHAT I KEPT AND WHY.** `flushAndExit()` stays, on all four exit paths, with its
+comment rewritten to say the above: it is there so this gate reads like the two
+STL gates and because #220 measured a real loss at 200,001 lines — **not** because
+a loss was ever observed here. A defensive change is fine; a defensive change
+whose comment cites a refuted mechanism is the folklore this repository exists to
+prevent, and it would have been read as evidence by the next session.
+
+**THE LESSON IS MINE AND IT IS THE SHAPE, NOT THE DETAIL.** A truncated artifact
+is evidence about the CAPTURE before it is evidence about the thing captured, and
+the tell was in hand the whole time — the gate's own exit code, which a genuinely
+failing run cannot report as 0. Instead I inferred a mechanism, fixed it, and
+documented it, and only then built the control that refuted it. **Build the
+control before the conclusion goes into a document, not after.** That is the same
+rule this project already states for gate clauses, arriving in prose.
