@@ -1829,14 +1829,24 @@ VERBATIM SNAPSHOT of that base commit's `buildMatrix()`, where the trio had thre
 `--verify-frozen phase11` went red on row 400 in 24 seconds, which is that check doing its
 job. The frozen form is the JSON literal (`{"label":…`); the live matrix uses the array form
 (`['ALL PETALS: …', { … }]`), so a targeted revert cannot reach it.
-**A SESSION DOES NOT PUSH FROZEN TAGS** (Eva's ruling, the sphere-stem session — THE RULE,
-and everything below it is the evidence that produced it rather than a procedure to retry).
-A session REGISTERS the baseline in both maps, PROVES it with `bloom-frozen-matrices`, and
-stops there. The tag is published by ONE `bloom-frozen-tags` dispatch from `main` AFTER the
-merge. **Do not attempt the push, and DELETE any local tag rather than leaving it as a trap** —
-an unpushed `frozen/*` in a working clone reads like a published baseline to the next session
-that lists tags. The registration is the load-bearing half and CI proves it; the tag only keeps
-the base commit alive, and a commit on `main` cannot be orphaned here anyway.
+**SESSIONS OWN THE `bloom-frozen-tags` DISPATCH AFTER THEIR OWN MERGE, AND REPORT THE RUN**
+(Eva's ruling, Sep 24 — standing, not a one-off, and first exercised on #283's own merge,
+`frozen/phase36` through `phase39`). **THIS SUPERSEDES "A SESSION DOES NOT PUSH FROZEN TAGS"
+BELOW** — the registering-and-proving half of that ruling stands unchanged, and everything
+below it is still the evidence that produced the mechanics; what is withdrawn is "stops
+there" and, further down, "the dispatch is still Eva's to fire". A session REGISTERS the
+baseline in both maps, PROVES it with `bloom-frozen-matrices`, merges its own PR, and THEN
+DISPATCHES `bloom-frozen-tags` from `main` ITSELF — never a raw `git push
+origin refs/tags/frozen/*` from a session, which is still refused (see below); the dispatch
+is the one path that reaches a runner. **Read back the OUTCOME rather than trusting the
+workflow's own exit code** — `git ls-remote --tags origin 'refs/tags/frozen/*'` or the tag
+API, per this file's own "a run's exit code is not its outcome" lesson a few paragraphs down
+— and report what was actually published, including any declared `TAG_PUSH_XFAIL` entries
+that stayed absent. **Do not attempt the push by hand, and DELETE any local tag rather than
+leaving it as a trap** — an unpushed `frozen/*` in a working clone reads like a published
+baseline to the next session that lists tags. The registration is the load-bearing half and
+CI proves it; the tag only keeps the base commit alive, and a commit on `main` cannot be
+orphaned here anyway.
 **THAT GAP IS CLOSED, AND THE SENTENCE THAT USED TO STAND HERE WAS WRONG FOR TWO WEEKS**
 (read `docs/bloom-frozen-tags-outcome.md` before touching `tools/publish-frozen-tags.sh`,
 its self-test, or `TAG_PUSH_XFAIL`). It
@@ -1870,7 +1880,9 @@ carried by none and was accepted). **#253's own body and commit message say "all
 on main's first-parent line" — that is one row loose, and the corrected figure is the stronger
 claim.** The predicate is GitHub-internal; what matters is that it is a
 property of the token class, it is stable, and it is not configurable.
-**THE DISPATCH IS STILL EVA'S TO FIRE, NOT A SESSION'S** — the rule above is unchanged.
+**THE DISPATCH IS THE SESSION'S TO FIRE, AFTER ITS OWN MERGE** — Eva's Sep 24 ruling above
+supersedes this line; it is kept, struck through in substance rather than in markup, so the
+reversal is legible to a reader who reaches this paragraph first.
 
 **`frozen/phase21` (572 rows at `b323268`, a commit on `main`) IS NOT PUBLISHED, AND EVA RULED
 THAT ACCEPTABLE** (session 32). Three things, because each has been re-derived at least once:
@@ -1893,20 +1905,19 @@ a failure in the exempt case AND one in the NON-exempt case: the sphere-stem ses
 (flat 403; `git ls-remote --tags origin 'refs/tags/frozen/phase29'` read back EMPTY) from a branch
 that DOES change a workflow file, so the condition is measured insensitive in BOTH directions.
 That strengthens the refutation and still supplies no successor.
-**(2) THE `git/refs` API ROUTE IS UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS "NO TOOL
-TO TRY IT", NOT "THE API REFUSED IT."** Creating a ref at a commit that already exists sends no
-tree, so it may well sidestep the restriction in (1) — nobody has been able to find out. The MCP
-surface exposes only tag READERS (`get_tag`, `list_tags`, `get_release_by_tag`, `list_releases`,
-`get_latest_release`); the one ref-creating tool, `create_branch`, takes a branch NAME and
-constructs `refs/heads/…`, so it cannot address `refs/tags/…`; and every writing tool
-(`create_or_update_file`, `push_files`) creates a TREE, which is the thing the hypothesis avoids.
-A session with a different tool surface COULD still attempt the POST — it is an open question,
-not a closed one — but under the rule above there is no longer a reason to: the runner route
-works, so the API question is a curiosity rather than a blocker. **IT IS NOW WIRED TO ANSWER
-ITSELF**: `tools/publish-frozen-tags.sh` tries that POST on the RUNNER, for the refs the push
-could not create and only those, prints whatever the API says, and cannot fail the run either
-way. The next dispatch settles a question this file has carried as untestable since Sep 5 — and
-if it works, the three declared entries come off the xfail list.
+**(2) THE `git/refs` API ROUTE IS REFUTED, NOT MERELY UNTESTED** (corrected here; the paragraph
+below is what this file used to assert, kept so the correction is checkable). It used to read
+*"UNTESTED AND UNREACHABLE FROM A SESSION, AND THAT IS 'NO TOOL TO TRY IT', NOT 'THE API REFUSED
+IT.'"* Creating a ref at a commit that already exists sends no tree, so the hypothesis was that
+it might sidestep the restriction in (1) via the MCP surface's only ref-creating tool reachable
+from a session, or via `tools/publish-frozen-tags.sh`'s own runner-side POST, which was WIRED to
+try it for the refs the push could not create and report whatever the API said, without failing
+the run either way. **IT HAS NOW BEEN TRIED AND IT FAILS THE SAME WAY**: that POST, on the
+RUNNER, for `frozen/phase5`, `frozen/phase22` and `frozen/phase23`, returned a flat **403** on
+run `36072453638` — measured, not inferred, and the same verdict as the git push in (1). The
+three stay in `TAG_PUSH_XFAIL` on that measured ground now, rather than on an untried route.
+Nothing here isolates WHY the API refuses it any more than (1) isolates why the push does; both
+are refused, and no successor mechanism is offered for either.
 **(3) IT IS BELT-AND-BRACES, NOT LOAD-BEARING, so do not re-litigate it.** `b323268` is in
 `main`'s history (a squash-merge, #188 — one parent, NOT a merge commit) and `main` is never
 force-pushed here, so the commit cannot be orphaned and the definitions stay replayable without
