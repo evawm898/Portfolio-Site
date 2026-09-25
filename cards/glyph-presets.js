@@ -15,14 +15,23 @@
 // Four families, picked to read as genuinely distinct at a glance rather
 // than near-duplicates of the built-in placeholder: a traditional smooth
 // silhouette (classic), a faceted straight-edge silhouette (minimal), a
-// thick low-detail silhouette (bold), and an asymmetric sketchy outline
+// baroque filigree silhouette (ornate), and an open, tapered-stroke outline
 // (hand-drawn).
+//
+// "Ornate" is a LABEL-ONLY rename of what shipped as "Bold" — Eva's ruling on
+// the review sheet asked for a filigree restyle rather than a thick/chunky
+// one. The id stays 'bold' (and so does assets/cards/glyph-presets/bold/)
+// on purpose: it is what a saved design's suitGlyphSource and any bulk-saved
+// state key on, and renaming an id out from under existing state is exactly
+// the silent-breakage this project's own font/registry retirement discipline
+// exists to avoid. Grep for 'Bold' before assuming it is safe to touch — the
+// only places that name is spelled out are this comment and the label below.
 
 export const GLYPH_FAMILIES = [
   { id: 'classic', label: 'Classic', description: 'Traditional smooth card-suit silhouettes.' },
   { id: 'minimal', label: 'Minimal', description: 'Faceted, straight-edged geometric shapes.' },
-  { id: 'bold', label: 'Bold', description: 'Thick, chunky, low-detail silhouettes.' },
-  { id: 'handdrawn', label: 'Hand-drawn', description: 'Asymmetric, sketchy outlines.' },
+  { id: 'bold', label: 'Ornate', description: 'Baroque filigree — scrolls and leaf motifs carved into the silhouette.' },
+  { id: 'handdrawn', label: 'Hand-drawn', description: 'Open, tapered calligraphic strokes.' },
 ];
 
 const FAMILY_IDS = new Set(GLYPH_FAMILIES.map((f) => f.id));
