@@ -26,6 +26,7 @@ import {
   resolveFont,
   searchFonts,
 } from './cards/font-manager.js';
+import { GLYPH_FAMILIES, isGlyphFamily, loadPresetFamily, loadPresetGlyph } from './cards/glyph-presets.js';
 
 const SUIT_LABELS = { spades: 'Spades', hearts: 'Hearts', diamonds: 'Diamonds', clubs: 'Clubs' };
 
@@ -64,7 +65,14 @@ function getStyle() {
     cornerFontScale: pct('styleCornerFontScale'),
     courtPlateScale: pct('styleCourtPlateScale'),
     courtLetterScale: pct('styleCourtLetterScale'),
+    glyphStretch: glyphStretchValue(),
   };
+}
+
+// The stretch slider reads 50–200 (%), same convention as the other style
+// sliders, mapped to card-template.js's 0.5–2 ratio.
+function glyphStretchValue() {
+  return parseFloat(document.getElementById('styleGlyphStretch').value) / 100;
 }
 
 function pct(id) {
@@ -78,6 +86,7 @@ function buildStyleControls() {
   const SLIDERS = [
     ['styleCornerInset', DEFAULT_STYLE.cornerInsetPct],
     ['styleGlyphScale', Math.round(DEFAULT_STYLE.glyphScale * 100)],
+    ['styleGlyphStretch', Math.round(DEFAULT_STYLE.glyphStretch * 100)],
     ['styleGlyphOffset', DEFAULT_STYLE.glyphOffsetPct],
     ['styleCornerFontScale', Math.round(DEFAULT_STYLE.cornerFontScale * 100)],
     ['styleCourtPlateScale', Math.round(DEFAULT_STYLE.courtPlateScale * 100)],
@@ -331,8 +340,150 @@ function buildFontPicker() {
 }
 
 // ---------------------------------------------------------------------
-// Suit upload rows
+// Suit glyph source — a built-in family (all four suits, or one suit
+// overridden), or an uploaded SVG, or the built-in placeholder. Whatever the
+// source, the RESULT handed to card-template.js is the same thing it always
+// was: suitImages[suit] is either a loaded <img> or null. Neither
+// card-template.js nor the export paths know or care which of these three
+// produced it — that is what "no special-casing" means here.
 // ---------------------------------------------------------------------
+
+// suit -> 'placeholder' | a GLYPH_FAMILIES id | 'upload'
+const suitGlyphSource = Object.fromEntries(SUITS.map((suit) => [suit, 'placeholder']));
+
+// An uploaded file's <img> and display name, kept per suit even while that
+// suit's source is switched away to a preset family — picking a family to
+// preview and then switching back to "your upload" should not require
+// re-uploading the file.
+const suitUploadImages = Object.fromEntries(SUITS.map((suit) => [suit, null]));
+const suitUploadNames = Object.fromEntries(SUITS.map((suit) => [suit, null]));
+
+function familyLabel(id) {
+  return GLYPH_FAMILIES.find((f) => f.id === id)?.label || id;
+}
+
+// Whether the width/height stretch slider does anything a viewer could tell
+// apart from glyphScale — i.e. whether at least one suit is drawing real
+// glyph art (a preset or an upload) rather than the built-in placeholder.
+// glyphStretch still applies uniformly regardless (see drawSuitGlyph's
+// header), this only decides whether the CONTROL is worth showing.
+function anyGlyphSourceActive() {
+  return SUITS.some((suit) => suitGlyphSource[suit] !== 'placeholder');
+}
+
+function updateStretchVisibility() {
+  const active = anyGlyphSourceActive();
+  const field = document.getElementById('styleGlyphStretchField');
+  field.hidden = !active;
+  // Reset to neutral when the control disappears, rather than leaving a
+  // stale value that would silently distort the built-in placeholder paths
+  // the moment every suit is cleared back to it — the slider's effect
+  // applies uniformly wherever a suit glyph is drawn (see drawSuitGlyph's
+  // header), so a value carried forward with no visible control to explain
+  // it would be a surprise, not a feature.
+  if (!active) {
+    const input = document.getElementById('styleGlyphStretch');
+    const output = document.getElementById('styleGlyphStretchValue');
+    input.value = 100;
+    output.textContent = '100%';
+  }
+}
+
+function buildGlyphFamilyPicker() {
+  const box = document.getElementById('glyphFamilies');
+  box.innerHTML = '';
+  for (const family of GLYPH_FAMILIES) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cd-font-cat';
+    btn.textContent = family.label;
+    btn.title = family.description;
+    btn.dataset.family = family.id;
+    btn.addEventListener('click', () => applyFamilyToAllSuits(family.id));
+    box.appendChild(btn);
+  }
+  updateFamilyPickerState();
+}
+
+// Highlights a family chip only when ALL FOUR suits currently use it —
+// i.e. it is the deck's one active family, not merely one suit's override.
+// Nothing highlights in a mixed state, and the mix is spelled out in the
+// per-suit summary line instead.
+function updateFamilyPickerState() {
+  const pure = GLYPH_FAMILIES.find((f) => SUITS.every((suit) => suitGlyphSource[suit] === f.id));
+  for (const btn of document.querySelectorAll('#glyphFamilies .cd-font-cat')) {
+    btn.setAttribute('aria-pressed', String(pure ? btn.dataset.family === pure.id : false));
+  }
+  const summary = document.getElementById('glyphFamilySummary');
+  if (pure) {
+    summary.textContent = `${pure.label} applied to all four suits.`;
+  } else {
+    const parts = SUITS.map((suit) => {
+      const src = suitGlyphSource[suit];
+      const label = src === 'placeholder' ? 'placeholder' : src === 'upload' ? 'your upload' : familyLabel(src);
+      return `${SUIT_LABELS[suit]}: ${label}`;
+    });
+    summary.textContent = `Mixed — ${parts.join(' · ')}`;
+  }
+}
+
+// Selecting a family from the top-level chips applies all four of its
+// glyphs at once, clearing any per-suit override (a fresh starting point the
+// user can then override again). Loaded in parallel so this is one preview
+// render, not four.
+async function applyFamilyToAllSuits(familyId) {
+  setStatus(`Loading ${familyLabel(familyId)} suit glyphs…`);
+  let images;
+  try {
+    images = await loadPresetFamily(familyId, SUITS);
+  } catch (err) {
+    setStatus(`Could not load the "${familyLabel(familyId)}" family: ${err.message}`);
+    return;
+  }
+  for (const suit of SUITS) {
+    suitGlyphSource[suit] = familyId;
+    suitImages[suit] = images[suit];
+    syncSuitRowUI(suit);
+  }
+  updateFamilyPickerState();
+  updateStretchVisibility();
+  setStatus('');
+  requestPreview();
+}
+
+// Per-suit override: a family id, 'upload' (only meaningful once a file has
+// been uploaded for that suit), or 'placeholder'.
+async function setSuitSource(suit, source) {
+  if (source === 'placeholder') {
+    suitGlyphSource[suit] = 'placeholder';
+    suitImages[suit] = null;
+  } else if (source === 'upload') {
+    suitGlyphSource[suit] = 'upload';
+    suitImages[suit] = suitUploadImages[suit] || null;
+  } else if (isGlyphFamily(source)) {
+    suitGlyphSource[suit] = source;
+    try {
+      suitImages[suit] = await loadPresetGlyph(source, suit);
+    } catch (err) {
+      suitImages[suit] = null;
+      setStatus(`Could not load the "${familyLabel(source)}" ${SUIT_LABELS[suit]} glyph: ${err.message}`);
+    }
+  } else {
+    return; // unrecognised value — leave state untouched
+  }
+  syncSuitRowUI(suit);
+  updateFamilyPickerState();
+  updateStretchVisibility();
+  requestPreview();
+}
+
+function syncSuitRowUI(suit) {
+  const select = document.getElementById(`suitFamily-${suit}`);
+  if (select) select.value = suitGlyphSource[suit];
+  const fileNameEl = document.getElementById(`suitFileName-${suit}`);
+  if (fileNameEl) fileNameEl.textContent = suitUploadNames[suit] || 'no file uploaded';
+}
+
 function buildSuitRows() {
   const container = document.getElementById('suitRows');
   container.innerHTML = '';
@@ -349,9 +500,44 @@ function buildSuitRows() {
     swatchCanvas.dataset.suit = suit;
     swatch.appendChild(swatchCanvas);
 
+    const main = document.createElement('div');
+    main.className = 'cd-suit-row__main';
+
     const name = document.createElement('div');
     name.className = 'cd-suit-row__name';
     name.textContent = SUIT_LABELS[suit];
+
+    const select = document.createElement('select');
+    select.className = 'cd-suit-row__select';
+    select.id = `suitFamily-${suit}`;
+    select.setAttribute('aria-label', `${SUIT_LABELS[suit]} glyph source`);
+
+    const placeholderOpt = document.createElement('option');
+    placeholderOpt.value = 'placeholder';
+    placeholderOpt.textContent = 'Placeholder';
+    select.appendChild(placeholderOpt);
+
+    const group = document.createElement('optgroup');
+    group.label = 'Family';
+    for (const family of GLYPH_FAMILIES) {
+      const opt = document.createElement('option');
+      opt.value = family.id;
+      opt.textContent = family.label;
+      group.appendChild(opt);
+    }
+    select.appendChild(group);
+
+    const uploadOpt = document.createElement('option');
+    uploadOpt.value = 'upload';
+    uploadOpt.textContent = 'Your upload';
+    uploadOpt.disabled = true; // enabled once a file is actually uploaded
+    uploadOpt.id = `suitUploadOption-${suit}`;
+    select.appendChild(uploadOpt);
+
+    select.value = suitGlyphSource[suit];
+    select.addEventListener('change', () => setSuitSource(suit, select.value));
+
+    main.append(name, select);
 
     const fileLabel = document.createElement('label');
     fileLabel.className = 'cd-file-btn';
@@ -365,7 +551,7 @@ function buildSuitRows() {
 
     const fileNameEl = document.createElement('div');
     fileNameEl.className = 'cd-suit-row__file';
-    fileNameEl.textContent = 'placeholder';
+    fileNameEl.textContent = 'no file uploaded';
     fileNameEl.id = `suitFileName-${suit}`;
 
     const clearBtn = document.createElement('button');
@@ -374,7 +560,7 @@ function buildSuitRows() {
     clearBtn.textContent = 'clear';
     clearBtn.addEventListener('click', () => clearSuitFile(suit));
 
-    row.append(swatch, name, fileNameEl, fileLabel, clearBtn);
+    row.append(swatch, main, fileNameEl, fileLabel, clearBtn);
     container.appendChild(row);
   }
 }
@@ -384,9 +570,11 @@ function onSuitFileChange(suit, file) {
   const url = URL.createObjectURL(file);
   const img = new Image();
   img.onload = () => {
-    suitImages[suit] = img;
-    document.getElementById(`suitFileName-${suit}`).textContent = file.name;
-    requestPreview();
+    suitUploadImages[suit] = img;
+    suitUploadNames[suit] = file.name;
+    const uploadOpt = document.getElementById(`suitUploadOption-${suit}`);
+    if (uploadOpt) uploadOpt.disabled = false;
+    setSuitSource(suit, 'upload');
     URL.revokeObjectURL(url);
   };
   img.onerror = () => {
@@ -397,10 +585,12 @@ function onSuitFileChange(suit, file) {
 }
 
 function clearSuitFile(suit) {
-  suitImages[suit] = null;
-  document.getElementById(`suitFileName-${suit}`).textContent = 'placeholder';
+  suitUploadImages[suit] = null;
+  suitUploadNames[suit] = null;
+  const uploadOpt = document.getElementById(`suitUploadOption-${suit}`);
+  if (uploadOpt) uploadOpt.disabled = true;
   document.getElementById(`suitFile-${suit}`).value = '';
-  requestPreview();
+  setSuitSource(suit, 'placeholder');
 }
 
 // Callers must already have awaited the style's font — every one of them
@@ -547,6 +737,8 @@ function renderSpecText() {
 
 function init() {
   buildSuitRows();
+  buildGlyphFamilyPicker();
+  updateStretchVisibility();
   buildStyleControls();
   buildFontPicker();
   buildZoomControl();
@@ -564,7 +756,10 @@ function init() {
   // A hook the font gate (tools/verify-cards-fonts.mjs) drives, so the race it
   // tests is the page's real one — pick a cold font and hit export in the same
   // tick, with no awaiting in between — rather than a re-implementation of it.
-  window.__cards = { selectFont, renderFullDeck, renderPreview, getStyle, resolveFont, ensureFontLoaded };
+  window.__cards = {
+    selectFont, renderFullDeck, renderPreview, getStyle, resolveFont, ensureFontLoaded,
+    applyFamilyToAllSuits, setSuitSource, suitGlyphSource,
+  };
 }
 
 init();

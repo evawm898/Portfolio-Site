@@ -46,6 +46,9 @@
 
     <details class="cd-panel__section" id="section-01" open>
       <summary class="cd-panel__label"><span>01</span>Suit Glyphs</summary>
+      <span class="cd-field__sub">Pick a built-in family to set all four suits at once, then override any single suit below — with a family of its own, or your own uploaded SVG.</span>
+      <div class="cd-glyph-families" id="glyphFamilies" role="group" aria-label="Suit glyph family"></div>
+      <p class="cd-field__sub" id="glyphFamilySummary"></p>
       <div id="suitRows"></div>
     </details>
 
@@ -137,7 +140,16 @@
           <output class="cd-field__value" id="styleGlyphScaleValue" for="styleGlyphScale">100%</output>
         </div>
         <input type="range" id="styleGlyphScale" min="50" max="150" step="5" value="100">
-        <span class="cd-field__sub">Scales the suit glyph relative to its size in each context (pips, ace, court plate).</span>
+        <span class="cd-field__sub">Scales the suit glyph relative to its size in each context (pips, ace, court plate). This is an OVERALL size — see "Suit glyph stretch" below for proportion.</span>
+      </div>
+
+      <div class="cd-field" id="styleGlyphStretchField" hidden>
+        <div class="cd-field__row">
+          <label class="cd-field__label" for="styleGlyphStretch">Suit glyph stretch</label>
+          <output class="cd-field__value" id="styleGlyphStretchValue" for="styleGlyphStretch">100%</output>
+        </div>
+        <input type="range" id="styleGlyphStretch" min="50" max="200" step="5" value="100">
+        <span class="cd-field__sub">Width-vs-height PROPORTION of the glyph — not its overall size (that's "Suit glyph scale" above). 100% is undistorted; above stretches wider, below stretches taller. Shown once a family or a custom suit glyph is in use.</span>
       </div>
 
       <div class="cd-field">

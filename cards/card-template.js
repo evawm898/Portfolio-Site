@@ -35,6 +35,17 @@ export const DEFAULT_STYLE = {
   courtPlateScale: 1, // 0.5–1.5, the court-card centre plate
   courtLetterScale: 1, // 0.5–1.5, the J/Q/K inside it
   cornerFontScale: 1, // 0.5–1.5, the corner rank letter (NOT its mini suit glyph)
+  // Width-vs-height STRETCH of the suit glyph — a proportion control, distinct
+  // from glyphScale above (an overall-size control). Stored as a single ratio
+  // 0.5–2: at 1 there is no stretch; above 1 the glyph is drawn wider than
+  // tall, below 1 taller than wide. drawSuitGlyph() derives independent x/y
+  // multipliers from it (x = glyphStretch, y = 1/glyphStretch) so the two are
+  // reciprocal rather than both growing together — stretching is a trade
+  // between width and height, not a second size slider wearing a disguise.
+  // Applies uniformly wherever a suit glyph is drawn (pips, ace, corner mini
+  // glyph, court glyphs) — the panel only shows the control when it would do
+  // something a viewer could tell apart from glyphScale (see cards.js).
+  glyphStretch: 1, // 0.5–2
 };
 
 // Base sizes, before any scale slider. Named because three call sites and the
@@ -176,9 +187,17 @@ function getTintedImage(img, color) {
 }
 
 // Draw one suit glyph centered at (x, y), `size` tall, optionally rotated
-// (degrees). `suitImages[suit]` is a loaded <img> if the user uploaded a
-// real SVG for that suit; otherwise the built-in placeholder path is used.
-export function drawSuitGlyph(ctx, suit, x, y, size, color, rotationDeg, suitImages) {
+// (degrees). `suitImages[suit]` is a loaded <img> — from a built-in family
+// preset (cards/glyph-presets.js) or a user upload, the two are
+// indistinguishable here — or null, which falls back to the built-in
+// placeholder path.
+//
+// `stretchX`/`stretchY` are independent multipliers on top of `size` (see
+// DEFAULT_STYLE.glyphStretch above): applied to BOTH the image path and the
+// placeholder path, so a placeholder-only deck is unaffected at the default
+// 1/1 and a deck stretches uniformly the moment any suit is upgraded off the
+// placeholder — one code path, not a special case per glyph source.
+export function drawSuitGlyph(ctx, suit, x, y, size, color, rotationDeg, suitImages, stretchX = 1, stretchY = 1) {
   ctx.save();
   ctx.translate(x, y);
   if (rotationDeg) ctx.rotate((rotationDeg * Math.PI) / 180);
@@ -186,9 +205,11 @@ export function drawSuitGlyph(ctx, suit, x, y, size, color, rotationDeg, suitIma
   const img = suitImages && suitImages[suit];
   if (img) {
     const tinted = getTintedImage(img, color);
-    ctx.drawImage(tinted, -size / 2, -size / 2, size, size);
+    const w = size * stretchX;
+    const h = size * stretchY;
+    ctx.drawImage(tinted, -w / 2, -h / 2, w, h);
   } else {
-    ctx.scale(size / 2, size / 2);
+    ctx.scale((size / 2) * stretchX, (size / 2) * stretchY);
     ctx.fillStyle = color;
     PLACEHOLDER_PATHS[suit](ctx);
     ctx.fill();
@@ -253,6 +274,14 @@ function suitColor(suit, palette) {
   return SUIT_GROUP[suit] === 'primary' ? palette.primary : palette.secondary;
 }
 
+// The single glyphStretch ratio, turned into the reciprocal x/y pair every
+// drawSuitGlyph() call site needs. One function so all four call sites agree
+// on the reciprocal relationship rather than each re-deriving it.
+function glyphStretchXY(style) {
+  const s = style.glyphStretch || 1;
+  return [s, 1 / s];
+}
+
 // Draw the two mirrored corner indices (rank stacked over a small suit
 // glyph, top-left; the same thing rotated 180deg, bottom-right).
 function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
@@ -310,7 +339,8 @@ function drawCornerIndices(ctx, rank, suit, palette, safe, suitImages, style) {
     const glyphX = glyphSize / 2 + extraTravel;
     const glyphY = letterBottom + MIN_LETTER_GLYPH_GAP + glyphSize / 2 + extraTravel;
 
-    drawSuitGlyph(ctx, suit, glyphX, glyphY, glyphSize, color, 0, suitImages);
+    const [sx, sy] = glyphStretchXY(style);
+    drawSuitGlyph(ctx, suit, glyphX, glyphY, glyphSize, color, 0, suitImages, sx, sy);
     ctx.restore();
   }
 
@@ -324,18 +354,20 @@ function drawPipCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const fieldTop = safe.y + safe.h * 0.16;
   const fieldH = safe.h * 0.68;
   const color = suitColor(suit, palette);
+  const [sx, sy] = glyphStretchXY(style);
 
   for (const p of layout) {
     const px = safe.x + p.x * safe.w;
     const py = fieldTop + p.y * fieldH;
-    drawSuitGlyph(ctx, suit, px, py, pipSize, color, p.rot || 0, suitImages);
+    drawSuitGlyph(ctx, suit, px, py, pipSize, color, p.rot || 0, suitImages, sx, sy);
   }
 }
 
 function drawAceCard(ctx, suit, palette, safe, suitImages, style) {
   const color = suitColor(suit, palette);
   const size = safe.w * 0.52 * style.glyphScale;
-  drawSuitGlyph(ctx, suit, safe.x + safe.w / 2, safe.y + safe.h / 2, size, color, 0, suitImages);
+  const [sx, sy] = glyphStretchXY(style);
+  drawSuitGlyph(ctx, suit, safe.x + safe.w / 2, safe.y + safe.h / 2, size, color, 0, suitImages, sx, sy);
 }
 
 // Simplified court card: no bespoke figure art (explicitly deferred) — a
@@ -385,8 +417,9 @@ function drawCourtCard(ctx, rank, suit, palette, safe, suitImages, style) {
   const minCentre = safe.y + glyphSize / 2;
   const belowY = Math.min(cy + plate.h / 2 + gap, maxCentre);
   const aboveY = Math.max(cy - plate.h / 2 - gap, minCentre);
-  drawSuitGlyph(ctx, suit, cx, belowY, glyphSize, color, 0, suitImages);
-  drawSuitGlyph(ctx, suit, cx, aboveY, glyphSize, color, 180, suitImages);
+  const [sx, sy] = glyphStretchXY(style);
+  drawSuitGlyph(ctx, suit, cx, belowY, glyphSize, color, 0, suitImages, sx, sy);
+  drawSuitGlyph(ctx, suit, cx, aboveY, glyphSize, color, 180, suitImages, sx, sy);
 }
 
 // ---------------------------------------------------------------------
