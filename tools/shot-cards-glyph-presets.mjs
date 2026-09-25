@@ -1,21 +1,17 @@
 /*
  * shot-cards-glyph-presets.mjs — review sheet for the /cards built-in
- * suit-glyph families (cards/glyph-presets.js), built for Eva's ruling on
- * the Classic/Ornate/Hand-drawn redraw.
+ * suit-glyph families (cards/glyph-presets.js).
  *
- * Six glyph rows (Placeholder, Classic, Minimal, Ornate CURRENT — the thin,
- * gate-failing variant this session started from, Ornate DENSER — the
- * shipped candidate, Hand-drawn) x 4 suits, each at "picker size" (48px —
- * the smallest size a suit glyph is actually drawn at on a card, the
- * corner-index mini glyph) and "large size" (200px — the ace glyph's own
- * order of magnitude), on a light panel and a dark panel. Below that, one
- * fully rendered card per family, read out of the REAL app the same way
- * the gate does (canvas -> PNG), never a mock.
+ * Four glyph rows (Placeholder, Classic, Minimal, Hand-drawn) x 4 suits,
+ * each at "picker size" (24px — the smallest size a suit glyph is actually
+ * drawn at on a card, the corner-index mini glyph) and "large size" (100px
+ * — the ace glyph's own order of magnitude), on a light panel and a dark
+ * panel. Below that, one fully rendered card per family, read out of the
+ * REAL app the same way the gate does (canvas -> PNG), never a mock.
  *
- * The two Ornate rows' captions carry BOTH the retired whole-mask Jaccard
- * number and the new carvingDistance number, measured by driving the real
- * gate's own functions against the real app — not re-derived here, so the
- * sheet cannot silently drift from what the gate actually checked.
+ * A fourth family, "Ornate", was built, iterated and then dropped entirely
+ * on Eva's ruling before this ever reached main — see cards/glyph-
+ * presets.js's own header. Nothing about it is reproduced here.
  *
  * RUN:  node tools/shot-cards-glyph-presets.mjs <out-dir>
  */
@@ -25,7 +21,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { findChromium } from './chromium-harness.mjs';
-import { decodePNG } from './pngdec.mjs';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = path.resolve(process.argv[2] || 'cards-glyph-review');
@@ -47,11 +42,6 @@ await new Promise((r) => server.listen(0, r));
 const port = server.address().port;
 const BASE = `http://localhost:${port}`;
 
-// The pre-ruling "current" Ornate art (thin rim curls, one small hole per
-// suit) is kept only in the session's own scratch dir, since it is no
-// longer what ships — read directly from there so the sheet can still show
-// it as the comparison row the ruling asked for.
-const THIN_DIR = '/tmp/ornate-gen/thin-backup';
 const SUIT_FILE = { spades: 'spade', hearts: 'heart', diamonds: 'diamond', clubs: 'club' };
 
 // The built-in canvas placeholder paths (card-template.js PLACEHOLDER_PATHS,
@@ -71,43 +61,8 @@ const rows = [
   { label: 'Placeholder', suits: Object.fromEntries(Object.entries(PLACEHOLDER_SVG).map(([s, d]) => [s, svgWrap(d, '-1.1 -1.1 2.2 2.2')])) },
   { label: 'Classic', suits: Object.fromEntries(Object.keys(SUIT_FILE).map((suit) => [suit, fs.readFileSync(path.join(ROOT, `assets/cards/glyph-presets/classic/${SUIT_FILE[suit]}.svg`), 'utf8')])) },
   { label: 'Minimal', suits: Object.fromEntries(Object.keys(SUIT_FILE).map((suit) => [suit, fs.readFileSync(path.join(ROOT, `assets/cards/glyph-presets/minimal/${SUIT_FILE[suit]}.svg`), 'utf8')])) },
-  { label: 'Ornate — CURRENT (pre-ruling, thin)', suits: Object.fromEntries(Object.keys(SUIT_FILE).map((suit) => [suit, fs.readFileSync(path.join(THIN_DIR, `${SUIT_FILE[suit]}.svg`), 'utf8')])), caption: null },
-  { label: 'Ornate — DENSER (shipped candidate)', suits: Object.fromEntries(Object.keys(SUIT_FILE).map((suit) => [suit, fs.readFileSync(path.join(ROOT, `assets/cards/glyph-presets/bold/${SUIT_FILE[suit]}.svg`), 'utf8')])), caption: null },
   { label: 'Hand-drawn', suits: Object.fromEntries(Object.keys(SUIT_FILE).map((suit) => [suit, fs.readFileSync(path.join(ROOT, `assets/cards/glyph-presets/handdrawn/${SUIT_FILE[suit]}.svg`), 'utf8')])) },
 ];
-
-// ---------------------------------------------------------------------
-// Measure the two Ornate rows' distinctness numbers by driving the REAL
-// app, the same functions the gate uses (copied here rather than
-// imported, since the gate is a script not a module — but character-for-
-// character the same formulas, and the numbers are cross-checked against
-// the gate's own last logged run below rather than trusted blindly).
-// ---------------------------------------------------------------------
-function inkMask(rgba, width, height, crop) {
-  const x0 = Math.floor(crop.x0 * width), x1 = Math.floor(crop.x1 * width);
-  const y0 = Math.floor(crop.y0 * height), y1 = Math.floor(crop.y1 * height);
-  const w = x1 - x0, h = y1 - y0;
-  const mask = new Uint8Array(w * h);
-  let idx = 0;
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-    const i = (y * width + x) * 4;
-    const luma = (rgba[i] * 299 + rgba[i + 1] * 587 + rgba[i + 2] * 114) / 1000;
-    mask[idx++] = luma < 200 ? 1 : 0;
-  }
-  return { mask, w, h };
-}
-function shapeDistance(a, b) {
-  let union = 0, xor = 0;
-  const n = Math.min(a.mask.length, b.mask.length);
-  for (let i = 0; i < n; i++) { const av = a.mask[i], bv = b.mask[i]; if (av || bv) union++; if (av !== bv) xor++; }
-  return union ? xor / union : 0;
-}
-function carvingDistance(ornamented, reference) {
-  let xor = 0, refInk = 0;
-  const n = Math.min(ornamented.mask.length, reference.mask.length);
-  for (let i = 0; i < n; i++) { const ov = ornamented.mask[i], rv = reference.mask[i]; if (rv) refInk++; if (ov !== rv) xor++; }
-  return refInk ? xor / refInk : 0;
-}
 
 const browser = await chromium.launch({ executablePath: findChromium(), args: ['--no-sandbox'] });
 const context = await browser.newContext();
@@ -126,57 +81,21 @@ await page.goto(`${BASE}/cards.html`, { waitUntil: 'load', timeout: 30000 });
 await page.waitForFunction(() => window.__cards, null, { timeout: 20000 });
 await page.waitForTimeout(500);
 
-async function canvasPNG(index) {
-  const dataUrl = await page.evaluate((i) => document.querySelectorAll('#previewGrid canvas')[i].toDataURL('image/png'), index);
-  return decodePNG(Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64'));
-}
-const ACE_CROP = { x0: 0, y0: 0.268, x1: 1, y1: 0.732 }; // matches the gate's own calibrated band
-async function aceMask() {
-  const r = await canvasPNG(0); // spades-A
-  return inkMask(r.data, r.width, r.height, ACE_CROP);
-}
 async function clickFamily(id) {
   await page.click(`#glyphFamilies button[data-family="${id}"]`);
   await page.waitForTimeout(500);
 }
 
-await clickFamily('classic');
-const classicMask = await aceMask();
-await clickFamily('minimal');
-const minimalMask = await aceMask();
-await clickFamily('bold'); // the shipped, denser variant currently installed
-const denserMask = await aceMask();
-
-const denserVsClassic = { whole: shapeDistance(denserMask, classicMask), carve: carvingDistance(denserMask, classicMask) };
-const denserVsMinimal = { whole: shapeDistance(denserMask, minimalMask), carve: carvingDistance(denserMask, minimalMask) };
-
-// The "current" (thin) numbers are the gate's own last logged FAIL run,
-// read back from this session's own log rather than re-swapped into the
-// live app (which now ships the denser art) — quoting a number the gate
-// did not itself produce would be exactly the thing this project's rules
-// warn against.
-const thinVsClassic = { whole: 0.245, carve: 0.253 };
-const thinVsMinimal = { whole: 0.324, carve: 0.441 };
-
-rows[3].caption = `whole-mask Jaccard ${thinVsClassic.whole.toFixed(3)} vs Classic / ${thinVsMinimal.whole.toFixed(3)} vs Minimal (both < 0.35, FAILED) · carvingDistance ${thinVsClassic.carve.toFixed(3)} vs Classic (< 0.35, FAILS under the new metric too) / ${thinVsMinimal.carve.toFixed(3)} vs Minimal (passes)`;
-rows[4].caption = `carvingDistance ${denserVsClassic.carve.toFixed(3)} vs Classic (> 0.35, PASSES) / ${denserVsMinimal.carve.toFixed(3)} vs Minimal (> 0.35, PASSES) · whole-mask Jaccard for reference: ${denserVsClassic.whole.toFixed(3)} / ${denserVsMinimal.whole.toFixed(3)} (whole-mask stays a FAIL by design — see carvingDistance's comment in the gate)`;
-
-console.log('Ornate CURRENT (thin):', rows[3].caption);
-console.log('Ornate DENSER (shipped):', rows[4].caption);
-
 // ---------------------------------------------------------------------
 // One fully rendered card per family, from the real app.
 // ---------------------------------------------------------------------
 const cardShots = {};
-await page.evaluate(() => { window.__cards.suitGlyphSource = { spades: 'placeholder', hearts: 'placeholder', diamonds: 'placeholder', clubs: 'placeholder' }; window.__cards.rebuild?.(); });
-await page.waitForTimeout(300);
 async function grabCard(label) {
   const buf = await page.evaluate((i) => document.querySelectorAll('#previewGrid canvas')[i].toDataURL('image/png'), 0);
   cardShots[label] = buf;
 }
 await clickFamily('classic'); await grabCard('Classic');
 await clickFamily('minimal'); await grabCard('Minimal');
-await clickFamily('bold'); await grabCard('Ornate');
 await clickFamily('handdrawn'); await grabCard('Hand-drawn');
 // Placeholder: reload fresh so nothing carries over.
 await page.reload({ waitUntil: 'load' });
