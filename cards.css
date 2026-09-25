@@ -216,15 +216,53 @@ details:not([open]) > summary.cd-panel__label { margin-bottom: 0; }
 
 /* Suit upload rows */
 
+/* Glyph family chips — same visual language as .cd-font-cat (the font
+   category filter), reused rather than duplicated so "a row of selectable
+   chips" looks like one thing across the panel. */
+.cd-glyph-families {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin: 0.5rem 0 0.35rem;
+}
+
 .cd-suit-row {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   padding: 0.6rem 0;
   border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
 }
 
 .cd-suit-row:last-child { border-bottom: none; }
+
+.cd-suit-row__main {
+  flex: 1 1 9rem;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+/* Per-suit family/placeholder/upload override. No <select> exists elsewhere
+   on this page (the font picker deliberately replaced its old one with a
+   searchable list), but sixteen options across four suit rows is exactly the
+   case a native select is built for — styled minimally, matching the other
+   small bordered controls (.cd-file-btn / .cd-clear-btn) rather than the
+   browser default. */
+.cd-suit-row__select {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px solid var(--line-strong);
+  padding: 0.3rem 0.4rem;
+  max-width: 100%;
+}
+
+.cd-suit-row__select:hover { border-color: var(--ink-faint); }
 
 .cd-suit-row__swatch {
   width: 28px; height: 28px;
