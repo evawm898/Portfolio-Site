@@ -172,6 +172,41 @@ function shapeDistance(a, b) {
   return union ? xor / union : 0;
 }
 
+// carvingDistance(a, reference) — the RIGHT instrument for an ORNAMENTED
+// family compared against the PLAIN family whose silhouette it is built
+// on (Ornate vs Classic, Ornate vs Minimal), and the WRONG one for every
+// other pair, which is why this is a second function rather than a
+// retune of shapeDistance's threshold.
+//
+// Whole-mask Jaccard (shapeDistance) normalises the symmetric difference
+// by the UNION of the two masks. For an ornamented-vs-plain pair that
+// union is, by design, almost entirely the shared plain silhouette —
+// Ornate is deliberately "Classic's outline with carving added", not an
+// unrelated shape — so the huge shared interior dilutes the denominator
+// and a small, real amount of carving reads as "barely different" even
+// when it is visibly there. That is a defect in the METRIC for this
+// pair, not in the art: whole-mask Jaccard answers "is the silhouette
+// different", and for a deliberately-shared silhouette the honest answer
+// is "no, and it isn't supposed to be".
+//
+// carvingDistance instead asks "what fraction of the REFERENCE shape's
+// own ink did the carving touch" — the symmetric difference (protruding
+// scrollwork added, holes cut into the interior) normalised by the
+// reference's OWN ink-pixel count rather than by the union. The shared
+// interior no longer inflates the denominator, because the reference's
+// ink IS the denominator's basis rather than an extra diluting term
+// alongside the carving.
+function carvingDistance(ornamented, reference) {
+  let xor = 0, refInk = 0;
+  const n = Math.min(ornamented.mask.length, reference.mask.length);
+  for (let i = 0; i < n; i++) {
+    const ov = ornamented.mask[i], rv = reference.mask[i];
+    if (rv) refInk++;
+    if (ov !== rv) xor++;
+  }
+  return refInk ? xor / refInk : 0;
+}
+
 // Bounding box of the ink in a mask, in the mask's own local coordinates.
 function maskBox(m) {
   let minX = 1e9, maxX = -1, minY = 1e9, maxY = -1;
@@ -206,6 +241,15 @@ const DIFFERENT = 0.35;
 // family-vs-family claim actually proves. Calibrated with headroom under
 // the measured 0.21 floor, same order as the font gate's own DIFFERENT.
 const DIFFERENT_FROM_PLACEHOLDER = 0.15;
+// The bar for carvingDistance (Ornate vs its plain siblings Classic and
+// Minimal ONLY — every other pair keeps whole-mask Jaccard and DIFFERENT
+// above). Held to the SAME 0.35 figure as DIFFERENT rather than a fresh
+// number invented for this metric: the two metrics answer different
+// questions (silhouette difference vs. fraction-of-reference-carved) but
+// "at least a third of the thing changed" is the same bar either way, and
+// reusing it avoids a second free-floating constant with no independent
+// calibration behind it.
+const CARVING_DISTINCT = 0.35;
 
 // The whole card — used for "this exact state reproduces exactly" checks,
 // where a mutation reaching ANY drawing path (corner glyph, pips, ace,
@@ -330,8 +374,23 @@ for (const family of GLYPH_FAMILIES) {
   const distFromPlaceholder = shapeDistance(m.ace, placeholderSpadesA.ace);
   check(distFromPlaceholder > DIFFERENT_FROM_PLACEHOLDER, `"${family.label}" reads as a different SHAPE from the placeholder (Jaccard distance ${distFromPlaceholder.toFixed(3)} > ${DIFFERENT_FROM_PLACEHOLDER})`);
   for (const [otherLabel, otherMask] of Object.entries(familyMasks)) {
-    const d = shapeDistance(m.ace, otherMask);
-    check(d > DIFFERENT, `"${family.label}" reads as a different SHAPE from "${otherLabel}" (${d.toFixed(3)} > ${DIFFERENT}) — the four families are not near-duplicates`);
+    // Ornate ("bold") is BUILT on Classic's / Minimal's own silhouette
+    // with carving added — its outline is deliberately not meant to be a
+    // different SHAPE from theirs, so whole-mask Jaccard is the wrong
+    // question for this one pair. carvingDistance asks the right one:
+    // what fraction of the reference's own ink did the carving touch.
+    // Every other pair (including Ornate vs the placeholder, which uses
+    // DIFFERENT_FROM_PLACEHOLDER above, and Hand-drawn vs everything,
+    // below) is unaffected and still reads whole-mask Jaccard > DIFFERENT.
+    if (family.id === 'bold' && (otherLabel === 'Classic' || otherLabel === 'Minimal')) {
+      const whole = shapeDistance(m.ace, otherMask);
+      const carved = carvingDistance(m.ace, otherMask);
+      check(carved > CARVING_DISTINCT,
+        `"${family.label}" carves at least a third of "${otherLabel}"'s own silhouette (carving distance ${carved.toFixed(3)} > ${CARVING_DISTINCT}; whole-mask Jaccard ${whole.toFixed(3)} is not the right instrument for this pair — see carvingDistance's own comment)`);
+    } else {
+      const d = shapeDistance(m.ace, otherMask);
+      check(d > DIFFERENT, `"${family.label}" reads as a different SHAPE from "${otherLabel}" (${d.toFixed(3)} > ${DIFFERENT}) — the four families are not near-duplicates`);
+    }
   }
   familyMasks[family.label] = m.ace;
 }
@@ -570,6 +629,49 @@ if (NEGATIVE) {
   check(dDistinct > DIFFERENT, `"Classic" vs "Minimal" ace glyphs read as different shapes by the same metric used above (${dDistinct.toFixed(3)} > ${DIFFERENT})`);
   const dSelf = shapeDistance(minimalMask, minimalMask);
   check(dSelf === 0, `...and the identical mask compared with itself reads exactly 0 (${dSelf}) — the metric is not just "always > ${DIFFERENT}"`);
+
+  // (d) carvingDistance must actually FAIL — read at or below CARVING_DISTINCT
+  // — when Ornate's carving is removed, i.e. when "Ornate" serves exactly
+  // Classic's own art under its own name. Otherwise section 2's carving
+  // check above could be passing on a metric that always reads high, the
+  // same vacuity (c) rules out for shapeDistance. Run on a FRESH page:
+  // glyph-presets.js caches a loaded <img> per (family, suit) for the life
+  // of the page, and "bold" has already been loaded genuinely earlier in
+  // this same page's session — so routing its URL here would be routing a
+  // request that never fires.
+  {
+    const negContext = await browser.newContext();
+    for (const [url, file] of Object.entries(CDN_LOCAL)) {
+      await negContext.route(url, (route) => route.fulfill({ status: 200, contentType: 'text/javascript', body: fs.readFileSync(file) }));
+    }
+    await negContext.route('**://fonts.googleapis.com/**', (route) => route.abort());
+    await negContext.route('**://fonts.gstatic.com/**', (route) => route.abort());
+    // Every assets/cards/glyph-presets/bold/<suit>.svg request is served
+    // Classic's own file instead — "Ornate" with its carving stripped out,
+    // wearing its own id/URL so nothing else about the pipeline changes.
+    for (const [suit, file] of Object.entries(SUIT_FILE)) {
+      await negContext.route(`**/assets/cards/glyph-presets/bold/${file}.svg`, (route) =>
+        route.fulfill({ status: 200, contentType: 'image/svg+xml', body: fs.readFileSync(path.join(ROOT, `assets/cards/glyph-presets/classic/${file}.svg`)) }));
+    }
+    const negPage = await negContext.newPage();
+    await negPage.goto(`${BASE}/cards.html`, { waitUntil: 'load', timeout: 30000 });
+    await negPage.waitForFunction(() => window.__cards, null, { timeout: 20000 });
+    await negPage.waitForTimeout(500);
+    async function maskOn(pg, index) {
+      const dataUrl = await pg.evaluate((i) => document.querySelectorAll('#previewGrid canvas')[i].toDataURL('image/png'), index);
+      const r = decodePNG(Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64'));
+      return inkMask(r.data, r.width, r.height, ACE_CROP);
+    }
+    await negPage.click('#glyphFamilies button[data-family="classic"]');
+    await negPage.waitForTimeout(500);
+    const negClassicMask = await maskOn(negPage, IDX['spades-A']);
+    await negPage.click('#glyphFamilies button[data-family="bold"]');
+    await negPage.waitForTimeout(500);
+    const negStrippedOrnateMask = await maskOn(negPage, IDX['spades-A']);
+    const dStripped = carvingDistance(negStrippedOrnateMask, negClassicMask);
+    check(dStripped <= CARVING_DISTINCT, `carvingDistance correctly FAILS the >${CARVING_DISTINCT} bar when "Ornate" is served Classic's own art with no carving at all (${dStripped.toFixed(4)} <= ${CARVING_DISTINCT}) — the check in section 2 is measuring real carving, not always passing`);
+    await negContext.close();
+  }
 }
 
 if (SHOTS) {
