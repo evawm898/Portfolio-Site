@@ -1481,6 +1481,11 @@ both ways.
 
 ### The finding: eight INFILL rows fold that neither feature folds alone
 
+Split out, cross-linked and re-measured against the merged tree as
+`evawm898/Portfolio-Site#286`: `INFILL: the ruled defaults` is one of the eight
+and is the feature's own shipping state, and the candidate fix below is
+named there rather than taken.
+
 The census over all 22 `INFILL:` rows, EXPORT, through the committed
 `bloom-census-sweep.mjs`:
 
@@ -1526,7 +1531,7 @@ live and export — so where the lattice is coarse against the surface a facet c
 cross a neighbouring hole's rim wall."* At the base the rows are the HELD uniform
 ones and the surface turns fastest, so the facets there are the most nearly
 tangent the blade has; thirteen microns is what it takes to push a handful
-through. Four of the eight read a worst span of **exactly 0.0000 mm**, so they
+through. Five of the eight read a worst span of **exactly 0.0000 mm**, so they
 are tangencies rather than folds — this project's own knife-edge class, where
 the count is a property of where the stations land against a crease.
 
