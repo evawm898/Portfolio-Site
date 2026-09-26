@@ -220,3 +220,108 @@ one this file's `toCreasedNormals` call was measured against for its crease-angl
 derivation in §1). Verified in a real headless browser: the only network request
 touching `BufferGeometryUtils` is the local static file at
 `/bloom-vendor/BufferGeometryUtils.js`; jsDelivr is never asked for it.
+
+
+## 7 — every mover in the 942-row matrix, declared with its mechanism
+
+`node` sweep (LIVE mode, one build per row per tree — the ramp/budget decision does
+not depend on `exportMode`, so LIVE is sufficient and cheap): 942 rows, both this
+branch's `bloom-geometry.js`/`bloom-registry.js` and a worktree of `origin/main`
+(`429500d`), comparing `MeshBuilder.triangleCount` directly (no STL export, no
+harness assertions — a pure triangle-count diff). Took 1040s.
+
+```
+MOVERS (triangle count differs from main): 19
+HELD (ramp-eligible but budget-capped back to main's bytes): 1
+UNAFFECTED (not ramp-eligible at all): 922
+```
+
+Every mover is `petalTipShape >= 2.30` (or a twin control crossing the same band —
+`sepalTipShape`), which is the ONLY mechanism in this PR that can move a triangle
+count. The nineteen:
+
+```
+petalTipShape max (3)                                                  main=24688   branch=47984
+TIP SHAPE: 3.00 — the held-width round tip, the ceiling                main=24688   branch=47984
+TIP SHAPE: 3.00 x a far-out widest point (a 4b, where the OLD cap made it inert)  main=24688   branch=47984
+TIP SHAPE: 3.00 x the widest point hard at the base (a min, b max)     main=24688   branch=47984
+TIP SHAPE: 3.00 x the longest, widest petal (60 x 30)                  main=24688   branch=47984
+TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at once) main=24688   branch=47984
+TIP SHAPE: x CONTINUOUS x 3 turns                                      main=73680   branch=143568
+TIP SHAPE: x the whole centre (stamens and a style under a round tip)  main=59248   branch=82544
+LADDER x BUCKLE: f 7 — the ceiling, where the gap bound collapses the ladder to uniform main=24688   branch=47984
+LADDER x BUCKLE: f 5 — the ladder is bounded but still redistributes   main=24688   branch=47984
+LADDER x BUCKLE: f 1 — one cycle, the ladder is unbounded by the buckle main=24688   branch=47984
+LADDER x BUCKLE: the clamp binding under a round tip                   main=24688   branch=36336
+TIP SHAPE: x petalCount 40 (forty apexes on one hub)                   main=122672  branch=239152
+TIP SHAPE: 3.00 x a cleft margin                                       main=24688   branch=47984
+LOBES: x petalTipShape 3.00                                            main=24688   branch=47984
+FRINGE: the terminal x the round apex law (3.00 — a blunt shoulder meeting a flat end) main=24688   branch=47984
+SEPALS: sepalTipShape max (3)                                          main=39998   branch=54558
+INFILL: x petalTipShape 3.00                                           main=46752   branch=75616
+APEX NIB: tip shape 3.00 x 20 mm (the steepest flank on the shortest — a 0.003 mm arc) main=24688   branch=47984
+```
+
+Every one reads `held: false` — the ramp applied — and none of the 19 is `ALL MAX` or
+`INFLO: ALL MAX`.
+
+**The one HELD row is `ALL MAX` itself**, confirmed by a targeted probe:
+`{"held":true,"baselineTris":3090816,"predictedTris":3090816,"budget":1500000}`. Its
+baseline (NU_BASE-forced, built directly into the caller's own accumulator per §5's
+mechanism) already reads 3,090,816 triangles — more than double the 1,500,000 export
+budget — so the budget decision short-circuits at step (1) and never even probes the
+ramp: `predictedTris === baselineTris` exactly, because no probe or ramped build was
+ever attempted. `ALL MAX` is therefore BYTE-IDENTICAL to `main` (0 of 3,090,816
+triangles moved), matching §5's own byte-identity claim, and it costs nothing extra
+over `main`'s own build time.
+
+`INFLO: ALL MAX` is in the 922 UNAFFECTED rows — its own `petalTipShape` never
+crosses 2.30, so it is not ramp-eligible at all and its own declared export refusal
+(2,354,268 triangles, per CLAUDE.md's fringe-ceiling entry) is untouched.
+
+## 8 — `bloom-combination-gate.mjs`: 13 magnitudes re-recorded, 2 removed, 1 verdict re-declared, 3 new hazards declared
+
+CI's `verify` job failed on push `9cd290d` — a fast, separate check inside the
+`bloom-export-watertight` workflow, not the 942-row matrix. `measureWall`'s SELF
+reading (the emitted-mesh self-approach distance
+`tools/bloom-combination-gate.mjs` measures) is taken from the emitted rows, so the
+apex ramp's denser tip mesh above `petalTipShape` 2.30 moves it for every declared
+cell whose `petalTipShape` column is 2.5 or 3.0 — expected and required work under
+this project's own #213 rule (a declared xfail/hazard magnitude is stale whether it
+moved better or worse, and any session moving a declared row's tessellation
+re-records it in the same commit).
+
+Re-measured with `node tools/bloom-combination-gate.mjs --emit` on this PR's own
+tree and cross-checked against CI's own printed numbers (matched exactly):
+
+- **10 cells re-recorded** — all of `cup-x-tipshape`'s and `gradient-x-tipshape`'s
+  n=2.5/3.0 cells (both pairs move identically, consistent with one mechanism: the
+  ramp's own denser mesh, not anything about cup vs. cup-gradient). Every cell moved
+  the SAME direction — more clearance — because the denser apex sampling resolves
+  the self-approach more finely rather than differently. Each entry's note gained an
+  appended "RE-RECORDED BY THE APEX ROW RAMP" paragraph naming the mechanism and the
+  prior (fold-clamp-era) figure, per the project's own re-record convention (append,
+  never overwrite the history of prior movers).
+- **2 cells REMOVED** — `cup-x-tipshape @ petalCup=0.6 x petalTipShape=2.5` (was
+  0.988mm) and `gradient-x-tipshape @ petalCupGradient=0.6 x petalTipShape=2.5` (was
+  0.991mm) now CLEAR (1.004mm and 1.005mm respectively) — the ramp's extra clearance
+  pushed both cells back over the 1.0mm bar. Removed rather than left standing on a
+  stale magnitude, per #213's "both directions" rule.
+- **3 NEW cells declared** — `buckle-x-tipshape @ buckleAmp=0.2 x petalTipShape=3`
+  (0.951mm), `@ buckleAmp=0.4 x petalTipShape=2.5` (0.988mm), and
+  `@ buckleAmp=0.4 x petalTipShape=3` (0.921mm, the worst of the three). None of
+  these existed as a hazard before the ramp — the ramp's denser apex sampling is what
+  first lets the buckle's own margin wave and the finer tip mesh compose into a
+  measured sub-bar self-approach.
+- **1 verdict re-declared** — `buckle-x-tipshape`'s `PAIRS` entry moved from
+  `'clears'` (the apex-nib session's own re-declaration, when the nib had pushed both
+  of its then-declared cells back over the bar) to `'product-only'` — the ramp
+  re-opens the hazard the nib had closed. CG4 fired on this pair for exactly the
+  reason it exists: a verdict that stops matching which cells are under the bar is a
+  finding, not a magnitude move to quietly absorb.
+
+Verified: `node -e "import('./tools/bloom-combination-gate.mjs')"` parses cleanly;
+`node tools/bloom-combination-gate.mjs` exits 0 with `--emit` printing zero `// MOVED
+from` comments (every declared magnitude now reproduces exactly); `node
+tools/bloom-combination-gate.mjs --control` (the must-fail sweep) reports "every
+clause fired on a plant that names it, and the tree is green without them."
