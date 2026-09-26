@@ -4822,8 +4822,10 @@ default 2.2 = `INFILL_ANISO`) and `infillBase` (0–1, default 0 — the lamina-
 a FRACTION of the travel from the derived floor to `ROOT_BLEND_END`, unblocked because the infill
 shipped) — hidden AND inert at the guard, out of the sweep through the derived `INFILL_SUBS`, their
 defaults the S3 constants AS THE SAME DOUBLES and the basal fraction at 0 a BRANCH, so a build at the
-defaults forms S3's own expressions (I8(d) measures the identity; the byte partition measured it over
-the whole matrix). **"The tip and base stay solid and the holes bunch in the middle" is CONFIRMED and
+defaults forms S3's own expressions (I8(d) measures the identity; the byte partition measured it:
+**8 movers / 943 holders over the 951-row matrix in both modes, 1,222,742,268 export floats and
+80,075,016 captured-grid values, 0 moved on any holder — every one of `main`'s 942 rows holds, the
+twenty-two S3 `INFILL:` rows included**). **"The tip and base stay solid and the holes bunch in the middle" is CONFIRMED and
 gets worse with density** — from 24 up the base tenth reads 0 holes of 5 cells and from 32 up the tip
 tenth 0 of 5 — **and the two ends have two causes**: the tip is the density law (cells shrink with the
 width, so the apex packs with cells under the 1.50 mm bar — at density 40 their capacity reads
