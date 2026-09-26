@@ -226,9 +226,24 @@ the sheet closer to itself than the plain blade does, at any density under any c
 * **flower-untouched**: predeclared, and `git diff --stat 4f3d31b..HEAD -- 'flower*'` is empty at
   close.
 
-## 6. The byte partition
+## 6. The byte partition: 8 movers / 943 holders, PASS
 
-(filled from the run — see the section appended below)
+`node tools/verify-bloom-surface-bytes.mjs --base <worktree of 4f3d31b> --movers '^INFILL: x
+(relaxation|density law|stretch|solid base|the four)'` over the whole 951-row live matrix in both
+modes, positionally under `Object.is`:
+
+* **1,222,742,268 export floats over 135,860,252 triangles and 80,075,016 captured-grid values.**
+* **0 floats moved on the 943 holders** — every row of `main`'s 942 (the two S4 GATED rows are
+  holders by construction, and so are all twenty-two S3 `INFILL:` rows, which is the "0 moved
+  on any row where the new controls sit at their defaults" claim measured rather than argued) —
+  and **all 8 predeclared movers moved**. `--control` perturbs one float by 1e-9 and fires.
+* The mover set is predeclared from the labels; the guard predicate cannot name it (every mover
+  and every S3 row has the guard ON), so what makes a row a mover here is a NON-DEFAULT value of
+  one of the four controls, and the eight are exactly block 39's new non-GATED rows.
+
+**`frozen/phase40` is the 942 rows at `4f3d31b`**, registered in `FROZEN_MATRICES` and
+`FROZEN_BASE_COMMITS` and proved deep-equal (`diff-bloom-bytes --verify-frozen --phase40`).
+No older tag's bytes stop reproducing: the partition above holds every row of `main` to the bit.
 
 ## 7. The density's dead travel, told
 
