@@ -3280,7 +3280,11 @@ if (NEGATIVE_CONTROL) {
     /* ROUTE (u), THE INFILL'S FOUR LEVERS: the second line read against the
        BUILDER, so a frozen panel shows the default's four values under a
        builder reporting twelve passes. */
-    const sawLevers = fail.some((f) => /^\[infill levers\] .*INFILL levers line says relaxation/.test(f));
+    /* Under the freeze the read-out holds the DEFAULT's text, which has no
+       INFILL line at all, so the frozen witness is the line's ABSENCE while
+       the builder built a field — and a line that thawed enough to be there
+       but stuck on the default's values is the "says relaxation" arm. */
+    const sawLevers = fail.some((f) => /^\[infill levers\] .*INFILL levers line (is absent while the builder built a field|says relaxation)/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
         && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers
         && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
