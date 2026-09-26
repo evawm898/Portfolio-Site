@@ -435,6 +435,11 @@ is **recorded, costed and not started**.
 
 ## 8. If Eva should be able to move it herself — the control, costed
 
+**BUILT — S4 of the port (`docs/bloom-infill-s4-outcome.md`): `infillBase`, 0–1, default 0, a
+fraction of the travel from the derived floor to `ROOT_BLEND_END`, hidden and inert at the guard,
+told DEAD where the floor already sits at the blend station, I9 rebuilding the floor from
+`ROOT_BLEND_END` and `infillFloorU`. The costing below is what it cost, to the item.**
+
 **SHE SHOULD, AND IT CANNOT SHIP BEFORE THE INFILL DOES**: a registry row for a feature the
 generator does not build would be a control that moves nothing. Costed for the day the port lands.
 

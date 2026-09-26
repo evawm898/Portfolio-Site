@@ -69,6 +69,45 @@
    the leaf's petiole ring). The plan reads `laminaHalfAt`, which is mode-free
    by construction; this is what says the construction worked.
 
+   I8 THE FOUR S4 LEVERS REACH THE PLAN AND MOVE THE ARTEFACT (S4). Q6 first:
+   every registry range, step and default is the geometry's own export, and
+   the three look defaults ARE the S3 constants (the same doubles). Then the
+   built default's record reads the registry's defaults back. Then each lever
+   ALONE, at a non-default value, moves the EMITTED cell stream — a record
+   that says "12 passes" over a plan that never read the control is what this
+   refuses, and the `passes` mutant is what it caught first. And at the
+   defaults the plan with the levers PASSED explicitly is bit-identical to the
+   plan without them: the by-construction identity, measured.
+
+   I9 THE BASAL BOUNDARY IS A FRACTION OF THE DERIVED TRAVEL, REBUILT. The
+   floor the plan reports is `baseFloorU + frac * max(0, ROOT_BLEND_END -
+   baseFloorU)` rebuilt in the gate from `ROOT_BLEND_END` (a constant with its
+   own owner) and `infillFloorU` (the derived floor's own function), EXACTLY
+   at 0 and at 1 and to 1 ulp between; the emitted region's lowest cell sits
+   at or above it; and raising the fraction never lowers the lowest cell — the
+   direction the control's name promises.
+
+   I10 THE DENSITY LAW'S DIRECTION IS THE MEASURED ONE, AND THE DENSITY'S DEAD
+   TRAVEL IS THE SWEEP'S. Eva's complaint is a claim about the along-u hole
+   distribution; the control's read-out says 0 fills the tip with HOLES and
+   1 with cells, so the gate asserts that at gamma 0 the top fifth of the
+   default blade holds at least as many holes as at gamma 2 (measured 1 vs 0
+   at density 16) — the direction, never a count. And the record's
+   `densityCap` is re-derived by the gate from its own sweep of the shipped
+   plan over `INFILL_DENSITY_SWEEP`: the lowest swept density reaching the
+   sweep's maximum, both directions.
+
+   I11 THE STRETCH IS THE METRIC THE CELLS ARE CUT IN, THE RELAXATION EVENS
+   THE LATTICE, AND THE WALL BETWEEN HOLES IS THE RULED WALL. On the default
+   blade the cells' median principal ratio at stretch 3 exceeds the ratio at
+   stretch 1 (port plan §4's own measurement, on the artefact); the cells'
+   area spread (coefficient of variation) at 12 passes is below the spread at
+   0; and the narrowest IN-SHEET wall between two holes, read off the surface
+   through `tools/bloom-infill-wall.mjs` (never the metric field), is at
+   least `INFILL_WALL_MM` less the plan grid's own quantum — two rim vertices
+   each moved by at most half a grid step, so the bound is DERIVED from
+   `INFILL_PLAN_GRID`, not typed.
+
    WHAT IT DOES NOT COVER, in its own header:
      - IT IS NODE-SIDE. It does not drive the page, so it inherits nothing
        about whether a row's values are REACHABLE through the UI; both STL
@@ -83,6 +122,7 @@
        naming the sampling applies to this file too.
    =================================================================== */
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import * as G from '../bloom-geometry.js';
@@ -468,7 +508,7 @@ function validity() {
   return bad;
 }
 
-function main() {
+async function main() {
   const v = validity();
   if (v.length) {
     console.log('HARNESS INVALID — the tree does not carry the infill, so nothing below could be trustworthy:');
@@ -517,6 +557,9 @@ function main() {
   }
   console.log(`I7 the topology is mode-free: ${states.length - modeDiff} of ${states.length} states identical live and export (cells, holes achieved and the measured genus).`);
 
+  /* S4 — I8..I11, on the shipped module. */
+  for (const c of s4Clauses(G, null)) say(c);
+
   /* The two refusals, by name. */
   for (const [name, set, why] of REFUSERS) {
     const st = { ...DEFAULTS, ...set, petalInfill: 'VORONOI' };
@@ -533,12 +576,12 @@ function main() {
     else console.log(`I2 refusal: ${name} — "${why}", and the mesh is bit-identical to the same state with the guard off.`);
   }
 
-  if (NEG) fails += negativeControl(states);
+  if (NEG) { fails += negativeControl(states); fails += await s4NegativeControl(); }
 
   const json = arg('--json', null);
   if (json) fs.writeFileSync(json, JSON.stringify(results, null, 1));
   console.log('');
-  console.log(fails === 0 ? `PASS — I0..I7 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
+  console.log(fails === 0 ? `PASS — I0..I11 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
   if (fails) process.exitCode = 1;
 }
 
@@ -581,6 +624,168 @@ function negativeControl(states) {
   return fails;
 }
 
+/* ---------------- S4: I8..I11 ---------------- */
+/* EVERY CLAUSE HERE TAKES THE MODULE AS AN ARGUMENT, so the negative control
+   can hand it a MUTATED COPY of bloom-geometry.js and the clause measures the
+   mutated artefact rather than the shipped one — session 41's L7 lesson: a
+   clause with both halves on the unmutated module cannot fire. */
+import { pathToFileURL } from 'node:url';
+import { infillPlanFor, infillWallSurfaceMm } from './bloom-infill-wall.mjs';
+const S4_DEFAULT = {};
+function s4Plan(M, set, opts = null) { return infillPlanFor(M, DEFAULTS, set, true, opts); }
+function cellsKey(plan) { return JSON.stringify((plan.cells || []).map((c) => c.map((q) => [q.x, q.y]))); }
+function principalRatio(poly) {
+  let mx = 0, my = 0; for (const q of poly) { mx += q.x; my += q.y; } mx /= poly.length; my /= poly.length;
+  let sxx = 0, sxy = 0, syy = 0; for (const q of poly) { const dx = q.x - mx, dy = q.y - my; sxx += dx * dx; sxy += dx * dy; syy += dy * dy; }
+  const tr = sxx + syy, det = sxx * syy - sxy * sxy; const disc = Math.sqrt(Math.max(0, tr * tr / 4 - det));
+  const l1 = tr / 2 + disc, l2 = tr / 2 - disc; return l2 > 1e-12 ? Math.sqrt(l1 / l2) : Infinity;
+}
+function median(a) { const s = a.slice().sort((x, y) => x - y); return s.length ? s[s.length >> 1] : NaN; }
+function polyArea(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a.x * b.y - b.x * a.y; } return Math.abs(s) / 2; }
+export function s4Clauses(M, only) {
+  const out = [];
+  const add = (id, ok, msg) => { if (!only || only.has(id)) out.push({ id, ok, msg }); };
+  const row = (id) => CONTROLS.find((c) => c.id === id);
+  /* I8 (a) — Q6: every range, step and default is the geometry's export, and
+     the three look defaults ARE the S3 constants. */
+  const q6 = [
+    ['infillRelax', M.INFILL_RELAX_RANGE, 1, M.INFILL_RELAX_DEFAULT, M.INFILL_LLOYD_PASSES],
+    ['infillLaw', M.INFILL_LAW_RANGE, M.INFILL_LAW_STEP, M.INFILL_LAW_DEFAULT, M.INFILL_TIP_GAMMA],
+    ['infillAniso', M.INFILL_ANISO_RANGE, M.INFILL_ANISO_STEP, M.INFILL_ANISO_DEFAULT, M.INFILL_ANISO],
+    ['infillBase', M.INFILL_BASE_RANGE, M.INFILL_BASE_STEP, M.INFILL_BASE_DEFAULT, 0],
+  ];
+  for (const [id, range, step, dflt, constant] of q6) {
+    const r = row(id);
+    add('I8', !!r, `the registry declares no \`${id}\``);
+    if (!r) continue;
+    add('I8', r.min === range[0] && r.max === range[1] && r.step === step && Object.is(r.default, dflt), `${id}: the registry row (${r.min}..${r.max} step ${r.step}, default ${r.default}) is not the geometry's own export (${range[0]}..${range[1]} step ${step}, default ${dflt}) — Q6`);
+    add('I8', Object.is(dflt, constant), `${id}: its default ${dflt} is not the S3 constant ${constant} as the SAME double — a build at the defaults would form a different expression from the one S3 shipped`);
+    add('I8', !!r.visibleWhen && r.visibleWhen.ref === 'infillPresent', `${id} is not gated on \`infillPresent\` — it would be visible with the guard off`);
+  }
+  /* I8 (b) — the built default's record reads the registry defaults back. */
+  const base = s4Plan(M, S4_DEFAULT);
+  const F = base.petal.infill;
+  add('I8', F && F.passes === DEFAULTS.infillRelax && F.gamma === DEFAULTS.infillLaw && F.aniso === DEFAULTS.infillAniso && F.baseFrac === DEFAULTS.infillBase,
+    `the built default's record reads passes ${F && F.passes} / gamma ${F && F.gamma} / aniso ${F && F.aniso} / base ${F && F.baseFrac} against the registry's ${DEFAULTS.infillRelax} / ${DEFAULTS.infillLaw} / ${DEFAULTS.infillAniso} / ${DEFAULTS.infillBase}`);
+  /* I8 (c) — each lever ALONE moves the emitted cell stream. Read off the
+     EMITTED positions inside the cells' own triangle range, not the plan. */
+  const streamOf = (r) => { const R = r.petal.infill && r.petal.infill.emittedTriRange; return R ? r.acc.positions.slice(R[0] * 9, R[1] * 9) : r.acc.positions; };
+  const same = (a, b) => a.length === b.length && a.every((v, i) => Object.is(v, b[i]));
+  const s0 = streamOf(base);
+  for (const [id, value] of [['infillRelax', 12], ['infillLaw', 0], ['infillAniso', 1], ['infillBase', 0.5]]) {
+    const r = s4Plan(M, { [id]: value });
+    add('I8', !same(s0, streamOf(r)), `${id} at ${value} emits the SAME cell stream as the default (${s0.length} floats) — the control does not reach the plan`);
+  }
+  /* I8 (d) — the by-construction identity: the levers passed explicitly at
+     their defaults reproduce the plan built without them, to the bit. */
+  const explicit = s4Plan(M, S4_DEFAULT, { passes: M.INFILL_LLOYD_PASSES, gamma: M.INFILL_TIP_GAMMA, aniso: M.INFILL_ANISO, baseFrac: 0 });
+  add('I8', same(s0, streamOf(explicit)), 'the plan with the four levers passed explicitly at their defaults is NOT bit-identical to the plan built without them');
+  /* I9 — the basal boundary rebuilt from ROOT_BLEND_END and infillFloorU. */
+  const floor0 = M.infillFloorU(base.surface);
+  const travel = Math.max(0, M.ROOT_BLEND_END - floor0);
+  add('I9', travel > 0, `the default blade has no basal travel (floor ${floor0.toFixed(4)} against ROOT_BLEND_END ${M.ROOT_BLEND_END}) — I9's subject is empty here and the gate cannot vouch for the control`);
+  let lastLow = -Infinity;
+  for (const frac of [0, 0.5, 1]) {
+    const r = s4Plan(M, { infillBase: frac });
+    const P = r.plan;
+    const want = frac === 0 ? floor0 : frac === 1 ? M.ROOT_BLEND_END : floor0 + frac * travel;
+    const okF = frac === 0 || frac === 1 ? P.floorU === want : Math.abs(P.floorU - want) <= 2 * Number.EPSILON * Math.max(1, want);
+    add('I9', okF, `infillBase ${frac}: the plan's floor ${P.floorU} is not ${want} rebuilt from ROOT_BLEND_END ${M.ROOT_BLEND_END} and the derived floor ${floor0}${frac === 0 || frac === 1 ? ' (EXACTLY, a branch)' : ''}`);
+    add('I9', P.baseFloorU === floor0 && P.baseTravel === travel, `infillBase ${frac}: the record's baseFloorU ${P.baseFloorU} / baseTravel ${P.baseTravel} disagree with ${floor0} / ${travel}`);
+    if (!P.refused) {
+      const low = Math.min(...P.cellU);
+      add('I9', low >= P.floorU - 1e-12, `infillBase ${frac}: the lowest cell centroid u ${low.toFixed(4)} sits below the floor ${P.floorU.toFixed(4)}`);
+      add('I9', low >= lastLow, `infillBase ${frac}: raising the fraction LOWERED the lowest cell (u ${low.toFixed(4)} after ${lastLow.toFixed(4)})`);
+      lastLow = low;
+      /* The seam row is the first row at or above the floor, re-read from the rows. */
+      const rows = r.petal.grid[0].rows;
+      const m = P.mSplit;
+      add('I9', rows[m - 1].u >= P.floorU - 1e-12 && (m - 2 < 0 || rows[m - 2].u < P.floorU - 1e-12 || rows[m - 2].u === 0), `infillBase ${frac}: the split row ${m} (u ${rows[m - 1].u.toFixed(4)}, below it ${rows[m - 2] ? rows[m - 2].u.toFixed(4) : '-'}) is not the first blade row at or above the floor ${P.floorU.toFixed(4)}`);
+    }
+  }
+  /* I10 — the law's direction, and the density cap re-derived. */
+  /* STRICT, AND AT DENSITY 24 RATHER THAN THE DEFAULT 16 — the mutant table
+     said why: at 16 the top fifth reads ONE hole at law 0 and ONE at law 2
+     (one seed, this state), so a `>=` passed a law the plan never read. At 24
+     it reads 4 against 1 and the highest hole u 0.94 against 0.85, both
+     strict; the clause names its sampling because the count is one seed's. */
+  const topFifth = (P) => (P.holeU || []).filter((u) => u >= 0.8).length;
+  const topU = (P) => Math.max(...(P.holeU || [0]));
+  const g0 = s4Plan(M, { infillLaw: 0, infillDensity: 24 }).plan, g2 = s4Plan(M, { infillLaw: 2, infillDensity: 24 }).plan;
+  add('I10', !g0.refused && !g2.refused && topFifth(g0) > topFifth(g2) && topU(g0) > topU(g2), `density law 0 puts ${topFifth(g0)} holes in the top fifth of the default blade at density 24 (highest u ${topU(g0).toFixed(3)}) against ${topFifth(g2)} (u ${topU(g2).toFixed(3)}) at law 2 — the read-out claims 0 fills the tip with holes and 2 with cells, and both must be STRICT`);
+  {
+    const rec = base.petal.infill;
+    const sweep = M.INFILL_DENSITY_SWEEP.map((d) => { const P = s4Plan(M, { infillDensity: d }).plan; return { density: d, achieved: P.refused ? 0 : P.achieved }; });
+    const best = Math.max(...sweep.map((x) => x.achieved));
+    const cap = sweep.find((x) => x.achieved === best).density;
+    add('I10', rec && rec.densityCap === cap && rec.densityBest === best, `the record's density cap ${rec && rec.densityCap} (best ${rec && rec.densityBest}) is not the gate's own sweep: ${sweep.map((x) => `${x.density}:${x.achieved}`).join(' ')} -> cap ${cap}, best ${best}`);
+    add('I10', rec && Array.isArray(rec.densitySweep) && rec.densitySweep.length === sweep.length && rec.densitySweep.every((x, i) => x.density === sweep[i].density && x.achieved === sweep[i].achieved), 'the record\'s density sweep does not reproduce the gate\'s');
+    const dens = row('infillDensity');
+    add('I10', dens && typeof dens.cap === 'function' && dens.cap({ infill: rec }) === (cap < M.INFILL_DENSITY_RANGE[1] ? cap : null), `the density control's cap reads ${dens && typeof dens.cap === 'function' ? dens.cap({ infill: rec }) : '(no cap)'} against the record's ${cap}`);
+  }
+  /* I11 — the stretch, the relaxation, the wall. */
+  const a1 = s4Plan(M, { infillAniso: 1 }).plan, a3 = s4Plan(M, { infillAniso: 3 }).plan;
+  const r1 = median(a1.cells.map(principalRatio)), r3 = median(a3.cells.map(principalRatio));
+  add('I11', r3 > r1, `the cells' median principal ratio at stretch 3 (${r3.toFixed(3)}) does not exceed the ratio at stretch 1 (${r1.toFixed(3)}) — the stretch is not the metric the cells are cut in`);
+  const cv = (P) => { const A = P.cells.map(polyArea); const m = A.reduce((s, x) => s + x, 0) / A.length; return Math.sqrt(A.reduce((s, x) => s + (x - m) ** 2, 0) / A.length) / m; };
+  const p0 = s4Plan(M, { infillRelax: 0 }).plan, p12 = s4Plan(M, { infillRelax: 12 }).plan;
+  add('I11', cv(p12) < cv(p0), `twelve Lloyd passes leave the cell areas MORE uneven (cv ${cv(p12).toFixed(3)}) than none (${cv(p0).toFixed(3)}) — the relaxation does not even the lattice`);
+  const wallBar = M.INFILL_WALL_MM - 2 * M.INFILL_PLAN_GRID;
+  for (const [n, set] of [['default', {}], ['density 40', { infillDensity: 40 }], ['cup 1.2 x curl 360', { petalCup: 1.2, petalSpineCurl: 360 }], ['the four at their far ends', { infillRelax: 12, infillLaw: 0, infillAniso: 3, infillBase: 1 }]]) {
+    const r = s4Plan(M, set);
+    const w = infillWallSurfaceMm(r.surface, r.plan);
+    add('I11', !!w && w.mm >= wallBar, `${n}: the narrowest in-sheet wall between holes reads ${w ? w.mm.toFixed(6) : 'none'} mm against INFILL_WALL_MM ${M.INFILL_WALL_MM} less two grid quanta (${wallBar.toFixed(6)})`);
+  }
+  return out;
+}
+/* THE S4 MUTATIONS RUN ON A COPY OF THE MODULE. Each names its clauses and
+   carries a WITNESS — a direct reading on the MUTATED module's own record
+   proving the intended behaviour moved, taken before the clauses are
+   consulted and deliberately not the assertion it names. The anchor must
+   match EXACTLY ONCE (a refactor disarms a mutant by moving it or by making it
+   match twice). */
+const S4_MUTANTS = [
+  { id: 'the-relaxation-count-is-not-read', from: 'const passes = opts.passes ?? INFILL_LLOYD_PASSES;', to: 'const passes = INFILL_LLOYD_PASSES;', breaks: ['I8'],
+    witness: (M) => s4Plan(M, { infillRelax: 12 }).plan.passes !== 12 },
+  { id: 'the-law-is-not-read', from: 'const gamma = opts.gamma ?? INFILL_TIP_GAMMA;', to: 'const gamma = INFILL_TIP_GAMMA;', breaks: ['I8', 'I10'],
+    witness: (M) => s4Plan(M, { infillLaw: 0 }).plan.gamma !== 0 },
+  { id: 'the-stretch-is-not-read', from: 'const aniso = opts.aniso ?? INFILL_ANISO;', to: 'const aniso = INFILL_ANISO;', breaks: ['I8', 'I11'],
+    witness: (M) => s4Plan(M, { infillAniso: 1 }).plan.aniso !== 1 },
+  { id: 'the-base-is-not-read', from: 'const baseFrac = opts.baseFrac ?? INFILL_BASE_DEFAULT;', to: 'const baseFrac = INFILL_BASE_DEFAULT;', breaks: ['I8', 'I9'],
+    witness: (M) => s4Plan(M, { infillBase: 0.5 }).plan.baseFrac !== 0.5 },
+  { id: 'the-base-is-a-station-not-a-fraction', from: 'const floorU = baseFrac > 0 && baseTravel > 0 ? baseFloorU + baseFrac * baseTravel : baseFloorU;', to: 'const floorU = baseFrac > 0 ? baseFrac : baseFloorU;', breaks: ['I9'],
+    witness: (M) => { const P = s4Plan(M, { infillBase: 0.5 }).plan; return Math.abs(P.floorU - 0.5) < 1e-12; } },
+  { id: 'the-density-cap-is-the-asked-density', from: "infill = { ...infill, densitySweep: sweep, densityCap: at ? at.density : null, densityBest: best };", to: "infill = { ...infill, densitySweep: sweep, densityCap: infill.density, densityBest: best };", breaks: ['I10'],
+    witness: (M) => s4Plan(M, { infillDensity: 40 }).petal.infill.densityCap === 40 },
+];
+async function s4NegativeControl() {
+  console.log('');
+  console.log('--- S4 NEGATIVE CONTROL: six mutations of a COPY of bloom-geometry.js, each with a witness on the mutated module ---');
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const src = fs.readFileSync(path.join(here, '..', 'bloom-geometry.js'), 'utf8');
+  let fails = 0;
+  for (const m of S4_MUTANTS) {
+    const n = src.split(m.from).length - 1;
+    if (n !== 1) { console.log(`${m.id.padEnd(40)} REFUSED — the anchor matches ${n} times, not once; the mutant is DISARMED`); fails++; continue; }
+  }
+  if (fails) return fails;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bloom-s4-mutant-'));
+  for (const m of S4_MUTANTS) {
+    const file = path.join(dir, `${m.id}.js`);
+    fs.writeFileSync(file, src.replace(m.from, m.to));
+    const M = await import(pathToFileURL(file).href);
+    let witness = false; try { witness = !!m.witness(M); } catch (e) { witness = false; }
+    const fired = new Set();
+    try { for (const c of s4Clauses(M, null)) if (!c.ok) fired.add(c.id); } catch (e) { fired.add('threw'); }
+    const missed = m.breaks.filter((b) => !fired.has(b));
+    const bad = !witness || missed.length;
+    if (bad) fails++;
+    console.log(`${m.id.padEnd(40)} witness ${witness ? 'MOVED' : 'DID NOT MOVE'} · fired ${[...fired].sort().join(',') || '(nothing)'} — ${missed.length ? 'MISSED ' + missed.join(',') : 'every clause it names went red'}`);
+  }
+  console.log(fails ? `S4 NEGATIVE CONTROL: FAIL — ${fails} mutant(s) did not behave` : 'S4 NEGATIVE CONTROL: every mutant witnessed and every named clause red.');
+  return fails;
+}
+
 /* ---------------- --cap-sweep ---------------- */
 /* WHERE `INFILL_DROP_PASSES` COMES FROM, so the constant is a measurement
    somebody can re-run rather than a number written down once. */
@@ -615,4 +820,4 @@ function capSweep() {
   if (CAP <= worst || losses > 0) process.exitCode = 1;
 }
 
-if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) main();
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) await main();

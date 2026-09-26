@@ -4813,6 +4813,51 @@ carries its own six must-fails and every one fires, recorded as a gap rather tha
 (33.6 s at 55ca84c against 34.5 s on the branch), which is why a local `bloom-smoke --conn` run is
 quoted without it and the full matrix in CI is the merge criterion.
 
+**S4 OF THE VORONOI INFILL SHIPS FOUR CONTROLS, AND THE DIAGNOSIS OF EVA'S COMPLAINT IS TWO
+CAUSES, ONE OF THEM STILL A CONSTANT** (read `docs/bloom-infill-s4-outcome.md` before touching
+`infillRelax` / `infillLaw` / `infillAniso` / `infillBase`, `petalInfillPlan`'s levers, the
+density's dead-travel sweep, `tools/bloom-infill-wall.mjs` or I8–I11). `infillRelax` (0–12, default
+4 = `INFILL_LLOYD_PASSES`), `infillLaw` (0–2, default 1 = `INFILL_TIP_GAMMA`), `infillAniso` (1–3,
+default 2.2 = `INFILL_ANISO`) and `infillBase` (0–1, default 0 — the lamina-floor doc's §8 control,
+a FRACTION of the travel from the derived floor to `ROOT_BLEND_END`, unblocked because the infill
+shipped) — hidden AND inert at the guard, out of the sweep through the derived `INFILL_SUBS`, their
+defaults the S3 constants AS THE SAME DOUBLES and the basal fraction at 0 a BRANCH, so a build at the
+defaults forms S3's own expressions (I8(d) measures the identity; the byte partition measured it over
+the whole matrix). **"The tip and base stay solid and the holes bunch in the middle" is CONFIRMED and
+gets worse with density** — from 24 up the base tenth reads 0 holes of 5 cells and from 32 up the tip
+tenth 0 of 5 — **and the two ends have two causes**: the tip is the density law (cells shrink with the
+width, so the apex packs with cells under the 1.50 mm bar — at density 40 their capacity reads
+0.26–1.06 mm), and the BASE is `INFILL_BASE_NARROW` 0.75 plus the basal V, NEITHER A CONTROL, empty
+at every gamma. **THE LAW'S DESCRIBED DIRECTION IS BACKWARDS ABOUT THE HOLES AND THE READ-OUT SAYS IT
+THE WAY IT MEASURES**: 0 (one size) puts a hole in all 17 cells and reaches u 0.92, 1 leaves 14 to
+0.87, 2 leaves 12 to 0.84 — shrinking the cells is what pushes the tip under the bar. **RELAXATION IS
+THE LEVER FOR BOTH ENDS AND 0 PASSES IS THE COMPLAINT ITSELF**: no passes reads 9 holes in u
+0.27–0.77 with none in the base or tip fifth; twelve reads 16 with three in the base fifth. The
+stretch moves holes around the middle (14–16, no monotone end effect) and **RESHUFFLES MID-DRAG,
+TOLD, NOT CLAMPED** — measured at 0.02 steps the greedy seeder jumps at 8 of 100 steps at density 16
+and 7 at 24, scattered over the WHOLE range (the prompt's "past ~2.3" is one of them, not a
+threshold), so there is no ceiling to clamp under. The solid base only raises the floor (14 → 13
+holes, the base fifth 0 from 0.25 up). **THE DENSITY'S DEAD TRAVEL IS A MEASUREMENT** — the achieved
+count is NOT monotone (19 at 20 asked, 16 at 24) — so the builder SWEEPS `INFILL_DENSITY_SWEEP` on the
+representative petal once a build (8–19 ms a plan), `densityCap` is the lowest swept density reaching
+the sweep's maximum, drawn as the cap tick and printed with its sampling; on the default it reads 20.
+**THE TWO COMBINATION PAIRS WERE BOUGHT ON A PREMISE S2 CLOSED, AND THE GATE MEASURED IT**: on `self`
+the density is BIT-IDENTICALLY inert (1.238 / 1.125 / 1.097 / 1.097 at cup 0 / 0.6 / 0.9 / 1.2 at
+every density), because `self` is the sheet against another part of itself and the wall inset keeps
+the cells out of the margins and tip where that approach is; and the IN-SHEET WALL between holes
+(`tools/bloom-infill-wall.mjs`, the surface read directly) is **1.000000 mm on every flat cell to
+4e-16 and above it on every curved one** (1.0153 at cup 1.2 × curl 360), because the plan lays it out
+at `INFILL_WALL_MM` BY CONSTRUCTION — a bar equal to the design value is a knife edge (a strict `<`
+flagged 0.9999996, the plan grid's own quantum, worst deficit 3.9e-7 against 9.5e-7). So the pairs
+ship CLEARS on `self` with the density in `COMBINATION_INERT` at exactly 0, and the wall is I11's, its
+bound DERIVED from `INFILL_PLAN_GRID`. **The bar's cost per density is on the table for Eva** (1.50
+against 1.00 mm: 14 / 15 at 16, 16 / 22 at 24, 16 / 26 at 40 — the prompt's 9 / 17 was the prototype).
+**I8–I11 run on a COPY of the module under six witnessed mutants, and the table found I10 written
+`>=` at density 16, where one seed reads ONE tip hole at law 0 and ONE at law 2 — strict at 24 now
+(4 against 1).** Panel route (u), three edits; `frozen/phase40` is the 942 rows at `4f3d31b`; block 39
+gains nine rows (951). **No default moved — the sweeps in `docs/img/infill-s4-*.png` are for Eva's
+ruling.**
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

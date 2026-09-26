@@ -39,7 +39,9 @@
    =================================================================== */
 import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCALE_RANGE,
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
-import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM } from './bloom-geometry.js';
+import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
+  INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
+  INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -1756,7 +1758,86 @@ export const CONTROLS = [
       if (!f || f.refused) return `${base} · nothing cut`;
       const tail = `${f.achieved} hole${f.achieved === 1 ? '' : 's'} at or over ${f.bar.toFixed(2)} mm across`
         + (f.solid ? `, ${f.solid} cell${f.solid === 1 ? '' : 's'} left solid` : '');
-      return f.achieved === n ? `${base} · ${tail}` : `${base} — BUILT ${f.cells} · ${tail}`;
+      const body = f.achieved === n ? `${base} · ${tail}` : `${base} — BUILT ${f.cells} · ${tail}`;
+      /* THE DEAD TRAVEL, MEASURED ON THIS BLADE AND TOLD (S4). `densityCap` is
+         the lowest swept density reaching the sweep's own best count; above
+         it the mark on the track says asking for more cells adds no hole on
+         the densities measured. The sampling is named because the count is
+         not monotone and a reader deserves to know how coarse the grid is. */
+      if (f.densityCap === null || f.densityCap === undefined) return body;
+      const n0 = INFILL_DENSITY_SWEEP[0], n1 = INFILL_DENSITY_SWEEP[INFILL_DENSITY_SWEEP.length - 1];
+      if (f.densityCap >= INFILL_DENSITY_RANGE[1]) return `${body} · still gaining holes at the top of the range (swept ${n0}..${n1} every ${INFILL_DENSITY_SWEEP[1] - n0})`;
+      return `${body} · most holes (${f.densityBest}) reached by ${f.densityCap} cells — the travel above the mark adds none on this blade (swept ${n0}..${n1} every ${INFILL_DENSITY_SWEEP[1] - n0})`;
+    },
+    cap: (shown) => (shown && shown.infill && shown.infill.built && shown.infill.densityCap !== null && shown.infill.densityCap !== undefined ? shown.infill.densityCap : null),
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+
+  /* S4 — THE THREE LOOK CONTROLS AND THE BASAL BOUNDARY (`docs/bloom-infill-s4-outcome.md`).
+     Every range, step and default is IMPORTED from the geometry (Q6), and the
+     three defaults are the S3 constants THEMSELVES — the same doubles — so a
+     build at the defaults forms exactly the expressions S3 shipped. All four
+     are hidden AND inert at the guard (`infillPresent`), and out of the
+     blanket sweep through `INFILL_SUBS`, which is derived from that predicate
+     rather than listed. */
+  { id: 'infillRelax', section: 'infill', kind: 'slider',
+    min: INFILL_RELAX_RANGE[0], max: INFILL_RELAX_RANGE[1], step: 1, default: INFILL_RELAX_DEFAULT,
+    label: 'Relaxation',
+    fmt: (v, ui, shown) => {
+      const n = Math.round(Number(v));
+      const f = shown && shown.infill;
+      const head = n === 0 ? 'no relaxation — the cells are the seeder\u2019s own, uneven' : `${n} Lloyd pass${n === 1 ? '' : 'es'} — each moves every seed to its cell\u2019s density-weighted centre, in the stretched metric, from ONE snapshot`;
+      if (!f || f.refused || !f.built) return head;
+      return `${head} · ${f.achieved} hole${f.achieved === 1 ? '' : 's'} on this blade`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+  { id: 'infillLaw', section: 'infill', kind: 'slider',
+    min: INFILL_LAW_RANGE[0], max: INFILL_LAW_RANGE[1], step: INFILL_LAW_STEP, default: INFILL_LAW_DEFAULT,
+    label: 'Density law',
+    /* THE DIRECTION IS SAID THE WAY IT MEASURES, NOT THE WAY IT SOUNDS: cells
+       that shrink with the blade are cells that fall under the hole bar at the
+       tip, so 1 is the SOLID tip and 0 the tip with holes in it. */
+    fmt: (v, ui, shown) => {
+      const g = Number(v);
+      const f = shown && shown.infill;
+      const head = g === 0 ? 'cells one size along the whole blade — fewer at the tip, each big enough to keep its hole'
+        : g === 1 ? 'cells shrink in step with the blade\u2019s width — the count stays even and the tip\u2019s cells fall under the hole bar'
+        : g < 1 ? `cells shrink as width^${g.toFixed(2)} — between one size and in step with the blade`
+        : `cells shrink as width^${g.toFixed(2)} — faster than the blade narrows; the tip packs with cells that hold no hole`;
+      if (!f || f.refused || !f.built || !f.holeU || !f.holeU.length) return head;
+      const top = f.holeU.filter((u) => u >= 0.8).length;
+      return `${head} · holes reach u ${Math.max(...f.holeU).toFixed(2)}, ${top} in the top fifth`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+  { id: 'infillAniso', section: 'infill', kind: 'slider',
+    min: INFILL_ANISO_RANGE[0], max: INFILL_ANISO_RANGE[1], step: INFILL_ANISO_STEP, default: INFILL_ANISO_DEFAULT,
+    label: 'Stretch',
+    /* THE SLIDER RESHUFFLES MID-DRAG, SAID PLAINLY. The seeder picks each seed
+       by a greedy farthest-point score in the stretched metric, and a greedy
+       choice is discontinuous in the metric: measured at 0.02 steps from 1.00
+       to 3.00 on the shipping default, the seed layout jumps at 8 of 100
+       steps (density 16) and 7 of 100 (density 24), scattered across the
+       WHOLE range rather than past a threshold — so there is no ceiling to
+       clamp under, and the honest control tells it. */
+    fmt: (v) => {
+      const a = Number(v);
+      return a === 1 ? 'no stretch — round cells (the seed layout reshuffles at some steps of this slider; a greedy seeder is not continuous in its metric)'
+        : `cells ${a.toFixed(2)}x longer along the midrib than across it (the seed layout reshuffles at some steps of this slider; a greedy seeder is not continuous in its metric)`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+  { id: 'infillBase', section: 'infill', kind: 'slider',
+    min: INFILL_BASE_RANGE[0], max: INFILL_BASE_RANGE[1], step: INFILL_BASE_STEP, default: INFILL_BASE_DEFAULT,
+    label: 'Solid base',
+    /* A FRACTION OF A TRAVEL, NEVER A `u` STATION (lamina-floor doc §8): 0 is
+       the derived floor, 1 the outline's own root-blend station. Where the
+       floor already sits at ROOT_BLEND_END the travel is zero and the whole
+       slider is dead on that petal — TOLD, never trimmed. */
+    fmt: (v, ui, shown) => {
+      const b = Number(v);
+      const f = shown && shown.infill;
+      if (!f || f.refused === 'panels' || f.refused === 'outline' || f.baseTravel === undefined || f.baseTravel === null) return b === 0 ? 'the cells start at the derived floor — as low as they go' : `${(b * 100).toFixed(0)}% of the way from the derived floor up to the root blend\u2019s own station`;
+      if (!(f.baseTravel > 0)) return `${(b * 100).toFixed(0)}% asked — DEAD on this blade: the derived floor already sits at u ${f.baseFloorU.toFixed(3)}, the root blend\u2019s own station, so there is no travel to move over`;
+      const at = `the cells start at u ${f.floorU.toFixed(3)}`;
+      return b === 0 ? `${at} — the derived floor, as low as they go` : `${(b * 100).toFixed(0)}% of the way from the derived floor (u ${f.baseFloorU.toFixed(3)}) to the root blend\u2019s station — ${at}`;
     },
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
 

@@ -154,6 +154,7 @@
          node tools/bloom-combination-gate.mjs --control   the must-fail
    =================================================================== */
 
+import { measureInfillWallMm } from './bloom-infill-wall.mjs';
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -238,6 +239,57 @@ export const PAIRS = [
     verdict: 'product-only',
     cite: "SELF_XFAIL['buckle-on-form'] in tools/bloom-wall-thickness.mjs names this pair in its own note (`curl+buckle 1.182`) — as a CURVATURE reading; this gate measures the SELF-APPROACH on it for the first time",
     why: 'the curl closes the blade on itself and the buckle spends the clearance that is left; session 34 measured that the composition has LOWER curvature than the base while the wall collapses, so no curvature bound can see it',
+  },
+  /* S4 OF THE VORONOI INFILL — THE TWO PAIRS §1 OF THE PORT PLAN NAMED, AND
+     BOTH ARE INERT IN THE DENSITY, MEASURED TWO WAYS. The 0.118 mm wall was a
+     PRODUCT of cup and curl on the FLAT plan; S2's metric plan made the wall
+     a SURFACE length and S3 shipped it that way, so the premise the pairs
+     were bought on no longer reaches a wall — and the gate measured that
+     rather than declaring it:
+       * on `self` (V5's own, through the material mask) the density is
+         BIT-IDENTICALLY inert: 1.238 / 1.125 / 1.097 / 1.097 mm at cup 0 /
+         0.6 / 0.9 / 1.2 and 1.238 / 1.234 / 1.232 / 1.230 at curl 0 / 180 /
+         270 / 360, the same digits at density 8, 16, 24 and 40. `self` is the
+         sheet approaching ANOTHER PART of itself, and on a cupped or curled
+         blade that approach is at the margins and the tip, in material the
+         wall inset keeps the cells out of. So the infill never brings the
+         sheet closer to itself than the plain blade does — which is a real
+         claim, kept here as COMBINATION_INERT's number failing both ways.
+       * on the IN-SHEET WALL between two holes (tools/bloom-infill-wall.mjs,
+         the surface read directly) the wall is 1.000000 mm on every flat
+         cell to 4e-16 and ABOVE it on every curved one (1.0045 at cup 0.6 x
+         curl 180, 1.0159 at cup 1.2 x curl 180, 1.0153 at cup 1.2 x curl
+         360), because the plan lays the wall out at INFILL_WALL_MM by
+         construction — a bar EQUAL to the design value, which a strict
+         comparison turns into a knife edge (0.9999996 reads as a hazard).
+         That measure is I11's, with its bound derived from the plan grid,
+         and not a combination gate's.
+     Every axis's first value is the control's own default (CG0). Verdict
+     CLEARS on both: no cell under the bar, and the day one appears the gate
+     says so. */
+  {
+    id: 'density-x-cup',
+    tier: 1,
+    label: 'infillDensity x petalCup — the cells under a cupped blade',
+    measure: 'self',
+    base: { petalInfill: 'VORONOI' },
+    a: { id: 'infillDensity', values: [16, 8, 24, 40] },
+    b: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
+    verdict: 'clears',
+    cite: 'docs/bloom-infill-port-plan.md §1 and §3 — the wall a flat plan quartered was a product of cup and curl; docs/bloom-infill-s4-outcome.md carries the grid and the two inertness measurements',
+    why: 'the cup lifts the margins toward each other and the cells cut the sheet between them into walls; more cells is more walls under the same lift — and measured, the cells never bring the sheet nearer itself than the plain blade',
+  },
+  {
+    id: 'density-x-curl',
+    tier: 1,
+    label: 'infillDensity x petalSpineCurl — the cells along a curled blade',
+    measure: 'self',
+    base: { petalInfill: 'VORONOI' },
+    a: { id: 'infillDensity', values: [16, 8, 24, 40] },
+    b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
+    verdict: 'clears',
+    cite: 'docs/bloom-infill-port-plan.md §1 and §3 — the wall a flat plan quartered was a product of cup and curl; docs/bloom-infill-s4-outcome.md carries the grid and the two inertness measurements',
+    why: 'the curl brings distant stations of one blade together and the cells put walls at every station; the compression along the spine is what S2 measured the plan for — and measured, the cells never bring the sheet nearer itself than the plain blade',
   },
   {
     id: 'leafangle-x-stem',
@@ -729,6 +781,16 @@ for (const [k, e] of Object.entries(COMBINATION_XFAIL)) {
    should hear about it". That is an xfail, and this project has one
    shape for an xfail: a number the gate reads, failing both ways. */
 export const COMBINATION_INERT = Object.freeze({
+  /* S4 — the infill's density is bit-identically inert for `self` on both
+     of its pairs; the header of `density-x-cup` has the two measurements. */
+  'density-x-cup @ infillDensity': {
+    maxMoveMm: 0,
+    note: "the cells never reach the margins or the tip (the wall inset keeps INFILL_WALL_MM of sheet inside the outline), and `self` is the sheet against another part of itself, whose nearest approach on a cupped blade is exactly there — so the density moves it by exactly 0.000e+0 at every cup, bit-identically. Measured 2026-09-26 on this tree; the in-sheet wall between holes is the measure that sees the density and it is I11's.",
+  },
+  'density-x-curl @ infillDensity': {
+    maxMoveMm: 0,
+    note: "as `density-x-cup @ infillDensity`: 1.238 / 1.234 / 1.232 / 1.230 mm at curl 0 / 180 / 270 / 360 at density 8, 16, 24 and 40 alike. Measured 2026-09-26 on this tree.",
+  },
   'leafangle-x-tooth @ leafToothDepth': {
     maxMoveMm: 0,
     note: "the teeth are cut into the leaf's MARGIN and the nearest blade point to the stem is at its BASE, so the serration moves this measure by exactly 0.000e+0 at all four angles — bit-identically, not merely under the band. The leaf's own emitted vertex stream DOES move with the tooth depth, so the control is wired and reaching the leaf; it does not reach this measure. Measured 2026-09-19 on c29a8b5.",
@@ -810,9 +872,13 @@ async function loadTree(root) {
 /* Build one cell and return its approach in mm. EXPORT mode throughout:
    the print floor is what the bar is about, and mixing modes in one table
    would make the column headings lie. */
-function measureCell({ G, W }, DEFAULTS, pair, va, vb) {
+function measureCell({ G, W, R }, DEFAULTS, pair, va, vb) {
   const state = { ...DEFAULTS, ...(pair.base || {}), [pair.a.id]: va, [pair.b.id]: vb };
   if (pair.measure === 'leaf-stem') return measureLeafStemApproachMm(G, state, true);
+  /* THE INFILL'S OWN MEASURE — the in-sheet wall between two holes on the
+     SHIPPED plan (tools/bloom-infill-wall.mjs), because `self` is
+     bit-identically inert in the density (its header has the numbers). */
+  if (pair.measure === 'infill-wall') return measureInfillWallMm(G, R.DEFAULTS, state);
   const acc = new G.MeshBuilder({ exportMode: true, captureGrid: true });
   const m = G.buildBloomInto(acc, state);
   /* A TOOL THAT CANNOT DO ITS JOB REFUSES; it never returns a passing
@@ -948,7 +1014,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
 
     /* ---------------------------------------------- the table, per pair */
     say(`  [tier ${pair.tier}${pair.guess ? ', a GUESS' : ''}] ${pair.label}`);
-    say(`    measure: ${pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
+    say(`    measure: ${pair.measure === 'self' ? 'SELF — the sheet against another part of itself (measureWall, the wall instrument\'s own)' : pair.measure === 'infill-wall' ? 'THE IN-SHEET WALL between two holes on the shipped plan (bloom-infill-wall.mjs; the surface read directly, never the metric field)' : 'LEAF BLADE against the FREE STEM (freeStemDistanceMm, the geometry\'s own; the petiole rod excluded by the builder\'s petioleAxis)'}`);
     say('      ' + `${pair.a.id} \\ ${pair.b.id}`.padEnd(30) + pair.b.values.map((v) => (num(v) + (Object.is(v, pair.b.values[0]) ? '*' : '')).padStart(10)).join(''));
     for (let i = 0; i < grid.length; i++) {
       const lead = num(pair.a.values[i]) + (i === 0 ? '*' : '');
@@ -1006,7 +1072,7 @@ export async function verify({ root = HERE, quiet = false, only = null, pairs = 
         fails.push(`CG1 reachability: "${pair.id}" moves the measure by at most ${moved.toExponential(2)} mm across the whole of ${ax.id} — under the ${COMBINATION_TOLERANCE_MM} mm band its own records are held to, so that control does not reach this measure and the pair is a ${other.id} sweep wearing a product's clothes. Every other clause about it is vacuous. Either the pair is wrong, or the measure is, or the inertness is a finding and belongs in COMBINATION_INERT with its number.`);
       }
     }
-    if (!Number.isFinite(base.mm) && pair.measure === 'leaf-stem') {
+    if (!Number.isFinite(base.mm) && (pair.measure === 'leaf-stem' || pair.measure === 'infill-wall')) {
       fails.push(`CG1 reachability: "${pair.id}" measures nothing at its own default cell (${base.why || 'no reading'}) — its base set does not build the parts it is about`);
     }
 

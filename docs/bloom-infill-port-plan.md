@@ -408,7 +408,15 @@ it; the **I family** written and seen red before the geometry exists; block 39; 
 re-run; the byte partition proving 0 moved at the guard; the frozen phase; the achieved-count
 read-out (ruling 3); the sepal pin (ruling 4).
 
-**S4 · THE THREE REMAINING CONTROLS.** *Gated on S3.*
+**S4 · THE THREE REMAINING CONTROLS.** *Gated on S3.* **DONE — `docs/bloom-infill-s4-outcome.md`.**
+Relaxation (0–12), the density law (0–2), the stretch (1–3) and the lamina-floor doc's §8 basal
+boundary (0–1) ship together, hidden and inert at the guard, out of the sweep through `INFILL_SUBS`,
+their defaults the S3 constants as the same doubles. The two combination pairs were bought on a
+premise S2 had already closed — measured, the density is BIT-IDENTICALLY inert on `self` and the
+in-sheet wall between holes is 1.000000 mm by construction at every density — so they ship as
+CLEARS with the density in `COMBINATION_INERT`. What the sweeps say: relaxation is the lever for
+both ends (0 passes IS the "bunched in the middle" complaint), the density law at 0 fills the tip
+with holes, and the base is held by `INFILL_BASE_NARROW` and the V, neither a control.
 Relaxation, cell density law and anisotropy **together**, because §4 measured that relaxation and
 anisotropy trade against each other and shipping one at a time would mean ruling on the same look
 twice. Plus `INFILL_SUBS`, the panel route, the dead-travel telling on density
