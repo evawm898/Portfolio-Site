@@ -385,3 +385,57 @@ silently disabled) on unramped rows while correctly standing down on ramped ones
 (A8's own mutant coverage, the two mutants that name it): CONTROL clean (the family
 is silent on the unmutated tree), both mutants fire A8 exactly as named — the fix
 loses none of A8's existing mutant coverage.
+
+## §10 — the ramp moved three declared SELF_INTERSECTION_XFAIL entries, #213's own obligation
+
+`bloom-export-watertight` failed separately (a different gate, same head) with 3 of
+942 rows DROPPED and 4 validity assertions — the tail of the CI log did not reach
+far enough back to show the actual messages (the export gate's own diagnostic
+output is dense enough that even a 5,000-line tail request lands well short of
+where the HARNESS INVALID block sits for a full 942-row run), so this was
+root-caused by a LOCAL reproduction: `node tools/verify-bloom-export.mjs --only
+"TIP SHAPE|SEPALS: sepalTipShape max|INFILL: x petalTipShape|APEX NIB: tip
+shape|FRINGE: the terminal x the round apex|LOBES: x petalTipShape|LADDER x
+BUCKLE|petalTipShape max \(3\)"` (the 19-mover set from §7, matched broadly) —
+33 rows attempted, 3 dropped, on this PR's own tree.
+
+**Nothing to do with A8 or the §9 fix.** This is #213's own obligation — a
+declared `SELF_INTERSECTION_XFAIL` magnitude is stale whether it moved better or
+worse, and a session that moves a declared row's tessellation re-records it in
+the same commit — arriving here because the apex row ramp's denser mesh moves
+where facets land relative to creases on every row whose OWN `petalTipShape`
+sits inside `APEX_NU_BAND`, which changes census self-intersection counts on
+three declared rows the same way it changed `measureWall`'s SELF reading in the
+combination gate (§8) — a second, independent surface hit by the same root
+cause, not a second defect.
+
+**1. `TIP SHAPE: 3.00 x ALL FORM MAX (the ladder under every deformation at
+once)`** — declared 10312 pairs / 1.7998 mm, reads 19064 pairs (+8752) / 0.8506 mm
+(-0.9492 mm): both quantities moved, in opposite directions (worse count,
+shallower span), re-recorded per #213's both-directions rule.
+
+**2. `INFILL: x petalTipShape 3.00`** — declared 992 pairs / 0.0000 mm, reads
+1024 pairs (+32) / 0.0000 mm (worst span unmoved — every pair is still a
+tangency, per the entry's own existing note on that class).
+
+**3. `LADDER x BUCKLE: f 1 — one cycle, the ladder is unbounded by the buckle`**
+— NOT previously declared at all (X2 requires every undeclared row to read
+EXACTLY ZERO within-shell pairs); now reads 58 pairs, worst span 0.0372 mm at
+(8.81, -3.07, 0.60) — a NEW entry, first crossing into a measured
+self-intersection because this row composes `petalTipShape` 3.00 (fully ramped)
+with an unbounded buckle ladder (frequency 1), neither of which reaches it
+alone on `main`.
+
+Cross-checked with the dedicated re-measurement instrument,
+`node tools/bloom-xfail-magnitudes.mjs --only "TIP SHAPE: 3.00 x ALL FORM
+MAX|LADDER x BUCKLE: f 1|INFILL: x petalTipShape 3.00" --emit`: identical
+figures to four decimals.
+
+**Verified.** `node tools/verify-bloom-export.mjs --only "TIP SHAPE: 3.00 x ALL
+FORM MAX|LADDER x BUCKLE: f 1|INFILL: x petalTipShape 3.00"`: 3/3 pass, 0
+validity assertions. Widened back to the full 19-mover regex used to find the
+defect: 33/33 pass, 0 validity assertions. `node
+tools/bloom-xfail-magnitudes.mjs --control` (the must-fail sweep, run over the
+WHOLE declared list): fires on a stale record in both directions on both
+quantities (pairs and span) and is silent on the true ones — unaffected by this
+session's edits, confirming the magnitude clause's own coverage is intact.
