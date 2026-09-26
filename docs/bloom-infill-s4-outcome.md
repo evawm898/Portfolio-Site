@@ -258,6 +258,20 @@ re-derives it from the gate's own sweep in both directions. On the shipping defa
 **most holes (19) reached by 20 cells asked**, so the travel from 20 to 40 is dead there. The
 range is not narrowed and the maximum is not adaptive.
 
+## 7b. The census on the nine new rows: two declared, both the base's, both span 0
+
+`node tools/bloom-census-sweep.mjs --only 'INFILL: x (relaxation|density law|stretch|solid base|the
+four)'` in EXPORT mode: relaxation 0 and 12, density law 0 and 2, stretch 1 and 3 all read **0
+within-shell pairs**. `solid base 1` reads **12 pairs at worst span 0.0000 mm**, and the far-ends
+composition (relaxation 12 × law 0 × stretch 3 × base 1) reads the **same 12 / 0.0000** — so the
+pairs are the base's, not the other three's. At `infillBase` 1 the cells start at the row at
+`ROOT_BLEND_END`, and the twelve are a sheet grazing itself at that seam: the span-0 tangency class
+(session 42's `LOBES: x cup 0.40`), decided by where the stations land, not a fold. The smoke gate's
+X2 is what found it (`bloom-smoke --conn`, the far-ends row DROPPED as a new self-intersector); both
+rows are declared in `SELF_INTERSECTION_XFAIL` with the number, and X1 trips the day a ladder change
+lands them at 0. The local smoke run is otherwise clean: 122 attempted, 120 reached the results and
+were watertight, `ALL MAX` the declared refusal, every other declared row at its recorded magnitude.
+
 ## 8. Not done, named
 
 * **The base-narrowing law and the basal V are still constants** (`INFILL_BASE_NARROW` 0.75,
