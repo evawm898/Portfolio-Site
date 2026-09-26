@@ -325,3 +325,63 @@ Verified: `node -e "import('./tools/bloom-combination-gate.mjs')"` parses cleanl
 from` comments (every declared magnitude now reproduces exactly); `node
 tools/bloom-combination-gate.mjs --control` (the must-fail sweep) reports "every
 clause fired on a plant that names it, and the tree is green without them."
+
+## §9 — A8 assumed NU is always BLADE_ROWS, and the ramp broke that
+
+`bloom-connectedness` failed on the re-triggered CI run with 2 of 942 rows DROPPED
+by a validity assertion — `LADDER x BUCKLE: f 7 — the ceiling, where the gap bound
+collapses the ladder to uniform` (`petalTipShape: 3`) and `LADDER x BUCKLE: the
+clamp binding under a round tip` (`petalTipShape: 2.5`) — both squarely in the
+ramp's `APEX_NU_BAND` [2.30, 2.70]. The `HARNESS INVALID` block:
+
+```
+A8: at the frequency ceiling the ladder must be uniform (56 rows over 7 cycles is
+8 per cycle with no slack), and the widest gap is 1.3999 x uniform
+```
+
+**Root cause.** `tools/bloom-harness.mjs`'s A8 has a ceiling clause reading
+`widest > 1 / ld.rows + 1e-9` — a HARDCODED "no slack" bound, correct only under
+the premise (stated in `bloom-geometry.js`'s own `BLADE_ROWS` comment, unedited
+since session 34): *"the buckle's frequency is CAPPED at NU / BUCKLE_ROWS_PER_CYCLE_MIN
+instead, and the cap is a constant because NU is."* The apex row ramp makes `NU`
+per-petal and NOT constant for `petalTipShape >= 2.30` — `ladderGapFactor(7)` reads
+the live (possibly ramped) `NU`, not the static `BLADE_ROWS`, so for a ramped petal
+it legitimately returns `min(1.4, NU/56)` rather than exactly 1. At full ramp
+(`NU=112`) that is the `LADDER_MAX_GAP_FACTOR` ceiling itself (1.4), which is what
+the CI log's `1.3999 x uniform` is — the ladder correctly using its OWN declared,
+wider bound, which A8's ceiling clause never considered because it predates the
+ramp and was written when `NU` had no other value it could take.
+
+**This is not a geometry defect.** A ramped ladder has MORE than `BLADE_ROWS`, so
+there is genuinely slack at the ceiling now, and `perCycle` (the buckle's real
+guarantee — never fewer than `BUCKLE_ROWS_PER_CYCLE_MIN` rows a cycle) is
+comfortably satisfied on both dropped rows (≈11.4 and higher, want=8). The bug is
+A8 asserting a premise (`NU === BLADE_ROWS` always) that a deliberate, ruled
+feature (this same PR's ramp) was built to violate for exactly these two rows.
+
+**The fix.** Gated A8's ceiling clause on `ld.rows === BLADE_ROWS` (imported into
+the harness already, used once at module load for the analogous static
+assertion) — the "no slack" claim now applies exactly where its premise holds.
+Nothing else moved:
+- The GENERAL bound clause just above (`widest > ld.gapFactor / ld.rows`) stays
+  unconditional and still catches any row — ramped or not — that exceeds ITS OWN
+  declared factor.
+- The `perCycle < want` clause stays unconditional and still asserts the buckle's
+  real structural guarantee on every row, ramped or not.
+- `BLADE_ROWS` is a differently-owned module constant (not derived from the
+  ladder record under test), so gating on it is a second, independent reading of
+  the same premise the module-load assertion already states — not an
+  entanglement with the quantity A8 measures.
+
+**Verified.** `node tools/verify-bloom-connectedness.mjs --only "LADDER x BUCKLE"`:
+4 of 4 pass, 0 validity assertions (both previously-dropped rows now reach the
+results and export as one connected piece). Widened to `--only "BUCKLE|buckle"`
+(45 rows spanning every family that touches the buckle — LADDER x BUCKLE, LOBES,
+FRINGE, VARIANCE, INFILL, APEX NIB, and the plain BUCKLE family including
+`BUCKLE: f max (7)`-shaped rows at the DEFAULT, unramped tip shape): 45 of 45
+pass, 0 validity assertions — confirming the ceiling clause still fires (is not
+silently disabled) on unramped rows while correctly standing down on ramped ones.
+`node tools/verify-bloom-apex-mutants.mjs --only=ladder-ignores-the-buckle,widest-counts-the-seam-offset`
+(A8's own mutant coverage, the two mutants that name it): CONTROL clean (the family
+is silent on the unmutated tree), both mutants fire A8 exactly as named — the fix
+loses none of A8's existing mutant coverage.

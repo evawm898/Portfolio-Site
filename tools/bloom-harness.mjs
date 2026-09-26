@@ -2906,7 +2906,22 @@ export async function thicknessAssertions(page, row) {
       if (ld.buckleFreq) {
         const perCycle = (1 / ld.buckleFreq) / widest;
         const want = BUCKLE_ROWS_PER_CYCLE_MIN;
-        if (ld.buckleFreq === BUCKLE_FREQ_RANGE[1] && widest > 1 / ld.rows + 1e-9) {
+        /* THE "NO SLACK" CLAIM BELONGS TO `ld.rows === BLADE_ROWS`, NOT TO
+           EVERY ROW. It reads "56 rows over 7 cycles is 8 per cycle with no
+           slack" -- true only where the ladder is running the STATIC row
+           count the apex row ramp (`bladeRowsFor`, above `APEX_NU_BAND[0]`)
+           exists to raise past. A ramped ladder carries MORE than
+           `BLADE_ROWS`, so there genuinely IS slack at the ceiling and
+           `ladderGapFactor(7)` correctly exceeds 1 there (up to
+           `LADDER_MAX_GAP_FACTOR`) -- the general bound just above still
+           catches any row, ramped or not, that exceeds ITS OWN declared
+           factor, and `perCycle` below still asserts the buckle's real
+           guarantee (never fewer than `want` rows a cycle) unconditionally.
+           `BLADE_ROWS` is the geometry's own static constant, checked once
+           at module load against this exact frequency ceiling, so gating on
+           it here is a second, differently-owned reading of the same
+           premise -- not a re-derivation from the ladder record under test. */
+        if (ld.buckleFreq === BUCKLE_FREQ_RANGE[1] && ld.rows === BLADE_ROWS && widest > 1 / ld.rows + 1e-9) {
           bad.push(`A8: ${at}at the frequency ceiling the ladder must be uniform (56 rows over 7 cycles is ${want} per cycle with no slack), and the widest gap is ${(widest * ld.rows).toFixed(4)} x uniform`);
         }
         if (perCycle < want - 1e-6) {
