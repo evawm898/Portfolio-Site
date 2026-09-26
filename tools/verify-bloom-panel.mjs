@@ -269,6 +269,17 @@
          because a branch is not something a number can show. `(z)` and not a
          reused `(y)`: that letter is the size field's, above, and this file's
          own route (w) records what two routes under one letter cost.
+     (u) THE INFILL'S FOUR S4 CONTROLS AND THE TWO TELLINGS THEY ADD (the
+         Voronoi infill, S4). Relaxation, density law, stretch and the solid
+         base are hidden AND inert at the guard and shown with it on — asserted
+         to APPEAR, not only to hide; the read-out's SECOND infill line speaks
+         the four levers AS THE BUILDER READ THEM (a line stuck on the
+         default's values while the builder moved is exactly what a frozen
+         panel shows), the along-u hole distribution and the basal travel; and
+         the density's dead travel is a CAP MARK on its track at the builder's
+         own `densityCap`, present iff the cap sits under the range's ceiling.
+         `(u)` is a free letter — (v) is retired and not reused, (g)/(h) are
+         referenced in prose — checked against this enumeration before use.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -3131,6 +3142,77 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
   await step('the guard OFF with the density at its MAXIMUM — no line, the density hidden (hidden AND inert)', [{ id: 'lobeDepth', value: '0' }, { id: 'petalInfill', value: 'NONE' }, { id: 'infillDensity', value: '40' }], { guard: 'NONE' });
 }
 
+/* ---------------- (u) THE FOUR S4 CONTROLS AND THEIR TELLINGS ----------
+   (the Voronoi infill, S4). Every clause reads the BUILDER's record through
+   `__bloomMetrics().infill` and holds the panel to it, never the panel to
+   itself: the second INFILL line's lever values, the base fraction's
+   "cells start at u", and the density cap mark are three claims with one
+   owner each. Under `--negative-control` the read-out is frozen (the same
+   freeze route (z) uses), so the lever line reads the DEFAULT's values while
+   the builder reports twelve passes — the failure a route that compared the
+   line against itself could never see. */
+{
+  const tag = '[infill levers]';
+  await openBloom(page, port);
+  if (NEGATIVE_CONTROL) {
+    await page.evaluate(() => { const el = document.getElementById('readout'); const t = el.textContent; Object.defineProperty(el, 'textContent', { get: () => t, set: () => {} }); });
+  }
+  const IDS = ['infillRelax', 'infillLaw', 'infillAniso', 'infillBase'];
+  const step = async (label, sets, want) => {
+    const bad = sets.length ? await applyConfig(page, sets) : [];
+    if (bad.length) { note(`${tag} ${label}: config did not take: ${bad.join('; ')}`); return; }
+    const res = await page.evaluate((ids) => {
+      const m = window.__bloomMetrics(); const txt = document.getElementById('readout').textContent;
+      const wrap = (id) => document.getElementById(id).closest('.bl-ctrl');
+      const dens = wrap('infillDensity');
+      return {
+        F: m.infill,
+        hidden: Object.fromEntries(ids.map((id) => [id, wrap(id).hidden])),
+        said: Object.fromEntries(ids.map((id) => [id, wrap(id).querySelector('.bl-val').textContent])),
+        levers: /INFILL holes along the blade[^\n]*\u00b7 relaxation (\d+) pass(?:es)?, density law ([\d.]+), stretch ([\d.]+)x \u00b7 ([^\n]*)/.exec(txt),
+        capped: dens.classList.contains('bl-ctrl--capped'), capAt: dens.dataset.cap,
+        densMax: Number(document.getElementById('infillDensity').max),
+      };
+    }, IDS);
+    const p = [];
+    const F = res.F;
+    for (const id of IDS) if (res.hidden[id] !== (want.guard === 'NONE')) p.push(`${id} is ${res.hidden[id] ? 'hidden' : 'shown'} with the guard ${want.guard}`);
+    if (want.guard === 'NONE') {
+      if (F) p.push('the builder reports an infill record with the guard off');
+      if (res.levers) p.push('the INFILL levers line is shown with the guard off');
+      if (res.capped) p.push('the density carries a cap mark with the guard off');
+    } else if (F && F.built) {
+      if (!res.levers) p.push('the INFILL levers line is absent while the builder built a field');
+      else {
+        if (Number(res.levers[1]) !== F.passes) p.push(`the INFILL levers line says relaxation ${res.levers[1]} while the builder reports ${F.passes}`);
+        if (Number(res.levers[2]) !== Number(Number(F.gamma).toFixed(2))) p.push(`the INFILL levers line says density law ${res.levers[2]} while the builder reports ${F.gamma}`);
+        if (Number(res.levers[3]) !== Number(Number(F.aniso).toFixed(2))) p.push(`the INFILL levers line says stretch ${res.levers[3]} while the builder reports ${F.aniso}`);
+        const start = /cells start at u ([\d.]+)/.exec(res.levers[4]);
+        if (!start || Number(start[1]) !== Number(F.floorU.toFixed(3))) p.push(`the INFILL levers line's basal clause (${res.levers[4].slice(0, 80)}) does not carry the builder's floor ${F.floorU.toFixed(3)}`);
+        if (F.baseTravel > 0 ? !/solid base \d+% of the travel/.test(res.levers[4]) : !/solid base: DEAD/.test(res.levers[4])) p.push(`the basal clause does not say ${F.baseTravel > 0 ? 'the travel' : 'DEAD'} while the builder reports a travel of ${F.baseTravel}`);
+      }
+      /* THE CONTROLS' OWN TELLINGS, one owner each. */
+      if (!new RegExp(`(^|\\D)${F.passes} Lloyd pass|no relaxation`).test(res.said.infillRelax) || (F.passes === 0) !== /no relaxation/.test(res.said.infillRelax)) p.push(`the relaxation control says "${res.said.infillRelax}" while the builder reports ${F.passes} passes`);
+      if (!new RegExp(`cells start at u ${F.floorU.toFixed(3)}`).test(res.said.infillBase) && F.baseTravel > 0) p.push(`the solid-base control says "${res.said.infillBase}" and not the builder's floor u ${F.floorU.toFixed(3)}`);
+      /* THE CAP MARK: present iff the builder's cap sits under the ceiling,
+         and AT it. */
+      const wantCap = F.densityCap !== null && F.densityCap !== undefined && F.densityCap < res.densMax;
+      if (res.capped !== wantCap) p.push(`the density cap mark is ${res.capped ? 'present' : 'absent'} while the builder's cap is ${F.densityCap} against a ceiling of ${res.densMax}`);
+      if (wantCap && res.capped && Number(res.capAt) !== F.densityCap) p.push(`the density cap mark sits at ${res.capAt} while the builder's cap is ${F.densityCap}`);
+      if (want.passes !== undefined && F.passes !== want.passes) p.push(`the builder reports ${F.passes} passes and the row asked ${want.passes}`);
+    } else if (want.guard !== 'NONE') {
+      p.push(`the builder reports ${F ? `refused ${F.refused}` : 'no record'} on a row that expected a field`);
+    }
+    if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
+    else ok.push(`${tag} ${label}: ${F ? `${F.passes} passes / law ${F.gamma} / stretch ${F.aniso} / base ${F.baseFrac}, floor u ${F.floorU.toFixed(3)}, cap ${F.densityCap}` : 'no record, four controls hidden'}`);
+  };
+  await step('the shipping default — the four hidden, no levers line, no cap mark', [], { guard: 'NONE' });
+  await step('the guard ON at the defaults — the four APPEAR and the line reads the defaults', [{ id: 'petalInfill', value: 'VORONOI' }], { guard: 'VORONOI', passes: 4 });
+  await step('relaxation 12 x law 0 x stretch 3 x base 0.5 — the line follows the builder', [{ id: 'infillRelax', value: '12' }, { id: 'infillLaw', value: '0' }, { id: 'infillAniso', value: '3' }, { id: 'infillBase', value: '0.5' }], { guard: 'VORONOI', passes: 12 });
+  await step('relaxation 0 — the control says so', [{ id: 'infillRelax', value: '0' }], { guard: 'VORONOI', passes: 0 });
+  await step('the guard OFF with the four at their far ends — hidden AND inert', [{ id: 'petalInfill', value: 'NONE' }, { id: 'infillRelax', value: '12' }, { id: 'infillLaw', value: '2' }, { id: 'infillAniso', value: '1' }, { id: 'infillBase', value: '1' }], { guard: 'NONE' });
+}
+
 await browser.close();
 server.close();
 
@@ -3195,10 +3277,18 @@ if (NEGATIVE_CONTROL) {
        its own biconditionals cannot report if the route never runs. */
     const sawInfill = fail.some((f) => /^\[infill\] .*INFILL line is (shown|absent)/.test(f));
     const sawNeighbour = fail.some((f) => /^\[variance\] .*NEIGHBOURS line says/.test(f));
+    /* ROUTE (u), THE INFILL'S FOUR LEVERS: the second line read against the
+       BUILDER, so a frozen panel shows the default's four values under a
+       builder reporting twelve passes. */
+    /* Under the freeze the read-out holds the DEFAULT's text, which has no
+       INFILL line at all, so the frozen witness is the line's ABSENCE while
+       the builder built a field — and a line that thawed enough to be there
+       but stuck on the default's values is the "says relaxation" arm. */
+    const sawLevers = fail.some((f) => /^\[infill levers\] .*INFILL levers line (is absent while the builder built a field|says relaxation)/.test(f));
     if (sawCensus && sawPath && sawAccordion && sawVisibility && sawLabel && sawDepth && sawPreview && sawInner && sawDome && sawCurl && sawSphere && sawRetired && sawStamens && sawStyle && sawFlag && sawChannel && sawPacking && sawInfill
-        && sawPlug && sawThrough && sawVariance && sawNeighbour
-        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL NINETEEN ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
-    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
+        && sawPlug && sawThrough && sawVariance && sawNeighbour && sawLevers
+        && sawContainer && sawKeptStamens && sawKeptStyle && sawCap) { console.log('\nALL TWENTY ROUTES, AND SESSION 23\u2019S FOUR CLAUSES, OBSERVED THE FAILURE they exist to catch.'); process.exit(0); }
+    console.error(`\nNEGATIVE CONTROL: INCOMPLETE — census route fired: ${sawCensus}, path route fired: ${sawPath}, accordion route fired: ${sawAccordion}, visibility route fired: ${sawVisibility}, derived-label route fired: ${sawLabel}, depth/caption route fired: ${sawDepth}, print-preview route fired: ${sawPreview}, inner-ring route fired: ${sawInner}, dome route fired: ${sawDome}, curl route fired: ${sawCurl}, sphere route fired: ${sawSphere}, retirement route fired: ${sawRetired}, androecium route fired: ${sawStamens}, gynoecium route fired: ${sawStyle}, flag route fired: ${sawFlag}, stem-channel route fired: ${sawChannel}, meridian-packing clause fired: ${sawPacking}, tip-plug clause fired: ${sawPlug}, crossover clause fired: ${sawThrough}, size-variance line fired: ${sawVariance}, infill line fired: ${sawInfill}, neighbours line fired: ${sawNeighbour}, infill levers line fired: ${sawLevers}; session 23 clauses — container: ${sawContainer}, kept (stamens): ${sawKeptStamens}, kept (style): ${sawKeptStyle}, cap mark: ${sawCap}. All must.`);
     process.exit(1);
   }
   console.error('\nNEGATIVE CONTROL: FAILED — the gate passed a panel with a deleted control, a listener-less input, an unreachable accordion handler, a frozen derived label, a frozen caption, a listener-less print-preview box, a frozen read-out, a frozen dome line, a frozen sphere line, a rig control inside the Center container, a frozen STAMENS line, a frozen STYLE line, a frozen container, two frozen read-out spans, a frozen cap mark, a frozen STEM CHANNEL line, a frozen MERIDIAN PACKING line, a frozen tip-plug clause, a frozen crossover clause, a frozen SIZE VARIANCE line, a frozen NEIGHBOURS line and a flag rewritten away. It is not measuring anything.');

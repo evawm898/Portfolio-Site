@@ -877,6 +877,13 @@ export const SMOKE_BLOCKS = [
         path: "the METRIC corner — the one reachable state where a flat plan emits 0.118 mm of material where it asked for 0.500, and where the achieved count is 10 of 16 rather than 16, so ruling 2 and ruling 3 are both exercised on one row" },
       { label: "INFILL: x a SPHERE head with a stem",
         path: "the CROSS-FAMILY axis — ST7/ST8/ST9 (the stem channel's criterion, the mask against a stemless build and the exported file's own clearance) on petals that are now perforated, beside S1-S4 and the junction families on a foot whose panel is a SUB-panel of the blade's" },
+      /* S4 — the four remaining controls at their FAR ENDS on one row, because
+         the matrix varies one control at a time and this composition is the
+         state it cannot see; it is also the only subset row where the density
+         law's tip-filling direction, the basal boundary's top and a twelve-pass
+         relaxation in a 3x metric all reach the I family at once. */
+      { label: "INFILL: x the four at their far ends (relaxation 12 x law 0 x stretch 3 x base 1)",
+        path: "S4's FOUR CONTROLS composed — relaxation, density law, stretch and the basal boundary each at its far end (I8-I11 in verify-bloom-infill.mjs; here the export and flood-fill gates on a blade whose cells start at ROOT_BLEND_END and whose tip holds holes)" },
       { label: "INFILL: REFUSED — a FRINGE owns the same region (several panels)",
         path: "the REFUSAL — a blade that is several panels takes today's path entirely, and the mesh must be bit-identical to the same state with the guard off; a branch is not something a triangle count can show" },
     ],

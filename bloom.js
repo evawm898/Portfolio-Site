@@ -12,7 +12,8 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE } from './bloom-geometry.js';
+const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -1252,7 +1253,25 @@ function infillLine(petals) {
     ? ` \u00b7 the drop reached its cap of ${F.passCap} passes and stopped there`
     : F.passesUsed ? ` \u00b7 ${F.passesUsed} drop pass${F.passesUsed === 1 ? '' : 'es'}` : '';
   const plan = F.metricPlan ? 'surface' : 'flat (the map is affine here, so a plan millimetre IS a millimetre of material)';
-  return `INFILL ${count} \u00b7 ${F.solid} cell${F.solid === 1 ? '' : 's'} left solid \u00b7 holes ${span} \u00b7 wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm, measured on the ${plan}${passes}\n`;
+  /* S4'S SECOND LINE — WHERE THE HOLES ARE ALONG THE BLADE, from the builder's
+     own `holeU`. Eva's complaint was that the tip and base stay solid and the
+     holes bunch in the middle; that is a claim about this distribution, so
+     the read-out prints it in fifths of the drawn length rather than leaving
+     it to the eye. Then the four levers as the plan read them, and the basal
+     boundary's travel — DEAD where the derived floor already sits at the
+     root blend's station, and said so. */
+  const hu = F.holeU || [];
+  const fifths = [0, 0, 0, 0, 0]; for (const u of hu) fifths[Math.min(4, Math.floor(u * 5))]++;
+  const where = hu.length ? `holes along the blade u ${Math.min(...hu).toFixed(2)}\u2013${Math.max(...hu).toFixed(2)}, by fifths base\u2192tip ${fifths.join(' / ')}` : 'holes along the blade: none';
+  const trav = F.baseTravel > 0
+    ? `solid base ${(F.baseFrac * 100).toFixed(0)}% of the travel u ${F.baseFloorU.toFixed(3)}\u2192${(F.baseFloorU + F.baseTravel).toFixed(3)}, cells start at u ${F.floorU.toFixed(3)}`
+    : `solid base: DEAD on this blade (the derived floor u ${(F.baseFloorU ?? F.floorU).toFixed(3)} is already at the root blend\u2019s station), cells start at u ${F.floorU.toFixed(3)}`;
+  const levers = `relaxation ${F.passes} pass${F.passes === 1 ? '' : 'es'}, density law ${Number(F.gamma).toFixed(2)}, stretch ${Number(F.aniso).toFixed(2)}x`;
+  const cap = F.densityCap !== null && F.densityCap !== undefined
+    ? (F.densityCap >= INFILL_DENSITY_RANGE_MAX ? ` \u00b7 still gaining holes at the top of the density range` : ` \u00b7 most holes (${F.densityBest}) by ${F.densityCap} cells asked, the travel above adds none (swept every 4th density)`)
+    : '';
+  return `INFILL ${count} \u00b7 ${F.solid} cell${F.solid === 1 ? '' : 's'} left solid \u00b7 holes ${span} \u00b7 wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm, measured on the ${plan}${passes}\n`
+    + `INFILL ${where} \u00b7 ${levers} \u00b7 ${trav}${cap}\n`;
 }
 
 /* THE ROOT-BLEND LINE IS RETIRED (created by session 36's ruling, retired by
@@ -2486,6 +2505,13 @@ window.__bloomMetrics = () => ({
     achieved: lastInfill.achieved, solid: lastInfill.solid, passesUsed: lastInfill.passesUsed,
     passCap: lastInfill.passCap, refused: lastInfill.refused || null, built: !!lastInfill.built,
     planFlat: !!lastInfill.planFlat, floorU: lastInfill.floorU, mSplit: lastInfill.mSplit,
+    /* S4: the four levers as the plan read them, the basal travel, where the
+       holes sit along the blade, and the density's measured dead travel. */
+    passes: lastInfill.passes, gamma: lastInfill.gamma, aniso: lastInfill.aniso, baseFrac: lastInfill.baseFrac,
+    baseFloorU: lastInfill.baseFloorU, baseTravel: lastInfill.baseTravel,
+    cellU: [...(lastInfill.cellU || [])], holeU: [...(lastInfill.holeU || [])],
+    densitySweep: lastInfill.densitySweep ? lastInfill.densitySweep.map((x) => ({ ...x })) : null,
+    densityCap: lastInfill.densityCap ?? null, densityBest: lastInfill.densityBest ?? null,
     /* THE CELL POLYGONS ARE DELIBERATELY NOT HERE. I1-I7 read them off the
        BUILDER in Node, where they are the artefact; projecting them through
        the page would copy a few thousand points on every metrics call for a

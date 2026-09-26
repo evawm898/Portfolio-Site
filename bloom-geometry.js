@@ -7947,8 +7947,27 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        control that goes through the shipped function is worth more than a
        mutated copy of it, and every lever here is read by `petalInfillPlan`
        and `emitInfillPanel` exactly as the shipped call reads its defaults. */
-    infill = petalInfillPlan(surface, rows, panels[0], { density: ps.infillDensity, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
+    infill = petalInfillPlan(surface, rows, panels[0], { density: ps.infillDensity, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
     if (infill.refused) infill = { ...infill, built: false };
+    /* THE DENSITY'S DEAD TRAVEL IS MEASURED, NOT DERIVED, AND THE SAMPLING IS
+       NAMED (`stamenSpread`'s ruling — told on the track, range not narrowed).
+       There is no closed form for how many holes a blade can hold: the
+       achieved count is NOT monotone in the asked density (the shipping
+       default reads 19 holes at 20 asked and 16 at 24), so the telling is a
+       SWEEP of the plan at `INFILL_DENSITY_SWEEP` on the REPRESENTATIVE petal
+       only (8 to 19 ms a plan, once a build), and `densityCap` is the LOWEST
+       swept density at which the sweep's own maximum is reached. Above it,
+       on the densities measured, asking for more cells adds no hole. */
+    if (isRep && !infill.refused) {
+      const sweep = [];
+      for (const d of INFILL_DENSITY_SWEEP) {
+        const q = d === infill.density ? infill : petalInfillPlan(surface, rows, panels[0], { density: d, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
+        sweep.push({ density: d, achieved: q.refused ? 0 : q.achieved });
+      }
+      const best = Math.max(...sweep.map((x) => x.achieved));
+      const at = sweep.find((x) => x.achieved === best);
+      infill = { ...infill, densitySweep: sweep, densityCap: at ? at.density : null, densityBest: best };
+    }
   }
   for (const panel of panels) {
     const useInfill = infill && !infill.refused && panel === panels[0];
@@ -8485,6 +8504,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       emittedTriRange: infill.emittedTriRange || null,
       metricPlan: !!infill.metricPlan, planFlat: !!infill.planFlat,
       floorU: infill.floorU, mSplit: infill.mSplit,
+      /* S4's four levers as the plan READ them, the basal travel they act over,
+         and where the holes sit along the blade. */
+      passes: infill.passes, gamma: infill.gamma, aniso: infill.aniso, baseFrac: infill.baseFrac,
+      baseFloorU: infill.baseFloorU, baseTravel: infill.baseTravel,
+      cellU: infill.cellU || [], holeU: infill.holeU || [],
+      densitySweep: infill.densitySweep || null, densityCap: infill.densityCap ?? null, densityBest: infill.densityBest ?? null,
       built: !infill.refused,
     } : null,
     /* THE BUILDER'S OWN TALLY of what this call emitted (the leaf builder's
@@ -9357,6 +9382,9 @@ function emitPanel(acc, rows, panel, tAt, rim) {
 
 /* THE RANGE IS THE REGISTRY'S OWN BOUND AND IS IMPORTED THERE (Q6). */
 export const INFILL_DENSITY_RANGE = Object.freeze([8, 40]);
+/* THE DENSITIES THE DEAD-TRAVEL SWEEP MEASURES — every fourth slider step, the
+   two ends included. A property of the telling, never of the geometry. */
+export const INFILL_DENSITY_SWEEP = Object.freeze([8, 12, 16, 20, 24, 28, 32, 36, 40]);
 export const INFILL_DENSITY_DEFAULT = 16;                 // Eva, ruling 1
 /* THE WALL IS READ, NEVER TYPED. Eva's ruling 5 is "the wall is 1.0 mm" and
    this project already has one owner of the minimum printable feature. */
@@ -9384,9 +9412,27 @@ export const INFILL_DROP_PASSES = 2;
    relaxation and anisotropy sliders trade against each other and must be
    ruled from one sheet, `docs/bloom-infill-port-plan.md` §4). The values are
    the prototype's, unchanged, so the renders S4 rules from are this tree's. */
-export const INFILL_ANISO = 2.2;              // the metric's stretch along the midrib
-export const INFILL_LLOYD_PASSES = 4;
-export const INFILL_TIP_GAMMA = 1.0;          // spacing follows halfWidth^gamma toward the tip
+export const INFILL_ANISO = 2.2;              // the metric's stretch along the midrib — `infillAniso`'s default
+export const INFILL_LLOYD_PASSES = 4;         // `infillRelax`'s default
+export const INFILL_TIP_GAMMA = 1.0;          // spacing follows halfWidth^gamma toward the tip — `infillLaw`'s default
+/* S4'S FOUR CONTROLS, ranges and defaults — IMPORTED by the registry (Q6).
+   The three look constants above are the DEFAULTS of three of them, the same
+   doubles, so a build at the defaults forms exactly the expressions S3 shipped.
+   The fourth, `infillBase`, is the lamina-floor doc's §8 control: a fraction
+   of the travel from the derived floor to `ROOT_BLEND_END`, default 0 (Eva:
+   as low as it goes). The anisotropy range's CEILING is measured, not chosen —
+   see `INFILL_ANISO_RANGE`'s own note. */
+export const INFILL_RELAX_RANGE = Object.freeze([0, 12]);
+export const INFILL_RELAX_DEFAULT = INFILL_LLOYD_PASSES;
+export const INFILL_LAW_RANGE = Object.freeze([0, 2]);
+export const INFILL_LAW_STEP = 0.05;
+export const INFILL_LAW_DEFAULT = INFILL_TIP_GAMMA;
+export const INFILL_ANISO_RANGE = Object.freeze([1, 3]);
+export const INFILL_ANISO_STEP = 0.05;
+export const INFILL_ANISO_DEFAULT = INFILL_ANISO;
+export const INFILL_BASE_RANGE = Object.freeze([0, 1]);
+export const INFILL_BASE_STEP = 0.05;
+export const INFILL_BASE_DEFAULT = 0;
 export const INFILL_BASE_NARROW = 0.75;       // cells at the base are this fraction of the mid-blade spacing
 export const INFILL_BASE_REACH = 0.30;        // over this fraction of the length the base narrowing relaxes back
 export const INFILL_CONVERGE = 0.10;          // the basal V reaches this fraction of the length up the margins
@@ -9737,8 +9783,9 @@ function infillFloorRow(rows, rowFrom, rowTo, floorU) {
    converging V so the pattern tapers into the solid base instead of ending on
    a line. The relaxation count, the anisotropy and the grading law are S4's
    controls and constants here. */
-function infillSeedField(hAt, L, xB, N, seed, outline) {
-  const a = INFILL_ANISO;
+function infillSeedField(hAt, L, xB, N, seed, outline, law = null) {
+  const a = law && law.aniso !== undefined ? law.aniso : INFILL_ANISO;
+  const gamma = law && law.gamma !== undefined ? law.gamma : INFILL_TIP_GAMMA;
   let hMax = 0; for (let i = 0; i <= 200; i++) hMax = Math.max(hMax, hAt(xB + (L - xB) * i / 200));
   const spacing = (x) => {
     /* `Math.pow` IS NOT CORRECTLY ROUNDED EITHER, and the spacing law feeds the
@@ -9749,7 +9796,7 @@ function infillSeedField(hAt, L, xB, N, seed, outline) {
        a gamma that is not 1 IS a cross-engine exposure and pretending
        otherwise is how this class keeps coming back. */
     const tipBase = Math.max(0.05, hAt(x) / hMax);
-    const tip = INFILL_TIP_GAMMA === 1 ? tipBase : Math.pow(tipBase, INFILL_TIP_GAMMA);
+    const tip = gamma === 1 ? tipBase : Math.pow(tipBase, gamma);
     const base = INFILL_BASE_NARROW + (1 - INFILL_BASE_NARROW) * Math.min(1, Math.max(0, (x - xB) / (INFILL_BASE_REACH * L)));
     return tip * base;
   };
@@ -9787,8 +9834,7 @@ function infillSeedField(hAt, L, xB, N, seed, outline) {
   pairs.forEach((s, i) => { seeds.push({ x: s.x, y: s.y, group: `p${i}`, axis: false }); seeds.push({ x: s.x, y: -s.y, group: `p${i}`, axis: false }); });
   return { seeds, outline, spacing, nAxis };
 }
-function infillRelax(seeds, outline, spacing, passes) {
-  const a = INFILL_ANISO;
+function infillRelax(seeds, outline, spacing, passes, a = INFILL_ANISO) {
   const rho = (x) => 1 / (spacing(x) ** 2);
   const wCentroid = (c) => {
     const g = infillCentroid(c); let W = 0, X = 0, Y = 0;
@@ -9873,9 +9919,24 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      below — where the cells start, where the seeds go, which cells keep a
      hole — is TOPOLOGY, and topology may not differ live from export. */
   const hAt = (x) => surface.profile.laminaHalfAt(Math.min(1, Math.max(0, x / L)));
-  const floorU = infillFloorU(surface, wall);
+  /* S4'S FOUR LEVERS, each read off `opts` with the S3 constant as its
+     default so the shipped defaults are the same doubles by construction. */
+  const passes = opts.passes ?? INFILL_LLOYD_PASSES;
+  const gamma = opts.gamma ?? INFILL_TIP_GAMMA;
+  const aniso = opts.aniso ?? INFILL_ANISO;
+  const baseFrac = opts.baseFrac ?? INFILL_BASE_DEFAULT;
+  /* THE BASAL BOUNDARY (lamina-floor doc §8): a FRACTION of the travel between
+     the derived floor and `ROOT_BLEND_END`, never a `u` station — the floor is
+     state-dependent, so a station would reach under it on some petals. At 0
+     the floor is handed back ITSELF (a branch, not `floor + 0 * travel`), so
+     the shipping default is bit-identical by construction. Where the floor
+     already sits at or above `ROOT_BLEND_END` the travel is zero and the
+     control is DEAD on that petal — told, never trimmed. */
+  const baseFloorU = infillFloorU(surface, wall);
+  const baseTravel = Math.max(0, ROOT_BLEND_END - baseFloorU);
+  const floorU = baseFrac > 0 && baseTravel > 0 ? baseFloorU + baseFrac * baseTravel : baseFloorU;
   const mSplit = infillFloorRow(rows, panel.rowFrom, panel.rowTo, floorU);
-  const base = { density, wall, bar, floorU, mSplit, cells: [], holes: [], cellOpen: [], achieved: 0, solid: 0, passesUsed: 0, widthsMm: [], capacityMm: [] };
+  const base = { density, wall, bar, floorU, baseFloorU, baseTravel, baseFrac, passes, gamma, aniso, mSplit, cells: [], holes: [], cellOpen: [], achieved: 0, solid: 0, passesUsed: 0, widthsMm: [], capacityMm: [], holeU: [], cellU: [] };
   /* A LOBED BLADE IS REFUSED, AND THE REASON IS A MEASUREMENT RATHER THAN A
      PREFERENCE. The port plan recorded lobes as "compatible by construction —
      they move `halfWidthAt`, which the outline reads". Measured, they are not:
@@ -9985,11 +10046,11 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
     const i = outlineRows[0], sp = spanOf(i), hh = surface.profile.laminaHalfAt(rows[i].u);
     for (let j = 1; j <= NV - 2; j++) { const v = sp[0] + ((sp[1] - sp[0]) * j) / (NV - 1); outline.push({ x: gq(rows[i].u * L), y: gq(v * hh), row: i, col: j, v }); }
   }
-  const { seeds, spacing } = infillSeedField(hAt, L, xB, density, opts.seed ?? INFILL_SEED, outline);
+  const { seeds, spacing } = infillSeedField(hAt, L, xB, density, opts.seed ?? INFILL_SEED, outline, { aniso, gamma });
   if (!seeds.length) return { ...base, refused: 'room' };
   const diam = (poly) => { let d = 0; for (let i = 0; i < poly.length; i++) for (let j = i + 1; j < poly.length; j++) d = Math.max(d, infillLen(poly[i].x - poly[j].x, poly[i].y - poly[j].y)); return d; };
 
-  let live = infillRelax(seeds, outline, spacing, opts.passes ?? INFILL_LLOYD_PASSES);
+  let live = infillRelax(seeds, outline, spacing, passes, aniso);
   let cells = null, holes = null, widths = null, caps = null, isOutlineEdge = null, passesUsed = 0;
   const cap = opts.dropPasses ?? INFILL_DROP_PASSES;
   /* THE SEAM IS THE LATTICE'S, AND A CELL VERTEX ON IT IS SNAPPED TO A LATTICE
@@ -10018,7 +10079,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
     return moved ? infillDedupe(out) : poly;
   };
   for (let pass = 0; ; pass++) {
-    const raw = infillCellsFor(live, outline, INFILL_ANISO);
+    const raw = infillCellsFor(live, outline, aniso);
     const keptIdx = []; const kept = [];
     for (let i = 0; i < raw.length; i++) if (raw[i] && raw[i].length >= 3) { const c = snapSeam(raw[i]); if (c && c.length >= 3) { keptIdx.push(i); kept.push(c); } }
     if (!kept.length) return { ...base, refused: 'room', passesUsed: pass };
@@ -10116,10 +10177,17 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
   }
   const open = widths.map((w) => w >= bar);
   const achieved = open.filter(Boolean).length;
+  /* WHERE THE HOLES ARE ALONG THE BLADE — each cell's centroid as a fraction
+     of the drawn length, and the open ones' alone. Eva's complaint ("the tip
+     and base stay solid and the holes bunch in the middle") is a claim about
+     this distribution, so the builder reports it and every caption reads it
+     off the record rather than re-deriving it. */
+  const cellU = cells.map((c) => infillCentroid(c).x / L);
+  const holeU = cellU.filter((u, i) => open[i]);
   return {
     ...base, surface, mSplit, xB, outline, cells, holes, cellOpen: open, widthsMm: widths, capacityMm: caps,
     isOutlineEdge, vAt, hB, field, metricPlan: !!field, planFlat: infillPlanIsFlat(surface),
-    achieved, solid: cells.length - achieved, passesUsed,
+    achieved, solid: cells.length - achieved, passesUsed, cellU, holeU,
     refused: achieved ? null : 'bar',
   };
 }
@@ -10195,7 +10263,7 @@ export const INFILL_REFINE_DEPTH = 64;
    straddling a grid line is a 1e-7 event per coordinate rather than the
    certainty a bare comparison gives. Seventh instance of a discrete decision
    on a continuous quantity here, and the second whose remedy is a grid. */
-const INFILL_PLAN_GRID = 1 / 1048576;              // 2^-20 mm
+export const INFILL_PLAN_GRID = 1 / 1048576;       // 2^-20 mm — exported for I11, whose wall bound is derived from it
 /* AND A GRID DOES NOT REMOVE A KNIFE EDGE, IT MOVES IT — AND AMPLIFIES WHAT IS
    LEFT. `Math.round(t)` carries a TIE at every half step, and the paragraph
    above predicted a straddle would be "a 1e-7 event per coordinate". Measured
