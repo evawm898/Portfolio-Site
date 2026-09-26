@@ -3756,14 +3756,33 @@ export const BLADE_ROWS = NU_BASE;
    downstream reads `petalTipShape` before this point. */
 export const APEX_NU_BAND = [2.30, 2.70];
 export const APEX_NU_ABOVE = 112;
+/* THE RAMP IS BUDGET-GATED FOR THE WHOLE BLOOM, NOT PER PETAL (Eva's
+   ruling): the extra tip rows apply only if the WHOLE bloom stays within
+   `EXPORT_TRI_BUDGET` with them; otherwise every petal keeps NU_BASE. Two
+   module-scoped flags, read only by `bladeRowsFor`, let `buildBloomInto`
+   (below) run cheap TRIAL builds before deciding: `RAMP_FORCE_BASE` pins
+   every ring at NU_BASE (the row-count-monotonic BASELINE — the ramp only
+   ever ADDS rows, so a baseline over budget proves the ramp cannot fit,
+   without ever building it), and `RAMP_PROBE_STEP` caps every eligible
+   ring's ramp at exactly one extra row (a PROBE bounded near baseline size,
+   never near the full ramped one, however large the real ramp would be). */
+let RAMP_FORCE_BASE = false;
+let RAMP_PROBE_STEP = false;
 export function bladeRowsFor(petalTipShape) {
   const n = Number(petalTipShape);
   const [lo, hi] = APEX_NU_BAND;
-  if (!(n > lo)) return NU_BASE;
+  if (RAMP_FORCE_BASE || !(n > lo)) return NU_BASE;
+  if (RAMP_PROBE_STEP) return NU_BASE + 1;
   if (n >= hi) return APEX_NU_ABOVE;
   const t = (n - lo) / (hi - lo);
   return Math.round(NU_BASE + t * (APEX_NU_ABOVE - NU_BASE));
 }
+
+/* THE EXPORT TRIANGLE BUDGET — ONE OWNER, imported by `bloom.js` rather than
+   restated there (it used to be a bare `bloom.js` constant with nothing
+   else reading it; the tip-row budget cap is the first thing IN THE
+   GEOMETRY that needs to know it, so it moves here). */
+export const EXPORT_TRI_BUDGET = 1_500_000;
 
 /* ===================================================================
    WHERE THE BLADE ROWS SIT — the turning-rate ladder (Eva, session 32).
@@ -13914,7 +13933,135 @@ export function buildSepalsInto(acc, state, fr, sites, stemPlanned = null, cap =
            footBuriedMm, blendReachesFoot, blendReachesRim: A.blendReachesRim, blendGapMm: A.blendGapMm };
 }
 
-export function buildBloomInto(acc, state, { below = null, capability = null } = {}) {
+/* THE BUDGET-CAP DECISION — a thin wrapper around the real builder
+   (`buildBloomCore`, below). See the note beside `RAMP_FORCE_BASE` and
+   `RAMP_PROBE_STEP`: whether the apex row ramp applies AT ALL is a property
+   of the WHOLE bloom, decided BEFORE the real build runs, from two cheap
+   trial builds bounded near the BASELINE's own size — never near the full
+   ramped size, which is what keeps the decision itself from ever being the
+   expensive thing.
+
+   THE SHORT-CIRCUIT IS EXACT AND NEEDS NO TRIAL: the ramp only ever ADDS
+   rows, so if the BASELINE (every ring at NU_BASE — exactly what `main`
+   builds today) already exceeds `EXPORT_TRI_BUDGET`, the ramped total
+   cannot possibly fit either, by monotonicity alone. `ALL MAX` (baseline
+   3,090,816, already the declared, pre-existing export refusal) is caught
+   here, at ZERO extra cost beyond what `main` already pays for that row —
+   its LIVE-mode build time (~29.7 s on this box, already at the harness's
+   30 s per-row ceiling on `main`, unrelated to this session) is therefore
+   UNCHANGED by the ramp, and its bytes are IDENTICAL to `main`'s.
+
+   WHEN BASELINE FITS, THE PREDICTION IS EXACT FOR A UNIFORM RAMP AND
+   CONSERVATIVE FOR A MIXED ONE. There are exactly two controls that can
+   drive a ring's own effective tip shape — `petalTipShape` (every petal
+   ring, via `petalStateFor`'s fallback) and `sepalTipShape` (the sepal
+   ring, via `sepalBladeState`'s `SEPAL_TWINS` substitution) — nothing else
+   overrides it per ring or per slot. A PROBE build (every eligible ring
+   capped at exactly NU_BASE+1, everyone else at NU_BASE — bounded near
+   baseline's own size, whatever the full ramp would cost) gives the total
+   marginal cost of one extra row, `marginal = probeTris - baselineTris`,
+   summed across every instance the ramp reaches — the probe is a REAL
+   whole-bloom build, so it already accounts for however many petals share
+   each ring's descriptor without this function needing to know that count
+   itself. `steps` is the LARGEST number of extra rows any single eligible
+   ring's own ramp asks for. `predicted = baselineTris + marginal * steps`
+   is EXACT when only one distinct ramp target is in play (petals alone,
+   sepals alone, or both ramping to the same target) — the case covered by
+   every state named for verification (the shipped default, `ALL MAX`,
+   `INFLO: ALL MAX`) — and an OVER-ESTIMATE (never an under-estimate, so
+   never unsafe) when petals and sepals ramp to two DIFFERENT targets at
+   once, because the largest ring's own per-row cost is charged against
+   every step instead of each ring paying only its own.
+
+   BOTH TRIAL BUILDS ARE EXPORT-MODE, REGARDLESS OF THE CALLER'S OWN MODE —
+   `EXPORT_TRI_BUDGET` is an export concept, and row COUNT (unlike some
+   thicknesses) is not mode-dependent, so the decision is the same live or
+   export by construction; nothing here reads `acc.exportMode`. */
+let BUDGET_DECISION_ACTIVE = false;
+export function buildBloomInto(acc, state, opts = {}) {
+  /* RE-ENTRANCY: `buildBloomCore` calls `buildBloomInto` again, once per
+     FLORET, for an inflorescence. The budget is a property of the WHOLE
+     composite plant, not of one floret in isolation, so a decision already
+     in force from the OUTER call must not be re-decided — and must not be
+     clobbered by a nested trial build stepping on the same module-scoped
+     flags mid-way through the outer build. Once a decision is active, every
+     nested call is a plain pass-through. */
+  if (BUDGET_DECISION_ACTIVE) {
+    const built = buildBloomCore(acc, state, opts);
+    built.tipRowBudget = null;
+    return built;
+  }
+  const petalTip = Number(state.petalTipShape);
+  const sepalEligible = Number(state.sepalCount) > 0;
+  const sepalTip = sepalEligible ? Number(state.sepalTipShape) : null;
+  const petalSteps = bladeRowsFor(petalTip) - NU_BASE;
+  const sepalSteps = sepalEligible ? bladeRowsFor(sepalTip) - NU_BASE : 0;
+  const steps = Math.max(petalSteps, sepalSteps);
+  const budget = { held: false, baselineTris: null, predictedTris: null, budget: EXPORT_TRI_BUDGET };
+  if (steps <= 0) {
+    /* NOTHING IS RAMP-ELIGIBLE — `bladeRowsFor` already returns NU_BASE for
+       every ring, so this is the fast path every below-band build already
+       took before the budget cap existed: no trial, no flag, no cost. */
+    const built = buildBloomCore(acc, state, opts);
+    built.tipRowBudget = budget;
+    return built;
+  }
+  /* NEVER PAY FOR A BUILD TWICE WHEN THE BASELINE ALONE ALREADY DECIDES IT.
+     The baseline goes STRAIGHT INTO THE CALLER'S OWN `acc` — not a throwaway
+     — because when it turns out to be held (over budget on its own, `ALL
+     MAX`'s own case), that IS the final, correct, main-identical result and
+     nothing further needs building. A first version of this wrapper always
+     built a fresh trial AND the final result separately, which cost `ALL
+     MAX` its baseline build TWICE (~59 s measured, against `main`'s own
+     ~29.7 s for the identical output) — worse than doing nothing, and
+     exactly the class of regression the budget cap exists to prevent. Only
+     when the ramp turns out to APPLY does a second, bounded build run, into
+     a throwaway accumulator whose fields are then copied onto `acc` — bounded
+     because by that point the ramped total has already been proven to fit
+     under `EXPORT_TRI_BUDGET`. */
+  const spawnLike = () => new MeshBuilder({ exportMode: acc.exportMode, captureGrid: acc.captureGrid, captureLamina: acc.captureLamina, captureRim: acc.captureRim, captureNormals: acc.captureNormals });
+  const copyAccInto = (dst, src) => { dst.positions = src.positions; dst.normals = src.normals; dst.minThickness = src.minThickness; dst.lo = src.lo; dst.hi = src.hi; };
+  BUDGET_DECISION_ACTIVE = true;
+  try {
+    RAMP_FORCE_BASE = true;
+    const baselineBuilt = buildBloomCore(acc, state, opts);
+    RAMP_FORCE_BASE = false;
+    const baselineTris = acc.triangleCount;
+    budget.baselineTris = baselineTris;
+    if (baselineTris > EXPORT_TRI_BUDGET) {
+      budget.held = true;
+      budget.predictedTris = baselineTris;
+      baselineBuilt.tipRowBudget = budget;
+      return baselineBuilt;
+    }
+    RAMP_PROBE_STEP = true;
+    const probeAcc = spawnLike();
+    buildBloomCore(probeAcc, state, opts);
+    RAMP_PROBE_STEP = false;
+    const marginal = probeAcc.triangleCount - baselineTris;
+    const predicted = baselineTris + marginal * steps;
+    budget.predictedTris = predicted;
+    budget.held = predicted > EXPORT_TRI_BUDGET;
+    if (budget.held) {
+      /* `acc` STILL HOLDS THE BASELINE FROM ABOVE — untouched since, so the
+         held case costs exactly one baseline build plus one bounded (near-
+         baseline-size) probe, never the full ramp. */
+      baselineBuilt.tipRowBudget = budget;
+      return baselineBuilt;
+    }
+    const rampedAcc = spawnLike();
+    const rampedBuilt = buildBloomCore(rampedAcc, state, opts);
+    copyAccInto(acc, rampedAcc);
+    rampedBuilt.tipRowBudget = budget;
+    return rampedBuilt;
+  } finally {
+    RAMP_FORCE_BASE = false;
+    RAMP_PROBE_STEP = false;
+    BUDGET_DECISION_ACTIVE = false;
+  }
+}
+
+function buildBloomCore(acc, state, { below = null, capability = null } = {}) {
   if (below !== null && below !== 'stem' && below !== 'branch') {
     throw new Error(`below must be 'stem' | 'branch' | null, got ${JSON.stringify(below)}`);
   }

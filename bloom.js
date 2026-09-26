@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -20,8 +20,11 @@ import { buildGridGltf } from './bloom-grid-gltf.js';
    has genuine cliffs no input-space guard can see). Measured against the
    export triangle count; export refuses above this. Phase-1 geometry peaks
    near 60k export tris at petalCount 40, so the cap is slack by design —
-   it exists so the refusal path is real before it is ever needed. */
-const EXPORT_TRI_BUDGET = 1_500_000;
+   it exists so the refusal path is real before it is ever needed.
+   IMPORTED FROM THE GEOMETRY, ONE OWNER — the apex row ramp's own
+   budget cap (see `buildBloomInto` in bloom-geometry.js) is the first thing
+   IN THE GEOMETRY that needs this number, so it moved there rather than
+   being restated in two places. */
 
 /* ---------------- panel: generated from the registry ---------------- */
 const panelRoot = document.getElementById('panelControls');
@@ -570,6 +573,7 @@ let lastFilamentStyle = null;
    every row rather than comment that they do. */
 let lastPlacement = 'RADIAL';
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
+let lastTipRowBudget = null;
 let lastFitCenter = [0, 0, 0];
 /* ORGANIC VARIANCE (build 1, size): the builder's own field record (null at
    amount 0, the guard) and the TOLD FLAG — the neighbour figures every
@@ -615,9 +619,15 @@ let capability = null;
    per-triangle one; PRINT PREVIEW keeps the flat normals it always had,
    because print preview exists to show what prints, and smoothing hides a
    real 0.7-0.9 mm facet as convincingly as fixing it would. `toCreasedNormals`
-   comes from the SAME `three/addons/` CDN mapping the page's importmap
-   already pins for OrbitControls and STLExporter — the exact `three@0.161.0`
-   this project already ships, not a new dependency.
+   is still imported as `three/addons/utils/BufferGeometryUtils.js` — the
+   normal `three/addons/` specifier every other addon here uses — but that
+   ONE exact specifier is pinned in `bloom.html`'s importmap to
+   `bloom-vendor/BufferGeometryUtils.js`, a local, byte-for-byte copy of
+   `three@0.161.0`'s own file (the exact version this project already
+   ships), rather than fetched from the CDN at runtime. It is NOT the copy
+   in `dress/vendor/` — that belongs to a different project in this repo and
+   is a newer, materially different three.js version; the bloom page must
+   not depend on it. See `bloom-vendor/BufferGeometryUtils.js`'s own header.
 
    THE CREASE ANGLE IS DERIVED FROM THIS MODEL'S OWN MEASURED GEOMETRY, not
    the library's own default (which happens to agree, but that is not why it
@@ -692,6 +702,10 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
+    /* THE APEX ROW RAMP'S OWN BUDGET DECISION, from the builder — null on a
+       nested (per-floret) build and on any build where nothing was
+       ramp-eligible at all, which the read-out treats as "nothing to say". */
+    lastTipRowBudget = built.tipRowBudget || null;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
@@ -1081,6 +1095,21 @@ function apexLine(petals) {
        + ` · drawn ${w.drawnLengthMm.toFixed(3)} mm against the ${w.askedLengthMm.toFixed(3)} asked (${d >= 0 ? '+' : ''}${d.toFixed(3)} mm)`
        + (live.length < aps.length ? ` · INERT on ${of(aps.length - live.length)} (${[...new Set(aps.filter((a) => !a.active).map((a) => a.why))].join('; ')})` : '')
        + ` · the ${(2 * APEX_HALF_MM).toFixed(2)} mm face is UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm minimum feature — an authored exception; UNMEASURED — no coupon has been printed\n`;
+}
+
+/* THE APEX ROW RAMP'S OWN BUDGET LINE (Eva's ruling) — read from the
+   builder's `tipRowBudget` record, never re-derived: it names the same
+   `baselineTris`/`predictedTris`/`budget` the decision itself was made
+   from. Absent (empty string) where nothing was ramp-eligible at all, the
+   same "nothing to say" convention every other conditional line here uses. */
+function tipRowBudgetLine(b) {
+  if (!b || (b.baselineTris === null && !b.held)) return '';
+  if (b.held) {
+    return `TIP ROWS HELD at 56: bloom over the triangle budget `
+         + `(predicted ${b.predictedTris.toLocaleString('en-US')} tris against the ${b.budget.toLocaleString('en-US')} export budget, `
+         + `baseline ${b.baselineTris.toLocaleString('en-US')})\n`;
+  }
+  return `TIP ROWS: the ramp is within budget (predicted ${b.predictedTris.toLocaleString('en-US')} of the ${b.budget.toLocaleString('en-US')} export budget)\n`;
 }
 
 /* THE FRINGE LINE (Eva's ruling, Sep 13) — the squared end and the teeth,
@@ -1760,6 +1789,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
        + apexLine(petals)
+       + tipRowBudgetLine(lastTipRowBudget)
        + infillLine(petals)
        + edgeProfileLine(petals)
        + fringeLine(petals)
