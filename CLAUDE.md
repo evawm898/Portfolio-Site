@@ -1492,6 +1492,30 @@ where **nothing has ever been printed**. The mini-face is not a convenience: a t
 collapses NV columns onto one edge (session 5's `domeInto`, 48 degenerate triangles from a ring
 6.1e-17 across). **ZERO TRIANGLES ADDED — 24,688 and 1,205.55 KiB at the default in both modes,
 main's own counts.**
+
+**ABOVE `petalTipShape` 2.50 THE APEX GETS MORE ROWS, AND 2.50 IS EVA'S OWN RULING, NOT A
+DERIVED NUMBER** (the apex-facet session — read `docs/bloom-apex-shading-and-ramp-outcome.md`
+before touching `APEX_NU_BAND`, `APEX_NU_ABOVE`, `bladeRowsFor` or `NU_BASE`). A round of
+discovery measured a DATA-DERIVED crossing at n approx 2.00–2.05 (the widened max-turn metric
+on the shipped default's own petal first exceeding the always-accepted default's own 11.59
+degrees), and Eva OVERRODE it: **2.50 is authored, deliberately different from the derived
+2.00–2.05, and is recorded as such rather than folded in as agreement.** `bladeRowsFor(n)`
+RAMPS `NU` linearly (rounded) from `NU_BASE` (56) at `APEX_NU_BAND[0]` (2.30) to `APEX_NU_ABOVE`
+(112) at `APEX_NU_BAND[1]` (2.70) — a 0.40-wide band centred on 2.50 — so a single 0.05 slider
+step never jumps the row count by 56 in one go; it rises by roughly 7 rows a step across the
+band instead. **BELOW `APEX_NU_BAND[0]` THIS IS BYTE-IDENTICAL TO `main`**, measured: 0 of every
+float differs at n = 1.70 / 2.00 / 2.25 / 2.29 / 2.30 against a worktree of `main`'s own build.
+`NU` is set PER PETAL, in `petalSurface()`, from `ps.petalTipShape` — the ring's own EFFECTIVE
+tip shape after zygomorphy/sepal-twin overrides, not the top-level control — so a sepal's own
+`sepalTipShape` correctly drives its own ring's ramp independent of the petal whorl's. The
+outline and the drawn length are UNAFFECTED by the ramp (both are analytic functions of
+`petalTipShape` alone; `NU` only changes how finely that same curve is sampled), measured
+continuous across the whole band on a fine sweep with no dip or reversal; the row-count and
+triangle-count RISE is what is graduated, in steps of one row (roughly 1,248 triangles) rather
+than one 56-row jump, and the whole ramp stays watertight with zero degenerate triangles at
+every step. `BLADE_ROWS` stays the STATIC `NU_BASE` (56) — never the per-petal `NU` — because
+it is read once at module load by `tools/bloom-harness.mjs`'s own frequency-ceiling assertion,
+before any petal has been built.
 **`petalLength` IS THE ASKED LENGTH AND THE OVERSHOOT IS REPORTED** (Eva's ruling). The blade is
 drawn to wherever the cap closes: **8.59 mm SHORTER at tip shape 0.60 on a 60 mm blade** and
 LONGER above about n 1.20 — the crossover is between 1.20 (−0.001 mm) and 1.40 (+0.122), the

@@ -123,7 +123,7 @@ if (want('3')) {
   console.log('          foot constant standing for "where the lamina begins". On a leaf that');
   console.log('          is the petiole junction. Measured cost below.');
   console.log(`      (b) the COUNT CAP goes through ladderWindowCapacity, which reads HELD_ROWS`);
-  console.log(`          (${G.HELD_ROWS}) and ladderGapFactor — the LADDER's constants deciding a leaf's`);
+  console.log(`          (${G.HELD_ROWS()}) and ladderGapFactor — the LADDER's constants deciding a leaf's`);
   console.log('          tooth count. Conservative (it under-counts a leaf\'s rows), not wrong.\n');
   for (const [L, W] of [[70, 22], [45, 14], [90, 30]]) {
     const q = leafProfile({ L, W, exportMode: true, set: { ...LEAFY, lobeDepth: 0.30, lobeCount: 7, lobeCoverage: 1, lobeCrestShape: 1, lobeNotchShape: 1 } });

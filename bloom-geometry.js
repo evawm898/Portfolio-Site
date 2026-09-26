@@ -3729,11 +3729,41 @@ export const ROOT_BLEND_END = 0.30;
    attribution (the controls move nothing; NU moves everything) are in
    docs/bloom-session-34-outcome.md. `curlStart`'s floor halves with it,
    0.0357 -> 0.0179, which is part of the same move. */
-const NU = 56;   // blade rows
+const NU_BASE = 56;   // the shipped, static blade row count
+let NU = NU_BASE;
 /* The blade's row count, EXPORTED under a name that says what it is, so the
    harness can check the frequency ceiling against it rather than restating
-   56. `NU` stays the internal name every expression here already uses. */
-export const BLADE_ROWS = NU;
+   56. `NU` stays the internal name every expression here already uses.
+   BLADE_ROWS is the STATIC shipped value at module load — `NU_BASE`, never
+   `NU` — because it is read once, at import time, by a module-load assertion
+   (`BUCKLE_FREQ_RANGE[1] * BUCKLE_ROWS_PER_CYCLE_MIN === BLADE_ROWS` in
+   tools/bloom-harness.mjs) that has to hold before any petal has ever been
+   built and therefore before `NU` has ever been set per petal. */
+export const BLADE_ROWS = NU_BASE;
+
+/* THE APEX ROW COUNT IS RAMPED BY `petalTipShape`, ABOVE `APEX_NU_BAND[0]`
+   (Eva's ruling — see the CLAUDE.md entry beside `APEX_HALF_MM`). The
+   THRESHOLD (2.50) is AUTHORED, not derived: a round-5 discovery measured a
+   data-derived crossing near n=2.00 (the widened max-turn metric first
+   exceeding the shipped default's own baseline), and Eva overrode it with
+   2.50 for reasons of her own — record that as an override, not agreement.
+   The RAMP exists so a 0.05 slider step never doubles the row count in one
+   jump: NU rises LINEARLY (rounded) from NU_BASE at `APEX_NU_BAND[0]` to
+   `APEX_NU_ABOVE` at `APEX_NU_BAND[1]`, so a 0.40-wide band turns one 56-row
+   jump into roughly seven rows per 0.05 step instead of one 56-row step.
+   Below the band this is BIT-IDENTICAL to shipped: `bladeRowsFor` returns
+   exactly `NU_BASE` for every n at or below `APEX_NU_BAND[0]`, and nothing
+   downstream reads `petalTipShape` before this point. */
+export const APEX_NU_BAND = [2.30, 2.70];
+export const APEX_NU_ABOVE = 112;
+export function bladeRowsFor(petalTipShape) {
+  const n = Number(petalTipShape);
+  const [lo, hi] = APEX_NU_BAND;
+  if (!(n > lo)) return NU_BASE;
+  if (n >= hi) return APEX_NU_ABOVE;
+  const t = (n - lo) / (hi - lo);
+  return Math.round(NU_BASE + t * (APEX_NU_ABOVE - NU_BASE));
+}
 
 /* ===================================================================
    WHERE THE BLADE ROWS SIT — the turning-rate ladder (Eva, session 32).
@@ -3845,7 +3875,7 @@ export const BLADE_ROWS = NU;
    expression stood in three places (the ladder, the seam's lattice step and
    the ladder telemetry) and two of them were textually identical, which is
    enough to make an anchored mutation land twice and say nothing. */
-export const HELD_ROWS = Math.floor(ROOT_BLEND_END * NU);
+export function HELD_ROWS() { return Math.floor(ROOT_BLEND_END * NU); }
 export const LADDER_ARC_SHARE = 0.70;
 export const LADDER_MAX_GAP_FACTOR = 1.4;
 const LADDER_SAMPLES = 8000;
@@ -3969,13 +3999,13 @@ export function seamClearanceMm(turnRad, sheetMm) {
 /* THE FURTHEST OUT THE BLOCK CAN START and still leave the redistributed
    ladder a domain at all: the last held row then lands at (SEAM_MAX_STEP +
    HELD_ROWS - 1) / NU, one row short of the tip. */
-export const SEAM_MAX_STEP = Math.max(1, NU - HELD_ROWS);
+export function SEAM_MAX_STEP() { return Math.max(1, NU - HELD_ROWS()); }
 export function seamLatticeStepRaw(seamMm, length) {
   const uSeam = length > 0 ? seamMm / length : 0;
   return Math.max(1, Math.floor(uSeam * NU) + 1);
 }
 export function seamLatticeStep(seamMm, length) {
-  return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP);
+  return Math.min(seamLatticeStepRaw(seamMm, length), SEAM_MAX_STEP());
 }
 
 /* The blend grid a demand's ladder is taken down to — see the note at the
@@ -3993,7 +4023,7 @@ export function bladeStations(profile, length, buckle = null, seamMm = 0, report
   if (report) { report.blend = 1; report.regions = null; }
   const uniform = Array.from({ length: NU }, (_, i) => (i + 1) / NU);
   /* The rows the root blend can reach keep their uniform stations, exactly. */
-  const held = HELD_ROWS;
+  const held = HELD_ROWS();
   /* THE SEAM FLOOR — REDISTRIBUTE, NEVER PILE (Eva, session 38). The held
      block keeps the uniform ROW LATTICE exactly and simply STARTS LATER: the
      first blade row is the first station of that lattice standing strictly
@@ -6135,7 +6165,7 @@ export function lobesEligible(state) { return !fringeEngaged(state); }
 export function ladderWindowCapacity(u0, u1, buckleFreq = 0) {
   /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
      places, which is what made an anchored mutation match three times. */
-  const held = HELD_ROWS;
+  const held = HELD_ROWS();
   const free = NU - held;
   /* AT THE BUCKLE'S FREQUENCY CAP THE LADDER IS UNIFORM, BY THE BUCKLE'S OWN
      RULE (56 rows over 7 cycles is 8 per cycle with no slack; A8 asserts it),
@@ -6158,7 +6188,7 @@ export function ladderWindowCapacity(u0, u1, buckleFreq = 0) {
 export function ladderOutsideMinima(u0, u1, buckleFreq = 0) {
   /* HELD_ROWS is the ONE owner of this count (session 38): it stood in three
      places, which is what made an anchored mutation match three times. */
-  const held = HELD_ROWS;
+  const held = HELD_ROWS();
   const gap = ladderGapFactor(buckleFreq) / NU;
   return { held, minStretch: Math.ceil(Math.max(0, u0 - held / NU) / gap - 1e-9), minTip: Math.ceil(Math.max(0, 1 - u1) / gap - 1e-9) };
 }
@@ -7204,6 +7234,14 @@ export function petalSurface(state, ring, slot, cap, acc) {
      petal quantities and `ps` for others would be two sources for one petal,
      which is the defect this project repeats most. One object, one petal. */
   const ps = petalStateFor(state, ring);
+  /* THE APEX ROW RAMP IS SET HERE, PER PETAL, FROM ITS OWN EFFECTIVE
+     `petalTipShape` — `ps` is the first point in this function where that
+     effective value exists (a sepal's own tip-shape twin, or a per-slot
+     zygomorphy override, is what `ps.petalTipShape` already resolves to, not
+     the top-level control). `NU` is module-scoped and builds are synchronous
+     and single-threaded, so it is safe to set here and read by everything
+     `widthProfile`/`bladeStations` call for the rest of this petal's build. */
+  NU = bladeRowsFor(ps.petalTipShape);
   /* THE ASKED LENGTH AND THE DRAWN ONE ARE TWO QUANTITIES (Eva's ruling).
      `petalLength` keeps meaning the length ASKED FOR; the apex nib ends the
      blade where the law meets the print floor and carries a cap on from
@@ -8249,7 +8287,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        rows below ROOT_BLEND_END are the uniform ones, and the widest gap
        respects whatever bound was in force. */
     bladeLadder: {
-      held: HELD_ROWS,
+      held: HELD_ROWS(),
       rows: NU,
       /* THE SEAM FLOOR, declared so A7 asserts the block the builder built
          rather than restating the law. */
@@ -8267,8 +8305,8 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
          read-out says so and A7 asserts the biconditional in both
          directions. */
       seamStepRaw: seamLatticeStepRaw(seamClearMm, length),
-      seamMaxStep: SEAM_MAX_STEP,
-      seamClamped: seamLatticeStepRaw(seamClearMm, length) > SEAM_MAX_STEP,
+      seamMaxStep: SEAM_MAX_STEP(),
+      seamClamped: seamLatticeStepRaw(seamClearMm, length) > SEAM_MAX_STEP(),
       seamClearU: length > 0 ? seamClearMm / length : 0,
       seamBaseU: stations[0],
       /* The owner's turn re-read off the two EMITTED frames, so the

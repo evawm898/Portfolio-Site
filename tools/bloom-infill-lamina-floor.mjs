@@ -198,9 +198,19 @@ export function ladderHeld(ctx, rows, ref = null) {
   let moved = 0, worst = 0;
   if (after.length !== reference.length) { moved = Math.abs(after.length - reference.length); worst = Infinity; }
   else for (let i = 0; i < after.length; i++) if (!Object.is(after[i], reference[i])) { moved++; worst = Math.max(worst, Math.abs(after[i] - reference[i])); }
-  const seamStep = Math.round(ctx.rows.filter((r) => r.u > 0)[0].u * G.BLADE_ROWS);
+  /* THE APEX ROW RAMP MAKES NU PER-PETAL, so a row count read off the STATIC
+     `G.BLADE_ROWS` would be wrong for any state whose effective
+     `petalTipShape` sits in or above the ramp band (`G.APEX_NU_BAND`). This
+     petal's own EMITTED BLADE row count (`ctx.rows` filtered to `u > 0` —
+     the same filter `seamStep` already used to find the first blade row,
+     excluding the foot/seam rows carrying `u <= 0`) is what NU actually was
+     for this build, and `HELD_ROWS()`'s own formula — floor(share * NU) — is
+     reproduced against it rather than against a stale module value. */
+  const nuHere = ctx.rows.filter((r) => r.u > 0).length;
+  const heldRows = Math.floor(G.ROOT_BLEND_END * nuHere);
+  const seamStep = Math.round(ctx.rows.filter((r) => r.u > 0)[0].u * nuHere);
   return { checked: built, stations: after.length, moved, worst, seamStep,
-    heldTopU: (seamStep + G.HELD_ROWS - 1) / G.BLADE_ROWS, heldRows: G.HELD_ROWS, rootBlendEnd: G.ROOT_BLEND_END };
+    heldTopU: (seamStep + heldRows - 1) / nuHere, heldRows, rootBlendEnd: G.ROOT_BLEND_END };
 }
 
 /* ------------------------------------------------------------------- report */
@@ -300,7 +310,7 @@ async function main() {
   const lad = ladderHeld(ctx, rows);
   out.ladder = lad;
   console.log(`   the field was run at every one of ${lad.checked} boundaries and the builder's ${lad.stations} stations compared afterwards against a FRESH build: ${lad.moved} moved${lad.moved ? `, worst |delta| ${lad.worst}` : ' — IDENTICAL under Object.is'}`);
-  console.log(`   seamStep ${lad.seamStep}; HELD_ROWS ${lad.heldRows}; the held block ends at u ${lad.heldTopU.toFixed(7)} (row ${Math.round(lad.heldTopU * G.BLADE_ROWS) - lad.seamStep + 1 + 3}); ROOT_BLEND_END ${lad.rootBlendEnd}`);
+  console.log(`   seamStep ${lad.seamStep}; HELD_ROWS ${lad.heldRows}; the held block ends at u ${lad.heldTopU.toFixed(7)} (row ${Math.round(lad.heldTopU * lad.stations) - lad.seamStep + 1 + 3}); ROOT_BLEND_END ${lad.rootBlendEnd}`);
   const opt2Row = ctx.rows.findIndex((r) => Math.abs(r.u - lad.heldTopU) < 1e-9);
   console.log(`   #252's option 2 puts the boundary AT the last held station — row ${opt2Row}, u ${lad.heldTopU.toFixed(7)}, panel ${(100 * areaU((u) => ctx.surface.profile.halfWidthAt(u), ctx.L, 0, ctx.rows[opt2Row].u) / areaU((u) => ctx.surface.profile.halfWidthAt(u), ctx.L, 0, 1)).toFixed(2)} % of the blade.`);
   console.log(`   Eva ruled row ${F_ROW} (panel 8.83 %) the best cell and asked for LOWER. Option 2 is ${opt2Row - F_ROW} rows ABOVE it: REFUTED by the ruling, not by a measurement.\n`);

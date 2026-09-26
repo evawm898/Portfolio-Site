@@ -612,13 +612,16 @@ const MUTANTS = [
      uniform ones, which moves a boundary footRing() owns. Watertight, one
      piece, identical triangle count; nothing else here can see it. */
   { id: 'ladder-eats-the-base', why: 'the ladder redistributes every row, including the ones the root blend owns',
-    find: 'export const HELD_ROWS = Math.floor(ROOT_BLEND_END * NU);',
+    find: 'export function HELD_ROWS() { return Math.floor(ROOT_BLEND_END * NU); }',
     /* A7 ONLY, and the claim was corrected by the control rather than the
        check by the claim: with the held count at 0 the ladder still respects
        its gap bound, so A8 is RIGHT not to fire here. */
-    into: 'export const HELD_ROWS = 0;', names: ['A7'],
+    into: 'export function HELD_ROWS() { return 0; }', names: ['A7'],
     witness: (M, C) => {
       const a = builtOn(M).stations, b = builtOn(C).stations;
+      /* REGISTRY_DEFAULTS' own petalTipShape (1.70) sits well below the apex
+         row-ramp's band floor, so BLADE_ROWS (the static, module-load NU)
+         still equals the row count this default build actually used. */
       const held = Math.floor(0.30 * C.BLADE_ROWS);
       for (let i = 0; i < held; i++) if (!Object.is(a[i], b[i])) return null;
       return `every station the root blend holds is unmoved (first ${held} of ${a.length})`;

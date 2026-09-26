@@ -635,7 +635,7 @@ console.log(`   R1c: ${flatTiedR1.toLocaleString()} zero-ramp vertices reconstru
 if (flatExcludedR1) console.log(`        excluded: ${[...new Set(flatExcludedWhere.map((w) => w.replace(/ side -?1$/, '')))].join(', ')}`);
 console.log(`   partition: ${partitionProbed.toLocaleString()} perimeter margin entries, each in exactly one of rim.apex and rim.flat`);
 console.log(`   BETWEEN stations (REPORTED, never asserted): ${insertedApexes.toLocaleString()} emitted vertices lie on the chord strictly between two consecutive station apexes, over ${insertedStretches.toLocaleString()} of ${stretchesScanned.toLocaleString()} stretches; worst ${worstOffLine.v === -1 ? 'n/a' : worstOffLine.v.toExponential(3) + ' mm off the line [' + worstOffLine.where + ']'}`);
-console.log(`\nR2 — the exported boundary against the reported arc (NU ${G.BLADE_ROWS} stations; the query at ${G.RIM_SAMPLES} cells + seam nodes):`);
+console.log(`\nR2 — the exported boundary against the reported arc (NU ${G.BLADE_ROWS} stations below the apex row ramp's band (${G.APEX_NU_BAND[0]}), up to ${G.APEX_NU_ABOVE} on the petalTipShape >= ${G.APEX_NU_BAND[1]} rows this table also carries; the query at ${G.RIM_SAMPLES} cells + seam nodes):`);
 console.log(`   min (arc - chord) over every station pair: ${minArcMinusChord.v.toExponential(3)} mm  [${minArcMinusChord.where}]  — never negative beyond rounding`);
 console.log(`   max total deficit, relative: ${(100 * maxDeficitRel.v).toFixed(3)}% of ${maxDeficitRel.S.toFixed(3)} mm (mesh polyline ${maxDeficitRel.poly.toFixed(3)})  [${maxDeficitRel.where}]`);
 console.log(`   max total deficit, absolute: ${maxDeficitMm.v.toFixed(4)} mm of ${maxDeficitMm.S.toFixed(3)}  [${maxDeficitMm.where}]`);
@@ -660,7 +660,7 @@ for (const m of modes) {
   }
   if (wd.v >= 0) console.log(`   ${m}: worst mesh deficit over BOTH margins ${(100 * wd.v).toFixed(3)}% (${wd.mm.toFixed(4)} mm of ${wd.S.toFixed(3)}) [${wd.state} side ${wd.side}]; worst query bound ${wb.v.toExponential(2)} mm [${wb.state} side ${wb.side}]`);
 }
-if (JSON_OUT) { fs.writeFileSync(JSON_OUT, JSON.stringify({ samples: G.RIM_SAMPLES, stations: G.BLADE_ROWS, table }, null, 1)); console.log(`\nper-state table written to ${JSON_OUT}`); }
+if (JSON_OUT) { fs.writeFileSync(JSON_OUT, JSON.stringify({ samples: G.RIM_SAMPLES, stationsBelowBand: G.BLADE_ROWS, apexNuBand: G.APEX_NU_BAND, apexNuAbove: G.APEX_NU_ABOVE, table }, null, 1)); console.log(`\nper-state table written to ${JSON_OUT}`); }
 
 if (bad.length) {
   console.log(`\n${CONTROL ? 'CONTROL RESULT' : 'FAIL'} — ${bad.length} finding(s):`);
