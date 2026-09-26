@@ -10,8 +10,9 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET } from './bloom-geometry.js';
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
 
@@ -19,8 +20,11 @@ import { buildGridGltf } from './bloom-grid-gltf.js';
    has genuine cliffs no input-space guard can see). Measured against the
    export triangle count; export refuses above this. Phase-1 geometry peaks
    near 60k export tris at petalCount 40, so the cap is slack by design —
-   it exists so the refusal path is real before it is ever needed. */
-const EXPORT_TRI_BUDGET = 1_500_000;
+   it exists so the refusal path is real before it is ever needed.
+   IMPORTED FROM THE GEOMETRY, ONE OWNER — the apex row ramp's own
+   budget cap (see `buildBloomInto` in bloom-geometry.js) is the first thing
+   IN THE GEOMETRY that needs this number, so it moved there rather than
+   being restated in two places. */
 
 /* ---------------- panel: generated from the registry ---------------- */
 const panelRoot = document.getElementById('panelControls');
@@ -569,6 +573,7 @@ let lastFilamentStyle = null;
    every row rather than comment that they do. */
 let lastPlacement = 'RADIAL';
 let lastTris = 0, lastMaxDim = 0, lastFitRadius = 0;
+let lastTipRowBudget = null;
 let lastFitCenter = [0, 0, 0];
 /* ORGANIC VARIANCE (build 1, size): the builder's own field record (null at
    amount 0, the guard) and the TOLD FLAG — the neighbour figures every
@@ -609,6 +614,36 @@ let capability = null;
    this; what it would cost them is an array the size of the positions on a
    build that can reach millions of triangles. It moves no position — asserted
    by E7 of tools/verify-bloom-edge-profile.mjs, not argued here. */
+/* SMOOTH SHADING IN THE NORMAL VIEW ONLY (Eva's ruling): the LIVE viewport
+   now shades from a creased-normal reconstruction rather than a flat
+   per-triangle one; PRINT PREVIEW keeps the flat normals it always had,
+   because print preview exists to show what prints, and smoothing hides a
+   real 0.7-0.9 mm facet as convincingly as fixing it would. `toCreasedNormals`
+   is still imported as `three/addons/utils/BufferGeometryUtils.js` — the
+   normal `three/addons/` specifier every other addon here uses — but that
+   ONE exact specifier is pinned in `bloom.html`'s importmap to
+   `bloom-vendor/BufferGeometryUtils.js`, a local, byte-for-byte copy of
+   `three@0.161.0`'s own file (the exact version this project already
+   ships), rather than fetched from the CDN at runtime. It is NOT the copy
+   in `dress/vendor/` — that belongs to a different project in this repo and
+   is a newer, materially different three.js version; the bloom page must
+   not depend on it. See `bloom-vendor/BufferGeometryUtils.js`'s own header.
+
+   THE CREASE ANGLE IS DERIVED FROM THIS MODEL'S OWN MEASURED GEOMETRY, not
+   the library's own default (which happens to agree, but that is not why it
+   was picked). A dihedral-angle census over a single isolated petal
+   (`petalCount: 1`, tip shape 3.00, the worst case) splits cleanly into three
+   populations: the tip's own facet — the thing this is FOR — never exceeds
+   44.8 degrees anywhere in the region; the rim bead's four 45-degree segments
+   sit at a 40-45 degree cluster; and the foot-to-blade SEAM — a real
+   architectural fold, not a faceting artefact — sits at 80-95 degrees with
+   nothing between 55 and 80. So ANY angle in (45, 80) smooths every facet
+   this feature exists to fix and every rim-bead segment transition (which
+   the closed-form normal already smoothed by a different, exact route — this
+   reproduces that by approximation rather than displacing it) while leaving
+   the seam's real fold untouched. 60 degrees sits in the middle of that
+   15-70 degree margin on both sides. */
+const SMOOTH_SHADING_CREASE_DEG = 60;
 function buildGeometry({ exportMode, record = false, captureGrid = false, captureNormals = false }) {
   const acc = new MeshBuilder({ exportMode, captureGrid, captureNormals });
   const uiForBuild = readUI();
@@ -667,6 +702,10 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
     lastFootDigest = footFramesDigest(built);
     lastFootBySlot = footFramesBySlot(built);
     lastTris = acc.triangleCount; lastMaxDim = acc.maxDimensionMm;
+    /* THE APEX ROW RAMP'S OWN BUDGET DECISION, from the builder — null on a
+       nested (per-floret) build and on any build where nothing was
+       ramp-eligible at all, which the read-out treats as "nothing to say". */
+    lastTipRowBudget = built.tipRowBudget || null;
   }
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(acc.positions, 3));
@@ -678,10 +717,22 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
      bead's own normal in closed form (see MeshBuilder's captureNormals note);
      every other triangle carries the same flat normal this line computed
      before, so nothing else on the model changes appearance. */
-  if (acc.normals && acc.normals.length === acc.positions.length) {
-    geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
+  if (exportMode) {
+    /* PRINT PREVIEW AND THE STL EXPORT STAY FLAT — Eva's ruling. Print
+       preview exists to show what prints, and creased-normal smoothing would
+       hide a real, measured 0.7-0.9 mm facet as convincingly as fixing it
+       would; the STL carries no normal channel a slicer reads anyway. */
+    if (acc.normals && acc.normals.length === acc.positions.length) {
+      geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
+    } else {
+      geo.computeVertexNormals();
+    }
   } else {
-    geo.computeVertexNormals();
+    /* THE NORMAL (LIVE) VIEW IS SMOOTH-SHADED — render-only, and it moves no
+       position: `toCreasedNormals` reads only the `position` attribute
+       already set above and writes a NEW `normal` attribute; `acc.positions`
+       and therefore the STL export are untouched regardless of this branch. */
+    toCreasedNormals(geo, SMOOTH_SHADING_CREASE_DEG * Math.PI / 180);
   }
   /* `built` is returned as well as cached, so the export path can summarise
      the geometry IT built rather than reading the live cache — the two are
@@ -1044,6 +1095,21 @@ function apexLine(petals) {
        + ` · drawn ${w.drawnLengthMm.toFixed(3)} mm against the ${w.askedLengthMm.toFixed(3)} asked (${d >= 0 ? '+' : ''}${d.toFixed(3)} mm)`
        + (live.length < aps.length ? ` · INERT on ${of(aps.length - live.length)} (${[...new Set(aps.filter((a) => !a.active).map((a) => a.why))].join('; ')})` : '')
        + ` · the ${(2 * APEX_HALF_MM).toFixed(2)} mm face is UNDER the ${MIN_FEATURE_MM.toFixed(2)} mm minimum feature — an authored exception; UNMEASURED — no coupon has been printed\n`;
+}
+
+/* THE APEX ROW RAMP'S OWN BUDGET LINE (Eva's ruling) — read from the
+   builder's `tipRowBudget` record, never re-derived: it names the same
+   `baselineTris`/`predictedTris`/`budget` the decision itself was made
+   from. Absent (empty string) where nothing was ramp-eligible at all, the
+   same "nothing to say" convention every other conditional line here uses. */
+function tipRowBudgetLine(b) {
+  if (!b || (b.baselineTris === null && !b.held)) return '';
+  if (b.held) {
+    return `TIP ROWS HELD at 56: bloom over the triangle budget `
+         + `(predicted ${b.predictedTris.toLocaleString('en-US')} tris against the ${b.budget.toLocaleString('en-US')} export budget, `
+         + `baseline ${b.baselineTris.toLocaleString('en-US')})\n`;
+  }
+  return `TIP ROWS: the ramp is within budget (predicted ${b.predictedTris.toLocaleString('en-US')} of the ${b.budget.toLocaleString('en-US')} export budget)\n`;
 }
 
 /* THE FRINGE LINE (Eva's ruling, Sep 13) — the squared end and the teeth,
@@ -1723,6 +1789,7 @@ function summarise(ui, acc, mode, rings, fr, petals, built = null) {
        + cupClampLine(petals, built && built.sepals ? built.sepals.built : null)
        + lobeLine(petals)
        + apexLine(petals)
+       + tipRowBudgetLine(lastTipRowBudget)
        + infillLine(petals)
        + edgeProfileLine(petals)
        + fringeLine(petals)
