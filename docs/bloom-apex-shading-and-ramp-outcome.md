@@ -138,3 +138,85 @@ conditional+ramped implementation (as opposed to round 5's blanket-GLOBAL compar
 per-mover declaration across the full 942-row matrix, the #286 links inside
 `tools/bloom-harness.mjs`'s INFILL `SELF_INTERSECTION_XFAIL` notes, and the final confirmation
 sheet are separate, larger pieces of work reported alongside this doc rather than inside it.
+
+## 5 — The budget cap (Eva's second ruling)
+
+The extra tip rows apply only if the WHOLE bloom stays within `EXPORT_TRI_BUDGET`
+(1,500,000) with them; otherwise every petal keeps NU_BASE (56). `buildBloomInto()`
+decides this before the real build, using two trial builds bounded near the
+baseline's own size (never near the full ramped size, however large that would be):
+
+- The BASELINE (every ring forced to NU_BASE) is built directly into the caller's
+  own accumulator, not a throwaway. When it alone already exceeds budget, that build
+  IS the correct final result — `main`'s own geometry, exactly — and nothing further
+  runs. This is an EXACT, zero-extra-cost short-circuit: the ramp only ever adds
+  rows, so a baseline over budget proves the ramped total cannot fit either, by
+  monotonicity alone.
+- When baseline fits, a PROBE (every ramp-eligible ring capped at exactly one extra
+  row, everyone else at NU_BASE) gives the total marginal cost of one extra row
+  across the whole bloom in a single real build, bounded near baseline's own size.
+  `predicted = baseline + marginal × steps`, where `steps` is the largest number of
+  extra rows any one ring's own ramp asks for. This is EXACT when only one distinct
+  tip-shape target is in play (petals alone via `petalTipShape`, sepals alone via
+  `sepalTipShape`, or both ramping to the same target — every state named for
+  verification below) and a safe OVER-estimate when petals and sepals ramp to two
+  different targets simultaneously.
+- Only once the prediction is proven to fit does the real ramped build run, into a
+  throwaway accumulator whose fields are copied onto the caller's own — bounded,
+  because it has already been shown to land under the same 1.5M budget every other
+  row here already respects.
+
+**`ALL MAX`'s LIVE-mode build was already ~29.7s on `origin/main`, before any of
+this session's work** — right at the harness's fixed 30-second per-row `settleBuild`
+timeout, for reasons unrelated to this change. An early version of the budget-cap
+mechanism (which always built a fresh baseline trial AND a separate final result)
+cost `ALL MAX` its baseline build TWICE — measured at ~56.7s, a straightforward
+regression over `main`'s own ~29.7s for the identical output. The fix (build baseline
+directly into the caller's real accumulator, reusing it when it alone decides the
+budget question) brings `ALL MAX`'s LIVE build back to ~28.3s — the SAME cost `main`
+already pays for this row, not a new one. The 30-second harness timeout itself is
+untouched.
+
+**Verified**:
+- `ALL MAX` is byte-identical to `origin/main` (`Object.is` over every exported
+  float, 3,090,816 triangles both trees), `tipRowBudget.held === true`,
+  `baselineTris === predictedTris === 3,090,816`.
+- `INFLO: ALL MAX` is unaffected (its own `petalTipShape` never crosses the ramp
+  band) and stays exportable at 1,425,468 triangles.
+- Eva's 60×8 petal at n=3.00: prediction equals the built triangle count exactly
+  (47,984 both ways) — the uniform-target case the mechanism is exact for.
+- The shipped default and every below-band state take the pre-existing fast path
+  (no ramp eligibility at all → no trial builds, zero added cost).
+- The decision is a single threshold comparison on a value (`predicted`) that rises
+  monotonically with the sliders that drive it, so it cannot chatter by
+  construction; a real sweep (`petalCount` 4→40 at a ramp-eligible tip shape) showed
+  zero flips over the range it covered. A genuine near-boundary straddling pair
+  within this session's time budget was not isolated; the architectural argument
+  (no hysteresis, a strict monotone threshold) is what stands behind the "no flip on
+  tiny slider moves" claim, alongside the zero-flip sweep.
+
+The read-out's `TIP ROWS` line (`bloom.js`'s `tipRowBudgetLine()`) reads
+`built.tipRowBudget` — never re-derives it — and prints
+`TIP ROWS HELD at 56: bloom over the triangle budget` when it binds, naming the
+predicted and baseline triangle counts against the budget, or a within-budget line
+otherwise. It is silent (empty string) when nothing was ramp-eligible at all.
+
+`EXPORT_TRI_BUDGET` moved from `bloom.js` to `bloom-geometry.js` (one owner);
+`bloom.js` now imports it.
+
+## 6 — `BufferGeometryUtils` is vendored locally, not from `dress/vendor/`
+
+`bloom-vendor/BufferGeometryUtils.js` is a byte-for-byte copy of three@0.161.0's own
+`examples/jsm/utils/BufferGeometryUtils.js` (the same file `node_modules/three`, this
+repo's dev dependency, and jsDelivr's CDN both serve for this exact version).
+`bloom.html`'s importmap pins the EXACT specifier
+`three/addons/utils/BufferGeometryUtils.js` to this local file; every other
+`three/addons/` import (`OrbitControls`, `STLExporter`) is untouched and still
+resolves to the CDN. This is deliberately NOT a copy of
+`dress/vendor/utils/BufferGeometryUtils.js` — that file belongs to a different
+project in this repo and is a materially different, NEWER three.js version (a
+hashed-bucket rewrite of `mergeVertices`/`toCreasedNormals`, not the `vertexMap`-based
+one this file's `toCreasedNormals` call was measured against for its crease-angle
+derivation in §1). Verified in a real headless browser: the only network request
+touching `BufferGeometryUtils` is the local static file at
+`/bloom-vendor/BufferGeometryUtils.js`; jsDelivr is never asked for it.
