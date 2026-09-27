@@ -14,6 +14,7 @@ on:
       - bloom-geometry.js
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
+      - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
@@ -44,6 +45,7 @@ on:
       - bloom-geometry.js
       - bloom-registry.js
       - tools/verify-bloom-export.mjs
+      - tools/bloom-export-shards.mjs
       - tools/bloom-wall-thickness.mjs
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
@@ -71,9 +73,29 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# THE MATRIX IS SHARDED, AND ITS COVERAGE IS PROVED RATHER THAN ASSUMED (read
+# tools/bloom-export-shards.mjs's header). One job ran 342 minutes on b4088e3
+# (run 36324870437: 26 min of Node preflight, 315 min of matrix) against
+# GitHub's 360-minute job limit, with no instrument able to tell SLOW from
+# HUNG. So there are three jobs:
+#   preflight  — every Node-only instrument, unchanged, in order;
+#   shard      — the matrix split EIGHT ways by `shardOf(index, n)`, each shard
+#                writing a census of what it attempted, reached and refused;
+#   verdict    — reconciles every census against its OWN buildMatrix() (every
+#                row in exactly one shard, none in two, none in none) and
+#                assembles the one verdict through the same `summarize()` the
+#                unsharded gate uses, over the UNION. It runs `if: always()`,
+#                so a shard that crashed or timed out is a named finding
+#                rather than a job nobody reads.
+# EVERY JOB HAS AN EXPLICIT TIMEOUT, well under GitHub's 360, so a hang is
+# DECLARED by the timeout and shows up in the verdict as a shard with no
+# census. The preflight runs in PARALLEL with the shards: a red preflight is
+# still red within its own ~26 minutes, and serialising it would add that to
+# every green run's wall time.
 jobs:
-  verify:
+  preflight:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       # fetch-depth 0 IS FOR CA5 AND NOTHING ELSE, AND A SHALLOW FETCH CANNOT
       # REPLACE IT. On a pull_request `actions/checkout` takes refs/pull/N/merge
@@ -241,7 +263,75 @@ jobs:
       # module load, so it sits after the npm install.
       - name: Every infilled state is under the triangle budget (B0-B2)
         run: node tools/verify-bloom-infill-budget.mjs --negative-control
+
+  shard:
+    runs-on: ubuntu-latest
+    # 315 min of matrix / 8 is ~40 min a shard on the S5 head; 150 is ~3.7x that
+    # and still 210 minutes under GitHub's own limit. A shard that reaches it is
+    # a HANG declared, and the verdict job names it.
+    timeout-minutes: 150
+    strategy:
+      # Every shard runs to completion whatever another does: a shard cancelled
+      # by fail-fast writes no census, and the verdict would then report a
+      # coverage hole that is only an artefact of the cancellation.
+      fail-fast: false
+      matrix:
+        # MUST be 0..SHARDS-1. A shard missing from this list writes no census
+        # and the verdict FAILS naming it; an extra one is refused at launch.
+        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+    env:
+      SHARDS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install render deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
-      - name: Every config must export watertight (boundary edges = 0)
-        run: node tools/verify-bloom-export.mjs
+      - name: Every config in this shard must export watertight (boundary edges = 0)
+        run: node tools/verify-bloom-export.mjs --shard ${{ matrix.shard }}/$SHARDS --census census/census-${{ matrix.shard }}.json
+      # always(): a shard that FAILED still wrote its census, and the verdict
+      # needs it to say what failed; a shard that crashed wrote none, and the
+      # verdict says that instead.
+      - name: Keep this shard's census for the verdict
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: census-${{ matrix.shard }}
+          path: census/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  verdict:
+    runs-on: ubuntu-latest
+    needs: [preflight, shard]
+    if: always()
+    timeout-minutes: 20
+    env:
+      SHARDS: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      # The harness imports playwright-core at module load; no browser is needed.
+      - name: Install deps (pinned three + playwright)
+        run: npm i --no-save three@0.161.0 playwright@1.62.1
+      - name: The shard selector partitions the matrix
+        run: node tools/bloom-export-shards.mjs --plan $SHARDS
+      - name: ... and the reconciliation must fail when a row goes missing
+        run: node tools/bloom-export-shards.mjs --negative-control --shards $SHARDS
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: census-*
+          path: census/
+          merge-multiple: true
+      - name: Every row in exactly one shard, and ONE verdict over all of them
+        run: node tools/bloom-export-shards.mjs --merge census --shards $SHARDS
+      - name: ... and the preflight instruments passed
+        if: always() && needs.preflight.result != 'success'
+        run: |
+          echo "preflight: ${{ needs.preflight.result }} — the Node-only instruments did not pass, so this gate is not green whatever the matrix says."
+          exit 1
