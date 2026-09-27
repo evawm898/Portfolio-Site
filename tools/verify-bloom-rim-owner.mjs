@@ -147,8 +147,8 @@ function check(src) {
 
 const MUTANTS = [
   { id: 'the-flat-emitRim-is-back-for-the-holes', names: ['O3'],
-    from: '        const got = emitHoleRim(sec.innerLoop, ring);',
-    to: '        const got = emitHoleRim(sec.innerLoop, ring); const emitRim = (A, B) => { const ps = edgePoints(A, B); for (let i = 0; i + 1 < ps.length; i++) { const p = pt(ps[i]), q = pt(ps[i + 1]); emitTri(q.T, p.T, p.B); emitTri(q.T, p.B, q.B); } }; emitRim(c[0], c[1]);' },
+    from: '      const rimGot = emitHoleRim(got.loop, ring);',
+    to: '      const rimGot = emitHoleRim(got.loop, ring); const emitRim = (A, B) => { const ps = edgePoints(A, B); for (let i = 0; i + 1 < ps.length; i++) { const p = pt(ps[i]), q = pt(ps[i + 1]); emitTri(q.T, p.T, p.B); emitTri(q.T, p.B, q.B); } }; emitRim(c[0], c[1]);' },
   { id: 'emitPanel-sweeps-its-own-rim', names: ['O2', 'O3'],
     from: '  emitRimLoop(acc, profs, K);',
     to: '  for (let k = 0; k < profs.length; k++) acc.quad(top[0][0], top[0][1], bot[0][1], bot[0][0]);' },
