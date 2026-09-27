@@ -9385,7 +9385,12 @@ export const INFILL_DENSITY_RANGE = Object.freeze([8, 40]);
 /* THE DENSITIES THE DEAD-TRAVEL SWEEP MEASURES — every fourth slider step, the
    two ends included. A property of the telling, never of the geometry. */
 export const INFILL_DENSITY_SWEEP = Object.freeze([8, 12, 16, 20, 24, 28, 32, 36, 40]);
-export const INFILL_DENSITY_DEFAULT = 16;                 // Eva, ruling 1
+/* 20, NOT RULING 1's 16 — Eva re-ruled it from the live preview with print
+   preview on, beside the three look defaults below (the ruled-defaults
+   session, `docs/bloom-infill-ruled-defaults.md`). At the four ruled values
+   the shipping default blade reads 20 asked, 20 cells, 20 holes at or over
+   the 1.50 mm bar, 0 solid, in BOTH modes — measured before anything moved. */
+export const INFILL_DENSITY_DEFAULT = 20;                 // Eva, ruled defaults (was 16, ruling 1)
 /* THE WALL IS READ, NEVER TYPED. Eva's ruling 5 is "the wall is 1.0 mm" and
    this project already has one owner of the minimum printable feature. */
 export const INFILL_WALL_MM = MIN_FEATURE_MM;
@@ -9408,13 +9413,17 @@ export const INFILL_HOLE_MM = 1.5;
    reached the cap) so a state that is truncated is visible rather than
    silent. I6 asserts termination inside it. */
 export const INFILL_DROP_PASSES = 2;
-/* THE THREE LOOK CONSTANTS ARE S4'S CONTROLS AND CONSTANTS HERE (ruling: the
-   relaxation and anisotropy sliders trade against each other and must be
-   ruled from one sheet, `docs/bloom-infill-port-plan.md` §4). The values are
-   the prototype's, unchanged, so the renders S4 rules from are this tree's. */
-export const INFILL_ANISO = 2.2;              // the metric's stretch along the midrib — `infillAniso`'s default
-export const INFILL_LLOYD_PASSES = 4;         // `infillRelax`'s default
-export const INFILL_TIP_GAMMA = 1.0;          // spacing follows halfWidth^gamma toward the tip — `infillLaw`'s default
+/* THE THREE LOOK CONSTANTS ARE THE DEFAULTS OF S4's CONTROLS, AND EVA RULED
+   THEM from the live preview with print preview on (the ruled-defaults
+   session). They were the prototype's 2.2 / 4 / 1.0 through S3 and S4.
+   STRETCH 1.65 IS ONE SLIDER STEP CLEAR OF A HOLE-COUNT EDGE, MEASURED: at
+   density 20 / relax 5 / law 0.30 the default blade holds 20 holes over
+   stretch 1.60..2.35 and 18 below 1.586 — so 1.60 and 1.70 keep 20 and 1.55
+   loses two. No >1.5 mm centroid reshuffle sits nearer than 1.14 and 2.38.
+   Reported, not moved: the value is Eva's. */
+export const INFILL_ANISO = 1.65;             // the metric's stretch along the midrib — `infillAniso`'s default (was 2.2)
+export const INFILL_LLOYD_PASSES = 5;         // `infillRelax`'s default (was 4)
+export const INFILL_TIP_GAMMA = 0.30;         // spacing follows halfWidth^gamma toward the tip — `infillLaw`'s default (was 1.0)
 /* S4'S FOUR CONTROLS, ranges and defaults — IMPORTED by the registry (Q6).
    The three look constants above are the DEFAULTS of three of them, the same
    doubles, so a build at the defaults forms exactly the expressions S3 shipped.
@@ -9790,11 +9799,15 @@ function infillSeedField(hAt, L, xB, N, seed, outline, law = null) {
   const spacing = (x) => {
     /* `Math.pow` IS NOT CORRECTLY ROUNDED EITHER, and the spacing law feeds the
        seed placement, which feeds every discrete answer downstream. At
-       `INFILL_TIP_GAMMA` 1 the law is the identity and `Math.pow` is skipped
-       outright, so the shipping value costs nothing and cannot differ between
-       engines; any other exponent goes through `Math.pow` and is told, because
-       a gamma that is not 1 IS a cross-engine exposure and pretending
-       otherwise is how this class keeps coming back. */
+       gamma 1 the law is the identity and `Math.pow` is skipped outright.
+       THE RULED DEFAULT IS 0.30 SINCE THE RULED-DEFAULTS SESSION, SO THE
+       DEFAULT INFILLED BLADE NOW GOES THROUGH `Math.pow` — a cross-engine
+       exposure on every infilled row, said here rather than hidden. What
+       bounds it: the spacing only enters the greedy seeder as a RATIO in a
+       strict `>` between fourteen random candidates, so a flip needs two
+       scores within an ulp of each other, and everything downstream is
+       quantised onto `INFILL_PLAN_GRID`. The witness is X0 in the browser on
+       every `INFILL:` row, not this argument. */
     const tipBase = Math.max(0.05, hAt(x) / hMax);
     const tip = gamma === 1 ? tipBase : Math.pow(tipBase, gamma);
     const base = INFILL_BASE_NARROW + (1 - INFILL_BASE_NARROW) * Math.min(1, Math.max(0, (x - xB) / (INFILL_BASE_REACH * L)));

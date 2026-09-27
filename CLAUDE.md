@@ -4860,6 +4860,29 @@ against 1.00 mm: 14 / 15 at 16, 16 / 22 at 24, 16 / 26 at 40 — the prompt's 9 
 gains nine rows (951). **No default moved — the sweeps in `docs/img/infill-s4-*.png` are for Eva's
 ruling.**
 
+**THE INFILL'S RULED DEFAULTS SHIP, AND THE SOLID BASE IS PARKED — HIDDEN, NOT RETIRED** (Eva, from
+the live preview with print preview on — read `docs/bloom-infill-ruled-defaults.md` before touching
+any `INFILL_*` default or `infillBase`'s predicate). Density **20**, relaxation **5**, density law
+**0.30**, stretch **1.65** — the geometry's own constants, so the registry defaults and the builder's
+fallbacks stay one double each; the hole bar stays 1.50. The default blade reads **20 asked · 20 holes
+· 0 solid, fifths 3/5/5/4/3**, both modes, measured BEFORE anything moved. **`infillBase` keeps its id,
+row and DEFAULTS key (0)** and is hidden at every state by `{ all: [{ ref: 'infillPresent' }, { any: [] }] }`
+— **the `infillPresent` term is load-bearing**: `INFILL_SUBS` is derived from a predicate's DRIVERS, and
+a bare `{ any: [] }` has none, which would drop the control into `SWEEPABLE` and hand `ALL MAX` a new
+value. Unhide it (drop the `any` term) if the basal-V work makes the base fillable. **STRETCH 1.65 IS ONE
+SLIDER STEP CLEAR OF A HOLE-COUNT EDGE** (18 holes up to 1.585, 20 from 1.586; the 20-hole plateau is
+1.60–2.35; 1.70 is the nearest value two steps clear) — reported, not moved; no >1.5 mm centroid
+reshuffle is nearer than 1.14 / 2.38. **THE LAW LEAVING 1 EXPOSED A PRE-EXISTING DISAGREEMENT** between
+the builder's bar estimator (`infillWidthMm` on the metric field) and I1's on-object width: `ALL FORM
+MAX` keeps a 1.4799 mm hole against the 1.50 bar (1.4034 with the law ALONE moved), declared in
+`I1_XFAIL` both ways — the builder's estimator is the fix and is its own change. **The law at 0.30 also
+puts `Math.pow` on every infilled row**, which gamma 1 skipped; X0 in the browser is the witness.
+**A DEFAULTS MOVE NEEDS ITS OWN BYTE INSTRUMENT**: `verify-bloom-surface-bytes` builds both trees from
+THIS tree's DEFAULTS and so reads every row "held" by construction; `node tools/verify-bloom-defaults-bytes.mjs
+--base <worktree> --shard k/n --out f` builds each tree from its own registry and matrix (paired by
+index), predeclares movers from the BASE tree's own builder record, and `--merge` closes it.
+`frozen/phase41` is the 951 rows at `a8cea82`.
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

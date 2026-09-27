@@ -1839,7 +1839,25 @@ export const CONTROLS = [
       const at = `the cells start at u ${f.floorU.toFixed(3)}`;
       return b === 0 ? `${at} — the derived floor, as low as they go` : `${(b * 100).toFixed(0)}% of the way from the derived floor (u ${f.baseFloorU.toFixed(3)}) to the root blend\u2019s station — ${at}`;
     },
-    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+    /* PARKED, NOT RETIRED (Eva, the ruled-defaults session). HIDDEN AT EVERY
+       STATE and pinned at its default 0 — the derived floor, as low as it
+       goes. The id, this row and the DEFAULTS key all stay, so no saved design
+       needs a migration and `RETIRED_IDS` does not apply; only visibility goes.
+       WHY: at 0 the cells already start on the derived lamina floor, and what
+       makes the base read solid is `INFILL_BASE_NARROW` plus the basal V —
+       both below the floor and neither a control — so this slider had nothing
+       left to offer. If the basal-V work makes the base fillable, this becomes
+       meaningful again and is unhidden: drop the `{ any: [] }` term.
+       THE PREDICATE KEEPS `infillPresent` AS A TERM ON PURPOSE: `INFILL_SUBS`
+       in the harness is DERIVED from a control's drivers including
+       `petalInfill`, and a bare `{ any: [] }` has no driver — so it would
+       drop the control out of `INFILL_SUBS`, into `SWEEPABLE`, and hand the
+       blanket sweep two new rows and `ALL MAX` a new value. It still works
+       when written (I9, the panel's levers route and the matrix's
+       `INFILL: x solid base 1` row all drive it), which is the point of
+       parking rather than deleting. */
+    hiddenReason: 'parked — at 0 the cells start on the derived floor; the solid base comes from INFILL_BASE_NARROW and the basal V, neither a control',
+    tier: 'standard', role: 'petal', visibleWhen: { all: [{ ref: 'infillPresent' }, { any: [] }] } },
 
   { id: 'lobeCrestShape', section: 'lobes', kind: 'slider',
     min: LOBE_SHAPE_RANGE[0], max: LOBE_SHAPE_RANGE[1], step: LOBE_SHAPE_STEP, default: LOBE_SHAPE_DEFAULT,

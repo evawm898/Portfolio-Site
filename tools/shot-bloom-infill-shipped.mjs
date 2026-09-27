@@ -77,6 +77,10 @@ function faceOn(b, k = 0.60, at = null) {
    carries a hole and `solid` is the rest — ruling 3's three numbers, which are
    three different things and which a caption saying only "16 cells" would
    flatten into one. */
+/* HOLES BY FIFTHS OF THE BLADE, from the builder's own `holeU` — the
+   ruled-defaults session asks for the distribution along the blade in every
+   caption, because "N holes" says nothing about whether they bunch. */
+function fifths(F) { const f = [0, 0, 0, 0, 0]; for (const u of F.holeU || []) f[Math.min(4, Math.floor(u * 5))]++; return f.join('/'); }
 function caption(b, label) {
   const F = b.F;
   if (!F) return `<b>${label}</b> — no infill record. ${num(b.tris)} triangles.`;
@@ -84,7 +88,8 @@ function caption(b, label) {
   const w = F.widthsMm.filter((x) => x >= F.bar).sort((a, c) => a - c);
   const span = w.length ? `${w[0].toFixed(2)}–${w[w.length - 1].toFixed(2)} mm across, median ${w[w.length >> 1].toFixed(2)}` : 'none';
   return `<b>${label}</b> — <b>${F.density} cells asked → ${F.cells} built, ${F.achieved} holding a hole</b>, `
-    + `${F.solid} left solid${F.passesUsed ? `, ${F.passesUsed} drop pass${F.passesUsed === 1 ? '' : 'es'}` : ''}. `
+    + `${F.solid} left solid${F.passesUsed ? `, ${F.passesUsed} drop pass${F.passesUsed === 1 ? '' : 'es'}` : ''}; holes by fifths base→tip ${fifths(F)}. `
+    + `Relaxation ${F.passes}, density law ${Number(F.gamma).toFixed(2)}, stretch ${Number(F.aniso).toFixed(2)}. `
     + `Holes ${span}; wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm. ${num(b.tris)} triangles.`;
 }
 
@@ -98,8 +103,8 @@ function shortCounts(b, whole) {
   const F = b.F;
   if (!F) return 'NO PATTERN CUT - THE CONTROL';
   if (F.refused) return `NOT CUT (${String(F.refused).toUpperCase()})`;
-  if (whole) return `${F.achieved} HOLES A PETAL, ${num(b.tris)} TRIANGLES`;
-  return `${F.density} ASKED, ${F.cells} CELLS, ${F.achieved} WITH A HOLE, ${F.solid} SOLID`;
+  if (whole) return `${F.achieved} OF ${F.density} A PETAL, FIFTHS ${fifths(F)}, ${num(b.tris)} TRIS`;
+  return `${F.density} ASKED, ${F.achieved} HOLES, ${F.solid} SOLID, FIFTHS ${fifths(F)}`;
 }
 
 const cells = [];
@@ -157,8 +162,8 @@ h1{font-size:19px;font-weight:600;margin:0 0 6px}p.lede{color:#a8a49c;max-width:
 figure{margin:0 0 26px}img{display:block;width:${W}px;border-radius:5px}
 figcaption{color:#b8b4ac;max-width:${W}px;margin-top:7px;font-size:13px}b{color:#e8e6e0}</style>
 <h1>The Voronoi infill as it ships</h1>
-<p class="lede">Rendered from <code>buildBloomInto</code> in EXPORT mode — the drop-and-recompute at the
-ruled sixteen cells, the 1.00 mm wall, the 1.50 mm hole bar and the proportional fillet. Every figure in
+<p class="lede">Rendered from <code>buildBloomInto</code> in EXPORT mode (the geometry print preview shows) — the drop-and-recompute at the
+registry's default of ${DEFAULTS.infillDensity} cells, the 1.00 mm wall, the 1.50 mm hole bar and the proportional fillet. Every figure in
 every caption is the builder's own record. No pixel delta is quoted: the rasteriser is deterministic.</p>
 ${cells.map((c) => `<figure><img src="data:image/png;base64,${c.png}"><figcaption>${c.caption}</figcaption></figure>`).join('\n')}`;
 fs.writeFileSync(path.join(DIR, 'index.html'), html);
