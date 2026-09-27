@@ -4883,6 +4883,38 @@ THIS tree's DEFAULTS and so reads every row "held" by construction; `node tools/
 index), predeclares movers from the BASE tree's own builder record, and `--merge` closes it.
 `frozen/phase41` is the 951 rows at `a8cea82`.
 
+**S5 SHIPS: EVERY HOLE THE INFILL CUTS CLOSES ON #278's BEAD, AND EVERY RIM IN THE GENERATOR HAS
+ONE OWNER — `emitRimLoop`** (read `docs/bloom-infill-s5-hole-rims.md` before touching
+`emitRimLoop`, `rimProfile`, `emitInfillPanel`'s `growHole` / `beadProf` / `emitHoleRim`, or the
+H / O / B families). `emitRimLoop` + `rimProfile` were MOVED VERBATIM out of `emitPanel` (129 rows,
+both modes, positions AND bead normals, 0 moved) and both callers close through them; S3's flat-wall
+`emitRim` is gone — the cell region's OUTLINE edges go through the same owner as its `w = 0` step
+profile (byte-identical walls) and are STILL FLAT, the declared #278 regression above the split
+standing, because the cells' refined skin has vertices within a bead's width of the margin that
+nothing moves. **BEAD-ONLY, MEASURED:** the room is the plan's 1.00 mm wall, the 0.45 x room arm
+binds on EVERY hole (`r = 0.45`, 0.10 mm of flat left down each wall, every clamped hole a record on
+`infill.bead.clamps` and told on a third INFILL read-out line), so a 0.3 mm taper has nowhere to live
+— and under #278's own distance law a taper shorter than the inset is inert anyway. **THE BEAD IS
+NOT A HALF-ROUND AND THAT IS #278's LAW:** reach 0.45 under a 0.60 half thickness blends the profile
+toward a wall by `a / b` (75% bead at the 1.2 mm sheet, 38% at 2.4 mm), leaving the skin at 32.5 and
+69.6 degrees against a wall's 90. **THE SKIN STOPS ON A GROWN RING** — each plan ring vertex pushed
+out along its own normal until the mid-surface CHORD is the radius (`rimInsetV`'s law, per vertex,
+`infillSnap`ped); a PER-EDGE metric offset was tried first and mitred 64 corners backwards on ALL FORM
+MAX. 0 flat holes on every row. **The 1.50 mm bar still measures the ruled quantity**: the apex IS
+the plan's hole, so the mid-plane aperture is unchanged and `emittedLoops` (what I1 reads) are the
+APEX loops; ALL FORM MAX's I1_XFAIL reads 1.4799 unmoved. **COST: the infilled default bloom 58,880
+-> 113,424; the cost corner `40 x 3` 712,512 -> 1,162,112 = 77.5% of budget**, projected before
+building. **CENSUS: no undeclared INFILL row gains a pair**; 11 re-records (most improve — ALL FORM
+MAX 21,704 -> 17,984, buckle span 0.99 -> 0.60), `density law 2` removed, the sphere-stem fold
+unmoved, and `petalTipShape 3.00`'s new 0.54 mm "span" is a COLLINEAR CONTACT at the seam's
+pre-existing T-junction (the contact's length), not a fold. Gates: `verify-bloom-rim-owner.mjs`
+(O1-O3, static, 3 must-fails), `verify-bloom-hole-rim.mjs` (H0-H3 — H1's subject is the EDGES THE
+RIM OWNS, from builder ranges pinned at 2K triangles a point, because "every edge near a hole" read
+178.7-180 degrees on the BASE tree's four fold states: those are the petal's own folds, declared in
+`H1_XFAIL` with values), `verify-bloom-infill-budget.mjs` (B0-B2), all three in
+`bloom-export-watertight.yml`. `frozen/phase42` is the 951 rows at `03a1042`; block 39 gains `INFILL:
+x sheetThickness 0.60` (952). The picture is `docs/img/infill-hole-rim.png`.
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

@@ -8497,6 +8497,12 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       /* THE LOOPS THE EMITTER WALKED — the artefact's own holes, which I5 needs
          because the plan's polygons are the mask's own producer. */
       emittedLoops: infill.emittedLoops || [],
+      /* S5: where the two SKINS stop round each hole (the apex loops above are
+         the mid-plane aperture), and the hole bead as the emitter drew it —
+         its radius, how many holes took it, how many kept a flat wall, and
+         every hole where the narrow-span clamp bound. */
+      emittedSkinLoops: infill.emittedSkinLoops || [],
+      bead: (rim.infill && rim.infill.bead) || null,
       /* AND WHERE THE CELLS' OWN TRIANGLES SIT IN THE STREAM — I4's subject.
          The welded petal is a basal solid ABUTTING a cell solid along the
          seam, which is not a manifold surface there, so its Euler
@@ -8864,6 +8870,167 @@ const rimInsetV = (sect, vEdge, vIn, want) => {
   return (lo + hi) / 2;
 };
 
+/* ===================================================================
+   emitRimLoop — THE ONE OWNER OF A RIM (the Voronoi infill's S5).
+
+   Every rim this generator closes goes through here: `emitPanel`'s own
+   perimeter loop, every HOLE the infill cuts, and the infilled region's
+   outline edges. Two functions, one law: `rimProfile` builds the profile at
+   one perimeter point from its skin point C, the normal n there, the half
+   thickness b and the APEX (the original boundary point the bead reaches),
+   and `emitRimLoop` sweeps consecutive profiles into strips. Both bodies were
+   MOVED VERBATIM out of `emitPanel` (#278), so a plain petal emits the bytes
+   it emitted before this split — measured, not argued: the full-matrix byte
+   partition holds every uninfilled row positionally under `Object.is`.
+
+   A second rim emitter is what this replaces: S3 closed hole rims and the
+   infilled outline with a flat-wall `emitRim` of its own, so the region the
+   bead did not reach had a different owner from the region it did. The
+   owner gate (`tools/verify-bloom-rim-owner.mjs`) fails on that shape.
+
+   `closed` false sweeps an OPEN chain (an outline edge between two cells),
+   which is the loop with its wrap-around strip left out.
+   =================================================================== */
+function rimProfile(acc, K, C, n, b, apex, topP, botP) {
+  const APEX = K / 2;
+  const pts = new Array(K + 1);
+  const ns = acc.captureNormals ? new Array(K + 1) : null;
+  pts[0] = topP; pts[K] = botP;
+  const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
+  /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
+     THIS IS THE MOST EXPENSIVE THING THIS SESSION LEARNED. The buried
+     perimeter — the foot under the hub slab, a cleft's or a fringe's base
+     panel under what overlaps it — must emit what main emits. Laying K
+     collinear points along the wall looked like exactly that: the same two
+     planes, the same corner vertices, more triangles. IT IS NOT THE SAME
+     SURFACE. The wall between two consecutive rows is a ruled surface
+     between two segments that are NOT parallel wherever the frame turns —
+     at the foot-to-blade seam most of all — so main's single quad and a
+     K-strip subdivision of it are two different interpolations of the same
+     four corners, and the subdivision BULGES.
+
+     Measured by ablation, census pairs on the branch against main's 0:
+     turning the bead off, the corner pivots off and the tip drop off ALL
+     changed nothing (32 / 226 / 520 on layerCount 3, headRise 0.5 and
+     layerCount 6), while the subdivision alone still read 34 / 228 / 1228.
+     The bulge was the whole of it, and it poked the inner whorls' feet
+     through their neighbours at the hub's own top face (z = 0.600, radius
+     7.03 mm, every site on the innermost layer).
+
+     Repeating each end point instead makes the strip's quads degenerate
+     everywhere but the middle, where the ONE surviving quad is main's wall
+     quad on main's four corners — and the emission loop needs no case for
+     it, because it already skips a triangle with a repeated vertex. A
+     treated profile beside an untreated one becomes a fan by the same
+     arithmetic. */
+  if (wx === 0 && wy === 0 && wz === 0) {
+    for (let m = 1; m < K; m++) pts[m] = m <= APEX ? pts[0] : pts[K];
+    /* No bead, so no smooth normal to offer: `null` leaves the sweep's own
+       FLAT normal in place, which is the right answer for a wall. */
+    return { pts, ns: null };
+  }
+  pts[APEX] = apex;
+  /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
+     cosine. At a full bead `a` equals `b` and the cosine is the half round,
+     which is what the shape has to be. Where the treatment has ramped to
+     nothing the profile is the flat WALL, and a cosine lays its points out
+     clustered at the middle of that wall — so the strip between two such
+     walls is a fan of slivers whose normals are ill-conditioned, and the
+     measured turn between two facets that are geometrically COPLANAR came
+     out at 108.21 degrees on the shipping default, at the foot-to-blade
+     seam, where main reads 93.92. Blending toward an even spacing as the
+     bead goes away costs nothing at the rim (the ratio is 1 there, the
+     cosine is untouched, and the bead is still a true half round) and makes
+     the wall's own subdivision uniform, which is what it always should have
+     been. Continuous in `a`, so there is no threshold. */
+  const aLen = Math.hypot(wx, wy, wz);
+  const ratio = b > 0 ? Math.min(1, aLen / b) : 0;
+  for (let m = 1; m < K; m++) {
+    if (m === APEX) continue;
+    /* SAMPLED UNIFORMLY IN TANGENT ANGLE, NOT IN THE ELLIPSE'S PARAMETER,
+       and that is what bounds the turn between facets at 180/K whatever the
+       bead's aspect. For a half ellipse (a sin t, b cos t) the tangent
+       direction is (a cos t, -b sin t), so a tangent angle psi corresponds to
+       `t = atan2(a sin psi, b cos psi)` — a closed form, no search. At a = b
+       it is the identity (`atan2(a sin psi, a cos psi)` IS psi), so a true
+       half round is sampled exactly as before.
+
+       IT MATTERS WHERE THE BEAD IS ELONGATED. The tip bead's semi-axis along
+       the length is the ladder's own last gaps, and on a SQUARED terminal
+       the ladder puts few rows near an outline that has stopped converging:
+       measured there at `a` around 2 mm against `b` of 0.5, the parameter-
+       uniform sampling piles most of the turn into the last facet before the
+       apex and the surface turned 63.17 degrees where the outline turns
+       nothing at all. In tangent angle the same bead turns 180/K a facet.
+
+       The linear blend below is the other end of the same problem: where the
+       treatment has ramped to nothing the profile is the flat WALL, and a
+       cosine lays its points out clustered at the middle of it. */
+    const psi = (Math.PI * m) / K;
+    const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;
+    const sn = aLen > 0 ? Math.sin(th) : 0;
+    const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
+    pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
+    /* THE BEAD'S OWN NORMAL, IN CLOSED FORM, AND IT IS THE CROSS-SECTION'S.
+       In the (n, w-hat) plane the profile is the ellipse
+       (b cos th along n, aLen sin th along w-hat), whose outward normal is
+       (aLen cos th, b sin th) — the semi-axes swapped, which is the whole
+       of it. Two ends fall out rather than being special-cased: at th = 0
+       it is +n (the top skin's own normal, and the bead leaves the skin
+       tangentially, so the two agree there) and at th = pi it is -n.
+
+       WHAT IT LEAVES OUT, said rather than hidden: the term along the SWEEP,
+       which is non-zero wherever the profile's size changes from one column
+       to the next — the taper's ramp, and the tip. It is a shading
+       approximation and it decides no geometry; the alternative is a
+       position search over every triangle on every rebuild, for a
+       second-order correction to a normal. */
+    if (ns) {
+      let px = n[0] * aLen * Math.cos(th) + (wx / aLen) * b * sn;
+      let py = n[1] * aLen * Math.cos(th) + (wy / aLen) * b * sn;
+      let pz = n[2] * aLen * Math.cos(th) + (wz / aLen) * b * sn;
+      const L = Math.hypot(px, py, pz);
+      ns[m] = L > 0 ? [px / L, py / L, pz / L] : [n[0], n[1], n[2]];
+    }
+  }
+  if (ns) {
+    ns[0] = [n[0], n[1], n[2]];
+    ns[K] = [-n[0], -n[1], -n[2]];
+    ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
+  }
+  return { pts, ns };
+}
+  /* A profile pair that shares its skin point — the two corners, where the
+     margin run hands over to the tip run — collapses its end quads to
+     triangles. Skipping a triangle with a repeated vertex is not a hole: the
+     quad's own boundary edges are exactly the surviving triangle's. */
+  /* THE SWEEP'S WINDING IS OUTWARD, AND IT WAS WRONG FIRST TIME — recorded
+     because the way it was found is the point. The first cut walked the strip
+     (A[m], A[m+1], B[m+1], B[m]) and produced a mesh with ZERO boundary edges
+     and ZERO non-manifold edges that was nonetheless inside-out on every rim
+     triangle: 2,112 DIRECTED edges on the default had no reverse partner and
+     the solid's signed volume came out −455.58 mm³ against main's +4,415.57.
+     The undirected census cannot see it — it keys on a SORTED pair, so two
+     triangles crossing one edge the SAME way count as a matched pair — which
+     is ST10's own finding on the stem tube's annuli, one solid later. The
+     strip is walked (A[m], B[m], B[m+1], A[m+1]) now, and E3 of
+     tools/verify-bloom-edge-profile.mjs runs a DIRECTED census so a fix
+     without a witness does not become folklore. */
+function emitRimLoop(acc, profs, K, closed = true) {
+  const N = closed ? profs.length : profs.length - 1;
+  let skipped = 0;                 // a strip triangle with a repeated vertex: skipped, never emitted
+  for (let k = 0; k < N; k++) {
+    const A = profs[k].pts, B = profs[(k + 1) % profs.length].pts;
+    const An = profs[k].ns, Bn = profs[(k + 1) % profs.length].ns;
+    for (let m = 0; m < K; m++) {
+      const p = A[m], q = B[m], s = B[m + 1], u = A[m + 1];
+      if (!rimSameP(p, q) && !rimSameP(q, s) && !rimSameP(s, p)) acc.triN(p, q, s, An && An[m], Bn && Bn[m], Bn && Bn[m + 1]); else skipped++;
+      if (!rimSameP(p, s) && !rimSameP(s, u) && !rimSameP(u, p)) acc.triN(p, s, u, An && An[m], Bn && Bn[m + 1], An && An[m + 1]); else skipped++;
+    }
+  }
+  return skipped;
+}
+
 /* One panel: a single-span quad grid, individually closed. Face quads first,
    then the rim loop — the placeholder's order, kept because at the default
    there is exactly ONE panel and the byte report is a two-sided assertion.
@@ -9030,7 +9197,6 @@ function emitPanel(acc, rows, panel, tAt, rim) {
 
   /* ---- the rim: ONE closed loop of profiles ---- */
   const K = rimSegments(sheetMax);
-  const APEX = K / 2;
   /* The loop, as (row, column) pairs on the ORIGINAL boundary. Its direction
      is the one that leaves the rim wound with the two skins; the witness is
      `boundaryEdges === 0` plus O1/O2, not this comment. */
@@ -9116,140 +9282,8 @@ function emitPanel(acc, rows, panel, tAt, rim) {
       }
     }
   }
-  const profs = entries.map(({ apex, sk, j }) => {
-    const C = skinP[sk][j], n = skinN[sk][j], b = skinB[sk][j];
-    const pts = new Array(K + 1);
-    const ns = acc.captureNormals ? new Array(K + 1) : null;
-    pts[0] = top[sk][j]; pts[K] = bot[sk][j];
-    const wx = apex[0] - C[0], wy = apex[1] - C[1], wz = apex[2] - C[2];
-    /* A PROFILE THE TREATMENT DID NOT REACH IS A STEP, NOT A SUBDIVISION, AND
-       THIS IS THE MOST EXPENSIVE THING THIS SESSION LEARNED. The buried
-       perimeter — the foot under the hub slab, a cleft's or a fringe's base
-       panel under what overlaps it — must emit what main emits. Laying K
-       collinear points along the wall looked like exactly that: the same two
-       planes, the same corner vertices, more triangles. IT IS NOT THE SAME
-       SURFACE. The wall between two consecutive rows is a ruled surface
-       between two segments that are NOT parallel wherever the frame turns —
-       at the foot-to-blade seam most of all — so main's single quad and a
-       K-strip subdivision of it are two different interpolations of the same
-       four corners, and the subdivision BULGES.
-
-       Measured by ablation, census pairs on the branch against main's 0:
-       turning the bead off, the corner pivots off and the tip drop off ALL
-       changed nothing (32 / 226 / 520 on layerCount 3, headRise 0.5 and
-       layerCount 6), while the subdivision alone still read 34 / 228 / 1228.
-       The bulge was the whole of it, and it poked the inner whorls' feet
-       through their neighbours at the hub's own top face (z = 0.600, radius
-       7.03 mm, every site on the innermost layer).
-
-       Repeating each end point instead makes the strip's quads degenerate
-       everywhere but the middle, where the ONE surviving quad is main's wall
-       quad on main's four corners — and the emission loop needs no case for
-       it, because it already skips a triangle with a repeated vertex. A
-       treated profile beside an untreated one becomes a fan by the same
-       arithmetic. */
-    if (wx === 0 && wy === 0 && wz === 0) {
-      for (let m = 1; m < K; m++) pts[m] = m <= APEX ? pts[0] : pts[K];
-      /* No bead, so no smooth normal to offer: `null` leaves the sweep's own
-         FLAT normal in place, which is the right answer for a wall. */
-      return { pts, ns: null };
-    }
-    pts[APEX] = apex;
-    /* HOW THE PROFILE IS SPACED ALONG THE NORMAL, and it is NOT simply the
-       cosine. At a full bead `a` equals `b` and the cosine is the half round,
-       which is what the shape has to be. Where the treatment has ramped to
-       nothing the profile is the flat WALL, and a cosine lays its points out
-       clustered at the middle of that wall — so the strip between two such
-       walls is a fan of slivers whose normals are ill-conditioned, and the
-       measured turn between two facets that are geometrically COPLANAR came
-       out at 108.21 degrees on the shipping default, at the foot-to-blade
-       seam, where main reads 93.92. Blending toward an even spacing as the
-       bead goes away costs nothing at the rim (the ratio is 1 there, the
-       cosine is untouched, and the bead is still a true half round) and makes
-       the wall's own subdivision uniform, which is what it always should have
-       been. Continuous in `a`, so there is no threshold. */
-    const aLen = Math.hypot(wx, wy, wz);
-    const ratio = b > 0 ? Math.min(1, aLen / b) : 0;
-    for (let m = 1; m < K; m++) {
-      if (m === APEX) continue;
-      /* SAMPLED UNIFORMLY IN TANGENT ANGLE, NOT IN THE ELLIPSE'S PARAMETER,
-         and that is what bounds the turn between facets at 180/K whatever the
-         bead's aspect. For a half ellipse (a sin t, b cos t) the tangent
-         direction is (a cos t, -b sin t), so a tangent angle psi corresponds to
-         `t = atan2(a sin psi, b cos psi)` — a closed form, no search. At a = b
-         it is the identity (`atan2(a sin psi, a cos psi)` IS psi), so a true
-         half round is sampled exactly as before.
-
-         IT MATTERS WHERE THE BEAD IS ELONGATED. The tip bead's semi-axis along
-         the length is the ladder's own last gaps, and on a SQUARED terminal
-         the ladder puts few rows near an outline that has stopped converging:
-         measured there at `a` around 2 mm against `b` of 0.5, the parameter-
-         uniform sampling piles most of the turn into the last facet before the
-         apex and the surface turned 63.17 degrees where the outline turns
-         nothing at all. In tangent angle the same bead turns 180/K a facet.
-
-         The linear blend below is the other end of the same problem: where the
-         treatment has ramped to nothing the profile is the flat WALL, and a
-         cosine lays its points out clustered at the middle of it. */
-      const psi = (Math.PI * m) / K;
-      const th = aLen > 0 ? Math.atan2(aLen * Math.sin(psi), b * Math.cos(psi)) : psi;
-      const sn = aLen > 0 ? Math.sin(th) : 0;
-      const cs = (1 - ratio) * (1 - (2 * m) / K) + ratio * Math.cos(th);
-      pts[m] = [C[0] + n[0] * b * cs + wx * sn, C[1] + n[1] * b * cs + wy * sn, C[2] + n[2] * b * cs + wz * sn];
-      /* THE BEAD'S OWN NORMAL, IN CLOSED FORM, AND IT IS THE CROSS-SECTION'S.
-         In the (n, w-hat) plane the profile is the ellipse
-         (b cos th along n, aLen sin th along w-hat), whose outward normal is
-         (aLen cos th, b sin th) — the semi-axes swapped, which is the whole
-         of it. Two ends fall out rather than being special-cased: at th = 0
-         it is +n (the top skin's own normal, and the bead leaves the skin
-         tangentially, so the two agree there) and at th = pi it is -n.
-
-         WHAT IT LEAVES OUT, said rather than hidden: the term along the SWEEP,
-         which is non-zero wherever the profile's size changes from one column
-         to the next — the taper's ramp, and the tip. It is a shading
-         approximation and it decides no geometry; the alternative is a
-         position search over every triangle on every rebuild, for a
-         second-order correction to a normal. */
-      if (ns) {
-        let px = n[0] * aLen * Math.cos(th) + (wx / aLen) * b * sn;
-        let py = n[1] * aLen * Math.cos(th) + (wy / aLen) * b * sn;
-        let pz = n[2] * aLen * Math.cos(th) + (wz / aLen) * b * sn;
-        const L = Math.hypot(px, py, pz);
-        ns[m] = L > 0 ? [px / L, py / L, pz / L] : [n[0], n[1], n[2]];
-      }
-    }
-    if (ns) {
-      ns[0] = [n[0], n[1], n[2]];
-      ns[K] = [-n[0], -n[1], -n[2]];
-      ns[APEX] = [wx / aLen, wy / aLen, wz / aLen];
-    }
-    return { pts, ns };
-  });
-  /* A profile pair that shares its skin point — the two corners, where the
-     margin run hands over to the tip run — collapses its end quads to
-     triangles. Skipping a triangle with a repeated vertex is not a hole: the
-     quad's own boundary edges are exactly the surviving triangle's. */
-  /* THE SWEEP'S WINDING IS OUTWARD, AND IT WAS WRONG FIRST TIME — recorded
-     because the way it was found is the point. The first cut walked the strip
-     (A[m], A[m+1], B[m+1], B[m]) and produced a mesh with ZERO boundary edges
-     and ZERO non-manifold edges that was nonetheless inside-out on every rim
-     triangle: 2,112 DIRECTED edges on the default had no reverse partner and
-     the solid's signed volume came out −455.58 mm³ against main's +4,415.57.
-     The undirected census cannot see it — it keys on a SORTED pair, so two
-     triangles crossing one edge the SAME way count as a matched pair — which
-     is ST10's own finding on the stem tube's annuli, one solid later. The
-     strip is walked (A[m], B[m], B[m+1], A[m+1]) now, and E3 of
-     tools/verify-bloom-edge-profile.mjs runs a DIRECTED census so a fix
-     without a witness does not become folklore. */
-  for (let k = 0; k < profs.length; k++) {
-    const A = profs[k].pts, B = profs[(k + 1) % profs.length].pts;
-    const An = profs[k].ns, Bn = profs[(k + 1) % profs.length].ns;
-    for (let m = 0; m < K; m++) {
-      const p = A[m], q = B[m], s = B[m + 1], u = A[m + 1];
-      if (!rimSameP(p, q) && !rimSameP(q, s) && !rimSameP(s, p)) acc.triN(p, q, s, An && An[m], Bn && Bn[m], Bn && Bn[m + 1]);
-      if (!rimSameP(p, s) && !rimSameP(s, u) && !rimSameP(u, p)) acc.triN(p, s, u, An && An[m], Bn && Bn[m + 1], An && An[m + 1]);
-    }
-  }
+  const profs = entries.map(({ apex, sk, j }) => rimProfile(acc, K, skinP[sk][j], skinN[sk][j], skinB[sk][j], apex, top[sk][j], bot[sk][j]));
+  emitRimLoop(acc, profs, K);
   if (rim) {
     if (acc.captureRim) {
       /* The apexes the treatment REACHED. `a > 0` is exact: the ramp returns
@@ -10733,12 +10767,184 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
      Measured: `petalWidth` 8 read 16 zero-area triangles across the bloom
      before this line and 0 after, at `DEGENERATE_AREA_MM2` on float32, which
      is the bar both STL gates fail on. */
-  const emitRim = (A, B) => {
+  /* EVERY RIM HERE GOES THROUGH `emitRimLoop` (S5), the one owner `emitPanel`
+     closes its own perimeter with. A profile is a function of the plan point it
+     sits on and nothing else, so it is MEMOISED on that point's canonical key:
+     two strips meeting at a point read the same profile object, which is what
+     keeps a loop watertight when it is swept one edge at a time. The count of
+     strip triangles skipped for a repeated vertex is `emitRimLoop`'s own return
+     and lands on `collapsed`, where S3's flat wall counted the same skips. */
+  const K = rimSegments(tAt(rows[mSplit].u));
+  const ZERO3 = [0, 0, 0];
+  const flatProfs = new Map();
+  /* THE FLAT WALL IS `rimProfile`'s OWN w = 0 ARM — the step profile whose one
+     surviving quad is the wall S3's `emitRim` drew, on the same four corners,
+     with the same diagonal, the same winding and in the same order. The
+     OUTLINE of the cell region stays flat in this session: its bead needs the
+     skin near the margin to give way to the inset, and the cells' refined skin
+     has vertices within a bead's width of the margin that nothing moves (§5 of
+     docs/bloom-infill-s5-hole-rims.md). What changes is its OWNER. */
+  const flatProf = (q) => {
+    const k = `${f6(q.x)},${f6(q.y)}`; let pr = flatProfs.get(k);
+    if (!pr) { const o = pt(q); pr = rimProfile(acc, K, ZERO3, null, 0, ZERO3, o.T, o.B); flatProfs.set(k, pr); }
+    return pr;
+  };
+  const emitRimFlat = (A, B) => {
     const ps = edgePoints(A, B);
-    for (let i = 0; i + 1 < ps.length; i++) {
-      const p = pt(ps[i]), q = pt(ps[i + 1]);
-      emitTri(q.T, p.T, p.B); emitTri(q.T, p.B, q.B);
+    /* A step profile skips its 2(K - 1) empty strip triangles BY CONSTRUCTION;
+       only a skip beyond those is a wall that collapsed, which is what S3's
+       `collapsed` counted and still counts. */
+    for (let i = 0; i + 1 < ps.length; i++) collapsed += emitRimLoop(acc, [flatProf(ps[i + 1]), flatProf(ps[i])], K, false) - 2 * (K - 1);
+  };
+
+  /* ---- THE HOLE BEAD (S5): the skin stops short of the hole and the rim
+     closes on a half round whose APEX is the plan's own hole boundary. ----
+
+     THE RADIUS IS #278's LAW WITH THE ROOM THE PLAN GUARANTEES:
+         r = min( RIM_BEAD_RADIUS_MM , t/2 , RIM_ROOM_FRACTION * room )
+     The room is `plan.wall` — the in-sheet wall every hole is laid out against
+     (I11 measures it at 1.000000 mm on a flat cell and above it on a curved
+     one) — so the third arm is 0.45 mm and it binds on EVERY hole rim: each
+     side's bead takes 0.45 of a 1.00 mm wall and 0.10 mm of flat is left down
+     its centre. The thickness arm is read through the mode-free floor
+     `max(t, MIN_FEATURE_MM) / 2 >= 0.50`, so it can never bind below the room
+     arm, and that is not a convenience: the inset MOVES THE PLAN RING the
+     annulus is triangulated against, so a radius that read the MODE's own
+     sheet would make the triangle count mode-dependent, which both STL gates
+     assert against by name — `rimSegments`' own argument, one step over.
+
+     BEAD ONLY, NO TAPER, AND THAT IS A READING OF #278's OWN LAW. Its distance
+     field starts at the ORIGINAL boundary (`d = a + arc`), so the taper's first
+     `a` of travel lies inside the bead's own footprint: any taper shorter than
+     the inset is inert by construction, and a 0.3 mm taper under a 0.45 mm
+     bead is exactly that — `b` at the skin's edge is the body's own half
+     thickness either way. The profile is the half ellipse from the body's skin
+     out to the apex, leaving the skin tangentially.
+
+     WHAT THE 1.50 mm BAR MEANS AFTERWARDS. The apex IS the plan's hole
+     boundary, so the aperture at the mid-plane — the narrowest the hole ever
+     is, since every other point of a profile lies behind its apex — is the
+     plan's own hole, unchanged. At the skins the hole is wider by the inset on
+     each side. `plan.emittedLoops` are the APEX loops and I1 measures those. */
+  const rHole = Math.min(RIM_BEAD_RADIUS_MM, Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);
+  /* WHERE THE SKIN NOW STOPS ROUND A HOLE: #278's OWN INSET LAW, per ring
+     vertex. `rimInsetV` walks in from a margin to where the CHORD from the
+     boundary point is the bead's radius, because the profile's half width IS
+     that chord; here the walk is outward from the hole, along the ring's own
+     vertex normal in the plan, on the mid-surface the plan maps onto. On a FLAT
+     plan the map is an isometry (the plan's own premise — `infillPlanIsFlat`
+     builds no field for exactly that reason) and the walk is skipped: the
+     answer IS the radius. On a curved one it is a bracketed bisection, with
+     `rimInsetV`'s own ULP slack on the comparison (a chord linear in the
+     offset lands the target on a dyadic point and ties to the bit).
+
+     A PER-EDGE OFFSET WAS TRIED FIRST AND IS WRONG ON A CURVED PLAN: marching
+     each edge's surface distance through the metric field gives adjacent edges
+     different plan offsets, and mitring two nearly collinear edges at different
+     distances throws the corner out past its neighbours — measured, 64 ring
+     corners reversed on ALL FORM MAX, 8 of its 17 holes refused. Per vertex,
+     along the vertex's own normal, nothing is mitred. */
+  const growSlack = infillTieSlack(Lm);
+  const flatPlan = !plan.field;
+  const insetPlanMm = (Q, dx, dy) => {
+    if (flatPlan) return rHole;
+    const P0 = mapPlan(Q.x, Q.y).P;
+    const chord = (d) => rimDist(mapPlan(Q.x + dx * d, Q.y + dy * d).P, P0);
+    const tol = RIM_INSET_TOL_ULPS * Number.EPSILON * (Math.abs(P0[0]) + Math.abs(P0[1]) + Math.abs(P0[2]) + rHole);
+    let lo = 0, hi = rHole;
+    for (let it = 0; it < 30 && chord(hi) < rHole - tol; it++) { lo = hi; hi *= 2; }
+    for (let it = 0; it < 20; it++) { const m = (lo + hi) / 2; if (chord(m) < rHole - tol) lo = m; else hi = m; }
+    return (lo + hi) / 2;
+  };
+  const growHole = (hole, cell) => {
+    const Hh = infillCcw(hole), n = Hh.length;
+    if (n < 3) return null;
+    const en = [];
+    for (let i = 0; i < n; i++) {
+      const A = Hh[i], B = Hh[(i + 1) % n], ex = B.x - A.x, ey = B.y - A.y, len = infillLen(ex, ey);
+      if (!(len > 1e-12)) return null;
+      en.push([ey / len, -ex / len]);                                    // OUTWARD of a CCW ring: into the wall
     }
+    const Gg = [];
+    for (let i = 0; i < n; i++) {
+      const [ax, ay] = en[(i - 1 + n) % n], [bx, by] = en[i];
+      let nx = ax + bx, ny = ay + by; const nl = infillLen(nx, ny);
+      if (!(nl > 1e-9)) return null;
+      nx /= nl; ny /= nl;
+      const d = insetPlanMm(Hh[i], nx, ny);
+      /* THROUGH `infillSnap`: the grown ring decides the annulus's topology,
+         and the grid is what keeps that decision the same in both engines. */
+      Gg.push({ x: infillSnap(Hh[i].x + nx * d, growSlack), y: infillSnap(Hh[i].y + ny * d, growSlack) });
+    }
+    /* THE GROWN RING MUST STILL BE A HOLE IN THIS CELL: every edge keeps its
+       direction, no two edges cross, and every vertex lies strictly inside the
+       cell. Where it does not, the hole keeps a flat wall and is COUNTED
+       (`flatHoles`) — a bead that would reach past its own wall is not built
+       quietly. */
+    for (let i = 0; i < n; i++) {
+      const A = Gg[i], B = Gg[(i + 1) % n], a0 = Hh[i], b0 = Hh[(i + 1) % n];
+      if (!((B.x - A.x) * (b0.x - a0.x) + (B.y - A.y) * (b0.y - a0.y) > 0)) return null;
+      if (!infillPointInPoly(A.x, A.y, cell)) return null;
+    }
+    const cross = (p, q, r2) => (q.x - p.x) * (r2.y - p.y) - (q.y - p.y) * (r2.x - p.x);
+    for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const A = Gg[i], B = Gg[(i + 1) % n], C = Gg[j], D = Gg[(j + 1) % n];
+      if (cross(A, B, C) * cross(A, B, D) < 0 && cross(C, D, A) * cross(C, D, B) < 0) return null;
+    }
+    return { H: Hh, G: Gg.map(cq) };
+  };
+  const beadProfs = new Map();
+  const beadProf = (q, ring) => {
+    const k = `${f6(q.x)},${f6(q.y)}`; let pr = beadProfs.get(k);
+    if (pr) return pr;
+    /* THE APEX IS THE POINT OF THE PLAN'S OWN RING AT THE SAME EDGE PARAMETER:
+       the grown ring's edge i is the plan ring's edge i pushed out, so a point
+       at parameter t along one is carried to parameter t along the other. */
+    const G = ring.G, Hh = ring.H, n = G.length;
+    let best = Infinity, bi = 0, bt = 0;
+    for (let i = 0; i < n; i++) {
+      const A = G[i], B = G[(i + 1) % n], ex = B.x - A.x, ey = B.y - A.y, l2 = ex * ex + ey * ey;
+      let t = l2 > 0 ? ((q.x - A.x) * ex + (q.y - A.y) * ey) / l2 : 0; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const dx = A.x + ex * t - q.x, dy = A.y + ey * t - q.y, d2 = dx * dx + dy * dy;
+      if (d2 < best) { best = d2; bi = i; bt = t; }
+    }
+    const A = Hh[bi], B = Hh[(bi + 1) % n];
+    const apPlan = { x: A.x + (B.x - A.x) * bt, y: A.y + (B.y - A.y) * bt };
+    const s = mapPlan(q.x, q.y), o = pt(q), tb = tAt(s.u);
+    const apex = mapPlan(apPlan.x, apPlan.y).P;
+    pr = rimProfile(acc, K, s.P, s.n, tb / 2, apex, o.T, o.B);
+    pr.apexPlan = apPlan;
+    beadProfs.set(k, pr);
+    return pr;
+  };
+  /* One hole's rim: walked FORWARD round the ring the skin stops on, every
+     edge subdivided exactly as the skin's own triangles split it (`edgePoints`
+     is the refiner's own rule), swept as ONE closed loop. */
+  let beadPoints = 0, beadedHoles = 0, flatHoles = 0;
+  const holeRimRanges = [];
+  const beadClamps = [];
+  const emitHoleRim = (loop, ring) => {
+    const seq = [];
+    for (let i = 0; i < loop.length; i++) { const ps = edgePoints(loop[i], loop[(i + 1) % loop.length]); for (let k2 = 0; k2 + 1 < ps.length; k2++) seq.push(ps[k2]); }
+    const profs = ring ? seq.map((q) => beadProf(q, ring)) : seq.map(flatProf);
+    const t0 = acc.triangleCount;
+    collapsed += emitRimLoop(acc, profs, K, true) - (ring ? 0 : 2 * (K - 1) * seq.length);
+    /* WHERE EACH HOLE'S RIM SITS IN THE STREAM — the hole-rim gate's subject
+       (the edges the rim owns), pinned there to 2K triangles a point so a
+       range cannot be trimmed without the gate saying so. */
+    holeRimRanges.push([t0, acc.triangleCount, seq.length, ring ? 1 : 0]);
+    if (ring) {
+      beadedHoles++; beadPoints += seq.length;
+      /* EVERY LOCATION THE NARROW-SPAN CLAMP TOOK THE BEAD UNDER ITS RULED
+         RADIUS, as Eva asked — one record per hole, since the room arm is the
+         plan's wall and binds the whole ring at once. */
+      if (rHole < RIM_BEAD_RADIUS_MM) {
+        let cx = 0, cy = 0; for (const q of ring.H) { cx += q.x; cy += q.y; } cx /= ring.H.length; cy /= ring.H.length;
+        beadClamps.push({ u: cx / Lm, yMm: cy, points: seq.length, radiusMm: rHole, roomMm: plan.wall });
+      }
+    } else flatHoles++;
+    return { skin: seq, apex: ring ? profs.map((pr) => pr.apexPlan) : seq };
   };
 
   /* ---- the cells ---- */
@@ -10754,7 +10960,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
      a wall and emit no rim between them) and read 2 - 2h exactly. */
   const triFrom = acc.triangleCount;
   let tileFail = 0, holesCut = 0, solid = 0, untiled = 0;
-  const holeLoops = [];                 // the hole outlines, kept as explicit closed loops for S5's `emitRimLoop`
+  const holeLoops = [], skinLoops = [];                 // the hole outlines, kept as explicit closed loops for S5's `emitRimLoop`
   for (let ci = 0; ci < plan.cells.length; ci++) {
     const c = plan.cells[ci].map(cq);
     const k = c.length; const O = c.map(pt);
@@ -10769,70 +10975,76 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
       let tris = infillEarClip(c, 1e-12, flatDrawn);
       if (!tiles(tris, infillPolyArea(c))) { tileFail++; tris = infillFan(c, flatDrawn); }
       emitSkin(tris);
-      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRimFlat(c[i], c[j]); }
       continue;
     }
     holesCut++;
-    const sec = infillAnnulusSectors(c, hole, cq);
-    let done = false;
-    if (sec) {
-      let all = [];
-      let ok = true;
-      for (const s of sec.sectors) { const tris = infillEarClip(s, 1e-12, flatDrawn); if (!tiles(tris, infillPolyArea(s))) { ok = false; break; } all = all.concat(tris); }
-      /* AND THE SECTORS MUST TILE THE ANNULUS, not merely each tile its own
-         sector — two different claims, and a cell at the blade's WAIST is not
-         convex, where neither a fan nor a sector walk is valid. */
-      if (ok && tiles(all, infillPolyArea(c) - infillPolyArea(hole)) && !all.some(flatDrawn)) {
-        emitSkin(all);
-        const IL = sec.innerLoop;
-        holeLoops.push(IL);
-        for (let i = 0; i < IL.length; i++) emitRim(IL[(i + 1) % IL.length], IL[i]);
-        for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
-        done = true;
+    let ring = growHole(hole, c);
+    /* ONE ATTEMPT AT THE ANNULUS AGAINST A GIVEN RING, EMITTING NOTHING: the
+       sector split first, the angular merge-walk if that fails. The bead's ring
+       is tried first and the plan's own hole after it, so a grown ring that no
+       arm can tile costs the hole its BEAD (a flat wall, counted in
+       `flatHoles`) and never its HOLE. */
+    const attempt = (rg) => {
+      const skinHole = rg ? rg.G : hole;
+      const want = infillPolyArea(c) - infillPolyArea(skinHole);
+      const sec = infillAnnulusSectors(c, skinHole, cq);
+      if (sec) {
+        let all = [];
+        let ok = true;
+        for (const sc of sec.sectors) { const tris = infillEarClip(sc, 1e-12, flatDrawn); if (!tiles(tris, infillPolyArea(sc))) { ok = false; break; } all = all.concat(tris); }
+        /* AND THE SECTORS MUST TILE THE ANNULUS, not merely each tile its own
+           sector — two different claims, and a cell at the blade's WAIST is not
+           convex, where neither a fan nor a sector walk is valid. */
+        if (ok && tiles(all, want) && !all.some(flatDrawn)) return { tris: all, loop: sec.innerLoop, walked: false };
       }
-    }
-    if (done) continue;
-    tileFail++;
-    /* THE FALLBACK IS THE ANGULAR MERGE-WALK, AND IT GOES THROUGH THE SAME
-       SUBDIVISION AS EVERYTHING ELSE. It emits PLAN triangles rather than skin
-       points, so `emitSkin` refines them and `emitRim` walks the rims at the
-       same `splitPoints` every other cell uses — which is the whole of
-       crack-freeness. Emitting this walk unsubdivided beside a conforming
-       neighbour is a crack along the wall they share: measured, `density 40`
-       LIVE read 80 boundary edges before this line, and 0 after. */
-    const inn = infillCcw(hole); const cc = infillCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
-    const I = inn.map((q) => ({ a: ang(q), q })); const Oa = c.map((q) => ({ a: ang(q), q }));
-    const rot = (arr) => { let m = 0; for (let i = 1; i < arr.length; i++) if (arr[i].a < arr[m].a) m = i; return arr.slice(m).concat(arr.slice(0, m)); };
-    const A = rot(Oa), Bq = rot(I); let ia = 0, ib = 0; const na = A.length, nb = Bq.length;
-    const nextA = (i) => A[(i + 1) % na].a + ((i + 1) >= na ? 2 * Math.PI : 0), nextB = (i) => Bq[(i + 1) % nb].a + ((i + 1) >= nb ? 2 * Math.PI : 0);
-    const walk = [];
-    while (ia < na || ib < nb) {
-      const advA = ib >= nb || (ia < na && nextA(ia) <= nextB(ib));
-      if (advA) { walk.push([A[ia % na].q, A[(ia + 1) % na].q, Bq[ib % nb].q]); ia++; }
-      else { walk.push([A[ia % na].q, Bq[(ib + 1) % nb].q, Bq[ib % nb].q]); ib++; }
-    }
-    /* AND THE MERGE-WALK IS HELD TO THE SAME AREA TEST AS EVERY OTHER ARM, which
-       is what it did not used to be. Its `advA` step spans two consecutive OUTER
-       vertices, so on a wide angular sector the triangle REACHES ACROSS THE
-       HOLE — S1's own second defect, in the shipping emitter's last resort. It
-       draws skin over material that is not there, which is a fold rather than a
-       crack, so no boundary-edge or degeneracy clause can see it: measured, the
-       census read 182 within-shell pairs at `infillDensity` 8 and 112 at
-       `petalWidth` 8, worst span 1.1374 mm, every one a cell skin crossing a
-       hole's own rim wall, on states whose PLAIN petal reads 0.
-       WHERE IT CANNOT TILE THE ANNULUS THE CELL KEEPS ITS MATERIAL. A solid
-       cell is an outcome this feature already has and already reports (ruling
-       3's own achieved count), and it is the only answer available here that
-       cannot draw a surface where there is none — bridging the hole to the
-       outer ring and ear-clipping the result is the tessellation that would
-       keep it, and it is S4's, beside the non-convex cell it shares a cause
-       with. The plan's own counts are corrected so `achieved` stays the number
-       of holes the ARTEFACT carries, which is what I4 reads it as. */
-    if (tiles(walk, infillPolyArea(c) - infillPolyArea(hole)) && !walk.some(flatDrawn)) {
-      emitSkin(walk);
-      holeLoops.push(inn);
-      for (let i = 0; i < nb; i++) emitRim(Bq[(i + 1) % nb].q, Bq[i % nb].q);
+      /* THE FALLBACK IS THE ANGULAR MERGE-WALK, AND IT GOES THROUGH THE SAME
+         SUBDIVISION AS EVERYTHING ELSE. It emits PLAN triangles rather than skin
+         points, so `emitSkin` refines them and `emitRimLoop` walks the rims at the
+         same `splitPoints` every other cell uses — which is the whole of
+         crack-freeness. Emitting this walk unsubdivided beside a conforming
+         neighbour is a crack along the wall they share: measured, `density 40`
+         LIVE read 80 boundary edges before this line, and 0 after. */
+      const inn = infillCcw(skinHole); const cc = infillCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
+      const I = inn.map((q) => ({ a: ang(q), q })); const Oa = c.map((q) => ({ a: ang(q), q }));
+      const rot = (arr) => { let m = 0; for (let i = 1; i < arr.length; i++) if (arr[i].a < arr[m].a) m = i; return arr.slice(m).concat(arr.slice(0, m)); };
+      const A = rot(Oa), Bq = rot(I); let ia = 0, ib = 0; const na = A.length, nb = Bq.length;
+      const nextA = (i) => A[(i + 1) % na].a + ((i + 1) >= na ? 2 * Math.PI : 0), nextB = (i) => Bq[(i + 1) % nb].a + ((i + 1) >= nb ? 2 * Math.PI : 0);
+      const walk = [];
+      while (ia < na || ib < nb) {
+        const advA = ib >= nb || (ia < na && nextA(ia) <= nextB(ib));
+        if (advA) { walk.push([A[ia % na].q, A[(ia + 1) % na].q, Bq[ib % nb].q]); ia++; }
+        else { walk.push([A[ia % na].q, Bq[(ib + 1) % nb].q, Bq[ib % nb].q]); ib++; }
+      }
+      /* AND THE MERGE-WALK IS HELD TO THE SAME AREA TEST AS EVERY OTHER ARM, which
+         is what it did not used to be. Its `advA` step spans two consecutive OUTER
+         vertices, so on a wide angular sector the triangle REACHES ACROSS THE
+         HOLE — S1's own second defect, in the shipping emitter's last resort. It
+         draws skin over material that is not there, which is a fold rather than a
+         crack, so no boundary-edge or degeneracy clause can see it: measured, the
+         census read 182 within-shell pairs at `infillDensity` 8 and 112 at
+         `petalWidth` 8, worst span 1.1374 mm, every one a cell skin crossing a
+         hole's own rim wall, on states whose PLAIN petal reads 0.
+         WHERE IT CANNOT TILE THE ANNULUS THE CELL KEEPS ITS MATERIAL. A solid
+         cell is an outcome this feature already has and already reports (ruling
+         3's own achieved count), and it is the only answer available here that
+         cannot draw a surface where there is none — bridging the hole to the
+         outer ring and ear-clipping the result is the tessellation that would
+         keep it, and it is S4's, beside the non-convex cell it shares a cause
+         with. The plan's own counts are corrected so `achieved` stays the number
+         of holes the ARTEFACT carries, which is what I4 reads it as. */
+      if (tiles(walk, want) && !walk.some(flatDrawn)) return { tris: walk, loop: Bq.map((e) => e.q), walked: true };
+      return null;
+    };
+    let got = attempt(ring);
+    if (!got && ring) { ring = null; got = attempt(null); }
+    if (got) {
+      if (got.walked) tileFail++;
+      emitSkin(got.tris);
+      const rimGot = emitHoleRim(got.loop, ring);
+      holeLoops.push(rimGot.apex); skinLoops.push(rimGot.skin);
     } else {
+      tileFail++;
       untiled++;
       /* AND THE CELL STOPS BEING OPEN IN THE PLAN, so the MATERIAL MASK says
          there is material where the emitter left material. The mask reads
@@ -10846,7 +11058,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
       emitSkin(tris);
       holesCut--; solid++;
     }
-    for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRim(c[i], c[j]); }
+    for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRimFlat(c[i], c[j]); }
   }
   /* THE PLAN'S COUNTS ARE THE ARTEFACT'S. A cell whose annulus no arm could
      tile carries no hole, so `achieved` must say so — the read-out speaks it,
@@ -10890,13 +11102,15 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     }
   }
   plan.emittedTriRange = [triFrom, acc.triangleCount];
-  if (rim) { rim.infill = { cells: plan.cells.length, holes: holesCut, solid, tileFail, cappedTris, tolMm, latticeDevMm: latDev, minEdgeMm, holeLoops: holeLoops.length, collapsed }; }
+  if (rim) { rim.infill = { cells: plan.cells.length, holes: holesCut, solid, tileFail, cappedTris, tolMm, latticeDevMm: latDev, minEdgeMm, holeLoops: holeLoops.length, collapsed,
+    bead: { radiusMm: rHole, segments: K, beadedHoles, flatHoles, points: beadPoints, clamps: beadClamps, rimRanges: holeRimRanges } }; }
   /* THE LOOPS THE EMITTER ACTUALLY WALKED, kept on the plan for two readers:
      I5's material-mask biconditional, which must ask about the artefact rather
      than about the polygons the plan holds, and S5, which will hang
      `emitRimLoop` on exactly these. They are the DENSIFIED loops the rim quads
      were drawn along, not the plan's `holes`. */
-  plan.emittedLoops = holeLoops;
+  plan.emittedLoops = holeLoops;         // the APEX loops: the aperture at the mid-plane, the ruled 1.50 mm quantity
+  plan.emittedSkinLoops = skinLoops;     // where the two skins stop: the aperture at the faces, wider by the inset
   return grid;
 }
 
