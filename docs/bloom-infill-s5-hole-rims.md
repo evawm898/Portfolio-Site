@@ -249,3 +249,24 @@ down each wall · the aperture is the ruled hole at the mid-plane and 0.90 mm wi
 at the faces`. Flat holes, if any, are counted on it. It is presentation of the
 builder's record; no panel route asserts it (the panel gate's INFILL regexes read
 the first two lines and are unaffected).
+
+## 11. After the merge — `frozen/phase42` cannot be published by the workflow
+
+`bloom-frozen-tags` was dispatched from `main` at `b4088e3` (run 36345899457). It
+published 37 of 41 baselines. The push rejected `frozen/phase42` with GitHub's
+workflow-scope refusal, naming `.github/workflows/bloom-export-watertight.yml`
+verbatim, and the git/refs API route returned 403 as well. So it joins phase5,
+phase22 and phase23 in `TAG_PUSH_XFAIL`, with the run and the file named.
+
+**This is one data point on the mechanism, not a settled answer.** No workflow file
+changed between `a8cea82` (phase41, published) and `03a1042`, so the only workflow
+difference between phase42's base and `main` is the one #292 made. That is the
+workflow-divergence shape. CLAUDE.md records a counter-example to that reading
+(phase25, refused with no divergence), so this is recorded as one observation.
+
+The registration is the load-bearing half, and CI proves it deep-equal. `03a1042`
+is on `main`'s history, so the commit cannot be orphaned.
+
+Also recorded: the export gate ran **342 min** on #292's head, 18 minutes under the
+6-hour job limit. The next session that adds matrix cost should shard the matrix
+or set `timeout-minutes` before its first push, not after the job times out.
