@@ -174,6 +174,14 @@ applied. Between vertices the bead is interpolated along the ring and the chord
 spreads by up to 0.0104 mm (flat, the ring's own polygon turn) and 0.084 mm (ALL
 FORM MAX, the metric along a plan edge); **reported, not bounded**.
 
+**`verify-bloom-edge-profile.mjs` (not in CI) reports 9 E2 findings, and they are `main`'s:** the
+base tree reads the IDENTICAL nine lines (diffed) — ORCHID x 2 whorls, FAN x PER-PETAL, the GRADIENT
+corner, the buckle and tip-shape records gone stale, LADDER x BUCKLE f 7, and two APEX NIB rows — every
+one a PLAIN petal, whose bytes this PR does not move. Recorded, not fixed here. Its infill rows still
+report E2 SKIPPED with the reason that remains true: the outer margin above the split is a flat wall.
+`verify-bloom-infill-bytes.mjs` REFUSES by design on this base (it needs a base without `petalInfill`;
+it is S3's guard instrument) — the full-matrix byte partition carries this PR's claim instead.
+
 ## 7. The census — no new fold on any undeclared row
 
 Both trees, every INFILL row, EXPORT, the builder's doubles
