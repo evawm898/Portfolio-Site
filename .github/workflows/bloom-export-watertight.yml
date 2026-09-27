@@ -18,6 +18,9 @@ on:
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-infill.mjs
+      - tools/verify-bloom-rim-owner.mjs
+      - tools/verify-bloom-hole-rim.mjs
+      - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -45,6 +48,9 @@ on:
       - tools/bloom-combination-gate.mjs
       - tools/verify-bloom-arc-stability.mjs
       - tools/verify-bloom-infill.mjs
+      - tools/verify-bloom-rim-owner.mjs
+      - tools/verify-bloom-hole-rim.mjs
+      - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
       - tools/bloom-harness.mjs
@@ -139,6 +145,15 @@ jobs:
         run: node tools/verify-bloom-infill.mjs
       - name: ... and every one of those clauses must be able to fail
         run: node tools/verify-bloom-infill.mjs --negative-control
+      # S5: every rim the bloom closes has ONE owner (emitRimLoop), and the
+      # hole rims are beads rather than walls. Both are Node-only and import
+      # neither the harness nor playwright, so they run beside the I family.
+      - name: Every rim has one owner — emitRimLoop (O1-O3)
+        run: node tools/verify-bloom-rim-owner.mjs --negative-control
+      - name: The hole rims take the edge profile (H0-H3)
+        run: node tools/verify-bloom-hole-rim.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-hole-rim.mjs --quick --negative-control
       # A SHARED CORNER MUST READ AS TOPOLOGY AND A REAL FOLD MUST STILL READ AS
       # A FOLD (CA0-CA3). X2 in this gate turns the census's count into a verdict,
       # and a count that is too LOW looks exactly like a clean solid — so the
@@ -221,6 +236,11 @@ jobs:
         run: node tools/verify-bloom-stem-channel.mjs
       - name: ... and it must be able to fail
         run: node tools/verify-bloom-stem-channel.mjs --control
+      # S5: every infilled row under the export budget on its own mesh. It
+      # imports the harness (for the matrix), which imports playwright at
+      # module load, so it sits after the npm install.
+      - name: Every infilled state is under the triangle budget (B0-B2)
+        run: node tools/verify-bloom-infill-budget.mjs --negative-control
       - name: Install headless Chromium
         run: npx playwright install --with-deps chromium
       - name: Every config must export watertight (boundary edges = 0)

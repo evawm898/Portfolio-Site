@@ -12,7 +12,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 import { toCreasedNormals } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CONTROLS, SECTIONS, DEFAULTS, evalPredicate, coerceValue, sectionLabel } from './bloom-registry.js';
-import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE } from './bloom-geometry.js';
+import { MeshBuilder, buildBloomInto, footRing, thicknessProfile, MIN_FEATURE_MM, TIP_HALF_MM, APEX_HALF_MM, FOOT_MIN_WIDTH_MM, FOOT_MAX_WIDTH_MM, SPIRAL_LEGIBLE_COUNT, MIRROR_THROUGH_GAP, stemIsAbsent, leafIsAbsent, sepalsAbsent, inflorescenceIsAbsent, varianceIsAbsent, infillIsAbsent, EXPORT_TRI_BUDGET, INFILL_DENSITY_RANGE, RIM_BEAD_RADIUS_MM } from './bloom-geometry.js';
 const INFILL_DENSITY_RANGE_MAX = INFILL_DENSITY_RANGE[1];
 import { VIEW_PRESETS } from './bloom-view-presets.js';
 import { buildGridGltf } from './bloom-grid-gltf.js';
@@ -1270,8 +1270,21 @@ function infillLine(petals) {
   const cap = F.densityCap !== null && F.densityCap !== undefined
     ? (F.densityCap >= INFILL_DENSITY_RANGE_MAX ? ` \u00b7 still gaining holes at the top of the density range` : ` \u00b7 most holes (${F.densityBest}) by ${F.densityCap} cells asked, the travel above adds none (swept every 4th density)`)
     : '';
+  /* S5'S THIRD LINE — THE HOLE RIMS, from the builder's own `bead` record.
+     The narrow-span clamp is TOLD, as Eva asked: the bead's radius is the
+     wall's 0.45 share wherever the room arm binds, and that is every hole of a
+     1.00 mm wall, so the line says so and says what is left down the wall's
+     centre. A hole whose grown ring could not be triangulated keeps a flat
+     wall and is counted here rather than drawn quietly. */
+  const B = F.bead;
+  const rims = B
+    ? `INFILL hole rims: a ${B.radiusMm.toFixed(2)} mm half-round bead on ${B.beadedHoles} of ${F.achieved} holes`
+      + (B.clamps.length ? ` \u00b7 CLAMPED from ${RIM_BEAD_RADIUS_MM.toFixed(2)} mm by the ${F.wall.toFixed(2)} mm wall on ${B.clamps.length} hole${B.clamps.length === 1 ? '' : 's'}, ${(F.wall - 2 * B.radiusMm).toFixed(2)} mm of flat left down each wall` : '')
+      + (B.flatHoles ? ` \u00b7 ${B.flatHoles} hole${B.flatHoles === 1 ? '' : 's'} kept a FLAT WALL (the grown ring could not be triangulated)` : '')
+      + ` \u00b7 the aperture is the ruled hole at the mid-plane and ${(2 * B.radiusMm).toFixed(2)} mm wider at the faces\n`
+    : '';
   return `INFILL ${count} \u00b7 ${F.solid} cell${F.solid === 1 ? '' : 's'} left solid \u00b7 holes ${span} \u00b7 wall ${F.wall.toFixed(2)} mm, bar ${F.bar.toFixed(2)} mm, measured on the ${plan}${passes}\n`
-    + `INFILL ${where} \u00b7 ${levers} \u00b7 ${trav}${cap}\n`;
+    + `INFILL ${where} \u00b7 ${levers} \u00b7 ${trav}${cap}\n` + rims;
 }
 
 /* THE ROOT-BLEND LINE IS RETIRED (created by session 36's ruling, retired by

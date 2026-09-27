@@ -423,6 +423,10 @@ twice. Plus `INFILL_SUBS`, the panel route, the dead-travel telling on density
 (`stamenSpread`'s ruling) and the two combination-gate pairs from §1.
 
 **S5 · HOLE RIMS TAKE THE EDGE PROFILE.** *Gated on #278 and S3.*
+**DONE — `docs/bloom-infill-s5-hole-rims.md`.** Every hole closes on #278's bead (bead-only: the
+0.45 x room clamp binds on every 1.00 mm wall and leaves 0.10 mm of flat, so a taper does not fit),
+`emitRimLoop` is the one owner of every rim, and the infilled default bloom is 113,424 triangles
+(the cost corner 1,162,112, 77.5%). The outline above the split is still a flat wall — named there.
 Extract `emitRimLoop` from `emitPanel`; call it for every hole. This is the session that spends
 §2c's triangles; it moves every infilled byte and wants its own partition and its own sheet.
 *Foldable into S3 if #278 has landed comfortably by then.*
