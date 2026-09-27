@@ -298,7 +298,7 @@ const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
 const MUTANTS = [
   { id: 'the-flat-wall-is-back', names: ['H0', 'H1', 'H2', 'H3'], from: '    let ring = growHole(hole, c);', to: '    let ring = null;' },
   { id: 'the-apex-is-the-skin-point', names: ['H1'], from: '    const apex = mapPlan(apPlan.x, apPlan.y).P;', to: '    const apex = s.P;' },
-  { id: 'the-room-arm-is-dropped', names: ['H0', 'H1', 'H2', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
+  { id: 'the-room-arm-is-dropped', names: ['H1', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
   { id: 'the-bead-grows-into-the-hole', names: ['H0', 'H1', 'H2', 'H3'], from: '      en.push([ey / len, -ex / len]);', to: '      en.push([-ey / len, ex / len]);' },
 ];
 

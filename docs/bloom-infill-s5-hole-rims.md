@@ -146,7 +146,7 @@ above the split — therefore stands**, now with one owner, and is the next move
 | 2 no hard edge — `verify-bloom-hole-rim.mjs` (H0–H3) + `--negative-control` | PASS over 13 states x 2 modes; 4 of 4 must-fails |
 | 3 budget — `verify-bloom-infill-budget.mjs` (B0–B2) + `--negative-control` | PASS; worst 1,162,112 = 77.5% |
 | 4 I0–I11 — `verify-bloom-infill.mjs` + `--negative-control` | PASS over 18 states x 2 modes; **12 of 12** witnessed mutants fire as named |
-| 5 byte partition — `verify-bloom-surface-bytes.mjs --movers` | see §7 |
+| 5 byte partition — `verify-bloom-surface-bytes.mjs --movers` + `--control` | PASS, **28 moved / 924 held** over the 952-row matrix, both modes — see §8 |
 | 6 frozen phase | `frozen/phase42` = the 951 rows at `03a1042`, registered in both maps |
 | 7 flower untouched | `git diff 03a1042 -- 'flower*'` is empty |
 
@@ -223,7 +223,18 @@ LIVE sheet is thinner than the bead is wide)` — so the live matrix is 952 rows
 **Byte partition, predeclared from the base tree's own builder record**: a row
 moves iff some petal on the BASE tree cut at least one hole (`infill.built` and a
 non-empty `emittedLoops`) — 28 rows, exactly the regex `^INFILL: (?!REFUSED|GATED)`;
-every other row holds. (Result recorded in the PR.)
+every other row holds.
+
+**MEASURED, PASS**: `verify-bloom-surface-bytes --base <worktree of 03a1042>`
+over all 952 rows in both modes, run as eleven `--only` chunks (the whole-matrix
+run does not survive a turn boundary in this container, and one chunk is bounded
+at ~9 minutes) whose regexes were checked to cover every row exactly once. **All 28
+predeclared movers moved; 0 floats moved on any of the 924 holders**, positionally
+under `Object.is` — ~1.19e9 export floats on the non-INFILL rows alone — with the
+four REFUSED / GATED `INFILL:` rows among the holders and `ALL MAX` held.
+`--control` fired both clauses (export stream and captured grid) on its 1e-9
+perturbation. The new `sheetThickness 0.60` row has no base counterpart and is
+counted with the movers.
 
 **Frozen tags whose bytes stop reproducing**: every frozen matrix that carries an
 infilled row — `frozen/phase40` (the S3 block-39 rows), `frozen/phase41` and
