@@ -3176,7 +3176,10 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     }, IDS);
     const p = [];
     const F = res.F;
-    for (const id of IDS) if (res.hidden[id] !== (want.guard === 'NONE')) p.push(`${id} is ${res.hidden[id] ? 'hidden' : 'shown'} with the guard ${want.guard}`);
+    /* THE SOLID BASE IS PARKED (Eva, the ruled-defaults session): hidden at
+       EVERY state, the guard on as well as off, while its value still reaches
+       the builder — which the basal clause below keeps checking. */
+    for (const id of IDS) { const wantHidden = want.guard === 'NONE' || id === 'infillBase'; if (res.hidden[id] !== wantHidden) p.push(`${id} is ${res.hidden[id] ? 'hidden' : 'shown'} with the guard ${want.guard}${id === 'infillBase' ? ' — it is PARKED and must be hidden at every state' : ''}`); }
     if (want.guard === 'NONE') {
       if (F) p.push('the builder reports an infill record with the guard off');
       if (res.levers) p.push('the INFILL levers line is shown with the guard off');
@@ -3206,8 +3209,8 @@ if (screenAgreed) ok.push(`[nesting] the depth-general on-screen walk agrees wit
     if (p.length) note(`${tag} ${label}: ${p.join('; ')}`);
     else ok.push(`${tag} ${label}: ${F ? `${F.passes} passes / law ${F.gamma} / stretch ${F.aniso} / base ${F.baseFrac}, floor u ${F.floorU.toFixed(3)}, cap ${F.densityCap}` : 'no record, four controls hidden'}`);
   };
-  await step('the shipping default — the four hidden, no levers line, no cap mark', [], { guard: 'NONE' });
-  await step('the guard ON at the defaults — the four APPEAR and the line reads the defaults', [{ id: 'petalInfill', value: 'VORONOI' }], { guard: 'VORONOI', passes: 4 });
+  await step('the shipping default — all four hidden, no levers line, no cap mark', [], { guard: 'NONE' });
+  await step('the guard ON at the defaults — three APPEAR, the parked solid base stays hidden, and the line reads the defaults', [{ id: 'petalInfill', value: 'VORONOI' }], { guard: 'VORONOI', passes: DEFAULTS.infillRelax });
   await step('relaxation 12 x law 0 x stretch 3 x base 0.5 — the line follows the builder', [{ id: 'infillRelax', value: '12' }, { id: 'infillLaw', value: '0' }, { id: 'infillAniso', value: '3' }, { id: 'infillBase', value: '0.5' }], { guard: 'VORONOI', passes: 12 });
   await step('relaxation 0 — the control says so', [{ id: 'infillRelax', value: '0' }], { guard: 'VORONOI', passes: 0 });
   await step('the guard OFF with the four at their far ends — hidden AND inert', [{ id: 'petalInfill', value: 'NONE' }, { id: 'infillRelax', value: '12' }, { id: 'infillLaw', value: '2' }, { id: 'infillAniso', value: '1' }, { id: 'infillBase', value: '1' }], { guard: 'NONE' });

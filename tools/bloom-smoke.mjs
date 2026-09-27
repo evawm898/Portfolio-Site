@@ -854,7 +854,7 @@ export const SMOKE_BLOCKS = [
   },
   {
     n: 39, title: 'the Voronoi infill — the builder, the guard and the material mask',
-    anchor: 'INFILL: the ruled defaults (16 cells, a 1.00 mm wall, a 1.50 mm hole bar)',
+    anchor: 'INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)',
     /* FIVE ROWS, ON THE AXES THE FEATURE HAS, AND THE LESSON THE LEAF SESSION
        PAID FOR IS WHY THE LAST TWO ARE HERE. A subset earns its keep by
        covering the axes a feature has — INCLUDING the axis that is another
@@ -869,7 +869,7 @@ export const SMOKE_BLOCKS = [
        in it, and J1-J9 about a foot whose panel is a sub-panel); and the
        FRINGE is the REFUSAL, which is a branch no number can show. */
     rows: [
-      { label: "INFILL: the ruled defaults (16 cells, a 1.00 mm wall, a 1.50 mm hole bar)",
+      { label: "INFILL: the ruled defaults (20 cells, 5 Lloyd passes, law 0.30, stretch 1.65, a 1.00 mm wall, a 1.50 mm hole bar)",
         path: "the shipping state of the feature — the two-arm panel loop with `emitPanel` on the basal sub-panel and the cells above it, the material mask on every captured row (which `measureWall` and through it the whole combination gate read), and the watertight and connectedness invariants on a blade with fourteen holes in it" },
       { label: "INFILL: GATED — the density at its MAXIMUM with the guard OFF (hidden AND inert)",
         path: "the GUARD's other arm — the density at 40 with `petalInfill` NONE must build the SHIPPING DEFAULT bit for bit, which is the whole of ruling 1 and is the only thing that can see a hidden control that still cuts a hole" },

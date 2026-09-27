@@ -273,7 +273,7 @@ export const PAIRS = [
     label: 'infillDensity x petalCup — the cells under a cupped blade',
     measure: 'self',
     base: { petalInfill: 'VORONOI' },
-    a: { id: 'infillDensity', values: [16, 8, 24, 40] },
+    a: { id: 'infillDensity', values: [20, 8, 24, 40] },
     b: { id: 'petalCup', values: [0, 0.6, 0.9, 1.2] },
     verdict: 'clears',
     cite: 'docs/bloom-infill-port-plan.md §1 and §3 — the wall a flat plan quartered was a product of cup and curl; docs/bloom-infill-s4-outcome.md carries the grid and the two inertness measurements',
@@ -285,7 +285,7 @@ export const PAIRS = [
     label: 'infillDensity x petalSpineCurl — the cells along a curled blade',
     measure: 'self',
     base: { petalInfill: 'VORONOI' },
-    a: { id: 'infillDensity', values: [16, 8, 24, 40] },
+    a: { id: 'infillDensity', values: [20, 8, 24, 40] },
     b: { id: 'petalSpineCurl', values: [0, 180, 270, 360] },
     verdict: 'clears',
     cite: 'docs/bloom-infill-port-plan.md §1 and §3 — the wall a flat plan quartered was a product of cup and curl; docs/bloom-infill-s4-outcome.md carries the grid and the two inertness measurements',
@@ -789,7 +789,7 @@ export const COMBINATION_INERT = Object.freeze({
   },
   'density-x-curl @ infillDensity': {
     maxMoveMm: 0,
-    note: "as `density-x-cup @ infillDensity`: 1.238 / 1.234 / 1.232 / 1.230 mm at curl 0 / 180 / 270 / 360 at density 8, 16, 24 and 40 alike. Measured 2026-09-26 on this tree.",
+    note: "as `density-x-cup @ infillDensity`: 1.238 / 1.234 / 1.232 / 1.230 mm at curl 0 / 180 / 270 / 360 at density 8, 16, 24 and 40 alike. Measured 2026-09-26 on this tree; re-run 2026-09-27 at the ruled defaults (the grid now starts at density 20), CG7 still reads exactly 0.",
   },
   'leafangle-x-tooth @ leafToothDepth': {
     maxMoveMm: 0,
