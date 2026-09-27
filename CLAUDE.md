@@ -5113,6 +5113,32 @@ would need is the neighbour measure with a bar that is NOT `MIN_FEATURE_MM`, sin
 declares the default's own crossing an accepted look. `frozen/phase37` is the 883 rows at
 `f1fbdf9`, registered in BOTH maps and proved deep-equal; the live matrix is 908.
 
+**THE EXPORT GATE IS EIGHT SHARDS AND A VERDICT JOB, AND ITS COVERAGE IS A RECONCILIATION,
+NOT AN ASSUMPTION** (read `tools/bloom-export-shards.mjs`'s header before touching
+`--shard`, the census, `summarize()` or the workflow's three jobs). One job ran **342 min on
+b4088e3** (run 36324870437: 26 min of Node preflight, 315 of matrix) against GitHub's 360.
+`bloom-export-watertight.yml` is now `preflight` (every Node-only instrument, unchanged,
+timeout 60) in parallel with `shard` (0..7, `fail-fast: false`, timeout 150 — a hang is
+DECLARED) and `verdict` (`needs` both, `if: always()`, timeout 20). **`shardOf(index, n)` is the
+ONE owner of membership** — by MATRIX INDEX, never by label, which a regex can miss (S5's
+eleven-chunk local run lost one row exactly that way). Each shard writes a census (the matrix
+it saw by count and label hash, the indices it attempted, slim results, refusals, validity,
+`complete: true` last); the verdict rebuilds the expected set from ITS OWN `buildMatrix()`
+and requires every row attempted by exactly one shard — **a shard with no census is a named
+finding, never a job nobody reads**. The headline, the matrix-level claims and the verdict
+come from `summarize()`, which the unsharded gate calls too, over the UNION in matrix order;
+a shard makes no matrix-level claim (the `--only` rule). **Measured equal**: 9 rows unsharded
+against the same 9 over 3 shards, the whole summary block byte-identical and every per-row
+line identical. `--negative-control` (in the verdict job) runs the shipped reconcile +
+summarize over censuses built from the shipped selector with no browser: one row removed
+from one shard's selector, a row in two shards, a missing / incomplete / wrong-matrix shard,
+and a dropped row, an open edge and a validity failure each hidden in a MIDDLE shard — all
+fail, the unbroken set passes. **Adding a shard is two edits in the workflow** (`SHARDS` in
+both jobs and the matrix list); a mismatch is a missing census, which fails. **No frozen phase
+was registered by that change** (no row moved), so it owed no `TAG_PUSH_XFAIL` entry — but the
+next phase whose base commit precedes a later edit to this workflow file will be refused the
+way phase42 was; declare it in the same PR.
+
 ## Flower generator — print-safety is a hard invariant
 
 The Flower Bloom generator (`flower.html`, `flower.js`, `flower-geometry.js`) is a

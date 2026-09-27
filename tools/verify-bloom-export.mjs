@@ -43,6 +43,12 @@
            Deliberately sets petalCount to an out-of-range value the browser
            must clamp, and requires the run to FAIL on read-back. A validity
            check nobody has seen fail is a hope, not a check.
+         node tools/verify-bloom-export.mjs --shard k/n --census <file>
+           Runs only the rows `shardOf(index, n)` assigns shard k, makes NO
+           matrix-level claim, and writes the census that
+           `node tools/bloom-export-shards.mjs --merge` reconciles. This is how
+           CI runs the gate (eight shards); a shard's PASS is never a matrix
+           verdict — read tools/bloom-export-shards.mjs's header.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -59,14 +65,24 @@ import { stlPositions, orientationAssertions, selfIntersectionAssertions, selfIn
 import { measure as sagitta, sagittaLine, SAGITTA_SCOPE } from './bloom-sagitta.mjs';
 import { measure as planCoverage, coverageLine, coverageAssert } from './bloom-plan-coverage.mjs';
 import { measure as solidCoverage, calibrate as solidCalibrate, calibrationLine, solidLine, solidAssert, solidHeadroom } from './bloom-solid-angle-coverage.mjs';
-import { spineLine, curlCoverage } from './bloom-harness.mjs';
+import { spineLine } from './bloom-harness.mjs';
+import { parseShard, shardOf, slimResult, summarize, writeCensus, matrixHash } from './bloom-export-shards.mjs';
 
 const NEGATIVE_CONTROL = process.argv.includes('--negative-control');
 /* `--only <regex>` (session 16): run the rows whose LABEL matches, for a
    smoke pass on a wiring change before the full matrix. The summary still
    counts what actually ran; a filtered run is never quoted as a pass of the
    matrix. */
-const ONLY = process.argv.includes('--only') ? new RegExp(process.argv[process.argv.indexOf('--only') + 1]) : null;
+const ONLY_SRC = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
+const ONLY = ONLY_SRC != null ? new RegExp(ONLY_SRC) : null;
+/* `--shard k/n` + `--census <file>` (the sharded CI gate — read
+   tools/bloom-export-shards.mjs's header). The shard runs the rows whose
+   MATRIX INDEX `shardOf()` assigns it, makes NO matrix-level claim (those are
+   false of a subset by construction, exactly as under --only), and writes a
+   census the merge job reconciles against its own buildMatrix(). */
+const SHARD = parseShard(process.argv);
+const CENSUS = process.argv.includes('--census') ? process.argv[process.argv.indexOf('--census') + 1] : null;
+if (CENSUS && !SHARD) throw new Error('--census is written by a shard; pass --shard k/n with it');
 
 const rows = buildMatrix();
 if (NEGATIVE_CONTROL) {
@@ -101,9 +117,12 @@ const t0 = Date.now();
    failure `continue`s out of this loop, so every ratio below divides by the
    SURVIVORS and a dropped row is invisible in all of them. */
 const attempted = [];
-for (const row of rows) {
+const attemptedIdx = [];
+for (const [rowIndex, row] of rows.entries()) {
+  if (SHARD && shardOf(rowIndex, SHARD.n) !== SHARD.k) continue;
   if (ONLY && !ONLY.test(row.label)) continue;
   attempted.push(row.label);
+  attemptedIdx.push({ index: rowIndex, label: row.label });
   await openBloom(page, port);   // fresh page per row — isolation by reload, not by a clear-list
   const bad = await applyConfig(page, row.set);
   if (bad.length) { validity.push(`${row.label}: config did not take: ${bad.join('; ')}`); continue; }
@@ -426,12 +445,8 @@ server.close();
 fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log('export gate: pass criterion is boundary === 0, nothing else. nonManifold and shells are unrated diagnostics.\n');
-const failures = [], countMoved = [], degenerates = [];
 for (const r of results) {
   const ok = r.boundary === 0;
-  if (!ok) failures.push(r);
-  if (r.liveTris !== r.tris) countMoved.push(r);
-  if (r.degenerate !== 0) degenerates.push(r);
   console.log(`  ${ok ? 'ok  ' : 'FAIL'} ${r.label.padEnd(46)} tris(live)=${String(r.liveTris).padStart(6)} tris(export)=${String(r.tris).padStart(6)} boundary=${r.boundary} degenerate=${r.degenerate} nonManifold=${r.nonManifold} (unrated) shells=${r.shells} (unrated) ${(r.bytes / 1024).toFixed(0)} KiB`);
   if (r.capability) console.log(`       ^ SCOPE: ${CAPABILITY_SCOPE}`);
   if (r.form) console.log(`       ^ FORM: ${r.form} · SCOPE: ${FORM_SCOPE}`);
@@ -450,85 +465,6 @@ for (const r of results) {
    outcome — and it is printed on every run with its count so the row can never
    go quiet, which is precisely the coverage loss a skip would have been. */
 for (const rr of refused) console.log(`\n${exportRefusedLine(rr.label, rr)}`);
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...exportRefusedCoverage(attempted));
-
-/* THE DENOMINATOR ITSELF, asserted — and the three real populations printed
-   beside it (#220). Every ratio in this summary divides by `results.length`,
-   which is the SURVIVORS of the validity assertions, so a dropped row shrinks
-   BOTH sides of seven ratios at once and each of them still reads as a clean
-   pass. The matrix count was never printed to compare them against. */
-const got = new Set(results.map((r) => r.label));
-/* A DECLARED REFUSAL IS NOT A DROPPED ROW (XR1). It reached no `results`
-   entry because there is no STL to analyse, but it is an ASSERTED outcome
-   rather than a row the gate lost — so it is excluded from the census and
-   named on its own line instead, which is what keeps it from going quiet. */
-const refusedLabels = new Set(refused.map((r) => r.label));
-const dropped = attempted.filter((l) => !got.has(l) && !refusedLabels.has(l));
-if (dropped.length) validity.push(`row census: ${attempted.length} rows attempted but ${results.length} reached the results — dropped: ${dropped.join(', ')}`);
-console.log(`\nROWS: ${attempted.length} attempted · ${results.length} reached the results · ${results.length - failures.length} watertight (boundary = 0)`
-  + (refused.length ? ` · ${refused.length} EXPORT REFUSED by the generator's own triangle budget (declared, asserted by XR1 — not a pass and not a skip)` : '')
-  + (dropped.length ? ` · ${dropped.length} DROPPED by a validity assertion — NOT a pass` : '')
-  + `; ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-if (dropped.length) console.log(`  ^ every ratio below divides by the ${results.length} row(s) that SURVIVED, not by the ${attempted.length} in the matrix.`);
-console.log(`${results.length - countMoved.length}/${results.length} measured configs have IDENTICAL live and export triangle counts (the floor changes geometry, never topology)`);
-console.log(`${results.length - degenerates.length}/${results.length} measured configs emit NO degenerate triangles (the converging tip cap's apex, and the DOME's before it)`);
-console.log(`JUNCTION SCOPE: ${JUNCTION_SCOPE}`);
-console.log(`ORIENTATION SCOPE: ${ORIENTATION_SCOPE}`);
-console.log(`SELF-INTERSECTION SCOPE: ${SELF_INTERSECTION_SCOPE}`);
-{
-  const xf = results.filter((r) => SELF_INTERSECTION_XFAIL_HAS(r.label)).length;
-  console.log(`${results.length - xf}/${results.length} configs free of within-shell self-intersection; ${xf} declared XFAIL (each still failing at its RECORDED magnitude — the pair count exactly, the worst span within ±${SELF_INTERSECTION_TOLERANCE.worstMm} mm — asserted by X1) · ${results.filter((r) => r.orientation.inward === r.orientation.declaredInward).length}/${results.length} configs meeting the orientation baseline O1 itself declared for them (every shell outward, plus the SPHERE hub's inner face, the stem bore's own sealed cavity, and every FLORET's own two where each exists)`);
-}
-console.log(`ZYGOMORPHY SCOPE: ${ZYGO_SCOPE}`);
-console.log(`ANDROECIUM SCOPE: ${STAMEN_SCOPE}`);
-console.log(`GYNOECIUM SCOPE: ${GYNOECIUM_SCOPE}`);
-console.log(`STEM SCOPE: ${STEM_SCOPE}`);
-console.log(`STEM CHANNEL SCOPE: ${STEM_CHANNEL_SCOPE}`);
-const crowdedRows = results.filter((r) => r.crowding.crowded);
-console.log(`${crowdedRows.length}/${results.length} configs FLAGGED CROWDED (a flag, not a failure) · CROWDING SCOPE: ${CROWDING_SCOPE}`);
-/* THE SAGITTA SUMMARY — a REPORT, and the worst is named with WHERE it sits,
-   because base and apex are different problems with different owners. */
-{
-  const sg = results.map((r) => r.sagitta).filter((x) => x && !x.skipped);
-  const sk = results.filter((r) => r.sagitta && r.sagitta.skipped).length;
-  if (sg.length) {
-    let w = { d: -1 };
-    for (const x of sg) if (x.worst.d > w.d) w = x.worst;
-    const mx = (z) => sg.reduce((a, x) => Math.max(a, x.zone[z]), -1);
-    console.log(`${sg.length}/${results.length} rows sagitta-measured (${sk} skipped, labelled) · worst ${w.d.toFixed(4)} mm at u=${w.u.toFixed(3)} (${w.zone}) · by zone: base ${mx('base').toFixed(4)} middle ${mx('middle').toFixed(4)} apex ${mx('apex').toFixed(4)} mm`);
-    console.log(`  ${SAGITTA_SCOPE}`);
-  }
-}
-/* THE FLAG IN BOTH DIRECTIONS, at matrix level: a matrix on which the flag
-   never raises has never shown the flag works, and one on which it always
-   raises has a stuck flag. Validity, not a row result. */
-/* MATRIX-LEVEL claims (a flag raised somewhere, an asserted row somewhere)
-   are claims about the MATRIX, so a filtered `--only` run does not make them. */
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...crowdingCoverage(results.map((r) => r.crowding)));
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...selfIntersectionCoverage(results.map((r) => r.label), refused.map((r) => r.label)));
-{ const note = selfIntersectionRefusedNote(refused.map((r) => r.label)); if (note) console.log(note); }
-/* THE SELF-CONTACT FLAG, both directions at matrix level (session 16). */
-if (!NEGATIVE_CONTROL && !ONLY) validity.push(...curlCoverage(results.map((r) => ({ selfContact: r.selfContact }))));
-{
-  const skipped = results.filter((r) => r.coverageSkipped), asserted = results.filter((r) => r.coverageAsserted);
-  console.log(`${results.length - skipped.length}/${results.length} rows plan-coverage measured; ${skipped.length} SKIPPED (split whorls — labelled, never silent); ${asserted.length} rows coverage-ASSERTED (the pinned incurve rows); ${results.filter((r) => r.selfContact).length} rows flag SELF-CONTACT; ${results.filter((r) => r.underFloor).length} rows carry a shipped uniform arc UNDER ONE SHEET THICKNESS (told, not clamped)`);
-  for (const r of skipped) console.log(`  skipped: ${r.label}`);
-  if (asserted.length === 0 && !NEGATIVE_CONTROL && !ONLY) validity.push('coverage coverage: no row in this matrix asserts plan coverage — the pinned incurve rows are missing');
-  /* THE SPHERE SKIP IN BOTH DIRECTIONS, at matrix level (session 18): at
-     least one SPHERE row was skipped as one (the skip has been seen to
-     happen), and at least one non-sphere row was measured (the skip is not
-     stuck on). */
-  const spheres = results.filter((r) => r.sphere);
-  const solidMeasured = results.filter((r) => r.solid), solidAsserted = results.filter((r) => r.solidAsserted);
-  console.log(`${spheres.length}/${results.length} rows are FULL-SPHERE heads — every one a labelled PLAN-coverage skip (a plan raster reads a sphere as a false clean) and every one READ by the solid-angle instrument; ${solidMeasured.length}/${results.length} rows solid-angle measured (the rest FLAT, labelled), ${solidAsserted.length} rows solid-coverage-ASSERTED (the rows Eva pinned, session 19), R5 mismatches across every row: ${results.reduce((a, r) => a + ((r.solidR5 && r.solidR5.mismatch) || 0), 0)}`);
-  if (!NEGATIVE_CONTROL && !ONLY) {
-    if (spheres.length === 0) validity.push('coverage coverage: no row in this matrix is a FULL-SPHERE head — the loud skip is unexercised (a default is not coverage; block 22 is missing)');
-    if (results.length - skipped.length === 0) validity.push('coverage coverage: every row was skipped — the raster measured nothing');
-    if (solidAsserted.length === 0) validity.push('coverage coverage: no row in this matrix asserts SOLID coverage — the pinned SPHERE rows are missing');
-    if (solidMeasured.length === 0) validity.push('coverage coverage: no row was solid-angle measured — the instrument read nothing');
-  }
-}
-
 /* NODE DOES NOT FLUSH A PIPED stdout ON process.exit(), AND A CI LOG IS A PIPE.
    Writes to a pipe are asynchronous, so the per-row dump sits in a buffer
    until the process ends — and exit() does not wait for it. On a PASSING run
@@ -550,55 +486,23 @@ async function flushAndExit(code) {
   process.exit(code);
 }
 
-let bad = false;
-if (validity.length) {
-  bad = true;
-  /* THE POINTER GOES TO STDOUT — stderr is unbuffered and stdout is block
-     buffered, so in a combined CI log this block flushes EARLIER than the
-     summary it follows. The detail stays here; that there IS detail belongs
-     in the stream carrying the summary. */
-  console.log(`\nexport gate: ${validity.length} VALIDITY ASSERTION(S) FAILED — see the "HARNESS INVALID" block (stderr; it may appear ABOVE this line in a combined log).`);
-  console.error(`\nexport gate: HARNESS INVALID — ${validity.length} validity assertion(s) failed. No result above is trustworthy.`);
-  for (const v of validity) console.error(`  - ${v}`);
+/* THE SUMMARY AND THE VERDICT live in tools/bloom-export-shards.mjs's
+   `summarize()`, which the sharded merge calls too — one function over the
+   same slim records, so the sharded verdict cannot drift from this one. */
+const slim = results.map(slimResult);
+const matrixLevel = !NEGATIVE_CONTROL && !ONLY && !SHARD;
+if (CENSUS) {
+  writeCensus(CENSUS, {
+    shard: SHARD, only: ONLY_SRC, matrix: { count: rows.length, hash: matrixHash(rows.map((r) => r.label)) },
+    attempted: attemptedIdx, results: slim, refused, validity, elapsedS: (Date.now() - t0) / 1000,
+  });
+  console.log(`\ncensus written: ${CENSUS} (shard ${SHARD.k}/${SHARD.n}, ${attempted.length} row(s) attempted)`);
 }
-if (failures.length) {
-  bad = true;
-  console.log(`\nexport gate: ${failures.length} CONFIG(S) NOT WATERTIGHT — see the detail on stderr.`);
-  console.error(`\nexport gate: FAIL — ${failures.length} config(s) export with open (boundary) edges:`);
-  for (const f of failures) console.error(`  - ${f.label}: boundary=${f.boundary}`);
-}
-/* A zero-area triangle encloses no volume while still contributing to the
-   edge census, so it can put an unexplained number in the unrated nonManifold
-   column — the DOME's defect, which passed the gated criterion for months
-   while being wrong. A converging tip cap is the same construction, so this is
-   rated rather than reported. */
-if (degenerates.length) {
-  bad = true;
-  console.log(`\nexport gate: ${degenerates.length} CONFIG(S) EMIT DEGENERATE TRIANGLES — see the detail on stderr.`);
-  console.error(`\nexport gate: FAIL — ${degenerates.length} config(s) emit degenerate (zero-area) triangles:`);
-  for (const f of degenerates) console.error(`  - ${f.label}: degenerate=${f.degenerate} of ${f.tris} (export)`);
-}
-/* A count that moved between modes means the fixed-topology premise is false
-   somewhere, which is a finding about the model rather than about this row —
-   the flower's floor moves features across a size threshold and adds or
-   removes tube segments, and the bloom is supposed to have no such mechanism.
-   Reported as its own failure rather than folded into the boundary criterion,
-   because it is a different property and this gate's pass criterion is stated
-   as boundary === 0 and nothing else. */
-if (countMoved.length) {
-  bad = true;
-  console.log(`\nexport gate: ${countMoved.length} CONFIG(S) MOVED TRIANGLE COUNT BETWEEN MODES — see the detail on stderr.`);
-  console.error(`\nexport gate: FAIL — ${countMoved.length} config(s) have DIFFERENT live and export triangle counts. The export floor is meant to change geometry and never topology:`);
-  for (const f of countMoved) console.error(`  - ${f.label}: tris(live)=${f.liveTris} tris(export)=${f.tris}`);
-}
+const { bad } = summarize({ results: slim, refused, attempted, validity, matrixLevel, elapsedS: (Date.now() - t0) / 1000, negativeControl: NEGATIVE_CONTROL });
 if (NEGATIVE_CONTROL) {
   if (bad) { console.log('\nNEGATIVE CONTROL: PASS — the harness rejected the clamped value, as it must.'); await flushAndExit(0); }
   console.error('\nNEGATIVE CONTROL: FAILED — the harness accepted a value the browser rewrote. The read-back is not measuring anything.');
   await flushAndExit(1);
 }
-if (bad) {
-  /* THE LAST LINE OF STDOUT MUST NEVER READ AS A PASS ON A FAILING RUN. */
-  console.log(`\nexport gate: FAILED — ${dropped.length} row(s) dropped of ${attempted.length} attempted, ${validity.length} validity assertion(s), ${failures.length} not watertight, ${degenerates.length} with degenerate triangles, ${countMoved.length} whose triangle count moved between modes. Nothing above is a pass.`);
-  await flushAndExit(1);
-}
-console.log(`\nexport gate: PASS — ${results.length} of ${attempted.length} attempted configs reached the results and every one exports watertight${refused.length ? `; ${refused.length} config(s) the generator REFUSED on its own triangle budget, declared and asserted by XR1 (named above) rather than skipped` : ''}.`);
+if (SHARD) console.log(`(this is shard ${SHARD.k}/${SHARD.n} of the matrix — NOT a matrix verdict; the merge job reconciles every shard's census and gives that.)`);
+await flushAndExit(bad ? 1 : 0);
