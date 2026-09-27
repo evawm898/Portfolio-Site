@@ -121,6 +121,7 @@ declare -A TAG_PUSH_XFAIL=(
   [phase5]='GITHUB_TOKEN refused: .github/workflows/bloom-frozen-matrices.yml (rejected on every run since Sep 5)'
   [phase22]='GITHUB_TOKEN refused: .github/workflows/bloom-export-watertight.yml'
   [phase23]='GITHUB_TOKEN refused: .github/workflows/bloom-export-watertight.yml'
+  [phase42]='GITHUB_TOKEN refused: .github/workflows/bloom-export-watertight.yml (run 36345899457; #292 edited that file after 03a1042)'
 )
 
 CHECK_ONLY=0
