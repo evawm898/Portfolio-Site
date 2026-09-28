@@ -317,8 +317,10 @@ const MUTANTS = [
   /* H0 and H2 too, since the margin-bead session: the hole bead's radius and
      the margin's are ONE expression now, so dropping the room arm makes both
      beads 0.50 mm on a 1.00 mm wall — no skin is left between them, grown rings
-     are refused and holes fall back to flat walls. */
-  { id: 'the-room-arm-is-dropped', names: ['H0', 'H1', 'H2', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
+     are refused and holes fall back to flat walls. That happens only on the
+     states outside the --quick subset (measured: CI's --quick run fires H1 and
+     H3 alone), so the claim is stated per state set rather than widened. */
+  { id: 'the-room-arm-is-dropped', names: ['H0', 'H1', 'H2', 'H3'], quickNames: ['H1', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
   { id: 'the-bead-grows-into-the-hole', names: ['H0', 'H1', 'H2', 'H3'], from: '      en.push([ey / len, -ex / len]);', to: '      en.push([-ey / len, ex / len]);' },
 ];
 
@@ -334,7 +336,8 @@ if (NEG) {
     const GM = await loadGeometry(SRC.replace(m.from, m.to));
     let res;
     try { res = await run(GM, true); } catch (e) { res = { bad: [`CRASH ${e.message}`], fired: new Set(['CRASH']) }; }
-    const missed = m.names.filter((x) => !res.fired.has(x)), extra = [...res.fired].filter((x) => !m.names.includes(x));
+    const names = (QUICK && m.quickNames) || m.names;
+    const missed = names.filter((x) => !res.fired.has(x)), extra = [...res.fired].filter((x) => !names.includes(x));
     if (missed.length || extra.length) { ok = false; console.error(`  ${m.id}: MISSED ${missed.join(',') || '-'} / UNCLAIMED ${extra.join(',') || '-'}\n    ${res.bad.slice(0, 3).join('\n    ')}`); }
     else console.log(`  ${m.id}: fired ${[...res.fired].sort().join(', ')} as claimed`);
   }
