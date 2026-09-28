@@ -330,7 +330,10 @@ The law, in `petalInfillPlan`'s `drawnOf`, one hole at a time:
    hole), so where the floor hole clears 1.50 mm and the opened one does not,
    the radius is bisected (eight halvings) to the largest that keeps the bar,
    and the hole is counted as HELD. **The achieved count now holds at every
-   step of the whole range on all six states measured, flat and curved.** On
+   step of the whole range on all six states measured, flat and curved.** (What
+   can fall on a curved plan is the count of holes rounded PAST their fillet —
+   a held hole may sit under its fillet again: `ALL FORM MAX` 13 → 12 at 0.70,
+   `cup 1.2 × curl 360` 7 → 5 at 0.75. The read-out says how many were held.) On
    the flat default the frame is the identity and the clamp never binds.
 
 The read-out (the control's own value line) tells the ACHIEVED shape from the
@@ -399,8 +402,23 @@ leaving **373,408 triangles (24.9%) of headroom** under the 1,500,000 budget.
   entries are `density law 2` (two span-0 tangencies on the whole bloom, 0 on
   one petal) and the new `roundness 1 x cup 1.2 x curl 360` row (the petal's
   own declared fold at an identical worst span).
-* **I12** (the roundness family, `verify-bloom-infill.mjs`), written red first,
-  and its six mutants.
+* **I12** (the roundness family, `verify-bloom-infill.mjs`), written red first
+  — against the base tree it reads 2 of 120 RED (the registry row against a
+  geometry with no export, and the ruled-default clause: that tree's holes are
+  today's, 179.08 mm² / 0.8177 against the swept 170.75 / 0.8468) — and six
+  mutants, each witnessed on the mutated module. **The mutant table found two
+  clauses of its own that could not see what they claimed**: (e) first asked
+  per-hole Hausdorff inside the discretisations' band and PASSED on the base
+  tree (opening a hexagonal corner from 0.8 mm to 0.6 × the inradius moves the
+  boundary ~0.04 mm, inside the band), so it now holds the default ten times
+  closer to the swept shape than today's is, in area and in median roundness;
+  and the containment band was the fillet's own sagitta, which the clip mutant
+  sat inside — it is two plan-grid steps now, because the control clips.
+* **I1's `ALL FORM MAX` xfail is RE-DECLARED 1.4799 → 1.4749 mm** (worse), not
+  widened: the bar clamp reads the same builder estimator the xfail is about.
+* **H1 and MB1 fold records re-recorded** (hole-rim: 179.56/129.14/178.67/151.87
+  → 160.43/134.23/179.79/110.97°; margin: 89.18/113.14/31.26 → 89.96/111.91/36.20°,
+  roll 330 unmoved) — every one a PLAIN-petal fold state, live = export.
 * **Panel route (aa)** — every single letter is taken.
 * **`frozen/phase44`** is the 953 rows at `38a4893`, registered in both maps and
   `--verify-frozen` deep-equal. No workflow file moves in this PR, so no
