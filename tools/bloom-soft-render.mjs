@@ -94,6 +94,12 @@ export function render(positions, w, h, cam, opts = {}) {
     const shade = 0.22 + 0.62 * Math.max(0, dot(n, L1)) + 0.28 * Math.max(0, dot(n, L2));
     const tint = opts.tint ? opts.tint(t) : 1;
     const r = Math.min(255, base[0] * shade * tint), g = Math.min(255, base[1] * shade * tint), b = Math.min(255, base[2] * shade * tint);
+    /* OPTIONAL PER-VERTEX NORMALS (opts.normals, 9 per triangle, the builder's
+       own captureNormals channel): interpolated across the triangle and shaded
+       per pixel, flipped to face the camera by the FACE's own orientation so a
+       smooth normal never lights the back of a face. Absent, this is the flat
+       renderer it always was, to the byte. */
+    const VN = opts.normals ? [0, 1, 2].map((k) => { const q = t * 9 + k * 3; let v = [opts.normals[q], opts.normals[q + 1], opts.normals[q + 2]]; const fl = norm(cross([B[0] - A[0], B[1] - A[1], B[2] - A[2]], [C[0] - A[0], C[1] - A[1], C[2] - A[2]])); if (dot(fl, fwd) > 0) v = [-v[0], -v[1], -v[2]]; return v; }) : null;
     const a = proj(A), bq = proj(B), cq = proj(C);
     const minX = Math.max(0, Math.floor(Math.min(a[0], bq[0], cq[0]))), maxX = Math.min(W - 1, Math.ceil(Math.max(a[0], bq[0], cq[0])));
     const minY = Math.max(0, Math.floor(Math.min(a[1], bq[1], cq[1]))), maxY = Math.min(H - 1, Math.ceil(Math.max(a[1], bq[1], cq[1])));
@@ -104,7 +110,14 @@ export function render(positions, w, h, cam, opts = {}) {
       const l2 = ((cq[0] - px) * (a[1] - py) - (a[0] - px) * (cq[1] - py)) / det;
       const l3 = 1 - l1 - l2; if (l1 < -1e-9 || l2 < -1e-9 || l3 < -1e-9) continue;
       const z = l1 * a[2] + l2 * bq[2] + l3 * cq[2]; const idx = y * W + x;
-      if (z > zbuf[idx]) { zbuf[idx] = z; col[idx * 3] = r; col[idx * 3 + 1] = g; col[idx * 3 + 2] = b; }
+      if (z > zbuf[idx]) {
+        zbuf[idx] = z;
+        if (VN) {
+          const m = norm([l1 * VN[0][0] + l2 * VN[1][0] + l3 * VN[2][0], l1 * VN[0][1] + l2 * VN[1][1] + l3 * VN[2][1], l1 * VN[0][2] + l2 * VN[1][2] + l3 * VN[2][2]]);
+          const sh = (0.22 + 0.62 * Math.max(0, dot(m, L1)) + 0.28 * Math.max(0, dot(m, L2))) * tint;
+          col[idx * 3] = Math.min(255, base[0] * sh); col[idx * 3 + 1] = Math.min(255, base[1] * sh); col[idx * 3 + 2] = Math.min(255, base[2] * sh);
+        } else { col[idx * 3] = r; col[idx * 3 + 1] = g; col[idx * 3 + 2] = b; }
+      }
     }
   }
   const out = Buffer.alloc(w * h * 3);
