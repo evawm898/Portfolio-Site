@@ -41,7 +41,8 @@ import { INFLORESCENCE_TYPES, FLORET_NODE_RANGE, FLORET_PETAL_RANGE, FLORET_SCAL
   PEDICEL_LENGTH_RANGE, PEDICEL_ANGLE_RANGE } from './bloom-geometry.js';
 import { INFILL_DENSITY_RANGE, INFILL_DENSITY_DEFAULT, INFILL_HOLE_MM, INFILL_WALL_MM, INFILL_DENSITY_SWEEP,
   INFILL_RELAX_RANGE, INFILL_RELAX_DEFAULT, INFILL_LAW_RANGE, INFILL_LAW_STEP, INFILL_LAW_DEFAULT,
-  INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT } from './bloom-geometry.js';
+  INFILL_ANISO_RANGE, INFILL_ANISO_STEP, INFILL_ANISO_DEFAULT, INFILL_BASE_RANGE, INFILL_BASE_STEP, INFILL_BASE_DEFAULT,
+  INFILL_ROUND_RANGE, INFILL_ROUND_STEP, INFILL_ROUND_DEFAULT } from './bloom-geometry.js';
 import { SEPAL_COUNT_RANGE, SEPAL_SCALE_RANGE, SEPAL_SCALE_DEFAULT, SEPAL_PHASE_RANGE, SEPAL_PHASE_DEFAULT, SEPAL_ANGLE_RANGE, SEPAL_ANGLE_STEP, SEPAL_ANGLE_DEFAULT, SEPAL_FOOT_BREADTH_RANGE, SEPAL_FOOT_BREADTH_DEFAULT, SEPAL_HEIGHT_RANGE, SEPAL_HEIGHT_DEFAULT, SEPAL_TWINS } from './bloom-geometry.js';
 import { BUCKLE_AMP_RANGE, BUCKLE_FREQ_RANGE, BUCKLE_ENV_RANGE, BUCKLE_ENV_DEFAULT, BUCKLE_FREQ_DEFAULT,
          APEX_SWEEP_RANGE,
@@ -1830,6 +1831,39 @@ export const CONTROLS = [
       const a = Number(v);
       return a === 1 ? 'no stretch — round cells (the seed layout reshuffles at some steps of this slider; a greedy seeder is not continuous in its metric)'
         : `cells ${a.toFixed(2)}x longer along the midrib than across it (the seed layout reshuffles at some steps of this slider; a greedy seeder is not continuous in its metric)`;
+    },
+    tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
+  /* THE ROUNDNESS (Eva's ruling, the roundness-control session). The swept law
+     UNREPARAMETERISED — 0 is today's filleted polygon by branch (the floor),
+     1 the inscribed stadium/circle — defaulting to the shape Eva ruled from
+     the sweep, 0.60. Range, step and default IMPORTED from the geometry (Q6);
+     hidden AND inert at the guard and out of the blanket sweep through the
+     derived `INFILL_SUBS`, like the four above.
+     THE DEAD-LOOKING TRAVEL IS THE LAW BEING HONEST AND IS TOLD PER BUILD,
+     NEVER BAKED INTO THE RANGE: below a hole's own onset (its 0.8 mm fillet
+     over its inradius) only its clamped corners move, because its fillet is
+     already rounder than asked — and the onsets run 0.469..1.036 on the
+     default petal alone and move with petal shape, so a fixed floor would clip
+     real travel on a narrow petal and leave dead travel on a wide one (Eva
+     rejected exactly that). The split at the default — some holes rounded,
+     some still at their fillet — is a property of the ABSOLUTE fillet; see
+     INFILL_ROUND_* in bloom-geometry.js before proposing a proportional one. */
+  { id: 'infillRound', section: 'infill', kind: 'slider',
+    min: INFILL_ROUND_RANGE[0], max: INFILL_ROUND_RANGE[1], step: INFILL_ROUND_STEP, default: INFILL_ROUND_DEFAULT,
+    label: 'Roundness',
+    fmt: (v, ui, shown) => {
+      const s = Number(v);
+      const head = s === 0 ? 'today\u2019s holes — polygons with 0.8 mm filleted corners (the floor: no setting is less round)'
+        : s === 1 ? 'every hole opened to its inscribed circle (a stadium where two sides bind)'
+        : `every hole opened by ${s.toFixed(2)} x its own inradius`;
+      const f = shown && shown.infill;
+      const r = f && f.roundShape;
+      if (!f || f.refused || !f.built || !r || r.medianRoundness === null) return head;
+      const unit = r.planFlat ? 'mm\u00b2' : 'plan mm\u00b2';
+      const shape = `median roundness ${r.medianRoundness.toFixed(3)} (1 = a circle), holes ${r.holeAreaMm2.toFixed(1)} ${unit}, ${(100 * r.solidFrac).toFixed(1)}% solid`;
+      if (s === 0 || r.onsetMin === null) return `${head} · ${shape}`;
+      const split = r.atFillet ? ` — ${r.rounded} hole${r.rounded === 1 ? '' : 's'} rounded past the fillet, ${r.atFillet} still at it (their fillet is already rounder than asked)` : ` — all ${r.rounded} holes rounded past the fillet`;
+      return `${head}${split} · ${shape} · on this blade a hole's fillet corners start moving between ${r.onsetMin.toFixed(3)} and ${r.onsetMax.toFixed(3)}; below that only its clamped corners round`;
     },
     tier: 'standard', role: 'petal', visibleWhen: { ref: 'infillPresent' } },
   { id: 'infillBase', section: 'infill', kind: 'slider',

@@ -123,7 +123,7 @@ declare -A TAG_PUSH_XFAIL=(
   [phase23]='GITHUB_TOKEN refused: .github/workflows/bloom-export-watertight.yml'
   [phase42]='GITHUB_TOKEN refused: .github/workflows/bloom-export-watertight.yml (run 36345899457; #292 edited that file after 03a1042)'
   [phase43]='DECLARED IN ADVANCE: the margin-bead session edits .github/workflows/bloom-export-watertight.yml after 2457d12, the shape GitHub refused for phase42; declared before the dispatch so an absence is expected, and a publish is called out as stale'
-  [phase44]='DECLARED IN ADVANCE: the stem-node session edits .github/workflows/bloom-export-watertight.yml after 21ddbbd (the ST12 must-fail step), the shape GitHub refused for phase42; an absence is expected and a publish is called out as stale'
+  [phase45]='DECLARED IN ADVANCE: the stem-node session edits .github/workflows/bloom-export-watertight.yml after c170500 (the ST12 must-fail step), the shape GitHub refused for phase42; an absence is expected and a publish is called out as stale'
 )
 
 CHECK_ONLY=0

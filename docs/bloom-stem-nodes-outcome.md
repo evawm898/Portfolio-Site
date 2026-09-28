@@ -244,9 +244,22 @@ inflorescence families were not run, because this PR touches none of their code.
 `tools/verify-bloom-surface-bytes.mjs` calls a row a mover iff THIS tree's `stemNodesAbsent`
 is false on it, OR the live leaf node count differs between this tree and the base. The second
 clause is there because the pitch floor went mode-free (§4.4), and it names no row. The run
-covered the whole 966-row matrix in both modes against a worktree of `21ddbbd`. It went in 25
-resumable `--range` chunks (`--json`), closed by `--merge`, which refuses chunks that do not
-tile the matrix:
+covered the whole 970-row matrix in both modes against a worktree of `c170500`, which is
+`main` after #300 merged. It went in 25 resumable `--range` chunks (`--json`), closed by
+`--merge`, which refuses chunks that do not tile the matrix:
+
+```
+MERGED 25 chunks over 970 rows x 2 modes, predicate stem-nodes, base <scratch>/base2
+partition     : 11 of 11 predeclared movers MOVED (every one must), 959 holders compared to the bit
+export stream : 1,270,152,540 floats over 141,128,060 triangles
+captured grid : 80,287,660 values over 9,245 panels (live)
+
+PASS — 0 floats moved on the 959 holders, positionally, under Object.is; all 11 predeclared movers moved.
+```
+
+**It was run twice, once per base, because a partition measured against one base does not
+carry to another.** The first run was against `21ddbbd`, before `main` moved under this PR, and
+read the same verdict over 966 rows:
 
 ```
 MERGED 25 chunks over 966 rows x 2 modes, predicate stem-nodes, base <scratch>/base
@@ -257,7 +270,7 @@ captured grid : 80,252,220 values over 9,241 panels (live)
 PASS — 0 floats moved on the 955 holders, positionally, under Object.is; all 11 predeclared movers moved.
 ```
 
-The 11 movers are block 41's non-GATED rows. The 955 holders are all 953 rows of `main` plus
+The 11 movers are block 41's non-GATED rows. The 959 holders are all 957 rows of `main` plus
 block 41's two GATED rows, so hidden-and-inert is measured rather than argued. **The shipping
 default holds by branch.** `ALL MAX` is a holder, because it has no leaves and the control
 needs them.
@@ -274,10 +287,11 @@ FAIL — 3 finding(s):
 (The third line of that run, `VACUOUS`, is the tool refusing a range that holds no mover.
 That is correct on rows 0–6 and is a third way the tool can fail.)
 
-**Frozen:** `--verify-frozen --phase44` PASS, deep-equal. No older phase's bytes are moved by this change, and
+**Frozen:** `--verify-frozen --phase45` PASS, deep-equal to `c170500`. No older phase's bytes are moved by this change, and
 both halves of the predicate were checked on the frozen rows. The prominence half: no frozen row sets the control, which
-did not exist. The pitch-floor half, measured over every row of every registered frozen matrix (25,413
-rows, 201 with leaves), in both modes, against the base tree: **0 rows whose leaf node
+did not exist. The pitch-floor half, measured over every row of every registered frozen matrix (26,370
+rows over all 44 registered phases, phase44 and phase45 included, 217 with leaves), in both modes, against a
+worktree of `c170500`: **0 rows whose leaf node
 depths differ.**
 
 ## 7. The wall, measured square to a leaning axis — REPORTED, Eva's to rule
@@ -363,12 +377,15 @@ scales as 1/R. So the station count scales as L/R.
 
 ## 9. Frozen phase, smoke, matrix
 
-- **`frozen/phase44`** is the 953 rows at `21ddbbd`. It is registered in both
-  `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS`, and `--verify-frozen --phase44` reads
+- **`frozen/phase45`** is the 957 rows at `c170500`. It is registered in both
+  `FROZEN_MATRICES` and `FROZEN_BASE_COMMITS`, and `--verify-frozen --phase45` reads
   PASS, deep-equal. It is pre-declared in `TAG_PUSH_XFAIL`, because this PR edits
-  `bloom-export-watertight.yml` after 21ddbbd (phase42's refusal class).
-- **Block 41, "STEM NODES"**, is 13 rows (953 → 966). Two of them are GATED holders.
-- **Smoke block 41** is 4 rows. `--check` reads **126 smoke rows over 37 blocks** of 966;
+  `bloom-export-watertight.yml` after c170500 (phase42's refusal class). **It is 45 and not
+  44 because `main` registered `frozen/phase44` for the infill roundness control (#300)
+  while this PR was in CI.** A merge conflict named the collision (phase38/39's precedent),
+  so this branch took `main` in and re-based everything on `c170500`.
+- **Block 41, "STEM NODES"**, is 13 rows (957 → 970). Two of them are GATED holders.
+- **Smoke block 41** is 4 rows. `--check` reads **127 smoke rows over 37 blocks** of 970;
   the block count rose from 36.
 - All 13 export watertight through `verify-bloom-export.mjs --only "^STEM NODES:"`:
   degenerate 0, 0 within-shell census pairs, O1 OK, and live tris = export tris on every
@@ -380,8 +397,8 @@ scales as 1/R. So the station count scales as L/R.
 |---|---|
 | `verify-bloom-export.mjs` + `verify-bloom-connectedness.mjs` over the smoke subset **less `ALL MAX`** | **PASS 125 of 125** each: watertight, one connected body. `ALL MAX` hits the harness's 30 s settle timeout on this box and does so on the base tree too (CLAUDE.md records it), so it is left to CI, where the full matrix is the merge criterion |
 | `verify-bloom-panel.mjs` / `--negative-control` | PASS / all twenty routes observed the failure |
-| `bloom-smoke --check` | 126 smoke rows over 37 blocks (was 36), 120 families claimed |
+| `bloom-smoke --check` | 127 smoke rows over 37 blocks (was 36), 120 families claimed |
 | `verify-bloom-stem-nodes.mjs` | 10 of 10 plants fired, baseline silent |
 | `verify-bloom-stem-channel`, `bloom-wall-thickness`, `bloom-combination-gate` | clean |
 | `verify-bloom-leaf-decoupled` | PASS. **It exited 1 on a PASS on `main` too** (reversed branches — the sepal tool's defect one tool later); fixed in this PR |
-| `--verify-frozen --phase44` | PASS |
+| `--verify-frozen --phase45` (against a worktree of `c170500`) | PASS |

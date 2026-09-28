@@ -101,11 +101,16 @@ const FLAT_XFAIL = Object.freeze({});
 /* RE-RECORDED by the margin-bead session (previous figures 165.71 and 128.89):
    the margin's own bead now sits beside these holes on the same folding
    sheet, and the new skin between the two beads moves which edge is worst. */
+/* RE-RECORDED by the roundness-control session (previous figures 179.56,
+   129.14, 178.67 and 151.87): the shipping roundness 0.60 opens every hole, so
+   each fold state's rims are re-traced and a different edge of the folding
+   sheet is worst — two read better, two worse, all four still the PLAIN
+   petal's own fold, identical in live and export. */
 const H1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { worstDeg: 179.56 },
-  'roll 330': { worstDeg: 129.14 },
-  'ALL FORM MAX': { worstDeg: 178.67 },
-  'buckle 0.60 f 3': { worstDeg: 151.87 },
+  'cup 1.2 x curl 360': { worstDeg: 160.43 },
+  'roll 330': { worstDeg: 134.23 },
+  'ALL FORM MAX': { worstDeg: 179.79 },
+  'buckle 0.60 f 3': { worstDeg: 110.97 },
 });
 
 async function loadGeometry(src) {
@@ -163,7 +168,7 @@ function runState(G, name, set, mode) {
   const surface = G.petalSurface(st, ring, slot, null, acc0);
   const g = petal.grid[0];
   const plan = G.petalInfillPlan(surface, g.rows, { rowFrom: g.rowFrom, rowTo: g.rowTo, label: g.label, spanAt: () => [-1, 1] },
-    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac });
+    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac, round: petal.infill.round });
   return { name, mode, st, petal, surface, plan, pos: a.positions, sheets: g.rows.map((r) => r.thickness) };
 }
 

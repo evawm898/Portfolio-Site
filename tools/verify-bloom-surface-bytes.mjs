@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-surface-bytes.mjs — THE SURFACE EXTRACTION MOVED NOTHING.
 
-     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--rows N] [--only <label regex>] [--control] [--movers <label regex>]
+     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--from K] [--rows N] [--only <label regex>] [--control] [--movers <label regex>]
 
    Session 37 lifted the petal's mid-surface law out of `buildPetalInto`'s row
    loop into `petalSurface()`. The claim is the strongest one available and
@@ -142,7 +142,12 @@ function stateOf(row) {
 const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
 const MATRIX = harness.buildMatrix();
 const [RFROM, RTO] = RANGE ? RANGE.split(':').map(Number) : [0, MATRIX.length];
-const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label)).slice(0, LIMIT);
+/* `--from K` starts at the K-th selected row (0-based), so a full-matrix run
+   can be closed out in foreground chunks of `--from K --rows N` without a
+   label regex that might miss a row. The union of the chunks is the matrix.
+   `--range a:b` is the same idea by MATRIX index, and composes with it. */
+const FROM = +(argOf('--from') || 0) || 0;
+const rows = MATRIX.slice(RFROM, RTO).filter((r) => !ONLY || ONLY.test(r.label)).slice(FROM, FROM + LIMIT);
 /* THE PREDICATES. Each reads the row's own coerced state and, where the
    change moves a record the BASE tree owns, the BASE tree's own builder — so
    the prediction's owner is never the quantity under test. */

@@ -884,6 +884,12 @@ export const SMOKE_BLOCKS = [
          relaxation in a 3x metric all reach the I family at once. */
       { label: "INFILL: x the four at their far ends (relaxation 12 x law 0 x stretch 3 x base 1)",
         path: "S4's FOUR CONTROLS composed — relaxation, density law, stretch and the basal boundary each at its far end (I8-I11 in verify-bloom-infill.mjs; here the export and flood-fill gates on a blade whose cells start at ROOT_BLEND_END and whose tip holds holes)" },
+      /* THE ROUNDNESS at its ceiling on the curved plan, where the metric
+         varies across a hole and the ruled bar holds the opening back — the
+         one axis of the new control the export and flood-fill gates can reach
+         (the default 0.60 rides on every other infilled row). */
+      { label: "INFILL: x roundness 1 x cup 1.2 x curl 360 (the bar holds the opening back on a curved plan)",
+        path: "THE ROUNDNESS CONTROL at its ceiling on a curved plan — every hole opened toward its inscribed circle in the surface's local frame, the bar clamping the opening where the metric varies across a hole (I12 in verify-bloom-infill.mjs; here the export and flood-fill gates on the opened rims)" },
       { label: "INFILL: REFUSED — a FRINGE owns the same region (several panels)",
         path: "the REFUSAL — a blade that is several panels takes today's path entirely, and the mesh must be bit-identical to the same state with the guard off; a branch is not something a triangle count can show" },
     ],
