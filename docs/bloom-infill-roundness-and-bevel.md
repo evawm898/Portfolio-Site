@@ -230,3 +230,35 @@ figure.
    existing fillet so the bottom of the travel is live (B3), and the proportional
    fillet question (B1) settled in the same ruling.
 3. **K stays 4** unless the budget is ruled on: K=6 refuses two shipped rows.
+
+## F. Ruling 3 cannot be met by the recommended reparameterisation (the roundness-control session, measured, nothing built)
+
+Eva ruled the control's default to be **the shape labelled ROUNDNESS 0.60** on
+`infill-roundness-sweep.png`, and asked that the control be reparameterised as
+§B3 recommended (floor mapped to the existing fillet, so the whole travel is
+live) with the default then set to whichever new value reproduces that shape
+— and to stop if none does. **None does.** `node tools/bloom-roundness-law-match.mjs`,
+EXPORT, ruled defaults, the default petal:
+
+* **The ruled shape is a SPLIT.** Under the swept law (`R = s × inradius`) a
+  hole's fillet corners first move at `s = fillet / inradius` — on the default
+  that onset runs **0.469 to 1.036, median 0.587**. So at 0.60, **9 of the 20
+  holes are still today's hole at every unclamped corner and 11 are rounded**:
+  the smaller holes have not started, the larger ones have.
+* **A law whose floor is the fillet moves every hole at its first step, so it
+  cannot produce that split at any value.** Measured over `t` 0 → 0.40 in 0.01
+  steps (`R = a + t (rIn − a)`, `a` = the hole's largest fillet radius, capped
+  at its inradius): the worst single hole differs from the ruled one by
+  **53.8% of its area and 1.51 mm Hausdorff at every t**, and the TOTAL hole
+  area never gets back to the ruled 170.75 mm² (163.69 at t = 0, falling from
+  there). The median roundness crosses the ruled 0.8468 near t 0.08, which is
+  exactly the "pick the nearer one" answer the ruling forbids — the holes are
+  different holes.
+* **The one family that reproduces it exactly is the swept law itself** (or an
+  affine rescale of its `s`), because the split is keyed on each hole's own
+  inradius. That family's travel below the smallest onset (0.469 here) moves
+  only the clamped corners (area 179.1 → 175.3 mm² by 0.50, median roundness
+  fixed) — the dead half §B3 named. The dead half and the ruled shape come
+  from the same property; removing one removes the other.
+
+The choice is Eva's; the options are in the session report.
