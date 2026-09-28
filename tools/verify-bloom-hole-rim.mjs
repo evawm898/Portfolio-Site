@@ -101,11 +101,16 @@ const FLAT_XFAIL = Object.freeze({});
 /* RE-RECORDED by the margin-bead session (previous figures 165.71 and 128.89):
    the margin's own bead now sits beside these holes on the same folding
    sheet, and the new skin between the two beads moves which edge is worst. */
+/* RE-RECORDED by the roundness-control session (previous figures 179.56,
+   129.14, 178.67 and 151.87): the shipping roundness 0.60 opens every hole, so
+   each fold state's rims are re-traced and a different edge of the folding
+   sheet is worst — two read better, two worse, all four still the PLAIN
+   petal's own fold, identical in live and export. */
 const H1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { worstDeg: 179.56 },
-  'roll 330': { worstDeg: 129.14 },
-  'ALL FORM MAX': { worstDeg: 178.67 },
-  'buckle 0.60 f 3': { worstDeg: 151.87 },
+  'cup 1.2 x curl 360': { worstDeg: 160.43 },
+  'roll 330': { worstDeg: 134.23 },
+  'ALL FORM MAX': { worstDeg: 179.79 },
+  'buckle 0.60 f 3': { worstDeg: 110.97 },
 });
 
 async function loadGeometry(src) {

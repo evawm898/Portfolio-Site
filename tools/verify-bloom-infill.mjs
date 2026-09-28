@@ -697,7 +697,7 @@ export async function i12Clauses(M, quick = false) {
   const out = []; const add = (id, ok, msg) => out.push({ id, ok, msg });
   const r = CONTROLS.find((c) => c.id === 'infillRound');
   /* (a) */
-  add('I12', !!r && r.min === M.INFILL_ROUND_RANGE[0] && r.max === M.INFILL_ROUND_RANGE[1] && r.step === M.INFILL_ROUND_STEP && Object.is(r.default, M.INFILL_ROUND_DEFAULT) && r.default === 0.6,
+  add('I12', !!r && r.min === M.INFILL_ROUND_RANGE?.[0] && r.max === M.INFILL_ROUND_RANGE?.[1] && r.step === M.INFILL_ROUND_STEP && Object.is(r.default, M.INFILL_ROUND_DEFAULT) && r.default === 0.6,
     `the registry's infillRound (${r ? `${r.min}..${r.max} step ${r.step}, default ${r.default}` : 'absent'}) is not the geometry's export (${M.INFILL_ROUND_RANGE} step ${M.INFILL_ROUND_STEP}, default ${M.INFILL_ROUND_DEFAULT}) at Eva's ruled 0.60`);
   if (r) add('I12', predicateDrivers(r.visibleWhen).has('petalInfill') && !evalPredicate(r.visibleWhen, { ...DEFAULTS, petalInfill: 'NONE' }) && evalPredicate(r.visibleWhen, { ...DEFAULTS, petalInfill: 'VORONOI' }), 'infillRound is not shown iff the guard is on');
   const V = await floorVariant();
@@ -751,25 +751,24 @@ export async function i12Clauses(M, quick = false) {
     const ref = RL.planFor(V, DEFAULTS, {}).plan;
     delete globalThis.__holeLaw; globalThis.__holeLaw = (Pl, fr, infillFillet) => infillFillet(Pl, fr);
     const got = planM({}, 0.6);
-    /* HOLE BY HOLE, AS A DISTANCE: the per-hole Hausdorff between the shipped
-       hole and the swept one against the two discretisations' own band (the
-       derivation is in tools/bloom-roundness-law-match.mjs): 10-degree chords
-       on both sides at that hole's radius, the five-chord trace kept at
-       unrounded corners, and the pruned flat. A TOTAL-area comparison was the
-       first cut and the mutant table said it could not see a control that
-       hands every hole back to today (8 mm2 of 171 inside a band summed over
-       twenty perimeters). */
-    const A0 = openH(ref), B0 = openH(got);
-    const hd = (a, b) => { let m = 0; for (const q of a) m = Math.max(m, RL.polyDist(q.x, q.y, b)); for (const q of b) m = Math.max(m, RL.polyDist(q.x, q.y, a)); return m; };
-    let over = 0, worst = 0, pairs = 0;
-    for (let i = 0; i < Math.max(A0.length, B0.length); i++) {
-      if (!A0[i] || !B0[i]) { if (!!A0[i] !== !!B0[i]) over++; continue; }
-      pairs++;
-      const rIn = RL.inradiusOf(A0[i], (pp, d) => { const qq = ccwPoly(pp); let o = qq.slice(); for (let k = 0; k < qq.length && o.length >= 3; k++) { const a = qq[k], b = qq[(k + 1) % qq.length]; const ex = b.x - a.x, ey = b.y - a.y, L = Math.hypot(ex, ey); if (L < 1e-12) continue; const nx = ey / L, ny = -ex / L, c0 = -(nx * a.x + ny * a.y) + d; const nx2 = []; for (let j = 0; j < o.length; j++) { const p1 = o[j], p2 = o[(j + 1) % o.length]; const d1 = nx * p1.x + ny * p1.y + c0, d2 = nx * p2.x + ny * p2.y + c0; if (d1 <= 0) nx2.push(p1); if ((d1 < 0 && d2 > 0) || (d1 > 0 && d2 < 0)) { const t = d1 / (d1 - d2); nx2.push({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t }); } } o = nx2; } return o.length >= 3 ? o : null; });
-      const band = 2 * rIn * (1 - Math.cos((5 * Math.PI) / 180)) + M.INFILL_FILLET_MM * (1 - Math.cos(Math.PI / 10)) + M.INFILL_ROUND_FLAT_MM + 2 * M.INFILL_PLAN_GRID;
-      const d = hd(A0[i], B0[i]); worst = Math.max(worst, d); if (d > band) over++;
-    }
-    add('I12', got.achieved === ref.achieved && over === 0, `the default at 0.60 draws ${got.achieved} holes against the swept law's ${ref.achieved}, and ${over} of ${pairs} holes stand outside their own discretisation band (worst ${worst.toFixed(4)} mm) — it is not the shape Eva ruled`);
+    /* AGAINST TODAY AS WELL AS AGAINST THE SWEEP, which is what makes it a
+       claim. Run against the BASE tree (no control, every hole today's) this
+       clause first shipped as a per-hole Hausdorff inside the discretisations'
+       own band — and it PASSED there: opening a hexagonal corner from 0.8 mm to
+       0.6 x the inradius moves the boundary by ~0.04 mm, inside the same band.
+       So the reference is a PAIR of owners — the swept law at 0.60 and today's
+       floor, both off the patched copy — and the shipped default must sit at
+       least TEN TIMES closer to the swept shape than today's does, in total
+       hole area AND in median roundness (on the default: floor 179.08 mm2 /
+       0.8177, swept 170.75 / 0.8468). The per-hole proof is
+       tools/bloom-roundness-law-match.mjs. */
+    const floor = RL.planFor(V, DEFAULTS, {}).plan;
+    const tot = (P) => openH(P).filter(Boolean).reduce((a, h) => a + polyArea(h), 0);
+    const medQ = (P) => median(openH(P).filter(Boolean).map(roundnessQ));
+    const gapA = Math.abs(tot(floor) - tot(ref)), gapQ = Math.abs(medQ(floor) - medQ(ref));
+    const dA = Math.abs(tot(got) - tot(ref)), dQ = Math.abs(medQ(got) - medQ(ref));
+    add('I12', got.achieved === ref.achieved && gapA > 0 && gapQ > 0 && dA <= gapA / 10 && dQ <= gapQ / 10,
+      `the default at 0.60 draws ${got.achieved} holes / ${tot(got).toFixed(2)} mm2 / median roundness ${medQ(got).toFixed(4)} against the swept law's ${ref.achieved} / ${tot(ref).toFixed(2)} / ${medQ(ref).toFixed(4)} and today's ${tot(floor).toFixed(2)} / ${medQ(floor).toFixed(4)} — it must sit ten times closer to the ruled shape than today's does (area ${dA.toFixed(3)} against ${(gapA / 10).toFixed(3)}, roundness ${dQ.toExponential(2)} against ${(gapQ / 10).toExponential(2)})`);
   }
   return out;
 }
