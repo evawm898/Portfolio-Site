@@ -4929,6 +4929,24 @@ is dead travel. Tools: `shot-bloom-rim-bevel.mjs`, `shot-bloom-infill-roundness.
 `bloom-rim-roundness-lib.mjs` (a patched copy of the geometry OUTSIDE the repo, anchors refuse on a
 miss).
 
+**THE INFILLED MARGIN IS BEADED NOW, AND EVERY FREE BOUNDARY IN THE BLOOM GOES THROUGH `emitRimLoop`**
+(the margin-bead session — read `docs/bloom-infill-margin-bead.md` before touching `insetPlan`,
+`skinOf`/`wallCross`, `marginOn`, `emitRimEdge`, `rEdge` or the MB family). The flat wall above is
+FIXED: the cells' skin stops short of the outline (`insetPlan`, one plan map; each cell's outline
+chain is CLIPPED to the inset boundary between its canonical wall crossings, validated, ONE decision
+per petal — 0 cells refused on every state measured) and the outline closes on #278's bead with its
+apex on the outline point, so the silhouette does not move. **BEAD ONLY, NO THICKNESS TAPER, BY
+MEASUREMENT** (the brief said "taper and bead": with the taper the tip rim thinned to 0.09 mm and H1
+read 151° on sheet 2.40 — it fights the first hole's bead for the same 1.00 mm wall). `rHole = rEdge`,
+ONE expression (#278's three arms, room = the 1.00 mm wall, so r = 0.45 on every treated point; the
+width arm at the tip); the buried end ramps from the step profile over `RIM_TAPER_MM` from the seam.
+Margin body turns 44.96° at the defaults against 90.00° before; four fold states declared in
+`MB1_XFAIL` by value. **Cost: infilled bloom 113,424 -> 118,576; `INFILL: x 40 x 3` 81.9% of budget;
+shipping default untouched.** 29 byte movers predeclared from the BASE record, every holder held.
+**The 1,872 triangles >60° off their face in print preview are `rimProfile`'s closed-form normal
+omitting the along-sweep term at the petal ENDS — pre-existing, plain petal, recorded, NOT fixed.**
+`frozen/phase43` is the 952 rows at `2457d12`, pre-declared in `TAG_PUSH_XFAIL`.
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

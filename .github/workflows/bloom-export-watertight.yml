@@ -21,6 +21,7 @@ on:
       - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-rim-owner.mjs
       - tools/verify-bloom-hole-rim.mjs
+      - tools/verify-bloom-infill-margin.mjs
       - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
@@ -52,6 +53,7 @@ on:
       - tools/verify-bloom-infill.mjs
       - tools/verify-bloom-rim-owner.mjs
       - tools/verify-bloom-hole-rim.mjs
+      - tools/verify-bloom-infill-margin.mjs
       - tools/verify-bloom-infill-budget.mjs
       - tools/verify-bloom-stem-channel.mjs
       - tools/bloom-sagitta.mjs
@@ -176,6 +178,14 @@ jobs:
         run: node tools/verify-bloom-hole-rim.mjs
       - name: ... and those clauses must be able to fail
         run: node tools/verify-bloom-hole-rim.mjs --quick --negative-control
+      # THE INFILLED PETAL'S OUTER MARGIN TAKES THE BEAD (MB0-MB2). Both STL
+      # gates are blind to a flat wall, a wrong radius, a skin that stops in the
+      # wrong place and a margin whose bead never engaged: all export watertight
+      # and as one piece. Node-only, beside the hole-rim gate for its reasons.
+      - name: The infilled margin takes the edge profile (MB0-MB2)
+        run: node tools/verify-bloom-infill-margin.mjs
+      - name: ... and those clauses must be able to fail
+        run: node tools/verify-bloom-infill-margin.mjs --quick --negative-control
       # A SHARED CORNER MUST READ AS TOPOLOGY AND A REAL FOLD MUST STILL READ AS
       # A FOLD (CA0-CA3). X2 in this gate turns the census's count into a verdict,
       # and a count that is too LOW looks exactly like a clean solid — so the

@@ -8,7 +8,9 @@
    closes a rim — sweeps a strip joining a TOP-skin point to a BOTTOM-skin
    point — and both callers that close rims reach it: `emitPanel` (a petal's
    own perimeter) and `emitInfillPanel` (every hole the infill cuts, and the
-   infilled region's outline edges). Before S5 the infill closed its rims with
+   infilled region's outline — the petal's own margin above the split, beaded
+   since the margin-bead session through `emitRimEdge` -> `emitRimLoop`, the
+   seam still the step profile through `emitRimFlat` -> `emitRimLoop`). Before S5 the infill closed its rims with
    a flat-wall `emitRim` of its own, so the region the bead reached and the
    region it did not had two owners, and the one the bead did not reach was
    the one nobody was looking at.
@@ -42,8 +44,9 @@
    --negative-control applies three written-down mutations to a COPY of the
    source text and requires each to fail the clause it names: S3's flat
    `emitRim` put back for the hole rims (O3), `emitPanel` sweeping its own rim
-   inline (O2 + O3), and a new top-level wall helper called from the infill
-   arm (O3, through the reachability walk).
+   inline (O2 + O3), a new top-level wall helper called from the infill
+   arm (O3, through the reachability walk), and the infilled MARGIN given a
+   wall emitter of its own beside `emitRimLoop` (O3).
    =================================================================== */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -152,6 +155,9 @@ const MUTANTS = [
   { id: 'emitPanel-sweeps-its-own-rim', names: ['O2', 'O3'],
     from: '  emitRimLoop(acc, profs, K);',
     to: '  for (let k = 0; k < profs.length; k++) acc.quad(top[0][0], top[0][1], bot[0][1], bot[0][0]);' },
+  { id: 'the-infilled-margin-gets-a-second-emitter', names: ['O3'],
+    from: '      const sk = emitRimLoop(acc, [edgeProf(ps[i + 1], prmOf(ps[i + 1])), edgeProf(ps[i], prmOf(ps[i]))], K, false);',
+    to: '      const a0 = pt(ps[i]), a1 = pt(ps[i + 1]); emitTri(a1.T, a0.T, a0.B); emitTri(a1.T, a0.B, a1.B); const sk = 0;' },
   { id: 'a-new-wall-helper-called-from-the-infill-arm', names: ['O3'],
     from: 'function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {',
     to: 'function emitHoleWall(acc, p, q) { acc.quad(p.T, q.T, q.B, p.B); }\nfunction emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) { emitHoleWall(acc, null, null);' },

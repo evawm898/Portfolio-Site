@@ -32,6 +32,8 @@ builds the control.
 
 ### A1. The outer margin of an INFILLED petal is a flat 90-degree wall
 
+> **FIXED by the margin-bead session — `docs/bloom-infill-margin-bead.md`.** The table below is the state before it.
+
 Cross-sections of the emitted mesh at 95 stations along the margin (`u` 0.04 →
 0.98), one default petal:
 
