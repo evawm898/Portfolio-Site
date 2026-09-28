@@ -264,3 +264,150 @@ EXPORT, ruled defaults, the default petal:
   from the same property; removing one removes the other.
 
 The choice is Eva's; the options are in the session report.
+
+## G. The roundness control ships (the roundness-control session — Eva's ruling on §F)
+
+**RULING (Eva), recorded as she gave it because it inverts this doc's own §B3
+recommendation and must not be re-litigated:** OPTION 1 — ship the swept law
+as it is, 0 to 1, **default exactly 0.60**.
+
+* **The dead-looking travel is the law being honest.** Below the point where
+  `s × inradius` passes a hole's existing 0.8 mm fillet there is nothing to
+  round; a slider that says "these corners are already rounder than you asked"
+  is correct, not broken.
+* **The threshold is per hole and per petal** (0.469 to 1.036 across the
+  default's twenty), so it is **TOLD PER BUILD in the read-out and never baked
+  into the range** — the stamen-spread and carnation-terminal precedent.
+* **Option 2 (a fixed 0.47 floor offset) is REJECTED:** 0.47 was measured on
+  one petal and the onsets move with petal shape, so it would clip real travel
+  on a narrow petal and leave dead travel on a wide one.
+
+**THE SECOND RULING IT IMPLIES, recorded explicitly:** the ruled 0.60 shape is
+a SPLIT — 9 of 20 holes at today's corners, 11 rounded — and that split exists
+only because the fillet is an ABSOLUTE 0.8 mm. **The earlier ruling "the fillet
+becomes a fixed proportion of cell scale rather than an absolute 0.8 mm, short-
+edge clamp as a ceiling only" was never implemented and is now RETIRED**: a
+proportional fillet rounds every hole together from the first step and
+destroys the shape Eva ruled. It is struck in `docs/bloom-infill-port-plan.md`
+with this reason, and the header of `INFILL_ROUND_*` in `bloom-geometry.js` and
+the registry row say the split is a property of the absolute fillet.
+
+### G1. What ships
+
+`infillRound` (Infill, a slider 0–1 step 0.05, **default 0.60**; range, step and
+default IMPORTED from the geometry — Q6). Hidden AND inert at the guard, out of
+`SWEEPABLE` and block 1 through the derived `INFILL_SUBS` (a slider hidden at
+DEFAULTS behind `infillPresent`), so `ALL MAX` stays uninfilled. K stays 4.
+
+The law, in `petalInfillPlan`'s `drawnOf`, one hole at a time:
+
+1. **Roundness 0 is today's hole BY BRANCH** — the shipped fillet's own
+   polygon, the same doubles; nothing below runs.
+2. Otherwise the hole is the **opening** of the fillet traced at 20 segments an
+   arc (the sweep's own construction) at `R = s × inradius` (the inradius of
+   today's hole; capped at 0.999 of the fine polygon's), and the dilation's
+   arcs are cut by BISECTING unit normals — `+`, `/` and `Math.sqrt` only, the
+   cosine a literal — and decimated at the sweep's own 9-degree step, so **no
+   discrete decision rests on trigonometry** (the `rimSameP` / `infillSnap`
+   class this feature has now been bitten by four times).
+3. **It is CLIPPED TO TODAY'S HOLE**, so the floor is structural: the control
+   only ever removes material from the hole that shipped. This was forced by
+   measurement: without it the finer trace bulges OUTSIDE the shipped
+   five-chord trace by up to its sagitta (3.9e-2 mm) and drew holes up to
+   **1.7e-4 LESS round** (isoperimetric) than today's at roundness 0.05–0.20 —
+   the tracing, not the law. The vertices the clip leaves on today's chords
+   are pruned where they sit within `INFILL_ROUND_FLAT_MM` = 0.8 mm × (1 − cos
+   5°) = 3.05e-3 mm of the chord through their neighbours.
+4. **The floor is also a DECISION**: where the pruned result is even slightly
+   less round than today's, today's hole is kept.
+5. **On a curved plan the opening is done in the surface's own local frame**
+   (the Cholesky factor of the first fundamental form at the hole's centroid,
+   snapped to 2^-30), and **the ruled bar holds it back**: a plan circle on a
+   compressed sheet is a narrower ellipse on the object, and measured, the
+   swept plan-space law took `cup 1.2 × curl 360` from 12 holes to **10** from
+   roundness 0.90 and `ALL FORM MAX` from 17 to **16** at 1.00. In the local
+   frame the loss was halved and not removed (the metric varies across a
+   hole), so where the floor hole clears 1.50 mm and the opened one does not,
+   the radius is bisected (eight halvings) to the largest that keeps the bar,
+   and the hole is counted as HELD. **The achieved count now holds at every
+   step of the whole range on all six states measured, flat and curved.** On
+   the flat default the frame is the identity and the clamp never binds.
+
+The read-out (the control's own value line) tells the ACHIEVED shape from the
+builder's record: median roundness, hole area, solid fraction, how many holes
+are rounded past their fillet and how many are still at it, and the per-build
+onset range below which only clamped corners move. `__bloomMetrics().infill`
+carries `round` and `roundShape`.
+
+### G2. The default is the ruled shape — measured, hole for hole
+
+`node tools/bloom-roundness-law-match.mjs` (the shipped control against the
+swept law at 0.60, run on a patched copy of THIS tree with the control stood
+down — a different owner; per-hole bands DERIVED from the two discretisations,
+nothing typed):
+
+| state | holes (swept) | hole area mm² (swept) | median roundness (swept) | worst per-hole area | worst per-hole Hausdorff |
+|---|---|---|---|---|---|
+| **default** | **20/20 (20/20)** | **170.67 (170.75)** | **0.8467 (0.8468)** | 0.43% | 0.0135 mm |
+| petalWidth 8 | 8/20 (8/20) | 39.17 (39.21) | 0.7619 (0.7618) | 0.17% | 0.0069 mm |
+| petalWidth 30 | 20/20 (20/20) | 388.48 (388.53) | 0.8709 (0.8709) | 0.27% | 0.0151 mm |
+| density 40 | 22/36 (22/36) | 116.14 (116.37) | 0.8577 (0.8579) | 0.69% | 0.0130 mm |
+| cup 1.2 × curl 360 | 12/20 (12/20) | 97.40 (97.48) | 0.8884 (0.8996) | — | — (opened in the surface frame, differs by design) |
+
+Every flat-plan hole within its own band; the residual is the arcs'
+discretisation (and, at unrounded corners, today's five-chord trace kept where
+the sweep drew the same arc at twenty) — 0.0135 mm against Nylon's ~0.35 mm
+resolvable detail. **The split reproduces exactly: 11 rounded / 9 at the
+fillet.**
+
+### G3. In the terms Eva has been ruling in (EXPORT, default petal)
+
+| roundness | holes | rounded / at fillet | hole area | solid | median roundness | tris petal | infilled bloom | 40 × 3 |
+|---|---|---|---|---|---|---|---|---|
+| 0 (the floor) | 20/20 | — | **179.1 mm²** | **53.8%** | 0.818 | 14,978 | 118,480 | 1,226,912 (81.8%) |
+| 0.10 | 20/20 | 0 / 20 | 179.0 | 53.9% | 0.818 | 12,370 | 97,616 | 1,046,112 (69.7%) |
+| 0.30 | 20/20 | 0 / 20 | 178.4 | 54.0% | 0.818 | 13,198 | 104,240 | 1,071,552 (71.4%) |
+| 0.50 | 20/20 | 1 / 19 | 175.1 | 54.8% | 0.818 | 13,738 | 108,560 | 1,109,312 (74.0%) |
+| **0.60 (DEFAULT)** | **20/20** | **11 / 9** | **170.7 mm²** | **56.0%** | **0.847** | **13,806** | **109,104** | **1,126,592 (75.1%)** |
+| 1 (the circle) | 20/20 | 18 / 2 | **99.3 mm²** | **74.4%** | 0.998 | — | 107,056 | — |
+
+(The full eleven-step table is `roundness-sweep.json` beside the sheet.) Every
+row keeps all twenty holes; no hole falls under the 1.50 mm bar anywhere in the
+range. Two holes stay "at the fillet" even at 1.00 — their onset is 1.036, the
+0.8 mm fillet already rounder than their own inradius allows.
+
+**THE BUDGET FALLS, and the reason is worth knowing: the prune.** Once any
+roundness is asked, every hole's ring is re-drawn from the opening, and the
+vertices that lie within 3 µm of a straight chord are dropped — which is why
+roundness 0.10, where no fillet corner moves, already costs 17% FEWER
+triangles on the petal than the floor. At the default the cost corner
+`INFILL: x 40 petals x 3 whorls` goes **1,226,912 (81.8%) → 1,126,592 (75.1%)**,
+leaving **373,408 triangles (24.9%) of headroom** under the 1,500,000 budget.
+
+### G4. What moved (the gates' own figures are in the PR)
+
+* **Byte partition, predeclared from the BASE tree's own record** (a row moves
+  iff the base tree builds infill cells on it AND this tree's control set asks
+  roundness > 0): **31 movers / 926 holders** over the 957-row matrix — #297's
+  29 plus the two new roundness-1 rows; `INFILL: x roundness 0` is a HOLDER (the
+  floor by branch), as are the REFUSED and GATED rows.
+* **Census (#213: re-recorded, never widened): 11 entries re-recorded, 2 added,
+  0 removed**, every one on an INFILL row, the previous figure kept in each
+  note. Eight read more pairs and one fewer; every worst span but two is
+  unmoved to four decimals (`CONTINUOUS x 3 turns` shallower, 0.5092 →
+  0.4428; `a SPHERE head with a stem` deeper, 0.427 → 0.4675). The two new
+  entries are `density law 2` (two span-0 tangencies on the whole bloom, 0 on
+  one petal) and the new `roundness 1 x cup 1.2 x curl 360` row (the petal's
+  own declared fold at an identical worst span).
+* **I12** (the roundness family, `verify-bloom-infill.mjs`), written red first,
+  and its six mutants.
+* **Panel route (aa)** — every single letter is taken.
+* **`frozen/phase44`** is the 953 rows at `38a4893`, registered in both maps and
+  `--verify-frozen` deep-equal. No workflow file moves in this PR, so no
+  `TAG_PUSH_XFAIL` entry is owed.
+* The sheet: `node tools/shot-bloom-infill-roundness-shipped.mjs <dir>` →
+  **`docs/img/infill-roundness-shipped.png`** (the sweep 0 → 1 on the shipped
+  control, default marked) and **`docs/img/infill-roundness-default.png`**
+  (the infilled petal and whole bloom at the ruled defaults, print preview).
+  `docs/img/infill-roundness-sweep.png` stays put — it predates #297 and records
+  the measurement pass.
