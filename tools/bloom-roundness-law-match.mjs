@@ -134,6 +134,6 @@ if (!process.argv.includes('--anchored')) {
     if (!ok) bad++;
     console.log(`${name.padEnd(20)} holes ${got.achieved}/${got.cells.length} (swept ${ref.achieved}/${ref.cells.length})  area ${tot(B).toFixed(2)} (swept ${tot(A).toFixed(2)}) mm2  median roundness ${q(B).toFixed(4)} (swept ${q(A).toFixed(4)})  worst per-hole area ${(100 * wA).toFixed(3)}%  worst per-hole Hausdorff ${wH.toFixed(5)} mm  (${over} of ${pairs} holes outside their own discretisation band)  ${ok ? (curved ? 'SAME COUNT (curved: opened in the surface frame, shape differs by design)' : 'MATCH') : 'DIFFERS'}`);
   }
-  console.log(bad ? `FAIL — ${bad} state(s) differ beyond the arc discretisation's own derived band, or in count` : 'PASS — on every flat plan the shipped control draws the swept law's shape hole for hole; the curved row keeps its count.');
+  console.log(bad ? `FAIL — ${bad} state(s) differ beyond the arc discretisation's own derived band, or in count` : "PASS — on every flat plan the shipped control draws the swept law's shape hole for hole; the curved row keeps its count.");
   if (bad) process.exitCode = 1;
 }

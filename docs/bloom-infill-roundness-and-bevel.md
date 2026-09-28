@@ -387,6 +387,19 @@ triangles on the petal than the floor. At the default the cost corner
 `INFILL: x 40 petals x 3 whorls` goes **1,226,912 (81.8%) → 1,126,592 (75.1%)**,
 leaving **373,408 triangles (24.9%) of headroom** under the 1,500,000 budget.
 
+**And the build TIME was a regression until it was measured in the browser.**
+The first cut took the cost corner from 17.1 s to **30.2 s** in Node, and
+Chromium's `settleBuild` (30 s) timed the row out — found by running it through
+the real export gate, not by any Node instrument. The cost was the opening's
+inradius: it was bisected twice per hole (on the coarse and the fine polygon)
+and the bar guard re-measured a width the plan already had. One inradius on the
+coarse polygon and a width cache take it to **19.6 s**, at the IDENTICAL
+1,126,592 triangles; every infilled row at roundness 0.60 and below is
+bit-identical across that change (62 of 66 row x mode builds hashed equal), and
+the two roundness-1 rows move (the cap `min(s, 0.999) x inradius` now reads the
+coarse polygon's inradius) with their triangle counts and census unmoved
+(0 pairs; 8832 / 0.6586 mm). All three pass the Chromium export gate, X0 included.
+
 ### G4. What moved (the gates' own figures are in the PR)
 
 * **Byte partition, predeclared from the BASE tree's own record** (a row moves

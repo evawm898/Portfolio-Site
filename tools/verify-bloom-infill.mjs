@@ -912,7 +912,7 @@ const I12_MUTANTS = [
     witness: (M) => { const P0 = s4Plan(M, { infillRound: 0 }).plan, P = s4Plan(M, { infillRound: 0.3 }).plan; let w = 0; for (let i = 0; i < P.holes.length; i++) if (P.cellOpen[i] && P0.cellOpen[i]) { const F = ccwPoly(P0.holes[i]); for (const q of P.holes[i]) w = Math.max(w, outsideBy(q, F)); } return w > 1e-4; } },
   { id: 'the-roundness-floor-is-not-decided', from: '      if (h && infillRoundness(h) < infillRoundness(q)) h = null;\n', to: '', breaks: ['I12'],
     witness: (M) => { const P0 = s4Plan(M, { infillRound: 0 }).plan; return [0.05, 0.2].some((st) => { const P = s4Plan(M, { infillRound: st }).plan; return P.holes.some((h, i) => h && P.cellOpen[i] && roundnessQ(h) < roundnessQ(P0.holes[i]) - 1e-9); }); } },
-  { id: 'the-bar-does-not-hold-the-opening-back', from: 'if (h && widthOf(q, c) >= bar && widthOf(h, c) < bar) {', to: 'if (false) {', breaks: ['I12'],
+  { id: 'the-bar-does-not-hold-the-opening-back', from: 'if (h && widthOfCached(h, c) < bar && widthOf(q, c) >= bar) {', to: 'if (false) {', breaks: ['I12'],
     witness: (M) => { const set = { petalCup: 1.2, petalSpineCurl: 360 }; return s4Plan(M, { ...set, infillRound: 1 }).plan.achieved < s4Plan(M, { ...set, infillRound: 0 }).plan.achieved; } },
   { id: 'the-record-calls-every-hole-rounded', from: 'rounded: Ru > rrMax, held });', to: 'rounded: true, held });', breaks: ['I12'],
     witness: (M) => { const P = s4Plan(M, { infillRound: 0.6 }).plan; return P.roundShape.rounded === P.achieved; } },

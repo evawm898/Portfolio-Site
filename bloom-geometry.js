@@ -10306,8 +10306,14 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
       /* In the SURFACE'S local frame on a curved plan; the identity on a flat one. */
       const T = field ? infillLocalFrame(field, infillCentroid(q)) : null;
       const qT = T ? q.map(T.to) : q, fineT = T ? fine.map(T.to) : fine;
+      /* ONE INRADIUS, OF TODAY'S HOLE. The finer trace bulges outside today's
+         chords, so its inradius is at least this one and `INFILL_ROUND_CORE x
+         rIn` is inside it too — the eroded core cannot vanish — and at every
+         roundness under 0.999 the cap does not bind at all. Measured cost:
+         the second bisection, on the finer polygon, was the largest single
+         term of the plan (the cost corner went 17 s -> 30 s a build with it). */
       const rIn = infillInradius(qT);
-      const R = Math.min(round * rIn, INFILL_ROUND_CORE * infillInradius(fineT));
+      const R = Math.min(round, INFILL_ROUND_CORE) * rIn;
       /* AND CLIPPED TO TODAY'S HOLE, which is what makes the floor structural.
          The opening starts from the fillet traced finer (the sweep's own
          construction), and a finer trace of an arc bulges OUTSIDE the shipped
@@ -10352,9 +10358,9 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
          the bar (eight halvings of the asked radius), so the achieved count
          never falls with roundness; the hole is counted as held, and the
          read-out says how many were. */
-      if (h && widthOf(q, c) >= bar && widthOf(h, c) < bar) {
+      if (h && widthOfCached(h, c) < bar && widthOf(q, c) >= bar) {
         held = true; let lo = 0, hi = R, best = null;
-        for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; const t = openAt(m); if (t && widthOf(t, c) >= bar) { lo = m; best = t; } else hi = m; }
+        for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; const t = openAt(m); if (t && widthOfCached(t, c) >= bar) { lo = m; best = t; } else hi = m; }
         Ru = lo; h = best;
       }
       /* THE FLOOR, AS A DECISION AND NOT ONLY A CONSTRUCTION: where the
@@ -10373,6 +10379,10 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
       return h;
     };
     const widthOf = (poly, c) => { if (!poly) return 0; const cp = diam(c); return infillWidthMm(poly, field ? (A, B, r) => acrossMm(A, B, r, cp) : null); };
+    /* The drawn hole's width is asked twice — by the roundness's bar clamp and
+       then by `widths` below — so it is computed once and read twice. */
+    const widthCache = new Map();
+    const widthOfCached = (poly, c) => { if (!poly) return 0; let w = widthCache.get(poly); if (w === undefined) { w = widthOf(poly, c); widthCache.set(poly, w); } return w; };
     const raws = cells.map(rawOf);
     const capacity = raws.map((r, i) => widthOf(r, cells[i]));
     caps = capacity;
@@ -10380,7 +10390,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
        it came from — and in SURFACE millimetres through the same offset the
        wall used. */
     holes = cells.map((c, i) => drawnOf(c, raws[i]));
-    widths = holes.map((h, i) => widthOf(h, cells[i]));
+    widths = holes.map((h, i) => widthOfCached(h, cells[i]));
     passesUsed = pass;
     /* A SEED IS DROPPED WHEN DROPPING IT CAN HELP, AND THE TEST IS STRUCTURAL.
        Ruling 3's drop is a REDISTRIBUTION: a cell too small to carry a ruled
