@@ -8503,6 +8503,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
          every hole where the narrow-span clamp bound. */
       emittedSkinLoops: infill.emittedSkinLoops || [],
       bead: (rim.infill && rim.infill.bead) || null,
+      margin: (rim.infill && rim.infill.margin) || null,
       /* AND WHERE THE CELLS' OWN TRIANGLES SIT IN THE STREAM — I4's subject.
          The welded petal is a basal solid ABUTTING a cell solid along the
          seam, which is not a manifold surface there, so its Euler
@@ -10060,7 +10061,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      so the plan's discrete answers are the same in every engine; a cell
      inherits its margin vertices from THIS array, so an outline point left off
      the grid is moved by the quantiser and its `f6` key can round the other
-     way — `skinCanon` then misses and `pt()` re-derives the margin through
+     way — `latticeAt` then misses and `pt()` re-derives the margin through
      `mapPlan` instead of handing back the lattice's own doubles. Measured:
      `verify-bloom-grid`'s clause 2a went red on 176 of 1072 captured boundary
      points, 144 of them on a margin. The 3D point is still the LATTICE's
@@ -10542,6 +10543,22 @@ function infillAnnulusSectors(outer, inner, cq) {
    hole, which would make `measureWall` skip a wall that is really there. That
    one is real, it is reachable through an untiled cell, and `plan.cellOpen` has
    its own comment about it at the merge-walk's fallback below. */
+/* EVERY LOCATION THE NARROW-SPAN CLAMP TOOK THE MARGIN'S BEAD UNDER ITS RULED
+   RADIUS, as Eva asked of the hole beads, compressed into runs of one arm: the
+   WALL arm (the room to the nearest hole is the plan's wall, so 0.45 of it) and
+   the WIDTH arm (the blade itself narrower than the bead, at the tip). Sorted
+   along the blade; each run carries its u range, its point count and the
+   smallest radius drawn in it. */
+function marginClampRuns(list) {
+  const xs = list.slice().sort((A, B) => A.u - B.u);
+  const runs = [];
+  for (const q of xs) {
+    const last = runs[runs.length - 1];
+    if (last && last.arm === q.arm) { last.uTo = q.u; last.points++; if (q.radiusMm < last.minRadiusMm) last.minRadiusMm = q.radiusMm; }
+    else runs.push({ arm: q.arm, uFrom: q.u, uTo: q.u, points: 1, minRadiusMm: q.radiusMm });
+  }
+  return runs;
+}
 function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const mSplit = plan.mSplit;
   /* THE BASAL PANEL STOPS WHERE THE CELL REGION BEGINS — `mSplit - 1`, the
@@ -10625,29 +10642,192 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const f6 = (x) => { const r = Math.round(x * 1e6) / 1e6; return (r === 0 ? 0 : r).toFixed(6); };
   const planCanon = new Map();
   const cq = (q) => { const k = `${f6(q.x)},${f6(q.y)}`; let v = planCanon.get(k); if (!v) { v = { x: q.x, y: q.y }; planCanon.set(k, v); } return v; };
-  const skinCanon = new Map();
+  const latticeAt = new Map();
   /* THE MARGIN'S VERTICES ARE THE LATTICE'S OWN POINTS, PRE-REGISTERED.
      `plan.outline` carries, on every vertex, the ROW it came from and which
-     margin it is, so the two skin points emitted there are `rows[i].sect(±1)`
-     offset by that row's own thickness — the very doubles the captured grid
-     holds — rather than a re-derivation through x -> u -> `surface.at`, whose
-     round trip is not exact. That is what makes `verify-bloom-grid`'s 2a an
-     IDENTITY on an infilled row rather than a proximity claim, and it is what
-     keeps the silhouette the one `emitPanel` draws below the split. */
+     margin it is, so the points emitted there are `rows[i].sect(v)` — the very
+     doubles the captured grid holds — rather than a re-derivation through
+     x -> u -> `surface.at`, whose round trip is not exact. That is what makes
+     `verify-bloom-grid`'s 2a an IDENTITY on an infilled row rather than a
+     proximity claim, and it is what keeps the silhouette the one `emitPanel`
+     draws below the split.
+     WHAT IS EMITTED THERE CHANGED WITH THE MARGIN BEAD, and 2a already asks the
+     right question of both: where the treatment reaches a margin vertex the
+     lattice point `C` is the bead's APEX (emitted as itself), and where it does
+     not — the seam, which the basal panel's own ramp has already faded to a
+     wall — it is the WALL, the two skins `C ± n t/2` offset exactly as the
+     basal panel's top row offsets them. `emitPanel`'s own either/or, one panel
+     over. */
   for (const q of plan.outline) {
     if (q.row === undefined) continue;
     const row = rows[q.row], tb = tAt(row.u);
     const s2 = row.sect(q.v);
     acc.noteSheet(tb);
-    skinCanon.set(`${f6(q.x)},${f6(q.y)}`, {
+    latticeAt.set(`${f6(q.x)},${f6(q.y)}`, {
       T: [s2.P[0] + s2.n[0] * tb / 2, s2.P[1] + s2.n[1] * tb / 2, s2.P[2] + s2.n[2] * tb / 2],
       B: [s2.P[0] - s2.n[0] * tb / 2, s2.P[1] - s2.n[1] * tb / 2, s2.P[2] - s2.n[2] * tb / 2],
+      C: s2.P, n: s2.n, b: tb / 2, tb,
     });
     planCanon.set(`${f6(q.x)},${f6(q.y)}`, q);
   }
+
+  /* ---- THE OUTER MARGIN TAKES THE EDGE PROFILE (the margin-bead session) ----
+
+     WHY IT WAS A WALL. S5 closed every outline edge of the cell region through
+     `emitRimLoop`'s `w = 0` arm — a step profile, the flat wall S3 drew — because
+     a bead needs the SKIN to stop short of the margin, and the cells' refined
+     skin has vertices within a bead's width of it that nothing moved (S5 §5).
+     Measured: 91 of 95 sections along the default infilled margin were a
+     1.200 mm wall meeting both skins at 90 degrees.
+
+     WHAT SHIPS. The margin is pulled in by `insetPlan` — ONE plan map, applied
+     to the OUTLINE's vertices only — and every cell touching the outline is
+     re-cut against that inset boundary BEFORE it is triangulated (the skin
+     polygons, below). Then each inset boundary edge closes on #278's own
+     profile through `emitRimLoop`, its apex on the ORIGINAL outline at the same
+     place, so the silhouette does not move. The inset is `emitPanel`'s own, in
+     the two directions `emitPanel` insets in: across the ROW for the two
+     margins (`rimInsetV`'s direction), along the LENGTH for the terminal face.
+
+     THE RADIUS IS #278's LAW WITH THE PLAN'S ROOM, the hole bead's own
+     expression — r = min(RIM_BEAD_RADIUS_MM, max(t, MIN_FEATURE_MM)/2,
+     RIM_ROOM_FRACTION * wall) = 0.45 mm — because the room between the margin
+     and the nearest hole IS the plan's wall (a hole is laid out a full wall in
+     from every outline edge); plus #278's width arm (0.45 x the blade's own
+     width) where the blade narrows to the tip. Both arms read the MODE-FREE
+     lamina and the mode-free sheet floor, so the inset boundary — which decides
+     the skin polygons' topology — is the same in both modes.
+
+     BEAD ONLY, NO TAPER, AND THAT IS A MEASUREMENT. #278's taper wants
+     RIM_TAPER_MM (3 mm) of solid sheet inside the rim; the infilled margin has
+     the plan's 1.00 mm wall before its first hole, so a taper lands its steepest
+     stretch on the hole rims. Built and measured: on the 2.4 mm sheet a hole
+     bead inside the taper read 151 degrees at its skin junction (H1), and
+     `petalWidth` 30 read 92.8 — and both went back under their bars with the
+     taper removed. S5 §2 reached the same answer for the holes from the other
+     side; the margin and the holes now close the same way, a 75%-ellipse bead
+     leaving the skin at ~32 degrees on the shipping sheet.
+
+     THE RAMP IS `emitPanel`'s BURIED-END RAMP. The seam is buried: the basal
+     panel below it has already faded its own bead to a wall there, and its top
+     row's lattice points are the cells' seam vertices. So the treatment rises
+     from nothing at the seam over RIM_TAPER_MM of margin arc by the same
+     smootherstep, the seam edges stay the step profile, and the two panels
+     meet on the same wall they met on before. */
+  const rEdge = Math.min(RIM_BEAD_RADIUS_MM, Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);
+  /* THE BAND: how deep into the blade the inset may squeeze the OUTLINE's own
+     vertices. On a side margin a vertex sits at depth 0 and simply moves `aS`
+     in; the band matters for the TERMINAL FACE, whose vertices lie inside the
+     half-width and are spread proportionally across the inset face, and for the
+     tip's own x-squeeze. `wall - rEdge` is the depth the plan keeps clear of
+     every hole's grown ring; that the skin polygons really do keep every ring
+     is not assumed — it is checked per cell before anything is emitted. */
+  const BAND = plan.wall - rEdge;
+  const sideRun = plan.outline.filter((q) => q.row !== undefined && q.col === NV - 1).sort((A, B) => A.x - B.x);
+  const xT = sideRun.length ? sideRun[sideRun.length - 1].x : Lm;
+  const sideS = [0];
+  for (let i = 1; i < sideRun.length; i++) sideS.push(sideS[i - 1] + infillLen(sideRun[i].x - sideRun[i - 1].x, sideRun[i].y - sideRun[i - 1].y));
+  const gAt = (x) => {
+    if (!(x > plan.xB)) return 0;
+    let i = 1; while (i < sideRun.length - 1 && sideRun[i].x < x) i++;
+    const A = sideRun[i - 1], B = sideRun[i];
+    const f = B && B.x > A.x ? Math.min(1, Math.max(0, (x - A.x) / (B.x - A.x))) : 1;
+    return rimEase((sideS[i - 1] + (sideS[i] - sideS[i - 1]) * f) / RIM_TAPER_MM);
+  };
+  /* the drawn inset at plan x, and which arm bounded it — the floor at
+     RIM_BEAD_RADIUS_MM / 512 is `emitPanel`'s own, for its reason (a bead of
+     1e-5 mm is numerically absent and its strips degenerate) */
+  const edgeArm = (x) => { const w = RIM_ROOM_FRACTION * 2 * hAt(x); return w < rEdge ? { r: w, arm: 'width' } : { r: rEdge, arm: rEdge < RIM_BEAD_RADIUS_MM ? 'wall' : 'none' }; };
+  /* ON A CURVED PLAN A PLAN LENGTH IS NOT A SURFACE LENGTH, and the band's
+     whole guarantee is a SURFACE one (a hole is laid out a surface wall in from
+     the outline). Measured before this: `ALL FORM MAX` moved 381 hole-rim
+     points, the plan's compression bringing rings nearer the outline IN THE
+     PLAN than the band. So the inset and the band are CHORDS on the
+     mid-surface, found the way `insetPlanMm` finds a hole's — a bracketed
+     bisection with `rimInsetV`'s own ULP slack — along the row for a margin and
+     along the length for the tip. On a flat plan the map is an isometry and the
+     walk is skipped: the answer IS the length. Cached per (x, side, length),
+     because every point of a row shares one answer.
+     THE BAND IS AN ARC, NOT A CHORD, and that was measured too: across a quill
+     (`petalRoll` 330) the chord from the margin shortcuts round the tube, so a
+     chord band reached 56 hole-rim points the plan had laid a full wall of ARC
+     away. `arcFor` marches the row in fixed steps and interpolates inside the
+     last one — no comparison against a continuous target decides a branch. */
+  const flatEdge = !plan.field;
+  const chordMemo = new Map();
+  const planFor = (x, sgn, want, alongX) => {
+    if (flatEdge || !(want > 0)) return want;
+    const k = `${f6(x)},${sgn},${want},${alongX ? 1 : 0}`; let v = chordMemo.get(k);
+    if (v !== undefined) return v;
+    const h = hAt(x);
+    const at = (d) => (alongX ? mapPlan(x - d, 0).P : mapPlan(x, sgn * (h - d)).P);
+    const P0 = at(0);
+    const chord = (d) => rimDist(at(d), P0);
+    const tol = RIM_INSET_TOL_ULPS * Number.EPSILON * (Math.abs(P0[0]) + Math.abs(P0[1]) + Math.abs(P0[2]) + want);
+    let lo = 0, hi = want;
+    for (let it = 0; it < 30 && chord(hi) < want - tol; it++) { lo = hi; hi *= 2; }
+    for (let it = 0; it < 20; it++) { const m = (lo + hi) / 2; if (chord(m) < want - tol) lo = m; else hi = m; }
+    v = (lo + hi) / 2;
+    chordMemo.set(k, v);
+    return v;
+  };
+  const arcFor = (x, sgn, want, alongX) => {
+    if (flatEdge || !(want > 0)) return want;
+    const k = `a${f6(x)},${sgn},${want},${alongX ? 1 : 0}`; let v = chordMemo.get(k);
+    if (v !== undefined) return v;
+    const h = hAt(x), STEPS = 64, dd = want / 16;
+    const at = (d) => (alongX ? mapPlan(x - d, 0).P : mapPlan(x, sgn * Math.max(0, h - d)).P);
+    let prev = at(0), acc2 = 0; v = want;
+    for (let i = 1; i <= STEPS * 4; i++) {
+      const P = at(i * dd), l = rimDist(P, prev);
+      if (acc2 + l >= want) { v = (i - 1) * dd + (l > 0 ? ((want - acc2) / l) * dd : 0); break; }
+      acc2 += l; prev = P; v = i * dd;
+    }
+    chordMemo.set(k, v);
+    return v;
+  };
+  const aSideAt = (x, sgn) => {
+    const g = gAt(x), arm = edgeArm(x);
+    const a = g > 0 ? Math.min(planFor(x, sgn, g * rEdge, false), g * arm.r) : 0;
+    return a > 0 ? Math.max(a, RIM_BEAD_RADIUS_MM / 512) : 0;
+  };
+  const aT = planFor(xT, 1, gAt(xT) * rEdge, true);
+  /* THE TIP'S BAND IS AS LONG AS THE HOLES ALLOW, NOT THE SIDES' 0.55 mm.
+     Squeezing the last 0.55 mm of blade into 0.10 mm made the inset boundary
+     turn far harder than the outline does there — the margin gate read the
+     tip's strip 7-16 degrees past its bar on every flat state. The band only
+     has to stay clear of the holes, and the tip's cells carry none, so it runs
+     back to the nearest hole-rim point (less the plan's own wall share) and no
+     further than RIM_TAPER_MM; never shorter than the sides' band. Assigned
+     once the rings are grown, before the inset boundary is built. */
+  let bandT = Math.max(arcFor(xT, 1, BAND, true), aT / 0.9), aTip = aT;
+  const insetPlan = (q) => {
+    let x = q.x, y = q.y;
+    const sgn = q.y < 0 ? -1 : 1;
+    const aS = aSideAt(q.x, sgn);
+    /* On the side margins `ds` is zero and this is `h - aS`. It is NOT dead
+       for the terminal face, whose vertices lie inside the half-width: the
+       band's proportional squeeze is what spreads them across the inset face
+       — replacing it with `h - aS` collapsed nine tip points onto two, and
+       MB2 caught it on every state. */
+    if (aS > 0) {
+      const h = hAt(q.x), beta = Math.min(Math.max(arcFor(q.x, sgn, BAND, false), aS / 0.9), h), ds = Math.max(0, h - Math.abs(q.y));
+      if (ds < beta) y = sgn * (h - (aS + (ds * (beta - aS)) / beta));
+    }
+    if (aTip > 0) { const dt = Math.max(0, xT - q.x); if (dt < bandT) x = xT - (aTip + (dt * (bandT - aTip)) / bandT); }
+    return x === q.x && y === q.y ? q : { x, y };
+  };
+  const skinMemo = new Map();
   const pt = (q) => {
-    const k = `${f6(q.x)},${f6(q.y)}`; let o = skinCanon.get(k);
-    if (!o) { const s = mapPlan(q.x, q.y); const tb = tAt(s.u); acc.noteSheet(tb); o = { T: [s.P[0] + s.n[0] * tb / 2, s.P[1] + s.n[1] * tb / 2, s.P[2] + s.n[2] * tb / 2], B: [s.P[0] - s.n[0] * tb / 2, s.P[1] - s.n[1] * tb / 2, s.P[2] - s.n[2] * tb / 2] }; skinCanon.set(k, o); }
+    const k = `${f6(q.x)},${f6(q.y)}`; let o = skinMemo.get(k);
+    if (o) return o;
+    const lat = latticeAt.get(k);
+    if (lat) o = lat;
+    else {
+      const s = mapPlan(q.x, q.y); const tb = tAt(s.u); acc.noteSheet(tb);
+      o = { T: [s.P[0] + s.n[0] * tb / 2, s.P[1] + s.n[1] * tb / 2, s.P[2] + s.n[2] * tb / 2], B: [s.P[0] - s.n[0] * tb / 2, s.P[1] - s.n[1] * tb / 2, s.P[2] - s.n[2] * tb / 2], C: s.P, n: s.n, b: tb / 2 };
+    }
+    skinMemo.set(k, o);
     return o;
   };
   /* The refinement. `dev` is memoised on the unordered plan pair, so the answer
@@ -10779,11 +10959,10 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   const flatProfs = new Map();
   /* THE FLAT WALL IS `rimProfile`'s OWN w = 0 ARM — the step profile whose one
      surviving quad is the wall S3's `emitRim` drew, on the same four corners,
-     with the same diagonal, the same winding and in the same order. The
-     OUTLINE of the cell region stays flat in this session: its bead needs the
-     skin near the margin to give way to the inset, and the cells' refined skin
-     has vertices within a bead's width of the margin that nothing moves (§5 of
-     docs/bloom-infill-s5-hole-rims.md). What changes is its OWNER. */
+     with the same diagonal, the same winding and in the same order. It is left
+     where the rim is BURIED — the seam against the basal panel, and a hole
+     whose grown ring no arm could tile — and nowhere else: the outer margin
+     takes the bead (`emitRimEdge`, below). */
   const flatProf = (q) => {
     const k = `${f6(q.x)},${f6(q.y)}`; let pr = flatProfs.get(k);
     if (!pr) { const o = pt(q); pr = rimProfile(acc, K, ZERO3, null, 0, ZERO3, o.T, o.B); flatProfs.set(k, pr); }
@@ -10795,6 +10974,95 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
        only a skip beyond those is a wall that collapsed, which is what S3's
        `collapsed` counted and still counts. */
     for (let i = 0; i + 1 < ps.length; i++) collapsed += emitRimLoop(acc, [flatProf(ps[i + 1]), flatProf(ps[i])], K, false) - 2 * (K - 1);
+  };
+  /* THE OUTER MARGIN'S PROFILE, memoised on the plan point like every other:
+     the skin comes from `pt` (so it IS where the cells' skin stops) and the
+     APEX is the ORIGINAL boundary point — the lattice's own mid point where the
+     vertex is a row the builder emitted, so the silhouette is the one the basal
+     panel draws and 2a's identity holds; `mapPlan` of the plan point on a
+     subdivision between two of them, which lies on the segment the outline
+     already had. Where the ramp is still zero the skin IS the apex and the
+     profile is the step: the fade into the seam costs nothing and needs no
+     branch. */
+  const edgeProfs = new Map();
+  let marginPoints = 0, marginSkipped = 0;
+  const marginClampU = [];
+  /* `q` is where the SKIN stops (a point of the inset boundary) and `prm` its
+     place along the loop (segment + t); the APEX is the ORIGINAL outline at the
+     same place — the inset boundary's segment s is the image of the outline's
+     segment s, vertex for vertex — and at a vertex it is the lattice's
+     registered point itself. The hole bead's own rule (`beadProf`), one
+     boundary over. Memoised on the skin point, which two cells meeting at a
+     wall's end share. */
+  const edgeProf = (q, prm) => {
+    const k = `${f6(q.x)},${f6(q.y)}`; let pr = edgeProfs.get(k);
+    if (pr) return pr;
+    const o = pt(q);
+    const s0 = Math.floor(prm), t = prm - s0;
+    const vtx = t < 1e-12 ? wrap(s0) : t > 1 - 1e-12 ? wrap(s0 + 1) : -1;
+    const A = OL[wrap(s0)], B = OL[wrap(s0 + 1)];
+    const ap = vtx >= 0 ? OL[vtx] : { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t };
+    const lat = vtx >= 0 ? latticeAt.get(`${f6(ap.x)},${f6(ap.y)}`) : null;
+    const apex = lat ? lat.C : mapPlan(ap.x, ap.y).P;
+    /* WHERE THE SKIN STOPS ON THE OUTLINE ITSELF (the ramp at zero, into the
+       seam) the profile is the STEP, and that is decided on the PLAN, never on
+       two 3D routes agreeing: `pt(q)` and the lattice / `mapPlan` reach the
+       same point by different arithmetic, so whether they came out bit-equal —
+       which is what sends `rimProfile` down its step branch — was a last-bit
+       question, and Chromium and Node answered it differently (X0 on
+       `INFILL: x 40 petals x 3 whorls`: 1,228,268 / 1,228,256 / 1,228,274
+       triangles across three engines, three petals of 120, every divergent
+       segment at g = 0). The plan points are quantised and mode-free, so this
+       is one answer everywhere. Eighth instance of a discrete decision on a
+       continuous quantity; the ninth refused.
+       AND PLAN EQUALITY IS NOT ENOUGH, MEASURED: of 1,440 profiles at g = 0 on
+       that row, 240 have a skin point a few ULP off the apex IN THE PLAN — the
+       apex is interpolated along its outline segment, the skin point is the
+       wall crossing's — so the 3D residue is ~6e-15 mm and is still the engine's
+       call. The RAMP is the owner: where `gAt` is exactly zero the treatment has
+       not started, the design puts the skin on the apex, and `!(x > plan.xB)` is
+       a comparison of plan quantities. */
+    const onOutline = gAt(ap.x) === 0 || (q.x === ap.x && q.y === ap.y);
+    pr = rimProfile(acc, K, onOutline ? apex : o.C, o.n, o.b, apex, o.T, o.B);
+    edgeProfs.set(k, pr);
+    marginPoints++;
+    const arm = edgeArm(ap.x);
+    if (!onOutline && arm.arm !== 'none') marginClampU.push({ u: ap.x / Lm, arm: arm.arm, radiusMm: arm.r });
+    return pr;
+  };
+  /* WHERE EACH MARGIN SEGMENT'S STRIP SITS IN THE STREAM — the margin gate's
+     subject (the edges this rim owns), with the triangles the strip skipped for
+     a repeated vertex, so emitted + skipped is exactly 2K a segment and a range
+     cannot be trimmed without the gate saying so. `g` is the ramp at the
+     segment, so the fade into the seam is reported rather than hidden. */
+  const marginRanges = [];
+  const emitRimEdge = (u, v, pu, pv) => {
+    const ps = edgePoints(u, v);
+    const d = circ(pu, pv), L2 = (v.x - u.x) ** 2 + (v.y - u.y) ** 2;
+    const prmOf = (q) => (q === u ? pu : q === v ? pv : pu + d * (L2 > 0 ? ((q.x - u.x) * (v.x - u.x) + (q.y - u.y) * (v.y - u.y)) / L2 : 0));
+    for (let i = 0; i + 1 < ps.length; i++) {
+      const t0 = acc.triangleCount;
+      const sk = emitRimLoop(acc, [edgeProf(ps[i + 1], prmOf(ps[i + 1])), edgeProf(ps[i], prmOf(ps[i]))], K, false);
+      marginSkipped += sk;
+      const xOf = (pp) => { const s0 = Math.floor(pp), t = pp - s0, A = OL[wrap(s0)], B = OL[wrap(s0 + 1)]; return A.x + (B.x - A.x) * t; };
+      const xa = xOf(prmOf(ps[i])), xb = xOf(prmOf(ps[i + 1]));
+      marginRanges.push([t0, acc.triangleCount, sk, Math.min(gAt(xa), gAt(xb)), Math.min(xa, xb), wrap(prmOf(ps[i]))]);
+    }
+  };
+  /* THE CELL'S RIM: the plan cell's outline edges as walls where the margin is
+     off, and otherwise every edge of the SKIN polygon both of whose ends sit on
+     the inset boundary within one segment of each other — beaded, except along
+     the SEAM, which is buried and keeps the step profile. */
+  const emitCellRim = (c0, c) => {
+    if (!marginOn) {
+      for (let i = 0; i < c0.length; i++) { const j = (i + 1) % c0.length; if (plan.isOutlineEdge(c0[i], c0[j])) emitRimFlat(c0[i], c0[j]); }
+      return;
+    }
+    for (let i = 0; i < c.length; i++) {
+      const u = c[i], v = c[(i + 1) % c.length], pu = paramOf(u), pv = paramOf(v);
+      if (pu === null || pv === null || !(Math.abs(circ(pu, pv)) <= 1 + 1e-9)) continue;
+      if (onSeam(u) && onSeam(v)) emitRimFlat(u, v); else emitRimEdge(u, v, pu, pv);
+    }
   };
 
   /* ---- THE HOLE BEAD (S5): the skin stops short of the hole and the rim
@@ -10826,7 +11094,13 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
      is, since every other point of a profile lies behind its apex — is the
      plan's own hole, unchanged. At the skins the hole is wider by the inset on
      each side. `plan.emittedLoops` are the APEX loops and I1 measures those. */
-  const rHole = Math.min(RIM_BEAD_RADIUS_MM, Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);
+  /* ONE LAW, ONE OWNER: the hole bead's radius IS the margin's `rEdge` (the
+     expression above, which carries the reasoning), because the room either
+     side of a hole wall and the room between the margin and a hole are the
+     same plan wall. The margin session first wrote the expression twice, and
+     the hole-rim gate's room-arm mutant then matched twice and was disarmed —
+     §9b(i) of the seam session, one bead over. */
+  const rHole = rEdge;
   /* WHERE THE SKIN NOW STOPS ROUND A HOLE: #278's OWN INSET LAW, per ring
      vertex. `rimInsetV` walks in from a margin to where the CHORD from the
      boundary point is the bead's radius, because the profile's half width IS
@@ -10911,9 +11185,12 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     }
     const A = Hh[bi], B = Hh[(bi + 1) % n];
     const apPlan = { x: A.x + (B.x - A.x) * bt, y: A.y + (B.y - A.y) * bt };
-    const s = mapPlan(q.x, q.y), o = pt(q), tb = tAt(s.u);
+    /* the skin, its normal and its half thickness are `pt`'s — the margin's
+       taper reaches a hole near the outline, and the rim must stop on the
+       skin the cells actually drew */
+    const o = pt(q);
     const apex = mapPlan(apPlan.x, apPlan.y).P;
-    pr = rimProfile(acc, K, s.P, s.n, tb / 2, apex, o.T, o.B);
+    pr = rimProfile(acc, K, o.C, o.n, o.b, apex, o.T, o.B);
     pr.apexPlan = apPlan;
     beadProfs.set(k, pr);
     return pr;
@@ -10958,13 +11235,168 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
      which is the tell that it is the JUNCTION being counted and not the
      holes. The cells alone are a closed manifold sheet (adjacent cells share
      a wall and emit no rim between them) and read 2 - 2h exactly. */
+  /* ---- THE SKIN POLYGONS: every cell with its outline chain replaced by the
+     piece of the INSET boundary its own two walls cut off ----
+
+     THE INSET BOUNDARY is `plan.outline` with every vertex moved by
+     `insetPlan` (the seam's are not moved: the ramp is zero there). Each cell
+     keeps every vertex that is not on the outline — the plan's own canonical
+     points, so a neighbour that does not reach the margin shares them to the
+     bit — and each maximal OUTLINE CHAIN of the cell (from the junction where a
+     wall meets the outline to the next one) is replaced by: the point where the
+     first wall's LINE crosses the inset boundary, the inset boundary's own
+     vertices after it, and the point where the second wall crosses it. The
+     walls do not move — only where they end.
+
+     WHY A CLIP AND NOT A MOVE — two measured failures, in order. Mapping the
+     finished skin triangles through `insetPlan` turned 31-43 of them over per
+     petal (a margin vertex on a steep stretch of outline, the triangle's other
+     two outside the band). Moving the cell's VERTICES and triangulating after
+     fixed that and then refused 7 of 20 cells on the shipping default: moving a
+     junction with the margin ROTATES the wall, and a grown ring stands 0.05 mm
+     off its wall; sliding the junction along the wall kept 1 of those and left
+     6 self-crossing, because where a wall meets the margin at a shallow angle
+     the inset margin crosses the wall PAST the next outline vertex — the true
+     skin polygon DROPS that vertex, which no move of vertices can say.
+
+     EVERY SKIN POLYGON IS CHECKED BEFORE ANY IS USED: simple, the cell's own
+     orientation, and still holding its hole's grown ring. The decision is ONE
+     for the petal — a cell keeping its wall beside a neighbour whose rim is
+     inset would be a crack — so a single failure keeps every margin a flat
+     wall and says so (`margin.refusedCells`). */
+  const edgeSlack = infillTieSlack(Lm);
+  const rings = [];
+  let holeTipGap = Infinity;
+  for (let ci = 0; ci < plan.cells.length; ci++) {
+    const hole = plan.cellOpen[ci] ? plan.holes[ci].map(cq) : null;
+    const ring = hole ? growHole(hole, plan.cells[ci].map(cq)) : null;
+    rings.push(ring);
+    if (hole) for (const q of (ring ? ring.G : hole)) holeTipGap = Math.min(holeTipGap, xT - q.x);
+  }
+  bandT = Math.max(bandT, Math.min(RIM_TAPER_MM, holeTipGap - (plan.wall - rEdge)));
+  /* AND THE TIP'S SQUEEZE MAY AT MOST HALVE ITS BAND. Where the holes come
+     close to the tip the band stays short, and a full-reach tip inset then
+     compresses the inset boundary onto a near-line that the ear clip fans into
+     slivers — measured, a 103.9-degree edge at `density 40`'s tip corner. So
+     the tip's reach is the law's, or half the band, whichever is less. */
+  aTip = Math.min(aT, 0.5 * bandT);
+  const OL = plan.outline.map(cq), NO = OL.length;
+  const OI = OL.map((q) => { const p = insetPlan(q); return p === q ? q : cq({ x: infillSnap(p.x, edgeSlack), y: infillSnap(p.y, edgeSlack) }); });
+  const olIndex = new Map(OL.map((q, i) => [`${f6(q.x)},${f6(q.y)}`, i]));
+  /* where a point of an ORIGINAL outline edge sits along the loop: segment + t */
+  const paramOnOutline = (q) => {
+    const i = olIndex.get(`${f6(q.x)},${f6(q.y)}`);
+    if (i !== undefined) return i;
+    let best = Infinity, bp = null;
+    for (let s2 = 0; s2 < NO; s2++) {
+      const A = OL[s2], B = OL[(s2 + 1) % NO], ex = B.x - A.x, ey = B.y - A.y, l2 = ex * ex + ey * ey;
+      if (!(l2 > 0)) continue;
+      let t = ((q.x - A.x) * ex + (q.y - A.y) * ey) / l2; t = t < 0 ? 0 : t > 1 ? 1 : t;
+      const d = Math.hypot(A.x + ex * t - q.x, A.y + ey * t - q.y);
+      if (d < best) { best = d; bp = s2 + t; }
+    }
+    return best < 1e-6 ? bp : null;
+  };
+  const circ = (a, b) => { let d = b - a; while (d > NO / 2) d -= NO; while (d < -NO / 2) d += NO; return d; };
+  const wrap = (a) => ((a % NO) + NO) % NO;
+  /* the WALL LINE from `Vw` through junction `J` meets the inset boundary: the
+     crossing nearest `J` along the wall, searched over the inset segments
+     around the junction's own. The line is fixed by the wall's two ends in
+     CANONICAL order, so the two cells sharing the wall find the same double. */
+  const wallCross = (Vw, J, pJ) => {
+    const [P, Q] = `${f6(Vw.x)},${f6(Vw.y)}` < `${f6(J.x)},${f6(J.y)}` ? [Vw, J] : [J, Vw];
+    const dx = Q.x - P.x, dy = Q.y - P.y;
+    let best = null;
+    const s0 = Math.floor(pJ);
+    for (let o = -12; o <= 12; o++) {
+      const s2 = wrap(s0 + o), R = OI[s2], S = OI[(s2 + 1) % NO];
+      const ex = S.x - R.x, ey = S.y - R.y, den = ex * dy - ey * dx;
+      if (!(Math.abs(den) > 1e-15)) continue;
+      const t = ((P.x - R.x) * dy - (P.y - R.y) * dx) / den;
+      if (!(t >= 0 && t <= 1)) continue;
+      const X = { x: R.x + ex * t, y: R.y + ey * t };
+      /* where along the wall, measured from the INTERIOR end: the wanted
+         crossing is the last one before the junction */
+      const lam = ((X.x - Vw.x) * (J.x - Vw.x) + (X.y - Vw.y) * (J.y - Vw.y)) / ((J.x - Vw.x) ** 2 + (J.y - Vw.y) ** 2);
+      if (!(lam > 1e-9 && lam <= 1 + 1e-9)) continue;
+      if (!best || lam > best.lam) best = { lam, X, p: s2 + t };
+    }
+    if (!best) return null;
+    const X = t01(best.p) === 0 ? OI[wrap(Math.round(best.p))] : cq({ x: infillSnap(best.X.x, edgeSlack), y: infillSnap(best.X.y, edgeSlack) });
+    return { X, p: best.p };
+  };
+  const t01 = (pp) => { const f = pp - Math.floor(pp); return f < 1e-12 || f > 1 - 1e-12 ? 0 : f; };
+  const skinParam = new Map();          // skin point key -> its param along the inset boundary
+  const skinOf = (c0) => {
+    const n = c0.length;
+    const onOut = c0.map((q, i) => plan.isOutlineEdge(q, c0[(i + 1) % n]));   // edge i -> i+1 is outline
+    if (!onOut.some(Boolean)) return { poly: c0 };
+    if (onOut.every(Boolean)) return null;
+    const out = [];
+    for (let i = 0; i < n; i++) {
+      if (onOut[(i - 1 + n) % n] && onOut[i]) continue;                // an interior chain vertex: replaced below
+      if (!onOut[(i - 1 + n) % n] && !onOut[i]) { out.push(c0[i]); continue; }  // not on the outline at all
+      if (!onOut[(i - 1 + n) % n] && onOut[i]) {
+        /* J1: the wall into it is c0[i-1] -> c0[i]; the chain starts here */
+        let j = i; const chain = [c0[i]];
+        while (onOut[j % n] && chain.length <= n) { j++; chain.push(c0[j % n]); }
+        const J1 = c0[i], J2 = c0[j % n], V1 = c0[(i - 1 + n) % n], V2 = c0[(j + 1) % n];
+        const p1 = paramOnOutline(J1), p2 = paramOnOutline(J2);
+        if (p1 === null || p2 === null) return null;
+        const pMid = paramOnOutline(chain[1]); if (pMid === null) return null;
+        const dir = circ(p1, pMid) >= 0 ? 1 : -1;
+        const X1 = wallCross(V1, J1, p1), X2 = wallCross(V2, J2, p2);
+        if (!X1 || !X2) return null;
+        const span = dir * circ(X1.p, X2.p);
+        if (!(span > 0)) return null;
+        out.push(X1.X); skinParam.set(`${f6(X1.X.x)},${f6(X1.X.y)}`, X1.p);
+        /* the inset boundary's own vertices strictly between, in the chain's direction */
+        let v = dir > 0 ? Math.floor(X1.p) + 1 : Math.ceil(X1.p) - 1;
+        for (let guard = 0; guard <= NO; guard++) {
+          if (!(dir * circ(X1.p, v) > 1e-12 && dir * circ(v, X2.p) > 1e-12)) break;
+          const q = OI[wrap(v)]; out.push(q); skinParam.set(`${f6(q.x)},${f6(q.y)}`, wrap(v));
+          v += dir;
+        }
+        out.push(X2.X); skinParam.set(`${f6(X2.X.x)},${f6(X2.X.y)}`, X2.p);
+        continue;
+      }
+      /* the chain's last vertex (outline in, wall out) was emitted as X2 */
+    }
+    return { poly: infillDedupe(out) };
+  };
+  const simpleSameWay = (P, Q) => {
+    const sa = (R) => { let w = 0; for (let i = 0; i < R.length; i++) { const A = R[i], B = R[(i + 1) % R.length]; w += A.x * B.y - B.x * A.y; } return w; };
+    if (Math.sign(sa(P)) !== Math.sign(sa(Q))) return false;
+    const n = Q.length, cr = (p, q, r2) => (q.x - p.x) * (r2.y - p.y) - (q.y - p.y) * (r2.x - p.x);
+    for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) {
+      if (i === 0 && j === n - 1) continue;
+      const A = Q[i], B = Q[(i + 1) % n], C = Q[j], D = Q[(j + 1) % n];
+      if (cr(A, B, C) * cr(A, B, D) < 0 && cr(C, D, A) * cr(C, D, B) < 0) return false;
+    }
+    return true;
+  };
+  const skinCells = [];
+  let refusedCells = 0;
+  for (let ci = 0; ci < plan.cells.length; ci++) {
+    const c = plan.cells[ci].map(cq);
+    const hole = plan.cellOpen[ci] ? plan.holes[ci].map(cq) : null;
+    const ring = rings[ci];
+    const sk = skinOf(c);
+    let ok = !!sk && sk.poly && sk.poly.length >= 3 && simpleSameWay(c, sk.poly);
+    if (ok && hole) for (const q of (ring ? ring.G : hole)) if (!infillPointInPoly(q.x, q.y, sk.poly)) { ok = false; break; }
+    if (!ok) refusedCells++;
+    skinCells.push(ok ? sk.poly : c);
+  }
+  const marginOn = refusedCells === 0;
+  const paramOf = (q) => { const v = skinParam.get(`${f6(q.x)},${f6(q.y)}`); return v === undefined ? null : v; };
   const triFrom = acc.triangleCount;
   let tileFail = 0, holesCut = 0, solid = 0, untiled = 0;
   const holeLoops = [], skinLoops = [];                 // the hole outlines, kept as explicit closed loops for S5's `emitRimLoop`
   for (let ci = 0; ci < plan.cells.length; ci++) {
-    const c = plan.cells[ci].map(cq);
-    const k = c.length; const O = c.map(pt);
-    const rimOK = (i) => plan.isOutlineEdge(c[i], c[(i + 1) % k]);
+    const c0 = plan.cells[ci].map(cq);
+    /* `c0` is the plan's cell, `c` the polygon the SKIN is drawn on — the same
+       vertices, the outline's pulled in by the margin's inset */
+    const c = marginOn ? skinCells[ci] : c0;
     const hole = plan.cellOpen[ci] ? plan.holes[ci].map(cq) : null;
     if (!hole) {
       solid++;
@@ -10975,20 +11407,20 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
       let tris = infillEarClip(c, 1e-12, flatDrawn);
       if (!tiles(tris, infillPolyArea(c))) { tileFail++; tris = infillFan(c, flatDrawn); }
       emitSkin(tris);
-      for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRimFlat(c[i], c[j]); }
+      emitCellRim(c0, c);
       continue;
     }
     holesCut++;
-    let ring = growHole(hole, c);
+    let ring = rings[ci];
     /* ONE ATTEMPT AT THE ANNULUS AGAINST A GIVEN RING, EMITTING NOTHING: the
        sector split first, the angular merge-walk if that fails. The bead's ring
        is tried first and the plan's own hole after it, so a grown ring that no
        arm can tile costs the hole its BEAD (a flat wall, counted in
        `flatHoles`) and never its HOLE. */
-    const attempt = (rg) => {
+    const attempt = (rg, cp = c) => {
       const skinHole = rg ? rg.G : hole;
-      const want = infillPolyArea(c) - infillPolyArea(skinHole);
-      const sec = infillAnnulusSectors(c, skinHole, cq);
+      const want = infillPolyArea(cp) - infillPolyArea(skinHole);
+      const sec = infillAnnulusSectors(cp, skinHole, cq);
       if (sec) {
         let all = [];
         let ok = true;
@@ -11006,7 +11438,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
          neighbour is a crack along the wall they share: measured, `density 40`
          LIVE read 80 boundary edges before this line, and 0 after. */
       const inn = infillCcw(skinHole); const cc = infillCentroid(inn); const ang = (q) => Math.atan2(q.y - cc.y, q.x - cc.x);
-      const I = inn.map((q) => ({ a: ang(q), q })); const Oa = c.map((q) => ({ a: ang(q), q }));
+      const I = inn.map((q) => ({ a: ang(q), q })); const Oa = cp.map((q) => ({ a: ang(q), q }));
       const rot = (arr) => { let m = 0; for (let i = 1; i < arr.length; i++) if (arr[i].a < arr[m].a) m = i; return arr.slice(m).concat(arr.slice(0, m)); };
       const A = rot(Oa), Bq = rot(I); let ia = 0, ib = 0; const na = A.length, nb = Bq.length;
       const nextA = (i) => A[(i + 1) % na].a + ((i + 1) >= na ? 2 * Math.PI : 0), nextB = (i) => Bq[(i + 1) % nb].a + ((i + 1) >= nb ? 2 * Math.PI : 0);
@@ -11038,6 +11470,16 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     };
     let got = attempt(ring);
     if (!got && ring) { ring = null; got = attempt(null); }
+    /* WHETHER A HOLE EXISTS MAY NOT MOVE WITH THE MARGIN. A hole whose ring
+       could not be grown is cut with a flat wall only where the plan's own
+       hole tiles against the plan's own CELL — the decision `main` took before
+       the margin had an inset. Measured, the one case it separates:
+       `petalTipShape` 3.00 carries a 117-vertex hole whose ring `growHole`
+       refuses on both trees; against the plan cell its annulus does not tile
+       and the cell stays solid, against the inset skin polygon it did, and the
+       petal gained a FLAT-WALLED hole (H0's own subject) because of a change
+       to its margin. */
+    if (got && !ring && marginOn && c !== c0 && !attempt(null, c0)) got = null;
     if (got) {
       if (got.walked) tileFail++;
       emitSkin(got.tris);
@@ -11058,7 +11500,7 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
       emitSkin(tris);
       holesCut--; solid++;
     }
-    for (let i = 0; i < k; i++) { const j = (i + 1) % k; if (rimOK(i)) emitRimFlat(c[i], c[j]); }
+    emitCellRim(c0, c);
   }
   /* THE PLAN'S COUNTS ARE THE ARTEFACT'S. A cell whose annulus no arm could
      tile carries no hole, so `achieved` must say so — the read-out speaks it,
@@ -11103,7 +11545,8 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
   }
   plan.emittedTriRange = [triFrom, acc.triangleCount];
   if (rim) { rim.infill = { cells: plan.cells.length, holes: holesCut, solid, tileFail, cappedTris, tolMm, latticeDevMm: latDev, minEdgeMm, holeLoops: holeLoops.length, collapsed,
-    bead: { radiusMm: rHole, segments: K, beadedHoles, flatHoles, points: beadPoints, clamps: beadClamps, rimRanges: holeRimRanges } }; }
+    bead: { radiusMm: rHole, segments: K, beadedHoles, flatHoles, points: beadPoints, clamps: beadClamps, rimRanges: holeRimRanges },
+    margin: { radiusMm: rEdge, bandMm: BAND, taperMm: RIM_TAPER_MM, points: marginPoints, skipped: marginSkipped, refusedCells, on: marginOn, rimRanges: marginRanges, clampRuns: marginClampRuns(marginClampU) } }; }
   /* THE LOOPS THE EMITTER ACTUALLY WALKED, kept on the plan for two readers:
      I5's material-mask biconditional, which must ask about the artefact rather
      than about the polygons the plan holds, and S5, which will hang

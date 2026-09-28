@@ -617,9 +617,10 @@ let capability = null;
    by E7 of tools/verify-bloom-edge-profile.mjs, not argued here. */
 /* SMOOTH SHADING IN THE NORMAL VIEW ONLY (Eva's ruling): the LIVE viewport
    now shades from a creased-normal reconstruction rather than a flat
-   per-triangle one; PRINT PREVIEW keeps the flat normals it always had,
-   because print preview exists to show what prints, and smoothing hides a
-   real 0.7-0.9 mm facet as convincingly as fixing it would. `toCreasedNormals`
+   per-triangle one; PRINT PREVIEW is not creased, because print preview
+   exists to show what prints, and smoothing hides a real 0.7-0.9 mm facet as
+   convincingly as fixing it would — it shades the rim bead from the builder's
+   own closed-form normals and every other facet flat (see buildGeometry). `toCreasedNormals`
    is still imported as `three/addons/utils/BufferGeometryUtils.js` — the
    normal `three/addons/` specifier every other addon here uses — but that
    ONE exact specifier is pinned in `bloom.html`'s importmap to
@@ -719,10 +720,22 @@ function buildGeometry({ exportMode, record = false, captureGrid = false, captur
      every other triangle carries the same flat normal this line computed
      before, so nothing else on the model changes appearance. */
   if (exportMode) {
-    /* PRINT PREVIEW AND THE STL EXPORT STAY FLAT — Eva's ruling. Print
-       preview exists to show what prints, and creased-normal smoothing would
-       hide a real, measured 0.7-0.9 mm facet as convincingly as fixing it
-       would; the STL carries no normal channel a slicer reads anyway. */
+    /* PRINT PREVIEW IS NOT FLAT, AND THIS COMMENT USED TO SAY IT WAS.
+       Measured in the real page: print preview hands three.js the BUILDER'S
+       closed-form bead normals (`captureNormals`) — 79,584 of 113,424
+       triangles on the infilled default carry a vertex normal off their own
+       face, 8,160 of 24,688 on the shipping default. What print preview does
+       NOT do is `toCreasedNormals`: every triangle the builder gave no normal
+       (skins, walls, anything but a rim bead) keeps the flat per-facet normal
+       `computeVertexNormals()` gives a non-indexed buffer, so a real facet on
+       a skin still reads as one — which is Eva's ruling on why print preview
+       is not creased. The STL carries no normal channel a slicer reads.
+       KNOWN, NOT FIXED: on the shipping default 1,872 rim triangles (20.1 mm²)
+       carry a vertex normal more than 60 degrees off their face, worst 89.6 —
+       every one at the petal's two ENDS (the tip's pivot fans and strips, and
+       the foot-to-blade ramp), where the bead's size changes from one profile
+       to the next and `rimProfile`'s closed form, by its own declaration,
+       leaves out the along-sweep term. A shading artefact; no position. */
     if (acc.normals && acc.normals.length === acc.positions.length) {
       geo.setAttribute('normal', new THREE.Float32BufferAttribute(acc.normals, 3));
     } else {

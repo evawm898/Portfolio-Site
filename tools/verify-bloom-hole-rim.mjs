@@ -59,8 +59,10 @@
    the bead grown into the hole (H0-H3).
 
    WHAT IT DOES NOT COVER: the petal's OUTER margin above the infill's split
-   is closed by `emitRimLoop` as a FLAT wall in S5 and is not this gate's
-   subject (H1 looks only near holes); petal 0 only, never the whorl.
+   (beaded since the margin-bead session) is `verify-bloom-infill-margin.mjs`'s
+   subject, not this gate's (H1 looks only near holes); petal 0 only, never the
+   whorl; and SLIVERS (inradius under 1% of their longest edge) are skipped by
+   H1 and counted on every row, because their face normal is noise.
    =================================================================== */
 import fs from 'node:fs';
 import os from 'node:os';
@@ -96,9 +98,12 @@ const FLAT_XFAIL = Object.freeze({});
    multiplied by the mesh). There the bead is laid on a surface that turns
    through itself within a bead's width, and the worst rim edge is recorded
    rather than bounded — held in BOTH directions (#213's rule). */
+/* RE-RECORDED by the margin-bead session (previous figures 165.71 and 128.89):
+   the margin's own bead now sits beside these holes on the same folding
+   sheet, and the new skin between the two beads moves which edge is worst. */
 const H1_XFAIL = Object.freeze({
-  'cup 1.2 x curl 360': { worstDeg: 165.71 },
-  'roll 330': { worstDeg: 128.89 },
+  'cup 1.2 x curl 360': { worstDeg: 179.56 },
+  'roll 330': { worstDeg: 129.14 },
   'ALL FORM MAX': { worstDeg: 178.67 },
   'buckle 0.60 f 3': { worstDeg: 151.87 },
 });
@@ -162,6 +167,7 @@ function runState(G, name, set, mode) {
   return { name, mode, st, petal, surface, plan, pos: a.positions, sheets: g.rows.map((r) => r.thickness) };
 }
 
+const SLIVER_ASPECT = 0.01;
 const inPoly = (x, y, poly) => { let inside = false; for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) { const a = poly[i], b = poly[j]; if ((a.y > y) !== (b.y > y) && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) inside = !inside; } return inside; };
 const segDist = (q, A, B) => { const ex = B.x - A.x, ey = B.y - A.y, l2 = ex * ex + ey * ey; let t = l2 > 0 ? ((q.x - A.x) * ex + (q.y - A.y) * ey) / l2 : 0; t = Math.max(0, Math.min(1, t)); return Math.hypot(A.x + ex * t - q.x, A.y + ey * t - q.y); };
 
@@ -235,12 +241,22 @@ function clauses(G, r) {
   const near = (p) => { const ix = Math.floor(p[0] / cell), iy = Math.floor(p[1] / cell), iz = Math.floor(p[2] / cell);
     for (let a = -1; a <= 1; a++) for (let b = -1; b <= 1; b++) for (let c = -1; c <= 1; c++) { const L2 = grid.get(`${ix + a},${iy + b},${iz + c}`); if (!L2) continue; for (const q of L2) if (Math.hypot(q[0] - p[0], q[1] - p[1], q[2] - p[2]) <= reach) return true; } return false; };
   const pos = r.pos, vid = new Map(), vtx = []; const idOf = (i) => { const k = `${pos[i]},${pos[i + 1]},${pos[i + 2]}`; let v = vid.get(k); if (v === undefined) { v = vtx.length; vid.set(k, v); vtx.push([pos[i], pos[i + 1], pos[i + 2]]); } return v; };
-  const tris = [], normals = [], edges = new Map();
+  const tris = [], normals = [], edges = new Map(); let slivers = 0;
   for (let t = 0; t < pos.length; t += 9) {
     const a = idOf(t), b = idOf(t + 3), c = idOf(t + 6); const ti = tris.length; tris.push([a, b, c]);
     const A = vtx[a], Bv = vtx[b], C = vtx[c];
     const ux = Bv[0] - A[0], uy = Bv[1] - A[1], uz = Bv[2] - A[2], wx = C[0] - A[0], wy = C[1] - A[1], wz = C[2] - A[2];
-    let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx; const l = Math.hypot(nx, ny, nz); normals.push(l > 0 ? [nx / l, ny / l, nz / l] : null);
+    let nx = uy * wz - uz * wy, ny = uz * wx - ux * wz, nz = ux * wy - uy * wx; const l = Math.hypot(nx, ny, nz);
+    /* A SLIVER HAS NO NORMAL WORTH MEASURING (the margin gate's rule, shared):
+       inradius under a hundredth of its longest edge. Added by the margin-bead
+       session, which put a 0.10 mm SKIN strip between the margin's bead and a
+       hole's — measured, three nearly collinear skin points there read 89.9
+       degrees against a correctly placed hole-rim facet. Counted, never
+       silently dropped; a flat wall is 1.2 mm tall and is never a sliver. */
+    const e1 = Math.hypot(ux, uy, uz), e2 = Math.hypot(wx, wy, wz), e3 = Math.hypot(C[0] - Bv[0], C[1] - Bv[1], C[2] - Bv[2]);
+    const sliver = !(l > 0) || l / (e1 + e2 + e3) < SLIVER_ASPECT * Math.max(e1, e2, e3);
+    if (sliver) slivers++;
+    normals.push(sliver ? null : [nx / l, ny / l, nz / l]);
     for (const [p, q] of [[a, b], [b, c], [c, a]]) { const k = p < q ? `${p},${q}` : `${q},${p}`; if (!edges.has(k)) edges.set(k, []); edges.get(k).push(ti); }
   }
   const nearV = new Map(); const isNear = (v) => { let x = nearV.get(v); if (x === undefined) { x = near(vtx[v]); nearV.set(v, x); } return x; };
@@ -276,7 +292,7 @@ function clauses(G, r) {
   const hx = H1_XFAIL[r.name];
   if (hx) add('H1', Math.abs(worst - hx.worstDeg) <= 0.01, `${r.name} ${r.mode}: the declared fold-state rim turn reads ${worst.toFixed(2)} degrees against its record ${hx.worstDeg.toFixed(2)} — ${worst > hx.worstDeg ? 'WORSE' : 'better'}; a change moved it and owes a re-record`);
   else add('H1', worst < bar, `${r.name} ${r.mode}: an edge within ${reach.toFixed(3)} mm of a hole turns ${worst.toFixed(2)} degrees, over the bead's own resolution ${bar.toFixed(2)} (a flat wall turns 90)`);
-  r.report = { worstRR, worstJ, worst, bar, counted, rLaw, chordWorst, chordSpread, vertices, beaded: B.beadedHoles, flat: B.flatHoles, clamps: B.clamps.length };
+  r.report = { slivers, worstRR, worstJ, worst, bar, counted, rLaw, chordWorst, chordSpread, vertices, beaded: B.beadedHoles, flat: B.flatHoles, clamps: B.clamps.length };
   return out;
 }
 
@@ -288,7 +304,7 @@ async function run(G, quiet) {
       const r = runState(G, name, set, mode);
       const cs = clauses(G, r);
       for (const c of cs) if (!c.ok) { bad.push(`${c.id}: ${c.msg}`); fired.add(c.id); }
-      if (!quiet && r.report) console.log(`  ${mode.padEnd(6)} ${name.padEnd(20)} r=${r.report.rLaw.toFixed(3)} beaded ${r.report.beaded} flat ${r.report.flat} clamps ${r.report.clamps}  worst turn ${r.report.worst.toFixed(2)} (rim-rim ${r.report.worstRR.toFixed(2)}, rim-skin ${r.report.worstJ.toFixed(2)}) / bar ${r.report.bar.toFixed(2)} deg over ${r.report.counted} rim edges  chord at ${r.report.vertices} vertices ${r.report.chordWorst.toExponential(2)} / between ${r.report.chordSpread.toFixed(4)} mm`);
+      if (!quiet && r.report) console.log(`  ${mode.padEnd(6)} ${name.padEnd(20)} r=${r.report.rLaw.toFixed(3)} beaded ${r.report.beaded} flat ${r.report.flat} clamps ${r.report.clamps}  worst turn ${r.report.worst.toFixed(2)} (rim-rim ${r.report.worstRR.toFixed(2)}, rim-skin ${r.report.worstJ.toFixed(2)}) / bar ${r.report.bar.toFixed(2)} deg over ${r.report.counted} rim edges (${r.report.slivers} slivers skipped)  chord at ${r.report.vertices} vertices ${r.report.chordWorst.toExponential(2)} / between ${r.report.chordSpread.toFixed(4)} mm`);
     }
   }
   return { bad, fired };
@@ -296,9 +312,15 @@ async function run(G, quiet) {
 
 const SRC = fs.readFileSync(path.join(ROOT, 'bloom-geometry.js'), 'utf8');
 const MUTANTS = [
-  { id: 'the-flat-wall-is-back', names: ['H0', 'H1', 'H2', 'H3'], from: '    let ring = growHole(hole, c);', to: '    let ring = null;' },
-  { id: 'the-apex-is-the-skin-point', names: ['H1'], from: '    const apex = mapPlan(apPlan.x, apPlan.y).P;', to: '    const apex = s.P;' },
-  { id: 'the-room-arm-is-dropped', names: ['H1', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
+  { id: 'the-flat-wall-is-back', names: ['H0', 'H1', 'H2', 'H3'], from: '    let ring = rings[ci];', to: '    let ring = null;' },
+  { id: 'the-apex-is-the-skin-point', names: ['H1'], from: '    const apex = mapPlan(apPlan.x, apPlan.y).P;', to: '    const apex = o.C;' },
+  /* H0 and H2 too, since the margin-bead session: the hole bead's radius and
+     the margin's are ONE expression now, so dropping the room arm makes both
+     beads 0.50 mm on a 1.00 mm wall — no skin is left between them, grown rings
+     are refused and holes fall back to flat walls. That happens only on the
+     states outside the --quick subset (measured: CI's --quick run fires H1 and
+     H3 alone), so the claim is stated per state set rather than widened. */
+  { id: 'the-room-arm-is-dropped', names: ['H0', 'H1', 'H2', 'H3'], quickNames: ['H1', 'H3'], from: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2, RIM_ROOM_FRACTION * plan.wall);', to: 'Math.max(tAt(rows[mSplit].u), MIN_FEATURE_MM) / 2);' },
   { id: 'the-bead-grows-into-the-hole', names: ['H0', 'H1', 'H2', 'H3'], from: '      en.push([ey / len, -ex / len]);', to: '      en.push([-ey / len, ex / len]);' },
 ];
 
@@ -314,7 +336,8 @@ if (NEG) {
     const GM = await loadGeometry(SRC.replace(m.from, m.to));
     let res;
     try { res = await run(GM, true); } catch (e) { res = { bad: [`CRASH ${e.message}`], fired: new Set(['CRASH']) }; }
-    const missed = m.names.filter((x) => !res.fired.has(x)), extra = [...res.fired].filter((x) => !m.names.includes(x));
+    const names = (QUICK && m.quickNames) || m.names;
+    const missed = names.filter((x) => !res.fired.has(x)), extra = [...res.fired].filter((x) => !names.includes(x));
     if (missed.length || extra.length) { ok = false; console.error(`  ${m.id}: MISSED ${missed.join(',') || '-'} / UNCLAIMED ${extra.join(',') || '-'}\n    ${res.bad.slice(0, 3).join('\n    ')}`); }
     else console.log(`  ${m.id}: fired ${[...res.fired].sort().join(', ')} as claimed`);
   }

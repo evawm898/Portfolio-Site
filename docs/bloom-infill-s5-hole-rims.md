@@ -126,6 +126,8 @@ Measured: live == export triangle counts on every infilled row.
 
 ## 5. What is NOT done: the outline above the split is still a flat wall
 
+> **CLOSED by the margin-bead session — `docs/bloom-infill-margin-bead.md`.** The outline above the split now closes on the bead; this section is the state before it.
+
 The cell region's outline edges (the petal margin above the infill's split, and
 the tip) go through `emitRimLoop` as its `w = 0` step profile — **the same wall
 S3's `emitRim` drew, on the same corners, same diagonal, same winding, same order
