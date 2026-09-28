@@ -4941,7 +4941,7 @@ read 151° on sheet 2.40 — it fights the first hole's bead for the same 1.00 m
 ONE expression (#278's three arms, room = the 1.00 mm wall, so r = 0.45 on every treated point; the
 width arm at the tip); the buried end ramps from the step profile over `RIM_TAPER_MM` from the seam.
 Margin body turns 44.96° at the defaults against 90.00° before; four fold states declared in
-`MB1_XFAIL` by value. **Cost: infilled bloom 113,424 -> 118,576; `INFILL: x 40 x 3` 81.9% of budget;
+`MB1_XFAIL` by value. **Cost: infilled bloom 113,424 -> 118,480; `INFILL: x 40 x 3` 81.8% of budget;
 shipping default untouched.** 29 byte movers predeclared from the BASE record, every holder held.
 **The 1,872 triangles >60° off their face in print preview are `rimProfile`'s closed-form normal
 omitting the along-sweep term at the petal ENDS — pre-existing, plain petal, recorded, NOT fixed.**

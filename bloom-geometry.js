@@ -11004,11 +11004,30 @@ function emitInfillPanel(acc, rows, panel, tAt, rim, plan, cap = null) {
     const ap = vtx >= 0 ? OL[vtx] : { x: A.x + (B.x - A.x) * t, y: A.y + (B.y - A.y) * t };
     const lat = vtx >= 0 ? latticeAt.get(`${f6(ap.x)},${f6(ap.y)}`) : null;
     const apex = lat ? lat.C : mapPlan(ap.x, ap.y).P;
-    pr = rimProfile(acc, K, o.C, o.n, o.b, apex, o.T, o.B);
+    /* WHERE THE SKIN STOPS ON THE OUTLINE ITSELF (the ramp at zero, into the
+       seam) the profile is the STEP, and that is decided on the PLAN, never on
+       two 3D routes agreeing: `pt(q)` and the lattice / `mapPlan` reach the
+       same point by different arithmetic, so whether they came out bit-equal —
+       which is what sends `rimProfile` down its step branch — was a last-bit
+       question, and Chromium and Node answered it differently (X0 on
+       `INFILL: x 40 petals x 3 whorls`: 1,228,268 / 1,228,256 / 1,228,274
+       triangles across three engines, three petals of 120, every divergent
+       segment at g = 0). The plan points are quantised and mode-free, so this
+       is one answer everywhere. Eighth instance of a discrete decision on a
+       continuous quantity; the ninth refused.
+       AND PLAN EQUALITY IS NOT ENOUGH, MEASURED: of 1,440 profiles at g = 0 on
+       that row, 240 have a skin point a few ULP off the apex IN THE PLAN — the
+       apex is interpolated along its outline segment, the skin point is the
+       wall crossing's — so the 3D residue is ~6e-15 mm and is still the engine's
+       call. The RAMP is the owner: where `gAt` is exactly zero the treatment has
+       not started, the design puts the skin on the apex, and `!(x > plan.xB)` is
+       a comparison of plan quantities. */
+    const onOutline = gAt(ap.x) === 0 || (q.x === ap.x && q.y === ap.y);
+    pr = rimProfile(acc, K, onOutline ? apex : o.C, o.n, o.b, apex, o.T, o.B);
     edgeProfs.set(k, pr);
     marginPoints++;
     const arm = edgeArm(ap.x);
-    if (!(q.x === ap.x && q.y === ap.y) && arm.arm !== 'none') marginClampU.push({ u: ap.x / Lm, arm: arm.arm, radiusMm: arm.r });
+    if (!onOutline && arm.arm !== 'none') marginClampU.push({ u: ap.x / Lm, arm: arm.arm, radiusMm: arm.r });
     return pr;
   };
   /* WHERE EACH MARGIN SEGMENT'S STRIP SITS IN THE STREAM — the margin gate's

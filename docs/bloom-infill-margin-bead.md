@@ -131,15 +131,15 @@ what `aTip ≤ 0.5 · bandT` bounds.
 
 Projection on the base tree (margin segments × 6 strips): worst row
 `INFILL: x 40 petals x 3 whorls` **1,257,632 = 83.8%** of the 1,500,000
-budget. Built: **1,228,274 = 81.9%**. **No shipped row crosses 1.5M**, so
+budget. Built: **1,226,912 = 81.8%** (1,228,274 before the X0 fix, §11). **No shipped row crosses 1.5M**, so
 nothing had to be refused; `verify-bloom-infill-budget.mjs` (B0–B2) passes,
 live = export, its must-fail fires.
 
 | | before | after |
 |---|---|---|
-| infilled bloom at the ruled defaults | 113,424 | **118,576** (+4.5%) |
+| infilled bloom at the ruled defaults | 113,424 | **118,480** (+4.5%) |
 | shipping default (infill off) | 24,688 | 24,688 |
-| `INFILL: x 40 petals x 3 whorls` | 1,162,112 (77.5%) | 1,228,274 (81.9%) |
+| `INFILL: x 40 petals x 3 whorls` | 1,162,112 (77.5%) | 1,226,912 (81.8%) |
 
 **Slowest shard, projected, not measured:** only the 29 infilled rows of 953
 change, by 4–6% of their triangles, so the export gate's slowest shard should
@@ -225,7 +225,7 @@ before and after at 150 px/mm (row 2 of `infill-rim-bevel.png`'s scale — the
 box becomes a profile) beside the plain petal's; the same margin shaded at
 K=4 SMOOTH (the builder's own `captureNormals`, which print preview hands
 three.js); and the whole infilled bloom at its ruled defaults, print preview
-geometry, 113,424 → 118,576 triangles. Rendered by `bloom-soft-render.mjs`,
+geometry, 113,424 → 118,576 triangles at render time (118,480 after the X0 fix in §11). Rendered by `bloom-soft-render.mjs`,
 deterministic, so no pixel delta is quoted.
 
 ## 10. Not done, named
@@ -237,3 +237,40 @@ deterministic, so no pixel delta is quoted.
 - The 1,872-triangle normal defect (§7).
 - No committed mutant in the apex table names an MB clause; the family's own
   four must-fails carry it, as S3's I family did.
+
+## 11. X0 went red in CI, and the cause was a ninth discrete decision on a continuous quantity
+
+The first CI run dropped `INFILL: x 40 petals x 3 whorls` on **X0**: the STL
+Chromium wrote held **1,228,256** triangles, the Node rebuild of the page's own
+state **1,228,274**, and this container's Chromium a third answer, **1,228,268**.
+Invisible to every Node instrument by construction (the page and the rebuild share
+one call chain there).
+
+**Where:** a per-petal probe (Node against Chromium, same state) put it on three
+petals of 120, only in the margin's `skipped` count (60 / 66 / 72), and every
+divergent strip at **g = 0** — the ramp's fade into the seam, where the design puts
+the skin ON the apex and `rimProfile` should take its structural step branch. It
+takes that branch on `wx === wy === wz === 0`, and the skin point (`pt(q)`) and the
+apex (the lattice's registered point, or `mapPlan` of the interpolated outline
+point) reach the same place by different arithmetic. Of **1,440** profiles at g = 0
+on that row, **1,200** agree in the plan to the bit and **240** do not — the apex is
+interpolated along its outline segment, the skin point is the wall crossing's — so
+the 3D residue is **~6e-15 mm** and whether it rounds to zero was the engine's call.
+Plan equality alone did not fix it (measured: no change).
+
+**The fix:** `edgeProf` hands `rimProfile` the apex as the skin point wherever
+`gAt(ap.x) === 0` (a comparison of plan quantities, `!(x > plan.xB)`) or the plan
+points are equal. The ramp is the owner of "the treatment has not started".
+
+**Measured:** Node and Chromium now agree on triangle count AND a sampled
+coordinate hash on **all 33** infill-bearing rows; the browser gate reads the
+failing row PASS, X0-identical, at **1,226,912** (81.8% of budget). The infilled
+default goes 118,576 → **118,480**. Eleven INFILL census entries re-recorded
+(#213), every new pair a span-0 seam tangency of the class those entries already
+declare (`petalWidth 8`: all 384 in the root blend, same worst site); **all 14
+undeclared INFILL rows still read 0**. MB, H, I, O, B, the grid gate, the wall
+instrument and the combination gate all pass again; holders cannot move (the change
+is inside `emitInfillPanel`'s margin profile, reached only with the infill on).
+
+The same CI run also caught the hole-rim negative control claiming H0/H2 under
+`--quick`, where only H1/H3 fire; that mutant's claim is now stated per state set.
