@@ -20,13 +20,12 @@ LIVE. The shipping default (`petalInfill: NONE`) is touched by neither half.
 ## 0. The ruling this session carried, and the one it supersedes
 
 **SUPERSEDED:** "cells are always round, no control at all" (the port plan's
-§0, *"carried from earlier passes"*). **CURRENT (Eva):** roundness gets a
+§0, *"carried from earlier passes"*). **CURRENT (Eva) — AND NOW BUILT, see §G:** roundness gets a
 control, and **the state shipping today is its FLOOR** — the least round the
 cells are ever allowed to be. The range extends upward toward circular. The
 port plan's line now points here. The comment above `infillFillet` in
-`bloom-geometry.js` still cites the old phrase; it is left alone because this
-session moves no generator byte, and is owed an edit by whichever session
-builds the control.
+`bloom-geometry.js` cited the old phrase; the roundness-control session (§G)
+edited it.
 
 ## A. Why the rim reads as a bevel — it is geometry, and on an infilled petal it is not a bevel at all
 
@@ -164,7 +163,8 @@ of equal area) would lose holes; this one cannot.
   one step: the eroded core collapses to a point as `R → r_in`. There is no
   plateau past which travel does nothing (1.0 is the circle and the end of the
   range), but the last 5% of travel does as much as the previous 40%.
-* **The bar never eats a hole** anywhere in the range (above). What the top end
+* **The bar never eats a hole** anywhere in the range (on the FLAT default —
+  on a curved plan it can, and the shipped control clamps against it; §G) (above). What the top end
   costs is open area — the solid fraction rises 53.8% → 74.4% — which is
   material, weight and the lace look, not printability. The junctions only
   thicken (min 1.055 → 1.202 mm).
@@ -228,7 +228,9 @@ figure.
    move). This is what Eva is seeing. Budget: S5's projection, under the ceiling.
 2. **Roundness as a control**, floor = today, with the floor mapped to the
    existing fillet so the bottom of the travel is live (B3), and the proportional
-   fillet question (B1) settled in the same ruling.
+   fillet question (B1) settled in the same ruling. **DONE — §G: the swept law
+   unreparameterised (§F refuted the reparameterisation), and B1's
+   proportional fillet RETIRED.**
 3. **K stays 4** unless the budget is ruled on: K=6 refuses two shipped rows.
 
 ## F. Ruling 3 cannot be met by the recommended reparameterisation (the roundness-control session, measured, nothing built)

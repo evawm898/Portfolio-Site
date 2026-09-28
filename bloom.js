@@ -2534,6 +2534,8 @@ window.__bloomMetrics = () => ({
     /* S4: the four levers as the plan read them, the basal travel, where the
        holes sit along the blade, and the density's measured dead travel. */
     passes: lastInfill.passes, gamma: lastInfill.gamma, aniso: lastInfill.aniso, baseFrac: lastInfill.baseFrac,
+    /* The roundness as the plan read it, and the achieved shape its control tells. */
+    round: lastInfill.round, roundShape: lastInfill.roundShape ? { ...lastInfill.roundShape } : null,
     baseFloorU: lastInfill.baseFloorU, baseTravel: lastInfill.baseTravel,
     cellU: [...(lastInfill.cellU || [])], holeU: [...(lastInfill.holeU || [])],
     densitySweep: lastInfill.densitySweep ? lastInfill.densitySweep.map((x) => ({ ...x })) : null,

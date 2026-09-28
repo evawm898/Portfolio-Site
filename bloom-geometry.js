@@ -7947,7 +7947,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
        control that goes through the shipped function is worth more than a
        mutated copy of it, and every lever here is read by `petalInfillPlan`
        and `emitInfillPanel` exactly as the shipped call reads its defaults. */
-    infill = petalInfillPlan(surface, rows, panels[0], { density: ps.infillDensity, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
+    infill = petalInfillPlan(surface, rows, panels[0], { density: ps.infillDensity, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, round: ps.infillRound, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
     if (infill.refused) infill = { ...infill, built: false };
     /* THE DENSITY'S DEAD TRAVEL IS MEASURED, NOT DERIVED, AND THE SAMPLING IS
        NAMED (`stamenSpread`'s ruling — told on the track, range not narrowed).
@@ -7961,7 +7961,7 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
     if (isRep && !infill.refused) {
       const sweep = [];
       for (const d of INFILL_DENSITY_SWEEP) {
-        const q = d === infill.density ? infill : petalInfillPlan(surface, rows, panels[0], { density: d, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
+        const q = d === infill.density ? infill : petalInfillPlan(surface, rows, panels[0], { density: d, passes: ps.infillRelax, gamma: ps.infillLaw, aniso: ps.infillAniso, baseFrac: ps.infillBase, round: ps.infillRound, ...(cap && cap.infillOpts ? cap.infillOpts : null) });
         sweep.push({ density: d, achieved: q.refused ? 0 : q.achieved });
       }
       const best = Math.max(...sweep.map((x) => x.achieved));
@@ -8514,6 +8514,8 @@ export function buildPetalInto(acc, state, ring, slot, cap = null, representativ
       /* S4's four levers as the plan READ them, the basal travel they act over,
          and where the holes sit along the blade. */
       passes: infill.passes, gamma: infill.gamma, aniso: infill.aniso, baseFrac: infill.baseFrac,
+      /* THE ROUNDNESS as the plan read it, and the shape it achieved (the read-out). */
+      round: infill.round, roundShape: infill.roundShape || null,
       baseFloorU: infill.baseFloorU, baseTravel: infill.baseTravel,
       cellU: infill.cellU || [], holeU: infill.holeU || [],
       densitySweep: infill.densitySweep || null, densityCap: infill.densityCap ?? null, densityBest: infill.densityBest ?? null,
@@ -9480,7 +9482,53 @@ export const INFILL_BASE_DEFAULT = 0;
 export const INFILL_BASE_NARROW = 0.75;       // cells at the base are this fraction of the mid-blade spacing
 export const INFILL_BASE_REACH = 0.30;        // over this fraction of the length the base narrowing relaxes back
 export const INFILL_CONVERGE = 0.10;          // the basal V reaches this fraction of the length up the margins
-export const INFILL_FILLET_MM = 0.8;          // target fillet radius on every hole corner, IN SURFACE MM
+export const INFILL_FILLET_MM = 0.8;          // target fillet radius on every hole corner, IN SURFACE MM — ABSOLUTE, by ruling (see INFILL_ROUND_* below)
+/* THE ROUNDNESS CONTROL — `infillRound` (Eva's ruling, the roundness-control
+   session; `docs/bloom-infill-roundness-and-bevel.md` §0, §F and §G).
+   THE LAW IS THE SWEPT ONE, UNREPARAMETERISED: roundness s in [0, 1] OPENS
+   each hole the shipped plan draws (erode, then dilate: the union of every
+   disc of radius R that fits) at R = s x the hole's own inradius. s = 0 IS
+   TODAY'S HOLE BY BRANCH — the floor is the state that shipped before the
+   control existed, and no setting draws a less round hole (an opening only
+   ever removes material outside discs that fit, and it never removes the
+   largest one, so the ruled 1.50 mm WIDTH — an inscribed width — cannot fall
+   under it; only the hole's AREA falls). s = 1 is the stadium/circle the
+   opening tends to.
+   THE DEFAULT 0.60 IS A SPLIT AND THE SPLIT IS A PROPERTY OF THE *ABSOLUTE*
+   FILLET — read this before proposing a proportional one. A hole's 0.8 mm
+   fillet corners first move at s = INFILL_FILLET_MM / inradius, which on the
+   default petal runs 0.469 .. 1.036, so at 0.60 nine of the twenty holes are
+   still today's hole at every unclamped corner and eleven are rounded: the
+   small holes have not started, the big ones have. That is the shape Eva
+   ruled. A fillet PROPORTIONAL to cell scale would round every hole together
+   from the first step and destroy it; the earlier "proportional fillet,
+   short-edge clamp as a ceiling only" ruling was never implemented and is
+   RETIRED for exactly this reason (Eva, the same session). And the travel
+   below each hole's onset rounds only its clamped corners — the law being
+   honest, not dead: the per-build onset range is TOLD on the control and
+   never baked into the range (the stamen-spread and carnation-terminal
+   precedent; Eva rejected a fixed floor offset because the onset moves with
+   petal shape).
+   NOTHING DISCRETE IS DECIDED ON TRIGONOMETRY. The dilation's arcs are cut
+   by BISECTING unit normals (`normalise(a + b)`, correctly-rounded sqrt only)
+   until consecutive normals are within INFILL_ROUND_ARC_COS of each other —
+   a literal, never `Math.cos` at load — so the vertex count of a rounded hole
+   is the same integer in every engine; the fillets it starts from are
+   quantised through `infillQuant` before anything is read off them. */
+export const INFILL_ROUND_RANGE = Object.freeze([0, 1]);
+export const INFILL_ROUND_STEP = 0.05;
+export const INFILL_ROUND_DEFAULT = 0.6;      // Eva's ruling: the shape labelled ROUNDNESS 0.60 on the sweep
+export const INFILL_ROUND_CORE = 0.999;       // the eroded core is kept this far inside the inradius so it never vanishes to a point (the sweep's own)
+export const INFILL_ROUND_FINE_ARC = 20;      // the fillet an opening starts from is traced this finely (the sweep's own)
+export const INFILL_ROUND_ARC_COS = 0.9876883405951378;   // cos(pi / 20): an arc segment turns at most 9 degrees (the sweep's own step)
+export const INFILL_ROUND_DENSE_COS = 0.9998476951563913;  // cos(pi / 180): the arcs are TRACED at 1 degree before the decimation keeps every ~9 (the sweep's own trace)
+/* A VERTEX THIS CLOSE TO THE CHORD THROUGH ITS NEIGHBOURS IS DROPPED — the sagitta
+   of the finest trace's own chord (a 10-degree span, 5 each side) at the fillet's
+   radius, 3.05e-3 mm: the dips the clip leaves where the finer trace crosses
+   today's chords are shallower than the trace itself resolves, and nothing a
+   print resolves (~0.35 mm) is that small. */
+export const INFILL_ROUND_FLAT_MM = INFILL_FILLET_MM * (1 - 0.9961946980917455);   // 1 - cos(5 deg)
+export const INFILL_ROUND_STRAIGHT_MM = 0.1;  // a straight run longer than this keeps both its ends (the sweep's own)
 export const INFILL_AXIS_SHARE = 0.3;         // share of the seeds placed ON the midrib
 export const INFILL_SEED = 7;                 // the field is deterministic; a seed control is not proposed
 
@@ -9583,9 +9631,11 @@ function infillWidthMm(poly, offsetOf, hi = null, iters = 20) {
 /* Fillet every corner of a convex CCW polygon. `r` may be a function of the
    corner: a fillet radius is a LENGTH, so on a compressed surface a constant
    plan radius draws a corner that is not round on the object, which is the one
-   thing "cells always round" forbids. `tMax` is the ceiling, so it cannot eat
+   thing a rounded cell must not be (the old "cells always round, no control"
+   ruling is SUPERSEDED by the roundness control, `infillRound`, whose floor
+   is this fillet exactly — see INFILL_ROUND_* above). `tMax` is the ceiling, so it cannot eat
    the hole — the short-edge clamp Eva ruled stays a ceiling only. */
-function infillFillet(poly, r, perArc = 5) {
+function infillFillet(poly, r, perArc = 5, radii = null) {
   const P = infillCcw(infillDedupe(poly)); const n = P.length; if (n < 3) return P;
   const rOf = typeof r === 'function' ? r : () => r;
   const out = [];
@@ -9597,6 +9647,7 @@ function infillFillet(poly, r, perArc = 5) {
     const cosT = Math.max(-1, Math.min(1, ua[0] * ub[0] + ua[1] * ub[1])); const theta = Math.acos(cosT);
     if (theta > Math.PI - 1e-3) { out.push(Q); continue; }
     const tMax = 0.45 * Math.min(la, lb); let rr = rOf(Q, A, B); let t = rr / Math.tan(theta / 2); if (t > tMax) { t = tMax; rr = t * Math.tan(theta / 2); }
+    if (radii) radii.push(rr);
     const T1 = { x: Q.x + ua[0] * t, y: Q.y + ua[1] * t }, T2 = { x: Q.x + ub[0] * t, y: Q.y + ub[1] * t };
     const bis = [ua[0] + ub[0], ua[1] + ub[1]]; const bl = infillLen(bis[0], bis[1]) || 1e-9; const dC = rr / Math.sin(theta / 2);
     const C = { x: Q.x + (bis[0] / bl) * dC, y: Q.y + (bis[1] / bl) * dC };
@@ -9605,6 +9656,73 @@ function infillFillet(poly, r, perArc = 5) {
     for (let k = 0; k <= perArc; k++) { const a = a1 + da * k / perArc; out.push({ x: C.x + rr * Math.cos(a), y: C.y + rr * Math.sin(a) }); }
   }
   return infillDedupe(out);
+}
+/* THE SURFACE'S OWN LOCAL FRAME AT A PLAN POINT — the Cholesky factor of the
+   first fundamental form M = [[E, F], [F, G]] at the nearest metric-lattice
+   node, so |T (p - c)| is the SURFACE length of a short plan step. The
+   roundness opens a hole IN THIS FRAME on a curved plan: an opening done in
+   the plan would draw a plan circle, which on a compressed surface is an
+   ellipse NARROWER than the hole it came from — measured, `petalCup` 1.2 x
+   `petalSpineCurl` 360 lost two of its twelve holes at roundness 0.90 and
+   `ALL FORM MAX` one of seventeen at 1.00, every one of them under the ruled
+   bar on the object. The coefficients are snapped to 2^-30 so the frame is
+   the same doubles in every engine (the metric is built from `sect`, which is
+   trigonometry). On a flat plan there is no field and nothing here runs. */
+function infillLocalFrame(field, c) {
+  const { NU, NV: NV2, L } = field;
+  const u = Math.min(1, Math.max(0, c.x / L)); const h = field.hAt(u);
+  const v = Math.max(-1, Math.min(1, h > 1e-9 ? c.y / h : 0));
+  const i = Math.min(NU, Math.max(0, Math.round(u * NU))), j = Math.min(NV2, Math.max(0, Math.round(((v + 1) / 2) * NV2)));
+  const k = i * (NV2 + 1) + j;
+  const g = 2 ** -30, snap = (x) => Math.round(x / g) * g;
+  const a = snap(Math.sqrt(Math.max(field.E[k], 1e-12))); const b = snap(field.F[k] / a); const d = snap(Math.sqrt(Math.max(field.G[k] - b * b, 1e-12)));
+  return {
+    to: (q) => { const dx = q.x - c.x, dy = q.y - c.y; return { x: a * dx + b * dy, y: d * dy }; },
+    from: (q) => { const dy = q.y / d; return { x: c.x + (q.x - b * dy) / a, y: c.y + dy }; },
+  };
+}
+/* THE HOLE'S PLAN INRADIUS — a bisection on the inset, which is the
+   arithmetic the width bar already uses (no trig, order-independent). */
+function infillRoundness(h) { let per = 0; for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i + 1) % h.length]; per += infillLen(b.x - a.x, b.y - a.y); } return per > 0 ? (4 * Math.PI * infillPolyArea(h)) / (per * per) : 0; }
+function infillInradius(poly) { return infillWidthMm(poly, null, null, 40) / 2; }
+/* THE OPENING OF A CONVEX CCW POLYGON AT R: erode by R, then dilate by R —
+   the Minkowski sum of the eroded core with a disc, i.e. the core's edges
+   pushed out by R and joined by arcs of radius R about its vertices. The arcs
+   are cut by bisecting the two edge normals until consecutive normals agree
+   to INFILL_ROUND_ARC_COS, so every vertex is `Q + R n` with `n` built from
+   `+`, `/` and `Math.sqrt` alone — the same doubles in every engine. */
+function infillOpen(poly, R) {
+  const E = infillInset(poly, R);
+  if (!E || E.length < 3) return null;
+  const P = infillCcw(E); const n = P.length; const dense = [];
+  const normal = (A, B) => { const ex = B.x - A.x, ey = B.y - A.y, L = infillLen(ex, ey); return L > 1e-12 ? { x: ey / L, y: -ex / L } : null; };
+  const unit = (a, b) => { const x = a.x + b.x, y = a.y + b.y, L = infillLen(x, y); return { x: x / L, y: y / L }; };
+  const put = (Q, m, edge) => dense.push({ p: { x: Q.x + R * m.x, y: Q.y + R * m.y }, n: m, edge });
+  const arc = (Q, a, b, depth) => {
+    if (a.x * b.x + a.y * b.y >= INFILL_ROUND_DENSE_COS || depth >= 12) { put(Q, a, false); return; }
+    const m = unit(a, b); arc(Q, a, m, depth + 1); arc(Q, m, b, depth + 1);
+  };
+  for (let i = 0; i < n; i++) {
+    const Q = P[i], na = normal(P[(i - 1 + n) % n], Q), nb = normal(Q, P[(i + 1) % n]);
+    if (!na || !nb) continue;
+    arc(Q, na, nb, 0); put(Q, nb, true);           // the segment AFTER an arc's last point is the core's own straight edge
+  }
+  /* DECIMATED BY TURNING, the sweep's own rule: the eroded core of a finely
+     filleted hole carries many short edges, each of which would otherwise
+     hand the emitter a vertex. A point is KEPT when the boundary's normal has
+     turned past INFILL_ROUND_ARC_COS since the last kept one, or where a
+     straight run longer than INFILL_ROUND_STRAIGHT_MM begins or ends — a dot
+     product and a sqrt, never an angle. */
+  const m = dense.length; if (m < 3) return null;
+  const out = [dense[0].p]; let last = dense[0].n;
+  for (let i = 1; i < m; i++) {
+    const a = dense[i - 1].p, b = dense[i].p, c = dense[(i + 1) % m].p;
+    const la = dense[i - 1].edge ? infillLen(b.x - a.x, b.y - a.y) : 0, lb = dense[i].edge ? infillLen(c.x - b.x, c.y - b.y) : 0;
+    const nn = dense[i].n;
+    if (last.x * nn.x + last.y * nn.y < INFILL_ROUND_ARC_COS || la > INFILL_ROUND_STRAIGHT_MM || lb > INFILL_ROUND_STRAIGHT_MM) { out.push(b); last = nn; }
+  }
+  const d = infillDedupe(out);
+  return d.length >= 3 ? d : null;
 }
 
 /* ---------------- THE SURFACE METRIC (ruling 2, ported from S2) ----------------
@@ -9973,6 +10091,9 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
   const gamma = opts.gamma ?? INFILL_TIP_GAMMA;
   const aniso = opts.aniso ?? INFILL_ANISO;
   const baseFrac = opts.baseFrac ?? INFILL_BASE_DEFAULT;
+  /* THE ROUNDNESS (the fifth lever). Clamped to its range here, so a saved
+     design or a hook cannot ask for an opening wider than the inradius. */
+  const round = Math.max(INFILL_ROUND_RANGE[0], Math.min(INFILL_ROUND_RANGE[1], Number(opts.round ?? INFILL_ROUND_DEFAULT)));
   /* THE BASAL BOUNDARY (lamina-floor doc §8): a FRACTION of the travel between
      the derived floor and `ROOT_BLEND_END`, never a `u` station — the floor is
      state-dependent, so a station would reach under it on some petals. At 0
@@ -9984,7 +10105,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
   const baseTravel = Math.max(0, ROOT_BLEND_END - baseFloorU);
   const floorU = baseFrac > 0 && baseTravel > 0 ? baseFloorU + baseFrac * baseTravel : baseFloorU;
   const mSplit = infillFloorRow(rows, panel.rowFrom, panel.rowTo, floorU);
-  const base = { density, wall, bar, floorU, baseFloorU, baseTravel, baseFrac, passes, gamma, aniso, mSplit, cells: [], holes: [], cellOpen: [], achieved: 0, solid: 0, passesUsed: 0, widthsMm: [], capacityMm: [], holeU: [], cellU: [] };
+  const base = { density, wall, bar, floorU, baseFloorU, baseTravel, baseFrac, passes, gamma, aniso, round, mSplit, cells: [], holes: [], cellOpen: [], achieved: 0, solid: 0, passesUsed: 0, widthsMm: [], capacityMm: [], holeU: [], cellU: [] };
   /* A LOBED BLADE IS REFUSED, AND THE REASON IS A MEASUREMENT RATHER THAN A
      PREFERENCE. The port plan recorded lobes as "compatible by construction —
      they move `halfWidthAt`, which the outline reads". Measured, they are not:
@@ -10126,6 +10247,7 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
     });
     return moved ? infillDedupe(out) : poly;
   };
+  const roundOf = new Map();                      // hole polygon -> what the roundness did to it (read-out only)
   for (let pass = 0; ; pass++) {
     const raw = infillCellsFor(live, outline, aniso);
     const keptIdx = []; const kept = [];
@@ -10171,10 +10293,84 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
       const cp = diam(c);
       const clipped = vClip(inner); if (!clipped) return null;
       const fr = field ? (Q, A, B) => Math.max(acrossMm(A, Q, INFILL_FILLET_MM, cp), acrossMm(Q, B, INFILL_FILLET_MM, cp)) : INFILL_FILLET_MM;
-      const f = infillFillet(clipped, fr);
+      const radii = [];
+      const f = infillFillet(clipped, fr, 5, radii);
       if (!(f && f.length >= 3)) return null;
       const q = infillDedupe(infillQuant(f, tieSlack));
-      return q && q.length >= 3 ? q : null;
+      if (!(q && q.length >= 3)) return null;
+      /* THE FLOOR IS TODAY'S HOLE BY BRANCH: at roundness 0 nothing below
+         runs and the hole is the shipped fillet's, the same doubles. */
+      if (!(round > 0)) { roundOf.set(q, null); return q; }
+      const fine = infillDedupe(infillQuant(infillFillet(clipped, fr, INFILL_ROUND_FINE_ARC), tieSlack));
+      if (!(fine && fine.length >= 3)) { roundOf.set(q, null); return q; }
+      /* In the SURFACE'S local frame on a curved plan; the identity on a flat one. */
+      const T = field ? infillLocalFrame(field, infillCentroid(q)) : null;
+      const qT = T ? q.map(T.to) : q, fineT = T ? fine.map(T.to) : fine;
+      const rIn = infillInradius(qT);
+      const R = Math.min(round * rIn, INFILL_ROUND_CORE * infillInradius(fineT));
+      /* AND CLIPPED TO TODAY'S HOLE, which is what makes the floor structural.
+         The opening starts from the fillet traced finer (the sweep's own
+         construction), and a finer trace of an arc bulges OUTSIDE the shipped
+         five-chord trace by up to its sagitta — measured, it drew holes up to
+         1.7e-4 LESS round than today's (isoperimetric) at low roundness, the
+         finer tracing and not the law. Intersecting with today's polygon
+         (half-plane clips on its own quantised edges, arithmetic only) means
+         the control only ever REMOVES material from the hole that shipped:
+         where a corner is not yet rounded the result IS today's chords, where
+         it is, the opening's arc lies inside them. */
+      const qc = infillCcw(q);
+      const clipToday = (poly) => { let o = poly; for (let k = 0; k < qc.length && o.length >= 3; k++) { const A = qc[k], B = qc[(k + 1) % qc.length]; const nx = B.y - A.y, ny = -(B.x - A.x); o = infillClipHalfPlane(o, nx, ny, -(nx * A.x + ny * A.y)); } return o; };
+      /* THE CLIP LEAVES POINTS ON TODAY'S CHORDS (where the finer trace crossed
+         them), and a point on a straight run is a vertex the emitter would
+         pay for with nothing to show — so a vertex within INFILL_ROUND_FLAT_MM
+         of the chord through its two neighbours is dropped (a cross product
+         and a sqrt; a length in millimetres, far under the plan grid's own
+         quantum times the 36-degree chord, so it removes nothing curved). */
+      const prune = (poly) => {
+        let o = poly.slice(), changed = true;
+        while (changed && o.length > 3) {
+          changed = false;
+          for (let k = 0; k < o.length && o.length > 3; k++) {
+            const A = o[(k - 1 + o.length) % o.length], Q = o[k], B = o[(k + 1) % o.length];
+            const L = infillLen(B.x - A.x, B.y - A.y);
+            if (L > 0 && Math.abs((B.x - A.x) * (Q.y - A.y) - (B.y - A.y) * (Q.x - A.x)) / L <= INFILL_ROUND_FLAT_MM) { o.splice(k, 1); changed = true; k--; }
+          }
+        }
+        return o;
+      };
+      const openAt = (r) => { const oT = infillOpen(fineT, r); const o = oT && T ? oT.map(T.from) : oT; const hh = o ? prune(infillDedupe(infillQuant(clipToday(infillDedupe(infillQuant(o, tieSlack))), tieSlack))) : null; return hh && hh.length >= 3 ? hh : null; };
+      let Ru = R, h = openAt(R), held = false;
+      /* THE RULED BAR HOLDS THE OPENING BACK, AND IT IS A CLAMP THAT IS TOLD.
+         On a flat plan an opening cannot take a hole under the 1.50 mm bar —
+         the bar is an inscribed width and an opening keeps the largest
+         inscribed disc. On a CURVED plan the metric varies ACROSS the hole, so
+         a disc in the local frame is not a disc everywhere on the object and
+         the surface width can fall: measured, `petalCup` 1.2 x
+         `petalSpineCurl` 360 lost two of twelve holes from roundness 0.90 even
+         in the local frame. Where the floor hole clears the bar and the opened
+         one does not, the radius is BISECTED down to the largest that keeps
+         the bar (eight halvings of the asked radius), so the achieved count
+         never falls with roundness; the hole is counted as held, and the
+         read-out says how many were. */
+      if (h && widthOf(q, c) >= bar && widthOf(h, c) < bar) {
+        held = true; let lo = 0, hi = R, best = null;
+        for (let k = 0; k < 8; k++) { const m = (lo + hi) / 2; const t = openAt(m); if (t && widthOf(t, c) >= bar) { lo = m; best = t; } else hi = m; }
+        Ru = lo; h = best;
+      }
+      /* THE FLOOR, AS A DECISION AND NOT ONLY A CONSTRUCTION: where the
+         discretisation (the pruned trace) would hand back a hole even slightly
+         less round than today's — measured, up to 1.5e-4 of the isoperimetric
+         quotient at roundness 0.05..0.20, a corner not yet rounded and a chord
+         vertex pruned — today's hole is kept, so no setting draws a hole less
+         round than the one that shipped. The comparison is `4 pi A / P^2` on
+         quantised polygons, arithmetic and `Math.sqrt` alone. */
+      if (h && infillRoundness(h) < infillRoundness(q)) h = null;
+      if (!h) { const rr0 = Math.max(...radii); roundOf.set(q, { held, rounded: false, rIn, R: 0, rrMax: rr0, onset: rr0 / rIn }); return q; }
+      /* WHAT THIS HOLE DID, for the read-out: its fillet corners move iff the
+         opening radius passes the largest radius the fillet drew there. */
+      const rrMax = Math.max(...radii);
+      roundOf.set(h, { rIn, R: Ru, rrMax, onset: rrMax / rIn, rounded: Ru > rrMax, held });
+      return h;
     };
     const widthOf = (poly, c) => { if (!poly) return 0; const cp = diam(c); return infillWidthMm(poly, field ? (A, B, r) => acrossMm(A, B, r, cp) : null); };
     const raws = cells.map(rawOf);
@@ -10232,10 +10428,28 @@ export function petalInfillPlan(surface, rows, panel, opts = {}) {
      off the record rather than re-deriving it. */
   const cellU = cells.map((c) => infillCentroid(c).x / L);
   const holeU = cellU.filter((u, i) => open[i]);
+  /* THE ACHIEVED SHAPE, for the read-out (PLAN millimetres — on a flat plan a
+     plan millimetre is a surface one, and the record says which it is). The
+     onset range is PER BUILD: below a hole's onset the control rounds only
+     its clamped corners, and where that is depends on the petal. */
+  const openHoles = holes.filter((h, i) => h && open[i]);
+  const qs = openHoles.map(infillRoundness).sort((a, b) => a - b);
+  const holeAreaMm2 = openHoles.reduce((acc, h) => acc + infillPolyArea(h), 0);
+  const cellAreaMm2 = cells.reduce((acc, c) => acc + infillPolyArea(c), 0);
+  const rinfo = openHoles.map((h) => roundOf.get(h) || null);
+  const onsets = rinfo.filter(Boolean).map((r) => r.onset).sort((a, b) => a - b);
+  const roundShape = {
+    medianRoundness: qs.length ? qs[qs.length >> 1] : null, minRoundness: qs.length ? qs[0] : null,
+    holeAreaMm2, solidFrac: cellAreaMm2 > 0 ? 1 - holeAreaMm2 / cellAreaMm2 : null,
+    rounded: rinfo.filter((r) => r && r.rounded).length, atFillet: rinfo.filter((r) => r && !r.rounded).length,
+    heldByBar: rinfo.filter((r) => r && r.held).length,
+    onsetMin: onsets.length ? onsets[0] : null, onsetMax: onsets.length ? onsets[onsets.length - 1] : null,
+    planFlat: infillPlanIsFlat(surface),
+  };
   return {
     ...base, surface, mSplit, xB, outline, cells, holes, cellOpen: open, widthsMm: widths, capacityMm: caps,
     isOutlineEdge, vAt, hB, field, metricPlan: !!field, planFlat: infillPlanIsFlat(surface),
-    achieved, solid: cells.length - achieved, passesUsed, cellU, holeU,
+    achieved, solid: cells.length - achieved, passesUsed, cellU, holeU, roundShape,
     refused: achieved ? null : 'bar',
   };
 }

@@ -1,7 +1,7 @@
 /* ===================================================================
    verify-bloom-surface-bytes.mjs — THE SURFACE EXTRACTION MOVED NOTHING.
 
-     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--rows N] [--only <label regex>] [--control] [--movers <label regex>]
+     node tools/verify-bloom-surface-bytes.mjs --base <worktree> [--from K] [--rows N] [--only <label regex>] [--control] [--movers <label regex>]
 
    Session 37 lifted the petal's mid-surface law out of `buildPetalInto`'s row
    loop into `petalSurface()`. The claim is the strongest one available and
@@ -100,7 +100,11 @@ function stateOf(row) {
 }
 
 const ONLY = argOf('--only') ? new RegExp(argOf('--only')) : null;
-const rows = harness.buildMatrix().filter((r) => !ONLY || ONLY.test(r.label)).slice(0, LIMIT);
+/* `--from K` starts at the K-th selected row (0-based), so a full-matrix run
+   can be closed out in foreground chunks of `--from K --rows N` without a
+   label regex that might miss a row. The union of the chunks is the matrix. */
+const FROM = +(argOf('--from') || 0) || 0;
+const rows = harness.buildMatrix().filter((r) => !ONLY || ONLY.test(r.label)).slice(FROM, FROM + LIMIT);
 console.log(`${rows.length} rows x 2 modes — this tree against ${BASE}`);
 const allFails = [];
 let floats = 0, gridFloats = 0, tris = 0, rowsDone = 0, panels = 0;

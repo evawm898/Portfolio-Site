@@ -163,7 +163,7 @@ function runState(G, name, set, mode) {
   const surface = G.petalSurface(st, ring, slot, null, acc0);
   const g = petal.grid[0];
   const plan = G.petalInfillPlan(surface, g.rows, { rowFrom: g.rowFrom, rowTo: g.rowTo, label: g.label, spanAt: () => [-1, 1] },
-    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac });
+    { density: petal.infill.density, passes: petal.infill.passes, gamma: petal.infill.gamma, aniso: petal.infill.aniso, baseFrac: petal.infill.baseFrac, round: petal.infill.round });
   return { name, mode, st, petal, surface, plan, pos: a.positions, sheets: g.rows.map((r) => r.thickness) };
 }
 

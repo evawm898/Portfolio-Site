@@ -78,7 +78,7 @@ export function infillPlanFor(G, DEFAULTS, set, exportMode = true, opts = null) 
   const surface = G.petalSurface(st, ring, slot, null, acc0);
   const g = petal.grid[0];
   const panel = { rowFrom: g.rowFrom, rowTo: g.rowTo, label: g.label, spanAt: () => [-1, 1] };
-  const plan = G.petalInfillPlan(surface, g.rows, panel, { density: st.infillDensity, passes: st.infillRelax, gamma: st.infillLaw, aniso: st.infillAniso, baseFrac: st.infillBase, ...(opts || null) });
+  const plan = G.petalInfillPlan(surface, g.rows, panel, { density: st.infillDensity, passes: st.infillRelax, gamma: st.infillLaw, aniso: st.infillAniso, baseFrac: st.infillBase, round: st.infillRound, ...(opts || null) });
   return { state: st, petal, surface, plan, acc: a };
 }
 

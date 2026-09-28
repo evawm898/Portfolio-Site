@@ -108,6 +108,34 @@
    each moved by at most half a grid step, so the bound is DERIVED from
    `INFILL_PLAN_GRID`, not typed.
 
+   I12 THE ROUNDNESS (the roundness-control session; Eva's ruling: the swept
+   law unreparameterised, default 0.60, floor = today). Written RED FIRST
+   against a tree with no control. Five clauses, and the reference of each has
+   an owner the roundness code does not write:
+     (a) Q6 and the gate: the registry row is the geometry's own range, step
+         and default (0.60), and it is shown iff the guard is on.
+     (b) THE FLOOR IS TODAY BY BRANCH: at roundness 0 every hole is, to the
+         bit, the hole a patched copy of THIS tree's source draws with the
+         control stood down (tools/bloom-rim-roundness-lib.mjs — read from
+         disk, so a mutated module under test cannot move it).
+     (c) NO SETTING IS LESS ROUND THAN TODAY, on the flat states where the
+         floor is defined in surface millimetres: at every step 0..1 by 0.05
+         each open hole lies INSIDE today's hole to within two plan-grid steps
+         (the control clips to today's polygon and quantises), and its
+         roundness (4 pi A / P^2) is at least today's.
+     (d) THE ACHIEVED COUNT HOLDS AT EVERY STEP, and every open hole clears the
+         ruled bar — on the flat states AND on the two curved ones, where the
+         metric varies across a hole and the bar is what holds the opening
+         back (without that clamp `cup 1.2 x curl 360` loses two of twelve).
+     (e) THE DEFAULT IS THE RULED SHAPE: at 0.60 on the default petal the
+         count and the total hole area agree with the swept law (the same
+         patched copy, `openingLaw` at 0.60 x inradius) within the arc
+         discretisation's own band; the per-hole proof is
+         tools/bloom-roundness-law-match.mjs.
+     (f) THE READ-OUT'S RECORD: rounded + at-fillet = achieved at every step
+         above 0, the rounded count never falls as roundness rises, and below
+         the record's own smallest onset nothing is rounded past its fillet.
+
    WHAT IT DOES NOT COVER, in its own header:
      - IT IS NODE-SIDE. It does not drive the page, so it inherits nothing
        about whether a row's values are REACHABLE through the UI; both STL
@@ -582,6 +610,8 @@ async function main() {
 
   /* S4 — I8..I11, on the shipped module. */
   for (const c of s4Clauses(G, null)) say(c);
+  /* THE ROUNDNESS — I12. */
+  { const cs = await i12Clauses(G, QUICK); for (const c of cs) say(c); console.log(`I12 the roundness: ${cs.filter((c) => c.ok).length} of ${cs.length} checks green (floor by branch, containment and roundness against today, count and bar at every step, the ruled default, the record).`); }
 
   /* The two refusals, by name. */
   for (const [name, set, why] of REFUSERS) {
@@ -604,7 +634,7 @@ async function main() {
   const json = arg('--json', null);
   if (json) fs.writeFileSync(json, JSON.stringify(results, null, 1));
   console.log('');
-  console.log(fails === 0 ? `PASS — I0..I11 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
+  console.log(fails === 0 ? `PASS — I0..I12 over ${states.length} states x 2 modes.` : `FAIL — ${fails} clause failure(s)`);
   if (fails) process.exitCode = 1;
 }
 
@@ -655,6 +685,94 @@ function negativeControl(states) {
 import { pathToFileURL } from 'node:url';
 import { infillPlanFor, infillWallSurfaceMm } from './bloom-infill-wall.mjs';
 const S4_DEFAULT = {};
+import * as RL from './bloom-rim-roundness-lib.mjs';
+let FLOOR_VARIANT = null;
+async function floorVariant() { if (!FLOOR_VARIANT) { FLOOR_VARIANT = await RL.loadVariant({ K: 4, law: true }); globalThis.__holeLaw = (Pl, fr, infillFillet) => infillFillet(Pl, fr); } return FLOOR_VARIANT; }
+function roundnessQ(h) { let per = 0; for (let i = 0; i < h.length; i++) { const a = h[i], b = h[(i + 1) % h.length]; per += Math.hypot(b.x - a.x, b.y - a.y); } return per > 0 ? (4 * Math.PI * polyArea(h)) / (per * per) : 0; }
+function ccwPoly(p) { let s = 0; for (let i = 0; i < p.length; i++) { const a = p[i], b = p[(i + 1) % p.length]; s += a.x * b.y - b.x * a.y; } return s < 0 ? p.slice().reverse() : p; }
+function outsideBy(q, poly) { let worst = 0; for (let i = 0; i < poly.length; i++) { const a = poly[i], b = poly[(i + 1) % poly.length]; const L = Math.hypot(b.x - a.x, b.y - a.y); if (L < 1e-12) continue; const cr = ((b.x - a.x) * (q.y - a.y) - (b.y - a.y) * (q.x - a.x)) / L; if (-cr > worst) worst = -cr; } return worst; }
+const I12_FLAT = [['default', {}], ['petalWidth 8', { petalWidth: 8 }], ['petalWidth 30', { petalWidth: 30 }], ['density 40', { infillDensity: 40 }]];
+const I12_CURVED = [['cup 1.2 x curl 360', { petalCup: 1.2, petalSpineCurl: 360 }], ['ALL FORM MAX', { petalCup: 1.2, petalCupGradient: 1, petalRoll: 330, petalTwist: 180, petalSpineCurl: 360 }]];
+export async function i12Clauses(M, quick = false) {
+  const out = []; const add = (id, ok, msg) => out.push({ id, ok, msg });
+  const r = CONTROLS.find((c) => c.id === 'infillRound');
+  /* (a) */
+  add('I12', !!r && r.min === M.INFILL_ROUND_RANGE[0] && r.max === M.INFILL_ROUND_RANGE[1] && r.step === M.INFILL_ROUND_STEP && Object.is(r.default, M.INFILL_ROUND_DEFAULT) && r.default === 0.6,
+    `the registry's infillRound (${r ? `${r.min}..${r.max} step ${r.step}, default ${r.default}` : 'absent'}) is not the geometry's export (${M.INFILL_ROUND_RANGE} step ${M.INFILL_ROUND_STEP}, default ${M.INFILL_ROUND_DEFAULT}) at Eva's ruled 0.60`);
+  if (r) add('I12', predicateDrivers(r.visibleWhen).has('petalInfill') && !evalPredicate(r.visibleWhen, { ...DEFAULTS, petalInfill: 'NONE' }) && evalPredicate(r.visibleWhen, { ...DEFAULTS, petalInfill: 'VORONOI' }), 'infillRound is not shown iff the guard is on');
+  const V = await floorVariant();
+  const planM = (set, round) => s4Plan(M, { ...set, infillRound: round }, { round }).plan;
+  const openH = (P) => P.holes.map((h, i) => (h && P.cellOpen[i] ? h : null));
+  /* CONTAINMENT IS EXACT UP TO QUANTISATION: the control clips every opened
+     hole to today's polygon, and the result is quantised onto the plan grid —
+     so no vertex may stand more than one grid step outside it. (Without the
+     clip the finer trace bulges out by up to the five-chord trace's own
+     sagitta, 3.9e-2 mm, which is what the clip's mutant measures.) */
+  const band = 2 * M.INFILL_PLAN_GRID;
+  const steps = quick ? [0, 0.05, 0.2, 0.3, 0.6, 1] : Array.from({ length: 21 }, (_, k) => k / 20);
+  for (const [name, set] of [...I12_FLAT, ...I12_CURVED]) {
+    const flat = I12_FLAT.some(([n]) => n === name);
+    const P0 = planM(set, 0);
+    /* (b) the floor by branch, against the patched copy with the control stood down. */
+    if (flat || name === 'cup 1.2 x curl 360') {
+      const ref = RL.planFor(V, DEFAULTS, set).plan;
+      const H0 = openH(P0), HR = openH(ref);
+      const same = H0.length === HR.length && H0.every((h, i) => (!h && !HR[i]) || (h && HR[i] && h.length === HR[i].length && h.every((q, k) => Object.is(q.x, HR[i][k].x) && Object.is(q.y, HR[i][k].y))));
+      add('I12', same, `${name}: at roundness 0 the holes are NOT today's to the bit (the patched copy with the control stood down) — the floor is not the shipped state`);
+    }
+    let lastRounded = -1;
+    for (const st of steps) {
+      const P = st === 0 ? P0 : planM(set, st);
+      /* (d) */
+      add('I12', P.achieved === P0.achieved, `${name}: roundness ${st.toFixed(2)} achieves ${P.achieved} holes against ${P0.achieved} at the floor — the count must hold at every step`);
+      const under = P.widthsMm.filter((w, i) => P.cellOpen[i] && w < M.INFILL_HOLE_MM).length;
+      add('I12', under === 0, `${name}: roundness ${st.toFixed(2)} leaves ${under} open hole(s) under the ${M.INFILL_HOLE_MM} mm bar`);
+      /* (c) */
+      if (flat && st > 0) {
+        let worstOut = 0, lessRound = 0;
+        const H = openH(P), H0 = openH(P0);
+        for (let i = 0; i < H.length; i++) { if (!H[i] || !H0[i]) continue; const F = ccwPoly(H0[i]); for (const q of H[i]) worstOut = Math.max(worstOut, outsideBy(q, F)); if (roundnessQ(H[i]) < roundnessQ(H0[i]) - 1e-9) lessRound++; }
+        add('I12', worstOut <= band, `${name}: at roundness ${st.toFixed(2)} a hole reaches ${worstOut.toExponential(3)} mm OUTSIDE today's hole (band ${band.toExponential(3)}) — the opening grew a hole past the floor`);
+        add('I12', lessRound === 0, `${name}: at roundness ${st.toFixed(2)}, ${lessRound} hole(s) are LESS round than today's — the floor is not enforced`);
+      }
+      /* (f) */
+      const R = P.roundShape;
+      if (st > 0 && R) {
+        add('I12', R.rounded + R.atFillet === P.achieved, `${name}: roundness ${st.toFixed(2)}: the record says ${R.rounded} rounded + ${R.atFillet} at the fillet against ${P.achieved} achieved`);
+        add('I12', R.rounded >= lastRounded, `${name}: the rounded count FELL to ${R.rounded} at roundness ${st.toFixed(2)} from ${lastRounded}`);
+        if (R.onsetMin !== null && st < R.onsetMin) add('I12', R.rounded === 0, `${name}: at roundness ${st.toFixed(2)}, below the smallest onset ${R.onsetMin.toFixed(3)}, the record calls ${R.rounded} hole(s) rounded past their fillet`);
+        lastRounded = R.rounded;
+      }
+    }
+  }
+  /* (e) the default is the ruled shape. */
+  {
+    globalThis.__holeLaw = (Pl, fr, infillFillet, infillInset) => RL.openingLaw(infillFillet(Pl, fr, 20), 0.6 * RL.inradiusOf(infillFillet(Pl, fr), infillInset), infillInset);
+    const ref = RL.planFor(V, DEFAULTS, {}).plan;
+    delete globalThis.__holeLaw; globalThis.__holeLaw = (Pl, fr, infillFillet) => infillFillet(Pl, fr);
+    const got = planM({}, 0.6);
+    /* HOLE BY HOLE, AS A DISTANCE: the per-hole Hausdorff between the shipped
+       hole and the swept one against the two discretisations' own band (the
+       derivation is in tools/bloom-roundness-law-match.mjs): 10-degree chords
+       on both sides at that hole's radius, the five-chord trace kept at
+       unrounded corners, and the pruned flat. A TOTAL-area comparison was the
+       first cut and the mutant table said it could not see a control that
+       hands every hole back to today (8 mm2 of 171 inside a band summed over
+       twenty perimeters). */
+    const A0 = openH(ref), B0 = openH(got);
+    const hd = (a, b) => { let m = 0; for (const q of a) m = Math.max(m, RL.polyDist(q.x, q.y, b)); for (const q of b) m = Math.max(m, RL.polyDist(q.x, q.y, a)); return m; };
+    let over = 0, worst = 0, pairs = 0;
+    for (let i = 0; i < Math.max(A0.length, B0.length); i++) {
+      if (!A0[i] || !B0[i]) { if (!!A0[i] !== !!B0[i]) over++; continue; }
+      pairs++;
+      const rIn = RL.inradiusOf(A0[i], (pp, d) => { const qq = ccwPoly(pp); let o = qq.slice(); for (let k = 0; k < qq.length && o.length >= 3; k++) { const a = qq[k], b = qq[(k + 1) % qq.length]; const ex = b.x - a.x, ey = b.y - a.y, L = Math.hypot(ex, ey); if (L < 1e-12) continue; const nx = ey / L, ny = -ex / L, c0 = -(nx * a.x + ny * a.y) + d; const nx2 = []; for (let j = 0; j < o.length; j++) { const p1 = o[j], p2 = o[(j + 1) % o.length]; const d1 = nx * p1.x + ny * p1.y + c0, d2 = nx * p2.x + ny * p2.y + c0; if (d1 <= 0) nx2.push(p1); if ((d1 < 0 && d2 > 0) || (d1 > 0 && d2 < 0)) { const t = d1 / (d1 - d2); nx2.push({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t }); } } o = nx2; } return o.length >= 3 ? o : null; });
+      const band = 2 * rIn * (1 - Math.cos((5 * Math.PI) / 180)) + M.INFILL_FILLET_MM * (1 - Math.cos(Math.PI / 10)) + M.INFILL_ROUND_FLAT_MM + 2 * M.INFILL_PLAN_GRID;
+      const d = hd(A0[i], B0[i]); worst = Math.max(worst, d); if (d > band) over++;
+    }
+    add('I12', got.achieved === ref.achieved && over === 0, `the default at 0.60 draws ${got.achieved} holes against the swept law's ${ref.achieved}, and ${over} of ${pairs} holes stand outside their own discretisation band (worst ${worst.toFixed(4)} mm) — it is not the shape Eva ruled`);
+  }
+  return out;
+}
 function s4Plan(M, set, opts = null) { return infillPlanFor(M, DEFAULTS, set, true, opts); }
 function cellsKey(plan) { return JSON.stringify((plan.cells || []).map((c) => c.map((q) => [q.x, q.y]))); }
 function principalRatio(poly) {
@@ -776,6 +894,22 @@ export function s4Clauses(M, only) {
    consulted and deliberately not the assertion it names. The anchor must
    match EXACTLY ONCE (a refactor disarms a mutant by moving it or by making it
    match twice). */
+/* THE ROUNDNESS MUTATIONS (I12), the same shape: a copy of the module, an
+   anchor that must match once, a witness on the MUTATED module's own record. */
+const I12_MUTANTS = [
+  { id: 'the-roundness-is-not-read', from: 'const round = Math.max(INFILL_ROUND_RANGE[0], Math.min(INFILL_ROUND_RANGE[1], Number(opts.round ?? INFILL_ROUND_DEFAULT)));', to: 'const round = INFILL_ROUND_DEFAULT;', breaks: ['I12'],
+    witness: (M) => s4Plan(M, { infillRound: 0 }).plan.round !== 0 },
+  { id: 'the-opening-only-erodes', from: 'const oT = infillOpen(fineT, r);', to: 'const oT = infillInset(fineT, r);', breaks: ['I12'],
+    witness: (M) => s4Plan(M, { infillRound: 0.6 }).plan.roundShape.rounded === 0 },
+  { id: 'the-hole-is-not-clipped-to-today', from: 'o = infillClipHalfPlane(o, nx, ny, -(nx * A.x + ny * A.y)); } return o; };', to: 'o = o; } return o; };', breaks: ['I12'],
+    witness: (M) => { const P0 = s4Plan(M, { infillRound: 0 }).plan, P = s4Plan(M, { infillRound: 0.3 }).plan; let w = 0; for (let i = 0; i < P.holes.length; i++) if (P.cellOpen[i] && P0.cellOpen[i]) { const F = ccwPoly(P0.holes[i]); for (const q of P.holes[i]) w = Math.max(w, outsideBy(q, F)); } return w > 1e-4; } },
+  { id: 'the-roundness-floor-is-not-decided', from: '      if (h && infillRoundness(h) < infillRoundness(q)) h = null;\n', to: '', breaks: ['I12'],
+    witness: (M) => { const P0 = s4Plan(M, { infillRound: 0 }).plan; return [0.05, 0.2].some((st) => { const P = s4Plan(M, { infillRound: st }).plan; return P.holes.some((h, i) => h && P.cellOpen[i] && roundnessQ(h) < roundnessQ(P0.holes[i]) - 1e-9); }); } },
+  { id: 'the-bar-does-not-hold-the-opening-back', from: 'if (h && widthOf(q, c) >= bar && widthOf(h, c) < bar) {', to: 'if (false) {', breaks: ['I12'],
+    witness: (M) => { const set = { petalCup: 1.2, petalSpineCurl: 360 }; return s4Plan(M, { ...set, infillRound: 1 }).plan.achieved < s4Plan(M, { ...set, infillRound: 0 }).plan.achieved; } },
+  { id: 'the-record-calls-every-hole-rounded', from: 'rounded: Ru > rrMax, held });', to: 'rounded: true, held });', breaks: ['I12'],
+    witness: (M) => { const P = s4Plan(M, { infillRound: 0.6 }).plan; return P.roundShape.rounded === P.achieved; } },
+];
 const S4_MUTANTS = [
   { id: 'the-relaxation-count-is-not-read', from: 'const passes = opts.passes ?? INFILL_LLOYD_PASSES;', to: 'const passes = INFILL_LLOYD_PASSES;', breaks: ['I8'],
     witness: (M) => s4Plan(M, { infillRelax: 12 }).plan.passes !== 12 },
@@ -815,7 +949,24 @@ async function s4NegativeControl() {
     console.log(`${m.id.padEnd(40)} witness ${witness ? 'MOVED' : 'DID NOT MOVE'} · fired ${[...fired].sort().join(',') || '(nothing)'} — ${missed.length ? 'MISSED ' + missed.join(',') : 'every clause it names went red'}`);
   }
   console.log(fails ? `S4 NEGATIVE CONTROL: FAIL — ${fails} mutant(s) did not behave` : 'S4 NEGATIVE CONTROL: every mutant witnessed and every named clause red.');
-  return fails;
+  /* I12 — the roundness mutants, every anchor checked before any runs. */
+  console.log('');
+  console.log(`--- I12 NEGATIVE CONTROL: ${I12_MUTANTS.length} mutations of a COPY of bloom-geometry.js, each with a witness on the mutated module ---`);
+  let f12 = 0;
+  for (const m of I12_MUTANTS) { const n = src.split(m.from).length - 1; if (n !== 1) { console.log(`${m.id.padEnd(40)} REFUSED — the anchor matches ${n} times, not once; the mutant is DISARMED`); f12++; } }
+  if (!f12) for (const m of I12_MUTANTS) {
+    const file = path.join(dir, `${m.id}.js`);
+    fs.writeFileSync(file, src.replace(m.from, m.to));
+    const M = await import(pathToFileURL(file).href);
+    let witness = false; try { witness = !!m.witness(M); } catch (e) { witness = false; }
+    const fired = new Set();
+    try { for (const c of await i12Clauses(M, true)) if (!c.ok) fired.add(c.id); } catch (e) { fired.add('threw'); }
+    const missed = m.breaks.filter((b) => !fired.has(b));
+    if (!witness || missed.length) f12++;
+    console.log(`${m.id.padEnd(40)} witness ${witness ? 'MOVED' : 'DID NOT MOVE'} · fired ${[...fired].sort().join(',') || '(nothing)'} — ${missed.length ? 'MISSED ' + missed.join(',') : 'every clause it names went red'}`);
+  }
+  console.log(f12 ? `I12 NEGATIVE CONTROL: FAIL — ${f12} mutant(s) did not behave` : 'I12 NEGATIVE CONTROL: every mutant witnessed and every named clause red.');
+  return fails + f12;
 }
 
 /* ---------------- --cap-sweep ---------------- */
