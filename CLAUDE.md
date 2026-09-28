@@ -4915,6 +4915,20 @@ RIM OWNS, from builder ranges pinned at 2K triangles a point, because "every edg
 `bloom-export-watertight.yml`. `frozen/phase42` is the 951 rows at `03a1042`; block 39 gains `INFILL:
 x sheetThickness 0.60` (952). The picture is `docs/img/infill-hole-rim.png`.
 
+**THE INFILLED PETAL'S "BEVEL" IS A FLAT WALL, AND ROUNDNESS GETS A CONTROL WHOSE FLOOR IS TODAY**
+(the roundness session — read `docs/bloom-infill-roundness-and-bevel.md`; nothing in the generator
+moved). "Cells always round, no control" is SUPERSEDED. Measured: on an infilled default petal
+**91 of 95 margin stations are a 1.200 mm flat wall meeting both skins at 90.00°** (S5 §5's declared
+regression) — that is the hard edge, not K and not shading. **Smoothing is ON in both views** (live:
+crease normals at 60°; print preview: the builder's closed-form bead normals, whatever bloom.js's
+comment says). **K>4 refuses two shipped rows** (K=6: `INFILL: x 40 x 3` 101.1%, `INFLO: ALL MAX`
+110.4%) — a budget ruling. **The fillet shipped ABSOLUTE (0.8 mm, clamp binding on 33.5% of corners),
+never proportional.** An OPENING by `s x inradius` keeps **20/20 holes at every step** (the bar is an
+inscribed width, which an opening never removes) while hole area falls 179 -> 99 mm²; its bottom half
+is dead travel. Tools: `shot-bloom-rim-bevel.mjs`, `shot-bloom-infill-roundness.mjs`,
+`bloom-rim-roundness-lib.mjs` (a patched copy of the geometry OUTSIDE the repo, anchors refuse on a
+miss).
+
 **A BLOOM CAN BE A RACEME: THE HEAD IS BUILT ONCE AT THE ORIGIN AND APPENDED UNDER N
 RIGID TRANSFORMS, AND THE PEDICEL IS THE FLORET'S OWN STEM** (Eva's twelve rulings are in
 `docs/bloom-inflorescence-discovery.md` and they govern — read them, then

@@ -26,7 +26,7 @@ Carried in from the brief and from the two rulings that closed this pass. Treat 
 | **6** | **THE BEAD ON A 1.0 mm WALL** is handled by #278's existing narrow-span clamp (shrink to fit, log the location). Not a new decision. |
 | **7** | **THE GUARD IS A CHOICE, NOT A SLIDER** — the `inflorescence` NONE shape, **not** the `lobeDepth` 0 shape. The blanket sweep must not reach it, so **`ALL MAX` stays uninfilled**. |
 
-Carried from earlier passes and unchanged: default **16 cells**; cells always round, the fillet a
+Carried from earlier passes and unchanged: default **16 cells**; ~~cells always round~~ (**SUPERSEDED — roundness gets a control whose floor is the state shipping today; see `docs/bloom-infill-roundness-and-bevel.md` §0**), the fillet a
 proportion of cell scale with the short-edge clamp as a ceiling only; **every cell must retain a
 hole >= 1.5 mm across after wall inset**; hole rims take the edge profile, **gated on #278**; the
 controls the port carries are **density, cell relaxation, cell density law, anisotropy**.
